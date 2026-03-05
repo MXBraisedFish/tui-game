@@ -16,7 +16,7 @@ use crate::utils::path_utils;
 const GITHUB_API_LATEST: &str = "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
 const FALLBACK_RELEASE_URL: &str = "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
 pub const GITHUB_TOKEN: &str = "";
-pub const CURRENT_VERSION_TAG: &str = "0.10.1";
+pub const CURRENT_VERSION_TAG: &str = "0.10.2";
 
 #[derive(Clone, Debug)]
 pub struct UpdateNotification {
