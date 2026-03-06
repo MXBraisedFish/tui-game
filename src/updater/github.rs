@@ -14,8 +14,10 @@ use serde::Deserialize;
 use crate::utils::path_utils;
 
 // github的release的地址API
-const GITHUB_API_LATEST: &str = "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
-const FALLBACK_RELEASE_URL: &str = "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
+const GITHUB_API_LATEST: &str =
+    "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
+const FALLBACK_RELEASE_URL: &str =
+    "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
 // 这里是开发者测试防止限制API
 pub const GITHUB_TOKEN: &str = "";
 // 硬编码版本,避免文件被篡改导致错误(记的更新啊!)
@@ -75,7 +77,7 @@ impl Updater {
         Self { receiver: rx }
     }
 
-    /// Non-blocking poll for updater events.
+    // 防止阻塞
     pub fn try_recv(&self) -> Option<UpdaterEvent> {
         self.receiver.try_recv().ok()
     }
@@ -157,11 +159,7 @@ fn parse_version_segments(version: &str) -> Option<Vec<u64>> {
         out.push(num);
     }
 
-    if out.is_empty() {
-        None
-    } else {
-        Some(out)
-    }
+    if out.is_empty() { None } else { Some(out) }
 }
 
 // 远程版本和当前版本的逐级比较
@@ -187,7 +185,9 @@ fn is_version_newer(remote: &str, current: &str) -> bool {
     matches!(compare_versions(remote, current), Some(Ordering::Greater))
 }
 
-/// 运行更新脚本
+// 运行更新脚本
+// windows版本
+#[cfg(target_os = "windows")]
 pub fn run_external_update_script(notification: &UpdateNotification) -> Result<bool> {
     let runtime = path_utils::runtime_dir()?;
     let bat = runtime.join("version.bat");
@@ -197,21 +197,25 @@ pub fn run_external_update_script(notification: &UpdateNotification) -> Result<b
         return Ok(false);
     };
 
-    let ext = script
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
+    let _child = Command::new("cmd")
+        .arg("/C")
+        .arg(script.as_os_str())
+        .arg(notification.latest_version.as_str())
+        .arg(notification.release_url.as_str())
+        .spawn()?;
+    Ok(true)
+}
 
-    if ext == "bat" {
-        let _child = Command::new("cmd")
-            .arg("/C")
-            .arg(script.as_os_str())
-            .arg(notification.latest_version.as_str())
-            .arg(notification.release_url.as_str())
-            .spawn()?;
-        return Ok(true);
-    }
+// unix版本
+#[cfg(not(target_os = "windows"))]
+pub fn run_external_update_script(notification: &UpdateNotification) -> Result<bool> {
+    let runtime = path_utils::runtime_dir()?;
+    let bat = runtime.join("version.bat");
+    let sh = runtime.join("version.sh");
+
+    let Some(script) = select_version_script(&bat, &sh) else {
+        return Ok(false);
+    };
 
     let _child = Command::new("sh")
         .arg(script.as_os_str())

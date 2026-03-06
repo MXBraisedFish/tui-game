@@ -20,17 +20,19 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::{i18n, stats};
 use crate::utils::path_utils;
 
-const EXIT_GAME_SENTINEL: &str = "__TUI_GAME_EXIT__";
-static OUT: Lazy<Mutex<Stdout>> = Lazy::new(|| Mutex::new(stdout()));
-static TERMINAL_DIRTY_FROM_LUA: AtomicBool = AtomicBool::new(false);
-static RNG_STATE: AtomicU64 = AtomicU64::new(0);
+const EXIT_GAME_SENTINEL: &str = "__TUI_GAME_EXIT__"; // 游戏退出标记
+static OUT: Lazy<Mutex<Stdout>> = Lazy::new(|| Mutex::new(stdout())); // 终端输出的全局锁
+static TERMINAL_DIRTY_FROM_LUA: AtomicBool = AtomicBool::new(false); // Lua 是否修改了终端
+static RNG_STATE: AtomicU64 = AtomicU64::new(0); // 随机数生成器状态
 
+// 启动游戏模式的枚举
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LaunchMode {
     New,
     Continue,
 }
 
+// 
 impl LaunchMode {
     fn as_str(self) -> &'static str {
         match self {
@@ -40,7 +42,7 @@ impl LaunchMode {
     }
 }
 
-/// Registers Lua APIs for game scripts.
+// 将API注册，让Lua可调用
 pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
     let get_key = lua.create_function(|_, blocking: bool| {
         flush_output()?;
@@ -197,7 +199,7 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
     Ok(())
 }
 
-/// Runs a Lua game script and returns when the script exits.
+// 启动游戏脚本，并处理程序控制权
 pub fn run_game_script(script_path: &Path, mode: LaunchMode) -> Result<()> {
     drain_input_events();
     let source = fs::read_to_string(script_path)?;
@@ -218,12 +220,12 @@ pub fn run_game_script(script_path: &Path, mode: LaunchMode) -> Result<()> {
     result
 }
 
-/// Returns whether Lua wrote directly to terminal since last check.
+// 检查这段时间Lua是否对终端有输入行为
 pub fn take_terminal_dirty_from_lua() -> bool {
     TERMINAL_DIRTY_FROM_LUA.swap(false, Ordering::AcqRel)
 }
 
-/// Returns latest saved game id from shared Lua save store.
+// 从存储中读取最近保存的存档ID
 pub fn latest_saved_game_id() -> Option<String> {
     let store = load_json_store().ok()?;
     if let Some(JsonValue::String(id)) = store.get("__latest_save_game") {
@@ -242,9 +244,8 @@ pub fn latest_saved_game_id() -> Option<String> {
     None
 }
 
-/// Clears active game save slot metadata and all game slot payloads.
-///
-/// This does not remove per-game best records or other auxiliary data.
+// 清理当前游戏的元数据和存档槽位
+// 不是清理全部游戏数据
 pub fn clear_active_game_save() -> Result<()> {
     let mut store =
         load_json_store().map_err(|e| anyhow!("failed to load lua save store for clearing: {e}"))?;
@@ -252,42 +253,51 @@ pub fn clear_active_game_save() -> Result<()> {
     write_json_store(&store).map_err(|e| anyhow!("failed to write lua save store after clear: {e}"))
 }
 
-
+// 富文本块结构体
 #[derive(Clone, Debug)]
 struct StyledChunk {
     text: String,
-    fg: Option<String>,
-    bg: Option<String>,
+    fg: Option<String>, // 前景色名称
+    bg: Option<String>, // 背景色名称
 }
 
+// 富文本样式结构体状态机
 #[derive(Clone, Debug)]
 struct RichStyleState {
-    default_fg: Option<String>,
-    default_bg: Option<String>,
-    fg: Option<String>,
-    bg: Option<String>,
-    fg_count: Option<usize>,
-    bg_count: Option<usize>,
-    fg_need_clear: bool,
-    bg_need_clear: bool,
+    default_fg: Option<String>, // 默认前景色（从draw_text参数传入）
+    default_bg: Option<String>, // 默认背景色（从draw_text参数传入）
+    fg: Option<String>, // 当前前景色
+    bg: Option<String>, // 当前背景色
+    fg_count: Option<usize>, // 前景色剩余生效字符数
+    bg_count: Option<usize>, // 背景色剩余生效字符数
+    fg_need_clear: bool, // 是否需要自动清除前景色（当count为None时）
+    bg_need_clear: bool, // 是否需要自动清除背景色（当count为None时）
 }
 
+// 富文本命令返回结果结构体
 #[derive(Clone, Debug)]
 struct TextCommandResult {
-    clear: bool,
-    color: Option<String>,
-    count: Option<usize>,
+    clear: bool, // true=清除当前颜色，false=设置新颜色
+    color: Option<String>, // 要设置的颜色名称
+    count: Option<usize>, // 颜色生效的字符数（None表示无限）
 }
 
+// 加载并注册所有文本命令函数
 fn load_text_functions(lua: &Lua, script_path: &Path) -> mlua::Result<()> {
+    // 获取Lua的全局环境
     let globals = lua.globals();
+    // 检查是否存在TEXT_COMMANDS表
     if globals.get::<Table>("TEXT_COMMANDS").is_err() {
+        // 不存在就创建空表
         globals.set("TEXT_COMMANDS", lua.create_table()?)?;
     }
 
+    // 给Lua注册函数，用于添加自定文本命令
     let register = lua.create_function(|lua, (name, func): (String, Function)| {
         let globals = lua.globals();
-        let table = match globals.get::<Table>("TEXT_COMMANDS") {
+        // 获取 TEXT_COMMANDS 表
+        let table = match globals.get::<Table>
+        ("TEXT_COMMANDS") {
             Ok(t) => t,
             Err(_) => {
                 let t = lua.create_table()?;
@@ -295,11 +305,13 @@ fn load_text_functions(lua: &Lua, script_path: &Path) -> mlua::Result<()> {
                 t
             }
         };
+        // 将函数存入表中
         table.set(name.trim().to_ascii_lowercase(), func)?;
         Ok(true)
     })?;
     globals.set("register_text_command", register)?;
 
+    // 构建搜索路径
     let mut dirs = Vec::<PathBuf>::new();
     if let Some(parent) = script_path.parent() {
         dirs.push(parent.join("text_function"));
@@ -313,6 +325,7 @@ fn load_text_functions(lua: &Lua, script_path: &Path) -> mlua::Result<()> {
         dirs.push(scripts_dir.join("text_function"));
     }
 
+    // 移除重复的目录路径
     let mut unique_dirs = Vec::<PathBuf>::new();
     for dir in dirs {
         if !unique_dirs.iter().any(|d| d == &dir) {
@@ -320,12 +333,16 @@ fn load_text_functions(lua: &Lua, script_path: &Path) -> mlua::Result<()> {
         }
     }
 
+    // 加载所有Lua文件
     let mut loaded_any = false;
+    // 遍历
     for dir in unique_dirs {
+        // 不存在就跳过
         if !dir.exists() || !dir.is_dir() {
             continue;
         }
 
+        // 过滤lua文件并排序
         let mut entries: Vec<PathBuf> = fs::read_dir(&dir)
             .map_err(mlua::Error::external)?
             .filter_map(|entry| entry.ok().map(|e| e.path()))
@@ -338,6 +355,7 @@ fn load_text_functions(lua: &Lua, script_path: &Path) -> mlua::Result<()> {
             .collect();
         entries.sort();
 
+        // 逐个加载文件并执行代码
         for file in entries {
             let source = fs::read_to_string(&file).map_err(mlua::Error::external)?;
             let source = source.trim_start_matches('\u{feff}');

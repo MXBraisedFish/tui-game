@@ -7,7 +7,7 @@ use crossterm::style::Print;
 use crossterm::terminal::{Clear, ClearType};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-/// Clears the whole terminal viewport.
+// 清理整个终端并把光标放到0，0的位置
 pub fn clear() -> Result<()> {
     let mut out = stdout();
     queue!(out, Clear(ClearType::All), MoveTo(0, 0))?;
@@ -15,7 +15,8 @@ pub fn clear() -> Result<()> {
     Ok(())
 }
 
-/// Draws text at absolute terminal coordinates.
+// 在终端指定位置绘制内容
+// 绝对坐标
 pub fn draw_text(x: u16, y: u16, text: &str) -> Result<()> {
     let mut out = stdout();
     queue!(out, MoveTo(x, y), Print(text))?;
@@ -23,7 +24,9 @@ pub fn draw_text(x: u16, y: u16, text: &str) -> Result<()> {
     Ok(())
 }
 
-/// Wraps text by display width using Unicode width rules.
+// 根据文本宽度自动换行
+// 会保留单词完整性避免跨单词换行
+// 用到了unicode_width库
 pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![String::new()];

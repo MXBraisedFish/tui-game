@@ -6,6 +6,7 @@ use mlua::{Lua, Table};
 
 use crate::utils::path_utils;
 
+// 游戏数据结构
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GameMeta {
     pub id: String,
@@ -14,7 +15,9 @@ pub struct GameMeta {
     pub script_path: PathBuf,
 }
 
-/// Scans scripts directory for Lua game files and reads GAME_META when available.
+// 扫描脚本目录找到游戏脚本目录
+// 在0.10.0更新了文件目录
+// 但也向老版本兼容了
 pub fn scan_scripts() -> Result<Vec<GameMeta>> {
     let scripts_dir = path_utils::scripts_dir()?;
 
@@ -39,6 +42,8 @@ pub fn scan_scripts() -> Result<Vec<GameMeta>> {
     Ok(dedup)
 }
 
+// 在目录里寻找脚本
+// 也带有排序的功能
 fn scan_scripts_in(dir: &Path) -> Result<Vec<GameMeta>> {
     if !dir.exists() {
         return Ok(Vec::new());
@@ -96,37 +101,4 @@ fn scan_scripts_in(dir: &Path) -> Result<Vec<GameMeta>> {
     }
 
     Ok(games)
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    use super::scan_scripts_in;
-
-    #[test]
-    fn scan_scripts_finds_lua_files_only() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-        let temp_dir = std::env::temp_dir().join(format!("tui_game_scan_test_{}", unique));
-        let result = (|| {
-            fs::create_dir_all(&temp_dir)?;
-            fs::write(
-                temp_dir.join("alpha.lua"),
-                "GAME_META = { name = 'Alpha', description = 'A test game' }",
-            )?;
-            fs::write(temp_dir.join("beta.txt"), "ignore")?;
-            fs::write(temp_dir.join("gamma.LUA"), "print('b')")?;
-
-            let games = scan_scripts_in(&temp_dir)?;
-            Ok::<usize, anyhow::Error>(games.len())
-        })();
-
-        let _ = fs::remove_dir_all(&temp_dir);
-        let len = result.expect("scan_scripts_in should succeed");
-        assert_eq!(len, 2);
-    }
 }

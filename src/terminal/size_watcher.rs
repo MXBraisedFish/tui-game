@@ -9,6 +9,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::i18n::t;
 
+// 终端尺寸结构体
 #[derive(Clone, Copy, Debug)]
 pub struct SizeState {
     pub width: u16,
@@ -16,7 +17,7 @@ pub struct SizeState {
     pub size_ok: bool,
 }
 
-/// Queries terminal size and validates minimal dimensions.
+// 检查终端尺寸大小
 pub fn check_size(min_width: u16, min_height: u16) -> Result<SizeState> {
     let (width, height) = terminal::size()?;
     Ok(SizeState {
@@ -26,7 +27,7 @@ pub fn check_size(min_width: u16, min_height: u16) -> Result<SizeState> {
     })
 }
 
-/// Draws a full-screen warning when terminal size is below minimum.
+// 绘制终端警告
 pub fn draw_size_warning(state: &SizeState, min_width: u16, min_height: u16) -> Result<()> {
     let mut out = stdout();
     let lines = [
