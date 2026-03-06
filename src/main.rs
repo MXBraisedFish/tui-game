@@ -34,24 +34,37 @@ use crate::updater::github::{
 };
 use crate::utils::path_utils;
 
+// 全局页面状态枚举
 pub enum AppState {
+    // 主页
     MainMenu { menu: Menu },
+    // 游戏选择页
     GameSelection { ui: GameSelection },
+    // 设置页
     Settings { ui: settings::SettingsState },
+    // 关于页
     About,
+    // 游戏继续
     Continue,
+    // 退出
     Exiting,
 }
 
+// 新游戏覆盖的准备状态
 struct PendingNewGameStart {
+    // 用户新启动的游戏
     target_game: GameMeta,
+    // 当前保存的游戏
     saved_game_name: String,
 }
 
+// 生命周期封装
+// 隐藏光标、进入和恢复终端功能
 struct TerminalSession {
     terminal: Terminal<CrosstermBackend<Stdout>>,
 }
 
+// 终端初始化
 impl TerminalSession {
     fn new() -> Result<Self> {
         enable_raw_mode()?;
@@ -63,6 +76,8 @@ impl TerminalSession {
     }
 }
 
+// 一个保底可以确定将游戏的终端模式清理部分
+// 防止有些时候终端卡死在游戏的控制页
 impl Drop for TerminalSession {
     fn drop(&mut self) {
         let _ = disable_raw_mode();
@@ -71,6 +86,7 @@ impl Drop for TerminalSession {
     }
 }
 
+// 安装panic_hook，避免终端卡死在隐藏光标状态
 fn install_panic_hook() {
     let old = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
@@ -81,31 +97,48 @@ fn install_panic_hook() {
     }));
 }
 
+// 程序的主入口
 fn main() {
     if let Err(err) = run() {
         eprintln!("Error: {err:#}");
     }
 }
 
+// 我服了这Rust怎么这么难写
+// 语法长的好奇怪
+// 比Java和C++还难的语言出现了
+
+// 主程序的核心入口
 fn run() -> Result<()> {
+    // 安装 panic hook
     install_panic_hook();
+    // 初始化i18n
     i18n::init("us-en")?;
 
+    // 初始终端会话
     let mut session = TerminalSession::new()?;
+    // 启动更新检查
     let updater = Updater::spawn(CURRENT_VERSION_TAG);
 
+    // 初始化主状态和全局变量
     let mut update_notification: Option<UpdateNotification> = None;
+    // 最后一个release版本
     let mut latest_release_version = normalized_tag(CURRENT_VERSION_TAG);
+    // 处理版本字符串
     let runtime_version = normalized_tag(CURRENT_VERSION_TAG);
+    // 主页状态
     let mut state = AppState::MainMenu { menu: Menu::new() };
     let mut pending_new_game_start: Option<PendingNewGameStart> = None;
+    // 是否准备卸载
     let mut should_run_uninstall = false;
 
     let frame_budget = Duration::from_millis(16);
 
+    // 开始主循环
     loop {
         let frame_start = Instant::now();
 
+        // 更新检查
         while let Some(event) = updater.try_recv() {
             match event {
                 UpdaterEvent::LatestVersion(latest) => {
@@ -118,10 +151,12 @@ fn run() -> Result<()> {
             }
         }
 
+        // 同步菜单状态
         if let AppState::MainMenu { menu } = &mut state {
             sync_continue_item(menu);
         }
 
+        // 键盘事件
         if event::poll(Duration::from_millis(0))? {
             let ev = event::read()?;
             if let Event::Key(key) = ev {
@@ -135,6 +170,7 @@ fn run() -> Result<()> {
             }
         }
 
+        // Lua脚本的强制清理屏幕处理
         if take_terminal_dirty_from_lua() {
             session.terminal.clear()?;
         }
@@ -143,6 +179,7 @@ fn run() -> Result<()> {
             break;
         }
 
+        // 动态窗口
         let (min_width, min_height) = minimum_size_for_state(&state);
         let size_state = size_watcher::check_size(min_width, min_height)?;
 
@@ -183,15 +220,18 @@ fn run() -> Result<()> {
                 AppState::Exiting => {}
             })?;
         } else {
+            // 最小尺寸警告
             size_watcher::draw_size_warning(&size_state, min_width, min_height)?;
         }
 
+        // 帧率控制
         let elapsed = frame_start.elapsed();
         if elapsed < frame_budget {
             thread::sleep(frame_budget - elapsed);
         }
     }
 
+    // 卸载程序
     drop(session);
     if should_run_uninstall {
         let _ = run_uninstall_script();
@@ -200,6 +240,8 @@ fn run() -> Result<()> {
     Ok(())
 }
 
+// 最小界面控制
+// 每个模块都会被单独计算所需大小
 fn minimum_size_for_state(state: &AppState) -> (u16, u16) {
     match state {
         AppState::MainMenu { .. } => (MENU_MIN_WIDTH, MENU_MIN_HEIGHT),
@@ -210,6 +252,7 @@ fn minimum_size_for_state(state: &AppState) -> (u16, u16) {
     }
 }
 
+// 全局按键检查中心
 fn handle_key_event(
     state: &mut AppState,
     pending_new_game_start: &mut Option<PendingNewGameStart>,
@@ -217,12 +260,16 @@ fn handle_key_event(
     key: KeyEvent,
     update_notification: Option<&UpdateNotification>,
 ) -> Result<()> {
+    // 通用键处理
+    // 没注册的键不会处理但也不打断运行
     if !matches!(key.kind, KeyEventKind::Press) {
         return Ok(());
     }
 
+    // U更新键
     if matches!(key.code, KeyCode::Char('u') | KeyCode::Char('U')) {
         if let Some(notification) = update_notification {
+            // 跑更新脚本并退出程序
             if run_external_update_script(notification).unwrap_or(false) {
                 *state = AppState::Exiting;
                 return Ok(());
@@ -230,11 +277,20 @@ fn handle_key_event(
         }
     }
 
+    // 新游戏状态清理
     if !matches!(state, AppState::GameSelection { .. }) {
         *pending_new_game_start = None;
     }
 
+    // 开始处理页面分支按键
     match state {
+        // Q和ESC是退出
+        // Y和ENTER是确认(大部分都只用了Y)
+
+        // 虽然这一部分很长,但是也比渲染部分写起来简单
+        // 逻辑处理还是太权威了
+
+        // 主页页面按键处理
         AppState::MainMenu { menu } => match key.code {
             KeyCode::Up | KeyCode::Char('k') => menu.previous(),
             KeyCode::Down | KeyCode::Char('j') => menu.next(),
@@ -260,7 +316,9 @@ fn handle_key_event(
             }
             _ => {}
         },
+        // 游戏列表选择按键处理
         AppState::GameSelection { ui } => {
+            // 新游戏存档覆盖确认
             if pending_new_game_start.is_some() {
                 match key.code {
                     KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
@@ -293,6 +351,7 @@ fn handle_key_event(
                 return Ok(());
             }
 
+            // 新游戏的处理
             if let Some(action) = ui.handle_event(key) {
                 match action {
                     GameSelectionAction::BackToMenu => {
@@ -321,6 +380,8 @@ fn handle_key_event(
                 }
             }
         }
+
+        // 设置按键处理
         AppState::Settings { ui } => {
             match settings::handle_key(ui, key.code) {
                 settings::SettingsAction::None => {}
@@ -335,38 +396,50 @@ fn handle_key_event(
                 }
             }
         }
+
+        // 关于按键处理
         AppState::About | AppState::Continue => match key.code {
             KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
                 *state = AppState::MainMenu { menu: Menu::new() }
             }
             _ => {}
         },
+
+        // 退出无额外按键
         AppState::Exiting => {}
     }
 
     Ok(())
 }
 
+// 渲染是否覆盖存档开启新游戏文本
+// 这个渲染调试简直难飞了
 fn render_new_game_confirm(frame: &mut ratatui::Frame<'_>, saved_game_name: &str) {
     use ratatui::layout::{Alignment, Constraint, Direction, Layout};
     use ratatui::style::{Color, Modifier, Style};
     use ratatui::text::{Line, Span};
     use ratatui::widgets::{Clear, Paragraph, Wrap};
 
+    // 清屏
     let area = frame.area();
     frame.render_widget(Clear, area);
 
+    // i18n的键不要调用错了
     let template = i18n::t(
         "confirm.new_game_overwrite",
     );
+    // 文本
     let msg = if template.contains("{game}") {
         template.replace("{game}", saved_game_name)
     } else {
         format!("{template} {saved_game_name}")
     };
+
+    // 这里也是,之前就写错了一次
     let yes = i18n::t("confirm.new_game_yes");
     let no = i18n::t("confirm.new_game_no");
 
+    // 一系列的文本处理,AI救我!!!
     let center = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(4), Constraint::Min(0)])
@@ -389,8 +462,10 @@ fn render_new_game_confirm(frame: &mut ratatui::Frame<'_>, saved_game_name: &str
     frame.render_widget(p, center[1]);
 }
 
+// 将玩家的动作处理转换为AppState状态机
 fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppState {
     match action {
+        // 进入游戏列表
         MenuAction::Play => {
             let games = match scan_scripts() {
                 Ok(found) => found,
@@ -400,6 +475,8 @@ fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppS
                 ui: GameSelection::new(games),
             }
         }
+
+        // 继续游戏存档,并将上一级菜单设置为游戏列表
         MenuAction::Continue => {
             if let Some(game_id) = continue_game_id {
                 let game = scan_scripts()
@@ -417,19 +494,32 @@ fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppS
                 ui: GameSelection::new(games),
             }
         }
+
+        // 设置页
         MenuAction::Settings => AppState::Settings {
             ui: settings::SettingsState::new(),
         },
+
+        // 关于页
         MenuAction::About => AppState::About,
+
+        // 拜拜了您嘞
         MenuAction::Quit => AppState::Exiting,
     }
 }
 
+// 执行卸载脚本
 fn run_uninstall_script() -> Result<bool> {
+    // 脚本定位
     let Some(script) = resolve_uninstall_script()? else {
         return Ok(false);
     };
 
+    // 脚本类型的执行
+    // Windows是.bat
+    // Linux和MacOS是.sh
+
+    // 调用不难,脚本文件倒是写了两天,无语了
     let ext = script
         .extension()
         .and_then(|e| e.to_str())
@@ -448,16 +538,21 @@ fn run_uninstall_script() -> Result<bool> {
     Ok(true)
 }
 
+// 专门判断是否有卸载脚本
 fn has_uninstall_script() -> Result<bool> {
     Ok(resolve_uninstall_script()?.is_some())
 }
 
+// 查找卸载脚本
 fn resolve_uninstall_script() -> Result<Option<std::path::PathBuf>> {
     let runtime = path_utils::runtime_dir()?;
     let bat = runtime.join("delete-tui-game.bat");
     let sh = runtime.join("delete-tui-game.sh");
 
+    // 个人认为这是Rust最好用的,居然有条件编译,无敌
+    // windows的条件编译
     #[cfg(target_os = "windows")]
+    // 条件赋值也很好用,压缩可读性这块
     let script = if bat.exists() {
         Some(bat)
     } else if sh.exists() {
@@ -466,6 +561,7 @@ fn resolve_uninstall_script() -> Result<Option<std::path::PathBuf>> {
         None
     };
 
+    // 非windows的条件编译
     #[cfg(not(target_os = "windows"))]
     let script = if sh.exists() {
         Some(sh)
@@ -478,6 +574,7 @@ fn resolve_uninstall_script() -> Result<Option<std::path::PathBuf>> {
     Ok(script)
 }
 
+// 读取当前可进行的游戏
 fn sync_continue_item(menu: &mut Menu) {
     let game_id = latest_saved_game_id();
     let game_name = game_id
@@ -486,6 +583,7 @@ fn sync_continue_item(menu: &mut Menu) {
     menu.set_continue_target(game_id, game_name);
 }
 
+// 版本标签规范化
 fn normalized_tag(raw: &str) -> String {
     let trimmed = raw.trim();
     if trimmed.starts_with('v') || trimmed.starts_with('V') {

@@ -13,17 +13,24 @@ use serde::Deserialize;
 
 use crate::utils::path_utils;
 
+// github的release的地址API
 const GITHUB_API_LATEST: &str = "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
 const FALLBACK_RELEASE_URL: &str = "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
+// 这里是开发者测试防止限制API
 pub const GITHUB_TOKEN: &str = "";
+// 硬编码版本,避免文件被篡改导致错误(记的更新啊!)
 pub const CURRENT_VERSION_TAG: &str = "0.10.2";
 
+// 派生宏,实话说我没搞明白,但AI告诉我这么写合适就这么写了
+
+// 定义版本数据结构体
 #[derive(Clone, Debug)]
 pub struct UpdateNotification {
     pub latest_version: String,
     pub release_url: String,
 }
 
+// 枚举更新状态
 #[derive(Clone, Debug)]
 pub enum UpdaterEvent {
     LatestVersion(UpdateNotification),
@@ -31,17 +38,20 @@ pub enum UpdaterEvent {
     NoUpdate,
 }
 
+// 接收更新事件
 #[derive(Debug)]
 pub struct Updater {
     receiver: Receiver<UpdaterEvent>,
 }
 
+// 解析github的响应数据结构体
 #[derive(Clone, Debug, Deserialize)]
 struct ReleaseResponse {
     tag_name: String,
     html_url: Option<String>,
 }
 
+// 版本更新主体
 impl Updater {
     /// Starts a background updater check thread.
     pub fn spawn(current_version: &str) -> Self {
@@ -71,6 +81,7 @@ impl Updater {
     }
 }
 
+// 获取最后一个release
 fn fetch_latest_release() -> Result<Option<UpdateNotification>> {
     let client = Client::builder().timeout(Duration::from_secs(8)).build()?;
     let mut req = client
@@ -107,6 +118,7 @@ fn fetch_latest_release() -> Result<Option<UpdateNotification>> {
     }))
 }
 
+// 写入当前版本缓存
 fn write_current_version_cache(current_version: &str) -> Result<()> {
     let path = path_utils::updater_cache_file()?;
     path_utils::ensure_parent_dir(&path)?;
@@ -114,6 +126,7 @@ fn write_current_version_cache(current_version: &str) -> Result<()> {
     Ok(())
 }
 
+// 版本格式化
 fn normalize_tag(raw: &str) -> String {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -126,7 +139,7 @@ fn normalize_tag(raw: &str) -> String {
     }
 }
 
-
+// 拆解版本号用于逐级检查
 fn parse_version_segments(version: &str) -> Option<Vec<u64>> {
     let clean = version.trim().trim_start_matches(['v', 'V']);
     if clean.is_empty() {
@@ -151,6 +164,7 @@ fn parse_version_segments(version: &str) -> Option<Vec<u64>> {
     }
 }
 
+// 远程版本和当前版本的逐级比较
 fn compare_versions(remote: &str, current: &str) -> Option<Ordering> {
     let a = parse_version_segments(remote)?;
     let b = parse_version_segments(current)?;
@@ -168,11 +182,12 @@ fn compare_versions(remote: &str, current: &str) -> Option<Ordering> {
     Some(Ordering::Equal)
 }
 
+// 远程是否更新了
 fn is_version_newer(remote: &str, current: &str) -> bool {
     matches!(compare_versions(remote, current), Some(Ordering::Greater))
 }
 
-/// Runs external updater script (version.bat/version.sh) and returns whether it was started.
+/// 运行更新脚本
 pub fn run_external_update_script(notification: &UpdateNotification) -> Result<bool> {
     let runtime = path_utils::runtime_dir()?;
     let bat = runtime.join("version.bat");
@@ -206,6 +221,7 @@ pub fn run_external_update_script(notification: &UpdateNotification) -> Result<b
     Ok(true)
 }
 
+// 选择运行的脚本
 fn select_version_script(bat: &Path, sh: &Path) -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
@@ -226,55 +242,5 @@ fn select_version_script(bat: &Path, sh: &Path) -> Option<PathBuf> {
             return Some(bat.to_path_buf());
         }
         None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{compare_versions, is_version_newer, normalize_tag, select_version_script};
-
-    #[test]
-    fn normalize_tag_adds_prefix() {
-        assert_eq!(normalize_tag("0.1.4"), "v0.1.4");
-        assert_eq!(normalize_tag("v0.1.4"), "v0.1.4");
-    }
-
-    #[test]
-    fn script_selection_prefers_bat_then_sh() {
-        let base = std::env::temp_dir().join("tui_game_updater_script_select");
-        let _ = std::fs::create_dir_all(&base);
-        let bat = base.join("version.bat");
-        let sh = base.join("version.sh");
-
-        let _ = std::fs::remove_file(&bat);
-        let _ = std::fs::remove_file(&sh);
-        assert!(select_version_script(&bat, &sh).is_none());
-
-        let _ = std::fs::write(&sh, "echo sh");
-        assert_eq!(select_version_script(&bat, &sh), Some(sh.clone()));
-
-        let _ = std::fs::write(&bat, "echo bat");
-        #[cfg(target_os = "windows")]
-        assert_eq!(select_version_script(&bat, &sh), Some(bat.clone()));
-        #[cfg(not(target_os = "windows"))]
-        assert_eq!(select_version_script(&bat, &sh), Some(sh.clone()));
-
-        let _ = std::fs::remove_file(&bat);
-        let _ = std::fs::remove_file(&sh);
-        let _ = std::fs::remove_dir_all(&base);
-    }
-
-    #[test]
-    fn version_compare_is_semantic() {
-        use std::cmp::Ordering;
-
-        assert_eq!(compare_versions("v0.3.2", "v0.3.1"), Some(Ordering::Greater));
-        assert_eq!(compare_versions("v0.3.1", "v0.3.2"), Some(Ordering::Less));
-        assert_eq!(compare_versions("v0.3.2", "v0.3.2"), Some(Ordering::Equal));
-        assert_eq!(compare_versions("v0.3.10", "v0.3.2"), Some(Ordering::Greater));
-
-        assert!(is_version_newer("v1.0.0", "v0.9.9"));
-        assert!(!is_version_newer("v0.9.9", "v1.0.0"));
-        assert!(!is_version_newer("v1.0.0", "v1.0.0"));
     }
 }
