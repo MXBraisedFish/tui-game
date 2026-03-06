@@ -9,6 +9,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 // 清理整个终端并把光标放到0，0的位置
 pub fn clear() -> Result<()> {
+    // 获取标准输出的笔(应该叫做句柄,但是我看不懂就写成笔了)
     let mut out = stdout();
     queue!(out, Clear(ClearType::All), MoveTo(0, 0))?;
     out.flush()?;
