@@ -1,5 +1,7 @@
-@echo off
-setlocal enabledelayedexpansion
+﻿@echo off
+chcp 65001 >nul
+setlocal EnableExtensions EnableDelayedExpansion
+cd /d "%~dp0"
 
 echo [1] 中文
 echo [2] English
@@ -24,7 +26,7 @@ if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_PATH_SKIP=[信息] 跳过 PATH 注册。"
     set "MSG_DONE=[成功] TUI-GAME 安装完成。"
     set "MSG_RUN=[信息] 你现在可以输入 tg 启动游戏。"
-    set "ERR_CURL=[错误] 未找到 curl。"
+    set "ERR_CURL=[错误] 未找到 curl.exe。"
     set "ERR_PS=[错误] 未找到 PowerShell。"
     set "ERR_FETCH=[错误] 下载版本信息失败。"
     set "ERR_ASSET=[错误] 未找到 Windows 安装包。"
@@ -46,7 +48,7 @@ if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_PATH_SKIP=[INFO] Skipping PATH registration."
     set "MSG_DONE=[SUCCESS] TUI-GAME has been installed."
     set "MSG_RUN=[INFO] You can now type tg to start the game."
-    set "ERR_CURL=[ERROR] curl was not found."
+    set "ERR_CURL=[ERROR] curl.exe was not found."
     set "ERR_PS=[ERROR] PowerShell was not found."
     set "ERR_FETCH=[ERROR] Failed to download release information."
     set "ERR_ASSET=[ERROR] Windows package asset was not found."
@@ -57,16 +59,15 @@ if /I "%LANG_CODE%"=="zh-cn" (
 )
 
 echo %MSG_START%
-
-where curl >nul 2>nul || (echo %ERR_CURL% & pause & exit /b 1)
-where powershell >nul 2>nul || (echo %ERR_PS% & pause & exit /b 1)
+where curl.exe >nul 2>nul || (echo %ERR_CURL% & pause & exit /b 1)
+where powershell.exe >nul 2>nul || (echo %ERR_PS% & pause & exit /b 1)
 
 set "API_URL=https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest"
-set "TEMP_JSON=%temp%\tui_game_init_%RANDOM%.json"
-set "TEMP_ZIP=%temp%\tui_game_%RANDOM%.zip"
+set "TEMP_JSON=%TEMP%\tui_game_init_%RANDOM%.json"
+set "TEMP_ZIP=%TEMP%\tui_game_%RANDOM%.zip"
 
 echo %MSG_FETCH%
-curl -s -L -o "%TEMP_JSON%" "%API_URL%"
+curl.exe -fsSL -o "%TEMP_JSON%" "%API_URL%"
 if errorlevel 1 (
     echo %ERR_FETCH%
     pause
@@ -75,7 +76,7 @@ if errorlevel 1 (
 
 echo %MSG_PARSE%
 set "DOWNLOAD_URL="
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$json = Get-Content -Raw '%TEMP_JSON%' | ConvertFrom-Json; $asset = $json.assets | Where-Object { $_.name -eq 'tui-game-windows.zip' } | Select-Object -First 1; if ($asset) { $asset.browser_download_url }"`) do (
+for /f "usebackq delims=" %%i in (`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $json = Get-Content -Raw -Encoding UTF8 '%TEMP_JSON%' | ConvertFrom-Json; $asset = $json.assets | Where-Object { $_.name -eq 'tui-game-windows.zip' } | Select-Object -First 1; if ($null -ne $asset) { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Output $asset.browser_download_url }"`) do (
     set "DOWNLOAD_URL=%%i"
 )
 if "!DOWNLOAD_URL!"=="" (
@@ -86,7 +87,7 @@ if "!DOWNLOAD_URL!"=="" (
 )
 
 echo %MSG_DL%
-curl -s -L -o "%TEMP_ZIP%" "!DOWNLOAD_URL!"
+curl.exe -fsSL -o "%TEMP_ZIP%" "!DOWNLOAD_URL!"
 if errorlevel 1 (
     echo %ERR_DL%
     del /f /q "%TEMP_JSON%" >nul 2>&1
@@ -95,7 +96,7 @@ if errorlevel 1 (
 )
 
 echo %MSG_EXTRACT%
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%CD%' -Force"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%CD%' -Force"
 if errorlevel 1 (
     echo %ERR_EXTRACT%
     del /f /q "%TEMP_JSON%" "%TEMP_ZIP%" >nul 2>&1
@@ -113,14 +114,8 @@ echo %MSG_CLEAN%
 echo.
 set /p ADD_PATH="%MSG_ASK_PATH%"
 if /I "!ADD_PATH!"=="Y" (
-    set "INSTALL_DIR=%CD%"
     echo %MSG_ADD_PATH%
-    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-        "$target=[System.IO.Path]::GetFullPath($env:CD).TrimEnd('\');" ^
-        "$userPath=[Environment]::GetEnvironmentVariable('Path','User');" ^
-        "$parts=@(); if(-not [string]::IsNullOrWhiteSpace($userPath)){ $parts=$userPath -split ';' | Where-Object { $_ } }" ^
-        "$exists=$false; foreach($p in $parts){ try { $full=[System.IO.Path]::GetFullPath($p).TrimEnd('\') } catch { $full=$p.TrimEnd('\') }; if($full -eq $target){ $exists=$true; break } }" ^
-        "if(-not $exists){ $newPath=if([string]::IsNullOrWhiteSpace($userPath)){$target}else{$userPath.TrimEnd(';') + ';' + $target}; [Environment]::SetEnvironmentVariable('Path',$newPath,'User') }"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $target = (Resolve-Path '.').Path.TrimEnd('\'); $userPath = [Environment]::GetEnvironmentVariable('Path','User'); $parts = @(); if (-not [string]::IsNullOrWhiteSpace($userPath)) { $parts = $userPath -split ';' | Where-Object { $_ } }; $exists = $false; foreach ($p in $parts) { try { $full = [System.IO.Path]::GetFullPath($p).TrimEnd('\') } catch { $full = $p.TrimEnd('\') }; if ($full -ieq $target) { $exists = $true; break } }; if (-not $exists) { $newPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $target } else { (($parts + $target) -join ';') }; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User') }"
     if errorlevel 1 (
         echo %ERR_PATH%
     ) else (

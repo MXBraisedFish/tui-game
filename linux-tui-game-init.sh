@@ -1,57 +1,56 @@
 #!/bin/bash
 set -eu
 
-echo "[1] 中文"
-echo "[2] English"
-read -r -p "Select language / 选择语言 (1/2): " CHOICE
+printf '%s\n' '[1] 中文' '[2] English'
+read -r -p 'Select language / 选择语言 (1/2): ' CHOICE
 if [[ "$CHOICE" == "1" ]]; then
-    LANG_CODE="zh-cn"
+    LANG_CODE='zh-cn'
 else
-    LANG_CODE="us-en"
+    LANG_CODE='us-en'
 fi
 
-if [[ "$LANG_CODE" == "zh-cn" ]]; then
-    MSG_START="[信息] 开始安装 TUI-GAME..."
-    MSG_FETCH="[信息] 正在从 GitHub 获取最新版本信息..."
-    MSG_PARSE="[信息] 正在解析 Linux 安装包下载链接..."
-    MSG_DL="[信息] 正在下载安装包..."
-    MSG_EXTRACT="[信息] 正在解压文件到当前目录..."
-    MSG_LANG_INIT="[信息] 正在初始化语言设置..."
-    MSG_CLEAN="[信息] 已清理临时文件。"
-    MSG_ASK_PATH="是否创建 tg 快捷启动命令？(Y/N): "
-    MSG_LINK_OK="[成功] 已创建 tg 快捷启动命令。"
-    MSG_LINK_SKIP="[信息] 跳过快捷命令创建。"
-    MSG_DONE="[成功] TUI-GAME 安装完成。"
-    MSG_RUN="[信息] 你现在可以输入 tg 启动游戏。"
-    ERR_CURL="[错误] 未找到 curl。"
-    ERR_PY="[错误] 未找到 python3。"
-    ERR_TAR="[错误] 未找到 tar。"
-    ERR_FETCH="[错误] 下载版本信息失败。"
-    ERR_ASSET="[错误] 未找到 Linux 安装包。"
-    ERR_DL="[错误] 下载安装包失败。"
-    ERR_EXTRACT="[错误] 解压安装包失败。"
-    MSG_EXIT="[信息] 按任意键退出并删除安装脚本。"
+if [[ "$LANG_CODE" == 'zh-cn' ]]; then
+    MSG_START='[信息] 开始安装 TUI-GAME...'
+    MSG_FETCH='[信息] 正在从 GitHub 获取最新版本信息...'
+    MSG_PARSE='[信息] 正在解析 Linux 安装包下载链接...'
+    MSG_DL='[信息] 正在下载安装包...'
+    MSG_EXTRACT='[信息] 正在解压文件到当前目录...'
+    MSG_LANG_INIT='[信息] 正在初始化语言设置...'
+    MSG_CLEAN='[信息] 已清理临时文件。'
+    MSG_ASK_PATH='是否创建 tg 快捷启动命令？(Y/N): '
+    MSG_LINK_OK='[成功] 已创建 tg 快捷启动命令。'
+    MSG_LINK_SKIP='[信息] 跳过快捷命令创建。'
+    MSG_DONE='[成功] TUI-GAME 安装完成。'
+    MSG_RUN='[信息] 你现在可以输入 tg 启动游戏。'
+    ERR_CURL='[错误] 未找到 curl。'
+    ERR_PY='[错误] 未找到 python3。'
+    ERR_TAR='[错误] 未找到 tar。'
+    ERR_FETCH='[错误] 下载版本信息失败。'
+    ERR_ASSET='[错误] 未找到 Linux 安装包。'
+    ERR_DL='[错误] 下载安装包失败。'
+    ERR_EXTRACT='[错误] 解压安装包失败。'
+    MSG_EXIT='[信息] 按任意键退出并删除安装脚本。'
 else
-    MSG_START="[INFO] Starting TUI-GAME installation..."
-    MSG_FETCH="[INFO] Fetching latest release information from GitHub..."
-    MSG_PARSE="[INFO] Extracting Linux package download URL..."
-    MSG_DL="[INFO] Downloading package..."
-    MSG_EXTRACT="[INFO] Extracting files to current directory..."
-    MSG_LANG_INIT="[INFO] Initializing language preference..."
-    MSG_CLEAN="[INFO] Temporary files cleaned up."
-    MSG_ASK_PATH="Create a tg launcher command? (Y/N): "
-    MSG_LINK_OK="[SUCCESS] tg launcher command created."
-    MSG_LINK_SKIP="[INFO] Skipping launcher creation."
-    MSG_DONE="[SUCCESS] TUI-GAME has been installed."
-    MSG_RUN="[INFO] You can now type tg to start the game."
-    ERR_CURL="[ERROR] curl was not found."
-    ERR_PY="[ERROR] python3 was not found."
-    ERR_TAR="[ERROR] tar was not found."
-    ERR_FETCH="[ERROR] Failed to download release information."
-    ERR_ASSET="[ERROR] Linux package asset was not found."
-    ERR_DL="[ERROR] Failed to download the package."
-    ERR_EXTRACT="[ERROR] Failed to extract the package."
-    MSG_EXIT="[INFO] Press any key to exit and delete this installer."
+    MSG_START='[INFO] Starting TUI-GAME installation...'
+    MSG_FETCH='[INFO] Fetching latest release information from GitHub...'
+    MSG_PARSE='[INFO] Extracting Linux package download URL...'
+    MSG_DL='[INFO] Downloading package...'
+    MSG_EXTRACT='[INFO] Extracting files to current directory...'
+    MSG_LANG_INIT='[INFO] Initializing language preference...'
+    MSG_CLEAN='[INFO] Temporary files cleaned up.'
+    MSG_ASK_PATH='Create a tg launcher command? (Y/N): '
+    MSG_LINK_OK='[SUCCESS] tg launcher command created.'
+    MSG_LINK_SKIP='[INFO] Skipping launcher creation.'
+    MSG_DONE='[SUCCESS] TUI-GAME has been installed.'
+    MSG_RUN='[INFO] You can now type tg to start the game.'
+    ERR_CURL='[ERROR] curl was not found.'
+    ERR_PY='[ERROR] python3 was not found.'
+    ERR_TAR='[ERROR] tar was not found.'
+    ERR_FETCH='[ERROR] Failed to download release information.'
+    ERR_ASSET='[ERROR] Linux package asset was not found.'
+    ERR_DL='[ERROR] Failed to download the package.'
+    ERR_EXTRACT='[ERROR] Failed to extract the package.'
+    MSG_EXIT='[INFO] Press any key to exit and delete this installer.'
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -62,22 +61,22 @@ command -v curl >/dev/null 2>&1 || { echo "$ERR_CURL"; read -n1 -r; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "$ERR_PY"; read -n1 -r; exit 1; }
 command -v tar >/dev/null 2>&1 || { echo "$ERR_TAR"; read -n1 -r; exit 1; }
 
-API_URL="https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest"
-TEMP_JSON=$(mktemp)
-TEMP_TGZ=$(mktemp).tar.gz
+API_URL='https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest'
+TEMP_JSON="$(mktemp)"
+TEMP_TGZ="$(mktemp).tar.gz"
 
 echo "$MSG_FETCH"
-curl -s -L -o "$TEMP_JSON" "$API_URL" || { echo "$ERR_FETCH"; rm -f "$TEMP_JSON"; read -n1 -r; exit 1; }
+curl -fsSL -o "$TEMP_JSON" "$API_URL" || { echo "$ERR_FETCH"; rm -f "$TEMP_JSON"; read -n1 -r; exit 1; }
 
 echo "$MSG_PARSE"
 DOWNLOAD_URL=$(python3 - <<PY
 import json
-url = ""
-with open(r"$TEMP_JSON", "r", encoding="utf-8") as f:
+url = ''
+with open(r'''$TEMP_JSON''', 'r', encoding='utf-8') as f:
     data = json.load(f)
-for asset in data.get("assets", []):
-    if asset.get("name") == "tui-game-linux.tar.gz":
-        url = asset.get("browser_download_url", "")
+for asset in data.get('assets', []):
+    if asset.get('name') == 'tui-game-linux.tar.gz':
+        url = asset.get('browser_download_url', '')
         break
 print(url)
 PY
@@ -90,7 +89,7 @@ if [[ -z "$DOWNLOAD_URL" ]]; then
 fi
 
 echo "$MSG_DL"
-curl -s -L -o "$TEMP_TGZ" "$DOWNLOAD_URL" || { echo "$ERR_DL"; rm -f "$TEMP_JSON" "$TEMP_TGZ"; read -n1 -r; exit 1; }
+curl -fsSL -o "$TEMP_TGZ" "$DOWNLOAD_URL" || { echo "$ERR_DL"; rm -f "$TEMP_JSON" "$TEMP_TGZ"; read -n1 -r; exit 1; }
 
 echo "$MSG_EXTRACT"
 tar -xzf "$TEMP_TGZ" -C "$SCRIPT_DIR" || { echo "$ERR_EXTRACT"; rm -f "$TEMP_JSON" "$TEMP_TGZ"; read -n1 -r; exit 1; }
