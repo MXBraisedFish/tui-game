@@ -84,7 +84,7 @@ local function tr(key)
 end
 
 -- 获取文本显示宽度
-local function key_width(text)
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then
@@ -109,7 +109,7 @@ local function wrap_words(text, max_width)
             current = token
         else
             local candidate = current .. " " .. token
-            if key_width(candidate) <= max_width then
+            if text_width(candidate) <= max_width then
                 current = candidate
             else
                 lines[#lines + 1] = current
@@ -129,7 +129,7 @@ end
 
 -- 计算在给定最大行数下所需的最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full = key_width(text)
+    local full = text_width(text)
     local width = hard_min
     while width <= full do
         if #wrap_words(text, width) <= max_lines then
@@ -640,7 +640,7 @@ local function render_once()
 
     -- 居中计算辅助函数
     local function centered_x(text, left_x, right_x)
-        local width = key_width(text)
+        local width = text_width(text)
         local cx = left_x + math.floor(((right_x - left_x + 1) - width) / 2)
         if cx < left_x then cx = left_x end
         if cx > right_x - width + 1 then
@@ -662,8 +662,8 @@ local function render_once()
 
     fill_line(status_y, w)
     local status_sep = "    "
-    local best_w = key_width(best_text)
-    local sep_w = key_width(status_sep)
+    local best_w = text_width(best_text)
+    local sep_w = text_width(status_sep)
     local sx = centered_x(best_text .. status_sep .. net_text, 1, w)
     draw_text(sx, status_y, best_text, "dark_gray", "black")
     draw_text(sx + best_w + sep_w, status_y, net_text, net_color, "black")
@@ -1322,7 +1322,7 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
     local top = math.floor((term_h - #lines) / 2)
     if top < 1 then top = 1 end
     for i = 1, #lines do
-        local x = math.floor((term_w - key_width(lines[i])) / 2)
+        local x = math.floor((term_w - text_width(lines[i])) / 2)
         if x < 1 then x = 1 end
         draw_text(x, top + i - 1, lines[i], "white", "black")
     end
@@ -1331,14 +1331,14 @@ end
 -- 计算最小所需终端尺寸
 local function minimum_required_size()
     local controls_w = min_width_for_lines(tr("game.blackjack.controls"), 3, 40)
-    local warning_w = key_width(tr("game.blackjack.warning"))
-    local status_w = key_width(tr("game.blackjack.best") .. ": -999999")
+    local warning_w = text_width(tr("game.blackjack.warning"))
+    local status_w = text_width(tr("game.blackjack.best") .. ": -999999")
         + 3
-        + key_width(tr("game.blackjack.net") .. ": -999999")
+        + text_width(tr("game.blackjack.net") .. ": -999999")
     local alert_w = math.max(
-        key_width(tr("game.blackjack.confirm_restart")),
-        key_width(tr("game.blackjack.confirm_exit")),
-        key_width(tr("game.blackjack.msg_bankrupt"))
+        text_width(tr("game.blackjack.confirm_restart")),
+        text_width(tr("game.blackjack.confirm_exit")),
+        text_width(tr("game.blackjack.msg_bankrupt"))
     )
     local min_w = math.max(TABLE_W + 2, controls_w + 2, warning_w + 2, status_w + 2, alert_w + 2)
     local min_h = TABLE_H + 6

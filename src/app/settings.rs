@@ -13,12 +13,14 @@ const H_GAP: u16 = 1;
 const TRIANGLE: &str = "\u{25B6} ";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 设置页的子页面状态。
 pub enum SettingsPage {
     Hub,
     Language,
 }
 
 #[derive(Clone, Debug)]
+/// 设置页运行时状态。
 pub struct SettingsState {
     pub page: SettingsPage,
     pub hub_selected: usize,
@@ -26,6 +28,7 @@ pub struct SettingsState {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 设置页需要主循环执行的高层动作。
 pub enum SettingsAction {
     None,
     BackToMenu,
@@ -33,6 +36,7 @@ pub enum SettingsAction {
 }
 
 #[derive(Clone, Copy, Debug)]
+/// 语言网格的布局参数。
 pub struct GridMetrics {
     pub cols: usize,
     pub inner_width: u16,
@@ -40,7 +44,7 @@ pub struct GridMetrics {
 }
 
 impl SettingsState {
-    /// Creates default settings state at settings hub page.
+    /// 创建默认设置页状态，初始停留在设置中转页。
     pub fn new() -> Self {
         Self {
             page: SettingsPage::Hub,
@@ -50,7 +54,7 @@ impl SettingsState {
     }
 }
 
-/// Returns the default selected language index (current active language).
+/// 返回语言网格默认选中项，即当前正在使用的语言索引。
 pub fn default_selected_index() -> usize {
     let languages = i18n::available_languages();
     let current = i18n::current_language_code();
@@ -60,7 +64,7 @@ pub fn default_selected_index() -> usize {
         .unwrap_or(0)
 }
 
-/// Handles keyboard input for settings pages.
+/// 处理设置页键盘输入，并返回需要主循环执行的动作。
 pub fn handle_key(state: &mut SettingsState, code: KeyCode) -> SettingsAction {
     match state.page {
         SettingsPage::Hub => handle_hub_key(state, code),
@@ -71,7 +75,7 @@ pub fn handle_key(state: &mut SettingsState, code: KeyCode) -> SettingsAction {
     }
 }
 
-/// Returns minimum terminal size needed by the active settings page.
+/// 返回当前设置子页面所需的最小终端尺寸。
 pub fn minimum_size(state: &SettingsState) -> (u16, u16) {
     match state.page {
         SettingsPage::Hub => minimum_size_hub(),
@@ -79,7 +83,7 @@ pub fn minimum_size(state: &SettingsState) -> (u16, u16) {
     }
 }
 
-/// Renders settings page based on current sub-page state.
+/// 根据当前设置子页面状态渲染对应界面。
 pub fn render(frame: &mut ratatui::Frame<'_>, state: &SettingsState) {
     match state.page {
         SettingsPage::Hub => render_hub(frame, state.hub_selected),
@@ -87,7 +91,7 @@ pub fn render(frame: &mut ratatui::Frame<'_>, state: &SettingsState) {
     }
 }
 
-/// Calculates metrics for language grid rendering and navigation.
+/// 计算语言网格的列数与单元宽度，用于渲染和导航。
 pub fn grid_metrics(term_width: u16, languages: &[i18n::LanguagePack]) -> GridMetrics {
     if languages.is_empty() {
         return GridMetrics {
@@ -118,7 +122,7 @@ pub fn grid_metrics(term_width: u16, languages: &[i18n::LanguagePack]) -> GridMe
     }
 }
 
-/// Moves selection inside the language grid with non-cycling boundaries.
+/// 在语言网格内移动选中项，边缘位置不会循环跳转。
 pub fn move_selection(selected: usize, key: KeyCode, metrics: GridMetrics, total: usize) -> usize {
     if total == 0 {
         return 0;

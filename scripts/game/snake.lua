@@ -1,61 +1,75 @@
+-- 贪吃蛇游戏元数据
 GAME_META = {
     name = "Snake",
     description = "Control the snake, eat food, and avoid biting yourself."
 }
 
-local GRID_W = 24
-local GRID_H = 10
+-- 游戏常量
+local GRID_W = 24 -- 网格宽度
+local GRID_H = 10 -- 网格高度
 local FPS = 60
 local FRAME_MS = 16
-local BASE_MOVE_FRAMES = FPS / 2      -- 2 cells per second
-local BOOST_MOVE_FRAMES = FPS / 4     -- 4 cells per second
-local BOOST_DURATION_FRAMES = FPS * 5
+local BASE_MOVE_FRAMES = FPS / 2      -- 基础移动速度（每秒2格）
+local BOOST_MOVE_FRAMES = FPS / 4     -- 加速移动速度（每秒4格）
+local BOOST_DURATION_FRAMES = FPS * 5 -- 加速持续时间（5秒）
 
-local BORDER_TL = "\u{2554}"
-local BORDER_TR = "\u{2557}"
-local BORDER_BL = "\u{255A}"
-local BORDER_BR = "\u{255D}"
-local BORDER_H = "\u{2550}"
-local BORDER_V = "\u{2551}"
+-- 边框字符
+local BORDER_TL = "\u{2554}" -- ┌
+local BORDER_TR = "\u{2557}" -- ┐
+local BORDER_BL = "\u{255A}" -- └
+local BORDER_BR = "\u{255D}" -- ┘
+local BORDER_H = "\u{2550}"  -- ─
+local BORDER_V = "\u{2551}"  -- │
 
+-- 游戏状态表
 local state = {
-    snake = {},
-    dir = "right",
-    next_dir = "right",
+    -- 蛇的状态
+    snake = {},         -- 蛇身坐标数组，第1个为头
+    dir = "right",      -- 当前移动方向
+    next_dir = "right", -- 下一个移动方向（用于缓冲）
 
-    normal_food = nil,
-    special_food = nil,
-    normal_eaten = 0,
-    next_special_at = 15,
+    -- 食物
+    normal_food = nil,    -- 普通食物位置
+    special_food = nil,   -- 特殊食物位置
+    normal_eaten = 0,     -- 已吃普通食物计数
+    next_special_at = 15, -- 下一次特殊食物出现的条件（每15个普通食物）
 
+    -- 游戏进度
     score = 0,
     won = false,
     game_over = false,
     end_frame = nil,
 
-    confirm_mode = nil,
-    toast_text = nil,
-    toast_until = 0,
+    -- UI状态
+    confirm_mode = nil, -- 确认模式：nil, "restart", "exit"
+    toast_text = nil,   -- 提示消息文本
+    toast_until = 0,    -- 提示消息显示的截止帧
 
+    -- 时间相关
     frame = 0,
     start_frame = 0,
-    last_move_frame = 0,
-    boost_until_frame = 0,
+    last_move_frame = 0,   -- 上次移动的帧号
+    boost_until_frame = 0, -- 加速状态截止帧
 
+    -- 渲染脏标记
     dirty = true,
     last_elapsed_sec = -1,
     last_boost_sec = -1,
     last_toast_visible = false,
 
+    -- 输入防抖
     last_key = "",
     last_key_frame = -100,
 
+    -- 启动模式
     launch_mode = "new",
 
+    -- 最佳记录
     best_score = 0,
     best_time_sec = 0,
     result_committed = false,
 
+    -- 尺寸警告
     size_warning_active = false,
     last_warn_term_w = 0,
     last_warn_term_h = 0,
@@ -63,6 +77,7 @@ local state = {
     last_warn_min_h = 0,
 }
 
+-- 翻译函数（安全调用）
 local function tr(key)
     if type(translate) ~= "function" then
         return key
@@ -80,6 +95,7 @@ local function tr(key)
     return value
 end
 
+-- 规范化按键
 local function normalize_key(key)
     if key == nil then
         return ""
@@ -93,6 +109,7 @@ local function normalize_key(key)
     return tostring(key):lower()
 end
 
+-- 获取文本显示宽度
 local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
@@ -103,6 +120,7 @@ local function text_width(text)
     return #text
 end
 
+-- 获取终端尺寸
 local function terminal_size()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
@@ -114,6 +132,7 @@ local function terminal_size()
     return w, h
 end
 
+-- 按单词换行
 local function wrap_words(text, max_width)
     if max_width <= 1 then
         return { text }
@@ -144,6 +163,7 @@ local function wrap_words(text, max_width)
     return lines
 end
 
+-- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
     local full = text_width(text)
     local width = hard_min
@@ -156,11 +176,13 @@ local function min_width_for_lines(text, max_lines, hard_min)
     return full
 end
 
+-- 计算已过秒数
 local function elapsed_seconds()
     local ending = state.end_frame or state.frame
     return math.max(0, math.floor((ending - state.start_frame) / FPS))
 end
 
+-- 格式化时间
 local function format_duration(sec)
     local h = math.floor(sec / 3600)
     local m = math.floor((sec % 3600) / 60)
@@ -168,10 +190,12 @@ local function format_duration(sec)
     return string.format("%02d:%02d:%02d", h, m, s)
 end
 
+-- 是否处于加速状态
 local function is_boosting()
     return state.frame < state.boost_until_frame
 end
 
+-- 获取当前移动间隔帧数
 local function current_move_frames()
     if is_boosting() then
         return BOOST_MOVE_FRAMES
@@ -179,6 +203,7 @@ local function current_move_frames()
     return BASE_MOVE_FRAMES
 end
 
+-- 获取相反方向
 local function opposite_dir(dir)
     if dir == "up" then return "down" end
     if dir == "down" then return "up" end
@@ -187,6 +212,7 @@ local function opposite_dir(dir)
     return ""
 end
 
+-- 克隆蛇身
 local function clone_snake(snake)
     local out = {}
     for i = 1, #snake do
@@ -195,10 +221,11 @@ local function clone_snake(snake)
     return out
 end
 
+-- 检查坐标是否在蛇身上
 local function snake_contains(x, y, include_tail)
     local last = #state.snake
     if not include_tail and last > 0 then
-        last = last - 1
+        last = last - 1 -- 不包含尾部（因为移动后尾部会移开）
     end
     for i = 1, last do
         local s = state.snake[i]
@@ -209,6 +236,7 @@ local function snake_contains(x, y, include_tail)
     return false
 end
 
+-- 随机获取空白格子
 local function random_empty_cell(avoid_normal, avoid_special)
     local cells = {}
     for y = 1, GRID_H do
@@ -235,14 +263,17 @@ local function random_empty_cell(avoid_normal, avoid_special)
     return cells[idx]
 end
 
+-- 生成普通食物
 local function spawn_normal_food()
     state.normal_food = random_empty_cell(false, true)
 end
 
+-- 生成或替换特殊食物
 local function spawn_or_replace_special_food()
     state.special_food = random_empty_cell(true, false)
 end
 
+-- 检查是否需要生成特殊食物
 local function maybe_spawn_special_food()
     while state.normal_eaten >= state.next_special_at do
         state.special_food = nil
@@ -251,11 +282,12 @@ local function maybe_spawn_special_food()
     end
 end
 
+-- 设置默认蛇身
 local function set_default_snake()
     local cx = math.floor(GRID_W / 2)
     local cy = math.floor(GRID_H / 2)
     state.snake = {
-        { x = cx, y = cy },
+        { x = cx,     y = cy },
         { x = cx - 1, y = cy },
         { x = cx - 2, y = cy },
     }
@@ -264,6 +296,7 @@ local function set_default_snake()
     end
 end
 
+-- 加载最佳记录
 local function load_best_record()
     if type(load_data) ~= "function" then
         state.best_score = 0
@@ -282,6 +315,7 @@ local function load_best_record()
     state.best_time_sec = math.max(0, math.floor(tonumber(data.best_time_sec) or 0))
 end
 
+-- 提交游戏结果
 local function commit_result_once()
     if state.result_committed then
         return
@@ -312,6 +346,7 @@ local function commit_result_once()
     end
 end
 
+-- 读取启动模式
 local function read_launch_mode()
     if type(get_launch_mode) ~= "function" then
         return "new"
@@ -327,6 +362,7 @@ local function read_launch_mode()
     return "new"
 end
 
+-- 创建游戏快照
 local function make_snapshot()
     local cooldown = math.max(0, current_move_frames() - (state.frame - state.last_move_frame))
     local boost_frames = math.max(0, state.boost_until_frame - state.frame)
@@ -347,6 +383,7 @@ local function make_snapshot()
     }
 end
 
+-- 验证快照有效性
 local function validate_snapshot(snapshot)
     if type(snapshot) ~= "table" then return false end
     if type(snapshot.snake) ~= "table" or #snapshot.snake < 1 then return false end
@@ -360,6 +397,7 @@ local function validate_snapshot(snapshot)
     return true
 end
 
+-- 恢复游戏快照
 local function restore_snapshot(snapshot)
     if not validate_snapshot(snapshot) then
         return false
@@ -412,6 +450,7 @@ local function restore_snapshot(snapshot)
     return true
 end
 
+-- 保存游戏状态
 local function save_game_state(show_toast)
     local ok = false
     local snapshot = make_snapshot()
@@ -436,6 +475,7 @@ local function save_game_state(show_toast)
     end
 end
 
+-- 加载游戏状态
 local function load_game_state()
     local ok, snapshot = false, nil
 
@@ -459,6 +499,7 @@ local function load_game_state()
     return false
 end
 
+-- 重置游戏
 local function reset_game()
     state.dir = "right"
     state.next_dir = "right"
@@ -489,6 +530,7 @@ local function reset_game()
     state.dirty = true
 end
 
+-- 防抖处理
 local function should_debounce(key)
     if key ~= "up" and key ~= "down" and key ~= "left" and key ~= "right" then
         return false
@@ -501,6 +543,7 @@ local function should_debounce(key)
     return false
 end
 
+-- 计算棋盘几何布局
 local function board_geometry()
     local w, h = terminal_size()
     local frame_w = GRID_W + 2
@@ -513,6 +556,7 @@ local function board_geometry()
     return x, y, frame_w, frame_h
 end
 
+-- 绘制外边框
 local function draw_outer_frame(x, y, frame_w, frame_h)
     draw_text(x, y, BORDER_TL .. string.rep(BORDER_H, frame_w - 2) .. BORDER_TR, "white", "black")
     for i = 1, frame_h - 2 do
@@ -522,12 +566,14 @@ local function draw_outer_frame(x, y, frame_w, frame_h)
     draw_text(x, y + frame_h - 1, BORDER_BL .. string.rep(BORDER_H, frame_w - 2) .. BORDER_BR, "white", "black")
 end
 
+-- 绘制状态栏
 local function draw_status(x, y)
     local term_w = terminal_size()
     draw_text(1, y - 3, string.rep(" ", term_w), "white", "black")
     draw_text(1, y - 2, string.rep(" ", term_w), "white", "black")
     draw_text(1, y - 1, string.rep(" ", term_w), "white", "black")
 
+    -- 截断长文本函数（确保文本不超过终端宽度）
     local function fit_line(line, max_w)
         if text_width(line) <= max_w then
             return line
@@ -548,6 +594,7 @@ local function draw_status(x, y)
         return out .. suffix
     end
 
+    -- 绘制居中行
     local function draw_centered_line(y_line, text, fg)
         local line = fit_line(text, math.max(1, term_w - 2))
         local x_line = math.floor((term_w - text_width(line)) / 2)
@@ -555,6 +602,7 @@ local function draw_status(x, y)
         draw_text(x_line, y_line, line, fg, "black")
     end
 
+    -- 显示最佳记录
     local best = tr("game.snake.best_score")
         .. " " .. tostring(state.best_score)
         .. "  "
@@ -562,6 +610,7 @@ local function draw_status(x, y)
         .. " " .. format_duration(state.best_time_sec)
     draw_centered_line(y - 3, best, "dark_gray")
 
+    -- 显示当前时间和分数
     local middle = tr("game.snake.time")
         .. " " .. format_duration(elapsed_seconds())
         .. "  "
@@ -569,6 +618,7 @@ local function draw_status(x, y)
         .. " " .. tostring(state.score)
     draw_centered_line(y - 2, middle, "light_cyan")
 
+    -- 显示提示信息
     if state.won then
         local line = tr("game.snake.win_banner")
             .. " "
@@ -592,13 +642,16 @@ local function draw_status(x, y)
     end
 end
 
+-- 绘制棋盘
 local function draw_board(x, y)
     draw_outer_frame(x, y, GRID_W + 2, GRID_H + 2)
 
+    -- 清空内部
     for yy = 1, GRID_H do
         draw_text(x + 1, y + yy, string.rep(" ", GRID_W), "white", "black")
     end
 
+    -- 绘制食物
     if state.normal_food ~= nil then
         draw_text(x + state.normal_food.x, y + state.normal_food.y, "$", "rgb(255,165,0)", "black")
     end
@@ -606,20 +659,21 @@ local function draw_board(x, y)
         draw_text(x + state.special_food.x, y + state.special_food.y, "%", "light_cyan", "black")
     end
 
+    -- 绘制蛇（从尾到头，让头在最上层）
     for i = #state.snake, 1, -1 do
         local part = state.snake[i]
         local color = "green"
         if i == 1 then
-            color = "yellow"
+            color = "yellow" -- 蛇头用黄色
         end
         draw_text(x + part.x, y + part.y, "\u{2588}", color, "black")
     end
 end
 
+-- 绘制控制说明
 local function draw_controls(y_bottom)
     local term_w = terminal_size()
-    local controls = tr(
-        "game.snake.controls")
+    local controls = tr("game.snake.controls")
 
     local max_w = math.max(10, term_w - 2)
     local lines = wrap_words(controls, max_w)
@@ -627,15 +681,18 @@ local function draw_controls(y_bottom)
         lines = { lines[1], lines[2], lines[3] }
     end
 
+    -- 清空控制区域
     draw_text(1, y_bottom + 1, string.rep(" ", term_w), "white", "black")
     draw_text(1, y_bottom + 2, string.rep(" ", term_w), "white", "black")
     draw_text(1, y_bottom + 3, string.rep(" ", term_w), "white", "black")
 
+    -- 垂直居中
     local offset = 0
     if #lines < 3 then
         offset = math.floor((3 - #lines) / 2)
     end
 
+    -- 绘制控制说明
     for i = 1, #lines do
         local line = lines[i]
         local cx = math.floor((term_w - text_width(line)) / 2)
@@ -644,6 +701,7 @@ local function draw_controls(y_bottom)
     end
 end
 
+-- 主渲染函数
 local function render()
     local x, y = board_geometry()
     draw_status(x, y)
@@ -651,6 +709,7 @@ local function render()
     draw_controls(y + GRID_H + 2)
 end
 
+-- 计算最小所需终端尺寸
 local function minimum_required_size()
     local frame_w = GRID_W + 2
     local frame_h = GRID_H + 2
@@ -663,9 +722,9 @@ local function minimum_required_size()
 
     local best_w = text_width(
         tr("game.snake.best_score") .. " 999999"
-            .. "  "
-            .. tr("game.snake.best_time")
-            .. " 00:00:00"
+        .. "  "
+        .. tr("game.snake.best_time")
+        .. " 00:00:00"
     )
 
     local score_w = text_width(tr("game.snake.time") .. " 00:00:00")
@@ -687,6 +746,7 @@ local function minimum_required_size()
     return min_w, min_h
 end
 
+-- 绘制终端尺寸警告
 local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
     local lines = {
         tr("warning.size_title"),
@@ -706,6 +766,7 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
     end
 end
 
+-- 确保终端尺寸足够
 local function ensure_terminal_size_ok()
     local term_w, term_h = terminal_size()
     local min_w, min_h = minimum_required_size()
@@ -738,6 +799,7 @@ local function ensure_terminal_size_ok()
     return false
 end
 
+-- 处理方向键输入
 local function handle_direction_key(key)
     local requested = nil
     if key == "up" or key == "k" then requested = "up" end
@@ -749,6 +811,7 @@ local function handle_direction_key(key)
         return false
     end
 
+    -- 不能直接掉头
     if requested == opposite_dir(state.dir) then
         return false
     end
@@ -757,6 +820,7 @@ local function handle_direction_key(key)
     return true
 end
 
+-- 计算下一个头部位置（支持穿越边界）
 local function next_head_position()
     local head = state.snake[1]
     local dx, dy = 0, 0
@@ -770,6 +834,7 @@ local function next_head_position()
     return nx, ny
 end
 
+-- 更新游戏逻辑（每帧调用）
 local function update_tick()
     if state.game_over or state.won or state.confirm_mode ~= nil then
         return
@@ -789,6 +854,7 @@ local function update_tick()
     local eat_special = state.special_food ~= nil and nx == state.special_food.x and ny == state.special_food.y
     local growing = eat_normal or eat_special
 
+    -- 检查是否撞到自己
     if snake_contains(nx, ny, growing) then
         state.game_over = true
         state.end_frame = state.frame
@@ -797,6 +863,7 @@ local function update_tick()
         return
     end
 
+    -- 移动蛇
     table.insert(state.snake, 1, { x = nx, y = ny })
 
     if eat_normal then
@@ -812,6 +879,7 @@ local function update_tick()
         table.remove(state.snake)
     end
 
+    -- 检查是否占满整个网格（胜利）
     if #state.snake >= GRID_W * GRID_H then
         state.won = true
         state.end_frame = state.frame
@@ -823,6 +891,7 @@ local function update_tick()
     state.dirty = true
 end
 
+-- 刷新脏标记
 local function refresh_dirty_flags()
     local elapsed = elapsed_seconds()
     if elapsed ~= state.last_elapsed_sec then
@@ -846,6 +915,7 @@ local function refresh_dirty_flags()
     end
 end
 
+-- 处理确认模式下的按键
 local function handle_confirm_key(key)
     if key == "y" or key == "enter" then
         if state.confirm_mode == "restart" then
@@ -868,6 +938,7 @@ local function handle_confirm_key(key)
     return "none"
 end
 
+-- 游戏初始化
 local function init_game()
     clear()
     load_best_record()
@@ -882,6 +953,7 @@ local function init_game()
     end
 end
 
+-- 主游戏循环
 local function game_loop()
     while true do
         local key = normalize_key(get_key(false))
@@ -937,5 +1009,6 @@ local function game_loop()
     end
 end
 
+-- 启动游戏
 init_game()
 game_loop()

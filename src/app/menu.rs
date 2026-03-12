@@ -16,6 +16,7 @@ pub const LOGO_ASCII: &str = r#"████████╗██╗   ██╗
    ╚═╝    ╚═════╝ ╚═╝     ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝"#;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 主菜单可触发的高层动作。
 pub enum MenuAction {
     Play,
     Continue,
@@ -25,6 +26,7 @@ pub enum MenuAction {
 }
 
 #[derive(Clone, Debug)]
+/// 单个主菜单项的数据描述。
 pub struct MenuItem {
     pub key: &'static str,
     pub shortcut: KeyCode,
@@ -32,6 +34,9 @@ pub struct MenuItem {
 }
 
 #[derive(Clone, Debug)]
+/// 主菜单状态。
+///
+/// 保存菜单项列表、当前选中项以及“继续游戏”关联的存档信息。
 pub struct Menu {
     items: Vec<MenuItem>,
     selected: usize,
@@ -40,7 +45,7 @@ pub struct Menu {
 }
 
 impl Menu {
-    /// Creates the default main menu.
+    /// 创建默认主菜单，初始化各项菜单项及其快捷键。
     pub fn new() -> Self {
         Self {
             items: vec![
@@ -76,24 +81,24 @@ impl Menu {
         }
     }
 
-    /// Returns all menu items.
+    /// 返回当前菜单的全部菜单项。
     pub fn items(&self) -> &[MenuItem] {
         &self.items
     }
 
-    /// Returns selected index.
+    /// 返回当前选中的菜单项下标。
     pub fn selected(&self) -> usize {
         self.selected
     }
 
-    /// Sets selected index when in range.
+    /// 在下标合法时更新当前选中项。
     pub fn set_selected(&mut self, index: usize) {
         if index < self.items.len() {
             self.selected = index;
         }
     }
 
-    /// Selects item matching a shortcut key if any.
+    /// 根据快捷键选中对应菜单项，匹配成功时返回 `true`。
     pub fn select_by_shortcut(&mut self, code: KeyCode) -> bool {
         if let Some(index) = self.items.iter().position(|item| item.shortcut == code) {
             self.selected = index;
@@ -102,7 +107,7 @@ impl Menu {
         false
     }
 
-    /// Selects next item.
+    /// 选中下一个菜单项，超出末尾时循环到开头。
     pub fn next(&mut self) {
         if self.items.is_empty() {
             return;
@@ -110,7 +115,7 @@ impl Menu {
         self.selected = (self.selected + 1) % self.items.len();
     }
 
-    /// Selects previous item.
+    /// 选中上一个菜单项，位于开头时循环到末尾。
     pub fn previous(&mut self) {
         if self.items.is_empty() {
             return;
@@ -122,29 +127,29 @@ impl Menu {
         };
     }
 
-    /// Returns action for selected item.
+    /// 返回当前选中菜单项对应的高层动作。
     pub fn selected_action(&self) -> Option<MenuAction> {
         self.items.get(self.selected).map(|it| it.action)
     }
 
-    /// Updates continue target game metadata.
+    /// 更新“继续游戏”对应的目标游戏信息。
     pub fn set_continue_target(&mut self, game_id: Option<String>, game_name: Option<String>) {
         self.continue_game_id = game_id;
         self.continue_game_name = game_name;
     }
 
-    /// Returns true when continue has a valid save target.
+    /// 判断“继续游戏”当前是否存在有效存档目标。
     pub fn can_continue(&self) -> bool {
         self.continue_game_id.is_some()
     }
 
-    /// Returns current continue game id if available.
+    /// 返回当前“继续游戏”关联的游戏 ID。
     pub fn continue_game_id(&self) -> Option<&str> {
         self.continue_game_id.as_deref()
     }
 }
 
-/// Renders the main menu screen.
+/// 渲染主菜单界面，包括 Logo、菜单项和版本提示。
 pub fn render_main_menu(
     frame: &mut ratatui::Frame<'_>,
     menu: &Menu,

@@ -12,6 +12,7 @@ use crate::utils::path_utils;
 const REQUIRED_KEYS: [&str; 3] = ["language_name", "language", "confirm_language"];
 
 #[derive(Clone, Debug)]
+/// 单个语言包的数据结构。
 pub struct LanguagePack {
     pub code: String,
     pub name: String,
@@ -19,6 +20,7 @@ pub struct LanguagePack {
 }
 
 #[derive(Clone, Debug)]
+/// 国际化系统的全局状态。
 struct I18nState {
     packs: Vec<LanguagePack>,
     fallback: LanguagePack,
@@ -34,7 +36,7 @@ static I18N: Lazy<RwLock<I18nState>> = Lazy::new(|| {
     })
 });
 
-/// Initializes i18n by loading language packs from assets/lang.
+/// 初始化国际化系统，并从 `assets/lang` 中加载全部语言包。
 pub fn init(default_code: &str) -> Result<()> {
     let mut packs = load_language_packs()?;
     packs.sort_by(|a, b| b.name.cmp(&a.name));
@@ -75,7 +77,7 @@ pub fn init(default_code: &str) -> Result<()> {
     Ok(())
 }
 
-/// Returns all valid language packs sorted by Unicode descending of language_name.
+/// 返回所有有效语言包，并按 `language_name` 的 Unicode 值降序排列。
 pub fn available_languages() -> Vec<LanguagePack> {
     if let Ok(state) = I18N.read() {
         return state.packs.clone();
@@ -83,7 +85,7 @@ pub fn available_languages() -> Vec<LanguagePack> {
     vec![builtin_english_pack()]
 }
 
-/// Returns current active language code.
+/// 返回当前正在使用的语言代码。
 pub fn current_language_code() -> String {
     if let Ok(state) = I18N.read() {
         return state.current_code.clone();
@@ -91,7 +93,7 @@ pub fn current_language_code() -> String {
     "us-en".to_string()
 }
 
-/// Switches active language by code.
+/// 根据语言代码切换当前语言，切换成功时返回 `true`。
 pub fn set_language(code: &str) -> bool {
     if let Ok(mut state) = I18N.write() {
         if state.packs.iter().any(|pack| pack.code == code) {
@@ -103,7 +105,7 @@ pub fn set_language(code: &str) -> bool {
     false
 }
 
-/// Looks up a key in current language with built-in English fallback.
+/// 在当前语言中查找指定键，缺失时回退到内置英文。
 pub fn t(key: &str) -> String {
     if let Ok(state) = I18N.read() {
         if let Some(current_pack) = state
@@ -124,7 +126,7 @@ pub fn t(key: &str) -> String {
     format!("[missing-i18n-key:{}]", key)
 }
 
-/// Looks up a key in a specific language code with English fallback.
+/// 在指定语言中查找指定键，缺失时回退到英文。
 pub fn t_for_code(code: &str, key: &str) -> String {
     if let Ok(state) = I18N.read() {
         if let Some(pack) = state.packs.iter().find(|pack| pack.code == code) {
@@ -141,7 +143,7 @@ pub fn t_for_code(code: &str, key: &str) -> String {
     format!("[missing-i18n-key:{}]", key)
 }
 
-/// Looks up a key in current language and falls back to provided text when missing.
+/// 在当前语言中查找键；如果依然缺失，则回退到调用方提供的文本。
 pub fn t_or(key: &str, fallback: &str) -> String {
     let value = t(key);
     if value.starts_with("[missing-i18n-key:") {

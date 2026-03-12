@@ -4,28 +4,34 @@
 
 **[English](../README.md)**
 
-# 本项目是
+# 本项目是做什么的？
 
-本项目基于 Rust 和 Lua 所制作的可在终端游玩的经典轻量级游戏合集，实现了在终端中游玩游戏的想法，支持国际化多语言和跨平台。
-Windows，Linux，MacOS
+你有想过在终端里玩游戏吗？这个项目就是我突发奇想，经过数日爆肝后，做出了这个由Rust和Lua共同打造的TUI游戏合集！
+在假装敲代码或者操作服务器的时候，悄摸摸的打开偷偷玩一把。
+(摸鱼这块)
+基本支持所有系统的终端：Windows，Linux，MacOS
 
 > 最新正式版：  
 > [![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600&label=Release&labelColor=cc8400&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
 
+> 官方网页
+> 开发中
+
 ## 目录
 
-- [实现的游戏](#实现的游戏)
+- [可玩的游戏](#可玩的游戏)
 - [语言支持](#语言支持)
 - [平台支持](#平台支持)
-- [其他特性](#其他特性)
+- [更多细节](#更多细节)
 - [安装指南](#安装指南)
   - [Windows](#Windows)
   - [Linux](#Linux)
   - [MacOS](#MacOS)
 - [界面截图](#界面截图)
-- [支持本项目](#支持本项目)
+- [支持本项目-点个星星！](#支持本项目-点个星星！)
+- [未来计划](#未来计划)
 
-## 实现的游戏
+## 可玩的游戏
 
 - [2048](#2048)
 - [二十一点](#二十一点)
@@ -56,6 +62,13 @@ Windows，Linux，MacOS
 - Windows
 - Linux
 - MacOS (仍需测试 bug)
+
+## 更多细节
+
+- 编译后的版本为**字节码**，不需要额外rust和lua编译器，下载即游玩
+- 自带终端**响应式**，大小不够的终端会有尺寸提示
+- 支持**自定义新增语言**，可在资源文件夹直接添加json语言文件
+- 部分游戏支持**存档**功能，便于持续性游玩
 
 ## 安装指南
 
@@ -89,24 +102,31 @@ windows-tui-game-init.bat
 ```text
 进入Releases界面:
 https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+
 下载压缩包 tui-game-windows.zip
+
 解压 tui-game-windows.zip
+
 运行 tg.bat 脚本
 ```
 
 #### - 源代码
 
-> 源代码版本，无任何自动服务
+> 源代码版本
 
 ```Shell
 # 新建文件夹
 mkdir tui-game
+
 # 进入文件夹
 cd tui-game
+
 # 拉取源代码
 git clone https://github.com/MXBraisedFish/TUI-GAME.git
+
 # 运行调试
 cargo run
+
 # 构建编译
 cargo build --release
 ```
@@ -141,8 +161,11 @@ sh linux-tui-game-init.sh
 ```text
 进入Releases界面:
 https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+
 下载压缩包 tui-game-linux.tar.gz
+
 解压 tui-game-linux.tar.gz
+
 运行 tui-game.sh 脚本
 ```
 
@@ -153,12 +176,16 @@ https://github.com/MXBraisedFish/TUI-GAME/releases/latest
 ```Shell
 # 新建文件夹
 mkdir tui-game
+
 # 进入文件夹
 cd tui-game
+
 # 拉取源代码
 git clone https://github.com/MXBraisedFish/TUI-GAME.git
+
 # 运行调试
 cargo run
+
 # 构建编译
 cargo build --release
 ```
@@ -193,8 +220,11 @@ sh macos-tui-game-init.sh
 ```text
 进入Releases界面:
 https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+
 下载压缩包 tui-game-macos.zip
+
 解压 tui-game-macos.zip
+
 运行 tui-game.sh 脚本
 ```
 
@@ -205,12 +235,16 @@ https://github.com/MXBraisedFish/TUI-GAME/releases/latest
 ```Shell
 # 新建文件夹
 mkdir tui-game
+
 # 进入文件夹
 cd tui-game
+
 # 拉取源代码
 git clone https://github.com/MXBraisedFish/TUI-GAME.git
+
 # 运行调试
 cargo run
+
 # 构建编译
 cargo build --release
 ```
@@ -293,10 +327,31 @@ cargo build --release
 
 ![Wordle](./image/wordle-zh-cn.png)
 
-## 支持本项目
+## 支持本项目-点个星星！
 
 如果您喜欢这个项目，请为我的仓库点一颗星星⭐！这也是我持续更新的动力。如果您有更好的想法或建议，欢迎提出 Issue。
 
 MacOS版本未经过测试，我没有相关的系统设备，如果您发现有Bug请及时反馈，十分感谢！
 
 GitHub Repo: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
+
+## 未来计划
+> 画大饼咯
+
+### 游戏计划
+1. 轮盘赌 - 包含经典的俄罗斯轮盘赌和有名的恶魔轮盘赌游戏
+2. 破译密码 - 包含多种经典密码破译
+3. 抽盲盒 - 更纯粹的拼运气游戏
+4. 公路赛车 - 在公路上飙车
+5. 地牢探险 - Roguelike地牢冒险
+6. 猜数字 - 在规定的对举内猜出数字
+7. 配颜色 - 根据参考色尽可能地调出相近地颜色
+8. Hitori(数阵去重) - 按照规则将重复的数字涂黑
+9. Nonogram(数织) - 按照提示涂出形状
+10. 接水管 - 让水流可以从起点流向重点
+11. Breakout(打砖块) - 反弹小球清空所有方块
+12. 绘图填色 - 在给定的图片里添上对应的颜色
+
+### 额外功能
+1. 模组制作 - 用户自己制作额外的游戏(目前已经完成了接口)
+2. 防老板功能 - 一键打开伪装功能界面，有效防止被老板发现摸鱼(而且会支持各个计算机行业：运维、前端、后端等等都会有，可设置)

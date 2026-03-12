@@ -15,6 +15,7 @@ use crate::app::stats::{
 };
 use crate::lua_bridge::script_loader::GameMeta;
 
+/// 游戏选择页的完整状态。
 pub struct GameSelection {
     games: Vec<GameMeta>,
     stats: HashMap<String, GameStats>,
@@ -33,19 +34,21 @@ pub struct GameSelection {
 }
 
 #[derive(Clone, Copy)]
+/// 列表分页状态。
 struct PageState {
     current_page: usize,
     page_size: usize,
     total_pages: usize,
 }
 
+/// 游戏选择页向主循环上报的高层动作。
 pub enum GameSelectionAction {
     BackToMenu,
     LaunchGame(GameMeta),
 }
 
 impl GameSelection {
-    /// Creates a game selection state from scanned games and local stats.
+    /// 根据扫描到的游戏列表和本地成绩数据创建游戏选择页状态。
     pub fn new(games: Vec<GameMeta>) -> Self {
         let stats = stats::load_stats();
         let lights_out_best = stats::load_lights_out_best();
@@ -84,7 +87,7 @@ impl GameSelection {
         }
     }
 
-    /// Handles keyboard events and returns high-level actions.
+    /// 处理游戏选择页按键事件，并返回需要主程序执行的高层动作。
     pub fn handle_event(&mut self, key: KeyEvent) -> Option<GameSelectionAction> {
         if self.launch_placeholder {
             self.launch_placeholder = false;
@@ -148,7 +151,7 @@ impl GameSelection {
         }
     }
 
-    /// Renders the game selection UI.
+    /// 渲染游戏选择界面，包括左侧列表和右侧详情面板。
     pub fn render(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {
         if self.launch_placeholder {
             self.render_launch_placeholder(frame, area);
@@ -179,7 +182,7 @@ impl GameSelection {
         frame.render_widget(hint_widget, root[1]);
     }
 
-    /// Returns the minimum terminal size needed for stable layout.
+    /// 返回游戏选择页稳定显示所需的最小终端尺寸。
     pub fn minimum_size(&self) -> (u16, u16) {
         let list_title = i18n::t("game_selection.panel.games");
         let detail_title = i18n::t("game_selection.panel.details");
@@ -765,15 +768,3 @@ impl GameSelection {
         self.list_state.select(Some(selected_in_page));
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-

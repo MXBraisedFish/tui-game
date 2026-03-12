@@ -85,7 +85,7 @@ local function tr(key)
 end
 
 -- 获取文本显示宽度
-local function key_width(text)
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then
@@ -110,7 +110,7 @@ local function wrap_words(text, max_width)
             current = token
         else
             local candidate = current .. " " .. token
-            if key_width(candidate) <= max_width then
+            if text_width(candidate) <= max_width then
                 current = candidate
             else
                 lines[#lines + 1] = current
@@ -130,7 +130,7 @@ end
 
 -- 计算在给定最大行数下所需的最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full = key_width(text)
+    local full = text_width(text)
     local width = hard_min
     while width <= full do
         if #wrap_words(text, width) <= max_lines then
@@ -282,7 +282,7 @@ end
 
 -- 计算文本居中位置
 local function centered_x(text, left_x, right_x)
-    local width = key_width(text)
+    local width = text_width(text)
     local x = left_x + math.floor(((right_x - left_x + 1) - width) / 2)
     if x < left_x then x = left_x end
     if x > right_x - width + 1 then
@@ -302,9 +302,9 @@ local function minimum_required_size()
         .. tr("game.color_memory.score") .. " 99999"
 
     local info_w = math.max(
-        key_width(tr("game.color_memory.confirm_restart")),
-        key_width(tr("game.color_memory.confirm_exit")),
-        key_width(
+        text_width(tr("game.color_memory.confirm_restart")),
+        text_width(tr("game.color_memory.confirm_exit")),
+        text_width(
             tr("game.color_memory.lose_banner")
             .. " "
             .. tr("game.color_memory.lose_controls")
@@ -313,7 +313,7 @@ local function minimum_required_size()
 
     local boxes_w = 4 * BOX_W + 3 * BOX_GAP
     local frame_w = math.max(48, boxes_w + 10, info_w + 2)
-    local min_w = math.max(frame_w + 2, controls_w + 2, key_width(best_line) + 2, key_width(curr_line) + 2)
+    local min_w = math.max(frame_w + 2, controls_w + 2, text_width(best_line) + 2, text_width(curr_line) + 2)
     local min_h = FRAME_H + 7
     return min_w, min_h
 end
@@ -330,7 +330,7 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
     local top = math.floor((term_h - #lines) / 2)
     if top < 1 then top = 1 end
     for i = 1, #lines do
-        local x = math.floor((term_w - key_width(lines[i])) / 2)
+        local x = math.floor((term_w - text_width(lines[i])) / 2)
         if x < 1 then x = 1 end
         draw_text(x, top + i - 1, lines[i], "white", "black")
     end

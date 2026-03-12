@@ -1,39 +1,50 @@
-﻿GAME_META = {
+﻿-- Wordle游戏元数据
+GAME_META = {
     name = "Wordle",
     description = "Guess the hidden word using color hints from each attempt."
 }
 
+-- 游戏常量
 local FPS, FRAME_MS = 60, 16
-local MAX_ATTEMPTS = 5
+local MAX_ATTEMPTS = 5 -- 最大尝试次数
 
+-- 游戏状态表
 local S = {
-    words = {},
-    secret = "",
-    word_len = 5,
-    guesses = {},
-    marks = {},
-    input = "",
-    mode = "input", -- input | action
-    confirm = nil, -- restart | exit
-    settled = false,
-    won = false,
+    -- 单词数据
+    words = {},   -- 所有可用单词列表
+    secret = "",  -- 当前要猜的秘密单词
+    word_len = 5, -- 单词长度
 
-    streak = 0,
-    best_time_sec = 0,
+    -- 游戏状态
+    guesses = {},    -- 已尝试的单词列表
+    marks = {},      -- 每个猜测的标记结果（correct/present/absent）
+    input = "",      -- 当前输入的字母
+    mode = "input",  -- 输入模式："input" 或 "action"
+    confirm = nil,   -- 确认模式
+    settled = false, -- 是否已结束（胜利或失败）
+    won = false,     -- 是否获胜
 
+    -- 统计记录
+    streak = 0,        -- 当前连胜次数
+    best_time_sec = 0, -- 最快完成时间
+
+    -- 时间相关
     frame = 0,
     start_frame = 0,
     end_frame = nil,
 
+    -- 提示消息
     toast = nil,
     toast_color = "green",
     toast_until = 0,
 
+    -- 渲染脏标记
     dirty = true,
     time_dirty = false,
     last_elapsed = -1,
     last_time_line = "",
 
+    -- 终端尺寸
     tw = 0,
     th = 0,
     warn = false,
@@ -43,6 +54,7 @@ local S = {
     lmh = 0,
 }
 
+-- 翻译函数（安全调用）
 local function tr(key)
     if type(translate) ~= "function" then
         return key
@@ -60,14 +72,16 @@ local function tr(key)
     return value
 end
 
-local function key(k)
+-- 规范化按键
+local function normalize_key(k)
     if k == nil then return "" end
     if type(k) == "string" then return string.lower(k) end
     if type(k) == "table" and type(k.code) == "string" then return string.lower(k.code) end
     return tostring(k):lower()
 end
 
-local function wid(t)
+-- 获取文本显示宽度
+local function text_width(t)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, t)
         if ok and type(w) == "number" then return w end
@@ -75,7 +89,8 @@ local function wid(t)
     return #t
 end
 
-local function ts()
+-- 获取终端尺寸
+local function terminal_size()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
         local tw, th = get_terminal_size()
@@ -84,34 +99,40 @@ local function ts()
     return w, h
 end
 
-local function sec()
+-- 计算已过秒数
+local function elapsed_seconds()
     local ef = S.end_frame or S.frame
     return math.max(0, math.floor((ef - S.start_frame) / FPS))
 end
 
-local function fmt(s)
+-- 格式化时间
+local function format_duration(s)
     local h = math.floor(s / 3600)
     local m = math.floor((s % 3600) / 60)
     local x = s % 60
     return string.format("%02d:%02d:%02d", h, m, x)
 end
 
-local function rnd(n)
+-- 随机整数 [0, n-1]
+local function rand_int(n)
     if n <= 0 then return 0 end
     if type(random) == "function" then return random(n) end
     return math.random(0, n - 1)
 end
 
-local function cx(text, l, r)
-    local x = l + math.floor(((r - l + 1) - wid(text)) / 2)
+-- 计算文本居中位置
+local function centered_x(text, l, r)
+    local x = l + math.floor(((r - l + 1) - text_width(text)) / 2)
     if x < l then x = l end
     return x
 end
 
+-- 清空一行
 local function clear_line(y, tw)
     draw_text(1, y, string.rep(" ", tw), "white", "black")
 end
 
+-- 读取文件内容
 local function read_file(path)
     if not io or not io.open then return nil end
     local f = io.open(path, "r")
@@ -121,6 +142,7 @@ local function read_file(path)
     return data
 end
 
+-- 加载单词列表
 local function load_words()
     local raw = read_file("assets/wordle/word.json")
     local words, seen = {}, {}
@@ -135,6 +157,7 @@ local function load_words()
         end
     end
 
+    -- 备用单词列表
     if #words == 0 then
         words = { "apple", "water", "green", "house", "sound", "light", "story", "music", "table", "clock" }
     end
@@ -142,28 +165,33 @@ local function load_words()
     S.words = words
 end
 
+-- 随机选择一个秘密单词
 local function pick_word()
     if #S.words == 0 then load_words() end
-    local idx = rnd(#S.words) + 1
+    local idx = rand_int(#S.words) + 1
     local w = S.words[idx]
     S.secret = string.lower(w)
     S.word_len = #S.secret
 end
 
+-- 获取字符串指定位置的字符
 local function char_at(str, i)
     return string.sub(str, i, i)
 end
 
+-- 评估猜测结果
 local function evaluate_guess(secret, guess)
     local n = #secret
     local marks, pool = {}, {}
 
+    -- 统计秘密单词中每个字母的出现次数
     for i = 1, n do
         local c = char_at(secret, i)
         pool[c] = (pool[c] or 0) + 1
         marks[i] = "absent"
     end
 
+    -- 先标记位置完全正确的字母
     for i = 1, n do
         local g = char_at(guess, i)
         local s = char_at(secret, i)
@@ -173,6 +201,7 @@ local function evaluate_guess(secret, guess)
         end
     end
 
+    -- 再标记存在但位置错误的字母
     for i = 1, n do
         if marks[i] ~= "correct" then
             local g = char_at(guess, i)
@@ -189,18 +218,21 @@ local function evaluate_guess(secret, guess)
     return marks
 end
 
+-- 保存最佳时间
 local function save_best_time()
     if type(save_data) == "function" then
         pcall(save_data, "wordle_best_time_sec", S.best_time_sec)
     end
 end
 
+-- 保存连胜次数
 local function save_streak()
     if type(save_data) == "function" then
         pcall(save_data, "wordle_streak", S.streak)
     end
 end
 
+-- 加载元数据（最佳时间和连胜）
 local function load_meta()
     if type(load_data) ~= "function" then return end
 
@@ -215,6 +247,7 @@ local function load_meta()
     end
 end
 
+-- 保存游戏进度
 local function save_slot()
     if type(save_game_slot) ~= "function" then return end
     local payload = {
@@ -224,7 +257,7 @@ local function save_slot()
         mode = S.mode,
         streak = S.streak,
         best_time_sec = S.best_time_sec,
-        elapsed_sec = sec(),
+        elapsed_sec = elapsed_seconds(),
         settled = S.settled,
         won = S.won,
     }
@@ -234,6 +267,7 @@ local function save_slot()
     S.toast_until = S.frame + FPS * 2
 end
 
+-- 加载游戏进度（如果是继续模式）
 local function load_slot_if_continue()
     if type(get_launch_mode) ~= "function" or type(load_game_slot) ~= "function" then return false end
     local mode = string.lower(tostring(get_launch_mode()))
@@ -242,13 +276,14 @@ local function load_slot_if_continue()
     local ok, slot = pcall(load_game_slot, "wordle")
     if not ok or type(slot) ~= "table" then return false end
     if type(slot.secret) ~= "string" or slot.secret == "" then return false end
-    if slot.settled then return false end
+    if slot.settled then return false end -- 已结束的游戏不继续
 
     S.secret = string.lower(slot.secret)
     S.word_len = #S.secret
     S.guesses = {}
     S.marks = {}
 
+    -- 恢复猜测记录
     if type(slot.guesses) == "table" then
         for i = 1, #slot.guesses do
             local g = tostring(slot.guesses[i]):lower()
@@ -259,6 +294,7 @@ local function load_slot_if_continue()
         end
     end
 
+    -- 恢复当前输入
     S.input = type(slot.input) == "string" and string.lower(slot.input) or ""
     if #S.input > S.word_len then
         S.input = string.sub(S.input, 1, S.word_len)
@@ -283,6 +319,7 @@ local function load_slot_if_continue()
     return true
 end
 
+-- 开始新的一轮
 local function new_round(preserve_streak)
     if not preserve_streak then
         S.streak = 0
@@ -303,6 +340,7 @@ local function new_round(preserve_streak)
     S.dirty = true
 end
 
+-- 结束当前回合
 local function settle(win)
     S.settled = true
     S.won = win
@@ -310,7 +348,7 @@ local function settle(win)
 
     if win then
         S.streak = S.streak + 1
-        local t = sec()
+        local t = elapsed_seconds()
         if S.best_time_sec <= 0 or t < S.best_time_sec then
             S.best_time_sec = t
             save_best_time()
@@ -325,6 +363,7 @@ local function settle(win)
     end
 end
 
+-- 获取状态文本
 local function status_text()
     if S.confirm == "restart" then
         return tr("game.wordle.confirm_restart"), "yellow"
@@ -347,6 +386,7 @@ local function status_text()
     return tr("game.wordle.mode_input"), "dark_gray"
 end
 
+-- 获取控制说明文本
 local function controls_text()
     if S.settled then
         return tr("game.wordle.controls_result")
@@ -357,18 +397,20 @@ local function controls_text()
     return tr("game.wordle.controls_input")
 end
 
-local function min_size()
-    local cw = wid(controls_text())
-    local row_w = wid("-> ") + S.word_len * 2 + 2
+-- 计算最小所需终端尺寸
+local function minimum_required_size()
+    local cw = text_width(controls_text())
+    local row_w = text_width("-> ") + S.word_len * 2 + 2
     local top_w = math.max(
-        wid(tr("game.wordle.best_time") .. " " .. fmt(0)),
-        wid(tr("game.wordle.time") .. " " .. fmt(0) .. "  " .. tr("game.wordle.streak") .. " 999")
+        text_width(tr("game.wordle.best_time") .. " " .. format_duration(0)),
+        text_width(tr("game.wordle.time") .. " " .. format_duration(0) .. "  " .. tr("game.wordle.streak") .. " 999")
     )
     local need_w = math.max(60, cw + 2, row_w + 8, top_w + 2)
     return need_w, 14
 end
 
-local function draw_warn(tw, th, mw, mh)
+-- 绘制终端尺寸警告
+local function draw_terminal_size_warning(tw, th, mw, mh)
     clear()
     local ls = {
         tr("warning.size_title"),
@@ -379,42 +421,52 @@ local function draw_warn(tw, th, mw, mh)
     local top = math.floor((th - #ls) / 2)
     if top < 1 then top = 1 end
     for i = 1, #ls do
-        draw_text(cx(ls[i], 1, tw), top + i - 1, ls[i], "white", "black")
+        draw_text(centered_x(ls[i], 1, tw), top + i - 1, ls[i], "white", "black")
     end
 end
 
-local function size_ok()
-    local tw, th = ts()
-    local mw, mh = min_size()
+-- 确保终端尺寸足够
+local function ensure_terminal_size_ok()
+    local tw, th = terminal_size()
+    local mw, mh = minimum_required_size()
     if tw >= mw and th >= mh then
-        if S.warn then clear(); S.dirty = true end
-        if tw ~= S.tw or th ~= S.th then clear(); S.dirty = true end
+        if S.warn then
+            clear()
+            S.dirty = true
+        end
+        if tw ~= S.tw or th ~= S.th then
+            clear()
+            S.dirty = true
+        end
         S.tw, S.th, S.warn = tw, th, false
         return true
     end
     local changed = (not S.warn) or S.lw ~= tw or S.lh ~= th or S.lmw ~= mw or S.lmh ~= mh
     if changed then
-        draw_warn(tw, th, mw, mh)
+        draw_terminal_size_warning(tw, th, mw, mh)
         S.lw, S.lh, S.lmw, S.lmh = tw, th, mw, mh
     end
     S.warn = true
     return false
 end
 
+-- 顶部时间行文本
 local function top_time_line()
-    return tr("game.wordle.time") .. " " .. fmt(sec()) .. "  " .. tr("game.wordle.streak") .. " " .. tostring(S.streak)
+    return tr("game.wordle.time") ..
+    " " .. format_duration(elapsed_seconds()) .. "  " .. tr("game.wordle.streak") .. " " .. tostring(S.streak)
 end
 
+-- 绘制单行猜测
 local function draw_guess_row(y, tw, idx)
     local prefix = "-> "
     local guess = S.guesses[idx]
     local marks = S.marks[idx]
 
-    local width = wid(prefix) + S.word_len * 2
-    local x = cx(string.rep(" ", width), 1, tw)
+    local width = text_width(prefix) + S.word_len * 2
+    local x = centered_x(string.rep(" ", width), 1, tw)
 
     draw_text(x, y, prefix, "white", "black")
-    x = x + wid(prefix)
+    x = x + text_width(prefix)
 
     for i = 1, S.word_len do
         local ch = " "
@@ -438,13 +490,14 @@ local function draw_guess_row(y, tw, idx)
     end
 end
 
+-- 绘制当前输入行
 local function draw_input_row(y, tw)
     local prefix = "  "
-    local width = wid(prefix) + S.word_len * 2
-    local x = cx(string.rep(" ", width), 1, tw)
+    local width = text_width(prefix) + S.word_len * 2
+    local x = centered_x(string.rep(" ", width), 1, tw)
 
     draw_text(x, y, prefix, "white", "black")
-    x = x + wid(prefix)
+    x = x + text_width(prefix)
 
     local show = S.input
     if S.settled then
@@ -468,21 +521,25 @@ local function draw_input_row(y, tw)
     end
 end
 
+-- 主渲染函数
 local function render()
-    local tw, th = ts()
+    local tw, th = terminal_size()
     local top = math.floor((th - 12) / 2)
     if top < 1 then top = 1 end
 
-    local best = tr("game.wordle.best_time") .. " " .. ((S.best_time_sec > 0) and fmt(S.best_time_sec) or tr("game.twenty_four.none"))
+    local best = tr("game.wordle.best_time") ..
+        " " .. ((S.best_time_sec > 0) and format_duration(S.best_time_sec) or tr("game.twenty_four.none"))
     local tline = top_time_line()
     local msg, mc = status_text()
 
+    -- 顶部区域
     for i = 0, 2 do clear_line(top + i, tw) end
-    draw_text(cx(best, 1, tw), top, best, "dark_gray", "black")
-    draw_text(cx(tline, 1, tw), top + 1, tline, "light_cyan", "black")
+    draw_text(centered_x(best, 1, tw), top, best, "dark_gray", "black")
+    draw_text(centered_x(tline, 1, tw), top + 1, tline, "light_cyan", "black")
     S.last_time_line = tline
-    draw_text(cx(msg, 1, tw), top + 2, msg, mc, "black")
+    draw_text(centered_x(msg, 1, tw), top + 2, msg, mc, "black")
 
+    -- 猜测区域
     local y0 = top + 4
     for i = 0, MAX_ATTEMPTS do clear_line(y0 + i, tw) end
     for i = 1, MAX_ATTEMPTS do
@@ -490,24 +547,27 @@ local function render()
     end
     draw_input_row(y0 + MAX_ATTEMPTS, tw)
 
+    -- 控制说明
     local controls = controls_text()
     clear_line(y0 + MAX_ATTEMPTS + 2, tw)
-    draw_text(cx(controls, 1, tw), y0 + MAX_ATTEMPTS + 2, controls, "white", "black")
+    draw_text(centered_x(controls, 1, tw), y0 + MAX_ATTEMPTS + 2, controls, "white", "black")
 end
 
+-- 仅更新时间显示（优化）
 local function render_time_only()
-    local tw, th = ts()
+    local tw, th = terminal_size()
     local top = math.floor((th - 12) / 2)
     if top < 1 then top = 1 end
     local tline = top_time_line()
 
-    local cw = math.max(wid(S.last_time_line or ""), wid(tline))
-    local x = cx(string.rep(" ", cw), 1, tw)
+    local cw = math.max(text_width(S.last_time_line or ""), text_width(tline))
+    local x = centered_x(string.rep(" ", cw), 1, tw)
     draw_text(x, top + 1, string.rep(" ", cw), "white", "black")
-    draw_text(cx(tline, 1, tw), top + 1, tline, "light_cyan", "black")
+    draw_text(centered_x(tline, 1, tw), top + 1, tline, "light_cyan", "black")
     S.last_time_line = tline
 end
 
+-- 应用当前猜测
 local function apply_guess()
     if #S.input ~= S.word_len then
         S.toast = tr("game.wordle.need_letters")
@@ -532,8 +592,9 @@ local function apply_guess()
     S.dirty = true
 end
 
-local function refresh_flags()
-    local e = sec()
+-- 刷新脏标记
+local function refresh_dirty_flags()
+    local e = elapsed_seconds()
     if e ~= S.last_elapsed then
         S.last_elapsed = e
         S.time_dirty = true
@@ -546,7 +607,8 @@ local function refresh_flags()
     end
 end
 
-local function handle_confirm(k)
+-- 处理确认模式按键
+local function handle_confirm_key(k)
     if k == "y" or k == "enter" then
         if S.confirm == "restart" then
             S.confirm = nil
@@ -566,6 +628,7 @@ local function handle_confirm(k)
     return "none"
 end
 
+-- 处理游戏进行中的按键
 local function handle_playing_key(k)
     if S.mode == "input" then
         if k == "tab" then
@@ -594,7 +657,7 @@ local function handle_playing_key(k)
         return "none"
     end
 
-    -- action mode
+    -- action模式
     if k == "tab" then
         S.mode = "input"
         S.dirty = true
@@ -618,6 +681,7 @@ local function handle_playing_key(k)
     return "none"
 end
 
+-- 处理游戏结束后的按键
 local function handle_settled_key(k)
     if k == "r" then
         new_round(S.won)
@@ -634,7 +698,8 @@ local function handle_settled_key(k)
     return "none"
 end
 
-local function init()
+-- 游戏初始化
+local function init_game()
     clear()
     if type(clear_input_buffer) == "function" then pcall(clear_input_buffer) end
 
@@ -646,23 +711,24 @@ local function init()
     end
 
     S.frame = 0
-    S.last_elapsed = sec()
+    S.last_elapsed = elapsed_seconds()
     S.time_dirty = false
     S.dirty = true
 end
 
-local function loop()
+-- 主游戏循环
+local function game_loop()
     while true do
-        if not size_ok() then
+        if not ensure_terminal_size_ok() then
             sleep(FRAME_MS)
             S.frame = S.frame + 1
         else
-            local k = key(get_key(false))
+            local k = normalize_key(get_key(false))
             local a = "none"
 
             if k ~= "" then
                 if S.confirm then
-                    a = handle_confirm(k)
+                    a = handle_confirm_key(k)
                 elseif S.settled then
                     a = handle_settled_key(k)
                 else
@@ -675,7 +741,7 @@ local function loop()
                 end
             end
 
-            refresh_flags()
+            refresh_dirty_flags()
             if S.dirty then
                 render()
                 S.dirty = false
@@ -691,5 +757,6 @@ local function loop()
     end
 end
 
-init()
-loop()
+-- 启动游戏
+init_game()
+game_loop()

@@ -1,140 +1,124 @@
 #!/bin/bash
-set -u
-echo "[INFO] Starting TUI-GAME installation for Linux..."
+set -eu
+
+echo "[1] 中文"
+echo "[2] English"
+read -r -p "Select language / 选择语言 (1/2): " CHOICE
+if [[ "$CHOICE" == "1" ]]; then
+    LANG_CODE="zh-cn"
+else
+    LANG_CODE="us-en"
+fi
+
+if [[ "$LANG_CODE" == "zh-cn" ]]; then
+    MSG_START="[信息] 开始安装 TUI-GAME..."
+    MSG_FETCH="[信息] 正在从 GitHub 获取最新版本信息..."
+    MSG_PARSE="[信息] 正在解析 Linux 安装包下载链接..."
+    MSG_DL="[信息] 正在下载安装包..."
+    MSG_EXTRACT="[信息] 正在解压文件到当前目录..."
+    MSG_LANG_INIT="[信息] 正在初始化语言设置..."
+    MSG_CLEAN="[信息] 已清理临时文件。"
+    MSG_ASK_PATH="是否创建 tg 快捷启动命令？(Y/N): "
+    MSG_LINK_OK="[成功] 已创建 tg 快捷启动命令。"
+    MSG_LINK_SKIP="[信息] 跳过快捷命令创建。"
+    MSG_DONE="[成功] TUI-GAME 安装完成。"
+    MSG_RUN="[信息] 你现在可以输入 tg 启动游戏。"
+    ERR_CURL="[错误] 未找到 curl。"
+    ERR_PY="[错误] 未找到 python3。"
+    ERR_TAR="[错误] 未找到 tar。"
+    ERR_FETCH="[错误] 下载版本信息失败。"
+    ERR_ASSET="[错误] 未找到 Linux 安装包。"
+    ERR_DL="[错误] 下载安装包失败。"
+    ERR_EXTRACT="[错误] 解压安装包失败。"
+    MSG_EXIT="[信息] 按任意键退出并删除安装脚本。"
+else
+    MSG_START="[INFO] Starting TUI-GAME installation..."
+    MSG_FETCH="[INFO] Fetching latest release information from GitHub..."
+    MSG_PARSE="[INFO] Extracting Linux package download URL..."
+    MSG_DL="[INFO] Downloading package..."
+    MSG_EXTRACT="[INFO] Extracting files to current directory..."
+    MSG_LANG_INIT="[INFO] Initializing language preference..."
+    MSG_CLEAN="[INFO] Temporary files cleaned up."
+    MSG_ASK_PATH="Create a tg launcher command? (Y/N): "
+    MSG_LINK_OK="[SUCCESS] tg launcher command created."
+    MSG_LINK_SKIP="[INFO] Skipping launcher creation."
+    MSG_DONE="[SUCCESS] TUI-GAME has been installed."
+    MSG_RUN="[INFO] You can now type tg to start the game."
+    ERR_CURL="[ERROR] curl was not found."
+    ERR_PY="[ERROR] python3 was not found."
+    ERR_TAR="[ERROR] tar was not found."
+    ERR_FETCH="[ERROR] Failed to download release information."
+    ERR_ASSET="[ERROR] Linux package asset was not found."
+    ERR_DL="[ERROR] Failed to download the package."
+    ERR_EXTRACT="[ERROR] Failed to extract the package."
+    MSG_EXIT="[INFO] Press any key to exit and delete this installer."
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR" || exit 1
+cd "$SCRIPT_DIR"
 
-if ! command -v curl >/dev/null 2>&1; then
-    echo "[ERROR] curl is required but not found."
-    read -n1 -r -p "Press any key to exit..."
-    exit 1
-fi
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "[ERROR] python3 is required but not found."
-    read -n1 -r -p "Press any key to exit..."
-    exit 1
-fi
-if ! command -v tar >/dev/null 2>&1; then
-    echo "[ERROR] tar is required but not found."
-    read -n1 -r -p "Press any key to exit..."
-    exit 1
-fi
+echo "$MSG_START"
+command -v curl >/dev/null 2>&1 || { echo "$ERR_CURL"; read -n1 -r; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "$ERR_PY"; read -n1 -r; exit 1; }
+command -v tar >/dev/null 2>&1 || { echo "$ERR_TAR"; read -n1 -r; exit 1; }
 
-# Step 1: Fetch latest release info
-echo "[INFO] Fetching latest release information from GitHub..."
 API_URL="https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest"
 TEMP_JSON=$(mktemp)
-
-if ! curl -s -L -o "$TEMP_JSON" "$API_URL"; then
-    echo "[ERROR] Failed to download release information. Check your internet connection."
-    rm -f "$TEMP_JSON"
-    read -n1 -r -p "Press any key to exit..."
-    exit 1
-fi
-
-# Step 2: Extract Linux package download URL
-echo "[INFO] Extracting download URL for Linux package..."
-ASSET_NAME="tui-game-linux.tar.gz"
-DOWNLOAD_URL=$(python3 -c "
-import sys, json
-try:
-    with open('$TEMP_JSON') as f:
-        data = json.load(f)
-    for asset in data.get('assets', []):
-        if asset.get('name') == '$ASSET_NAME':
-            print(asset.get('browser_download_url', ''))
-            break
-except Exception:
-    pass
-")
-
-if [ -z "$DOWNLOAD_URL" ]; then
-    echo "[ERROR] Could not find Linux asset '$ASSET_NAME' in the latest release."
-    rm -f "$TEMP_JSON"
-    read -n1 -r -p "Press any key to exit..."
-    exit 1
-fi
-echo "[INFO] Download URL: $DOWNLOAD_URL"
-rm -f "$TEMP_JSON"
-
-# Step 3: Download package
-echo "[INFO] Downloading game package..."
 TEMP_TGZ=$(mktemp).tar.gz
-if ! curl -s -L -o "$TEMP_TGZ" "$DOWNLOAD_URL"; then
-    echo "[ERROR] Failed to download game package."
-    rm -f "$TEMP_TGZ"
-    read -n1 -r -p "Press any key to exit..."
+
+echo "$MSG_FETCH"
+curl -s -L -o "$TEMP_JSON" "$API_URL" || { echo "$ERR_FETCH"; rm -f "$TEMP_JSON"; read -n1 -r; exit 1; }
+
+echo "$MSG_PARSE"
+DOWNLOAD_URL=$(python3 - <<PY
+import json
+url = ""
+with open(r"$TEMP_JSON", "r", encoding="utf-8") as f:
+    data = json.load(f)
+for asset in data.get("assets", []):
+    if asset.get("name") == "tui-game-linux.tar.gz":
+        url = asset.get("browser_download_url", "")
+        break
+print(url)
+PY
+)
+if [[ -z "$DOWNLOAD_URL" ]]; then
+    echo "$ERR_ASSET"
+    rm -f "$TEMP_JSON"
+    read -n1 -r
     exit 1
 fi
 
-# Step 4: Extract to current directory
-echo "[INFO] Extracting files to $SCRIPT_DIR ..."
-if ! tar -xzf "$TEMP_TGZ" -C "$SCRIPT_DIR"; then
-    echo "[ERROR] Failed to extract game package."
-    rm -f "$TEMP_TGZ"
-    read -n1 -r -p "Press any key to exit..."
-    exit 1
-fi
+echo "$MSG_DL"
+curl -s -L -o "$TEMP_TGZ" "$DOWNLOAD_URL" || { echo "$ERR_DL"; rm -f "$TEMP_JSON" "$TEMP_TGZ"; read -n1 -r; exit 1; }
 
-# Step 5: Set execute permissions
-chmod +x "$SCRIPT_DIR/tui-game" "$SCRIPT_DIR"/*.sh 2>/dev/null || true
+echo "$MSG_EXTRACT"
+tar -xzf "$TEMP_TGZ" -C "$SCRIPT_DIR" || { echo "$ERR_EXTRACT"; rm -f "$TEMP_JSON" "$TEMP_TGZ"; read -n1 -r; exit 1; }
 
-# Clean up temporary file
-rm -f "$TEMP_TGZ"
-echo "[INFO] Temporary files cleaned up."
+echo "$MSG_LANG_INIT"
+mkdir -p "$SCRIPT_DIR/tui-game-data"
+printf '%s\n' "$LANG_CODE" > "$SCRIPT_DIR/tui-game-data/language_pref.txt"
 
-# Step 6: Ask about adding to PATH (via symlink)
+chmod +x "$SCRIPT_DIR"/tui-game "$SCRIPT_DIR"/version "$SCRIPT_DIR"/updata "$SCRIPT_DIR"/remove "$SCRIPT_DIR"/*.sh "$SCRIPT_DIR"/scripts/bash/*.sh 2>/dev/null || true
+
+rm -f "$TEMP_JSON" "$TEMP_TGZ"
+echo "$MSG_CLEAN"
+
 echo
-read -p "Do you want to add the installation folder to your PATH environment variable? (Y/N): " ADD_PATH
+read -r -p "$MSG_ASK_PATH" ADD_PATH
 if [[ "$ADD_PATH" =~ ^[Yy]$ ]]; then
-    echo "[INFO] Setting up command 'tg'..."
-    TARGET_DIR="$HOME/.local/bin"
-    mkdir -p "$TARGET_DIR"
-    LINK_PATH="$TARGET_DIR/tg"
-    if [ -e "$LINK_PATH" ]; then
-        echo "[INFO] $LINK_PATH already exists. Skipping."
-    else
-        ln -s "$SCRIPT_DIR/tg.sh" "$LINK_PATH"
-        if [ $? -eq 0 ]; then
-            echo "[SUCCESS] Created symlink: $LINK_PATH -> $SCRIPT_DIR/tg.sh"
-            # Ensure ~/.local/bin is in PATH
-            if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-                echo "[INFO] Note: $HOME/.local/bin may not be in your PATH. Please add it manually."
-            fi
-        else
-            echo "[ERROR] Failed to create symlink. You may need to run with appropriate permissions."
-        fi
-    fi
-    REG_OPTION="yes"
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$SCRIPT_DIR/tg.sh" "$HOME/.local/bin/tg"
+    echo "$MSG_LINK_OK"
 else
-    echo "[INFO] Skipping symlink creation."
-    REG_OPTION="no"
-fi
-
-# Step 7: Final messages
-echo
-echo "[SUCCESS] TUI-GAME has been installed successfully!"
-echo =================================
-echo "[INFO] Enjoy the game! :)"
-echo
-echo "[INFO] If you like it, please give a star on GitHub: https://github.com/MXBraisedFish/TUI-GAME"
-echo "[INFO] Author: MXBraisedFish (MXFish)"
-echo =================================
-
-if [ "$REG_OPTION" = "yes" ]; then
-    echo "[INFO] You can start the game by typing 'tg' in any terminal (ensure ~/.local/bin is in PATH)."
-else
-    echo "[INFO] To start the game easily from anywhere, you can add this folder to your PATH or create a symlink, then use 'tg' command."
-    echo "[INFO] Current folder: $SCRIPT_DIR"
+    echo "$MSG_LINK_SKIP"
 fi
 
 echo
-echo "[INFO] Press any key to exit and delete this installer."
+echo "$MSG_DONE"
+echo "$MSG_RUN"
+echo
+echo "$MSG_EXIT"
 read -n1 -r
-
-# Delete this script itself
-rm -f "$0" && echo "[INFO] Installer removed." || echo "[ERROR] Failed to delete installer. Please remove it manually."
-
+rm -f "$0"
 exit 0
-

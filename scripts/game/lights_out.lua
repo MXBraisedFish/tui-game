@@ -90,7 +90,7 @@ local function tr(key)
 end
 
 -- 获取文本显示宽度
-local function key_width(text)
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then
@@ -115,7 +115,7 @@ local function wrap_words(text, max_width)
             current = token
         else
             local candidate = current .. " " .. token
-            if key_width(candidate) <= max_width then
+            if text_width(candidate) <= max_width then
                 current = candidate
             else
                 lines[#lines + 1] = current
@@ -135,7 +135,7 @@ end
 
 -- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full = key_width(text)
+    local full = text_width(text)
     local width = hard_min
     while width <= full do
         if #wrap_words(text, width) <= max_lines then
@@ -505,10 +505,10 @@ local function board_geometry()
     local grid_w = (state.size - 1) * CELL_STEP_X + CELL_W
     local grid_h = (state.size - 1) * CELL_STEP_Y + CELL_H
 
-    local status_w = key_width(tr("game.lights_out.time") .. " 00:00:00")
+    local status_w = text_width(tr("game.lights_out.time") .. " 00:00:00")
         + 2
-        + key_width(tr("game.lights_out.steps") .. " 9999")
-    local win_line_w = key_width(
+        + text_width(tr("game.lights_out.steps") .. " 9999")
+    local win_line_w = text_width(
         tr("game.lights_out.win_banner")
         .. tr("game.lights_out.win_controls")
     )
@@ -634,7 +634,7 @@ local function draw_status(x, y, frame_w)
     local time_text = tr("game.lights_out.time") .. " " .. format_duration(elapsed)
     local steps_text = tr("game.lights_out.steps") .. " " .. tostring(state.steps)
     local term_w = terminal_size()
-    local right_x = x + frame_w - key_width(steps_text)
+    local right_x = x + frame_w - text_width(steps_text)
     if right_x < 1 then right_x = 1 end
 
     -- 清空状态区域
@@ -697,7 +697,7 @@ local function draw_controls(x, y, frame_h)
     -- 绘制控制说明
     for i = 1, #lines do
         local line = lines[i]
-        local line_x = math.floor((term_w - key_width(line)) / 2)
+        local line_x = math.floor((term_w - text_width(line)) / 2)
         if line_x < 1 then line_x = 1 end
         draw_text(line_x, y + frame_h + 1 + offset + i - 1, line, "white", "black")
     end
@@ -756,10 +756,10 @@ local function minimum_required_size()
         3,
         24
     )
-    local status_w = key_width(tr("game.lights_out.time") .. " 00:00:00")
+    local status_w = text_width(tr("game.lights_out.time") .. " 00:00:00")
         + 2
-        + key_width(tr("game.lights_out.steps") .. " 9999")
-    local hint_w = key_width(tr("game.lights_out.input_jump_hint"))
+        + text_width(tr("game.lights_out.steps") .. " 9999")
+    local hint_w = text_width(tr("game.lights_out.input_jump_hint"))
 
     local min_w = math.max(frame_w, controls_w, status_w, hint_w) + 2
     -- 渲染范围是 [y-3, y+frame_h+3]，且 y 最小为6
@@ -782,7 +782,7 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
 
     for i = 1, #lines do
         local line = lines[i]
-        local x = math.floor((term_w - key_width(line)) / 2)
+        local x = math.floor((term_w - text_width(line)) / 2)
         if x < 1 then x = 1 end
         draw_text(x, top + i - 1, line, "white", "black")
     end

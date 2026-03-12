@@ -1,75 +1,199 @@
-GAME_META = {
+-- 飞机射击游戏元数据
+GAME_META                          = {
     name = "Air Shooter",
     description = "Pilot a fighter and dodge enemy fire."
 }
 
-local FPS = 60
-local FRAME_MS = 16
-local BOARD_W, BOARD_H = 32, 18
-local INNER_W, INNER_H = 30, 16
-local PLAYER_ROW = INNER_H
-local PLAYER_MIN_C, PLAYER_MAX_C = 2, 29
-local ENEMY_COL_MIN, ENEMY_COL_MAX = 2, 29
-local BASE_BOSS_SCORE = 100
-local BOSS_HP_BAR_W = 20
-local CH_DBL_TL = utf8.char(9556)  -- ╔
-local CH_DBL_TR = utf8.char(9559)  -- ╗
-local CH_DBL_BL = utf8.char(9562)  -- ╚
-local CH_DBL_BR = utf8.char(9565)  -- ╝
-local CH_DBL_H  = utf8.char(9552)  -- ═
-local CH_DBL_V  = utf8.char(9553)  -- ║
-local CH_BLOCK  = utf8.char(9608)  -- █
+-- 帧率控制
+local FPS                          = 60
+local FRAME_MS                     = 16
+local BOARD_W, BOARD_H             = 32, 18 -- 游戏区域大小
+local INNER_W, INNER_H             = 30, 16 -- 内部可活动区域
+local PLAYER_ROW                   = INNER_H -- 玩家所在行
+local PLAYER_MIN_C, PLAYER_MAX_C   = 2, 29 -- 玩家左右边界
+local ENEMY_COL_MIN, ENEMY_COL_MAX = 2, 29 -- 敌人出现范围
+local BASE_BOSS_SCORE              = 100   -- 触发Boss的基础分数
+local BOSS_HP_BAR_W                = 20    -- Boss血条宽度
 
-local ENEMY_TYPES = {
-    normal = { glyph = "V", color = "rgb(255,170,170)", score = 2, hp = 2, speed = 2, collide = 2, shooter = true, bullet = "v", base_dmg = 1, tracking = false, shot_active = 3.0, shot_idle = 6.0 },
-    fast =   { glyph = "Y", color = "rgb(255,170,170)", score = 1, hp = 1, speed = 4, collide = 3, shooter = false, bullet = "",  base_dmg = 0, tracking = false },
-    tank =   { glyph = "W", color = "rgb(255,170,170)", score = 3, hp = 6, speed = 1, collide = 4, shooter = true, bullet = "v", base_dmg = 1, tracking = false, shot_active = 6.0, shot_idle = 8.0 },
-    heavy =  { glyph = "U", color = "rgb(255,170,170)", score = 4, hp = 2, speed = 2, collide = 2, shooter = true, bullet = "u", base_dmg = 4, tracking = true, shot_active = 8.0, shot_idle = 12.0 },
+-- 边框字符
+local CH_DBL_TL                    = utf8.char(9556) -- ╔
+local CH_DBL_TR                    = utf8.char(9559) -- ╗
+local CH_DBL_BL                    = utf8.char(9562) -- ╚
+local CH_DBL_BR                    = utf8.char(9565) -- ╝
+local CH_DBL_H                     = utf8.char(9552) -- ═
+local CH_DBL_V                     = utf8.char(9553) -- ║
+local CH_BLOCK                     = utf8.char(9608) -- █
+
+-- 敌人类型定义
+local ENEMY_TYPES                  = {
+    normal = {
+        glyph = "V",
+        color = "rgb(255,170,170)",
+        score = 2,
+        hp = 2,
+        speed = 2,
+        collide = 2,
+        shooter = true,
+        bullet = "v",
+        base_dmg = 1,
+        tracking = false,
+        shot_active = 3.0,
+        shot_idle = 6.0
+    },
+    fast = {
+        glyph = "Y",
+        color = "rgb(255,170,170)",
+        score = 1,
+        hp = 1,
+        speed = 4,
+        collide = 3,
+        shooter = false
+    },
+    tank = {
+        glyph = "W",
+        color = "rgb(255,170,170)",
+        score = 3,
+        hp = 6,
+        speed = 1,
+        collide = 4,
+        shooter = true,
+        bullet = "v",
+        base_dmg = 1,
+        tracking = false,
+        shot_active = 6.0,
+        shot_idle = 8.0
+    },
+    heavy = {
+        glyph = "U",
+        color = "rgb(255,170,170)",
+        score = 4,
+        hp = 2,
+        speed = 2,
+        collide = 2,
+        shooter = true,
+        bullet = "u",
+        base_dmg = 4,
+        tracking = true,
+        shot_active = 8.0,
+        shot_idle = 12.0
+    },
 }
 
-local ATTACK_BUFF = {
-    ["@"] = { mode = "rapid", dur = 4 },
-    ["%"] = { mode = "laser", dur = 10 },
-    ["$"] = { mode = "double", dur = 10 },
-    ["#"] = { mode = "single", dur = 10 },
-    ["&"] = { mode = "missile", dur = 12 },
+-- 攻击型道具
+local ATTACK_BUFF                  = {
+    ["@"] = { mode = "rapid", dur = 4 },    -- 快速射击
+    ["%"] = { mode = "laser", dur = 10 },   -- 激光
+    ["$"] = { mode = "double", dur = 10 },  -- 双重射击
+    ["#"] = { mode = "single", dur = 10 },  -- 单发强击
+    ["&"] = { mode = "missile", dur = 12 }, -- 追踪导弹
 }
 
-local FUNC_BUFF = {
-    ["*"] = { mode = "shield", dur = 4 },
-    ["~"] = { mode = "heal", dur = 0 },
-    ["o"] = { mode = "coin", dur = 0 },
-    ["c"] = { mode = "magnet", dur = 20 },
-    ["+"] = { mode = "bullet_speed", dur = 20 },
-    ["G"] = { mode = "nuke", dur = 0 },
+-- 功能型道具
+local FUNC_BUFF                    = {
+    ["*"] = { mode = "shield", dur = 4 },        -- 护盾
+    ["~"] = { mode = "heal", dur = 0 },          -- 回血
+    ["o"] = { mode = "coin", dur = 0 },          -- 金币
+    ["c"] = { mode = "magnet", dur = 20 },       -- 磁铁
+    ["+"] = { mode = "bullet_speed", dur = 20 }, -- 子弹加速
+    ["G"] = { mode = "nuke", dur = 0 },          -- 核弹
 }
 
-local state = {
-    frame = 0, dirty = true, launch_mode = "new",
-    player_c = math.floor((PLAYER_MIN_C + PLAYER_MAX_C) / 2), player_last_dir = 1,
-    hp = 10, score = 0, stage = 1, next_boss_score = BASE_BOSS_SCORE,
-    run_start_frame = 0, end_frame = nil, phase = "playing", confirm_mode = nil,
+-- 游戏状态表
+local state                        = {
+    -- 基础状态
+    frame = 0,
+    dirty = true,
+    launch_mode = "new",
 
-    enemies = {}, enemy_bullets = {}, player_bullets = {}, items = {},
+    -- 玩家
+    player_c = math.floor((PLAYER_MIN_C + PLAYER_MAX_C) / 2),
+    player_last_dir = 1, -- 上次移动方向（用于预测）
+    hp = 10,
+    score = 0,
+    stage = 1,
+    next_boss_score = BASE_BOSS_SCORE,
 
-    boss = { active = false, row = 1, center_c = 15, hp = 0, max_hp = 1, mode = "attack", mode_until = 0, next_move_at = 0, next_shot_at = 0, start_frame = 0, chase_cd_until = 0 },
+    -- 时间
+    run_start_frame = 0,
+    end_frame = nil,
+    phase = "playing", -- playing/lost/won
+    confirm_mode = nil,
 
-    attack_symbol = nil, attack_until = 0, missile_shots = 0, missile_last = 0, last_player_fire = 0,
-    buff_until = { ["*"] = 0, ["c"] = 0, ["+"] = 0 }, buff_order = {},
-    hurt_invuln_until = 0,
-    nuke_stock = 0, fire_mode = "auto", enemy_spawn_block_until = 0, boom_until = 0,
+    -- 实体列表
+    enemies = {},
+    enemy_bullets = {},
+    player_bullets = {},
+    items = {},
 
-    next_enemy_spawn_at = 0, next_item_spawn_at = 0,
-    msg_text = "", msg_color = "dark_gray", msg_until = 0, msg_persistent = false,
+    -- Boss
+    boss = {
+        active = false,
+        row = 1,
+        center_c = 15,
+        hp = 0,
+        max_hp = 1,
+        mode = "attack",
+        mode_until = 0,
+        next_move_at = 0,
+        next_shot_at = 0,
+        start_frame = 0,
+        chase_cd_until = 0,
+    },
 
-    best_score = 0, best_stage = 1, result_committed = false,
+    -- 玩家状态
+    attack_symbol = nil,
+    attack_until = 0,
+    missile_shots = 0,
+    missile_last = 0,
+    last_player_fire = 0,
+
+    -- Buff状态
+    buff_until = { ["*"] = 0, ["c"] = 0, ["+"] = 0 },
+    buff_order = {}, -- 用于显示顺序
+
+    -- 伤害相关
+    hurt_invuln_until = 0, -- 受伤无敌直到
+
+    -- 核弹
+    nuke_stock = 0,
+
+    -- 射击模式
+    fire_mode = "auto", -- auto/manual
+
+    -- 生成控制
+    enemy_spawn_block_until = 0, -- 禁止生成敌人直到
+    boom_until = 0,              -- BOOM特效直到
+
+    -- 生成计时器
+    next_enemy_spawn_at = 0,
+    next_item_spawn_at = 0,
+
+    -- 消息
+    msg_text = "",
+    msg_color = "dark_gray",
+    msg_until = 0,
+    msg_persistent = false,
+
+    -- 最佳记录
+    best_score = 0,
+    best_stage = 1,
+    result_committed = false,
+
+    -- 时间刷新
     last_elapsed = -1,
 
-    last_area = nil, last_term_w = 0, last_term_h = 0,
+    -- 渲染
+    last_area = nil,
+    last_term_w = 0,
+    last_term_h = 0,
     size_warning_active = false,
-    last_warn_term_w = 0, last_warn_term_h = 0, last_warn_min_w = 0, last_warn_min_h = 0,
+    last_warn_term_w = 0,
+    last_warn_term_h = 0,
+    last_warn_min_w = 0,
+    last_warn_min_h = 0,
 }
 
+-- 翻译函数（安全调用）
 local function tr(key)
     if type(translate) ~= "function" then
         return key
@@ -87,7 +211,8 @@ local function tr(key)
     return value
 end
 
-local function key_width(t)
+-- 获取文本宽度
+local function text_width(t)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, t)
         if ok and type(w) == "number" then return w end
@@ -95,27 +220,56 @@ local function key_width(t)
     return #t
 end
 
-local function clamp(v, lo, hi) if v < lo then return lo end if v > hi then return hi end return v end
-local function rand_int(n) if n <= 0 or type(random) ~= "function" then return 0 end return random(n) end
-local function rand_range(lo, hi) if hi <= lo then return lo end return lo + rand_int(hi - lo + 1) end
-local function sec_to_frames(sec) return math.max(1, math.floor(sec * FPS + 0.5)) end
-local function speed_to_interval(cps) if cps <= 0 then return sec_to_frames(999) end return math.max(1, math.floor(FPS / cps + 0.5)) end
+-- 数值限幅
+local function clamp(v, lo, hi)
+    if v < lo then return lo end
+    if v > hi then return hi end
+    return v
+end
 
+-- 随机整数 [1, n]
+local function rand_int(n)
+    if n <= 0 or type(random) ~= "function" then return 0 end
+    return random(n)
+end
+
+-- 随机范围 [lo, hi]
+local function rand_range(lo, hi)
+    if hi <= lo then return lo end
+    return lo + rand_int(hi - lo + 1)
+end
+
+-- 秒转帧数
+local function sec_to_frames(sec)
+    return math.max(1, math.floor(sec * FPS + 0.5))
+end
+
+-- 每秒次数转帧间隔
+local function speed_to_interval(cps)
+    if cps <= 0 then return sec_to_frames(999) end
+    return math.max(1, math.floor(FPS / cps + 0.5))
+end
+
+-- 获取终端尺寸
 local function terminal_size()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
         local tw, th = get_terminal_size()
-        if type(tw) == "number" and type(th) == "number" then w, h = tw, th end
+        if type(tw) == "number" and type(th) == "number" then
+            w, h = tw, th
+        end
     end
     return w, h
 end
 
+-- 规范化按键
 local function normalize_key(key)
     if key == nil then return "" end
     if type(key) == "string" then return string.lower(key) end
     return tostring(key):lower()
 end
 
+-- 读取启动模式
 local function read_launch_mode()
     if type(get_launch_mode) ~= "function" then return "new" end
     local ok, mode = pcall(get_launch_mode)
@@ -124,11 +278,13 @@ local function read_launch_mode()
     return mode == "continue" and "continue" or "new"
 end
 
+-- 计算已过秒数
 local function elapsed_seconds()
     local ending = state.end_frame or state.frame
     return math.max(0, math.floor((ending - state.run_start_frame) / FPS))
 end
 
+-- 格式化时间
 local function format_duration(sec)
     local h = math.floor(sec / 3600)
     local m = math.floor((sec % 3600) / 60)
@@ -136,6 +292,7 @@ local function format_duration(sec)
     return string.format("%02d:%02d:%02d", h, m, s)
 end
 
+-- 显示消息
 local function show_message(text, color, dur_sec, persistent)
     state.msg_text = text or ""
     state.msg_color = color or "dark_gray"
@@ -148,6 +305,7 @@ local function show_message(text, color, dur_sec, persistent)
     state.dirty = true
 end
 
+-- 清除消息
 local function clear_message()
     if state.msg_text ~= "" then
         state.msg_text = ""
@@ -158,31 +316,46 @@ local function clear_message()
     end
 end
 
+-- 更新消息计时器
 local function update_message_timer()
     if state.msg_persistent then return end
-    if state.msg_until > 0 and state.frame >= state.msg_until then clear_message() end
+    if state.msg_until > 0 and state.frame >= state.msg_until then
+        clear_message()
+    end
 end
 
+-- 填充矩形
 local function fill_rect(x, y, w, h, bg)
     if w <= 0 or h <= 0 then return end
     local line = string.rep(" ", w)
-    for i = 0, h - 1 do draw_text(x, y + i, line, "white", bg or "black") end
+    for i = 0, h - 1 do
+        draw_text(x, y + i, line, "white", bg or "black")
+    end
 end
 
+-- 计算居中X坐标
 local function centered_x(text, x, w)
-    local px = x + math.floor((w - key_width(text)) / 2)
+    local px = x + math.floor((w - text_width(text)) / 2)
     if px < x then px = x end
     return px
 end
 
+-- 按单词换行
 local function wrap_words(text, max_width)
     if max_width <= 1 then return { text } end
     local lines, cur, had = {}, "", false
     for token in string.gmatch(text, "%S+") do
         had = true
-        if cur == "" then cur = token else
+        if cur == "" then
+            cur = token
+        else
             local cand = cur .. " " .. token
-            if key_width(cand) <= max_width then cur = cand else lines[#lines + 1] = cur; cur = token end
+            if text_width(cand) <= max_width then
+                cur = cand
+            else
+                lines[#lines + 1] = cur
+                cur = token
+            end
         end
     end
     if not had then return { "" } end
@@ -190,8 +363,10 @@ local function wrap_words(text, max_width)
     return lines
 end
 
+-- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full, w = key_width(text), hard_min
+    local full = text_width(text)
+    local w = hard_min
     while w <= full do
         if #wrap_words(text, w) <= max_lines then return w end
         w = w + 1
@@ -199,9 +374,12 @@ local function min_width_for_lines(text, max_lines, hard_min)
     return full
 end
 
+-- 权重随机选择
 local function choose_weighted(entries)
     local total = 0
-    for i = 1, #entries do total = total + entries[i].w end
+    for i = 1, #entries do
+        total = total + entries[i].w
+    end
     if total <= 0 then return entries[1] end
     local pick = rand_int(total) + 1
     local acc = 0
@@ -212,57 +390,81 @@ local function choose_weighted(entries)
     return entries[#entries]
 end
 
+-- 获取关卡等级（从0开始）
 local function stage_level()
     return math.max(0, state.stage - 1)
 end
 
+-- 缩放玩家伤害
 local function scale_player_dmg(base)
     local s = stage_level()
     local mult = math.max(1, s / 2)
     return math.max(1, math.floor(base * mult))
 end
 
+-- 缩放敌人子弹伤害
 local function scale_enemy_bullet_dmg(base)
     local s = stage_level()
     local mult = math.max(1, s / 2)
     return clamp(math.floor(base * mult), 1, 10)
 end
 
+-- 缩放敌人血量
 local function scale_enemy_hp(base)
     local s = stage_level()
     if s <= 0 then return base end
     return base + math.floor(math.max(1, (s ^ 1.5) / 3))
 end
 
+-- 缩放敌人碰撞伤害
 local function scale_enemy_collide(base)
     local s = stage_level()
     if s <= 0 then return clamp(base, 1, 10) end
     return clamp(base + math.floor(math.max(1, s / 4)), 1, 10)
 end
 
+-- 缩放Boss血量
 local function scale_boss_hp(base)
     local s = stage_level()
     return math.max(1, math.floor(base * math.max(1, s / 2)))
 end
 
-local function has_magnet() return state.buff_until["c"] > state.frame end
-local function has_shield() return state.buff_until["*"] > state.frame end
-local function has_bullet_speed() return state.buff_until["+"] > state.frame end
+-- 是否有磁铁
+local function has_magnet()
+    return state.buff_until["c"] > state.frame
+end
 
+-- 是否有护盾
+local function has_shield()
+    return state.buff_until["*"] > state.frame
+end
+
+-- 是否有子弹加速
+local function has_bullet_speed()
+    return state.buff_until["+"] > state.frame
+end
+
+-- 玩家是否无敌（受伤无敌或护盾）
 local function player_invuln_active()
     local inv = state.hurt_invuln_until
-    if state.buff_until["*"] > inv then inv = state.buff_until["*"] end
+    if state.buff_until["*"] > inv then
+        inv = state.buff_until["*"]
+    end
     return state.frame < inv
 end
 
+-- 获取玩家颜色（受伤时闪烁）
 local function player_color()
     if player_invuln_active() then
-        if (state.frame // 6) % 2 == 0 then return "yellow" end
+        if (state.frame // 6) % 2 == 0 then
+            return "yellow"
+        end
         return "light_cyan"
     end
     return "yellow"
 end
 
+-- 清空所有实体
 local function clear_world_entities()
     state.enemies = {}
     state.enemy_bullets = {}
@@ -270,17 +472,24 @@ local function clear_world_entities()
     state.items = {}
 end
 
+-- 从Buff顺序中移除
 local function remove_buff_order(symbol)
     local out = {}
-    for i = 1, #state.buff_order do if state.buff_order[i] ~= symbol then out[#out + 1] = state.buff_order[i] end end
+    for i = 1, #state.buff_order do
+        if state.buff_order[i] ~= symbol then
+            out[#out + 1] = state.buff_order[i]
+        end
+    end
     state.buff_order = out
 end
 
+-- 触碰Buff顺序（移到末尾）
 local function touch_buff_order(symbol)
     remove_buff_order(symbol)
     state.buff_order[#state.buff_order + 1] = symbol
 end
 
+-- 清除所有Buff
 local function clear_buffs()
     state.attack_symbol = nil
     state.attack_until = 0
@@ -292,6 +501,7 @@ local function clear_buffs()
     state.buff_order = {}
 end
 
+-- 加载最佳记录
 local function load_best_records()
     if type(load_data) ~= "function" then return end
     local ok, data = pcall(load_data, "shooter_best")
@@ -302,25 +512,39 @@ local function load_best_records()
     if bt ~= nil and bt >= 1 then state.best_stage = math.floor(bt) end
 end
 
+-- 保存最佳记录
 local function save_best_records()
     if type(save_data) ~= "function" then return end
     pcall(save_data, "shooter_best", { best_score = state.best_score, best_stage = state.best_stage })
 end
 
+-- 更新最佳记录
 local function update_best_records()
     local changed = false
-    if state.score > state.best_score then state.best_score = state.score; changed = true end
-    if state.stage > state.best_stage then state.best_stage = state.stage; changed = true end
-    if changed then save_best_records() end
+    if state.score > state.best_score then
+        state.best_score = state.score
+        changed = true
+    end
+    if state.stage > state.best_stage then
+        state.best_stage = state.stage
+        changed = true
+    end
+    if changed then
+        save_best_records()
+    end
 end
 
+-- 提交游戏结果
 local function commit_result_once()
     if state.result_committed then return end
     update_best_records()
-    if type(update_game_stats) == "function" then pcall(update_game_stats, "shooter", state.score, elapsed_seconds()) end
+    if type(update_game_stats) == "function" then
+        pcall(update_game_stats, "shooter", state.score, elapsed_seconds())
+    end
     state.result_committed = true
 end
 
+-- 创建游戏快照（用于保存）
 local function make_snapshot()
     local function cp(src)
         local out = {}
@@ -380,6 +604,7 @@ local function make_snapshot()
     }
 end
 
+-- 保存游戏状态
 local function save_game_state(show_toast)
     local ok = false
     local snap = make_snapshot()
@@ -401,6 +626,7 @@ local function save_game_state(show_toast)
     end
 end
 
+-- 恢复游戏快照
 local function restore_snapshot(snap)
     if type(snap) ~= "table" then return false end
 
@@ -425,7 +651,8 @@ local function restore_snapshot(snap)
     state.buff_until["+"] = state.frame + sec_to_frames(math.max(0, tonumber(snap.bullet_speed_left) or 0))
     state.hurt_invuln_until = state.frame + sec_to_frames(math.max(0, tonumber(snap.hurt_invuln_left) or 0))
     state.nuke_stock = clamp(math.floor(tonumber(snap.nuke_stock) or 0), 0, 3)
-    state.fire_mode = (type(snap.fire_mode) == "string" and string.lower(snap.fire_mode) == "manual") and "manual" or "auto"
+    state.fire_mode = (type(snap.fire_mode) == "string" and string.lower(snap.fire_mode) == "manual") and "manual" or
+    "auto"
     state.enemy_spawn_block_until = state.frame + sec_to_frames(math.max(0, tonumber(snap.enemy_spawn_block_left) or 0))
     state.boom_until = state.frame + sec_to_frames(math.max(0, tonumber(snap.boom_left) or 0))
 
@@ -446,6 +673,7 @@ local function restore_snapshot(snap)
         return state.frame + left
     end
 
+    -- 重置敌人计时器
     for i = 1, #state.enemies do
         local e = state.enemies[i]
         if type(e) == "table" then
@@ -460,6 +688,7 @@ local function restore_snapshot(snap)
         end
     end
 
+    -- 重置敌人子弹计时器
     for i = 1, #state.enemy_bullets do
         local b = state.enemy_bullets[i]
         if type(b) == "table" then
@@ -468,6 +697,7 @@ local function restore_snapshot(snap)
         end
     end
 
+    -- 重置玩家子弹计时器
     for i = 1, #state.player_bullets do
         local b = state.player_bullets[i]
         if type(b) == "table" then
@@ -476,6 +706,7 @@ local function restore_snapshot(snap)
         end
     end
 
+    -- 重置物品计时器
     for i = 1, #state.items do
         local it = state.items[i]
         if type(it) == "table" then
@@ -483,6 +714,7 @@ local function restore_snapshot(snap)
         end
     end
 
+    -- 恢复Boss状态
     if type(snap.boss) == "table" then
         local b = snap.boss
         state.boss.active = b.active == true
@@ -518,39 +750,49 @@ local function restore_snapshot(snap)
     return true
 end
 
+-- 加载游戏状态
 local function load_game_state()
     local ok, snap = false, nil
     if type(load_game_slot) == "function" then
         local s, ret = pcall(load_game_slot, "shooter")
-        ok = s and type(ret) == "table"; snap = ret
+        ok = s and type(ret) == "table"
+        snap = ret
     elseif type(load_data) == "function" then
         local s, ret = pcall(load_data, "shooter")
-        ok = s and type(ret) == "table"; snap = ret
+        ok = s and type(ret) == "table"
+        snap = ret
     end
     if not ok then return false end
     return restore_snapshot(snap)
 end
 
+-- 重置生成计时器
 local function reset_spawn_timers()
     state.next_enemy_spawn_at = state.frame + sec_to_frames(3)
     state.next_item_spawn_at = state.frame + sec_to_frames(rand_range(5, 10))
 end
 
+-- 重置游戏
 local function reset_run()
-    state.score = 0; state.stage = 1; state.next_boss_score = BASE_BOSS_SCORE
+    state.score = 0
+    state.stage = 1
+    state.next_boss_score = BASE_BOSS_SCORE
     state.hp = 10
     state.player_c = math.floor((PLAYER_MIN_C + PLAYER_MAX_C) / 2)
     state.player_last_dir = 1
 
-    clear_world_entities(); clear_buffs()
+    clear_world_entities()
+    clear_buffs()
     state.hurt_invuln_until = 0
     state.nuke_stock = 0
     state.fire_mode = "auto"
     state.enemy_spawn_block_until = state.frame
     state.boom_until = 0
 
-    state.phase = "playing"; state.confirm_mode = nil
-    state.run_start_frame = state.frame; state.end_frame = nil
+    state.phase = "playing"
+    state.confirm_mode = nil
+    state.run_start_frame = state.frame
+    state.end_frame = nil
 
     state.boss.active = false
     state.boss.row = 1
@@ -573,11 +815,13 @@ local function reset_run()
     state.dirty = true
 end
 
+-- 计算下一Boss分数阈值
 local function next_boss_threshold(cur, next_stage)
     if next_stage <= 1 then return BASE_BOSS_SCORE end
     return cur + BASE_BOSS_SCORE + 50 * next_stage
 end
 
+-- 设置失败状态
 local function set_lost_state()
     state.phase = "lost"
     state.end_frame = state.frame
@@ -586,16 +830,25 @@ local function set_lost_state()
     show_message(tr("game.shooter.lose_banner") .. " " .. tr("game.shooter.result_controls"), "red", 0, true)
 end
 
+-- 应用玩家伤害
 local function apply_player_damage(dmg, ignore_invuln)
     if state.phase ~= "playing" then return end
     if not ignore_invuln and player_invuln_active() then return end
 
     state.hp = state.hp - dmg
-    if not ignore_invuln then state.hurt_invuln_until = state.frame + sec_to_frames(2) end
+    if not ignore_invuln then
+        state.hurt_invuln_until = state.frame + sec_to_frames(2)
+    end
 
-    if state.hp <= 0 then state.hp = 0; set_lost_state() else state.dirty = true end
+    if state.hp <= 0 then
+        state.hp = 0
+        set_lost_state()
+    else
+        state.dirty = true
+    end
 end
 
+-- 从列表中移除指定索引
 local function remove_idx(list, idx)
     local n = #list
     if idx < 1 or idx > n then return end
@@ -603,33 +856,49 @@ local function remove_idx(list, idx)
     list[n] = nil
 end
 
+-- 获取Boss占据的格子
 local function boss_cells()
     if not state.boss.active then return {} end
     local r, c = state.boss.row, state.boss.center_c
     return {
-        { r = r, c = c - 1 },
-        { r = r, c = c },
-        { r = r, c = c + 1 },
+        { r = r,     c = c - 1 },
+        { r = r,     c = c },
+        { r = r,     c = c + 1 },
         { r = r + 1, c = c },
     }
 end
 
+-- 检查坐标是否在Boss身上
 local function boss_contains(r, c)
     local cells = boss_cells()
-    for i = 1, #cells do if cells[i].r == r and cells[i].c == c then return true end end
+    for i = 1, #cells do
+        if cells[i].r == r and cells[i].c == c then
+            return true
+        end
+    end
     return false
 end
 
+-- 生成敌人
 local function spawn_enemy(kind, col)
     local def = ENEMY_TYPES[kind]
     if def == nil then return end
 
     local e = {
-        kind = kind, glyph = def.glyph, color = def.color, score = def.score,
-        hp = scale_enemy_hp(def.hp), collide = scale_enemy_collide(def.collide),
-        shooter = def.shooter, bullet = def.bullet, base_dmg = def.base_dmg, tracking = def.tracking,
-        shot_active = def.shot_active or 1.5, shot_idle = def.shot_idle or 3.0,
-        r = 1, c = clamp(col, ENEMY_COL_MIN, ENEMY_COL_MAX),
+        kind = kind,
+        glyph = def.glyph,
+        color = def.color,
+        score = def.score,
+        hp = scale_enemy_hp(def.hp),
+        collide = scale_enemy_collide(def.collide),
+        shooter = def.shooter,
+        bullet = def.bullet,
+        base_dmg = def.base_dmg,
+        tracking = def.tracking,
+        shot_active = def.shot_active or 1.5,
+        shot_idle = def.shot_idle or 3.0,
+        r = 1,
+        c = clamp(col, ENEMY_COL_MIN, ENEMY_COL_MAX),
         move_interval = speed_to_interval(def.speed / 4),
         next_move_at = state.frame + speed_to_interval(def.speed / 4),
         next_shot_at = state.frame + sec_to_frames(def.shot_active or 1.5),
@@ -638,6 +907,7 @@ local function spawn_enemy(kind, col)
     state.dirty = true
 end
 
+-- 尝试生成敌人
 local function maybe_spawn_enemy()
     if state.boss.active or state.frame < state.next_enemy_spawn_at then return end
     if state.frame < state.enemy_spawn_block_until then return end
@@ -650,11 +920,15 @@ local function maybe_spawn_enemy()
     if #state.enemies >= cap then return end
 
     local pick = choose_weighted({
-        { id = "normal", w = 60 }, { id = "fast", w = 20 }, { id = "tank", w = 10 }, { id = "heavy", w = 10 },
+        { id = "normal", w = 60 },
+        { id = "fast",   w = 20 },
+        { id = "tank",   w = 10 },
+        { id = "heavy",  w = 10 },
     })
     spawn_enemy(pick.id, rand_range(ENEMY_COL_MIN, ENEMY_COL_MAX))
 end
 
+-- 激活攻击型道具
 local function activate_attack_buff(symbol)
     local def = ATTACK_BUFF[symbol]
     if def == nil then return end
@@ -672,6 +946,7 @@ local function activate_attack_buff(symbol)
     show_message(tr("game.shooter.item." .. symbol) .. " " .. tr("game.shooter.msg_buff_on"), "green", 3, false)
 end
 
+-- 激活功能型道具
 local function activate_function_item(symbol)
     local def = FUNC_BUFF[symbol]
     if def == nil then return end
@@ -681,22 +956,31 @@ local function activate_function_item(symbol)
         touch_buff_order("*")
     elseif symbol == "c" then
         local extra = sec_to_frames(def.dur)
-        if state.buff_until["c"] > state.frame then state.buff_until["c"] = state.buff_until["c"] + extra else state.buff_until["c"] = state.frame + extra end
+        if state.buff_until["c"] > state.frame then
+            state.buff_until["c"] = state.buff_until["c"] + extra
+        else
+            state.buff_until["c"] = state.frame + extra
+        end
         touch_buff_order("c")
     elseif symbol == "+" then
         state.buff_until["+"] = state.frame + sec_to_frames(def.dur)
         touch_buff_order("+")
     elseif symbol == "~" then
-        if state.hp < 10 then state.hp = state.hp + 1 end
+        if state.hp < 10 then
+            state.hp = state.hp + 1
+        end
     elseif symbol == "o" then
         state.score = state.score + 10
     elseif symbol == "G" then
-        if state.nuke_stock < 3 then state.nuke_stock = state.nuke_stock + 1 end
+        if state.nuke_stock < 3 then
+            state.nuke_stock = state.nuke_stock + 1
+        end
     end
 
     show_message(tr("game.shooter.item." .. symbol) .. " " .. tr("game.shooter.msg_item_get"), "light_cyan", 3, false)
 end
 
+-- 核弹生成概率（千分比）
 local function nuke_spawn_permille()
     if state.boss.active then return 0 end
     if state.nuke_stock <= 0 then return 10 end
@@ -705,6 +989,7 @@ local function nuke_spawn_permille()
     return 0
 end
 
+-- 生成道具
 local function spawn_item()
     if state.frame < state.next_item_spawn_at then return end
     state.next_item_spawn_at = state.frame + sec_to_frames(rand_range(5, 10))
@@ -715,21 +1000,46 @@ local function spawn_item()
     if nuke_p > 0 and rand_int(1000) < nuke_p then
         symbol, color, kind = "G", "magenta", "function"
     else
-        local group = choose_weighted({ { kind = "attack", w = 60 }, { kind = "function", w = 40 } })
+        local group = choose_weighted({
+            { kind = "attack",   w = 60 },
+            { kind = "function", w = 40 }
+        })
         kind = group.kind
         if group.kind == "attack" then
-            local pick = choose_weighted({ { sym = "@", w = 20 }, { sym = "%", w = 20 }, { sym = "$", w = 20 }, { sym = "#", w = 20 }, { sym = "&", w = 20 } })
-            symbol = pick.sym; color = "rgb(170,255,170)"
+            local pick = choose_weighted({
+                { sym = "@", w = 20 },
+                { sym = "%", w = 20 },
+                { sym = "$", w = 20 },
+                { sym = "#", w = 20 },
+                { sym = "&", w = 20 }
+            })
+            symbol = pick.sym
+            color = "rgb(170,255,170)"
         else
-            local pick = choose_weighted({ { sym = "*", w = 25 }, { sym = "~", w = 5 }, { sym = "o", w = 50 }, { sym = "c", w = 10 }, { sym = "+", w = 10 } })
-            symbol = pick.sym; color = "light_cyan"
+            local pick = choose_weighted({
+                { sym = "*", w = 25 },
+                { sym = "~", w = 5 },
+                { sym = "o", w = 50 },
+                { sym = "c", w = 10 },
+                { sym = "+", w = 10 }
+            })
+            symbol = pick.sym
+            color = "light_cyan"
         end
     end
 
-    state.items[#state.items + 1] = { symbol = symbol, color = color, kind = kind, r = 1, c = rand_range(ENEMY_COL_MIN, ENEMY_COL_MAX), next_move_at = state.frame + sec_to_frames(1) }
+    state.items[#state.items + 1] = {
+        symbol = symbol,
+        color = color,
+        kind = kind,
+        r = 1,
+        c = rand_range(ENEMY_COL_MIN, ENEMY_COL_MAX),
+        next_move_at = state.frame + sec_to_frames(1)
+    }
     state.dirty = true
 end
 
+-- 获取当前攻击模式名称
 local function attack_mode_name()
     if state.attack_symbol == nil then return "normal" end
     local def = ATTACK_BUFF[state.attack_symbol]
@@ -737,43 +1047,70 @@ local function attack_mode_name()
     return def.mode
 end
 
+-- 创建玩家子弹
 local function create_player_bullet(c, mode)
     local speed_mul = has_bullet_speed() and 2 or 1
     local b = {
-        owner = "player", r = PLAYER_ROW - 1, c = c,
-        ch = "^", color = "green", damage = scale_player_dmg(1),
-        kind = "normal", pierce = false, tracking = false,
-        is_missile = false, missile_hp = 0,
+        owner = "player",
+        r = PLAYER_ROW - 1,
+        c = c,
+        ch = "^",
+        color = "green",
+        damage = scale_player_dmg(1),
+        kind = "normal",
+        pierce = false,
+        tracking = false,
+        is_missile = false,
+        missile_hp = 0,
         move_interval = speed_to_interval(2 * speed_mul),
         next_move_at = state.frame,
     }
 
     if mode == "laser" then
-        b.ch = "|"; b.kind = "laser"; b.pierce = true; b.damage = scale_player_dmg(1)
+        b.ch = "|"
+        b.kind = "laser"
+        b.pierce = true
+        b.damage = scale_player_dmg(1)
     elseif mode == "double" then
-        b.ch = ":"; b.kind = "double"; b.damage = scale_player_dmg(2)
+        b.ch = ":"
+        b.kind = "double"
+        b.damage = scale_player_dmg(2)
     elseif mode == "single" then
-        b.ch = "."; b.kind = "single"; b.damage = scale_player_dmg(3)
+        b.ch = "."
+        b.kind = "single"
+        b.damage = scale_player_dmg(3)
     elseif mode == "missile" then
-        b.ch = "!"; b.kind = "missile"; b.damage = scale_player_dmg(4); b.tracking = true; b.move_interval = speed_to_interval(1 * speed_mul); b.is_missile = true; b.missile_hp = 2
+        b.ch = "!"
+        b.kind = "missile"
+        b.damage = scale_player_dmg(4)
+        b.tracking = true
+        b.move_interval = speed_to_interval(1 * speed_mul)
+        b.is_missile = true
+        b.missile_hp = 2
     end
     return b
 end
 
+-- 获取最近的敌人列
 local function nearest_enemy_col(c)
     local best_c, best_d = nil, 10 ^ 9
     for i = 1, #state.enemies do
         local e = state.enemies[i]
         local d = math.abs(e.c - c) + math.abs(e.r - PLAYER_ROW)
-        if d < best_d then best_d, best_c = d, e.c end
+        if d < best_d then
+            best_d, best_c = d, e.c
+        end
     end
     if state.boss.active then
         local d = math.abs(state.boss.center_c - c)
-        if d < best_d then best_c = state.boss.center_c end
+        if d < best_d then
+            best_c = state.boss.center_c
+        end
     end
     return best_c
 end
 
+-- 玩家开火
 local function fire_player_if_needed(force_once)
     if state.phase ~= "playing" or state.confirm_mode ~= nil then return end
     if state.fire_mode == "manual" and force_once ~= true then return end
@@ -782,7 +1119,9 @@ local function fire_player_if_needed(force_once)
     local rapid = (mode == "rapid")
     local interval = rapid and sec_to_frames(0.5) or sec_to_frames(1)
 
-    if state.last_player_fire == nil then state.last_player_fire = state.frame - interval end
+    if state.last_player_fire == nil then
+        state.last_player_fire = state.frame - interval
+    end
 
     if mode == "missile" then
         if state.frame - state.missile_last >= sec_to_frames(2) then
@@ -800,21 +1139,29 @@ local function fire_player_if_needed(force_once)
     state.player_bullets[#state.player_bullets + 1] = create_player_bullet(state.player_c, fire_kind)
     state.dirty = true
 end
+
+-- 杀死敌人
 local function kill_enemy(idx)
     local e = state.enemies[idx]
-    if e ~= nil then state.score = state.score + (e.score or 0) end
+    if e ~= nil then
+        state.score = state.score + (e.score or 0)
+    end
     remove_idx(state.enemies, idx)
     state.dirty = true
 end
 
+-- 查找指定位置的敌人
 local function find_enemy_at(r, c)
     for i = 1, #state.enemies do
         local e = state.enemies[i]
-        if e.r == r and e.c == c then return i, e end
+        if e.r == r and e.c == c then
+            return i, e
+        end
     end
     return nil, nil
 end
 
+-- Boss受伤
 local function boss_take_damage(dmg)
     if not state.boss.active then return end
     state.boss.hp = state.boss.hp - dmg
@@ -829,6 +1176,7 @@ local function boss_take_damage(dmg)
     state.dirty = true
 end
 
+-- 更新玩家子弹
 local function update_player_bullets()
     local i = 1
     while i <= #state.player_bullets do
@@ -840,14 +1188,22 @@ local function update_player_bullets()
             b.next_move_at = state.frame + b.move_interval
             if b.tracking then
                 local target = nearest_enemy_col(b.c)
-                if target ~= nil then if target > b.c then b.c = b.c + 1 elseif target < b.c then b.c = b.c - 1 end end
+                if target ~= nil then
+                    if target > b.c then
+                        b.c = b.c + 1
+                    elseif target < b.c then
+                        b.c = b.c - 1
+                    end
+                end
             end
             b.r = b.r - 1
             can_hit = true
             state.dirty = true
         end
 
-        if b.r < 1 or b.c < 1 or b.c > INNER_W then remove = true end
+        if b.r < 1 or b.c < 1 or b.c > INNER_W then
+            remove = true
+        end
 
         if (not remove) and can_hit and state.boss.active and boss_contains(b.r, b.c) then
             local dmg = b.damage or 1
@@ -866,7 +1222,9 @@ local function update_player_bullets()
                 remove = true
             else
                 boss_take_damage(dmg)
-                if not b.pierce then remove = true end
+                if not b.pierce then
+                    remove = true
+                end
             end
         end
 
@@ -892,20 +1250,31 @@ local function update_player_bullets()
                 else
                     e.hp = e.hp - dmg
                     if e.hp <= 0 then kill_enemy(ei) end
-                    if not b.pierce then remove = true end
+                    if not b.pierce then
+                        remove = true
+                    end
                 end
             end
         end
 
-        if remove then remove_idx(state.player_bullets, i) else i = i + 1 end
+        if remove then
+            remove_idx(state.player_bullets, i)
+        else
+            i = i + 1
+        end
     end
 end
 
+-- 生成敌人子弹
 local function spawn_enemy_bullet(c, ch, base_dmg, tracking, row)
     local is_missile = ch == "u"
     state.enemy_bullets[#state.enemy_bullets + 1] = {
-        owner = "enemy", r = row or 2, c = clamp(c, ENEMY_COL_MIN, ENEMY_COL_MAX),
-        ch = ch, color = "magenta", damage = scale_enemy_bullet_dmg(base_dmg),
+        owner = "enemy",
+        r = row or 2,
+        c = clamp(c, ENEMY_COL_MIN, ENEMY_COL_MAX),
+        ch = ch,
+        color = "magenta",
+        damage = scale_enemy_bullet_dmg(base_dmg),
         tracking = tracking == true,
         target_c = state.player_c,
         is_missile = is_missile,
@@ -915,6 +1284,7 @@ local function spawn_enemy_bullet(c, ch, base_dmg, tracking, row)
     }
 end
 
+-- 更新敌人子弹
 local function update_enemy_bullets()
     local i = 1
     while i <= #state.enemy_bullets do
@@ -924,7 +1294,11 @@ local function update_enemy_bullets()
             b.next_move_at = state.frame + b.move_interval
             if b.tracking then
                 local tc = b.target_c or b.c
-                if tc > b.c then b.c = b.c + 1 elseif tc < b.c then b.c = b.c - 1 end
+                if tc > b.c then
+                    b.c = b.c + 1
+                elseif tc < b.c then
+                    b.c = b.c - 1
+                end
                 b.c = clamp(b.c, ENEMY_COL_MIN, ENEMY_COL_MAX)
             end
             b.r = b.r + 1
@@ -932,16 +1306,22 @@ local function update_enemy_bullets()
         end
 
         local remove = false
-        if b.r > INNER_H then remove = true
+        if b.r > INNER_H then
+            remove = true
         elseif b.r == PLAYER_ROW and b.c == state.player_c then
             apply_player_damage(b.damage or 1, false)
             remove = true
         end
 
-        if remove then remove_idx(state.enemy_bullets, i) else i = i + 1 end
+        if remove then
+            remove_idx(state.enemy_bullets, i)
+        else
+            i = i + 1
+        end
     end
 end
 
+-- 检查指定位置附近是否有敌人子弹
 local function has_enemy_bullet_too_close(col, spawn_row)
     for i = 1, #state.enemy_bullets do
         local b = state.enemy_bullets[i]
@@ -952,6 +1332,7 @@ local function has_enemy_bullet_too_close(col, spawn_row)
     return false
 end
 
+-- 检查Boss炮口是否被堵塞
 local function boss_muzzle_blocked(col)
     local muzzle_row = state.boss.row + 2
     for i = 1, #state.enemy_bullets do
@@ -963,6 +1344,7 @@ local function boss_muzzle_blocked(col)
     return false
 end
 
+-- 更新敌人
 local function update_enemies()
     local i = 1
     while i <= #state.enemies do
@@ -976,10 +1358,12 @@ local function update_enemies()
         end
 
         if e.r > INNER_H then
-            remove_idx(state.enemies, i); removed = true
+            remove_idx(state.enemies, i)
+            removed = true
         elseif e.r == PLAYER_ROW and e.c == state.player_c then
             apply_player_damage(e.collide or 1, false)
-            remove_idx(state.enemies, i); removed = true
+            remove_idx(state.enemies, i)
+            removed = true
         end
 
         if not removed then
@@ -1001,55 +1385,84 @@ local function update_enemies()
     end
 end
 
+-- 查找最近的玩家子弹列
 local function find_nearest_player_bullet_col()
     local best_c, best_d = nil, 10 ^ 9
     for i = 1, #state.player_bullets do
         local b = state.player_bullets[i]
         local d = math.abs(b.c - state.boss.center_c) + math.abs(b.r - state.boss.row)
-        if d < best_d then best_d, best_c = d, b.c end
+        if d < best_d then
+            best_d, best_c = d, b.c
+        end
     end
     return best_c
 end
 
+-- Boss召唤一波敌人
 local function boss_summon_wave()
     local n = rand_range(2, 5)
     for _ = 1, n do
-        local pick = choose_weighted({ { id = "normal", w = 45 }, { id = "fast", w = 25 }, { id = "tank", w = 15 }, { id = "heavy", w = 15 } })
+        local pick = choose_weighted({
+            { id = "normal", w = 45 },
+            { id = "fast",   w = 25 },
+            { id = "tank",   w = 15 },
+            { id = "heavy",  w = 15 }
+        })
         spawn_enemy(pick.id, rand_range(ENEMY_COL_MIN, ENEMY_COL_MAX))
     end
 end
 
+-- 选择Boss模式
 local function choose_boss_mode()
     local chase_w = (state.frame >= (state.boss.chase_cd_until or 0)) and 10 or 0
     return choose_weighted({
-        { mode = "attack", w = 35 },
+        { mode = "attack",  w = 35 },
         { mode = "predict", w = 30 },
-        { mode = "dodge", w = 15 },
-        { mode = "summon", w = 10 },
-        { mode = "chase", w = chase_w },
+        { mode = "dodge",   w = 15 },
+        { mode = "summon",  w = 10 },
+        { mode = "chase",   w = chase_w },
     }).mode
 end
 
+-- Boss开火
 local function boss_fire(mode)
     local w = mode == "predict"
-        and { { ch = "v", base = 1, tr = false, p = 60 }, { ch = ".", base = 2, tr = false, p = 20 }, { ch = "u", base = 4, tr = true, p = 20 } }
-        or  { { ch = "v", base = 1, tr = false, p = 70 }, { ch = ".", base = 2, tr = false, p = 20 }, { ch = "u", base = 4, tr = true, p = 10 } }
+        and {
+            { ch = "v", base = 1, tr = false, p = 60 },
+            { ch = ".", base = 2, tr = false, p = 20 },
+            { ch = "u", base = 4, tr = true,  p = 20 }
+        }
+        or {
+            { ch = "v", base = 1, tr = false, p = 70 },
+            { ch = ".", base = 2, tr = false, p = 20 },
+            { ch = "u", base = 4, tr = true,  p = 10 }
+        }
 
-    local pick = choose_weighted({ { idx = 1, w = w[1].p }, { idx = 2, w = w[2].p }, { idx = 3, w = w[3].p } })
+    local pick = choose_weighted({
+        { idx = 1, w = w[1].p },
+        { idx = 2, w = w[2].p },
+        { idx = 3, w = w[3].p }
+    })
     local spec = w[pick.idx]
 
     local c = state.boss.center_c
-    if mode == "predict" then c = clamp(state.player_c + state.player_last_dir * 2, ENEMY_COL_MIN, ENEMY_COL_MAX)
-    elseif mode == "attack" then c = state.player_c
-    elseif mode == "chase" then c = state.player_c end
+    if mode == "predict" then
+        c = clamp(state.player_c + state.player_last_dir * 2, ENEMY_COL_MIN, ENEMY_COL_MAX)
+    elseif mode == "attack" then
+        c = state.player_c
+    elseif mode == "chase" then
+        c = state.player_c
+    end
 
     if boss_muzzle_blocked(c) then return false end
     spawn_enemy_bullet(c, spec.ch, spec.base, spec.tr, state.boss.row + 2)
     return true
 end
 
+-- 进入Boss战
 local function enter_boss_battle()
-    clear_world_entities(); clear_buffs()
+    clear_world_entities()
+    clear_buffs()
     state.boss.active = true
     state.boss.row = 1
     state.boss.center_c = math.floor((PLAYER_MIN_C + PLAYER_MAX_C) / 2)
@@ -1064,19 +1477,25 @@ local function enter_boss_battle()
     show_message(tr("game.shooter.msg_boss_incoming"), "yellow", 3, false)
 end
 
+-- 检查是否触发Boss
 local function maybe_trigger_boss()
     if state.boss.active then return end
-    if state.score >= state.next_boss_score then enter_boss_battle() end
+    if state.score >= state.next_boss_score then
+        enter_boss_battle()
+    end
 end
 
+-- 更新Boss
 local function update_boss()
     if not state.boss.active then return end
 
+    -- Boss存在时间超过3分钟，玩家直接死亡
     if state.frame - state.boss.start_frame >= sec_to_frames(180) then
         apply_player_damage(99, true)
         return
     end
 
+    -- 切换模式
     if state.frame >= state.boss.mode_until then
         if state.boss.mode == "chase" then
             state.boss.chase_cd_until = state.frame + sec_to_frames(10)
@@ -1089,38 +1508,62 @@ local function update_boss()
             state.boss.next_shot_at = state.frame
         else
             state.boss.mode_until = state.frame + sec_to_frames(rand_range(3, 6))
-            if state.boss.mode == "summon" then boss_summon_wave() end
+            if state.boss.mode == "summon" then
+                boss_summon_wave()
+            end
         end
     end
 
+    -- 移动
     if state.frame >= state.boss.next_move_at then
         local move_interval = sec_to_frames(2)
-        if state.boss.mode == "chase" then move_interval = sec_to_frames(0.35) end
+        if state.boss.mode == "chase" then
+            move_interval = sec_to_frames(0.35)
+        end
         state.boss.next_move_at = state.frame + move_interval
 
         local target = state.boss.center_c
-        if state.boss.mode == "attack" then target = state.player_c
-        elseif state.boss.mode == "predict" then target = clamp(state.player_c + state.player_last_dir * 3, 3, 28)
+        if state.boss.mode == "attack" then
+            target = state.player_c
+        elseif state.boss.mode == "predict" then
+            target = clamp(state.player_c + state.player_last_dir * 3, 3, 28)
         elseif state.boss.mode == "dodge" then
             local bc = find_nearest_player_bullet_col()
-            if bc ~= nil then if bc <= state.boss.center_c then target = state.boss.center_c + 2 else target = state.boss.center_c - 2 end
-            else target = clamp(state.player_c - state.player_last_dir * 3, 3, 28) end
+            if bc ~= nil then
+                if bc <= state.boss.center_c then
+                    target = state.boss.center_c + 2
+                else
+                    target = state.boss.center_c - 2
+                end
+            else
+                target = clamp(state.player_c - state.player_last_dir * 3, 3, 28)
+            end
         elseif state.boss.mode == "summon" then
-            if state.player_c < state.boss.center_c then target = 27 else target = 4 end
+            if state.player_c < state.boss.center_c then
+                target = 27
+            else
+                target = 4
+            end
         elseif state.boss.mode == "chase" then
             target = state.player_c
         end
 
         target = clamp(target, 3, 28)
-        if target > state.boss.center_c then state.boss.center_c = state.boss.center_c + 1
-        elseif target < state.boss.center_c then state.boss.center_c = state.boss.center_c - 1 end
+        if target > state.boss.center_c then
+            state.boss.center_c = state.boss.center_c + 1
+        elseif target < state.boss.center_c then
+            state.boss.center_c = state.boss.center_c - 1
+        end
         state.boss.center_c = clamp(state.boss.center_c, 3, 28)
         state.dirty = true
     end
 
+    -- 开火
     if state.frame >= state.boss.next_shot_at then
         local shot_interval = sec_to_frames(1)
-        if state.boss.mode == "chase" then shot_interval = sec_to_frames(0.5) end
+        if state.boss.mode == "chase" then
+            shot_interval = sec_to_frames(0.5)
+        end
 
         if state.boss.mode ~= "summon" and state.boss.mode ~= "dodge" then
             boss_fire(state.boss.mode)
@@ -1130,15 +1573,28 @@ local function update_boss()
     end
 end
 
+-- 更新Buff
 local function update_buffs()
     local changed = false
-    if state.attack_symbol ~= nil and state.frame >= state.attack_until then state.attack_symbol = nil; state.attack_until = 0; state.missile_shots = 0; changed = true end
-    for _, sym in ipairs({ "*", "c", "+" }) do
-        if state.buff_until[sym] > 0 and state.frame >= state.buff_until[sym] then state.buff_until[sym] = 0; remove_buff_order(sym); changed = true end
+    if state.attack_symbol ~= nil and state.frame >= state.attack_until then
+        state.attack_symbol = nil
+        state.attack_until = 0
+        state.missile_shots = 0
+        changed = true
     end
-    if changed then state.dirty = true end
+    for _, sym in ipairs({ "*", "c", "+" }) do
+        if state.buff_until[sym] > 0 and state.frame >= state.buff_until[sym] then
+            state.buff_until[sym] = 0
+            remove_buff_order(sym)
+            changed = true
+        end
+    end
+    if changed then
+        state.dirty = true
+    end
 end
 
+-- 处理子弹与子弹的碰撞
 local function resolve_bullet_vs_bullet_collisions()
     if #state.player_bullets == 0 or #state.enemy_bullets == 0 then
         return
@@ -1146,6 +1602,7 @@ local function resolve_bullet_vs_bullet_collisions()
 
     local changed = false
 
+    -- 检查碰撞
     for pi = 1, #state.player_bullets do
         local pb = state.player_bullets[pi]
         for ei = 1, #state.enemy_bullets do
@@ -1167,6 +1624,7 @@ local function resolve_bullet_vs_bullet_collisions()
         return
     end
 
+    -- 移除HP耗尽的导弹
     for i = #state.player_bullets, 1, -1 do
         local b = state.player_bullets[i]
         if b.is_missile and (b.missile_hp or 0) <= 0 then
@@ -1184,16 +1642,22 @@ local function resolve_bullet_vs_bullet_collisions()
     state.dirty = true
 end
 
-
+-- 更新道具
 local function update_items()
     local i = 1
     while i <= #state.items do
         local it = state.items[i]
 
+        -- 磁铁吸引
         if has_magnet() and math.abs(it.c - state.player_c) <= 3 then
-            if it.c < state.player_c then it.c = it.c + 1 elseif it.c > state.player_c then it.c = it.c - 1 end
+            if it.c < state.player_c then
+                it.c = it.c + 1
+            elseif it.c > state.player_c then
+                it.c = it.c - 1
+            end
         end
 
+        -- 移动
         if state.frame >= it.next_move_at then
             it.next_move_at = state.frame + sec_to_frames(1)
             it.r = it.r + 1
@@ -1201,11 +1665,18 @@ local function update_items()
         end
 
         local picked = false
-        if it.r == PLAYER_ROW and it.c == state.player_c then picked = true
-        elseif has_magnet() and math.abs(it.c - state.player_c) <= 1 and it.r >= PLAYER_ROW - 1 then picked = true end
+        if it.r == PLAYER_ROW and it.c == state.player_c then
+            picked = true
+        elseif has_magnet() and math.abs(it.c - state.player_c) <= 1 and it.r >= PLAYER_ROW - 1 then
+            picked = true
+        end
 
         if picked then
-            if it.kind == "attack" then activate_attack_buff(it.symbol) else activate_function_item(it.symbol) end
+            if it.kind == "attack" then
+                activate_attack_buff(it.symbol)
+            else
+                activate_function_item(it.symbol)
+            end
             remove_idx(state.items, i)
         elseif it.r > INNER_H then
             remove_idx(state.items, i)
@@ -1215,6 +1686,7 @@ local function update_items()
     end
 end
 
+-- 使用核弹
 local function use_nuke()
     if state.nuke_stock <= 0 then
         show_message(tr("game.shooter.msg_nuke_empty"), "dark_gray", 2, false)
@@ -1236,6 +1708,7 @@ local function use_nuke()
     state.dirty = true
 end
 
+-- 游戏逻辑更新
 local function gameplay_update()
     if state.phase ~= "playing" or state.confirm_mode ~= nil then return end
 
@@ -1257,14 +1730,17 @@ local function gameplay_update()
         state.dirty = true
     end
 
-    if state.hp <= 0 and state.phase ~= "lost" then set_lost_state() end
+    if state.hp <= 0 and state.phase ~= "lost" then
+        set_lost_state()
+    end
 end
 
-
+-- 将游戏坐标转换为终端坐标
 local function board_to_term(layout, c, r)
     return layout.board_x + c, layout.board_y + r
 end
 
+-- 绘制游戏区域边框
 local function draw_board_frame(layout)
     local x, y = layout.board_x, layout.board_y
     draw_text(x, y, CH_DBL_TL .. string.rep(CH_DBL_H, BOARD_W - 2) .. CH_DBL_TR, "white", "black")
@@ -1275,6 +1751,7 @@ local function draw_board_frame(layout)
     draw_text(x, y + BOARD_H - 1, CH_DBL_BL .. string.rep(CH_DBL_H, BOARD_W - 2) .. CH_DBL_BR, "white", "black")
 end
 
+-- 构建游戏区域缓冲区
 local function build_board_buffer()
     local buf = {}
     for r = 1, INNER_H do
@@ -1284,9 +1761,11 @@ local function build_board_buffer()
         end
     end
 
+    -- 边界标记
     buf[PLAYER_ROW][1] = { ch = CH_BLOCK, fg = "white", bg = "black" }
     buf[PLAYER_ROW][INNER_W] = { ch = CH_BLOCK, fg = "white", bg = "black" }
 
+    -- 道具
     for i = 1, #state.items do
         local it = state.items[i]
         if it.r >= 1 and it.r <= INNER_H and it.c >= 1 and it.c <= INNER_W then
@@ -1294,6 +1773,7 @@ local function build_board_buffer()
         end
     end
 
+    -- 玩家子弹
     for i = 1, #state.player_bullets do
         local b = state.player_bullets[i]
         if b.r >= 1 and b.r <= INNER_H and b.c >= 1 and b.c <= INNER_W then
@@ -1301,6 +1781,7 @@ local function build_board_buffer()
         end
     end
 
+    -- 敌人子弹
     for i = 1, #state.enemy_bullets do
         local b = state.enemy_bullets[i]
         if b.r >= 1 and b.r <= INNER_H and b.c >= 1 and b.c <= INNER_W then
@@ -1308,6 +1789,7 @@ local function build_board_buffer()
         end
     end
 
+    -- 敌人
     for i = 1, #state.enemies do
         local e = state.enemies[i]
         if e.r >= 1 and e.r <= INNER_H and e.c >= 1 and e.c <= INNER_W then
@@ -1315,6 +1797,7 @@ local function build_board_buffer()
         end
     end
 
+    -- Boss
     if state.boss.active then
         local cells = boss_cells()
         for i = 1, #cells do
@@ -1325,10 +1808,12 @@ local function build_board_buffer()
         end
     end
 
+    -- 玩家
     buf[PLAYER_ROW][state.player_c] = { ch = "A", fg = player_color(), bg = "black" }
     return buf
 end
 
+-- 绘制游戏区域内容
 local function draw_board_content(layout)
     local buf = build_board_buffer()
     for r = 1, INNER_H do
@@ -1347,6 +1832,7 @@ local function draw_board_content(layout)
     end
 end
 
+-- 绘制Boss血条
 local function draw_boss_bar(layout)
     local term_w, _ = terminal_size()
     draw_text(1, layout.boss_bar_y, string.rep(" ", term_w), "white", "black")
@@ -1356,33 +1842,50 @@ local function draw_boss_bar(layout)
     local filled = clamp(math.floor((state.boss.hp / state.boss.max_hp) * BOSS_HP_BAR_W + 0.5), 0, BOSS_HP_BAR_W)
 
     local x = centered_x(string.rep(CH_BLOCK, BOSS_HP_BAR_W) .. " 100%", layout.x, layout.total_w)
-    if filled > 0 then draw_text(x, layout.boss_bar_y, string.rep(CH_BLOCK, filled), "green", "black") end
-    if filled < BOSS_HP_BAR_W then draw_text(x + filled, layout.boss_bar_y, string.rep(CH_BLOCK, BOSS_HP_BAR_W - filled), "red", "black") end
+    if filled > 0 then
+        draw_text(x, layout.boss_bar_y, string.rep(CH_BLOCK, filled), "green", "black")
+    end
+    if filled < BOSS_HP_BAR_W then
+        draw_text(x + filled, layout.boss_bar_y, string.rep(CH_BLOCK, BOSS_HP_BAR_W - filled), "red", "black")
+    end
     draw_text(x + BOSS_HP_BAR_W, layout.boss_bar_y, string.format(" %d%%", pct), "white", "black")
 end
 
+-- 绘制生命条
 local function draw_life_block(x, y)
     draw_text(x, y, tr("game.shooter.hp") .. ":", "white", "black")
     local a = math.min(5, state.hp)
     local b = math.max(0, state.hp - 5)
     draw_text(x, y + 1, string.rep("A", a), "yellow", "black")
-    if a < 5 then draw_text(x + a, y + 1, string.rep("-", 5 - a), "dark_gray", "black") end
+    if a < 5 then
+        draw_text(x + a, y + 1, string.rep("-", 5 - a), "dark_gray", "black")
+    end
     draw_text(x, y + 2, string.rep("A", b), "yellow", "black")
-    if b < 5 then draw_text(x + b, y + 2, string.rep("-", 5 - b), "dark_gray", "black") end
+    if b < 5 then
+        draw_text(x + b, y + 2, string.rep("-", 5 - b), "dark_gray", "black")
+    end
 end
 
+-- 绘制Buff进度条
 local function draw_buff_line(x, y, sym, remain, total)
     local blocks = 6
     local filled = 0
-    if total > 0 then filled = math.floor((remain / total) * blocks + 0.999) end
+    if total > 0 then
+        filled = math.floor((remain / total) * blocks + 0.999)
+    end
     filled = clamp(filled, 0, blocks)
 
     draw_text(x, y, sym, "white", "black")
-    if filled > 0 then draw_text(x + 2, y, string.rep(CH_BLOCK, filled), "green", "black") end
-    if filled < blocks then draw_text(x + 2 + filled, y, string.rep(CH_BLOCK, blocks - filled), "dark_gray", "black") end
+    if filled > 0 then
+        draw_text(x + 2, y, string.rep(CH_BLOCK, filled), "green", "black")
+    end
+    if filled < blocks then
+        draw_text(x + 2 + filled, y, string.rep(CH_BLOCK, blocks - filled), "dark_gray", "black")
+    end
     draw_text(x + 2 + blocks + 1, y, tostring(remain) .. tr("game.shooter.seconds"), "white", "black")
 end
 
+-- 绘制右侧信息区
 local function draw_info(layout)
     local x, y, w = layout.info_x, layout.info_y, layout.info_w
     fill_rect(x, y, w, BOARD_H, "black")
@@ -1392,7 +1895,10 @@ local function draw_info(layout)
     draw_text(x, y + 2, tr("game.shooter.score") .. ": " .. tostring(state.score), "white", "black")
     draw_text(x, y + 3, tr("game.shooter.time") .. ": " .. format_duration(elapsed_seconds()), "light_cyan", "black")
 
-    draw_text(x, y + 4, tr("game.shooter.fire_mode") .. ": " .. tr(state.fire_mode == "manual" and "game.shooter.fire_mode_manual" or "game.shooter.fire_mode_auto"), "white", "black")
+    draw_text(x, y + 4,
+        tr("game.shooter.fire_mode") ..
+        ": " .. tr(state.fire_mode == "manual" and "game.shooter.fire_mode_manual" or "game.shooter.fire_mode_auto"),
+        "white", "black")
     draw_text(x, y + 5, tr("game.shooter.stage") .. ": " .. tostring(state.stage), "white", "black")
     draw_life_block(x, y + 6)
 
@@ -1419,32 +1925,48 @@ local function draw_info(layout)
     end
 end
 
+-- 获取当前消息
 local function current_msg()
-    if state.confirm_mode == "restart" then return tr("game.shooter.confirm_restart"), "yellow" end
-    if state.confirm_mode == "exit" then return tr("game.shooter.confirm_exit"), "yellow" end
+    if state.confirm_mode == "restart" then
+        return tr("game.shooter.confirm_restart"), "yellow"
+    end
+    if state.confirm_mode == "exit" then
+        return tr("game.shooter.confirm_exit"), "yellow"
+    end
     return state.msg_text, state.msg_color
 end
 
+-- 获取控制说明文本
 local function shooter_controls_text()
     return tr("game.shooter.controls")
 end
 
+-- 绘制消息和控制说明
 local function draw_message_controls(layout)
     local term_w, _ = terminal_size()
     draw_text(1, layout.message_y, string.rep(" ", term_w), "white", "black")
 
     local m, c = current_msg()
-    if m ~= nil and m ~= "" then draw_text(centered_x(m, 1, term_w), layout.message_y, m, c or "dark_gray", "black") end
+    if m ~= nil and m ~= "" then
+        draw_text(centered_x(m, 1, term_w), layout.message_y, m, c or "dark_gray", "black")
+    end
 
     local txt = shooter_controls_text()
     local lines = wrap_words(txt, math.max(12, term_w - 2))
-    if #lines > 3 then lines = { lines[1], lines[2], lines[3] } end
+    if #lines > 3 then
+        lines = { lines[1], lines[2], lines[3] }
+    end
 
-    for i = 0, 2 do draw_text(1, layout.controls_y + i, string.rep(" ", term_w), "white", "black") end
+    for i = 0, 2 do
+        draw_text(1, layout.controls_y + i, string.rep(" ", term_w), "white", "black")
+    end
     local off = (#lines < 3) and math.floor((3 - #lines) / 2) or 0
-    for i = 1, #lines do draw_text(centered_x(lines[i], 1, term_w), layout.controls_y + off + i - 1, lines[i], "white", "black") end
+    for i = 1, #lines do
+        draw_text(centered_x(lines[i], 1, term_w), layout.controls_y + off + i - 1, lines[i], "white", "black")
+    end
 end
 
+-- 构建界面布局
 local function build_layout()
     local term_w, term_h = terminal_size()
     local info_w, gap = 28, 4
@@ -1452,11 +1974,11 @@ local function build_layout()
     local content_w = BOARD_W + gap + info_w
     local controls_w = min_width_for_lines(shooter_controls_text(), 3, 28)
     local msg_w = math.max(
-        key_width(tr("game.shooter.lose_banner") .. " " .. tr("game.shooter.result_controls")),
-        key_width(tr("game.shooter.confirm_restart")),
-        key_width(tr("game.shooter.confirm_exit")),
-        key_width(tr("game.shooter.msg_boss_incoming")),
-        key_width(tr("game.shooter.msg_boss_defeated"))
+        text_width(tr("game.shooter.lose_banner") .. " " .. tr("game.shooter.result_controls")),
+        text_width(tr("game.shooter.confirm_restart")),
+        text_width(tr("game.shooter.confirm_exit")),
+        text_width(tr("game.shooter.msg_boss_incoming")),
+        text_width(tr("game.shooter.msg_boss_defeated"))
     )
 
     local total_w = math.max(content_w, controls_w, msg_w, BOSS_HP_BAR_W + 8)
@@ -1468,33 +1990,43 @@ local function build_layout()
     if y < 2 then y = 2 end
 
     return {
-        x = x, y = y, total_w = total_w, total_h = total_h,
-        board_x = x, board_y = y,
-        info_x = x + BOARD_W + gap, info_y = y, info_w = info_w,
+        x = x,
+        y = y,
+        total_w = total_w,
+        total_h = total_h,
+        board_x = x,
+        board_y = y,
+        info_x = x + BOARD_W + gap,
+        info_y = y,
+        info_w = info_w,
         boss_bar_y = y - 1,
         message_y = y + BOARD_H,
         controls_y = y + BOARD_H + 1,
     }
 end
 
+-- 清除上次渲染区域
 local function clear_last_area()
     if state.last_area == nil then return end
     fill_rect(state.last_area.x, state.last_area.y, state.last_area.w, state.last_area.h, "black")
 end
 
+-- 强制完全刷新
 local function force_full_refresh()
     clear()
     state.last_area = nil
     state.dirty = true
 end
 
+-- 主渲染函数
 local function render()
     local layout = build_layout()
     local area = { x = layout.x, y = layout.boss_bar_y, w = layout.total_w, h = BOARD_H + 1 + 3 }
 
     if state.last_area == nil then
         fill_rect(area.x, area.y, area.w, area.h, "black")
-    elseif state.last_area.x ~= area.x or state.last_area.y ~= area.y or state.last_area.w ~= area.w or state.last_area.h ~= area.h then
+    elseif state.last_area.x ~= area.x or state.last_area.y ~= area.y
+        or state.last_area.w ~= area.w or state.last_area.h ~= area.h then
         clear_last_area()
         fill_rect(area.x, area.y, area.w, area.h, "black")
     end
@@ -1507,13 +2039,14 @@ local function render()
     draw_message_controls(layout)
 end
 
+-- 计算最小所需终端尺寸
 local function minimum_required_size()
     local content_w = BOARD_W + 4 + 28
     local controls_w = min_width_for_lines(shooter_controls_text(), 3, 28)
     local msg_w = math.max(
-        key_width(tr("game.shooter.confirm_restart")),
-        key_width(tr("game.shooter.confirm_exit")),
-        key_width(tr("game.shooter.lose_banner") .. " " .. tr("game.shooter.result_controls"))
+        text_width(tr("game.shooter.confirm_restart")),
+        text_width(tr("game.shooter.confirm_exit")),
+        text_width(tr("game.shooter.lose_banner") .. " " .. tr("game.shooter.result_controls"))
     )
 
     local min_w = math.max(content_w, controls_w, msg_w, BOSS_HP_BAR_W + 8) + 2
@@ -1521,6 +2054,7 @@ local function minimum_required_size()
     return min_w, min_h
 end
 
+-- 绘制尺寸警告
 local function draw_size_warning(term_w, term_h, min_w, min_h)
     local lines = {
         tr("warning.size_title"),
@@ -1535,18 +2069,23 @@ local function draw_size_warning(term_w, term_h, min_w, min_h)
 
     for i = 1, #lines do
         local line = lines[i]
-        local x = math.floor((term_w - key_width(line)) / 2)
+        local x = math.floor((term_w - text_width(line)) / 2)
         if x < 1 then x = 1 end
         draw_text(x, top + i - 1, line, "white", "black")
     end
 end
 
+-- 确保尺寸足够
 local function ensure_size_ok()
     local term_w, term_h = terminal_size()
     local min_w, min_h = minimum_required_size()
 
     if term_w >= min_w and term_h >= min_h then
-        if state.size_warning_active then clear(); state.last_area = nil; state.dirty = true end
+        if state.size_warning_active then
+            clear()
+            state.last_area = nil
+            state.dirty = true
+        end
         state.size_warning_active = false
         return true
     end
@@ -1565,6 +2104,7 @@ local function ensure_size_ok()
     return false
 end
 
+-- 同步尺寸变化
 local function sync_resize()
     local w, h = terminal_size()
     if w ~= state.last_term_w or h ~= state.last_term_h then
@@ -1573,15 +2113,25 @@ local function sync_resize()
     end
 end
 
+-- 刷新时间脏标记
 local function refresh_dirty_time()
     local elapsed = elapsed_seconds()
-    if elapsed ~= state.last_elapsed then state.last_elapsed = elapsed; state.dirty = true end
+    if elapsed ~= state.last_elapsed then
+        state.last_elapsed = elapsed
+        state.dirty = true
+    end
 end
 
-local function handle_confirm(key)
+-- 处理确认模式输入
+local function handle_confirm_key(key)
     if state.confirm_mode == nil then return false end
     if key == "y" or key == "enter" then
-        if state.confirm_mode == "restart" then reset_run() else commit_result_once(); exit_game() end
+        if state.confirm_mode == "restart" then
+            reset_run()
+        else
+            commit_result_once()
+            exit_game()
+        end
         return true
     end
     if key == "n" or key == "q" or key == "esc" then
@@ -1592,20 +2142,43 @@ local function handle_confirm(key)
     return true
 end
 
+-- 处理输入
 local function handle_input(key)
     if key == nil or key == "" then return end
 
-    if state.confirm_mode ~= nil then handle_confirm(key); return end
-
-    if state.phase == "lost" then
-        if key == "r" then reset_run(); return end
-        if key == "q" or key == "esc" then commit_result_once(); exit_game(); return end
+    if state.confirm_mode ~= nil then
+        handle_confirm_key(key)
         return
     end
 
-    if key == "left" then state.player_c = clamp(state.player_c - 1, PLAYER_MIN_C, PLAYER_MAX_C); state.player_last_dir = -1; state.dirty = true; return end
-    if key == "right" then state.player_c = clamp(state.player_c + 1, PLAYER_MIN_C, PLAYER_MAX_C); state.player_last_dir = 1; state.dirty = true; return end
+    if state.phase == "lost" then
+        if key == "r" then
+            reset_run()
+            return
+        end
+        if key == "q" or key == "esc" then
+            commit_result_once()
+            exit_game()
+            return
+        end
+        return
+    end
 
+    -- 移动
+    if key == "left" then
+        state.player_c = clamp(state.player_c - 1, PLAYER_MIN_C, PLAYER_MAX_C)
+        state.player_last_dir = -1
+        state.dirty = true
+        return
+    end
+    if key == "right" then
+        state.player_c = clamp(state.player_c + 1, PLAYER_MIN_C, PLAYER_MAX_C)
+        state.player_last_dir = 1
+        state.dirty = true
+        return
+    end
+
+    -- 切换射击模式
     if key == "z" then
         if state.fire_mode == "auto" then
             state.fire_mode = "manual"
@@ -1617,17 +2190,41 @@ local function handle_input(key)
         state.dirty = true
         return
     end
+
+    -- 手动开火
     if key == "space" then
-        if state.fire_mode == "manual" then fire_player_if_needed(true) end
+        if state.fire_mode == "manual" then
+            fire_player_if_needed(true)
+        end
         return
     end
-    if key == "x" then use_nuke(); return end
 
-    if key == "s" then save_game_state(true); return end
-    if key == "r" then state.confirm_mode = "restart"; state.dirty = true; return end
-    if key == "q" or key == "esc" then state.confirm_mode = "exit"; state.dirty = true; return end
+    -- 使用核弹
+    if key == "x" then
+        use_nuke()
+        return
+    end
+
+    -- 保存
+    if key == "s" then
+        save_game_state(true)
+        return
+    end
+
+    -- 重启/退出确认
+    if key == "r" then
+        state.confirm_mode = "restart"
+        state.dirty = true
+        return
+    end
+    if key == "q" or key == "esc" then
+        state.confirm_mode = "exit"
+        state.dirty = true
+        return
+    end
 end
 
+-- 游戏初始化
 local function init_game()
     clear()
     local w, h = terminal_size()
@@ -1636,12 +2233,19 @@ local function init_game()
 
     load_best_records()
     reset_run()
-    if state.launch_mode == "continue" then if not load_game_state() then reset_run() end end
+    if state.launch_mode == "continue" then
+        if not load_game_state() then
+            reset_run()
+        end
+    end
 
-    if type(clear_input_buffer) == "function" then pcall(clear_input_buffer) end
+    if type(clear_input_buffer) == "function" then
+        pcall(clear_input_buffer)
+    end
 end
 
-local function loop()
+-- 主游戏循环
+local function game_loop()
     while true do
         local key = normalize_key(get_key(false))
 
@@ -1652,15 +2256,23 @@ local function loop()
             refresh_dirty_time()
             sync_resize()
 
-            if state.dirty then render(); state.dirty = false end
+            if state.dirty then
+                render()
+                state.dirty = false
+            end
             state.frame = state.frame + 1
         else
-            if key == "q" or key == "esc" then commit_result_once(); exit_game(); return end
+            if key == "q" or key == "esc" then
+                commit_result_once()
+                exit_game()
+                return
+            end
         end
 
         sleep(FRAME_MS)
     end
 end
 
+-- 启动游戏
 init_game()
-loop()
+game_loop()

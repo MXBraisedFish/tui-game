@@ -5,13 +5,14 @@ pub const MENU_MIN_HEIGHT: u16 = 15;
 pub const MAIN_CONTENT_WIDTH: u16 = 72;
 pub const MENU_LIST_WIDTH: u16 = 30;
 
+/// 主菜单渲染时各区域的布局结果。
 pub struct MainMenuAreas {
     pub logo: Rect,
     pub menu: Rect,
     pub version: Rect,
 }
 
-/// Returns centered layout areas for the main menu.
+/// 计算主菜单界面的中心布局区域。
 pub fn main_menu_areas(area: Rect) -> MainMenuAreas {
     let content = centered_rect(area, MAIN_CONTENT_WIDTH.min(area.width), 15.min(area.height));
     let rows = Layout::default()
@@ -40,7 +41,7 @@ pub fn main_menu_areas(area: Rect) -> MainMenuAreas {
     }
 }
 
-/// Creates a centered rectangle within a parent area.
+/// 在父区域内部创建一个水平和垂直都居中的子矩形。
 pub fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
     let horizontal = Layout::default()
         .direction(Direction::Horizontal)

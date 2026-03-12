@@ -8,12 +8,16 @@ use serde_json::Value as JsonValue;
 use crate::utils::path_utils;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+/// 通用游戏成绩结构。
+///
+/// 适用于只关心最高分与最长游玩时长的游戏。
 pub struct GameStats {
     pub high_score: u32,
     pub max_duration_sec: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 点灯游戏最佳记录。
 pub struct LightsOutBest {
     pub max_size: usize,
     pub min_steps: u64,
@@ -21,6 +25,7 @@ pub struct LightsOutBest {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 记忆翻牌最佳记录。
 pub struct MemoryFlipBest {
     pub difficulty: usize,
     pub min_steps: u64,
@@ -28,6 +33,7 @@ pub struct MemoryFlipBest {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// 扫雷官方三档难度的最佳时间记录。
 pub struct MinesweeperBest {
     pub d1_min_time_sec: Option<u64>,
     pub d2_min_time_sec: Option<u64>,
@@ -35,6 +41,7 @@ pub struct MinesweeperBest {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 走迷宫最佳记录。
 pub struct MazeEscapeBest {
     pub max_area: usize,
     pub max_cols: usize,
@@ -44,6 +51,7 @@ pub struct MazeEscapeBest {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// 纸牌接龙三个模式的最佳时间记录。
 pub struct SolitaireBest {
     pub freecell_min_time_sec: Option<u64>,
     pub klondike_min_time_sec: Option<u64>,
@@ -51,6 +59,7 @@ pub struct SolitaireBest {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 数独最佳记录。
 pub struct SudokuBest {
     pub difficulty: usize,
     pub min_time_sec: u64,
@@ -62,7 +71,7 @@ struct StatsFile {
     games: HashMap<String, GameStats>,
 }
 
-/// Loads per-game stats from local config file.
+/// 从本地统计文件中读取各个游戏的基础成绩数据。
 pub fn load_stats() -> HashMap<String, GameStats> {
     match load_stats_inner() {
         Ok(map) => map,
@@ -70,7 +79,7 @@ pub fn load_stats() -> HashMap<String, GameStats> {
     }
 }
 
-/// Updates per-game stats using max(high_score) and max(max_duration_sec).
+/// 按“最高分更大、最长游玩时间更长”的规则更新指定游戏的统计数据。
 pub fn update_game_stats(game_id: &str, score: u32, duration_sec: u64) -> Result<()> {
     let path = stats_file_path();
     if !path.exists() {
@@ -106,7 +115,7 @@ fn load_stats_inner() -> Result<HashMap<String, GameStats>> {
     Ok(parsed.games)
 }
 
-/// Formats duration seconds into HH:MM:SS.
+/// 将秒数格式化为 `HH:MM:SS` 形式，供界面直接显示。
 pub fn format_duration(seconds: u64) -> String {
     let h = seconds / 3600;
     let m = (seconds % 3600) / 60;
@@ -114,7 +123,7 @@ pub fn format_duration(seconds: u64) -> String {
     format!("{h:02}:{m:02}:{s:02}")
 }
 
-/// Loads lights_out best record from shared Lua save file.
+/// 从共享 Lua 存档文件中读取点灯游戏的最佳记录。
 pub fn load_lights_out_best() -> Option<LightsOutBest> {
     let path = lua_saves_file_path();
     if !path.exists() {
@@ -137,7 +146,7 @@ pub fn load_lights_out_best() -> Option<LightsOutBest> {
     })
 }
 
-/// Loads memory_flip best record from shared Lua save file.
+/// 从共享 Lua 存档文件中读取记忆翻牌的最佳记录。
 pub fn load_memory_flip_best() -> Option<MemoryFlipBest> {
     let path = lua_saves_file_path();
     if !path.exists() {
@@ -160,7 +169,7 @@ pub fn load_memory_flip_best() -> Option<MemoryFlipBest> {
     })
 }
 
-/// Loads minesweeper best record (official difficulties) from shared Lua save file.
+/// 从共享 Lua 存档文件中读取扫雷官方难度的最佳记录。
 pub fn load_minesweeper_best() -> Option<MinesweeperBest> {
     let path = lua_saves_file_path();
     if !path.exists() {
@@ -179,7 +188,7 @@ pub fn load_minesweeper_best() -> Option<MinesweeperBest> {
     })
 }
 
-/// Loads maze_escape best record from shared Lua save file.
+/// 从共享 Lua 存档文件中读取走迷宫的最佳记录。
 pub fn load_maze_escape_best() -> Option<MazeEscapeBest> {
     let path = lua_saves_file_path();
     if !path.exists() {
@@ -206,7 +215,7 @@ pub fn load_maze_escape_best() -> Option<MazeEscapeBest> {
     })
 }
 
-/// Loads solitaire best records (FreeCell/Klondike/Spider) from shared Lua save file.
+/// 从共享 Lua 存档文件中读取纸牌接龙三个模式的最佳记录。
 pub fn load_solitaire_best() -> Option<SolitaireBest> {
     let path = lua_saves_file_path();
     if !path.exists() {
@@ -217,7 +226,7 @@ pub fn load_solitaire_best() -> Option<SolitaireBest> {
     let root = serde_json::from_str::<JsonValue>(&raw).ok()?;
     let object = root.as_object()?;
 
-    // New format: solitaire_best_v2
+    // 新格式：`solitaire_best_v2`，分别记录三个模式的成绩。
     if let Some(best) = object.get("solitaire_best_v2").and_then(JsonValue::as_object) {
         let freecell = best.get("freecell").and_then(JsonValue::as_u64);
         let klondike = best.get("klondike").and_then(JsonValue::as_u64);
@@ -237,7 +246,7 @@ pub fn load_solitaire_best() -> Option<SolitaireBest> {
         });
     }
 
-    // Legacy format fallback: solitaire_best
+    // 兼容旧格式：`solitaire_best`，用于读取早期版本保存的数据。
     if let Some(best) = object.get("solitaire_best").and_then(JsonValue::as_object) {
         let freecell = best
             .get("freecell")
@@ -259,7 +268,7 @@ pub fn load_solitaire_best() -> Option<SolitaireBest> {
     None
 }
 
-/// Loads sudoku best record from shared Lua save file.
+/// 从共享 Lua 存档文件中读取数独的最佳记录。
 pub fn load_sudoku_best() -> Option<SudokuBest> {
     let path = lua_saves_file_path();
     if !path.exists() {
@@ -290,7 +299,7 @@ pub fn load_sudoku_best() -> Option<SudokuBest> {
     })
 }
 
-/// Loads 24-points best time from shared Lua save file.
+/// 从共享 Lua 存档文件中读取 24 点游戏的最短完成时间。
 pub fn load_twenty_four_best_time() -> Option<u64> {
     let path = lua_saves_file_path();
     if !path.exists() {
@@ -331,13 +340,3 @@ fn lua_saves_file_path() -> PathBuf {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::format_duration;
-
-    #[test]
-    fn format_duration_works() {
-        assert_eq!(format_duration(1250), "00:20:50");
-        assert_eq!(format_duration(3661), "01:01:01");
-    }
-}

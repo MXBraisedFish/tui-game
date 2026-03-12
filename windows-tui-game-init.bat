@@ -1,137 +1,142 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo [INFO] Starting TUI-GAME installation...
-
-where curl >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [ERROR] curl is required but was not found in PATH.
-    pause
-    exit /b 1
+echo [1] 中文
+echo [2] English
+set /p CHOICE="Select language / 选择语言 (1/2): "
+if "%CHOICE%"=="1" (
+    set "LANG_CODE=zh-cn"
+) else (
+    set "LANG_CODE=us-en"
 )
 
-where powershell >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [ERROR] PowerShell is required but was not found in PATH.
-    pause
-    exit /b 1
+if /I "%LANG_CODE%"=="zh-cn" (
+    set "MSG_START=[信息] 开始安装 TUI-GAME..."
+    set "MSG_FETCH=[信息] 正在从 GitHub 获取最新版本信息..."
+    set "MSG_PARSE=[信息] 正在解析 Windows 安装包下载链接..."
+    set "MSG_DL=[信息] 正在下载安装包..."
+    set "MSG_EXTRACT=[信息] 正在解压文件到当前目录..."
+    set "MSG_LANG_INIT=[信息] 正在初始化语言设置..."
+    set "MSG_CLEAN=[信息] 已清理临时文件。"
+    set "MSG_ASK_PATH=是否将安装目录加入 PATH 环境变量？(Y/N): "
+    set "MSG_ADD_PATH=[信息] 正在写入用户 PATH..."
+    set "MSG_PATH_OK=[成功] 已写入用户 PATH，重新打开终端后可直接使用 tg。"
+    set "MSG_PATH_SKIP=[信息] 跳过 PATH 注册。"
+    set "MSG_DONE=[成功] TUI-GAME 安装完成。"
+    set "MSG_RUN=[信息] 你现在可以输入 tg 启动游戏。"
+    set "ERR_CURL=[错误] 未找到 curl。"
+    set "ERR_PS=[错误] 未找到 PowerShell。"
+    set "ERR_FETCH=[错误] 下载版本信息失败。"
+    set "ERR_ASSET=[错误] 未找到 Windows 安装包。"
+    set "ERR_DL=[错误] 下载安装包失败。"
+    set "ERR_EXTRACT=[错误] 解压安装包失败。"
+    set "ERR_PATH=[警告] PATH 写入失败，请手动添加。"
+    set "MSG_EXIT=[信息] 按任意键退出并删除安装脚本。"
+) else (
+    set "MSG_START=[INFO] Starting TUI-GAME installation..."
+    set "MSG_FETCH=[INFO] Fetching latest release information from GitHub..."
+    set "MSG_PARSE=[INFO] Extracting Windows package download URL..."
+    set "MSG_DL=[INFO] Downloading package..."
+    set "MSG_EXTRACT=[INFO] Extracting files to current directory..."
+    set "MSG_LANG_INIT=[INFO] Initializing language preference..."
+    set "MSG_CLEAN=[INFO] Temporary files cleaned up."
+    set "MSG_ASK_PATH=Do you want to add the installation folder to PATH? (Y/N): "
+    set "MSG_ADD_PATH=[INFO] Updating user PATH..."
+    set "MSG_PATH_OK=[SUCCESS] User PATH updated. Reopen the terminal to use tg."
+    set "MSG_PATH_SKIP=[INFO] Skipping PATH registration."
+    set "MSG_DONE=[SUCCESS] TUI-GAME has been installed."
+    set "MSG_RUN=[INFO] You can now type tg to start the game."
+    set "ERR_CURL=[ERROR] curl was not found."
+    set "ERR_PS=[ERROR] PowerShell was not found."
+    set "ERR_FETCH=[ERROR] Failed to download release information."
+    set "ERR_ASSET=[ERROR] Windows package asset was not found."
+    set "ERR_DL=[ERROR] Failed to download the package."
+    set "ERR_EXTRACT=[ERROR] Failed to extract the package."
+    set "ERR_PATH=[WARNING] Failed to update PATH. Please add it manually."
+    set "MSG_EXIT=[INFO] Press any key to exit and delete this installer."
 )
 
-REM ----- Step 1: Fetch latest release info -----
-echo [INFO] Fetching latest release information from GitHub...
+echo %MSG_START%
+
+where curl >nul 2>nul || (echo %ERR_CURL% & pause & exit /b 1)
+where powershell >nul 2>nul || (echo %ERR_PS% & pause & exit /b 1)
+
 set "API_URL=https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest"
 set "TEMP_JSON=%temp%\tui_game_init_%RANDOM%.json"
+set "TEMP_ZIP=%temp%\tui_game_%RANDOM%.zip"
 
+echo %MSG_FETCH%
 curl -s -L -o "%TEMP_JSON%" "%API_URL%"
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to download release information. Check your internet connection.
+if errorlevel 1 (
+    echo %ERR_FETCH%
     pause
     exit /b 1
 )
 
-REM ----- Step 2: Extract Windows zip download URL -----
-echo [INFO] Extracting download URL for Windows package...
-set "WIN_ZIP_NAME=tui-game-windows.zip"
+echo %MSG_PARSE%
 set "DOWNLOAD_URL="
-
-for /f "usebackq delims=" %%i in (`powershell -command "& { $json = Get-Content '%TEMP_JSON%' | ConvertFrom-Json; $asset = $json.assets | Where-Object { $_.name -eq '%WIN_ZIP_NAME%' }; if ($asset) { $asset.browser_download_url } else { '' } }"`) do (
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$json = Get-Content -Raw '%TEMP_JSON%' | ConvertFrom-Json; $asset = $json.assets | Where-Object { $_.name -eq 'tui-game-windows.zip' } | Select-Object -First 1; if ($asset) { $asset.browser_download_url }"`) do (
     set "DOWNLOAD_URL=%%i"
 )
-
 if "!DOWNLOAD_URL!"=="" (
-    echo [ERROR] Could not find Windows asset '%WIN_ZIP_NAME%' in the latest release.
-    del "%TEMP_JSON%"
+    echo %ERR_ASSET%
+    del /f /q "%TEMP_JSON%" >nul 2>&1
     pause
     exit /b 1
 )
-echo [INFO] Download URL: !DOWNLOAD_URL!
 
-REM ----- Step 3: Download the zip package -----
-echo [INFO] Downloading game package...
-set "TEMP_ZIP=%temp%\tui-game_%RANDOM%.zip"
+echo %MSG_DL%
 curl -s -L -o "%TEMP_ZIP%" "!DOWNLOAD_URL!"
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to download game package.
-    del "%TEMP_JSON%"
+if errorlevel 1 (
+    echo %ERR_DL%
+    del /f /q "%TEMP_JSON%" >nul 2>&1
     pause
     exit /b 1
 )
 
-REM ----- Step 4: Extract zip to current directory (overwrite) -----
-echo [INFO] Extracting files to %CD% ...
-powershell -command "& { Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%CD%' -Force }"
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to extract game package.
-    del "%TEMP_JSON%"
-    del "%TEMP_ZIP%"
+echo %MSG_EXTRACT%
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%CD%' -Force"
+if errorlevel 1 (
+    echo %ERR_EXTRACT%
+    del /f /q "%TEMP_JSON%" "%TEMP_ZIP%" >nul 2>&1
     pause
     exit /b 1
 )
 
-REM ----- Clean up temporary files -----
-del "%TEMP_JSON%"
-del "%TEMP_ZIP%"
-echo [INFO] Temporary files cleaned up.
+echo %MSG_LANG_INIT%
+if not exist "%CD%\tui-game-data" mkdir "%CD%\tui-game-data"
+> "%CD%\tui-game-data\language_pref.txt" echo %LANG_CODE%
 
-REM ----- Step 5: Ask about adding installation folder to PATH -----
+del /f /q "%TEMP_JSON%" "%TEMP_ZIP%" >nul 2>&1
+echo %MSG_CLEAN%
+
 echo.
-set /p ADD_PATH="Do you want to add the installation folder to your PATH environment variable? (Y/N): "
-if /i "!ADD_PATH!"=="Y" (
+set /p ADD_PATH="%MSG_ASK_PATH%"
+if /I "!ADD_PATH!"=="Y" (
     set "INSTALL_DIR=%CD%"
-    if "!INSTALL_DIR:~-1!"=="\" set "INSTALL_DIR=!INSTALL_DIR:~0,-1!"
-    set "TUI_GAME_INSTALL_DIR=!INSTALL_DIR!"
-    echo [INFO] Adding !INSTALL_DIR! to user PATH...
-
+    echo %MSG_ADD_PATH%
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-        "$ErrorActionPreference = 'Stop';" ^
-        "$target = [System.IO.Path]::GetFullPath($env:TUI_GAME_INSTALL_DIR).TrimEnd('\');" ^
-        "$userPath = [Environment]::GetEnvironmentVariable('Path','User');" ^
-        "$parts = @(); if (-not [string]::IsNullOrWhiteSpace($userPath)) { $parts = $userPath -split ';' | Where-Object { $_ } }" ^
-        "$exists = $false;" ^
-        "foreach ($p in $parts) { try { $full = [System.IO.Path]::GetFullPath($p).TrimEnd('\') } catch { $full = $p.TrimEnd('\') }; if ($full -eq $target) { $exists = $true; break } }" ^
-        "if ($exists) { exit 10 }" ^
-        "$newPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $target } else { $userPath.TrimEnd(';') + ';' + $target };" ^
-        "[Environment]::SetEnvironmentVariable('Path', $newPath, 'User');" ^
-        "exit 0"
-
-    if !errorlevel! equ 10 (
-        echo [INFO] Directory already in User PATH. Skipping.
-    ) else if !errorlevel! neq 0 (
-        echo [WARNING] Failed to update User PATH. You may need to add it manually.
+        "$target=[System.IO.Path]::GetFullPath($env:CD).TrimEnd('\');" ^
+        "$userPath=[Environment]::GetEnvironmentVariable('Path','User');" ^
+        "$parts=@(); if(-not [string]::IsNullOrWhiteSpace($userPath)){ $parts=$userPath -split ';' | Where-Object { $_ } }" ^
+        "$exists=$false; foreach($p in $parts){ try { $full=[System.IO.Path]::GetFullPath($p).TrimEnd('\') } catch { $full=$p.TrimEnd('\') }; if($full -eq $target){ $exists=$true; break } }" ^
+        "if(-not $exists){ $newPath=if([string]::IsNullOrWhiteSpace($userPath)){$target}else{$userPath.TrimEnd(';') + ';' + $target}; [Environment]::SetEnvironmentVariable('Path',$newPath,'User') }"
+    if errorlevel 1 (
+        echo %ERR_PATH%
     ) else (
-        echo [SUCCESS] User PATH updated. You can now use 'tg' command from any terminal ^(may need to reopen^).
+        echo %MSG_PATH_OK%
     )
-    set "REG_OPTION=yes"
 ) else (
-    echo [INFO] Skipping PATH registration.
-    set "REG_OPTION=no"
-)
-
-REM ----- Step 6: Final messages -----
-echo.
-echo [SUCCESS] TUI-GAME has been installed successfully!
-echo =================================
-setlocal disabledelayedexpansion
-echo Enjoy the game! :^)
-setlocal enabledelayedexpansion
-echo.
-echo If you like it, please give a star on GitHub: https://github.com/MXBraisedFish/TUI-GAME
-echo Author: MXBraisedFish (MXFish)
-echo =================================
-
-if /i "!REG_OPTION!"=="yes" (
-    echo [INFO] You can start the game by typing 'tg' in any terminal.
-) else (
-    echo [INFO] To start the game easily from anywhere, add this folder to your PATH, then you can use 'tg' command.
-    echo [INFO] Current folder: %~dp0
+    echo %MSG_PATH_SKIP%
 )
 
 echo.
-echo [INFO] Press any key to exit and delete this installer.
+echo %MSG_DONE%
+echo %MSG_RUN%
+echo.
+echo %MSG_EXIT%
 pause >nul
 
-REM ----- Delete this script itself -----
 set "SELF_BAT=%~f0"
 start "" /b cmd /c "ping 127.0.0.1 -n 2 >nul & del /f /q ""%SELF_BAT%"" >nul 2>&1"
-
 exit /b 0

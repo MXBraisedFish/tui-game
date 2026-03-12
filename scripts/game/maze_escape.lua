@@ -104,7 +104,7 @@ local function tr(key)
 end
 
 -- 获取文本显示宽度
-local function key_width(text)
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then
@@ -179,7 +179,7 @@ local function wrap_words(text, max_width)
             current = token
         else
             local candidate = current .. " " .. token
-            if key_width(candidate) <= max_width then
+            if text_width(candidate) <= max_width then
                 current = candidate
             else
                 lines[#lines + 1] = current
@@ -198,7 +198,7 @@ end
 
 -- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full = key_width(text)
+    local full = text_width(text)
     local width = hard_min
     while width <= full do
         if #wrap_words(text, width) <= max_lines then
@@ -252,7 +252,7 @@ end
 
 -- 获取迷宫单元格显示宽度
 local function maze_cell_width()
-    local w = key_width(WALL_GLYPH)
+    local w = text_width(WALL_GLYPH)
     if w < 1 then
         return 1
     end
@@ -261,7 +261,7 @@ end
 
 -- 填充单元格文本（确保固定宽度）
 local function fit_cell_text(text, cell_w)
-    local w = key_width(text)
+    local w = text_width(text)
     if w >= cell_w then
         return text
     end
@@ -700,35 +700,22 @@ local function parse_config_input()
     if #nums < 1 or #nums > 3 then
         return nil
     end
-    local cols = state.cols
     local rows = state.rows
+    local cols = state.cols
     local mode = state.mode
 
     if #nums == 1 then
         mode = nums[1]
     elseif #nums >= 2 then
-        cols = nums[1]
-        rows = nums[2]
+        rows = nums[1]
+        cols = nums[2]
         if #nums == 3 then
             mode = nums[3]
         end
 
-        -- 尝试交换行列（用户可能输反了）
-        local cols_ok = cols >= MIN_COLS and cols <= MAX_COLS
         local rows_ok = rows >= MIN_ROWS and rows <= MAX_ROWS
-        if not (cols_ok and rows_ok) then
-            local sw_cols = rows
-            local sw_rows = cols
-            local sw_cols_ok = sw_cols >= MIN_COLS and sw_cols <= MAX_COLS
-            local sw_rows_ok = sw_rows >= MIN_ROWS and sw_rows <= MAX_ROWS
-            if sw_cols_ok and sw_rows_ok then
-                cols = sw_cols
-                rows = sw_rows
-                cols_ok = true
-                rows_ok = true
-            end
-        end
-        if not (cols_ok and rows_ok) then
+        local cols_ok = cols >= MIN_COLS and cols <= MAX_COLS
+        if not (rows_ok and cols_ok) then
             return nil
         end
     end
@@ -737,7 +724,7 @@ local function parse_config_input()
     return cols, rows, mode
 end
 
--- 创建游戏快照
+-- ??????
 local function make_snapshot()
     return {
         cols = state.cols,
@@ -913,18 +900,18 @@ local function board_geometry()
     local status_left = tr("game.maze_escape.time") .. " 00:00:00"
     local status_mid = tr("game.maze_escape.steps") .. " 9999"
     local status_right = tr("game.maze_escape.keys") .. " 99"
-    local status_w = key_width(status_left) + 2 + key_width(status_mid) + 2 + key_width(status_right)
+    local status_w = text_width(status_left) + 2 + text_width(status_mid) + 2 + text_width(status_right)
 
     local mode_text = tr("game.maze_escape.mode") .. ": " .. mode_label(state.mode)
     local timer_text = tr("game.maze_escape.remaining") .. " 00:00:00"
-    local mode_line_w = key_width(mode_text) + 2 + key_width(timer_text)
+    local mode_line_w = text_width(mode_text) + 2 + text_width(timer_text)
 
     local message_w = math.max(
-        key_width(tr("game.maze_escape.win_banner")),
-        key_width(tr("game.maze_escape.lose_banner")),
-        key_width(tr("game.maze_escape.input_config_hint")),
-        key_width(tr("game.2048.confirm_restart")),
-        key_width(tr("game.2048.confirm_exit"))
+        text_width(tr("game.maze_escape.win_banner")),
+        text_width(tr("game.maze_escape.lose_banner")),
+        text_width(tr("game.maze_escape.input_config_hint")),
+        text_width(tr("game.2048.confirm_restart")),
+        text_width(tr("game.2048.confirm_exit"))
     )
 
     local board_w = state.cols * maze_cell_width()
@@ -943,7 +930,7 @@ end
 
 -- 计算文本居中位置
 local function centered_x(line, area_x, area_w)
-    local x = area_x + math.floor((area_w - key_width(line)) / 2)
+    local x = area_x + math.floor((area_w - text_width(line)) / 2)
     if x < area_x then x = area_x end
     return x
 end
@@ -963,12 +950,12 @@ local function draw_status(x, y, w)
     -- 计算位置（避免重叠）
     local left_x = x
     local mid_x = centered_x(mid, x, w)
-    local right_x = x + w - key_width(right)
-    if mid_x < left_x + key_width(left) + 1 then
-        mid_x = left_x + key_width(left) + 1
+    local right_x = x + w - text_width(right)
+    if mid_x < left_x + text_width(left) + 1 then
+        mid_x = left_x + text_width(left) + 1
     end
-    if right_x <= mid_x + key_width(mid) then
-        right_x = mid_x + key_width(mid) + 1
+    if right_x <= mid_x + text_width(mid) then
+        right_x = mid_x + text_width(mid) + 1
     end
 
     -- 绘制时间、步数、钥匙数
@@ -1072,7 +1059,7 @@ local function draw_controls(x, y, w)
     -- 绘制控制说明
     for i = 1, #lines do
         local line = lines[i]
-        local line_x = math.floor((term_w - key_width(line)) / 2)
+        local line_x = math.floor((term_w - text_width(line)) / 2)
         if line_x < 1 then line_x = 1 end
         draw_text(line_x, y + offset + i - 1, line, "white", "black")
     end
@@ -1108,14 +1095,14 @@ local function minimum_required_size()
     local status_left = tr("game.maze_escape.time") .. " 00:00:00"
     local status_mid = tr("game.maze_escape.steps") .. " 9999"
     local status_right = tr("game.maze_escape.keys") .. " 99"
-    local status_w = key_width(status_left) + 2 + key_width(status_mid) + 2 + key_width(status_right)
+    local status_w = text_width(status_left) + 2 + text_width(status_mid) + 2 + text_width(status_right)
 
     local hint_w = math.max(
-        key_width(tr("game.maze_escape.input_config_hint")),
-        key_width(tr("game.maze_escape.win_banner") .. " " .. tr("game.maze_escape.result_controls")),
-        key_width(tr("game.maze_escape.lose_banner") .. " " .. tr("game.maze_escape.result_controls")),
-        key_width(tr("game.2048.confirm_restart")),
-        key_width(tr("game.2048.confirm_exit"))
+        text_width(tr("game.maze_escape.input_config_hint")),
+        text_width(tr("game.maze_escape.win_banner") .. " " .. tr("game.maze_escape.result_controls")),
+        text_width(tr("game.maze_escape.lose_banner") .. " " .. tr("game.maze_escape.result_controls")),
+        text_width(tr("game.2048.confirm_restart")),
+        text_width(tr("game.2048.confirm_exit"))
     )
 
     local board_w = state.cols * maze_cell_width()
@@ -1137,7 +1124,7 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
 
     for i = 1, #lines do
         local line = lines[i]
-        local px = math.floor((term_w - key_width(line)) / 2)
+        local px = math.floor((term_w - text_width(line)) / 2)
         if px < 1 then px = 1 end
         draw_text(px, top + i - 1, line, "white", "black")
     end

@@ -10,17 +10,33 @@ jobs:
     name: Build for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: tui-game
             asset_name: tui-game-linux.tar.gz
+            main_bin: tui-game
+            version_bin: version
+            updata_bin: updata
+            remove_bin: remove
+            tg_script: Linux/tg.sh
+            tg_output: tg.sh
           - os: windows-latest
-            artifact_name: tui-game.exe
             asset_name: tui-game-windows.zip
+            main_bin: tui-game.exe
+            version_bin: version.exe
+            updata_bin: updata.exe
+            remove_bin: remove.exe
+            tg_script: Windows/tg.bat
+            tg_output: tg.bat
           - os: macos-latest
-            artifact_name: tui-game
             asset_name: tui-game-macos.zip
+            main_bin: tui-game
+            version_bin: version
+            updata_bin: updata
+            remove_bin: remove
+            tg_script: MacOS/tg.sh
+            tg_output: tg.sh
 
     steps:
       - name: Checkout code
@@ -29,57 +45,57 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build release
-        run: cargo build --release
+      - name: Build release binaries
+        run: cargo build --release --bins
 
-      - name: Package assets and scripts
+      - name: Prepare dist directory
         shell: bash
         run: |
-          # 1. 创建打包临时目录
+          set -euo pipefail
+
+          rm -rf dist
           mkdir -p dist
 
-          # 2. 拷贝二进制文件到 dist 根目录
-          cp target/release/${{ matrix.artifact_name }} dist/
+          cp "target/release/${{ matrix.main_bin }}" "dist/${{ matrix.main_bin }}"
+          cp "target/release/${{ matrix.version_bin }}" "dist/${{ matrix.version_bin }}"
+          cp "target/release/${{ matrix.updata_bin }}" "dist/${{ matrix.updata_bin }}"
+          cp "target/release/${{ matrix.remove_bin }}" "dist/${{ matrix.remove_bin }}"
 
-          # 3. 拷贝 assets 目录（如果存在）
+          cp "${{ matrix.tg_script }}" "dist/${{ matrix.tg_output }}"
+
           if [ -d "assets" ]; then
-            cp -r assets dist/
+            cp -R assets dist/
           fi
 
-          # 4. 拷贝 scripts 目录（如果存在）
           if [ -d "scripts" ]; then
-            cp -r scripts dist/
+            cp -R scripts dist/
           fi
 
-          # 5. 根据平台从根目录下对应的平台目录拷贝脚本到 dist 根目录
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            # Windows 专用脚本 (目录名为 Windows)
-            [ -f "Windows/version.bat" ] && cp Windows/version.bat dist/
-            [ -f "Windows/delete-tui-game.bat" ] && cp Windows/delete-tui-game.bat dist/
-            [ -f "Windows/tg.bat" ] && cp Windows/tg.bat dist/
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # macOS 专用脚本 (目录名为 macOS)
-            [ -f "MacOS/version.sh" ] && cp MacOS/version.sh dist/
-            [ -f "MacOS/delete-tui-game.sh" ] && cp MacOS/delete-tui-game.sh dist/
-            [ -f "MacOS/tg.sh" ] && cp MacOS/tg.sh dist/
-          else
-            # Linux 专用脚本 (目录名为 linux)
-            [ -f "Linux/version.sh" ] && cp Linux/version.sh dist/
-            [ -f "Linux/delete-tui-game.sh" ] && cp Linux/delete-tui-game.sh dist/
-            [ -f "Linux/tg.sh" ] && cp Linux/tg.sh dist/
+          if [ "${{ matrix.os }}" != "windows-latest" ]; then
+            chmod +x \
+              "dist/${{ matrix.main_bin }}" \
+              "dist/${{ matrix.version_bin }}" \
+              "dist/${{ matrix.updata_bin }}" \
+              "dist/${{ matrix.remove_bin }}" \
+              "dist/${{ matrix.tg_output }}" || true
+
+            if [ -d "dist/scripts/bash" ]; then
+              chmod +x dist/scripts/bash/*.sh || true
+            fi
           fi
 
-          # 6. 进入 dist 目录并打包
+      - name: Create archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
           cd dist
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            # Windows 使用 7z 打包为 zip
-            7z a ../${{ matrix.asset_name }} *
+            7z a "../${{ matrix.asset_name }}" *
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # macOS 使用 zip 命令打包
-            zip -r ../${{ matrix.asset_name }} *
+            zip -r "../${{ matrix.asset_name }}" *
           else
-            # Linux 使用 tar 打包为 tar.gz
-            tar -czf ../${{ matrix.asset_name }} *
+            tar -czf "../${{ matrix.asset_name }}" *
           fi
 
       - name: Upload to Release

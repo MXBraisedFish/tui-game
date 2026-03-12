@@ -1,51 +1,74 @@
+-- 井字棋游戏元数据
 GAME_META = {
     name = "井字棋",
     description = "Place X and O marks and connect three in a row."
 }
 
+-- 游戏常量
 local FPS = 60
 local FRAME_MS = 16
 
+-- 棋盘格子状态常量
 local EMPTY = 0
 local MARK_X = 1
 local MARK_O = 2
 
+-- 棋盘尺寸（用于布局）
 local BOARD_W = 8
 local BOARD_H = 5
 
+-- 胜利条件：所有可能的3连一线组合
 local WIN_LINES = {
-    { { 1, 1 }, { 1, 2 }, { 1, 3 } },
-    { { 2, 1 }, { 2, 2 }, { 2, 3 } },
-    { { 3, 1 }, { 3, 2 }, { 3, 3 } },
-    { { 1, 1 }, { 2, 1 }, { 3, 1 } },
-    { { 1, 2 }, { 2, 2 }, { 3, 2 } },
-    { { 1, 3 }, { 2, 3 }, { 3, 3 } },
-    { { 1, 1 }, { 2, 2 }, { 3, 3 } },
-    { { 1, 3 }, { 2, 2 }, { 3, 1 } },
+    { { 1, 1 }, { 1, 2 }, { 1, 3 } }, -- 第一行
+    { { 2, 1 }, { 2, 2 }, { 2, 3 } }, -- 第二行
+    { { 3, 1 }, { 3, 2 }, { 3, 3 } }, -- 第三行
+    { { 1, 1 }, { 2, 1 }, { 3, 1 } }, -- 第一列
+    { { 1, 2 }, { 2, 2 }, { 3, 2 } }, -- 第二列
+    { { 1, 3 }, { 2, 3 }, { 3, 3 } }, -- 第三列
+    { { 1, 1 }, { 2, 2 }, { 3, 3 } }, -- 主对角线
+    { { 1, 3 }, { 2, 2 }, { 3, 1 } }, -- 副对角线
 }
 
+-- 游戏状态表
 local state = {
-    board = {},
+    -- 棋盘数据
+    board = {}, -- 3x3 棋盘，存储每个格子的状态（EMPTY/MARK_X/MARK_O）
+
+    -- 光标位置
     cursor_row = 1,
     cursor_col = 1,
+
+    -- 玩家和AI的标记
     player_mark = MARK_X,
     ai_mark = MARK_O,
-    turn = MARK_X,
-    winner = EMPTY, -- EMPTY/no result, -1 draw, MARK_X/MARK_O winner
-    game_over = false,
-    win_cells = {},
-    confirm_mode = nil, -- "restart" | "exit"
-    toast_text = nil,
-    toast_until = 0,
+
+    -- 游戏状态
+    turn = MARK_X,     -- 当前回合该谁下
+    winner = EMPTY,    -- 获胜者（EMPTY表示无）
+    game_over = false, -- 游戏是否结束
+    win_cells = {},    -- 获胜格子的映射表
+
+    -- UI状态
+    confirm_mode = nil, -- 确认模式：nil, "restart", "exit"
+    toast_text = nil,   -- 提示消息
+    toast_until = 0,    -- 提示消息截止帧
+
+    -- 时间相关
     frame = 0,
     start_frame = 0,
     end_frame = nil,
     result_committed = false,
+
+    -- 渲染脏标记
     dirty = true,
     last_term_w = 0,
     last_term_h = 0,
+
+    -- 输入防抖
     last_key = "",
     last_key_frame = -100,
+
+    -- 尺寸警告
     size_warning_active = false,
     last_warn_term_w = 0,
     last_warn_term_h = 0,
@@ -53,6 +76,7 @@ local state = {
     last_warn_min_h = 0,
 }
 
+-- 翻译函数（安全调用）
 local function tr(key)
     if type(translate) ~= "function" then
         return key
@@ -70,6 +94,7 @@ local function tr(key)
     return value
 end
 
+-- 规范化按键
 local function normalize_key(key)
     if key == nil then return "" end
     if type(key) == "string" then return string.lower(key) end
@@ -77,6 +102,7 @@ local function normalize_key(key)
     return tostring(key):lower()
 end
 
+-- 获取文本显示宽度
 local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
@@ -87,6 +113,7 @@ local function text_width(text)
     return #text
 end
 
+-- 获取终端尺寸
 local function terminal_size()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
@@ -98,6 +125,7 @@ local function terminal_size()
     return w, h
 end
 
+-- 按单词换行
 local function wrap_words(text, max_width)
     if max_width <= 1 then
         return { text }
@@ -128,6 +156,7 @@ local function wrap_words(text, max_width)
     return lines
 end
 
+-- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
     local full = text_width(text)
     local width = hard_min
@@ -140,6 +169,7 @@ local function min_width_for_lines(text, max_lines, hard_min)
     return full
 end
 
+-- 计算文本居中位置
 local function centered_x(text, min_x, max_x)
     local span = max_x - min_x + 1
     local x = min_x + math.floor((span - text_width(text)) / 2)
@@ -147,11 +177,13 @@ local function centered_x(text, min_x, max_x)
     return x
 end
 
+-- 计算已过秒数
 local function elapsed_seconds()
     local ending = state.end_frame or state.frame
     return math.max(0, math.floor((ending - state.start_frame) / FPS))
 end
 
+-- 获取标记的显示符号
 local function mark_symbol(mark)
     if mark == MARK_X then
         return "><"
@@ -162,6 +194,7 @@ local function mark_symbol(mark)
     return "  "
 end
 
+-- 获取标记的名称
 local function mark_name(mark)
     if mark == MARK_X then
         return tr("game.tic_tac_toe.mark_x")
@@ -169,6 +202,7 @@ local function mark_name(mark)
     return tr("game.tic_tac_toe.mark_o")
 end
 
+-- 设置空棋盘
 local function set_empty_board()
     state.board = {
         { EMPTY, EMPTY, EMPTY },
@@ -190,10 +224,12 @@ local function set_empty_board()
     state.dirty = true
 end
 
+-- 生成格子的键名（用于映射表）
 local function win_key(r, c)
     return tostring(r) .. "," .. tostring(c)
 end
 
+-- 检查棋盘是否已满
 local function board_full(board)
     for r = 1, 3 do
         for c = 1, 3 do
@@ -205,6 +241,7 @@ local function board_full(board)
     return true
 end
 
+-- 检查获胜者
 local function check_winner(board)
     for i = 1, #WIN_LINES do
         local line = WIN_LINES[i]
@@ -221,6 +258,7 @@ local function check_winner(board)
     return EMPTY, nil
 end
 
+-- 复制棋盘
 local function copy_board(src)
     local out = {
         { src[1][1], src[1][2], src[1][3] },
@@ -230,6 +268,7 @@ local function copy_board(src)
     return out
 end
 
+-- 极小极大算法
 local function minimax(board, turn, depth)
     local winner = check_winner(board)
     local result = winner
@@ -280,6 +319,7 @@ local function minimax(board, turn, depth)
     return best
 end
 
+-- 提交游戏结果
 local function commit_result_once()
     if state.result_committed then
         return
@@ -294,6 +334,7 @@ local function commit_result_once()
     end
 end
 
+-- 更新结果状态
 local function update_result_state(winner, line)
     if winner == EMPTY then
         return false
@@ -313,16 +354,19 @@ local function update_result_state(winner, line)
     return true
 end
 
+-- 评估游戏结果
 local function evaluate_result()
     local winner, line = check_winner(state.board)
     return update_result_state(winner, line)
 end
 
+-- AI走棋
 local function ai_move()
     if state.game_over or state.turn ~= state.ai_mark then
         return
     end
 
+    -- 寻找强制走法（能直接赢或阻止玩家赢）
     local function find_forced_move(mark)
         local temp = copy_board(state.board)
         for r = 1, 3 do
@@ -340,6 +384,7 @@ local function ai_move()
         return nil
     end
 
+    -- 列出所有空位
     local function list_empty_moves()
         local moves = {}
         for r = 1, 3 do
@@ -352,8 +397,10 @@ local function ai_move()
         return moves
     end
 
+    -- 先检查是否能直接赢
     local pick = find_forced_move(state.ai_mark)
     if pick == nil then
+        -- 再检查是否需要阻止玩家赢
         pick = find_forced_move(state.player_mark)
     end
 
@@ -362,11 +409,13 @@ local function ai_move()
         if #all_moves == 0 then
             return
         end
+        -- 随机模式概率
         local random_mode = (random(100) < 50)
 
         if random_mode then
             pick = all_moves[random(#all_moves) + 1]
         else
+            -- 使用极小极大算法选择最佳走法
             local best_score = -999
             local best_moves = {}
             local temp = copy_board(state.board)
@@ -392,12 +441,14 @@ local function ai_move()
         return
     end
 
+    -- 执行AI走棋
     state.board[pick.r][pick.c] = state.ai_mark
     state.turn = state.player_mark
     evaluate_result()
     state.dirty = true
 end
 
+-- 玩家在当前光标位置下棋
 local function place_current_cell()
     if state.game_over or state.turn ~= state.player_mark then
         return
@@ -406,6 +457,7 @@ local function place_current_cell()
         return
     end
 
+    -- 玩家下棋
     state.board[state.cursor_row][state.cursor_col] = state.player_mark
     state.turn = state.ai_mark
     if not evaluate_result() then
@@ -414,6 +466,7 @@ local function place_current_cell()
     state.dirty = true
 end
 
+-- 开始新一局
 local function begin_round()
     set_empty_board()
     if state.ai_mark == MARK_X then
@@ -421,6 +474,7 @@ local function begin_round()
     end
 end
 
+-- 移动光标
 local function move_cursor(dr, dc)
     local nr = state.cursor_row + dr
     local nc = state.cursor_col + dc
@@ -435,6 +489,7 @@ local function move_cursor(dr, dc)
     end
 end
 
+-- 交换玩家和AI的标记
 local function switch_marks()
     set_empty_board()
     if state.player_mark == MARK_X then
@@ -453,6 +508,7 @@ local function switch_marks()
     state.dirty = true
 end
 
+-- 绘制尺寸警告
 local function draw_size_warning(term_w, term_h, min_w, min_h)
     clear()
     local lines = {
@@ -469,11 +525,12 @@ local function draw_size_warning(term_w, term_h, min_w, min_h)
     end
 end
 
+-- 获取控制说明文本
 local function controls_text()
-    return tr(
-        "game.tic_tac_toe.controls")
+    return tr("game.tic_tac_toe.controls")
 end
 
+-- 计算最小所需终端尺寸
 local function minimum_required_size()
     local status = tr("game.tic_tac_toe.you")
         .. ":" .. mark_symbol(state.player_mark)
@@ -494,6 +551,7 @@ local function minimum_required_size()
     return min_w, min_h
 end
 
+-- 确保终端尺寸足够
 local function ensure_terminal_size_ok()
     local term_w, term_h = terminal_size()
     local min_w, min_h = minimum_required_size()
@@ -522,10 +580,12 @@ local function ensure_terminal_size_ok()
     return false
 end
 
+-- 获取指定格子的符号
 local function row_cell_symbol(r, c)
     return mark_symbol(state.board[r][c])
 end
 
+-- 获取指定格子的前景色
 local function row_cell_fg(r, c)
     local v = state.board[r][c]
     if v == EMPTY then
@@ -540,6 +600,7 @@ local function row_cell_fg(r, c)
     return "cyan"
 end
 
+-- 绘制棋盘
 local function draw_board(board_x, board_y)
     local row_offsets = { 0, 2, 4 }
     local row_ys = { board_y + row_offsets[1], board_y + row_offsets[2], board_y + row_offsets[3] }
@@ -550,7 +611,6 @@ local function draw_board(board_x, board_y)
 
     for r = 1, 3 do
         local y = row_ys[r]
-        -- Clear one logical row region.
         draw_text(board_x, y, "        ", "white", "black")
         local x1 = board_x
         local x2 = board_x + 3
@@ -568,6 +628,7 @@ local function draw_board(board_x, board_y)
     end
 end
 
+-- 获取当前消息
 local function current_message()
     if state.game_over then
         if state.winner == state.player_mark then
@@ -590,6 +651,7 @@ local function current_message()
     return tr("game.tic_tac_toe.ready"), "dark_gray"
 end
 
+-- 绘制控制说明
 local function draw_controls(y, term_w)
     for i = 0, 2 do
         draw_text(1, y + i, string.rep(" ", term_w), "white", "black")
@@ -605,6 +667,7 @@ local function draw_controls(y, term_w)
     end
 end
 
+-- 主渲染函数
 local function render()
     local term_w, term_h = terminal_size()
     clear()
@@ -629,6 +692,7 @@ local function render()
     draw_controls(board_y + BOARD_H + 1, term_w)
 end
 
+-- 同步终端尺寸变化
 local function sync_terminal_resize()
     local w, h = terminal_size()
     if w ~= state.last_term_w or h ~= state.last_term_h then
@@ -638,6 +702,7 @@ local function sync_terminal_resize()
     end
 end
 
+-- 处理确认模式下的按键
 local function handle_confirm_key(key)
     if key == "y" or key == "enter" then
         if state.confirm_mode == "restart" then
@@ -657,6 +722,7 @@ local function handle_confirm_key(key)
     return "none"
 end
 
+-- 防抖处理
 local function should_debounce(key)
     if key ~= "up" and key ~= "down" and key ~= "left" and key ~= "right" then
         return false
@@ -669,6 +735,7 @@ local function should_debounce(key)
     return false
 end
 
+-- 处理游戏进行中的按键
 local function handle_active_key(key)
     if key == "up" or key == "k" then
         move_cursor(-1, 0)
@@ -706,6 +773,7 @@ local function handle_active_key(key)
     end
 end
 
+-- 处理游戏结束后的按键
 local function handle_result_key(key)
     if key == "r" then
         begin_round()
@@ -717,6 +785,7 @@ local function handle_result_key(key)
     return "none"
 end
 
+-- 游戏初始化
 local function init_game()
     local w, h = terminal_size()
     state.last_term_w = w
@@ -729,6 +798,7 @@ local function init_game()
     end
 end
 
+-- 主游戏循环
 local function game_loop()
     while true do
         local key = normalize_key(get_key(false))
@@ -765,5 +835,6 @@ local function game_loop()
     end
 end
 
+-- 启动游戏
 init_game()
 game_loop()

@@ -5,13 +5,14 @@ use ratatui::widgets::{Paragraph, Wrap};
 use crate::app::i18n::t;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 占位页面类型。
 pub enum PlaceholderPage {
     Settings,
     About,
     Continue,
 }
 
-/// Renders a simple placeholder page.
+/// 渲染通用占位页面，用于暂未完成的功能入口。
 pub fn render_placeholder(
     frame: &mut ratatui::Frame<'_>,
     page: PlaceholderPage,

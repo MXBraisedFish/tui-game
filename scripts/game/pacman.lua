@@ -176,7 +176,7 @@ local function tr(key)
 end
 
 -- 获取文本显示宽度
-local function key_width(text)
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then return w end
@@ -211,7 +211,7 @@ local function wrap_words(text, max_width)
             current = token
         else
             local candidate = current .. " " .. token
-            if key_width(candidate) <= max_width then
+            if text_width(candidate) <= max_width then
                 current = candidate
             else
                 lines[#lines + 1] = current
@@ -226,7 +226,7 @@ end
 
 -- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full = key_width(text)
+    local full = text_width(text)
     local width = hard_min
     while width <= full do
         if #wrap_words(text, width) <= max_lines then return width end
@@ -1267,7 +1267,7 @@ end
 
 -- 计算文本居中位置
 local function centered_x(text, area_x, area_w)
-    local x = area_x + math.floor((area_w - key_width(text)) / 2)
+    local x = area_x + math.floor((area_w - text_width(text)) / 2)
     if x < area_x then x = area_x end
     return x
 end
@@ -1305,7 +1305,7 @@ local function build_info_width()
     local candidates = { best_line, score_line, time_line, level_line, power_line, fruits_line, lives_label ..
     lives_icons }
     for i = 1, #candidates do
-        local w = key_width(candidates[i])
+        local w = text_width(candidates[i])
         if w > max_w then max_w = w end
     end
     return max_w + 1
@@ -1323,12 +1323,12 @@ local function board_geometry()
 
     local controls = tr("game.pacman.controls")
     local controls_w = min_width_for_lines(controls, 3, 24)
-    local result_w = key_width(tr("game.pacman.lose_banner") .. " " .. tr("game.pacman.result_controls"))
+    local result_w = text_width(tr("game.pacman.lose_banner") .. " " .. tr("game.pacman.result_controls"))
     local confirm_w = math.max(
-        key_width(tr("game.pacman.confirm_restart")),
-        key_width(tr("game.pacman.confirm_exit"))
+        text_width(tr("game.pacman.confirm_restart")),
+        text_width(tr("game.pacman.confirm_exit"))
     )
-    local countdown_w = key_width(tr("game.pacman.countdown") .. " 3")
+    local countdown_w = text_width(tr("game.pacman.countdown") .. " 3")
 
     local total_w = math.max(content_w, controls_w, result_w, confirm_w, countdown_w)
     local total_h = content_h + 1 + 3
@@ -1403,7 +1403,7 @@ local function draw_info(layout)
     local lives_icons = string.rep("@", math.max(0, state.lives))
     if lives_icons == "" then lives_icons = "-" end
     draw_text(layout.info_x, mid_y + 1, lives_label, "white", "black")
-    draw_text(layout.info_x + key_width(lives_label), mid_y + 1, lives_icons, "yellow", "black")
+    draw_text(layout.info_x + text_width(lives_label), mid_y + 1, lives_icons, "yellow", "black")
 
     local remain = is_power_active() and math.max(0, math.ceil((state.power_until - state.frame) / FPS)) or 0
     local power_line = tr("game.pacman.power_left") .. " " .. tostring(remain) .. tr("game.pacman.seconds_unit")
@@ -1474,10 +1474,10 @@ local function minimum_required_size()
 
     local controls_text = tr("game.pacman.controls")
     local controls_w = min_width_for_lines(controls_text, 3, 24)
-    local result_w = key_width(tr("game.pacman.lose_banner") .. " " .. tr("game.pacman.result_controls"))
+    local result_w = text_width(tr("game.pacman.lose_banner") .. " " .. tr("game.pacman.result_controls"))
     local confirm_w = math.max(
-        key_width(tr("game.pacman.confirm_restart")),
-        key_width(tr("game.pacman.confirm_exit"))
+        text_width(tr("game.pacman.confirm_restart")),
+        text_width(tr("game.pacman.confirm_exit"))
     )
 
     local min_w = math.max(content_w, controls_w, result_w, confirm_w) + 2
@@ -1497,7 +1497,7 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
     local top = math.floor((term_h - #lines) / 2)
     if top < 1 then top = 1 end
     for i = 1, #lines do
-        local x = math.floor((term_w - key_width(lines[i])) / 2)
+        local x = math.floor((term_w - text_width(lines[i])) / 2)
         if x < 1 then x = 1 end
         draw_text(x, top + i - 1, lines[i], "white", "black")
     end

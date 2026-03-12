@@ -60,7 +60,7 @@ local function tr(key)
 end
 
 -- 获取文本显示宽度
-local function key_width(text)
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then
@@ -103,7 +103,7 @@ local function wrap_words(text, max_width)
             current = token
         else
             local candidate = current .. " " .. token
-            if key_width(candidate) <= max_width then
+            if text_width(candidate) <= max_width then
                 current = candidate
             else
                 lines[#lines + 1] = current
@@ -122,7 +122,7 @@ end
 
 -- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full = key_width(text)
+    local full = text_width(text)
     local width = hard_min
     while width <= full do
         if #wrap_words(text, width) <= max_lines then
@@ -135,9 +135,22 @@ end
 
 -- 计算文本居中位置
 local function centered_x(text, area_x, area_w)
-    local x = area_x + math.floor((area_w - key_width(text)) / 2)
+    local x = area_x + math.floor((area_w - text_width(text)) / 2)
     if x < area_x then x = area_x end
     return x
+end
+
+-- 以中心分隔符为基准绘制左右文本，保证分隔符始终居中
+local function draw_center_split_line(y, left_text, right_text, fg, bg)
+    local term_w = select(1, terminal_size())
+    local center_x = math.floor(term_w / 2)
+    local left_w = text_width(left_text)
+    local left_x = center_x - 2 - left_w
+    local right_x = center_x + 3
+    if left_x < 1 then left_x = 1 end
+    draw_text(left_x, y, left_text, fg, bg)
+    draw_text(center_x, y, "|", fg, bg)
+    draw_text(right_x, y, right_text, fg, bg)
 end
 
 -- 保存最佳记录
@@ -244,7 +257,7 @@ local function minimum_required_size()
         .. tr("game.rock_paper_scissors.result_controls")
     local controls = tr("game.rock_paper_scissors.controls")
     local controls_w = min_width_for_lines(controls, 3, 24)
-    local min_w = math.max(key_width(top1), key_width(top2), key_width(header), key_width(picks), key_width(msg), controls_w) + 2
+    local min_w = math.max(text_width(top1), text_width(top2), text_width(header), text_width(picks), text_width(msg), controls_w) + 2
     local min_h = 10
     return min_w, min_h
 end
@@ -261,7 +274,7 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
     if top < 1 then top = 1 end
     for i = 1, #lines do
         local line = lines[i]
-        local x = math.floor((term_w - key_width(line)) / 2)
+        local x = math.floor((term_w - text_width(line)) / 2)
         if x < 1 then x = 1 end
         draw_text(x, top + i - 1, line, "white", "black")
     end
@@ -323,7 +336,7 @@ local function draw_controls(y)
     -- 绘制控制说明
     for i = 1, #lines do
         local line = lines[i]
-        local x = math.floor((term_w - key_width(line)) / 2)
+        local x = math.floor((term_w - text_width(line)) / 2)
         if x < 1 then x = 1 end
         draw_text(x, y + offset + i - 1, line, "white", "black")
     end
@@ -350,10 +363,12 @@ local function render()
     end
 
     -- 显示双方选择
-    local header = tr("game.rock_paper_scissors.player") .. "   |   " .. tr("game.rock_paper_scissors.system")
-    local line = choice_text(state.player_pick) .. "   |   " .. choice_text(state.ai_pick)
-    draw_text(centered_x(header, 1, term_w), y0 + 4, header, "white", "black")
-    draw_text(centered_x(line, 1, term_w), y0 + 5, line, "white", "black")
+    local left_header = tr("game.rock_paper_scissors.player")
+    local right_header = tr("game.rock_paper_scissors.system")
+    local left_pick = choice_text(state.player_pick)
+    local right_pick = choice_text(state.ai_pick)
+    draw_center_split_line(y0 + 4, left_header, right_header, "white", "black")
+    draw_center_split_line(y0 + 5, left_pick, right_pick, "white", "black")
 
     -- 绘制控制说明
     draw_controls(y0 + 7)

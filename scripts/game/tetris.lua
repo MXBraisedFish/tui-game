@@ -1,20 +1,22 @@
-﻿GAME_META = {
+﻿-- 俄罗斯方块游戏元数据
+GAME_META = {
     name = "俄罗斯方块",
     description = "Stack falling blocks and clear complete lines."
 }
 
-local BOARD_W = 10
-local BOARD_H = 20
-local CELL = "██"
+-- 游戏常量
+local BOARD_W = 10 -- 游戏区域宽度（列数）
+local BOARD_H = 20 -- 游戏区域高度（行数）
+local CELL = "██" -- 方块显示字符
 local FPS = 60
 local FRAME_MS = 16
+local FRAME_W = BOARD_W * 2 + 2 -- 游戏区域边框宽度
+local FRAME_H = BOARD_H + 2     -- 游戏区域边框高度
+local SIDE_GAP = 2              -- 侧边栏间距
+local LEFT_W = 20               -- 左侧面板宽度
+local RIGHT_W = 24              -- 右侧面板宽度
 
-local FRAME_W = BOARD_W * 2 + 2
-local FRAME_H = BOARD_H + 2
-local SIDE_GAP = 2
-local LEFT_W = 20
-local RIGHT_W = 24
-
+-- 边框字符
 local BORDER_TL = "╔"
 local BORDER_TR = "╗"
 local BORDER_BL = "╚"
@@ -22,8 +24,10 @@ local BORDER_BR = "╝"
 local BORDER_H = "═"
 local BORDER_V = "║"
 
+-- 方块顺序（用于循环）
 local PIECE_ORDER = { "I", "O", "T", "Z", "L", "S", "J" }
 
+-- 方块定义
 local PIECES = {
     I = {
         group = 1,
@@ -90,19 +94,66 @@ local PIECES = {
     },
 }
 
+-- 颜色调色板
 local PALETTE = {
-    [0] = "#545454", [1] = "#001e74", [2] = "#081090", [3] = "#300088", [4] = "#440064", [5] = "#5c0030",
-    [6] = "#540400", [7] = "#3c1800", [8] = "#202a00", [9] = "#083a00", [10] = "#004000", [11] = "#003c00",
-    [12] = "#00323c", [13] = "#989698", [14] = "#0072bc", [15] = "#3050f8", [16] = "#6424f4", [17] = "#8814b0",
-    [18] = "#b41050", [19] = "#a82200", [20] = "#884000", [21] = "#645c00", [22] = "#347400", [23] = "#088800",
-    [24] = "#008424", [25] = "#007868", [26] = "#005e8c", [27] = "#eceeec", [28] = "#00ccf0", [29] = "#609cfc",
-    [30] = "#9c7cfc", [31] = "#c870dc", [32] = "#ec66a0", [33] = "#f06e48", [34] = "#e89e24", [35] = "#c8c430",
-    [36] = "#84e230", [37] = "#30ec44", [38] = "#2ce684", [39] = "#3cd2c4", [40] = "#54ace8", [41] = "#eceeec",
-    [42] = "#6ce2fc", [43] = "#acbefc", [44] = "#d4b0fc", [45] = "#f0aaec", [46] = "#f8a8b4", [47] = "#fcb27c",
-    [48] = "#f4d270", [49] = "#e0e884", [50] = "#b4f88c", [51] = "#88fa98", [52] = "#90eeb8", [53] = "#9cdedc",
+    [0] = "#545454",
+    [1] = "#001e74",
+    [2] = "#081090",
+    [3] = "#300088",
+    [4] = "#440064",
+    [5] = "#5c0030",
+    [6] = "#540400",
+    [7] = "#3c1800",
+    [8] = "#202a00",
+    [9] = "#083a00",
+    [10] = "#004000",
+    [11] = "#003c00",
+    [12] = "#00323c",
+    [13] = "#989698",
+    [14] = "#0072bc",
+    [15] = "#3050f8",
+    [16] = "#6424f4",
+    [17] = "#8814b0",
+    [18] = "#b41050",
+    [19] = "#a82200",
+    [20] = "#884000",
+    [21] = "#645c00",
+    [22] = "#347400",
+    [23] = "#088800",
+    [24] = "#008424",
+    [25] = "#007868",
+    [26] = "#005e8c",
+    [27] = "#eceeec",
+    [28] = "#00ccf0",
+    [29] = "#609cfc",
+    [30] = "#9c7cfc",
+    [31] = "#c870dc",
+    [32] = "#ec66a0",
+    [33] = "#f06e48",
+    [34] = "#e89e24",
+    [35] = "#c8c430",
+    [36] = "#84e230",
+    [37] = "#30ec44",
+    [38] = "#2ce684",
+    [39] = "#3cd2c4",
+    [40] = "#54ace8",
+    [41] = "#eceeec",
+    [42] = "#6ce2fc",
+    [43] = "#acbefc",
+    [44] = "#d4b0fc",
+    [45] = "#f0aaec",
+    [46] = "#f8a8b4",
+    [47] = "#fcb27c",
+    [48] = "#f4d270",
+    [49] = "#e0e884",
+    [50] = "#b4f88c",
+    [51] = "#88fa98",
+    [52] = "#90eeb8",
+    [53] = "#9cdedc",
     [54] = "#a4c8f0",
 }
 
+-- 随机颜色池（排除特定索引）
 local RANDOM_COLOR_POOL = {}
 for i = 0, 54 do
     if i ~= 0 and i ~= 1 and i ~= 12 and i ~= 13 then
@@ -110,30 +161,90 @@ for i = 0, 54 do
     end
 end
 
+-- 固定颜色行（根据等级）
 local FIXED_COLOR_ROWS = {
-    [0] = { 27, 27, 27 }, [1] = { 19, 19, 19 }, [2] = { 40, 40, 40 }, [3] = { 35, 30, 30 }, [4] = { 14, 34, 23 },
-    [5] = { 38, 15, 32 }, [6] = { 26, 34, 19 }, [7] = { 34, 38, 31 }, [8] = { 2, 15, 23 }, [9] = { 32, 19, 29 },
+    [0] = { 27, 27, 27 },
+    [1] = { 19, 19, 19 },
+    [2] = { 40, 40, 40 },
+    [3] = { 35, 30, 30 },
+    [4] = { 14, 34, 23 },
+    [5] = { 38, 15, 32 },
+    [6] = { 26, 34, 19 },
+    [7] = { 34, 38, 31 },
+    [8] = { 2, 15, 23 },
+    [9] = { 32, 19, 29 },
 }
 
+-- 等级0-9的下落帧数
 local DROP_FRAMES_0_9 = { [0] = 48, [1] = 43, [2] = 38, [3] = 33, [4] = 28, [5] = 23, [6] = 18, [7] = 13, [8] = 8, [9] = 6 }
 
+-- 游戏状态表
 local state = {
-    board = {}, active = nil, next_kind = 1,
-    level = 0, reincarnated = false, phase = 1, lines_total = 0, lines_for_level = 0, score = 0,
+    -- 游戏区域
+    board = {}, -- 游戏板，存储每个格子的信息 {kind, color} 或 0
+
+    -- 当前活动方块
+    active = nil,  -- 当前活动方块
+    next_kind = 1, -- 下一个方块种类索引
+
+    -- 等级和阶段
+    level = 0,            -- 当前等级
+    reincarnated = false, -- 是否已重生
+    phase = 1,            -- 阶段编号
+    lines_total = 0,      -- 总消除行数
+    lines_for_level = 0,  -- 当前等级累积行数
+    score = 0,            -- 当前分数
+
+    -- 统计计数器
     counters = { single = 0, double = 0, triple = 0, tetris = 0 },
     piece_used = { I = 0, O = 0, T = 0, Z = 0, L = 0, S = 0, J = 0 },
-    color_group = { 27, 27, 27 }, color_level = -999,
-    game_over = false, end_frame = nil, result_committed = false,
-    confirm_mode = nil, input_mode = nil, input_buffer = "",
-    toast_text = nil, toast_until = 0,
-    frame = 0, start_frame = 0, drop_accum = 0, last_auto_save_sec = 0,
-    best_score = 0, launch_mode = "new", start_level = 0,
-    dirty = true, last_elapsed_sec = -1, last_toast_visible = false,
-    last_key = "", last_key_frame = -100,
-    size_warning_active = false, last_warn_term_w = 0, last_warn_term_h = 0, last_warn_min_w = 0, last_warn_min_h = 0,
+
+    -- 颜色相关
+    color_group = { 27, 27, 27 }, -- 当前三组颜色索引
+    color_level = -999,           -- 上次更新颜色的等级
+
+    -- 游戏状态
+    game_over = false,
+    end_frame = nil,
+    result_committed = false,
+    confirm_mode = nil,
+    input_mode = nil,
+    input_buffer = "",
+    toast_text = nil,
+    toast_until = 0,
+
+    -- 帧相关
+    frame = 0,
+    start_frame = 0,
+    drop_accum = 0, -- 下落累计帧数
+    last_auto_save_sec = 0,
+
+    -- 最佳记录
+    best_score = 0,
+
+    -- 启动模式
+    launch_mode = "new",
+    start_level = 0, -- 起始等级
+
+    -- 渲染脏标记
+    dirty = true,
+    last_elapsed_sec = -1,
+    last_toast_visible = false,
+
+    -- 输入防抖
+    last_key = "",
+    last_key_frame = -100,
+
+    -- 尺寸警告
+    size_warning_active = false,
+    last_warn_term_w = 0,
+    last_warn_term_h = 0,
+    last_warn_min_w = 0,
+    last_warn_min_h = 0,
     last_layout = nil,
 }
 
+-- 翻译函数（安全调用）
 local function tr(key)
     if type(translate) ~= "function" then
         return key
@@ -151,6 +262,7 @@ local function tr(key)
     return value
 end
 
+-- 规范化按键
 local function normalize_key(key)
     if key == nil then return "" end
     if type(key) == "string" then return string.lower(key) end
@@ -158,6 +270,7 @@ local function normalize_key(key)
     return tostring(key):lower()
 end
 
+-- 获取文本显示宽度
 local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
@@ -166,6 +279,7 @@ local function text_width(text)
     return #text
 end
 
+-- 获取终端尺寸
 local function terminal_size()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
@@ -175,14 +289,19 @@ local function terminal_size()
     return w, h
 end
 
+-- 按单词换行
 local function wrap_words(text, max_width)
     if max_width <= 1 then return { text } end
     local lines, current, had = {}, "", false
     for token in string.gmatch(text, "%S+") do
         had = true
-        if current == "" then current = token else
+        if current == "" then
+            current = token
+        else
             local candidate = current .. " " .. token
-            if text_width(candidate) <= max_width then current = candidate else
+            if text_width(candidate) <= max_width then
+                current = candidate
+            else
                 lines[#lines + 1] = current
                 current = token
             end
@@ -193,6 +312,7 @@ local function wrap_words(text, max_width)
     return lines
 end
 
+-- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
     local full = text_width(text)
     local w = hard_min
@@ -203,11 +323,13 @@ local function min_width_for_lines(text, max_lines, hard_min)
     return full
 end
 
+-- 随机整数 [0, max-1]
 local function rand_int(max)
     if max <= 0 or type(random) ~= "function" then return 0 end
     return random(max)
 end
 
+-- 克隆游戏板
 local function clone_board(src)
     local out = {}
     for y = 1, BOARD_H do
@@ -217,11 +339,13 @@ local function clone_board(src)
     return out
 end
 
+-- 计算已过秒数
 local function elapsed_seconds()
     local ending = state.end_frame or state.frame
     return math.max(0, math.floor((ending - state.start_frame) / FPS))
 end
 
+-- 格式化时间
 local function format_duration(sec)
     local h = math.floor(sec / 3600)
     local m = math.floor((sec % 3600) / 60)
@@ -229,11 +353,13 @@ local function format_duration(sec)
     return string.format("%02d:%02d:%02d", h, m, s)
 end
 
+-- 等级提升所需行数
 local function threshold_for_level(level)
     if level == 235 then return 810 end
     return 10
 end
 
+-- 获取下落间隔帧数
 local function frames_per_drop(level)
     if level >= 29 then return 1 end
     if level >= 19 then return 2 end
@@ -243,6 +369,7 @@ local function frames_per_drop(level)
     return DROP_FRAMES_0_9[level] or 48
 end
 
+-- 获取阶段标签键名
 local function stage_label_key()
     if state.level == 255 then return "game.tetris.stage.dawn" end
     if state.level == 235 then return "game.tetris.stage.marathon" end
@@ -254,6 +381,7 @@ local function stage_label_key()
     return "game.tetris.stage.classic"
 end
 
+-- 获取阶段标签
 local function stage_label()
     local key = stage_label_key()
     if key == "game.tetris.stage.dawn" then return tr(key) end
@@ -266,6 +394,7 @@ local function stage_label()
     return tr(key)
 end
 
+-- 获取阶段颜色
 local function stage_color()
     local key = stage_label_key()
     if key == "game.tetris.stage.classic" then return "white" end
@@ -279,24 +408,29 @@ local function stage_color()
     return "white"
 end
 
+-- 格式化数字为5位（带前导零）
 local function fmt5(n)
     n = math.max(0, math.floor(n or 0))
     if n < 100000 then return string.format("%05d", n) end
     return tostring(n)
 end
 
+-- 获取方块名称
 local function piece_name(kind_id)
     return PIECE_ORDER[kind_id] or "I"
 end
 
+-- 随机方块种类
 local function random_piece_kind()
     return rand_int(#PIECE_ORDER) + 1
 end
 
+-- 随机选择颜色索引
 local function pick_random_color_index()
     return RANDOM_COLOR_POOL[rand_int(#RANDOM_COLOR_POOL) + 1]
 end
 
+-- 更新等级颜色
 local function update_level_colors(force)
     if (not force) and state.color_level == state.level then return end
     local a, b, c
@@ -314,6 +448,7 @@ local function update_level_colors(force)
     state.color_level = state.level
 end
 
+-- 获取方块颜色
 local function color_for_kind(kind_id)
     local piece = PIECES[piece_name(kind_id)]
     local group = 1
@@ -322,6 +457,7 @@ local function color_for_kind(kind_id)
     return PALETTE[idx] or "#eceeec"
 end
 
+-- 刷新游戏板所有格子的颜色
 local function refresh_board_colors_by_kind()
     for y = 1, BOARD_H do
         for x = 1, BOARD_W do
@@ -345,6 +481,7 @@ local function refresh_board_colors_by_kind()
     end
 end
 
+-- 初始化游戏板
 local function init_board()
     state.board = {}
     for y = 1, BOARD_H do
@@ -353,11 +490,13 @@ local function init_board()
     end
 end
 
+-- 获取方块的单元格坐标
 local function get_cells(kind_id, rot)
     local piece = PIECES[piece_name(kind_id)] or PIECES.I
     return piece.rots[((rot or 0) % 4) + 1]
 end
 
+-- 检查方块是否碰撞
 local function collides(kind_id, rot, px, py)
     local cells = get_cells(kind_id, rot)
     for i = 1, #cells do
@@ -369,6 +508,7 @@ local function collides(kind_id, rot, px, py)
     return false
 end
 
+-- 创建活动方块
 local function make_active(kind_id)
     return {
         kind = kind_id,
@@ -379,6 +519,7 @@ local function make_active(kind_id)
     }
 end
 
+-- 生成新的活动方块
 local function spawn_active()
     local kind_id = state.next_kind
     state.next_kind = random_piece_kind()
@@ -392,6 +533,7 @@ local function spawn_active()
     state.dirty = true
 end
 
+-- 尝试移动方块
 local function try_move(dx, dy)
     if state.active == nil then return false end
     local nx, ny = state.active.x + dx, state.active.y + dy
@@ -401,6 +543,7 @@ local function try_move(dx, dy)
     return true
 end
 
+-- 尝试旋转方块
 local function try_rotate(delta)
     if state.active == nil then return false end
     local nr = (state.active.rot + delta) % 4
@@ -410,6 +553,7 @@ local function try_rotate(delta)
         return true
     end
 
+    -- 踢墙检查
     local kicks = { 1, -1, 2, -2 }
     for i = 1, #kicks do
         local nx = state.active.x + kicks[i]
@@ -423,6 +567,7 @@ local function try_rotate(delta)
     return false
 end
 
+-- 将活动方块固定到游戏板
 local function lock_active_to_board()
     if state.active == nil then return end
     local cells = get_cells(state.active.kind, state.active.rot)
@@ -439,6 +584,7 @@ local function lock_active_to_board()
     state.active = nil
 end
 
+-- 清除满行
 local function clear_full_rows()
     local keep = {}
     local cleared = 0
@@ -465,6 +611,7 @@ local function clear_full_rows()
     return cleared
 end
 
+-- 应用等级提升
 local function apply_level_up()
     if state.level >= 255 then
         state.level = 0
@@ -477,6 +624,7 @@ local function apply_level_up()
     refresh_board_colors_by_kind()
 end
 
+-- 应用消除行结果
 local function apply_line_result(cleared)
     if cleared <= 0 then return end
 
@@ -494,10 +642,15 @@ local function apply_line_result(cleared)
     state.lines_for_level = state.lines_for_level + cleared
 
     local base = 0
-    if cleared == 1 then base = 40
-    elseif cleared == 2 then base = 100
-    elseif cleared == 3 then base = 300
-    else base = 1200 end
+    if cleared == 1 then
+        base = 40
+    elseif cleared == 2 then
+        base = 100
+    elseif cleared == 3 then
+        base = 300
+    else
+        base = 1200
+    end
     state.score = state.score + (base * (state.level + 1))
 
     while state.lines_for_level >= threshold_for_level(state.level) do
@@ -506,6 +659,7 @@ local function apply_line_result(cleared)
     end
 end
 
+-- 固定当前方块并生成新方块
 local function settle_and_respawn()
     lock_active_to_board()
     if state.game_over then return end
@@ -514,10 +668,12 @@ local function settle_and_respawn()
     spawn_active()
 end
 
+-- 是否可以使用软降
 local function can_soft_drop()
     return state.level <= 28
 end
 
+-- 执行软降
 local function do_soft_drop()
     if state.active == nil then return false end
     if try_move(0, 1) then
@@ -528,6 +684,7 @@ local function do_soft_drop()
     return false
 end
 
+-- 执行硬降
 local function do_hard_drop()
     if state.active == nil then return end
     while try_move(0, 1) do
@@ -535,11 +692,13 @@ local function do_hard_drop()
     settle_and_respawn()
 end
 
+-- 克隆活动方块
 local function clone_active(a)
     if a == nil then return nil end
     return { kind = a.kind, rot = a.rot, x = a.x, y = a.y, color = a.color }
 end
 
+-- 读取启动模式
 local function read_launch_mode()
     if type(get_launch_mode) ~= "function" then return "new" end
     local ok, mode = pcall(get_launch_mode)
@@ -550,6 +709,7 @@ local function read_launch_mode()
     return "new"
 end
 
+-- 加载最佳分数
 local function load_best_score()
     local data = nil
     if type(load_data) == "function" then
@@ -563,11 +723,13 @@ local function load_best_score()
     end
 end
 
+-- 保存最佳分数
 local function save_best_score()
     if type(save_data) ~= "function" then return end
     pcall(save_data, "tetris_best", { best_score = state.best_score })
 end
 
+-- 保存游戏快照
 local function save_snapshot(manual)
     local snapshot = {
         level = state.level,
@@ -609,6 +771,7 @@ local function save_snapshot(manual)
     end
 end
 
+-- 加载游戏快照
 local function load_snapshot()
     local snap = nil
     if type(load_game_slot) == "function" then
@@ -691,6 +854,7 @@ local function load_snapshot()
     return true
 end
 
+-- 重置游戏
 local function reset_run(start_level)
     state.level = start_level or 0
     state.start_level = state.level
@@ -722,21 +886,19 @@ local function reset_run(start_level)
     state.dirty = true
 end
 
-local function key_width(text)
-    return text_width(text or "")
-end
-
+-- 计算文本居中位置
 local function centered_x(text, min_x, max_x)
     min_x = min_x or 1
     max_x = max_x or terminal_size()
     local span = (max_x - min_x + 1)
     if span <= 1 then return min_x end
-    local w = key_width(text)
+    local w = text_width(text)
     local x = min_x + math.floor((span - w) / 2)
     if x < min_x then x = min_x end
     return x
 end
 
+-- 填充矩形区域
 local function fill_rect(x, y, w, h, bg)
     if w <= 0 or h <= 0 then return end
     local row = string.rep(" ", w)
@@ -745,12 +907,13 @@ local function fill_rect(x, y, w, h, bg)
     end
 end
 
+-- 绘制带填充的文本
 local function draw_padded(x, y, w, text, fg, bg, align)
     local blank = string.rep(" ", w)
     draw_text(x, y, blank, "white", bg or "black")
     if text == nil or text == "" then return end
     local tx = x
-    local tw = key_width(text)
+    local tw = text_width(text)
     if align == "right" then
         tx = x + math.max(0, w - tw)
     elseif align == "center" then
@@ -759,6 +922,7 @@ local function draw_padded(x, y, w, text, fg, bg, align)
     draw_text(tx, y, text, fg or "white", bg or "black")
 end
 
+-- 构建界面布局
 local function build_layout()
     local term_w, term_h = terminal_size()
     local board_x = math.floor((term_w - FRAME_W) / 2) + 1
@@ -779,33 +943,43 @@ local function build_layout()
     local area_h = controls_y - board_y + 2
 
     return {
-        term_w = term_w, term_h = term_h,
-        board_x = board_x, board_y = board_y,
-        left_x = left_x, left_y = board_y,
-        right_x = right_x, right_y = board_y,
-        msg_y = msg_y, controls_y = controls_y,
-        area_x = area_x, area_y = area_y, area_w = area_w, area_h = area_h,
+        term_w = term_w,
+        term_h = term_h,
+        board_x = board_x,
+        board_y = board_y,
+        left_x = left_x,
+        left_y = board_y,
+        right_x = right_x,
+        right_y = board_y,
+        msg_y = msg_y,
+        controls_y = controls_y,
+        area_x = area_x,
+        area_y = area_y,
+        area_w = area_w,
+        area_h = area_h,
     }
 end
 
+-- 获取控制说明文本
 local function controls_text()
-    return tr(
-        "game.tetris.controls")
+    return tr("game.tetris.controls")
 end
 
+-- 计算最小所需终端尺寸
 local function minimum_required_size()
     local controls_w = min_width_for_lines(controls_text(), 3, 60)
     local content_w = LEFT_W + SIDE_GAP + FRAME_W + SIDE_GAP + RIGHT_W
     local msg_w = math.max(
-        key_width(tr("game.tetris.confirm_exit")),
-        key_width(tr("game.tetris.confirm_restart")),
-        key_width(tr("game.tetris.lose_banner") .. " " .. tr("game.tetris.result_controls"))
+        text_width(tr("game.tetris.confirm_exit")),
+        text_width(tr("game.tetris.confirm_restart")),
+        text_width(tr("game.tetris.lose_banner") .. " " .. tr("game.tetris.result_controls"))
     )
     local min_w = math.max(content_w, controls_w, msg_w) + 2
     local min_h = FRAME_H + 6
     return min_w, min_h
 end
 
+-- 绘制尺寸警告
 local function draw_size_warning(term_w, term_h, min_w, min_h)
     local lines = {
         tr("warning.size_title"),
@@ -823,6 +997,7 @@ local function draw_size_warning(term_w, term_h, min_w, min_h)
     end
 end
 
+-- 确保终端尺寸足够
 local function ensure_size_ok()
     local term_w, term_h = terminal_size()
     local min_w, min_h = minimum_required_size()
@@ -850,12 +1025,14 @@ local function ensure_size_ok()
     return false
 end
 
+-- 强制完全刷新
 local function force_full_refresh()
     clear()
     state.last_layout = nil
     state.dirty = true
 end
 
+-- 绘制游戏区域边框
 local function draw_frame(layout)
     local x, y = layout.board_x, layout.board_y
     draw_text(x, y, BORDER_TL .. string.rep(BORDER_H, FRAME_W - 2) .. BORDER_TR, "blue", "black")
@@ -866,6 +1043,7 @@ local function draw_frame(layout)
     draw_text(x, y + FRAME_H - 1, BORDER_BL .. string.rep(BORDER_H, FRAME_W - 2) .. BORDER_BR, "blue", "black")
 end
 
+-- 构建活动方块位置映射
 local function build_active_map()
     local map = {}
     if state.active == nil then return map end
@@ -880,6 +1058,7 @@ local function build_active_map()
     return map
 end
 
+-- 绘制游戏板内容
 local function draw_board_content(layout)
     local inner_x = layout.board_x + 1
     local inner_y = layout.board_y + 1
@@ -908,6 +1087,7 @@ local function draw_board_content(layout)
     end
 end
 
+-- 绘制下一个方块预览
 local function draw_next_preview(layout)
     local kind = state.next_kind
     local cells = get_cells(kind, 0)
@@ -935,6 +1115,7 @@ local function draw_next_preview(layout)
     end
 end
 
+-- 绘制左侧面板
 local function draw_left_panel(layout)
     local x, y = layout.left_x, layout.left_y
     local lines = {
@@ -965,6 +1146,7 @@ local function draw_left_panel(layout)
     end
 end
 
+-- 绘制右侧面板
 local function draw_right_panel(layout)
     local x, y = layout.right_x, layout.right_y
     draw_padded(x, y + 0, RIGHT_W, tr("game.tetris.best_score"), "dark_gray", "black", "left")
@@ -983,9 +1165,10 @@ local function draw_right_panel(layout)
     draw_padded(x, y + 19, RIGHT_W, "", "white", "black", "left")
     local prefix = tr("game.tetris.stage") .. " "
     draw_text(x, y + 19, prefix, "white", "black")
-    draw_text(x + key_width(prefix), y + 19, stage_label(), stage_color(), "black")
+    draw_text(x + text_width(prefix), y + 19, stage_label(), stage_color(), "black")
 end
 
+-- 获取当前消息
 local function current_message()
     if state.game_over then
         return tr("game.tetris.lose_banner") .. " "
@@ -1007,6 +1190,7 @@ local function current_message()
     return "", "white"
 end
 
+-- 绘制消息和控制说明
 local function draw_message_and_controls(layout)
     local msg, msg_color = current_message()
     draw_text(1, layout.msg_y, string.rep(" ", layout.term_w), "white", "black")
@@ -1024,6 +1208,7 @@ local function draw_message_and_controls(layout)
     end
 end
 
+-- 主渲染函数
 local function render()
     local layout = build_layout()
     local l = state.last_layout
@@ -1036,9 +1221,12 @@ local function render()
         or l.term_h ~= layout.term_h then
         clear()
         state.last_layout = {
-            board_x = layout.board_x, board_y = layout.board_y,
-            left_x = layout.left_x, right_x = layout.right_x,
-            term_w = layout.term_w, term_h = layout.term_h,
+            board_x = layout.board_x,
+            board_y = layout.board_y,
+            left_x = layout.left_x,
+            right_x = layout.right_x,
+            term_w = layout.term_w,
+            term_h = layout.term_h,
         }
     end
     draw_frame(layout)
@@ -1048,6 +1236,7 @@ local function render()
     draw_message_and_controls(layout)
 end
 
+-- 提交游戏结果
 local function commit_result_once()
     if state.result_committed then return end
     if state.score > state.best_score then
@@ -1060,6 +1249,7 @@ local function commit_result_once()
     state.result_committed = true
 end
 
+-- 更新提示消息计时器
 local function update_toast_timer()
     local visible = (state.toast_text ~= nil and state.frame < state.toast_until)
     if state.last_toast_visible ~= visible then
@@ -1068,6 +1258,7 @@ local function update_toast_timer()
     end
 end
 
+-- 刷新时间脏标记
 local function refresh_dirty_time()
     local sec = elapsed_seconds()
     if sec ~= state.last_elapsed_sec then
@@ -1076,6 +1267,7 @@ local function refresh_dirty_time()
     end
 end
 
+-- 同步终端尺寸变化
 local function sync_resize()
     local w, h = terminal_size()
     if w ~= state.last_warn_term_w or h ~= state.last_warn_term_h then
@@ -1084,6 +1276,7 @@ local function sync_resize()
     end
 end
 
+-- 游戏逻辑更新
 local function gameplay_update()
     if state.game_over then return end
     if state.confirm_mode ~= nil or state.input_mode ~= nil then return end
@@ -1105,7 +1298,8 @@ local function gameplay_update()
     end
 end
 
-local function handle_confirm(key)
+-- 处理确认模式下的按键
+local function handle_confirm_key(key)
     if state.confirm_mode == nil then return false end
     if key == "y" or key == "enter" then
         if state.confirm_mode == "restart" then
@@ -1125,6 +1319,7 @@ local function handle_confirm(key)
     return true
 end
 
+-- 处理输入模式下的按键
 local function handle_input_mode(key)
     if state.input_mode ~= "level" then return false end
     if key == "esc" or key == "q" then
@@ -1162,11 +1357,12 @@ local function handle_input_mode(key)
     return true
 end
 
+-- 主输入处理函数
 local function handle_input(key)
     if key == nil or key == "" then return end
 
     if state.confirm_mode ~= nil then
-        handle_confirm(key)
+        handle_confirm_key(key)
         return
     end
     if state.input_mode ~= nil then
@@ -1233,6 +1429,7 @@ local function handle_input(key)
     end
 end
 
+-- 游戏初始化
 local function init_game()
     clear()
     state.launch_mode = read_launch_mode()
@@ -1253,7 +1450,8 @@ local function init_game()
     end
 end
 
-local function loop()
+-- 主游戏循环
+local function game_loop()
     while true do
         local key = normalize_key(get_key(false))
 
@@ -1281,5 +1479,6 @@ local function loop()
     end
 end
 
+-- 启动游戏
 init_game()
-loop()
+game_loop()

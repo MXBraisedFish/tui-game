@@ -32,6 +32,7 @@ local COLOR_QUESTION = "rgb(0,140,255)" -- 问号标记
 local COLOR_MINE = "rgb(255,0,0)"       -- 地雷
 local COLOR_EMPTY = "rgb(180,180,180)"  -- 空格
 local COLOR_CURSOR = "yellow"           -- 光标颜色
+local COLOR_GUIDE_BG = "rgb(179,179,179)" -- 引导背景色
 
 -- 数字颜色映射
 local NUMBER_COLORS = {
@@ -91,6 +92,7 @@ local state = {
 
     -- 表情动画
     action_face_until = 0,
+    guide_mode = false,
 
     -- 终端尺寸
     last_term_w = 0,
@@ -121,7 +123,7 @@ local function tr(key)
 end
 
 -- 获取文本显示宽度
-local function key_width(text)
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then
@@ -176,7 +178,7 @@ local function wrap_words(text, max_width)
             current = token
         else
             local candidate = current .. " " .. token
-            if key_width(candidate) <= max_width then
+            if text_width(candidate) <= max_width then
                 current = candidate
             else
                 lines[#lines + 1] = current
@@ -196,7 +198,7 @@ end
 
 -- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full = key_width(text)
+    local full = text_width(text)
     local width = hard_min
     while width <= full do
         if #wrap_words(text, width) <= max_lines then
@@ -379,7 +381,8 @@ local function make_snapshot()
         elapsed_sec = elapsed_seconds(),
         won = state.won,
         lost = state.lost,
-        last_auto_save_sec = state.last_auto_save_sec
+        last_auto_save_sec = state.last_auto_save_sec,
+        guide_mode = state.guide_mode
     }
 end
 
@@ -474,6 +477,7 @@ local function restore_snapshot(snapshot)
     state.toast_until = 0
     state.best_committed = state.won
     state.action_face_until = 0
+    state.guide_mode = not not snapshot.guide_mode
     state.last_area = nil
     state.dirty = true
     return true
@@ -524,6 +528,7 @@ local function reset_game(rows, cols, mines, difficulty)
     state.last_auto_save_sec = 0
     state.best_committed = false
     state.action_face_until = 0
+    state.guide_mode = false
     state.last_area = nil
     state.dirty = true
 end
@@ -593,20 +598,20 @@ local function board_geometry()
 
     local time_text = tr("game.minesweeper.time") .. " 00:00:00"
     local mines_text = tr("game.minesweeper.mines_left") .. " -999"
-    local status_w = key_width(time_text) + 2 + key_width("ovo") + 2 + key_width(mines_text)
+    local status_w = text_width(time_text) + 2 + text_width("ovo") + 2 + text_width(mines_text)
     local message_w = math.max(
-        key_width(tr("game.2048.confirm_restart")),
-        key_width(tr("game.2048.confirm_exit")),
-        key_width(tr("game.minesweeper.win_banner")),
-        key_width(tr("game.minesweeper.lose_banner")),
-        key_width(tr("game.minesweeper.input_config_hint")),
-        key_width(tr("game.minesweeper.input_jump_hint"))
+        text_width(tr("game.2048.confirm_restart")),
+        text_width(tr("game.2048.confirm_exit")),
+        text_width(tr("game.minesweeper.win_banner")),
+        text_width(tr("game.minesweeper.lose_banner")),
+        text_width(tr("game.minesweeper.input_config_hint")),
+        text_width(tr("game.minesweeper.input_jump_hint"))
     )
 
     local controls_text = tr("game.minesweeper.controls")
     local controls_w = min_width_for_lines(controls_text, 3, 26)
 
-    local frame_w = math.max(grid_w, status_w, message_w, controls_w, key_width(best_line())) + 2
+    local frame_w = math.max(grid_w, status_w, message_w, controls_w, text_width(best_line())) + 2
     local frame_h = grid_h + 2
     local x = math.floor((w - frame_w) / 2)
     local y = math.floor((h - frame_h) / 2)
@@ -636,6 +641,17 @@ local function draw_outer_frame(x, y, frame_w, frame_h)
     draw_text(x, y + frame_h - 1, "╚" .. string.rep("═", frame_w - 2) .. "╝", "white", "black")
 end
 
+-- 判断格子是否位于光标周围八格
+local function is_guide_neighbor(r, c)
+    if not state.guide_mode then
+        return false
+    end
+    if r == state.cursor_r and c == state.cursor_c then
+        return false
+    end
+    return math.abs(r - state.cursor_r) <= 1 and math.abs(c - state.cursor_c) <= 1
+end
+
 -- 获取单元格字符和样式
 local function cell_char_and_style(r, c)
     local is_cursor = (r == state.cursor_r and c == state.cursor_c)
@@ -658,6 +674,9 @@ local function cell_char_and_style(r, c)
             else
                 char = tostring(n)
                 fg = NUMBER_COLORS[n] or COLOR_EMPTY
+                if n == 7 or n == 8 then
+                    fg = "white"
+                end
             end
         end
     else
@@ -678,6 +697,11 @@ local function cell_char_and_style(r, c)
         bg = COLOR_CURSOR
         if char == "!" or char == "#" then
             fg = "black" -- 光标下让旗子和未翻开格子文字变黑以提高对比度
+        end
+    elseif is_guide_neighbor(r, c) then
+        bg = COLOR_GUIDE_BG
+        if char == "#" or char == "7" or char == "8" then
+            fg = "black"
         end
     end
     return char, fg, bg
@@ -742,13 +766,13 @@ local function draw_status(x, y, frame_w)
 
     -- 计算位置（避免重叠）
     local left_x = x
-    local center_x = x + math.floor((frame_w - key_width(center)) / 2)
-    local right_x = x + frame_w - key_width(right)
-    if center_x < left_x + key_width(left) + 1 then
-        center_x = left_x + key_width(left) + 1
+    local center_x = x + math.floor((frame_w - text_width(center)) / 2)
+    local right_x = x + frame_w - text_width(right)
+    if center_x < left_x + text_width(left) + 1 then
+        center_x = left_x + text_width(left) + 1
     end
-    if right_x < center_x + key_width(center) + 1 then
-        right_x = center_x + key_width(center) + 1
+    if right_x < center_x + text_width(center) + 1 then
+        right_x = center_x + text_width(center) + 1
     end
 
     -- 绘制信息
@@ -811,7 +835,7 @@ local function draw_controls(x, y, frame_h)
     -- 绘制控制说明
     for i = 1, #lines do
         local line = lines[i]
-        local line_x = math.floor((term_w - key_width(line)) / 2)
+        local line_x = math.floor((term_w - text_width(line)) / 2)
         if line_x < 1 then line_x = 1 end
         draw_text(line_x, y + frame_h + 1 + offset + i - 1, line, "white", "black")
     end
@@ -874,16 +898,16 @@ local function minimum_required_size()
 
     local controls_text = tr("game.minesweeper.controls")
     local controls_w = min_width_for_lines(controls_text, 3, 26)
-    local status_w = key_width(tr("game.minesweeper.time") .. " 00:00:00")
-        + 2 + key_width("ovo")
-        + 2 + key_width(tr("game.minesweeper.mines_left") .. " -999")
+    local status_w = text_width(tr("game.minesweeper.time") .. " 00:00:00")
+        + 2 + text_width("ovo")
+        + 2 + text_width(tr("game.minesweeper.mines_left") .. " -999")
     local hint_w = math.max(
-        key_width(tr("game.minesweeper.input_config_hint")),
-        key_width(tr("game.minesweeper.input_jump_hint")),
-        key_width(tr("game.minesweeper.win_banner") .. tr("game.minesweeper.win_controls")),
-        key_width(tr("game.minesweeper.lose_banner") .. tr("game.minesweeper.lose_controls")),
-        key_width(tr("game.2048.confirm_restart")),
-        key_width(tr("game.2048.confirm_exit"))
+        text_width(tr("game.minesweeper.input_config_hint")),
+        text_width(tr("game.minesweeper.input_jump_hint")),
+        text_width(tr("game.minesweeper.win_banner") .. tr("game.minesweeper.win_controls")),
+        text_width(tr("game.minesweeper.lose_banner") .. tr("game.minesweeper.lose_controls")),
+        text_width(tr("game.2048.confirm_restart")),
+        text_width(tr("game.2048.confirm_exit"))
     )
 
     local min_w = math.max(frame_w, controls_w, status_w, hint_w) + 2
@@ -907,7 +931,7 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
 
     for i = 1, #lines do
         local line = lines[i]
-        local px = math.floor((term_w - key_width(line)) / 2)
+        local px = math.floor((term_w - text_width(line)) / 2)
         if px < 1 then px = 1 end
         draw_text(px, top + i - 1, line, "white", "black")
     end
@@ -1320,6 +1344,11 @@ local function handle_input(key)
     end
     if key == "d" then
         start_input_mode("jump")
+        return "changed"
+    end
+    if key == "c" then
+        state.guide_mode = not state.guide_mode
+        state.dirty = true
         return "changed"
     end
 

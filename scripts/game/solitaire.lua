@@ -1,80 +1,96 @@
-
+-- 纸牌游戏元数据
 GAME_META = {
     name = "Solitaire",
     description = "Play FreeCell, Klondike, or Spider Solitaire in one game."
 }
 
+-- 游戏常量
 local FPS = 60
 local FRAME_MS = 16
-local MAX_UNDO = 100
+local MAX_UNDO = 100 -- 最大撤销步数
 
-local MODE_FREECELL = "freecell"
-local MODE_KLONDIKE = "klondike"
-local MODE_SPIDER = "spider"
+-- 游戏模式常量
+local MODE_FREECELL = "freecell" -- 空当接龙模式
+local MODE_KLONDIKE = "klondike" -- 克朗代克模式
+local MODE_SPIDER = "spider"     -- 蜘蛛纸牌模式
 
-local SUIT_HEART = 1
-local SUIT_SPADE = 2
-local SUIT_DIAMOND = 3
-local SUIT_CLUB = 4
+-- 花色常量
+local SUIT_HEART = 1   -- 红心
+local SUIT_SPADE = 2   -- 黑桃
+local SUIT_DIAMOND = 3 -- 方块
+local SUIT_CLUB = 4    -- 梅花
 
+-- 游戏状态表
 local state = {
+    -- 当前游戏模式和难度
     mode = MODE_FREECELL,
-    spider_diff = 1,
+    spider_diff = 1, -- 蜘蛛纸牌难度 (1-3)
 
-    tableau = {},
-    foundations = {},
-    cells = {},
-    stock = {},
-    waste = {},
+    -- 牌堆数据
+    tableau = {},     -- 牌桌列（二维数组，每列是一堆牌）
+    foundations = {}, -- 基础牌堆（4个，按花色存放）
+    cells = {},       -- 自由单元格（4个，用于空当接龙）
+    stock = {},       -- 牌堆（未发的牌）
+    waste = {},       -- 废牌堆（克朗代克模式）
 
-    spider_removed = 0,
+    -- 蜘蛛纸牌专用
+    spider_removed = 0, -- 已移除的完整序列数（满8个获胜）
 
-    cursor_col = 1,
-    selected_col = nil,
-    cursor_pick_depth = 1,
-    selected_pick_depth = nil,
+    -- 光标和选择状态
+    cursor_col = 1,            -- 光标所在的列
+    selected_col = nil,        -- 已选中的列
+    cursor_pick_depth = 1,     -- 光标选择的深度（从顶部往下数几张牌）
+    selected_pick_depth = nil, -- 已选中列的深度
 
-    frame = 0,
-    start_frame = 0,
-    end_frame = nil,
-    won = false,
+    -- 时间相关
+    frame = 0,       -- 当前帧计数
+    start_frame = 0, -- 游戏开始时的帧计数
+    end_frame = nil, -- 游戏结束时的帧计数
+    won = false,     -- 是否获胜
 
-    confirm_mode = nil,
-    mode_input = false,
-    spider_diff_input = false,
+    -- UI状态
+    confirm_mode = nil,        -- 确认模式：nil, "restart", "exit"
+    mode_input = false,        -- 是否正在输入模式选择
+    spider_diff_input = false, -- 是否正在输入蜘蛛难度
 
-    msg_text = "",
-    msg_color = "dark_gray",
-    msg_until = 0,
-    msg_persistent = false,
+    -- 消息提示
+    msg_text = "",           -- 消息文本
+    msg_color = "dark_gray", -- 消息颜色
+    msg_until = 0,           -- 消息显示的截止帧
+    msg_persistent = false,  -- 消息是否持续显示（不自动消失）
 
-    dirty = true,
-    top_dirty = false,
-    grid_dirty = false,
-    bottom_dirty = false,
-    last_elapsed_sec = -1,
-    last_auto_save_sec = 0,
+    -- 渲染脏标记（用于部分重绘优化）
+    dirty = true,           -- 是否需要完全重绘
+    top_dirty = false,      -- 顶部区域是否需要重绘
+    grid_dirty = false,     -- 网格区域是否需要重绘
+    bottom_dirty = false,   -- 底部区域是否需要重绘
+    last_elapsed_sec = -1,  -- 上次记录的已过秒数
+    last_auto_save_sec = 0, -- 上次自动保存的时间（秒）
 
+    -- 最佳记录
     best = {
-        freecell = 0,
-        klondike = 0,
-        spider1 = 0,
-        spider2 = 0,
-        spider3 = 0,
+        freecell = 0, -- 空当接龙最佳时间
+        klondike = 0, -- 克朗代克最佳时间
+        spider1 = 0,  -- 蜘蛛纸牌难度1最佳时间
+        spider2 = 0,  -- 蜘蛛纸牌难度2最佳时间
+        spider3 = 0,  -- 蜘蛛纸牌难度3最佳时间
     },
 
-    launch_mode = "new",
-    undo_stack = {},
+    -- 启动模式
+    launch_mode = "new", -- 启动模式："new" 或 "continue"
+    undo_stack = {},     -- 撤销栈
 
-    size_warning_active = false,
-    last_warn_term_w = 0,
-    last_warn_term_h = 0,
-    last_warn_min_w = 0,
-    last_warn_min_h = 0,
-    last_term_w = 0,
-    last_term_h = 0,
+    -- 尺寸警告
+    size_warning_active = false, -- 是否正在显示尺寸警告
+    last_warn_term_w = 0,        -- 上次警告时的终端宽度
+    last_warn_term_h = 0,        -- 上次警告时的终端高度
+    last_warn_min_w = 0,         -- 上次警告时的最小要求宽度
+    last_warn_min_h = 0,         -- 上次警告时的最小要求高度
+    last_term_w = 0,             -- 上次记录的终端宽度
+    last_term_h = 0,             -- 上次记录的终端高度
 }
 
+-- 翻译函数（安全调用）
 local function tr(key)
     if type(translate) ~= "function" then
         return key
@@ -92,7 +108,8 @@ local function tr(key)
     return value
 end
 
-local function key_width(text)
+-- 获取文本显示宽度
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then return w end
@@ -100,6 +117,7 @@ local function key_width(text)
     return #text
 end
 
+-- 按单词换行
 local function wrap_words(text, max_width)
     if max_width <= 1 then return { text } end
     local lines, current, had = {}, "", false
@@ -109,7 +127,7 @@ local function wrap_words(text, max_width)
             current = token
         else
             local candidate = current .. " " .. token
-            if key_width(candidate) <= max_width then
+            if text_width(candidate) <= max_width then
                 current = candidate
             else
                 lines[#lines + 1] = current
@@ -122,8 +140,9 @@ local function wrap_words(text, max_width)
     return lines
 end
 
+-- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
-    local full = key_width(text)
+    local full = text_width(text)
     local width = hard_min
     while width <= full do
         if #wrap_words(text, width) <= max_lines then return width end
@@ -132,6 +151,7 @@ local function min_width_for_lines(text, max_lines, hard_min)
     return full
 end
 
+-- 获取终端尺寸
 local function terminal_size()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
@@ -141,33 +161,39 @@ local function terminal_size()
     return w, h
 end
 
+-- 计算文本居中位置
 local function centered_x(text, x, w)
-    local px = x + math.floor((w - key_width(text)) / 2)
+    local px = x + math.floor((w - text_width(text)) / 2)
     if px < x then px = x end
     return px
 end
 
+-- 规范化按键
 local function normalize_key(key)
     if key == nil then return "" end
     if type(key) == "string" then return string.lower(key) end
     return tostring(key):lower()
 end
 
+-- 清空输入缓冲区
 local function flush_input_buffer()
     if type(clear_input_buffer) == "function" then pcall(clear_input_buffer) end
 end
 
+-- 数值限幅
 local function clamp(v, lo, hi)
     if v < lo then return lo end
     if v > hi then return hi end
     return v
 end
 
+-- 计算已过秒数
 local function elapsed_seconds()
     local ending = state.end_frame or state.frame
     return math.max(0, math.floor((ending - state.start_frame) / FPS))
 end
 
+-- 格式化时间
 local function format_duration(sec)
     local h = math.floor(sec / 3600)
     local m = math.floor((sec % 3600) / 60)
@@ -175,11 +201,13 @@ local function format_duration(sec)
     return string.format("%02d:%02d:%02d", h, m, s)
 end
 
+-- 随机整数 [1, n]
 local function rand_int(n)
     if n <= 0 or type(random) ~= "function" then return 0 end
     return random(n)
 end
 
+-- 显示消息
 local function show_message(text, color, dur_sec, persistent)
     state.msg_text = text or ""
     state.msg_color = color or "dark_gray"
@@ -192,6 +220,7 @@ local function show_message(text, color, dur_sec, persistent)
     state.bottom_dirty = true
 end
 
+-- 清除消息
 local function clear_message()
     if state.msg_text ~= "" then
         state.msg_text = ""
@@ -202,11 +231,13 @@ local function clear_message()
     end
 end
 
+-- 更新消息计时器
 local function update_message_timer()
     if state.msg_persistent then return end
     if state.msg_until > 0 and state.frame >= state.msg_until then clear_message() end
 end
 
+-- 获取当前模式的键名（用于最佳记录）
 local function mode_key()
     if state.mode == MODE_SPIDER then
         return "spider" .. tostring(state.spider_diff)
@@ -214,12 +245,14 @@ local function mode_key()
     return state.mode
 end
 
+-- 获取模式标签
 local function mode_label(mode)
     if mode == MODE_FREECELL then return tr("game.solitaire.mode.freecell") end
     if mode == MODE_KLONDIKE then return tr("game.solitaire.mode.klondike") end
     return tr("game.solitaire.mode.spider")
 end
 
+-- 获取牌面文本
 local function rank_text(rank)
     if rank == 1 then return "A" end
     if rank == 11 then return "J" end
@@ -228,10 +261,12 @@ local function rank_text(rank)
     return tostring(rank)
 end
 
+-- 判断是否为红色花色
 local function is_red(card)
     return card.suit == SUIT_HEART or card.suit == SUIT_DIAMOND
 end
 
+-- 获取牌的颜色
 local function card_color(card)
     if card.suit == SUIT_HEART then return "red" end
     if card.suit == SUIT_DIAMOND then return "rgb(255,165,0)" end
@@ -239,32 +274,38 @@ local function card_color(card)
     return "white"
 end
 
+-- 获取颜色组（红=1，黑=0）
 local function color_group(card)
     return is_red(card) and 1 or 0
 end
 
+-- 克隆一张牌
 local function clone_card(card)
     return { rank = card.rank, suit = card.suit, face_up = card.face_up == true }
 end
 
+-- 复制牌列表
 local function copy_cards(cards)
     local out = {}
     for i = 1, #cards do out[i] = clone_card(cards[i]) end
     return out
 end
 
+-- 复制牌桌
 local function copy_tableau(tableau)
     local out = {}
     for i = 1, #tableau do out[i] = copy_cards(tableau[i] or {}) end
     return out
 end
 
+-- 复制基础牌堆
 local function copy_foundations(fd)
     local out = {}
     for i = 1, 4 do out[i] = copy_cards(fd[i] or {}) end
     return out
 end
 
+-- 复制自由单元格
 local function copy_cells(cells)
     local out = {}
     for i = 1, 4 do
@@ -273,6 +314,7 @@ local function copy_cells(cells)
     return out
 end
 
+-- 清空当前模式的牌堆
 local function empty_mode_piles()
     local cols = 8
     if state.mode == MODE_KLONDIKE then cols = 7 end
@@ -290,6 +332,7 @@ local function empty_mode_piles()
     state.spider_removed = 0
 end
 
+-- 构建标准扑克牌（52张）
 local function build_standard_deck()
     local deck = {}
     for suit = SUIT_HEART, SUIT_CLUB do
@@ -300,6 +343,7 @@ local function build_standard_deck()
     return deck
 end
 
+-- 洗牌
 local function shuffle_cards(cards)
     for i = #cards, 2, -1 do
         local j = rand_int(i) + 1
@@ -307,6 +351,7 @@ local function shuffle_cards(cards)
     end
 end
 
+-- 构建蜘蛛纸牌牌堆
 local function build_spider_deck(diff)
     local suits, copies = {}, 2
     if diff == 1 then
@@ -331,6 +376,7 @@ local function build_spider_deck(diff)
     return deck
 end
 
+-- 发牌：空当接龙
 local function deal_freecell()
     state.mode = MODE_FREECELL
     empty_mode_piles()
@@ -350,6 +396,7 @@ local function deal_freecell()
     end
 end
 
+-- 发牌：克朗代克
 local function deal_klondike()
     state.mode = MODE_KLONDIKE
     empty_mode_piles()
@@ -375,6 +422,7 @@ local function deal_klondike()
     end
 end
 
+-- 发牌：蜘蛛纸牌
 local function deal_spider(diff)
     state.mode = MODE_SPIDER
     state.spider_diff = clamp(math.floor(diff or 1), 1, 3)
@@ -401,6 +449,8 @@ local function deal_spider(diff)
         state.stock[#state.stock + 1] = c
     end
 end
+
+-- 创建状态快照（用于撤销）
 local function snapshot_state()
     return {
         mode = state.mode,
@@ -422,6 +472,8 @@ local function snapshot_state()
         last_auto_save_sec = state.last_auto_save_sec,
     }
 end
+
+-- 恢复状态快照
 local function restore_snapshot(snap, clear_undo)
     state.mode = (snap.mode == MODE_KLONDIKE or snap.mode == MODE_SPIDER) and snap.mode or MODE_FREECELL
     state.spider_diff = clamp(math.floor(tonumber(snap.spider_diff) or 1), 1, 3)
@@ -461,11 +513,14 @@ local function restore_snapshot(snap, clear_undo)
     clear_message()
     state.dirty = true
 end
+
+-- 压入撤销栈
 local function push_undo()
     state.undo_stack[#state.undo_stack + 1] = snapshot_state()
     while #state.undo_stack > MAX_UNDO do table.remove(state.undo_stack, 1) end
 end
 
+-- 弹出撤销栈
 local function pop_undo()
     if #state.undo_stack == 0 then
         show_message(tr("game.solitaire.undo_empty"), "dark_gray", 2, false)
@@ -478,6 +533,7 @@ local function pop_undo()
     return true
 end
 
+-- 加载最佳记录
 local function load_best_record()
     state.best.freecell = 0
     state.best.klondike = 0
@@ -496,6 +552,7 @@ local function load_best_record()
     state.best.spider3 = math.max(0, math.floor(tonumber(data.spider3) or 0))
 end
 
+-- 保存最佳记录
 local function save_best_record()
     if type(save_data) ~= "function" then return false end
     local payload = {
@@ -509,17 +566,20 @@ local function save_best_record()
     return ok
 end
 
+-- 获取当前模式的最佳时间
 local function best_time_for_current_mode()
     local k = mode_key()
     return state.best[k] or 0
 end
 
+-- 计算基础牌堆总牌数
 local function total_foundation_cards()
     local total = 0
     for i = 1, 4 do total = total + #state.foundations[i] end
     return total
 end
 
+-- 需要时更新最佳记录
 local function update_best_if_needed()
     if not state.won then return end
     local elapsed = elapsed_seconds()
@@ -531,11 +591,13 @@ local function update_best_if_needed()
     end
 end
 
+-- 获取当前模式分数
 local function mode_score()
     if state.mode == MODE_SPIDER then return state.spider_removed * 13 end
     return total_foundation_cards()
 end
 
+-- 检查胜利
 local function check_win()
     if state.won then return end
     local won = false
@@ -556,6 +618,7 @@ local function check_win()
     end
 end
 
+-- 获取指定列的第一张正面牌索引
 local function first_face_up_index(col)
     local pile = state.tableau[col]
     for i = 1, #pile do
@@ -564,6 +627,7 @@ local function first_face_up_index(col)
     return nil
 end
 
+-- 获取指定列可移动的起始索引
 local function movable_start_index(col)
     local pile = state.tableau[col]
     if pile == nil or #pile == 0 then return nil end
@@ -571,6 +635,7 @@ local function movable_start_index(col)
     return first_face_up_index(col)
 end
 
+-- 获取指定列的最大可选深度
 local function max_pick_depth(col)
     local pile = state.tableau[col]
     if pile == nil then return 0 end
@@ -579,6 +644,7 @@ local function max_pick_depth(col)
     return #pile - start + 1
 end
 
+-- 根据深度获取起始索引
 local function pick_start_from_depth(col, depth)
     local pile = state.tableau[col]
     if pile == nil then return nil end
@@ -589,6 +655,7 @@ local function pick_start_from_depth(col, depth)
     return #pile - d + 1
 end
 
+-- 限制光标深度在有效范围内
 local function clamp_cursor_pick_depth()
     local maxd = max_pick_depth(state.cursor_col)
     if maxd <= 0 then
@@ -598,6 +665,7 @@ local function clamp_cursor_pick_depth()
     end
 end
 
+-- 翻开新顶牌
 local function reveal_new_top(col)
     if state.mode ~= MODE_KLONDIKE and state.mode ~= MODE_SPIDER then return end
     local pile = state.tableau[col]
@@ -609,6 +677,7 @@ local function reveal_new_top(col)
     end
 end
 
+-- 判断是否可以放到目标列
 local function can_place_on_tableau(card, dest_col)
     local dest = state.tableau[dest_col]
     local top = dest[#dest]
@@ -628,6 +697,7 @@ local function can_place_on_tableau(card, dest_col)
     return color_group(top) ~= color_group(card)
 end
 
+-- 检查克朗代克式序列是否有效（红黑交替递减）
 local function run_valid_klondike_like(cards, start_idx)
     if start_idx < 1 or start_idx > #cards then return false end
     for i = start_idx, #cards - 1 do
@@ -640,6 +710,7 @@ local function run_valid_klondike_like(cards, start_idx)
     return true
 end
 
+-- 检查蜘蛛纸牌序列是否有效（同花色递减）
 local function run_valid_spider_same(cards, start_idx)
     if start_idx < 1 or start_idx > #cards then return false end
     for i = start_idx, #cards - 1 do
@@ -652,12 +723,14 @@ local function run_valid_spider_same(cards, start_idx)
     return true
 end
 
+-- 统计空自由单元格数
 local function count_empty_cells()
     local n = 0
     for i = 1, 4 do if state.cells[i] == nil then n = n + 1 end end
     return n
 end
 
+-- 统计空列数（排除源和目标）
 local function count_empty_columns(src_col, dst_col)
     local n = 0
     for c = 1, #state.tableau do
@@ -666,12 +739,14 @@ local function count_empty_columns(src_col, dst_col)
     return n
 end
 
+-- 计算空当接龙可移动的最大牌数
 local function max_freecell_movable(src_col, dst_col)
     local cells = count_empty_cells()
     local empties = count_empty_columns(src_col, dst_col)
     return (1 + cells) * (2 ^ empties)
 end
 
+-- 判断指定起始索引的序列是否可移动
 local function is_valid_run_start(src_col, dst_col, start_idx)
     local src = state.tableau[src_col]
     if src == nil or #src == 0 then return false end
@@ -689,6 +764,7 @@ local function is_valid_run_start(src_col, dst_col, start_idx)
         return can_place_on_tableau(src[start_idx], dst_col)
     end
 
+    -- Spider
     local first = first_face_up_index(src_col)
     if first == nil or start_idx < first then return false end
     local len = #src - start_idx + 1
@@ -696,6 +772,7 @@ local function is_valid_run_start(src_col, dst_col, start_idx)
     return can_place_on_tableau(src[start_idx], dst_col)
 end
 
+-- 寻找可移动的起始索引
 local function find_move_start_index(src_col, dst_col, preferred_start)
     local src = state.tableau[src_col]
     if #src <= 0 then return nil end
@@ -717,6 +794,7 @@ local function find_move_start_index(src_col, dst_col, preferred_start)
     return nil
 end
 
+-- 移动牌桌中的牌叠
 local function move_tableau_stack(src_col, dst_col, preferred_start)
     if src_col < 1 or src_col > #state.tableau or dst_col < 1 or dst_col > #state.tableau then return false end
     if src_col == dst_col then return false end
@@ -738,6 +816,8 @@ local function move_tableau_stack(src_col, dst_col, preferred_start)
     state.dirty = true
     return true
 end
+
+-- 判断是否可以放到基础牌堆
 local function can_place_foundation(slot, card)
     local pile = state.foundations[slot]
     local top = pile[#pile]
@@ -747,6 +827,7 @@ local function can_place_foundation(slot, card)
     return top.suit == card.suit and card.rank == top.rank + 1
 end
 
+-- 移动牌到基础牌堆
 local function move_card_to_foundation(card)
     if state.mode == MODE_SPIDER then return false end
     local slot = card.suit
@@ -756,6 +837,7 @@ local function move_card_to_foundation(card)
     return true
 end
 
+-- 移动列顶牌到基础牌堆
 local function move_column_top_to_foundation(col)
     if state.mode == MODE_SPIDER then return false end
     if col < 1 or col > #state.tableau then return false end
@@ -777,6 +859,7 @@ local function move_column_top_to_foundation(col)
     return true
 end
 
+-- 移动废牌堆顶牌到基础牌堆
 local function move_waste_to_foundation()
     if state.mode ~= MODE_KLONDIKE then return false end
     local card = state.waste[#state.waste]
@@ -795,6 +878,7 @@ local function move_waste_to_foundation()
     return true
 end
 
+-- 移动废牌堆顶牌到列
 local function move_waste_to_column(col)
     if state.mode ~= MODE_KLONDIKE then return false end
     if col < 1 or col > #state.tableau then return false end
@@ -808,13 +892,17 @@ local function move_waste_to_column(col)
     state.dirty = true
     return true
 end
+
+-- 移动列顶牌到自由单元格
 local function move_column_to_cell(col)
     if state.mode ~= MODE_FREECELL then return false end
     if col < 1 or col > #state.tableau then return false end
 
     local empty_slot = nil
     for i = 1, 4 do
-        if state.cells[i] == nil then empty_slot = i; break end
+        if state.cells[i] == nil then
+            empty_slot = i; break
+        end
     end
     if empty_slot == nil then return false end
 
@@ -829,6 +917,7 @@ local function move_column_to_cell(col)
     return true
 end
 
+-- 移动自由单元格的牌到列
 local function move_cell_to_column(col)
     if state.mode ~= MODE_FREECELL then return false end
     if col < 1 or col > #state.tableau then return false end
@@ -846,6 +935,7 @@ local function move_cell_to_column(col)
     return false
 end
 
+-- 移动自由单元格的牌到基础牌堆
 local function move_cell_to_foundation()
     if state.mode ~= MODE_FREECELL then return false end
     for i = 1, 4 do
@@ -864,6 +954,7 @@ local function move_cell_to_foundation()
     return false
 end
 
+-- 从牌堆抽牌（克朗代克）
 local function draw_from_stock_klondike()
     if state.mode ~= MODE_KLONDIKE then return false end
 
@@ -896,6 +987,7 @@ local function draw_from_stock_klondike()
     return true
 end
 
+-- 发一行牌（蜘蛛纸牌）
 local function draw_spider_row()
     if state.mode ~= MODE_SPIDER then return false end
     if #state.stock < 10 then
@@ -921,6 +1013,7 @@ local function draw_spider_row()
     return true
 end
 
+-- 移除蜘蛛纸牌的完整序列
 local function remove_spider_complete_runs()
     if state.mode ~= MODE_SPIDER then return false end
     local changed = false
@@ -935,9 +1028,15 @@ local function remove_spider_complete_runs()
                 for i = start, #pile - 1 do
                     local a = pile[i]
                     local b = pile[i + 1]
-                    if not a.face_up or not b.face_up then ok = false; break end
-                    if b.suit ~= suit then ok = false; break end
-                    if b.rank ~= a.rank - 1 then ok = false; break end
+                    if not a.face_up or not b.face_up then
+                        ok = false; break
+                    end
+                    if b.suit ~= suit then
+                        ok = false; break
+                    end
+                    if b.rank ~= a.rank - 1 then
+                        ok = false; break
+                    end
                 end
             end
 
@@ -958,6 +1057,7 @@ local function remove_spider_complete_runs()
     return changed
 end
 
+-- 保存进度
 local function save_progress(manual)
     local snap = snapshot_state()
     local ok = false
@@ -978,6 +1078,7 @@ local function save_progress(manual)
     return ok
 end
 
+-- 尝试加载进度
 local function try_load_progress()
     local data = nil
     if type(load_game_slot) == "function" then
@@ -996,6 +1097,7 @@ local function try_load_progress()
     return true
 end
 
+-- 开始新游戏
 local function deal_new_game(mode, diff)
     if mode == MODE_SPIDER then
         deal_spider(diff or state.spider_diff)
@@ -1022,6 +1124,7 @@ local function deal_new_game(mode, diff)
     state.dirty = true
 end
 
+-- 计算最小所需尺寸
 local function minimum_size()
     local cols = #state.tableau
     if cols <= 0 then cols = 8 end
@@ -1039,6 +1142,8 @@ local function minimum_size()
     if state.mode == MODE_SPIDER then min_h = 32 end
     return min_w, min_h
 end
+
+-- 绘制尺寸警告
 local function draw_size_warning(term_w, term_h, min_w, min_h)
     clear()
     local title = tr("warning.size_title")
@@ -1053,12 +1158,14 @@ local function draw_size_warning(term_w, term_h, min_w, min_h)
     draw_text(centered_x(hint, 1, term_w), y + 3, hint, "dark_gray", "black")
 end
 
+-- 获取牌的两字符表示
 local function card_two_chars(card)
     local rt = rank_text(card.rank)
     if rt == "10" then return "10" end
     return " " .. rt
 end
 
+-- 绘制列边框
 local function draw_column_frame(x, y_top, card_count, color, empty_col)
     if empty_col then
         draw_text(x, y_top, "┌──┐", color, "black")
@@ -1075,6 +1182,8 @@ local function draw_column_frame(x, y_top, card_count, color, empty_col)
     end
     draw_text(x, y_top + card_count, "└──┘", color, "black")
 end
+
+-- 绘制牌桌网格
 local function draw_cards_grid(g, max_visible_rows)
     local cols = #state.tableau
     local max_rows = 1
@@ -1087,10 +1196,12 @@ local function draw_cards_grid(g, max_visible_rows)
         rows_to_draw = math.min(rows_to_draw, math.max(1, max_visible_rows))
     end
 
+    -- 绘制行号
     for r = 1, rows_to_draw do
         draw_text(g.x, g.y + r - 1, string.format("R%-2d", r), "dark_gray", "black")
     end
 
+    -- 绘制列号和牌
     for c = 1, cols do
         local cx = g.x + 5 + (c - 1) * 5
         draw_text(cx, g.y - 1, string.format("C%-2d", c), "dark_gray", "black")
@@ -1116,6 +1227,7 @@ local function draw_cards_grid(g, max_visible_rows)
         end
     end
 
+    -- 绘制选中框和光标框
     for c = 1, cols do
         local frame_x = g.x + 5 + (c - 1) * 5
         local pile = state.tableau[c]
@@ -1147,40 +1259,46 @@ local function draw_cards_grid(g, max_visible_rows)
         end
     end
 end
+
+-- 获取基础牌堆标签
 local function foundation_label(slot)
     local pile = state.foundations[slot]
     if #pile == 0 then return "[ ]" end
     return "[" .. rank_text(pile[#pile].rank) .. "]"
 end
+
+-- 绘制颜色提示
 local function draw_color_hint(term_w, y)
     local red_text = tr("game.solitaire.color_hint.red")
     local black_text = tr("game.solitaire.color_hint.black")
     local segments = {
-        {"[A]", "red"},
-        {" ", "white"},
-        {"[A]", "rgb(255,165,0)"},
-        {" -> ", "dark_gray"},
-        {red_text, "white"},
-        {"   ", "white"},
-        {"[A]", "cyan"},
-        {" ", "white"},
-        {"[A]", "white"},
-        {" -> ", "dark_gray"},
-        {black_text, "white"},
+        { "[A]",      "red" },
+        { " ",        "white" },
+        { "[A]",      "rgb(255,165,0)" },
+        { " -> ",     "dark_gray" },
+        { red_text,   "white" },
+        { "   ",      "white" },
+        { "[A]",      "cyan" },
+        { " ",        "white" },
+        { "[A]",      "white" },
+        { " -> ",     "dark_gray" },
+        { black_text, "white" },
     }
 
     local total = 0
     for i = 1, #segments do
-        total = total + key_width(segments[i][1])
+        total = total + text_width(segments[i][1])
     end
 
     local x = math.max(1, math.floor((term_w - total) / 2) + 1)
     for i = 1, #segments do
         local text_seg = segments[i][1]
         draw_text(x, y, text_seg, segments[i][2], "black")
-        x = x + key_width(text_seg)
+        x = x + text_width(text_seg)
     end
 end
+
+-- 绘制顶部栏
 local function draw_top_bar(term_w)
     local best = best_time_for_current_mode()
     local best_text = best > 0 and format_duration(best) or "--:--:--"
@@ -1207,7 +1325,8 @@ local function draw_top_bar(term_w)
                 cells = cells .. "[" .. card_two_chars(state.cells[i]) .. "] "
             end
         end
-        local f = foundation_label(1) .. " " .. foundation_label(2) .. " " .. foundation_label(3) .. " " .. foundation_label(4)
+        local f = foundation_label(1) ..
+        " " .. foundation_label(2) .. " " .. foundation_label(3) .. " " .. foundation_label(4)
         local line2 = tr("game.solitaire.cells") .. " " .. cells .. "   " .. tr("game.solitaire.foundations") .. " " .. f
         draw_text(centered_x(line2, 1, term_w), 4, line2, "white", "black")
     elseif state.mode == MODE_KLONDIKE then
@@ -1215,8 +1334,10 @@ local function draw_top_bar(term_w)
         if #state.waste >= 1 then w1 = card_two_chars(state.waste[#state.waste]) end
         if #state.waste >= 2 then w2 = card_two_chars(state.waste[#state.waste - 1]) end
         if #state.waste >= 3 then w3 = card_two_chars(state.waste[#state.waste - 2]) end
-        local f = foundation_label(1) .. " " .. foundation_label(2) .. " " .. foundation_label(3) .. " " .. foundation_label(4)
-        local line2 = tr("game.solitaire.stock") .. " [##]   " .. tr("game.solitaire.waste") .. " [" .. w3 .. " " .. w2 .. " " .. w1 .. "]"
+        local f = foundation_label(1) ..
+        " " .. foundation_label(2) .. " " .. foundation_label(3) .. " " .. foundation_label(4)
+        local line2 = tr("game.solitaire.stock") ..
+            " [##]   " .. tr("game.solitaire.waste") .. " [" .. w3 .. " " .. w2 .. " " .. w1 .. "]"
             .. "   " .. tr("game.solitaire.foundations") .. " " .. f
         draw_text(centered_x(line2, 1, term_w), 4, line2, "white", "black")
     else
@@ -1226,6 +1347,7 @@ local function draw_top_bar(term_w)
     end
 end
 
+-- 获取当前消息
 local function current_message()
     if state.mode_input then
         if state.spider_diff_input then
@@ -1245,6 +1367,7 @@ local function current_message()
     return "", "dark_gray"
 end
 
+-- 获取控制说明文本
 local function controls_text()
     if state.mode == MODE_FREECELL then
         return tr("game.solitaire.controls.freecell")
@@ -1253,6 +1376,8 @@ local function controls_text()
     end
     return tr("game.solitaire.controls.spider")
 end
+
+-- 计算布局
 local function compute_layout(term_w, term_h)
     local cols = #state.tableau
     local grid_w = 4 + cols * 5
@@ -1281,6 +1406,7 @@ local function compute_layout(term_w, term_h)
     }
 end
 
+-- 绘制底部区域
 local function draw_bottom_area(layout)
     local msg, msg_color = current_message()
     local clear_start = layout.controls_start_y - 2
@@ -1297,26 +1423,31 @@ local function draw_bottom_area(layout)
     end
 
     if layout.controls_too_long then
-        draw_text(centered_x(tr("warning.size_title"), 1, layout.term_w), layout.controls_start_y, tr("warning.size_title"), "yellow", "black")
+        draw_text(centered_x(tr("warning.size_title"), 1, layout.term_w), layout.controls_start_y,
+            tr("warning.size_title"), "yellow", "black")
     else
         for i = 1, #layout.wrapped do
-            draw_text(centered_x(layout.wrapped[i], 1, layout.term_w), layout.controls_start_y + i - 1, layout.wrapped[i], "white", "black")
+            draw_text(centered_x(layout.wrapped[i], 1, layout.term_w), layout.controls_start_y + i - 1, layout.wrapped
+            [i], "white", "black")
         end
     end
 end
 
+-- 部分渲染：网格
 local function render_grid_partial(term_w, term_h)
     local layout = compute_layout(term_w, term_h)
     draw_cards_grid(layout.g, layout.max_visible_rows)
     state.grid_dirty = false
 end
 
+-- 部分渲染：底部
 local function render_bottom_partial(term_w, term_h)
     local layout = compute_layout(term_w, term_h)
     draw_bottom_area(layout)
     state.bottom_dirty = false
 end
 
+-- 完整渲染
 local function render()
     local term_w, term_h = terminal_size()
     local min_w, min_h = minimum_size()
@@ -1349,6 +1480,7 @@ local function render()
     state.dirty = false
 end
 
+-- 自动保存
 local function auto_save_tick()
     if state.won then return end
     local sec = elapsed_seconds()
@@ -1358,6 +1490,7 @@ local function auto_save_tick()
     end
 end
 
+-- 处理模式输入
 local function handle_mode_input_key(key)
     if key == "esc" or key == "q" or key == "z" then
         state.mode_input = false
@@ -1390,6 +1523,7 @@ local function handle_mode_input_key(key)
     end
 end
 
+-- 处理确认模式输入
 local function handle_confirm_key(key)
     if key == "y" then
         if state.confirm_mode == "restart" then
@@ -1404,6 +1538,7 @@ local function handle_confirm_key(key)
     end
 end
 
+-- 处理结果状态输入
 local function handle_result_key(key)
     if key == "r" then
         deal_new_game(state.mode, state.spider_diff)
@@ -1412,6 +1547,7 @@ local function handle_result_key(key)
     end
 end
 
+-- 判断列是否可选择
 local function selectable_column(col)
     if col < 1 or col > #state.tableau then return false end
     local pile = state.tableau[col]
@@ -1420,6 +1556,7 @@ local function selectable_column(col)
     return first_face_up_index(col) ~= nil
 end
 
+-- 处理普通模式输入
 local function handle_normal_key(key)
     if key == "left" then
         state.cursor_col = clamp(state.cursor_col - 1, 1, #state.tableau)
@@ -1542,6 +1679,8 @@ local function handle_normal_key(key)
         return
     end
 end
+
+-- 加载启动模式
 local function load_launch_mode()
     if type(get_launch_mode) ~= "function" then return "new" end
     local ok, mode = pcall(get_launch_mode)
@@ -1549,6 +1688,7 @@ local function load_launch_mode()
     return "new"
 end
 
+-- 游戏初始化
 local function init_game()
     load_best_record()
     state.launch_mode = load_launch_mode()
@@ -1562,6 +1702,7 @@ local function init_game()
     end
 end
 
+-- 输入处理
 local function input_tick()
     local key = normalize_key(get_key(false))
     if key == "" then return end
@@ -1584,70 +1725,56 @@ local function input_tick()
     handle_normal_key(key)
 end
 
-init_game()
+-- 主游戏循环
+local function game_loop()
+    while true do
+        state.frame = state.frame + 1
 
-while true do
-    state.frame = state.frame + 1
-
-    local sec = elapsed_seconds()
-    if sec ~= state.last_elapsed_sec then
-        state.last_elapsed_sec = sec
-        if state.dirty then
-            state.top_dirty = false
-        else
-            state.top_dirty = true
+        local sec = elapsed_seconds()
+        if sec ~= state.last_elapsed_sec then
+            state.last_elapsed_sec = sec
+            if state.dirty then
+                state.top_dirty = false
+            else
+                state.top_dirty = true
+            end
         end
-    end
 
-    auto_save_tick()
-    update_message_timer()
-    input_tick()
+        auto_save_tick()
+        update_message_timer()
+        input_tick()
 
-    local tw, th = terminal_size()
-    if tw ~= state.last_term_w or th ~= state.last_term_h then
-        state.dirty = true
-    end
-
-    if state.size_warning_active then
-        local min_w, min_h = minimum_size()
-        if tw ~= state.last_warn_term_w or th ~= state.last_warn_term_h or min_w ~= state.last_warn_min_w or min_h ~= state.last_warn_min_h then
+        local tw, th = terminal_size()
+        if tw ~= state.last_term_w or th ~= state.last_term_h then
             state.dirty = true
         end
-    end
 
-    if state.dirty then
-        render()
-    else
-        if (not state.size_warning_active) and state.top_dirty then
-            draw_top_bar(tw)
-            state.top_dirty = false
+        if state.size_warning_active then
+            local min_w, min_h = minimum_size()
+            if tw ~= state.last_warn_term_w or th ~= state.last_warn_term_h or min_w ~= state.last_warn_min_w or min_h ~= state.last_warn_min_h then
+                state.dirty = true
+            end
         end
-        if (not state.size_warning_active) and state.grid_dirty then
-            render_grid_partial(tw, th)
-        end
-        if (not state.size_warning_active) and state.bottom_dirty then
-            render_bottom_partial(tw, th)
-        end
-    end
 
-    sleep(FRAME_MS)
+        if state.dirty then
+            render()
+        else
+            if (not state.size_warning_active) and state.top_dirty then
+                draw_top_bar(tw)
+                state.top_dirty = false
+            end
+            if (not state.size_warning_active) and state.grid_dirty then
+                render_grid_partial(tw, th)
+            end
+            if (not state.size_warning_active) and state.bottom_dirty then
+                render_bottom_partial(tw, th)
+            end
+        end
+
+        sleep(FRAME_MS)
+    end
 end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+-- 启动游戏
+init_game()
+game_loop()

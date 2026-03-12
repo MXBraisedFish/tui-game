@@ -1,7 +1,27 @@
 [package]
 name = "tui-game"
-version = "0.10.3"
+version = "0.10.5"
 edition = "2024"
+
+[lib]
+name = "tui_game"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tui-game"
+path = "src/main.rs"
+
+[[bin]]
+name = "version"
+path = "src/bin/version.rs"
+
+[[bin]]
+name = "updata"
+path = "src/bin/updata.rs"
+
+[[bin]]
+name = "remove"
+path = "src/bin/remove.rs"
 
 [dependencies]
 crossterm = "0.29.0"

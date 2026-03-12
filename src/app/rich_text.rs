@@ -22,11 +22,11 @@ struct StyleState {
     bg_need_clear: bool,
 }
 
-/// Parses optional `f%` rich-text syntax and wraps into ratatui lines.
+/// 解析可选的 `f%` 富文本语法，并按指定宽度包装为 ratatui 可渲染的文本行。
 ///
-/// Supported commands:
-/// - `{tc:<color>}` / `{tc:clear}` / `{tc:<color>><count>}`
-/// - `{bg:<color>}` / `{bg:clear}` / `{bg:<color>><count>}`
+/// 当前支持的指令：
+/// - `{tc:<颜色>}` / `{tc:clear}` / `{tc:<颜色>><数量>}`：控制文字颜色。
+/// - `{bg:<颜色>}` / `{bg:clear}` / `{bg:<颜色>><数量>}`：控制背景颜色。
 pub fn parse_rich_text_wrapped(text: &str, width: usize, base: Style) -> Vec<Line<'static>> {
     let content = text.strip_prefix("f%").unwrap_or(text);
 
@@ -521,4 +521,3 @@ fn parse_rgb_color(raw: &str) -> Option<Color> {
     let b = parts[2].parse::<u8>().ok()?;
     Some(Color::Rgb(r, g, b))
 }
-
