@@ -1,4 +1,6 @@
 #!/bin/sh
+set +x
+set +v
 set -eu
 
 INSTALL_DIR=${1:-}

@@ -1,4 +1,6 @@
 #!/bin/bash
+set +x
+set +v
 set -u
 echo "[INFO] Starting update process..."
 

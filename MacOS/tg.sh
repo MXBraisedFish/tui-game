@@ -1,4 +1,6 @@
 #!/bin/bash
+set +x
+set +v
 set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"

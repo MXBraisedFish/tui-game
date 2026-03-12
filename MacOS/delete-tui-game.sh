@@ -1,4 +1,6 @@
 #!/bin/bash
+set +x
+set +v
 set -u
 
 echo "[WARNING] This will delete all game data, including saves and records."

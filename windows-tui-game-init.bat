@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
@@ -28,9 +28,9 @@ if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_RUN=[信息] 你现在可以输入 tg 启动游戏。"
     set "ERR_CURL=[错误] 未找到 curl.exe。"
     set "ERR_PS=[错误] 未找到 PowerShell。"
-    set "ERR_FETCH=[错误] 下载版本信息失败。"
+    set "ERR_FETCH=[错误] 下载版本信息失败。错误码："
     set "ERR_ASSET=[错误] 未找到 Windows 安装包。"
-    set "ERR_DL=[错误] 下载安装包失败。"
+    set "ERR_DL=[错误] 下载安装包失败。错误码："
     set "ERR_EXTRACT=[错误] 解压安装包失败。"
     set "ERR_PATH=[警告] PATH 写入失败，请手动添加。"
     set "MSG_EXIT=[信息] 按任意键退出并删除安装脚本。"
@@ -50,9 +50,9 @@ if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_RUN=[INFO] You can now type tg to start the game."
     set "ERR_CURL=[ERROR] curl.exe was not found."
     set "ERR_PS=[ERROR] PowerShell was not found."
-    set "ERR_FETCH=[ERROR] Failed to download release information."
+    set "ERR_FETCH=[ERROR] Failed to download release information. Error code: "
     set "ERR_ASSET=[ERROR] Windows package asset was not found."
-    set "ERR_DL=[ERROR] Failed to download the package."
+    set "ERR_DL=[ERROR] Failed to download the package. Error code: "
     set "ERR_EXTRACT=[ERROR] Failed to extract the package."
     set "ERR_PATH=[WARNING] Failed to update PATH. Please add it manually."
     set "MSG_EXIT=[INFO] Press any key to exit and delete this installer."
@@ -62,6 +62,10 @@ echo %MSG_START%
 where curl.exe >nul 2>nul || (echo %ERR_CURL% & pause & exit /b 1)
 where powershell.exe >nul 2>nul || (echo %ERR_PS% & pause & exit /b 1)
 
+echo %MSG_LANG_INIT%
+if not exist "%CD%\tui-game-data" mkdir "%CD%\tui-game-data"
+> "%CD%\tui-game-data\language_pref.txt" echo %LANG_CODE%
+
 set "API_URL=https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest"
 set "TEMP_JSON=%TEMP%\tui_game_init_%RANDOM%.json"
 set "TEMP_ZIP=%TEMP%\tui_game_%RANDOM%.zip"
@@ -69,7 +73,8 @@ set "TEMP_ZIP=%TEMP%\tui_game_%RANDOM%.zip"
 echo %MSG_FETCH%
 curl.exe -fsSL -o "%TEMP_JSON%" "%API_URL%"
 if errorlevel 1 (
-    echo %ERR_FETCH%
+    set "CURL_CODE=%ERRORLEVEL%"
+    echo %ERR_FETCH%%CURL_CODE%
     pause
     exit /b 1
 )
@@ -89,7 +94,8 @@ if "!DOWNLOAD_URL!"=="" (
 echo %MSG_DL%
 curl.exe -fsSL -o "%TEMP_ZIP%" "!DOWNLOAD_URL!"
 if errorlevel 1 (
-    echo %ERR_DL%
+    set "CURL_CODE=%ERRORLEVEL%"
+    echo %ERR_DL%%CURL_CODE%
     del /f /q "%TEMP_JSON%" >nul 2>&1
     pause
     exit /b 1
@@ -103,10 +109,6 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-
-echo %MSG_LANG_INIT%
-if not exist "%CD%\tui-game-data" mkdir "%CD%\tui-game-data"
-> "%CD%\tui-game-data\language_pref.txt" echo %LANG_CODE%
 
 del /f /q "%TEMP_JSON%" "%TEMP_ZIP%" >nul 2>&1
 echo %MSG_CLEAN%
