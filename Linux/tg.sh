@@ -52,14 +52,18 @@ case "$1" in
         exec "$REMOVE_BIN"
         ;;
     -h|-H|-help)
-        msg "script.help.header" "Usage: tg [option]"
-        msg "script.help.run" "  tg                 Start the game."
-        msg "script.help.version" "  tg -v              Show current version and check latest release."
-        msg "script.help.update" "  tg -u              Check and install updates if available."
-        msg "script.help.help" "  tg -h              Show this help message."
-        msg "script.help.remove" "  tg -r              Uninstall the game."
-        msg "script.help.path" "  tg -p              Show the installation path."
-        msg "script.help.footer" "Long options: -version / -updata / -help / -remove / -path"
+        help_text=$(
+            printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s' \
+                "$(msg "script.help.header" "Usage: tg [option]")" \
+                "$(msg "script.help.run" "  tg                 Start the game.")" \
+                "$(msg "script.help.version" "  tg -v              Show current version and check latest release.")" \
+                "$(msg "script.help.update" "  tg -u              Check and install updates if available.")" \
+                "$(msg "script.help.help" "  tg -h              Show this help message.")" \
+                "$(msg "script.help.remove" "  tg -r              Uninstall the game.")" \
+                "$(msg "script.help.path" "  tg -p              Show the installation path.")" \
+                "$(msg "script.help.footer" "Long options: -version / -updata / -help / -remove / -path")"
+        )
+        printf '%s\n' "$help_text"
         ;;
     -p|-P|-path)
         msg "script.path" "Install path: {path}"

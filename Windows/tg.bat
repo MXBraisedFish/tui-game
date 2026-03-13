@@ -68,14 +68,26 @@ if not exist "!REMOVE_BIN!" (
 exit /b %errorlevel%
 
 :show_help
-call :msg script.help.header "Usage: tg [option]"
-call :msg script.help.run "  tg                 Start the game."
-call :msg script.help.version "  tg -v              Show current version and check latest release."
-call :msg script.help.update "  tg -u              Check and install updates if available."
-call :msg script.help.help "  tg -h              Show this help message."
-call :msg script.help.remove "  tg -r              Uninstall the game."
-call :msg script.help.path "  tg -p              Show the installation path."
-call :msg script.help.footer "Long options: -version / -updata / -help / -remove / -path"
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$file='%LANG_FILE%';" ^
+    "$defaults = @(" ^
+    "  @('script.help.header','Usage: tg [option]')," ^
+    "  @('script.help.run','  tg                 Start the game.')," ^
+    "  @('script.help.version','  tg -v              Show current version and check latest release.')," ^
+    "  @('script.help.update','  tg -u              Check and install updates if available.')," ^
+    "  @('script.help.help','  tg -h              Show this help message.')," ^
+    "  @('script.help.remove','  tg -r              Uninstall the game.')," ^
+    "  @('script.help.path','  tg -p              Show the installation path.')," ^
+    "  @('script.help.footer','Long options: -version / -updata / -help / -remove / -path')" ^
+    ");" ^
+    "try {" ^
+    "  $json = $null;" ^
+    "  if (Test-Path $file) { $json = Get-Content -Raw -Encoding UTF8 $file | ConvertFrom-Json }" ^
+    "  $lines = foreach ($entry in $defaults) { $key = $entry[0]; $fallback = $entry[1]; if ($null -ne $json -and $json.PSObject.Properties[$key]) { [string]$json.PSObject.Properties[$key].Value } else { $fallback } };" ^
+    "  [Console]::Write(($lines -join [Environment]::NewLine))" ^
+    "} catch {" ^
+    "  [Console]::Write((($defaults | ForEach-Object { $_[1] }) -join [Environment]::NewLine))" ^
+    "}"
 exit /b 0
 
 :show_path
