@@ -14,7 +14,8 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            asset_name: tui-game-linux.tar.gz
+            full_asset_name: tui-game-linux.tar.gz
+            update_asset_name: tui-game-linux-update.tar.gz
             main_bin: tui-game
             version_bin: version
             updata_bin: updata
@@ -23,7 +24,8 @@ jobs:
             tg_output: tg.sh
             bash_keep_ext: sh
           - os: windows-latest
-            asset_name: tui-game-windows.zip
+            full_asset_name: tui-game-windows.zip
+            update_asset_name: tui-game-windows-update.zip
             main_bin: tui-game.exe
             version_bin: version.exe
             updata_bin: updata.exe
@@ -32,7 +34,8 @@ jobs:
             tg_output: tg.bat
             bash_keep_ext: bat
           - os: macos-latest
-            asset_name: tui-game-macos.zip
+            full_asset_name: tui-game-macos.zip
+            update_asset_name: tui-game-macos-update.zip
             main_bin: tui-game
             version_bin: version
             updata_bin: updata
@@ -51,63 +54,88 @@ jobs:
       - name: Build release binaries
         run: cargo build --release --bins
 
-      - name: Prepare dist directory
+      - name: Prepare dist directories
         shell: bash
         run: |
           set -euo pipefail
 
-          rm -rf dist
-          mkdir -p dist
+          rm -rf dist-full dist-update
+          mkdir -p dist-full dist-update
 
-          cp "target/release/${{ matrix.main_bin }}" "dist/${{ matrix.main_bin }}"
-          cp "target/release/${{ matrix.version_bin }}" "dist/${{ matrix.version_bin }}"
-          cp "target/release/${{ matrix.updata_bin }}" "dist/${{ matrix.updata_bin }}"
-          cp "target/release/${{ matrix.remove_bin }}" "dist/${{ matrix.remove_bin }}"
+          cp "target/release/${{ matrix.main_bin }}" "dist-full/${{ matrix.main_bin }}"
+          cp "target/release/${{ matrix.version_bin }}" "dist-full/${{ matrix.version_bin }}"
+          cp "target/release/${{ matrix.updata_bin }}" "dist-full/${{ matrix.updata_bin }}"
+          cp "target/release/${{ matrix.remove_bin }}" "dist-full/${{ matrix.remove_bin }}"
 
-          cp "${{ matrix.tg_script }}" "dist/${{ matrix.tg_output }}"
+          cp "${{ matrix.tg_script }}" "dist-full/${{ matrix.tg_output }}"
 
           if [ -d "assets" ]; then
-            cp -R assets dist/
+            cp -R assets dist-full/
+            mkdir -p dist-update/assets
+            cp -R assets/lang dist-update/assets/
+            cp -R assets/wordle dist-update/assets/
           fi
 
           if [ -d "scripts" ]; then
-            cp -R scripts dist/
+            cp -R scripts dist-full/
+            mkdir -p dist-update/scripts
+            cp -R scripts/game dist-update/scripts/
+            cp -R scripts/text_function dist-update/scripts/
           fi
 
-          if [ -d "dist/scripts/bash" ]; then
-            find "dist/scripts/bash" -type f ! -name "*.${{ matrix.bash_keep_ext }}" -delete
+          cp "target/release/${{ matrix.main_bin }}" "dist-update/${{ matrix.main_bin }}"
+
+          if [ -d "dist-full/scripts/bash" ]; then
+            find "dist-full/scripts/bash" -type f ! -name "*.${{ matrix.bash_keep_ext }}" -delete
           fi
 
           if [ "${{ matrix.os }}" != "windows-latest" ]; then
             chmod +x \
-              "dist/${{ matrix.main_bin }}" \
-              "dist/${{ matrix.version_bin }}" \
-              "dist/${{ matrix.updata_bin }}" \
-              "dist/${{ matrix.remove_bin }}" \
-              "dist/${{ matrix.tg_output }}" || true
+              "dist-full/${{ matrix.main_bin }}" \
+              "dist-full/${{ matrix.version_bin }}" \
+              "dist-full/${{ matrix.updata_bin }}" \
+              "dist-full/${{ matrix.remove_bin }}" \
+              "dist-full/${{ matrix.tg_output }}" \
+              "dist-update/${{ matrix.main_bin }}" || true
 
-            if [ -d "dist/scripts/bash" ]; then
-              chmod +x dist/scripts/bash/*.sh || true
+            if [ -d "dist-full/scripts/bash" ]; then
+              chmod +x dist-full/scripts/bash/*.sh || true
             fi
           fi
 
-      - name: Create archive
+      - name: Create full archive
         shell: bash
         run: |
           set -euo pipefail
 
-          cd dist
+          cd dist-full
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            7z a "../${{ matrix.asset_name }}" *
+            7z a "../${{ matrix.full_asset_name }}" *
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            zip -r "../${{ matrix.asset_name }}" *
+            zip -r "../${{ matrix.full_asset_name }}" *
           else
-            tar -czf "../${{ matrix.asset_name }}" *
+            tar -czf "../${{ matrix.full_asset_name }}" *
+          fi
+
+      - name: Create update archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd dist-update
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a "../${{ matrix.update_asset_name }}" *
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            zip -r "../${{ matrix.update_asset_name }}" *
+          else
+            tar -czf "../${{ matrix.update_asset_name }}" *
           fi
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.asset_name }}
+          files: |
+            ${{ matrix.full_asset_name }}
+            ${{ matrix.update_asset_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

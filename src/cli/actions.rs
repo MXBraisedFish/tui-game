@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::cli::lang::CliLang;
 use crate::updater::github::{
     CURRENT_VERSION_TAG, latest_release_download, latest_release_notification, normalize_tag,
-    platform_asset_name, spawn_helper_script,
+    platform_update_asset_name, spawn_helper_script,
 };
 use crate::utils::path_utils;
 
@@ -68,7 +68,7 @@ pub fn run_updata_cli(_version_override: Option<String>, _release_url_override: 
         None => {
             println!(
                 "{}",
-                lang.fmt("updata.asset_missing", &[("{asset}", platform_asset_name())])
+                lang.fmt("updata.asset_missing", &[("{asset}", platform_update_asset_name())])
             );
             Ok(1)
         }

@@ -99,12 +99,12 @@ pub fn latest_release_download() -> Result<Option<ReleaseDownload>> {
         .html_url
         .clone()
         .unwrap_or_else(|| FALLBACK_RELEASE_URL.to_string());
-    let asset_name = platform_asset_name().to_string();
+    let asset_name = platform_update_asset_name().to_string();
 
     let asset = payload.assets.into_iter().find(|asset| {
         asset
             .name
-            .eq_ignore_ascii_case(platform_asset_name())
+            .eq_ignore_ascii_case(platform_update_asset_name())
     });
 
     let Some(asset) = asset else {
@@ -135,18 +135,18 @@ pub fn is_version_newer(remote: &str, current: &str) -> bool {
     matches!(compare_versions(remote, current), Some(Ordering::Greater))
 }
 
-pub fn platform_asset_name() -> &'static str {
+pub fn platform_update_asset_name() -> &'static str {
     #[cfg(target_os = "windows")]
     {
-        "tui-game-windows.zip"
+        "tui-game-windows-update.zip"
     }
     #[cfg(target_os = "linux")]
     {
-        "tui-game-linux.tar.gz"
+        "tui-game-linux-update.tar.gz"
     }
     #[cfg(target_os = "macos")]
     {
-        "tui-game-macos.zip"
+        "tui-game-macos-update.zip"
     }
 }
 
