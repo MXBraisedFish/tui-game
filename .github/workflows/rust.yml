@@ -21,6 +21,7 @@ jobs:
             remove_bin: remove
             tg_script: Linux/tg.sh
             tg_output: tg.sh
+            bash_keep_ext: sh
           - os: windows-latest
             asset_name: tui-game-windows.zip
             main_bin: tui-game.exe
@@ -29,6 +30,7 @@ jobs:
             remove_bin: remove.exe
             tg_script: Windows/tg.bat
             tg_output: tg.bat
+            bash_keep_ext: bat
           - os: macos-latest
             asset_name: tui-game-macos.zip
             main_bin: tui-game
@@ -37,6 +39,7 @@ jobs:
             remove_bin: remove
             tg_script: MacOS/tg.sh
             tg_output: tg.sh
+            bash_keep_ext: sh
 
     steps:
       - name: Checkout code
@@ -69,6 +72,10 @@ jobs:
 
           if [ -d "scripts" ]; then
             cp -R scripts dist/
+          fi
+
+          if [ -d "dist/scripts/bash" ]; then
+            find "dist/scripts/bash" -type f ! -name "*.${{ matrix.bash_keep_ext }}" -delete
           fi
 
           if [ "${{ matrix.os }}" != "windows-latest" ]; then

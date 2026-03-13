@@ -17,7 +17,7 @@ const GITHUB_API_LATEST: &str =
     "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
 const FALLBACK_RELEASE_URL: &str = "https://github.com/MXBraisedFish/TUI-GAME/releases/latest";
 pub const GITHUB_TOKEN: &str = "";
-pub const CURRENT_VERSION_TAG: &str = "0.10.6";
+pub const CURRENT_VERSION_TAG: &str = "0.10.7";
 
 #[derive(Clone, Debug)]
 pub struct UpdateNotification {
@@ -157,7 +157,7 @@ pub fn write_current_version_cache(current_version: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn run_external_update_script(notification: &UpdateNotification) -> Result<bool> {
+pub fn run_update_binary(notification: &UpdateNotification) -> Result<bool> {
     let updata_bin = path_utils::updata_binary_file()?;
     if !updata_bin.exists() {
         return Ok(false);

@@ -25,7 +25,7 @@ use tui_game::lua_bridge::api::{
 use tui_game::lua_bridge::script_loader::{GameMeta, scan_scripts};
 use tui_game::terminal::size_watcher;
 use tui_game::updater::github::{
-    CURRENT_VERSION_TAG, UpdateNotification, Updater, UpdaterEvent, run_external_update_script,
+    CURRENT_VERSION_TAG, UpdateNotification, Updater, UpdaterEvent, run_update_binary,
 };
 use tui_game::utils::path_utils;
 
@@ -127,7 +127,7 @@ fn run() -> Result<()> {
     // 初始页面为主菜单。
     let mut state = AppState::MainMenu { menu: Menu::new() };
     let mut pending_new_game_start: Option<PendingNewGameStart> = None;
-    // 标记是否需要在退出后执行卸载脚本。
+    // 标记是否需要在退出后执行 remove 字节码程序。
     let mut should_run_uninstall = false;
 
     let frame_budget = Duration::from_millis(16);
@@ -229,10 +229,10 @@ fn run() -> Result<()> {
         }
     }
 
-    // 终端恢复后再执行卸载脚本，避免脚本继承异常终端状态。
+    // 终端恢复后再执行 remove 字节码程序，避免子进程继承异常终端状态。
     drop(session);
     if should_run_uninstall {
-        let _ = run_uninstall_script();
+        let _ = run_remove_binary();
     }
 
     Ok(())
@@ -265,10 +265,10 @@ fn handle_key_event(
         return Ok(());
     }
 
-    // 全局更新快捷键。
+    // 全局更新快捷键，拉起 updata 字节码程序处理更新。
     if matches!(key.code, KeyCode::Char('u') | KeyCode::Char('U')) {
         if let Some(notification) = update_notification {
-            if run_external_update_script(notification).unwrap_or(false) {
+            if run_update_binary(notification).unwrap_or(false) {
                 *state = AppState::Exiting;
                 return Ok(());
             }
@@ -378,7 +378,7 @@ fn handle_key_event(
                     *state = AppState::MainMenu { menu: Menu::new() };
                 }
                 settings::SettingsAction::RunUninstall => {
-                    if has_uninstall_script().unwrap_or(false) {
+                    if has_remove_binary().unwrap_or(false) {
                         *should_run_uninstall = true;
                         *state = AppState::Exiting;
                     }
@@ -486,8 +486,8 @@ fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppS
     }
 }
 
-/// 执行当前目录下的卸载脚本。
-fn run_uninstall_script() -> Result<bool> {
+/// 执行当前目录下的 remove 字节码程序。
+fn run_remove_binary() -> Result<bool> {
     let remove_bin = path_utils::remove_binary_file()?;
     if !remove_bin.exists() {
         return Ok(false);
@@ -497,8 +497,8 @@ fn run_uninstall_script() -> Result<bool> {
     Ok(true)
 }
 
-/// 判断当前运行目录中是否存在可执行的卸载脚本。
-fn has_uninstall_script() -> Result<bool> {
+/// 判断当前运行目录中是否存在可执行的 remove 字节码程序。
+fn has_remove_binary() -> Result<bool> {
     Ok(path_utils::remove_binary_file()?.exists())
 }
 

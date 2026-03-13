@@ -4,12 +4,16 @@ set +v
 set -eu
 
 printf '%s\n' '[1] 中文' '[2] English'
-read -r -p 'Select language / 选择语言 (1/2): ' CHOICE
+read -r -p '选择语言 / Select language (1/2): ' CHOICE
 if [[ "$CHOICE" == "1" ]]; then
     LANG_CODE='zh-cn'
 else
     LANG_CODE='us-en'
 fi
+
+ROOT_LINE='========================================'
+TO_HTTP='https://github.com/MXBraisedFish/TUI-GAME'
+TO_WEB='none'
 
 if [[ "$LANG_CODE" == 'zh-cn' ]]; then
     MSG_START='[信息] 开始安装 TUI-GAME...'
@@ -19,19 +23,28 @@ if [[ "$LANG_CODE" == 'zh-cn' ]]; then
     MSG_EXTRACT='[信息] 正在解压文件到当前目录...'
     MSG_LANG_INIT='[信息] 正在初始化语言设置...'
     MSG_CLEAN='[信息] 已清理临时文件。'
-    MSG_ASK_PATH='是否创建 tg 快捷启动命令？(Y/N): '
-    MSG_LINK_OK='[成功] 已创建 tg 快捷启动命令。'
-    MSG_LINK_SKIP='[信息] 跳过快捷命令创建。'
+    MSG_ASK_PATH='是否创建 tg 快捷启动命令并加入 PATH 环境变量？(Y/N): '
+    MSG_ADD_PATH='[信息] 正在写入 shell 配置...'
+    MSG_PATH_OK='[成功] 已创建 tg 快捷启动命令，重新打开终端后可直接使用 tg。'
+    MSG_PATH_SKIP='[信息] 跳过 PATH 注册。'
     MSG_DONE='[成功] TUI-GAME 安装完成。'
     MSG_RUN='[信息] 你现在可以输入 tg 启动游戏。'
+    MSG_MORE='[信息] 或输入 tg -h 查看指令详情。'
     ERR_CURL='[错误] 未找到 curl。'
     ERR_PY='[错误] 未找到 python3。'
     ERR_TAR='[错误] 未找到 tar。'
-    ERR_FETCH='[错误] 下载版本信息失败。错误码：'
+    ERR_FETCH='[错误] 下载版本信息失败，错误码：'
     ERR_ASSET='[错误] 未找到 Linux 安装包。'
-    ERR_DL='[错误] 下载安装包失败。错误码：'
+    ERR_DL='[错误] 下载安装包失败，错误码：'
     ERR_EXTRACT='[错误] 解压安装包失败。'
-    MSG_EXIT='[信息] 按任意键退出并删除安装脚本。'
+    ERR_PATH='[警告] PATH 写入失败，请手动添加。'
+    ERR_NO_PATH='[警告] 未创建 PATH 环境变量，请手动添加。'
+    ERR_WHY_PATH='[警告] 添加 PATH 环境变量可在后续使用快捷指令。'
+    MSG_EXIT='[信息] 按任意键退出。'
+    ROOT_THANKS='感谢下载游玩！如果喜欢还请给我的仓库点一颗星星。'
+    ROOT_ENJOY='尽情享受在终端的娱乐吧。:P'
+    ROOT_HTTP='仓库地址：'
+    ROOT_WEB='官网地址：'
 else
     MSG_START='[INFO] Starting TUI-GAME installation...'
     MSG_FETCH='[INFO] Fetching latest release information from GitHub...'
@@ -40,11 +53,13 @@ else
     MSG_EXTRACT='[INFO] Extracting files to current directory...'
     MSG_LANG_INIT='[INFO] Initializing language preference...'
     MSG_CLEAN='[INFO] Temporary files cleaned up.'
-    MSG_ASK_PATH='Create a tg launcher command? (Y/N): '
-    MSG_LINK_OK='[SUCCESS] tg launcher command created.'
-    MSG_LINK_SKIP='[INFO] Skipping launcher creation.'
+    MSG_ASK_PATH='Do you want to create a tg launcher and add it to PATH? (Y/N): '
+    MSG_ADD_PATH='[INFO] Updating shell profile...'
+    MSG_PATH_OK='[SUCCESS] tg launcher created. Reopen the terminal to use tg.'
+    MSG_PATH_SKIP='[INFO] Skipping PATH registration.'
     MSG_DONE='[SUCCESS] TUI-GAME has been installed.'
     MSG_RUN='[INFO] You can now type tg to start the game.'
+    MSG_MORE='[INFO] Or run tg -h to view command details.'
     ERR_CURL='[ERROR] curl was not found.'
     ERR_PY='[ERROR] python3 was not found.'
     ERR_TAR='[ERROR] tar was not found.'
@@ -52,10 +67,34 @@ else
     ERR_ASSET='[ERROR] Linux package asset was not found.'
     ERR_DL='[ERROR] Failed to download the package. Error code: '
     ERR_EXTRACT='[ERROR] Failed to extract the package.'
-    MSG_EXIT='[INFO] Press any key to exit and delete this installer.'
+    ERR_PATH='[WARNING] Failed to update PATH. Please add it manually.'
+    ERR_NO_PATH='[WARNING] PATH environment variable not set. Please add it manually.'
+    ERR_WHY_PATH='[WARNING] Adding the PATH environment variable allows you to use quick commands in the future.'
+    MSG_EXIT='[INFO] Press any key to exit.'
+    ROOT_THANKS='Thanks for downloading and playing! If you enjoy it, please give my repository a star.'
+    ROOT_ENJOY='Enjoy your entertainment in the terminal. :P'
+    ROOT_HTTP='Repository URL: '
+    ROOT_WEB='Official website URL: '
 fi
 
+append_path_export() {
+    profile_file="$1"
+    launcher_dir="$2"
+    if [[ ! -f "$profile_file" ]]; then
+        : > "$profile_file"
+    fi
+    if ! grep -Fqs "$launcher_dir" "$profile_file" 2>/dev/null; then
+        {
+            printf '\n# TUI-GAME launcher\n'
+            printf 'export PATH="%s:$PATH"\n' "$launcher_dir"
+        } >> "$profile_file"
+    fi
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LAUNCHER_DIR="$HOME/.local/bin"
+LAUNCHER_PATH="$LAUNCHER_DIR/tg"
+PROFILE_FILES="$HOME/.profile $HOME/.bashrc"
 cd "$SCRIPT_DIR"
 
 echo "$MSG_START"
@@ -84,7 +123,7 @@ echo "$MSG_PARSE"
 DOWNLOAD_URL=$(python3 - <<PY
 import json
 url = ''
-with open(r'''$TEMP_JSON''', 'r', encoding='utf-8') as f:
+with open("$TEMP_JSON", 'r', encoding='utf-8') as f:
     data = json.load(f)
 for asset in data.get('assets', []):
     if asset.get('name') == 'tui-game-linux.tar.gz':
@@ -110,9 +149,21 @@ if ! curl -fsSL -o "$TEMP_TGZ" "$DOWNLOAD_URL"; then
 fi
 
 echo "$MSG_EXTRACT"
-tar -xzf "$TEMP_TGZ" -C "$SCRIPT_DIR" || { echo "$ERR_EXTRACT"; rm -f "$TEMP_JSON" "$TEMP_TGZ"; read -n1 -r; exit 1; }
+if ! tar -xzf "$TEMP_TGZ" -C "$SCRIPT_DIR"; then
+    echo "$ERR_EXTRACT"
+    rm -f "$TEMP_JSON" "$TEMP_TGZ"
+    read -n1 -r
+    exit 1
+fi
 
-chmod +x "$SCRIPT_DIR"/tui-game "$SCRIPT_DIR"/version "$SCRIPT_DIR"/updata "$SCRIPT_DIR"/remove "$SCRIPT_DIR"/*.sh "$SCRIPT_DIR"/scripts/bash/*.sh 2>/dev/null || true
+chmod +x \
+    "$SCRIPT_DIR/tui-game" \
+    "$SCRIPT_DIR/version" \
+    "$SCRIPT_DIR/updata" \
+    "$SCRIPT_DIR/remove" \
+    "$SCRIPT_DIR/tg.sh" \
+    "$SCRIPT_DIR"/*.sh \
+    "$SCRIPT_DIR/scripts/bash"/*.sh 2>/dev/null || true
 
 rm -f "$TEMP_JSON" "$TEMP_TGZ"
 echo "$MSG_CLEAN"
@@ -120,16 +171,42 @@ echo "$MSG_CLEAN"
 echo
 read -r -p "$MSG_ASK_PATH" ADD_PATH
 if [[ "$ADD_PATH" =~ ^[Yy]$ ]]; then
-    mkdir -p "$HOME/.local/bin"
-    ln -sf "$SCRIPT_DIR/tg.sh" "$HOME/.local/bin/tg"
-    echo "$MSG_LINK_OK"
+    echo "$MSG_ADD_PATH"
+    mkdir -p "$LAUNCHER_DIR"
+    ln -sf "$SCRIPT_DIR/tg.sh" "$LAUNCHER_PATH"
+    PATH_OK=1
+    for profile_file in $PROFILE_FILES; do
+        append_path_export "$profile_file" "$LAUNCHER_DIR" || PATH_OK=0
+    done
+    if [[ -L "$LAUNCHER_PATH" && "$PATH_OK" -eq 1 ]]; then
+        echo "$MSG_PATH_OK"
+    else
+        echo "$ERR_PATH"
+        ADD_PATH='N'
+    fi
 else
-    echo "$MSG_LINK_SKIP"
+    echo "$MSG_PATH_SKIP"
 fi
 
 echo
 echo "$MSG_DONE"
+echo
+echo "$ROOT_LINE"
+echo "$ROOT_THANKS"
+echo "$ROOT_ENJOY"
+echo "${ROOT_HTTP}${TO_HTTP}"
+if [[ "$TO_WEB" != 'none' ]]; then
+    echo "${ROOT_WEB}${TO_WEB}"
+fi
+echo "$ROOT_LINE"
+echo
+if [[ ! "$ADD_PATH" =~ ^[Yy]$ ]]; then
+    echo "$ERR_NO_PATH"
+    echo "$ERR_WHY_PATH"
+    echo
+fi
 echo "$MSG_RUN"
+echo "$MSG_MORE"
 echo
 echo "$MSG_EXIT"
 read -n1 -r

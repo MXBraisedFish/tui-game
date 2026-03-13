@@ -5,13 +5,16 @@ cd /d "%~dp0"
 
 echo [1] 中文
 echo [2] English
-set /p CHOICE="Select language / 选择语言 (1/2): "
+set /p CHOICE="选择语言 / Select language (1/2): "
 if "%CHOICE%"=="1" (
     set "LANG_CODE=zh-cn"
 ) else (
     set "LANG_CODE=us-en"
 )
 
+set "ROOT_LINE========================================"
+set "TO_HTTP=https://github.com/MXBraisedFish/TUI-GAME"
+set "TO_WEB=none"
 if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_START=[信息] 开始安装 TUI-GAME..."
     set "MSG_FETCH=[信息] 正在从 GitHub 获取最新版本信息..."
@@ -26,14 +29,21 @@ if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_PATH_SKIP=[信息] 跳过 PATH 注册。"
     set "MSG_DONE=[成功] TUI-GAME 安装完成。"
     set "MSG_RUN=[信息] 你现在可以输入 tg 启动游戏。"
+    set "MSG_MORE=[信息] 或输入 tg -h 可查看指令详情。"
     set "ERR_CURL=[错误] 未找到 curl.exe。"
     set "ERR_PS=[错误] 未找到 PowerShell。"
     set "ERR_FETCH=[错误] 下载版本信息失败。错误码："
     set "ERR_ASSET=[错误] 未找到 Windows 安装包。"
-    set "ERR_DL=[错误] 下载安装包失败。错误码："
+    set "ERR_DL=[错误] 下载安装包失败。请检查错误码。"
     set "ERR_EXTRACT=[错误] 解压安装包失败。"
     set "ERR_PATH=[警告] PATH 写入失败，请手动添加。"
-    set "MSG_EXIT=[信息] 按任意键退出并删除安装脚本。"
+    set "ERR_NO_PATH=[警告] 未创建 PATH 环境变量，请手动添加。"
+    set "ERR_WHY_PATH=[警告] 添加 PATH 环境变量可在后续使用快捷指令。"
+    set "MSG_EXIT=[信息] 按任意键退出。"
+    set "ROOT_THANKS=感谢下载游玩！如果喜欢还请给我的仓库点一颗星星。"
+    set "ROOT_ENJOY=尽情享受在终端的娱乐吧。:P"
+    set "ROOT_HTTP=仓库地址："
+    set "ROOT_WEB=官网地址："
 ) else (
     set "MSG_START=[INFO] Starting TUI-GAME installation..."
     set "MSG_FETCH=[INFO] Fetching latest release information from GitHub..."
@@ -47,15 +57,22 @@ if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_PATH_OK=[SUCCESS] User PATH updated. Reopen the terminal to use tg."
     set "MSG_PATH_SKIP=[INFO] Skipping PATH registration."
     set "MSG_DONE=[SUCCESS] TUI-GAME has been installed."
-    set "MSG_RUN=[INFO] You can now type tg to start the game."
+    set "MSG_RUN=[INFO] You can now run tg to start the game."
+    set "MSG_MORE=[INFO] Or run tg -h to view command details."
     set "ERR_CURL=[ERROR] curl.exe was not found."
     set "ERR_PS=[ERROR] PowerShell was not found."
     set "ERR_FETCH=[ERROR] Failed to download release information. Error code: "
     set "ERR_ASSET=[ERROR] Windows package asset was not found."
-    set "ERR_DL=[ERROR] Failed to download the package. Error code: "
+    set "ERR_DL=[ERROR] Failed to download the package. Please check the error code."
     set "ERR_EXTRACT=[ERROR] Failed to extract the package."
     set "ERR_PATH=[WARNING] Failed to update PATH. Please add it manually."
-    set "MSG_EXIT=[INFO] Press any key to exit and delete this installer."
+    set "ERR_NO_PATH=[WARNING] PATH environment variable not set. Please add it manually."
+    set "ERR_WHY_PATH=[WARNING] Adding the PATH environment variable allows you to use quick commands in the future."
+    set "MSG_EXIT=[INFO] Press any key to exit."
+    set "ROOT_THANKS=Thanks for downloading and playing! If you enjoy it, please give my repository a star."
+    set "ROOT_ENJOY=Enjoy your entertainment in the terminal. :P"
+    set "ROOT_HTTP=Repository URL:"
+    set "ROOT_WEB=Official website URL:"
 )
 
 echo %MSG_START%
@@ -120,6 +137,7 @@ if /I "!ADD_PATH!"=="Y" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $target = (Resolve-Path '.').Path.TrimEnd('\'); $userPath = [Environment]::GetEnvironmentVariable('Path','User'); $parts = @(); if (-not [string]::IsNullOrWhiteSpace($userPath)) { $parts = $userPath -split ';' | Where-Object { $_ } }; $exists = $false; foreach ($p in $parts) { try { $full = [System.IO.Path]::GetFullPath($p).TrimEnd('\') } catch { $full = $p.TrimEnd('\') }; if ($full -ieq $target) { $exists = $true; break } }; if (-not $exists) { $newPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $target } else { (($parts + $target) -join ';') }; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User') }"
     if errorlevel 1 (
         echo %ERR_PATH%
+        set ADD_PATH=N
     ) else (
         echo %MSG_PATH_OK%
     )
@@ -129,7 +147,19 @@ if /I "!ADD_PATH!"=="Y" (
 
 echo.
 echo %MSG_DONE%
+echo.
+echo %ROOT_LINE%
+echo %ROOT_THANKS%
+echo %ROOT_ENJOY%
+echo %ROOT_HTTP%%TO_HTTP%
+echo %ROOT_LINE%
+echo.
+if /I not "!ADD_PATH!"=="Y" (
+    echo %ERR_NO_PATH%
+    echo.
+)
 echo %MSG_RUN%
+echo %MSG_MORE%
 echo.
 echo %MSG_EXIT%
 pause >nul
