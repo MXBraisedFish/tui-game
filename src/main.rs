@@ -127,6 +127,8 @@ fn run() -> Result<()> {
     // 初始页面为主菜单。
     let mut state = AppState::MainMenu { menu: Menu::new() };
     let mut pending_new_game_start: Option<PendingNewGameStart> = None;
+    // 标记是否需要在退出后执行 updata 字节码程序。
+    let mut should_run_update = false;
     // 标记是否需要在退出后执行 remove 字节码程序。
     let mut should_run_uninstall = false;
 
@@ -161,6 +163,7 @@ fn run() -> Result<()> {
                 handle_key_event(
                     &mut state,
                     &mut pending_new_game_start,
+                    &mut should_run_update,
                     &mut should_run_uninstall,
                     key,
                     update_notification.as_ref(),
@@ -229,8 +232,11 @@ fn run() -> Result<()> {
         }
     }
 
-    // 终端恢复后再执行 remove 字节码程序，避免子进程继承异常终端状态。
+    // 终端恢复后再执行 updata/remove 字节码程序，避免子进程继承异常终端状态。
     drop(session);
+    if should_run_update {
+        let _ = run_update_binary();
+    }
     if should_run_uninstall {
         let _ = run_remove_binary();
     }
@@ -256,6 +262,7 @@ fn minimum_size_for_state(state: &AppState) -> (u16, u16) {
 fn handle_key_event(
     state: &mut AppState,
     pending_new_game_start: &mut Option<PendingNewGameStart>,
+    should_run_update: &mut bool,
     should_run_uninstall: &mut bool,
     key: KeyEvent,
     update_notification: Option<&UpdateNotification>,
@@ -265,10 +272,11 @@ fn handle_key_event(
         return Ok(());
     }
 
-    // 全局更新快捷键，拉起 updata 字节码程序处理更新。
+    // 全局更新快捷键，退出主程序后再拉起 updata 字节码程序处理更新。
     if matches!(key.code, KeyCode::Char('u') | KeyCode::Char('U')) {
-        if let Some(notification) = update_notification {
-            if run_update_binary(notification).unwrap_or(false) {
+        if update_notification.is_some() {
+            if has_update_binary().unwrap_or(false) {
+                *should_run_update = true;
                 *state = AppState::Exiting;
                 return Ok(());
             }
@@ -495,6 +503,11 @@ fn run_remove_binary() -> Result<bool> {
 
     let _child = Command::new(remove_bin).spawn()?;
     Ok(true)
+}
+
+/// 判断当前运行目录中是否存在可执行的 updata 字节码程序。
+fn has_update_binary() -> Result<bool> {
+    Ok(path_utils::updata_binary_file()?.exists())
 }
 
 /// 判断当前运行目录中是否存在可执行的 remove 字节码程序。

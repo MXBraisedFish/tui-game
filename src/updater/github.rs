@@ -157,14 +157,13 @@ pub fn write_current_version_cache(current_version: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn run_update_binary(notification: &UpdateNotification) -> Result<bool> {
+pub fn run_update_binary() -> Result<bool> {
     let updata_bin = path_utils::updata_binary_file()?;
     if !updata_bin.exists() {
         return Ok(false);
     }
 
     let mut command = Command::new(updata_bin);
-    let _ = notification;
     let _child = command.spawn()?;
     Ok(true)
 }
