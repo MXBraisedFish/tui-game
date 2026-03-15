@@ -305,9 +305,9 @@ cargo build --release
 
 ### 纸牌接龙
 
-![空当接龙](./README-i18n/image/freecell.png)
-![Klondike](./README-i18n/image/klondike.png)
-![蜘蛛纸牌](./README-i18n/image/spider.png)
+![空当接龙](./image/freecell-zh-cn.png)
+![Klondike](./image/klondike-zh-cn.png)
+![蜘蛛纸牌](./image/spider-zh-cn.png)
 
 ### 数独
 
@@ -359,4 +359,6 @@ GitHub Repo: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 2. 防老板功能 - 一键打开伪装功能界面，有效防止被老板发现摸鱼(而且会支持各个计算机行业：运维、前端、后端等等都会有，可设置)
 
 纸牌接龙 -> K模式 -> 预存牌无颜色
-空中射击 -> 此贴
+空中射击 -> 磁铁会超远吸附
+数独 -> 切换难度没有数字提示
+wordle -> 增加一次机会变为六次

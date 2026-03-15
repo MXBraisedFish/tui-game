@@ -29,7 +29,7 @@ if [[ "$LANG_CODE" == 'zh-cn' ]]; then
     MSG_PATH_SKIP='[信息] 跳过 PATH 注册。'
     MSG_DONE='[成功] TUI-GAME 安装完成。'
     MSG_RUN='[信息] 你现在可以输入 tg 启动游戏。'
-    MSG_MORE='[信息] 或输入 tg -h 查看指令详情。'
+    MSG_MORE='[信息] 或输入 tg -h 查看命令说明。'
     ERR_CURL='[错误] 未找到 curl。'
     ERR_PY='[错误] 未找到 python3。'
     ERR_UNZIP='[错误] 未找到 unzip。'
@@ -39,10 +39,10 @@ if [[ "$LANG_CODE" == 'zh-cn' ]]; then
     ERR_EXTRACT='[错误] 解压安装包失败。'
     ERR_PATH='[警告] PATH 写入失败，请手动添加。'
     ERR_NO_PATH='[警告] 未创建 PATH 环境变量，请手动添加。'
-    ERR_WHY_PATH='[警告] 添加 PATH 环境变量可在后续使用快捷指令。'
+    ERR_WHY_PATH='[警告] 添加 PATH 环境变量后可在后续使用快捷命令。'
     MSG_EXIT='[信息] 按任意键退出。'
-    ROOT_THANKS='感谢下载游玩！如果喜欢还请给我的仓库点一颗星星。'
-    ROOT_ENJOY='尽情享受在终端的娱乐吧。:P'
+    ROOT_THANKS='感谢下载和游玩！如果喜欢，请给我的仓库点一颗星。'
+    ROOT_ENJOY='尽情享受终端里的娱乐吧。 :P'
     ROOT_HTTP='仓库地址：'
     ROOT_WEB='官网地址：'
 else
@@ -78,8 +78,8 @@ else
 fi
 
 append_path_export() {
-    profile_file="$1"
-    launcher_dir="$2"
+    local profile_file="$1"
+    local launcher_dir="$2"
     if [[ ! -f "$profile_file" ]]; then
         : > "$profile_file"
     fi
@@ -94,7 +94,7 @@ append_path_export() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAUNCHER_DIR="$HOME/.local/bin"
 LAUNCHER_PATH="$LAUNCHER_DIR/tg"
-PROFILE_FILES="$HOME/.zprofile $HOME/.zshrc $HOME/.profile"
+PROFILE_FILES=("$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.profile")
 cd "$SCRIPT_DIR"
 
 echo "$MSG_START"
@@ -162,6 +162,7 @@ chmod +x \
     "$SCRIPT_DIR/updata" \
     "$SCRIPT_DIR/remove" \
     "$SCRIPT_DIR/tg.sh" \
+    "$SCRIPT_DIR/delete-tui-game.sh" \
     "$SCRIPT_DIR"/*.sh \
     "$SCRIPT_DIR/scripts/bash"/*.sh 2>/dev/null || true
 
@@ -175,7 +176,7 @@ if [[ "$ADD_PATH" =~ ^[Yy]$ ]]; then
     mkdir -p "$LAUNCHER_DIR"
     ln -sf "$SCRIPT_DIR/tg.sh" "$LAUNCHER_PATH"
     PATH_OK=1
-    for profile_file in $PROFILE_FILES; do
+    for profile_file in "${PROFILE_FILES[@]}"; do
         append_path_export "$profile_file" "$LAUNCHER_DIR" || PATH_OK=0
     done
     if [[ -L "$LAUNCHER_PATH" && "$PATH_OK" -eq 1 ]]; then
