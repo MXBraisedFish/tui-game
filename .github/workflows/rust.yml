@@ -22,6 +22,7 @@ jobs:
             remove_bin: remove
             tg_script: Linux/tg.sh
             tg_output: tg.sh
+            delete_script: delete-tui-game.sh
             bash_keep_ext: sh
           - os: windows-latest
             full_asset_name: tui-game-windows.zip
@@ -32,6 +33,7 @@ jobs:
             remove_bin: remove.exe
             tg_script: Windows/tg.bat
             tg_output: tg.bat
+            delete_script: delete-tui-game.bat
             bash_keep_ext: bat
           - os: macos-latest
             full_asset_name: tui-game-macos.zip
@@ -42,6 +44,7 @@ jobs:
             remove_bin: remove
             tg_script: MacOS/tg.sh
             tg_output: tg.sh
+            delete_script: delete-tui-game.sh
             bash_keep_ext: sh
 
     steps:
@@ -68,6 +71,7 @@ jobs:
           cp "target/release/${{ matrix.remove_bin }}" "dist-full/${{ matrix.remove_bin }}"
 
           cp "${{ matrix.tg_script }}" "dist-full/${{ matrix.tg_output }}"
+          cp "${{ matrix.delete_script }}" "dist-full/${{ matrix.delete_script }}"
 
           if [ -d "assets" ]; then
             cp -R assets dist-full/
@@ -96,6 +100,7 @@ jobs:
               "dist-full/${{ matrix.updata_bin }}" \
               "dist-full/${{ matrix.remove_bin }}" \
               "dist-full/${{ matrix.tg_output }}" \
+              "dist-full/${{ matrix.delete_script }}" \
               "dist-update/${{ matrix.main_bin }}" || true
 
             if [ -d "dist-full/scripts/bash" ]; then

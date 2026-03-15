@@ -309,7 +309,9 @@ cargo build --release
 
 ### Solitaire
 
-![Solitaire](./README-i18n/image/solitaire.png)
+![Solitaire](./README-i18n/image/freecell.png)
+![Solitaire](./README-i18n/image/klondike.png)
+![Solitaire](./README-i18n/image/spider.png)
 
 ### Sudoku
 

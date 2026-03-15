@@ -79,6 +79,13 @@ pub fn remove_binary_file() -> Result<PathBuf> {
 }
 
 pub fn helper_script_file(name: &str) -> Result<PathBuf> {
+    if name.eq_ignore_ascii_case("remove") {
+        let runtime_script = runtime_dir()?.join(root_remove_script_name());
+        if runtime_script.exists() {
+            return Ok(runtime_script);
+        }
+        return Ok(project_root()?.join(root_remove_script_name()));
+    }
     Ok(bash_scripts_dir()?.join(helper_script_name(name)))
 }
 
@@ -108,5 +115,16 @@ fn helper_script_name(stem: &str) -> String {
     #[cfg(not(target_os = "windows"))]
     {
         format!("{stem}.sh")
+    }
+}
+
+fn root_remove_script_name() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        "delete-tui-game.bat".to_string()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        "delete-tui-game.sh".to_string()
     }
 }
