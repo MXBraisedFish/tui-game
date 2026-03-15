@@ -305,7 +305,9 @@ cargo build --release
 
 ### 纸牌接龙
 
-![纸牌接龙](./image/solitaire-zh-cn.png)
+![空当接龙](./README-i18n/image/freecell.png)
+![Klondike](./README-i18n/image/klondike.png)
+![蜘蛛纸牌](./README-i18n/image/spider.png)
 
 ### 数独
 
