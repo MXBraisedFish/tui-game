@@ -84,7 +84,8 @@ set "HELPER=%TEMP%\tui-game-remove-%RANDOM%%RANDOM%.cmd"
 >> "%HELPER%" echo del /f /q "%INSTALL_DIR%\remove" ^>nul 2^>^&1
 >> "%HELPER%" echo del /f /q "%INSTALL_DIR%\delete-tui-game.bat" ^>nul 2^>^&1
 >> "%HELPER%" echo del /f /q "%INSTALL_DIR%\delete-tui-game.sh" ^>nul 2^>^&1
->> "%HELPER%" echo del /f /q "%%~f0" ^>nul 2^>^&1
+>> "%HELPER%" echo start "" /b %%COMSPEC%% /c "ping 127.0.0.1 -n 2 ^>nul ^& del /f /q ""%HELPER%"" ^>nul 2^>^&1"
+>> "%HELPER%" echo exit /b 0
 
-start "" /b "%COMSPEC%" /c call "%HELPER%"
+start "" /b "%COMSPEC%" /c "%HELPER%"
 exit /b 0
