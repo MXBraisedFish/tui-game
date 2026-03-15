@@ -1,5 +1,3 @@
-use std::io::{self, Write};
-
 use anyhow::Result;
 
 use crate::cli::lang::CliLang;
@@ -76,47 +74,14 @@ pub fn run_updata_cli(_version_override: Option<String>, _release_url_override: 
 }
 
 pub fn run_remove_cli() -> Result<i32> {
-    let lang = CliLang::load();
-    if !confirm(&lang.t("remove.confirm_first"))? {
-        println!("{}", lang.t("remove.cancelled"));
-        return Ok(0);
-    }
-
-    println!("{}", lang.t("remove.confirm_mode"));
-    print!("> ");
-    io::stdout().flush()?;
-    let mut mode = String::new();
-    io::stdin().read_line(&mut mode)?;
-    let mode = mode.trim();
-    let (delete_data_flag, mode_text) = match mode {
-        "1" => ("0", lang.t("remove.mode.keep")),
-        "2" => ("1", lang.t("remove.mode.full")),
-        _ => {
-            println!("{}", lang.t("remove.cancelled"));
-            return Ok(0);
-        }
-    };
-
-    if !confirm(&lang.fmt("remove.confirm_second", &[("{mode}", mode_text.as_str())]))? {
-        println!("{}", lang.t("remove.cancelled"));
-        return Ok(0);
-    }
-
     let install_dir = path_utils::runtime_dir()?;
     let install_dir = install_dir.to_string_lossy().to_string();
-    if !spawn_helper_script("remove", &[install_dir.as_str(), delete_data_flag], None)? {
+    let lang = CliLang::load();
+    if !spawn_helper_script("remove", &[install_dir.as_str()], None)? {
         println!("{}", lang.t("remove.helper_missing"));
         return Ok(1);
     }
 
     println!("{}", lang.t("remove.launching"));
     Ok(0)
-}
-
-fn confirm(prompt: &str) -> Result<bool> {
-    print!("{prompt} ");
-    io::stdout().flush()?;
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    Ok(matches!(input.trim(), "y" | "Y"))
 }
