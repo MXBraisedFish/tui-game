@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 setlocal enabledelayedexpansion
 chcp 65001 >nul
 
@@ -12,12 +12,12 @@ if exist "%INSTALL_DIR%\tui-game-data\language_pref.txt" (
 
 set "MSG_CONFIRM1=This will uninstall TUI-GAME. Continue? [y/N]"
 set "MSG_MODE=Choose uninstall mode: [1] Keep saves  [2] Delete all data"
-set "MSG_CONFIRM2=Confirm uninstall in mode ""{mode}""? [y/N]"
+set "MSG_CONFIRM2=Confirm uninstall in mode \"{mode}\"? [y/N]"
 set "MSG_MODE_KEEP=Keep saves"
 set "MSG_MODE_FULL=Delete all data"
 set "MSG_CANCELLED=Uninstall cancelled."
 set "MSG_START=Starting uninstall..."
-set "MSG_DONE=Uninstall task started."
+set "MSG_DONE=Uninstall completed."
 
 if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_CONFIRM1=这将卸载 TUI-GAME，是否继续？ [y/N]"
@@ -27,7 +27,7 @@ if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_MODE_FULL=删除全部数据"
     set "MSG_CANCELLED=已取消卸载。"
     set "MSG_START=正在启动卸载程序……"
-    set "MSG_DONE=卸载任务已启动。"
+    set "MSG_DONE=卸载完成。"
 )
 
 set /p CONFIRM1=%MSG_CONFIRM1% 
@@ -57,22 +57,18 @@ if /I not "%CONFIRM2%"=="y" if /I not "%CONFIRM2%"=="Y" (
 )
 
 echo %MSG_START%
+ping 127.0.0.1 -n 2 >nul
 
-set "HELPER=%TEMP%\tui-game-remove-%RANDOM%%RANDOM%.cmd"
-> "%HELPER%" echo @echo off
->> "%HELPER%" echo setlocal
->> "%HELPER%" echo ping 127.0.0.1 -n 4 ^>nul
->> "%HELPER%" echo del /f /q "%INSTALL_DIR%\tg.bat" ^>nul 2^>^&1
->> "%HELPER%" echo rmdir /s /q "%INSTALL_DIR%\assets" ^>nul 2^>^&1
->> "%HELPER%" echo rmdir /s /q "%INSTALL_DIR%\scripts" ^>nul 2^>^&1
-if "%DELETE_DATA%"=="1" >> "%HELPER%" echo rmdir /s /q "%INSTALL_DIR%\tui-game-data" ^>nul 2^>^&1
->> "%HELPER%" echo del /f /q "%INSTALL_DIR%\tui-game.exe" ^>nul 2^>^&1
->> "%HELPER%" echo del /f /q "%INSTALL_DIR%\version.exe" ^>nul 2^>^&1
->> "%HELPER%" echo del /f /q "%INSTALL_DIR%\updata.exe" ^>nul 2^>^&1
->> "%HELPER%" echo del /f /q "%INSTALL_DIR%\remove.exe" ^>nul 2^>^&1
->> "%HELPER%" echo start "" /b cmd /c "ping 127.0.0.1 -n 3 ^>nul ^& del /f /q ""%HELPER%"" ^>nul 2^>^&1"
->> "%HELPER%" echo exit /b 0
+del /f /q "%INSTALL_DIR%\tg.bat" >nul 2>&1
+rmdir /s /q "%INSTALL_DIR%\assets" >nul 2>&1
+rmdir /s /q "%INSTALL_DIR%\scripts" >nul 2>&1
+if "%DELETE_DATA%"=="1" rmdir /s /q "%INSTALL_DIR%\tui-game-data" >nul 2>&1
 
-start "" /b cmd /c ""%HELPER%""
+del /f /q "%INSTALL_DIR%\tui-game.exe" >nul 2>&1
+del /f /q "%INSTALL_DIR%\version.exe" >nul 2>&1
+del /f /q "%INSTALL_DIR%\updata.exe" >nul 2>&1
+
+start "" /b cmd /c "ping 127.0.0.1 -n 3 >nul & del /f /q \"%INSTALL_DIR%\remove.exe\" >nul 2>&1"
+
 echo %MSG_DONE%
 exit /b 0

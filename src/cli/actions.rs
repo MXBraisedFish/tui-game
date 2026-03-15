@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::process::Command;
 
 use crate::cli::lang::CliLang;
 use crate::updater::github::{
@@ -77,11 +78,38 @@ pub fn run_remove_cli() -> Result<i32> {
     let install_dir = path_utils::runtime_dir()?;
     let install_dir = install_dir.to_string_lossy().to_string();
     let lang = CliLang::load();
-    if !spawn_helper_script("remove", &[install_dir.as_str()], None)? {
+    if !run_helper_script_blocking("remove", &[install_dir.as_str()])? {
         println!("{}", lang.t("remove.helper_missing"));
         return Ok(1);
     }
-
-    println!("{}", lang.t("remove.launching"));
     Ok(0)
+}
+
+fn run_helper_script_blocking(helper_name: &str, args: &[&str]) -> Result<bool> {
+    let script = path_utils::helper_script_file(helper_name)?;
+    if !script.exists() {
+        return Ok(false);
+    }
+
+    #[cfg(target_os = "windows")]
+    let status = {
+        let mut command = Command::new("cmd");
+        command.arg("/C").arg(script.as_os_str());
+        for arg in args {
+            command.arg(arg);
+        }
+        command.status()?
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let status = {
+        let mut command = Command::new("sh");
+        command.arg(script.as_os_str());
+        for arg in args {
+            command.arg(arg);
+        }
+        command.status()?
+    };
+
+    Ok(status.success())
 }
