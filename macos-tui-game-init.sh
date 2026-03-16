@@ -3,8 +3,8 @@ set +x
 set +v
 set -eu
 
-printf '%s\n' '[1] 中文' '[2] English'
-read -r -p '选择语言 / Select language (1/2): ' CHOICE
+printf '%s\n' '[1] ??' '[2] English'
+read -r -p '???? / Select language (1/2): ' CHOICE
 if [[ "$CHOICE" == "1" ]]; then
     LANG_CODE='zh-cn'
 else
@@ -16,35 +16,35 @@ TO_HTTP='https://github.com/MXBraisedFish/TUI-GAME'
 TO_WEB='none'
 
 if [[ "$LANG_CODE" == 'zh-cn' ]]; then
-    MSG_START='[信息] 开始安装 TUI-GAME...'
-    MSG_FETCH='[信息] 正在从 GitHub 获取最新版本信息...'
-    MSG_PARSE='[信息] 正在解析 macOS 安装包下载链接...'
-    MSG_DL='[信息] 正在下载安装包...'
-    MSG_EXTRACT='[信息] 正在解压文件到当前目录...'
-    MSG_LANG_INIT='[信息] 正在初始化语言设置...'
-    MSG_CLEAN='[信息] 已清理临时文件。'
-    MSG_ASK_PATH='是否创建 tg 快捷启动命令并加入 PATH 环境变量？(Y/N): '
-    MSG_ADD_PATH='[信息] 正在写入 shell 配置...'
-    MSG_PATH_OK='[成功] 已创建 tg 快捷启动命令，重新打开终端后可直接使用 tg。'
-    MSG_PATH_SKIP='[信息] 跳过 PATH 注册。'
-    MSG_DONE='[成功] TUI-GAME 安装完成。'
-    MSG_RUN='[信息] 你现在可以输入 tg 启动游戏。'
-    MSG_MORE='[信息] 或输入 tg -h 查看命令说明。'
-    ERR_CURL='[错误] 未找到 curl。'
-    ERR_PY='[错误] 未找到 python3。'
-    ERR_UNZIP='[错误] 未找到 unzip。'
-    ERR_FETCH='[错误] 下载版本信息失败，错误码：'
-    ERR_ASSET='[错误] 未找到 macOS 安装包。'
-    ERR_DL='[错误] 下载安装包失败，错误码：'
-    ERR_EXTRACT='[错误] 解压安装包失败。'
-    ERR_PATH='[警告] PATH 写入失败，请手动添加。'
-    ERR_NO_PATH='[警告] 未创建 PATH 环境变量，请手动添加。'
-    ERR_WHY_PATH='[警告] 添加 PATH 环境变量后可在后续使用快捷命令。'
-    MSG_EXIT='[信息] 按任意键退出。'
-    ROOT_THANKS='感谢下载和游玩！如果喜欢，请给我的仓库点一颗星。'
-    ROOT_ENJOY='尽情享受终端里的娱乐吧。 :P'
-    ROOT_HTTP='仓库地址：'
-    ROOT_WEB='官网地址：'
+    MSG_START='[??] ???? TUI-GAME...'
+    MSG_FETCH='[??] ??? GitHub ????????...'
+    MSG_PARSE='[??] ???? macOS ???????...'
+    MSG_DL='[??] ???????...'
+    MSG_EXTRACT='[??] ???????????...'
+    MSG_LANG_INIT='[??] ?????????...'
+    MSG_CLEAN='[??] ????????'
+    MSG_ASK_PATH='???? tg ????????? PATH ?????(Y/N): '
+    MSG_ADD_PATH='[??] ???? shell ??...'
+    MSG_PATH_OK='[??] ??? tg ??????????????????? tg?'
+    MSG_PATH_SKIP='[??] ?? PATH ???'
+    MSG_DONE='[??] TUI-GAME ?????'
+    MSG_RUN='[??] ??????? tg ?????'
+    MSG_MORE='[??] ??? tg -h ???????'
+    ERR_CURL='[??] ??? curl?'
+    ERR_PY='[??] ??? python3?'
+    ERR_UNZIP='[??] ??? unzip?'
+    ERR_FETCH='[??] ?????????????'
+    ERR_ASSET='[??] ??? macOS ????'
+    ERR_DL='[??] ????????????'
+    ERR_EXTRACT='[??] ????????'
+    ERR_PATH='[??] PATH ???????????'
+    ERR_NO_PATH='[??] ??? PATH ???????????'
+    ERR_WHY_PATH='[??] ?? PATH ????????????????'
+    MSG_EXIT='[??] ???????'
+    ROOT_THANKS='????????????????????????'
+    ROOT_ENJOY='????????????:P'
+    ROOT_HTTP='?????'
+    ROOT_WEB='?????'
 else
     MSG_START='[INFO] Starting TUI-GAME installation...'
     MSG_FETCH='[INFO] Fetching latest release information from GitHub...'
@@ -108,7 +108,7 @@ printf '%s\n' "$LANG_CODE" > "$SCRIPT_DIR/tui-game-data/language_pref.txt"
 
 API_URL='https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest'
 TEMP_JSON="$(mktemp)"
-TEMP_ZIP="$(mktemp).zip"
+TEMP_TGZ="$(mktemp).zip"
 
 echo "$MSG_FETCH"
 if ! curl -fsSL -o "$TEMP_JSON" "$API_URL"; then
@@ -123,7 +123,7 @@ echo "$MSG_PARSE"
 DOWNLOAD_URL=$(python3 - <<PY
 import json
 url = ''
-with open("$TEMP_JSON", 'r', encoding='utf-8') as f:
+with open(r"$TEMP_JSON", 'r', encoding='utf-8') as f:
     data = json.load(f)
 for asset in data.get('assets', []):
     if asset.get('name') == 'tui-game-macos.zip':
@@ -140,18 +140,18 @@ if [[ -z "$DOWNLOAD_URL" ]]; then
 fi
 
 echo "$MSG_DL"
-if ! curl -fsSL -o "$TEMP_ZIP" "$DOWNLOAD_URL"; then
+if ! curl -fsSL -o "$TEMP_TGZ" "$DOWNLOAD_URL"; then
     CURL_CODE=$?
     echo "${ERR_DL}${CURL_CODE}"
-    rm -f "$TEMP_JSON" "$TEMP_ZIP"
+    rm -f "$TEMP_JSON" "$TEMP_TGZ"
     read -n1 -r
     exit 1
 fi
 
 echo "$MSG_EXTRACT"
-if ! unzip -oq "$TEMP_ZIP" -d "$SCRIPT_DIR"; then
+if ! unzip -oq "$TEMP_TGZ" -d "$SCRIPT_DIR"; then
     echo "$ERR_EXTRACT"
-    rm -f "$TEMP_JSON" "$TEMP_ZIP"
+    rm -f "$TEMP_JSON" "$TEMP_TGZ"
     read -n1 -r
     exit 1
 fi
@@ -166,7 +166,7 @@ chmod +x \
     "$SCRIPT_DIR"/*.sh \
     "$SCRIPT_DIR/scripts/bash"/*.sh 2>/dev/null || true
 
-rm -f "$TEMP_JSON" "$TEMP_ZIP"
+rm -f "$TEMP_JSON" "$TEMP_TGZ"
 echo "$MSG_CLEAN"
 
 echo
