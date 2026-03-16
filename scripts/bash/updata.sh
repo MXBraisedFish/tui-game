@@ -31,6 +31,19 @@ case "$ASSET_NAME" in
   *) exit 1 ;;
 esac
 
+PAYLOAD_ROOT="$EXTRACT_DIR"
+if [ ! -f "$PAYLOAD_ROOT/tui-game" ]; then
+  set +e
+  child_count=$(find "$EXTRACT_DIR" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')
+  set -e
+  if [ "$child_count" = "1" ]; then
+    only_child=$(find "$EXTRACT_DIR" -mindepth 1 -maxdepth 1 | head -n 1)
+    if [ -d "$only_child" ]; then
+      PAYLOAD_ROOT="$only_child"
+    fi
+  fi
+fi
+
 replace_dir() {
   src_dir="$1"
   dst_dir="$2"
@@ -41,14 +54,14 @@ replace_dir() {
   fi
 }
 
-if [ -f "$EXTRACT_DIR/tui-game" ]; then
-  cp "$EXTRACT_DIR/tui-game" "$INSTALL_DIR/tui-game"
+if [ -f "$PAYLOAD_ROOT/tui-game" ]; then
+  cp "$PAYLOAD_ROOT/tui-game" "$INSTALL_DIR/tui-game"
 fi
 
-replace_dir "$EXTRACT_DIR/assets/lang" "$INSTALL_DIR/assets/lang"
-replace_dir "$EXTRACT_DIR/assets/wordle" "$INSTALL_DIR/assets/wordle"
-replace_dir "$EXTRACT_DIR/scripts/game" "$INSTALL_DIR/scripts/game"
-replace_dir "$EXTRACT_DIR/scripts/text_function" "$INSTALL_DIR/scripts/text_function"
+replace_dir "$PAYLOAD_ROOT/assets/lang" "$INSTALL_DIR/assets/lang"
+replace_dir "$PAYLOAD_ROOT/assets/wordle" "$INSTALL_DIR/assets/wordle"
+replace_dir "$PAYLOAD_ROOT/scripts/game" "$INSTALL_DIR/scripts/game"
+replace_dir "$PAYLOAD_ROOT/scripts/text_function" "$INSTALL_DIR/scripts/text_function"
 
 mkdir -p "$INSTALL_DIR/tui-game-data"
 printf '"%s"\n' "$LATEST_VERSION" > "$INSTALL_DIR/tui-game-data/updater_cache.json"

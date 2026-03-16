@@ -4,7 +4,7 @@ use std::process::Command;
 use crate::cli::lang::CliLang;
 use crate::updater::github::{
     CURRENT_VERSION_TAG, latest_release_download, latest_release_notification, normalize_tag,
-    platform_update_asset_name, spawn_helper_script,
+    platform_update_asset_name,
 };
 use crate::utils::path_utils;
 
@@ -57,12 +57,21 @@ pub fn run_updata_cli(_version_override: Option<String>, _release_url_override: 
                 "{}",
                 lang.fmt("updata.update_found", &[("{version}", download.latest_version.as_str())])
             );
-            if !spawn_helper_script("updata", &helper_args, None)? {
-                println!("{}", lang.t("updata.helper_missing"));
-                return Ok(1);
-            }
             println!("{}", lang.t("updata.launching"));
-            Ok(0)
+            match run_helper_script_blocking("updata", &helper_args)? {
+                None => {
+                    println!("{}", lang.t("updata.helper_missing"));
+                    Ok(1)
+                }
+                Some(true) => {
+                    println!("{}", lang.t("updata.completed"));
+                    Ok(0)
+                }
+                Some(false) => {
+                    println!("{}", lang.t("updata.failed"));
+                    Ok(1)
+                }
+            }
         }
         None => {
             println!(
@@ -78,17 +87,23 @@ pub fn run_remove_cli() -> Result<i32> {
     let install_dir = path_utils::runtime_dir()?;
     let install_dir = install_dir.to_string_lossy().to_string();
     let lang = CliLang::load();
-    if !run_helper_script_blocking("remove", &[install_dir.as_str()])? {
-        println!("{}", lang.t("remove.helper_missing"));
-        return Ok(1);
+    match run_helper_script_blocking("remove", &[install_dir.as_str()])? {
+        None => {
+            println!("{}", lang.t("remove.helper_missing"));
+            Ok(1)
+        }
+        Some(true) => Ok(0),
+        Some(false) => {
+            println!("{}", lang.t("remove.failed"));
+            Ok(1)
+        }
     }
-    Ok(0)
 }
 
-fn run_helper_script_blocking(helper_name: &str, args: &[&str]) -> Result<bool> {
+fn run_helper_script_blocking(helper_name: &str, args: &[&str]) -> Result<Option<bool>> {
     let script = path_utils::helper_script_file(helper_name)?;
     if !script.exists() {
-        return Ok(false);
+        return Ok(None);
     }
 
     #[cfg(target_os = "windows")]
@@ -111,5 +126,5 @@ fn run_helper_script_blocking(helper_name: &str, args: &[&str]) -> Result<bool> 
         command.status()?
     };
 
-    Ok(status.success())
+    Ok(Some(status.success()))
 }

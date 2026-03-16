@@ -6,7 +6,7 @@ GAME_META = {
 
 -- 游戏常量
 local FPS, FRAME_MS = 60, 16
-local MAX_ATTEMPTS = 5 -- 最大尝试次数
+local MAX_ATTEMPTS = 6 -- 最大尝试次数
 
 -- 游戏状态表
 local S = {

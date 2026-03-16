@@ -1331,15 +1331,39 @@ local function draw_top_bar(term_w)
         draw_text(centered_x(line2, 1, term_w), 4, line2, "white", "black")
     elseif state.mode == MODE_KLONDIKE then
         local w1, w2, w3 = "  ", "  ", "  "
-        if #state.waste >= 1 then w1 = card_two_chars(state.waste[#state.waste]) end
-        if #state.waste >= 2 then w2 = card_two_chars(state.waste[#state.waste - 1]) end
-        if #state.waste >= 3 then w3 = card_two_chars(state.waste[#state.waste - 2]) end
+        local c1, c2, c3 = nil, nil, nil
+        if #state.waste >= 1 then
+            c1 = state.waste[#state.waste]
+            w1 = card_two_chars(c1)
+        end
+        if #state.waste >= 2 then
+            c2 = state.waste[#state.waste - 1]
+            w2 = card_two_chars(c2)
+        end
+        if #state.waste >= 3 then
+            c3 = state.waste[#state.waste - 2]
+            w3 = card_two_chars(c3)
+        end
         local f = foundation_label(1) ..
         " " .. foundation_label(2) .. " " .. foundation_label(3) .. " " .. foundation_label(4)
-        local line2 = tr("game.solitaire.stock") ..
-            " [##]   " .. tr("game.solitaire.waste") .. " [" .. w3 .. " " .. w2 .. " " .. w1 .. "]"
-            .. "   " .. tr("game.solitaire.foundations") .. " " .. f
-        draw_text(centered_x(line2, 1, term_w), 4, line2, "white", "black")
+        local prefix = tr("game.solitaire.stock") ..
+            " [##]   " .. tr("game.solitaire.waste") .. " ["
+        local suffix = "]   " .. tr("game.solitaire.foundations") .. " " .. f
+        local line2 = prefix .. w3 .. " " .. w2 .. " " .. w1 .. suffix
+        local x = centered_x(line2, 1, term_w)
+        draw_text(x, 4, prefix, "white", "black")
+        x = x + text_width(prefix)
+        draw_text(x, 4, w3, c3 and card_color(c3) or "white", "black")
+        x = x + text_width(w3)
+        draw_text(x, 4, " ", "white", "black")
+        x = x + 1
+        draw_text(x, 4, w2, c2 and card_color(c2) or "white", "black")
+        x = x + text_width(w2)
+        draw_text(x, 4, " ", "white", "black")
+        x = x + 1
+        draw_text(x, 4, w1, c1 and card_color(c1) or "white", "black")
+        x = x + text_width(w1)
+        draw_text(x, 4, suffix, "white", "black")
     else
         local line2 = tr("game.solitaire.spider_stock") .. " " .. tostring(math.floor(#state.stock / 10))
             .. "   " .. tr("game.solitaire.spider_removed") .. " " .. tostring(state.spider_removed) .. "/8"

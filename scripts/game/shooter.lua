@@ -1086,7 +1086,7 @@ local function create_player_bullet(c, mode)
         b.tracking = true
         b.move_interval = speed_to_interval(1 * speed_mul)
         b.is_missile = true
-        b.missile_hp = 2
+        b.missile_hp = 4
     end
     return b
 end
@@ -1278,7 +1278,7 @@ local function spawn_enemy_bullet(c, ch, base_dmg, tracking, row)
         tracking = tracking == true,
         target_c = state.player_c,
         is_missile = is_missile,
-        missile_hp = is_missile and 4 or 0,
+        missile_hp = is_missile and 8 or 0,
         move_interval = speed_to_interval(1),
         next_move_at = state.frame,
     }
@@ -1609,11 +1609,11 @@ local function resolve_bullet_vs_bullet_collisions()
             local eb = state.enemy_bullets[ei]
             if pb.r == eb.r and pb.c == eb.c then
                 if pb.is_missile then
-                    pb.missile_hp = (pb.missile_hp or 2) - 1
+                    pb.missile_hp = (pb.missile_hp or 4) - 1
                     changed = true
                 end
                 if eb.is_missile then
-                    eb.missile_hp = (eb.missile_hp or 4) - 1
+                    eb.missile_hp = (eb.missile_hp or 8) - 1
                     changed = true
                 end
             end
@@ -1647,27 +1647,32 @@ local function update_items()
     local i = 1
     while i <= #state.items do
         local it = state.items[i]
-
-        -- 磁铁吸引
-        if has_magnet() and math.abs(it.c - state.player_c) <= 3 then
-            if it.c < state.player_c then
-                it.c = it.c + 1
-            elseif it.c > state.player_c then
-                it.c = it.c - 1
-            end
-        end
+        local magnet_tracking = has_magnet()
+            and math.abs(it.c - state.player_c) <= 4
+            and math.abs(it.r - PLAYER_ROW) <= 4
 
         -- 移动
         if state.frame >= it.next_move_at then
             it.next_move_at = state.frame + sec_to_frames(1)
-            it.r = it.r + 1
+            if magnet_tracking then
+                if it.c < state.player_c then
+                    it.c = it.c + 1
+                elseif it.c > state.player_c then
+                    it.c = it.c - 1
+                end
+                if it.r < PLAYER_ROW then
+                    it.r = it.r + 1
+                elseif it.r > PLAYER_ROW then
+                    it.r = it.r - 1
+                end
+            else
+                it.r = it.r + 1
+            end
             state.dirty = true
         end
 
         local picked = false
         if it.r == PLAYER_ROW and it.c == state.player_c then
-            picked = true
-        elseif has_magnet() and math.abs(it.c - state.player_c) <= 1 and it.r >= PLAYER_ROW - 1 then
             picked = true
         end
 
