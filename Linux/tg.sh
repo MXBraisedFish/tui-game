@@ -31,7 +31,7 @@ msg() {
 MAIN_BIN="$SCRIPT_DIR/tui-game"
 VERSION_BIN="$SCRIPT_DIR/version"
 UPDATA_BIN="$SCRIPT_DIR/updata"
-REMOVE_BIN="$SCRIPT_DIR/remove"
+UNINSTALL_SCRIPT="$SCRIPT_DIR/tg-delete.sh"
 
 if [ $# -eq 0 ]; then
     [ -x "$MAIN_BIN" ] || { msg "script.error.main_missing" "Main game binary not found."; exit 1; }
@@ -51,8 +51,8 @@ case "$1" in
         exit $?
         ;;
     -r|-R|-remove)
-        [ -x "$REMOVE_BIN" ] || { msg "script.error.remove_missing" "Remove helper binary not found."; exit 1; }
-        "$REMOVE_BIN"
+        [ -f "$UNINSTALL_SCRIPT" ] || { msg "script.error.remove_missing" "Uninstall script not found."; exit 1; }
+        sh "$UNINSTALL_SCRIPT"
         exit $?
         ;;
     -h|-H|-help)

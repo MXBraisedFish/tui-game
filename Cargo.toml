@@ -19,10 +19,6 @@ path = "src/bin/version.rs"
 name = "updata"
 path = "src/bin/updata.rs"
 
-[[bin]]
-name = "remove"
-path = "src/bin/remove.rs"
-
 [dependencies]
 crossterm = "0.29.0"
 ratatui = "0.30.0"

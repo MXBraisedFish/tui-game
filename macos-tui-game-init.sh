@@ -82,10 +82,11 @@ append_path_export() {
     if [[ ! -f "$profile_file" ]]; then
         : > "$profile_file"
     fi
-    if ! grep -Fqs "$launcher_dir" "$profile_file" 2>/dev/null; then
+    if ! grep -Fqs '# >>> TUI-GAME launcher >>>' "$profile_file" 2>/dev/null; then
         {
-            printf '\n# TUI-GAME launcher\n'
+            printf '\n# >>> TUI-GAME launcher >>>\n'
             printf 'export PATH="%s:$PATH"\n' "$launcher_dir"
+            printf '# <<< TUI-GAME launcher <<<\n'
         } >> "$profile_file"
     fi
 }
@@ -159,9 +160,8 @@ chmod +x \
     "$SCRIPT_DIR/tui-game" \
     "$SCRIPT_DIR/version" \
     "$SCRIPT_DIR/updata" \
-    "$SCRIPT_DIR/remove" \
     "$SCRIPT_DIR/tg.sh" \
-    "$SCRIPT_DIR/delete-tui-game.sh" \
+    "$SCRIPT_DIR/tg-delete.sh" \
     "$SCRIPT_DIR"/*.sh \
     "$SCRIPT_DIR/scripts/bash"/*.sh 2>/dev/null || true
 

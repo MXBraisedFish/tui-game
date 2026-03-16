@@ -21,7 +21,6 @@ set "MSG_PATH_FAIL=PATH registration cleanup failed. Please remove it manually."
 set "MSG_MODE_KEEP=Keep saves"
 set "MSG_MODE_FULL=Delete all data"
 set "MSG_CANCELLED=Uninstall cancelled."
-set "MSG_START=Starting uninstall..."
 set "MSG_DONE=Uninstall finished."
 set "MSG_PRESS_KEY=Press any key to finish and remove the uninstaller."
 
@@ -37,7 +36,6 @@ if /I "%LANG_CODE%"=="zh-cn" (
     set "MSG_MODE_KEEP=保留存档"
     set "MSG_MODE_FULL=删除全部数据"
     set "MSG_CANCELLED=已取消卸载。"
-    set "MSG_START=正在启动卸载程序……"
     set "MSG_DONE=卸载完成。"
     set "MSG_PRESS_KEY=按任意键完成卸载并移除卸载程序。"
 )
@@ -78,17 +76,14 @@ if /I "%CLEAN_PATH_ANSWER%"=="Y" (
     set "CLEAN_PATH=0"
 )
 
-echo %MSG_START%
-ping 127.0.0.1 -n 2 >nul
-
 if "%CLEAN_PATH%"=="1" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
         "$ErrorActionPreference='Stop';" ^
-        "$target = [System.IO.Path]::GetFullPath('%INSTALL_DIR%').TrimEnd('\');" ^
+        "$target = [System.IO.Path]::GetFullPath('%INSTALL_DIR%').TrimEnd('\\');" ^
         "$userPath = [Environment]::GetEnvironmentVariable('Path','User');" ^
         "if ([string]::IsNullOrWhiteSpace($userPath)) { exit 0 };" ^
         "$parts = $userPath -split ';' | Where-Object { $_ };" ^
-        "$filtered = foreach ($p in $parts) { try { $full = [System.IO.Path]::GetFullPath($p).TrimEnd('\') } catch { $full = $p.TrimEnd('\') }; if ($full -ine $target) { $p } };" ^
+        "$filtered = foreach ($p in $parts) { try { $full = [System.IO.Path]::GetFullPath($p).TrimEnd('\\') } catch { $full = $p.TrimEnd('\\') }; if ($full -ine $target) { $p } };" ^
         "[Environment]::SetEnvironmentVariable('Path', ($filtered -join ';'), 'User')" >nul 2>&1
     if errorlevel 1 (
         echo %MSG_PATH_FAIL%
@@ -107,6 +102,8 @@ del /f /q "%INSTALL_DIR%\version.exe" >nul 2>&1
 del /f /q "%INSTALL_DIR%\version" >nul 2>&1
 del /f /q "%INSTALL_DIR%\updata.exe" >nul 2>&1
 del /f /q "%INSTALL_DIR%\updata" >nul 2>&1
+del /f /q "%INSTALL_DIR%\remove.exe" >nul 2>&1
+del /f /q "%INSTALL_DIR%\remove" >nul 2>&1
 rmdir /s /q "%INSTALL_DIR%\assets" >nul 2>&1
 rmdir /s /q "%INSTALL_DIR%\scripts" >nul 2>&1
 if "%DELETE_DATA%"=="1" rmdir /s /q "%INSTALL_DIR%\tui-game-data" >nul 2>&1
@@ -117,6 +114,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$null = $Host.UI.Raw
 
 start "" /b powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ^
     "Start-Sleep -Seconds 1;" ^
-    "$targets = @('%INSTALL_DIR%\remove.exe','%INSTALL_DIR%\remove','%INSTALL_DIR%\delete-tui-game.bat','%INSTALL_DIR%\delete-tui-game.sh');" ^
+    "$targets = @('%INSTALL_DIR%\tg-delete.bat','%INSTALL_DIR%\tg-delete.sh','%INSTALL_DIR%\delete-tui-game.bat','%INSTALL_DIR%\delete-tui-game.sh');" ^
     "foreach ($target in $targets) { try { Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue } catch {} }"
 exit /b 0

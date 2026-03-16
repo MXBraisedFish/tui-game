@@ -16,7 +16,7 @@ if exist "!SCRIPT_DIR!\assets\bash_lang\!LANG_CODE!.json" (
 set "MAIN_BIN=!SCRIPT_DIR!\tui-game.exe"
 set "VERSION_BIN=!SCRIPT_DIR!\version.exe"
 set "UPDATA_BIN=!SCRIPT_DIR!\updata.exe"
-set "REMOVE_BIN=!SCRIPT_DIR!\remove.exe"
+set "UNINSTALL_SCRIPT=!SCRIPT_DIR!\tg-delete.bat"
 
 if "%~1"=="" (
     if not exist "!MAIN_BIN!" (
@@ -60,11 +60,11 @@ if not exist "!UPDATA_BIN!" (
 exit /b %errorlevel%
 
 :run_remove
-if not exist "!REMOVE_BIN!" (
-    call :msg script.error.remove_missing "Remove helper binary not found."
+if not exist "!UNINSTALL_SCRIPT!" (
+    call :msg script.error.remove_missing "Uninstall script not found."
     exit /b 1
 )
-"!REMOVE_BIN!"
+call "!UNINSTALL_SCRIPT!"
 exit /b %errorlevel%
 
 :show_help

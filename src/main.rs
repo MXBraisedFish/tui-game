@@ -129,7 +129,7 @@ fn run() -> Result<()> {
     let mut pending_new_game_start: Option<PendingNewGameStart> = None;
     // 标记是否需要在退出后执行 updata 字节码程序。
     let mut should_run_update = false;
-    // 标记是否需要在退出后执行 remove 字节码程序。
+    // 标记是否需要在退出后执行 tg-delete 卸载脚本。
     let mut should_run_uninstall = false;
 
     let frame_budget = Duration::from_millis(16);
@@ -239,13 +239,14 @@ fn run() -> Result<()> {
         }
     }
 
-    // 终端恢复后再执行 updata/remove 字节码程序，避免子进程继承异常终端状态。
+    // 终端恢复后再执行 updata 字节码程序或 tg-delete 卸载脚本，
+    // 避免子进程继承异常终端状态。
     drop(session);
     if should_run_update {
         let _ = run_update_binary();
     }
     if should_run_uninstall {
-        let _ = run_remove_binary();
+        let _ = run_uninstall_script();
     }
 
     Ok(())
@@ -393,7 +394,7 @@ fn handle_key_event(
                     *state = AppState::MainMenu { menu: Menu::new() };
                 }
                 settings::SettingsAction::RunUninstall => {
-                    if has_remove_binary().unwrap_or(false) {
+                    if has_uninstall_script().unwrap_or(false) {
                         *should_run_uninstall = true;
                         *state = AppState::Exiting;
                     }
@@ -501,25 +502,27 @@ fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppS
     }
 }
 
-/// 执行当前目录下的 remove 字节码程序。
-fn run_remove_binary() -> Result<bool> {
-    let remove_bin = path_utils::remove_binary_file()?;
-    if !remove_bin.exists() {
+/// 执行当前目录下的 tg-delete 卸载脚本。
+fn run_uninstall_script() -> Result<bool> {
+    let uninstall_script = path_utils::uninstall_script_file()?;
+    if !uninstall_script.exists() {
         return Ok(false);
     }
 
     #[cfg(target_os = "windows")]
     {
         let status = Command::new("cmd")
-            .args(["/C", "start", "", "cmd", "/K"])
-            .arg(format!("\"{}\"", remove_bin.display()))
+            .arg("/C")
+            .arg(uninstall_script.as_os_str())
             .status()?;
-        return Ok(status.success());
+        Ok(status.success())
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        let status = Command::new(remove_bin).status()?;
+        let status = Command::new("sh")
+            .arg(uninstall_script.as_os_str())
+            .status()?;
         Ok(status.success())
     }
 }
@@ -529,9 +532,9 @@ fn has_update_binary() -> Result<bool> {
     Ok(path_utils::updata_binary_file()?.exists())
 }
 
-/// 判断当前运行目录中是否存在可执行的 remove 字节码程序。
-fn has_remove_binary() -> Result<bool> {
-    Ok(path_utils::remove_binary_file()?.exists())
+/// 判断当前运行目录中是否存在可执行的 tg-delete 卸载脚本。
+fn has_uninstall_script() -> Result<bool> {
+    Ok(path_utils::uninstall_script_file()?.exists())
 }
 
 /// 根据共享存档槽同步主菜单中“继续游戏”的状态。

@@ -83,23 +83,6 @@ pub fn run_updata_cli(_version_override: Option<String>, _release_url_override: 
     }
 }
 
-pub fn run_remove_cli() -> Result<i32> {
-    let install_dir = path_utils::runtime_dir()?;
-    let install_dir = install_dir.to_string_lossy().to_string();
-    let lang = CliLang::load();
-    match run_helper_script_blocking("remove", &[install_dir.as_str()])? {
-        None => {
-            println!("{}", lang.t("remove.helper_missing"));
-            Ok(1)
-        }
-        Some(true) => Ok(0),
-        Some(false) => {
-            println!("{}", lang.t("remove.failed"));
-            Ok(1)
-        }
-    }
-}
-
 fn run_helper_script_blocking(helper_name: &str, args: &[&str]) -> Result<Option<bool>> {
     let script = path_utils::helper_script_file(helper_name)?;
     if !script.exists() {

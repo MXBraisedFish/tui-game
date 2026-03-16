@@ -3,7 +3,7 @@ set +x
 set +v
 set -eu
 
-INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 LANG_CODE='us-en'
 if [[ -f "$INSTALL_DIR/tui-game-data/language_pref.txt" ]]; then
@@ -22,7 +22,6 @@ if [[ "$LANG_CODE" == 'zh-cn' ]]; then
     MSG_MODE_KEEP='保留存档'
     MSG_MODE_FULL='删除全部数据'
     MSG_CANCELLED='已取消卸载。'
-    MSG_START='正在启动卸载程序……'
     MSG_DONE='卸载完成。'
     MSG_PRESS_KEY='按任意键完成卸载并移除卸载程序。'
 else
@@ -37,7 +36,6 @@ else
     MSG_MODE_KEEP='Keep saves'
     MSG_MODE_FULL='Delete all data'
     MSG_CANCELLED='Uninstall cancelled.'
-    MSG_START='Starting uninstall...'
     MSG_DONE='Uninstall finished.'
     MSG_PRESS_KEY='Press any key to finish and remove the uninstaller.'
 fi
@@ -81,9 +79,6 @@ case "$clean_path_answer" in
     *) CLEAN_PATH=0 ;;
 esac
 
-printf '%s\n' "$MSG_START"
-sleep 1
-
 LAUNCHER_DIR="$HOME/.local/bin"
 LAUNCHER_PATH="$LAUNCHER_DIR/tg"
 PROFILE_FILES=("$HOME/.profile" "$HOME/.bashrc" "$HOME/.zprofile" "$HOME/.zshrc")
@@ -94,18 +89,22 @@ if [[ "$CLEAN_PATH" == '1' ]]; then
     for profile_file in "${PROFILE_FILES[@]}"; do
         [[ -f "$profile_file" ]] || continue
         tmp_file="${profile_file}.tui-game-remove.$$"
-        if ! python3 - <<PY "$profile_file" "$tmp_file" "$LAUNCHER_DIR"
+        if ! python3 - <<'PY' "$profile_file" "$tmp_file"
 from pathlib import Path
 import sys
 profile = Path(sys.argv[1])
 out = Path(sys.argv[2])
-launcher_dir = sys.argv[3]
 text = profile.read_text(encoding='utf-8', errors='ignore')
 lines = []
+skip = False
 for line in text.splitlines():
-    if '# TUI-GAME launcher' in line:
+    if line.strip() == '# >>> TUI-GAME launcher >>>':
+        skip = True
         continue
-    if launcher_dir in line and 'export PATH=' in line:
+    if line.strip() == '# <<< TUI-GAME launcher <<<':
+        skip = False
+        continue
+    if skip:
         continue
     lines.append(line)
 out.write_text('\n'.join(lines) + ('\n' if lines else ''), encoding='utf-8')
@@ -135,7 +134,9 @@ rm -f \
     "$INSTALL_DIR/version" \
     "$INSTALL_DIR/version.exe" \
     "$INSTALL_DIR/updata" \
-    "$INSTALL_DIR/updata.exe" 2>/dev/null || true
+    "$INSTALL_DIR/updata.exe" \
+    "$INSTALL_DIR/remove" \
+    "$INSTALL_DIR/remove.exe" 2>/dev/null || true
 rm -rf "$INSTALL_DIR/assets" "$INSTALL_DIR/scripts" 2>/dev/null || true
 if [[ "$DELETE_DATA" == '1' ]]; then
     rm -rf "$INSTALL_DIR/tui-game-data" 2>/dev/null || true
@@ -146,16 +147,5 @@ printf '%s\n' "$MSG_PRESS_KEY"
 read -r -n 1 _
 printf '\n'
 
-HELPER="$(mktemp "${TMPDIR:-/tmp}/tui-game-remove-XXXXXX.sh")"
-cat >"$HELPER" <<EOF
-#!/bin/bash
-sleep 1
-rm -f "$INSTALL_DIR/remove" "$INSTALL_DIR/remove.exe" 2>/dev/null || true
-rm -f "$INSTALL_DIR/delete-tui-game.sh" "$INSTALL_DIR/delete-tui-game.bat" 2>/dev/null || true
-rm -f "$HELPER" 2>/dev/null || true
-exit 0
-EOF
-chmod +x "$HELPER"
-nohup bash "$HELPER" >/dev/null 2>&1 &
-
+( sleep 1; rm -f "$INSTALL_DIR/tg-delete.sh" "$INSTALL_DIR/tg-delete.bat" "$INSTALL_DIR/delete-tui-game.sh" "$INSTALL_DIR/delete-tui-game.bat" ) >/dev/null 2>&1 &
 exit 0
