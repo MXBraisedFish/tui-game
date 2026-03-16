@@ -494,8 +494,9 @@
     "updater.new_version": "发现新版本",
     "updater.no_update": "当前已是最新版本",
     "updater.press_u": "按 U 打开发布页面",
-    "warning.current": "当前尺寸",
-    "warning.enlarge_hint": "请放大终端窗口以继续。",
-    "warning.required": "需要尺寸",
-    "warning.size_title": "终端窗口过小"
+    "warning.current": "当前大小",
+    "warning.enlarge_hint": "请放大终端窗口以继续",
+    "warning.required": "所需大小",
+    "warning.size_title": "终端窗口过小",
+    "warning.quit_hint": "按 ESC / Q 退出"
 }

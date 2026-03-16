@@ -156,10 +156,21 @@ fn run() -> Result<()> {
             sync_continue_item(menu);
         }
 
+        // 先检查当前终端尺寸，尺寸不足时只允许使用 Esc/Q 退出程序。
+        let (min_width, min_height) = minimum_size_for_state(&state);
+        let size_state = size_watcher::check_size(min_width, min_height)?;
+
         // 处理键盘事件。
         if event::poll(Duration::from_millis(0))? {
             let ev = event::read()?;
             if let Event::Key(key) = ev {
+                if !size_state.size_ok
+                    && matches!(key.kind, KeyEventKind::Press)
+                    && matches!(key.code, KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q'))
+                {
+                    state = AppState::Exiting;
+                    continue;
+                }
                 handle_key_event(
                     &mut state,
                     &mut pending_new_game_start,
@@ -179,10 +190,6 @@ fn run() -> Result<()> {
         if matches!(state, AppState::Exiting) {
             break;
         }
-
-        // 根据当前页面动态计算最小终端尺寸。
-        let (min_width, min_height) = minimum_size_for_state(&state);
-        let size_state = size_watcher::check_size(min_width, min_height)?;
 
         if size_state.size_ok {
             session.terminal.draw(|frame| match &mut state {

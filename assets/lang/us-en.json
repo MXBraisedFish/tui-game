@@ -497,5 +497,6 @@
     "warning.current": "Current Size",
     "warning.enlarge_hint": "Please enlarge the terminal window to continue.",
     "warning.required": "Required Size",
-    "warning.size_title": "Terminal Window Too Small"
+    "warning.size_title": "Terminal Window Too Small",
+    "warning.quit_hint": "Press ESC / Q to quit"
 }

@@ -357,5 +357,3 @@ GitHub Repo: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 ### 额外功能
 1. 模组制作 - 用户自己制作额外的游戏(目前已经完成了接口)
 2. 防老板功能 - 一键打开伪装功能界面，有效防止被老板发现摸鱼(而且会支持各个计算机行业：运维、前端、后端等等都会有，可设置)
-
-数独 -> 切换难度没有数字提示

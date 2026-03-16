@@ -263,31 +263,20 @@ impl GameSelection {
             String::new()
         };
 
-        let left_w = UnicodeWidthStr::width(left.as_str()) as u16;
-        let right_w = UnicodeWidthStr::width(right.as_str()) as u16;
-        let pager_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(left_w),
-                Constraint::Min(0),
-                Constraint::Length(right_w),
-            ])
-            .split(rows[1]);
-
         let left_widget = Paragraph::new(left)
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Left);
-        frame.render_widget(left_widget, pager_chunks[0]);
+        frame.render_widget(left_widget, rows[1]);
 
         let center_widget = Paragraph::new(center)
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Center);
-        frame.render_widget(center_widget, pager_chunks[1]);
+        frame.render_widget(center_widget, rows[1]);
 
         let right_widget = Paragraph::new(right)
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Right);
-        frame.render_widget(right_widget, pager_chunks[2]);
+        frame.render_widget(right_widget, rows[1]);
     }
 
     fn render_detail_panel(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {

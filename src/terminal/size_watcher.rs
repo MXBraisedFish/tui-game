@@ -39,6 +39,7 @@ pub fn draw_size_warning(state: &SizeState, min_width: u16, min_height: u16) -> 
         format!("{}: {}x{}", t("warning.required"), min_width, min_height),
         format!("{}: {}x{}", t("warning.current"), state.width, state.height),
         t("warning.enlarge_hint").to_string(),
+        t("warning.quit_hint").to_string(),
     ];
 
     // 计算垂直居中位置
