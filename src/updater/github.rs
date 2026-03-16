@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+﻿use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -17,7 +17,7 @@ const GITHUB_API_LATEST: &str =
     "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
 const FALLBACK_RELEASE_URL: &str = "https://github.com/MXBraisedFish/TUI-GAME/releases/latest";
 pub const GITHUB_TOKEN: &str = "";
-pub const CURRENT_VERSION_TAG: &str = "0.10.15";
+pub const CURRENT_VERSION_TAG: &str = "0.10.16";
 
 #[derive(Clone, Debug)]
 pub struct UpdateNotification {
@@ -163,10 +163,10 @@ pub fn run_update_binary() -> Result<bool> {
         return Ok(false);
     }
 
-    let mut command = Command::new(updata_bin);
-    let _child = command.spawn()?;
-    Ok(true)
+    let status = Command::new(updata_bin).status()?;
+    Ok(status.success())
 }
+
 
 pub fn spawn_helper_script(
     helper_name: &str,
@@ -289,3 +289,4 @@ fn compare_versions(remote: &str, current: &str) -> Option<Ordering> {
 
     Some(Ordering::Equal)
 }
+

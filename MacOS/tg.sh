@@ -35,21 +35,25 @@ REMOVE_BIN="$SCRIPT_DIR/remove"
 
 if [ $# -eq 0 ]; then
     [ -x "$MAIN_BIN" ] || { msg "script.error.main_missing" "Main game binary not found."; exit 1; }
-    exec "$MAIN_BIN"
+    "$MAIN_BIN"
+    exit $?
 fi
 
 case "$1" in
     -v|-V|-version)
         [ -x "$VERSION_BIN" ] || { msg "script.error.version_missing" "Version helper binary not found."; exit 1; }
-        exec "$VERSION_BIN"
+        "$VERSION_BIN"
+        exit $?
         ;;
     -u|-U|-updata)
         [ -x "$UPDATA_BIN" ] || { msg "script.error.updata_missing" "Update helper binary not found."; exit 1; }
-        exec "$UPDATA_BIN"
+        "$UPDATA_BIN"
+        exit $?
         ;;
     -r|-R|-remove)
         [ -x "$REMOVE_BIN" ] || { msg "script.error.remove_missing" "Remove helper binary not found."; exit 1; }
-        exec "$REMOVE_BIN"
+        "$REMOVE_BIN"
+        exit $?
         ;;
     -h|-H|-help)
         help_text=$(

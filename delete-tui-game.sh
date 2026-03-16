@@ -5,12 +5,12 @@ set -eu
 
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-LANG_CODE="us-en"
+LANG_CODE='us-en'
 if [[ -f "$INSTALL_DIR/tui-game-data/language_pref.txt" ]]; then
     LANG_CODE="$(cat "$INSTALL_DIR/tui-game-data/language_pref.txt" 2>/dev/null || printf '%s' 'us-en')"
 fi
 
-if [[ "$LANG_CODE" == "zh-cn" ]]; then
+if [[ "$LANG_CODE" == 'zh-cn' ]]; then
     MSG_CONFIRM1='这将卸载 TUI-GAME，是否继续？ [Y/N]'
     MSG_MODE='选择卸载模式：[1] 保留存档  [2] 删除全部数据'
     MSG_CONFIRM2='确认以“%s”模式卸载？ [Y/N]'
@@ -88,7 +88,7 @@ LAUNCHER_DIR="$HOME/.local/bin"
 LAUNCHER_PATH="$LAUNCHER_DIR/tg"
 PROFILE_FILES=("$HOME/.profile" "$HOME/.bashrc" "$HOME/.zprofile" "$HOME/.zshrc")
 
-if [[ "$CLEAN_PATH" == "1" ]]; then
+if [[ "$CLEAN_PATH" == '1' ]]; then
     rm -f "$LAUNCHER_PATH" 2>/dev/null || true
     cleanup_ok=1
     for profile_file in "${PROFILE_FILES[@]}"; do
@@ -117,7 +117,7 @@ PY
         fi
         mv "$tmp_file" "$profile_file" || cleanup_ok=0
     done
-    if [[ "$cleanup_ok" == "1" ]]; then
+    if [[ "$cleanup_ok" == '1' ]]; then
         printf '%s\n' "$MSG_PATH_DONE"
     else
         printf '%s\n' "$MSG_PATH_FAIL"
@@ -137,7 +137,7 @@ rm -f \
     "$INSTALL_DIR/updata" \
     "$INSTALL_DIR/updata.exe" 2>/dev/null || true
 rm -rf "$INSTALL_DIR/assets" "$INSTALL_DIR/scripts" 2>/dev/null || true
-if [[ "$DELETE_DATA" == "1" ]]; then
+if [[ "$DELETE_DATA" == '1' ]]; then
     rm -rf "$INSTALL_DIR/tui-game-data" 2>/dev/null || true
 fi
 
