@@ -2478,7 +2478,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tui-game"
-version = "0.10.16"
+version = "0.10.17"
 dependencies = [
  "anyhow",
  "crossterm",

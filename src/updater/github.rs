@@ -17,7 +17,7 @@ const GITHUB_API_LATEST: &str =
     "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
 const FALLBACK_RELEASE_URL: &str = "https://github.com/MXBraisedFish/TUI-GAME/releases/latest";
 pub const GITHUB_TOKEN: &str = "";
-pub const CURRENT_VERSION_TAG: &str = "0.10.16";
+pub const CURRENT_VERSION_TAG: &str = "0.10.17";
 
 #[derive(Clone, Debug)]
 pub struct UpdateNotification {
@@ -163,8 +163,20 @@ pub fn run_update_binary() -> Result<bool> {
         return Ok(false);
     }
 
-    let status = Command::new(updata_bin).status()?;
-    Ok(status.success())
+    #[cfg(target_os = "windows")]
+    {
+        let status = Command::new("cmd")
+            .args(["/C", "start", "", "cmd", "/K"])
+            .arg(format!("\"{}\"", updata_bin.display()))
+            .status()?;
+        return Ok(status.success());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let status = Command::new(updata_bin).status()?;
+        Ok(status.success())
+    }
 }
 
 

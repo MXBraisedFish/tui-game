@@ -508,8 +508,20 @@ fn run_remove_binary() -> Result<bool> {
         return Ok(false);
     }
 
-    let _status = Command::new(remove_bin).status()?;
-    Ok(true)
+    #[cfg(target_os = "windows")]
+    {
+        let status = Command::new("cmd")
+            .args(["/C", "start", "", "cmd", "/K"])
+            .arg(format!("\"{}\"", remove_bin.display()))
+            .status()?;
+        return Ok(status.success());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let status = Command::new(remove_bin).status()?;
+        Ok(status.success())
+    }
 }
 
 /// 判断当前运行目录中是否存在可执行的 updata 字节码程序。
