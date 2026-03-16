@@ -508,7 +508,7 @@ fn run_remove_binary() -> Result<bool> {
         return Ok(false);
     }
 
-    let _child = Command::new(remove_bin).spawn()?;
+    let _status = Command::new(remove_bin).status()?;
     Ok(true)
 }
 
