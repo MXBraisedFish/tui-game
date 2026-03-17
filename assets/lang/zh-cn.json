@@ -472,7 +472,7 @@
     "menu.play": "开始游戏",
     "menu.quit": "退出",
     "menu.settings": "设置",
-    "menu.version_update_hint": "{发现新版本，按 [U] 更新}",
+    "menu.version_update_hint": "{有新版本可更新}",
     "placeholder.about": "TUI 游戏\n作者:  MXBraisedFish(MXFish)\nGitHub:  https://github.com/MXBraisedFish/TUI-GAME",
     "placeholder.continue": "继续游戏功能尚未实现。",
     "placeholder.latest_version": "最新版本:",

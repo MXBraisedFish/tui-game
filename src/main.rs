@@ -1,5 +1,5 @@
 ﻿use std::io::{self, Stdout};
-use std::process::Command;
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -10,6 +10,7 @@ use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode};
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use serde::Deserialize;
 
 use tui_game::app;
 use tui_game::app::game_selection::{GameSelection, GameSelectionAction};
@@ -24,10 +25,15 @@ use tui_game::lua_bridge::api::{
 };
 use tui_game::lua_bridge::script_loader::{GameMeta, scan_scripts};
 use tui_game::terminal::size_watcher;
-use tui_game::updater::github::{
-    CURRENT_VERSION_TAG, UpdateNotification, Updater, UpdaterEvent, run_update_binary,
-};
-use tui_game::utils::path_utils;
+
+const RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
+const LATEST_RELEASE_API_URL: &str =
+    "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
+
+#[derive(Deserialize)]
+struct LatestReleaseResponse {
+    tag_name: String,
+}
 
 /// 应用的全局界面状态。
 ///
@@ -108,6 +114,10 @@ fn main() {
 /// 负责初始化终端、国际化、更新检查器与全局状态，
 /// 然后驱动整个应用主循环。
 fn run() -> Result<()> {
+    if handle_cli_passthrough()? {
+        return Ok(());
+    }
+
     // 安装 panic hook，避免异常时终端残留在 raw mode。
     install_panic_hook();
     // 初始化国际化系统。
@@ -115,22 +125,14 @@ fn run() -> Result<()> {
 
     // 初始化终端会话。
     let mut session = TerminalSession::new()?;
-    // 启动后台更新检查线程。
-    let updater = Updater::spawn(CURRENT_VERSION_TAG);
-
-    // 初始化全局状态和运行时变量。
-    let mut update_notification: Option<UpdateNotification> = None;
-    // 记录远端最新 release 版本。
-    let mut latest_release_version = normalized_tag(CURRENT_VERSION_TAG);
     // 记录当前运行版本。
-    let runtime_version = normalized_tag(CURRENT_VERSION_TAG);
+    let runtime_version = normalized_tag(RUNTIME_VERSION);
+    // ???????????????????????????
+    let update_check_rx = spawn_update_check(runtime_version.clone());
+    let mut update_hint: Option<String> = None;
     // 初始页面为主菜单。
     let mut state = AppState::MainMenu { menu: Menu::new() };
     let mut pending_new_game_start: Option<PendingNewGameStart> = None;
-    // 标记是否需要在退出后执行 updata 字节码程序。
-    let mut should_run_update = false;
-    // 标记是否需要在退出后执行 tg-delete 卸载脚本。
-    let mut should_run_uninstall = false;
 
     let frame_budget = Duration::from_millis(16);
 
@@ -138,25 +140,19 @@ fn run() -> Result<()> {
     loop {
         let frame_start = Instant::now();
 
-        // 非阻塞拉取后台更新检查结果。
-        while let Some(event) = updater.try_recv() {
-            match event {
-                UpdaterEvent::LatestVersion(latest) => {
-                    latest_release_version = latest.latest_version;
-                }
-                UpdaterEvent::NewVersion(notification) => {
-                    update_notification = Some(notification);
-                }
-                UpdaterEvent::NoUpdate => {}
-            }
-        }
-
-        // 主菜单下同步“继续游戏”的可用状态与目标游戏名。
+        // ????????????????????????
         if let AppState::MainMenu { menu } = &mut state {
             sync_continue_item(menu);
         }
 
-        // 先检查当前终端尺寸，尺寸不足时只允许使用 Esc/Q 退出程序。
+        // ?????????????????????????
+        if update_hint.is_none() {
+            if let Ok(Some(latest_tag)) = update_check_rx.try_recv() {
+                update_hint = Some(latest_tag);
+            }
+        }
+
+        // ???????????????????? Esc/Q ?????
         let (min_width, min_height) = minimum_size_for_state(&state);
         let size_state = size_watcher::check_size(min_width, min_height)?;
 
@@ -174,10 +170,7 @@ fn run() -> Result<()> {
                 handle_key_event(
                     &mut state,
                     &mut pending_new_game_start,
-                    &mut should_run_update,
-                    &mut should_run_uninstall,
                     key,
-                    update_notification.as_ref(),
                 )?;
             }
         }
@@ -194,10 +187,12 @@ fn run() -> Result<()> {
         if size_state.size_ok {
             session.terminal.draw(|frame| match &mut state {
                 AppState::MainMenu { menu } => {
-                    let version_hint = update_notification
-                        .as_ref()
-                        .map(|update| update.latest_version.as_str());
-                    app::menu::render_main_menu(frame, menu, CURRENT_VERSION_TAG, version_hint);
+                    app::menu::render_main_menu(
+                        frame,
+                        menu,
+                        RUNTIME_VERSION,
+                        update_hint.as_deref(),
+                    );
                 }
                 AppState::GameSelection { ui } => {
                     if let Some(pending) = pending_new_game_start.as_ref() {
@@ -214,7 +209,7 @@ fn run() -> Result<()> {
                         frame,
                         PlaceholderPage::About,
                         runtime_version.as_str(),
-                        Some(latest_release_version.as_str()),
+                        None,
                     );
                 }
                 AppState::Continue => {
@@ -239,15 +234,8 @@ fn run() -> Result<()> {
         }
     }
 
-    // 终端恢复后再执行 updata 字节码程序或 tg-delete 卸载脚本，
-    // 避免子进程继承异常终端状态。
+    // 终端恢复由 drop 统一完成。
     drop(session);
-    if should_run_update {
-        let _ = run_update_binary();
-    }
-    if should_run_uninstall {
-        let _ = run_uninstall_script();
-    }
 
     Ok(())
 }
@@ -270,25 +258,11 @@ fn minimum_size_for_state(state: &AppState) -> (u16, u16) {
 fn handle_key_event(
     state: &mut AppState,
     pending_new_game_start: &mut Option<PendingNewGameStart>,
-    should_run_update: &mut bool,
-    should_run_uninstall: &mut bool,
     key: KeyEvent,
-    update_notification: Option<&UpdateNotification>,
 ) -> Result<()> {
     // 只响应按下事件，忽略重复输入和释放事件。
     if !matches!(key.kind, KeyEventKind::Press) {
         return Ok(());
-    }
-
-    // 全局更新快捷键，退出主程序后再拉起 updata 字节码程序处理更新。
-    if matches!(key.code, KeyCode::Char('u') | KeyCode::Char('U')) {
-        if update_notification.is_some() {
-            if has_update_binary().unwrap_or(false) {
-                *should_run_update = true;
-                *state = AppState::Exiting;
-                return Ok(());
-            }
-        }
     }
 
     // 只要离开游戏选择页，就清理“覆盖存档确认”状态。
@@ -394,10 +368,7 @@ fn handle_key_event(
                     *state = AppState::MainMenu { menu: Menu::new() };
                 }
                 settings::SettingsAction::RunUninstall => {
-                    if has_uninstall_script().unwrap_or(false) {
-                        *should_run_uninstall = true;
-                        *state = AppState::Exiting;
-                    }
+                    // 卸载入口已经迁移到 tg 脚本参数层，应用内不再直接触发。
                 }
             }
         }
@@ -502,39 +473,21 @@ fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppS
     }
 }
 
-/// 执行当前目录下的 tg-delete 卸载脚本。
-fn run_uninstall_script() -> Result<bool> {
-    let uninstall_script = path_utils::uninstall_script_file()?;
-    if !uninstall_script.exists() {
-        return Ok(false);
-    }
-
-    #[cfg(target_os = "windows")]
+/// 处理命令行透传参数。
+///
+/// 供外层 tg 脚本读取运行时版本，避免额外 version 字节码。
+fn handle_cli_passthrough() -> Result<bool> {
+    let arg = match std::env::args().nth(1) {
+        Some(v) => v,
+        None => return Ok(false),
+    };
+    if arg.eq_ignore_ascii_case("--runtime-version")
+        || arg.eq_ignore_ascii_case("-runtime-version")
     {
-        let status = Command::new("cmd")
-            .arg("/C")
-            .arg(uninstall_script.as_os_str())
-            .status()?;
-        Ok(status.success())
+        println!("v{}", RUNTIME_VERSION.trim());
+        return Ok(true);
     }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let status = Command::new("sh")
-            .arg(uninstall_script.as_os_str())
-            .status()?;
-        Ok(status.success())
-    }
-}
-
-/// 判断当前运行目录中是否存在可执行的 updata 字节码程序。
-fn has_update_binary() -> Result<bool> {
-    Ok(path_utils::updata_binary_file()?.exists())
-}
-
-/// 判断当前运行目录中是否存在可执行的 tg-delete 卸载脚本。
-fn has_uninstall_script() -> Result<bool> {
-    Ok(path_utils::uninstall_script_file()?.exists())
+    Ok(false)
 }
 
 /// 根据共享存档槽同步主菜单中“继续游戏”的状态。
@@ -557,4 +510,66 @@ fn normalized_tag(raw: &str) -> String {
 }
 
 
+/// ???????????
+///
+/// ?????? GitHub ???? tag????????????
+/// ?? `Some(latest_tag)`????? `None`?
+fn spawn_update_check(current_version: String) -> Receiver<Option<String>> {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let result = check_latest_release(&current_version).ok().flatten();
+        let _ = tx.send(result);
+    });
+    rx
+}
 
+/// ?? GitHub ???????????????
+fn check_latest_release(current_version: &str) -> Result<Option<String>> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()?;
+    let response = client
+        .get(LATEST_RELEASE_API_URL)
+        .header(reqwest::header::USER_AGENT, "tui-game")
+        .send()?
+        .error_for_status()?
+        .json::<LatestReleaseResponse>()?;
+    let latest_tag = normalized_tag(&response.tag_name);
+    if is_remote_version_newer(current_version, &latest_tag) {
+        Ok(Some(latest_tag))
+    } else {
+        Ok(None)
+    }
+}
+
+/// ?????????????????
+///
+/// ??????? `vX.Y.Z` ? `X.Y.Z`?????????????
+fn is_remote_version_newer(current_version: &str, remote_version: &str) -> bool {
+    let current = parse_version_segments(current_version);
+    let remote = parse_version_segments(remote_version);
+    let max_len = current.len().max(remote.len());
+    for idx in 0..max_len {
+        let current_part = *current.get(idx).unwrap_or(&0);
+        let remote_part = *remote.get(idx).unwrap_or(&0);
+        if remote_part > current_part {
+            return true;
+        }
+        if remote_part < current_part {
+            return false;
+        }
+    }
+    false
+}
+
+/// ?????????????????
+fn parse_version_segments(version: &str) -> Vec<u32> {
+    let trimmed = version
+        .trim()
+        .trim_start_matches('v')
+        .trim_start_matches('V');
+    trimmed
+        .split('.')
+        .map(|part| part.parse::<u32>().unwrap_or(0))
+        .collect()
+}

@@ -46,10 +46,6 @@ pub fn bash_scripts_dir() -> Result<PathBuf> {
     Ok(scripts_dir()?.join("bash"))
 }
 
-pub fn updater_cache_file() -> Result<PathBuf> {
-    Ok(app_data_dir()?.join("updater_cache.json"))
-}
-
 pub fn language_pref_file() -> Result<PathBuf> {
     Ok(app_data_dir()?.join("language_pref.txt"))
 }
@@ -64,26 +60,6 @@ pub fn stats_file() -> Result<PathBuf> {
 
 pub fn main_binary_file() -> Result<PathBuf> {
     Ok(runtime_dir()?.join(binary_name("tui-game")))
-}
-
-pub fn version_binary_file() -> Result<PathBuf> {
-    Ok(runtime_dir()?.join(binary_name("version")))
-}
-
-pub fn updata_binary_file() -> Result<PathBuf> {
-    Ok(runtime_dir()?.join(binary_name("updata")))
-}
-
-pub fn uninstall_script_file() -> Result<PathBuf> {
-    let runtime_script = runtime_dir()?.join(root_uninstall_script_name());
-    if runtime_script.exists() {
-        return Ok(runtime_script);
-    }
-    Ok(project_root()?.join(root_uninstall_script_name()))
-}
-
-pub fn helper_script_file(name: &str) -> Result<PathBuf> {
-    Ok(bash_scripts_dir()?.join(helper_script_name(name)))
 }
 
 pub fn ensure_parent_dir(path: &Path) -> Result<()> {
@@ -101,27 +77,5 @@ fn binary_name(stem: &str) -> String {
     #[cfg(not(target_os = "windows"))]
     {
         stem.to_string()
-    }
-}
-
-fn helper_script_name(stem: &str) -> String {
-    #[cfg(target_os = "windows")]
-    {
-        format!("{stem}.bat")
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        format!("{stem}.sh")
-    }
-}
-
-fn root_uninstall_script_name() -> String {
-    #[cfg(target_os = "windows")]
-    {
-        "tg-delete.bat".to_string()
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        "tg-delete.sh".to_string()
     }
 }
