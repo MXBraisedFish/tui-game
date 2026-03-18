@@ -1,0 +1,11 @@
+Package: tui-game
+Version: __VERSION__
+Section: games
+Priority: optional
+Architecture: amd64
+Depends: bash
+Maintainer: MXBraisedFish (MXFish)
+Description: TUI-GAME
+ Terminal games collection powered by Rust and Lua.
+ Includes 2048, Tetris, Sudoku, Pac-Man, Minesweeper,
+ and more playable directly inside the terminal.

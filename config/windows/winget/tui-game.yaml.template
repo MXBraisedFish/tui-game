@@ -1,0 +1,26 @@
+PackageIdentifier: MXBraisedFish.TuiGame
+PackageVersion: __VERSION__
+PackageLocale: en-US
+Publisher: MXBraisedFish
+PublisherUrl: https://github.com/MXBraisedFish/TUI-GAME
+PublisherSupportUrl: https://github.com/MXBraisedFish/TUI-GAME/issues
+PackageName: TUI-GAME
+License: MIT
+LicenseUrl: https://github.com/MXBraisedFish/TUI-GAME/blob/main/LICENSE
+ShortDescription: TUI-GAME terminal games collection
+Description: Terminal game collection powered by Rust and Lua.
+Tags:
+  - games
+  - terminal
+  - tui
+  - cli
+ReleaseNotesUrl: https://github.com/MXBraisedFish/TUI-GAME/releases/tag/v__VERSION__
+Installers:
+  - Architecture: x64
+    InstallerType: zip
+    InstallerUrl: https://github.com/MXBraisedFish/TUI-GAME/releases/download/v__VERSION__/tui-game-__VERSION__-windows.zip
+    InstallerSha256: __SHA256__
+    Commands:
+      - tg
+ManifestType: singleton
+ManifestVersion: 1.6.0

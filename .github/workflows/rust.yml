@@ -5,45 +5,15 @@ on:
     tags:
       - "v*"
 
-jobs:
-  build:
-    name: Build for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            full_asset_name: tui-game-linux.tar.gz
-            update_asset_name: tui-game-linux-update.tar.gz
-            main_bin: tui-game
-            version_bin: version
-            updata_bin: updata
-            tg_script: Linux/tg.sh
-            tg_output: tg.sh
-            delete_script: tg-delete.sh
-            bash_keep_ext: sh
-          - os: windows-latest
-            full_asset_name: tui-game-windows.zip
-            update_asset_name: tui-game-windows-update.zip
-            main_bin: tui-game.exe
-            version_bin: version.exe
-            updata_bin: updata.exe
-            tg_script: Windows/tg.bat
-            tg_output: tg.bat
-            delete_script: tg-delete.bat
-            bash_keep_ext: bat
-          - os: macos-latest
-            full_asset_name: tui-game-macos.zip
-            update_asset_name: tui-game-macos-update.zip
-            main_bin: tui-game
-            version_bin: version
-            updata_bin: updata
-            tg_script: MacOS/tg.sh
-            tg_output: tg.sh
-            delete_script: tg-delete.sh
-            bash_keep_ext: sh
+permissions:
+  contents: write
 
+jobs:
+  package-linux:
+    name: Package Linux
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,91 +21,208 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build release binaries
-        run: cargo build --release --bins
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
 
-      - name: Prepare dist directories
+      - name: Build release binary
+        run: cargo build --release --bin tui-game
+
+      - name: Package Linux artifacts
         shell: bash
         run: |
           set -euo pipefail
 
-          rm -rf dist-full dist-update
-          mkdir -p dist-full dist-update
+          VERSION="${VERSION#v}"
+          WORKDIR="$RUNNER_TEMP/linux-pack"
+          RELEASE_ROOT="$WORKDIR/release"
+          DEB_ROOT="$WORKDIR/deb-root"
+          RPM_TOP="$WORKDIR/rpmbuild"
+          RPM_SOURCE_ROOT="$WORKDIR/tui-game-${VERSION}"
 
-          cp "target/release/${{ matrix.main_bin }}" "dist-full/${{ matrix.main_bin }}"
-          cp "target/release/${{ matrix.version_bin }}" "dist-full/${{ matrix.version_bin }}"
-          cp "target/release/${{ matrix.updata_bin }}" "dist-full/${{ matrix.updata_bin }}"
+          rm -rf "$WORKDIR"
+          mkdir -p "$RELEASE_ROOT" "$DEB_ROOT/DEBIAN" "$DEB_ROOT/usr/lib/tui-game" \
+                   "$RPM_TOP/BUILD" "$RPM_TOP/BUILDROOT" "$RPM_TOP/RPMS" "$RPM_TOP/SOURCES" "$RPM_TOP/SPECS" "$RPM_TOP/SRPMS" \
+                   "$RPM_SOURCE_ROOT"
 
-          cp "${{ matrix.tg_script }}" "dist-full/${{ matrix.tg_output }}"
-          cp "${{ matrix.delete_script }}" "dist-full/${{ matrix.delete_script }}"
+          install -m 755 target/release/tui-game "$RELEASE_ROOT/tui-game"
+          install -m 755 Linux/tg.sh "$RELEASE_ROOT/tg.sh"
+          cp -R assets "$RELEASE_ROOT/assets"
+          cp -R scripts "$RELEASE_ROOT/scripts"
+          find "$RELEASE_ROOT/scripts" -type f -name '*.lua' -exec chmod 644 {} \;
 
-          if [ -d "assets" ]; then
-            cp -R assets dist-full/
-            mkdir -p dist-update/assets
-            cp -R assets/lang dist-update/assets/
-            cp -R assets/wordle dist-update/assets/
-          fi
+          (cd "$RELEASE_ROOT" && tar -czf "$GITHUB_WORKSPACE/tui-game-${VERSION}-linux.tar.gz" *)
 
-          if [ -d "scripts" ]; then
-            cp -R scripts dist-full/
-            mkdir -p dist-update/scripts
-            cp -R scripts/game dist-update/scripts/
-            cp -R scripts/text_function dist-update/scripts/
-          fi
+          sed "s/__VERSION__/${VERSION}/g" config/linux/deb/control.template > "$DEB_ROOT/DEBIAN/control"
+          install -m 755 config/linux/deb/postinst "$DEB_ROOT/DEBIAN/postinst"
+          install -m 755 config/linux/deb/prerm "$DEB_ROOT/DEBIAN/prerm"
+          install -m 755 config/linux/deb/postrm "$DEB_ROOT/DEBIAN/postrm"
+          cp -R "$RELEASE_ROOT/." "$DEB_ROOT/usr/lib/tui-game/"
+          dpkg-deb --build --root-owner-group "$DEB_ROOT" "$GITHUB_WORKSPACE/tui-game-${VERSION}-linux.deb"
 
-          cp "target/release/${{ matrix.main_bin }}" "dist-update/${{ matrix.main_bin }}"
+          cp -R "$RELEASE_ROOT/." "$RPM_SOURCE_ROOT/"
+          tar -C "$WORKDIR" -czf "$RPM_TOP/SOURCES/tui-game-${VERSION}.tar.gz" "tui-game-${VERSION}"
+          sed "s/__VERSION__/${VERSION}/g" config/linux/rpm/tui-game.spec.template > "$RPM_TOP/SPECS/tui-game.spec"
+          rpmbuild --define "_topdir $RPM_TOP" -bb "$RPM_TOP/SPECS/tui-game.spec"
+          cp "$(find "$RPM_TOP/RPMS" -name '*.rpm' | head -n 1)" "$GITHUB_WORKSPACE/tui-game-${VERSION}-linux.rpm"
 
-          if [ -d "dist-full/scripts/bash" ]; then
-            find "dist-full/scripts/bash" -type f ! -name "*.${{ matrix.bash_keep_ext }}" -delete
-          fi
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: |
+            tui-game-*-linux.tar.gz
+            tui-game-*-linux.deb
+            tui-game-*-linux.rpm
 
-          if [ "${{ matrix.os }}" != "windows-latest" ]; then
-            chmod +x \
-              "dist-full/${{ matrix.main_bin }}" \
-              "dist-full/${{ matrix.version_bin }}" \
-              "dist-full/${{ matrix.updata_bin }}" \
-              "dist-full/${{ matrix.tg_output }}" \
-              "dist-full/${{ matrix.delete_script }}" \
-              "dist-update/${{ matrix.main_bin }}" || true
+  package-macos:
+    name: Package macOS
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            if [ -d "dist-full/scripts/bash" ]; then
-              chmod +x dist-full/scripts/bash/*.sh || true
-            fi
-          fi
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Create full archive
+      - name: Build release binary
+        run: cargo build --release --bin tui-game
+
+      - name: Package macOS artifacts
         shell: bash
         run: |
           set -euo pipefail
 
-          cd dist-full
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            7z a "../${{ matrix.full_asset_name }}" *
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            zip -r "../${{ matrix.full_asset_name }}" *
-          else
-            tar -czf "../${{ matrix.full_asset_name }}" *
-          fi
+          VERSION="${VERSION#v}"
+          WORKDIR="$RUNNER_TEMP/macos-pack"
+          RELEASE_ROOT="$WORKDIR/release"
+          ARCHIVE="$GITHUB_WORKSPACE/tui-game-${VERSION}-macos.tar.gz"
+          FORMULA="$GITHUB_WORKSPACE/tui-game-${VERSION}-macos.rb"
 
-      - name: Create update archive
-        shell: bash
+          rm -rf "$WORKDIR"
+          mkdir -p "$RELEASE_ROOT"
+
+          install -m 755 target/release/tui-game "$RELEASE_ROOT/tui-game"
+          install -m 755 MacOS/tg.sh "$RELEASE_ROOT/tg.sh"
+          cp -R assets "$RELEASE_ROOT/assets"
+          cp -R scripts "$RELEASE_ROOT/scripts"
+          find "$RELEASE_ROOT/scripts" -type f -name '*.lua' -exec chmod 644 {} \;
+
+          (cd "$RELEASE_ROOT" && tar -czf "$ARCHIVE" *)
+          SHA256="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+          sed -e "s/__VERSION__/${VERSION}/g" -e "s/__SHA256__/${SHA256}/g" \
+            config/macos/homebrew/tui-game.rb.template > "$FORMULA"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: |
+            tui-game-*-macos.tar.gz
+            tui-game-*-macos.rb
+
+  package-windows:
+    name: Package Windows
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --bin tui-game
+
+      - name: Package Windows artifacts
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = 'Stop'
 
-          cd dist-update
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            7z a "../${{ matrix.update_asset_name }}" *
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            zip -r "../${{ matrix.update_asset_name }}" *
-          else
-            tar -czf "../${{ matrix.update_asset_name }}" *
-          fi
+          $version = $env:VERSION.TrimStart('v')
+          $workdir = Join-Path $env:RUNNER_TEMP 'windows-pack'
+          $releaseRoot = Join-Path $workdir 'release'
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE "tui-game-$version-windows.zip"
+          $scoopPath = Join-Path $env:GITHUB_WORKSPACE "tui-game-$version-windows.json"
+          $wingetPath = Join-Path $env:GITHUB_WORKSPACE "tui-game-$version-windows.yaml"
+          $nuspecOut = Join-Path $env:GITHUB_WORKSPACE "tui-game-$version-windows.nuspec"
+          $nupkgOut = Join-Path $env:GITHUB_WORKSPACE "tui-game-$version-windows.nupkg"
+          $chocoRoot = Join-Path $workdir 'choco'
+          $toolsDir = Join-Path $chocoRoot 'tools'
 
-      - name: Upload to Release
+          if (Test-Path $workdir) { Remove-Item $workdir -Recurse -Force }
+          New-Item -ItemType Directory -Path $releaseRoot | Out-Null
+          New-Item -ItemType Directory -Path $toolsDir | Out-Null
+
+          Copy-Item target/release/tui-game.exe (Join-Path $releaseRoot 'tui-game.exe')
+          Copy-Item Windows/tg.bat (Join-Path $releaseRoot 'tg.bat')
+          Copy-Item assets (Join-Path $releaseRoot 'assets') -Recurse
+          Copy-Item scripts (Join-Path $releaseRoot 'scripts') -Recurse
+
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path (Join-Path $releaseRoot '*') -DestinationPath $zipPath -CompressionLevel Optimal
+          $sha256 = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          $scoop = Get-Content config/windows/scoop/tui-game.json.template -Raw
+          $scoop = $scoop.Replace('__VERSION__', $version).Replace('__SHA256__', $sha256)
+          Set-Content -Encoding UTF8 $scoopPath $scoop
+
+          $winget = Get-Content config/windows/winget/tui-game.yaml.template -Raw
+          $winget = $winget.Replace('__VERSION__', $version).Replace('__SHA256__', $sha256)
+          Set-Content -Encoding UTF8 $wingetPath $winget
+
+          $nuspec = Get-Content config/windows/chocolatey/tui-game.nuspec.template -Raw
+          $nuspec = $nuspec.Replace('__VERSION__', $version)
+          Set-Content -Encoding UTF8 $nuspecOut $nuspec
+          Set-Content -Encoding UTF8 (Join-Path $chocoRoot 'tui-game.nuspec') $nuspec
+
+          $installPs1 = Get-Content config/windows/chocolatey/tools/chocolateyInstall.ps1 -Raw
+          $installPs1 = $installPs1.Replace('__VERSION__', $version).Replace('__SHA256__', $sha256)
+          Set-Content -Encoding UTF8 (Join-Path $toolsDir 'chocolateyInstall.ps1') $installPs1
+
+          Copy-Item config/windows/chocolatey/tools/chocolateyUninstall.ps1 (Join-Path $toolsDir 'chocolateyUninstall.ps1')
+
+          $tempZip = Join-Path $workdir 'tui-game-chocolatey.zip'
+          Compress-Archive -Path (Join-Path $chocoRoot '*') -DestinationPath $tempZip -CompressionLevel Optimal
+          if (Test-Path $nupkgOut) { Remove-Item $nupkgOut -Force }
+          Move-Item $tempZip $nupkgOut
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: |
+            tui-game-*-windows.zip
+            tui-game-*-windows.json
+            tui-game-*-windows.yaml
+            tui-game-*-windows.nuspec
+            tui-game-*-windows.nupkg
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs:
+      - package-linux
+      - package-macos
+      - package-windows
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Show release files
+        run: ls -R release-artifacts
+
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            ${{ matrix.full_asset_name }}
-            ${{ matrix.update_asset_name }}
+          files: release-artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

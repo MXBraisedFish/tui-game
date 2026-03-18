@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>tui-game</id>
+    <version>__VERSION__</version>
+    <title>TUI-GAME</title>
+    <authors>MXBraisedFish</authors>
+    <projectUrl>https://github.com/MXBraisedFish/TUI-GAME</projectUrl>
+    <license type="expression">MIT</license>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>TUI-GAME terminal games collection.</description>
+    <summary>Terminal game collection powered by Rust and Lua.</summary>
+    <releaseNotes>https://github.com/MXBraisedFish/TUI-GAME/releases/tag/v__VERSION__</releaseNotes>
+    <tags>games terminal tui cli</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

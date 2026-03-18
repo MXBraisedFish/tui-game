@@ -1,0 +1,25 @@
+{
+  "version": "__VERSION__",
+  "description": "TUI-GAME terminal games collection",
+  "homepage": "https://github.com/MXBraisedFish/TUI-GAME",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/MXBraisedFish/TUI-GAME/releases/download/v__VERSION__/tui-game-__VERSION__-windows.zip",
+      "hash": "__SHA256__"
+    }
+  },
+  "bin": [
+    ["tg.bat", "tg"]
+  ],
+  "checkver": {
+    "github": "https://github.com/MXBraisedFish/TUI-GAME"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/MXBraisedFish/TUI-GAME/releases/download/v$version/tui-game-$version-windows.zip"
+      }
+    }
+  }
+}

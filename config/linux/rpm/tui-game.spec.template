@@ -1,0 +1,46 @@
+Name:           tui-game
+Version:        __VERSION__
+Release:        1%{?dist}
+Summary:        TUI-GAME terminal games collection
+
+License:        MIT
+URL:            https://github.com/MXBraisedFish/TUI-GAME
+Source0:        %{name}-%{version}.tar.gz
+BuildArch:      x86_64
+Requires:       bash
+
+%description
+TUI-GAME is a collection of classic terminal games powered by Rust and Lua.
+
+%prep
+%setup -q
+
+%install
+rm -rf %{buildroot}
+mkdir -p %{buildroot}/usr/lib/tui-game
+cp -a * %{buildroot}/usr/lib/tui-game/
+chmod 0755 %{buildroot}/usr/lib/tui-game/tui-game
+chmod 0755 %{buildroot}/usr/lib/tui-game/tg.sh
+find %{buildroot}/usr/lib/tui-game/scripts -type f -name '*.lua' -exec chmod 0644 {} \;
+
+%post
+ln -sf /usr/lib/tui-game/tg.sh /usr/bin/tg
+chmod 755 /usr/lib/tui-game/tui-game || true
+chmod 755 /usr/lib/tui-game/tg.sh || true
+find /usr/lib/tui-game/scripts -type f -name '*.lua' -exec chmod 644 {} \; 2>/dev/null || true
+
+%preun
+rm -f /usr/bin/tg
+
+%postun
+if [ "$1" = "0" ]; then
+    rm -rf /usr/lib/tui-game
+fi
+
+%files
+/usr/lib/tui-game
+%ghost /usr/bin/tg
+
+%changelog
+* Thu Jan 01 1970 MXBraisedFish <opensource@invalid.local> - __VERSION__-1
+- Release build

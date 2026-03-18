@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+chmod 755 /usr/lib/tui-game/tui-game || true
+chmod 755 /usr/lib/tui-game/tg.sh || true
+find /usr/lib/tui-game/scripts -type f -name '*.lua' -exec chmod 644 {} \; 2>/dev/null || true
+ln -sf /usr/lib/tui-game/tg.sh /usr/bin/tg

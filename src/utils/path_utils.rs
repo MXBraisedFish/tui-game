@@ -38,14 +38,6 @@ pub fn scripts_dir() -> Result<PathBuf> {
     Ok(project_root()?.join("scripts"))
 }
 
-pub fn bash_lang_dir() -> Result<PathBuf> {
-    Ok(assets_dir()?.join("bash_lang"))
-}
-
-pub fn bash_scripts_dir() -> Result<PathBuf> {
-    Ok(scripts_dir()?.join("bash"))
-}
-
 pub fn language_pref_file() -> Result<PathBuf> {
     Ok(app_data_dir()?.join("language_pref.txt"))
 }

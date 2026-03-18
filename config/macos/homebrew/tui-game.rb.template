@@ -1,0 +1,19 @@
+class TuiGame < Formula
+  desc "TUI-GAME terminal games collection"
+  homepage "https://github.com/MXBraisedFish/TUI-GAME"
+  url "https://github.com/MXBraisedFish/TUI-GAME/releases/download/v__VERSION__/tui-game-__VERSION__-macos.tar.gz"
+  sha256 "__SHA256__"
+  version "__VERSION__"
+  license "MIT"
+
+  def install
+    libexec.install Dir["*"]
+    chmod 0755, libexec/"tui-game"
+    chmod 0755, libexec/"tg.sh"
+    bin.install_symlink libexec/"tg.sh" => "tg"
+  end
+
+  test do
+    system "#{bin}/tg", "-h"
+  end
+end
