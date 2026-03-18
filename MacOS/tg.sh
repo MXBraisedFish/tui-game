@@ -3,7 +3,16 @@ set +x
 set +v
 set -eu
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_PATH="$0"
+while [ -L "$SCRIPT_PATH" ]; do
+    LINK_DIR="$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
+    LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+    case "$LINK_TARGET" in
+        /*) SCRIPT_PATH="$LINK_TARGET" ;;
+        *) SCRIPT_PATH="$LINK_DIR/$LINK_TARGET" ;;
+    esac
+done
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
 LANG_CODE="us-en"
 if [ -f "$SCRIPT_DIR/tui-game-data/language_pref.txt" ]; then
     LANG_CODE=$(tr -d '\r\n' < "$SCRIPT_DIR/tui-game-data/language_pref.txt")

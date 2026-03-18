@@ -32,7 +32,6 @@ pub struct SettingsState {
 pub enum SettingsAction {
     None,
     BackToMenu,
-    RunUninstall,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -167,25 +166,12 @@ pub fn move_selection(selected: usize, key: KeyCode, metrics: GridMetrics, total
 
 fn handle_hub_key(state: &mut SettingsState, code: KeyCode) -> SettingsAction {
     match code {
-        KeyCode::Up | KeyCode::Char('k') => {
-            if state.hub_selected > 0 {
-                state.hub_selected -= 1;
-            }
-        }
-        KeyCode::Down | KeyCode::Char('j') => {
-            if state.hub_selected < 1 {
-                state.hub_selected += 1;
-            }
-        }
+        KeyCode::Up | KeyCode::Char('k') => state.hub_selected = 0,
+        KeyCode::Down | KeyCode::Char('j') => state.hub_selected = 0,
         KeyCode::Char('1') => state.hub_selected = 0,
-        KeyCode::Char('2') => state.hub_selected = 1,
         KeyCode::Enter => {
-            if state.hub_selected == 0 {
-                state.page = SettingsPage::Language;
-                state.lang_selected = default_selected_index();
-            } else {
-                return SettingsAction::RunUninstall;
-            }
+            state.page = SettingsPage::Language;
+            state.lang_selected = default_selected_index();
         }
         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
             return SettingsAction::BackToMenu;
@@ -231,14 +217,12 @@ fn handle_language_key(state: &mut SettingsState, code: KeyCode) {
 
 fn minimum_size_hub() -> (u16, u16) {
     let label_lang = i18n::t("settings.hub.language");
-    let label_uninstall = i18n::t("settings.hub.uninstall");
     let enter_key = i18n::t("menu.enter_shortcut");
     let back_hint = i18n::t("settings.hub.back_hint");
 
     let widths = [
         UnicodeWidthStr::width(format!("{}[1] {}", TRIANGLE, label_lang).as_str()),
-        UnicodeWidthStr::width(format!("{}[2] {}", TRIANGLE, label_uninstall).as_str()),
-        UnicodeWidthStr::width(format!("{}{} {}", TRIANGLE, enter_key, label_uninstall).as_str()),
+        UnicodeWidthStr::width(format!("{}{} {}", TRIANGLE, enter_key, label_lang).as_str()),
         UnicodeWidthStr::width(back_hint.as_str()),
     ];
 
@@ -275,10 +259,7 @@ fn minimum_size_language() -> (u16, u16) {
 
 fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
     let area = frame.area();
-    let items = [
-        ("[1]", i18n::t("settings.hub.language")),
-        ("[2]", i18n::t("settings.hub.uninstall")),
-    ];
+    let items = [("[1]", i18n::t("settings.hub.language"))];
     let enter_hint = i18n::t("menu.enter_shortcut");
 
     let content_width = items

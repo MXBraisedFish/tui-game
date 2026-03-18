@@ -367,9 +367,6 @@ fn handle_key_event(
                 settings::SettingsAction::BackToMenu => {
                     *state = AppState::MainMenu { menu: Menu::new() };
                 }
-                settings::SettingsAction::RunUninstall => {
-                    // 卸载入口已经迁移到 tg 脚本参数层，应用内不再直接触发。
-                }
             }
         }
 

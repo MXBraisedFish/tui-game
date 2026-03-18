@@ -489,7 +489,6 @@
     "rich_text.error.unterminated_style": "Style not terminated",
     "settings.hub.back_hint": "[ESC]/[Q] Return to main menu",
     "settings.hub.language": "Language",
-    "settings.hub.uninstall": "Uninstall TUI Games",
     "settings.no_valid_languages": "No valid language files found in assets/lang/ directory",
     "updater.new_version": "New version available",
     "updater.no_update": "Already the latest version",
