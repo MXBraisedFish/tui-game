@@ -1,4 +1,4 @@
-﻿pub mod game_selection;
+pub mod game_selection;
 pub mod i18n;
 pub mod layout;
 pub mod menu;

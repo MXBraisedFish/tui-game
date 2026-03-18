@@ -1,4 +1,4 @@
-﻿-- 俄罗斯方块游戏元数据
+-- 俄罗斯方块游戏元数据
 GAME_META = {
     name = "俄罗斯方块",
     description = "Stack falling blocks and clear complete lines."

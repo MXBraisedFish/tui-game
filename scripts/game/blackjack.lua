@@ -1,4 +1,4 @@
-﻿-- 21点游戏元数据
+-- 21点游戏元数据
 GAME_META = {
     name = "Blackjack",
     description = "Play against the dealer and manage your bets to win with 21."

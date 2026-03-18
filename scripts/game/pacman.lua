@@ -1,4 +1,4 @@
-﻿-- 吃豆人游戏元数据
+-- 吃豆人游戏元数据
 GAME_META = {
     name = "Pac-Man",
     description = "Collect pellets while avoiding roaming ghosts."

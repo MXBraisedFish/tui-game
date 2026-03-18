@@ -1,4 +1,4 @@
-﻿use std::io::{Write, stdout};
+use std::io::{Write, stdout};
 
 use anyhow::Result;
 use crossterm::cursor::MoveTo;

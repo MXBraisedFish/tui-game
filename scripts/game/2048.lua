@@ -1,4 +1,4 @@
-﻿-- 2048 for TUI GAME
+-- 2048 for TUI GAME
 -- 游戏元数据，供启动器显示
 GAME_META = {
     name = "2048",

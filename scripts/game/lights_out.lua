@@ -1,4 +1,4 @@
-﻿-- 关灯游戏元数据
+-- 关灯游戏元数据
 GAME_META = {
     name = "Lights Out",
     description = "Light all tiles by toggling cross patterns."

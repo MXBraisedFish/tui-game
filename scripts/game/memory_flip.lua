@@ -1,4 +1,4 @@
-﻿-- 记忆翻牌游戏元数据
+-- 记忆翻牌游戏元数据
 GAME_META = {
     name = "Memory Flip",
     description = "Flip cards and match identical pairs with memory."

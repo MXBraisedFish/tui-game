@@ -1,4 +1,4 @@
-﻿-- 扫雷游戏元数据
+-- 扫雷游戏元数据
 GAME_META = {
     name = "Minesweeper",
     description = "Reveal safe cells and mark all hidden mines."

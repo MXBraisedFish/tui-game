@@ -1,4 +1,4 @@
-﻿use std::collections::BTreeMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Stdout, Write, stdout};
 use std::path::{Path, PathBuf};

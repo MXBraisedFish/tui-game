@@ -1,4 +1,4 @@
-﻿use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub const MENU_MIN_WIDTH: u16 = 60;
 pub const MENU_MIN_HEIGHT: u16 = 15;

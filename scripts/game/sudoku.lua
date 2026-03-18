@@ -1,4 +1,4 @@
-﻿-- 数独游戏元数据
+-- 数独游戏元数据
 GAME_META = { name = "Sudoku", description = "Fill each row, column, and 3x3 box with digits 1-9 exactly once." }
 
 -- 游戏常量定义

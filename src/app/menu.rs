@@ -1,4 +1,4 @@
-﻿use crossterm::event::KeyCode;
+use crossterm::event::KeyCode;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};

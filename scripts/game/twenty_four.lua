@@ -1,4 +1,4 @@
-﻿-- 24点游戏元数据
+-- 24点游戏元数据
 GAME_META = {
     name = "24 Points",
     description = "Use A/J/Q/K and + - * / () to form an expression equal to 24."

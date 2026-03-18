@@ -1,4 +1,4 @@
-﻿use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthChar;
 
