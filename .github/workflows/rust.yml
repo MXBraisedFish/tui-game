@@ -18,6 +18,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Normalize text files to UTF-8 (no BOM)
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          patterns = (
+              ".rs", ".toml", ".lock", ".json", ".md", ".txt", ".lua", ".sh", ".bat",
+              ".ps1", ".yaml", ".yml", ".spec", ".template", ".rb", ".nuspec"
+          )
+          files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          for rel in files:
+              if not rel.endswith(patterns):
+                  continue
+              path = Path(rel)
+              text = path.read_text(encoding="utf-8-sig")
+              path.write_text(text, encoding="utf-8", newline="")
+          PY
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -85,6 +105,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Normalize text files to UTF-8 (no BOM)
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          patterns = (
+              ".rs", ".toml", ".lock", ".json", ".md", ".txt", ".lua", ".sh", ".bat",
+              ".ps1", ".yaml", ".yml", ".spec", ".template", ".rb", ".nuspec"
+          )
+          files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          for rel in files:
+              if not rel.endswith(patterns):
+                  continue
+              path = Path(rel)
+              text = path.read_text(encoding="utf-8-sig")
+              path.write_text(text, encoding="utf-8", newline="")
+          PY
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -133,6 +173,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Normalize text files to UTF-8 (no BOM)
+        shell: pwsh
+        run: |
+          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          $patterns = @('*.rs','*.toml','*.lock','*.json','*.md','*.txt','*.lua','*.sh','*.bat','*.ps1','*.yaml','*.yml','*.spec','*.template','*.rb','*.nuspec')
+          $files = git ls-files | Where-Object {
+            $name = $_
+            foreach ($pattern in $patterns) {
+              if ($name -like $pattern) { return $true }
+            }
+            return $false
+          }
+          foreach ($file in $files) {
+            $fullPath = Join-Path $env:GITHUB_WORKSPACE $file
+            $content = [System.IO.File]::ReadAllText($fullPath)
+            [System.IO.File]::WriteAllText($fullPath, $content, $utf8NoBom)
+          }
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -143,6 +201,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+
+          function Write-Utf8NoBom {
+            param(
+              [Parameter(Mandatory = $true)][string]$Path,
+              [Parameter(Mandatory = $true)][string]$Content
+            )
+            [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+          }
 
           $version = $env:VERSION.TrimStart('v')
           $workdir = Join-Path $env:RUNNER_TEMP 'windows-pack'
@@ -170,20 +237,20 @@ jobs:
 
           $scoop = Get-Content config/windows/scoop/tui-game.json.template -Raw
           $scoop = $scoop.Replace('__VERSION__', $version).Replace('__SHA256__', $sha256)
-          Set-Content -Encoding UTF8 $scoopPath $scoop
+          Write-Utf8NoBom -Path $scoopPath -Content $scoop
 
           $winget = Get-Content config/windows/winget/tui-game.yaml.template -Raw
           $winget = $winget.Replace('__VERSION__', $version).Replace('__SHA256__', $sha256)
-          Set-Content -Encoding UTF8 $wingetPath $winget
+          Write-Utf8NoBom -Path $wingetPath -Content $winget
 
           $nuspec = Get-Content config/windows/chocolatey/tui-game.nuspec.template -Raw
           $nuspec = $nuspec.Replace('__VERSION__', $version)
-          Set-Content -Encoding UTF8 $nuspecOut $nuspec
-          Set-Content -Encoding UTF8 (Join-Path $chocoRoot 'tui-game.nuspec') $nuspec
+          Write-Utf8NoBom -Path $nuspecOut -Content $nuspec
+          Write-Utf8NoBom -Path (Join-Path $chocoRoot 'tui-game.nuspec') -Content $nuspec
 
           $installPs1 = Get-Content config/windows/chocolatey/tools/chocolateyInstall.ps1 -Raw
           $installPs1 = $installPs1.Replace('__VERSION__', $version).Replace('__SHA256__', $sha256)
-          Set-Content -Encoding UTF8 (Join-Path $toolsDir 'chocolateyInstall.ps1') $installPs1
+          Write-Utf8NoBom -Path (Join-Path $toolsDir 'chocolateyInstall.ps1') -Content $installPs1
 
           Copy-Item config/windows/chocolatey/tools/chocolateyUninstall.ps1 (Join-Path $toolsDir 'chocolateyUninstall.ps1')
 
