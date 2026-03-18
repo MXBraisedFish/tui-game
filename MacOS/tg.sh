@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 set +x
 set +v
 set -eu
