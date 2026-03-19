@@ -271,8 +271,13 @@ fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
         })
         .max()
         .unwrap_or(1) as u16;
+    let back_hint_width = UnicodeWidthStr::width(i18n::t("settings.hub.back_hint").as_str()) as u16;
 
-    let width = area.width.saturating_sub(2).max(1).min(content_width.max(1));
+    let width = area
+        .width
+        .saturating_sub(2)
+        .max(1)
+        .min(content_width.max(back_hint_width).max(1));
     let height = (items.len() + 2) as u16;
     let menu_area = Rect {
         x: area.x + area.width.saturating_sub(width) / 2,
