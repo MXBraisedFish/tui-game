@@ -317,7 +317,7 @@ If you like this project, please give my repository a star⭐! It's also my moti
 
 The MacOS version hasn't been tested; I don't have the relevant system devices. If you find bugs, please report them. Thank you very much!
 
-GitHub Repo: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
+GitHub: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 
 ## Future Plans
 > Dreaming big
