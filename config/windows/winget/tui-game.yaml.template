@@ -18,6 +18,10 @@ ReleaseNotesUrl: https://github.com/MXBraisedFish/TUI-GAME/releases/tag/v__VERSI
 Installers:
   - Architecture: x64
     InstallerType: zip
+    NestedInstallerType: portable
+    NestedInstallerFiles:
+      - RelativeFilePath: tui-game.exe
+        PortableCommandAlias: tg
     InstallerUrl: https://github.com/MXBraisedFish/TUI-GAME/releases/download/v__VERSION__/tui-game-__VERSION__-windows.zip
     InstallerSha256: __SHA256__
     Commands:
