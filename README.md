@@ -2,261 +2,240 @@
 
 # Language
 
-**[English](./README-i18n/README-zh-cn.md)**
+**[中文](./README-i18n/README-zh-cn.md)**
 
-# What is this project?
+# What is this project about?
 
-Have you ever thought about playing games in the terminal?
-This project started as a sudden idea, and after several days of intense coding, I created this TUI game collection built with **Rust and Lua**!
+Have you ever thought about playing games in the terminal? This project came to me as a sudden idea, and after days of intense development, I created this TUI game collection built with Rust and Lua!  
+You can secretly play a game while pretending to code or operate a server.  
+(Perfect for sneaky breaks)  
+Basically supports all system terminals: Windows, Linux, MacOS
 
-You can secretly open it and play a round while pretending to write code or operate servers.
-(Perfect for a little sneaky break.)
+> Latest stable version:<br />[![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600&label=Release&labelColor=cc8400&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
 
-Basically supports terminals on all systems: **Windows, Linux, MacOS**
-
-> Latest release:
-> [![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600\&label=Release\&labelColor=cc8400\&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
-
-> Official website
-> In development
+> Official website  
+> Under development
 
 ## Table of Contents
 
-* [Playable Games](#playable-games)
-* [Language Support](#language-support)
-* [Platform Support](#platform-support)
-* [More Details](#more-details)
-* [Installation Guide](#installation-guide)
-  * [Windows](#windows)
-  * [Linux](#linux)
-  * [MacOS](#macos)
-* [Screenshots](#screenshots)
-* [Support the Project - Give it a Star!](#support-the-project---give-it-a-star)
-* [Future Plans](#future-plans)
+- [Playable Games](#playable-games)
+- [Language Support](#language-support)
+- [Platform Support](#platform-support)
+- [More Details](#more-details)
+- [Command Usage Guide](#command-usage-guide)
+- [Installation Guide](#installation-guide)
+  - [Windows](#windows)
+  - [Linux](#linux)
+  - [MacOS](#macos)
+- [Screenshots](#screenshots)
+- [Support This Project - Give a Star!](#support-this-project---give-a-star)
+- [Future Plans](#future-plans)
 
 ## Playable Games
 
-* [2048](#2048)
-* [Blackjack](#blackjack)
-* [Color Memory Game](#color-memory-game)
-* [Lights Out](#lights-out)
-* [Maze Escape](#maze-escape)
-* [Memory Flip](#memory-flip)
-* [Minesweeper](#minesweeper)
-* [Pac-Man](#pac-man)
-* [Rock Paper Scissors](#rock-paper-scissors)
-* [Air Shooter](#air-shooter)
-* [Number Sliding Puzzle](#number-sliding-puzzle)
-* [Snake](#snake)
-* [Solitaire](#solitaire)
-* [Sudoku](#sudoku)
-* [Tetris](#tetris)
-* [Tic-Tac-Toe](#tic-tac-toe)
-* [24 Points](#24-points)
-* [Wordle](#wordle)
+- [2048](#2048)
+- [Blackjack](#blackjack)
+- [Color Memory Game](#color-memory-game)
+- [Lights Out](#lights-out)
+- [Maze Escape](#maze-escape)
+- [Memory Flip](#memory-flip)
+- [Minesweeper](#minesweeper)
+- [Pac-Man](#pac-man)
+- [Rock Paper Scissors](#rock-paper-scissors)
+- [Air Shooter](#air-shooter)
+- [Number Sliding Puzzle](#number-sliding-puzzle)
+- [Snake](#snake)
+- [Solitaire](#solitaire)
+- [Sudoku](#sudoku)
+- [Tetris](#tetris)
+- [Tic-Tac-Toe](#tic-tac-toe)
+- [24 Points](#24-points)
+- [Wordle](#wordle)
 
 ## Language Support
 
-* English
-* Simplified Chinese
+- English
+- 简体中文 (switch in settings)
 
 ## Platform Support
 
-* Windows
-* Linux
-* MacOS (still needs bug testing)
+- Windows
+- Linux
+- MacOS (still needs testing for bugs)
 
 ## More Details
 
-* The compiled version is **bytecode**, no Rust or Lua compiler required, download and play directly
-* Built-in **terminal responsive design**, terminals that are too small will show size warnings
-* Supports **adding new languages**, you can directly add JSON language files in the resource folder
-Some games support a **save feature**, allowing you to continue playing later.
+- Compiled version is **bytecode**, no need for additional Rust or Lua compilers — download and play
+- Built-in terminal **responsiveness**, with size提示 if terminal is too small
+- Supports **custom language additions**, just add JSON language files directly in the resource folder
+- Some games support **save functionality** for continuous play
+
+## Command Usage Guide
+
+- Syntax: `tg [arguments]`
+- Arguments
+  - (no arguments) Launch the game
+  - -v/-V/-version Get current installed version and latest online version
+  - -h/-H/-help Get command usage instructions
+  - -p/-P/-Path Get installation path (for package manager installs, points to symlink)
 
 ## Installation Guide
 
 ### Windows
 
-#### - Terminal Script Installation (Recommended)
-
-> Includes all automatic services (compiled, auto update, quick uninstall, automatic environment variable registration)
-
-```Shell
-# Create folder
-mkdir tui-game
-
-# Enter folder
-cd tui-game
-
-# Download installation script
-# Official source
-curl -L -o windows-tui-game-init.bat https://raw.githubusercontent.com/MXBraisedFish/TUI-GAME/main/windows-tui-game-init.bat
-# Mirror source
-curl -L -o windows-tui-game-init.bat https://fastly.jsdelivr.net/gh/MXBraisedFish/TUI-GAME@main/windows-tui-game-init.bat
-
-# Run installation script
-windows-tui-game-init.bat
-```
-
-#### - Download ZIP Package
-
-> Includes some automatic services (compiled, auto update, quick uninstall, no automatic environment variable registration)
-
+#### Archive
 ```text
-Go to Releases:
-https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+Create a tui-game folder
 
-Download tui-game-windows.zip
+Download tui-game-[version]-windows.zip from Releases
 
-Extract tui-game-windows.zip
+Extract to the tui-game folder
 
-Run tg.bat
+Add the directory to your PATH environment variable
+
+Use the tg command in the terminal to start the game
 ```
 
-#### - Source Code
+#### Package Manager
 
-> Source code version
+#### Scoop
 
-```Shell
-# Create folder
+```bash
+Download the installation manifest tui-game-[version]-windows.json
+
+# Create a tui-game folder
 mkdir tui-game
-
-# Enter folder
 cd tui-game
 
-# Clone source code
-git clone https://github.com/MXBraisedFish/TUI-GAME.git
+Place the installation manifest in the current directory
 
-# Run debug
-cargo run
+# Run the command and follow the prompts to install
+scoop install tui-game-[version]-windows.json
 
-# Build release
-cargo build --release
+# Installation successful, start the program
+tg
+```
+
+#### winget
+
+> Note: This installation method does not support command arguments! (Only the tg command can be used)
+
+```bash
+Download the installation manifest tui-game-[version]-windows.yaml
+
+# Create a tui-game folder
+mkdir tui-game
+cd tui-game
+
+Place the installation manifest in the current directory
+
+# Run the command and follow the prompts to install
+winget install --manifest .
+
+# Installation successful, start the program
+tg
+```
+
+#### Chocolatey
+
+```bash
+Download the installation manifests
+ - tui-game-[version]-windows.nupkg
+ - tui-game-[version]-windows.nuspec
+
+# Create a tui-game folder
+mkdir tui-game
+cd tui-game
+
+Place the installation manifests in the current directory
+
+# Run the command and follow the prompts to install
+choco install tui-game -s . -f
+
+# Installation successful, start the program
+tg
 ```
 
 ### Linux
 
-#### - Terminal Script Installation (Recommended)
-
-> Includes all automatic services (compiled, auto update, quick uninstall, automatic environment variable registration)
-
-```Shell
-# Create folder
-mkdir tui-game
-
-# Enter folder
-cd tui-game
-
-# Download installation script
-# Official source
-curl -L -o linux-tui-game-init.sh https://raw.githubusercontent.com/MXBraisedFish/TUI-GAME/main/linux-tui-game-init.sh
-# Mirror source
-curl -L -o linux-tui-game-init.sh https://fastly.jsdelivr.net/gh/MXBraisedFish/TUI-GAME@main/linux-tui-game-init.sh
-
-# Run installation script
-sh linux-tui-game-init.sh
-```
-
-#### - Download Package
-
-> Includes some automatic services (compiled, auto update, quick uninstall, no automatic environment variable registration)
-
+#### Archive
 ```text
-Go to Releases:
-https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+Create a tui-game folder
 
-Download tui-game-linux.tar.gz
+Download tui-game-[version]-linux.tar.gz from Releases
 
-Extract tui-game-linux.tar.gz
+Extract to the tui-game folder
 
-Run tui-game.sh
+Add the directory to your PATH environment variable
+
+Use the tg command in the terminal to start the game
 ```
 
-#### - Source Code
+#### APT
 
-> Source code version, no automatic services
+```bash
+Download tui-game-[version]-linux.deb from Releases
 
-```Shell
-# Create folder
-mkdir tui-game
+# Run the command and follow the prompts to install
+sudo apt install ./tui-game-[version]-linux.deb
 
-# Enter folder
-cd tui-game
-
-# Clone source code
-git clone https://github.com/MXBraisedFish/TUI-GAME.git
-
-# Run debug
-cargo run
-
-# Build release
-cargo build --release
+# Installation successful, start the program
+tg
 ```
 
-### MacOS (still needs bug testing)
+#### DNF
 
-#### - Terminal Script Installation (Recommended)
+```bash
+Download tui-game-[version]-linux.rpm from Releases
 
-> Includes all automatic services (compiled, auto update, quick uninstall, automatic environment variable registration)
+# Run the command and follow the prompts to install
+sudo dnf install ./tui-game-[version]-linux.rpm
 
-```Shell
-# Create folder
-mkdir tui-game
-
-# Enter folder
-cd tui-game
-
-# Download installation script
-# Official source
-curl -L -o macos-tui-game-init.sh https://raw.githubusercontent.com/MXBraisedFish/TUI-GAME/main/macos-tui-game-init.sh
-# Mirror source
-curl -L -o macos-tui-game-init.sh https://fastly.jsdelivr.net/gh/MXBraisedFish/TUI-GAME@main/macos-tui-game-init.sh
-
-# Run installation script
-sh macos-tui-game-init.sh
+# Installation successful, start the program
+tg
 ```
 
-#### - Download Compiled Version
+### MacOS
 
-> No quick uninstall program, no automatic update program
+> Note: MacOS has not been tested on actual hardware. If you encounter bugs, please submit an Issue. Thank you!
 
+#### Archive
 ```text
-Go to Releases:
-https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+Create a tui-game folder
 
-Download tui-game-macos.zip
+Download tui-game-[version]-macos.tar.gz from Releases
 
-Extract tui-game-macos.zip
+Extract to the tui-game folder
 
-Run tui-game.sh
+Add the directory to your PATH environment variable
+
+Use the tg command in the terminal to start the game
 ```
 
-#### - Source Code
+#### Homebrew
 
-> Source code version, no automatic services
+```bash
+# Download the installation manifest
+Download tui-game-[version]-macos.rb from Releases
 
-```Shell
-# Create folder
+# Create a tui-game folder
 mkdir tui-game
-
-# Enter folder
 cd tui-game
 
-# Clone source code
-git clone https://github.com/MXBraisedFish/TUI-GAME.git
+Place the installation manifest in the current directory
 
-# Run debug
-cargo run
+# Run the command and follow the prompts to install
+brew install tui-game.rb
 
-# Build release
-cargo build --release
+# Installation successful, start the program
+tg
 ```
 
 ## Screenshots
 
-### Home Page & Game List
+### Main Page and Game List
 
-![Home](./README-i18n/image/main-page.png)
+![Main Page](./README-i18n/image/main-page.png)
 ![Game List](./README-i18n/image/game-list.png)
 
 ### 2048
@@ -269,7 +248,7 @@ cargo build --release
 
 ### Color Memory Game
 
-![Color Memory](./README-i18n/image/colormemory.png)
+![Color Memory Game](./README-i18n/image/colormemory.png)
 
 ### Lights Out
 
@@ -288,12 +267,11 @@ cargo build --release
 ![Minesweeper](./README-i18n/image/minesweeper.png)
 
 ### Pac-Man
-
-![Pacman](./README-i18n/image/pacman.png)
+![Pac-Man](./README-i18n/image/pacman.png)
 
 ### Rock Paper Scissors
 
-![RPS](./README-i18n/image/rockpaperscissors.png)
+![Rock Paper Scissors](./README-i18n/image/rockpaperscissors.png)
 
 ### Air Shooter
 
@@ -301,7 +279,7 @@ cargo build --release
 
 ### Number Sliding Puzzle
 
-![Sliding Puzzle](./README-i18n/image/numberslidingpuzzle.png)
+![Number Sliding Puzzle](./README-i18n/image/numberslidingpuzzle.png)
 
 ### Snake
 
@@ -323,7 +301,7 @@ cargo build --release
 
 ### Tic-Tac-Toe
 
-![TicTacToe](./README-i18n/image/tic-tac-toe.png)
+![Tic-Tac-Toe](./README-i18n/image/tic-tac-toe.png)
 
 ### 24 Points
 
@@ -333,39 +311,31 @@ cargo build --release
 
 ![Wordle](./README-i18n/image/wordle.png)
 
-## Support the Project - Give it a Star!
+## Support This Project - Give a Star!
 
-If you like this project, please give my repository a star ⭐!
-It is also the motivation for me to keep updating.
-If you have better ideas or suggestions, feel free to open an Issue.
+If you like this project, please give my repository a star⭐! It's also my motivation to keep updating. If you have any ideas or suggestions, feel free to open an Issue.
 
-The MacOS version has not been tested because I do not have the device.
-If you find any bugs, please report them. Thank you very much!
+The MacOS version hasn't been tested; I don't have the relevant system devices. If you find bugs, please report them. Thank you very much!
 
-GitHub Repo:
-[MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
+GitHub Repo: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 
 ## Future Plans
-
-> Big plans ahead
+> Dreaming big
 
 ### Game Plans
+1. **Roulette** - Includes classic Russian roulette and the famous Devil's roulette
+2. **Code Breaker** - Includes various classic code-breaking games
+3. **Blind Box** - A game of pure luck
+4. **Highway Racing** - Race on the highway
+5. **Dungeon Crawl** - Roguelike dungeon adventure
+6. **Guess the Number** - Guess the number within a set number of rounds
+7. **Color Matche**r - Match a reference color as closely as possible
+8. **Hitori** - Black out duplicate numbers according to the rules
+9. **Nonogram** - Paint shapes based on hints
+10. **Pipe Mania** - Connect pipes so water can flow from start to end
+11. **Breakout** - Bounce the ball to clear all bricks
+12. **Paint by Numbers** - Fill in the colors on a given picture
 
-1. Roulette - Includes classic Russian roulette and the famous devil roulette
-2. Cipher Breaking - Includes multiple classic cipher cracking games
-3. Blind Box - A pure luck-based game
-4. Road Racing - Speed on the highway
-5. Dungeon Adventure - Roguelike dungeon exploration
-6. Guess the Number - Guess the number within limited attempts
-7. Color Matching - Mix colors to match a reference color as closely as possible
-8. Hitori - Eliminate duplicate numbers according to rules
-9. Nonogram - Fill grids according to hints to reveal shapes
-10. Pipes - Connect pipes so water flows from start to end
-11. Breakout - Bounce the ball to clear all bricks
-12. Coloring - Fill the given picture with correct colors
-
-### Extra Features
-
-1. Modding Support - Users can create their own games (API already completed)
-2. Anti-Boss Mode - One-click disguise interface to prevent your boss from discovering you playing (will support multiple computer professions such as DevOps, Frontend, Backend, etc., customizable)
-
+### Additional Features
+1. **Modding** - Users can create their own additional games (basic interfaces are already in place)
+2. **Boss Key** - One-click to open a disguise interface, effectively preventing bosses from catching you slacking off (will support various computer-related professions: operations, frontend, backend, etc., configurable)

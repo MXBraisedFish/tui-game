@@ -11,8 +11,7 @@
 (摸鱼这块)
 基本支持所有系统的终端：Windows，Linux，MacOS
 
-> 最新正式版：  
-> [![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600&label=Release&labelColor=cc8400&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
+> 最新正式版：<br />[![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600&label=Release&labelColor=cc8400&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
 
 > 官方网页
 > 开发中
@@ -23,6 +22,7 @@
 - [语言支持](#语言支持)
 - [平台支持](#平台支持)
 - [更多细节](#更多细节)
+- [指令使用指南](#指令使用指南)
 - [安装指南](#安装指南)
   - [Windows](#Windows)
   - [Linux](#Linux)
@@ -54,8 +54,8 @@
 
 ## 语言支持
 
-- English  
-- 简体中文
+- English
+- 简体中文(在设置中切换)
 
 ## 平台支持
 
@@ -70,183 +70,165 @@
 - 支持**自定义新增语言**，可在资源文件夹直接添加json语言文件
 - 部分游戏支持**存档**功能，便于持续性游玩
 
+## 指令使用指南
+
+- 语法 `tg [参数]`
+- 参数
+  - (无参数) 启动游戏
+  - -v/-V/-version 获取当前安装版本与线上最新版本
+  - -h/-H/-help 获取指令使用说明
+  - -p/-P/- Path  获取安装路径(包管理器安装会指向符号链接)
+
 ## 安装指南
 
 ### Windows
 
-#### - 终端脚本安装(推荐)
-
-> 包含所有自动服务(已编译，自动更新，快捷卸载，自动注册环境变量)
-
-```Shell
-# 新建文件夹
-mkdir tui-game
-
-# 进入文件夹
-cd tui-game
-
-# 拉取安装脚本
-# 官方源
-curl -L -o windows-tui-game-init.bat https://raw.githubusercontent.com/MXBraisedFish/TUI-GAME/main/windows-tui-game-init.bat
-# 镜像源
-curl -L -o windows-tui-game-init.bat https://fastly.jsdelivr.net/gh/MXBraisedFish/TUI-GAME@main/windows-tui-game-init.bat
-
-# 运行安装脚本
-windows-tui-game-init.bat
-```
-
-#### - 下载压缩包
-
-> 包含部分自动服务(已编译，自动更新，快捷卸载，无自动注册环境变量)
-
+#### 压缩包
 ```text
-进入Releases界面:
-https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+新建 tui-game 文件夹
 
-下载压缩包 tui-game-windows.zip
+在 Releases 下载 tui-game-[version]-windows.zip
 
-解压 tui-game-windows.zip
+解压至 tui-game 文件夹
 
-运行 tg.bat 脚本
+在 Path 环境中注册该目录
+
+在终端中使用 tg 指令启动游戏
 ```
 
-#### - 源代码
+#### 包管理器
 
-> 源代码版本
+#### Scoop
 
-```Shell
-# 新建文件夹
+```bash
+下载安装引导文件 tui-game-[version]-windows.json
+
+# 新建 tui-game 文件夹
 mkdir tui-game
-
-# 进入文件夹
 cd tui-game
 
-# 拉取源代码
-git clone https://github.com/MXBraisedFish/TUI-GAME.git
+将安装引导文件放在当前目录
 
-# 运行调试
-cargo run
+# 运行指令，并按照引导进行安装
+scoop install tui-game-[version]-windows.json
 
-# 构建编译
-cargo build --release
+# 安装成功，启动程序
+tg
+```
+
+#### winget
+
+> 注意：该安装方式不支持指令参数！(只可使用 tg 指令)
+
+```bash
+下载安装引导文件 tui-game-[version]-windows.yaml
+
+# 新建 tui-game 文件夹
+mkdir tui-game
+cd tui-game
+
+将安装引导文件放在当前目录
+
+# 运行指令，并按照引导进行安装
+winget install --manifest .
+
+# 安装成功，启动程序
+tg
+```
+
+#### Chocolatey
+
+```bash
+下载安装引导文件
+ - tui-game-[version]-windows.nupkg 
+ - tui-game-[version]-windows.nuspec 
+
+# 新建 tui-game 文件夹
+mkdir tui-game
+cd tui-game
+
+将安装引导文件放在当前目录
+
+# 运行指令，并按照引导进行安装
+choco install tui-game -s . -f
+
+# 安装成功，启动程序
+tg
 ```
 
 ### Linux
 
-#### - 终端脚本安装(推荐)
-
-> 包含所有自动服务(已编译，自动更新，快捷卸载，自动注册环境变量)
-
-```Shell
-# 新建文件夹
-mkdir tui-game
-
-# 进入文件夹
-cd tui-game
-
-# 拉取安装脚本
-# 官方源
-curl -L -o linux-tui-game-init.sh https://raw.githubusercontent.com/MXBraisedFish/TUI-GAME/main/linux-tui-game-init.sh
-# 镜像源
-curl -L -o linux-tui-game-init.sh https://fastly.jsdelivr.net/gh/MXBraisedFish/TUI-GAME@main/linux-tui-game-init.sh
-
-# 运行安装脚本
-sh linux-tui-game-init.sh
-```
-
-#### - 下载压缩包
-
-> 包含部分自动服务(已编译，自动更新，快捷卸载，无自动注册环境变量)
-
+#### 压缩包
 ```text
-进入Releases界面:
-https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+新建 tui-game 文件夹
 
-下载压缩包 tui-game-linux.tar.gz
+在 Releases 下载 tui-game-[version]-linux.tar.gz
 
-解压 tui-game-linux.tar.gz
+解压至 tui-game 文件夹
 
-运行 tui-game.sh 脚本
+在 Path 环境中注册该目录
+
+在终端中使用 tg 指令启动游戏
 ```
 
-#### - 源代码
+#### APT
 
-> 源代码版本，无任何自动服务
+```bash
+在 Releases 下载 tui-game-[version]-linux.deb
 
-```Shell
-# 新建文件夹
-mkdir tui-game
+# 运行指令，并按照引导进行安装
+sudo apt install ./tui-game-[version]-linux.deb
 
-# 进入文件夹
-cd tui-game
-
-# 拉取源代码
-git clone https://github.com/MXBraisedFish/TUI-GAME.git
-
-# 运行调试
-cargo run
-
-# 构建编译
-cargo build --release
+# 安装成功，启动程序
+tg
 ```
 
-### MacOS (仍需测试 bug)
+#### DNF
 
-#### - 终端脚本安装(推荐)
+```bash
+在 Releases 下载 tui-game-[version]-linux.rpm
 
-> 包含所有自动服务(已编译，自动更新，快捷卸载，自动注册环境变量)
+# 运行指令，并按照引导进行安装
+sudo dnf install ./tui-game-[version]-linux.rpm
 
-```Shell
-# 新建文件夹
-mkdir tui-game
-
-# 进入文件夹
-cd tui-game
-
-# 拉取安装脚本
-# 官方源
-curl -L -o macos-tui-game-init.sh https://raw.githubusercontent.com/MXBraisedFish/TUI-GAME/main/macos-tui-game-init.sh
-# 镜像源
-curl -L -o macos-tui-game-init.sh https://fastly.jsdelivr.net/gh/MXBraisedFish/TUI-GAME@main/macos-tui-game-init.sh
-
-# 运行安装脚本
-sh macos-tui-game-init.sh
+# 安装成功，启动程序
+tg
 ```
 
-#### - 下载编译版本
+### MacOS
 
-> 无快捷卸载程序，无自动更新程序
+> 注意：MacOS 系统未经实机测试，如果遇到BUG请及时提交 Issue 反馈，十分感谢！
 
+#### 压缩包
 ```text
-进入Releases界面:
-https://github.com/MXBraisedFish/TUI-GAME/releases/latest
+新建 tui-game 文件夹
 
-下载压缩包 tui-game-macos.zip
+在 Releases 下载 tui-game-[version]-macos.tar.gz 
 
-解压 tui-game-macos.zip
+解压至 tui-game 文件夹
 
-运行 tui-game.sh 脚本
+在 Path 环境中注册该目录
+
+在终端中使用 tg 指令启动游戏
 ```
 
-#### - 源代码
+#### Homebrew
 
-> 源代码版本，无任何自动服务
+```bash
+# 下载安装引导文件
+在 Releases 下载 tui-game-[version]-macos.rb
 
-```Shell
-# 新建文件夹
+# 新建 tui-game 文件夹
 mkdir tui-game
-
-# 进入文件夹
 cd tui-game
 
-# 拉取源代码
-git clone https://github.com/MXBraisedFish/TUI-GAME.git
+将安装引导文件放在当前目录
 
-# 运行调试
-cargo run
+# 运行指令，并按照引导进行安装
+brew install tui-game.rb
 
-# 构建编译
-cargo build --release
+# 安装成功，启动程序
+tg
 ```
 
 ## 界面截图
@@ -341,19 +323,19 @@ GitHub Repo: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 > 画大饼咯
 
 ### 游戏计划
-1. 轮盘赌 - 包含经典的俄罗斯轮盘赌和有名的恶魔轮盘赌游戏
-2. 破译密码 - 包含多种经典密码破译
-3. 抽盲盒 - 更纯粹的拼运气游戏
-4. 公路赛车 - 在公路上飙车
-5. 地牢探险 - Roguelike地牢冒险
-6. 猜数字 - 在规定的对举内猜出数字
-7. 配颜色 - 根据参考色尽可能地调出相近地颜色
-8. Hitori(数阵去重) - 按照规则将重复的数字涂黑
-9. Nonogram(数织) - 按照提示涂出形状
-10. 接水管 - 让水流可以从起点流向重点
-11. Breakout(打砖块) - 反弹小球清空所有方块
-12. 绘图填色 - 在给定的图片里添上对应的颜色
+1. **轮盘赌** - 包含经典的俄罗斯轮盘赌和有名的恶魔轮盘赌游戏
+2. **破译密码** - 包含多种经典密码破译
+3. **抽盲盒** - 更纯粹的拼运气游戏
+4. **公路赛车** - 在公路上飙车
+5. **地牢探险** - Roguelike地牢冒险
+6. **猜数字** - 在规定的对局内猜出数字
+7. **调色师** - 根据参考色尽可能地调出相近的颜色
+8. **Hitori(数阵去重)** - 按照规则将重复的数字涂黑
+9. **Nonogram(数织)** - 按照提示涂出形状
+10. **接水管** - 让水流可以从起点流向重点
+11. **Breakout(打砖块)** - 反弹小球清空所有方块
+12. **绘图填色** - 在给定的图片里添上对应的颜色
 
 ### 额外功能
-1. 模组制作 - 用户自己制作额外的游戏(目前已经完成了接口)
-2. 防老板功能 - 一键打开伪装功能界面，有效防止被老板发现摸鱼(而且会支持各个计算机行业：运维、前端、后端等等都会有，可设置)
+1. **模组制作** - 用户自己制作额外的游戏(目前已经完成了基础接口)
+2. **防老板功能** - 一键打开伪装功能界面，有效防止被老板发现摸鱼(而且会支持各个计算机行业：运维、前端、后端等等都会有，可设置)
