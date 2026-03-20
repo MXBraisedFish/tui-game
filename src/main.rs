@@ -127,7 +127,7 @@ fn run() -> Result<()> {
     let mut session = TerminalSession::new()?;
     // 记录当前运行版本。
     let runtime_version = normalized_tag(RUNTIME_VERSION);
-    // ???????????????????????????
+    // 记录当前运行版本。
     let update_check_rx = spawn_update_check(runtime_version.clone());
     let mut update_hint: Option<String> = None;
     // 初始页面为主菜单。
@@ -140,19 +140,19 @@ fn run() -> Result<()> {
     loop {
         let frame_start = Instant::now();
 
-        // ????????????????????????
+        // 同步主菜单里的继续游戏入口显示状态。
         if let AppState::MainMenu { menu } = &mut state {
             sync_continue_item(menu);
         }
 
-        // ?????????????????????????
+        // 尝试读取后台版本检查结果。
         if update_hint.is_none() {
             if let Ok(Some(latest_tag)) = update_check_rx.try_recv() {
                 update_hint = Some(latest_tag);
             }
         }
 
-        // ???????????????????? Esc/Q ?????
+        // 检查当前页面尺寸，并允许在尺寸警告界面按 Esc/Q 退出。
         let (min_width, min_height) = minimum_size_for_state(&state);
         let size_state = size_watcher::check_size(min_width, min_height)?;
 
@@ -507,10 +507,10 @@ fn normalized_tag(raw: &str) -> String {
 }
 
 
-/// ???????????
+/// 启动后台更新检查线程。
 ///
-/// ?????? GitHub ???? tag????????????
-/// ?? `Some(latest_tag)`????? `None`?
+/// 如果检测到 GitHub 上存在更高版本的 tag，则通过通道返回。
+/// 返回 `Some(latest_tag)` 表示有更新，否则返回 `None`。
 fn spawn_update_check(current_version: String) -> Receiver<Option<String>> {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
@@ -520,7 +520,7 @@ fn spawn_update_check(current_version: String) -> Receiver<Option<String>> {
     rx
 }
 
-/// ?? GitHub ???????????????
+/// 向 GitHub 查询最新发布版本。
 fn check_latest_release(current_version: &str) -> Result<Option<String>> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(10))
@@ -539,9 +539,9 @@ fn check_latest_release(current_version: &str) -> Result<Option<String>> {
     }
 }
 
-/// ?????????????????
+/// 比较远端版本是否更新。
 ///
-/// ??????? `vX.Y.Z` ? `X.Y.Z`?????????????
+/// 支持比较 `vX.Y.Z` 和 `X.Y.Z` 这两类版本格式。
 fn is_remote_version_newer(current_version: &str, remote_version: &str) -> bool {
     let current = parse_version_segments(current_version);
     let remote = parse_version_segments(remote_version);
@@ -559,7 +559,7 @@ fn is_remote_version_newer(current_version: &str, remote_version: &str) -> bool 
     false
 }
 
-/// ?????????????????
+/// 解析版本号中的数字段。
 fn parse_version_segments(version: &str) -> Vec<u32> {
     let trimmed = version
         .trim()

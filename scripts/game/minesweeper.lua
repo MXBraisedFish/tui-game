@@ -923,7 +923,8 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
         tr("warning.size_title"),
         string.format("%s: %dx%d", tr("warning.required"), min_w, min_h),
         string.format("%s: %dx%d", tr("warning.current"), term_w, term_h),
-        tr("warning.enlarge_hint")
+        tr("warning.enlarge_hint"),
+        tr("warning.back_to_game_list_hint")
     }
 
     local top = math.floor((term_h - #lines) / 2)

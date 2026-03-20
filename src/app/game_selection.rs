@@ -355,32 +355,19 @@ impl GameSelection {
                 top_lines.push(Line::from(i18n::t("game.memory_flip.best_none")));
             }
         } else if game.id == "minesweeper" {
-            if let Some(best) = self.minesweeper_best {
-                let fmt = |v: Option<u64>| -> String {
-                    match v {
-                        Some(sec) => stats::format_duration(sec),
-                        None => "-".to_string(),
-                    }
-                };
-                top_lines.push(Line::from(i18n::t("game.minesweeper.best_title")));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.minesweeper.best_d1"),
-                    fmt(best.d1_min_time_sec)
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.minesweeper.best_d2"),
-                    fmt(best.d2_min_time_sec)
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.minesweeper.best_d3"),
-                    fmt(best.d3_min_time_sec)
-                )));
+            let (d1, d2, d3) = if let Some(best) = self.minesweeper_best {
+                (
+                    best.d1_min_time_sec.map(stats::format_duration).unwrap_or_else(|| "--".to_string()),
+                    best.d2_min_time_sec.map(stats::format_duration).unwrap_or_else(|| "--".to_string()),
+                    best.d3_min_time_sec.map(stats::format_duration).unwrap_or_else(|| "--".to_string()),
+                )
             } else {
-                top_lines.push(Line::from(i18n::t("game.minesweeper.best_none")));
-            }
+                ("--".to_string(), "--".to_string(), "--".to_string())
+            };
+            top_lines.push(Line::from(i18n::t("game.minesweeper.best_title")));
+            top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d1"), d1)));
+            top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d2"), d2)));
+            top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d3"), d3)));
         } else if game.id == "maze_escape" {
             if let Some(best) = self.maze_escape_best {
                 let size = if best.max_cols > 0 && best.max_rows > 0 {

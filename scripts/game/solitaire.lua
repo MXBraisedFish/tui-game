@@ -1150,12 +1150,14 @@ local function draw_size_warning(term_w, term_h, min_w, min_h)
     local req = tr("warning.required") .. ": " .. tostring(min_w) .. "x" .. tostring(min_h)
     local cur = tr("warning.current") .. ": " .. tostring(term_w) .. "x" .. tostring(term_h)
     local hint = tr("warning.enlarge_hint")
+    local quit_hint = tr("warning.back_to_game_list_hint")
 
     local y = math.max(2, math.floor(term_h / 2) - 2)
     draw_text(centered_x(title, 1, term_w), y, title, "yellow", "black")
     draw_text(centered_x(req, 1, term_w), y + 1, req, "white", "black")
     draw_text(centered_x(cur, 1, term_w), y + 2, cur, "white", "black")
     draw_text(centered_x(hint, 1, term_w), y + 3, hint, "dark_gray", "black")
+    draw_text(centered_x(quit_hint, 1, term_w), y + 4, quit_hint, "dark_gray", "black")
 end
 
 -- 获取牌的两字符表示
@@ -1729,24 +1731,32 @@ end
 -- 输入处理
 local function input_tick()
     local key = normalize_key(get_key(false))
-    if key == "" then return end
+    if key == "" then return nil end
+
+    if state.size_warning_active then
+        if key == "q" or key == "esc" then
+            return "exit"
+        end
+        return nil
+    end
 
     if state.mode_input then
         handle_mode_input_key(key)
-        return
+        return nil
     end
 
     if state.confirm_mode ~= nil then
         handle_confirm_key(key)
-        return
+        return nil
     end
 
     if state.won then
         handle_result_key(key)
-        return
+        return nil
     end
 
     handle_normal_key(key)
+    return nil
 end
 
 -- 主游戏循环
@@ -1766,7 +1776,10 @@ local function game_loop()
 
         auto_save_tick()
         update_message_timer()
-        input_tick()
+        local action = input_tick()
+        if action == "exit" then
+            return
+        end
 
         local tw, th = terminal_size()
         if tw ~= state.last_term_w or th ~= state.last_term_h then

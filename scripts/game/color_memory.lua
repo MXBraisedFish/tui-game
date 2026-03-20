@@ -325,7 +325,8 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
         tr("warning.size_title"),
         string.format("%s: %dx%d", tr("warning.required"), min_w, min_h),
         string.format("%s: %dx%d", tr("warning.current"), term_w, term_h),
-        tr("warning.enlarge_hint")
+        tr("warning.enlarge_hint"),
+        tr("warning.back_to_game_list_hint")
     }
     local top = math.floor((term_h - #lines) / 2)
     if top < 1 then top = 1 end
@@ -824,6 +825,16 @@ end
 local function game_loop()
     while state.running do
         local key = normalize_key(get_key(false))
+        if not ensure_terminal_size_ok() then
+            if key == "q" or key == "esc" then
+                return
+            end
+
+            state.frame = state.frame + 1
+            sleep(FRAME_MS)
+            goto continue
+        end
+
         local action = handle_input(key)
         if action == "exit" then
             return
@@ -834,6 +845,8 @@ local function game_loop()
 
         state.frame = state.frame + 1
         sleep(FRAME_MS)
+
+        ::continue::
     end
 end
 

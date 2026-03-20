@@ -416,7 +416,8 @@ local function draw_terminal_size_warning(tw, th, mw, mh)
         tr("warning.size_title"),
         string.format("%s: %dx%d", tr("warning.required"), mw, mh),
         string.format("%s: %dx%d", tr("warning.current"), tw, th),
-        tr("warning.enlarge_hint")
+        tr("warning.enlarge_hint"),
+        tr("warning.back_to_game_list_hint")
     }
     local top = math.floor((th - #ls) / 2)
     if top < 1 then top = 1 end
@@ -719,11 +720,17 @@ end
 -- 主游戏循环
 local function game_loop()
     while true do
+        local k = normalize_key(get_key(false))
+
         if not ensure_terminal_size_ok() then
+            if k == "q" or k == "esc" then
+                exit_game()
+                return
+            end
+
             sleep(FRAME_MS)
             S.frame = S.frame + 1
         else
-            local k = normalize_key(get_key(false))
             local a = "none"
 
             if k ~= "" then

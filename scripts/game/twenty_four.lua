@@ -638,7 +638,8 @@ local function draw_terminal_size_warning(tw, th, mw, mh)
         tr("warning.size_title"),
         string.format("%s: %dx%d", tr("warning.required"), mw, mh),
         string.format("%s: %dx%d", tr("warning.current"), tw, th),
-        tr("warning.enlarge_hint")
+        tr("warning.enlarge_hint"),
+        tr("warning.back_to_game_list_hint")
     }
     local top = math.floor((th - #ls) / 2)
     if top < 1 then top = 1 end

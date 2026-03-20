@@ -178,6 +178,17 @@ local function fill_line(y, width)
     draw_text(1, y, string.rep(" ", width), "white", "black")
 end
 
+-- 填充矩形区域（用于局部清屏，避免整屏闪烁）
+local function fill_rect(x, y, width, height)
+    if width <= 0 or height <= 0 then
+        return
+    end
+    local blank = string.rep(" ", width)
+    for row = 0, height - 1 do
+        draw_text(x, y + row, blank, "white", "black")
+    end
+end
+
 -- 随机生成牌面
 local function random_rank()
     local n = random(13) + 1
@@ -613,7 +624,6 @@ end
 
 -- 渲染函数（完整绘制一次）
 local function render_once()
-    clear()
     local w, h = terminal_size()
     local controls = tr("game.blackjack.controls")
     local ctrl_lines = wrap_words(controls, math.max(10, w - 2))
@@ -637,6 +647,9 @@ local function render_once()
     local table_x = math.floor((w - TABLE_W) / 2)
     if table_x < 1 then table_x = 1 end
     local table_right = table_x + TABLE_W - 1
+
+    -- 仅清理本局布局实际占用的区域，避免每次操作都整屏 clear 导致闪烁
+    fill_rect(table_x, table_y, TABLE_W, TABLE_H)
 
     -- 居中计算辅助函数
     local function centered_x(text, left_x, right_x)
@@ -1317,7 +1330,8 @@ local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
         tr("warning.size_title"),
         string.format("%s: %dx%d", tr("warning.required"), min_w, min_h),
         string.format("%s: %dx%d", tr("warning.current"), term_w, term_h),
-        tr("warning.enlarge_hint")
+        tr("warning.enlarge_hint"),
+        tr("warning.back_to_game_list_hint")
     }
     local top = math.floor((term_h - #lines) / 2)
     if top < 1 then top = 1 end
