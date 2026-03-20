@@ -48,16 +48,41 @@ pub enum GameSelectionAction {
 }
 
 impl GameSelection {
+    fn load_supporting_data(
+    ) -> (
+        HashMap<String, GameStats>,
+        Option<LightsOutBest>,
+        Option<MemoryFlipBest>,
+        Option<MinesweeperBest>,
+        Option<MazeEscapeBest>,
+        Option<SolitaireBest>,
+        Option<SudokuBest>,
+        Option<u64>,
+    ) {
+        (
+            stats::load_stats(),
+            stats::load_lights_out_best(),
+            stats::load_memory_flip_best(),
+            stats::load_minesweeper_best(),
+            stats::load_maze_escape_best(),
+            stats::load_solitaire_best(),
+            stats::load_sudoku_best(),
+            stats::load_twenty_four_best_time(),
+        )
+    }
+
     /// 根据扫描到的游戏列表和本地成绩数据创建游戏选择页状态。
     pub fn new(games: Vec<GameMeta>) -> Self {
-        let stats = stats::load_stats();
-        let lights_out_best = stats::load_lights_out_best();
-        let memory_flip_best = stats::load_memory_flip_best();
-        let minesweeper_best = stats::load_minesweeper_best();
-        let maze_escape_best = stats::load_maze_escape_best();
-        let solitaire_best = stats::load_solitaire_best();
-        let sudoku_best = stats::load_sudoku_best();
-        let twenty_four_best_time_sec = stats::load_twenty_four_best_time();
+        let (
+            stats,
+            lights_out_best,
+            memory_flip_best,
+            minesweeper_best,
+            maze_escape_best,
+            solitaire_best,
+            sudoku_best,
+            twenty_four_best_time_sec,
+        ) = Self::load_supporting_data();
         let initial_page_size = games.len().max(1);
 
         let mut list_state = ListState::default();
@@ -85,6 +110,60 @@ impl GameSelection {
             detail_scroll: 0,
             detail_scroll_available: false,
         }
+    }
+
+    /// 刷新游戏列表和成绩数据，但尽量保留当前选中的游戏、分页和详情滚动位置。
+    pub fn refresh_preserving_selection(&mut self, games: Vec<GameMeta>) {
+        let selected_id = self.selected_game().map(|g| g.id.clone());
+        let previous_global = self.selected_global_index().unwrap_or(0);
+        let previous_scroll = self.detail_scroll;
+
+        let (
+            stats,
+            lights_out_best,
+            memory_flip_best,
+            minesweeper_best,
+            maze_escape_best,
+            solitaire_best,
+            sudoku_best,
+            twenty_four_best_time_sec,
+        ) = Self::load_supporting_data();
+
+        self.games = games;
+        self.stats = stats;
+        self.lights_out_best = lights_out_best;
+        self.memory_flip_best = memory_flip_best;
+        self.minesweeper_best = minesweeper_best;
+        self.maze_escape_best = maze_escape_best;
+        self.solitaire_best = solitaire_best;
+        self.sudoku_best = sudoku_best;
+        self.twenty_four_best_time_sec = twenty_four_best_time_sec;
+        self.launch_placeholder = false;
+
+        if self.games.is_empty() {
+            self.list_state.select(None);
+            self.page_state.current_page = 0;
+            self.page_state.total_pages = 1;
+            self.detail_scroll = 0;
+            self.detail_scroll_available = false;
+            return;
+        }
+
+        let target_global = selected_id
+            .and_then(|id| self.games.iter().position(|g| g.id == id))
+            .unwrap_or_else(|| previous_global.min(self.games.len().saturating_sub(1)));
+
+        let page_size = self.page_state.page_size.max(1);
+        self.page_state.total_pages =
+            ((self.games.len() + page_size.saturating_sub(1)) / page_size).max(1);
+        self.page_state.current_page =
+            (target_global / page_size).min(self.page_state.total_pages.saturating_sub(1));
+
+        let start = self.page_state.current_page * page_size;
+        let page_len = (self.games.len() - start).min(page_size);
+        let selected_in_page = (target_global - start).min(page_len.saturating_sub(1));
+        self.list_state.select(Some(selected_in_page));
+        self.detail_scroll = previous_scroll;
     }
 
     /// 处理游戏选择页按键事件，并返回需要主程序执行的高层动作。

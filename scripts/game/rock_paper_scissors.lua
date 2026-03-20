@@ -23,6 +23,7 @@ local state = {
     -- 连胜记录
     current_streak = 0,     -- 当前连胜数
     best_streak = 0,        -- 历史最佳连胜
+    loss_streak = 0,        -- 当前连续输给系统的次数（用于保底）
 
     -- 消息显示
     message = "",           -- 提示消息
@@ -204,10 +205,37 @@ local function resolve_round(player_idx, ai_idx)
     return -1
 end
 
+-- 获取当前连输下的玩家保底胜率
+-- 第 1 次连输后开始提升，第 8 把前强制保底为 100%
+local function player_win_bias(loss_streak)
+    if loss_streak <= 0 then
+        return 0
+    end
+    if loss_streak >= 7 then
+        return 1
+    end
+    return loss_streak / 8
+end
+
+-- 根据玩家选择生成 AI 选择
+-- 为了避免玩家长时间连续失败，系统会根据连输次数逐步提高“本局玩家必胜”的概率
+local function pick_ai_choice(player_idx)
+    local bias = player_win_bias(state.loss_streak)
+    if bias > 0 then
+        local roll = (random(1000) + 1) / 1000
+        if roll <= bias then
+            if player_idx == 1 then return 3 end -- 剪刀胜布
+            if player_idx == 2 then return 1 end -- 石头胜剪刀
+            return 2                             -- 布胜石头
+        end
+    end
+    return random(3) + 1
+end
+
 -- 进行一回合
 local function play_round(player_idx)
-    -- AI随机选择
-    local ai_idx = random(3) + 1
+    -- AI 选择：基础随机 + 连输保底修正
+    local ai_idx = pick_ai_choice(player_idx)
     state.player_pick = player_idx
     state.ai_pick = ai_idx
 
@@ -216,6 +244,7 @@ local function play_round(player_idx)
     if result > 0 then
         -- 玩家胜
         state.current_streak = state.current_streak + 1
+        state.loss_streak = 0
         if state.current_streak > state.best_streak then
             state.best_streak = state.current_streak
             save_best()
@@ -225,11 +254,13 @@ local function play_round(player_idx)
     elseif result < 0 then
         -- AI胜
         state.current_streak = 0
+        state.loss_streak = state.loss_streak + 1
         state.message = tr("game.rock_paper_scissors.lose_banner") .. " " .. controls
         state.message_color = "red"
     else
         -- 平局
         state.current_streak = 0
+        -- 平局不影响连输保底
         state.message = tr("game.rock_paper_scissors.draw_banner") .. " " .. controls
         state.message_color = "yellow"
     end
@@ -242,6 +273,7 @@ local function reset_round()
     state.player_pick = nil
     state.ai_pick = nil
     state.current_streak = 0
+    state.loss_streak = 0
     state.message = tr("game.rock_paper_scissors.ready_banner")
     state.message_color = "dark_gray"
     state.dirty = true

@@ -13,8 +13,7 @@ Basically supports all system terminals: Windows, Linux, MacOS
 
 > Latest stable version:<br />[![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600&label=Release&labelColor=cc8400&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
 
-> Official website  
-> Under development
+> Official website<br />Under development
 
 ## Table of Contents
 
@@ -335,6 +334,7 @@ GitHub: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 10. **Pipe Mania** - Connect pipes so water can flow from start to end
 11. **Breakout** - Bounce the ball to clear all bricks
 12. **Paint by Numbers** - Fill in the colors on a given picture
+13. **Sokoban** - Move the boxes to the designated locations.
 
 ### Additional Features
 1. **Modding** - Users can create their own additional games (basic interfaces are already in place)

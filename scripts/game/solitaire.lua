@@ -954,6 +954,51 @@ local function move_cell_to_foundation()
     return false
 end
 
+-- 空当接龙自动回收：把当前可直接放入基础牌堆的牌持续送入回收单元
+local function auto_collect_freecell()
+    if state.mode ~= MODE_FREECELL or state.won then return false end
+
+    local changed = false
+    local moved = true
+    while moved do
+        moved = false
+
+        -- 优先尝试从自由单元回收，减少占位
+        for i = 1, 4 do
+            local card = state.cells[i]
+            if card ~= nil and can_place_foundation(card.suit, card) then
+                state.cells[i] = nil
+                state.foundations[card.suit][#state.foundations[card.suit] + 1] = card
+                changed = true
+                moved = true
+                break
+            end
+        end
+
+        -- 如果这一轮自由单元没有回收成功，再检查各列顶牌
+        if not moved then
+            for col = 1, #state.tableau do
+                local pile = state.tableau[col]
+                local card = pile[#pile]
+                if card ~= nil and card.face_up and can_place_foundation(card.suit, card) then
+                    table.remove(pile, #pile)
+                    state.foundations[card.suit][#state.foundations[card.suit] + 1] = card
+                    reveal_new_top(col)
+                    changed = true
+                    moved = true
+                    break
+                end
+            end
+        end
+    end
+
+    if changed then
+        state.dirty = true
+        check_win()
+    end
+    return changed
+end
+
 -- 从牌堆抽牌（克朗代克）
 local function draw_from_stock_klondike()
     if state.mode ~= MODE_KLONDIKE then return false end
@@ -1121,6 +1166,7 @@ local function deal_new_game(mode, diff)
     state.undo_stack = {}
     clear_message()
     flush_input_buffer()
+    auto_collect_freecell()
     state.dirty = true
 end
 
@@ -1269,6 +1315,31 @@ local function foundation_label(slot)
     return "[" .. rank_text(pile[#pile].rank) .. "]"
 end
 
+-- 获取基础牌堆标签和颜色
+local function foundation_label_and_color(slot)
+    local pile = state.foundations[slot]
+    if #pile == 0 then return "[ ]", "white" end
+    local card = pile[#pile]
+    return "[" .. rank_text(card.rank) .. "]", card_color(card)
+end
+
+-- 以居中的方式按片段绘制一整行文本，便于给同一行里的不同牌面着色
+local function draw_centered_segments(term_w, y, segments)
+    local total = 0
+    for i = 1, #segments do
+        total = total + text_width(segments[i][1])
+    end
+
+    local x = math.max(1, math.floor((term_w - total) / 2) + 1)
+    for i = 1, #segments do
+        local text_seg = segments[i][1]
+        local fg = segments[i][2] or "white"
+        local bg = segments[i][3] or "black"
+        draw_text(x, y, text_seg, fg, bg)
+        x = x + text_width(text_seg)
+    end
+end
+
 -- 绘制颜色提示
 local function draw_color_hint(term_w, y)
     local red_text = tr("game.solitaire.color_hint.red")
@@ -1319,18 +1390,35 @@ local function draw_top_bar(term_w)
     end
 
     if state.mode == MODE_FREECELL then
-        local cells = ""
+        local segments = {
+            { tr("game.solitaire.cells"), "white", "black" },
+            { " ", "white", "black" },
+        }
         for i = 1, 4 do
-            if state.cells[i] == nil then
-                cells = cells .. "[  ] "
+            local card = state.cells[i]
+            if card == nil then
+                segments[#segments + 1] = { "[  ]", "white", "black" }
             else
-                cells = cells .. "[" .. card_two_chars(state.cells[i]) .. "] "
+                segments[#segments + 1] = { "[" .. card_two_chars(card) .. "]", card_color(card), "black" }
+            end
+            if i < 4 then
+                segments[#segments + 1] = { " ", "white", "black" }
             end
         end
-        local f = foundation_label(1) ..
-        " " .. foundation_label(2) .. " " .. foundation_label(3) .. " " .. foundation_label(4)
-        local line2 = tr("game.solitaire.cells") .. " " .. cells .. "   " .. tr("game.solitaire.foundations") .. " " .. f
-        draw_text(centered_x(line2, 1, term_w), 4, line2, "white", "black")
+
+        segments[#segments + 1] = { "   ", "white", "black" }
+        segments[#segments + 1] = { tr("game.solitaire.foundations"), "white", "black" }
+        segments[#segments + 1] = { " ", "white", "black" }
+
+        for i = 1, 4 do
+            local label, color = foundation_label_and_color(i)
+            segments[#segments + 1] = { label, color, "black" }
+            if i < 4 then
+                segments[#segments + 1] = { " ", "white", "black" }
+            end
+        end
+
+        draw_centered_segments(term_w, 4, segments)
     elseif state.mode == MODE_KLONDIKE then
         local w1, w2, w3 = "  ", "  ", "  "
         local c1, c2, c3 = nil, nil, nil
@@ -1346,26 +1434,30 @@ local function draw_top_bar(term_w)
             c3 = state.waste[#state.waste - 2]
             w3 = card_two_chars(c3)
         end
-        local f = foundation_label(1) ..
-        " " .. foundation_label(2) .. " " .. foundation_label(3) .. " " .. foundation_label(4)
-        local prefix = tr("game.solitaire.stock") ..
-            " [##]   " .. tr("game.solitaire.waste") .. " ["
-        local suffix = "]   " .. tr("game.solitaire.foundations") .. " " .. f
-        local line2 = prefix .. w3 .. " " .. w2 .. " " .. w1 .. suffix
-        local x = centered_x(line2, 1, term_w)
-        draw_text(x, 4, prefix, "white", "black")
-        x = x + text_width(prefix)
-        draw_text(x, 4, w3, c3 and card_color(c3) or "white", "black")
-        x = x + text_width(w3)
-        draw_text(x, 4, " ", "white", "black")
-        x = x + 1
-        draw_text(x, 4, w2, c2 and card_color(c2) or "white", "black")
-        x = x + text_width(w2)
-        draw_text(x, 4, " ", "white", "black")
-        x = x + 1
-        draw_text(x, 4, w1, c1 and card_color(c1) or "white", "black")
-        x = x + text_width(w1)
-        draw_text(x, 4, suffix, "white", "black")
+        local segments = {
+            { tr("game.solitaire.stock"), "white", "black" },
+            { " [##]   ", "white", "black" },
+            { tr("game.solitaire.waste"), "white", "black" },
+            { " [", "white", "black" },
+            { w3, c3 and card_color(c3) or "white", "black" },
+            { " ", "white", "black" },
+            { w2, c2 and card_color(c2) or "white", "black" },
+            { " ", "white", "black" },
+            { w1, c1 and card_color(c1) or "white", "black" },
+            { "]   ", "white", "black" },
+            { tr("game.solitaire.foundations"), "white", "black" },
+            { " ", "white", "black" },
+        }
+
+        for i = 1, 4 do
+            local label, color = foundation_label_and_color(i)
+            segments[#segments + 1] = { label, color, "black" }
+            if i < 4 then
+                segments[#segments + 1] = { " ", "white", "black" }
+            end
+        end
+
+        draw_centered_segments(term_w, 4, segments)
     else
         local line2 = tr("game.solitaire.spider_stock") .. " " .. tostring(math.floor(#state.stock / 10))
             .. "   " .. tr("game.solitaire.spider_removed") .. " " .. tostring(state.spider_removed) .. "/8"
@@ -1627,14 +1719,29 @@ local function handle_normal_key(key)
             local src, dst = state.selected_col, state.cursor_col
             local start_idx = pick_start_from_depth(src, state.selected_pick_depth or 1)
             if src ~= dst and start_idx ~= nil and move_tableau_stack(src, dst, start_idx) then
-                if state.mode == MODE_SPIDER then remove_spider_complete_runs() else check_win() end
+                if state.mode == MODE_SPIDER then
+                    remove_spider_complete_runs()
+                elseif state.mode == MODE_FREECELL then
+                    auto_collect_freecell()
+                else
+                    check_win()
+                end
             else
                 show_message(tr("game.solitaire.move_invalid"), "red", 2, false)
             end
         else
-            if not move_column_top_to_foundation(state.cursor_col) then
-                if state.mode == MODE_KLONDIKE then move_waste_to_foundation() end
-                if state.mode == MODE_FREECELL then move_cell_to_foundation() end
+            local moved_to_foundation = move_column_top_to_foundation(state.cursor_col)
+            if not moved_to_foundation then
+                if state.mode == MODE_KLONDIKE then
+                    moved_to_foundation = move_waste_to_foundation()
+                end
+                if state.mode == MODE_FREECELL then
+                    moved_to_foundation = move_cell_to_foundation()
+                end
+            end
+
+            if moved_to_foundation and state.mode == MODE_FREECELL then
+                auto_collect_freecell()
             end
         end
         return
@@ -1656,6 +1763,8 @@ local function handle_normal_key(key)
         else
             if not move_column_to_cell(state.cursor_col) then
                 show_message(tr("game.solitaire.cell_full"), "dark_gray", 2, false)
+            else
+                auto_collect_freecell()
             end
         end
         clamp_cursor_pick_depth()
@@ -1670,6 +1779,8 @@ local function handle_normal_key(key)
         elseif state.mode == MODE_FREECELL then
             if not move_cell_to_column(state.cursor_col) then
                 show_message(tr("game.solitaire.cell_empty"), "dark_gray", 2, false)
+            else
+                auto_collect_freecell()
             end
         end
         clamp_cursor_pick_depth()

@@ -316,7 +316,7 @@ fn handle_key_event(
                                 );
                             }
                             let games = scan_scripts().unwrap_or_default();
-                            *ui = GameSelection::new(games);
+                            ui.refresh_preserving_selection(games);
                         }
                     }
                     KeyCode::Char('n')
@@ -355,7 +355,7 @@ fn handle_key_event(
                             eprintln!("Failed to run game '{}': {err:#}", game.id);
                         }
                         let games = scan_scripts().unwrap_or_default();
-                        *ui = GameSelection::new(games);
+                        ui.refresh_preserving_selection(games);
                     }
                 }
             }

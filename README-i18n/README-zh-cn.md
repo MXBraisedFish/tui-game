@@ -13,8 +13,7 @@
 
 > 最新正式版：<br />[![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600&label=Release&labelColor=cc8400&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
 
-> 官方网页
-> 开发中
+> 官方网页<br />开发中
 
 ## 目录
 
@@ -335,6 +334,7 @@ GitHub: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 10. **接水管** - 让水流可以从起点流向重点
 11. **Breakout(打砖块)** - 反弹小球清空所有方块
 12. **绘图填色** - 在给定的图片里添上对应的颜色
+13. **推箱子** - 把箱子移动到指定位置
 
 ### 额外功能
 1. **模组制作** - 用户自己制作额外的游戏(目前已经完成了基础接口)
