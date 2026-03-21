@@ -13,7 +13,7 @@ Basically supports all system terminals: Windows, Linux, MacOS
 
 > Latest stable version:<br />[![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600&label=Release&labelColor=cc8400&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
 
-> Official website<br />Under development
+> Official website<br />Under development......
 
 ## Table of Contents
 
