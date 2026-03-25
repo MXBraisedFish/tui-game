@@ -71,9 +71,9 @@ Basically supports all system terminals: Windows, Linux, MacOS
 
 ## Command Usage Guide
 
-- Syntax: `tg [arguments]`
-- Arguments
-  - (no arguments) Launch the game
+- Syntax: `tg [option]`
+- Options
+  - (no option) Launch the game
   - -v/-V/-version Get current installed version and latest online version
   - -h/-H/-help Get command usage instructions
   - -p/-P/-Path Get installation path (for package manager installs, points to symlink)
