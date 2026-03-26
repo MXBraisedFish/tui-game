@@ -41,7 +41,7 @@ pub struct MinesweeperBest {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// 走迷宫最佳记录。
+/// 迷宫逃脱最佳记录。
 pub struct MazeEscapeBest {
     pub max_area: usize,
     pub max_cols: usize,
@@ -188,7 +188,7 @@ pub fn load_minesweeper_best() -> Option<MinesweeperBest> {
     })
 }
 
-/// 从共享 Lua 存档文件中读取走迷宫的最佳记录。
+/// 从共享 Lua 存档文件中读取迷宫逃脱的最佳记录。
 pub fn load_maze_escape_best() -> Option<MazeEscapeBest> {
     let path = lua_saves_file_path();
     if !path.exists() {
