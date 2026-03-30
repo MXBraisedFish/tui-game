@@ -14,6 +14,7 @@ use crate::app::stats::{
     self, GameStats, LightsOutBest, MazeEscapeBest, MemoryFlipBest, MinesweeperBest, SolitaireBest, SudokuBest,
 };
 use crate::lua_bridge::script_loader::GameMeta;
+use crate::mods;
 
 /// 游戏选择页的完整状态。
 pub struct GameSelection {
@@ -301,11 +302,7 @@ impl GameSelection {
 
         self.sync_paging(rows[0].height as usize);
 
-        let page_games: Vec<String> = self
-            .current_page_games()
-            .iter()
-            .map(|g| self.localized_game_name(g))
-            .collect();
+        let page_games = self.current_page_games();
         if page_games.is_empty() {
             let p = Paragraph::new(i18n::t("game_selection.empty"))
                 .alignment(Alignment::Center)
@@ -314,9 +311,10 @@ impl GameSelection {
             return;
         }
 
+        let list_width = rows[0].width.saturating_sub(1) as usize;
         let items: Vec<ListItem<'_>> = page_games
             .iter()
-            .map(|name| ListItem::new(Line::from(name.clone())))
+            .map(|game| ListItem::new(self.render_game_list_line(game, list_width)))
             .collect();
 
         let list = List::new(items)
@@ -567,6 +565,33 @@ impl GameSelection {
                 stats::format_duration(s.max_duration_sec)
             )));
         }
+
+        if let Some(mod_info) = &game.mod_info {
+            top_lines.push(Line::from(separator.clone()));
+            top_lines.push(Line::from(Span::styled(
+                text("mods.info.title", "Mod Info"),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            )));
+            top_lines.push(Line::from(format!(
+                "{} {}",
+                text("mods.info.package", "Package:"),
+                mod_info.package_name
+            )));
+            top_lines.push(Line::from(format!(
+                "{} {}",
+                text("mods.info.author", "Author:"),
+                mod_info.author
+            )));
+            top_lines.push(Line::from(format!(
+                "{} {}",
+                text("mods.info.version", "Version:"),
+                mod_info.version
+            )));
+            for line in format_mod_best_score(game) {
+                top_lines.push(Line::from(line));
+            }
+        }
+
         if top_lines.len() > stat_lines_start {
             top_lines.push(Line::from(separator.clone()));
         }
@@ -778,6 +803,32 @@ impl GameSelection {
         }
     }
 
+    fn render_game_list_line(&self, game: &GameMeta, width: usize) -> Line<'static> {
+        let name = self.localized_game_name(game);
+        if game.mod_info.is_none() || width == 0 {
+            return Line::from(truncate_with_ellipsis(&name, width));
+        }
+
+        let badge = "MOD";
+        let badge_width = UnicodeWidthStr::width(badge);
+        if width <= badge_width + 1 {
+            return Line::from(truncate_with_ellipsis(&name, width));
+        }
+
+        let left_width = width - badge_width - 1;
+        let left = truncate_with_ellipsis(&name, left_width);
+        let pad = width
+            .saturating_sub(UnicodeWidthStr::width(left.as_str()) + badge_width);
+        Line::from(vec![
+            Span::raw(left),
+            Span::raw(" ".repeat(pad)),
+            Span::styled(
+                badge.to_string(),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            ),
+        ])
+    }
+
     fn localized_game_name(&self, game: &GameMeta) -> String {
         i18n::t_or(&format!("game.{}.name", game.id), &game.name)
     }
@@ -821,5 +872,96 @@ impl GameSelection {
         let page_len = (self.games.len() - start).min(page_size);
         let selected_in_page = (clamped_global - start).min(page_len.saturating_sub(1));
         self.list_state.select(Some(selected_in_page));
+    }
+}
+
+fn truncate_with_ellipsis(text: &str, max_width: usize) -> String {
+    if max_width == 0 {
+        return String::new();
+    }
+    if UnicodeWidthStr::width(text) <= max_width {
+        return text.to_string();
+    }
+    if max_width <= 3 {
+        return ".".repeat(max_width);
+    }
+
+    let mut result = String::new();
+    for ch in text.chars() {
+        let next = format!("{result}{ch}");
+        if UnicodeWidthStr::width(next.as_str()) + 3 > max_width {
+            break;
+        }
+        result.push(ch);
+    }
+    result.push_str("...");
+    result
+}
+
+fn text(key: &str, fallback: &str) -> String {
+    i18n::t_or(key, fallback)
+}
+
+fn format_mod_best_score(game: &GameMeta) -> Vec<String> {
+    let Some(mod_info) = &game.mod_info else {
+        return Vec::new();
+    };
+    let Some(score) = mods::read_mod_best_score(&mod_info.namespace, &game.id) else {
+        return vec![format!("{} --", text("mods.info.best_score", "Best Record:"))];
+    };
+
+    match score {
+        serde_json::Value::String(value) => {
+            vec![format!("{} {}", text("mods.info.best_score", "Best Record:"), value)]
+        }
+        serde_json::Value::Object(map) => {
+            let mut lines = Vec::new();
+            if let Some(value) = map.get("label").and_then(|value| value.as_str()) {
+                let display = map
+                    .get("value")
+                    .map(json_value_to_inline_text)
+                    .unwrap_or_else(|| "--".to_string());
+                lines.push(format!("{value} {display}"));
+            } else {
+                lines.push(format!(
+                    "{} {}",
+                    text("mods.info.best_score", "Best Record:"),
+                    map.get("value")
+                        .map(json_value_to_inline_text)
+                        .unwrap_or_else(|| "--".to_string())
+                ));
+            }
+
+            if let Some(extra) = map.get("extra").and_then(|value| value.as_object()) {
+                for (key, value) in extra {
+                    lines.push(format!("{key}: {}", json_value_to_inline_text(value)));
+                }
+            }
+            lines
+        }
+        other => vec![format!(
+            "{} {}",
+            text("mods.info.best_score", "Best Record:"),
+            json_value_to_inline_text(&other)
+        )],
+    }
+}
+
+fn json_value_to_inline_text(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "--".to_string(),
+        serde_json::Value::Bool(v) => v.to_string(),
+        serde_json::Value::Number(v) => v.to_string(),
+        serde_json::Value::String(v) => v.clone(),
+        serde_json::Value::Array(values) => values
+            .iter()
+            .map(json_value_to_inline_text)
+            .collect::<Vec<_>>()
+            .join(", "),
+        serde_json::Value::Object(map) => map
+            .iter()
+            .map(|(key, value)| format!("{key}: {}", json_value_to_inline_text(value)))
+            .collect::<Vec<_>>()
+            .join(", "),
     }
 }

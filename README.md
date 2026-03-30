@@ -340,3 +340,4 @@ GitHub: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 1. **Modding** - Users can create their own additional games (basic interfaces are already in place)
 2. **Boss Key** - One-click to open a disguise interface, effectively preventing bosses from catching you slacking off (will support various computer-related professions: operations, frontend, backend, etc., configurable)
 3. **Customizable Shortcuts** - You can modify the in-game key bindings to suit your own play style
+

@@ -340,8 +340,7 @@ fn handle_key_event(
                     }
                     GameSelectionAction::LaunchGame(game) => {
                         if let Some(saved_game_id) = latest_saved_game_id() {
-                            let saved_game_name =
-                                i18n::t_or(&format!("game.{}.name", saved_game_id), &saved_game_id);
+                            let saved_game_name = resolve_saved_game_name(&saved_game_id);
                             *pending_new_game_start = Some(PendingNewGameStart {
                                 target_game: game,
                                 saved_game_name,
@@ -490,10 +489,17 @@ fn handle_cli_passthrough() -> Result<bool> {
 /// 根据共享存档槽同步主菜单中“继续游戏”的状态。
 fn sync_continue_item(menu: &mut Menu) {
     let game_id = latest_saved_game_id();
-    let game_name = game_id
-        .as_deref()
-        .map(|id| i18n::t_or(&format!("game.{}.name", id), id));
+    let game_name = game_id.as_deref().map(resolve_saved_game_name);
     menu.set_continue_target(game_id, game_name);
+}
+
+fn resolve_saved_game_name(game_id: &str) -> String {
+    if let Ok(games) = scan_scripts() {
+        if let Some(game) = games.into_iter().find(|game| game.id == game_id) {
+            return game.name;
+        }
+    }
+    i18n::t_or(&format!("game.{}.name", game_id), game_id)
 }
 
 /// 将版本标签规范化为统一的 `vX.Y.Z` 形式。

@@ -1,0 +1,9 @@
+{
+  "example_mod.package_name": "示例模组包",
+  "example_mod.package_description": "用于演示 TUI-GAME 模组系统的最小模组包。",
+  "example_mod.game_name": "示例演示",
+  "example_mod.game_description": "一个最小可运行示例。按 Enter 或空格退出。",
+  "example_mod.game_detail": "这个示例展示了 GAME_META 必填字段、动作注册、辅助脚本加载、语言读取、日志写入和最佳记录返回的基本方式。",
+  "example_mod.demo_hint": "这是一个示例模组游戏。",
+  "example_mod.demo_controls": "[Enter]/[Space] 退出  [Esc]/[Q] 返回"
+}
