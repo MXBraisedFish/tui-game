@@ -28,6 +28,9 @@ pub struct SettingsState {
     pub hub_selected: usize,
     pub lang_selected: usize,
     pub mod_selected: usize,
+    pub mod_page: usize,
+    pub mod_detail_scroll: usize,
+    pub mod_detail_scroll_available: bool,
     pub mod_packages: Vec<ModPackage>,
 }
 
@@ -51,6 +54,9 @@ impl SettingsState {
             hub_selected: 0,
             lang_selected: default_selected_index(),
             mod_selected: 0,
+            mod_page: 0,
+            mod_detail_scroll: 0,
+            mod_detail_scroll_available: false,
             mod_packages: load_mod_packages(),
         }
     }
@@ -63,6 +69,9 @@ impl SettingsState {
         self.mod_packages = load_mod_packages();
         if self.mod_packages.is_empty() {
             self.mod_selected = 0;
+            self.mod_page = 0;
+            self.mod_detail_scroll = 0;
+            self.mod_detail_scroll_available = false;
             return;
         }
         self.mod_selected = previous_namespace
@@ -73,6 +82,10 @@ impl SettingsState {
             })
             .unwrap_or(0)
             .min(self.mod_packages.len().saturating_sub(1));
+        let page_size = current_mod_page_size();
+        self.mod_page = (self.mod_selected / page_size).min(total_mod_pages(self.mod_packages.len(), page_size).saturating_sub(1));
+        self.mod_detail_scroll = 0;
+        self.mod_detail_scroll_available = false;
     }
 }
 
@@ -107,7 +120,7 @@ pub fn minimum_size(state: &SettingsState) -> (u16, u16) {
     }
 }
 
-pub fn render(frame: &mut ratatui::Frame<'_>, state: &SettingsState) {
+pub fn render(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
     match state.page {
         SettingsPage::Hub => render_hub(frame, state.hub_selected),
         SettingsPage::Language => render_language_selector(frame, state.lang_selected),
@@ -261,14 +274,42 @@ fn handle_language_key(state: &mut SettingsState, code: KeyCode) {
 }
 
 fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
+    let page_size = current_mod_page_size();
     match code {
         KeyCode::Up | KeyCode::Char('k') => {
             state.mod_selected = state.mod_selected.saturating_sub(1);
+            state.mod_page = state.mod_selected / page_size;
+            state.mod_detail_scroll = 0;
         }
         KeyCode::Down | KeyCode::Char('j') => {
             if !state.mod_packages.is_empty() {
                 state.mod_selected =
                     (state.mod_selected + 1).min(state.mod_packages.len().saturating_sub(1));
+                state.mod_page = state.mod_selected / page_size;
+                state.mod_detail_scroll = 0;
+            }
+        }
+        KeyCode::Char('w') | KeyCode::Char('W') => {
+            state.mod_detail_scroll = state.mod_detail_scroll.saturating_sub(1);
+        }
+        KeyCode::Char('s') | KeyCode::Char('S') => {
+            state.mod_detail_scroll = state.mod_detail_scroll.saturating_add(1);
+        }
+        KeyCode::Char('q') | KeyCode::Char('Q') => {
+            if state.mod_page > 0 {
+                state.mod_page -= 1;
+                let start = state.mod_page * page_size;
+                state.mod_selected = start.min(state.mod_packages.len().saturating_sub(1));
+                state.mod_detail_scroll = 0;
+            }
+        }
+        KeyCode::Char('e') | KeyCode::Char('E') => {
+            let total_pages = total_mod_pages(state.mod_packages.len(), page_size);
+            if state.mod_page + 1 < total_pages {
+                state.mod_page += 1;
+                let start = state.mod_page * page_size;
+                state.mod_selected = start.min(state.mod_packages.len().saturating_sub(1));
+                state.mod_detail_scroll = 0;
             }
         }
         KeyCode::Enter | KeyCode::Char(' ') => {
@@ -286,7 +327,7 @@ fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
         KeyCode::Char('r') | KeyCode::Char('R') => {
             state.refresh_mods();
         }
-        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
+        KeyCode::Esc => {
             state.page = SettingsPage::Hub;
         }
         _ => {}
@@ -457,7 +498,26 @@ fn render_language_selector(frame: &mut ratatui::Frame<'_>, selected: usize) {
     frame.render_widget(hint_widget, sections[3]);
 }
 
-fn render_mods(frame: &mut ratatui::Frame<'_>, state: &SettingsState) {
+fn render_mods(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
+    if state.mod_packages.is_empty() {
+        state.mod_selected = 0;
+        state.mod_page = 0;
+        state.mod_detail_scroll = 0;
+        state.mod_detail_scroll_available = false;
+    } else {
+        let page_size = current_mod_page_size();
+        let total_pages = total_mod_pages(state.mod_packages.len(), page_size);
+        if state.mod_page >= total_pages {
+            state.mod_page = total_pages.saturating_sub(1);
+        }
+        let page_start = state.mod_page * page_size;
+        let page_end = (page_start + page_size).min(state.mod_packages.len());
+        if state.mod_selected < page_start || state.mod_selected >= page_end {
+            state.mod_selected = page_start.min(state.mod_packages.len().saturating_sub(1));
+            state.mod_detail_scroll = 0;
+        }
+    }
+
     let area = frame.area();
     let root = Layout::default()
         .direction(Direction::Vertical)
@@ -471,14 +531,19 @@ fn render_mods(frame: &mut ratatui::Frame<'_>, state: &SettingsState) {
     render_mod_list(frame, columns[0], state);
     render_mod_detail(frame, columns[1], state);
 
-    let hints = format!(
-        "{}  {}  {}  {}  {}",
+    let mut hints = format!(
+        "{}  {}  {}  {}  {}  {}",
         text("settings.mods.hint.toggle", "[Enter] Toggle"),
         text("settings.mods.hint.debug", "[D] Debug"),
         text("settings.mods.hint.rescan", "[R] Rescan"),
         text("settings.mods.hint.move", "[↑]/[↓] Move"),
-        text("settings.hub.back_hint", "[ESC]/[Q] Return to main menu")
+        text("settings.mods.hint.page", "[Q]/[E] Page"),
+        text("settings.hub.back_hint", "[ESC] Return to main menu")
     );
+    if state.mod_detail_scroll_available {
+        hints.push_str("  ");
+        hints.push_str(&text("settings.mods.hint.scroll", "[W]/[S] Scroll Details"));
+    }
     frame.render_widget(
         Paragraph::new(hints)
             .style(Style::default().fg(Color::DarkGray))
@@ -495,40 +560,79 @@ fn render_mod_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsS
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(inner);
+
     if state.mod_packages.is_empty() {
         frame.render_widget(
             Paragraph::new(text("settings.mods.empty", "No mods found."))
                 .style(Style::default().fg(Color::White))
                 .alignment(Alignment::Center),
-            inner,
+            rows[0],
+        );
+        frame.render_widget(
+            Paragraph::new("1/1")
+                .style(Style::default().fg(Color::White))
+                .alignment(Alignment::Center),
+            rows[1],
         );
         return;
     }
 
     let item_height = 5u16;
-    let visible = (inner.height / item_height).max(1) as usize;
-    let start = if state.mod_selected >= visible {
-        state.mod_selected + 1 - visible
-    } else {
-        0
-    };
+    let page_size = ((rows[0].height / item_height).max(1)) as usize;
+    let total_pages = total_mod_pages(state.mod_packages.len(), page_size);
+    let page = state.mod_page.min(total_pages.saturating_sub(1));
+    let start = page * page_size;
 
     for (index, package) in state
         .mod_packages
         .iter()
         .enumerate()
         .skip(start)
-        .take(visible)
+        .take(page_size)
     {
         let local = (index - start) as u16;
         let item_area = Rect::new(
-            inner.x,
-            inner.y + local * item_height,
-            inner.width,
-            item_height.min(inner.height.saturating_sub(local * item_height)),
+            rows[0].x,
+            rows[0].y + local * item_height,
+            rows[0].width,
+            item_height.min(rows[0].height.saturating_sub(local * item_height)),
         );
         render_mod_list_item(frame.buffer_mut(), item_area, package, index == state.mod_selected);
     }
+
+    let left = if page > 0 {
+        i18n::t("game_selection.pager.prev")
+    } else {
+        String::new()
+    };
+    let center = format!("{}/{}", page + 1, total_pages.max(1));
+    let right = if page + 1 < total_pages {
+        i18n::t("game_selection.pager.next")
+    } else {
+        String::new()
+    };
+    frame.render_widget(
+        Paragraph::new(left)
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Left),
+        rows[1],
+    );
+    frame.render_widget(
+        Paragraph::new(center)
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Center),
+        rows[1],
+    );
+    frame.render_widget(
+        Paragraph::new(right)
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Right),
+        rows[1],
+    );
 }
 
 fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, selected: bool) {
@@ -616,7 +720,7 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
     }
 }
 
-fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsState) {
+fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut SettingsState) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" {} ", text("settings.mods.detail", "Mod Details")))
@@ -634,9 +738,10 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &Setting
         return;
     };
 
+    let content_width = inner.width.saturating_sub(2).max(1) as usize;
     let mut lines = rich_lines_from_image(
         &package.banner,
-        inner.width.max(1) as usize,
+        content_width,
         Style::default().fg(Color::White),
     );
     lines.push(Line::from(""));
@@ -687,7 +792,11 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &Setting
         text("settings.mods.description", "Description"),
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
     )));
-    lines.push(Line::from(package.description.clone()));
+    lines.extend(rich_text::parse_rich_text_wrapped(
+        &package.description,
+        content_width,
+        Style::default().fg(Color::White),
+    ));
     if !package.errors.is_empty() {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
@@ -695,20 +804,73 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &Setting
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )));
         for error in package.errors.iter().take(8) {
-            lines.push(Line::from(format!(
-                "[{}] {}",
-                error.severity.to_ascii_uppercase(),
-                error.message
-            )));
+            lines.extend(rich_text::parse_rich_text_wrapped(
+                &format!("[{}] {}", error.severity.to_ascii_uppercase(), error.message),
+                content_width,
+                Style::default().fg(Color::White),
+            ));
         }
     }
+
+    let viewport_h = inner.height as usize;
+    let max_scroll = lines.len().saturating_sub(viewport_h);
+    if state.mod_detail_scroll > max_scroll {
+        state.mod_detail_scroll = max_scroll;
+    }
+    state.mod_detail_scroll_available = max_scroll > 0;
+
+    let text_area = if state.mod_detail_scroll_available && inner.width > 2 {
+        Rect::new(inner.x, inner.y, inner.width - 2, inner.height)
+    } else {
+        inner
+    };
 
     frame.render_widget(
         Paragraph::new(lines)
             .style(Style::default().fg(Color::White))
-            .wrap(Wrap { trim: false }),
-        inner,
+            .wrap(Wrap { trim: false })
+            .scroll((state.mod_detail_scroll as u16, 0)),
+        text_area,
     );
+
+    if state.mod_detail_scroll_available && inner.width > 2 {
+        let scroll_x = inner.x + inner.width - 1;
+        let can_up = state.mod_detail_scroll > 0;
+        let can_down = state.mod_detail_scroll < max_scroll;
+
+        frame.render_widget(
+            Paragraph::new(if can_up { "↑" } else { " " }).style(Style::default().fg(Color::White)),
+            Rect::new(scroll_x, inner.y, 1, 1),
+        );
+        frame.render_widget(
+            Paragraph::new(if can_up { "W" } else { " " }).style(Style::default().fg(Color::White)),
+            Rect::new(scroll_x, inner.y.saturating_add(1), 1, 1),
+        );
+
+        if inner.height > 4 {
+            let track_start = inner.y.saturating_add(2);
+            let track_len = inner.height.saturating_sub(4);
+            let pos = if max_scroll == 0 {
+                0
+            } else {
+                ((state.mod_detail_scroll * (track_len as usize - 1)) / max_scroll) as u16
+            };
+            frame.render_widget(
+                Paragraph::new("█").style(Style::default().fg(Color::White)),
+                Rect::new(scroll_x, track_start.saturating_add(pos), 1, 1),
+            );
+        }
+
+        let d_y = inner.y + inner.height.saturating_sub(2);
+        frame.render_widget(
+            Paragraph::new(if can_down { "S" } else { " " }).style(Style::default().fg(Color::White)),
+            Rect::new(scroll_x, d_y, 1, 1),
+        );
+        frame.render_widget(
+            Paragraph::new(if can_down { "↓" } else { " " }).style(Style::default().fg(Color::White)),
+            Rect::new(scroll_x, d_y.saturating_add(1), 1, 1),
+        );
+    }
 }
 
 fn rich_lines_from_image(image: &mods::ModImage, width: usize, base: Style) -> Vec<Line<'static>> {
@@ -716,8 +878,74 @@ fn rich_lines_from_image(image: &mods::ModImage, width: usize, base: Style) -> V
         .lines
         .iter()
         .take(13)
-        .flat_map(|line| rich_text::parse_rich_text_wrapped(line, width, base))
+        .map(|line| rich_line_from_image(line, width, base))
         .collect()
+}
+
+fn rich_line_from_image(text: &str, width: usize, base: Style) -> Line<'static> {
+    let line = rich_text::parse_rich_text_wrapped(text, usize::MAX / 8, base)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| Line::from(""));
+    crop_line_center_to_width(&line, width)
+}
+
+fn crop_line_center_to_width(line: &Line<'static>, width: usize) -> Line<'static> {
+    if width == 0 {
+        return Line::from("");
+    }
+
+    let mut cells = Vec::<(char, Style, usize)>::new();
+    for span in &line.spans {
+        for ch in span.content.chars() {
+            let ch_width = UnicodeWidthStr::width(ch.encode_utf8(&mut [0; 4]));
+            if ch_width == 0 {
+                continue;
+            }
+            cells.push((ch, span.style, ch_width));
+        }
+    }
+
+    let mut total_width: usize = cells.iter().map(|(_, _, w)| *w).sum();
+    if total_width <= width {
+        return line.clone();
+    }
+
+    let mut trim_left = true;
+    while total_width > width && !cells.is_empty() {
+        if trim_left {
+            if let Some((_, _, w)) = cells.first().copied() {
+                total_width = total_width.saturating_sub(w);
+            }
+            cells.remove(0);
+        } else if let Some((_, _, w)) = cells.pop() {
+            total_width = total_width.saturating_sub(w);
+        }
+        trim_left = !trim_left;
+    }
+
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut current_style: Option<Style> = None;
+    let mut current_text = String::new();
+    for (ch, style, _) in cells {
+        match current_style {
+            Some(existing) if existing == style => current_text.push(ch),
+            Some(existing) => {
+                spans.push(Span::styled(current_text.clone(), existing));
+                current_text.clear();
+                current_text.push(ch);
+                current_style = Some(style);
+            }
+            None => {
+                current_text.push(ch);
+                current_style = Some(style);
+            }
+        }
+    }
+    if let Some(style) = current_style {
+        spans.push(Span::styled(current_text, style));
+    }
+    Line::from(spans)
 }
 
 fn render_rich_line_to_buffer(
@@ -729,9 +957,10 @@ fn render_rich_line_to_buffer(
     base: Style,
 ) {
     let lines = rich_text::parse_rich_text_wrapped(text, width.max(1), base);
-    let Some(line) = lines.first() else {
+    let Some(first_line) = lines.first() else {
         return;
     };
+    let line = crop_line_center_to_width(first_line, width.max(1));
 
     let mut cursor_x = x;
     for span in &line.spans {
@@ -748,6 +977,22 @@ fn render_rich_line_to_buffer(
         if cursor_x >= x.saturating_add(width as u16) {
             break;
         }
+    }
+}
+
+fn current_mod_page_size() -> usize {
+    let (_, term_height) = crossterm::terminal::size().unwrap_or((90, 26));
+    let root_height = term_height.saturating_sub(1);
+    let inner_height = root_height.saturating_sub(2);
+    let content_height = inner_height.saturating_sub(1);
+    (content_height / 5).max(1) as usize
+}
+
+fn total_mod_pages(total_items: usize, page_size: usize) -> usize {
+    if total_items == 0 {
+        1
+    } else {
+        ((total_items + page_size.saturating_sub(1)) / page_size).max(1)
     }
 }
 

@@ -28,11 +28,11 @@ const DEFAULT_THUMBNAIL_LINES: [&str; 4] = ["████████", "██ 
 
 const DEFAULT_BANNER_ASCII: [&str; 7] = [
     "`7MMM.     ,MMF' .g8\"\"8q. `7MM\"\"\"Yb.",
-    "  MMMb    dPMM .dP'    `YM. MM    `Yb.",
-    "  M YM   ,M MM dM'      `MM MM     `Mb",
-    "  M  Mb  M' MM MM        MM MM      MM",
-    "  M  YM.P'  MM MM.      ,MP MM     ,MP",
-    "  M  `YM'   MM `Mb.    ,dP' MM    ,dP'",
+    "    MMMb    dPMM .dP'    `YM. MM    `Yb.",
+    "    M YM   ,M MM dM'      `MM MM     `Mb",
+    "    M  Mb  M' MM MM        MM MM      MM",
+    "    M  YM.P'  MM MM.      ,MP MM     ,MP",
+    "    M  `YM'   MM `Mb.    ,dP' MM    ,dP'",
     ".JML. `'  .JMML. `\"bmmd\"' .JMMmmmdP'",
 ];
 
@@ -988,7 +988,8 @@ fn render_braille_image(
     kind: ImageKind,
 ) -> ModImage {
     let (target_h, target_w) = image_target_size(kind);
-    let pixel_w = (target_w * 2) as u32;
+    let visual_w = image_visual_width(target_w);
+    let pixel_w = (visual_w * 2) as u32;
     let pixel_h = (target_h * 4) as u32;
     let resized = resize_and_crop_image(image, pixel_w, pixel_h);
 
@@ -1001,7 +1002,7 @@ fn render_braille_image(
         };
         let mut current_color: Option<String> = None;
 
-        for cell_x in 0..target_w {
+        for cell_x in 0..visual_w {
             let mut bits = 0u8;
             let mut rgb_sum = [0u32; 3];
             let mut samples = 0u32;
@@ -1051,6 +1052,7 @@ fn render_braille_image(
             }
 
             line.push(ch);
+            line.push(ch);
         }
 
         if matches!(color_mode, ImageColorMode::Grayscale | ImageColorMode::Color) && current_color.is_some() {
@@ -1069,7 +1071,8 @@ fn render_charset_image(
     chars: &[char],
 ) -> ModImage {
     let (target_h, target_w) = image_target_size(kind);
-    let resized = resize_and_crop_image(image, target_w as u32, target_h as u32);
+    let visual_w = image_visual_width(target_w);
+    let resized = resize_and_crop_image(image, visual_w as u32, target_h as u32);
     let mut lines = Vec::with_capacity(target_h);
 
     for y in 0..target_h {
@@ -1080,7 +1083,7 @@ fn render_charset_image(
         };
         let mut current_color: Option<String> = None;
 
-        for x in 0..target_w {
+        for x in 0..visual_w {
             let pixel = resized.get_pixel(x as u32, y as u32).0;
             let alpha = pixel[3] as f32 / 255.0;
             let luminance = ((0.299 * pixel[0] as f32)
@@ -1104,6 +1107,7 @@ fn render_charset_image(
                 }
             }
 
+            line.push(ch);
             line.push(ch);
         }
 
@@ -1320,6 +1324,10 @@ fn image_target_size(kind: ImageKind) -> (usize, usize) {
         ImageKind::Thumbnail => (4, 8),
         ImageKind::Banner => (13, 86),
     }
+}
+
+fn image_visual_width(char_width: usize) -> usize {
+    (char_width / 2).max(1)
 }
 
 fn pad_line_balanced(line: &str, pad: usize) -> String {

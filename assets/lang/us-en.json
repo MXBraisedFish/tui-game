@@ -473,7 +473,7 @@
     "menu.quit": "Quit",
     "menu.settings": "Settings",
     "menu.version_update_hint": "{New version available}",
-    "placeholder.about": "TUI Games\nAuthor: MXBraisedFish (MXFish)\nGitHub: https://github.com/MXBraisedFish/TUI-GAME",
+    "placeholder.about": "TUI GAME\nAuthor: MXBraisedFish (MXFish)\nGitHub: https://github.com/MXBraisedFish/TUI-GAME",
     "placeholder.continue": "Continue game function not yet implemented.",
     "placeholder.latest_version": "Latest Version:",
     "placeholder.runtime_version": "Runtime Version:",
