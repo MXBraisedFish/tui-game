@@ -1,9 +1,0 @@
-{
-  "example_mod.package_name": "Example Pack",
-  "example_mod.package_description": "A minimal mod package used to demonstrate the TUI-GAME mod system.",
-  "example_mod.game_name": "Example Demo",
-  "example_mod.game_description": "A minimal demo game. Press Enter or Space to exit.",
-  "example_mod.game_detail": "This example demonstrates the required GAME_META fields, action registration, helper script loading, language lookup, logging and best score return.",
-  "example_mod.demo_hint": "This is a demo mod game.",
-  "example_mod.demo_controls": "[Enter]/[Space] Exit  [Esc]/[Q] Back"
-}

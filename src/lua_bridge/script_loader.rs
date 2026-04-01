@@ -13,7 +13,12 @@ pub struct GameMeta {
     pub name: String,
     pub description: String,
     pub detail: String,
+    pub best_none: Option<String>,
     pub save: bool,
+    pub min_width: Option<u16>,
+    pub min_height: Option<u16>,
+    pub max_width: Option<u16>,
+    pub max_height: Option<u16>,
     pub script_path: PathBuf,
     pub mod_info: Option<ModGameInfo>,
 }
@@ -71,6 +76,10 @@ fn scan_scripts_in(dir: &Path) -> Result<Vec<GameMeta>> {
         let mut description = "No description available.".to_string();
         let mut detail = String::new();
         let mut save = false;
+        let mut min_width = None;
+        let mut min_height = None;
+        let mut max_width = None;
+        let mut max_height = None;
 
         if let Ok(content) = fs::read_to_string(&path) {
             let content = content.trim_start_matches('\u{feff}');
@@ -96,6 +105,18 @@ fn scan_scripts_in(dir: &Path) -> Result<Vec<GameMeta>> {
                     if let Ok(value) = meta.get::<bool>("save") {
                         save = value;
                     }
+                    if let Ok(value) = meta.get::<i64>("min_width") {
+                        min_width = u16::try_from(value).ok().filter(|v| *v > 0);
+                    }
+                    if let Ok(value) = meta.get::<i64>("min_height") {
+                        min_height = u16::try_from(value).ok().filter(|v| *v > 0);
+                    }
+                    if let Ok(value) = meta.get::<i64>("max_width") {
+                        max_width = u16::try_from(value).ok().filter(|v| *v > 0);
+                    }
+                    if let Ok(value) = meta.get::<i64>("max_height") {
+                        max_height = u16::try_from(value).ok().filter(|v| *v > 0);
+                    }
                 }
             }
         }
@@ -105,7 +126,12 @@ fn scan_scripts_in(dir: &Path) -> Result<Vec<GameMeta>> {
             name,
             description,
             detail,
+            best_none: None,
             save,
+            min_width,
+            min_height,
+            max_width,
+            max_height,
             script_path: path,
             mod_info: None,
         });

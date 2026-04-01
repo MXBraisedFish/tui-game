@@ -248,7 +248,12 @@ GAME_META = {
   name = "example_mod.game_name",
   description = "example_mod.game_description",
   detail = "example_mod.game_detail",
-  save = true
+  best_none = "example_mod.best_none",
+  save = true,
+  min_width = 60,
+  min_height = 24,
+  max_width = 0,
+  max_height = 0
 }
 ```
 
@@ -259,13 +264,20 @@ GAME_META = {
 | `name` | `string` | 游戏名，可写文本或语言键，不能为空 |
 | `description` | `string` | 游戏简介，可写文本或语言键 |
 | `detail` | `string` | 游戏详情，可写文本或语言键 |
+| `best_none` | `string` | 没有最佳记录时显示的文本，可写文本或语言键 |
 | `save` | `boolean` | 是否允许存档 |
+| `min_width` | `integer` | 最小终端宽度，`0` 或缺省表示不限制 |
+| `min_height` | `integer` | 最小终端高度，`0` 或缺省表示不限制 |
+| `max_width` | `integer` | 最大终端宽度，`0` 或缺省表示不限制 |
+| `max_height` | `integer` | 最大终端高度，`0` 或缺省表示不限制 |
 
 ### 5. 兼容规则
 
 - `name` 若为空、缺失或仅包含空白，则该游戏拒绝加载。
 - `description` 和 `detail` 可为空。
+- `best_none` 可为空。
 - `save` 必须为布尔值。
+- 尺寸限制字段可缺省；缺省或 `0` 表示不限制。
 - 允许额外字段，宿主会忽略。
 
 ### 6. 函数职责
@@ -281,6 +293,14 @@ GAME_META = {
 #### `best_score()`
 
 用于返回当前游戏最佳记录。
+
+### 7. 尺寸与重绘行为
+
+- 宿主会自动监听终端尺寸变化；
+- 尺寸变化后，宿主会自动清屏并触发一次重绘机会；
+- 若 `GAME_META` 声明了尺寸限制，宿主会统一显示尺寸不足提示页；
+- 模组作者不需要自行实现 `on_resize()` 或额外重绘回调；
+- 若模组完全不处理尺寸变化，宿主仍会保证基础可用。
 
 ## 五、游戏唯一 ID 条目
 
@@ -688,6 +708,136 @@ if is_action_pressed("confirm") then
 end
 ```
 
+#### 读取终端尺寸
+
+```lua
+local width, height = get_terminal_size()
+```
+
+#### 读取单行文本显示宽度
+
+```lua
+local width = get_text_width("示例标题")
+```
+
+说明：
+
+- 返回的是终端中的实际显示宽度；
+- 不是字节数，也不是 `string.len()` 的结果；
+- 适用于中英文、全角字符、符号混排场景。
+
+#### 读取多行文本宽高
+
+```lua
+local width, height = get_text_size("标题\n说明文本")
+```
+
+说明：
+
+- `width` 为所有行中的最大显示宽度；
+- `height` 为总行数；
+- 适合弹窗、说明面板、居中块布局等场景。
+
+#### 布局锚点常量
+
+宿主公开以下布局常量：
+
+```lua
+ANCHOR_LEFT
+ANCHOR_CENTER
+ANCHOR_RIGHT
+ANCHOR_TOP
+ANCHOR_MIDDLE
+ANCHOR_BOTTOM
+```
+
+这些常量本身表示“对齐方式”，而不是绝对坐标。
+
+#### 解析水平坐标
+
+```lua
+local x = resolve_x(ANCHOR_CENTER, get_text_width(title), 0)
+```
+
+参数：
+
+- 第一个参数：水平锚点
+- 第二个参数：内容宽度
+- 第三个参数：相对偏移，可正可负，可省略
+
+示例：
+
+```lua
+local x = resolve_x(ANCHOR_LEFT, 10, 2)
+```
+
+含义：
+
+- 以终端左边界为基准；
+- 内容宽度为 10；
+- 再向右偏移 2 格。
+
+#### 解析垂直坐标
+
+```lua
+local y = resolve_y(ANCHOR_BOTTOM, 1, -2)
+```
+
+参数：
+
+- 第一个参数：垂直锚点
+- 第二个参数：内容高度
+- 第三个参数：相对偏移，可正可负，可省略
+
+#### 解析矩形左上角坐标
+
+```lua
+local x, y = resolve_rect(ANCHOR_CENTER, ANCHOR_MIDDLE, 20, 5, 0, 0)
+```
+
+适用于：
+
+- 居中弹窗
+- 面板
+- 子区域布局
+
+其中：
+
+- `20` 表示内容宽度
+- `5` 表示内容高度
+- 后两个参数表示偏移量
+
+#### 布局示例
+
+```lua
+local title = translate("demo.title")
+local title_w = get_text_width(title)
+local title_x = resolve_x(ANCHOR_CENTER, title_w, 0)
+local title_y = resolve_y(ANCHOR_TOP, 1, 1)
+draw_text(title_x, title_y, title, "cyan", nil)
+
+local hint = translate("demo.hint")
+local hint_x = resolve_x(ANCHOR_CENTER, get_text_width(hint), 0)
+local hint_y = resolve_y(ANCHOR_BOTTOM, 1, -1)
+draw_text(hint_x, hint_y, hint, "dark_gray", nil)
+```
+
+#### 检查尺寸是否刚变化
+
+```lua
+if was_terminal_resized() then
+  -- 可以选择在这里重算布局
+end
+```
+
+#### 消耗一次尺寸变化事件
+
+```lua
+if consume_resize_event() then
+  -- 宿主已经完成基础重绘，这里适合刷新缓存或提示文字
+end
+```
+
 ### 5. 原始按键接口
 
 ```lua
@@ -701,6 +851,20 @@ local key = get_raw_key(true)
 - 少量特殊编辑场景
 
 不建议将核心移动、确认、菜单逻辑写死在原始按键上。
+
+### 5.1 尺寸接口说明
+
+- `was_terminal_resized()`
+  - 仅检查当前是否存在尚未消费的尺寸变化事件；
+  - 不会清除事件标记。
+
+- `consume_resize_event()`
+  - 读取并清除一次尺寸变化标记；
+  - 适合在 `game_loop()` 中作为“刷新布局”的触发器。
+
+- 若模组不调用这两个接口：
+  - 宿主仍会自动处理基础重绘；
+  - 这两个接口只用于高级布局控制。
 
 ### 6. 按键写法
 
@@ -759,34 +923,53 @@ load_game_slot(game_id)
 
 ## 十三、最佳记录条目
 
-### 1. 返回字符串
-
-```lua
-function best_score()
-  return "Best Time 00:00:30"
-end
-```
-
-### 2. 返回结构表
+### 1. 返回结构表
 
 ```lua
 function best_score()
   return {
-    label = "Best Time",
-    value = "00:00:30",
-    score = 120,
-    time_sec = 30,
-    extra = {
-      mode = "hard",
-      streak = 4
-    }
+    best_string = "example_mod.best_record",
+    steps = 120
   }
 end
 ```
 
-### 3. `extra`
+### 2. 字段说明
 
-`extra` 是额外键值对，宿主会原样保存，并在需要时用于展示附加信息。
+- `best_string`
+  - 必填；
+  - 可写普通字符串；
+  - 可写语言键；
+  - 宿主会先解析该字符串，再使用对象里的其他字段做 `{field}` 占位替换。
+
+- 其余字段
+  - 不限命名；
+  - 用于给 `best_string` 提供占位参数；
+  - 会被宿主原样保存。
+
+### 3. 示例
+
+```lua
+function best_score()
+  return {
+    best_string = "最高分数\n{score}",
+    score = 10000
+  }
+end
+```
+
+渲染结果：
+
+```text
+最高分数
+10000
+```
+
+### 4. 空记录显示
+
+- 若 `best_score()` 返回 `nil`，则视为当前没有最佳记录；
+- 此时若 `GAME_META.best_none` 存在，则显示 `best_none`；
+- 若 `best_none` 也不存在，则宿主回退为 `--`。
 
 ### 4. 非法返回
 

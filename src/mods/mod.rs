@@ -62,7 +62,12 @@ pub struct ModGameMeta {
     pub name: String,
     pub description: String,
     pub detail: String,
+    pub best_none: Option<String>,
     pub save: bool,
+    pub min_width: Option<u16>,
+    pub min_height: Option<u16>,
+    pub max_width: Option<u16>,
+    pub max_height: Option<u16>,
     pub mod_info: ModGameInfo,
 }
 
@@ -222,6 +227,28 @@ fn default_true() -> bool {
     true
 }
 
+fn sanitize_mod_save_file_stem(game_id: &str) -> String {
+    let mut sanitized = String::with_capacity(game_id.len());
+    for ch in game_id.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
+            sanitized.push(ch);
+        } else {
+            sanitized.push('_');
+        }
+    }
+
+    while sanitized.contains("__") {
+        sanitized = sanitized.replace("__", "_");
+    }
+
+    let trimmed = sanitized.trim_matches('_');
+    if trimmed.is_empty() {
+        "mod_save".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 pub fn mod_root_dir() -> Result<PathBuf> {
     Ok(path_utils::app_data_dir()?.join("mod"))
 }
@@ -247,7 +274,10 @@ pub fn mod_save_dir(namespace: &str) -> Result<PathBuf> {
 }
 
 pub fn mod_save_path(namespace: &str, game_id: &str) -> Result<PathBuf> {
-    Ok(mod_save_dir(namespace)?.join(format!("{game_id}.json")))
+    Ok(mod_save_dir(namespace)?.join(format!(
+        "{}.json",
+        sanitize_mod_save_file_stem(game_id)
+    )))
 }
 
 pub fn mod_log_path(namespace: &str) -> Result<PathBuf> {
@@ -711,7 +741,33 @@ fn scan_game_script(
         .map(|value| resolve_mod_text(&meta.namespace, &value))
         .unwrap_or_else(|| DEFAULT_GAME_DETAIL.to_string());
 
+    let best_none = meta_table
+        .get::<String>("best_none")
+        .ok()
+        .map(|value| resolve_mod_text(&meta.namespace, &value))
+        .filter(|value| !value.trim().is_empty());
+
     let save = meta_table.get::<bool>("save").unwrap_or(false);
+    let min_width = meta_table
+        .get::<i64>("min_width")
+        .ok()
+        .and_then(|value| u16::try_from(value).ok())
+        .filter(|value| *value > 0);
+    let min_height = meta_table
+        .get::<i64>("min_height")
+        .ok()
+        .and_then(|value| u16::try_from(value).ok())
+        .filter(|value| *value > 0);
+    let max_width = meta_table
+        .get::<i64>("max_width")
+        .ok()
+        .and_then(|value| u16::try_from(value).ok())
+        .filter(|value| *value > 0);
+    let max_height = meta_table
+        .get::<i64>("max_height")
+        .ok()
+        .and_then(|value| u16::try_from(value).ok())
+        .filter(|value| *value > 0);
     let game_id = build_game_id(meta, &script_name);
 
     Ok(ModGameMeta {
@@ -721,13 +777,24 @@ fn scan_game_script(
         name,
         description,
         detail,
+        best_none,
         save,
+        min_width,
+        min_height,
+        max_width,
+        max_height,
         mod_info: base_info.clone(),
     })
 }
 
 fn install_scan_stubs(lua: &Lua) -> mlua::Result<()> {
     let globals = lua.globals();
+    globals.set("ANCHOR_LEFT", 0)?;
+    globals.set("ANCHOR_CENTER", 1)?;
+    globals.set("ANCHOR_RIGHT", 2)?;
+    globals.set("ANCHOR_TOP", 0)?;
+    globals.set("ANCHOR_MIDDLE", 1)?;
+    globals.set("ANCHOR_BOTTOM", 2)?;
     globals.set("draw_text", lua.create_function(|_, ()| Ok(()))?)?;
     globals.set("draw_text_ex", lua.create_function(|_, ()| Ok(()))?)?;
     globals.set("clear", lua.create_function(|_, ()| Ok(()))?)?;
@@ -748,6 +815,73 @@ fn install_scan_stubs(lua: &Lua) -> mlua::Result<()> {
     globals.set("random", lua.create_function(|_, max: i64| Ok(max.max(0)))?)?;
     globals.set("exit_game", lua.create_function(|_, ()| Ok(()))?)?;
     globals.set("get_terminal_size", lua.create_function(|_, ()| Ok((80_u16, 24_u16)))?)?;
+    globals.set(
+        "get_text_size",
+        lua.create_function(|_, text: String| {
+            let mut max_width = 0usize;
+            let mut height = 0i64;
+            for line in text.split('\n') {
+                max_width = max_width.max(line.chars().count());
+                height += 1;
+            }
+            if text.is_empty() {
+                height = 1;
+            }
+            Ok((max_width as i64, height))
+        })?,
+    )?;
+    globals.set(
+        "resolve_x",
+        lua.create_function(|_, (anchor, width, offset): (i64, i64, Option<i64>)| {
+            let terminal_width = 80_i64;
+            let base = match anchor {
+                1 => ((terminal_width - width.max(0)).max(0) / 2) + 1,
+                2 => (terminal_width - width.max(0)).max(0) + 1,
+                _ => 1,
+            };
+            Ok(base + offset.unwrap_or(0))
+        })?,
+    )?;
+    globals.set(
+        "resolve_y",
+        lua.create_function(|_, (anchor, height, offset): (i64, i64, Option<i64>)| {
+            let terminal_height = 24_i64;
+            let base = match anchor {
+                1 => ((terminal_height - height.max(0)).max(0) / 2) + 1,
+                2 => (terminal_height - height.max(0)).max(0) + 1,
+                _ => 1,
+            };
+            Ok(base + offset.unwrap_or(0))
+        })?,
+    )?;
+    globals.set(
+        "resolve_rect",
+        lua.create_function(
+            |_, (h_anchor, v_anchor, width, height, offset_x, offset_y): (i64, i64, i64, i64, Option<i64>, Option<i64>)| {
+                let terminal_width = 80_i64;
+                let terminal_height = 24_i64;
+                let x = match h_anchor {
+                    1 => ((terminal_width - width.max(0)).max(0) / 2) + 1,
+                    2 => (terminal_width - width.max(0)).max(0) + 1,
+                    _ => 1,
+                } + offset_x.unwrap_or(0);
+                let y = match v_anchor {
+                    1 => ((terminal_height - height.max(0)).max(0) / 2) + 1,
+                    2 => (terminal_height - height.max(0)).max(0) + 1,
+                    _ => 1,
+                } + offset_y.unwrap_or(0);
+                Ok((x, y))
+            },
+        )?,
+    )?;
+    globals.set(
+        "was_terminal_resized",
+        lua.create_function(|_, ()| Ok(false))?,
+    )?;
+    globals.set(
+        "consume_resize_event",
+        lua.create_function(|_, ()| Ok(false))?,
+    )?;
     globals.set("get_text_width", lua.create_function(|_, text: String| Ok(text.chars().count() as i64))?)?;
     globals.set("get_launch_mode", lua.create_function(|_, ()| Ok(String::from("new")))?)?;
     globals.set("mod_log", lua.create_function(|_, ()| Ok(true))?)?;
@@ -1206,6 +1340,10 @@ fn flatten_ascii_row(value: &JsonValue, out: &mut String) -> Option<()> {
     }
 }
 
+pub fn resolve_mod_text_for_display(namespace: &str, raw: &str) -> String {
+    resolve_mod_text(namespace, raw)
+}
+
 fn resolve_mod_text(namespace: &str, raw: &str) -> String {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -1412,7 +1550,12 @@ fn mod_game_to_game_meta(game: ModGameMeta) -> GameMeta {
         name: game.name,
         description: game.description,
         detail: game.detail,
+        best_none: game.best_none,
         save: game.save,
+        min_width: game.min_width,
+        min_height: game.min_height,
+        max_width: game.max_width,
+        max_height: game.max_height,
         script_path: game.script_path,
         mod_info: Some(game.mod_info),
     }
@@ -1436,4 +1579,3 @@ impl ApiVersionField {
         }
     }
 }
-

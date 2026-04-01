@@ -19,6 +19,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{i18n, stats};
 use crate::mods;
+use crate::terminal::size_watcher::{self, SizeConstraints};
 use crate::utils::path_utils;
 
 const EXIT_GAME_SENTINEL: &str = "__TUI_GAME_EXIT__"; // 娓告垙閫€鍑烘爣璁?
@@ -29,6 +30,12 @@ static MOD_WATCHDOG_ACTIVE: AtomicBool = AtomicBool::new(false);
 static MOD_WATCHDOG_LAST_TOUCH_MS: AtomicU64 = AtomicU64::new(0);
 const MOD_EXECUTION_BUDGET_MS: u64 = 800;
 const MOD_HOOK_INSTRUCTION_STEP: u32 = 20_000;
+const ANCHOR_LEFT: i64 = 0;
+const ANCHOR_CENTER: i64 = 1;
+const ANCHOR_RIGHT: i64 = 2;
+const ANCHOR_TOP: i64 = 0;
+const ANCHOR_MIDDLE: i64 = 1;
+const ANCHOR_BOTTOM: i64 = 2;
 
 // 鍚姩娓告垙妯″紡鐨勬灇涓?
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -48,6 +55,14 @@ impl LaunchMode {
 
 // 灏咥PI娉ㄥ唽锛岃Lua鍙皟鐢?
 pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
+    let globals = lua.globals();
+    globals.set("ANCHOR_LEFT", ANCHOR_LEFT)?;
+    globals.set("ANCHOR_CENTER", ANCHOR_CENTER)?;
+    globals.set("ANCHOR_RIGHT", ANCHOR_RIGHT)?;
+    globals.set("ANCHOR_TOP", ANCHOR_TOP)?;
+    globals.set("ANCHOR_MIDDLE", ANCHOR_MIDDLE)?;
+    globals.set("ANCHOR_BOTTOM", ANCHOR_BOTTOM)?;
+
     let get_key = lua.create_function(|_, blocking: bool| {
         touch_mod_watchdog();
         flush_output()?;
@@ -71,7 +86,7 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
         }
         Ok(String::new())
     })?;
-    lua.globals().set("get_key", get_key)?;
+    globals.set("get_key", get_key)?;
 
     let get_raw_key = lua.create_function(|_, blocking: bool| {
         touch_mod_watchdog();
@@ -96,7 +111,7 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
         }
         Ok(String::new())
     })?;
-    lua.globals().set("get_raw_key", get_raw_key)?;
+    globals.set("get_raw_key", get_raw_key)?;
 
     let clear = lua.create_function(|_, ()| {
         touch_mod_watchdog();
@@ -109,7 +124,7 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
         .map_err(mlua::Error::external)?;
         Ok(())
     })?;
-    lua.globals().set("clear", clear)?;
+    globals.set("clear", clear)?;
 
     let draw_text = lua.create_function(
         |lua, (x, y, text, fg, bg): (i64, i64, String, Option<String>, Option<String>)| {
@@ -117,7 +132,7 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
             draw_text_rich_impl(lua, x, y, &text, fg.as_deref(), bg.as_deref())
         },
     )?;
-    lua.globals().set("draw_text", draw_text)?;
+    globals.set("draw_text", draw_text)?;
 
     let draw_text_ex = lua.create_function(
         |lua,
@@ -151,7 +166,7 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
             draw_text_rich_impl(lua, x, y, &rendered, fg.as_deref(), bg.as_deref())
         },
     )?;
-    lua.globals().set("draw_text_ex", draw_text_ex)?;
+    globals.set("draw_text_ex", draw_text_ex)?;
 
     let sleep = lua.create_function(|_, ms: i64| {
         touch_mod_watchdog();
@@ -163,15 +178,14 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
         }
         Ok(())
     })?;
-    lua.globals().set("sleep", sleep)?;
+    globals.set("sleep", sleep)?;
 
     let clear_input_buffer = lua.create_function(|_, ()| {
         touch_mod_watchdog();
         drain_input_events();
         Ok(true)
     })?;
-    lua.globals()
-        .set("clear_input_buffer", clear_input_buffer)?;
+    globals.set("clear_input_buffer", clear_input_buffer)?;
 
     let random = lua.create_function(|_, max: i64| {
         touch_mod_watchdog();
@@ -180,60 +194,138 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
         }
         Ok((next_random_u64() % (max as u64)) as i64)
     })?;
-    lua.globals().set("random", random)?;
+    globals.set("random", random)?;
 
     let exit_game = lua.create_function(|_, ()| -> mlua::Result<()> {
         touch_mod_watchdog();
         Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()))
     })?;
-    lua.globals().set("exit_game", exit_game)?;
+    globals.set("exit_game", exit_game)?;
 
     let translate = lua.create_function(|_, key: String| Ok(i18n::t(&key)))?;
-    lua.globals().set("translate", translate)?;
+    globals.set("translate", translate)?;
 
     let get_terminal_size = lua.create_function(|_, ()| {
         touch_mod_watchdog();
         let (w, h) = crossterm::terminal::size().map_err(mlua::Error::external)?;
         Ok((w, h))
     })?;
-    lua.globals().set("get_terminal_size", get_terminal_size)?;
+    globals.set("get_terminal_size", get_terminal_size)?;
 
     let get_text_width =
         lua.create_function(|_, text: String| {
             touch_mod_watchdog();
             Ok(UnicodeWidthStr::width(text.as_str()) as i64)
         })?;
-    lua.globals().set("get_text_width", get_text_width)?;
+    globals.set("get_text_width", get_text_width)?;
+
+    let get_text_size = lua.create_function(|_, text: String| {
+        touch_mod_watchdog();
+        let mut max_width = 0usize;
+        let mut height = 0i64;
+        for line in text.split('\n') {
+            max_width = max_width.max(UnicodeWidthStr::width(line));
+            height += 1;
+        }
+        if text.is_empty() {
+            height = 1;
+        }
+        Ok((max_width as i64, height))
+    })?;
+    globals.set("get_text_size", get_text_size)?;
+
+    let resolve_x = lua.create_function(
+        |_, (anchor, content_width, offset): (i64, i64, Option<i64>)| {
+            touch_mod_watchdog();
+            let (term_w, _) = crossterm::terminal::size().map_err(mlua::Error::external)?;
+            let resolved = resolve_axis_position(
+                anchor,
+                term_w as i64,
+                content_width.max(0),
+                offset.unwrap_or(0),
+                AxisOrientation::Horizontal,
+            );
+            Ok(resolved)
+        },
+    )?;
+    globals.set("resolve_x", resolve_x)?;
+
+    let resolve_y = lua.create_function(
+        |_, (anchor, content_height, offset): (i64, i64, Option<i64>)| {
+            touch_mod_watchdog();
+            let (_, term_h) = crossterm::terminal::size().map_err(mlua::Error::external)?;
+            let resolved = resolve_axis_position(
+                anchor,
+                term_h as i64,
+                content_height.max(0),
+                offset.unwrap_or(0),
+                AxisOrientation::Vertical,
+            );
+            Ok(resolved)
+        },
+    )?;
+    globals.set("resolve_y", resolve_y)?;
+
+    let resolve_rect = lua.create_function(
+        |_,
+         (h_anchor, v_anchor, width, height, offset_x, offset_y): (
+            i64,
+            i64,
+            i64,
+            i64,
+            Option<i64>,
+            Option<i64>,
+        )| {
+            touch_mod_watchdog();
+            let (term_w, term_h) = crossterm::terminal::size().map_err(mlua::Error::external)?;
+            let x = resolve_axis_position(
+                h_anchor,
+                term_w as i64,
+                width.max(0),
+                offset_x.unwrap_or(0),
+                AxisOrientation::Horizontal,
+            );
+            let y = resolve_axis_position(
+                v_anchor,
+                term_h as i64,
+                height.max(0),
+                offset_y.unwrap_or(0),
+                AxisOrientation::Vertical,
+            );
+            Ok((x, y))
+        },
+    )?;
+    globals.set("resolve_rect", resolve_rect)?;
 
     let get_launch_mode = lua.create_function(move |_, ()| Ok(mode.as_str().to_string()))?;
-    lua.globals().set("get_launch_mode", get_launch_mode)?;
+    globals.set("get_launch_mode", get_launch_mode)?;
 
     let save_data = lua.create_function(|_, (key, value): (String, Value)| {
         touch_mod_watchdog();
         save_lua_data(&key, &value)?;
         Ok(true)
     })?;
-    lua.globals().set("save_data", save_data)?;
+    globals.set("save_data", save_data)?;
 
     let load_data = lua.create_function(|lua, key: String| {
         touch_mod_watchdog();
         load_lua_data(lua, &key)
     })?;
-    lua.globals().set("load_data", load_data)?;
+    globals.set("load_data", load_data)?;
 
     let save_game_slot = lua.create_function(|_, (game_id, value): (String, Value)| {
         touch_mod_watchdog();
         save_game_slot_data(&game_id, &value)?;
         Ok(true)
     })?;
-    lua.globals().set("save_game_slot", save_game_slot)?;
+    globals.set("save_game_slot", save_game_slot)?;
 
     let load_game_slot =
         lua.create_function(|lua, game_id: String| {
             touch_mod_watchdog();
             load_lua_data(lua, &game_slot_key(&game_id))
         })?;
-    lua.globals().set("load_game_slot", load_game_slot)?;
+    globals.set("load_game_slot", load_game_slot)?;
 
     let update_game_stats =
         lua.create_function(|_, (game_id, score, duration_sec): (String, i64, i64)| {
@@ -244,7 +336,7 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
                 .map_err(mlua::Error::external)?;
             Ok(true)
         })?;
-    lua.globals().set("update_game_stats", update_game_stats)?;
+    globals.set("update_game_stats", update_game_stats)?;
 
     Ok(())
 }
@@ -382,12 +474,33 @@ fn run_mod_game_script(game: mods::ModGameMeta, mode: LaunchMode) -> Result<()> 
     let source = fs::read_to_string(&game.script_path)?;
     let source = source.trim_start_matches('\u{feff}');
     let lua = Lua::new();
+    let (initial_width, initial_height) = crossterm::terminal::size().unwrap_or((80, 24));
+    let viewport_state = Arc::new(Mutex::new(ModViewportState {
+        width: initial_width,
+        height: initial_height,
+        resized_pending: false,
+    }));
+    let size_constraints = SizeConstraints {
+        min_width: game.min_width,
+        min_height: game.min_height,
+        max_width: game.max_width,
+        max_height: game.max_height,
+    };
     activate_mod_watchdog();
     install_mod_execution_hook(&lua)
         .map_err(|e| anyhow!("failed to install mod execution hook: {e}"))?;
 
     let result = (|| -> Result<()> {
         register_api(&lua, mode).map_err(|e| anyhow!("Lua API registration error: {e}"))?;
+        let mod_namespace = game.mod_info.namespace.clone();
+        let mod_translate = lua
+            .create_function(move |_, key: String| {
+                Ok(mods::resolve_mod_text_for_display(&mod_namespace, &key))
+            })
+            .map_err(|e| anyhow!("mod translate registration error: {e}"))?;
+        lua.globals()
+            .set("translate", mod_translate)
+            .map_err(|e| anyhow!("mod translate global set error: {e}"))?;
         let action_registry = register_mod_runtime_api(
             &lua,
             ModRuntimeContext {
@@ -395,6 +508,8 @@ fn run_mod_game_script(game: mods::ModGameMeta, mode: LaunchMode) -> Result<()> 
                 game_id: game.game_id.clone(),
                 script_name: game.script_name.clone(),
                 save_enabled: game.save,
+                size_constraints,
+                viewport_state: viewport_state.clone(),
             },
         )
         .map_err(|e| anyhow!("mod runtime API registration error: {e}"))?;
@@ -417,16 +532,30 @@ fn run_mod_game_script(game: mods::ModGameMeta, mode: LaunchMode) -> Result<()> 
             .get("game_loop")
             .map_err(|_| anyhow!("mod script missing game_loop()"))?;
 
-        init_game
-            .call::<()>(())
-            .map_err(|err| anyhow!("mod init_game() failed: {err}"))?;
+        if !ensure_mod_runtime_size_valid(size_constraints, &viewport_state)
+            .map_err(|err| anyhow!("mod size validation failed: {err}"))?
+        {
+            return Ok(());
+        }
+        match init_game.call::<()>(()) {
+            Ok(()) => {}
+            Err(err) if err.to_string().contains(EXIT_GAME_SENTINEL) => return Ok(()),
+            Err(err) => return Err(anyhow!("mod init_game() failed: {err}")),
+        }
         if let Ok(mut registry) = action_registry.lock() {
             registry.registration_open = false;
             let _ = registry.persist_keybindings();
         }
-        game_loop
-            .call::<()>(())
-            .map_err(|err| anyhow!("mod game_loop() failed: {err}"))?;
+        if !ensure_mod_runtime_size_valid(size_constraints, &viewport_state)
+            .map_err(|err| anyhow!("mod size validation failed: {err}"))?
+        {
+            return Ok(());
+        }
+        match game_loop.call::<()>(()) {
+            Ok(()) => {}
+            Err(err) if err.to_string().contains(EXIT_GAME_SENTINEL) => return Ok(()),
+            Err(err) => return Err(anyhow!("mod game_loop() failed: {err}")),
+        }
 
         if let Ok(best_score) = globals.get::<mlua::Function>("best_score") {
             if let Ok(value) = best_score.call::<mlua::Value>(()) {
@@ -498,36 +627,141 @@ fn register_mod_runtime_api(
     )?;
     globals.set("register_action", register_action)?;
 
+    let peek_resize_state = context.viewport_state.clone();
+    let was_terminal_resized = lua.create_function(move |_, ()| {
+        touch_mod_watchdog();
+        Ok(peek_resize_state
+            .lock()
+            .map_err(|_| mlua::Error::external("viewport state lock poisoned"))?
+            .resized_pending)
+    })?;
+    globals.set("was_terminal_resized", was_terminal_resized)?;
+
+    let consume_resize_state = context.viewport_state.clone();
+    let consume_resize_event = lua.create_function(move |_, ()| {
+        touch_mod_watchdog();
+        let mut state = consume_resize_state
+            .lock()
+            .map_err(|_| mlua::Error::external("viewport state lock poisoned"))?;
+        let resized = state.resized_pending;
+        state.resized_pending = false;
+        Ok(resized)
+    })?;
+    globals.set("consume_resize_event", consume_resize_event)?;
+
+    let raw_blocking_viewport = context.viewport_state.clone();
+    let raw_blocking_constraints = context.size_constraints;
+    let mod_get_key = lua.create_function(move |_, blocking: bool| {
+        touch_mod_watchdog();
+        flush_output()?;
+
+        if blocking {
+            loop {
+                match event::read().map_err(mlua::Error::external)? {
+                    Event::Resize(width, height) => {
+                        if handle_mod_resize_event(
+                            width,
+                            height,
+                            raw_blocking_constraints,
+                            &raw_blocking_viewport,
+                        )? {
+                            return Ok(String::new());
+                        }
+                        return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
+                    }
+                    Event::Key(key) if key.kind == KeyEventKind::Press => {
+                        return decode_key_event(key);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if event::poll(Duration::from_millis(0)).map_err(mlua::Error::external)? {
+            match event::read().map_err(mlua::Error::external)? {
+                Event::Resize(width, height) => {
+                    if handle_mod_resize_event(
+                        width,
+                        height,
+                        raw_blocking_constraints,
+                        &raw_blocking_viewport,
+                    )? {
+                        return Ok(String::new());
+                    }
+                    return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
+                }
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    return decode_key_event(key);
+                }
+                _ => {}
+            }
+        }
+        Ok(String::new())
+    })?;
+    globals.set("get_key", mod_get_key.clone())?;
+    globals.set("get_raw_key", mod_get_key)?;
+
     let blocking_registry = action_registry.clone();
+    let blocking_viewport = context.viewport_state.clone();
+    let blocking_constraints = context.size_constraints;
     let get_action_blocking = lua.create_function(move |_, ()| {
         touch_mod_watchdog();
         flush_output()?;
         loop {
-            if let Event::Key(key) = event::read().map_err(mlua::Error::external)? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
+            match event::read().map_err(mlua::Error::external)? {
+                Event::Resize(width, height) => {
+                    if handle_mod_resize_event(
+                        width,
+                        height,
+                        blocking_constraints,
+                        &blocking_viewport,
+                    )? {
+                        return Ok(String::new());
+                    }
+                    return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
                 }
-                let raw = decode_key_event(key)?;
-                if let Some(action) = lock_action_registry(&blocking_registry)?.resolve_action(&raw) {
-                    return Ok(action);
+                Event::Key(key) => {
+                    if key.kind != KeyEventKind::Press {
+                        continue;
+                    }
+                    let raw = decode_key_event(key)?;
+                    if let Some(action) =
+                        lock_action_registry(&blocking_registry)?.resolve_action(&raw)
+                    {
+                        return Ok(action);
+                    }
                 }
+                _ => {}
             }
         }
     })?;
     globals.set("get_action_blocking", get_action_blocking)?;
 
     let poll_registry = action_registry.clone();
+    let poll_viewport = context.viewport_state.clone();
+    let poll_constraints = context.size_constraints;
     let poll_action = lua.create_function(move |_, ()| {
         touch_mod_watchdog();
         flush_output()?;
         if event::poll(Duration::from_millis(0)).map_err(mlua::Error::external)? {
-            if let Event::Key(key) = event::read().map_err(mlua::Error::external)? {
-                if key.kind == KeyEventKind::Press {
-                    let raw = decode_key_event(key)?;
-                    if let Some(action) = lock_action_registry(&poll_registry)?.resolve_action(&raw) {
-                        return Ok(action);
+            match event::read().map_err(mlua::Error::external)? {
+                Event::Resize(width, height) => {
+                    if handle_mod_resize_event(width, height, poll_constraints, &poll_viewport)? {
+                        return Ok(String::new());
+                    }
+                    return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
+                }
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        let raw = decode_key_event(key)?;
+                        if let Some(action) =
+                            lock_action_registry(&poll_registry)?.resolve_action(&raw)
+                        {
+                            return Ok(action);
+                        }
                     }
                 }
+                _ => {}
             }
         }
         Ok(String::new())
@@ -535,16 +769,32 @@ fn register_mod_runtime_api(
     globals.set("poll_action", poll_action)?;
 
     let pressed_registry = action_registry.clone();
+    let pressed_viewport = context.viewport_state.clone();
+    let pressed_constraints = context.size_constraints;
     let is_action_pressed = lua.create_function(move |_, action_name: String| {
         touch_mod_watchdog();
         flush_output()?;
         if event::poll(Duration::from_millis(0)).map_err(mlua::Error::external)? {
-            if let Event::Key(key) = event::read().map_err(mlua::Error::external)? {
-                if key.kind == KeyEventKind::Press {
-                    let raw = decode_key_event(key)?;
-                    let resolved = lock_action_registry(&pressed_registry)?.resolve_action(&raw);
-                    return Ok(resolved.as_deref() == Some(action_name.as_str()));
+            match event::read().map_err(mlua::Error::external)? {
+                Event::Resize(width, height) => {
+                    if handle_mod_resize_event(
+                        width,
+                        height,
+                        pressed_constraints,
+                        &pressed_viewport,
+                    )? {
+                        return Ok(false);
+                    }
+                    return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
                 }
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        let raw = decode_key_event(key)?;
+                        let resolved = lock_action_registry(&pressed_registry)?.resolve_action(&raw);
+                        return Ok(resolved.as_deref() == Some(action_name.as_str()));
+                    }
+                }
+                _ => {}
             }
         }
         Ok(false)
@@ -1292,6 +1542,15 @@ struct ModRuntimeContext {
     game_id: String,
     script_name: String,
     save_enabled: bool,
+    size_constraints: SizeConstraints,
+    viewport_state: Arc<Mutex<ModViewportState>>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ModViewportState {
+    width: u16,
+    height: u16,
+    resized_pending: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -1309,6 +1568,12 @@ struct ModActionRegistry {
     script_name: String,
     persisted_overrides: std::collections::HashMap<String, Vec<String>>,
     bindings: Vec<ActionBinding>,
+}
+
+#[derive(Clone, Copy)]
+enum AxisOrientation {
+    Horizontal,
+    Vertical,
 }
 
 impl ModActionRegistry {
@@ -1380,6 +1645,110 @@ impl ModActionRegistry {
             &self.script_name,
             bindings,
         )
+    }
+}
+
+fn resolve_axis_position(
+    anchor: i64,
+    terminal_extent: i64,
+    content_extent: i64,
+    offset: i64,
+    orientation: AxisOrientation,
+) -> i64 {
+    let base = match orientation {
+        AxisOrientation::Horizontal => match anchor {
+            ANCHOR_CENTER => ((terminal_extent - content_extent).max(0) / 2) + 1,
+            ANCHOR_RIGHT => (terminal_extent - content_extent).max(0) + 1,
+            _ => 1,
+        },
+        AxisOrientation::Vertical => match anchor {
+            ANCHOR_MIDDLE => ((terminal_extent - content_extent).max(0) / 2) + 1,
+            ANCHOR_BOTTOM => (terminal_extent - content_extent).max(0) + 1,
+            _ => 1,
+        },
+    };
+    base + offset
+}
+
+fn update_mod_viewport_state(
+    viewport_state: &Arc<Mutex<ModViewportState>>,
+    width: u16,
+    height: u16,
+    resized_pending: bool,
+) -> mlua::Result<()> {
+    let mut state = viewport_state
+        .lock()
+        .map_err(|_| mlua::Error::external("viewport state lock poisoned"))?;
+    state.width = width;
+    state.height = height;
+    if resized_pending {
+        state.resized_pending = true;
+    }
+    Ok(())
+}
+
+fn handle_mod_resize_event(
+    width: u16,
+    height: u16,
+    constraints: SizeConstraints,
+    viewport_state: &Arc<Mutex<ModViewportState>>,
+) -> mlua::Result<bool> {
+    update_mod_viewport_state(viewport_state, width, height, true)?;
+    let should_continue = ensure_mod_runtime_size_valid(constraints, viewport_state)
+        .map_err(mlua::Error::external)?;
+    Ok(should_continue)
+}
+
+fn ensure_mod_runtime_size_valid(
+    constraints: SizeConstraints,
+    viewport_state: &Arc<Mutex<ModViewportState>>,
+) -> Result<bool> {
+    let mut state = size_watcher::check_constraints(constraints)?;
+    update_mod_viewport_state(viewport_state, state.width, state.height, false)
+        .map_err(|err| anyhow!("failed to update viewport state: {err}"))?;
+    if state.size_ok {
+        return Ok(true);
+    }
+
+    loop {
+        size_watcher::draw_size_warning_with_constraints(&state, constraints, true)?;
+        flush_output().map_err(|err| anyhow!("failed to flush size warning: {err}"))?;
+        match event::read()? {
+            Event::Resize(width, height) => {
+                state = size_watcher::SizeState {
+                    width,
+                    height,
+                    size_ok: constraints.is_satisfied_by(width, height),
+                };
+                update_mod_viewport_state(viewport_state, width, height, true)
+                    .map_err(|err| anyhow!("failed to update viewport state: {err}"))?;
+                if state.size_ok {
+                    let mut viewport = viewport_state
+                        .lock()
+                        .map_err(|_| anyhow!("viewport state lock poisoned"))?;
+                    viewport.resized_pending = true;
+                    drop(viewport);
+                    if let Ok(mut out) = OUT.lock() {
+                        let _ = queue!(
+                            out,
+                            crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
+                            crossterm::cursor::MoveTo(0, 0),
+                            ResetColor
+                        );
+                        let _ = out.flush();
+                    }
+                    drain_input_events();
+                    return Ok(true);
+                }
+            }
+            Event::Key(key) if key.kind == KeyEventKind::Press => {
+                let raw = decode_key_event(key).map_err(|err| anyhow!("key decode failed: {err}"))?;
+                if raw == "esc" || raw == "q" {
+                    return Ok(false);
+                }
+            }
+            _ => {}
+        }
     }
 }
 

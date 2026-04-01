@@ -202,28 +202,7 @@ impl GameSelection {
             }
             KeyCode::Enter => {
                 if let Some(game) = self.selected_game_cloned() {
-                    if game.id == "2048"
-                        || game.id == "lights_out"
-                        || game.id == "memory_flip"
-                        || game.id == "sliding_puzzle"
-                        || game.id == "solitaire"
-                        || game.id == "color_memory"
-                        || game.id == "minesweeper"
-                        || game.id == "rock_paper_scissors"
-                        || game.id == "blackjack"
-                        || game.id == "maze_escape"
-                        || game.id == "pacman"
-                        || game.id == "snake"
-                        || game.id == "shooter"
-                        || game.id == "sudoku"
-                        || game.id == "tetris"
-                        || game.id == "tic_tac_toe"
-                        || game.id == "twenty_four"
-                        || game.id == "wordle"
-                    {
-                        return Some(GameSelectionAction::LaunchGame(game));
-                    }
-                    self.launch_placeholder = true;
+                    return Some(GameSelectionAction::LaunchGame(game));
                 }
                 None
             }
@@ -553,25 +532,9 @@ impl GameSelection {
                 i18n::t("game_selection.label.high_score"),
                 s.high_score
             )));
-        } else {
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game_selection.label.high_score"),
-                s.high_score
-            )));
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game_selection.label.longest_play"),
-                stats::format_duration(s.max_duration_sec)
-            )));
-        }
-
-        if let Some(mod_info) = &game.mod_info {
+        } else if let Some(mod_info) = &game.mod_info {
+            top_lines.extend(format_mod_best_score_lines(game, inner.width.saturating_sub(1) as usize));
             top_lines.push(Line::from(separator.clone()));
-            top_lines.push(Line::from(Span::styled(
-                text("mods.info.title", "Mod Info"),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-            )));
             top_lines.push(Line::from(format!(
                 "{} {}",
                 text("mods.info.package", "Package:"),
@@ -587,12 +550,23 @@ impl GameSelection {
                 text("mods.info.version", "Version:"),
                 mod_info.version
             )));
-            for line in format_mod_best_score(game) {
-                top_lines.push(Line::from(line));
-            }
+            top_lines.push(Line::from(separator.clone()));
+        } else {
+            top_lines.push(Line::from(format!(
+                "{} {}",
+                i18n::t("game_selection.label.high_score"),
+                s.high_score
+            )));
+            top_lines.push(Line::from(format!(
+                "{} {}",
+                i18n::t("game_selection.label.longest_play"),
+                stats::format_duration(s.max_duration_sec)
+            )));
         }
 
-        if top_lines.len() > stat_lines_start {
+        if top_lines.len() > stat_lines_start
+            && game.mod_info.is_none()
+        {
             top_lines.push(Line::from(separator.clone()));
         }
         top_lines.push(Line::from(i18n::t("game_selection.label.how_to_play")));
@@ -809,8 +783,8 @@ impl GameSelection {
             return Line::from(truncate_with_ellipsis(&name, width));
         }
 
-        let badge = "MOD";
-        let badge_width = UnicodeWidthStr::width(badge);
+        let badge = text("mods.badge", "MOD");
+        let badge_width = UnicodeWidthStr::width(badge.as_str());
         if width <= badge_width + 1 {
             return Line::from(truncate_with_ellipsis(&name, width));
         }
@@ -838,7 +812,7 @@ impl GameSelection {
     }
 
     fn localized_game_details(&self, game: &GameMeta) -> String {
-        i18n::t_or(&format!("game.{}.details", game.id), "")
+        i18n::t_or(&format!("game.{}.details", game.id), &game.detail)
     }
 
     fn selected_global_index(&self) -> Option<usize> {
@@ -902,48 +876,46 @@ fn text(key: &str, fallback: &str) -> String {
     i18n::t_or(key, fallback)
 }
 
-fn format_mod_best_score(game: &GameMeta) -> Vec<String> {
+fn format_mod_best_score_lines(game: &GameMeta, width: usize) -> Vec<Line<'static>> {
     let Some(mod_info) = &game.mod_info else {
-        return Vec::new();
+        return vec![Line::from("--")];
     };
     let Some(score) = mods::read_mod_best_score(&mod_info.namespace, &game.id) else {
-        return vec![format!("{} --", text("mods.info.best_score", "Best Record:"))];
+        return vec![Line::from(
+            game.best_none.clone().unwrap_or_else(|| "--".to_string()),
+        )];
     };
 
-    match score {
-        serde_json::Value::String(value) => {
-            vec![format!("{} {}", text("mods.info.best_score", "Best Record:"), value)]
-        }
+    let rendered = match score {
         serde_json::Value::Object(map) => {
-            let mut lines = Vec::new();
-            if let Some(value) = map.get("label").and_then(|value| value.as_str()) {
-                let display = map
-                    .get("value")
-                    .map(json_value_to_inline_text)
-                    .unwrap_or_else(|| "--".to_string());
-                lines.push(format!("{value} {display}"));
-            } else {
-                lines.push(format!(
-                    "{} {}",
-                    text("mods.info.best_score", "Best Record:"),
-                    map.get("value")
-                        .map(json_value_to_inline_text)
-                        .unwrap_or_else(|| "--".to_string())
-                ));
-            }
-
-            if let Some(extra) = map.get("extra").and_then(|value| value.as_object()) {
-                for (key, value) in extra {
-                    lines.push(format!("{key}: {}", json_value_to_inline_text(value)));
+            if let Some(best_string_raw) = map.get("best_string").and_then(|value| value.as_str()) {
+                let mut rendered = mods::resolve_mod_text_for_display(&mod_info.namespace, best_string_raw);
+                for (key, value) in &map {
+                    if key == "best_string" {
+                        continue;
+                    }
+                    rendered = rendered.replace(&format!("{{{key}}}"), &json_value_to_inline_text(value));
                 }
+                rendered
+            } else if let Some(value) = map.get("value") {
+                json_value_to_inline_text(value)
+            } else {
+                "--".to_string()
             }
-            lines
         }
-        other => vec![format!(
-            "{} {}",
-            text("mods.info.best_score", "Best Record:"),
-            json_value_to_inline_text(&other)
-        )],
+        serde_json::Value::String(value) => value,
+        other => json_value_to_inline_text(&other),
+    };
+
+    let lines = rich_text::parse_rich_text_wrapped(
+        &rendered,
+        width.max(1),
+        Style::default().fg(Color::White),
+    );
+    if lines.is_empty() {
+        vec![Line::from("--")]
+    } else {
+        lines
     }
 }
 

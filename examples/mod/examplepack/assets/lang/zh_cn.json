@@ -1,0 +1,19 @@
+{
+  "example_mod.package_name": "示例模组包",
+  "example_mod.package_description": "这是一个可实际游玩的最小模组示例，用来演示渲染、动作映射、存档、日志和最佳记录接口的使用方式。",
+  "example_mod.game_name": "移动方块",
+  "example_mod.game_description": "把 @ 移动到 X。Enter 保存退出，Esc 不保存直接返回。",
+  "example_mod.game_detail": "这个示例展示了模组主脚本如何注册动作、绘制一个简单场地、读写模组存档、写入日志，以及把最佳记录数据传回宿主。它的目标是作为自定义游戏的最小可运行模板。",
+  "example_mod.demo_controls": "[↑]/[↓]/[←]/[→] 移动  [Enter]/[Space] 保存并退出  [R] 重开  [Esc]/[Q] 返回",
+  "example_mod.best_record": "最佳步数\n{steps}",
+  "example_mod.best_none": "暂无记录",
+  "example_mod.label_steps": "步数",
+  "example_mod.label_best": "最佳",
+  "example_mod.msg_reach_goal": "尽可能用更少的步数走到 X。",
+  "example_mod.msg_loaded": "已读取存档，从上次位置继续。",
+  "example_mod.msg_moving": "继续朝着目标移动。",
+  "example_mod.msg_restart": "场地已重置。",
+  "example_mod.msg_finished": "已到达终点，按 Enter 保存并退出。",
+  "example_mod.msg_new_record": "刷新最佳记录，按 Enter 保存并退出。",
+  "example_mod.msg_resized": "终端尺寸已变化，界面已重新绘制。"
+}

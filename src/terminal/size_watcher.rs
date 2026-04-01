@@ -9,63 +9,140 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::i18n::t;
 
-// 终端尺寸结构体
-#[derive(Clone, Copy, Debug)]
-pub struct SizeState {
-    pub width: u16, // 当前终端宽度
-    pub height: u16, // 当前终端高度
-    pub size_ok: bool, // 是否满足最小尺寸要求
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SizeConstraints {
+    pub min_width: Option<u16>,
+    pub min_height: Option<u16>,
+    pub max_width: Option<u16>,
+    pub max_height: Option<u16>,
 }
 
-// 检查终端尺寸大小
+#[derive(Clone, Copy, Debug)]
+pub struct SizeState {
+    pub width: u16,
+    pub height: u16,
+    pub size_ok: bool,
+}
+
+impl SizeConstraints {
+    pub fn with_min(min_width: u16, min_height: u16) -> Self {
+        Self {
+            min_width: Some(min_width),
+            min_height: Some(min_height),
+            max_width: None,
+            max_height: None,
+        }
+    }
+
+    pub fn is_satisfied_by(&self, width: u16, height: u16) -> bool {
+        if let Some(min_width) = self.min_width
+            && width < min_width
+        {
+            return false;
+        }
+        if let Some(min_height) = self.min_height
+            && height < min_height
+        {
+            return false;
+        }
+        if let Some(max_width) = self.max_width
+            && width > max_width
+        {
+            return false;
+        }
+        if let Some(max_height) = self.max_height
+            && height > max_height
+        {
+            return false;
+        }
+        true
+    }
+}
+
 pub fn check_size(min_width: u16, min_height: u16) -> Result<SizeState> {
-    // 调用crossterm获取终端尺寸
+    check_constraints(SizeConstraints::with_min(min_width, min_height))
+}
+
+pub fn check_constraints(constraints: SizeConstraints) -> Result<SizeState> {
     let (width, height) = terminal::size()?;
     Ok(SizeState {
         width,
         height,
-        // 只有宽高都满足要求才是true
-        size_ok: width >= min_width && height >= min_height,
+        size_ok: constraints.is_satisfied_by(width, height),
     })
 }
 
-// 绘制终端警告
 pub fn draw_size_warning(state: &SizeState, min_width: u16, min_height: u16) -> Result<()> {
+    draw_size_warning_with_constraints(
+        state,
+        SizeConstraints::with_min(min_width, min_height),
+        false,
+    )
+}
+
+pub fn draw_size_warning_with_constraints(
+    state: &SizeState,
+    constraints: SizeConstraints,
+    back_to_game_list: bool,
+) -> Result<()> {
     let mut out = stdout();
 
-    // i18n文本
-    let lines = [
-        t("warning.size_title").to_string(),
-        format!("{}: {}x{}", t("warning.required"), min_width, min_height),
-        format!("{}: {}x{}", t("warning.current"), state.width, state.height),
-        t("warning.enlarge_hint").to_string(),
-        t("warning.quit_hint").to_string(),
-    ];
+    let mut lines = vec![if constraints.max_width.is_some() || constraints.max_height.is_some() {
+        t("warning.size_invalid_title").to_string()
+    } else {
+        t("warning.size_title").to_string()
+    }];
 
-    // 计算垂直居中位置
-    // 计算警告框的顶部位置
+    if let (Some(min_width), Some(min_height)) = (constraints.min_width, constraints.min_height) {
+        lines.push(format!(
+            "{}: {}x{}",
+            t("warning.required"),
+            min_width,
+            min_height
+        ));
+    }
+    if let (Some(max_width), Some(max_height)) = (constraints.max_width, constraints.max_height) {
+        lines.push(format!(
+            "{}: {}x{}",
+            t("warning.max_allowed"),
+            max_width,
+            max_height
+        ));
+    }
+
+    lines.push(format!(
+        "{}: {}x{}",
+        t("warning.current"),
+        state.width,
+        state.height
+    ));
+
+    if constraints.max_width.is_some() || constraints.max_height.is_some() {
+        lines.push(t("warning.adjust_hint").to_string());
+    } else {
+        lines.push(t("warning.enlarge_hint").to_string());
+    }
+
+    lines.push(if back_to_game_list {
+        t("warning.back_to_game_list_hint").to_string()
+    } else {
+        t("warning.quit_hint").to_string()
+    });
+
     let top = state.height.saturating_sub(lines.len() as u16) / 2;
 
-    // 清空屏幕
     queue!(out, Clear(ClearType::All))?;
 
     for (idx, line) in lines.iter().enumerate() {
-        // 计算当前行的显示宽度
         let width = UnicodeWidthStr::width(line.as_str()) as u16;
-
-        // 水平居中:x = (屏幕宽度 - 文本宽度) / 2
         let x = state.width.saturating_sub(width) / 2;
-
-        // 垂直位置:x = 顶部偏移 + 行号
         let y = top + idx as u16;
-
-        // 使用粗体绘制,然后重置样式
         queue!(
             out,
             MoveTo(x, y),
-            SetAttribute(Attribute::Bold), // 设置为粗体
-            Print(line), // 打印文本
-            SetAttribute(Attribute::Reset) // 重置所有属性
+            SetAttribute(Attribute::Bold),
+            Print(line),
+            SetAttribute(Attribute::Reset)
         )?;
     }
 

@@ -1,0 +1,19 @@
+{
+  "example_mod.package_name": "Example Pack",
+  "example_mod.package_description": "A minimal playable mod package that demonstrates rendering, action mapping, save data, logging and best score reporting.",
+  "example_mod.game_name": "Block Walker",
+  "example_mod.game_description": "Move @ to X. Enter saves and exits. Esc exits without saving.",
+  "example_mod.game_detail": "This sample shows how to register actions, draw a simple playfield, load and save mod data, write logs and report best score data back to the host. It is intended to be the smallest useful starting point for custom games.",
+  "example_mod.demo_controls": "[Up]/[Down]/[Left]/[Right] Move  [Enter]/[Space] Save And Exit  [R] Restart  [Esc]/[Q] Back",
+  "example_mod.best_record": "Best Steps\n{steps}",
+  "example_mod.best_none": "No record yet",
+  "example_mod.label_steps": "Steps",
+  "example_mod.label_best": "Best",
+  "example_mod.msg_reach_goal": "Reach X with as few steps as possible.",
+  "example_mod.msg_loaded": "Save loaded. Continue from the saved position.",
+  "example_mod.msg_moving": "Keep moving toward the goal.",
+  "example_mod.msg_restart": "Field reset.",
+  "example_mod.msg_finished": "Goal reached. Press Enter to save and exit.",
+  "example_mod.msg_new_record": "New best record. Press Enter to save and exit.",
+  "example_mod.msg_resized": "Terminal size changed. The screen has been redrawn."
+}

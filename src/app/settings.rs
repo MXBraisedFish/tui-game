@@ -642,6 +642,7 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
 
     let thumb_width = 8u16;
     let text_x = area.x + thumb_width + 2;
+    let content_height = area.height.min(4);
     let status = if package.enabled {
         text("settings.mods.enabled", "Enabled")
     } else {
@@ -672,12 +673,12 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
     }
     .bg(if selected { Color::DarkGray } else { Color::Reset });
 
-    for dy in 0..area.height {
+    for dy in 0..content_height {
         buffer.set_string(area.x, area.y + dy, " ".repeat(area.width as usize), base_style);
     }
 
     for (idx, line) in package.thumbnail.lines.iter().take(4).enumerate() {
-        if idx as u16 >= area.height {
+        if idx as u16 >= content_height {
             break;
         }
         render_rich_line_to_buffer(
@@ -691,7 +692,7 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
     }
 
     buffer.set_stringn(text_x, area.y, &package.package_name, area.width.saturating_sub(thumb_width + 2) as usize, title_style);
-    if area.height > 1 {
+    if content_height > 1 {
         buffer.set_stringn(
             text_x,
             area.y + 1,
@@ -700,7 +701,7 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
             meta_style,
         );
     }
-    if area.height > 2 {
+    if content_height > 2 {
         buffer.set_stringn(
             text_x,
             area.y + 2,
@@ -709,7 +710,7 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
             meta_style,
         );
     }
-    if area.height > 3 {
+    if content_height > 3 {
         buffer.set_stringn(
             text_x,
             area.y + 3,
@@ -717,6 +718,17 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
             area.width.saturating_sub(thumb_width + 2) as usize,
             status_style,
         );
+    }
+
+    if package.debug_enabled && content_height > 0 && area.width > 0 {
+        let debug_x = area.x + area.width - 1;
+        for dy in 0..content_height {
+            buffer.set_string(debug_x, area.y + dy, "█", Style::default().fg(Color::Red).bg(if selected {
+                Color::DarkGray
+            } else {
+                Color::Reset
+            }));
+        }
     }
 }
 
@@ -738,92 +750,83 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut Set
         return;
     };
 
-    let content_width = inner.width.saturating_sub(2).max(1) as usize;
-    let mut lines = rich_lines_from_image(
-        &package.banner,
-        content_width,
-        Style::default().fg(Color::White),
-    );
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        package.package_name.clone(),
-        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::from(format!(
-        "{} {}",
-        text("settings.mods.author", "Author:"),
-        package.author
-    )));
-    lines.push(Line::from(format!(
-        "{} {}",
-        text("settings.mods.version", "Version:"),
-        package.version
-    )));
-    lines.push(Line::from(format!(
-        "{} {}",
-        text("settings.mods.namespace", "Namespace:"),
-        package.namespace
-    )));
-    lines.push(Line::from(format!(
-        "{} {}",
-        text("settings.mods.games", "Games:"),
-        package.games.len()
-    )));
-    lines.push(Line::from(format!(
-        "{} {}",
-        text("settings.mods.state", "State:"),
-        if package.enabled {
-            text("settings.mods.enabled", "Enabled")
-        } else {
-            text("settings.mods.disabled", "Disabled")
-        }
-    )));
-    lines.push(Line::from(format!(
-        "{} {}",
-        text("settings.mods.debug", "Debug:"),
-        if package.debug_enabled {
-            text("common.on", "On")
-        } else {
-            text("common.off", "Off")
-        }
-    )));
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        text("settings.mods.description", "Description"),
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-    )));
-    lines.extend(rich_text::parse_rich_text_wrapped(
-        &package.description,
-        content_width,
-        Style::default().fg(Color::White),
-    ));
-    if !package.errors.is_empty() {
+    let build_detail_lines = |content_width: usize| {
+        let mut lines = rich_lines_from_image(
+            &package.banner,
+            content_width,
+            Style::default().fg(Color::White),
+        );
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            text("settings.mods.errors", "Scan Errors"),
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            package.package_name.clone(),
+            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
         )));
-        for error in package.errors.iter().take(8) {
-            lines.extend(rich_text::parse_rich_text_wrapped(
-                &format!("[{}] {}", error.severity.to_ascii_uppercase(), error.message),
-                content_width,
-                Style::default().fg(Color::White),
-            ));
+        lines.push(Line::from(format!(
+            "{} {}",
+            text("settings.mods.author", "Author:"),
+            package.author
+        )));
+        lines.push(Line::from(format!(
+            "{} {}",
+            text("settings.mods.version", "Version:"),
+            package.version
+        )));
+        lines.push(Line::from(format!(
+            "{} {}",
+            text("settings.mods.namespace", "Namespace:"),
+            package.namespace
+        )));
+        lines.push(Line::from(format!(
+            "{} {}",
+            text("settings.mods.games", "Games:"),
+            package.games.len()
+        )));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            text("settings.mods.description", "Description"),
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        )));
+        lines.extend(rich_text::parse_rich_text_wrapped(
+            &package.description,
+            content_width,
+            Style::default().fg(Color::White),
+        ));
+        if !package.errors.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                text("settings.mods.errors", "Scan Errors"),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            )));
+            for error in package.errors.iter().take(8) {
+                lines.extend(rich_text::parse_rich_text_wrapped(
+                    &format!("[{}] {}", error.severity.to_ascii_uppercase(), error.message),
+                    content_width,
+                    Style::default().fg(Color::White),
+                ));
+            }
         }
-    }
+        lines
+    };
 
     let viewport_h = inner.height as usize;
+    let full_width = inner.width.max(1) as usize;
+    let wide_lines = build_detail_lines(full_width);
+    let needs_scroll = wide_lines.len() > viewport_h;
+
+    let (lines, text_area) = if needs_scroll && inner.width > 2 {
+        (
+            build_detail_lines(inner.width.saturating_sub(2).max(1) as usize),
+            Rect::new(inner.x, inner.y, inner.width - 2, inner.height),
+        )
+    } else {
+        (wide_lines, inner)
+    };
+
     let max_scroll = lines.len().saturating_sub(viewport_h);
     if state.mod_detail_scroll > max_scroll {
         state.mod_detail_scroll = max_scroll;
     }
     state.mod_detail_scroll_available = max_scroll > 0;
-
-    let text_area = if state.mod_detail_scroll_available && inner.width > 2 {
-        Rect::new(inner.x, inner.y, inner.width - 2, inner.height)
-    } else {
-        inner
-    };
 
     frame.render_widget(
         Paragraph::new(lines)
