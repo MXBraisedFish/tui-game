@@ -24,6 +24,7 @@ use tui_game::lua_bridge::api::{
     take_terminal_dirty_from_lua,
 };
 use tui_game::lua_bridge::script_loader::{GameMeta, scan_scripts};
+use tui_game::mods;
 use tui_game::terminal::size_watcher;
 
 const RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -488,9 +489,22 @@ fn handle_cli_passthrough() -> Result<bool> {
 
 /// 根据共享存档槽同步主菜单中“继续游戏”的状态。
 fn sync_continue_item(menu: &mut Menu) {
-    let game_id = latest_saved_game_id();
-    let game_name = game_id.as_deref().map(resolve_saved_game_name);
-    menu.set_continue_target(game_id, game_name);
+    let Some(game_id) = latest_saved_game_id() else {
+        menu.set_continue_target(None, None);
+        return;
+    };
+
+    match resolve_continue_target(&game_id) {
+        Some((resolved_id, resolved_name)) => {
+            menu.set_continue_target(Some(resolved_id), Some(resolved_name));
+        }
+        None => {
+            if game_id.contains(':') {
+                let _ = mods::clear_latest_mod_save_game();
+            }
+            menu.set_continue_target(None, None);
+        }
+    }
 }
 
 fn resolve_saved_game_name(game_id: &str) -> String {
@@ -499,7 +513,22 @@ fn resolve_saved_game_name(game_id: &str) -> String {
             return game.name;
         }
     }
-    i18n::t_or(&format!("game.{}.name", game_id), game_id)
+    "--".to_string()
+}
+
+fn resolve_continue_target(game_id: &str) -> Option<(String, String)> {
+    let games = scan_scripts().ok()?;
+    let game = games.into_iter().find(|game| game.id == game_id)?;
+
+    if game_id.contains(':') {
+        let namespace = game_id.split(':').next()?;
+        let save_path = mods::mod_save_path(namespace, game_id).ok()?;
+        if !save_path.exists() {
+            return None;
+        }
+    }
+
+    Some((game.id, game.name))
 }
 
 /// 将版本标签规范化为统一的 `vX.Y.Z` 形式。
