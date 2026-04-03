@@ -1,0 +1,20 @@
+{
+  "id": "examplepack:2b602f20:demo",
+  "name": "example_mod.game_name",
+  "description": "example_mod.game_description",
+  "detail": "example_mod.game_detail",
+  "entry": "scripts/runtime_demo.lua",
+  "save": true,
+  "best_none": "example_mod.best_none",
+  "min_width": 60,
+  "min_height": 24,
+  "actions": {
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "move_up": ["up", "w"],
+    "move_down": ["down", "s"],
+    "confirm": ["enter", "space"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

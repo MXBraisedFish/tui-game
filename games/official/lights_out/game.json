@@ -1,0 +1,22 @@
+{
+  "id": "lights_out",
+  "name": "game.lights_out.name",
+  "description": "game.lights_out.description",
+  "detail": "game.lights_out.details",
+  "entry": "scripts/lights_out.lua",
+  "save": true,
+  "best_none": "game.lights_out.best_none_block",
+  "min_width": 46,
+  "min_height": 18,
+  "actions": {
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "move_up": ["up", "w"],
+    "move_down": ["down"],
+    "toggle": ["space", "enter"],
+    "resize_cycle": ["p"],
+    "save": ["s"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

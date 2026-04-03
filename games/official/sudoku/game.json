@@ -1,0 +1,33 @@
+{
+  "id": "sudoku",
+  "name": "game.sudoku.name",
+  "description": "game.sudoku.description",
+  "detail": "game.sudoku.details",
+  "entry": "scripts/sudoku.lua",
+  "save": true,
+  "best_none": "game.sudoku.best_none_block",
+  "min_width": 72,
+  "min_height": 28,
+  "actions": {
+    "move_left": ["left"],
+    "move_right": ["right"],
+    "move_up": ["up"],
+    "move_down": ["down"],
+    "digit_1": ["1"],
+    "digit_2": ["2"],
+    "digit_3": ["3"],
+    "digit_4": ["4"],
+    "digit_5": ["5"],
+    "digit_6": ["6"],
+    "digit_7": ["7"],
+    "digit_8": ["8"],
+    "digit_9": ["9"],
+    "clear_cell": ["space", "0"],
+    "undo": ["a"],
+    "change_difficulty": ["p"],
+    "toggle_locator": ["z"],
+    "restart": ["r"],
+    "save": ["s"],
+    "quit_action": ["q"]
+  }
+}

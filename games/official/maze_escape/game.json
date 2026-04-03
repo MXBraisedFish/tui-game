@@ -1,0 +1,22 @@
+{
+  "id": "maze_escape",
+  "name": "game.maze_escape.name",
+  "description": "game.maze_escape.description",
+  "detail": "game.maze_escape.details",
+  "entry": "scripts/maze_escape.lua",
+  "save": true,
+  "best_none": "game.maze_escape.best_none_block",
+  "min_width": 56,
+  "min_height": 24,
+  "actions": {
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "move_up": ["up", "w"],
+    "move_down": ["down"],
+    "cycle_mode": ["p"],
+    "save": ["s"],
+    "restart": ["r"],
+    "confirm": ["enter", "space"],
+    "quit_action": ["q", "esc"]
+  }
+}

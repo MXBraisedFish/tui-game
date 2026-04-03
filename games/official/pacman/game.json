@@ -1,0 +1,19 @@
+{
+  "id": "pacman",
+  "name": "game.pacman.name",
+  "description": "game.pacman.description",
+  "detail": "game.pacman.details",
+  "entry": "scripts/pacman.lua",
+  "save": false,
+  "best_none": "game.pacman.best_none_block",
+  "min_width": 60,
+  "min_height": 24,
+  "actions": {
+    "move_up": ["up", "w"],
+    "move_down": ["down"],
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "memory_flip",
+  "name": "game.memory_flip.name",
+  "description": "game.memory_flip.description",
+  "detail": "game.memory_flip.details",
+  "entry": "scripts/memory_flip.lua",
+  "save": true,
+  "best_none": "game.memory_flip.best_none_block",
+  "min_width": 58,
+  "min_height": 20,
+  "actions": {
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "move_up": ["up", "w"],
+    "move_down": ["down"],
+    "flip": ["space", "enter"],
+    "difficulty_cycle": ["p"],
+    "save": ["s"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+﻿use std::collections::HashMap;
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
@@ -13,12 +13,13 @@ use crate::app::rich_text;
 use crate::app::stats::{
     self, GameStats, LightsOutBest, MazeEscapeBest, MemoryFlipBest, MinesweeperBest, SolitaireBest, SudokuBest,
 };
-use crate::lua_bridge::script_loader::GameMeta;
+use crate::core::stats as runtime_stats;
+use crate::game::registry::{GameDescriptor, GameSourceKind};
 use crate::mods;
 
 /// 游戏选择页的完整状态。
 pub struct GameSelection {
-    games: Vec<GameMeta>,
+    games: Vec<GameDescriptor>,
     stats: HashMap<String, GameStats>,
     lights_out_best: Option<LightsOutBest>,
     memory_flip_best: Option<MemoryFlipBest>,
@@ -45,7 +46,7 @@ struct PageState {
 /// 游戏选择页向主循环上报的高层动作。
 pub enum GameSelectionAction {
     BackToMenu,
-    LaunchGame(GameMeta),
+    LaunchGame(GameDescriptor),
 }
 
 impl GameSelection {
@@ -73,7 +74,7 @@ impl GameSelection {
     }
 
     /// 根据扫描到的游戏列表和本地成绩数据创建游戏选择页状态。
-    pub fn new(games: Vec<GameMeta>) -> Self {
+    pub fn new(games: Vec<GameDescriptor>) -> Self {
         let (
             stats,
             lights_out_best,
@@ -114,7 +115,7 @@ impl GameSelection {
     }
 
     /// 刷新游戏列表和成绩数据，但尽量保留当前选中的游戏、分页和详情滚动位置。
-    pub fn refresh_preserving_selection(&mut self, games: Vec<GameMeta>) {
+    pub fn refresh_preserving_selection(&mut self, games: Vec<GameDescriptor>) {
         let selected_id = self.selected_game().map(|g| g.id.clone());
         let previous_global = self.selected_global_index().unwrap_or(0);
         let previous_scroll = self.detail_scroll;
@@ -167,7 +168,7 @@ impl GameSelection {
         self.detail_scroll = previous_scroll;
     }
 
-    /// 处理游戏选择页按键事件，并返回需要主程序执行的高层动作。
+    /// 澶勭悊娓告垙閫夋嫨椤垫寜閿簨浠讹紝骞惰繑鍥為渶瑕佷富绋嬪簭鎵ц鐨勯珮灞傚姩浣溿€?
     pub fn handle_event(&mut self, key: KeyEvent) -> Option<GameSelectionAction> {
         if self.launch_placeholder {
             self.launch_placeholder = false;
@@ -210,7 +211,7 @@ impl GameSelection {
         }
     }
 
-    /// 渲染游戏选择界面，包括左侧列表和右侧详情面板。
+    /// 娓叉煋娓告垙閫夋嫨鐣岄潰锛屽寘鎷乏渚у垪琛ㄥ拰鍙充晶璇︽儏闈㈡澘銆?
     pub fn render(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {
         if self.launch_placeholder {
             self.render_launch_placeholder(frame, area);
@@ -241,7 +242,7 @@ impl GameSelection {
         frame.render_widget(hint_widget, root[1]);
     }
 
-    /// 返回游戏选择页稳定显示所需的最小终端尺寸。
+    /// 杩斿洖娓告垙閫夋嫨椤电ǔ瀹氭樉绀烘墍闇€鐨勬渶灏忕粓绔昂瀵搞€?
     pub fn minimum_size(&self) -> (u16, u16) {
         let list_title = i18n::t("game_selection.panel.games");
         let detail_title = i18n::t("game_selection.panel.details");
@@ -369,7 +370,7 @@ impl GameSelection {
 
         top_lines.push(Line::from(separator.clone()));
         let stat_lines_start = top_lines.len();
-        if game.id == "lights_out" {
+        if game.id == "lights_out" && matches!(game.source, GameSourceKind::Legacy) {
             if let Some(best) = self.lights_out_best {
                 top_lines.push(Line::from(format!(
                     "{} {}x{}",
@@ -390,7 +391,7 @@ impl GameSelection {
             } else {
                 top_lines.push(Line::from(i18n::t("game.lights_out.best_none")));
             }
-        } else if game.id == "memory_flip" {
+        } else if game.id == "memory_flip" && matches!(game.source, GameSourceKind::Legacy) {
             if let Some(best) = self.memory_flip_best {
                 top_lines.push(Line::from(format!(
                     "{} {}",
@@ -410,7 +411,7 @@ impl GameSelection {
             } else {
                 top_lines.push(Line::from(i18n::t("game.memory_flip.best_none")));
             }
-        } else if game.id == "minesweeper" {
+        } else if game.id == "minesweeper" && matches!(game.source, GameSourceKind::Legacy) {
             let (d1, d2, d3) = if let Some(best) = self.minesweeper_best {
                 (
                     best.d1_min_time_sec.map(stats::format_duration).unwrap_or_else(|| "--".to_string()),
@@ -424,7 +425,7 @@ impl GameSelection {
             top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d1"), d1)));
             top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d2"), d2)));
             top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d3"), d3)));
-        } else if game.id == "maze_escape" {
+        } else if game.id == "maze_escape" && matches!(game.source, GameSourceKind::Legacy) {
             if let Some(best) = self.maze_escape_best {
                 let size = if best.max_cols > 0 && best.max_rows > 0 {
                     format!("{}x{}", best.max_cols, best.max_rows)
@@ -455,7 +456,7 @@ impl GameSelection {
             } else {
                 top_lines.push(Line::from(i18n::t("game.maze_escape.best_none")));
             }
-        } else if game.id == "solitaire" {
+        } else if game.id == "solitaire" && matches!(game.source, GameSourceKind::Legacy) {
             let fmt = |v: Option<u64>| -> String {
                 v.map(stats::format_duration)
                     .unwrap_or_else(|| "--:--:--".to_string())
@@ -476,7 +477,7 @@ impl GameSelection {
                 i18n::t("game.solitaire.best.spider"),
                 fmt(best.spider_min_time_sec)
             )));
-        } else if game.id == "sudoku" {
+        } else if game.id == "sudoku" && matches!(game.source, GameSourceKind::Legacy) {
             if let Some(best) = self.sudoku_best {
                 top_lines.push(Line::from(format!(
                     "{} {}",
@@ -491,7 +492,7 @@ impl GameSelection {
             } else {
                 top_lines.push(Line::from(i18n::t("game.sudoku.best_none")));
             }
-        } else if game.id == "twenty_four" {
+        } else if game.id == "twenty_four" && matches!(game.source, GameSourceKind::Legacy) {
             let best = self
                 .twenty_four_best_time_sec
                 .map(stats::format_duration)
@@ -502,55 +503,69 @@ impl GameSelection {
                 best
             )));
         } else if game.id == "tic_tac_toe" {
-        } else if game.id == "pacman" {
+        } else if game.id == "pacman" && matches!(game.source, GameSourceKind::Legacy) {
             top_lines.push(Line::from(format!(
                 "{} {}",
                 i18n::t("game_selection.label.high_score"),
                 s.high_score
             )));
-        } else if game.id == "wordle" {
+        } else if game.id == "wordle" && matches!(game.source, GameSourceKind::Legacy) {
             top_lines.push(Line::from(format!(
                 "{} {}",
                 i18n::t("game.wordle.best_streak"),
                 s.high_score
             )));
-        } else if game.id == "rock_paper_scissors" {
+        } else if game.id == "rock_paper_scissors" && matches!(game.source, GameSourceKind::Legacy) {
             top_lines.push(Line::from(format!(
                 "{} {}",
                 i18n::t("game.rock_paper_scissors.best_streak"),
                 s.high_score
             )));
-        } else if game.id == "blackjack" {
+        } else if game.id == "blackjack" && matches!(game.source, GameSourceKind::Legacy) {
             top_lines.push(Line::from(format!(
                 "{} {}",
                 i18n::t("game_selection.label.high_net_profit"),
                 s.high_score
             )));
-        } else if game.id == "tetris" {
+        } else if game.id == "tetris" && matches!(game.source, GameSourceKind::Legacy) {
             top_lines.push(Line::from(format!(
                 "{} {}",
                 i18n::t("game_selection.label.high_score"),
                 s.high_score
             )));
-        } else if let Some(mod_info) = &game.mod_info {
-            top_lines.extend(format_mod_best_score_lines(game, inner.width.saturating_sub(1) as usize));
+        } else if game.is_mod_game() {
+            top_lines.extend(format_runtime_best_score_lines(
+                game,
+                inner.width.saturating_sub(1) as usize,
+            ));
             top_lines.push(Line::from(separator.clone()));
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                text("mods.info.package", "Package:"),
-                mod_info.package_name
-            )));
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                text("mods.info.author", "Author:"),
-                mod_info.author
-            )));
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                text("mods.info.version", "Version:"),
-                mod_info.version
-            )));
+            if let Some(package_name) = self.mod_package_name(game) {
+                top_lines.push(Line::from(format!(
+                    "{} {}",
+                    text("mods.info.package", "Package:"),
+                    package_name
+                )));
+            }
+            if let Some(author) = self.mod_author(game) {
+                top_lines.push(Line::from(format!(
+                    "{} {}",
+                    text("mods.info.author", "Author:"),
+                    author
+                )));
+            }
+            if let Some(version) = self.mod_version(game) {
+                top_lines.push(Line::from(format!(
+                    "{} {}",
+                    text("mods.info.version", "Version:"),
+                    version
+                )));
+            }
             top_lines.push(Line::from(separator.clone()));
+        } else if !matches!(game.source, GameSourceKind::Legacy) {
+            top_lines.extend(format_runtime_best_score_lines(
+                game,
+                inner.width.saturating_sub(1) as usize,
+            ));
         } else {
             top_lines.push(Line::from(format!(
                 "{} {}",
@@ -565,7 +580,7 @@ impl GameSelection {
         }
 
         if top_lines.len() > stat_lines_start
-            && game.mod_info.is_none()
+            && !game.is_mod_game()
         {
             top_lines.push(Line::from(separator.clone()));
         }
@@ -705,17 +720,17 @@ impl GameSelection {
         frame.render_widget(msg, inner);
     }
 
-    fn selected_game(&self) -> Option<&GameMeta> {
+    fn selected_game(&self) -> Option<&GameDescriptor> {
         let selected_in_page = self.list_state.selected()?;
         let global = self.page_state.current_page * self.page_state.page_size + selected_in_page;
         self.games.get(global)
     }
 
-    fn selected_game_cloned(&self) -> Option<GameMeta> {
+    fn selected_game_cloned(&self) -> Option<GameDescriptor> {
         self.selected_game().cloned()
     }
 
-    fn current_page_games(&self) -> &[GameMeta] {
+    fn current_page_games(&self) -> &[GameDescriptor] {
         let start = self.page_state.current_page * self.page_state.page_size;
         let end = (start + self.page_state.page_size).min(self.games.len());
         &self.games[start..end]
@@ -777,9 +792,9 @@ impl GameSelection {
         }
     }
 
-    fn render_game_list_line(&self, game: &GameMeta, width: usize) -> Line<'static> {
+    fn render_game_list_line(&self, game: &GameDescriptor, width: usize) -> Line<'static> {
         let name = self.localized_game_name(game);
-        if game.mod_info.is_none() || width == 0 {
+        if !game.is_mod_game() || width == 0 {
             return Line::from(truncate_with_ellipsis(&name, width));
         }
 
@@ -803,18 +818,55 @@ impl GameSelection {
         ])
     }
 
-    fn localized_game_name(&self, game: &GameMeta) -> String {
+    fn localized_game_name(&self, game: &GameDescriptor) -> String {
+        if let Some(namespace) = mod_namespace(game) {
+            return mods::resolve_mod_text_for_display(namespace, &game.name);
+        }
         i18n::t_or(&format!("game.{}.name", game.id), &game.name)
     }
 
-    fn localized_game_description(&self, game: &GameMeta) -> String {
+    fn localized_game_description(&self, game: &GameDescriptor) -> String {
+        if let Some(namespace) = mod_namespace(game) {
+            return mods::resolve_mod_text_for_display(namespace, &game.description);
+        }
         i18n::t_or(&format!("game.{}.description", game.id), &game.description)
     }
 
-    fn localized_game_details(&self, game: &GameMeta) -> String {
+    fn localized_game_details(&self, game: &GameDescriptor) -> String {
+        if let Some(namespace) = mod_namespace(game) {
+            return mods::resolve_mod_text_for_display(namespace, &game.detail);
+        }
         i18n::t_or(&format!("game.{}.details", game.id), &game.detail)
     }
 
+
+    fn mod_package_name(&self, game: &GameDescriptor) -> Option<String> {
+        if let Some(mod_info) = &game.mod_info {
+            Some(mod_info.package_name.clone())
+        } else {
+            let namespace = mod_namespace(game)?;
+            Some(mods::resolve_mod_text_for_display(
+                namespace,
+                game.package_info()?.package_name.as_str(),
+            ))
+        }
+    }
+
+    fn mod_author<'a>(&self, game: &'a GameDescriptor) -> Option<&'a str> {
+        if let Some(mod_info) = &game.mod_info {
+            Some(mod_info.author.as_str())
+        } else {
+            game.package_info().map(|package| package.author.as_str())
+        }
+    }
+
+    fn mod_version<'a>(&self, game: &'a GameDescriptor) -> Option<&'a str> {
+        if let Some(mod_info) = &game.mod_info {
+            Some(mod_info.version.as_str())
+        } else {
+            game.package_info().map(|package| package.version.as_str())
+        }
+    }
     fn selected_global_index(&self) -> Option<usize> {
         let selected_in_page = self.list_state.selected()?;
         let global = self.page_state.current_page * self.page_state.page_size + selected_in_page;
@@ -876,20 +928,27 @@ fn text(key: &str, fallback: &str) -> String {
     i18n::t_or(key, fallback)
 }
 
-fn format_mod_best_score_lines(game: &GameMeta, width: usize) -> Vec<Line<'static>> {
-    let Some(mod_info) = &game.mod_info else {
-        return vec![Line::from("--")];
-    };
-    let Some(score) = mods::read_mod_best_score(&mod_info.namespace, &game.id) else {
-        return vec![Line::from(
-            game.best_none.clone().unwrap_or_else(|| "--".to_string()),
-        )];
+fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<Line<'static>> {
+    let Some(score) = runtime_stats::read_runtime_best_score(&game.id) else {
+        let fallback = if let Some(namespace) = mod_namespace(game) {
+            game.best_none
+                .as_ref()
+                .map(|raw| mods::resolve_mod_text_for_display(namespace, raw))
+                .unwrap_or_else(|| "--".to_string())
+        } else {
+            game.best_none.clone().unwrap_or_else(|| "--".to_string())
+        };
+        return vec![Line::from(fallback)];
     };
 
     let rendered = match score {
         serde_json::Value::Object(map) => {
             if let Some(best_string_raw) = map.get("best_string").and_then(|value| value.as_str()) {
-                let mut rendered = mods::resolve_mod_text_for_display(&mod_info.namespace, best_string_raw);
+                let mut rendered = if let Some(namespace) = mod_namespace(game) {
+                    mods::resolve_mod_text_for_display(namespace, best_string_raw)
+                } else {
+                    i18n::t_or(best_string_raw, best_string_raw)
+                };
                 for (key, value) in &map {
                     if key == "best_string" {
                         continue;
@@ -897,8 +956,6 @@ fn format_mod_best_score_lines(game: &GameMeta, width: usize) -> Vec<Line<'stati
                     rendered = rendered.replace(&format!("{{{key}}}"), &json_value_to_inline_text(value));
                 }
                 rendered
-            } else if let Some(value) = map.get("value") {
-                json_value_to_inline_text(value)
             } else {
                 "--".to_string()
             }
@@ -937,3 +994,17 @@ fn json_value_to_inline_text(value: &serde_json::Value) -> String {
             .join(", "),
     }
 }
+
+fn mod_namespace(game: &GameDescriptor) -> Option<&str> {
+    if let Some(mod_info) = &game.mod_info {
+        Some(mod_info.namespace.as_str())
+    } else if game.is_mod_game() {
+        game.package_info().map(|package| package.namespace.as_str())
+    } else {
+        None
+    }
+}
+
+
+
+

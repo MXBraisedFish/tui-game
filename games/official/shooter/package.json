@@ -1,0 +1,8 @@
+{
+  "namespace": "official",
+  "package_name": "Official Air Shooter Package",
+  "author": "TUI-GAME",
+  "version": "1.0.0",
+  "description": "Official package for the new unified runtime air shooter implementation.",
+  "api_version": 1
+}

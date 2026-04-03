@@ -38,6 +38,14 @@ pub fn scripts_dir() -> Result<PathBuf> {
     Ok(project_root()?.join("scripts"))
 }
 
+pub fn official_games_dir() -> Result<PathBuf> {
+    let runtime_games = runtime_dir()?.join("games").join("official");
+    if runtime_games.exists() {
+        return Ok(runtime_games);
+    }
+    Ok(project_root()?.join("games").join("official"))
+}
+
 pub fn language_pref_file() -> Result<PathBuf> {
     Ok(app_data_dir()?.join("language_pref.txt"))
 }

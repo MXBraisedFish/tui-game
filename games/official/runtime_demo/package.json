@@ -1,0 +1,8 @@
+{
+  "namespace": "official",
+  "package_name": "Official Runtime Demo",
+  "author": "TUI-GAME",
+  "version": "1.0.0",
+  "description": "A minimal official package used to validate the new unified runtime.",
+  "api_version": 1
+}

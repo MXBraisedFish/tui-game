@@ -1,0 +1,20 @@
+{
+  "id": "color_memory",
+  "name": "game.color_memory.name",
+  "description": "game.color_memory.description",
+  "detail": "game.color_memory.details",
+  "entry": "scripts/color_memory.lua",
+  "save": false,
+  "best_none": "game.color_memory.best_none_block",
+  "min_width": 62,
+  "min_height": 18,
+  "actions": {
+    "pick_1": ["1"],
+    "pick_2": ["2"],
+    "pick_3": ["3"],
+    "pick_4": ["4"],
+    "confirm": ["enter", "space"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

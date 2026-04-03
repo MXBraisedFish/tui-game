@@ -1,0 +1,22 @@
+{
+  "id": "tetris",
+  "name": "game.tetris.name",
+  "description": "game.tetris.description",
+  "detail": "game.tetris.details",
+  "entry": "scripts/tetris.lua",
+  "save": true,
+  "best_none": "game.tetris.best_none_block",
+  "min_width": 70,
+  "min_height": 28,
+  "actions": {
+    "move_left": ["left"],
+    "move_right": ["right"],
+    "soft_drop": ["down"],
+    "rotate_left": ["z"],
+    "rotate_right": ["x"],
+    "hard_drop": ["space"],
+    "restart": ["r"],
+    "save": ["s"],
+    "quit_action": ["q"]
+  }
+}

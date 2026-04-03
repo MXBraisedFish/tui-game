@@ -1,0 +1,20 @@
+{
+  "id": "tic_tac_toe",
+  "name": "game.tic_tac_toe.name",
+  "description": "game.tic_tac_toe.description",
+  "detail": "game.tic_tac_toe.details",
+  "entry": "scripts/tic_tac_toe.lua",
+  "save": false,
+  "min_width": 46,
+  "min_height": 16,
+  "actions": {
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "move_up": ["up", "w"],
+    "move_down": ["down", "s"],
+    "confirm": ["enter", "space"],
+    "switch_mark": ["x"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "namespace": "examplepack",
+  "package_name": "example_mod.package_name",
+  "author": "TUI-GAME",
+  "version": "1.0.0",
+  "description": "example_mod.package_description",
+  "api_version": 1
+}

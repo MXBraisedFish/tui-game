@@ -1,0 +1,19 @@
+{
+  "id": "official.runtime_demo",
+  "name": "Runtime Demo",
+  "description": "Move @ to X. Enter saves and exits.",
+  "detail": "This official package validates the new manifest-driven runtime, fixed-tick event loop, canvas rendering and unified best score protocol.",
+  "entry": "scripts/runtime_demo.lua",
+  "save": true,
+  "best_none": "No record yet",
+  "min_width": 60,
+  "min_height": 24,
+  "actions": {
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "move_up": ["up", "w"],
+    "move_down": ["down", "s"],
+    "confirm": ["enter", "space"],
+    "restart": ["r"]
+  }
+}

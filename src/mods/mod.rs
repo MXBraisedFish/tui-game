@@ -6,13 +6,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Context, Result};
 use image::GenericImageView;
-use mlua::{Lua, Table};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use unicode_width::UnicodeWidthChar;
 
 use crate::app::i18n;
-use crate::lua_bridge::script_loader::GameMeta;
+use crate::game::package::{load_package, GamePackageSource};
 use crate::utils::path_utils;
 
 pub const MOD_API_VERSION: u32 = 1;
@@ -89,7 +88,6 @@ pub struct ModPackage {
 #[derive(Clone, Debug)]
 pub struct ModScanOutput {
     pub packages: Vec<ModPackage>,
-    pub games: Vec<GameMeta>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -99,8 +97,6 @@ pub struct ModState {
     pub mods: HashMap<String, ModStateEntry>,
     #[serde(default)]
     pub scan_errors: Vec<ModScanError>,
-    #[serde(default)]
-    pub latest_save_game: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -391,22 +387,6 @@ pub fn read_mod_best_score(namespace: &str, game_id: &str) -> Option<JsonValue> 
         .map(|game| game.best_score.clone())
 }
 
-pub fn set_latest_mod_save_game(game_id: &str) -> Result<()> {
-    let mut state = load_mod_state();
-    state.latest_save_game = Some(game_id.to_string());
-    save_mod_state(&state)
-}
-
-pub fn latest_mod_save_game_id() -> Option<String> {
-    load_mod_state().latest_save_game
-}
-
-pub fn clear_latest_mod_save_game() -> Result<()> {
-    let mut state = load_mod_state();
-    state.latest_save_game = None;
-    save_mod_state(&state)
-}
-
 pub fn mod_log(namespace: &str, level: &str, message: &str) -> Result<()> {
     let state = load_mod_state();
     let debug_enabled = state
@@ -489,68 +469,7 @@ pub fn scan_mods() -> Result<ModScanOutput> {
     save_mod_state(&state)?;
     save_scan_cache(&cache)?;
 
-    let games = packages
-        .iter()
-        .filter(|package| package.enabled)
-        .flat_map(|package| package.games.iter().cloned())
-        .map(mod_game_to_game_meta)
-        .collect();
-
-    Ok(ModScanOutput { packages, games })
-}
-
-pub fn load_mod_game_from_path(script_path: &Path) -> Result<Option<ModGameMeta>> {
-    let script_path = fs::canonicalize(script_path).unwrap_or_else(|_| script_path.to_path_buf());
-    let scripts_dir = script_path.parent().ok_or_else(|| anyhow!("invalid mod script path"))?;
-    let package_dir = scripts_dir.parent().ok_or_else(|| anyhow!("invalid mod package path"))?;
-    if scripts_dir
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default()
-        != "scripts"
-    {
-        return Ok(None);
-    }
-
-    let meta_path = package_dir.join("meta.json");
-    if !meta_path.exists() {
-        return Ok(None);
-    }
-
-    let raw_meta = load_meta(&meta_path)?;
-    validate_meta(package_dir, &raw_meta)?;
-    let state = load_mod_state();
-    let state_entry = state.mods.get(&raw_meta.namespace).cloned().unwrap_or_default();
-
-    let description = resolve_mod_text(
-        &raw_meta.namespace,
-        raw_meta
-            .description
-            .as_deref()
-            .unwrap_or(DEFAULT_PACKAGE_DESCRIPTION),
-    );
-    let base_info = ModGameInfo {
-        namespace: raw_meta.namespace.clone(),
-        package_name: resolve_mod_text(&raw_meta.namespace, &raw_meta.package_name),
-        author: raw_meta.author.clone(),
-        version: raw_meta.version.clone(),
-        description,
-        thumbnail: image_from_meta(&raw_meta.namespace, raw_meta.thumbnail.as_ref(), ImageKind::Thumbnail)?,
-        banner: image_from_meta(&raw_meta.namespace, raw_meta.banner.as_ref(), ImageKind::Banner)?,
-        enabled: state_entry.enabled,
-        debug_enabled: state_entry.debug_enabled,
-    };
-
-    Ok(Some(scan_game_script(
-        package_dir,
-        &raw_meta,
-        &base_info,
-        &script_path,
-    )?))
-}
-
-pub fn load_mod_helper_scripts(lua: &Lua, package_dir: &Path) -> mlua::Result<()> {
-    load_helper_scripts(lua, &package_dir.join("scripts").join("function"))
+    Ok(ModScanOutput { packages })
 }
 
 fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> Result<Option<ModPackage>> {
@@ -595,31 +514,15 @@ fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> R
         ));
     }
 
-    let scripts_dir = dir.join("scripts");
-    let mut scripts: Vec<PathBuf> = if scripts_dir.is_dir() {
-        fs::read_dir(&scripts_dir)?
-            .filter_map(|entry| entry.ok().map(|item| item.path()))
-            .filter(|path| {
-                path.is_file()
-                    && path
-                        .extension()
-                        .and_then(|value| value.to_str())
-                        .map(|ext| ext.eq_ignore_ascii_case("lua"))
-                        .unwrap_or(false)
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
-    scripts.sort();
+    let package = load_package(dir, GamePackageSource::Mod)?;
 
-    if scripts.is_empty() {
+    if package.games.is_empty() {
         errors.push(scan_error(
             &namespace,
             "package",
-            "scripts",
+            "game.json",
             "warning",
-            "no main lua scripts found in scripts/ root".to_string(),
+            "no game manifests found".to_string(),
         ));
         cache.packages.insert(
             namespace,
@@ -634,14 +537,15 @@ fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> R
 
     let mut games = Vec::new();
     let mut script_mtimes = BTreeMap::new();
-    for script_path in scripts {
-        let script_name = script_path
+    for game_manifest in &package.games {
+        let script_path = dir.join(&game_manifest.entry);
+        let script_name = Path::new(&game_manifest.entry)
             .file_stem()
             .and_then(|value| value.to_str())
             .unwrap_or("game")
             .to_string();
         script_mtimes.insert(script_name.clone(), mtime_secs(&script_path));
-        match scan_game_script(dir, &raw_meta, &base_info, &script_path) {
+        match scan_game_manifest(&namespace, &base_info, dir, game_manifest) {
             Ok(game) => {
                 state_entry.games.entry(game.game_id.clone()).or_insert_with(|| ModGameState {
                     script_name: game.script_name.clone(),
@@ -653,7 +557,7 @@ fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> R
                 errors.push(scan_error(
                     &namespace,
                     "game",
-                    script_path.file_name().and_then(|value| value.to_str()).unwrap_or("unknown.lua"),
+                    &game_manifest.entry,
                     "error",
                     err.to_string(),
                 ));
@@ -690,246 +594,64 @@ fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> R
         errors,
     }))
 }
-fn scan_game_script(
-    package_dir: &Path,
-    meta: &RawMeta,
+fn scan_game_manifest(
+    namespace: &str,
     base_info: &ModGameInfo,
-    script_path: &Path,
+    package_dir: &Path,
+    game_manifest: &crate::game::manifest::GameManifest,
 ) -> Result<ModGameMeta> {
-    let source = fs::read_to_string(script_path)
-        .with_context(|| format!("failed to read mod script: {}", script_path.display()))?;
-    let source = source.trim_start_matches('\u{feff}');
+    let script_path = package_dir.join(&game_manifest.entry);
+    if !script_path.exists() || !script_path.is_file() {
+        return Err(anyhow!(
+            "game entry does not exist: {}",
+            script_path.display()
+        ));
+    }
 
-    let lua = Lua::new();
-    install_scan_stubs(&lua).map_err(|err| anyhow!("failed to install mod scan stubs: {err}"))?;
-    load_helper_scripts(&lua, &package_dir.join("scripts").join("function"))
-        .map_err(|err| anyhow!("failed to load mod helper scripts: {err}"))?;
-    lua.load(source)
-        .set_name(script_path.to_string_lossy().to_string())
-        .exec()
-        .map_err(|err| anyhow!("lua runtime error: {err}"))?;
-
-    let globals = lua.globals();
-    let meta_table = globals
-        .get::<Table>("GAME_META")
-        .map_err(|_| anyhow!("GAME_META table is missing"))?;
-
-    let script_name = script_path
+    let script_name = Path::new(&game_manifest.entry)
         .file_stem()
         .and_then(|value| value.to_str())
         .unwrap_or("game")
         .to_string();
 
-    let raw_name = meta_table
-        .get::<String>("name")
-        .map_err(|_| anyhow!("GAME_META.name is missing"))?;
-    let name = resolve_mod_text(&meta.namespace, &raw_name);
+    let name = resolve_mod_text(namespace, &game_manifest.name);
     if name.trim().is_empty() {
-        return Err(anyhow!("GAME_META.name cannot be blank"));
+        return Err(anyhow!("game manifest name cannot be blank"));
     }
 
-    let description = meta_table
-        .get::<String>("description")
-        .ok()
-        .map(|value| resolve_mod_text(&meta.namespace, &value))
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| DEFAULT_GAME_DESCRIPTION.to_string());
+    let description = if game_manifest.description.trim().is_empty() {
+        DEFAULT_GAME_DESCRIPTION.to_string()
+    } else {
+        resolve_mod_text(namespace, &game_manifest.description)
+    };
 
-    let detail = meta_table
-        .get::<String>("detail")
-        .ok()
-        .map(|value| resolve_mod_text(&meta.namespace, &value))
-        .unwrap_or_else(|| DEFAULT_GAME_DETAIL.to_string());
+    let detail = if game_manifest.detail.trim().is_empty() {
+        DEFAULT_GAME_DETAIL.to_string()
+    } else {
+        resolve_mod_text(namespace, &game_manifest.detail)
+    };
 
-    let best_none = meta_table
-        .get::<String>("best_none")
-        .ok()
-        .map(|value| resolve_mod_text(&meta.namespace, &value))
+    let best_none = game_manifest
+        .best_none
+        .as_deref()
+        .map(|value| resolve_mod_text(namespace, value))
         .filter(|value| !value.trim().is_empty());
 
-    let save = meta_table.get::<bool>("save").unwrap_or(false);
-    let min_width = meta_table
-        .get::<i64>("min_width")
-        .ok()
-        .and_then(|value| u16::try_from(value).ok())
-        .filter(|value| *value > 0);
-    let min_height = meta_table
-        .get::<i64>("min_height")
-        .ok()
-        .and_then(|value| u16::try_from(value).ok())
-        .filter(|value| *value > 0);
-    let max_width = meta_table
-        .get::<i64>("max_width")
-        .ok()
-        .and_then(|value| u16::try_from(value).ok())
-        .filter(|value| *value > 0);
-    let max_height = meta_table
-        .get::<i64>("max_height")
-        .ok()
-        .and_then(|value| u16::try_from(value).ok())
-        .filter(|value| *value > 0);
-    let game_id = build_game_id(meta, &script_name);
-
     Ok(ModGameMeta {
-        game_id,
+        game_id: game_manifest.id.clone(),
         script_name,
-        script_path: script_path.to_path_buf(),
+        script_path,
         name,
         description,
         detail,
         best_none,
-        save,
-        min_width,
-        min_height,
-        max_width,
-        max_height,
+        save: game_manifest.save,
+        min_width: game_manifest.min_width.filter(|value| *value > 0),
+        min_height: game_manifest.min_height.filter(|value| *value > 0),
+        max_width: game_manifest.max_width.filter(|value| *value > 0),
+        max_height: game_manifest.max_height.filter(|value| *value > 0),
         mod_info: base_info.clone(),
     })
-}
-
-fn install_scan_stubs(lua: &Lua) -> mlua::Result<()> {
-    let globals = lua.globals();
-    globals.set("ANCHOR_LEFT", 0)?;
-    globals.set("ANCHOR_CENTER", 1)?;
-    globals.set("ANCHOR_RIGHT", 2)?;
-    globals.set("ANCHOR_TOP", 0)?;
-    globals.set("ANCHOR_MIDDLE", 1)?;
-    globals.set("ANCHOR_BOTTOM", 2)?;
-    globals.set("draw_text", lua.create_function(|_, ()| Ok(()))?)?;
-    globals.set("draw_text_ex", lua.create_function(|_, ()| Ok(()))?)?;
-    globals.set("clear", lua.create_function(|_, ()| Ok(()))?)?;
-    globals.set("sleep", lua.create_function(|_, ()| Ok(()))?)?;
-    globals.set("clear_input_buffer", lua.create_function(|_, ()| Ok(true))?)?;
-    globals.set("get_key", lua.create_function(|_, ()| Ok(String::new()))?)?;
-    globals.set("get_raw_key", lua.create_function(|_, ()| Ok(String::new()))?)?;
-    globals.set("get_action_blocking", lua.create_function(|_, ()| Ok(String::new()))?)?;
-    globals.set("poll_action", lua.create_function(|_, ()| Ok(String::new()))?)?;
-    globals.set("is_action_pressed", lua.create_function(|_, ()| Ok(false))?)?;
-    globals.set("register_action", lua.create_function(|_, ()| Ok(true))?)?;
-    globals.set("save_data", lua.create_function(|_, ()| Ok(true))?)?;
-    globals.set("load_data", lua.create_function(|_, ()| Ok(mlua::Value::Nil))?)?;
-    globals.set("save_game_slot", lua.create_function(|_, ()| Ok(true))?)?;
-    globals.set("load_game_slot", lua.create_function(|_, ()| Ok(mlua::Value::Nil))?)?;
-    globals.set("update_game_stats", lua.create_function(|_, ()| Ok(true))?)?;
-    globals.set("translate", lua.create_function(|_, key: String| Ok(key))?)?;
-    globals.set("random", lua.create_function(|_, max: i64| Ok(max.max(0)))?)?;
-    globals.set("exit_game", lua.create_function(|_, ()| Ok(()))?)?;
-    globals.set("get_terminal_size", lua.create_function(|_, ()| Ok((80_u16, 24_u16)))?)?;
-    globals.set(
-        "get_text_size",
-        lua.create_function(|_, text: String| {
-            let mut max_width = 0usize;
-            let mut height = 0i64;
-            for line in text.split('\n') {
-                max_width = max_width.max(line.chars().count());
-                height += 1;
-            }
-            if text.is_empty() {
-                height = 1;
-            }
-            Ok((max_width as i64, height))
-        })?,
-    )?;
-    globals.set(
-        "resolve_x",
-        lua.create_function(|_, (anchor, width, offset): (i64, i64, Option<i64>)| {
-            let terminal_width = 80_i64;
-            let base = match anchor {
-                1 => ((terminal_width - width.max(0)).max(0) / 2) + 1,
-                2 => (terminal_width - width.max(0)).max(0) + 1,
-                _ => 1,
-            };
-            Ok(base + offset.unwrap_or(0))
-        })?,
-    )?;
-    globals.set(
-        "resolve_y",
-        lua.create_function(|_, (anchor, height, offset): (i64, i64, Option<i64>)| {
-            let terminal_height = 24_i64;
-            let base = match anchor {
-                1 => ((terminal_height - height.max(0)).max(0) / 2) + 1,
-                2 => (terminal_height - height.max(0)).max(0) + 1,
-                _ => 1,
-            };
-            Ok(base + offset.unwrap_or(0))
-        })?,
-    )?;
-    globals.set(
-        "resolve_rect",
-        lua.create_function(
-            |_, (h_anchor, v_anchor, width, height, offset_x, offset_y): (i64, i64, i64, i64, Option<i64>, Option<i64>)| {
-                let terminal_width = 80_i64;
-                let terminal_height = 24_i64;
-                let x = match h_anchor {
-                    1 => ((terminal_width - width.max(0)).max(0) / 2) + 1,
-                    2 => (terminal_width - width.max(0)).max(0) + 1,
-                    _ => 1,
-                } + offset_x.unwrap_or(0);
-                let y = match v_anchor {
-                    1 => ((terminal_height - height.max(0)).max(0) / 2) + 1,
-                    2 => (terminal_height - height.max(0)).max(0) + 1,
-                    _ => 1,
-                } + offset_y.unwrap_or(0);
-                Ok((x, y))
-            },
-        )?,
-    )?;
-    globals.set(
-        "was_terminal_resized",
-        lua.create_function(|_, ()| Ok(false))?,
-    )?;
-    globals.set(
-        "consume_resize_event",
-        lua.create_function(|_, ()| Ok(false))?,
-    )?;
-    globals.set("get_text_width", lua.create_function(|_, text: String| Ok(text.chars().count() as i64))?)?;
-    globals.set("get_launch_mode", lua.create_function(|_, ()| Ok(String::from("new")))?)?;
-    globals.set("mod_log", lua.create_function(|_, ()| Ok(true))?)?;
-
-    globals.set("io", mlua::Value::Nil)?;
-    globals.set("debug", mlua::Value::Nil)?;
-    if let Ok(os_table) = globals.get::<Table>("os") {
-        let _ = os_table.set("execute", mlua::Value::Nil);
-        let _ = os_table.set("remove", mlua::Value::Nil);
-        let _ = os_table.set("rename", mlua::Value::Nil);
-        let _ = os_table.set("exit", mlua::Value::Nil);
-    }
-    if let Ok(package_table) = globals.get::<Table>("package") {
-        let _ = package_table.set("loadlib", mlua::Value::Nil);
-    }
-
-    Ok(())
-}
-
-fn load_helper_scripts(lua: &Lua, dir: &Path) -> mlua::Result<()> {
-    if !dir.is_dir() {
-        return Ok(());
-    }
-
-    let mut entries: Vec<PathBuf> = fs::read_dir(dir)
-        .map_err(mlua::Error::external)?
-        .filter_map(|entry| entry.ok().map(|item| item.path()))
-        .filter(|path| {
-            path.is_file()
-                && path
-                    .extension()
-                    .and_then(|value| value.to_str())
-                    .map(|ext| ext.eq_ignore_ascii_case("lua"))
-                    .unwrap_or(false)
-        })
-        .collect();
-    entries.sort();
-
-    for entry in entries {
-        let source = fs::read_to_string(&entry).map_err(mlua::Error::external)?;
-        let source = source.trim_start_matches('\u{feff}');
-        lua.load(source)
-            .set_name(entry.to_string_lossy().to_string())
-            .exec()
-            .map_err(|err| mlua::Error::external(anyhow!("helper script load failed: {err}")))?;
-    }
-
-    Ok(())
 }
 
 fn load_meta(path: &Path) -> Result<RawMeta> {
@@ -1534,31 +1256,6 @@ fn mtime_secs(path: &Path) -> u64 {
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
         .map(|value| value.as_secs())
         .unwrap_or(0)
-}
-
-fn build_game_id(meta: &RawMeta, script_name: &str) -> String {
-    let seed = format!("{}|{}|{}", meta.package_name, meta.namespace, meta.author);
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    seed.hash(&mut hasher);
-    let hash = format!("{:08x}", hasher.finish() as u32);
-    format!("{}:{}:{}", meta.namespace, hash, script_name)
-}
-
-fn mod_game_to_game_meta(game: ModGameMeta) -> GameMeta {
-    GameMeta {
-        id: game.game_id,
-        name: game.name,
-        description: game.description,
-        detail: game.detail,
-        best_none: game.best_none,
-        save: game.save,
-        min_width: game.min_width,
-        min_height: game.min_height,
-        max_width: game.max_width,
-        max_height: game.max_height,
-        script_path: game.script_path,
-        mod_info: Some(game.mod_info),
-    }
 }
 
 fn scan_error(namespace: &str, scope: &str, target: impl Into<String>, severity: &str, message: impl Into<String>) -> ModScanError {

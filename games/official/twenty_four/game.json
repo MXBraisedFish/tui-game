@@ -1,0 +1,22 @@
+{
+  "id": "twenty_four",
+  "name": "game.twenty_four.name",
+  "description": "game.twenty_four.description",
+  "detail": "game.twenty_four.details",
+  "entry": "scripts/twenty_four.lua",
+  "save": true,
+  "best_none": "game.twenty_four.best_none_block",
+  "min_width": 68,
+  "min_height": 22,
+  "actions": {
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "op_add": ["1", "+"],
+    "op_sub": ["2", "-"],
+    "op_mul": ["3", "*"],
+    "op_div": ["4", "/"],
+    "save": ["s"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

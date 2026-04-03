@@ -1,0 +1,8 @@
+{
+  "namespace": "official",
+  "package_name": "TUI-GAME Official",
+  "author": "TUI-GAME",
+  "version": "1.0.0",
+  "description": "Official built-in games packaged under the unified runtime.",
+  "api_version": 1
+}

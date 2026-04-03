@@ -1,0 +1,20 @@
+{
+  "id": "2048",
+  "name": "game.2048.name",
+  "description": "game.2048.description",
+  "detail": "game.2048.details",
+  "entry": "scripts/2048.lua",
+  "save": true,
+  "best_none": "game.2048.best_none_block",
+  "min_width": 50,
+  "min_height": 20,
+  "actions": {
+    "move_left": ["left", "a"],
+    "move_right": ["right", "d"],
+    "move_up": ["up", "w"],
+    "move_down": ["down"],
+    "save": ["s"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

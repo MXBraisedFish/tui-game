@@ -19,12 +19,10 @@ use tui_game::app::layout::{MENU_MIN_HEIGHT, MENU_MIN_WIDTH};
 use tui_game::app::menu::{Menu, MenuAction};
 use tui_game::app::placeholder_pages::{self, PlaceholderPage};
 use tui_game::app::settings;
-use tui_game::lua_bridge::api::{
-    LaunchMode, clear_active_game_save, latest_saved_game_id, run_game_script,
-    take_terminal_dirty_from_lua,
-};
-use tui_game::lua_bridge::script_loader::{GameMeta, scan_scripts};
-use tui_game::mods;
+use tui_game::core::runtime::launch_game;
+use tui_game::core::save;
+use tui_game::lua_bridge::api::{LaunchMode, take_terminal_dirty_from_lua};
+use tui_game::game::registry::{GameDescriptor, GameRegistry};
 use tui_game::terminal::size_watcher;
 
 const RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -58,7 +56,7 @@ pub enum AppState {
 /// 新开游戏前的存档覆盖确认状态。
 struct PendingNewGameStart {
     /// 用户准备启动的新游戏。
-    target_game: GameMeta,
+    target_game: GameDescriptor,
     /// 当前已有存档所属游戏名，用于确认提示。
     saved_game_name: String,
 }
@@ -305,18 +303,16 @@ fn handle_key_event(
                     KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
                         let pending = pending_new_game_start.take();
                         if let Some(pending) = pending {
-                            if let Err(err) = clear_active_game_save() {
+                            if let Err(err) = save::clear_active_game_save() {
                                 eprintln!("Failed to clear active save slot: {err:#}");
                             }
-                            if let Err(err) =
-                                run_game_script(&pending.target_game.script_path, LaunchMode::New)
-                            {
+                            if let Err(err) = launch_game(&pending.target_game, LaunchMode::New) {
                                 eprintln!(
                                     "Failed to run game '{}': {err:#}",
                                     pending.target_game.id
                                 );
                             }
-                            let games = scan_scripts().unwrap_or_default();
+                            let games = GameRegistry::scan_all().map(GameRegistry::into_games).unwrap_or_default();
                             ui.refresh_preserving_selection(games);
                         }
                     }
@@ -340,7 +336,7 @@ fn handle_key_event(
                         *state = AppState::MainMenu { menu: Menu::new() };
                     }
                     GameSelectionAction::LaunchGame(game) => {
-                        if let Some(saved_game_id) = latest_saved_game_id() {
+                        if let Some(saved_game_id) = save::latest_saved_game_id() {
                             let saved_game_name = resolve_saved_game_name(&saved_game_id);
                             *pending_new_game_start = Some(PendingNewGameStart {
                                 target_game: game,
@@ -348,13 +344,13 @@ fn handle_key_event(
                             });
                             return Ok(());
                         }
-                        if let Err(err) = clear_active_game_save() {
+                        if let Err(err) = save::clear_active_game_save() {
                             eprintln!("Failed to clear active save slot: {err:#}");
                         }
-                        if let Err(err) = run_game_script(&game.script_path, LaunchMode::New) {
+                        if let Err(err) = launch_game(&game, LaunchMode::New) {
                             eprintln!("Failed to run game '{}': {err:#}", game.id);
                         }
-                        let games = scan_scripts().unwrap_or_default();
+                        let games = GameRegistry::scan_all().map(GameRegistry::into_games).unwrap_or_default();
                         ui.refresh_preserving_selection(games);
                     }
                 }
@@ -432,8 +428,8 @@ fn render_new_game_confirm(frame: &mut ratatui::Frame<'_>, saved_game_name: &str
 fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppState {
     match action {
         MenuAction::Play => {
-            let games = match scan_scripts() {
-                Ok(found) => found,
+            let games = match GameRegistry::scan_all() {
+                Ok(found) => found.into_games(),
                 Err(_) => Vec::new(),
             };
             AppState::GameSelection {
@@ -444,17 +440,18 @@ fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppS
         // 继续游戏会尝试直接载入共享存档，然后返回游戏列表。
         MenuAction::Continue => {
             if let Some(game_id) = continue_game_id {
-                let game = scan_scripts()
+                let game = GameRegistry::scan_all()
+                    .map(GameRegistry::into_games)
                     .unwrap_or_default()
                     .into_iter()
                     .find(|g| g.id.eq_ignore_ascii_case(game_id));
                 if let Some(game) = game {
-                    if let Err(err) = run_game_script(&game.script_path, LaunchMode::Continue) {
+                    if let Err(err) = launch_game(&game, LaunchMode::Continue) {
                         eprintln!("Failed to continue game '{}': {err:#}", game.id);
                     }
                 }
             }
-            let games = scan_scripts().unwrap_or_default();
+            let games = GameRegistry::scan_all().map(GameRegistry::into_games).unwrap_or_default();
             AppState::GameSelection {
                 ui: GameSelection::new(games),
             }
@@ -489,7 +486,7 @@ fn handle_cli_passthrough() -> Result<bool> {
 
 /// 根据共享存档槽同步主菜单中“继续游戏”的状态。
 fn sync_continue_item(menu: &mut Menu) {
-    let Some(game_id) = latest_saved_game_id() else {
+    let Some(game_id) = save::latest_saved_game_id() else {
         menu.set_continue_target(None, None);
         return;
     };
@@ -499,17 +496,15 @@ fn sync_continue_item(menu: &mut Menu) {
             menu.set_continue_target(Some(resolved_id), Some(resolved_name));
         }
         None => {
-            if game_id.contains(':') {
-                let _ = mods::clear_latest_mod_save_game();
-            }
+            let _ = save::clear_latest_runtime_save_game();
             menu.set_continue_target(None, None);
         }
     }
 }
 
 fn resolve_saved_game_name(game_id: &str) -> String {
-    if let Ok(games) = scan_scripts() {
-        if let Some(game) = games.into_iter().find(|game| game.id == game_id) {
+    if let Ok(games) = GameRegistry::scan_all() {
+        if let Some(game) = games.into_games().into_iter().find(|game| game.id == game_id) {
             return game.name;
         }
     }
@@ -517,15 +512,12 @@ fn resolve_saved_game_name(game_id: &str) -> String {
 }
 
 fn resolve_continue_target(game_id: &str) -> Option<(String, String)> {
-    let games = scan_scripts().ok()?;
-    let game = games.into_iter().find(|game| game.id == game_id)?;
+    let games = GameRegistry::scan_all().ok()?;
+    let game = games.into_games().into_iter().find(|game| game.id == game_id)?;
 
-    if game_id.contains(':') {
-        let namespace = game_id.split(':').next()?;
-        let save_path = mods::mod_save_path(namespace, game_id).ok()?;
-        if !save_path.exists() {
-            return None;
-        }
+    let save_path = save::runtime_game_save_path(game_id).ok()?;
+    if !save_path.exists() {
+        return None;
     }
 
     Some((game.id, game.name))

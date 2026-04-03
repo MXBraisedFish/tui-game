@@ -1,0 +1,18 @@
+{
+  "id": "rock_paper_scissors",
+  "name": "game.rock_paper_scissors.name",
+  "description": "game.rock_paper_scissors.description",
+  "detail": "game.rock_paper_scissors.details",
+  "entry": "scripts/rock_paper_scissors.lua",
+  "save": true,
+  "best_none": "game.rock_paper_scissors.best_none_block",
+  "min_width": 50,
+  "min_height": 16,
+  "actions": {
+    "pick_scissors": ["1"],
+    "pick_rock": ["2"],
+    "pick_paper": ["3"],
+    "restart": ["r"],
+    "quit_action": ["q"]
+  }
+}

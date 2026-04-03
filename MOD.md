@@ -110,7 +110,7 @@ mod123
 非法示例：
 
 ```text
-example_pack
+examplepack
 demo-pack
 demo.pack
 demo pack
@@ -1077,7 +1077,7 @@ tui-game-data/mod/logs/<namespace>.log
 仓库中提供完整示例模组：
 
 ```text
-examples/mod/example_pack/
+examples/mod/examplepack/
 ```
 
 示例内包含：

@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{Stdout, Write, stdout};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Result, anyhow};
@@ -12,30 +12,52 @@ use crossterm::queue;
 use crossterm::style::{
     Color as CColor, Print, ResetColor, SetBackgroundColor, SetForegroundColor,
 };
-use mlua::{Function, HookTriggers, Lua, Table, Value, VmState};
+use mlua::{Function, Lua, Table, Value};
 use once_cell::sync::Lazy;
 use serde_json::{Map, Number, Value as JsonValue};
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{i18n, stats};
-use crate::mods;
-use crate::terminal::size_watcher::{self, SizeConstraints};
 use crate::utils::path_utils;
 
 const EXIT_GAME_SENTINEL: &str = "__TUI_GAME_EXIT__"; // 娓告垙閫€鍑烘爣璁?
 static OUT: Lazy<Mutex<Stdout>> = Lazy::new(|| Mutex::new(stdout())); // 缁堢杈撳嚭鐨勫叏灞€閿?
 static TERMINAL_DIRTY_FROM_LUA: AtomicBool = AtomicBool::new(false); // Lua 鏄惁淇敼浜嗙粓绔?
 static RNG_STATE: AtomicU64 = AtomicU64::new(0); // 随机数状态
-static MOD_WATCHDOG_ACTIVE: AtomicBool = AtomicBool::new(false);
-static MOD_WATCHDOG_LAST_TOUCH_MS: AtomicU64 = AtomicU64::new(0);
-const MOD_EXECUTION_BUDGET_MS: u64 = 800;
-const MOD_HOOK_INSTRUCTION_STEP: u32 = 20_000;
 const ANCHOR_LEFT: i64 = 0;
 const ANCHOR_CENTER: i64 = 1;
 const ANCHOR_RIGHT: i64 = 2;
 const ANCHOR_TOP: i64 = 0;
 const ANCHOR_MIDDLE: i64 = 1;
 const ANCHOR_BOTTOM: i64 = 2;
+
+#[derive(Clone, Copy)]
+enum AxisOrientation {
+    Horizontal,
+    Vertical,
+}
+
+fn resolve_axis_position(
+    anchor: i64,
+    terminal_extent: i64,
+    content_extent: i64,
+    offset: i64,
+    orientation: AxisOrientation,
+) -> i64 {
+    let base = match orientation {
+        AxisOrientation::Horizontal => match anchor {
+            ANCHOR_CENTER => ((terminal_extent - content_extent).max(0) / 2) + 1,
+            ANCHOR_RIGHT => (terminal_extent - content_extent).max(0) + 1,
+            _ => 1,
+        },
+        AxisOrientation::Vertical => match anchor {
+            ANCHOR_MIDDLE => ((terminal_extent - content_extent).max(0) / 2) + 1,
+            ANCHOR_BOTTOM => (terminal_extent - content_extent).max(0) + 1,
+            _ => 1,
+        },
+    };
+    base + offset
+}
 
 // 鍚姩娓告垙妯″紡鐨勬灇涓?
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -343,10 +365,6 @@ pub fn register_api(lua: &Lua, mode: LaunchMode) -> mlua::Result<()> {
 
 // 鍚姩娓告垙鑴氭湰锛屽苟澶勭悊绋嬪簭鎺у埗鏉?
 pub fn run_game_script(script_path: &Path, mode: LaunchMode) -> Result<()> {
-    if let Some(mod_game) = mods::load_mod_game_from_path(script_path)? {
-        return run_mod_game_script(mod_game, mode);
-    }
-
     drain_input_events();
     let source = fs::read_to_string(script_path)?;
     let source = source.trim_start_matches('\u{feff}');
@@ -375,491 +393,463 @@ pub fn take_terminal_dirty_from_lua() -> bool {
     TERMINAL_DIRTY_FROM_LUA.swap(false, Ordering::AcqRel)
 }
 
-fn now_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|value| value.as_millis() as u64)
-        .unwrap_or(0)
-}
-
-fn activate_mod_watchdog() {
-    MOD_WATCHDOG_LAST_TOUCH_MS.store(now_millis(), Ordering::Release);
-    MOD_WATCHDOG_ACTIVE.store(true, Ordering::Release);
-}
-
 fn touch_mod_watchdog() {
-    if MOD_WATCHDOG_ACTIVE.load(Ordering::Acquire) {
-        MOD_WATCHDOG_LAST_TOUCH_MS.store(now_millis(), Ordering::Release);
-    }
-}
-
-fn deactivate_mod_watchdog() {
-    MOD_WATCHDOG_ACTIVE.store(false, Ordering::Release);
-}
-
-fn install_mod_execution_hook(lua: &Lua) -> mlua::Result<()> {
-    lua.set_hook(
-        HookTriggers::new().every_nth_instruction(MOD_HOOK_INSTRUCTION_STEP),
-        |_lua, _debug| {
-            if !MOD_WATCHDOG_ACTIVE.load(Ordering::Acquire) {
-                return Ok(VmState::Continue);
-            }
-
-            let last_touch = MOD_WATCHDOG_LAST_TOUCH_MS.load(Ordering::Acquire);
-            if now_millis().saturating_sub(last_touch) > MOD_EXECUTION_BUDGET_MS {
-                return Err(mlua::Error::RuntimeError(
-                    "mod execution timeout".to_string(),
-                ));
-            }
-
-            Ok(VmState::Continue)
-        },
-    )?;
-    Ok(())
 }
 
 // 浠庡瓨鍌ㄤ腑璇诲彇鏈€杩戜繚瀛樼殑瀛樻。ID
 pub fn latest_saved_game_id() -> Option<String> {
-    let builtin = latest_builtin_saved_game_id();
-    let mod_latest = mods::latest_mod_save_game_id();
-
-    match (builtin, mod_latest) {
-        (None, None) => None,
-        (Some(game_id), None) => Some(game_id),
-        (None, Some(game_id)) => Some(game_id),
-        (Some(builtin_id), Some(mod_id)) => {
-            let builtin_time = fs::metadata(save_file_path())
-                .and_then(|meta| meta.modified())
-                .ok();
-            let mod_time = mod_save_path_from_game_id(&mod_id)
-                .and_then(|path| fs::metadata(path).ok())
-                .and_then(|meta| meta.modified().ok());
-
-            match (builtin_time, mod_time) {
-                (Some(builtin_time), Some(mod_time)) => {
-                    if mod_time > builtin_time {
-                        Some(mod_id)
-                    } else {
-                        Some(builtin_id)
-                    }
-                }
-                (None, Some(_)) => Some(mod_id),
-                _ => Some(builtin_id),
-            }
-        }
-    }
+    crate::core::save::latest_saved_game_id()
 }
 
 // 娓呯悊褰撳墠娓告垙鐨勫厓鏁版嵁鍜屽瓨妗ｆЫ浣?
 // 涓嶆槸娓呯悊鍏ㄩ儴娓告垙鏁版嵁
 pub fn clear_active_game_save() -> Result<()> {
-    let mut store = load_json_store()
-        .map_err(|e| anyhow!("failed to load lua save store for clearing: {e}"))?;
-    clear_game_slots(&mut store);
-    write_json_store(&store).map_err(|e| anyhow!("failed to write lua save store after clear: {e}"))?;
+    crate::core::save::clear_active_game_save()
+}
 
-    if let Some(mod_game_id) = mods::latest_mod_save_game_id() {
-        if let Some(path) = mod_save_path_from_game_id(&mod_game_id) {
-            let _ = fs::remove_file(path);
+fn load_text_functions(lua: &Lua, script_path: &Path) -> mlua::Result<()> {
+    let globals = lua.globals();
+    if globals.get::<Table>("TEXT_COMMANDS").is_err() {
+        globals.set("TEXT_COMMANDS", lua.create_table()?)?;
+    }
+
+    let register = lua.create_function(|lua, (name, func): (String, Function)| {
+        let globals = lua.globals();
+        let table = match globals.get::<Table>("TEXT_COMMANDS") {
+            Ok(t) => t,
+            Err(_) => {
+                let t = lua.create_table()?;
+                globals.set("TEXT_COMMANDS", t.clone())?;
+                t
+            }
+        };
+        table.set(name.trim().to_ascii_lowercase(), func)?;
+        Ok(true)
+    })?;
+    globals.set("register_text_command", register)?;
+
+    let mut dirs = Vec::<PathBuf>::new();
+    if let Some(parent) = script_path.parent() {
+        dirs.push(parent.join("text_function"));
+        if parent.file_name().and_then(|s| s.to_str()) == Some("game") {
+            if let Some(root) = parent.parent() {
+                dirs.push(root.join("text_function"));
+            }
         }
-        let _ = mods::clear_latest_mod_save_game();
+    }
+    if let Ok(scripts_dir) = path_utils::scripts_dir() {
+        dirs.push(scripts_dir.join("text_function"));
+    }
+
+    let mut unique_dirs = Vec::<PathBuf>::new();
+    for dir in dirs {
+        if !unique_dirs.iter().any(|d| d == &dir) {
+            unique_dirs.push(dir);
+        }
+    }
+
+    let mut loaded_any = false;
+    for dir in unique_dirs {
+        if !dir.exists() || !dir.is_dir() {
+            continue;
+        }
+
+        let mut entries: Vec<PathBuf> = fs::read_dir(&dir)
+            .map_err(mlua::Error::external)?
+            .filter_map(|entry| entry.ok().map(|e| e.path()))
+            .filter(|path| {
+                path.extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("lua"))
+                    .unwrap_or(false)
+            })
+            .collect();
+        entries.sort();
+
+        for file in entries {
+            let source = fs::read_to_string(&file).map_err(mlua::Error::external)?;
+            let source = source.trim_start_matches('\u{feff}');
+            lua.load(source)
+                .set_name(file.to_string_lossy().as_ref())
+                .exec()?;
+            loaded_any = true;
+        }
+    }
+
+    if !loaded_any {
+        let globals = lua.globals();
+        if globals.get::<Table>("TEXT_COMMANDS").is_err() {
+            globals.set("TEXT_COMMANDS", lua.create_table()?)?;
+        }
     }
 
     Ok(())
 }
 
-fn run_mod_game_script(game: mods::ModGameMeta, mode: LaunchMode) -> Result<()> {
-    drain_input_events();
+fn draw_text_rich_impl(
+    lua: &Lua,
+    x: i64,
+    y: i64,
+    text: &str,
+    fg: Option<&str>,
+    bg: Option<&str>,
+) -> mlua::Result<()> {
+    if !text.starts_with("f%") {
+        return draw_text_impl(x, y, text, fg, bg);
+    }
 
-    let source = fs::read_to_string(&game.script_path)?;
-    let source = source.trim_start_matches('\u{feff}');
-    let lua = Lua::new();
-    let (initial_width, initial_height) = crossterm::terminal::size().unwrap_or((80, 24));
-    let viewport_state = Arc::new(Mutex::new(ModViewportState {
-        width: initial_width,
-        height: initial_height,
-        resized_pending: false,
-    }));
-    let size_constraints = SizeConstraints {
-        min_width: game.min_width,
-        min_height: game.min_height,
-        max_width: game.max_width,
-        max_height: game.max_height,
+    let default_fg = fg.map(|v| v.to_string());
+    let default_bg = bg.map(|v| v.to_string());
+
+    let mut state = RichStyleState {
+        default_fg: default_fg.clone(),
+        default_bg: default_bg.clone(),
+        fg: default_fg,
+        bg: default_bg,
+        fg_count: None,
+        bg_count: None,
+        fg_need_clear: false,
+        bg_need_clear: false,
     };
-    activate_mod_watchdog();
-    install_mod_execution_hook(&lua)
-        .map_err(|e| anyhow!("failed to install mod execution hook: {e}"))?;
 
-    let result = (|| -> Result<()> {
-        register_api(&lua, mode).map_err(|e| anyhow!("Lua API registration error: {e}"))?;
-        let mod_namespace = game.mod_info.namespace.clone();
-        let mod_translate = lua
-            .create_function(move |_, key: String| {
-                Ok(mods::resolve_mod_text_for_display(&mod_namespace, &key))
-            })
-            .map_err(|e| anyhow!("mod translate registration error: {e}"))?;
-        lua.globals()
-            .set("translate", mod_translate)
-            .map_err(|e| anyhow!("mod translate global set error: {e}"))?;
-        let action_registry = register_mod_runtime_api(
-            &lua,
-            ModRuntimeContext {
-                namespace: game.mod_info.namespace.clone(),
-                game_id: game.game_id.clone(),
-                script_name: game.script_name.clone(),
-                save_enabled: game.save,
-                size_constraints,
-                viewport_state: viewport_state.clone(),
-            },
-        )
-        .map_err(|e| anyhow!("mod runtime API registration error: {e}"))?;
+    let body = &text[2..];
+    let mut chunks = Vec::<StyledChunk>::new();
 
-        mods::load_mod_helper_scripts(&lua, game.script_path.parent().and_then(|path| path.parent()).ok_or_else(|| anyhow!("invalid mod package path"))?)
-            .map_err(|e| anyhow!("mod helper script load error: {e}"))?;
-        load_text_functions(&lua, &game.script_path)
-            .map_err(|e| anyhow!("Lua text command registration error: {e}"))?;
+    let mut i = 0usize;
+    while i < body.len() {
+        let mut iter = body[i..].chars();
+        let ch = match iter.next() {
+            Some(c) => c,
+            None => break,
+        };
+        let ch_len = ch.len_utf8();
 
-        lua.load(source)
-            .set_name(game.script_path.to_string_lossy().to_string())
-            .exec()
-            .map_err(|err| anyhow!("Lua runtime error: {err}"))?;
-
-        let globals = lua.globals();
-        let init_game: mlua::Function = globals
-            .get("init_game")
-            .map_err(|_| anyhow!("mod script missing init_game()"))?;
-        let game_loop: mlua::Function = globals
-            .get("game_loop")
-            .map_err(|_| anyhow!("mod script missing game_loop()"))?;
-
-        if !ensure_mod_runtime_size_valid(size_constraints, &viewport_state)
-            .map_err(|err| anyhow!("mod size validation failed: {err}"))?
-        {
-            return Ok(());
-        }
-        match init_game.call::<()>(()) {
-            Ok(()) => {}
-            Err(err) if err.to_string().contains(EXIT_GAME_SENTINEL) => return Ok(()),
-            Err(err) => return Err(anyhow!("mod init_game() failed: {err}")),
-        }
-        if let Ok(mut registry) = action_registry.lock() {
-            registry.registration_open = false;
-            let _ = registry.persist_keybindings();
-        }
-        if !ensure_mod_runtime_size_valid(size_constraints, &viewport_state)
-            .map_err(|err| anyhow!("mod size validation failed: {err}"))?
-        {
-            return Ok(());
-        }
-        match game_loop.call::<()>(()) {
-            Ok(()) => {}
-            Err(err) if err.to_string().contains(EXIT_GAME_SENTINEL) => return Ok(()),
-            Err(err) => return Err(anyhow!("mod game_loop() failed: {err}")),
-        }
-
-        if let Ok(best_score) = globals.get::<mlua::Function>("best_score") {
-            if let Ok(value) = best_score.call::<mlua::Value>(()) {
-                if let Ok(json) = lua_to_json(&value) {
-                    let _ = mods::update_mod_best_score(
-                        &game.mod_info.namespace,
-                        &game.game_id,
-                        &game.script_name,
-                        json,
-                    );
-                }
+        if ch == '\\' {
+            if let Some(next_ch) = iter.next() {
+                push_styled_char(&mut chunks, next_ch, &mut state);
+                i += ch_len + next_ch.len_utf8();
+            } else {
+                push_styled_char(&mut chunks, '\\', &mut state);
+                i += ch_len;
             }
+            continue;
         }
 
-        Ok(())
-    })();
+        if ch == '{' {
+            if let Some((inner, consumed)) = read_command_block(body, i)? {
+                if inner.trim().is_empty() {
+                    push_error(&mut chunks, &rich_text_error("rich_text.error.empty_command"));
+                    i += consumed;
+                    continue;
+                }
 
-    lua.remove_hook();
-    deactivate_mod_watchdog();
-    finalize_terminal_after_script();
-    TERMINAL_DIRTY_FROM_LUA.store(true, Ordering::Release);
-    if let Err(err) = &result {
-        show_mod_runtime_failure(err.to_string());
-        let _ = mods::mod_log(
-            &game.mod_info.namespace,
-            "error",
-            &format!("runtime degrade fallback: {err}"),
+                match apply_command_block(lua, &inner, &mut state) {
+                    Ok(()) => {}
+                    Err(msg) => push_error(&mut chunks, &msg.to_string()),
+                }
+
+                i += consumed;
+                continue;
+            }
+
+            push_error(
+                &mut chunks,
+                &rich_text_error("rich_text.error.unclosed_command"),
+            );
+            i += ch_len;
+            continue;
+        }
+
+        if ch == '}' {
+            push_error(
+                &mut chunks,
+                &rich_text_error("rich_text.error.unclosed_command"),
+            );
+            i += ch_len;
+            continue;
+        }
+
+        push_styled_char(&mut chunks, ch, &mut state);
+        i += ch_len;
+    }
+
+    if state.fg_need_clear || state.bg_need_clear {
+        push_error(
+            &mut chunks,
+            &rich_text_error("rich_text.error.unterminated_style"),
         );
     }
-    result
+
+    draw_styled_chunks(x, y, &chunks)
 }
 
-fn register_mod_runtime_api(
+fn read_command_block(input: &str, start: usize) -> mlua::Result<Option<(String, usize)>> {
+    let mut i = start + '{'.len_utf8();
+    let mut escape = false;
+    while i < input.len() {
+        let c = match input[i..].chars().next() {
+            Some(v) => v,
+            None => break,
+        };
+        let clen = c.len_utf8();
+
+        if escape {
+            escape = false;
+            i += clen;
+            continue;
+        }
+
+        if c == '\\' {
+            escape = true;
+            i += clen;
+            continue;
+        }
+
+        if c == '}' {
+            let inner = input[start + 1..i].to_string();
+            return Ok(Some((inner, i + clen - start)));
+        }
+
+        i += clen;
+    }
+    Ok(None)
+}
+
+fn split_unescaped(input: &str, sep: char) -> Vec<String> {
+    let mut out = Vec::<String>::new();
+    let mut cur = String::new();
+    let mut escape = false;
+
+    for c in input.chars() {
+        if escape {
+            cur.push(c);
+            escape = false;
+            continue;
+        }
+        if c == '\\' {
+            escape = true;
+            continue;
+        }
+        if c == sep {
+            out.push(cur.trim().to_string());
+            cur.clear();
+            continue;
+        }
+        cur.push(c);
+    }
+
+    if escape {
+        cur.push('\\');
+    }
+
+    out.push(cur.trim().to_string());
+    out
+}
+
+fn apply_command_block(lua: &Lua, block: &str, state: &mut RichStyleState) -> mlua::Result<()> {
+    let entries = split_unescaped(block, '|');
+    for entry in entries {
+        if entry.trim().is_empty() {
+            return Err(mlua::Error::external(rich_text_error(
+                "rich_text.error.empty_command",
+            )));
+        }
+
+        let mut parts = split_unescaped(&entry, ':');
+        if parts.len() != 2 {
+            return Err(mlua::Error::external(rich_text_error(
+                "rich_text.error.missing_command_or_param",
+            )));
+        }
+
+        let cmd = parts.remove(0).trim().to_ascii_lowercase();
+        let param_expr = parts.remove(0);
+        let params = split_unescaped(&param_expr, '>');
+
+        if cmd.is_empty() {
+            return Err(mlua::Error::external(rich_text_error(
+                "rich_text.error.missing_command_or_param",
+            )));
+        }
+
+        let result = apply_single_command(lua, &cmd, &params)?;
+        apply_command_result(&cmd, result, state)?;
+    }
+    Ok(())
+}
+
+fn apply_single_command(
     lua: &Lua,
-    context: ModRuntimeContext,
-) -> mlua::Result<Arc<Mutex<ModActionRegistry>>> {
-    let globals = lua.globals();
-    let persisted_overrides = mods::read_mod_keybindings(&context.namespace, &context.game_id);
-    let action_registry = Arc::new(Mutex::new(ModActionRegistry {
-        registration_open: true,
-        namespace: context.namespace.clone(),
-        game_id: context.game_id.clone(),
-        script_name: context.script_name.clone(),
-        persisted_overrides,
-        ..Default::default()
-    }));
+    cmd: &str,
+    params: &[String],
+) -> mlua::Result<TextCommandResult> {
+    if let Some(via_lua) = apply_command_via_lua(lua, cmd, params)? {
+        return Ok(via_lua);
+    }
 
-    let register_registry = action_registry.clone();
-    let register_action = lua.create_function(
-        move |_, (name, default_keys, description): (String, mlua::Value, String)| {
-            touch_mod_watchdog();
-            let keys = match default_keys {
-                mlua::Value::String(value) => vec![value.to_str()?.to_string()],
-                mlua::Value::Table(table) => {
-                    let mut keys = Vec::new();
-                    for value in table.sequence_values::<String>() {
-                        keys.push(value?);
-                    }
-                    keys
-                }
-                _ => {
-                    return Err(mlua::Error::external(
-                        "default_keys must be a string or string array",
-                    ));
-                }
-            };
-            lock_action_registry(&register_registry)?.register(name, keys, description)
-        },
-    )?;
-    globals.set("register_action", register_action)?;
+    if params.is_empty() || params[0].trim().is_empty() {
+        return Err(mlua::Error::external(rich_text_error(
+            "rich_text.error.missing_param",
+        )));
+    }
 
-    let peek_resize_state = context.viewport_state.clone();
-    let was_terminal_resized = lua.create_function(move |_, ()| {
-        touch_mod_watchdog();
-        Ok(peek_resize_state
-            .lock()
-            .map_err(|_| mlua::Error::external("viewport state lock poisoned"))?
-            .resized_pending)
-    })?;
-    globals.set("was_terminal_resized", was_terminal_resized)?;
-
-    let consume_resize_state = context.viewport_state.clone();
-    let consume_resize_event = lua.create_function(move |_, ()| {
-        touch_mod_watchdog();
-        let mut state = consume_resize_state
-            .lock()
-            .map_err(|_| mlua::Error::external("viewport state lock poisoned"))?;
-        let resized = state.resized_pending;
-        state.resized_pending = false;
-        Ok(resized)
-    })?;
-    globals.set("consume_resize_event", consume_resize_event)?;
-
-    let raw_blocking_viewport = context.viewport_state.clone();
-    let raw_blocking_constraints = context.size_constraints;
-    let mod_get_key = lua.create_function(move |_, blocking: bool| {
-        touch_mod_watchdog();
-        flush_output()?;
-
-        if blocking {
-            loop {
-                match event::read().map_err(mlua::Error::external)? {
-                    Event::Resize(width, height) => {
-                        if handle_mod_resize_event(
-                            width,
-                            height,
-                            raw_blocking_constraints,
-                            &raw_blocking_viewport,
-                        )? {
-                            return Ok(String::new());
-                        }
-                        return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
-                    }
-                    Event::Key(key) if key.kind == KeyEventKind::Press => {
-                        return decode_key_event(key);
-                    }
-                    _ => {}
-                }
-            }
+    let first = params[0].trim();
+    if first.eq_ignore_ascii_case("clear") {
+        if params.len() != 1 {
+            return Err(mlua::Error::external(rich_text_error(
+                "rich_text.error.unterminated_style",
+            )));
         }
+        return Ok(TextCommandResult {
+            clear: true,
+            color: None,
+            count: None,
+        });
+    }
 
-        if event::poll(Duration::from_millis(0)).map_err(mlua::Error::external)? {
-            match event::read().map_err(mlua::Error::external)? {
-                Event::Resize(width, height) => {
-                    if handle_mod_resize_event(
-                        width,
-                        height,
-                        raw_blocking_constraints,
-                        &raw_blocking_viewport,
-                    )? {
-                        return Ok(String::new());
-                    }
-                    return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
-                }
-                Event::Key(key) if key.kind == KeyEventKind::Press => {
-                    return decode_key_event(key);
-                }
-                _ => {}
-            }
+    if parse_color(Some(first)).is_none() {
+        return Err(mlua::Error::external(rich_text_error(
+            "rich_text.error.invalid_param",
+        )));
+    }
+
+    let count = if params.len() >= 2 && !params[1].trim().is_empty() {
+        let raw = params[1]
+            .trim()
+            .parse::<usize>()
+            .map_err(|_| mlua::Error::external(rich_text_error("rich_text.error.invalid_param")))?;
+        if raw == 0 {
+            return Err(mlua::Error::external(rich_text_error(
+                "rich_text.error.invalid_param",
+            )));
         }
-        Ok(String::new())
-    })?;
-    globals.set("get_key", mod_get_key.clone())?;
-    globals.set("get_raw_key", mod_get_key)?;
+        Some(raw)
+    } else {
+        None
+    };
 
-    let blocking_registry = action_registry.clone();
-    let blocking_viewport = context.viewport_state.clone();
-    let blocking_constraints = context.size_constraints;
-    let get_action_blocking = lua.create_function(move |_, ()| {
-        touch_mod_watchdog();
-        flush_output()?;
-        loop {
-            match event::read().map_err(mlua::Error::external)? {
-                Event::Resize(width, height) => {
-                    if handle_mod_resize_event(
-                        width,
-                        height,
-                        blocking_constraints,
-                        &blocking_viewport,
-                    )? {
-                        return Ok(String::new());
-                    }
-                    return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
-                }
-                Event::Key(key) => {
-                    if key.kind != KeyEventKind::Press {
-                        continue;
-                    }
-                    let raw = decode_key_event(key)?;
-                    if let Some(action) =
-                        lock_action_registry(&blocking_registry)?.resolve_action(&raw)
-                    {
-                        return Ok(action);
-                    }
-                }
-                _ => {}
-            }
-        }
-    })?;
-    globals.set("get_action_blocking", get_action_blocking)?;
+    if params.len() > 2 {
+        return Err(mlua::Error::external(rich_text_error(
+            "rich_text.error.invalid_param",
+        )));
+    }
 
-    let poll_registry = action_registry.clone();
-    let poll_viewport = context.viewport_state.clone();
-    let poll_constraints = context.size_constraints;
-    let poll_action = lua.create_function(move |_, ()| {
-        touch_mod_watchdog();
-        flush_output()?;
-        if event::poll(Duration::from_millis(0)).map_err(mlua::Error::external)? {
-            match event::read().map_err(mlua::Error::external)? {
-                Event::Resize(width, height) => {
-                    if handle_mod_resize_event(width, height, poll_constraints, &poll_viewport)? {
-                        return Ok(String::new());
-                    }
-                    return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
-                }
-                Event::Key(key) => {
-                    if key.kind == KeyEventKind::Press {
-                        let raw = decode_key_event(key)?;
-                        if let Some(action) =
-                            lock_action_registry(&poll_registry)?.resolve_action(&raw)
-                        {
-                            return Ok(action);
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-        Ok(String::new())
-    })?;
-    globals.set("poll_action", poll_action)?;
-
-    let pressed_registry = action_registry.clone();
-    let pressed_viewport = context.viewport_state.clone();
-    let pressed_constraints = context.size_constraints;
-    let is_action_pressed = lua.create_function(move |_, action_name: String| {
-        touch_mod_watchdog();
-        flush_output()?;
-        if event::poll(Duration::from_millis(0)).map_err(mlua::Error::external)? {
-            match event::read().map_err(mlua::Error::external)? {
-                Event::Resize(width, height) => {
-                    if handle_mod_resize_event(
-                        width,
-                        height,
-                        pressed_constraints,
-                        &pressed_viewport,
-                    )? {
-                        return Ok(false);
-                    }
-                    return Err(mlua::Error::RuntimeError(EXIT_GAME_SENTINEL.to_string()));
-                }
-                Event::Key(key) => {
-                    if key.kind == KeyEventKind::Press {
-                        let raw = decode_key_event(key)?;
-                        let resolved = lock_action_registry(&pressed_registry)?.resolve_action(&raw);
-                        return Ok(resolved.as_deref() == Some(action_name.as_str()));
-                    }
-                }
-                _ => {}
-            }
-        }
-        Ok(false)
-    })?;
-    globals.set("is_action_pressed", is_action_pressed)?;
-
-    sanitize_mod_runtime(lua)?;
-
-    let save_path = mods::mod_save_path(&context.namespace, &context.game_id)
-        .map_err(mlua::Error::external)?;
-    let save_enabled = context.save_enabled;
-    let namespace = context.namespace.clone();
-    let game_id = context.game_id.clone();
-
-    let save_data = lua.create_function(move |_, (key, value): (String, Value)| {
-        touch_mod_watchdog();
-        save_lua_data_to_path(&save_path, &key, &value)?;
-        if save_enabled {
-            clear_builtin_game_slots().map_err(mlua::Error::external)?;
-            mods::set_latest_mod_save_game(&game_id).map_err(mlua::Error::external)?;
-        }
-        Ok(true)
-    })?;
-    globals.set("save_data", save_data)?;
-
-    let load_path = mods::mod_save_path(&context.namespace, &context.game_id)
-        .map_err(mlua::Error::external)?;
-    let load_data = lua.create_function(move |lua, key: String| {
-        touch_mod_watchdog();
-        load_lua_data_from_path(lua, &load_path, &key)
-    })?;
-    globals.set("load_data", load_data)?;
-
-    let slot_save_path = mods::mod_save_path(&context.namespace, &context.game_id)
-        .map_err(mlua::Error::external)?;
-    let slot_game_id = context.game_id.clone();
-    let save_game_slot = lua.create_function(move |_, (_ignored_game_id, value): (String, Value)| {
-        touch_mod_watchdog();
-        save_lua_data_to_path(&slot_save_path, "__slot", &value)?;
-        if save_enabled {
-            clear_builtin_game_slots().map_err(mlua::Error::external)?;
-            mods::set_latest_mod_save_game(&slot_game_id).map_err(mlua::Error::external)?;
-        }
-        Ok(true)
-    })?;
-    globals.set("save_game_slot", save_game_slot)?;
-
-    let slot_load_path = mods::mod_save_path(&context.namespace, &context.game_id)
-        .map_err(mlua::Error::external)?;
-    let load_game_slot = lua.create_function(move |lua, _ignored_game_id: String| {
-        touch_mod_watchdog();
-        load_lua_data_from_path(lua, &slot_load_path, "__slot")
-    })?;
-    globals.set("load_game_slot", load_game_slot)?;
-
-    let log_namespace = namespace.clone();
-    let mod_log_fn = lua.create_function(move |_, (level, message): (String, String)| {
-        touch_mod_watchdog();
-        mods::mod_log(&log_namespace, &level, &message).map_err(mlua::Error::external)?;
-        Ok(true)
-    })?;
-    globals.set("mod_log", mod_log_fn)?;
-
-    Ok(action_registry)
+    Ok(TextCommandResult {
+        clear: false,
+        color: Some(first.to_string()),
+        count,
+    })
 }
+
+fn apply_command_via_lua(
+    lua: &Lua,
+    cmd: &str,
+    params: &[String],
+) -> mlua::Result<Option<TextCommandResult>> {
+    let globals = lua.globals();
+    let commands = match globals.get::<Table>("TEXT_COMMANDS") {
+        Ok(t) => t,
+        Err(_) => return Ok(None),
+    };
+
+    let func = match commands.get::<Function>(cmd) {
+        Ok(f) => f,
+        Err(_) => return Ok(None),
+    };
+
+    let ptable = lua.create_table()?;
+    for (idx, p) in params.iter().enumerate() {
+        ptable.set((idx + 1) as i64, p.as_str())?;
+    }
+
+    let ret = func.call::<Value>(ptable)?;
+    let t = match ret {
+        Value::Table(t) => t,
+        _ => {
+            return Err(mlua::Error::external(rich_text_error(
+                "rich_text.error.invalid_return_value",
+            )));
+        }
+    };
+
+    if let Ok(msg) = t.get::<String>("error") {
+        if !msg.trim().is_empty() {
+            return Err(mlua::Error::external(rich_text_error(
+                "rich_text.error.invalid_custom_command",
+            )));
+        }
+    }
+
+    let clear = t.get::<bool>("clear").unwrap_or(false);
+    let color = t.get::<String>("color").ok();
+    let count = t
+        .get::<i64>("count")
+        .ok()
+        .and_then(|v| if v > 0 { Some(v as usize) } else { None });
+
+    if !clear {
+        if let Some(c) = color.as_deref() {
+            if parse_color(Some(c)).is_none() {
+                return Err(mlua::Error::external(rich_text_error(
+                    "rich_text.error.invalid_param",
+                )));
+            }
+        } else {
+            return Err(mlua::Error::external(rich_text_error(
+                "rich_text.error.invalid_param",
+            )));
+        }
+    }
+
+    Ok(Some(TextCommandResult {
+        clear,
+        color,
+        count,
+    }))
+}
+
+fn apply_command_result(
+    cmd: &str,
+    result: TextCommandResult,
+    state: &mut RichStyleState,
+) -> mlua::Result<()> {
+    match cmd {
+        "tc" => {
+            if result.clear {
+                state.fg = state.default_fg.clone();
+                state.fg_count = None;
+                state.fg_need_clear = false;
+                return Ok(());
+            }
+            let color = result
+                .color
+                .ok_or_else(|| mlua::Error::external(rich_text_error("rich_text.error.missing_param")))?;
+            state.fg = Some(color);
+            state.fg_count = result.count;
+            state.fg_need_clear = result.count.is_none();
+            Ok(())
+        }
+        "bg" => {
+            if result.clear {
+                state.bg = state.default_bg.clone();
+                state.bg_count = None;
+                state.bg_need_clear = false;
+                return Ok(());
+            }
+            let color = result
+                .color
+                .ok_or_else(|| mlua::Error::external(rich_text_error("rich_text.error.missing_param")))?;
+            state.bg = Some(color);
+            state.bg_count = result.count;
+            state.bg_need_clear = result.count.is_none();
+            Ok(())
+        }
+        _ => Err(mlua::Error::external(rich_text_error(
+            "rich_text.error.unknown_command",
+        ))),
+    }
+}
+
 
 // 瀵屾枃鏈潡缁撴瀯浣?
 #[derive(Clone, Debug)]
@@ -894,863 +884,6 @@ fn rich_text_error(key: &str) -> String {
     i18n::t(key).to_string()
 }
 
-fn lock_action_registry(
-    registry: &Arc<Mutex<ModActionRegistry>>,
-) -> mlua::Result<std::sync::MutexGuard<'_, ModActionRegistry>> {
-    registry
-        .lock()
-        .map_err(|_| mlua::Error::external("mod action registry lock poisoned"))
-}
-
-fn normalize_action_key(raw: &str) -> String {
-    raw.trim().to_ascii_lowercase()
-}
-
-fn sanitize_mod_runtime(lua: &Lua) -> mlua::Result<()> {
-    let globals = lua.globals();
-    globals.set("io", mlua::Value::Nil)?;
-    globals.set("debug", mlua::Value::Nil)?;
-
-    if let Ok(os_table) = globals.get::<Table>("os") {
-        let _ = os_table.set("execute", mlua::Value::Nil);
-        let _ = os_table.set("remove", mlua::Value::Nil);
-        let _ = os_table.set("rename", mlua::Value::Nil);
-        let _ = os_table.set("exit", mlua::Value::Nil);
-    }
-
-    if let Ok(package_table) = globals.get::<Table>("package") {
-        let _ = package_table.set("loadlib", mlua::Value::Nil);
-    }
-
-    Ok(())
-}
-
-fn latest_builtin_saved_game_id() -> Option<String> {
-    let store = load_json_store().ok()?;
-    if let Some(JsonValue::String(id)) = store.get("__latest_save_game") {
-        let normalized = id.trim().to_string();
-        if !normalized.is_empty() {
-            return Some(normalized);
-        }
-    }
-    for key in store.keys() {
-        if let Some(id) = key.strip_prefix("game:") {
-            if !id.trim().is_empty() {
-                return Some(id.to_string());
-            }
-        }
-    }
-    None
-}
-
-fn clear_builtin_game_slots() -> Result<()> {
-    let mut store = load_json_store().map_err(|e| anyhow!("failed to load builtin saves: {e}"))?;
-    clear_game_slots(&mut store);
-    write_json_store(&store).map_err(|e| anyhow!("failed to write builtin saves: {e}"))?;
-    Ok(())
-}
-
-fn mod_save_path_from_game_id(game_id: &str) -> Option<PathBuf> {
-    let namespace = game_id.split(':').next()?;
-    mods::mod_save_path(namespace, game_id).ok()
-}
-
-fn load_json_store_from_path(path: &Path) -> mlua::Result<Map<String, JsonValue>> {
-    if !path.exists() {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(mlua::Error::external)?;
-        }
-        fs::write(path, "{}").map_err(mlua::Error::external)?;
-        return Ok(Map::new());
-    }
-
-    let raw = fs::read_to_string(path).map_err(mlua::Error::external)?;
-    let parsed =
-        serde_json::from_str::<JsonValue>(&raw).unwrap_or(JsonValue::Object(Map::new()));
-    if let JsonValue::Object(map) = parsed {
-        Ok(map)
-    } else {
-        Ok(Map::new())
-    }
-}
-
-fn write_json_store_to_path(path: &Path, store: &Map<String, JsonValue>) -> mlua::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(mlua::Error::external)?;
-    }
-    let payload = serde_json::to_string_pretty(store).map_err(mlua::Error::external)?;
-    fs::write(path, payload).map_err(mlua::Error::external)?;
-    Ok(())
-}
-
-fn save_lua_data_to_path(path: &Path, key: &str, value: &Value) -> mlua::Result<()> {
-    let mut store = load_json_store_from_path(path)?;
-    let json = lua_to_json(value)?;
-    store.insert(key.to_string(), json);
-    write_json_store_to_path(path, &store)
-}
-
-fn load_lua_data_from_path(lua: &Lua, path: &Path, key: &str) -> mlua::Result<Value> {
-    let store = load_json_store_from_path(path)?;
-    if let Some(v) = store.get(key) {
-        json_to_lua(lua, v)
-    } else {
-        Ok(Value::Nil)
-    }
-}
-
-// 鍔犺浇骞舵敞鍐屾墍鏈夋枃鏈懡浠ゅ嚱鏁?
-fn load_text_functions(lua: &Lua, script_path: &Path) -> mlua::Result<()> {
-    // 鑾峰彇Lua鐨勫叏灞€鐜
-    let globals = lua.globals();
-    // 妫€鏌ユ槸鍚﹀瓨鍦═EXT_COMMANDS琛?
-    if globals.get::<Table>("TEXT_COMMANDS").is_err() {
-        // 涓嶅瓨鍦ㄥ氨鍒涘缓绌鸿〃
-        globals.set("TEXT_COMMANDS", lua.create_table()?)?;
-    }
-
-    // 缁橪ua娉ㄥ唽鍑芥暟锛岀敤浜庢坊鍔犺嚜瀹氭枃鏈懡浠?
-    let register = lua.create_function(|lua, (name, func): (String, Function)| {
-        let globals = lua.globals();
-        // 鑾峰彇 TEXT_COMMANDS 琛?
-        let table = match globals.get::<Table>("TEXT_COMMANDS") {
-            Ok(t) => t,
-            Err(_) => {
-                let t = lua.create_table()?;
-                globals.set("TEXT_COMMANDS", t.clone())?;
-                t
-            }
-        };
-        // 灏嗗嚱鏁板瓨鍏ヨ〃涓?
-        table.set(name.trim().to_ascii_lowercase(), func)?;
-        Ok(true)
-    })?;
-    globals.set("register_text_command", register)?;
-
-    // 鏋勫缓鎼滅储璺緞
-    let mut dirs = Vec::<PathBuf>::new();
-    if let Some(parent) = script_path.parent() {
-        dirs.push(parent.join("text_function"));
-        if parent.file_name().and_then(|s| s.to_str()) == Some("game") {
-            if let Some(root) = parent.parent() {
-                dirs.push(root.join("text_function"));
-            }
-        }
-    }
-    if let Ok(scripts_dir) = path_utils::scripts_dir() {
-        dirs.push(scripts_dir.join("text_function"));
-    }
-
-    // 绉婚櫎閲嶅鐨勭洰褰曡矾寰?
-    let mut unique_dirs = Vec::<PathBuf>::new();
-    for dir in dirs {
-        if !unique_dirs.iter().any(|d| d == &dir) {
-            unique_dirs.push(dir);
-        }
-    }
-
-    // 鍔犺浇鎵€鏈塋ua鏂囦欢
-    let mut loaded_any = false;
-    // 閬嶅巻
-    for dir in unique_dirs {
-        // 涓嶅瓨鍦ㄥ氨璺宠繃
-        if !dir.exists() || !dir.is_dir() {
-            continue;
-        }
-
-        // 杩囨护lua鏂囦欢骞舵帓搴?
-        let mut entries: Vec<PathBuf> = fs::read_dir(&dir)
-            .map_err(mlua::Error::external)?
-            .filter_map(|entry| entry.ok().map(|e| e.path()))
-            .filter(|path| {
-                path.extension()
-                    .and_then(|ext| ext.to_str())
-                    .map(|ext| ext.eq_ignore_ascii_case("lua"))
-                    .unwrap_or(false)
-            })
-            .collect();
-        entries.sort();
-
-        // 閫愪釜鍔犺浇鏂囦欢骞舵墽琛屼唬鐮?
-        for file in entries {
-            let source = fs::read_to_string(&file).map_err(mlua::Error::external)?;
-            let source = source.trim_start_matches('\u{feff}');
-            lua.load(source)
-                .set_name(file.to_string_lossy().as_ref())
-                .exec()?;
-            loaded_any = true;
-        }
-    }
-
-    // 濡傛灉娌℃湁鍔犺浇浠讳綍鏂囦欢锛岀‘淇漈EXT_COMMANDS琛ㄥ瓨鍦紝淇濊瘉娌℃湁瀵屾枃鏈寚浠や篃鍙互娓叉煋
-    if !loaded_any {
-        let globals = lua.globals();
-        if globals.get::<Table>("TEXT_COMMANDS").is_err() {
-            globals.set("TEXT_COMMANDS", lua.create_table()?)?;
-        }
-    }
-
-    Ok(())
-}
-
-// 瀵屾枃鏈В鏋愭牳蹇冨嚱鏁?
-fn draw_text_rich_impl(
-    lua: &Lua,
-    x: i64,
-    y: i64,
-    text: &str,
-    fg: Option<&str>,
-    bg: Option<&str>,
-) -> mlua::Result<()> {
-    // 涓嶆槸f%寮€澶寸殑璧版櫘閫氭覆鏌?
-    if !text.starts_with("f%") {
-        return draw_text_impl(x, y, text, fg, bg);
-    }
-
-    // 鏍峰紡鍒濆鍖?
-    let default_fg = fg.map(|v| v.to_string());
-    let default_bg = bg.map(|v| v.to_string());
-
-    let mut state = RichStyleState {
-        default_fg: default_fg.clone(), // 淇濆瓨榛樿鍓嶆櫙鑹?
-        default_bg: default_bg.clone(), // 淇濆瓨榛樿鑳屾櫙鑹?
-        fg: default_fg,                 // 褰撳墠鍓嶆櫙鑹插垵濮嬩负榛樿鍊?
-        bg: default_bg,                 // 褰撳墠鑳屾櫙鑹插垵濮嬩负榛樿鍊?
-        fg_count: None,                 // 鍓嶆櫙鑹叉棤娆℃暟闄愬埗
-        bg_count: None,                 // 鑳屾櫙鑹叉棤娆℃暟闄愬埗
-        fg_need_clear: false,           // 涓嶉渶瑕佹竻鐞嗗墠鏅?
-        bg_need_clear: false,           // 涓嶉渶瑕佹竻鐞嗚儗鏅?
-    };
-
-    // 鍘绘帀寮€澶寸殑f%澹版槑
-    let body = &text[2..];
-    // 瀛樺偍瑙ｆ瀽鍑虹殑鏍峰紡鍧?
-    let mut chunks = Vec::<StyledChunk>::new();
-
-    // 褰撳墠瑙ｆ瀽鐨勪綅缃?
-    let mut i = 0usize;
-    // 閬嶅巻姣忎釜瀛楃
-    while i < body.len() {
-        // 鑾峰彇褰撳墠瀛楃
-        let mut iter = body[i..].chars();
-        let ch = match iter.next() {
-            Some(c) => c,
-            None => break,
-        };
-        // 瀛楃鐨勭紪鐮佸瓧鑺傞暱搴?
-        let ch_len = ch.len_utf8();
-
-        // 澶勭悊杞箟绗?
-        // \\, \{, \}
-        if ch == '\\' {
-            if let Some(next_ch) = iter.next() {
-                push_styled_char(&mut chunks, next_ch, &mut state);
-                i += ch_len + next_ch.len_utf8();
-            } else {
-                push_styled_char(&mut chunks, '\\', &mut state);
-                i += ch_len;
-            }
-            continue;
-        }
-
-        // 閬囧埌{寮€濮嬪鐞嗗懡浠?
-        if ch == '{' {
-            // 璇诲彇瀹屾暣鐨勫懡浠ゅ潡
-            if let Some((inner, consumed)) = read_command_block(body, i)? {
-                // 濡傛灉涓虹┖鍒欐姏鍑哄紓甯?
-                if inner.trim().is_empty() {
-                    push_error(&mut chunks, &rich_text_error("rich_text.error.empty_command"));
-                    i += consumed;
-                    continue;
-                }
-
-                // 姝ｅ父灏变繚瀛樺埌缁撴瀯浣撶姸鎬佹満褰撲腑
-                match apply_command_block(lua, &inner, &mut state) {
-                    Ok(()) => {}
-                    Err(msg) => push_error(&mut chunks, &msg.to_string()),
-                }
-
-                i += consumed;
-                continue;
-            }
-
-            // 濡傛灉娌℃湁}灏辨姏鍑哄紓甯?
-            push_error(
-                &mut chunks,
-                &rich_text_error("rich_text.error.unclosed_command"),
-            );
-            i += ch_len;
-            continue;
-        }
-
-        // 濡傛灉鍙湁}灏辨姏鍑哄紓甯?
-        if ch == '}' {
-            push_error(
-                &mut chunks,
-                &rich_text_error("rich_text.error.unclosed_command"),
-            );
-            i += ch_len;
-            continue;
-        }
-
-        // 灏嗘櫘閫氬瓧绗︽坊鍔犲埌褰撳墠鏍峰紡鍧楅噷
-        push_styled_char(&mut chunks, ch, &mut state);
-        i += ch_len;
-    }
-
-    // 妫€鏌ユ湭琚竻鐞嗙殑鏍峰紡锛屾湭琚竻鐞嗙殑鎶涘嚭寮傚父
-    if state.fg_need_clear || state.bg_need_clear {
-        push_error(
-            &mut chunks,
-            &rich_text_error("rich_text.error.unterminated_style"),
-        );
-    }
-
-    // 缁樺埗
-    draw_styled_chunks(x, y, &chunks)
-}
-
-// 璇诲彇瀹屾暣鐨勬寚浠XXX}
-fn read_command_block(input: &str, start: usize) -> mlua::Result<Option<(String, usize)>> {
-    // 浠巤寮€濮?
-    let mut i = start + '{'.len_utf8();
-    let mut escape = false; // 杞箟鏍囪
-    while i < input.len() {
-        // 鑾峰彇褰撳墠瀛楃浣嶇疆
-        let c = match input[i..].chars().next() {
-            Some(v) => v,
-            None => break,
-        };
-        let clen = c.len_utf8(); // 瀛楃鐨勭紪鐮佸瓧鑺傞暱搴?
-
-        // 澶勭悊杞箟鐘舵€?
-        if escape {
-            escape = false; // 閲嶇疆杞箟鏍囪
-            i += clen; // 璺宠繃杞箟鐨勫瓧绗?
-            continue;
-        }
-
-        // 閬囧埌杞箟瀛楃
-        if c == '\\' {
-            escape = true; // 鏍囪杞箟
-            i += clen;
-            continue;
-        }
-
-        // 閬囧埌}缁撴潫锛屾彁鍙栧唴瀹?
-        if c == '}' {
-            let inner = input[start + 1..i].to_string();
-            return Ok(Some((inner, i + clen - start)));
-        }
-
-        // 鏅€氬瓧绗﹀氨缁х画鍚戜笅閬嶅巻
-        i += clen;
-    }
-    Ok(None)
-}
-
-// 鏍规嵁绗﹀彿鍒嗗壊瀛楃
-fn split_unescaped(input: &str, sep: char) -> Vec<String> {
-    let mut out = Vec::<String>::new(); // 瀛樺偍鍒嗗壊鍚庣殑鐗囨
-    let mut cur = String::new(); // 褰撳墠姝ｅ湪鏋勫缓鐨勭墖娈?
-    let mut escape = false; // 杞箟鏍囪
-
-    // 寮€濮嬮亶鍘嗗瓧绗︿覆
-    for c in input.chars() {
-        if escape {
-            // 杞箟鐘舵€侊細鐩存帴娣诲姞瀛楃锛屼笉褰撲綔鐗规畩瀛楃
-            cur.push(c);
-            escape = false;
-            continue;
-        }
-        if c == '\\' {
-            // 閬囧埌杞箟绗︼細鏍囪杞箟鐘舵€?
-            escape = true;
-            continue;
-        }
-        if c == sep {
-            // 閬囧埌鏈浆涔夌殑鍒嗛殧绗︼細淇濆瓨褰撳墠鐗囨
-            out.push(cur.trim().to_string());
-            cur.clear();
-            continue;
-        }
-
-        // 鏅€氬瓧绗︼紝娣诲姞鍒板綋鍓嶇墖娈?
-        cur.push(c);
-    }
-
-    // 澶勭悊鏈熬娈嬬暀鐨勮浆涔夌
-    if escape {
-        cur.push('\\');
-    }
-
-    // 娣诲姞鏈€鍚庝竴涓墖娈?
-    out.push(cur.trim().to_string());
-    out
-}
-
-// 鍒嗗壊澶氭寚浠?
-fn apply_command_block(lua: &Lua, block: &str, state: &mut RichStyleState) -> mlua::Result<()> {
-    // 鎸夌収 | 鍒嗗壊澶氭寚浠?
-    let entries = split_unescaped(block, '|');
-    for entry in entries {
-        // 璺宠繃绌烘寚浠?
-        if entry.trim().is_empty() {
-            return Err(mlua::Error::external(rich_text_error(
-                "rich_text.error.empty_command",
-            )));
-        }
-
-        // 鎸夌収 : 鍒嗗壊鎸囦护鍜屽弬鏁?
-        let mut parts = split_unescaped(&entry, ':');
-        if parts.len() != 2 {
-            return Err(mlua::Error::external(rich_text_error(
-                "rich_text.error.missing_command_or_param",
-            )));
-        }
-
-        // 鎻愬彇鎸囦护
-        let cmd = parts.remove(0).trim().to_ascii_lowercase();
-
-        // 鎸夌収 > 鍒嗗壊鍙傛暟
-        let param_expr = parts.remove(0);
-        let params = split_unescaped(&param_expr, '>');
-
-        // 涓虹┖灏辨姤閿?
-        if cmd.is_empty() {
-            return Err(mlua::Error::external(rich_text_error(
-                "rich_text.error.missing_command_or_param",
-            )));
-        }
-
-        // 鎵ц鎸囦护
-        let result = apply_single_command(lua, &cmd, &params)?;
-
-        // 搴旂敤浜庣姸鎬佹満
-        apply_command_result(&cmd, result, state)?;
-    }
-    Ok(())
-}
-
-// 鎵ц鎸囦护
-fn apply_single_command(
-    lua: &Lua,
-    cmd: &str,
-    params: &[String],
-) -> mlua::Result<TextCommandResult> {
-    // 浼樺厛灏濊瘯浣跨敤Lua鐨勮嚜瀹氫箟鎸囦护
-    if let Some(via_lua) = apply_command_via_lua(lua, cmd, params)? {
-        return Ok(via_lua);
-    }
-
-    // 鍐呴儴鎸囦护瑙ｆ瀽鍣?涓€涓鐢ㄦ柟妗?
-    // 妫€鏌ュ弬鏁版槸鍚︿负绌?
-    if params.is_empty() || params[0].trim().is_empty() {
-        return Err(mlua::Error::external(rich_text_error(
-            "rich_text.error.missing_param",
-        )));
-    }
-
-    // 澶勭悊clear鍙傛暟
-    let first = params[0].trim();
-    if first.eq_ignore_ascii_case("clear") {
-        if params.len() != 1 {
-            return Err(mlua::Error::external(rich_text_error(
-                "rich_text.error.unterminated_style",
-            )));
-        }
-        return Ok(TextCommandResult {
-            clear: true,
-            color: None,
-            count: None,
-        });
-    }
-
-    // 妫€鏌ラ鑹蹭唬鐮佹槸鍚︾鍚堟爣鍑?
-    if parse_color(Some(first)).is_none() {
-        return Err(mlua::Error::external(rich_text_error(
-            "rich_text.error.invalid_param",
-        )));
-    }
-
-    // 绗簩鍙傛暟鏁板瓧鏈夋晥鎬?
-    let count = if params.len() >= 2 && !params[1].trim().is_empty() {
-        let raw = params[1]
-            .trim()
-            .parse::<usize>()
-            .map_err(|_| mlua::Error::external(rich_text_error("rich_text.error.invalid_param")))?;
-        if raw == 0 {
-            return Err(mlua::Error::external(rich_text_error(
-                "rich_text.error.invalid_param",
-            )));
-        }
-        Some(raw)
-    } else {
-        None
-    };
-
-    // 妫€鏌ユ槸鍚︽湁澶氫綑鍙傛暟
-    if params.len() > 2 {
-        return Err(mlua::Error::external(rich_text_error(
-            "rich_text.error.invalid_param",
-        )));
-    }
-
-    // 杩斿洖缁撴瀯
-    Ok(TextCommandResult {
-        clear: false,
-        color: Some(first.to_string()),
-        count,
-    })
-}
-
-// 璋冪敤Lua鑷畾涔夋寚浠?
-fn apply_command_via_lua(
-    lua: &Lua,
-    cmd: &str,
-    params: &[String],
-) -> mlua::Result<Option<TextCommandResult>> {
-    // 鑾峰彇TEXT_COMMANDS琛?
-    let globals = lua.globals();
-    let commands = match globals.get::<Table>("TEXT_COMMANDS") {
-        Ok(t) => t,
-        Err(_) => return Ok(None), // 娌℃湁娉ㄥ唽浠讳綍鍛戒护
-    };
-
-    // 鑾峰彇瀵瑰簲鎸囦护鐨勫嚱鏁?
-    let func = match commands.get::<Function>(cmd) {
-        Ok(f) => f,
-        Err(_) => return Ok(None), // 娌℃湁鎵惧埌杩欎釜鎸囦护
-    };
-
-    // 灏嗗弬鏁板垪琛ㄨ浆鎹负Lua琛?
-    let ptable = lua.create_table()?;
-    for (idx, p) in params.iter().enumerate() {
-        ptable.set((idx + 1) as i64, p.as_str())?;
-    }
-
-    // 璋冪敤Lua鍑芥暟
-    let ret = func.call::<Value>(ptable)?;
-    // 楠岃瘉杩斿洖鍊兼槸鍚︽槸涓€涓〃
-    let t = match ret {
-        Value::Table(t) => t,
-        _ => {
-            return Err(mlua::Error::external(rich_text_error(
-                "rich_text.error.invalid_return_value",
-            )));
-        }
-    };
-
-    // 妫€鏌ユ槸鍚︽湁閿欒
-    if let Ok(msg) = t.get::<String>("error") {
-        if !msg.trim().is_empty() {
-            return Err(mlua::Error::external(rich_text_error(
-                "rich_text.error.invalid_custom_command",
-            )));
-        }
-    }
-
-    // 瑙ｆ瀽杩斿洖鍊?
-    let clear = t.get::<bool>("clear").unwrap_or(false);
-    let color = t.get::<String>("color").ok();
-    let count = t
-        .get::<i64>("count")
-        .ok()
-        .and_then(|v| if v > 0 { Some(v as usize) } else { None });
-
-    // 楠岃瘉杩斿洖鍊肩殑鏈夋晥鎬?
-    if !clear {
-        if let Some(c) = color.as_deref() {
-            if parse_color(Some(c)).is_none() {
-                return Err(mlua::Error::external(rich_text_error(
-                    "rich_text.error.invalid_param",
-                )));
-            }
-        } else {
-            return Err(mlua::Error::external(rich_text_error(
-                "rich_text.error.invalid_param",
-            )));
-        }
-    }
-
-    Ok(Some(TextCommandResult {
-        clear,
-        color,
-        count,
-    }))
-}
-
-// 灏嗘寚浠ゆ墽琛岀粨鏋滃簲鐢?
-fn apply_command_result(
-    cmd: &str,
-    result: TextCommandResult,
-    state: &mut RichStyleState,
-) -> mlua::Result<()> {
-    match cmd {
-        // 澶勭悊鏂囧瓧棰滆壊
-        "tc" => {
-            if result.clear {
-                // clear 鎭㈠鏂囧瓧棰滆壊
-                state.fg = state.default_fg.clone();
-                state.fg_count = None;
-                state.fg_need_clear = false;
-                return Ok(());
-            }
-            // 璁剧疆鏂扮殑鏂囧瓧棰滆壊
-            let color = result
-                .color
-                .ok_or_else(|| {
-                    mlua::Error::external(rich_text_error("rich_text.error.missing_param"))
-                })?;
-            state.fg = Some(color);
-            state.fg_count = result.count;
-            // 濡傛灉娌℃湁鎸囧畾绗簩鍙傛暟,鏍囪闇€瑕佸悗缁嚜鍔ㄦ竻鐞?
-            state.fg_need_clear = result.count.is_none();
-            Ok(())
-        }
-
-        // 澶勭悊鑳屾櫙鑹?
-        "bg" => {
-            if result.clear {
-                // clear 鎭㈠鑳屾櫙鑹?
-                state.bg = state.default_bg.clone();
-                state.bg_count = None;
-                state.bg_need_clear = false;
-                return Ok(());
-            }
-            // 璁剧疆鏂扮殑鑳屾櫙鑹?
-            let color = result
-                .color
-                .ok_or_else(|| {
-                    mlua::Error::external(rich_text_error("rich_text.error.missing_param"))
-                })?;
-            state.bg = Some(color);
-            state.bg_count = result.count;
-            // 濡傛灉娌℃湁鎸囧畾绗簩鍙傛暟,鏍囪闇€瑕佸悗缁嚜鍔ㄦ竻鐞?
-            state.bg_need_clear = result.count.is_none();
-            Ok(())
-        }
-        _ => Err(mlua::Error::external(rich_text_error(
-            "rich_text.error.unknown_command",
-        ))),
-    }
-}
-
-#[derive(Clone, Debug)]
-struct ModRuntimeContext {
-    namespace: String,
-    game_id: String,
-    script_name: String,
-    save_enabled: bool,
-    size_constraints: SizeConstraints,
-    viewport_state: Arc<Mutex<ModViewportState>>,
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-struct ModViewportState {
-    width: u16,
-    height: u16,
-    resized_pending: bool,
-}
-
-#[derive(Clone, Debug)]
-struct ActionBinding {
-    name: String,
-    keys: Vec<String>,
-    description: String,
-}
-
-#[derive(Default)]
-struct ModActionRegistry {
-    registration_open: bool,
-    namespace: String,
-    game_id: String,
-    script_name: String,
-    persisted_overrides: std::collections::HashMap<String, Vec<String>>,
-    bindings: Vec<ActionBinding>,
-}
-
-#[derive(Clone, Copy)]
-enum AxisOrientation {
-    Horizontal,
-    Vertical,
-}
-
-impl ModActionRegistry {
-    fn register(
-        &mut self,
-        name: String,
-        keys: Vec<String>,
-        description: String,
-    ) -> mlua::Result<bool> {
-        if !self.registration_open {
-            return Err(mlua::Error::external(
-                "register_action can only be used during init_game",
-            ));
-        }
-
-        if name.trim().is_empty() {
-            return Err(mlua::Error::external("action name cannot be blank"));
-        }
-
-        let normalized_keys = keys
-            .into_iter()
-            .map(|key| normalize_action_key(&key))
-            .collect::<Vec<_>>();
-        if normalized_keys.is_empty() {
-            return Err(mlua::Error::external("action must have at least one key"));
-        }
-
-        let effective_keys = self
-            .persisted_overrides
-            .get(&name)
-            .cloned()
-            .unwrap_or(normalized_keys);
-
-        if let Some(existing) = self.bindings.iter().find(|binding| binding.name == name) {
-            if existing.keys == effective_keys && existing.description == description {
-                return Ok(true);
-            }
-            return Err(mlua::Error::external(format!(
-                "action '{}' already registered with different definition",
-                name
-            )));
-        }
-
-        self.bindings.push(ActionBinding {
-            name,
-            keys: effective_keys,
-            description,
-        });
-        Ok(true)
-    }
-
-    fn resolve_action(&self, key: &str) -> Option<String> {
-        let normalized = normalize_action_key(key);
-        self.bindings
-            .iter()
-            .find(|binding| binding.keys.iter().any(|candidate| candidate == &normalized))
-            .map(|binding| binding.name.clone())
-    }
-
-    fn persist_keybindings(&self) -> Result<()> {
-        let bindings = self
-            .bindings
-            .iter()
-            .map(|binding| (binding.name.clone(), binding.keys.clone()))
-            .collect();
-        mods::update_mod_keybindings(
-            &self.namespace,
-            &self.game_id,
-            &self.script_name,
-            bindings,
-        )
-    }
-}
-
-fn resolve_axis_position(
-    anchor: i64,
-    terminal_extent: i64,
-    content_extent: i64,
-    offset: i64,
-    orientation: AxisOrientation,
-) -> i64 {
-    let base = match orientation {
-        AxisOrientation::Horizontal => match anchor {
-            ANCHOR_CENTER => ((terminal_extent - content_extent).max(0) / 2) + 1,
-            ANCHOR_RIGHT => (terminal_extent - content_extent).max(0) + 1,
-            _ => 1,
-        },
-        AxisOrientation::Vertical => match anchor {
-            ANCHOR_MIDDLE => ((terminal_extent - content_extent).max(0) / 2) + 1,
-            ANCHOR_BOTTOM => (terminal_extent - content_extent).max(0) + 1,
-            _ => 1,
-        },
-    };
-    base + offset
-}
-
-fn update_mod_viewport_state(
-    viewport_state: &Arc<Mutex<ModViewportState>>,
-    width: u16,
-    height: u16,
-    resized_pending: bool,
-) -> mlua::Result<()> {
-    let mut state = viewport_state
-        .lock()
-        .map_err(|_| mlua::Error::external("viewport state lock poisoned"))?;
-    state.width = width;
-    state.height = height;
-    if resized_pending {
-        state.resized_pending = true;
-    }
-    Ok(())
-}
-
-fn handle_mod_resize_event(
-    width: u16,
-    height: u16,
-    constraints: SizeConstraints,
-    viewport_state: &Arc<Mutex<ModViewportState>>,
-) -> mlua::Result<bool> {
-    update_mod_viewport_state(viewport_state, width, height, true)?;
-    let should_continue = ensure_mod_runtime_size_valid(constraints, viewport_state)
-        .map_err(mlua::Error::external)?;
-    Ok(should_continue)
-}
-
-fn ensure_mod_runtime_size_valid(
-    constraints: SizeConstraints,
-    viewport_state: &Arc<Mutex<ModViewportState>>,
-) -> Result<bool> {
-    let mut state = size_watcher::check_constraints(constraints)?;
-    update_mod_viewport_state(viewport_state, state.width, state.height, false)
-        .map_err(|err| anyhow!("failed to update viewport state: {err}"))?;
-    if state.size_ok {
-        return Ok(true);
-    }
-
-    loop {
-        size_watcher::draw_size_warning_with_constraints(&state, constraints, true)?;
-        flush_output().map_err(|err| anyhow!("failed to flush size warning: {err}"))?;
-        match event::read()? {
-            Event::Resize(width, height) => {
-                state = size_watcher::SizeState {
-                    width,
-                    height,
-                    size_ok: constraints.is_satisfied_by(width, height),
-                };
-                update_mod_viewport_state(viewport_state, width, height, true)
-                    .map_err(|err| anyhow!("failed to update viewport state: {err}"))?;
-                if state.size_ok {
-                    let mut viewport = viewport_state
-                        .lock()
-                        .map_err(|_| anyhow!("viewport state lock poisoned"))?;
-                    viewport.resized_pending = true;
-                    drop(viewport);
-                    if let Ok(mut out) = OUT.lock() {
-                        let _ = queue!(
-                            out,
-                            crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
-                            crossterm::cursor::MoveTo(0, 0),
-                            ResetColor
-                        );
-                        let _ = out.flush();
-                    }
-                    drain_input_events();
-                    return Ok(true);
-                }
-            }
-            Event::Key(key) if key.kind == KeyEventKind::Press => {
-                let raw = decode_key_event(key).map_err(|err| anyhow!("key decode failed: {err}"))?;
-                if raw == "esc" || raw == "q" {
-                    return Ok(false);
-                }
-            }
-            _ => {}
-        }
-    }
-}
 
 // 鎶涘嚭寮傚父
 fn push_error(chunks: &mut Vec<StyledChunk>, message: &str) {
@@ -2205,45 +1338,11 @@ fn save_game_slot_data(game_id: &str, value: &Value) -> mlua::Result<()> {
     
     // 璁板綍鏈€鏂板瓨妗D
     store.insert("__latest_save_game".to_string(), JsonValue::String(game_id));
-    let _ = mods::clear_latest_mod_save_game();
     
     // 鍐欏洖鏂囦欢
     write_json_store(&store)
 }
 
-fn show_mod_runtime_failure(message: String) {
-    let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
-    let title = "MOD RUNTIME ERROR";
-    let detail = format!("Returning to game list: {message}");
-    let title_x = ((width as usize).saturating_sub(title.len())) / 2;
-    let detail_trimmed = if detail.len() > width.saturating_sub(4) as usize {
-        detail.chars().take(width.saturating_sub(4) as usize).collect::<String>()
-    } else {
-        detail
-    };
-    let detail_x = ((width as usize).saturating_sub(detail_trimmed.len())) / 2;
-    let title_y = height.saturating_sub(2) / 2;
-    let detail_y = title_y.saturating_add(2);
-
-    if let Ok(mut out) = OUT.lock() {
-        let _ = queue!(
-            out,
-            crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
-            crossterm::cursor::MoveTo(title_x as u16, title_y),
-            SetForegroundColor(CColor::Red),
-            Print(title),
-            ResetColor,
-            crossterm::cursor::MoveTo(detail_x as u16, detail_y),
-            SetForegroundColor(CColor::White),
-            Print(detail_trimmed),
-            ResetColor
-        );
-        let _ = out.flush();
-    }
-
-    std::thread::sleep(Duration::from_millis(1200));
-    drain_input_events();
-}
 
 // 娓呯悊娓告垙瀛樻。
 fn clear_game_slots(store: &mut Map<String, JsonValue>) {

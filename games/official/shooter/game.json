@@ -1,0 +1,21 @@
+{
+  "id": "shooter",
+  "name": "game.shooter.name",
+  "description": "game.shooter.description",
+  "detail": "game.shooter.details",
+  "entry": "scripts/shooter.lua",
+  "save": true,
+  "best_none": "game.shooter.best_none_block",
+  "min_width": 72,
+  "min_height": 26,
+  "actions": {
+    "move_left": ["left"],
+    "move_right": ["right"],
+    "fire": ["space"],
+    "toggle_fire_mode": ["z"],
+    "use_nuke": ["x"],
+    "restart": ["r"],
+    "save": ["s"],
+    "quit_action": ["q"]
+  }
+}
