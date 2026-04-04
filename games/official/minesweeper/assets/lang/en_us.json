@@ -1,10 +1,8 @@
 {
-  "game.minesweeper.best_d1": "1:",
-  "game.minesweeper.best_d2": "2:",
-  "game.minesweeper.best_d3": "3:",
-  "game.minesweeper.best_block": "Best Records\n1: {d1}\n2: {d2}\n3: {d3}",
-  "game.minesweeper.best_none_block": "Best Records\n1: --\n2: --\n3: --",
+  "game.2048.confirm_exit": "Confirm exit? [Y] Yes / [N] No",
+  "game.2048.confirm_restart": "Confirm restart? [Y] Yes / [N] No",
   "game.minesweeper.best_none": "No Record",
+  "game.minesweeper.best_none_block": "Best Records\n1: --\n2: --\n3: --",
   "game.minesweeper.best_title": "Best Records",
   "game.minesweeper.controls": "[↑]/[↓]/[←]/[→] Move Cursor  [Space] Open Cell  [Z] Mark/Unmark Mine  [X] Mark/Unmark Suspect  [C] Toggle Guide  [P] Adjust Config  [D] Quick Jump  [S] Save  [R] Restart  [Q]/[ESC] Exit",
   "game.minesweeper.description": "Use number clues to deduce and mark all mine locations, clearing all safe areas.",
@@ -16,10 +14,11 @@
   "game.minesweeper.mines_left": "Mines Left",
   "game.minesweeper.name": "Minesweeper",
   "game.minesweeper.time": "Time",
-  "game.minesweeper.runtime_difficulty_changed": "Difficulty changed.",
-  "game.minesweeper.runtime_ready": "Open a safe cell to begin.",
-  "game.minesweeper.runtime_resized": "Terminal resized. Layout updated.",
-  "game.minesweeper.runtime_saved": "Save successful!",
   "game.minesweeper.win_banner": "Congratulations! All mines cleared!",
-  "game.minesweeper.win_controls": "[R] Restart [Q]/[ESC] Exit"
+  "game.minesweeper.win_controls": "[R] Restart [Q]/[ESC] Exit",
+  "warning.back_to_game_list_hint": "Press ESC / Q to return to the game list",
+  "warning.current": "Current Size",
+  "warning.enlarge_hint": "Please enlarge the terminal window to continue.",
+  "warning.required": "Required Size",
+  "warning.size_title": "Terminal Window Too Small"
 }

@@ -1,10 +1,8 @@
 {
-  "game.minesweeper.best_d1": "1:",
-  "game.minesweeper.best_d2": "2:",
-  "game.minesweeper.best_d3": "3:",
-  "game.minesweeper.best_block": "最佳记录\n1: {d1}\n2: {d2}\n3: {d3}",
-  "game.minesweeper.best_none_block": "最佳记录\n1: --\n2: --\n3: --",
+  "game.2048.confirm_exit": "确认退出？ [Y] 是 / [N] 否",
+  "game.2048.confirm_restart": "确认重新开始？ [Y] 是 / [N] 否",
   "game.minesweeper.best_none": "暂无记录",
+  "game.minesweeper.best_none_block": "最佳记录\n1: --\n2: --\n3: --",
   "game.minesweeper.best_title": "最佳记录",
   "game.minesweeper.controls": "[↑]/[↓]/[←]/[→] 移动光标  [Space] 打开格子  [Z] 标记/取消地雷  [X] 标记/取消可疑  [C] 开启/关闭引导  [P] 调整配置  [D] 快速定位  [S] 保存  [R] 重新开始  [Q]/[ESC] 退出",
   "game.minesweeper.description": "根据数字线索推理并标记出所有地雷的位置，点开所有安全区域。",
@@ -16,10 +14,11 @@
   "game.minesweeper.mines_left": "剩余雷数",
   "game.minesweeper.name": "扫雷",
   "game.minesweeper.time": "用时",
-  "game.minesweeper.runtime_difficulty_changed": "难度已切换。",
-  "game.minesweeper.runtime_ready": "翻开一个安全格子开始游戏。",
-  "game.minesweeper.runtime_resized": "终端尺寸已变化，布局已刷新。",
-  "game.minesweeper.runtime_saved": "保存成功！",
   "game.minesweeper.win_banner": "恭喜！所有地雷已清除！",
-  "game.minesweeper.win_controls": "[R] 重新开始  [Q]/[ESC] 退出"
+  "game.minesweeper.win_controls": "[R] 重新开始  [Q]/[ESC] 退出",
+  "warning.back_to_game_list_hint": "按 ESC / Q 返回游戏列表",
+  "warning.current": "当前大小",
+  "warning.enlarge_hint": "请放大终端窗口以继续",
+  "warning.required": "所需大小",
+  "warning.size_title": "终端窗口过小"
 }

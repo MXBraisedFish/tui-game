@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
@@ -20,6 +21,8 @@ use crate::game::resources;
 use crate::lua::sandbox;
 use crate::terminal::{renderer, size_watcher};
 
+static RANDOM_STATE: AtomicU64 = AtomicU64::new(0x9E37_79B9_7F4A_7C15);
+
 struct RuntimeBridges {
     canvas: Arc<Mutex<Canvas>>,
     commands: Arc<Mutex<Vec<RuntimeCommand>>>,
@@ -27,6 +30,7 @@ struct RuntimeBridges {
     save_path: PathBuf,
     game: GameDescriptor,
     launch_mode: LaunchMode,
+    started_at: Instant,
 }
 
 /// Lua engine wrapper for the unified runtime.
@@ -56,6 +60,7 @@ impl LuaGameEngine {
                 save_path: save_path.clone(),
                 game: game.clone(),
                 launch_mode,
+                started_at: Instant::now(),
             },
         )
         .map_err(anyhow_lua_error)?;
@@ -97,6 +102,7 @@ impl LuaGameEngine {
                 save_path,
                 game,
                 launch_mode,
+                started_at: Instant::now(),
             },
         })
     }
@@ -157,7 +163,9 @@ impl LuaGameEngine {
                         *resize_flag = true;
                     }
                 }
-                self.handle_event(&event)?;
+                if let Err(err) = self.handle_event(&event) {
+                    return Err(err);
+                }
             }
 
             let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
@@ -167,7 +175,9 @@ impl LuaGameEngine {
                 }
                 canvas.clear();
             });
-            self.render()?;
+            if let Err(err) = self.render() {
+                return Err(err);
+            }
             {
                 let canvas = self
                     .bridges
@@ -182,7 +192,11 @@ impl LuaGameEngine {
             for command in commands {
                 match command {
                     RuntimeCommand::ExitGame => should_exit = true,
-                    RuntimeCommand::RefreshBestScore => self.persist_best_score()?,
+                    RuntimeCommand::RefreshBestScore => {
+                        if let Err(err) = self.persist_best_score() {
+                            return Err(err);
+                        }
+                    }
                     RuntimeCommand::SaveRequest => {}
                     RuntimeCommand::ClearSave => {
                         let _ = fs::remove_file(&self.bridges.save_path);
@@ -196,7 +210,9 @@ impl LuaGameEngine {
             }
         }
 
-        self.persist_best_score()?;
+        if let Err(err) = self.persist_best_score() {
+            return Err(err);
+        }
         renderer::invalidate_canvas_cache();
         Ok(())
     }
@@ -554,6 +570,76 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
         })?,
     )?;
 
+    globals.set(
+        "clear_input_buffer",
+        lua.create_function(move |_, ()| {
+            while event::poll(Duration::from_millis(0))
+                .map_err(anyhow::Error::from)
+                .map_err(lua_runtime_error)?
+            {
+                let _ = event::read()
+                    .map_err(anyhow::Error::from)
+                    .map_err(lua_runtime_error)?;
+            }
+            Ok(())
+        })?,
+    )?;
+
+    let started_at = bridges.started_at;
+    globals.set(
+        "time_now_ms",
+        lua.create_function(move |_, ()| Ok(started_at.elapsed().as_millis() as u64))?,
+    )?;
+    globals.set(
+        "after_ms",
+        lua.create_function(move |_, delay_ms: u64| {
+            Ok(started_at.elapsed().as_millis() as u64 + delay_ms)
+        })?,
+    )?;
+    let started_at = bridges.started_at;
+    globals.set(
+        "deadline_passed",
+        lua.create_function(move |_, deadline_ms: u64| {
+            Ok(started_at.elapsed().as_millis() as u64 >= deadline_ms)
+        })?,
+    )?;
+    let started_at = bridges.started_at;
+    globals.set(
+        "remaining_ms",
+        lua.create_function(move |_, deadline_ms: u64| {
+            let now = started_at.elapsed().as_millis() as u64;
+            Ok(deadline_ms.saturating_sub(now))
+        })?,
+    )?;
+
+    globals.set(
+        "random",
+        lua.create_function(|_, (min, max): (Option<i64>, Option<i64>)| {
+            let value = match (min, max) {
+                (Some(lo), Some(hi)) => {
+                    let (lo, hi) = if lo <= hi { (lo, hi) } else { (hi, lo) };
+                    random_range_i64(lo, hi)
+                }
+                (Some(upper), None) => {
+                    if upper <= 0 {
+                        0
+                    } else {
+                        random_range_i64(0, upper - 1)
+                    }
+                }
+                (None, None) => next_random_u64() as i64,
+                (None, Some(hi)) => {
+                    if hi <= 0 {
+                        0
+                    } else {
+                        random_range_i64(0, hi - 1)
+                    }
+                }
+            };
+            Ok(value)
+        })?,
+    )?;
+
     Ok(())
 }
 
@@ -654,6 +740,33 @@ fn load_runtime_slot(path: &PathBuf, slot: &str) -> Result<Option<JsonValue>> {
     let store = serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
         .unwrap_or_default();
     Ok(store.get(slot).cloned())
+}
+
+fn next_random_u64() -> u64 {
+    let now = Instant::now().elapsed().as_nanos() as u64;
+    let mut current = RANDOM_STATE.load(Ordering::Relaxed);
+    loop {
+        let mut x = current ^ now.rotate_left(17);
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        if RANDOM_STATE
+            .compare_exchange_weak(current, x, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            return x;
+        }
+        current = RANDOM_STATE.load(Ordering::Relaxed);
+    }
+}
+
+fn random_range_i64(min: i64, max: i64) -> i64 {
+    if min >= max {
+        return min;
+    }
+    let span = (max as i128 - min as i128 + 1) as u128;
+    let value = (next_random_u64() as u128) % span;
+    min + value as i64
 }
 
 fn lua_value_to_json(value: &Value) -> Result<JsonValue> {
@@ -815,5 +928,358 @@ mod tests {
         let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
         let _: mlua::Function = globals.get("render").expect("render export");
         let _: mlua::Function = globals.get("best_score").expect("best_score export");
+    }
+
+    #[test]
+    fn minesweeper_runtime_script_exports_required_functions() {
+        let script_path = PathBuf::from("games/official/minesweeper/scripts/minesweeper.lua");
+        let source = fs::read_to_string(&script_path).expect("read minesweeper runtime script");
+
+        let lua = Lua::new();
+        let globals = lua.globals();
+        globals
+            .set(
+                "canvas_clear",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("canvas_clear stub"),
+            )
+            .expect("set canvas_clear");
+        globals
+            .set(
+                "canvas_draw_text",
+                lua.create_function(
+                    |_,
+                     (_x, _y, _text, _fg, _bg): (
+                        u16,
+                        u16,
+                        String,
+                        Option<String>,
+                        Option<String>,
+                    )| { Ok(()) },
+                )
+                .expect("canvas_draw_text stub"),
+            )
+            .expect("set canvas_draw_text");
+        globals
+            .set(
+                "get_terminal_size",
+                lua.create_function(|_, ()| Ok((120u16, 40u16)))
+                    .expect("get_terminal_size stub"),
+            )
+            .expect("set get_terminal_size");
+        globals
+            .set(
+                "get_text_width",
+                lua.create_function(|_, text: String| Ok(text.chars().count() as u16))
+                    .expect("get_text_width stub"),
+            )
+            .expect("set get_text_width");
+        globals
+            .set(
+                "translate",
+                lua.create_function(|_, key: String| Ok(key))
+                    .expect("translate stub"),
+            )
+            .expect("set translate");
+        globals
+            .set(
+                "load_data",
+                lua.create_function(|_, _slot: String| Ok(mlua::Value::Nil))
+                    .expect("load_data stub"),
+            )
+            .expect("set load_data");
+        globals
+            .set(
+                "get_launch_mode",
+                lua.create_function(|_, ()| Ok("new".to_string()))
+                    .expect("get_launch_mode stub"),
+            )
+            .expect("set get_launch_mode");
+
+        lua.load(&source)
+            .set_name(script_path.to_string_lossy().as_ref())
+            .exec()
+            .expect("exec minesweeper runtime script");
+
+        let init_game: mlua::Function = globals.get("init_game").expect("init_game export");
+        let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
+        let _: mlua::Function = globals.get("render").expect("render export");
+        let _: mlua::Function = globals.get("best_score").expect("best_score export");
+        let init_result = init_game.call::<mlua::Value>(()).expect("init_game call");
+        assert!(matches!(init_result, mlua::Value::Table(_)));
+    }
+
+    #[test]
+    fn pacman_runtime_script_exports_required_functions() {
+        let script_path = PathBuf::from("games/official/pacman/scripts/pacman.lua");
+        let source = fs::read_to_string(&script_path).expect("read pacman runtime script");
+
+        let lua = Lua::new();
+        let globals = lua.globals();
+        globals
+            .set(
+                "canvas_clear",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("canvas_clear stub"),
+            )
+            .expect("set canvas_clear");
+        globals
+            .set(
+                "canvas_draw_text",
+                lua.create_function(
+                    |_,
+                     (_x, _y, _text, _fg, _bg): (
+                        u16,
+                        u16,
+                        String,
+                        Option<String>,
+                        Option<String>,
+                    )| { Ok(()) },
+                )
+                .expect("canvas_draw_text stub"),
+            )
+            .expect("set canvas_draw_text");
+        globals
+            .set(
+                "get_terminal_size",
+                lua.create_function(|_, ()| Ok((120u16, 40u16)))
+                    .expect("get_terminal_size stub"),
+            )
+            .expect("set get_terminal_size");
+        globals
+            .set(
+                "get_text_width",
+                lua.create_function(|_, text: String| Ok(text.chars().count() as u16))
+                    .expect("get_text_width stub"),
+            )
+            .expect("set get_text_width");
+        globals
+            .set(
+                "translate",
+                lua.create_function(|_, key: String| Ok(key))
+                    .expect("translate stub"),
+            )
+            .expect("set translate");
+        globals
+            .set(
+                "load_data",
+                lua.create_function(|_, _slot: String| Ok(mlua::Value::Nil))
+                    .expect("load_data stub"),
+            )
+            .expect("set load_data");
+        globals
+            .set(
+                "request_exit",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("request_exit stub"),
+            )
+            .expect("set request_exit");
+
+        lua.load(&source)
+            .set_name(script_path.to_string_lossy().as_ref())
+            .exec()
+            .expect("exec pacman runtime script");
+
+        let init_game: mlua::Function = globals.get("init_game").expect("init_game export");
+        let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
+        let _: mlua::Function = globals.get("render").expect("render export");
+        let _: mlua::Function = globals.get("best_score").expect("best_score export");
+        let init_result = init_game.call::<mlua::Value>(()).expect("init_game call");
+        assert!(matches!(init_result, mlua::Value::Table(_)));
+    }
+
+    #[test]
+    fn rock_paper_scissors_runtime_script_exports_required_functions() {
+        let script_path =
+            PathBuf::from("games/official/rock_paper_scissors/scripts/rock_paper_scissors.lua");
+        let source =
+            fs::read_to_string(&script_path).expect("read rock_paper_scissors runtime script");
+
+        let lua = Lua::new();
+        let globals = lua.globals();
+        globals
+            .set(
+                "canvas_clear",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("canvas_clear stub"),
+            )
+            .expect("set canvas_clear");
+        globals
+            .set(
+                "canvas_draw_text",
+                lua.create_function(
+                    |_,
+                     (_x, _y, _text, _fg, _bg): (
+                        u16,
+                        u16,
+                        String,
+                        Option<String>,
+                        Option<String>,
+                    )| { Ok(()) },
+                )
+                .expect("canvas_draw_text stub"),
+            )
+            .expect("set canvas_draw_text");
+        globals
+            .set(
+                "get_terminal_size",
+                lua.create_function(|_, ()| Ok((120u16, 40u16)))
+                    .expect("get_terminal_size stub"),
+            )
+            .expect("set get_terminal_size");
+        globals
+            .set(
+                "get_text_width",
+                lua.create_function(|_, text: String| Ok(text.chars().count() as u16))
+                    .expect("get_text_width stub"),
+            )
+            .expect("set get_text_width");
+        globals
+            .set(
+                "translate",
+                lua.create_function(|_, key: String| Ok(key))
+                    .expect("translate stub"),
+            )
+            .expect("set translate");
+        globals
+            .set(
+                "load_data",
+                lua.create_function(|_, _slot: String| Ok(mlua::Value::Nil))
+                    .expect("load_data stub"),
+            )
+            .expect("set load_data");
+        globals
+            .set(
+                "request_exit",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("request_exit stub"),
+            )
+            .expect("set request_exit");
+
+        lua.load(&source)
+            .set_name(script_path.to_string_lossy().as_ref())
+            .exec()
+            .expect("exec rock_paper_scissors runtime script");
+
+        let init_game: mlua::Function = globals.get("init_game").expect("init_game export");
+        let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
+        let _: mlua::Function = globals.get("render").expect("render export");
+        let _: mlua::Function = globals.get("best_score").expect("best_score export");
+        let init_result = init_game.call::<mlua::Value>(()).expect("init_game call");
+        assert!(matches!(init_result, mlua::Value::Table(_)));
+    }
+
+    #[test]
+    fn shooter_runtime_script_exports_required_functions() {
+        let script_path = PathBuf::from("games/official/shooter/scripts/shooter.lua");
+        let source = fs::read_to_string(&script_path).expect("read shooter runtime script");
+
+        let lua = Lua::new();
+        let globals = lua.globals();
+        globals
+            .set(
+                "canvas_clear",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("canvas_clear stub"),
+            )
+            .expect("set canvas_clear");
+        globals
+            .set(
+                "canvas_draw_text",
+                lua.create_function(
+                    |_,
+                     (_x, _y, _text, _fg, _bg): (
+                        u16,
+                        u16,
+                        String,
+                        Option<String>,
+                        Option<String>,
+                    )| { Ok(()) },
+                )
+                .expect("canvas_draw_text stub"),
+            )
+            .expect("set canvas_draw_text");
+        globals
+            .set(
+                "get_terminal_size",
+                lua.create_function(|_, ()| Ok((120u16, 40u16)))
+                    .expect("get_terminal_size stub"),
+            )
+            .expect("set get_terminal_size");
+        globals
+            .set(
+                "get_text_width",
+                lua.create_function(|_, text: String| Ok(text.chars().count() as u16))
+                    .expect("get_text_width stub"),
+            )
+            .expect("set get_text_width");
+        globals
+            .set(
+                "translate",
+                lua.create_function(|_, key: String| Ok(key))
+                    .expect("translate stub"),
+            )
+            .expect("set translate");
+        globals
+            .set(
+                "load_data",
+                lua.create_function(|_, _slot: String| Ok(mlua::Value::Nil))
+                    .expect("load_data stub"),
+            )
+            .expect("set load_data");
+        globals
+            .set(
+                "get_launch_mode",
+                lua.create_function(|_, ()| Ok("new".to_string()))
+                    .expect("get_launch_mode stub"),
+            )
+            .expect("set get_launch_mode");
+        globals
+            .set(
+                "clear_input_buffer",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("clear_input_buffer stub"),
+            )
+            .expect("set clear_input_buffer");
+        globals
+            .set(
+                "request_exit",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("request_exit stub"),
+            )
+            .expect("set request_exit");
+        globals
+            .set(
+                "request_refresh_best_score",
+                lua.create_function(|_, ()| Ok(()))
+                    .expect("request_refresh_best_score stub"),
+            )
+            .expect("set request_refresh_best_score");
+        globals
+            .set(
+                "save_data",
+                lua.create_function(|_, (_slot, _value): (String, mlua::Value)| Ok(()))
+                    .expect("save_data stub"),
+            )
+            .expect("set save_data");
+        globals
+            .set(
+                "random",
+                lua.create_function(|_, (_min, _max): (Option<i64>, Option<i64>)| Ok(0i64))
+                    .expect("random stub"),
+            )
+            .expect("set random");
+
+        lua.load(&source)
+            .set_name(script_path.to_string_lossy().as_ref())
+            .exec()
+            .expect("exec shooter runtime script");
+
+        let init_game: mlua::Function = globals.get("init_game").expect("init_game export");
+        let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
+        let _: mlua::Function = globals.get("render").expect("render export");
+        let _: mlua::Function = globals.get("best_score").expect("best_score export");
+        let init_result = init_game.call::<mlua::Value>(()).expect("init_game call");
+        assert!(matches!(init_result, mlua::Value::Table(_)));
     }
 }

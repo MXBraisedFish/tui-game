@@ -161,6 +161,36 @@ local function random(n)
     return math.random(0, n - 1)
 end
 
+local function now_ms()
+    if type(time_now_ms) == "function" then
+        local ok, value = pcall(time_now_ms)
+        if ok and type(value) == "number" then
+            return value
+        end
+    end
+    return state.frame * FRAME_MS
+end
+
+local function make_deadline(delay_ms)
+    if type(after_ms) == "function" then
+        local ok, value = pcall(after_ms, math.max(0, delay_ms or 0))
+        if ok and type(value) == "number" then
+            return value
+        end
+    end
+    return now_ms() + math.max(0, delay_ms or 0)
+end
+
+local function deadline_passed_now(deadline_ms)
+    if type(deadline_passed) == "function" then
+        local ok, value = pcall(deadline_passed, deadline_ms)
+        if ok and type(value) == "boolean" then
+            return value
+        end
+    end
+    return now_ms() >= deadline_ms
+end
+
 local function normalize_key(key)
     if key == nil then
         return ""
@@ -567,7 +597,7 @@ local function start_sequence_animation()
     state.sequence_anim = {
         step = "initial_off",
         index = 1,
-        remaining_ms = SHOW_OFF_MS
+        deadline_ms = make_deadline(SHOW_OFF_MS)
     }
     state.dirty = true
 end
@@ -631,8 +661,7 @@ local function advance_sequence_animation(dt_ms)
         return
     end
 
-    anim.remaining_ms = anim.remaining_ms - (dt_ms or FRAME_MS)
-    while anim ~= nil and anim.remaining_ms <= 0 do
+    while anim ~= nil and deadline_passed_now(anim.deadline_ms or make_deadline(0)) do
         if anim.step == "initial_off" or anim.step == "off" then
             if anim.index > #state.sequence then
                 flush_input_buffer()
@@ -644,13 +673,13 @@ local function advance_sequence_animation(dt_ms)
             end
             state.highlight_idx = state.sequence[anim.index]
             anim.step = "on"
-            anim.remaining_ms = anim.remaining_ms + SHOW_ON_MS
+            anim.deadline_ms = make_deadline(SHOW_ON_MS)
             state.dirty = true
         else
             state.highlight_idx = 0
             anim.index = anim.index + 1
             anim.step = "off"
-            anim.remaining_ms = anim.remaining_ms + SHOW_OFF_MS
+            anim.deadline_ms = make_deadline(SHOW_OFF_MS)
             state.dirty = true
         end
         anim = state.sequence_anim

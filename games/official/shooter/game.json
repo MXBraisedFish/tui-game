@@ -6,16 +6,39 @@
   "entry": "scripts/shooter.lua",
   "save": true,
   "best_none": "game.shooter.best_none_block",
-  "min_width": 72,
-  "min_height": 26,
+  "min_width": 1,
+  "min_height": 1,
   "actions": {
-    "move_left": ["left"],
-    "move_right": ["right"],
-    "fire": ["space"],
-    "toggle_fire_mode": ["z"],
-    "use_nuke": ["x"],
-    "restart": ["r"],
-    "save": ["s"],
-    "quit_action": ["q"]
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "fire": [
+      "space"
+    ],
+    "toggle_fire_mode": [
+      "z"
+    ],
+    "use_nuke": [
+      "x"
+    ],
+    "restart": [
+      "r"
+    ],
+    "save": [
+      "s"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y",
+      "enter"
+    ],
+    "confirm_no": [
+      "n"
+    ]
   }
 }
