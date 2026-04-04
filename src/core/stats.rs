@@ -19,7 +19,8 @@ pub fn runtime_stats_path() -> Result<std::path::PathBuf> {
 pub fn read_runtime_best_score(game_id: &str) -> Option<JsonValue> {
     let path = runtime_stats_path().ok()?;
     let raw = fs::read_to_string(path).ok()?;
-    let store = serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}')).ok()?;
+    let store =
+        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}')).ok()?;
     store.get(game_id).cloned()
 }
 
@@ -28,7 +29,8 @@ pub fn write_runtime_best_score(game_id: &str, value: &JsonValue) -> Result<()> 
     path_utils::ensure_parent_dir(&path)?;
     let mut store = if path.exists() {
         let raw = fs::read_to_string(&path)?;
-        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}')).unwrap_or_default()
+        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
+            .unwrap_or_default()
     } else {
         Map::new()
     };
@@ -43,7 +45,9 @@ pub fn prune_runtime_scores(valid_game_ids: impl IntoIterator<Item = String>) ->
         return Ok(());
     }
     let raw = fs::read_to_string(&path)?;
-    let mut store = serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}')).unwrap_or_default();
+    let mut store =
+        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
+            .unwrap_or_default();
     let valid: HashSet<String> = valid_game_ids.into_iter().collect();
     store.retain(|key, _| valid.contains(key));
     fs::write(path, serde_json::to_string_pretty(&store)?)?;

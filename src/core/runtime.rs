@@ -1,12 +1,25 @@
-﻿use anyhow::Result;
+use anyhow::Result;
 
 use crate::core::command::RuntimeCommand;
 use crate::core::event::InputEvent;
 use crate::core::screen::Canvas;
 use crate::game::registry::GameDescriptor;
 use crate::lua::engine;
-use crate::lua_bridge::api::LaunchMode;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LaunchMode {
+    New,
+    Continue,
+}
+
+impl LaunchMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::New => "new",
+            Self::Continue => "continue",
+        }
+    }
+}
 /// 宿主驱动的统一游戏运行时上下文。
 #[derive(Clone, Debug)]
 pub struct RuntimeSession {

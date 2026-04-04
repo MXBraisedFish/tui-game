@@ -6,7 +6,6 @@ use anyhow::Result;
 use crate::core::stats;
 use crate::game::action::ActionBinding;
 use crate::game::package::{GamePackageSource, discover_packages};
-use crate::mods::ModGameInfo;
 use crate::mods;
 use crate::utils::path_utils;
 
@@ -14,7 +13,6 @@ use crate::utils::path_utils;
 pub enum GameSourceKind {
     Official,
     Mod,
-    Legacy,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,7 +38,6 @@ pub struct GameDescriptor {
     pub max_height: Option<u16>,
     pub actions: BTreeMap<String, ActionBinding>,
     pub entry_path: PathBuf,
-    pub mod_info: Option<ModGameInfo>,
     pub source: GameSourceKind,
     pub package: Option<PackageDescriptor>,
 }
@@ -51,7 +48,7 @@ impl GameDescriptor {
     }
 
     pub fn is_mod_game(&self) -> bool {
-        matches!(self.source, GameSourceKind::Mod) || self.mod_info.is_some()
+        matches!(self.source, GameSourceKind::Mod)
     }
 }
 
@@ -76,7 +73,10 @@ impl GameRegistry {
 
         let mut dedup = Vec::new();
         for game in games {
-            if !dedup.iter().any(|existing: &GameDescriptor| existing.id == game.id) {
+            if !dedup
+                .iter()
+                .any(|existing: &GameDescriptor| existing.id == game.id)
+            {
                 dedup.push(game);
             }
         }
@@ -104,7 +104,6 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
     let base_dir = match source {
         GamePackageSource::Official => path_utils::official_games_dir()?,
         GamePackageSource::Mod => mods::mod_data_dir()?,
-        GamePackageSource::LegacyBuiltin => return Ok(Vec::new()),
     };
 
     let mut games = Vec::new();
@@ -117,7 +116,6 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
             source: match source {
                 GamePackageSource::Official => GameSourceKind::Official,
                 GamePackageSource::Mod => GameSourceKind::Mod,
-                GamePackageSource::LegacyBuiltin => GameSourceKind::Legacy,
             },
         };
 
@@ -135,7 +133,6 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
                 max_height: game.max_height,
                 actions: game.actions,
                 entry_path: package.root_dir.join(&game.entry),
-                mod_info: None,
                 source: package_descriptor.source.clone(),
                 package: Some(package_descriptor.clone()),
             });

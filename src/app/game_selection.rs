@@ -1,5 +1,3 @@
-﻿use std::collections::HashMap;
-
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -10,24 +8,13 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::i18n;
 use crate::app::rich_text;
-use crate::app::stats::{
-    self, GameStats, LightsOutBest, MazeEscapeBest, MemoryFlipBest, MinesweeperBest, SolitaireBest, SudokuBest,
-};
 use crate::core::stats as runtime_stats;
-use crate::game::registry::{GameDescriptor, GameSourceKind};
+use crate::game::registry::GameDescriptor;
 use crate::mods;
 
 /// 游戏选择页的完整状态。
 pub struct GameSelection {
     games: Vec<GameDescriptor>,
-    stats: HashMap<String, GameStats>,
-    lights_out_best: Option<LightsOutBest>,
-    memory_flip_best: Option<MemoryFlipBest>,
-    minesweeper_best: Option<MinesweeperBest>,
-    maze_escape_best: Option<MazeEscapeBest>,
-    solitaire_best: Option<SolitaireBest>,
-    sudoku_best: Option<SudokuBest>,
-    twenty_four_best_time_sec: Option<u64>,
     list_state: ListState,
     page_state: PageState,
     launch_placeholder: bool,
@@ -50,41 +37,8 @@ pub enum GameSelectionAction {
 }
 
 impl GameSelection {
-    fn load_supporting_data(
-    ) -> (
-        HashMap<String, GameStats>,
-        Option<LightsOutBest>,
-        Option<MemoryFlipBest>,
-        Option<MinesweeperBest>,
-        Option<MazeEscapeBest>,
-        Option<SolitaireBest>,
-        Option<SudokuBest>,
-        Option<u64>,
-    ) {
-        (
-            stats::load_stats(),
-            stats::load_lights_out_best(),
-            stats::load_memory_flip_best(),
-            stats::load_minesweeper_best(),
-            stats::load_maze_escape_best(),
-            stats::load_solitaire_best(),
-            stats::load_sudoku_best(),
-            stats::load_twenty_four_best_time(),
-        )
-    }
-
     /// 根据扫描到的游戏列表和本地成绩数据创建游戏选择页状态。
     pub fn new(games: Vec<GameDescriptor>) -> Self {
-        let (
-            stats,
-            lights_out_best,
-            memory_flip_best,
-            minesweeper_best,
-            maze_escape_best,
-            solitaire_best,
-            sudoku_best,
-            twenty_four_best_time_sec,
-        ) = Self::load_supporting_data();
         let initial_page_size = games.len().max(1);
 
         let mut list_state = ListState::default();
@@ -94,14 +48,6 @@ impl GameSelection {
 
         Self {
             games,
-            stats,
-            lights_out_best,
-            memory_flip_best,
-            minesweeper_best,
-            maze_escape_best,
-            solitaire_best,
-            sudoku_best,
-            twenty_four_best_time_sec,
             list_state,
             page_state: PageState {
                 current_page: 0,
@@ -120,26 +66,7 @@ impl GameSelection {
         let previous_global = self.selected_global_index().unwrap_or(0);
         let previous_scroll = self.detail_scroll;
 
-        let (
-            stats,
-            lights_out_best,
-            memory_flip_best,
-            minesweeper_best,
-            maze_escape_best,
-            solitaire_best,
-            sudoku_best,
-            twenty_four_best_time_sec,
-        ) = Self::load_supporting_data();
-
         self.games = games;
-        self.stats = stats;
-        self.lights_out_best = lights_out_best;
-        self.memory_flip_best = memory_flip_best;
-        self.minesweeper_best = minesweeper_best;
-        self.maze_escape_best = maze_escape_best;
-        self.solitaire_best = solitaire_best;
-        self.sudoku_best = sudoku_best;
-        self.twenty_four_best_time_sec = twenty_four_best_time_sec;
         self.launch_placeholder = false;
 
         if self.games.is_empty() {
@@ -168,7 +95,7 @@ impl GameSelection {
         self.detail_scroll = previous_scroll;
     }
 
-    /// 澶勭悊娓告垙閫夋嫨椤垫寜閿簨浠讹紝骞惰繑鍥為渶瑕佷富绋嬪簭鎵ц鐨勯珮灞傚姩浣溿€?
+    /// Handle game selection input and return the resulting high-level action.
     pub fn handle_event(&mut self, key: KeyEvent) -> Option<GameSelectionAction> {
         if self.launch_placeholder {
             self.launch_placeholder = false;
@@ -211,7 +138,7 @@ impl GameSelection {
         }
     }
 
-    /// 娓叉煋娓告垙閫夋嫨鐣岄潰锛屽寘鎷乏渚у垪琛ㄥ拰鍙充晶璇︽儏闈㈡澘銆?
+    /// Render the game selection page, including the list and detail panel.
     pub fn render(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {
         if self.launch_placeholder {
             self.render_launch_placeholder(frame, area);
@@ -242,7 +169,7 @@ impl GameSelection {
         frame.render_widget(hint_widget, root[1]);
     }
 
-    /// 杩斿洖娓告垙閫夋嫨椤电ǔ瀹氭樉绀烘墍闇€鐨勬渶灏忕粓绔昂瀵搞€?
+    /// Return the minimum terminal size required for stable layout.
     pub fn minimum_size(&self) -> (u16, u16) {
         let list_title = i18n::t("game_selection.panel.games");
         let detail_title = i18n::t("game_selection.panel.details");
@@ -356,7 +283,6 @@ impl GameSelection {
             return;
         };
 
-        let s = self.stats.get(&game.id).copied().unwrap_or_default();
         let sep_len = inner.width as usize;
         let separator = "─".repeat(sep_len.max(1));
         let name = self.localized_game_name(game);
@@ -365,174 +291,14 @@ impl GameSelection {
 
         let mut top_lines = vec![Line::from(Span::styled(
             name,
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
         ))];
 
         top_lines.push(Line::from(separator.clone()));
         let stat_lines_start = top_lines.len();
-        if game.id == "lights_out" && matches!(game.source, GameSourceKind::Legacy) {
-            if let Some(best) = self.lights_out_best {
-                top_lines.push(Line::from(format!(
-                    "{} {}x{}",
-                    i18n::t("game.lights_out.best_size"),
-                    best.max_size,
-                    best.max_size
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.lights_out.best_steps"),
-                    best.min_steps
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.lights_out.best_time"),
-                    stats::format_duration(best.min_time_sec)
-                )));
-            } else {
-                top_lines.push(Line::from(i18n::t("game.lights_out.best_none")));
-            }
-        } else if game.id == "memory_flip" && matches!(game.source, GameSourceKind::Legacy) {
-            if let Some(best) = self.memory_flip_best {
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.memory_flip.best_difficulty"),
-                    best.difficulty
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.memory_flip.best_steps"),
-                    best.min_steps
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.memory_flip.best_time"),
-                    stats::format_duration(best.min_time_sec)
-                )));
-            } else {
-                top_lines.push(Line::from(i18n::t("game.memory_flip.best_none")));
-            }
-        } else if game.id == "minesweeper" && matches!(game.source, GameSourceKind::Legacy) {
-            let (d1, d2, d3) = if let Some(best) = self.minesweeper_best {
-                (
-                    best.d1_min_time_sec.map(stats::format_duration).unwrap_or_else(|| "--".to_string()),
-                    best.d2_min_time_sec.map(stats::format_duration).unwrap_or_else(|| "--".to_string()),
-                    best.d3_min_time_sec.map(stats::format_duration).unwrap_or_else(|| "--".to_string()),
-                )
-            } else {
-                ("--".to_string(), "--".to_string(), "--".to_string())
-            };
-            top_lines.push(Line::from(i18n::t("game.minesweeper.best_title")));
-            top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d1"), d1)));
-            top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d2"), d2)));
-            top_lines.push(Line::from(format!("{} {}", i18n::t("game.minesweeper.best_d3"), d3)));
-        } else if game.id == "maze_escape" && matches!(game.source, GameSourceKind::Legacy) {
-            if let Some(best) = self.maze_escape_best {
-                let size = if best.max_cols > 0 && best.max_rows > 0 {
-                    format!("{}x{}", best.max_cols, best.max_rows)
-                } else if best.max_area > 0 {
-                    best.max_area.to_string()
-                } else {
-                    "-".to_string()
-                };
-                let fastest = best
-                    .min_time_sec
-                    .map(stats::format_duration)
-                    .unwrap_or_else(|| "-".to_string());
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.maze_escape.best_max_size"),
-                    size
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.maze_escape.best_max_mode"),
-                    best.max_mode
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.maze_escape.best_fastest"),
-                    fastest
-                )));
-            } else {
-                top_lines.push(Line::from(i18n::t("game.maze_escape.best_none")));
-            }
-        } else if game.id == "solitaire" && matches!(game.source, GameSourceKind::Legacy) {
-            let fmt = |v: Option<u64>| -> String {
-                v.map(stats::format_duration)
-                    .unwrap_or_else(|| "--:--:--".to_string())
-            };
-            let best = self.solitaire_best.unwrap_or_default();
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game.solitaire.best.freecell"),
-                fmt(best.freecell_min_time_sec)
-            )));
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game.solitaire.best.klondike"),
-                fmt(best.klondike_min_time_sec)
-            )));
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game.solitaire.best.spider"),
-                fmt(best.spider_min_time_sec)
-            )));
-        } else if game.id == "sudoku" && matches!(game.source, GameSourceKind::Legacy) {
-            if let Some(best) = self.sudoku_best {
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.sudoku.best_difficulty"),
-                    i18n::t(&format!("game.sudoku.difficulty.{}", best.difficulty))
-                )));
-                top_lines.push(Line::from(format!(
-                    "{} {}",
-                    i18n::t("game.sudoku.best_time"),
-                    stats::format_duration(best.min_time_sec)
-                )));
-            } else {
-                top_lines.push(Line::from(i18n::t("game.sudoku.best_none")));
-            }
-        } else if game.id == "twenty_four" && matches!(game.source, GameSourceKind::Legacy) {
-            let best = self
-                .twenty_four_best_time_sec
-                .map(stats::format_duration)
-                .unwrap_or_else(|| i18n::t("game.twenty_four.none"));
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game.twenty_four.best_time"),
-                best
-            )));
-        } else if game.id == "tic_tac_toe" {
-        } else if game.id == "pacman" && matches!(game.source, GameSourceKind::Legacy) {
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game_selection.label.high_score"),
-                s.high_score
-            )));
-        } else if game.id == "wordle" && matches!(game.source, GameSourceKind::Legacy) {
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game.wordle.best_streak"),
-                s.high_score
-            )));
-        } else if game.id == "rock_paper_scissors" && matches!(game.source, GameSourceKind::Legacy) {
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game.rock_paper_scissors.best_streak"),
-                s.high_score
-            )));
-        } else if game.id == "blackjack" && matches!(game.source, GameSourceKind::Legacy) {
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game_selection.label.high_net_profit"),
-                s.high_score
-            )));
-        } else if game.id == "tetris" && matches!(game.source, GameSourceKind::Legacy) {
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game_selection.label.high_score"),
-                s.high_score
-            )));
+        if game.id == "tic_tac_toe" {
         } else if game.is_mod_game() {
             top_lines.extend(format_runtime_best_score_lines(
                 game,
@@ -561,27 +327,14 @@ impl GameSelection {
                 )));
             }
             top_lines.push(Line::from(separator.clone()));
-        } else if !matches!(game.source, GameSourceKind::Legacy) {
+        } else {
             top_lines.extend(format_runtime_best_score_lines(
                 game,
                 inner.width.saturating_sub(1) as usize,
             ));
-        } else {
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game_selection.label.high_score"),
-                s.high_score
-            )));
-            top_lines.push(Line::from(format!(
-                "{} {}",
-                i18n::t("game_selection.label.longest_play"),
-                stats::format_duration(s.max_duration_sec)
-            )));
         }
 
-        if top_lines.len() > stat_lines_start
-            && !game.is_mod_game()
-        {
+        if top_lines.len() > stat_lines_start && !game.is_mod_game() {
             top_lines.push(Line::from(separator.clone()));
         }
         top_lines.push(Line::from(i18n::t("game_selection.label.how_to_play")));
@@ -608,7 +361,11 @@ impl GameSelection {
 
         let detail_rows = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(1), Constraint::Min(1)])
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Min(1),
+            ])
             .split(chunks[1]);
 
         frame.render_widget(
@@ -661,11 +418,13 @@ impl GameSelection {
             let can_down = self.detail_scroll < max_scroll;
 
             frame.render_widget(
-                Paragraph::new(if can_up { "↑" } else { " " }).style(Style::default().fg(Color::White)),
+                Paragraph::new(if can_up { "↑" } else { " " })
+                    .style(Style::default().fg(Color::White)),
                 Rect::new(scroll_x, detail_rows[2].y, 1, 1),
             );
             frame.render_widget(
-                Paragraph::new(if can_up { "W" } else { " " }).style(Style::default().fg(Color::White)),
+                Paragraph::new(if can_up { "W" } else { " " })
+                    .style(Style::default().fg(Color::White)),
                 Rect::new(scroll_x, detail_rows[2].y.saturating_add(1), 1, 1),
             );
 
@@ -685,16 +444,17 @@ impl GameSelection {
 
             let d_y = detail_rows[2].y + detail_rows[2].height.saturating_sub(2);
             frame.render_widget(
-                Paragraph::new(if can_down { "S" } else { " " }).style(Style::default().fg(Color::White)),
+                Paragraph::new(if can_down { "S" } else { " " })
+                    .style(Style::default().fg(Color::White)),
                 Rect::new(scroll_x, d_y, 1, 1),
             );
             frame.render_widget(
-                Paragraph::new(if can_down { "↓" } else { " " }).style(Style::default().fg(Color::White)),
+                Paragraph::new(if can_down { "↓" } else { " " })
+                    .style(Style::default().fg(Color::White)),
                 Rect::new(scroll_x, d_y.saturating_add(1), 1, 1),
             );
         }
     }
-
 
     fn render_launch_placeholder(&self, frame: &mut ratatui::Frame<'_>, area: Rect) {
         let width = 32u16.min(area.width.saturating_sub(2));
@@ -715,8 +475,8 @@ impl GameSelection {
             i18n::t("game_selection.placeholder.title"),
             i18n::t("game_selection.placeholder.back")
         ))
-            .style(Style::default().fg(Color::White))
-            .alignment(Alignment::Center);
+        .style(Style::default().fg(Color::White))
+        .alignment(Alignment::Center);
         frame.render_widget(msg, inner);
     }
 
@@ -806,14 +566,15 @@ impl GameSelection {
 
         let left_width = width - badge_width - 1;
         let left = truncate_with_ellipsis(&name, left_width);
-        let pad = width
-            .saturating_sub(UnicodeWidthStr::width(left.as_str()) + badge_width);
+        let pad = width.saturating_sub(UnicodeWidthStr::width(left.as_str()) + badge_width);
         Line::from(vec![
             Span::raw(left),
             Span::raw(" ".repeat(pad)),
             Span::styled(
                 badge.to_string(),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
             ),
         ])
     }
@@ -839,33 +600,20 @@ impl GameSelection {
         i18n::t_or(&format!("game.{}.details", game.id), &game.detail)
     }
 
-
     fn mod_package_name(&self, game: &GameDescriptor) -> Option<String> {
-        if let Some(mod_info) = &game.mod_info {
-            Some(mod_info.package_name.clone())
-        } else {
-            let namespace = mod_namespace(game)?;
-            Some(mods::resolve_mod_text_for_display(
-                namespace,
-                game.package_info()?.package_name.as_str(),
-            ))
-        }
+        let namespace = mod_namespace(game)?;
+        Some(mods::resolve_mod_text_for_display(
+            namespace,
+            game.package_info()?.package_name.as_str(),
+        ))
     }
 
     fn mod_author<'a>(&self, game: &'a GameDescriptor) -> Option<&'a str> {
-        if let Some(mod_info) = &game.mod_info {
-            Some(mod_info.author.as_str())
-        } else {
-            game.package_info().map(|package| package.author.as_str())
-        }
+        game.package_info().map(|package| package.author.as_str())
     }
 
     fn mod_version<'a>(&self, game: &'a GameDescriptor) -> Option<&'a str> {
-        if let Some(mod_info) = &game.mod_info {
-            Some(mod_info.version.as_str())
-        } else {
-            game.package_info().map(|package| package.version.as_str())
-        }
+        game.package_info().map(|package| package.version.as_str())
     }
     fn selected_global_index(&self) -> Option<usize> {
         let selected_in_page = self.list_state.selected()?;
@@ -882,7 +630,8 @@ impl GameSelection {
         let selected_global = self.selected_global_index().unwrap_or(0);
 
         self.page_state.page_size = page_size;
-        self.page_state.total_pages = ((self.games.len() + page_size.saturating_sub(1)) / page_size).max(1);
+        self.page_state.total_pages =
+            ((self.games.len() + page_size.saturating_sub(1)) / page_size).max(1);
 
         if self.games.is_empty() {
             self.page_state.current_page = 0;
@@ -953,7 +702,8 @@ fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<L
                     if key == "best_string" {
                         continue;
                     }
-                    rendered = rendered.replace(&format!("{{{key}}}"), &json_value_to_inline_text(value));
+                    rendered =
+                        rendered.replace(&format!("{{{key}}}"), &json_value_to_inline_text(value));
                 }
                 rendered
             } else {
@@ -996,15 +746,10 @@ fn json_value_to_inline_text(value: &serde_json::Value) -> String {
 }
 
 fn mod_namespace(game: &GameDescriptor) -> Option<&str> {
-    if let Some(mod_info) = &game.mod_info {
-        Some(mod_info.namespace.as_str())
-    } else if game.is_mod_game() {
-        game.package_info().map(|package| package.namespace.as_str())
+    if game.is_mod_game() {
+        game.package_info()
+            .map(|package| package.namespace.as_str())
     } else {
         None
     }
 }
-
-
-
-

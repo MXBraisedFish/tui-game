@@ -83,7 +83,8 @@ impl SettingsState {
             .unwrap_or(0)
             .min(self.mod_packages.len().saturating_sub(1));
         let page_size = current_mod_page_size();
-        self.mod_page = (self.mod_selected / page_size).min(total_mod_pages(self.mod_packages.len(), page_size).saturating_sub(1));
+        self.mod_page = (self.mod_selected / page_size)
+            .min(total_mod_pages(self.mod_packages.len(), page_size).saturating_sub(1));
         self.mod_detail_scroll = 0;
         self.mod_detail_scroll_available = false;
     }
@@ -145,9 +146,8 @@ pub fn grid_metrics(term_width: u16, languages: &[i18n::LanguagePack]) -> GridMe
 
     let inner_width = (max_name_width + 2) as u16;
     let outer_width = inner_width + 2;
-    let cols_by_width = (((term_width as usize) + H_GAP as usize)
-        / (outer_width as usize + H_GAP as usize))
-        .max(1);
+    let cols_by_width =
+        (((term_width as usize) + H_GAP as usize) / (outer_width as usize + H_GAP as usize)).max(1);
     let cols = languages.len().min(MAX_COLS).min(cols_by_width).max(1);
 
     GridMetrics {
@@ -400,8 +400,9 @@ fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
         })
         .max()
         .unwrap_or(1) as u16;
-    let back_hint_width =
-        UnicodeWidthStr::width(text("settings.hub.back_hint", "[ESC]/[Q] Return to main menu").as_str()) as u16;
+    let back_hint_width = UnicodeWidthStr::width(
+        text("settings.hub.back_hint", "[ESC]/[Q] Return to main menu").as_str(),
+    ) as u16;
 
     let width = area
         .width
@@ -486,7 +487,11 @@ fn render_language_selector(frame: &mut ratatui::Frame<'_>, selected: usize) {
     let hint = i18n::t("confirm_language");
 
     let title_widget = Paragraph::new(title)
-        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
+        .style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
         .alignment(Alignment::Center);
     frame.render_widget(title_widget, sections[0]);
 
@@ -536,7 +541,7 @@ fn render_mods(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
         text("settings.mods.hint.toggle", "[Enter] Toggle"),
         text("settings.mods.hint.debug", "[D] Debug"),
         text("settings.mods.hint.rescan", "[R] Rescan"),
-        text("settings.mods.hint.move", "[↑]/[↓] Move"),
+        text("settings.mods.hint.move", "[鈫慮/[鈫揮 Move"),
         text("settings.mods.hint.page", "[Q]/[E] Page"),
         text("settings.hub.back_hint", "[ESC] Return to main menu")
     );
@@ -601,7 +606,12 @@ fn render_mod_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsS
             rows[0].width,
             item_height.min(rows[0].height.saturating_sub(local * item_height)),
         );
-        render_mod_list_item(frame.buffer_mut(), item_area, package, index == state.mod_selected);
+        render_mod_list_item(
+            frame.buffer_mut(),
+            item_area,
+            package,
+            index == state.mod_selected,
+        );
     }
 
     let left = if page > 0 {
@@ -659,7 +669,9 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
             .bg(Color::DarkGray)
             .add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD)
     };
     let meta_style = if selected {
         Style::default().fg(Color::White).bg(Color::DarkGray)
@@ -671,10 +683,19 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
     } else {
         Style::default().fg(Color::Red)
     }
-    .bg(if selected { Color::DarkGray } else { Color::Reset });
+    .bg(if selected {
+        Color::DarkGray
+    } else {
+        Color::Reset
+    });
 
     for dy in 0..content_height {
-        buffer.set_string(area.x, area.y + dy, " ".repeat(area.width as usize), base_style);
+        buffer.set_string(
+            area.x,
+            area.y + dy,
+            " ".repeat(area.width as usize),
+            base_style,
+        );
     }
 
     for (idx, line) in package.thumbnail.lines.iter().take(4).enumerate() {
@@ -691,12 +712,22 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
         );
     }
 
-    buffer.set_stringn(text_x, area.y, &package.package_name, area.width.saturating_sub(thumb_width + 2) as usize, title_style);
+    buffer.set_stringn(
+        text_x,
+        area.y,
+        &package.package_name,
+        area.width.saturating_sub(thumb_width + 2) as usize,
+        title_style,
+    );
     if content_height > 1 {
         buffer.set_stringn(
             text_x,
             area.y + 1,
-            &format!("{} {}", text("settings.mods.author", "Author:"), package.author),
+            &format!(
+                "{} {}",
+                text("settings.mods.author", "Author:"),
+                package.author
+            ),
             area.width.saturating_sub(thumb_width + 2) as usize,
             meta_style,
         );
@@ -705,7 +736,11 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
         buffer.set_stringn(
             text_x,
             area.y + 2,
-            &format!("{} {}", text("settings.mods.version", "Version:"), package.version),
+            &format!(
+                "{} {}",
+                text("settings.mods.version", "Version:"),
+                package.version
+            ),
             area.width.saturating_sub(thumb_width + 2) as usize,
             meta_style,
         );
@@ -723,11 +758,16 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
     if package.debug_enabled && content_height > 0 && area.width > 0 {
         let debug_x = area.x + area.width - 1;
         for dy in 0..content_height {
-            buffer.set_string(debug_x, area.y + dy, "█", Style::default().fg(Color::Red).bg(if selected {
-                Color::DarkGray
-            } else {
-                Color::Reset
-            }));
+            buffer.set_string(
+                debug_x,
+                area.y + dy,
+                "█",
+                Style::default().fg(Color::Red).bg(if selected {
+                    Color::DarkGray
+                } else {
+                    Color::Reset
+                }),
+            );
         }
     }
 }
@@ -759,7 +799,9 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut Set
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             package.package_name.clone(),
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from(format!(
             "{} {}",
@@ -784,7 +826,9 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut Set
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             text("settings.mods.description", "Description"),
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )));
         lines.extend(rich_text::parse_rich_text_wrapped(
             &package.description,
@@ -799,7 +843,11 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut Set
             )));
             for error in package.errors.iter().take(8) {
                 lines.extend(rich_text::parse_rich_text_wrapped(
-                    &format!("[{}] {}", error.severity.to_ascii_uppercase(), error.message),
+                    &format!(
+                        "[{}] {}",
+                        error.severity.to_ascii_uppercase(),
+                        error.message
+                    ),
                     content_width,
                     Style::default().fg(Color::White),
                 ));
@@ -866,11 +914,13 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut Set
 
         let d_y = inner.y + inner.height.saturating_sub(2);
         frame.render_widget(
-            Paragraph::new(if can_down { "S" } else { " " }).style(Style::default().fg(Color::White)),
+            Paragraph::new(if can_down { "S" } else { " " })
+                .style(Style::default().fg(Color::White)),
             Rect::new(scroll_x, d_y, 1, 1),
         );
         frame.render_widget(
-            Paragraph::new(if can_down { "↓" } else { " " }).style(Style::default().fg(Color::White)),
+            Paragraph::new(if can_down { "↓" } else { " " })
+                .style(Style::default().fg(Color::White)),
             Rect::new(scroll_x, d_y.saturating_add(1), 1, 1),
         );
     }

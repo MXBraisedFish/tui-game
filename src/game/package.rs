@@ -9,7 +9,6 @@ use crate::game::manifest::{GameManifest, PackageManifest};
 pub enum GamePackageSource {
     Official,
     Mod,
-    LegacyBuiltin,
 }
 
 #[derive(Clone, Debug)]
@@ -149,7 +148,10 @@ mod tests {
         assert_eq!(package.package.namespace, "demo");
         assert_eq!(package.games.len(), 1);
         assert_eq!(package.games[0].id, "demo.runtime");
-        assert_eq!(package.games[0].actions["confirm"].keys(), vec!["enter".to_string(), "space".to_string()]);
+        assert_eq!(
+            package.games[0].actions["confirm"].keys(),
+            vec!["enter".to_string(), "space".to_string()]
+        );
 
         let _ = fs::remove_dir_all(root);
     }

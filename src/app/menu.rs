@@ -198,7 +198,11 @@ pub fn render_main_menu(
             } else {
                 shortcut
             };
-            let content = format!("\u{25B6} {} {}", effective_shortcut, menu_item_label(menu, item));
+            let content = format!(
+                "\u{25B6} {} {}",
+                effective_shortcut,
+                menu_item_label(menu, item)
+            );
             UnicodeWidthStr::width(content.as_str()) as u16
         })
         .max()

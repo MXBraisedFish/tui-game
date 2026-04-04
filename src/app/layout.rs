@@ -14,7 +14,11 @@ pub struct MainMenuAreas {
 
 /// 计算主菜单界面的中心布局区域。
 pub fn main_menu_areas(area: Rect) -> MainMenuAreas {
-    let content = centered_rect(area, MAIN_CONTENT_WIDTH.min(area.width), 15.min(area.height));
+    let content = centered_rect(
+        area,
+        MAIN_CONTENT_WIDTH.min(area.width),
+        15.min(area.height),
+    );
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

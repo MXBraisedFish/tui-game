@@ -272,8 +272,10 @@ fn save_persisted_language_code(code: &str) -> Result<()> {
 }
 
 fn builtin_english_pack() -> LanguagePack {
-    const US_EN_JSON: &str =
-        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/lang/us-en.json"));
+    const US_EN_JSON: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/assets/lang/us-en.json"
+    ));
 
     let parsed = serde_json::from_str::<Value>(US_EN_JSON)
         .ok()

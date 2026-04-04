@@ -363,12 +363,20 @@ fn styled_chars_to_lines(chars: &[StyledChar], width: usize, base: Style) -> Vec
     lines
 }
 
-fn wrap_segment_wordwise(segment: &[StyledChar], width: usize, base: Style, out: &mut Vec<Line<'static>>) {
+fn wrap_segment_wordwise(
+    segment: &[StyledChar],
+    width: usize,
+    base: Style,
+    out: &mut Vec<Line<'static>>,
+) {
     let mut remaining: Vec<StyledChar> = segment.to_vec();
     let width = width.max(1);
 
     while !remaining.is_empty() {
-        let total_w = remaining.iter().map(|c| UnicodeWidthChar::width(c.ch).unwrap_or(0)).sum::<usize>();
+        let total_w = remaining
+            .iter()
+            .map(|c| UnicodeWidthChar::width(c.ch).unwrap_or(0))
+            .sum::<usize>();
         if total_w <= width {
             out.push(build_line(&remaining, base));
             break;
@@ -445,8 +453,6 @@ fn build_line(chars: &[StyledChar], base: Style) -> Line<'static> {
 
     Line::from(spans)
 }
-
-
 
 fn parse_color(raw: &str) -> Option<Color> {
     let text = raw.trim();

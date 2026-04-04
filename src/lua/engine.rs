@@ -11,12 +11,12 @@ use serde_json::{Map, Value as JsonValue};
 use crate::app::i18n;
 use crate::core::command::RuntimeCommand;
 use crate::core::event::InputEvent;
-use crate::core::screen::Canvas;
+use crate::core::runtime::LaunchMode;
 use crate::core::save;
+use crate::core::screen::Canvas;
 use crate::core::stats;
 use crate::game::registry::GameDescriptor;
 use crate::lua::sandbox;
-use crate::lua_bridge::api::LaunchMode;
 use crate::mods;
 use crate::terminal::{renderer, size_watcher};
 
@@ -29,7 +29,7 @@ struct RuntimeBridges {
     launch_mode: LaunchMode,
 }
 
-/// 新运行时下的 Lua 引擎包装。
+/// 新运行时下的 Lua 引擎封装。
 pub struct LuaGameEngine {
     lua: Lua,
     state_key: RegistryKey,
@@ -60,19 +60,31 @@ impl LuaGameEngine {
         )
         .map_err(anyhow_lua_error)?;
 
-        let source = fs::read_to_string(&game.entry_path)
-            .with_context(|| format!("failed to read runtime script: {}", game.entry_path.display()))?;
+        let source = fs::read_to_string(&game.entry_path).with_context(|| {
+            format!(
+                "failed to read runtime script: {}",
+                game.entry_path.display()
+            )
+        })?;
         lua.load(source.trim_start_matches('\u{feff}'))
             .set_name(game.entry_path.to_string_lossy().as_ref())
             .exec()
-            .map_err(|err| anyhow!("failed to execute runtime script {}: {}", game.entry_path.display(), err))?;
+            .map_err(|err| {
+                anyhow!(
+                    "failed to execute runtime script {}: {}",
+                    game.entry_path.display(),
+                    err
+                )
+            })?;
 
         let init_game: mlua::Function = lua
             .globals()
             .get("init_game")
             .map_err(|err| anyhow!("runtime script missing init_game(): {}", err))?;
         let initial_state = init_game.call::<Value>(()).map_err(anyhow_lua_error)?;
-        let state_key = lua.create_registry_value(initial_state).map_err(anyhow_lua_error)?;
+        let state_key = lua
+            .create_registry_value(initial_state)
+            .map_err(anyhow_lua_error)?;
 
         Ok(Self {
             lua,
@@ -110,7 +122,10 @@ impl LuaGameEngine {
                     match event::read()? {
                         Event::Key(key)
                             if matches!(key.kind, KeyEventKind::Press)
-                                && matches!(key.code, KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q')) =>
+                                && matches!(
+                                    key.code,
+                                    KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q')
+                                ) =>
                         {
                             break;
                         }
@@ -154,7 +169,11 @@ impl LuaGameEngine {
             });
             self.render()?;
             {
-                let canvas = self.bridges.canvas.lock().map_err(|_| anyhow!("canvas poisoned"))?;
+                let canvas = self
+                    .bridges
+                    .canvas
+                    .lock()
+                    .map_err(|_| anyhow!("canvas poisoned"))?;
                 renderer::render_canvas(&canvas)?;
             }
 
@@ -183,17 +202,22 @@ impl LuaGameEngine {
     }
 
     fn handle_event(&mut self, event: &InputEvent) -> Result<()> {
-        let handle_event: mlua::Function = self
+        let handle_event: mlua::Function =
+            self.lua.globals().get("handle_event").map_err(|err| {
+                anyhow!("runtime script missing handle_event(state, event): {}", err)
+            })?;
+        let state = self
             .lua
-            .globals()
-            .get("handle_event")
-            .map_err(|err| anyhow!("runtime script missing handle_event(state, event): {}", err))?;
-        let state = self.lua.registry_value::<Value>(&self.state_key).map_err(anyhow_lua_error)?;
+            .registry_value::<Value>(&self.state_key)
+            .map_err(anyhow_lua_error)?;
         let event_table = to_lua_event_table(&self.lua, event).map_err(anyhow_lua_error)?;
         let new_state = handle_event
             .call::<Value>((state, event_table))
             .map_err(anyhow_lua_error)?;
-        self.state_key = self.lua.create_registry_value(new_state).map_err(anyhow_lua_error)?;
+        self.state_key = self
+            .lua
+            .create_registry_value(new_state)
+            .map_err(anyhow_lua_error)?;
         Ok(())
     }
 
@@ -203,7 +227,10 @@ impl LuaGameEngine {
             .globals()
             .get("render")
             .map_err(|err| anyhow!("runtime script missing render(state): {}", err))?;
-        let state = self.lua.registry_value::<Value>(&self.state_key).map_err(anyhow_lua_error)?;
+        let state = self
+            .lua
+            .registry_value::<Value>(&self.state_key)
+            .map_err(anyhow_lua_error)?;
         render.call::<()>(state).map_err(anyhow_lua_error)?;
         Ok(())
     }
@@ -213,7 +240,10 @@ impl LuaGameEngine {
             Ok(func) => func,
             Err(_) => return Ok(()),
         };
-        let state = self.lua.registry_value::<Value>(&self.state_key).map_err(anyhow_lua_error)?;
+        let state = self
+            .lua
+            .registry_value::<Value>(&self.state_key)
+            .map_err(anyhow_lua_error)?;
         let value = best_score.call::<Value>(state).map_err(anyhow_lua_error)?;
         if matches!(value, Value::Nil) {
             return Ok(());
@@ -260,19 +290,30 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
     let canvas_ref = Arc::clone(&bridges.canvas);
     globals.set(
         "canvas_draw_text",
-        lua.create_function(move |_, (x, y, text, fg, bg): (u16, u16, String, Option<String>, Option<String>)| {
-            if let Ok(mut canvas) = canvas_ref.lock() {
-                canvas.draw_text(x, y, &text, fg, bg);
-            }
-            Ok(())
-        })?,
+        lua.create_function(
+            move |_, (x, y, text, fg, bg): (u16, u16, String, Option<String>, Option<String>)| {
+                if let Ok(mut canvas) = canvas_ref.lock() {
+                    canvas.draw_text(x, y, &text, fg, bg);
+                }
+                Ok(())
+            },
+        )?,
     )?;
 
     let canvas_ref = Arc::clone(&bridges.canvas);
     globals.set(
         "canvas_fill_rect",
         lua.create_function(
-            move |_, (x, y, width, height, ch, fg, bg): (u16, u16, u16, u16, String, Option<String>, Option<String>)| {
+            move |_,
+                  (x, y, width, height, ch, fg, bg): (
+                u16,
+                u16,
+                u16,
+                u16,
+                String,
+                Option<String>,
+                Option<String>,
+            )| {
                 if let Ok(mut canvas) = canvas_ref.lock() {
                     let fill = ch.chars().next().unwrap_or(' ');
                     canvas.fill_rect(
@@ -280,11 +321,7 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
                         y,
                         width,
                         height,
-                        crate::core::screen::Cell {
-                            ch: fill,
-                            fg,
-                            bg,
-                        },
+                        crate::core::screen::Cell { ch: fill, fg, bg },
                     );
                 }
                 Ok(())
@@ -319,17 +356,31 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
     globals.set("ANCHOR_BOTTOM", 2)?;
     globals.set(
         "resolve_x",
-        lua.create_function(|_, (anchor, content_width, offset): (i64, u16, Option<i64>)| {
-            let (term_w, _) = crossterm::terminal::size().unwrap_or((80, 24));
-            Ok(resolve_axis_position(anchor, term_w, content_width, offset.unwrap_or(0)))
-        })?,
+        lua.create_function(
+            |_, (anchor, content_width, offset): (i64, u16, Option<i64>)| {
+                let (term_w, _) = crossterm::terminal::size().unwrap_or((80, 24));
+                Ok(resolve_axis_position(
+                    anchor,
+                    term_w,
+                    content_width,
+                    offset.unwrap_or(0),
+                ))
+            },
+        )?,
     )?;
     globals.set(
         "resolve_y",
-        lua.create_function(|_, (anchor, content_height, offset): (i64, u16, Option<i64>)| {
-            let (_, term_h) = crossterm::terminal::size().unwrap_or((80, 24));
-            Ok(resolve_axis_position(anchor, term_h, content_height, offset.unwrap_or(0)))
-        })?,
+        lua.create_function(
+            |_, (anchor, content_height, offset): (i64, u16, Option<i64>)| {
+                let (_, term_h) = crossterm::terminal::size().unwrap_or((80, 24));
+                Ok(resolve_axis_position(
+                    anchor,
+                    term_h,
+                    content_height,
+                    offset.unwrap_or(0),
+                ))
+            },
+        )?,
     )?;
     globals.set(
         "resolve_rect",
@@ -409,7 +460,8 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
     globals.set(
         "load_data",
         lua.create_function(move |lua, slot: String| {
-            let Some(value) = load_runtime_slot(&save_path, &slot).map_err(lua_runtime_error)? else {
+            let Some(value) = load_runtime_slot(&save_path, &slot).map_err(lua_runtime_error)?
+            else {
                 return Ok(Value::Nil);
             };
             json_to_lua_value(lua, &value)
@@ -419,8 +471,7 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
     let namespace = bridges
         .game
         .package_info()
-        .map(|package| package.namespace.clone())
-        .or_else(|| bridges.game.mod_info.as_ref().map(|info| info.namespace.clone()));
+        .map(|package| package.namespace.clone());
     globals.set(
         "translate",
         lua.create_function(move |_, key: String| {
@@ -435,10 +486,12 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
     let launch_mode = bridges.launch_mode;
     globals.set(
         "get_launch_mode",
-        lua.create_function(move |_, ()| Ok(match launch_mode {
-            LaunchMode::Continue => "continue".to_string(),
-            LaunchMode::New => "new".to_string(),
-        }))?,
+        lua.create_function(move |_, ()| {
+            Ok(match launch_mode {
+                LaunchMode::Continue => "continue".to_string(),
+                LaunchMode::New => "new".to_string(),
+            })
+        })?,
     )?;
 
     Ok(())
@@ -519,7 +572,8 @@ fn runtime_save_path(game: &GameDescriptor) -> Result<PathBuf> {
 fn save_runtime_slot(path: &PathBuf, slot: &str, value: &JsonValue) -> Result<()> {
     let mut store = if path.exists() {
         let raw = fs::read_to_string(path)?;
-        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}')).unwrap_or_default()
+        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
+            .unwrap_or_default()
     } else {
         Map::new()
     };
@@ -533,7 +587,8 @@ fn load_runtime_slot(path: &PathBuf, slot: &str) -> Result<Option<JsonValue>> {
         return Ok(None);
     }
     let raw = fs::read_to_string(path)?;
-    let store = serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}')).unwrap_or_default();
+    let store = serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
+        .unwrap_or_default();
     Ok(store.get(slot).cloned())
 }
 
@@ -575,7 +630,11 @@ fn lua_value_to_json(value: &Value) -> Result<JsonValue> {
                 JsonValue::Object(map)
             }
         }
-        other => return Err(anyhow!("unsupported lua value for json conversion: {other:?}")),
+        other => {
+            return Err(anyhow!(
+                "unsupported lua value for json conversion: {other:?}"
+            ));
+        }
     })
 }
 

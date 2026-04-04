@@ -1,4 +1,3 @@
-pub mod app;
 pub mod command;
 pub mod event;
 pub mod runtime;

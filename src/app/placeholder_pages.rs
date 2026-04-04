@@ -36,7 +36,11 @@ pub fn render_placeholder(
     let lines = text.lines().count() as u16;
     let sections = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(lines), Constraint::Min(0)])
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(lines),
+            Constraint::Min(0),
+        ])
         .split(frame.area());
 
     let paragraph = Paragraph::new(text)

@@ -87,11 +87,13 @@ pub fn draw_size_warning_with_constraints(
 ) -> Result<()> {
     let mut out = stdout();
 
-    let mut lines = vec![if constraints.max_width.is_some() || constraints.max_height.is_some() {
-        t("warning.size_invalid_title").to_string()
-    } else {
-        t("warning.size_title").to_string()
-    }];
+    let mut lines = vec![
+        if constraints.max_width.is_some() || constraints.max_height.is_some() {
+            t("warning.size_invalid_title").to_string()
+        } else {
+            t("warning.size_title").to_string()
+        },
+    ];
 
     if let (Some(min_width), Some(min_height)) = (constraints.min_width, constraints.min_height) {
         lines.push(format!(

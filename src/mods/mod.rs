@@ -1,17 +1,17 @@
-﻿use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use unicode_width::UnicodeWidthChar;
 
 use crate::app::i18n;
-use crate::game::package::{load_package, GamePackageSource};
+use crate::game::package::{GamePackageSource, load_package};
 use crate::utils::path_utils;
 
 pub const MOD_API_VERSION: u32 = 1;
@@ -40,19 +40,6 @@ pub struct ModImage {
     pub lines: Vec<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ModGameInfo {
-    pub namespace: String,
-    pub package_name: String,
-    pub author: String,
-    pub version: String,
-    pub description: String,
-    pub thumbnail: ModImage,
-    pub banner: ModImage,
-    pub enabled: bool,
-    pub debug_enabled: bool,
-}
-
 #[derive(Clone, Debug)]
 pub struct ModGameMeta {
     pub game_id: String,
@@ -67,7 +54,6 @@ pub struct ModGameMeta {
     pub min_height: Option<u16>,
     pub max_width: Option<u16>,
     pub max_height: Option<u16>,
-    pub mod_info: ModGameInfo,
 }
 
 #[derive(Clone, Debug)]
@@ -270,14 +256,13 @@ pub fn mod_save_dir(namespace: &str) -> Result<PathBuf> {
 }
 
 pub fn mod_save_path(namespace: &str, game_id: &str) -> Result<PathBuf> {
-    Ok(mod_save_dir(namespace)?.join(format!(
-        "{}.json",
-        sanitize_mod_save_file_stem(game_id)
-    )))
+    Ok(mod_save_dir(namespace)?.join(format!("{}.json", sanitize_mod_save_file_stem(game_id))))
 }
 
 pub fn mod_log_path(namespace: &str) -> Result<PathBuf> {
-    Ok(mod_root_dir()?.join("logs").join(format!("{namespace}.log")))
+    Ok(mod_root_dir()?
+        .join("logs")
+        .join(format!("{namespace}.log")))
 }
 pub fn load_mod_state() -> ModState {
     let Ok(path) = mod_state_path() else {
@@ -294,7 +279,8 @@ pub fn load_mod_state() -> ModState {
         };
     };
 
-    let mut state = serde_json::from_str::<ModState>(raw.trim_start_matches('\u{feff}')).unwrap_or_default();
+    let mut state =
+        serde_json::from_str::<ModState>(raw.trim_start_matches('\u{feff}')).unwrap_or_default();
     if state.api_version == 0 {
         state.api_version = MOD_API_VERSION;
     }
@@ -333,7 +319,11 @@ pub fn set_mod_enabled(namespace: &str, enabled: bool) -> Result<()> {
 
 pub fn set_mod_debug_enabled(namespace: &str, enabled: bool) -> Result<()> {
     let mut state = load_mod_state();
-    state.mods.entry(namespace.to_string()).or_default().debug_enabled = enabled;
+    state
+        .mods
+        .entry(namespace.to_string())
+        .or_default()
+        .debug_enabled = enabled;
     save_mod_state(&state)
 }
 
@@ -365,7 +355,12 @@ pub fn read_mod_keybindings(namespace: &str, game_id: &str) -> HashMap<String, V
         .unwrap_or_default()
 }
 
-pub fn update_mod_best_score(namespace: &str, game_id: &str, script_name: &str, score: JsonValue) -> Result<()> {
+pub fn update_mod_best_score(
+    namespace: &str,
+    game_id: &str,
+    script_name: &str,
+    score: JsonValue,
+) -> Result<()> {
     let mut state = load_mod_state();
     let game = state
         .mods
@@ -472,7 +467,11 @@ pub fn scan_mods() -> Result<ModScanOutput> {
     Ok(ModScanOutput { packages })
 }
 
-fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> Result<Option<ModPackage>> {
+fn scan_package(
+    dir: &Path,
+    state: &mut ModState,
+    cache: &mut ModScanCache,
+) -> Result<Option<ModPackage>> {
     let meta_path = dir.join("meta.json");
     if !meta_path.exists() {
         return Ok(None);
@@ -487,21 +486,25 @@ fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> R
     state_entry.author = raw_meta.author.clone();
     state_entry.version = raw_meta.version.clone();
 
-    let description = resolve_mod_text(&namespace, raw_meta.description.as_deref().unwrap_or(DEFAULT_PACKAGE_DESCRIPTION));
-    let thumbnail = image_from_meta(&namespace, raw_meta.thumbnail.as_ref(), ImageKind::Thumbnail)?;
+    let description = resolve_mod_text(
+        &namespace,
+        raw_meta
+            .description
+            .as_deref()
+            .unwrap_or(DEFAULT_PACKAGE_DESCRIPTION),
+    );
+    let thumbnail = image_from_meta(
+        &namespace,
+        raw_meta.thumbnail.as_ref(),
+        ImageKind::Thumbnail,
+    )?;
     let banner = image_from_meta(&namespace, raw_meta.banner.as_ref(), ImageKind::Banner)?;
 
-    let base_info = ModGameInfo {
-        namespace: namespace.clone(),
-        package_name: resolve_mod_text(&namespace, &raw_meta.package_name),
-        author: raw_meta.author.clone(),
-        version: raw_meta.version.clone(),
-        description: description.clone(),
-        thumbnail: thumbnail.clone(),
-        banner: banner.clone(),
-        enabled: state_entry.enabled,
-        debug_enabled: state_entry.debug_enabled,
-    };
+    let package_name = resolve_mod_text(&namespace, &raw_meta.package_name);
+    let author = raw_meta.author.clone();
+    let version = raw_meta.version.clone();
+    let enabled = state_entry.enabled;
+    let debug_enabled = state_entry.debug_enabled;
 
     let mut errors = Vec::new();
     for key in raw_meta.extra.keys() {
@@ -545,12 +548,15 @@ fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> R
             .unwrap_or("game")
             .to_string();
         script_mtimes.insert(script_name.clone(), mtime_secs(&script_path));
-        match scan_game_manifest(&namespace, &base_info, dir, game_manifest) {
+        match scan_game_manifest(&namespace, dir, game_manifest) {
             Ok(game) => {
-                state_entry.games.entry(game.game_id.clone()).or_insert_with(|| ModGameState {
-                    script_name: game.script_name.clone(),
-                    ..Default::default()
-                });
+                state_entry
+                    .games
+                    .entry(game.game_id.clone())
+                    .or_insert_with(|| ModGameState {
+                        script_name: game.script_name.clone(),
+                        ..Default::default()
+                    });
                 games.push(game);
             }
             Err(err) => {
@@ -582,11 +588,11 @@ fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> R
 
     Ok(Some(ModPackage {
         namespace,
-        enabled: base_info.enabled,
-        debug_enabled: base_info.debug_enabled,
-        package_name: base_info.package_name,
-        author: base_info.author,
-        version: base_info.version,
+        enabled,
+        debug_enabled,
+        package_name,
+        author,
+        version,
         description,
         thumbnail,
         banner,
@@ -596,7 +602,6 @@ fn scan_package(dir: &Path, state: &mut ModState, cache: &mut ModScanCache) -> R
 }
 fn scan_game_manifest(
     namespace: &str,
-    base_info: &ModGameInfo,
     package_dir: &Path,
     game_manifest: &crate::game::manifest::GameManifest,
 ) -> Result<ModGameMeta> {
@@ -650,7 +655,6 @@ fn scan_game_manifest(
         min_height: game_manifest.min_height.filter(|value| *value > 0),
         max_width: game_manifest.max_width.filter(|value| *value > 0),
         max_height: game_manifest.max_height.filter(|value| *value > 0),
-        mod_info: base_info.clone(),
     })
 }
 
@@ -682,7 +686,9 @@ fn validate_meta(dir: &Path, meta: &RawMeta) -> Result<()> {
         return Err(anyhow!("version cannot be blank"));
     }
     if !meta.api_version.supports(MOD_API_VERSION) {
-        return Err(anyhow!("api_version does not support host version {MOD_API_VERSION}"));
+        return Err(anyhow!(
+            "api_version does not support host version {MOD_API_VERSION}"
+        ));
     }
     Ok(())
 }
@@ -690,7 +696,9 @@ fn validate_meta(dir: &Path, meta: &RawMeta) -> Result<()> {
 fn image_from_meta(namespace: &str, raw: Option<&JsonValue>, kind: ImageKind) -> Result<ModImage> {
     let image = match raw {
         Some(JsonValue::String(value)) => load_image_from_string(namespace, value, kind)?,
-        Some(JsonValue::Array(value)) => parse_ascii_image_array(value, kind).unwrap_or_else(|| default_image(kind)),
+        Some(JsonValue::Array(value)) => {
+            parse_ascii_image_array(value, kind).unwrap_or_else(|| default_image(kind))
+        }
         _ => default_image(kind),
     };
     Ok(normalize_image(image, kind))
@@ -790,9 +798,7 @@ fn render_cached_raster_image(path: &Path, spec: &ImageSpec, kind: ImageKind) ->
     let cache_path = mod_cache_dir()?.join(format!("{cache_key}.json"));
 
     if let Ok(raw) = fs::read_to_string(&cache_path) {
-        if let Ok(image) =
-            serde_json::from_str::<ModImage>(raw.trim_start_matches('\u{feff}'))
-        {
+        if let Ok(image) = serde_json::from_str::<ModImage>(raw.trim_start_matches('\u{feff}')) {
             return Ok(image);
         }
     }
@@ -831,9 +837,15 @@ fn render_raster_image(path: &Path, spec: &ImageSpec, kind: ImageKind) -> Result
         .with_context(|| format!("failed to open raster image: {}", path.display()))?;
     let image = match spec.render_mode {
         ImageRenderMode::Braille => render_braille_image(&dynamic, spec.color_mode, kind),
-        ImageRenderMode::Math => render_charset_image(&dynamic, spec.color_mode, kind, &MATH_IMAGE_CHARS),
-        ImageRenderMode::Number => render_charset_image(&dynamic, spec.color_mode, kind, &NUMBER_IMAGE_CHARS),
-        ImageRenderMode::Block => render_charset_image(&dynamic, spec.color_mode, kind, &BLOCK_IMAGE_CHARS),
+        ImageRenderMode::Math => {
+            render_charset_image(&dynamic, spec.color_mode, kind, &MATH_IMAGE_CHARS)
+        }
+        ImageRenderMode::Number => {
+            render_charset_image(&dynamic, spec.color_mode, kind, &NUMBER_IMAGE_CHARS)
+        }
+        ImageRenderMode::Block => {
+            render_charset_image(&dynamic, spec.color_mode, kind, &BLOCK_IMAGE_CHARS)
+        }
     };
     Ok(image)
 }
@@ -851,7 +863,10 @@ fn render_braille_image(
 
     let mut lines = Vec::with_capacity(target_h);
     for cell_y in 0..target_h {
-        let mut line = if matches!(color_mode, ImageColorMode::Grayscale | ImageColorMode::Color) {
+        let mut line = if matches!(
+            color_mode,
+            ImageColorMode::Grayscale | ImageColorMode::Color
+        ) {
             String::from("f%")
         } else {
             String::new()
@@ -911,7 +926,11 @@ fn render_braille_image(
             line.push(ch);
         }
 
-        if matches!(color_mode, ImageColorMode::Grayscale | ImageColorMode::Color) && current_color.is_some() {
+        if matches!(
+            color_mode,
+            ImageColorMode::Grayscale | ImageColorMode::Color
+        ) && current_color.is_some()
+        {
             line.push_str("{tc:clear}");
         }
         lines.push(line);
@@ -932,7 +951,10 @@ fn render_charset_image(
     let mut lines = Vec::with_capacity(target_h);
 
     for y in 0..target_h {
-        let mut line = if matches!(color_mode, ImageColorMode::Grayscale | ImageColorMode::Color) {
+        let mut line = if matches!(
+            color_mode,
+            ImageColorMode::Grayscale | ImageColorMode::Color
+        ) {
             String::from("f%")
         } else {
             String::new()
@@ -942,12 +964,10 @@ fn render_charset_image(
         for x in 0..visual_w {
             let pixel = resized.get_pixel(x as u32, y as u32).0;
             let alpha = pixel[3] as f32 / 255.0;
-            let luminance = ((0.299 * pixel[0] as f32)
-                + (0.587 * pixel[1] as f32)
-                + (0.114 * pixel[2] as f32))
-                * alpha;
-            let index = ((luminance / 255.0) * (chars.len() - 1) as f32).round()
-                as usize;
+            let luminance =
+                ((0.299 * pixel[0] as f32) + (0.587 * pixel[1] as f32) + (0.114 * pixel[2] as f32))
+                    * alpha;
+            let index = ((luminance / 255.0) * (chars.len() - 1) as f32).round() as usize;
             let ch = if alpha <= 0.05 {
                 ' '
             } else {
@@ -955,7 +975,8 @@ fn render_charset_image(
             };
 
             if ch != ' ' {
-                if let Some(color) = image_output_color(color_mode, [pixel[0], pixel[1], pixel[2]]) {
+                if let Some(color) = image_output_color(color_mode, [pixel[0], pixel[1], pixel[2]])
+                {
                     if current_color.as_deref() != Some(color.as_str()) {
                         line.push_str(&format!("{{tc:{color}}}"));
                         current_color = Some(color);
@@ -967,7 +988,11 @@ fn render_charset_image(
             line.push(ch);
         }
 
-        if matches!(color_mode, ImageColorMode::Grayscale | ImageColorMode::Color) && current_color.is_some() {
+        if matches!(
+            color_mode,
+            ImageColorMode::Grayscale | ImageColorMode::Color
+        ) && current_color.is_some()
+        {
             line.push_str("{tc:clear}");
         }
         lines.push(line);
@@ -1089,7 +1114,9 @@ fn resolve_mod_text(namespace: &str, raw: &str) -> String {
 }
 
 fn resolve_mod_lang_key(namespace: &str, key: &str) -> String {
-    let current_code = i18n::current_language_code().replace('-', "_").to_lowercase();
+    let current_code = i18n::current_language_code()
+        .replace('-', "_")
+        .to_lowercase();
     if let Some(value) = load_mod_lang_value(namespace, &current_code, key) {
         return value;
     }
@@ -1100,20 +1127,34 @@ fn resolve_mod_lang_key(namespace: &str, key: &str) -> String {
 }
 
 fn load_mod_lang_value(namespace: &str, code: &str, key: &str) -> Option<String> {
-    let lang_path = mod_data_dir().ok()?.join(namespace).join("assets").join("lang").join(format!("{code}.json"));
+    let lang_path = mod_data_dir()
+        .ok()?
+        .join(namespace)
+        .join("assets")
+        .join("lang")
+        .join(format!("{code}.json"));
     let raw = fs::read_to_string(lang_path).ok()?;
     let json = serde_json::from_str::<JsonValue>(raw.trim_start_matches('\u{feff}')).ok()?;
-    json.as_object()?.get(key)?.as_str().map(|value| value.to_string())
+    json.as_object()?
+        .get(key)?
+        .as_str()
+        .map(|value| value.to_string())
 }
 
 fn resolve_asset_path(namespace: &str, path_str: &str) -> Result<PathBuf> {
     if path_str.starts_with('/') || path_str.starts_with('\\') {
         return Err(anyhow!("asset path must be relative"));
     }
-    let asset_path = mod_data_dir()?.join(namespace).join("assets").join(path_str);
+    let asset_path = mod_data_dir()?
+        .join(namespace)
+        .join("assets")
+        .join(path_str);
     let asset_root = mod_data_dir()?.join(namespace).join("assets");
     let normalized = asset_path.components().collect::<PathBuf>();
-    if path_str.split(['/', '\\']).any(|segment| segment == "." || segment == "..") {
+    if path_str
+        .split(['/', '\\'])
+        .any(|segment| segment == "." || segment == "..")
+    {
         return Err(anyhow!("asset path cannot escape assets directory"));
     }
     if !normalized.starts_with(&asset_root) {
@@ -1124,8 +1165,14 @@ fn resolve_asset_path(namespace: &str, path_str: &str) -> Result<PathBuf> {
 
 fn default_image(kind: ImageKind) -> ModImage {
     let lines = match kind {
-        ImageKind::Thumbnail => DEFAULT_THUMBNAIL_LINES.iter().map(|line| (*line).to_string()).collect(),
-        ImageKind::Banner => DEFAULT_BANNER_ASCII.iter().map(|line| (*line).to_string()).collect(),
+        ImageKind::Thumbnail => DEFAULT_THUMBNAIL_LINES
+            .iter()
+            .map(|line| (*line).to_string())
+            .collect(),
+        ImageKind::Banner => DEFAULT_BANNER_ASCII
+            .iter()
+            .map(|line| (*line).to_string())
+            .collect(),
     };
     ModImage { lines }
 }
@@ -1246,7 +1293,10 @@ fn visible_text_width(text: &str) -> usize {
 }
 
 fn is_probable_lang_key(value: &str) -> bool {
-    value.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-')) && value.contains('.')
+    value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+        && value.contains('.')
 }
 
 fn mtime_secs(path: &Path) -> u64 {
@@ -1258,7 +1308,13 @@ fn mtime_secs(path: &Path) -> u64 {
         .unwrap_or(0)
 }
 
-fn scan_error(namespace: &str, scope: &str, target: impl Into<String>, severity: &str, message: impl Into<String>) -> ModScanError {
+fn scan_error(
+    namespace: &str,
+    scope: &str,
+    target: impl Into<String>,
+    severity: &str,
+    message: impl Into<String>,
+) -> ModScanError {
     ModScanError {
         namespace: namespace.to_string(),
         scope: scope.to_string(),

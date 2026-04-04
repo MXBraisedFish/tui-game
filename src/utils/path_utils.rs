@@ -50,10 +50,6 @@ pub fn language_pref_file() -> Result<PathBuf> {
     Ok(app_data_dir()?.join("language_pref.txt"))
 }
 
-pub fn lua_saves_file() -> Result<PathBuf> {
-    Ok(app_data_dir()?.join("lua_saves.json"))
-}
-
 pub fn stats_file() -> Result<PathBuf> {
     Ok(app_data_dir()?.join("stats.json"))
 }

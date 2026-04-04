@@ -1,24 +1,17 @@
-﻿use std::fs;
-use std::path::PathBuf;
-
 use anyhow::Result;
+use std::fs;
 
 use crate::utils::path_utils;
 
-/// 旧共享存档所在目录。
-pub fn save_root_dir() -> Result<PathBuf> {
-    path_utils::lua_saves_file().map(|path| path.parent().unwrap_or(&path).to_path_buf())
-}
-
 /// 新 runtime 的统一存档目录。
-pub fn runtime_save_dir() -> Result<PathBuf> {
+pub fn runtime_save_dir() -> Result<std::path::PathBuf> {
     let dir = path_utils::app_data_dir()?.join("runtime_save");
     fs::create_dir_all(&dir)?;
     Ok(dir)
 }
 
 /// 记录“最近一次由新 runtime 保存的游戏”。
-fn latest_runtime_save_marker_path() -> Result<PathBuf> {
+fn latest_runtime_save_marker_path() -> Result<std::path::PathBuf> {
     Ok(path_utils::app_data_dir()?.join("latest_runtime_save.txt"))
 }
 
@@ -42,11 +35,8 @@ pub fn sanitize_runtime_save_stem(raw: &str) -> String {
 }
 
 /// 新 runtime 单游戏存档文件路径。
-pub fn runtime_game_save_path(game_id: &str) -> Result<PathBuf> {
-    Ok(runtime_save_dir()?.join(format!(
-        "{}.json",
-        sanitize_runtime_save_stem(game_id)
-    )))
+pub fn runtime_game_save_path(game_id: &str) -> Result<std::path::PathBuf> {
+    Ok(runtime_save_dir()?.join(format!("{}.json", sanitize_runtime_save_stem(game_id))))
 }
 
 pub fn set_latest_runtime_save_game(game_id: &str) -> Result<()> {
@@ -78,8 +68,11 @@ pub fn clear_latest_runtime_save_game() -> Result<()> {
 /// 宿主统一解析当前可继续的最近存档目标。
 pub fn latest_saved_game_id() -> Option<String> {
     let runtime_latest = latest_runtime_save_game_id();
-    let runtime_pair = runtime_latest
-        .and_then(|game_id| runtime_game_save_path(&game_id).ok().map(|path| (game_id, path)));
+    let runtime_pair = runtime_latest.and_then(|game_id| {
+        runtime_game_save_path(&game_id)
+            .ok()
+            .map(|path| (game_id, path))
+    });
 
     [runtime_pair]
         .into_iter()
