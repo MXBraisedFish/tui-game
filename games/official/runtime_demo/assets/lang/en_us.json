@@ -1,0 +1,16 @@
+{
+  "game.runtime_demo.name": "Runtime Demo",
+  "game.runtime_demo.description": "Move @ to X. Enter saves and exits.",
+  "game.runtime_demo.detail": "This official package validates the unified manifest-driven runtime, package-local resources, fixed-tick event loop, canvas rendering and best score protocol.",
+  "game.runtime_demo.best_none": "No record yet",
+  "game.runtime_demo.best": "Best",
+  "game.runtime_demo.steps": "Steps",
+  "game.runtime_demo.controls": "[Arrows] Move  [Enter] Save/Exit  [R] Restart  [Esc] Exit",
+  "game.runtime_demo.msg_reach_goal": "Reach X with as few steps as possible.",
+  "game.runtime_demo.msg_resized": "Terminal size changed. Layout recalculated.",
+  "game.runtime_demo.msg_keep_moving": "Keep moving toward the goal.",
+  "game.runtime_demo.msg_reset": "Field reset.",
+  "game.runtime_demo.msg_new_best": "New best record. Press Enter to save and exit.",
+  "game.runtime_demo.msg_goal_reached": "Goal reached. Press Enter to save and exit.",
+  "game.runtime_demo.best_block": "Best Steps\n{steps}"
+}

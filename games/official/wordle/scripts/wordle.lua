@@ -1,5 +1,5 @@
-local WORDS = { "apple", "brace", "clock", "dream", "earth", "flame", "grape", "house", "light", "sound", "table", "water" }
 local MAX_ATTEMPTS = 6
+local WORDS = nil
 
 local function tr(key)
   return translate(key)
@@ -9,8 +9,33 @@ local function centered_x(text)
   return resolve_x(ANCHOR_CENTER, select(1, measure_text(text)), 0)
 end
 
+local function load_words()
+  if type(WORDS) == "table" and #WORDS > 0 then
+    return WORDS
+  end
+
+  local words = {}
+  local ok, data = pcall(read_json, "data/word.json")
+  if ok and type(data) == "table" then
+    for _, value in ipairs(data) do
+      local word = type(value) == "string" and string.lower(value) or nil
+      if word and #word >= 2 and word:match("^[a-z]+$") then
+        words[#words + 1] = word
+      end
+    end
+  end
+
+  if #words == 0 then
+    words = { "apple", "water", "green", "house", "sound", "light", "story", "music", "table", "clock" }
+  end
+
+  WORDS = words
+  return WORDS
+end
+
 local function pick_word()
-  return WORDS[math.random(1, #WORDS)]
+  local words = load_words()
+  return words[math.random(1, #words)]
 end
 
 local function load_best_record(state)

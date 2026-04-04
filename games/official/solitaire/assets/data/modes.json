@@ -1,0 +1,8 @@
+{
+  "order": ["freecell", "klondike", "spider"],
+  "targets": {
+    "freecell": 18,
+    "klondike": 22,
+    "spider": 26
+  }
+}

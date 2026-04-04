@@ -1,0 +1,1 @@
+[Arrows] Move  [Enter] Save/Exit  [R] Restart  [Esc] Exit

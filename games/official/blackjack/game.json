@@ -4,17 +4,23 @@
   "description": "game.blackjack.description",
   "detail": "game.blackjack.details",
   "entry": "scripts/blackjack.lua",
-  "save": true,
+  "save": false,
   "best_none": "game.blackjack.best_none_block",
-  "min_width": 72,
-  "min_height": 24,
+  "min_width": 1,
+  "min_height": 1,
   "actions": {
-    "bet_down": ["-"],
-    "bet_up": ["+"],
+    "adjust_down": ["-"],
+    "adjust_up": ["+", "="],
+    "confirm_yes": ["y"],
+    "confirm_no": ["n"],
+    "double_down": ["z"],
     "hit": ["space"],
-    "stand": ["enter"],
+    "insurance": ["c"],
     "restart": ["r"],
-    "save": ["s"],
-    "quit_action": ["q"]
+    "quit_action": ["q"],
+    "split_hand": ["x"],
+    "stand": ["enter"],
+    "switch_left": ["left"],
+    "switch_right": ["right"]
   }
 }

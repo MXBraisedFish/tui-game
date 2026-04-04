@@ -17,6 +17,7 @@ pub enum GameSourceKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PackageDescriptor {
+    pub root_dir: PathBuf,
     pub namespace: String,
     pub package_name: String,
     pub author: String,
@@ -109,6 +110,7 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
     let mut games = Vec::new();
     for package in discover_packages(&base_dir, source.clone())? {
         let package_descriptor = PackageDescriptor {
+            root_dir: package.root_dir.clone(),
             namespace: package.package.namespace.clone(),
             package_name: package.package.package_name.clone(),
             author: package.package.author.clone(),

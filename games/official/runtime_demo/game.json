@@ -1,11 +1,11 @@
 {
   "id": "official.runtime_demo",
-  "name": "Runtime Demo",
-  "description": "Move @ to X. Enter saves and exits.",
-  "detail": "This official package validates the new manifest-driven runtime, fixed-tick event loop, canvas rendering and unified best score protocol.",
+  "name": "game.runtime_demo.name",
+  "description": "game.runtime_demo.description",
+  "detail": "game.runtime_demo.detail",
   "entry": "scripts/runtime_demo.lua",
   "save": true,
-  "best_none": "No record yet",
+  "best_none": "game.runtime_demo.best_none",
   "min_width": 60,
   "min_height": 24,
   "actions": {

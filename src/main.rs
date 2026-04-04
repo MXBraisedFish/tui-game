@@ -8,7 +8,7 @@ use crossterm::cursor::{Hide, Show};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
-    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+    Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
@@ -24,6 +24,7 @@ use tui_game::app::settings;
 use tui_game::core::runtime::{LaunchMode, launch_game};
 use tui_game::core::save;
 use tui_game::game::registry::{GameDescriptor, GameRegistry};
+use tui_game::terminal::renderer;
 use tui_game::terminal::size_watcher;
 
 const RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -113,6 +114,7 @@ fn run() -> Result<()> {
     let mut update_hint: Option<String> = None;
     let mut state = AppState::MainMenu { menu: Menu::new() };
     let mut pending_new_game_start: Option<PendingNewGameStart> = None;
+    let mut force_ui_full_redraw = false;
 
     let frame_budget = Duration::from_millis(16);
 
@@ -146,7 +148,12 @@ fn run() -> Result<()> {
                     state = AppState::Exiting;
                     continue;
                 }
-                handle_key_event(&mut state, &mut pending_new_game_start, key)?;
+                handle_key_event(
+                    &mut state,
+                    &mut pending_new_game_start,
+                    &mut force_ui_full_redraw,
+                    key,
+                )?;
             }
         }
 
@@ -155,6 +162,10 @@ fn run() -> Result<()> {
         }
 
         if size_state.size_ok {
+            if force_ui_full_redraw {
+                session.terminal.clear()?;
+                force_ui_full_redraw = false;
+            }
             session.terminal.draw(|frame| match &mut state {
                 AppState::MainMenu { menu } => {
                     app::menu::render_main_menu(
@@ -222,6 +233,7 @@ fn minimum_size_for_state(state: &AppState) -> (u16, u16) {
 fn handle_key_event(
     state: &mut AppState,
     pending_new_game_start: &mut Option<PendingNewGameStart>,
+    force_ui_full_redraw: &mut bool,
     key: KeyEvent,
 ) -> Result<()> {
     if !matches!(key.kind, KeyEventKind::Press) {
@@ -253,7 +265,8 @@ fn handle_key_event(
                     if matches!(action, MenuAction::Continue) && !menu.can_continue() {
                         return Ok(());
                     }
-                    *state = apply_menu_action(action, menu.continue_game_id());
+                    *state =
+                        apply_menu_action(action, menu.continue_game_id(), force_ui_full_redraw);
                 }
             }
             _ => {}
@@ -273,6 +286,8 @@ fn handle_key_event(
                                     pending.target_game.id
                                 );
                             }
+                            reset_terminal_after_runtime()?;
+                            *force_ui_full_redraw = true;
                             let games = GameRegistry::scan_all()
                                 .map(GameRegistry::into_games)
                                 .unwrap_or_default();
@@ -312,6 +327,8 @@ fn handle_key_event(
                         if let Err(err) = launch_game(&game, LaunchMode::New) {
                             eprintln!("Failed to run game '{}': {err:#}", game.id);
                         }
+                        reset_terminal_after_runtime()?;
+                        *force_ui_full_redraw = true;
                         let games = GameRegistry::scan_all()
                             .map(GameRegistry::into_games)
                             .unwrap_or_default();
@@ -391,7 +408,11 @@ fn render_new_game_confirm(frame: &mut ratatui::Frame<'_>, saved_game_name: &str
 }
 
 /// Convert a main menu action into the next application state.
-fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppState {
+fn apply_menu_action(
+    action: MenuAction,
+    continue_game_id: Option<&str>,
+    force_ui_full_redraw: &mut bool,
+) -> AppState {
     match action {
         MenuAction::Play => {
             let games = match GameRegistry::scan_all() {
@@ -414,6 +435,8 @@ fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppS
                     if let Err(err) = launch_game(&game, LaunchMode::Continue) {
                         eprintln!("Failed to continue game '{}': {err:#}", game.id);
                     }
+                    let _ = reset_terminal_after_runtime();
+                    *force_ui_full_redraw = true;
                 }
             }
             let games = GameRegistry::scan_all()
@@ -432,6 +455,13 @@ fn apply_menu_action(action: MenuAction, continue_game_id: Option<&str>) -> AppS
 
         MenuAction::Quit => AppState::Exiting,
     }
+}
+
+fn reset_terminal_after_runtime() -> Result<()> {
+    renderer::invalidate_canvas_cache();
+    let mut out = io::stdout();
+    execute!(out, Clear(ClearType::All), crossterm::cursor::MoveTo(0, 0))?;
+    Ok(())
 }
 
 /// Handle simple CLI passthrough flags used by wrapper scripts.

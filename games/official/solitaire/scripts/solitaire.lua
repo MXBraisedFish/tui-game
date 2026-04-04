@@ -1,11 +1,15 @@
-local MODE_ORDER = { "freecell", "klondike", "spider" }
+local DEFAULT_MODE_ORDER = { "freecell", "klondike", "spider" }
 local MODE_KEY = {
   freecell = "game.solitaire.mode.freecell",
   klondike = "game.solitaire.mode.klondike",
   spider = "game.solitaire.mode.spider",
 }
 
-local TARGETS = { freecell = 18, klondike = 22, spider = 26 }
+local DEFAULT_TARGETS = { freecell = 18, klondike = 22, spider = 26 }
+local MODE_ORDER = DEFAULT_MODE_ORDER
+local TARGETS = DEFAULT_TARGETS
+
+load_helper("helpers/clone.lua")
 
 local function tr(key)
   return translate(key)
@@ -15,21 +19,35 @@ local function centered_x(text)
   return resolve_x(ANCHOR_CENTER, select(1, measure_text(text)), 0)
 end
 
-local function clone_items(items)
-  local out = {}
-  for i = 1, #items do
-    out[i] = items[i]
+local function load_mode_config()
+  local ok, data = pcall(read_json, "data/modes.json")
+  if not ok or type(data) ~= "table" then
+    return
   end
-  return out
+
+  if type(data.order) == "table" and #data.order > 0 then
+    local order = {}
+    for _, value in ipairs(data.order) do
+      if type(value) == "string" and value ~= "" then
+        order[#order + 1] = value
+      end
+    end
+    if #order > 0 then
+      MODE_ORDER = order
+    end
+  end
+
+  if type(data.targets) == "table" then
+    local targets = {}
+    for mode, fallback in pairs(DEFAULT_TARGETS) do
+      local value = data.targets[mode]
+      targets[mode] = type(value) == "number" and math.max(1, math.floor(value)) or fallback
+    end
+    TARGETS = targets
+  end
 end
 
-local function clone_columns(columns)
-  local out = {}
-  for i = 1, #columns do
-    out[i] = clone_items(columns[i])
-  end
-  return out
-end
+load_mode_config()
 
 local function mode_name(mode)
   return tr(MODE_KEY[mode] or "game.solitaire.mode.freecell")

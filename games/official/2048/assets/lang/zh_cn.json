@@ -1,0 +1,22 @@
+{
+  "game.2048.best_score": "最高分",
+  "game.2048.best_block": "最高分 {score}\n最短用时 {time}",
+  "game.2048.best_none_block": "最高分 --\n最短用时 --:--:--",
+  "game.2048.best_time": "最短用时",
+  "game.2048.best_title": "最佳记录",
+  "game.2048.confirm_exit": "确认退出？ [Y] 是 / [N] 否",
+  "game.2048.confirm_restart": "确认重新开始？ [Y] 是 / [N] 否",
+  "game.2048.controls": "[↑]/[↓]/[←]/[→] 移动方块  [R] 重新开始  [S] 保存  [Q]/[ESC] 退出",
+  "game.2048.description": "合并相同数字的方块，最终达到 2048 方块。",
+  "game.2048.details": "f%普通目标：合成{tc:black|bg:#ff0000}2048{tc:clear|bg:clear}\n进阶目标：合成{tc:black|bg:gray}131072{tc:clear|bg:clear}\n\n{tc:yellow}操作提示：{tc:clear}\n{tc:light_cyan}[↑]/[↓]/[←]/[→]{tc:clear} 移动方块\n{tc:light_cyan}[R]{tc:clear} 重新开始\n{tc:light_cyan}[S]{tc:clear} 保存\n{tc:light_cyan}[Q]/[ESC]{tc:clear} 退出",
+  "game.2048.game_over": "游戏结束！ [Y] 重新开始, [N] 返回游戏列表。",
+  "game.2048.name": "2048",
+  "game.2048.save_success": "保存成功！",
+  "game.2048.save_unavailable": "保存功能不可用。",
+  "game.2048.score": "分数",
+  "game.2048.time": "用时",
+  "game.2048.win_banner": "⚡ 超越机器极限！ ⚡",
+  "game.2048.win_controls": "[R] 重新开始  [Q]/[ESC] 退出",
+  "game.2048.runtime_ready": "合并方块并尽量坚持更久。",
+  "game.2048.runtime_resized": "终端尺寸已变化。"
+}

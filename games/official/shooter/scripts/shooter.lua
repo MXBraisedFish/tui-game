@@ -1,9 +1,40 @@
+local DEFAULT_CONFIG = {
+  width = 30,
+  height = 16,
+  starting_hp = 10,
+  starting_nuke_stock = 1,
+  enemy_spawn_base_ms = 700,
+  enemy_spawn_stage_step_ms = 30,
+  enemy_spawn_min_ms = 180,
+  auto_fire_ms = 220,
+  enemy_hit_score = 2,
+  enemy_escape_damage = 1,
+  nuke_enemy_score = 5,
+  stage_score_step = 20,
+}
+
+local CONFIG = nil
 local WIDTH = 30
 local HEIGHT = 16
 
 local function tr(key)
   return translate(key)
 end
+
+local function config_value(key)
+  if CONFIG == nil then
+    local ok, data = pcall(read_json, "data/config.json")
+    CONFIG = ok and type(data) == "table" and data or DEFAULT_CONFIG
+  end
+  local value = CONFIG[key]
+  if type(value) ~= "number" then
+    value = DEFAULT_CONFIG[key]
+  end
+  return value
+end
+
+WIDTH = config_value("width")
+HEIGHT = config_value("height")
 
 local function centered_x(text)
   return resolve_x(ANCHOR_CENTER, select(1, measure_text(text)), 0)
@@ -58,11 +89,11 @@ end
 local function fresh_state()
   local state = {
     player_x = math.floor(WIDTH / 2),
-    hp = 10,
+    hp = config_value("starting_hp"),
     score = 0,
     stage = 1,
     fire_mode = "auto",
-    nuke_stock = 1,
+    nuke_stock = config_value("starting_nuke_stock"),
     elapsed_ms = 0,
     bullets = {},
     enemies = {},
@@ -138,7 +169,7 @@ local function use_nuke(state)
     return
   end
   state.nuke_stock = state.nuke_stock - 1
-  state.score = state.score + #state.enemies * 5
+  state.score = state.score + #state.enemies * config_value("nuke_enemy_score")
   state.enemies = {}
   update_best_record(state)
 end
@@ -152,11 +183,11 @@ function handle_event(state, event)
     state.elapsed_ms = state.elapsed_ms + dt
     state.enemy_tick = state.enemy_tick + dt
     state.fire_tick = state.fire_tick + dt
-    if state.fire_mode == "auto" and state.fire_tick >= 220 then
+    if state.fire_mode == "auto" and state.fire_tick >= config_value("auto_fire_ms") then
       state.fire_tick = 0
       fire_bullet(state)
     end
-    if state.enemy_tick >= math.max(180, 700 - state.stage * 30) then
+    if state.enemy_tick >= math.max(config_value("enemy_spawn_min_ms"), config_value("enemy_spawn_base_ms") - state.stage * config_value("enemy_spawn_stage_step_ms")) then
       state.enemy_tick = 0
       spawn_enemy(state)
     end
@@ -169,7 +200,7 @@ function handle_event(state, event)
     for i = #state.enemies, 1, -1 do
       state.enemies[i].y = state.enemies[i].y + 1
       if state.enemies[i].y >= HEIGHT then
-        state.hp = state.hp - 1
+        state.hp = state.hp - config_value("enemy_escape_damage")
         table.remove(state.enemies, i)
       end
     end
@@ -181,8 +212,8 @@ function handle_event(state, event)
         if enemy.x == bullet.x and enemy.y == bullet.y then
           table.remove(state.enemies, ei)
           table.remove(state.bullets, bi)
-          state.score = state.score + 2
-          state.stage = math.max(1, math.floor(state.score / 20) + 1)
+          state.score = state.score + config_value("enemy_hit_score")
+          state.stage = math.max(1, math.floor(state.score / config_value("stage_score_step")) + 1)
           update_best_record(state)
           hit = true
           break

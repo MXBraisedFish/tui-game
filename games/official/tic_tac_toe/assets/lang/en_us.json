@@ -1,0 +1,19 @@
+{
+  "game.tic_tac_toe.ai": "System",
+  "game.tic_tac_toe.confirm_exit": "Confirm exit? [Y] Yes / [N] No",
+  "game.tic_tac_toe.confirm_restart": "Confirm restart? [Y] Yes / [N] No",
+  "game.tic_tac_toe.controls": "[↑]/[↓]/[←]/[→] Move Cursor [Space]/[Enter] Place Mark [X] Switch Mark Type [R] Restart [Q]/[ESC] Exit",
+  "game.tic_tac_toe.description": "Place X and O marks, be the first to get three in a row.",
+  "game.tic_tac_toe.details": "f%Classic Tic-Tac-Toe game.\n\n{tc:yellow}Items:{tc:clear}\n{tc:red}><{tc:clear} X\n{tc:light_cyan}(){tc:clear} O\n\n{tc:yellow}Controls:{tc:clear}\n{tc:light_cyan}[↑]/[↓]/[←]/[→]{tc:clear} Move cursor\n{tc:light_cyan}[Space]/[Enter]{tc:clear} Place mark\n{tc:light_cyan}[X]{tc:clear} Switch mark type\n{tc:light_cyan}[R]{tc:clear} Restart\n{tc:light_cyan}[Q]/[ESC]{tc:clear} Exit",
+  "game.tic_tac_toe.draw_banner": "Draw!",
+  "game.tic_tac_toe.lose_banner": "You lose!",
+  "game.tic_tac_toe.mark_o": "O",
+  "game.tic_tac_toe.mark_x": "X",
+  "game.tic_tac_toe.name": "Tic Tac Toe",
+  "game.tic_tac_toe.ready": "Your turn.",
+  "game.tic_tac_toe.result_controls": "[R] Restart [Q]/[ESC] Exit",
+  "game.tic_tac_toe.switch_to_o": "Switched: You are now O.",
+  "game.tic_tac_toe.switch_to_x": "Switched: You are now X.",
+  "game.tic_tac_toe.win_banner": "You win!",
+  "game.tic_tac_toe.you": "Player"
+}

@@ -59,6 +59,9 @@ pub fn render_canvas(canvas: &Canvas) -> Result<()> {
 }
 
 fn queue_cell<W: Write>(out: &mut W, x: u16, y: u16, cell: &Cell) -> Result<()> {
+    if cell.continuation {
+        return Ok(());
+    }
     queue!(out, MoveTo(x, y), ResetColor)?;
     if let Some(color) = parse_color(cell.fg.as_deref()) {
         queue!(out, SetForegroundColor(color))?;

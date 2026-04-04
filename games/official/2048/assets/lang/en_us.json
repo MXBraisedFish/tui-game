@@ -1,0 +1,22 @@
+{
+  "game.2048.best_score": "Best Score",
+  "game.2048.best_block": "Best Score {score}\nBest Time {time}",
+  "game.2048.best_none_block": "Best Score --\nBest Time --:--:--",
+  "game.2048.best_time": "Best Time",
+  "game.2048.best_title": "Best Records",
+  "game.2048.confirm_exit": "Confirm exit? [Y] Yes / [N] No",
+  "game.2048.confirm_restart": "Confirm restart? [Y] Yes / [N] No",
+  "game.2048.controls": "[↑]/[↓]/[←]/[→] Move Tiles  [R] Restart  [S] Save  [Q]/[ESC] Exit",
+  "game.2048.description": "Merge identical number tiles, ultimately reaching the 2048 tile.",
+  "game.2048.details": "f%Normal goal: Combine {tc:black|bg:#ff0000}2048{tc:clear|bg:clear}\nAdvanced goal: Combine {tc:black|bg:gray}131072{tc:clear|bg:clear}\n\n{tc:yellow}Controls:{tc:clear}\n{tc:light_cyan}[↑]/[↓]/[←]/[→]{tc:clear} Move tiles\n{tc:light_cyan}[R]{tc:clear} Restart\n{tc:light_cyan}[S]{tc:clear} Save\n{tc:light_cyan}[Q]/[ESC]{tc:clear} Exit",
+  "game.2048.game_over": "Game Over! [Y] Restart, [N] Return to game list.",
+  "game.2048.name": "2048",
+  "game.2048.save_success": "Save successful!",
+  "game.2048.save_unavailable": "Save function unavailable.",
+  "game.2048.score": "Score",
+  "game.2048.time": "Time",
+  "game.2048.win_banner": "⚡ Beyond Machine Limits! ⚡",
+  "game.2048.win_controls": "[R] Restart  [Q]/[ESC] Exit",
+  "game.2048.runtime_ready": "Merge tiles to keep the board alive.",
+  "game.2048.runtime_resized": "Terminal size changed."
+}

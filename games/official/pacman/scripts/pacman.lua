@@ -1,4 +1,4 @@
-local MAP = {
+local DEFAULT_MAP = {
   "###################",
   "#........#........#",
   "#.###.##.#.##.###.#",
@@ -12,6 +12,8 @@ local MAP = {
   "###################",
 }
 
+local MAP = nil
+
 local DIRS = {
   up = { 0, -1 },
   down = { 0, 1 },
@@ -23,20 +25,44 @@ local function tr(key)
   return translate(key)
 end
 
+local function load_map()
+  if type(MAP) == "table" and #MAP > 0 then
+    return MAP
+  end
+
+  local ok, raw = pcall(read_text, "data/map.txt")
+  if ok and type(raw) == "string" and raw ~= "" then
+    local lines = {}
+    for line in raw:gmatch("[^\r\n]+") do
+      if line ~= "" then
+        lines[#lines + 1] = line
+      end
+    end
+    if #lines > 0 then
+      MAP = lines
+      return MAP
+    end
+  end
+
+  MAP = DEFAULT_MAP
+  return MAP
+end
+
 local function centered_x(text)
   return resolve_x(ANCHOR_CENTER, select(1, measure_text(text)), 0)
 end
 
 local function parse_map()
+  local map = load_map()
   local pellets, walls = {}, {}
   local player_x, player_y = 2, 2
   local ghost_x, ghost_y = 2, 2
   local dots = 0
-  for y = 1, #MAP do
+  for y = 1, #map do
     walls[y] = {}
     pellets[y] = {}
-    for x = 1, #MAP[y] do
-      local ch = MAP[y]:sub(x, x)
+    for x = 1, #map[y] do
+      local ch = map[y]:sub(x, x)
       walls[y][x] = ch == "#"
       if ch == "@" then
         player_x, player_y = x, y

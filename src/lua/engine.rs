@@ -16,8 +16,8 @@ use crate::core::save;
 use crate::core::screen::Canvas;
 use crate::core::stats;
 use crate::game::registry::GameDescriptor;
+use crate::game::resources;
 use crate::lua::sandbox;
-use crate::mods;
 use crate::terminal::{renderer, size_watcher};
 
 struct RuntimeBridges {
@@ -29,7 +29,7 @@ struct RuntimeBridges {
     launch_mode: LaunchMode,
 }
 
-/// 新运行时下的 Lua 引擎封装。
+/// Lua engine wrapper for the unified runtime.
 pub struct LuaGameEngine {
     lua: Lua,
     state_key: RegistryKey,
@@ -321,7 +321,12 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
                         y,
                         width,
                         height,
-                        crate::core::screen::Cell { ch: fill, fg, bg },
+                        crate::core::screen::Cell {
+                            ch: fill,
+                            fg,
+                            bg,
+                            continuation: false,
+                        },
                     );
                 }
                 Ok(())
@@ -468,18 +473,73 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
         })?,
     )?;
 
-    let namespace = bridges
-        .game
-        .package_info()
-        .map(|package| package.namespace.clone());
+    let package = bridges.game.package_info().cloned();
     globals.set(
         "translate",
         lua.create_function(move |_, key: String| {
-            if let Some(namespace) = &namespace {
-                Ok(mods::resolve_mod_text_for_display(namespace, &key))
+            if let Some(package) = &package {
+                Ok(resources::resolve_package_text(package, &key))
             } else {
                 Ok(i18n::t_or(&key, &key))
             }
+        })?,
+    )?;
+
+    let package = bridges.game.package_info().cloned();
+    globals.set(
+        "read_text",
+        lua.create_function(move |_, logical_path: String| {
+            let package = package
+                .as_ref()
+                .ok_or_else(|| mlua::Error::RuntimeError("package context missing".to_string()))?;
+            resources::read_package_text(package, &logical_path).map_err(lua_runtime_error)
+        })?,
+    )?;
+
+    let package = bridges.game.package_info().cloned();
+    globals.set(
+        "read_bytes",
+        lua.create_function(move |lua, logical_path: String| {
+            let package = package
+                .as_ref()
+                .ok_or_else(|| mlua::Error::RuntimeError("package context missing".to_string()))?;
+            let bytes =
+                resources::read_package_bytes(package, &logical_path).map_err(lua_runtime_error)?;
+            lua.create_string(&bytes)
+        })?,
+    )?;
+
+    let package = bridges.game.package_info().cloned();
+    globals.set(
+        "read_json",
+        lua.create_function(move |lua, logical_path: String| {
+            let package = package
+                .as_ref()
+                .ok_or_else(|| mlua::Error::RuntimeError("package context missing".to_string()))?;
+            let json =
+                resources::read_package_json(package, &logical_path).map_err(lua_runtime_error)?;
+            json_to_lua_value(lua, &json)
+        })?,
+    )?;
+
+    let package = bridges.game.package_info().cloned();
+    globals.set(
+        "load_helper",
+        lua.create_function(move |lua, logical_path: String| {
+            let package = package
+                .as_ref()
+                .ok_or_else(|| mlua::Error::RuntimeError("package context missing".to_string()))?;
+            let helper_path = resources::resolve_package_helper_path(package, &logical_path)
+                .map_err(lua_runtime_error)?;
+            let source = fs::read_to_string(&helper_path).map_err(|err| {
+                lua_runtime_error(anyhow!(
+                    "failed to read helper script {}: {err}",
+                    helper_path.display()
+                ))
+            })?;
+            lua.load(source.trim_start_matches('\u{feff}'))
+                .set_name(helper_path.to_string_lossy().as_ref())
+                .exec()
         })?,
     )?;
 
@@ -502,6 +562,10 @@ fn to_lua_event_table(lua: &Lua, event: &InputEvent) -> mlua::Result<Table> {
     match event {
         InputEvent::Action(name) => {
             table.set("type", "action")?;
+            table.set("name", name.as_str())?;
+        }
+        InputEvent::Key(name) => {
+            table.set("type", "key")?;
             table.set("name", name.as_str())?;
         }
         InputEvent::Resize { width, height } => {
@@ -534,7 +598,7 @@ fn map_key_to_event(game: &GameDescriptor, key: KeyEvent) -> Option<InputEvent> 
     if matches!(key.code, KeyCode::Esc) {
         return Some(InputEvent::Quit);
     }
-    None
+    Some(InputEvent::Key(key_name))
 }
 
 fn normalize_key_name(code: KeyCode) -> Option<String> {
@@ -673,4 +737,83 @@ fn json_to_lua_value(lua: &Lua, value: &JsonValue) -> mlua::Result<Value> {
             Value::Table(table)
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn color_memory_runtime_script_exports_required_functions() {
+        let script_path = PathBuf::from("games/official/color_memory/scripts/color_memory.lua");
+        let source = fs::read_to_string(&script_path).expect("read color_memory runtime script");
+
+        let lua = Lua::new();
+        lua.load(&source)
+            .set_name(script_path.to_string_lossy().as_ref())
+            .exec()
+            .expect("exec color_memory runtime script");
+
+        let globals = lua.globals();
+        let _: mlua::Function = globals.get("init_game").expect("init_game export");
+        let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
+        let _: mlua::Function = globals.get("render").expect("render export");
+        let _: mlua::Function = globals.get("best_score").expect("best_score export");
+    }
+
+    #[test]
+    fn memory_flip_runtime_script_exports_required_functions() {
+        let script_path = PathBuf::from("games/official/memory_flip/scripts/memory_flip.lua");
+        let source = fs::read_to_string(&script_path).expect("read memory_flip runtime script");
+
+        let lua = Lua::new();
+        lua.load(&source)
+            .set_name(script_path.to_string_lossy().as_ref())
+            .exec()
+            .expect("exec memory_flip runtime script");
+
+        let globals = lua.globals();
+        let _: mlua::Function = globals.get("init_game").expect("init_game export");
+        let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
+        let _: mlua::Function = globals.get("render").expect("render export");
+        let _: mlua::Function = globals.get("best_score").expect("best_score export");
+    }
+
+    #[test]
+    fn lights_out_runtime_script_exports_required_functions() {
+        let script_path = PathBuf::from("games/official/lights_out/scripts/lights_out.lua");
+        let source = fs::read_to_string(&script_path).expect("read lights_out runtime script");
+
+        let lua = Lua::new();
+        lua.load(&source)
+            .set_name(script_path.to_string_lossy().as_ref())
+            .exec()
+            .expect("exec lights_out runtime script");
+
+        let globals = lua.globals();
+        let _: mlua::Function = globals.get("init_game").expect("init_game export");
+        let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
+        let _: mlua::Function = globals.get("render").expect("render export");
+        let _: mlua::Function = globals.get("best_score").expect("best_score export");
+    }
+
+    #[test]
+    fn maze_escape_runtime_script_exports_required_functions() {
+        let script_path = PathBuf::from("games/official/maze_escape/scripts/maze_escape.lua");
+        let source = fs::read_to_string(&script_path).expect("read maze_escape runtime script");
+
+        let lua = Lua::new();
+        lua.load(&source)
+            .set_name(script_path.to_string_lossy().as_ref())
+            .exec()
+            .expect("exec maze_escape runtime script");
+
+        let globals = lua.globals();
+        let _: mlua::Function = globals.get("init_game").expect("init_game export");
+        let _: mlua::Function = globals.get("handle_event").expect("handle_event export");
+        let _: mlua::Function = globals.get("render").expect("render export");
+        let _: mlua::Function = globals.get("best_score").expect("best_score export");
+    }
 }

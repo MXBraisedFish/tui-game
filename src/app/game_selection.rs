@@ -10,7 +10,7 @@ use crate::app::i18n;
 use crate::app::rich_text;
 use crate::core::stats as runtime_stats;
 use crate::game::registry::GameDescriptor;
-use crate::mods;
+use crate::game::resources;
 
 /// 游戏选择页的完整状态。
 pub struct GameSelection {
@@ -580,31 +580,31 @@ impl GameSelection {
     }
 
     fn localized_game_name(&self, game: &GameDescriptor) -> String {
-        if let Some(namespace) = mod_namespace(game) {
-            return mods::resolve_mod_text_for_display(namespace, &game.name);
+        if let Some(package) = game.package_info() {
+            return resources::resolve_package_text(package, &game.name);
         }
         i18n::t_or(&format!("game.{}.name", game.id), &game.name)
     }
 
     fn localized_game_description(&self, game: &GameDescriptor) -> String {
-        if let Some(namespace) = mod_namespace(game) {
-            return mods::resolve_mod_text_for_display(namespace, &game.description);
+        if let Some(package) = game.package_info() {
+            return resources::resolve_package_text(package, &game.description);
         }
         i18n::t_or(&format!("game.{}.description", game.id), &game.description)
     }
 
     fn localized_game_details(&self, game: &GameDescriptor) -> String {
-        if let Some(namespace) = mod_namespace(game) {
-            return mods::resolve_mod_text_for_display(namespace, &game.detail);
+        if let Some(package) = game.package_info() {
+            return resources::resolve_package_text(package, &game.detail);
         }
         i18n::t_or(&format!("game.{}.details", game.id), &game.detail)
     }
 
     fn mod_package_name(&self, game: &GameDescriptor) -> Option<String> {
-        let namespace = mod_namespace(game)?;
-        Some(mods::resolve_mod_text_for_display(
-            namespace,
-            game.package_info()?.package_name.as_str(),
+        let package = game.package_info()?;
+        Some(resources::resolve_package_text(
+            package,
+            package.package_name.as_str(),
         ))
     }
 
@@ -679,10 +679,10 @@ fn text(key: &str, fallback: &str) -> String {
 
 fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<Line<'static>> {
     let Some(score) = runtime_stats::read_runtime_best_score(&game.id) else {
-        let fallback = if let Some(namespace) = mod_namespace(game) {
+        let fallback = if let Some(package) = game.package_info() {
             game.best_none
                 .as_ref()
-                .map(|raw| mods::resolve_mod_text_for_display(namespace, raw))
+                .map(|raw| resources::resolve_package_text(package, raw))
                 .unwrap_or_else(|| "--".to_string())
         } else {
             game.best_none.clone().unwrap_or_else(|| "--".to_string())
@@ -693,8 +693,8 @@ fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<L
     let rendered = match score {
         serde_json::Value::Object(map) => {
             if let Some(best_string_raw) = map.get("best_string").and_then(|value| value.as_str()) {
-                let mut rendered = if let Some(namespace) = mod_namespace(game) {
-                    mods::resolve_mod_text_for_display(namespace, best_string_raw)
+                let mut rendered = if let Some(package) = game.package_info() {
+                    resources::resolve_package_text(package, best_string_raw)
                 } else {
                     i18n::t_or(best_string_raw, best_string_raw)
                 };
@@ -742,14 +742,5 @@ fn json_value_to_inline_text(value: &serde_json::Value) -> String {
             .map(|(key, value)| format!("{key}: {}", json_value_to_inline_text(value)))
             .collect::<Vec<_>>()
             .join(", "),
-    }
-}
-
-fn mod_namespace(game: &GameDescriptor) -> Option<&str> {
-    if game.is_mod_game() {
-        game.package_info()
-            .map(|package| package.namespace.as_str())
-    } else {
-        None
     }
 }

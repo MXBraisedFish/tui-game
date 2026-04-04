@@ -1,0 +1,14 @@
+{
+  "width": 30,
+  "height": 16,
+  "starting_hp": 10,
+  "starting_nuke_stock": 1,
+  "enemy_spawn_base_ms": 700,
+  "enemy_spawn_stage_step_ms": 30,
+  "enemy_spawn_min_ms": 180,
+  "auto_fire_ms": 220,
+  "enemy_hit_score": 2,
+  "enemy_escape_damage": 1,
+  "nuke_enemy_score": 5,
+  "stage_score_step": 20
+}

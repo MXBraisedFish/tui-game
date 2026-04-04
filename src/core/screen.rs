@@ -1,10 +1,11 @@
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Cell {
     pub ch: char,
     pub fg: Option<String>,
     pub bg: Option<String>,
+    pub continuation: bool,
 }
 
 impl Default for Cell {
@@ -13,6 +14,7 @@ impl Default for Cell {
             ch: ' ',
             fg: None,
             bg: None,
+            continuation: false,
         }
     }
 }
@@ -80,6 +82,10 @@ impl Canvas {
             if ch == '\n' {
                 break;
             }
+            let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+            if ch_width == 0 {
+                continue;
+            }
             self.set_cell(
                 cursor_x,
                 y,
@@ -87,9 +93,24 @@ impl Canvas {
                     ch,
                     fg: fg.clone(),
                     bg: bg.clone(),
+                    continuation: false,
                 },
             );
-            cursor_x = cursor_x.saturating_add(1);
+            if ch_width > 1 {
+                for extra in 1..ch_width {
+                    self.set_cell(
+                        cursor_x.saturating_add(extra),
+                        y,
+                        Cell {
+                            ch: ' ',
+                            fg: fg.clone(),
+                            bg: bg.clone(),
+                            continuation: true,
+                        },
+                    );
+                }
+            }
+            cursor_x = cursor_x.saturating_add(ch_width);
         }
     }
 

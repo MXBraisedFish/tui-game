@@ -1,0 +1,16 @@
+{
+  "game.runtime_demo.name": "运行时演示",
+  "game.runtime_demo.description": "把 @ 移动到 X，按 Enter 保存并退出。",
+  "game.runtime_demo.detail": "这个官方包用于验证统一 manifest 运行时、包内资源解析、固定 tick 事件循环、Canvas 渲染和最佳记录协议。",
+  "game.runtime_demo.best_none": "暂无记录",
+  "game.runtime_demo.best": "最佳",
+  "game.runtime_demo.steps": "步数",
+  "game.runtime_demo.controls": "[方向键] 移动  [Enter] 保存/退出  [R] 重开  [Esc] 退出",
+  "game.runtime_demo.msg_reach_goal": "尽量用更少的步数走到 X。",
+  "game.runtime_demo.msg_resized": "终端尺寸已变化，布局已重新计算。",
+  "game.runtime_demo.msg_keep_moving": "继续朝目标移动。",
+  "game.runtime_demo.msg_reset": "场地已重置。",
+  "game.runtime_demo.msg_new_best": "新的最佳记录，按 Enter 保存并退出。",
+  "game.runtime_demo.msg_goal_reached": "已到达目标，按 Enter 保存并退出。",
+  "game.runtime_demo.best_block": "最佳步数\n{steps}"
+}

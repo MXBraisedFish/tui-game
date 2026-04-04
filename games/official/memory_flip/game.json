@@ -6,17 +6,50 @@
   "entry": "scripts/memory_flip.lua",
   "save": true,
   "best_none": "game.memory_flip.best_none_block",
-  "min_width": 58,
-  "min_height": 20,
+  "min_width": 1,
+  "min_height": 1,
   "actions": {
-    "move_left": ["left", "a"],
-    "move_right": ["right", "d"],
-    "move_up": ["up", "w"],
-    "move_down": ["down"],
-    "flip": ["space", "enter"],
-    "difficulty_cycle": ["p"],
-    "save": ["s"],
-    "restart": ["r"],
-    "quit_action": ["q"]
+    "move_up": [
+      "up"
+    ],
+    "move_down": [
+      "down"
+    ],
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "flip": [
+      "space"
+    ],
+    "difficulty_input": [
+      "p"
+    ],
+    "quick_jump": [
+      "d"
+    ],
+    "save": [
+      "s"
+    ],
+    "restart": [
+      "r"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y"
+    ],
+    "confirm_no": [
+      "n"
+    ],
+    "remove_last_backspace": [
+      "backspace"
+    ],
+    "remove_last_delete": [
+      "delete"
+    ]
   }
 }

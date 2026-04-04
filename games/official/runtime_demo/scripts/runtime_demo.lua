@@ -1,5 +1,12 @@
 local FIELD_WIDTH = 17
 local FIELD_HEIGHT = 9
+local CONTROLS_TEXT = nil
+
+load_helper("helpers/layout.lua")
+
+local function tr(key)
+  return translate(key)
+end
 
 local function fresh_state()
   return {
@@ -9,7 +16,7 @@ local function fresh_state()
     goal_y = FIELD_HEIGHT - 1,
     steps = 0,
     best_steps = nil,
-    message = "Reach X with as few steps as possible.",
+    message = "game.runtime_demo.msg_reach_goal",
     finished = false,
   }
 end
@@ -44,10 +51,17 @@ local function clamp(value, min_value, max_value)
   return value
 end
 
-local function centered_x(text)
-  local width = select(1, get_terminal_size())
-  local text_width = select(1, measure_text(text))
-  return math.max(0, math.floor((width - text_width) / 2))
+local function controls_text()
+  if CONTROLS_TEXT ~= nil then
+    return CONTROLS_TEXT
+  end
+  local ok, value = pcall(read_text, "text/help.txt")
+  if ok and type(value) == "string" and value ~= "" then
+    CONTROLS_TEXT = value:gsub("\r", ""):gsub("\n+$", "")
+  else
+    CONTROLS_TEXT = tr("game.runtime_demo.controls")
+  end
+  return CONTROLS_TEXT
 end
 
 local function save_state(state)
@@ -56,7 +70,7 @@ end
 
 function handle_event(state, event)
   if event.type == "resize" then
-    state.message = "Terminal size changed. Layout recalculated."
+    state.message = "game.runtime_demo.msg_resized"
     return state
   end
 
@@ -72,23 +86,23 @@ function handle_event(state, event)
   if event.name == "move_left" then
     state.player_x = clamp(state.player_x - 1, 1, FIELD_WIDTH)
     state.steps = state.steps + 1
-    state.message = "Keep moving toward the goal."
+    state.message = "game.runtime_demo.msg_keep_moving"
   elseif event.name == "move_right" then
     state.player_x = clamp(state.player_x + 1, 1, FIELD_WIDTH)
     state.steps = state.steps + 1
-    state.message = "Keep moving toward the goal."
+    state.message = "game.runtime_demo.msg_keep_moving"
   elseif event.name == "move_up" then
     state.player_y = clamp(state.player_y - 1, 1, FIELD_HEIGHT)
     state.steps = state.steps + 1
-    state.message = "Keep moving toward the goal."
+    state.message = "game.runtime_demo.msg_keep_moving"
   elseif event.name == "move_down" then
     state.player_y = clamp(state.player_y + 1, 1, FIELD_HEIGHT)
     state.steps = state.steps + 1
-    state.message = "Keep moving toward the goal."
+    state.message = "game.runtime_demo.msg_keep_moving"
   elseif event.name == "restart" then
     state = fresh_state()
     state.best_steps = load_data("best_steps")
-    state.message = "Field reset."
+    state.message = "game.runtime_demo.msg_reset"
     return state
   elseif event.name == "confirm" then
     save_state(state)
@@ -104,9 +118,9 @@ function handle_event(state, event)
       state.best_steps = state.steps
       save_data("best_steps", state.best_steps)
       request_refresh_best_score()
-      state.message = "New best record. Press Enter to save and exit."
+      state.message = "game.runtime_demo.msg_new_best"
     else
-      state.message = "Goal reached. Press Enter to save and exit."
+      state.message = "game.runtime_demo.msg_goal_reached"
     end
     save_state(state)
   end
@@ -136,21 +150,22 @@ function render(state)
   canvas_clear()
 
   local term_w, term_h = get_terminal_size()
-  local title = "Runtime Demo"
-  local desc = "Move @ to X. Enter saves and exits."
-  local best = state.best_steps and tostring(state.best_steps) or "No record yet"
+  local title = tr("game.runtime_demo.name")
+  local desc = tr("game.runtime_demo.description")
+  local best = state.best_steps and tostring(state.best_steps) or tr("game.runtime_demo.best_none")
   local field_origin_x = math.max(0, math.floor((term_w - (FIELD_WIDTH + 2)) / 2))
   local field_origin_y = math.max(4, math.floor((term_h - (FIELD_HEIGHT + 2)) / 2))
 
-  canvas_draw_text(centered_x(title), 1, title, "cyan", nil)
-  canvas_draw_text(centered_x(desc), 2, desc, "dark_gray", nil)
-  canvas_draw_text(math.max(0, term_w - 12), 1, "Steps: " .. tostring(state.steps), "yellow", nil)
-  canvas_draw_text(math.max(0, term_w - 20), 2, "Best: " .. best, "green", nil)
+  canvas_draw_text(rt_centered_x(title), 1, title, "cyan", nil)
+  canvas_draw_text(rt_centered_x(desc), 2, desc, "dark_gray", nil)
+  canvas_draw_text(math.max(0, term_w - 12), 1, tr("game.runtime_demo.steps") .. ": " .. tostring(state.steps), "yellow", nil)
+  canvas_draw_text(math.max(0, term_w - 20), 2, tr("game.runtime_demo.best") .. ": " .. best, "green", nil)
 
   draw_field(state, field_origin_x, field_origin_y)
 
-  canvas_draw_text(centered_x(state.message), math.max(0, term_h - 3), state.message, state.finished and "green" or "white", nil)
-  canvas_draw_text(centered_x("[Arrows] Move  [Enter] Save/Exit  [R] Restart  [Esc] Exit"), math.max(0, term_h - 1), "[Arrows] Move  [Enter] Save/Exit  [R] Restart  [Esc] Exit", "dark_gray", nil)
+  canvas_draw_text(rt_centered_x(tr(state.message)), math.max(0, term_h - 3), tr(state.message), state.finished and "green" or "white", nil)
+  local controls = controls_text()
+  canvas_draw_text(rt_centered_x(controls), math.max(0, term_h - 1), controls, "dark_gray", nil)
 end
 
 function best_score(state)
@@ -158,7 +173,7 @@ function best_score(state)
     return nil
   end
   return {
-    best_string = "Best Steps\n{steps}",
+    best_string = "game.runtime_demo.best_block",
     steps = state.best_steps,
   }
 end
