@@ -1,21 +1,40 @@
 use anyhow::Result;
+use serde_json::{Map, Value as JsonValue};
 use std::fs;
 
 use crate::utils::path_utils;
 
-/// 新 runtime 的统一存档目录。
-pub fn runtime_save_dir() -> Result<std::path::PathBuf> {
-    let dir = path_utils::app_data_dir()?.join("runtime_save");
-    fs::create_dir_all(&dir)?;
-    Ok(dir)
+fn empty_store() -> Map<String, JsonValue> {
+    let mut store = Map::new();
+    store.insert("continue".to_string(), JsonValue::Object(Map::new()));
+    store.insert("data".to_string(), JsonValue::Object(Map::new()));
+    store
 }
 
-/// 记录“最近一次由新 runtime 保存的游戏”。
-fn latest_runtime_save_marker_path() -> Result<std::path::PathBuf> {
-    Ok(path_utils::app_data_dir()?.join("latest_runtime_save.txt"))
+fn read_store() -> Result<Map<String, JsonValue>> {
+    let path = path_utils::saves_file()?;
+    if !path.exists() {
+        return Ok(empty_store());
+    }
+    let raw = fs::read_to_string(path)?;
+    let mut store = serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
+        .unwrap_or_else(|_| empty_store());
+    if !matches!(store.get("continue"), Some(JsonValue::Object(_))) {
+        store.insert("continue".to_string(), JsonValue::Object(Map::new()));
+    }
+    if !matches!(store.get("data"), Some(JsonValue::Object(_))) {
+        store.insert("data".to_string(), JsonValue::Object(Map::new()));
+    }
+    Ok(store)
 }
 
-/// 将游戏 ID 转成适合文件系统使用的文件名主干。
+fn write_store(store: &Map<String, JsonValue>) -> Result<()> {
+    let path = path_utils::saves_file()?;
+    path_utils::ensure_parent_dir(&path)?;
+    fs::write(path, serde_json::to_string_pretty(store)?)?;
+    Ok(())
+}
+
 pub fn sanitize_runtime_save_stem(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len());
     for ch in raw.chars() {
@@ -25,7 +44,6 @@ pub fn sanitize_runtime_save_stem(raw: &str) -> String {
             out.push('_');
         }
     }
-
     let trimmed = out.trim_matches('_');
     if trimmed.is_empty() {
         "runtime_save".to_string()
@@ -34,65 +52,71 @@ pub fn sanitize_runtime_save_stem(raw: &str) -> String {
     }
 }
 
-/// 新 runtime 单游戏存档文件路径。
-pub fn runtime_game_save_path(game_id: &str) -> Result<std::path::PathBuf> {
-    Ok(runtime_save_dir()?.join(format!("{}.json", sanitize_runtime_save_stem(game_id))))
+pub fn save_data_slot(game_id: &str, slot: &str, value: &JsonValue) -> Result<()> {
+    let mut store = read_store()?;
+    let data = store
+        .get_mut("data")
+        .and_then(JsonValue::as_object_mut)
+        .expect("data object");
+    let game_slots = data
+        .entry(game_id.to_string())
+        .or_insert_with(|| JsonValue::Object(Map::new()))
+        .as_object_mut()
+        .expect("game data object");
+    game_slots.insert(slot.to_string(), value.clone());
+    write_store(&store)
 }
 
-pub fn set_latest_runtime_save_game(game_id: &str) -> Result<()> {
-    let path = latest_runtime_save_marker_path()?;
-    path_utils::ensure_parent_dir(&path)?;
-    fs::write(path, game_id.trim())?;
-    Ok(())
+pub fn load_data_slot(game_id: &str, slot: &str) -> Result<Option<JsonValue>> {
+    let store = read_store()?;
+    Ok(store
+        .get("data")
+        .and_then(JsonValue::as_object)
+        .and_then(|data| data.get(game_id))
+        .and_then(JsonValue::as_object)
+        .and_then(|slots| slots.get(slot))
+        .cloned())
 }
 
-pub fn latest_runtime_save_game_id() -> Option<String> {
-    let path = latest_runtime_save_marker_path().ok()?;
-    let raw = fs::read_to_string(path).ok()?;
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
-    }
+pub fn save_continue(game_id: &str, value: &JsonValue) -> Result<()> {
+    let mut store = read_store()?;
+    let continue_map = store
+        .get_mut("continue")
+        .and_then(JsonValue::as_object_mut)
+        .expect("continue object");
+    continue_map.clear();
+    continue_map.insert(game_id.to_string(), value.clone());
+    write_store(&store)
 }
 
-pub fn clear_latest_runtime_save_game() -> Result<()> {
-    let path = latest_runtime_save_marker_path()?;
-    if path.exists() {
-        fs::remove_file(path)?;
-    }
-    Ok(())
+pub fn load_continue(game_id: &str) -> Result<Option<JsonValue>> {
+    let store = read_store()?;
+    Ok(store
+        .get("continue")
+        .and_then(JsonValue::as_object)
+        .and_then(|continue_map| continue_map.get(game_id))
+        .cloned())
 }
 
-/// 宿主统一解析当前可继续的最近存档目标。
 pub fn latest_saved_game_id() -> Option<String> {
-    let runtime_latest = latest_runtime_save_game_id();
-    let runtime_pair = runtime_latest.and_then(|game_id| {
-        runtime_game_save_path(&game_id)
-            .ok()
-            .map(|path| (game_id, path))
-    });
-
-    [runtime_pair]
-        .into_iter()
-        .flatten()
-        .filter_map(|(game_id, path)| {
-            let modified = fs::metadata(path).ok()?.modified().ok()?;
-            Some((game_id, modified))
-        })
-        .max_by_key(|(_, modified)| *modified)
-        .map(|(game_id, _)| game_id)
+    let store = read_store().ok()?;
+    store
+        .get("continue")
+        .and_then(JsonValue::as_object)
+        .and_then(|continue_map| continue_map.keys().next().cloned())
 }
 
-/// 统一清理“当前活动存档”。
 pub fn clear_active_game_save() -> Result<()> {
-    if let Some(game_id) = latest_runtime_save_game_id() {
-        if let Ok(path) = runtime_game_save_path(&game_id) {
-            let _ = fs::remove_file(path);
-        }
-        let _ = clear_latest_runtime_save_game();
+    let mut store = read_store()?;
+    if let Some(continue_map) = store.get_mut("continue").and_then(JsonValue::as_object_mut) {
+        continue_map.clear();
     }
+    write_store(&store)
+}
 
-    Ok(())
+pub fn game_has_continue_save(game_id: &str) -> bool {
+    load_continue(game_id)
+        .ok()
+        .flatten()
+        .is_some()
 }

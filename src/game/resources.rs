@@ -78,6 +78,10 @@ fn resolve_package_lang_key(package: &PackageDescriptor, key: &str) -> String {
     if let Some(value) = load_package_lang_value(package, "en_us", key) {
         return value;
     }
+    let global = i18n::t_or(key, key);
+    if global != key {
+        return global;
+    }
     format!("[missing-i18n-key:{}:{}]", package.namespace, key)
 }
 

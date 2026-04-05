@@ -105,7 +105,9 @@ fn run() -> Result<()> {
     }
 
     install_panic_hook();
+    cleanup_legacy_runtime_data()?;
     i18n::init("us-en")?;
+    initialize_runtime_layout()?;
 
     // Initialize terminal session.
     let mut session = TerminalSession::new()?;
@@ -215,6 +217,59 @@ fn run() -> Result<()> {
 
     drop(session);
 
+    Ok(())
+}
+
+fn initialize_runtime_layout() -> Result<()> {
+    let app_data = tui_game::utils::path_utils::app_data_dir()?;
+    std::fs::create_dir_all(app_data.join("mod"))?;
+    std::fs::create_dir_all(app_data.join("official"))?;
+    std::fs::create_dir_all(app_data.join("log"))?;
+
+    let language = tui_game::utils::path_utils::language_file()?;
+    if !language.exists() {
+        std::fs::write(&language, format!("{}\n", i18n::current_language_code()))?;
+    }
+
+    let best_scores = tui_game::utils::path_utils::best_scores_file()?;
+    if !best_scores.exists() {
+        std::fs::write(&best_scores, "{}\n")?;
+    }
+
+    let saves = tui_game::utils::path_utils::saves_file()?;
+    if !saves.exists() {
+        std::fs::write(&saves, "{\n  \"continue\": {},\n  \"data\": {}\n}\n")?;
+    }
+
+    let updater_cache = tui_game::utils::path_utils::updater_cache_file()?;
+    if !updater_cache.exists() {
+        std::fs::write(&updater_cache, "{}\n")?;
+    }
+
+    let _ = tui_game::utils::path_utils::official_games_dir()?;
+    Ok(())
+}
+
+fn cleanup_legacy_runtime_data() -> Result<()> {
+    let app_data = tui_game::utils::path_utils::app_data_dir()?;
+    for file_name in [
+        "stats.json",
+        "lua_saves.json",
+        "runtime_best_scores.json",
+        "latest_runtime_save.txt",
+        "language_pref.txt",
+    ] {
+        let path = app_data.join(file_name);
+        if path.exists() {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+    for dir_name in ["runtime_save", "runtime-logs"] {
+        let path = app_data.join(dir_name);
+        if path.exists() {
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
     Ok(())
 }
 
@@ -489,7 +544,7 @@ fn sync_continue_item(menu: &mut Menu) {
             menu.set_continue_target(Some(resolved_id), Some(resolved_name));
         }
         None => {
-            let _ = save::clear_latest_runtime_save_game();
+            let _ = save::clear_active_game_save();
             menu.set_continue_target(None, None);
         }
     }
@@ -515,8 +570,7 @@ fn resolve_continue_target(game_id: &str) -> Option<(String, String)> {
         .into_iter()
         .find(|game| game.id == game_id)?;
 
-    let save_path = save::runtime_game_save_path(game_id).ok()?;
-    if !save_path.exists() {
+    if !save::game_has_continue_save(game_id) {
         return None;
     }
 

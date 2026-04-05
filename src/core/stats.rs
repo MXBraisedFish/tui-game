@@ -4,52 +4,64 @@ use std::fs;
 use anyhow::Result;
 use serde_json::{Map, Value as JsonValue};
 
-use crate::app::stats::{self, GameStats};
 use crate::utils::path_utils;
 
-/// 统一运行时读取宿主统计信息。
-pub fn load_all() -> HashMap<String, GameStats> {
-    stats::load_stats()
+fn merge_objects(base: &mut Map<String, JsonValue>, overlay: &Map<String, JsonValue>) {
+    for (key, value) in overlay {
+        match (base.get_mut(key), value) {
+            (Some(JsonValue::Object(existing)), JsonValue::Object(incoming)) => {
+                merge_objects(existing, incoming);
+            }
+            _ => {
+                base.insert(key.clone(), value.clone());
+            }
+        }
+    }
 }
 
-pub fn runtime_stats_path() -> Result<std::path::PathBuf> {
-    Ok(path_utils::app_data_dir()?.join("runtime_best_scores.json"))
+fn read_store() -> Result<Map<String, JsonValue>> {
+    let path = path_utils::best_scores_file()?;
+    if !path.exists() {
+        return Ok(Map::new());
+    }
+    let raw = fs::read_to_string(path)?;
+    Ok(serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
+        .unwrap_or_default())
+}
+
+fn write_store(store: &Map<String, JsonValue>) -> Result<()> {
+    let path = path_utils::best_scores_file()?;
+    path_utils::ensure_parent_dir(&path)?;
+    fs::write(path, serde_json::to_string_pretty(store)?)?;
+    Ok(())
 }
 
 pub fn read_runtime_best_score(game_id: &str) -> Option<JsonValue> {
-    let path = runtime_stats_path().ok()?;
-    let raw = fs::read_to_string(path).ok()?;
-    let store =
-        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}')).ok()?;
-    store.get(game_id).cloned()
+    read_store().ok()?.get(game_id).cloned()
 }
 
 pub fn write_runtime_best_score(game_id: &str, value: &JsonValue) -> Result<()> {
-    let path = runtime_stats_path()?;
-    path_utils::ensure_parent_dir(&path)?;
-    let mut store = if path.exists() {
-        let raw = fs::read_to_string(&path)?;
-        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
-            .unwrap_or_default()
-    } else {
-        Map::new()
+    let mut store = read_store()?;
+    let merged = match (store.remove(game_id), value) {
+        (Some(JsonValue::Object(mut existing)), JsonValue::Object(incoming)) => {
+            merge_objects(&mut existing, incoming);
+            JsonValue::Object(existing)
+        }
+        _ => value.clone(),
     };
-    store.insert(game_id.to_string(), value.clone());
-    fs::write(path, serde_json::to_string_pretty(&store)?)?;
-    Ok(())
+    store.insert(game_id.to_string(), merged);
+    write_store(&store)
 }
 
 pub fn prune_runtime_scores(valid_game_ids: impl IntoIterator<Item = String>) -> Result<()> {
-    let path = runtime_stats_path()?;
-    if !path.exists() {
-        return Ok(());
-    }
-    let raw = fs::read_to_string(&path)?;
-    let mut store =
-        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
-            .unwrap_or_default();
     let valid: HashSet<String> = valid_game_ids.into_iter().collect();
+    let mut store = read_store()?;
     store.retain(|key, _| valid.contains(key));
-    fs::write(path, serde_json::to_string_pretty(&store)?)?;
-    Ok(())
+    write_store(&store)
+}
+
+pub fn load_all() -> HashMap<String, JsonValue> {
+    read_store()
+        .map(|store| store.into_iter().collect())
+        .unwrap_or_default()
 }

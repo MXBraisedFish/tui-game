@@ -30,7 +30,6 @@ struct RuntimeBridges {
     canvas: Arc<Mutex<Canvas>>,
     commands: Arc<Mutex<Vec<RuntimeCommand>>>,
     resize_flag: Arc<Mutex<bool>>,
-    save_path: PathBuf,
     game: GameDescriptor,
     launch_mode: LaunchMode,
     started_at: Instant,
@@ -53,14 +52,12 @@ impl LuaGameEngine {
         let canvas = Arc::new(Mutex::new(Canvas::new(width, height)));
         let commands = Arc::new(Mutex::new(Vec::new()));
         let resize_flag = Arc::new(Mutex::new(false));
-        let save_path = runtime_save_path(&game)?;
         install_runtime_apis(
             &lua,
             RuntimeBridges {
                 canvas: Arc::clone(&canvas),
                 commands: Arc::clone(&commands),
                 resize_flag: Arc::clone(&resize_flag),
-                save_path: save_path.clone(),
                 game: game.clone(),
                 launch_mode,
                 started_at: Instant::now(),
@@ -102,7 +99,6 @@ impl LuaGameEngine {
                 canvas,
                 commands,
                 resize_flag,
-                save_path,
                 game,
                 launch_mode,
                 started_at: Instant::now(),
@@ -201,9 +197,6 @@ impl LuaGameEngine {
                         }
                     }
                     RuntimeCommand::SaveRequest => {}
-                    RuntimeCommand::ClearSave => {
-                        let _ = fs::remove_file(&self.bridges.save_path);
-                    }
                     RuntimeCommand::ShowToast { .. } => {}
                 }
             }
@@ -490,50 +483,67 @@ fn install_runtime_apis(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> 
         })?,
     )?;
 
-    let save_path = bridges.save_path.clone();
-    let latest_game_id = bridges.game.id.clone();
+    let game_id = bridges.game.id.clone();
     globals.set(
         "save_data",
         lua.create_function(move |_, (slot, value): (String, Value)| {
             let json = lua_value_to_json(&value).map_err(lua_runtime_error)?;
-            save_runtime_slot(&save_path, &slot, &json).map_err(lua_runtime_error)?;
-            let _ = save::set_latest_runtime_save_game(&latest_game_id);
+            if let Some(best_value) = legacy_best_payload_to_runtime_best(&game_id, &slot, &json) {
+                runtime_stats::write_runtime_best_score(&game_id, &best_value)
+                    .map_err(lua_runtime_error)?;
+                return Ok(());
+            }
+            save::save_data_slot(&game_id, &slot, &json).map_err(lua_runtime_error)?;
             Ok(())
         })?,
     )?;
 
-    let save_path = bridges.save_path.clone();
+    let game_id = bridges.game.id.clone();
     globals.set(
         "load_data",
         lua.create_function(move |lua, slot: String| {
-            let Some(value) = load_runtime_slot(&save_path, &slot).map_err(lua_runtime_error)?
-            else {
+            if legacy_best_slot(&slot) {
+                let Some(value) = runtime_stats::read_runtime_best_score(&game_id) else {
+                    return Ok(Value::Nil);
+                };
+                let Some(legacy) = runtime_best_to_legacy_payload(&game_id, &slot, &value) else {
+                    return Ok(Value::Nil);
+                };
+                return json_to_lua_value(lua, &legacy);
+            }
+            let Some(value) = save::load_data_slot(&game_id, &slot).map_err(lua_runtime_error)? else {
                 return Ok(Value::Nil);
             };
             json_to_lua_value(lua, &value)
         })?,
     )?;
 
-    let save_path = bridges.save_path.clone();
-    let latest_game_id = bridges.game.id.clone();
+    let game_id = bridges.game.id.clone();
     globals.set(
-        "save_game_slot",
-        lua.create_function(move |_, (slot, value): (String, Value)| {
+        "load_best_score",
+        lua.create_function(move |lua, ()| {
+            let Some(value) = runtime_stats::read_runtime_best_score(&game_id) else {
+                return Ok(Value::Nil);
+            };
+            json_to_lua_value(lua, &value)
+        })?,
+    )?;
+
+    let game_id = bridges.game.id.clone();
+    globals.set(
+        "save_continue",
+        lua.create_function(move |_, value: Value| {
             let json = lua_value_to_json(&value).map_err(lua_runtime_error)?;
-            save_runtime_slot(&save_path, &format!("slot:{slot}"), &json)
-                .map_err(lua_runtime_error)?;
-            let _ = save::set_latest_runtime_save_game(&latest_game_id);
+            save::save_continue(&game_id, &json).map_err(lua_runtime_error)?;
             Ok(true)
         })?,
     )?;
 
-    let save_path = bridges.save_path.clone();
+    let game_id = bridges.game.id.clone();
     globals.set(
-        "load_game_slot",
-        lua.create_function(move |lua, slot: String| {
-            let Some(value) = load_runtime_slot(&save_path, &format!("slot:{slot}"))
-                .map_err(lua_runtime_error)?
-            else {
+        "load_continue",
+        lua.create_function(move |lua, ()| {
+            let Some(value) = save::load_continue(&game_id).map_err(lua_runtime_error)? else {
                 return Ok(Value::Nil);
             };
             json_to_lua_value(lua, &value)
@@ -773,15 +783,299 @@ fn resolve_axis_position(anchor: i64, terminal_span: u16, content_span: u16, off
     resolved.min(i64::from(u16::MAX)) as u16
 }
 
-fn runtime_save_path(game: &GameDescriptor) -> Result<PathBuf> {
-    save::runtime_game_save_path(&game.id)
-}
-
 fn runtime_log_path(game: &GameDescriptor) -> Result<PathBuf> {
-    Ok(path_utils::runtime_logs_dir()?.join(format!(
+    Ok(path_utils::log_dir()?.join(format!(
         "{}.log",
         save::sanitize_runtime_save_stem(&game.id)
     )))
+}
+
+fn legacy_best_slot(slot: &str) -> bool {
+    matches!(
+        slot,
+        "blackjack_best_net"
+            | "color_memory_best"
+            | "lights_out_best"
+            | "maze_escape_best"
+            | "memory_flip_best"
+            | "minesweeper_best"
+            | "pacman_best_score"
+            | "rock_paper_scissors_best"
+            | "shooter_best"
+            | "sliding_puzzle_best"
+            | "snake_best"
+            | "solitaire_best_v2"
+            | "sudoku_best"
+            | "twenty_four_best_time"
+            | "wordle_best_time_sec"
+    )
+}
+
+fn parse_duration_to_secs(text: &str) -> Option<i64> {
+    let mut parts = text.split(':');
+    let h = parts.next()?.parse::<i64>().ok()?;
+    let m = parts.next()?.parse::<i64>().ok()?;
+    let s = parts.next()?.parse::<i64>().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(h * 3600 + m * 60 + s)
+}
+
+fn legacy_best_payload_to_runtime_best(game_id: &str, slot: &str, value: &JsonValue) -> Option<JsonValue> {
+    let obj = value.as_object();
+    let mut out = Map::new();
+    match (game_id, slot) {
+        ("blackjack", "blackjack_best_net") => {
+            let net = obj?.get("value")?.as_i64()?;
+            out.insert("best_string".to_string(), JsonValue::String("game.blackjack.best_block".to_string()));
+            out.insert("net".to_string(), JsonValue::from(net));
+            out.insert("value".to_string(), JsonValue::from(net));
+        }
+        ("color_memory", "color_memory_best") => {
+            let score = obj?.get("best_score").and_then(JsonValue::as_i64).unwrap_or(0);
+            let time_sec = obj?.get("best_time_sec").and_then(JsonValue::as_i64).unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.color_memory.best_block".to_string()));
+            out.insert("score".to_string(), JsonValue::from(score));
+            out.insert("best_score".to_string(), JsonValue::from(score));
+            out.insert("time_sec".to_string(), JsonValue::from(time_sec));
+            out.insert("best_time_sec".to_string(), JsonValue::from(time_sec));
+        }
+        ("lights_out", "lights_out_best") => {
+            let size = obj?.get("max_size").and_then(JsonValue::as_i64).unwrap_or(0);
+            let steps = obj?.get("min_steps").and_then(JsonValue::as_i64).unwrap_or(0);
+            let time_sec = obj?.get("min_time_sec").and_then(JsonValue::as_i64).unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.lights_out.best_block".to_string()));
+            out.insert("size".to_string(), JsonValue::from(size));
+            out.insert("max_size".to_string(), JsonValue::from(size));
+            out.insert("steps".to_string(), JsonValue::from(steps));
+            out.insert("min_steps".to_string(), JsonValue::from(steps));
+            out.insert("time_sec".to_string(), JsonValue::from(time_sec));
+            out.insert("min_time_sec".to_string(), JsonValue::from(time_sec));
+        }
+        ("maze_escape", "maze_escape_best") => {
+            let cols = obj?.get("max_cols").and_then(JsonValue::as_i64).unwrap_or(0);
+            let rows = obj?.get("max_rows").and_then(JsonValue::as_i64).unwrap_or(0);
+            let area = obj?.get("max_area").and_then(JsonValue::as_i64).unwrap_or(cols * rows);
+            let mode = obj?.get("max_mode").and_then(JsonValue::as_str).unwrap_or("normal");
+            let time_sec = obj?.get("min_time_sec").and_then(JsonValue::as_i64).unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.maze_escape.best_block".to_string()));
+            out.insert("size".to_string(), JsonValue::String(format!("{cols}x{rows}")));
+            out.insert("max_cols".to_string(), JsonValue::from(cols));
+            out.insert("max_rows".to_string(), JsonValue::from(rows));
+            out.insert("max_area".to_string(), JsonValue::from(area));
+            out.insert("mode".to_string(), JsonValue::String(mode.to_string()));
+            out.insert("max_mode".to_string(), JsonValue::String(mode.to_string()));
+            out.insert("min_time_sec".to_string(), JsonValue::from(time_sec));
+        }
+        ("memory_flip", "memory_flip_best") => {
+            let difficulty = obj?.get("difficulty").and_then(JsonValue::as_i64).unwrap_or(0);
+            let steps = obj?.get("min_steps").and_then(JsonValue::as_i64).unwrap_or(0);
+            let time_sec = obj?.get("min_time_sec").and_then(JsonValue::as_i64).unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.memory_flip.best_block".to_string()));
+            out.insert("difficulty".to_string(), JsonValue::from(difficulty));
+            out.insert("steps".to_string(), JsonValue::from(steps));
+            out.insert("min_steps".to_string(), JsonValue::from(steps));
+            out.insert("time_sec".to_string(), JsonValue::from(time_sec));
+            out.insert("min_time_sec".to_string(), JsonValue::from(time_sec));
+        }
+        ("minesweeper", "minesweeper_best") => {
+            out.insert("best_string".to_string(), JsonValue::String("game.minesweeper.best_block".to_string()));
+            let mut records = Map::new();
+            for key in ["1", "2", "3"] {
+                if let Some(value) = obj?.get(key).and_then(JsonValue::as_i64) {
+                    records.insert(key.to_string(), JsonValue::from(value));
+                }
+            }
+            out.insert("records".to_string(), JsonValue::Object(records));
+        }
+        ("pacman", "pacman_best_score") => {
+            let value = obj?.get("value").and_then(JsonValue::as_i64).unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.pacman.best_block".to_string()));
+            out.insert("score".to_string(), JsonValue::from(value));
+            out.insert("value".to_string(), JsonValue::from(value));
+        }
+        ("rock_paper_scissors", "rock_paper_scissors_best") => {
+            let streak = obj?.get("best_streak").and_then(JsonValue::as_i64).unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.rock_paper_scissors.best_block".to_string()));
+            out.insert("streak".to_string(), JsonValue::from(streak));
+            out.insert("best_streak".to_string(), JsonValue::from(streak));
+        }
+        ("shooter", "shooter_best") => {
+            let score = obj?.get("best_score").and_then(JsonValue::as_i64).unwrap_or(0);
+            let stage = obj?.get("best_stage").and_then(JsonValue::as_i64).unwrap_or(1);
+            out.insert("best_string".to_string(), JsonValue::String("game.shooter.best_block".to_string()));
+            out.insert("score".to_string(), JsonValue::from(score));
+            out.insert("best_score".to_string(), JsonValue::from(score));
+            out.insert("stage".to_string(), JsonValue::from(stage));
+            out.insert("best_stage".to_string(), JsonValue::from(stage));
+        }
+        ("sliding_puzzle", "sliding_puzzle_best") => {
+            let steps = obj?.get("steps").and_then(JsonValue::as_i64).unwrap_or(0);
+            let time_sec = obj?.get("time_sec").and_then(JsonValue::as_i64).unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.sliding_puzzle.best_block".to_string()));
+            out.insert("steps".to_string(), JsonValue::from(steps));
+            out.insert("time_sec".to_string(), JsonValue::from(time_sec));
+        }
+        ("snake", "snake_best") => {
+            let score = obj?.get("best_score").and_then(JsonValue::as_i64).unwrap_or(0);
+            let time_sec = obj?.get("best_time_sec").and_then(JsonValue::as_i64).unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.snake.best_block".to_string()));
+            out.insert("score".to_string(), JsonValue::from(score));
+            out.insert("best_score".to_string(), JsonValue::from(score));
+            out.insert("time_sec".to_string(), JsonValue::from(time_sec));
+            out.insert("best_time_sec".to_string(), JsonValue::from(time_sec));
+        }
+        ("solitaire", "solitaire_best_v2") => {
+            let freecell = obj?.get("freecell").and_then(JsonValue::as_i64).unwrap_or(0);
+            let klondike = obj?.get("klondike").and_then(JsonValue::as_i64).unwrap_or(0);
+            let spider1 = obj?.get("spider1").and_then(JsonValue::as_i64).unwrap_or(0);
+            let spider2 = obj?.get("spider2").and_then(JsonValue::as_i64).unwrap_or(0);
+            let spider3 = obj?.get("spider3").and_then(JsonValue::as_i64).unwrap_or(0);
+            let spider = [spider1, spider2, spider3].into_iter().filter(|v| *v > 0).min().unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.solitaire.best_block".to_string()));
+            out.insert("freecell_sec".to_string(), JsonValue::from(freecell));
+            out.insert("klondike_sec".to_string(), JsonValue::from(klondike));
+            out.insert("spider1_sec".to_string(), JsonValue::from(spider1));
+            out.insert("spider2_sec".to_string(), JsonValue::from(spider2));
+            out.insert("spider3_sec".to_string(), JsonValue::from(spider3));
+            out.insert("freecell".to_string(), JsonValue::String(format_duration_seconds(freecell)));
+            out.insert("klondike".to_string(), JsonValue::String(format_duration_seconds(klondike)));
+            out.insert("spider".to_string(), JsonValue::String(format_duration_seconds(spider)));
+        }
+        ("sudoku", "sudoku_best") => {
+            let obj = obj?;
+            let difficulty = obj
+                .get("difficulty")
+                .and_then(JsonValue::as_i64)
+                .or_else(|| obj.get("d").and_then(JsonValue::as_i64))
+                .unwrap_or(0);
+            let time_sec = obj
+                .get("min_time_sec")
+                .and_then(JsonValue::as_i64)
+                .or_else(|| obj.get("t").and_then(JsonValue::as_i64))
+                .unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.sudoku.best_block".to_string()));
+            out.insert("difficulty_id".to_string(), JsonValue::from(difficulty));
+            out.insert("d".to_string(), JsonValue::from(difficulty));
+            out.insert("time_sec".to_string(), JsonValue::from(time_sec));
+            out.insert("t".to_string(), JsonValue::from(time_sec));
+        }
+        ("twenty_four", "twenty_four_best_time") => {
+            let time_sec = obj
+                .and_then(|v| v.get("time_sec"))
+                .and_then(JsonValue::as_i64)
+                .or_else(|| value.as_i64())
+                .unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.twenty_four.best_block".to_string()));
+            out.insert("time_sec".to_string(), JsonValue::from(time_sec));
+        }
+        ("wordle", "wordle_best_time_sec") => {
+            let time_sec = value
+                .as_i64()
+                .or_else(|| obj.and_then(|v| v.get("time_sec")).and_then(JsonValue::as_i64))
+                .unwrap_or(0);
+            out.insert("best_string".to_string(), JsonValue::String("game.wordle.best_block".to_string()));
+            out.insert("time_sec".to_string(), JsonValue::from(time_sec));
+        }
+        _ => return None,
+    }
+    Some(JsonValue::Object(out))
+}
+
+fn runtime_best_to_legacy_payload(game_id: &str, slot: &str, value: &JsonValue) -> Option<JsonValue> {
+    let obj = value.as_object()?;
+    match (game_id, slot) {
+        ("blackjack", "blackjack_best_net") => Some(JsonValue::Object(Map::from_iter([
+            ("value".to_string(), JsonValue::from(obj.get("net").and_then(JsonValue::as_i64).or_else(|| obj.get("value").and_then(JsonValue::as_i64)).unwrap_or(0))),
+        ]))),
+        ("color_memory", "color_memory_best") => Some(JsonValue::Object(Map::from_iter([
+            ("best_score".to_string(), JsonValue::from(obj.get("best_score").and_then(JsonValue::as_i64).or_else(|| obj.get("score").and_then(JsonValue::as_i64)).unwrap_or(0))),
+            ("best_time_sec".to_string(), JsonValue::from(obj.get("best_time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("time_sec").and_then(JsonValue::as_i64)).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+        ]))),
+        ("lights_out", "lights_out_best") => Some(JsonValue::Object(Map::from_iter([
+            ("max_size".to_string(), JsonValue::from(obj.get("max_size").and_then(JsonValue::as_i64).or_else(|| obj.get("size").and_then(JsonValue::as_i64)).unwrap_or(0))),
+            ("min_steps".to_string(), JsonValue::from(obj.get("min_steps").and_then(JsonValue::as_i64).or_else(|| obj.get("steps").and_then(JsonValue::as_i64)).unwrap_or(0))),
+            ("min_time_sec".to_string(), JsonValue::from(obj.get("min_time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("time_sec").and_then(JsonValue::as_i64)).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+        ]))),
+        ("maze_escape", "maze_escape_best") => {
+            let (cols, rows) = obj.get("size").and_then(JsonValue::as_str).and_then(|s| s.split_once('x')).map(|(c, r)| (c.parse::<i64>().ok(), r.parse::<i64>().ok())).map(|(c, r)| (c.unwrap_or(0), r.unwrap_or(0))).unwrap_or((0, 0));
+            Some(JsonValue::Object(Map::from_iter([
+                ("max_cols".to_string(), JsonValue::from(obj.get("max_cols").and_then(JsonValue::as_i64).unwrap_or(cols))),
+                ("max_rows".to_string(), JsonValue::from(obj.get("max_rows").and_then(JsonValue::as_i64).unwrap_or(rows))),
+                ("max_area".to_string(), JsonValue::from(obj.get("max_area").and_then(JsonValue::as_i64).unwrap_or(cols * rows))),
+                ("max_mode".to_string(), JsonValue::String(obj.get("max_mode").and_then(JsonValue::as_str).or_else(|| obj.get("mode").and_then(JsonValue::as_str)).unwrap_or("normal").to_string())),
+                ("min_time_sec".to_string(), JsonValue::from(obj.get("min_time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("fastest").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+            ])))
+        }
+        ("memory_flip", "memory_flip_best") => Some(JsonValue::Object(Map::from_iter([
+            ("difficulty".to_string(), JsonValue::from(obj.get("difficulty").and_then(JsonValue::as_i64).unwrap_or(0))),
+            ("min_steps".to_string(), JsonValue::from(obj.get("min_steps").and_then(JsonValue::as_i64).or_else(|| obj.get("steps").and_then(JsonValue::as_i64)).unwrap_or(0))),
+            ("min_time_sec".to_string(), JsonValue::from(obj.get("min_time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("time_sec").and_then(JsonValue::as_i64)).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+        ]))),
+        ("minesweeper", "minesweeper_best") => {
+            let mut out = Map::new();
+            if let Some(records) = obj.get("records").and_then(JsonValue::as_object) {
+                for key in ["1", "2", "3"] {
+                    if let Some(value) = records.get(key).and_then(JsonValue::as_i64) {
+                        out.insert(key.to_string(), JsonValue::from(value));
+                    }
+                }
+            } else {
+                for key in ["1", "2", "3"] {
+                    let display_key = format!("d{}", key);
+                    if let Some(value) = obj.get(&display_key).and_then(JsonValue::as_str).and_then(parse_duration_to_secs) {
+                        out.insert(key.to_string(), JsonValue::from(value));
+                    }
+                }
+            }
+            Some(JsonValue::Object(out))
+        }
+        ("pacman", "pacman_best_score") => Some(JsonValue::Object(Map::from_iter([
+            ("value".to_string(), JsonValue::from(obj.get("value").and_then(JsonValue::as_i64).or_else(|| obj.get("score").and_then(JsonValue::as_i64)).unwrap_or(0))),
+        ]))),
+        ("rock_paper_scissors", "rock_paper_scissors_best") => Some(JsonValue::Object(Map::from_iter([
+            ("best_streak".to_string(), JsonValue::from(obj.get("best_streak").and_then(JsonValue::as_i64).or_else(|| obj.get("streak").and_then(JsonValue::as_i64)).unwrap_or(0))),
+        ]))),
+        ("shooter", "shooter_best") => Some(JsonValue::Object(Map::from_iter([
+            ("best_score".to_string(), JsonValue::from(obj.get("best_score").and_then(JsonValue::as_i64).or_else(|| obj.get("score").and_then(JsonValue::as_i64)).unwrap_or(0))),
+            ("best_stage".to_string(), JsonValue::from(obj.get("best_stage").and_then(JsonValue::as_i64).or_else(|| obj.get("stage").and_then(JsonValue::as_i64)).unwrap_or(1))),
+        ]))),
+        ("sliding_puzzle", "sliding_puzzle_best") => Some(JsonValue::Object(Map::from_iter([
+            ("steps".to_string(), JsonValue::from(obj.get("steps").and_then(JsonValue::as_i64).unwrap_or(0))),
+            ("time_sec".to_string(), JsonValue::from(obj.get("time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+        ]))),
+        ("snake", "snake_best") => Some(JsonValue::Object(Map::from_iter([
+            ("best_score".to_string(), JsonValue::from(obj.get("best_score").and_then(JsonValue::as_i64).or_else(|| obj.get("score").and_then(JsonValue::as_i64)).unwrap_or(0))),
+            ("best_time_sec".to_string(), JsonValue::from(obj.get("best_time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("time_sec").and_then(JsonValue::as_i64)).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+        ]))),
+        ("solitaire", "solitaire_best_v2") => Some(JsonValue::Object(Map::from_iter([
+            ("freecell".to_string(), JsonValue::from(obj.get("freecell_sec").and_then(JsonValue::as_i64).unwrap_or(0))),
+            ("klondike".to_string(), JsonValue::from(obj.get("klondike_sec").and_then(JsonValue::as_i64).unwrap_or(0))),
+            ("spider1".to_string(), JsonValue::from(obj.get("spider1_sec").and_then(JsonValue::as_i64).unwrap_or(0))),
+            ("spider2".to_string(), JsonValue::from(obj.get("spider2_sec").and_then(JsonValue::as_i64).unwrap_or(0))),
+            ("spider3".to_string(), JsonValue::from(obj.get("spider3_sec").and_then(JsonValue::as_i64).unwrap_or(0))),
+        ]))),
+        ("sudoku", "sudoku_best") => Some(JsonValue::Object(Map::from_iter([
+            ("d".to_string(), JsonValue::from(obj.get("d").and_then(JsonValue::as_i64).or_else(|| obj.get("difficulty_id").and_then(JsonValue::as_i64)).unwrap_or(0))),
+            ("t".to_string(), JsonValue::from(obj.get("t").and_then(JsonValue::as_i64).or_else(|| obj.get("time_sec").and_then(JsonValue::as_i64)).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+            ("difficulty".to_string(), JsonValue::from(obj.get("difficulty_id").and_then(JsonValue::as_i64).or_else(|| obj.get("d").and_then(JsonValue::as_i64)).unwrap_or(0))),
+            ("min_time_sec".to_string(), JsonValue::from(obj.get("time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("t").and_then(JsonValue::as_i64)).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+        ]))),
+        ("twenty_four", "twenty_four_best_time") => Some(JsonValue::Object(Map::from_iter([
+            ("time_sec".to_string(), JsonValue::from(obj.get("time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+        ]))),
+        ("wordle", "wordle_best_time_sec") => Some(JsonValue::from(obj.get("time_sec").and_then(JsonValue::as_i64).or_else(|| obj.get("time").and_then(JsonValue::as_str).and_then(parse_duration_to_secs)).unwrap_or(0))),
+        _ => None,
+    }
+}
+
+fn format_duration_seconds(total_secs: i64) -> String {
+    let total = total_secs.max(0);
+    let hours = total / 3600;
+    let minutes = (total % 3600) / 60;
+    let seconds = total % 60;
+    format!("{hours:02}:{minutes:02}:{seconds:02}")
 }
 
 fn append_runtime_log(path: &PathBuf, message: &str) -> Result<()> {
@@ -789,29 +1083,6 @@ fn append_runtime_log(path: &PathBuf, message: &str) -> Result<()> {
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
     writeln!(file, "{message}")?;
     Ok(())
-}
-
-fn save_runtime_slot(path: &PathBuf, slot: &str, value: &JsonValue) -> Result<()> {
-    let mut store = if path.exists() {
-        let raw = fs::read_to_string(path)?;
-        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
-            .unwrap_or_default()
-    } else {
-        Map::new()
-    };
-    store.insert(slot.to_string(), value.clone());
-    fs::write(path, serde_json::to_string_pretty(&store)?)?;
-    Ok(())
-}
-
-fn load_runtime_slot(path: &PathBuf, slot: &str) -> Result<Option<JsonValue>> {
-    if !path.exists() {
-        return Ok(None);
-    }
-    let raw = fs::read_to_string(path)?;
-    let store = serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
-        .unwrap_or_default();
-    Ok(store.get(slot).cloned())
 }
 
 fn next_random_u64() -> u64 {
@@ -2127,18 +2398,18 @@ mod tests {
             .expect("set save_data");
         globals
             .set(
-                "save_game_slot",
-                lua.create_function(|_, (_slot, _value): (String, mlua::Value)| Ok(true))
-                    .expect("save_game_slot stub"),
+                "save_continue",
+                lua.create_function(|_, _value: mlua::Value| Ok(true))
+                    .expect("save_continue stub"),
             )
-            .expect("set save_game_slot");
+            .expect("set save_continue");
         globals
             .set(
-                "load_game_slot",
-                lua.create_function(|_, _slot: String| Ok(mlua::Value::Nil))
-                    .expect("load_game_slot stub"),
+                "load_continue",
+                lua.create_function(|_, ()| Ok(mlua::Value::Nil))
+                    .expect("load_continue stub"),
             )
-            .expect("set load_game_slot");
+            .expect("set load_continue");
         globals
             .set(
                 "update_game_stats",

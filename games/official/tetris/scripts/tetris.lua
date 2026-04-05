@@ -684,22 +684,17 @@ local function read_launch_mode()
     return "new"
 end
 
-local function load_best_score()
+local function load_best_record()
     local data = nil
-    if type(load_data) == "function" then
-        local ok, ret = pcall(load_data, "tetris_best")
+    if type(load_best_score) == "function" then
+        local ok, ret = pcall(load_best_score)
         if ok then data = ret end
     end
-    if type(data) == "table" and type(data.best_score) == "number" then
-        state.best_score = math.max(0, math.floor(data.best_score))
+    if type(data) == "table" and type(data.score) == "number" then
+        state.best_score = math.max(0, math.floor(data.score))
     else
         state.best_score = 0
     end
-end
-
-local function save_best_score()
-    if type(save_data) ~= "function" then return end
-    pcall(save_data, "tetris_best", { best_score = state.best_score })
 end
 
 local function save_snapshot(manual)
@@ -722,12 +717,8 @@ local function save_snapshot(manual)
     }
 
     local ok = false
-    if type(save_game_slot) == "function" then
-        local s, ret = pcall(save_game_slot, "tetris", snapshot)
-        ok = s and ret ~= false
-    end
-    if (not ok) and type(save_data) == "function" then
-        local s, ret = pcall(save_data, "tetris_slot", snapshot)
+    if type(save_continue) == "function" then
+        local s, ret = pcall(save_continue, snapshot)
         ok = s and ret ~= false
     end
 
@@ -745,12 +736,8 @@ end
 
 local function load_snapshot()
     local snap = nil
-    if type(load_game_slot) == "function" then
-        local s, ret = pcall(load_game_slot, "tetris")
-        if s and type(ret) == "table" then snap = ret end
-    end
-    if snap == nil and type(load_data) == "function" then
-        local s, ret = pcall(load_data, "tetris_slot")
+    if type(load_continue) == "function" then
+        local s, ret = pcall(load_continue)
         if s and type(ret) == "table" then snap = ret end
     end
     if type(snap) ~= "table" then return false end
@@ -1175,7 +1162,9 @@ local function commit_result_once()
     if state.result_committed then return end
     if state.score > state.best_score then
         state.best_score = state.score
-        save_best_score()
+        if type(request_refresh_best_score) == "function" then
+            pcall(request_refresh_best_score)
+        end
     end
     if type(update_game_stats) == "function" then
         pcall(update_game_stats, "tetris", state.score, elapsed_seconds())
@@ -1359,7 +1348,7 @@ end
 local function bootstrap_game()
     clear()
     state.launch_mode = read_launch_mode()
-    load_best_score()
+    load_best_record()
     state.frame = 0
     state.last_warn_term_w, state.last_warn_term_h = terminal_size()
 

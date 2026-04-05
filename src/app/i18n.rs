@@ -250,7 +250,7 @@ fn resolve_lang_dirs() -> Vec<PathBuf> {
 }
 
 fn load_persisted_language_code() -> Result<Option<String>> {
-    let path = path_utils::language_pref_file()?;
+    let path = path_utils::language_file()?;
     if !path.exists() {
         return Ok(None);
     }
@@ -265,7 +265,7 @@ fn load_persisted_language_code() -> Result<Option<String>> {
 }
 
 fn save_persisted_language_code(code: &str) -> Result<()> {
-    let path = path_utils::language_pref_file()?;
+    let path = path_utils::language_file()?;
     path_utils::ensure_parent_dir(&path)?;
     fs::write(path, format!("{}\n", code.trim().to_ascii_lowercase()))?;
     Ok(())

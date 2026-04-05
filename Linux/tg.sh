@@ -14,8 +14,8 @@ while [ -L "$SCRIPT_PATH" ]; do
 done
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
 LANG_CODE="us-en"
-if [ -f "$SCRIPT_DIR/tui-game-data/language_pref.txt" ]; then
-    LANG_CODE=$(tr -d '\r\n' < "$SCRIPT_DIR/tui-game-data/language_pref.txt")
+if [ -f "$SCRIPT_DIR/tui-game-data/language.txt" ]; then
+    LANG_CODE=$(tr -d '\r\n' < "$SCRIPT_DIR/tui-game-data/language.txt")
 fi
 LANG_FILE="$SCRIPT_DIR/assets/bash_lang/$LANG_CODE.json"
 [ -f "$LANG_FILE" ] || LANG_FILE="$SCRIPT_DIR/assets/bash_lang/us-en.json"

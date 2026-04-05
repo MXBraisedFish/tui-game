@@ -222,8 +222,8 @@ local function save_slot()
         won = S.won,
     }
     local ok = false
-    if type(save_game_slot) == "function" then
-        local s, ret = pcall(save_game_slot, "wordle", payload)
+    if type(save_continue) == "function" then
+        local s, ret = pcall(save_continue, payload)
         ok = s and ret ~= false
     elseif type(save_data) == "function" then
         local s, ret = pcall(save_data, "wordle_slot", payload)
@@ -241,8 +241,8 @@ local function load_slot_if_continue()
     if mode ~= "continue" then return false end
 
     local ok, slot = false, nil
-    if type(load_game_slot) == "function" then
-        local s, ret = pcall(load_game_slot, "wordle")
+    if type(load_continue) == "function" then
+        local s, ret = pcall(load_continue)
         ok = s and ret ~= nil
         slot = ret
     elseif type(load_data) == "function" then

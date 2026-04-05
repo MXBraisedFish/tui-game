@@ -6,8 +6,8 @@ if "!SCRIPT_DIR:~-1!"=="\" set "SCRIPT_DIR=!SCRIPT_DIR:~0,-1!"
 set "LANG_CODE=us-en"
 set "LANG_FILE=!SCRIPT_DIR!\assets\bash_lang\us-en.json"
 
-if exist "!SCRIPT_DIR!\tui-game-data\language_pref.txt" (
-    set /p LANG_CODE=<"!SCRIPT_DIR!\tui-game-data\language_pref.txt"
+if exist "!SCRIPT_DIR!\tui-game-data\language.txt" (
+    set /p LANG_CODE=<"!SCRIPT_DIR!\tui-game-data\language.txt"
 )
 if exist "!SCRIPT_DIR!\assets\bash_lang\!LANG_CODE!.json" (
     set "LANG_FILE=!SCRIPT_DIR!\assets\bash_lang\!LANG_CODE!.json"

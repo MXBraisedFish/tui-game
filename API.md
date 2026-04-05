@@ -19,12 +19,12 @@
 | `consume_resize_event()` | 读取并清除终端尺寸变化标记。 | 无参数。返回 `boolean`。 |
 | `request_exit()` | 请求宿主退出当前游戏并返回上层页面。 | 无参数。 |
 | `request_refresh_best_score()` | 请求宿主立即刷新最佳记录。 | 无参数。 |
-| `debug_log(message)` | 向当前游戏的运行时日志文件追加一行调试信息。 | `message: string`。日志文件位于 `tui-game-data/runtime-logs/<game_id>.log`。 |
+| `debug_log(message)` | 向当前游戏的运行时日志文件追加一行调试信息。 | `message: string`。日志文件位于 `tui-game-data/log/<game_id>.log`。 |
 | `clear_debug_log()` | 清空当前游戏的运行时日志文件。 | 无参数。 |
 | `save_data(slot, value)` | 保存当前游戏的存档槽。 | `slot: string`；`value: nil \| boolean \| number \| string \| table`。 |
 | `load_data(slot)` | 读取当前游戏的存档槽。 | `slot: string`。返回对应 Lua 值，不存在时返回 `nil`。 |
-| `save_game_slot(slot, value)` | 保存“继续游戏”快照槽。 | `slot: string`；`value: nil \| boolean \| number \| string \| table`。返回 `true`。 |
-| `load_game_slot(slot)` | 读取“继续游戏”快照槽。 | `slot: string`。返回对应 Lua 值，不存在时返回 `nil`。 |
+| `save_continue(value)` | 保存“继续游戏”快照槽。 | `slot: string`；`value: nil \| boolean \| number \| string \| table`。返回 `true`。 |
+| `load_continue()` | 读取“继续游戏”快照槽。 | `slot: string`。返回对应 Lua 值，不存在时返回 `nil`。 |
 | `update_game_stats(game_id, score, duration_sec)` | 更新宿主统计文件中的分数和时长。 | `game_id: string`；`score: integer`；`duration_sec: integer`。 |
 | `translate(key)` | 读取当前包语言域中的语言键。 | `key: string`。查询顺序为当前语言、包内 `en_us`、缺失提示。 |
 | `read_text(path)` | 读取当前包 `assets/` 下的文本资源。 | `path: string` 包内逻辑路径，例如 `data/help.txt`。禁止绝对路径和 `..`。 |
@@ -57,5 +57,5 @@
 | 颜色参数 | 当前颜色参数统一为字符串或 `nil`，例如 `white`、`black`、`yellow`、`light_cyan`、`dark_gray`、`rgb(255,0,0)`。 |
 | 坐标系 | `canvas_*` 系列函数全部使用从 `0` 开始的画布坐标。旧脚本若是从 `1` 开始，需要自行做偏移。 |
 | 资源路径 | `read_text/read_json/read_bytes/load_helper` 都只接收包内逻辑路径，不要写 `assets/...`，不要写绝对路径，也不能跨包。 |
-| 存档值 | `save_data` 与 `save_game_slot` 只应保存可序列化的 Lua 值，避免函数、userdata、线程等内容。 |
+| 存档值 | `save_data`、`save_continue` 只应保存可序列化的 Lua 值，避免函数、userdata、线程等内容。 |
 | 随机数 | `random(max)` 不是 Lua 标准库 `math.random(max)` 语义，而是兼容旧宿主脚本的 `0..max-1`。 |

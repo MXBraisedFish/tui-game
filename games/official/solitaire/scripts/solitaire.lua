@@ -1142,8 +1142,8 @@ end
 local function save_progress(manual)
     local snap = snapshot_state()
     local ok = false
-    if type(save_game_slot) == "function" then
-        ok = pcall(save_game_slot, "solitaire", snap)
+    if type(save_continue) == "function" then
+        ok = pcall(save_continue, snap)
     elseif type(save_data) == "function" then
         ok = pcall(save_data, "solitaire_v2", snap)
     end
@@ -1162,8 +1162,8 @@ end
 -- 尝试加载进度
 local function try_load_progress()
     local data = nil
-    if type(load_game_slot) == "function" then
-        local ok, ret = pcall(load_game_slot, "solitaire")
+    if type(load_continue) == "function" then
+        local ok, ret = pcall(load_continue)
         if ok and type(ret) == "table" then data = ret end
     end
     if data == nil and type(load_data) == "function" then

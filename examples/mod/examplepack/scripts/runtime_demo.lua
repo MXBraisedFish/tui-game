@@ -17,7 +17,7 @@ end
 local function load_state()
   local state = nil
   if get_launch_mode() == "continue" then
-    state = load_data("state")
+    state = load_continue()
   end
   if type(state) ~= "table" then
     state = new_state()
@@ -108,7 +108,7 @@ function handle_event(state, event)
     state.message = "example_mod.msg_restart"
     return state
   elseif event.name == "confirm" then
-    save_data("state", state)
+    save_continue(state)
     request_exit()
     return state
   elseif event.name == "quit_action" then
@@ -128,7 +128,7 @@ function handle_event(state, event)
     else
       state.message = "example_mod.msg_finished"
     end
-    save_data("state", state)
+    save_continue(state)
   end
 
   return state

@@ -3,7 +3,6 @@
 pub enum RuntimeCommand {
     ExitGame,
     SaveRequest,
-    ClearSave,
     RefreshBestScore,
     ShowToast { message: String },
 }

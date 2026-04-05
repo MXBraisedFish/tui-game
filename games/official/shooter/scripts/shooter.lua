@@ -579,8 +579,8 @@ local function save_game_state(show_toast)
     local ok = false
     local snap = make_snapshot()
 
-    if type(save_game_slot) == "function" then
-        local s, ret = pcall(save_game_slot, "shooter", snap)
+    if type(save_continue) == "function" then
+        local s, ret = pcall(save_continue, snap)
         ok = s and ret ~= false
     elseif type(save_data) == "function" then
         local s, ret = pcall(save_data, "shooter", snap)
@@ -716,8 +716,8 @@ end
 
 local function load_game_state()
     local ok, snap = false, nil
-    if type(load_game_slot) == "function" then
-        local s, ret = pcall(load_game_slot, "shooter")
+    if type(load_continue) == "function" then
+        local s, ret = pcall(load_continue)
         ok = s and type(ret) == "table"
         snap = ret
     elseif type(load_data) == "function" then

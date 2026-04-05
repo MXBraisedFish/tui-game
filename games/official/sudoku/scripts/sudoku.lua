@@ -501,8 +501,8 @@ end
 local function save_state(show)
     local ok = false
     local x = snap()
-    if type(save_game_slot) == "function" then
-        local s, r = pcall(save_game_slot, "sudoku", x)
+    if type(save_continue) == "function" then
+        local s, r = pcall(save_continue, x)
         ok = s and r ~= false
     elseif type(save_data) == "function" then
         local s, r = pcall(save_data, "sudoku", x)
@@ -519,8 +519,8 @@ end
 
 local function load_state()
     local ok, x = false, nil
-    if type(load_game_slot) == "function" then
-        local s, r = pcall(load_game_slot, "sudoku")
+    if type(load_continue) == "function" then
+        local s, r = pcall(load_continue)
         ok = s and r ~= nil
         x = r
     elseif type(load_data) == "function" then

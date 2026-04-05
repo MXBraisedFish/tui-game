@@ -317,15 +317,15 @@ end
 | --- | --- |
 | `save_data(slot, value)` | 保存普通数据 |
 | `load_data(slot)` | 读取普通数据 |
-| `save_game_slot(slot, value)` | 保存继续游戏快照 |
-| `load_game_slot(slot)` | 读取继续游戏快照 |
+| `save_continue(value)` | 保存继续游戏快照 |
+| `load_continue()` | 读取继续游戏快照 |
 | `request_refresh_best_score()` | 请求宿主刷新最佳记录 |
 | `update_game_stats(game_id, score, duration_sec)` | 更新宿主统计文件 |
 
 建议：
 
 - `save_data/load_data` 用来存长期记录、最佳数据、配置。
-- `save_game_slot/load_game_slot` 用来存可恢复的中间局面。
+- `save_continue/load_continue` 用来存可恢复的中间局面。
 - `best_score(state)` 返回最终展示给宿主的最佳记录块。
 
 ### 5.5 资源和语言
@@ -356,7 +356,7 @@ end
 
 - 需要停顿、阶段切换、动画时，优先用 `tick + after_ms/deadline_passed`。
 - `random(max)` 返回 `0..max-1`，这是为了兼容旧脚本中常见的 `random(n) + 1` 写法。
-- `debug_log(message)` 和 `clear_debug_log()` 适合调试输入、状态切换和资源读取，日志文件位于 `tui-game-data/runtime-logs/<game_id>.log`。
+- `debug_log(message)` 和 `clear_debug_log()` 适合调试输入、状态切换和资源读取，日志文件位于 `tui-game-data/log/<game_id>.log`。
 
 ### 5.7 其他必要函数
 | 函数 | 用途 |

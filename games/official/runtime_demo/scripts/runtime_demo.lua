@@ -24,7 +24,7 @@ end
 local function load_state()
   local state = nil
   if get_launch_mode() == "continue" then
-    state = load_data("state")
+    state = load_continue()
   end
   if type(state) ~= "table" then
     state = fresh_state()
@@ -65,7 +65,7 @@ local function controls_text()
 end
 
 local function save_state(state)
-  save_data("state", state)
+  save_continue(state)
 end
 
 function handle_event(state, event)

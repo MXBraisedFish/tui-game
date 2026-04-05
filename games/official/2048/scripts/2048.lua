@@ -14,14 +14,17 @@ local BORDER_V = utf8.char(9474)
 
 local state = nil
 
+-- 通过宿主翻译接口解析语言键。
 local function tr(key)
   return translate(key)
 end
 
+-- 使用宿主画布按 1 基坐标绘制文本。
 local function draw_text(x, y, text, fg, bg)
   canvas_draw_text(math.max(0, x - 1), math.max(0, y - 1), text, fg, bg)
 end
 
+-- 在宿主画布上填充指定背景色矩形。
 local function fill_rect(x, y, w, h, bg)
   if w <= 0 or h <= 0 then
     return
@@ -29,6 +32,7 @@ local function fill_rect(x, y, w, h, bg)
   canvas_fill_rect(math.max(0, x - 1), math.max(0, y - 1), w, h, " ", nil, bg or "black")
 end
 
+-- 生成 [0, n - 1] 范围内的随机整数。
 local function random(n)
   if n <= 0 then
     return 0
@@ -36,6 +40,7 @@ local function random(n)
   return math.random(0, n - 1)
 end
 
+-- 将宿主事件归一化为脚本内部使用的键语义。
 local function normalize_key_name(event)
   if type(event) ~= "table" then
     return ""
@@ -55,15 +60,16 @@ local function normalize_key_name(event)
     move_right = "right",
     move_up = "up",
     move_down = "down",
-    save = "s",
-    restart = "r",
-    quit_action = "q",
-    confirm_yes = "enter",
-    confirm_no = "esc",
+    save = "save",
+    restart = "restart",
+    quit_action = "quit_action",
+    confirm_yes = "y",
+    confirm_no = "n",
   }
   return map[event.name] or ""
 end
 
+-- 深拷贝当前棋盘，用于保存快照。
 local function deep_copy_board(board)
   local out = {}
   for r = 1, SIZE do
@@ -75,6 +81,7 @@ local function deep_copy_board(board)
   return out
 end
 
+-- 构造一个全 0 的空棋盘。
 local function init_empty_board()
   local board = {}
   for r = 1, SIZE do
@@ -86,6 +93,7 @@ local function init_empty_board()
   return board
 end
 
+-- 按原版概率生成新数字块的值。
 local function random_tile_value()
   if random(10) == 0 then
     return 4
@@ -93,6 +101,7 @@ local function random_tile_value()
   return 2
 end
 
+-- 列出棋盘上的所有空格。
 local function list_empty_cells(board)
   local cells = {}
   for r = 1, SIZE do
@@ -105,6 +114,7 @@ local function list_empty_cells(board)
   return cells
 end
 
+-- 在随机空格中生成一个新数字块。
 local function spawn_tile(board)
   local empty = list_empty_cells(board)
   if #empty == 0 then
@@ -118,6 +128,7 @@ local function spawn_tile(board)
   return true
 end
 
+-- 将秒数格式化为 HH:MM:SS。
 local function format_duration(sec)
   local h = math.floor(sec / 3600)
   local m = math.floor((sec % 3600) / 60)
@@ -125,6 +136,7 @@ local function format_duration(sec)
   return string.format("%02d:%02d:%02d", h, m, s)
 end
 
+-- 将单个数字块格式化为紧凑显示文本。
 local function format_cell_value(v)
   if v == 0 then
     return "."
@@ -145,6 +157,7 @@ local function format_cell_value(v)
   return text
 end
 
+-- 根据数字块取背景颜色。
 local function tile_bg_color(v)
   if v == 0 then return "rgb(90,90,90)" end
   if v == 2 then return "rgb(255,255,255)" end
@@ -166,6 +179,7 @@ local function tile_bg_color(v)
   return "rgb(0,0,0)"
 end
 
+-- 根据数字块取文字颜色。
 local function text_color_for_value(v)
   if v == 0 then
     return "black"
@@ -176,6 +190,7 @@ local function text_color_for_value(v)
   return "white"
 end
 
+-- 借助宿主接口计算文本显示宽度。
 local function text_width(text)
   local ok, w = pcall(get_text_width, text)
   if ok and type(w) == "number" then
@@ -184,6 +199,7 @@ local function text_width(text)
   return #text
 end
 
+-- 将一句文本按宽度限制分行为多行。
 local function wrap_words(text, max_width)
   if max_width <= 1 then
     return { text }
@@ -214,6 +230,7 @@ local function wrap_words(text, max_width)
   return lines
 end
 
+-- 计算文本在限定行数内所需的最小宽度。
 local function min_width_for_lines(text, max_lines, hard_min)
   local full = text_width(text)
   local width = hard_min
@@ -226,6 +243,7 @@ local function min_width_for_lines(text, max_lines, hard_min)
   return full
 end
 
+-- 按原版 2048 规则合并一行或一列。
 local function merge_line(values)
   local compact = {}
   for i = 1, #values do
@@ -258,6 +276,7 @@ local function merge_line(values)
   return out, gained
 end
 
+-- 读取棋盘中的一行。
 local function get_row(board, r)
   local line = {}
   for c = 1, SIZE do
@@ -266,12 +285,14 @@ local function get_row(board, r)
   return line
 end
 
+-- 将一行写回棋盘。
 local function set_row(board, r, line)
   for c = 1, SIZE do
     board[r][c] = line[c]
   end
 end
 
+-- 读取棋盘中的一列。
 local function get_col(board, c)
   local line = {}
   for r = 1, SIZE do
@@ -280,12 +301,14 @@ local function get_col(board, c)
   return line
 end
 
+-- 将一列写回棋盘。
 local function set_col(board, c, line)
   for r = 1, SIZE do
     board[r][c] = line[r]
   end
 end
 
+-- 反转一行或一列。
 local function reverse_line(line)
   local out = {}
   for i = 1, SIZE do
@@ -294,6 +317,7 @@ local function reverse_line(line)
   return out
 end
 
+-- 比较两行或两列是否完全相同。
 local function lines_equal(a, b)
   for i = 1, SIZE do
     if a[i] ~= b[i] then
@@ -303,6 +327,7 @@ local function lines_equal(a, b)
   return true
 end
 
+-- 对棋盘执行一次移动并累计得分变化。
 local function apply_move(dir)
   local moved = false
   local gained = 0
@@ -351,6 +376,7 @@ local function apply_move(dir)
   return moved
 end
 
+-- 检查当前是否还存在合法移动。
 local function can_move_any()
   if #list_empty_cells(state.board) > 0 then
     return true
@@ -369,6 +395,7 @@ local function can_move_any()
   return false
 end
 
+-- 计算当前局的已用时秒数。
 local function elapsed_seconds()
   local end_frame = state.end_frame
   if end_frame == nil then
@@ -377,17 +404,18 @@ local function elapsed_seconds()
   return math.floor((end_frame - state.start_frame) / FPS)
 end
 
+-- 如果本局刷新记录，则保存最高分和最短时间。
 local function commit_stats()
   local score = tonumber(state.score) or 0
   local duration = elapsed_seconds()
   if score > state.best_score or (score == state.best_score and score > 0 and (state.best_time_sec == 0 or duration < state.best_time_sec)) then
     state.best_score = score
     state.best_time_sec = duration
-    save_data("2048_best", { score = state.best_score, time_sec = state.best_time_sec })
     request_refresh_best_score()
   end
 end
 
+-- 当目标块出现时，更新胜利状态并提交记录。
 local function update_win_and_loss()
   local was_won = state.won
   state.won = false
@@ -406,6 +434,7 @@ local function update_win_and_loss()
   end
 end
 
+-- 生成当前对局快照，用于保存和继续游戏。
 local function make_snapshot()
   return {
     board = deep_copy_board(state.board),
@@ -414,8 +443,9 @@ local function make_snapshot()
   }
 end
 
+-- 读取已保存的最佳记录。
 local function load_best_record()
-  local data = load_data("2048_best")
+  local data = load_best_score()
   if type(data) ~= "table" then
     state.best_score = 0
     state.best_time_sec = 0
@@ -425,6 +455,7 @@ local function load_best_record()
   state.best_time_sec = math.max(0, math.floor(tonumber(data.time_sec) or 0))
 end
 
+-- 将已保存的对局快照恢复到运行时状态。
 local function restore_snapshot(snapshot)
   if type(snapshot) ~= "table" or type(snapshot.board) ~= "table" then
     return false
@@ -455,10 +486,11 @@ local function restore_snapshot(snapshot)
   return true
 end
 
+-- 保存当前对局，并按需显示提示。
 local function save_game_state(show_toast)
   local ok = false
   local snapshot = make_snapshot()
-  local ret = save_data("2048", snapshot)
+  local ret = save_continue(snapshot)
   ok = ret ~= false
 
   if show_toast then
@@ -469,14 +501,16 @@ local function save_game_state(show_toast)
   end
 end
 
+-- 尝试读取继续游戏快照。
 local function load_game_state()
-  local snapshot = load_data("2048")
+  local snapshot = load_continue()
   if snapshot ~= nil then
     return restore_snapshot(snapshot)
   end
   return false
 end
 
+-- 将棋盘重置为一局全新的游戏。
 local function reset_game()
   state.board = init_empty_board()
   state.score = 0
@@ -494,6 +528,7 @@ local function reset_game()
   state.dirty = true
 end
 
+-- 读取宿主启动模式，并收敛为 new/continue。
 local function read_launch_mode()
   local mode = string.lower(tostring(get_launch_mode() or "new"))
   if mode == "continue" then
@@ -502,25 +537,12 @@ local function read_launch_mode()
   return "new"
 end
 
+-- 计算棋盘外框的渲染区域。
 local function board_geometry()
   local w, h = get_terminal_size()
   local grid_w = SIZE * CELL_W
   local grid_h = SIZE * CELL_H
-  local status_w = text_width(tr("game.2048.time") .. " 00:00:00")
-      + 2
-      + text_width(tr("game.2048.score") .. " 999999999")
-  local best_w = text_width(
-    tr("game.2048.best_title")
-      .. "  "
-      .. tr("game.2048.best_score")
-      .. " "
-      .. tostring(math.max(0, state.best_score))
-      .. "  "
-      .. tr("game.2048.best_time")
-      .. " "
-      .. format_duration(math.max(0, state.best_time_sec))
-  )
-  local frame_w = math.max(grid_w, status_w, best_w) + 2
+  local frame_w = grid_w + 2
   local frame_h = grid_h + 2
   local x = math.floor((w - frame_w) / 2)
   local y = math.floor((h - frame_h) / 2)
@@ -529,33 +551,7 @@ local function board_geometry()
   return x, y, frame_w, frame_h
 end
 
-local function minimum_required_size()
-  local frame_w = SIZE * CELL_W + 2
-  local frame_h = SIZE * CELL_H + 2
-  local controls_w = min_width_for_lines(tr("game.2048.controls"), 3, 24)
-  local status_w = text_width(tr("game.2048.time") .. " 00:00:00")
-      + 2
-      + text_width(tr("game.2048.score") .. " 999999999")
-  local best_w = text_width(
-    tr("game.2048.best_title")
-      .. "  "
-      .. tr("game.2048.best_score")
-      .. " 999999999  "
-      .. tr("game.2048.best_time")
-      .. " 00:00:00"
-  )
-  local win_line_w = text_width(tr("game.2048.win_banner") .. tr("game.2048.win_controls"))
-  local tip_w = math.max(
-    text_width(tr("game.2048.game_over")),
-    text_width(tr("game.2048.confirm_restart")),
-    text_width(tr("game.2048.confirm_exit")),
-    win_line_w
-  )
-  local min_w = math.max(frame_w, controls_w, status_w, best_w, tip_w) + 2
-  local min_h = frame_h + 8
-  return min_w, min_h
-end
-
+-- 绘制棋盘外框。
 local function draw_outer_frame(x, y, frame_w, frame_h)
   draw_text(x, y, BORDER_TL .. string.rep(BORDER_H, frame_w - 2) .. BORDER_TR, "white", "black")
   for i = 1, frame_h - 2 do
@@ -565,6 +561,7 @@ local function draw_outer_frame(x, y, frame_w, frame_h)
   draw_text(x, y + frame_h - 1, BORDER_BL .. string.rep(BORDER_H, frame_w - 2) .. BORDER_BR, "white", "black")
 end
 
+-- 在棋盘指定位置绘制一个数字块。
 local function draw_tile(tile_x, tile_y, value)
   local bg = tile_bg_color(value)
   local fg = text_color_for_value(value)
@@ -577,6 +574,7 @@ local function draw_tile(tile_x, tile_y, value)
   draw_text(text_x, text_y, text, fg, bg)
 end
 
+-- 绘制棋盘上方的状态信息。
 local function draw_status(x, y, frame_w)
   local elapsed = elapsed_seconds()
   local left = tr("game.2048.time") .. " " .. format_duration(elapsed)
@@ -591,32 +589,46 @@ local function draw_status(x, y, frame_w)
   draw_text(1, y - 2, string.rep(" ", term_w), "white", "black")
   draw_text(1, y - 1, string.rep(" ", term_w), "white", "black")
 
-  local best_line = tr("game.2048.best_title")
-      .. "  "
-      .. tr("game.2048.best_score")
+  local best_line = tr("game.2048.best_score")
       .. " "
       .. tostring(math.max(0, state.best_score))
       .. "  "
       .. tr("game.2048.best_time")
       .. " "
       .. format_duration(math.max(0, state.best_time_sec))
-  draw_text(x, y - 3, best_line, "dark_gray", "black")
+  local best_x = math.floor((term_w - text_width(best_line)) / 2)
+  if best_x < 1 then best_x = 1 end
+  draw_text(best_x, y - 3, best_line, "dark_gray", "black")
   draw_text(x, y - 2, left, "light_cyan", "black")
   draw_text(right_x, y - 2, right, "light_cyan", "black")
 
+  local notice = nil
+  local notice_fg = "white"
   if state.won then
-    draw_text(x, y - 1, tr("game.2048.win_banner") .. tr("game.2048.win_controls"), "yellow", "black")
+    notice = tr("game.2048.win_banner") .. tr("game.2048.win_controls")
+    notice_fg = "yellow"
   elseif state.confirm_mode == "game_over" then
-    draw_text(x, y - 1, tr("game.2048.game_over"), "red", "black")
+    notice = tr("game.2048.game_over")
+    notice_fg = "red"
   elseif state.confirm_mode == "restart" then
-    draw_text(x, y - 1, tr("game.2048.confirm_restart"), "yellow", "black")
+    notice = tr("game.2048.confirm_restart")
+    notice_fg = "yellow"
   elseif state.confirm_mode == "exit" then
-    draw_text(x, y - 1, tr("game.2048.confirm_exit"), "yellow", "black")
+    notice = tr("game.2048.confirm_exit")
+    notice_fg = "yellow"
   elseif state.toast_text ~= nil and state.frame <= state.toast_until then
-    draw_text(x, y - 1, state.toast_text, "green", "black")
+    notice = state.toast_text
+    notice_fg = "green"
+  end
+
+  if notice ~= nil then
+    local notice_x = math.floor((term_w - text_width(notice)) / 2)
+    if notice_x < 1 then notice_x = 1 end
+    draw_text(notice_x, y - 1, notice, notice_fg, "black")
   end
 end
 
+-- 绘制棋盘下方的操作提示。
 local function draw_controls(x, y, frame_h)
   local term_w = select(1, get_terminal_size())
   local controls = tr("game.2048.controls")
@@ -644,15 +656,14 @@ local function draw_controls(x, y, frame_h)
   end
 end
 
+-- 渲染当前帧的完整 2048 画面。
 local function render_game()
   local x, y, frame_w, frame_h = board_geometry()
   fill_rect(x, y - 3, frame_w, frame_h + 7, "black")
   draw_status(x, y, frame_w)
   draw_outer_frame(x, y, frame_w, frame_h)
 
-  local pad_x = math.floor((frame_w - 2 - SIZE * CELL_W) / 2)
-  if pad_x < 0 then pad_x = 0 end
-  local inner_x = x + 1 + pad_x
+  local inner_x = x + 1
   local inner_y = y + 1
   for r = 1, SIZE do
     for c = 1, SIZE do
@@ -665,6 +676,7 @@ local function render_game()
   draw_controls(x, y, frame_h)
 end
 
+-- 处理重新开始、退出、结算确认框中的按键。
 local function handle_confirm_key(key)
   if key == "y" or key == "enter" then
     if state.confirm_mode == "game_over" or state.confirm_mode == "restart" then
@@ -677,16 +689,11 @@ local function handle_confirm_key(key)
     end
   end
 
-  if state.confirm_mode == "game_over" and (key == "q" or key == "esc") then
-    commit_stats()
-    return "exit"
-  end
-
-  if state.confirm_mode == "game_over" then
-    return "none"
-  end
-
-  if key == "q" or key == "esc" then
+  if key == "n" or key == "esc" then
+    if state.confirm_mode == "game_over" then
+      commit_stats()
+      return "exit"
+    end
     state.confirm_mode = nil
     state.dirty = true
     return "changed"
@@ -694,6 +701,7 @@ local function handle_confirm_key(key)
   return "none"
 end
 
+-- 当重新出现可移动空间时，清理旧的失败状态。
 local function reconcile_game_over_state()
   if state.confirm_mode == "game_over" and can_move_any() then
     state.game_over = false
@@ -703,17 +711,28 @@ local function reconcile_game_over_state()
   end
 end
 
+-- 将动作语义和原始方向键统一映射为移动方向。
 local function apply_direction_key(key)
-  if key == "up" or key == "down" or key == "left" or key == "right" then
-    return key
-  end
+  local map = {
+    move_up = "up",
+    move_down = "down",
+    move_left = "left",
+    move_right = "right",
+    up = "up",
+    down = "down",
+    left = "left",
+    right = "right",
+  }
+  if map[key] ~= nil then return map[key] end
   return nil
 end
 
+-- 判断当前键是否属于移动方向。
 local function is_move_key(key)
-  return key == "up" or key == "down" or key == "left" or key == "right"
+  return apply_direction_key(key) ~= nil
 end
 
+-- 对连续方向输入做简易消抖，贴近原版手感。
 local function should_debounce(key)
   if not is_move_key(key) then
     return false
@@ -726,6 +745,7 @@ local function should_debounce(key)
   return false
 end
 
+-- 按当前状态处理一次归一化后的输入。
 local function handle_input(key)
   if key == nil or key == "" then
     return "none"
@@ -741,28 +761,28 @@ local function handle_input(key)
   end
 
   if state.won then
-    if key == "r" then
+    if key == "restart" or key == "r" then
       reset_game()
       return "changed"
     end
-    if key == "q" or key == "esc" then
+    if key == "quit_action" or key == "q" or key == "esc" then
       commit_stats()
       return "exit"
     end
     return "none"
   end
 
-  if key == "r" then
+  if key == "restart" or key == "r" then
     state.confirm_mode = "restart"
     state.dirty = true
     return "changed"
   end
-  if key == "q" or key == "esc" then
+  if key == "quit_action" or key == "q" or key == "esc" then
     state.confirm_mode = "exit"
     state.dirty = true
     return "changed"
   end
-  if key == "s" then
+  if key == "save" or key == "s" then
     save_game_state(true)
     return "changed"
   end
@@ -796,6 +816,7 @@ local function handle_input(key)
   return "none"
 end
 
+-- 每经过一分钟自动保存一次当前对局。
 local function auto_save_if_needed()
   local elapsed = elapsed_seconds()
   if elapsed - state.last_auto_save_sec >= 60 then
@@ -804,6 +825,7 @@ local function auto_save_if_needed()
   end
 end
 
+-- 当计时或提示变化时，标记界面需要重绘。
 local function refresh_dirty_flags()
   local elapsed = math.floor((state.frame - state.start_frame) / FPS)
   if elapsed ~= state.last_elapsed_sec then
@@ -822,6 +844,7 @@ local function refresh_dirty_flags()
   end
 end
 
+-- 当终端尺寸变化时，标记界面需要重绘。
 local function sync_terminal_resize()
   local w, h = get_terminal_size()
   if w ~= state.last_term_w or h ~= state.last_term_h then
@@ -832,6 +855,7 @@ local function sync_terminal_resize()
   end
 end
 
+-- 创建并初始化运行时状态表。
 function init_game()
   state = {
     board = init_empty_board(),
@@ -880,6 +904,7 @@ function init_game()
   return state
 end
 
+-- 响应宿主事件并推进游戏状态。
 function handle_event(in_state, event)
   state = in_state
 
@@ -907,11 +932,13 @@ function handle_event(in_state, event)
   return state
 end
 
+-- 绘制当前帧。
 function render(in_state)
   state = in_state
   render_game()
 end
 
+-- 导出供宿主展示的最佳记录数据。
 function best_score(in_state)
   state = in_state
   if state.best_score <= 0 then
