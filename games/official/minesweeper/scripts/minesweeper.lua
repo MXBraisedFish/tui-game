@@ -192,8 +192,8 @@ local function normalize_event_key(event)
         save = "s",
         restart = "r",
         quit_action = "q",
-        confirm_yes = "y",
-        confirm_no = "n",
+        confirm_yes = "enter",
+        confirm_no = "esc",
         remove_last_backspace = "backspace",
         remove_last_delete = "delete"
     }
@@ -1311,7 +1311,7 @@ local function handle_confirm_key(key)
         end
     end
 
-    if key == "n" or key == "q" or key == "esc" then
+    if key == "q" or key == "esc" then
         state.confirm_mode = nil
         state.dirty = true
         return "changed"

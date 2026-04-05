@@ -118,10 +118,10 @@ fn resolve_relative_under(root: PathBuf, logical_path: &str) -> Result<PathBuf> 
 }
 
 fn is_probable_lang_key(value: &str) -> bool {
-    value
-        .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
-        && value.contains('.')
+    value.contains('.')
+        && !value.contains('/')
+        && !value.contains('\\')
+        && !value.chars().any(char::is_whitespace)
 }
 
 #[cfg(test)]

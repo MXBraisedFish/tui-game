@@ -1,43 +1,42 @@
 {
-  "id": "maze_escape",
-  "name": "game.maze_escape.name",
-  "description": "game.maze_escape.description",
-  "detail": "game.maze_escape.details",
-  "entry": "scripts/maze_escape.lua",
-  "save": true,
-  "best_none": "game.maze_escape.best_none_block",
-  "min_width": 1,
-  "min_height": 1,
-  "actions": {
-    "move_left": [
-      "left"
-    ],
-    "move_right": [
-      "right"
-    ],
-    "move_up": [
-      "up"
-    ],
-    "move_down": [
-      "down"
-    ],
-    "config_input": [
-      "p"
-    ],
-    "save": [
-      "s"
-    ],
-    "restart": [
-      "r"
-    ],
-    "quit_action": [
-      "q"
-    ],
-    "confirm_yes": [
-      "y"
-    ],
-    "confirm_no": [
-      "n"
-    ]
-  }
+    "id":  "maze_escape",
+    "name":  "game.maze_escape.name",
+    "description":  "game.maze_escape.description",
+    "detail":  "game.maze_escape.details",
+    "entry":  "scripts/maze_escape.lua",
+    "save":  true,
+    "best_none":  "game.maze_escape.best_none_block",
+    "min_width":  1,
+    "min_height":  1,
+    "actions":  {
+                    "move_left":  [
+                                      "left"
+                                  ],
+                    "move_right":  [
+                                       "right"
+                                   ],
+                    "move_up":  [
+                                    "up"
+                                ],
+                    "move_down":  [
+                                      "down"
+                                  ],
+                    "config_input":  [
+                                         "p"
+                                     ],
+                    "save":  [
+                                 "s"
+                             ],
+                    "restart":  [
+                                    "r"
+                                ],
+                    "quit_action":  [
+                                        "q"
+                                    ],
+                    "confirm_yes":  [
+                                        "y",
+                                        "enter"
+                                    ],
+                    "confirm_no": ["q", "esc", "n"]
+                }
 }

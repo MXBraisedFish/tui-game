@@ -1,21 +1,42 @@
 {
-  "id": "sliding_puzzle",
-  "name": "game.sliding_puzzle.name",
-  "description": "game.sliding_puzzle.description",
-  "detail": "game.sliding_puzzle.details",
-  "entry": "scripts/sliding_puzzle.lua",
-  "save": true,
-  "best_none": "game.sliding_puzzle.best_none_block",
-  "min_width": 56,
-  "min_height": 24,
-  "actions": {
-    "move_left": ["left", "a"],
-    "move_right": ["right", "d"],
-    "move_up": ["up", "w"],
-    "move_down": ["down"],
-    "toggle_mode": ["x"],
-    "save": ["s"],
-    "restart": ["r"],
-    "quit_action": ["q"]
-  }
+    "id":  "sliding_puzzle",
+    "name":  "game.sliding_puzzle.name",
+    "description":  "game.sliding_puzzle.description",
+    "detail":  "game.sliding_puzzle.details",
+    "entry":  "scripts/sliding_puzzle.lua",
+    "save":  true,
+    "best_none":  "game.sliding_puzzle.best_none_block",
+    "min_width":  1,
+    "min_height":  1,
+    "actions":  {
+                    "move_left":  [
+                                      "left"
+                                  ],
+                    "move_right":  [
+                                       "right"
+                                   ],
+                    "move_up":  [
+                                    "up"
+                                ],
+                    "move_down":  [
+                                      "down"
+                                  ],
+                    "toggle_mode":  [
+                                        "x"
+                                    ],
+                    "save":  [
+                                 "s"
+                             ],
+                    "restart":  [
+                                    "r"
+                                ],
+                    "quit_action":  [
+                                        "q"
+                                    ],
+                    "confirm_yes":  [
+                                        "y",
+                                        "enter"
+                                    ],
+                    "confirm_no": ["q", "esc", "n"]
+                }
 }

@@ -1,25 +1,48 @@
 {
-  "id": "lights_out",
-  "name": "game.lights_out.name",
-  "description": "game.lights_out.description",
-  "detail": "game.lights_out.details",
-  "entry": "scripts/lights_out.lua",
-  "save": true,
-  "best_none": "game.lights_out.best_none_block",
-  "min_width": 1,
-  "min_height": 1,
-  "actions": {
-    "move_left": ["left"],
-    "move_right": ["right"],
-    "move_up": ["up"],
-    "move_down": ["down"],
-    "toggle": ["space"],
-    "resize_cycle": ["p"],
-    "quick_jump": ["d"],
-    "save": ["s"],
-    "restart": ["r"],
-    "quit_action": ["q"],
-    "confirm_yes": ["y"],
-    "confirm_no": ["n"]
-  }
+    "id":  "lights_out",
+    "name":  "game.lights_out.name",
+    "description":  "game.lights_out.description",
+    "detail":  "game.lights_out.details",
+    "entry":  "scripts/lights_out.lua",
+    "save":  true,
+    "best_none":  "game.lights_out.best_none_block",
+    "min_width":  1,
+    "min_height":  1,
+    "actions":  {
+                    "move_left":  [
+                                      "left"
+                                  ],
+                    "move_right":  [
+                                       "right"
+                                   ],
+                    "move_up":  [
+                                    "up"
+                                ],
+                    "move_down":  [
+                                      "down"
+                                  ],
+                    "toggle":  [
+                                   "space"
+                               ],
+                    "resize_cycle":  [
+                                         "p"
+                                     ],
+                    "quick_jump":  [
+                                       "d"
+                                   ],
+                    "save":  [
+                                 "s"
+                             ],
+                    "restart":  [
+                                    "r"
+                                ],
+                    "quit_action":  [
+                                        "q"
+                                    ],
+                    "confirm_yes":  [
+                                        "y",
+                                        "enter"
+                                    ],
+                    "confirm_no": ["q", "esc", "n"]
+                }
 }

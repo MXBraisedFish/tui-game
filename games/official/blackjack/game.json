@@ -1,26 +1,52 @@
 {
-  "id": "blackjack",
-  "name": "game.blackjack.name",
-  "description": "game.blackjack.description",
-  "detail": "game.blackjack.details",
-  "entry": "scripts/blackjack.lua",
-  "save": false,
-  "best_none": "game.blackjack.best_none_block",
-  "min_width": 1,
-  "min_height": 1,
-  "actions": {
-    "adjust_down": ["-"],
-    "adjust_up": ["+", "="],
-    "confirm_yes": ["y"],
-    "confirm_no": ["n"],
-    "double_down": ["z"],
-    "hit": ["space"],
-    "insurance": ["c"],
-    "restart": ["r"],
-    "quit_action": ["q"],
-    "split_hand": ["x"],
-    "stand": ["enter"],
-    "switch_left": ["left"],
-    "switch_right": ["right"]
-  }
+    "id":  "blackjack",
+    "name":  "game.blackjack.name",
+    "description":  "game.blackjack.description",
+    "detail":  "game.blackjack.details",
+    "entry":  "scripts/blackjack.lua",
+    "save":  false,
+    "best_none":  "game.blackjack.best_none_block",
+    "min_width":  1,
+    "min_height":  1,
+    "actions":  {
+                    "adjust_down":  [
+                                        "-"
+                                    ],
+                    "adjust_up":  [
+                                      "+",
+                                      "="
+                                  ],
+                    "confirm_yes":  [
+                                        "y",
+                                        "enter"
+                                    ],
+                    "confirm_no": ["q", "esc", "n"],
+                    "double_down":  [
+                                        "z"
+                                    ],
+                    "hit":  [
+                                "space"
+                            ],
+                    "insurance":  [
+                                      "c"
+                                  ],
+                    "restart":  [
+                                    "r"
+                                ],
+                    "quit_action":  [
+                                        "q"
+                                    ],
+                    "split_hand":  [
+                                       "x"
+                                   ],
+                    "stand":  [
+                                  "enter"
+                              ],
+                    "switch_left":  [
+                                        "left"
+                                    ],
+                    "switch_right":  [
+                                         "right"
+                                     ]
+                }
 }

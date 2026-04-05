@@ -1,55 +1,54 @@
 {
-  "id": "memory_flip",
-  "name": "game.memory_flip.name",
-  "description": "game.memory_flip.description",
-  "detail": "game.memory_flip.details",
-  "entry": "scripts/memory_flip.lua",
-  "save": true,
-  "best_none": "game.memory_flip.best_none_block",
-  "min_width": 1,
-  "min_height": 1,
-  "actions": {
-    "move_up": [
-      "up"
-    ],
-    "move_down": [
-      "down"
-    ],
-    "move_left": [
-      "left"
-    ],
-    "move_right": [
-      "right"
-    ],
-    "flip": [
-      "space"
-    ],
-    "difficulty_input": [
-      "p"
-    ],
-    "quick_jump": [
-      "d"
-    ],
-    "save": [
-      "s"
-    ],
-    "restart": [
-      "r"
-    ],
-    "quit_action": [
-      "q"
-    ],
-    "confirm_yes": [
-      "y"
-    ],
-    "confirm_no": [
-      "n"
-    ],
-    "remove_last_backspace": [
-      "backspace"
-    ],
-    "remove_last_delete": [
-      "delete"
-    ]
-  }
+    "id":  "memory_flip",
+    "name":  "game.memory_flip.name",
+    "description":  "game.memory_flip.description",
+    "detail":  "game.memory_flip.details",
+    "entry":  "scripts/memory_flip.lua",
+    "save":  true,
+    "best_none":  "game.memory_flip.best_none_block",
+    "min_width":  1,
+    "min_height":  1,
+    "actions":  {
+                    "move_up":  [
+                                    "up"
+                                ],
+                    "move_down":  [
+                                      "down"
+                                  ],
+                    "move_left":  [
+                                      "left"
+                                  ],
+                    "move_right":  [
+                                       "right"
+                                   ],
+                    "flip":  [
+                                 "space"
+                             ],
+                    "difficulty_input":  [
+                                             "p"
+                                         ],
+                    "quick_jump":  [
+                                       "d"
+                                   ],
+                    "save":  [
+                                 "s"
+                             ],
+                    "restart":  [
+                                    "r"
+                                ],
+                    "quit_action":  [
+                                        "q"
+                                    ],
+                    "confirm_yes":  [
+                                        "y",
+                                        "enter"
+                                    ],
+                    "confirm_no": ["q", "esc", "n"],
+                    "remove_last_backspace":  [
+                                                  "backspace"
+                                              ],
+                    "remove_last_delete":  [
+                                               "delete"
+                                           ]
+                }
 }

@@ -212,8 +212,8 @@ local function normalize_key(key)
                 pick_3 = "3",
                 pick_4 = "4",
                 confirm = "enter",
-                confirm_yes = "y",
-                confirm_no = "n",
+                confirm_yes = "enter",
+                confirm_no = "esc",
                 remove_last_backspace = "backspace",
                 remove_last_delete = "delete",
                 restart = "r",
@@ -697,7 +697,7 @@ local function handle_confirm_key(key)
             commit_stats_if_needed()
             return "exit"
         end
-    elseif key == "n" or key == "q" or key == "esc" then
+    elseif key == "q" or key == "esc" then
         state.confirm_mode = nil
         state.dirty = true
         return "changed"

@@ -260,7 +260,7 @@ local function normalize_key(key)
                 save = "s",
                 quit_action = "q",
                 confirm_yes = "enter",
-                confirm_no = "n",
+                confirm_no = "esc",
             }
             return map[key.name] or ""
         end
@@ -2029,7 +2029,7 @@ local function handle_confirm_key(key)
         end
         return true
     end
-    if key == "n" or key == "q" or key == "esc" then
+    if key == "q" or key == "esc" then
         state.confirm_mode = nil
         state.dirty = true
         return true

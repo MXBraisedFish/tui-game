@@ -54,6 +54,12 @@ pub fn stats_file() -> Result<PathBuf> {
     Ok(app_data_dir()?.join("stats.json"))
 }
 
+pub fn runtime_logs_dir() -> Result<PathBuf> {
+    let dir = app_data_dir()?.join("runtime-logs");
+    fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
 pub fn main_binary_file() -> Result<PathBuf> {
     Ok(runtime_dir()?.join(binary_name("tui-game")))
 }

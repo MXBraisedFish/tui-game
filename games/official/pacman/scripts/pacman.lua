@@ -195,8 +195,8 @@ local function normalize_key(key)
                 move_right = "right",
                 restart = "r",
                 quit_action = "q",
-                confirm_yes = "y",
-                confirm_no = "n",
+                confirm_yes = "enter",
+                confirm_no = "esc",
             }
             return map[key.name] or ""
         end
@@ -1195,7 +1195,7 @@ end
 -- 澶勭悊纭妯″紡涓嬬殑杈撳叆
 local function handle_confirm_input(key)
     if state.confirm_mode == nil then return false end
-    if key == "y" then
+    if key == "y" or key == "enter" then
         if state.confirm_mode == "restart" then
             start_new_run()
         else
@@ -1204,7 +1204,7 @@ local function handle_confirm_input(key)
         end
         return true
     end
-    if key == "n" or key == "q" or key == "esc" then
+    if key == "q" or key == "esc" then
         state.confirm_mode = nil
         state.dirty = true
         return true

@@ -59,7 +59,7 @@ local function normalize_key_name(event)
     restart = "r",
     quit_action = "q",
     confirm_yes = "enter",
-    confirm_no = "n",
+    confirm_no = "esc",
   }
   return map[event.name] or ""
 end
@@ -677,7 +677,7 @@ local function handle_confirm_key(key)
     end
   end
 
-  if state.confirm_mode == "game_over" and key == "n" then
+  if state.confirm_mode == "game_over" and (key == "q" or key == "esc") then
     commit_stats()
     return "exit"
   end
@@ -686,7 +686,7 @@ local function handle_confirm_key(key)
     return "none"
   end
 
-  if key == "n" or key == "q" or key == "esc" then
+  if key == "q" or key == "esc" then
     state.confirm_mode = nil
     state.dirty = true
     return "changed"

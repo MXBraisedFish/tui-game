@@ -1,21 +1,60 @@
 {
-  "id": "solitaire",
-  "name": "game.solitaire.name",
-  "description": "game.solitaire.description",
-  "detail": "game.solitaire.details",
-  "entry": "scripts/solitaire.lua",
-  "save": true,
-  "best_none": "game.solitaire.best_none_block",
-  "min_width": 70,
-  "min_height": 24,
-  "actions": {
-    "prev_column": ["left", "a"],
-    "next_column": ["right", "d"],
-    "move_card": ["enter", "space"],
-    "switch_mode": ["p"],
-    "undo": ["z"],
-    "save": ["s"],
-    "restart": ["r"],
-    "quit_action": ["q"]
-  }
+    "id":  "solitaire",
+    "name":  "game.solitaire.name",
+    "description":  "game.solitaire.description",
+    "detail":  "game.solitaire.details",
+    "entry":  "scripts/solitaire.lua",
+    "save":  true,
+    "best_none":  "game.solitaire.best_none_block",
+    "min_width":  1,
+    "min_height":  1,
+    "actions":  {
+                    "prev_column":  [
+                                        "left"
+                                    ],
+                    "next_column":  [
+                                        "right"
+                                    ],
+                    "cursor_up":  [
+                                      "up"
+                                  ],
+                    "cursor_down":  [
+                                        "down"
+                                    ],
+                    "select_column":  [
+                                          "space"
+                                      ],
+                    "primary_action":  [
+                                           "enter"
+                                       ],
+                    "cancel_selection":  [
+                                             "z"
+                                         ],
+                    "secondary_action":  [
+                                             "x"
+                                         ],
+                    "tertiary_action":  [
+                                            "c"
+                                        ],
+                    "switch_mode":  [
+                                        "p"
+                                    ],
+                    "undo":  [
+                                 "a"
+                             ],
+                    "save":  [
+                                 "s"
+                             ],
+                    "restart":  [
+                                    "r"
+                                ],
+                    "quit_action":  [
+                                        "q"
+                                    ],
+                    "confirm_yes":  [
+                                        "y",
+                                        "enter"
+                                    ],
+                    "confirm_no": ["q", "esc", "n"]
+                }
 }

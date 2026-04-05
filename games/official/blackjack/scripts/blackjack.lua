@@ -1,4 +1,4 @@
-﻿local STARTING_FUNDS = 1000
+local STARTING_FUNDS = 1000
 local BASE_BET = 100
 local FPS = 60
 local FRAME_MS = 16
@@ -169,7 +169,7 @@ local function normalize_key(key)
             local map = {
                 adjust_up = "+",
                 adjust_down = "-",
-                confirm_yes = "y",
+                confirm_yes = "enter",
                 switch_left = "left",
                 switch_right = "right",
                 hit = "space",
@@ -179,7 +179,7 @@ local function normalize_key(key)
                 insurance = "c",
                 restart = "r",
                 quit_action = "q",
-                confirm_no = "n"
+                confirm_no = "esc"
             }
             return map[key.name] or ""
         end
@@ -1270,7 +1270,7 @@ local function handle_confirm_key(key)
             maybe_commit_best_on_exit()
             return "exit"
         end
-    elseif key == "n" or key == "q" or key == "esc" then
+    elseif key == "q" or key == "esc" then
         state.confirm_mode = nil
         update_player_prompt()
         state.dirty = true

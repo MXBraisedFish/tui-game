@@ -69,8 +69,10 @@ jobs:
           install -m 755 target/release/tui-game "$RELEASE_ROOT/tui-game"
           install -m 755 Linux/tg.sh "$RELEASE_ROOT/tg.sh"
           cp -R assets "$RELEASE_ROOT/assets"
-          cp -R scripts "$RELEASE_ROOT/scripts"
-          find "$RELEASE_ROOT/scripts" -type f -name '*.lua' -exec chmod 644 {} \;
+          mkdir -p "$RELEASE_ROOT/games"
+          cp -R games/official "$RELEASE_ROOT/games/official"
+          find "$RELEASE_ROOT/games" -type f -name '*.lua' -exec chmod 644 {} \;
+          find "$RELEASE_ROOT/games" -type f -name '*.json' -exec chmod 644 {} \;
 
           (cd "$RELEASE_ROOT" && tar -czf "$GITHUB_WORKSPACE/tui-game-${VERSION}-linux.tar.gz" *)
 
@@ -148,8 +150,10 @@ jobs:
           install -m 755 target/release/tui-game "$RELEASE_ROOT/tui-game"
           install -m 755 MacOS/tg.sh "$RELEASE_ROOT/tg.sh"
           cp -R assets "$RELEASE_ROOT/assets"
-          cp -R scripts "$RELEASE_ROOT/scripts"
-          find "$RELEASE_ROOT/scripts" -type f -name '*.lua' -exec chmod 644 {} \;
+          mkdir -p "$RELEASE_ROOT/games"
+          cp -R games/official "$RELEASE_ROOT/games/official"
+          find "$RELEASE_ROOT/games" -type f -name '*.lua' -exec chmod 644 {} \;
+          find "$RELEASE_ROOT/games" -type f -name '*.json' -exec chmod 644 {} \;
 
           (cd "$RELEASE_ROOT" && tar -czf "$ARCHIVE" *)
           SHA256="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
@@ -229,7 +233,8 @@ jobs:
           Copy-Item target/release/tui-game.exe (Join-Path $releaseRoot 'tui-game.exe')
           Copy-Item Windows/tg.bat (Join-Path $releaseRoot 'tg.bat')
           Copy-Item assets (Join-Path $releaseRoot 'assets') -Recurse
-          Copy-Item scripts (Join-Path $releaseRoot 'scripts') -Recurse
+          New-Item -ItemType Directory -Path (Join-Path $releaseRoot 'games') | Out-Null
+          Copy-Item games/official (Join-Path $releaseRoot 'games\\official') -Recurse
 
           if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
           Compress-Archive -Path (Join-Path $releaseRoot '*') -DestinationPath $zipPath -CompressionLevel Optimal
@@ -293,3 +298,5 @@ jobs:
           files: release-artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
