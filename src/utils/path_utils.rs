@@ -42,15 +42,13 @@ pub fn official_games_dir() -> Result<PathBuf> {
     let dir = app_data_dir()?.join("official");
     fs::create_dir_all(&dir)?;
 
-    if fs::read_dir(&dir)?.next().is_none() {
-        let bundled = runtime_dir()?.join("games").join("official");
-        if bundled.exists() {
-            copy_dir_contents(&bundled, &dir)?;
-        } else {
-            let project = project_root()?.join("games").join("official");
-            if project.exists() {
-                copy_dir_contents(&project, &dir)?;
-            }
+    let bundled = runtime_dir()?.join("games").join("official");
+    if bundled.exists() {
+        copy_dir_contents(&bundled, &dir)?;
+    } else {
+        let project = project_root()?.join("games").join("official");
+        if project.exists() {
+            copy_dir_contents(&project, &dir)?;
         }
     }
 

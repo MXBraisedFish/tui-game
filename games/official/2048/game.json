@@ -1,40 +1,44 @@
 {
-    "id": "2048",
-    "name": "game.2048.name",
-    "description": "game.2048.description",
-    "detail": "game.2048.details",
-    "entry": "scripts/2048.lua",
-    "save": true,
-    "best_none": "game.2048.best_none_block",
-    "min_width": 52,
-    "min_height": 26,
-    "actions": {
-        "move_left": [
-            "left"
-        ],
-        "move_right": [
-            "right"
-        ],
-        "move_up": [
-            "up"
-        ],
-        "move_down": [
-            "down"
-        ],
-        "save": [
-            "s"
-        ],
-        "restart": [
-            "r"
-        ],
-        "quit_action": [
-            "q"
-        ],
-        "confirm_yes": [
-            "y"
-        ],
-        "confirm_no": [
-            "n"
-        ]
-    }
+  "id": "tui_game_2048_pQc2haTtPbX0Pt6T",
+  "name": "game.2048.name",
+  "description": "game.2048.description",
+  "detail": "game.2048.details",
+  "author": "TUI-GAME",
+  "entry": "scripts/2048.lua",
+  "save": true,
+  "best_none": "game.2048.best_none_block",
+  "min_width": 52,
+  "min_height": 26,
+  "actions": {
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "move_up": [
+      "up"
+    ],
+    "move_down": [
+      "down"
+    ],
+    "save": [
+      "s"
+    ],
+    "restart": [
+      "r"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y"
+    ],
+    "confirm_no": [
+      "n"
+    ]
+  },
+  "runtime": {
+    "target_fps": 60
+  }
 }

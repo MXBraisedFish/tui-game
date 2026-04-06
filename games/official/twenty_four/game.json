@@ -1,67 +1,75 @@
 {
-    "id":  "twenty_four",
-    "name":  "game.twenty_four.name",
-    "description":  "game.twenty_four.description",
-    "detail":  "game.twenty_four.details",
-    "entry":  "scripts/twenty_four.lua",
-    "save":  false,
-    "best_none":  "game.twenty_four.best_none_block",
-    "min_width":  1,
-    "min_height":  1,
-    "actions":  {
-                    "move_left":  [
-                                      "left"
-                                  ],
-                    "move_right":  [
-                                       "right"
-                                   ],
-                    "move_up":  [
-                                    "up"
-                                ],
-                    "move_down":  [
-                                      "down"
-                                  ],
-                    "switch_cursor_mode":  [
-                                               "c"
-                                           ],
-                    "add_paren":  [
-                                      "z"
-                                  ],
-                    "remove_paren":  [
-                                         "x"
-                                     ],
-                    "change_difficulty":  [
-                                              "p"
-                                          ],
-                    "op_add":  [
-                                   "1",
-                                   "+"
-                               ],
-                    "op_sub":  [
-                                   "2",
-                                   "-"
-                               ],
-                    "op_mul":  [
-                                   "3",
-                                   "*"
-                               ],
-                    "op_div":  [
-                                   "4",
-                                   "/"
-                               ],
-                    "clear_operator":  [
-                                           "space"
-                                       ],
-                    "restart":  [
-                                    "r"
-                                ],
-                    "quit_action":  [
-                                        "q"
-                                    ],
-                    "confirm_yes":  [
-                                        "y",
-                                        "enter"
-                                    ],
-                    "confirm_no": ["q", "esc", "n"]
-                }
+  "id": "tui_game_twenty_four_2OXLBOgg3sO8dFdu",
+  "name": "game.twenty_four.name",
+  "description": "game.twenty_four.description",
+  "detail": "game.twenty_four.details",
+  "author": "TUI-GAME",
+  "entry": "scripts/twenty_four.lua",
+  "save": false,
+  "best_none": "game.twenty_four.best_none_block",
+  "min_width": 1,
+  "min_height": 1,
+  "actions": {
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "move_up": [
+      "up"
+    ],
+    "move_down": [
+      "down"
+    ],
+    "switch_cursor_mode": [
+      "c"
+    ],
+    "add_paren": [
+      "z"
+    ],
+    "remove_paren": [
+      "x"
+    ],
+    "change_difficulty": [
+      "p"
+    ],
+    "op_add": [
+      "1",
+      "+"
+    ],
+    "op_sub": [
+      "2",
+      "-"
+    ],
+    "op_mul": [
+      "3",
+      "*"
+    ],
+    "op_div": [
+      "4",
+      "/"
+    ],
+    "clear_operator": [
+      "space"
+    ],
+    "restart": [
+      "r"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y",
+      "enter"
+    ],
+    "confirm_no": [
+      "q",
+      "esc",
+      "n"
+    ]
+  },
+  "runtime": {
+    "target_fps": 60
+  }
 }

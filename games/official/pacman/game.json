@@ -1,36 +1,44 @@
 {
-    "id":  "pacman",
-    "name":  "game.pacman.name",
-    "description":  "game.pacman.description",
-    "detail":  "game.pacman.details",
-    "entry":  "scripts/pacman.lua",
-    "save":  false,
-    "best_none":  "game.pacman.best_none_block",
-    "min_width":  1,
-    "min_height":  1,
-    "actions":  {
-                    "move_up":  [
-                                    "up"
-                                ],
-                    "move_down":  [
-                                      "down"
-                                  ],
-                    "move_left":  [
-                                      "left"
-                                  ],
-                    "move_right":  [
-                                       "right"
-                                   ],
-                    "restart":  [
-                                    "r"
-                                ],
-                    "quit_action":  [
-                                        "q"
-                                    ],
-                    "confirm_yes":  [
-                                        "y",
-                                        "enter"
-                                    ],
-                    "confirm_no": ["q", "esc", "n"]
-                }
+  "id": "tui_game_pacman_Eb6R0Hjd07mJobl0",
+  "name": "game.pacman.name",
+  "description": "game.pacman.description",
+  "detail": "game.pacman.details",
+  "author": "TUI-GAME",
+  "entry": "scripts/pacman.lua",
+  "save": false,
+  "best_none": "game.pacman.best_none_block",
+  "min_width": 1,
+  "min_height": 1,
+  "actions": {
+    "move_up": [
+      "up"
+    ],
+    "move_down": [
+      "down"
+    ],
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "restart": [
+      "r"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y",
+      "enter"
+    ],
+    "confirm_no": [
+      "q",
+      "esc",
+      "n"
+    ]
+  },
+  "runtime": {
+    "target_fps": 60
+  }
 }

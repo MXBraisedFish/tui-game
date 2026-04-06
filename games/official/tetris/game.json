@@ -1,48 +1,56 @@
 {
-    "id":  "tetris",
-    "name":  "game.tetris.name",
-    "description":  "game.tetris.description",
-    "detail":  "game.tetris.details",
-    "entry":  "scripts/tetris.lua",
-    "save":  true,
-    "best_none":  "game.tetris.best_none_block",
-    "min_width":  1,
-    "min_height":  1,
-    "actions":  {
-                    "move_left":  [
-                                      "left"
-                                  ],
-                    "move_right":  [
-                                       "right"
-                                   ],
-                    "soft_drop":  [
-                                      "down"
-                                  ],
-                    "rotate_left":  [
-                                        "z"
-                                    ],
-                    "rotate_right":  [
-                                         "x"
-                                     ],
-                    "hard_drop":  [
-                                      "space"
-                                  ],
-                    "set_level":  [
-                                      "p"
-                                  ],
-                    "save":  [
-                                 "s"
-                             ],
-                    "restart":  [
-                                    "r"
-                                ],
-                    "quit_action":  [
-                                        "q"
-                                    ],
-                    "confirm_yes":  [
-                                        "y",
-                                        "enter"
-                                    ],
-                    "confirm_no": ["q", "esc", "n"]
-                }
+  "id": "tui_game_tetris_nhFSLnZRWPrMRzr5",
+  "name": "game.tetris.name",
+  "description": "game.tetris.description",
+  "detail": "game.tetris.details",
+  "author": "TUI-GAME",
+  "entry": "scripts/tetris.lua",
+  "save": true,
+  "best_none": "game.tetris.best_none_block",
+  "min_width": 1,
+  "min_height": 1,
+  "actions": {
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "soft_drop": [
+      "down"
+    ],
+    "rotate_left": [
+      "z"
+    ],
+    "rotate_right": [
+      "x"
+    ],
+    "hard_drop": [
+      "space"
+    ],
+    "set_level": [
+      "p"
+    ],
+    "save": [
+      "s"
+    ],
+    "restart": [
+      "r"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y",
+      "enter"
+    ],
+    "confirm_no": [
+      "q",
+      "esc",
+      "n"
+    ]
+  },
+  "runtime": {
+    "target_fps": 60
+  }
 }

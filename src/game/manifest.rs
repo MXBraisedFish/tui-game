@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::game::action::ActionBinding;
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+pub struct RuntimeManifest {
+    #[serde(default)]
+    pub target_fps: Option<u16>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct PackageManifest {
     pub namespace: String,
@@ -28,6 +34,14 @@ pub struct GameManifest {
     pub description: String,
     #[serde(default)]
     pub detail: String,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub introduction: Option<String>,
+    #[serde(default)]
+    pub icon: Option<serde_json::Value>,
+    #[serde(default)]
+    pub banner: Option<serde_json::Value>,
     pub entry: String,
     #[serde(default)]
     pub save: bool,
@@ -43,4 +57,6 @@ pub struct GameManifest {
     pub max_height: Option<u16>,
     #[serde(default)]
     pub actions: BTreeMap<String, ActionBinding>,
+    #[serde(default)]
+    pub runtime: RuntimeManifest,
 }

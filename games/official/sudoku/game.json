@@ -1,51 +1,59 @@
 {
-    "id":  "sudoku",
-    "name":  "game.sudoku.name",
-    "description":  "game.sudoku.description",
-    "detail":  "game.sudoku.details",
-    "entry":  "scripts/sudoku.lua",
-    "save":  true,
-    "best_none":  "game.sudoku.best_none_block",
-    "min_width":  1,
-    "min_height":  1,
-    "actions":  {
-                    "move_left":  [
-                                      "left"
-                                  ],
-                    "move_right":  [
-                                       "right"
-                                   ],
-                    "move_up":  [
-                                    "up"
-                                ],
-                    "move_down":  [
-                                      "down"
-                                  ],
-                    "undo":  [
-                                 "a"
-                             ],
-                    "jump":  [
-                                 "d"
-                             ],
-                    "change_difficulty":  [
-                                              "p"
-                                          ],
-                    "toggle_locator":  [
-                                           "z"
-                                       ],
-                    "restart":  [
-                                    "r"
-                                ],
-                    "save":  [
-                                 "s"
-                             ],
-                    "quit_action":  [
-                                        "q"
-                                    ],
-                    "confirm_yes":  [
-                                        "y",
-                                        "enter"
-                                    ],
-                    "confirm_no": ["q", "esc", "n"]
-                }
+  "id": "tui_game_sudoku_YYI0zXww863GC2Oc",
+  "name": "game.sudoku.name",
+  "description": "game.sudoku.description",
+  "detail": "game.sudoku.details",
+  "author": "TUI-GAME",
+  "entry": "scripts/sudoku.lua",
+  "save": true,
+  "best_none": "game.sudoku.best_none_block",
+  "min_width": 1,
+  "min_height": 1,
+  "actions": {
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "move_up": [
+      "up"
+    ],
+    "move_down": [
+      "down"
+    ],
+    "undo": [
+      "a"
+    ],
+    "jump": [
+      "d"
+    ],
+    "change_difficulty": [
+      "p"
+    ],
+    "toggle_locator": [
+      "z"
+    ],
+    "restart": [
+      "r"
+    ],
+    "save": [
+      "s"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y",
+      "enter"
+    ],
+    "confirm_no": [
+      "q",
+      "esc",
+      "n"
+    ]
+  },
+  "runtime": {
+    "target_fps": 60
+  }
 }

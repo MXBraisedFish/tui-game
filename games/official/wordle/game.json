@@ -1,16 +1,27 @@
 {
-  "id": "wordle",
+  "id": "tui_game_wordle_zUfgTho7okdh5vKf",
   "name": "game.wordle.name",
   "description": "game.wordle.description",
   "detail": "game.wordle.details",
+  "author": "TUI-GAME",
   "entry": "scripts/wordle.lua",
   "save": true,
   "best_none": "game.wordle.best_none_block",
   "min_width": 1,
   "min_height": 1,
   "actions": {
-    "submit": ["enter"],
-    "backspace": ["backspace", "delete"],
-    "toggle_mode": ["tab"]
+    "submit": [
+      "enter"
+    ],
+    "backspace": [
+      "backspace",
+      "delete"
+    ],
+    "toggle_mode": [
+      "tab"
+    ]
+  },
+  "runtime": {
+    "target_fps": 60
   }
 }

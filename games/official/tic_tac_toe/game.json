@@ -1,44 +1,53 @@
 {
-    "id":  "tic_tac_toe",
-    "name":  "game.tic_tac_toe.name",
-    "description":  "game.tic_tac_toe.description",
-    "detail":  "game.tic_tac_toe.details",
-    "entry":  "scripts/tic_tac_toe.lua",
-    "save":  false,
-    "min_width":  1,
-    "min_height":  1,
-    "actions":  {
-                    "move_left":  [
-                                      "left"
-                                  ],
-                    "move_right":  [
-                                       "right"
-                                   ],
-                    "move_up":  [
-                                    "up"
-                                ],
-                    "move_down":  [
-                                      "down"
-                                  ],
-                    "confirm":  [
-                                    "enter"
-                                ],
-                    "confirm_alt":  [
-                                        "space"
-                                    ],
-                    "switch_mark":  [
-                                        "x"
-                                    ],
-                    "restart":  [
-                                    "r"
-                                ],
-                    "quit_action":  [
-                                        "q"
-                                    ],
-                    "confirm_yes":  [
-                                        "y",
-                                        "enter"
-                                    ],
-                    "confirm_no": ["q", "esc", "n"]
-                }
+  "id": "tui_game_tic_tac_toe_6yQszA754SKGMt1f",
+  "name": "game.tic_tac_toe.name",
+  "description": "game.tic_tac_toe.description",
+  "detail": "game.tic_tac_toe.details",
+  "author": "TUI-GAME",
+  "entry": "scripts/tic_tac_toe.lua",
+  "save": false,
+  "best_none": null,
+  "min_width": 1,
+  "min_height": 1,
+  "actions": {
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "move_up": [
+      "up"
+    ],
+    "move_down": [
+      "down"
+    ],
+    "confirm": [
+      "enter"
+    ],
+    "confirm_alt": [
+      "space"
+    ],
+    "switch_mark": [
+      "x"
+    ],
+    "restart": [
+      "r"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y",
+      "enter"
+    ],
+    "confirm_no": [
+      "q",
+      "esc",
+      "n"
+    ]
+  },
+  "runtime": {
+    "target_fps": 60
+  }
 }

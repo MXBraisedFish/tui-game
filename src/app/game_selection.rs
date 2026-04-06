@@ -300,11 +300,13 @@ impl GameSelection {
         let stat_lines_start = top_lines.len();
         if game.id == "tic_tac_toe" {
         } else if game.is_mod_game() {
-            top_lines.extend(format_runtime_best_score_lines(
-                game,
-                inner.width.saturating_sub(1) as usize,
-            ));
-            top_lines.push(Line::from(separator.clone()));
+            if game.has_best_score {
+                top_lines.extend(format_runtime_best_score_lines(
+                    game,
+                    inner.width.saturating_sub(1) as usize,
+                ));
+                top_lines.push(Line::from(separator.clone()));
+            }
             if let Some(package_name) = self.mod_package_name(game) {
                 top_lines.push(Line::from(format!(
                     "{} {}",
@@ -327,7 +329,7 @@ impl GameSelection {
                 )));
             }
             top_lines.push(Line::from(separator.clone()));
-        } else {
+        } else if game.has_best_score {
             top_lines.extend(format_runtime_best_score_lines(
                 game,
                 inner.width.saturating_sub(1) as usize,
@@ -678,6 +680,9 @@ fn text(key: &str, fallback: &str) -> String {
 }
 
 fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<Line<'static>> {
+    if !game.has_best_score {
+        return Vec::new();
+    }
     let Some(score) = runtime_stats::read_runtime_best_score(&game.id) else {
         let fallback = if let Some(package) = game.package_info() {
             game.best_none

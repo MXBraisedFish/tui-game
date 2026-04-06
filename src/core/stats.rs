@@ -25,8 +25,10 @@ fn read_store() -> Result<Map<String, JsonValue>> {
         return Ok(Map::new());
     }
     let raw = fs::read_to_string(path)?;
-    Ok(serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
-        .unwrap_or_default())
+    Ok(
+        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
+            .unwrap_or_default(),
+    )
 }
 
 fn write_store(store: &Map<String, JsonValue>) -> Result<()> {

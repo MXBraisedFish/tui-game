@@ -1,42 +1,50 @@
 {
-    "id":  "shooter",
-    "name":  "game.shooter.name",
-    "description":  "game.shooter.description",
-    "detail":  "game.shooter.details",
-    "entry":  "scripts/shooter.lua",
-    "save":  true,
-    "best_none":  "game.shooter.best_none_block",
-    "min_width":  1,
-    "min_height":  1,
-    "actions":  {
-                    "move_left":  [
-                                      "left"
-                                  ],
-                    "move_right":  [
-                                       "right"
-                                   ],
-                    "fire":  [
-                                 "space"
-                             ],
-                    "toggle_fire_mode":  [
-                                             "z"
-                                         ],
-                    "use_nuke":  [
-                                     "x"
-                                 ],
-                    "restart":  [
-                                    "r"
-                                ],
-                    "save":  [
-                                 "s"
-                             ],
-                    "quit_action":  [
-                                        "q"
-                                    ],
-                    "confirm_yes":  [
-                                        "y",
-                                        "enter"
-                                    ],
-                    "confirm_no": ["q", "esc", "n"]
-                }
+  "id": "tui_game_shooter_7HmO65U8EsqSJRsH",
+  "name": "game.shooter.name",
+  "description": "game.shooter.description",
+  "detail": "game.shooter.details",
+  "author": "TUI-GAME",
+  "entry": "scripts/shooter.lua",
+  "save": true,
+  "best_none": "game.shooter.best_none_block",
+  "min_width": 1,
+  "min_height": 1,
+  "actions": {
+    "move_left": [
+      "left"
+    ],
+    "move_right": [
+      "right"
+    ],
+    "fire": [
+      "space"
+    ],
+    "toggle_fire_mode": [
+      "z"
+    ],
+    "use_nuke": [
+      "x"
+    ],
+    "restart": [
+      "r"
+    ],
+    "save": [
+      "s"
+    ],
+    "quit_action": [
+      "q"
+    ],
+    "confirm_yes": [
+      "y",
+      "enter"
+    ],
+    "confirm_no": [
+      "q",
+      "esc",
+      "n"
+    ]
+  },
+  "runtime": {
+    "target_fps": 60
+  }
 }

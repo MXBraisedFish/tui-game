@@ -31,13 +31,19 @@ pub struct GameDescriptor {
     pub name: String,
     pub description: String,
     pub detail: String,
+    pub author: String,
+    pub introduction: Option<String>,
+    pub icon: Option<serde_json::Value>,
+    pub banner: Option<serde_json::Value>,
     pub best_none: Option<String>,
+    pub has_best_score: bool,
     pub save: bool,
     pub min_width: Option<u16>,
     pub min_height: Option<u16>,
     pub max_width: Option<u16>,
     pub max_height: Option<u16>,
     pub actions: BTreeMap<String, ActionBinding>,
+    pub target_fps: u16,
     pub entry_path: PathBuf,
     pub source: GameSourceKind,
     pub package: Option<PackageDescriptor>,
@@ -122,18 +128,25 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
         };
 
         for game in package.games {
+            let has_best_score = game.best_none.is_some();
             games.push(GameDescriptor {
                 id: game.id,
                 name: game.name,
                 description: game.description,
                 detail: game.detail,
+                author: game.author,
+                introduction: game.introduction,
+                icon: game.icon,
+                banner: game.banner,
                 best_none: game.best_none,
+                has_best_score,
                 save: game.save,
                 min_width: game.min_width,
                 min_height: game.min_height,
                 max_width: game.max_width,
                 max_height: game.max_height,
                 actions: game.actions,
+                target_fps: sanitize_target_fps(game.runtime.target_fps),
                 entry_path: package.root_dir.join(&game.entry),
                 source: package_descriptor.source.clone(),
                 package: Some(package_descriptor.clone()),
@@ -141,4 +154,13 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
         }
     }
     Ok(games)
+}
+
+fn sanitize_target_fps(value: Option<u16>) -> u16 {
+    match value {
+        Some(30) => 30,
+        Some(60) => 60,
+        Some(120) => 120,
+        _ => 60,
+    }
 }

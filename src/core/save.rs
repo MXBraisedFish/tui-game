@@ -17,8 +17,9 @@ fn read_store() -> Result<Map<String, JsonValue>> {
         return Ok(empty_store());
     }
     let raw = fs::read_to_string(path)?;
-    let mut store = serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
-        .unwrap_or_else(|_| empty_store());
+    let mut store =
+        serde_json::from_str::<Map<String, JsonValue>>(raw.trim_start_matches('\u{feff}'))
+            .unwrap_or_else(|_| empty_store());
     if !matches!(store.get("continue"), Some(JsonValue::Object(_))) {
         store.insert("continue".to_string(), JsonValue::Object(Map::new()));
     }
@@ -115,8 +116,5 @@ pub fn clear_active_game_save() -> Result<()> {
 }
 
 pub fn game_has_continue_save(game_id: &str) -> bool {
-    load_continue(game_id)
-        .ok()
-        .flatten()
-        .is_some()
+    load_continue(game_id).ok().flatten().is_some()
 }
