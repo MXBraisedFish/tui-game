@@ -80,7 +80,7 @@ my_mod/
 
 ```json
 {
-  "id": "mod_game_example_pack_qR13VtAXQc7FRck8",
+  "package": "package",
   "name": "game.example.name",
   "description": "game.example.description",
   "detail": "game.example.detail",
@@ -93,6 +93,7 @@ my_mod/
   "best_none": "game.example.best_none",
   "min_width": 60,
   "min_height": 24,
+  "write": true,
   "actions": {
     "move_left": ["left", "a"],
     "move_right": ["right", "d"]
