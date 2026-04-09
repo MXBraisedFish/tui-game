@@ -68,7 +68,7 @@
 
 宿主与脚本运行链如下图所示：
 
-![[frame_loop_call_chain_zh_cn.png]]
+![[./image/program_flowchart_zh_cn.png]]
 
 ## 使用示例
 
