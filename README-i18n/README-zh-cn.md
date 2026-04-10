@@ -4,6 +4,12 @@
 
 **[English](../README.md)**
 
+# 文档导航
+
+- [MOD 制作规范及教程](../dev_docs/zh_cn/MOD.md)
+- [API 规范与查询](../dev_docs/zh_cn/API.md)
+- [富文本指令](../dev_docs/zh_cn/RICH_TEXT.md)
+
 # 本项目是做什么的？
 
 你有想过在终端里玩游戏吗？这个项目就是我突发奇想，经过数日爆肝后，做出了这个由Rust和Lua共同打造的TUI游戏合集！
