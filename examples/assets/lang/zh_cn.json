@@ -1,0 +1,8 @@
+{
+  "example.introduction": "这是一个示例模组包，用于展示一个最基础的模组包结构",
+  "example.name": "示例模组包",
+  "example.description": "展示模组包的最简组成",
+  "example.detail": "最基础的包必须包含：\npackage.json\ngame.json\nscripts/main.lua\nassets/lang/en_us.json\n\n并按照要求填写相应的字段和实现必须的API",
+  "example.best.none": "最少步数 ---",
+  "example.best": "最少步数 {step}步"
+}

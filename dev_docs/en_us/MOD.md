@@ -31,6 +31,8 @@
   - [目录结构](#目录结构3)
   - [语言文件](#语言文件)
   - [其它资源文件](#其它资源文件)
+- [附录](#附录)
+  - [物理按键语义映射表](#物理按键语义映射表)
 
 ---
 
@@ -119,8 +121,8 @@
 | `name` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> | 游戏显示名称，在游戏列表中展示。可填写字符串或语言键。 |
 | `description` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> | 游戏简短描述，建议一句话概括玩法或目标。可填写字符串或语言键。 |
 | `detail` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> | 游戏详细描述，建议包含：游戏目标、核心机制、操作方式、特殊警告（如与原版差异）等。可填写字符串或语言键。 |
-| `icon` | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 图标，在模组列表中展示。推荐使用 4 行 × 8 列的二维数组（字符）。若使用字符串，请用 `\n` 换行，否则宿主仅单行解析。若使用图片路径，建议宽高比 1:1，但宿主图片渲染效果通常不理想。若不填写会使用默认图标，见 附录-[默认图标](#默认图标) |
-| `banner` | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 横幅，在模组详情页展示。推荐使用 13 行 × 43 列的二维数组。若使用字符串，请用 `\n` 换行。若使用图片路径，建议宽高比 13:43，宿主图片渲染效果通常不理想。若不填写会使用默认头图，见 附录-[默认头图](#默认头图) |
+| `icon` | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 图标，在模组列表中展示。具体要求见 其它-[头图与图标](#图标和头图) |
+| `banner` | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 横幅，在模组详情页展示。具体要求见 其它-[头图与图标](#图标和头图) |
 
 ## `game.json`
 
@@ -150,12 +152,12 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `api` | <font color="#92cddc">Array</font> \| <font color="#92cddc">int</font> | 支持的 API 版本。数组格式 `[min, max]` 表示支持从 `min` 到 `max` 的版本（含端点）；整数表示仅支持该单一版本。若版本不符合宿主要求，模组将不被加载并抛出异常（详见 API 文档「通用异常」）。 |
+| `api` | <font color="#92cddc">Array</font> \| <font color="#92cddc">int</font> | 支持的 API 版本。数组格式 `[min, max]` 表示支持从 `min` 到 `max` 的版本（含端点）；整数表示仅支持该单一版本。若版本不符合宿主要求，模组将不被加载并抛出异常。 |
 | `entry` | <font color="#92cddc">path</font> | 入口脚本路径，相对于 `scripts/` 目录。若路径错误，模组将不被加载并抛出异常。 |
 | `save` | <font color="#92cddc">boolean</font> | 是否支持存档。`true` 表示需要实现声明式 API `save_game(state)`；`false` 则忽略相关调用。 |
 | `best_none` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> \| <font color="#92cddc">null</font> | 无最佳记录时显示的文本。若不为 `null`，需实现声明式 API `save_best_score(state)`；若为 `null`，表示不启用最佳记录功能，相关调用被忽略。 |
-| `min_width` | <font color="#92cddc">int</font> | 游戏所需的最小终端宽度（字符列数）。终端尺寸不足时会显示提示。 |
-| `min_height` | <font color="#92cddc">int</font> | 游戏所需的最小终端高度（字符行数）。终端尺寸不足时会显示提示。 |
+| `min_width` | <font color="#92cddc">int</font> | 游戏所需的最小终端宽度（字符列数）。终端尺寸不足时会显示提示。值≦0为无限制。 |
+| `min_height` | <font color="#92cddc">int</font> | 游戏所需的最小终端高度（字符行数）。终端尺寸不足时会显示提示。值≦0为无限制。 |
 | `write` | <font color="#92cddc">boolean</font> | 是否请求直写权限。`true` 表示模组需要文件写入权限，加载时会向用户申请；`false` 表示不需要权限，所有直写请求将被宿主忽略。<font color="red">直写操作为高风险操作，请最大程度避免使用！</font> |
 | `actions` | <font color="#92cddc">object</font> | 按键动作映射表，格式见下方「注册表格式」。宿主会将物理按键映射为语义化动作。 |
 | `runtime` | <font color="#92cddc">object</font> | 运行时设置。 |
@@ -167,7 +169,7 @@
 > - `#` 表示自定义或可变内容。
 > - `[]` 表示字段可重复或扩展。
 > - `<>` 表示类型约束。
-> - `key` 表示按键映射名，具体按键映射见 附录-[物理键语义映射表](#物理键语义映射表)。
+> - `key` 表示按键映射名，具体按键映射见 附录-[物理按键语义映射表](#物理按键语义映射表)。
 
 ```json
 "actions": {
@@ -185,7 +187,6 @@
 ```
 
 > 每个动作可绑定单个按键或多个按键（数组形式）。宿主会将按键事件转换为动作事件，通过 `handle_event` 传递给脚本（事件类型 `action`）。
-> 目前尚不支持组合键
 
 ## UID
 
@@ -370,9 +371,119 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ---
 
+# 其它
+
+## 图标与头图
+
+### 图标
+
+图标用于在模组列表中展示，显示区域为 **4 行 × 8 列**（终端字符）。
+
+**支持参数类型**：数组 / 字符串 / 图片
+
+#### 数组
+
+- 传递一个二维数组，最多包含 4 个子数组，每个子数组最多包含 8 个元素。
+- **行数处理**：
+  - 若子数组不足 4 行，宿主会在上下交替补充空行补齐至 4 行（**先上后下**）。
+  - 若子数组超过 4 行，仅保留前 4 行。
+- **列数处理**：
+  - 若子数组内元素不足 8 个，宿主会在左右交替补充空格补齐至 8 个元素（**先右后左**）。
+  - 若子数组内元素超过 8 个，仅保留前 8 个。
+- 完成上述填充后，已填写的图标元素会被**居中显示**。
+- **推荐写法**：将所有元素左对齐，剩余对齐与填充工作交由宿主完成。
+
+#### 字符串
+
+- 传递一个单行字符串，使用 `\n` 表示换行。
+- 宿主会根据 `\n` 将字符串拆分为二维数组，后续处理规则与数组一致。
+- **不推荐使用**：可读性极差，有时会被误识别为图片路径。
+
+#### 图片
+
+- 填写相对于 `assets/` 目录的路径。
+- 建议图片比例为 **1:1**。
+- 宿主会根据图片比例生成一个 1:1 的比例框进行截取，然后将图片符号化并染色。
+- **不推荐使用**：生成效果通常严重偏离预期，仅作为功能扩展保留。
+
+#### 默认值
+
+- 若该字段不填写或传递空数组，将使用默认图标，见附录 [默认图标](#默认图标)。
+
+---
+
+### 头图
+
+头图用于在模组详情的详细信息展示，显示区域为 **13 行 × 86 列**（终端字符）。
+
+**支持参数类型**：数组 / 字符串 / 图片
+
+#### 数组
+
+- 传递一个二维数组，最多包含 13 个子数组，每个子数组最多包含 86 个元素。
+- **行数处理**：
+  - 若子数组不足 13 行，宿主会在上下交替补充空行补齐至 13 行（**先上后下**）。
+  - 若子数组超过 13 行，仅保留前 13 行。
+- **列数处理**：
+  - 若子数组内元素不足 86 个，宿主会在左右交替补充空格补齐至 86 个元素（**先左后右**）。
+  - 若子数组内元素超过 86 个，仅保留前 86 个。
+- 完成上述填充后，已填写的头图元素会被**居中显示**。
+- **推荐写法**：将所有元素左对齐，剩余对齐与填充工作交由宿主完成。
+
+#### 字符串
+
+- 传递一个单行字符串，使用 `\n` 表示换行。
+- 宿主会根据 `\n` 将字符串拆分为二维数组，后续处理规则与数组一致。
+- **不推荐使用**：可读性极差，有时会被误识别为图片路径。
+
+#### 图片
+
+- 填写相对于 `assets/` 目录的路径。
+- 建议图片比例为 **13:43**。
+- 宿主会生成一个最大可被 13×43 整除的比例框进行截取，然后将图片符号化并染色。
+- **不推荐使用**：生成效果通常严重偏离预期，仅作为功能扩展保留。
+
+#### 默认值
+
+- 若该字段不填写或传递空数组，将使用默认头图，见附录 [默认头图](#默认头图)。
+
+---
+
+## 绘制坐标
+
+绘制原点位于终端的**左上角**。坐标系定义如下：
+
+- **X 轴**：水平向右为正方向
+- **Y 轴**：垂直向下为正方向
+
+示意图如下：
+
+![绘制坐标](./image/axis.png)
+
+---
+
+## `introduction` / `description` / `detail` 展示位置
+
+各字段在界面中的展示位置如下：
+
+- **`introduction`**：展示于**模组列表**的详细信息区域，用于描述整个模组包的概要信息。
+- **`description`**：展示于**游戏列表**的详细信息区域，用于说明游戏的玩法或基本规则。
+- **`detail`**：展示于**游戏列表**的详细信息区域，用于提供游戏的详细说明。
+
+示意图如下：
+
+![introduction 展示位置](./image/introduction)  
+![description 与 detail 展示位置](./image/description_detail)
+
+---
+
 # 附录
 
-## 物理键语义映射表
+## 物理按键语义映射表
+
+> 键盘监听基于 `crossterm` 与 `rdev` 两库联合实现，尽可能覆盖绝大多数按键的检测。为确保兼容性，建议优先使用显式声明的键位，避免因特殊键无法匹配而导致输入失效。
+>
+> 当前版本**不支持组合键**（如 `Ctrl+C`、`Shift+A` 等）。所有与 `Shift` 键组合的输入，其语义仍会被解析为对应的单键（例如 `Shift + A` 映射为 `A`）。
 
 ### 字母键（小写）
 | 物理按键 | 返回值 |
@@ -406,7 +517,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 ### 符号键（无 Shift）
 | 物理按键 | 返回值 |
 |----------|--------|
-| ``` | ``` |
+| ``` ` ``` | ``` ` ``` |
 | `-` | `-` |
 | `=` | `=` |
 | `[` | `[` |
@@ -421,7 +532,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 ### 符号键（Shift 组合）
 | 物理按键 | 返回值 |
 |----------|--------|
-| `Shift` + ``` | `~` |
+| `Shift` + ``` ` ``` | `~` |
 | `Shift` + `-` | `_` |
 | `Shift` + `=` | `+` |
 | `Shift` + `[` | `{` |
@@ -453,58 +564,131 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 ### 编辑键
 | 物理按键 | 返回值 |
 |----------|--------|
-| Enter / Return | enter |
-| Backspace | backspace |
-| Delete | del |
-| Insert | ins |
-| Tab | tab |
-| Shift + Tab | back_tab |
-| Space | space |
+| `Enter` | `enter` |
+| `Backspace` | `backspace` |
+| `Delete` | `del` |
+| `Insert` | `ins` |
+| `Tab` | `tab` |
+| `Shift` + `Tab` | `back_tab` |
+| `Space` | `space` |
 
 ### 修饰键
 | 物理按键 | 返回值 |
 |----------|--------|
-| 左 Ctrl | left_ctrl |
-| 右 Ctrl | right_ctrl |
-| 左 Shift | left_shift |
-| 右 Shift | right_shift |
-| 左 Alt | left_alt |
-| 右 Alt (AltGr) | right_alt |
-| 左 Meta (Win / Cmd) | left_meta |
-| 右 Meta | right_meta |
-| Fn | fn |
+| `左 Ctrl` | `left_ctrl` |
+| `右 Ctrl` | `right_ctrl` |
+| `左 Shift` | `left_shift` |
+| `右 Shift` | `right_shift` |
+| `左 Alt` | `left_alt` |
+| `右 Alt` | `right_alt` |
+| `左 Meta` (Win / Cmd) | `left_meta` |
+| `右 Meta` (Win / Cmd)| `right_meta` |
 
 ### 锁定键
 | 物理按键 | 返回值 |
 |----------|--------|
-| CapsLock | capslock |
-| NumLock | numlock |
-| ScrollLock | scrolllock |
+| `CapsLock` | `capslock` |
+| `NumLock` | `numlock` |
+| `ScrollLock` | `scrolllock` |
 
 ### 系统功能键
 | 物理按键 | 返回值 |
 |----------|--------|
-| Esc | esc |
-| PrintScreen | printscreen |
-| Pause | pause |
-| Menu | menu |
+| `Esc` | `esc` |
+| `PrintScreen` | `printscreen` |
+| `Pause` | `pause` |
+| `Menu` | `menu` |
 
 ### 小键盘
 | 物理按键 | 返回值 |
 |----------|--------|
-| 小键盘 0 ~ 9 | 0 ~ 9 |
-| 小键盘 + | + |
-| 小键盘 - | - |
-| 小键盘 * | * |
-| 小键盘 / | / |
-| 小键盘 Del | del |
-| 小键盘 Enter | enter |
+| 小键盘 `0` ~ `9` | `0` ~ `9` |
+| 小键盘 `+` | `+` |
+| 小键盘 `-` | `-` |
+| 小键盘 `*` | `*` |
+| 小键盘 `/` | `/` |
+| 小键盘 `Del` | `del` |
+| 小键盘 `Enter` | `enter` |
 
-### 未知键（兜底）
+### 未知键
 | 物理按键 | 返回值 |
 |----------|--------|
-| 无法识别的按键 | key(扫描码) |
+| 无法识别的按键 | `key(扫描码)` |
 
 ---
 
-表格已完成，可直接用于项目文档。
+## 默认图标
+
+**代码**
+
+```json
+[
+  "████████", 
+  "██ ██ ██",
+  "   ██   ",
+  "  ████  "
+]
+```
+
+**样图**
+![默认图标](./image/mod_icon.png)
+
+## 默认头图
+
+**代码**
+
+```json
+[
+  "`7MMM.     ,MMF' .g8\"\"8q. `7MM\"\"\"Yb.   ",
+  "  MMMb    dPMM .dP'    `YM. MM    `Yb. ",
+  "  M YM   ,M MM dM'      `MM MM     `Mb ",
+  "  M  Mb  M' MM MM        MM MM      MM ",
+  "  M  YM.P'  MM MM.      ,MP MM     ,MP ",
+  "  M  `YM'   MM `Mb.    ,dP' MM    ,dP' ",
+  ".JML. `'  .JMML. `\"bmmd\"' .JMMmmmdP'   ",
+]
+```
+
+**样图**
+![默认头图](./image/mod_banner.png)
+
+---
+
+# 模组最小示例
+
+> 该部分是纯文本展示，可查看仓库的 examples/ 目录了解详细代码
+
+## 结构
+```text
+宿主执行目录/tui-game-data/mod/
+└─ example/
+   ├─ package.json
+   ├─ game.json
+   ├─ scripts/
+   │  ├─ main.lua
+   │  └─ function/
+   │     └─ helper.lua
+   └─ assets/
+      ├─ lang/
+      │  ├─ en_us.json
+      │  └─ zh_cn.json
+      └─ json/
+         └─ word.json
+```
+
+## 文件
+
+### `package.json`
+
+```json
+{
+  "package": "example",
+  "introduction": "example.introduction",
+  "author": "TUI GAME",
+  "name": "example.name",
+  "description": "example.description",
+  "detail": "example.detail",
+  "icon": [],
+  "banner": []
+}
+```

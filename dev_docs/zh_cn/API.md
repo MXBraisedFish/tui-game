@@ -88,7 +88,7 @@
 
 宿主与脚本运行链如下图所示：
 
-![[./image/program_flowchart_zh_cn.png]]
+![执行流程](./image/program_flowchart.png)
 
 ## 使用示例
 
@@ -279,7 +279,7 @@ end
 | 可达性                                | 函数名                        | 作用                                                       | 参数                            | 返回值                                                                                                                                        |
 | ------------------------------------- | ----------------------------- | ---------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | <font color="#7f7f7f">无要求</font>   | `get_launch_mode()`           | 获取本次游戏的启动模式。                                   | <font color="#7f7f7f">无</font> | `status` - <font color="#92cddc">"new"</font> \| <font color="#92cddc">"continue"</font>：`"new"` 表示新游戏，`"continue"` 表示继续已有存档。 |
-| <font color="#7f7f7f">无要求</font>   | `get_best_score()`            | 获取游戏存储的最佳记录数据。                               | <font color="#7f7f7f">无</font> | `data` - <font color="#92cddc">table</font>：存储的最佳记录数据，宿主返回脚本所传递的 best 参数。                                             |
+| <font color="#7f7f7f">无要求</font>   | `get_best_score()`            | 获取游戏存储的最佳记录数据。                               | <font color="#7f7f7f">无</font> | `data` - <font color="#92cddc">table</font> | <font color="#92cddc">nil</font>：存储的最佳记录数据，宿主返回脚本所传递的 best 参数，若不存在返回 nil。                                             |
 | <font color="red">至少一条可达</font> | `request_exit()`              | 向宿主发送退出游戏请求。                                   | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
 | <font color="#7f7f7f">无要求</font>   | `request_skip_event_queue()`  | 向宿主发送跳过尚未处理的事件队列请求。                     | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
 | <font color="#7f7f7f">无要求</font>   | `request_clear_event_queue()` | 向宿主发送清空尚未处理的事件队列请求。                     | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
@@ -291,13 +291,33 @@ end
 
 ## 内容绘制
 
-> 注：`color` 类型见 附录-[颜色 color](#颜色-color)
+> 注：
+> 1. `color` 类型见 附录-[颜色 color](#颜色-color)
+> 2. 所有绘制操作的基准点均为**内容的左上角**，即绘制内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
 
 | 函数名                                                     | 作用                                     | 参数                                                                                                                                                                                                                                                                                                                                                                                                                                         | 返回值                          |
 | ---------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
 | `canvas_clear()`                                           | 清空当前帧的画布。                       | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                                                                                                                              | <font color="#7f7f7f">无</font> |
-| `canvas_draw_text(x, y, text, *[fg, *[bg)`                 | 在画布指定位置横向绘制字符串。           | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：要绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。                                                                                                                                 | <font color="#7f7f7f">无</font> |
+| `canvas_draw_text(x, y, text, *[fg, *[bg)`                 | 在画布指定位置绘制内容串。           | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：要绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。                                                                                                                                 | <font color="#7f7f7f">无</font> |
 | `canvas_fill_rect(x, y, width, height, [char, *[fg, *[bg)` | 从指定位置绘制矩形，并使用指定字符填充。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char` - <font color="#92cddc">string</font>：可选，用于填充的单个字符。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。 | <font color="#7f7f7f">无</font> |
+| `canvas_border_rect(x, y, width, height, [char_list, *[fg, *[bg)` | 从指定位置绘制矩形边框，并使用指定字符作为边框。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char_list` - <font color="#92cddc">table</font>：可选，边框字符配置表，结构见下方。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。 | <font color="#7f7f7f">无</font> |
+
+**`[char_list` 格式**
+
+```lua
+{
+  top = char,           -- 上边框
+  top_right = char,     -- 右上角
+  right = char,         -- 右边框
+  bottom_right = char,  -- 右下角
+  bottom = char,        -- 下边框
+  bottom_left = char,   -- 左下角
+  left = char,          -- 左边框
+  top_left = char       -- 左上角
+}
+```
+
+> 若 `char_list` 未提供或字段缺失，对应位置的边框将不绘制（留空）。
 
 ---
 
@@ -691,6 +711,7 @@ end
 | <font color="#7f7f7f">无风险</font> | `canvas_clear()`                                                          | 清空画布           | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                  | <font color="#7f7f7f">无</font>                                                          | [内容绘制](#内容绘制)         |
 | <font color="#7f7f7f">无风险</font> | `canvas_draw_text(x, y, text, *[fg, *[bg)`                                | 绘制文本           | `x` - <font color="#92cddc">int</font>, `y` - <font color="#92cddc">int</font>, `text` - <font color="#92cddc">string</font>, `*[fg` - <font color="#92cddc">color</font>, `*[bg` - <font color="#92cddc">color</font>                                                                                           | <font color="#7f7f7f">无</font>                                                          | [内容绘制](#内容绘制)         |
 | <font color="#7f7f7f">无风险</font> | `canvas_fill_rect(x, y, width, height, [char, *[fg, *[bg)`                | 填充矩形           | `x` - <font color="#92cddc">int</font>, `y` - <font color="#92cddc">int</font>, `width` - <font color="#92cddc">int</font>, `height` - <font color="#92cddc">int</font>, `[char` - <font color="#92cddc">string</font>, `*[fg` - <font color="#92cddc">color</font>, `*[bg` - <font color="#92cddc">color</font> | <font color="#7f7f7f">无</font>                                                          | [内容绘制](#内容绘制)         |
+| <font color="#7f7f7f">无风险</font> | `canvas_border_rect(x, y, width, height, [char_list, *[fg, *[bg)`                | 绘制矩形边框           | `x` - <font color="#92cddc">int</font>, `y` - <font color="#92cddc">int</font>, `width` - <font color="#92cddc">int</font>, `height` - <font color="#92cddc">int</font>, `[char_list` - <font color="#92cddc">table</font>, `*[fg` - <font color="#92cddc">color</font>, `*[bg` - <font color="#92cddc">color</font> | <font color="#7f7f7f">无</font>                                                          | [内容绘制](#内容绘制)         |
 | <font color="#7f7f7f">无风险</font> | `get_text_size(text)`                                                     | 测量文本尺寸       | `text` - <font color="#92cddc">string</font>                                                                                                                                                                                                                                                                     | `width` - <font color="#92cddc">int</font>, `height` - <font color="#92cddc">int</font>  | [内容尺寸计算](#内容尺寸计算) |
 | <font color="#7f7f7f">无风险</font> | `get_text_width(text)`                                                    | 测量文本宽度       | `text` - <font color="#92cddc">string</font>                                                                                                                                                                                                                                                                     | `width` - <font color="#92cddc">int</font>                                               | [内容尺寸计算](#内容尺寸计算) |
 | <font color="#7f7f7f">无风险</font> | `get_text_height(text)`                                                   | 测量文本高度       | `text` - <font color="#92cddc">string</font>                                                                                                                                                                                                                                                                     | `height` - <font color="#92cddc">int</font>                                              | [内容尺寸计算](#内容尺寸计算) |
