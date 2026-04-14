@@ -142,7 +142,7 @@ end
 
 ```lua
 {
-    [#key] = "#value"
+  [#key] = "#value"
 }
 ```
 
@@ -153,8 +153,8 @@ end
 
 ```lua
 {
-    type = "#type",
-    [#name] = "#value"
+  type = "#type",
+  [#name] = "#value"
 }
 ```
 
@@ -165,8 +165,8 @@ end
 
 ```lua
 {
-    best_string = "#string",
-    [#key] = "#value"
+  best_string = "#string",
+  [#key] = "#value"
 }
 ```
 
@@ -181,8 +181,8 @@ end
 
 ```lua
 {
-    type = "action",
-    name = "#registered_key"
+  type = "action",
+  name = "#registered_key"
 }
 ```
 
@@ -193,8 +193,8 @@ end
 
 ```lua
 {
-    type = "key",
-    name = "#enter"
+  type = "key",
+  name = "#enter"
 }
 ```
 
@@ -205,9 +205,9 @@ end
 
 ```lua
 {
-    type = "resize",
-    width = int,
-    height = int
+  type = "resize",
+  width = int,
+  height = int
 }
 ```
 
@@ -218,13 +218,13 @@ end
 
 ```lua
 {
-    type = "tick",
-    dt_ms = int
+  type = "tick",
+  dt_ms = int
 }
 ```
 
 **作用**：  
-通知脚本时间推进，`dt_ms` 表示距离上一事件的时间差（毫秒）。适用于与时间相关的逻辑处理，如动画、倒计时等。
+通知脚本时间推进，`dt_ms` 表示距离上一个 `tick` 事件的时间差（毫秒）。
 
 ---
 
@@ -268,13 +268,15 @@ end
 
 > 注：
 >
-> - `[` 表示参数可选。
+> - `[` 表示参数可选，如需跳过参数，填写 `nil` 占位。
 > - `*` 表示特定参数。
 > - 多返回值以多个独立值返回，而非表（table）。
 
 ---
 
 ## 系统请求
+
+> 注：`request_skip_event_queue` 和 `request_clear_event_queue` 不会影响队尾的 `tick` 事件。`tick` 事件在每个帧循环中**必定**会被传入，详情流程见 声明式 API - [执行流程](#执行流程)。
 
 | 可达性                                | 函数名                        | 作用                                                       | 参数                            | 返回值                                                                                                                                        |
 | ------------------------------------- | ----------------------------- | ---------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -298,6 +300,7 @@ end
 | 函数名                                                     | 作用                                     | 参数                                                                                                                                                                                                                                                                                                                                                                                                                                         | 返回值                          |
 | ---------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
 | `canvas_clear()`                                           | 清空当前帧的画布。                       | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                                                                                                                              | <font color="#7f7f7f">无</font> |
+| `canvas_eraser(x, y, width, height)`                                           | 清空画布指定区域。                       | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：区域宽度。<br>`height` - <font color="#92cddc">int</font>：区域高度。 | <font color="#7f7f7f">无</font> |
 | `canvas_draw_text(x, y, text, *[fg, *[bg)`                 | 在画布指定位置绘制内容串。           | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：要绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。                                                                                                                                 | <font color="#7f7f7f">无</font> |
 | `canvas_fill_rect(x, y, width, height, [char, *[fg, *[bg)` | 从指定位置绘制矩形，并使用指定字符填充。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char` - <font color="#92cddc">string</font>：可选，用于填充的单个字符。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。 | <font color="#7f7f7f">无</font> |
 | `canvas_border_rect(x, y, width, height, [char_list, *[fg, *[bg)` | 从指定位置绘制矩形边框，并使用指定字符作为边框。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char_list` - <font color="#92cddc">table</font>：可选，边框字符配置表，结构见下方。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。 | <font color="#7f7f7f">无</font> |
@@ -566,8 +569,8 @@ end
   name = string | key,             -- 游戏显示名称
   description = string | key,      -- 游戏简短描述
   detail = string | key,           -- 游戏详细描述
-  icon = string | Array | image,   -- 图标
-  banner = string | Array | image, -- 横幅
+  icon = Array | string | image,   -- 图标
+  banner = Array | string | image, -- 横幅
   api = Array | int,               -- 支持的API版本
   entry = path,                    -- 入口脚本路径
   save = boolean,                  -- 是否支持保存

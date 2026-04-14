@@ -12,14 +12,25 @@ pub struct RuntimeManifest {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct PackageManifest {
+    #[serde(default)]
     pub namespace: String,
+    #[serde(default, alias = "package")]
     pub package_name: String,
+    #[serde(default)]
     pub author: String,
+    #[serde(default)]
     pub version: String,
+    #[serde(default)]
+    pub introduction: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
-    pub thumbnail: Option<serde_json::Value>,
+    pub detail: Option<String>,
+    #[serde(default)]
+    #[serde(alias = "thumbnail")]
+    pub icon: Option<serde_json::Value>,
     #[serde(default)]
     pub banner: Option<serde_json::Value>,
     #[serde(default)]
@@ -28,7 +39,9 @@ pub struct PackageManifest {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct GameManifest {
+    #[serde(default)]
     pub id: String,
+    #[serde(default)]
     pub name: String,
     #[serde(default)]
     pub description: String,
@@ -59,4 +72,8 @@ pub struct GameManifest {
     pub actions: BTreeMap<String, ActionBinding>,
     #[serde(default)]
     pub runtime: RuntimeManifest,
+    #[serde(default)]
+    pub api: Option<serde_json::Value>,
+    #[serde(default)]
+    pub write: bool,
 }

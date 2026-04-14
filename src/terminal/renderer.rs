@@ -9,7 +9,7 @@ use crossterm::style::{
 };
 use crossterm::terminal::{Clear, ClearType};
 
-use crate::core::screen::{Canvas, Cell};
+use crate::core::screen::Canvas;
 
 static LAST_CANVAS: OnceLock<Mutex<Option<Canvas>>> = OnceLock::new();
 
@@ -35,22 +35,20 @@ pub fn render_canvas(canvas: &Canvas) -> Result<()> {
 
     if full_redraw {
         queue!(out, Clear(ClearType::All), MoveTo(0, 0))?;
+        let mut style_state = StyleState::default();
         for y in 0..canvas.height() {
-            for x in 0..canvas.width() {
-                let index = usize::from(y) * usize::from(canvas.width()) + usize::from(x);
-                queue_cell(&mut out, x, y, &canvas.cells[index])?;
-            }
+            queue_row_segments(&mut out, canvas, None, y, &mut style_state)?;
         }
+        queue!(out, ResetColor)?;
     } else if let Some(prev) = previous {
+        let mut style_state = StyleState::default();
         for y in 0..canvas.height() {
-            for x in 0..canvas.width() {
-                let index = usize::from(y) * usize::from(canvas.width()) + usize::from(x);
-                let cell = &canvas.cells[index];
-                if prev.cells.get(index) != Some(cell) {
-                    queue_cell(&mut out, x, y, cell)?;
-                }
+            if canvas.row(y) == prev.row(y) {
+                continue;
             }
+            queue_row_segments(&mut out, canvas, Some(prev), y, &mut style_state)?;
         }
+        queue!(out, ResetColor)?;
     }
 
     out.flush()?;
@@ -58,18 +56,92 @@ pub fn render_canvas(canvas: &Canvas) -> Result<()> {
     Ok(())
 }
 
-fn queue_cell<W: Write>(out: &mut W, x: u16, y: u16, cell: &Cell) -> Result<()> {
-    if cell.continuation {
+#[derive(Default)]
+struct StyleState {
+    fg: Option<CColor>,
+    bg: Option<CColor>,
+}
+
+fn queue_row_segments<W: Write>(
+    out: &mut W,
+    canvas: &Canvas,
+    previous: Option<&Canvas>,
+    y: u16,
+    style_state: &mut StyleState,
+) -> Result<()> {
+    let Some(row) = canvas.row(y) else {
         return Ok(());
+    };
+    let previous_row = previous.and_then(|canvas| canvas.row(y));
+
+    let mut x = 0usize;
+    while x < row.len() {
+        let current = &row[x];
+        let unchanged = previous_row
+            .and_then(|prev| prev.get(x))
+            .map(|prev| prev == current)
+            .unwrap_or(false);
+        if unchanged {
+            x += 1;
+            continue;
+        }
+
+        if current.continuation {
+            x += 1;
+            continue;
+        }
+
+        let segment_start = x;
+        let segment_fg = parse_color(current.fg.as_deref());
+        let segment_bg = parse_color(current.bg.as_deref());
+        let mut text = String::new();
+
+        while x < row.len() {
+            let cell = &row[x];
+            let same_style =
+                parse_color(cell.fg.as_deref()) == segment_fg && parse_color(cell.bg.as_deref()) == segment_bg;
+            let changed = previous_row
+                .and_then(|prev| prev.get(x))
+                .map(|prev| prev != cell)
+                .unwrap_or(true);
+
+            if !changed || cell.continuation || !same_style {
+                break;
+            }
+
+            text.push(cell.ch);
+            x += 1;
+        }
+
+        if !text.is_empty() {
+            queue!(out, MoveTo(segment_start as u16, y))?;
+            apply_style(out, style_state, segment_fg, segment_bg)?;
+            queue!(out, Print(&text))?;
+        } else {
+            x += 1;
+        }
     }
-    queue!(out, MoveTo(x, y), ResetColor)?;
-    if let Some(color) = parse_color(cell.fg.as_deref()) {
-        queue!(out, SetForegroundColor(color))?;
+
+    Ok(())
+}
+
+fn apply_style<W: Write>(
+    out: &mut W,
+    style_state: &mut StyleState,
+    fg: Option<CColor>,
+    bg: Option<CColor>,
+) -> Result<()> {
+    if style_state.fg != fg || style_state.bg != bg {
+        queue!(out, ResetColor)?;
+        if let Some(color) = fg {
+            queue!(out, SetForegroundColor(color))?;
+        }
+        if let Some(color) = bg {
+            queue!(out, SetBackgroundColor(color))?;
+        }
+        style_state.fg = fg;
+        style_state.bg = bg;
     }
-    if let Some(color) = parse_color(cell.bg.as_deref()) {
-        queue!(out, SetBackgroundColor(color))?;
-    }
-    queue!(out, Print(cell.ch), ResetColor)?;
     Ok(())
 }
 

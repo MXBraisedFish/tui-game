@@ -150,6 +150,7 @@ mod tests {
             package_name: "Demo".to_string(),
             author: "Tester".to_string(),
             version: "1.0.0".to_string(),
+            debug_enabled: false,
             source: GameSourceKind::Official,
         }
     }

@@ -2,12 +2,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, anyhow};
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value as JsonValue};
+use serde_json::Value as JsonValue;
 use unicode_width::UnicodeWidthChar;
 
 use crate::app::i18n;
@@ -21,18 +22,23 @@ const DEFAULT_GAME_DESCRIPTION: &str = "No description available.";
 const DEFAULT_GAME_DETAIL: &str = "";
 const MATH_IMAGE_CHARS: [char; 9] = ['@', '%', '#', '*', '+', '=', '-', ':', '.'];
 const NUMBER_IMAGE_CHARS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const BLOCK_IMAGE_CHARS: [char; 3] = ['█', '▓', '▒'];
+const BLOCK_IMAGE_CHARS: [char; 3] = ['\u{2588}', '\u{2593}', '\u{2591}'];
 
-const DEFAULT_THUMBNAIL_LINES: [&str; 4] = ["████████", "██ ██ ██", "   ██   ", "  ████  "];
+const DEFAULT_THUMBNAIL_LINES: [&str; 4] = [
+    "\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}",
+    "\u{2588}\u{2588} \u{2588}\u{2588} \u{2588}\u{2588}",
+    "   \u{2588}\u{2588}   ",
+    "  \u{2588}\u{2588}\u{2588}\u{2588}  ",
+];
 
 const DEFAULT_BANNER_ASCII: [&str; 7] = [
-    "`7MMM.     ,MMF' .g8\"\"8q. `7MM\"\"\"Yb.",
-    "    MMMb    dPMM .dP'    `YM. MM    `Yb.",
-    "    M YM   ,M MM dM'      `MM MM     `Mb",
-    "    M  Mb  M' MM MM        MM MM      MM",
-    "    M  YM.P'  MM MM.      ,MP MM     ,MP",
-    "    M  `YM'   MM `Mb.    ,dP' MM    ,dP'",
-    ".JML. `'  .JMML. `\"bmmd\"' .JMMmmmdP'",
+    "`7MMM.     ,MMF' .g8\"\"8q. `7MM\"\"\"Yb.   ",
+    "  MMMb    dPMM .dP'    `YM. MM    `Yb. ",
+    "  M YM   ,M MM dM'      `MM MM     `Mb ",
+    "  M  Mb  M' MM MM        MM MM      MM ",
+    "  M  YM.P'  MM MM.      ,MP MM     ,MP ",
+    "  M  `YM'   MM `Mb.    ,dP' MM    ,dP' ",
+    ".JML. `'  .JMML. `\"bmmd\"' .JMMmmmdP'   ",
 ];
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -152,30 +158,6 @@ pub struct CachedPackage {
     pub scan_ok: bool,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-struct RawMeta {
-    package_name: String,
-    #[serde(default)]
-    description: Option<String>,
-    author: String,
-    version: String,
-    namespace: String,
-    api_version: ApiVersionField,
-    #[serde(default)]
-    thumbnail: Option<JsonValue>,
-    #[serde(default)]
-    banner: Option<JsonValue>,
-    #[serde(flatten)]
-    extra: Map<String, JsonValue>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-enum ApiVersionField {
-    Single(u32),
-    Range([u32; 2]),
-}
-
 #[derive(Clone, Copy, Debug)]
 enum ImageKind {
     Thumbnail,
@@ -209,6 +191,13 @@ fn default_true() -> bool {
     true
 }
 
+static MOD_STATE_STORE: LazyLock<Mutex<ModState>> = LazyLock::new(|| {
+    Mutex::new(ModState {
+        api_version: MOD_API_VERSION,
+        ..Default::default()
+    })
+});
+
 fn sanitize_mod_save_file_stem(game_id: &str) -> String {
     let mut sanitized = String::with_capacity(game_id.len());
     for ch in game_id.chars() {
@@ -236,78 +225,42 @@ pub fn mod_root_dir() -> Result<PathBuf> {
 }
 
 pub fn mod_data_dir() -> Result<PathBuf> {
-    Ok(mod_root_dir()?.join("list"))
-}
-
-pub fn mod_state_path() -> Result<PathBuf> {
-    Ok(mod_root_dir()?.join("mod_state.json"))
-}
-
-pub fn mod_scan_cache_path() -> Result<PathBuf> {
-    Ok(mod_root_dir()?.join("scan_cache.json"))
+    mod_root_dir()
 }
 
 pub fn mod_cache_dir() -> Result<PathBuf> {
-    Ok(mod_root_dir()?.join("cache"))
+    path_utils::cache_dir()
 }
 
 pub fn mod_save_dir(namespace: &str) -> Result<PathBuf> {
-    Ok(mod_root_dir()?.join("save").join(namespace))
+    Ok(path_utils::mod_save_dir()?.join(namespace))
 }
 
 pub fn mod_save_path(namespace: &str, game_id: &str) -> Result<PathBuf> {
     Ok(mod_save_dir(namespace)?.join(format!("{}.json", sanitize_mod_save_file_stem(game_id))))
 }
-
-pub fn mod_log_path(namespace: &str) -> Result<PathBuf> {
-    Ok(mod_root_dir()?
-        .join("logs")
-        .join(format!("{namespace}.log")))
-}
 pub fn load_mod_state() -> ModState {
-    let Ok(path) = mod_state_path() else {
-        return ModState {
+    MOD_STATE_STORE
+        .lock()
+        .map(|state| state.clone())
+        .unwrap_or_else(|_| ModState {
             api_version: MOD_API_VERSION,
             ..Default::default()
-        };
-    };
-
-    let Ok(raw) = fs::read_to_string(path) else {
-        return ModState {
-            api_version: MOD_API_VERSION,
-            ..Default::default()
-        };
-    };
-
-    let mut state =
-        serde_json::from_str::<ModState>(raw.trim_start_matches('\u{feff}')).unwrap_or_default();
-    if state.api_version == 0 {
-        state.api_version = MOD_API_VERSION;
-    }
-    state
+        })
 }
 
 pub fn save_mod_state(state: &ModState) -> Result<()> {
-    let path = mod_state_path()?;
-    path_utils::ensure_parent_dir(&path)?;
-    fs::write(path, serde_json::to_string_pretty(state)?)?;
+    if let Ok(mut guard) = MOD_STATE_STORE.lock() {
+        *guard = state.clone();
+    }
     Ok(())
 }
 
 pub fn load_scan_cache() -> ModScanCache {
-    let Ok(path) = mod_scan_cache_path() else {
-        return ModScanCache::default();
-    };
-    let Ok(raw) = fs::read_to_string(path) else {
-        return ModScanCache::default();
-    };
-    serde_json::from_str::<ModScanCache>(raw.trim_start_matches('\u{feff}')).unwrap_or_default()
+    ModScanCache::default()
 }
 
-pub fn save_scan_cache(cache: &ModScanCache) -> Result<()> {
-    let path = mod_scan_cache_path()?;
-    path_utils::ensure_parent_dir(&path)?;
-    fs::write(path, serde_json::to_string_pretty(cache)?)?;
+pub fn save_scan_cache(_cache: &ModScanCache) -> Result<()> {
     Ok(())
 }
 
@@ -397,26 +350,17 @@ pub fn mod_log(namespace: &str, level: &str, message: &str) -> Result<()> {
         }
     }
 
-    let path = mod_log_path(namespace)?;
-    path_utils::ensure_parent_dir(&path)?;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let line = format!("[{now}] [{}] {message}\n", level.to_ascii_uppercase());
-    let mut existing = fs::read_to_string(&path).unwrap_or_default();
-    existing.push_str(&line);
-    fs::write(path, existing)?;
+    let _ = namespace;
+    let _ = level;
+    let _ = message;
     Ok(())
 }
 
 pub fn scan_mods() -> Result<ModScanOutput> {
     let root = mod_data_dir()?;
-    let mod_root = mod_root_dir()?;
     fs::create_dir_all(&root)?;
     fs::create_dir_all(mod_cache_dir()?)?;
-    fs::create_dir_all(mod_root.join("save"))?;
-    fs::create_dir_all(mod_root.join("logs"))?;
+    fs::create_dir_all(path_utils::mod_save_dir()?)?;
 
     let mut state = load_mod_state();
     let mut cache = load_scan_cache();
@@ -451,7 +395,7 @@ pub fn scan_mods() -> Result<ModScanOutput> {
                 global_errors.push(scan_error(
                     &namespace,
                     "package",
-                    "meta.json",
+                    "package.json",
                     "error",
                     format!("mod package scan failed: {err}"),
                 ));
@@ -472,52 +416,43 @@ fn scan_package(
     state: &mut ModState,
     cache: &mut ModScanCache,
 ) -> Result<Option<ModPackage>> {
-    let meta_path = dir.join("meta.json");
-    if !meta_path.exists() {
+    let package_path = dir.join("package.json");
+    if !package_path.exists() {
         return Ok(None);
     }
 
-    let raw_meta = load_meta(&meta_path)?;
-    validate_meta(dir, &raw_meta)?;
+    let package = load_package(dir, GamePackageSource::Mod)?;
+    validate_mod_package_root(dir, &package.package)?;
 
-    let namespace = raw_meta.namespace.clone();
+    let namespace = package.package.namespace.clone();
     let state_entry = state.mods.entry(namespace.clone()).or_default();
-    state_entry.package_name = raw_meta.package_name.clone();
-    state_entry.author = raw_meta.author.clone();
-    state_entry.version = raw_meta.version.clone();
+    state_entry.package_name = package.package.package_name.clone();
+    state_entry.author = package.package.author.clone();
+    state_entry.version = package.package.version.clone();
 
     let description = resolve_mod_text(
         &namespace,
-        raw_meta
-            .description
-            .as_deref()
-            .unwrap_or(DEFAULT_PACKAGE_DESCRIPTION),
+        if package.package.description.trim().is_empty() {
+            DEFAULT_PACKAGE_DESCRIPTION
+        } else {
+            package.package.description.as_str()
+        },
     );
     let thumbnail = image_from_meta(
         &namespace,
-        raw_meta.thumbnail.as_ref(),
+        package.package.icon.as_ref(),
         ImageKind::Thumbnail,
     )?;
-    let banner = image_from_meta(&namespace, raw_meta.banner.as_ref(), ImageKind::Banner)?;
+    let banner = image_from_meta(&namespace, package.package.banner.as_ref(), ImageKind::Banner)?;
 
-    let package_name = resolve_mod_text(&namespace, &raw_meta.package_name);
-    let author = raw_meta.author.clone();
-    let version = raw_meta.version.clone();
+    let package_name = resolve_mod_text(&namespace, &package.package.package_name);
+    let author = package.package.author.clone();
+    let version = package.package.version.clone();
     let enabled = state_entry.enabled;
     let debug_enabled = state_entry.debug_enabled;
 
     let mut errors = Vec::new();
-    for key in raw_meta.extra.keys() {
-        errors.push(scan_error(
-            &namespace,
-            "package",
-            "meta.json",
-            "warning",
-            format!("unknown meta field ignored: {key}"),
-        ));
-    }
-
-    let package = load_package(dir, GamePackageSource::Mod)?;
+    validate_mod_structure(dir)?;
 
     if package.games.is_empty() {
         errors.push(scan_error(
@@ -530,7 +465,7 @@ fn scan_package(
         cache.packages.insert(
             namespace,
             CachedPackage {
-                meta_mtime: mtime_secs(&meta_path),
+                meta_mtime: mtime_secs(&package_path),
                 scan_ok: false,
                 ..Default::default()
             },
@@ -541,14 +476,14 @@ fn scan_package(
     let mut games = Vec::new();
     let mut script_mtimes = BTreeMap::new();
     for game_manifest in &package.games {
-        let script_path = dir.join(&game_manifest.entry);
+        let script_path = resolve_mod_entry_path(dir, &game_manifest.entry);
         let script_name = Path::new(&game_manifest.entry)
             .file_stem()
             .and_then(|value| value.to_str())
             .unwrap_or("game")
             .to_string();
         script_mtimes.insert(script_name.clone(), mtime_secs(&script_path));
-        match scan_game_manifest(&namespace, dir, game_manifest) {
+        match scan_game_manifest(&namespace, dir, &package.package, game_manifest) {
             Ok(game) => {
                 state_entry
                     .games
@@ -574,7 +509,7 @@ fn scan_package(
     cache.packages.insert(
         namespace.clone(),
         CachedPackage {
-            meta_mtime: mtime_secs(&meta_path),
+            meta_mtime: mtime_secs(&package_path),
             script_mtimes,
             thumbnail_cache_key: None,
             banner_cache_key: None,
@@ -603,9 +538,10 @@ fn scan_package(
 fn scan_game_manifest(
     namespace: &str,
     package_dir: &Path,
+    package_manifest: &crate::game::manifest::PackageManifest,
     game_manifest: &crate::game::manifest::GameManifest,
 ) -> Result<ModGameMeta> {
-    let script_path = package_dir.join(&game_manifest.entry);
+    let script_path = resolve_mod_entry_path(package_dir, &game_manifest.entry);
     if !script_path.exists() || !script_path.is_file() {
         return Err(anyhow!(
             "game entry does not exist: {}",
@@ -619,21 +555,31 @@ fn scan_game_manifest(
         .unwrap_or("game")
         .to_string();
 
-    let name = resolve_mod_text(namespace, &game_manifest.name);
+    let raw_name = package_manifest
+        .name
+        .as_deref()
+        .unwrap_or(&game_manifest.name);
+    let name = resolve_mod_text(namespace, raw_name);
     if name.trim().is_empty() {
         return Err(anyhow!("game manifest name cannot be blank"));
     }
 
-    let description = if game_manifest.description.trim().is_empty() {
+    let raw_description = if package_manifest.description.trim().is_empty() {
+        game_manifest.description.as_str()
+    } else {
+        package_manifest.description.as_str()
+    };
+    let description = if raw_description.trim().is_empty() {
         DEFAULT_GAME_DESCRIPTION.to_string()
     } else {
-        resolve_mod_text(namespace, &game_manifest.description)
+        resolve_mod_text(namespace, raw_description)
     };
 
-    let detail = if game_manifest.detail.trim().is_empty() {
+    let raw_detail = package_manifest.detail.as_deref().unwrap_or(&game_manifest.detail);
+    let detail = if raw_detail.trim().is_empty() {
         DEFAULT_GAME_DETAIL.to_string()
     } else {
-        resolve_mod_text(namespace, &game_manifest.detail)
+        resolve_mod_text(namespace, raw_detail)
     };
 
     let best_none = game_manifest
@@ -658,39 +604,94 @@ fn scan_game_manifest(
     })
 }
 
-fn load_meta(path: &Path) -> Result<RawMeta> {
-    let raw = fs::read_to_string(path)?;
-    let raw = raw.trim_start_matches('\u{feff}');
-    Ok(serde_json::from_str(raw)?)
-}
-
-fn validate_meta(dir: &Path, meta: &RawMeta) -> Result<()> {
+fn validate_mod_package_root(dir: &Path, package: &crate::game::manifest::PackageManifest) -> Result<()> {
     let folder_name = dir
         .file_name()
         .and_then(|value| value.to_str())
         .ok_or_else(|| anyhow!("invalid mod directory name"))?;
 
-    if meta.namespace != folder_name {
+    if package.namespace != folder_name {
         return Err(anyhow!("namespace must match directory name"));
     }
-    if !meta.namespace.chars().all(|ch| ch.is_ascii_alphanumeric()) {
-        return Err(anyhow!("namespace only allows letters and numbers"));
-    }
-    if meta.package_name.trim().is_empty() {
-        return Err(anyhow!("package_name cannot be blank"));
-    }
-    if meta.author.trim().is_empty() {
-        return Err(anyhow!("author cannot be blank"));
-    }
-    if meta.version.trim().is_empty() {
-        return Err(anyhow!("version cannot be blank"));
-    }
-    if !meta.api_version.supports(MOD_API_VERSION) {
+    if !package
+        .namespace
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    {
         return Err(anyhow!(
-            "api_version does not support host version {MOD_API_VERSION}"
+            "namespace only allows letters, numbers, and underscore"
         ));
     }
+    if package.package_name.trim().is_empty() {
+        return Err(anyhow!("package_name cannot be blank"));
+    }
+    if package.author.trim().is_empty() {
+        return Err(anyhow!("author cannot be blank"));
+    }
+    if package
+        .introduction
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_none()
+    {
+        return Err(anyhow!("introduction cannot be blank"));
+    }
+    if package
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_none()
+    {
+        return Err(anyhow!("name cannot be blank"));
+    }
+    if package.description.trim().is_empty() {
+        return Err(anyhow!("description cannot be blank"));
+    }
+    if package
+        .detail
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_none()
+    {
+        return Err(anyhow!("detail cannot be blank"));
+    }
     Ok(())
+}
+
+fn validate_mod_structure(dir: &Path) -> Result<()> {
+    let scripts_dir = dir.join("scripts");
+    let main_script = scripts_dir.join("main.lua");
+    let assets_dir = dir.join("assets");
+    let lang_dir = assets_dir.join("lang");
+    let en_us = lang_dir.join("en_us.json");
+
+    if !scripts_dir.is_dir() {
+        return Err(anyhow!("scripts directory is missing"));
+    }
+    if !main_script.is_file() {
+        return Err(anyhow!("scripts/main.lua is missing"));
+    }
+    if !assets_dir.is_dir() {
+        return Err(anyhow!("assets directory is missing"));
+    }
+    if !lang_dir.is_dir() {
+        return Err(anyhow!("assets/lang directory is missing"));
+    }
+    if !en_us.is_file() {
+        return Err(anyhow!("assets/lang/en_us.json is missing"));
+    }
+    Ok(())
+}
+
+fn resolve_mod_entry_path(package_dir: &Path, entry: &str) -> PathBuf {
+    if entry.starts_with("scripts/") || entry.starts_with("scripts\\") {
+        package_dir.join(entry)
+    } else {
+        package_dir.join("scripts").join(entry)
+    }
 }
 
 fn image_from_meta(namespace: &str, raw: Option<&JsonValue>, kind: ImageKind) -> Result<ModImage> {
@@ -1321,14 +1322,5 @@ fn scan_error(
         target: target.into(),
         severity: severity.to_string(),
         message: message.into(),
-    }
-}
-
-impl ApiVersionField {
-    fn supports(&self, version: u32) -> bool {
-        match self {
-            Self::Single(value) => *value == version,
-            Self::Range([min, max]) => version >= *min && version <= *max,
-        }
     }
 }

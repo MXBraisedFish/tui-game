@@ -122,6 +122,15 @@ impl Canvas {
             .count()
     }
 
+    pub fn row(&self, y: u16) -> Option<&[Cell]> {
+        if y >= self.height {
+            return None;
+        }
+        let start = usize::from(y) * usize::from(self.width);
+        let end = start + usize::from(self.width);
+        self.cells.get(start..end)
+    }
+
     pub fn measure_text(text: &str) -> (u16, u16) {
         let mut width = 0usize;
         let mut height = 0u16;

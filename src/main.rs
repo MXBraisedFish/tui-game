@@ -88,13 +88,18 @@ fn install_panic_hook() {
         let _ = disable_raw_mode();
         let mut out = io::stdout();
         let _ = execute!(out, Show, LeaveAlternateScreen);
+        tui_game::utils::host_log::append_host_error(
+            "host.error.program_crashed",
+            &[("panic_info", &panic_info.to_string())],
+        );
         old(panic_info);
     }));
 }
 
 fn main() {
     if let Err(err) = run() {
-        eprintln!("Error: {err:#}");
+        let err_text = format!("{err:#}");
+        tui_game::utils::host_log::append_host_error("host.error.raw", &[("err", &err_text)]);
     }
 }
 
@@ -224,6 +229,8 @@ fn initialize_runtime_layout() -> Result<()> {
     let app_data = tui_game::utils::path_utils::app_data_dir()?;
     std::fs::create_dir_all(app_data.join("mod"))?;
     std::fs::create_dir_all(app_data.join("official"))?;
+    std::fs::create_dir_all(app_data.join("cache"))?;
+    std::fs::create_dir_all(app_data.join("mod_save"))?;
     std::fs::create_dir_all(app_data.join("log"))?;
 
     let language = tui_game::utils::path_utils::language_file()?;
@@ -258,16 +265,28 @@ fn cleanup_legacy_runtime_data() -> Result<()> {
         "runtime_best_scores.json",
         "latest_runtime_save.txt",
         "language_pref.txt",
+        "mod_state.json",
+        "scan_cache.json",
     ] {
         let path = app_data.join(file_name);
         if path.exists() {
-            let _ = std::fs::remove_file(path);
+            if let Err(err) = std::fs::remove_file(path) {
+                tui_game::utils::host_log::append_host_error(
+                    "host.error.clean_old_save_failed",
+                    &[("err", &err.to_string())],
+                );
+            }
         }
     }
     for dir_name in ["runtime_save", "runtime-logs"] {
         let path = app_data.join(dir_name);
         if path.exists() {
-            let _ = std::fs::remove_dir_all(path);
+            if let Err(err) = std::fs::remove_dir_all(path) {
+                tui_game::utils::host_log::append_host_error(
+                    "host.error.clean_old_save_failed",
+                    &[("err", &err.to_string())],
+                );
+            }
         }
     }
     Ok(())
@@ -333,12 +352,20 @@ fn handle_key_event(
                         let pending = pending_new_game_start.take();
                         if let Some(pending) = pending {
                             if let Err(err) = save::clear_active_game_save() {
-                                eprintln!("Failed to clear active save slot: {err:#}");
+                                let err_text = format!("{err:#}");
+                                tui_game::utils::host_log::append_host_error(
+                                    "host.error.clean_old_save_failed",
+                                    &[("err", &err_text)],
+                                );
                             }
                             if let Err(err) = launch_game(&pending.target_game, LaunchMode::New) {
-                                eprintln!(
-                                    "Failed to run game '{}': {err:#}",
-                                    pending.target_game.id
+                                let err_text = format!("{err:#}");
+                                tui_game::utils::host_log::append_host_error(
+                                    "host.error.run_game_failed",
+                                    &[
+                                        ("game_id", pending.target_game.id.as_str()),
+                                        ("err", &err_text),
+                                    ],
                                 );
                             }
                             reset_terminal_after_runtime()?;
@@ -377,10 +404,18 @@ fn handle_key_event(
                             return Ok(());
                         }
                         if let Err(err) = save::clear_active_game_save() {
-                            eprintln!("Failed to clear active save slot: {err:#}");
+                            let err_text = format!("{err:#}");
+                            tui_game::utils::host_log::append_host_error(
+                                "host.error.clean_old_save_failed",
+                                &[("err", &err_text)],
+                            );
                         }
                         if let Err(err) = launch_game(&game, LaunchMode::New) {
-                            eprintln!("Failed to run game '{}': {err:#}", game.id);
+                            let err_text = format!("{err:#}");
+                            tui_game::utils::host_log::append_host_error(
+                                "host.error.run_game_failed",
+                                &[("game_id", game.id.as_str()), ("err", &err_text)],
+                            );
                         }
                         reset_terminal_after_runtime()?;
                         *force_ui_full_redraw = true;
@@ -488,7 +523,11 @@ fn apply_menu_action(
                     .find(|g| g.id.eq_ignore_ascii_case(game_id));
                 if let Some(game) = game {
                     if let Err(err) = launch_game(&game, LaunchMode::Continue) {
-                        eprintln!("Failed to continue game '{}': {err:#}", game.id);
+                        let err_text = format!("{err:#}");
+                        tui_game::utils::host_log::append_host_error(
+                            "host.error.continue_game_failed",
+                            &[("game_id", game.id.as_str()), ("err", &err_text)],
+                        );
                     }
                     let _ = reset_terminal_after_runtime();
                     *force_ui_full_redraw = true;
