@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
+use chrono::{Datelike, Local, NaiveDateTime, TimeZone, Timelike};
 use mlua::{Lua, Table, Value};
 
 use crate::lua::engine::RuntimeBridges;
@@ -46,9 +47,16 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
     let globals = lua.globals();
 
     {
-        let bridges = bridges.clone();
         globals.set(
             "now",
+            lua.create_function(move |_, ()| Ok(Local::now().timestamp_millis()))?,
+        )?;
+    }
+
+    {
+        let bridges = bridges.clone();
+        globals.set(
+            "running_time",
             lua.create_function(move |_, ()| Ok(bridges.started_at.elapsed().as_millis() as i64))?,
         )?;
     }
@@ -211,6 +219,44 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         )?;
     }
 
+    globals.set(
+        "get_current_year",
+        lua.create_function(move |_, ()| Ok(Local::now().year()))?,
+    )?;
+    globals.set(
+        "get_current_month",
+        lua.create_function(move |_, ()| Ok(Local::now().month() as i64))?,
+    )?;
+    globals.set(
+        "get_current_day",
+        lua.create_function(move |_, ()| Ok(Local::now().day() as i64))?,
+    )?;
+    globals.set(
+        "get_current_hour",
+        lua.create_function(move |_, ()| Ok(Local::now().hour() as i64))?,
+    )?;
+    globals.set(
+        "get_current_minute",
+        lua.create_function(move |_, ()| Ok(Local::now().minute() as i64))?,
+    )?;
+    globals.set(
+        "get_current_second",
+        lua.create_function(move |_, ()| Ok(Local::now().second() as i64))?,
+    )?;
+    globals.set(
+        "timestamp_to_date",
+        lua.create_function(move |_, (timestamp, format): (i64, Option<String>)| {
+            let format = format.unwrap_or_else(|| {
+                "{year}-{month}-{day} {hour}:{minute}:{second}".to_string()
+            });
+            Ok(format_timestamp(timestamp, &format))
+        })?,
+    )?;
+    globals.set(
+        "date_to_timestamp",
+        lua.create_function(move |_, date_str: String| Ok(parse_timestamp(&date_str)))?,
+    )?;
+
     Ok(())
 }
 
@@ -322,4 +368,27 @@ fn build_timer_info(lua: &Lua, timer: &TimerEntry) -> mlua::Result<Table> {
     table.set("remaining", current_remaining(timer) as i64)?;
     table.set("duration", timer.duration_ms as i64)?;
     Ok(table)
+}
+
+fn format_timestamp(timestamp_ms: i64, format: &str) -> String {
+    let Some(local_dt) = Local.timestamp_millis_opt(timestamp_ms).single() else {
+        return String::new();
+    };
+    format
+        .replace("{year}", &format!("{:04}", local_dt.year()))
+        .replace("{month}", &format!("{:02}", local_dt.month()))
+        .replace("{day}", &format!("{:02}", local_dt.day()))
+        .replace("{hour}", &format!("{:02}", local_dt.hour()))
+        .replace("{minute}", &format!("{:02}", local_dt.minute()))
+        .replace("{second}", &format!("{:02}", local_dt.second()))
+}
+
+fn parse_timestamp(date_str: &str) -> Value {
+    let Ok(naive) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%d %H:%M:%S") else {
+        return Value::Nil;
+    };
+    let Some(local_dt) = Local.from_local_datetime(&naive).single() else {
+        return Value::Nil;
+    };
+    Value::Integer(local_dt.timestamp_millis())
 }
