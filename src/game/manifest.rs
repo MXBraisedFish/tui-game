@@ -17,6 +17,8 @@ pub struct PackageManifest {
     #[serde(default, alias = "package")]
     pub package_name: String,
     #[serde(default)]
+    pub mod_name: Option<String>,
+    #[serde(default)]
     pub author: String,
     #[serde(default)]
     pub version: String,

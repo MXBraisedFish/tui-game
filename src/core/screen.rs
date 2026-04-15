@@ -1,5 +1,10 @@
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
+pub const ALIGN_NO_WRAP: i64 = 0;
+pub const ALIGN_LEFT: i64 = 1;
+pub const ALIGN_CENTER: i64 = 2;
+pub const ALIGN_RIGHT: i64 = 3;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Cell {
     pub ch: char,
@@ -76,41 +81,73 @@ impl Canvas {
         text: &str,
         fg: Option<String>,
         bg: Option<String>,
+        align: i64,
     ) {
-        let mut cursor_x = x;
+        if align == ALIGN_NO_WRAP {
+            let escaped = text.replace('\n', "\\n");
+            self.draw_text_line(i64::from(x), y, &escaped, fg, bg);
+            return;
+        }
+
+        let first_line = text.split('\n').next().unwrap_or("");
+        let first_width = UnicodeWidthStr::width(first_line) as i64;
+
+        for (row_offset, line) in text.split('\n').enumerate() {
+            let line_width = UnicodeWidthStr::width(line) as i64;
+            let start_x = match align {
+                ALIGN_CENTER => i64::from(x) + ((first_width - line_width) / 2),
+                ALIGN_RIGHT => i64::from(x) + (first_width - line_width),
+                _ => i64::from(x),
+            };
+            let draw_y = y.saturating_add(row_offset as u16);
+            self.draw_text_line(start_x, draw_y, line, fg.clone(), bg.clone());
+        }
+    }
+
+    fn draw_text_line(
+        &mut self,
+        start_x: i64,
+        y: u16,
+        text: &str,
+        fg: Option<String>,
+        bg: Option<String>,
+    ) {
+        let mut cursor_x = start_x;
         for ch in text.chars() {
-            if ch == '\n' {
-                break;
-            }
-            let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+            let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0) as i64;
             if ch_width == 0 {
                 continue;
             }
-            self.set_cell(
-                cursor_x,
-                y,
-                Cell {
-                    ch,
-                    fg: fg.clone(),
-                    bg: bg.clone(),
-                    continuation: false,
-                },
-            );
-            if ch_width > 1 {
-                for extra in 1..ch_width {
-                    self.set_cell(
-                        cursor_x.saturating_add(extra),
-                        y,
-                        Cell {
-                            ch: ' ',
-                            fg: fg.clone(),
-                            bg: bg.clone(),
-                            continuation: true,
-                        },
-                    );
+            if cursor_x >= 0 {
+                self.set_cell(
+                    cursor_x as u16,
+                    y,
+                    Cell {
+                        ch,
+                        fg: fg.clone(),
+                        bg: bg.clone(),
+                        continuation: false,
+                    },
+                );
+                if ch_width > 1 {
+                    for extra in 1..ch_width {
+                        let continuation_x = cursor_x + extra;
+                        if continuation_x >= 0 {
+                            self.set_cell(
+                                continuation_x as u16,
+                                y,
+                                Cell {
+                                    ch: ' ',
+                                    fg: fg.clone(),
+                                    bg: bg.clone(),
+                                    continuation: true,
+                                },
+                            );
+                        }
+                    }
                 }
             }
-            cursor_x = cursor_x.saturating_add(ch_width);
+            cursor_x += ch_width;
         }
     }
 

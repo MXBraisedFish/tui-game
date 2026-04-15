@@ -67,6 +67,7 @@ pub struct ModPackage {
     pub namespace: String,
     pub enabled: bool,
     pub debug_enabled: bool,
+    pub safe_mode_enabled: bool,
     pub package_name: String,
     pub author: String,
     pub version: String,
@@ -97,6 +98,10 @@ pub struct ModStateEntry {
     pub enabled: bool,
     #[serde(default)]
     pub debug_enabled: bool,
+    #[serde(default = "default_true")]
+    pub safe_mode_enabled: bool,
+    #[serde(skip)]
+    pub session_safe_mode_enabled: Option<bool>,
     #[serde(default)]
     pub package_name: String,
     #[serde(default)]
@@ -112,6 +117,8 @@ impl Default for ModStateEntry {
         Self {
             enabled: true,
             debug_enabled: false,
+            safe_mode_enabled: true,
+            session_safe_mode_enabled: None,
             package_name: String::new(),
             author: String::new(),
             version: String::new(),
@@ -192,10 +199,10 @@ fn default_true() -> bool {
 }
 
 static MOD_STATE_STORE: LazyLock<Mutex<ModState>> = LazyLock::new(|| {
-    Mutex::new(ModState {
+    Mutex::new(read_persisted_mod_state().unwrap_or_else(|| ModState {
         api_version: MOD_API_VERSION,
         ..Default::default()
-    })
+    }))
 });
 
 fn sanitize_mod_save_file_stem(game_id: &str) -> String {
@@ -253,15 +260,16 @@ pub fn save_mod_state(state: &ModState) -> Result<()> {
     if let Ok(mut guard) = MOD_STATE_STORE.lock() {
         *guard = state.clone();
     }
+    persist_mod_state(state)?;
     Ok(())
 }
 
 pub fn load_scan_cache() -> ModScanCache {
-    ModScanCache::default()
+    read_persisted_scan_cache().unwrap_or_default()
 }
 
 pub fn save_scan_cache(_cache: &ModScanCache) -> Result<()> {
-    Ok(())
+    persist_scan_cache(_cache)
 }
 
 pub fn set_mod_enabled(namespace: &str, enabled: bool) -> Result<()> {
@@ -278,6 +286,22 @@ pub fn set_mod_debug_enabled(namespace: &str, enabled: bool) -> Result<()> {
         .or_default()
         .debug_enabled = enabled;
     save_mod_state(&state)
+}
+
+pub fn set_mod_safe_mode(namespace: &str, enabled: bool, persist: bool) -> Result<()> {
+    let mut state = load_mod_state();
+    let entry = state.mods.entry(namespace.to_string()).or_default();
+    if persist {
+        entry.safe_mode_enabled = enabled;
+        entry.session_safe_mode_enabled = None;
+        save_mod_state(&state)
+    } else {
+        entry.session_safe_mode_enabled = Some(enabled);
+        if let Ok(mut guard) = MOD_STATE_STORE.lock() {
+            *guard = state;
+        }
+        Ok(())
+    }
 }
 
 pub fn update_mod_keybindings(
@@ -445,11 +469,22 @@ fn scan_package(
     )?;
     let banner = image_from_meta(&namespace, package.package.banner.as_ref(), ImageKind::Banner)?;
 
-    let package_name = resolve_mod_text(&namespace, &package.package.package_name);
+    let package_name = resolve_mod_text(
+        &namespace,
+        package
+            .package
+            .mod_name
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or(&package.package.package_name),
+    );
     let author = package.package.author.clone();
     let version = package.package.version.clone();
     let enabled = state_entry.enabled;
     let debug_enabled = state_entry.debug_enabled;
+    let safe_mode_enabled = state_entry
+        .session_safe_mode_enabled
+        .unwrap_or(state_entry.safe_mode_enabled);
 
     let mut errors = Vec::new();
     validate_mod_structure(dir)?;
@@ -525,6 +560,7 @@ fn scan_package(
         namespace,
         enabled,
         debug_enabled,
+        safe_mode_enabled,
         package_name,
         author,
         version,
@@ -1307,6 +1343,42 @@ fn mtime_secs(path: &Path) -> u64 {
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
         .map(|value| value.as_secs())
         .unwrap_or(0)
+}
+
+fn mod_state_cache_file() -> Result<PathBuf> {
+    Ok(mod_cache_dir()?.join("mod_state.json"))
+}
+
+fn scan_cache_file() -> Result<PathBuf> {
+    Ok(mod_cache_dir()?.join("scan_cache.json"))
+}
+
+fn read_persisted_mod_state() -> Option<ModState> {
+    let path = mod_state_cache_file().ok()?;
+    let raw = fs::read_to_string(path).ok()?;
+    let mut state = serde_json::from_str::<ModState>(raw.trim_start_matches('\u{feff}')).ok()?;
+    state.api_version = MOD_API_VERSION;
+    Some(state)
+}
+
+fn persist_mod_state(state: &ModState) -> Result<()> {
+    let path = mod_state_cache_file()?;
+    path_utils::ensure_parent_dir(&path)?;
+    fs::write(path, serde_json::to_string_pretty(state)?)?;
+    Ok(())
+}
+
+fn read_persisted_scan_cache() -> Option<ModScanCache> {
+    let path = scan_cache_file().ok()?;
+    let raw = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<ModScanCache>(raw.trim_start_matches('\u{feff}')).ok()
+}
+
+fn persist_scan_cache(cache: &ModScanCache) -> Result<()> {
+    let path = scan_cache_file()?;
+    path_utils::ensure_parent_dir(&path)?;
+    fs::write(path, serde_json::to_string_pretty(cache)?)?;
+    Ok(())
 }
 
 fn scan_error(

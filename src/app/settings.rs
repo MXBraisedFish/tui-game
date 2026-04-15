@@ -6,6 +6,7 @@ use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use unicode_width::UnicodeWidthStr;
 
 use crossterm::event::KeyCode;
+use std::time::Instant;
 
 use crate::app::i18n;
 use crate::app::rich_text;
@@ -32,6 +33,14 @@ pub struct SettingsState {
     pub mod_detail_scroll: usize,
     pub mod_detail_scroll_available: bool,
     pub mod_packages: Vec<ModPackage>,
+    pub mod_safe_dialog: Option<ModSafeDialog>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ModSafeDialog {
+    pub namespace: String,
+    pub mod_name: String,
+    pub opened_at: Instant,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -58,6 +67,7 @@ impl SettingsState {
             mod_detail_scroll: 0,
             mod_detail_scroll_available: false,
             mod_packages: load_mod_packages(),
+            mod_safe_dialog: None,
         }
     }
 
@@ -87,6 +97,14 @@ impl SettingsState {
             .min(total_mod_pages(self.mod_packages.len(), page_size).saturating_sub(1));
         self.mod_detail_scroll = 0;
         self.mod_detail_scroll_available = false;
+        if let Some(dialog) = &self.mod_safe_dialog
+            && !self
+                .mod_packages
+                .iter()
+                .any(|package| package.namespace == dialog.namespace)
+        {
+            self.mod_safe_dialog = None;
+        }
     }
 }
 
@@ -274,6 +292,27 @@ fn handle_language_key(state: &mut SettingsState, code: KeyCode) {
 }
 
 fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
+    if let Some(dialog) = &state.mod_safe_dialog {
+        let countdown_done = dialog.opened_at.elapsed().as_secs() >= 5;
+        match code {
+            KeyCode::Esc | KeyCode::Char('1') => {
+                state.mod_safe_dialog = None;
+            }
+            KeyCode::Char('2') if countdown_done => {
+                let _ = mods::set_mod_safe_mode(&dialog.namespace, false, false);
+                state.mod_safe_dialog = None;
+                state.refresh_mods();
+            }
+            KeyCode::Char('3') if countdown_done => {
+                let _ = mods::set_mod_safe_mode(&dialog.namespace, false, true);
+                state.mod_safe_dialog = None;
+                state.refresh_mods();
+            }
+            _ => {}
+        }
+        return;
+    }
+
     let page_size = current_mod_page_size();
     match code {
         KeyCode::Up | KeyCode::Char('k') => {
@@ -325,7 +364,18 @@ fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
             }
         }
         KeyCode::Char('r') | KeyCode::Char('R') => {
-            state.refresh_mods();
+            if let Some(package) = state.mod_packages.get(state.mod_selected) {
+                if package.safe_mode_enabled {
+                    state.mod_safe_dialog = Some(ModSafeDialog {
+                        namespace: package.namespace.clone(),
+                        mod_name: package.package_name.clone(),
+                        opened_at: Instant::now(),
+                    });
+                } else {
+                    let _ = mods::set_mod_safe_mode(&package.namespace, true, true);
+                    state.refresh_mods();
+                }
+            }
         }
         KeyCode::Esc => {
             state.page = SettingsPage::Hub;
@@ -540,7 +590,7 @@ fn render_mods(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
         "{}  {}  {}  {}  {}  {}",
         text("settings.mods.hint.toggle", "[Enter] Toggle"),
         text("settings.mods.hint.debug", "[D] Debug"),
-        text("settings.mods.hint.rescan", "[R] Rescan"),
+        text("settings.mods.hint.safe_mode", "[R] Safe Mode"),
         text("settings.mods.hint.move", "[鈫慮/[鈫揮 Move"),
         text("settings.mods.hint.page", "[Q]/[E] Page"),
         text("settings.hub.back_hint", "[ESC] Return to main menu")
@@ -555,6 +605,9 @@ fn render_mods(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
             .alignment(Alignment::Center),
         root[1],
     );
+    if let Some(dialog) = &state.mod_safe_dialog {
+        render_mod_safe_dialog(frame, dialog);
+    }
 }
 
 fn render_mod_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsState) {
@@ -749,7 +802,17 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
         buffer.set_stringn(
             text_x,
             area.y + 3,
-            &format!("{} {}", text("settings.mods.state", "State:"), status),
+            &format!(
+                "{} {} / {} {}",
+                text("settings.mods.state", "State:"),
+                status,
+                text("settings.mods.safe_mode", "Safe Mode:"),
+                if package.safe_mode_enabled {
+                    text("settings.mods.safe_mode_on", "On")
+                } else {
+                    text("settings.mods.safe_mode_off", "Off")
+                }
+            ),
             area.width.saturating_sub(thumb_width + 2) as usize,
             status_style,
         );
@@ -817,6 +880,15 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut Set
             "{} {}",
             text("settings.mods.namespace", "Namespace:"),
             package.namespace
+        )));
+        lines.push(Line::from(format!(
+            "{} {}",
+            text("settings.mods.safe_mode", "Safe Mode:"),
+            if package.safe_mode_enabled {
+                text("settings.mods.safe_mode_on", "On")
+            } else {
+                text("settings.mods.safe_mode_off", "Off")
+            }
         )));
         lines.push(Line::from(format!(
             "{} {}",
@@ -1047,6 +1119,119 @@ fn total_mod_pages(total_items: usize, page_size: usize) -> usize {
     } else {
         ((total_items + page_size.saturating_sub(1)) / page_size).max(1)
     }
+}
+
+fn render_mod_safe_dialog(frame: &mut ratatui::Frame<'_>, dialog: &ModSafeDialog) {
+    use ratatui::widgets::Clear;
+
+    let area = frame.area();
+    frame.render_widget(Clear, area);
+
+    let width = area.width.saturating_sub(8).clamp(40, 72);
+    let height = area.height.saturating_sub(4).clamp(10, 14);
+    let rect = Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(
+            " {} ",
+            text("settings.mods.safe_mode_dialog.title", "Safe Mode")
+        ))
+        .border_style(Style::default().fg(Color::White));
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let remaining = 5u64.saturating_sub(dialog.opened_at.elapsed().as_secs());
+    let countdown_done = remaining == 0;
+    let message = text(
+        "settings.mods.safe_mode_dialog.message",
+        "Are you sure you want to disable Safe Mode for mod \"{mod_name}\"?\n\nSafe Mode is designed to protect your device. After disabling it, this mod may perform high-risk operations such as file writes or system calls, which may cause data loss or system instability.\nPlease make sure you fully trust the source and author of this mod.",
+    )
+    .replace("{mod_name}", &dialog.mod_name);
+
+    let mut lines = rich_text::parse_rich_text_wrapped(
+        &message,
+        inner.width.saturating_sub(2) as usize,
+        Style::default().fg(Color::White),
+    );
+    lines.push(Line::from(""));
+    let index_style = Style::default().fg(Color::White);
+    lines.push(Line::from(vec![
+        Span::styled("[1] ", index_style),
+        Span::styled(
+            text("settings.mods.safe_mode_dialog.cancel", "Cancel"),
+            Style::default().fg(Color::LightGreen),
+        ),
+    ]));
+    let gated_style = Style::default().fg(if countdown_done {
+        Color::Red
+    } else {
+        Color::DarkGray
+    });
+    lines.push(Line::from(vec![
+        Span::styled("[2] ", index_style),
+        Span::styled(
+            format!(
+                "{} {}{}",
+                text(
+                    "settings.mods.safe_mode_dialog.disable_once",
+                    "Confirm Disable"
+                ),
+                text(
+                    "settings.mods.safe_mode_dialog.disable_once_sub",
+                    "(Only This Time)"
+                ),
+                if countdown_done {
+                    String::new()
+                } else {
+                    format!(
+                        " {}",
+                        text("settings.mods.safe_mode_dialog.countdown", "{seconds}s")
+                            .replace("{seconds}", &remaining.to_string())
+                    )
+                }
+            ),
+            gated_style,
+        ),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled("[3] ", index_style),
+        Span::styled(
+            format!(
+                "{} {}{}",
+                text(
+                    "settings.mods.safe_mode_dialog.disable_forever",
+                    "Confirm Disable"
+                ),
+                text(
+                    "settings.mods.safe_mode_dialog.disable_forever_sub",
+                    "(Permanently Trust This Mod)"
+                ),
+                if countdown_done {
+                    String::new()
+                } else {
+                    format!(
+                        " {}",
+                        text("settings.mods.safe_mode_dialog.countdown", "{seconds}s")
+                            .replace("{seconds}", &remaining.to_string())
+                    )
+                }
+            ),
+            gated_style,
+        ),
+    ]));
+
+    frame.render_widget(
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .alignment(Alignment::Left),
+        inner,
+    );
 }
 
 fn draw_language_grid(

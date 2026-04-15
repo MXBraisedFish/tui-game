@@ -109,5 +109,20 @@
     "host.error.entry_missing_required_callback_apis": "入口脚本缺少必须实现的声明式 API：{err}",
     "host.error.log_write_failed": "日志写入失败",
     "host.error.clear_event_queue_failed": "清空事件队列失败",
-    "host.error.skip_event_queue_failed": "跳过事件队列失败"
+    "host.error.skip_event_queue_failed": "跳过事件队列失败",
+    "host.warning.file_write_request": "{game_uid} 于 {timestamp} 请求调用 {api}，路径：{path}，{status}。",
+    "host.status.allowed": "已被允许",
+    "host.status.denied": "已被拒绝",
+    "settings.mods.hint.safe_mode": "[R] 安全模式",
+    "settings.mods.safe_mode": "安全模式：",
+    "settings.mods.safe_mode_on": "开启",
+    "settings.mods.safe_mode_off": "关闭",
+    "settings.mods.safe_mode_dialog.title": "安全模式",
+    "settings.mods.safe_mode_dialog.message": "确定要为模组“{mod_name}”关闭安全模式吗？\n\n安全模式旨在保护您的设备安全。关闭后，该模组可能执行高风险操作（如文件写入等），可能导致数据丢失或系统异常。\n\n请确保您完全信任该模组的来源和作者。",
+    "settings.mods.safe_mode_dialog.cancel": "取消",
+    "settings.mods.safe_mode_dialog.disable_once": "确认关闭",
+    "settings.mods.safe_mode_dialog.disable_once_sub": "（仅本次）",
+    "settings.mods.safe_mode_dialog.disable_forever": "确认关闭",
+    "settings.mods.safe_mode_dialog.disable_forever_sub": "（永久信任此模组）",
+    "settings.mods.safe_mode_dialog.countdown": "{seconds}秒"
 }

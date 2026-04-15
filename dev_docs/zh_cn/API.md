@@ -295,13 +295,14 @@ end
 
 > 注：
 > 1. `color` 类型见 附录-[颜色 color](#颜色-color)
+> 1. `color` 类型见 附录-[对齐 align](#对齐-align)
 > 2. 所有绘制操作的基准点均为**内容的左上角**，即绘制内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
 
 | 函数名                                                     | 作用                                     | 参数                                                                                                                                                                                                                                                                                                                                                                                                                                         | 返回值                          |
 | ---------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
 | `canvas_clear()`                                           | 清空当前帧的画布。                       | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                                                                                                                              | <font color="#7f7f7f">无</font> |
 | `canvas_eraser(x, y, width, height)`                                           | 清空画布指定区域。                       | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：区域宽度。<br>`height` - <font color="#92cddc">int</font>：区域高度。 | <font color="#7f7f7f">无</font> |
-| `canvas_draw_text(x, y, text, *[fg, *[bg)`                 | 在画布指定位置绘制内容串。           | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：要绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。                                                                                                                                 | <font color="#7f7f7f">无</font> |
+| `canvas_draw_text(x, y, text, *[fg, *[bg, *[align)`                 | 在画布指定位置绘制内容串。           | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：要绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。<br>`*[align` - <font color="#92cddc">align</font>：可选，换行内容对齐方式。                                                                                                                                  | <font color="#7f7f7f">无</font> |
 | `canvas_fill_rect(x, y, width, height, [char, *[fg, *[bg)` | 从指定位置绘制矩形，并使用指定字符填充。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char` - <font color="#92cddc">string</font>：可选，用于填充的单个字符。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。 | <font color="#7f7f7f">无</font> |
 | `canvas_border_rect(x, y, width, height, [char_list, *[fg, *[bg)` | 从指定位置绘制矩形边框，并使用指定字符作为边框。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char_list` - <font color="#92cddc">table</font>：可选，边框字符配置表，结构见下方。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。 | <font color="#7f7f7f">无</font> |
 
@@ -326,7 +327,9 @@ end
 
 ## 内容尺寸计算
 
-> 注：宽度、高度返回值均以**终端字符数**为单位（宽度为列数，高度为行数）。
+> 注：
+> 1. 宽度、高度返回值均以**终端字符数**为单位（宽度为列数，高度为行数）。
+> 2. 所有计算操作的基准点均为**内容的左上角**，即计算内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
 
 | 函数名                  | 作用                                 | 参数                                                           | 返回值                                                                                                                    |
 | ----------------------- | ------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -343,11 +346,12 @@ end
 >
 > 1. 宽度、高度返回值均以**终端字符数**为单位（宽度为列数，高度为行数）。
 > 2. `x_anchor` 和 `y_anchor` 类型见 附录-[锚点 anchor](#锚点-anchor)
+> 3. 所有计算操作的基准点均为**内容的左上角**，即计算内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
 
 | 函数名                                                                    | 作用                                                         | 参数                                                                                                                                                                                                                                                                                                                                                                                                | 返回值                                                                                                         |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `resolve_x(*x_anchor, cw, [offset_x)`                                     | 根据水平锚点、内容宽度和偏移量，计算起始 X 坐标。            | `*x_anchor` - <font color="#92cddc">x_anchor</font>：水平锚点。<br>`cw` - <font color="#92cddc">int</font>：内容宽度。<br>`[offset_x` - <font color="#92cddc">int</font>：可选，水平偏移量。                                                                                                                                                                                                        | `x` - <font color="#92cddc">int</font>：起始 X 坐标。                                                          |
-| `resolve_y(*y_anchor, ch, [offset_y)`                                     | 根据垂直锚点、内容高度和偏移量，计算起始 Y 坐标。            | `*y_anchor` - <font color="#92cddc">y_anchor</font>：垂直锚点。<br>`ch` - <font color="#92cddc">int</font>：内容高度。<br>`[offset_y` - <font color="#92cddc">int</font>：可选，垂直偏移量。                                                                                                                                                                                                        | `y` - <font color="#92cddc">int</font>：起始 Y 坐标。                                                          |
+| `resolve_x(*x_anchor, width, [offset_x)`                                     | 根据水平锚点、内容宽度和偏移量，计算起始 X 坐标。            | `*x_anchor` - <font color="#92cddc">x_anchor</font>：水平锚点。<br>`width` - <font color="#92cddc">int</font>：内容宽度。<br>`[offset_x` - <font color="#92cddc">int</font>：可选，水平偏移量。                                                                                                                                                                                                        | `x` - <font color="#92cddc">int</font>：起始 X 坐标。                                                          |
+| `resolve_y(*y_anchor, height, [offset_y)`                                     | 根据垂直锚点、内容高度和偏移量，计算起始 Y 坐标。            | `*y_anchor` - <font color="#92cddc">y_anchor</font>：垂直锚点。<br>`height` - <font color="#92cddc">int</font>：内容高度。<br>`[offset_y` - <font color="#92cddc">int</font>：可选，垂直偏移量。                                                                                                                                                                                                        | `y` - <font color="#92cddc">int</font>：起始 Y 坐标。                                                          |
 | `resolve_rect(*x_anchor, *y_anchor, width, height, [offset_x, [offset_y)` | 根据水平和垂直锚点、宽高及偏移量，计算矩形的起始 X、Y 坐标。 | `*x_anchor` - <font color="#92cddc">x_anchor</font>：水平锚点。<br>`*y_anchor` - <font color="#92cddc">y_anchor</font>：垂直锚点。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[offset_x` - <font color="#92cddc">int</font>：可选，水平偏移量。<br>`[offset_y` - <font color="#92cddc">int</font>：可选，垂直偏移量。 | `x` - <font color="#92cddc">int</font>：起始 X 坐标。<br>`y` - <font color="#92cddc">int</font>：起始 Y 坐标。 |
 
 ---
@@ -362,7 +366,6 @@ end
 | 函数名             | 作用                                                   | 参数                                                                    | 返回值                                                                                                             |
 | ------------------ | ------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `translate(key)`   | 读取当前游戏资源包中指定语言键对应的本地化字符串。     | `key` - <font color="#92cddc">string</font>：语言键。                   | `value` - <font color="#92cddc">string</font>：对应的本地化字符串。                                                |
-| `read_bytes(path)` | 读取资源包中指定路径的二进制文件。                     | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：文件的二进制数据（以 Lua 字符串形式返回，并非二进制/十六进制类型）。 |
 | `read_text(path)`  | 读取资源包中指定路径的 `.txt` 文本文件。               | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：文件文本内容。                                                       |
 | `read_json(path)`  | 读取资源包中指定路径的 `.json` 文件，并解析为 Lua 表。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。                                                     |
 | `read_xml(path)`   | 读取资源包中指定路径的 `.xml` 文件，并解析为 Lua 表。  | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。                                                     |
@@ -377,9 +380,10 @@ end
 > 注：
 >
 > 1. 本章节中所有 `path` 参数均相对于游戏资源包中的 `assets/` 目录。
-> 2. 所有 `write_*` 函数均为高风险直写操作。仅当 `game.json` 中 `write` 字段为 `true` 且用户授予模组完全信任权限时，直写操作才会被执行；否则所有直写请求将被宿主忽略。
-> 3. 无论直写操作是否执行，每次调用都会在调试报告中记录，供用户安全检查。
-> 4. 所有 `write_*` 函数的 `content` 参数均为 `string` 类型。
+> 2. 所有 `write_*` 函数的 `content` 参数均为 `string` 类型。
+> 3. 所有 `write_*` 函数仅为语义命名，实际写入并不会做结构检查。
+> 4. 所有 `write_*` 函数均为高风险直写操作。仅当 `game.json` 中 `write` 字段为 `true` 且用户授予模组完全信任权限时，直写操作才会被执行；否则所有直写请求将被宿主忽略。
+> 5. 无论直写操作是否执行，每次调用都会在调试报告中记录，供用户安全检查。
 
 <font color="red"><b>直写操作不可撤回！</b></font>
 <font color="red"><b>直写操作不可撤回！</b></font>
@@ -389,13 +393,31 @@ end
 
 | 风险等级                        | 函数名                       | 作用                             | 参数                                                                                                                                              | 返回值                                                                             |
 | ------------------------------- | ---------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| <font color="red">高风险</font> | `write_bytes(path, content)` | 写入二进制文件到资源包指定路径。 | `path` - <font color="#92cddc">string</font>：文件路径。<br>`content` - <font color="#92cddc">string</font>：要写入的二进制数据（以字符串形式）。 | `bool` - <font color="#92cddc">boolean</font>：`true` 写入成功，`false` 写入失败。 |
 | <font color="red">高风险</font> | `write_text(path, content)`  | 写入文本文件到资源包指定路径。   | `path` - <font color="#92cddc">string</font>：文件路径。<br>`content` - <font color="#92cddc">string</font>：要写入的文本内容。                   | `bool` - <font color="#92cddc">boolean</font>：`true` 写入成功，`false` 写入失败。 |
 | <font color="red">高风险</font> | `write_json(path, content)`  | 写入 JSON 文件到资源包指定路径。 | `path` - <font color="#92cddc">string</font>：文件路径。<br>`content` - <font color="#92cddc">string</font>：要写入的 JSON 字符串。               | `bool` - <font color="#92cddc">boolean</font>：`true` 写入成功，`false` 写入失败。 |
 | <font color="red">高风险</font> | `write_xml(path, content)`   | 写入 XML 文件到资源包指定路径。  | `path` - <font color="#92cddc">string</font>：文件路径。<br>`content` - <font color="#92cddc">string</font>：要写入的 XML 字符串。                | `bool` - <font color="#92cddc">boolean</font>：`true` 写入成功，`false` 写入失败。 |
 | <font color="red">高风险</font> | `write_yaml(path, content)`  | 写入 YAML 文件到资源包指定路径。 | `path` - <font color="#92cddc">string</font>：文件路径。<br>`content` - <font color="#92cddc">string</font>：要写入的 YAML 字符串。               | `bool` - <font color="#92cddc">boolean</font>：`true` 写入成功，`false` 写入失败。 |
 | <font color="red">高风险</font> | `write_toml(path, content)`  | 写入 TOML 文件到资源包指定路径。 | `path` - <font color="#92cddc">string</font>：文件路径。<br>`content` - <font color="#92cddc">string</font>：要写入的 TOML 字符串。               | `bool` - <font color="#92cddc">boolean</font>：`true` 写入成功，`false` 写入失败。 |
 | <font color="red">高风险</font> | `write_csv(path, content)`   | 写入 CSV 文件到资源包指定路径。  | `path` - <font color="#92cddc">string</font>：文件路径。<br>`content` - <font color="#92cddc">string</font>：要写入的 CSV 字符串。                | `bool` - <font color="#92cddc">boolean</font>：`true` 写入成功，`false` 写入失败。 |
+
+---
+
+## 表处理工具
+
+> 注：
+> 1. 该部分 API 用于将表转换为各种数据格式的字符串，或进行表的深拷贝操作。
+> 2. 转换结果主要用于调试输出、数据交换或持久化存储。
+> 3. 若转换失败，函数将返回 `nil` 并输出错误信息到调试日志。
+> 4. 转换函数对表格式有严格要求，详细见 附录-[表转换格式](#表转换格式)
+
+| 函数名 | 作用 | 参数 | 返回值 |
+| --- | --- | --- | --- |
+| `table_to_json(table)` | 将 Lua 表转换为 JSON 格式字符串。 | `table` - <font color="#92cddc">table</font>：要转换的表。 | `json_str` - <font color="#92cddc">string</font> \| <font color="#92cddc">nil</font>：JSON 格式字符串。 |
+| `table_to_yaml(table)` | 将 Lua 表转换为 YAML 格式字符串。 | `table` - <font color="#92cddc">table</font>：要转换的表。 | `yaml_str` - <font color="#92cddc">string</font> \| <font color="#92cddc">nil</font>：YAML 格式字符串。 |
+| `table_to_toml(table)` | 将 Lua 表转换为 TOML 格式字符串。 | `table` - <font color="#92cddc">table</font>：要转换的表。 | `toml_str` - <font color="#92cddc">string</font> \| <font color="#92cddc">nil</font>：TOML 格式字符串。 |
+| `table_to_csv(table)` | 将 Lua 表转换为 CSV 格式字符串。 | `table` - <font color="#92cddc">table</font>：要转换的表（应为二维数组结构）。 | `csv_str` - <font color="#92cddc">string</font> \| <font color="#92cddc">nil</font>：CSV 格式字符串。 |
+| `table_to_xml(table)` | 将 Lua 表转换为 XML 格式字符串。 | `table` - <font color="#92cddc">table</font>：要转换的表。 | `xml_str` - <font color="#92cddc">string</font> \| <font color="#92cddc">nil</font>：XML 格式字符串。 |
+| `deep_copy(table)` | 深拷贝一个 Lua 表，返回全新的独立副本。 | `table` - <font color="#92cddc">table</font>：要拷贝的表。 | `new_table` - <font color="#92cddc">table</font>：深拷贝后的新表。 |
 
 ---
 
@@ -419,6 +441,7 @@ end
 > 4. 查询 `init` 状态的计时器，`elapsed` 返回 0；查询 `completed` 状态的计时器，`remaining` 返回 0。
 > 5. 除 `is_timer_exists` 外，参数使用不存在的计时器 ID 会抛出异常。
 > 6. 所有脚本创建的计时器会在游戏退出后被删除。
+> 7. 每个游戏运行时最多同时存在64个计时器。
 
 | 是否启动计时器                  | 函数名                          | 作用                                                        | 参数                                                                                                                                       | 返回值                                                                                                                                                                                                                                                                                  |
 | ------------------------------- | ------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -439,6 +462,18 @@ end
 | <font color="#7f7f7f">否</font> | `get_timer_duration(id)`        | 获取指定 ID 计时器的总时长（毫秒）。                        | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                    | `time` - <font color="#92cddc">int</font>：总时长（毫秒）。                                                                                                                                                                                                                             |
 | <font color="#7f7f7f">否</font> | `get_timer_completed(id)`       | 检查指定 ID 的计时器是否已结束。                            | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                    | `bool` - <font color="#92cddc">boolean</font>：`true` 已结束，`false` 未结束 。                                                                                                                                                                                                         |
 | <font color="#7f7f7f">否</font> | `is_timer_exists(id)`           | 检查指定 ID 的计时器是否存在。                              | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                    | `bool` - <font color="#92cddc">boolean</font>：`true` 存在，`false` 不存在。                                                                                                                                                                                                            |
+| <font color="#7f7f7f">否</font> | `is_timer_exists(id)`           | 检查指定 ID 的计时器是否存在。                              | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                    | `bool` - <font color="#92cddc">boolean</font>：`true` 存在，`false` 不存在。                                                                                                                                                                                                            |
+| <font color="#7f7f7f">否</font> | `get_current_year()` | 获取当前年份。 | <font color="#7f7f7f">无</font> | `year` - <font color="#92cddc">int</font>：当前年份。 |
+| <font color="#7f7f7f">否</font> | `get_current_month()` | 获取当前月份。 | <font color="#7f7f7f">无</font> | `month` - <font color="#92cddc">int</font>：当前月份（1–12）。 |
+| <font color="#7f7f7f">否</font> | `get_current_day()` | 获取当前日期（月中第几天）。 | <font color="#7f7f7f">无</font> | `day` - <font color="#92cddc">int</font>：当前日期（1–31）。 |
+| <font color="#7f7f7f">否</font> | `get_current_hour()` | 获取当前小时（24 小时制）。 | <font color="#7f7f7f">无</font> | `hour` - <font color="#92cddc">int</font>：当前小时（0–23）。 |
+| <font color="#7f7f7f">否</font> | `get_current_minute()` | 获取当前分钟。 | <font color="#7f7f7f">无</font> | `minute` - <font color="#92cddc">int</font>：当前分钟（0–59）。 |
+| <font color="#7f7f7f">否</font> | `get_current_second()` | 获取当前秒数。 | <font color="#7f7f7f">无</font> | `second` - <font color="#92cddc">int</font>：当前秒数（0–59）。 |
+| <font color="#7f7f7f">否</font> | `timestamp_to_date(timestamp, [format)` | 将时间戳转换为格式化的日期时间字符串。 | `timestamp` - <font color="#92cddc">int</font>：时间戳（毫秒）。<br>`[format]` - <font color="#92cddc">string</font>：可选，格式化模板，默认 `"%Y-%m-%d %H:%M:%S"`。 | `date_str` - <font color="#92cddc">string</font>：格式化后的日期字符串。 |
+| <font color="#7f7f7f">否</font> | `date_to_timestamp(date_str, [format)` | 将日期字符串解析为时间戳。 | `date_str` - <font color="#92cddc">string</font>：日期字符串。<br>`[format` - <font color="#92cddc">string</font>：可选，解析模板，默认 `"%Y-%m-%d %H:%M:%S"`。 | `timestamp` - <font color="#92cddc">int</font> \| <font color="#92cddc">nil</font>：时间戳（毫秒），解析失败返回 `nil`。 |
+
+---
+
 
 ### `timers` 数据格式
 
@@ -593,7 +628,9 @@ end
 
 ### 锚点 `anchor`
 
-> 以下常量的值与含义对应。
+> 注：
+> 1. 以下常量的值与含义对应。
+> 2. 值以变量的形式传递。
 
 #### 水平锚点 `x_anchor`
 
@@ -613,11 +650,28 @@ end
 
 ---
 
+### 对齐 `align`
+
+> 注：
+> 1. 以下常量的值与含义对应。
+> 2. 值以变量的形式传递。
+
+| 常量            | 值  | 作用         |
+| --------------- | --- | ------------ |
+| `nil`   | `0` | 不换行   |
+| `ALIGN_LEFT`   | `1` | 相对第一行左对齐   |
+| `ALIGN_CENTER` | `2` | 相对第一行居中对齐 |
+| `ALIGN__RIGHT`  | `3` | 相对第一行右对齐   |
+
+---
+
 ### 颜色 `color`
 
 #### 预定义颜色名称
 
-> 注：以下颜色值为逻辑名称，实际显示效果取决于终端的颜色映射。
+> 注：
+> 1. 以下颜色值为逻辑名称，实际显示效果取决于终端的颜色映射。
+> 2. 值以字符串的形式传递。
 
 | 颜色值          | 映射的终端颜色 |
 | --------------- | -------------- |
@@ -686,6 +740,76 @@ end
 
 ---
 
+## 表转换格式
+
+### `json`
+
+任意普通对象 / 数组 / 嵌套表
+
+```lua
+{
+  name = "demo",
+  score = 100,
+  items = { "a", "b" }
+}
+```
+
+### `yaml`
+
+任意普通对象 / 数组 / 嵌套表
+
+```lua
+{
+  name = "demo",
+  score = 100
+}
+```
+
+### `toml`
+
+以对象为主的嵌套表
+
+```lua
+{
+  app = {
+    name = "demo",
+    version = "1.0"
+  },
+  window = {
+    width = 80,
+    height = 24
+  }
+}
+```
+
+### `csv`
+
+二维数组
+
+```lua
+{
+  { "name", "score" },
+  { "alice", 100 },
+  { "bob", 80 }
+}
+```
+
+### `xml`
+
+对象 + 数组的层级表
+
+```lua
+{
+  player = {
+    name = "hero",
+    hp = 100
+  },
+  items = { "potion", "sword" }
+}
+```
+
+---
+
 # 快速查询
 
 ## 声明式 API
@@ -719,7 +843,7 @@ end
 | <font color="#7f7f7f">无风险</font> | `get_text_width(text)`                                                    | 测量文本宽度       | `text` - <font color="#92cddc">string</font>                                                                                                                                                                                                                                                                     | `width` - <font color="#92cddc">int</font>                                               | [内容尺寸计算](#内容尺寸计算) |
 | <font color="#7f7f7f">无风险</font> | `get_text_height(text)`                                                   | 测量文本高度       | `text` - <font color="#92cddc">string</font>                                                                                                                                                                                                                                                                     | `height` - <font color="#92cddc">int</font>                                              | [内容尺寸计算](#内容尺寸计算) |
 | <font color="#7f7f7f">无风险</font> | `get_terminal_size()`                                                     | 获取终端尺寸       | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                  | `width` - <font color="#92cddc">int</font>, `height` - <font color="#92cddc">int</font>  | [内容尺寸计算](#内容尺寸计算) |
-| <font color="#7f7f7f">无风险</font> | `resolve_x(*x_anchor, cw, [offset)`                                       | 计算X坐标          | `*x_anchor` - <font color="#92cddc">x_anchor</font>, `cw` - <font color="#92cddc">int</font>, `[offset` - <font color="#92cddc">int</font>                                                                                                                                                                       | `x` - <font color="#92cddc">int</font>                                                   | [布局定位计算](#布局定位计算) |
+| <font color="#7f7f7f">无风险</font> | `resolve_x(*x_anchor, width, [offset)`                                       | 计算X坐标          | `*x_anchor` - <font color="#92cddc">x_anchor</font>, `width` - <font color="#92cddc">int</font>, `[offset` - <font color="#92cddc">int</font>                                                                                                                                                                       | `x` - <font color="#92cddc">int</font>                                                   | [布局定位计算](#布局定位计算) |
 | <font color="#7f7f7f">无风险</font> | `resolve_y(*y_anchor, ch, [offset)`                                       | 计算Y坐标          | `*y_anchor` - <font color="#92cddc">y_anchor</font>, `ch` - <font color="#92cddc">int</font>, `[offset` - <font color="#92cddc">int</font>                                                                                                                                                                       | `y` - <font color="#92cddc">int</font>                                                   | [布局定位计算](#布局定位计算) |
 | <font color="#7f7f7f">无风险</font> | `resolve_rect(*x_anchor, *y_anchor, width, height, [offset_x, [offset_y)` | 计算矩形位置       | `*x_anchor` - <font color="#92cddc">x_anchor</font>, `*y_anchor` - <font color="#92cddc">y_anchor</font>, `width` - <font color="#92cddc">int</font>, `height` - <font color="#92cddc">int</font>, `[offset_x` - <font color="#92cddc">int</font>, `[offset_y` - <font color="#92cddc">int</font>                | `x` - <font color="#92cddc">int</font>, `y` - <font color="#92cddc">int</font>           | [布局定位计算](#布局定位计算) |
 | <font color="#7f7f7f">无风险</font> | `translate(key)`                                                          | 翻译文本           | `key` - <font color="#92cddc">string</font>                                                                                                                                                                                                                                                                      | `value` - <font color="#92cddc">string</font>                                            | [数据读取](#数据读取)         |
@@ -841,7 +965,7 @@ end
 | 适用函数                                 | 异常条件                                      | 异常信息                                     | 异常类型                             |
 | ---------------------------------------- | --------------------------------------------- | -------------------------------------------- | ------------------------------------ |
 | `resolve_x`, `resolve_y`, `resolve_rect` | 锚点值无效（不是 `0`、`1`、`2` 或对应的常量） | 无效的锚点值：`{anchor}`                     | <font color="purple">脚本异常</font> |
-| `resolve_x`, `resolve_rect`              | 内容宽度 `cw` 或矩形宽度 `width` 为负数或0    | 宽度无效：宽度必须为正整数，实际为 `{value}` | <font color="purple">脚本异常</font> |
+| `resolve_x`, `resolve_rect`              | 内容宽度 `width` 或矩形宽度 `width` 为负数或0    | 宽度无效：宽度必须为正整数，实际为 `{value}` | <font color="purple">脚本异常</font> |
 | `resolve_y`, `resolve_rect`              | 内容高度 `ch` 或矩形高度 `height` 为负数或0   | 高度无效：高度必须为正整数，实际为 `{value}` | <font color="purple">脚本异常</font> |
 
 ---

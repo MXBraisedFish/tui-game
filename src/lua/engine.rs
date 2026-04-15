@@ -25,6 +25,7 @@ pub(crate) struct RuntimeBridges {
     pub(crate) canvas: Arc<Mutex<Canvas>>,
     pub(crate) commands: Arc<Mutex<Vec<RuntimeCommand>>>,
     pub(crate) resize_flag: Arc<Mutex<bool>>,
+    pub(crate) timers: Arc<Mutex<api::direct_timer_api::TimerStore>>,
     pub(crate) game: GameDescriptor,
     pub(crate) launch_mode: LaunchMode,
     pub(crate) started_at: Instant,
@@ -46,10 +47,12 @@ impl LuaGameEngine {
         let canvas = Arc::new(Mutex::new(Canvas::new(width, height)));
         let commands = Arc::new(Mutex::new(Vec::new()));
         let resize_flag = Arc::new(Mutex::new(false));
+        let timers = Arc::new(Mutex::new(api::direct_timer_api::TimerStore::default()));
         let bridges = RuntimeBridges {
             canvas: Arc::clone(&canvas),
             commands: Arc::clone(&commands),
             resize_flag: Arc::clone(&resize_flag),
+            timers: Arc::clone(&timers),
             game: game.clone(),
             launch_mode,
             started_at: Instant::now(),
@@ -320,7 +323,15 @@ fn frame_duration_for_fps(target_fps: u16) -> Duration {
 }
 
 pub fn run_game_descriptor(game: &GameDescriptor, mode: LaunchMode) -> Result<()> {
+    clear_startup_input_buffer();
     LuaGameEngine::new(game.clone(), mode)?.run()
+}
+
+fn clear_startup_input_buffer() {
+    while event::poll(Duration::from_millis(0)).unwrap_or(false) {
+        let _ = event::read();
+    }
+    semantic_key_source().clear_pending_keys();
 }
 
 fn map_semantic_key_to_event(game: &GameDescriptor, key_name: String) -> InputEvent {

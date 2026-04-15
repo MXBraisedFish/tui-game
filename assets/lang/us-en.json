@@ -109,5 +109,20 @@
     "host.error.entry_missing_required_callback_apis": "Entry script is missing required Callback APIs: {err}",
     "host.error.log_write_failed": "Failed to write log.",
     "host.error.clear_event_queue_failed": "Failed to clear event queue.",
-    "host.error.skip_event_queue_failed": "Failed to skip event queue."
+    "host.error.skip_event_queue_failed": "Failed to skip event queue.",
+    "host.warning.file_write_request": "{game_uid} requested {api} at {timestamp}, path: {path}, {status}.",
+    "host.status.allowed": "allowed",
+    "host.status.denied": "denied",
+    "settings.mods.hint.safe_mode": "[R] Safe Mode",
+    "settings.mods.safe_mode": "Safe Mode:",
+    "settings.mods.safe_mode_on": "On",
+    "settings.mods.safe_mode_off": "Off",
+    "settings.mods.safe_mode_dialog.title": "Safe Mode",
+    "settings.mods.safe_mode_dialog.message": "Are you sure you want to disable Safe Mode for mod \"{mod_name}\"?\n\nSafe Mode is designed to protect your device. After disabling it, this mod may perform high-risk operations such as file writes, which may cause data loss or system instability.\nPlease make sure you fully trust the source and author of this mod.",
+    "settings.mods.safe_mode_dialog.cancel": "Cancel",
+    "settings.mods.safe_mode_dialog.disable_once": "Confirm Disable",
+    "settings.mods.safe_mode_dialog.disable_once_sub": "(Only This Time)",
+    "settings.mods.safe_mode_dialog.disable_forever": "Confirm Disable",
+    "settings.mods.safe_mode_dialog.disable_forever_sub": "(Permanently Trust This Mod)",
+    "settings.mods.safe_mode_dialog.countdown": "{seconds}s"
 }

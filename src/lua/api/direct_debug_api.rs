@@ -112,7 +112,7 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
     Ok(())
 }
 
-fn is_debug_enabled(bridges: &RuntimeBridges) -> bool {
+pub(crate) fn is_debug_enabled(bridges: &RuntimeBridges) -> bool {
     bridges
         .game
         .package
@@ -121,13 +121,17 @@ fn is_debug_enabled(bridges: &RuntimeBridges) -> bool {
         .unwrap_or(false)
 }
 
-fn debug_log_path(bridges: &RuntimeBridges) -> mlua::Result<std::path::PathBuf> {
+pub(crate) fn debug_log_path(bridges: &RuntimeBridges) -> mlua::Result<std::path::PathBuf> {
     Ok(path_utils::log_dir()
         .map_err(mlua::Error::external)?
         .join(format!("{}.txt", bridges.game.id)))
 }
 
-fn write_log_line(bridges: &RuntimeBridges, title: &str, message: &str) -> mlua::Result<()> {
+pub(crate) fn write_log_line(
+    bridges: &RuntimeBridges,
+    title: &str,
+    message: &str,
+) -> mlua::Result<()> {
     let path = debug_log_path(bridges)?;
     path_utils::ensure_parent_dir(&path).map_err(mlua::Error::external)?;
     let line = format!("[{}] {}\n", title, message);
@@ -140,6 +144,13 @@ fn write_log_line(bridges: &RuntimeBridges, title: &str, message: &str) -> mlua:
         ))
     })?;
     Ok(())
+}
+
+pub(crate) fn write_debug_error_line(bridges: &RuntimeBridges, message: &str) {
+    if !is_debug_enabled(bridges) {
+        return;
+    }
+    let _ = write_log_line(bridges, &i18n::t_or("debug.title.error", "错误"), message);
 }
 
 fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {

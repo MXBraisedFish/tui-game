@@ -345,6 +345,7 @@ mod tests {
         let package_manifest = PackageManifest {
             namespace: "demo".to_string(),
             package_name: "Demo Package".to_string(),
+            mod_name: Some("Demo Mod".to_string()),
             author: "Tester".to_string(),
             version: String::new(),
             introduction: Some("demo intro".to_string()),
@@ -437,6 +438,7 @@ mod tests {
         let package_manifest = PackageManifest {
             namespace: "alpha".to_string(),
             package_name: "Alpha Pack".to_string(),
+            mod_name: Some("Alpha Mod".to_string()),
             author: "Tester".to_string(),
             version: String::new(),
             introduction: Some("alpha introduction".to_string()),
@@ -549,6 +551,7 @@ mod tests {
         let package = PackageManifest {
             namespace: "examplepack".to_string(),
             package_name: "Example Pack".to_string(),
+            mod_name: Some("Example Mod".to_string()),
             author: "Tester".to_string(),
             version: String::new(),
             introduction: Some("Intro".to_string()),

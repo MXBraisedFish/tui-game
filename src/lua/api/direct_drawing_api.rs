@@ -1,10 +1,14 @@
 use mlua::{Lua, Table, Value, Variadic};
 
-use crate::core::screen::Cell;
+use crate::core::screen::{Cell, ALIGN_CENTER, ALIGN_LEFT, ALIGN_NO_WRAP, ALIGN_RIGHT};
 use crate::lua::engine::RuntimeBridges;
 
 pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
     let globals = lua.globals();
+
+    globals.set("ALIGN_LEFT", ALIGN_LEFT)?;
+    globals.set("ALIGN_CENTER", ALIGN_CENTER)?;
+    globals.set("ALIGN_RIGHT", ALIGN_RIGHT)?;
 
     {
         let bridges = bridges.clone();
@@ -21,20 +25,13 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "canvas_draw_text",
-            lua.create_function(
-                move |_, (x, y, text, fg, bg): (i64, i64, String, Option<String>, Option<String>)| {
-                    with_canvas(&bridges, |canvas| {
-                        canvas.draw_text(
-                            to_u16(x),
-                            to_u16(y),
-                            &text,
-                            fg.filter(|value| !value.trim().is_empty()),
-                            bg.filter(|value| !value.trim().is_empty()),
-                        );
-                    })?;
-                    Ok(())
-                },
-            )?,
+            lua.create_function(move |_, (x, y, text, rest): (i64, i64, String, Variadic<Value>)| {
+                let (fg, bg, align) = parse_draw_text_args(&rest);
+                with_canvas(&bridges, |canvas| {
+                    canvas.draw_text(to_u16(x), to_u16(y), &text, fg, bg, align);
+                })?;
+                Ok(())
+            })?,
         )?;
     }
 
@@ -122,6 +119,25 @@ struct BorderChars {
     bottom_left: Option<char>,
     left: Option<char>,
     top_left: Option<char>,
+}
+
+fn parse_draw_text_args(rest: &Variadic<Value>) -> (Option<String>, Option<String>, i64) {
+    let fg = rest
+        .first()
+        .and_then(value_as_string)
+        .filter(|value| !value.trim().is_empty());
+    let bg = rest
+        .get(1)
+        .and_then(value_as_string)
+        .filter(|value| !value.trim().is_empty());
+    let align = match rest.get(2) {
+        None => ALIGN_LEFT,
+        Some(Value::Nil) => ALIGN_NO_WRAP,
+        Some(Value::Integer(value)) => *value,
+        Some(Value::Number(value)) => *value as i64,
+        _ => ALIGN_LEFT,
+    };
+    (fg, bg, align)
 }
 
 fn with_canvas(
