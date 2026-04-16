@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 
 use chrono::{Datelike, Local, NaiveDateTime, TimeZone, Timelike};
-use mlua::{Lua, Table, Value};
+use mlua::{Lua, Table, Value, Variadic};
 
+use crate::lua::api::common;
 use crate::lua::engine::RuntimeBridges;
 
 const MAX_TIMERS: usize = 64;
@@ -49,7 +50,10 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
     {
         globals.set(
             "now",
-            lua.create_function(move |_, ()| Ok(Local::now().timestamp_millis()))?,
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 0)?;
+                Ok(Local::now().timestamp_millis())
+            })?,
         )?;
     }
 
@@ -57,7 +61,10 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "running_time",
-            lua.create_function(move |_, ()| Ok(bridges.started_at.elapsed().as_millis() as i64))?,
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 0)?;
+                Ok(bridges.started_at.elapsed().as_millis() as i64)
+            })?,
         )?;
     }
 
@@ -65,7 +72,10 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "timer_create",
-            lua.create_function(move |lua, (delay_ms, note): (i64, Option<String>)| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_arg_count_range(&args, 1, 2)?;
+                let delay_ms = common::expect_i64_arg(&args, 0, "delay_ms")?;
+                let note = common::expect_optional_string_arg(&args, 1, "note")?;
                 let mut store = timer_store(&bridges)?;
                 if store.timers.len() >= MAX_TIMERS {
                     return Ok(Value::Nil);
@@ -129,7 +139,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "timer_kill",
-            lua.create_function(move |_, id: String| {
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let id = common::expect_string_arg(&args, 0, "id")?;
                 let mut store = timer_store(&bridges)?;
                 store.timers.remove(&id);
                 Ok(())
@@ -141,7 +153,10 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "set_timer_note",
-            lua.create_function(move |_, (id, note): (String, String)| {
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 2)?;
+                let id = common::expect_string_arg(&args, 0, "id")?;
+                let note = common::expect_string_arg(&args, 1, "note")?;
                 let mut store = timer_store(&bridges)?;
                 let timer = get_timer_mut(&mut store, &id)?;
                 timer.note = note;
@@ -154,7 +169,8 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "get_timer_list",
-            lua.create_function(move |lua, ()| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 0)?;
                 let mut store = timer_store(&bridges)?;
                 let arr = lua.create_table()?;
                 for (idx, timer) in store.timers.values_mut().enumerate() {
@@ -170,7 +186,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "get_timer_info",
-            lua.create_function(move |lua, id: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let id = common::expect_string_arg(&args, 0, "id")?;
                 let mut store = timer_store(&bridges)?;
                 let timer = get_timer_mut(&mut store, &id)?;
                 normalize_timer(timer);
@@ -183,7 +201,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "get_timer_status",
-            lua.create_function(move |lua, id: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let id = common::expect_string_arg(&args, 0, "id")?;
                 let mut store = timer_store(&bridges)?;
                 let timer = get_timer_mut(&mut store, &id)?;
                 normalize_timer(timer);
@@ -212,7 +232,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "is_timer_exists",
-            lua.create_function(move |_, id: String| {
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let id = common::expect_string_arg(&args, 0, "id")?;
                 let store = timer_store(&bridges)?;
                 Ok(store.timers.contains_key(&id))
             })?,
@@ -221,32 +243,52 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
 
     globals.set(
         "get_current_year",
-        lua.create_function(move |_, ()| Ok(Local::now().year()))?,
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 0)?;
+            Ok(Local::now().year())
+        })?,
     )?;
     globals.set(
         "get_current_month",
-        lua.create_function(move |_, ()| Ok(Local::now().month() as i64))?,
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 0)?;
+            Ok(Local::now().month() as i64)
+        })?,
     )?;
     globals.set(
         "get_current_day",
-        lua.create_function(move |_, ()| Ok(Local::now().day() as i64))?,
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 0)?;
+            Ok(Local::now().day() as i64)
+        })?,
     )?;
     globals.set(
         "get_current_hour",
-        lua.create_function(move |_, ()| Ok(Local::now().hour() as i64))?,
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 0)?;
+            Ok(Local::now().hour() as i64)
+        })?,
     )?;
     globals.set(
         "get_current_minute",
-        lua.create_function(move |_, ()| Ok(Local::now().minute() as i64))?,
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 0)?;
+            Ok(Local::now().minute() as i64)
+        })?,
     )?;
     globals.set(
         "get_current_second",
-        lua.create_function(move |_, ()| Ok(Local::now().second() as i64))?,
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 0)?;
+            Ok(Local::now().second() as i64)
+        })?,
     )?;
     globals.set(
         "timestamp_to_date",
-        lua.create_function(move |_, (timestamp, format): (i64, Option<String>)| {
-            let format = format.unwrap_or_else(|| {
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_arg_count_range(&args, 1, 2)?;
+            let timestamp = common::expect_i64_arg(&args, 0, "timestamp")?;
+            let format = common::expect_optional_string_arg(&args, 1, "format")?.unwrap_or_else(|| {
                 "{year}-{month}-{day} {hour}:{minute}:{second}".to_string()
             });
             Ok(format_timestamp(timestamp, &format))
@@ -254,7 +296,11 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
     )?;
     globals.set(
         "date_to_timestamp",
-        lua.create_function(move |_, date_str: String| Ok(parse_timestamp(&date_str)))?,
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 1)?;
+            let date_str = common::expect_string_arg(&args, 0, "date_str")?;
+            Ok(parse_timestamp(&date_str))
+        })?,
     )?;
 
     Ok(())
@@ -283,7 +329,9 @@ where
     let apply = mutator.clone();
     globals.set(
         name,
-        lua.create_function(move |_, id: String| {
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 1)?;
+            let id = common::expect_string_arg(&args, 0, "id")?;
             let mut store = timer_store(&bridges)?;
             let timer = get_timer_mut(&mut store, &id)?;
             apply(timer);
@@ -306,7 +354,9 @@ where
     let get = getter.clone();
     globals.set(
         name,
-        lua.create_function(move |_, id: String| {
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 1)?;
+            let id = common::expect_string_arg(&args, 0, "id")?;
             let mut store = timer_store(&bridges)?;
             let timer = get_timer_mut(&mut store, &id)?;
             normalize_timer(timer);

@@ -2,10 +2,11 @@ use std::fs;
 use std::path::{Component, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use mlua::Lua;
+use mlua::{Lua, Value, Variadic};
 
 use crate::app::i18n;
 use crate::game::registry::{GameSourceKind, PackageDescriptor};
+use crate::lua::api::common;
 use crate::lua::engine::RuntimeBridges;
 use crate::mods;
 use crate::utils::{host_log, path_utils};
@@ -51,7 +52,10 @@ where
     let writer = write_fn.clone();
     globals.set(
         api_name,
-        lua.create_function(move |_, (path, content): (String, String)| {
+        lua.create_function(move |_, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 2)?;
+            let path = common::expect_string_arg(&args, 0, "path")?;
+            let content = common::expect_string_arg(&args, 1, "content")?;
             let allowed = is_write_allowed(&bridges);
             log_write_request(&bridges, api_name, &path, allowed);
             if !allowed {

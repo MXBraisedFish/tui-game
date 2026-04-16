@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
 use csv::StringRecord;
-use mlua::{Lua, Table, Value};
+use mlua::{Lua, Table, Value, Variadic};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use serde_json::{Map, Value as JsonValue};
 
 use crate::game::resources;
+use crate::lua::api::common;
 use crate::lua::engine::RuntimeBridges;
 
 pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
@@ -16,7 +17,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "translate",
-            lua.create_function(move |_, key: String| {
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let key = common::expect_string_arg(&args, 0, "key")?;
                 Ok(current_package(&bridges)
                     .map(|package| resources::resolve_package_text(package, &key))
                     .unwrap_or(key))
@@ -28,7 +31,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "read_bytes",
-            lua.create_function(move |lua, path: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let path = common::expect_string_arg(&args, 0, "path")?;
                 let bytes = current_package(&bridges)
                     .and_then(|package| resources::read_package_bytes(package, &path).ok())
                     .unwrap_or_default();
@@ -46,7 +51,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "read_text",
-            lua.create_function(move |_, path: String| {
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let path = common::expect_string_arg(&args, 0, "path")?;
                 Ok(current_package(&bridges)
                     .and_then(|package| resources::read_package_text(package, &path).ok())
                     .unwrap_or_default())
@@ -58,7 +65,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "read_json",
-            lua.create_function(move |lua, path: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let path = common::expect_string_arg(&args, 0, "path")?;
                 let value = current_package(&bridges)
                     .and_then(|package| resources::read_package_json(package, &path).ok())
                     .unwrap_or(JsonValue::Null);
@@ -71,7 +80,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "read_yaml",
-            lua.create_function(move |lua, path: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let path = common::expect_string_arg(&args, 0, "path")?;
                 let value = current_package(&bridges)
                     .and_then(|package| resources::read_package_text(package, &path).ok())
                     .and_then(|text| serde_yaml::from_str::<serde_yaml::Value>(&text).ok())
@@ -86,7 +97,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "read_toml",
-            lua.create_function(move |lua, path: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let path = common::expect_string_arg(&args, 0, "path")?;
                 let value = current_package(&bridges)
                     .and_then(|package| resources::read_package_text(package, &path).ok())
                     .and_then(|text| text.parse::<toml::Value>().ok())
@@ -101,7 +114,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "read_csv",
-            lua.create_function(move |lua, path: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let path = common::expect_string_arg(&args, 0, "path")?;
                 let value = current_package(&bridges)
                     .and_then(|package| resources::read_package_text(package, &path).ok())
                     .map(|text| parse_csv_to_json(&text))
@@ -115,7 +130,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "read_xml",
-            lua.create_function(move |lua, path: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let path = common::expect_string_arg(&args, 0, "path")?;
                 let value = current_package(&bridges)
                     .and_then(|package| resources::read_package_text(package, &path).ok())
                     .map(|text| parse_xml_to_json(&text))

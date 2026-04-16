@@ -1,9 +1,10 @@
 use std::fs;
 use std::path::{Component, PathBuf};
 
-use mlua::{Lua, Value};
+use mlua::{Lua, Value, Variadic};
 
 use crate::game::registry::PackageDescriptor;
+use crate::lua::api::common;
 use crate::lua::engine::RuntimeBridges;
 
 pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
@@ -13,7 +14,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "load_function",
-            lua.create_function(move |lua, path: String| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let path = common::expect_string_arg(&args, 0, "path")?;
                 let Some(package) = current_package(&bridges) else {
                     return lua.create_table();
                 };

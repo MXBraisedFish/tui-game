@@ -26,6 +26,7 @@ pub(crate) struct RuntimeBridges {
     pub(crate) commands: Arc<Mutex<Vec<RuntimeCommand>>>,
     pub(crate) resize_flag: Arc<Mutex<bool>>,
     pub(crate) timers: Arc<Mutex<api::direct_timer_api::TimerStore>>,
+    pub(crate) randoms: Arc<Mutex<api::direct_random_api::RandomStore>>,
     pub(crate) game: GameDescriptor,
     pub(crate) launch_mode: LaunchMode,
     pub(crate) started_at: Instant,
@@ -48,11 +49,13 @@ impl LuaGameEngine {
         let commands = Arc::new(Mutex::new(Vec::new()));
         let resize_flag = Arc::new(Mutex::new(false));
         let timers = Arc::new(Mutex::new(api::direct_timer_api::TimerStore::default()));
+        let randoms = Arc::new(Mutex::new(api::direct_random_api::RandomStore::default()));
         let bridges = RuntimeBridges {
             canvas: Arc::clone(&canvas),
             commands: Arc::clone(&commands),
             resize_flag: Arc::clone(&resize_flag),
             timers: Arc::clone(&timers),
+            randoms: Arc::clone(&randoms),
             game: game.clone(),
             launch_mode,
             started_at: Instant::now(),

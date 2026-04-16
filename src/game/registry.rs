@@ -148,6 +148,20 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
             let (name, description, detail, author, introduction, icon, banner) =
                 resolve_display_fields(&package.package, &game);
             let entry = game.entry.clone();
+            if matches!(source, GamePackageSource::Mod) {
+                if !has_best_score {
+                    host_log::append_host_warning(
+                        "host.warning.best_none_null_ignored",
+                        &[("mod_uid", game.id.as_str())],
+                    );
+                }
+                if !game.save {
+                    host_log::append_host_warning(
+                        "host.warning.save_false_ignored",
+                        &[("mod_uid", game.id.as_str())],
+                    );
+                }
+            }
             games.push(GameDescriptor {
                 id: game.id,
                 name,

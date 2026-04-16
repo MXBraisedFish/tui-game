@@ -1,7 +1,8 @@
 use csv::WriterBuilder;
-use mlua::{Lua, Table, Value};
+use mlua::{Lua, Table, Value, Variadic};
 use serde_json::{Map, Number, Value as JsonValue};
 
+use crate::lua::api::common;
 use crate::lua::api::direct_debug_api;
 use crate::lua::engine::RuntimeBridges;
 
@@ -12,7 +13,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "table_to_json",
-            lua.create_function(move |lua, table: Table| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let table = common::expect_table_arg(&args, 0, "table")?;
                 serialize_table(lua, &bridges, table, table_to_json_string)
             })?,
         )?;
@@ -22,7 +25,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "table_to_yaml",
-            lua.create_function(move |lua, table: Table| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let table = common::expect_table_arg(&args, 0, "table")?;
                 serialize_table(lua, &bridges, table, table_to_yaml_string)
             })?,
         )?;
@@ -32,7 +37,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "table_to_toml",
-            lua.create_function(move |lua, table: Table| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let table = common::expect_table_arg(&args, 0, "table")?;
                 serialize_table(lua, &bridges, table, table_to_toml_string)
             })?,
         )?;
@@ -42,7 +49,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "table_to_csv",
-            lua.create_function(move |lua, table: Table| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let table = common::expect_table_arg(&args, 0, "table")?;
                 serialize_table(lua, &bridges, table, table_to_csv_string)
             })?,
         )?;
@@ -52,7 +61,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "table_to_xml",
-            lua.create_function(move |lua, table: Table| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
+                let table = common::expect_table_arg(&args, 0, "table")?;
                 serialize_table(lua, &bridges, table, table_to_xml_string)
             })?,
         )?;
@@ -60,7 +71,11 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
 
     globals.set(
         "deep_copy",
-        lua.create_function(move |lua, table: Table| deep_copy_table(lua, &table).map(Value::Table))?,
+        lua.create_function(move |lua, args: Variadic<Value>| {
+            common::expect_exact_arg_count(&args, 1)?;
+            let table = common::expect_table_arg(&args, 0, "table")?;
+            deep_copy_table(lua, &table).map(Value::Table)
+        })?,
     )?;
 
     Ok(())

@@ -3,6 +3,7 @@
 use mlua::{Lua, Table, Value, Variadic};
 
 use crate::app::i18n;
+use crate::lua::api::common;
 use crate::lua::engine::RuntimeBridges;
 use crate::utils::path_utils;
 
@@ -14,10 +15,15 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         globals.set(
             "debug_log",
             lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
                 if !is_debug_enabled(&bridges) {
                     return Ok(());
                 }
-                write_log_line(&bridges, &i18n::t_or("debug.title.log", "日志"), &stringify_variadic(args))
+                write_log_line(
+                    &bridges,
+                    &i18n::t_or("debug.title.log", "日志"),
+                    &stringify_value(&args[0]),
+                )
             })?,
         )?;
     }
@@ -27,10 +33,15 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         globals.set(
             "debug_warn",
             lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
                 if !is_debug_enabled(&bridges) {
                     return Ok(());
                 }
-                write_log_line(&bridges, &i18n::t_or("debug.title.warning", "警告"), &stringify_variadic(args))
+                write_log_line(
+                    &bridges,
+                    &i18n::t_or("debug.title.warning", "警告"),
+                    &stringify_value(&args[0]),
+                )
             })?,
         )?;
     }
@@ -40,10 +51,15 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         globals.set(
             "debug_error",
             lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 1)?;
                 if !is_debug_enabled(&bridges) {
                     return Ok(());
                 }
-                write_log_line(&bridges, &i18n::t_or("debug.title.error", "错误"), &stringify_variadic(args))
+                write_log_line(
+                    &bridges,
+                    &i18n::t_or("debug.title.error", "异常"),
+                    &stringify_value(&args[0]),
+                )
             })?,
         )?;
     }
@@ -52,7 +68,10 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "debug_print",
-            lua.create_function(move |_, (title, message): (String, Value)| {
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 2)?;
+                let title = common::expect_string_arg(&args, 0, "title")?;
+                let message = args.get(1).cloned().unwrap_or(Value::Nil);
                 if !is_debug_enabled(&bridges) {
                     return Ok(());
                 }
@@ -65,7 +84,8 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "clear_debug_log",
-            lua.create_function(move |_, ()| {
+            lua.create_function(move |_, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 0)?;
                 if !is_debug_enabled(&bridges) {
                     return Ok(());
                 }
@@ -87,7 +107,8 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "get_game_uid",
-            lua.create_function(move |lua, ()| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 0)?;
                 if !is_debug_enabled(&bridges) {
                     return Ok(Value::Nil);
                 }
@@ -100,7 +121,8 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         let bridges = bridges.clone();
         globals.set(
             "get_game_info",
-            lua.create_function(move |lua, ()| {
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_exact_arg_count(&args, 0)?;
                 if !is_debug_enabled(&bridges) {
                     return Ok(Value::Nil);
                 }
@@ -150,7 +172,7 @@ pub(crate) fn write_debug_error_line(bridges: &RuntimeBridges, message: &str) {
     if !is_debug_enabled(bridges) {
         return;
     }
-    let _ = write_log_line(bridges, &i18n::t_or("debug.title.error", "错误"), message);
+    let _ = write_log_line(bridges, &i18n::t_or("debug.title.error", "异常"), message);
 }
 
 fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {
@@ -259,18 +281,6 @@ fn json_to_lua(lua: &Lua, value: &serde_json::Value) -> mlua::Result<Value> {
     }
 }
 
-fn stringify_variadic(args: Variadic<Value>) -> String {
-    match args.len() {
-        0 => String::new(),
-        1 => stringify_value(&args[0]),
-        _ => args
-            .iter()
-            .map(stringify_value)
-            .collect::<Vec<_>>()
-            .join(" "),
-    }
-}
-
 fn stringify_value(value: &Value) -> String {
     match value {
         Value::Nil => "nil".to_string(),
@@ -290,5 +300,3 @@ fn stringify_value(value: &Value) -> String {
         Value::Other(_) => "<other>".to_string(),
     }
 }
-
-

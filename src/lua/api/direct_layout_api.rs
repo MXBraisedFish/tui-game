@@ -1,5 +1,7 @@
 use crossterm::terminal;
-use mlua::Lua;
+use mlua::{Lua, Value, Variadic};
+
+use crate::lua::api::common;
 
 const ANCHOR_LEFT: i64 = 0;
 const ANCHOR_CENTER: i64 = 1;
@@ -20,37 +22,43 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
 
     globals.set(
         "resolve_x",
-        lua.create_function(|_, (x_anchor, width, offset_x): (i64, i64, Option<i64>)| {
+        lua.create_function(|_, args: Variadic<Value>| {
+            common::expect_arg_count_range(&args, 2, 3)?;
+            let x_anchor = common::expect_i64_arg(&args, 0, "x_anchor")?;
+            let width = common::expect_i64_arg(&args, 1, "cw")?;
+            let offset_x = common::expect_optional_i64_arg(&args, 2, "offset_x")?.unwrap_or(0);
             let (term_width, _) = terminal_size_i64();
-            Ok(resolve_axis(x_anchor, term_width, width, offset_x.unwrap_or(0)))
+            Ok(resolve_axis(x_anchor, term_width, width, offset_x))
         })?,
     )?;
 
     globals.set(
         "resolve_y",
-        lua.create_function(|_, (y_anchor, height, offset_y): (i64, i64, Option<i64>)| {
+        lua.create_function(|_, args: Variadic<Value>| {
+            common::expect_arg_count_range(&args, 2, 3)?;
+            let y_anchor = common::expect_i64_arg(&args, 0, "y_anchor")?;
+            let height = common::expect_i64_arg(&args, 1, "ch")?;
+            let offset_y = common::expect_optional_i64_arg(&args, 2, "offset_y")?.unwrap_or(0);
             let (_, term_height) = terminal_size_i64();
-            Ok(resolve_axis(y_anchor, term_height, height, offset_y.unwrap_or(0)))
+            Ok(resolve_axis(y_anchor, term_height, height, offset_y))
         })?,
     )?;
 
     globals.set(
         "resolve_rect",
-        lua.create_function(
-            |_, (x_anchor, y_anchor, width, height, offset_x, offset_y): (
-                i64,
-                i64,
-                i64,
-                i64,
-                Option<i64>,
-                Option<i64>,
-            )| {
-                let (term_width, term_height) = terminal_size_i64();
-                let x = resolve_axis(x_anchor, term_width, width, offset_x.unwrap_or(0));
-                let y = resolve_axis(y_anchor, term_height, height, offset_y.unwrap_or(0));
-                Ok((x, y))
-            },
-        )?,
+        lua.create_function(|_, args: Variadic<Value>| {
+            common::expect_arg_count_range(&args, 4, 6)?;
+            let x_anchor = common::expect_i64_arg(&args, 0, "x_anchor")?;
+            let y_anchor = common::expect_i64_arg(&args, 1, "y_anchor")?;
+            let width = common::expect_i64_arg(&args, 2, "width")?;
+            let height = common::expect_i64_arg(&args, 3, "height")?;
+            let offset_x = common::expect_optional_i64_arg(&args, 4, "offset_x")?.unwrap_or(0);
+            let offset_y = common::expect_optional_i64_arg(&args, 5, "offset_y")?.unwrap_or(0);
+            let (term_width, term_height) = terminal_size_i64();
+            let x = resolve_axis(x_anchor, term_width, width, offset_x);
+            let y = resolve_axis(y_anchor, term_height, height, offset_y);
+            Ok((x, y))
+        })?,
     )?;
 
     Ok(())
