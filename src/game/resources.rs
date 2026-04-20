@@ -148,6 +148,7 @@ mod tests {
             root_dir,
             namespace: "demo".to_string(),
             package_name: "Demo".to_string(),
+            mod_name: None,
             author: "Tester".to_string(),
             version: "1.0.0".to_string(),
             debug_enabled: false,

@@ -57,8 +57,9 @@ where
             common::expect_exact_arg_count(&args, 2)?;
             let path = common::expect_string_arg(&args, 0, "path")?;
             let content = common::expect_string_arg(&args, 1, "content")?;
+            let logged_path = resolve_logged_path(&bridges, &path);
             let allowed = is_write_allowed(&bridges);
-            log_write_request(&bridges, api_name, &path, allowed);
+            log_write_request(&bridges, api_name, &logged_path, allowed);
             if !allowed {
                 return Ok(false);
             }
@@ -142,6 +143,13 @@ fn write_bytes(path: &std::path::Path, content: &str) -> std::io::Result<()> {
 
 fn write_text(path: &std::path::Path, content: &str) -> std::io::Result<()> {
     fs::write(path, content)
+}
+
+fn resolve_logged_path(bridges: &RuntimeBridges, logical_path: &str) -> String {
+    current_package(bridges)
+        .and_then(|package| resolve_asset_write_path(package, logical_path).ok())
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|| logical_path.to_string())
 }
 
 fn log_write_request(bridges: &RuntimeBridges, api_name: &str, path: &str, allowed: bool) {

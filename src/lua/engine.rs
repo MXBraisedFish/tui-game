@@ -268,7 +268,7 @@ impl LuaGameEngine {
                     if let Some(pending_events) = pending_events.as_deref_mut() {
                         pending_events.clear();
                     }
-                    api::direct_system_control_api::clear_pending_input_queue();
+                    api::direct_system_request_api::clear_pending_input_queue();
                 }
                 RuntimeCommand::RenderNow => {
                     self.render_current_frame()?;

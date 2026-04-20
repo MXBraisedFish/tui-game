@@ -179,6 +179,11 @@ fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {
             .map(|value| value.package_name.as_str())
             .unwrap_or_default(),
     )?;
+    set_optional_string(
+        &table,
+        "mod_name",
+        package.and_then(|value| value.mod_name.as_deref()),
+    )?;
     set_optional_string(&table, "introduction", bridges.game.introduction.as_deref())?;
     table.set("author", bridges.game.author.as_str())?;
     table.set("name", bridges.game.name.as_str())?;
@@ -193,7 +198,6 @@ fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {
     set_optional_u16(&table, "min_width", bridges.game.min_width)?;
     set_optional_u16(&table, "min_height", bridges.game.min_height)?;
     table.set("write", bridges.game.write)?;
-    table.set("version", package.map(|value| value.version.as_str()).unwrap_or(""))?;
 
     let actions = lua.create_table()?;
     for (name, binding) in &bridges.game.actions {
