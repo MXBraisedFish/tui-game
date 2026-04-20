@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use chrono::{Datelike, Local, NaiveDateTime, TimeZone, Timelike};
 use mlua::{Lua, Table, Value, Variadic};
 
+use crate::app::i18n;
 use crate::lua::api::common;
 use crate::lua::engine::RuntimeBridges;
+use crate::utils::host_log;
 
 const MAX_TIMERS: usize = 64;
 
@@ -52,7 +54,7 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             "now",
             lua.create_function(move |_, args: Variadic<Value>| {
                 common::expect_exact_arg_count(&args, 0)?;
-                Ok(Local::now().timestamp_millis())
+                current_timestamp_millis()
             })?,
         )?;
     }
@@ -63,7 +65,8 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             "running_time",
             lua.create_function(move |_, args: Variadic<Value>| {
                 common::expect_exact_arg_count(&args, 0)?;
-                Ok(bridges.started_at.elapsed().as_millis() as i64)
+                i64::try_from(bridges.started_at.elapsed().as_millis())
+                    .map_err(|err| running_time_failed_error(&err.to_string()))
             })?,
         )?;
     }
@@ -75,10 +78,14 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             lua.create_function(move |lua, args: Variadic<Value>| {
                 common::expect_arg_count_range(&args, 1, 2)?;
                 let delay_ms = common::expect_i64_arg(&args, 0, "delay_ms")?;
+                if delay_ms <= 0 {
+                    return Err(timer_duration_must_be_positive_error());
+                }
                 let note = common::expect_optional_string_arg(&args, 1, "note")?;
-                let mut store = timer_store(&bridges)?;
+                let mut store = timer_store(&bridges)
+                    .map_err(|err| create_timer_failed_error(&err.to_string()))?;
                 if store.timers.len() >= MAX_TIMERS {
-                    return Ok(Value::Nil);
+                    return Err(create_timer_failed_error("timer limit reached"));
                 }
                 store.next_id += 1;
                 let id = format!("timer_{}", store.next_id);
@@ -87,53 +94,90 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
                     TimerEntry {
                         id: id.clone(),
                         note: note.unwrap_or_default(),
-                        duration_ms: delay_ms.max(0) as u64,
+                        duration_ms: delay_ms as u64,
                         elapsed_ms: 0,
                         started_at: None,
                         status: TimerStatus::Init,
                     },
                 );
-                Ok(Value::String(lua.create_string(&id)?))
+                lua.create_string(&id)
+                    .map(Value::String)
+                    .map_err(|err| create_timer_failed_error(&err.to_string()))
             })?,
         )?;
     }
 
-    install_timer_mutator(lua, &globals, "timer_start", bridges.clone(), |timer| {
-        normalize_timer(timer);
-        if timer.status == TimerStatus::Init {
-            timer.started_at = Some(Instant::now());
-            timer.status = TimerStatus::Running;
-        }
-    })?;
+    install_timer_mutator(
+        lua,
+        &globals,
+        "timer_start",
+        bridges.clone(),
+        start_timer_failed_error,
+        |timer| {
+            normalize_timer(timer);
+            if timer.status == TimerStatus::Init {
+                timer.started_at = Some(Instant::now());
+                timer.status = TimerStatus::Running;
+            }
+        },
+    )?;
 
-    install_timer_mutator(lua, &globals, "timer_pause", bridges.clone(), |timer| {
-        normalize_timer(timer);
-        if timer.status == TimerStatus::Running {
-            timer.elapsed_ms = current_elapsed(timer);
+    install_timer_mutator(
+        lua,
+        &globals,
+        "timer_pause",
+        bridges.clone(),
+        pause_timer_failed_error,
+        |timer| {
+            normalize_timer(timer);
+            if timer.status == TimerStatus::Running {
+                timer.elapsed_ms = current_elapsed(timer);
+                timer.started_at = None;
+                timer.status = TimerStatus::Pause;
+            }
+        },
+    )?;
+
+    install_timer_mutator(
+        lua,
+        &globals,
+        "timer_resume",
+        bridges.clone(),
+        resume_timer_failed_error,
+        |timer| {
+            normalize_timer(timer);
+            if timer.status == TimerStatus::Pause {
+                timer.started_at = Some(Instant::now());
+                timer.status = TimerStatus::Running;
+            }
+        },
+    )?;
+
+    install_timer_mutator(
+        lua,
+        &globals,
+        "timer_reset",
+        bridges.clone(),
+        reset_timer_failed_error,
+        |timer| {
+            timer.elapsed_ms = 0;
             timer.started_at = None;
-            timer.status = TimerStatus::Pause;
-        }
-    })?;
+            timer.status = TimerStatus::Init;
+        },
+    )?;
 
-    install_timer_mutator(lua, &globals, "timer_resume", bridges.clone(), |timer| {
-        normalize_timer(timer);
-        if timer.status == TimerStatus::Pause {
+    install_timer_mutator(
+        lua,
+        &globals,
+        "timer_restart",
+        bridges.clone(),
+        start_timer_failed_error,
+        |timer| {
+            timer.elapsed_ms = 0;
             timer.started_at = Some(Instant::now());
             timer.status = TimerStatus::Running;
-        }
-    })?;
-
-    install_timer_mutator(lua, &globals, "timer_reset", bridges.clone(), |timer| {
-        timer.elapsed_ms = 0;
-        timer.started_at = None;
-        timer.status = TimerStatus::Init;
-    })?;
-
-    install_timer_mutator(lua, &globals, "timer_restart", bridges.clone(), |timer| {
-        timer.elapsed_ms = 0;
-        timer.started_at = Some(Instant::now());
-        timer.status = TimerStatus::Running;
-    })?;
+        },
+    )?;
 
     {
         let bridges = bridges.clone();
@@ -142,8 +186,11 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             lua.create_function(move |_, args: Variadic<Value>| {
                 common::expect_exact_arg_count(&args, 1)?;
                 let id = common::expect_string_arg(&args, 0, "id")?;
-                let mut store = timer_store(&bridges)?;
-                store.timers.remove(&id);
+                let mut store = timer_store(&bridges)
+                    .map_err(|err| kill_timer_failed_error(&err.to_string()))?;
+                if store.timers.remove(&id).is_none() {
+                    return Err(timer_not_found_error(&id));
+                }
                 Ok(())
             })?,
         )?;
@@ -157,7 +204,8 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
                 common::expect_exact_arg_count(&args, 2)?;
                 let id = common::expect_string_arg(&args, 0, "id")?;
                 let note = common::expect_string_arg(&args, 1, "note")?;
-                let mut store = timer_store(&bridges)?;
+                let mut store = timer_store(&bridges)
+                    .map_err(|err| timer_info_failed_error(&id, &err.to_string()))?;
                 let timer = get_timer_mut(&mut store, &id)?;
                 timer.note = note;
                 Ok(())
@@ -171,11 +219,12 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             "get_timer_list",
             lua.create_function(move |lua, args: Variadic<Value>| {
                 common::expect_exact_arg_count(&args, 0)?;
-                let mut store = timer_store(&bridges)?;
+                let mut store = timer_store(&bridges)
+                    .map_err(|err| get_timer_list_failed_error(&err.to_string()))?;
                 let arr = lua.create_table()?;
                 for (idx, timer) in store.timers.values_mut().enumerate() {
                     normalize_timer(timer);
-                    arr.set(idx + 1, build_timer_info(lua, timer)?)?;
+                    arr.set(idx + 1, build_timer_info(lua, timer)?)?
                 }
                 Ok(arr)
             })?,
@@ -189,7 +238,8 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             lua.create_function(move |lua, args: Variadic<Value>| {
                 common::expect_exact_arg_count(&args, 1)?;
                 let id = common::expect_string_arg(&args, 0, "id")?;
-                let mut store = timer_store(&bridges)?;
+                let mut store = timer_store(&bridges)
+                    .map_err(|err| timer_info_failed_error(&id, &err.to_string()))?;
                 let timer = get_timer_mut(&mut store, &id)?;
                 normalize_timer(timer);
                 build_timer_info(lua, timer)
@@ -204,29 +254,52 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             lua.create_function(move |lua, args: Variadic<Value>| {
                 common::expect_exact_arg_count(&args, 1)?;
                 let id = common::expect_string_arg(&args, 0, "id")?;
-                let mut store = timer_store(&bridges)?;
+                let mut store = timer_store(&bridges)
+                    .map_err(|err| timer_info_failed_error(&id, &err.to_string()))?;
                 let timer = get_timer_mut(&mut store, &id)?;
                 normalize_timer(timer);
-                Ok(Value::String(lua.create_string(timer.status.as_str())?))
+                lua.create_string(timer.status.as_str())
+                    .map(Value::String)
+                    .map_err(|err| timer_info_failed_error(&id, &err.to_string()))
             })?,
         )?;
     }
 
-    install_timer_getter(lua, &globals, "get_timer_elapsed", bridges.clone(), |timer| {
-        Value::Integer(current_elapsed(timer) as i64)
-    })?;
+    install_timer_getter(
+        lua,
+        &globals,
+        "get_timer_elapsed",
+        bridges.clone(),
+        timer_info_failed_error,
+        |timer| Value::Integer(current_elapsed(timer) as i64),
+    )?;
 
-    install_timer_getter(lua, &globals, "get_timer_remaining", bridges.clone(), |timer| {
-        Value::Integer(current_remaining(timer) as i64)
-    })?;
+    install_timer_getter(
+        lua,
+        &globals,
+        "get_timer_remaining",
+        bridges.clone(),
+        timer_info_failed_error,
+        |timer| Value::Integer(current_remaining(timer) as i64),
+    )?;
 
-    install_timer_getter(lua, &globals, "get_timer_duration", bridges.clone(), |timer| {
-        Value::Integer(timer.duration_ms as i64)
-    })?;
+    install_timer_getter(
+        lua,
+        &globals,
+        "get_timer_duration",
+        bridges.clone(),
+        timer_info_failed_error,
+        |timer| Value::Integer(timer.duration_ms as i64),
+    )?;
 
-    install_timer_getter(lua, &globals, "get_timer_completed", bridges.clone(), |timer| {
-        (timer.status == TimerStatus::Completed).into_lua()
-    })?;
+    install_timer_getter(
+        lua,
+        &globals,
+        "is_timer_completed",
+        bridges.clone(),
+        timer_info_failed_error,
+        |timer| (timer.status == TimerStatus::Completed).into_lua(),
+    )?;
 
     {
         let bridges = bridges.clone();
@@ -235,7 +308,8 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             lua.create_function(move |_, args: Variadic<Value>| {
                 common::expect_exact_arg_count(&args, 1)?;
                 let id = common::expect_string_arg(&args, 0, "id")?;
-                let store = timer_store(&bridges)?;
+                let store = timer_store(&bridges)
+                    .map_err(|err| timer_exists_check_failed_error(&id, &err.to_string()))?;
                 Ok(store.timers.contains_key(&id))
             })?,
         )?;
@@ -245,42 +319,42 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         "get_current_year",
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 0)?;
-            Ok(Local::now().year())
+            Ok(current_local_datetime()?.year())
         })?,
     )?;
     globals.set(
         "get_current_month",
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 0)?;
-            Ok(Local::now().month() as i64)
+            Ok(current_local_datetime()?.month() as i64)
         })?,
     )?;
     globals.set(
         "get_current_day",
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 0)?;
-            Ok(Local::now().day() as i64)
+            Ok(current_local_datetime()?.day() as i64)
         })?,
     )?;
     globals.set(
         "get_current_hour",
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 0)?;
-            Ok(Local::now().hour() as i64)
+            Ok(current_local_datetime()?.hour() as i64)
         })?,
     )?;
     globals.set(
         "get_current_minute",
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 0)?;
-            Ok(Local::now().minute() as i64)
+            Ok(current_local_datetime()?.minute() as i64)
         })?,
     )?;
     globals.set(
         "get_current_second",
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 0)?;
-            Ok(Local::now().second() as i64)
+            Ok(current_local_datetime()?.second() as i64)
         })?,
     )?;
     globals.set(
@@ -288,10 +362,16 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_arg_count_range(&args, 1, 2)?;
             let timestamp = common::expect_i64_arg(&args, 0, "timestamp")?;
+            if timestamp < 0 {
+                return Err(timestamp_must_be_non_negative_error());
+            }
             let format = common::expect_optional_string_arg(&args, 1, "format")?.unwrap_or_else(|| {
                 "{year}-{month}-{day} {hour}:{minute}:{second}".to_string()
             });
-            Ok(format_timestamp(timestamp, &format))
+            if !contains_any_datetime_placeholder(&format) {
+                return Err(date_string_missing_required_parameters_error());
+            }
+            format_timestamp(timestamp, &format)
         })?,
     )?;
     globals.set(
@@ -299,7 +379,7 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 1)?;
             let date_str = common::expect_string_arg(&args, 0, "date_str")?;
-            Ok(parse_timestamp(&date_str))
+            parse_timestamp(&date_str)
         })?,
     )?;
 
@@ -316,23 +396,26 @@ impl IntoLuaValue for bool {
     }
 }
 
-fn install_timer_mutator<F>(
+fn install_timer_mutator<F, E>(
     lua: &Lua,
     globals: &Table,
     name: &'static str,
     bridges: RuntimeBridges,
+    error_factory: E,
     mutator: F,
 ) -> mlua::Result<()>
 where
     F: Fn(&mut TimerEntry) + Clone + Send + 'static,
+    E: Fn(&str) -> mlua::Error + Clone + Send + 'static,
 {
     let apply = mutator.clone();
+    let make_error = error_factory.clone();
     globals.set(
         name,
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 1)?;
             let id = common::expect_string_arg(&args, 0, "id")?;
-            let mut store = timer_store(&bridges)?;
+            let mut store = timer_store(&bridges).map_err(|err| make_error(&err.to_string()))?;
             let timer = get_timer_mut(&mut store, &id)?;
             apply(timer);
             Ok(())
@@ -341,23 +424,26 @@ where
     Ok(())
 }
 
-fn install_timer_getter<F>(
+fn install_timer_getter<F, E>(
     lua: &Lua,
     globals: &Table,
     name: &'static str,
     bridges: RuntimeBridges,
+    error_factory: E,
     getter: F,
 ) -> mlua::Result<()>
 where
     F: Fn(&TimerEntry) -> Value + Clone + Send + 'static,
+    E: Fn(&str, &str) -> mlua::Error + Clone + Send + 'static,
 {
     let get = getter.clone();
+    let make_error = error_factory.clone();
     globals.set(
         name,
         lua.create_function(move |_, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 1)?;
             let id = common::expect_string_arg(&args, 0, "id")?;
-            let mut store = timer_store(&bridges)?;
+            let mut store = timer_store(&bridges).map_err(|err| make_error(&id, &err.to_string()))?;
             let timer = get_timer_mut(&mut store, &id)?;
             normalize_timer(timer);
             Ok(get(timer))
@@ -370,14 +456,14 @@ fn timer_store<'a>(bridges: &'a RuntimeBridges) -> mlua::Result<std::sync::Mutex
     bridges
         .timers
         .lock()
-        .map_err(|_| mlua::Error::external("timer store poisoned"))
+        .map_err(|err| mlua::Error::external(err.to_string()))
 }
 
 fn get_timer_mut<'a>(store: &'a mut TimerStore, id: &str) -> mlua::Result<&'a mut TimerEntry> {
     store
         .timers
         .get_mut(id)
-        .ok_or_else(|| mlua::Error::external("timer not found"))
+        .ok_or_else(|| timer_not_found_error(id))
 }
 
 fn normalize_timer(timer: &mut TimerEntry) {
@@ -420,25 +506,221 @@ fn build_timer_info(lua: &Lua, timer: &TimerEntry) -> mlua::Result<Table> {
     Ok(table)
 }
 
-fn format_timestamp(timestamp_ms: i64, format: &str) -> String {
+fn format_timestamp(timestamp_ms: i64, format: &str) -> mlua::Result<String> {
     let Some(local_dt) = Local.timestamp_millis_opt(timestamp_ms).single() else {
-        return String::new();
+        return Err(system_time_failed_error("invalid timestamp"));
     };
-    format
+    Ok(format
         .replace("{year}", &format!("{:04}", local_dt.year()))
         .replace("{month}", &format!("{:02}", local_dt.month()))
         .replace("{day}", &format!("{:02}", local_dt.day()))
         .replace("{hour}", &format!("{:02}", local_dt.hour()))
         .replace("{minute}", &format!("{:02}", local_dt.minute()))
-        .replace("{second}", &format!("{:02}", local_dt.second()))
+        .replace("{second}", &format!("{:02}", local_dt.second())))
 }
 
-fn parse_timestamp(date_str: &str) -> Value {
+fn parse_timestamp(date_str: &str) -> mlua::Result<Value> {
     let Ok(naive) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%d %H:%M:%S") else {
-        return Value::Nil;
+        return Err(invalid_date_string_format_error());
     };
     let Some(local_dt) = Local.from_local_datetime(&naive).single() else {
-        return Value::Nil;
+        return Err(invalid_date_string_format_error());
     };
-    Value::Integer(local_dt.timestamp_millis())
+    Ok(Value::Integer(local_dt.timestamp_millis()))
+}
+
+fn current_timestamp_millis() -> mlua::Result<i64> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| system_timestamp_failed_error(&err.to_string()))?;
+    i64::try_from(duration.as_millis()).map_err(|err| system_timestamp_failed_error(&err.to_string()))
+}
+
+fn current_local_datetime() -> mlua::Result<chrono::DateTime<Local>> {
+    let timestamp = current_timestamp_millis().map_err(|err| system_time_failed_error(&err.to_string()))?;
+    Local
+        .timestamp_millis_opt(timestamp)
+        .single()
+        .ok_or_else(|| system_time_failed_error("invalid local time"))
+}
+
+fn contains_any_datetime_placeholder(format: &str) -> bool {
+    ["{year}", "{month}", "{day}", "{hour}", "{minute}", "{second}"]
+        .iter()
+        .any(|placeholder| format.contains(placeholder))
+}
+
+fn running_time_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.running_time_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.running_time_failed",
+            "Failed to get current game runtime: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn timer_duration_must_be_positive_error() -> mlua::Error {
+    host_log::append_host_error("host.exception.timer_duration_must_be_positive", &[]);
+    mlua::Error::external(i18n::t_or(
+        "host.exception.timer_duration_must_be_positive",
+        "Timer duration must be a positive integer",
+    ))
+}
+
+fn timer_not_found_error(id: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.timer_not_found", &[("id", id)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.timer_not_found",
+            "Timer with specified ID does not exist: {id}",
+        )
+        .replace("{id}", id),
+    )
+}
+
+fn create_timer_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.create_timer_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.create_timer_failed",
+            "Failed to create timer: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn start_timer_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.start_timer_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.start_timer_failed",
+            "Failed to start timer with specified ID: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn pause_timer_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.pause_timer_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.pause_timer_failed",
+            "Failed to pause timer with specified ID: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn resume_timer_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.resume_timer_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.resume_timer_failed",
+            "Failed to resume timer with specified ID: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn reset_timer_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.reset_timer_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.reset_timer_failed",
+            "Failed to reset timer with specified ID: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn kill_timer_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.kill_timer_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.kill_timer_failed",
+            "Failed to kill timer with specified ID: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn get_timer_list_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.get_timer_list_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.get_timer_list_failed",
+            "Failed to get current timer list: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn timer_info_failed_error(id: &str, _err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.timer_info_failed", &[("id", id)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.timer_info_failed",
+            "Failed to get info for timer with specified ID: {id}",
+        )
+        .replace("{id}", id),
+    )
+}
+
+fn timer_exists_check_failed_error(id: &str, _err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.timer_exists_check_failed", &[("id", id)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.timer_exists_check_failed",
+            "Failed to check existence of timer with specified ID: {id}",
+        )
+        .replace("{id}", id),
+    )
+}
+
+fn system_timestamp_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.system_timestamp_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.system_timestamp_failed",
+            "Failed to get system timestamp: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn system_time_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.system_time_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.system_time_failed",
+            "Failed to get system time: {err}",
+        )
+        .replace("{err}", err),
+    )
+}
+
+fn timestamp_must_be_non_negative_error() -> mlua::Error {
+    host_log::append_host_error("host.exception.timestamp_must_be_non_negative", &[]);
+    mlua::Error::external(i18n::t_or(
+        "host.exception.timestamp_must_be_non_negative",
+        "Timestamp must be a non-negative integer",
+    ))
+}
+
+fn date_string_missing_required_parameters_error() -> mlua::Error {
+    host_log::append_host_error("host.exception.date_string_missing_required_parameters", &[]);
+    mlua::Error::external(i18n::t_or(
+        "host.exception.date_string_missing_required_parameters",
+        "Date string missing required parameters",
+    ))
+}
+
+fn invalid_date_string_format_error() -> mlua::Error {
+    host_log::append_host_error("host.exception.invalid_date_string_format", &[]);
+    mlua::Error::external(i18n::t_or(
+        "host.exception.invalid_date_string_format",
+        "Invalid date string format",
+    ))
 }

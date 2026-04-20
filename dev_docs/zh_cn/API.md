@@ -61,20 +61,20 @@
 
 以下是调整列顺序后的表格：
 
-| 重写需求                                           | 函数名                       | 作用说明                 | 参数名                                                                                     | 参数说明                                                                   | 传递值类型                                   | 传递值说明                                                                                     | 宿主调用时机                                                       |
-| -------------------------------------------------- | ---------------------------- | ------------------------ | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| <font color="red">必须重写</font>                  | `init_game(state)`           | 游戏脚本的初始化         | `state` - <font color="#92cddc">table</font> \| <font color="#92cddc">nil</font>           | 继续游戏时传入上次保存的 `state`；新游戏时传入 `nil`。                     | `state` - <font color="#92cddc">table</font> | 传递初始化后的游戏状态。宿主会将其作为当前帧数据保存，并用于后续 `handle_event` 和 `render`。  | 游戏首次启动时调用一次。                                           |
-| <font color="red">必须重写</font>                  | `handle_event(state, event)` | 游戏事件逻辑处理         | `state` - <font color="#92cddc">table</font>, `event` - <font color="#92cddc">table</font> | `state`：宿主临时存储的游戏上一帧数据；<br>`event`：宿主解析后的事件信息。 | `state` - <font color="#92cddc">table</font> | 传递更新后的游戏状态。宿主会用其替换当前帧数据。                                               | 游戏运行时，每帧对事件队列中的每个事件依次调用。                   |
-| <font color="red">必须重写</font>                  | `render(state)`              | 游戏画面绘制             | `state` - <font color="#92cddc">table</font>                                               | 宿主临时存储的游戏当前帧数据。                                             | <font color="#7f7f7f">无</font>              | <font color="#7f7f7f">无传递值</font>                                                          | 游戏运行时，每帧在所有事件处理完成后调用一次，脚本也可以手动调用。 |
-| <font color="red">必须重写</font>                  | `exit_game(state)`           | 游戏退出前的最后一次处理 | `state` - <font color="#92cddc">table</font>                                               | 宿主临时存储的游戏当前帧数据。                                             | `state` - <font color="#92cddc">table</font> | 传递修改后的 `state`，供后续 `save_best_score` 使用。宿主不会保存此返回值。                    | 脚本调用 `request_exit()` 后，宿主在退出前调用一次。               |
-| 当 `game.json` 中 `best_none` 为 `true` 时必须重写 | `save_best_score(state)`     | 向宿主传递游戏最佳记录   | `state` - <font color="#92cddc">table</font>                                               | 宿主临时存储的游戏当前帧数据（通常来自 `exit_game` 的返回值）。            | `best` - <font color="#92cddc">table</font>  | 传递包含最佳记录文本及变量表的 `best` 表，结构见下文。                                         | 宿主在 `exit_game` 之后自动调用（若启用），脚本也可手动调用。      |
-| 当 `game.json` 中 `save` 为 `true` 时必须重写      | `save_game(state)`           | 保存游戏存档             | `state` - <font color="#92cddc">table</font>                                               | 宿主临时存储的游戏当前帧数据。                                             | `state` - <font color="#92cddc">table</font> | 传递用于长期存储的 `state`。**注意**：此传递值仅用于存档，当前游戏会继续使用传入的原 `state`。 | 由脚本手动调用，宿主不会自动调用。                                 |
+| 重写需求                                        | 函数名                          | 作用说明         | 参数名                                                                                        | 参数说明                                           | 传递值类型                                        | 传递值说明                                                       | 宿主调用时机                                |
+| ------------------------------------------- | ---------------------------- | ------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------- | ------------------------------------- |
+| <font color="red">必须重写</font>               | `init_game(state)`           | 游戏脚本的初始化     | `state` - <font color="#92cddc">table</font> \| <font color="#92cddc">nil</font>           | 继续游戏时传入上次保存的 `state`；新游戏时传入 `nil`。             | `state` - <font color="#92cddc">table</font> | 传递初始化后的游戏状态。宿主会将其作为当前帧数据保存，并用于后续 `handle_event` 和 `render`。 | 游戏首次启动时调用一次。                          |
+| <font color="red">必须重写</font>               | `handle_event(state, event)` | 游戏事件逻辑处理     | `state` - <font color="#92cddc">table</font>, `event` - <font color="#92cddc">table</font> | `state`：宿主临时存储的游戏上一帧数据；<br>`event`：宿主解析后的事件信息。 | `state` - <font color="#92cddc">table</font> | 传递更新后的游戏状态。宿主会用其替换当前帧数据。                                    | 游戏运行时，每帧对事件队列中的每个事件依次调用。              |
+| <font color="red">必须重写</font>               | `render(state)`              | 游戏画面绘制       | `state` - <font color="#92cddc">table</font>                                               | 宿主临时存储的游戏当前帧数据。                                | <font color="#7f7f7f">无</font>               | <font color="#7f7f7f">无传递值</font>                           | 游戏运行时，每帧在所有事件处理完成后调用一次，脚本也可以手动调用。     |
+| <font color="red">必须重写</font>               | `exit_game(state)`           | 游戏退出前的最后一次处理 | `state` - <font color="#92cddc">table</font>                                               | 宿主临时存储的游戏当前帧数据。                                | `state` - <font color="#92cddc">table</font> | 传递修改后的 `state`，可供后续 `save_best_score` 使用。                   | 脚本调用 `request_exit()` 后，宿主在退出前调用一次。   |
+| 当 `game.json` 中 `best_none` 不为 `null` 时必须重写 | `save_best_score(state)`     | 向宿主传递游戏最佳记录  | `state` - <font color="#92cddc">table</font>                                               | 宿主临时存储的游戏当前帧数据。                                | `best` - <font color="#92cddc">table</font>  | 传递包含最佳记录文本及变量表的 `best` 表，结构见下文。                             | 宿主在 `exit_game` 之后自动调用（若需要），脚本也可手动调用。 |
+| 当 `game.json` 中 `save` 为 `true` 时必须重写       | `save_game(state)`           | 保存游戏存档       | `state` - <font color="#92cddc">table</font>                                               | 宿主临时存储的游戏当前帧数据。                                | `state` - <font color="#92cddc">table</font> | 传递用于长期存储的 `state`。**注意**：此传递值仅用于存档，当前游戏会继续使用传入的原 `state`。   | 由脚本手动调用，宿主不会自动调用。                     |
 
 ## 执行流程
 
 宿主与脚本运行链如下图所示：
 
-![执行流程](./image/program_flowchart.png)
+![执行流程|697](./image/program_flowchart.png)
 
 ## 使用示例
 
@@ -93,7 +93,7 @@ function handle_event(state, event)
         request_exit()
       end
     end
-
+	
     return state
 end
 
@@ -108,6 +108,8 @@ function exit_game(state)
     return state
 end
 
+-- game.json
+-- "best_none": "最高分：--"
 function save_best_score(state)
     local best = {
         best_string = "最高分：{score}",
@@ -116,6 +118,8 @@ function save_best_score(state)
     return best
 end
 
+-- game.json
+-- "save": true
 function save_game(state)
     -- 存档逻辑：可在此深拷贝或修改 state 用于存储
     local saved_state = { ... }
@@ -151,7 +155,7 @@ end
 ```
 
 - `event` 的数据结构由宿主定义并传递。
-- `type` 字段决定了事件的类型，具体取值及对应的扩展字段见下文「事件类型」章节。
+- `type` 字段决定了事件的类型，具体取值及对应的扩展字段见下文『声明式 API -[事件类型](#事件类型)』。
 
 ### `best` 数据格式
 
@@ -179,7 +183,8 @@ end
 ```
 
 **作用**：  
-宿主根据 `game.json` 中的 `actions` 配置，将物理按键映射为语义化动作事件。适用于自定义动作按键的处理。
+宿主根据 `game.json` 中的 `actions` 配置，将物理按键映射为语义化动作事件。
+适用于自定义动作按键的处理。
 
 ### 2. `key`
 
@@ -204,7 +209,8 @@ end
 ```
 
 **作用**：  
-通知脚本终端显示区域的宽度或高度发生变化。用于实现响应式界面布局。
+通知脚本终端显示区域的宽度或高度发生变化。
+可用于响应式重新布局。
 
 ### 4. `tick`
 
@@ -231,19 +237,19 @@ end
 
 ### 二、返回值规范
 
-| 函数                         | 传递值要求                                                                          |
-| ---------------------------- | ----------------------------------------------------------------------------------- |
-| `init_game(state)`           | **必须传递** `state` 表                                                             |
-| `handle_event(state, event)` | **必须传递** `state` 表                                                             |
-| `exit_game(state)`           | **必须传递** `state` 表                                                             |
-| `render(state)`              | 无传递值                                                                            |
-| `save_best_score(state)`     | **必须传递** `best` 表（结构见「数据格式」章节）                                    |
-| `save_game(state)`           | **必须传递** `state` 表（该返回值仅用于长期存储，当前游戏继续使用传入的原 `state`） |
+| 函数                           | 传递值要求              |
+| ---------------------------- | ------------------ |
+| `init_game(state)`           | **必须传递** `state` 表 |
+| `handle_event(state, event)` | **必须传递** `state` 表 |
+| `exit_game(state)`           | **必须传递** `state` 表 |
+| `render(state)`              | 无传递值               |
+| `save_best_score(state)`     | **必须传递** `best` 表  |
+| `save_game(state)`           | **必须传递** `state` 表 |
 
 ### 三、宿主职责与限制
 
-1. 宿主仅负责**事件的交流**与 **`state` 的存储/恢复**，**不对事件或 `state` 进行任何业务逻辑处理**。所有游戏逻辑（状态更新、事件响应、画面绘制等）均需由脚本自身实现。
-2. `save_game` 传递的 `state` 仅用于**持久化存档**，当前游戏的运行仍使用传入的原始 `state`。
+1. 宿主仅负责**事件的交流**与 **`state` 的存储/恢复**，**不对事件或 `state` 进行任何游戏逻辑处理**。所有游戏逻辑（状态更新、事件响应、画面绘制等）均需由脚本自身实现。
+2. `save_game` 传递的 `state` 仅用于**持久化存档**，当前游戏的运行会使用传入的原始 `state` 继续游戏帧的循环。
 
 ### 四、事件队列规则
 
@@ -261,25 +267,25 @@ end
 > 注：
 >
 > - `[` 表示参数可选，如需跳过参数，填写 `nil` 占位。
-> - `*` 表示特定参数。
-> - 多返回值以多个独立值返回，而非表（table）。
+> - `*` 表示特定参数，需参考相关提示填写。
+> - 多返回值以多个独立值返回，而非表。
 
 ---
 
 ## 系统请求
 
-> 注：`request_skip_event_queue` 和 `request_clear_event_queue` 不会影响队尾的 `tick` 事件。`tick` 事件在每个帧循环中**必定**会被传入，详情流程见 声明式 API - [执行流程](#执行流程)。
+> 注：`request_skip_event_queue` 和 `request_clear_event_queue` 不会影响队尾的 `tick` 事件。`tick` 事件在每个帧循环中**必定**会被传入，详细流程见『声明式 API -[执行流程](#执行流程)』。
 
-| 可达性                                | 函数名                        | 作用                                                       | 参数                            | 返回值                                                                                                                                        |
-| ------------------------------------- | ----------------------------- | ---------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| <font color="#7f7f7f">无要求</font>   | `get_launch_mode()`           | 获取本次游戏的启动模式。                                   | <font color="#7f7f7f">无</font> | `status` - <font color="#92cddc">"new"</font> \| <font color="#92cddc">"continue"</font>：`"new"` 表示新游戏，`"continue"` 表示继续已有存档。 |
-| <font color="#7f7f7f">无要求</font>   | `get_best_score()`            | 获取游戏存储的最佳记录数据。                               | <font color="#7f7f7f">无</font> | `data` - <font color="#92cddc">table</font>                                                                                                   \| <font color="#92cddc">nil</font>：存储的最佳记录数据，宿主返回脚本所传递的 best 参数，若不存在返回 nil。 |
-| <font color="red">至少一条可达</font> | `request_exit()`              | 向宿主发送退出游戏请求。                                   | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
-| <font color="#7f7f7f">无要求</font>   | `request_skip_event_queue()`  | 向宿主发送跳过尚未处理的事件队列请求。                     | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
-| <font color="#7f7f7f">无要求</font>   | `request_clear_event_queue()` | 向宿主发送清空尚未处理的事件队列请求。                     | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
-| <font color="#7f7f7f">无要求</font>   | `request_render()`            | 请求宿主调用 `render(state)` 以重绘当前界面。              | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
-| <font color="#7f7f7f">无要求</font>   | `request_save_best_score()`   | 请求宿主调用 `save_best_score(state)` 以保存当前最佳记录。 | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
-| <font color="#7f7f7f">无要求</font>   | `request_save_game()`         | 请求宿主调用 `save_game(state)` 以保存当前游戏存档。       | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                               |
+| 可达性                              | 函数名                           | 作用                                         | 参数                             | 返回值                                                                                                                           |
+| -------------------------------- | ----------------------------- | ------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| <font color="#7f7f7f">无要求</font> | `get_launch_mode()`           | 获取本次游戏的启动模式。                               | <font color="#7f7f7f">无</font> | `status` - <font color="#92cddc">"new"</font> \| <font color="#92cddc">"continue"</font>：`"new"` 表示新游戏，`"continue"` 表示继续已有存档。 |
+| <font color="#7f7f7f">无要求</font> | `get_best_score()`            | 获取游戏存储的最佳记录数据。                             | <font color="#7f7f7f">无</font> | `data` - <font color="#92cddc">table</font> \| <font color="#92cddc">nil</font>：存储的最佳记录数据，宿主返回脚本所传递的 best 参数，若不存在返回 nil。      |
+| <font color="red">至少一条可达</font>  | `request_exit()`              | 向宿主发送退出游戏请求。                               | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                |
+| <font color="#7f7f7f">无要求</font> | `request_skip_event_queue()`  | 向宿主发送跳过尚未处理的事件队列请求。                        | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                |
+| <font color="#7f7f7f">无要求</font> | `request_clear_event_queue()` | 向宿主发送清空尚未处理的事件队列请求。                        | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                |
+| <font color="#7f7f7f">无要求</font> | `request_render()`            | 请求宿主调用 `render(state)` 以重绘当前界面。            | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                |
+| <font color="#7f7f7f">无要求</font> | `request_save_best_score()`   | 请求宿主调用 `save_best_score(state)` 以保存当前最佳记录。 | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                |
+| <font color="#7f7f7f">无要求</font> | `request_save_game()`         | 请求宿主调用 `save_game(state)` 以保存当前游戏存档。       | <font color="#7f7f7f">无</font> | <font color="#7f7f7f">无</font>                                                                                                |
 
 ---
 
@@ -287,16 +293,18 @@ end
 
 > 注：
 >
-> 1. `color` 类型见 附录-[颜色 color](#颜色-color)
-> 1. `color` 类型见 附录-[对齐 align](#对齐-align)
-> 1. 所有绘制操作的基准点均为**内容的左上角**，即绘制内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
+> 1. `color` 类型见『附录-[颜色 color](#颜色-color)』。
+> 2. `align` 类型见『附录-[对齐 align](#对齐-align)』。
+> 3. 宽度、高度参数均以**终端字符数**为单位（宽度为列数，高度为行数）。
+> 4. 所有绘制操作的基准点均为**内容的左上角**，即绘制内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
+> 5. 绘制坐标详细见『MOD 制作规范及教程-[绘制坐标](./MOD.md#绘制坐标)』。
 
-| 函数名                                                            | 作用                                             | 参数                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 返回值                          |
-| ----------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| `canvas_clear()`                                                  | 清空当前帧的画布。                               | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                                                                                                                                          | <font color="#7f7f7f">无</font> |
-| `canvas_eraser(x, y, width, height)`                              | 清空画布指定区域。                               | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：区域宽度。<br>`height` - <font color="#92cddc">int</font>：区域高度。                                                                                                                                                                                                                            | <font color="#7f7f7f">无</font> |
-| `canvas_draw_text(x, y, text, *[fg, *[bg, *[align)`               | 在画布指定位置绘制内容串。                       | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：要绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。<br>`*[align` - <font color="#92cddc">align</font>：可选，换行内容对齐方式。                                                                 | <font color="#7f7f7f">无</font> |
-| `canvas_fill_rect(x, y, width, height, [char, *[fg, *[bg)`        | 从指定位置绘制矩形，并使用指定字符填充。         | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char` - <font color="#92cddc">string</font>：可选，用于填充的单个字符。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。             | <font color="#7f7f7f">无</font> |
+| 函数名                                                               | 作用                       | 参数                                                                                                                                                                                                                                                                                                                                                                                           | 返回值                            |
+| ----------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `canvas_clear()`                                                  | 清空当前帧的画布。                | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                                                                               | <font color="#7f7f7f">无</font> |
+| `canvas_eraser(x, y, width, height)`                              | 清空画布指定区域。                | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：区域宽度。<br>`height` - <font color="#92cddc">int</font>：区域高度。                                                                                                                                                                                        | <font color="#7f7f7f">无</font> |
+| `canvas_draw_text(x, y, text, *[fg, *[bg, *[align)`               | 在画布指定位置绘制内容串。            | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：要绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。<br>`*[align` - <font color="#92cddc">align</font>：可选，换行内容对齐方式。                                                         | <font color="#7f7f7f">无</font> |
+| `canvas_fill_rect(x, y, width, height, [char, *[fg, *[bg)`        | 从指定位置绘制矩形，并使用指定字符填充。     | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char` - <font color="#92cddc">char</font>：可选，用于填充的单个字符。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。           | <font color="#7f7f7f">无</font> |
 | `canvas_border_rect(x, y, width, height, [char_list, *[fg, *[bg)` | 从指定位置绘制矩形边框，并使用指定字符作为边框。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char_list` - <font color="#92cddc">table</font>：可选，边框字符配置表，结构见下方。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。 | <font color="#7f7f7f">无</font> |
 
 **`[char_list` 格式**
@@ -324,6 +332,7 @@ end
 >
 > 1. 宽度、高度返回值均以**终端字符数**为单位（宽度为列数，高度为行数）。
 > 2. 所有计算操作的基准点均为**内容的左上角**，即计算内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
+> 3. 绘制坐标详细见『MOD 制作规范及教程-[绘制坐标](./MOD.md#绘制坐标)』。
 
 | 函数名                  | 作用                                 | 参数                                                           | 返回值                                                                                                                    |
 | ----------------------- | ------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -338,9 +347,10 @@ end
 
 > 注：
 >
-> 1. 宽度、高度返回值均以**终端字符数**为单位（宽度为列数，高度为行数）。
-> 2. `x_anchor` 和 `y_anchor` 类型见 附录-[锚点 anchor](#锚点-anchor)
+> 1. `x_anchor` 和 `y_anchor` 类型见 附录-[锚点 anchor](#锚点-anchor)
+> 2. 宽度、高度参数均以**终端字符数**为单位（宽度为列数，高度为行数）。
 > 3. 所有计算操作的基准点均为**内容的左上角**，即计算内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
+> 4. 绘制坐标详细见『MOD 制作规范及教程-[绘制坐标](./MOD.md#绘制坐标)』。
 
 | 函数名                                                                    | 作用                                                         | 参数                                                                                                                                                                                                                                                                                                                                                                                                | 返回值                                                                                                         |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -357,15 +367,20 @@ end
 > 1. 本章节中所有 `path` 参数均相对于游戏资源包中的 `assets/` 目录。
 > 2. 请注意返回值的数据类型，避免解析错误。
 
-| 函数名            | 作用                                                   | 参数                                                                    | 返回值                                                              |
-| ----------------- | ------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `translate(key)`  | 读取当前游戏资源包中指定语言键对应的本地化字符串。     | `key` - <font color="#92cddc">string</font>：语言键。                   | `value` - <font color="#92cddc">string</font>：对应的本地化字符串。 |
-| `read_text(path)` | 读取资源包中指定路径的 `.txt` 文本文件。               | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：文件文本内容。        |
-| `read_json(path)` | 读取资源包中指定路径的 `.json` 文件，并解析为 Lua 表。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。      |
-| `read_xml(path)`  | 读取资源包中指定路径的 `.xml` 文件，并解析为 Lua 表。  | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。      |
-| `read_yaml(path)` | 读取资源包中指定路径的 `.yaml` 文件，并解析为 Lua 表。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。      |
-| `read_toml(path)` | 读取资源包中指定路径的 `.toml` 文件，并解析为 Lua 表。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。      |
-| `read_csv(path)`  | 读取资源包中指定路径的 `.csv` 文件，并解析为 Lua 表。  | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。      |
+| 函数名               | 作用                                 | 参数                                                              | 返回值                                                      |
+| ----------------- | ---------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------- |
+| `translate(key)`  | 读取当前游戏资源包中指定语言键对应的本地化字符串。          | `key` - <font color="#92cddc">string</font>：语言键。                | `value` - <font color="#92cddc">string</font>：对应的本地化字符串。 |
+| `read_text(path)` | 读取资源包中指定路径的 `.txt` 文本文件。           | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：文件文本内容。     |
+| `read_json(path)` | 读取资源包中指定路径的 `.json` 文件，并解析为 Lua 表。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。  |
+| `read_xml(path)`  | 读取资源包中指定路径的 `.xml` 文件，并解析为 Lua 表。  | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。  |
+| `read_yaml(path)` | 读取资源包中指定路径的 `.yaml` 文件，并解析为 Lua 表。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。  |
+| `read_toml(path)` | 读取资源包中指定路径的 `.toml` 文件，并解析为 Lua 表。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。  |
+| `read_csv(path)`  | 读取资源包中指定路径的 `.csv` 文件，并解析为 Lua 表。  | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">table</font>：解析后的 Lua 表。  |
+| `read_json_string(path)` | 读取资源包中指定路径的 `.json` 文件，直接返回读取内容。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：读取文件的原文字符串。  |
+| `read_xml_string(path)`  | 读取资源包中指定路径的 `.xml` 文件，直接返回读取内容。  | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：读取文件的原文字符串。  |
+| `read_yaml_string(path)` | 读取资源包中指定路径的 `.yaml` 文件，直接返回读取内容。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：读取文件的原文字符串。  |
+| `read_toml_string(path)` | 读取资源包中指定路径的 `.toml` 文件，直接返回读取内容。 | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：读取文件的原文字符串。  |
+| `read_csv_string(path)`  | 读取资源包中指定路径的 `.csv` 文件，直接返回读取内容。  | `path` - <font color="#92cddc">string</font>：相对于 `assets/` 的路径。 | `data` - <font color="#92cddc">string</font>：读取文件的原文字符串。  |
 
 ---
 
@@ -376,8 +391,8 @@ end
 > 1. 本章节中所有 `path` 参数均相对于游戏资源包中的 `assets/` 目录。
 > 2. 所有 `write_*` 函数的 `content` 参数均为 `string` 类型。
 > 3. 所有 `write_*` 函数仅为语义命名，实际写入并不会做结构检查。
-> 4. 所有 `write_*` 函数均为高风险直写操作。仅当 `game.json` 中 `write` 字段为 `true` 且用户授予模组完全信任权限时，直写操作才会被执行；否则所有直写请求将被宿主忽略。
-> 5. 无论直写操作是否执行，每次调用都会在调试报告中记录，供用户安全检查。
+> 4. 所有 `write_*` 函数均为高风险直写操作。仅当 `game.json` 中 `write` 字段为 `true` 且用户授予模组“完全信任权限”时，直写操作才会被执行；否则所有直写请求将被宿主忽略。
+> 5. 无论直写操作是否执行，每次调用都会在 `tui_log.txt` 中记录，供用户安全检查。
 
 <font color="red"><b>直写操作不可撤回！</b></font>
 <font color="red"><b>直写操作不可撤回！</b></font>
@@ -455,8 +470,7 @@ end
 | <font color="#7f7f7f">否</font> | `get_timer_elapsed(id)`                 | 获取指定 ID 计时器的已过时间（毫秒）。                      | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                                                                         | `time` - <font color="#92cddc">int</font>：已过时间（毫秒）。                                                                                                                                                                                                                           |
 | <font color="#7f7f7f">否</font> | `get_timer_remaining(id)`               | 获取指定 ID 计时器的剩余时间（毫秒）。                      | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                                                                         | `time` - <font color="#92cddc">int</font>：剩余时间（毫秒）。                                                                                                                                                                                                                           |
 | <font color="#7f7f7f">否</font> | `get_timer_duration(id)`                | 获取指定 ID 计时器的总时长（毫秒）。                        | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                                                                         | `time` - <font color="#92cddc">int</font>：总时长（毫秒）。                                                                                                                                                                                                                             |
-| <font color="#7f7f7f">否</font> | `get_timer_completed(id)`               | 检查指定 ID 的计时器是否已结束。                            | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                                                                         | `bool` - <font color="#92cddc">boolean</font>：`true` 已结束，`false` 未结束 。                                                                                                                                                                                                         |
-| <font color="#7f7f7f">否</font> | `is_timer_exists(id)`                   | 检查指定 ID 的计时器是否存在。                              | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                                                                         | `bool` - <font color="#92cddc">boolean</font>：`true` 存在，`false` 不存在。                                                                                                                                                                                                            |
+| <font color="#7f7f7f">否</font> | `is_timer_completed(id)`               | 检查指定 ID 的计时器是否已结束。                            | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                                                                         | `bool` - <font color="#92cddc">boolean</font>：`true` 已结束，`false` 未结束 。                                                                                                                                                                                                         |
 | <font color="#7f7f7f">否</font> | `is_timer_exists(id)`                   | 检查指定 ID 的计时器是否存在。                              | `id` - <font color="#92cddc">string</font>：计时器 ID。                                                                                                                                         | `bool` - <font color="#92cddc">boolean</font>：`true` 存在，`false` 不存在。                                                                                                                                                                                                            |
 | <font color="#7f7f7f">否</font> | `now()`                                 | 获取当前现实世界的时间戳。               | <font color="#7f7f7f">无</font>                                                                                                                                                                 | `timestamp` - <font color="#92cddc">int</font>：已当前时间戳。                                                                                                                                                                                                                       |
 | <font color="#7f7f7f">否</font> | `get_current_year()`                    | 获取当前年份。                                              | <font color="#7f7f7f">无</font>                                                                                                                                                                 | `year` - <font color="#92cddc">int</font>：当前年份。                                                                                                                                                                                                                                   |

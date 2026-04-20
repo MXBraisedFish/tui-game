@@ -2,9 +2,10 @@ use csv::WriterBuilder;
 use mlua::{Lua, Table, Value, Variadic};
 use serde_json::{Map, Number, Value as JsonValue};
 
+use crate::app::i18n;
 use crate::lua::api::common;
-use crate::lua::api::direct_debug_api;
 use crate::lua::engine::RuntimeBridges;
+use crate::utils::host_log;
 
 pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
     let globals = lua.globals();
@@ -74,7 +75,9 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         lua.create_function(move |lua, args: Variadic<Value>| {
             common::expect_exact_arg_count(&args, 1)?;
             let table = common::expect_table_arg(&args, 0, "table")?;
-            deep_copy_table(lua, &table).map(Value::Table)
+            deep_copy_table(lua, &table)
+                .map(Value::Table)
+                .map_err(|err| deep_copy_failed_error(&err.to_string()))
         })?,
     )?;
 
@@ -83,17 +86,13 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
 
 fn serialize_table(
     lua: &Lua,
-    bridges: &RuntimeBridges,
+    _bridges: &RuntimeBridges,
     table: Table,
     serializer: impl FnOnce(&JsonValue) -> Result<String, String>,
 ) -> mlua::Result<Value> {
-    match lua_table_to_json(&table).and_then(|json| serializer(&json)) {
-        Ok(serialized) => Ok(Value::String(lua.create_string(&serialized)?)),
-        Err(reason) => {
-            direct_debug_api::write_debug_error_line(bridges, &reason);
-            Ok(Value::Nil)
-        }
-    }
+    let json = lua_table_to_json(&table).map_err(map_table_conversion_reason)?;
+    let serialized = serializer(&json).map_err(|err| table_conversion_failed_error(&err))?;
+    Ok(Value::String(lua.create_string(&serialized)?))
 }
 
 fn table_to_json_string(value: &JsonValue) -> Result<String, String> {
@@ -218,10 +217,13 @@ fn json_scalar_to_string(value: &JsonValue) -> String {
 fn deep_copy_table(lua: &Lua, table: &Table) -> mlua::Result<Table> {
     let new_table = lua.create_table()?;
     for pair in table.clone().pairs::<Value, Value>() {
-        let (key, value) = pair?;
+        let (key, value) =
+            pair.map_err(|_| mlua::Error::external(table_structure_corrupted_message()))?;
         let copied_key = deep_copy_value(lua, key)?;
         let copied_value = deep_copy_value(lua, value)?;
-        new_table.set(copied_key, copied_value)?;
+        new_table
+            .set(copied_key, copied_value)
+            .map_err(|_| mlua::Error::external(table_structure_corrupted_message()))?;
     }
     Ok(new_table)
 }
@@ -239,7 +241,7 @@ fn lua_table_to_json(table: &Table) -> Result<JsonValue, String> {
     let mut array_only = true;
 
     for pair in table.clone().pairs::<Value, Value>() {
-        let (key, value) = pair.map_err(|err| err.to_string())?;
+        let (key, value) = pair.map_err(|_| "table_structure_corrupted".to_string())?;
         let json_value = lua_value_to_json(&value)?;
         match key {
             Value::Integer(index) if index >= 1 => {
@@ -248,12 +250,14 @@ fn lua_table_to_json(table: &Table) -> Result<JsonValue, String> {
             Value::String(key) => {
                 array_only = false;
                 object_entries.insert(
-                    key.to_str().map_err(|err| err.to_string())?.to_string(),
+                    key.to_str()
+                        .map_err(|_| "table_structure_corrupted".to_string())?
+                        .to_string(),
                     json_value,
                 );
             }
             Value::Nil => {}
-            _ => return Err("unsupported lua table key for conversion".to_string()),
+            _ => return Err("table_structure_invalid".to_string()),
         }
     }
 
@@ -283,16 +287,69 @@ fn lua_value_to_json(value: &Value) -> Result<JsonValue, String> {
         Value::Integer(value) => Ok(JsonValue::Number(Number::from(*value))),
         Value::Number(value) => Number::from_f64(*value)
             .map(JsonValue::Number)
-            .ok_or_else(|| "cannot convert non-finite lua number".to_string()),
+            .ok_or_else(|| "table_structure_invalid".to_string()),
         Value::String(value) => Ok(JsonValue::String(
-            value.to_str().map_err(|err| err.to_string())?.to_string(),
+            value
+                .to_str()
+                .map_err(|_| "table_structure_corrupted".to_string())?
+                .to_string(),
         )),
         Value::Table(table) => lua_table_to_json(table),
-        Value::Function(_) => Err("cannot convert function to string format".to_string()),
-        Value::Thread(_) => Err("cannot convert thread to string format".to_string()),
-        Value::UserData(_) => Err("cannot convert userdata to string format".to_string()),
-        Value::LightUserData(_) => Err("cannot convert lightuserdata to string format".to_string()),
-        Value::Error(err) => Err(err.to_string()),
-        Value::Other(_) => Err("cannot convert other lua value to string format".to_string()),
+        Value::Function(_)
+        | Value::Thread(_)
+        | Value::UserData(_)
+        | Value::LightUserData(_)
+        | Value::Other(_) => Err("table_structure_invalid".to_string()),
+        Value::Error(_) => Err("table_structure_corrupted".to_string()),
     }
+}
+
+fn map_table_conversion_reason(reason: String) -> mlua::Error {
+    match reason.as_str() {
+        "table_structure_corrupted" => table_structure_corrupted_error(),
+        "table_structure_invalid"
+        | "CSV export expects a two-dimensional array table"
+        | "CSV export expects each row to be an array" => table_structure_invalid_error(),
+        other => table_conversion_failed_error(other),
+    }
+}
+
+fn table_structure_corrupted_error() -> mlua::Error {
+    let message = table_structure_corrupted_message();
+    host_log::append_host_error("host.exception.table_structure_corrupted", &[]);
+    mlua::Error::external(message)
+}
+
+fn table_structure_corrupted_message() -> String {
+    i18n::t_or(
+        "host.exception.table_structure_corrupted",
+        "Table structure is corrupted, unable to process",
+    )
+}
+
+fn table_structure_invalid_error() -> mlua::Error {
+    let message = i18n::t_or(
+        "host.exception.table_structure_invalid",
+        "Table structure does not conform to conversion specification, unable to process",
+    );
+    host_log::append_host_error("host.exception.table_structure_invalid", &[]);
+    mlua::Error::external(message)
+}
+
+fn deep_copy_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.deep_copy_failed", &[("err", err)]);
+    mlua::Error::external(i18n::t_or(
+        "host.exception.deep_copy_failed",
+        &format!("Deep copy operation failed: {err}"),
+    )
+    .replace("{err}", err))
+}
+
+fn table_conversion_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.table_conversion_failed", &[("err", err)]);
+    mlua::Error::external(i18n::t_or(
+        "host.exception.table_conversion_failed",
+        &format!("Table conversion operation failed: {err}"),
+    )
+    .replace("{err}", err))
 }

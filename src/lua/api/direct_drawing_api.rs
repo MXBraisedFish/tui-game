@@ -60,7 +60,7 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
                 ensure_coordinate(x)?;
                 ensure_coordinate(y)?;
                 ensure_positive_size(width, height)?;
-                let (fill_char, fg, bg) = parse_fill_rect_args(&args[4..])?;
+                let (fill_char, fg, bg) = parse_fill_rect_args(&bridges, &args[4..])?;
                 with_canvas(&bridges, |canvas| {
                     warn_if_rect_exceeds_canvas(&bridges, canvas, x, y, width, height);
                     canvas.fill_rect(
@@ -122,7 +122,7 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
                 ensure_coordinate(x)?;
                 ensure_coordinate(y)?;
                 ensure_positive_size(width, height)?;
-                let (chars, fg, bg) = parse_border_rect_args(&args[4..])?;
+                let (chars, fg, bg) = parse_border_rect_args(&bridges, &args[4..])?;
                 with_canvas(&bridges, |canvas| {
                     warn_if_rect_exceeds_canvas(&bridges, canvas, x, y, width, height);
                     draw_border_rect(
@@ -192,9 +192,12 @@ fn with_canvas(
     Ok(())
 }
 
-fn parse_fill_rect_args(rest: &[Value]) -> mlua::Result<(char, Option<String>, Option<String>)> {
+fn parse_fill_rect_args(
+    bridges: &RuntimeBridges,
+    rest: &[Value],
+) -> mlua::Result<(char, Option<String>, Option<String>)> {
     let fill_char = common::expect_optional_string_arg(rest, 0, "char")?
-        .and_then(first_char)
+        .and_then(|value| normalize_fill_char_warning(bridges, &value))
         .unwrap_or(' ');
     let fg = common::expect_optional_string_arg(rest, 1, "fg")?
         .filter(|value| !value.trim().is_empty());
@@ -203,9 +206,12 @@ fn parse_fill_rect_args(rest: &[Value]) -> mlua::Result<(char, Option<String>, O
     Ok((fill_char, fg, bg))
 }
 
-fn parse_border_rect_args(rest: &[Value]) -> mlua::Result<(BorderChars, Option<String>, Option<String>)> {
+fn parse_border_rect_args(
+    bridges: &RuntimeBridges,
+    rest: &[Value],
+) -> mlua::Result<(BorderChars, Option<String>, Option<String>)> {
     let chars = match common::expect_optional_table_arg(rest, 0, "char_list")? {
-        Some(table) => parse_border_chars(&table)?,
+        Some(table) => parse_border_chars(bridges, &table)?,
         None => BorderChars::default(),
     };
     let fg = common::expect_optional_string_arg(rest, 1, "fg")?
@@ -215,24 +221,32 @@ fn parse_border_rect_args(rest: &[Value]) -> mlua::Result<(BorderChars, Option<S
     Ok((chars, fg, bg))
 }
 
-fn parse_border_chars(table: &Table) -> mlua::Result<BorderChars> {
+fn parse_border_chars(bridges: &RuntimeBridges, table: &Table) -> mlua::Result<BorderChars> {
     Ok(BorderChars {
-        top: get_optional_char(table, "top")?,
-        top_right: get_optional_char(table, "top_right")?,
-        right: get_optional_char(table, "right")?,
-        bottom_right: get_optional_char(table, "bottom_right")?,
-        bottom: get_optional_char(table, "bottom")?,
-        bottom_left: get_optional_char(table, "bottom_left")?,
-        left: get_optional_char(table, "left")?,
-        top_left: get_optional_char(table, "top_left")?,
+        top: get_optional_char(bridges, table, "top")?,
+        top_right: get_optional_char(bridges, table, "top_right")?,
+        right: get_optional_char(bridges, table, "right")?,
+        bottom_right: get_optional_char(bridges, table, "bottom_right")?,
+        bottom: get_optional_char(bridges, table, "bottom")?,
+        bottom_left: get_optional_char(bridges, table, "bottom_left")?,
+        left: get_optional_char(bridges, table, "left")?,
+        top_left: get_optional_char(bridges, table, "top_left")?,
     })
 }
 
-fn get_optional_char(table: &Table, key: &str) -> mlua::Result<Option<char>> {
+fn get_optional_char(
+    bridges: &RuntimeBridges,
+    table: &Table,
+    key: &str,
+) -> mlua::Result<Option<char>> {
     let value: Value = table.get(key)?;
     Ok(match value {
         Value::Nil => None,
-        Value::String(value) => value.to_str().ok().map(|value| value.to_string()).and_then(first_char),
+        Value::String(value) => value
+            .to_str()
+            .ok()
+            .map(|value| value.to_string())
+            .and_then(|value| normalize_fill_char_warning(bridges, &value)),
         other => return Err(common::arg_type_error(key, "string", &other)),
     })
 }
@@ -418,6 +432,37 @@ fn write_drawing_bounds_warning(
     );
 }
 
+fn normalize_fill_char_warning(bridges: &RuntimeBridges, value: &str) -> Option<char> {
+    let first = value.chars().next()?;
+    let length = value.chars().count();
+    if length > 1 {
+        write_fill_char_length_warning(bridges, length, value, first);
+    }
+    Some(first)
+}
+
+fn write_fill_char_length_warning(
+    bridges: &RuntimeBridges,
+    length: usize,
+    source: &str,
+    first: char,
+) {
+    let length_text = length.to_string();
+    let char_text = first.to_string();
+    let message = crate::app::i18n::t_or(
+        "script.warning.fill_char_length_invalid",
+        "The fill character length must be 0 or 1, but got {length} (string: {string}). The first character `{char}` will be automatically used as the fill content.",
+    )
+    .replace("{length}", &length_text)
+    .replace("{string}", source)
+    .replace("{char}", &char_text);
+    let _ = direct_debug_api::write_log_line(
+        bridges,
+        &crate::app::i18n::t_or("debug.title.warning", "Warning"),
+        &message,
+    );
+}
+
 fn to_u16(value: i64) -> u16 {
     if value <= 0 {
         0
@@ -426,7 +471,4 @@ fn to_u16(value: i64) -> u16 {
     } else {
         value as u16
     }
-}
-fn first_char(value: String) -> Option<char> {
-    value.chars().next()
 }

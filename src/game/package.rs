@@ -6,6 +6,8 @@ use anyhow::{Context, Result, anyhow};
 use crate::app::i18n;
 use crate::game::manifest::{GameManifest, PackageManifest};
 
+pub const HOST_GAME_API_VERSION: u32 = 7;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GamePackageSource {
     Official,
@@ -142,6 +144,8 @@ fn validate_game_manifest(
     manifest: &GameManifest,
     path: &Path,
 ) -> Result<()> {
+    validate_game_api_version(&manifest.api)?;
+
     if manifest.entry.trim().is_empty() {
         return Err(anyhow!("game entry cannot be blank"));
     }
@@ -255,6 +259,66 @@ fn validate_game_manifest(
     }
 
     Ok(())
+}
+
+fn validate_game_api_version(api: &Option<serde_json::Value>) -> Result<()> {
+    let Some(api) = api.as_ref() else {
+        return Ok(());
+    };
+
+    let host_version = HOST_GAME_API_VERSION;
+    let supported = match api {
+        serde_json::Value::Number(value) => value
+            .as_u64()
+            .map(|version| version == host_version as u64)
+            .unwrap_or(false),
+        serde_json::Value::Array(values) if values.len() == 2 => {
+            let min = values[0].as_u64();
+            let max = values[1].as_u64();
+            match (min, max) {
+                (Some(min), Some(max)) if min <= max => {
+                    (min..=max).contains(&(host_version as u64))
+                }
+                _ => false,
+            }
+        }
+        _ => false,
+    };
+
+    if supported {
+        return Ok(());
+    }
+
+    let actual = api_version_display(api);
+    Err(anyhow!(
+        "{}",
+        i18n::t_or(
+            "host.error.api_version_mismatch",
+            "API version mismatch: expected {api_version}, got {actual_api_version}"
+        )
+        .replace("{api_version}", &host_version.to_string())
+        .replace("{actual_api_version}", &actual)
+    ))
+}
+
+fn api_version_display(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Number(number) => number.to_string(),
+        serde_json::Value::Array(values) if values.len() == 2 => {
+            format!(
+                "{}-{}",
+                values[0]
+                    .as_u64()
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| values[0].to_string()),
+                values[1]
+                    .as_u64()
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| values[1].to_string())
+            )
+        }
+        _ => value.to_string(),
+    }
 }
 
 pub fn expected_mod_game_id(package: &PackageManifest) -> String {

@@ -168,13 +168,6 @@ pub(crate) fn write_log_line(
     Ok(())
 }
 
-pub(crate) fn write_debug_error_line(bridges: &RuntimeBridges, message: &str) {
-    if !is_debug_enabled(bridges) {
-        return;
-    }
-    let _ = write_log_line(bridges, &i18n::t_or("debug.title.error", "异常"), message);
-}
-
 fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {
     let table = lua.create_table()?;
     let package = bridges.game.package.as_ref();

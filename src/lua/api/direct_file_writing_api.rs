@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Component, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -65,14 +66,13 @@ where
             let Some(package) = current_package(&bridges) else {
                 return Ok(false);
             };
-            let Some(resolved) = resolve_asset_write_path(package, &path) else {
-                return Ok(false);
-            };
-            if path_utils::ensure_parent_dir(&resolved).is_err() {
-                return Ok(false);
-            }
+            let resolved = resolve_asset_write_path(package, &path)?;
+            path_utils::ensure_parent_dir(&resolved)
+                .map_err(|err| write_file_failed_error(&err.to_string()))?;
 
-            Ok(writer(&resolved, &content).is_ok())
+            writer(&resolved, &content)
+                .map_err(|err| classify_write_error(err, &path))?;
+            Ok(true)
         })?,
     )?;
     Ok(())
@@ -111,31 +111,29 @@ fn is_mod_safe_mode_enabled(namespace: &str) -> bool {
         .unwrap_or(true)
 }
 
-fn resolve_asset_write_path(package: &PackageDescriptor, logical_path: &str) -> Option<PathBuf> {
+fn resolve_asset_write_path(package: &PackageDescriptor, logical_path: &str) -> mlua::Result<PathBuf> {
     let trimmed = logical_path.trim();
-    if trimmed.is_empty() {
-        return None;
+    if !trimmed.starts_with('/') && !trimmed.starts_with('\\') {
+        return Err(invalid_path_format_error(trimmed));
     }
 
-    let path = PathBuf::from(trimmed);
-    if path.is_absolute() {
-        return None;
-    }
-
+    let stripped = trimmed.trim_start_matches(['/', '\\']);
+    let path = PathBuf::from(stripped);
     let mut clean = PathBuf::new();
     for component in path.components() {
         match component {
             Component::Normal(part) => clean.push(part),
             Component::CurDir => {}
-            Component::ParentDir | Component::Prefix(_) | Component::RootDir => return None,
+            Component::ParentDir => return Err(path_contains_parent_error()),
+            Component::Prefix(_) | Component::RootDir => return Err(invalid_path_format_error(trimmed)),
         }
     }
 
     if clean.as_os_str().is_empty() {
-        return None;
+        return Err(invalid_path_format_error(trimmed));
     }
 
-    Some(package.root_dir.join("assets").join(clean))
+    Ok(package.root_dir.join("assets").join(clean))
 }
 
 fn write_bytes(path: &std::path::Path, content: &str) -> std::io::Result<()> {
@@ -169,4 +167,41 @@ fn log_write_request(bridges: &RuntimeBridges, api_name: &str, path: &str, allow
             ("status", &status),
         ],
     );
+}
+
+fn invalid_path_format_error(path: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.invalid_write_path_format", &[("path", path)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.invalid_write_path_format",
+            "Invalid path format: expected absolute path, got `{path}`",
+        )
+        .replace("{path}", path),
+    )
+}
+
+fn path_contains_parent_error() -> mlua::Error {
+    host_log::append_host_error("host.exception.write_path_contains_parent", &[]);
+    mlua::Error::external(i18n::t_or(
+        "host.exception.write_path_contains_parent",
+        "Path contains `..` operator, access denied",
+    ))
+}
+
+fn classify_write_error(err: std::io::Error, path: &str) -> mlua::Error {
+    match err.kind() {
+        ErrorKind::NotFound => write_file_failed_error(&format!("{} ({path})", err)),
+        _ => write_file_failed_error(&err.to_string()),
+    }
+}
+
+fn write_file_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.write_file_failed", &[("err", err)]);
+    mlua::Error::external(
+        i18n::t_or(
+            "host.exception.write_file_failed",
+            "Failed to write file: {err}",
+        )
+        .replace("{err}", err),
+    )
 }

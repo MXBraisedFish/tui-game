@@ -21,7 +21,7 @@ pub(crate) fn install_runtime_apis(lua: &Lua, bridges: &RuntimeBridges) -> mlua:
     direct_file_reading_api::install(lua, bridges.clone())?;
     direct_file_writing_api::install(lua, bridges.clone())?;
     direct_layout_api::install(lua)?;
-    direct_measurement_api::install(lua)?;
+    direct_measurement_api::install(lua, bridges.clone())?;
     direct_module_loading_api::install(lua, bridges.clone())?;
     direct_random_api::install(lua, bridges.clone())?;
     direct_debug_api::install(lua, bridges.clone())?;
