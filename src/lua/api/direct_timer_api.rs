@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use chrono::{Datelike, Local, NaiveDateTime, TimeZone, Timelike};
+use chrono::{Datelike, Local, NaiveDate, TimeZone, Timelike};
 use mlua::{Lua, Table, Value, Variadic};
 
 use crate::app::i18n;
@@ -377,9 +377,14 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
     globals.set(
         "date_to_timestamp",
         lua.create_function(move |_, args: Variadic<Value>| {
-            common::expect_exact_arg_count(&args, 1)?;
-            let date_str = common::expect_string_arg(&args, 0, "date_str")?;
-            parse_timestamp(&date_str)
+            common::expect_arg_count_range(&args, 0, 6)?;
+            let year = common::expect_optional_i64_arg(&args, 0, "year")?.unwrap_or(2000);
+            let month = common::expect_optional_i64_arg(&args, 1, "month")?.unwrap_or(1);
+            let day = common::expect_optional_i64_arg(&args, 2, "day")?.unwrap_or(1);
+            let hour = common::expect_optional_i64_arg(&args, 3, "hour")?.unwrap_or(0);
+            let minute = common::expect_optional_i64_arg(&args, 4, "minute")?.unwrap_or(0);
+            let second = common::expect_optional_i64_arg(&args, 5, "second")?.unwrap_or(0);
+            build_timestamp(year, month, day, hour, minute, second)
         })?,
     )?;
 
@@ -519,13 +524,34 @@ fn format_timestamp(timestamp_ms: i64, format: &str) -> mlua::Result<String> {
         .replace("{second}", &format!("{:02}", local_dt.second())))
 }
 
-fn parse_timestamp(date_str: &str) -> mlua::Result<Value> {
-    let Ok(naive) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%d %H:%M:%S") else {
-        return Err(invalid_date_string_format_error());
-    };
-    let Some(local_dt) = Local.from_local_datetime(&naive).single() else {
-        return Err(invalid_date_string_format_error());
-    };
+fn build_timestamp(
+    year: i64,
+    month: i64,
+    day: i64,
+    hour: i64,
+    minute: i64,
+    second: i64,
+) -> mlua::Result<Value> {
+    let year = i32::try_from(year).map_err(|_| date_conversion_failed_error("year out of range"))?;
+    let month =
+        u32::try_from(month).map_err(|_| date_conversion_failed_error("month out of range"))?;
+    let day = u32::try_from(day).map_err(|_| date_conversion_failed_error("day out of range"))?;
+    let hour =
+        u32::try_from(hour).map_err(|_| date_conversion_failed_error("hour out of range"))?;
+    let minute = u32::try_from(minute)
+        .map_err(|_| date_conversion_failed_error("minute out of range"))?;
+    let second = u32::try_from(second)
+        .map_err(|_| date_conversion_failed_error("second out of range"))?;
+
+    let naive_date = NaiveDate::from_ymd_opt(year, month, day)
+        .ok_or_else(|| date_conversion_failed_error("invalid date components"))?;
+    let naive = naive_date
+        .and_hms_opt(hour, minute, second)
+        .ok_or_else(|| date_conversion_failed_error("invalid time components"))?;
+    let local_dt = Local
+        .from_local_datetime(&naive)
+        .single()
+        .ok_or_else(|| date_conversion_failed_error("ambiguous or invalid local datetime"))?;
     Ok(Value::Integer(local_dt.timestamp_millis()))
 }
 
@@ -717,10 +743,11 @@ fn date_string_missing_required_parameters_error() -> mlua::Error {
     ))
 }
 
-fn invalid_date_string_format_error() -> mlua::Error {
-    host_log::append_host_error("host.exception.invalid_date_string_format", &[]);
+fn date_conversion_failed_error(err: &str) -> mlua::Error {
+    host_log::append_host_error("host.exception.date_conversion_failed", &[("err", err)]);
     mlua::Error::external(i18n::t_or(
-        "host.exception.invalid_date_string_format",
-        "Invalid date string format",
-    ))
+        "host.exception.date_conversion_failed",
+        "Date conversion failed: {err}",
+    )
+    .replace("{err}", err))
 }

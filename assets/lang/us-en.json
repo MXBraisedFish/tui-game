@@ -182,7 +182,6 @@
     "host.exception.system_time_failed": "Failed to get system time: {err}",
     "host.exception.timestamp_must_be_non_negative": "Timestamp must be a non-negative integer",
     "host.exception.date_string_missing_required_parameters": "Date string missing required parameters",
-    "host.exception.invalid_date_string_format": "Invalid date string format",
     "host.exception.random_generation_failed": "Failed to generate random number: {err}",
     "host.exception.random_not_found": "Random number generator with specified ID does not exist: {id}",
     "host.exception.random_type_mismatch": "Random number generator type mismatch for specified ID: {id}",
@@ -194,5 +193,6 @@
     "host.exception.random_kill_failed": "Failed to delete random number generator: {err}",
     "host.exception.random_get_list_failed": "Failed to get random number generator list: {err}",
     "host.exception.random_info_failed": "Failed to get info for random number generator with specified ID: {id}",
-    "script.warning.fill_char_length_invalid": "The fill character length must be 0 or 1, but got {length} (string: {string}). The first character `{char}` will be automatically used as the fill content."
+    "script.warning.fill_char_length_invalid": "The fill character length must be 0 or 1, but got {length} (string: {string}). The first character `{char}` will be automatically used as the fill content.",
+    "host.exception.date_conversion_failed": "Date conversion failed: {err}"
 }

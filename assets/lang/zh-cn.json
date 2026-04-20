@@ -182,7 +182,6 @@
     "host.exception.system_time_failed": "获取系统时间失败：{err}",
     "host.exception.timestamp_must_be_non_negative": "时间戳必须为大于等于 0 的整数",
     "host.exception.date_string_missing_required_parameters": "日期字符串缺少必要参数",
-    "host.exception.invalid_date_string_format": "日期字符串格式无效",
     "host.exception.random_generation_failed": "无法生成随机数：{err}",
     "host.exception.random_not_found": "指定 ID 随机数生成器不存在：{id}",
     "host.exception.random_type_mismatch": "指定 ID 随机数生成器类型不匹配：{id}",
@@ -194,5 +193,6 @@
     "host.exception.random_kill_failed": "删除随机数生成器失败：{err}",
     "host.exception.random_get_list_failed": "无法获取随机数生成器列表：{err}",
     "host.exception.random_info_failed": "无法获取指定 ID 随机数生成器的信息：{id}",
-    "script.warning.fill_char_length_invalid": "填充字符长度应为 0 或 1，实际长度为 {length}（字符串内容：{string}），将截取首个字符 \"{char}\" 作为填充内容"
+    "script.warning.fill_char_length_invalid": "填充字符长度应为 0 或 1，实际长度为 {length}（字符串内容：{string}），将截取首个字符 \"{char}\" 作为填充内容",
+    "host.exception.date_conversion_failed": "???????{err}"
 }
