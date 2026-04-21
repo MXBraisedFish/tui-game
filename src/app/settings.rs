@@ -6,6 +6,7 @@ use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use unicode_width::UnicodeWidthStr;
 
 use crossterm::event::KeyCode;
+use std::cmp::Ordering;
 use std::time::Instant;
 
 use crate::app::i18n;
@@ -15,6 +16,20 @@ use crate::mods::{self, ModPackage};
 const MAX_COLS: usize = 12;
 const H_GAP: u16 = 1;
 const TRIANGLE: &str = "\u{25B6} ";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModListView {
+    Detailed,
+    Simple,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModSortMode {
+    Name,
+    Enabled,
+    Author,
+    SafeMode,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SettingsPage {
@@ -34,6 +49,10 @@ pub struct SettingsState {
     pub mod_detail_scroll_available: bool,
     pub mod_packages: Vec<ModPackage>,
     pub mod_safe_dialog: Option<ModSafeDialog>,
+    pub mod_page_jump_dialog: Option<ModPageJumpDialog>,
+    pub mod_list_view: ModListView,
+    pub mod_sort_mode: ModSortMode,
+    pub mod_sort_descending: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -41,6 +60,11 @@ pub struct ModSafeDialog {
     pub namespace: String,
     pub mod_name: String,
     pub opened_at: Instant,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ModPageJumpDialog {
+    pub input: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -58,7 +82,7 @@ pub struct GridMetrics {
 
 impl SettingsState {
     pub fn new() -> Self {
-        Self {
+        let mut state = Self {
             page: SettingsPage::Hub,
             hub_selected: 0,
             lang_selected: default_selected_index(),
@@ -68,7 +92,13 @@ impl SettingsState {
             mod_detail_scroll_available: false,
             mod_packages: load_mod_packages(),
             mod_safe_dialog: None,
-        }
+            mod_page_jump_dialog: None,
+            mod_list_view: ModListView::Detailed,
+            mod_sort_mode: ModSortMode::Name,
+            mod_sort_descending: false,
+        };
+        state.apply_mod_sort();
+        state
     }
 
     pub fn refresh_mods(&mut self) {
@@ -84,17 +114,8 @@ impl SettingsState {
             self.mod_detail_scroll_available = false;
             return;
         }
-        self.mod_selected = previous_namespace
-            .and_then(|namespace| {
-                self.mod_packages
-                    .iter()
-                    .position(|package| package.namespace == namespace)
-            })
-            .unwrap_or(0)
-            .min(self.mod_packages.len().saturating_sub(1));
-        let page_size = current_mod_page_size();
-        self.mod_page = (self.mod_selected / page_size)
-            .min(total_mod_pages(self.mod_packages.len(), page_size).saturating_sub(1));
+        self.apply_mod_sort();
+        self.restore_selected_mod(previous_namespace.as_deref());
         self.mod_detail_scroll = 0;
         self.mod_detail_scroll_available = false;
         if let Some(dialog) = &self.mod_safe_dialog
@@ -105,6 +126,70 @@ impl SettingsState {
         {
             self.mod_safe_dialog = None;
         }
+    }
+
+    fn apply_mod_sort(&mut self) {
+        let sort_mode = self.mod_sort_mode;
+        let descending = self.mod_sort_descending;
+        self.mod_packages.sort_by(|left, right| {
+            let ordering = compare_mod_packages(left, right, sort_mode);
+            if descending {
+                ordering.reverse()
+            } else {
+                ordering
+            }
+        });
+    }
+
+    fn restore_selected_mod(&mut self, namespace: Option<&str>) {
+        if self.mod_packages.is_empty() {
+            self.mod_selected = 0;
+            self.mod_page = 0;
+            return;
+        }
+
+        if let Some(namespace) = namespace
+            && let Some(index) = self
+                .mod_packages
+                .iter()
+                .position(|package| package.namespace == namespace)
+        {
+            self.mod_selected = index;
+        } else {
+            self.mod_selected = self.mod_selected.min(self.mod_packages.len().saturating_sub(1));
+        }
+
+        let page_size = current_mod_page_size(self.mod_list_view);
+        self.mod_page = (self.mod_selected / page_size)
+            .min(total_mod_pages(self.mod_packages.len(), page_size).saturating_sub(1));
+    }
+
+    fn set_mod_sort_mode(&mut self, mode: ModSortMode) {
+        let current = self
+            .mod_packages
+            .get(self.mod_selected)
+            .map(|package| package.namespace.clone());
+        self.mod_sort_mode = mode;
+        self.apply_mod_sort();
+        self.restore_selected_mod(current.as_deref());
+    }
+
+    fn toggle_mod_sort_order(&mut self) {
+        let current = self
+            .mod_packages
+            .get(self.mod_selected)
+            .map(|package| package.namespace.clone());
+        self.mod_sort_descending = !self.mod_sort_descending;
+        self.apply_mod_sort();
+        self.restore_selected_mod(current.as_deref());
+    }
+
+    fn toggle_mod_list_view(&mut self) {
+        self.mod_list_view = match self.mod_list_view {
+            ModListView::Detailed => ModListView::Simple,
+            ModListView::Simple => ModListView::Detailed,
+        };
+        self.restore_selected_mod(None);
     }
 }
 
@@ -227,6 +312,31 @@ fn text(key: &str, fallback: &str) -> String {
     i18n::t_or(key, fallback)
 }
 
+fn compare_mod_packages(left: &ModPackage, right: &ModPackage, mode: ModSortMode) -> Ordering {
+    match mode {
+        ModSortMode::Name => cmp_lowercase(&left.package_name, &right.package_name)
+            .then_with(|| cmp_lowercase(&left.author, &right.author))
+            .then_with(|| left.namespace.cmp(&right.namespace)),
+        ModSortMode::Enabled => bool_true_first(left.enabled, right.enabled)
+            .then_with(|| cmp_lowercase(&left.package_name, &right.package_name))
+            .then_with(|| left.namespace.cmp(&right.namespace)),
+        ModSortMode::Author => cmp_lowercase(&left.author, &right.author)
+            .then_with(|| cmp_lowercase(&left.package_name, &right.package_name))
+            .then_with(|| left.namespace.cmp(&right.namespace)),
+        ModSortMode::SafeMode => bool_true_first(left.safe_mode_enabled, right.safe_mode_enabled)
+            .then_with(|| cmp_lowercase(&left.package_name, &right.package_name))
+            .then_with(|| left.namespace.cmp(&right.namespace)),
+    }
+}
+
+fn cmp_lowercase(left: &str, right: &str) -> Ordering {
+    left.to_lowercase().cmp(&right.to_lowercase())
+}
+
+fn bool_true_first(left: bool, right: bool) -> Ordering {
+    right.cmp(&left)
+}
+
 fn handle_hub_key(state: &mut SettingsState, code: KeyCode) -> SettingsAction {
     let item_count = 2;
     match code {
@@ -313,7 +423,36 @@ fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
         return;
     }
 
-    let page_size = current_mod_page_size();
+    if let Some(dialog) = state.mod_page_jump_dialog.as_mut() {
+        let total_pages =
+            total_mod_pages(state.mod_packages.len(), current_mod_page_size(state.mod_list_view));
+        match code {
+            KeyCode::Esc => state.mod_page_jump_dialog = None,
+            KeyCode::Backspace => {
+                dialog.input.pop();
+            }
+            KeyCode::Char(ch) if ch.is_ascii_digit() => {
+                if dialog.input.len() < 4 {
+                    dialog.input.push(ch);
+                }
+            }
+            KeyCode::Enter => {
+                if let Ok(page) = dialog.input.parse::<usize>()
+                    && (1..=total_pages.max(1)).contains(&page)
+                {
+                    state.mod_page = page - 1;
+                    let start = state.mod_page * current_mod_page_size(state.mod_list_view);
+                    state.mod_selected = start.min(state.mod_packages.len().saturating_sub(1));
+                    state.mod_detail_scroll = 0;
+                }
+                state.mod_page_jump_dialog = None;
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    let page_size = current_mod_page_size(state.mod_list_view);
     match code {
         KeyCode::Up | KeyCode::Char('k') => {
             state.mod_selected = state.mod_selected.saturating_sub(1);
@@ -377,6 +516,31 @@ fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
                 }
             }
         }
+        KeyCode::Char('l') | KeyCode::Char('L') => {
+            state.toggle_mod_list_view();
+            state.mod_detail_scroll = 0;
+        }
+        KeyCode::Char('z') | KeyCode::Char('Z') => {
+            let next = match state.mod_sort_mode {
+                ModSortMode::Name => ModSortMode::Enabled,
+                ModSortMode::Enabled => ModSortMode::Author,
+                ModSortMode::Author => ModSortMode::SafeMode,
+                ModSortMode::SafeMode => ModSortMode::Name,
+            };
+            state.set_mod_sort_mode(next);
+            state.mod_detail_scroll = 0;
+        }
+        KeyCode::Char('x') | KeyCode::Char('X') => {
+            state.toggle_mod_sort_order();
+            state.mod_detail_scroll = 0;
+        }
+        KeyCode::Char('p') | KeyCode::Char('P') => {
+            if total_mod_pages(state.mod_packages.len(), page_size) > 1 {
+                state.mod_page_jump_dialog = Some(ModPageJumpDialog {
+                    input: String::new(),
+                });
+            }
+        }
         KeyCode::Esc => {
             state.page = SettingsPage::Hub;
         }
@@ -430,7 +594,12 @@ fn minimum_size_language() -> (u16, u16) {
 }
 
 fn minimum_size_mods() -> (u16, u16) {
-    (90, 26)
+    let min_width = 90u16;
+    let hint_lines =
+        wrap_mod_hint_lines(&build_mod_hint_segments(true), min_width.saturating_sub(2) as usize)
+            .len()
+            .max(1) as u16;
+    (min_width, 25 + hint_lines)
 }
 
 fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
@@ -560,7 +729,7 @@ fn render_mods(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
         state.mod_detail_scroll = 0;
         state.mod_detail_scroll_available = false;
     } else {
-        let page_size = current_mod_page_size();
+        let page_size = current_mod_page_size(state.mod_list_view);
         let total_pages = total_mod_pages(state.mod_packages.len(), page_size);
         if state.mod_page >= total_pages {
             state.mod_page = total_pages.saturating_sub(1);
@@ -574,9 +743,17 @@ fn render_mods(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
     }
 
     let area = frame.area();
+    let hint_lines = wrap_mod_hint_lines(
+        &build_mod_hint_segments(state.mod_detail_scroll_available),
+        area.width.max(1) as usize,
+    );
+    let hint_height = hint_lines
+        .len()
+        .max(1)
+        .min(u16::MAX as usize) as u16;
     let root = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .constraints([Constraint::Min(0), Constraint::Length(hint_height)])
         .split(area);
     let columns = Layout::default()
         .direction(Direction::Horizontal)
@@ -586,21 +763,8 @@ fn render_mods(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
     render_mod_list(frame, columns[0], state);
     render_mod_detail(frame, columns[1], state);
 
-    let mut hints = format!(
-        "{}  {}  {}  {}  {}  {}",
-        text("settings.mods.hint.toggle", "[Enter] Toggle"),
-        text("settings.mods.hint.debug", "[D] Debug"),
-        text("settings.mods.hint.safe_mode", "[R] Safe Mode"),
-        text("settings.mods.hint.move", "[鈫慮/[鈫揮 Move"),
-        text("settings.mods.hint.page", "[Q]/[E] Page"),
-        text("settings.hub.back_hint", "[ESC] Return to main menu")
-    );
-    if state.mod_detail_scroll_available {
-        hints.push_str("  ");
-        hints.push_str(&text("settings.mods.hint.scroll", "[W]/[S] Scroll Details"));
-    }
     frame.render_widget(
-        Paragraph::new(hints)
+        Paragraph::new(hint_lines)
             .style(Style::default().fg(Color::DarkGray))
             .alignment(Alignment::Center),
         root[1],
@@ -613,7 +777,7 @@ fn render_mods(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
 fn render_mod_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsState) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" {} ", text("settings.mods.title", "Mods")))
+        .title(mod_list_title(state))
         .border_style(Style::default().fg(Color::White));
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -639,7 +803,7 @@ fn render_mod_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsS
         return;
     }
 
-    let item_height = 5u16;
+    let item_height = mod_item_height(state.mod_list_view);
     let page_size = ((rows[0].height / item_height).max(1)) as usize;
     let total_pages = total_mod_pages(state.mod_packages.len(), page_size);
     let page = state.mod_page.min(total_pages.saturating_sub(1));
@@ -664,85 +828,78 @@ fn render_mod_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsS
             item_area,
             package,
             index == state.mod_selected,
+            state.mod_list_view,
         );
     }
 
-    let left = if page > 0 {
-        i18n::t("game_selection.pager.prev")
+    let pager_line = if let Some(dialog) = &state.mod_page_jump_dialog {
+        let input_text = if dialog.input.is_empty() {
+            "_".to_string()
+        } else {
+            dialog.input.clone()
+        };
+        let input_style = Style::default()
+            .fg(if dialog.input.is_empty() {
+                Color::Yellow
+            } else {
+                Color::Black
+            })
+            .bg(Color::Yellow);
+        Line::from(vec![
+            Span::styled(input_text, input_style),
+            Span::styled(
+                format!("/{}", total_pages.max(1)),
+                Style::default().fg(Color::White),
+            ),
+        ])
     } else {
-        String::new()
-    };
-    let center = format!("{}/{}", page + 1, total_pages.max(1));
-    let right = if page + 1 < total_pages {
-        i18n::t("game_selection.pager.next")
-    } else {
-        String::new()
+        Line::from(Span::styled(
+            format!("{}/{}", page + 1, total_pages.max(1)),
+            Style::default().fg(Color::White),
+        ))
     };
     frame.render_widget(
-        Paragraph::new(left)
-            .style(Style::default().fg(Color::White))
-            .alignment(Alignment::Left),
-        rows[1],
-    );
-    frame.render_widget(
-        Paragraph::new(center)
-            .style(Style::default().fg(Color::White))
-            .alignment(Alignment::Center),
-        rows[1],
-    );
-    frame.render_widget(
-        Paragraph::new(right)
-            .style(Style::default().fg(Color::White))
-            .alignment(Alignment::Right),
+        Paragraph::new(pager_line).alignment(Alignment::Center),
         rows[1],
     );
 }
 
-fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, selected: bool) {
+fn render_mod_list_item(
+    buffer: &mut Buffer,
+    area: Rect,
+    package: &ModPackage,
+    selected: bool,
+    list_view: ModListView,
+) {
     if area.height == 0 || area.width == 0 {
         return;
     }
 
-    let thumb_width = 8u16;
-    let text_x = area.x + thumb_width + 2;
-    let content_height = area.height.min(4);
-    let status = if package.enabled {
-        text("settings.mods.enabled", "Enabled")
-    } else {
-        text("settings.mods.disabled", "Disabled")
-    };
     let base_style = if selected {
         Style::default().bg(Color::DarkGray)
     } else {
         Style::default()
-    };
-    let title_style = if selected {
-        Style::default()
-            .fg(Color::LightCyan)
-            .bg(Color::DarkGray)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD)
     };
     let meta_style = if selected {
         Style::default().fg(Color::White).bg(Color::DarkGray)
     } else {
         Style::default().fg(Color::Gray)
     };
-    let status_style = if package.enabled {
-        Style::default().fg(Color::Green)
-    } else {
-        Style::default().fg(Color::Red)
-    }
-    .bg(if selected {
-        Color::DarkGray
-    } else {
-        Color::Reset
-    });
 
-    for dy in 0..content_height {
+    for dy in 0..area.height {
+        buffer.set_string(
+            area.x,
+            area.y + dy,
+            " ".repeat(area.width as usize),
+            Style::default(),
+        );
+    }
+    let highlight_rows = match list_view {
+        ModListView::Detailed if selected => area.height.min(4),
+        ModListView::Simple if selected => area.height.min(1),
+        _ => 0,
+    };
+    for dy in 0..highlight_rows {
         buffer.set_string(
             area.x,
             area.y + dy,
@@ -751,88 +908,273 @@ fn render_mod_list_item(buffer: &mut Buffer, area: Rect, package: &ModPackage, s
         );
     }
 
-    for (idx, line) in package.thumbnail.lines.iter().take(4).enumerate() {
-        if idx as u16 >= content_height {
-            break;
-        }
-        render_rich_line_to_buffer(
-            buffer,
-            area.x,
-            area.y + idx as u16,
-            thumb_width as usize,
-            line,
-            meta_style,
-        );
-    }
+    match list_view {
+        ModListView::Detailed => {
+            let thumb_width = 8u16;
+            let text_x = area.x + thumb_width + 2;
+            let content_height = area.height.min(4);
+            let safe_marker_width = if package.safe_mode_enabled { 0 } else { 1 };
+            let text_width = area.width.saturating_sub(thumb_width + 2 + safe_marker_width) as usize;
+            if text_width == 0 {
+                return;
+            }
 
-    buffer.set_stringn(
-        text_x,
-        area.y,
-        &package.package_name,
-        area.width.saturating_sub(thumb_width + 2) as usize,
-        title_style,
-    );
-    if content_height > 1 {
-        buffer.set_stringn(
-            text_x,
-            area.y + 1,
-            &format!(
-                "{} {}",
-                text("settings.mods.author", "Author:"),
-                package.author
-            ),
-            area.width.saturating_sub(thumb_width + 2) as usize,
-            meta_style,
-        );
-    }
-    if content_height > 2 {
-        buffer.set_stringn(
-            text_x,
-            area.y + 2,
-            &format!(
-                "{} {}",
-                text("settings.mods.version", "Version:"),
-                package.version
-            ),
-            area.width.saturating_sub(thumb_width + 2) as usize,
-            meta_style,
-        );
-    }
-    if content_height > 3 {
-        buffer.set_stringn(
-            text_x,
-            area.y + 3,
-            &format!(
-                "{} {} / {} {}",
-                text("settings.mods.state", "State:"),
-                status,
-                text("settings.mods.safe_mode", "Safe Mode:"),
-                if package.safe_mode_enabled {
-                    text("settings.mods.safe_mode_on", "On")
-                } else {
-                    text("settings.mods.safe_mode_off", "Off")
-                }
-            ),
-            area.width.saturating_sub(thumb_width + 2) as usize,
-            status_style,
-        );
-    }
+            for (idx, line) in package.thumbnail.lines.iter().take(content_height as usize).enumerate() {
+                render_rich_line_to_buffer(
+                    buffer,
+                    area.x,
+                    area.y + idx as u16,
+                    thumb_width as usize,
+                    line,
+                    meta_style,
+                );
+            }
 
-    if package.debug_enabled && content_height > 0 && area.width > 0 {
-        let debug_x = area.x + area.width - 1;
-        for dy in 0..content_height {
-            buffer.set_string(
-                debug_x,
-                area.y + dy,
-                "█",
-                Style::default().fg(Color::Red).bg(if selected {
-                    Color::DarkGray
-                } else {
-                    Color::Reset
-                }),
+            render_mod_debug_prefix(buffer, text_x, area.y, package.debug_enabled, selected);
+            let name_x = text_x + if package.debug_enabled { 3 } else { 0 };
+            let name_width = text_width.saturating_sub(if package.debug_enabled { 3 } else { 0 });
+            render_rich_line_to_buffer(
+                buffer,
+                name_x,
+                area.y,
+                name_width,
+                &package.package_name,
+                base_style.add_modifier(Modifier::BOLD),
             );
+
+            if content_height > 1 {
+                buffer.set_stringn(
+                    text_x,
+                    area.y + 1,
+                    format!("{} {}", text("settings.mods.author", "Author:"), package.author),
+                    text_width,
+                    meta_style,
+                );
+            }
+            if content_height > 2 {
+                buffer.set_stringn(
+                    text_x,
+                    area.y + 2,
+                    format!("{} {}", text("settings.mods.version", "Version:"), package.version),
+                    text_width,
+                    meta_style,
+                );
+            }
+            if content_height > 3 {
+                render_mod_status_line(buffer, text_x, area.y + 3, text_width, package, selected);
+            }
+
+            if !package.safe_mode_enabled {
+                render_safe_mode_marker_column(buffer, area, content_height);
+            }
+        }
+        ModListView::Simple => {
+            let safe_marker_width = if package.safe_mode_enabled { 0 } else { 1 };
+            let status_width = 6usize;
+            let text_width = area.width.saturating_sub(safe_marker_width) as usize;
+            let name_width = text_width.saturating_sub(status_width + 1);
+            let text_x = area.x;
+
+            render_mod_debug_prefix(buffer, text_x, area.y, package.debug_enabled, selected);
+            let name_x = text_x + if package.debug_enabled { 3 } else { 0 };
+            let actual_name_width = name_width.saturating_sub(if package.debug_enabled { 3 } else { 0 });
+            render_rich_line_to_buffer(
+                buffer,
+                name_x,
+                area.y,
+                actual_name_width,
+                &package.package_name,
+                base_style,
+            );
+
+            let status_x = area.x + name_width as u16 + 1;
+            render_enabled_tag(buffer, status_x, area.y, package.enabled, selected);
+
+            if !package.safe_mode_enabled {
+                let marker_x = area.x + area.width - 1;
+                buffer.set_string(
+                    marker_x,
+                    area.y,
+                    " ",
+                    Style::default().bg(Color::Red),
+                );
+            }
         }
     }
+}
+
+
+fn mod_list_title(state: &SettingsState) -> Line<'static> {
+    let order_text = if state.mod_sort_descending {
+        format!("\u{2191}{}", text("settings.mods.order.desc", "Descending"))
+    } else {
+        format!("\u{2193}{}", text("settings.mods.order.asc", "Ascending"))
+    };
+    Line::from(vec![
+        Span::raw(" "),
+        Span::styled(
+            text("settings.mods.title", "Mods"),
+            Style::default().fg(Color::White),
+        ),
+        Span::styled(" *", Style::default().fg(Color::White)),
+        Span::styled(
+            mod_sort_label(state.mod_sort_mode),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ", Style::default().fg(Color::White)),
+        Span::styled("[", Style::default().fg(Color::White)),
+        Span::styled(order_text, Style::default().fg(Color::DarkGray)),
+        Span::styled("]", Style::default().fg(Color::White)),
+        Span::raw(" "),
+    ])
+}
+
+fn mod_sort_label(mode: ModSortMode) -> String {
+    match mode {
+        ModSortMode::Name => text("settings.mods.sort.name", "Name"),
+        ModSortMode::Enabled => text("settings.mods.sort.enabled", "Enabled"),
+        ModSortMode::Author => text("settings.mods.sort.author", "Author"),
+        ModSortMode::SafeMode => text("settings.mods.sort.safe_mode", "Safe Mode"),
+    }
+}
+
+fn mod_item_height(list_view: ModListView) -> u16 {
+    match list_view {
+        ModListView::Detailed => 5,
+        ModListView::Simple => 1,
+    }
+}
+
+fn render_mod_debug_prefix(
+    buffer: &mut Buffer,
+    x: u16,
+    y: u16,
+    enabled: bool,
+    selected: bool,
+) {
+    if !enabled {
+        return;
+    }
+
+    let bg = if selected { Color::DarkGray } else { Color::Reset };
+    buffer.set_string(x, y, "[", Style::default().fg(Color::White).bg(bg));
+    buffer.set_string(x + 1, y, "D", Style::default().fg(Color::LightBlue).bg(bg));
+    buffer.set_string(x + 2, y, "]", Style::default().fg(Color::White).bg(bg));
+}
+
+fn render_enabled_tag(buffer: &mut Buffer, x: u16, y: u16, enabled: bool, selected: bool) {
+    let bg = if selected { Color::DarkGray } else { Color::Reset };
+    let value = if enabled { "ON" } else { "OFF" };
+    let value_style = Style::default()
+        .fg(if enabled { Color::Green } else { Color::Red })
+        .bg(bg)
+        .add_modifier(Modifier::BOLD);
+    let bracket_style = Style::default().fg(Color::White).bg(bg);
+
+    buffer.set_string(x, y, "[", bracket_style);
+    buffer.set_string(x + 1, y, value, value_style);
+    buffer.set_string(x + 1 + value.len() as u16, y, "]", bracket_style);
+}
+
+fn render_mod_status_line(
+    buffer: &mut Buffer,
+    x: u16,
+    y: u16,
+    width: usize,
+    package: &ModPackage,
+    selected: bool,
+) {
+    let bg = if selected { Color::DarkGray } else { Color::Reset };
+    let label = format!("{} ", text("settings.mods.state", "State:"));
+    let label_style = Style::default().fg(Color::Gray).bg(bg);
+    let value_style = Style::default()
+        .fg(if package.enabled { Color::Green } else { Color::Red })
+        .bg(bg)
+        .add_modifier(Modifier::BOLD);
+
+    buffer.set_stringn(x, y, &label, width, label_style);
+    let value_x = x + UnicodeWidthStr::width(label.as_str()) as u16;
+    buffer.set_stringn(
+        value_x,
+        y,
+        if package.enabled {
+            text("settings.mods.enabled", "Enabled")
+        } else {
+            text("settings.mods.disabled", "Disabled")
+        },
+        width.saturating_sub(UnicodeWidthStr::width(label.as_str())),
+        value_style,
+    );
+}
+
+fn render_safe_mode_marker_column(
+    buffer: &mut Buffer,
+    area: Rect,
+    content_height: u16,
+) {
+    let marker_x = area.x + area.width - 1;
+    let style = Style::default().bg(Color::Red);
+    for dy in 0..content_height {
+        buffer.set_string(marker_x, area.y + dy, " ", style);
+    }
+}
+
+fn build_mod_hint_segments(include_scroll: bool) -> Vec<String> {
+    let mut segments = vec![
+        text("settings.mods.hint.toggle", "[Enter] Toggle"),
+        text("settings.mods.hint.debug", "[D] Debug"),
+        text("settings.mods.hint.safe_mode", "[R] Safe Mode"),
+        text("settings.mods.hint.view", "[L] View"),
+        text("settings.mods.hint.jump", "[P] Jump"),
+        text("settings.mods.hint.sort_mode", "[Z] Sort"),
+        text("settings.mods.hint.sort_order", "[X] Order"),
+        text("settings.mods.hint.move", "[\u{2191}]/[\u{2193}] Move"),
+        text("settings.mods.hint.page", "[Q]/[E] Page"),
+        text("settings.hub.back_hint", "[ESC] Return to main menu"),
+    ];
+    if include_scroll {
+        segments.push(text("settings.mods.hint.scroll", "[W]/[S] Scroll Details"));
+    }
+    segments
+}
+
+fn wrap_mod_hint_lines(segments: &[String], width: usize) -> Vec<Line<'static>> {
+    if width == 0 || segments.is_empty() {
+        return vec![Line::from("")];
+    }
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    let mut current_segments: Vec<Span<'static>> = Vec::new();
+    let mut current_width = 0usize;
+
+    for segment in segments {
+        let segment_width = UnicodeWidthStr::width(segment.as_str());
+        let separator_width = if current_segments.is_empty() { 0 } else { 2 };
+
+        if !current_segments.is_empty() && current_width + separator_width + segment_width > width {
+            lines.push(Line::from(std::mem::take(&mut current_segments)));
+            current_width = 0;
+        }
+
+        if !current_segments.is_empty() {
+            current_segments.push(Span::raw("  "));
+            current_width += 2;
+        }
+        current_segments.push(Span::raw(segment.clone()));
+        current_width += segment_width;
+    }
+
+    if !current_segments.is_empty() {
+        lines.push(Line::from(current_segments));
+    }
+
+    if lines.is_empty() {
+        lines.push(Line::from(""));
+    }
+
+    lines
 }
 
 fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut SettingsState) {
@@ -1105,12 +1447,12 @@ fn render_rich_line_to_buffer(
     }
 }
 
-fn current_mod_page_size() -> usize {
+fn current_mod_page_size(list_view: ModListView) -> usize {
     let (_, term_height) = crossterm::terminal::size().unwrap_or((90, 26));
     let root_height = term_height.saturating_sub(1);
     let inner_height = root_height.saturating_sub(2);
     let content_height = inner_height.saturating_sub(1);
-    (content_height / 5).max(1) as usize
+    (content_height / mod_item_height(list_view)).max(1) as usize
 }
 
 fn total_mod_pages(total_items: usize, page_size: usize) -> usize {
