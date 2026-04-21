@@ -1,13 +1,13 @@
 # 文档信息
 
-1. 更新日期：2026年4月9日
+1. 更新日期：2026年4月21日
 2. API 版本：**7**
 3. 本文档定义了脚本与宿主之间的交互接口规范，所有实现须遵循其中约定的函数签名、参数类型及行为准则，以确保兼容性与正确性。
 
 # 文档导航
 
 - [README](../../README-i18n/README-zh-cn.md)
-- [MOD 制作规范及教程](./MOD.md)
+- [模组包制作规范及教程](./MOD.md)
 - [富文本指令](./RICH_TEXT.md)
 
 # 目录
@@ -27,6 +27,7 @@
   - [布局定位计算](#布局定位计算)
   - [数据读取](#数据读取)
   - [数据写入](#数据写入)
+  - [表处理工具](#表处理工具)
   - [辅助脚本加载](#辅助脚本加载)
   - [时间处理](#时间处理)
   - [随机数](#随机数)
@@ -36,7 +37,9 @@
     - [锚点 anchor](#锚点-anchor)
     - [颜色 color](#颜色-color)
   - [调试输出目录](#调试输出目录)
+  - [表转换格式](#表转换格式)
 - [快速查询](#快速查询)
+- [异常和警告速查表](#异常和警告速查表)
 
 ---
 
@@ -297,7 +300,7 @@ end
 > 2. `align` 类型见『附录-[对齐 align](#对齐-align)』。
 > 3. 宽度、高度参数均以**终端字符数**为单位（宽度为列数，高度为行数）。
 > 4. 所有绘制操作的基准点均为**内容的左上角**，即绘制内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
-> 5. 绘制坐标详细见『MOD 制作规范及教程-其它-[绘制坐标](./MOD.md#绘制坐标)』。
+> 5. 绘制坐标详细见『模组包制作规范及教程-其它-[绘制坐标](./MOD.md#绘制坐标)』。
 
 | 函数名                                                               | 作用                       | 参数                                                                                                                                                                                                                                                                                                                                                                                           | 返回值                            |
 | ----------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -332,7 +335,7 @@ end
 >
 > 1. 宽度、高度返回值均以**终端字符数**为单位（宽度为列数，高度为行数）。
 > 2. 所有计算操作的基准点均为**内容的左上角**，即计算内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
-> 3. 绘制坐标详细见『MOD 制作规范及教程-[绘制坐标](./MOD.md#绘制坐标)』。
+> 3. 绘制坐标详细见『模组包制作规范及教程-[绘制坐标](./MOD.md#绘制坐标)』。
 
 | 函数名                  | 作用                                 | 参数                                                           | 返回值                                                                                                                    |
 | ----------------------- | ------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -350,7 +353,7 @@ end
 > 1. `x_anchor` 和 `y_anchor` 类型见 附录-[锚点 anchor](#锚点-anchor)
 > 2. 宽度、高度参数均以**终端字符数**为单位（宽度为列数，高度为行数）。
 > 3. 所有计算操作的基准点均为**内容的左上角**，即计算内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
-> 4. 绘制坐标详细见『MOD 制作规范及教程-[绘制坐标](./MOD.md#绘制坐标)』。
+> 4. 绘制坐标详细见『模组包制作规范及教程-[绘制坐标](./MOD.md#绘制坐标)』。
 
 | 函数名                                                                    | 作用                                                         | 参数                                                                                                                                                                                                                                                                                                                                                                                                | 返回值                                                                                                         |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -391,7 +394,7 @@ end
 > 1. 本章节中所有 `path` 参数均相对于游戏资源包中的 `assets/` 目录。
 > 2. 所有 `write_*` 函数的 `content` 参数均为 `string` 类型。
 > 3. 所有 `write_*` 函数仅为语义命名，实际写入并不会做结构检查。
-> 4. 所有 `write_*` 函数均为高风险直写操作。仅当 `game.json` 中 `write` 字段为 `true` 且用户授予模组“完全信任权限”时，直写操作才会被执行；否则所有直写请求将被宿主忽略。
+> 4. 所有 `write_*` 函数均为高风险直写操作。仅当 `game.json` 中 `write` 字段为 `true` 且用户授予模组包“完全信任权限”时，直写操作才会被执行；否则所有直写请求将被宿主忽略。
 > 5. 无论直写操作是否执行，每次调用都会在 `tui_log.txt` 中记录，供用户安全检查。
 
 <font color="red"><b>直写操作不可撤回！</b></font>
@@ -432,7 +435,7 @@ end
 
 ## 辅助脚本加载
 
-> 注：辅助脚本的具体编写与使用请参考『MOD 制作规范及教程-其它-[辅助脚本规范](./MOD.md#辅助脚本规范)』。
+> 注：辅助脚本的具体编写与使用请参考『模组包制作规范及教程-其它-[辅助脚本规范](./MOD.md#辅助脚本规范)』。
 
 | 函数名                | 作用                                                                      | 参数                                                                          | 返回值                                                                           |
 | --------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -448,7 +451,7 @@ end
 > 2. `timer_reset` 将计时器重置为 `init` 状态（已过时间归零）；`timer_restart` 相当于 reset + start。
 > 3. 查询 `init` 状态的计时器，`elapsed` 返回 0；查询 `completed` 状态的计时器，`remaining` 返回 0。
 > 4. 所有脚本创建的计时器会在游戏退出后被删除。
-> 5. 每个游戏运行时最多同时存在64个计时器。
+> 5. 每个游戏运行时最多同时存在 64 个计时器。
 
 | 是否启动计时器                        | 函数名                                                               | 作用                                      | 参数                                                                                                                                                                                                                                                                                                                                                                    | 返回值                                                                                                                                                                                                                                                              |
 | ------------------------------ | ----------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -587,8 +590,8 @@ end
 | `debug_error(message)`        | 在日志文件中写入一条异常信息。        | `message` - <font color="#92cddc">任意</font>：要写入的异常信息。                                                       | <font color="#7f7f7f">无</font>                            |
 | `debug_print(title, message)` | 在日志文件中写入一条带自定义标题的调试信息。 | `title` - <font color="#92cddc">string</font>：日志标题。 <br>`message` - <font color="#92cddc">任意</font>：要写入的信息。 | <font color="#7f7f7f">无</font>                            |
 | `clear_debug_log()`           | 清空游戏日志文件。                | <font color="#7f7f7f">无</font>                                                                              | <font color="#7f7f7f">无</font>                            |
-| `get_game_uid()`              | 获取当前模组在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `uid` - <font color="#92cddc">string</font>：模组 UID。       |
-| `get_game_info()`             | 获取当前模组的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `info` - <font color="#92cddc">table</font>：模组元信息表，结构见下文。 |
+| `get_game_uid()`              | 获取当前模组包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `uid` - <font color="#92cddc">string</font>：模组包 UID。       |
+| `get_game_info()`             | 获取当前模组包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `info` - <font color="#92cddc">table</font>：模组包元信息表，结构见下文。 |
 
 ### 日志输出格式
 
@@ -722,17 +725,18 @@ end
 
 ### 游戏日志 `[uid].txt`
 
-> 类型：脚本警告
+> 类型：<font color="purple">脚本警告</font>
 
 **包含内容：**
 
-- 调试信息 API 的输出（`debug_log`、`debug_warning`、`debug_error`）。
+- 调试信息 API 的输出。
 - 部分 API 的警告信息。
 
 > 注：该日志仅在开启 Debug 模式时输出。
+> 
 ### 官方日志 `tui_log.txt`
 
-> 类型：宿主异常，宿主警告
+> 类型：<font color="red">宿主异常</font>，<font color="orange">宿主警告</font>
 
 **包含内容：**
 
@@ -919,12 +923,19 @@ end
 | <font color="#7f7f7f">无风险</font> | `debug_error(message)`                                                    | 异常日志                | `message` - <font color="#92cddc">任意</font>                                                                                                                                                                                                                                                                                      | <font color="#7f7f7f">无</font>                                                            | [调试信息](#调试信息)     |
 | <font color="#7f7f7f">无风险</font> | `debug_print(title, message)`                                             | 自定义日志               | `title` - <font color="#92cddc">string</font><br>`message` - <font color="#92cddc">任意</font>                                                                                                                                                                                                                                     | <font color="#7f7f7f">无</font>                                                            | [调试信息](#调试信息)     |
 | <font color="#7f7f7f">无风险</font> | `clear_debug_log()`                                                       | 清空游戏日志              | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                   | <font color="#7f7f7f">无</font>                                                            | [调试信息](#调试信息)     |
-| <font color="#7f7f7f">无风险</font> | `get_game_uid()`                                                          | 获取模组 UID            | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                   | `uid` - <font color="#92cddc">string</font>                                               | [调试信息](#调试信息)     |
-| <font color="#7f7f7f">无风险</font> | `get_game_info()`                                                         | 获取模组元信息             | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                   | `info` - <font color="#92cddc">table</font>                                               | [调试信息](#调试信息)     |
+| <font color="#7f7f7f">无风险</font> | `get_game_uid()`                                                          | 获取模组包 UID            | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                   | `uid` - <font color="#92cddc">string</font>                                               | [调试信息](#调试信息)     |
+| <font color="#7f7f7f">无风险</font> | `get_game_info()`                                                         | 获取模组包元信息             | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                   | `info` - <font color="#92cddc">table</font>                                               | [调试信息](#调试信息)     |
 
 ---
 
-# 异常/警告速查表
+# 异常和警告速查表
+
+> 注：
+>
+> 1. 异常会输出日志，并终止宿主和脚本的运行
+> 2. 警告仅输出日志，不会终止宿主和脚本的运行
+
+## 异常
 
 ### 宿主内部异常
 
@@ -932,56 +943,213 @@ end
 | ------------------------------ | -------------------- | ---------------------------------------------------------------------- | ----------------------------- |
 | <font color="#7f7f7f">无</font> | 宿主内部出现错误             | 程序崩溃：{panic_info}                                                      | <font color="red">宿主异常</font> |
 | <font color="#7f7f7f">无</font> | 异常原始错误               | {err}                                                                  | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 全局按键监听无法使用           | 全局按键监听失效：{err}                                                         | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 宿主全局按键监听无法使用           | 全局按键监听失效：{err}                                                         | <font color="red">宿主异常</font> |
 
 ### 宿主加载模组包异常
 
 | 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
-| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |
-| <font color="#7f7f7f">无</font> | 无法扫描模组包              | 无法扫描模组包：{err}                                                          | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 模组目录名无效              | 模组目录名“{mod_namespace}”不可用                                              | <font color="red">宿主异常</font> |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
+| <font color="#7f7f7f">无</font> | 宿主无法扫描模组包              | 无法扫描模组包：{err}                                                          | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 模组包目录名无效              | 模组包目录名“{mod_namespace}”不可用                                              | <font color="red">宿主异常</font> |
 | <font color="#7f7f7f">无</font> | `package.json` 格式无效  | package.json 文件 JSON 格式无效：{path}                                       | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 读取 `package.json` 失败 | 读取 package.json 文件失败：{path}                                            | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 宿主读取 `package.json` 失败 | 读取 package.json 文件失败：{path}                                            | <font color="red">宿主异常</font> |
 | <font color="#7f7f7f">无</font> | `game.json` 格式无效     | game.json 文件 JSON 格式无效：{path}                                          | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 读取 `game.json` 失败    | 读取 game.json 文件失败：{path}                                               | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 宿主读取 `game.json` 失败    | 读取 game.json 文件失败：{path}                                               | <font color="red">宿主异常</font> |
 | <font color="#7f7f7f">无</font> | 字段为空                 | {file} 文件 {key} 字段不能为空                                                 | <font color="red">宿主异常</font> |
 | <font color="#7f7f7f">无</font> | 字段类型错误               | {file} 文件 {key} 字段类型错误，应为 {type}，实际为 {actual_type}                     | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | API 版本不匹配            | “{mod_namespce}”API 版本不符合宿主要求，应为 {api_version}，实际 {actual_api_version} | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 脚本 API 版本不匹配宿主要求            | “{mod_namespce}”API 版本不符合宿主要求，应为 {api_version}，实际 {actual_api_version} | <font color="red">宿主异常</font> |
 
 ### 宿主运行游戏异常
 
 | 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
-| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |
-| <font color="#7f7f7f">无</font> | 无法运行游戏               | 无法运行游戏“{game_id}”：{err}                                                | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 无法继续游戏               | 无法继续游戏“{game_id}”：{err}                                                | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 清理旧存档失败              | 清理旧存档失败：{err}                                                          | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 无法读取脚本               | 无法读取脚本：{path}                                                          | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 无法运行脚本               | 无法运行脚本：{path}                                                          | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 未找到入口脚本              | 未找到入口脚本：{path}                                                         | <font color="red">宿主异常</font> |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
+| <font color="#7f7f7f">无</font> | 宿主无法运行游戏               | 无法运行游戏“{game_id}”：{err}                                                | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 宿主无法继续游戏               | 无法继续游戏“{game_id}”：{err}                                                | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 宿主清理旧存档失败              | 清理旧存档失败：{err}                                                          | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 宿主无法读取脚本               | 无法读取脚本：{path}                                                          | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 宿主无法运行脚本               | 无法运行脚本：{path}                                                          | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 宿主未找到入口脚本              | 未找到入口脚本：{path}                                                         | <font color="red">宿主异常</font> |
+
+### 宿主安全异常
+
+| 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
+| <font color="#7f7f7f">无</font> | 脚本调用被宿主沙箱禁用的 API         | 模组包中调用被沙箱禁用的 Lua 内置 API，已被拦截：{err}                                      | <font color="red">宿主异常</font> |
+
+### 通用异常
+
+| 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
+|<font color="green">所有 API</font>|参数数量错误|API 参数数量不匹配：期望接收 {expected} 个参数，实际收到 {actual} 个 | <font color="red">宿主异常</font> |
+|<font color="green">所有 API</font>|参数类型错误|API 参数 {arg_name} 类型错误：期望类型为 {expected_type}，实际类型为 {actual_type} | <font color="red">宿主异常</font> |
+
+
+### 声明式 API 异常
+
+| 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
+| `init_game`<br>`handle_event`<br>`exit_game`<br>`render` | 入口脚本缺少必须实现的声明式 API   | 入口脚本缺少必须实现的声明式 API：{err}                                               | <font color="red">宿主异常</font> |
+| `init_game`<br>`handle_event`<br>`exit_game`<br>`save_best_score`<br>`save_game` | 声明式 API 未按要求传递需要的值   | 声明式 API 未按要求传递需要的值。                                                    | <font color="red">宿主异常</font> |
+| `save_best_score` | 条件满足但未实现对应的声明式 API | best_none 字段不为 null，但未实现 save_best_score | <font color="red">宿主异常</font> |
+| `save_game` | 条件满足但未实现对应的声明式 API | save 字段为 true，但未实现 save_game | <font color="red">宿主异常</font> |
 
 ### 直用式 API 异常
 
-| 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
-| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |
-| <font color="#7f7f7f">无</font> | 入口脚本缺少必须实现的声明式 API   | 入口脚本缺少必须实现的声明式 API：{err}                                               | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 声明式 API 未按要求传递需要的值   | 声明式 API 未按要求传递需要的值。                                                    | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 日志写入失败               | 日志写入失败                                                                 | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 清空事件队列失败             | 清空事件队列失败                                                               | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 跳过事件队列失败             | 跳过事件队列失败                                                               | <font color="red">宿主异常</font> |
-| `get_launch_mode()`            | 获取启动模式失败             | 无法获取本次游戏启动模式：{err}                                                     | <font color="red">宿主异常</font> |
-| `get_best_score()`             | 获取最佳纪录数据失败           | 无法获取游戏存储的最佳记录数据：{err}                                                  | <font color="red">宿主异常</font> |
-| `request_exit()`               | 退出请求无效               | 退出请求无效：{err}                                                           | <font color="red">宿主异常</font> |
-| `request_render()`             | 重绘请求无效               | 重绘请求无效：{err}                                                           | <font color="red">宿主异常</font> |
-| `request_save_best_score()`    | 最佳记录保存请求无效           | 最佳记录保存请求无效：{err}                                                       | <font color="red">宿主异常</font> |
-| `request_save_game()`          | 游戏存档保存请求无效           | 游戏存档保存请求无效：{err}                                                       | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 调用被沙箱禁止的 API         | 模组中调用被沙箱禁用的 Lua 内置 API，已被拦截：{err}                                      | <font color="red">宿主异常</font> |
+#### 系统请求
 
-### 警告
+| 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
+|`get_launch_mode`|宿主无法获取当前游戏启动模式|无法获取本次游戏启动模式：{err}|<font color="red">宿主异常</font>|
+|`get_best_score`|宿主无法获取当前游戏最佳记录数据|无法获取游戏存储的最佳记录数据：{err}|<font color="red">宿主异常</font>|
+|`request_exit`|宿主无法处理退出请求|退出请求无效：{err}|<font color="red">宿主异常</font>|
+| `request_skip_event_queue` | 宿主清空事件队列失败             | 清空事件队列失败                                                               | <font color="red">宿主异常</font> |
+| `request_clear_event_queue` | 宿主跳过事件队列失败             | 跳过事件队列失败                                                               | <font color="red">宿主异常</font> |
+|`request_render`|宿主无法处理重绘请求|重绘请求无效：{err}|<font color="red">宿主异常</font>|
+|`request_save_best_score`|宿主无法处理最佳纪录保存请求|最佳记录保存请求无效：{err}|<font color="red">宿主异常</font>|
+|`request_save_game`|宿主无法处理游戏存档保存请求|游戏存档保存请求无效：{err}|<font color="red">宿主异常</font>|
+
+#### 内容绘制
+
+| 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
+| <font color="green">内容绘制 API</font> | 宿主无法处理画布操作 | 画布上下文无效，无法执行绘制操作。 | <font color="red">宿主异常</font> |
+| `canvas_eraser`<br>`canvas_draw_text`<br>`canvas_fill_rect`<br>`canvas_border_rect` | 相关参数不符合要求 | 坐标参数无效：必须为大于等于 0 的整数，实际值为 {value} | <font color="red">宿主异常</font> |
+| `canvas_eraser`<br>`canvas_fill_rect`<br>`canvas_border_rect` | 相关参数不符合要求 | 宽高参数无效：必须为大于等于 0 的整数，实际宽度为 {width}，高度为 {height} | <font color="red">宿主异常</font> |
+
+#### 内容尺寸计算
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `get_text_height` | 宿主无法获取终端尺寸 | 无法获取终端尺寸，请检查终端环境是否正常 | <font color="red">宿主异常</font> |
+
+#### 布局定位计算
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `resolve_rect` | 相关参数不符合要求 | 宽高参数无效：必须为大于等于 0 的整数，实际宽度为 {width}，高度为 {height} | <font color="red">宿主异常</font> |
+| `resolve_x` | 相关参数不符合要求 | 宽参数无效：必须为大于等于 0 的整数，实际宽度为 {width} | <font color="red">宿主异常</font> |
+| `resolve_y` | 相关参数不符合要求 | 高参数无效：必须为大于等于 0 的整数，实际高度为 {height} | <font color="red">宿主异常</font> |
+| `resolve_x`<br>`resolve_y`<br>`resolve_rect` | 相关参数不符合要求 | 锚点参数无效 | <font color="red">宿主异常</font> |
+
+#### 数据读取
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `read_*` | 路径错误 | 未找到目标文件：{path} | <font color="red">宿主异常</font> |
+| `read_*` | 路径错误 | 路径格式错误：应为绝对路径，实际为 {path} | <font color="red">宿主异常</font> |
+| `read_*` | 路径错误 | 路径中包含 .. 操作符，已拒绝访问 | <font color="red">宿主异常</font> |
+| `read_*` | 文件格式有误 | 文件格式无效，解析失败：{path} | <font color="red">宿主异常</font> |
+| `read_*` | 宿主无法读取文件 | 读取文件失败：{err} | <font color="red">宿主异常</font> |
+| `translate` | 宿主无法解析语言键 | 无法获取语言键对应的内容：{key} | <font color="red">宿主异常</font> |
+
+#### 数据写入
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `write_*` | 路径错误 | 路径格式错误：应为绝对路径，实际为 {path} | <font color="red">宿主异常</font> |
+| `write_*` | 路径错误 | 路径中包含 .. 操作符，已拒绝访问 | <font color="red">宿主异常</font> |
+| `write_*` | 宿主无法写入文件 | 写入文件失败：{err} | <font color="red">宿主异常</font> |
+
+#### 表处理工具
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `table_*`<br>`deep_copy` | 表结构不符合要求 | 表结构已损坏，无法处理 | <font color="red">宿主异常</font> |
+| `table_*` | 表结构不符合要求 | 表结构不符合转换规范，无法处理 | <font color="red">宿主异常</font> |
+| `table_*` | 宿主无法处理表转换 | 表转换操作失败：{err} | <font color="red">宿主异常</font> |
+| `deep_copy` | 宿主无法深拷贝表 | 深拷贝操作失败：{err} | <font color="red">宿主异常</font> |
+
+
+#### 辅助脚本加载
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `load_function` | 路径错误 | 未找到目标文件：{path} | <font color="red">宿主异常</font> |
+| `load_function` | 路径错误 | 路径格式错误：应为绝对路径，实际为 `{path}` | <font color="red">宿主异常</font> |
+| `load_function` | 路径错误 | 路径中包含 .. 操作符，已拒绝访问 | <font color="red">宿主异常</font> |
+| `load_function` | 宿主无法解析辅助脚本 | 加载辅助脚本失败：{err} | <font color="red">宿主异常</font> |
+
+#### 时间处理
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| <font color="green">时间处理 API</font> | 使用的 ID 不存在 | 指定 ID 的计时器不存在：{id} | <font color="red">宿主异常</font> |
+| `running_time` | 宿主无法获取游戏运行时长 | 无法获取当前游戏运行时长：{err} | <font color="red">宿主异常</font> |
+| `timer_create` | 相关参数不符合要求 | 计时时长必须为正整数 | <font color="red">宿主异常</font> |
+| `timer_create` | 计时器创建达到上限 | 计时器已达上限 64 | <font color="red">宿主异常</font> |
+| `timer_create` | 宿主无法创建计时器 | 创建计时器失败：{err} | <font color="red">宿主异常</font> |
+| `timer_start`<br>`timer_restart` | 宿主无法启动计时器 | 启动指定 ID 计时器失败：{err} | <font color="red">宿主异常</font> |
+| `timer_pause` | 宿主无法暂停计时器 | 暂停指定 ID 计时器失败：{err} | <font color="red">宿主异常</font> |
+| `timer_resume` | 宿主无法恢复计时器 | 恢复指定 ID 计时器失败：{err} | <font color="red">宿主异常</font> |
+| `timer_reset`<br>`timer_restart` | 宿主无法重置计时器 | 重置指定 ID 计时器失败：{err} | <font color="red">宿主异常</font> |
+| `timer_kill` | 宿主无法删除计时器 | 删除指定 ID 计时器失败：{err} | <font color="red">宿主异常</font> |
+| `get_timer_list` | 宿主无法获取计时器列表 | 无法获取当前计时器列表：{err} | <font color="red">宿主异常</font> |
+| `get_timer_info`<br>`get_timer_statue`<br>`get_timer_elapsed`<br>`get_timer_remaining`<br>`get_timer_duration`<br>`is_timer_completed` | 宿主无法获取信息 | 无法获取指定 ID 计时器的信息：{id} | <font color="red">宿主异常</font> |
+| `is_timer_exists` | 宿主无法检查计时器 | 无法检查指定 ID 的计时器是否存在：{id} | <font color="red">宿主异常</font> |
+| `now` | 宿主无法获取系统时间戳 | 获取系统时间戳失败：{err} | <font color="red">宿主异常</font> |
+| `get_current_*` | 宿主无法获取系统时间 | 获取系统时间失败：{err} | <font color="red">宿主异常</font> |
+| `timestamp_to_date` | 相关参数不符合要求 | 时间戳必须为大于等于 0 的整数 | <font color="red">宿主异常</font> |
+| `timestamp_to_date` | 相关参数不符合要求 | 日期字符串缺少必要参数 | <font color="red">宿主异常</font> |
+| `date_to_timestamp` | 宿主无法转换日期 | 日期转换失败：{err} | <font color="red">宿主异常</font> |
+
+#### 随机数
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| <font color="green">随机数 API</font> | 使用的 ID 不存在 | 指定 ID 随机数生成器不存在：{id} | <font color="red">宿主异常</font> |
+| `random`<br>`random_float` | 宿主无法生成随机数 | 无法生成随机数：{err} | <font color="red">宿主异常</font> |
+| `random`<br>`random_float` | 随机数生成器类型不符合要求 | 指定 ID 随机数生成器类型不匹配：{id} | <font color="red">宿主异常</font> |
+| `random` | 相关参数不符合要求 | max参数应为正整数，实际为 {max} | <font color="red">宿主异常</font> |
+| `random` | 相关参数不符合要求 | max参数应大于min，实际为min {min}，max {max} | <font color="red">宿主异常</font> |
+| `random_create`<br>`random_float_create` | 宿主无法根据种子创建随机数生成器 | 种子无效：{seed} | <font color="red">宿主异常</font> |
+| `random_create`<br>`random_float_create` | 宿主无法创建随机书生成器 | 创建随机数生成器失败：{err} | <font color="red">宿主异常</font> |
+| `random_reset_step` | 宿主无法重置随机数生成器 | 重置随机数生成器步进数失败：{err} | <font color="red">宿主异常</font> |
+| `random_kill` | 宿主无法删除随机数生成器 | 删除随机数生成器失败：{err} | <font color="red">宿主异常</font> |
+| `get_random_list` | 宿主无法获取随机数生成器列表 | 无法获取随机数生成器列表：{err} | <font color="red">宿主异常</font> |
+| `get_random_info`<br>`get_random_step`<br>`get_random_seed`<br>`get_random_type` | 宿主无法获取信息 | 无法获取指定 ID 随机数生成器的信息：{id} | <font color="red">宿主异常</font> |
+
+#### 调试信息
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| <font color="#7f7f7f">无</font> | 日志写入失败               | 日志写入失败                                                                 | <font color="red">宿主异常</font> |
+
+## 警告
+
+### 宿主加载模组包警告
 
 | 适用函数                           | 触发条件                                  | 抛出句式                                                   | 类型                               |
 | ------------------------------ | ------------------------------------- | ------------------------------------------------------ | -------------------------------- |
-| <font color="#7f7f7f">无</font> | 目录中存在命名空间相同的模组包                       | 模组命名空间“{mod_namespace}”全局不唯一                           | <font color="orange">宿主警告</font> |
+| <font color="#7f7f7f">无</font> | 目录中存在命名空间相同的模组包                       | 模组包命名空间“{mod_namespace}”全局不唯一                           | <font color="orange">宿主警告</font> |
 | <font color="#7f7f7f">无</font> | FPS 不符合宿主要求值                          | FPS 要求为 30/60/120，实际为 {actual_fps}，已退回 60              | <font color="orange">宿主警告</font> |
-| <font color="#7f7f7f">无</font> | 脚本请求调用 `write_*` 相关直写函数               | {game_uid} 于 {timestamp} 请求调用 {api}，路径：{path}，{status} | <font color="orange">宿主警告</font> |
 | <font color="#7f7f7f">无</font> | `game.json` 中 `best_none` 字段为 `null`  | {mod_uid} 的 best_none 字段为 null，相关请求将被忽略                | <font color="orange">宿主警告</font> |
-| <font color="#7f7f7f">无</font> | `game.json` 中 `best_none` 字段为 `false` | {mod_uid} 的 save 字段为 false，相关请求将被忽略                    | <font color="orange">宿主警告</font> |
+| <font color="#7f7f7f">无</font> | `game.json` 中 `save` 字段为 `false` | {mod_uid} 的 save 字段为 false，相关请求将被忽略                    | <font color="orange">宿主警告</font> |
+
+### 直用式 API 警告
+
+#### 内容绘制
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| <font color="green">内容绘制 API</font> | 绘制的内容部分超出画布 | 绘制内容超出画布边界：画布尺寸为 {w} 列 × {h} 行，绘制起始点为 ({x}, {y})。 | <font color="purple">脚本警告</font> |
+| `canvas_fill_rect`<br>`canvas_border_rect` | 填充字符长度不符合要求 | 填充字符长度应为 0 或 1，实际长度为 {length}（字符串内容：{string}），将截取首个字符 "{char}" 作为填充内容 | <font color="purple">脚本警告</font> |
+
+#### 内容尺寸计算
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `get_text_size`<br>`get_text_width`<br>`get_text_height` | 内容宽度为0 | 计算所得的内容宽度为 0，可能导致显示异常 | <font color="purple">脚本警告</font> |
+| `get_text_size`<br>`get_text_width`<br>`get_text_height` | 内容高度为0 | 计算所得的内容高度为 0，可能导致显示异常 | <font color="purple">脚本警告</font> |
+
+#### 数据读取
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `translate` | 未匹配到宿主使用语言的语言键 | 未找到当前语言对应的语言键，已回退使用 en_us.json | <font color="purple">脚本警告</font> |
+| `translate` | 未匹配到 `en_us.json` 文件对应的语言键 | 未在 en_us.json 中找到对应的语言键：\[missing-i18n-key: {key}\] | <font color="purple">脚本警告</font> |
+
+#### 数据写入
+
+| 适用函数 | 触发条件 | 抛出句式 | 类型 |
+| --- | --- | --- | --- |
+| `write_*` | 脚本请求调用 `write_*` 相关直写函数               | {game_uid} 于 {timestamp} 请求调用 {api}，路径：{path}，{status} | <font color="orange">宿主警告</font> |

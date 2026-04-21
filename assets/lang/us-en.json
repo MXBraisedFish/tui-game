@@ -196,5 +196,6 @@
     "script.warning.fill_char_length_invalid": "The fill character length must be 0 or 1, but got {length} (string: {string}). The first character `{char}` will be automatically used as the fill content.",
     "host.exception.date_conversion_failed": "Date conversion failed: {err}",
     "host.error.save_best_score_not_implemented": "best_none is not null, but save_best_score is not implemented.",
-    "host.error.save_game_not_implemented": "save is true, but save_game is not implemented."
+    "host.error.save_game_not_implemented": "save is true, but save_game is not implemented.",
+    "host.exception.timer_limit_reached": "Timer limit of 64 has been reached"
 }

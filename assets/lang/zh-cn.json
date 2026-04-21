@@ -185,7 +185,7 @@
     "host.exception.random_generation_failed": "无法生成随机数：{err}",
     "host.exception.random_not_found": "指定 ID 随机数生成器不存在：{id}",
     "host.exception.random_type_mismatch": "指定 ID 随机数生成器类型不匹配：{id}",
-    "host.exception.random_invalid_max": "max参数应为正整数，实际为{max}",
+    "host.exception.random_invalid_max": "max参数应为正整数，实际为 {max}",
     "host.exception.random_invalid_min_max": "max参数应大于min，实际为min {min}，max {max}",
     "host.exception.random_invalid_seed": "种子无效：{seed}",
     "host.exception.random_create_failed": "创建随机数生成器失败：{err}",
@@ -195,6 +195,7 @@
     "host.exception.random_info_failed": "无法获取指定 ID 随机数生成器的信息：{id}",
     "script.warning.fill_char_length_invalid": "填充字符长度应为 0 或 1，实际长度为 {length}（字符串内容：{string}），将截取首个字符 \"{char}\" 作为填充内容",
     "host.exception.date_conversion_failed": "日期转换失败：{err}",
-    "host.error.save_best_score_not_implemented": "best_none ???? null????? save_best_score?",
-    "host.error.save_game_not_implemented": "save ??? true????? save_game?"
+    "host.error.save_best_score_not_implemented": "best_none 字段不为 null，但未实现 save_best_score",
+    "host.error.save_game_not_implemented": "save 字段为 true，但未实现 save_game",
+    "host.exception.timer_limit_reached": "计时器已达上限 64"
 }

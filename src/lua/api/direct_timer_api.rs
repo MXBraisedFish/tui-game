@@ -85,7 +85,7 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
                 let mut store = timer_store(&bridges)
                     .map_err(|err| create_timer_failed_error(&err.to_string()))?;
                 if store.timers.len() >= MAX_TIMERS {
-                    return Err(create_timer_failed_error("timer limit reached"));
+                    return Err(timer_limit_reached_error());
                 }
                 store.next_id += 1;
                 let id = format!("timer_{}", store.next_id);
@@ -615,6 +615,14 @@ fn create_timer_failed_error(err: &str) -> mlua::Error {
         )
         .replace("{err}", err),
     )
+}
+
+fn timer_limit_reached_error() -> mlua::Error {
+    host_log::append_host_error("host.exception.timer_limit_reached", &[]);
+    mlua::Error::external(i18n::t_or(
+        "host.exception.timer_limit_reached",
+        "Timer limit of 64 has been reached",
+    ))
 }
 
 fn start_timer_failed_error(err: &str) -> mlua::Error {
