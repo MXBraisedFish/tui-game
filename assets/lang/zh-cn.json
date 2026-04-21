@@ -100,9 +100,9 @@
     "host.error.field_invalid_type": "{file} 文件 {key} 字段类型错误，应为 {type}，实际为 {actual_type}",
     "host.warning.namespace_not_unique": "模组命名空间“{mod_namespace}”全局不唯一",
     "host.error.invalid_mod_directory_name": "模组目录名“{mod_namespace}”不可用",
-    "host.error.api_version_mismatch": "API 版本不符合宿主要求，应为 {api_version}，实际为 {actual_api_version}",
-    "host.error.entry_script_not_found": "入口脚本未找到：{path}",
-    "host.error.missing_required_callback_api": "缺少必须实现的声明式 API：{err}",
+    "host.error.api_version_mismatch": "“{mod_namespce}”API 版本不符合宿主要求，应为 {api_version}，实际 {actual_api_version}",
+    "host.error.entry_script_not_found": "未找到入口脚本：{path}",
+    "host.error.missing_required_callback_api": "声明式 API 未按要求传递需要的值",
     "host.warning.invalid_fps_fallback": "FPS 要求为 30/60/120，实际为 {actual_fps}，已退回 60",
     "host.error.read_script_failed": "无法读取脚本：{path}",
     "host.error.execute_script_failed": "无法运行脚本：{path}",
@@ -194,5 +194,7 @@
     "host.exception.random_get_list_failed": "无法获取随机数生成器列表：{err}",
     "host.exception.random_info_failed": "无法获取指定 ID 随机数生成器的信息：{id}",
     "script.warning.fill_char_length_invalid": "填充字符长度应为 0 或 1，实际长度为 {length}（字符串内容：{string}），将截取首个字符 \"{char}\" 作为填充内容",
-    "host.exception.date_conversion_failed": "???????{err}"
+    "host.exception.date_conversion_failed": "日期转换失败：{err}",
+    "host.error.save_best_score_not_implemented": "best_none ???? null????? save_best_score?",
+    "host.error.save_game_not_implemented": "save ??? true????? save_game?"
 }

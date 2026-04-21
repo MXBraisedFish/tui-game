@@ -100,9 +100,9 @@
     "host.error.field_invalid_type": "Field \"{key}\" in {file} has invalid type: expected {type}, got {actual_type}",
     "host.warning.namespace_not_unique": "Mod namespace \"{mod_namespace}\" is not globally unique",
     "host.error.invalid_mod_directory_name": "Mod directory name \"{mod_namespace}\" is invalid",
-    "host.error.api_version_mismatch": "API version mismatch: expected {api_version}, got {actual_api_version}",
+    "host.error.api_version_mismatch": "\"{mod_namespce}\" API version mismatch: expected {api_version}, got {actual_api_version}",
     "host.error.entry_script_not_found": "Entry script not found: {path}",
-    "host.error.missing_required_callback_api": "Missing required Callback API: {err}",
+    "host.error.missing_required_callback_api": "Callback API did not return the required value.",
     "host.warning.invalid_fps_fallback": "Invalid FPS value {actual_fps}: must be 30, 60, or 120. Falling back to 60",
     "host.error.read_script_failed": "Failed to read script: {path}",
     "host.error.execute_script_failed": "Failed to execute script: {path}",
@@ -194,5 +194,7 @@
     "host.exception.random_get_list_failed": "Failed to get random number generator list: {err}",
     "host.exception.random_info_failed": "Failed to get info for random number generator with specified ID: {id}",
     "script.warning.fill_char_length_invalid": "The fill character length must be 0 or 1, but got {length} (string: {string}). The first character `{char}` will be automatically used as the fill content.",
-    "host.exception.date_conversion_failed": "Date conversion failed: {err}"
+    "host.exception.date_conversion_failed": "Date conversion failed: {err}",
+    "host.error.save_best_score_not_implemented": "best_none is not null, but save_best_score is not implemented.",
+    "host.error.save_game_not_implemented": "save is true, but save_game is not implemented."
 }

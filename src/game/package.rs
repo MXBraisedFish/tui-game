@@ -144,7 +144,7 @@ fn validate_game_manifest(
     manifest: &GameManifest,
     path: &Path,
 ) -> Result<()> {
-    validate_game_api_version(&manifest.api)?;
+    validate_game_api_version(package, &manifest.api)?;
 
     if manifest.entry.trim().is_empty() {
         return Err(anyhow!("game entry cannot be blank"));
@@ -261,7 +261,10 @@ fn validate_game_manifest(
     Ok(())
 }
 
-fn validate_game_api_version(api: &Option<serde_json::Value>) -> Result<()> {
+fn validate_game_api_version(
+    package: &PackageManifest,
+    api: &Option<serde_json::Value>,
+) -> Result<()> {
     let Some(api) = api.as_ref() else {
         return Ok(());
     };
@@ -294,8 +297,9 @@ fn validate_game_api_version(api: &Option<serde_json::Value>) -> Result<()> {
         "{}",
         i18n::t_or(
             "host.error.api_version_mismatch",
-            "API version mismatch: expected {api_version}, got {actual_api_version}"
+            "\"{mod_namespce}\" API version mismatch: expected {api_version}, got {actual_api_version}"
         )
+        .replace("{mod_namespce}", package.namespace.trim())
         .replace("{api_version}", &host_version.to_string())
         .replace("{actual_api_version}", &actual)
     ))

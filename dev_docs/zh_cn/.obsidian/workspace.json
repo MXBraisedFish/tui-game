@@ -36,6 +36,20 @@
             }
           },
           {
+            "id": "28220053e7fcb98b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "API.md",
+                "mode": "source",
+                "source": true
+              },
+              "icon": "lucide-file",
+              "title": "API"
+            }
+          },
+          {
             "id": "5b4f8030bef747fb",
             "type": "leaf",
             "state": {
@@ -50,7 +64,7 @@
             }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -212,7 +226,7 @@
       "bases:新建数据库": false
     }
   },
-  "active": "a8a07212a569637b",
+  "active": "28220053e7fcb98b",
   "lastOpenFiles": [
     "MOD.md",
     "RICH_TEXT.md",

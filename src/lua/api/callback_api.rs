@@ -9,6 +9,7 @@ use crate::core::save as runtime_save;
 use crate::core::stats as runtime_stats;
 use crate::game::registry::GameDescriptor;
 use crate::lua::engine::anyhow_lua_error;
+use crate::utils::host_log;
 
 pub(crate) fn validate_required_callbacks(lua: &Lua, game: &GameDescriptor) -> Result<()> {
     require_callback(lua, "init_game", "init_game(state)")?;
@@ -16,10 +17,10 @@ pub(crate) fn validate_required_callbacks(lua: &Lua, game: &GameDescriptor) -> R
     require_callback(lua, "render", "render(state)")?;
     require_callback(lua, "exit_game", "exit_game(state)")?;
     if game.has_best_score {
-        require_callback(lua, "save_best_score", "save_best_score(state)")?;
+        require_save_best_score_callback(lua)?;
     }
     if game.save {
-        require_callback(lua, "save_game", "save_game(state)")?;
+        require_save_game_callback(lua)?;
     }
     Ok(())
 }
@@ -43,6 +44,7 @@ pub(crate) fn initialize_state(
     let state = init_game
         .call::<Value>(incoming_state)
         .map_err(anyhow_lua_error)?;
+    ensure_required_callback_value(&state)?;
     lua.create_registry_value(state).map_err(anyhow_lua_error)
 }
 
@@ -62,6 +64,7 @@ pub(crate) fn call_handle_event(
     let new_state = handle_event
         .call::<Value>((state, event_table))
         .map_err(anyhow_lua_error)?;
+    ensure_required_callback_value(&new_state)?;
     lua.create_registry_value(new_state).map_err(anyhow_lua_error)
 }
 
@@ -86,6 +89,7 @@ pub(crate) fn call_exit_game(lua: &Lua, state_key: &RegistryKey) -> Result<Regis
         .registry_value::<Value>(state_key)
         .map_err(anyhow_lua_error)?;
     let new_state = exit_game.call::<Value>(state).map_err(anyhow_lua_error)?;
+    ensure_required_callback_value(&new_state)?;
     lua.create_registry_value(new_state).map_err(anyhow_lua_error)
 }
 
@@ -100,16 +104,14 @@ pub(crate) fn persist_best_score(
     let save_best_score: Function = lua
         .globals()
         .get("save_best_score")
-        .map_err(|err| missing_entry_callback_error("save_best_score(state)", &err.to_string()))?;
+        .map_err(|err| missing_save_best_score_error(&err.to_string()))?;
     let state = lua
         .registry_value::<Value>(state_key)
         .map_err(anyhow_lua_error)?;
     let value = save_best_score
         .call::<Value>(state)
         .map_err(anyhow_lua_error)?;
-    if matches!(value, Value::Nil) {
-        return Ok(());
-    }
+    ensure_required_callback_value(&value)?;
     runtime_stats::write_runtime_best_score(game.id.as_str(), &lua_value_to_json(&value)?)?;
     Ok(())
 }
@@ -125,14 +127,12 @@ pub(crate) fn persist_save_game(
     let save_game: Function = lua
         .globals()
         .get("save_game")
-        .map_err(|err| missing_entry_callback_error("save_game(state)", &err.to_string()))?;
+        .map_err(|err| missing_save_game_error(&err.to_string()))?;
     let state = lua
         .registry_value::<Value>(state_key)
         .map_err(anyhow_lua_error)?;
     let value = save_game.call::<Value>(state).map_err(anyhow_lua_error)?;
-    if matches!(value, Value::Nil) {
-        return Ok(());
-    }
+    ensure_required_callback_value(&value)?;
     runtime_save::save_continue(game.id.as_str(), &lua_value_to_json(&value)?)?;
     Ok(())
 }
@@ -145,12 +145,26 @@ fn require_callback(lua: &Lua, global_name: &str, label: &str) -> Result<()> {
             anyhow!(
                 "{}",
                 i18n::t_or(
-                    "host.error.missing_required_callback_api",
-                    "Missing required Callback API: {err}",
+                    "host.error.entry_missing_required_callback_apis",
+                    "Entry script is missing required Callback APIs: {err}",
                 )
                 .replace("{err}", &format!("{label}: {err}"))
             )
         })?;
+    Ok(())
+}
+
+fn require_save_best_score_callback(lua: &Lua) -> Result<()> {
+    let _: Function = lua.globals().get("save_best_score").map_err(|err| {
+        missing_save_best_score_error(&err.to_string())
+    })?;
+    Ok(())
+}
+
+fn require_save_game_callback(lua: &Lua) -> Result<()> {
+    let _: Function = lua.globals().get("save_game").map_err(|err| {
+        missing_save_game_error(&err.to_string())
+    })?;
     Ok(())
 }
 
@@ -163,6 +177,40 @@ fn missing_entry_callback_error(label: &str, err: &str) -> anyhow::Error {
         )
         .replace("{err}", &format!("{label}: {err}"))
     )
+}
+
+fn missing_save_best_score_error(_err: &str) -> anyhow::Error {
+    anyhow!(
+        "{}",
+        i18n::t_or(
+            "host.error.save_best_score_not_implemented",
+            "best_none is not null, but save_best_score is not implemented.",
+        )
+    )
+}
+
+fn missing_save_game_error(_err: &str) -> anyhow::Error {
+    anyhow!(
+        "{}",
+        i18n::t_or(
+            "host.error.save_game_not_implemented",
+            "save is true, but save_game is not implemented.",
+        )
+    )
+}
+
+fn ensure_required_callback_value(value: &Value) -> Result<()> {
+    if matches!(value, Value::Nil) {
+        host_log::append_host_error("host.error.missing_required_callback_api", &[]);
+        return Err(anyhow!(
+            "{}",
+            i18n::t_or(
+                "host.error.missing_required_callback_api",
+                "Callback API did not return the required value.",
+            )
+        ));
+    }
+    Ok(())
 }
 
 fn to_lua_event_table(lua: &Lua, event: &InputEvent) -> mlua::Result<Table> {
