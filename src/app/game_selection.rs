@@ -9,6 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::i18n;
 use crate::app::rich_text;
 use crate::core::stats as runtime_stats;
+use crate::game::registry::GameSourceKind;
 use crate::game::registry::GameDescriptor;
 use crate::game::resources;
 
@@ -17,9 +18,12 @@ pub struct GameSelection {
     games: Vec<GameDescriptor>,
     list_state: ListState,
     page_state: PageState,
+    page_jump_input: Option<String>,
     launch_placeholder: bool,
     detail_scroll: usize,
     detail_scroll_available: bool,
+    sort_mode: GameSortMode,
+    sort_descending: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -28,6 +32,13 @@ struct PageState {
     current_page: usize,
     page_size: usize,
     total_pages: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum GameSortMode {
+    Source,
+    Name,
+    Author,
 }
 
 /// 游戏选择页向主循环上报的高层动作。
@@ -46,7 +57,7 @@ impl GameSelection {
             list_state.select(Some(0));
         }
 
-        Self {
+        let mut this = Self {
             games,
             list_state,
             page_state: PageState {
@@ -54,10 +65,15 @@ impl GameSelection {
                 page_size: initial_page_size,
                 total_pages: 1,
             },
+            page_jump_input: None,
             launch_placeholder: false,
             detail_scroll: 0,
             detail_scroll_available: false,
-        }
+            sort_mode: GameSortMode::Source,
+            sort_descending: false,
+        };
+        this.apply_sort();
+        this
     }
 
     /// 刷新游戏列表和成绩数据，但尽量保留当前选中的游戏、分页和详情滚动位置。
@@ -67,12 +83,15 @@ impl GameSelection {
         let previous_scroll = self.detail_scroll;
 
         self.games = games;
+        self.apply_sort();
+        self.page_jump_input = None;
         self.launch_placeholder = false;
 
         if self.games.is_empty() {
             self.list_state.select(None);
             self.page_state.current_page = 0;
             self.page_state.total_pages = 1;
+            self.page_jump_input = None;
             self.detail_scroll = 0;
             self.detail_scroll_available = false;
             return;
@@ -102,6 +121,32 @@ impl GameSelection {
             return None;
         }
 
+        if let Some(input) = self.page_jump_input.as_mut() {
+            match key.code {
+                KeyCode::Esc => self.page_jump_input = None,
+                KeyCode::Backspace => {
+                    input.pop();
+                }
+                KeyCode::Char(ch) if ch.is_ascii_digit() => {
+                    if input.len() < 4 {
+                        input.push(ch);
+                    }
+                }
+                KeyCode::Enter => {
+                    if let Ok(page) = input.parse::<usize>()
+                        && (1..=self.page_state.total_pages.max(1)).contains(&page)
+                    {
+                        self.page_state.current_page = page - 1;
+                        self.list_state.select(Some(0));
+                        self.reset_detail_scroll();
+                    }
+                    self.page_jump_input = None;
+                }
+                _ => {}
+            }
+            return None;
+        }
+
         match key.code {
             KeyCode::Esc => Some(GameSelectionAction::BackToMenu),
             KeyCode::Char('w') | KeyCode::Char('W') => {
@@ -118,6 +163,25 @@ impl GameSelection {
             }
             KeyCode::Char('e') | KeyCode::Char('E') => {
                 self.next_page();
+                None
+            }
+            KeyCode::Char('p') | KeyCode::Char('P') => {
+                if self.page_state.total_pages > 1 {
+                    self.page_jump_input = Some(String::new());
+                }
+                None
+            }
+            KeyCode::Char('z') | KeyCode::Char('Z') => {
+                let next = match self.sort_mode {
+                    GameSortMode::Source => GameSortMode::Name,
+                    GameSortMode::Name => GameSortMode::Author,
+                    GameSortMode::Author => GameSortMode::Source,
+                };
+                self.set_sort_mode(next);
+                None
+            }
+            KeyCode::Char('x') | KeyCode::Char('X') => {
+                self.toggle_sort_order();
                 None
             }
             KeyCode::Up | KeyCode::Char('k') => {
@@ -145,9 +209,13 @@ impl GameSelection {
             return;
         }
 
+        let hint_lines = wrap_game_hint_lines(
+            &build_game_hint_segments(self.detail_scroll_available),
+            area.width.max(1) as usize,
+        );
         let root = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .constraints([Constraint::Min(0), Constraint::Length(hint_lines.len().max(1) as u16)])
             .split(area);
 
         let columns = Layout::default()
@@ -158,12 +226,7 @@ impl GameSelection {
         self.render_list_panel(frame, columns[0]);
         self.render_detail_panel(frame, columns[1]);
 
-        let mut hints = i18n::t("game_selection.hint.controls");
-        if self.detail_scroll_available {
-            hints.push_str("  ");
-            hints.push_str(&i18n::t("game_selection.hint.detail_scroll"));
-        }
-        let hint_widget = Paragraph::new(hints)
+        let hint_widget = Paragraph::new(hint_lines)
             .style(Style::default().fg(Color::DarkGray))
             .alignment(Alignment::Center);
         frame.render_widget(hint_widget, root[1]);
@@ -173,7 +236,7 @@ impl GameSelection {
     pub fn minimum_size(&self) -> (u16, u16) {
         let list_title = i18n::t("game_selection.panel.games");
         let detail_title = i18n::t("game_selection.panel.details");
-        let hint = i18n::t("game_selection.hint.controls");
+        let hint = build_game_hint_segments(true).join("  ");
         let list_title_w = UnicodeWidthStr::width(list_title.as_str());
         let detail_title_w = UnicodeWidthStr::width(detail_title.as_str());
         let hint_w = UnicodeWidthStr::width(hint.as_str());
@@ -197,7 +260,7 @@ impl GameSelection {
             .borders(Borders::ALL)
             .border_set(symbols::border::DOUBLE)
             .border_style(Style::default().fg(Color::White))
-            .title(format!(" {} ", i18n::t("game_selection.panel.games")));
+            .title(self.list_title());
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -236,11 +299,34 @@ impl GameSelection {
         } else {
             String::new()
         };
-        let center = format!(
-            "{}/{}",
-            self.page_state.current_page + 1,
-            self.page_state.total_pages
-        );
+        let center = if let Some(input) = &self.page_jump_input {
+            let input_text = if input.is_empty() {
+                "_".to_string()
+            } else {
+                input.clone()
+            };
+            Line::from(vec![
+                Span::styled(
+                    input_text,
+                    Style::default()
+                        .fg(if input.is_empty() { Color::Yellow } else { Color::Black })
+                        .bg(Color::Yellow),
+                ),
+                Span::styled(
+                    format!("/{}", self.page_state.total_pages.max(1)),
+                    Style::default().fg(Color::White),
+                ),
+            ])
+        } else {
+            Line::from(Span::styled(
+                format!(
+                    "{}/{}",
+                    self.page_state.current_page + 1,
+                    self.page_state.total_pages
+                ),
+                Style::default().fg(Color::White),
+            ))
+        };
         let right = if has_next {
             i18n::t("game_selection.pager.next")
         } else {
@@ -252,9 +338,7 @@ impl GameSelection {
             .alignment(Alignment::Left);
         frame.render_widget(left_widget, rows[1]);
 
-        let center_widget = Paragraph::new(center)
-            .style(Style::default().fg(Color::White))
-            .alignment(Alignment::Center);
+        let center_widget = Paragraph::new(center).alignment(Alignment::Center);
         frame.render_widget(center_widget, rows[1]);
 
         let right_widget = Paragraph::new(right)
@@ -307,26 +391,32 @@ impl GameSelection {
                 ));
                 top_lines.push(Line::from(separator.clone()));
             }
-            if let Some(package_name) = self.mod_package_name(game) {
-                top_lines.push(Line::from(format!(
-                    "{} {}",
+            if let Some((package_name, allow_rich)) = self.mod_package_name(game) {
+                top_lines.extend(label_manifest_value_lines(
                     text("mods.info.package", "Package:"),
-                    package_name
-                )));
+                    package_name,
+                    allow_rich,
+                    inner.width.saturating_sub(1) as usize,
+                    Style::default().fg(Color::White),
+                ));
             }
             if let Some(author) = self.mod_author(game) {
-                top_lines.push(Line::from(format!(
-                    "{} {}",
+                top_lines.extend(label_manifest_value_lines(
                     text("mods.info.author", "Author:"),
-                    author
-                )));
+                    author,
+                    true,
+                    inner.width.saturating_sub(1) as usize,
+                    Style::default().fg(Color::White),
+                ));
             }
             if let Some(version) = self.mod_version(game) {
-                top_lines.push(Line::from(format!(
-                    "{} {}",
+                top_lines.extend(label_manifest_value_lines(
                     text("mods.info.version", "Version:"),
-                    version
-                )));
+                    version,
+                    true,
+                    inner.width.saturating_sub(1) as usize,
+                    Style::default().fg(Color::White),
+                ));
             }
             top_lines.push(Line::from(separator.clone()));
         } else if game.has_best_score {
@@ -339,7 +429,12 @@ impl GameSelection {
         if top_lines.len() > stat_lines_start && !game.is_mod_game() {
             top_lines.push(Line::from(separator.clone()));
         }
-        top_lines.push(Line::from(i18n::t("game_selection.label.how_to_play")));
+        top_lines.push(Line::from(
+            Span::styled(
+            i18n::t("game_selection.label.how_to_play"),
+            Style::default().fg(Color::Yellow),
+        )   
+        ));
 
         let rich_lines = rich_text::parse_rich_text_wrapped(
             &description,
@@ -379,7 +474,7 @@ impl GameSelection {
 
         frame.render_widget(
             Paragraph::new(i18n::t("game_selection.label.game_details"))
-                .style(Style::default().fg(Color::White))
+                .style(Style::default().fg(Color::Yellow))
                 .alignment(Alignment::Left),
             detail_rows[1],
         );
@@ -510,6 +605,46 @@ impl GameSelection {
         self.detail_scroll = 0;
     }
 
+    fn apply_sort(&mut self) {
+        let selected_id = self.selected_game().map(|game| game.id.clone());
+        let sort_mode = self.sort_mode;
+        let descending = self.sort_descending;
+        self.games.sort_by(|left, right| {
+            let ordering = compare_games(left, right, sort_mode);
+            if descending {
+                ordering.reverse()
+            } else {
+                ordering
+            }
+        });
+        self.restore_selected_game(selected_id.as_deref());
+    }
+
+    fn restore_selected_game(&mut self, id: Option<&str>) {
+        if self.games.is_empty() {
+            self.page_state.current_page = 0;
+            self.list_state.select(None);
+            return;
+        }
+
+        let target_global = id
+            .and_then(|value| self.games.iter().position(|game| game.id == value))
+            .or_else(|| self.selected_global_index())
+            .unwrap_or(0)
+            .min(self.games.len().saturating_sub(1));
+
+        let page_size = self.page_state.page_size.max(1);
+        self.page_state.total_pages =
+            ((self.games.len() + page_size.saturating_sub(1)) / page_size).max(1);
+        self.page_state.current_page =
+            (target_global / page_size).min(self.page_state.total_pages.saturating_sub(1));
+
+        let start = self.page_state.current_page * page_size;
+        let page_len = (self.games.len() - start).min(page_size);
+        let selected_in_page = (target_global - start).min(page_len.saturating_sub(1));
+        self.list_state.select(Some(selected_in_page));
+    }
+
     fn select_prev(&mut self) {
         let page_len = self.current_page_games().len();
         if page_len == 0 {
@@ -554,6 +689,46 @@ impl GameSelection {
         }
     }
 
+    fn set_sort_mode(&mut self, mode: GameSortMode) {
+        self.sort_mode = mode;
+        self.apply_sort();
+        self.reset_detail_scroll();
+    }
+
+    fn toggle_sort_order(&mut self) {
+        self.sort_descending = !self.sort_descending;
+        self.apply_sort();
+        self.reset_detail_scroll();
+    }
+
+    fn list_title(&self) -> Line<'static> {
+        let order_text = if self.sort_descending {
+            format!("\u{2191}{}", text("settings.mods.order.desc", "Descending"))
+        } else {
+            format!("\u{2193}{}", text("settings.mods.order.asc", "Ascending"))
+        };
+
+        Line::from(vec![
+            Span::raw(" "),
+            Span::styled(
+                i18n::t("game_selection.panel.games"),
+                Style::default().fg(Color::White),
+            ),
+            Span::styled(" *", Style::default().fg(Color::White)),
+            Span::styled(
+                game_sort_label(self.sort_mode),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" ", Style::default().fg(Color::White)),
+            Span::styled("[", Style::default().fg(Color::White)),
+            Span::styled(order_text, Style::default().fg(Color::DarkGray)),
+            Span::styled("]", Style::default().fg(Color::White)),
+            Span::raw(" "),
+        ])
+    }
+
     fn render_game_list_line(&self, game: &GameDescriptor, width: usize) -> Line<'static> {
         let name = self.localized_game_name(game);
         if !game.is_mod_game() || width == 0 {
@@ -582,40 +757,30 @@ impl GameSelection {
     }
 
     fn localized_game_name(&self, game: &GameDescriptor) -> String {
-        if let Some(package) = game.package_info() {
-            return resources::resolve_package_text(package, &game.name);
-        }
-        i18n::t_or(&format!("game.{}.name", game.id), &game.name)
+        game.display_name.clone()
     }
 
     fn localized_game_description(&self, game: &GameDescriptor) -> String {
-        if let Some(package) = game.package_info() {
-            return resources::resolve_package_text(package, &game.description);
-        }
-        i18n::t_or(&format!("game.{}.description", game.id), &game.description)
+        game.display_description.clone()
     }
 
     fn localized_game_details(&self, game: &GameDescriptor) -> String {
-        if let Some(package) = game.package_info() {
-            return resources::resolve_package_text(package, &game.detail);
-        }
-        i18n::t_or(&format!("game.{}.details", game.id), &game.detail)
+        game.display_detail.clone()
     }
 
-    fn mod_package_name(&self, game: &GameDescriptor) -> Option<String> {
-        let package = game.package_info()?;
-        Some(resources::resolve_package_text(
-            package,
-            package.package_name.as_str(),
+    fn mod_package_name(&self, game: &GameDescriptor) -> Option<(String, bool)> {
+        Some((
+            game.display_package_name.clone()?,
+            game.display_package_name_allows_rich,
         ))
     }
 
-    fn mod_author<'a>(&self, game: &'a GameDescriptor) -> Option<&'a str> {
-        game.package_info().map(|package| package.author.as_str())
+    fn mod_author(&self, game: &GameDescriptor) -> Option<String> {
+        game.display_package_author.clone()
     }
 
-    fn mod_version<'a>(&self, game: &'a GameDescriptor) -> Option<&'a str> {
-        game.package_info().map(|package| package.version.as_str())
+    fn mod_version(&self, game: &GameDescriptor) -> Option<String> {
+        game.display_package_version.clone()
     }
     fn selected_global_index(&self) -> Option<usize> {
         let selected_in_page = self.list_state.selected()?;
@@ -679,19 +844,201 @@ fn text(key: &str, fallback: &str) -> String {
     i18n::t_or(key, fallback)
 }
 
+fn game_sort_label(mode: GameSortMode) -> String {
+    match mode {
+        GameSortMode::Source => text("game_selection.sort.source", "Official & Third-party"),
+        GameSortMode::Name => text("game_selection.sort.name", "Name"),
+        GameSortMode::Author => text("game_selection.sort.author", "Author"),
+    }
+}
+
+fn compare_games(left: &GameDescriptor, right: &GameDescriptor, mode: GameSortMode) -> std::cmp::Ordering {
+    match mode {
+        GameSortMode::Source => source_rank(&left.source)
+            .cmp(&source_rank(&right.source))
+            .then_with(|| cmp_lowercase(&left.display_name, &right.display_name))
+            .then_with(|| cmp_lowercase(&left.display_author, &right.display_author))
+            .then_with(|| left.id.cmp(&right.id)),
+        GameSortMode::Name => cmp_lowercase(&left.display_name, &right.display_name)
+            .then_with(|| source_rank(&left.source).cmp(&source_rank(&right.source)))
+            .then_with(|| cmp_lowercase(&left.display_author, &right.display_author))
+            .then_with(|| left.id.cmp(&right.id)),
+        GameSortMode::Author => cmp_lowercase(&left.display_author, &right.display_author)
+            .then_with(|| cmp_lowercase(&left.display_name, &right.display_name))
+            .then_with(|| source_rank(&left.source).cmp(&source_rank(&right.source)))
+            .then_with(|| left.id.cmp(&right.id)),
+    }
+}
+
+fn source_rank(source: &GameSourceKind) -> u8 {
+    match source {
+        GameSourceKind::Official => 0,
+        GameSourceKind::Mod => 1,
+    }
+}
+
+fn cmp_lowercase(left: &str, right: &str) -> std::cmp::Ordering {
+    left.to_lowercase().cmp(&right.to_lowercase())
+}
+
+fn build_game_hint_segments(include_scroll: bool) -> Vec<String> {
+    let mut segments = vec![
+        text("game_selection.hint.confirm", "[Enter] Confirm"),
+        text("game_selection.hint.jump", "[P] Jump"),
+        text("game_selection.hint.sort_mode", "[Z] Sort"),
+        text("game_selection.hint.sort_order", "[X] Order"),
+        text("game_selection.hint.move", "[↑]/[↓] Select Game"),
+        text("game_selection.hint.page", "[Q]/[E] Change Page"),
+        text("game_selection.hint.back", "[ESC] Return to Menu"),
+    ];
+    if include_scroll {
+        segments.push(i18n::t("game_selection.hint.detail_scroll"));
+    }
+    segments
+}
+
+fn wrap_game_hint_lines(segments: &[String], width: usize) -> Vec<Line<'static>> {
+    if width == 0 || segments.is_empty() {
+        return vec![Line::from("")];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_segments: Vec<Span<'static>> = Vec::new();
+    let mut current_width = 0usize;
+
+    for segment in segments {
+        let segment_width = UnicodeWidthStr::width(segment.as_str());
+        let separator_width = if current_segments.is_empty() { 0 } else { 2 };
+
+        if !current_segments.is_empty() && current_width + separator_width + segment_width > width {
+            lines.push(Line::from(std::mem::take(&mut current_segments)));
+            current_width = 0;
+        }
+
+        if !current_segments.is_empty() {
+            current_segments.push(Span::raw("  "));
+            current_width += 2;
+        }
+        current_segments.push(Span::raw(segment.clone()));
+        current_width += segment_width;
+    }
+
+    if !current_segments.is_empty() {
+        lines.push(Line::from(current_segments));
+    }
+
+    if lines.is_empty() {
+        lines.push(Line::from(""));
+    }
+
+    lines
+}
+
+fn label_manifest_value_lines(
+    label: String,
+    value: String,
+    allow_rich: bool,
+    width: usize,
+    value_style: Style,
+) -> Vec<Line<'static>> {
+    if !allow_rich || !value.starts_with("f%") {
+        return vec![Line::from(vec![
+            Span::styled(label, Style::default().fg(Color::White)),
+            Span::raw(" "),
+            Span::styled(value, value_style.add_modifier(Modifier::BOLD)),
+        ])];
+    }
+
+    let mut parsed = rich_text::parse_rich_text_wrapped(&value, usize::MAX / 8, value_style);
+    if parsed.is_empty() {
+        return vec![Line::from(vec![
+            Span::styled(label, Style::default().fg(Color::White)),
+            Span::raw(" "),
+        ])];
+    }
+
+    let mut first_spans = vec![
+        Span::styled(label.clone(), Style::default().fg(Color::White)),
+        Span::raw(" "),
+    ];
+    first_spans.extend(parsed.remove(0).spans);
+
+    let mut lines = vec![Line::from(first_spans)];
+    let indent = " ".repeat(UnicodeWidthStr::width(label.as_str()) + 1);
+    let continuation_width = width.saturating_sub(indent.len()).max(1);
+    for line in parsed {
+        let wrapped = crop_line_center_to_width(&line, continuation_width);
+        let mut spans = vec![Span::styled(indent.clone(), Style::default().fg(Color::White))];
+        spans.extend(wrapped.spans);
+        lines.push(Line::from(spans));
+    }
+    lines
+}
+
+fn crop_line_center_to_width(line: &Line<'static>, width: usize) -> Line<'static> {
+    if width == 0 {
+        return Line::from("");
+    }
+
+    let mut cells = Vec::<(char, Style, usize)>::new();
+    for span in &line.spans {
+        for ch in span.content.chars() {
+            let ch_width = UnicodeWidthStr::width(ch.encode_utf8(&mut [0; 4]));
+            if ch_width == 0 {
+                continue;
+            }
+            cells.push((ch, span.style, ch_width));
+        }
+    }
+
+    let mut total_width: usize = cells.iter().map(|(_, _, w)| *w).sum();
+    if total_width <= width {
+        return line.clone();
+    }
+
+    let mut trim_left = true;
+    while total_width > width && !cells.is_empty() {
+        if trim_left {
+            if let Some((_, _, w)) = cells.first().copied() {
+                total_width = total_width.saturating_sub(w);
+            }
+            cells.remove(0);
+        } else if let Some((_, _, w)) = cells.pop() {
+            total_width = total_width.saturating_sub(w);
+        }
+        trim_left = !trim_left;
+    }
+
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut current_style: Option<Style> = None;
+    let mut current_text = String::new();
+    for (ch, style, _) in cells {
+        match current_style {
+            Some(existing) if existing == style => current_text.push(ch),
+            Some(existing) => {
+                spans.push(Span::styled(current_text.clone(), existing));
+                current_text.clear();
+                current_text.push(ch);
+                current_style = Some(style);
+            }
+            None => {
+                current_text.push(ch);
+                current_style = Some(style);
+            }
+        }
+    }
+    if let Some(style) = current_style {
+        spans.push(Span::styled(current_text, style));
+    }
+    Line::from(spans)
+}
+
 fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<Line<'static>> {
     if !game.has_best_score {
         return Vec::new();
     }
     let Some(score) = runtime_stats::read_runtime_best_score(&game.id) else {
-        let fallback = if let Some(package) = game.package_info() {
-            game.best_none
-                .as_ref()
-                .map(|raw| resources::resolve_package_text(package, raw))
-                .unwrap_or_else(|| "--".to_string())
-        } else {
-            game.best_none.clone().unwrap_or_else(|| "--".to_string())
-        };
+        let fallback = resolved_best_none_text(game);
         return vec![Line::from(fallback)];
     };
 
@@ -728,6 +1075,13 @@ fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<L
         vec![Line::from("--")]
     } else {
         lines
+    }
+}
+
+fn resolved_best_none_text(game: &GameDescriptor) -> String {
+    match game.display_best_none.clone() {
+        Some(value) if !value.trim().is_empty() => value,
+        _ => "---".to_string(),
     }
 }
 

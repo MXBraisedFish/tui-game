@@ -181,7 +181,7 @@ fn validate_game_manifest(
             return Err(anyhow!("mod package name cannot be blank"));
         }
         if package
-            .name
+            .game_name
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
@@ -192,7 +192,7 @@ fn validate_game_manifest(
     }
 
     let effective_name = package
-        .name
+        .game_name
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -417,7 +417,7 @@ mod tests {
             author: "Tester".to_string(),
             version: String::new(),
             introduction: Some("demo intro".to_string()),
-            name: Some("Demo Name".to_string()),
+            game_name: Some("Demo Name".to_string()),
             description: "demo.desc".to_string(),
             detail: Some("demo detail".to_string()),
             icon: None,
@@ -454,7 +454,7 @@ mod tests {
   "package": "Demo Package",
   "introduction": "demo intro",
   "author": "Tester",
-  "name": "Demo Name",
+  "game_name": "Demo Name",
   "description": "demo.desc",
   "detail": "demo detail"
 }"#,
@@ -510,7 +510,7 @@ mod tests {
             author: "Tester".to_string(),
             version: String::new(),
             introduction: Some("alpha introduction".to_string()),
-            name: Some("Alpha Display".to_string()),
+            game_name: Some("Alpha Display".to_string()),
             description: "alpha.desc".to_string(),
             detail: Some("alpha detail".to_string()),
             icon: None,
@@ -567,7 +567,7 @@ mod tests {
   "package": "Alpha Pack",
   "introduction": "alpha introduction",
   "author": "Tester",
-  "name": "Alpha Display",
+  "game_name": "Alpha Display",
   "description": "alpha.desc",
   "detail": "alpha detail"
 }"#,
@@ -623,7 +623,7 @@ mod tests {
             author: "Tester".to_string(),
             version: String::new(),
             introduction: Some("Intro".to_string()),
-            name: Some("Word Puzzle".to_string()),
+            game_name: Some("Word Puzzle".to_string()),
             description: String::new(),
             detail: Some("Detail".to_string()),
             icon: None,

@@ -24,8 +24,8 @@ pub struct PackageManifest {
     pub version: String,
     #[serde(default)]
     pub introduction: Option<String>,
-    #[serde(default)]
-    pub name: Option<String>,
+    #[serde(default, alias = "name")]
+    pub game_name: Option<String>,
     #[serde(default)]
     pub description: String,
     #[serde(default)]

@@ -7,11 +7,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, anyhow};
 use image::GenericImageView;
+use ratatui::style::{Color, Style};
+use ratatui::text::Line;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use unicode_width::UnicodeWidthChar;
 
 use crate::app::i18n;
+use crate::app::rich_text;
 use crate::game::package::{GamePackageSource, load_package};
 use crate::utils::path_utils;
 
@@ -20,9 +23,8 @@ pub const MOD_API_VERSION: u32 = 1;
 const DEFAULT_PACKAGE_DESCRIPTION: &str = "No package description available.";
 const DEFAULT_GAME_DESCRIPTION: &str = "No description available.";
 const DEFAULT_GAME_DETAIL: &str = "";
-const MATH_IMAGE_CHARS: [char; 9] = ['@', '%', '#', '*', '+', '=', '-', ':', '.'];
-const NUMBER_IMAGE_CHARS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const BLOCK_IMAGE_CHARS: [char; 3] = ['\u{2588}', '\u{2593}', '\u{2591}'];
+const ASCII_IMAGE_CHARS: &str = r#"M@N%W$E#RK&FXYI*l]}1/+i>"!~';,`:."#;
+const IMAGE_RENDER_ALGORITHM_VERSION: u8 = 2;
 
 const DEFAULT_THUMBNAIL_LINES: [&str; 4] = [
     "\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}",
@@ -44,6 +46,8 @@ const DEFAULT_BANNER_ASCII: [&str; 7] = [
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ModImage {
     pub lines: Vec<String>,
+    #[serde(skip, default)]
+    pub rendered_lines: Vec<Line<'static>>,
 }
 
 #[derive(Clone, Debug)]
@@ -54,12 +58,21 @@ pub struct ModGameMeta {
     pub name: String,
     pub description: String,
     pub detail: String,
+    pub introduction: String,
     pub best_none: Option<String>,
     pub save: bool,
+    pub write: bool,
     pub min_width: Option<u16>,
     pub min_height: Option<u16>,
     pub max_width: Option<u16>,
     pub max_height: Option<u16>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModSafeModeState {
+    Enabled,
+    DisabledSession,
+    DisabledTrusted,
 }
 
 #[derive(Clone, Debug)]
@@ -68,10 +81,16 @@ pub struct ModPackage {
     pub enabled: bool,
     pub debug_enabled: bool,
     pub safe_mode_enabled: bool,
+    pub safe_mode_state: ModSafeModeState,
     pub package_name: String,
+    pub package_name_allows_rich: bool,
     pub author: String,
     pub version: String,
+    pub introduction: String,
     pub description: String,
+    pub has_best_score_storage: bool,
+    pub has_save_storage: bool,
+    pub has_write_request: bool,
     pub thumbnail: ModImage,
     pub banner: ModImage,
     pub games: Vec<ModGameMeta>,
@@ -172,17 +191,8 @@ enum ImageKind {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ImageRenderMode {
-    Braille,
-    Math,
-    Number,
-    Block,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ImageColorMode {
     Grayscale,
-    White,
     Color,
 }
 
@@ -191,7 +201,6 @@ struct ImageSpec {
     namespace: String,
     path: String,
     color_mode: ImageColorMode,
-    render_mode: ImageRenderMode,
 }
 
 fn default_true() -> bool {
@@ -462,6 +471,15 @@ fn scan_package(
             package.package.description.as_str()
         },
     );
+    let introduction = resolve_mod_text(
+        &namespace,
+        package
+            .package
+            .introduction
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or(DEFAULT_PACKAGE_DESCRIPTION),
+    );
     let thumbnail = image_from_meta(
         &namespace,
         package.package.icon.as_ref(),
@@ -469,19 +487,28 @@ fn scan_package(
     )?;
     let banner = image_from_meta(&namespace, package.package.banner.as_ref(), ImageKind::Banner)?;
 
-    let package_name = resolve_mod_text(
-        &namespace,
-        package
-            .package
-            .mod_name
-            .as_deref()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or(&package.package.package_name),
-    );
-    let author = package.package.author.clone();
-    let version = package.package.version.clone();
+    let package_name_source = package
+        .package
+        .mod_name
+        .as_deref()
+        .filter(|value| !value.trim().is_empty());
+    let package_name_allows_rich = package_name_source.is_some();
+    let package_name = if let Some(raw) = package_name_source {
+        resolve_mod_text(&namespace, raw)
+    } else {
+        package.package.package_name.clone()
+    };
+    let author = resolve_mod_text(&namespace, &package.package.author);
+    let version = resolve_mod_text(&namespace, &package.package.version);
     let enabled = state_entry.enabled;
     let debug_enabled = state_entry.debug_enabled;
+    let safe_mode_state = if let Some(false) = state_entry.session_safe_mode_enabled {
+        ModSafeModeState::DisabledSession
+    } else if !state_entry.safe_mode_enabled {
+        ModSafeModeState::DisabledTrusted
+    } else {
+        ModSafeModeState::Enabled
+    };
     let safe_mode_enabled = state_entry
         .session_safe_mode_enabled
         .unwrap_or(state_entry.safe_mode_enabled);
@@ -556,15 +583,25 @@ fn scan_package(
         return Ok(None);
     }
 
+    let has_best_score_storage = games.iter().any(|game| game.best_none.is_some());
+    let has_save_storage = games.iter().any(|game| game.save);
+    let has_write_request = package.games.iter().any(|game| game.write);
+
     Ok(Some(ModPackage {
         namespace,
         enabled,
         debug_enabled,
         safe_mode_enabled,
+        safe_mode_state,
         package_name,
+        package_name_allows_rich,
         author,
         version,
+        introduction,
         description,
+        has_best_score_storage,
+        has_save_storage,
+        has_write_request,
         thumbnail,
         banner,
         games,
@@ -592,7 +629,7 @@ fn scan_game_manifest(
         .to_string();
 
     let raw_name = package_manifest
-        .name
+        .game_name
         .as_deref()
         .unwrap_or(&game_manifest.name);
     let name = resolve_mod_text(namespace, raw_name);
@@ -617,6 +654,12 @@ fn scan_game_manifest(
     } else {
         resolve_mod_text(namespace, raw_detail)
     };
+    let raw_introduction = game_manifest
+        .introduction
+        .as_deref()
+        .or(package_manifest.introduction.as_deref())
+        .unwrap_or(DEFAULT_PACKAGE_DESCRIPTION);
+    let introduction = resolve_mod_text(namespace, raw_introduction);
 
     let best_none = game_manifest
         .best_none
@@ -631,8 +674,10 @@ fn scan_game_manifest(
         name,
         description,
         detail,
+        introduction,
         best_none,
         save: game_manifest.save,
+        write: game_manifest.write,
         min_width: game_manifest.min_width.filter(|value| *value > 0),
         min_height: game_manifest.min_height.filter(|value| *value > 0),
         max_width: game_manifest.max_width.filter(|value| *value > 0),
@@ -674,7 +719,7 @@ fn validate_mod_package_root(dir: &Path, package: &crate::game::manifest::Packag
         return Err(anyhow!("introduction cannot be blank"));
     }
     if package
-        .name
+        .game_name
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -738,48 +783,72 @@ fn image_from_meta(namespace: &str, raw: Option<&JsonValue>, kind: ImageKind) ->
         }
         _ => default_image(kind),
     };
-    Ok(normalize_image(image, kind))
+    let mut image = normalize_image(image, kind);
+    warm_rendered_image_lines(&mut image);
+    Ok(image)
 }
 
 fn load_image_from_string(namespace: &str, value: &str, kind: ImageKind) -> Result<ModImage> {
-    let spec = match parse_image_spec(namespace, value) {
-        Ok(spec) => spec,
+    if let Ok(spec) = parse_image_spec(namespace, value) {
+        let asset_path = resolve_asset_path(&spec.namespace, &spec.path)?;
+        if !asset_path.exists() {
+            return Ok(default_image(kind));
+        }
+
+        return match asset_path
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("png") | Some("jpg") | Some("jpeg") | Some("webp") => {
+                render_cached_raster_image(&asset_path, &spec, kind)
+            }
+            _ => Ok(default_image(kind)),
+        };
+    }
+
+    let asset_path = match resolve_asset_path(namespace, value) {
+        Ok(path) => path,
         Err(_) => return Ok(default_image(kind)),
     };
-    let asset_path = resolve_asset_path(&spec.namespace, &spec.path)?;
     if !asset_path.exists() {
         return Ok(default_image(kind));
     }
 
-    match asset_path
-        .extension()
-        .and_then(|value| value.to_str())
-        .map(|value| value.to_ascii_lowercase())
-        .as_deref()
-    {
-        Some("png") | Some("jpg") | Some("jpeg") | Some("webp") => {
-            render_cached_raster_image(&asset_path, &spec, kind)
-        }
-        _ => {
-            let content = fs::read_to_string(asset_path)?;
-            let lines = content
-                .trim_start_matches('\u{feff}')
-                .lines()
-                .map(|line| line.to_string())
-                .collect::<Vec<_>>();
-            if lines.is_empty() {
-                Ok(default_image(kind))
-            } else {
-                Ok(ModImage { lines })
-            }
-        }
+    let content = fs::read_to_string(asset_path)?;
+    let lines = content
+        .trim_start_matches('\u{feff}')
+        .lines()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>();
+    if lines.is_empty() {
+        Ok(default_image(kind))
+    } else {
+        Ok(ModImage {
+            lines,
+            rendered_lines: Vec::new(),
+        })
     }
+}
+
+fn warm_rendered_image_lines(image: &mut ModImage) {
+    image.rendered_lines = image
+        .lines
+        .iter()
+        .map(|line| {
+            rich_text::parse_rich_text_wrapped(line, usize::MAX / 8, Style::default().fg(Color::White))
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| Line::from(""))
+        })
+        .collect();
 }
 
 fn parse_image_spec(namespace: &str, value: &str) -> Result<ImageSpec> {
     let mut color_mode = ImageColorMode::Grayscale;
-    let mut render_mode = ImageRenderMode::Braille;
     let mut parts = value.split(':').collect::<Vec<_>>();
+    let mut saw_image_prefix = false;
 
     while let Some(head) = parts.first().copied() {
         match head {
@@ -787,45 +856,27 @@ fn parse_image_spec(namespace: &str, value: &str) -> Result<ImageSpec> {
                 color_mode = ImageColorMode::Color;
                 parts.remove(0);
             }
-            "white" => {
-                color_mode = ImageColorMode::White;
+            "image" => {
                 parts.remove(0);
-            }
-            "math" => {
-                render_mode = ImageRenderMode::Math;
-                parts.remove(0);
-            }
-            "number" => {
-                render_mode = ImageRenderMode::Number;
-                parts.remove(0);
-            }
-            "block" => {
-                render_mode = ImageRenderMode::Block;
-                parts.remove(0);
+                saw_image_prefix = true;
+                break;
             }
             _ => break,
         }
     }
 
-    if parts.len() < 2 {
+    if !saw_image_prefix {
         return Err(anyhow!("invalid image spec"));
     }
-
-    let image_namespace = parts.remove(0).to_string();
-    if image_namespace != namespace {
-        return Err(anyhow!("resource namespace mismatch"));
-    }
-
     let path = parts.join(":");
     if path.trim().is_empty() {
         return Err(anyhow!("empty image path"));
     }
 
     Ok(ImageSpec {
-        namespace: image_namespace,
+        namespace: namespace.to_string(),
         path,
         color_mode,
-        render_mode,
     })
 }
 
@@ -847,20 +898,14 @@ fn render_cached_raster_image(path: &Path, spec: &ImageSpec, kind: ImageKind) ->
 
 fn build_image_cache_key(path: &Path, spec: &ImageSpec, kind: ImageKind) -> String {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    IMAGE_RENDER_ALGORITHM_VERSION.hash(&mut hasher);
     path.to_string_lossy().hash(&mut hasher);
     mtime_secs(path).hash(&mut hasher);
     spec.namespace.hash(&mut hasher);
     spec.path.hash(&mut hasher);
     match spec.color_mode {
         ImageColorMode::Grayscale => 11_u8.hash(&mut hasher),
-        ImageColorMode::White => 12_u8.hash(&mut hasher),
         ImageColorMode::Color => 13_u8.hash(&mut hasher),
-    }
-    match spec.render_mode {
-        ImageRenderMode::Braille => 1_u8.hash(&mut hasher),
-        ImageRenderMode::Math => 2_u8.hash(&mut hasher),
-        ImageRenderMode::Number => 5_u8.hash(&mut hasher),
-        ImageRenderMode::Block => 6_u8.hash(&mut hasher),
     }
     match kind {
         ImageKind::Thumbnail => 3_u8.hash(&mut hasher),
@@ -872,121 +917,18 @@ fn build_image_cache_key(path: &Path, spec: &ImageSpec, kind: ImageKind) -> Stri
 fn render_raster_image(path: &Path, spec: &ImageSpec, kind: ImageKind) -> Result<ModImage> {
     let dynamic = image::open(path)
         .with_context(|| format!("failed to open raster image: {}", path.display()))?;
-    let image = match spec.render_mode {
-        ImageRenderMode::Braille => render_braille_image(&dynamic, spec.color_mode, kind),
-        ImageRenderMode::Math => {
-            render_charset_image(&dynamic, spec.color_mode, kind, &MATH_IMAGE_CHARS)
-        }
-        ImageRenderMode::Number => {
-            render_charset_image(&dynamic, spec.color_mode, kind, &NUMBER_IMAGE_CHARS)
-        }
-        ImageRenderMode::Block => {
-            render_charset_image(&dynamic, spec.color_mode, kind, &BLOCK_IMAGE_CHARS)
-        }
-    };
-    Ok(image)
+    Ok(render_ascii_image(&dynamic, spec.color_mode, kind))
 }
 
-fn render_braille_image(
+fn render_ascii_image(
     image: &image::DynamicImage,
     color_mode: ImageColorMode,
     kind: ImageKind,
 ) -> ModImage {
     let (target_h, target_w) = image_target_size(kind);
-    let visual_w = image_visual_width(target_w);
-    let pixel_w = (visual_w * 2) as u32;
-    let pixel_h = (target_h * 4) as u32;
-    let resized = resize_and_crop_image(image, pixel_w, pixel_h);
+    let resized = resize_ascii_image(image, target_w as u32, target_h as u32);
 
     let mut lines = Vec::with_capacity(target_h);
-    for cell_y in 0..target_h {
-        let mut line = if matches!(
-            color_mode,
-            ImageColorMode::Grayscale | ImageColorMode::Color
-        ) {
-            String::from("f%")
-        } else {
-            String::new()
-        };
-        let mut current_color: Option<String> = None;
-
-        for cell_x in 0..visual_w {
-            let mut bits = 0u8;
-            let mut rgb_sum = [0u32; 3];
-            let mut samples = 0u32;
-
-            for py in 0..4 {
-                for px in 0..2 {
-                    let x = (cell_x * 2 + px) as u32;
-                    let y = (cell_y * 4 + py) as u32;
-                    let pixel = resized.get_pixel(x, y).0;
-                    let alpha = pixel[3] as f32 / 255.0;
-                    let luminance = ((0.299 * pixel[0] as f32)
-                        + (0.587 * pixel[1] as f32)
-                        + (0.114 * pixel[2] as f32))
-                        * alpha;
-
-                    if alpha > 0.05 && luminance < 196.0 {
-                        bits |= braille_bit(px, py);
-                    }
-
-                    rgb_sum[0] += pixel[0] as u32;
-                    rgb_sum[1] += pixel[1] as u32;
-                    rgb_sum[2] += pixel[2] as u32;
-                    samples += 1;
-                }
-            }
-
-            let ch = if bits == 0 {
-                ' '
-            } else {
-                char::from_u32(0x2800 + bits as u32).unwrap_or(' ')
-            };
-
-            if ch != ' ' {
-                if let Some(color) = image_output_color(
-                    color_mode,
-                    [
-                        (rgb_sum[0] / samples) as u8,
-                        (rgb_sum[1] / samples) as u8,
-                        (rgb_sum[2] / samples) as u8,
-                    ],
-                ) {
-                    if current_color.as_deref() != Some(color.as_str()) {
-                        line.push_str(&format!("{{tc:{color}}}"));
-                        current_color = Some(color);
-                    }
-                }
-            }
-
-            line.push(ch);
-            line.push(ch);
-        }
-
-        if matches!(
-            color_mode,
-            ImageColorMode::Grayscale | ImageColorMode::Color
-        ) && current_color.is_some()
-        {
-            line.push_str("{tc:clear}");
-        }
-        lines.push(line);
-    }
-
-    ModImage { lines }
-}
-
-fn render_charset_image(
-    image: &image::DynamicImage,
-    color_mode: ImageColorMode,
-    kind: ImageKind,
-    chars: &[char],
-) -> ModImage {
-    let (target_h, target_w) = image_target_size(kind);
-    let visual_w = image_visual_width(target_w);
-    let resized = resize_and_crop_image(image, visual_w as u32, target_h as u32);
-    let mut lines = Vec::with_capacity(target_h);
-
     for y in 0..target_h {
         let mut line = if matches!(
             color_mode,
@@ -998,22 +940,24 @@ fn render_charset_image(
         };
         let mut current_color: Option<String> = None;
 
-        for x in 0..visual_w {
+        for x in 0..target_w {
             let pixel = resized.get_pixel(x as u32, y as u32).0;
-            let alpha = pixel[3] as f32 / 255.0;
-            let luminance =
-                ((0.299 * pixel[0] as f32) + (0.587 * pixel[1] as f32) + (0.114 * pixel[2] as f32))
-                    * alpha;
-            let index = ((luminance / 255.0) * (chars.len() - 1) as f32).round() as usize;
-            let ch = if alpha <= 0.05 {
+            let alpha = pixel[3];
+            let ch = if alpha == 0 {
                 ' '
             } else {
-                chars[index.min(chars.len() - 1)]
+                let gray = image_luma([pixel[0], pixel[1], pixel[2]]);
+                let index = (((255.0 - gray as f32) / 255.0)
+                    * (ASCII_IMAGE_CHARS.chars().count().saturating_sub(1)) as f32)
+                    .round() as usize;
+                ASCII_IMAGE_CHARS
+                    .chars()
+                    .nth(index.min(ASCII_IMAGE_CHARS.chars().count().saturating_sub(1)))
+                    .unwrap_or('.')
             };
 
             if ch != ' ' {
-                if let Some(color) = image_output_color(color_mode, [pixel[0], pixel[1], pixel[2]])
-                {
+                if let Some(color) = image_output_color(color_mode, [pixel[0], pixel[1], pixel[2]]) {
                     if current_color.as_deref() != Some(color.as_str()) {
                         line.push_str(&format!("{{tc:{color}}}"));
                         current_color = Some(color);
@@ -1021,8 +965,7 @@ fn render_charset_image(
                 }
             }
 
-            line.push(ch);
-            line.push(ch);
+            push_rich_text_safe_char(&mut line, ch);
         }
 
         if matches!(
@@ -1035,22 +978,36 @@ fn render_charset_image(
         lines.push(line);
     }
 
-    ModImage { lines }
+    ModImage {
+        lines,
+        rendered_lines: Vec::new(),
+    }
 }
 
 fn image_output_color(color_mode: ImageColorMode, rgb: [u8; 3]) -> Option<String> {
     match color_mode {
-        ImageColorMode::White => None,
         ImageColorMode::Color => Some(format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2])),
         ImageColorMode::Grayscale => {
-            let gray = ((0.299 * rgb[0] as f32) + (0.587 * rgb[1] as f32) + (0.114 * rgb[2] as f32))
-                .round() as u8;
+            let gray = image_luma(rgb);
             Some(format!("#{:02x}{:02x}{:02x}", gray, gray, gray))
         }
     }
 }
 
-fn resize_and_crop_image(
+fn push_rich_text_safe_char(out: &mut String, ch: char) {
+    if matches!(ch, '{' | '}' | '\\') {
+        out.push('\\');
+    }
+    out.push(ch);
+}
+
+fn image_luma(rgb: [u8; 3]) -> u8 {
+    ((0.2126 * rgb[0] as f32) + (0.7152 * rgb[1] as f32) + (0.0722 * rgb[2] as f32))
+        .round()
+        .clamp(0.0, 255.0) as u8
+}
+
+fn resize_ascii_image(
     image: &image::DynamicImage,
     target_w: u32,
     target_h: u32,
@@ -1059,7 +1016,9 @@ fn resize_and_crop_image(
 
     let (src_w, src_h) = image.dimensions();
     let src_ratio = src_w as f32 / src_h as f32;
-    let dst_ratio = target_w as f32 / target_h as f32;
+    let cell_width = 1.0_f32;
+    let cell_height = 2.0_f32;
+    let dst_ratio = (target_w as f32 * cell_width) / (target_h as f32 * cell_height);
 
     let cropped = if src_ratio > dst_ratio {
         let new_w = (src_h as f32 * dst_ratio).round().max(1.0) as u32;
@@ -1072,22 +1031,8 @@ fn resize_and_crop_image(
     };
 
     cropped
-        .resize_exact(target_w, target_h, FilterType::Triangle)
+        .resize_exact(target_w, target_h, FilterType::Lanczos3)
         .to_rgba8()
-}
-
-fn braille_bit(px: usize, py: usize) -> u8 {
-    match (px, py) {
-        (0, 0) => 0x01,
-        (0, 1) => 0x02,
-        (0, 2) => 0x04,
-        (1, 0) => 0x08,
-        (1, 1) => 0x10,
-        (1, 2) => 0x20,
-        (0, 3) => 0x40,
-        (1, 3) => 0x80,
-        _ => 0,
-    }
 }
 
 fn parse_ascii_image_array(raw: &[JsonValue], _kind: ImageKind) -> Option<ModImage> {
@@ -1100,7 +1045,10 @@ fn parse_ascii_image_array(raw: &[JsonValue], _kind: ImageKind) -> Option<ModIma
     if lines.is_empty() {
         None
     } else {
-        Some(ModImage { lines })
+        Some(ModImage {
+            lines,
+            rendered_lines: Vec::new(),
+        })
     }
 }
 
@@ -1211,7 +1159,10 @@ fn default_image(kind: ImageKind) -> ModImage {
             .map(|line| (*line).to_string())
             .collect(),
     };
-    ModImage { lines }
+    ModImage {
+        lines,
+        rendered_lines: Vec::new(),
+    }
 }
 
 fn normalize_image(image: ModImage, kind: ImageKind) -> ModImage {
@@ -1228,7 +1179,10 @@ fn normalize_image(image: ModImage, kind: ImageKind) -> ModImage {
         .map(|line| center_crop_or_pad_horizontal(&line, target_w))
         .collect();
 
-    ModImage { lines }
+    ModImage {
+        lines,
+        rendered_lines: Vec::new(),
+    }
 }
 
 fn center_crop_or_pad_vertical(mut lines: Vec<String>, target_h: usize) -> Vec<String> {
@@ -1268,10 +1222,6 @@ fn image_target_size(kind: ImageKind) -> (usize, usize) {
         ImageKind::Thumbnail => (4, 8),
         ImageKind::Banner => (13, 86),
     }
-}
-
-fn image_visual_width(char_width: usize) -> usize {
-    (char_width / 2).max(1)
 }
 
 fn pad_line_balanced(line: &str, pad: usize) -> String {

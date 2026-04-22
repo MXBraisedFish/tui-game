@@ -186,7 +186,7 @@ fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {
     )?;
     set_optional_string(&table, "introduction", bridges.game.introduction.as_deref())?;
     table.set("author", bridges.game.author.as_str())?;
-    table.set("name", bridges.game.name.as_str())?;
+    table.set("game_name", bridges.game.name.as_str())?;
     table.set("description", bridges.game.description.as_str())?;
     table.set("detail", bridges.game.detail.as_str())?;
     set_json_value(lua, &table, "icon", bridges.game.icon.as_ref())?;

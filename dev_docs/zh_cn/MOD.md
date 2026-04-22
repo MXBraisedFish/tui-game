@@ -103,7 +103,7 @@
   "mod_name": string | key,         -- 模组包显示名称
   "introduction": string | key,     -- 模组包简介
   "author": string | key,           -- 作者信息
-  "name": string | key,             -- 游戏显示名称
+  "game_name": string | key,        -- 游戏显示名称
   "description": string | key,      -- 游戏简短描述
   "detail": string | key,           -- 游戏详细描述
   "version": string,                -- 游戏版本号
@@ -408,9 +408,11 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 #### 图片
 
+- 格式：使用 `image:` 开头然后填写路径。
 - 填写相对于 `assets/` 目录的路径。
-- 建议图片比例为 **1:1**。
-- 宿主会根据图片比例生成一个 1:1 的比例框进行截取，然后将图片符号化并染色。
+- 建议图片比例为 **1:1**（宽 x 高）。
+- 宿主会根据图片比例生成一个 1:1 的比例框进行截取，然后将图片符号化。
+- 开头可添加 `color:`  参数让图片保留颜色，`color:image:`。
 - **不推荐使用**：生成效果通常严重偏离预期，仅作为功能扩展保留。
 
 #### 默认值
@@ -445,9 +447,11 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 #### 图片
 
+- 格式：使用 `image:` 开头然后填写路径。
 - 填写相对于 `assets/` 目录的路径。
-- 建议图片比例为 **13:43**。
-- 宿主会生成一个最大可被 13×43 整除的比例框进行截取，然后将图片符号化并染色。
+- 建议图片比例为 **13:43**（宽 x 高）。
+- 宿主会生成一个最大可被 13×43 整除的比例框进行截取，然后将图片符号化。
+- 开头可添加 `color:`  参数让图片保留颜色，`color:image:`。
 - **不推荐使用**：生成效果通常严重偏离预期，仅作为功能扩展保留。
 
 #### 默认值
@@ -469,15 +473,9 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ---
 
-## `introduction` / `description` / `detail` 展示位置
+## 字段展示位置
 
-各字段在界面中的展示位置如下：
-
-- **`introduction`**：展示于**模组包列表**的详细信息区域，用于描述整个模组包的概要信息。
-- **`description`**：展示于**游戏列表**的详细信息区域，用于说明游戏的玩法或基本规则。
-- **`detail`**：展示于**游戏列表**的详细信息区域，用于提供游戏的详细说明。
-
-示意图如下：
+字段如图所示
 
 ![introduction 展示位置](./image/introduction)  
 ![description 与 detail 展示位置](./image/description_detail)
@@ -697,7 +695,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
   "package": "example",
   "introduction": "example.introduction",
   "author": "TUI GAME",
-  "name": "example.name",
+  "game_name": "example.name",
   "description": "example.description",
   "detail": "example.detail",
   "icon": [],

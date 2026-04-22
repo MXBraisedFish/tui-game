@@ -5,11 +5,21 @@ pub const ALIGN_LEFT: i64 = 1;
 pub const ALIGN_CENTER: i64 = 2;
 pub const ALIGN_RIGHT: i64 = 3;
 
+pub const STYLE_BOLD: i64 = 0;
+pub const STYLE_ITALIC: i64 = 1;
+pub const STYLE_UNDERLINE: i64 = 2;
+pub const STYLE_STRIKE: i64 = 3;
+pub const STYLE_BLINK: i64 = 4;
+pub const STYLE_REVERSE: i64 = 5;
+pub const STYLE_HIDDEN: i64 = 6;
+pub const STYLE_DIM: i64 = 7;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Cell {
     pub ch: char,
     pub fg: Option<String>,
     pub bg: Option<String>,
+    pub style: Option<i64>,
     pub continuation: bool,
 }
 
@@ -19,6 +29,7 @@ impl Default for Cell {
             ch: ' ',
             fg: None,
             bg: None,
+            style: None,
             continuation: false,
         }
     }
@@ -81,11 +92,12 @@ impl Canvas {
         text: &str,
         fg: Option<String>,
         bg: Option<String>,
+        style: Option<i64>,
         align: i64,
     ) {
         if align == ALIGN_NO_WRAP {
             let escaped = text.replace('\n', "\\n");
-            self.draw_text_line(i64::from(x), y, &escaped, fg, bg);
+            self.draw_text_line(i64::from(x), y, &escaped, fg, bg, style);
             return;
         }
 
@@ -100,7 +112,7 @@ impl Canvas {
                 _ => i64::from(x),
             };
             let draw_y = y.saturating_add(row_offset as u16);
-            self.draw_text_line(start_x, draw_y, line, fg.clone(), bg.clone());
+            self.draw_text_line(start_x, draw_y, line, fg.clone(), bg.clone(), style);
         }
     }
 
@@ -111,6 +123,7 @@ impl Canvas {
         text: &str,
         fg: Option<String>,
         bg: Option<String>,
+        style: Option<i64>,
     ) {
         let mut cursor_x = start_x;
         for ch in text.chars() {
@@ -126,6 +139,7 @@ impl Canvas {
                         ch,
                         fg: fg.clone(),
                         bg: bg.clone(),
+                        style,
                         continuation: false,
                     },
                 );
@@ -140,6 +154,7 @@ impl Canvas {
                                     ch: ' ',
                                     fg: fg.clone(),
                                     bg: bg.clone(),
+                                    style,
                                     continuation: true,
                                 },
                             );

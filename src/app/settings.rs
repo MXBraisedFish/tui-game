@@ -9,9 +9,10 @@ use crossterm::event::KeyCode;
 use std::cmp::Ordering;
 use std::time::Instant;
 
+use crate::app::content_cache;
 use crate::app::i18n;
 use crate::app::rich_text;
-use crate::mods::{self, ModPackage};
+use crate::mods::{self, ModPackage, ModSafeModeState};
 
 const MAX_COLS: usize = 12;
 const H_GAP: u16 = 1;
@@ -303,9 +304,7 @@ pub fn move_selection(selected: usize, key: KeyCode, metrics: GridMetrics, total
 }
 
 fn load_mod_packages() -> Vec<ModPackage> {
-    mods::scan_mods()
-        .map(|output| output.packages)
-        .unwrap_or_default()
+    content_cache::mods()
 }
 
 fn text(key: &str, fallback: &str) -> String {
@@ -392,6 +391,8 @@ fn handle_language_key(state: &mut SettingsState, code: KeyCode) {
         KeyCode::Enter => {
             if let Some(pack) = languages.get(state.lang_selected) {
                 let _ = i18n::set_language(&pack.code);
+                content_cache::reload();
+                state.refresh_mods();
             }
         }
         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
@@ -411,11 +412,13 @@ fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
             KeyCode::Char('2') if countdown_done => {
                 let _ = mods::set_mod_safe_mode(&dialog.namespace, false, false);
                 state.mod_safe_dialog = None;
+                content_cache::reload();
                 state.refresh_mods();
             }
             KeyCode::Char('3') if countdown_done => {
                 let _ = mods::set_mod_safe_mode(&dialog.namespace, false, true);
                 state.mod_safe_dialog = None;
+                content_cache::reload();
                 state.refresh_mods();
             }
             _ => {}
@@ -493,12 +496,14 @@ fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
         KeyCode::Enter | KeyCode::Char(' ') => {
             if let Some(package) = state.mod_packages.get(state.mod_selected) {
                 let _ = mods::set_mod_enabled(&package.namespace, !package.enabled);
+                content_cache::reload();
                 state.refresh_mods();
             }
         }
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if let Some(package) = state.mod_packages.get(state.mod_selected) {
                 let _ = mods::set_mod_debug_enabled(&package.namespace, !package.debug_enabled);
+                content_cache::reload();
                 state.refresh_mods();
             }
         }
@@ -512,6 +517,7 @@ fn handle_mods_key(state: &mut SettingsState, code: KeyCode) {
                     });
                 } else {
                     let _ = mods::set_mod_safe_mode(&package.namespace, true, true);
+                    content_cache::reload();
                     state.refresh_mods();
                 }
             }
@@ -832,6 +838,16 @@ fn render_mod_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsS
         );
     }
 
+    let left = if page > 0 {
+        i18n::t("game_selection.pager.prev")
+    } else {
+        String::new()
+    };
+    let right = if page + 1 < total_pages {
+        i18n::t("game_selection.pager.next")
+    } else {
+        String::new()
+    };
     let pager_line = if let Some(dialog) = &state.mod_page_jump_dialog {
         let input_text = if dialog.input.is_empty() {
             "_".to_string()
@@ -859,7 +875,19 @@ fn render_mod_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsS
         ))
     };
     frame.render_widget(
+        Paragraph::new(left)
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Left),
+        rows[1],
+    );
+    frame.render_widget(
         Paragraph::new(pager_line).alignment(Alignment::Center),
+        rows[1],
+    );
+    frame.render_widget(
+        Paragraph::new(right)
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Right),
         rows[1],
     );
 }
@@ -919,44 +947,56 @@ fn render_mod_list_item(
                 return;
             }
 
-            for (idx, line) in package.thumbnail.lines.iter().take(content_height as usize).enumerate() {
-                render_rich_line_to_buffer(
+            for (idx, line) in package
+                .thumbnail
+                .rendered_lines
+                .iter()
+                .take(content_height as usize)
+                .enumerate()
+            {
+                render_compiled_line_to_buffer(
                     buffer,
                     area.x,
                     area.y + idx as u16,
                     thumb_width as usize,
                     line,
-                    meta_style,
                 );
             }
 
             render_mod_debug_prefix(buffer, text_x, area.y, package.debug_enabled, selected);
             let name_x = text_x + if package.debug_enabled { 3 } else { 0 };
             let name_width = text_width.saturating_sub(if package.debug_enabled { 3 } else { 0 });
-            render_rich_line_to_buffer(
+            render_manifest_text_to_buffer(
                 buffer,
                 name_x,
                 area.y,
                 name_width,
                 &package.package_name,
+                package.package_name_allows_rich,
                 base_style.add_modifier(Modifier::BOLD),
             );
 
             if content_height > 1 {
-                buffer.set_stringn(
+                render_label_manifest_value_to_buffer(
+                    buffer,
                     text_x,
                     area.y + 1,
-                    format!("{} {}", text("settings.mods.author", "Author:"), package.author),
                     text_width,
+                    &text("settings.mods.author", "Author:"),
+                    &package.author,
+                    true,
                     meta_style,
                 );
             }
             if content_height > 2 {
-                buffer.set_stringn(
+                render_label_manifest_value_to_buffer(
+                    buffer,
                     text_x,
                     area.y + 2,
-                    format!("{} {}", text("settings.mods.version", "Version:"), package.version),
                     text_width,
+                    &text("settings.mods.version", "Version:"),
+                    &package.version,
+                    true,
                     meta_style,
                 );
             }
@@ -978,12 +1018,13 @@ fn render_mod_list_item(
             render_mod_debug_prefix(buffer, text_x, area.y, package.debug_enabled, selected);
             let name_x = text_x + if package.debug_enabled { 3 } else { 0 };
             let actual_name_width = name_width.saturating_sub(if package.debug_enabled { 3 } else { 0 });
-            render_rich_line_to_buffer(
+            render_manifest_text_to_buffer(
                 buffer,
                 name_x,
                 area.y,
                 actual_name_width,
                 &package.package_name,
+                package.package_name_allows_rich,
                 base_style,
             );
 
@@ -1121,6 +1162,57 @@ fn render_safe_mode_marker_column(
     }
 }
 
+fn section_title_line(title: String) -> Line<'static> {
+    Line::from(Span::styled(
+        title,
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    ))
+}
+
+fn label_value_line(label: String, value: String, value_style: Style) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(label, Style::default().fg(Color::White)),
+        Span::raw(" "),
+        Span::styled(value, value_style.add_modifier(Modifier::BOLD)),
+    ])
+}
+
+fn label_value_lines(
+    label: String,
+    value: String,
+    allow_rich: bool,
+    width: usize,
+    value_style: Style,
+) -> Vec<Line<'static>> {
+    if !allow_rich || !value.starts_with("f%") {
+        return vec![label_value_line(label, value, value_style)];
+    }
+
+    let mut parsed = rich_text::parse_rich_text_wrapped(&value, usize::MAX / 8, value_style);
+    if parsed.is_empty() {
+        return vec![label_value_line(label, String::new(), value_style)];
+    }
+
+    let mut first_spans = vec![
+        Span::styled(label.clone(), Style::default().fg(Color::White)),
+        Span::raw(" "),
+    ];
+    first_spans.extend(parsed.remove(0).spans);
+
+    let mut lines = vec![Line::from(first_spans)];
+    let indent = " ".repeat(UnicodeWidthStr::width(label.as_str()) + 1);
+    let continuation_width = width.saturating_sub(indent.len()).max(1);
+    for line in parsed {
+        let mut spans = vec![Span::styled(indent.clone(), Style::default().fg(Color::White))];
+        let wrapped = crop_line_center_to_width(&line, continuation_width);
+        spans.extend(wrapped.spans);
+        lines.push(Line::from(spans));
+    }
+    lines
+}
+
 fn build_mod_hint_segments(include_scroll: bool) -> Vec<String> {
     let mut segments = vec![
         text("settings.mods.hint.toggle", "[Enter] Toggle"),
@@ -1177,6 +1269,66 @@ fn wrap_mod_hint_lines(segments: &[String], width: usize) -> Vec<Line<'static>> 
     lines
 }
 
+fn wrap_plain_text_lines(text: &str, width: usize, style: Style) -> Vec<Line<'static>> {
+    let width = width.max(1);
+    let mut out = Vec::new();
+
+    for raw_line in text.lines() {
+        let mut remaining = raw_line.trim_end().to_string();
+        if remaining.is_empty() {
+            out.push(Line::from(""));
+            continue;
+        }
+
+        while !remaining.is_empty() {
+            if UnicodeWidthStr::width(remaining.as_str()) <= width {
+                out.push(Line::from(Span::styled(remaining.clone(), style)));
+                break;
+            }
+
+            let mut cur = String::new();
+            let mut cur_width = 0usize;
+            let mut last_space_byte = None;
+
+            for (idx, ch) in remaining.char_indices() {
+                let ch_width = UnicodeWidthStr::width(ch.encode_utf8(&mut [0; 4]));
+                if cur_width + ch_width > width {
+                    break;
+                }
+                cur.push(ch);
+                cur_width += ch_width;
+                if ch.is_whitespace() {
+                    last_space_byte = Some(idx);
+                }
+            }
+
+            if cur.is_empty() {
+                if let Some(ch) = remaining.chars().next() {
+                    out.push(Line::from(Span::styled(ch.to_string(), style)));
+                    remaining = remaining[ch.len_utf8()..].trim_start().to_string();
+                }
+                continue;
+            }
+
+            if let Some(space_idx) = last_space_byte {
+                let head = remaining[..space_idx].trim_end().to_string();
+                if !head.is_empty() {
+                    out.push(Line::from(Span::styled(head, style)));
+                }
+                remaining = remaining[space_idx + 1..].trim_start().to_string();
+            } else {
+                out.push(Line::from(Span::styled(cur.clone(), style)));
+                remaining = remaining[cur.len()..].trim_start().to_string();
+            }
+        }
+    }
+
+    if out.is_empty() {
+        out.push(Line::from(""));
+    }
+    out
+}
+
 fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut SettingsState) {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -1202,71 +1354,113 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut Set
             Style::default().fg(Color::White),
         );
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
+        lines.push(section_title_line(text(
+            "settings.mods.section.basic_info",
+            "Basic Info",
+        )));
+        lines.extend(label_value_lines(
+            text("settings.mods.package_label", "Mod Package:"),
             package.package_name.clone(),
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )));
-        lines.push(Line::from(format!(
-            "{} {}",
-            text("settings.mods.author", "Author:"),
-            package.author
-        )));
-        lines.push(Line::from(format!(
-            "{} {}",
-            text("settings.mods.version", "Version:"),
-            package.version
-        )));
-        lines.push(Line::from(format!(
-            "{} {}",
-            text("settings.mods.namespace", "Namespace:"),
-            package.namespace
-        )));
-        lines.push(Line::from(format!(
-            "{} {}",
-            text("settings.mods.safe_mode", "Safe Mode:"),
-            if package.safe_mode_enabled {
-                text("settings.mods.safe_mode_on", "On")
-            } else {
-                text("settings.mods.safe_mode_off", "Off")
-            }
-        )));
-        lines.push(Line::from(format!(
-            "{} {}",
-            text("settings.mods.games", "Games:"),
-            package.games.len()
-        )));
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            text("settings.mods.description", "Description"),
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )));
-        lines.extend(rich_text::parse_rich_text_wrapped(
-            &package.description,
+            package.package_name_allows_rich,
             content_width,
             Style::default().fg(Color::White),
         ));
-        if !package.errors.is_empty() {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                text("settings.mods.errors", "Scan Errors"),
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-            )));
-            for error in package.errors.iter().take(8) {
-                lines.extend(rich_text::parse_rich_text_wrapped(
-                    &format!(
-                        "[{}] {}",
-                        error.severity.to_ascii_uppercase(),
-                        error.message
-                    ),
-                    content_width,
-                    Style::default().fg(Color::White),
-                ));
-            }
-        }
+        lines.extend(label_value_lines(
+            text("settings.mods.author", "Author:"),
+            package.author.clone(),
+            true,
+            content_width,
+            Style::default().fg(Color::White),
+        ));
+        lines.extend(label_value_lines(
+            text("settings.mods.version", "Version:"),
+            package.version.clone(),
+            true,
+            content_width,
+            Style::default().fg(Color::White),
+        ));
+
+        lines.push(Line::from(""));
+        lines.push(section_title_line(text(
+            "settings.mods.section.storage",
+            "Data Storage",
+        )));
+        lines.push(label_value_line(
+            text("settings.mods.best_score", "Best Score:"),
+            if package.has_best_score_storage {
+                text("settings.mods.storage_has", "Available")
+            } else {
+                text("settings.mods.storage_none", "None")
+            },
+            if package.has_best_score_storage {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            },
+        ));
+        lines.push(label_value_line(
+            text("settings.mods.save_data", "Game Save:"),
+            if package.has_save_storage {
+                text("settings.mods.storage_has", "Available")
+            } else {
+                text("settings.mods.storage_none", "None")
+            },
+            if package.has_save_storage {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            },
+        ));
+
+        lines.push(Line::from(""));
+        lines.push(section_title_line(text(
+            "settings.mods.section.security",
+            "Security",
+        )));
+        lines.push(label_value_line(
+            text("settings.mods.write_request", "Direct Write Request:"),
+            if package.has_write_request {
+                text("settings.mods.storage_has", "Available")
+            } else {
+                text("settings.mods.storage_none", "None")
+            },
+            if package.has_write_request {
+                Style::default().fg(Color::Red)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            },
+        ));
+        let safe_mode_text = match package.safe_mode_state {
+            ModSafeModeState::Enabled => text("settings.mods.safe_mode_on", "On"),
+            ModSafeModeState::DisabledSession => text(
+                "settings.mods.safe_mode_session_off",
+                "Disabled (This Session)",
+            ),
+            ModSafeModeState::DisabledTrusted => text(
+                "settings.mods.safe_mode_trusted_off",
+                "Disabled (Permanently Trusted)",
+            ),
+        };
+        lines.push(label_value_line(
+            text("settings.mods.safe_mode", "Safe Mode:"),
+            safe_mode_text,
+            if package.safe_mode_enabled {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::Red)
+            },
+        ));
+
+        lines.push(Line::from(""));
+        lines.push(section_title_line(text(
+            "settings.mods.section.introduction",
+            "Mod Introduction",
+        )));
+        lines.extend(rich_text::parse_rich_text_wrapped(
+            &package.introduction,
+            content_width,
+            Style::default().fg(Color::White),
+        ));
         lines
     };
 
@@ -1342,19 +1536,44 @@ fn render_mod_detail(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut Set
 
 fn rich_lines_from_image(image: &mods::ModImage, width: usize, base: Style) -> Vec<Line<'static>> {
     image
-        .lines
+        .rendered_lines
         .iter()
         .take(13)
-        .map(|line| rich_line_from_image(line, width, base))
+        .map(|line| center_or_crop_line_to_width(line, width, base))
         .collect()
 }
 
-fn rich_line_from_image(text: &str, width: usize, base: Style) -> Line<'static> {
-    let line = rich_text::parse_rich_text_wrapped(text, usize::MAX / 8, base)
-        .into_iter()
-        .next()
-        .unwrap_or_else(|| Line::from(""));
-    crop_line_center_to_width(&line, width)
+fn center_or_crop_line_to_width(line: &Line<'static>, width: usize, base: Style) -> Line<'static> {
+    let line_width = line_width(line);
+    if width == 0 {
+        return Line::from("");
+    }
+    if line_width > width {
+        return crop_line_center_to_width(line, width);
+    }
+    if line_width == width {
+        return line.clone();
+    }
+
+    let pad = width.saturating_sub(line_width);
+    let left = pad / 2;
+    let right = pad.saturating_sub(left);
+    let mut spans = Vec::new();
+    if left > 0 {
+        spans.push(Span::styled(" ".repeat(left), base));
+    }
+    spans.extend(line.spans.iter().cloned());
+    if right > 0 {
+        spans.push(Span::styled(" ".repeat(right), base));
+    }
+    Line::from(spans)
+}
+
+fn line_width(line: &Line<'static>) -> usize {
+    line.spans
+        .iter()
+        .map(|span| UnicodeWidthStr::width(span.content.as_ref()))
+        .sum()
 }
 
 fn crop_line_center_to_width(line: &Line<'static>, width: usize) -> Line<'static> {
@@ -1447,6 +1666,91 @@ fn render_rich_line_to_buffer(
     }
 }
 
+fn render_compiled_line_to_buffer(
+    buffer: &mut Buffer,
+    x: u16,
+    y: u16,
+    width: usize,
+    line: &Line<'static>,
+) {
+    let line = crop_line_center_to_width(line, width.max(1));
+
+    let mut cursor_x = x;
+    for span in &line.spans {
+        let content = span.content.as_ref();
+        if content.is_empty() {
+            continue;
+        }
+        let remaining = width.saturating_sub(cursor_x.saturating_sub(x) as usize);
+        if remaining == 0 {
+            break;
+        }
+        buffer.set_stringn(cursor_x, y, content, remaining, span.style);
+        cursor_x = cursor_x.saturating_add(UnicodeWidthStr::width(content) as u16);
+        if cursor_x >= x.saturating_add(width as u16) {
+            break;
+        }
+    }
+}
+
+fn render_manifest_text_to_buffer(
+    buffer: &mut Buffer,
+    x: u16,
+    y: u16,
+    width: usize,
+    text: &str,
+    allow_rich: bool,
+    base: Style,
+) {
+    if allow_rich && text.starts_with("f%") {
+        render_rich_line_to_buffer(buffer, x, y, width, text, base);
+        return;
+    }
+    let line = truncate_with_ellipsis_plain(text, width);
+    buffer.set_stringn(x, y, line, width, base);
+}
+
+fn render_label_manifest_value_to_buffer(
+    buffer: &mut Buffer,
+    x: u16,
+    y: u16,
+    width: usize,
+    label: &str,
+    value: &str,
+    allow_rich: bool,
+    base: Style,
+) {
+    let prefix = format!("{label} ");
+    let prefix_width = UnicodeWidthStr::width(prefix.as_str());
+    buffer.set_stringn(x, y, &prefix, width, base);
+    let value_x = x.saturating_add(prefix_width as u16);
+    let value_width = width.saturating_sub(prefix_width);
+    render_manifest_text_to_buffer(buffer, value_x, y, value_width, value, allow_rich, base);
+}
+
+fn truncate_with_ellipsis_plain(text: &str, max_width: usize) -> String {
+    if max_width == 0 {
+        return String::new();
+    }
+    if UnicodeWidthStr::width(text) <= max_width {
+        return text.to_string();
+    }
+    if max_width <= 3 {
+        return ".".repeat(max_width);
+    }
+
+    let mut result = String::new();
+    for ch in text.chars() {
+        let next = format!("{result}{ch}");
+        if UnicodeWidthStr::width(next.as_str()) + 3 > max_width {
+            break;
+        }
+        result.push(ch);
+    }
+    result.push_str("...");
+    result
+}
+
 fn current_mod_page_size(list_view: ModListView) -> usize {
     let (_, term_height) = crossterm::terminal::size().unwrap_or((90, 26));
     let root_height = term_height.saturating_sub(1);
@@ -1496,7 +1800,7 @@ fn render_mod_safe_dialog(frame: &mut ratatui::Frame<'_>, dialog: &ModSafeDialog
     )
     .replace("{mod_name}", &dialog.mod_name);
 
-    let mut lines = rich_text::parse_rich_text_wrapped(
+    let mut lines = wrap_plain_text_lines(
         &message,
         inner.width.saturating_sub(2) as usize,
         Style::default().fg(Color::White),

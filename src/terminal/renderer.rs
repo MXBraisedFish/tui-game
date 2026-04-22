@@ -5,11 +5,15 @@ use anyhow::Result;
 use crossterm::cursor::MoveTo;
 use crossterm::queue;
 use crossterm::style::{
-    Color as CColor, Print, ResetColor, SetBackgroundColor, SetForegroundColor,
+    Attribute, Color as CColor, Print, ResetColor, SetAttribute, SetBackgroundColor,
+    SetForegroundColor,
 };
 use crossterm::terminal::{Clear, ClearType};
 
-use crate::core::screen::Canvas;
+use crate::core::screen::{
+    Canvas, STYLE_BLINK, STYLE_BOLD, STYLE_DIM, STYLE_HIDDEN, STYLE_ITALIC, STYLE_REVERSE,
+    STYLE_STRIKE, STYLE_UNDERLINE,
+};
 
 static LAST_CANVAS: OnceLock<Mutex<Option<Canvas>>> = OnceLock::new();
 
@@ -60,6 +64,7 @@ pub fn render_canvas(canvas: &Canvas) -> Result<()> {
 struct StyleState {
     fg: Option<CColor>,
     bg: Option<CColor>,
+    text_style: Option<i64>,
 }
 
 fn queue_row_segments<W: Write>(
@@ -94,12 +99,14 @@ fn queue_row_segments<W: Write>(
         let segment_start = x;
         let segment_fg = parse_color(current.fg.as_deref());
         let segment_bg = parse_color(current.bg.as_deref());
+        let segment_style = current.style;
         let mut text = String::new();
 
         while x < row.len() {
             let cell = &row[x];
-            let same_style =
-                parse_color(cell.fg.as_deref()) == segment_fg && parse_color(cell.bg.as_deref()) == segment_bg;
+            let same_style = parse_color(cell.fg.as_deref()) == segment_fg
+                && parse_color(cell.bg.as_deref()) == segment_bg
+                && cell.style == segment_style;
             let changed = previous_row
                 .and_then(|prev| prev.get(x))
                 .map(|prev| prev != cell)
@@ -115,7 +122,7 @@ fn queue_row_segments<W: Write>(
 
         if !text.is_empty() {
             queue!(out, MoveTo(segment_start as u16, y))?;
-            apply_style(out, style_state, segment_fg, segment_bg)?;
+            apply_style(out, style_state, segment_fg, segment_bg, segment_style)?;
             queue!(out, Print(&text))?;
         } else {
             x += 1;
@@ -130,19 +137,38 @@ fn apply_style<W: Write>(
     style_state: &mut StyleState,
     fg: Option<CColor>,
     bg: Option<CColor>,
+    text_style: Option<i64>,
 ) -> Result<()> {
-    if style_state.fg != fg || style_state.bg != bg {
-        queue!(out, ResetColor)?;
+    if style_state.fg != fg || style_state.bg != bg || style_state.text_style != text_style {
+        queue!(out, SetAttribute(Attribute::Reset), ResetColor)?;
         if let Some(color) = fg {
             queue!(out, SetForegroundColor(color))?;
         }
         if let Some(color) = bg {
             queue!(out, SetBackgroundColor(color))?;
         }
+        if let Some(attribute) = map_text_style(text_style) {
+            queue!(out, SetAttribute(attribute))?;
+        }
         style_state.fg = fg;
         style_state.bg = bg;
+        style_state.text_style = text_style;
     }
     Ok(())
+}
+
+fn map_text_style(style: Option<i64>) -> Option<Attribute> {
+    match style {
+        Some(STYLE_BOLD) => Some(Attribute::Bold),
+        Some(STYLE_ITALIC) => Some(Attribute::Italic),
+        Some(STYLE_UNDERLINE) => Some(Attribute::Underlined),
+        Some(STYLE_STRIKE) => Some(Attribute::CrossedOut),
+        Some(STYLE_BLINK) => Some(Attribute::SlowBlink),
+        Some(STYLE_REVERSE) => Some(Attribute::Reverse),
+        Some(STYLE_HIDDEN) => Some(Attribute::Hidden),
+        Some(STYLE_DIM) => Some(Attribute::Dim),
+        _ => None,
+    }
 }
 
 fn parse_color(name: Option<&str>) -> Option<CColor> {

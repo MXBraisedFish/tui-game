@@ -32,13 +32,18 @@ pub struct PackageDescriptor {
 pub struct GameDescriptor {
     pub id: String,
     pub name: String,
+    pub display_name: String,
     pub description: String,
+    pub display_description: String,
     pub detail: String,
+    pub display_detail: String,
     pub author: String,
+    pub display_author: String,
     pub introduction: Option<String>,
     pub icon: Option<serde_json::Value>,
     pub banner: Option<serde_json::Value>,
     pub best_none: Option<String>,
+    pub display_best_none: Option<String>,
     pub has_best_score: bool,
     pub save: bool,
     pub api: Option<serde_json::Value>,
@@ -53,6 +58,10 @@ pub struct GameDescriptor {
     pub entry_path: PathBuf,
     pub source: GameSourceKind,
     pub package: Option<PackageDescriptor>,
+    pub display_package_name: Option<String>,
+    pub display_package_name_allows_rich: bool,
+    pub display_package_author: Option<String>,
+    pub display_package_version: Option<String>,
 }
 
 impl GameDescriptor {
@@ -167,13 +176,18 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
             games.push(GameDescriptor {
                 id: game.id,
                 name,
+                display_name: String::new(),
                 description,
+                display_description: String::new(),
                 detail,
+                display_detail: String::new(),
                 author,
+                display_author: String::new(),
                 introduction,
                 icon,
                 banner,
                 best_none: game.best_none,
+                display_best_none: None,
                 has_best_score,
                 save: game.save,
                 api: game.api,
@@ -188,6 +202,10 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
                 entry_path: resolve_entry_path(&package.root_dir, &entry, &source),
                 source: package_descriptor.source.clone(),
                 package: Some(package_descriptor.clone()),
+                display_package_name: None,
+                display_package_name_allows_rich: false,
+                display_package_author: None,
+                display_package_version: None,
             });
         }
     }
@@ -223,7 +241,7 @@ fn resolve_display_fields(
     Option<serde_json::Value>,
 ) {
     let name = package
-        .name
+        .game_name
         .clone()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| game.name.clone());

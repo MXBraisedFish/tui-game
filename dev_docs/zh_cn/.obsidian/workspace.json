@@ -8,13 +8,13 @@
         "type": "tabs",
         "children": [
           {
-            "id": "a8a07212a569637b",
+            "id": "d7f96c1dbdd81b39",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
                 "file": "API.md",
-                "mode": "preview",
+                "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",

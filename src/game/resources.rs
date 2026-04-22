@@ -1,11 +1,19 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
 use anyhow::{Result, anyhow};
+use once_cell::sync::Lazy;
 use serde_json::Value as JsonValue;
 
 use crate::app::i18n;
 use crate::game::registry::PackageDescriptor;
+
+type PackageLangCache = HashMap<String, HashMap<String, HashMap<String, String>>>;
+
+static PACKAGE_LANG_CACHE: Lazy<RwLock<PackageLangCache>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub fn resolve_package_text(package: &PackageDescriptor, raw: &str) -> String {
     let trimmed = raw.trim();
@@ -27,6 +35,35 @@ pub fn resolve_package_text(package: &PackageDescriptor, raw: &str) -> String {
     }
 
     trimmed.to_string()
+}
+
+pub fn rebuild_package_language_cache(packages: &[PackageDescriptor]) {
+    let current_code = i18n::current_language_code()
+        .replace('-', "_")
+        .to_lowercase();
+    let mut next = HashMap::new();
+
+    for package in packages {
+        let key = package_cache_key(package);
+        if next.contains_key(&key) {
+            continue;
+        }
+
+        let mut per_lang = HashMap::new();
+        if let Some(dict) = load_package_lang_dict(package, &current_code) {
+            per_lang.insert(current_code.clone(), dict);
+        }
+        if current_code != "en_us"
+            && let Some(dict) = load_package_lang_dict(package, "en_us")
+        {
+            per_lang.insert("en_us".to_string(), dict);
+        }
+        next.insert(key, per_lang);
+    }
+
+    if let Ok(mut cache) = PACKAGE_LANG_CACHE.write() {
+        *cache = next;
+    }
 }
 
 pub fn read_package_text(package: &PackageDescriptor, logical_path: &str) -> Result<String> {
@@ -72,10 +109,16 @@ fn resolve_package_lang_key(package: &PackageDescriptor, key: &str) -> String {
     let current_code = i18n::current_language_code()
         .replace('-', "_")
         .to_lowercase();
-    if let Some(value) = load_package_lang_value(package, &current_code, key) {
+    if let Some(value) = cached_package_lang_value(package, &current_code, key) {
         return value;
     }
-    if let Some(value) = load_package_lang_value(package, "en_us", key) {
+    if let Some(value) = uncached_package_lang_value(package, &current_code, key) {
+        return value;
+    }
+    if let Some(value) = cached_package_lang_value(package, "en_us", key) {
+        return value;
+    }
+    if let Some(value) = uncached_package_lang_value(package, "en_us", key) {
         return value;
     }
     let global = i18n::t_or(key, key);
@@ -85,7 +128,21 @@ fn resolve_package_lang_key(package: &PackageDescriptor, key: &str) -> String {
     format!("[missing-i18n-key:{}:{}]", package.namespace, key)
 }
 
-fn load_package_lang_value(package: &PackageDescriptor, code: &str, key: &str) -> Option<String> {
+fn cached_package_lang_value(package: &PackageDescriptor, code: &str, key: &str) -> Option<String> {
+    PACKAGE_LANG_CACHE
+        .read()
+        .ok()?
+        .get(&package_cache_key(package))?
+        .get(code)?
+        .get(key)
+        .cloned()
+}
+
+fn uncached_package_lang_value(package: &PackageDescriptor, code: &str, key: &str) -> Option<String> {
+    load_package_lang_dict(package, code)?.get(key).cloned()
+}
+
+fn load_package_lang_dict(package: &PackageDescriptor, code: &str) -> Option<HashMap<String, String>> {
     let lang_path = package
         .root_dir
         .join("assets")
@@ -93,10 +150,17 @@ fn load_package_lang_value(package: &PackageDescriptor, code: &str, key: &str) -
         .join(format!("{code}.json"));
     let raw = fs::read_to_string(lang_path).ok()?;
     let json = serde_json::from_str::<JsonValue>(raw.trim_start_matches('\u{feff}')).ok()?;
-    json.as_object()?
-        .get(key)?
-        .as_str()
-        .map(|value| value.to_string())
+    let mut dict = HashMap::new();
+    for (entry_key, value) in json.as_object()? {
+        if let Some(text) = value.as_str() {
+            dict.insert(entry_key.to_string(), text.to_string());
+        }
+    }
+    Some(dict)
+}
+
+fn package_cache_key(package: &PackageDescriptor) -> String {
+    package.root_dir.to_string_lossy().to_string()
 }
 
 fn resolve_relative_under(root: PathBuf, logical_path: &str) -> Result<PathBuf> {

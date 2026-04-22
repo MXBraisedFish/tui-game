@@ -1,3 +1,4 @@
+pub mod content_cache;
 pub mod game_selection;
 pub mod i18n;
 pub mod layout;

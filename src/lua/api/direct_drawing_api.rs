@@ -1,7 +1,10 @@
 use mlua::{Lua, Table, Value, Variadic};
 use unicode_width::UnicodeWidthStr;
 
-use crate::core::screen::{Cell, ALIGN_CENTER, ALIGN_LEFT, ALIGN_NO_WRAP, ALIGN_RIGHT};
+use crate::core::screen::{
+    Cell, ALIGN_CENTER, ALIGN_LEFT, ALIGN_NO_WRAP, ALIGN_RIGHT, STYLE_BLINK, STYLE_BOLD,
+    STYLE_DIM, STYLE_HIDDEN, STYLE_ITALIC, STYLE_REVERSE, STYLE_STRIKE, STYLE_UNDERLINE,
+};
 use crate::lua::api::common;
 use crate::lua::api::direct_debug_api;
 use crate::lua::engine::RuntimeBridges;
@@ -13,6 +16,14 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
     globals.set("ALIGN_LEFT", ALIGN_LEFT)?;
     globals.set("ALIGN_CENTER", ALIGN_CENTER)?;
     globals.set("ALIGN_RIGHT", ALIGN_RIGHT)?;
+    globals.set("BOLD", STYLE_BOLD)?;
+    globals.set("ITALIC", STYLE_ITALIC)?;
+    globals.set("UNDERLINE", STYLE_UNDERLINE)?;
+    globals.set("STRIKE", STYLE_STRIKE)?;
+    globals.set("BLINK", STYLE_BLINK)?;
+    globals.set("REVERSE", STYLE_REVERSE)?;
+    globals.set("HIDDEN", STYLE_HIDDEN)?;
+    globals.set("DIM", STYLE_DIM)?;
 
     {
         let bridges = bridges.clone();
@@ -31,16 +42,16 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         globals.set(
             "canvas_draw_text",
             lua.create_function(move |_, args: Variadic<Value>| {
-                common::expect_arg_count_range(&args, 3, 6)?;
+                common::expect_arg_count_range(&args, 3, 7)?;
                 let x = common::expect_i64_arg(&args, 0, "x")?;
                 let y = common::expect_i64_arg(&args, 1, "y")?;
                 let text = common::expect_string_arg(&args, 2, "text")?;
                 ensure_coordinate(x)?;
                 ensure_coordinate(y)?;
-                let (fg, bg, align) = parse_draw_text_args(&args[3..])?;
+                let (fg, bg, style, align) = parse_draw_text_args(&args[3..])?;
                 with_canvas(&bridges, |canvas| {
                     warn_if_text_exceeds_canvas(&bridges, canvas, x, y, &text, align);
-                    canvas.draw_text(to_u16(x), to_u16(y), &text, fg, bg, align);
+                    canvas.draw_text(to_u16(x), to_u16(y), &text, fg, bg, style, align);
                 })?;
                 Ok(())
             })?,
@@ -72,6 +83,7 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
                             ch: fill_char,
                             fg,
                             bg,
+                            style: None,
                             continuation: false,
                         },
                     );
@@ -156,19 +168,27 @@ struct BorderChars {
     top_left: Option<char>,
 }
 
-fn parse_draw_text_args(rest: &[Value]) -> mlua::Result<(Option<String>, Option<String>, i64)> {
+fn parse_draw_text_args(
+    rest: &[Value],
+) -> mlua::Result<(Option<String>, Option<String>, Option<i64>, i64)> {
     let fg = common::expect_optional_string_arg(rest, 0, "fg")?
         .filter(|value| !value.trim().is_empty());
     let bg = common::expect_optional_string_arg(rest, 1, "bg")?
         .filter(|value| !value.trim().is_empty());
-    let align = match rest.get(2) {
+    let style = match rest.get(2) {
+        None | Some(Value::Nil) => None,
+        Some(Value::Integer(value)) => Some(*value),
+        Some(Value::Number(value)) => Some(*value as i64),
+        Some(value) => return Err(common::arg_type_error("style", "number", value)),
+    };
+    let align = match rest.get(3) {
         None => ALIGN_LEFT,
         Some(Value::Nil) => ALIGN_NO_WRAP,
         Some(Value::Integer(value)) => *value,
         Some(Value::Number(value)) => *value as i64,
         Some(value) => return Err(common::arg_type_error("align", "number", value)),
     };
-    Ok((fg, bg, align))
+    Ok((fg, bg, style, align))
 }
 
 fn with_canvas(
@@ -309,6 +329,7 @@ fn make_cell(ch: char, fg: Option<String>, bg: Option<String>) -> Cell {
         ch,
         fg,
         bg,
+        style: None,
         continuation: false,
     }
 }

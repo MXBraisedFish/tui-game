@@ -1,4 +1,4 @@
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthChar;
 
@@ -16,10 +16,13 @@ struct StyleState {
     default_bg: Option<Color>,
     fg: Option<Color>,
     bg: Option<Color>,
+    modifiers: Modifier,
     fg_count: Option<usize>,
     bg_count: Option<usize>,
+    modifier_count: Option<usize>,
     fg_need_clear: bool,
     bg_need_clear: bool,
+    modifier_need_clear: bool,
 }
 
 /// 解析可选的 `f%` 富文本语法，并按指定宽度包装为 ratatui 可渲染的文本行。
@@ -27,6 +30,7 @@ struct StyleState {
 /// 当前支持的指令：
 /// - `{tc:<颜色>}` / `{tc:clear}` / `{tc:<颜色>><数量>}`：控制文字颜色。
 /// - `{bg:<颜色>}` / `{bg:clear}` / `{bg:<颜色>><数量>}`：控制背景颜色。
+/// - `{ts:<样式>}` / `{ts:clear}` / `{ts:<样式>><数量>}`：控制文字样式。
 pub fn parse_rich_text_wrapped(text: &str, width: usize, base: Style) -> Vec<Line<'static>> {
     let content = text.strip_prefix("f%").unwrap_or(text);
 
@@ -35,10 +39,13 @@ pub fn parse_rich_text_wrapped(text: &str, width: usize, base: Style) -> Vec<Lin
         default_bg: base.bg,
         fg: base.fg,
         bg: base.bg,
+        modifiers: Modifier::empty(),
         fg_count: None,
         bg_count: None,
+        modifier_count: None,
         fg_need_clear: false,
         bg_need_clear: false,
+        modifier_need_clear: false,
     };
 
     let mut out: Vec<StyledChar> = Vec::new();
@@ -103,7 +110,7 @@ pub fn parse_rich_text_wrapped(text: &str, width: usize, base: Style) -> Vec<Lin
         i += 1;
     }
 
-    if state.fg_need_clear || state.bg_need_clear {
+    if state.fg_need_clear || state.bg_need_clear || state.modifier_need_clear {
         push_error(&mut out, &rt("rich_text.error.unterminated_style"), base);
         reset_to_default(&mut state);
     }
@@ -114,10 +121,13 @@ pub fn parse_rich_text_wrapped(text: &str, width: usize, base: Style) -> Vec<Lin
 fn reset_to_default(state: &mut StyleState) {
     state.fg = state.default_fg;
     state.bg = state.default_bg;
+    state.modifiers = Modifier::empty();
     state.fg_count = None;
     state.bg_count = None;
+    state.modifier_count = None;
     state.fg_need_clear = false;
     state.bg_need_clear = false;
+    state.modifier_need_clear = false;
 }
 
 fn read_block(input: &[char]) -> Option<(String, usize)> {
@@ -199,6 +209,7 @@ fn apply_block(block: &str, state: &mut StyleState, rest: &[char]) -> Result<(),
         match cmd.as_str() {
             "tc" => apply_color_command(params, true, state, rest)?,
             "bg" => apply_color_command(params, false, state, rest)?,
+            "ts" => apply_text_style_command(params, state, rest)?,
             _ => return Err(rt("rich_text.error.invalid_command")),
         }
     }
@@ -268,6 +279,52 @@ fn apply_color_command(
     Ok(())
 }
 
+fn apply_text_style_command(
+    params: Vec<String>,
+    state: &mut StyleState,
+    rest: &[char],
+) -> Result<(), String> {
+    if params.is_empty() || params[0].is_empty() {
+        return Err(rt("rich_text.error.invalid_param"));
+    }
+
+    if params[0].eq_ignore_ascii_case("clear") {
+        if params.len() != 1 {
+            return Err(rt("rich_text.error.invalid_param"));
+        }
+        state.modifiers = Modifier::empty();
+        state.modifier_count = None;
+        state.modifier_need_clear = false;
+        return Ok(());
+    }
+
+    let Some(modifiers) = parse_text_styles(&params[0]) else {
+        return Err(rt("rich_text.error.invalid_param"));
+    };
+
+    let count = if params.len() >= 2 && !params[1].trim().is_empty() {
+        match params[1].trim().parse::<usize>() {
+            Ok(v) if v > 0 => Some(v),
+            _ => return Err(rt("rich_text.error.invalid_param")),
+        }
+    } else {
+        None
+    };
+
+    if params.len() > 2 {
+        return Err(rt("rich_text.error.invalid_param"));
+    }
+
+    if count.is_none() && !has_future_clear(rest, "ts") {
+        return Err(rt("rich_text.error.unterminated_style"));
+    }
+
+    state.modifiers = modifiers;
+    state.modifier_count = count;
+    state.modifier_need_clear = count.is_none();
+    Ok(())
+}
+
 fn has_future_clear(rest: &[char], cmd: &str) -> bool {
     let mut i = 0usize;
     while i < rest.len() {
@@ -302,6 +359,9 @@ fn push_char(out: &mut Vec<StyledChar>, ch: char, state: &mut StyleState, base: 
     let mut style = base;
     style.fg = state.fg;
     style.bg = state.bg;
+    if !state.modifiers.is_empty() {
+        style = style.add_modifier(state.modifiers);
+    }
     out.push(StyledChar { ch, style });
 
     if let Some(rem) = state.fg_count {
@@ -319,6 +379,15 @@ fn push_char(out: &mut Vec<StyledChar>, ch: char, state: &mut StyleState, base: 
             state.bg = state.default_bg;
         } else {
             state.bg_count = Some(rem - 1);
+        }
+    }
+
+    if let Some(rem) = state.modifier_count {
+        if rem <= 1 {
+            state.modifier_count = None;
+            state.modifiers = Modifier::empty();
+        } else {
+            state.modifier_count = Some(rem - 1);
         }
     }
 }
@@ -485,6 +554,33 @@ fn parse_color(raw: &str) -> Option<Color> {
         "light_magenta" => Some(Color::LightMagenta),
         "light_cyan" => Some(Color::LightCyan),
         _ => None,
+    }
+}
+
+fn parse_text_styles(raw: &str) -> Option<Modifier> {
+    let mut modifiers = Modifier::empty();
+    let mut saw_any = false;
+
+    for token in raw.split('+').map(str::trim).filter(|token| !token.is_empty()) {
+        let modifier = match token.to_ascii_lowercase().as_str() {
+            "bold" => Modifier::BOLD,
+            "italic" => Modifier::ITALIC,
+            "underline" => Modifier::UNDERLINED,
+            "strike" => Modifier::CROSSED_OUT,
+            "blink" => Modifier::SLOW_BLINK,
+            "reverse" => Modifier::REVERSED,
+            "hidden" => Modifier::HIDDEN,
+            "dim" => Modifier::DIM,
+            _ => return None,
+        };
+        modifiers |= modifier;
+        saw_any = true;
+    }
+
+    if saw_any {
+        Some(modifiers)
+    } else {
+        None
     }
 }
 

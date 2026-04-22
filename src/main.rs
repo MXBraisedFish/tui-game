@@ -15,6 +15,7 @@ use ratatui::backend::CrosstermBackend;
 use serde::Deserialize;
 
 use tui_game::app;
+use tui_game::app::content_cache;
 use tui_game::app::game_selection::{GameSelection, GameSelectionAction};
 use tui_game::app::i18n;
 use tui_game::app::layout::{MENU_MIN_HEIGHT, MENU_MIN_WIDTH};
@@ -23,7 +24,7 @@ use tui_game::app::placeholder_pages::{self, PlaceholderPage};
 use tui_game::app::settings;
 use tui_game::core::runtime::{LaunchMode, launch_game};
 use tui_game::core::save;
-use tui_game::game::registry::{GameDescriptor, GameRegistry};
+use tui_game::game::registry::GameDescriptor;
 use tui_game::terminal::renderer;
 use tui_game::terminal::size_watcher;
 
@@ -113,6 +114,7 @@ fn run() -> Result<()> {
     cleanup_legacy_runtime_data()?;
     i18n::init("us-en")?;
     initialize_runtime_layout()?;
+    content_cache::reload();
 
     // Initialize terminal session.
     let mut session = TerminalSession::new()?;
@@ -370,9 +372,7 @@ fn handle_key_event(
                             }
                             reset_terminal_after_runtime()?;
                             *force_ui_full_redraw = true;
-                            let games = GameRegistry::scan_all()
-                                .map(GameRegistry::into_games)
-                                .unwrap_or_default();
+                            let games = content_cache::games();
                             ui.refresh_preserving_selection(games);
                         }
                     }
@@ -419,9 +419,7 @@ fn handle_key_event(
                         }
                         reset_terminal_after_runtime()?;
                         *force_ui_full_redraw = true;
-                        let games = GameRegistry::scan_all()
-                            .map(GameRegistry::into_games)
-                            .unwrap_or_default();
+                        let games = content_cache::games();
                         ui.refresh_preserving_selection(games);
                     }
                 }
@@ -505,20 +503,14 @@ fn apply_menu_action(
 ) -> AppState {
     match action {
         MenuAction::Play => {
-            let games = match GameRegistry::scan_all() {
-                Ok(found) => found.into_games(),
-                Err(_) => Vec::new(),
-            };
             AppState::GameSelection {
-                ui: GameSelection::new(games),
+                ui: GameSelection::new(content_cache::games()),
             }
         }
 
         MenuAction::Continue => {
             if let Some(game_id) = continue_game_id {
-                let game = GameRegistry::scan_all()
-                    .map(GameRegistry::into_games)
-                    .unwrap_or_default()
+                let game = content_cache::games()
                     .into_iter()
                     .find(|g| g.id.eq_ignore_ascii_case(game_id));
                 if let Some(game) = game {
@@ -533,11 +525,8 @@ fn apply_menu_action(
                     *force_ui_full_redraw = true;
                 }
             }
-            let games = GameRegistry::scan_all()
-                .map(GameRegistry::into_games)
-                .unwrap_or_default();
             AppState::GameSelection {
-                ui: GameSelection::new(games),
+                ui: GameSelection::new(content_cache::games()),
             }
         }
 
@@ -590,30 +579,20 @@ fn sync_continue_item(menu: &mut Menu) {
 }
 
 fn resolve_saved_game_name(game_id: &str) -> String {
-    if let Ok(games) = GameRegistry::scan_all() {
-        if let Some(game) = games
-            .into_games()
-            .into_iter()
-            .find(|game| game.id == game_id)
-        {
-            return game.name;
-        }
+    if let Some(game) = content_cache::find_game(game_id) {
+        return game.display_name;
     }
     "--".to_string()
 }
 
 fn resolve_continue_target(game_id: &str) -> Option<(String, String)> {
-    let games = GameRegistry::scan_all().ok()?;
-    let game = games
-        .into_games()
-        .into_iter()
-        .find(|game| game.id == game_id)?;
+    let game = content_cache::find_game(game_id)?;
 
     if !save::game_has_continue_save(game_id) {
         return None;
     }
 
-    Some((game.id, game.name))
+    Some((game.id, game.display_name))
 }
 
 fn normalized_tag(raw: &str) -> String {

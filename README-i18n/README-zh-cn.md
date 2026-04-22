@@ -6,7 +6,7 @@
 
 # 文档导航
 
-- [MOD 制作规范及教程](../dev_docs/zh_cn/MOD.md)
+- [模组包制作规范及教程](../dev_docs/zh_cn/MOD.md)
 - [API 规范与查询](../dev_docs/zh_cn/API.md)
 - [富文本指令](../dev_docs/zh_cn/RICH_TEXT.md)
 
