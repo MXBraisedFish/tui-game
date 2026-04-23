@@ -135,6 +135,14 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
         None
     };
     for package in discover_packages(&base_dir, source.clone())? {
+        let enabled = mod_state
+            .as_ref()
+            .and_then(|state| state.mods.get(&package.package.namespace))
+            .map(|entry| entry.enabled)
+            .unwrap_or(true);
+        if matches!(source, GamePackageSource::Mod) && !enabled {
+            continue;
+        }
         let debug_enabled = mod_state
             .as_ref()
             .and_then(|state| state.mods.get(&package.package.namespace))

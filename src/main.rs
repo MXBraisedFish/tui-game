@@ -12,6 +12,10 @@ use crossterm::terminal::{
 };
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use ratatui::layout::{Alignment, Constraint, Direction, Layout};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, Gauge, Paragraph, Wrap};
 use serde::Deserialize;
 
 use tui_game::app;
@@ -31,6 +35,10 @@ use tui_game::terminal::size_watcher;
 const RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
 const LATEST_RELEASE_API_URL: &str =
     "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
+const MAX_UI_EVENTS_PER_FRAME: usize = 256;
+const ACTIVE_FRAME_BUDGET: Duration = Duration::from_millis(16);
+const IDLE_FRAME_BUDGET: Duration = Duration::from_millis(250);
+const UI_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Deserialize)]
 struct LatestReleaseResponse {
@@ -114,106 +122,178 @@ fn run() -> Result<()> {
     cleanup_legacy_runtime_data()?;
     i18n::init("us-en")?;
     initialize_runtime_layout()?;
-    content_cache::reload();
 
     // Initialize terminal session.
     let mut session = TerminalSession::new()?;
+    render_loading_screen(
+        &mut session.terminal,
+        &content_cache::LoadingProgress {
+            percent: 0,
+            message: i18n::t_or("loading.startup.preparing", "Preparing startup..."),
+        },
+    )?;
+    content_cache::reload_with_progress(|progress| {
+        let _ = render_loading_screen(
+            &mut session.terminal,
+            &content_cache::LoadingProgress {
+                percent: progress.percent,
+                message: progress.message,
+            },
+        );
+    });
     let runtime_version = normalized_tag(RUNTIME_VERSION);
     let update_check_rx = spawn_update_check(runtime_version.clone());
     let mut update_hint: Option<String> = None;
     let mut state = AppState::MainMenu { menu: Menu::new() };
     let mut pending_new_game_start: Option<PendingNewGameStart> = None;
     let mut force_ui_full_redraw = false;
-
-    let frame_budget = Duration::from_millis(16);
+    let mut last_activity_at = Instant::now();
+    let mut ui_dirty = true;
+    let mut last_size_ok: Option<bool> = None;
 
     loop {
         let frame_start = Instant::now();
+        let idle_mode = frame_start.duration_since(last_activity_at) >= UI_IDLE_TIMEOUT;
+        let frame_budget = if idle_mode {
+            IDLE_FRAME_BUDGET
+        } else {
+            ACTIVE_FRAME_BUDGET
+        };
 
         if let AppState::MainMenu { menu } = &mut state {
             sync_continue_item(menu);
+        }
+
+        if let AppState::Settings { ui } = &mut state
+            && settings::poll_mod_hot_reload(ui)
+        {
+            ui_dirty = true;
+            force_ui_full_redraw = true;
+        }
+        if let AppState::GameSelection { ui } = &mut state
+            && ui.poll_mod_hot_reload()
+        {
+            ui_dirty = true;
+            force_ui_full_redraw = true;
         }
 
         // Try to receive the background version check result.
         if update_hint.is_none() {
             if let Ok(Some(latest_tag)) = update_check_rx.try_recv() {
                 update_hint = Some(latest_tag);
+                ui_dirty = true;
             }
         }
 
         let (min_width, min_height) = minimum_size_for_state(&state);
         let size_state = size_watcher::check_size(min_width, min_height)?;
 
-        if event::poll(Duration::from_millis(0))? {
-            let ev = event::read()?;
-            if let Event::Key(key) = ev {
-                if !size_state.size_ok
-                    && matches!(key.kind, KeyEventKind::Press)
-                    && matches!(
-                        key.code,
-                        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q')
-                    )
-                {
-                    state = AppState::Exiting;
-                    continue;
+        let initial_poll_timeout = if should_keep_ui_animating(&state) || !idle_mode {
+            Duration::from_millis(0)
+        } else {
+            frame_budget
+        };
+        let mut handled_events = 0usize;
+        let mut saw_input_event = false;
+        let mut saw_resize_event = false;
+        let mut polled = event::poll(initial_poll_timeout)?;
+        while handled_events < MAX_UI_EVENTS_PER_FRAME && polled {
+            handled_events += 1;
+            match event::read()? {
+                Event::Key(key) => {
+                    saw_input_event = true;
+                    if !size_state.size_ok
+                        && matches!(key.kind, KeyEventKind::Press)
+                        && matches!(
+                            key.code,
+                            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q')
+                        )
+                    {
+                        state = AppState::Exiting;
+                        break;
+                    }
+                    handle_key_event(
+                        &mut state,
+                        &mut pending_new_game_start,
+                        &mut force_ui_full_redraw,
+                        key,
+                    )?;
                 }
-                handle_key_event(
-                    &mut state,
-                    &mut pending_new_game_start,
-                    &mut force_ui_full_redraw,
-                    key,
-                )?;
+                Event::Resize(_, _) => {
+                    saw_resize_event = true;
+                    force_ui_full_redraw = true;
+                }
+                _ => {}
             }
+            polled = event::poll(Duration::from_millis(0))?;
+        }
+
+        if saw_input_event || saw_resize_event {
+            last_activity_at = Instant::now();
+            ui_dirty = true;
         }
 
         if matches!(state, AppState::Exiting) {
             break;
         }
 
+        let should_draw = force_ui_full_redraw
+            || ui_dirty
+            || last_size_ok != Some(size_state.size_ok)
+            || should_keep_ui_animating(&state);
+
         if size_state.size_ok {
             if force_ui_full_redraw {
                 session.terminal.clear()?;
                 force_ui_full_redraw = false;
             }
-            session.terminal.draw(|frame| match &mut state {
-                AppState::MainMenu { menu } => {
-                    app::menu::render_main_menu(
-                        frame,
-                        menu,
-                        RUNTIME_VERSION,
-                        update_hint.as_deref(),
-                    );
-                }
-                AppState::GameSelection { ui } => {
-                    if let Some(pending) = pending_new_game_start.as_ref() {
-                        render_new_game_confirm(frame, &pending.saved_game_name);
-                    } else {
-                        ui.render(frame, frame.area());
+            if should_draw {
+                session.terminal.draw(|frame| match &mut state {
+                    AppState::MainMenu { menu } => {
+                        app::menu::render_main_menu(
+                            frame,
+                            menu,
+                            RUNTIME_VERSION,
+                            update_hint.as_deref(),
+                        );
                     }
-                }
-                AppState::Settings { ui } => {
-                    settings::render(frame, ui);
-                }
-                AppState::About => {
-                    placeholder_pages::render_placeholder(
-                        frame,
-                        PlaceholderPage::About,
-                        runtime_version.as_str(),
-                        None,
-                    );
-                }
-                AppState::Continue => {
-                    placeholder_pages::render_placeholder(
-                        frame,
-                        PlaceholderPage::Continue,
-                        runtime_version.as_str(),
-                        None,
-                    );
-                }
-                AppState::Exiting => {}
-            })?;
+                    AppState::GameSelection { ui } => {
+                        if let Some(pending) = pending_new_game_start.as_ref() {
+                            render_new_game_confirm(frame, &pending.saved_game_name);
+                        } else {
+                            ui.render(frame, frame.area());
+                        }
+                    }
+                    AppState::Settings { ui } => {
+                        settings::render(frame, ui);
+                    }
+                    AppState::About => {
+                        placeholder_pages::render_placeholder(
+                            frame,
+                            PlaceholderPage::About,
+                            runtime_version.as_str(),
+                            None,
+                        );
+                    }
+                    AppState::Continue => {
+                        placeholder_pages::render_placeholder(
+                            frame,
+                            PlaceholderPage::Continue,
+                            runtime_version.as_str(),
+                            None,
+                        );
+                    }
+                    AppState::Exiting => {}
+                })?;
+                ui_dirty = false;
+                last_size_ok = Some(true);
+            }
         } else {
-            size_watcher::draw_size_warning(&size_state, min_width, min_height)?;
+            if should_draw {
+                size_watcher::draw_size_warning(&size_state, min_width, min_height)?;
+                ui_dirty = false;
+                last_size_ok = Some(false);
+            }
         }
 
         let elapsed = frame_start.elapsed();
@@ -225,6 +305,111 @@ fn run() -> Result<()> {
     drop(session);
 
     Ok(())
+}
+
+fn render_loading_screen(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    progress: &content_cache::LoadingProgress,
+) -> Result<()> {
+    let title = i18n::t_or("loading.startup.title", "Loading data");
+    let hint = i18n::t_or(
+        "loading.startup.hint",
+        "The program is preparing game and mod resources. This is not a freeze.",
+    );
+    terminal.draw(|frame| {
+        let area = frame.area();
+        let block_width = area.width.saturating_sub(2).max(1);
+        let hint_lines = estimate_wrapped_lines(&hint, block_width.saturating_sub(2));
+        let block_height = 5u16.saturating_add(hint_lines.max(1));
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),
+                Constraint::Length(block_height),
+                Constraint::Min(0),
+            ])
+            .split(area);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(Line::from(vec![
+                Span::styled(" ", Style::default()),
+                Span::styled(title.clone(), Style::default().fg(Color::White)),
+                Span::styled(" ", Style::default()),
+            ]))
+            .border_style(Style::default().fg(Color::White));
+        let inner = block.inner(layout[1]);
+        frame.render_widget(block, layout[1]);
+
+        let body = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(hint_lines.max(1)),
+            ])
+            .split(inner);
+
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!("{}%", progress.percent),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )))
+            .alignment(Alignment::Center),
+            body[0],
+        );
+
+        frame.render_widget(
+            Gauge::default()
+                .gauge_style(Style::default().fg(Color::LightGreen).bg(Color::DarkGray))
+                .percent(progress.percent.min(100))
+                .label(""),
+            body[1],
+        );
+
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                progress.message.clone(),
+                Style::default().fg(Color::White),
+            )))
+            .alignment(Alignment::Center),
+            body[2],
+        );
+
+        frame.render_widget(
+            Paragraph::new(hint.clone())
+                .alignment(Alignment::Center)
+                .wrap(Wrap { trim: false })
+                .style(Style::default().fg(Color::DarkGray)),
+            body[3],
+        );
+    })?;
+    Ok(())
+}
+
+fn estimate_wrapped_lines(text: &str, width: u16) -> u16 {
+    let width = width.max(1) as usize;
+    let mut total = 0usize;
+    for raw_line in text.lines() {
+        let len = raw_line.chars().count().max(1);
+        total += len.div_ceil(width);
+    }
+    total.max(1) as u16
+}
+
+fn should_keep_ui_animating(state: &AppState) -> bool {
+    match state {
+        AppState::Settings { ui } => {
+            ui.mod_safe_dialog.is_some()
+                || ui.cleanup_dialog.is_some()
+                || ui.default_safe_mode_disable_dialog.is_some()
+                || ui.security_success_at.is_some()
+        }
+        _ => false,
+    }
 }
 
 fn initialize_runtime_layout() -> Result<()> {

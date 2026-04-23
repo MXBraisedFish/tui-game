@@ -105,6 +105,10 @@ pub struct ModScanOutput {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ModState {
     pub api_version: u32,
+    #[serde(default = "default_true")]
+    pub default_mod_enabled: bool,
+    #[serde(default = "default_true")]
+    pub default_safe_mode_enabled: bool,
     #[serde(default)]
     pub mods: HashMap<String, ModStateEntry>,
     #[serde(default)]
@@ -207,6 +211,20 @@ fn default_true() -> bool {
     true
 }
 
+fn ensure_mod_state_entry<'a>(state: &'a mut ModState, namespace: &str) -> &'a mut ModStateEntry {
+    let default_mod_enabled = state.default_mod_enabled;
+    let default_safe_mode_enabled = state.default_safe_mode_enabled;
+    state
+        .mods
+        .entry(namespace.to_string())
+        .or_insert_with(|| ModStateEntry {
+            enabled: default_mod_enabled,
+            safe_mode_enabled: default_safe_mode_enabled,
+            session_safe_mode_enabled: None,
+            ..Default::default()
+        })
+}
+
 static MOD_STATE_STORE: LazyLock<Mutex<ModState>> = LazyLock::new(|| {
     Mutex::new(read_persisted_mod_state().unwrap_or_else(|| ModState {
         api_version: MOD_API_VERSION,
@@ -283,23 +301,19 @@ pub fn save_scan_cache(_cache: &ModScanCache) -> Result<()> {
 
 pub fn set_mod_enabled(namespace: &str, enabled: bool) -> Result<()> {
     let mut state = load_mod_state();
-    state.mods.entry(namespace.to_string()).or_default().enabled = enabled;
+    ensure_mod_state_entry(&mut state, namespace).enabled = enabled;
     save_mod_state(&state)
 }
 
 pub fn set_mod_debug_enabled(namespace: &str, enabled: bool) -> Result<()> {
     let mut state = load_mod_state();
-    state
-        .mods
-        .entry(namespace.to_string())
-        .or_default()
-        .debug_enabled = enabled;
+    ensure_mod_state_entry(&mut state, namespace).debug_enabled = enabled;
     save_mod_state(&state)
 }
 
 pub fn set_mod_safe_mode(namespace: &str, enabled: bool, persist: bool) -> Result<()> {
     let mut state = load_mod_state();
-    let entry = state.mods.entry(namespace.to_string()).or_default();
+    let entry = ensure_mod_state_entry(&mut state, namespace);
     if persist {
         entry.safe_mode_enabled = enabled;
         entry.session_safe_mode_enabled = None;
@@ -320,10 +334,7 @@ pub fn update_mod_keybindings(
     bindings: HashMap<String, Vec<String>>,
 ) -> Result<()> {
     let mut state = load_mod_state();
-    let game = state
-        .mods
-        .entry(namespace.to_string())
-        .or_default()
+    let game = ensure_mod_state_entry(&mut state, namespace)
         .games
         .entry(game_id.to_string())
         .or_default();
@@ -348,15 +359,46 @@ pub fn update_mod_best_score(
     score: JsonValue,
 ) -> Result<()> {
     let mut state = load_mod_state();
-    let game = state
-        .mods
-        .entry(namespace.to_string())
-        .or_default()
+    let game = ensure_mod_state_entry(&mut state, namespace)
         .games
         .entry(game_id.to_string())
         .or_default();
     game.script_name = script_name.to_string();
     game.best_score = score;
+    save_mod_state(&state)
+}
+
+pub fn default_mod_settings() -> (bool, bool) {
+    let state = load_mod_state();
+    (state.default_safe_mode_enabled, state.default_mod_enabled)
+}
+
+pub fn set_default_safe_mode_enabled(enabled: bool) -> Result<()> {
+    let mut state = load_mod_state();
+    state.default_safe_mode_enabled = enabled;
+    save_mod_state(&state)
+}
+
+pub fn set_default_mod_enabled(enabled: bool) -> Result<()> {
+    let mut state = load_mod_state();
+    state.default_mod_enabled = enabled;
+    save_mod_state(&state)
+}
+
+pub fn reset_all_mod_safe_modes_enabled() -> Result<()> {
+    let mut state = load_mod_state();
+    for entry in state.mods.values_mut() {
+        entry.safe_mode_enabled = true;
+        entry.session_safe_mode_enabled = None;
+    }
+    save_mod_state(&state)
+}
+
+pub fn reset_all_mod_enabled_disabled() -> Result<()> {
+    let mut state = load_mod_state();
+    for entry in state.mods.values_mut() {
+        entry.enabled = false;
+    }
     save_mod_state(&state)
 }
 
@@ -458,7 +500,7 @@ fn scan_package(
     validate_mod_package_root(dir, &package.package)?;
 
     let namespace = package.package.namespace.clone();
-    let state_entry = state.mods.entry(namespace.clone()).or_default();
+    let state_entry = ensure_mod_state_entry(state, &namespace);
     state_entry.package_name = package.package.package_name.clone();
     state_entry.author = package.package.author.clone();
     state_entry.version = package.package.version.clone();

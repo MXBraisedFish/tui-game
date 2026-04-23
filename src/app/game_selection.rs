@@ -4,14 +4,18 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::{symbols, widgets::Wrap};
+use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthStr;
 
+use crate::app::content_cache;
 use crate::app::i18n;
 use crate::app::rich_text;
 use crate::core::stats as runtime_stats;
 use crate::game::registry::GameSourceKind;
 use crate::game::registry::GameDescriptor;
 use crate::game::resources;
+
+const MOD_HOT_RELOAD_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 /// 游戏选择页的完整状态。
 pub struct GameSelection {
@@ -24,6 +28,8 @@ pub struct GameSelection {
     detail_scroll_available: bool,
     sort_mode: GameSortMode,
     sort_descending: bool,
+    mod_hot_reload_fingerprint: Option<u64>,
+    mod_hot_reload_last_checked_at: Instant,
 }
 
 #[derive(Clone, Copy)]
@@ -71,6 +77,8 @@ impl GameSelection {
             detail_scroll_available: false,
             sort_mode: GameSortMode::Source,
             sort_descending: false,
+            mod_hot_reload_fingerprint: content_cache::current_mod_tree_fingerprint(),
+            mod_hot_reload_last_checked_at: Instant::now(),
         };
         this.apply_sort();
         this
@@ -86,6 +94,8 @@ impl GameSelection {
         self.apply_sort();
         self.page_jump_input = None;
         self.launch_placeholder = false;
+        self.mod_hot_reload_fingerprint = content_cache::current_mod_tree_fingerprint();
+        self.mod_hot_reload_last_checked_at = Instant::now();
 
         if self.games.is_empty() {
             self.list_state.select(None);
@@ -202,12 +212,41 @@ impl GameSelection {
         }
     }
 
+    pub fn poll_mod_hot_reload(&mut self) -> bool {
+        let now = Instant::now();
+        if now.duration_since(self.mod_hot_reload_last_checked_at) < MOD_HOT_RELOAD_POLL_INTERVAL {
+            return false;
+        }
+        self.mod_hot_reload_last_checked_at = now;
+
+        let current_fingerprint = content_cache::current_mod_tree_fingerprint();
+        if current_fingerprint != self.mod_hot_reload_fingerprint {
+            content_cache::reload();
+            let games = content_cache::games();
+            self.refresh_preserving_selection(games);
+            return true;
+        }
+
+        false
+    }
+
     /// Render the game selection page, including the list and detail panel.
     pub fn render(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {
         if self.launch_placeholder {
             self.render_launch_placeholder(frame, area);
             return;
         }
+
+        let root_preview = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(area);
+        let columns_preview = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+            .split(root_preview[0]);
+        self.detail_scroll_available =
+            self.compute_detail_scroll_available(columns_preview[1]);
 
         let hint_lines = wrap_game_hint_lines(
             &build_game_hint_segments(self.detail_scroll_available),
@@ -230,6 +269,117 @@ impl GameSelection {
             .style(Style::default().fg(Color::DarkGray))
             .alignment(Alignment::Center);
         frame.render_widget(hint_widget, root[1]);
+    }
+
+    fn compute_detail_scroll_available(&self, area: Rect) -> bool {
+        let block_inner = Block::default()
+            .borders(Borders::ALL)
+            .border_set(symbols::border::DOUBLE)
+            .border_style(Style::default().fg(Color::White))
+            .title(format!(" {} ", i18n::t("game_selection.panel.details")))
+            .inner(area);
+
+        let Some(game) = self.selected_game() else {
+            return false;
+        };
+
+        let inner = block_inner;
+        let sep_len = inner.width as usize;
+        let separator = "─".repeat(sep_len.max(1));
+        let name = self.localized_game_name(game);
+        let description = self.localized_game_description(game);
+        let details = self.localized_game_details(game);
+
+        let mut top_lines = vec![Line::from(Span::styled(
+            name,
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ))];
+
+        top_lines.push(Line::from(separator.clone()));
+        let stat_lines_start = top_lines.len();
+        if game.id == "tic_tac_toe" {
+        } else if game.is_mod_game() {
+            if game.has_best_score {
+                top_lines.extend(format_runtime_best_score_lines(
+                    game,
+                    inner.width.saturating_sub(1) as usize,
+                ));
+                top_lines.push(Line::from(separator.clone()));
+            }
+            if let Some((package_name, allow_rich)) = self.mod_package_name(game) {
+                top_lines.extend(label_manifest_value_lines(
+                    text("mods.info.package", "Package:"),
+                    package_name,
+                    allow_rich,
+                    inner.width.saturating_sub(1) as usize,
+                    Style::default().fg(Color::White),
+                ));
+            }
+            if let Some(author) = self.mod_author(game) {
+                top_lines.extend(label_manifest_value_lines(
+                    text("mods.info.author", "Author:"),
+                    author,
+                    true,
+                    inner.width.saturating_sub(1) as usize,
+                    Style::default().fg(Color::White),
+                ));
+            }
+            if let Some(version) = self.mod_version(game) {
+                top_lines.extend(label_manifest_value_lines(
+                    text("mods.info.version", "Version:"),
+                    version,
+                    true,
+                    inner.width.saturating_sub(1) as usize,
+                    Style::default().fg(Color::White),
+                ));
+            }
+            top_lines.push(Line::from(separator.clone()));
+        } else if game.has_best_score {
+            top_lines.extend(format_runtime_best_score_lines(
+                game,
+                inner.width.saturating_sub(1) as usize,
+            ));
+        }
+
+        if top_lines.len() > stat_lines_start && !game.is_mod_game() {
+            top_lines.push(Line::from(separator.clone()));
+        }
+        top_lines.push(Line::from(Span::styled(
+            i18n::t("game_selection.label.how_to_play"),
+            Style::default().fg(Color::Yellow),
+        )));
+        top_lines.extend(rich_text::parse_rich_text_wrapped(
+            &description,
+            inner.width.saturating_sub(1) as usize,
+            Style::default().fg(Color::White),
+        ));
+
+        let min_details_h = 3u16.min(inner.height.max(1));
+        let top_content_h = top_lines.len() as u16;
+        let top_h = top_content_h.min(inner.height.saturating_sub(min_details_h));
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(top_h), Constraint::Min(min_details_h)])
+            .split(inner);
+
+        let detail_rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Min(1),
+            ])
+            .split(chunks[1]);
+
+        let details_full_lines = rich_text::parse_rich_text_wrapped(
+            &details,
+            detail_rows[2].width.saturating_sub(2) as usize,
+            Style::default().fg(Color::White),
+        );
+        let viewport_h = detail_rows[2].height as usize;
+        details_full_lines.len().saturating_sub(viewport_h) > 0
     }
 
     /// Return the minimum terminal size required for stable layout.
@@ -934,6 +1084,31 @@ fn wrap_game_hint_lines(segments: &[String], width: usize) -> Vec<Line<'static>>
     lines
 }
 
+fn wrap_plain_text_lines(text: &str, width: usize, style: Style) -> Vec<Line<'static>> {
+    let width = width.max(1);
+    let mut lines = Vec::new();
+
+    for raw_line in text.split('\n') {
+        let mut current = String::new();
+        let mut current_width = 0usize;
+        for ch in raw_line.chars() {
+            let ch_width = UnicodeWidthStr::width(ch.to_string().as_str()).max(1);
+            if current_width > 0 && current_width + ch_width > width {
+                lines.push(Line::from(Span::styled(std::mem::take(&mut current), style)));
+                current_width = 0;
+            }
+            current.push(ch);
+            current_width += ch_width;
+        }
+        lines.push(Line::from(Span::styled(current, style)));
+    }
+
+    if lines.is_empty() {
+        lines.push(Line::from(""));
+    }
+    lines
+}
+
 fn label_manifest_value_lines(
     label: String,
     value: String,
@@ -1039,10 +1214,14 @@ fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<L
     }
     let Some(score) = runtime_stats::read_runtime_best_score(&game.id) else {
         let fallback = resolved_best_none_text(game);
-        return vec![Line::from(fallback)];
+        return rich_text::parse_rich_text_wrapped(
+            &fallback,
+            width.max(1),
+            Style::default().fg(Color::White),
+        );
     };
 
-    let rendered = match score {
+    let (rendered, allow_rich) = match score {
         serde_json::Value::Object(map) => {
             if let Some(best_string_raw) = map.get("best_string").and_then(|value| value.as_str()) {
                 let mut rendered = if let Some(package) = game.package_info() {
@@ -1057,20 +1236,24 @@ fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<L
                     rendered =
                         rendered.replace(&format!("{{{key}}}"), &json_value_to_inline_text(value));
                 }
-                rendered
+                (rendered, true)
             } else {
-                "--".to_string()
+                ("--".to_string(), false)
             }
         }
-        serde_json::Value::String(value) => value,
-        other => json_value_to_inline_text(&other),
+        serde_json::Value::String(value) => (value, false),
+        other => (json_value_to_inline_text(&other), false),
     };
 
-    let lines = rich_text::parse_rich_text_wrapped(
-        &rendered,
-        width.max(1),
-        Style::default().fg(Color::White),
-    );
+    let lines = if allow_rich {
+        rich_text::parse_rich_text_wrapped(
+            &rendered,
+            width.max(1),
+            Style::default().fg(Color::White),
+        )
+    } else {
+        wrap_plain_text_lines(&rendered, width.max(1), Style::default().fg(Color::White))
+    };
     if lines.is_empty() {
         vec![Line::from("--")]
     } else {
