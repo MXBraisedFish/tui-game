@@ -1,6 +1,7 @@
 use anyhow::Result;
 use serde_json::{Map, Value as JsonValue};
 use std::fs;
+use std::collections::HashMap;
 
 use crate::utils::path_utils;
 
@@ -35,6 +36,8 @@ fn write_store(store: &Map<String, JsonValue>) -> Result<()> {
     fs::write(path, serde_json::to_string_pretty(store)?)?;
     Ok(())
 }
+
+const KEYBINDINGS_SLOT: &str = "__keybindings";
 
 pub fn sanitize_runtime_save_stem(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len());
@@ -117,4 +120,16 @@ pub fn clear_active_game_save() -> Result<()> {
 
 pub fn game_has_continue_save(game_id: &str) -> bool {
     load_continue(game_id).ok().flatten().is_some()
+}
+
+pub fn save_keybindings(game_id: &str, bindings: &HashMap<String, Vec<String>>) -> Result<()> {
+    let value = serde_json::to_value(bindings)?;
+    save_data_slot(game_id, KEYBINDINGS_SLOT, &value)
+}
+
+pub fn load_keybindings(game_id: &str) -> Result<HashMap<String, Vec<String>>> {
+    let Some(value) = load_data_slot(game_id, KEYBINDINGS_SLOT)? else {
+        return Ok(HashMap::new());
+    };
+    Ok(serde_json::from_value(value).unwrap_or_default())
 }

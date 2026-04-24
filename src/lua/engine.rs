@@ -338,16 +338,27 @@ fn clear_startup_input_buffer() {
 }
 
 fn map_semantic_key_to_event(game: &GameDescriptor, key_name: String) -> InputEvent {
+    let event_key_name = if game.case_sensitive {
+        key_name
+    } else {
+        key_name.to_lowercase()
+    };
     for (action, binding) in &game.actions {
         if binding
             .keys()
             .into_iter()
-            .any(|candidate| candidate.eq_ignore_ascii_case(&key_name))
+            .any(|candidate| {
+                if game.case_sensitive {
+                    candidate == event_key_name
+                } else {
+                    candidate.eq_ignore_ascii_case(&event_key_name)
+                }
+            })
         {
             return InputEvent::Action(action.clone());
         }
     }
-    InputEvent::Key(key_name)
+    InputEvent::Key(event_key_name)
 }
 
 pub(crate) fn anyhow_lua_error(err: mlua::Error) -> anyhow::Error {

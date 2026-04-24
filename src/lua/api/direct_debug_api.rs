@@ -131,6 +131,26 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
         )?;
     }
 
+    {
+        let bridges = bridges.clone();
+        globals.set(
+            "get_key",
+            lua.create_function(move |lua, args: Variadic<Value>| {
+                common::expect_arg_count_range(&args, 0, 1)?;
+                if !is_debug_enabled(&bridges) {
+                    return Ok(Value::Nil);
+                }
+
+                let requested_key = common::expect_optional_string_arg(&args, 0, "key")?;
+                Ok(Value::Table(build_key_info_table(
+                    lua,
+                    &bridges,
+                    requested_key.as_deref(),
+                )?))
+            })?,
+        )?;
+    }
+
     Ok(())
 }
 
@@ -198,19 +218,11 @@ fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {
     set_optional_u16(&table, "min_width", bridges.game.min_width)?;
     set_optional_u16(&table, "min_height", bridges.game.min_height)?;
     table.set("write", bridges.game.write)?;
+    table.set("case_sensitive", bridges.game.case_sensitive)?;
 
     let actions = lua.create_table()?;
     for (name, binding) in &bridges.game.actions {
-        let keys = binding.keys();
-        if keys.len() == 1 {
-            actions.set(name.as_str(), keys[0].clone())?;
-        } else {
-            let arr = lua.create_table()?;
-            for (idx, key) in keys.iter().enumerate() {
-                arr.set(idx + 1, key.as_str())?;
-            }
-            actions.set(name.as_str(), arr)?;
-        }
+        actions.set(name.as_str(), build_action_binding_table(lua, binding)?)?;
     }
     table.set("actions", actions)?;
 
@@ -218,6 +230,45 @@ fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {
     runtime.set("target_fps", bridges.game.target_fps)?;
     table.set("runtime", runtime)?;
 
+    Ok(table)
+}
+
+fn build_key_info_table(
+    lua: &Lua,
+    bridges: &RuntimeBridges,
+    requested_key: Option<&str>,
+) -> mlua::Result<Table> {
+    let table = lua.create_table()?;
+
+    for (semantic_key, binding) in &bridges.game.actions {
+        if requested_key.is_some_and(|key| key != semantic_key) {
+            continue;
+        }
+        table.set(
+            semantic_key.as_str(),
+            build_action_binding_table(lua, binding)?,
+        )?;
+    }
+
+    Ok(table)
+}
+
+fn build_action_binding_table(
+    lua: &Lua,
+    binding: &crate::game::action::ActionBinding,
+) -> mlua::Result<Table> {
+    let table = lua.create_table()?;
+    let keys = binding.keys();
+    if keys.len() == 1 {
+        table.set("key", keys[0].clone())?;
+    } else {
+        let arr = lua.create_table()?;
+        for (idx, key) in keys.iter().enumerate() {
+            arr.set(idx + 1, key.as_str())?;
+        }
+        table.set("key", arr)?;
+    }
+    table.set("key_name", binding.key_name())?;
     Ok(table)
 }
 

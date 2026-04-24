@@ -278,5 +278,18 @@
   "settings.memory.confirm_clear_all_question": "确认清理全部存储吗？",
   "settings.memory.confirm_cleanup": "确认清理",
   "settings.memory.confirm_countdown": "{seconds}秒",
-  "settings.secondary.back_hint": "[ESC]/[Q] 返回主菜单"
+  "settings.secondary.back_hint": "[ESC]/[Q] 返回主菜单",
+  "settings.hub.keybind": "按键设置",
+  "settings.keybind.games_title": "游戏选择",
+  "settings.keybind.mapping_title": "按键映射",
+  "settings.keybind.hint": "[↑]/[↓]移动  [Q]/[E] 翻页  [P] 跳页  [Enter] 选择  [Esc]/[Q] 保存并退出",
+  "settings.keybind.games_hint": "[↑]/[↓]移动  [Q]/[E] 翻页  [P] 跳页  [Enter] 选择  [Esc]/[Q] 保存并退出",
+  "settings.keybind.actions_hint": "[↑]/[↓]移动  [W]/[S] 滚动界面  [1]/[2]/[3]/[4]/[5] 修改按键",
+  "settings.keybind.actions_hint_add": "[↑]/[↓]移动  [W]/[S] 滚动界面  [Z] 重置该操作按键  [R] 重置当前游戏按键  [X] 切换模式  [1]/[2]/[3]/[4]/[5] 添加/修改按键",
+  "settings.keybind.actions_hint_delete": "[↑]/[↓]移动  [W]/[S] 滚动界面  [Z] 重置该操作按键  [R] 重置当前游戏按键  [X] 切换模式  [1]/[2]/[3]/[4]/[5] 删除按键",
+  "settings.keybind.capture_hint": "[任意键] 修改至对应的键  [Shift] 长摁2秒绑定 Shift 键",
+  "settings.keybind.action": "动作",
+  "settings.keybind.key": "按键",
+  "settings.keybind.unassigned": "未设置",
+  "host.warning.action_key_limit_exceeded": "按键动作注册表数量超过 5 个上限，当前数量为 {key_count}，超出部分将被忽略，仅前 5 个生效"
 }

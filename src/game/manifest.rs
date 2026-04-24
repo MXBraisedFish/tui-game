@@ -78,4 +78,6 @@ pub struct GameManifest {
     pub api: Option<serde_json::Value>,
     #[serde(default)]
     pub write: bool,
+    #[serde(default)]
+    pub case_sensitive: bool,
 }

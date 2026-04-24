@@ -27,26 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "RICH_TEXT.md",
+                "file": "MOD.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "RICH_TEXT"
-            }
-          },
-          {
-            "id": "b529ce772bc95feb",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "RICH_TEXT.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "RICH_TEXT"
+              "title": "MOD"
             }
           }
         ],
@@ -214,9 +200,9 @@
   },
   "active": "28220053e7fcb98b",
   "lastOpenFiles": [
+    "RICH_TEXT.md",
     "MOD.md",
     "API.md",
-    "RICH_TEXT.md",
     "image/program_flowchart.png",
     "image/mod_icon.png",
     "image/mod_banner.png",

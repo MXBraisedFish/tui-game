@@ -351,12 +351,14 @@ tg
 ## 支持本项目-点个星星！
 
 如果您喜欢这个项目，请为我的仓库点一颗星星⭐！这也是我持续更新的动力。如果您有更好的想法或建议，欢迎提出 Issue。
-
 MacOS版本未经过测试，我没有相关的系统设备，如果您发现有Bug请及时反馈，十分感谢！
 
-仓库：
+**仓库**：
+GitHub：[MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
 
-GitHub: [MXBraisedFish/TUI-GAME](https://github.com/MXBraisedFish/TUI-GAME)
+**博客**：
+Bilibili：[闷香红烧鱼](https://space.bilibili.com/609170202)
+小红书：[闷香红烧鱼](https://xhslink.com/m/4vb9XsSgxNr)
 
 ---
 

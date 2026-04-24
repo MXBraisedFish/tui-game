@@ -147,7 +147,8 @@
   "min_width": int,                  -- 最小终端宽度（终端字符列数）
   "min_height": int,                 -- 最小终端高度（终端字符行数）
   "write": boolean,                  -- 是否请求直写权限
-  "actions": object,                 -- 按键动作映射表
+  "case_sensitive": boolean,         -- 按键是否区分大小写
+  "actions": object,                 -- 按键动作注册表
   "runtime": {
     "target_fps": int                -- 目标帧率
   }
@@ -156,18 +157,18 @@
 
 **字段说明**
 
-| 字段                   | 类型                                                                                                           | 说明                                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `api`                | <font color="#92cddc">Array</font> \| <font color="#92cddc">int</font>                                       | 支持的 API 版本。数组格式 $[min, max]$ 表示支持从 `min` 到 `max` 的版本（含端点）；整数表示仅支持该单一版本。                                            |
-| `entry`              | <font color="#92cddc">path</font>                                                                            | 入口脚本路径，相对于 `scripts/` 目录。                                                                                          |
-| `save`               | <font color="#92cddc">boolean</font>                                                                         | 是否支持存档。`true` 则需要实现声明式 API `save_game(state)`；`false` 则忽略相关调用。                                                     |
-| `best_none`          | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> \| <font color="#92cddc">null</font> | 无最佳记录时显示的文本。若不为 `null`，需要实现声明式 API `save_best_score(state)`；若为 `null` 则忽略相关调用。                                     |
-| `min_width`          | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端宽度（终端字符列数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                          |
-| `min_height`         | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端高度（终端字符行数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                          |
+| 字段                   | 类型                                                                                                           | 说明                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `api`                | <font color="#92cddc">Array</font> \| <font color="#92cddc">int</font>                                       | 支持的 API 版本。数组格式 $[min, max]$ 表示支持从 `min` 到 `max` 的版本（含端点）；整数表示仅支持该单一版本。                                             |
+| `entry`              | <font color="#92cddc">path</font>                                                                            | 入口脚本路径，相对于 `scripts/` 目录。                                                                                           |
+| `save`               | <font color="#92cddc">boolean</font>                                                                         | 是否支持存档。`true` 则需要实现声明式 API `save_game(state)`；`false` 则忽略相关调用。                                                      |
+| `best_none`          | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> \| <font color="#92cddc">null</font> | 无最佳记录时显示的文本。若不为 `null`，需要实现声明式 API `save_best_score(state)`；若为 `null` 则忽略相关调用。                                      |
+| `min_width`          | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端宽度（终端字符列数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
+| `min_height`         | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端高度（终端字符行数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
 | `write`              | <font color="#92cddc">boolean</font>                                                                         | 是否请求直写权限。`true` 表示模组包需要文件写入权限，加载时会向用户申请；`false` 表示不需要权限，所有直写请求将被宿主忽略。<font color="red">直写操作为高风险操作，请最大程度避免使用！</font> |
-| `actions`            | <font color="#92cddc">object</font>                                                                          | 按键动作映射表，格式见『模组包配置文件-[注册表格式](#注册表格式)』。宿主会将物理按键映射为语义化动作。                                                              |
-| `runtime`            | <font color="#92cddc">object</font>                                                                          | 运行时设置。                                                                                                             |
-| `runtime.target_fps` | <font color="#92cddc">int</font>                                                                             | 目标帧率，支持 `30`、`60`、`120`。其它值将被忽略并回退为 `60`。实际帧率受机器性能影响，该值为上限。                                                        |
+| `actions`            | <font color="#92cddc">object</font>                                                                          | 按键动作注册表，格式见『模组包配置文件-[注册表格式](#注册表格式)』。宿主会将物理按键映射为语义化动作。填写空对象代表不注册任何按键。                                               |
+| `runtime`            | <font color="#92cddc">object</font>                                                                          | 运行时设置。                                                                                                              |
+| `runtime.target_fps` | <font color="#92cddc">int</font>                                                                             | 目标帧率，支持 `30`、`60`、`120`。其它值将被忽略并回退为 `60`。实际帧率受机器性能影响，该值为上限。                                                         |
 
 ## 注册表格式
 
@@ -179,7 +180,10 @@
 
 ```json
 "actions": {
-  [#action]: key | Array
+  [#action]: {
+    "key": Array | string,
+    "key_name": string | key
+  }
 }
 ```
 
@@ -187,8 +191,14 @@
 
 ```json
 "actions": {
-  "jump": "space",
-  "move": ["up", "down", "left", "right"]
+  "jump": {
+    "key": "space",
+    "key_name": "跳跃"
+  },
+  "move": {
+    "key": ["up", "down", "left", "right"],
+    "key_name": "game.move"
+  }
 }
 ```
 

@@ -2,11 +2,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow};
+use serde_json::Value;
 
 use crate::app::i18n;
+use crate::game::action::ActionKeys;
 use crate::game::manifest::{GameManifest, PackageManifest};
+use crate::utils::host_log;
 
 pub const HOST_GAME_API_VERSION: u32 = 7;
+const MAX_ACTION_KEYS_PER_BINDING: usize = 5;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GamePackageSource {
@@ -122,19 +126,179 @@ fn read_game_manifest(
         i18n::t_or("host.error.read_game_json_failed", "Failed to read game.json: {path}")
             .replace("{path}", &path.display().to_string())
     })?;
-    let mut manifest: GameManifest = serde_json::from_str(raw.trim_start_matches('\u{feff}'))
-        .with_context(|| {
+    let raw_value: Value =
+        serde_json::from_str(raw.trim_start_matches('\u{feff}')).with_context(|| {
             i18n::t_or(
                 "host.error.invalid_game_json",
                 "Invalid JSON format in game.json: {path}",
             )
             .replace("{path}", &path.display().to_string())
         })?;
+    validate_game_actions_shape(&raw_value)?;
+    validate_game_case_sensitive_shape(&raw_value)?;
+    let mut manifest: GameManifest = serde_json::from_value(raw_value).with_context(|| {
+        i18n::t_or(
+            "host.error.invalid_game_json",
+            "Invalid JSON format in game.json: {path}",
+        )
+        .replace("{path}", &path.display().to_string())
+    })?;
+    truncate_action_keys_with_warning(&mut manifest);
     if matches!(source, GamePackageSource::Mod) {
         manifest.id = expected_mod_game_id(package);
     }
     validate_game_manifest(root_dir, package, source, &manifest, path)?;
     Ok(manifest)
+}
+
+fn truncate_action_keys_with_warning(manifest: &mut GameManifest) {
+    for binding in manifest.actions.values_mut() {
+        let ActionKeys::Multiple(keys) = &mut binding.key else {
+            continue;
+        };
+        if keys.len() <= MAX_ACTION_KEYS_PER_BINDING {
+            continue;
+        }
+        let key_count = keys.len().to_string();
+        host_log::append_host_warning(
+            "host.warning.action_key_limit_exceeded",
+            &[("key_count", &key_count)],
+        );
+        keys.truncate(MAX_ACTION_KEYS_PER_BINDING);
+    }
+}
+
+fn validate_game_actions_shape(root: &Value) -> Result<()> {
+    let Some(actions) = root.get("actions") else {
+        return Ok(());
+    };
+    let Some(actions_obj) = actions.as_object() else {
+        return Err(field_invalid_type_error("game.json", "actions", "object", actions));
+    };
+
+    for (action_name, binding) in actions_obj {
+        let binding_key = format!("actions.{action_name}");
+        let Some(binding_obj) = binding.as_object() else {
+            return Err(field_invalid_type_error(
+                "game.json",
+                &binding_key,
+                "object",
+                binding,
+            ));
+        };
+
+        let key_field = format!("{binding_key}.key");
+        let Some(key_value) = binding_obj.get("key") else {
+            return Err(field_blank_error("game.json", &key_field));
+        };
+        validate_action_key_value(&key_field, key_value)?;
+
+        let key_name_field = format!("{binding_key}.key_name");
+        let Some(key_name_value) = binding_obj.get("key_name") else {
+            return Err(field_blank_error("game.json", &key_name_field));
+        };
+        let Some(key_name) = key_name_value.as_str() else {
+            return Err(field_invalid_type_error(
+                "game.json",
+                &key_name_field,
+                "string",
+                key_name_value,
+            ));
+        };
+        if key_name.trim().is_empty() {
+            return Err(field_blank_error("game.json", &key_name_field));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_game_case_sensitive_shape(root: &Value) -> Result<()> {
+    let Some(value) = root.get("case_sensitive") else {
+        return Ok(());
+    };
+    if value.is_boolean() {
+        Ok(())
+    } else {
+        Err(field_invalid_type_error(
+            "game.json",
+            "case_sensitive",
+            "boolean",
+            value,
+        ))
+    }
+}
+
+fn validate_action_key_value(field_key: &str, value: &Value) -> Result<()> {
+    match value {
+        Value::String(text) => {
+            if text.trim().is_empty() {
+                Err(field_blank_error("game.json", field_key))
+            } else {
+                Ok(())
+            }
+        }
+        Value::Array(values) => {
+            if values.is_empty() {
+                return Err(field_blank_error("game.json", field_key));
+            }
+            for (index, item) in values.iter().enumerate() {
+                let item_key = format!("{field_key}[{}]", index + 1);
+                let Some(text) = item.as_str() else {
+                    return Err(field_invalid_type_error(
+                        "game.json",
+                        &item_key,
+                        "string",
+                        item,
+                    ));
+                };
+                if text.trim().is_empty() {
+                    return Err(field_blank_error("game.json", &item_key));
+                }
+            }
+            Ok(())
+        }
+        _ => Err(field_invalid_type_error(
+            "game.json",
+            field_key,
+            "string | array",
+            value,
+        )),
+    }
+}
+
+fn field_blank_error(file: &str, key: &str) -> anyhow::Error {
+    anyhow!(
+        "{}",
+        i18n::t_or("host.error.field_blank", "Field \"{key}\" in {file} cannot be empty")
+            .replace("{file}", file)
+            .replace("{key}", key)
+    )
+}
+
+fn field_invalid_type_error(file: &str, key: &str, expected: &str, actual: &Value) -> anyhow::Error {
+    anyhow!(
+        "{}",
+        i18n::t_or(
+            "host.error.field_invalid_type",
+            "Field \"{key}\" in {file} has invalid type: expected {type}, got {actual_type}",
+        )
+        .replace("{file}", file)
+        .replace("{key}", key)
+        .replace("{type}", expected)
+        .replace("{actual_type}", json_value_type_name(actual))
+    )
+}
+
+fn json_value_type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
 }
 
 fn validate_game_manifest(
@@ -201,12 +365,11 @@ fn validate_game_manifest(
         return Err(anyhow!("game name cannot be blank"));
     }
 
-    if manifest.id.trim().is_empty() {
-        return Err(anyhow!("game id cannot be blank"));
-    }
-
     match source {
         GamePackageSource::Official => {
+            if manifest.id.trim().is_empty() {
+                return Err(anyhow!("game id cannot be blank"));
+            }
             let slug = root_dir
                 .file_name()
                 .and_then(|value| value.to_str())
@@ -220,15 +383,7 @@ fn validate_game_manifest(
                 ));
             }
         }
-        GamePackageSource::Mod => {
-            let expected = expected_mod_game_id(package);
-            if manifest.id != expected {
-                return Err(anyhow!(
-                    "mod game id mismatch: expected {expected}, got {}",
-                    manifest.id
-                ));
-            }
-        }
+        GamePackageSource::Mod => {}
     }
 
     if manifest.icon.is_some()
@@ -446,6 +601,7 @@ mod tests {
             },
             api: Some(serde_json::json!(7)),
             write: false,
+            case_sensitive: false,
         };
         let game_id = expected_mod_game_id(&package_manifest);
         fs::write(
@@ -475,7 +631,10 @@ mod tests {
     "target_fps": 30
   }},
   "actions": {{
-    "confirm": ["enter", "space"]
+    "confirm": {{
+      "key": ["enter", "space"],
+      "key_name": "Confirm"
+    }}
   }}
 }}"#,
             ),
@@ -537,6 +696,7 @@ mod tests {
             runtime: Default::default(),
             api: Some(serde_json::json!([1, 2])),
             write: false,
+            case_sensitive: false,
         };
         let _game_two = GameManifest {
             id: String::new(),
@@ -558,6 +718,7 @@ mod tests {
             runtime: Default::default(),
             api: Some(serde_json::json!([1, 2])),
             write: false,
+            case_sensitive: false,
         };
         let _game_one_id = expected_mod_game_id(&package_manifest);
 
@@ -594,7 +755,10 @@ mod tests {
                 "  \"entry\": \"scripts/two.lua\",\n",
                 "  \"save\": true,\n",
                 "  \"actions\": {\n",
-                "    \"move_left\": [\"left\", \"a\"]\n",
+                "    \"move_left\": {\n",
+                "      \"key\": [\"left\", \"a\"],\n",
+                "      \"key_name\": \"Move Left\"\n",
+                "    }\n",
                 "  }\n",
                 "}\n"
             ),

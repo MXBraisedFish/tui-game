@@ -407,6 +407,7 @@ fn should_keep_ui_animating(state: &AppState) -> bool {
                 || ui.cleanup_dialog.is_some()
                 || ui.default_safe_mode_disable_dialog.is_some()
                 || ui.security_success_at.is_some()
+                || ui.keybind_capture.is_some()
         }
         _ => false,
     }
@@ -611,7 +612,7 @@ fn handle_key_event(
             }
         }
 
-        AppState::Settings { ui } => match settings::handle_key(ui, key.code) {
+        AppState::Settings { ui } => match settings::handle_key(ui, key) {
             settings::SettingsAction::None => {}
             settings::SettingsAction::BackToMenu => {
                 *state = AppState::MainMenu { menu: Menu::new() };

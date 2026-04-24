@@ -278,5 +278,18 @@
   "settings.memory.confirm_clear_all_question": "Confirm clearing all storage?",
   "settings.memory.confirm_cleanup": "Confirm Cleanup",
   "settings.memory.confirm_countdown": "{seconds}s",
-  "settings.secondary.back_hint": "[ESC]/[Q] Return to main menu"
+  "settings.secondary.back_hint": "[ESC]/[Q] Return to main menu",
+  "settings.hub.keybind": "Keybinding Settings",
+  "settings.keybind.games_title": "Game Selection",
+  "settings.keybind.mapping_title": "Key Mapping",
+  "settings.keybind.hint": "[↑]/[↓] Move  [Q]/[E] Page  [P] Jump Page  [Enter] Select  [Esc]/[Q] Save and Exit",
+  "settings.keybind.games_hint": "[↑]/[↓] Move  [Q]/[E] Page  [P] Jump Page  [Enter] Select  [Esc]/[Q] Save and Exit",
+  "settings.keybind.actions_hint": "[↑]/[↓] Move  [W]/[S] Scroll  [1]/[2]/[3]/[4]/[5] Rebind Key",
+  "settings.keybind.actions_hint_add": "[↑]/[↓] Move  [W]/[S] Scroll  [Z] Reset Action  [R] Reset Current Game  [X] Toggle Mode  [1]/[2]/[3]/[4]/[5] Add/Rebind Key",
+  "settings.keybind.actions_hint_delete": "[↑]/[↓] Move  [W]/[S] Scroll  [Z] Reset Action  [R] Reset Current Game  [X] Toggle Mode  [1]/[2]/[3]/[4]/[5] Delete Key",
+  "settings.keybind.capture_hint": "[Any Key] Bind to this slot  [Shift] Hold for 2s to bind Shift",
+  "settings.keybind.action": "Action",
+  "settings.keybind.key": "Key",
+  "settings.keybind.unassigned": "Unassigned",
+  "host.warning.action_key_limit_exceeded": "Key action binding count exceeds the limit of 5. Current count is {key_count}. Extra bindings will be ignored and only the first 5 will take effect."
 }

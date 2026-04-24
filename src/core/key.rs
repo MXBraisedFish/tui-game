@@ -22,6 +22,8 @@ struct DelayedRdev {
 struct SharedState {
     delayed_rdevs: VecDeque<DelayedRdev>,
     last_ct_output: Option<Instant>,
+    shift_keys_down: HashSet<RKey>,
+    shift_hold_started: Option<Instant>,
 }
 
 pub struct SemanticKeySource {
@@ -41,13 +43,28 @@ impl SemanticKeySource {
         let shared_rdev = Arc::clone(&shared);
         thread::spawn(move || {
             if let Err(err) = listen(move |event: REvent| {
-                if let REventType::KeyPress(key) = event.event_type
-                    && let Ok(mut state) = shared_rdev.lock()
-                {
-                    state.delayed_rdevs.push_back(DelayedRdev {
-                        key,
-                        timestamp: Instant::now(),
-                    });
+                if let Ok(mut state) = shared_rdev.lock() {
+                    match event.event_type {
+                        REventType::KeyPress(key) => {
+                            state.delayed_rdevs.push_back(DelayedRdev {
+                                key,
+                                timestamp: Instant::now(),
+                            });
+                            if is_shift_key(key) {
+                                state.shift_keys_down.insert(key);
+                                state.shift_hold_started.get_or_insert_with(Instant::now);
+                            }
+                        }
+                        REventType::KeyRelease(key) => {
+                            if is_shift_key(key) {
+                                state.shift_keys_down.remove(&key);
+                                if state.shift_keys_down.is_empty() {
+                                    state.shift_hold_started = None;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }) {
                 host_log::append_host_error(
@@ -115,8 +132,25 @@ impl SemanticKeySource {
     pub fn clear_pending_keys(&self) {
         if let Ok(mut state) = self.shared.lock() {
             state.delayed_rdevs.clear();
+            state.shift_keys_down.clear();
+            state.shift_hold_started = None;
         }
     }
+
+    pub fn is_shift_held_for(&self, duration: Duration) -> bool {
+        let Ok(state) = self.shared.lock() else {
+            return false;
+        };
+        !state.shift_keys_down.is_empty()
+            && state
+                .shift_hold_started
+                .map(|started| started.elapsed() >= duration)
+                .unwrap_or(false)
+    }
+}
+
+fn is_shift_key(key: RKey) -> bool {
+    matches!(key, RKey::ShiftLeft | RKey::ShiftRight)
 }
 
 fn allowed_ct_keycodes() -> HashSet<KeyCode> {
