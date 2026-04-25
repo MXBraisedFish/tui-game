@@ -1,8 +1,25 @@
 {
   "namespace": "official",
-  "package_name": "TUI-GAME Official",
+  "package": "TUI-GAME Official",
+  "mod_name": "TUI-GAME Official",
+  "introduction": "game.color_memory.package_introduction",
   "author": "TUI-GAME",
+  "game_name": "game.color_memory.name",
+  "description": "game.color_memory.description",
+  "detail": "game.color_memory.details",
   "version": "1.0.0",
-  "description": "Official built-in games packaged under the unified runtime.",
-  "api_version": 1
+  "icon": [
+    " COLOR  ",
+    " R Y    ",
+    " B G    ",
+    " MEMORY "
+  ],
+  "banner": [
+    "   ____      _             __  __                                  ",
+    "  / ___|___ | | ___  _ __ |  \\/  | ___ _ __ ___   ___  _ __ _   _ ",
+    " | |   / _ \\| |/ _ \\| '__|| |\\/| |/ _ \\ '_ ` _ \\ / _ \\| '__| | | |",
+    " | |__| (_) | | (_) | |   | |  | |  __/ | | | | | (_) | |  | |_| |",
+    "  \\____\\___/|_|\\___/|_|   |_|  |_|\\___|_| |_| |_|\\___/|_|   \\__, |",
+    "                                                             |___/ "
+  ]
 }

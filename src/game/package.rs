@@ -136,6 +136,8 @@ fn read_game_manifest(
             )
             .replace("{path}", &path.display().to_string())
         })?;
+    let log_object = game_log_object_id(package, path, &raw_value);
+    let _log_object_guard = host_log::scoped_log_object(log_object);
     validate_game_actions_shape(&raw_value)?;
     validate_game_case_sensitive_shape(&raw_value)?;
     let mut manifest: GameManifest = serde_json::from_value(raw_value).with_context(|| {
@@ -147,9 +149,7 @@ fn read_game_manifest(
     })?;
     truncate_action_keys_with_warning(&mut manifest);
     validate_action_key_bindings(&manifest)?;
-    if matches!(source, GamePackageSource::Mod) {
-        manifest.id = expected_mod_game_id(package);
-    }
+    manifest.id = expected_game_id(package, &manifest);
     validate_game_manifest(root_dir, package, source, &manifest, path)?;
     Ok(manifest)
 }
@@ -356,7 +356,7 @@ fn json_value_type_name(value: &Value) -> &'static str {
 }
 
 fn validate_game_manifest(
-    root_dir: &Path,
+    _root_dir: &Path,
     package: &PackageManifest,
     source: &GamePackageSource,
     manifest: &GameManifest,
@@ -417,27 +417,6 @@ fn validate_game_manifest(
         .unwrap_or_else(|| manifest.name.trim());
     if effective_name.is_empty() {
         return Err(anyhow!("game name cannot be blank"));
-    }
-
-    match source {
-        GamePackageSource::Official => {
-            if manifest.id.trim().is_empty() {
-                return Err(anyhow!("game id cannot be blank"));
-            }
-            let slug = root_dir
-                .file_name()
-                .and_then(|value| value.to_str())
-                .ok_or_else(|| anyhow!("invalid official package directory name"))?;
-            let expected = official_game_id(slug)
-                .ok_or_else(|| anyhow!("unknown official game package: {slug}"))?;
-            if manifest.id != expected {
-                return Err(anyhow!(
-                    "official game id mismatch: expected {expected}, got {}",
-                    manifest.id
-                ));
-            }
-        }
-        GamePackageSource::Mod => {}
     }
 
     if manifest.icon.is_some()
@@ -534,14 +513,53 @@ fn api_version_display(value: &serde_json::Value) -> String {
     }
 }
 
-pub fn expected_mod_game_id(package: &PackageManifest) -> String {
+pub fn expected_game_id(package: &PackageManifest, manifest: &GameManifest) -> String {
     let seed = format!(
-        "{}{}{}",
+        "{}{}{}{}{}",
         package.namespace.trim(),
         package.package_name.trim(),
-        package.author.trim()
+        package.author.trim(),
+        package
+            .game_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| manifest.name.trim()),
+        manifest.entry.trim()
     );
-    format!("mod_game_{}", stable_base62_hash16(&seed))
+    format!("tui_game_{}", stable_base62_hash16(&seed))
+}
+
+fn game_log_object_id(package: &PackageManifest, path: &Path, raw: &Value) -> String {
+    let raw_name = raw
+        .get("game_name")
+        .or_else(|| raw.get("name"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let package_name = package
+        .game_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let name = package_name
+        .or(raw_name)
+        .unwrap_or_else(|| path.file_stem().and_then(|value| value.to_str()).unwrap_or_default());
+    let entry = raw
+        .get("entry")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| path.file_name().and_then(|value| value.to_str()).unwrap_or_default());
+    let seed = format!(
+        "{}{}{}{}{}",
+        package.namespace.trim(),
+        package.package_name.trim(),
+        package.author.trim(),
+        name,
+        entry
+    );
+    format!("tui_game_{}", stable_base62_hash16(&seed))
 }
 
 fn stable_base62_hash16(seed: &str) -> String {
@@ -573,31 +591,6 @@ fn splitmix64(mut x: u64) -> u64 {
     x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     x ^ (x >> 31)
-}
-
-fn official_game_id(slug: &str) -> Option<&'static str> {
-    match slug {
-        "2048" => Some("tui_game_2048_pQc2haTtPbX0Pt6T"),
-        "blackjack" => Some("tui_game_blackjack_jVXqxsSGfj9DMYt5"),
-        "color_memory" => Some("tui_game_color_memory_LIl6cm7WEeSdrdeo"),
-        "lights_out" => Some("tui_game_lights_out_YHJI1Ohd7LRsBOw8"),
-        "maze_escape" => Some("tui_game_maze_escape_lSLl3X3NeXyAIwlS"),
-        "memory_flip" => Some("tui_game_memory_flip_KcCJtaia0xHz09Jk"),
-        "minesweeper" => Some("tui_game_minesweeper_j2sLgIzwXa9p8kf7"),
-        "pacman" => Some("tui_game_pacman_Eb6R0Hjd07mJobl0"),
-        "rock_paper_scissors" => Some("tui_game_rock_paper_scissors_fLY3u9xabne5WIXU"),
-        "runtime_demo" => Some("tui_game_runtime_demo_x8SLN4sM4x3dU4Yp"),
-        "shooter" => Some("tui_game_shooter_7HmO65U8EsqSJRsH"),
-        "sliding_puzzle" => Some("tui_game_sliding_puzzle_f1yJ2NLHSP2S7jGf"),
-        "snake" => Some("tui_game_snake_pLwlS3961Tm8KGgT"),
-        "solitaire" => Some("tui_game_solitaire_p7Ab6hOUh1QXuFtI"),
-        "sudoku" => Some("tui_game_sudoku_YYI0zXww863GC2Oc"),
-        "tetris" => Some("tui_game_tetris_nhFSLnZRWPrMRzr5"),
-        "tic_tac_toe" => Some("tui_game_tic_tac_toe_6yQszA754SKGMt1f"),
-        "twenty_four" => Some("tui_game_twenty_four_2OXLBOgg3sO8dFdu"),
-        "wordle" => Some("tui_game_wordle_zUfgTho7okdh5vKf"),
-        _ => None,
-    }
 }
 
 #[cfg(test)]
@@ -657,7 +650,7 @@ mod tests {
             write: false,
             case_sensitive: false,
         };
-        let game_id = expected_mod_game_id(&package_manifest);
+        let game_id = expected_game_id(&package_manifest, &_game_manifest);
         fs::write(
             root.join("package.json"),
             r#"{
@@ -748,7 +741,7 @@ mod tests {
             max_height: None,
             actions: Default::default(),
             runtime: Default::default(),
-            api: Some(serde_json::json!([1, 2])),
+            api: Some(serde_json::json!([1, 7])),
             write: false,
             case_sensitive: false,
         };
@@ -770,11 +763,11 @@ mod tests {
             max_height: None,
             actions: Default::default(),
             runtime: Default::default(),
-            api: Some(serde_json::json!([1, 2])),
+            api: Some(serde_json::json!([1, 7])),
             write: false,
             case_sensitive: false,
         };
-        let _game_one_id = expected_mod_game_id(&package_manifest);
+        let _game_one_id = expected_game_id(&package_manifest, &_game_one);
 
         fs::write(
             package_root.join("package.json"),
@@ -792,7 +785,7 @@ mod tests {
             games_dir.join("one.json"),
             format!(
                 r#"{{
-  "api": [1, 2],
+  "api": [1, 7],
   "entry": "scripts/one.lua",
   "save": false,
   "actions": {{}}
@@ -805,7 +798,7 @@ mod tests {
             concat!(
                 "\u{feff}",
                 "{\n",
-                "  \"api\": [1, 2],\n",
+                "  \"api\": [1, 7],\n",
                 "  \"entry\": \"scripts/two.lua\",\n",
                 "  \"save\": true,\n",
                 "  \"actions\": {\n",
@@ -823,7 +816,10 @@ mod tests {
         assert_eq!(packages.len(), 1);
         assert_eq!(packages[0].package.namespace, "alpha");
         assert_eq!(packages[0].games.len(), 2);
-        assert_eq!(packages[0].games[1].id, expected_mod_game_id(&package_manifest));
+        assert_eq!(
+            packages[0].games[1].id,
+            expected_game_id(&package_manifest, &_game_two)
+        );
         assert_eq!(
             packages[0].games[1].actions["move_left"].keys(),
             vec!["left".to_string(), "a".to_string()]
@@ -833,7 +829,7 @@ mod tests {
     }
 
     #[test]
-    fn expected_mod_game_id_is_stable() {
+    fn expected_game_id_is_stable() {
         let package = PackageManifest {
             namespace: "examplepack".to_string(),
             package_name: "Example Pack".to_string(),
@@ -848,11 +844,33 @@ mod tests {
             banner: None,
             api_version: None,
         };
-        let id = expected_mod_game_id(&package);
-        assert_eq!(id, expected_mod_game_id(&package));
-        assert!(id.starts_with("mod_game_"));
-        assert_eq!(id.len(), "mod_game_".len() + 16);
-        assert!(id["mod_game_".len()..]
+        let manifest = GameManifest {
+            id: String::new(),
+            name: String::new(),
+            description: String::new(),
+            detail: String::new(),
+            author: String::new(),
+            introduction: None,
+            icon: None,
+            banner: None,
+            entry: "scripts/word_puzzle.lua".to_string(),
+            save: false,
+            best_none: None,
+            min_width: None,
+            min_height: None,
+            max_width: None,
+            max_height: None,
+            actions: Default::default(),
+            runtime: Default::default(),
+            api: Some(serde_json::json!(7)),
+            write: false,
+            case_sensitive: false,
+        };
+        let id = expected_game_id(&package, &manifest);
+        assert_eq!(id, expected_game_id(&package, &manifest));
+        assert!(id.starts_with("tui_game_"));
+        assert_eq!(id.len(), "tui_game_".len() + 16);
+        assert!(id["tui_game_".len()..]
             .chars()
             .all(|ch| ch.is_ascii_alphanumeric()));
     }

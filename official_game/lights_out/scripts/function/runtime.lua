@@ -1,17 +1,17 @@
--- 游戏常量定义
-local DEFAULT_SIZE = 5 -- 默认棋盘大小 5x5
-local MIN_SIZE = 2     -- 最小棋盘大小
-local MAX_SIZE = 10    -- 最大棋盘大小
+local Constants = load_function("/constants.lua")
 
-local FPS = 60         -- 目标帧率
-local FRAME_MS = 16    -- 每帧毫秒数
+local DEFAULT_SIZE = Constants.DEFAULT_SIZE
+local MIN_SIZE = Constants.MIN_SIZE
+local MAX_SIZE = Constants.MAX_SIZE
 
--- 界面尺寸常量
-local CELL_W = 4      -- 单元格宽度
-local CELL_H = 3      -- 单元格高度
-local CELL_STEP_X = 5 -- 水平步进（包含间距）
-local CELL_STEP_Y = 2 -- 垂直步进（包含间距）
-local LABEL_W = 3     -- 行列标签宽度
+local FPS = Constants.FPS
+local FRAME_MS = Constants.FRAME_MS
+
+local CELL_W = Constants.CELL_W
+local CELL_H = Constants.CELL_H
+local CELL_STEP_X = Constants.CELL_STEP_X
+local CELL_STEP_Y = Constants.CELL_STEP_Y
+local LABEL_W = Constants.LABEL_W
 
 -- 游戏状态表
 local state = {
@@ -73,11 +73,11 @@ local function clear()
     canvas_clear()
 end
 
-local function random(n)
+local function random_index(n)
     if type(n) ~= "number" or n <= 0 then
         return 0
     end
-    return math.random(0, n - 1)
+    return random(n - 1)
 end
 
 -- 翻译函数（安全调用）
@@ -97,6 +97,83 @@ local function tr(key)
 
     return value
 end
+
+local KEY_DISPLAY = {
+    up = "↑",
+    down = "↓",
+    left = "←",
+    right = "→",
+    enter = "Enter",
+    esc = "Esc",
+    space = "Space",
+    backspace = "Bksp",
+    del = "Del",
+    tab = "Tab",
+    back_tab = "BTab"
+}
+
+local function display_key_name(key)
+    key = tostring(key or "")
+    if key == "" then return "" end
+    if KEY_DISPLAY[key] ~= nil then return KEY_DISPLAY[key] end
+    if #key == 1 then return string.upper(key) end
+    if string.sub(key, 1, 1) == "f" and tonumber(string.sub(key, 2)) ~= nil then
+        return string.upper(key)
+    end
+    return key
+end
+
+local function key_label(action)
+    if type(get_key) ~= "function" then
+        return "[]"
+    end
+    local ok, info = pcall(get_key, action)
+    if not ok or type(info) ~= "table" then
+        return "[]"
+    end
+    if info[action] ~= nil and type(info[action]) == "table" then
+        info = info[action]
+    end
+    local keys = info.key_user or info.key
+    if type(keys) ~= "table" then
+        keys = { keys }
+    end
+    local out = {}
+    for i = 1, #keys do
+        local label = display_key_name(keys[i])
+        if label ~= "" then
+            out[#out + 1] = "[" .. label .. "]"
+        end
+    end
+    if #out == 0 then return "[]" end
+    return table.concat(out, "/")
+end
+
+local function replace_prompt_keys(text)
+    text = tostring(text or "")
+    text = string.gsub(text, "%[Y%]", key_label("confirm_yes"))
+    text = string.gsub(text, "%[N%]", key_label("confirm_no"))
+    text = string.gsub(text, "%[Q%]/%[ESC%]", key_label("quit_action"))
+    return text
+end
+
+local function controls_text()
+    return table.concat({
+        key_label("move_up") .. "/" .. key_label("move_down") .. "/" .. key_label("move_left") .. "/" .. key_label("move_right") .. " " .. tr("game.lights_out.action.move_up"),
+        key_label("toggle") .. " " .. tr("game.lights_out.action.toggle"),
+        key_label("resize_cycle") .. " " .. tr("game.lights_out.action.resize_cycle"),
+        key_label("quick_jump") .. " " .. tr("game.lights_out.action.quick_jump"),
+        key_label("save") .. " " .. tr("game.lights_out.action.save"),
+        key_label("restart") .. " " .. tr("game.lights_out.action.restart"),
+        key_label("quit_action") .. " " .. tr("game.lights_out.action.quit")
+    }, "  ")
+end
+
+local function restart_quit_controls_text()
+    return key_label("restart") .. " " .. tr("game.lights_out.action.restart")
+        .. "  " .. key_label("quit_action") .. " " .. tr("game.lights_out.action.quit")
+end
+
 
 -- 获取文本显示宽度
 local function text_width(text)
@@ -205,22 +282,23 @@ end
 
 local function normalize_event_key(event)
     if type(event) ~= "table" then return "" end
-    if event.type == "quit" then return "esc" end
+    if event.type == "quit" then return "quit_action" end
     if event.type == "key" then return normalize_key(event.name) end
     if event.type ~= "action" then return "" end
     local map = {
-        move_up = "up",
-        move_down = "down",
-        move_left = "left",
-        move_right = "right",
-        toggle = "space",
-        resize_cycle = "p",
-        quick_jump = "d",
-        save = "s",
-        restart = "r",
-        quit_action = "q",
-        confirm_yes = "enter",
-        confirm_no = "esc",
+        move_up = "move_up",
+        move_down = "move_down",
+        move_left = "move_left",
+        move_right = "move_right",
+        toggle = "toggle",
+        resize_cycle = "resize_cycle",
+        quick_jump = "quick_jump",
+        save = "save",
+        confirm = "confirm",
+        restart = "restart",
+        quit_action = "quit_action",
+        confirm_yes = "confirm_yes",
+        confirm_no = "confirm_no",
     }
     return map[event.name] or normalize_key(event.name)
 end
@@ -275,30 +353,27 @@ end
 local function randomize_board(size)
     local board = new_board(size, true)
     for _ = 1, size * size do
-        local rr = random(size) + 1
-        local cc = random(size) + 1
+        local rr = random_index(size) + 1
+        local cc = random_index(size) + 1
         toggle_cross_on(board, size, rr, cc)
     end
     -- 如果生成了全亮棋盘，再随机点一下
     if all_lit_board(board, size) then
-        toggle_cross_on(board, size, random(size) + 1, random(size) + 1)
+        toggle_cross_on(board, size, random_index(size) + 1, random_index(size) + 1)
     end
     return board
 end
 
 -- 加载最佳记录
 local function load_best_record()
-    if type(load_data) ~= "function" then
-        return nil
-    end
-    local ok, data = pcall(load_data, "lights_out_best")
+    local ok, data = pcall(get_best_score)
     if not ok or type(data) ~= "table" then
         return nil
     end
 
-    local max_size = tonumber(data.max_size)
-    local min_steps = tonumber(data.min_steps)
-    local min_time_sec = tonumber(data.min_time_sec)
+    local max_size = tonumber(data.max_size or data.size)
+    local min_steps = tonumber(data.min_steps or data.steps)
+    local min_time_sec = tonumber(data.min_time_sec or data.time_sec)
     if max_size == nil or min_steps == nil or min_time_sec == nil then
         return nil
     end
@@ -327,14 +402,6 @@ local function should_replace_best(old, new)
     return new.min_time_sec < old.min_time_sec
 end
 
--- 保存最佳记录
-local function save_best_record(record)
-    if type(save_data) ~= "function" then
-        return
-    end
-    pcall(save_data, "lights_out_best", record)
-end
-
 -- 提交最佳记录（如果需要）
 local function commit_best_if_needed()
     if state.best_committed then
@@ -348,12 +415,11 @@ local function commit_best_if_needed()
     local changed = false
     if should_replace_best(state.best, record) then
         state.best = record
-        save_best_record(record)
         changed = true
     end
     state.best_committed = true
-    if changed and type(request_refresh_best_score) == "function" then
-        pcall(request_refresh_best_score)
+    if changed and type(request_save_best_score) == "function" then
+        pcall(request_save_best_score)
     end
 end
 
@@ -386,18 +452,13 @@ end
 -- 保存游戏状态
 local function save_game_state(show_toast)
     local ok = false
-    local snapshot = make_snapshot()
-    if type(save_continue) == "function" then
-        local s, ret = pcall(save_continue, snapshot)
-        ok = s and ret ~= false
-    elseif type(save_data) == "function" then
-        local s, ret = pcall(save_data, "lights_out", snapshot)
+    if type(request_save_game) == "function" then
+        local s, ret = pcall(request_save_game)
         ok = s and ret ~= false
     end
 
     if show_toast then
-        local key = ok and "game.2048.save_success" or "game.2048.save_unavailable"
-        local def = ok and "Save successful!" or "Save API unavailable."
+        local key = ok and "game.lights_out.save_success" or "game.lights_out.save_unavailable"
         state.toast_text = tr(key)
         state.toast_until = state.frame + 2 * FPS
         state.dirty = true
@@ -457,26 +518,6 @@ local function restore_snapshot(snapshot)
     return true
 end
 
--- 加载游戏状态
-local function load_game_state()
-    local ok = false
-    local snapshot = nil
-    if type(load_continue) == "function" then
-        local s, ret = pcall(load_continue)
-        ok = s and ret ~= nil
-        snapshot = ret
-    elseif type(load_data) == "function" then
-        local s, ret = pcall(load_data, "lights_out")
-        ok = s and ret ~= nil
-        snapshot = ret
-    end
-
-    if ok then
-        return restore_snapshot(snapshot)
-    end
-    return false
-end
-
 -- 重置游戏
 local function reset_game(new_size)
     if new_size ~= nil then
@@ -503,7 +544,7 @@ local function reset_game(new_size)
 end
 
 -- 游戏初始化
-function init_game()
+local function runtime_init_game(saved_state)
     clear()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
@@ -512,12 +553,11 @@ function init_game()
             w, h = tw, th
         end
     end
-    math.randomseed(os.time())
     state.last_term_w, state.last_term_h = w, h
     state.best = load_best_record()
     state.launch_mode = read_launch_mode()
     if state.launch_mode == "continue" then
-        if not load_game_state() then
+        if not restore_snapshot(saved_state) then
             reset_game(DEFAULT_SIZE)
         end
     else
@@ -549,7 +589,7 @@ local function board_geometry()
         + text_width(tr("game.lights_out.steps") .. " 9999")
     local win_line_w = text_width(
         tr("game.lights_out.win_banner")
-        .. tr("game.lights_out.win_controls")
+        .. restart_quit_controls_text()
     )
     local content_w = math.max(LABEL_W + grid_w, status_w, win_line_w)
     local content_h = 1 + grid_h
@@ -701,12 +741,12 @@ local function draw_status(x, y, frame_w)
         end
     elseif state.won then
         local line = tr("game.lights_out.win_banner")
-            .. tr("game.lights_out.win_controls")
+            .. restart_quit_controls_text()
         draw_text(x, y - 1, line, "yellow", "black")
     elseif state.confirm_mode == "restart" then
-        draw_text(x, y - 1, tr("game.2048.confirm_restart"), "yellow", "black")
+        draw_text(x, y - 1, replace_prompt_keys(tr("game.lights_out.confirm_restart")), "yellow", "black")
     elseif state.confirm_mode == "exit" then
-        draw_text(x, y - 1, tr("game.2048.confirm_exit"), "yellow", "black")
+        draw_text(x, y - 1, replace_prompt_keys(tr("game.lights_out.confirm_exit")), "yellow", "black")
     elseif state.toast_text ~= nil and state.frame <= state.toast_until then
         draw_text(x, y - 1, state.toast_text, "green", "black")
     end
@@ -715,7 +755,7 @@ end
 -- 绘制控制说明
 local function draw_controls(x, y, frame_h)
     local term_w = terminal_size()
-    local text = tr("game.lights_out.controls")
+    local text = controls_text()
     local max_w = math.max(10, term_w - 2)
     local lines = wrap_words(text, max_w)
     if #lines > 3 then
@@ -751,8 +791,8 @@ local function clear_last_area()
 end
 
 -- 主渲染函数
-function render(state_arg)
-    state = state_arg
+local function runtime_render(state_arg)
+    state = state_arg or state
     local x, y, frame_w, frame_h = board_geometry()
     local area = { x = x, y = y - 3, w = frame_w, h = frame_h + 7 }
 
@@ -792,7 +832,7 @@ local function minimum_required_size()
     local frame_h = 1 + grid_h + 2
 
     local controls_w = min_width_for_lines(
-        tr("game.lights_out.controls"),
+        controls_text(),
         3,
         24
     )
@@ -899,14 +939,14 @@ end
 
 -- 处理输入模式下的按键
 local function handle_input_mode_key(key)
-    if key == "esc" or key == "q" then
+    if key == "quit_action" or key == "confirm_no" then
         state.input_mode = nil
         state.input_buffer = ""
         state.dirty = true
         return "changed"
     end
 
-    if key == "enter" then
+    if key == "confirm" then
         if state.input_mode == "size" then
             local size = parse_size_input()
             state.input_mode = nil
@@ -936,7 +976,7 @@ local function handle_input_mode_key(key)
         end
     end
 
-    if key == "backspace" then
+    if key == "backspace" or key == "del" then
         if #state.input_buffer > 0 then
             state.input_buffer = string.sub(state.input_buffer, 1, #state.input_buffer - 1)
             state.dirty = true
@@ -957,9 +997,9 @@ local function handle_input_mode_key(key)
     end
 
     if state.input_mode == "jump" then
-        if key:match("^%d$") or key == "space" then
+        if key:match("^%d$") or key == "space" or key == "toggle" then
             local token = key
-            if key == "space" then
+            if key == "space" or key == "toggle" then
                 token = " "
             end
             if #state.input_buffer < 6 then
@@ -976,7 +1016,7 @@ end
 
 -- 处理确认模式下的按键
 local function handle_confirm_key(key)
-    if key == "y" or key == "enter" then
+    if key == "confirm_yes" then
         if state.confirm_mode == "restart" then
             reset_game(state.size)
             return "changed"
@@ -986,7 +1026,7 @@ local function handle_confirm_key(key)
         end
     end
 
-    if key == "q" or key == "esc" then
+    if key == "confirm_no" or key == "quit_action" then
         state.confirm_mode = nil
         state.dirty = true
         return "changed"
@@ -997,7 +1037,7 @@ end
 
 -- 防抖处理
 local function should_debounce(key)
-    if not (key == "up" or key == "down" or key == "left" or key == "right") then
+    if not (key == "move_up" or key == "move_down" or key == "move_left" or key == "move_right") then
         return false
     end
     if key == state.last_key and (state.frame - state.last_key_frame) <= 2 then
@@ -1030,71 +1070,71 @@ local function handle_input(key)
 
     -- 胜利状态
     if state.won then
-        if key == "r" then
+        if key == "restart" then
             reset_game(state.size)
             return "changed"
         end
-        if key == "q" or key == "esc" then
+        if key == "confirm_no" or key == "quit_action" then
             return "exit"
         end
         return "none"
     end
 
     -- 功能键
-    if key == "r" then
+    if key == "restart" then
         state.confirm_mode = "restart"
         state.dirty = true
         return "changed"
     end
 
-    if key == "q" or key == "esc" then
+    if key == "confirm_no" or key == "quit_action" then
         state.confirm_mode = "exit"
         state.dirty = true
         return "changed"
     end
 
-    if key == "s" then
+    if key == "save" then
         save_game_state(true)
         return "changed"
     end
 
-    if key == "p" then
+    if key == "resize_cycle" then
         start_input_mode("size")
         return "changed"
     end
 
-    if key == "d" then
+    if key == "quick_jump" then
         start_input_mode("jump")
         return "changed"
     end
 
     -- 光标移动
-    if key == "up" then
+    if key == "move_up" then
         state.cursor_r = clamp(state.cursor_r - 1, 1, state.size)
         state.dirty = true
         return "changed"
     end
 
-    if key == "down" then
+    if key == "move_down" then
         state.cursor_r = clamp(state.cursor_r + 1, 1, state.size)
         state.dirty = true
         return "changed"
     end
 
-    if key == "left" then
+    if key == "move_left" then
         state.cursor_c = clamp(state.cursor_c - 1, 1, state.size)
         state.dirty = true
         return "changed"
     end
 
-    if key == "right" then
+    if key == "move_right" then
         state.cursor_c = clamp(state.cursor_c + 1, 1, state.size)
         state.dirty = true
         return "changed"
     end
 
     -- 空格切换
-    if key == "space" then
+    if key == "toggle" then
         toggle_cross_on(state.board, state.size, state.cursor_r, state.cursor_c)
         state.steps = state.steps + 1
         if all_lit() then
@@ -1135,9 +1175,10 @@ local function refresh_dirty_flags()
     end
 end
 
-function handle_event(state_arg, event)
-    state = state_arg
+local function runtime_handle_event(state_arg, event)
+    state = state_arg or state
     state.frame = state.frame + 1
+    event = event or {}
 
     local key = normalize_event_key(event)
     local term_w, term_h = terminal_size()
@@ -1158,15 +1199,19 @@ function handle_event(state_arg, event)
     end
 
     if not size_ok then
-        if key == "q" or key == "esc" then
-            request_exit()
+        if key == "confirm_no" or key == "quit_action" then
+            if type(request_exit) == "function" then
+                pcall(request_exit)
+            end
         end
         return state
     end
 
     local action = handle_input(key)
     if action == "exit" then
-        request_exit()
+        if type(request_exit) == "function" then
+            pcall(request_exit)
+        end
     end
 
     sync_terminal_resize()
@@ -1175,15 +1220,42 @@ function handle_event(state_arg, event)
     return state
 end
 
-function best_score(state_arg)
-    state = state_arg
+local function runtime_save_best_score(state_arg)
+    state = state_arg or state
     if state.best == nil then
-        return nil
+        return { best_string = "game.lights_out.best_none_block" }
     end
     return {
         best_string = "game.lights_out.best_block",
         size = state.best.max_size,
         steps = state.best.min_steps,
+        time_sec = state.best.min_time_sec,
         time = format_duration(state.best.min_time_sec)
     }
 end
+
+
+local function runtime_exit_game(state_arg)
+    state = state_arg or state
+    if not state.won then
+        save_game_state(false)
+    end
+    return state
+end
+
+local function runtime_save_game(state_arg)
+    state = state_arg or state
+    return make_snapshot()
+end
+
+local Runtime = {
+    init_game = runtime_init_game,
+    handle_event = runtime_handle_event,
+    render = runtime_render,
+    exit_game = runtime_exit_game,
+    save_best_score = runtime_save_best_score,
+    save_game = runtime_save_game,
+}
+
+_G.LIGHTS_OUT_RUNTIME = Runtime
+return Runtime

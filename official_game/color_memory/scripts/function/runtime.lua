@@ -1,13 +1,15 @@
-local FPS = 60
-local FRAME_MS = 16
-local SHOW_ON_MS = 1200
-local SHOW_OFF_MS = 800
+local Constants = load_function("/constants.lua")
 
-local BOX_W = 4
-local BOX_H = 3
-local BOX_GAP = 3
-local INPUT_GAP = 1
-local FRAME_H = 12
+local FPS = Constants.FPS
+local FRAME_MS = Constants.FRAME_MS
+local SHOW_ON_MS = Constants.SHOW_ON_MS
+local SHOW_OFF_MS = Constants.SHOW_OFF_MS
+
+local BOX_W = Constants.BOX_W
+local BOX_H = Constants.BOX_H
+local BOX_GAP = Constants.BOX_GAP
+local INPUT_GAP = Constants.INPUT_GAP
+local FRAME_H = Constants.FRAME_H
 
 local FRAME_TL = utf8.char(9556)
 local FRAME_TR = utf8.char(9559)
@@ -22,12 +24,7 @@ local BOX_BR = utf8.char(9496)
 local BOX_HL = utf8.char(9472)
 local BOX_VL = utf8.char(9474)
 
-local COLORS = {
-    { bg = "rgb(255,0,0)" },
-    { bg = "rgb(255,255,0)" },
-    { bg = "rgb(0,120,255)" },
-    { bg = "rgb(0,200,0)" }
-}
+local COLORS = Constants.COLORS
 
 local state = {
     score = 0,
@@ -61,7 +58,8 @@ local state = {
     last_warn_min_w = 0,
     last_warn_min_h = 0,
 
-    sequence_anim = nil
+    sequence_anim = nil,
+    sequence_timer_id = nil
 }
 
 local function tr(key)
@@ -80,6 +78,82 @@ local function tr(key)
 
     return value
 end
+
+local KEY_DISPLAY = {
+    up = "↑",
+    down = "↓",
+    left = "←",
+    right = "→",
+    enter = "Enter",
+    esc = "Esc",
+    space = "Space",
+    backspace = "Bksp",
+    del = "Del",
+    tab = "Tab",
+    back_tab = "BTab"
+}
+
+local function display_key_name(key)
+    key = tostring(key or "")
+    if key == "" then return "" end
+    if KEY_DISPLAY[key] ~= nil then return KEY_DISPLAY[key] end
+    if #key == 1 then return string.upper(key) end
+    if string.sub(key, 1, 1) == "f" and tonumber(string.sub(key, 2)) ~= nil then
+        return string.upper(key)
+    end
+    return key
+end
+
+local function key_label(action)
+    if type(get_key) ~= "function" then
+        return "[]"
+    end
+    local ok, info = pcall(get_key, action)
+    if not ok or type(info) ~= "table" then
+        return "[]"
+    end
+    if info[action] ~= nil and type(info[action]) == "table" then
+        info = info[action]
+    end
+    local keys = info.key_user or info.key
+    if type(keys) ~= "table" then
+        keys = { keys }
+    end
+    local out = {}
+    for i = 1, #keys do
+        local label = display_key_name(keys[i])
+        if label ~= "" then
+            out[#out + 1] = "[" .. label .. "]"
+        end
+    end
+    if #out == 0 then return "[]" end
+    return table.concat(out, "/")
+end
+
+
+local function replace_prompt_keys(text)
+    text = tostring(text or "")
+    text = string.gsub(text, "%[Y%]", key_label("confirm_yes"))
+    text = string.gsub(text, "%[N%]", key_label("confirm_no"))
+    text = string.gsub(text, "%[Q%]/%[ESC%]", key_label("quit_action"))
+    return text
+end
+
+local function controls_text()
+    return table.concat({
+        key_label("pick_1") .. "/" .. key_label("pick_2") .. "/" .. key_label("pick_3") .. "/" .. key_label("pick_4") .. " " .. tr("game.color_memory.action.pick_1"),
+        key_label("confirm") .. " " .. tr("game.color_memory.action.confirm"),
+        key_label("remove_last") .. " " .. tr("game.color_memory.action.remove_last"),
+        key_label("restart") .. " " .. tr("game.color_memory.action.restart"),
+        key_label("quit_action") .. " " .. tr("game.color_memory.action.quit")
+    }, "  ")
+end
+
+local function restart_quit_controls_text()
+    return key_label("restart") .. " " .. tr("game.color_memory.action.restart")
+        .. "  " .. key_label("quit_action") .. " " .. tr("game.color_memory.action.quit")
+end
+
 
 local function text_width(text)
     if type(get_text_width) == "function" then
@@ -154,41 +228,28 @@ local function clear()
     canvas_clear()
 end
 
-local function random(n)
+local function random_index(n)
     if type(n) ~= "number" or n <= 0 then
         return 0
     end
-    return math.random(0, n - 1)
+    return random(n - 1)
 end
 
-local function now_ms()
-    if type(time_now_ms) == "function" then
-        local ok, value = pcall(time_now_ms)
-        if ok and type(value) == "number" then
-            return value
-        end
+local function kill_sequence_timer()
+    if state.sequence_timer_id ~= nil and type(timer_kill) == "function" then
+        pcall(timer_kill, state.sequence_timer_id)
     end
-    return state.frame * FRAME_MS
+    state.sequence_timer_id = nil
 end
 
-local function make_deadline(delay_ms)
-    if type(after_ms) == "function" then
-        local ok, value = pcall(after_ms, math.max(0, delay_ms or 0))
-        if ok and type(value) == "number" then
-            return value
-        end
-    end
-    return now_ms() + math.max(0, delay_ms or 0)
+local function start_sequence_timer(delay_ms)
+    kill_sequence_timer()
+    state.sequence_timer_id = timer_create(math.max(1, delay_ms or 1), "color_memory_sequence")
+    timer_start(state.sequence_timer_id)
 end
 
-local function deadline_passed_now(deadline_ms)
-    if type(deadline_passed) == "function" then
-        local ok, value = pcall(deadline_passed, deadline_ms)
-        if ok and type(value) == "boolean" then
-            return value
-        end
-    end
-    return now_ms() >= deadline_ms
+local function sequence_timer_completed()
+    return state.sequence_timer_id ~= nil and is_timer_completed(state.sequence_timer_id)
 end
 
 local function normalize_key(key)
@@ -200,24 +261,23 @@ local function normalize_key(key)
     end
     if type(key) == "table" then
         if key.type == "quit" then
-            return "esc"
+            return "quit_action"
         end
         if key.type == "key" and type(key.name) == "string" then
             return string.lower(key.name)
         end
         if key.type == "action" and type(key.name) == "string" then
             local map = {
-                pick_1 = "1",
-                pick_2 = "2",
-                pick_3 = "3",
-                pick_4 = "4",
-                confirm = "enter",
-                confirm_yes = "enter",
-                confirm_no = "esc",
-                remove_last_backspace = "backspace",
-                remove_last_delete = "delete",
-                restart = "r",
-                quit_action = "q"
+                pick_1 = "pick_1",
+                pick_2 = "pick_2",
+                pick_3 = "pick_3",
+                pick_4 = "pick_4",
+                confirm = "confirm",
+                confirm_yes = "confirm_yes",
+                confirm_no = "confirm_no",
+                remove_last = "remove_last",
+                restart = "restart",
+                quit_action = "quit_action"
             }
             return map[key.name] or ""
         end
@@ -279,31 +339,18 @@ local function draw_highlight_box(x, y, color_idx)
 end
 
 local function load_best_record()
-    if type(load_data) ~= "function" then
-        return
-    end
-    local ok, data = pcall(load_data, "color_memory_best")
+    local ok, data = pcall(get_best_score)
     if not ok or type(data) ~= "table" then
         return
     end
-    local bs = tonumber(data.best_score)
-    local bt = tonumber(data.best_time_sec)
+    local bs = tonumber(data.score or data.best_score)
+    local bt = tonumber(data.time_sec or data.best_time_sec)
     if bs ~= nil and bs >= 0 then
         state.best_score = math.floor(bs)
     end
     if bt ~= nil and bt >= 0 then
         state.best_time_sec = math.floor(bt)
     end
-end
-
-local function save_best_record()
-    if type(save_data) ~= "function" then
-        return
-    end
-    pcall(save_data, "color_memory_best", {
-        best_score = state.best_score,
-        best_time_sec = state.best_time_sec
-    })
 end
 
 local function commit_stats_if_needed()
@@ -320,9 +367,8 @@ local function commit_stats_if_needed()
         state.best_time_sec = dur
         changed = true
     end
-    save_best_record()
-    if changed and type(request_refresh_best_score) == "function" then
-        pcall(request_refresh_best_score)
+    if changed and type(request_save_best_score) == "function" then
+        pcall(request_save_best_score)
     end
     state.committed = true
 end
@@ -340,7 +386,7 @@ local function centered_x(text, left_x, right_x)
 end
 
 local function minimum_required_size()
-    local controls = tr("game.color_memory.controls")
+    local controls = controls_text()
     local controls_w = min_width_for_lines(controls, 3, 40)
 
     local best_line = tr("game.color_memory.best_score") .. " 99999  "
@@ -349,9 +395,9 @@ local function minimum_required_size()
         .. tr("game.color_memory.score") .. " 99999"
 
     local info_w = math.max(
-        text_width(tr("game.color_memory.confirm_restart")),
-        text_width(tr("game.color_memory.confirm_exit")),
-        text_width(tr("game.color_memory.lose_banner") .. " " .. tr("game.color_memory.lose_controls"))
+        text_width(replace_prompt_keys(tr("game.color_memory.confirm_restart"))),
+        text_width(replace_prompt_keys(tr("game.color_memory.confirm_exit"))),
+        text_width(tr("game.color_memory.lose_banner") .. " " .. restart_quit_controls_text())
     )
 
     local boxes_w = 4 * BOX_W + 3 * BOX_GAP
@@ -539,11 +585,11 @@ local function draw_header(g)
     local info = ""
     local info_color = "yellow"
     if state.confirm_mode == "restart" then
-        info = tr("game.color_memory.confirm_restart")
+        info = replace_prompt_keys(tr("game.color_memory.confirm_restart"))
     elseif state.confirm_mode == "exit" then
-        info = tr("game.color_memory.confirm_exit")
+        info = replace_prompt_keys(tr("game.color_memory.confirm_exit"))
     elseif state.lost then
-        info = tr("game.color_memory.lose_banner") .. " " .. tr("game.color_memory.lose_controls")
+        info = tr("game.color_memory.lose_banner") .. " " .. restart_quit_controls_text()
         info_color = "red"
     end
     if info ~= "" then
@@ -552,7 +598,7 @@ local function draw_header(g)
 end
 
 local function draw_controls(g)
-    local controls = tr("game.color_memory.controls")
+    local controls = controls_text()
     local lines = wrap_words(controls, math.max(10, g.term_w - 2))
     if #lines > 3 then
         lines = { lines[1], lines[2], lines[3] }
@@ -586,7 +632,7 @@ end
 local function generate_sequence(round_no)
     local out = {}
     for _ = 1, round_no do
-        out[#out + 1] = random(4) + 1
+        out[#out + 1] = random_index(4) + 1
     end
     return out
 end
@@ -596,9 +642,9 @@ local function start_sequence_animation()
     state.highlight_idx = 0
     state.sequence_anim = {
         step = "initial_off",
-        index = 1,
-        deadline_ms = make_deadline(SHOW_OFF_MS)
+        index = 1
     }
+    start_sequence_timer(SHOW_OFF_MS)
     state.dirty = true
 end
 
@@ -637,6 +683,7 @@ local function mark_lost()
     state.end_frame = state.frame
     state.confirm_mode = nil
     state.sequence_anim = nil
+    kill_sequence_timer()
     commit_stats_if_needed()
     state.dirty = true
 end
@@ -657,37 +704,35 @@ end
 
 local function advance_sequence_animation(dt_ms)
     local anim = state.sequence_anim
-    if anim == nil then
+    if anim == nil or not sequence_timer_completed() then
         return
     end
 
-    while anim ~= nil and deadline_passed_now(anim.deadline_ms or make_deadline(0)) do
-        if anim.step == "initial_off" or anim.step == "off" then
-            if anim.index > #state.sequence then
-                flush_input_buffer()
-                state.phase = "input"
-                state.highlight_idx = 0
-                state.sequence_anim = nil
-                state.dirty = true
-                return
-            end
-            state.highlight_idx = state.sequence[anim.index]
-            anim.step = "on"
-            anim.deadline_ms = make_deadline(SHOW_ON_MS)
-            state.dirty = true
-        else
+    if anim.step == "initial_off" or anim.step == "off" then
+        if anim.index > #state.sequence then
+            flush_input_buffer()
+            state.phase = "input"
             state.highlight_idx = 0
-            anim.index = anim.index + 1
-            anim.step = "off"
-            anim.deadline_ms = make_deadline(SHOW_OFF_MS)
+            state.sequence_anim = nil
+            kill_sequence_timer()
             state.dirty = true
+            return
         end
-        anim = state.sequence_anim
+        state.highlight_idx = state.sequence[anim.index]
+        anim.step = "on"
+        start_sequence_timer(SHOW_ON_MS)
+        state.dirty = true
+    else
+        state.highlight_idx = 0
+        anim.index = anim.index + 1
+        anim.step = "off"
+        start_sequence_timer(SHOW_OFF_MS)
+        state.dirty = true
     end
 end
 
 local function handle_confirm_key(key)
-    if key == "y" or key == "enter" then
+    if key == "confirm_yes" then
         if state.confirm_mode == "restart" then
             commit_stats_if_needed()
             start_new_run()
@@ -697,7 +742,7 @@ local function handle_confirm_key(key)
             commit_stats_if_needed()
             return "exit"
         end
-    elseif key == "q" or key == "esc" then
+    elseif key == "confirm_no" or key == "quit_action" then
         state.confirm_mode = nil
         state.dirty = true
         return "changed"
@@ -715,23 +760,23 @@ local function handle_input(key)
     end
 
     if state.lost then
-        if key == "r" then
+        if key == "restart" then
             start_new_run()
             return "changed"
         end
-        if key == "q" or key == "esc" then
+        if key == "quit_action" then
             commit_stats_if_needed()
             return "exit"
         end
         return "none"
     end
 
-    if key == "q" or key == "esc" then
+    if key == "quit_action" then
         state.confirm_mode = "exit"
         state.dirty = true
         return "changed"
     end
-    if key == "r" then
+    if key == "restart" then
         state.confirm_mode = "restart"
         state.dirty = true
         return "changed"
@@ -741,7 +786,7 @@ local function handle_input(key)
         return "none"
     end
 
-    if key == "backspace" or key == "delete" then
+    if key == "remove_last" then
         if #state.input_colors > 0 then
             table.remove(state.input_colors)
             state.dirty = true
@@ -750,10 +795,10 @@ local function handle_input(key)
     end
 
     local color_idx = nil
-    if key == "1" then color_idx = 1 end
-    if key == "2" then color_idx = 2 end
-    if key == "3" then color_idx = 3 end
-    if key == "4" then color_idx = 4 end
+    if key == "pick_1" then color_idx = 1 end
+    if key == "pick_2" then color_idx = 2 end
+    if key == "pick_3" then color_idx = 3 end
+    if key == "pick_4" then color_idx = 4 end
 
     if color_idx ~= nil then
         state.input_colors[#state.input_colors + 1] = color_idx
@@ -761,7 +806,7 @@ local function handle_input(key)
         return "changed"
     end
 
-    if key == "enter" then
+    if key == "confirm" then
         local ok = #state.input_colors == #state.sequence
         if ok then
             for i = 1, #state.sequence do
@@ -783,7 +828,7 @@ local function handle_input(key)
     return "none"
 end
 
-function init_game()
+local function runtime_init_game(saved_state)
     clear()
     flush_input_buffer()
     local w, h = terminal_size()
@@ -807,7 +852,7 @@ local function handle_tick(dt_ms)
     state.frame = state.frame + 1
 end
 
-function handle_event(state_arg, event)
+local function runtime_handle_event(state_arg, event)
     state = state_arg or state
 
     if event ~= nil and event.type == "resize" then
@@ -824,7 +869,7 @@ function handle_event(state_arg, event)
 
     local key = normalize_key(event)
     if not ensure_terminal_size_ok() then
-        if key == "q" or key == "esc" then
+        if key == "quit_action" then
             if type(request_exit) == "function" then
                 pcall(request_exit)
             end
@@ -841,7 +886,7 @@ function handle_event(state_arg, event)
     return state
 end
 
-function render(state_arg)
+local function runtime_render(state_arg)
     state = state_arg or state
     if not ensure_terminal_size_ok() then
         return
@@ -849,14 +894,34 @@ function render(state_arg)
     render_full(frame_geometry())
 end
 
-function best_score(state_arg)
+local function runtime_save_best_score(state_arg)
     state = state_arg or state
     if state.best_score <= 0 and state.best_time_sec <= 0 then
-        return nil
+        return { best_string = "game.color_memory.best_none_block" }
     end
     return {
         best_string = "game.color_memory.best_block",
         score = state.best_score,
+        time_sec = state.best_time_sec,
         time = format_duration(state.best_time_sec)
     }
 end
+
+
+local function runtime_exit_game(state_arg)
+    state = state_arg or state
+    kill_sequence_timer()
+    commit_stats_if_needed()
+    return state
+end
+
+local Runtime = {
+    init_game = runtime_init_game,
+    handle_event = runtime_handle_event,
+    render = runtime_render,
+    exit_game = runtime_exit_game,
+    save_best_score = runtime_save_best_score,
+}
+
+_G.COLOR_MEMORY_RUNTIME = Runtime
+return Runtime

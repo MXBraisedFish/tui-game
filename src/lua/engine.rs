@@ -15,6 +15,7 @@ use crate::core::screen::Canvas;
 use crate::game::registry::GameDescriptor;
 use crate::lua::{api, sandbox};
 use crate::terminal::{renderer, size_watcher};
+use crate::utils::host_log;
 
 const DEFAULT_TARGET_FPS: u16 = 60;
 const MAX_EVENTS_PER_FRAME: usize = 256;
@@ -41,6 +42,7 @@ pub struct LuaGameEngine {
 
 impl LuaGameEngine {
     pub fn new(game: GameDescriptor, launch_mode: LaunchMode) -> Result<Self> {
+        let _log_object_guard = host_log::scoped_log_object(game.id.clone());
         let lua = Lua::new();
         sandbox::install_sandbox(&lua).map_err(anyhow_lua_error)?;
 
@@ -95,6 +97,7 @@ impl LuaGameEngine {
     }
 
     pub fn run(mut self) -> Result<()> {
+        let _log_object_guard = host_log::scoped_log_object(self.game.id.clone());
         renderer::invalidate_canvas_cache();
         let frame_duration = frame_duration_for_fps(self.game.target_fps);
         let mut last_tick_at = Instant::now();

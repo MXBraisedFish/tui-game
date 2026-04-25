@@ -138,10 +138,6 @@ pub(crate) fn install(lua: &Lua, bridges: RuntimeBridges) -> mlua::Result<()> {
             "get_key",
             lua.create_function(move |lua, args: Variadic<Value>| {
                 common::expect_arg_count_range(&args, 0, 1)?;
-                if !is_debug_enabled(&bridges) {
-                    return Ok(Value::Nil);
-                }
-
                 let requested_key = common::expect_optional_string_arg(&args, 0, "key")?;
                 Ok(Value::Table(build_key_info_table(
                     lua,

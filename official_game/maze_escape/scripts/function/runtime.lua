@@ -1,27 +1,22 @@
--- 游戏常量定义
-local FPS = 60
-local FRAME_MS = 16
+local Constants = load_function("/constants.lua")
 
--- 迷宫尺寸范围
-local MIN_COLS = 10
-local MAX_COLS = 32
-local MIN_ROWS = 8
-local MAX_ROWS = 22
-local MIN_MODE = 1
-local MAX_MODE = 4
-
--- 瓷砖类型定义
-local TILE_PATH = 0                  -- 通路
-local TILE_WALL = 1                  -- 墙壁
-local TILE_DOOR = 2                  -- 门（需要钥匙）
-local TILE_KEY = 3                   -- 钥匙
-local TILE_EXIT = 4                  -- 出口
-local WALL_GLYPH = utf8.char(0x2588) -- 墙壁字符 "█"
-
--- 默认配置
-local DEFAULT_COLS = 18
-local DEFAULT_ROWS = 12
-local DEFAULT_MODE = 1
+local FPS = Constants.FPS
+local FRAME_MS = Constants.FRAME_MS
+local MIN_COLS = Constants.MIN_COLS
+local MAX_COLS = Constants.MAX_COLS
+local MIN_ROWS = Constants.MIN_ROWS
+local MAX_ROWS = Constants.MAX_ROWS
+local MIN_MODE = Constants.MIN_MODE
+local MAX_MODE = Constants.MAX_MODE
+local TILE_PATH = Constants.TILE_PATH
+local TILE_WALL = Constants.TILE_WALL
+local TILE_DOOR = Constants.TILE_DOOR
+local TILE_KEY = Constants.TILE_KEY
+local TILE_EXIT = Constants.TILE_EXIT
+local WALL_GLYPH = Constants.WALL_GLYPH
+local DEFAULT_COLS = Constants.DEFAULT_COLS
+local DEFAULT_ROWS = Constants.DEFAULT_ROWS
+local DEFAULT_MODE = Constants.DEFAULT_MODE
 
 local function draw_text(x, y, text, fg, bg)
     canvas_draw_text(math.max(0, x - 1), math.max(0, y - 1), text or "", fg, bg)
@@ -31,11 +26,11 @@ local function clear()
     canvas_clear()
 end
 
-local function random(n)
+local function random_index(n)
     if type(n) ~= "number" or n <= 0 then
         return 0
     end
-    return math.random(0, n - 1)
+    return random(n - 1)
 end
 
 -- 游戏状态表
@@ -58,6 +53,7 @@ local state = {
     start_frame = 0,
     end_frame = nil,
     time_limit_sec = nil, -- 时间限制（模式3/4）
+    time_timer_id = nil,  -- 限时模式计时器 ID
     won = false,
     lost = false,
 
@@ -112,6 +108,81 @@ local function tr(key)
     return value
 end
 
+local KEY_DISPLAY = {
+    up = "↑",
+    down = "↓",
+    left = "←",
+    right = "→",
+    enter = "Enter",
+    esc = "Esc",
+    space = "Space",
+    backspace = "Bksp",
+    del = "Del",
+    tab = "Tab",
+    back_tab = "BTab"
+}
+
+local function display_key_name(key)
+    key = tostring(key or "")
+    if key == "" then return "" end
+    if KEY_DISPLAY[key] ~= nil then return KEY_DISPLAY[key] end
+    if #key == 1 then return string.upper(key) end
+    if string.sub(key, 1, 1) == "f" and tonumber(string.sub(key, 2)) ~= nil then
+        return string.upper(key)
+    end
+    return key
+end
+
+local function key_label(action)
+    if type(get_key) ~= "function" then
+        return "[]"
+    end
+    local ok, info = pcall(get_key, action)
+    if not ok or type(info) ~= "table" then
+        return "[]"
+    end
+    if info[action] ~= nil and type(info[action]) == "table" then
+        info = info[action]
+    end
+    local keys = info.key_user or info.key
+    if type(keys) ~= "table" then
+        keys = { keys }
+    end
+    local out = {}
+    for i = 1, #keys do
+        local label = display_key_name(keys[i])
+        if label ~= "" then
+            out[#out + 1] = "[" .. label .. "]"
+        end
+    end
+    if #out == 0 then return "[]" end
+    return table.concat(out, "/")
+end
+
+local function replace_prompt_keys(text)
+    text = tostring(text or "")
+    text = string.gsub(text, "%[Y%]", key_label("confirm_yes"))
+    text = string.gsub(text, "%[N%]", key_label("confirm_no"))
+    text = string.gsub(text, "%[Q%]/%[ESC%]", key_label("quit_action"))
+    text = string.gsub(text, "%[ESC%]/%[Q%]", key_label("quit_action"))
+    return text
+end
+
+local function controls_text()
+    return table.concat({
+        key_label("move_up") .. "/" .. key_label("move_down") .. "/" .. key_label("move_left") .. "/" .. key_label("move_right") .. " " .. tr("game.maze_escape.action.move_up"),
+        key_label("config_input") .. " " .. tr("game.maze_escape.action.config_input"),
+        key_label("save") .. " " .. tr("game.maze_escape.action.save"),
+        key_label("restart") .. " " .. tr("game.maze_escape.action.restart"),
+        key_label("quit_action") .. " " .. tr("game.maze_escape.action.quit")
+    }, "  ")
+end
+
+local function restart_quit_controls_text()
+    return key_label("restart") .. " " .. tr("game.maze_escape.action.restart")
+        .. "  " .. key_label("quit_action") .. " " .. tr("game.maze_escape.action.quit")
+end
+
 -- 获取文本显示宽度
 local function text_width(text)
     if type(get_text_width) == "function" then
@@ -141,20 +212,21 @@ end
 
 local function normalize_event_key(event)
     if type(event) ~= "table" then return "" end
-    if event.type == "quit" then return "esc" end
+    if event.type == "quit" then return "quit_action" end
     if event.type == "key" then return normalize_key(event.name) end
     if event.type ~= "action" then return "" end
     local map = {
-        move_up = "up",
-        move_down = "down",
-        move_left = "left",
-        move_right = "right",
-        config_input = "p",
-        save = "s",
-        restart = "r",
-        quit_action = "q",
-        confirm_yes = "enter",
-        confirm_no = "esc",
+        move_up = "move_up",
+        move_down = "move_down",
+        move_left = "move_left",
+        move_right = "move_right",
+        config_input = "config_input",
+        save = "save",
+        confirm = "confirm",
+        restart = "restart",
+        quit_action = "quit_action",
+        confirm_yes = "confirm_yes",
+        confirm_no = "confirm_no",
     }
     return map[event.name] or normalize_key(event.name)
 end
@@ -236,6 +308,28 @@ local function min_width_for_lines(text, max_lines, hard_min)
         width = width + 1
     end
     return full
+end
+
+-- 停止限时模式计时器
+local function stop_time_timer()
+    if state.time_timer_id ~= nil and type(timer_kill) == "function" then
+        pcall(timer_kill, state.time_timer_id)
+    end
+    state.time_timer_id = nil
+end
+
+-- 启动限时模式计时器
+local function start_time_timer(limit_sec, elapsed_sec)
+    stop_time_timer()
+    if limit_sec == nil or type(timer_create) ~= "function" or type(timer_start) ~= "function" then
+        return
+    end
+    local remaining = math.max(1, math.floor((limit_sec - (elapsed_sec or 0)) * 1000))
+    local ok, id = pcall(timer_create, remaining, "maze_escape_limit")
+    if ok and type(id) == "string" then
+        state.time_timer_id = id
+        pcall(timer_start, id)
+    end
 end
 
 -- 计算已过秒数
@@ -348,53 +442,26 @@ end
 
 -- 加载最佳记录
 local function load_best_record()
-    if type(load_data) ~= "function" then
-        return
-    end
-    local ok, data = pcall(load_data, "maze_escape_best")
+    local ok, data = pcall(get_best_score)
     if not ok or type(data) ~= "table" then
         return
     end
-    local area = tonumber(data.max_area)
-    local max_cols = tonumber(data.max_cols)
-    local max_rows = tonumber(data.max_rows)
-    local mode = tonumber(data.max_mode)
-    local min_time = tonumber(data.min_time_sec)
-    if area ~= nil and area >= 0 then
-        state.best.max_area = math.floor(area)
-    end
-    if max_cols ~= nil and max_cols >= 0 then
-        state.best.max_cols = math.floor(max_cols)
-    end
-    if max_rows ~= nil and max_rows >= 0 then
-        state.best.max_rows = math.floor(max_rows)
-    end
-    if mode ~= nil and mode >= MIN_MODE and mode <= MAX_MODE then
-        state.best.max_mode = math.floor(mode)
-    end
-    if min_time ~= nil and min_time >= 0 then
-        state.best.min_time_sec = math.floor(min_time)
-    end
-end
-
--- 保存最佳记录
-local function save_best_record()
-    if type(save_data) ~= "function" then
-        return
-    end
-    pcall(save_data, "maze_escape_best", {
-        max_area = state.best.max_area,
-        max_cols = state.best.max_cols,
-        max_rows = state.best.max_rows,
-        max_mode = state.best.max_mode,
-        min_time_sec = state.best.min_time_sec
-    })
+    local area = tonumber(data.max_area or data.area)
+    local max_cols = tonumber(data.max_cols or data.cols)
+    local max_rows = tonumber(data.max_rows or data.rows)
+    local mode = tonumber(data.max_mode or data.mode)
+    local min_time = tonumber(data.min_time_sec or data.time_sec)
+    if area ~= nil and area >= 0 then state.best.max_area = math.floor(area) end
+    if max_cols ~= nil and max_cols >= 0 then state.best.max_cols = math.floor(max_cols) end
+    if max_rows ~= nil and max_rows >= 0 then state.best.max_rows = math.floor(max_rows) end
+    if mode ~= nil and mode >= MIN_MODE and mode <= MAX_MODE then state.best.max_mode = math.floor(mode) end
+    if min_time ~= nil and min_time >= 0 then state.best.min_time_sec = math.floor(min_time) end
 end
 
 -- 打乱数组（用于随机化方向）
 local function shuffle_array(arr)
     for i = #arr, 2, -1 do
-        local j = random(i) + 1
+        local j = random_index(i) + 1
         arr[i], arr[j] = arr[j], arr[i]
     end
 end
@@ -648,6 +715,7 @@ end
 
 -- 构建迷宫
 local function build_maze(cols, rows, mode)
+    stop_time_timer()
     state.cols = clamp(cols, MIN_COLS, MAX_COLS)
     state.rows = clamp(rows, MIN_ROWS, MAX_ROWS)
     state.mode = clamp(mode, MIN_MODE, MAX_MODE)
@@ -707,6 +775,9 @@ local function build_maze(cols, rows, mode)
         state.time_limit_sec = math.max(1, math.floor(raw_limit + 0.5))
     else
         state.time_limit_sec = nil
+    end
+    if state.time_limit_sec ~= nil then
+        start_time_timer(state.time_limit_sec, 0)
     end
 
     state.last_area = nil
@@ -778,18 +849,13 @@ end
 -- 保存游戏状态
 local function save_game_state(show_toast)
     local ok = false
-    local snapshot = make_snapshot()
-    if type(save_continue) == "function" then
-        local s, ret = pcall(save_continue, snapshot)
-        ok = s and ret ~= false
-    elseif type(save_data) == "function" then
-        local s, ret = pcall(save_data, "maze_escape", snapshot)
+    if type(request_save_game) == "function" then
+        local s, ret = pcall(request_save_game)
         ok = s and ret ~= false
     end
 
     if show_toast then
         local key = ok and "game.maze_escape.save_success" or "game.maze_escape.save_unavailable"
-        local fallback = ok and "Save successful!" or "Save API unavailable."
         state.toast_text = tr(key)
         state.toast_until = state.frame + 2 * FPS
         state.dirty = true
@@ -861,28 +927,19 @@ local function restore_snapshot(snapshot)
     state.input_buffer = ""
     state.toast_text = nil
     state.toast_until = 0
-    state.result_committed = state.won
+    state.result_committed = state.won or state.lost
+    if state.time_limit_sec ~= nil and not state.won and not state.lost then
+        start_time_timer(state.time_limit_sec, elapsed)
+    else
+        stop_time_timer()
+    end
     state.last_area = nil
     state.dirty = true
     return true
 end
 
 -- 加载游戏状态
-local function load_game_state()
-    local ok = false
-    local snapshot = nil
-    if type(load_continue) == "function" then
-        local s, ret = pcall(load_continue)
-        ok = s and ret ~= nil
-        snapshot = ret
-    elseif type(load_data) == "function" then
-        local s, ret = pcall(load_data, "maze_escape")
-        ok = s and ret ~= nil
-        snapshot = ret
-    end
-    if not ok then
-        return false
-    end
+local function load_game_state(snapshot)
     return restore_snapshot(snapshot)
 end
 
@@ -892,38 +949,34 @@ local function commit_result_if_needed()
         return
     end
     local duration = elapsed_seconds()
-    local score = 0
+    local changed = false
     if state.won then
-        -- 计算得分：基础分减去时间和步数惩罚
-        local base = 20000 - duration * 80 - state.steps * 25
-        if base < 1 then base = 1 end
-        score = base
-
-        -- 更新最佳记录
         local area = state.rows * state.cols
         if area > state.best.max_area then
             state.best.max_area = area
             state.best.max_cols = state.cols
             state.best.max_rows = state.rows
+            changed = true
         end
         if state.mode > state.best.max_mode then
             state.best.max_mode = state.mode
+            changed = true
         end
         if state.best.min_time_sec == nil or duration < state.best.min_time_sec then
             state.best.min_time_sec = duration
+            changed = true
         end
-        save_best_record()
-    end
-    if type(update_game_stats) == "function" then
-        pcall(update_game_stats, "maze_escape", score, duration)
     end
     state.result_committed = true
+    if changed and type(request_save_best_score) == "function" then
+        pcall(request_save_best_score)
+    end
 end
 
 -- 计算棋盘几何布局
 local function board_geometry()
     local term_w, term_h = terminal_size()
-    local controls_text = tr("game.maze_escape.controls")
+    local controls_text = controls_text()
     local controls_w = min_width_for_lines(controls_text, 3, 28)
 
     local status_left = tr("game.maze_escape.time") .. " 00:00:00"
@@ -939,8 +992,8 @@ local function board_geometry()
         text_width(tr("game.maze_escape.win_banner")),
         text_width(tr("game.maze_escape.lose_banner")),
         text_width(tr("game.maze_escape.input_config_hint")),
-        text_width(tr("game.2048.confirm_restart")),
-        text_width(tr("game.2048.confirm_exit"))
+        text_width(replace_prompt_keys(tr("game.maze_escape.confirm_restart"))),
+        text_width(replace_prompt_keys(tr("game.maze_escape.confirm_exit")))
     )
 
     local board_w = state.cols * maze_cell_width()
@@ -1011,18 +1064,16 @@ local function draw_status(x, y, w)
             draw_text(centered_x(state.input_buffer, x, w), y + 2, state.input_buffer, "white", "black")
         end
     elseif state.won then
-        local line = tr("game.maze_escape.win_banner")
-            .. " " .. tr("game.maze_escape.result_controls")
+        local line = tr("game.maze_escape.win_banner") .. " " .. restart_quit_controls_text()
         draw_text(centered_x(line, x, w), y + 2, line, "green", "black")
     elseif state.lost then
-        local line = tr("game.maze_escape.lose_banner")
-            .. " " .. tr("game.maze_escape.result_controls")
+        local line = tr("game.maze_escape.lose_banner") .. " " .. restart_quit_controls_text()
         draw_text(centered_x(line, x, w), y + 2, line, "red", "black")
     elseif state.confirm_mode == "restart" then
-        local line = tr("game.2048.confirm_restart")
+        local line = replace_prompt_keys(tr("game.maze_escape.confirm_restart"))
         draw_text(centered_x(line, x, w), y + 2, line, "yellow", "black")
     elseif state.confirm_mode == "exit" then
-        local line = tr("game.2048.confirm_exit")
+        local line = replace_prompt_keys(tr("game.maze_escape.confirm_exit"))
         draw_text(centered_x(line, x, w), y + 2, line, "yellow", "black")
     elseif state.toast_text ~= nil and state.frame <= state.toast_until then
         draw_text(centered_x(state.toast_text, x, w), y + 2, state.toast_text, "green", "black")
@@ -1066,7 +1117,7 @@ end
 
 -- 绘制控制说明
 local function draw_controls(x, y, w)
-    local text = tr("game.maze_escape.controls")
+    local text = controls_text()
     local term_w = terminal_size()
     local max_w = math.max(10, term_w - 2)
     local lines = wrap_words(text, max_w)
@@ -1095,8 +1146,8 @@ local function draw_controls(x, y, w)
 end
 
 -- 主渲染函数
-function render(state_arg)
-    state = state_arg
+local function runtime_render(state_arg)
+    state = state_arg or state
     local x, y, w = board_geometry()
     local total_h = 3 + state.rows + 3
     local area = { x = x, y = y, w = w, h = total_h }
@@ -1119,7 +1170,7 @@ end
 
 -- 计算最小所需终端尺寸
 local function minimum_required_size()
-    local controls_text = tr("game.maze_escape.controls")
+    local controls_text = controls_text()
     local controls_w = min_width_for_lines(controls_text, 3, 28)
 
     local status_left = tr("game.maze_escape.time") .. " 00:00:00"
@@ -1129,10 +1180,10 @@ local function minimum_required_size()
 
     local hint_w = math.max(
         text_width(tr("game.maze_escape.input_config_hint")),
-        text_width(tr("game.maze_escape.win_banner") .. " " .. tr("game.maze_escape.result_controls")),
-        text_width(tr("game.maze_escape.lose_banner") .. " " .. tr("game.maze_escape.result_controls")),
-        text_width(tr("game.2048.confirm_restart")),
-        text_width(tr("game.2048.confirm_exit"))
+        text_width(tr("game.maze_escape.win_banner") .. " " .. restart_quit_controls_text()),
+        text_width(tr("game.maze_escape.lose_banner") .. " " .. restart_quit_controls_text()),
+        text_width(replace_prompt_keys(tr("game.maze_escape.confirm_restart"))),
+        text_width(replace_prompt_keys(tr("game.maze_escape.confirm_exit")))
     )
 
     local board_w = state.cols * maze_cell_width()
@@ -1207,7 +1258,7 @@ end
 
 -- 防抖处理
 local function should_debounce(key)
-    if not (key == "up" or key == "down" or key == "left" or key == "right") then
+    if not (key == "move_up" or key == "move_down" or key == "move_left" or key == "move_right") then
         return false
     end
     if key == state.last_key and (state.frame - state.last_key_frame) <= 2 then
@@ -1220,6 +1271,7 @@ end
 
 -- 标记胜利
 local function mark_win()
+    stop_time_timer()
     state.won = true
     state.end_frame = state.frame
     state.confirm_mode = nil
@@ -1229,6 +1281,7 @@ end
 
 -- 标记失败
 local function mark_lost()
+    stop_time_timer()
     state.lost = true
     state.end_frame = state.frame
     state.confirm_mode = nil
@@ -1240,6 +1293,12 @@ end
 local function timed_out()
     if state.time_limit_sec == nil then
         return false
+    end
+    if state.time_timer_id ~= nil and type(is_timer_completed) == "function" then
+        local ok, done = pcall(is_timer_completed, state.time_timer_id)
+        if ok and done then
+            return true
+        end
     end
     return elapsed_seconds() >= state.time_limit_sec
 end
@@ -1288,14 +1347,14 @@ end
 
 -- 处理输入模式下的按键
 local function handle_input_mode_key(key)
-    if key == "esc" or key == "q" then
+    if key == "quit_action" or key == "confirm_no" then
         state.input_mode = nil
         state.input_buffer = ""
         state.dirty = true
         return "changed"
     end
 
-    if key == "enter" then
+    if key == "confirm" then
         local cols, rows, mode = parse_config_input()
         state.input_mode = nil
         state.input_buffer = ""
@@ -1311,7 +1370,7 @@ local function handle_input_mode_key(key)
         return "changed"
     end
 
-    if key == "backspace" then
+    if key == "backspace" or key == "del" then
         if #state.input_buffer > 0 then
             state.input_buffer = string.sub(state.input_buffer, 1, #state.input_buffer - 1)
             state.dirty = true
@@ -1321,8 +1380,8 @@ local function handle_input_mode_key(key)
     end
 
     -- 这些键会退出输入模式
-    if key == "up" or key == "down" or key == "left" or key == "right"
-        or key == "r" or key == "s" then
+    if key == "move_up" or key == "move_down" or key == "move_left" or key == "move_right"
+        or key == "restart" or key == "save" then
         state.input_mode = nil
         state.input_buffer = ""
         state.dirty = true
@@ -1345,7 +1404,7 @@ end
 
 -- 处理确认模式下的按键
 local function handle_confirm_key(key)
-    if key == "y" or key == "enter" then
+    if key == "confirm_yes" then
         if state.confirm_mode == "restart" then
             build_maze(state.cols, state.rows, state.mode)
             force_full_refresh()
@@ -1356,7 +1415,7 @@ local function handle_confirm_key(key)
         end
     end
 
-    if key == "q" or key == "esc" then
+    if key == "confirm_no" or key == "quit_action" then
         state.confirm_mode = nil
         state.dirty = true
         flush_input_buffer()
@@ -1389,44 +1448,44 @@ local function handle_input(key)
 
     -- 胜利/失败状态
     if state.won or state.lost then
-        if key == "r" then
+        if key == "restart" then
             build_maze(state.cols, state.rows, state.mode)
             force_full_refresh()
             return "changed"
         end
-        if key == "q" or key == "esc" then
+        if key == "confirm_no" or key == "quit_action" then
             return "exit"
         end
         return "none"
     end
 
     -- 功能键
-    if key == "r" then
+    if key == "restart" then
         state.confirm_mode = "restart"
         state.dirty = true
         flush_input_buffer()
         return "changed"
     end
-    if key == "q" or key == "esc" then
+    if key == "confirm_no" or key == "quit_action" then
         state.confirm_mode = "exit"
         state.dirty = true
         flush_input_buffer()
         return "changed"
     end
-    if key == "s" then
+    if key == "save" then
         save_game_state(true)
         return "changed"
     end
-    if key == "p" then
+    if key == "config_input" then
         start_input_mode("config")
         return "changed"
     end
 
     -- 移动
-    if key == "up" then return move_player(-1, 0) end
-    if key == "down" then return move_player(1, 0) end
-    if key == "left" then return move_player(0, -1) end
-    if key == "right" then return move_player(0, 1) end
+    if key == "move_up" then return move_player(-1, 0) end
+    if key == "move_down" then return move_player(1, 0) end
+    if key == "move_left" then return move_player(0, -1) end
+    if key == "move_right" then return move_player(0, 1) end
     return "none"
 end
 
@@ -1463,16 +1522,15 @@ local function refresh_dirty_flags()
 end
 
 -- 游戏初始化
-function init_game()
+local function runtime_init_game(saved_state)
     clear()
-    math.randomseed(os.time())
     local w, h = terminal_size()
     state.last_term_w = w
     state.last_term_h = h
     state.launch_mode = read_launch_mode()
     load_best_record()
-    if state.launch_mode == "continue" then
-        if not load_game_state() then
+    if state.launch_mode == "continue" and type(saved_state) == "table" then
+        if not load_game_state(saved_state) then
             build_maze(DEFAULT_COLS, DEFAULT_ROWS, DEFAULT_MODE)
         end
     else
@@ -1484,8 +1542,9 @@ end
 
 -- 主游戏循环
 
-function handle_event(state_arg, event)
-    state = state_arg
+local function runtime_handle_event(state_arg, event)
+    state = state_arg or state
+    event = event or {}
     state.frame = state.frame + 1
 
     local key = normalize_event_key(event)
@@ -1506,15 +1565,15 @@ function handle_event(state_arg, event)
     end
 
     if not ensure_terminal_size_ok() then
-        if key == "q" or key == "esc" then
-            request_exit()
+        if key == "confirm_no" or key == "quit_action" then
+            if type(request_exit) == "function" then pcall(request_exit) end
         end
         return state
     end
 
     local action = handle_input(key)
     if action == "exit" then
-        request_exit()
+        if type(request_exit) == "function" then pcall(request_exit) end
     end
 
     sync_terminal_resize()
@@ -1523,15 +1582,46 @@ function handle_event(state_arg, event)
     return state
 end
 
-function best_score(state_arg)
-    state = state_arg
+local function runtime_save_best_score(state_arg)
+    state = state_arg or state
     if state.best.max_area <= 0 then
-        return nil
+        return { best_string = "game.maze_escape.best_none_block" }
     end
     return {
         best_string = "game.maze_escape.best_block",
+        max_area = state.best.max_area,
+        max_cols = state.best.max_cols,
+        max_rows = state.best.max_rows,
+        max_mode = state.best.max_mode,
+        min_time_sec = state.best.min_time_sec,
         size = string.format("%dx%d", state.best.max_cols, state.best.max_rows),
         mode = state.best.max_mode,
         fastest = state.best.min_time_sec and format_duration(state.best.min_time_sec) or "--:--:--"
     }
 end
+
+local function runtime_save_game(state_arg)
+    state = state_arg or state
+    return make_snapshot()
+end
+
+local function runtime_exit_game(state_arg)
+    state = state_arg or state
+    if not state.won and not state.lost then
+        save_game_state(false)
+    end
+    stop_time_timer()
+    return state
+end
+
+local Runtime = {
+    init_game = runtime_init_game,
+    handle_event = runtime_handle_event,
+    render = runtime_render,
+    exit_game = runtime_exit_game,
+    save_best_score = runtime_save_best_score,
+    save_game = runtime_save_game,
+}
+
+_G.MAZE_ESCAPE_RUNTIME = Runtime
+return Runtime

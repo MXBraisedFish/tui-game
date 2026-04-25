@@ -1,8 +1,25 @@
 {
   "namespace": "official",
-  "package_name": "TUI-GAME Official",
+  "package": "TUI-GAME Official",
+  "mod_name": "TUI-GAME Official",
+  "introduction": "game.lights_out.package_introduction",
   "author": "TUI-GAME",
+  "game_name": "game.lights_out.name",
+  "description": "game.lights_out.description",
+  "detail": "game.lights_out.details",
   "version": "1.0.0",
-  "description": "Official built-in games packaged under the unified runtime.",
-  "api_version": 1
+  "icon": [
+    " LIGHTS ",
+    "  * *   ",
+    " * + *  ",
+    "  * *   "
+  ],
+  "banner": [
+    "  _     _       _     _        ___        _   ",
+    " | |   (_) __ _| |__ | |_ ___ / _ \\ _   _| |_ ",
+    " | |   | |/ _` | '_ \\| __/ __| | | | | | | __|",
+    " | |___| | (_| | | | | |_\\__ \\ |_| | |_| | |_ ",
+    " |_____|_|\\__, |_| |_|\\__|___/\\___/ \\__,_|\\__|",
+    "          |___/                                  "
+  ]
 }

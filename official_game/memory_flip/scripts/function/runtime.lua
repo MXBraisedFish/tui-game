@@ -1,14 +1,19 @@
-local DEFAULT_DIFFICULTY = 2          -- 默认难度
-local MIN_DIFFICULTY = 1              -- 最小难度
-local MAX_DIFFICULTY = 3              -- 最大难度
-local DIFFICULTY_TO_SIZE = {          -- 难度对应的棋盘大小
-    [1] = 2,  -- 简单：2x2（4张牌）
-    [2] = 4,  -- 普通：4x4（16张牌）
-    [3] = 6   -- 困难：6x6（36张牌）
-}
+local Constants = load_function("/constants.lua")
 
-local FPS = 60
-local FRAME_MS = 16
+local DEFAULT_DIFFICULTY = Constants.DEFAULT_DIFFICULTY
+local MIN_DIFFICULTY = Constants.MIN_DIFFICULTY
+local MAX_DIFFICULTY = Constants.MAX_DIFFICULTY
+local DIFFICULTY_TO_SIZE = Constants.DIFFICULTY_TO_SIZE
+local FPS = Constants.FPS
+local FRAME_MS = Constants.FRAME_MS
+local CELL_W = Constants.CELL_W
+local CELL_H = Constants.CELL_H
+local CELL_STEP_X = Constants.CELL_STEP_X
+local CELL_STEP_Y = Constants.CELL_STEP_Y
+local LABEL_W = Constants.LABEL_W
+local HIDE_DELAY_MS = Constants.HIDE_DELAY_MS
+local SYMBOLS = Constants.SYMBOLS
+local PALETTE = Constants.PALETTE
 
 local function draw_text(x, y, text, fg, bg)
     canvas_draw_text(math.max(0, x - 1), math.max(0, y - 1), text or "", fg, bg)
@@ -18,32 +23,12 @@ local function clear()
     canvas_clear()
 end
 
-local function random(n)
+local function random_index(n)
     if type(n) ~= "number" or n <= 0 then
         return 0
     end
-    return math.random(0, n - 1)
+    return random(n - 1)
 end
-
-local CELL_W = 4                      -- 卡片宽度
-local CELL_H = 3                      -- 卡片高度
-local CELL_STEP_X = 6                 -- 水平步进（包含间距）
-local CELL_STEP_Y = 2                 -- 垂直步进（包含间距）
-local LABEL_W = 3                     -- 行列标签宽度
-
-local SYMBOLS = {
-    "!", "@", "#", "$", "%", "^", "&", "*", "A",
-    "B", "C", "D", "E", "F", "G", "H", "I", "J"
-}
-
-local PALETTE = {
-    "rgb(255,110,110)", "rgb(255,150,90)", "rgb(255,205,90)",
-    "rgb(200,235,90)", "rgb(120,230,120)", "rgb(90,215,175)",
-    "rgb(90,200,245)", "rgb(125,165,250)", "rgb(165,145,245)",
-    "rgb(205,130,245)", "rgb(245,125,220)", "rgb(245,125,175)",
-    "rgb(245,160,160)", "rgb(240,190,140)", "rgb(225,215,140)",
-    "rgb(190,220,150)", "rgb(150,215,195)", "rgb(150,200,220)"
-}
 
 local state = {
     difficulty = DEFAULT_DIFFICULTY,
@@ -79,7 +64,8 @@ local state = {
     best_committed = false,
 
     first_pick = nil,                  -- 第一次翻开的卡片位置
-    pending_hide = nil,                 -- 等待隐藏的不匹配卡片
+    pending_hide = nil,                -- 等待隐藏的不匹配卡片
+    pending_hide_timer_id = nil,       -- 等待盖回计时器 ID
 
     last_term_w = 0,
     last_term_h = 0,
@@ -105,6 +91,84 @@ local function tr(key)
     end
 
     return value
+end
+
+local KEY_DISPLAY = {
+    up = "↑",
+    down = "↓",
+    left = "←",
+    right = "→",
+    enter = "Enter",
+    esc = "Esc",
+    space = "Space",
+    backspace = "Bksp",
+    del = "Del",
+    tab = "Tab",
+    back_tab = "BTab"
+}
+
+local function display_key_name(key)
+    key = tostring(key or "")
+    if key == "" then return "" end
+    if KEY_DISPLAY[key] ~= nil then return KEY_DISPLAY[key] end
+    if #key == 1 then return string.upper(key) end
+    if string.sub(key, 1, 1) == "f" and tonumber(string.sub(key, 2)) ~= nil then
+        return string.upper(key)
+    end
+    return key
+end
+
+local function key_label(action)
+    if type(get_key) ~= "function" then
+        return "[]"
+    end
+    local ok, info = pcall(get_key, action)
+    if not ok or type(info) ~= "table" then
+        return "[]"
+    end
+    if info[action] ~= nil and type(info[action]) == "table" then
+        info = info[action]
+    end
+    local keys = info.key_user or info.key
+    if type(keys) ~= "table" then
+        keys = { keys }
+    end
+    local out = {}
+    for i = 1, #keys do
+        local label = display_key_name(keys[i])
+        if label ~= "" then
+            out[#out + 1] = "[" .. label .. "]"
+        end
+    end
+    if #out == 0 then return "[]" end
+    return table.concat(out, "/")
+end
+
+local function replace_prompt_keys(text)
+    text = tostring(text or "")
+    text = string.gsub(text, "%[Y%]", key_label("confirm_yes"))
+    text = string.gsub(text, "%[N%]", key_label("confirm_no"))
+    text = string.gsub(text, "%[Q%]/%[ESC%]", key_label("quit_action"))
+    text = string.gsub(text, "%[ESC%]/%[Q%]", key_label("quit_action"))
+    text = string.gsub(text, "%[R%]", key_label("restart"))
+    return text
+end
+
+local function controls_text()
+    return table.concat({
+        key_label("move_up") .. "/" .. key_label("move_down") .. "/" .. key_label("move_left") .. "/" .. key_label("move_right") .. " " .. tr("game.memory_flip.action.move_up"),
+        key_label("flip") .. " " .. tr("game.memory_flip.action.flip"),
+        key_label("difficulty_input") .. " " .. tr("game.memory_flip.action.difficulty_input"),
+        key_label("quick_jump") .. " " .. tr("game.memory_flip.action.quick_jump"),
+        key_label("save") .. " " .. tr("game.memory_flip.action.save"),
+        key_label("restart") .. " " .. tr("game.memory_flip.action.restart"),
+        key_label("quit_action") .. " " .. tr("game.memory_flip.action.quit")
+    }, "  ")
+end
+
+local function restart_quit_controls_text()
+    return key_label("restart") .. " " .. tr("game.memory_flip.action.restart")
+        .. "  " .. key_label("quit_action") .. " " .. tr("game.memory_flip.action.quit")
 end
 
 local function text_width(text)
@@ -185,34 +249,31 @@ end
 local function normalize_key(key)
     if key == nil then return "" end
     if type(key) == "string" then return string.lower(key) end
-    if type(key) == "table" then
-        if key.type == "quit" then
-            return "esc"
-        end
-        if key.type == "key" and type(key.name) == "string" then
-            return string.lower(key.name)
-        end
-        if key.type == "action" and type(key.name) == "string" then
-            local map = {
-                move_up = "up",
-                move_down = "down",
-                move_left = "left",
-                move_right = "right",
-                flip = "space",
-                difficulty_input = "p",
-                quick_jump = "d",
-                save = "s",
-                restart = "r",
-                quit_action = "q",
-                confirm_yes = "enter",
-                confirm_no = "esc",
-                remove_last_backspace = "backspace",
-                remove_last_delete = "delete"
-            }
-            return map[key.name] or ""
-        end
-    end
     return tostring(key):lower()
+end
+
+local function normalize_event_key(event)
+    if type(event) ~= "table" then return "" end
+    if event.type == "quit" then return "quit_action" end
+    if event.type == "key" then return normalize_key(event.name) end
+    if event.type ~= "action" then return "" end
+    local map = {
+        move_up = "move_up",
+        move_down = "move_down",
+        move_left = "move_left",
+        move_right = "move_right",
+        flip = "flip",
+        difficulty_input = "difficulty_input",
+        quick_jump = "quick_jump",
+        save = "save",
+        confirm = "confirm",
+        restart = "restart",
+        quit_action = "quit_action",
+        confirm_yes = "confirm_yes",
+        confirm_no = "confirm_no",
+        remove_last = "remove_last",
+    }
+    return map[event.name] or normalize_key(event.name)
 end
 
 local function elapsed_seconds()
@@ -295,7 +356,7 @@ end
 
 local function shuffle_list(items)
     for i = #items, 2, -1 do
-        local j = random(i) + 1
+        local j = random_index(i) + 1
         items[i], items[j] = items[j], items[i]
     end
 end
@@ -331,6 +392,36 @@ local function all_matched()
     return true
 end
 
+local function stop_pending_hide_timer()
+    if state.pending_hide_timer_id ~= nil and type(timer_kill) == "function" then
+        pcall(timer_kill, state.pending_hide_timer_id)
+    end
+    state.pending_hide_timer_id = nil
+end
+
+local function start_pending_hide_timer()
+    stop_pending_hide_timer()
+    if type(timer_create) ~= "function" or type(timer_start) ~= "function" then
+        return
+    end
+    local ok, id = pcall(timer_create, HIDE_DELAY_MS, "memory_flip_hide_pair")
+    if ok and type(id) == "string" then
+        state.pending_hide_timer_id = id
+        pcall(timer_start, id)
+    end
+end
+
+local function pending_hide_completed()
+    if state.pending_hide == nil then
+        return false
+    end
+    if state.pending_hide_timer_id ~= nil and type(is_timer_completed) == "function" then
+        local ok, done = pcall(is_timer_completed, state.pending_hide_timer_id)
+        if ok and done then return true end
+    end
+    return state.frame >= (state.pending_hide.until_frame or 0)
+end
+
 local function make_snapshot()
     local snapshot = {
         difficulty = state.difficulty,
@@ -357,18 +448,13 @@ end
 
 local function save_game_state(show_toast)
     local ok = false
-    local snapshot = make_snapshot()
-    if type(save_continue) == "function" then
-        local s, ret = pcall(save_continue, snapshot)
-        ok = s and ret ~= false
-    elseif type(save_data) == "function" then
-        local s, ret = pcall(save_data, "memory_flip", snapshot)
+    if type(request_save_game) == "function" then
+        local s, ret = pcall(request_save_game)
         ok = s and ret ~= false
     end
 
     if show_toast then
-        local key = ok and "game.2048.save_success" or "game.2048.save_unavailable"
-        local def = ok and "Save successful!" or "Save API unavailable."
+        local key = ok and "game.memory_flip.save_success" or "game.memory_flip.save_unavailable"
         state.toast_text = tr(key)
         state.toast_until = state.frame + 2 * FPS
         state.dirty = true
@@ -457,6 +543,7 @@ local function restore_snapshot(snapshot)
     end
 
     state.pending_hide = nil
+    stop_pending_hide_timer()
     state.confirm_mode = nil
     state.input_mode = nil
     state.input_buffer = ""
@@ -468,37 +555,22 @@ local function restore_snapshot(snapshot)
     return true
 end
 
-local function load_game_state()
-    local ok = false
-    local snapshot = nil
-    if type(load_continue) == "function" then
-        local s, ret = pcall(load_continue)
-        ok = s and ret ~= nil
-        snapshot = ret
-    elseif type(load_data) == "function" then
-        local s, ret = pcall(load_data, "memory_flip")
-        ok = s and ret ~= nil
-        snapshot = ret
-    end
-
-    if ok then
+local function load_game_state(snapshot)
+    if type(snapshot) == "table" then
         return restore_snapshot(snapshot)
     end
     return false
 end
 
 local function load_best_record()
-    if type(load_data) ~= "function" then
-        return nil
-    end
-    local ok, data = pcall(load_data, "memory_flip_best")
+    local ok, data = pcall(get_best_score)
     if not ok or type(data) ~= "table" then
         return nil
     end
 
     local difficulty = tonumber(data.difficulty)
-    local min_steps = tonumber(data.min_steps)
-    local min_time_sec = tonumber(data.min_time_sec)
+    local min_steps = tonumber(data.min_steps or data.steps)
+    local min_time_sec = tonumber(data.min_time_sec or data.time_sec)
     if difficulty == nil or min_steps == nil or min_time_sec == nil then
         return nil
     end
@@ -523,13 +595,9 @@ local function should_replace_best(old, new)
     return new.min_time_sec < old.min_time_sec
 end
 
-local function save_best_record(record)
-    if type(save_data) ~= "function" then
-        return
-    end
-    pcall(save_data, "memory_flip_best", record)
-    if type(request_refresh_best_score) == "function" then
-        pcall(request_refresh_best_score)
+local function request_best_save()
+    if type(request_save_best_score) == "function" then
+        pcall(request_save_best_score)
     end
 end
 
@@ -544,7 +612,7 @@ local function commit_best_if_needed()
     }
     if should_replace_best(state.best, record) then
         state.best = record
-        save_best_record(record)
+        request_best_save()
     end
     state.best_committed = true
 end
@@ -557,6 +625,7 @@ local function mark_won()
     state.end_frame = state.frame
     state.confirm_mode = nil
     state.pending_hide = nil
+    stop_pending_hide_timer()
     state.first_pick = nil
     commit_best_if_needed()
     state.dirty = true
@@ -585,11 +654,12 @@ local function reset_game(new_difficulty)
     state.best_committed = false
     state.first_pick = nil
     state.pending_hide = nil
+    stop_pending_hide_timer()
     state.last_area = nil
     state.dirty = true
 end
 
-local function init_runtime_state()
+local function init_runtime_state(saved_state)
     clear()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
@@ -601,8 +671,8 @@ local function init_runtime_state()
     state.last_term_w, state.last_term_h = w, h
     state.best = load_best_record()
     state.launch_mode = read_launch_mode()
-    if state.launch_mode == "continue" then
-        if not load_game_state() then
+    if state.launch_mode == "continue" and type(saved_state) == "table" then
+        if not load_game_state(saved_state) then
             reset_game(DEFAULT_DIFFICULTY)
         end
     else
@@ -630,8 +700,7 @@ local function board_geometry()
         + 2
         + text_width(tr("game.memory_flip.steps") .. " 9999")
     local win_line_w = text_width(
-        tr("game.memory_flip.win_banner")
-            .. tr("game.memory_flip.win_controls")
+        tr("game.memory_flip.win_banner") .. restart_quit_controls_text()
     )
     local content_w = math.max(LABEL_W + grid_w, status_w, win_line_w)
     local content_h = 1 + grid_h
@@ -792,13 +861,12 @@ local function draw_status(x, y, frame_w)
             draw_text(x, y - 1, state.input_buffer, "white", "black")
         end
     elseif state.won then
-        local line = tr("game.memory_flip.win_banner")
-            .. tr("game.memory_flip.win_controls")
+        local line = tr("game.memory_flip.win_banner") .. restart_quit_controls_text()
         draw_text(x, y - 1, line, "yellow", "black")
     elseif state.confirm_mode == "restart" then
-        draw_text(x, y - 1, tr("game.2048.confirm_restart"), "yellow", "black")
+        draw_text(x, y - 1, replace_prompt_keys(tr("game.memory_flip.confirm_restart")), "yellow", "black")
     elseif state.confirm_mode == "exit" then
-        draw_text(x, y - 1, tr("game.2048.confirm_exit"), "yellow", "black")
+        draw_text(x, y - 1, replace_prompt_keys(tr("game.memory_flip.confirm_exit")), "yellow", "black")
     elseif state.toast_text ~= nil and state.frame <= state.toast_until then
         draw_text(x, y - 1, state.toast_text, "green", "black")
     end
@@ -806,7 +874,7 @@ end
 
 local function draw_controls(x, y, frame_h)
     local term_w = terminal_size()
-    local text = tr("game.memory_flip.controls")
+    local text = controls_text()
     local max_w = math.max(10, term_w - 2)
     local lines = wrap_words(text, max_w)
     if #lines > 3 then
@@ -873,7 +941,7 @@ local function minimum_required_size()
     local frame_h = 1 + grid_h + 2
 
     local controls_w = min_width_for_lines(
-        tr("game.memory_flip.controls"),
+        controls_text(),
         3,
         24
     )
@@ -885,8 +953,7 @@ local function minimum_required_size()
         text_width(tr("game.memory_flip.input_jump_hint"))
     )
     local win_w = text_width(
-        tr("game.memory_flip.win_banner")
-            .. tr("game.memory_flip.win_controls")
+        tr("game.memory_flip.win_banner") .. restart_quit_controls_text()
     )
 
     local min_w = math.max(frame_w, controls_w, status_w, hint_w, win_w) + 2
@@ -979,14 +1046,14 @@ local function parse_jump_input()
 end
 
 local function handle_input_mode_key(key)
-    if key == "esc" or key == "q" then
+    if key == "quit_action" or key == "confirm_no" then
         state.input_mode = nil
         state.input_buffer = ""
         state.dirty = true
         return "changed"
     end
 
-    if key == "enter" then
+    if key == "confirm" then
         if state.input_mode == "difficulty" then
             local difficulty = parse_difficulty_input()
             state.input_mode = nil
@@ -1014,7 +1081,7 @@ local function handle_input_mode_key(key)
         end
     end
 
-    if key == "backspace" then
+    if key == "remove_last" or key == "backspace" or key == "del" then
         if #state.input_buffer > 0 then
             state.input_buffer = string.sub(state.input_buffer, 1, #state.input_buffer - 1)
             state.dirty = true
@@ -1033,9 +1100,9 @@ local function handle_input_mode_key(key)
     end
 
     if state.input_mode == "jump" then
-        if key:match("^%d$") or key == "space" then
+        if key:match("^%d$") or key == "flip" then
             local token = key
-            if key == "space" then
+            if key == "flip" then
                 token = " "
             end
             if #state.input_buffer < 6 then
@@ -1051,7 +1118,7 @@ local function handle_input_mode_key(key)
 end
 
 local function handle_confirm_key(key)
-    if key == "y" or key == "enter" then
+    if key == "confirm_yes" then
         if state.confirm_mode == "restart" then
             reset_game(state.difficulty)
             return "changed"
@@ -1061,7 +1128,7 @@ local function handle_confirm_key(key)
         end
     end
 
-    if key == "q" or key == "esc" then
+    if key == "quit_action" or key == "confirm_no" then
         state.confirm_mode = nil
         state.dirty = true
         return "changed"
@@ -1070,7 +1137,7 @@ local function handle_confirm_key(key)
 end
 
 local function should_debounce(key)
-    if not (key == "up" or key == "down" or key == "left" or key == "right") then
+    if not (key == "move_up" or key == "move_down" or key == "move_left" or key == "move_right") then
         return false
     end
     if key == state.last_key and (state.frame - state.last_key_frame) <= 2 then
@@ -1085,10 +1152,11 @@ local function hide_pending_pair_if_needed()
     if state.pending_hide == nil then
         return
     end
-    if state.frame < state.pending_hide.until_frame then
+    if not pending_hide_completed() then
         return
     end
 
+    stop_pending_hide_timer()
     local p = state.pending_hide
     if not state.matched[p.r1][p.c1] then
         state.revealed[p.r1][p.c1] = false
@@ -1140,8 +1208,9 @@ local function try_flip_current()
             c1 = fc,
             r2 = r,
             c2 = c,
-            until_frame = state.frame + math.floor(0.5 * FPS)
+            until_frame = state.frame + math.floor((HIDE_DELAY_MS / 1000) * FPS)
         }
+        start_pending_hide_timer()
         state.first_pick = nil
         state.dirty = true
     end
@@ -1165,29 +1234,29 @@ local function handle_input(key)
     end
 
     if state.won then
-        if key == "r" then
+        if key == "restart" then
             reset_game(state.difficulty)
             return "changed"
         end
-        if key == "q" or key == "esc" then
+        if key == "quit_action" or key == "confirm_no" then
             return "exit"
         end
         return "none"
     end
 
-    if key == "r" then
+    if key == "restart" then
         state.confirm_mode = "restart"
         state.dirty = true
         return "changed"
     end
 
-    if key == "q" or key == "esc" then
+    if key == "quit_action" or key == "confirm_no" then
         state.confirm_mode = "exit"
         state.dirty = true
         return "changed"
     end
 
-    if key == "s" then
+    if key == "save" then
         save_game_state(true)
         return "changed"
     end
@@ -1196,41 +1265,41 @@ local function handle_input(key)
         return "none"
     end
 
-    if key == "p" then
+    if key == "difficulty_input" then
         start_input_mode("difficulty")
         return "changed"
     end
 
-    if key == "d" then
+    if key == "quick_jump" then
         start_input_mode("jump")
         return "changed"
     end
 
-    if key == "up" then
+    if key == "move_up" then
         state.cursor_r = clamp(state.cursor_r - 1, 1, state.size)
         state.dirty = true
         return "changed"
     end
 
-    if key == "down" then
+    if key == "move_down" then
         state.cursor_r = clamp(state.cursor_r + 1, 1, state.size)
         state.dirty = true
         return "changed"
     end
 
-    if key == "left" then
+    if key == "move_left" then
         state.cursor_c = clamp(state.cursor_c - 1, 1, state.size)
         state.dirty = true
         return "changed"
     end
 
-    if key == "right" then
+    if key == "move_right" then
         state.cursor_c = clamp(state.cursor_c + 1, 1, state.size)
         state.dirty = true
         return "changed"
     end
 
-    if key == "space" then
+    if key == "flip" then
         try_flip_current()
         return "changed"
     end
@@ -1281,7 +1350,7 @@ local function step_runtime(key)
         auto_save_if_needed()
         refresh_dirty_flags()
     else
-        if key == "q" or key == "esc" then
+        if key == "quit_action" or key == "confirm_no" then
             if type(request_exit) == "function" then
                 pcall(request_exit)
             end
@@ -1291,13 +1360,14 @@ local function step_runtime(key)
     state.frame = state.frame + 1
 end
 
-function init_game()
-    init_runtime_state()
+local function runtime_init_game(saved_state)
+    init_runtime_state(saved_state)
     return state
 end
 
-function handle_event(state_arg, event)
+local function runtime_handle_event(state_arg, event)
     state = state_arg or state
+    event = event or {}
 
     if event ~= nil and event.type == "resize" then
         state.last_term_w = event.width or state.last_term_w
@@ -1308,12 +1378,12 @@ function handle_event(state_arg, event)
         return state
     end
 
-    local key = normalize_key(event)
+    local key = normalize_event_key(event)
     step_runtime(key)
     return state
 end
 
-function render(state_arg)
+local function runtime_render(state_arg)
     state = state_arg or state
     if not ensure_terminal_size_ok() then
         return
@@ -1321,16 +1391,44 @@ function render(state_arg)
     render_frame()
 end
 
-function best_score(state_arg)
+local function runtime_save_best_score(state_arg)
     state = state_arg or state
     if state.best == nil then
-        return nil
+        return { best_string = "game.memory_flip.best_none_block" }
     end
 
     return {
         best_string = "game.memory_flip.best_block",
         difficulty = state.best.difficulty,
+        min_steps = state.best.min_steps,
+        min_time_sec = state.best.min_time_sec,
         steps = state.best.min_steps,
         time = format_duration(state.best.min_time_sec)
     }
 end
+
+local function runtime_save_game(state_arg)
+    state = state_arg or state
+    return make_snapshot()
+end
+
+local function runtime_exit_game(state_arg)
+    state = state_arg or state
+    if not state.won then
+        save_game_state(false)
+    end
+    stop_pending_hide_timer()
+    return state
+end
+
+local Runtime = {
+    init_game = runtime_init_game,
+    handle_event = runtime_handle_event,
+    render = runtime_render,
+    exit_game = runtime_exit_game,
+    save_best_score = runtime_save_best_score,
+    save_game = runtime_save_game,
+}
+
+_G.MEMORY_FLIP_RUNTIME = Runtime
+return Runtime

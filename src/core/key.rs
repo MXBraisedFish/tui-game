@@ -10,7 +10,7 @@ use rdev::{Event as REvent, EventType as REventType, Key as RKey, listen};
 use crate::utils::host_log;
 
 const RDEV_DELAY: Duration = Duration::from_millis(20);
-const SUPPRESS_WINDOW: Duration = Duration::from_millis(30);
+const SUPPRESS_WINDOW: Duration = Duration::from_millis(120);
 
 #[derive(Debug, Clone)]
 struct DelayedRdev {
@@ -21,7 +21,7 @@ struct DelayedRdev {
 #[derive(Default)]
 struct SharedState {
     delayed_rdevs: VecDeque<DelayedRdev>,
-    last_ct_output: Option<Instant>,
+    last_ct_output: Option<(String, Instant)>,
     shift_keys_down: HashSet<RKey>,
     shift_hold_started: Option<Instant>,
 }
@@ -157,8 +157,8 @@ impl SemanticKeySource {
         };
 
         if ALLOWED_CT_KEYCODES.contains(&key.code) {
-            state.last_ct_output = Some(now);
             if let Some(semantic) = map_keycode_to_semantic(key.code) {
+                state.last_ct_output = Some((semantic.clone(), now));
                 return vec![semantic];
             }
         }
@@ -184,12 +184,17 @@ impl SemanticKeySource {
 
             let key = delayed.key;
             state.delayed_rdevs.pop_front();
-            let suppressed = state
-                .last_ct_output
-                .map(|t| now.duration_since(t) < SUPPRESS_WINDOW)
-                .unwrap_or(false);
-
-            if !suppressed && let Some(semantic) = map_rkey_to_semantic(key) {
+            if let Some(semantic) = map_rkey_to_semantic(key) {
+                let suppressed = state
+                    .last_ct_output
+                    .as_ref()
+                    .map(|(last_key, timestamp)| {
+                        last_key == &semantic && now.duration_since(*timestamp) < SUPPRESS_WINDOW
+                    })
+                    .unwrap_or(false);
+                if suppressed {
+                    continue;
+                }
                 out.push(semantic);
             }
         }

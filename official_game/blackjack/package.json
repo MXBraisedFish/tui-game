@@ -1,8 +1,25 @@
 {
   "namespace": "official",
-  "package_name": "Official Blackjack Package",
+  "package": "TUI-GAME Official",
+  "mod_name": "TUI-GAME Official",
+  "introduction": "game.blackjack.package_introduction",
   "author": "TUI-GAME",
+  "game_name": "game.blackjack.name",
+  "description": "game.blackjack.description",
+  "detail": "game.blackjack.details",
   "version": "1.0.0",
-  "description": "Official package for the new unified runtime blackjack implementation.",
-  "api_version": 1
+  "icon": [
+    "  BJ    ",
+    " +--+   ",
+    " |21|   ",
+    " +--+   "
+  ],
+  "banner": [
+    "  ____  _            _    _            _    ",
+    " | __ )| | __ _  ___| | _(_) __ _  ___| | __",
+    " |  _ \\| |/ _` |/ __| |/ / |/ _` |/ __| |/ /",
+    " | |_) | | (_| | (__|   <| | (_| | (__|   < ",
+    " |____/|_|\\__,_|\\___|_|\\_\\ |\\__,_|\\___|_|\\_\\",
+    "                       |__/                 "
+  ]
 }

@@ -1,16 +1,18 @@
-local STARTING_FUNDS = 1000
-local BASE_BET = 100
-local FPS = 60
-local FRAME_MS = 16
-local DEALER_REVEAL_PAUSE_MS = 500
-local DEALER_DRAW_PAUSE_MS = 500
-local SETTLE_COMPARE_PAUSE_MS = 1000
+local Constants = load_function("/constants.lua")
 
-local TABLE_W = 108
-local TABLE_H = 24
-local CARD_W = 5
-local CARD_H = 3
-local SPINNER = { "|", "/", "-", "\\" }
+local STARTING_FUNDS = Constants.STARTING_FUNDS
+local BASE_BET = Constants.BASE_BET
+local FPS = Constants.FPS
+local FRAME_MS = Constants.FRAME_MS
+local DEALER_REVEAL_PAUSE_MS = Constants.DEALER_REVEAL_PAUSE_MS
+local DEALER_DRAW_PAUSE_MS = Constants.DEALER_DRAW_PAUSE_MS
+local SETTLE_COMPARE_PAUSE_MS = Constants.SETTLE_COMPARE_PAUSE_MS
+
+local TABLE_W = Constants.TABLE_W
+local TABLE_H = Constants.TABLE_H
+local CARD_W = Constants.CARD_W
+local CARD_H = Constants.CARD_H
+local SPINNER = Constants.SPINNER
 
 local state = {
     funds = STARTING_FUNDS,
@@ -64,6 +66,86 @@ local function tr(key)
     end
 
     return value
+end
+
+
+local KEY_DISPLAY = {
+    up = "↑",
+    down = "↓",
+    left = "←",
+    right = "→",
+    enter = "Enter",
+    esc = "Esc",
+    space = "Space",
+    backspace = "Bksp",
+    del = "Del",
+    tab = "Tab",
+    back_tab = "BTab"
+}
+
+local function display_key_name(key)
+    key = tostring(key or "")
+    if key == "" then return "" end
+    if KEY_DISPLAY[key] ~= nil then return KEY_DISPLAY[key] end
+    if #key == 1 then return string.upper(key) end
+    if string.sub(key, 1, 1) == "f" and tonumber(string.sub(key, 2)) ~= nil then
+        return string.upper(key)
+    end
+    return key
+end
+
+local function key_label(action)
+    if type(get_key) ~= "function" then
+        return "[]"
+    end
+    local ok, info = pcall(get_key, action)
+    if not ok or type(info) ~= "table" then
+        return "[]"
+    end
+    if info[action] ~= nil and type(info[action]) == "table" then
+        info = info[action]
+    end
+    local keys = info.key_user or info.key
+    if type(keys) ~= "table" then
+        keys = { keys }
+    end
+    local out = {}
+    for i = 1, #keys do
+        local label = display_key_name(keys[i])
+        if label ~= "" then
+            out[#out + 1] = "[" .. label .. "]"
+        end
+    end
+    if #out == 0 then return "[]" end
+    return table.concat(out, "/")
+end
+
+local function replace_prompt_keys(text)
+    text = tostring(text or "")
+    text = string.gsub(text, "%[Y%]", key_label("confirm_yes"))
+    text = string.gsub(text, "%[N%]", key_label("confirm_no"))
+    text = string.gsub(text, "%[Enter%]", key_label("stand"))
+    text = string.gsub(text, "%[Q%]/%[ESC%]", key_label("quit_action"))
+    return text
+end
+
+local function controls_text()
+    return table.concat({
+        key_label("adjust_up") .. "/" .. key_label("adjust_down") .. " " .. tr("game.blackjack.ops_adjust_multiplier"),
+        key_label("switch_left") .. "/" .. key_label("switch_right") .. " " .. tr("game.blackjack.action.switch_left"),
+        key_label("hit") .. " " .. tr("game.blackjack.action.hit"),
+        key_label("stand") .. " " .. tr("game.blackjack.action.stand"),
+        key_label("double_down") .. " " .. tr("game.blackjack.action.double_down"),
+        key_label("split_hand") .. " " .. tr("game.blackjack.action.split_hand"),
+        key_label("insurance") .. " " .. tr("game.blackjack.action.insurance"),
+        key_label("restart") .. " " .. tr("game.blackjack.action.restart"),
+        key_label("quit_action") .. " " .. tr("game.blackjack.action.quit")
+    }, "  ")
+end
+
+local function restart_quit_controls_text()
+    return key_label("restart") .. " " .. tr("game.blackjack.action.restart")
+        .. "  " .. key_label("quit_action") .. " " .. tr("game.blackjack.action.quit")
 end
 
 
@@ -143,11 +225,11 @@ local function clear()
     canvas_clear()
 end
 
-local function random(n)
+local function random_index(n)
     if type(n) ~= "number" or n <= 0 then
         return 0
     end
-    return math.random(0, n - 1)
+    return _G.random(n - 1)
 end
 
 
@@ -160,26 +242,26 @@ local function normalize_key(key)
     end
     if type(key) == "table" then
         if key.type == "quit" then
-            return "esc"
+            return "quit_action"
         end
         if key.type == "key" and type(key.name) == "string" then
             return string.lower(key.name)
         end
         if key.type == "action" and type(key.name) == "string" then
             local map = {
-                adjust_up = "+",
-                adjust_down = "-",
-                confirm_yes = "enter",
-                switch_left = "left",
-                switch_right = "right",
-                hit = "space",
-                stand = "enter",
-                double_down = "z",
-                split_hand = "x",
-                insurance = "c",
-                restart = "r",
-                quit_action = "q",
-                confirm_no = "esc"
+                adjust_up = "adjust_up",
+                adjust_down = "adjust_down",
+                confirm_yes = "confirm_yes",
+                switch_left = "switch_left",
+                switch_right = "switch_right",
+                hit = "hit",
+                stand = "stand",
+                double_down = "double_down",
+                split_hand = "split_hand",
+                insurance = "insurance",
+                restart = "restart",
+                quit_action = "quit_action",
+                confirm_no = "confirm_no"
             }
             return map[key.name] or ""
         end
@@ -208,7 +290,7 @@ end
 
 
 local function random_rank()
-    local n = random(13) + 1
+    local n = random_index(13) + 1
     if n == 1 then return "A" end
     if n == 11 then return "J" end
     if n == 12 then return "Q" end
@@ -331,24 +413,14 @@ end
 
 local function load_best_record()
     state.best_net = 0
-    if type(load_data) ~= "function" then
+    local data = get_best_score()
+    if type(data) ~= "table" then
         return
     end
-    local ok, data = pcall(load_data, "blackjack_best_net")
-    if not ok then
-        return
-    end
-    if type(data) == "number" then
-        state.best_net = math.floor(data)
-    elseif type(data) == "table" and type(data.value) == "number" then
+    if type(data.net) == "number" then
+        state.best_net = math.floor(data.net)
+    elseif type(data.value) == "number" then
         state.best_net = math.floor(data.value)
-    end
-end
-
-
-local function save_best_record()
-    if type(save_data) == "function" then
-        pcall(save_data, "blackjack_best_net", { value = state.best_net })
     end
 end
 
@@ -363,10 +435,7 @@ local function maybe_commit_best_on_exit()
     end
     if net > state.best_net then
         state.best_net = net
-        save_best_record()
-        if type(request_refresh_best_score) == "function" then
-            pcall(request_refresh_best_score)
-        end
+        request_save_best_score()
     end
 end
 
@@ -642,7 +711,7 @@ end
 
 local function render_once()
     local w, h = terminal_size()
-    local controls = tr("game.blackjack.controls")
+    local controls = controls_text()
     local ctrl_lines = wrap_words(controls, math.max(10, w - 2))
     if #ctrl_lines > 3 then
         ctrl_lines = { ctrl_lines[1], ctrl_lines[2], ctrl_lines[3] }
@@ -702,18 +771,18 @@ local function render_once()
     local alert_text = ""
     local alert_color = "red"
     if state.confirm_mode == "restart" then
-        alert_text = tr("game.blackjack.confirm_restart")
+        alert_text = replace_prompt_keys(tr("game.blackjack.confirm_restart"))
         alert_color = "yellow"
     elseif state.confirm_mode == "exit" then
-        alert_text = tr("game.blackjack.confirm_exit")
+        alert_text = replace_prompt_keys(tr("game.blackjack.confirm_exit"))
         alert_color = "yellow"
     elseif state.bankrupt then
         alert_text = tr("game.blackjack.msg_bankrupt")
             .. "  "
-            .. tr("game.blackjack.bankrupt_controls")
+            .. restart_quit_controls_text()
         alert_color = "red"
     elseif state.await_next_round then
-        alert_text = tr("game.blackjack.msg_press_enter_next")
+        alert_text = replace_prompt_keys(tr("game.blackjack.msg_press_enter_next"))
         alert_color = "yellow"
     elseif state.toast_text ~= nil and state.frame <= state.toast_until then
         alert_text = state.toast_text
@@ -1261,7 +1330,7 @@ end
 
 
 local function handle_confirm_key(key)
-    if key == "y" or key == "enter" then
+    if key == "confirm_yes" then
         if state.confirm_mode == "restart" then
             restart_session()
             return "changed"
@@ -1270,7 +1339,7 @@ local function handle_confirm_key(key)
             maybe_commit_best_on_exit()
             return "exit"
         end
-    elseif key == "q" or key == "esc" then
+    elseif key == "confirm_no" or key == "quit_action" then
         state.confirm_mode = nil
         update_player_prompt()
         state.dirty = true
@@ -1290,11 +1359,11 @@ local function handle_input(key)
 
 
     if state.bankrupt then
-        if key == "r" then
+        if key == "restart" then
             restart_session()
             return "changed"
         end
-        if key == "q" or key == "esc" then
+        if key == "quit_action" then
             maybe_commit_best_on_exit()
             return "exit"
         end
@@ -1302,13 +1371,13 @@ local function handle_input(key)
     end
 
 
-    if key == "q" or key == "esc" then
+    if key == "quit_action" then
         state.confirm_mode = "exit"
         state.dirty = true
         return "changed"
     end
 
-    if key == "r" then
+    if key == "restart" then
         state.confirm_mode = "restart"
         state.dirty = true
         return "changed"
@@ -1316,7 +1385,7 @@ local function handle_input(key)
 
 
     if state.await_next_round then
-        if key == "enter" then
+        if key == "stand" then
             begin_round()
             return "changed"
         end
@@ -1329,23 +1398,23 @@ local function handle_input(key)
     end
 
 
-    if key == "+" or key == "=" or key == "add" then
+    if key == "adjust_up" then
         adjust_bet_multiplier(0.5)
         return "changed"
     end
-    if key == "-" or key == "subtract" then
+    if key == "adjust_down" then
         adjust_bet_multiplier(-0.5)
         return "changed"
     end
 
 
-    if key == "left" and state.split_mode then
+    if key == "switch_left" and state.split_mode then
         state.active_hand = 1
         update_player_prompt()
         state.dirty = true
         return "changed"
     end
-    if key == "right" and state.split_mode then
+    if key == "switch_right" and state.split_mode then
         state.active_hand = 2
         update_player_prompt()
         state.dirty = true
@@ -1353,19 +1422,19 @@ local function handle_input(key)
     end
 
 
-    if key == "space" then
+    if key == "hit" then
         hit_current(); return "changed"
     end
-    if key == "enter" then
+    if key == "stand" then
         stand_current(); return "changed"
     end
-    if key == "z" then
+    if key == "double_down" then
         double_current(); return "changed"
     end
-    if key == "x" then
+    if key == "split_hand" then
         split_current(); return "changed"
     end
-    if key == "c" then
+    if key == "insurance" then
         insurance_current(); return "changed"
     end
     return "none"
@@ -1401,14 +1470,14 @@ end
 
 
 local function minimum_required_size()
-    local controls_w = min_width_for_lines(tr("game.blackjack.controls"), 3, 40)
+    local controls_w = min_width_for_lines(controls_text(), 3, 40)
     local warning_w = text_width(tr("game.blackjack.warning"))
     local status_w = text_width(tr("game.blackjack.best") .. ": -999999")
         + 3
         + text_width(tr("game.blackjack.net") .. ": -999999")
     local alert_w = math.max(
-        text_width(tr("game.blackjack.confirm_restart")),
-        text_width(tr("game.blackjack.confirm_exit")),
+        text_width(replace_prompt_keys(tr("game.blackjack.confirm_restart"))),
+        text_width(replace_prompt_keys(tr("game.blackjack.confirm_exit"))),
         text_width(tr("game.blackjack.msg_bankrupt"))
     )
     local min_w = math.max(TABLE_W + 2, controls_w + 2, warning_w + 2, status_w + 2, alert_w + 2)
@@ -1453,11 +1522,15 @@ local function ensure_terminal_size_ok()
 end
 
 
-function init_game()
+local function runtime_init_game(saved_state)
     clear()
     flush_input_buffer()
     load_best_record()
     restart_session()
+    if type(saved_state) == "table" then
+        if type(saved_state.funds) == "number" then state.funds = saved_state.funds end
+        if type(saved_state.initial_funds) == "number" then state.initial_funds = saved_state.initial_funds end
+    end
     state.anim = nil
     state.frame = 0
     state.dirty = true
@@ -1490,7 +1563,7 @@ local function handle_runtime_event(event)
     local key = normalize_key(event)
 
     if not ensure_terminal_size_ok() then
-        if key == "q" or key == "esc" then
+        if key == "quit_action" then
             maybe_commit_best_on_exit()
             if type(request_exit) == "function" then
                 pcall(request_exit)
@@ -1530,7 +1603,7 @@ local function handle_runtime_event(event)
     refresh_dirty_flags()
 end
 
-function render(state_arg)
+local function runtime_render(state_arg)
     state = state_arg or state
     if not ensure_terminal_size_ok() then
         return
@@ -1538,13 +1611,13 @@ function render(state_arg)
     render_once()
 end
 
-function handle_event(state_arg, event)
+local function runtime_handle_event(state_arg, event)
     state = state_arg or state
     handle_runtime_event(event)
     return state
 end
 
-function best_score(state_arg)
+local function runtime_save_best_score(state_arg)
     state = state_arg or state
     if type(state.best_net) == "number" and state.best_net > 0 then
         return {
@@ -1557,3 +1630,21 @@ function best_score(state_arg)
     }
 end
 
+
+
+local function runtime_exit_game(state_arg)
+    state = state_arg or state
+    maybe_commit_best_on_exit()
+    return state
+end
+
+local Runtime = {
+    init_game = runtime_init_game,
+    handle_event = runtime_handle_event,
+    render = runtime_render,
+    exit_game = runtime_exit_game,
+    save_best_score = runtime_save_best_score,
+}
+
+_G.BLACKJACK_RUNTIME = Runtime
+return Runtime

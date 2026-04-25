@@ -1,0 +1,16 @@
+local M = {}
+
+M.DEFAULT_SIZE = 5
+M.MIN_SIZE = 2
+M.MAX_SIZE = 10
+
+M.FPS = 60
+M.FRAME_MS = 16
+
+M.CELL_W = 4
+M.CELL_H = 3
+M.CELL_STEP_X = 5
+M.CELL_STEP_Y = 2
+M.LABEL_W = 3
+
+return M

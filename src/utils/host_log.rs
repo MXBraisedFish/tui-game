@@ -1,6 +1,39 @@
+use std::cell::RefCell;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::app::i18n;
+
+thread_local! {
+    static LOG_OBJECT: RefCell<String> = RefCell::new("宿主".to_string());
+}
+
+pub struct LogObjectGuard {
+    previous: String,
+}
+
+impl Drop for LogObjectGuard {
+    fn drop(&mut self) {
+        let previous = std::mem::take(&mut self.previous);
+        LOG_OBJECT.with(|object| {
+            *object.borrow_mut() = previous;
+        });
+    }
+}
+
+pub fn scoped_log_object(object: impl Into<String>) -> LogObjectGuard {
+    let object = object.into();
+    let previous = LOG_OBJECT.with(|current| {
+        let mut current = current.borrow_mut();
+        let previous = current.clone();
+        *current = if object.trim().is_empty() {
+            "宿主".to_string()
+        } else {
+            object
+        };
+        previous
+    });
+    LogObjectGuard { previous }
+}
 
 pub fn append_host_log_line(message: &str) {
     let Ok(log_dir) = crate::utils::path_utils::log_dir() else {
@@ -11,7 +44,9 @@ pub fn append_host_log_line(message: &str) {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    let line = format!("[{timestamp}] {message}\n");
+    let time_text = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let object = LOG_OBJECT.with(|object| object.borrow().clone());
+    let line = format!("[{timestamp}][{time_text}][{object}] {message}\n");
     let mut existing = std::fs::read_to_string(&path).unwrap_or_default();
     existing.push_str(&line);
     let _ = std::fs::write(path, existing);

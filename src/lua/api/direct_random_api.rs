@@ -197,7 +197,7 @@ fn random_call(bridges: &RuntimeBridges, args: &[Value]) -> mlua::Result<i64> {
             } else {
                 let max = value_as_i64(&args[0])
                     .ok_or_else(|| common::arg_type_error("max", "number|string", &args[0]))?;
-                if max <= 0 {
+                if max < 0 {
                     return Err(invalid_random_max_error(max));
                 }
                 let mut rng = rand::thread_rng();
@@ -208,7 +208,7 @@ fn random_call(bridges: &RuntimeBridges, args: &[Value]) -> mlua::Result<i64> {
             if let Some(id) = value_as_string(&args[1]) {
                 let max = value_as_i64(&args[0])
                     .ok_or_else(|| common::arg_type_error("max", "number", &args[0]))?;
-                if max <= 0 {
+                if max < 0 {
                     return Err(invalid_random_max_error(max));
                 }
                 let entry = get_random_mut(&mut store, &id)?;
@@ -221,7 +221,7 @@ fn random_call(bridges: &RuntimeBridges, args: &[Value]) -> mlua::Result<i64> {
                     .ok_or_else(|| common::arg_type_error("min", "number", &args[0]))?;
                 let max = value_as_i64(&args[1])
                     .ok_or_else(|| common::arg_type_error("max", "number|string", &args[1]))?;
-                if max <= min {
+                if max < min {
                     return Err(invalid_random_min_max_error(min, max));
                 }
                 let mut rng = rand::thread_rng();
@@ -233,7 +233,7 @@ fn random_call(bridges: &RuntimeBridges, args: &[Value]) -> mlua::Result<i64> {
                 .ok_or_else(|| common::arg_type_error("min", "number", &args[0]))?;
             let max = value_as_i64(&args[1])
                 .ok_or_else(|| common::arg_type_error("max", "number", &args[1]))?;
-            if max <= min {
+            if max < min {
                 return Err(invalid_random_min_max_error(min, max));
             }
             let id = value_as_string(&args[2])
@@ -465,7 +465,7 @@ fn invalid_random_max_error(max: i64) -> mlua::Error {
     mlua::Error::external(
         i18n::t_or(
             "host.exception.random_invalid_max",
-            "max parameter must be a positive integer, got: {max}",
+            "max parameter must be a non-negative integer, got: {max}",
         )
         .replace("{max}", &max_text),
     )
@@ -481,7 +481,7 @@ fn invalid_random_min_max_error(min: i64, max: i64) -> mlua::Error {
     mlua::Error::external(
         i18n::t_or(
             "host.exception.random_invalid_min_max",
-            "max parameter must be greater than min, got min: {min}, max: {max}",
+            "max parameter must be greater than or equal to min, got min: {min}, max: {max}",
         )
         .replace("{min}", &min_text)
         .replace("{max}", &max_text),

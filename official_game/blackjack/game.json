@@ -1,58 +1,71 @@
 {
-  "id": "tui_game_blackjack_jVXqxsSGfj9DMYt5",
-  "name": "game.blackjack.name",
-  "description": "game.blackjack.description",
-  "detail": "game.blackjack.details",
-  "author": "TUI-GAME",
-  "entry": "scripts/blackjack.lua",
+  "api": 7,
+  "entry": "scripts/main.lua",
   "save": false,
   "best_none": "game.blackjack.best_none_block",
   "min_width": 1,
   "min_height": 1,
+  "write": false,
+  "case_sensitive": false,
   "actions": {
-    "adjust_down": [
-      "-"
-    ],
-    "adjust_up": [
-      "+",
-      "="
-    ],
-    "confirm_yes": [
-      "y",
-      "enter"
-    ],
-    "confirm_no": [
-      "q",
-      "esc",
-      "n"
-    ],
-    "double_down": [
-      "z"
-    ],
-    "hit": [
-      "space"
-    ],
-    "insurance": [
-      "c"
-    ],
-    "restart": [
-      "r"
-    ],
-    "quit_action": [
-      "q"
-    ],
-    "split_hand": [
-      "x"
-    ],
-    "stand": [
-      "enter"
-    ],
-    "switch_left": [
-      "left"
-    ],
-    "switch_right": [
-      "right"
-    ]
+    "adjust_down": {
+      "key": "-",
+      "key_name": "game.blackjack.action.adjust_down"
+    },
+    "adjust_up": {
+      "key": [
+        "+",
+        "="
+      ],
+      "key_name": "game.blackjack.action.adjust_up"
+    },
+    "confirm_yes": {
+      "key": "y",
+      "key_name": "game.blackjack.action.confirm_yes"
+    },
+    "confirm_no": {
+      "key": "n",
+      "key_name": "game.blackjack.action.confirm_no"
+    },
+    "double_down": {
+      "key": "z",
+      "key_name": "game.blackjack.action.double_down"
+    },
+    "hit": {
+      "key": "space",
+      "key_name": "game.blackjack.action.hit"
+    },
+    "insurance": {
+      "key": "c",
+      "key_name": "game.blackjack.action.insurance"
+    },
+    "restart": {
+      "key": "r",
+      "key_name": "game.blackjack.action.restart"
+    },
+    "quit_action": {
+      "key": [
+        "q",
+        "esc"
+      ],
+      "key_name": "game.blackjack.action.quit"
+    },
+    "split_hand": {
+      "key": "x",
+      "key_name": "game.blackjack.action.split_hand"
+    },
+    "stand": {
+      "key": "enter",
+      "key_name": "game.blackjack.action.stand"
+    },
+    "switch_left": {
+      "key": "left",
+      "key_name": "game.blackjack.action.switch_left"
+    },
+    "switch_right": {
+      "key": "right",
+      "key_name": "game.blackjack.action.switch_right"
+    }
   },
   "runtime": {
     "target_fps": 60

@@ -582,22 +582,22 @@ end
 
 > 注：
 >
-> 1. 该部分 API 仅在游戏开启调试模式（debug 模式）时可用，否则调用将被宿主忽略。
+> 1. 该部分的部分 API 仅在游戏开启调试模式（debug 模式）时可用，否则调用将被宿主忽略。
 > 2. `info` 数据格式中 `key` 数据类型含义为填写语言键。
 > 3. `info` 数据格式中 `image` 数据类型含义为相对于assets/的图片路径。
 > 4. `任意` 类型会被强制转换为 `string` 类型打印。
 > 5. 详细调试输出见『附录-[调试输出目录](#调试输出目录)』。
 
-| 函数名                           | 作用                      | 参数                                                                                                          | 返回值                                                                |
-| ----------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `debug_log(message)`          | 在日志文件中写入一条调试信息。         | `message` - <font color="#92cddc">任意</font>：要写入的信息。                                                         | <font color="#7f7f7f">无</font>                                     |
-| `debug_warn(message)`         | 在日志文件中写入一条警告信息。         | `message` - <font color="#92cddc">任意</font>：要写入的警告信息。                                                       | <font color="#7f7f7f">无</font>                                     |
-| `debug_error(message)`        | 在日志文件中写入一条异常信息。         | `message` - <font color="#92cddc">任意</font>：要写入的异常信息。                                                       | <font color="#7f7f7f">无</font>                                     |
-| `debug_print(title, message)` | 在日志文件中写入一条带自定义标题的调试信息。  | `title` - <font color="#92cddc">string</font>：日志标题。 <br>`message` - <font color="#92cddc">任意</font>：要写入的信息。 | <font color="#7f7f7f">无</font>                                     |
-| `clear_debug_log()`           | 清空游戏日志文件。               | <font color="#7f7f7f">无</font>                                                                              | <font color="#7f7f7f">无</font>                                     |
-| `get_game_uid()`              | 获取当前模组包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `uid` - <font color="#92cddc">string</font>：模组包 UID。               |
-| `get_game_info()`             | 获取当前模组包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `info` - <font color="#92cddc">table</font>：模组包元信息表，结构见下文。         |
-| `get_key([action)`            | 获取按键动作注册表信息。            | `[action` - <font color="#92cddc">string</font>：可选，动作，不填写时返回所有动作信息。                                         | `action_value` - <font color="#92cddc">table</font>：动作的按键信息，结构见下文。 |
+| 是否需要调试模式 | 函数名                           | 作用                      | 参数                                                                                                          | 返回值                                                                |
+| --- | ----------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| <font color="red">是</font> | `debug_log(message)`          | 在日志文件中写入一条调试信息。         | `message` - <font color="#92cddc">任意</font>：要写入的信息。                                                         | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font> | `debug_warn(message)`         | 在日志文件中写入一条警告信息。         | `message` - <font color="#92cddc">任意</font>：要写入的警告信息。                                                       | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font> | `debug_error(message)`        | 在日志文件中写入一条异常信息。         | `message` - <font color="#92cddc">任意</font>：要写入的异常信息。                                                       | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font> | `debug_print(title, message)` | 在日志文件中写入一条带自定义标题的调试信息。  | `title` - <font color="#92cddc">string</font>：日志标题。 <br>`message` - <font color="#92cddc">任意</font>：要写入的信息。 | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font> | `clear_debug_log()`           | 清空游戏日志文件。               | <font color="#7f7f7f">无</font>                                                                              | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font> | `get_game_uid()`              | 获取当前模组包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `uid` - <font color="#92cddc">string</font>：模组包 UID。               |
+| <font color="red">是</font> | `get_game_info()`             | 获取当前模组包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `info` - <font color="#92cddc">table</font>：模组包元信息表，结构见下文。         |
+| <font color="#7f7f7f">否</font> | `get_key([action)`            | 获取按键动作注册表信息。            | `[action` - <font color="#92cddc">string</font>：可选，动作，不填写时返回所有动作信息。                                         | `action_value` - <font color="#92cddc">table</font>：动作的按键信息，结构见下文。 |
 
 ### 日志输出格式
 
@@ -1057,8 +1057,8 @@ end
 | 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
 | ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
 | <font color="green">内容绘制 API</font> | 宿主无法处理画布操作 | 画布上下文无效，无法执行绘制操作。 | <font color="red">宿主异常</font> |
-| `canvas_eraser`<br>`canvas_draw_text`<br>`canvas_fill_rect`<br>`canvas_border_rect` | 相关参数不符合要求 | 坐标参数无效：必须为大于等于 0 的整数，实际值为 {value} | <font color="red">宿主异常</font> |
-| `canvas_eraser`<br>`canvas_fill_rect`<br>`canvas_border_rect` | 相关参数不符合要求 | 宽高参数无效：必须为大于等于 0 的整数，实际宽度为 {width}，高度为 {height} | <font color="red">宿主异常</font> |
+| `canvas_eraser`<br>`canvas_draw_text`<br>`canvas_fill_rect`<br>`canvas_border_rect` | 相关参数不符合要求 | 坐标参数无效：应为大于等于 0 的整数，实际值为 {value} | <font color="red">宿主异常</font> |
+| `canvas_eraser`<br>`canvas_fill_rect`<br>`canvas_border_rect` | 相关参数不符合要求 | 宽高参数无效：应为大于等于 0 的整数，实际宽度为 {width}，高度为 {height} | <font color="red">宿主异常</font> |
 
 #### 内容尺寸计算
 
@@ -1070,9 +1070,9 @@ end
 
 | 适用函数 | 触发条件 | 抛出句式 | 类型 |
 | --- | --- | --- | --- |
-| `resolve_rect` | 相关参数不符合要求 | 宽高参数无效：必须为大于等于 0 的整数，实际宽度为 {width}，高度为 {height} | <font color="red">宿主异常</font> |
-| `resolve_x` | 相关参数不符合要求 | 宽参数无效：必须为大于等于 0 的整数，实际宽度为 {width} | <font color="red">宿主异常</font> |
-| `resolve_y` | 相关参数不符合要求 | 高参数无效：必须为大于等于 0 的整数，实际高度为 {height} | <font color="red">宿主异常</font> |
+| `resolve_rect` | 相关参数不符合要求 | 宽高参数无效：应为大于等于 0 的整数，实际宽度为 {width}，高度为 {height} | <font color="red">宿主异常</font> |
+| `resolve_x` | 相关参数不符合要求 | 宽参数无效：应为大于等于 0 的整数，实际宽度为 {width} | <font color="red">宿主异常</font> |
+| `resolve_y` | 相关参数不符合要求 | 高参数无效：应为大于等于 0 的整数，实际高度为 {height} | <font color="red">宿主异常</font> |
 | `resolve_x`<br>`resolve_y`<br>`resolve_rect` | 相关参数不符合要求 | 锚点参数无效 | <font color="red">宿主异常</font> |
 
 #### 数据读取
@@ -1119,7 +1119,7 @@ end
 | --- | --- | --- | --- |
 | <font color="green">时间处理 API</font> | 使用的 ID 不存在 | 指定 ID 的计时器不存在：{id} | <font color="red">宿主异常</font> |
 | `running_time` | 宿主无法获取游戏运行时长 | 无法获取当前游戏运行时长：{err} | <font color="red">宿主异常</font> |
-| `timer_create` | 相关参数不符合要求 | 计时时长必须为正整数 | <font color="red">宿主异常</font> |
+| `timer_create` | 相关参数不符合要求 | 计时时长应为正整数 | <font color="red">宿主异常</font> |
 | `timer_create` | 计时器创建达到上限 | 计时器已达上限 64 | <font color="red">宿主异常</font> |
 | `timer_create` | 宿主无法创建计时器 | 创建计时器失败：{err} | <font color="red">宿主异常</font> |
 | `timer_start`<br>`timer_restart` | 宿主无法启动计时器 | 启动指定 ID 计时器失败：{err} | <font color="red">宿主异常</font> |
@@ -1132,7 +1132,7 @@ end
 | `is_timer_exists` | 宿主无法检查计时器 | 无法检查指定 ID 的计时器是否存在：{id} | <font color="red">宿主异常</font> |
 | `now` | 宿主无法获取系统时间戳 | 获取系统时间戳失败：{err} | <font color="red">宿主异常</font> |
 | `get_current_*` | 宿主无法获取系统时间 | 获取系统时间失败：{err} | <font color="red">宿主异常</font> |
-| `timestamp_to_date` | 相关参数不符合要求 | 时间戳必须为大于等于 0 的整数 | <font color="red">宿主异常</font> |
+| `timestamp_to_date` | 相关参数不符合要求 | 时间戳应为大于等于 0 的整数 | <font color="red">宿主异常</font> |
 | `timestamp_to_date` | 相关参数不符合要求 | 日期字符串缺少必要参数 | <font color="red">宿主异常</font> |
 | `date_to_timestamp` | 宿主无法转换日期 | 日期转换失败：{err} | <font color="red">宿主异常</font> |
 
@@ -1143,8 +1143,8 @@ end
 | <font color="green">随机数 API</font> | 使用的 ID 不存在 | 指定 ID 随机数生成器不存在：{id} | <font color="red">宿主异常</font> |
 | `random`<br>`random_float` | 宿主无法生成随机数 | 无法生成随机数：{err} | <font color="red">宿主异常</font> |
 | `random`<br>`random_float` | 随机数生成器类型不符合要求 | 指定 ID 随机数生成器类型不匹配：{id} | <font color="red">宿主异常</font> |
-| `random` | 相关参数不符合要求 | max参数应为正整数，实际为 {max} | <font color="red">宿主异常</font> |
-| `random` | 相关参数不符合要求 | max参数应大于min，实际为min {min}，max {max} | <font color="red">宿主异常</font> |
+| `random(max, [id)` | 相关参数不符合要求 | max参数应为大于等于 0 的整数，实际为 {max} | <font color="red">宿主异常</font> |
+| `random` | 相关参数不符合要求 | max 参数应大于等于 min，实际为min {min}，max {max} | <font color="red">宿主异常</font> |
 | `random_create`<br>`random_float_create` | 宿主无法根据种子创建随机数生成器 | 种子无效：{seed} | <font color="red">宿主异常</font> |
 | `random_create`<br>`random_float_create` | 宿主无法创建随机书生成器 | 创建随机数生成器失败：{err} | <font color="red">宿主异常</font> |
 | `random_reset_step` | 宿主无法重置随机数生成器 | 重置随机数生成器步进数失败：{err} | <font color="red">宿主异常</font> |

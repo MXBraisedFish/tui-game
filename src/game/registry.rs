@@ -145,6 +145,8 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
         None
     };
     for root_dir in entries {
+        let fallback_log_object = package_log_object_from_root(&root_dir);
+        let _log_object_guard = host_log::scoped_log_object(fallback_log_object);
         let package = match load_package(&root_dir, source.clone()) {
             Ok(package) => package,
             Err(err) => {
@@ -247,6 +249,17 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
         }
     }
     Ok(games)
+}
+
+fn package_log_object_from_root(root_dir: &PathBuf) -> String {
+    let name = root_dir
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    if name.trim().is_empty() {
+        return "宿主".to_string();
+    }
+    format!("tui_game_{}", name)
 }
 
 fn apply_saved_keybindings(

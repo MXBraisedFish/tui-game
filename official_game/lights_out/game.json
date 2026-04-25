@@ -1,54 +1,68 @@
 {
-  "id": "tui_game_lights_out_YHJI1Ohd7LRsBOw8",
-  "name": "game.lights_out.name",
-  "description": "game.lights_out.description",
-  "detail": "game.lights_out.details",
-  "author": "TUI-GAME",
-  "entry": "scripts/lights_out.lua",
+  "api": 7,
+  "entry": "scripts/main.lua",
   "save": true,
   "best_none": "game.lights_out.best_none_block",
   "min_width": 1,
   "min_height": 1,
+  "write": false,
+  "case_sensitive": false,
   "actions": {
-    "move_left": [
-      "left"
-    ],
-    "move_right": [
-      "right"
-    ],
-    "move_up": [
-      "up"
-    ],
-    "move_down": [
-      "down"
-    ],
-    "toggle": [
-      "space"
-    ],
-    "resize_cycle": [
-      "p"
-    ],
-    "quick_jump": [
-      "d"
-    ],
-    "save": [
-      "s"
-    ],
-    "restart": [
-      "r"
-    ],
-    "quit_action": [
-      "q"
-    ],
-    "confirm_yes": [
-      "y",
-      "enter"
-    ],
-    "confirm_no": [
-      "q",
-      "esc",
-      "n"
-    ]
+    "move_left": {
+      "key": "left",
+      "key_name": "game.lights_out.action.move_left"
+    },
+    "move_right": {
+      "key": "right",
+      "key_name": "game.lights_out.action.move_right"
+    },
+    "move_up": {
+      "key": "up",
+      "key_name": "game.lights_out.action.move_up"
+    },
+    "move_down": {
+      "key": "down",
+      "key_name": "game.lights_out.action.move_down"
+    },
+    "toggle": {
+      "key": "space",
+      "key_name": "game.lights_out.action.toggle"
+    },
+    "resize_cycle": {
+      "key": "p",
+      "key_name": "game.lights_out.action.resize_cycle"
+    },
+    "quick_jump": {
+      "key": "d",
+      "key_name": "game.lights_out.action.quick_jump"
+    },
+    "save": {
+      "key": "s",
+      "key_name": "game.lights_out.action.save"
+    },
+    "confirm": {
+      "key": "enter",
+      "key_name": "game.lights_out.action.confirm"
+    },
+    "restart": {
+      "key": "r",
+      "key_name": "game.lights_out.action.restart"
+    },
+    "quit_action": {
+      "key": [
+        "q",
+        "esc"
+      ],
+      "key_name": "game.lights_out.action.quit"
+    },
+    "confirm_yes": {
+      "key": "y",
+      "key_name": "game.lights_out.action.confirm_yes"
+    },
+    "confirm_no": {
+      "key": "n",
+      "key_name": "game.lights_out.action.confirm_no"
+    }
   },
   "runtime": {
     "target_fps": 60
