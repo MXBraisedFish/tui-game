@@ -192,6 +192,7 @@ fn scan_manifest_games(source: GamePackageSource) -> Result<Vec<GameDescriptor>>
                 &game_id,
                 &entry,
                 &source,
+                game.case_sensitive,
             );
             if matches!(source, GamePackageSource::Mod) {
                 if !has_best_score {
@@ -254,6 +255,7 @@ fn apply_saved_keybindings(
     game_id: &str,
     script_name: &str,
     source: &GamePackageSource,
+    case_sensitive: bool,
 ) -> BTreeMap<String, ActionBinding> {
     let overrides = match source {
         GamePackageSource::Official => runtime_save::load_keybindings(game_id).unwrap_or_default(),
@@ -268,6 +270,7 @@ fn apply_saved_keybindings(
         let Some(binding) = out.get_mut(&action_name) else {
             continue;
         };
+        let keys = compact_action_keys(keys, case_sensitive);
         binding.key = match keys.len() {
             0 => ActionKeys::Multiple(Vec::new()),
             1 => ActionKeys::Single(keys[0].clone()),
@@ -275,6 +278,26 @@ fn apply_saved_keybindings(
         };
     }
     let _ = script_name;
+    out
+}
+
+fn compact_action_keys(keys: Vec<String>, case_sensitive: bool) -> Vec<String> {
+    let mut out = Vec::new();
+    for key in keys.into_iter().filter(|key| !key.trim().is_empty()) {
+        let exists = out.iter().any(|existing: &String| {
+            if case_sensitive {
+                existing == &key
+            } else {
+                existing.eq_ignore_ascii_case(&key)
+            }
+        });
+        if !exists {
+            out.push(key);
+        }
+        if out.len() >= 5 {
+            break;
+        }
+    }
     out
 }
 

@@ -9,7 +9,12 @@ use serde_json::Value;
 
 use crate::utils::path_utils;
 
-const REQUIRED_KEYS: [&str; 3] = ["language_name", "language", "confirm_language"];
+const REQUIRED_KEYS: [&str; 4] = [
+    "language_name",
+    "language",
+    "language.hint.segment.confirm",
+    "language.hint.segment.back",
+];
 
 #[derive(Clone, Debug)]
 /// 单个语言包的数据结构。
@@ -310,8 +315,12 @@ fn minimal_builtin_english_pack() -> LanguagePack {
     dict.insert("language_name".to_string(), "English".to_string());
     dict.insert("language".to_string(), "Language".to_string());
     dict.insert(
-        "confirm_language".to_string(),
-        "[Enter] Confirm language [ESC] / [Q] Return to main menu".to_string(),
+        "language.hint.segment.confirm".to_string(),
+        "[Enter] Confirm language".to_string(),
+    );
+    dict.insert(
+        "language.hint.segment.back".to_string(),
+        "[ESC]/[Q] Return to main menu".to_string(),
     );
 
     LanguagePack {

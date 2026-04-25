@@ -10,6 +10,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::content_cache;
 use crate::app::i18n;
 use crate::app::rich_text;
+use crate::core::key::display_semantic_key;
 use crate::core::stats as runtime_stats;
 use crate::game::registry::GameSourceKind;
 use crate::game::registry::GameDescriptor;
@@ -350,7 +351,8 @@ impl GameSelection {
             i18n::t("game_selection.label.how_to_play"),
             Style::default().fg(Color::Yellow),
         )));
-        top_lines.extend(rich_text::parse_rich_text_wrapped(
+        top_lines.extend(parse_game_rich_text_wrapped(
+            game,
             &description,
             inner.width.saturating_sub(1) as usize,
             Style::default().fg(Color::White),
@@ -373,7 +375,8 @@ impl GameSelection {
             ])
             .split(chunks[1]);
 
-        let details_full_lines = rich_text::parse_rich_text_wrapped(
+        let details_full_lines = parse_game_rich_text_wrapped(
+            game,
             &details,
             detail_rows[2].width.saturating_sub(2) as usize,
             Style::default().fg(Color::White),
@@ -586,7 +589,8 @@ impl GameSelection {
         )   
         ));
 
-        let rich_lines = rich_text::parse_rich_text_wrapped(
+        let rich_lines = parse_game_rich_text_wrapped(
+            game,
             &description,
             inner.width.saturating_sub(1) as usize,
             Style::default().fg(Color::White),
@@ -629,7 +633,8 @@ impl GameSelection {
             detail_rows[1],
         );
 
-        let details_full_lines = rich_text::parse_rich_text_wrapped(
+        let details_full_lines = parse_game_rich_text_wrapped(
+            game,
             &details,
             detail_rows[2].width.saturating_sub(2) as usize,
             Style::default().fg(Color::White),
@@ -1033,16 +1038,31 @@ fn cmp_lowercase(left: &str, right: &str) -> std::cmp::Ordering {
 
 fn build_game_hint_segments(include_scroll: bool) -> Vec<String> {
     let mut segments = vec![
-        text("game_selection.hint.confirm", "[Enter] Confirm"),
-        text("game_selection.hint.jump", "[P] Jump"),
-        text("game_selection.hint.sort_mode", "[Z] Sort"),
-        text("game_selection.hint.sort_order", "[X] Order"),
-        text("game_selection.hint.move", "[↑]/[↓] Select Game"),
-        text("game_selection.hint.page", "[Q]/[E] Change Page"),
-        text("game_selection.hint.back", "[ESC] Return to Menu"),
+        text(
+            "game_selection.hint.segment.confirm",
+            "[Enter] Confirm Selection",
+        ),
+        text("game_selection.hint.segment.jump", "[P] Jump"),
+        text("game_selection.hint.segment.sort_mode", "[Z] Sort"),
+        text("game_selection.hint.segment.sort_order", "[X] Order"),
+        text(
+            "game_selection.hint.segment.move",
+            "[↑]/[↓] Select Game",
+        ),
+        text(
+            "game_selection.hint.segment.page",
+            "[Q]/[E] Change Page",
+        ),
+        text(
+            "game_selection.hint.segment.back",
+            "[ESC] Return to Menu",
+        ),
     ];
     if include_scroll {
-        segments.push(i18n::t("game_selection.hint.detail_scroll"));
+        segments.push(text(
+            "game_selection.hint.segment.detail_scroll",
+            "[W]/[S] Scroll Game Details",
+        ));
     }
     segments
 }
@@ -1150,6 +1170,29 @@ fn label_manifest_value_lines(
     lines
 }
 
+fn parse_game_rich_text_wrapped(
+    game: &GameDescriptor,
+    text: &str,
+    width: usize,
+    base: Style,
+) -> Vec<Line<'static>> {
+    rich_text::parse_rich_text_wrapped_with_keys(text, width, base, |semantic_key, mode| {
+        let binding = match mode {
+            rich_text::KeyBindingMode::User => game.actions.get(semantic_key),
+            rich_text::KeyBindingMode::Original => game.default_actions.get(semantic_key),
+        };
+        binding
+            .map(|binding| {
+                binding
+                    .keys()
+                    .into_iter()
+                    .map(|key| display_semantic_key(&key, game.case_sensitive))
+                    .collect()
+            })
+            .or_else(|| Some(vec![i18n::t("rich_text.error.key_not_found")]))
+    })
+}
+
 fn crop_line_center_to_width(line: &Line<'static>, width: usize) -> Line<'static> {
     if width == 0 {
         return Line::from("");
@@ -1214,7 +1257,8 @@ fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<L
     }
     let Some(score) = runtime_stats::read_runtime_best_score(&game.id) else {
         let fallback = resolved_best_none_text(game);
-        return rich_text::parse_rich_text_wrapped(
+        return parse_game_rich_text_wrapped(
+            game,
             &fallback,
             width.max(1),
             Style::default().fg(Color::White),
@@ -1246,7 +1290,8 @@ fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<L
     };
 
     let lines = if allow_rich {
-        rich_text::parse_rich_text_wrapped(
+        parse_game_rich_text_wrapped(
+            game,
             &rendered,
             width.max(1),
             Style::default().fg(Color::White),

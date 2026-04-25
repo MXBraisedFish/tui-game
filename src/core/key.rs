@@ -31,10 +31,78 @@ pub struct SemanticKeySource {
 }
 
 static ALLOWED_CT_KEYCODES: Lazy<HashSet<KeyCode>> = Lazy::new(allowed_ct_keycodes);
+static EXPLICIT_SEMANTIC_KEYS: Lazy<HashSet<String>> = Lazy::new(explicit_semantic_keys);
 static GLOBAL_KEY_SOURCE: Lazy<SemanticKeySource> = Lazy::new(SemanticKeySource::new);
 
 pub fn semantic_key_source() -> &'static SemanticKeySource {
     &GLOBAL_KEY_SOURCE
+}
+
+pub fn is_explicit_semantic_key(key: &str) -> bool {
+    EXPLICIT_SEMANTIC_KEYS.contains(key.trim())
+}
+
+pub fn display_semantic_key(key: &str, case_sensitive: bool) -> String {
+    let key = key.trim();
+    if key.is_empty() {
+        return String::new();
+    }
+
+    if key.len() == 1 {
+        let ch = key.chars().next().unwrap_or_default();
+        if ch.is_ascii_lowercase() && !case_sensitive {
+            return ch.to_ascii_uppercase().to_string();
+        }
+        return ch.to_string();
+    }
+
+    match key {
+        "f1" => "F1",
+        "f2" => "F2",
+        "f3" => "F3",
+        "f4" => "F4",
+        "f5" => "F5",
+        "f6" => "F6",
+        "f7" => "F7",
+        "f8" => "F8",
+        "f9" => "F9",
+        "f10" => "F10",
+        "f11" => "F11",
+        "f12" => "F12",
+        "up" => "\u{2191}",
+        "down" => "\u{2193}",
+        "left" => "\u{2190}",
+        "right" => "\u{2192}",
+        "home" => "Home",
+        "end" => "End",
+        "pageup" => "PgUp",
+        "pagedown" => "PgDn",
+        "enter" => "Enter",
+        "backspace" => "Bksp",
+        "del" => "Del",
+        "ins" => "Ins",
+        "tab" => "Tab",
+        "back_tab" => "BTab",
+        "space" => "Space",
+        "left_ctrl" => "LCtrl",
+        "right_ctrl" => "RCtrl",
+        "left_shift" => "LShift",
+        "right_shift" => "RShift",
+        "shift" => "Shift",
+        "left_alt" => "LAlt",
+        "right_alt" => "RAlt",
+        "left_meta" => "LMeta",
+        "right_meta" => "RMeta",
+        "capslock" => "Caps",
+        "numlock" => "Num",
+        "scrolllock" => "Scrl",
+        "esc" => "Esc",
+        "printscreen" => "Prtsc",
+        "pause" => "Pause",
+        "menu" => "Menu",
+        other => other,
+    }
+    .to_string()
 }
 
 impl SemanticKeySource {
@@ -195,6 +263,34 @@ fn allowed_ct_keycodes() -> HashSet<KeyCode> {
     set.insert(PrintScreen);
     set.insert(Pause);
     set.insert(Menu);
+
+    set
+}
+
+fn explicit_semantic_keys() -> HashSet<String> {
+    let mut set = HashSet::new();
+
+    for key in allowed_ct_keycodes()
+        .into_iter()
+        .filter_map(map_keycode_to_semantic)
+    {
+        set.insert(key);
+    }
+
+    for key in [
+        "left_ctrl",
+        "right_ctrl",
+        "left_shift",
+        "right_shift",
+        "shift",
+        "left_meta",
+        "right_meta",
+        "left_alt",
+        "right_alt",
+        "fn",
+    ] {
+        set.insert(key.to_string());
+    }
 
     set
 }

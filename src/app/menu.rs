@@ -276,6 +276,23 @@ pub fn render_main_menu(
     }
     let version_line = Paragraph::new(Line::from(version_spans)).alignment(Alignment::Center);
     frame.render_widget(version_line, areas.version);
+
+    let hint_y = areas.version.y.saturating_add(2);
+    let frame_bottom = frame.area().y.saturating_add(frame.area().height);
+    if hint_y < frame_bottom {
+        let hint_area = Rect {
+            x: frame.area().x,
+            y: hint_y,
+            width: frame.area().width,
+            height: 1,
+        };
+        let hint = Paragraph::new(Line::from(Span::styled(
+            t("menu.operation_hint"),
+            Style::default().fg(Color::DarkGray),
+        )))
+        .alignment(Alignment::Center);
+        frame.render_widget(hint, hint_area);
+    }
 }
 
 fn menu_item_label(menu: &Menu, item: &MenuItem) -> String {

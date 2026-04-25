@@ -1,0 +1,25 @@
+{
+  "namespace": "official",
+  "package": "TUI-GAME Official",
+  "mod_name": "TUI-GAME Official",
+  "introduction": "game.2048.package_introduction",
+  "author": "TUI-GAME",
+  "game_name": "game.2048.name",
+  "description": "game.2048.description",
+  "detail": "game.2048.details",
+  "version": "1.0.0",
+  "icon": [
+    "  2048  ",
+    " +----+ ",
+    " |2048| ",
+    " +----+ "
+  ],
+  "banner": [
+    "  ____   ___  _  _   ___  ",
+    " |___ \\ / _ \\| || | / _ \\ ",
+    "   __) | | | | || || (_) |",
+    "  / __/| | | |__   _> _ < ",
+    " |_____| |_| |  | || (_) |",
+    "        \\___/   |_| \\___/ "
+  ]
+}

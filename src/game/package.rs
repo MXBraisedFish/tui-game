@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -5,6 +6,7 @@ use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
 
 use crate::app::i18n;
+use crate::core::key::is_explicit_semantic_key;
 use crate::game::action::ActionKeys;
 use crate::game::manifest::{GameManifest, PackageManifest};
 use crate::utils::host_log;
@@ -144,6 +146,7 @@ fn read_game_manifest(
         .replace("{path}", &path.display().to_string())
     })?;
     truncate_action_keys_with_warning(&mut manifest);
+    validate_action_key_bindings(&manifest)?;
     if matches!(source, GamePackageSource::Mod) {
         manifest.id = expected_mod_game_id(package);
     }
@@ -152,7 +155,7 @@ fn read_game_manifest(
 }
 
 fn truncate_action_keys_with_warning(manifest: &mut GameManifest) {
-    for binding in manifest.actions.values_mut() {
+    for (action, binding) in &mut manifest.actions {
         let ActionKeys::Multiple(keys) = &mut binding.key else {
             continue;
         };
@@ -162,10 +165,49 @@ fn truncate_action_keys_with_warning(manifest: &mut GameManifest) {
         let key_count = keys.len().to_string();
         host_log::append_host_warning(
             "host.warning.action_key_limit_exceeded",
-            &[("key_count", &key_count)],
+            &[("action", action.as_str()), ("key_count", &key_count)],
         );
         keys.truncate(MAX_ACTION_KEYS_PER_BINDING);
     }
+}
+
+fn validate_action_key_bindings(manifest: &GameManifest) -> Result<()> {
+    let mut buckets: HashMap<String, Vec<String>> = HashMap::new();
+
+    for binding in manifest.actions.values() {
+        for key in binding.keys() {
+            let trimmed = key.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if !is_explicit_semantic_key(trimmed) {
+                host_log::append_host_warning(
+                    "host.warning.action_key_non_explicit",
+                    &[("key", trimmed)],
+                );
+            }
+            let canonical = if manifest.case_sensitive {
+                trimmed.to_string()
+            } else {
+                trimmed.to_lowercase()
+            };
+            buckets
+                .entry(canonical)
+                .or_default()
+                .push(trimmed.to_string());
+        }
+    }
+
+    let conflicts = buckets
+        .into_values()
+        .filter(|keys| keys.len() > 1)
+        .flatten()
+        .collect::<Vec<_>>();
+    if !conflicts.is_empty() {
+        return Err(action_key_duplicate_error(&conflicts.join(", ")));
+    }
+
+    Ok(())
 }
 
 fn validate_game_actions_shape(root: &Value) -> Result<()> {
@@ -211,6 +253,18 @@ fn validate_game_actions_shape(root: &Value) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn action_key_duplicate_error(keys: &str) -> anyhow::Error {
+    host_log::append_host_error("host.error.action_key_duplicate", &[("keys", keys)]);
+    anyhow!(
+        "{}",
+        i18n::t_or(
+            "host.error.action_key_duplicate",
+            "Key action registry has duplicate key bindings. Conflicting keys: {keys}"
+        )
+        .replace("{keys}", keys)
+    )
 }
 
 fn validate_game_case_sensitive_shape(root: &Value) -> Result<()> {

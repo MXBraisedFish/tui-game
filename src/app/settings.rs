@@ -13,10 +13,10 @@ use std::time::{Duration, Instant};
 use crate::app::content_cache;
 use crate::app::i18n;
 use crate::app::rich_text;
-use crate::core::key::semantic_key_source;
+use crate::core::key::{display_semantic_key, semantic_key_source};
 use crate::core::save as runtime_save;
 use crate::game::action::{ActionBinding, ActionKeys};
-use crate::game::registry::GameDescriptor;
+use crate::game::registry::{GameDescriptor, GameSourceKind};
 use crate::game::resources;
 use crate::mods::{self, ModPackage, ModSafeModeState};
 use crate::utils::path_utils;
@@ -25,7 +25,7 @@ const MAX_COLS: usize = 12;
 const H_GAP: u16 = 1;
 const TRIANGLE: &str = "\u{25B6} ";
 const MOD_HOT_RELOAD_POLL_INTERVAL: Duration = Duration::from_secs(1);
-const SHIFT_BIND_HOLD: Duration = Duration::from_secs(2);
+const SHIFT_BIND_HOLD: Duration = Duration::from_secs(1);
 const KEYBIND_ACTION_PADDING: u16 = 2;
 const KEYBIND_CAPTURE_DELAY: Duration = Duration::from_millis(120);
 
@@ -65,6 +65,13 @@ pub enum KeybindEditMode {
     Delete,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KeybindGameSortMode {
+    Source,
+    Name,
+    Author,
+}
+
 #[derive(Clone, Debug)]
 pub struct KeybindCaptureState {
     pub slot_index: usize,
@@ -100,6 +107,8 @@ pub struct SettingsState {
     pub keybind_action_scroll: usize,
     pub keybind_edit_mode: KeybindEditMode,
     pub keybind_capture: Option<KeybindCaptureState>,
+    pub keybind_sort_mode: KeybindGameSortMode,
+    pub keybind_sort_descending: bool,
     pub memory_selected: usize,
     pub cleanup_dialog: Option<CleanupDialog>,
     pub default_safe_mode_disable_dialog: Option<DefaultSafeModeDisableDialog>,
@@ -179,12 +188,15 @@ impl SettingsState {
             keybind_action_scroll: 0,
             keybind_edit_mode: KeybindEditMode::Add,
             keybind_capture: None,
+            keybind_sort_mode: KeybindGameSortMode::Source,
+            keybind_sort_descending: false,
             memory_selected: 0,
             cleanup_dialog: None,
             default_safe_mode_disable_dialog: None,
             security_success_at: None,
         };
         state.apply_mod_sort();
+        state.apply_keybind_sort();
         state
     }
 
@@ -295,6 +307,7 @@ impl SettingsState {
             .get(self.keybind_selected)
             .map(|game| game.id.clone());
         self.keybind_games = load_keybind_games();
+        self.apply_keybind_sort();
         if self.keybind_games.is_empty() {
             self.keybind_selected = 0;
             self.keybind_page = 0;
@@ -325,6 +338,47 @@ impl SettingsState {
         self.keybind_action_scroll = 0;
         self.keybind_edit_mode = KeybindEditMode::Add;
         self.keybind_capture = None;
+    }
+
+    fn apply_keybind_sort(&mut self) {
+        let mode = self.keybind_sort_mode;
+        let descending = self.keybind_sort_descending;
+        self.keybind_games.sort_by(|left, right| {
+            let ordering = compare_keybind_games(left, right, mode);
+            if descending { ordering.reverse() } else { ordering }
+        });
+    }
+
+    fn set_keybind_sort_mode(&mut self, mode: KeybindGameSortMode) {
+        let selected_id = self
+            .keybind_games
+            .get(self.keybind_selected)
+            .map(|game| game.id.clone());
+        self.keybind_sort_mode = mode;
+        self.apply_keybind_sort();
+        self.restore_keybind_selection(selected_id);
+    }
+
+    fn toggle_keybind_sort_order(&mut self) {
+        let selected_id = self
+            .keybind_games
+            .get(self.keybind_selected)
+            .map(|game| game.id.clone());
+        self.keybind_sort_descending = !self.keybind_sort_descending;
+        self.apply_keybind_sort();
+        self.restore_keybind_selection(selected_id);
+    }
+
+    fn restore_keybind_selection(&mut self, selected_id: Option<String>) {
+        if let Some(id) = selected_id
+            && let Some(index) = self.keybind_games.iter().position(|game| game.id == id)
+        {
+            self.keybind_selected = index;
+        }
+        self.keybind_selected = self
+            .keybind_selected
+            .min(self.keybind_games.len().saturating_sub(1));
+        self.keybind_page = self.keybind_selected / current_keybind_page_size().max(1);
     }
 }
 
@@ -520,6 +574,32 @@ fn compare_mod_packages(left: &ModPackage, right: &ModPackage, mode: ModSortMode
         ModSortMode::SafeMode => bool_true_first(left.safe_mode_enabled, right.safe_mode_enabled)
             .then_with(|| cmp_lowercase(&left.package_name, &right.package_name))
             .then_with(|| left.namespace.cmp(&right.namespace)),
+    }
+}
+
+fn compare_keybind_games(
+    left: &GameDescriptor,
+    right: &GameDescriptor,
+    mode: KeybindGameSortMode,
+) -> Ordering {
+    match mode {
+        KeybindGameSortMode::Source => source_rank(&left.source)
+            .cmp(&source_rank(&right.source))
+            .then_with(|| cmp_lowercase(&left.display_name, &right.display_name))
+            .then_with(|| left.id.cmp(&right.id)),
+        KeybindGameSortMode::Name => cmp_lowercase(&left.display_name, &right.display_name)
+            .then_with(|| source_rank(&left.source).cmp(&source_rank(&right.source)))
+            .then_with(|| left.id.cmp(&right.id)),
+        KeybindGameSortMode::Author => cmp_lowercase(&left.display_author, &right.display_author)
+            .then_with(|| cmp_lowercase(&left.display_name, &right.display_name))
+            .then_with(|| left.id.cmp(&right.id)),
+    }
+}
+
+fn source_rank(source: &GameSourceKind) -> u8 {
+    match source {
+        GameSourceKind::Official => 0,
+        GameSourceKind::Mod => 1,
     }
 }
 
@@ -748,6 +828,17 @@ fn handle_keybind_key(state: &mut SettingsState, key: KeyEvent) {
                 if total_keybind_pages(state.keybind_games.len(), page_size) > 1 {
                     state.keybind_page_jump_input = Some(String::new());
                 }
+            }
+            KeyCode::Char('z') | KeyCode::Char('Z') => {
+                let next = match state.keybind_sort_mode {
+                    KeybindGameSortMode::Source => KeybindGameSortMode::Name,
+                    KeybindGameSortMode::Name => KeybindGameSortMode::Author,
+                    KeybindGameSortMode::Author => KeybindGameSortMode::Source,
+                };
+                state.set_keybind_sort_mode(next);
+            }
+            KeyCode::Char('x') | KeyCode::Char('X') => {
+                state.toggle_keybind_sort_order();
             }
             KeyCode::Enter => {
                 state.keybind_focus = KeybindFocus::Actions;
@@ -1099,12 +1190,64 @@ fn minimum_size_language() -> (u16, u16) {
 
     let grid_width = cols * outer_width + cols.saturating_sub(1) * H_GAP;
     let grid_height = rows * 3;
-    let hint = i18n::t("confirm_language");
-    let hint_width = UnicodeWidthStr::width(hint.as_str()) as u16;
+    let hint = build_language_hint_segments_for_code("");
+    let hint_width = UnicodeWidthStr::width(hint.join("  ").as_str()) as u16;
 
     let min_w = grid_width.max(hint_width).max(30) + 2;
     let min_h = 1 + 1 + grid_height + 1 + 2;
     (min_w, min_h.max(10))
+}
+
+fn build_language_hint_segments_for_code(code: &str) -> Vec<String> {
+    let translate = |key: &str, fallback: &str| {
+        if code.is_empty() {
+            text(key, fallback)
+        } else {
+            i18n::t_for_code(code, key)
+        }
+    };
+
+    vec![
+        translate("language.hint.segment.confirm", "[Enter] Confirm language"),
+        translate("language.hint.segment.back", "[ESC]/[Q] Return to main menu"),
+    ]
+}
+
+fn wrap_language_hint_lines(segments: &[String], width: usize) -> Vec<Line<'static>> {
+    if width == 0 || segments.is_empty() {
+        return vec![Line::from("")];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_segments: Vec<Span<'static>> = Vec::new();
+    let mut current_width = 0usize;
+
+    for segment in segments {
+        let segment_width = UnicodeWidthStr::width(segment.as_str());
+        let separator_width = if current_segments.is_empty() { 0 } else { 2 };
+
+        if !current_segments.is_empty() && current_width + separator_width + segment_width > width {
+            lines.push(Line::from(std::mem::take(&mut current_segments)));
+            current_width = 0;
+        }
+
+        if !current_segments.is_empty() {
+            current_segments.push(Span::raw("  "));
+            current_width += 2;
+        }
+        current_segments.push(Span::raw(segment.clone()));
+        current_width += segment_width;
+    }
+
+    if !current_segments.is_empty() {
+        lines.push(Line::from(current_segments));
+    }
+
+    if lines.is_empty() {
+        lines.push(Line::from(""));
+    }
+
+    lines
 }
 
 fn minimum_size_mods() -> (u16, u16) {
@@ -1156,6 +1299,13 @@ fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
         })
         .max()
         .unwrap_or(1) as u16;
+    let operation_hint_width = UnicodeWidthStr::width(
+        text(
+            "settings.hub.operation_hint",
+            "[↑]/[↓] Select Option  [Enter] Confirm",
+        )
+        .as_str(),
+    ) as u16;
     let back_hint_width = UnicodeWidthStr::width(
         text("settings.hub.back_hint", "[ESC]/[Q] Return to main menu").as_str(),
     ) as u16;
@@ -1164,8 +1314,8 @@ fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
         .width
         .saturating_sub(2)
         .max(1)
-        .min(content_width.max(back_hint_width).max(1));
-    let height = (items.len() + 2) as u16;
+        .min(content_width.max(operation_hint_width).max(back_hint_width).max(1));
+    let height = (items.len() + 3) as u16;
     let menu_area = Rect {
         x: area.x + area.width.saturating_sub(width) / 2,
         y: area.y + area.height.saturating_sub(height) / 2,
@@ -1173,8 +1323,21 @@ fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
         height,
     };
 
-    let left_pad = menu_area.width.saturating_sub(content_width) / 2;
-    let mut lines = Vec::new();
+    let item_area = Rect {
+        x: menu_area.x,
+        y: menu_area.y,
+        width: menu_area.width,
+        height: items.len() as u16,
+    };
+    let hint_area = Rect {
+        x: menu_area.x,
+        y: menu_area.y + items.len() as u16 + 1,
+        width: menu_area.width,
+        height: 2,
+    };
+
+    let left_pad = item_area.width.saturating_sub(content_width) / 2;
+    let mut item_lines = Vec::new();
 
     for (idx, (shortcut, text)) in items.iter().enumerate() {
         let is_selected = idx == selected.min(items.len().saturating_sub(1));
@@ -1198,7 +1361,7 @@ fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
             shortcut
         };
 
-        lines.push(Line::from(vec![
+        item_lines.push(Line::from(vec![
             Span::raw(" ".repeat(left_pad as usize)),
             Span::styled(if is_selected { TRIANGLE } else { "  " }, base_style),
             Span::styled(key.to_string(), key_style),
@@ -1206,14 +1369,24 @@ fn render_hub(frame: &mut ratatui::Frame<'_>, selected: usize) {
         ]));
     }
 
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        text("settings.hub.back_hint", "[ESC]/[Q] Return to main menu"),
-        Style::default().fg(Color::DarkGray),
-    )));
+    let item_widget = Paragraph::new(item_lines).alignment(Alignment::Left);
+    frame.render_widget(item_widget, item_area);
 
-    let widget = Paragraph::new(lines).alignment(Alignment::Left);
-    frame.render_widget(widget, menu_area);
+    let hint_lines = vec![
+        Line::from(Span::styled(
+            text(
+                "settings.hub.operation_hint",
+                "[↑]/[↓] Select Option  [Enter] Confirm",
+            ),
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(Span::styled(
+            text("settings.hub.back_hint", "[ESC]/[Q] Return to main menu"),
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+    let hint_widget = Paragraph::new(hint_lines).alignment(Alignment::Center);
+    frame.render_widget(hint_widget, hint_area);
 }
 
 fn render_security(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
@@ -1233,6 +1406,10 @@ fn render_security(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
                 "Default mod safe mode",
             ),
             state.default_safe_mode_enabled,
+            "settings.security.enabled",
+            "settings.security.disabled",
+            "Enabled",
+            "Disabled",
         ),
         selection_option_with_value_line(
             1,
@@ -1242,6 +1419,10 @@ fn render_security(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
                 "Default mod enabled state",
             ),
             state.default_mod_enabled,
+            "settings.security.mod_enabled",
+            "settings.security.mod_disabled",
+            "Enabled",
+            "Disabled",
         ),
         selection_action_line(
             2,
@@ -1274,7 +1455,24 @@ fn render_security(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
             text("settings.security.reset_success", "Reset successful"),
         );
     }
-    render_box_back_hint(frame, rect, text("settings.secondary.back_hint", "[ESC]/[Q] Return to main menu"));
+    render_box_hint_line(
+        frame,
+        rect,
+        2,
+        text(
+            "settings.security.operation_hint",
+            "[↑]/[↓] Select Option  [Enter] Confirm/Toggle Option",
+        ),
+    );
+    render_box_hint_line(
+        frame,
+        rect,
+        3,
+        text(
+            "settings.secondary.back_hint",
+            "[ESC]/[Q] Return to main menu",
+        ),
+    );
 }
 
 fn render_memory(frame: &mut ratatui::Frame<'_>, state: &SettingsState) {
@@ -1299,7 +1497,24 @@ fn render_memory(frame: &mut ratatui::Frame<'_>, state: &SettingsState) {
         Line::from(""),
     ];
     let rect = render_settings_box(frame, text("settings.memory.title", "Memory Cleanup"), 32, lines);
-    render_box_back_hint(frame, rect, text("settings.secondary.back_hint", "[ESC]/[Q] Return to main menu"));
+    render_box_hint_line(
+        frame,
+        rect,
+        2,
+        text(
+            "settings.memory.operation_hint",
+            "[↑]/[↓] Select Option  [Enter] Confirm",
+        ),
+    );
+    render_box_hint_line(
+        frame,
+        rect,
+        3,
+        text(
+            "settings.secondary.back_hint",
+            "[ESC]/[Q] Return to main menu",
+        ),
+    );
 }
 
 fn render_keybind(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
@@ -1320,9 +1535,12 @@ fn render_keybind(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
     }
 
     let area = frame.area();
+    let hint_segments = build_keybind_hint_segments(state);
+    let hint_lines = wrap_keybind_hint_lines(&hint_segments, area.width.max(1) as usize);
+    let hint_height = hint_lines.len().max(1) as u16;
     let root = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .constraints([Constraint::Min(0), Constraint::Length(hint_height)])
         .split(area);
     let columns = Layout::default()
         .direction(Direction::Horizontal)
@@ -1331,27 +1549,107 @@ fn render_keybind(frame: &mut ratatui::Frame<'_>, state: &mut SettingsState) {
 
     render_keybind_game_list(frame, columns[0], state);
     render_keybind_mapping_panel(frame, columns[1], state);
-    let hint_key = if state.keybind_capture.is_some() {
-        "settings.keybind.capture_hint"
-    } else if state.keybind_focus == KeybindFocus::Actions {
-        match state.keybind_edit_mode {
-            KeybindEditMode::Add => "settings.keybind.actions_hint_add",
-            KeybindEditMode::Delete => "settings.keybind.actions_hint_delete",
-        }
-    } else {
-        "settings.keybind.games_hint"
-    };
     frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            text(
-                hint_key,
-                "[↑]/[↓] Move  [Q]/[E] Page  [P] Jump Page  [Enter] Select  [Esc]/[Q] Save and Exit",
-            ),
-            Style::default().fg(Color::DarkGray),
-        )))
-        .alignment(Alignment::Center),
+        Paragraph::new(hint_lines)
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center),
         root[1],
     );
+}
+
+fn build_keybind_hint_segments(state: &SettingsState) -> Vec<String> {
+    if state.keybind_capture.is_some() {
+        return vec![
+            text(
+                "settings.keybind.hint.segment.capture_any",
+                "[Any Key] Bind to this slot",
+            ),
+            text(
+                "settings.keybind.hint.segment.capture_shift",
+                "[Shift] Hold for 2s to bind Shift",
+            ),
+        ];
+    }
+
+    if state.keybind_focus == KeybindFocus::Actions {
+        let mut segments = vec![
+            text("settings.keybind.hint.segment.move", "[↑]/[↓] Move"),
+            text("settings.keybind.hint.segment.scroll", "[W]/[S] Scroll"),
+            text(
+                "settings.keybind.hint.segment.reset_action",
+                "[Z] Reset Action",
+            ),
+            text(
+                "settings.keybind.hint.segment.reset_game",
+                "[R] Reset Current Game",
+            ),
+            text(
+                "settings.keybind.hint.segment.toggle_mode",
+                "[X] Toggle Mode",
+            ),
+        ];
+        segments.push(match state.keybind_edit_mode {
+            KeybindEditMode::Add => text(
+                "settings.keybind.hint.segment.add_key",
+                "[1]/[2]/[3]/[4]/[5] Add/Rebind Key",
+            ),
+            KeybindEditMode::Delete => text(
+                "settings.keybind.hint.segment.delete_key",
+                "[1]/[2]/[3]/[4]/[5] Delete Key",
+            ),
+        });
+        return segments;
+    }
+
+    vec![
+        text("settings.keybind.hint.segment.move", "[↑]/[↓] Move"),
+        text("settings.keybind.hint.segment.page", "[Q]/[E] Page"),
+        text("settings.keybind.hint.segment.jump", "[P] Jump Page"),
+        text("settings.keybind.hint.segment.sort_mode", "[Z] Sort Mode"),
+        text("settings.keybind.hint.segment.sort_order", "[X] Sort Order"),
+        text("settings.keybind.hint.segment.select", "[Enter] Select"),
+        text(
+            "settings.keybind.hint.segment.save_exit",
+            "[Esc]/[Q] Save and Exit",
+        ),
+    ]
+}
+
+fn wrap_keybind_hint_lines(segments: &[String], width: usize) -> Vec<Line<'static>> {
+    if width == 0 || segments.is_empty() {
+        return vec![Line::from("")];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_segments: Vec<Span<'static>> = Vec::new();
+    let mut current_width = 0usize;
+
+    for segment in segments {
+        let segment_width = UnicodeWidthStr::width(segment.as_str());
+        let separator_width = if current_segments.is_empty() { 0 } else { 2 };
+
+        if !current_segments.is_empty() && current_width + separator_width + segment_width > width {
+            lines.push(Line::from(std::mem::take(&mut current_segments)));
+            current_width = 0;
+        }
+
+        if !current_segments.is_empty() {
+            current_segments.push(Span::raw("  "));
+            current_width += 2;
+        }
+        current_segments.push(Span::raw(segment.clone()));
+        current_width += segment_width;
+    }
+
+    if !current_segments.is_empty() {
+        lines.push(Line::from(current_segments));
+    }
+
+    if lines.is_empty() {
+        lines.push(Line::from(""));
+    }
+
+    lines
 }
 
 fn render_language_selector(frame: &mut ratatui::Frame<'_>, selected: usize) {
@@ -1378,7 +1676,10 @@ fn render_language_selector(frame: &mut ratatui::Frame<'_>, selected: usize) {
     let selected_idx = selected.min(languages.len() - 1);
     let selected_pack = &languages[selected_idx];
     let title = i18n::t_for_code(&selected_pack.code, "language");
-    let hint = i18n::t_for_code(&selected_pack.code, "confirm_language");
+    let hint_lines = wrap_language_hint_lines(
+        &build_language_hint_segments_for_code(&selected_pack.code),
+        sections[3].width.max(1) as usize,
+    );
 
     let title_widget = Paragraph::new(title)
         .style(
@@ -1391,7 +1692,7 @@ fn render_language_selector(frame: &mut ratatui::Frame<'_>, selected: usize) {
 
     draw_language_grid(frame.buffer_mut(), sections[2], &languages, selected_idx);
 
-    let hint_widget = Paragraph::new(Line::from(hint))
+    let hint_widget = Paragraph::new(hint_lines)
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Left);
     frame.render_widget(hint_widget, sections[3]);
@@ -1466,6 +1767,22 @@ fn render_box_back_hint(frame: &mut ratatui::Frame<'_>, rect: Rect, message: Str
     );
 }
 
+fn render_box_hint_line(frame: &mut ratatui::Frame<'_>, rect: Rect, offset: u16, message: String) {
+    let y = rect.y.saturating_add(rect.height).saturating_add(offset);
+    if y >= frame.area().y.saturating_add(frame.area().height) {
+        return;
+    }
+
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            message,
+            Style::default().fg(Color::DarkGray),
+        )))
+        .alignment(Alignment::Center),
+        Rect::new(rect.x, y, rect.width, 1),
+    );
+}
+
 fn selection_action_line(index: usize, selected: usize, label: String) -> Line<'static> {
     let selected_row = index == selected;
     let marker_style = Style::default()
@@ -1498,6 +1815,10 @@ fn selection_option_with_value_line(
     selected: usize,
     label: String,
     enabled: bool,
+    enabled_key: &str,
+    disabled_key: &str,
+    enabled_fallback: &str,
+    disabled_fallback: &str,
 ) -> Line<'static> {
     let selected_row = index == selected;
     let marker_style = Style::default()
@@ -1517,9 +1838,9 @@ fn selection_option_with_value_line(
     };
     let key_style = Style::default().fg(Color::DarkGray);
     let status = if enabled {
-        text("settings.security.enabled", "Enabled")
+        text(enabled_key, enabled_fallback)
     } else {
-        text("settings.security.disabled", "Disabled")
+        text(disabled_key, disabled_fallback)
     };
     let status_style = Style::default()
         .fg(if enabled { Color::Green } else { Color::Red })
@@ -1625,13 +1946,90 @@ fn total_keybind_pages(total_items: usize, page_size: usize) -> usize {
     }
 }
 
+fn keybind_game_list_title(state: &SettingsState) -> Line<'static> {
+    let order_text = if state.keybind_sort_descending {
+        format!("\u{2191}{}", text("settings.mods.order.desc", "Descending"))
+    } else {
+        format!("\u{2193}{}", text("settings.mods.order.asc", "Ascending"))
+    };
+
+    Line::from(vec![
+        Span::raw(" "),
+        Span::styled(
+            text("settings.keybind.games_title", "Game Selection"),
+            Style::default().fg(Color::White),
+        ),
+        Span::styled(" *", Style::default().fg(Color::White)),
+        Span::styled(
+            keybind_game_sort_label(state.keybind_sort_mode),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ", Style::default().fg(Color::White)),
+        Span::styled("[", Style::default().fg(Color::White)),
+        Span::styled(order_text, Style::default().fg(Color::DarkGray)),
+        Span::styled("]", Style::default().fg(Color::White)),
+        Span::raw(" "),
+    ])
+}
+
+fn keybind_game_sort_label(mode: KeybindGameSortMode) -> String {
+    match mode {
+        KeybindGameSortMode::Source => text("game_selection.sort.source", "Official & Mods"),
+        KeybindGameSortMode::Name => text("game_selection.sort.name", "Name"),
+        KeybindGameSortMode::Author => text("game_selection.sort.author", "Author"),
+    }
+}
+
+fn keybind_game_list_line(game: &GameDescriptor, width: usize, style: Style) -> Line<'static> {
+    if width == 0 {
+        return Line::from("");
+    }
+
+    let name = game.display_name.clone();
+    if !game.is_mod_game() {
+        return Line::from(Span::styled(
+            truncate_with_ellipsis_plain(&name, width),
+            style,
+        ));
+    }
+
+    let badge = text("mods.badge", "MOD");
+    let badge_width = UnicodeWidthStr::width(badge.as_str());
+    if width <= badge_width + 1 {
+        return Line::from(Span::styled(
+            truncate_with_ellipsis_plain(&name, width),
+            style,
+        ));
+    }
+
+    let left_width = width - badge_width - 1;
+    let left = truncate_with_ellipsis_plain(&name, left_width);
+    let pad = width.saturating_sub(UnicodeWidthStr::width(left.as_str()) + badge_width);
+    let badge_fg = if matches!(style.bg, Some(Color::LightBlue)) {
+        Color::Black
+    } else {
+        Color::Yellow
+    };
+
+    Line::from(vec![
+        Span::styled(left, style),
+        Span::styled(" ".repeat(pad), style),
+        Span::styled(
+            badge,
+            Style::default()
+                .fg(badge_fg)
+                .bg(style.bg.unwrap_or(Color::Reset))
+                .add_modifier(Modifier::BOLD),
+        ),
+    ])
+}
+
 fn render_keybind_game_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &SettingsState) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(
-            "── {} ",
-            text("settings.keybind.games_title", "Game Selection")
-        ))
+        .title(keybind_game_list_title(state))
         .border_style(Style::default().fg(Color::White));
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -1668,7 +2066,6 @@ fn render_keybind_game_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &
         .take(page_size)
         .collect::<Vec<_>>();
 
-    let buffer = frame.buffer_mut();
     for (index, game) in page_games.iter().enumerate() {
         let y = rows[0].y + index as u16;
         if y >= rows[0].y + rows[0].height {
@@ -1677,6 +2074,7 @@ fn render_keybind_game_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &
         let selected = start + index == state.keybind_selected;
         let invalid = game_has_missing_keys(game);
         if selected {
+            let buffer = frame.buffer_mut();
             fill_buffer_row(
                 buffer,
                 rows[0].x,
@@ -1694,7 +2092,10 @@ fn render_keybind_game_list(frame: &mut ratatui::Frame<'_>, area: Rect, state: &
         } else {
             Style::default().fg(Color::White)
         };
-        buffer.set_stringn(rows[0].x, y, &game.display_name, rows[0].width as usize, style);
+        frame.render_widget(
+            Paragraph::new(keybind_game_list_line(game, rows[0].width as usize, style)),
+            Rect::new(rows[0].x, y, rows[0].width, 1),
+        );
     }
 
     let left = if page > 0 {
@@ -1755,21 +2156,14 @@ fn render_keybind_mapping_panel(
     area: Rect,
     state: &mut SettingsState,
 ) {
-    let selected_game = state.keybind_games.get(state.keybind_selected);
-    let title = if let Some(game) = selected_game {
-        format!(
-            "── {}: {} ",
-            text("settings.keybind.mapping_title", "Key Mapping"),
-            game.display_name
-        )
-    } else {
-        format!("── {} ", text("settings.keybind.mapping_title", "Key Mapping"))
-    };
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(title)
+        .title(keybind_mapping_title(state.keybind_games.get(state.keybind_selected)))
         .border_style(Style::default().fg(Color::White));
     let inner = block.inner(area);
+    let viewport_h = inner.height.saturating_sub(2) as usize;
+    sync_keybind_action_view(state, viewport_h);
+    let selected_game = state.keybind_games.get(state.keybind_selected);
     frame.render_widget(block, area);
 
     let Some(game) = selected_game else {
@@ -1819,8 +2213,6 @@ fn render_keybind_mapping_panel(
     );
 
     let actions = keybind_action_rows(game);
-    let viewport_h = inner.height.saturating_sub(2) as usize;
-    sync_keybind_action_view(state, viewport_h);
     let max_scroll = actions.len().saturating_sub(viewport_h);
     let scroll = state.keybind_action_scroll.min(max_scroll);
     let selected_row = state.keybind_action_selected.min(actions.len().saturating_sub(1));
@@ -1883,7 +2275,7 @@ fn render_keybind_mapping_panel(
             let formatted = if value.trim().is_empty() {
                 String::new()
             } else {
-                format_key_name(&value)
+                display_semantic_key(&value, game.case_sensitive)
             };
             render_key_slot(
                 frame.buffer_mut(),
@@ -1897,6 +2289,31 @@ fn render_keybind_mapping_panel(
         }
         let _ = binding_key;
     }
+}
+
+fn keybind_mapping_title(selected_game: Option<&GameDescriptor>) -> Line<'static> {
+    let mut spans = vec![Span::styled(
+        format!("── {}: ", text("settings.keybind.mapping_title", "Key Mapping")),
+        Style::default().fg(Color::White),
+    )];
+    if let Some(game) = selected_game {
+        spans.push(Span::styled(
+            game.display_name.clone(),
+            Style::default().fg(Color::White),
+        ));
+        if game.case_sensitive {
+            spans.push(Span::raw(" "));
+            spans.push(Span::styled(
+                text(
+                    "settings.keybind.case_sensitive_hint",
+                    "Letter keys are case-sensitive",
+                ),
+                Style::default().fg(Color::Yellow),
+            ));
+        }
+        spans.push(Span::raw(" "));
+    }
+    Line::from(spans)
 }
 
 fn localized_action_name(game: &GameDescriptor, binding: &crate::game::action::ActionBinding) -> String {
@@ -2002,11 +2419,20 @@ fn render_key_slot(
     let value_style = Style::default()
         .fg(row_style.fg.unwrap_or(Color::White))
         .bg(row_style.bg.unwrap_or(Color::Reset));
+    let value_width = UnicodeWidthStr::width(value);
+    let slot_width = if value.is_empty() {
+        2
+    } else {
+        value_width.saturating_add(4)
+    };
+    let slot_width = slot_width.min(width as usize) as u16;
+    let end_x = x + slot_width.saturating_sub(1);
+
     buffer.set_string(x, y, "[", bracket_style);
     if !value.is_empty() {
-        buffer.set_stringn(x + 2, y, value, width.saturating_sub(4) as usize, value_style);
+        let value_limit = slot_width.saturating_sub(3) as usize;
+        buffer.set_stringn(x + 2, y, value, value_limit, value_style);
     }
-    let end_x = x + width.saturating_sub(1).min(3 + value.len() as u16);
     buffer.set_string(end_x, y, "]", bracket_style);
 }
 
@@ -2021,31 +2447,82 @@ fn capture_key_name(key: KeyEvent) -> Option<String> {
     names
         .into_iter()
         .find(|name| !matches!(name.as_str(), "left_shift" | "right_shift"))
-        .map(normalize_bound_key_name)
 }
 
-fn normalize_bound_key_name(value: String) -> String {
+fn normalize_bound_key_name(value: String, case_sensitive: bool) -> String {
     match value.as_str() {
         "left_shift" | "right_shift" => "shift".to_string(),
+        _ if case_sensitive => value,
         _ => value.to_lowercase(),
     }
 }
 
-fn compact_key_slots(slots: Vec<String>) -> Vec<String> {
-    slots
-        .into_iter()
-        .filter(|slot| !slot.trim().is_empty())
-        .take(5)
-        .collect()
+fn key_names_conflict(left: &str, right: &str, case_sensitive: bool) -> bool {
+    if case_sensitive {
+        left == right
+    } else {
+        left.eq_ignore_ascii_case(right)
+    }
 }
 
-fn set_binding_slots(binding: &mut ActionBinding, slots: Vec<String>) {
-    let slots = compact_key_slots(slots);
+fn compact_key_slots(slots: Vec<String>, case_sensitive: bool) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for slot in slots.into_iter().filter(|slot| !slot.trim().is_empty()) {
+        if out
+            .iter()
+            .any(|existing| key_names_conflict(existing, &slot, case_sensitive))
+        {
+            continue;
+        }
+        out.push(slot);
+        if out.len() >= 5 {
+            break;
+        }
+    }
+    out
+}
+
+fn set_binding_slots(binding: &mut ActionBinding, slots: Vec<String>, case_sensitive: bool) {
+    let slots = compact_key_slots(slots, case_sensitive);
     binding.key = match slots.len() {
         0 => ActionKeys::Multiple(Vec::new()),
         1 => ActionKeys::Single(slots[0].clone()),
         _ => ActionKeys::Multiple(slots),
     };
+}
+
+fn apply_binding_slots_to_game(
+    game: &mut GameDescriptor,
+    binding_key: &str,
+    slots: Vec<String>,
+    remove_conflicts: bool,
+) {
+    let normalized_slots = compact_key_slots(slots, game.case_sensitive);
+    if remove_conflicts {
+        let conflict_keys = normalized_slots.clone();
+        for (other_key, other_binding) in &mut game.actions {
+            if other_key == binding_key {
+                continue;
+            }
+            let mut other_slots = other_binding.slots();
+            let mut changed = false;
+            for slot in &mut other_slots {
+                if conflict_keys
+                    .iter()
+                    .any(|key| key_names_conflict(slot, key, game.case_sensitive))
+                {
+                    slot.clear();
+                    changed = true;
+                }
+            }
+            if changed {
+                set_binding_slots(other_binding, other_slots, game.case_sensitive);
+            }
+        }
+    }
+    if let Some(binding) = game.actions.get_mut(binding_key) {
+        set_binding_slots(binding, normalized_slots, game.case_sensitive);
+    }
 }
 
 fn apply_keybind_to_selected_game(state: &mut SettingsState, slot_index: usize, key_name: String) {
@@ -2056,28 +2533,16 @@ fn apply_keybind_to_selected_game(state: &mut SettingsState, slot_index: usize, 
         return;
     };
 
-    for binding in game.actions.values_mut() {
-        let mut slots = binding.slots();
-        let mut changed = false;
-        for slot in &mut slots {
-            if slot.eq_ignore_ascii_case(&key_name) {
-                slot.clear();
-                changed = true;
-            }
-        }
-        if changed {
-            set_binding_slots(binding, slots);
-        }
+    let mut slots = game
+        .actions
+        .get(binding_key.as_str())
+        .map(ActionBinding::slots)
+        .unwrap_or_default();
+    while slots.len() <= slot_index {
+        slots.push(String::new());
     }
-
-    if let Some(binding) = game.actions.get_mut(binding_key.as_str()) {
-        let mut slots = binding.slots();
-        while slots.len() <= slot_index {
-            slots.push(String::new());
-        }
-        slots[slot_index] = key_name;
-        set_binding_slots(binding, slots);
-    }
+    slots[slot_index] = key_name;
+    apply_binding_slots_to_game(game, binding_key.as_str(), slots, true);
 
     persist_selected_game_keybindings(game);
 }
@@ -2093,7 +2558,7 @@ fn delete_keybind_slot(state: &mut SettingsState, slot_index: usize) {
         let mut slots = binding.slots();
         if slot_index < slots.len() {
             slots[slot_index].clear();
-            set_binding_slots(binding, slots);
+            set_binding_slots(binding, slots, game.case_sensitive);
             persist_selected_game_keybindings(game);
         }
     }
@@ -2107,7 +2572,7 @@ fn reset_selected_action_keybind(state: &mut SettingsState) {
         return;
     };
     if let Some(default_binding) = game.default_actions.get(binding_key.as_str()).cloned() {
-        game.actions.insert(binding_key, default_binding);
+        apply_binding_slots_to_game(game, binding_key.as_str(), default_binding.slots(), true);
         persist_selected_game_keybindings(game);
     }
 }
@@ -2168,38 +2633,20 @@ fn poll_keybind_capture(state: &mut SettingsState) -> bool {
         .find(|key_name| !matches!(key_name.as_str(), "left_shift" | "right_shift"))
     {
         let slot_index = state.keybind_capture.as_ref().map(|capture| capture.slot_index).unwrap_or(0);
-        apply_keybind_to_selected_game(state, slot_index, normalize_bound_key_name(key_name));
+        let case_sensitive = selected_keybind_game(state)
+            .map(|game| game.case_sensitive)
+            .unwrap_or(false);
+        apply_keybind_to_selected_game(
+            state,
+            slot_index,
+            normalize_bound_key_name(key_name, case_sensitive),
+        );
         state.keybind_capture = None;
         return true;
     }
     false
 }
 
-fn format_key_name(value: &str) -> String {
-    if value.is_empty() {
-        return String::new();
-    }
-    if value.len() == 1 {
-        return value.to_uppercase();
-    }
-
-    value
-        .split(['_', '-', ' '])
-        .filter(|part| !part.is_empty())
-        .map(|part| {
-            let mut chars = part.chars();
-            match chars.next() {
-                Some(first) => format!(
-                    "{}{}",
-                    first.to_uppercase(),
-                    chars.as_str().to_lowercase()
-                ),
-                None => String::new(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
 
 fn render_cleanup_dialog(frame: &mut ratatui::Frame<'_>, dialog: &CleanupDialog) {
     use ratatui::widgets::Clear;
@@ -2938,7 +3385,11 @@ fn render_mod_debug_prefix(
 
 fn render_enabled_tag(buffer: &mut Buffer, x: u16, y: u16, enabled: bool, selected: bool) {
     let bg = if selected { Color::DarkGray } else { Color::Reset };
-    let value = if enabled { "ON" } else { "OFF" };
+    let value = if enabled {
+        text("settings.mods.simple_enabled", "On")
+    } else {
+        text("settings.mods.simple_disabled", "Off")
+    };
     let value_style = Style::default()
         .fg(if enabled { Color::Green } else { Color::Red })
         .bg(bg)
@@ -2946,8 +3397,9 @@ fn render_enabled_tag(buffer: &mut Buffer, x: u16, y: u16, enabled: bool, select
     let bracket_style = Style::default().fg(Color::White).bg(bg);
 
     buffer.set_string(x, y, "[", bracket_style);
-    buffer.set_string(x + 1, y, value, value_style);
-    buffer.set_string(x + 1 + value.len() as u16, y, "]", bracket_style);
+    buffer.set_string(x + 1, y, &value, value_style);
+    let value_width = UnicodeWidthStr::width(value.as_str()) as u16;
+    buffer.set_string(x + 1 + value_width, y, "]", bracket_style);
 }
 
 fn render_mod_status_line(

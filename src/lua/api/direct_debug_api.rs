@@ -3,6 +3,7 @@
 use mlua::{Lua, Table, Value, Variadic};
 
 use crate::app::i18n;
+use crate::game::action::ActionBinding;
 use crate::lua::api::common;
 use crate::lua::engine::RuntimeBridges;
 use crate::utils::path_utils;
@@ -222,7 +223,10 @@ fn build_game_info(lua: &Lua, bridges: &RuntimeBridges) -> mlua::Result<Table> {
 
     let actions = lua.create_table()?;
     for (name, binding) in &bridges.game.actions {
-        actions.set(name.as_str(), build_action_binding_table(lua, binding)?)?;
+        actions.set(
+            name.as_str(),
+            build_action_binding_table(lua, binding, None)?,
+        )?;
     }
     table.set("actions", actions)?;
 
@@ -244,9 +248,10 @@ fn build_key_info_table(
         if requested_key.is_some_and(|key| key != semantic_key) {
             continue;
         }
+        let default_binding = bridges.game.default_actions.get(semantic_key);
         table.set(
             semantic_key.as_str(),
-            build_action_binding_table(lua, binding)?,
+            build_action_binding_table(lua, default_binding.unwrap_or(binding), Some(binding))?,
         )?;
     }
 
@@ -255,21 +260,28 @@ fn build_key_info_table(
 
 fn build_action_binding_table(
     lua: &Lua,
-    binding: &crate::game::action::ActionBinding,
+    binding: &ActionBinding,
+    user_binding: Option<&ActionBinding>,
 ) -> mlua::Result<Table> {
     let table = lua.create_table()?;
-    let keys = binding.keys();
+    set_key_value(lua, &table, "key", &binding.keys())?;
+    table.set("key_name", binding.key_name())?;
+    if let Some(user_binding) = user_binding {
+        set_key_value(lua, &table, "key_user", &user_binding.keys())?;
+    }
+    Ok(table)
+}
+
+fn set_key_value(lua: &Lua, table: &Table, field: &str, keys: &[String]) -> mlua::Result<()> {
     if keys.len() == 1 {
-        table.set("key", keys[0].clone())?;
+        table.set(field, keys[0].clone())
     } else {
         let arr = lua.create_table()?;
         for (idx, key) in keys.iter().enumerate() {
             arr.set(idx + 1, key.as_str())?;
         }
-        table.set("key", arr)?;
+        table.set(field, arr)
     }
-    table.set("key_name", binding.key_name())?;
-    Ok(table)
 }
 
 fn set_optional_string(table: &Table, key: &str, value: Option<&str>) -> mlua::Result<()> {

@@ -588,16 +588,16 @@ end
 > 4. `任意` 类型会被强制转换为 `string` 类型打印。
 > 5. 详细调试输出见『附录-[调试输出目录](#调试输出目录)』。
 
-| 函数名                           | 作用                      | 参数                                                                                                          | 返回值                                                        |
-| ----------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `debug_log(message)`          | 在日志文件中写入一条调试信息。         | `message` - <font color="#92cddc">任意</font>：要写入的信息。                                                         | <font color="#7f7f7f">无</font>                             |
-| `debug_warn(message)`         | 在日志文件中写入一条警告信息。         | `message` - <font color="#92cddc">任意</font>：要写入的警告信息。                                                       | <font color="#7f7f7f">无</font>                             |
-| `debug_error(message)`        | 在日志文件中写入一条异常信息。         | `message` - <font color="#92cddc">任意</font>：要写入的异常信息。                                                       | <font color="#7f7f7f">无</font>                             |
-| `debug_print(title, message)` | 在日志文件中写入一条带自定义标题的调试信息。  | `title` - <font color="#92cddc">string</font>：日志标题。 <br>`message` - <font color="#92cddc">任意</font>：要写入的信息。 | <font color="#7f7f7f">无</font>                             |
-| `clear_debug_log()`           | 清空游戏日志文件。               | <font color="#7f7f7f">无</font>                                                                              | <font color="#7f7f7f">无</font>                             |
-| `get_game_uid()`              | 获取当前模组包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `uid` - <font color="#92cddc">string</font>：模组包 UID。       |
-| `get_game_info()`             | 获取当前模组包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `info` - <font color="#92cddc">table</font>：模组包元信息表，结构见下文。 |
-| `get_key([key)`  | 获取自定义按键信息。          | `[key` - <font color="#92cddc">string</font>：可选，按键语义键，不填写时返回所有按键信息。                | `key_value` - <font color="#92cddc">table</font>：按键语言键对应的信息，结构见下文。 |
+| 函数名                           | 作用                      | 参数                                                                                                          | 返回值                                                                |
+| ----------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `debug_log(message)`          | 在日志文件中写入一条调试信息。         | `message` - <font color="#92cddc">任意</font>：要写入的信息。                                                         | <font color="#7f7f7f">无</font>                                     |
+| `debug_warn(message)`         | 在日志文件中写入一条警告信息。         | `message` - <font color="#92cddc">任意</font>：要写入的警告信息。                                                       | <font color="#7f7f7f">无</font>                                     |
+| `debug_error(message)`        | 在日志文件中写入一条异常信息。         | `message` - <font color="#92cddc">任意</font>：要写入的异常信息。                                                       | <font color="#7f7f7f">无</font>                                     |
+| `debug_print(title, message)` | 在日志文件中写入一条带自定义标题的调试信息。  | `title` - <font color="#92cddc">string</font>：日志标题。 <br>`message` - <font color="#92cddc">任意</font>：要写入的信息。 | <font color="#7f7f7f">无</font>                                     |
+| `clear_debug_log()`           | 清空游戏日志文件。               | <font color="#7f7f7f">无</font>                                                                              | <font color="#7f7f7f">无</font>                                     |
+| `get_game_uid()`              | 获取当前模组包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `uid` - <font color="#92cddc">string</font>：模组包 UID。               |
+| `get_game_info()`             | 获取当前模组包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `info` - <font color="#92cddc">table</font>：模组包元信息表，结构见下文。         |
+| `get_key([action)`            | 获取按键动作注册表信息。            | `[action` - <font color="#92cddc">string</font>：可选，动作，不填写时返回所有动作信息。                                         | `action_value` - <font color="#92cddc">table</font>：动作的按键信息，结构见下文。 |
 
 ### 日志输出格式
 
@@ -627,7 +627,7 @@ end
   min_width = int,                 -- 最小宽度（终端字符列数）
   min_height = int,                -- 最小高度（终端字符行数）
   write = boolean,                 -- 是否允许写入文件
-  case_sensitive = boolean         -- 按键是否区分大小写
+  case_sensitive = boolean,        -- 按键是否区分大小写
   actions = table,                 -- 按键动作注册表
   runtime = {
     target_fps = int               -- 目标帧率
@@ -635,19 +635,20 @@ end
 }
 ```
 
-### `key_value` 数据格式
+### `action_value` 数据格式
 
 ```lua
 {
-  key_value = {             -- 按键语义键
-    key = Array | string,   -- 物理按键
-    key_name = string,      -- 语义键含义
+  action = {                  -- 动作
+    key = Array | string,     -- 原始物理按键
+    key_name = string,        -- 动作含义
+    key_user = Array | string -- 用户自定义物理按键
   },
   ...
 }
 ```
 
-- 若无对应的按键语义键，`key_value` 为空表 `{}`。
+- 若无对应的按键语义键，`action_value` 为空表 `{}`。
 
 ---
 
@@ -989,17 +990,18 @@ end
 
 ### 宿主加载模组包异常
 
-| 适用函数                           | 触发条件                 | 抛出句式                                                                   | 类型                            |
-| ------------------------------ | -------------------- | ---------------------------------------------------------------------- |---|
+| 适用函数                           | 触发条件                   | 抛出句式                                                                   | 类型                            |
+| ------------------------------ | ---------------------- | ---------------------------------------------------------------------- | ----------------------------- |
 | <font color="#7f7f7f">无</font> | 宿主无法扫描模组包              | 无法扫描模组包：{err}                                                          | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 模组包目录名无效              | 模组包目录名“{mod_namespace}”不可用                                              | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | `package.json` 格式无效  | package.json 文件 JSON 格式无效：{path}                                       | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 模组包目录名无效               | 模组包目录名“{mod_namespace}”不可用                                             | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | `package.json` 格式无效    | package.json 文件 JSON 格式无效：{path}                                       | <font color="red">宿主异常</font> |
 | <font color="#7f7f7f">无</font> | 宿主读取 `package.json` 失败 | 读取 package.json 文件失败：{path}                                            | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | `game.json` 格式无效     | game.json 文件 JSON 格式无效：{path}                                          | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | `game.json` 格式无效       | game.json 文件 JSON 格式无效：{path}                                          | <font color="red">宿主异常</font> |
 | <font color="#7f7f7f">无</font> | 宿主读取 `game.json` 失败    | 读取 game.json 文件失败：{path}                                               | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 字段为空                 | {file} 文件 {key} 字段不能为空                                                 | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 字段类型错误               | {file} 文件 {key} 字段类型错误，应为 {type}，实际为 {actual_type}                     | <font color="red">宿主异常</font> |
-| <font color="#7f7f7f">无</font> | 脚本 API 版本不匹配宿主要求            | “{mod_namespce}”API 版本不符合宿主要求，应为 {api_version}，实际 {actual_api_version} | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 字段为空                   | {file} 文件 {key} 字段不能为空                                                 | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 字段类型错误                 | {file} 文件 {key} 字段类型错误，应为 {type}，实际为 {actual_type}                     | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 脚本 API 版本不匹配宿主要求       | “{mod_namespce}”API 版本不符合宿主要求，应为 {api_version}，实际 {actual_api_version} | <font color="red">宿主异常</font> |
+| <font color="#7f7f7f">无</font> | 按键动作注册表出现重复注册键         | 按键动作注册表出现重复注册键，冲突键: {keys}                                             | <font color="red">宿主异常</font> |
 
 ### 宿主运行游戏异常
 
@@ -1160,12 +1162,14 @@ end
 
 ### 宿主加载模组包警告
 
-| 适用函数                           | 触发条件                                  | 抛出句式                                                   | 类型                               |
-| ------------------------------ | ------------------------------------- | ------------------------------------------------------ | -------------------------------- |
-| <font color="#7f7f7f">无</font> | 目录中存在命名空间相同的模组包                       | 模组包命名空间“{mod_namespace}”全局不唯一                           | <font color="orange">宿主警告</font> |
-| <font color="#7f7f7f">无</font> | FPS 不符合宿主要求值                          | FPS 要求为 30/60/120，实际为 {actual_fps}，已退回 60              | <font color="orange">宿主警告</font> |
-| <font color="#7f7f7f">无</font> | `game.json` 中 `best_none` 字段为 `null`  | {mod_uid} 的 best_none 字段为 null，相关请求将被忽略                | <font color="orange">宿主警告</font> |
-| <font color="#7f7f7f">无</font> | `game.json` 中 `save` 字段为 `false` | {mod_uid} 的 save 字段为 false，相关请求将被忽略                    | <font color="orange">宿主警告</font> |
+| 适用函数                           | 触发条件                                 | 抛出句式                                                                 | 类型                               |
+| ------------------------------ | ------------------------------------ | -------------------------------------------------------------------- | -------------------------------- |
+| <font color="#7f7f7f">无</font> | 目录中存在命名空间相同的模组包                      | 模组包命名空间“{mod_namespace}”全局不唯一                                        | <font color="orange">宿主警告</font> |
+| <font color="#7f7f7f">无</font> | FPS 不符合宿主要求值                         | FPS 要求为 30/60/120，实际为 {actual_fps}，已退回 60                            | <font color="orange">宿主警告</font> |
+| <font color="#7f7f7f">无</font> | `game.json` 中 `best_none` 字段为 `null` | {mod_uid} 的 best_none 字段为 null，相关请求将被忽略                              | <font color="orange">宿主警告</font> |
+| <font color="#7f7f7f">无</font> | `game.json` 中 `save` 字段为 `false`     | {mod_uid} 的 save 字段为 false，相关请求将被忽略                                  | <font color="orange">宿主警告</font> |
+| <font color="#7f7f7f">无</font> | 按键动作注册表单语义绑定键数量超过 5 个上限              | 按键动作注册表动作 {action} 绑定键数量超过 5 个上限，当前数量为 {key_count}，超出部分将被忽略，仅前 5 个生效 | <font color="orange">宿主警告</font> |
+| <font color="#7f7f7f">无</font> | 按键动作注册表出现非显式绑定按键                     | 按键动作注册表动作出现非显式绑定按键 {key}，可能会导致语义映射失效                                 | <font color="orange">宿主警告</font> |
 
 ### 直用式 API 警告
 

@@ -17,5 +17,15 @@
   "game.2048.win_banner": "⚡ Beyond Machine Limits! ⚡",
   "game.2048.win_controls": "[R] Restart  [Q]/[ESC] Exit",
   "game.2048.runtime_ready": "Merge tiles to keep the board alive.",
-  "game.2048.runtime_resized": "Terminal size changed."
+  "game.2048.runtime_resized": "Terminal size changed.",
+  "game.2048.package_introduction": "Classic 2048 tile-merging game.",
+  "game.2048.action.move_left": "Move Left",
+  "game.2048.action.move_right": "Move Right",
+  "game.2048.action.move_up": "Move Up",
+  "game.2048.action.move_down": "Move Down",
+  "game.2048.action.save": "Save",
+  "game.2048.action.restart": "Restart",
+  "game.2048.action.quit": "Exit",
+  "game.2048.action.confirm_yes": "Confirm Yes",
+  "game.2048.action.confirm_no": "Confirm No"
 }

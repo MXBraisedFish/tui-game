@@ -4,6 +4,12 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::app::i18n;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KeyBindingMode {
+    User,
+    Original,
+}
+
 #[derive(Clone)]
 struct StyledChar {
     ch: char,
@@ -32,7 +38,20 @@ struct StyleState {
 /// - `{bg:<颜色>}` / `{bg:clear}` / `{bg:<颜色>><数量>}`：控制背景颜色。
 /// - `{ts:<样式>}` / `{ts:clear}` / `{ts:<样式>><数量>}`：控制文字样式。
 pub fn parse_rich_text_wrapped(text: &str, width: usize, base: Style) -> Vec<Line<'static>> {
+    parse_rich_text_wrapped_with_keys(text, width, base, |_, _| None)
+}
+
+pub fn parse_rich_text_wrapped_with_keys<F>(
+    text: &str,
+    width: usize,
+    base: Style,
+    key_resolver: F,
+) -> Vec<Line<'static>>
+where
+    F: Fn(&str, KeyBindingMode) -> Option<Vec<String>>,
+{
     let content = text.strip_prefix("f%").unwrap_or(text);
+    let content = replace_key_commands(content, &key_resolver);
 
     let mut state = StyleState {
         default_fg: base.fg,
@@ -116,6 +135,121 @@ pub fn parse_rich_text_wrapped(text: &str, width: usize, base: Style) -> Vec<Lin
     }
 
     styled_chars_to_lines(&out, width.max(1), base)
+}
+
+fn replace_key_commands<F>(content: &str, key_resolver: &F) -> String
+where
+    F: Fn(&str, KeyBindingMode) -> Option<Vec<String>>,
+{
+    let chars: Vec<char> = content.chars().collect();
+    let mut out = String::new();
+    let mut i = 0usize;
+
+    while i < chars.len() {
+        if chars[i] == '\\' {
+            if i + 1 < chars.len() {
+                out.push(chars[i]);
+                out.push(chars[i + 1]);
+                i += 2;
+            } else {
+                out.push(chars[i]);
+                i += 1;
+            }
+            continue;
+        }
+
+        if chars[i] == '{'
+            && let Some((block, consumed)) = read_block(&chars[i..])
+            && let Some(replacement) = replace_key_commands_in_block(&block, key_resolver)
+        {
+            out.push_str(&replacement);
+            i += consumed;
+            continue;
+        }
+
+        out.push(chars[i]);
+        i += 1;
+    }
+
+    out
+}
+
+fn replace_key_commands_in_block<F>(block: &str, key_resolver: &F) -> Option<String>
+where
+    F: Fn(&str, KeyBindingMode) -> Option<Vec<String>>,
+{
+    let mut style_commands = Vec::new();
+    let mut replacements = Vec::new();
+
+    for command in split_unescaped(block, '|') {
+        if command.trim().is_empty() {
+            style_commands.push(command);
+            continue;
+        }
+
+        if let Some(replacement) = resolve_key_command(&command, key_resolver) {
+            replacements.push(replacement);
+        } else {
+            style_commands.push(command);
+        }
+    }
+
+    if replacements.is_empty() {
+        return None;
+    }
+
+    let mut out = String::new();
+    if !style_commands.is_empty() {
+        out.push('{');
+        out.push_str(&style_commands.join("|"));
+        out.push('}');
+    }
+    out.push_str(&replacements.join(""));
+    Some(out)
+}
+
+fn resolve_key_command<F>(block: &str, key_resolver: &F) -> Option<String>
+where
+    F: Fn(&str, KeyBindingMode) -> Option<Vec<String>>,
+{
+    let pair = split_unescaped(block, ':');
+    if pair.len() != 2 || !pair[0].trim().eq_ignore_ascii_case("key") {
+        return None;
+    }
+
+    let params = split_unescaped(&pair[1], '>');
+    if params.is_empty() || params[0].trim().is_empty() || params.len() > 2 {
+        return None;
+    }
+
+    let mode = match params.get(1).map(|value| value.trim().to_ascii_lowercase()) {
+        None => KeyBindingMode::User,
+        Some(value) if value.is_empty() || value == "user" => KeyBindingMode::User,
+        Some(value) if value == "original" => KeyBindingMode::Original,
+        Some(_) => return None,
+    };
+
+    let keys = key_resolver(params[0].trim(), mode)?;
+    Some(format_key_list(&keys))
+}
+
+fn format_key_list(keys: &[String]) -> String {
+    keys.iter()
+        .filter(|key| !key.trim().is_empty())
+        .map(|key| format!("[{}]", escape_rich_replacement(key.trim())))
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn escape_rich_replacement(text: &str) -> String {
+    let mut out = String::new();
+    for ch in text.chars() {
+        if matches!(ch, '\\' | '{' | '}') {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
 }
 
 fn reset_to_default(state: &mut StyleState) {

@@ -18,5 +18,15 @@
   "game.2048.win_banner": "⚡ 超越机器极限！ ⚡",
   "game.2048.win_controls": "[R] 重新开始  [Q]/[ESC] 退出",
   "game.2048.runtime_ready": "合并方块并尽量坚持更久。",
-  "game.2048.runtime_resized": "终端尺寸已变化。"
+  "game.2048.runtime_resized": "终端尺寸已变化。",
+  "game.2048.package_introduction": "经典 2048 数字合成游戏。",
+  "game.2048.action.move_left": "左移",
+  "game.2048.action.move_right": "右移",
+  "game.2048.action.move_up": "上移",
+  "game.2048.action.move_down": "下移",
+  "game.2048.action.save": "保存",
+  "game.2048.action.restart": "重新开始",
+  "game.2048.action.quit": "退出",
+  "game.2048.action.confirm_yes": "确认是",
+  "game.2048.action.confirm_no": "确认否"
 }
