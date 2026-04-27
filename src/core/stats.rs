@@ -1,3 +1,8 @@
+/// 游戏最佳成绩存储管理
+/// 业务逻辑：
+/// 数据文件（best_scores.json）
+/// 读写操作
+
 use std::collections::{HashMap, HashSet};
 use std::fs;
 

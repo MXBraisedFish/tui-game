@@ -1,3 +1,8 @@
+/// 系统请求 API，游戏向宿主发送命令
+/// 业务逻辑：
+/// 查询函数
+/// 指令函数
+
 use std::time::Duration;
 
 use crossterm::event;

@@ -27,11 +27,19 @@ local function clear()
     canvas_clear()
 end
 
-local function random(n)
+local function random_index(n)
     if type(n) ~= "number" or n <= 0 then
         return 0
     end
-    return math.random(0, n - 1)
+    local max = math.floor(n) - 1
+    if max <= 0 then
+        return 0
+    end
+    local ok, value = pcall(_G.random, max)
+    if ok and type(value) == "number" then
+        return math.floor(value)
+    end
+    return 0
 end
 
 
@@ -143,6 +151,91 @@ local function text_width(text)
     return #text
 end
 
+local KEY_DISPLAY = {
+    up = "↑",
+    down = "↓",
+    left = "←",
+    right = "→",
+    enter = "Enter",
+    esc = "Esc",
+    space = "Space",
+    backspace = "Bksp",
+    del = "Del",
+    tab = "Tab",
+    back_tab = "BTab",
+}
+
+local function display_key_name(key)
+    key = tostring(key or "")
+    if key == "" then return "" end
+    local mapped = KEY_DISPLAY[key]
+    if mapped ~= nil then return mapped end
+    if #key == 1 then return string.upper(key) end
+    if string.sub(key, 1, 1) == "f" and tonumber(string.sub(key, 2)) ~= nil then
+        return string.upper(key)
+    end
+    return key
+end
+
+local function key_label(action)
+    if type(get_key) ~= "function" then
+        return "[]"
+    end
+    local ok, info = pcall(get_key, action)
+    if not ok or type(info) ~= "table" then
+        return "[]"
+    end
+    if info[action] ~= nil and type(info[action]) == "table" then
+        info = info[action]
+    end
+    local keys = info.key_user or info.key
+    if type(keys) ~= "table" then
+        keys = { keys }
+    end
+    local parts = {}
+    for i = 1, #keys do
+        local label = display_key_name(keys[i])
+        if label ~= "" then
+            parts[#parts + 1] = "[" .. label .. "]"
+        end
+    end
+    if #parts == 0 then
+        return "[]"
+    end
+    return table.concat(parts, "/")
+end
+
+local function replace_prompt_keys(text)
+    text = tostring(text or "")
+    text = string.gsub(text, "%[Y%]", key_label("confirm_yes"))
+    text = string.gsub(text, "%[N%]", key_label("confirm_no"))
+    text = string.gsub(text, "%[Q%]/%[ESC%]", key_label("quit_action"))
+    text = string.gsub(text, "%[ESC%]/%[Q%]", key_label("quit_action"))
+    text = string.gsub(text, "%[R%]", key_label("restart"))
+    return text
+end
+
+local function controls_text()
+    local items = {
+        key_label("move_up") .. "/" .. key_label("move_down") .. "/" .. key_label("move_left") .. "/" .. key_label("move_right") .. " " .. tr("game.minesweeper.action.move_up"),
+        key_label("reveal") .. " " .. tr("game.minesweeper.action.reveal"),
+        key_label("flag") .. " " .. tr("game.minesweeper.action.flag"),
+        key_label("question") .. " " .. tr("game.minesweeper.action.question"),
+        key_label("toggle_guide") .. " " .. tr("game.minesweeper.action.toggle_guide"),
+        key_label("config_input") .. " " .. tr("game.minesweeper.action.config_input"),
+        key_label("jump_input") .. " " .. tr("game.minesweeper.action.jump_input"),
+        key_label("save") .. " " .. tr("game.minesweeper.action.save"),
+        key_label("restart") .. " " .. tr("game.minesweeper.action.restart"),
+        key_label("quit_action") .. " " .. tr("game.minesweeper.action.quit")
+    }
+    return table.concat(items, "  ")
+end
+
+local function restart_quit_controls_text()
+    return key_label("restart") .. " " .. tr("game.minesweeper.action.restart")
+        .. "  " .. key_label("quit_action") .. " " .. tr("game.minesweeper.action.quit")
+end
+
 -- 数值限幅
 local function clamp(v, lo, hi)
     if v < lo then return lo end
@@ -175,29 +268,10 @@ end
 
 local function normalize_event_key(event)
     if type(event) ~= "table" then return "" end
-    if event.type == "quit" then return "esc" end
+    if event.type == "quit" then return "quit_action" end
     if event.type == "key" then return normalize_key(event.name) end
-    if event.type ~= "action" then return "" end
-    local map = {
-        move_up = "up",
-        move_down = "down",
-        move_left = "left",
-        move_right = "right",
-        reveal = "space",
-        flag = "z",
-        question = "x",
-        toggle_guide = "c",
-        config_input = "p",
-        jump_input = "d",
-        save = "s",
-        restart = "r",
-        quit_action = "q",
-        confirm_yes = "enter",
-        confirm_no = "esc",
-        remove_last_backspace = "backspace",
-        remove_last_delete = "delete"
-    }
-    return map[event.name] or normalize_key(event.name)
+    if event.type == "action" then return normalize_key(event.name) end
+    return ""
 end
 
 
@@ -334,17 +408,16 @@ end
 
 -- 加载最佳记录
 local function load_best_record()
-    if type(load_data) ~= "function" then
+    if type(get_best_score) ~= "function" then
         return {}
     end
-    local ok, data = pcall(load_data, "minesweeper_best")
+    local ok, data = pcall(get_best_score)
     if not ok or type(data) ~= "table" then
         return {}
     end
     local out = {}
     for d = MIN_DIFFICULTY, MAX_DIFFICULTY do
-        local k = tostring(d)
-        local value = tonumber(data[k])
+        local value = tonumber(data["d" .. tostring(d)] or data[tostring(d)] or data[d])
         if value ~= nil and value >= 0 then
             out[d] = math.floor(value)
         end
@@ -354,18 +427,8 @@ end
 
 -- 保存最佳记录
 local function save_best_record()
-    if type(save_data) ~= "function" then
-        return
-    end
-    local payload = {}
-    for d = MIN_DIFFICULTY, MAX_DIFFICULTY do
-        if state.best[d] ~= nil then
-            payload[tostring(d)] = state.best[d]
-        end
-    end
-    pcall(save_data, "minesweeper_best", payload)
-    if type(request_refresh_best_score) == "function" then
-        pcall(request_refresh_best_score)
+    if type(request_save_best_score) == "function" then
+        pcall(request_save_best_score)
     end
 end
 
@@ -430,18 +493,13 @@ end
 -- 保存游戏状态
 local function save_game_state(show_toast)
     local ok = false
-    local snapshot = make_snapshot()
-    if type(save_continue) == "function" then
-        local s, ret = pcall(save_continue, snapshot)
-        ok = s and ret ~= false
-    elseif type(save_data) == "function" then
-        local s, ret = pcall(save_data, "minesweeper", snapshot)
+    if type(request_save_game) == "function" then
+        local s, ret = pcall(request_save_game)
         ok = s and ret ~= false
     end
 
     if show_toast then
-        local key = ok and "game.2048.save_success" or "game.2048.save_unavailable"
-        local def = ok and "Save successful!" or "Save API unavailable."
+        local key = ok and "game.minesweeper.save_success" or "game.minesweeper.save_unavailable"
         state.toast_text = tr(key)
         state.toast_until = state.frame + 2 * FPS
         state.dirty = true
@@ -525,19 +583,8 @@ local function restore_snapshot(snapshot)
 end
 
 -- 加载游戏状态
-local function load_game_state()
-    local ok = false
-    local snapshot = nil
-    if type(load_continue) == "function" then
-        local s, ret = pcall(load_continue)
-        ok = s and ret ~= nil
-        snapshot = ret
-    elseif type(load_data) == "function" then
-        local s, ret = pcall(load_data, "minesweeper")
-        ok = s and ret ~= nil
-        snapshot = ret
-    end
-    if ok then
+local function load_game_state(snapshot)
+    if type(snapshot) == "table" then
         return restore_snapshot(snapshot)
     end
     return false
@@ -582,7 +629,7 @@ local function reset_official(difficulty)
 end
 
 -- 游戏初始化
-function init_game()
+local function runtime_init_game(saved_state)
     clear()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
@@ -594,8 +641,8 @@ function init_game()
     state.last_term_w, state.last_term_h = w, h
     state.best = load_best_record()
     state.launch_mode = read_launch_mode()
-    if state.launch_mode == "continue" then
-        if not load_game_state() then
+    if state.launch_mode == "continue" and type(saved_state) == "table" then
+        if not load_game_state(saved_state) then
             reset_official(1)
         end
     else
@@ -642,15 +689,15 @@ local function board_geometry()
     local mines_text = tr("game.minesweeper.mines_left") .. " -999"
     local status_w = text_width(time_text) + 2 + text_width("ovo") + 2 + text_width(mines_text)
     local message_w = math.max(
-        text_width(tr("game.2048.confirm_restart")),
-        text_width(tr("game.2048.confirm_exit")),
+        text_width(replace_prompt_keys(tr("game.minesweeper.confirm_restart"))),
+        text_width(replace_prompt_keys(tr("game.minesweeper.confirm_exit"))),
         text_width(tr("game.minesweeper.win_banner")),
         text_width(tr("game.minesweeper.lose_banner")),
         text_width(tr("game.minesweeper.input_config_hint")),
         text_width(tr("game.minesweeper.input_jump_hint"))
     )
 
-    local controls_text = tr("game.minesweeper.controls")
+    local controls_text = controls_text()
     local controls_w = min_width_for_lines(controls_text, 3, 26)
 
     local frame_w = math.max(grid_w, status_w, message_w, controls_w, text_width(best_line())) + 2
@@ -838,16 +885,16 @@ local function draw_status(x, y, frame_w)
         end
     elseif state.won then
         local line = tr("game.minesweeper.win_banner")
-            .. tr("game.minesweeper.win_controls")
+            .. restart_quit_controls_text()
         draw_text(x, y - 1, line, "yellow", "black")
     elseif state.lost then
         local line = tr("game.minesweeper.lose_banner")
-            .. tr("game.minesweeper.lose_controls")
+            .. restart_quit_controls_text()
         draw_text(x, y - 1, line, "red", "black")
     elseif state.confirm_mode == "restart" then
-        draw_text(x, y - 1, tr("game.2048.confirm_restart"), "yellow", "black")
+        draw_text(x, y - 1, replace_prompt_keys(tr("game.minesweeper.confirm_restart")), "yellow", "black")
     elseif state.confirm_mode == "exit" then
-        draw_text(x, y - 1, tr("game.2048.confirm_exit"), "yellow", "black")
+        draw_text(x, y - 1, replace_prompt_keys(tr("game.minesweeper.confirm_exit")), "yellow", "black")
     elseif state.toast_text ~= nil and state.frame <= state.toast_until then
         draw_text(x, y - 1, state.toast_text, "green", "black")
     end
@@ -855,7 +902,7 @@ end
 
 -- 绘制控制说明
 local function draw_controls(x, y, frame_h)
-    local text = tr("game.minesweeper.controls")
+    local text = controls_text()
     local term_w = terminal_size()
     local max_w = math.max(10, term_w - 2)
     local lines = wrap_words(text, max_w)
@@ -899,7 +946,7 @@ local function force_full_refresh()
 end
 
 -- 主渲染函数
-function render(state_arg)
+local function runtime_render(state_arg)
     state = state_arg
     local x, y, frame_w, frame_h = board_geometry()
     local area = { x = x, y = y - 3, w = frame_w, h = frame_h + 7 }
@@ -939,7 +986,7 @@ local function minimum_required_size()
     local frame_w = grid_w + 2
     local frame_h = grid_h + 2
 
-    local controls_text = tr("game.minesweeper.controls")
+    local controls_text = controls_text()
     local controls_w = min_width_for_lines(controls_text, 3, 26)
     local status_w = text_width(tr("game.minesweeper.time") .. " 00:00:00")
         + 2 + text_width("ovo")
@@ -947,10 +994,10 @@ local function minimum_required_size()
     local hint_w = math.max(
         text_width(tr("game.minesweeper.input_config_hint")),
         text_width(tr("game.minesweeper.input_jump_hint")),
-        text_width(tr("game.minesweeper.win_banner") .. tr("game.minesweeper.win_controls")),
-        text_width(tr("game.minesweeper.lose_banner") .. tr("game.minesweeper.lose_controls")),
-        text_width(tr("game.2048.confirm_restart")),
-        text_width(tr("game.2048.confirm_exit"))
+        text_width(tr("game.minesweeper.win_banner") .. restart_quit_controls_text()),
+        text_width(tr("game.minesweeper.lose_banner") .. restart_quit_controls_text()),
+        text_width(replace_prompt_keys(tr("game.minesweeper.confirm_restart"))),
+        text_width(replace_prompt_keys(tr("game.minesweeper.confirm_exit")))
     )
 
     local min_w = math.max(frame_w, controls_w, status_w, hint_w) + 2
@@ -1029,7 +1076,7 @@ local function place_mines(exclude_r, exclude_c)
 
     -- 随机打乱
     for i = #candidates, 2, -1 do
-        local j = random(i) + 1
+        local j = random_index(i) + 1
         candidates[i], candidates[j] = candidates[j], candidates[i]
     end
 
@@ -1241,14 +1288,14 @@ end
 
 -- 处理输入模式下的按键
 local function handle_input_mode_key(key)
-    if key == "esc" or key == "q" then
+    if key == "quit_action" or key == "esc" or key == "q" then
         state.input_mode = nil
         state.input_buffer = ""
         state.dirty = true
         return "changed"
     end
 
-    if key == "enter" then
+    if key == "confirm" or key == "enter" then
         if state.input_mode == "config" then
             local applied = handle_config_input()
             state.input_mode = nil
@@ -1272,7 +1319,7 @@ local function handle_input_mode_key(key)
         end
     end
 
-    if key == "backspace" then
+    if key == "remove_last" or key == "backspace" or key == "del" then
         if #state.input_buffer > 0 then
             state.input_buffer = string.sub(state.input_buffer, 1, #state.input_buffer - 1)
             state.dirty = true
@@ -1283,7 +1330,7 @@ local function handle_input_mode_key(key)
 
     if key:match("^%d$") or key == "space" then
         local token = key
-        if key == "space" then
+        if key == "reveal" or key == "space" then
             token = " "
         end
         if #state.input_buffer < 12 then
@@ -1297,7 +1344,7 @@ end
 
 -- 处理确认模式下的按键
 local function handle_confirm_key(key)
-    if key == "y" or key == "enter" then
+    if key == "confirm_yes" or key == "y" then
         if state.confirm_mode == "restart" then
             if state.difficulty >= 1 and state.difficulty <= 3 then
                 reset_official(state.difficulty)
@@ -1311,7 +1358,7 @@ local function handle_confirm_key(key)
         end
     end
 
-    if key == "q" or key == "esc" then
+    if key == "confirm_no" or key == "n" then
         state.confirm_mode = nil
         state.dirty = true
         return "changed"
@@ -1353,7 +1400,7 @@ local function handle_input(key)
 
     -- 胜利/失败状态
     if state.won or state.lost then
-        if key == "r" then
+        if key == "restart" or key == "r" then
             if state.difficulty >= 1 and state.difficulty <= 3 then
                 reset_official(state.difficulty)
             else
@@ -1361,58 +1408,58 @@ local function handle_input(key)
             end
             return "changed"
         end
-        if key == "q" or key == "esc" then
+        if key == "quit_action" or key == "q" or key == "esc" then
             return "exit"
         end
         return "none"
     end
 
     -- 功能键
-    if key == "r" then
+    if key == "restart" or key == "r" then
         state.confirm_mode = "restart"
         state.dirty = true
         return "changed"
     end
-    if key == "q" or key == "esc" then
+    if key == "quit_action" or key == "q" or key == "esc" then
         state.confirm_mode = "exit"
         state.dirty = true
         return "changed"
     end
-    if key == "s" then
+    if key == "save" or key == "s" then
         save_game_state(true)
         return "changed"
     end
-    if key == "p" then
+    if key == "config_input" or key == "p" then
         start_input_mode("config")
         return "changed"
     end
-    if key == "d" then
+    if key == "jump_input" or key == "d" then
         start_input_mode("jump")
         return "changed"
     end
-    if key == "c" then
+    if key == "toggle_guide" or key == "c" then
         state.guide_mode = not state.guide_mode
         state.dirty = true
         return "changed"
     end
 
     -- 光标移动
-    if key == "up" then
+    if key == "move_up" or key == "up" then
         state.cursor_r = clamp(state.cursor_r - 1, 1, state.rows)
         state.dirty = true
         return "changed"
     end
-    if key == "down" then
+    if key == "move_down" or key == "down" then
         state.cursor_r = clamp(state.cursor_r + 1, 1, state.rows)
         state.dirty = true
         return "changed"
     end
-    if key == "left" then
+    if key == "move_left" or key == "left" then
         state.cursor_c = clamp(state.cursor_c - 1, 1, state.cols)
         state.dirty = true
         return "changed"
     end
-    if key == "right" then
+    if key == "move_right" or key == "right" then
         state.cursor_c = clamp(state.cursor_c + 1, 1, state.cols)
         state.dirty = true
         return "changed"
@@ -1422,7 +1469,7 @@ local function handle_input(key)
     local c = state.cursor_c
 
     -- 空格翻开
-    if key == "space" then
+    if key == "reveal" or key == "space" then
         return open_current_cell()
     end
 
@@ -1432,7 +1479,7 @@ local function handle_input(key)
     end
 
     -- 旗子标记
-    if key == "z" then
+    if key == "flag" or key == "z" then
         if state.marks[r][c] == 1 then
             state.marks[r][c] = 0
         else
@@ -1445,7 +1492,7 @@ local function handle_input(key)
     end
 
     -- 问号标记
-    if key == "x" then
+    if key == "question" or key == "x" then
         if state.marks[r][c] == 2 then
             state.marks[r][c] = 0
         else
@@ -1489,7 +1536,7 @@ end
 
 -- 主游戏循环
 
-function handle_event(state_arg, event)
+local function runtime_handle_event(state_arg, event)
     state = state_arg
     state.frame = state.frame + 1
 
@@ -1511,7 +1558,7 @@ function handle_event(state_arg, event)
     end
 
     if not ensure_terminal_size_ok() then
-        if key == "q" or key == "esc" then
+        if key == "quit_action" or key == "q" or key == "esc" then
             request_exit()
         end
         return state
@@ -1528,7 +1575,7 @@ function handle_event(state_arg, event)
     return state
 end
 
-function best_score(state_arg)
+local function runtime_save_best_score(state_arg)
     state = state_arg
     local d1 = state.best[1]
     local d2 = state.best[2]
@@ -1547,3 +1594,29 @@ function best_score(state_arg)
         d3 = fmt(d3)
     }
 end
+
+
+local function runtime_save_game(state_arg)
+    state = state_arg or state
+    return make_snapshot()
+end
+
+local function runtime_exit_game(state_arg)
+    state = state_arg or state
+    if not state.won and not state.lost then
+        save_game_state(false)
+    end
+    return state
+end
+
+local Runtime = {
+    init_game = runtime_init_game,
+    handle_event = runtime_handle_event,
+    render = runtime_render,
+    exit_game = runtime_exit_game,
+    save_best_score = runtime_save_best_score,
+    save_game = runtime_save_game,
+}
+
+_G.MINESWEEPER_RUNTIME = Runtime
+return Runtime

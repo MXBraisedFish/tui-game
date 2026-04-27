@@ -1,3 +1,11 @@
+/// 统一管理应用程序所有文件与目录路径
+/// 业务逻辑：
+/// 运行时目录定位
+/// 应用数据目录
+/// 资源与脚本路径
+/// 官方游戏目录
+/// 持久化文件路径
+/// 工具函数
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -8,11 +16,12 @@ pub fn project_root() -> Result<PathBuf> {
 }
 
 pub fn runtime_dir() -> Result<PathBuf> {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            return Ok(parent.to_path_buf());
-        }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(parent) = exe.parent()
+    {
+        return Ok(parent.to_path_buf());
     }
+
     project_root()
 }
 

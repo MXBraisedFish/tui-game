@@ -1,3 +1,9 @@
+/// 应用程序内容缓存管理，负责扫描、加载和缓存游戏与 Mod 数据
+/// 包含业务：
+/// 启动时资源扫描
+/// 缓存访问
+/// Mod 文件树指纹
+
 use std::sync::RwLock;
 
 use once_cell::sync::Lazy;

@@ -1,3 +1,10 @@
+/// 游戏选择页面，展示游戏列表和详情，处理选择、排序、翻页和启动
+/// 包含业务：
+/// 游戏列表管理
+/// 详情面板
+/// 游戏启动
+/// Mod 热重载检测
+
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -233,11 +240,6 @@ impl GameSelection {
 
     /// Render the game selection page, including the list and detail panel.
     pub fn render(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {
-        if self.launch_placeholder {
-            self.render_launch_placeholder(frame, area);
-            return;
-        }
-
         let root_preview = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(0), Constraint::Length(1)])
@@ -706,30 +708,6 @@ impl GameSelection {
                 Rect::new(scroll_x, d_y.saturating_add(1), 1, 1),
             );
         }
-    }
-
-    fn render_launch_placeholder(&self, frame: &mut ratatui::Frame<'_>, area: Rect) {
-        let width = 32u16.min(area.width.saturating_sub(2));
-        let height = 5u16.min(area.height.saturating_sub(2));
-        let x = area.x + area.width.saturating_sub(width) / 2;
-        let y = area.y + area.height.saturating_sub(height) / 2;
-        let rect = Rect::new(x, y, width.max(1), height.max(1));
-
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_set(symbols::border::DOUBLE)
-            .border_style(Style::default().fg(Color::White));
-        let inner = block.inner(rect);
-        frame.render_widget(block, rect);
-
-        let msg = Paragraph::new(format!(
-            "{}\n{}",
-            i18n::t("game_selection.placeholder.title"),
-            i18n::t("game_selection.placeholder.back")
-        ))
-        .style(Style::default().fg(Color::White))
-        .alignment(Alignment::Center);
-        frame.render_widget(msg, inner);
     }
 
     fn selected_game(&self) -> Option<&GameDescriptor> {

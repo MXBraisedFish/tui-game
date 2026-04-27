@@ -1,3 +1,10 @@
+/// 游戏包资源访问与国际化文本解析
+/// 业务逻辑：
+/// 包文本解析
+/// 语言缓存
+/// 资源读取
+/// 路径安全
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};

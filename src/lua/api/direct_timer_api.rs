@@ -1,3 +1,11 @@
+/// 定时器 API，管理倒计时/计时器
+/// 业务逻辑：
+/// 系统时间
+/// 定时器管理
+/// 定时器信息
+/// 日期/时间工具
+/// 定时器自动完成
+
 use std::collections::BTreeMap;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 

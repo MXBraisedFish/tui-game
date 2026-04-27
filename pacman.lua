@@ -1,58 +1,67 @@
--- 甯х巼鎺у埗
+-- 吃豆人游戏元数据
+GAME_META = {
+    name = "Pac-Man",
+    description = "Collect pellets while avoiding roaming ghosts."
+}
+
+-- 帧率控制
 local FPS = 60
 local FRAME_MS = 16
-local PLAYER_STEP_FRAMES = 12   -- 鐜╁姣忔鎵€闇€甯ф暟
-local GHOST_SLOW_FACTOR = 2     -- 骞界伒閫熷害鍥犲瓙锛堣秺澶ц秺鎱級
-local MAX_LEVEL = 20            -- 鏈€澶у叧鍗℃暟
-local EXTRA_LIFE_SCORE = 100000 -- 棰濆鐢熷懡鎵€闇€鍒嗘暟
+local PLAYER_STEP_FRAMES = 12   -- 玩家每步所需帧数
+local GHOST_SLOW_FACTOR = 2     -- 幽灵速度因子（越大越慢）
+local MAX_LEVEL = 20            -- 最大关卡数
+local EXTRA_LIFE_SCORE = 100000 -- 额外生命所需分数
 
--- 鍦板浘鍏冪礌瀛楃
-local PELLET_CHAR = "路" -- 鏅€氳眴瀛?local POWER_CHAR = "*"  -- 鑳介噺璞?local DOOR_CHAR = "-"   -- 骞界伒鎴块棬
+-- 地图元素字符
+local PELLET_CHAR = "·" -- 普通豆子
+local POWER_CHAR = "*"  -- 能量豆
+local DOOR_CHAR = "-"   -- 幽灵房门
 
--- 鍦板浘妯℃澘锛圓SCII鑹烘湳锛?local MAP_TEMPLATE = {
-    "鈺斺晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺︹晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?,
-    "鈺懧仿仿仿仿仿仿仿仿封晳路路路路路路路路路鈺?,
-    "鈺懧封晹鈺愨晽路鈺斺晲鈺椔封晳路鈺斺晲鈺椔封晹鈺愨晽路鈺?,
-    "鈺?鈺?鈺懧封晳 鈺懧封晳路鈺?鈺懧封晳 鈺?鈺?,
-    "鈺懧封暁鈺愨暆路鈺氣晲鈺澛封晳路鈺氣晲鈺澛封暁鈺愨暆路鈺?,
-    "鈺懧仿仿仿仿仿仿仿仿仿仿仿仿仿仿仿仿仿仿封晳",
-    "鈺懧封晹鈺愨晽路鈺懧封晹鈺愨晲鈺愨晽路鈺懧封晹鈺愨晽路鈺?,
-    "鈺懧封暁鈺愨暆路鈺懧封暁鈺愨暒鈺愨暆路鈺懧封暁鈺愨暆路鈺?,
-    "鈺懧仿仿仿仿封晳路路路鈺懧仿仿封晳路路路路路鈺?,
-    "鈺氣晲鈺愨晲鈺椔封暊鈺愨晲 鈺?鈺愨晲鈺Ｂ封晹鈺愨晲鈺愨暆",
-    "    鈺懧封晳       鈺懧封晳    ",
-    "鈺愨晲鈺愨晲鈺澛封晳 鈺斺晲-鈺愨晽 鈺懧封暁鈺愨晲鈺愨晲",
-    "<    路  鈺?  鈺? 路    >",
-    "鈺愨晲鈺愨晲鈺椔封晳 鈺氣晲鈺愨晲鈺?鈺懧封晹鈺愨晲鈺愨晲",
-    "    鈺懧封晳       鈺懧封晳    ",
-    "    鈺懧封晳 鈺斺晲鈺愨晲鈺?鈺懧封晳    ",
-    "鈺斺晲鈺愨晲鈺澛封晳 鈺氣晲鈺︹晲鈺?鈺懧封暁鈺愨晲鈺愨晽",
-    "鈺懧仿仿仿仿仿仿仿仿封晳路路路路路路路路路鈺?,
-    "鈺懧封晲鈺愨晽路鈺愨晲鈺惵封晳路鈺愨晲鈺惵封晹鈺愨晲路鈺?,
-    "鈺?路路鈺懧仿仿仿仿仿仿仿仿仿仿封晳路路*鈺?,
-    "鈺犫晲鈺椔封晳路鈺懧封晹鈺愨晲鈺愨晽路鈺懧封晳路鈺斺晲鈺?,
-    "鈺犫晲鈺澛封晳路鈺懧封暁鈺愨暒鈺愨暆路鈺懧封晳路鈺氣晲鈺?,
-    "鈺懧仿仿仿仿封晳路路路鈺懧仿仿封晳路路路路路鈺?,
-    "鈺懧封晲鈺愨晲鈺愨暕鈺愨晲路鈺懧封晲鈺愨暕鈺愨晲鈺愨晲路鈺?,
-    "鈺懧仿仿仿仿仿仿仿仿仿仿仿仿仿仿仿仿仿仿封晳",
-    "鈺氣晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
+-- 地图模板（ASCII艺术）
+local MAP_TEMPLATE = {
+    "╔═════════╦═════════╗",
+    "║·········║·········║",
+    "║·╔═╗·╔═╗·║·╔═╗·╔═╗·║",
+    "║*║ ║·║ ║·║·║ ║·║ ║*║",
+    "║·╚═╝·╚═╝·║·╚═╝·╚═╝·║",
+    "║···················║",
+    "║·╔═╗·║·╔═══╗·║·╔═╗·║",
+    "║·╚═╝·║·╚═╦═╝·║·╚═╝·║",
+    "║·····║···║···║·····║",
+    "╚═══╗·╠══ ║ ══╣·╔═══╝",
+    "    ║·║       ║·║    ",
+    "════╝·║ ╔═-═╗ ║·╚════",
+    "<    ·  ║   ║  ·    >",
+    "════╗·║ ╚═══╝ ║·╔════",
+    "    ║·║       ║·║    ",
+    "    ║·║ ╔═══╗ ║·║    ",
+    "╔═══╝·║ ╚═╦═╝ ║·╚═══╗",
+    "║·········║·········║",
+    "║·══╗·═══·║·═══·╔══·║",
+    "║*··║···········║··*║",
+    "╠═╗·║·║·╔═══╗·║·║·╔═╣",
+    "╠═╝·║·║·╚═╦═╝·║·║·╚═╣",
+    "║·····║···║···║·····║",
+    "║·════╩══·║·══╩════·║",
+    "║···················║",
+    "╚═══════════════════╝"
 }
 
--- 澧欏瀛楃闆嗗悎
+-- 墙壁字符集合
 local WALL_SET = {
-    ["鈺?] = true,
-    ["鈺?] = true,
-    ["鈺?] = true,
-    ["鈺?] = true,
-    ["鈺?] = true,
-    ["鈺?] = true,
-    ["鈺?] = true,
-    ["鈺?] = true,
-    ["鈺?] = true,
-    ["鈺?] = true,
+    ["╔"] = true,
+    ["╗"] = true,
+    ["╚"] = true,
+    ["╝"] = true,
+    ["═"] = true,
+    ["║"] = true,
+    ["╦"] = true,
+    ["╩"] = true,
+    ["╠"] = true,
+    ["╣"] = true,
 }
 
--- 鏂瑰悜瀹氫箟
+-- 方向定义
 local DIRS = {
     { name = "up",    dr = -1, dc = 0 },
     { name = "left",  dr = 0,  dc = -1 },
@@ -60,7 +69,7 @@ local DIRS = {
     { name = "right", dr = 0,  dc = 1 },
 }
 
--- 姘存灉琛紙鎸夊叧鍗★級
+-- 水果表（按关卡）
 local FRUIT_TABLE = {
     { symbol = "%", points = 100,  key = "game.pacman.fruit.cherry",     fallback = "Cherry" },
     { symbol = "U", points = 300,  key = "game.pacman.fruit.strawberry", fallback = "Strawberry" },
@@ -68,50 +77,54 @@ local FRUIT_TABLE = {
     { symbol = "O", points = 500,  key = "game.pacman.fruit.orange",     fallback = "Orange" },
     { symbol = "Q", points = 700,  key = "game.pacman.fruit.apple",      fallback = "Apple" },
     { symbol = "Q", points = 700,  key = "game.pacman.fruit.apple",      fallback = "Apple" },
-    { symbol = "搂", points = 1000, key = "game.pacman.fruit.grape",      fallback = "Grape" },
-    { symbol = "搂", points = 1000, key = "game.pacman.fruit.grape",      fallback = "Grape" },
+    { symbol = "§", points = 1000, key = "game.pacman.fruit.grape",      fallback = "Grape" },
+    { symbol = "§", points = 1000, key = "game.pacman.fruit.grape",      fallback = "Grape" },
     { symbol = "W", points = 2000, key = "game.pacman.fruit.galaxian",   fallback = "Galaxian" },
     { symbol = "W", points = 2000, key = "game.pacman.fruit.galaxian",   fallback = "Galaxian" },
     { symbol = "?", points = 3000, key = "game.pacman.fruit.bell",       fallback = "Bell" },
     { symbol = "?", points = 3000, key = "game.pacman.fruit.bell",       fallback = "Bell" },
 }
 
--- 娓告垙鐘舵€佽〃
+-- 游戏状态表
 local state = {
-    -- 鍦板浘鏁版嵁
+    -- 地图数据
     rows = 0,
     cols = 0,
-    base_map = {},         -- 鍩虹鍦板浘锛堝澹併€侀棬绛夛級
-    pellets = {},          -- 璞嗗瓙鐘舵€?    total_pellets = 0,     -- 鎬昏眴瀛愭暟
-    remaining_pellets = 0, -- 鍓╀綑璞嗗瓙鏁?
-    -- 鐜╁
+    base_map = {},         -- 基础地图（墙壁、门等）
+    pellets = {},          -- 豆子状态
+    total_pellets = 0,     -- 总豆子数
+    remaining_pellets = 0, -- 剩余豆子数
+
+    -- 玩家
     player = { r = 1, c = 1, dir = "left", next_dir = "left", next_step_at = 0 },
     player_start = { r = 1, c = 1 },
 
-    -- 骞界伒
+    -- 幽灵
     ghosts = {},
     ghost_spawn = { r = 1, c = 1 },
-    global_pause_until = 0, -- 鍏ㄥ眬鏆傚仠鐩村埌璇ュ抚
+    global_pause_until = 0, -- 全局暂停直到该帧
 
-    -- 闅ч亾
+    -- 隧道
     tunnel_left = nil,
     tunnel_right = nil,
-    door_cells = {}, -- 骞界伒鎴块棬浣嶇疆
+    door_cells = {}, -- 幽灵房门位置
 
-    -- 姘存灉
+    -- 水果
     fruit = { active = false, spawned = false, r = 1, c = 1 },
 
-    -- 娓告垙杩涘害
+    -- 游戏进度
     level = 1,
     score = 0,
     best_score = 0,
     lives = 3,
     extra_life_granted = false,
 
-    -- 鑳介噺鐘舵€?    power_until = 0,
-    power_chain = 0,  -- 杩炵画鍚冨菇鐏佃鏁?    power_eaten = {}, -- 鍚勫菇鐏垫槸鍚﹀凡琚悆
+    -- 能量状态
+    power_until = 0,
+    power_chain = 0,  -- 连续吃幽灵计数
+    power_eaten = {}, -- 各幽灵是否已被吃
 
-    -- 娓告垙闃舵
+    -- 游戏阶段
     phase = "playing", -- playing/won/lost
     frame = 0,
     run_start_frame = 0,
@@ -120,17 +133,19 @@ local state = {
     stats_committed = false,
     confirm_mode = nil,
 
-    -- 鍊掕鏃?    countdown_until = 0,
+    -- 倒计时
+    countdown_until = 0,
     last_countdown_sec = nil,
 
-    -- 鎻愮ず淇℃伅
+    -- 提示信息
     info_message = "",
     info_color = "dark_gray",
     info_message_until = nil,
 
-    -- 鏀堕泦鐨勬按鏋滆褰?    collected_fruits = {},
+    -- 收集的水果记录
+    collected_fruits = {},
 
-    -- 娓叉煋鐩稿叧
+    -- 渲染相关
     dirty = true,
     last_area = nil,
     last_term_w = 0,
@@ -142,7 +157,7 @@ local state = {
     last_warn_min_h = 0,
 }
 
--- 缈昏瘧鍑芥暟锛堝畨鍏ㄨ皟鐢級
+-- 翻译函数（安全调用）
 local function tr(key)
     if type(translate) ~= "function" then
         return key
@@ -160,7 +175,8 @@ local function tr(key)
     return value
 end
 
--- 閼惧嘲褰囬弬鍥ㄦ拱閺勫墽銇氱€硅棄瀹?local function text_width(text)
+-- 获取文本显示宽度
+local function text_width(text)
     if type(get_text_width) == "function" then
         local ok, w = pcall(get_text_width, text)
         if ok and type(w) == "number" then return w end
@@ -168,33 +184,15 @@ end
     return #text
 end
 
--- 鐟欏嫯瀵栭崠鏍ㄥ瘻闁?
+-- 规范化按键
 local function normalize_key(key)
     if key == nil then return "" end
     if type(key) == "string" then return string.lower(key) end
-    if type(key) == "table" then
-        if key.type == "quit" then return "esc" end
-        if key.type == "key" and type(key.name) == "string" then
-            return string.lower(key.name)
-        end
-        if key.type == "action" and type(key.name) == "string" then
-            local map = {
-                move_up = "up",
-                move_down = "down",
-                move_left = "left",
-                move_right = "right",
-                restart = "r",
-                quit_action = "q",
-                confirm_yes = "enter",
-                confirm_no = "esc",
-            }
-            return map[key.name] or ""
-        end
-    end
     return tostring(key):lower()
 end
 
--- 閼惧嘲褰囩紒鍫㈩伂鐏忓搫顕?local function terminal_size()
+-- 获取终端尺寸
+local function terminal_size()
     local w, h = 120, 40
     if type(get_terminal_size) == "function" then
         local tw, th = get_terminal_size()
@@ -203,21 +201,7 @@ end
     return w, h
 end
 
-local function draw_text(x, y, text, fg, bg)
-    canvas_draw_text(math.max(0, x - 1), math.max(0, y - 1), text or "", fg, bg)
-end
-
-local function clear()
-    canvas_clear()
-end
-
-local function exit_game(reason)
-    if type(request_exit) == "function" then
-        pcall(request_exit)
-    end
-end
-
--- 閹稿宕熺拠宥嗗床鐞?
+-- 按单词换行
 local function wrap_words(text, max_width)
     if max_width <= 1 then return { text } end
     local lines, current, had = {}, "", false
@@ -240,7 +224,7 @@ local function wrap_words(text, max_width)
     return lines
 end
 
--- 鐠侊紕鐣婚張鈧亸蹇擃啍鎼?
+-- 计算最小宽度
 local function min_width_for_lines(text, max_lines, hard_min)
     local full = text_width(text)
     local width = hard_min
@@ -251,20 +235,21 @@ local function min_width_for_lines(text, max_lines, hard_min)
     return full
 end
 
--- 閺佹澘鈧ジ妾洪獮?
+-- 数值限幅
 local function clamp(v, lo, hi)
     if v < lo then return lo end
     if v > hi then return hi end
     return v
 end
 
--- 鐠侊紕鐣诲鑼剁箖缁夋帗鏆?local function elapsed_seconds()
+-- 计算已过秒数
+local function elapsed_seconds()
     local ending = state.end_frame
     if ending == nil then ending = state.frame end
     return math.floor((ending - state.run_start_frame) / FPS)
 end
 
--- 閺嶇厧绱￠崠鏍ㄥ瘮缂侇厽妞傞梻?
+-- 格式化持续时间
 local function format_duration(sec)
     local h = math.floor(sec / 3600)
     local m = math.floor((sec % 3600) / 60)
@@ -272,14 +257,14 @@ local function format_duration(sec)
     return string.format("%02d:%02d:%02d", h, m, s)
 end
 
--- 鐏忓棗鐡х粭锔胯鏉烆兛璐烾TF-8鐎涙顑侀弫鎵矋
+-- 将字符串转为UTF-8字符数组
 local function utf8_chars(str)
     local out = {}
     for _, code in utf8.codes(str) do out[#out + 1] = utf8.char(code) end
     return out
 end
 
--- 閸掓稑缂撶粚铏规閻晠妯€
+-- 创建空白矩阵
 local function blank_matrix(rows, cols, value)
     local m = {}
     for r = 1, rows do
@@ -289,7 +274,8 @@ local function blank_matrix(rows, cols, value)
     return m
 end
 
--- 鐟欙絾鐎介崷鏉挎禈濡剝婢?local function parse_map()
+-- 解析地图模板
+local function parse_map()
     local lines, max_cols = {}, 0
     for i = 1, #MAP_TEMPLATE do
         lines[i] = utf8_chars(MAP_TEMPLATE[i])
@@ -317,26 +303,27 @@ end
     end
 end
 
--- 鏉堝湱鏅Λ鈧弻?
+-- 边界检查
 local function in_bounds(r, c)
     return r >= 1 and r <= state.rows and c >= 1 and c <= state.cols
 end
 
--- 閺勵垰鎯佹稉鍝勵暰婢?
+-- 是否为墙壁
 local function is_wall(r, c)
     return (not in_bounds(r, c)) or WALL_SET[state.base_map[r][c]] == true
 end
 
--- 閺勵垰鎯佹稉鐑樺煣闂?
+-- 是否为房门
 local function is_door(r, c)
     return in_bounds(r, c) and state.base_map[r][c] == DOOR_CHAR
 end
 
--- 閺勵垰鎯侀崣顖濐攽鐠у府绱欓棃鐐差暰婢逛緤绱?local function is_walkable(r, c)
+-- 是否可行走（非墙壁）
+local function is_walkable(r, c)
     return in_bounds(r, c) and (not is_wall(r, c))
 end
 
--- 鎼存梻鏁ら梾褔浜炬导鐘烩偓?
+-- 应用隧道传送
 local function apply_tunnel(r, c)
     if state.tunnel_left and state.tunnel_right then
         if r == state.tunnel_left.r and c < 1 then
@@ -349,7 +336,7 @@ local function apply_tunnel(r, c)
     return r, c
 end
 
--- 閸掋倖鏌囬悳鈺侇啀閺勵垰鎯侀崣顖欎簰缁夎濮╅崚鐗堝瘹鐎规矮缍呯純?
+-- 判断玩家是否可以移动到指定位置
 local function can_move_player(r, c)
     r, c = apply_tunnel(r, c)
     if not in_bounds(r, c) or is_wall(r, c) or is_door(r, c) then
@@ -358,7 +345,7 @@ local function can_move_player(r, c)
     return true, r, c
 end
 
--- 閸掋倖鏌囬獮鐣屼紥閺勵垰鎯侀崣顖欎簰缁夎濮╅崚鐗堝瘹鐎规矮缍呯純?
+-- 判断幽灵是否可以移动到指定位置
 local function can_move_ghost(r, c)
     r, c = apply_tunnel(r, c)
     if not in_bounds(r, c) or is_wall(r, c) then
@@ -367,7 +354,7 @@ local function can_move_ghost(r, c)
     return true, r, c
 end
 
--- 閼惧嘲褰囬弬鐟版倻鐎电懓绨查惃鍕攽閸掓褰夐崠?
+-- 获取方向对应的行列变化
 local function direction_delta(dir)
     if dir == "up" then return -1, 0 end
     if dir == "down" then return 1, 0 end
@@ -375,14 +362,16 @@ local function direction_delta(dir)
     return 0, 1
 end
 
--- 閼惧嘲褰囬惄绋垮冀閺傜懓鎮?local function opposite_dir(dir)
+-- 获取相反方向
+local function opposite_dir(dir)
     if dir == "up" then return "down" end
     if dir == "down" then return "up" end
     if dir == "left" then return "right" end
     return "left"
 end
 
--- 缂佺喕顓哥挒鍡楃摍閹粯鏆?local function pellet_counts()
+-- 统计豆子总数
+local function pellet_counts()
     local total = 0
     for r = 1, state.rows do
         for c = 1, state.cols do
@@ -394,7 +383,7 @@ end
     return total
 end
 
--- 閼惧嘲褰囬懗浠嬪櫤閹镐胶鐢婚弮鍫曟？閿涘牏顫楅敍?
+-- 获取能量持续时间（秒）
 local function power_duration_sec(level)
     if level <= 1 then
         return 6
@@ -409,7 +398,7 @@ local function power_duration_sec(level)
     end
 end
 
--- 閼惧嘲褰囬獮鐣屼紥婢跺秵妞块弮鍫曟？閿涘牏顫楅敍?
+-- 获取幽灵复活时间（秒）
 local function ghost_revive_sec(level)
     if level >= 11 and level <= 16 then
         return 5
@@ -417,7 +406,7 @@ local function ghost_revive_sec(level)
     return 3
 end
 
--- 閼惧嘲褰囪ぐ鎾冲閸忓啿宕遍惃鍕寜閺?
+-- 获取当前关卡的水果
 local function fruit_for_level(level)
     if level >= 13 then
         return { symbol = "!", points = 5000, key = "game.pacman.fruit.key", fallback = "Key" }
@@ -425,7 +414,8 @@ local function fruit_for_level(level)
     return FRUIT_TABLE[level] or FRUIT_TABLE[#FRUIT_TABLE]
 end
 
--- 閼惧嘲褰囬弫锝呯殸/鏉╀粙鈧劖妞傞梻纾嬨€?local function scatter_schedule(level)
+-- 获取散射/追逐时间表
+local function scatter_schedule(level)
     if level >= 17 then
         return {
             { mode = "scatter", sec = 1 },
@@ -456,7 +446,7 @@ end
     }
 end
 
--- 閼惧嘲褰囪ぐ鎾冲鏉╀粙鈧劖膩瀵?
+-- 获取当前追逐模式
 local function current_chase_mode()
     local t = math.floor((state.frame - state.level_start_frame) / FPS)
     local schedule = scatter_schedule(state.level)
@@ -470,7 +460,7 @@ local function current_chase_mode()
     return "chase"
 end
 
--- 閼惧嘲褰囬獮鐣屼紥闁插﹥鏂佸鎯扮箿
+-- 获取幽灵释放延迟
 local function ghost_release_delays(level)
     if level <= 1 then
         return { blinky = 0, pinky = 2, inky = 4, clyde = 6 }
@@ -480,7 +470,7 @@ local function ghost_release_delays(level)
     return { blinky = 0, pinky = 1, inky = 2, clyde = 3 }
 end
 
--- 鐎电粯澹橀張鈧潻鎴犳畱閸欘垵顢戠挧棰佺秴缂?
+-- 寻找最近的可行走位置
 local function find_nearest_walkable(start_r, start_c)
     if is_walkable(start_r, start_c) and (not is_door(start_r, start_c)) then
         return start_r, start_c
@@ -508,7 +498,8 @@ local function find_nearest_walkable(start_r, start_c)
     return 2, 2
 end
 
--- 閺嬪嫬缂撻悳鈺侇啀閸欘垵鎻崠鍝勭厵閹衡晝鐖?local function build_player_reachable_mask()
+-- 构建玩家可达区域掩码
+local function build_player_reachable_mask()
     local reachable = blank_matrix(state.rows, state.cols, false)
     local sr, sc = state.player_start.r, state.player_start.c
     if not in_bounds(sr, sc) then return reachable end
@@ -532,7 +523,7 @@ end
     return reachable
 end
 
--- 閺嬪嫬缂撻獮鐣屼紥鐏炲灏崺鐔稿负閻?
+-- 构建幽灵屋区域掩码
 local function build_ghost_house_mask()
     local house = blank_matrix(state.rows, state.cols, false)
     local sr, sc = state.ghost_spawn.r, state.ghost_spawn.c
@@ -561,7 +552,7 @@ local function build_ghost_house_mask()
     return house
 end
 
--- 娴犲骸婀撮崶鎯у灥婵瀵查悳鈺侇啀閸滃苯鑿囬悘鍏哥秴缂?
+-- 从地图初始化玩家和幽灵位置
 local function init_positions_from_map()
     local center_r, center_c = math.floor(state.rows * 0.75), math.floor(state.cols / 2)
     local pr, pc = find_nearest_walkable(center_r, center_c)
@@ -578,7 +569,7 @@ local function init_positions_from_map()
     end
 end
 
--- 娑撳搫缍嬮崜宥呭彠閸楋繝娈㈤張鍝勫濮樺瓨鐏夋担宥囩枂
+-- 为当前关卡随机化水果位置
 local function randomize_fruit_spawn_for_level()
     local candidates = {}
     local reachable = build_player_reachable_mask()
@@ -610,28 +601,32 @@ local function randomize_fruit_spawn_for_level()
     state.fruit.r, state.fruit.c = pick.r, pick.c
 end
 
--- 閸旂姾娴囬張鈧担鍐插瀻閺?
-local function load_best_record()
+-- 加载最佳分数
+local function load_best_score()
     state.best_score = 0
-    if type(load_best_score) ~= "function" then return end
-    local ok, v = pcall(load_best_score)
+    if type(load_data) ~= "function" then return end
+    local ok, v = pcall(load_data, "pacman_best_score")
     if not ok then return end
-    if type(v) == "table" and type(v.score) == "number" then
-        state.best_score = math.floor(v.score)
-    elseif type(v) == "number" then
+    if type(v) == "number" then
         state.best_score = math.floor(v)
     elseif type(v) == "table" and type(v.value) == "number" then
         state.best_score = math.floor(v.value)
     end
 end
 
--- 閹绘劒姘﹀〒鍛婂灆缂佺喕顓?local function commit_stats_once()
+-- 保存最佳分数
+local function save_best_score()
+    if type(save_data) == "function" then
+        pcall(save_data, "pacman_best_score", { value = state.best_score })
+    end
+end
+
+-- 提交游戏统计
+local function commit_stats_once()
     if state.stats_committed then return end
     if state.score > state.best_score then
         state.best_score = state.score
-        if type(request_refresh_best_score) == "function" then
-            pcall(request_refresh_best_score)
-        end
+        save_best_score()
     end
     if type(update_game_stats) == "function" then
         pcall(update_game_stats, "pacman", state.score, elapsed_seconds())
@@ -639,7 +634,8 @@ end
     state.stats_committed = true
 end
 
--- 鐠佸墽鐤嗛幓鎰仛娣団剝浼?local function set_info_message(text, color, duration_sec)
+-- 设置提示信息
+local function set_info_message(text, color, duration_sec)
     state.info_message, state.info_color = text, (color or "dark_gray")
     if duration_sec ~= nil and duration_sec > 0 then
         state.info_message_until = state.frame + math.floor(duration_sec * FPS)
@@ -648,7 +644,7 @@ end
     end
 end
 
--- 瀵偓婵娲栭崥鍫濃偓鎺曨吀閺?
+-- 开始回合倒计时
 local function start_round_countdown(seconds)
     local sec = math.max(0, math.floor(seconds or 0))
     state.countdown_until = state.frame + sec * FPS
@@ -659,17 +655,16 @@ local function start_round_countdown(seconds)
     if type(clear_input_buffer) == "function" then
         pcall(clear_input_buffer)
     end
-    return state
 end
 
--- 閼惧嘲褰囬崜鈺€缍戦崐鎺曨吀閺冨墎顫楅弫?
+-- 获取剩余倒计时秒数
 local function countdown_seconds_left()
     if state.phase ~= "playing" then return 0 end
     if state.countdown_until <= state.frame then return 0 end
     return math.max(1, math.ceil((state.countdown_until - state.frame) / FPS))
 end
 
--- 閼惧嘲褰囪ぐ鎾冲濡亜绠欏☉鍫熶紖
+-- 获取当前横幅消息
 local function current_banner_message()
     if state.confirm_mode == "restart" then
         return tr("game.pacman.confirm_restart"), "yellow"
@@ -689,7 +684,7 @@ local function current_banner_message()
     return state.info_message, state.info_color or "dark_gray"
 end
 
--- 闁插秶鐤嗛懗浠嬪櫤閻樿埖鈧?
+-- 重置能量状态
 local function reset_power_cycle()
     state.power_until, state.power_chain, state.power_eaten = 0, 0, {}
     for i = 1, #state.ghosts do
@@ -699,7 +694,7 @@ local function reset_power_cycle()
     end
 end
 
--- 濠碘偓濞叉槒鍏橀柌蹇曞Ц閹?
+-- 激活能量状态
 local function activate_power_cycle()
     state.power_until = state.frame + power_duration_sec(state.level) * FPS
     state.power_chain, state.power_eaten = 0, {}
@@ -712,7 +707,7 @@ local function activate_power_cycle()
     end
 end
 
--- 婢х偛濮為崚鍡樻殶
+-- 增加分数
 local function add_score(delta)
     if delta <= 0 then return end
     state.score = state.score + delta
@@ -722,7 +717,7 @@ local function add_score(delta)
     end
 end
 
--- 閸掓稑缂撻獮鐣屼紥
+-- 创建幽灵
 local function create_ghost(id, color, home_r, home_c)
     return {
         id = id,
@@ -738,7 +733,7 @@ local function create_ghost(id, color, home_r, home_c)
     }
 end
 
--- 闁插秶鐤嗛悳鈺侇啀閼奉亜濮╅弬鐟版倻
+-- 重置玩家自动方向
 local function reset_player_auto_direction()
     local order = { "left", "up", "right", "down" }
     for i = 1, #order do
@@ -755,7 +750,7 @@ local function reset_player_auto_direction()
     state.player.next_dir = "left"
 end
 
--- 闁插秶鐤嗙€圭偘缍嬮崚鏉跨秼閸撳秴鍙ч崡?
+-- 重置实体到当前关卡
 local function reset_entities_for_level()
     state.player.r, state.player.c = state.player_start.r, state.player_start.c
     state.player.next_step_at = state.frame
@@ -784,7 +779,7 @@ local function reset_entities_for_level()
     state.fruit.active, state.fruit.spawned = false, false
 end
 
--- 瀵偓婵鏌婇崗鍐插幢
+-- 开始新关卡
 local function start_level(level)
     state.level, state.level_start_frame = level, state.frame
     parse_map()
@@ -798,7 +793,7 @@ local function start_level(level)
     state.dirty = true
 end
 
--- 瀵偓婵鏌婂〒鍛婂灆
+-- 开始新游戏
 local function start_new_run()
     state.score, state.lives, state.extra_life_granted = 0, 3, false
     state.phase, state.run_start_frame, state.end_frame = "playing", state.frame, nil
@@ -808,12 +803,12 @@ local function start_new_run()
     start_level(1)
 end
 
--- 濡偓閺屻儴鍏橀柌蹇旀Ц閸氾附绺哄ú?
+-- 检查能量是否激活
 local function is_power_active()
     return state.power_until > state.frame
 end
 
--- 閺囧瓨鏌婇懗浠嬪櫤閻樿埖鈧?
+-- 更新能量状态
 local function update_power_state()
     if state.power_until > 0 and state.frame >= state.power_until then
         reset_power_cycle()
@@ -821,7 +816,8 @@ local function update_power_state()
     end
 end
 
--- 闂団偓鐟曚焦妞傞悽鐔稿灇濮樺瓨鐏?local function spawn_fruit_if_needed()
+-- 需要时生成水果
+local function spawn_fruit_if_needed()
     if state.fruit.spawned then return end
     if state.remaining_pellets <= math.floor(state.total_pellets * 0.7) then
         state.fruit.spawned = true
@@ -830,7 +826,7 @@ end
     end
 end
 
--- 閸氬啯甯€瑜版挸澧犻弽鐓庣摍娑撳﹦娈戦悧鈺佹惂
+-- 吃掉当前格子上的物品
 local function consume_current_cell()
     local r, c = state.player.r, state.player.c
     local pellet = state.pellets[r][c]
@@ -862,9 +858,6 @@ local function consume_current_cell()
             state.phase = "won"
             state.end_frame = state.frame
             commit_stats_once()
-            if type(clear_input_buffer) == "function" then
-                pcall(clear_input_buffer)
-            end
             set_info_message(tr("game.pacman.win_banner") .. " " .. tr("game.pacman.result_controls"), "green")
             state.dirty = true
         else
@@ -874,17 +867,20 @@ local function consume_current_cell()
     end
 end
 
--- 鐏忔繆鐦粔璇插З閻溾晛顔?local function try_move_player()
+-- 尝试移动玩家
+local function try_move_player()
     if state.frame < state.player.next_step_at then return end
     state.player.next_step_at = state.frame + PLAYER_STEP_FRAMES
 
-    -- 鐏忔繆鐦潪顒€鎮?    local dr, dc = direction_delta(state.player.next_dir)
+    -- 尝试转向
+    local dr, dc = direction_delta(state.player.next_dir)
     local can_turn = can_move_player(state.player.r + dr, state.player.c + dc)
     if can_turn then
         state.player.dir = state.player.next_dir
     end
 
-    -- 瑜版挸澧犻弬鐟版倻缁夎濮?    local mdr, mdc = direction_delta(state.player.dir)
+    -- 当前方向移动
+    local mdr, mdc = direction_delta(state.player.dir)
     local can_move, nr, nc = can_move_player(state.player.r + mdr, state.player.c + mdc)
     if can_move then
         state.player.r, state.player.c = nr, nc
@@ -893,12 +889,12 @@ end
     end
 end
 
--- BFS 閸欘垵顢戠挧鏉垮灲閺?
+-- BFS 可行走判断
 local function walkable_for_bfs(r, c)
     return in_bounds(r, c) and (not is_wall(r, c))
 end
 
--- BFS 鐠烘繄顬囩拋锛勭暬
+-- BFS 距离计算
 local function bfs_distance(sr, sc, tr, tc)
     if sr == tr and sc == tc then return 0 end
     if not in_bounds(sr, sc) then return 9999 end
@@ -922,7 +918,7 @@ local function bfs_distance(sr, sc, tr, tc)
     return 9999
 end
 
--- 闁瀚ㄩ獮鐣屼紥閻ㄥ嫪绗呮稉鈧?
+-- 选择幽灵的下一步
 local function choose_step_towards(g, target_r, target_c)
     local candidates = {}
     for i = 1, #DIRS do
@@ -962,7 +958,7 @@ local function choose_step_towards(g, target_r, target_c)
     return best or candidates[random(#candidates) + 1]
 end
 
--- 妫板嫭绁撮悳鈺侇啀閺堫亝娼垫担宥囩枂
+-- 预测玩家未来位置
 local function projected_player_pos(steps)
     local r, c = state.player.r, state.player.c
     local dr, dc = direction_delta(state.player.dir)
@@ -974,13 +970,13 @@ local function projected_player_pos(steps)
     return r, c
 end
 
--- Blinky 閺勵垰鎯侀悪鍌涙瘹
+-- Blinky 是否狂暴
 local function blinky_enraged()
     if state.level < 5 then return false end
     return state.remaining_pellets <= math.max(20, math.floor(state.total_pellets * 0.15))
 end
 
--- 閼惧嘲褰囬獮鐣屼紥閻╊喗鐖ｆ担宥囩枂
+-- 获取幽灵目标位置
 local function ghost_target(g)
     if g.state == "eyes" then
         return state.ghost_spawn.r, state.ghost_spawn.c
@@ -1020,7 +1016,8 @@ local function ghost_target(g)
     end
 end
 
--- 楠炵晫浼掑銉ㄧ箻闂傛挳娈?local function ghost_step_interval(g)
+-- 幽灵步进间隔
+local function ghost_step_interval(g)
     if g.state == "eyes" then
         return math.max(1, math.floor(4 * GHOST_SLOW_FACTOR + 0.5))
     end
@@ -1034,7 +1031,7 @@ end
     return math.max(1, math.floor(base * GHOST_SLOW_FACTOR + 0.5))
 end
 
--- 楠炵晫浼掓潻娑樺弳楠炵晫浼掔仦?
+-- 幽灵进入幽灵屋
 local function ghost_enter_house(g)
     g.r, g.c = state.ghost_spawn.r, state.ghost_spawn.c
     g.state = "house"
@@ -1042,7 +1039,8 @@ local function ghost_enter_house(g)
     g.next_step_at = state.frame + FPS
 end
 
--- 閸氬啯甯€楠炵晫浼?local function eat_ghost(g)
+-- 吃掉幽灵
+local function eat_ghost(g)
     if g.state ~= "frightened" or state.power_eaten[g.id] then
         return false
     end
@@ -1058,7 +1056,7 @@ end
     return true
 end
 
--- 閻溾晛顔嶅璁抽閸氬酣鍣哥純?
+-- 玩家死亡后重置
 local function reset_after_player_death()
     state.player.r, state.player.c = state.player_start.r, state.player_start.c
     state.player.next_step_at = state.frame
@@ -1079,23 +1077,20 @@ local function reset_after_player_death()
     state.dirty = true
 end
 
--- 閻溾晛顔嶆径鍗炲箵娑撯偓閺夆€虫嚒
+-- 玩家失去一条命
 local function player_lost_life()
     state.lives = state.lives - 1
     if state.lives <= 0 then
         state.phase = "lost"
         state.end_frame = state.frame
         commit_stats_once()
-        if type(clear_input_buffer) == "function" then
-            pcall(clear_input_buffer)
-        end
         set_info_message(tr("game.pacman.lose_banner") .. " " .. tr("game.pacman.result_controls"), "red")
     else
         reset_after_player_death()
     end
 end
 
--- 濡偓閺屻儳甯虹€规湹绗岄獮鐣屼紥閻ㄥ嫮顫幘?
+-- 检查玩家与幽灵的碰撞
 local function check_collision_with_ghost(g)
     if state.player.r ~= g.r or state.player.c ~= g.c then return end
     if g.state == "eyes" or g.state == "house" then return end
@@ -1106,7 +1101,7 @@ local function check_collision_with_ghost(g)
     end
 end
 
--- 缁夎濮╅獮鐣屼紥
+-- 移动幽灵
 local function move_ghost(g)
     if g.state == "house" then
         if state.frame >= g.release_at and state.frame >= state.global_pause_until then
@@ -1131,7 +1126,7 @@ local function move_ghost(g)
     end
 end
 
--- 閺囧瓨鏌婇幍鈧張澶婅弴閻?
+-- 更新所有幽灵
 local function update_ghosts()
     if state.phase ~= "playing" then return end
 
@@ -1153,7 +1148,7 @@ local function update_ghosts()
     end
 end
 
--- 閺囧瓨鏌婇悳鈺侇啀閸滃瞼顫幘鐐搭梾濞?
+-- 更新玩家和碰撞检测
 local function update_player_and_collisions()
     if state.phase ~= "playing" or countdown_seconds_left() > 0 then return end
     try_move_player()
@@ -1163,19 +1158,19 @@ local function update_player_and_collisions()
     end
 end
 
--- 婢跺嫮鎮婄涵顔款吇濡€崇础娑撳娈戞潏鎾冲弳
+-- 处理确认模式下的输入
 local function handle_confirm_input(key)
     if state.confirm_mode == nil then return false end
-    if key == "y" or key == "enter" then
+    if key == "y" then
         if state.confirm_mode == "restart" then
             start_new_run()
         else
             commit_stats_once()
-            exit_game("confirm_exit_yes")
+            exit_game()
         end
         return true
     end
-    if key == "q" or key == "esc" then
+    if key == "n" or key == "q" or key == "esc" then
         state.confirm_mode = nil
         state.dirty = true
         return true
@@ -1183,7 +1178,7 @@ local function handle_confirm_input(key)
     return true
 end
 
--- 婢跺嫮鎮婂〒鍛婂灆娑擃厾娈戞潏鎾冲弳
+-- 处理游戏中的输入
 local function handle_playing_input(key)
     if handle_confirm_input(key) then return end
     if key == "up" or key == "down" or key == "left" or key == "right" then
@@ -1192,34 +1187,29 @@ local function handle_playing_input(key)
     end
     if key == "r" then
         state.confirm_mode = "restart"
-        if type(clear_input_buffer) == "function" then
-            pcall(clear_input_buffer)
-        end
         state.dirty = true
         return
     end
     if key == "q" or key == "esc" then
         state.confirm_mode = "exit"
-        if type(clear_input_buffer) == "function" then
-            pcall(clear_input_buffer)
-        end
         state.dirty = true
         return
     end
 end
 
--- 婢跺嫮鎮婂〒鍛婂灆缂佹挻娼崥搴ｆ畱鏉堟挸鍙?local function handle_result_input(key)
+-- 处理游戏结束后的输入
+local function handle_result_input(key)
     if key == "r" then
         start_new_run()
         return
     end
     if key == "q" or key == "esc" then
         commit_stats_once()
-        exit_game("result_input")
+        exit_game()
     end
 end
 
--- 閼惧嘲褰囬幐鍥х暰娴ｅ秶鐤嗛惃鍕弴閻?
+-- 获取指定位置的幽灵
 local function ghost_at(r, c)
     for i = 1, #state.ghosts do
         local g = state.ghosts[i]
@@ -1230,7 +1220,7 @@ local function ghost_at(r, c)
     return nil
 end
 
--- 閼惧嘲褰囬崡鏇炲帗閺嶅吋妯夌粈鍝勭摟缁楋箑鎷版０婊嗗
+-- 获取单元格显示字符和颜色
 local function cell_visual(r, c)
     if state.player.r == r and state.player.c == c then
         return "@", (is_power_active() and "light_cyan" or "light_yellow")
@@ -1275,21 +1265,22 @@ local function cell_visual(r, c)
     return ch, "white"
 end
 
--- 鐠侊紕鐣婚弬鍥ㄦ拱鐏炲懍鑵戞担宥囩枂
+-- 计算文本居中位置
 local function centered_x(text, area_x, area_w)
     local x = area_x + math.floor((area_w - text_width(text)) / 2)
     if x < area_x then x = area_x end
     return x
 end
 
--- 婵夘偄鍘栭惌鈺佽埌閸栧搫鐓?local function fill_rect(x, y, w, h)
+-- 填充矩形区域
+local function fill_rect(x, y, w, h)
     local line = string.rep(" ", w)
     for i = 0, h - 1 do
         draw_text(x, y + i, line, "white", "black")
     end
 end
 
--- 閼惧嘲褰囬弨鍫曟肠閻ㄥ嫭鎸夐弸婊咁儊閸欏嘲鐡х粭锔胯
+-- 获取收集的水果符号字符串
 local function collected_fruit_symbols()
     if #state.collected_fruits == 0 then
         return "-"
@@ -1297,7 +1288,7 @@ local function collected_fruit_symbols()
     return table.concat(state.collected_fruits, " ")
 end
 
--- 閺嬪嫬缂撻崣鍏呮櫠娣団剝浼呴崠鍝勭厵閻ㄥ嫬顔旀惔?
+-- 构建右侧信息区域的宽度
 local function build_info_width()
     local best_line = tr("game.pacman.best_score") .. ": " .. tostring(state.best_score)
     local score_line = tr("game.pacman.current_score") .. ": " .. tostring(state.score)
@@ -1320,7 +1311,7 @@ local function build_info_width()
     return max_w + 1
 end
 
--- 鐠侊紕鐣婚悾宀勬桨閸戠姳缍嶇敮鍐ㄧ湰
+-- 计算界面几何布局
 local function board_geometry()
     local term_w, term_h = terminal_size()
     local map_w, map_h = state.cols, state.rows
@@ -1380,7 +1371,7 @@ local function board_geometry()
     }
 end
 
--- 缂佹ê鍩楅崷鏉挎禈
+-- 绘制地图
 local function draw_map(layout)
     for r = 1, state.rows do
         for c = 1, state.cols do
@@ -1390,7 +1381,8 @@ local function draw_map(layout)
     end
 end
 
--- 缂佹ê鍩楅崣鍏呮櫠娣団剝浼?local function draw_info(layout)
+-- 绘制右侧信息
+local function draw_info(layout)
     fill_rect(layout.info_x, layout.info_y, layout.info_w, layout.map_h)
 
     local top_y = layout.info_y
@@ -1420,7 +1412,7 @@ end
     draw_text(layout.info_x, layout.info_fruits_y, collected_fruit_symbols(), "light_magenta", "black")
 end
 
--- 缂佹ê鍩楀☉鍫熶紖鐞?
+-- 绘制消息行
 local function draw_message(layout)
     local term_w, _ = terminal_size()
     draw_text(1, layout.message_y, string.rep(" ", term_w), "white", "black")
@@ -1431,7 +1423,7 @@ local function draw_message(layout)
     end
 end
 
--- 缂佹ê鍩楅幒褍鍩楃拠瀛樻
+-- 绘制控制说明
 local function draw_controls(layout)
     local controls = tr("game.pacman.controls")
     local term_w, _ = terminal_size()
@@ -1452,7 +1444,8 @@ local function draw_controls(layout)
     end
 end
 
--- 濞撳懘娅庢稉濠冾偧濞撳弶鐓嬮惃鍕隘閸╃噦绱欐俊鍌涚亯闂団偓鐟曚緤绱?local function clear_last_area_if_needed(layout)
+-- 清除上次渲染的区域（如果需要）
+local function clear_last_area_if_needed(layout)
     local area = { x = layout.x, y = layout.y, w = layout.total_w, h = layout.total_h }
     if state.last_area == nil then
         fill_rect(area.x, area.y, area.w, area.h)
@@ -1463,8 +1456,8 @@ end
     state.last_area = area
 end
 
--- 娑撶粯瑕嗛弻鎾冲毐閺?
-local function render_scene()
+-- 主渲染函数
+local function render()
     local layout = board_geometry()
     clear_last_area_if_needed(layout)
     draw_map(layout)
@@ -1473,7 +1466,7 @@ local function render_scene()
     draw_controls(layout)
 end
 
--- 鐠侊紕鐣婚張鈧亸蹇斿闂団偓缂佸牏顏亸鍝勵嚟
+-- 计算最小所需终端尺寸
 local function minimum_required_size()
     local map_w, map_h = state.cols, state.rows
     local info_w = build_info_width()
@@ -1492,7 +1485,8 @@ local function minimum_required_size()
     return min_w, min_h
 end
 
--- 缂佹ê鍩楃紒鍫㈩伂鐏忓搫顕拃锕€鎲?local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
+-- 绘制终端尺寸警告
+local function draw_terminal_size_warning(term_w, term_h, min_w, min_h)
     clear()
     local lines = {
         tr("warning.size_title"),
@@ -1510,7 +1504,7 @@ end
     end
 end
 
--- 绾喕绻氱紒鍫㈩伂鐏忓搫顕搾鍐差檮
+-- 确保终端尺寸足够
 local function ensure_terminal_size_ok()
     local term_w, term_h = terminal_size()
     local min_w, min_h = minimum_required_size()
@@ -1538,7 +1532,7 @@ local function ensure_terminal_size_ok()
     return false
 end
 
--- 閸氬本顒炵紒鍫㈩伂鐏忓搫顕崣妯哄
+-- 同步终端尺寸变化
 local function sync_resize()
     local w, h = terminal_size()
     if w ~= state.last_term_w or h ~= state.last_term_h then
@@ -1549,22 +1543,22 @@ local function sync_resize()
     end
 end
 
--- 濞撳憡鍨欓崚婵嗩潗閸?
-function init_game()
+-- 游戏初始化
+local function init_game()
     local w, h = terminal_size()
     state.last_term_w, state.last_term_h = w, h
     clear()
-    load_best_record()
+    load_best_score()
     parse_map()
     init_positions_from_map()
     start_new_run()
     if type(clear_input_buffer) == "function" then
         pcall(clear_input_buffer)
     end
-    return state
 end
 
--- 閺囧瓨鏌婂〒鍛婂灆闁槒绶?local function update_logic(key)
+-- 更新游戏逻辑
+local function update_logic(key)
     if state.phase == "playing" then
         handle_playing_input(key)
     else
@@ -1597,53 +1591,28 @@ end
     update_ghosts()
 end
 
--- 娑撶粯鐖堕幋蹇撴儕閻?
-function handle_event(state_arg, event)
-    state = state_arg or state
-
-    if event ~= nil and event.type == "resize" then
-        state.last_term_w = event.width or state.last_term_w
-        state.last_term_h = event.height or state.last_term_h
-        clear()
-        state.last_area = nil
-        state.dirty = true
-        return state
-    end
-
-    local key = normalize_key(event)
-    if event ~= nil and event.type == "tick" then
-        key = ""
-    end
-
-    if ensure_terminal_size_ok() then
-        update_logic(key)
-        sync_resize()
-        state.frame = state.frame + 1
-    else
-        if key == "q" or key == "esc" then
-            commit_stats_once()
-            exit_game("size_warning")
+-- 主游戏循环
+local function game_loop()
+    while true do
+        local key = normalize_key(get_key(false))
+        if ensure_terminal_size_ok() then
+            update_logic(key)
+            sync_resize()
+            if state.dirty then
+                render()
+                state.dirty = false
+            end
+            state.frame = state.frame + 1
+        else
+            if key == "q" or key == "esc" then
+                commit_stats_once()
+                exit_game()
+            end
         end
-    end
-
-    return state
-end
-
-function render(state_arg)
-    state = state_arg or state
-    if ensure_terminal_size_ok() then
-        render_scene()
-        state.dirty = false
+        sleep(FRAME_MS)
     end
 end
 
-function best_score(state_arg)
-    state = state_arg or state
-    return {
-        best_string = "game.pacman.best_block",
-        score = state.best_score,
-        level = state.level,
-    }
-end
-
-
+-- 启动游戏
+init_game()
+game_loop()

@@ -1,3 +1,9 @@
+/// 表格工具 API，Lua 表与多种格式互转
+/// 业务逻辑：
+/// 序列化
+/// 深拷贝
+/// 内部转换
+
 use csv::WriterBuilder;
 use mlua::{Lua, Table, Value, Variadic};
 use serde_json::{Map, Number, Value as JsonValue};

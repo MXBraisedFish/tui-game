@@ -1,7 +1,7 @@
 target*/
 test.py
-sort_json_keys.py
-print.py
-word.py
 sort.py
+print.py
+use.py
+word.py
 compare.py

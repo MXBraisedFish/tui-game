@@ -1,3 +1,12 @@
+/// 全局键盘输入管理，融合 crossterm 终端事件与 rdev 全局热键监听
+/// 业务逻辑：
+/// 双源键盘输入
+/// 事件去重与延迟
+/// Shift 键长按检测
+/// 语义键映射
+/// 显式语义键集合
+/// 显示转换
+
 use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::thread;

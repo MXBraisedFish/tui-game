@@ -1,3 +1,7 @@
+/// 模块加载 API，加载包内 scripts/function/ 目录下的 Lua 辅助脚本
+/// 业务逻辑：
+/// 加载指定路径的 Lua 文件，执行后必须返回 table
+
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Component, PathBuf};

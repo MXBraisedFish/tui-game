@@ -1,3 +1,5 @@
+/// 定义游戏与包的清单文件数据结构（对应 JSON schema）
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};

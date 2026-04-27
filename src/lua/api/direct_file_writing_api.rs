@@ -1,3 +1,9 @@
+/// 文件写入 API，受安全模式控制
+/// 业务逻辑：
+/// 写入函数
+/// 权限控制
+/// 安全限制
+
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Component, PathBuf};

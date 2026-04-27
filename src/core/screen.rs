@@ -1,3 +1,5 @@
+/// 虚拟画布，供游戏逻辑绘制像素/文本
+
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub const ALIGN_NO_WRAP: i64 = 0;

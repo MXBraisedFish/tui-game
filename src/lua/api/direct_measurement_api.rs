@@ -1,3 +1,8 @@
+/// 测量 API，计算文本尺寸和终端尺寸
+/// 业务逻辑：
+/// 测量函数
+/// 终端尺寸
+
 use crossterm::terminal;
 use mlua::{Lua, Value, Variadic};
 

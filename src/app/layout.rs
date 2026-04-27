@@ -1,3 +1,9 @@
+/// 主菜单页面布局计算
+/// 业务逻辑：
+/// 定义主菜单最小尺寸常量
+/// 计算 Logo 区、菜单列表区、版本信息区的矩形位置
+/// 通用居中矩形计算工具函数
+
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub const MENU_MIN_WIDTH: u16 = 60;

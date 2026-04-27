@@ -1,4 +1,10 @@
-﻿use std::fs;
+﻿/// 调试 API，提供日志输出和游戏信息查询
+/// 业务逻辑：
+/// 日志函数
+/// 游戏信息查询
+/// 辅助功能
+
+use std::fs;
 
 use mlua::{Lua, Table, Value, Variadic};
 

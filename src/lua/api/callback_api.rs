@@ -1,3 +1,14 @@
+/// 游戏生命周期回调 API，管理 Lua 与 Rust 之间的状态传递
+/// 业务逻辑：
+/// 回调验证
+/// 状态初始化
+/// 事件处理
+/// 渲染
+/// 退出
+/// 成绩持久化
+/// 存档持久化
+/// 数据转换
+
 use anyhow::{Result, anyhow};
 use mlua::{Function, Lua, RegistryKey, Table, Value};
 use serde_json::{Map, Number, Value as JsonValue};

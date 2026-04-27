@@ -1,3 +1,9 @@
+/// 绘图 API，向虚拟画布绘制文本和图形
+/// 业务逻辑：
+/// 全局常量
+/// 绘图函数
+/// 参数校验
+
 use mlua::{Lua, Table, Value, Variadic};
 use unicode_width::UnicodeWidthStr;
 

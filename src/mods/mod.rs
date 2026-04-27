@@ -1,15 +1,33 @@
-use std::collections::{BTreeMap, HashMap};
+/// Mod 系统的完整实现（单文件模块），负责 Mod 包的扫描、验证、状态管理、资源加载和图像渲染
+/// 业务逻辑：
+/// Mod 扫描
+/// Mod 状态管理
+/// 全局状态
+/// 操作接口
+/// 图像处理
+/// 支持三种图像源
+/// 图像规格
+/// 缓存机制
+/// 彩色输出
+/// 文本国际化
+/// 结构化验证
+/// 辅助功能
+
+pub mod types;
+pub use types::*;
+pub mod state;
+pub use state::*;
+
+use std::collections::{BTreeMap};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
-use std::sync::{LazyLock, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{UNIX_EPOCH};
 
 use anyhow::{Context, Result, anyhow};
 use image::GenericImageView;
 use ratatui::style::{Color, Style};
 use ratatui::text::Line;
-use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use unicode_width::UnicodeWidthChar;
 
@@ -17,8 +35,6 @@ use crate::app::i18n;
 use crate::app::rich_text;
 use crate::game::package::{GamePackageSource, load_package};
 use crate::utils::path_utils;
-
-pub const MOD_API_VERSION: u32 = 1;
 
 const DEFAULT_PACKAGE_DESCRIPTION: &str = "No package description available.";
 const DEFAULT_GAME_DESCRIPTION: &str = "No description available.";
@@ -43,217 +59,6 @@ const DEFAULT_BANNER_ASCII: [&str; 7] = [
     ".JML. `'  .JMML. `\"bmmd\"' .JMMmmmdP'   ",
 ];
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ModImage {
-    pub lines: Vec<String>,
-    #[serde(skip, default)]
-    pub rendered_lines: Vec<Line<'static>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ModGameMeta {
-    pub game_id: String,
-    pub script_name: String,
-    pub script_path: PathBuf,
-    pub name: String,
-    pub description: String,
-    pub detail: String,
-    pub introduction: String,
-    pub best_none: Option<String>,
-    pub save: bool,
-    pub write: bool,
-    pub min_width: Option<u16>,
-    pub min_height: Option<u16>,
-    pub max_width: Option<u16>,
-    pub max_height: Option<u16>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ModSafeModeState {
-    Enabled,
-    DisabledSession,
-    DisabledTrusted,
-}
-
-#[derive(Clone, Debug)]
-pub struct ModPackage {
-    pub namespace: String,
-    pub enabled: bool,
-    pub debug_enabled: bool,
-    pub safe_mode_enabled: bool,
-    pub safe_mode_state: ModSafeModeState,
-    pub package_name: String,
-    pub package_name_allows_rich: bool,
-    pub author: String,
-    pub version: String,
-    pub introduction: String,
-    pub description: String,
-    pub has_best_score_storage: bool,
-    pub has_save_storage: bool,
-    pub has_write_request: bool,
-    pub thumbnail: ModImage,
-    pub banner: ModImage,
-    pub games: Vec<ModGameMeta>,
-    pub errors: Vec<ModScanError>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ModScanOutput {
-    pub packages: Vec<ModPackage>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ModState {
-    pub api_version: u32,
-    #[serde(default = "default_true")]
-    pub default_mod_enabled: bool,
-    #[serde(default = "default_true")]
-    pub default_safe_mode_enabled: bool,
-    #[serde(default)]
-    pub mods: HashMap<String, ModStateEntry>,
-    #[serde(default)]
-    pub scan_errors: Vec<ModScanError>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ModStateEntry {
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub debug_enabled: bool,
-    #[serde(default = "default_true")]
-    pub safe_mode_enabled: bool,
-    #[serde(skip)]
-    pub session_safe_mode_enabled: Option<bool>,
-    #[serde(default)]
-    pub package_name: String,
-    #[serde(default)]
-    pub author: String,
-    #[serde(default)]
-    pub version: String,
-    #[serde(default)]
-    pub games: HashMap<String, ModGameState>,
-}
-
-impl Default for ModStateEntry {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            debug_enabled: false,
-            safe_mode_enabled: true,
-            session_safe_mode_enabled: None,
-            package_name: String::new(),
-            author: String::new(),
-            version: String::new(),
-            games: HashMap::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ModGameState {
-    #[serde(default)]
-    pub script_name: String,
-    #[serde(default)]
-    pub best_score: JsonValue,
-    #[serde(default)]
-    pub keybindings: HashMap<String, Vec<String>>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ModScanError {
-    pub namespace: String,
-    pub scope: String,
-    pub target: String,
-    pub severity: String,
-    pub message: String,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ModScanCache {
-    #[serde(default)]
-    pub packages: HashMap<String, CachedPackage>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct CachedPackage {
-    pub meta_mtime: u64,
-    #[serde(default)]
-    pub script_mtimes: BTreeMap<String, u64>,
-    #[serde(default)]
-    pub thumbnail_cache_key: Option<String>,
-    #[serde(default)]
-    pub banner_cache_key: Option<String>,
-    #[serde(default)]
-    pub scan_ok: bool,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum ImageKind {
-    Thumbnail,
-    Banner,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ImageColorMode {
-    Grayscale,
-    Color,
-}
-
-#[derive(Clone, Debug)]
-struct ImageSpec {
-    namespace: String,
-    path: String,
-    color_mode: ImageColorMode,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn ensure_mod_state_entry<'a>(state: &'a mut ModState, namespace: &str) -> &'a mut ModStateEntry {
-    let default_mod_enabled = state.default_mod_enabled;
-    let default_safe_mode_enabled = state.default_safe_mode_enabled;
-    state
-        .mods
-        .entry(namespace.to_string())
-        .or_insert_with(|| ModStateEntry {
-            enabled: default_mod_enabled,
-            safe_mode_enabled: default_safe_mode_enabled,
-            session_safe_mode_enabled: None,
-            ..Default::default()
-        })
-}
-
-static MOD_STATE_STORE: LazyLock<Mutex<ModState>> = LazyLock::new(|| {
-    Mutex::new(read_persisted_mod_state().unwrap_or_else(|| ModState {
-        api_version: MOD_API_VERSION,
-        ..Default::default()
-    }))
-});
-
-fn sanitize_mod_save_file_stem(game_id: &str) -> String {
-    let mut sanitized = String::with_capacity(game_id.len());
-    for ch in game_id.chars() {
-        if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
-            sanitized.push(ch);
-        } else {
-            sanitized.push('_');
-        }
-    }
-
-    while sanitized.contains("__") {
-        sanitized = sanitized.replace("__", "_");
-    }
-
-    let trimmed = sanitized.trim_matches('_');
-    if trimmed.is_empty() {
-        "mod_save".to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
-
 pub fn mod_root_dir() -> Result<PathBuf> {
     Ok(path_utils::app_data_dir()?.join("mod"))
 }
@@ -268,167 +73,6 @@ pub fn mod_cache_dir() -> Result<PathBuf> {
 
 pub fn mod_save_dir(namespace: &str) -> Result<PathBuf> {
     Ok(path_utils::mod_save_dir()?.join(namespace))
-}
-
-pub fn mod_save_path(namespace: &str, game_id: &str) -> Result<PathBuf> {
-    Ok(mod_save_dir(namespace)?.join(format!("{}.json", sanitize_mod_save_file_stem(game_id))))
-}
-pub fn load_mod_state() -> ModState {
-    MOD_STATE_STORE
-        .lock()
-        .map(|state| state.clone())
-        .unwrap_or_else(|_| ModState {
-            api_version: MOD_API_VERSION,
-            ..Default::default()
-        })
-}
-
-pub fn save_mod_state(state: &ModState) -> Result<()> {
-    if let Ok(mut guard) = MOD_STATE_STORE.lock() {
-        *guard = state.clone();
-    }
-    persist_mod_state(state)?;
-    Ok(())
-}
-
-pub fn load_scan_cache() -> ModScanCache {
-    read_persisted_scan_cache().unwrap_or_default()
-}
-
-pub fn save_scan_cache(_cache: &ModScanCache) -> Result<()> {
-    persist_scan_cache(_cache)
-}
-
-pub fn set_mod_enabled(namespace: &str, enabled: bool) -> Result<()> {
-    let mut state = load_mod_state();
-    ensure_mod_state_entry(&mut state, namespace).enabled = enabled;
-    save_mod_state(&state)
-}
-
-pub fn set_mod_debug_enabled(namespace: &str, enabled: bool) -> Result<()> {
-    let mut state = load_mod_state();
-    ensure_mod_state_entry(&mut state, namespace).debug_enabled = enabled;
-    save_mod_state(&state)
-}
-
-pub fn set_mod_safe_mode(namespace: &str, enabled: bool, persist: bool) -> Result<()> {
-    let mut state = load_mod_state();
-    let entry = ensure_mod_state_entry(&mut state, namespace);
-    if persist {
-        entry.safe_mode_enabled = enabled;
-        entry.session_safe_mode_enabled = None;
-        save_mod_state(&state)
-    } else {
-        entry.session_safe_mode_enabled = Some(enabled);
-        if let Ok(mut guard) = MOD_STATE_STORE.lock() {
-            *guard = state;
-        }
-        Ok(())
-    }
-}
-
-pub fn update_mod_keybindings(
-    namespace: &str,
-    game_id: &str,
-    script_name: &str,
-    bindings: HashMap<String, Vec<String>>,
-) -> Result<()> {
-    let mut state = load_mod_state();
-    let game = ensure_mod_state_entry(&mut state, namespace)
-        .games
-        .entry(game_id.to_string())
-        .or_default();
-    game.script_name = script_name.to_string();
-    game.keybindings = bindings;
-    save_mod_state(&state)
-}
-
-pub fn read_mod_keybindings(namespace: &str, game_id: &str) -> HashMap<String, Vec<String>> {
-    load_mod_state()
-        .mods
-        .get(namespace)
-        .and_then(|entry| entry.games.get(game_id))
-        .map(|game| game.keybindings.clone())
-        .unwrap_or_default()
-}
-
-pub fn update_mod_best_score(
-    namespace: &str,
-    game_id: &str,
-    script_name: &str,
-    score: JsonValue,
-) -> Result<()> {
-    let mut state = load_mod_state();
-    let game = ensure_mod_state_entry(&mut state, namespace)
-        .games
-        .entry(game_id.to_string())
-        .or_default();
-    game.script_name = script_name.to_string();
-    game.best_score = score;
-    save_mod_state(&state)
-}
-
-pub fn default_mod_settings() -> (bool, bool) {
-    let state = load_mod_state();
-    (state.default_safe_mode_enabled, state.default_mod_enabled)
-}
-
-pub fn set_default_safe_mode_enabled(enabled: bool) -> Result<()> {
-    let mut state = load_mod_state();
-    state.default_safe_mode_enabled = enabled;
-    save_mod_state(&state)
-}
-
-pub fn set_default_mod_enabled(enabled: bool) -> Result<()> {
-    let mut state = load_mod_state();
-    state.default_mod_enabled = enabled;
-    save_mod_state(&state)
-}
-
-pub fn reset_all_mod_safe_modes_enabled() -> Result<()> {
-    let mut state = load_mod_state();
-    for entry in state.mods.values_mut() {
-        entry.safe_mode_enabled = true;
-        entry.session_safe_mode_enabled = None;
-    }
-    save_mod_state(&state)
-}
-
-pub fn reset_all_mod_enabled_disabled() -> Result<()> {
-    let mut state = load_mod_state();
-    for entry in state.mods.values_mut() {
-        entry.enabled = false;
-    }
-    save_mod_state(&state)
-}
-
-pub fn read_mod_best_score(namespace: &str, game_id: &str) -> Option<JsonValue> {
-    load_mod_state()
-        .mods
-        .get(namespace)
-        .and_then(|entry| entry.games.get(game_id))
-        .map(|game| game.best_score.clone())
-}
-
-pub fn mod_log(namespace: &str, level: &str, message: &str) -> Result<()> {
-    let state = load_mod_state();
-    let debug_enabled = state
-        .mods
-        .get(namespace)
-        .map(|entry| entry.debug_enabled)
-        .unwrap_or(false);
-
-    if !debug_enabled {
-        let level_lower = level.to_ascii_lowercase();
-        if level_lower != "warn" && level_lower != "error" {
-            return Ok(());
-        }
-    }
-
-    let _ = namespace;
-    let _ = level;
-    let _ = message;
-    Ok(())
 }
 
 pub fn scan_mods() -> Result<ModScanOutput> {
@@ -1335,42 +979,6 @@ fn mtime_secs(path: &Path) -> u64 {
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
         .map(|value| value.as_secs())
         .unwrap_or(0)
-}
-
-fn mod_state_cache_file() -> Result<PathBuf> {
-    Ok(mod_cache_dir()?.join("mod_state.json"))
-}
-
-fn scan_cache_file() -> Result<PathBuf> {
-    Ok(mod_cache_dir()?.join("scan_cache.json"))
-}
-
-fn read_persisted_mod_state() -> Option<ModState> {
-    let path = mod_state_cache_file().ok()?;
-    let raw = fs::read_to_string(path).ok()?;
-    let mut state = serde_json::from_str::<ModState>(raw.trim_start_matches('\u{feff}')).ok()?;
-    state.api_version = MOD_API_VERSION;
-    Some(state)
-}
-
-fn persist_mod_state(state: &ModState) -> Result<()> {
-    let path = mod_state_cache_file()?;
-    path_utils::ensure_parent_dir(&path)?;
-    fs::write(path, serde_json::to_string_pretty(state)?)?;
-    Ok(())
-}
-
-fn read_persisted_scan_cache() -> Option<ModScanCache> {
-    let path = scan_cache_file().ok()?;
-    let raw = fs::read_to_string(path).ok()?;
-    serde_json::from_str::<ModScanCache>(raw.trim_start_matches('\u{feff}')).ok()
-}
-
-fn persist_scan_cache(cache: &ModScanCache) -> Result<()> {
-    let path = scan_cache_file()?;
-    path_utils::ensure_parent_dir(&path)?;
-    fs::write(path, serde_json::to_string_pretty(cache)?)?;
-    Ok(())
 }
 
 fn scan_error(

@@ -1,3 +1,5 @@
+/// 游戏注册表，管理所有已发现游戏的描述符集合
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;

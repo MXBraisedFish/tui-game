@@ -1,3 +1,5 @@
+/// 定义游戏动作的按键绑定数据结构
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]

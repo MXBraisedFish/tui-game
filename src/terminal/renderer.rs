@@ -1,3 +1,11 @@
+/// 将游戏虚拟画布 Canvas 渲染到终端，支持增量渲染优化
+/// 业务逻辑：
+/// Canvas 缓存
+/// 渲染流程
+/// 行渲染
+/// 样式应用
+/// 颜色与样式映射
+
 use std::io::{Write, stdout};
 use std::sync::{Mutex, OnceLock};
 

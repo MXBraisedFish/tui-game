@@ -1,3 +1,12 @@
+/// 设置页面系统，包含语言选择、Mod 管理、安全设置、按键绑定、内存清理五个子页面
+/// 业务逻辑：
+/// Hub 页面
+/// 语言选择
+/// Mod 管理
+/// 安全设置
+/// 按键绑定
+/// 内存清理
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};

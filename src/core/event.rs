@@ -1,4 +1,5 @@
-/// 宿主统一输入事件。
+/// 定义宿主统一的输入事件类型
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InputEvent {
     Action(String),

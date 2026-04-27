@@ -1,3 +1,11 @@
+/// 游戏存档管理，基于 JSON 文件持久化
+/// 业务逻辑：
+/// 存档文件结构（saves.json）
+/// 数据槽操作
+/// 继续游戏
+/// 按键绑定持久化
+/// 存档名清理
+
 use anyhow::Result;
 use serde_json::{Map, Value as JsonValue};
 use std::fs;

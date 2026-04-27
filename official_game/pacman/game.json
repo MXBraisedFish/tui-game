@@ -1,42 +1,48 @@
 {
-  "id": "tui_game_pacman_Eb6R0Hjd07mJobl0",
-  "name": "game.pacman.name",
-  "description": "game.pacman.description",
-  "detail": "game.pacman.details",
-  "author": "TUI-GAME",
-  "entry": "scripts/pacman.lua",
+  "api": 7,
+  "entry": "scripts/main.lua",
   "save": false,
   "best_none": "game.pacman.best_none_block",
   "min_width": 1,
   "min_height": 1,
+  "write": false,
+  "case_sensitive": false,
   "actions": {
-    "move_up": [
-      "up"
-    ],
-    "move_down": [
-      "down"
-    ],
-    "move_left": [
-      "left"
-    ],
-    "move_right": [
-      "right"
-    ],
-    "restart": [
-      "r"
-    ],
-    "quit_action": [
-      "q"
-    ],
-    "confirm_yes": [
-      "y",
-      "enter"
-    ],
-    "confirm_no": [
-      "q",
-      "esc",
-      "n"
-    ]
+    "move_up": {
+      "key": "up",
+      "key_name": "game.pacman.action.move_up"
+    },
+    "move_down": {
+      "key": "down",
+      "key_name": "game.pacman.action.move_down"
+    },
+    "move_left": {
+      "key": "left",
+      "key_name": "game.pacman.action.move_left"
+    },
+    "move_right": {
+      "key": "right",
+      "key_name": "game.pacman.action.move_right"
+    },
+    "restart": {
+      "key": "r",
+      "key_name": "game.pacman.action.restart"
+    },
+    "quit_action": {
+      "key": [
+        "q",
+        "esc"
+      ],
+      "key_name": "game.pacman.action.quit"
+    },
+    "confirm_yes": {
+      "key": "y",
+      "key_name": "game.pacman.action.confirm_yes"
+    },
+    "confirm_no": {
+      "key": "n",
+      "key_name": "game.pacman.action.confirm_no"
+    }
   },
   "runtime": {
     "target_fps": 60

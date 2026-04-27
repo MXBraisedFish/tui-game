@@ -1,3 +1,9 @@
+/// 自定义富文本解析器，支持 f% 前缀的格式化文本语法
+/// 业务逻辑：
+/// 支持的样式指令
+/// 按键绑定替换
+/// 输出处理
+
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthChar;

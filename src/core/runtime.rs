@@ -1,3 +1,5 @@
+/// 游戏运行时管理，负责启动游戏和帧生命周期
+
 use anyhow::Result;
 
 use crate::core::command::RuntimeCommand;

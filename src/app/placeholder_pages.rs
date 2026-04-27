@@ -1,3 +1,9 @@
+/// 简易占位页面渲染，用于未完成的页面入口
+/// 业务逻辑：
+/// 支持三种占位页面
+/// 显示对应提示文本和返回操作提示
+/// About 页面还显示运行时版本和最新版本信息
+
 use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};

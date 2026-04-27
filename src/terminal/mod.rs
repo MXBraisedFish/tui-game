@@ -1,5 +1,5 @@
-// 模块入口
-// 对外暴露两个模块
-// 只负责“模块组织”，不负责业务逻辑
+/// terminal 模块入口，声明子模块
+
 pub mod renderer;
+pub mod session;
 pub mod size_watcher;

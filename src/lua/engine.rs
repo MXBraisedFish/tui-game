@@ -1,4 +1,12 @@
-﻿use std::fs;
+﻿/// Lua 游戏引擎核心，负责游戏生命周期管理（初始化、事件循环、渲染、退出）
+/// 业务逻辑：
+/// 引擎初始化
+/// 主循环
+/// 命令处理
+/// 退出流程
+/// 按键映射
+
+use std::fs;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -19,6 +27,7 @@ use crate::utils::host_log;
 
 const DEFAULT_TARGET_FPS: u16 = 60;
 const MAX_EVENTS_PER_FRAME: usize = 256;
+const MAX_CATCH_UP_TICKS_PER_FRAME: usize = 8;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -101,6 +110,7 @@ impl LuaGameEngine {
         renderer::invalidate_canvas_cache();
         let frame_duration = frame_duration_for_fps(self.game.target_fps);
         let mut last_tick_at = Instant::now();
+        let mut tick_accumulator = Duration::ZERO;
 
         loop {
             let constraints = size_watcher::SizeConstraints {
@@ -185,19 +195,30 @@ impl LuaGameEngine {
                 }
             }
 
-            // A frame-ending tick is always delivered exactly once.
-            // Queue control commands such as skip/clear only affect the remaining
-            // non-tick events in the current frame and pending host input buffers.
-            let dt_ms = last_tick_at
-                .elapsed()
+            // Deliver fixed-step ticks. When rendering or event handling takes longer
+            // than one frame, catch up logical time before rendering once.
+            let now = Instant::now();
+            tick_accumulator = tick_accumulator.saturating_add(now.saturating_duration_since(last_tick_at));
+            last_tick_at = now;
+
+            let fixed_dt_ms = frame_duration
                 .as_millis()
                 .clamp(1, u128::from(u32::MAX)) as u32;
-            last_tick_at = Instant::now();
-            self.handle_event(&InputEvent::Tick { dt_ms })?;
-            if self.process_runtime_commands_for_pending_frame(None)? {
-                self.exit_runtime()?;
-                renderer::invalidate_canvas_cache();
-                return Ok(());
+            let mut catch_up_ticks = 0;
+            while tick_accumulator >= frame_duration
+                && catch_up_ticks < MAX_CATCH_UP_TICKS_PER_FRAME
+            {
+                tick_accumulator = tick_accumulator.saturating_sub(frame_duration);
+                self.handle_event(&InputEvent::Tick { dt_ms: fixed_dt_ms })?;
+                if self.process_runtime_commands_for_pending_frame(None)? {
+                    self.exit_runtime()?;
+                    renderer::invalidate_canvas_cache();
+                    return Ok(());
+                }
+                catch_up_ticks += 1;
+            }
+            if catch_up_ticks == MAX_CATCH_UP_TICKS_PER_FRAME && tick_accumulator >= frame_duration {
+                tick_accumulator = Duration::ZERO;
             }
 
             self.render_current_frame()?;

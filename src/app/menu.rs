@@ -1,3 +1,10 @@
+/// 主菜单页面，包含 LOGO 渲染、菜单项导航和"继续游戏"功能
+/// 业务逻辑：
+/// 菜单项定义
+/// 导航
+/// 继续游戏
+/// 渲染
+
 use crossterm::event::KeyCode;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Modifier, Style};

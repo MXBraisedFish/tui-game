@@ -1191,7 +1191,7 @@ end
 
 | 适用函数 | 触发条件 | 抛出句式 | 类型 |
 | --- | --- | --- | --- |
-| `translate` | 未匹配到宿主使用语言的语言键 | 未找到当前语言对应的语言键，已回退使用 en_us.json | <font color="purple">脚本警告</font> |
+| `translate` | 未匹配到宿主使用语言的语言键 | 未找到当前宿主语言对应的语言键，已回退使用 en_us.json | <font color="purple">脚本警告</font> |
 | `translate` | 未匹配到 `en_us.json` 文件对应的语言键 | 未在 en_us.json 中找到对应的语言键：[missing-i18n-key: {key}\] | <font color="purple">脚本警告</font> |
 
 #### 数据写入

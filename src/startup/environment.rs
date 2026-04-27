@@ -1,0 +1,96 @@
+use std::fs;
+
+use anyhow::Result;
+
+use crate::app::i18n;
+use crate::utils::host_log;
+use crate::utils::path_utils;
+
+/// 清理旧版本遗留的运行时数据文件与目录。
+///
+/// 删除以下文件（若存在）：
+/// - stats.json
+/// - lua_saves.json
+/// - runtime_best_scores.json
+/// - latest_runtime_save.txt
+/// - language_pref.txt
+/// - mod_state.json
+/// - scan_cache.json
+///
+/// 删除以下目录（若存在）：
+/// - runtime_save/
+/// - runtime-logs/
+pub fn cleanup_legacy_runtime_data() -> Result<()> {
+    let app_data = path_utils::app_data_dir()?;
+    for file_name in [
+        "stats.json",
+        "lua_saves.json",
+        "runtime_best_scores.json",
+        "latest_runtime_save.txt",
+        "language_pref.txt",
+        "mod_state.json",
+        "scan_cache.json",
+    ] {
+        let path = app_data.join(file_name);
+        if path.exists()
+            && let Err(err) = fs::remove_file(path)
+        {
+            host_log::append_host_error(
+                "host.error.clean_old_save_failed",
+                &[("err", &err.to_string())],
+            );
+        }
+    }
+    for dir_name in ["runtime_save", "runtime-logs"] {
+        let path = app_data.join(dir_name);
+        if path.exists()
+            && let Err(err) = fs::remove_file(path)
+        {
+            host_log::append_host_error(
+                "host.error.clean_old_save_failed",
+                &[("err", &err.to_string())],
+            );
+        }
+    }
+    Ok(())
+}
+
+/// 创建运行时所需的目录结构，并初始化默认文件。
+/// 创建子目录：mod/、official/、cache/、mod_save/、log/
+/// 若不存在则创建默认文件：
+/// - language.txt
+/// - best_scores.json
+/// - saves.json
+/// - updater_cache.json
+/// 同时复制官方游戏资源。
+pub fn initialize_runtime_layout() -> Result<()> {
+    let app_data = path_utils::app_data_dir()?;
+    fs::create_dir_all(app_data.join("mod"))?;
+    fs::create_dir_all(app_data.join("official"))?;
+    fs::create_dir_all(app_data.join("cache"))?;
+    fs::create_dir_all(app_data.join("mod_save"))?;
+    fs::create_dir_all(app_data.join("log"))?;
+
+    let language = path_utils::language_file()?;
+    if !language.exists() {
+        fs::write(&language, format!("{}\n", i18n::current_language_code()))?;
+    }
+
+    let best_scores = path_utils::best_scores_file()?;
+    if !best_scores.exists() {
+        fs::write(&best_scores, "{}\n")?;
+    }
+
+    let saves = path_utils::saves_file()?;
+    if !saves.exists() {
+        fs::write(&saves, "{\n  \"continue\": {},\n  \"data\": {}\n}\n")?;
+    }
+
+    let updater_cache = path_utils::updater_cache_file()?;
+    if !updater_cache.exists() {
+        fs::write(&updater_cache, "{}\n")?;
+    }
+
+    let _ = path_utils::official_games_dir()?;
+    Ok(())
+}

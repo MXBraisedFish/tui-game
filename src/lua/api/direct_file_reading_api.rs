@@ -1,3 +1,9 @@
+/// 文件读取 API，安全读取游戏包内 assets/ 目录下的文件
+/// 业务逻辑：
+/// 翻译函数
+/// 文件读取函数
+/// 安全限制
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;

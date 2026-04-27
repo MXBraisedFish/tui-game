@@ -1,3 +1,10 @@
+/// 宿主日志记录系统，将运行日志写入文件
+/// 业务逻辑：
+/// 日志文件
+/// 日志格式
+/// 日志对象
+/// 日志方法
+
 use std::cell::RefCell;
 use std::time::{SystemTime, UNIX_EPOCH};
 

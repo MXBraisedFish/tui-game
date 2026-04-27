@@ -1,3 +1,9 @@
+/// 国际化（多语言）系统，管理语言包的加载、切换和文本查找
+/// 业务逻辑：
+/// 语言包加载
+/// 语言切换与持久化
+/// 文本查找
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};

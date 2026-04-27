@@ -1,3 +1,5 @@
+/// Lua API 模块入口，统一安装所有游戏可用的 API
+
 pub mod callback_api;
 pub mod common;
 pub mod direct_debug_api;

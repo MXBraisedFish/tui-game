@@ -1,69 +1,87 @@
 {
-  "id": "tui_game_minesweeper_j2sLgIzwXa9p8kf7",
-  "name": "game.minesweeper.name",
-  "description": "game.minesweeper.description",
-  "detail": "game.minesweeper.details",
-  "author": "TUI-GAME",
-  "entry": "scripts/minesweeper.lua",
+  "api": 7,
+  "entry": "scripts/main.lua",
   "save": true,
   "best_none": "game.minesweeper.best_none_block",
   "min_width": 1,
   "min_height": 1,
+  "write": false,
+  "case_sensitive": false,
   "actions": {
-    "move_left": [
-      "left"
-    ],
-    "move_right": [
-      "right"
-    ],
-    "move_up": [
-      "up"
-    ],
-    "move_down": [
-      "down"
-    ],
-    "reveal": [
-      "space"
-    ],
-    "flag": [
-      "z"
-    ],
-    "question": [
-      "x"
-    ],
-    "toggle_guide": [
-      "c"
-    ],
-    "config_input": [
-      "p"
-    ],
-    "jump_input": [
-      "d"
-    ],
-    "save": [
-      "s"
-    ],
-    "restart": [
-      "r"
-    ],
-    "quit_action": [
-      "q"
-    ],
-    "confirm_yes": [
-      "y",
-      "enter"
-    ],
-    "confirm_no": [
-      "q",
-      "esc",
-      "n"
-    ],
-    "remove_last_backspace": [
-      "backspace"
-    ],
-    "remove_last_delete": [
-      "delete"
-    ]
+    "move_left": {
+      "key": "left",
+      "key_name": "game.minesweeper.action.move_left"
+    },
+    "move_right": {
+      "key": "right",
+      "key_name": "game.minesweeper.action.move_right"
+    },
+    "move_up": {
+      "key": "up",
+      "key_name": "game.minesweeper.action.move_up"
+    },
+    "move_down": {
+      "key": "down",
+      "key_name": "game.minesweeper.action.move_down"
+    },
+    "reveal": {
+      "key": "space",
+      "key_name": "game.minesweeper.action.reveal"
+    },
+    "flag": {
+      "key": "z",
+      "key_name": "game.minesweeper.action.flag"
+    },
+    "question": {
+      "key": "x",
+      "key_name": "game.minesweeper.action.question"
+    },
+    "toggle_guide": {
+      "key": "c",
+      "key_name": "game.minesweeper.action.toggle_guide"
+    },
+    "config_input": {
+      "key": "p",
+      "key_name": "game.minesweeper.action.config_input"
+    },
+    "jump_input": {
+      "key": "d",
+      "key_name": "game.minesweeper.action.jump_input"
+    },
+    "save": {
+      "key": "s",
+      "key_name": "game.minesweeper.action.save"
+    },
+    "confirm": {
+      "key": "enter",
+      "key_name": "game.minesweeper.action.confirm"
+    },
+    "restart": {
+      "key": "r",
+      "key_name": "game.minesweeper.action.restart"
+    },
+    "quit_action": {
+      "key": [
+        "q",
+        "esc"
+      ],
+      "key_name": "game.minesweeper.action.quit"
+    },
+    "confirm_yes": {
+      "key": "y",
+      "key_name": "game.minesweeper.action.confirm_yes"
+    },
+    "confirm_no": {
+      "key": "n",
+      "key_name": "game.minesweeper.action.confirm_no"
+    },
+    "remove_last": {
+      "key": [
+        "backspace",
+        "del"
+      ],
+      "key_name": "game.minesweeper.action.remove_last"
+    }
   },
   "runtime": {
     "target_fps": 60

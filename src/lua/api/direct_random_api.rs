@@ -1,3 +1,10 @@
+/// 随机数 API，提供多种随机数生成方式
+/// 业务逻辑：
+/// 临时随机数
+/// 种子随机数
+/// 生成器管理
+/// 类型安全
+
 use std::collections::BTreeMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};

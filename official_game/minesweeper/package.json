@@ -1,8 +1,25 @@
 {
   "namespace": "official",
-  "package_name": "Official Minesweeper Package",
+  "package": "TUI-GAME Official",
+  "mod_name": "TUI-GAME Official",
+  "introduction": "game.minesweeper.package_introduction",
   "author": "TUI-GAME",
+  "game_name": "game.minesweeper.name",
+  "description": "game.minesweeper.description",
+  "detail": "game.minesweeper.details",
   "version": "1.0.0",
-  "description": "Official package for the new unified runtime minesweeper implementation.",
-  "api_version": 1
+  "icon": [
+    " MINES  ",
+    " #1!#   ",
+    " #@?#   ",
+    " SWEEP  "
+  ],
+  "banner": [
+    "  __  __ _                                                   ",
+    " |  \\/  (_)_ __   ___  _____      _____  ___ _ __   ___ _ __ ",
+    " | |\\/| | | '_ \\ / _ \\/ __\\ \\ /\\ / / _ \\/ _ \\ '_ \\ / _ \\ '__|",
+    " | |  | | | | | |  __/\\__ \\ V  V /  __/  __/ |_) |  __/ |   ",
+    " |_|  |_|_|_| |_|\\___||___/ \\_/\\_/ \\___|\\___| .__/ \\___|_|   ",
+    "                                             |_|              "
+  ]
 }

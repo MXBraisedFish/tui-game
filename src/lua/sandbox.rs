@@ -1,3 +1,8 @@
+/// Lua 沙箱安全限制，禁止 Mod 脚本执行危险操作
+/// 业务逻辑：
+/// 禁用系统调用
+/// 禁止模块访问
+
 use mlua::{Lua, Table, Value};
 
 use crate::app::i18n;

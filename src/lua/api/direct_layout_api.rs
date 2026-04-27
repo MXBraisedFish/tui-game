@@ -1,3 +1,9 @@
+/// 布局计算 API，根据终端尺寸自动计算居中/对齐位置
+/// 业务逻辑：
+/// 锚点常量
+/// 计算函数
+/// 参数校验
+
 use crossterm::terminal;
 use mlua::{Lua, Value, Variadic};
 

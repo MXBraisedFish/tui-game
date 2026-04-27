@@ -1,3 +1,7 @@
+/// 游戏统计数据管理
+/// 业务逻辑：
+/// 定义 GameStats 结构体
+
 use std::collections::HashMap;
 
 use anyhow::Result;
