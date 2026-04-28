@@ -1,12 +1,8 @@
-use anyhow::Result;
+// 处理命令行参数，供外部脚本查询版本号。属于"透传"功能——匹配到特殊参数时直接处理并通知退出，未匹配则继续正常启动
 
-/// 处理命令行透传标志。
-///
-/// 当前支持：
-/// - `-rv` 或 `-run-version`：打印版本号后退出。
-///
-/// 返回 `Ok(true)` 表示已处理并应立即退出程序，
-/// 返回 `Ok(false)` 表示没有匹配的 CLI 指令，继续正常启动。
+use anyhow::Result; // 错误处理
+
+// 读取第一个命令行参数，匹配 -rv 或 -run-version（不区分大小写）时打印版本号并返回 Ok(true)；无参数或不匹配时返回 Ok(false)
 pub fn handle_cli_passthrough() -> Result<bool> {
     let arg = match std::env::args().nth(1) {
         Some(value) => value,

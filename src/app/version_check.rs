@@ -1,19 +1,23 @@
-use std::sync::mpsc::{self, Receiver};
-use std::thread;
-use std::time::Duration;
+// 后台版本更新检查。通过 GitHub API 查询最新 release 版本号，与当前版本比较，通过 channel 通知主循环是否有更新
 
-use anyhow::Result;
-use serde::Deserialize;
+use std::sync::mpsc::{self, Receiver}; // 创建后台线程和消息通道
+use std::thread; // 启动后台线程
+use std::time::Duration; // HTTP 请求超时
 
+use anyhow::Result; // 错误处理
+use serde::Deserialize; // 反序列化 GitHub API 响应
+
+// GitHub 最新 release 的 API 地址
 const LATEST_RELEASE_API_URL: &str =
     "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";
 
+// GitHub API 响应结构
 #[derive(Deserialize)]
 struct LatestReleaseResponse {
     tag_name: String,
 }
 
-/// 规范化版本标签，确保以 "v" 开头。
+// 规范化版本标签，确保以 "v" 开头
 pub fn normalize_tag(raw: &str) -> String {
     let trimmed = raw.trim();
     if trimmed.starts_with('v') || trimmed.starts_with('V') {
@@ -23,8 +27,7 @@ pub fn normalize_tag(raw: &str) -> String {
     }
 }
 
-/// 启动后台线程，检查是否有新版本。
-/// 返回接收端，当检查完成时发送 `Some(latest_tag)` 或 `None`。
+// 启动后台线程检查更新，返回接收端
 pub fn spawn_update_check(current_version: String) -> Receiver<Option<String>> {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
@@ -34,7 +37,7 @@ pub fn spawn_update_check(current_version: String) -> Receiver<Option<String>> {
     rx
 }
 
-/// 查询 GitHub 最新发布版本。
+// 查询 GitHub API 获取最新版本号，比较后返回新版本或 None
 fn check_latest_release(current_version: &str) -> Result<Option<String>> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(10))
@@ -53,7 +56,7 @@ fn check_latest_release(current_version: &str) -> Result<Option<String>> {
     }
 }
 
-/// 比较两个版本号字符串，判断远程版本是否更新。
+// 逐段比较版本号，判断远程是否更新
 fn is_remote_version_newer(current_version: &str, remote_version: &str) -> bool {
     let current = parse_version_segments(current_version);
     let remote = parse_version_segments(remote_version);
@@ -71,7 +74,7 @@ fn is_remote_version_newer(current_version: &str, remote_version: &str) -> bool 
     false
 }
 
-/// 将版本号字符串解析为 `Vec<u32>`，例如 "v1.2.3" -> `[1, 2, 3]`。
+// 将版本号字符串解析为 Vec<u32>（如 "v1.2.3" → [1, 2, 3]）
 fn parse_version_segments(version: &str) -> Vec<u32> {
     let trimmed = version
         .trim()

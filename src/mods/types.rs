@@ -1,13 +1,15 @@
-use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
+// 定义 Mod 系统中所有核心数据结构，包括 Mod 图像、游戏元数据、包信息、系统持久状态、扫描缓存以及图像处理相关的辅助类型。是 mods 模块的类型基石。
 
-use ratatui::text::Line;
-use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
+use std::collections::{BTreeMap, HashMap}; // 有序映射（脚本修改时间）和哈希映射（Mod 状态、游戏状态、按键绑定）
+use std::path::PathBuf; // 路径类型（用于脚本路径）
 
-pub const MOD_API_VERSION: u32 = 1;
+use ratatui::text::Line; // 预渲染的富文本行（ModImage 缓存）
+use serde::{Deserialize, Serialize}; // 序列化/反序列化（持久化到 JSON）
+use serde_json::Value as JsonValue; // 通用 JSON 值（最佳成绩字段）
 
-/// 单个 Mod 包的图像数据（包含 ASCII 行和预渲染的 ratatui 行）。
+pub const MOD_API_VERSION: u32 = 1; // 当前支持的 Mod API 版本号，用于兼容性检查
+
+// 单个 Mod 包的图像数据
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ModImage {
     pub lines: Vec<String>,
@@ -15,7 +17,7 @@ pub struct ModImage {
     pub rendered_lines: Vec<Line<'static>>,
 }
 
-/// Mod 中单个游戏的元数据。
+// Mod 中单个游戏的元数据
 #[derive(Clone, Debug)]
 pub struct ModGameMeta {
     pub game_id: String,
@@ -34,7 +36,7 @@ pub struct ModGameMeta {
     pub max_height: Option<u16>,
 }
 
-/// Mod 安全模式的运行状态。
+// Mod 安全模式的运行状态
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ModSafeModeState {
     Enabled,
@@ -42,7 +44,7 @@ pub enum ModSafeModeState {
     DisabledTrusted,
 }
 
-/// 一个 Mod 包的完整信息。
+// 一个 Mod 包的完整信息
 #[derive(Clone, Debug)]
 pub struct ModPackage {
     pub namespace: String,
@@ -65,13 +67,13 @@ pub struct ModPackage {
     pub errors: Vec<ModScanError>,
 }
 
-/// Mod 扫描结果。
+// Mod 扫描结果
 #[derive(Clone, Debug)]
 pub struct ModScanOutput {
     pub packages: Vec<ModPackage>,
 }
 
-/// 持久的 Mod 系统状态。
+// 持久的 Mod 系统状态（JSON 文件）
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ModState {
     pub api_version: u32,
@@ -85,7 +87,7 @@ pub struct ModState {
     pub scan_errors: Vec<ModScanError>,
 }
 
-/// 单个 Mod 的状态条目。
+// 单个 Mod 的状态条目
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ModStateEntry {
     #[serde(default = "default_true")]
@@ -121,7 +123,7 @@ impl Default for ModStateEntry {
     }
 }
 
-/// Mod 中单个游戏的状态（成绩、按键绑定等）。
+// Mod 中单个游戏的状态
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ModGameState {
     #[serde(default)]
@@ -132,7 +134,7 @@ pub struct ModGameState {
     pub keybindings: HashMap<String, Vec<String>>,
 }
 
-/// Mod 扫描过程中产生的错误或警告。
+// 扫描过程中产生的错误或警告
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ModScanError {
     pub namespace: String,
@@ -142,14 +144,14 @@ pub struct ModScanError {
     pub message: String,
 }
 
-/// Mod 扫描缓存（用于加速后续扫描）。
+// 扫描缓存，加速后续扫描
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ModScanCache {
     #[serde(default)]
     pub packages: HashMap<String, CachedPackage>,
 }
 
-/// 单个包的缓存元数据。
+// 单个包的缓存元数据
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct CachedPackage {
     pub meta_mtime: u64,
@@ -163,21 +165,21 @@ pub struct CachedPackage {
     pub scan_ok: bool,
 }
 
-/// 图像类型（缩略图或横幅）。
+// 图像类型
 #[derive(Clone, Copy, Debug)]
 pub enum ImageKind {
     Thumbnail,
     Banner,
 }
 
-/// 图像色彩模式。
+// 图像色彩模式
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImageColorMode {
     Grayscale,
     Color,
 }
 
-/// 从包元数据中解析出的图像规格。
+// 从包元数据解析出的图像规格
 #[derive(Clone, Debug)]
 pub struct ImageSpec {
     pub namespace: String,
@@ -185,7 +187,7 @@ pub struct ImageSpec {
     pub color_mode: ImageColorMode,
 }
 
-/// serde 辅助函数：默认值为 true。
+// serde 辅助函数：当 JSON 字段缺失时，默认值为 true。用于 #[serde(default = "default_true")]
 fn default_true() -> bool {
     true
 }

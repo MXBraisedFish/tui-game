@@ -1,20 +1,16 @@
-/// 主菜单页面，包含 LOGO 渲染、菜单项导航和"继续游戏"功能
-/// 业务逻辑：
-/// 菜单项定义
-/// 导航
-/// 继续游戏
-/// 渲染
+// 主菜单页面，包含彩色 ASCII LOGO 渲染、5 个菜单项（Play/Continue/Settings/About/Quit）、继续游戏的存档目标管理和渲染
 
-use crossterm::event::KeyCode;
-use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::Paragraph;
-use unicode_width::UnicodeWidthStr;
+use crossterm::event::KeyCode; // 按键码
+use ratatui::layout::{Alignment, Rect}; // 对齐和区域
+use ratatui::style::{Color, Modifier, Style}; // 样式
+use ratatui::text::{Line, Span}; // 富文本
+use ratatui::widgets::Paragraph; // 段落渲染
+use unicode_width::UnicodeWidthStr; // 文本宽度计算
 
-use crate::app::i18n::t;
-use crate::app::layout;
+use crate::app::i18n::t; // 国际化
+use crate::app::layout; // 主菜单布局
 
+// TUI-GAME 的 ASCII 艺术 LOGO
 pub const LOGO_ASCII: &str = r#"████████╗██╗   ██╗██╗     ██████╗  █████╗ ███╗   ███╗███████╗
 ╚══██╔══╝██║   ██║██║    ██╔════╝ ██╔══██╗████╗ ████║██╔════╝
    ██║   ██║   ██║██║    ██║  ███╗███████║██╔████╔██║█████╗  
@@ -22,8 +18,8 @@ pub const LOGO_ASCII: &str = r#"████████╗██╗   ██╗
    ██║   ╚██████╔╝██║    ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗
    ╚═╝    ╚═════╝ ╚═╝     ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝"#;
 
+// 主菜单可触发的高层动作
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// 主菜单可触发的高层动作。
 pub enum MenuAction {
     Play,
     Continue,
@@ -32,18 +28,16 @@ pub enum MenuAction {
     Quit,
 }
 
+// 单个菜单项
 #[derive(Clone, Debug)]
-/// 单个主菜单项的数据描述。
 pub struct MenuItem {
     pub key: &'static str,
     pub shortcut: KeyCode,
     pub action: MenuAction,
 }
 
+// 主菜单状态
 #[derive(Clone, Debug)]
-/// 主菜单状态。
-///
-/// 保存菜单项列表、当前选中项以及“继续游戏”关联的存档信息。
 pub struct Menu {
     items: Vec<MenuItem>,
     selected: usize,
@@ -52,7 +46,7 @@ pub struct Menu {
 }
 
 impl Menu {
-    /// 创建默认主菜单，初始化各项菜单项及其快捷键。
+    // 构造默认主菜单：5 个菜单项，快捷键分别为 1/2/3/4/Esc
     pub fn new() -> Self {
         Self {
             items: vec![
@@ -88,24 +82,24 @@ impl Menu {
         }
     }
 
-    /// 返回当前菜单的全部菜单项。
+    // 	返回菜单项切片
     pub fn items(&self) -> &[MenuItem] {
         &self.items
     }
 
-    /// 返回当前选中的菜单项下标。
+    // 返回当前选中的索引
     pub fn selected(&self) -> usize {
         self.selected
     }
 
-    /// 在下标合法时更新当前选中项。
+    // 设置选中索引（边界检查）
     pub fn set_selected(&mut self, index: usize) {
         if index < self.items.len() {
             self.selected = index;
         }
     }
 
-    /// 根据快捷键选中对应菜单项，匹配成功时返回 `true`。
+    // 根据快捷键选中菜单项，返回是否找到
     pub fn select_by_shortcut(&mut self, code: KeyCode) -> bool {
         if let Some(index) = self.items.iter().position(|item| item.shortcut == code) {
             self.selected = index;
@@ -114,7 +108,7 @@ impl Menu {
         false
     }
 
-    /// 选中下一个菜单项，超出末尾时循环到开头。
+    // 循环移动选中项
     pub fn next(&mut self) {
         if self.items.is_empty() {
             return;
@@ -122,7 +116,7 @@ impl Menu {
         self.selected = (self.selected + 1) % self.items.len();
     }
 
-    /// 选中上一个菜单项，位于开头时循环到末尾。
+    // 获取当前选中项的动作
     pub fn previous(&mut self) {
         if self.items.is_empty() {
             return;
@@ -134,18 +128,18 @@ impl Menu {
         };
     }
 
-    /// 返回当前选中菜单项对应的高层动作。
+    // 更新继续游戏的目标
     pub fn selected_action(&self) -> Option<MenuAction> {
         self.items.get(self.selected).map(|it| it.action)
     }
 
-    /// 更新“继续游戏”对应的目标游戏信息。
+    // 	是否存在有效继续存档
     pub fn set_continue_target(&mut self, game_id: Option<String>, game_name: Option<String>) {
         self.continue_game_id = game_id;
         self.continue_game_name = game_name;
     }
 
-    /// 判断“继续游戏”当前是否存在有效存档目标。
+    // 获取继续游戏的游戏 ID
     pub fn can_continue(&self) -> bool {
         self.continue_game_id.is_some()
     }
@@ -156,7 +150,7 @@ impl Menu {
     }
 }
 
-/// 渲染主菜单界面，包括 Logo、菜单项和版本提示。
+// 渲染主菜单：LOGO（橙色/白色）→ 菜单项（选中高亮青色 + Enter 提示）→ 版本号（暗灰 + 品红更新提示）→ 操作提示。宽度自适应防止选中时抖动
 pub fn render_main_menu(
     frame: &mut ratatui::Frame<'_>,
     menu: &Menu,
@@ -302,6 +296,7 @@ pub fn render_main_menu(
     }
 }
 
+// 构建菜单项的显示标签：Continue 项显示为"继续-游戏名"，其余项直接显示翻译文本
 fn menu_item_label(menu: &Menu, item: &MenuItem) -> String {
     if item.action == MenuAction::Continue {
         if let Some(name) = &menu.continue_game_name {

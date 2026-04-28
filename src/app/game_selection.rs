@@ -1,31 +1,27 @@
-/// 游戏选择页面，展示游戏列表和详情，处理选择、排序、翻页和启动
-/// 包含业务：
-/// 游戏列表管理
-/// 详情面板
-/// 游戏启动
-/// Mod 热重载检测
+// 游戏选择页面，展示所有游戏列表（分页），右侧显示选中游戏的详细信息，支持排序、翻页、页面跳转、滚动详情，以及 Mod 热重载检测。页面向主循环上报 BackToMenu 或 LaunchGame 动作
 
-use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
-use ratatui::{symbols, widgets::Wrap};
-use std::time::{Duration, Instant};
-use unicode_width::UnicodeWidthStr;
+use crossterm::event::{KeyCode, KeyEvent}; // 按键处理
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect}; // 布局
+use ratatui::style::{Color, Modifier, Style}; // 样式
+use ratatui::text::{Line, Span}; // 富文本
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph}; // 列表、段落组件
+use ratatui::{symbols, widgets::Wrap}; // 边框符号、换行
+use std::time::{Duration, Instant}; // 热重载轮询间隔、时间戳
+use unicode_width::UnicodeWidthStr; // 文本宽度
 
-use crate::app::content_cache;
-use crate::app::i18n;
-use crate::app::rich_text;
-use crate::core::key::display_semantic_key;
-use crate::core::stats as runtime_stats;
-use crate::game::registry::GameSourceKind;
-use crate::game::registry::GameDescriptor;
-use crate::game::resources;
+use crate::app::content_cache; // 缓存查询及热重载触发
+use crate::app::i18n; // 国际化
+use crate::app::rich_text; // 富文本解析（游戏说明、按键替换）
+use crate::core::key::display_semantic_key; // 语义键显示
+use crate::core::stats as runtime_stats; // 读取最佳成绩
+use crate::game::registry::GameSourceKind; // 游戏来源类型
+use crate::game::registry::GameDescriptor; // 游戏描述符
+use crate::game::resources; // 包级文本解析
 
+// Mod 热重载轮询间隔
 const MOD_HOT_RELOAD_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
-/// 游戏选择页的完整状态。
+// 	游戏选择页的完整状态（公开）
 pub struct GameSelection {
     games: Vec<GameDescriptor>,
     list_state: ListState,
@@ -40,14 +36,15 @@ pub struct GameSelection {
     mod_hot_reload_last_checked_at: Instant,
 }
 
+// 列表分页状态（私有）
 #[derive(Clone, Copy)]
-/// 列表分页状态。
 struct PageState {
     current_page: usize,
     page_size: usize,
     total_pages: usize,
 }
 
+// 游戏排序方式枚举（私有）
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum GameSortMode {
     Source,
@@ -55,14 +52,14 @@ enum GameSortMode {
     Author,
 }
 
-/// 游戏选择页向主循环上报的高层动作。
+// 向主循环上报的高层动作（公开）
 pub enum GameSelectionAction {
     BackToMenu,
     LaunchGame(GameDescriptor),
 }
 
 impl GameSelection {
-    /// 根据扫描到的游戏列表和本地成绩数据创建游戏选择页状态。
+    // 构造游戏选择页，初始排序并选中第一项
     pub fn new(games: Vec<GameDescriptor>) -> Self {
         let initial_page_size = games.len().max(1);
 
@@ -92,7 +89,7 @@ impl GameSelection {
         this
     }
 
-    /// 刷新游戏列表和成绩数据，但尽量保留当前选中的游戏、分页和详情滚动位置。
+    // 刷新游戏列表，尝试保留之前的选中项（通过 ID 或全局索引），重置跳页输入
     pub fn refresh_preserving_selection(&mut self, games: Vec<GameDescriptor>) {
         let selected_id = self.selected_game().map(|g| g.id.clone());
         let previous_global = self.selected_global_index().unwrap_or(0);
@@ -132,7 +129,7 @@ impl GameSelection {
         self.detail_scroll = previous_scroll;
     }
 
-    /// Handle game selection input and return the resulting high-level action.
+    // 主事件处理：跳页输入模式 / 正常模式。正常模式支持返回、详情滚动、翻页、跳页、排序、选择、启动游戏
     pub fn handle_event(&mut self, key: KeyEvent) -> Option<GameSelectionAction> {
         if self.launch_placeholder {
             self.launch_placeholder = false;
@@ -220,6 +217,7 @@ impl GameSelection {
         }
     }
 
+    // 轮询 Mod 变化并触发热重载：检查指纹变化 → 重载缓存 → 刷新列表并保留选区
     pub fn poll_mod_hot_reload(&mut self) -> bool {
         let now = Instant::now();
         if now.duration_since(self.mod_hot_reload_last_checked_at) < MOD_HOT_RELOAD_POLL_INTERVAL {
@@ -238,7 +236,7 @@ impl GameSelection {
         false
     }
 
-    /// Render the game selection page, including the list and detail panel.
+    // 主页渲染：计算提示行高度，分成左右两栏（40%/60%）分别渲染列表和详情
     pub fn render(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {
         let root_preview = Layout::default()
             .direction(Direction::Vertical)
@@ -274,6 +272,7 @@ impl GameSelection {
         frame.render_widget(hint_widget, root[1]);
     }
 
+    // 预计算详情面板是否需要滚动条（通过构建详情行并比较视口高度）
     fn compute_detail_scroll_available(&self, area: Rect) -> bool {
         let block_inner = Block::default()
             .borders(Borders::ALL)
@@ -387,7 +386,7 @@ impl GameSelection {
         details_full_lines.len().saturating_sub(viewport_h) > 0
     }
 
-    /// Return the minimum terminal size required for stable layout.
+    // 计算游戏选择页的最小终端尺寸
     pub fn minimum_size(&self) -> (u16, u16) {
         let list_title = i18n::t("game_selection.panel.games");
         let detail_title = i18n::t("game_selection.panel.details");
@@ -410,6 +409,7 @@ impl GameSelection {
         (min_w, min_h)
     }
 
+    // 渲染左栏游戏列表：分页显示，标题栏含排序模式标记，页面导航和跳页输入
     fn render_list_panel(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {
         let block = Block::default()
             .borders(Borders::ALL)
@@ -502,6 +502,7 @@ impl GameSelection {
         frame.render_widget(right_widget, rows[1]);
     }
 
+    // 渲染右栏详情：游戏名称、分隔符、成绩/包信息、操作说明、游戏描述、详细说明（可滚动），包含滚动条
     fn render_detail_panel(&mut self, frame: &mut ratatui::Frame<'_>, area: Rect) {
         let block = Block::default()
             .borders(Borders::ALL)
@@ -710,16 +711,19 @@ impl GameSelection {
         }
     }
 
+    // 获取当前选中的游戏
     fn selected_game(&self) -> Option<&GameDescriptor> {
         let selected_in_page = self.list_state.selected()?;
         let global = self.page_state.current_page * self.page_state.page_size + selected_in_page;
         self.games.get(global)
     }
 
+    // 获取当前选中的游戏
     fn selected_game_cloned(&self) -> Option<GameDescriptor> {
         self.selected_game().cloned()
     }
 
+    // 获取当前页的游戏切片
     fn current_page_games(&self) -> &[GameDescriptor] {
         let start = self.page_state.current_page * self.page_state.page_size;
         let end = (start + self.page_state.page_size).min(self.games.len());
@@ -738,6 +742,7 @@ impl GameSelection {
         self.detail_scroll = 0;
     }
 
+    // 排序游戏列表并恢复选区
     fn apply_sort(&mut self) {
         let selected_id = self.selected_game().map(|game| game.id.clone());
         let sort_mode = self.sort_mode;
@@ -753,6 +758,7 @@ impl GameSelection {
         self.restore_selected_game(selected_id.as_deref());
     }
 
+    // 排序游戏列表并恢复选区
     fn restore_selected_game(&mut self, id: Option<&str>) {
         if self.games.is_empty() {
             self.page_state.current_page = 0;
@@ -778,6 +784,7 @@ impl GameSelection {
         self.list_state.select(Some(selected_in_page));
     }
 
+    // 移动选中项和翻页
     fn select_prev(&mut self) {
         let page_len = self.current_page_games().len();
         if page_len == 0 {
@@ -792,6 +799,7 @@ impl GameSelection {
         }
     }
 
+    // 移动选中项和翻页
     fn select_next(&mut self) {
         let page_len = self.current_page_games().len();
         if page_len == 0 {
@@ -806,6 +814,7 @@ impl GameSelection {
         }
     }
 
+    // 移动选中项和翻页
     fn prev_page(&mut self) {
         if self.page_state.current_page > 0 {
             self.page_state.current_page -= 1;
@@ -814,6 +823,7 @@ impl GameSelection {
         }
     }
 
+    // 移动选中项和翻页
     fn next_page(&mut self) {
         if self.page_state.current_page + 1 < self.page_state.total_pages {
             self.page_state.current_page += 1;
@@ -822,18 +832,21 @@ impl GameSelection {
         }
     }
 
+    // 切换排序模式和升降序
     fn set_sort_mode(&mut self, mode: GameSortMode) {
         self.sort_mode = mode;
         self.apply_sort();
         self.reset_detail_scroll();
     }
 
+    // 切换排序模式和升降序
     fn toggle_sort_order(&mut self) {
         self.sort_descending = !self.sort_descending;
         self.apply_sort();
         self.reset_detail_scroll();
     }
 
+    // 构建列表标题（含排序模式和升降序箭头）
     fn list_title(&self) -> Line<'static> {
         let order_text = if self.sort_descending {
             format!("\u{2191}{}", text("settings.mods.order.desc", "Descending"))
@@ -862,6 +875,7 @@ impl GameSelection {
         ])
     }
 
+    // 渲染单行游戏名，Mod 游戏显示黄色 MOD 徽章
     fn render_game_list_line(&self, game: &GameDescriptor, width: usize) -> Line<'static> {
         let name = self.localized_game_name(game);
         if !game.is_mod_game() || width == 0 {
@@ -889,18 +903,22 @@ impl GameSelection {
         ])
     }
 
+    // 获取游戏的本地化显示字段
     fn localized_game_name(&self, game: &GameDescriptor) -> String {
         game.display_name.clone()
     }
 
+    // 获取游戏的本地化显示字段
     fn localized_game_description(&self, game: &GameDescriptor) -> String {
         game.display_description.clone()
     }
 
+    // 获取游戏的本地化显示字段
     fn localized_game_details(&self, game: &GameDescriptor) -> String {
         game.display_detail.clone()
     }
 
+    // 获取 Mod 包的显示名称、作者、版本
     fn mod_package_name(&self, game: &GameDescriptor) -> Option<(String, bool)> {
         Some((
             game.display_package_name.clone()?,
@@ -908,13 +926,16 @@ impl GameSelection {
         ))
     }
 
+    // 获取 Mod 包的显示名称、作者、版本
     fn mod_author(&self, game: &GameDescriptor) -> Option<String> {
         game.display_package_author.clone()
     }
 
+    // 获取 Mod 包的显示名称、作者、版本
     fn mod_version(&self, game: &GameDescriptor) -> Option<String> {
         game.display_package_version.clone()
     }
+
     fn selected_global_index(&self) -> Option<usize> {
         let selected_in_page = self.list_state.selected()?;
         let global = self.page_state.current_page * self.page_state.page_size + selected_in_page;
@@ -925,6 +946,7 @@ impl GameSelection {
         }
     }
 
+    // 根据可视行数重新计算分页，保持当前选中项
     fn sync_paging(&mut self, visible_rows: usize) {
         let page_size = visible_rows.max(1);
         let selected_global = self.selected_global_index().unwrap_or(0);
@@ -950,6 +972,7 @@ impl GameSelection {
     }
 }
 
+// 文本截断加省略号
 fn truncate_with_ellipsis(text: &str, max_width: usize) -> String {
     if max_width == 0 {
         return String::new();
@@ -973,10 +996,12 @@ fn truncate_with_ellipsis(text: &str, max_width: usize) -> String {
     result
 }
 
+// 国际化文本获取
 fn text(key: &str, fallback: &str) -> String {
     i18n::t_or(key, fallback)
 }
 
+// 排序模式标签
 fn game_sort_label(mode: GameSortMode) -> String {
     match mode {
         GameSortMode::Source => text("game_selection.sort.source", "Official & Third-party"),
@@ -985,6 +1010,7 @@ fn game_sort_label(mode: GameSortMode) -> String {
     }
 }
 
+// 三模式游戏比较器，多级回退
 fn compare_games(left: &GameDescriptor, right: &GameDescriptor, mode: GameSortMode) -> std::cmp::Ordering {
     match mode {
         GameSortMode::Source => source_rank(&left.source)
@@ -1003,6 +1029,7 @@ fn compare_games(left: &GameDescriptor, right: &GameDescriptor, mode: GameSortMo
     }
 }
 
+// 来源排序权重
 fn source_rank(source: &GameSourceKind) -> u8 {
     match source {
         GameSourceKind::Official => 0,
@@ -1010,10 +1037,12 @@ fn source_rank(source: &GameSourceKind) -> u8 {
     }
 }
 
+// 不区分大小写比较
 fn cmp_lowercase(left: &str, right: &str) -> std::cmp::Ordering {
     left.to_lowercase().cmp(&right.to_lowercase())
 }
 
+// 构建操作提示文本
 fn build_game_hint_segments(include_scroll: bool) -> Vec<String> {
     let mut segments = vec![
         text(
@@ -1045,6 +1074,7 @@ fn build_game_hint_segments(include_scroll: bool) -> Vec<String> {
     segments
 }
 
+// 提示文本自动换行
 fn wrap_game_hint_lines(segments: &[String], width: usize) -> Vec<Line<'static>> {
     if width == 0 || segments.is_empty() {
         return vec![Line::from("")];
@@ -1082,6 +1112,7 @@ fn wrap_game_hint_lines(segments: &[String], width: usize) -> Vec<Line<'static>>
     lines
 }
 
+// 纯文本自动换行
 fn wrap_plain_text_lines(text: &str, width: usize, style: Style) -> Vec<Line<'static>> {
     let width = width.max(1);
     let mut lines = Vec::new();
@@ -1107,6 +1138,7 @@ fn wrap_plain_text_lines(text: &str, width: usize, style: Style) -> Vec<Line<'st
     lines
 }
 
+// Mod 标签值行构建，支持富文本
 fn label_manifest_value_lines(
     label: String,
     value: String,
@@ -1148,6 +1180,7 @@ fn label_manifest_value_lines(
     lines
 }
 
+// 解析游戏中的富文本，替换按键占位符
 fn parse_game_rich_text_wrapped(
     game: &GameDescriptor,
     text: &str,
@@ -1171,6 +1204,7 @@ fn parse_game_rich_text_wrapped(
     })
 }
 
+// 富文本行居中裁剪
 fn crop_line_center_to_width(line: &Line<'static>, width: usize) -> Line<'static> {
     if width == 0 {
         return Line::from("");
@@ -1229,6 +1263,7 @@ fn crop_line_center_to_width(line: &Line<'static>, width: usize) -> Line<'static
     Line::from(spans)
 }
 
+// 格式化最佳成绩行，支持富文本和字段替换
 fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<Line<'static>> {
     if !game.has_best_score {
         return Vec::new();
@@ -1284,6 +1319,7 @@ fn format_runtime_best_score_lines(game: &GameDescriptor, width: usize) -> Vec<L
     }
 }
 
+// 获取无成绩时的回退文本
 fn resolved_best_none_text(game: &GameDescriptor) -> String {
     match game.display_best_none.clone() {
         Some(value) if !value.trim().is_empty() => value,
@@ -1291,6 +1327,7 @@ fn resolved_best_none_text(game: &GameDescriptor) -> String {
     }
 }
 
+// JSON 值转为内联文本
 fn json_value_to_inline_text(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::Null => "--".to_string(),

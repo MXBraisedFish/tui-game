@@ -1,29 +1,32 @@
-use std::sync::mpsc::Receiver;
-use std::thread;
-use std::time::{Duration, Instant};
+// 应用主循环和顶层状态管理。包含 UI 状态机（AppState）、事件分发（handle_key_event）、主渲染循环（run）和各类辅助函数。是 main.rs 中拆分出的核心模块
 
-use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use std::sync::mpsc::Receiver; // 接收版本检查结果
+use std::thread; // 帧率控制睡眠
+use std::time::{Duration, Instant}; // 帧预算和时间计算
 
-use crate::app::content_cache;
-use crate::app::continue_game;
-use crate::app::game_selection::{GameSelection, GameSelectionAction};
-use crate::app::i18n;
-use crate::app::layout::{MENU_MIN_HEIGHT, MENU_MIN_WIDTH};
-use crate::app::menu::{Menu, MenuAction};
-use crate::app::placeholder_pages::{self, PlaceholderPage};
-use crate::app::settings;
-use crate::core::runtime::{LaunchMode, launch_game};
-use crate::core::save;
-use crate::game::registry::GameDescriptor;
-use crate::terminal::session::TerminalSession;
-use crate::terminal::size_watcher;
+use anyhow::Result; // 错误处理
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind}; // 终端事件（键盘、Resize）
 
-pub const MAX_UI_EVENTS_PER_FRAME: usize = 256;
-pub const ACTIVE_FRAME_BUDGET: Duration = Duration::from_millis(16);
-pub const IDLE_FRAME_BUDGET: Duration = Duration::from_millis(250);
-pub const UI_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
+use crate::app::content_cache; // 缓存查询（游戏列表）
+use crate::app::continue_game; // 继续游戏同步
+use crate::app::game_selection::{GameSelection, GameSelectionAction}; // 游戏选择页状态和动作
+use crate::app::i18n; // 国际化文本
+use crate::app::layout::{MENU_MIN_HEIGHT, MENU_MIN_WIDTH}; // 主菜单尺寸常量
+use crate::app::menu::{Menu, MenuAction}; // 主菜单类型和渲染
+use crate::app::placeholder_pages::{self, PlaceholderPage}; // 占位页面
+use crate::app::settings; // 设置系统
+use crate::core::runtime::{LaunchMode, launch_game}; // 游戏启动
+use crate::core::save; // 存档操作
+use crate::game::registry::GameDescriptor; // 游戏描述符
+use crate::terminal::session::TerminalSession; // 终端会话
+use crate::terminal::size_watcher; // 终端尺寸检测
 
+pub const MAX_UI_EVENTS_PER_FRAME: usize = 256; // 每帧最多处理的 UI 事件数
+pub const ACTIVE_FRAME_BUDGET: Duration = Duration::from_millis(16); // 活跃时的帧预算（~60fps）
+pub const IDLE_FRAME_BUDGET: Duration = Duration::from_millis(250); // 空闲时的帧预算（~4fps）
+pub const UI_IDLE_TIMEOUT: Duration = Duration::from_secs(60); // 进入空闲模式的超时
+
+// 	顶层应用状态枚举
 pub enum AppState {
     MainMenu { menu: Menu },
     GameSelection { ui: GameSelection },
@@ -33,11 +36,13 @@ pub enum AppState {
     Exiting,
 }
 
+// 待确认的新游戏启动数据
 pub struct PendingNewGameStart {
     pub target_game: GameDescriptor,
     pub saved_game_name: String,
 }
 
+// 根据当前状态返回最小终端尺寸
 pub fn minimum_size_for_state(state: &AppState) -> (u16, u16) {
     match state {
         AppState::MainMenu { .. } => (MENU_MIN_WIDTH, MENU_MIN_HEIGHT),
@@ -48,6 +53,7 @@ pub fn minimum_size_for_state(state: &AppState) -> (u16, u16) {
     }
 }
 
+// 判断是否需要持续刷新 UI（有对话框或按键捕获时返回 true）
 pub fn should_keep_ui_animating(state: &AppState) -> bool {
     match state {
         AppState::Settings { ui } => {
@@ -61,6 +67,7 @@ pub fn should_keep_ui_animating(state: &AppState) -> bool {
     }
 }
 
+// 核心事件分发器：根据 AppState 分发按键到各子页面。包含主菜单导航、游戏选择确认、新游戏覆盖确认对话框、设置调度、占位页返回等
 pub fn handle_key_event(
     state: &mut AppState,
     pending_new_game_start: &mut Option<PendingNewGameStart>,
@@ -195,6 +202,7 @@ pub fn handle_key_event(
     Ok(())
 }
 
+// 渲染新游戏覆盖确认模态框：全屏 Clear 背景，垂直居中显示警告消息和 Y/N 选项
 pub fn render_new_game_confirm(frame: &mut ratatui::Frame<'_>, saved_game_name: &str) {
     use ratatui::layout::{Alignment, Constraint, Direction, Layout};
     use ratatui::style::{Color, Modifier, Style};
@@ -242,6 +250,7 @@ pub fn render_new_game_confirm(frame: &mut ratatui::Frame<'_>, saved_game_name: 
     frame.render_widget(p, center[1]);
 }
 
+// 将主菜单动作转换为下一个 AppState：Play→游戏选择、Continue→启动继续游戏（失败仅记录日志）、Settings→设置页、About→占位页、Quit→退出
 fn apply_menu_action(
     action: MenuAction,
     continue_game_id: Option<&str>,
@@ -279,8 +288,7 @@ fn apply_menu_action(
     }
 }
 
-/// 运行主循环。
-/// 接收终端会话、版本字符串、更新检查接收器，开始处理事件和渲染。
+// 主循环入口：初始化状态变量 → 循环执行帧预算控制、继续游戏同步、Mod 热重载轮询、版本更新检查、尺寸检测、事件收集与分发、页面渲染、帧率控制。接收到 Exiting 状态时退出循环
 pub fn run(
     mut session: TerminalSession,
     runtime_version: String,

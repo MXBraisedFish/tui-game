@@ -1,37 +1,35 @@
-/// 终端尺寸检测与尺寸不足时的警告画面渲染
-/// 业务逻辑：
-/// 尺寸约束
-/// 尺寸状态
-/// 尺寸检测
-/// 警告画面
+// 监控终端尺寸是否满足当前页面的最小/最大尺寸要求。若不满足，绘制居中警告信息提示用户调整窗口
 
-use std::io::{Write, stdout};
+use std::io::{Write, stdout}; // 标准输出写入
 
-use anyhow::Result;
-use crossterm::cursor::MoveTo;
-use crossterm::queue;
-use crossterm::style::{Attribute, Print, SetAttribute};
-use crossterm::terminal::{self, Clear, ClearType};
-use unicode_width::UnicodeWidthStr;
+use anyhow::Result; // 错误处理
+use crossterm::cursor::MoveTo; // 光标定位
+use crossterm::queue; // 批量排队 ANSI 指令
+use crossterm::style::{Attribute, Print, SetAttribute}; // 文本加粗等样式
+use crossterm::terminal::{self, Clear, ClearType}; // 清屏
+use unicode_width::UnicodeWidthStr; // Unicode 字符串宽度计算（用于居中布局）
 
-use crate::app::i18n::t;
+use crate::app::i18n::t; // 国际化文本模块
 
+// 尺寸约束结构体。
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SizeConstraints {
-    pub min_width: Option<u16>,
-    pub min_height: Option<u16>,
-    pub max_width: Option<u16>,
-    pub max_height: Option<u16>,
+    pub min_width: Option<u16>, // 最小宽度要求
+    pub min_height: Option<u16>, // 最小高度要求
+    pub max_width: Option<u16>, // 最大宽度限制
+    pub max_height: Option<u16>, // 最大高度限制
 }
 
+// 当前终端尺寸状态
 #[derive(Clone, Copy, Debug)]
 pub struct SizeState {
-    pub width: u16,
-    pub height: u16,
-    pub size_ok: bool,
+    pub width: u16, // 当前宽度
+    pub height: u16, // 当前高度
+    pub size_ok: bool, // 是否满足约束
 }
 
 impl SizeConstraints {
+    // 构造仅有最小限制的约束
     pub fn with_min(min_width: u16, min_height: u16) -> Self {
         Self {
             min_width: Some(min_width),
@@ -41,6 +39,7 @@ impl SizeConstraints {
         }
     }
 
+    // 检查给定宽高是否满足所有约束
     pub fn is_satisfied_by(&self, width: u16, height: u16) -> bool {
         if let Some(min_width) = self.min_width
             && width < min_width
@@ -66,10 +65,12 @@ impl SizeConstraints {
     }
 }
 
+// 便捷函数，使用最小约束检查当前终端尺寸
 pub fn check_size(min_width: u16, min_height: u16) -> Result<SizeState> {
     check_constraints(SizeConstraints::with_min(min_width, min_height))
 }
 
+// 检查当前终端尺寸是否满足自定义约束
 pub fn check_constraints(constraints: SizeConstraints) -> Result<SizeState> {
     let (width, height) = terminal::size()?;
     Ok(SizeState {
@@ -79,6 +80,7 @@ pub fn check_constraints(constraints: SizeConstraints) -> Result<SizeState> {
     })
 }
 
+// 使用最小约束绘制尺寸不足警告
 pub fn draw_size_warning(state: &SizeState, min_width: u16, min_height: u16) -> Result<()> {
     draw_size_warning_with_constraints(
         state,
@@ -87,6 +89,7 @@ pub fn draw_size_warning(state: &SizeState, min_width: u16, min_height: u16) -> 
     )
 }
 
+// 绘制尺寸警告画面，区分"尺寸不足"和"超出限制"两种场景
 pub fn draw_size_warning_with_constraints(
     state: &SizeState,
     constraints: SizeConstraints,

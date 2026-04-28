@@ -1,25 +1,21 @@
-/// 简易占位页面渲染，用于未完成的页面入口
-/// 业务逻辑：
-/// 支持三种占位页面
-/// 显示对应提示文本和返回操作提示
-/// About 页面还显示运行时版本和最新版本信息
+// 提供简易占位页面渲染，用于 About、Settings（旧版）、Continue 等暂未完整实现的功能入口。显示对应的提示文本和返回操作提示
 
-use ratatui::layout::{Alignment, Constraint, Direction, Layout};
-use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Paragraph, Wrap};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout}; // 垂直居中布局
+use ratatui::style::{Color, Style}; // 文本样式
+use ratatui::text::{Line, Span}; // 富文本
+use ratatui::widgets::{Paragraph, Wrap}; // 段落渲染
 
-use crate::app::i18n::t;
+use crate::app::i18n::t; // 国际化
 
+// 占位页面类型枚举
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// 占位页面类型。
 pub enum PlaceholderPage {
     Settings,
     About,
     Continue,
 }
 
-/// 渲染通用占位页面，用于暂未完成的功能入口。
+// 渲染占位页面：根据页面类型显示对应消息，About 页面显示版本号信息。消息垂直居中，底部显示返回提示
 pub fn render_placeholder(
     frame: &mut ratatui::Frame<'_>,
     page: PlaceholderPage,

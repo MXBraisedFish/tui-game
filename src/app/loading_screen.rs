@@ -1,19 +1,19 @@
-use std::io::Stdout;
+// 渲染启动加载画面，显示进度百分比、进度条、当前步骤信息和底部提示。在 main.rs 的启动流程中被调用
 
-use anyhow::Result;
-use ratatui::Terminal;
-use ratatui::backend::CrosstermBackend;
-use ratatui::layout::{Alignment, Constraint, Direction, Layout};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Gauge, Paragraph, Wrap};
+use std::io::Stdout; // 标准输出类型（终端后端泛型参数）
 
-use crate::app::content_cache;
-use crate::app::i18n;
+use anyhow::Result; // 错误处理
+use ratatui::Terminal; // 终端渲染器
+use ratatui::backend::CrosstermBackend; // crossterm 后端
+use ratatui::layout::{Alignment, Constraint, Direction, Layout}; // 布局约束和方向
+use ratatui::style::{Color, Modifier, Style}; // 颜色、修饰、样式
+use ratatui::text::{Line, Span}; // 富文本行和片段
+use ratatui::widgets::{Block, Borders, Gauge, Paragraph, Wrap}; // Block、Borders、Gauge（进度条）、Paragraph、Wrap
 
-/// 在终端上渲染启动加载进度画面。
-///
-/// 显示标题、进度百分比、进度条、当前步骤信息和底部提示。
+use crate::app::content_cache; // 加载进度数据结构
+use crate::app::i18n; // 国际化文本
+
+// 绘制加载画面：标题 + 百分比 + 进度条 + 当前步骤 + 底部提示。整体居中显示在有边框的块内
 pub fn render_loading_screen(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     progress: &content_cache::LoadingProgress,
@@ -97,9 +97,7 @@ pub fn render_loading_screen(
     Ok(())
 }
 
-/// 估算文本在给定宽度下换行后的总行数。
-///
-/// 用于计算加载画面中提示文本所需的高度。
+// 估算文本在给定宽度下换行后的总行数。按字符数除以每行宽度向上取整
 pub fn estimate_wrapped_lines(text: &str, width: u16) -> u16 {
     let width = width.max(1) as usize;
     let mut total = 0usize;

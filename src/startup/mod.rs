@@ -1,17 +1,21 @@
+// startup 模块入口，声明 cli 和 environment 子模块，并提供一个统一的 prepare_environment() 入口函数，按顺序编排整个启动流程
+
+// 命令行参数处理
 pub mod cli;
+
+// 环境准备：清理旧数据、创建目录、初始化默认文件
 pub mod environment;
 
-use anyhow::Result;
-use std::io;
+use anyhow::Result; // 错误处理，prepare_environment 返回 Result
+use std::io; // 标准输出句柄，用于 panic hook 中恢复终端
 
-use crossterm::cursor::Show;
-use crossterm::execute;
-use crossterm::terminal::{LeaveAlternateScreen, disable_raw_mode};
+use crossterm::cursor::Show; // 显示光标，panic 时恢复
+use crossterm::execute; // 执行终端指令
+use crossterm::terminal::{LeaveAlternateScreen, disable_raw_mode}; // 退出 alternate screen 和 raw mode
 
-use crate::app::i18n;
+use crate::app::i18n; // 初始化国际化
 
-/// 安装程序崩溃处理钩子。
-/// panic 时自动恢复终端状态并记录错误日志。
+// 安装程序崩溃处理钩子。panic 发生时自动恢复终端（关闭 raw mode、显示光标、退出 alternate screen），记录错误日志，然后调用原有的 panic handler
 pub fn install_panic_hook() {
     let old = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
@@ -26,17 +30,7 @@ pub fn install_panic_hook() {
     }));
 }
 
-/// 执行启动前的环境准备。
-///
-/// 按顺序执行：
-/// 1. 处理 CLI 参数（如 `-rv` 输出版本号）
-/// 2. 安装 panic hook
-/// 3. 清理旧版遗留数据
-/// 4. 初始化国际化
-/// 5. 创建运行时目录与默认文件
-///
-/// 返回 `Ok(true)` 表示 CLI 已处理完毕，调用方应退出程序。
-/// 返回 `Ok(false)` 表示环境准备完成，继续正常启动。
+// 按顺序编排启动流程：CLI 处理 → panic hook → 清理旧数据 → 初始化国际化 → 创建目录结构。返回 Ok(true) 表示 CLI 已处理应退出，Ok(false) 表示继续启动
 pub fn prepare_environment() -> Result<bool> {
     if cli::handle_cli_passthrough()? {
         return Ok(true);

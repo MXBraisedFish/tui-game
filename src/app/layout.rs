@@ -1,24 +1,20 @@
-/// 主菜单页面布局计算
-/// 业务逻辑：
-/// 定义主菜单最小尺寸常量
-/// 计算 Logo 区、菜单列表区、版本信息区的矩形位置
-/// 通用居中矩形计算工具函数
+// 主菜单页面的布局计算，提供通用居中矩形工具和主菜单三个区域（Logo、菜单列表、版本信息）的定位
 
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout, Rect}; // 布局约束和矩形
 
-pub const MENU_MIN_WIDTH: u16 = 60;
-pub const MENU_MIN_HEIGHT: u16 = 15;
-pub const MAIN_CONTENT_WIDTH: u16 = 72;
-pub const MENU_LIST_WIDTH: u16 = 30;
+pub const MENU_MIN_WIDTH: u16 = 60; // 主菜单最小终端宽度
+pub const MENU_MIN_HEIGHT: u16 = 15; // 主菜单最小终端高度
+pub const MAIN_CONTENT_WIDTH: u16 = 72; // 主菜单理想内容宽度
+pub const MENU_LIST_WIDTH: u16 = 30; // 菜单列表区域的理想宽度
 
-/// 主菜单渲染时各区域的布局结果。
+// 主菜单各区域的布局结果
 pub struct MainMenuAreas {
     pub logo: Rect,
     pub menu: Rect,
     pub version: Rect,
 }
 
-/// 计算主菜单界面的中心布局区域。
+// 计算主菜单的布局：整个内容区居中（72x15），纵向分为 logo(6) / 间距(1) / 菜单(5) / 版本(2) / 间距(1)，菜单区域再横向居中（宽度 30）
 pub fn main_menu_areas(area: Rect) -> MainMenuAreas {
     let content = centered_rect(
         area,
@@ -51,7 +47,7 @@ pub fn main_menu_areas(area: Rect) -> MainMenuAreas {
     }
 }
 
-/// 在父区域内部创建一个水平和垂直都居中的子矩形。
+// 在父区域内部创建水平和垂直都居中的子矩形
 pub fn centered_rect(area: Rect, width: u16, height: u16) -> Rect {
     let horizontal = Layout::default()
         .direction(Direction::Horizontal)

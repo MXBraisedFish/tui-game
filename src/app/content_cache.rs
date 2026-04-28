@@ -1,35 +1,34 @@
-/// 应用程序内容缓存管理，负责扫描、加载和缓存游戏与 Mod 数据
-/// 包含业务：
-/// 启动时资源扫描
-/// 缓存访问
-/// Mod 文件树指纹
+// 应用程序内容缓存管理，负责在启动时扫描所有游戏和 Mod 包，填充全局缓存，并在后续使用时提供数据查询。同时提供 Mod 文件树指纹检测，供热重载判断
 
-use std::sync::RwLock;
+use std::sync::RwLock; // 读写锁，保护全局缓存的并发访问
 
-use once_cell::sync::Lazy;
-use std::collections::hash_map::DefaultHasher;
-use std::fs;
-use std::hash::{Hash, Hasher};
-use std::path::Path;
+use once_cell::sync::Lazy; // 惰性静态初始化
+use std::collections::hash_map::DefaultHasher; // 构建 Mod 文件树哈希
+use std::fs; // 文件系统元数据（文件修改时间、大小）
+use std::hash::{Hash, Hasher}; // 哈希计算
+use std::path::Path; // 路径操作
 
-use crate::app::i18n;
-use crate::game::registry::{GameDescriptor, GameRegistry, PackageDescriptor};
-use crate::game::resources;
-use crate::mods::{self, ModPackage};
-use crate::utils::host_log;
+use crate::app::i18n; // 国际化文本（加载进度提示）
+use crate::game::registry::{GameDescriptor, GameRegistry, PackageDescriptor}; // 游戏注册表相关类型
+use crate::game::resources; // 包级语言缓存构建
+use crate::mods::{self, ModPackage}; // Mod 包扫描与类型
+use crate::utils::host_log; // 错误日志
 
+// 加载进度描述
 #[derive(Clone, Debug)]
 pub struct LoadingProgress {
     pub percent: u16,
     pub message: String,
 }
 
+// 全局应用缓存（私有）
 #[derive(Clone, Debug, Default)]
 struct AppContentCache {
     games: Vec<GameDescriptor>,
     mods: Vec<ModPackage>,
 }
 
+// 无进度的重载，内部调用 reload_with_progress
 static CONTENT_CACHE: Lazy<RwLock<AppContentCache>> =
     Lazy::new(|| RwLock::new(AppContentCache::default()));
 
@@ -37,6 +36,7 @@ pub fn reload() {
     reload_with_progress(|_| {});
 }
 
+// 执行分阶段加载：扫描游戏 → 扫描 Mod → 收集包元数据 → 重建语言缓存 → 填充游戏显示字段 → 发布缓存。每个阶段回调进度
 pub fn reload_with_progress(mut on_progress: impl FnMut(LoadingProgress)) {
     on_progress(LoadingProgress {
         percent: 5,
@@ -141,6 +141,7 @@ pub fn reload_with_progress(mut on_progress: impl FnMut(LoadingProgress)) {
     });
 }
 
+// 获取游戏描述符列表的克隆
 pub fn games() -> Vec<GameDescriptor> {
     CONTENT_CACHE
         .read()
@@ -148,6 +149,7 @@ pub fn games() -> Vec<GameDescriptor> {
         .unwrap_or_default()
 }
 
+// 获取 Mod 包列表的克隆
 pub fn mods() -> Vec<ModPackage> {
     CONTENT_CACHE
         .read()
@@ -155,6 +157,7 @@ pub fn mods() -> Vec<ModPackage> {
         .unwrap_or_default()
 }
 
+// 按 ID 查找单个游戏，返回 Option<GameDescriptor>
 pub fn find_game(id: &str) -> Option<GameDescriptor> {
     CONTENT_CACHE
         .read()
@@ -162,6 +165,7 @@ pub fn find_game(id: &str) -> Option<GameDescriptor> {
         .and_then(|cache| cache.games.iter().find(|game| game.id == id).cloned())
 }
 
+// 计算 Mod 目录的文件树哈希（跳过 save/cache/logs 目录），用于热重载检测
 pub fn current_mod_tree_fingerprint() -> Option<u64> {
     let root = mods::mod_data_dir().ok()?;
     let mut hasher = DefaultHasher::new();
@@ -169,6 +173,7 @@ pub fn current_mod_tree_fingerprint() -> Option<u64> {
     Some(hasher.finish())
 }
 
+// 为游戏描述符填充本地化显示字段：名称、描述、详情、作者、包名、版本、最佳成绩。有包信息时通过 resources::resolve_package_text 解析，否则使用原始值
 fn hydrate_game_display_fields(game: &mut GameDescriptor) {
     if let Some(package) = game.package_info().cloned() {
         game.display_name = resources::resolve_package_text(&package, &game.name);
@@ -212,6 +217,7 @@ fn hydrate_game_display_fields(game: &mut GameDescriptor) {
     }
 }
 
+// 递归遍历 Mod 目录，将文件相对路径、大小、修改时间哈希化。跳过 save/cache/logs 子目录
 fn hash_mod_tree(root: &Path, path: &Path, hasher: &mut DefaultHasher) {
     let Ok(metadata) = fs::metadata(path) else {
         return;

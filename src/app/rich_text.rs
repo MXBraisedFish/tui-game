@@ -1,27 +1,26 @@
-/// 自定义富文本解析器，支持 f% 前缀的格式化文本语法
-/// 业务逻辑：
-/// 支持的样式指令
-/// 按键绑定替换
-/// 输出处理
+// 自定义富文本解析器，支持 f% 前缀的格式化文本语法。提供颜色、背景、文字样式的内联控制，支持按键占位符替换，最终将解析后的带样式字符按指定宽度自动换行，输出 Vec<Line> 供 ratatui 渲染
 
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use unicode_width::UnicodeWidthChar;
+use ratatui::style::{Color, Modifier, Style}; // 颜色、修饰、样式类型
+use ratatui::text::{Line, Span}; // 输出行和片段
+use unicode_width::UnicodeWidthChar; // 字符宽度计算（用于换行）
 
-use crate::app::i18n;
+use crate::app::i18n; // 错误消息的国际化
 
+// 按键绑定查询模式
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum KeyBindingMode {
     User,
     Original,
 }
 
+// 解析后的带样式字符
 #[derive(Clone)]
 struct StyledChar {
     ch: char,
     style: Style,
 }
 
+// 当前样式状态机
 #[derive(Clone)]
 struct StyleState {
     default_fg: Option<Color>,
@@ -37,16 +36,12 @@ struct StyleState {
     modifier_need_clear: bool,
 }
 
-/// 解析可选的 `f%` 富文本语法，并按指定宽度包装为 ratatui 可渲染的文本行。
-///
-/// 当前支持的指令：
-/// - `{tc:<颜色>}` / `{tc:clear}` / `{tc:<颜色>><数量>}`：控制文字颜色。
-/// - `{bg:<颜色>}` / `{bg:clear}` / `{bg:<颜色>><数量>}`：控制背景颜色。
-/// - `{ts:<样式>}` / `{ts:clear}` / `{ts:<样式>><数量>}`：控制文字样式。
+// 解析富文本，不处理按键替换，按指定宽度换行
 pub fn parse_rich_text_wrapped(text: &str, width: usize, base: Style) -> Vec<Line<'static>> {
     parse_rich_text_wrapped_with_keys(text, width, base, |_, _| None)
 }
 
+// 解析富文本，支持 {key:...} 按键占位符替换，按宽度换行
 pub fn parse_rich_text_wrapped_with_keys<F>(
     text: &str,
     width: usize,
@@ -143,6 +138,7 @@ where
     styled_chars_to_lines(&out, width.max(1), base)
 }
 
+// 在全文中查找 {key:...} 块并替换为实际键名
 fn replace_key_commands<F>(content: &str, key_resolver: &F) -> String
 where
     F: Fn(&str, KeyBindingMode) -> Option<Vec<String>>,
@@ -180,6 +176,7 @@ where
     out
 }
 
+// 在花括号块中分离样式指令和按键指令，按键指令替换为文本
 fn replace_key_commands_in_block<F>(block: &str, key_resolver: &F) -> Option<String>
 where
     F: Fn(&str, KeyBindingMode) -> Option<Vec<String>>,
@@ -214,6 +211,7 @@ where
     Some(out)
 }
 
+// 解析单个 key:语义键名>模式 命令
 fn resolve_key_command<F>(block: &str, key_resolver: &F) -> Option<String>
 where
     F: Fn(&str, KeyBindingMode) -> Option<Vec<String>>,
@@ -239,6 +237,7 @@ where
     Some(format_key_list(&keys))
 }
 
+// 将键名列表格式化为 [key1]/[key2]
 fn format_key_list(keys: &[String]) -> String {
     keys.iter()
         .filter(|key| !key.trim().is_empty())
@@ -247,6 +246,7 @@ fn format_key_list(keys: &[String]) -> String {
         .join("/")
 }
 
+// 转义富文本中的特殊字符（\、{、}）
 fn escape_rich_replacement(text: &str) -> String {
     let mut out = String::new();
     for ch in text.chars() {
@@ -258,6 +258,7 @@ fn escape_rich_replacement(text: &str) -> String {
     out
 }
 
+// 将样式状态重置为默认值
 fn reset_to_default(state: &mut StyleState) {
     state.fg = state.default_fg;
     state.bg = state.default_bg;
@@ -270,6 +271,7 @@ fn reset_to_default(state: &mut StyleState) {
     state.modifier_need_clear = false;
 }
 
+// 从字符数组中读取 {...} 块，处理转义，返回块内容和消费长度
 fn read_block(input: &[char]) -> Option<(String, usize)> {
     if input.first().copied() != Some('{') {
         return None;
@@ -298,6 +300,7 @@ fn read_block(input: &[char]) -> Option<(String, usize)> {
     None
 }
 
+// 按分隔符切分字符串，忽略转义的分隔符
 fn split_unescaped(input: &str, sep: char) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = String::new();
@@ -328,6 +331,7 @@ fn split_unescaped(input: &str, sep: char) -> Vec<String> {
     out
 }
 
+// 将花括号块中的指令应用到样式状态机
 fn apply_block(block: &str, state: &mut StyleState, rest: &[char]) -> Result<(), String> {
     let commands = split_unescaped(block, '|');
     if commands.is_empty() {
@@ -357,6 +361,7 @@ fn apply_block(block: &str, state: &mut StyleState, rest: &[char]) -> Result<(),
     Ok(())
 }
 
+// 处理 tc/bg 颜色指令：支持 clear、命名颜色、#RGB、rgb() 和数量限定
 fn apply_color_command(
     params: Vec<String>,
     is_fg: bool,
@@ -419,6 +424,7 @@ fn apply_color_command(
     Ok(())
 }
 
+// 处理 ts 文字样式指令：支持 clear、bold+italic 组合、数量限定
 fn apply_text_style_command(
     params: Vec<String>,
     state: &mut StyleState,
@@ -465,6 +471,7 @@ fn apply_text_style_command(
     Ok(())
 }
 
+// 前瞻搜索后续文本中是否存在对应命令的 clear 指令（防止无限样式蔓延）
 fn has_future_clear(rest: &[char], cmd: &str) -> bool {
     let mut i = 0usize;
     while i < rest.len() {
@@ -495,6 +502,7 @@ fn has_future_clear(rest: &[char], cmd: &str) -> bool {
     false
 }
 
+// 将字符以当前样式状态压入输出，并更新数量计数
 fn push_char(out: &mut Vec<StyledChar>, ch: char, state: &mut StyleState, base: Style) {
     let mut style = base;
     style.fg = state.fg;
@@ -532,10 +540,12 @@ fn push_char(out: &mut Vec<StyledChar>, ch: char, state: &mut StyleState, base: 
     }
 }
 
+// 国际化错误消息的便捷函数
 fn rt(key: &str) -> String {
     i18n::t(key).to_string()
 }
 
+// 以红色样式输出错误标记 {错误消息}
 fn push_error(out: &mut Vec<StyledChar>, msg: &str, base: Style) {
     let mut style = base;
     style.fg = Some(Color::Red);
@@ -545,6 +555,7 @@ fn push_error(out: &mut Vec<StyledChar>, msg: &str, base: Style) {
     }
 }
 
+// 将 StyledChar 列表转换为 Vec<Line>：遇到 \n 换行，其余按宽度自动换行
 fn styled_chars_to_lines(chars: &[StyledChar], width: usize, base: Style) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut segment: Vec<StyledChar> = Vec::new();
@@ -572,6 +583,7 @@ fn styled_chars_to_lines(chars: &[StyledChar], width: usize, base: Style) -> Vec
     lines
 }
 
+// 将一段连续的 StyledChar 按宽度切分，优先在空格处换行（词边界）
 fn wrap_segment_wordwise(
     segment: &[StyledChar],
     width: usize,
@@ -637,6 +649,7 @@ fn wrap_segment_wordwise(
     }
 }
 
+// 将 StyledChar 列表构建为单个 Line，合并相同样式的连续字符为 Span
 fn build_line(chars: &[StyledChar], base: Style) -> Line<'static> {
     if chars.is_empty() {
         return Line::default();
@@ -663,6 +676,7 @@ fn build_line(chars: &[StyledChar], base: Style) -> Line<'static> {
     Line::from(spans)
 }
 
+// 解析颜色字符串：支持 16 种命名颜色、#RGB/#RRGGBB 十六进制、rgb(r,g,b)
 fn parse_color(raw: &str) -> Option<Color> {
     let text = raw.trim();
     if text.is_empty() {
@@ -697,6 +711,7 @@ fn parse_color(raw: &str) -> Option<Color> {
     }
 }
 
+// 解析文字样式组合：bold、italic、underline、strike、blink、reverse、hidden、dim，可用 + 连接
 fn parse_text_styles(raw: &str) -> Option<Modifier> {
     let mut modifiers = Modifier::empty();
     let mut saw_any = false;
@@ -724,6 +739,7 @@ fn parse_text_styles(raw: &str) -> Option<Modifier> {
     }
 }
 
+// 解析 #RGB（3位）和 #RRGGBB（6位）十六进制颜色
 fn parse_hex_color(raw: &str) -> Option<Color> {
     if !raw.starts_with('#') {
         return None;
@@ -746,6 +762,7 @@ fn parse_hex_color(raw: &str) -> Option<Color> {
     None
 }
 
+// 解析 rgb(r,g,b) 函数格式颜色
 fn parse_rgb_color(raw: &str) -> Option<Color> {
     let lower = raw.to_ascii_lowercase();
     if !lower.starts_with("rgb(") || !lower.ends_with(')') {

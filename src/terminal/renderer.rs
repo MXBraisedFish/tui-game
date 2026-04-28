@@ -1,40 +1,45 @@
-/// 将游戏虚拟画布 Canvas 渲染到终端，支持增量渲染优化
-/// 业务逻辑：
-/// Canvas 缓存
-/// 渲染流程
-/// 行渲染
-/// 样式应用
-/// 颜色与样式映射
+// 将游戏的虚拟画布（Canvas）高效渲染到终端。核心优化是增量渲染——只重绘与实际上一帧不同的单元格，并维护样式状态以减少重复的 ANSI 控制序列
 
-use std::io::{Write, stdout};
-use std::sync::{Mutex, OnceLock};
+use std::io::{Write, stdout}; // 标准输出写入
+use std::sync::{Mutex, OnceLock}; // 线程安全的画布缓存
 
-use anyhow::Result;
-use crossterm::cursor::MoveTo;
-use crossterm::queue;
-use crossterm::style::{
+use anyhow::Result; // 错误处理
+use crossterm::cursor::MoveTo; // 移动终端光标
+use crossterm::queue; // 批量排队 ANSI 指令
+use crossterm::style::{ // 颜色、样式属性控制
     Attribute, Color as CColor, Print, ResetColor, SetAttribute, SetBackgroundColor,
     SetForegroundColor,
 };
-use crossterm::terminal::{Clear, ClearType};
+use crossterm::terminal::{Clear, ClearType}; // 清屏
 
-use crate::core::screen::{
+use crate::core::screen::{ // 游戏的虚拟画布和样式定义
     Canvas, STYLE_BLINK, STYLE_BOLD, STYLE_DIM, STYLE_HIDDEN, STYLE_ITALIC, STYLE_REVERSE,
     STYLE_STRIKE, STYLE_UNDERLINE,
 };
 
 static LAST_CANVAS: OnceLock<Mutex<Option<Canvas>>> = OnceLock::new();
 
+// 内部状态结构体，缓存当前终端的前景色、背景色、文本样式，避免重复设置相同的样式
+#[derive(Default)]
+struct StyleState {
+    fg: Option<CColor>,
+    bg: Option<CColor>,
+    text_style: Option<i64>,
+}
+
+// 获取全局画布缓存的单例（用于增量渲染对比）
 fn canvas_cache() -> &'static Mutex<Option<Canvas>> {
     LAST_CANVAS.get_or_init(|| Mutex::new(None))
 }
 
+// 清除缓存，强制下一帧全量重绘
 pub fn invalidate_canvas_cache() {
     if let Ok(mut cache) = canvas_cache().lock() {
         *cache = None;
     }
 }
 
+// 主渲染函数，对比缓存决定全量/增量渲染，调用行渲染
 pub fn render_canvas(canvas: &Canvas) -> Result<()> {
     let mut out = stdout();
     let mut cache = canvas_cache()
@@ -68,13 +73,7 @@ pub fn render_canvas(canvas: &Canvas) -> Result<()> {
     Ok(())
 }
 
-#[derive(Default)]
-struct StyleState {
-    fg: Option<CColor>,
-    bg: Option<CColor>,
-    text_style: Option<i64>,
-}
-
+// 渲染指定行，跳过未变化的单元格，合并在同一渲染段的相同样式字符
 fn queue_row_segments<W: Write>(
     out: &mut W,
     canvas: &Canvas,
@@ -140,6 +139,7 @@ fn queue_row_segments<W: Write>(
     Ok(())
 }
 
+// 仅在样式变化时发送 ANSI 控制序列，更新样式状态
 fn apply_style<W: Write>(
     out: &mut W,
     style_state: &mut StyleState,
@@ -165,6 +165,7 @@ fn apply_style<W: Write>(
     Ok(())
 }
 
+// 将游戏内样式常量映射为 crossterm 的 Attribute
 fn map_text_style(style: Option<i64>) -> Option<Attribute> {
     match style {
         Some(STYLE_BOLD) => Some(Attribute::Bold),
@@ -179,6 +180,7 @@ fn map_text_style(style: Option<i64>) -> Option<Attribute> {
     }
 }
 
+// 将颜色字符串（命名颜色、#RGB 十六进制、rgb() 函数）解析为 crossterm 的 Color
 fn parse_color(name: Option<&str>) -> Option<CColor> {
     let raw = name.unwrap_or("").trim();
     if let Some(hex) = parse_hex_color(raw) {
@@ -205,6 +207,7 @@ fn parse_color(name: Option<&str>) -> Option<CColor> {
     }
 }
 
+// 解析 #RRGGBB 格式的十六进制颜色字符串
 fn parse_hex_color(raw: &str) -> Option<CColor> {
     if raw.len() != 7 || !raw.starts_with('#') {
         return None;
@@ -215,6 +218,7 @@ fn parse_hex_color(raw: &str) -> Option<CColor> {
     Some(CColor::Rgb { r, g, b })
 }
 
+// 解析 rgb(r,g,b) 格式的颜色字符串
 fn parse_rgb_color(raw: &str) -> Option<CColor> {
     let lower = raw.to_ascii_lowercase();
     if !lower.starts_with("rgb(") || !lower.ends_with(')') {
