@@ -46,14 +46,14 @@ static I18N: Lazy<RwLock<I18nState>> = Lazy::new(|| {
     })
 });
 
-// 加载所有语言包 → 排序（按名称降序）→ 确定回退包（us-en）→ 确定当前语言（持久化偏好 > 默认 > us-en > 回退）→ 更新全局状态
+// 加载所有语言包 → 排序（按名称降序）→ 确定回退包（en_us）→ 确定当前语言（持久化偏好 > 默认 > en_us > 回退）→ 更新全局状态
 pub fn init(default_code: &str) -> Result<()> {
     let mut packs = load_language_packs()?;
     packs.sort_by(|a, b| b.name.cmp(&a.name));
 
     let fallback = packs
         .iter()
-        .find(|pack| pack.code == "us-en")
+        .find(|pack| pack.code == "en_us")
         .cloned()
         .unwrap_or_else(builtin_english_pack);
 
@@ -70,8 +70,8 @@ pub fn init(default_code: &str) -> Result<()> {
         preferred_code
     } else if packs.iter().any(|pack| pack.code == default_code) {
         default_code.to_string()
-    } else if packs.iter().any(|pack| pack.code == "us-en") {
-        "us-en".to_string()
+    } else if packs.iter().any(|pack| pack.code == "en_us") {
+        "en_us".to_string()
     } else {
         fallback.code.clone()
     };
@@ -100,7 +100,7 @@ pub fn current_language_code() -> String {
     if let Ok(state) = I18N.read() {
         return state.current_code.clone();
     }
-    "us-en".to_string()
+    "en_us".to_string()
 }
 
 // 切换语言：验证语言存在 → 更新当前代码 → 持久化偏好 → 返回成功/失败
@@ -286,11 +286,11 @@ fn save_persisted_language_code(code: &str) -> Result<()> {
     Ok(())
 }
 
-// 编译时内置英文语言包：通过 include_str! 嵌入 assets/lang/us-en.json，解析失败时使用最小内置包
+// 编译时内置英文语言包：通过 include_str! 嵌入 assets/lang/en_us.json，解析失败时使用最小内置包
 fn builtin_english_pack() -> LanguagePack {
     const US_EN_JSON: &str = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/assets/lang/us-en.json"
+        "/assets/lang/en_us.json"
     ));
 
     let parsed = serde_json::from_str::<Value>(US_EN_JSON)
@@ -311,7 +311,7 @@ fn builtin_english_pack() -> LanguagePack {
                 .cloned()
                 .unwrap_or_else(|| "English".to_string());
             return LanguagePack {
-                code: "us-en".to_string(),
+                code: "en_us".to_string(),
                 name,
                 dict,
             };
@@ -336,7 +336,7 @@ fn minimal_builtin_english_pack() -> LanguagePack {
     );
 
     LanguagePack {
-        code: "us-en".to_string(),
+        code: "en_us".to_string(),
         name: "English".to_string(),
         dict,
     }

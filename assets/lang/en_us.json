@@ -1,0 +1,10 @@
+{
+  "global.error.missing_key": "[Missing i18n key: {key}]",
+  "loading.init_env": "Initializing environment...",
+  "loading.scan_mod": "Scanning mod packages...",
+  "loading.scan_ui": "Scanning UI packages...",
+  "loading.read_data": "Reading data...",
+  "loading.pre_cache": "Preparing cache...",
+  "loading.ready_launch": "Ready to start...",
+  "loading.complete": "Complete."
+}
