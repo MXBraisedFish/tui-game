@@ -249,10 +249,14 @@ fn load_language_file(root_dir: &Path, language_code: &str) -> Option<HashMap<St
 
 /// 获取程序根目录（可执行文件所在目录或当前目录）
 fn root_dir() -> PathBuf {
-    std::env::current_exe()
+    std::env::current_dir()
         .ok()
-        .and_then(|path| path.parent().map(Path::to_path_buf))
-        .or_else(|| std::env::current_dir().ok())
+        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|path| path.parent().map(Path::to_path_buf))
+        })
         .unwrap_or_else(|| PathBuf::from("."))
 }
 

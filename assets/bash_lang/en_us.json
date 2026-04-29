@@ -13,7 +13,7 @@
   "cli.help.header": "Short        Long               Description",
   "cli.help.no_arg": "[none]                          Launch the game",
   "cli.help.help": "-h           -help              Show help",
-  "cli.help.api": "-a          -api            Show API version",
+  "cli.help.api": "-a           -api               Show API version",
   "cli.help.fix": "-f           -fix               Repair official resource files",
   "cli.help.path": "-p           -path              Show install path",
   "cli.help.version": "-v           -version           Show version and check for updates",

@@ -38,7 +38,7 @@ pub fn prepare_environment() -> Result<bool> {
 
     install_panic_hook();
     environment::cleanup_legacy_runtime_data()?;
-    i18n::init("us_en")?;
+    i18n::init("en_us")?;
     environment::initialize_runtime_layout()?;
 
     Ok(false)

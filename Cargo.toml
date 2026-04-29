@@ -2,23 +2,11 @@
 name = "tui-game"
 version = "1.0.0"
 edition = "2024"
-default-run = "tui-game"
-
-[lib]
-name = "tui_game"
-path = "src/old/lib.rs"
+default-run = "tg"
 
 [[bin]]
-name = "tui-game"
+name = "tg"
 path = "src/main.rs"
-
-[[bin]]
-name = "tui-game-old"
-path = "src/old/main.rs"
-
-[[bin]]
-name = "tui-game-new"
-path = "src/new/main.rs"
 
 [dependencies]
 crossterm = "0.29.0"

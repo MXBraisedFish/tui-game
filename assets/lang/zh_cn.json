@@ -1,7 +1,7 @@
 {
   "global.error.missing_key": "[缺少 i18n 键：{key}]",
   "loading.init_env": "初始化环境……",
-  "loading.scan_mod": "模组包扫描……",
+  "loading.scan_game": "读取游戏模块……",
   "loading.scan_ui": "UI 包扫描……",
   "loading.read_data": "数据读取……",
   "loading.pre_cache": "准备缓存……",

@@ -18,11 +18,11 @@ pub fn ensure() -> EnvironmentResult<()> {
     ensure_dir(&root_dir.join("data/cache"))?;
     ensure_dir(&root_dir.join("data/cache/images"))?;
     ensure_file(
-        &root_dir.join("data/cache/mod_state.json"),
+        &root_dir.join("data/cache/mod_scan_cache.json"),
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
-        &root_dir.join("data/cache/scan_cache.json"),
+        &root_dir.join("data/cache/ui_scan_cache.json"),
         EMPTY_JSON_OBJECT,
     )?;
 
@@ -38,6 +38,18 @@ pub fn ensure() -> EnvironmentResult<()> {
     ensure_file(
         &root_dir.join("data/profiles/language.txt"),
         DEFAULT_LANGUAGE_CODE,
+    )?;
+    ensure_file(
+        &root_dir.join("data/profiles/keybind.json"),
+        EMPTY_JSON_OBJECT,
+    )?;
+    ensure_file(
+        &root_dir.join("data/profiles/ui_state.json"),
+        EMPTY_JSON_OBJECT,
+    )?;
+    ensure_file(
+        &root_dir.join("data/profiles/mod_state.json"),
+        EMPTY_JSON_OBJECT,
     )?;
 
     ensure_dir(&root_dir.join("data/log"))?;

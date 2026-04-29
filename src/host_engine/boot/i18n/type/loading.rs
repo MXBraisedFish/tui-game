@@ -5,7 +5,7 @@ use once_cell::sync::OnceCell;
 use crate::host_engine::boot::i18n::i18n::{resolve_text, LanguageSource};
 
 pub static INIT_ENV: OnceCell<String> = OnceCell::new();
-pub static SCAN_MOD: OnceCell<String> = OnceCell::new();
+pub static SCAN_GAME: OnceCell<String> = OnceCell::new();
 pub static SCAN_UI: OnceCell<String> = OnceCell::new();
 pub static READ_DATA: OnceCell<String> = OnceCell::new();
 pub static PRE_CACHE: OnceCell<String> = OnceCell::new();
@@ -16,7 +16,7 @@ pub static COMPLETE: OnceCell<String> = OnceCell::new();
 #[derive(Clone, Copy)]
 pub struct LoadingText {
     pub init_env: &'static str,
-    pub scan_mod: &'static str,
+    pub scan_game: &'static str,
     pub scan_ui: &'static str,
     pub read_data: &'static str,
     pub pre_cache: &'static str,
@@ -27,7 +27,7 @@ pub struct LoadingText {
 /// 注册 loading.* 文本
 pub fn register(language_source: &LanguageSource) -> LoadingText {
     set_text(&INIT_ENV, language_source, "loading.init_env");
-    set_text(&SCAN_MOD, language_source, "loading.scan_mod");
+    set_text(&SCAN_GAME, language_source, "loading.scan_game");
     set_text(&SCAN_UI, language_source, "loading.scan_ui");
     set_text(&READ_DATA, language_source, "loading.read_data");
     set_text(&PRE_CACHE, language_source, "loading.pre_cache");
@@ -36,7 +36,7 @@ pub fn register(language_source: &LanguageSource) -> LoadingText {
 
     LoadingText {
         init_env: text(&INIT_ENV),
-        scan_mod: text(&SCAN_MOD),
+        scan_game: text(&SCAN_GAME),
         scan_ui: text(&SCAN_UI),
         read_data: text(&READ_DATA),
         pre_cache: text(&PRE_CACHE),
