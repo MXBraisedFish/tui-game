@@ -273,14 +273,13 @@ fn validate_action_key(value: &Value, action_name: &str) -> ScannerResult<()> {
 
 fn generate_game_uid(
     source: GameModuleSource,
-    package_dir: &Path,
+    _package_dir: &Path,
     package: &PackageManifest,
     game: &GameManifest,
 ) -> String {
     let seed = format!(
-        "{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}",
         source.as_str(),
-        package_dir.display(),
         package.package,
         package.game_name,
         package.author,

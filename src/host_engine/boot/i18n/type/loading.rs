@@ -2,7 +2,7 @@
 
 use once_cell::sync::OnceCell;
 
-use crate::host_engine::boot::i18n::i18n::{resolve_text, LanguageSource};
+use crate::host_engine::boot::i18n::i18n::{LanguageSource, resolve_text};
 
 pub static INIT_ENV: OnceCell<String> = OnceCell::new();
 pub static SCAN_GAME: OnceCell<String> = OnceCell::new();

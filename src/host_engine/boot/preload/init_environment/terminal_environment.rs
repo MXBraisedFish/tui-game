@@ -2,8 +2,8 @@
 
 use std::io::{self, Stdout};
 
-use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
 
 use super::{alternate_screen, cursor_visibility, raw_mode};
 

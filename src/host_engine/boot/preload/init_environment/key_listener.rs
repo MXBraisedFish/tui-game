@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use once_cell::sync::Lazy;
-use rdev::{listen, Event as RdevEvent, EventType as RdevEventType, Key as RdevKey};
+use rdev::{Event as RdevEvent, EventType as RdevEventType, Key as RdevKey, listen};
 
 use super::ctrl_c_handler;
 use super::input_event::HostInputEvent;

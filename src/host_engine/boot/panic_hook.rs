@@ -11,7 +11,7 @@ use chrono::Local;
 use crossterm::cursor::Show;
 use crossterm::event::DisableMouseCapture;
 use crossterm::execute;
-use crossterm::terminal::{disable_raw_mode, LeaveAlternateScreen};
+use crossterm::terminal::{LeaveAlternateScreen, disable_raw_mode};
 
 const HOST_LOG_PATH: &str = "data/log/tui_log.txt";
 

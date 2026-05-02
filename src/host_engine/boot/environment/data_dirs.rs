@@ -21,10 +21,6 @@ pub fn ensure() -> EnvironmentResult<()> {
         &root_dir.join("data/cache/mod_scan_cache.json"),
         EMPTY_JSON_OBJECT,
     )?;
-    ensure_file(
-        &root_dir.join("data/cache/ui_scan_cache.json"),
-        EMPTY_JSON_OBJECT,
-    )?;
 
     ensure_dir(&root_dir.join("data/profiles"))?;
     ensure_file(
@@ -44,10 +40,6 @@ pub fn ensure() -> EnvironmentResult<()> {
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
-        &root_dir.join("data/profiles/ui_state.json"),
-        EMPTY_JSON_OBJECT,
-    )?;
-    ensure_file(
         &root_dir.join("data/profiles/mod_state.json"),
         EMPTY_JSON_OBJECT,
     )?;
@@ -56,7 +48,6 @@ pub fn ensure() -> EnvironmentResult<()> {
     ensure_file(&root_dir.join("data/log/tui_log.txt"), "")?;
 
     ensure_dir(&root_dir.join("data/mod"))?;
-    ensure_dir(&root_dir.join("data/ui"))?;
 
     Ok(())
 }

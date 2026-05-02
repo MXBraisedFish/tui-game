@@ -38,11 +38,11 @@
 
 # 模组放置目录
 
-所有 MOD 文件必须放置在宿主执行目录下的 `tui-game-data/mod/` 目录中，按命名空间组织。
+所有 MOD 文件必须放置在宿主执行目录下的 `data/mod/` 目录中，按命名空间组织。
 
 ```text
 宿主执行目录/
-└─ tui-game-data/
+└─ data/
     └─ mod/
         └─ <namespace>/    -- 命名空间
             └─ *           -- 该模组的所有文件
@@ -660,7 +660,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ## 结构
 ```text
-宿主执行目录/tui-game-data/mod/
+宿主执行目录/data/mod/
 └─ example/
    ├─ package.json
    ├─ game.json

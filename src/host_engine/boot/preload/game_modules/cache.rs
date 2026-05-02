@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use super::manifest::GameModuleRegistry;
 use super::source::GameModuleSource;
@@ -52,14 +52,14 @@ pub fn persist_default_mod_state(registry: &GameModuleRegistry) -> CacheResult<(
             continue;
         }
 
-        root.entry(game_module.package.package.clone())
-            .or_insert_with(|| {
-                json!({
-                    "enabled": true,
-                    "debug": false,
-                    "safe_mode": true
-                })
-            });
+        root.entry(game_module.uid.clone()).or_insert_with(|| {
+            json!({
+                "package": game_module.package.package,
+                "enabled": true,
+                "debug": false,
+                "safe_mode": true
+            })
+        });
     }
 
     write_json_pretty(&path, &root)

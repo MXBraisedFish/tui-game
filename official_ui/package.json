@@ -1,0 +1,28 @@
+{
+  "entry": {
+    "home": "home.lua",
+    "game_list": "game_list.lua",
+    "setting": "setting.lua",
+    "setting_security": "setting/setting_security.lua",
+    "setting_mods": "setting/setting_mods.lua",
+    "setting_language": "setting/setting_language.lua",
+    "setting_memory": "setting/setting_memory.lua",
+    "setting_keybind.lua": "setting/setting_keybind.lua",
+    "warning_security": "warning/warning_security.lua",
+    "warning_mod": "warning/warning_mod.lua",
+    "warning_clear_cache": "warning/warning_clear_cache.lua",
+    "warning_clear_data": "warning/warning_clear_data.lua"
+  },
+  "actions": {
+    "home": {
+      "prev_select": {
+        "key": "up",
+        "name": ""
+      },
+      "next_select": {
+        "key": "down",
+        "name": ""
+      }
+    }
+  }
+}
