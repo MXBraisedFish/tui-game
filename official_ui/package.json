@@ -7,7 +7,7 @@
     "setting_mods": "setting/setting_mods.lua",
     "setting_language": "setting/setting_language.lua",
     "setting_memory": "setting/setting_memory.lua",
-    "setting_keybind.lua": "setting/setting_keybind.lua",
+    "setting_keybind": "setting/setting_keybind.lua",
     "warning_security": "warning/warning_security.lua",
     "warning_mod": "warning/warning_mod.lua",
     "warning_clear_cache": "warning/warning_clear_cache.lua",
@@ -47,6 +47,50 @@
       "option5": {
         "key": "esc",
         "name": "HOME_OPTION5"
+      }
+    },
+    "setting": {
+      "prev_option": {
+        "key": "up",
+        "name": "SETTING_PREV_OPTION"
+      },
+      "next_option": {
+        "key": "down",
+        "name": "SETTING_NEXT_OPTION"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "SETTING_CONFIRM"
+      },
+      "option1": {
+        "key": "1",
+        "name": "SETTING_OPTION1"
+      },
+      "option2": {
+        "key": "2",
+        "name": "SETTING_OPTION2"
+      },
+      "option3": {
+        "key": "3",
+        "name": "SETTING_OPTION3"
+      },
+      "option4": {
+        "key": "4",
+        "name": "SETTING_OPTION4"
+      },
+      "option5": {
+        "key": "5",
+        "name": "SETTING_OPTION5"
+      },
+      "return": {
+        "key": ["esc", "q"],
+        "name": "SETTING_BACK"
+      }
+    },
+    "warning_needed_size": {
+      "return": {
+        "key": ["esc", "q"],
+        "name": "KEY_SIZE_RETURN"
       }
     }
   }

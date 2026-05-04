@@ -9,7 +9,6 @@ pub enum LuaEvent {
     Key { name: String },
     Resize { width: u16, height: u16 },
     Tick { dt_ms: u64 },
-    Quit,
 }
 
 impl LuaEvent {
@@ -33,9 +32,6 @@ impl LuaEvent {
             Self::Tick { dt_ms } => {
                 table.set("type", "tick")?;
                 table.set("dt_ms", dt_ms)?;
-            }
-            Self::Quit => {
-                table.set("type", "quit")?;
             }
         }
         Ok(table)

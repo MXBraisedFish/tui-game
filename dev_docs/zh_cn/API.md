@@ -636,14 +636,34 @@ end
 
 ### `action_value` 数据格式
 
+**多键**
+
 ```lua
 {
-  action = {                  -- 动作
-    key = Array | string,     -- 原始物理按键
-    key_name = string,        -- 动作含义
-    key_user = Array | string -- 用户自定义物理按键
+  action = {                      -- 动作
+    key = Array | string,         -- 原始物理按键
+    key_name = string,            -- 动作含义
+    key_user = Array | string,    -- 用户自定义物理按键
+    key_display = {               -- 物理按键显示文本
+	    key  = Array | string,    -- 原始物理按键
+	    key_user = Array | string -- 用户自定义物理按键
+    }
   },
   ...
+}
+```
+
+**单键**
+
+```lua
+{                      -- 动作
+	key = Array | string,         -- 原始物理按键
+	key_name = string,            -- 动作含义
+	key_user = Array | string,    -- 用户自定义物理按键
+	key_display = {               -- 物理按键显示文本
+		key  = Array | string,    -- 原始物理按键
+		key_user = Array | string -- 用户自定义物理按键
+	}
 }
 ```
 

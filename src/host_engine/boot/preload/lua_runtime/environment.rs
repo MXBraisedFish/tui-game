@@ -23,10 +23,11 @@ impl LuaRuntimeEnvironment {
 /// 创建 Lua VM 并安装沙箱。
 pub fn create_lua_runtime_environment(
     host_bridge: HostLuaBridge,
+    api_scope: ApiScope,
 ) -> Result<LuaRuntimeEnvironment, Box<dyn std::error::Error>> {
     let lua = Lua::new();
     sandbox::install_sandbox(&lua)?;
-    api::install_runtime_apis(&lua, ApiScope::game_package(), host_bridge.clone())?;
+    api::install_runtime_apis(&lua, api_scope, host_bridge.clone())?;
 
     Ok(LuaRuntimeEnvironment {
         lua,

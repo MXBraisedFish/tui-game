@@ -6,6 +6,12 @@ pub const API_VERSION: u32 = 1;
 /// 宿主版本号（编译时注入）
 pub const HOST_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// 宿主 UI 最小宽度（终端字符列数）。
+pub const ROOT_UI_MIN_WIDTH: u16 = 98;
+
+/// 宿主 UI 最小高度（终端字符行数）。
+pub const ROOT_UI_MIN_HEIGHT: u16 = 26;
+
 /// GitHub 最新版本检查 API
 pub const UPDATE_API_URL: &str =
     "https://api.github.com/repos/MXBraisedFish/TUI-GAME/releases/latest";

@@ -140,7 +140,7 @@ fn close_loading_screen(loading_screen: LoadingScreenState) -> HostResult<()> {
 /// 主运行时循环：事件分发、渲染、状态机更新
 fn run_runtime_loop(
     lua_runtime: LuaRuntimeState,
-    loaded_resources: LoadedResources,
+    mut loaded_resources: LoadedResources,
 ) -> HostResult<ExitState> {
     let runtime_terminal = host_engine::runtime::terminal::enter()?;
     let _ = runtime_terminal.is_active();
@@ -154,7 +154,30 @@ fn run_runtime_loop(
     let _ = loaded_resources.cache_data.removed_game_uids.len();
     let _ = loaded_resources.host_state_machine.has_dialog();
     let _ = loaded_resources.launch_readiness.has_todo_items();
-    host_engine::runtime::event_loop::run(&loaded_resources.initialized_environment.input_receiver)?;
+    let mut active_ui_page = host_engine::runtime::ui_runtime::load_home_page(
+        &lua_runtime,
+        &loaded_resources,
+    )?;
+    let (terminal_width, terminal_height) = crossterm::terminal::size()?;
+    let current_terminal_size = host_engine::boot::preload::init_environment::TerminalSize {
+        width: terminal_width,
+        height: terminal_height,
+    };
+    lua_runtime
+        .lua_runtime_environment
+        .host_bridge
+        .set_terminal_size(current_terminal_size);
+    lua_runtime
+        .lua_runtime_environment
+        .host_bridge
+        .resize_canvas(current_terminal_size)?;
+    host_engine::runtime::event_loop::run(
+        &loaded_resources.initialized_environment.input_receiver,
+        &lua_runtime.lua_runtime_environment.host_bridge,
+        &lua_runtime,
+        &mut active_ui_page,
+        &mut loaded_resources.host_state_machine,
+    )?;
     Ok(ExitState {})
 }
 

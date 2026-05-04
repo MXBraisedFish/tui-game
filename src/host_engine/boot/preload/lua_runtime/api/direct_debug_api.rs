@@ -161,6 +161,7 @@ fn install_get_key(
                 lua,
                 runtime_context.current_game.as_ref(),
                 &runtime_context.keybinds,
+                &runtime_context.current_ui_actions,
                 requested_action.as_deref(),
             )?))
         })?,

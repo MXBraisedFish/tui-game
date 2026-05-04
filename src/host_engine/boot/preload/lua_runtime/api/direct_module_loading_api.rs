@@ -32,12 +32,17 @@ fn install_load_function(
             let logical_path = argument::expect_string_arg(&args, 0)?;
             let runtime_context = host_bridge.runtime_context();
             let package_root = runtime_context
-                .current_game
-                .as_ref()
-                .map(|game_module| game_module.root_dir.as_path())
+                .current_script_root
+                .clone()
+                .or_else(|| {
+                    runtime_context
+                        .current_game
+                        .as_ref()
+                        .map(|game_module| game_module.root_dir.join("scripts"))
+                })
                 .ok_or_else(|| mlua::Error::external("current package is unavailable"))?;
             let script_path =
-                function_path::resolve_function_path(package_root, logical_path.as_str())?;
+                function_path::resolve_function_path(&package_root, logical_path.as_str())?;
             if !script_path.is_file() {
                 return Err(mlua::Error::external(format!(
                     "helper script not found: {}",

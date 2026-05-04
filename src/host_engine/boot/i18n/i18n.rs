@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use once_cell::sync::OnceCell;
 
-use super::r#type::{global, home, key, loading, start, warning};
+use super::r#type::{global, home, key, loading, setting, start, warning};
 
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 const LANGUAGE_PROFILE_PATH: &str = "data/profiles/language.txt";
@@ -24,6 +24,7 @@ pub struct I18nText {
     pub home: home::HomeText,
     pub key: key::KeyText,
     pub loading: loading::LoadingText,
+    pub setting: setting::SettingText,
     pub start: start::StartText,
     pub warning: warning::WarningText,
 }
@@ -42,6 +43,7 @@ pub fn load() -> I18nResult<()> {
     let home_text = home::register(&language_source);
     let key_text = key::register(&language_source);
     let loading_text = loading::register(&language_source);
+    let setting_text = setting::register(&language_source);
     let start_text = start::register(&language_source);
     let warning_text = warning::register(&language_source);
 
@@ -50,6 +52,7 @@ pub fn load() -> I18nResult<()> {
         home: home_text,
         key: key_text,
         loading: loading_text,
+        setting: setting_text,
         start: start_text,
         warning: warning_text,
     });
@@ -66,6 +69,7 @@ pub fn text() -> &'static I18nText {
             home: home::register(&language_source),
             key: key::register(&language_source),
             loading: loading::register(&language_source),
+            setting: setting::register(&language_source),
             start: start::register(&language_source),
             warning: warning::register(&language_source),
         }

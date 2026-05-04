@@ -1,38 +1,32 @@
-local C = load_function("home/constants.lua")
-local L = load_function("home/layout.lua")
+local C = load_function("setting/constants.lua")
+local L = load_function("setting/layout.lua")
 
 local M = {}
 
-local HOME_PLAY
+local FIRST_LABEL
 
 local function menu_texts(root_state)
-  local has_continue = type(root_state) == "table" and type(root_state.continue) == "table" and next(root_state.continue) ~= nil
-  HOME_PLAY = L.language(root_state, "HOME_PLAY", C.DEFAULT_TEXT.play)
+  FIRST_LABEL = L.language(root_state, "SETTING_LANGUAGE", C.DEFAULT_TEXT.language)
   return {
     {
       key = C.DEFAULT_TEXT.option1,
-      label = HOME_PLAY,
-      disabled = false,
+      label = FIRST_LABEL,
     },
     {
       key = C.DEFAULT_TEXT.option2,
-      label = L.language(root_state, "HOME_CONTINUE", C.DEFAULT_TEXT.continue_game),
-      disabled = not has_continue,
+      label = L.language(root_state, "SETTING_KEYBIND", C.DEFAULT_TEXT.keybind),
     },
     {
       key = C.DEFAULT_TEXT.option3,
-      label = L.language(root_state, "HOME_SETTINGS", C.DEFAULT_TEXT.settings),
-      disabled = false,
+      label = L.language(root_state, "SETTING_MODS", C.DEFAULT_TEXT.mods),
     },
     {
       key = C.DEFAULT_TEXT.option4,
-      label = L.language(root_state, "HOME_ABOUT", C.DEFAULT_TEXT.about),
-      disabled = false,
+      label = L.language(root_state, "SETTING_MEMORY", C.DEFAULT_TEXT.memory),
     },
     {
       key = C.DEFAULT_TEXT.option5,
-      label = L.language(root_state, "HOME_QUIT", C.DEFAULT_TEXT.quit),
-      disabled = false,
+      label = L.language(root_state, "SETTING_SECURITY", C.DEFAULT_TEXT.security),
     },
   }
 end
@@ -45,7 +39,7 @@ local function selected_index(root_state)
 end
 
 local function alignment_width()
-  return L.text_width("▶ " .. C.DEFAULT_TEXT.option1 .. " " .. HOME_PLAY)
+  return L.text_width("▶ " .. C.DEFAULT_TEXT.option1 .. " " .. FIRST_LABEL)
 end
 
 function M.draw_menu(root_state, origin_y)
@@ -56,12 +50,7 @@ function M.draw_menu(root_state, origin_y)
     local is_selected = index == selected
     local prefix = is_selected and "▶ " or "  "
     local key_text = is_selected and C.DEFAULT_TEXT.enter or item.key
-    local label_color = C.NORMAL_COLOR
-    if item.disabled then
-      label_color = C.DISABLED_COLOR
-    elseif is_selected then
-      label_color = C.SELECTED_COLOR
-    end
+    local label_color = is_selected and C.SELECTED_COLOR or C.NORMAL_COLOR
 
     local y = origin_y + index - 1
     local cursor_x = x

@@ -28,6 +28,11 @@ pub enum DialogState {
     /// TODO: 确认后关闭弹窗并执行不可逆数据清理。
     /// TODO: 取消后关闭弹窗且不修改状态。
     ClearDataWarning,
+
+    /// 终端尺寸不足提示弹窗。
+    ///
+    /// TODO: 运行时根据当前终端尺寸自动显示或关闭，保留原页面上下文。
+    NeededSizeWarning,
 }
 
 /// 弹窗上下文数据。

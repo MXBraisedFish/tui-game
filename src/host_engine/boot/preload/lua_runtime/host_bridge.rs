@@ -1,6 +1,7 @@
 //! 宿主与 Lua 通信桥占位
 
 use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
 use std::time::Instant;
 
 use serde_json::Value;
@@ -40,6 +41,8 @@ pub enum HostLuaMessage {
 pub struct LuaRuntimeContext {
     pub consumer: LuaRuntimeConsumer,
     pub current_game: Option<GameModule>,
+    pub current_ui_actions: Value,
+    pub current_script_root: Option<PathBuf>,
     pub language_code: String,
     pub keybinds: Value,
     pub best_scores: Value,
@@ -108,6 +111,27 @@ impl HostLuaBridge {
             .lock()
             .map(|runtime_context| runtime_context.clone())
             .unwrap_or_default()
+    }
+
+    /// 更新 Lua API 可见的终端尺寸。
+    pub fn set_terminal_size(&self, terminal_size: TerminalSize) {
+        if let Ok(mut runtime_context) = self.runtime_context.lock() {
+            runtime_context.terminal_size = terminal_size;
+        }
+    }
+
+    /// 更新当前 UI 页面 actions，供 UI 包调用 get_key 查询。
+    pub fn set_current_ui_actions(&self, current_ui_actions: Value) {
+        if let Ok(mut runtime_context) = self.runtime_context.lock() {
+            runtime_context.current_ui_actions = current_ui_actions;
+        }
+    }
+
+    /// 调整当前虚拟画布到终端尺寸。
+    pub fn resize_canvas(&self, terminal_size: TerminalSize) -> mlua::Result<()> {
+        self.with_canvas_state(|canvas_state| {
+            canvas_state.resize(terminal_size.width, terminal_size.height);
+        })
     }
 
     /// 操作当前虚拟画布。

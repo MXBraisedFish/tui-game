@@ -61,6 +61,15 @@ impl CanvasState {
         self.height
     }
 
+    /// 调整画布尺寸。
+    ///
+    /// 尺寸变化后由当前 UI 重新渲染，因此这里直接清空旧单元格，避免旧尺寸内容残留。
+    pub fn resize(&mut self, width: u16, height: u16) {
+        self.width = width;
+        self.height = height;
+        self.clear();
+    }
+
     /// 清空画布。
     pub fn clear(&mut self) {
         self.cells.clear();
@@ -78,5 +87,10 @@ impl CanvasState {
         if x < self.width && y < self.height {
             self.cells.remove(&(x, y));
         }
+    }
+
+    /// 迭代所有已写入单元格。
+    pub fn cells(&self) -> impl Iterator<Item = (&(u16, u16), &CanvasCell)> {
+        self.cells.iter()
     }
 }

@@ -11,6 +11,7 @@ pub use host_bridge::{
 };
 
 use crate::LoadedResources;
+use super::lua_runtime::api::ApiScope;
 
 /// 准备 Lua 虚拟机和沙箱环境。
 ///
@@ -25,16 +26,23 @@ pub(crate) fn load(
     loaded_resources: &LoadedResources,
 ) -> Result<LuaRuntimeEnvironment, Box<dyn std::error::Error>> {
     let host_bridge = HostLuaBridge::new();
+    let official_ui_package = loaded_resources.official_ui_registry.packages.first();
+    let terminal_size = loaded_resources.initialized_environment.terminal_size;
     host_bridge.set_runtime_context(LuaRuntimeContext {
-        consumer: LuaRuntimeConsumer::GamePackage,
-        current_game: loaded_resources.game_module_registry.games.first().cloned(),
+        consumer: LuaRuntimeConsumer::OfficialUiPackage,
+        current_game: None,
+        current_ui_actions: serde_json::Value::Null,
+        current_script_root: official_ui_package
+            .map(|ui_package| ui_package.root_dir.join("scripts")),
         language_code: loaded_resources.persistent_data.language_code.clone(),
         keybinds: loaded_resources.persistent_data.keybinds.clone(),
         best_scores: loaded_resources.persistent_data.best_scores.clone(),
         mod_state: loaded_resources.persistent_data.mod_state.clone(),
         launch_mode: LaunchMode::New,
-        terminal_size: loaded_resources.initialized_environment.terminal_size,
+        terminal_size,
     });
-    let lua_runtime_environment = environment::create_lua_runtime_environment(host_bridge)?;
+    host_bridge.resize_canvas(terminal_size)?;
+    let lua_runtime_environment =
+        environment::create_lua_runtime_environment(host_bridge, ApiScope::official_ui_package())?;
     Ok(lua_runtime_environment)
 }

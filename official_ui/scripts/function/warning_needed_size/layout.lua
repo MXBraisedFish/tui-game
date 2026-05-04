@@ -8,17 +8,12 @@ function M.text_width(text)
   return width
 end
 
-function M.terminal_size()
-  local width, height = get_terminal_size()
-  return width or 98, height or 26
-end
-
 function M.center_x(width, offset)
   return resolve_x(ANCHOR_CENTER, width, offset or 0)
 end
 
-function M.content_top(content_height)
-  return resolve_y(ANCHOR_MIDDLE, content_height, 0)
+function M.center_y(height, offset)
+  return resolve_y(ANCHOR_MIDDLE, height, offset or 0)
 end
 
 function M.language(root_state, key, fallback)

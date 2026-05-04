@@ -28,6 +28,7 @@ mod validation;
 mod value;
 
 pub use scope::ApiScope;
+pub(crate) use value::event_value::LuaEvent;
 
 use mlua::Lua;
 
