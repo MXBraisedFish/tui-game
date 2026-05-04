@@ -29,6 +29,8 @@ const ANSI_WHITE: &str = "\x1b[37m";
 const ANSI_GRAY: &str = "\x1b[90m";
 /// 绿色前景色
 const ANSI_GREEN: &str = "\x1b[32m";
+/// 加粗样式
+const ANSI_BOLD: &str = "\x1b[1m";
 /// 黄色前景色
 const ANSI_YELLOW: &str = "\x1b[33m";
 /// 清除当前行
@@ -144,16 +146,12 @@ fn run_loading_thread(progress_receiver: Receiver<LoadingMessage>) {
                 latest_progress = progress;
             }
             Ok(LoadingMessage::Finish) => {
-                if has_rendered {
-                    println!();
-                }
+                render_finish(has_rendered);
                 break;
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {
-                if has_rendered {
-                    println!();
-                }
+                render_finish(has_rendered);
                 break;
             }
         }
@@ -162,6 +160,21 @@ fn run_loading_thread(progress_receiver: Receiver<LoadingMessage>) {
         spinner_index = (spinner_index + 1) % SPINNER_FRAMES.len();
         has_rendered = true;
     }
+}
+
+/// 渲染加载完成后的启动标识。
+fn render_finish(has_rendered: bool) {
+    let mut stdout = io::stdout();
+    if has_rendered {
+        let _ = write!(
+            stdout,
+            "{ANSI_CLEAR_LINE}{ANSI_CURSOR_UP_ONE_LINE}{ANSI_CLEAR_LINE}"
+        );
+    }
+
+    let finish_text = i18n::text().start.finish;
+    let _ = writeln!(stdout, "{ANSI_BOLD}{ANSI_GREEN}{finish_text}{ANSI_RESET}");
+    let _ = stdout.flush();
 }
 
 /// 渲染进度条到终端

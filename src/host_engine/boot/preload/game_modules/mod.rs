@@ -21,7 +21,6 @@ pub fn load() -> GameModuleResult<GameModuleRegistry> {
     registry.extend(official_modules);
     registry.extend(mod_modules);
 
-    cache::persist_scan_cache(&registry)?;
     cache::persist_default_keybinds(&registry)?;
     cache::persist_default_mod_state(&registry)?;
 

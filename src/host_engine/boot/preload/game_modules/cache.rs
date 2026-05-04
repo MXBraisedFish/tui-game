@@ -10,11 +10,6 @@ use super::source::GameModuleSource;
 
 type CacheResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-/// 写入游戏模块扫描缓存
-pub fn persist_scan_cache(registry: &GameModuleRegistry) -> CacheResult<()> {
-    write_json_pretty(&root_dir().join("data/cache/mod_scan_cache.json"), registry)
-}
-
 /// 将默认按键信息写入持久化按键偏好。已有用户数据不会被覆盖。
 pub fn persist_default_keybinds(registry: &GameModuleRegistry) -> CacheResult<()> {
     let path = root_dir().join("data/profiles/keybind.json");

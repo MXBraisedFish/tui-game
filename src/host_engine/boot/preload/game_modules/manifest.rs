@@ -52,7 +52,7 @@ pub struct GameManifest {
 }
 
 /// 成功读取的游戏模块
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GameModule {
     pub uid: String,
     pub source: GameModuleSource,
@@ -63,7 +63,7 @@ pub struct GameModule {
 }
 
 /// 游戏模块读取错误
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct GameModuleScanError {
     pub source: String,
     pub path: String,
@@ -71,7 +71,7 @@ pub struct GameModuleScanError {
 }
 
 /// 游戏模块注册表
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct GameModuleRegistry {
     pub games: Vec<GameModule>,
     pub errors: Vec<GameModuleScanError>,

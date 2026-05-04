@@ -9,6 +9,15 @@ pub struct TerminalSize {
     pub height: u16,
 }
 
+impl Default for TerminalSize {
+    fn default() -> Self {
+        Self {
+            width: 80,
+            height: 24,
+        }
+    }
+}
+
 /// 获取当前终端尺寸
 pub fn current() -> TerminalSizeResult<TerminalSize> {
     let (width, height) = crossterm::terminal::size()?;

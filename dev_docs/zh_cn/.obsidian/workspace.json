@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "RICH_TEXT.md",
+                "file": "API.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "RICH_TEXT"
+              "title": "API"
             }
           }
         ]
@@ -185,6 +185,7 @@
   },
   "active": "c8aa9b2e93e171b3",
   "lastOpenFiles": [
+    "RICH_TEXT.md",
     "MOD.md",
     "API.md",
     "UI.md"

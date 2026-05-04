@@ -11,17 +11,42 @@
     "warning_security": "warning/warning_security.lua",
     "warning_mod": "warning/warning_mod.lua",
     "warning_clear_cache": "warning/warning_clear_cache.lua",
-    "warning_clear_data": "warning/warning_clear_data.lua"
+    "warning_clear_data": "warning/warning_clear_data.lua",
+    "warning_needed_size": "warning/warning_needed_size.lua"
   },
   "actions": {
     "home": {
-      "prev_select": {
+      "prev_option": {
         "key": "up",
-        "name": ""
+        "name": "HOME_PREV_OPTION"
       },
-      "next_select": {
+      "next_option": {
         "key": "down",
-        "name": ""
+        "name": "HOME_NEXT_OPTION"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "HOME_CONFIRM"
+      },
+      "option1": {
+        "key": "1",
+        "name": "HOME_OPTION1"
+      },
+      "option2": {
+        "key": "2",
+        "name": "HOME_OPTION2"
+      },
+      "option3": {
+        "key": "3",
+        "name": "HOME_OPTION3"
+      },
+      "option4": {
+        "key": "4",
+        "name": "HOME_OPTION4"
+      },
+      "option5": {
+        "key": "esc",
+        "name": "HOME_OPTION5"
       }
     }
   }

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use once_cell::sync::OnceCell;
 
-use super::r#type::{global, loading};
+use super::r#type::{global, home, key, loading, start, warning};
 
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 const LANGUAGE_PROFILE_PATH: &str = "data/profiles/language.txt";
@@ -21,7 +21,11 @@ type I18nResult<T> = Result<T, Box<dyn std::error::Error>>;
 #[derive(Clone, Copy)]
 pub struct I18nText {
     pub global: global::GlobalText,
+    pub home: home::HomeText,
+    pub key: key::KeyText,
     pub loading: loading::LoadingText,
+    pub start: start::StartText,
+    pub warning: warning::WarningText,
 }
 
 /// 语言源数据，供分类注册模块按键读取
@@ -35,11 +39,19 @@ pub struct LanguageSource {
 pub fn load() -> I18nResult<()> {
     let language_source = load_language_source();
     let global_text = global::register(&language_source);
+    let home_text = home::register(&language_source);
+    let key_text = key::register(&language_source);
     let loading_text = loading::register(&language_source);
+    let start_text = start::register(&language_source);
+    let warning_text = warning::register(&language_source);
 
     let _ = I18N_TEXT.set(I18nText {
         global: global_text,
+        home: home_text,
+        key: key_text,
         loading: loading_text,
+        start: start_text,
+        warning: warning_text,
     });
 
     Ok(())
@@ -51,7 +63,11 @@ pub fn text() -> &'static I18nText {
         let language_source = load_language_source();
         I18nText {
             global: global::register(&language_source),
+            home: home::register(&language_source),
+            key: key::register(&language_source),
             loading: loading::register(&language_source),
+            start: start::register(&language_source),
+            warning: warning::register(&language_source),
         }
     })
 }

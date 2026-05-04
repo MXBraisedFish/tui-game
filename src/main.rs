@@ -92,25 +92,44 @@ fn load_resources(loading_screen: &mut LoadingScreenState) -> HostResult<LoadedR
     loading_screen
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::ScanUi, 40)?;
+    let official_ui_registry = host_engine::boot::preload::official_ui::load()?;
     loading_screen
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::ReadData, 60)?;
+    let persistent_data = host_engine::boot::preload::persistent_data::load()?;
     loading_screen
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::PreCache, 80)?;
+    let cache_data = host_engine::boot::preload::cache_data::load(&game_module_registry)?;
+    let host_state_machine = host_engine::boot::preload::state_machine::load();
     loading_screen
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::ReadyLaunch, 95)?;
+    let launch_readiness = host_engine::boot::preload::finalize_launch::load(
+        &game_module_registry,
+        &official_ui_registry,
+        &persistent_data,
+        &cache_data,
+        &host_state_machine,
+    )?;
 
     Ok(LoadedResources {
         initialized_environment,
         game_module_registry,
+        official_ui_registry,
+        persistent_data,
+        cache_data,
+        host_state_machine,
+        launch_readiness,
     })
 }
 
 /// 启动 Lua 虚拟机，加载基础脚本和 API
-fn start_lua_runtime(_loaded_resources: &LoadedResources) -> HostResult<LuaRuntimeState> {
-    Ok(LuaRuntimeState {})
+fn start_lua_runtime(loaded_resources: &LoadedResources) -> HostResult<LuaRuntimeState> {
+    let lua_runtime_environment = host_engine::boot::preload::lua_runtime::load(loaded_resources)?;
+    Ok(LuaRuntimeState {
+        lua_runtime_environment,
+    })
 }
 
 /// 关闭加载屏幕，释放相关资源
@@ -120,13 +139,22 @@ fn close_loading_screen(loading_screen: LoadingScreenState) -> HostResult<()> {
 
 /// 主运行时循环：事件分发、渲染、状态机更新
 fn run_runtime_loop(
-    _lua_runtime: LuaRuntimeState,
+    lua_runtime: LuaRuntimeState,
     loaded_resources: LoadedResources,
 ) -> HostResult<ExitState> {
+    let runtime_terminal = host_engine::runtime::terminal::enter()?;
+    let _ = runtime_terminal.is_active();
+    let _ = lua_runtime.lua_runtime_environment.is_sandbox_installed();
     let _ = loaded_resources
         .initialized_environment
         .is_input_listener_running();
     let _ = loaded_resources.game_module_registry.games.len();
+    let _ = loaded_resources.official_ui_registry.packages.len();
+    let _ = loaded_resources.persistent_data.language_code.len();
+    let _ = loaded_resources.cache_data.removed_game_uids.len();
+    let _ = loaded_resources.host_state_machine.has_dialog();
+    let _ = loaded_resources.launch_readiness.has_todo_items();
+    host_engine::runtime::event_loop::run(&loaded_resources.initialized_environment.input_receiver)?;
     Ok(ExitState {})
 }
 
@@ -144,10 +172,17 @@ struct LoadingScreenState {
 struct LoadedResources {
     initialized_environment: host_engine::boot::preload::init_environment::InitializedEnvironment,
     game_module_registry: host_engine::boot::preload::game_modules::GameModuleRegistry,
+    official_ui_registry: host_engine::boot::preload::official_ui::OfficialUiRegistry,
+    persistent_data: host_engine::boot::preload::persistent_data::PersistentData,
+    cache_data: host_engine::boot::preload::cache_data::CacheData,
+    host_state_machine: host_engine::boot::preload::state_machine::HostStateMachine,
+    launch_readiness: host_engine::boot::preload::finalize_launch::LaunchReadiness,
 }
 
 /// Lua 运行时状态（虚拟机实例、全局注册表等）
-struct LuaRuntimeState {}
+struct LuaRuntimeState {
+    lua_runtime_environment: host_engine::boot::preload::lua_runtime::LuaRuntimeEnvironment,
+}
 
 /// 退出状态，携带关闭时需要保留的数据
 struct ExitState {}
