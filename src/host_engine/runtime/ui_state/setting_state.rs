@@ -58,6 +58,11 @@ impl SettingUiState {
         self.lua_state = SettingLuaState::new(self.root_state.select);
     }
 
+    /// 刷新 Setting 页面语言文本。
+    pub fn refresh_language(&mut self) {
+        self.root_state.language = setting_language_pairs();
+    }
+
     /// 应用 Lua 返回状态。
     pub fn apply_lua_state(&mut self, lua_state: SettingLuaState) -> SettingLuaAction {
         self.lua_state = lua_state;
@@ -184,22 +189,56 @@ fn setting_language_pairs() -> Vec<(String, String)> {
             "SETTING_NEXT_OPTION".to_string(),
             text.key.setting_next_option.to_string(),
         ),
-        ("SETTING_SELECT".to_string(), text.key.setting_select.to_string()),
+        (
+            "SETTING_SELECT".to_string(),
+            text.key.setting_select.to_string(),
+        ),
         (
             "SETTING_CONFIRM".to_string(),
             text.key.setting_confirm.to_string(),
         ),
-        ("SETTING_OPTION1".to_string(), text.key.setting_option1.to_string()),
-        ("SETTING_OPTION2".to_string(), text.key.setting_option2.to_string()),
-        ("SETTING_OPTION3".to_string(), text.key.setting_option3.to_string()),
-        ("SETTING_OPTION4".to_string(), text.key.setting_option4.to_string()),
-        ("SETTING_OPTION5".to_string(), text.key.setting_option5.to_string()),
-        ("SETTING_BACK".to_string(), text.key.setting_back.to_string()),
-        ("SETTING_LANGUAGE".to_string(), text.setting.language.to_string()),
-        ("SETTING_KEYBIND".to_string(), text.setting.keybind.to_string()),
+        (
+            "SETTING_OPTION1".to_string(),
+            text.key.setting_option1.to_string(),
+        ),
+        (
+            "SETTING_OPTION2".to_string(),
+            text.key.setting_option2.to_string(),
+        ),
+        (
+            "SETTING_OPTION3".to_string(),
+            text.key.setting_option3.to_string(),
+        ),
+        (
+            "SETTING_OPTION4".to_string(),
+            text.key.setting_option4.to_string(),
+        ),
+        (
+            "SETTING_OPTION5".to_string(),
+            text.key.setting_option5.to_string(),
+        ),
+        (
+            "SETTING_BACK".to_string(),
+            text.key.setting_back.to_string(),
+        ),
+        ("SETTING_TITLE".to_string(), text.setting.title.to_string()),
+        (
+            "SETTING_LANGUAGE".to_string(),
+            text.setting.language.to_string(),
+        ),
+        (
+            "SETTING_KEYBIND".to_string(),
+            text.setting.keybind.to_string(),
+        ),
         ("SETTING_MODS".to_string(), text.setting.mods.to_string()),
-        ("SETTING_MEMORY".to_string(), text.setting.memory.to_string()),
-        ("SETTING_SECURITY".to_string(), text.setting.security.to_string()),
+        (
+            "SETTING_MEMORY".to_string(),
+            text.setting.memory.to_string(),
+        ),
+        (
+            "SETTING_SECURITY".to_string(),
+            text.setting.security.to_string(),
+        ),
     ]
 }
 

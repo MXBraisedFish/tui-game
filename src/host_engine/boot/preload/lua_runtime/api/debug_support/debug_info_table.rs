@@ -38,6 +38,7 @@ pub fn build_game_info_table(lua: &Lua, game_module: &GameModule) -> mlua::Resul
     table.set("min_width", game_module.game.min_width)?;
     table.set("min_height", game_module.game.min_height)?;
     table.set("write", game_module.game.write)?;
+    table.set("afk_time", game_module.game.afk_time)?;
     table.set("case_sensitive", game_module.game.case_sensitive)?;
     table.set("actions", build_actions_table(lua, game_module)?)?;
     table.set("runtime", build_runtime_table(lua, game_module)?)?;

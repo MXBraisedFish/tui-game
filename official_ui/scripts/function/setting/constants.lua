@@ -7,6 +7,7 @@ M.SELECTED_COLOR = "light_cyan"
 M.NORMAL_COLOR = "white"
 M.KEY_COLOR = "dark_gray"
 M.VERSION_COLOR = "dark_gray"
+M.TITLE_COLOR = "white"
 
 function key_label(keys)
   if type(keys) == "string" then
@@ -22,6 +23,7 @@ function key_label(keys)
 end
 
 M.DEFAULT_TEXT = {
+  title = "Settings",
   language = "Language",
   keybind = "Key Bindings",
   mods = "Mod List",

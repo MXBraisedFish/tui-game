@@ -211,7 +211,7 @@ fn format_progress_bar(percent: u8) -> String {
 }
 
 /// 获取加载阶段的本地化文本
-fn stage_text(stage: LoadingStage) -> &'static str {
+fn stage_text(stage: LoadingStage) -> String {
     let loading_text = i18n::text().loading;
     match stage {
         LoadingStage::InitEnv => loading_text.init_env,

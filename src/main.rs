@@ -154,10 +154,8 @@ fn run_runtime_loop(
     let _ = loaded_resources.cache_data.removed_game_uids.len();
     let _ = loaded_resources.host_state_machine.has_dialog();
     let _ = loaded_resources.launch_readiness.has_todo_items();
-    let mut active_ui_page = host_engine::runtime::ui_runtime::load_home_page(
-        &lua_runtime,
-        &loaded_resources,
-    )?;
+    let mut active_ui_page =
+        host_engine::runtime::ui_runtime::load_home_page(&lua_runtime, &loaded_resources)?;
     let (terminal_width, terminal_height) = crossterm::terminal::size()?;
     let current_terminal_size = host_engine::boot::preload::init_environment::TerminalSize {
         width: terminal_width,

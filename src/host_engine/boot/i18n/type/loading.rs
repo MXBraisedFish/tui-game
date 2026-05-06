@@ -1,27 +1,26 @@
 //! loading.* 语言文本注册
 
-use once_cell::sync::OnceCell;
-
 use crate::host_engine::boot::i18n::i18n::{LanguageSource, resolve_text};
+use crate::host_engine::boot::i18n::pseudo_text::MutableText;
 
-pub static INIT_ENV: OnceCell<String> = OnceCell::new();
-pub static SCAN_GAME: OnceCell<String> = OnceCell::new();
-pub static SCAN_UI: OnceCell<String> = OnceCell::new();
-pub static READ_DATA: OnceCell<String> = OnceCell::new();
-pub static PRE_CACHE: OnceCell<String> = OnceCell::new();
-pub static READY_LAUNCH: OnceCell<String> = OnceCell::new();
-pub static COMPLETE: OnceCell<String> = OnceCell::new();
+pub static INIT_ENV: MutableText = MutableText::new();
+pub static SCAN_GAME: MutableText = MutableText::new();
+pub static SCAN_UI: MutableText = MutableText::new();
+pub static READ_DATA: MutableText = MutableText::new();
+pub static PRE_CACHE: MutableText = MutableText::new();
+pub static READY_LAUNCH: MutableText = MutableText::new();
+pub static COMPLETE: MutableText = MutableText::new();
 
 /// loading.* 文本集合
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug)]
 pub struct LoadingText {
-    pub init_env: &'static str,
-    pub scan_game: &'static str,
-    pub scan_ui: &'static str,
-    pub read_data: &'static str,
-    pub pre_cache: &'static str,
-    pub ready_launch: &'static str,
-    pub complete: &'static str,
+    pub init_env: String,
+    pub scan_game: String,
+    pub scan_ui: String,
+    pub read_data: String,
+    pub pre_cache: String,
+    pub ready_launch: String,
+    pub complete: String,
 }
 
 /// 注册 loading.* 文本
@@ -45,10 +44,10 @@ pub fn register(language_source: &LanguageSource) -> LoadingText {
     }
 }
 
-fn set_text(cell: &'static OnceCell<String>, language_source: &LanguageSource, key: &str) {
-    let _ = cell.set(resolve_text(language_source, key));
+fn set_text(cell: &'static MutableText, language_source: &LanguageSource, key: &str) {
+    cell.set(resolve_text(language_source, key));
 }
 
-fn text(cell: &'static OnceCell<String>) -> &'static str {
-    cell.get().map(String::as_str).unwrap_or("")
+fn text(cell: &'static MutableText) -> String {
+    cell.get()
 }

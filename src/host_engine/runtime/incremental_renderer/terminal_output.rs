@@ -4,8 +4,8 @@ use std::io::{self, Write};
 
 use crossterm::cursor::MoveTo;
 use crossterm::queue;
-use crossterm::style::{Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor};
 use crossterm::style::Attribute;
+use crossterm::style::{Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor};
 use crossterm::terminal::{Clear, ClearType};
 
 use crate::host_engine::boot::preload::lua_runtime::api::drawing_support::canvas_state::CanvasCell;

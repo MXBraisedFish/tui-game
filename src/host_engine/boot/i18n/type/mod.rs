@@ -1,7 +1,12 @@
+pub mod clear_cache;
+pub mod clear_data;
+pub mod game_list;
 pub mod global;
 pub mod home;
 pub mod key;
+pub mod language;
 pub mod loading;
+pub mod memory;
 pub mod setting;
 pub mod start;
 pub mod warning;

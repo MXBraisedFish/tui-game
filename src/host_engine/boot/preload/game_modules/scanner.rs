@@ -7,6 +7,8 @@ use std::path::Path;
 
 use serde_json::{Map, Value};
 
+use crate::host_engine::constant::API_VERSION;
+
 use super::manifest::{
     GameActionBinding, GameManifest, GameModule, GameModuleRegistry, GameModuleScanError,
     GameRuntimeManifest, PackageManifest,
@@ -81,15 +83,18 @@ fn read_game_manifest(package_dir: &Path) -> ScannerResult<GameManifest> {
     let path = package_dir.join("game.json");
     let value = read_json_object(&path)?;
     let runtime = require_object(&value, "game.json", "runtime")?;
+    let api = require_value(&value, "game.json", "api")?.clone();
+    validate_api_version(&api)?;
 
     Ok(GameManifest {
-        api: require_value(&value, "game.json", "api")?.clone(),
+        api,
         entry: require_string(&value, "game.json", "entry")?,
         save: require_bool(&value, "game.json", "save")?,
         best_none: require_optional_string(&value, "game.json", "best_none")?,
         min_width: require_integer(&value, "game.json", "min_width")?,
         min_height: require_integer(&value, "game.json", "min_height")?,
         write: require_bool(&value, "game.json", "write")?,
+        afk_time: require_non_negative_u64(&value, "game.json", "afk_time")?,
         case_sensitive: require_bool(&value, "game.json", "case_sensitive")?,
         actions: require_actions(&value)?,
         runtime: GameRuntimeManifest {
@@ -177,6 +182,17 @@ fn require_integer(
         .ok_or_else(|| field_type_error(file_name, field_name, "integer", value))
 }
 
+fn require_non_negative_u64(
+    object: &Map<String, Value>,
+    file_name: &str,
+    field_name: &str,
+) -> ScannerResult<u64> {
+    let value = require_value(object, file_name, field_name)?;
+    value
+        .as_u64()
+        .ok_or_else(|| field_type_error(file_name, field_name, "non-negative integer", value))
+}
+
 fn require_u16(
     object: &Map<String, Value>,
     file_name: &str,
@@ -217,17 +233,30 @@ fn require_actions(
                 action_value,
             )
         })?;
-        let key_value = require_value(
-            action_object,
-            "game.json",
-            &format!("actions.{action_name}.key"),
-        )?;
+        let key_value = action_object.get("key").ok_or_else(|| {
+            field_missing_error("game.json", &format!("actions.{action_name}.key"))
+        })?;
         validate_action_key(key_value, action_name)?;
-        let key_name = require_string(
-            action_object,
-            "game.json",
-            &format!("actions.{action_name}.key_name"),
-        )?;
+        let key_name_value = action_object.get("key_name").ok_or_else(|| {
+            field_missing_error("game.json", &format!("actions.{action_name}.key_name"))
+        })?;
+        let key_name = key_name_value
+            .as_str()
+            .ok_or_else(|| {
+                field_type_error(
+                    "game.json",
+                    &format!("actions.{action_name}.key_name"),
+                    "string",
+                    key_name_value,
+                )
+            })?
+            .to_string();
+        if key_name.trim().is_empty() {
+            return Err(field_missing_error(
+                "game.json",
+                &format!("actions.{action_name}.key_name"),
+            ));
+        }
         bindings.insert(
             action_name.clone(),
             GameActionBinding {
@@ -271,15 +300,48 @@ fn validate_action_key(value: &Value, action_name: &str) -> ScannerResult<()> {
     }
 }
 
+fn validate_api_version(api: &Value) -> ScannerResult<()> {
+    match api {
+        Value::Number(number) => {
+            let Some(version) = number.as_i64() else {
+                return Err(api_version_type_error(api));
+            };
+            if version == -1 || version == i64::from(API_VERSION) {
+                return Ok(());
+            }
+            Err(api_version_mismatch_error(api))
+        }
+        Value::Array(values) if values.len() == 2 => {
+            let Some(min_version) = values[0].as_i64() else {
+                return Err(api_version_type_error(api));
+            };
+            let Some(max_version) = values[1].as_i64() else {
+                return Err(api_version_type_error(api));
+            };
+            let host_version = i64::from(API_VERSION);
+            if min_version <= host_version && host_version <= max_version {
+                return Ok(());
+            }
+            Err(api_version_mismatch_error(api))
+        }
+        _ => Err(api_version_type_error(api)),
+    }
+}
+
 fn generate_game_uid(
     source: GameModuleSource,
-    _package_dir: &Path,
+    package_dir: &Path,
     package: &PackageManifest,
     game: &GameManifest,
 ) -> String {
+    let namespace = package_dir
+        .file_name()
+        .and_then(|file_name| file_name.to_str())
+        .unwrap_or_default();
     let seed = format!(
-        "{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}",
         source.as_str(),
+        namespace,
         package.package,
         package.game_name,
         package.author,
@@ -292,6 +354,28 @@ fn field_missing_error(file_name: &str, field_name: &str) -> Box<dyn std::error:
     io::Error::new(
         io::ErrorKind::InvalidData,
         format!("{file_name} missing required field: {field_name}"),
+    )
+    .into()
+}
+
+fn api_version_mismatch_error(actual_value: &Value) -> Box<dyn std::error::Error> {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!(
+            "game.json api version mismatch: expected {}, got {}",
+            API_VERSION, actual_value
+        ),
+    )
+    .into()
+}
+
+fn api_version_type_error(actual_value: &Value) -> Box<dyn std::error::Error> {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!(
+            "game.json field api type mismatch: expected -1 | integer | [min, max], got {}",
+            json_type_name(actual_value)
+        ),
     )
     .into()
 }

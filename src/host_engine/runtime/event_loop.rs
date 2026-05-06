@@ -1,27 +1,27 @@
 //! 运行阶段主事件循环
 
 use std::collections::VecDeque;
-use std::sync::mpsc::{RecvTimeoutError, Receiver};
-use std::time::{Duration, Instant};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::time::Instant;
 
 use crate::LuaRuntimeState;
-use crate::host_engine::constant::{ROOT_UI_MIN_HEIGHT, ROOT_UI_MIN_WIDTH};
 use crate::host_engine::boot::preload::init_environment::{
     HostInputEvent, ResizeEvent, TerminalSize,
 };
-use crate::host_engine::boot::preload::state_machine::HostStateMachine;
-use crate::host_engine::boot::preload::lua_runtime::{HostLuaBridge, HostLuaMessage};
 use crate::host_engine::boot::preload::lua_runtime::api::LuaEvent;
-use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
+use crate::host_engine::boot::preload::lua_runtime::{HostLuaBridge, HostLuaMessage};
+use crate::host_engine::boot::preload::state_machine::HostStateMachine;
+use crate::host_engine::constant::{ROOT_UI_MIN_HEIGHT, ROOT_UI_MIN_WIDTH};
+use crate::host_engine::runtime::frame_rate::FrameRateController;
 use crate::host_engine::runtime::renderer::RendererState;
+use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
+use crate::host_engine::runtime::ui_runtime::ActiveUiPage;
 use crate::host_engine::runtime::ui_state::needed_size_state::{
     NeededSizeMode, NeededSizeRootState,
 };
-use crate::host_engine::runtime::ui_runtime::ActiveUiPage;
 
 type RuntimeLoopResult<T> = Result<T, Box<dyn std::error::Error>>;
 const UI_EVENT_QUEUE_LIMIT: usize = 256;
-const UI_TICK_INTERVAL_MS: u64 = 16;
 
 /// 运行最小宿主事件循环。
 ///
@@ -45,8 +45,9 @@ pub(crate) fn run(
     crate::host_engine::runtime::renderer::render_canvas(host_bridge, &mut renderer_state)?;
     let mut event_queue = VecDeque::new();
     let mut last_tick_at = Instant::now();
+    let mut frame_rate_controller = FrameRateController::root_ui();
     loop {
-        match input_receiver.recv_timeout(Duration::from_millis(UI_TICK_INTERVAL_MS)) {
+        match input_receiver.recv_timeout(frame_rate_controller.frame_interval()) {
             Ok(HostInputEvent::ExitRequested) => break,
             Ok(HostInputEvent::Resize(resize_event)) => {
                 enqueue_limited(
@@ -60,6 +61,7 @@ pub(crate) fn run(
                 renderer_state.request_full_redraw();
             }
             Ok(HostInputEvent::Key { key }) => {
+                frame_rate_controller.mark_input();
                 enqueue_key_events(&mut event_queue, active_ui_page, key.as_str());
             }
             Err(RecvTimeoutError::Timeout) => {}
@@ -71,12 +73,20 @@ pub(crate) fn run(
         last_tick_at = now;
 
         let page_key = current_page_key(host_bridge, host_state_machine);
+        if active_ui_page.page_key() != page_key {
+            renderer_state.request_full_redraw();
+        }
         crate::host_engine::runtime::ui_runtime::ensure_page(
             lua_runtime,
             active_ui_page,
             page_key,
         )?;
-        dispatch_event_queue(lua_runtime, active_ui_page, host_state_machine, &mut event_queue)?;
+        dispatch_event_queue(
+            lua_runtime,
+            active_ui_page,
+            host_state_machine,
+            &mut event_queue,
+        )?;
         crate::host_engine::runtime::ui_runtime::handle_event(
             lua_runtime,
             active_ui_page,
@@ -84,6 +94,9 @@ pub(crate) fn run(
             LuaEvent::Tick { dt_ms: tick_dt_ms },
         )?;
         let page_key = current_page_key(host_bridge, host_state_machine);
+        if active_ui_page.page_key() != page_key {
+            renderer_state.request_full_redraw();
+        }
         crate::host_engine::runtime::ui_runtime::ensure_page(
             lua_runtime,
             active_ui_page,

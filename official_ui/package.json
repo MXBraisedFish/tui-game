@@ -12,7 +12,8 @@
     "warning_mod": "warning/warning_mod.lua",
     "warning_clear_cache": "warning/warning_clear_cache.lua",
     "warning_clear_data": "warning/warning_clear_data.lua",
-    "warning_needed_size": "warning/warning_needed_size.lua"
+    "warning_needed_size": "warning/warning_needed_size.lua",
+    "storage_details": "window/storage_details.lua"
   },
   "actions": {
     "home": {
@@ -49,6 +50,52 @@
         "name": "HOME_OPTION5"
       }
     },
+    "game_list": {
+      "prev_option": {
+        "key": "up",
+        "name": "GAME_LIST_PREV_OPTION"
+      },
+      "next_option": {
+        "key": "down",
+        "name": "GAME_LIST_NEXT_OPTION"
+      },
+      "prev_page": {
+        "key": "q",
+        "name": "GAME_LIST_PREV_PAGE"
+      },
+      "next_page": {
+        "key": "e",
+        "name": "GAME_LIST_NEXT_PAGE"
+      },
+      "scroll_up": {
+        "key": "w",
+        "name": "GAME_LIST_SCROLL_UP"
+      },
+      "scroll_down": {
+        "key": "s",
+        "name": "GAME_LIST_SCROLL_DOWN"
+      },
+      "jump": {
+        "key": "j",
+        "name": "GAME_LIST_JUMP"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "GAME_LIST_START_CONFIRM"
+      },
+      "return": {
+        "key": "esc",
+        "name": "GAME_LIST_BACK_CANCEL"
+      },
+      "order": {
+        "key": "z",
+        "name": "GAME_LIST_ORDER"
+      },
+      "sort": {
+        "key": "x",
+        "name": "GAME_LIST_SORT"
+      }
+    },
     "setting": {
       "prev_option": {
         "key": "up",
@@ -83,14 +130,120 @@
         "name": "SETTING_OPTION5"
       },
       "return": {
-        "key": ["esc", "q"],
+        "key": [
+          "esc",
+          "q"
+        ],
         "name": "SETTING_BACK"
+      }
+    },
+    "setting_language": {
+      "up_option": {
+        "key": "up",
+        "name": "LANGUAGE_UP_OPTION"
+      },
+      "down_option": {
+        "key": "down",
+        "name": "LANGUAGE_DOWN_OPTION"
+      },
+      "left_option": {
+        "key": "left",
+        "name": "LANGUAGE_LEFT_OPTION"
+      },
+      "right_option": {
+        "key": "right",
+        "name": "LANGUAGE_RIGHT_OPTION"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "LANGUAGE_CONFIRM"
+      },
+      "jump": {
+        "key": "j",
+        "name": "LANGUAGE_JUMP"
+      },
+      "prev_page": {
+        "key": "q",
+        "name": "LANGUAGE_PREV_PAGE"
+      },
+      "next_page": {
+        "key": "e",
+        "name": "LANGUAGE_NEXT_PAGE"
+      },
+      "return": {
+        "key": "esc",
+        "name": "LANGUAGE_BACK_CANCEL"
+      }
+    },
+    "setting_memory": {
+      "prev_option": {
+        "key": "up",
+        "name": "MEMORY_PREV_OPTION"
+      },
+      "next_option": {
+        "key": "down",
+        "name": "MEMORY_NEXT_OPTION"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "MEMORY_CONFIRM"
+      },
+      "option1": {
+        "key": "1",
+        "name": "MEMORY_OPTION1"
+      },
+      "option2": {
+        "key": "2",
+        "name": "MEMORY_OPTION2"
+      },
+      "option3": {
+        "key": "3",
+        "name": "MEMORY_OPTION3"
+      },
+      "return": {
+        "key": [
+          "esc",
+          "q"
+        ],
+        "name": "MEMORY_BACK"
       }
     },
     "warning_needed_size": {
       "return": {
-        "key": ["esc", "q"],
+        "key": [
+          "esc",
+          "q"
+        ],
         "name": "KEY_SIZE_RETURN"
+      }
+    },
+    "warning_clear_data": {
+      "cancel": {
+        "key": "n",
+        "name": "CLEAR_DATA_CANCEL"
+      },
+      "confirm": {
+        "key": "y",
+        "name": "CLEAR_DATA_CONFIRM"
+      }
+    },
+    "warning_clear_cache": {
+      "cancel": {
+        "key": "n",
+        "name": "CLEAR_CACHE_CANCEL"
+      },
+      "confirm": {
+        "key": "y",
+        "name": "CLEAR_CACHE_CONFIRM"
+      }
+    },
+    "storage_details": {
+      "return": {
+        "key": [
+          "esc",
+          "q"
+        ],
+        "name": "STORAGE_DETAILS_BACK"
       }
     }
   }

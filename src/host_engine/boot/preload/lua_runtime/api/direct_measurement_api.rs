@@ -26,9 +26,10 @@ fn install_get_text_size(lua: &Lua, globals: &mlua::Table) -> mlua::Result<()> {
     globals.set(
         "get_text_size",
         lua.create_function(|_, args: Variadic<Value>| {
-            argument::expect_exact_arg_count(&args, 1)?;
+            argument::expect_arg_count_range(&args, 1, 2)?;
             let text = argument::expect_string_arg(&args, 0)?;
-            let text_size = text_measurement::measure_text(text.as_str());
+            let wrap_width = parse_optional_wrap_width(&args, 1)?;
+            let text_size = text_measurement::measure_text(text.as_str(), wrap_width);
             Ok((i64::from(text_size.width), i64::from(text_size.height)))
         })?,
     )
@@ -38,9 +39,10 @@ fn install_get_text_width(lua: &Lua, globals: &mlua::Table) -> mlua::Result<()> 
     globals.set(
         "get_text_width",
         lua.create_function(|_, args: Variadic<Value>| {
-            argument::expect_exact_arg_count(&args, 1)?;
+            argument::expect_arg_count_range(&args, 1, 2)?;
             let text = argument::expect_string_arg(&args, 0)?;
-            let text_size = text_measurement::measure_text(text.as_str());
+            let wrap_width = parse_optional_wrap_width(&args, 1)?;
+            let text_size = text_measurement::measure_text(text.as_str(), wrap_width);
             Ok(i64::from(text_size.width))
         })?,
     )
@@ -50,9 +52,10 @@ fn install_get_text_height(lua: &Lua, globals: &mlua::Table) -> mlua::Result<()>
     globals.set(
         "get_text_height",
         lua.create_function(|_, args: Variadic<Value>| {
-            argument::expect_exact_arg_count(&args, 1)?;
+            argument::expect_arg_count_range(&args, 1, 2)?;
             let text = argument::expect_string_arg(&args, 0)?;
-            let text_size = text_measurement::measure_text(text.as_str());
+            let wrap_width = parse_optional_wrap_width(&args, 1)?;
+            let text_size = text_measurement::measure_text(text.as_str(), wrap_width);
             Ok(i64::from(text_size.height))
         })?,
     )
@@ -74,4 +77,19 @@ fn install_get_terminal_size(
             ))
         })?,
     )
+}
+
+fn parse_optional_wrap_width(args: &Variadic<Value>, index: usize) -> mlua::Result<Option<u16>> {
+    let Some(value) = argument::expect_optional_i64_arg(args, index)? else {
+        return Ok(None);
+    };
+    if value == 0 {
+        return Ok(None);
+    }
+    if value < 0 {
+        return Err(mlua::Error::external(
+            "wrap_width must be nil, 0, or a positive integer",
+        ));
+    }
+    Ok(Some(u16::try_from(value).map_err(mlua::Error::external)?))
 }

@@ -37,6 +37,26 @@ local function menu_texts(root_state)
   }
 end
 
+function get_max_text_width(data_table)
+    if not data_table or #data_table == 0 then
+        return 0
+    end
+    
+    local max_width = 0
+
+    for i = 1, #data_table do
+        local label = data_table[i].label
+        if label then
+            local width = get_text_width(label)
+            if width > max_width then
+                max_width = width
+            end
+        end
+    end
+    
+    return max_width
+end
+
 local function selected_index(root_state)
   if type(root_state) == "table" and type(root_state.select) == "number" then
     return math.max(1, math.min(5, math.floor(root_state.select)))
@@ -44,14 +64,14 @@ local function selected_index(root_state)
   return 1
 end
 
-local function alignment_width()
-  return L.text_width("▶ " .. C.DEFAULT_TEXT.option1 .. " " .. HOME_PLAY)
+local function alignment_width(items)
+  return get_max_text_width(items)
 end
 
 function M.draw_menu(root_state, origin_y)
   local items = menu_texts(root_state)
   local selected = selected_index(root_state)
-  local x = L.center_x(alignment_width(), 0)
+  local x = L.center_x(alignment_width(items), -3)
   for index, item in ipairs(items) do
     local is_selected = index == selected
     local prefix = is_selected and "▶ " or "  "

@@ -17,6 +17,7 @@ pub enum UiPageKey {
     SettingLanguage,
     SettingMemory,
     SettingKeybind,
+    StorageDetails,
     WarningSecurity,
     WarningMod,
     WarningClearCache,
@@ -36,6 +37,7 @@ impl UiPageKey {
             Self::SettingLanguage => "setting_language",
             Self::SettingMemory => "setting_memory",
             Self::SettingKeybind => "setting_keybind",
+            Self::StorageDetails => "storage_details",
             Self::WarningSecurity => "warning_security",
             Self::WarningMod => "warning_mod",
             Self::WarningClearCache => "warning_clear_cache",
@@ -52,7 +54,9 @@ impl UiPageKey {
 
         match host_state_machine.top_level_state {
             TopLevelState::Home => Self::Home,
-            TopLevelState::GameList => Self::from_game_list_state(&host_state_machine.game_list_state),
+            TopLevelState::GameList => {
+                Self::from_game_list_state(&host_state_machine.game_list_state)
+            }
             TopLevelState::Setting => Self::from_setting_state(&host_state_machine.setting_state),
             TopLevelState::About => Self::Setting,
         }
@@ -72,6 +76,7 @@ impl UiPageKey {
             SettingState::Keybind => Self::SettingKeybind,
             SettingState::Security => Self::SettingSecurity,
             SettingState::Memory => Self::SettingMemory,
+            SettingState::StorageDetails => Self::StorageDetails,
         }
     }
 

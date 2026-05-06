@@ -1,23 +1,22 @@
 //! home.* 语言文本注册
 
-use once_cell::sync::OnceCell;
+use crate::host_engine::boot::i18n::i18n::{LanguageSource, resolve_text};
+use crate::host_engine::boot::i18n::pseudo_text::MutableText;
 
-use crate::host_engine::boot::i18n::i18n::{resolve_text, LanguageSource};
-
-pub static PLAY: OnceCell<String> = OnceCell::new();
-pub static CONTINUE: OnceCell<String> = OnceCell::new();
-pub static SETTINGS: OnceCell<String> = OnceCell::new();
-pub static ABOUT: OnceCell<String> = OnceCell::new();
-pub static QUIT: OnceCell<String> = OnceCell::new();
+pub static PLAY: MutableText = MutableText::new();
+pub static CONTINUE: MutableText = MutableText::new();
+pub static SETTINGS: MutableText = MutableText::new();
+pub static ABOUT: MutableText = MutableText::new();
+pub static QUIT: MutableText = MutableText::new();
 
 /// home.* 文本集合
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug)]
 pub struct HomeText {
-    pub play: &'static str,
-    pub continue_game: &'static str,
-    pub settings: &'static str,
-    pub about: &'static str,
-    pub quit: &'static str,
+    pub play: String,
+    pub continue_game: String,
+    pub settings: String,
+    pub about: String,
+    pub quit: String,
 }
 
 /// 注册 home.* 文本
@@ -37,10 +36,10 @@ pub fn register(language_source: &LanguageSource) -> HomeText {
     }
 }
 
-fn set_text(cell: &'static OnceCell<String>, language_source: &LanguageSource, key: &str) {
-    let _ = cell.set(resolve_text(language_source, key));
+fn set_text(cell: &'static MutableText, language_source: &LanguageSource, key: &str) {
+    cell.set(resolve_text(language_source, key));
 }
 
-fn text(cell: &'static OnceCell<String>) -> &'static str {
-    cell.get().map(String::as_str).unwrap_or("")
+fn text(cell: &'static MutableText) -> String {
+    cell.get()
 }

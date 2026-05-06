@@ -36,6 +36,7 @@ pub fn sync_game_package_cache(
         current_game_module_registry: game_module_registry.clone(),
         removed_game_uids,
         image_cache_dir,
+        language_ui_texts: Default::default(),
     })
 }
 

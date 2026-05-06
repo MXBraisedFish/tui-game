@@ -4,26 +4,35 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
 use once_cell::sync::OnceCell;
 
-use super::r#type::{global, home, key, loading, setting, start, warning};
+use super::r#type::{
+    clear_cache, clear_data, game_list, global, home, key, language, loading, memory, setting,
+    start, warning,
+};
 
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 const LANGUAGE_PROFILE_PATH: &str = "data/profiles/language.txt";
 const LANGUAGE_DIR: &str = "assets/lang";
 
-static I18N_TEXT: OnceCell<I18nText> = OnceCell::new();
+static I18N_TEXT: OnceCell<RwLock<I18nText>> = OnceCell::new();
 
 type I18nResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 /// 已注册的宿主语言文本集合
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug)]
 pub struct I18nText {
+    pub clear_cache: clear_cache::ClearCacheText,
+    pub clear_data: clear_data::ClearDataText,
+    pub game_list: game_list::GameListText,
     pub global: global::GlobalText,
     pub home: home::HomeText,
     pub key: key::KeyText,
+    pub language: language::LanguageText,
     pub loading: loading::LoadingText,
+    pub memory: memory::MemoryText,
     pub setting: setting::SettingText,
     pub start: start::StartText,
     pub warning: warning::WarningText,
@@ -39,41 +48,30 @@ pub struct LanguageSource {
 /// 加载宿主语言文件并注册伪常量
 pub fn load() -> I18nResult<()> {
     let language_source = load_language_source();
-    let global_text = global::register(&language_source);
-    let home_text = home::register(&language_source);
-    let key_text = key::register(&language_source);
-    let loading_text = loading::register(&language_source);
-    let setting_text = setting::register(&language_source);
-    let start_text = start::register(&language_source);
-    let warning_text = warning::register(&language_source);
-
-    let _ = I18N_TEXT.set(I18nText {
-        global: global_text,
-        home: home_text,
-        key: key_text,
-        loading: loading_text,
-        setting: setting_text,
-        start: start_text,
-        warning: warning_text,
-    });
-
+    update_text_snapshot(register_texts(&language_source));
     Ok(())
 }
 
 /// 获取已加载的语言文本集合
-pub fn text() -> &'static I18nText {
-    I18N_TEXT.get_or_init(|| {
-        let language_source = load_language_source();
-        I18nText {
-            global: global::register(&language_source),
-            home: home::register(&language_source),
-            key: key::register(&language_source),
-            loading: loading::register(&language_source),
-            setting: setting::register(&language_source),
-            start: start::register(&language_source),
-            warning: warning::register(&language_source),
-        }
-    })
+pub fn text() -> I18nText {
+    I18N_TEXT
+        .get_or_init(|| {
+            let language_source = load_language_source();
+            RwLock::new(register_texts(&language_source))
+        })
+        .read()
+        .map(|text| text.clone())
+        .unwrap_or_else(|_| {
+            let language_source = load_language_source();
+            register_texts(&language_source)
+        })
+}
+
+/// 按指定语言代码重新加载宿主语言文本。
+pub fn reload(language_code: &str) -> I18nResult<()> {
+    let language_source = load_language_source_for_code(language_code);
+    update_text_snapshot(register_texts(&language_source));
+    Ok(())
 }
 
 /// 读取指定 key，并按当前语言 -> en_us -> 修复占位的顺序回退
@@ -104,19 +102,51 @@ fn load_language_source() -> LanguageSource {
     let root_dir = root_dir();
     let preferred_code =
         read_language_preference(&root_dir).unwrap_or_else(|| DEFAULT_LANGUAGE_CODE.to_string());
-    let preferred_texts = read_language_file(&root_dir, &preferred_code).unwrap_or_else(|| {
-        read_language_file(&root_dir, DEFAULT_LANGUAGE_CODE).unwrap_or_default()
+    let language_code = fallback_language_code_if_missing(&root_dir, &preferred_code);
+    load_language_source_from_root(&root_dir, &language_code)
+}
+
+fn load_language_source_for_code(language_code: &str) -> LanguageSource {
+    let root_dir = root_dir();
+    load_language_source_from_root(&root_dir, language_code)
+}
+
+fn load_language_source_from_root(root_dir: &Path, preferred_code: &str) -> LanguageSource {
+    let preferred_texts = read_language_file(root_dir, preferred_code)
+        .unwrap_or_else(|| read_language_file(root_dir, DEFAULT_LANGUAGE_CODE).unwrap_or_default());
+    let fallback_texts = read_language_file(root_dir, DEFAULT_LANGUAGE_CODE).unwrap_or_else(|| {
+        repair_language_files();
+        HashMap::new()
     });
-    let fallback_texts =
-        read_language_file(&root_dir, DEFAULT_LANGUAGE_CODE).unwrap_or_else(|| {
-            repair_language_files();
-            HashMap::new()
-        });
 
     LanguageSource {
         preferred_texts,
         fallback_texts,
         is_default_language: preferred_code == DEFAULT_LANGUAGE_CODE,
+    }
+}
+
+fn register_texts(language_source: &LanguageSource) -> I18nText {
+    I18nText {
+        clear_cache: clear_cache::register(language_source),
+        clear_data: clear_data::register(language_source),
+        game_list: game_list::register(language_source),
+        global: global::register(language_source),
+        home: home::register(language_source),
+        key: key::register(language_source),
+        language: language::register(language_source),
+        loading: loading::register(language_source),
+        memory: memory::register(language_source),
+        setting: setting::register(language_source),
+        start: start::register(language_source),
+        warning: warning::register(language_source),
+    }
+}
+
+fn update_text_snapshot(text: I18nText) {
+    let text_lock = I18N_TEXT.get_or_init(|| RwLock::new(text.clone()));
+    if let Ok(mut current_text) = text_lock.write() {
+        *current_text = text;
     }
 }
 
@@ -138,6 +168,30 @@ fn read_language_file(root_dir: &Path, language_code: &str) -> Option<HashMap<St
         .join(format!("{language_code}.json"));
     let raw_json = fs::read_to_string(language_path).ok()?;
     serde_json::from_str::<HashMap<String, String>>(&raw_json).ok()
+}
+
+fn fallback_language_code_if_missing(root_dir: &Path, language_code: &str) -> String {
+    if language_file_exists(root_dir, language_code) {
+        return language_code.to_string();
+    }
+
+    write_default_language_preference(root_dir);
+    DEFAULT_LANGUAGE_CODE.to_string()
+}
+
+fn language_file_exists(root_dir: &Path, language_code: &str) -> bool {
+    root_dir
+        .join(LANGUAGE_DIR)
+        .join(format!("{language_code}.json"))
+        .is_file()
+}
+
+fn write_default_language_preference(root_dir: &Path) {
+    let language_path = root_dir.join(LANGUAGE_PROFILE_PATH);
+    if let Some(parent_dir) = language_path.parent() {
+        let _ = fs::create_dir_all(parent_dir);
+    }
+    let _ = fs::write(language_path, DEFAULT_LANGUAGE_CODE);
 }
 
 /// 缺失 key 的文本。优先使用已加载的缺失键模板。

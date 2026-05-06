@@ -35,6 +35,11 @@ impl HomeUiState {
         self.lua_state = HomeLuaState::new(self.root_state.select);
     }
 
+    /// 刷新 Home 页面语言文本。
+    pub fn refresh_language(&mut self) {
+        self.root_state.language = home_language_pairs();
+    }
+
     /// 应用 Lua 返回状态。
     pub fn apply_lua_state(&mut self, lua_state: HomeLuaState) -> Option<HomeConfirmAction> {
         self.lua_state = lua_state;
@@ -53,17 +58,44 @@ impl HomeUiState {
 fn home_language_pairs() -> Vec<(String, String)> {
     let text = i18n::text();
     vec![
-        ("HOME_PREV_OPTION".to_string(), text.key.home_prev_option.to_string()),
-        ("HOME_NEXT_OPTION".to_string(), text.key.home_next_option.to_string()),
+        (
+            "HOME_PREV_OPTION".to_string(),
+            text.key.home_prev_option.to_string(),
+        ),
+        (
+            "HOME_NEXT_OPTION".to_string(),
+            text.key.home_next_option.to_string(),
+        ),
         ("HOME_SELECT".to_string(), text.key.home_select.to_string()),
-        ("HOME_CONFIRM".to_string(), text.key.home_confirm.to_string()),
-        ("HOME_OPTION1".to_string(), text.key.home_option1.to_string()),
-        ("HOME_OPTION2".to_string(), text.key.home_option2.to_string()),
-        ("HOME_OPTION3".to_string(), text.key.home_option3.to_string()),
-        ("HOME_OPTION4".to_string(), text.key.home_option4.to_string()),
-        ("HOME_OPTION5".to_string(), text.key.home_option5.to_string()),
+        (
+            "HOME_CONFIRM".to_string(),
+            text.key.home_confirm.to_string(),
+        ),
+        (
+            "HOME_OPTION1".to_string(),
+            text.key.home_option1.to_string(),
+        ),
+        (
+            "HOME_OPTION2".to_string(),
+            text.key.home_option2.to_string(),
+        ),
+        (
+            "HOME_OPTION3".to_string(),
+            text.key.home_option3.to_string(),
+        ),
+        (
+            "HOME_OPTION4".to_string(),
+            text.key.home_option4.to_string(),
+        ),
+        (
+            "HOME_OPTION5".to_string(),
+            text.key.home_option5.to_string(),
+        ),
         ("HOME_PLAY".to_string(), text.home.play.to_string()),
-        ("HOME_CONTINUE".to_string(), text.home.continue_game.to_string()),
+        (
+            "HOME_CONTINUE".to_string(),
+            text.home.continue_game.to_string(),
+        ),
         ("HOME_SETTINGS".to_string(), text.home.settings.to_string()),
         ("HOME_ABOUT".to_string(), text.home.about.to_string()),
         ("HOME_QUIT".to_string(), text.home.quit.to_string()),

@@ -139,6 +139,7 @@
 > 
 > - `key` 表示语言键。
 > - `path` 表示脚本路径，相对于 `scripts/` 目录。
+> - `低资源运行模式`：帧率限制为 10 FPS。
 
 该文件用于声明游戏的核心配置，格式如下：
 
@@ -151,6 +152,7 @@
   "min_width": int,                  -- 最小终端宽度（终端字符列数）
   "min_height": int,                 -- 最小终端高度（终端字符行数）
   "write": boolean,                  -- 是否请求直写权限
+  "afk_time": int,                   -- 低资源运行时间阈值
   "case_sensitive": boolean,         -- 按键是否区分大小写
   "actions": object,                 -- 按键动作注册表
   "runtime": {
@@ -170,7 +172,8 @@
 | `min_width`          | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端宽度（终端字符列数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
 | `min_height`         | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端高度（终端字符行数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
 | `write`              | <font color="#92cddc">boolean</font>                                                                         | 是否请求直写权限。`true` 表示模组包需要文件写入权限，加载时会向用户申请；`false` 表示不需要权限，所有直写请求将被宿主忽略。<font color="red">直写操作为高风险操作，请最大程度避免使用！</font> |
-| `case_sensitive`              | <font color="#92cddc">boolean</font>                                                                         | 按键是否区分大小写。`true` 表示字母按键区分大小写；`false` 表示字母按键不区分大小写。 |
+| `afk_time`           | <font color="#92cddc">int</font>                                                                             | 低资源运行时间阈值。填写正整数，单位为秒。值为 0 则表示永不进入低资源运行模式。                                                                           |
+| `case_sensitive`     | <font color="#92cddc">boolean</font>                                                                         | 按键是否区分大小写。`true` 表示字母按键区分大小写；`false` 表示字母按键不区分大小写。                                                                  |
 | `actions`            | <font color="#92cddc">object</font>                                                                          | 按键动作注册表，格式见『模组包配置文件-[注册表格式](#注册表格式)』。宿主会将物理按键映射为语义化动作。填写空对象代表不注册任何按键。                                               |
 | `runtime`            | <font color="#92cddc">object</font>                                                                          | 运行时设置。                                                                                                              |
 | `runtime.target_fps` | <font color="#92cddc">int</font>                                                                             | 目标帧率，支持 `30`、`60`、`120`。其它值将被忽略并回退为 `60`。实际帧率受机器性能影响，该值为上限。                                                         |

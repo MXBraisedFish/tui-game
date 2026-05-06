@@ -21,6 +21,10 @@ pub fn ensure() -> EnvironmentResult<()> {
         &root_dir.join("data/cache/mod_scan_cache.json"),
         EMPTY_JSON_OBJECT,
     )?;
+    ensure_file(
+        &root_dir.join("data/cache/language_ui_cache.json"),
+        EMPTY_JSON_OBJECT,
+    )?;
 
     ensure_dir(&root_dir.join("data/profiles"))?;
     ensure_file(

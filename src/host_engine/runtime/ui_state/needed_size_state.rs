@@ -49,7 +49,10 @@ fn language_table(lua: &Lua) -> mlua::Result<Table> {
     table.set("WARNING_SIZE_NEEDED", text.warning.size_needed)?;
     table.set("WARNING_SIZE_HINT", text.warning.size_hint)?;
     table.set("WARNING_SIZE_ACTION_EXIT", text.warning.size_action_exit)?;
-    table.set("WARNING_SIZE_ACTION_RETURN", text.warning.size_action_return)?;
+    table.set(
+        "WARNING_SIZE_ACTION_RETURN",
+        text.warning.size_action_return,
+    )?;
     table.set("KEY_SIZE_RETURN", text.key.size_return)?;
     Ok(table)
 }

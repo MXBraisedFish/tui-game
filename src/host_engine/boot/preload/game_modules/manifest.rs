@@ -46,6 +46,7 @@ pub struct GameManifest {
     pub min_width: i64,
     pub min_height: i64,
     pub write: bool,
+    pub afk_time: u64,
     pub case_sensitive: bool,
     pub actions: BTreeMap<String, GameActionBinding>,
     pub runtime: GameRuntimeManifest,

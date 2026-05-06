@@ -4,23 +4,33 @@ use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-use mlua::{Function, Value};
+use mlua::{Function, Table, Value};
 use serde_json::Value as JsonValue;
 
 use crate::LoadedResources;
 use crate::LuaRuntimeState;
-use crate::host_engine::boot::preload::lua_runtime::api::LuaEvent;
 use crate::host_engine::boot::preload::lua_runtime::api::ApiScope;
+use crate::host_engine::boot::preload::lua_runtime::api::LuaEvent;
 use crate::host_engine::boot::preload::lua_runtime::api::callback_api;
 use crate::host_engine::boot::preload::lua_runtime::{
     HostLuaBridge, HostLuaMessage, LuaRuntimeConsumer, LuaRuntimeContext,
 };
 use crate::host_engine::boot::preload::state_machine::{
-    HostStateMachine, SettingState, TopLevelState,
+    DialogState, HostStateMachine, SettingState, TopLevelState,
 };
+use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
 use crate::host_engine::runtime::ui_state::action_map::UiActionMap;
+use crate::host_engine::runtime::ui_state::game_list_state::{
+    GameListLuaAction, GameListLuaState, GameListUiState,
+};
 use crate::host_engine::runtime::ui_state::home_state::HomeUiState;
+use crate::host_engine::runtime::ui_state::language_state::{
+    LanguageLuaAction, LanguageLuaState, LanguageUiState,
+};
 use crate::host_engine::runtime::ui_state::lua_state::HomeLuaState;
+use crate::host_engine::runtime::ui_state::memory_state::{
+    MemoryConfirmAction, MemoryLuaAction, MemoryLuaState, MemoryUiState,
+};
 use crate::host_engine::runtime::ui_state::needed_size_state::{
     NeededSizeMode, NeededSizeRootState,
 };
@@ -28,7 +38,6 @@ use crate::host_engine::runtime::ui_state::root_state::HomeConfirmAction;
 use crate::host_engine::runtime::ui_state::setting_state::{
     SettingLuaAction, SettingLuaState, SettingUiState,
 };
-use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
 
 type UiRuntimeResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -38,7 +47,10 @@ pub struct ActiveUiPage {
     manifest: JsonValue,
     page_key: UiPageKey,
     home_state: HomeUiState,
+    game_list_state: GameListUiState,
     setting_state: SettingUiState,
+    language_state: LanguageUiState,
+    memory_state: MemoryUiState,
     needed_size_mode: NeededSizeMode,
     action_map: UiActionMap,
 }
@@ -56,7 +68,8 @@ pub(crate) fn load_home_page(
     let page_key = UiPageKey::Home;
     let entry_path = entry_path(&official_ui_package.manifest, page_key.as_str())?;
     let script_path = resolve_script_path(&official_ui_package.root_dir, entry_path.as_str())?;
-    let action_map = UiActionMap::from_manifest_page(&official_ui_package.manifest, page_key.as_str());
+    let action_map =
+        UiActionMap::from_manifest_page(&official_ui_package.manifest, page_key.as_str());
 
     let lua = &lua_runtime.lua_runtime_environment.lua;
     let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
@@ -84,14 +97,30 @@ pub(crate) fn load_home_page(
 
     let mut home_state = HomeUiState::new();
     home_state.reset_lua_state();
+    let mut game_list_state = GameListUiState::new(
+        loaded_resources.game_module_registry.clone(),
+        loaded_resources.persistent_data.best_scores.clone(),
+        loaded_resources.persistent_data.language_code.clone(),
+    );
+    game_list_state.reset_lua_state();
     let mut setting_state = SettingUiState::new();
     setting_state.reset_lua_state();
+    let mut language_state = LanguageUiState::new(
+        loaded_resources.persistent_data.language_code.clone(),
+        loaded_resources.cache_data.language_ui_texts.clone(),
+    );
+    language_state.reset_lua_state();
+    let mut memory_state = MemoryUiState::new();
+    memory_state.reset_lua_state();
     Ok(ActiveUiPage {
         package_root: official_ui_package.root_dir.clone(),
         manifest: official_ui_package.manifest.clone(),
         page_key,
         home_state,
+        game_list_state,
         setting_state,
+        language_state,
+        memory_state,
         needed_size_mode: NeededSizeMode::Root,
         action_map,
     })
@@ -136,8 +165,23 @@ pub(crate) fn ensure_page(
     if page_key == UiPageKey::Home {
         active_ui_page.home_state.reset_lua_state();
     }
+    if page_key == UiPageKey::GameList {
+        active_ui_page.game_list_state.reset_lua_state();
+    }
     if page_key == UiPageKey::Setting {
         active_ui_page.setting_state.reset_lua_state();
+    }
+    if page_key == UiPageKey::SettingLanguage {
+        active_ui_page.language_state.reset_lua_state();
+    }
+    if page_key == UiPageKey::SettingMemory {
+        active_ui_page.memory_state.reset_lua_state();
+    }
+    if page_key == UiPageKey::StorageDetails {
+        active_ui_page.memory_state.root_state =
+            crate::host_engine::runtime::ui_state::memory_state::MemoryRootState::new(
+                active_ui_page.memory_state.root_state.select,
+            );
     }
 
     Ok(())
@@ -151,10 +195,14 @@ pub(crate) fn handle_event(
     event: LuaEvent,
 ) -> UiRuntimeResult<()> {
     let lua = &lua_runtime.lua_runtime_environment.lua;
+    sync_page_script_state(lua_runtime, active_ui_page)?;
     let handle_event: Function = lua.globals().get("handle_event")?;
     let lua_state = match active_ui_page.page_key {
         UiPageKey::Home => active_ui_page.home_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::GameList => active_ui_page.game_list_state.lua_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::SettingLanguage => active_ui_page.language_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::SettingMemory => active_ui_page.memory_state.lua_state.to_lua_table(lua)?,
         UiPageKey::WarningNeededSize => {
             let table = lua.create_table()?;
             table.set("exit", false)?;
@@ -167,9 +215,40 @@ pub(crate) fn handle_event(
     let returned_state = handle_event.call::<Value>((lua_state, event_table))?;
 
     if active_ui_page.page_key != UiPageKey::Home {
+        if active_ui_page.page_key == UiPageKey::GameList {
+            let lua_state = GameListLuaState::from_lua_value(returned_state)?;
+            handle_game_list_lua_state(active_ui_page, host_state_machine, lua_state);
+            return Ok(());
+        }
         if active_ui_page.page_key == UiPageKey::Setting {
             let lua_state = SettingLuaState::from_lua_value(returned_state)?;
             handle_setting_lua_state(active_ui_page, host_state_machine, lua_state);
+            return Ok(());
+        }
+        if active_ui_page.page_key == UiPageKey::SettingLanguage {
+            let lua_state = LanguageLuaState::from_lua_value(returned_state)?;
+            handle_language_lua_state(
+                &lua_runtime.lua_runtime_environment.host_bridge,
+                active_ui_page,
+                host_state_machine,
+                lua_state,
+            )?;
+            return Ok(());
+        }
+        if active_ui_page.page_key == UiPageKey::SettingMemory {
+            let lua_state = MemoryLuaState::from_lua_value(returned_state)?;
+            handle_memory_lua_state(active_ui_page, host_state_machine, lua_state);
+            return Ok(());
+        }
+        if active_ui_page.page_key == UiPageKey::StorageDetails {
+            handle_storage_details_lua_state(host_state_machine, returned_state)?;
+            return Ok(());
+        }
+        if matches!(
+            active_ui_page.page_key,
+            UiPageKey::WarningClearCache | UiPageKey::WarningClearData
+        ) {
+            handle_clear_warning_lua_state(active_ui_page, host_state_machine, returned_state)?;
             return Ok(());
         }
         handle_non_home_lua_state(
@@ -195,6 +274,29 @@ pub(crate) fn handle_event(
     Ok(())
 }
 
+/// 同步 Lua 脚本内部的页面缓存状态。
+///
+/// 部分官方 UI 脚本会在 render 阶段缓存 root_state 供 handle_event 使用。
+/// 页面刚切换后，首个输入事件可能早于首次 render 到达，因此这里先用当前 root_state
+/// 做一次脚本级同步，避免事件处理读取到空缓存。
+fn sync_page_script_state(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &ActiveUiPage,
+) -> UiRuntimeResult<()> {
+    if active_ui_page.page_key != UiPageKey::GameList {
+        return Ok(());
+    }
+
+    let lua = &lua_runtime.lua_runtime_environment.lua;
+    let render: Function = lua.globals().get("render")?;
+    let root_state = active_ui_page
+        .game_list_state
+        .root_state
+        .to_lua_table(lua)?;
+    render.call::<()>(root_state)?;
+    Ok(())
+}
+
 /// 渲染当前 UI 页面。
 pub(crate) fn render(
     lua_runtime: &LuaRuntimeState,
@@ -203,7 +305,16 @@ pub(crate) fn render(
     let lua = &lua_runtime.lua_runtime_environment.lua;
     let root_state = match active_ui_page.page_key {
         UiPageKey::Home => active_ui_page.home_state.root_state.to_lua_table(lua)?,
+        UiPageKey::GameList => active_ui_page
+            .game_list_state
+            .root_state
+            .to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.root_state.to_lua_table(lua)?,
+        UiPageKey::SettingLanguage => active_ui_page.language_state.root_state.to_lua_table(lua)?,
+        UiPageKey::SettingMemory => active_ui_page.memory_state.root_state.to_lua_table(lua)?,
+        UiPageKey::StorageDetails => active_ui_page.memory_state.root_state.to_lua_table(lua)?,
+        UiPageKey::WarningClearCache => clear_cache_root_state(lua)?,
+        UiPageKey::WarningClearData => clear_data_root_state(lua)?,
         _ => lua.create_table()?,
     };
     let render: Function = lua.globals().get("render")?;
@@ -289,7 +400,10 @@ fn load_page_script(
     Ok(())
 }
 
-fn handle_home_confirm_action(host_state_machine: &mut HostStateMachine, confirm_action: HomeConfirmAction) {
+fn handle_home_confirm_action(
+    host_state_machine: &mut HostStateMachine,
+    confirm_action: HomeConfirmAction,
+) {
     match confirm_action {
         HomeConfirmAction::GameList => {
             host_state_machine.top_level_state = TopLevelState::GameList;
@@ -324,6 +438,189 @@ fn handle_setting_lua_state(
     }
 }
 
+fn handle_game_list_lua_state(
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    lua_state: GameListLuaState,
+) {
+    match active_ui_page.game_list_state.apply_lua_state(lua_state) {
+        GameListLuaAction::None => {}
+        GameListLuaAction::Back => {
+            host_state_machine.top_level_state = TopLevelState::Home;
+        }
+        GameListLuaAction::Confirm(_game_uid) => {
+            // TODO: 选择游戏后切换到游戏详情/运行时状态。
+        }
+    }
+}
+
+fn handle_language_lua_state(
+    host_bridge: &HostLuaBridge,
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    lua_state: LanguageLuaState,
+) -> UiRuntimeResult<()> {
+    match active_ui_page.language_state.apply_lua_state(lua_state) {
+        LanguageLuaAction::None => {}
+        LanguageLuaAction::Back => {
+            host_state_machine.setting_state = SettingState::Hub;
+        }
+        LanguageLuaAction::Confirm(language_code) => {
+            persist_language_code(language_code.as_str())?;
+            crate::host_engine::boot::i18n::i18n::reload(language_code.as_str())?;
+            active_ui_page.home_state.refresh_language();
+            active_ui_page
+                .game_list_state
+                .refresh_language(language_code.clone());
+            active_ui_page.setting_state.refresh_language();
+            active_ui_page.memory_state.refresh_language();
+            host_bridge.set_language_code(language_code);
+        }
+    }
+    Ok(())
+}
+
+fn handle_memory_lua_state(
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    lua_state: MemoryLuaState,
+) {
+    match active_ui_page.memory_state.apply_lua_state(lua_state) {
+        MemoryLuaAction::None => {}
+        MemoryLuaAction::Back => {
+            host_state_machine.setting_state = SettingState::Hub;
+        }
+        MemoryLuaAction::Confirm(_confirm_action) => match _confirm_action {
+            MemoryConfirmAction::ClearCache => {
+                host_state_machine.dialog_state = Some(DialogState::ClearCacheWarning);
+            }
+            MemoryConfirmAction::ClearData => {
+                host_state_machine.dialog_state = Some(DialogState::ClearDataWarning);
+            }
+            MemoryConfirmAction::ShowStorageDetails => {
+                host_state_machine.setting_state = SettingState::StorageDetails;
+            }
+        },
+    }
+}
+
+fn handle_clear_warning_lua_state(
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    returned_state: Value,
+) -> UiRuntimeResult<()> {
+    let Value::Table(table) = returned_state else {
+        return Ok(());
+    };
+    let confirm = table.get::<Option<bool>>("confirm")?.unwrap_or(false);
+    let back = table.get::<Option<bool>>("back")?.unwrap_or(false);
+
+    if confirm {
+        match host_state_machine.dialog_state {
+            Some(DialogState::ClearCacheWarning) => {
+                crate::host_engine::runtime::memory_cleanup::clear_cache()?;
+            }
+            Some(DialogState::ClearDataWarning) => {
+                crate::host_engine::runtime::memory_cleanup::clear_data()?;
+            }
+            _ => {}
+        }
+        active_ui_page.memory_state.reset_lua_state();
+        host_state_machine.dialog_state = None;
+        host_state_machine.setting_state = SettingState::Memory;
+        return Ok(());
+    }
+
+    if back {
+        host_state_machine.dialog_state = None;
+        host_state_machine.setting_state = SettingState::Memory;
+    }
+
+    Ok(())
+}
+
+fn clear_cache_root_state(lua: &mlua::Lua) -> mlua::Result<Table> {
+    let text = crate::host_engine::boot::i18n::text();
+    let language = lua.create_table()?;
+    language.set("CLEAR_CACHE_CONFIRM", text.key.clear_cache_confirm)?;
+    language.set("CLEAR_CACHE_CANCEL", text.key.clear_cache_cancel)?;
+    language.set("CLEAR_CACHE_TITLE", text.clear_cache.title)?;
+    language.set("CLEAR_CACHE_WARN", text.clear_cache.warn)?;
+    language.set("CLEAR_CACHE_CACHE_PATH", text.clear_cache.cache_path)?;
+    language.set("CLEAR_CACHE_LOG_PATH", text.clear_cache.log_path)?;
+    language.set("CLEAR_CACHE_SECOND", text.clear_cache.second)?;
+
+    let root_dir = root_dir();
+    let dir = lua.create_table()?;
+    dir.set(
+        "cache_dir",
+        root_dir.join("data").join("cache").display().to_string(),
+    )?;
+    dir.set(
+        "log_dir",
+        root_dir.join("data").join("log").display().to_string(),
+    )?;
+
+    let table = lua.create_table()?;
+    table.set("language", language)?;
+    table.set("dir", dir)?;
+    Ok(table)
+}
+
+fn clear_data_root_state(lua: &mlua::Lua) -> mlua::Result<Table> {
+    let text = crate::host_engine::boot::i18n::text();
+    let language = lua.create_table()?;
+    language.set("CLEAR_DATA_CONFIRM", text.key.clear_data_confirm)?;
+    language.set("CLEAR_DATA_CANCEL", text.key.clear_data_cancel)?;
+    language.set("CLEAR_DATA_TITLE", text.clear_data.title)?;
+    language.set("CLEAR_DATA_WARN", text.clear_data.warn)?;
+    language.set("CLEAR_DATA_PATH", text.clear_data.path)?;
+    language.set("CLEAR_DATA_SECOND", text.clear_data.second)?;
+
+    let dir = lua.create_table()?;
+    dir.set("data_dir", root_dir().join("data").display().to_string())?;
+
+    let table = lua.create_table()?;
+    table.set("language", language)?;
+    table.set("dir", dir)?;
+    Ok(table)
+}
+
+fn handle_storage_details_lua_state(
+    host_state_machine: &mut HostStateMachine,
+    returned_state: Value,
+) -> UiRuntimeResult<()> {
+    let Value::Table(table) = returned_state else {
+        return Ok(());
+    };
+    let back = table.get::<Option<bool>>("back")?.unwrap_or(false);
+    if back {
+        host_state_machine.setting_state = SettingState::Memory;
+    }
+    Ok(())
+}
+
+fn persist_language_code(language_code: &str) -> UiRuntimeResult<()> {
+    let path = root_dir().join("data/profiles/language.txt");
+    if let Some(parent_dir) = path.parent() {
+        fs::create_dir_all(parent_dir)?;
+    }
+    fs::write(path, language_code)?;
+    Ok(())
+}
+
+fn root_dir() -> PathBuf {
+    std::env::current_dir()
+        .ok()
+        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|path| path.parent().map(Path::to_path_buf))
+        })
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
 fn handle_non_home_lua_state(
     host_bridge: &HostLuaBridge,
     page_key: UiPageKey,
@@ -339,7 +636,9 @@ fn handle_non_home_lua_state(
 
     match page_key {
         UiPageKey::WarningNeededSize => {
-            let mode = table.get::<Option<String>>("mode")?.unwrap_or_else(|| "root".to_string());
+            let mode = table
+                .get::<Option<String>>("mode")?
+                .unwrap_or_else(|| "root".to_string());
             if mode == "game" {
                 // TODO: game 模式接入游戏运行态后，在这里返回游戏列表。
             } else {

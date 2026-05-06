@@ -60,4 +60,9 @@ pub enum SettingState {
     /// TODO: 清理缓存时打开 `DialogState::ClearCacheWarning`。
     /// TODO: 清理数据时打开 `DialogState::ClearDataWarning`。
     Memory,
+
+    /// 存储详情。
+    ///
+    /// TODO: 返回键切换回 `Memory`。
+    StorageDetails,
 }

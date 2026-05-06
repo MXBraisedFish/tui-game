@@ -135,7 +135,10 @@ fn build_single_ui_action_table(
             .unwrap_or(""),
     )?;
     table.set("key_user", lua_table_value::json_to_lua_value(lua, key)?)?;
-    table.set("key_display", build_key_display_table(lua, key, key, false)?)?;
+    table.set(
+        "key_display",
+        build_key_display_table(lua, key, key, false)?,
+    )?;
     Ok(Some(table))
 }
 

@@ -29,6 +29,7 @@ pub struct DrawTextArgs {
     pub bg: Option<String>,
     pub style: Option<i64>,
     pub align: i64,
+    pub wrap_width: Option<u16>,
 }
 
 /// 矩形填充参数。
@@ -66,7 +67,7 @@ pub struct BorderRectArgs {
 
 /// 解析 canvas_draw_text 参数。
 pub fn parse_draw_text_args(args: &Variadic<Value>) -> mlua::Result<DrawTextArgs> {
-    argument::expect_arg_count_range(args, 3, 7)?;
+    argument::expect_arg_count_range(args, 3, 8)?;
     let x = parse_coordinate(args, 0)?;
     let y = parse_coordinate(args, 1)?;
     let text = argument::expect_string_arg(args, 2)?;
@@ -78,6 +79,7 @@ pub fn parse_draw_text_args(args: &Variadic<Value>) -> mlua::Result<DrawTextArgs
         Some(Value::Nil) => ALIGN_NO_WRAP,
         Some(_) => argument::expect_i64_arg(args, 6)?,
     };
+    let wrap_width = parse_optional_wrap_width(args, 7)?;
 
     Ok(DrawTextArgs {
         x,
@@ -87,6 +89,7 @@ pub fn parse_draw_text_args(args: &Variadic<Value>) -> mlua::Result<DrawTextArgs
         bg,
         style,
         align,
+        wrap_width,
     })
 }
 
@@ -152,6 +155,24 @@ fn parse_positive_size(args: &Variadic<Value>, index: usize) -> mlua::Result<u16
         ));
     }
     u16::try_from(value).map_err(mlua::Error::external)
+}
+
+pub fn parse_optional_wrap_width(
+    args: &Variadic<Value>,
+    index: usize,
+) -> mlua::Result<Option<u16>> {
+    let Some(value) = argument::expect_optional_i64_arg(args, index)? else {
+        return Ok(None);
+    };
+    if value == 0 {
+        return Ok(None);
+    }
+    if value < 0 {
+        return Err(mlua::Error::external(
+            "wrap_width must be nil, 0, or a positive integer",
+        ));
+    }
+    Ok(Some(u16::try_from(value).map_err(mlua::Error::external)?))
 }
 
 fn parse_optional_char(value: Option<&Value>, default_char: char) -> char {

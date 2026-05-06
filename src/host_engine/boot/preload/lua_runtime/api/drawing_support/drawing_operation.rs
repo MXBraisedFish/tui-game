@@ -7,10 +7,11 @@ use super::drawing_parser::{
     ALIGN_CENTER, ALIGN_LEFT, ALIGN_NO_WRAP, ALIGN_RIGHT, BorderRectArgs, DrawTextArgs, EraserArgs,
     FillRectArgs,
 };
+use crate::host_engine::boot::preload::lua_runtime::api::text_support::text_wrapping;
 
 /// 执行文本绘制。
 pub fn draw_text(canvas_state: &mut CanvasState, args: DrawTextArgs) {
-    let lines = text_lines(args.text.as_str(), args.align);
+    let lines = text_lines(args.text.as_str(), args.align, args.wrap_width);
     let first_line_width = lines
         .first()
         .map(|line| UnicodeWidthStr::width(line.as_str()) as i64)
@@ -137,11 +138,11 @@ pub fn border_rect(canvas_state: &mut CanvasState, args: BorderRectArgs) {
     );
 }
 
-fn text_lines(text: &str, align: i64) -> Vec<String> {
-    if align == ALIGN_NO_WRAP {
-        vec![text.replace('\n', "\\n")]
+fn text_lines(text: &str, align: i64, wrap_width: Option<u16>) -> Vec<String> {
+    if wrap_width.is_none() && align == ALIGN_NO_WRAP {
+        text_wrapping::no_wrap_line(text)
     } else {
-        text.split('\n').map(ToString::to_string).collect()
+        text_wrapping::wrap_text_lines(text, wrap_width)
     }
 }
 

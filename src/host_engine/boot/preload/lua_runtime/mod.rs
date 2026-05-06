@@ -10,8 +10,8 @@ pub use host_bridge::{
     HostLuaBridge, HostLuaMessage, LaunchMode, LuaRuntimeConsumer, LuaRuntimeContext,
 };
 
-use crate::LoadedResources;
 use super::lua_runtime::api::ApiScope;
+use crate::LoadedResources;
 
 /// 准备 Lua 虚拟机和沙箱环境。
 ///

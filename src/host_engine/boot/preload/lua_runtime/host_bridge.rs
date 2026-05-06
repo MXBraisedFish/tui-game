@@ -1,7 +1,7 @@
 //! 宿主与 Lua 通信桥占位
 
-use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use serde_json::Value;
@@ -124,6 +124,13 @@ impl HostLuaBridge {
     pub fn set_current_ui_actions(&self, current_ui_actions: Value) {
         if let Ok(mut runtime_context) = self.runtime_context.lock() {
             runtime_context.current_ui_actions = current_ui_actions;
+        }
+    }
+
+    /// 更新当前语言代码。
+    pub fn set_language_code(&self, language_code: String) {
+        if let Ok(mut runtime_context) = self.runtime_context.lock() {
+            runtime_context.language_code = language_code;
         }
     }
 

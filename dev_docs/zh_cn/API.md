@@ -81,6 +81,8 @@
 
 ![执行流程图](./image/mod_program_flowchart.png)
 
+---
+
 ## 使用示例
 
 ```lua
@@ -132,6 +134,8 @@ function save_game(state)
 end
 ```
 
+---
+
 ## 数据格式
 
 > 注：
@@ -173,6 +177,8 @@ end
 
 - `best_string`：必填字段，用于传递最佳记录的显示文本。
 - `["#key"]`：可选字段，作为 `best_string` 中对应变量的引用值，支持动态替换文本中的变量占位符。
+
+---
 
 ## 事件类型
 
@@ -305,14 +311,15 @@ end
 > 4. 宽度、高度参数均以**终端字符数**为单位（宽度为列数，高度为行数）。
 > 5. 所有绘制操作的基准点均为**内容的左上角**，即绘制内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
 > 6. 绘制坐标详细见『模组包制作规范及教程-其它-[绘制坐标](MOD.md#绘制坐标)』。
+> 7. `[wrap_width` 参数含义为到达指定长度后的文本会**自动换行**（可与 `*[align` 参数搭配），默认无限制。
 
-| 函数名                                                               | 作用                       | 参数                                                                                                                                                                                                                                                                                                                                                                                              | 返回值                            |
-| ----------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `canvas_clear()`                                                  | 清空当前帧的画布。                | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                                                                                  | <font color="#7f7f7f">无</font> |
-| `canvas_eraser(x, y, width, height)`                              | 清空画布指定区域。                | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：区域宽度。<br>`height` - <font color="#92cddc">int</font>：区域高度。                                                                                                                                                                                           | <font color="#7f7f7f">无</font> |
-| `canvas_draw_text(x, y, text, *[fg, *[bg, *[style, *[align)`      | 在画布指定位置绘制字符串。            | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：要绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。<br>`*[style` - <font color="#92cddc">style</font>：可选，文本样式。<br>`*[align` - <font color="#92cddc">align</font>：可选，换行内容对齐方式。 | <font color="#7f7f7f">无</font> |
-| `canvas_fill_rect(x, y, width, height, [char, *[fg, *[bg)`        | 从指定位置绘制矩形，并使用指定字符填充。     | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char` - <font color="#92cddc">char</font>：可选，用于填充的单个字符。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。              | <font color="#7f7f7f">无</font> |
-| `canvas_border_rect(x, y, width, height, [char_list, *[fg, *[bg)` | 从指定位置绘制矩形边框，并使用指定字符作为边框。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char_list` - <font color="#92cddc">table</font>：可选，边框字符配置表，结构见下文。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。    | <font color="#7f7f7f">无</font> |
+| 函数名                                                                       | 作用                       | 参数                                                                                                                                                                                                                                                                                                                                                                                                                                                            | 返回值                            |
+| ------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `canvas_clear()`                                                          | 清空当前帧的画布。                | <font color="#7f7f7f">无</font>                                                                                                                                                                                                                                                                                                                                                                                                                                | <font color="#7f7f7f">无</font> |
+| `canvas_eraser(x, y, width, height)`                                      | 清空画布指定区域。                | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：区域宽度。<br>`height` - <font color="#92cddc">int</font>：区域高度。                                                                                                                                                                                                                                                         | <font color="#7f7f7f">无</font> |
+| `canvas_draw_text(x, y, text, *[fg, *[bg, *[style, *[align, [wrap_width)` | 在画布指定位置绘制字符串。            | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`text` - <font color="#92cddc">string</font>：绘制的字符串。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。<br>`*[style` - <font color="#92cddc">style</font>：可选，文本样式。<br>`*[align` - <font color="#92cddc">align</font>：可选，换行内容对齐方式。<br>`[wrap_width` - <font color="#92cddc">align</font>：可选，换行宽度。 | <font color="#7f7f7f">无</font> |
+| `canvas_fill_rect(x, y, width, height, [char, *[fg, *[bg)`                | 从指定位置绘制矩形，并使用指定字符填充。     | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char` - <font color="#92cddc">char</font>：可选，用于填充的单个字符。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。                                                                            | <font color="#7f7f7f">无</font> |
+| `canvas_border_rect(x, y, width, height, [char_list, *[fg, *[bg)`         | 从指定位置绘制矩形边框，并使用指定字符作为边框。 | `x` - <font color="#92cddc">int</font>：横轴坐标。<br>`y` - <font color="#92cddc">int</font>：纵轴坐标。<br>`width` - <font color="#92cddc">int</font>：矩形宽度。<br>`height` - <font color="#92cddc">int</font>：矩形高度。<br>`[char_list` - <font color="#92cddc">table</font>：可选，边框字符配置表，结构见下文。<br>`*[fg` - <font color="#92cddc">color</font>：可选，字符颜色。<br>`*[bg` - <font color="#92cddc">color</font>：可选，背景颜色。                                                                  | <font color="#7f7f7f">无</font> |
 
 **`[char_list` 格式**
 
@@ -341,12 +348,12 @@ end
 > 2. 所有计算操作的基准点均为**内容的左上角**，即计算内容将从指定的 (x, y) 坐标处开始向右、向下延伸。
 > 3. 绘制坐标详细见『模组包制作规范及教程-[绘制坐标](MOD.md#绘制坐标)』。
 
-| 函数名                     | 作用                 | 参数                                                    | 返回值                                                                                                       |
-| ----------------------- | ------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `get_text_size(text)`   | 计算字符串在终端中所占的宽度和高度。 | `text` - <font color="#92cddc">string</font>：要测量的字符串。 | `width` - <font color="#92cddc">int</font>：文字所占宽度。<br>`height` - <font color="#92cddc">int</font>：文字所占高度。 |
-| `get_text_width(text)`  | 计算字符串在终端中所占的宽度。    | `text` - <font color="#92cddc">string</font>：要测量的字符串。 | `width` - <font color="#92cddc">int</font>：文字所占宽度。                                                        |
-| `get_text_height(text)` | 计算字符串在终端中所占的高度。    | `text` - <font color="#92cddc">string</font>：要测量的字符串。 | `height` - <font color="#92cddc">int</font>：文字所占高度。                                                       |
-| `get_terminal_size()`   | 获取当前终端的宽度和高度。      | <font color="#7f7f7f">无</font>                        | `width` - <font color="#92cddc">int</font>：终端宽度。<br>`height` - <font color="#92cddc">int</font>：终端高度。     |
+| 函数名                                  | 作用                 | 参数                                                                                                                   | 返回值                                                                                                       |
+| ------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `get_text_size(text, [wrap_width)`   | 计算字符串在终端中所占的宽度和高度。 | `text` - <font color="#92cddc">string</font>：要测量的字符串。<br>`[wrap_width` - <font color="#92cddc">align</font>：可选，换行宽度。 | `width` - <font color="#92cddc">int</font>：文字所占宽度。<br>`height` - <font color="#92cddc">int</font>：文字所占高度。 |
+| `get_text_width(text, [wrap_width)`  | 计算字符串在终端中所占的宽度。    | `text` - <font color="#92cddc">string</font><br>`[wrap_width` - <font color="#92cddc">align</font>：可选，换行宽度。：要测量的字符串。 | `width` - <font color="#92cddc">int</font>：文字所占宽度。                                                        |
+| `get_text_height(text, [wrap_width)` | 计算字符串在终端中所占的高度。    | `text` - <font color="#92cddc">string</font>：要测量的字符串。<br>`[wrap_width` - <font color="#92cddc">align</font>：可选，换行宽度。 | `height` - <font color="#92cddc">int</font>：文字所占高度。                                                       |
+| `get_terminal_size()`                | 获取当前终端的宽度和高度。      | <font color="#7f7f7f">无</font>                                                                                       | `width` - <font color="#92cddc">int</font>：终端宽度。<br>`height` - <font color="#92cddc">int</font>：终端高度。     |
 
 ---
 
@@ -587,16 +594,16 @@ end
 > 4. `任意` 类型会被强制转换为 `string` 类型打印。
 > 5. 详细调试输出见『附录-[调试输出目录](#调试输出目录)』。
 
-| 是否需要调试模式                       | 函数名                           | 作用                        | 参数                                                                                                          | 返回值                                                                |
-| ------------------------------ | ----------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| <font color="red">是</font>     | `debug_log(message)`          | 在日志文件中写入一条调试信息。           | `message` - <font color="#92cddc">任意</font>：要写入的信息。                                                         | <font color="#7f7f7f">无</font>                                     |
-| <font color="red">是</font>     | `debug_warn(message)`         | 在日志文件中写入一条警告信息。           | `message` - <font color="#92cddc">任意</font>：要写入的警告信息。                                                       | <font color="#7f7f7f">无</font>                                     |
-| <font color="red">是</font>     | `debug_error(message)`        | 在日志文件中写入一条异常信息。           | `message` - <font color="#92cddc">任意</font>：要写入的异常信息。                                                       | <font color="#7f7f7f">无</font>                                     |
-| <font color="red">是</font>     | `debug_print(title, message)` | 在日志文件中写入一条带自定义标题的调试信息。    | `title` - <font color="#92cddc">string</font>：日志标题。 <br>`message` - <font color="#92cddc">任意</font>：要写入的信息。 | <font color="#7f7f7f">无</font>                                     |
-| <font color="red">是</font>     | `clear_debug_log()`           | 清空游戏日志文件。                 | <font color="#7f7f7f">无</font>                                                                              | <font color="#7f7f7f">无</font>                                     |
-| <font color="red">是</font>     | `get_game_uid()`              | 获取当前模组包在宿主中的唯一标识符（UID）。   | <font color="#7f7f7f">无</font>                                                                              | `game_uid` - <font color="#92cddc">string</font>：模组包 UID。          |
-| <font color="red">是</font>     | `get_game_info()`             | 获取当前模组包的完整元信息。            | <font color="#7f7f7f">无</font>                                                                              | `game_info` - <font color="#92cddc">table</font>：模组包元信息表，结构见下文。    |
-| <font color="#7f7f7f">否</font> | `get_key([action)`            | 获取按键动作注册表信息。              | `[action` - <font color="#92cddc">string</font>：可选，动作，不填写时返回所有动作信息。                                         | `action_value` - <font color="#92cddc">table</font>：动作的按键信息，结构见下文。 |
+| 是否需要调试模式                       | 函数名                           | 作用                      | 参数                                                                                                          | 返回值                                                                |
+| ------------------------------ | ----------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| <font color="red">是</font>     | `debug_log(message)`          | 在日志文件中写入一条调试信息。         | `message` - <font color="#92cddc">任意</font>：要写入的信息。                                                         | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font>     | `debug_warn(message)`         | 在日志文件中写入一条警告信息。         | `message` - <font color="#92cddc">任意</font>：要写入的警告信息。                                                       | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font>     | `debug_error(message)`        | 在日志文件中写入一条异常信息。         | `message` - <font color="#92cddc">任意</font>：要写入的异常信息。                                                       | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font>     | `debug_print(title, message)` | 在日志文件中写入一条带自定义标题的调试信息。  | `title` - <font color="#92cddc">string</font>：日志标题。 <br>`message` - <font color="#92cddc">任意</font>：要写入的信息。 | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font>     | `clear_debug_log()`           | 清空游戏日志文件。               | <font color="#7f7f7f">无</font>                                                                              | <font color="#7f7f7f">无</font>                                     |
+| <font color="red">是</font>     | `get_game_uid()`              | 获取当前模组包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `game_uid` - <font color="#92cddc">string</font>：模组包 UID。          |
+| <font color="red">是</font>     | `get_game_info()`             | 获取当前模组包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `game_info` - <font color="#92cddc">table</font>：模组包元信息表，结构见下文。    |
+| <font color="#7f7f7f">否</font> | `get_key([action)`            | 获取按键动作注册表信息。            | `[action` - <font color="#92cddc">string</font>：可选，动作，不填写时返回所有动作信息。                                         | `action_value` - <font color="#92cddc">table</font>：动作的按键信息，结构见下文。 |
 
 ### 日志输出格式
 
@@ -626,6 +633,7 @@ end
   min_width = int,                 -- 最小宽度（终端字符列数）
   min_height = int,                -- 最小高度（终端字符行数）
   write = boolean,                 -- 是否允许写入文件
+  afk_time = int,                  -- 低资源运行时间阈值
   case_sensitive = boolean,        -- 按键是否区分大小写
   actions = table,                 -- 按键动作注册表
   runtime = {
@@ -707,12 +715,12 @@ end
 > 1. 以下常量的值与含义对应。
 > 2. 值以变量的形式传递。
 
-| 常量           | 值  | 作用               |
-| -------------- | --- | ------------------ |
-| `nil`          | `0` | 不换行             |
-| `ALIGN_LEFT`   | `1` | 相对第一行左对齐   |
+| 常量             | 值   | 作用        |
+| -------------- | --- | --------- |
+| `nil`          | `0` | 不换行       |
+| `ALIGN_LEFT`   | `1` | 相对第一行左对齐  |
 | `ALIGN_CENTER` | `2` | 相对第一行居中对齐 |
-| `ALIGN__RIGHT` | `3` | 相对第一行右对齐   |
+| `ALIGN__RIGHT` | `3` | 相对第一行右对齐  |
 
 ---
 

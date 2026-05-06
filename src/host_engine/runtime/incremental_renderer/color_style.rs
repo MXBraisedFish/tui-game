@@ -15,7 +15,11 @@ pub fn parse_color(color: &str) -> Option<Color> {
         "dark_red" => Some(Color::DarkRed),
         "yellow" | "light_yellow" => Some(Color::Yellow),
         "dark_yellow" => Some(Color::DarkYellow),
-        "orange" => Some(Color::Rgb { r: 255, g: 165, b: 0 }),
+        "orange" => Some(Color::Rgb {
+            r: 255,
+            g: 165,
+            b: 0,
+        }),
         "green" | "light_green" => Some(Color::Green),
         "blue" | "light_blue" => Some(Color::Blue),
         "cyan" | "light_cyan" => Some(Color::Cyan),
@@ -50,5 +54,9 @@ fn parse_hex_color(color: &str) -> Option<Color> {
     let red = u8::from_str_radix(&hex[0..2], 16).ok()?;
     let green = u8::from_str_radix(&hex[2..4], 16).ok()?;
     let blue = u8::from_str_radix(&hex[4..6], 16).ok()?;
-    Some(Color::Rgb { r: red, g: green, b: blue })
+    Some(Color::Rgb {
+        r: red,
+        g: green,
+        b: blue,
+    })
 }

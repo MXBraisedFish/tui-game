@@ -6,12 +6,13 @@ local M = {}
 
 function M.render(root_state)
   canvas_clear()
+  root_state = root_state or {}
 
-  local content_y = L.content_top(C.CONTENT_HEIGHT)
-  local menu_y = content_y
-  local action_y = menu_y + C.MENU_HEIGHT + 2
+  local title = L.language(root_state, "SETTING_TITLE", C.DEFAULT_TEXT.title)
+  canvas_draw_text(L.center_x(L.text_width(title), 0), 1, title, C.TITLE_COLOR, nil, BOLD, nil)
 
-  Menu.draw_menu(root_state or {}, menu_y)
+  local menu_y = L.content_top(C.MENU_HEIGHT)
+  Menu.draw_menu(root_state, menu_y)
 
   local select_text = L.language(root_state, "SETTING_SELECT", C.DEFAULT_TEXT.select)
   local confirm_text = L.language(root_state, "SETTING_CONFIRM", C.DEFAULT_TEXT.confirm)
@@ -20,7 +21,8 @@ function M.render(root_state)
     .. "  " .. C.DEFAULT_TEXT.confirm_key .. " " .. confirm_text
     .. "  " .. C.DEFAULT_TEXT.back_key .. " " .. back_text
 
-  canvas_draw_text(L.center_x(L.text_width(action), 0), action_y, action, C.VERSION_COLOR, nil, nil, nil)
+  local _, terminal_height = get_terminal_size()
+  canvas_draw_text(L.center_x(L.text_width(action), 0), (terminal_height or 26) - 1, action, C.VERSION_COLOR, nil, nil, nil)
 end
 
 return M

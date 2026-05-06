@@ -23,6 +23,7 @@ mod module_loading_support;
 pub(crate) mod random_support;
 mod scope;
 mod table_utilities_support;
+mod text_support;
 pub(crate) mod timer_support;
 mod validation;
 mod value;

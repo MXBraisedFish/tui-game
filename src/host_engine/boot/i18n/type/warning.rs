@@ -1,23 +1,22 @@
 //! warning.* 语言文本注册
 
-use once_cell::sync::OnceCell;
+use crate::host_engine::boot::i18n::i18n::{LanguageSource, resolve_text};
+use crate::host_engine::boot::i18n::pseudo_text::MutableText;
 
-use crate::host_engine::boot::i18n::i18n::{resolve_text, LanguageSource};
-
-pub static SIZE_ACTUAL: OnceCell<String> = OnceCell::new();
-pub static SIZE_NEEDED: OnceCell<String> = OnceCell::new();
-pub static SIZE_HINT: OnceCell<String> = OnceCell::new();
-pub static SIZE_ACTION_EXIT: OnceCell<String> = OnceCell::new();
-pub static SIZE_ACTION_RETURN: OnceCell<String> = OnceCell::new();
+pub static SIZE_ACTUAL: MutableText = MutableText::new();
+pub static SIZE_NEEDED: MutableText = MutableText::new();
+pub static SIZE_HINT: MutableText = MutableText::new();
+pub static SIZE_ACTION_EXIT: MutableText = MutableText::new();
+pub static SIZE_ACTION_RETURN: MutableText = MutableText::new();
 
 /// warning.* 文本集合
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug)]
 pub struct WarningText {
-    pub size_actual: &'static str,
-    pub size_needed: &'static str,
-    pub size_hint: &'static str,
-    pub size_action_exit: &'static str,
-    pub size_action_return: &'static str,
+    pub size_actual: String,
+    pub size_needed: String,
+    pub size_hint: String,
+    pub size_action_exit: String,
+    pub size_action_return: String,
 }
 
 /// 注册 warning.* 文本
@@ -45,10 +44,10 @@ pub fn register(language_source: &LanguageSource) -> WarningText {
     }
 }
 
-fn set_text(cell: &'static OnceCell<String>, language_source: &LanguageSource, key: &str) {
-    let _ = cell.set(resolve_text(language_source, key));
+fn set_text(cell: &'static MutableText, language_source: &LanguageSource, key: &str) {
+    cell.set(resolve_text(language_source, key));
 }
 
-fn text(cell: &'static OnceCell<String>) -> &'static str {
-    cell.get().map(String::as_str).unwrap_or("")
+fn text(cell: &'static MutableText) -> String {
+    cell.get()
 }

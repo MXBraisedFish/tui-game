@@ -30,17 +30,7 @@ pub fn diff_frames(previous_frame: &FrameCache, current_frame: &FrameCache) -> V
             }
 
             match current_cell {
-                Some(cell) if cell.is_continuation => {
-                    if previous_cell.is_some() {
-                        Some(RenderChange {
-                            x,
-                            y,
-                            cell: CanvasCell::default(),
-                        })
-                    } else {
-                        None
-                    }
-                }
+                Some(cell) if cell.is_continuation => None,
                 Some(cell) => Some(RenderChange {
                     x,
                     y,

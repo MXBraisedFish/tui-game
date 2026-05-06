@@ -3,14 +3,11 @@ local L = load_function("setting/layout.lua")
 
 local M = {}
 
-local FIRST_LABEL
-
 local function menu_texts(root_state)
-  FIRST_LABEL = L.language(root_state, "SETTING_LANGUAGE", C.DEFAULT_TEXT.language)
   return {
     {
       key = C.DEFAULT_TEXT.option1,
-      label = FIRST_LABEL,
+      label = L.language(root_state, "SETTING_LANGUAGE", C.DEFAULT_TEXT.language),
     },
     {
       key = C.DEFAULT_TEXT.option2,
@@ -38,14 +35,22 @@ local function selected_index(root_state)
   return 1
 end
 
-local function alignment_width()
-  return L.text_width("▶ " .. C.DEFAULT_TEXT.option1 .. " " .. FIRST_LABEL)
+local function menu_width(items)
+  local max_width = 0
+  for _, item in ipairs(items) do
+    local key_width = math.max(L.text_width(item.key), L.text_width(C.DEFAULT_TEXT.enter))
+    local width = L.text_width("▶ ") + key_width + L.text_width(" " .. item.label)
+    if width > max_width then
+      max_width = width
+    end
+  end
+  return max_width
 end
 
 function M.draw_menu(root_state, origin_y)
   local items = menu_texts(root_state)
   local selected = selected_index(root_state)
-  local x = L.center_x(alignment_width(), 0)
+  local x = L.center_x(menu_width(items), 0)
   for index, item in ipairs(items) do
     local is_selected = index == selected
     local prefix = is_selected and "▶ " or "  "
