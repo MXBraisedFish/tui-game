@@ -47,6 +47,7 @@ local function normalize_lua_state(lua_state)
   lua_state.user_page = lua_state.jump and math.max(0, math.floor(lua_state.user_page or 0)) or 0
   lua_state.jump = lua_state.jump == true
   lua_state.info_scroll = math.max(0, math.floor(lua_state.info_scroll or 0))
+  lua_state.info_scroll = math.min(lua_state.info_scroll, Render.max_info_scroll(lua_state))
   return lua_state
 end
 
@@ -81,6 +82,7 @@ function handle_event(lua_state, event)
   if event.type == "resize" then
     lua_state.pages = State.pages()
     lua_state.page = math.max(1, math.min(lua_state.pages, lua_state.page))
+    lua_state.info_scroll = math.min(lua_state.info_scroll, Render.max_info_scroll(lua_state))
     return lua_state
   end
 
@@ -121,7 +123,7 @@ function handle_event(lua_state, event)
     elseif event.name == "scroll_up" then
       lua_state.info_scroll = math.max(0, lua_state.info_scroll - 1)
     elseif event.name == "scroll_down" then
-      lua_state.info_scroll = lua_state.info_scroll + 1
+      lua_state.info_scroll = math.min(Render.max_info_scroll(lua_state), lua_state.info_scroll + 1)
     elseif event.name == "jump" then
       if lua_state.pages > 1 then
         lua_state.user_page = 0

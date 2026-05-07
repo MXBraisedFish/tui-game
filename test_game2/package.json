@@ -7,6 +7,6 @@
   "description": "test_game2.description",
   "detail": "test_game2.detail",
   "version": "0.2.0",
-  "icon": "image:images/icon.png",
-  "banner": "image:images/banner.png"
+  "icon": "color:image:images/icon.png",
+  "banner": "color:image:images/banner.png"
 }

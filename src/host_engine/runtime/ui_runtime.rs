@@ -33,6 +33,9 @@ use crate::host_engine::runtime::ui_state::lua_state::HomeLuaState;
 use crate::host_engine::runtime::ui_state::memory_state::{
     MemoryConfirmAction, MemoryLuaAction, MemoryLuaState, MemoryUiState,
 };
+use crate::host_engine::runtime::ui_state::mod_list_state::{
+    ModListLuaAction, ModListLuaState, ModListUiState,
+};
 use crate::host_engine::runtime::ui_state::needed_size_state::{
     NeededSizeMode, NeededSizeRootState,
 };
@@ -55,6 +58,7 @@ pub struct ActiveUiPage {
     setting_state: SettingUiState,
     language_state: LanguageUiState,
     memory_state: MemoryUiState,
+    mod_list_state: ModListUiState,
     needed_size_mode: NeededSizeMode,
     action_map: UiActionMap,
     game_session: Option<GameSession>,
@@ -117,6 +121,12 @@ pub(crate) fn load_home_page(
     language_state.reset_lua_state();
     let mut memory_state = MemoryUiState::new();
     memory_state.reset_lua_state();
+    let mut mod_list_state = ModListUiState::new(
+        loaded_resources.game_module_registry.clone(),
+        loaded_resources.persistent_data.mod_state.clone(),
+        loaded_resources.persistent_data.language_code.clone(),
+    );
+    mod_list_state.reset_lua_state();
     Ok(ActiveUiPage {
         package_root: official_ui_package.root_dir.clone(),
         manifest: official_ui_package.manifest.clone(),
@@ -128,6 +138,7 @@ pub(crate) fn load_home_page(
         setting_state,
         language_state,
         memory_state,
+        mod_list_state,
         needed_size_mode: NeededSizeMode::Root,
         action_map,
         game_session: None,
@@ -204,6 +215,9 @@ pub(crate) fn ensure_page(
     if page_key == UiPageKey::SettingMemory {
         active_ui_page.memory_state.reset_lua_state();
     }
+    if page_key == UiPageKey::SettingMods {
+        active_ui_page.mod_list_state.reset_lua_state();
+    }
     if page_key == UiPageKey::StorageDetails {
         active_ui_page.memory_state.root_state =
             crate::host_engine::runtime::ui_state::memory_state::MemoryRootState::new(
@@ -230,6 +244,7 @@ pub(crate) fn handle_event(
             .game_list_state
             .root_state
             .to_lua_table(lua)?,
+        UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingLanguage => active_ui_page.language_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingMemory => active_ui_page.memory_state.lua_state.to_lua_table(lua)?,
@@ -253,6 +268,11 @@ pub(crate) fn handle_event(
         if active_ui_page.page_key == UiPageKey::Setting {
             let lua_state = SettingLuaState::from_lua_value(returned_state)?;
             handle_setting_lua_state(active_ui_page, host_state_machine, lua_state);
+            return Ok(());
+        }
+        if active_ui_page.page_key == UiPageKey::SettingMods {
+            let lua_state = ModListLuaState::from_lua_value(returned_state)?;
+            handle_mod_list_lua_state(lua_runtime, active_ui_page, host_state_machine, lua_state)?;
             return Ok(());
         }
         if active_ui_page.page_key == UiPageKey::SettingLanguage {
@@ -313,16 +333,22 @@ fn sync_page_script_state(
     lua_runtime: &LuaRuntimeState,
     active_ui_page: &ActiveUiPage,
 ) -> UiRuntimeResult<()> {
-    if active_ui_page.page_key != UiPageKey::GameList {
+    if active_ui_page.page_key != UiPageKey::GameList
+        && active_ui_page.page_key != UiPageKey::SettingMods
+    {
         return Ok(());
     }
 
     let lua = &lua_runtime.lua_runtime_environment.lua;
     let render: Function = lua.globals().get("render")?;
-    let root_state = active_ui_page
-        .game_list_state
-        .root_state
-        .to_lua_table(lua)?;
+    let root_state = if active_ui_page.page_key == UiPageKey::GameList {
+        active_ui_page
+            .game_list_state
+            .root_state
+            .to_lua_table(lua)?
+    } else {
+        active_ui_page.mod_list_state.root_state.to_lua_table(lua)?
+    };
     render.call::<()>(root_state)?;
     Ok(())
 }
@@ -339,6 +365,7 @@ pub(crate) fn render(
             .game_list_state
             .root_state
             .to_lua_table(lua)?,
+        UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.root_state.to_lua_table(lua)?,
         UiPageKey::SettingLanguage => active_ui_page.language_state.root_state.to_lua_table(lua)?,
         UiPageKey::SettingMemory => active_ui_page.memory_state.root_state.to_lua_table(lua)?,
@@ -522,6 +549,27 @@ fn handle_game_list_lua_state(
     Ok(())
 }
 
+fn handle_mod_list_lua_state(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    lua_state: ModListLuaState,
+) -> UiRuntimeResult<()> {
+    match active_ui_page.mod_list_state.apply_lua_state(lua_state) {
+        ModListLuaAction::None => {}
+        ModListLuaAction::Back => {
+            host_state_machine.setting_state = SettingState::Hub;
+        }
+        ModListLuaAction::StateChanged(mod_state) => {
+            let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
+            let mut current_context = host_bridge.runtime_context();
+            current_context.mod_state = mod_state;
+            host_bridge.set_runtime_context(current_context);
+        }
+    }
+    Ok(())
+}
+
 fn handle_language_lua_state(
     host_bridge: &HostLuaBridge,
     active_ui_page: &mut ActiveUiPage,
@@ -539,6 +587,9 @@ fn handle_language_lua_state(
             active_ui_page.home_state.refresh_language();
             active_ui_page
                 .game_list_state
+                .refresh_language(language_code.clone());
+            active_ui_page
+                .mod_list_state
                 .refresh_language(language_code.clone());
             active_ui_page.setting_state.refresh_language();
             active_ui_page.memory_state.refresh_language();

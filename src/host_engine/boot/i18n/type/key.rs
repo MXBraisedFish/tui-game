@@ -40,6 +40,30 @@ pub static GAME_LIST_CANCEL: MutableText = MutableText::new();
 pub static GAME_LIST_SELECT: MutableText = MutableText::new();
 pub static GAME_LIST_FLIP: MutableText = MutableText::new();
 pub static GAME_LIST_SCROLL: MutableText = MutableText::new();
+pub static MOD_LIST_PREV_OPTION: MutableText = MutableText::new();
+pub static MOD_LIST_NEXT_OPTION: MutableText = MutableText::new();
+pub static MOD_LIST_PREV_PAGE: MutableText = MutableText::new();
+pub static MOD_LIST_NEXT_PAGE: MutableText = MutableText::new();
+pub static MOD_LIST_SCROLL_UP: MutableText = MutableText::new();
+pub static MOD_LIST_SCROLL_DOWN: MutableText = MutableText::new();
+pub static MOD_LIST_JUMP: MutableText = MutableText::new();
+pub static MOD_LIST_ORDER: MutableText = MutableText::new();
+pub static MOD_LIST_SORT: MutableText = MutableText::new();
+pub static MOD_LIST_BACK: MutableText = MutableText::new();
+pub static MOD_LIST_TOGGLE_CONFIRM: MutableText = MutableText::new();
+pub static MOD_LIST_BACK_CANCEL: MutableText = MutableText::new();
+pub static MOD_LIST_TOGGLE: MutableText = MutableText::new();
+pub static MOD_LIST_CONFIRM: MutableText = MutableText::new();
+pub static MOD_LIST_CANCEL: MutableText = MutableText::new();
+pub static MOD_LIST_SELECT: MutableText = MutableText::new();
+pub static MOD_LIST_FLIP: MutableText = MutableText::new();
+pub static MOD_LIST_SCROLL: MutableText = MutableText::new();
+pub static MOD_LIST_DEBUG: MutableText = MutableText::new();
+pub static MOD_LIST_LIST: MutableText = MutableText::new();
+pub static MOD_LIST_SAFE_MODE: MutableText = MutableText::new();
+pub static MOD_SECURITY_CLOSE_PERMANENT: MutableText = MutableText::new();
+pub static MOD_SECURITY_CLOSE_TEMPORARY: MutableText = MutableText::new();
+pub static MOD_SECURITY_CANCEL: MutableText = MutableText::new();
 pub static LANGUAGE_UP_OPTION: MutableText = MutableText::new();
 pub static LANGUAGE_DOWN_OPTION: MutableText = MutableText::new();
 pub static LANGUAGE_LEFT_OPTION: MutableText = MutableText::new();
@@ -109,6 +133,30 @@ pub struct KeyText {
     pub game_list_select: String,
     pub game_list_flip: String,
     pub game_list_scroll: String,
+    pub mod_list_prev_option: String,
+    pub mod_list_next_option: String,
+    pub mod_list_prev_page: String,
+    pub mod_list_next_page: String,
+    pub mod_list_scroll_up: String,
+    pub mod_list_scroll_down: String,
+    pub mod_list_jump: String,
+    pub mod_list_order: String,
+    pub mod_list_sort: String,
+    pub mod_list_back: String,
+    pub mod_list_toggle_confirm: String,
+    pub mod_list_back_cancel: String,
+    pub mod_list_toggle: String,
+    pub mod_list_confirm: String,
+    pub mod_list_cancel: String,
+    pub mod_list_select: String,
+    pub mod_list_flip: String,
+    pub mod_list_scroll: String,
+    pub mod_list_debug: String,
+    pub mod_list_list: String,
+    pub mod_list_safe_mode: String,
+    pub mod_security_close_permanent: String,
+    pub mod_security_close_temporary: String,
+    pub mod_security_cancel: String,
     pub language_up_option: String,
     pub language_down_option: String,
     pub language_left_option: String,
@@ -218,6 +266,78 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
     set_text(&GAME_LIST_SELECT, language_source, "key.game_list.select");
     set_text(&GAME_LIST_FLIP, language_source, "key.game_list.flip");
     set_text(&GAME_LIST_SCROLL, language_source, "key.game_list.scroll");
+    set_text(
+        &MOD_LIST_PREV_OPTION,
+        language_source,
+        "key.mod_list.prev_option",
+    );
+    set_text(
+        &MOD_LIST_NEXT_OPTION,
+        language_source,
+        "key.mod_list.next_option",
+    );
+    set_text(
+        &MOD_LIST_PREV_PAGE,
+        language_source,
+        "key.mod_list.prev_page",
+    );
+    set_text(
+        &MOD_LIST_NEXT_PAGE,
+        language_source,
+        "key.mod_list.next_page",
+    );
+    set_text(
+        &MOD_LIST_SCROLL_UP,
+        language_source,
+        "key.mod_list.scroll_up",
+    );
+    set_text(
+        &MOD_LIST_SCROLL_DOWN,
+        language_source,
+        "key.mod_list.scroll_down",
+    );
+    set_text(&MOD_LIST_JUMP, language_source, "key.mod_list.jump");
+    set_text(&MOD_LIST_ORDER, language_source, "key.mod_list.order");
+    set_text(&MOD_LIST_SORT, language_source, "key.mod_list.sort");
+    set_text(&MOD_LIST_BACK, language_source, "key.mod_list.back");
+    set_text(
+        &MOD_LIST_TOGGLE_CONFIRM,
+        language_source,
+        "key.mod_list.toggle_confirm",
+    );
+    set_text(
+        &MOD_LIST_BACK_CANCEL,
+        language_source,
+        "key.mod_list.back_cancel",
+    );
+    set_text(&MOD_LIST_TOGGLE, language_source, "key.mod_list.toggle");
+    set_text(&MOD_LIST_CONFIRM, language_source, "key.mod_list.confirm");
+    set_text(&MOD_LIST_CANCEL, language_source, "key.mod_list.cancel");
+    set_text(&MOD_LIST_SELECT, language_source, "key.mod_list.select");
+    set_text(&MOD_LIST_FLIP, language_source, "key.mod_list.flip");
+    set_text(&MOD_LIST_SCROLL, language_source, "key.mod_list.scroll");
+    set_text(&MOD_LIST_DEBUG, language_source, "key.mod_list.debug");
+    set_text(&MOD_LIST_LIST, language_source, "key.mod_list.list");
+    set_text(
+        &MOD_LIST_SAFE_MODE,
+        language_source,
+        "key.mod_list.safe_mode",
+    );
+    set_text(
+        &MOD_SECURITY_CLOSE_PERMANENT,
+        language_source,
+        "key.mod_security.close.permanent",
+    );
+    set_text(
+        &MOD_SECURITY_CLOSE_TEMPORARY,
+        language_source,
+        "key.mod_security.close.temporary",
+    );
+    set_text(
+        &MOD_SECURITY_CANCEL,
+        language_source,
+        "key.mod_security.cancel",
+    );
     set_text(
         &LANGUAGE_UP_OPTION,
         language_source,
@@ -337,6 +457,30 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         game_list_select: text(&GAME_LIST_SELECT),
         game_list_flip: text(&GAME_LIST_FLIP),
         game_list_scroll: text(&GAME_LIST_SCROLL),
+        mod_list_prev_option: text(&MOD_LIST_PREV_OPTION),
+        mod_list_next_option: text(&MOD_LIST_NEXT_OPTION),
+        mod_list_prev_page: text(&MOD_LIST_PREV_PAGE),
+        mod_list_next_page: text(&MOD_LIST_NEXT_PAGE),
+        mod_list_scroll_up: text(&MOD_LIST_SCROLL_UP),
+        mod_list_scroll_down: text(&MOD_LIST_SCROLL_DOWN),
+        mod_list_jump: text(&MOD_LIST_JUMP),
+        mod_list_order: text(&MOD_LIST_ORDER),
+        mod_list_sort: text(&MOD_LIST_SORT),
+        mod_list_back: text(&MOD_LIST_BACK),
+        mod_list_toggle_confirm: text(&MOD_LIST_TOGGLE_CONFIRM),
+        mod_list_back_cancel: text(&MOD_LIST_BACK_CANCEL),
+        mod_list_toggle: text(&MOD_LIST_TOGGLE),
+        mod_list_confirm: text(&MOD_LIST_CONFIRM),
+        mod_list_cancel: text(&MOD_LIST_CANCEL),
+        mod_list_select: text(&MOD_LIST_SELECT),
+        mod_list_flip: text(&MOD_LIST_FLIP),
+        mod_list_scroll: text(&MOD_LIST_SCROLL),
+        mod_list_debug: text(&MOD_LIST_DEBUG),
+        mod_list_list: text(&MOD_LIST_LIST),
+        mod_list_safe_mode: text(&MOD_LIST_SAFE_MODE),
+        mod_security_close_permanent: text(&MOD_SECURITY_CLOSE_PERMANENT),
+        mod_security_close_temporary: text(&MOD_SECURITY_CLOSE_TEMPORARY),
+        mod_security_cancel: text(&MOD_SECURITY_CANCEL),
         language_up_option: text(&LANGUAGE_UP_OPTION),
         language_down_option: text(&LANGUAGE_DOWN_OPTION),
         language_left_option: text(&LANGUAGE_LEFT_OPTION),

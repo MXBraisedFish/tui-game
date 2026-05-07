@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use mlua::{Lua, Table, Value};
 use serde_json::Value as JsonValue;
+use unicode_width::UnicodeWidthStr;
 
 use crate::host_engine::boot::i18n;
 use crate::host_engine::boot::preload::game_modules::{
@@ -436,14 +437,38 @@ fn compare_game(
     right: &GameListItem,
     sort_mode: GameListSortMode,
 ) -> Ordering {
-    let primary = match sort_mode {
+    match sort_mode {
         GameListSortMode::OfficialMod => source_rank(left.source).cmp(&source_rank(right.source)),
-        GameListSortMode::Name => compare_text(left.game_name.as_str(), right.game_name.as_str()),
-        GameListSortMode::Author => compare_text(left.author.as_str(), right.author.as_str()),
-    };
-    primary
-        .then_with(|| compare_text(left.game_name.as_str(), right.game_name.as_str()))
-        .then_with(|| left.uid.cmp(&right.uid))
+        GameListSortMode::Name => {
+            compare_text_by_width_then_dictionary(left.game_name.as_str(), right.game_name.as_str())
+        }
+        GameListSortMode::Author => {
+            compare_text_by_width_then_dictionary(left.author.as_str(), right.author.as_str())
+        }
+    }
+    .then_with(|| {
+        compare_text_by_width_then_dictionary(left.game_name.as_str(), right.game_name.as_str())
+    })
+    .then_with(|| {
+        compare_text_by_width_then_dictionary(left.author.as_str(), right.author.as_str())
+    })
+    .then_with(|| {
+        compare_text_by_width_then_dictionary(left.mod_name.as_str(), right.mod_name.as_str())
+    })
+    .then_with(|| {
+        compare_text_by_width_then_dictionary(left.package.as_str(), right.package.as_str())
+    })
+}
+
+fn compare_text_by_width_then_dictionary(left: &str, right: &str) -> Ordering {
+    let left_text = left.to_lowercase();
+    let right_text = right.to_lowercase();
+    let left_width = UnicodeWidthStr::width(left_text.as_str());
+    let right_width = UnicodeWidthStr::width(right_text.as_str());
+
+    left_width
+        .cmp(&right_width)
+        .then_with(|| left_text.cmp(&right_text))
 }
 
 fn source_rank(source: GameModuleSource) -> u8 {
@@ -451,10 +476,6 @@ fn source_rank(source: GameModuleSource) -> u8 {
         GameModuleSource::Office => 0,
         GameModuleSource::Mod => 1,
     }
-}
-
-fn compare_text(left: &str, right: &str) -> Ordering {
-    left.to_lowercase().cmp(&right.to_lowercase())
 }
 
 fn game_list_language_pairs() -> Vec<(String, String)> {

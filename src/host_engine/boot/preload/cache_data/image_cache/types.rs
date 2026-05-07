@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 /// 图片缓存算法版本。
-pub const IMAGE_CACHE_ALGORITHM_VERSION: u32 = 1;
+pub const IMAGE_CACHE_ALGORITHM_VERSION: u32 = 2;
 
 /// ASCII 亮度映射表，左侧最亮，右侧最暗。
 pub const ASCII_GRADIENT: &str = r#"M@N%W$E#RK&FXYI*l]}1/+i>"!~';,`:."#;

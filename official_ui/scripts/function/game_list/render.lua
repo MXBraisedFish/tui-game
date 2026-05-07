@@ -170,6 +170,42 @@ local function add_separator(lines, width)
   lines[#lines + 1] = { text = string.rep("─", math.max(1, width)), color = C.BORDER_COLOR }
 end
 
+local function draw_scroll_indicator(x, top_y, bottom_y, total_rows, visible_rows, scroll, up_key, down_key)
+  if total_rows <= visible_rows or visible_rows <= 0 then
+    return
+  end
+
+  local max_scroll = math.max(1, total_rows - visible_rows)
+  if scroll > 0 then
+    if top_y <= bottom_y then
+      canvas_draw_text(x, top_y, "↑", C.KEY_COLOR, nil, BOLD, nil)
+    end
+    if up_key ~= nil and tostring(up_key) ~= "" and top_y + 1 <= bottom_y then
+      canvas_draw_text(x, top_y + 1, tostring(up_key), C.KEY_COLOR, nil, BOLD, nil)
+    end
+  end
+  if scroll < max_scroll then
+    if down_key ~= nil and tostring(down_key) ~= "" and bottom_y - 1 >= top_y then
+      canvas_draw_text(x, bottom_y - 1, tostring(down_key), C.KEY_COLOR, nil, BOLD, nil)
+    end
+    if bottom_y >= top_y then
+      canvas_draw_text(x, bottom_y, "↓", C.KEY_COLOR, nil, BOLD, nil)
+    end
+  end
+
+  local track_top = top_y + 3
+  local track_bottom = bottom_y - 3
+  if track_top > track_bottom then
+    return
+  end
+  local track_height = math.max(1, track_bottom - track_top + 1)
+  local thumb_height = math.max(1, math.floor(track_height * visible_rows / total_rows))
+  local thumb_top = track_top + math.floor((track_height - thumb_height) * math.min(scroll, max_scroll) / max_scroll)
+  for y = thumb_top, math.min(track_bottom, thumb_top + thumb_height - 1) do
+    canvas_draw_text(x, y, "█", C.KEY_COLOR, nil, BOLD, nil)
+  end
+end
+
 local function fixed_info_lines(root_state, wrap_width)
   local info = root_state.game_info or {}
   local lines = {}
@@ -229,6 +265,31 @@ local function has_game_info(root_state)
     or (info.name ~= nil and tostring(info.name) ~= "")
 end
 
+local function detail_scroll_metrics(root_state)
+  State.set_root_state(root_state or {})
+  local layout = State.layout()
+  local fixed_rows = fixed_info_lines(root_state or {}, layout.info_width)
+  local detail_rows = detail_info_lines(root_state or {}, layout.info_width)
+  local content_width = math.max(1, layout.right_width - 2)
+  local max_rows = layout.info_height
+  local row_index = 0
+
+  for index = 1, #fixed_rows do
+    if row_index >= max_rows then
+      break
+    end
+    local row = fixed_rows[index]
+    local height = math.max(1, get_text_height(row.text or "", content_width))
+    if row_index + height > max_rows then
+      break
+    end
+    row_index = row_index + height
+  end
+
+  local detail_capacity = math.max(0, max_rows - row_index)
+  return detail_rows, detail_capacity, math.max(0, #detail_rows - detail_capacity)
+end
+
 local function draw_info(layout, root_state)
   local title = L.language(root_state, "GAME_LIST_INFO_TITLE", C.DEFAULT_TEXT.info_title)
   draw_panel(layout.right_x, layout.right_y, layout.right_width, layout.right_height, title)
@@ -243,7 +304,7 @@ local function draw_info(layout, root_state)
 
   local scroll = math.max(0, math.floor(root_state.info_scroll or 0))
   local fixed_rows = fixed_info_lines(root_state, layout.info_width)
-  local detail_rows = detail_info_lines(root_state, layout.info_width)
+  local detail_rows, _, max_scroll = detail_scroll_metrics(root_state)
   local content_x = layout.right_x + 1
   local content_width = math.max(1, layout.right_width - 2)
   local y = layout.right_y + 1
@@ -264,8 +325,12 @@ local function draw_info(layout, root_state)
   end
 
   local detail_capacity = math.max(0, max_rows - row_index)
+  local needs_scroll = #detail_rows > detail_capacity
+  if needs_scroll then
+    content_width = math.max(1, content_width - 2)
+  end
   if detail_capacity > 0 then
-    scroll = math.min(scroll, math.max(0, #detail_rows - detail_capacity))
+    scroll = math.min(scroll, max_scroll)
   else
     scroll = 0
   end
@@ -282,10 +347,21 @@ local function draw_info(layout, root_state)
     end
   end
 
-  if #detail_rows > detail_capacity then
-    canvas_draw_text(layout.right_x + layout.right_width - 4, layout.right_y + 1, "↑", C.KEY_COLOR, nil, BOLD, nil)
-    canvas_draw_text(layout.right_x + layout.right_width - 4, layout.right_y + layout.right_height - 2, "↓", C.KEY_COLOR, nil, BOLD, nil)
-  end
+  draw_scroll_indicator(
+    layout.right_x + layout.right_width - 2,
+    y + row_index,
+    y + row_index + detail_capacity - 1,
+    #detail_rows,
+    detail_capacity,
+    scroll,
+    C.DEFAULT_TEXT.scroll_up_key_text,
+    C.DEFAULT_TEXT.scroll_down_key_text
+  )
+end
+
+function M.max_info_scroll(root_state)
+  local _, _, max_scroll = detail_scroll_metrics(root_state or {})
+  return max_scroll
 end
 
 local function draw_action_line(layout, root_state)

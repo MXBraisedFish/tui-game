@@ -38,7 +38,11 @@ pub fn render_image_to_ascii(
                 }
             }
 
-            push_rich_text_safe_character(&mut line, character);
+            if color_mode == GameImageColorMode::Color {
+                push_rich_text_safe_character(&mut line, character);
+            } else {
+                line.push(character);
+            }
         }
 
         if color_mode == GameImageColorMode::Color && current_color.is_some() {
