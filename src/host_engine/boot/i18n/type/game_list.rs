@@ -9,6 +9,9 @@ pub static INFO_SORT_MOD_OFFICIAL: MutableText = MutableText::new();
 pub static INFO_SORT_AUTHOR: MutableText = MutableText::new();
 pub static INFO_ORDER_ASCENDING: MutableText = MutableText::new();
 pub static INFO_ORDER_DESCENDING: MutableText = MutableText::new();
+pub static INFO_MOD: MutableText = MutableText::new();
+pub static INFO_AUTHOR: MutableText = MutableText::new();
+pub static INFO_VERSION: MutableText = MutableText::new();
 pub static INFO_TITLE: MutableText = MutableText::new();
 pub static MOD: MutableText = MutableText::new();
 pub static NONE_GAME: MutableText = MutableText::new();
@@ -23,6 +26,9 @@ pub struct GameListText {
     pub info_sort_author: String,
     pub info_order_ascending: String,
     pub info_order_descending: String,
+    pub info_mod: String,
+    pub info_author: String,
+    pub info_version: String,
     pub info_title: String,
     pub mod_label: String,
     pub none_game: String,
@@ -53,6 +59,9 @@ pub fn register(language_source: &LanguageSource) -> GameListText {
         language_source,
         "game_list.info.order.descending",
     );
+    set_text(&INFO_MOD, language_source, "game_list.info.mod");
+    set_text(&INFO_AUTHOR, language_source, "game_list.info.author");
+    set_text(&INFO_VERSION, language_source, "game_list.info.version");
     set_text(&INFO_TITLE, language_source, "game_list.info.title");
     set_text(&MOD, language_source, "game_list.source.mod");
     set_text(&NONE_GAME, language_source, "game_list.none.game");
@@ -65,6 +74,9 @@ pub fn register(language_source: &LanguageSource) -> GameListText {
         info_sort_author: text(&INFO_SORT_AUTHOR),
         info_order_ascending: text(&INFO_ORDER_ASCENDING),
         info_order_descending: text(&INFO_ORDER_DESCENDING),
+        info_mod: text(&INFO_MOD),
+        info_author: text(&INFO_AUTHOR),
+        info_version: text(&INFO_VERSION),
         info_title: text(&INFO_TITLE),
         mod_label: text(&MOD),
         none_game: text(&NONE_GAME),

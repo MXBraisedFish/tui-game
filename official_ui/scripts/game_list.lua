@@ -34,6 +34,9 @@ end
 
 local function normalize_lua_state(lua_state)
   lua_state = lua_state or {}
+  if type(lua_state.game_list) == "table" then
+    State.set_root_state(lua_state)
+  end
   lua_state.select = tostring(lua_state.select or State.first_uid())
   lua_state.confirm = false
   lua_state.back = false

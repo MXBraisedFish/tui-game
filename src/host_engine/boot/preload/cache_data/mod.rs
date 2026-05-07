@@ -2,6 +2,7 @@
 
 mod cache_snapshot;
 mod game_package_cache;
+mod image_cache;
 mod language_ui_cache;
 
 pub use cache_snapshot::{CacheData, LanguageUiText};

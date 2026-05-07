@@ -187,9 +187,9 @@ local function fixed_info_lines(root_state, wrap_width)
 
   add(tostring(info.game_name or info.name or ""), C.TITLE_COLOR)
   add_separator(lines, wrap_width)
-  add((C.DEFAULT_TEXT.package .. ": " .. tostring(info.mod_name or "")), C.INFO_TEXT_COLOR)
-  add((C.DEFAULT_TEXT.author .. ": " .. tostring(info.author or "")), C.INFO_TEXT_COLOR)
-  add((C.DEFAULT_TEXT.version .. ": " .. tostring(info.version or "")), C.INFO_TEXT_COLOR)
+  add((L.language(root_state, "GAME_LIST_INFO_MOD", C.DEFAULT_TEXT.info_mod) .. tostring(info.mod_name or "")), C.INFO_TEXT_COLOR)
+  add((L.language(root_state, "GAME_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.info_author) .. tostring(info.author or "")), C.INFO_TEXT_COLOR)
+  add((L.language(root_state, "GAME_LIST_INFO_VERSION", C.DEFAULT_TEXT.info_version) .. tostring(info.version or "")), C.INFO_TEXT_COLOR)
   if info.best_score ~= nil and tostring(info.best_score) ~= "" then
     add_separator(lines, wrap_width)
     add(tostring(info.best_score), C.INFO_TEXT_COLOR)

@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::host_engine::boot::preload::game_modules::GameModuleRegistry;
 
 use super::cache_snapshot::CacheData;
+use super::image_cache;
 
 type CacheResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -29,6 +30,7 @@ pub fn sync_game_package_cache(
         find_removed_game_uids(&previous_game_module_registry, game_module_registry);
 
     remove_unused_game_cache(&image_cache_dir, &removed_game_uids)?;
+    image_cache::sync_image_cache(game_module_registry, &image_cache_dir)?;
     write_game_scan_cache(&scan_cache_path, game_module_registry)?;
 
     Ok(CacheData {

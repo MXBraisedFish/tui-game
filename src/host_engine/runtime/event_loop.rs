@@ -46,7 +46,21 @@ pub(crate) fn run(
     let mut event_queue = VecDeque::new();
     let mut last_tick_at = Instant::now();
     let mut frame_rate_controller = FrameRateController::root_ui();
+    let mut was_running_game = false;
     loop {
+        if active_ui_page.has_game_session() && !was_running_game {
+            if let Some(game_session) = active_ui_page.game_session() {
+                frame_rate_controller = FrameRateController::game(
+                    game_session.afk_time_secs(),
+                    game_session.target_fps(),
+                );
+            }
+            was_running_game = true;
+        } else if !active_ui_page.has_game_session() && was_running_game {
+            frame_rate_controller = FrameRateController::root_ui();
+            was_running_game = false;
+        }
+
         match input_receiver.recv_timeout(frame_rate_controller.frame_interval()) {
             Ok(HostInputEvent::ExitRequested) => break,
             Ok(HostInputEvent::Resize(resize_event)) => {
@@ -62,7 +76,7 @@ pub(crate) fn run(
             }
             Ok(HostInputEvent::Key { key }) => {
                 frame_rate_controller.mark_input();
-                enqueue_key_events(&mut event_queue, active_ui_page, key.as_str());
+                enqueue_key_events(&mut event_queue, host_bridge, active_ui_page, key.as_str());
             }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => break,
@@ -71,6 +85,25 @@ pub(crate) fn run(
         let now = Instant::now();
         let tick_dt_ms = now.duration_since(last_tick_at).as_millis() as u64;
         last_tick_at = now;
+
+        if active_ui_page.has_game_session() {
+            dispatch_game_event_queue(lua_runtime, active_ui_page, &mut event_queue)?;
+            handle_game_event(
+                lua_runtime,
+                active_ui_page,
+                LuaEvent::Tick { dt_ms: tick_dt_ms },
+            )?;
+            render_game(lua_runtime, active_ui_page)?;
+            crate::host_engine::runtime::renderer::render_canvas(host_bridge, &mut renderer_state)?;
+            handle_game_messages(
+                lua_runtime,
+                host_bridge,
+                active_ui_page,
+                host_state_machine,
+                &mut event_queue,
+            )?;
+            continue;
+        }
 
         let page_key = current_page_key(host_bridge, host_state_machine);
         if active_ui_page.page_key() != page_key {
@@ -87,6 +120,23 @@ pub(crate) fn run(
             host_state_machine,
             &mut event_queue,
         )?;
+        if active_ui_page.has_game_session() {
+            handle_game_event(
+                lua_runtime,
+                active_ui_page,
+                LuaEvent::Tick { dt_ms: tick_dt_ms },
+            )?;
+            render_game(lua_runtime, active_ui_page)?;
+            crate::host_engine::runtime::renderer::render_canvas(host_bridge, &mut renderer_state)?;
+            handle_game_messages(
+                lua_runtime,
+                host_bridge,
+                active_ui_page,
+                host_state_machine,
+                &mut event_queue,
+            )?;
+            continue;
+        }
         crate::host_engine::runtime::ui_runtime::handle_event(
             lua_runtime,
             active_ui_page,
@@ -159,9 +209,18 @@ fn needed_size_root_state(host_bridge: &HostLuaBridge) -> NeededSizeRootState {
 
 fn enqueue_key_events(
     event_queue: &mut VecDeque<LuaEvent>,
+    host_bridge: &HostLuaBridge,
     active_ui_page: &ActiveUiPage,
     key: &str,
 ) {
+    if let Some(game_session) = active_ui_page.game_session() {
+        let runtime_context = host_bridge.runtime_context();
+        if let Some(action) = game_session.action_for_key(&runtime_context.keybinds, key) {
+            enqueue_limited(event_queue, LuaEvent::Action { name: action });
+            return;
+        }
+    }
+
     if let Some(action) = active_ui_page.action_for_key(key) {
         enqueue_limited(event_queue, LuaEvent::Action { name: action });
         return;
@@ -173,6 +232,70 @@ fn enqueue_key_events(
             name: key.to_string(),
         },
     );
+}
+
+fn dispatch_game_event_queue(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &mut ActiveUiPage,
+    event_queue: &mut VecDeque<LuaEvent>,
+) -> RuntimeLoopResult<()> {
+    while let Some(event) = event_queue.pop_front() {
+        handle_game_event(lua_runtime, active_ui_page, event)?;
+    }
+    Ok(())
+}
+
+fn handle_game_event(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &mut ActiveUiPage,
+    event: LuaEvent,
+) -> RuntimeLoopResult<()> {
+    if let Some(game_session) = active_ui_page.game_session_mut() {
+        game_session.handle_event(lua_runtime, event)?;
+    }
+    Ok(())
+}
+
+fn render_game(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &ActiveUiPage,
+) -> RuntimeLoopResult<()> {
+    if let Some(game_session) = active_ui_page.game_session() {
+        game_session.render(lua_runtime)?;
+    }
+    Ok(())
+}
+
+fn handle_game_messages(
+    lua_runtime: &LuaRuntimeState,
+    host_bridge: &HostLuaBridge,
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    event_queue: &mut VecDeque<LuaEvent>,
+) -> RuntimeLoopResult<()> {
+    let mut should_exit_game = false;
+    for message in host_bridge.drain_messages() {
+        match message {
+            HostLuaMessage::ExitGame => should_exit_game = true,
+            HostLuaMessage::ClearEventQueue => event_queue.clear(),
+            HostLuaMessage::SkipEventQueue => event_queue.clear(),
+            HostLuaMessage::RenderNow => {}
+            HostLuaMessage::SaveBestScore | HostLuaMessage::SaveGame => {
+                // TODO: 接入持久化存储后在这里调用 save_best_score/save_game。
+            }
+        }
+    }
+
+    if should_exit_game {
+        if let Some(game_session) = active_ui_page.game_session_mut() {
+            game_session.exit_game(lua_runtime)?;
+        }
+        active_ui_page.clear_game_session();
+        host_state_machine.game_list_state =
+            crate::host_engine::boot::preload::state_machine::GameListState::List;
+    }
+
+    Ok(())
 }
 
 fn enqueue_limited(event_queue: &mut VecDeque<LuaEvent>, event: LuaEvent) {

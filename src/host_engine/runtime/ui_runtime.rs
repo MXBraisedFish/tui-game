@@ -9,15 +9,17 @@ use serde_json::Value as JsonValue;
 
 use crate::LoadedResources;
 use crate::LuaRuntimeState;
-use crate::host_engine::boot::preload::lua_runtime::api::ApiScope;
+use crate::host_engine::boot::preload::game_modules::GameModule;
 use crate::host_engine::boot::preload::lua_runtime::api::LuaEvent;
 use crate::host_engine::boot::preload::lua_runtime::api::callback_api;
+use crate::host_engine::boot::preload::lua_runtime::api::{self, ApiScope};
 use crate::host_engine::boot::preload::lua_runtime::{
     HostLuaBridge, HostLuaMessage, LuaRuntimeConsumer, LuaRuntimeContext,
 };
 use crate::host_engine::boot::preload::state_machine::{
-    DialogState, HostStateMachine, SettingState, TopLevelState,
+    DialogState, GameListState, HostStateMachine, SettingState, TopLevelState,
 };
+use crate::host_engine::runtime::game_engine::{GameSession, script_loader};
 use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
 use crate::host_engine::runtime::ui_state::action_map::UiActionMap;
 use crate::host_engine::runtime::ui_state::game_list_state::{
@@ -45,7 +47,9 @@ type UiRuntimeResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub struct ActiveUiPage {
     package_root: PathBuf,
     manifest: JsonValue,
+    game_modules: Vec<GameModule>,
     page_key: UiPageKey,
+    page_needs_reload: bool,
     home_state: HomeUiState,
     game_list_state: GameListUiState,
     setting_state: SettingUiState,
@@ -53,6 +57,7 @@ pub struct ActiveUiPage {
     memory_state: MemoryUiState,
     needed_size_mode: NeededSizeMode,
     action_map: UiActionMap,
+    game_session: Option<GameSession>,
 }
 
 /// 加载初始 Home UI 页面。
@@ -115,7 +120,9 @@ pub(crate) fn load_home_page(
     Ok(ActiveUiPage {
         package_root: official_ui_package.root_dir.clone(),
         manifest: official_ui_package.manifest.clone(),
+        game_modules: loaded_resources.game_module_registry.games.clone(),
         page_key,
+        page_needs_reload: false,
         home_state,
         game_list_state,
         setting_state,
@@ -123,6 +130,7 @@ pub(crate) fn load_home_page(
         memory_state,
         needed_size_mode: NeededSizeMode::Root,
         action_map,
+        game_session: None,
     })
 }
 
@@ -141,6 +149,27 @@ impl ActiveUiPage {
     pub fn set_needed_size_mode(&mut self, needed_size_mode: NeededSizeMode) {
         self.needed_size_mode = needed_size_mode;
     }
+
+    /// 当前是否正在运行游戏。
+    pub(crate) fn has_game_session(&self) -> bool {
+        self.game_session.is_some()
+    }
+
+    /// 当前游戏会话。
+    pub(crate) fn game_session(&self) -> Option<&GameSession> {
+        self.game_session.as_ref()
+    }
+
+    /// 当前游戏会话，可变。
+    pub(crate) fn game_session_mut(&mut self) -> Option<&mut GameSession> {
+        self.game_session.as_mut()
+    }
+
+    /// 清除当前游戏会话。
+    pub(crate) fn clear_game_session(&mut self) {
+        self.game_session = None;
+        self.page_needs_reload = true;
+    }
 }
 
 /// 确保当前已加载指定 UI 页面脚本。
@@ -149,17 +178,15 @@ pub(crate) fn ensure_page(
     active_ui_page: &mut ActiveUiPage,
     page_key: UiPageKey,
 ) -> UiRuntimeResult<()> {
-    if active_ui_page.page_key == page_key {
+    if active_ui_page.page_key == page_key && !active_ui_page.page_needs_reload {
         return Ok(());
     }
 
     let action_map = UiActionMap::from_manifest_page(&active_ui_page.manifest, page_key.as_str());
-    lua_runtime
-        .lua_runtime_environment
-        .host_bridge
-        .set_current_ui_actions(action_map.actions_value());
+    switch_to_ui_context(lua_runtime, active_ui_page, action_map.actions_value())?;
     load_page_script(lua_runtime, active_ui_page, page_key)?;
     active_ui_page.page_key = page_key;
+    active_ui_page.page_needs_reload = false;
     active_ui_page.action_map = action_map;
 
     if page_key == UiPageKey::Home {
@@ -199,7 +226,10 @@ pub(crate) fn handle_event(
     let handle_event: Function = lua.globals().get("handle_event")?;
     let lua_state = match active_ui_page.page_key {
         UiPageKey::Home => active_ui_page.home_state.lua_state.to_lua_table(lua)?,
-        UiPageKey::GameList => active_ui_page.game_list_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::GameList => active_ui_page
+            .game_list_state
+            .root_state
+            .to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingLanguage => active_ui_page.language_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingMemory => active_ui_page.memory_state.lua_state.to_lua_table(lua)?,
@@ -217,7 +247,7 @@ pub(crate) fn handle_event(
     if active_ui_page.page_key != UiPageKey::Home {
         if active_ui_page.page_key == UiPageKey::GameList {
             let lua_state = GameListLuaState::from_lua_value(returned_state)?;
-            handle_game_list_lua_state(active_ui_page, host_state_machine, lua_state);
+            handle_game_list_lua_state(lua_runtime, active_ui_page, host_state_machine, lua_state)?;
             return Ok(());
         }
         if active_ui_page.page_key == UiPageKey::Setting {
@@ -400,6 +430,33 @@ fn load_page_script(
     Ok(())
 }
 
+fn switch_to_ui_context(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &ActiveUiPage,
+    current_ui_actions: JsonValue,
+) -> UiRuntimeResult<()> {
+    let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
+    let current_context = host_bridge.runtime_context();
+    host_bridge.set_runtime_context(LuaRuntimeContext {
+        consumer: LuaRuntimeConsumer::OfficialUiPackage,
+        current_game: None,
+        current_ui_actions,
+        current_script_root: Some(active_ui_page.package_root.join("scripts")),
+        language_code: current_context.language_code,
+        keybinds: current_context.keybinds,
+        best_scores: current_context.best_scores,
+        mod_state: current_context.mod_state,
+        launch_mode: current_context.launch_mode,
+        terminal_size: current_context.terminal_size,
+    });
+    api::install_runtime_apis(
+        &lua_runtime.lua_runtime_environment.lua,
+        ApiScope::official_ui_package(),
+        host_bridge.clone(),
+    )?;
+    Ok(())
+}
+
 fn handle_home_confirm_action(
     host_state_machine: &mut HostStateMachine,
     confirm_action: HomeConfirmAction,
@@ -439,19 +496,30 @@ fn handle_setting_lua_state(
 }
 
 fn handle_game_list_lua_state(
+    lua_runtime: &LuaRuntimeState,
     active_ui_page: &mut ActiveUiPage,
     host_state_machine: &mut HostStateMachine,
     lua_state: GameListLuaState,
-) {
+) -> UiRuntimeResult<()> {
     match active_ui_page.game_list_state.apply_lua_state(lua_state) {
         GameListLuaAction::None => {}
         GameListLuaAction::Back => {
             host_state_machine.top_level_state = TopLevelState::Home;
         }
-        GameListLuaAction::Confirm(_game_uid) => {
-            // TODO: 选择游戏后切换到游戏详情/运行时状态。
+        GameListLuaAction::Confirm(game_uid) => {
+            if let Some(game_module) = active_ui_page
+                .game_modules
+                .iter()
+                .find(|game_module| game_module.uid == game_uid)
+                .cloned()
+            {
+                active_ui_page.game_session =
+                    Some(script_loader::load_new_game(lua_runtime, game_module)?);
+                host_state_machine.game_list_state = GameListState::Game;
+            }
         }
     }
+    Ok(())
 }
 
 fn handle_language_lua_state(

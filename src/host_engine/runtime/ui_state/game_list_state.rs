@@ -330,7 +330,14 @@ impl GameListRootState {
         };
         if let Some(game) = selected_game {
             if let Some(best_score) = self.best_scores.get(game.uid.as_str()) {
-                table.set("best_score", best_score_to_text(best_score))?;
+                let language_texts =
+                    load_package_language_texts(&game.root_dir, self.language_code.as_str());
+                table.set(
+                    "best_score",
+                    best_score_to_text(best_score, &language_texts),
+                )?;
+            } else if let Some(best_none) = game.best_none.as_deref() {
+                table.set("best_score", best_none)?;
             }
         }
         Ok(table)
@@ -350,6 +357,7 @@ pub struct GameListItem {
     pub game_name_raw: String,
     pub description_raw: String,
     pub detail_raw: String,
+    pub best_none_raw: Option<String>,
     pub version: String,
     pub root_dir: PathBuf,
     pub mod_name: String,
@@ -358,6 +366,7 @@ pub struct GameListItem {
     pub game_name: String,
     pub description: String,
     pub detail: String,
+    pub best_none: Option<String>,
 }
 
 impl GameListItem {
@@ -373,6 +382,7 @@ impl GameListItem {
             game_name_raw: game_module.package.game_name.clone(),
             description_raw: game_module.package.description.clone(),
             detail_raw: game_module.package.detail.clone(),
+            best_none_raw: game_module.game.best_none.clone(),
             version: game_module.package.version.clone(),
             root_dir: game_module.root_dir.clone(),
             mod_name: String::new(),
@@ -381,6 +391,7 @@ impl GameListItem {
             game_name: String::new(),
             description: String::new(),
             detail: String::new(),
+            best_none: None,
         };
         item.refresh_display(language_code);
         item
@@ -394,6 +405,10 @@ impl GameListItem {
         self.game_name = resolve_package_text(&language_texts, &self.game_name_raw);
         self.description = resolve_package_text(&language_texts, &self.description_raw);
         self.detail = resolve_package_text(&language_texts, &self.detail_raw);
+        self.best_none = self
+            .best_none_raw
+            .as_deref()
+            .map(|raw_value| resolve_package_text(&language_texts, raw_value));
     }
 
     fn to_lua_table(&self, lua: &Lua) -> mlua::Result<Table> {
@@ -406,6 +421,9 @@ impl GameListItem {
         table.set("author", self.author.as_str())?;
         table.set("description", self.description.as_str())?;
         table.set("detail", self.detail.as_str())?;
+        if let Some(best_none) = self.best_none.as_deref() {
+            table.set("best_none", best_none)?;
+        }
         table.set("source", self.source_label.as_str())?;
         table.set("version", self.version.as_str())?;
         table.set("package", self.package.as_str())?;
@@ -508,6 +526,15 @@ fn game_list_language_pairs() -> Vec<(String, String)> {
             "GAME_LIST_INFO_ORDER_DESCENDING".to_string(),
             text.game_list.info_order_descending,
         ),
+        ("GAME_LIST_INFO_MOD".to_string(), text.game_list.info_mod),
+        (
+            "GAME_LIST_INFO_AUTHOR".to_string(),
+            text.game_list.info_author,
+        ),
+        (
+            "GAME_LIST_INFO_VERSION".to_string(),
+            text.game_list.info_version,
+        ),
         (
             "GAME_LIST_INFO_TITLE".to_string(),
             text.game_list.info_title,
@@ -534,14 +561,72 @@ fn game_list_to_table(lua: &Lua, games: &[GameListItem]) -> mlua::Result<Table> 
     Ok(table)
 }
 
-fn best_score_to_text(best_score: &JsonValue) -> String {
+fn best_score_to_text(best_score: &JsonValue, language_texts: &HashMap<String, String>) -> String {
     if let Some(best_string) = best_score.get("best_string").and_then(JsonValue::as_str) {
-        return best_string.to_string();
+        let template = resolve_package_text(language_texts, best_string);
+        return format_best_score_template(template.as_str(), best_score);
     }
     if let Some(text) = best_score.as_str() {
-        return text.to_string();
+        return resolve_package_text(language_texts, text);
     }
     serde_json::to_string(best_score).unwrap_or_default()
+}
+
+fn format_best_score_template(template: &str, best_score: &JsonValue) -> String {
+    let mut result = String::new();
+    let mut chars = template.chars().peekable();
+
+    while let Some(current_char) = chars.next() {
+        match current_char {
+            '\\' => match chars.peek().copied() {
+                Some('{') | Some('}') => {
+                    if let Some(escaped_char) = chars.next() {
+                        result.push(escaped_char);
+                    }
+                }
+                _ => result.push(current_char),
+            },
+            '{' => {
+                let mut variable_name = String::new();
+                let mut closed = false;
+                for variable_char in chars.by_ref() {
+                    if variable_char == '}' {
+                        closed = true;
+                        break;
+                    }
+                    variable_name.push(variable_char);
+                }
+
+                if closed {
+                    if let Some(variable_value) = best_score.get(variable_name.as_str()) {
+                        result.push_str(best_score_value_to_text(variable_value).as_str());
+                    } else {
+                        result.push('{');
+                        result.push_str(variable_name.as_str());
+                        result.push('}');
+                    }
+                } else {
+                    result.push('{');
+                    result.push_str(variable_name.as_str());
+                }
+            }
+            _ => result.push(current_char),
+        }
+    }
+
+    result
+}
+
+fn best_score_value_to_text(value: &JsonValue) -> String {
+    match value {
+        JsonValue::Null => String::new(),
+        JsonValue::Bool(value) => value.to_string(),
+        JsonValue::Number(value) => value.to_string(),
+        JsonValue::String(value) => value.clone(),
+        JsonValue::Array(_) | JsonValue::Object(_) => {
+            serde_json::to_string(value).unwrap_or_default()
+        }
+    }
 }
 
 fn load_package_language_texts(root_dir: &Path, language_code: &str) -> HashMap<String, String> {
