@@ -109,6 +109,34 @@ pub static SETTING_KEYBIND_LIST_SELECT: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_LIST_CONFIRM: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_LIST_BACK: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_LIST_TITLE: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_PREV_OPTION: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_NEXT_OPTION: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_SELECT: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_PREV_PAGE: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_NEXT_PAGE: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_SCROLL_UP: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_SCROLL_DOWN: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_JUMP: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_ORDER: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_SORT: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_CONFIRM: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_LIST_BACK: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_BACK: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_LIST: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_KEY1: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_KEY2: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_KEY3: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_KEY4: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_TIP_DELETE: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_TIP_ADD_MODIFY: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_ADD: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_MODIFY: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_ADD_SHIFT: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_MODIFY_SHIFT: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_DELETE: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_KEY_MODE: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_RESET_ONLY: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_RESET_GAME: MutableText = MutableText::new();
 pub static STORAGE_DETAILS_BACK: MutableText = MutableText::new();
 pub static CLEAR_DATA_CONFIRM: MutableText = MutableText::new();
 pub static CLEAR_DATA_CANCEL: MutableText = MutableText::new();
@@ -225,6 +253,34 @@ pub struct KeyText {
     pub setting_keybind_list_confirm: String,
     pub setting_keybind_list_back: String,
     pub setting_keybind_list_title: String,
+    pub setting_keybind_system_prev_option: String,
+    pub setting_keybind_system_next_option: String,
+    pub setting_keybind_system_select: String,
+    pub setting_keybind_system_prev_page: String,
+    pub setting_keybind_system_next_page: String,
+    pub setting_keybind_system_scroll_up: String,
+    pub setting_keybind_system_scroll_down: String,
+    pub setting_keybind_system_jump: String,
+    pub setting_keybind_system_order: String,
+    pub setting_keybind_system_sort: String,
+    pub setting_keybind_system_confirm: String,
+    pub setting_keybind_system_list_back: String,
+    pub setting_keybind_system_back: String,
+    pub setting_keybind_system_list: String,
+    pub setting_keybind_system_key1: String,
+    pub setting_keybind_system_key2: String,
+    pub setting_keybind_system_key3: String,
+    pub setting_keybind_system_key4: String,
+    pub setting_keybind_system_tip_delete: String,
+    pub setting_keybind_system_tip_add_modify: String,
+    pub setting_keybind_system_add: String,
+    pub setting_keybind_system_modify: String,
+    pub setting_keybind_system_add_shift: String,
+    pub setting_keybind_system_modify_shift: String,
+    pub setting_keybind_system_delete: String,
+    pub setting_keybind_system_key_mode: String,
+    pub setting_keybind_system_reset_only: String,
+    pub setting_keybind_system_reset_game: String,
     pub storage_details_back: String,
     pub clear_data_confirm: String,
     pub clear_data_cancel: String,
@@ -526,6 +582,146 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         "key.setting_keybind.list.title",
     );
     set_text(
+        &SETTING_KEYBIND_SYSTEM_PREV_OPTION,
+        language_source,
+        "key.setting_keybind.system.prev_option",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_NEXT_OPTION,
+        language_source,
+        "key.setting_keybind.system.next_option",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_SELECT,
+        language_source,
+        "key.setting_keybind.system.select",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_PREV_PAGE,
+        language_source,
+        "key.setting_keybind.system.prev_page",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_NEXT_PAGE,
+        language_source,
+        "key.setting_keybind.system.next_page",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_SCROLL_UP,
+        language_source,
+        "key.setting_keybind.system.scroll_up",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_SCROLL_DOWN,
+        language_source,
+        "key.setting_keybind.system.scroll_down",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_JUMP,
+        language_source,
+        "key.setting_keybind.system.jump",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_ORDER,
+        language_source,
+        "key.setting_keybind.system.order",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_SORT,
+        language_source,
+        "key.setting_keybind.system.sort",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_CONFIRM,
+        language_source,
+        "key.setting_keybind.system.confirm",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_LIST_BACK,
+        language_source,
+        "key.setting_keybind.system.list_back",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_BACK,
+        language_source,
+        "key.setting_keybind.system.back",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_LIST,
+        language_source,
+        "key.setting_keybind.system.list",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_KEY1,
+        language_source,
+        "key.setting_keybind.system.key1",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_KEY2,
+        language_source,
+        "key.setting_keybind.system.key2",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_KEY3,
+        language_source,
+        "key.setting_keybind.system.key3",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_KEY4,
+        language_source,
+        "key.setting_keybind.system.key4",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_TIP_DELETE,
+        language_source,
+        "key.setting_keybind.system.tip.delete",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_TIP_ADD_MODIFY,
+        language_source,
+        "key.setting_keybind.system.tip.add_modify",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_ADD,
+        language_source,
+        "key.setting_keybind.system.add",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_MODIFY,
+        language_source,
+        "key.setting_keybind.system.modify",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_ADD_SHIFT,
+        language_source,
+        "key.setting_keybind.system.add.shift",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_MODIFY_SHIFT,
+        language_source,
+        "key.setting_keybind.system.modify.shift",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_DELETE,
+        language_source,
+        "key.setting_keybind.system.delete",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_KEY_MODE,
+        language_source,
+        "key.setting_keybind.system.key_mode",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_RESET_ONLY,
+        language_source,
+        "key.setting_keybind.system.reset.only",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_RESET_GAME,
+        language_source,
+        "key.setting_keybind.system.reset.game",
+    );
+    set_text(
         &STORAGE_DETAILS_BACK,
         language_source,
         "key.storage_details.back",
@@ -655,6 +851,34 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         setting_keybind_list_confirm: text(&SETTING_KEYBIND_LIST_CONFIRM),
         setting_keybind_list_back: text(&SETTING_KEYBIND_LIST_BACK),
         setting_keybind_list_title: text(&SETTING_KEYBIND_LIST_TITLE),
+        setting_keybind_system_prev_option: text(&SETTING_KEYBIND_SYSTEM_PREV_OPTION),
+        setting_keybind_system_next_option: text(&SETTING_KEYBIND_SYSTEM_NEXT_OPTION),
+        setting_keybind_system_select: text(&SETTING_KEYBIND_SYSTEM_SELECT),
+        setting_keybind_system_prev_page: text(&SETTING_KEYBIND_SYSTEM_PREV_PAGE),
+        setting_keybind_system_next_page: text(&SETTING_KEYBIND_SYSTEM_NEXT_PAGE),
+        setting_keybind_system_scroll_up: text(&SETTING_KEYBIND_SYSTEM_SCROLL_UP),
+        setting_keybind_system_scroll_down: text(&SETTING_KEYBIND_SYSTEM_SCROLL_DOWN),
+        setting_keybind_system_jump: text(&SETTING_KEYBIND_SYSTEM_JUMP),
+        setting_keybind_system_order: text(&SETTING_KEYBIND_SYSTEM_ORDER),
+        setting_keybind_system_sort: text(&SETTING_KEYBIND_SYSTEM_SORT),
+        setting_keybind_system_confirm: text(&SETTING_KEYBIND_SYSTEM_CONFIRM),
+        setting_keybind_system_list_back: text(&SETTING_KEYBIND_SYSTEM_LIST_BACK),
+        setting_keybind_system_back: text(&SETTING_KEYBIND_SYSTEM_BACK),
+        setting_keybind_system_list: text(&SETTING_KEYBIND_SYSTEM_LIST),
+        setting_keybind_system_key1: text(&SETTING_KEYBIND_SYSTEM_KEY1),
+        setting_keybind_system_key2: text(&SETTING_KEYBIND_SYSTEM_KEY2),
+        setting_keybind_system_key3: text(&SETTING_KEYBIND_SYSTEM_KEY3),
+        setting_keybind_system_key4: text(&SETTING_KEYBIND_SYSTEM_KEY4),
+        setting_keybind_system_tip_delete: text(&SETTING_KEYBIND_SYSTEM_TIP_DELETE),
+        setting_keybind_system_tip_add_modify: text(&SETTING_KEYBIND_SYSTEM_TIP_ADD_MODIFY),
+        setting_keybind_system_add: text(&SETTING_KEYBIND_SYSTEM_ADD),
+        setting_keybind_system_modify: text(&SETTING_KEYBIND_SYSTEM_MODIFY),
+        setting_keybind_system_add_shift: text(&SETTING_KEYBIND_SYSTEM_ADD_SHIFT),
+        setting_keybind_system_modify_shift: text(&SETTING_KEYBIND_SYSTEM_MODIFY_SHIFT),
+        setting_keybind_system_delete: text(&SETTING_KEYBIND_SYSTEM_DELETE),
+        setting_keybind_system_key_mode: text(&SETTING_KEYBIND_SYSTEM_KEY_MODE),
+        setting_keybind_system_reset_only: text(&SETTING_KEYBIND_SYSTEM_RESET_ONLY),
+        setting_keybind_system_reset_game: text(&SETTING_KEYBIND_SYSTEM_RESET_GAME),
         storage_details_back: text(&STORAGE_DETAILS_BACK),
         clear_data_confirm: text(&CLEAR_DATA_CONFIRM),
         clear_data_cancel: text(&CLEAR_DATA_CANCEL),

@@ -1,6 +1,6 @@
 //! 键盘监听：融合 crossterm 与 rdev
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -19,6 +19,7 @@ const CROSSTERM_POLL_INTERVAL_MS: u64 = 16;
 const RDEV_DELAY_MS: u64 = 20;
 const SUPPRESS_WINDOW_MS: u64 = 120;
 const RDEV_DRAIN_LIMIT: usize = 16;
+const SHIFT_BIND_HOLD_MS: u64 = 2_000;
 
 static ALLOWED_CROSSTERM_KEYCODES: Lazy<HashSet<KeyCode>> = Lazy::new(allowed_crossterm_keycodes);
 
@@ -32,6 +33,7 @@ struct DelayedRdevEvent {
 struct SharedKeyState {
     delayed_rdev_events: VecDeque<DelayedRdevEvent>,
     last_crossterm_output: Option<(String, Instant)>,
+    held_shift_keys: HashMap<RdevKey, Instant>,
 }
 
 /// 键盘监听句柄
@@ -112,15 +114,38 @@ fn start_rdev_listener(shared_key_state: Arc<Mutex<SharedKeyState>>) {
     thread::spawn(move || {
         let _ = listen(move |event: RdevEvent| {
             if let Ok(mut key_state) = shared_key_state.lock() {
-                if let RdevEventType::KeyPress(key) = event.event_type {
-                    key_state.delayed_rdev_events.push_back(DelayedRdevEvent {
-                        key,
-                        timestamp: Instant::now(),
-                    });
+                match event.event_type {
+                    RdevEventType::KeyPress(key) if is_shift_key(key) => {
+                        key_state
+                            .held_shift_keys
+                            .entry(key)
+                            .or_insert_with(Instant::now);
+                    }
+                    RdevEventType::KeyRelease(key) if is_shift_key(key) => {
+                        if let Some(started_at) = key_state.held_shift_keys.remove(&key) {
+                            if started_at.elapsed() >= Duration::from_millis(SHIFT_BIND_HOLD_MS) {
+                                key_state.delayed_rdev_events.push_back(DelayedRdevEvent {
+                                    key,
+                                    timestamp: Instant::now(),
+                                });
+                            }
+                        }
+                    }
+                    RdevEventType::KeyPress(key) => {
+                        key_state.delayed_rdev_events.push_back(DelayedRdevEvent {
+                            key,
+                            timestamp: Instant::now(),
+                        });
+                    }
+                    _ => {}
                 }
             }
         });
     });
+}
+
+fn is_shift_key(key: RdevKey) -> bool {
+    matches!(key, RdevKey::ShiftLeft | RdevKey::ShiftRight)
 }
 
 fn handle_crossterm_key_event(

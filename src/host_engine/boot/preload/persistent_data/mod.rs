@@ -1,5 +1,6 @@
 //! 持久化数据预读取入口
 
+pub mod keybind_profile;
 mod loader;
 mod profile_data;
 

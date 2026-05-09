@@ -17,6 +17,7 @@ pub enum UiPageKey {
     SettingLanguage,
     SettingMemory,
     SettingKeybind,
+    KeybindSystem,
     StorageDetails,
     WarningSecurity,
     WarningMod,
@@ -37,6 +38,7 @@ impl UiPageKey {
             Self::SettingLanguage => "setting_language",
             Self::SettingMemory => "setting_memory",
             Self::SettingKeybind => "setting_keybind",
+            Self::KeybindSystem => "keybind_system",
             Self::StorageDetails => "storage_details",
             Self::WarningSecurity => "warning_security",
             Self::WarningMod => "warning_mod",
@@ -76,6 +78,7 @@ impl UiPageKey {
             SettingState::Keybind => Self::SettingKeybind,
             SettingState::Security => Self::SettingSecurity,
             SettingState::Memory => Self::SettingMemory,
+            SettingState::KeybindSystem => Self::KeybindSystem,
             SettingState::StorageDetails => Self::StorageDetails,
         }
     }

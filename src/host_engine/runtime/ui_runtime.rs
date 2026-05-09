@@ -30,6 +30,9 @@ use crate::host_engine::runtime::ui_state::home_state::HomeUiState;
 use crate::host_engine::runtime::ui_state::keybind_state::{
     KeybindLuaAction, KeybindLuaState, KeybindUiState,
 };
+use crate::host_engine::runtime::ui_state::keybind_system_state::{
+    KeybindSystemLuaAction, KeybindSystemLuaState, KeybindSystemUiState, persist_system_keybinds,
+};
 use crate::host_engine::runtime::ui_state::language_state::{
     LanguageLuaAction, LanguageLuaState, LanguageUiState,
 };
@@ -58,6 +61,7 @@ const MOD_SCAN_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 pub struct ActiveUiPage {
     package_root: PathBuf,
     manifest: JsonValue,
+    keybinds: JsonValue,
     game_modules: Vec<GameModule>,
     page_key: UiPageKey,
     page_needs_reload: bool,
@@ -65,6 +69,7 @@ pub struct ActiveUiPage {
     game_list_state: GameListUiState,
     setting_state: SettingUiState,
     keybind_state: KeybindUiState,
+    keybind_system_state: KeybindSystemUiState,
     language_state: LanguageUiState,
     memory_state: MemoryUiState,
     security_state: SecurityUiState,
@@ -89,8 +94,11 @@ pub(crate) fn load_home_page(
     let page_key = UiPageKey::Home;
     let entry_path = entry_path(&official_ui_package.manifest, page_key.as_str())?;
     let script_path = resolve_script_path(&official_ui_package.root_dir, entry_path.as_str())?;
-    let action_map =
-        UiActionMap::from_manifest_page(&official_ui_package.manifest, page_key.as_str());
+    let action_map = UiActionMap::from_manifest_page(
+        &official_ui_package.manifest,
+        page_key.as_str(),
+        &loaded_resources.persistent_data.keybinds,
+    );
 
     let lua = &lua_runtime.lua_runtime_environment.lua;
     let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
@@ -129,6 +137,11 @@ pub(crate) fn load_home_page(
     setting_state.reset_lua_state();
     let mut keybind_state = KeybindUiState::new();
     keybind_state.reset_lua_state();
+    let mut keybind_system_state = KeybindSystemUiState::new(
+        official_ui_package.manifest.clone(),
+        loaded_resources.persistent_data.keybinds.clone(),
+    );
+    keybind_system_state.reset_lua_state();
     let mut language_state = LanguageUiState::new(
         loaded_resources.persistent_data.language_code.clone(),
         loaded_resources.cache_data.language_ui_texts.clone(),
@@ -147,6 +160,7 @@ pub(crate) fn load_home_page(
     Ok(ActiveUiPage {
         package_root: official_ui_package.root_dir.clone(),
         manifest: official_ui_package.manifest.clone(),
+        keybinds: loaded_resources.persistent_data.keybinds.clone(),
         game_modules: loaded_resources.game_module_registry.games.clone(),
         page_key,
         page_needs_reload: false,
@@ -154,6 +168,7 @@ pub(crate) fn load_home_page(
         game_list_state,
         setting_state,
         keybind_state,
+        keybind_system_state,
         language_state,
         memory_state,
         security_state,
@@ -218,7 +233,11 @@ pub(crate) fn ensure_page(
         return Ok(());
     }
 
-    let action_map = UiActionMap::from_manifest_page(&active_ui_page.manifest, page_key.as_str());
+    let action_map = UiActionMap::from_manifest_page(
+        &active_ui_page.manifest,
+        page_key.as_str(),
+        &active_ui_page.keybinds,
+    );
     switch_to_ui_context(lua_runtime, active_ui_page, action_map.actions_value())?;
     load_page_script(lua_runtime, active_ui_page, page_key)?;
     active_ui_page.page_key = page_key;
@@ -236,6 +255,9 @@ pub(crate) fn ensure_page(
     }
     if page_key == UiPageKey::SettingKeybind {
         active_ui_page.keybind_state.reset_lua_state();
+    }
+    if page_key == UiPageKey::KeybindSystem {
+        active_ui_page.keybind_system_state.reset_lua_state();
     }
     if page_key == UiPageKey::SettingLanguage {
         active_ui_page.language_state.reset_lua_state();
@@ -278,6 +300,7 @@ fn refresh_mod_modules_if_needed(
     let _ = crate::host_engine::boot::preload::cache_data::load(&registry)?;
 
     active_ui_page.game_modules = registry.games.clone();
+    active_ui_page.keybinds = persistent_data.keybinds.clone();
     active_ui_page.game_list_state = GameListUiState::new(
         registry.clone(),
         persistent_data.best_scores.clone(),
@@ -291,6 +314,9 @@ fn refresh_mod_modules_if_needed(
         persistent_data.language_code.clone(),
     );
     active_ui_page.mod_list_state.reset_lua_state();
+    active_ui_page
+        .keybind_system_state
+        .refresh_keybinds(persistent_data.keybinds.clone());
 
     let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
     let mut current_context = host_bridge.runtime_context();
@@ -356,6 +382,10 @@ pub(crate) fn handle_event(
         UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingKeybind => active_ui_page.keybind_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::KeybindSystem => active_ui_page
+            .keybind_system_state
+            .lua_state
+            .to_lua_table(lua)?,
         UiPageKey::SettingLanguage => active_ui_page.language_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingMemory => active_ui_page.memory_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingSecurity => active_ui_page.security_state.lua_state.to_lua_table(lua)?,
@@ -384,6 +414,16 @@ pub(crate) fn handle_event(
         if active_ui_page.page_key == UiPageKey::SettingKeybind {
             let lua_state = KeybindLuaState::from_lua_value(returned_state)?;
             handle_keybind_lua_state(active_ui_page, host_state_machine, lua_state);
+            return Ok(());
+        }
+        if active_ui_page.page_key == UiPageKey::KeybindSystem {
+            let lua_state = KeybindSystemLuaState::from_lua_value(returned_state)?;
+            handle_keybind_system_lua_state(
+                lua_runtime,
+                active_ui_page,
+                host_state_machine,
+                lua_state,
+            )?;
             return Ok(());
         }
         if active_ui_page.page_key == UiPageKey::SettingMods {
@@ -469,19 +509,24 @@ fn sync_page_script_state(
 ) -> UiRuntimeResult<()> {
     if active_ui_page.page_key != UiPageKey::GameList
         && active_ui_page.page_key != UiPageKey::SettingMods
+        && active_ui_page.page_key != UiPageKey::KeybindSystem
     {
         return Ok(());
     }
 
     let lua = &lua_runtime.lua_runtime_environment.lua;
     let render: Function = lua.globals().get("render")?;
-    let root_state = if active_ui_page.page_key == UiPageKey::GameList {
-        active_ui_page
+    let root_state = match active_ui_page.page_key {
+        UiPageKey::GameList => active_ui_page
             .game_list_state
             .root_state
-            .to_lua_table(lua)?
-    } else {
-        active_ui_page.mod_list_state.root_state.to_lua_table(lua)?
+            .to_lua_table(lua)?,
+        UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
+        UiPageKey::KeybindSystem => active_ui_page
+            .keybind_system_state
+            .root_state
+            .to_lua_table(lua)?,
+        _ => lua.create_table()?,
     };
     render.call::<()>(root_state)?;
     Ok(())
@@ -502,6 +547,10 @@ pub(crate) fn render(
         UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.root_state.to_lua_table(lua)?,
         UiPageKey::SettingKeybind => active_ui_page.keybind_state.root_state.to_lua_table(lua)?,
+        UiPageKey::KeybindSystem => active_ui_page
+            .keybind_system_state
+            .root_state
+            .to_lua_table(lua)?,
         UiPageKey::SettingLanguage => active_ui_page.language_state.root_state.to_lua_table(lua)?,
         UiPageKey::SettingMemory => active_ui_page.memory_state.root_state.to_lua_table(lua)?,
         UiPageKey::SettingSecurity => active_ui_page.security_state.root_state.to_lua_table(lua)?,
@@ -670,10 +719,46 @@ fn handle_keybind_lua_state(
         KeybindLuaAction::Back => {
             host_state_machine.setting_state = SettingState::Hub;
         }
-        KeybindLuaAction::Confirm(_confirm_action) => {
-            // TODO: 接入具体按键映射页面后，在这里切换到 Global/System/Game 子页面。
+        KeybindLuaAction::Confirm(confirm_action) => match confirm_action {
+            crate::host_engine::runtime::ui_state::keybind_state::KeybindConfirmAction::Global => {
+                // TODO: 接入全局按键设置页。
+            }
+            crate::host_engine::runtime::ui_state::keybind_state::KeybindConfirmAction::System => {
+                host_state_machine.setting_state = SettingState::KeybindSystem;
+            }
+            crate::host_engine::runtime::ui_state::keybind_state::KeybindConfirmAction::Game => {
+                // TODO: 接入游戏按键设置页。
+            }
+        },
+    }
+}
+
+fn handle_keybind_system_lua_state(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    lua_state: KeybindSystemLuaState,
+) -> UiRuntimeResult<()> {
+    match active_ui_page
+        .keybind_system_state
+        .apply_lua_state(lua_state)
+    {
+        KeybindSystemLuaAction::None => {}
+        KeybindSystemLuaAction::Back(keybinds) => {
+            persist_system_keybinds(&keybinds)?;
+            active_ui_page.keybinds = keybinds.clone();
+            active_ui_page
+                .keybind_system_state
+                .refresh_keybinds(keybinds.clone());
+            let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
+            let mut current_context = host_bridge.runtime_context();
+            current_context.keybinds = keybinds;
+            host_bridge.set_runtime_context(current_context);
+            active_ui_page.page_needs_reload = true;
+            host_state_machine.setting_state = SettingState::Keybind;
         }
     }
+    Ok(())
 }
 
 fn handle_game_list_lua_state(
@@ -754,6 +839,7 @@ fn handle_language_lua_state(
                 .refresh_language(language_code.clone());
             active_ui_page.setting_state.refresh_language();
             active_ui_page.keybind_state.refresh_language();
+            active_ui_page.keybind_system_state.refresh_language();
             active_ui_page.memory_state.refresh_language();
             active_ui_page.security_state.refresh_language();
             host_bridge.set_language_code(language_code);

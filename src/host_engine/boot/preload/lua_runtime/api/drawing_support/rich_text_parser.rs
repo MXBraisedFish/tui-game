@@ -4,6 +4,7 @@ use serde_json::Value as JsonValue;
 
 use crate::host_engine::boot::preload::lua_runtime::api::debug_support::key_display;
 use crate::host_engine::boot::preload::lua_runtime::{LuaRuntimeConsumer, LuaRuntimeContext};
+use crate::host_engine::boot::preload::persistent_data::keybind_profile;
 
 use super::drawing_parser::{
     STYLE_BLINK, STYLE_BOLD, STYLE_DIM, STYLE_HIDDEN, STYLE_ITALIC, STYLE_REVERSE, STYLE_STRIKE,
@@ -310,7 +311,8 @@ fn find_user_key<'a>(
     action: &str,
 ) -> Option<&'a JsonValue> {
     keybinds
-        .get(game_uid)
+        .get(keybind_profile::GAME_SECTION)
+        .and_then(|game_keybinds| game_keybinds.get(game_uid))
         .and_then(|game_keybinds| game_keybinds.get(action))
         .and_then(|action_keybind| action_keybind.get("key_user"))
 }

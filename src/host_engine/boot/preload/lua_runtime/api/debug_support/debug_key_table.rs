@@ -5,6 +5,7 @@ use serde_json::Value as JsonValue;
 
 use super::{key_display, lua_table_value};
 use crate::host_engine::boot::preload::game_modules::GameModule;
+use crate::host_engine::boot::preload::persistent_data::keybind_profile;
 use crate::host_engine::constant::MAX_ACTION_KEYS;
 
 /// 构造 action_value 表。
@@ -177,7 +178,8 @@ fn find_user_key<'a>(
     action: &str,
 ) -> Option<&'a JsonValue> {
     keybinds
-        .get(game_uid)
+        .get(keybind_profile::GAME_SECTION)
+        .and_then(|game_keybinds| game_keybinds.get(game_uid))
         .and_then(|game_keybinds| game_keybinds.get(action))
         .and_then(|action_keybind| action_keybind.get("key_user"))
 }

@@ -13,7 +13,7 @@ pub const ROOT_UI_MIN_WIDTH: u16 = 98;
 pub const ROOT_UI_MIN_HEIGHT: u16 = 26;
 
 /// 单个动作最多允许绑定的物理按键数量。
-pub const MAX_ACTION_KEYS: usize = 3;
+pub const MAX_ACTION_KEYS: usize = 4;
 
 /// GitHub 最新版本检查 API
 pub const UPDATE_API_URL: &str =

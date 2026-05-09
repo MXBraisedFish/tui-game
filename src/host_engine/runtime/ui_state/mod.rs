@@ -4,6 +4,7 @@ pub mod action_map;
 pub mod game_list_state;
 pub mod home_state;
 pub mod keybind_state;
+pub mod keybind_system_state;
 pub mod language_state;
 pub mod lua_state;
 pub mod memory_state;

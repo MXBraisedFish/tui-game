@@ -3,6 +3,7 @@
 use serde_json::Value;
 
 use crate::host_engine::boot::preload::game_modules::GameModule;
+use crate::host_engine::boot::preload::persistent_data::keybind_profile;
 use crate::host_engine::constant::MAX_ACTION_KEYS;
 
 /// 查找物理键对应的游戏动作。
@@ -23,7 +24,8 @@ pub fn action_for_key(game_module: &GameModule, keybinds: &Value, key: &str) -> 
 
 fn action_keys(game_module: &GameModule, keybinds: &Value, action_name: &str) -> Vec<String> {
     let user_key = keybinds
-        .get(game_module.uid.as_str())
+        .get(keybind_profile::GAME_SECTION)
+        .and_then(|game_keybinds| game_keybinds.get(game_module.uid.as_str()))
         .and_then(|game_keybinds| game_keybinds.get(action_name))
         .and_then(|action_keybind| action_keybind.get("key_user"));
 

@@ -400,6 +400,84 @@
         ],
         "name": "STORAGE_DETAILS_BACK"
       }
+    },
+    "keybind_system": {
+      "prev_option": {
+        "key": "up",
+        "name": "SETTING_KEYBIND_SYSTEM_PREV_OPTION"
+      },
+      "next_option": {
+        "key": "down",
+        "name": "SETTING_KEYBIND_SYSTEM_NEXT_OPTION"
+      },
+      "prev_page": {
+        "key": "q",
+        "name": "SETTING_KEYBIND_SYSTEM_PREV_PAGE"
+      },
+      "next_page": {
+        "key": "e",
+        "name": "SETTING_KEYBIND_SYSTEM_NEXT_PAGE"
+      },
+      "scroll_up": {
+        "key": "w",
+        "name": "SETTING_KEYBIND_SYSTEM_SCROLL_UP"
+      },
+      "scroll_down": {
+        "key": "s",
+        "name": "SETTING_KEYBIND_SYSTEM_SCROLL_DOWN"
+      },
+      "jump": {
+        "key": "j",
+        "name": "SETTING_KEYBIND_SYSTEM_JUMP"
+      },
+      "order": {
+        "key": "z",
+        "name": "SETTING_KEYBIND_SYSTEM_ORDER"
+      },
+      "sort": {
+        "key": "x",
+        "name": "SETTING_KEYBIND_SYSTEM_SORT"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "SETTING_KEYBIND_SYSTEM_CONFIRM"
+      },
+      "return": {
+        "key": "esc",
+        "name": "SETTING_KEYBIND_SYSTEM_BACK"
+      },
+      "list": {
+        "key": "l",
+        "name": "SETTING_KEYBIND_SYSTEM_LIST_BACK"
+      },
+      "key1": {
+        "key": "1",
+        "name": "SETTING_KEYBIND_SYSTEM_KEY1"
+      },
+      "key2": {
+        "key": "2",
+        "name": "SETTING_KEYBIND_SYSTEM_KEY2"
+      },
+      "key3": {
+        "key": "3",
+        "name": "SETTING_KEYBIND_SYSTEM_KEY3"
+      },
+      "key4": {
+        "key": "4",
+        "name": "SETTING_KEYBIND_SYSTEM_KEY4"
+      },
+      "key_mode": {
+        "key": "a",
+        "name": "SETTING_KEYBIND_SYSTEM_KEY_MODE"
+      },
+      "delete": {
+        "key": "d",
+        "name": "SETTING_KEYBIND_SYSTEM_DELETE"
+      },
+      "reset_only": {
+        "key": "r",
+        "name": "SETTING_KEYBIND_SYSTEM_RESET_ONLY"
+      }
     }
   }
 }

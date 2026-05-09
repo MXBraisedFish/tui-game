@@ -48,6 +48,11 @@ pub enum SettingState {
     /// TODO: 返回键切换回 `Hub`。
     Keybind,
 
+    /// 系统按键设置。
+    ///
+    /// TODO: 返回键切换回 `Keybind`。
+    KeybindSystem,
+
     /// 安全设置。
     ///
     /// TODO: 返回键切换回 `Hub`。

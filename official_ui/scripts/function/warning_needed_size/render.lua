@@ -11,7 +11,8 @@ local function size_text(size)
 end
 
 local function draw_line(x, y, parts)
-  local cursor_x = x
+  local cursor_x = math.max(0, x or 0)
+  y = math.max(0, y or 0)
   for _, part in ipairs(parts) do
     canvas_draw_text(cursor_x, y, part.text, part.color, nil, part.style, nil)
     cursor_x = cursor_x + L.text_width(part.text)
@@ -19,7 +20,7 @@ local function draw_line(x, y, parts)
 end
 
 local function center_x_for_text(text)
-  return L.center_x(L.text_width(text), 0)
+  return math.max(0, L.center_x(L.text_width(text), 0))
 end
 
 function M.render(root_state)
@@ -42,7 +43,7 @@ function M.render(root_state)
   }
 
   local content_height = #lines + 2
-  local y = L.center_y(content_height, 0)
+  local y = math.max(0, L.center_y(content_height, 0))
 
   draw_line(center_x_for_text(lines[1].text), y, {
     { text = lines[1].text, color = C.WARNING_COLOR, style = BOLD },

@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
+use super::keybind_profile;
 use super::profile_data::PersistentData;
 
 type LoaderResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -21,7 +22,7 @@ pub fn load_persistent_data() -> LoaderResult<PersistentData> {
         saves: read_json_object(&profiles_dir.join("saves.json"))?,
         best_scores: read_json_object(&profiles_dir.join("best_scores.json"))?,
         language_code: read_language_code(&root_dir, &profiles_dir.join("language.txt"))?,
-        keybinds: read_json_object(&profiles_dir.join("keybind.json"))?,
+        keybinds: keybind_profile::load_keybind_profile(&profiles_dir.join("keybind.json"))?,
         mod_state: read_json_object(&profiles_dir.join("mod_state.json"))?,
     })
 }

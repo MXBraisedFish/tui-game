@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value, json};
 
+use crate::host_engine::boot::preload::persistent_data::keybind_profile;
+
 use super::manifest::GameModuleRegistry;
 use super::source::GameModuleSource;
 
@@ -13,10 +15,15 @@ type CacheResult<T> = Result<T, Box<dyn std::error::Error>>;
 /// 将默认按键信息写入持久化按键偏好。已有用户数据不会被覆盖。
 pub fn persist_default_keybinds(registry: &GameModuleRegistry) -> CacheResult<()> {
     let path = root_dir().join("data/profiles/keybind.json");
-    let mut root = read_json_object(&path);
+    let mut root = keybind_profile::read_keybind_profile(&path);
+    let game_section = root
+        .as_object_mut()
+        .and_then(|root_object| root_object.get_mut(keybind_profile::GAME_SECTION))
+        .and_then(Value::as_object_mut)
+        .expect("normalized keybind profile must contain game object");
 
     for game_module in &registry.games {
-        let game_entry = root
+        let game_entry = game_section
             .entry(game_module.uid.clone())
             .or_insert_with(|| Value::Object(Map::new()));
         let Some(game_object) = game_entry.as_object_mut() else {
@@ -25,16 +32,12 @@ pub fn persist_default_keybinds(registry: &GameModuleRegistry) -> CacheResult<()
 
         for (action_name, action_binding) in &game_module.game.actions {
             game_object.entry(action_name.clone()).or_insert_with(|| {
-                json!({
-                    "key": action_binding.key,
-                    "key_name": action_binding.key_name,
-                    "key_user": action_binding.key
-                })
+                keybind_profile::keybind_entry(&action_binding.key, &action_binding.key_name)
             });
         }
     }
 
-    write_json_pretty(&path, &root)
+    keybind_profile::write_keybind_profile(&path, &root)
 }
 
 /// 将第三方模块默认状态写入 mod_state。已有用户状态不会被覆盖。
