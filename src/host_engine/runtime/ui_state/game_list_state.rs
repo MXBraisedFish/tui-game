@@ -78,8 +78,9 @@ impl GameListUiState {
         registry: GameModuleRegistry,
         best_scores: JsonValue,
         language_code: String,
+        mod_state: JsonValue,
     ) -> Self {
-        let root_state = GameListRootState::new(registry, best_scores, language_code);
+        let root_state = GameListRootState::new(registry, best_scores, language_code, mod_state);
         let lua_state = GameListLuaState::from_root_state(&root_state);
         Self {
             root_state,
@@ -99,6 +100,13 @@ impl GameListUiState {
         self.root_state.language_code = language_code;
         self.root_state.refresh_language();
         self.root_state.refresh_game_display();
+    }
+
+    /// 刷新模组启用状态。
+    pub fn refresh_mod_state(&mut self, mod_state: JsonValue) {
+        self.root_state.mod_state = mod_state;
+        self.root_state.refresh_enabled_state();
+        self.root_state.normalize_select();
     }
 
     /// 应用 Lua 返回状态。
@@ -231,6 +239,7 @@ pub struct GameListRootState {
     pub language: Vec<(String, String)>,
     pub games: Vec<GameListItem>,
     pub best_scores: JsonValue,
+    pub mod_state: JsonValue,
     pub language_code: String,
     pub selected_uid: String,
     pub sort_order: GameListSortOrder,
@@ -243,11 +252,18 @@ pub struct GameListRootState {
 }
 
 impl GameListRootState {
-    fn new(registry: GameModuleRegistry, best_scores: JsonValue, language_code: String) -> Self {
+    fn new(
+        registry: GameModuleRegistry,
+        best_scores: JsonValue,
+        language_code: String,
+        mod_state: JsonValue,
+    ) -> Self {
         let mut games = registry
             .games
             .iter()
-            .map(|game_module| GameListItem::from_game_module(game_module, language_code.as_str()))
+            .map(|game_module| {
+                GameListItem::from_game_module(game_module, language_code.as_str(), &mod_state)
+            })
             .collect::<Vec<_>>();
         let selected_uid = games
             .first()
@@ -257,6 +273,7 @@ impl GameListRootState {
             language: game_list_language_pairs(),
             games: Vec::new(),
             best_scores,
+            mod_state,
             language_code,
             selected_uid,
             sort_order: GameListSortOrder::Asc,
@@ -283,14 +300,28 @@ impl GameListRootState {
         }
     }
 
+    fn refresh_enabled_state(&mut self) {
+        for game in &mut self.games {
+            game.refresh_enabled(&self.mod_state);
+        }
+    }
+
     fn normalize_select(&mut self) {
-        if self.games.is_empty() {
+        let visible_games = self.visible_games();
+        if visible_games.is_empty() {
             self.selected_uid.clear();
             return;
         }
-        if !self.games.iter().any(|game| game.uid == self.selected_uid) {
-            self.selected_uid = self.games[0].uid.clone();
+        if !visible_games
+            .iter()
+            .any(|game| game.uid == self.selected_uid)
+        {
+            self.selected_uid = visible_games[0].uid.clone();
         }
+    }
+
+    fn visible_games(&self) -> Vec<&GameListItem> {
+        self.games.iter().filter(|game| game.enabled).collect()
     }
 
     fn sort_games(&mut self) {
@@ -306,7 +337,7 @@ impl GameListRootState {
     pub fn to_lua_table(&self, lua: &Lua) -> mlua::Result<Table> {
         let table = lua.create_table()?;
         table.set("language", pairs_to_table(lua, &self.language)?)?;
-        table.set("game_list", game_list_to_table(lua, &self.games)?)?;
+        table.set("game_list", game_list_to_table(lua, &self.visible_games())?)?;
         table.set("game_info", self.selected_game_info(lua)?)?;
         table.set("order", self.sort_order.as_str())?;
         table.set("sort", self.sort_mode.as_str())?;
@@ -320,11 +351,12 @@ impl GameListRootState {
     }
 
     fn selected_game_info(&self, lua: &Lua) -> mlua::Result<Table> {
-        let selected_game = self
-            .games
+        let visible_games = self.visible_games();
+        let selected_game = visible_games
             .iter()
+            .copied()
             .find(|game| game.uid == self.selected_uid)
-            .or_else(|| self.games.first());
+            .or_else(|| visible_games.first().copied());
         let table = match selected_game {
             Some(game) => game.to_lua_table(lua)?,
             None => lua.create_table()?,
@@ -368,10 +400,15 @@ pub struct GameListItem {
     pub description: String,
     pub detail: String,
     pub best_none: Option<String>,
+    pub enabled: bool,
 }
 
 impl GameListItem {
-    fn from_game_module(game_module: &GameModule, language_code: &str) -> Self {
+    fn from_game_module(
+        game_module: &GameModule,
+        language_code: &str,
+        mod_state: &JsonValue,
+    ) -> Self {
         let mut item = Self {
             uid: game_module.uid.clone(),
             source: game_module.source,
@@ -393,6 +430,7 @@ impl GameListItem {
             description: String::new(),
             detail: String::new(),
             best_none: None,
+            enabled: module_enabled(game_module, mod_state),
         };
         item.refresh_display(language_code);
         item
@@ -410,6 +448,16 @@ impl GameListItem {
             .best_none_raw
             .as_deref()
             .map(|raw_value| resolve_package_text(&language_texts, raw_value));
+    }
+
+    fn refresh_enabled(&mut self, mod_state: &JsonValue) {
+        if self.source == GameModuleSource::Mod {
+            self.enabled = mod_state
+                .get(self.uid.as_str())
+                .and_then(|value| value.get("enabled"))
+                .and_then(JsonValue::as_bool)
+                .unwrap_or(true);
+        }
     }
 
     fn to_lua_table(&self, lua: &Lua) -> mlua::Result<Table> {
@@ -476,6 +524,18 @@ fn source_rank(source: GameModuleSource) -> u8 {
         GameModuleSource::Office => 0,
         GameModuleSource::Mod => 1,
     }
+}
+
+fn module_enabled(game_module: &GameModule, mod_state: &JsonValue) -> bool {
+    if game_module.source != GameModuleSource::Mod {
+        return true;
+    }
+
+    mod_state
+        .get(game_module.uid.as_str())
+        .and_then(|value| value.get("enabled"))
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(true)
 }
 
 fn game_list_language_pairs() -> Vec<(String, String)> {
@@ -574,7 +634,7 @@ fn pairs_to_table(lua: &Lua, pairs: &[(String, String)]) -> mlua::Result<Table> 
     Ok(table)
 }
 
-fn game_list_to_table(lua: &Lua, games: &[GameListItem]) -> mlua::Result<Table> {
+fn game_list_to_table(lua: &Lua, games: &[&GameListItem]) -> mlua::Result<Table> {
     let table = lua.create_table()?;
     for (index, game) in games.iter().enumerate() {
         table.set(index + 1, game.to_lua_table(lua)?)?;

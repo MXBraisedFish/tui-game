@@ -2,12 +2,15 @@
 
 use serde_json::Value as JsonValue;
 
+use crate::host_engine::constant::MAX_ACTION_KEYS;
+
 /// 将按键语义值转换为 UI 展示文本。
 pub fn display_key_value(key_value: &JsonValue, case_sensitive: bool) -> JsonValue {
     match key_value {
         JsonValue::String(key) => JsonValue::String(display_semantic_key(key, case_sensitive)),
         JsonValue::Array(keys) => JsonValue::Array(
             keys.iter()
+                .take(MAX_ACTION_KEYS)
                 .map(|key| display_key_value(key, case_sensitive))
                 .collect(),
         ),

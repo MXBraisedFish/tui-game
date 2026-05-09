@@ -4,3 +4,4 @@ pub mod border_chars;
 pub mod canvas_state;
 pub mod drawing_operation;
 pub mod drawing_parser;
+pub mod rich_text_parser;

@@ -1,5 +1,6 @@
 pub mod clear_cache;
 pub mod clear_data;
+pub mod default_security;
 pub mod game_list;
 pub mod global;
 pub mod home;
@@ -9,6 +10,8 @@ pub mod loading;
 pub mod memory;
 pub mod mod_list;
 pub mod mod_security;
+pub mod security;
 pub mod setting;
+pub mod setting_keybind;
 pub mod start;
 pub mod warning;

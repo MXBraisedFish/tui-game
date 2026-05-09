@@ -170,6 +170,148 @@ local function add_separator(lines, width)
   lines[#lines + 1] = { text = string.rep("─", math.max(1, width)), color = C.BORDER_COLOR }
 end
 
+local function add_rich(lines, text)
+  lines[#lines + 1] = { text = tostring(text or ""), rich = true, color = C.INFO_TEXT_COLOR }
+end
+
+local function add_rich_value(lines, prefix, value)
+  lines[#lines + 1] = {
+    text = tostring(prefix or ""),
+    color = C.INFO_TEXT_COLOR,
+    text2 = tostring(value or ""),
+    rich2 = true,
+    color2 = C.INFO_TEXT_COLOR
+  }
+end
+
+local function row_height(row, wrap_width)
+  local height = row.rich
+    and get_rich_text_height(row.text or "", wrap_width)
+    or get_text_height(row.text or "", wrap_width)
+  height = math.max(1, height)
+  if row.text2 ~= nil then
+    local remaining_width = math.max(1, wrap_width - L.text_width(row.text or ""))
+    local value_height = row.rich2
+      and get_rich_text_height(tostring(row.text2), remaining_width)
+      or get_text_height(tostring(row.text2), remaining_width)
+    height = math.max(height, value_height)
+  end
+  return height
+end
+
+local function update_active_rich_prefix(token, active)
+  local command_text = token:sub(2, -2)
+  for command in command_text:gmatch("[^|]+") do
+    if command:match("^tc:clear") then
+      active.tc = nil
+    elseif command:match("^bg:clear") then
+      active.bg = nil
+    elseif command:match("^ts:clear") then
+      active.ts = nil
+    elseif command:match("^tc:") then
+      active.tc = "{" .. command .. "}"
+    elseif command:match("^bg:") then
+      active.bg = "{" .. command .. "}"
+    elseif command:match("^ts:") then
+      active.ts = "{" .. command .. "}"
+    end
+  end
+end
+
+local function active_rich_prefix(active)
+  return (active.tc or "") .. (active.bg or "") .. (active.ts or "")
+end
+
+local function clear_active_rich_suffix(active)
+  local suffix = ""
+  if active.tc ~= nil then
+    suffix = suffix .. "{tc:clear}"
+  end
+  if active.bg ~= nil then
+    suffix = suffix .. "{bg:clear}"
+  end
+  if active.ts ~= nil then
+    suffix = suffix .. "{ts:clear}"
+  end
+  return suffix
+end
+
+local function rich_wrapped_lines(text, wrap_width, color)
+  local width = math.max(1, math.floor(wrap_width or 1))
+  local value = tostring(text or "")
+  local lines = {}
+  local active = {}
+  local current = ""
+  local current_width = 0
+  local index = 1
+
+  local function push_line()
+    lines[#lines + 1] = { text = current .. clear_active_rich_suffix(active), rich = true, color = color or C.INFO_TEXT_COLOR }
+    current = active_rich_prefix(active)
+    current_width = 0
+  end
+
+  while index <= #value do
+    local byte = value:sub(index, index)
+    if byte == "{" then
+      local close_index = value:find("}", index + 1, true)
+      if close_index then
+        local token = value:sub(index, close_index)
+        update_active_rich_prefix(token, active)
+        current = current .. token
+        index = close_index + 1
+      else
+        local next_index = utf8.offset(value, 2, index) or (#value + 1)
+        local character = value:sub(index, next_index - 1)
+        local character_width = math.max(1, get_text_width(character))
+        if current_width > 0 and current_width + character_width > width then
+          push_line()
+        end
+        current = current .. character
+        current_width = current_width + character_width
+        index = next_index
+      end
+    elseif byte == "\\" and value:sub(index + 1, index + 1) == "n" then
+      push_line()
+      index = index + 2
+    else
+      local next_index = utf8.offset(value, 2, index) or (#value + 1)
+      local character = value:sub(index, next_index - 1)
+      if character == "\n" then
+        push_line()
+      else
+        local character_width = math.max(1, get_text_width(character))
+        if current_width > 0 and current_width + character_width > width then
+          push_line()
+        end
+        current = current .. character
+        current_width = current_width + character_width
+      end
+      index = next_index
+    end
+  end
+
+  if current ~= "" or #lines == 0 then
+    lines[#lines + 1] = { text = current .. clear_active_rich_suffix(active), rich = true, color = color or C.INFO_TEXT_COLOR }
+  end
+  return lines
+end
+
+local function wrapped_row_lines(row, wrap_width)
+  local width = math.max(1, math.floor(wrap_width or 1))
+  if row.rich then
+    return rich_wrapped_lines(row.text or "", width, row.color)
+  end
+  local lines = {}
+  for _, line in ipairs(wrapped_lines(row.text or "", width)) do
+    lines[#lines + 1] = { text = line, color = row.color }
+  end
+  if #lines == 0 then
+    lines[#lines + 1] = { text = "", color = row.color }
+  end
+  return lines
+end
+
 local function draw_scroll_indicator(x, top_y, bottom_y, total_rows, visible_rows, scroll, up_key, down_key)
   if total_rows <= visible_rows or visible_rows <= 0 then
     return
@@ -223,16 +365,16 @@ local function fixed_info_lines(root_state, wrap_width)
 
   add(tostring(info.game_name or info.name or ""), C.TITLE_COLOR)
   add_separator(lines, wrap_width)
-  add((L.language(root_state, "GAME_LIST_INFO_MOD", C.DEFAULT_TEXT.info_mod) .. tostring(info.mod_name or "")), C.INFO_TEXT_COLOR)
-  add((L.language(root_state, "GAME_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.info_author) .. tostring(info.author or "")), C.INFO_TEXT_COLOR)
-  add((L.language(root_state, "GAME_LIST_INFO_VERSION", C.DEFAULT_TEXT.info_version) .. tostring(info.version or "")), C.INFO_TEXT_COLOR)
+  add_rich_value(lines, L.language(root_state, "GAME_LIST_INFO_MOD", C.DEFAULT_TEXT.info_mod), info.mod_name)
+  add_rich_value(lines, L.language(root_state, "GAME_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.info_author), info.author)
+  add_rich_value(lines, L.language(root_state, "GAME_LIST_INFO_VERSION", C.DEFAULT_TEXT.info_version), info.version)
   if info.best_score ~= nil and tostring(info.best_score) ~= "" then
     add_separator(lines, wrap_width)
-    add(tostring(info.best_score), C.INFO_TEXT_COLOR)
+    add_rich(lines, info.best_score)
   end
   if info.description ~= nil and tostring(info.description) ~= "" then
     add_separator(lines, wrap_width)
-    add_text_block(info.description)
+    add_rich(lines, info.description)
   end
   if info.detail ~= nil and tostring(info.detail) ~= "" then
     add_separator(lines, wrap_width)
@@ -248,10 +390,7 @@ local function detail_info_lines(root_state, wrap_width)
   end
 
   local output = {}
-  local detail = wrapped_lines(tostring(info.detail), wrap_width)
-  for _, line in ipairs(detail) do
-    output[#output + 1] = { text = line, color = C.INFO_TEXT_COLOR }
-  end
+  output[#output + 1] = { text = tostring(info.detail), rich = true, color = C.INFO_TEXT_COLOR }
   return output
 end
 
@@ -279,7 +418,7 @@ local function detail_scroll_metrics(root_state)
       break
     end
     local row = fixed_rows[index]
-    local height = math.max(1, get_text_height(row.text or "", content_width))
+    local height = row_height(row, content_width)
     if row_index + height > max_rows then
       break
     end
@@ -287,7 +426,18 @@ local function detail_scroll_metrics(root_state)
   end
 
   local detail_capacity = math.max(0, max_rows - row_index)
-  return detail_rows, detail_capacity, math.max(0, #detail_rows - detail_capacity)
+  local detail_line_count = 0
+  for _, row in ipairs(detail_rows) do
+    detail_line_count = detail_line_count + #wrapped_row_lines(row, layout.info_width)
+  end
+  if detail_line_count > detail_capacity then
+    local adjusted_width = math.max(1, layout.info_width - 2)
+    detail_line_count = 0
+    for _, row in ipairs(detail_rows) do
+      detail_line_count = detail_line_count + #wrapped_row_lines(row, adjusted_width)
+    end
+  end
+  return detail_rows, detail_capacity, math.max(0, detail_line_count - detail_capacity)
 end
 
 local function draw_info(layout, root_state)
@@ -316,18 +466,36 @@ local function draw_info(layout, root_state)
       break
     end
     local row = fixed_rows[index]
-    local height = math.max(1, get_text_height(row.text or "", content_width))
+    local height = row_height(row, content_width)
     if row_index + height > max_rows then
       break
     end
-    canvas_draw_text(content_x, y + row_index, row.text or "", row.color, nil, nil, ALIGN_LEFT, content_width)
+    if row.rich then
+      canvas_draw_rich_text(content_x, y + row_index, row.text or "", row.color, nil, ALIGN_LEFT, content_width)
+    else
+      canvas_draw_text(content_x, y + row_index, row.text or "", row.color, nil, nil, ALIGN_LEFT, content_width)
+    end
+    if row.text2 ~= nil then
+      local x2 = content_x + L.text_width(row.text or "")
+      local remaining_width = math.max(1, content_width - L.text_width(row.text or ""))
+      if row.rich2 then
+        canvas_draw_rich_text(x2, y + row_index, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, ALIGN_LEFT, remaining_width)
+      else
+        canvas_draw_text(x2, y + row_index, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, BOLD, nil, remaining_width)
+      end
+    end
     row_index = row_index + height
   end
 
   local detail_capacity = math.max(0, max_rows - row_index)
-  local needs_scroll = #detail_rows > detail_capacity
+  local needs_scroll = max_scroll > 0
   if needs_scroll then
     content_width = math.max(1, content_width - 2)
+    local adjusted_lines = 0
+    for _, row in ipairs(detail_rows) do
+      adjusted_lines = adjusted_lines + #wrapped_row_lines(row, content_width)
+    end
+    max_scroll = math.max(0, adjusted_lines - detail_capacity)
   end
   if detail_capacity > 0 then
     scroll = math.min(scroll, max_scroll)
@@ -336,14 +504,23 @@ local function draw_info(layout, root_state)
   end
 
   if detail_capacity > 0 then
-    local detail_index = 0
-    for index = 1 + scroll, #detail_rows do
-      if detail_index >= detail_capacity then
+    local detail_lines = {}
+    for _, row in ipairs(detail_rows) do
+      for _, line in ipairs(wrapped_row_lines(row, content_width)) do
+        detail_lines[#detail_lines + 1] = line
+      end
+    end
+    for index = 1 + scroll, #detail_lines do
+      local draw_index = index - scroll - 1
+      if draw_index >= detail_capacity then
         break
       end
-      local row = detail_rows[index]
-      canvas_draw_text(content_x, y + row_index + detail_index, row.text or "", row.color, nil, nil, ALIGN_LEFT, content_width)
-      detail_index = detail_index + 1
+      local line = detail_lines[index]
+      if line.rich then
+        canvas_draw_rich_text(content_x, y + row_index + draw_index, line.text or "", line.color, nil, nil, nil)
+      else
+        canvas_draw_text(content_x, y + row_index + draw_index, line.text or "", line.color, nil, nil, nil, nil)
+      end
     end
   end
 
@@ -351,7 +528,7 @@ local function draw_info(layout, root_state)
     layout.right_x + layout.right_width - 2,
     y + row_index,
     y + row_index + detail_capacity - 1,
-    #detail_rows,
+    detail_capacity + max_scroll,
     detail_capacity,
     scroll,
     C.DEFAULT_TEXT.scroll_up_key_text,

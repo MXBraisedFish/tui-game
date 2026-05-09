@@ -135,7 +135,7 @@ impl ModListUiState {
 
         if self.lua_state.toggle_safe_mode {
             self.lua_state.toggle_safe_mode = false;
-            return self.toggle_safe_mode();
+            return self.request_safe_mode_change();
         }
 
         if self.lua_state.confirm {
@@ -174,18 +174,93 @@ impl ModListUiState {
         ModListLuaAction::None
     }
 
-    fn toggle_safe_mode(&mut self) -> ModListLuaAction {
+    fn request_safe_mode_change(&mut self) -> ModListLuaAction {
         let selected_uid = self.root_state.selected_uid.clone();
         if selected_uid.is_empty() {
             return ModListLuaAction::None;
         }
         if let Some(item) = self.root_state.item_mut(selected_uid.as_str()) {
-            item.safe_mode = !item.safe_mode;
+            if item.safe_mode {
+                return ModListLuaAction::OpenSafeModeWarning(selected_uid);
+            }
+            item.safe_mode = true;
+            item.safe_mode_permanent = false;
             self.root_state.write_item_state(selected_uid.as_str());
             let _ = persist_mod_state(&self.root_state.mod_state);
             return ModListLuaAction::StateChanged(self.root_state.mod_state.clone());
         }
         ModListLuaAction::None
+    }
+
+    /// 关闭指定模组包安全模式。
+    ///
+    /// `permanent = true` 会写入持久化文件；否则只更新本次运行内存状态。
+    pub fn close_safe_mode(&mut self, uid: &str, permanent: bool) -> ModListLuaAction {
+        if uid.is_empty() {
+            return ModListLuaAction::None;
+        }
+        if let Some(item) = self.root_state.item_mut(uid) {
+            item.safe_mode = false;
+            item.safe_mode_permanent = permanent;
+            self.root_state.write_item_state(uid);
+            if permanent {
+                let _ = persist_mod_state(&self.root_state.mod_state);
+            }
+            return ModListLuaAction::StateChanged(self.root_state.mod_state.clone());
+        }
+        ModListLuaAction::None
+    }
+
+    /// 重置所有模组包安全模式为开启。
+    pub fn reset_all_safe_mode_on(&mut self) -> ModListLuaAction {
+        let uids = self
+            .root_state
+            .mods
+            .iter()
+            .map(|item| item.uid.clone())
+            .collect::<Vec<_>>();
+        for uid in &uids {
+            if let Some(item) = self.root_state.item_mut(uid.as_str()) {
+                item.safe_mode = true;
+                item.safe_mode_permanent = false;
+            }
+            self.root_state.write_item_state(uid.as_str());
+        }
+        let _ = persist_mod_state(&self.root_state.mod_state);
+        ModListLuaAction::StateChanged(self.root_state.mod_state.clone())
+    }
+
+    /// 重置所有模组包启用状态为禁用。
+    pub fn reset_all_enabled_off(&mut self) -> ModListLuaAction {
+        let uids = self
+            .root_state
+            .mods
+            .iter()
+            .map(|item| item.uid.clone())
+            .collect::<Vec<_>>();
+        for uid in &uids {
+            if let Some(item) = self.root_state.item_mut(uid.as_str()) {
+                item.enabled = false;
+            }
+            self.root_state.write_item_state(uid.as_str());
+        }
+        let _ = persist_mod_state(&self.root_state.mod_state);
+        ModListLuaAction::StateChanged(self.root_state.mod_state.clone())
+    }
+
+    /// 指定模组包显示名。
+    pub fn mod_name(&self, uid: &str) -> String {
+        self.root_state
+            .mods
+            .iter()
+            .find(|item| item.uid == uid)
+            .map(|item| item.mod_name.clone())
+            .unwrap_or_else(|| uid.to_string())
+    }
+
+    /// 当前选中模组包 UID。
+    pub fn selected_uid(&self) -> String {
+        self.root_state.selected_uid.clone()
     }
 }
 
@@ -194,6 +269,7 @@ impl ModListUiState {
 pub enum ModListLuaAction {
     None,
     Back,
+    OpenSafeModeWarning(String),
     StateChanged(JsonValue),
 }
 
@@ -418,7 +494,8 @@ impl ModListRootState {
                 "package": item.package,
                 "enabled": item.enabled,
                 "debug": item.debug,
-                "safe_mode": item.safe_mode
+                "safe_mode": item.safe_mode,
+                "safe_mode_permanent": item.safe_mode_permanent
             }),
         );
     }
@@ -470,6 +547,7 @@ pub struct ModListItem {
     pub enabled: bool,
     pub debug: bool,
     pub safe_mode: bool,
+    pub safe_mode_permanent: bool,
     pub write: bool,
     pub icon: Vec<String>,
     pub banner: Vec<String>,
@@ -505,6 +583,16 @@ impl ModListItem {
                 .and_then(|value| value.get("safe_mode"))
                 .and_then(JsonValue::as_bool)
                 .unwrap_or(true),
+            safe_mode_permanent: state
+                .and_then(|value| value.get("safe_mode_permanent"))
+                .and_then(JsonValue::as_bool)
+                .unwrap_or_else(|| {
+                    state
+                        .and_then(|value| value.get("safe_mode"))
+                        .and_then(JsonValue::as_bool)
+                        .map(|safe_mode| !safe_mode)
+                        .unwrap_or(false)
+                }),
             write: game_module.game.write,
             icon: image_lines(game_module.uid.as_str(), "icon", &game_module.package.icon),
             banner: image_lines(
@@ -536,6 +624,7 @@ impl ModListItem {
         table.set("enabled", self.enabled)?;
         table.set("debug", self.debug)?;
         table.set("safe_mode", self.safe_mode)?;
+        table.set("safe_mode_permanent", self.safe_mode_permanent)?;
         table.set("write", self.write)?;
         table.set("icon", string_vec_to_table(lua, &self.icon)?)?;
         table.set("banner", string_vec_to_table(lua, &self.banner)?)?;

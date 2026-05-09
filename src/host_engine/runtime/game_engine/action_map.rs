@@ -3,6 +3,7 @@
 use serde_json::Value;
 
 use crate::host_engine::boot::preload::game_modules::GameModule;
+use crate::host_engine::constant::MAX_ACTION_KEYS;
 
 /// 查找物理键对应的游戏动作。
 pub fn action_for_key(game_module: &GameModule, keybinds: &Value, key: &str) -> Option<String> {
@@ -43,6 +44,7 @@ fn parse_key_value(value: Option<&Value>) -> Option<Vec<String>> {
         Value::String(key) => Some(vec![key.clone()]),
         Value::Array(keys) => Some(
             keys.iter()
+                .take(MAX_ACTION_KEYS)
                 .filter_map(Value::as_str)
                 .map(ToString::to_string)
                 .collect(),

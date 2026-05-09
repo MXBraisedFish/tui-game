@@ -19,6 +19,7 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
     install_canvas_clear(lua, &globals, host_bridge.clone())?;
     install_canvas_eraser(lua, &globals, host_bridge.clone())?;
     install_canvas_draw_text(lua, &globals, host_bridge.clone())?;
+    install_canvas_draw_rich_text(lua, &globals, host_bridge.clone())?;
     install_canvas_fill_rect(lua, &globals, host_bridge.clone())?;
     install_canvas_border_rect(lua, &globals, host_bridge)?;
 
@@ -84,6 +85,29 @@ fn install_canvas_draw_text(
             host_bridge.with_canvas_state(|canvas_state| {
                 drawing_operation::draw_text(canvas_state, draw_text_args);
             })
+        })?,
+    )
+}
+
+fn install_canvas_draw_rich_text(
+    lua: &Lua,
+    globals: &mlua::Table,
+    host_bridge: HostLuaBridge,
+) -> mlua::Result<()> {
+    globals.set(
+        "canvas_draw_rich_text",
+        lua.create_function(move |_, args: Variadic<Value>| {
+            let draw_rich_text_args = drawing_parser::parse_draw_rich_text_args(&args)?;
+            let runtime_context = host_bridge.runtime_context();
+            let mut draw_result = Ok(());
+            host_bridge.with_canvas_state(|canvas_state| {
+                draw_result = drawing_operation::draw_rich_text(
+                    canvas_state,
+                    draw_rich_text_args,
+                    &runtime_context,
+                );
+            })?;
+            draw_result
         })?,
     )
 }

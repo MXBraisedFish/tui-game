@@ -3,6 +3,7 @@
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use mlua::{Function, Table, Value};
 use serde_json::Value as JsonValue;
@@ -17,7 +18,7 @@ use crate::host_engine::boot::preload::lua_runtime::{
     HostLuaBridge, HostLuaMessage, LuaRuntimeConsumer, LuaRuntimeContext,
 };
 use crate::host_engine::boot::preload::state_machine::{
-    DialogState, GameListState, HostStateMachine, SettingState, TopLevelState,
+    DialogContext, DialogState, GameListState, HostStateMachine, SettingState, TopLevelState,
 };
 use crate::host_engine::runtime::game_engine::{GameSession, script_loader};
 use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
@@ -26,6 +27,9 @@ use crate::host_engine::runtime::ui_state::game_list_state::{
     GameListLuaAction, GameListLuaState, GameListUiState,
 };
 use crate::host_engine::runtime::ui_state::home_state::HomeUiState;
+use crate::host_engine::runtime::ui_state::keybind_state::{
+    KeybindLuaAction, KeybindLuaState, KeybindUiState,
+};
 use crate::host_engine::runtime::ui_state::language_state::{
     LanguageLuaAction, LanguageLuaState, LanguageUiState,
 };
@@ -40,11 +44,15 @@ use crate::host_engine::runtime::ui_state::needed_size_state::{
     NeededSizeMode, NeededSizeRootState,
 };
 use crate::host_engine::runtime::ui_state::root_state::HomeConfirmAction;
+use crate::host_engine::runtime::ui_state::security_state::{
+    SecurityConfirmAction, SecurityLuaAction, SecurityLuaState, SecurityUiState,
+};
 use crate::host_engine::runtime::ui_state::setting_state::{
     SettingLuaAction, SettingLuaState, SettingUiState,
 };
 
 type UiRuntimeResult<T> = Result<T, Box<dyn std::error::Error>>;
+const MOD_SCAN_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 
 /// 当前激活的官方 UI 页面实例。
 pub struct ActiveUiPage {
@@ -56,12 +64,16 @@ pub struct ActiveUiPage {
     home_state: HomeUiState,
     game_list_state: GameListUiState,
     setting_state: SettingUiState,
+    keybind_state: KeybindUiState,
     language_state: LanguageUiState,
     memory_state: MemoryUiState,
+    security_state: SecurityUiState,
     mod_list_state: ModListUiState,
     needed_size_mode: NeededSizeMode,
     action_map: UiActionMap,
     game_session: Option<GameSession>,
+    mod_directory_signature: String,
+    last_mod_scan_check: Instant,
 }
 
 /// 加载初始 Home UI 页面。
@@ -110,10 +122,13 @@ pub(crate) fn load_home_page(
         loaded_resources.game_module_registry.clone(),
         loaded_resources.persistent_data.best_scores.clone(),
         loaded_resources.persistent_data.language_code.clone(),
+        loaded_resources.persistent_data.mod_state.clone(),
     );
     game_list_state.reset_lua_state();
     let mut setting_state = SettingUiState::new();
     setting_state.reset_lua_state();
+    let mut keybind_state = KeybindUiState::new();
+    keybind_state.reset_lua_state();
     let mut language_state = LanguageUiState::new(
         loaded_resources.persistent_data.language_code.clone(),
         loaded_resources.cache_data.language_ui_texts.clone(),
@@ -121,6 +136,8 @@ pub(crate) fn load_home_page(
     language_state.reset_lua_state();
     let mut memory_state = MemoryUiState::new();
     memory_state.reset_lua_state();
+    let mut security_state = SecurityUiState::new();
+    security_state.reset_lua_state();
     let mut mod_list_state = ModListUiState::new(
         loaded_resources.game_module_registry.clone(),
         loaded_resources.persistent_data.mod_state.clone(),
@@ -136,12 +153,16 @@ pub(crate) fn load_home_page(
         home_state,
         game_list_state,
         setting_state,
+        keybind_state,
         language_state,
         memory_state,
+        security_state,
         mod_list_state,
         needed_size_mode: NeededSizeMode::Root,
         action_map,
         game_session: None,
+        mod_directory_signature: mod_directory_signature(),
+        last_mod_scan_check: Instant::now(),
     })
 }
 
@@ -189,6 +210,10 @@ pub(crate) fn ensure_page(
     active_ui_page: &mut ActiveUiPage,
     page_key: UiPageKey,
 ) -> UiRuntimeResult<()> {
+    if page_key == UiPageKey::SettingMods {
+        refresh_mod_modules_if_needed(lua_runtime, active_ui_page)?;
+    }
+
     if active_ui_page.page_key == page_key && !active_ui_page.page_needs_reload {
         return Ok(());
     }
@@ -209,11 +234,17 @@ pub(crate) fn ensure_page(
     if page_key == UiPageKey::Setting {
         active_ui_page.setting_state.reset_lua_state();
     }
+    if page_key == UiPageKey::SettingKeybind {
+        active_ui_page.keybind_state.reset_lua_state();
+    }
     if page_key == UiPageKey::SettingLanguage {
         active_ui_page.language_state.reset_lua_state();
     }
     if page_key == UiPageKey::SettingMemory {
         active_ui_page.memory_state.reset_lua_state();
+    }
+    if page_key == UiPageKey::SettingSecurity {
+        active_ui_page.security_state.reset_lua_state();
     }
     if page_key == UiPageKey::SettingMods {
         active_ui_page.mod_list_state.reset_lua_state();
@@ -226,6 +257,84 @@ pub(crate) fn ensure_page(
     }
 
     Ok(())
+}
+
+fn refresh_mod_modules_if_needed(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &mut ActiveUiPage,
+) -> UiRuntimeResult<()> {
+    if active_ui_page.last_mod_scan_check.elapsed() < MOD_SCAN_CHECK_INTERVAL {
+        return Ok(());
+    }
+    active_ui_page.last_mod_scan_check = Instant::now();
+
+    let current_signature = mod_directory_signature();
+    if current_signature == active_ui_page.mod_directory_signature {
+        return Ok(());
+    }
+
+    let registry = crate::host_engine::boot::preload::game_modules::load()?;
+    let persistent_data = crate::host_engine::boot::preload::persistent_data::load()?;
+    let _ = crate::host_engine::boot::preload::cache_data::load(&registry)?;
+
+    active_ui_page.game_modules = registry.games.clone();
+    active_ui_page.game_list_state = GameListUiState::new(
+        registry.clone(),
+        persistent_data.best_scores.clone(),
+        persistent_data.language_code.clone(),
+        persistent_data.mod_state.clone(),
+    );
+    active_ui_page.game_list_state.reset_lua_state();
+    active_ui_page.mod_list_state = ModListUiState::new(
+        registry,
+        persistent_data.mod_state.clone(),
+        persistent_data.language_code.clone(),
+    );
+    active_ui_page.mod_list_state.reset_lua_state();
+
+    let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
+    let mut current_context = host_bridge.runtime_context();
+    current_context.language_code = persistent_data.language_code;
+    current_context.keybinds = persistent_data.keybinds;
+    current_context.best_scores = persistent_data.best_scores;
+    current_context.mod_state = persistent_data.mod_state;
+    host_bridge.set_runtime_context(current_context);
+
+    active_ui_page.mod_directory_signature = current_signature;
+    active_ui_page.page_needs_reload = true;
+    Ok(())
+}
+
+fn mod_directory_signature() -> String {
+    let mod_dir = root_dir().join("data/mod");
+    let Ok(entries) = fs::read_dir(mod_dir) else {
+        return String::new();
+    };
+
+    let mut parts = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            if !path.is_dir() {
+                return None;
+            }
+            let name = path
+                .file_name()
+                .and_then(|file_name| file_name.to_str())
+                .unwrap_or_default()
+                .to_string();
+            let modified_secs = entry
+                .metadata()
+                .ok()
+                .and_then(|metadata| metadata.modified().ok())
+                .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|duration| duration.as_secs())
+                .unwrap_or_default();
+            Some(format!("{name}:{modified_secs}"))
+        })
+        .collect::<Vec<_>>();
+    parts.sort();
+    parts.join("|")
 }
 
 /// 将事件传递给当前 UI 页面。
@@ -246,8 +355,10 @@ pub(crate) fn handle_event(
             .to_lua_table(lua)?,
         UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::SettingKeybind => active_ui_page.keybind_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingLanguage => active_ui_page.language_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingMemory => active_ui_page.memory_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::SettingSecurity => active_ui_page.security_state.lua_state.to_lua_table(lua)?,
         UiPageKey::WarningNeededSize => {
             let table = lua.create_table()?;
             table.set("exit", false)?;
@@ -270,6 +381,11 @@ pub(crate) fn handle_event(
             handle_setting_lua_state(active_ui_page, host_state_machine, lua_state);
             return Ok(());
         }
+        if active_ui_page.page_key == UiPageKey::SettingKeybind {
+            let lua_state = KeybindLuaState::from_lua_value(returned_state)?;
+            handle_keybind_lua_state(active_ui_page, host_state_machine, lua_state);
+            return Ok(());
+        }
         if active_ui_page.page_key == UiPageKey::SettingMods {
             let lua_state = ModListLuaState::from_lua_value(returned_state)?;
             handle_mod_list_lua_state(lua_runtime, active_ui_page, host_state_machine, lua_state)?;
@@ -290,6 +406,11 @@ pub(crate) fn handle_event(
             handle_memory_lua_state(active_ui_page, host_state_machine, lua_state);
             return Ok(());
         }
+        if active_ui_page.page_key == UiPageKey::SettingSecurity {
+            let lua_state = SecurityLuaState::from_lua_value(returned_state)?;
+            handle_security_lua_state(lua_runtime, active_ui_page, host_state_machine, lua_state);
+            return Ok(());
+        }
         if active_ui_page.page_key == UiPageKey::StorageDetails {
             handle_storage_details_lua_state(host_state_machine, returned_state)?;
             return Ok(());
@@ -299,6 +420,19 @@ pub(crate) fn handle_event(
             UiPageKey::WarningClearCache | UiPageKey::WarningClearData
         ) {
             handle_clear_warning_lua_state(active_ui_page, host_state_machine, returned_state)?;
+            return Ok(());
+        }
+        if active_ui_page.page_key == UiPageKey::WarningSecurity {
+            handle_security_warning_lua_state(active_ui_page, host_state_machine, returned_state)?;
+            return Ok(());
+        }
+        if active_ui_page.page_key == UiPageKey::WarningMod {
+            handle_mod_security_lua_state(
+                lua_runtime,
+                active_ui_page,
+                host_state_machine,
+                returned_state,
+            )?;
             return Ok(());
         }
         handle_non_home_lua_state(
@@ -367,11 +501,15 @@ pub(crate) fn render(
             .to_lua_table(lua)?,
         UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.root_state.to_lua_table(lua)?,
+        UiPageKey::SettingKeybind => active_ui_page.keybind_state.root_state.to_lua_table(lua)?,
         UiPageKey::SettingLanguage => active_ui_page.language_state.root_state.to_lua_table(lua)?,
         UiPageKey::SettingMemory => active_ui_page.memory_state.root_state.to_lua_table(lua)?,
+        UiPageKey::SettingSecurity => active_ui_page.security_state.root_state.to_lua_table(lua)?,
         UiPageKey::StorageDetails => active_ui_page.memory_state.root_state.to_lua_table(lua)?,
         UiPageKey::WarningClearCache => clear_cache_root_state(lua)?,
         UiPageKey::WarningClearData => clear_data_root_state(lua)?,
+        UiPageKey::WarningSecurity => default_security_root_state(lua)?,
+        UiPageKey::WarningMod => mod_security_root_state(lua, active_ui_page)?,
         _ => lua.create_table()?,
     };
     let render: Function = lua.globals().get("render")?;
@@ -522,6 +660,22 @@ fn handle_setting_lua_state(
     }
 }
 
+fn handle_keybind_lua_state(
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    lua_state: KeybindLuaState,
+) {
+    match active_ui_page.keybind_state.apply_lua_state(lua_state) {
+        KeybindLuaAction::None => {}
+        KeybindLuaAction::Back => {
+            host_state_machine.setting_state = SettingState::Hub;
+        }
+        KeybindLuaAction::Confirm(_confirm_action) => {
+            // TODO: 接入具体按键映射页面后，在这里切换到 Global/System/Game 子页面。
+        }
+    }
+}
+
 fn handle_game_list_lua_state(
     lua_runtime: &LuaRuntimeState,
     active_ui_page: &mut ActiveUiPage,
@@ -560,7 +714,14 @@ fn handle_mod_list_lua_state(
         ModListLuaAction::Back => {
             host_state_machine.setting_state = SettingState::Hub;
         }
+        ModListLuaAction::OpenSafeModeWarning(uid) => {
+            host_state_machine.dialog_state = Some(DialogState::ModSecurityWarning);
+            host_state_machine.dialog_context = DialogContext::ModPackage { uid };
+        }
         ModListLuaAction::StateChanged(mod_state) => {
+            active_ui_page
+                .game_list_state
+                .refresh_mod_state(mod_state.clone());
             let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
             let mut current_context = host_bridge.runtime_context();
             current_context.mod_state = mod_state;
@@ -592,7 +753,9 @@ fn handle_language_lua_state(
                 .mod_list_state
                 .refresh_language(language_code.clone());
             active_ui_page.setting_state.refresh_language();
+            active_ui_page.keybind_state.refresh_language();
             active_ui_page.memory_state.refresh_language();
+            active_ui_page.security_state.refresh_language();
             host_bridge.set_language_code(language_code);
         }
     }
@@ -621,6 +784,58 @@ fn handle_memory_lua_state(
             }
         },
     }
+}
+
+fn handle_security_lua_state(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    lua_state: SecurityLuaState,
+) {
+    match active_ui_page.security_state.apply_lua_state(lua_state) {
+        SecurityLuaAction::None => {}
+        SecurityLuaAction::Back => {
+            host_state_machine.setting_state = SettingState::Hub;
+        }
+        SecurityLuaAction::Confirm(confirm_action) => match confirm_action {
+            SecurityConfirmAction::ToggleDefaultSafeMode => {
+                if active_ui_page.security_state.root_state.default_safe_mode {
+                    host_state_machine.dialog_state = Some(DialogState::SecurityWarning);
+                } else {
+                    active_ui_page.security_state.root_state.default_safe_mode = true;
+                }
+            }
+            SecurityConfirmAction::ToggleDefaultMod => {
+                active_ui_page.security_state.root_state.default_mod_enabled =
+                    !active_ui_page.security_state.root_state.default_mod_enabled;
+            }
+            SecurityConfirmAction::ResetSafeMode => {
+                let action = active_ui_page.mod_list_state.reset_all_safe_mode_on();
+                apply_mod_state_change(lua_runtime, active_ui_page, action);
+            }
+            SecurityConfirmAction::ResetMod => {
+                let action = active_ui_page.mod_list_state.reset_all_enabled_off();
+                apply_mod_state_change(lua_runtime, active_ui_page, action);
+            }
+        },
+    }
+}
+
+fn apply_mod_state_change(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &mut ActiveUiPage,
+    action: ModListLuaAction,
+) {
+    let ModListLuaAction::StateChanged(mod_state) = action else {
+        return;
+    };
+    active_ui_page
+        .game_list_state
+        .refresh_mod_state(mod_state.clone());
+    let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
+    let mut current_context = host_bridge.runtime_context();
+    current_context.mod_state = mod_state;
+    host_bridge.set_runtime_context(current_context);
 }
 
 fn handle_clear_warning_lua_state(
@@ -653,6 +868,83 @@ fn handle_clear_warning_lua_state(
     if back {
         host_state_machine.dialog_state = None;
         host_state_machine.setting_state = SettingState::Memory;
+    }
+
+    Ok(())
+}
+
+fn handle_security_warning_lua_state(
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    returned_state: Value,
+) -> UiRuntimeResult<()> {
+    let Value::Table(table) = returned_state else {
+        return Ok(());
+    };
+    let close_permanent = table
+        .get::<Option<bool>>("close_permanent")?
+        .unwrap_or(false);
+    let back = table.get::<Option<bool>>("back")?.unwrap_or(false);
+
+    if close_permanent {
+        active_ui_page.security_state.root_state.default_safe_mode = false;
+        host_state_machine.dialog_state = None;
+        host_state_machine.setting_state = SettingState::Security;
+        return Ok(());
+    }
+
+    if back {
+        host_state_machine.dialog_state = None;
+        host_state_machine.setting_state = SettingState::Security;
+    }
+
+    Ok(())
+}
+
+fn handle_mod_security_lua_state(
+    lua_runtime: &LuaRuntimeState,
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    returned_state: Value,
+) -> UiRuntimeResult<()> {
+    let Value::Table(table) = returned_state else {
+        return Ok(());
+    };
+    let close_temporary = table
+        .get::<Option<bool>>("close_temporary")?
+        .unwrap_or(false);
+    let close_permanent = table
+        .get::<Option<bool>>("close_permanent")?
+        .unwrap_or(false);
+    let back = table.get::<Option<bool>>("back")?.unwrap_or(false);
+
+    if close_temporary || close_permanent {
+        let uid = match &host_state_machine.dialog_context {
+            DialogContext::ModPackage { uid } => uid.clone(),
+            DialogContext::None => String::new(),
+        };
+        let action = active_ui_page
+            .mod_list_state
+            .close_safe_mode(uid.as_str(), close_permanent);
+        if let ModListLuaAction::StateChanged(mod_state) = action {
+            active_ui_page
+                .game_list_state
+                .refresh_mod_state(mod_state.clone());
+            let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
+            let mut current_context = host_bridge.runtime_context();
+            current_context.mod_state = mod_state;
+            host_bridge.set_runtime_context(current_context);
+        }
+        host_state_machine.dialog_state = None;
+        host_state_machine.dialog_context = DialogContext::None;
+        host_state_machine.setting_state = SettingState::ModList;
+        return Ok(());
+    }
+
+    if back {
+        host_state_machine.dialog_state = None;
+        host_state_machine.dialog_context = DialogContext::None;
+        host_state_machine.setting_state = SettingState::ModList;
     }
 
     Ok(())
@@ -702,6 +994,51 @@ fn clear_data_root_state(lua: &mlua::Lua) -> mlua::Result<Table> {
     let table = lua.create_table()?;
     table.set("language", language)?;
     table.set("dir", dir)?;
+    Ok(table)
+}
+
+fn default_security_root_state(lua: &mlua::Lua) -> mlua::Result<Table> {
+    let text = crate::host_engine::boot::i18n::text();
+    let language = lua.create_table()?;
+    language.set(
+        "DEFAULT_SECURITY_CLOSE_PERMANENT",
+        text.key.default_security_close_permanent,
+    )?;
+    language.set("DEFAULT_SECURITY_CANCEL", text.key.default_security_cancel)?;
+    language.set("DEFAULT_SECURITY_TITLE", text.default_security.title)?;
+    language.set("DEFAULT_SECURITY_WARN", text.default_security.warn)?;
+    language.set("DEFAULT_SECURITY_SECOND", text.default_security.second)?;
+
+    let table = lua.create_table()?;
+    table.set("language", language)?;
+    Ok(table)
+}
+
+fn mod_security_root_state(lua: &mlua::Lua, active_ui_page: &ActiveUiPage) -> mlua::Result<Table> {
+    let text = crate::host_engine::boot::i18n::text();
+    let language = lua.create_table()?;
+    language.set(
+        "MOD_SECURITY_CLOSE_PERMANENT",
+        text.key.mod_security_close_permanent,
+    )?;
+    language.set(
+        "MOD_SECURITY_CLOSE_TEMPORARY",
+        text.key.mod_security_close_temporary,
+    )?;
+    language.set("MOD_SECURITY_CANCEL", text.key.mod_security_cancel)?;
+    language.set("MOD_SECURITY_TITLE", text.mod_security.title)?;
+    language.set("MOD_SECURITY_WARN", text.mod_security.warn)?;
+    language.set("MOD_SECURITY_MOD", text.mod_security.mod_label)?;
+    language.set("MOD_SECURITY_SECOND", text.mod_security.second)?;
+
+    let mod_uid = active_ui_page.mod_list_state.selected_uid();
+    let table = lua.create_table()?;
+    table.set("language", language)?;
+    table.set("mod_uid", mod_uid.as_str())?;
+    table.set(
+        "mod_name",
+        active_ui_page.mod_list_state.mod_name(mod_uid.as_str()),
+    )?;
     Ok(table)
 }
 

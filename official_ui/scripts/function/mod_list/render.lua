@@ -74,7 +74,7 @@ local function draw_icon(icon, x, y, bg)
   for row = 1, C.ICON_HEIGHT do
     local line = tostring(icon[row] or "")
     if line ~= "" then
-      canvas_draw_text(x, y + row - 1, line, C.NORMAL_COLOR, bg, nil, nil, C.ICON_WIDTH)
+      canvas_draw_rich_text(x, y + row - 1, line, C.NORMAL_COLOR, bg, nil, C.ICON_WIDTH)
     end
   end
 end
@@ -102,9 +102,9 @@ local function draw_full_item(layout, root_state, item, row_y, is_selected)
   end
   canvas_draw_text(name_x, row_y, tostring(item.mod_name or item.name or ""), fg, bg, BOLD, nil, math.max(1, max_width - (name_x - text_x)))
   canvas_draw_text(text_x, row_y + 1, L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author), C.NORMAL_COLOR, bg, nil, nil)
-  canvas_draw_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author)), row_y + 1, tostring(item.author or ""), fg, bg, nil, nil, max_width)
+  canvas_draw_rich_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author)), row_y + 1, tostring(item.author or ""), fg, bg, nil, max_width)
   canvas_draw_text(text_x, row_y + 2, L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version), C.NORMAL_COLOR, bg, nil, nil)
-  canvas_draw_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version)), row_y + 2, tostring(item.version or ""), fg, bg, nil, nil, max_width)
+  canvas_draw_rich_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version)), row_y + 2, tostring(item.version or ""), fg, bg, nil, max_width)
   local status, status_color = status_text(root_state, item.enabled == true, false)
   local prefix = L.language(root_state, "MOD_LIST_STATUS", C.DEFAULT_TEXT.status)
   canvas_draw_text(text_x, row_y + 3, prefix, C.NORMAL_COLOR, bg, nil, nil)
@@ -291,8 +291,144 @@ local function crop_center_text(text, width)
   return output
 end
 
-local function add_line(lines, text, color, fg2, text2)
-  lines[#lines + 1] = { text = text or "", color = color or C.INFO_TEXT_COLOR, text2 = text2, color2 = fg2 }
+local function update_active_rich_prefix(token, active)
+  local command_text = token:sub(2, -2)
+  for command in command_text:gmatch("[^|]+") do
+    if command:match("^tc:clear") then
+      active.tc = nil
+    elseif command:match("^bg:clear") then
+      active.bg = nil
+    elseif command:match("^ts:clear") then
+      active.ts = nil
+    elseif command:match("^tc:") then
+      active.tc = "{" .. command .. "}"
+    elseif command:match("^bg:") then
+      active.bg = "{" .. command .. "}"
+    elseif command:match("^ts:") then
+      active.ts = "{" .. command .. "}"
+    end
+  end
+end
+
+local function active_rich_prefix(active)
+  return (active.tc or "") .. (active.bg or "") .. (active.ts or "")
+end
+
+local function clear_active_rich_suffix(active)
+  local suffix = ""
+  if active.tc ~= nil then
+    suffix = suffix .. "{tc:clear}"
+  end
+  if active.bg ~= nil then
+    suffix = suffix .. "{bg:clear}"
+  end
+  if active.ts ~= nil then
+    suffix = suffix .. "{ts:clear}"
+  end
+  return suffix
+end
+
+local function crop_center_rich_text(text, width)
+  local max_width = math.max(1, math.floor(width or 1))
+  local value = tostring(text or "")
+  if get_rich_text_width(value) <= max_width then
+    return value
+  end
+
+  local total_width = get_rich_text_width(value)
+  local skip_width = math.max(0, math.floor((total_width - max_width) / 2))
+  local active = {}
+  local current_width = 0
+  local output_width = 0
+  local output = ""
+  local started = false
+  local index = 1
+
+  while index <= #value do
+    local byte = value:sub(index, index)
+    if byte == "{" then
+      local close_index = value:find("}", index + 1, true)
+      if close_index then
+        local token = value:sub(index, close_index)
+        update_active_rich_prefix(token, active)
+        if started then
+          output = output .. token
+        end
+        index = close_index + 1
+      else
+        local next_index = utf8.offset(value, 2, index) or (#value + 1)
+        local character = value:sub(index, next_index - 1)
+        local character_width = math.max(1, get_text_width(character))
+        if not started then
+          if current_width + character_width <= skip_width then
+            current_width = current_width + character_width
+          else
+            started = true
+            output = active_rich_prefix(active)
+          end
+        end
+        if started then
+          if output_width + character_width > max_width then
+            break
+          end
+          output = output .. character
+          output_width = output_width + character_width
+        end
+        index = next_index
+      end
+    elseif byte == "\\" then
+      local next_byte = value:sub(index + 1, index + 1)
+      local escaped = next_byte == "{" or next_byte == "}" or next_byte == "\\"
+      local token = escaped and value:sub(index, index + 1) or byte
+      local visible = escaped and next_byte or byte
+      local character_width = math.max(1, get_text_width(visible))
+      if not started then
+        if current_width + character_width <= skip_width then
+          current_width = current_width + character_width
+        else
+          started = true
+          output = active_rich_prefix(active)
+        end
+      end
+      if started then
+        if output_width + character_width > max_width then
+          break
+        end
+        output = output .. token
+        output_width = output_width + character_width
+      end
+      index = index + (escaped and 2 or 1)
+    else
+      local next_index = utf8.offset(value, 2, index) or (#value + 1)
+      local character = value:sub(index, next_index - 1)
+      local character_width = math.max(1, get_text_width(character))
+      if not started then
+        if current_width + character_width <= skip_width then
+          current_width = current_width + character_width
+        else
+          started = true
+          output = active_rich_prefix(active)
+        end
+      end
+      if started then
+        if output_width + character_width > max_width then
+          break
+        end
+        output = output .. character
+        output_width = output_width + character_width
+      end
+      index = next_index
+    end
+  end
+
+  if output == "" then
+    return ""
+  end
+  return output .. clear_active_rich_suffix(active)
+end
+
+local function add_line(lines, text, color, fg2, text2, rich, rich2)
+  lines[#lines + 1] = { text = text or "", color = color or C.INFO_TEXT_COLOR, text2 = text2, color2 = fg2, rich = rich, rich2 = rich2 }
 end
 
 local function add_blank(lines)
@@ -306,6 +442,29 @@ local function add_wrapped(lines, text, width, color)
   for _, line in ipairs(wrapped_lines(text, width)) do
     add_line(lines, line, color or C.INFO_TEXT_COLOR)
   end
+end
+
+local function add_rich_line(lines, text, color)
+  add_line(lines, tostring(text or ""), color or C.INFO_TEXT_COLOR, nil, nil, true, false)
+end
+
+local function add_rich_value(lines, prefix, value)
+  add_line(lines, tostring(prefix or ""), C.INFO_TEXT_COLOR, C.INFO_TEXT_COLOR, tostring(value or ""), false, true)
+end
+
+local function row_height(row, wrap_width)
+  local height = row.rich
+    and get_rich_text_height(row.text or "", wrap_width)
+    or get_text_height(row.text or "", wrap_width)
+  height = math.max(1, height)
+  if row.text2 ~= nil then
+    local remaining_width = math.max(1, wrap_width - L.text_width(row.text or ""))
+    local value_height = row.rich2
+      and get_rich_text_height(tostring(row.text2), remaining_width)
+      or get_text_height(tostring(row.text2), remaining_width)
+    height = math.max(height, value_height)
+  end
+  return height
 end
 
 local function add_status_line(lines, prefix, value, value_color)
@@ -355,15 +514,13 @@ local function banner_lines(info, width)
   end
   for _, raw_line in ipairs(info.banner) do
     local line = tostring(raw_line or "")
-    local line_width = L.text_width(line)
+    local line_width = get_rich_text_width(line)
     if line_width <= width then
       local pad = math.max(0, math.floor((width - line_width) / 2))
-      lines[#lines + 1] = { text = string.rep(" ", pad) .. line, color = C.INFO_TEXT_COLOR }
+      lines[#lines + 1] = { text = string.rep(" ", pad) .. line, color = C.INFO_TEXT_COLOR, rich = true }
     else
-      if not line:find("{", 1, true) then
-        line = crop_center_text(line, width)
-      end
-      lines[#lines + 1] = { text = line, color = C.INFO_TEXT_COLOR }
+      line = crop_center_rich_text(line, width)
+      lines[#lines + 1] = { text = line, color = C.INFO_TEXT_COLOR, rich = true }
     end
   end
   return lines
@@ -378,8 +535,8 @@ local function info_lines(root_state, width)
 
   add_line(lines, L.language(root_state, "MOD_LIST_INFO_BASE", C.DEFAULT_TEXT.base), C.INFO_LABEL_COLOR)
   add_line(lines, tostring(info.mod_name or info.name or ""), C.INFO_TEXT_COLOR)
-  add_line(lines, L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author) .. tostring(info.author or ""), C.INFO_TEXT_COLOR)
-  add_line(lines, L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version) .. tostring(info.version or ""), C.INFO_TEXT_COLOR)
+  add_rich_value(lines, L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author), info.author)
+  add_rich_value(lines, L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version), info.version)
   add_blank(lines)
 
   add_line(lines, L.language(root_state, "MOD_LIST_INFO_SAFE", C.DEFAULT_TEXT.safe), C.INFO_LABEL_COLOR)
@@ -390,14 +547,19 @@ local function info_lines(root_state, width)
   add_status_line(lines, debug_prefix, debug_text, info.debug == true and C.DANGER_COLOR or C.DISABLED_COLOR)
   local write_text = bool_text(root_state, info.write == true, "MOD_LIST_TOGGLE_WRITE_ON", "MOD_LIST_TOGGLE_WRITE_OFF", C.DEFAULT_TEXT.write_on, C.DEFAULT_TEXT.write_off)
   add_status_line(lines, L.language(root_state, "MOD_LIST_INFO_SAFE_WRITE", C.DEFAULT_TEXT.safe_write), write_text, info.write == true and C.DANGER_COLOR or C.DISABLED_COLOR)
-  local safe_text = info.safe_mode == true
-    and L.language(root_state, "MOD_LIST_TOGGLE_SAFE_MODE_ON", C.DEFAULT_TEXT.safe_mode_on)
-    or L.language(root_state, "MOD_LIST_TOGGLE_SAFE_MODE_OFF_PERMANENT", C.DEFAULT_TEXT.safe_mode_off_permanent)
+  local safe_text
+  if info.safe_mode == true then
+    safe_text = L.language(root_state, "MOD_LIST_TOGGLE_SAFE_MODE_ON", C.DEFAULT_TEXT.safe_mode_on)
+  elseif info.safe_mode_permanent == true then
+    safe_text = L.language(root_state, "MOD_LIST_TOGGLE_SAFE_MODE_OFF_PERMANENT", C.DEFAULT_TEXT.safe_mode_off_permanent)
+  else
+    safe_text = L.language(root_state, "MOD_LIST_TOGGLE_SAFE_MODE_OFF_TEMPORARY", C.DEFAULT_TEXT.safe_mode_off_temporary)
+  end
   add_status_line(lines, L.language(root_state, "MOD_LIST_INFO_SAFE_SAFE_MODE", C.DEFAULT_TEXT.safe_safe_mode), safe_text, info.safe_mode == true and C.ON_COLOR or C.OFF_COLOR)
   add_blank(lines)
 
   add_line(lines, L.language(root_state, "MOD_LIST_INFO_INTRODUCTION", C.DEFAULT_TEXT.introduction), C.INFO_LABEL_COLOR)
-  add_wrapped(lines, tostring(info.introduction or ""), width, C.INFO_TEXT_COLOR)
+  add_rich_line(lines, tostring(info.introduction or ""), C.INFO_TEXT_COLOR)
 
   return lines
 end
@@ -416,12 +578,20 @@ local function info_scroll_metrics(root_state)
   State.set_root_state(root_state or {})
   local layout = State.layout()
   local rows = info_lines(root_state or {}, layout.info_width)
-  local needs_scroll = #rows > layout.info_height
+  local total_height = 0
+  for _, row in ipairs(rows) do
+    total_height = total_height + row_height(row, layout.info_width)
+  end
+  local needs_scroll = total_height > layout.info_height
   local content_width = needs_scroll and math.max(1, layout.info_width - 2) or layout.info_width
   if needs_scroll then
     rows = info_lines(root_state or {}, content_width)
+    total_height = 0
+    for _, row in ipairs(rows) do
+      total_height = total_height + row_height(row, content_width)
+    end
   end
-  return rows, layout.info_height, math.max(0, #rows - layout.info_height)
+  return rows, layout.info_height, math.max(0, total_height - layout.info_height)
 end
 
 local function draw_info(layout, root_state)
@@ -444,24 +614,41 @@ local function draw_info(layout, root_state)
   scroll = math.min(scroll, max_scroll)
 
   local drawn = 0
-  for index = 1 + scroll, #rows do
-    if drawn >= max_rows then
+  local skipped_height = 0
+  for index = 1, #rows do
+    local row = rows[index]
+    local row_draw_height = row_height(row, content_width)
+    if skipped_height + row_draw_height <= scroll then
+      skipped_height = skipped_height + row_draw_height
+    elseif drawn >= max_rows then
+      break
+    else
+    if drawn + row_draw_height > max_rows then
       break
     end
-    local row = rows[index]
-    canvas_draw_text(content_x, y + drawn, row.text or "", row.color, nil, nil, ALIGN_LEFT, content_width)
+    if row.rich then
+      canvas_draw_rich_text(content_x, y + drawn, row.text or "", row.color, nil, ALIGN_LEFT, content_width)
+    else
+      canvas_draw_text(content_x, y + drawn, row.text or "", row.color, nil, nil, ALIGN_LEFT, content_width)
+    end
     if row.text2 ~= nil then
       local x2 = content_x + L.text_width(row.text or "")
-      canvas_draw_text(x2, y + drawn, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, BOLD, nil, math.max(1, content_width - L.text_width(row.text or "")))
+      local remaining_width = math.max(1, content_width - L.text_width(row.text or ""))
+      if row.rich2 then
+        canvas_draw_rich_text(x2, y + drawn, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, ALIGN_LEFT, remaining_width)
+      else
+        canvas_draw_text(x2, y + drawn, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, BOLD, nil, remaining_width)
+      end
     end
-    drawn = drawn + 1
+    drawn = drawn + row_draw_height
+    end
   end
 
   draw_scroll_indicator(
     layout.right_x + layout.right_width - 2,
     layout.right_y + 1,
     layout.right_y + layout.right_height - 2,
-    #rows,
+    max_rows + max_scroll,
     max_rows,
     scroll,
     C.DEFAULT_TEXT.scroll_up_key_text,

@@ -5,6 +5,7 @@ use serde_json::Value as JsonValue;
 
 use super::{key_display, lua_table_value};
 use crate::host_engine::boot::preload::game_modules::GameModule;
+use crate::host_engine::constant::MAX_ACTION_KEYS;
 
 /// 构造 action_value 表。
 pub fn build_key_table(
@@ -63,24 +64,18 @@ fn build_single_game_action_table(
     let table = lua.create_table()?;
     let user_key =
         find_user_key(keybinds, game_module.uid.as_str(), action).unwrap_or(&action_binding.key);
+    let key = truncate_key_value(&action_binding.key);
+    let user_key = truncate_key_value(user_key);
 
-    table.set(
-        "key",
-        lua_table_value::json_to_lua_value(lua, &action_binding.key)?,
-    )?;
+    table.set("key", lua_table_value::json_to_lua_value(lua, &key)?)?;
     table.set("key_name", action_binding.key_name.as_str())?;
     table.set(
         "key_user",
-        lua_table_value::json_to_lua_value(lua, user_key)?,
+        lua_table_value::json_to_lua_value(lua, &user_key)?,
     )?;
     table.set(
         "key_display",
-        build_key_display_table(
-            lua,
-            &action_binding.key,
-            user_key,
-            game_module.game.case_sensitive,
-        )?,
+        build_key_display_table(lua, &key, &user_key, game_module.game.case_sensitive)?,
     )?;
 
     Ok(Some(table))
@@ -126,7 +121,8 @@ fn build_single_ui_action_table(
     };
 
     let table = lua.create_table()?;
-    table.set("key", lua_table_value::json_to_lua_value(lua, key)?)?;
+    let key = truncate_key_value(key);
+    table.set("key", lua_table_value::json_to_lua_value(lua, &key)?)?;
     table.set(
         "key_name",
         action_value
@@ -134,10 +130,10 @@ fn build_single_ui_action_table(
             .and_then(JsonValue::as_str)
             .unwrap_or(""),
     )?;
-    table.set("key_user", lua_table_value::json_to_lua_value(lua, key)?)?;
+    table.set("key_user", lua_table_value::json_to_lua_value(lua, &key)?)?;
     table.set(
         "key_display",
-        build_key_display_table(lua, key, key, false)?,
+        build_key_display_table(lua, &key, &key, false)?,
     )?;
     Ok(Some(table))
 }
@@ -164,6 +160,15 @@ fn build_key_display_table(
         )?,
     )?;
     Ok(table)
+}
+
+fn truncate_key_value(key_value: &JsonValue) -> JsonValue {
+    match key_value {
+        JsonValue::Array(keys) => {
+            JsonValue::Array(keys.iter().take(MAX_ACTION_KEYS).cloned().collect())
+        }
+        _ => key_value.clone(),
+    }
 }
 
 fn find_user_key<'a>(

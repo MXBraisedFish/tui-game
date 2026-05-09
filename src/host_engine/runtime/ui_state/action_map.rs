@@ -4,6 +4,8 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
+use crate::host_engine::constant::MAX_ACTION_KEYS;
+
 /// 单个 UI 动作定义。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiActionBinding {
@@ -31,7 +33,7 @@ impl UiActionMap {
             return action_map;
         };
 
-        action_map.actions = Value::Object(page_actions.clone());
+        action_map.actions = Value::Object(normalize_page_actions(page_actions));
         for (action_name, action_value) in page_actions {
             if let Some(keys) = parse_keys(action_value.get("key")) {
                 for key in keys {
@@ -61,11 +63,35 @@ fn parse_keys(value: Option<&Value>) -> Option<Vec<String>> {
         Value::String(key) => Some(vec![key.clone()]),
         Value::Array(keys) => Some(
             keys.iter()
+                .take(MAX_ACTION_KEYS)
                 .filter_map(Value::as_str)
                 .map(ToString::to_string)
                 .collect(),
         ),
         _ => None,
+    }
+}
+
+fn normalize_page_actions(
+    page_actions: &serde_json::Map<String, Value>,
+) -> serde_json::Map<String, Value> {
+    let mut normalized_actions = serde_json::Map::new();
+    for (action_name, action_value) in page_actions {
+        let mut normalized_action = action_value.clone();
+        if let Some(action_object) = normalized_action.as_object_mut() {
+            if let Some(key_value) = action_object.get_mut("key") {
+                *key_value = truncate_key_value(key_value);
+            }
+        }
+        normalized_actions.insert(action_name.clone(), normalized_action);
+    }
+    normalized_actions
+}
+
+fn truncate_key_value(key_value: &Value) -> Value {
+    match key_value {
+        Value::Array(keys) => Value::Array(keys.iter().take(MAX_ACTION_KEYS).cloned().collect()),
+        _ => key_value.clone(),
     }
 }
 

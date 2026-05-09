@@ -64,6 +64,20 @@ pub static MOD_LIST_SAFE_MODE: MutableText = MutableText::new();
 pub static MOD_SECURITY_CLOSE_PERMANENT: MutableText = MutableText::new();
 pub static MOD_SECURITY_CLOSE_TEMPORARY: MutableText = MutableText::new();
 pub static MOD_SECURITY_CANCEL: MutableText = MutableText::new();
+pub static DEFAULT_SECURITY_CLOSE_PERMANENT: MutableText = MutableText::new();
+pub static DEFAULT_SECURITY_CANCEL: MutableText = MutableText::new();
+pub static SECURITY_PREV_OPTION: MutableText = MutableText::new();
+pub static SECURITY_NEXT_OPTION: MutableText = MutableText::new();
+pub static SECURITY_SELECT: MutableText = MutableText::new();
+pub static SECURITY_CLOSE_PERMANENT: MutableText = MutableText::new();
+pub static SECURITY_BACK: MutableText = MutableText::new();
+pub static SECURITY_TOGGLE_CONFIRM: MutableText = MutableText::new();
+pub static SECURITY_TOGGLE: MutableText = MutableText::new();
+pub static SECURITY_CONFIRM: MutableText = MutableText::new();
+pub static SECURITY_OPTION1: MutableText = MutableText::new();
+pub static SECURITY_OPTION2: MutableText = MutableText::new();
+pub static SECURITY_OPTION3: MutableText = MutableText::new();
+pub static SECURITY_OPTION4: MutableText = MutableText::new();
 pub static LANGUAGE_UP_OPTION: MutableText = MutableText::new();
 pub static LANGUAGE_DOWN_OPTION: MutableText = MutableText::new();
 pub static LANGUAGE_LEFT_OPTION: MutableText = MutableText::new();
@@ -86,6 +100,15 @@ pub static MEMORY_OPTION2: MutableText = MutableText::new();
 pub static MEMORY_OPTION3: MutableText = MutableText::new();
 pub static MEMORY_CONFIRM: MutableText = MutableText::new();
 pub static MEMORY_BACK: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_OPTION1: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_OPTION2: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_OPTION3: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_PREV_OPTION: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_NEXT_OPTION: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_SELECT: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_CONFIRM: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_BACK: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_LIST_TITLE: MutableText = MutableText::new();
 pub static STORAGE_DETAILS_BACK: MutableText = MutableText::new();
 pub static CLEAR_DATA_CONFIRM: MutableText = MutableText::new();
 pub static CLEAR_DATA_CANCEL: MutableText = MutableText::new();
@@ -157,6 +180,20 @@ pub struct KeyText {
     pub mod_security_close_permanent: String,
     pub mod_security_close_temporary: String,
     pub mod_security_cancel: String,
+    pub default_security_close_permanent: String,
+    pub default_security_cancel: String,
+    pub security_prev_option: String,
+    pub security_next_option: String,
+    pub security_select: String,
+    pub security_close_permanent: String,
+    pub security_back: String,
+    pub security_toggle_confirm: String,
+    pub security_toggle: String,
+    pub security_confirm: String,
+    pub security_option1: String,
+    pub security_option2: String,
+    pub security_option3: String,
+    pub security_option4: String,
     pub language_up_option: String,
     pub language_down_option: String,
     pub language_left_option: String,
@@ -179,6 +216,15 @@ pub struct KeyText {
     pub memory_option3: String,
     pub memory_confirm: String,
     pub memory_back: String,
+    pub setting_keybind_list_option1: String,
+    pub setting_keybind_list_option2: String,
+    pub setting_keybind_list_option3: String,
+    pub setting_keybind_list_prev_option: String,
+    pub setting_keybind_list_next_option: String,
+    pub setting_keybind_list_select: String,
+    pub setting_keybind_list_confirm: String,
+    pub setting_keybind_list_back: String,
+    pub setting_keybind_list_title: String,
     pub storage_details_back: String,
     pub clear_data_confirm: String,
     pub clear_data_cancel: String,
@@ -339,6 +385,44 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         "key.mod_security.cancel",
     );
     set_text(
+        &DEFAULT_SECURITY_CLOSE_PERMANENT,
+        language_source,
+        "key.default_security.close.permanent",
+    );
+    set_text(
+        &DEFAULT_SECURITY_CANCEL,
+        language_source,
+        "key.default_security.cancel",
+    );
+    set_text(
+        &SECURITY_PREV_OPTION,
+        language_source,
+        "key.security.prev_option",
+    );
+    set_text(
+        &SECURITY_NEXT_OPTION,
+        language_source,
+        "key.security.next_option",
+    );
+    set_text(&SECURITY_SELECT, language_source, "key.security.select");
+    set_text(
+        &SECURITY_CLOSE_PERMANENT,
+        language_source,
+        "key.security.close.permanent",
+    );
+    set_text(&SECURITY_BACK, language_source, "key.security.back");
+    set_text(
+        &SECURITY_TOGGLE_CONFIRM,
+        language_source,
+        "key.security.toggle_confirm",
+    );
+    set_text(&SECURITY_TOGGLE, language_source, "key.security.toggle");
+    set_text(&SECURITY_CONFIRM, language_source, "key.security.confirm");
+    set_text(&SECURITY_OPTION1, language_source, "key.security.option1");
+    set_text(&SECURITY_OPTION2, language_source, "key.security.option2");
+    set_text(&SECURITY_OPTION3, language_source, "key.security.option3");
+    set_text(&SECURITY_OPTION4, language_source, "key.security.option4");
+    set_text(
         &LANGUAGE_UP_OPTION,
         language_source,
         "key.language.up_option",
@@ -396,6 +480,51 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
     set_text(&MEMORY_OPTION3, language_source, "key.memory.option3");
     set_text(&MEMORY_CONFIRM, language_source, "key.memory.confirm");
     set_text(&MEMORY_BACK, language_source, "key.memory.back");
+    set_text(
+        &SETTING_KEYBIND_LIST_OPTION1,
+        language_source,
+        "key.setting_keybind.list.option1",
+    );
+    set_text(
+        &SETTING_KEYBIND_LIST_OPTION2,
+        language_source,
+        "key.setting_keybind.list.option2",
+    );
+    set_text(
+        &SETTING_KEYBIND_LIST_OPTION3,
+        language_source,
+        "key.setting_keybind.list.option3",
+    );
+    set_text(
+        &SETTING_KEYBIND_LIST_PREV_OPTION,
+        language_source,
+        "key.setting_keybind.list.prev_option",
+    );
+    set_text(
+        &SETTING_KEYBIND_LIST_NEXT_OPTION,
+        language_source,
+        "key.setting_keybind.list.next_option",
+    );
+    set_text(
+        &SETTING_KEYBIND_LIST_SELECT,
+        language_source,
+        "key.setting_keybind.list.select",
+    );
+    set_text(
+        &SETTING_KEYBIND_LIST_CONFIRM,
+        language_source,
+        "key.setting_keybind.list.confirm",
+    );
+    set_text(
+        &SETTING_KEYBIND_LIST_BACK,
+        language_source,
+        "key.setting_keybind.list.back",
+    );
+    set_text(
+        &SETTING_KEYBIND_LIST_TITLE,
+        language_source,
+        "key.setting_keybind.list.title",
+    );
     set_text(
         &STORAGE_DETAILS_BACK,
         language_source,
@@ -481,6 +610,20 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         mod_security_close_permanent: text(&MOD_SECURITY_CLOSE_PERMANENT),
         mod_security_close_temporary: text(&MOD_SECURITY_CLOSE_TEMPORARY),
         mod_security_cancel: text(&MOD_SECURITY_CANCEL),
+        default_security_close_permanent: text(&DEFAULT_SECURITY_CLOSE_PERMANENT),
+        default_security_cancel: text(&DEFAULT_SECURITY_CANCEL),
+        security_prev_option: text(&SECURITY_PREV_OPTION),
+        security_next_option: text(&SECURITY_NEXT_OPTION),
+        security_select: text(&SECURITY_SELECT),
+        security_close_permanent: text(&SECURITY_CLOSE_PERMANENT),
+        security_back: text(&SECURITY_BACK),
+        security_toggle_confirm: text(&SECURITY_TOGGLE_CONFIRM),
+        security_toggle: text(&SECURITY_TOGGLE),
+        security_confirm: text(&SECURITY_CONFIRM),
+        security_option1: text(&SECURITY_OPTION1),
+        security_option2: text(&SECURITY_OPTION2),
+        security_option3: text(&SECURITY_OPTION3),
+        security_option4: text(&SECURITY_OPTION4),
         language_up_option: text(&LANGUAGE_UP_OPTION),
         language_down_option: text(&LANGUAGE_DOWN_OPTION),
         language_left_option: text(&LANGUAGE_LEFT_OPTION),
@@ -503,6 +646,15 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         memory_option3: text(&MEMORY_OPTION3),
         memory_confirm: text(&MEMORY_CONFIRM),
         memory_back: text(&MEMORY_BACK),
+        setting_keybind_list_option1: text(&SETTING_KEYBIND_LIST_OPTION1),
+        setting_keybind_list_option2: text(&SETTING_KEYBIND_LIST_OPTION2),
+        setting_keybind_list_option3: text(&SETTING_KEYBIND_LIST_OPTION3),
+        setting_keybind_list_prev_option: text(&SETTING_KEYBIND_LIST_PREV_OPTION),
+        setting_keybind_list_next_option: text(&SETTING_KEYBIND_LIST_NEXT_OPTION),
+        setting_keybind_list_select: text(&SETTING_KEYBIND_LIST_SELECT),
+        setting_keybind_list_confirm: text(&SETTING_KEYBIND_LIST_CONFIRM),
+        setting_keybind_list_back: text(&SETTING_KEYBIND_LIST_BACK),
+        setting_keybind_list_title: text(&SETTING_KEYBIND_LIST_TITLE),
         storage_details_back: text(&STORAGE_DETAILS_BACK),
         clear_data_confirm: text(&CLEAR_DATA_CONFIRM),
         clear_data_cancel: text(&CLEAR_DATA_CANCEL),

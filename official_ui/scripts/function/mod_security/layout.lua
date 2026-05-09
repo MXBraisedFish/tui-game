@@ -1,0 +1,60 @@
+local M = {}
+
+function M.text_width(text)
+  local width = get_text_width(text or "")
+  if width == nil then
+    return #(text or "")
+  end
+  return width
+end
+
+function M.terminal_size()
+  local width, height = get_terminal_size()
+  return width or 98, height or 26
+end
+
+function M.center_x(width, offset)
+  return resolve_x(ANCHOR_CENTER, width, offset or 0)
+end
+
+function M.language(root_state, key, fallback)
+  if type(root_state) == "table" and type(root_state.language) == "table" then
+    local value = root_state.language[key]
+    if value ~= nil and tostring(value) ~= "" then
+      return tostring(value)
+    end
+  end
+  return fallback
+end
+
+function M.wrap(text, width)
+  local lines = {}
+  width = math.max(10, width or 72)
+  text = tostring(text or ""):gsub("\\n", "\n")
+
+  for paragraph in (text .. "\n"):gmatch("(.-)\n") do
+    local current = ""
+    for word in paragraph:gmatch("%S+") do
+      local candidate = current == "" and word or (current .. " " .. word)
+      if M.text_width(candidate) > width and current ~= "" then
+        lines[#lines + 1] = current
+        current = word
+      else
+        current = candidate
+      end
+    end
+
+    if current ~= "" then
+      lines[#lines + 1] = current
+    elseif paragraph == "" then
+      lines[#lines + 1] = ""
+    end
+  end
+
+  if #lines == 0 then
+    lines[1] = ""
+  end
+  return lines
+end
+
+return M

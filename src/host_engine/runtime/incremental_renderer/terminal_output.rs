@@ -51,7 +51,7 @@ fn queue_cell_style(stdout: &mut io::Stdout, cell: &CanvasCell) -> TerminalOutpu
     if let Some(bg) = cell.bg.as_deref().and_then(parse_color) {
         queue!(stdout, SetBackgroundColor(bg))?;
     }
-    if let Some(style) = cell.style.and_then(parse_style) {
+    for style in cell.styles.iter().filter_map(|style| parse_style(*style)) {
         queue!(stdout, SetAttribute(style))?;
     }
     Ok(())

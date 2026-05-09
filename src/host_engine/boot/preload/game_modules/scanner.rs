@@ -7,7 +7,7 @@ use std::path::Path;
 
 use serde_json::{Map, Value};
 
-use crate::host_engine::constant::API_VERSION;
+use crate::host_engine::constant::{API_VERSION, MAX_ACTION_KEYS};
 
 use super::manifest::{
     GameActionBinding, GameManifest, GameModule, GameModuleRegistry, GameModuleScanError,
@@ -236,7 +236,7 @@ fn require_actions(
         let key_value = action_object.get("key").ok_or_else(|| {
             field_missing_error("game.json", &format!("actions.{action_name}.key"))
         })?;
-        validate_action_key(key_value, action_name)?;
+        let key_value = normalize_action_key(key_value, action_name)?;
         let key_name_value = action_object.get("key_name").ok_or_else(|| {
             field_missing_error("game.json", &format!("actions.{action_name}.key_name"))
         })?;
@@ -260,7 +260,7 @@ fn require_actions(
         bindings.insert(
             action_name.clone(),
             GameActionBinding {
-                key: key_value.clone(),
+                key: key_value,
                 key_name,
             },
         );
@@ -269,11 +269,12 @@ fn require_actions(
     Ok(bindings)
 }
 
-fn validate_action_key(value: &Value, action_name: &str) -> ScannerResult<()> {
+fn normalize_action_key(value: &Value, action_name: &str) -> ScannerResult<Value> {
     match value {
-        Value::String(text) if !text.trim().is_empty() => Ok(()),
+        Value::String(text) if !text.trim().is_empty() => Ok(value.clone()),
         Value::Array(values) if !values.is_empty() => {
-            for (index, item) in values.iter().enumerate() {
+            let mut normalized_keys = Vec::new();
+            for (index, item) in values.iter().take(MAX_ACTION_KEYS).enumerate() {
                 let Some(text) = item.as_str() else {
                     return Err(field_type_error(
                         "game.json",
@@ -288,8 +289,9 @@ fn validate_action_key(value: &Value, action_name: &str) -> ScannerResult<()> {
                         &format!("actions.{action_name}.key[{}]", index + 1),
                     ));
                 }
+                normalized_keys.push(Value::String(text.to_string()));
             }
-            Ok(())
+            Ok(Value::Array(normalized_keys))
         }
         _ => Err(field_type_error(
             "game.json",

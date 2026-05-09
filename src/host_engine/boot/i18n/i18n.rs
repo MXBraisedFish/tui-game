@@ -9,8 +9,8 @@ use std::sync::RwLock;
 use once_cell::sync::OnceCell;
 
 use super::r#type::{
-    clear_cache, clear_data, game_list, global, home, key, language, loading, memory, mod_list,
-    mod_security, setting, start, warning,
+    clear_cache, clear_data, default_security, game_list, global, home, key, language, loading,
+    memory, mod_list, mod_security, security, setting, setting_keybind, start, warning,
 };
 
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
@@ -26,6 +26,7 @@ type I18nResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub struct I18nText {
     pub clear_cache: clear_cache::ClearCacheText,
     pub clear_data: clear_data::ClearDataText,
+    pub default_security: default_security::DefaultSecurityText,
     pub game_list: game_list::GameListText,
     pub global: global::GlobalText,
     pub home: home::HomeText,
@@ -35,7 +36,9 @@ pub struct I18nText {
     pub memory: memory::MemoryText,
     pub mod_list: mod_list::ModListText,
     pub mod_security: mod_security::ModSecurityText,
+    pub security: security::SecurityText,
     pub setting: setting::SettingText,
+    pub setting_keybind: setting_keybind::SettingKeybindText,
     pub start: start::StartText,
     pub warning: warning::WarningText,
 }
@@ -132,6 +135,7 @@ fn register_texts(language_source: &LanguageSource) -> I18nText {
     I18nText {
         clear_cache: clear_cache::register(language_source),
         clear_data: clear_data::register(language_source),
+        default_security: default_security::register(language_source),
         game_list: game_list::register(language_source),
         global: global::register(language_source),
         home: home::register(language_source),
@@ -141,7 +145,9 @@ fn register_texts(language_source: &LanguageSource) -> I18nText {
         memory: memory::register(language_source),
         mod_list: mod_list::register(language_source),
         mod_security: mod_security::register(language_source),
+        security: security::register(language_source),
         setting: setting::register(language_source),
+        setting_keybind: setting_keybind::register(language_source),
         start: start::register(language_source),
         warning: warning::register(language_source),
     }

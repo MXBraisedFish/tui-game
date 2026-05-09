@@ -1,6 +1,6 @@
 //! 绘制参数解析
 
-use mlua::{Value, Variadic};
+use mlua::{Table, Value, Variadic};
 
 use super::border_chars::BorderChars;
 use crate::host_engine::boot::preload::lua_runtime::api::validation::argument;
@@ -27,7 +27,19 @@ pub struct DrawTextArgs {
     pub text: String,
     pub fg: Option<String>,
     pub bg: Option<String>,
-    pub style: Option<i64>,
+    pub styles: Vec<i64>,
+    pub align: i64,
+    pub wrap_width: Option<u16>,
+}
+
+/// 绘制富文本参数。
+#[derive(Clone, Debug)]
+pub struct DrawRichTextArgs {
+    pub x: u16,
+    pub y: u16,
+    pub rich_text: String,
+    pub fg: Option<String>,
+    pub bg: Option<String>,
     pub align: i64,
     pub wrap_width: Option<u16>,
 }
@@ -73,7 +85,7 @@ pub fn parse_draw_text_args(args: &Variadic<Value>) -> mlua::Result<DrawTextArgs
     let text = argument::expect_string_arg(args, 2)?;
     let fg = argument::expect_optional_string_arg(args, 3)?;
     let bg = argument::expect_optional_string_arg(args, 4)?;
-    let style = argument::expect_optional_i64_arg(args, 5)?;
+    let styles = parse_optional_styles(args, 5)?;
     let align = match args.get(6) {
         None => ALIGN_LEFT,
         Some(Value::Nil) => ALIGN_NO_WRAP,
@@ -87,7 +99,33 @@ pub fn parse_draw_text_args(args: &Variadic<Value>) -> mlua::Result<DrawTextArgs
         text,
         fg,
         bg,
-        style,
+        styles,
+        align,
+        wrap_width,
+    })
+}
+
+/// 解析 canvas_draw_rich_text 参数。
+pub fn parse_draw_rich_text_args(args: &Variadic<Value>) -> mlua::Result<DrawRichTextArgs> {
+    argument::expect_arg_count_range(args, 3, 7)?;
+    let x = parse_coordinate(args, 0)?;
+    let y = parse_coordinate(args, 1)?;
+    let rich_text = argument::expect_string_arg(args, 2)?;
+    let fg = argument::expect_optional_string_arg(args, 3)?;
+    let bg = argument::expect_optional_string_arg(args, 4)?;
+    let align = match args.get(5) {
+        None => ALIGN_LEFT,
+        Some(Value::Nil) => ALIGN_NO_WRAP,
+        Some(_) => argument::expect_i64_arg(args, 5)?,
+    };
+    let wrap_width = parse_optional_wrap_width(args, 6)?;
+
+    Ok(DrawRichTextArgs {
+        x,
+        y,
+        rich_text,
+        fg,
+        bg,
         align,
         wrap_width,
     })
@@ -173,6 +211,74 @@ pub fn parse_optional_wrap_width(
         ));
     }
     Ok(Some(u16::try_from(value).map_err(mlua::Error::external)?))
+}
+
+fn parse_optional_styles(args: &Variadic<Value>, index: usize) -> mlua::Result<Vec<i64>> {
+    match args.get(index) {
+        Some(Value::Nil) | None => Ok(Vec::new()),
+        Some(Value::Integer(style)) => parse_style_list([*style]),
+        Some(Value::Number(style)) => parse_style_list([*style as i64]),
+        Some(Value::Table(table)) => parse_style_table(table),
+        Some(value) => Err(mlua::Error::external(format!(
+            "argument type mismatch: expected integer or table, got {}",
+            style_lua_type_name(value)
+        ))),
+    }
+}
+
+fn parse_style_table(table: &Table) -> mlua::Result<Vec<i64>> {
+    let mut styles = Vec::new();
+    for value in table.clone().sequence_values::<Value>() {
+        let style = match value? {
+            Value::Integer(style) => style,
+            Value::Number(style) => style as i64,
+            value => {
+                return Err(mlua::Error::external(format!(
+                    "invalid text style value type: {}",
+                    style_lua_type_name(&value)
+                )));
+            }
+        };
+        push_unique_style(&mut styles, style)?;
+    }
+    Ok(styles)
+}
+
+fn parse_style_list<const LENGTH: usize>(styles: [i64; LENGTH]) -> mlua::Result<Vec<i64>> {
+    let mut parsed_styles = Vec::new();
+    for style in styles {
+        push_unique_style(&mut parsed_styles, style)?;
+    }
+    Ok(parsed_styles)
+}
+
+fn push_unique_style(styles: &mut Vec<i64>, style: i64) -> mlua::Result<()> {
+    if !(STYLE_BOLD..=STYLE_DIM).contains(&style) {
+        return Err(mlua::Error::external(format!(
+            "invalid text style value: {style}"
+        )));
+    }
+    if !styles.contains(&style) {
+        styles.push(style);
+    }
+    Ok(())
+}
+
+fn style_lua_type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Nil => "nil",
+        Value::Boolean(_) => "boolean",
+        Value::LightUserData(_) => "light_userdata",
+        Value::Integer(_) => "integer",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Table(_) => "table",
+        Value::Function(_) => "function",
+        Value::Thread(_) => "thread",
+        Value::UserData(_) => "userdata",
+        Value::Error(_) => "error",
+        Value::Other(_) => "other",
+    }
 }
 
 fn parse_optional_char(value: Option<&Value>, default_char: char) -> char {

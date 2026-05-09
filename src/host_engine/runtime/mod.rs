@@ -4,6 +4,7 @@ pub mod game_engine;
 pub mod incremental_renderer;
 pub mod memory_cleanup;
 pub mod renderer;
+pub mod rust;
 pub mod terminal;
 pub mod ui_page;
 pub mod ui_runtime;

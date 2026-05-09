@@ -4,9 +4,11 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::canvas_state::{CanvasCell, CanvasState};
 use super::drawing_parser::{
-    ALIGN_CENTER, ALIGN_LEFT, ALIGN_NO_WRAP, ALIGN_RIGHT, BorderRectArgs, DrawTextArgs, EraserArgs,
-    FillRectArgs,
+    ALIGN_CENTER, ALIGN_LEFT, ALIGN_NO_WRAP, ALIGN_RIGHT, BorderRectArgs, DrawRichTextArgs,
+    DrawTextArgs, EraserArgs, FillRectArgs,
 };
+use super::rich_text_parser::{StyledCharacter, parse_rich_text};
+use crate::host_engine::boot::preload::lua_runtime::LuaRuntimeContext;
 use crate::host_engine::boot::preload::lua_runtime::api::text_support::text_wrapping;
 
 /// 执行文本绘制。
@@ -33,9 +35,37 @@ pub fn draw_text(canvas_state: &mut CanvasState, args: DrawTextArgs) {
             line,
             args.fg.clone(),
             args.bg.clone(),
-            args.style,
+            args.styles.clone(),
         );
     }
+}
+
+/// 执行富文本绘制。
+pub fn draw_rich_text(
+    canvas_state: &mut CanvasState,
+    args: DrawRichTextArgs,
+    runtime_context: &LuaRuntimeContext,
+) -> mlua::Result<()> {
+    let characters = parse_rich_text(args.rich_text.as_str(), runtime_context)?;
+    let lines = rich_text_lines(&characters, args.align, args.wrap_width);
+    let first_line_width = lines
+        .first()
+        .map(|line| rich_line_width(line))
+        .unwrap_or_default();
+
+    for (line_index, line) in lines.iter().enumerate() {
+        let line_width = rich_line_width(line);
+        let x = match args.align {
+            ALIGN_CENTER => i64::from(args.x) + ((first_line_width - line_width) / 2),
+            ALIGN_RIGHT => i64::from(args.x) + first_line_width - line_width,
+            ALIGN_LEFT | ALIGN_NO_WRAP => i64::from(args.x),
+            _ => i64::from(args.x),
+        };
+        let y = i64::from(args.y) + line_index as i64;
+        draw_styled_line(canvas_state, x, y, line, args.fg.clone(), args.bg.clone());
+    }
+
+    Ok(())
 }
 
 /// 执行矩形填充。
@@ -49,7 +79,7 @@ pub fn fill_rect(canvas_state: &mut CanvasState, args: FillRectArgs) {
                     text: args.fill_char.to_string(),
                     fg: args.fg.clone(),
                     bg: args.bg.clone(),
-                    style: None,
+                    styles: Vec::new(),
                     is_continuation: false,
                 },
             );
@@ -153,7 +183,7 @@ fn draw_line(
     line: &str,
     fg: Option<String>,
     bg: Option<String>,
-    style: Option<i64>,
+    styles: Vec<i64>,
 ) {
     if y < 0 {
         return;
@@ -181,7 +211,7 @@ fn draw_line(
                 text: character.to_string(),
                 fg: fg.clone(),
                 bg: bg.clone(),
-                style,
+                styles: styles.clone(),
                 is_continuation: false,
             },
         );
@@ -196,7 +226,7 @@ fn draw_line(
                         text: String::new(),
                         fg: fg.clone(),
                         bg: bg.clone(),
-                        style,
+                        styles: styles.clone(),
                         is_continuation: true,
                     },
                 );
@@ -256,8 +286,130 @@ fn set_border_cell(
             text: character.to_string(),
             fg: args.fg.clone(),
             bg: args.bg.clone(),
-            style: None,
+            styles: Vec::new(),
             is_continuation: false,
         },
     );
+}
+
+fn rich_text_lines(
+    characters: &[StyledCharacter],
+    align: i64,
+    wrap_width: Option<u16>,
+) -> Vec<Vec<StyledCharacter>> {
+    if wrap_width.is_none() && align == ALIGN_NO_WRAP {
+        return no_wrap_rich_lines(characters);
+    }
+    wrap_rich_lines(characters, wrap_width)
+}
+
+fn no_wrap_rich_lines(characters: &[StyledCharacter]) -> Vec<Vec<StyledCharacter>> {
+    let mut lines = vec![Vec::new()];
+    for character in characters {
+        if character.character == '\n' {
+            lines.push(Vec::new());
+        } else if let Some(line) = lines.last_mut() {
+            line.push(character.clone());
+        }
+    }
+    lines
+}
+
+fn wrap_rich_lines(
+    characters: &[StyledCharacter],
+    wrap_width: Option<u16>,
+) -> Vec<Vec<StyledCharacter>> {
+    let Some(wrap_width) = wrap_width.filter(|wrap_width| *wrap_width > 0) else {
+        return no_wrap_rich_lines(characters);
+    };
+
+    let wrap_width = i64::from(wrap_width);
+    let mut lines = vec![Vec::new()];
+    let mut current_width = 0_i64;
+
+    for character in characters {
+        if character.character == '\n' {
+            lines.push(Vec::new());
+            current_width = 0;
+            continue;
+        }
+
+        let character_width = character.character.width().unwrap_or(1).max(1) as i64;
+        if current_width > 0 && current_width + character_width > wrap_width {
+            lines.push(Vec::new());
+            current_width = 0;
+        }
+
+        if let Some(line) = lines.last_mut() {
+            line.push(character.clone());
+        }
+        current_width += character_width;
+    }
+
+    lines
+}
+
+fn rich_line_width(line: &[StyledCharacter]) -> i64 {
+    line.iter()
+        .map(|character| character.character.width().unwrap_or(1).max(1) as i64)
+        .sum()
+}
+
+fn draw_styled_line(
+    canvas_state: &mut CanvasState,
+    start_x: i64,
+    y: i64,
+    line: &[StyledCharacter],
+    default_fg: Option<String>,
+    default_bg: Option<String>,
+) {
+    if y < 0 {
+        return;
+    }
+
+    let mut x = start_x;
+    for character in line {
+        let character_width = character.character.width().unwrap_or(1).max(1);
+        if x < 0 {
+            x += character_width as i64;
+            continue;
+        }
+
+        let Ok(cell_x) = u16::try_from(x) else {
+            break;
+        };
+        let Ok(cell_y) = u16::try_from(y) else {
+            break;
+        };
+
+        canvas_state.set_cell(
+            cell_x,
+            cell_y,
+            CanvasCell {
+                text: character.character.to_string(),
+                fg: character.fg.clone().or_else(|| default_fg.clone()),
+                bg: character.bg.clone().or_else(|| default_bg.clone()),
+                styles: character.styles.clone(),
+                is_continuation: false,
+            },
+        );
+
+        if character_width > 1 {
+            for offset in 1..character_width {
+                canvas_state.set_cell(
+                    cell_x.saturating_add(offset as u16),
+                    cell_y,
+                    CanvasCell {
+                        text: String::new(),
+                        fg: character.fg.clone().or_else(|| default_fg.clone()),
+                        bg: character.bg.clone().or_else(|| default_bg.clone()),
+                        styles: character.styles.clone(),
+                        is_continuation: true,
+                    },
+                );
+            }
+        }
+
+        x += character_width as i64;
+    }
 }

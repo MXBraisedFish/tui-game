@@ -11,7 +11,7 @@ pub struct CanvasCell {
     pub text: String,
     pub fg: Option<String>,
     pub bg: Option<String>,
-    pub style: Option<i64>,
+    pub styles: Vec<i64>,
     pub is_continuation: bool,
 }
 
@@ -21,7 +21,7 @@ impl Default for CanvasCell {
             text: " ".to_string(),
             fg: None,
             bg: None,
-            style: None,
+            styles: Vec::new(),
             is_continuation: false,
         }
     }

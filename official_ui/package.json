@@ -13,7 +13,10 @@
     "warning_clear_cache": "warning/warning_clear_cache.lua",
     "warning_clear_data": "warning/warning_clear_data.lua",
     "warning_needed_size": "warning/warning_needed_size.lua",
-    "storage_details": "window/storage_details.lua"
+    "storage_details": "window/storage_details.lua",
+    "keybind_global": "keybind/keybind_global.lua",
+    "keybind_system": "keybind/keybind_system.lua",
+    "keybind_game": "keybind/keybind_game.lua"
   },
   "actions": {
     "home": {
@@ -208,6 +211,43 @@
         "name": "MEMORY_BACK"
       }
     },
+    "setting_security": {
+      "prev_option": {
+        "key": "up",
+        "name": "SECURITY_PREV_OPTION"
+      },
+      "next_option": {
+        "key": "down",
+        "name": "SECURITY_NEXT_OPTION"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "SECURITY_TOGGLE_CONFIRM"
+      },
+      "option1": {
+        "key": "1",
+        "name": "SECURITY_OPTION1"
+      },
+      "option2": {
+        "key": "2",
+        "name": "SECURITY_OPTION2"
+      },
+      "option3": {
+        "key": "3",
+        "name": "SECURITY_OPTION3"
+      },
+      "option4": {
+        "key": "4",
+        "name": "SECURITY_OPTION4"
+      },
+      "return": {
+        "key": [
+          "esc",
+          "q"
+        ],
+        "name": "SECURITY_BACK"
+      }
+    },
     "setting_mods": {
       "prev_option": {
         "key": "up",
@@ -266,6 +306,39 @@
         "name": "MOD_LIST_SAFE_MODE"
       }
     },
+    "setting_keybind": {
+      "prev_option": {
+        "key": "up",
+        "name": "SETTING_KEYBIND_LIST_PREV_OPTION"
+      },
+      "next_option": {
+        "key": "down",
+        "name": "SETTING_KEYBIND_LIST_NEXT_OPTION"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "SETTING_KEYBIND_LIST_CONFIRM"
+      },
+      "option1": {
+        "key": "1",
+        "name": "SETTING_KEYBIND_LIST_OPTION1"
+      },
+      "option2": {
+        "key": "2",
+        "name": "SETTING_KEYBIND_LIST_OPTION2"
+      },
+      "option3": {
+        "key": "3",
+        "name": "SETTING_KEYBIND_LIST_OPTION3"
+      },
+      "return": {
+        "key": [
+          "esc",
+          "q"
+        ],
+        "name": "SETTING_KEYBIND_LIST_BACK"
+      }
+    },
     "warning_needed_size": {
       "return": {
         "key": [
@@ -293,6 +366,30 @@
       "confirm": {
         "key": "y",
         "name": "CLEAR_CACHE_CONFIRM"
+      }
+    },
+    "warning_mod": {
+      "cancel": {
+        "key": "n",
+        "name": "MOD_SECURITY_CANCEL"
+      },
+      "close_temporary": {
+        "key": "1",
+        "name": "MOD_SECURITY_CLOSE_TEMPORARY"
+      },
+      "close_permanent": {
+        "key": "2",
+        "name": "MOD_SECURITY_CLOSE_PERMANENT"
+      }
+    },
+    "warning_security": {
+      "cancel": {
+        "key": "n",
+        "name": "DEFAULT_SECURITY_CANCEL"
+      },
+      "close_permanent": {
+        "key": "y",
+        "name": "DEFAULT_SECURITY_CLOSE_PERMANENT"
       }
     },
     "storage_details": {
