@@ -25,11 +25,12 @@ function M.language(root_state, key, fallback)
   return fallback
 end
 
-function M.layout()
+function M.layout(bottom_reserve)
   local terminal_width, terminal_height = M.terminal_size()
   terminal_width = math.max(1, terminal_width or 98)
   terminal_height = math.max(1, terminal_height or 26)
-  local content_height = math.max(3, terminal_height - 1)
+  local reserve = math.max(1, math.floor(tonumber(bottom_reserve) or 2))
+  local content_height = math.max(3, terminal_height - reserve)
   local left_width
   if terminal_width < C.MIN_PANEL_WIDTH * 2 then
     left_width = math.max(1, math.floor(terminal_width * C.LEFT_RATIO))

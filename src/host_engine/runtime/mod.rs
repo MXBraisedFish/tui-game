@@ -3,6 +3,7 @@ pub mod frame_rate;
 pub mod game_engine;
 pub mod incremental_renderer;
 pub mod memory_cleanup;
+pub mod overlay;
 pub mod renderer;
 pub mod rust;
 pub mod terminal;

@@ -7,6 +7,10 @@ pub enum ApiConsumer {
     GamePackage,
     /// 官方 UI 包脚本。
     OfficialUiPackage,
+    /// 屏保覆盖层脚本。
+    ScreenPackage,
+    /// 老板键覆盖层脚本。
+    BossPackage,
 }
 
 /// API 公开作用域。
@@ -30,6 +34,20 @@ impl ApiScope {
         }
     }
 
+    /// 屏保覆盖层 API 作用域。
+    pub fn screen_package() -> Self {
+        Self {
+            consumer: ApiConsumer::ScreenPackage,
+        }
+    }
+
+    /// 老板键覆盖层 API 作用域。
+    pub fn boss_package() -> Self {
+        Self {
+            consumer: ApiConsumer::BossPackage,
+        }
+    }
+
     /// 当前作用域是否允许使用游戏专属声明式 API。
     pub fn allows_game_callbacks(self) -> bool {
         matches!(self.consumer, ApiConsumer::GamePackage)
@@ -47,7 +65,10 @@ impl ApiScope {
     pub fn allows_debug_log(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 
@@ -86,7 +107,10 @@ impl ApiScope {
     pub fn allows_canvas_drawing(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 
@@ -94,7 +118,10 @@ impl ApiScope {
     pub fn allows_measurement(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 
@@ -102,7 +129,10 @@ impl ApiScope {
     pub fn allows_layout(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 
@@ -110,7 +140,10 @@ impl ApiScope {
     pub fn allows_file_reading(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 
@@ -123,7 +156,10 @@ impl ApiScope {
     pub fn allows_table_utilities(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 
@@ -131,7 +167,10 @@ impl ApiScope {
     pub fn allows_module_loading(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 
@@ -139,7 +178,10 @@ impl ApiScope {
     pub fn allows_timer(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 
@@ -147,7 +189,10 @@ impl ApiScope {
     pub fn allows_random(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
+            ApiConsumer::GamePackage
+                | ApiConsumer::OfficialUiPackage
+                | ApiConsumer::ScreenPackage
+                | ApiConsumer::BossPackage
         )
     }
 }

@@ -31,17 +31,32 @@ M.BORDER_CHARS = {
 
 local function display_key_value(value)
   if type(value) == "table" then
-    return value[1] or ""
+    local first = value[1]
+    if first ~= nil then
+      return display_key_value(first)
+    end
+    for _, v in pairs(value) do
+      return display_key_value(v)
+    end
+    return ""
   end
   return tostring(value or "")
 end
 
 local function key_label(value)
   local key = display_key_value(value)
-  if key == "" then
+  if type(key) ~= "string" or key == "" then
     return "[]"
   end
   return "[" .. key .. "]"
+end
+
+local function safe_key_label(action_name)
+  local info = get_key(action_name)
+  if type(info) == "table" and type(info.key_display) == "table" then
+    return key_label(info.key_display.key_user)
+  end
+  return "[" .. tostring(action_name or "?") .. "]"
 end
 
 M.DEFAULT_TEXT = {
@@ -68,25 +83,29 @@ M.DEFAULT_TEXT = {
   delete_tip = "Delete key",
   key_mode = "Key mode",
   reset_only = "Reset action keys",
-  prev_option_key = key_label(get_key("prev_option").key_display.key_user),
-  next_option_key = key_label(get_key("next_option").key_display.key_user),
-  prev_page_key = key_label(get_key("prev_page").key_display.key_user),
-  next_page_key = key_label(get_key("next_page").key_display.key_user),
-  scroll_up_key = key_label(get_key("scroll_up").key_display.key_user),
-  scroll_down_key = key_label(get_key("scroll_down").key_display.key_user),
-  jump_key = key_label(get_key("jump").key_display.key_user),
-  order_key = key_label(get_key("order").key_display.key_user),
-  sort_key = key_label(get_key("sort").key_display.key_user),
-  confirm_key = key_label(get_key("confirm").key_display.key_user),
-  return_key = key_label(get_key("return").key_display.key_user),
-  list_key = key_label(get_key("list").key_display.key_user),
-  mode_key = key_label(get_key("key_mode").key_display.key_user),
-  delete_key = key_label(get_key("delete").key_display.key_user),
-  reset_only_key = key_label(get_key("reset_only").key_display.key_user),
-  key1_key = key_label(get_key("key1").key_display.key_user),
-  key2_key = key_label(get_key("key2").key_display.key_user),
-  key3_key = key_label(get_key("key3").key_display.key_user),
-  key4_key = key_label(get_key("key4").key_display.key_user)
+  page_reset = "Reset page keys",
+  key_any = "[Any]",
+  add_shift = "Hold 2s for Shift",
+  modify_shift = "Hold 2s for Shift",
+  prev_option_key = safe_key_label("prev_option"),
+  next_option_key = safe_key_label("next_option"),
+  prev_page_key = safe_key_label("prev_page"),
+  next_page_key = safe_key_label("next_page"),
+  scroll_up_key = safe_key_label("scroll_up"),
+  scroll_down_key = safe_key_label("scroll_down"),
+  jump_key = safe_key_label("jump"),
+  order_key = safe_key_label("order"),
+  sort_key = safe_key_label("sort"),
+  confirm_key = safe_key_label("confirm"),
+  return_key = safe_key_label("return"),
+  list_key = safe_key_label("list"),
+  mode_key = safe_key_label("key_mode"),
+  reset_only_key = safe_key_label("reset_only"),
+  key1_key = safe_key_label("key1"),
+  key2_key = safe_key_label("key2"),
+  key3_key = safe_key_label("key3"),
+  key4_key = safe_key_label("key4"),
+  page_reset_key = safe_key_label("page_reset")
 }
 
 return M

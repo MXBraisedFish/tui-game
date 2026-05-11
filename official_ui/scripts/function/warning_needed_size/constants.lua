@@ -22,6 +22,14 @@ function key_label(keys)
   return "[]"
 end
 
+local function safe_key_label(action_name)
+  local info = get_key(action_name)
+  if type(info) == "table" and type(info.key_display) == "table" then
+    return key_label(info.key_display.key_user)
+  end
+  return "[" .. tostring(action_name or "?") .. "]"
+end
+
 M.DEFAULT_TEXT = {
   actual = "Current terminal size: ",
   needed = "Required terminal size: ",
@@ -29,7 +37,7 @@ M.DEFAULT_TEXT = {
   exit_action = "Exit the program",
   return_action = "Return to game list",
   return_key_name = "Return/Exit",
-  return_key = key_label(get_key("return").key_display.key_user)
+  return_key = safe_key_label("return")
 }
 
 return M

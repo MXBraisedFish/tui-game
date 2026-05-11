@@ -93,6 +93,7 @@ fn load_resources(loading_screen: &mut LoadingScreenState) -> HostResult<LoadedR
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::ScanUi, 40)?;
     let official_ui_registry = host_engine::boot::preload::official_ui::load()?;
+    let overlay_registry = host_engine::boot::preload::overlay_modules::load()?;
     loading_screen
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::ReadData, 60)?;
@@ -117,6 +118,7 @@ fn load_resources(loading_screen: &mut LoadingScreenState) -> HostResult<LoadedR
         initialized_environment,
         game_module_registry,
         official_ui_registry,
+        overlay_registry,
         persistent_data,
         cache_data,
         host_state_machine,
@@ -150,6 +152,8 @@ fn run_runtime_loop(
         .is_input_listener_running();
     let _ = loaded_resources.game_module_registry.games.len();
     let _ = loaded_resources.official_ui_registry.packages.len();
+    let _ = loaded_resources.overlay_registry.screens.len();
+    let _ = loaded_resources.overlay_registry.bosses.len();
     let _ = loaded_resources.persistent_data.language_code.len();
     let _ = loaded_resources.cache_data.removed_game_uids.len();
     let _ = loaded_resources.host_state_machine.has_dialog();
@@ -175,6 +179,7 @@ fn run_runtime_loop(
         &lua_runtime,
         &mut active_ui_page,
         &mut loaded_resources.host_state_machine,
+        &loaded_resources.overlay_registry,
     )?;
     Ok(ExitState {})
 }
@@ -194,6 +199,7 @@ struct LoadedResources {
     initialized_environment: host_engine::boot::preload::init_environment::InitializedEnvironment,
     game_module_registry: host_engine::boot::preload::game_modules::GameModuleRegistry,
     official_ui_registry: host_engine::boot::preload::official_ui::OfficialUiRegistry,
+    overlay_registry: host_engine::boot::preload::overlay_modules::OverlayRegistry,
     persistent_data: host_engine::boot::preload::persistent_data::PersistentData,
     cache_data: host_engine::boot::preload::cache_data::CacheData,
     host_state_machine: host_engine::boot::preload::state_machine::HostStateMachine,

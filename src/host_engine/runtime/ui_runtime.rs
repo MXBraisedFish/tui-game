@@ -106,14 +106,17 @@ pub(crate) fn load_home_page(
     host_bridge.set_runtime_context(LuaRuntimeContext {
         consumer: LuaRuntimeConsumer::OfficialUiPackage,
         current_game: None,
+        current_overlay: None,
         current_ui_actions: action_map.actions_value(),
         current_script_root: Some(official_ui_package.root_dir.join("scripts")),
         language_code: loaded_resources.persistent_data.language_code.clone(),
         keybinds: loaded_resources.persistent_data.keybinds.clone(),
         best_scores: loaded_resources.persistent_data.best_scores.clone(),
         mod_state: loaded_resources.persistent_data.mod_state.clone(),
+        overlay_state: loaded_resources.persistent_data.overlay_state.clone(),
         launch_mode: Default::default(),
         terminal_size,
+        is_focused: true,
     });
     host_bridge.resize_canvas(terminal_size)?;
 
@@ -654,14 +657,17 @@ fn switch_to_ui_context(
     host_bridge.set_runtime_context(LuaRuntimeContext {
         consumer: LuaRuntimeConsumer::OfficialUiPackage,
         current_game: None,
+        current_overlay: None,
         current_ui_actions,
         current_script_root: Some(active_ui_page.package_root.join("scripts")),
         language_code: current_context.language_code,
         keybinds: current_context.keybinds,
         best_scores: current_context.best_scores,
         mod_state: current_context.mod_state,
+        overlay_state: current_context.overlay_state,
         launch_mode: current_context.launch_mode,
         terminal_size: current_context.terminal_size,
+        is_focused: current_context.is_focused,
     });
     api::install_runtime_apis(
         &lua_runtime.lua_runtime_environment.lua,

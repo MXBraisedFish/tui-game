@@ -2,6 +2,8 @@ local L = load_function("keybind_system/layout.lua")
 
 local M = {}
 
+M.listening_slot = 0
+
 local root_state_cache = {}
 
 local function non_empty(value, fallback)

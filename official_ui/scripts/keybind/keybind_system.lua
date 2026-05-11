@@ -1,11 +1,15 @@
 local Render = load_function("keybind_system/render.lua")
-local State = load_function("keybind_system/state.lua")
+local State = Render.State
 
 local function normalize_state(lua_state)
   lua_state = State.normalize(lua_state or {})
   lua_state.confirm = false
   lua_state.back = false
   lua_state.pending_update = nil
+  if not (lua_state.waiting_slot and lua_state.waiting_slot > 0) then
+    shift_press = nil
+    State.listening_slot = 0
+  end
   return lua_state
 end
 
@@ -15,6 +19,10 @@ local function selected_slot(action_name)
   if slot > 4 then return 4 end
   return slot
 end
+
+local SHIFT_NAMES = { shift = true, left_shift = true, right_shift = true }
+local SHIFT_TIMEOUT_MS = 2000
+local shift_press = nil
 
 local function key_from_event(event)
   if type(event) ~= "table" then
@@ -73,11 +81,61 @@ local function handle_jump(lua_state, event)
 end
 
 local function handle_waiting(lua_state, event)
-  local key = key_from_event(event)
-  lua_state.key_slot = lua_state.waiting_slot
-  lua_state.waiting_slot = 0
-  if key ~= "" then
-    set_update(lua_state, "bind", lua_state.key_slot, key)
+  if shift_press then
+    if event.type == "tick" then
+      shift_press.elapsed = shift_press.elapsed + (event.dt_ms or 0)
+      if shift_press.elapsed >= SHIFT_TIMEOUT_MS then
+        lua_state.key_slot = lua_state.waiting_slot
+        lua_state.waiting_slot = 0
+        State.listening_slot = 0
+        set_update(lua_state, "bind", lua_state.key_slot, shift_press.key)
+        shift_press = nil
+      end
+      return lua_state
+    end
+
+    if event.type == "key" and event.status == "release" then
+      local released_key = key_from_event(event)
+      if released_key == shift_press.key then
+        if shift_press.elapsed >= SHIFT_TIMEOUT_MS then
+          lua_state.key_slot = lua_state.waiting_slot
+          lua_state.waiting_slot = 0
+          State.listening_slot = 0
+          set_update(lua_state, "bind", lua_state.key_slot, shift_press.key)
+        else
+          lua_state.waiting_slot = 0
+          State.listening_slot = 0
+        end
+        shift_press = nil
+      end
+      return lua_state
+    end
+
+    if event.status == "press" then
+      local second_key = key_from_event(event)
+      if second_key ~= "" and not SHIFT_NAMES[second_key] then
+        lua_state.key_slot = lua_state.waiting_slot
+        lua_state.waiting_slot = 0
+        State.listening_slot = 0
+        set_update(lua_state, "bind", lua_state.key_slot, second_key)
+        shift_press = nil
+      end
+    end
+    return lua_state
+  end
+
+  if event.status == "press" then
+    local key = key_from_event(event)
+    if key ~= "" then
+      if SHIFT_NAMES[key] then
+        shift_press = { key = key, elapsed = 0 }
+      else
+        lua_state.key_slot = lua_state.waiting_slot
+        lua_state.waiting_slot = 0
+        State.listening_slot = 0
+        set_update(lua_state, "bind", lua_state.key_slot, key)
+      end
+    end
   end
   return lua_state
 end
@@ -97,18 +155,23 @@ local function handle_keys_focus(lua_state, event)
     State.scroll_actions(lua_state, 1)
   elseif event.name == "list" or event.name == "return" then
     lua_state.focus = "list"
+    lua_state.action_select = ""
+    lua_state.action_scroll = 0
   elseif event.name == "key_mode" then
     lua_state.mode = lua_state.mode == "delete" and "add" or "delete"
   elseif event.name == "delete" then
     lua_state.mode = "delete"
   elseif event.name == "reset_only" then
     set_update(lua_state, "reset", lua_state.key_slot or 1, "")
+  elseif event.name == "page_reset" then
+    set_update(lua_state, "page_reset", 0, "")
   elseif event.name == "key1" or event.name == "key2" or event.name == "key3" or event.name == "key4" then
     lua_state.key_slot = selected_slot(event.name)
     if lua_state.mode == "delete" then
       set_update(lua_state, "delete", lua_state.key_slot, "")
     else
       lua_state.waiting_slot = lua_state.key_slot
+      State.listening_slot = lua_state.key_slot
     end
   end
 
@@ -140,6 +203,10 @@ local function handle_list_focus(lua_state, event)
   elseif event.name == "confirm" then
     lua_state.focus = "keys"
     lua_state.confirm = true
+    lua_state.action_select = ""
+    lua_state.action_scroll = 0
+    lua_state.key_slot = 1
+    lua_state.mode = "add"
   elseif event.name == "return" then
     if not State.has_empty_actions() then
       lua_state.back = true

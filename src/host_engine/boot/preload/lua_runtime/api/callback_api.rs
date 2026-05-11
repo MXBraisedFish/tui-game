@@ -18,6 +18,15 @@ pub fn install(_lua: &Lua, _api_scope: ApiScope) -> mlua::Result<()> {
 
 /// 校验当前 Lua 环境是否实现了作用域要求的声明式 API。
 pub fn validate_required_callbacks(lua: &Lua, api_scope: ApiScope) -> mlua::Result<()> {
+    if matches!(
+        api_scope.consumer,
+        super::scope::ApiConsumer::ScreenPackage | super::scope::ApiConsumer::BossPackage
+    ) {
+        callback_contract::require_function(lua, "update")?;
+        callback_contract::require_function(lua, "render")?;
+        return Ok(());
+    }
+
     if api_scope.allows_ui_callbacks() {
         callback_contract::require_function(lua, "handle_event")?;
         callback_contract::require_function(lua, "render")?;
@@ -31,6 +40,15 @@ pub fn validate_required_callbacks(lua: &Lua, api_scope: ApiScope) -> mlua::Resu
     }
 
     Ok(())
+}
+
+/// 调用覆盖层状态更新函数 update(state)。
+pub fn call_update(lua: &Lua, state_key: &RegistryKey) -> mlua::Result<RegistryKey> {
+    let update: Function = lua.globals().get("update")?;
+    let state = lua.registry_value::<Value>(state_key)?;
+    let new_state = update.call::<Value>(state)?;
+    callback_contract::ensure_returned_value(&new_state)?;
+    lua.create_registry_value(new_state)
 }
 
 /// 调用游戏初始化函数 init_game(state)。

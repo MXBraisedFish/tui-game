@@ -30,14 +30,17 @@ pub fn load_new_game(
     host_bridge.set_runtime_context(LuaRuntimeContext {
         consumer: LuaRuntimeConsumer::GamePackage,
         current_game: Some(game_module.clone()),
+        current_overlay: None,
         current_ui_actions: serde_json::Value::Null,
         current_script_root: Some(script_root),
         language_code: current_context.language_code,
         keybinds: current_context.keybinds,
         best_scores: current_context.best_scores,
         mod_state: current_context.mod_state,
+        overlay_state: current_context.overlay_state,
         launch_mode: LaunchMode::New,
         terminal_size: current_context.terminal_size,
+        is_focused: current_context.is_focused,
     });
     api::install_runtime_apis(lua, ApiScope::game_package(), host_bridge.clone())?;
 

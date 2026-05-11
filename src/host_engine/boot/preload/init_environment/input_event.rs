@@ -5,7 +5,9 @@ use super::resize_watcher::ResizeEvent;
 /// 宿主输入事件
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HostInputEvent {
-    Key { key: String },
+    Key { key: String, status: String },
     Resize(ResizeEvent),
+    FocusGained,
+    FocusLost,
     ExitRequested,
 }

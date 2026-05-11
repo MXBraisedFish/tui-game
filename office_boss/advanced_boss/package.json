@@ -1,0 +1,11 @@
+{
+  "api": -1,
+  "entry": "main.lua",
+  "package_name": "advanced_boss.package_name",
+  "author": "advanced_boss.author",
+  "version": "0.2.0",
+  "boss_name": "advanced_boss.boss_name",
+  "introduction": "advanced_boss.introduction",
+  "icon": "color:image:images/icon.png",
+  "banner": "color:image:images/banner.png"
+}

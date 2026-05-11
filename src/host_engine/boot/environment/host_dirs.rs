@@ -34,6 +34,8 @@ fn verify_required_files() -> EnvironmentResult<()> {
     ensure_dir(&root_dir.join("scripts"))?;
     ensure_dir(&root_dir.join("scripts/game"))?;
     ensure_dir(&root_dir.join("scripts/ui"))?;
+    ensure_creatable_dir(&root_dir.join("scripts/screen"))?;
+    ensure_creatable_dir(&root_dir.join("scripts/boss"))?;
 
     Ok(())
 }
@@ -49,6 +51,12 @@ fn ensure_dir(path: &Path) -> EnvironmentResult<()> {
         format!("required directory is missing: {}", path.display()),
     )
     .into())
+}
+
+/// 确保可为空的官方扩展目录存在。
+fn ensure_creatable_dir(path: &Path) -> EnvironmentResult<()> {
+    fs::create_dir_all(path)?;
+    Ok(())
 }
 
 /// 确保文件存在且不为空

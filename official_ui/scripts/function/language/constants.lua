@@ -27,6 +27,14 @@ function M.key_label(keys)
   return "[]"
 end
 
+local function safe_key_label(action_name)
+  local info = get_key(action_name)
+  if type(info) == "table" and type(info.key_display) == "table" then
+    return M.key_label(info.key_display.key_user)
+  end
+  return "[" .. tostring(action_name or "?") .. "]"
+end
+
 M.DEFAULT_TEXT = {
   title = "Language",
   select = "Select",
@@ -36,15 +44,15 @@ M.DEFAULT_TEXT = {
   page = "Page",
   back = "Back",
   cancel = "Cancel",
-  up_key = M.key_label(get_key("up_option").key_display.key_user),
-  down_key = M.key_label(get_key("down_option").key_display.key_user),
-  left_key = M.key_label(get_key("left_option").key_display.key_user),
-  right_key = M.key_label(get_key("right_option").key_display.key_user),
-  confirm_key = M.key_label(get_key("confirm").key_display.key_user),
-  jump_key = M.key_label(get_key("jump").key_display.key_user),
-  prev_page_key = M.key_label(get_key("prev_page").key_display.key_user),
-  next_page_key = M.key_label(get_key("next_page").key_display.key_user),
-  return_key = M.key_label(get_key("return").key_display.key_user)
+  up_key = safe_key_label("up_option"),
+  down_key = safe_key_label("down_option"),
+  left_key = safe_key_label("left_option"),
+  right_key = safe_key_label("right_option"),
+  confirm_key = safe_key_label("confirm"),
+  jump_key = safe_key_label("jump"),
+  prev_page_key = safe_key_label("prev_page"),
+  next_page_key = safe_key_label("next_page"),
+  return_key = safe_key_label("return")
 }
 
 return M

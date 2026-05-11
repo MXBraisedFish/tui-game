@@ -661,36 +661,62 @@ function M.max_info_scroll(root_state)
   return max_scroll
 end
 
-local function draw_action_line(layout, root_state)
-  local y = layout.terminal_height - 1
-  local action
-  if root_state.jump then
-    action = "[1]-[9] " .. L.language(root_state, "MOD_LIST_SELECT", C.DEFAULT_TEXT.select)
-      .. "  " .. C.DEFAULT_TEXT.confirm_key .. " " .. L.language(root_state, "MOD_LIST_CONFIRM", C.DEFAULT_TEXT.confirm)
-      .. "  " .. C.DEFAULT_TEXT.return_key .. " " .. L.language(root_state, "MOD_LIST_CANCEL", C.DEFAULT_TEXT.cancel)
-  else
-    action = C.DEFAULT_TEXT.prev_option_key .. "/" .. C.DEFAULT_TEXT.next_option_key .. " "
-      .. L.language(root_state, "MOD_LIST_SELECT", C.DEFAULT_TEXT.select)
-      .. "  " .. C.DEFAULT_TEXT.confirm_key .. " " .. L.language(root_state, "MOD_LIST_TOGGLE", C.DEFAULT_TEXT.toggle)
-      .. "  " .. C.DEFAULT_TEXT.debug_key .. " " .. L.language(root_state, "MOD_LIST_DEBUG", C.DEFAULT_TEXT.debug)
-      .. "  " .. C.DEFAULT_TEXT.safe_mode_key .. " " .. L.language(root_state, "MOD_LIST_SAFE_MODE", C.DEFAULT_TEXT.safe_mode)
-      .. "  " .. C.DEFAULT_TEXT.list_key .. " " .. L.language(root_state, "MOD_LIST_LIST", C.DEFAULT_TEXT.list)
-      .. "  " .. C.DEFAULT_TEXT.scroll_up_key .. "/" .. C.DEFAULT_TEXT.scroll_down_key .. " "
-      .. L.language(root_state, "MOD_LIST_SCROLL", C.DEFAULT_TEXT.scroll)
-      .. "  " .. C.DEFAULT_TEXT.order_key .. " " .. L.language(root_state, "MOD_LIST_ORDER", C.DEFAULT_TEXT.order)
-      .. "  " .. C.DEFAULT_TEXT.sort_key .. " " .. L.language(root_state, "MOD_LIST_SORT", C.DEFAULT_TEXT.sort)
-    if root_state.pages and root_state.pages > 1 then
-      action = action
-        .. "  " .. C.DEFAULT_TEXT.jump_key .. " " .. L.language(root_state, "MOD_LIST_JUMP", C.DEFAULT_TEXT.jump)
-        .. "  " .. C.DEFAULT_TEXT.prev_page_key .. "/" .. C.DEFAULT_TEXT.next_page_key .. " "
-        .. L.language(root_state, "MOD_LIST_FLIP", C.DEFAULT_TEXT.flip)
+local function wrap_segments(segments, separator, max_width)
+  local lines = {}
+  local current = nil
+  for _, seg in ipairs(segments) do
+    if current == nil then
+      current = seg
+    else
+      local candidate = current .. separator .. seg
+      if L.text_width(candidate) <= max_width then
+        current = candidate
+      else
+        table.insert(lines, current)
+        current = seg
+      end
     end
-    action = action .. "  " .. C.DEFAULT_TEXT.return_key .. " " .. L.language(root_state, "MOD_LIST_BACK", C.DEFAULT_TEXT.back)
+  end
+  if current ~= nil then
+    table.insert(lines, current)
+  end
+  if #lines == 0 then
+    table.insert(lines, "")
+  end
+  return lines
+end
+
+local function draw_action_line(layout, root_state)
+  local segments = {}
+  if root_state.jump then
+    table.insert(segments, "[1]-[9] " .. L.language(root_state, "MOD_LIST_SELECT", C.DEFAULT_TEXT.select))
+    table.insert(segments, C.DEFAULT_TEXT.confirm_key .. " " .. L.language(root_state, "MOD_LIST_CONFIRM", C.DEFAULT_TEXT.confirm))
+    table.insert(segments, C.DEFAULT_TEXT.return_key .. " " .. L.language(root_state, "MOD_LIST_CANCEL", C.DEFAULT_TEXT.cancel))
+  else
+    table.insert(segments, C.DEFAULT_TEXT.prev_option_key .. "/" .. C.DEFAULT_TEXT.next_option_key .. " "
+      .. L.language(root_state, "MOD_LIST_SELECT", C.DEFAULT_TEXT.select))
+    table.insert(segments, C.DEFAULT_TEXT.confirm_key .. " " .. L.language(root_state, "MOD_LIST_TOGGLE_CONFIRM", C.DEFAULT_TEXT.toggle_confirm))
+    table.insert(segments, C.DEFAULT_TEXT.debug_key .. " " .. L.language(root_state, "MOD_LIST_DEBUG", C.DEFAULT_TEXT.debug))
+    table.insert(segments, C.DEFAULT_TEXT.safe_mode_key .. " " .. L.language(root_state, "MOD_LIST_SAFE_MODE", C.DEFAULT_TEXT.safe_mode))
+    table.insert(segments, C.DEFAULT_TEXT.list_key .. " " .. L.language(root_state, "MOD_LIST_LIST", C.DEFAULT_TEXT.list))
+    table.insert(segments, C.DEFAULT_TEXT.scroll_up_key .. "/" .. C.DEFAULT_TEXT.scroll_down_key .. " "
+      .. L.language(root_state, "MOD_LIST_SCROLL", C.DEFAULT_TEXT.scroll))
+    table.insert(segments, C.DEFAULT_TEXT.order_key .. " " .. L.language(root_state, "MOD_LIST_ORDER", C.DEFAULT_TEXT.order))
+    table.insert(segments, C.DEFAULT_TEXT.sort_key .. " " .. L.language(root_state, "MOD_LIST_SORT", C.DEFAULT_TEXT.sort))
+    if root_state.pages and root_state.pages > 1 then
+      table.insert(segments, C.DEFAULT_TEXT.jump_key .. " " .. L.language(root_state, "MOD_LIST_JUMP", C.DEFAULT_TEXT.jump))
+      table.insert(segments, C.DEFAULT_TEXT.prev_page_key .. "/" .. C.DEFAULT_TEXT.next_page_key .. " "
+        .. L.language(root_state, "MOD_LIST_FLIP", C.DEFAULT_TEXT.flip))
+    end
+    table.insert(segments, C.DEFAULT_TEXT.return_key .. " " .. L.language(root_state, "MOD_LIST_BACK", C.DEFAULT_TEXT.back))
   end
   local wrap_width = math.max(1, layout.terminal_width - 2)
-  local action_width = math.min(get_text_width(action, wrap_width), wrap_width)
-  local x = math.max(0, math.floor((layout.terminal_width - action_width) / 2))
-  canvas_draw_text(x, y, action, C.KEY_COLOR, nil, nil, ALIGN_LEFT, wrap_width)
+  local lines = wrap_segments(segments, "  ", wrap_width)
+  local base_y = math.max(0, layout.terminal_height - #lines)
+  for i, line in ipairs(lines) do
+    local x = math.max(0, math.floor((layout.terminal_width - math.min(L.text_width(line), wrap_width)) / 2))
+    canvas_draw_text(x, base_y + i - 1, line, C.KEY_COLOR, nil, nil, ALIGN_LEFT, wrap_width)
+  end
 end
 
 function M.render(root_state)

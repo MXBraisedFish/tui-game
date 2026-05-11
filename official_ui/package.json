@@ -16,7 +16,13 @@
     "storage_details": "window/storage_details.lua",
     "keybind_global": "keybind/keybind_global.lua",
     "keybind_system": "keybind/keybind_system.lua",
-    "keybind_game": "keybind/keybind_game.lua"
+    "keybind_game": "keybind/keybind_game.lua",
+    "setting_boss": "setting/setting_boss.lua",
+    "setting_screen": "setting/setting_screen.lua",
+    "screen_list": "screen/list.lua",
+    "screen_display": "screen/display.lua",
+    "boss_list": "boss/list.lua",
+    "boss_display": "boss/display.lua"
   },
   "actions": {
     "home": {
@@ -444,10 +450,6 @@
       },
       "return": {
         "key": "esc",
-        "name": "SETTING_KEYBIND_SYSTEM_BACK"
-      },
-      "list": {
-        "key": "l",
         "name": "SETTING_KEYBIND_SYSTEM_LIST_BACK"
       },
       "key1": {
@@ -470,13 +472,13 @@
         "key": "a",
         "name": "SETTING_KEYBIND_SYSTEM_KEY_MODE"
       },
-      "delete": {
-        "key": "d",
-        "name": "SETTING_KEYBIND_SYSTEM_DELETE"
-      },
       "reset_only": {
         "key": "r",
         "name": "SETTING_KEYBIND_SYSTEM_RESET_ONLY"
+      },
+      "page_reset": {
+        "key": "t",
+        "name": "SETTING_KEYBIND_SYSTEM_RESET_PAGE"
       }
     }
   }

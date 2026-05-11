@@ -75,11 +75,7 @@ fn install_translate(
             argument::expect_exact_arg_count(&args, 1)?;
             let key = argument::expect_string_arg(&args, 0)?;
             let runtime_context = host_bridge.runtime_context();
-            let package_root = runtime_context
-                .current_game
-                .as_ref()
-                .map(|game_module| game_module.root_dir.as_path())
-                .ok_or_else(|| mlua::Error::external("current package is unavailable"))?;
+            let package_root = current_package_root(&runtime_context)?;
             match translation_reader::read_translation(
                 package_root,
                 runtime_context.language_code.as_str(),
@@ -145,12 +141,30 @@ fn read_asset_text(host_bridge: &HostLuaBridge, args: &Variadic<Value>) -> mlua:
     argument::expect_exact_arg_count(args, 1)?;
     let logical_path = argument::expect_string_arg(args, 0)?;
     let runtime_context = host_bridge.runtime_context();
-    let package_root = runtime_context
-        .current_game
-        .as_ref()
-        .map(|game_module| game_module.root_dir.as_path())
-        .ok_or_else(|| mlua::Error::external("current package is unavailable"))?;
+    let package_root = current_package_root(&runtime_context)?;
     let resolved_path = asset_path::resolve_asset_path(package_root, logical_path.as_str())?;
     file_reader::ensure_file_exists(&resolved_path)?;
     file_reader::read_text(&resolved_path)
+}
+
+fn current_package_root(
+    runtime_context: &crate::host_engine::boot::preload::lua_runtime::LuaRuntimeContext,
+) -> mlua::Result<&std::path::Path> {
+    runtime_context
+        .current_game
+        .as_ref()
+        .map(|game_module| game_module.root_dir.as_path())
+        .or_else(|| {
+            runtime_context
+                .current_overlay
+                .as_ref()
+                .map(|overlay_package| overlay_package.root_dir.as_path())
+        })
+        .or_else(|| {
+            runtime_context
+                .current_script_root
+                .as_deref()
+                .and_then(|script_root| script_root.parent())
+        })
+        .ok_or_else(|| mlua::Error::external("current package is unavailable"))
 }

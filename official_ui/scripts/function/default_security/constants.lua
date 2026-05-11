@@ -20,14 +20,22 @@ local function key_label(keys)
   return "[]"
 end
 
+local function safe_key_label(action_name)
+  local info = get_key(action_name)
+  if type(info) == "table" and type(info.key_display) == "table" then
+    return key_label(info.key_display.key_user)
+  end
+  return "[" .. tostring(action_name or "?") .. "]"
+end
+
 M.DEFAULT_TEXT = {
   title = "Default Safe Mode Warning",
   warn = "Safe mode is designed to protect your computer and information.\nIf disabled, the host cannot block high-risk mod operations.\nMake sure you fully trust all mod package authors.\nConfirm disable?",
   close_permanent = "Disable permanently",
   cancel = "Cancel",
   second = "s",
-  close_permanent_key = key_label(get_key("close_permanent").key_display.key_user),
-  cancel_key = key_label(get_key("cancel").key_display.key_user)
+  close_permanent_key = safe_key_label("close_permanent"),
+  cancel_key = safe_key_label("cancel")
 }
 
 return M

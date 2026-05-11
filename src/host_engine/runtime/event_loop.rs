@@ -10,9 +10,11 @@ use crate::host_engine::boot::preload::init_environment::{
 };
 use crate::host_engine::boot::preload::lua_runtime::api::LuaEvent;
 use crate::host_engine::boot::preload::lua_runtime::{HostLuaBridge, HostLuaMessage};
+use crate::host_engine::boot::preload::overlay_modules::OverlayRegistry;
 use crate::host_engine::boot::preload::state_machine::HostStateMachine;
 use crate::host_engine::constant::{ROOT_UI_MIN_HEIGHT, ROOT_UI_MIN_WIDTH};
 use crate::host_engine::runtime::frame_rate::FrameRateController;
+use crate::host_engine::runtime::overlay::{OverlaySession, OverlaySessionKind};
 use crate::host_engine::runtime::renderer::RendererState;
 use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
 use crate::host_engine::runtime::ui_runtime::ActiveUiPage;
@@ -33,6 +35,7 @@ pub(crate) fn run(
     lua_runtime: &LuaRuntimeState,
     active_ui_page: &mut ActiveUiPage,
     host_state_machine: &mut HostStateMachine,
+    overlay_registry: &OverlayRegistry,
 ) -> RuntimeLoopResult<()> {
     let mut renderer_state = RendererState::new();
     let initial_page_key = current_page_key(host_bridge, host_state_machine);
@@ -47,6 +50,8 @@ pub(crate) fn run(
     let mut last_tick_at = Instant::now();
     let mut frame_rate_controller = FrameRateController::root_ui();
     let mut was_running_game = false;
+    let mut is_focused = true;
+    let mut overlay_session: Option<OverlaySession> = None;
     loop {
         if active_ui_page.has_game_session() && !was_running_game {
             if let Some(game_session) = active_ui_page.game_session() {
@@ -63,20 +68,65 @@ pub(crate) fn run(
 
         match input_receiver.recv_timeout(frame_rate_controller.frame_interval()) {
             Ok(HostInputEvent::ExitRequested) => break,
+            Ok(HostInputEvent::FocusLost) => {
+                is_focused = false;
+                event_queue.clear();
+                let mut ctx = host_bridge.runtime_context();
+                ctx.is_focused = false;
+                host_bridge.set_runtime_context(ctx);
+                if overlay_session.is_none() {
+                    enqueue_limited(&mut event_queue, LuaEvent::FocusLost);
+                }
+            }
+            Ok(HostInputEvent::FocusGained) => {
+                is_focused = true;
+                let mut ctx = host_bridge.runtime_context();
+                ctx.is_focused = true;
+                host_bridge.set_runtime_context(ctx);
+                if overlay_session.is_none() {
+                    enqueue_limited(&mut event_queue, LuaEvent::FocusGained);
+                }
+            }
             Ok(HostInputEvent::Resize(resize_event)) => {
-                enqueue_limited(
-                    &mut event_queue,
-                    LuaEvent::Resize {
-                        width: resize_event.width,
-                        height: resize_event.height,
-                    },
-                );
+                if overlay_session.is_none() {
+                    enqueue_limited(
+                        &mut event_queue,
+                        LuaEvent::Resize {
+                            width: resize_event.width,
+                            height: resize_event.height,
+                        },
+                    );
+                }
                 update_resize_surface(host_bridge, resize_event)?;
                 renderer_state.request_full_redraw();
             }
-            Ok(HostInputEvent::Key { key }) => {
+            Ok(HostInputEvent::Key { key, status }) if is_focused => {
                 frame_rate_controller.mark_input();
-                enqueue_key_events(&mut event_queue, host_bridge, active_ui_page, key.as_str());
+                if status == "press" {
+                    if handle_global_key(
+                        key.as_str(),
+                        host_bridge,
+                        active_ui_page,
+                        host_state_machine,
+                        overlay_registry,
+                        &mut overlay_session,
+                        &mut renderer_state,
+                    )? {
+                        event_queue.clear();
+                        continue;
+                    }
+                    if overlay_session.is_some() {
+                        continue;
+                    }
+                    enqueue_key_events(&mut event_queue, host_bridge, active_ui_page, key.as_str(), status.as_str());
+                } else {
+                    if overlay_session.is_none() {
+                        enqueue_limited(&mut event_queue, LuaEvent::Key { name: key, status });
+                    }
+                }
+            }
+            Ok(HostInputEvent::Key { .. }) => {
+                // Drop key events when unfocused
             }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => break,
@@ -85,6 +135,12 @@ pub(crate) fn run(
         let now = Instant::now();
         let tick_dt_ms = now.duration_since(last_tick_at).as_millis() as u64;
         last_tick_at = now;
+
+        if let Some(overlay_session) = overlay_session.as_mut() {
+            overlay_session.update_and_render()?;
+            crate::host_engine::runtime::renderer::render_canvas(host_bridge, &mut renderer_state)?;
+            continue;
+        }
 
         if active_ui_page.has_game_session() {
             dispatch_game_event_queue(lua_runtime, active_ui_page, &mut event_queue)?;
@@ -163,6 +219,79 @@ pub(crate) fn run(
     Ok(())
 }
 
+fn handle_global_key(
+    key: &str,
+    host_bridge: &HostLuaBridge,
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    overlay_registry: &OverlayRegistry,
+    overlay_session: &mut Option<OverlaySession>,
+    renderer_state: &mut RendererState,
+) -> RuntimeLoopResult<bool> {
+    match key.to_ascii_lowercase().as_str() {
+        "f2" => {
+            toggle_overlay(
+                host_bridge,
+                overlay_registry.default_screen().cloned(),
+                OverlaySessionKind::Screen,
+                overlay_session,
+                renderer_state,
+            )?;
+            Ok(true)
+        }
+        "f3" => {
+            toggle_overlay(
+                host_bridge,
+                overlay_registry.default_boss().cloned(),
+                OverlaySessionKind::Boss,
+                overlay_session,
+                renderer_state,
+            )?;
+            Ok(true)
+        }
+        "f4" => {
+            if active_ui_page.has_game_session() {
+                active_ui_page.clear_game_session();
+                host_state_machine.game_list_state =
+                    crate::host_engine::boot::preload::state_machine::GameListState::List;
+                renderer_state.request_full_redraw();
+            }
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+fn toggle_overlay(
+    host_bridge: &HostLuaBridge,
+    package: Option<crate::host_engine::boot::preload::overlay_modules::OverlayPackage>,
+    target_kind: OverlaySessionKind,
+    overlay_session: &mut Option<OverlaySession>,
+    renderer_state: &mut RendererState,
+) -> RuntimeLoopResult<()> {
+    if overlay_session
+        .as_ref()
+        .map(|session| session.kind() == target_kind)
+        .unwrap_or(false)
+    {
+        if let Some(session) = overlay_session.take() {
+            session.stop(host_bridge);
+        }
+        renderer_state.request_full_redraw();
+        return Ok(());
+    }
+
+    if let Some(session) = overlay_session.take() {
+        session.stop(host_bridge);
+    }
+
+    if let Some(package) = package {
+        *overlay_session = Some(OverlaySession::start(host_bridge, package)?);
+        renderer_state.request_full_redraw();
+    }
+    Ok(())
+}
+
 fn current_page_key(
     host_bridge: &HostLuaBridge,
     host_state_machine: &HostStateMachine,
@@ -212,17 +341,18 @@ fn enqueue_key_events(
     host_bridge: &HostLuaBridge,
     active_ui_page: &ActiveUiPage,
     key: &str,
+    status: &str,
 ) {
     if let Some(game_session) = active_ui_page.game_session() {
         let runtime_context = host_bridge.runtime_context();
         if let Some(action) = game_session.action_for_key(&runtime_context.keybinds, key) {
-            enqueue_limited(event_queue, LuaEvent::Action { name: action });
+            enqueue_limited(event_queue, LuaEvent::Action { name: action, status: status.to_string() });
             return;
         }
     }
 
     if let Some(action) = active_ui_page.action_for_key(key) {
-        enqueue_limited(event_queue, LuaEvent::Action { name: action });
+        enqueue_limited(event_queue, LuaEvent::Action { name: action, status: status.to_string() });
         return;
     }
 
@@ -230,6 +360,7 @@ fn enqueue_key_events(
         event_queue,
         LuaEvent::Key {
             name: key.to_string(),
+            status: status.to_string(),
         },
     );
 }

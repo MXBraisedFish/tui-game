@@ -1,0 +1,11 @@
+{
+  "api": -1,
+  "entry": "main.lua",
+  "package_name": "advanced_screen.package_name",
+  "author": "advanced_screen.author",
+  "version": "0.2.0",
+  "screen_name": "advanced_screen.screen_name",
+  "introduction": "advanced_screen.introduction",
+  "icon": "color:image:images/icon.png",
+  "banner": "color:image:images/banner.png"
+}

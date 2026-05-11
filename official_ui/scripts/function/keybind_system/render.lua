@@ -159,44 +159,106 @@ local function draw_key_table(layout, root_state)
   end
 end
 
-local function draw_action_line(layout, root_state)
-  local action
+local function wrap_segments(segments, separator, max_width)
+  local lines = {}
+  local current = nil
+  for _, seg in ipairs(segments) do
+    if current == nil then
+      current = seg
+    else
+      local candidate = current .. separator .. seg
+      if L.text_width(candidate) <= max_width then
+        current = candidate
+      else
+        table.insert(lines, current)
+        current = seg
+      end
+    end
+  end
+  if current ~= nil then
+    table.insert(lines, current)
+  end
+  if #lines == 0 then
+    table.insert(lines, "")
+  end
+  return lines
+end
+
+local function slot_has_key(root_state, slot)
+  local actions = root_state.action_list or {}
+  for _, action in ipairs(actions) do
+    if tostring(action.id or "") == tostring(root_state.action_select or "") then
+      local display = action.key_display or {}
+      local keys = key_array(display.key_user)
+      local key = keys[slot]
+      return key ~= nil and tostring(key) ~= ""
+    end
+  end
+  return false
+end
+
+local function action_segments(root_state)
+  local segments = {}
+
   if root_state.jump then
-    action = "[1]-[9] " .. language(root_state, "SETTING_KEYBIND_SYSTEM_SELECT", C.DEFAULT_TEXT.select)
-      .. "  " .. C.DEFAULT_TEXT.confirm_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_CONFIRM", C.DEFAULT_TEXT.confirm)
-      .. "  " .. C.DEFAULT_TEXT.return_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_BACK", C.DEFAULT_TEXT.back)
+    table.insert(segments, "[1]-[9] " .. language(root_state, "SETTING_KEYBIND_SYSTEM_SELECT", C.DEFAULT_TEXT.select))
+    table.insert(segments, C.DEFAULT_TEXT.confirm_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_CONFIRM", C.DEFAULT_TEXT.confirm))
+    table.insert(segments, C.DEFAULT_TEXT.return_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_BACK", C.DEFAULT_TEXT.back))
+  elseif State.listening_slot > 0 then
+    local is_modify = slot_has_key(root_state, State.listening_slot)
+    local any_text = language(root_state, "SETTING_KEYBIND_SYSTEM_KEY_ANY", C.DEFAULT_TEXT.key_any)
+    local act_text = is_modify
+      and language(root_state, "SETTING_KEYBIND_SYSTEM_MODIFY", C.DEFAULT_TEXT.modify)
+      or language(root_state, "SETTING_KEYBIND_SYSTEM_ADD", C.DEFAULT_TEXT.add)
+    local shift_text = is_modify
+      and language(root_state, "SETTING_KEYBIND_SYSTEM_MODIFY_SHIFT", C.DEFAULT_TEXT.modify_shift)
+      or language(root_state, "SETTING_KEYBIND_SYSTEM_ADD_SHIFT", C.DEFAULT_TEXT.add_shift)
+    table.insert(segments, any_text .. " " .. act_text)
+    table.insert(segments, "[Shift] " .. shift_text)
   elseif root_state.focus == "keys" then
     local mode_text = root_state.mode == "delete"
       and language(root_state, "SETTING_KEYBIND_SYSTEM_TIP_DELETE", C.DEFAULT_TEXT.delete_tip)
       or language(root_state, "SETTING_KEYBIND_SYSTEM_TIP_ADD_MODIFY", C.DEFAULT_TEXT.add_modify_tip)
-    action = C.DEFAULT_TEXT.prev_option_key .. "/" .. C.DEFAULT_TEXT.next_option_key .. " "
-      .. language(root_state, "SETTING_KEYBIND_SYSTEM_SELECT", C.DEFAULT_TEXT.select)
-      .. "  " .. C.DEFAULT_TEXT.scroll_up_key .. "/" .. C.DEFAULT_TEXT.scroll_down_key .. " "
-      .. language(root_state, "SETTING_KEYBIND_SYSTEM_SCROLL_UP", "Scroll")
-      .. "  " .. C.DEFAULT_TEXT.key1_key .. "/" .. C.DEFAULT_TEXT.key2_key .. "/" .. C.DEFAULT_TEXT.key3_key .. "/" .. C.DEFAULT_TEXT.key4_key .. " "
-      .. mode_text
-      .. "  " .. C.DEFAULT_TEXT.mode_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_KEY_MODE", C.DEFAULT_TEXT.key_mode)
-      .. "  " .. C.DEFAULT_TEXT.reset_only_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_RESET_ONLY", C.DEFAULT_TEXT.reset_only)
-      .. "  " .. C.DEFAULT_TEXT.list_key .. "/" .. C.DEFAULT_TEXT.return_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_LIST", C.DEFAULT_TEXT.list)
-  else
-    action = C.DEFAULT_TEXT.prev_option_key .. "/" .. C.DEFAULT_TEXT.next_option_key .. " "
-      .. language(root_state, "SETTING_KEYBIND_SYSTEM_SELECT", C.DEFAULT_TEXT.select)
-      .. "  " .. C.DEFAULT_TEXT.confirm_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_CONFIRM", C.DEFAULT_TEXT.confirm)
-      .. "  " .. C.DEFAULT_TEXT.order_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_ORDER", "Order")
-      .. "  " .. C.DEFAULT_TEXT.sort_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_SORT", "Sort")
-    if root_state.pages and root_state.pages > 1 then
-      action = action
-        .. "  " .. C.DEFAULT_TEXT.jump_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_JUMP", "Jump")
-        .. "  " .. C.DEFAULT_TEXT.prev_page_key .. "/" .. C.DEFAULT_TEXT.next_page_key .. " "
-        .. language(root_state, "SETTING_KEYBIND_SYSTEM_NEXT_PAGE", "Page")
+    table.insert(segments, C.DEFAULT_TEXT.prev_option_key .. "/" .. C.DEFAULT_TEXT.next_option_key .. " "
+      .. language(root_state, "SETTING_KEYBIND_SYSTEM_SELECT", C.DEFAULT_TEXT.select))
+    local actions = root_state.action_list or {}
+    local has_scroll = #actions > 0
+    if has_scroll then
+      table.insert(segments, C.DEFAULT_TEXT.scroll_up_key .. "/" .. C.DEFAULT_TEXT.scroll_down_key .. " "
+        .. language(root_state, "SETTING_KEYBIND_SYSTEM_SCROLL", "Scroll"))
     end
-    action = action .. "  " .. C.DEFAULT_TEXT.return_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_BACK", C.DEFAULT_TEXT.back)
+    table.insert(segments, C.DEFAULT_TEXT.key1_key .. "/" .. C.DEFAULT_TEXT.key2_key .. "/" .. C.DEFAULT_TEXT.key3_key .. "/" .. C.DEFAULT_TEXT.key4_key .. " "
+      .. mode_text)
+    table.insert(segments, C.DEFAULT_TEXT.mode_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_KEY_MODE", C.DEFAULT_TEXT.key_mode))
+    table.insert(segments, C.DEFAULT_TEXT.reset_only_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_RESET_ONLY", C.DEFAULT_TEXT.reset_only))
+    table.insert(segments, C.DEFAULT_TEXT.page_reset_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_RESET_PAGE", C.DEFAULT_TEXT.page_reset))
+    table.insert(segments, C.DEFAULT_TEXT.return_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_LIST", C.DEFAULT_TEXT.list))
+  else
+    table.insert(segments, C.DEFAULT_TEXT.prev_option_key .. "/" .. C.DEFAULT_TEXT.next_option_key .. " "
+      .. language(root_state, "SETTING_KEYBIND_SYSTEM_SELECT", C.DEFAULT_TEXT.select))
+    table.insert(segments, C.DEFAULT_TEXT.confirm_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_CONFIRM", C.DEFAULT_TEXT.confirm))
+    table.insert(segments, C.DEFAULT_TEXT.order_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_ORDER", "Order"))
+    table.insert(segments, C.DEFAULT_TEXT.sort_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_SORT", "Sort"))
+    if root_state.pages and root_state.pages > 1 then
+      table.insert(segments, C.DEFAULT_TEXT.jump_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_JUMP", "Jump"))
+      table.insert(segments, C.DEFAULT_TEXT.prev_page_key .. "/" .. C.DEFAULT_TEXT.next_page_key .. " "
+        .. language(root_state, "SETTING_KEYBIND_SYSTEM_NEXT_PAGE", "Page"))
+    end
+    table.insert(segments, C.DEFAULT_TEXT.return_key .. " " .. language(root_state, "SETTING_KEYBIND_SYSTEM_BACK", C.DEFAULT_TEXT.back))
   end
 
-  local y = math.max(0, layout.terminal_height - 1)
+  return segments
+end
+
+local function draw_action_line(layout, root_state)
+  local segments = action_segments(root_state)
   local width = math.max(1, layout.terminal_width - 2)
-  local x = math.max(0, math.floor((layout.terminal_width - math.min(L.text_width(action), width)) / 2))
-  canvas_draw_text(x, y, action, C.KEY_COLOR, nil, nil, ALIGN_LEFT, width)
+  local lines = wrap_segments(segments, "  ", width)
+  local base_y = math.max(0, layout.terminal_height - #lines)
+  for i, line in ipairs(lines) do
+    local x = math.max(0, math.floor((layout.terminal_width - math.min(L.text_width(line), width)) / 2))
+    canvas_draw_text(x, base_y + i - 1, line, C.KEY_COLOR, nil, nil, ALIGN_LEFT, width)
+  end
 end
 
 function M.render(root_state)
@@ -207,7 +269,8 @@ function M.render(root_state)
   root_state.page = tonumber(root_state.page or 1) or 1
   if root_state.page < 1 then root_state.page = 1 end
   if root_state.page > root_state.pages then root_state.page = root_state.pages end
-  local layout = L.layout()
+  local hint_lines = #wrap_segments(action_segments(root_state), "  ", math.max(1, (L.terminal_size()) - 2))
+  local layout = L.layout(hint_lines)
 
   draw_panel(layout.left_x, layout.left_y, layout.left_width, layout.content_height, "")
   draw_panel(layout.right_x, layout.right_y, layout.right_width, layout.right_height, language(root_state, "SETTING_KEYBIND_SYSTEM_KEY_TITLE", C.DEFAULT_TEXT.key_title))
@@ -218,4 +281,5 @@ function M.render(root_state)
   draw_action_line(layout, root_state)
 end
 
+M.State = State
 return M

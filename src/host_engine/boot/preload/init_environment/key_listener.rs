@@ -1,6 +1,6 @@
 //! 键盘监听：融合 crossterm 与 rdev
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -19,21 +19,36 @@ const CROSSTERM_POLL_INTERVAL_MS: u64 = 16;
 const RDEV_DELAY_MS: u64 = 20;
 const SUPPRESS_WINDOW_MS: u64 = 120;
 const RDEV_DRAIN_LIMIT: usize = 16;
-const SHIFT_BIND_HOLD_MS: u64 = 2_000;
 
 static ALLOWED_CROSSTERM_KEYCODES: Lazy<HashSet<KeyCode>> = Lazy::new(allowed_crossterm_keycodes);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RdevKeyEventType {
+    Press,
+    Release,
+}
 
 #[derive(Debug, Clone)]
 struct DelayedRdevEvent {
     key: RdevKey,
+    event_type: RdevKeyEventType,
     timestamp: Instant,
 }
 
-#[derive(Default)]
 struct SharedKeyState {
     delayed_rdev_events: VecDeque<DelayedRdevEvent>,
     last_crossterm_output: Option<(String, Instant)>,
-    held_shift_keys: HashMap<RdevKey, Instant>,
+    is_focused: bool,
+}
+
+impl Default for SharedKeyState {
+    fn default() -> Self {
+        Self {
+            delayed_rdev_events: VecDeque::default(),
+            last_crossterm_output: None,
+            is_focused: true,
+        }
+    }
 }
 
 /// 键盘监听句柄
@@ -101,6 +116,19 @@ fn start_crossterm_listener(
                         let _ = resize_sender.send(resize_event);
                         let _ = input_sender.send(HostInputEvent::Resize(resize_event));
                     }
+                    Ok(Event::FocusGained) => {
+                        if let Ok(mut key_state) = shared_key_state.lock() {
+                            key_state.is_focused = true;
+                        }
+                        let _ = input_sender.send(HostInputEvent::FocusGained);
+                    }
+                    Ok(Event::FocusLost) => {
+                        if let Ok(mut key_state) = shared_key_state.lock() {
+                            key_state.is_focused = false;
+                            key_state.delayed_rdev_events.clear();
+                        }
+                        let _ = input_sender.send(HostInputEvent::FocusLost);
+                    }
                     Ok(_) | Err(_) => {}
                 }
             }
@@ -115,25 +143,17 @@ fn start_rdev_listener(shared_key_state: Arc<Mutex<SharedKeyState>>) {
         let _ = listen(move |event: RdevEvent| {
             if let Ok(mut key_state) = shared_key_state.lock() {
                 match event.event_type {
-                    RdevEventType::KeyPress(key) if is_shift_key(key) => {
-                        key_state
-                            .held_shift_keys
-                            .entry(key)
-                            .or_insert_with(Instant::now);
-                    }
-                    RdevEventType::KeyRelease(key) if is_shift_key(key) => {
-                        if let Some(started_at) = key_state.held_shift_keys.remove(&key) {
-                            if started_at.elapsed() >= Duration::from_millis(SHIFT_BIND_HOLD_MS) {
-                                key_state.delayed_rdev_events.push_back(DelayedRdevEvent {
-                                    key,
-                                    timestamp: Instant::now(),
-                                });
-                            }
-                        }
-                    }
                     RdevEventType::KeyPress(key) => {
                         key_state.delayed_rdev_events.push_back(DelayedRdevEvent {
                             key,
+                            event_type: RdevKeyEventType::Press,
+                            timestamp: Instant::now(),
+                        });
+                    }
+                    RdevEventType::KeyRelease(key) => {
+                        key_state.delayed_rdev_events.push_back(DelayedRdevEvent {
+                            key,
+                            event_type: RdevKeyEventType::Release,
                             timestamp: Instant::now(),
                         });
                     }
@@ -142,10 +162,6 @@ fn start_rdev_listener(shared_key_state: Arc<Mutex<SharedKeyState>>) {
             }
         });
     });
-}
-
-fn is_shift_key(key: RdevKey) -> bool {
-    matches!(key, RdevKey::ShiftLeft | RdevKey::ShiftRight)
 }
 
 fn handle_crossterm_key_event(
@@ -173,7 +189,7 @@ fn handle_crossterm_key_event(
     if let Ok(mut key_state) = shared_key_state.lock() {
         key_state.last_crossterm_output = Some((semantic_key.clone(), Instant::now()));
     }
-    let _ = input_sender.send(HostInputEvent::Key { key: semantic_key });
+    let _ = input_sender.send(HostInputEvent::Key { key: semantic_key, status: "press".to_string() });
 }
 
 fn drain_ready_rdev_keys(
@@ -182,13 +198,18 @@ fn drain_ready_rdev_keys(
     limit: usize,
 ) {
     let now = Instant::now();
-    let mut output_keys = Vec::new();
+    let mut output_events: Vec<HostInputEvent> = Vec::new();
     let mut key_state = match shared_key_state.lock() {
         Ok(key_state) => key_state,
         Err(_) => return,
     };
 
-    while output_keys.len() < limit {
+    if !key_state.is_focused {
+        key_state.delayed_rdev_events.clear();
+        return;
+    }
+
+    while output_events.len() < limit {
         let Some(delayed_event) = key_state.delayed_rdev_events.front() else {
             break;
         };
@@ -197,28 +218,36 @@ fn drain_ready_rdev_keys(
         }
 
         let key = delayed_event.key;
+        let event_type = delayed_event.event_type;
         key_state.delayed_rdev_events.pop_front();
 
         if let Some(semantic_key) = map_rdev_key_to_semantic(key) {
-            let should_suppress = key_state
-                .last_crossterm_output
-                .as_ref()
-                .map(|(last_key, timestamp)| {
-                    last_key == &semantic_key
-                        && now.duration_since(*timestamp)
-                            < Duration::from_millis(SUPPRESS_WINDOW_MS)
-                })
-                .unwrap_or(false);
-            if !should_suppress {
-                output_keys.push(semantic_key);
+            match event_type {
+                RdevKeyEventType::Press => {
+                    let should_suppress = key_state
+                        .last_crossterm_output
+                        .as_ref()
+                        .map(|(last_key, timestamp)| {
+                            last_key == &semantic_key
+                                && now.duration_since(*timestamp)
+                                    < Duration::from_millis(SUPPRESS_WINDOW_MS)
+                        })
+                        .unwrap_or(false);
+                    if !should_suppress {
+                        output_events.push(HostInputEvent::Key { key: semantic_key, status: "press".to_string() });
+                    }
+                }
+                RdevKeyEventType::Release => {
+                    output_events.push(HostInputEvent::Key { key: semantic_key, status: "release".to_string() });
+                }
             }
         }
     }
 
     drop(key_state);
 
-    for semantic_key in output_keys {
-        let _ = input_sender.send(HostInputEvent::Key { key: semantic_key });
+    for event in output_events {
+        let _ = input_sender.send(event);
     }
 }
 

@@ -1,0 +1,18 @@
+{
+  "api": -1,
+  "entry": "main.lua",
+  "package_name": "official_minimal_boss",
+  "author": "TUI GAME",
+  "version": "0.1.0",
+  "boss_name": "Minimal Boss",
+  "introduction": "A minimal official boss-key overlay.",
+  "icon": [
+    "+------+",
+    "| BOSS |",
+    "+------+",
+    "      "
+  ],
+  "banner": [
+    "MINIMAL BOSS OVERLAY"
+  ]
+}

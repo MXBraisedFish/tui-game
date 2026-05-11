@@ -1,0 +1,23 @@
+{
+  "advanced_example.mod_name": "官方高级示例",
+  "advanced_example.introduction": "一个更完整的官方示例游戏，用于测试语言键元信息、图片路径、计时器、随机数、存档、最佳记录和富文本。",
+  "advanced_example.author": "TUI GAME",
+  "advanced_example.game_name": "高级示例",
+  "advanced_example.description": "收集星星、保存状态，并验证更完整的宿主 API。",
+  "advanced_example.detail": "该游戏演示语言键元信息、图片 icon/banner 路径、save_game、save_best_score、get_key 富文本、计时器 API、随机数 API、布局 API 和绘制 API。请将图片放到 assets/images/icon.png 与 assets/images/banner.png。",
+  "advanced_example.best.none": "最佳分数：---",
+  "advanced_example.action.up": "上移",
+  "advanced_example.action.down": "下移",
+  "advanced_example.action.left": "左移",
+  "advanced_example.action.right": "右移",
+  "advanced_example.action.collect": "收集",
+  "advanced_example.action.reset": "重置",
+  "advanced_example.action.save": "保存",
+  "advanced_example.action.quit": "退出",
+  "advanced_example.title": "高级示例",
+  "advanced_example.help": "{key:up}/{key:down}/{key:left}/{key:right} 移动  {key:collect} 收集  {key:reset} 重置  {key:save} 保存  {key:quit} 退出",
+  "advanced_example.saved": "已请求保存。",
+  "advanced_example.collected": "已收集。",
+  "advanced_example.missed": "请先移动到星星上。",
+  "advanced_example.reset": "已重置。"
+}

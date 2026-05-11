@@ -15,16 +15,43 @@ M.DISABLED_COLOR = "dark_gray"
 M.KEY_COLOR = "dark_gray"
 M.VERSION_COLOR = "dark_gray"
 
-function key_label(keys)
-  if type(keys) == "string" then
-    return "[" .. keys .. "]"
-  elseif type(keys) == "table" then
-    local formatted = {}
-    for i, key in ipairs(keys) do
-      formatted[i] = "[" .. key .. "]"
+local function append_key_labels(value, formatted)
+  if type(value) == "table" then
+    for _, item in ipairs(value) do
+      append_key_labels(item, formatted)
     end
-    return table.concat(formatted, "/")
+    return
   end
+
+  local key = tostring(value or "")
+  if key ~= "" then
+    formatted[#formatted + 1] = "[" .. key .. "]"
+  end
+end
+
+function key_label(keys)
+  local formatted = {}
+  append_key_labels(keys, formatted)
+  if #formatted == 0 then
+    return "[]"
+  end
+  return table.concat(formatted, "/")
+end
+
+local function safe_key_value(action_name)
+  local info = get_key(action_name)
+  if type(info) == "table" and type(info.key_display) == "table" then
+    return info.key_display.key_user
+  end
+  return tostring(action_name or "?")
+end
+
+local function safe_key_label(action_name)
+  local info = get_key(action_name)
+  if type(info) == "table" and type(info.key_display) == "table" then
+    return key_label(info.key_display.key_user)
+  end
+  return "[" .. tostring(action_name or "?") .. "]"
 end
 
 M.LOGO_LINES = {
@@ -42,14 +69,14 @@ M.DEFAULT_TEXT = {
   settings = "Settings",
   about = "About",
   quit = "Quit",
-  enter = key_label(get_key("confirm").key_display.key_user),
-  option1 = key_label(get_key("option1").key_display.key_user),
-  option2 = key_label(get_key("option2").key_display.key_user),
-  option3 = key_label(get_key("option3").key_display.key_user),
-  option4 = key_label(get_key("option4").key_display.key_user),
-  option5 = key_label(get_key("option5").key_display.key_user),
-  select_key = key_label({get_key("prev_option").key_display.key_user, get_key("next_option").key_display.key_user}),
-  confirm_key = key_label(get_key("confirm").key_display.key_user),
+  enter = safe_key_label("confirm"),
+  option1 = safe_key_label("option1"),
+  option2 = safe_key_label("option2"),
+  option3 = safe_key_label("option3"),
+  option4 = safe_key_label("option4"),
+  option5 = safe_key_label("option5"),
+  select_key = key_label({safe_key_value("prev_option"), safe_key_value("next_option")}),
+  confirm_key = safe_key_label("confirm"),
   version = "v0.0.0",
   select = "Select",
   confirm = "Confirm"

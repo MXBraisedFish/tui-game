@@ -11,6 +11,7 @@ use crate::host_engine::boot::preload::init_environment::TerminalSize;
 use crate::host_engine::boot::preload::lua_runtime::api::drawing_support::canvas_state::CanvasState;
 use crate::host_engine::boot::preload::lua_runtime::api::random_support::random_store::RandomStore;
 use crate::host_engine::boot::preload::lua_runtime::api::timer_support::timer_store::TimerStore;
+use crate::host_engine::boot::preload::overlay_modules::OverlayPackage;
 
 /// 宿主与 Lua 通信桥。
 ///
@@ -37,18 +38,41 @@ pub enum HostLuaMessage {
 }
 
 /// Lua API 运行上下文。
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct LuaRuntimeContext {
     pub consumer: LuaRuntimeConsumer,
     pub current_game: Option<GameModule>,
+    pub current_overlay: Option<OverlayPackage>,
     pub current_ui_actions: Value,
     pub current_script_root: Option<PathBuf>,
     pub language_code: String,
     pub keybinds: Value,
     pub best_scores: Value,
     pub mod_state: Value,
+    pub overlay_state: Value,
     pub launch_mode: LaunchMode,
     pub terminal_size: TerminalSize,
+    pub is_focused: bool,
+}
+
+impl Default for LuaRuntimeContext {
+    fn default() -> Self {
+        Self {
+            consumer: LuaRuntimeConsumer::default(),
+            current_game: None,
+            current_overlay: None,
+            current_ui_actions: Value::Null,
+            current_script_root: None,
+            language_code: String::new(),
+            keybinds: Value::Null,
+            best_scores: Value::Null,
+            mod_state: Value::Null,
+            overlay_state: Value::Null,
+            launch_mode: LaunchMode::default(),
+            terminal_size: TerminalSize::default(),
+            is_focused: true,
+        }
+    }
 }
 
 /// Lua API 使用方。
@@ -57,6 +81,8 @@ pub enum LuaRuntimeConsumer {
     #[default]
     GamePackage,
     OfficialUiPackage,
+    ScreenPackage,
+    BossPackage,
 }
 
 /// 游戏启动模式。

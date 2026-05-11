@@ -323,6 +323,13 @@ impl KeybindSystemRootState {
     }
 
     fn apply_update(&mut self, update: KeybindPendingUpdate) {
+        if update.op == "page_reset" {
+            if !update.page.trim().is_empty() {
+                self.reset_page(update.page.as_str());
+            }
+            return;
+        }
+
         if update.page.trim().is_empty() || update.action.trim().is_empty() {
             return;
         }
@@ -332,6 +339,20 @@ impl KeybindSystemRootState {
             "delete" => self.delete_key(update.page.as_str(), update.action.as_str(), update.slot),
             "reset" => self.reset_action(update.page.as_str(), update.action.as_str()),
             _ => {}
+        }
+    }
+
+    fn reset_page(&mut self, page: &str) {
+        let action_names: Vec<String> = self
+            .manifest
+            .get("actions")
+            .and_then(JsonValue::as_object)
+            .and_then(|actions| actions.get(page))
+            .and_then(JsonValue::as_object)
+            .map(|actions| actions.keys().cloned().collect())
+            .unwrap_or_default();
+        for action_name in &action_names {
+            self.reset_action(page, action_name.as_str());
         }
     }
 
@@ -661,6 +682,20 @@ fn keybind_system_language_map() -> Map<String, JsonValue> {
     insert!("GAME_LIST_BACK", text.key.game_list_back);
     insert!("GAME_LIST_BACK_CANCEL", text.key.game_list_back_cancel);
     insert!("GAME_LIST_START_CONFIRM", text.key.game_list_start_confirm);
+    insert!("MOD_LIST_PREV_OPTION", text.key.mod_list_prev_option);
+    insert!("MOD_LIST_NEXT_OPTION", text.key.mod_list_next_option);
+    insert!("MOD_LIST_PREV_PAGE", text.key.mod_list_prev_page);
+    insert!("MOD_LIST_NEXT_PAGE", text.key.mod_list_next_page);
+    insert!("MOD_LIST_SCROLL_UP", text.key.mod_list_scroll_up);
+    insert!("MOD_LIST_SCROLL_DOWN", text.key.mod_list_scroll_down);
+    insert!("MOD_LIST_JUMP", text.key.mod_list_jump);
+    insert!("MOD_LIST_TOGGLE_CONFIRM", text.key.mod_list_toggle_confirm);
+    insert!("MOD_LIST_BACK_CANCEL", text.key.mod_list_back_cancel);
+    insert!("MOD_LIST_ORDER", text.key.mod_list_order);
+    insert!("MOD_LIST_SORT", text.key.mod_list_sort);
+    insert!("MOD_LIST_DEBUG", text.key.mod_list_debug);
+    insert!("MOD_LIST_LIST", text.key.mod_list_list);
+    insert!("MOD_LIST_SAFE_MODE", text.key.mod_list_safe_mode);
     insert!("LANGUAGE_UP_OPTION", text.key.language_up_option);
     insert!("LANGUAGE_DOWN_OPTION", text.key.language_down_option);
     insert!("LANGUAGE_LEFT_OPTION", text.key.language_left_option);
@@ -706,6 +741,7 @@ fn keybind_system_language_pairs() -> Vec<(String, String)> {
         ("SETTING_KEYBIND_SYSTEM_NEXT_PAGE".to_string(), text.key.setting_keybind_system_next_page),
         ("SETTING_KEYBIND_SYSTEM_SCROLL_UP".to_string(), text.key.setting_keybind_system_scroll_up),
         ("SETTING_KEYBIND_SYSTEM_SCROLL_DOWN".to_string(), text.key.setting_keybind_system_scroll_down),
+        ("SETTING_KEYBIND_SYSTEM_SCROLL".to_string(), text.key.setting_keybind_system_scroll),
         ("SETTING_KEYBIND_SYSTEM_JUMP".to_string(), text.key.setting_keybind_system_jump),
         ("SETTING_KEYBIND_SYSTEM_ORDER".to_string(), text.key.setting_keybind_system_order),
         ("SETTING_KEYBIND_SYSTEM_SORT".to_string(), text.key.setting_keybind_system_sort),
@@ -727,6 +763,7 @@ fn keybind_system_language_pairs() -> Vec<(String, String)> {
         ("SETTING_KEYBIND_SYSTEM_KEY_MODE".to_string(), text.key.setting_keybind_system_key_mode),
         ("SETTING_KEYBIND_SYSTEM_RESET_ONLY".to_string(), text.key.setting_keybind_system_reset_only),
         ("SETTING_KEYBIND_SYSTEM_RESET_GAME".to_string(), text.key.setting_keybind_system_reset_game),
+        ("SETTING_KEYBIND_SYSTEM_RESET_PAGE".to_string(), text.key.setting_keybind_system_reset_page),
         ("SETTING_KEYBIND_SYSTEM_LIST_TITLE".to_string(), text.setting_keybind.system_list_title),
         ("SETTING_KEYBIND_SYSTEM_KEY_TITLE".to_string(), text.setting_keybind.system_key_title),
         ("SETTING_KEYBIND_SYSTEM_KEY_ANY".to_string(), text.setting_keybind.system_key_any),

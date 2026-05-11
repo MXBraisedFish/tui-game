@@ -1,0 +1,9 @@
+{
+  "minimal_example.action.up": "上移",
+  "minimal_example.action.down": "下移",
+  "minimal_example.action.left": "左移",
+  "minimal_example.action.right": "右移",
+  "minimal_example.action.quit": "退出",
+  "minimal_example.title": "最小示例",
+  "minimal_example.help": "使用 {key:up}/{key:down}/{key:left}/{key:right} 移动，使用 {key:quit} 退出。"
+}

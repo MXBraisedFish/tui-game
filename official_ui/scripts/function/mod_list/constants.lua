@@ -107,6 +107,7 @@ M.DEFAULT_TEXT = {
   toggle = "Toggle",
   confirm = "Confirm",
   cancel = "Cancel",
+  toggle_confirm = "Toggle / Confirm",
   back = "Back",
   debug = "Debug",
   list = "List",

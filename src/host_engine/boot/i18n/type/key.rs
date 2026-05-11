@@ -116,6 +116,7 @@ pub static SETTING_KEYBIND_SYSTEM_PREV_PAGE: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_NEXT_PAGE: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_SCROLL_UP: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_SCROLL_DOWN: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_SCROLL: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_JUMP: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_ORDER: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_SORT: MutableText = MutableText::new();
@@ -137,6 +138,7 @@ pub static SETTING_KEYBIND_SYSTEM_DELETE: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_KEY_MODE: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_RESET_ONLY: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_RESET_GAME: MutableText = MutableText::new();
+pub static SETTING_KEYBIND_SYSTEM_RESET_PAGE: MutableText = MutableText::new();
 pub static STORAGE_DETAILS_BACK: MutableText = MutableText::new();
 pub static CLEAR_DATA_CONFIRM: MutableText = MutableText::new();
 pub static CLEAR_DATA_CANCEL: MutableText = MutableText::new();
@@ -260,6 +262,7 @@ pub struct KeyText {
     pub setting_keybind_system_next_page: String,
     pub setting_keybind_system_scroll_up: String,
     pub setting_keybind_system_scroll_down: String,
+    pub setting_keybind_system_scroll: String,
     pub setting_keybind_system_jump: String,
     pub setting_keybind_system_order: String,
     pub setting_keybind_system_sort: String,
@@ -281,6 +284,7 @@ pub struct KeyText {
     pub setting_keybind_system_key_mode: String,
     pub setting_keybind_system_reset_only: String,
     pub setting_keybind_system_reset_game: String,
+    pub setting_keybind_system_reset_page: String,
     pub storage_details_back: String,
     pub clear_data_confirm: String,
     pub clear_data_cancel: String,
@@ -617,6 +621,11 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         "key.setting_keybind.system.scroll_down",
     );
     set_text(
+        &SETTING_KEYBIND_SYSTEM_SCROLL,
+        language_source,
+        "key.setting_keybind.system.scroll",
+    );
+    set_text(
         &SETTING_KEYBIND_SYSTEM_JUMP,
         language_source,
         "key.setting_keybind.system.jump",
@@ -720,6 +729,11 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         &SETTING_KEYBIND_SYSTEM_RESET_GAME,
         language_source,
         "key.setting_keybind.system.reset.game",
+    );
+    set_text(
+        &SETTING_KEYBIND_SYSTEM_RESET_PAGE,
+        language_source,
+        "key.setting_keybind.system.reset.page",
     );
     set_text(
         &STORAGE_DETAILS_BACK,
@@ -858,6 +872,7 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         setting_keybind_system_next_page: text(&SETTING_KEYBIND_SYSTEM_NEXT_PAGE),
         setting_keybind_system_scroll_up: text(&SETTING_KEYBIND_SYSTEM_SCROLL_UP),
         setting_keybind_system_scroll_down: text(&SETTING_KEYBIND_SYSTEM_SCROLL_DOWN),
+        setting_keybind_system_scroll: text(&SETTING_KEYBIND_SYSTEM_SCROLL),
         setting_keybind_system_jump: text(&SETTING_KEYBIND_SYSTEM_JUMP),
         setting_keybind_system_order: text(&SETTING_KEYBIND_SYSTEM_ORDER),
         setting_keybind_system_sort: text(&SETTING_KEYBIND_SYSTEM_SORT),
@@ -879,6 +894,7 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         setting_keybind_system_key_mode: text(&SETTING_KEYBIND_SYSTEM_KEY_MODE),
         setting_keybind_system_reset_only: text(&SETTING_KEYBIND_SYSTEM_RESET_ONLY),
         setting_keybind_system_reset_game: text(&SETTING_KEYBIND_SYSTEM_RESET_GAME),
+        setting_keybind_system_reset_page: text(&SETTING_KEYBIND_SYSTEM_RESET_PAGE),
         storage_details_back: text(&STORAGE_DETAILS_BACK),
         clear_data_confirm: text(&CLEAR_DATA_CONFIRM),
         clear_data_cancel: text(&CLEAR_DATA_CANCEL),

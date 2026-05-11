@@ -22,6 +22,14 @@ local function key_label(keys)
   return "[]"
 end
 
+local function safe_key_label(action_name)
+  local info = get_key(action_name)
+  if type(info) == "table" and type(info.key_display) == "table" then
+    return key_label(info.key_display.key_user)
+  end
+  return "[" .. tostring(action_name or "?") .. "]"
+end
+
 M.DEFAULT_TEXT = {
   title = "Clear Data Warning",
   warn = "Clearing data will permanently delete all records. This action cannot be undone. Are you sure you want to proceed?",
@@ -29,8 +37,8 @@ M.DEFAULT_TEXT = {
   second = "s",
   confirm = "Confirm",
   cancel = "Cancel",
-  confirm_key = key_label(get_key("confirm").key_display.key_user),
-  cancel_key = key_label(get_key("cancel").key_display.key_user)
+  confirm_key = safe_key_label("confirm"),
+  cancel_key = safe_key_label("cancel")
 }
 
 return M

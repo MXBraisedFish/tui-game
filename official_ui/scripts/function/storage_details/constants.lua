@@ -20,6 +20,14 @@ local function key_label(keys)
   return "[]"
 end
 
+local function safe_key_label(action_name)
+  local info = get_key(action_name)
+  if type(info) == "table" and type(info.key_display) == "table" then
+    return key_label(info.key_display.key_user)
+  end
+  return "[" .. tostring(action_name or "?") .. "]"
+end
+
 M.DEFAULT_TEXT = {
   title = "View Storage Details",
   dir = "Directory",
@@ -33,7 +41,7 @@ M.DEFAULT_TEXT = {
   mod_dir = "Mod",
   tip = "Sizes use 1024-based units",
   back = "Back",
-  back_key = key_label(get_key("return").key_display.key_user)
+  back_key = safe_key_label("return")
 }
 
 return M

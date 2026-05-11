@@ -31,6 +31,7 @@ pub(crate) fn load(
     host_bridge.set_runtime_context(LuaRuntimeContext {
         consumer: LuaRuntimeConsumer::OfficialUiPackage,
         current_game: None,
+        current_overlay: None,
         current_ui_actions: serde_json::Value::Null,
         current_script_root: official_ui_package
             .map(|ui_package| ui_package.root_dir.join("scripts")),
@@ -38,11 +39,23 @@ pub(crate) fn load(
         keybinds: loaded_resources.persistent_data.keybinds.clone(),
         best_scores: loaded_resources.persistent_data.best_scores.clone(),
         mod_state: loaded_resources.persistent_data.mod_state.clone(),
+        overlay_state: loaded_resources.persistent_data.overlay_state.clone(),
         launch_mode: LaunchMode::New,
         terminal_size,
+        is_focused: true,
     });
     host_bridge.resize_canvas(terminal_size)?;
     let lua_runtime_environment =
         environment::create_lua_runtime_environment(host_bridge, ApiScope::official_ui_package())?;
     Ok(lua_runtime_environment)
+}
+
+/// 创建一个共享宿主桥的独立 Lua 运行时。
+///
+/// 覆盖层使用独立 VM，避免覆盖当前 UI / 游戏脚本的全局声明式函数。
+pub(crate) fn create_scoped_runtime(
+    host_bridge: HostLuaBridge,
+    api_scope: ApiScope,
+) -> Result<LuaRuntimeEnvironment, Box<dyn std::error::Error>> {
+    environment::create_lua_runtime_environment(host_bridge, api_scope)
 }

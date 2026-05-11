@@ -47,11 +47,17 @@ pub fn ensure() -> EnvironmentResult<()> {
         &root_dir.join("data/profiles/mod_state.json"),
         EMPTY_JSON_OBJECT,
     )?;
+    ensure_file(
+        &root_dir.join("data/profiles/overlay_state.json"),
+        EMPTY_JSON_OBJECT,
+    )?;
 
     ensure_dir(&root_dir.join("data/log"))?;
     ensure_file(&root_dir.join("data/log/tui_log.txt"), "")?;
 
     ensure_dir(&root_dir.join("data/mod"))?;
+    ensure_dir(&root_dir.join("data/screen"))?;
+    ensure_dir(&root_dir.join("data/boss"))?;
 
     Ok(())
 }
