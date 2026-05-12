@@ -8,7 +8,7 @@ function handle_event(lua_state, event)
     return lua_state
   end
 
-  if event.type == "action" and event.name == "return" then
+  if event.type == "action" and event.name == "return" and event.status == "press" then
     lua_state.back = true
   end
 

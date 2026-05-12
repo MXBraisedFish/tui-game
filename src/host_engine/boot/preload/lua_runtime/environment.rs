@@ -1,6 +1,6 @@
 //! Lua 运行时环境
 
-use mlua::Lua;
+use mlua::{Lua, LuaOptions, StdLib};
 
 use super::api::{self, ApiScope};
 use super::host_bridge::HostLuaBridge;
@@ -25,7 +25,10 @@ pub fn create_lua_runtime_environment(
     host_bridge: HostLuaBridge,
     api_scope: ApiScope,
 ) -> Result<LuaRuntimeEnvironment, Box<dyn std::error::Error>> {
-    let lua = Lua::new();
+    let lua = Lua::new_with(
+        StdLib::MATH | StdLib::UTF8 | StdLib::STRING | StdLib::TABLE,
+        LuaOptions::default(),
+    )?;
     sandbox::install_sandbox(&lua)?;
     api::install_runtime_apis(&lua, api_scope, host_bridge.clone())?;
 

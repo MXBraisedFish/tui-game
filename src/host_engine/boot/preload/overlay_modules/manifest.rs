@@ -11,6 +11,7 @@ use super::source::{OverlayKind, OverlaySource};
 pub struct OverlayPackageManifest {
     pub api: Value,
     pub entry: String,
+    pub package: String,
     pub package_name: String,
     pub author: String,
     pub version: String,

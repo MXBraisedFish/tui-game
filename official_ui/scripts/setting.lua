@@ -24,6 +24,12 @@ function handle_event(lua_state, event)
     return lua_state
   end
 
+  if event.type == "action" or event.type == "key" then
+    if event.status ~= "press" then
+      return lua_state
+    end
+  end
+
   if event.type == "action" then
     if event.name == "prev_option" then
       lua_state.select = normalize_select(lua_state.select - 1)

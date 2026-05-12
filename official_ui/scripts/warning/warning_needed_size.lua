@@ -5,7 +5,7 @@ function handle_event(lua_state, event)
   lua_state.mode = lua_state.mode or "root"
   lua_state.exit = false
 
-  if type(event) == "table" and event.type == "action" and event.name == "return" then
+  if type(event) == "table" and event.type == "action" and event.status == "press" and event.name == "return" then
     lua_state.exit = true
   end
 

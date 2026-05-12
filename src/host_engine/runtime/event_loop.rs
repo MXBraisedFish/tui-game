@@ -24,6 +24,7 @@ use crate::host_engine::runtime::ui_state::needed_size_state::{
 
 type RuntimeLoopResult<T> = Result<T, Box<dyn std::error::Error>>;
 const UI_EVENT_QUEUE_LIMIT: usize = 256;
+const RESIZE_DEBOUNCE_MS: u64 = 50;
 
 /// 运行最小宿主事件循环。
 ///
@@ -52,6 +53,7 @@ pub(crate) fn run(
     let mut was_running_game = false;
     let mut is_focused = true;
     let mut overlay_session: Option<OverlaySession> = None;
+    let mut pending_resize: Option<(ResizeEvent, Instant)> = None;
     loop {
         if active_ui_page.has_game_session() && !was_running_game {
             if let Some(game_session) = active_ui_page.game_session() {
@@ -97,8 +99,7 @@ pub(crate) fn run(
                         },
                     );
                 }
-                update_resize_surface(host_bridge, resize_event)?;
-                renderer_state.request_full_redraw();
+                pending_resize = Some((resize_event, Instant::now()));
             }
             Ok(HostInputEvent::Key { key, status }) if is_focused => {
                 frame_rate_controller.mark_input();
@@ -135,6 +136,15 @@ pub(crate) fn run(
         let now = Instant::now();
         let tick_dt_ms = now.duration_since(last_tick_at).as_millis() as u64;
         last_tick_at = now;
+
+        if let Some((resize_event, recorded_at)) = pending_resize.take() {
+            if now.duration_since(recorded_at).as_millis() as u64 >= RESIZE_DEBOUNCE_MS {
+                update_resize_surface(host_bridge, resize_event)?;
+                renderer_state.request_full_redraw();
+            } else {
+                pending_resize = Some((resize_event, recorded_at));
+            }
+        }
 
         if let Some(overlay_session) = overlay_session.as_mut() {
             overlay_session.update_and_render()?;

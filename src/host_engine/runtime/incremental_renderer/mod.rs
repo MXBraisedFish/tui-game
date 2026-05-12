@@ -51,8 +51,8 @@ pub fn render_canvas(
         renderer_state.force_full_redraw = false;
     }
 
-    let changes = diff_frames(&renderer_state.previous_frame, &current_frame);
-    write_changes(&changes)?;
+    let segments = diff_frames(&renderer_state.previous_frame, &current_frame);
+    write_changes(&segments)?;
     renderer_state.previous_frame = current_frame;
     Ok(())
 }

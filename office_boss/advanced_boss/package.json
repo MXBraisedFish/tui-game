@@ -1,6 +1,7 @@
 {
   "api": -1,
   "entry": "main.lua",
+  "package": "advanced_boss",
   "package_name": "advanced_boss.package_name",
   "author": "advanced_boss.author",
   "version": "0.2.0",

@@ -189,13 +189,18 @@ end
 ```lua
 {
   type = "action",
-  name = "#registered_key"
+  name = "#registered_key",
+  status = "press" | "release"
 }
 ```
 
 **作用**：  
 宿主根据 `game.json` 中的 `actions` 配置，将物理按键映射为语义化动作事件。
 适用于自定义动作按键的处理。
+
+**status 字段**:
+- `press` 按键按下
+- `release` 按键松开
 
 ### 2. `key`
 
@@ -234,6 +239,28 @@ end
 
 **作用**：  
 通知脚本时间推进，`dt_ms` 表示距离上一个 `tick` 事件的时间差（毫秒）。
+
+### 5. `focus_gained`
+
+```lua
+{
+  type = "focus_gained"
+}
+```
+
+**作用**：  
+通知脚本终端获得焦点。
+
+### 6. `focus_lost`
+
+```lua
+{
+  type = "focus_lost"
+}
+```
+
+**作用**：  
+通知脚本终端失去焦点。
 
 ---
 

@@ -20,13 +20,15 @@ function handle_event(lua_state, event)
   end
 
   if event.type == "action" and event.name == "confirm" then
-    if ready_to_confirm() then
+    if event.status == "press" and ready_to_confirm() then
       lua_state.confirm = true
     end
     return lua_state
   end
 
-  lua_state.back = true
+  if event.type == "action" and event.status == "press" then
+    lua_state.back = true
+  end
   return lua_state
 end
 

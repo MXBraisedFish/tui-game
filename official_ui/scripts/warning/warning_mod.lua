@@ -28,7 +28,7 @@ function handle_event(lua_state, event)
     return lua_state
   end
 
-  if event.type == "action" then
+  if event.type == "action" and event.status == "press" then
     if event.name == "close_permanent" then
       if ready_to_close_permanent() then
         lua_state.close_permanent = true
@@ -40,9 +40,8 @@ function handle_event(lua_state, event)
       end
       return lua_state
     end
+    lua_state.back = true
   end
-
-  lua_state.back = true
   return lua_state
 end
 

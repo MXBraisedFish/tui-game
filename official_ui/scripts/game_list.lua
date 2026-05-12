@@ -90,6 +90,10 @@ function handle_event(lua_state, event)
     return lua_state
   end
 
+  if event.status ~= "press" then
+    return lua_state
+  end
+
   if lua_state.jump then
     if event.type == "action" then
       if event.name == "confirm" then

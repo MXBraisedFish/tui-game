@@ -168,6 +168,7 @@ fn read_manifest(kind: OverlayKind, package_dir: &Path) -> ScannerResult<Overlay
     Ok(OverlayPackageManifest {
         api,
         entry: require_string(&value, "package.json", "entry")?,
+        package: require_string(&value, "package.json", "package")?,
         package_name: require_string(&value, "package.json", "package_name")?,
         author: require_string(&value, "package.json", "author")?,
         version: require_string(&value, "package.json", "version")?,
@@ -255,9 +256,10 @@ fn generate_uid(
     manifest: &OverlayPackageManifest,
 ) -> String {
     let seed = format!(
-        "{}|{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}|{}|{}",
         source.as_str(),
         namespace,
+        manifest.package,
         manifest.package_name,
         manifest.author,
         manifest.entry,

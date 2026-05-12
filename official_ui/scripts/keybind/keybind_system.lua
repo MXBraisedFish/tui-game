@@ -56,6 +56,9 @@ end
 
 local function handle_jump(lua_state, event)
   if event.type == "key" then
+    if event.status ~= "press" then
+      return lua_state
+    end
     local digit = tonumber(event.name)
     if digit ~= nil then
       lua_state.user_page = (tonumber(lua_state.user_page) or 0) * 10 + digit
@@ -145,6 +148,10 @@ local function handle_keys_focus(lua_state, event)
     return lua_state
   end
 
+  if event.status ~= "press" then
+    return lua_state
+  end
+
   if event.name == "prev_option" then
     State.move_action_select(lua_state, -1)
   elseif event.name == "next_option" then
@@ -180,6 +187,10 @@ end
 
 local function handle_list_focus(lua_state, event)
   if event.type ~= "action" then
+    return lua_state
+  end
+
+  if event.status ~= "press" then
     return lua_state
   end
 

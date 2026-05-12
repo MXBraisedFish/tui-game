@@ -1,6 +1,7 @@
 {
   "api": -1,
   "entry": "main.lua",
+  "package": "minimal_screen",
   "package_name": "official_minimal_screen",
   "author": "TUI GAME",
   "version": "0.1.0",

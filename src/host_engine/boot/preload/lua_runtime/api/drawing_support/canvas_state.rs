@@ -27,12 +27,12 @@ impl Default for CanvasCell {
     }
 }
 
-/// 虚拟画布。
+/// 虚拟画布。按行组织，稀疏存储——仅保存已写入的单元格。
 #[derive(Clone, Debug)]
 pub struct CanvasState {
     width: u16,
     height: u16,
-    cells: BTreeMap<(u16, u16), CanvasCell>,
+    rows: BTreeMap<u16, BTreeMap<u16, CanvasCell>>,
 }
 
 impl Default for CanvasState {
@@ -47,7 +47,7 @@ impl CanvasState {
         Self {
             width,
             height,
-            cells: BTreeMap::new(),
+            rows: BTreeMap::new(),
         }
     }
 
@@ -72,25 +72,47 @@ impl CanvasState {
 
     /// 清空画布。
     pub fn clear(&mut self) {
-        self.cells.clear();
+        self.rows.clear();
     }
 
     /// 写入一个单元格。
     pub fn set_cell(&mut self, x: u16, y: u16, cell: CanvasCell) {
         if x < self.width && y < self.height {
-            self.cells.insert((x, y), cell);
+            self.rows.entry(y).or_default().insert(x, cell);
         }
     }
 
     /// 清空一个单元格。
     pub fn erase_cell(&mut self, x: u16, y: u16) {
         if x < self.width && y < self.height {
-            self.cells.remove(&(x, y));
+            if let Some(row) = self.rows.get_mut(&y) {
+                row.remove(&x);
+                if row.is_empty() {
+                    self.rows.remove(&y);
+                }
+            }
         }
     }
 
-    /// 迭代所有已写入单元格。
-    pub fn cells(&self) -> impl Iterator<Item = (&(u16, u16), &CanvasCell)> {
-        self.cells.iter()
+    /// 获取指定行的所有单元格。
+    pub fn row(&self, y: u16) -> Option<&BTreeMap<u16, CanvasCell>> {
+        self.rows.get(&y)
+    }
+
+    /// 所有行的迭代器（按 y 升序）。
+    pub fn rows(&self) -> impl Iterator<Item = (&u16, &BTreeMap<u16, CanvasCell>)> {
+        self.rows.iter()
+    }
+
+    /// 迭代所有已写入单元格（按 y 升序，同 y 按 x 升序）。
+    pub fn cells(&self) -> impl Iterator<Item = (u16, u16, &CanvasCell)> {
+        self.rows
+            .iter()
+            .flat_map(|(y, row)| row.iter().map(move |(x, cell)| (*x, *y, cell)))
+    }
+
+    /// 获取指定位置的单元格。
+    pub fn get_cell(&self, x: u16, y: u16) -> Option<&CanvasCell> {
+        self.rows.get(&y).and_then(|row| row.get(&x))
     }
 }

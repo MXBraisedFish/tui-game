@@ -16,6 +16,12 @@ function handle_event(lua_state, event)
     return lua_state
   end
 
+  if event.type == "action" or event.type == "key" then
+    if event.status ~= "press" then
+      return lua_state
+    end
+  end
+
   if lua_state.jump then
     if event.type == "key" then
       local digit = digit_value(event.name)
