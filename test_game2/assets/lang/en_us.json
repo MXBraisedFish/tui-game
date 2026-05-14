@@ -1,5 +1,4 @@
 {
-  "test_game2.mod_name": "Advanced Test Game",
   "test_game2.introduction": "A fuller temporary game package for testing manifest fields, images, save data, best score, actions, timers and rendering.",
   "test_game2.author": "TUI GAME",
   "test_game2.game_name": "Advanced Test Game",
@@ -35,5 +34,6 @@
   "test_game2.help.reset": "Reset",
   "test_game2.help.save": "Save",
   "test_game2.help.debug": "Debug",
-  "test_game2.help.quit": "Quit"
+  "test_game2.help.quit": "Quit",
+  "test_game2.package_name": "Advanced Test Game"
 }

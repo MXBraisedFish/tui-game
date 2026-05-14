@@ -16,21 +16,21 @@ type OverlayResult<T> = Result<T, Box<dyn std::error::Error>>;
 /// 当前覆盖层类别。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OverlaySessionKind {
-    Screen,
+    Saver,
     Boss,
 }
 
 impl OverlaySessionKind {
     fn api_scope(self) -> ApiScope {
         match self {
-            Self::Screen => ApiScope::screen_package(),
+            Self::Saver => ApiScope::saver_package(),
             Self::Boss => ApiScope::boss_package(),
         }
     }
 
     fn consumer(self) -> LuaRuntimeConsumer {
         match self {
-            Self::Screen => LuaRuntimeConsumer::ScreenPackage,
+            Self::Saver => LuaRuntimeConsumer::SaverPackage,
             Self::Boss => LuaRuntimeConsumer::BossPackage,
         }
     }
@@ -39,7 +39,7 @@ impl OverlaySessionKind {
 impl From<OverlayKind> for OverlaySessionKind {
     fn from(value: OverlayKind) -> Self {
         match value {
-            OverlayKind::Screen => Self::Screen,
+            OverlayKind::Saver => Self::Saver,
             OverlayKind::Boss => Self::Boss,
         }
     }
@@ -80,9 +80,9 @@ impl OverlaySession {
             .exec()?;
         callback_api::validate_required_callbacks(&lua_runtime.lua, kind.api_scope())?;
 
-        let state_key = lua_runtime.lua.create_registry_value(Value::Table(
-            lua_runtime.lua.create_table()?,
-        ))?;
+        let state_key = lua_runtime
+            .lua
+            .create_registry_value(Value::Table(lua_runtime.lua.create_table()?))?;
 
         Ok(Self {
             kind,

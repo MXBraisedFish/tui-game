@@ -31,6 +31,11 @@ impl GameSession {
         self.game_module.game.afk_time
     }
 
+    /// 当前游戏 UID。
+    pub(crate) fn uid(&self) -> &str {
+        self.game_module.uid.as_str()
+    }
+
     /// 根据物理键查询动作。
     pub(crate) fn action_for_key(&self, keybinds: &serde_json::Value, key: &str) -> Option<String> {
         super::action_map::action_for_key(&self.game_module, keybinds, key)
@@ -60,5 +65,11 @@ impl GameSession {
         let new_state_key = callback_api::call_exit_game(lua, &self.state_key)?;
         self.state_key = new_state_key;
         Ok(())
+    }
+
+    /// 调用最佳记录保存回调。
+    pub(crate) fn save_best_score(&self, lua_runtime: &LuaRuntimeState) -> mlua::Result<String> {
+        let lua = &lua_runtime.lua_runtime_environment.lua;
+        callback_api::call_save_best_score(lua, &self.state_key)
     }
 }

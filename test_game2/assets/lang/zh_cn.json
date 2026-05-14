@@ -1,5 +1,4 @@
 {
-  "test_game2.mod_name": "高级测试包",
   "test_game2.introduction": "用于测试配置字段、图片、存档、最佳记录、动作、计时器和渲染的更完整临时游戏包。",
   "test_game2.author": "TUI GAME",
   "test_game2.game_name": "高级测试游戏",
@@ -35,5 +34,6 @@
   "test_game2.help.reset": "重置",
   "test_game2.help.save": "保存",
   "test_game2.help.debug": "调试",
-  "test_game2.help.quit": "退出"
+  "test_game2.help.quit": "退出",
+  "test_game2.package_name": "高级测试包"
 }

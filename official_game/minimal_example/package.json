@@ -1,6 +1,5 @@
 {
   "package": "official_minimal_example",
-  "mod_name": "Official Examples",
   "introduction": "A minimal official example game package.",
   "author": "TUI GAME",
   "game_name": "Minimal Example",
@@ -15,5 +14,6 @@
   ],
   "banner": [
     "MINIMAL EXAMPLE GAME"
-  ]
+  ],
+  "package_name": "Official Examples"
 }

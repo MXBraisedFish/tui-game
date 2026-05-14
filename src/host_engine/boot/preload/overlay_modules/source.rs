@@ -1,10 +1,10 @@
-//! 屏保/老板覆盖层包来源。
+//! Saver/老板覆盖层包来源。
 
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum OverlayKind {
-    Screen,
+    Saver,
     Boss,
 }
 
@@ -17,24 +17,18 @@ pub enum OverlaySource {
 impl OverlayKind {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Screen => "screen",
+            Self::Saver => "saver",
             Self::Boss => "boss",
         }
     }
 
     pub fn name_field(self) -> &'static str {
         match self {
-            Self::Screen => "screen_name",
+            Self::Saver => "saver_name",
             Self::Boss => "boss_name",
         }
     }
 
-    pub fn uid_prefix(self) -> &'static str {
-        match self {
-            Self::Screen => "screen_",
-            Self::Boss => "boss_",
-        }
-    }
 }
 
 impl OverlaySource {
@@ -45,10 +39,20 @@ impl OverlaySource {
         }
     }
 
+
+    pub fn uid_prefix(self, kind: OverlayKind) -> &'static str {
+        match (self, kind) {
+            (Self::Office, OverlayKind::Saver) => "saver_",
+            (Self::ThirdParty, OverlayKind::Saver) => "mod_saver_",
+            (Self::Office, OverlayKind::Boss) => "boss_",
+            (Self::ThirdParty, OverlayKind::Boss) => "mod_boss_",
+        }
+    }
+
     pub fn root_dir(self, kind: OverlayKind) -> PathBuf {
         match self {
             Self::Office => root_dir().join("scripts").join(kind.as_str()),
-            Self::ThirdParty => root_dir().join("data").join(kind.as_str()),
+            Self::ThirdParty => root_dir().join("data").join("mod").join(kind.as_str()),
         }
     }
 }

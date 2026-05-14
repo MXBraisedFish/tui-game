@@ -1,5 +1,4 @@
 {
-  "test_game.mod_name": "Test Game",
   "test_game.introduction": "A minimal temporary test game package.",
   "test_game.author": "TUI GAME",
   "test_game.game_name": "Test Game",
@@ -21,5 +20,6 @@
   "test_game.message.exit": "Exiting.",
   "test_game.help.move": "Move",
   "test_game.help.confirm": "Confirm",
-  "test_game.help.quit": "Quit"
+  "test_game.help.quit": "Quit",
+  "test_game.package_name": "Test Game"
 }

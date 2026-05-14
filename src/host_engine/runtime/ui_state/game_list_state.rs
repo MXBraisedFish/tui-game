@@ -109,6 +109,11 @@ impl GameListUiState {
         self.root_state.normalize_select();
     }
 
+    /// 刷新最佳记录快照。
+    pub fn refresh_best_scores(&mut self, best_scores: JsonValue) {
+        self.root_state.best_scores = best_scores;
+    }
+
     /// 应用 Lua 返回状态。
     pub fn apply_lua_state(&mut self, lua_state: GameListLuaState) -> GameListLuaAction {
         self.lua_state = lua_state;
@@ -384,7 +389,7 @@ pub struct GameListItem {
     pub source: GameModuleSource,
     pub source_label: String,
     pub package: String,
-    pub mod_name_raw: String,
+    pub package_name_raw: String,
     pub introduction_raw: String,
     pub author_raw: String,
     pub game_name_raw: String,
@@ -393,7 +398,7 @@ pub struct GameListItem {
     pub best_none_raw: Option<String>,
     pub version: String,
     pub root_dir: PathBuf,
-    pub mod_name: String,
+    pub package_name: String,
     pub introduction: String,
     pub author: String,
     pub game_name: String,
@@ -414,7 +419,7 @@ impl GameListItem {
             source: game_module.source,
             source_label: game_module.source_label.clone(),
             package: game_module.package.package.clone(),
-            mod_name_raw: game_module.package.mod_name.clone(),
+            package_name_raw: game_module.package.package_name.clone(),
             introduction_raw: game_module.package.introduction.clone(),
             author_raw: game_module.package.author.clone(),
             game_name_raw: game_module.package.game_name.clone(),
@@ -423,7 +428,7 @@ impl GameListItem {
             best_none_raw: game_module.game.best_none.clone(),
             version: game_module.package.version.clone(),
             root_dir: game_module.root_dir.clone(),
-            mod_name: String::new(),
+            package_name: String::new(),
             introduction: String::new(),
             author: String::new(),
             game_name: String::new(),
@@ -438,7 +443,7 @@ impl GameListItem {
 
     fn refresh_display(&mut self, language_code: &str) {
         let language_texts = load_package_language_texts(&self.root_dir, language_code);
-        self.mod_name = resolve_package_text(&language_texts, &self.mod_name_raw);
+        self.package_name = resolve_package_text(&language_texts, &self.package_name_raw);
         self.introduction = resolve_package_text(&language_texts, &self.introduction_raw);
         self.author = resolve_package_text(&language_texts, &self.author_raw);
         self.game_name = resolve_package_text(&language_texts, &self.game_name_raw);
@@ -465,7 +470,7 @@ impl GameListItem {
         table.set("uid", self.uid.as_str())?;
         table.set("name", self.game_name.as_str())?;
         table.set("game_name", self.game_name.as_str())?;
-        table.set("mod_name", self.mod_name.as_str())?;
+        table.set("package_name", self.package_name.as_str())?;
         table.set("introduction", self.introduction.as_str())?;
         table.set("author", self.author.as_str())?;
         table.set("description", self.description.as_str())?;
@@ -501,7 +506,7 @@ fn compare_game(
         compare_text_by_width_then_dictionary(left.author.as_str(), right.author.as_str())
     })
     .then_with(|| {
-        compare_text_by_width_then_dictionary(left.mod_name.as_str(), right.mod_name.as_str())
+        compare_text_by_width_then_dictionary(left.package_name.as_str(), right.package_name.as_str())
     })
     .then_with(|| {
         compare_text_by_width_then_dictionary(left.package.as_str(), right.package.as_str())
@@ -643,12 +648,13 @@ fn game_list_to_table(lua: &Lua, games: &[&GameListItem]) -> mlua::Result<Table>
 }
 
 fn best_score_to_text(best_score: &JsonValue, language_texts: &HashMap<String, String>) -> String {
+    if let Some(text) = best_score.as_str() {
+        return text.to_string();
+    }
+
     if let Some(best_string) = best_score.get("best_string").and_then(JsonValue::as_str) {
         let template = resolve_package_text(language_texts, best_string);
         return format_best_score_template(template.as_str(), best_score);
-    }
-    if let Some(text) = best_score.as_str() {
-        return resolve_package_text(language_texts, text);
     }
     serde_json::to_string(best_score).unwrap_or_default()
 }

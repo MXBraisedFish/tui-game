@@ -1,14 +1,16 @@
-//! 屏保/老板覆盖层包扫描。
+//! Saver/老板覆盖层包扫描。
 
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use chrono::Local;
 use serde_json::{Map, Value};
 
-use crate::host_engine::constant::API_VERSION;
+use crate::host_engine::constant::{
+    API_VERSION, DEFAULT_BOSS_BANNER, DEFAULT_PACKAGE_ICON, DEFAULT_SAVER_BANNER,
+};
 
 use super::manifest::{OverlayPackage, OverlayPackageManifest, OverlayRegistry, OverlayScanError};
 use super::source::{OverlayKind, OverlaySource};
@@ -19,13 +21,13 @@ type ScannerResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub fn scan_all() -> ScannerResult<OverlayRegistry> {
     let mut registry = OverlayRegistry::default();
 
-    for kind in [OverlayKind::Screen, OverlayKind::Boss] {
+    for kind in [OverlayKind::Saver, OverlayKind::Boss] {
         for source in [OverlaySource::Office, OverlaySource::ThirdParty] {
             registry.extend(scan_source(kind, source)?);
         }
     }
 
-    sort_packages(&mut registry.screens);
+    sort_packages(&mut registry.savers);
     sort_packages(&mut registry.bosses);
     Ok(registry)
 }
@@ -46,7 +48,7 @@ fn scan_source(kind: OverlayKind, source: OverlaySource) -> ScannerResult<Overla
     for package_dir in entries {
         match read_overlay_package(kind, source, &package_dir) {
             Ok(package) => match kind {
-                OverlayKind::Screen => registry.screens.push(package),
+                OverlayKind::Saver => registry.savers.push(package),
                 OverlayKind::Boss => registry.bosses.push(package),
             },
             Err(error) => registry.errors.push(OverlayScanError {
@@ -65,7 +67,11 @@ fn scan_source(kind: OverlayKind, source: OverlaySource) -> ScannerResult<Overla
     Ok(registry)
 }
 
-fn append_scan_error_log(kind: OverlayKind, package_dir: &Path, error_text: &str) -> io::Result<()> {
+fn append_scan_error_log(
+    kind: OverlayKind,
+    package_dir: &Path,
+    error_text: &str,
+) -> io::Result<()> {
     let namespace = package_dir
         .file_name()
         .and_then(|file_name| file_name.to_str())
@@ -97,7 +103,9 @@ fn read_overlay_package(
         .unwrap_or_default()
         .to_string();
     if namespace.trim().is_empty() {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "overlay namespace is empty").into());
+        return Err(
+            io::Error::new(io::ErrorKind::InvalidData, "overlay namespace is empty").into(),
+        );
     }
 
     require_dir(&package_dir.join("scripts"))?;
@@ -174,9 +182,96 @@ fn read_manifest(kind: OverlayKind, package_dir: &Path) -> ScannerResult<Overlay
         version: require_string(&value, "package.json", "version")?,
         display_name: require_string(&value, "package.json", kind.name_field())?,
         introduction: require_string(&value, "package.json", "introduction")?,
-        icon: require_value(&value, "package.json", "icon")?.clone(),
-        banner: require_value(&value, "package.json", "banner")?.clone(),
+        icon: image_or_default(&value, package_dir, "icon", DEFAULT_PACKAGE_ICON),
+        banner: image_or_default(
+            &value,
+            package_dir,
+            "banner",
+            match kind {
+                OverlayKind::Saver => DEFAULT_SAVER_BANNER,
+                OverlayKind::Boss => DEFAULT_BOSS_BANNER,
+            },
+        ),
     })
+}
+
+fn image_or_default(
+    object: &Map<String, Value>,
+    package_dir: &Path,
+    field_name: &str,
+    default_lines: &[&str],
+) -> Value {
+    object
+        .get(field_name)
+        .filter(|value| is_valid_image_field(package_dir, value))
+        .cloned()
+        .unwrap_or_else(|| default_lines_value(default_lines))
+}
+
+fn default_lines_value(lines: &[&str]) -> Value {
+    Value::Array(
+        lines
+            .iter()
+            .map(|line| Value::String((*line).to_string()))
+            .collect(),
+    )
+}
+
+fn is_valid_image_field(package_dir: &Path, value: &Value) -> bool {
+    match value {
+        Value::Array(values) => {
+            !values.is_empty()
+                && values
+                    .iter()
+                    .all(|value| value.as_str().is_some_and(|text| !text.is_empty()))
+        }
+        Value::String(text) => {
+            let text = text.trim();
+            if text.is_empty() {
+                return false;
+            }
+            if text.starts_with("image:") || text.starts_with("color:image:") {
+                return image_reference_exists(package_dir, text);
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+fn image_reference_exists(package_dir: &Path, text: &str) -> bool {
+    let image_path = text
+        .strip_prefix("color:")
+        .unwrap_or(text)
+        .strip_prefix("image:")
+        .unwrap_or("")
+        .trim();
+    let Some(clean_path) = normalize_image_path(image_path) else {
+        return false;
+    };
+    package_dir.join("assets").join(clean_path).is_file()
+}
+
+fn normalize_image_path(path: &str) -> Option<PathBuf> {
+    if path.is_empty() || Path::new(path).is_absolute() {
+        return None;
+    }
+
+    let mut clean_path = PathBuf::new();
+    for component in PathBuf::from(path).components() {
+        match component {
+            Component::Normal(part) => clean_path.push(part),
+            Component::CurDir
+            | Component::ParentDir
+            | Component::Prefix(_)
+            | Component::RootDir => {
+                return None;
+            }
+        }
+    }
+
+    let extension = clean_path.extension()?.to_str()?.to_ascii_lowercase();
+    matches!(extension.as_str(), "png" | "jpg" | "jpeg").then_some(clean_path)
 }
 
 fn read_json_object(path: &Path) -> ScannerResult<Map<String, Value>> {
@@ -256,17 +351,15 @@ fn generate_uid(
     manifest: &OverlayPackageManifest,
 ) -> String {
     let seed = format!(
-        "{}|{}|{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}",
         source.as_str(),
         namespace,
         manifest.package,
-        manifest.package_name,
+        manifest.display_name,
         manifest.author,
-        manifest.entry,
-        kind.as_str(),
-        manifest.display_name
+        manifest.entry
     );
-    format!("{}{}", kind.uid_prefix(), uid::hash_base62_16(&seed))
+    format!("{}{}", source.uid_prefix(kind), uid::hash_base62_16(&seed))
 }
 
 fn sort_packages(packages: &mut [OverlayPackage]) {

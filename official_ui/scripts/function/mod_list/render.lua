@@ -100,7 +100,7 @@ local function draw_full_item(layout, root_state, item, row_y, is_selected)
   if item.debug == true then
     name_x = draw_debug_mark(text_x, row_y, bg) + 1
   end
-  canvas_draw_text(name_x, row_y, tostring(item.mod_name or item.name or ""), fg, bg, BOLD, nil, math.max(1, max_width - (name_x - text_x)))
+  canvas_draw_text(name_x, row_y, tostring(item.package_name or item.name or ""), fg, bg, BOLD, nil, math.max(1, max_width - (name_x - text_x)))
   canvas_draw_text(text_x, row_y + 1, L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author), C.NORMAL_COLOR, bg, nil, nil)
   canvas_draw_rich_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author)), row_y + 1, tostring(item.author or ""), fg, bg, nil, max_width)
   canvas_draw_text(text_x, row_y + 2, L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version), C.NORMAL_COLOR, bg, nil, nil)
@@ -135,7 +135,7 @@ local function draw_brief_item(layout, root_state, item, row_y, is_selected)
   local status_width = L.text_width(status_text_value)
   local safe_bar_space = 2
   local max_name_width = math.max(1, inner_width - (x - inner_x) - status_width - safe_bar_space - 2)
-  canvas_draw_text(x, row_y, tostring(item.mod_name or item.name or ""), fg, bg, BOLD, nil, max_name_width)
+  canvas_draw_text(x, row_y, tostring(item.package_name or item.name or ""), fg, bg, BOLD, nil, max_name_width)
   local status_x = layout.left_x + layout.left_width - status_width - safe_bar_space - 2
   canvas_draw_text(status_x, row_y, "[", C.NORMAL_COLOR, bg, nil, nil)
   canvas_draw_text(status_x + 1, row_y, status, status_color, bg, BOLD, nil)
@@ -523,6 +523,17 @@ local function banner_lines(info, width)
       lines[#lines + 1] = { text = line, color = C.INFO_TEXT_COLOR, rich = true }
     end
   end
+  local pad_to = 13
+  local add_to_top = true
+  while #lines > 0 and #lines < pad_to do
+    local blank = { text = "", color = C.INFO_TEXT_COLOR, rich = false }
+    if add_to_top then
+      table.insert(lines, 1, blank)
+    else
+      lines[#lines + 1] = blank
+    end
+    add_to_top = not add_to_top
+  end
   return lines
 end
 
@@ -534,7 +545,7 @@ local function info_lines(root_state, width)
   end
 
   add_line(lines, L.language(root_state, "MOD_LIST_INFO_BASE", C.DEFAULT_TEXT.base), C.INFO_LABEL_COLOR)
-  add_line(lines, tostring(info.mod_name or info.name or ""), C.INFO_TEXT_COLOR)
+  add_line(lines, tostring(info.package_name or info.name or ""), C.INFO_TEXT_COLOR)
   add_rich_value(lines, L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author), info.author)
   add_rich_value(lines, L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version), info.version)
   add_blank(lines)
@@ -570,7 +581,7 @@ local function has_mod_info(root_state)
     return false
   end
   return (info.uid ~= nil and tostring(info.uid) ~= "")
-    or (info.mod_name ~= nil and tostring(info.mod_name) ~= "")
+    or (info.package_name ~= nil and tostring(info.package_name) ~= "")
     or (info.name ~= nil and tostring(info.name) ~= "")
 end
 
@@ -686,7 +697,7 @@ local function wrap_segments(segments, separator, max_width)
   return lines
 end
 
-local function draw_action_line(layout, root_state)
+local function action_segments(root_state)
   local segments = {}
   if root_state.jump then
     table.insert(segments, "[1]-[9] " .. L.language(root_state, "MOD_LIST_SELECT", C.DEFAULT_TEXT.select))
@@ -710,6 +721,11 @@ local function draw_action_line(layout, root_state)
     end
     table.insert(segments, C.DEFAULT_TEXT.return_key .. " " .. L.language(root_state, "MOD_LIST_BACK", C.DEFAULT_TEXT.back))
   end
+  return segments
+end
+
+local function draw_action_line(layout, root_state)
+  local segments = action_segments(root_state)
   local wrap_width = math.max(1, layout.terminal_width - 2)
   local lines = wrap_segments(segments, "  ", wrap_width)
   local base_y = math.max(0, layout.terminal_height - #lines)
@@ -723,9 +739,10 @@ function M.render(root_state)
   canvas_clear()
   root_state = root_state or {}
   State.set_root_state(root_state)
-  local layout = State.layout()
   root_state.pages = State.pages()
   root_state.page = math.max(1, math.min(root_state.pages, root_state.page or 1))
+  local hint_lines = #wrap_segments(action_segments(root_state), "  ", math.max(1, (L.terminal_size()) - 2))
+  local layout = L.layout(root_state.list_mode or "full", hint_lines)
 
   draw_panel(layout.left_x, layout.left_y, layout.left_width, layout.content_height, "")
   draw_colored_header(layout, root_state)

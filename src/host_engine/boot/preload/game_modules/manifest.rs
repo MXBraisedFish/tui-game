@@ -12,7 +12,7 @@ use super::source::GameModuleSource;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PackageManifest {
     pub package: String,
-    pub mod_name: String,
+    pub package_name: String,
     pub introduction: String,
     pub author: String,
     pub game_name: String,

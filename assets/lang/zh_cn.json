@@ -34,17 +34,16 @@
   "key.setting.confirm": "确认",
   "key.setting.option1": "选项-语言设置",
   "key.setting.option2": "选项-按键设置",
-  "key.setting.option3": "选项-模组列表",
+  "key.setting.option3": "选项-模组设置",
   "key.setting.option4": "选项-内存管理",
   "key.setting.option5": "选项-安全设置",
   "key.setting.back": "返回",
   "setting.title": "设置",
   "setting.language": "语言设置",
   "setting.keybind": "按键设置",
-  "setting.mods": "模组列表",
+  "setting.mods": "模组设置",
   "setting.memory": "内存管理",
   "setting.security": "安全设置",
-
   "key.language.up_option": "向上选择",
   "key.language.down_option": "向下选择",
   "key.language.left_option": "向左选择",
@@ -61,7 +60,6 @@
   "key.language.flip": "翻页",
   "language.title": "语言",
   "language.name": "简体中文",
-
   "key.memory.prev_option": "上个选项",
   "key.memory.next_option": "下个选项",
   "key.memory.select": "选择",
@@ -74,7 +72,6 @@
   "memory.cache": "清理缓存",
   "memory.data": "清理数据",
   "memory.show": "存储详情",
-
   "memory.info.dir": "目录",
   "memory.info.size": "大小",
   "memory.info.path": "路径",
@@ -85,16 +82,13 @@
   "memory.info.name.log": "日志目录",
   "memory.info.name.mod": "模组目录",
   "memory.tip": "大小按照 1024 进制换算",
-
   "key.storage_details.back": "返回",
-
   "key.clear_data.confirm": "确认",
   "key.clear_data.cancel": "取消",
   "clear_data.title": "清理数据警告",
   "clear_data.warn": "清理数据会永久删除所有记录数据，该操作不可撤回。\n是否确认清理？",
   "clear_data.path": "目录：",
   "clear_data.second": "秒",
-
   "key.clear_cache.confirm": "确认",
   "key.clear_cache.cancel": "取消",
   "clear_cache.title": "清理缓存警告",
@@ -102,7 +96,17 @@
   "clear_cache.cache_path": "缓存目录：",
   "clear_cache.log_path": "日志目录：",
   "clear_cache.second": "秒",
-
+  "key.mod.prev_option": "上个选项",
+  "key.mod.next_option": "下个选项",
+  "key.mod.list.option1": "选项-游戏包",
+  "key.mod.list.option2": "选项-屏保包",
+  "key.mod.list.option3": "选项-老板包",
+  "key.mod.list.select": "选择",
+  "key.mod.list.confirm": "确认",
+  "key.mod.list.back": "返回",
+  "key.mod.list.title": "模组设置",
+  "mod.list.game": "游戏包",
+  "mod.list.boss": "老板包",
   "key.game_list.prev_option": "上个选项",
   "key.game_list.next_option": "下个选项",
   "key.game_list.prev_page": "上一页",
@@ -134,7 +138,6 @@
   "game_list.source.mod": "模组",
   "game_list.none.game": "未找到游戏",
   "game_list.none.info": "未找到游戏信息",
-
   "key.mod_list.prev_option": "上个选项",
   "key.mod_list.next_option": "下个选项",
   "key.mod_list.prev_page": "上一页",
@@ -187,7 +190,6 @@
   "mod_list.toggle.safe_mode.off.temporary": "关闭（仅本次运行）",
   "mod_list.toggle.safe_mode.off.permanent": "关闭（永久）",
   "mod_list.status": "状态：",
-
   "key.mod_security.close.temporary": "关闭（仅本次运行）",
   "key.mod_security.close.permanent": "关闭（永久）",
   "key.mod_security.cancel": "取消",
@@ -195,13 +197,11 @@
   "mod_security.warn": "安全模式旨在保护您的电脑以及信息安全。\n若关闭宿主将无法拦截模组执行高危操作，例如直写操作等。\n请确保您完全信任该模组包的作者。\n是否确认关闭？",
   "mod_security.mod": "模组包：",
   "mod_security.second": "秒",
-
   "key.default_security.close.permanent": "关闭（永久）",
   "key.default_security.cancel": "取消",
   "default_security.title": "关闭默认安全模式警告",
   "default_security.warn": "安全模式旨在保护您的电脑以及信息安全。\n若关闭宿主将无法拦截模组执行高危操作，例如直写操作等。\n请确保您完全信任所有模组包的作者。\n是否确认关闭？",
   "default_security.second": "秒",
-
   "key.security.prev_option": "上个选项",
   "key.security.next_option": "下个选项",
   "key.security.select": "选择",
@@ -225,7 +225,6 @@
   "security.reset.mod": "重置所有模组包状态为禁用",
   "security.reset.success": "重置成功",
   "security.reset.faild": "重置失败",
-
   "key.setting_keybind.list.option1": "选项-全局按键",
   "key.setting_keybind.list.option2": "选项-系统按键",
   "key.setting_keybind.list.option3": "选项-游戏按键",
@@ -238,7 +237,6 @@
   "setting_keybind.list.global": "全局按键",
   "setting_keybind.list.system": "系统按键",
   "setting_keybind.list.game": "游戏按键",
-
   "key.setting_keybind.system.prev_option": "上个选项",
   "key.setting_keybind.system.next_option": "下个选项",
   "key.setting_keybind.system.select": "选择",
@@ -283,7 +281,6 @@
   "setting_keybind.system.table.key3": "按键3",
   "setting_keybind.system.table.key4": "按键4",
   "setting_keybind.system.case_sensitive": "按键区分大小写",
-
   "setting_keybind.system.page.home": "主页",
   "setting_keybind.system.page.setting": "设置",
   "setting_keybind.system.page.game_list": "开始游戏",
@@ -291,9 +288,10 @@
   "setting_keybind.system.page.setting_keybind": "按键设置",
   "setting_keybind.system.page.setting_memory": "内存管理",
   "setting_keybind.system.page.setting_language": "语言设置",
-  "setting_keybind.system.page.setting_mods": "模组列表",
+  "setting_keybind.system.page.setting_mods": "模组设置",
   "setting_keybind.system.page.setting_security": "安全设置",
   "setting_keybind.system.page.keybind_system": "系统按键",
   "setting_keybind.system.page.keybind_global": "全局按键",
-  "setting_keybind.system.page.keybind_game": "游戏按键"
+  "setting_keybind.system.page.keybind_game": "游戏按键",
+  "mod.list.saver": "屏保包"
 }

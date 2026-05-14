@@ -10,5 +10,6 @@ pub struct PersistentData {
     pub language_code: String,
     pub keybinds: Value,
     pub mod_state: Value,
-    pub overlay_state: Value,
+    pub saver_state: Value,
+    pub boss_state: Value,
 }

@@ -1,5 +1,4 @@
 {
-  "advanced_example.mod_name": "Official Advanced Examples",
   "advanced_example.introduction": "A richer official example game using localized metadata, image paths, timers, random numbers, save data, best score and rich text.",
   "advanced_example.author": "TUI GAME",
   "advanced_example.game_name": "Advanced Example",
@@ -19,5 +18,6 @@
   "advanced_example.saved": "Save requested.",
   "advanced_example.collected": "Collected.",
   "advanced_example.missed": "Move onto the star first.",
-  "advanced_example.reset": "Reset."
+  "advanced_example.reset": "Reset.",
+  "advanced_example.package_name": "Official Advanced Examples"
 }

@@ -14,14 +14,14 @@ impl GameModuleSource {
     pub fn root_dir(self) -> PathBuf {
         match self {
             Self::Office => root_dir().join("scripts/game"),
-            Self::Mod => root_dir().join("data/mod"),
+            Self::Mod => root_dir().join("data/mod/game"),
         }
     }
 
     /// UID 前缀
     pub fn uid_prefix(self) -> &'static str {
         match self {
-            Self::Office => "tui_game_",
+            Self::Office => "game_",
             Self::Mod => "mod_game_",
         }
     }
@@ -29,8 +29,8 @@ impl GameModuleSource {
     /// 来源标识
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Office => "office",
-            Self::Mod => "mod",
+            Self::Office => "game",
+            Self::Mod => "mod_game",
         }
     }
 }

@@ -24,7 +24,8 @@ pub fn load_persistent_data() -> LoaderResult<PersistentData> {
         language_code: read_language_code(&root_dir, &profiles_dir.join("language.txt"))?,
         keybinds: keybind_profile::load_keybind_profile(&profiles_dir.join("keybind.json"))?,
         mod_state: read_json_object(&profiles_dir.join("mod_state.json"))?,
-        overlay_state: read_json_object(&profiles_dir.join("overlay_state.json"))?,
+        saver_state: read_json_object(&profiles_dir.join("saver_state"))?,
+        boss_state: read_json_object(&profiles_dir.join("boss_state"))?,
     })
 }
 

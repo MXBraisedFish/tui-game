@@ -152,7 +152,7 @@ fn run_runtime_loop(
         .is_input_listener_running();
     let _ = loaded_resources.game_module_registry.games.len();
     let _ = loaded_resources.official_ui_registry.packages.len();
-    let _ = loaded_resources.overlay_registry.screens.len();
+    let _ = loaded_resources.overlay_registry.savers.len();
     let _ = loaded_resources.overlay_registry.bosses.len();
     let _ = loaded_resources.persistent_data.language_code.len();
     let _ = loaded_resources.cache_data.removed_game_uids.len();

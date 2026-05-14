@@ -3,9 +3,9 @@ local M = {}
 function M.render(state)
   canvas_clear()
   local width, height = get_terminal_size()
-  local title = translate("advanced_screen.title")
-  local hint = translate("advanced_screen.hint")
-  local time_text = translate("advanced_screen.time") .. ": " .. tostring(math.floor(running_time() / 1000)) .. "s"
+  local title = translate("advanced_saver.title")
+  local hint = translate("advanced_saver.hint")
+  local time_text = translate("advanced_saver.time") .. ": " .. tostring(math.floor(running_time() / 1000)) .. "s"
 
   canvas_draw_text(resolve_x(ANCHOR_CENTER, get_text_width(title)), 1, title, "#ffa500", nil, BOLD)
   canvas_draw_text(resolve_x(ANCHOR_CENTER, get_text_width(time_text)), 3, time_text, "light_cyan")

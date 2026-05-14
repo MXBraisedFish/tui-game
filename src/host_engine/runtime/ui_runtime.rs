@@ -40,6 +40,9 @@ use crate::host_engine::runtime::ui_state::lua_state::HomeLuaState;
 use crate::host_engine::runtime::ui_state::memory_state::{
     MemoryConfirmAction, MemoryLuaAction, MemoryLuaState, MemoryUiState,
 };
+use crate::host_engine::runtime::ui_state::mod_hub_state::{
+    ModHubLuaAction, ModHubLuaState, ModHubUiState,
+};
 use crate::host_engine::runtime::ui_state::mod_list_state::{
     ModListLuaAction, ModListLuaState, ModListUiState,
 };
@@ -73,6 +76,7 @@ pub struct ActiveUiPage {
     language_state: LanguageUiState,
     memory_state: MemoryUiState,
     security_state: SecurityUiState,
+    mod_hub_state: ModHubUiState,
     mod_list_state: ModListUiState,
     needed_size_mode: NeededSizeMode,
     action_map: UiActionMap,
@@ -113,7 +117,8 @@ pub(crate) fn load_home_page(
         keybinds: loaded_resources.persistent_data.keybinds.clone(),
         best_scores: loaded_resources.persistent_data.best_scores.clone(),
         mod_state: loaded_resources.persistent_data.mod_state.clone(),
-        overlay_state: loaded_resources.persistent_data.overlay_state.clone(),
+        saver_state: loaded_resources.persistent_data.saver_state.clone(),
+        boss_state: loaded_resources.persistent_data.boss_state.clone(),
         launch_mode: Default::default(),
         terminal_size,
         is_focused: true,
@@ -154,6 +159,8 @@ pub(crate) fn load_home_page(
     memory_state.reset_lua_state();
     let mut security_state = SecurityUiState::new();
     security_state.reset_lua_state();
+    let mut mod_hub_state = ModHubUiState::new();
+    mod_hub_state.reset_lua_state();
     let mut mod_list_state = ModListUiState::new(
         loaded_resources.game_module_registry.clone(),
         loaded_resources.persistent_data.mod_state.clone(),
@@ -175,6 +182,7 @@ pub(crate) fn load_home_page(
         language_state,
         memory_state,
         security_state,
+        mod_hub_state,
         mod_list_state,
         needed_size_mode: NeededSizeMode::Root,
         action_map,
@@ -220,6 +228,11 @@ impl ActiveUiPage {
         self.game_session = None;
         self.page_needs_reload = true;
     }
+
+    /// 刷新游戏列表使用的最佳记录快照。
+    pub(crate) fn refresh_best_scores(&mut self, best_scores: JsonValue) {
+        self.game_list_state.refresh_best_scores(best_scores);
+    }
 }
 
 /// 确保当前已加载指定 UI 页面脚本。
@@ -228,7 +241,7 @@ pub(crate) fn ensure_page(
     active_ui_page: &mut ActiveUiPage,
     page_key: UiPageKey,
 ) -> UiRuntimeResult<()> {
-    if page_key == UiPageKey::SettingMods {
+    if page_key == UiPageKey::ModGameList {
         refresh_mod_modules_if_needed(lua_runtime, active_ui_page)?;
     }
 
@@ -272,6 +285,9 @@ pub(crate) fn ensure_page(
         active_ui_page.security_state.reset_lua_state();
     }
     if page_key == UiPageKey::SettingMods {
+        active_ui_page.mod_hub_state.reset_lua_state();
+    }
+    if page_key == UiPageKey::ModGameList {
         active_ui_page.mod_list_state.reset_lua_state();
     }
     if page_key == UiPageKey::StorageDetails {
@@ -335,35 +351,39 @@ fn refresh_mod_modules_if_needed(
 }
 
 fn mod_directory_signature() -> String {
-    let mod_dir = root_dir().join("data/mod");
-    let Ok(entries) = fs::read_dir(mod_dir) else {
-        return String::new();
-    };
-
-    let mut parts = entries
-        .filter_map(Result::ok)
-        .filter_map(|entry| {
-            let path = entry.path();
-            if !path.is_dir() {
-                return None;
-            }
-            let name = path
-                .file_name()
-                .and_then(|file_name| file_name.to_str())
-                .unwrap_or_default()
-                .to_string();
-            let modified_secs = entry
-                .metadata()
-                .ok()
-                .and_then(|metadata| metadata.modified().ok())
-                .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|duration| duration.as_secs())
-                .unwrap_or_default();
-            Some(format!("{name}:{modified_secs}"))
-        })
-        .collect::<Vec<_>>();
+    let root = root_dir().join("data/mod");
+    let mut parts = Vec::new();
+    collect_directory_signature(root.as_path(), root.as_path(), &mut parts);
     parts.sort();
     parts.join("|")
+}
+
+fn collect_directory_signature(root: &Path, current: &Path, parts: &mut Vec<String>) {
+    let Ok(entries) = fs::read_dir(current) else {
+        return;
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        let modified_secs = metadata
+            .modified()
+            .ok()
+            .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs())
+            .unwrap_or_default();
+        let relative_path = path
+            .strip_prefix(root)
+            .ok()
+            .and_then(|path| path.to_str())
+            .unwrap_or_default()
+            .replace('\\', "/");
+        parts.push(format!("{relative_path}:{modified_secs}"));
+        if metadata.is_dir() {
+            collect_directory_signature(root, path.as_path(), parts);
+        }
+    }
 }
 
 /// 将事件传递给当前 UI 页面。
@@ -382,7 +402,8 @@ pub(crate) fn handle_event(
             .game_list_state
             .root_state
             .to_lua_table(lua)?,
-        UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
+        UiPageKey::SettingMods => active_ui_page.mod_hub_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::ModGameList => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.lua_state.to_lua_table(lua)?,
         UiPageKey::SettingKeybind => active_ui_page.keybind_state.lua_state.to_lua_table(lua)?,
         UiPageKey::KeybindSystem => active_ui_page
@@ -430,6 +451,11 @@ pub(crate) fn handle_event(
             return Ok(());
         }
         if active_ui_page.page_key == UiPageKey::SettingMods {
+            let lua_state = ModHubLuaState::from_lua_value(returned_state)?;
+            handle_mod_hub_lua_state(active_ui_page, host_state_machine, lua_state);
+            return Ok(());
+        }
+        if active_ui_page.page_key == UiPageKey::ModGameList {
             let lua_state = ModListLuaState::from_lua_value(returned_state)?;
             handle_mod_list_lua_state(lua_runtime, active_ui_page, host_state_machine, lua_state)?;
             return Ok(());
@@ -511,7 +537,7 @@ fn sync_page_script_state(
     active_ui_page: &ActiveUiPage,
 ) -> UiRuntimeResult<()> {
     if active_ui_page.page_key != UiPageKey::GameList
-        && active_ui_page.page_key != UiPageKey::SettingMods
+        && active_ui_page.page_key != UiPageKey::ModGameList
         && active_ui_page.page_key != UiPageKey::KeybindSystem
     {
         return Ok(());
@@ -524,7 +550,8 @@ fn sync_page_script_state(
             .game_list_state
             .root_state
             .to_lua_table(lua)?,
-        UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
+        UiPageKey::SettingMods => active_ui_page.mod_hub_state.lua_state.to_lua_table(lua)?,
+        UiPageKey::ModGameList => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::KeybindSystem => active_ui_page
             .keybind_system_state
             .root_state
@@ -547,7 +574,8 @@ pub(crate) fn render(
             .game_list_state
             .root_state
             .to_lua_table(lua)?,
-        UiPageKey::SettingMods => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
+        UiPageKey::SettingMods => active_ui_page.mod_hub_state.root_state.to_lua_table(lua)?,
+        UiPageKey::ModGameList => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
         UiPageKey::Setting => active_ui_page.setting_state.root_state.to_lua_table(lua)?,
         UiPageKey::SettingKeybind => active_ui_page.keybind_state.root_state.to_lua_table(lua)?,
         UiPageKey::KeybindSystem => active_ui_page
@@ -664,7 +692,8 @@ fn switch_to_ui_context(
         keybinds: current_context.keybinds,
         best_scores: current_context.best_scores,
         mod_state: current_context.mod_state,
-        overlay_state: current_context.overlay_state,
+        saver_state: current_context.saver_state,
+        boss_state: current_context.boss_state,
         launch_mode: current_context.launch_mode,
         terminal_size: current_context.terminal_size,
         is_focused: current_context.is_focused,
@@ -794,6 +823,25 @@ fn handle_game_list_lua_state(
     Ok(())
 }
 
+fn handle_mod_hub_lua_state(
+    active_ui_page: &mut ActiveUiPage,
+    host_state_machine: &mut HostStateMachine,
+    lua_state: ModHubLuaState,
+) {
+    match active_ui_page.mod_hub_state.apply_lua_state(lua_state) {
+        ModHubLuaAction::None => {}
+        ModHubLuaAction::Back => {
+            host_state_machine.setting_state = SettingState::Hub;
+        }
+        ModHubLuaAction::OpenGamePackList => {
+            host_state_machine.setting_state = SettingState::ModGameList;
+        }
+        ModHubLuaAction::OpenSaverPackList | ModHubLuaAction::OpenBossPackList => {
+            // TODO: 接入 Saver/Boss 包列表页。
+        }
+    }
+}
+
 fn handle_mod_list_lua_state(
     lua_runtime: &LuaRuntimeState,
     active_ui_page: &mut ActiveUiPage,
@@ -803,7 +851,7 @@ fn handle_mod_list_lua_state(
     match active_ui_page.mod_list_state.apply_lua_state(lua_state) {
         ModListLuaAction::None => {}
         ModListLuaAction::Back => {
-            host_state_machine.setting_state = SettingState::Hub;
+            host_state_machine.setting_state = SettingState::ModList;
         }
         ModListLuaAction::OpenSafeModeWarning(uid) => {
             host_state_machine.dialog_state = Some(DialogState::ModSecurityWarning);
@@ -840,6 +888,7 @@ fn handle_language_lua_state(
             active_ui_page
                 .game_list_state
                 .refresh_language(language_code.clone());
+            active_ui_page.mod_hub_state.refresh_language();
             active_ui_page
                 .mod_list_state
                 .refresh_language(language_code.clone());
@@ -1029,14 +1078,14 @@ fn handle_mod_security_lua_state(
         }
         host_state_machine.dialog_state = None;
         host_state_machine.dialog_context = DialogContext::None;
-        host_state_machine.setting_state = SettingState::ModList;
+        host_state_machine.setting_state = SettingState::ModGameList;
         return Ok(());
     }
 
     if back {
         host_state_machine.dialog_state = None;
         host_state_machine.dialog_context = DialogContext::None;
-        host_state_machine.setting_state = SettingState::ModList;
+        host_state_machine.setting_state = SettingState::ModGameList;
     }
 
     Ok(())
@@ -1128,8 +1177,8 @@ fn mod_security_root_state(lua: &mlua::Lua, active_ui_page: &ActiveUiPage) -> ml
     table.set("language", language)?;
     table.set("mod_uid", mod_uid.as_str())?;
     table.set(
-        "mod_name",
-        active_ui_page.mod_list_state.mod_name(mod_uid.as_str()),
+        "package_name",
+        active_ui_page.mod_list_state.package_name(mod_uid.as_str()),
     )?;
     Ok(table)
 }

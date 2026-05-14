@@ -284,7 +284,8 @@ impl KeybindSystemRootState {
     }
 
     fn rebuild_pages(&mut self) {
-        self.pages_list = build_system_pages(&self.manifest, &self.keybinds, &self.sort, &self.order);
+        self.pages_list =
+            build_system_pages(&self.manifest, &self.keybinds, &self.sort, &self.order);
     }
 
     fn normalize_selection(&mut self) {
@@ -305,7 +306,10 @@ impl KeybindSystemRootState {
         let actions = self.selected_actions();
         if actions.is_empty() {
             self.selected_action.clear();
-        } else if !actions.iter().any(|action| action.id == self.selected_action) {
+        } else if !actions
+            .iter()
+            .any(|action| action.id == self.selected_action)
+        {
             self.selected_action = actions[0].id.clone();
         }
     }
@@ -335,7 +339,12 @@ impl KeybindSystemRootState {
         }
 
         match update.op.as_str() {
-            "bind" => self.bind_key(update.page.as_str(), update.action.as_str(), update.slot, update.key.as_str()),
+            "bind" => self.bind_key(
+                update.page.as_str(),
+                update.action.as_str(),
+                update.slot,
+                update.key.as_str(),
+            ),
             "delete" => self.delete_key(update.page.as_str(), update.action.as_str(), update.slot),
             "reset" => self.reset_action(update.page.as_str(), update.action.as_str()),
             _ => {}
@@ -720,13 +729,34 @@ fn keybind_system_language_map() -> Map<String, JsonValue> {
     insert!("SECURITY_OPTION3", text.key.security_option3);
     insert!("SECURITY_OPTION4", text.key.security_option4);
     insert!("SECURITY_BACK", text.key.security_back);
-    insert!("SETTING_KEYBIND_LIST_PREV_OPTION", text.key.setting_keybind_list_prev_option);
-    insert!("SETTING_KEYBIND_LIST_NEXT_OPTION", text.key.setting_keybind_list_next_option);
-    insert!("SETTING_KEYBIND_LIST_CONFIRM", text.key.setting_keybind_list_confirm);
-    insert!("SETTING_KEYBIND_LIST_OPTION1", text.key.setting_keybind_list_option1);
-    insert!("SETTING_KEYBIND_LIST_OPTION2", text.key.setting_keybind_list_option2);
-    insert!("SETTING_KEYBIND_LIST_OPTION3", text.key.setting_keybind_list_option3);
-    insert!("SETTING_KEYBIND_LIST_BACK", text.key.setting_keybind_list_back);
+    insert!(
+        "SETTING_KEYBIND_LIST_PREV_OPTION",
+        text.key.setting_keybind_list_prev_option
+    );
+    insert!(
+        "SETTING_KEYBIND_LIST_NEXT_OPTION",
+        text.key.setting_keybind_list_next_option
+    );
+    insert!(
+        "SETTING_KEYBIND_LIST_CONFIRM",
+        text.key.setting_keybind_list_confirm
+    );
+    insert!(
+        "SETTING_KEYBIND_LIST_OPTION1",
+        text.key.setting_keybind_list_option1
+    );
+    insert!(
+        "SETTING_KEYBIND_LIST_OPTION2",
+        text.key.setting_keybind_list_option2
+    );
+    insert!(
+        "SETTING_KEYBIND_LIST_OPTION3",
+        text.key.setting_keybind_list_option3
+    );
+    insert!(
+        "SETTING_KEYBIND_LIST_BACK",
+        text.key.setting_keybind_list_back
+    );
     insert!("STORAGE_DETAILS_BACK", text.key.storage_details_back);
     map
 }
@@ -734,49 +764,178 @@ fn keybind_system_language_map() -> Map<String, JsonValue> {
 fn keybind_system_language_pairs() -> Vec<(String, String)> {
     let text = i18n::text();
     vec![
-        ("SETTING_KEYBIND_SYSTEM_PREV_OPTION".to_string(), text.key.setting_keybind_system_prev_option),
-        ("SETTING_KEYBIND_SYSTEM_NEXT_OPTION".to_string(), text.key.setting_keybind_system_next_option),
-        ("SETTING_KEYBIND_SYSTEM_SELECT".to_string(), text.key.setting_keybind_system_select),
-        ("SETTING_KEYBIND_SYSTEM_PREV_PAGE".to_string(), text.key.setting_keybind_system_prev_page),
-        ("SETTING_KEYBIND_SYSTEM_NEXT_PAGE".to_string(), text.key.setting_keybind_system_next_page),
-        ("SETTING_KEYBIND_SYSTEM_SCROLL_UP".to_string(), text.key.setting_keybind_system_scroll_up),
-        ("SETTING_KEYBIND_SYSTEM_SCROLL_DOWN".to_string(), text.key.setting_keybind_system_scroll_down),
-        ("SETTING_KEYBIND_SYSTEM_SCROLL".to_string(), text.key.setting_keybind_system_scroll),
-        ("SETTING_KEYBIND_SYSTEM_JUMP".to_string(), text.key.setting_keybind_system_jump),
-        ("SETTING_KEYBIND_SYSTEM_ORDER".to_string(), text.key.setting_keybind_system_order),
-        ("SETTING_KEYBIND_SYSTEM_SORT".to_string(), text.key.setting_keybind_system_sort),
-        ("SETTING_KEYBIND_SYSTEM_CONFIRM".to_string(), text.key.setting_keybind_system_confirm),
-        ("SETTING_KEYBIND_SYSTEM_LIST_BACK".to_string(), text.key.setting_keybind_system_list_back),
-        ("SETTING_KEYBIND_SYSTEM_BACK".to_string(), text.key.setting_keybind_system_back),
-        ("SETTING_KEYBIND_SYSTEM_LIST".to_string(), text.key.setting_keybind_system_list),
-        ("SETTING_KEYBIND_SYSTEM_KEY1".to_string(), text.key.setting_keybind_system_key1),
-        ("SETTING_KEYBIND_SYSTEM_KEY2".to_string(), text.key.setting_keybind_system_key2),
-        ("SETTING_KEYBIND_SYSTEM_KEY3".to_string(), text.key.setting_keybind_system_key3),
-        ("SETTING_KEYBIND_SYSTEM_KEY4".to_string(), text.key.setting_keybind_system_key4),
-        ("SETTING_KEYBIND_SYSTEM_TIP_DELETE".to_string(), text.key.setting_keybind_system_tip_delete),
-        ("SETTING_KEYBIND_SYSTEM_TIP_ADD_MODIFY".to_string(), text.key.setting_keybind_system_tip_add_modify),
-        ("SETTING_KEYBIND_SYSTEM_ADD".to_string(), text.key.setting_keybind_system_add),
-        ("SETTING_KEYBIND_SYSTEM_MODIFY".to_string(), text.key.setting_keybind_system_modify),
-        ("SETTING_KEYBIND_SYSTEM_ADD_SHIFT".to_string(), text.key.setting_keybind_system_add_shift),
-        ("SETTING_KEYBIND_SYSTEM_MODIFY_SHIFT".to_string(), text.key.setting_keybind_system_modify_shift),
-        ("SETTING_KEYBIND_SYSTEM_DELETE".to_string(), text.key.setting_keybind_system_delete),
-        ("SETTING_KEYBIND_SYSTEM_KEY_MODE".to_string(), text.key.setting_keybind_system_key_mode),
-        ("SETTING_KEYBIND_SYSTEM_RESET_ONLY".to_string(), text.key.setting_keybind_system_reset_only),
-        ("SETTING_KEYBIND_SYSTEM_RESET_GAME".to_string(), text.key.setting_keybind_system_reset_game),
-        ("SETTING_KEYBIND_SYSTEM_RESET_PAGE".to_string(), text.key.setting_keybind_system_reset_page),
-        ("SETTING_KEYBIND_SYSTEM_LIST_TITLE".to_string(), text.setting_keybind.system_list_title),
-        ("SETTING_KEYBIND_SYSTEM_KEY_TITLE".to_string(), text.setting_keybind.system_key_title),
-        ("SETTING_KEYBIND_SYSTEM_KEY_ANY".to_string(), text.setting_keybind.system_key_any),
-        ("SETTING_KEYBIND_SYSTEM_SORT_NAME".to_string(), text.setting_keybind.system_sort_name),
-        ("SETTING_KEYBIND_SYSTEM_SORT_CONFLICT".to_string(), text.setting_keybind.system_sort_conflict),
-        ("SETTING_KEYBIND_SYSTEM_ORDER_ASCENDING".to_string(), text.setting_keybind.system_order_ascending),
-        ("SETTING_KEYBIND_SYSTEM_ORDER_DESCENDING".to_string(), text.setting_keybind.system_order_descending),
-        ("SETTING_KEYBIND_SYSTEM_TABLE_ACTION".to_string(), text.setting_keybind.system_table_action),
-        ("SETTING_KEYBIND_SYSTEM_TABLE_KEY1".to_string(), text.setting_keybind.system_table_key1),
-        ("SETTING_KEYBIND_SYSTEM_TABLE_KEY2".to_string(), text.setting_keybind.system_table_key2),
-        ("SETTING_KEYBIND_SYSTEM_TABLE_KEY3".to_string(), text.setting_keybind.system_table_key3),
-        ("SETTING_KEYBIND_SYSTEM_TABLE_KEY4".to_string(), text.setting_keybind.system_table_key4),
-        ("SETTING_KEYBIND_SYSTEM_CASE_SENSITIVE".to_string(), text.setting_keybind.system_case_sensitive),
+        (
+            "SETTING_KEYBIND_SYSTEM_PREV_OPTION".to_string(),
+            text.key.setting_keybind_system_prev_option,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_NEXT_OPTION".to_string(),
+            text.key.setting_keybind_system_next_option,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_SELECT".to_string(),
+            text.key.setting_keybind_system_select,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_PREV_PAGE".to_string(),
+            text.key.setting_keybind_system_prev_page,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_NEXT_PAGE".to_string(),
+            text.key.setting_keybind_system_next_page,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_SCROLL_UP".to_string(),
+            text.key.setting_keybind_system_scroll_up,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_SCROLL_DOWN".to_string(),
+            text.key.setting_keybind_system_scroll_down,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_SCROLL".to_string(),
+            text.key.setting_keybind_system_scroll,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_JUMP".to_string(),
+            text.key.setting_keybind_system_jump,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_ORDER".to_string(),
+            text.key.setting_keybind_system_order,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_SORT".to_string(),
+            text.key.setting_keybind_system_sort,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_CONFIRM".to_string(),
+            text.key.setting_keybind_system_confirm,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_LIST_BACK".to_string(),
+            text.key.setting_keybind_system_list_back,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_BACK".to_string(),
+            text.key.setting_keybind_system_back,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_LIST".to_string(),
+            text.key.setting_keybind_system_list,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_KEY1".to_string(),
+            text.key.setting_keybind_system_key1,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_KEY2".to_string(),
+            text.key.setting_keybind_system_key2,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_KEY3".to_string(),
+            text.key.setting_keybind_system_key3,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_KEY4".to_string(),
+            text.key.setting_keybind_system_key4,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_TIP_DELETE".to_string(),
+            text.key.setting_keybind_system_tip_delete,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_TIP_ADD_MODIFY".to_string(),
+            text.key.setting_keybind_system_tip_add_modify,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_ADD".to_string(),
+            text.key.setting_keybind_system_add,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_MODIFY".to_string(),
+            text.key.setting_keybind_system_modify,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_ADD_SHIFT".to_string(),
+            text.key.setting_keybind_system_add_shift,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_MODIFY_SHIFT".to_string(),
+            text.key.setting_keybind_system_modify_shift,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_DELETE".to_string(),
+            text.key.setting_keybind_system_delete,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_KEY_MODE".to_string(),
+            text.key.setting_keybind_system_key_mode,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_RESET_ONLY".to_string(),
+            text.key.setting_keybind_system_reset_only,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_RESET_GAME".to_string(),
+            text.key.setting_keybind_system_reset_game,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_RESET_PAGE".to_string(),
+            text.key.setting_keybind_system_reset_page,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_LIST_TITLE".to_string(),
+            text.setting_keybind.system_list_title,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_KEY_TITLE".to_string(),
+            text.setting_keybind.system_key_title,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_KEY_ANY".to_string(),
+            text.setting_keybind.system_key_any,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_SORT_NAME".to_string(),
+            text.setting_keybind.system_sort_name,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_SORT_CONFLICT".to_string(),
+            text.setting_keybind.system_sort_conflict,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_ORDER_ASCENDING".to_string(),
+            text.setting_keybind.system_order_ascending,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_ORDER_DESCENDING".to_string(),
+            text.setting_keybind.system_order_descending,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_TABLE_ACTION".to_string(),
+            text.setting_keybind.system_table_action,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_TABLE_KEY1".to_string(),
+            text.setting_keybind.system_table_key1,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_TABLE_KEY2".to_string(),
+            text.setting_keybind.system_table_key2,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_TABLE_KEY3".to_string(),
+            text.setting_keybind.system_table_key3,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_TABLE_KEY4".to_string(),
+            text.setting_keybind.system_table_key4,
+        ),
+        (
+            "SETTING_KEYBIND_SYSTEM_CASE_SENSITIVE".to_string(),
+            text.setting_keybind.system_case_sensitive,
+        ),
     ]
 }
 
@@ -883,7 +1042,9 @@ fn normalize_key(key: &str) -> String {
 
 fn truncate_key_value(key_value: &JsonValue) -> JsonValue {
     match key_value {
-        JsonValue::Array(keys) => JsonValue::Array(keys.iter().take(MAX_ACTION_KEYS).cloned().collect()),
+        JsonValue::Array(keys) => {
+            JsonValue::Array(keys.iter().take(MAX_ACTION_KEYS).cloned().collect())
+        }
         _ => key_value.clone(),
     }
 }

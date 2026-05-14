@@ -1,9 +1,9 @@
-# 模组包制作规范
+# 游戏包制作规范
 
 # 文档信息
 
-1. 更新日期：2026年4月30日
-2. 本文档旨在为模组包开发者提供完整的规范化指引与教程，涵盖模组包结构、最佳实践及常见问题。
+1. 更新日期：2026年5月13日
+2. 本文档旨在为游戏包开发者提供完整的规范化指引与教程，涵盖游戏包结构、最佳实践及常见问题。
 
 ---
 
@@ -17,23 +17,23 @@
 
 # 目录
 
-- [模组包放置目录](#模组包放置目录)
-- [模组包目录结构](#模组包目录结构)
-- [模组包配置文件](#模组包配置文件)
+- [游戏包放置目录](#游戏包放置目录)
+- [游戏包目录结构](#游戏包目录结构)
+- [游戏包配置文件](#游戏包配置文件)
   - [目录结构](#目录结构1)
   - [命名空间](#命名空间)
   - [package.json](#packagejson)
   - [game.json](#gamejson)
   - [注册表格式](#注册表格式)
   - [UID](#uid)
-- [模组包脚本规范](#模组包脚本规范)
+- [游戏包脚本规范](#游戏包脚本规范)
   - [目录结构](#目录结构2)
   - [规范要求](#规范要求)
   - [沙箱限制](#沙箱限制禁用-api)
   - [不建议使用的 API](#不建议使用的-api)
   - [入口脚本规范](#入口脚本规范)
   - [辅助脚本规范](#辅助脚本规范)
-- [模组包资源目录](#模组包资源目录)
+- [游戏包资源目录](#游戏包资源目录)
   - [目录结构](#目录结构3)
   - [语言文件](#语言文件)
   - [其它资源文件](#其它资源文件)
@@ -46,28 +46,28 @@
 
 ---
 
-# 模组包放置目录
+# 游戏包放置目录
 
-所有模组包文件必须放置在宿主执行目录下的 `data/mod/` 目录中，按命名空间组织。
+所有游戏包文件必须放置在宿主执行目录下的 `data/mod/` 目录中，按命名空间组织。
 
 ```text
 宿主执行目录/
 └─ data/
     └─ mod/
         └─ <namespace>/    -- 命名空间
-            └─ *           -- 该模组包的所有文件
+            └─ *           -- 该游戏包的所有文件
 ```
 
 ---
 
-# 模组包目录结构
+# 游戏包目录结构
 
-一个合规的模组包必须遵循以下目录结构，缺少部分内容宿主将无法识别和加载该模组包。
+一个合规的游戏包必须遵循以下目录结构，缺少部分内容宿主将无法识别和加载该游戏包。
 
 ```text
-<namespace>/               -- 模组包命名空间/根目录
-├─ package.json            -- 模组包信息（名称、作者、版本等）
-├─ game.json               -- 模组包游戏信息（配置、入口、权限等）
+<namespace>/               -- 游戏包命名空间/根目录
+├─ package.json            -- 游戏包信息（名称、作者、版本等）
+├─ game.json               -- 游戏包游戏信息（配置、入口、权限等）
 ├─ scripts/                -- 脚本目录
 │  ├─ main.lua             -- 脚本入口文件
 │  └─ function/            -- 辅助脚本目录
@@ -82,20 +82,20 @@
 
 ---
 
-# 模组包配置文件
+# 游戏包配置文件
 
 ## 目录结构<font style="opacity:0;">1</font>
 
 ```text
-<namespace>/               -- 模组包命名空间/根目录
-├─ package.json            -- 模组包信息
-└─ game.json               -- 模组包游戏信息
+<namespace>/               -- 游戏包命名空间/根目录
+├─ package.json            -- 游戏包信息
+└─ game.json               -- 游戏包游戏信息
 ```
 
 ## 命名空间
 
-- 模组包根目录为 `<namespace>/`，`<namespace>` 即为该模组包的命名空间。
-- 命名空间在全局必须唯一，宿主将优先加载首个遇到的同名命名空间模组包。
+- 游戏包根目录为 `<namespace>/`，`<namespace>` 即为该游戏包的命名空间。
+- 命名空间在全局必须唯一，宿主将优先加载首个遇到的同名命名空间游戏包。
 - 命名空间仅允许包含以下字符：小写字母 `a-z`、大写字母 `A-Z`、数字 `0-9`、下划线 `_`。
 
 ## `package.json`
@@ -105,13 +105,13 @@
 > - `key` 表示语言键，需配合语言文件使用。
 > - `image` 表示图片路径，相对于 `assets/` 目录。
 
-该文件用于声明模组包的基本信息，格式如下：
+该文件用于声明游戏包的基本信息，格式如下：
 
 ```json
 {
   "package": string,                -- 包名
-  "mod_name": string | key,         -- 模组包显示名称
-  "introduction": string | key,     -- 模组包简介
+  "package_name": string | key,         -- 游戏包显示名称
+  "introduction": string | key,     -- 游戏包简介
   "author": string | key,           -- 作者信息
   "game_name": string | key,        -- 游戏显示名称
   "description": string | key,      -- 游戏简短描述
@@ -126,16 +126,16 @@
 
 | 字段             | 类型                                                                                                              | 说明                                           |
 | -------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同模组包，全局唯一。仅允许字符串。                     |
-| `mod_name`     | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 模组包显示名称，在模组包列表展示的包名。可填写字符串或语言键。               |
-| `introduction` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 模组包简介，在模组包列表中展示。可填写字符串或语言键。            |
+| `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同游戏包，全局唯一。仅允许字符串。                    |
+| `package_name` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏包显示名称，在游戏包列表展示的包名。可填写字符串或语言键。              |
+| `introduction` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏包简介，在游戏包列表中展示。可填写字符串或语言键。                  |
 | `author`       | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 作者名称。可填写字符串或语言键。                             |
-| `game_name`         | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏显示名称，在游戏列表中展示。可填写字符串或语言键。                  |
+| `game_name`    | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏展示名称，在游戏列表中展示。可填写字符串或语言键。                  |
 | `description`  | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏简短描述，建议一句话概括玩法或目标。可填写字符串或语言键。              |
 | `detail`       | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏详细描述，建议包含：游戏目标、核心机制、操作方式、特殊警告等。可填写字符串或语言键。 |
-| `version`      | <font color="#92cddc">string</font>                                                                             | 游戏版本号，由作者自行定义。推荐格式：主版本号.次版本号。仅允许字符串。         |
-| `icon`         | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 图标，在模组包列表中展示。具体要求见『其它-[头图与图标](#图标和头图)』。       |
-| `banner`       | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 横幅，在模组包详情页展示。具体要求见『其它-[头图与图标](#图标和头图)』。       |
+| `version`      | <font color="#92cddc">string</font>                                                                             | 游戏包版本号，由作者自行定义。推荐格式：主版本号.次版本号。仅允许字符串。        |
+| `icon`         | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 图标，在游戏包列表中展示。具体要求见『其它-[头图与图标](#图标和头图)』。      |
+| `banner`       | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 横幅，在游戏包详情页展示。具体要求见『其它-[头图与图标](#图标和头图)』。      |
 
 ## `game.json`
 
@@ -175,10 +175,10 @@
 | `best_none`          | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> \| <font color="#92cddc">null</font> | 无最佳记录时显示的文本。若不为 `null`，需要实现声明式 API `save_best_score(state)`；若为 `null` 则忽略相关调用。                                      |
 | `min_width`          | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端宽度（终端字符列数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
 | `min_height`         | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端高度（终端字符行数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
-| `write`              | <font color="#92cddc">boolean</font>                                                                         | 是否请求直写权限。`true` 表示模组包需要文件写入权限，加载时会向用户申请；`false` 表示不需要权限，所有直写请求将被宿主忽略。<font color="red">直写操作为高风险操作，请最大程度避免使用！</font> |
+| `write`              | <font color="#92cddc">boolean</font>                                                                         | 是否请求直写权限。`true` 表示游戏包需要文件写入权限，加载时会向用户申请；`false` 表示不需要权限，所有直写请求将被宿主忽略。<font color="red">直写操作为高风险操作，请最大程度避免使用！</font> |
 | `afk_time`           | <font color="#92cddc">int</font>                                                                             | 低资源运行时间阈值。填写正整数，单位为秒。值为 0 则表示永不进入低资源运行模式。                                                                           |
 | `case_sensitive`     | <font color="#92cddc">boolean</font>                                                                         | 按键是否区分大小写。`true` 表示字母按键区分大小写；`false` 表示字母按键不区分大小写。                                                                  |
-| `actions`            | <font color="#92cddc">object</font>                                                                          | 按键动作注册表，格式见『模组包配置文件-[注册表格式](#注册表格式)』。宿主会将物理按键映射为语义化动作。填写空对象代表不注册任何按键。                                               |
+| `actions`            | <font color="#92cddc">object</font>                                                                          | 按键动作注册表，格式见『游戏包配置文件-[注册表格式](#注册表格式)』。宿主会将物理按键映射为语义化动作。填写空对象代表不注册任何按键。                                               |
 | `runtime`            | <font color="#92cddc">object</font>                                                                          | 运行时设置。                                                                                                              |
 | `runtime.target_fps` | <font color="#92cddc">int</font>                                                                             | 目标帧率，支持 `30`、`60`、`120`。其它值将被忽略并回退为 `60`。实际帧率受机器性能影响，该值为上限。                                                         |
 
@@ -218,33 +218,33 @@
 
 ## UID
 
-UID 是宿主为每个模组包生成的唯一标识码，用于内部区分不同模组包，是最终的识别 ID。
+UID 是宿主为每个游戏包生成的唯一标识码，用于内部区分不同游戏包，是最终的识别 ID。
 
 **构成格式**：`mod_game_{编码}`
 
 **编码生成规则**：
 
-1. 将模组包的 `来源（source）`、`包名（package）`、`游戏名（game_name）`、`作者（author）`、`入口（entry）` 按特定格式拼接成一个字符串。
+1. 将游戏包的 `来源（source）`、`命名空间（namespace）`、`包名（package）`、`游戏名（game_name）`、`作者（author）`、`入口（entry）` 按特定格式拼接成一个字符串。
 2. 对该字符串进行特定运算编码。
 
 上述过程可用以下伪代码表示：
 ```python
-encoding = function(source + package + game_name + author + entry)
+encoding = function(source + namespace + package + game_name + author + entry)
 uid = "mod_game_" + encoding
 ```
 
-**稳定性**：只要 `来源`、`命名空间`、`游戏名`、`作者`、`入口` 保持不变，生成的 UID 就不会改变。这确保了模组包在不同环境中的一致性识别。
+**稳定性**：只要 `来源`、`命名空间`、`包名`、`游戏名`、`作者`、`入口` 保持不变，生成的 UID 就不会改变。
 
 **符号**：由`0-9` `a-z` `A-Z`组成。
 
 ---
 
-# 模组包脚本规范
+# 游戏包脚本规范
 
 ## 目录结构<font style="opacity:0;">2</font>
 
 ```text
-<namespace>/               -- 模组包命名空间/根目录
+<namespace>/               -- 游戏包命名空间/根目录
 └─ scripts/                -- 脚本目录
    ├─ main.lua             -- 脚本入口文件
    └─ function/            -- 辅助脚本目录
@@ -253,33 +253,58 @@ uid = "mod_game_" + encoding
 
 ## 规范要求
 
-1. 所有脚本文件必须放置在 `scripts/` 目录下，且仅支持 `.lua` 扩展名。
-2. 入口脚本建议直接放在 `scripts/` 目录下，默认文件名为 `main.lua`（由 `game.json` 中的 `entry` 字段指定，可自定义）。
-3. 辅助脚本必须存放在 `scripts/function/` 目录下，用于组织可复用的模块化代码。
+1. 所有脚本文件必须放在 `scripts/` 目录下，且仅支持 `.lua` 扩展名。
+2. 入口脚本建议直接放在 `scripts/` 目录下，由 `package.json` 中的 `entry` 字段指定，可自定义。
+3. 辅助脚本必须放在 `scripts/function/` 目录下，用于组织可复用的模块化代码。
 
 ## 沙箱限制（禁用 API）
 
 以下 Lua 内置 API 在脚本中**严格禁止使用**，宿主沙箱会阻止其执行：
 
-- `os.execute`
-- `os.remove`
-- `os.rename`
-- `os.exit`
-- `io.*`（所有输入输出函数）
-- `debug.*`（所有调试函数）
+- `os`库
+- `io`库
+- `debug`库
+- `package`库
+- `coroutine`库
+- `bit`库
+- `debug`库
+- `dofile` API
+- `loadfile` API
+- `loadstring` API
 
 ## 不建议使用的 API
 
 为保证游戏性能和宿主稳定性，以下 Lua 内置 API 不建议在脚本中使用，推荐使用宿主提供的替代方案：
 
-| 不建议使用的 API                   | 推荐替代方案                                  |
-| ---------------------------- | --------------------------------------- |
-| `require`                    | 使用 直用式 API `load_function` 加载辅助脚本       |
-| `dofile`                     | 使用 `load_function`                      |
-| `loadfile`                   | 使用 `load_function`                      |
-| `while true do ... end`（死循环） | 依赖宿主每帧调用的 声明式 API `handle_event` 实现循环逻辑 |
-| `math.random`                | 使用直用式 API `random_*` 系列函数（可复现、更安全）      |
-| `print`                      | 使用直用式 API `debug_*`（输出到日志文件）            |
+| 不建议使用的 API | 推荐替代方案 | 说明 |
+| --- | --- | --- |
+| `math.random` | 直用式 API `random_*` 系列函数 | 支持可复现的随机序列，更安全可控 |
+
+## 修改行为的 API
+
+以下 Lua 内置 API 的输出重定向至日志文件：
+
+| API      | 修改说明                          |
+| -------- | ----------------------------- |
+| `print`  | 输出内容写入日志文件，且需要开启调试模式          |
+| `assert` | 断言信息写入日志文件，且需要开启调试模式（断言本身不需要） |
+| `error`  | 错误信息写入日志文件，且需要开启调试模式（错误本身不需要） |
+
+> 建议使用直用式 API `debug_*` 系列函数。
+
+## 脚本运行规范
+
+脚本中**禁止编写可能引发死循环或脚本卡死的代码**，例如：
+
+```lua
+while true do
+  -- 无跳出条件的循环
+end
+```
+
+宿主会对脚本执行**超时保护机制**。当检测到脚本执行时间过长时，将强制中断脚本运行，以保护宿主线程的稳定性。
+
+> 使用直用式 API `handle_event`，宿主会以帧为单位循环调用该函数，脚本无需自行编写死循环。
 
 ## 入口脚本规范
 
@@ -336,12 +361,12 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ---
 
-# 模组包资源目录
+# 游戏包资源目录
 
 ## 目录结构<font style="opacity:0;">3</font>
 
 ```text
-<namespace>/               -- 模组包命名空间/根目录
+<namespace>/               -- 游戏包命名空间/根目录
 └─ assets/                 -- 资源目录
    ├─ lang/                -- 语言资源目录
    │  ├─ en_us.json        -- 英语（美国）
@@ -355,7 +380,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 ### 文件规范
 
 - 所有语言文件必须存放在 `assets/lang/` 目录下。
-- **`en_us.json` 必须提供**，作为默认回退语言。当宿主请求的语言模组包未实现时，会自动使用 `en_us.json` 中的对应键值；若该键在 `en_us.json` 中也不存在，则返回  \[missing-i18n-key: `key` ]。
+- **`en_us.json` 必须提供**，作为默认回退语言。当宿主请求的语言游戏包未实现时，会自动使用 `en_us.json` 中的对应键值；若该键在 `en_us.json` 中也不存在，则返回  \[missing-i18n-key: `key` ]。
 - **`zh_cn.json` 建议提供**（软规范）。由于仓库作者来自中文社区，提供简体中文支持有助于本地化体验，但非强制。
 - 其它语言文件请按照 `{语言代码}.json` 的命名规则创建，确保宿主能够根据用户选择的语言正确加载。宿主支持的语言扩展详见 `LANGUAGE.md`。
 
@@ -374,7 +399,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ```json
 {
-  "[#key]": "string"
+  [#key]: string
 }
 ```
 
@@ -384,7 +409,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 {
   "game.title": "推箱子",
   "game.score": "当前得分：{score}",
-  "game.hint": "{tc:green}按 R 键重新开始<tc:clear>"
+  "game.hint": "{tc:green}按 R 键重新开始{tc:clear}"
 }
 ```
 
@@ -407,7 +432,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ### 图标
 
-图标用于在模组包列表中展示，显示区域为 **4 行 × 8 列**（终端字符数）。
+图标用于在游戏包列表中展示，显示区域为 **4 行 × 8 列**（终端字符数）。
 
 **支持参数类型**：数组 / 字符串 / 图片
 
@@ -421,7 +446,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
   - 若子数组内元素不足 8 个，宿主会在左右交替补充空格补齐至 8 个元素（**先右后左**）。
   - 若子数组内元素超过 8 个，仅保留前 8 个。
 - 完成上述填充后，已填写的图标元素会被**居中显示**。
-- **推荐写法**：将所有元素左对齐，剩余对齐与填充工作交由宿主完成。
+- **推荐写法**：将所有元素长度设置一样，剩余对齐与填充工作交由宿主完成。
 
 #### 字符串
 
@@ -446,7 +471,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ### 头图
 
-头图用于在模组包详情的详细信息展示，显示区域为 **13 行 × 86 列**（终端字符数）。
+头图用于在游戏包详情的详细信息展示，显示区域为 **13 行 × 86 列**（终端字符数）。
 
 **支持参数类型**：数组 / 字符串 / 图片
 
@@ -460,7 +485,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
   - 若子数组内元素不足 86 个，宿主会在左右交替补充空格补齐至 86 个元素（**先左后右**）。
   - 若子数组内元素超过 86 个，仅保留前 86 个。
 - 完成上述填充后，已填写的头图元素会被**居中显示**。
-- **推荐写法**：将所有元素左对齐，剩余对齐与填充工作交由宿主完成。
+- **推荐写法**：将所有元素长度设置一样，剩余对齐与填充工作交由宿主完成。
 
 #### 字符串
 

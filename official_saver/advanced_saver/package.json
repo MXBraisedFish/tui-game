@@ -1,0 +1,12 @@
+{
+  "api": -1,
+  "entry": "main.lua",
+  "package": "advanced_saver",
+  "package_name": "advanced_saver.package_name",
+  "author": "advanced_saver.author",
+  "version": "0.2.0",
+  "saver_name": "advanced_saver.saver_name",
+  "introduction": "advanced_saver.introduction",
+  "icon": "color:image:images/icon.png",
+  "banner": "color:image:images/banner.png"
+}

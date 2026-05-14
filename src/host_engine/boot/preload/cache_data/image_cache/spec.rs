@@ -1,7 +1,7 @@
 //! package.json 图片字段解析
 
 use std::io;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use serde_json::Value;
 
@@ -20,24 +20,43 @@ pub fn parse_image_spec(package_root_dir: &Path, value: &Value) -> Option<GameIm
     };
 
     let relative_path = image_value.strip_prefix(IMAGE_PREFIX)?.trim();
-    if relative_path.is_empty() || relative_path.contains("..") {
+    if relative_path.is_empty() || Path::new(relative_path).is_absolute() {
         return None;
     }
 
-    let absolute_path = package_root_dir.join("assets").join(relative_path);
+    let clean_path = normalize_and_validate_image_path(relative_path)?;
+    let absolute_path = package_root_dir.join("assets").join(&clean_path);
     if !absolute_path.is_file() {
         return None;
     }
 
     Some(GameImageSpec {
-        relative_path: normalize_relative_path(relative_path),
+        relative_path: normalize_relative_path(&clean_path),
         absolute_path,
         color_mode,
     })
 }
 
-fn normalize_relative_path(path: &str) -> String {
-    path.replace('\\', "/")
+fn normalize_and_validate_image_path(path: &str) -> Option<PathBuf> {
+    let mut clean_path = PathBuf::new();
+    for component in PathBuf::from(path).components() {
+        match component {
+            Component::Normal(part) => clean_path.push(part),
+            Component::CurDir
+            | Component::ParentDir
+            | Component::Prefix(_)
+            | Component::RootDir => {
+                return None;
+            }
+        }
+    }
+
+    let extension = clean_path.extension()?.to_str()?.to_ascii_lowercase();
+    matches!(extension.as_str(), "png" | "jpg" | "jpeg").then_some(clean_path)
+}
+
+fn normalize_relative_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }
 
 pub fn invalid_image_error(path: &Path, error: impl std::fmt::Display) -> io::Error {

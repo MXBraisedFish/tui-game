@@ -8,6 +8,7 @@ pub mod key;
 pub mod language;
 pub mod loading;
 pub mod memory;
+pub mod mod_hub;
 pub mod mod_list;
 pub mod mod_security;
 pub mod security;

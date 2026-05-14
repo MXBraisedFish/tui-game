@@ -29,7 +29,7 @@ pub fn create_lua_runtime_environment(
         StdLib::MATH | StdLib::UTF8 | StdLib::STRING | StdLib::TABLE,
         LuaOptions::default(),
     )?;
-    sandbox::install_sandbox(&lua)?;
+    sandbox::install_sandbox(&lua, &host_bridge)?;
     api::install_runtime_apis(&lua, api_scope, host_bridge.clone())?;
 
     Ok(LuaRuntimeEnvironment {

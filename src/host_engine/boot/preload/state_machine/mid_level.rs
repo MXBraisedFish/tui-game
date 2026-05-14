@@ -37,11 +37,17 @@ pub enum SettingState {
     /// TODO: 返回键切换回 `Hub`。
     Language,
 
-    /// Mod 列表。
+    /// Mod 设置中转页。
     ///
     /// TODO: 返回键切换回 `Hub`。
-    /// TODO: 关闭单个 Mod 安全模式时打开 `DialogState::ModSecurityWarning`。
+    /// TODO: 选择游戏包时切换到 `ModGameList`。
     ModList,
+
+    /// 游戏包 Mod 列表。
+    ///
+    /// TODO: 返回键切换回 `ModList`。
+    /// TODO: 关闭单个 Mod 安全模式时打开 `DialogState::ModSecurityWarning`。
+    ModGameList,
 
     /// 按键设置。
     ///

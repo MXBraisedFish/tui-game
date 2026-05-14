@@ -49,7 +49,8 @@ pub struct LuaRuntimeContext {
     pub keybinds: Value,
     pub best_scores: Value,
     pub mod_state: Value,
-    pub overlay_state: Value,
+    pub saver_state: Value,
+    pub boss_state: Value,
     pub launch_mode: LaunchMode,
     pub terminal_size: TerminalSize,
     pub is_focused: bool,
@@ -67,7 +68,8 @@ impl Default for LuaRuntimeContext {
             keybinds: Value::Null,
             best_scores: Value::Null,
             mod_state: Value::Null,
-            overlay_state: Value::Null,
+            saver_state: Value::Null,
+            boss_state: Value::Null,
             launch_mode: LaunchMode::default(),
             terminal_size: TerminalSize::default(),
             is_focused: true,
@@ -81,7 +83,7 @@ pub enum LuaRuntimeConsumer {
     #[default]
     GamePackage,
     OfficialUiPackage,
-    ScreenPackage,
+    SaverPackage,
     BossPackage,
 }
 

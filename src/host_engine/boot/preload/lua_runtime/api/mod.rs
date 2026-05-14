@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 pub mod callback_api;
-mod debug_support;
+pub(crate) mod debug_support;
 pub mod direct_debug_api;
 pub mod direct_drawing_api;
 pub mod direct_file_reading_api;

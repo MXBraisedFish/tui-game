@@ -6,6 +6,7 @@ use super::file_reading_support::asset_path;
 use super::file_reading_support::file_reader;
 use super::file_reading_support::lua_value;
 use super::file_reading_support::structured_parser::{self, StructuredFormat};
+use super::file_reading_support::translation_parameter;
 use super::file_reading_support::translation_reader::{self, TranslationResult};
 use super::scope::ApiScope;
 use super::validation::argument;
@@ -26,6 +27,7 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
         host_bridge.clone(),
         "read_json",
         StructuredFormat::Json,
+        "json",
     )?;
     install_read_structured(
         lua,
@@ -33,6 +35,7 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
         host_bridge.clone(),
         "read_xml",
         StructuredFormat::Xml,
+        "xml",
     )?;
     install_read_structured(
         lua,
@@ -40,6 +43,7 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
         host_bridge.clone(),
         "read_yaml",
         StructuredFormat::Yaml,
+        "yaml",
     )?;
     install_read_structured(
         lua,
@@ -47,6 +51,7 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
         host_bridge.clone(),
         "read_toml",
         StructuredFormat::Toml,
+        "toml",
     )?;
     install_read_structured(
         lua,
@@ -54,12 +59,31 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
         host_bridge.clone(),
         "read_csv",
         StructuredFormat::Csv,
+        "csv",
     )?;
-    install_read_raw_string(lua, &globals, host_bridge.clone(), "read_json_string")?;
-    install_read_raw_string(lua, &globals, host_bridge.clone(), "read_xml_string")?;
-    install_read_raw_string(lua, &globals, host_bridge.clone(), "read_yaml_string")?;
-    install_read_raw_string(lua, &globals, host_bridge.clone(), "read_toml_string")?;
-    install_read_raw_string(lua, &globals, host_bridge, "read_csv_string")?;
+    install_read_raw_string(
+        lua,
+        &globals,
+        host_bridge.clone(),
+        "read_json_string",
+        "json",
+    )?;
+    install_read_raw_string(lua, &globals, host_bridge.clone(), "read_xml_string", "xml")?;
+    install_read_raw_string(
+        lua,
+        &globals,
+        host_bridge.clone(),
+        "read_yaml_string",
+        "yaml",
+    )?;
+    install_read_raw_string(
+        lua,
+        &globals,
+        host_bridge.clone(),
+        "read_toml_string",
+        "toml",
+    )?;
+    install_read_raw_string(lua, &globals, host_bridge, "read_csv_string", "csv")?;
 
     Ok(())
 }
@@ -72,8 +96,19 @@ fn install_translate(
     globals.set(
         "translate",
         lua.create_function(move |lua, args: Variadic<Value>| {
-            argument::expect_exact_arg_count(&args, 1)?;
+            argument::expect_arg_count_range(&args, 1, 2)?;
             let key = argument::expect_string_arg(&args, 0)?;
+            let parameters = match args.get(1) {
+                Some(Value::Nil) | None => None,
+                Some(Value::Table(table)) => {
+                    Some(translation_parameter::read_parameter_table(table)?)
+                }
+                Some(_) => {
+                    return Err(mlua::Error::external(
+                        "translation parameter must be a table",
+                    ));
+                }
+            };
             let runtime_context = host_bridge.runtime_context();
             let package_root = current_package_root(&runtime_context)?;
             match translation_reader::read_translation(
@@ -81,7 +116,15 @@ fn install_translate(
                 runtime_context.language_code.as_str(),
                 key.as_str(),
             )? {
-                TranslationResult::Found(value) => Ok(Value::String(lua.create_string(&value)?)),
+                TranslationResult::Found(value) => {
+                    let value = parameters
+                        .as_ref()
+                        .map(|parameters| {
+                            translation_parameter::apply_parameters(value.as_str(), parameters)
+                        })
+                        .unwrap_or(value);
+                    Ok(Value::String(lua.create_string(&value)?))
+                }
                 TranslationResult::MissingInCurrentLanguage
                 | TranslationResult::MissingInFallback => Ok(Value::String(
                     lua.create_string(format!("[missing-i18n-key: {key}]").as_str())?,
@@ -99,7 +142,7 @@ fn install_read_text(
     globals.set(
         "read_text",
         lua.create_function(move |lua, args: Variadic<Value>| {
-            let text = read_asset_text(&host_bridge, &args)?;
+            let text = read_asset_text(&host_bridge, &args, "txt")?;
             Ok(Value::String(lua.create_string(&text)?))
         })?,
     )
@@ -111,11 +154,12 @@ fn install_read_structured(
     host_bridge: HostLuaBridge,
     function_name: &'static str,
     file_format: StructuredFormat,
+    file_extension: &'static str,
 ) -> mlua::Result<()> {
     globals.set(
         function_name,
         lua.create_function(move |lua, args: Variadic<Value>| {
-            let text = read_asset_text(&host_bridge, &args)?;
+            let text = read_asset_text(&host_bridge, &args, file_extension)?;
             let value = structured_parser::parse_structured_text(text.as_str(), file_format)?;
             lua_value::json_to_lua_value(lua, &value)
         })?,
@@ -127,22 +171,31 @@ fn install_read_raw_string(
     globals: &mlua::Table,
     host_bridge: HostLuaBridge,
     function_name: &'static str,
+    file_extension: &'static str,
 ) -> mlua::Result<()> {
     globals.set(
         function_name,
         lua.create_function(move |lua, args: Variadic<Value>| {
-            let text = read_asset_text(&host_bridge, &args)?;
+            let text = read_asset_text(&host_bridge, &args, file_extension)?;
             Ok(Value::String(lua.create_string(&text)?))
         })?,
     )
 }
 
-fn read_asset_text(host_bridge: &HostLuaBridge, args: &Variadic<Value>) -> mlua::Result<String> {
+fn read_asset_text(
+    host_bridge: &HostLuaBridge,
+    args: &Variadic<Value>,
+    file_extension: &str,
+) -> mlua::Result<String> {
     argument::expect_exact_arg_count(args, 1)?;
     let logical_path = argument::expect_string_arg(args, 0)?;
     let runtime_context = host_bridge.runtime_context();
     let package_root = current_package_root(&runtime_context)?;
-    let resolved_path = asset_path::resolve_asset_path(package_root, logical_path.as_str())?;
+    let resolved_path = asset_path::resolve_asset_file_path(
+        package_root,
+        logical_path.as_str(),
+        Some(file_extension),
+    )?;
     file_reader::ensure_file_exists(&resolved_path)?;
     file_reader::read_text(&resolved_path)
 }

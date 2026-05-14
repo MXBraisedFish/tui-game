@@ -115,6 +115,9 @@ fn install_get_game_uid(
         "get_game_uid",
         lua.create_function(move |lua, args: Variadic<Value>| {
             argument::expect_exact_arg_count(&args, 0)?;
+            if !debug_log_writer::is_debug_enabled(&host_bridge) {
+                return Ok(Value::Nil);
+            }
             let runtime_context = host_bridge.runtime_context();
             let game_uid = runtime_context
                 .current_game
@@ -134,6 +137,9 @@ fn install_get_game_info(
         "get_game_info",
         lua.create_function(move |lua, args: Variadic<Value>| {
             argument::expect_exact_arg_count(&args, 0)?;
+            if !debug_log_writer::is_debug_enabled(&host_bridge) {
+                return Ok(Value::Nil);
+            }
             let runtime_context = host_bridge.runtime_context();
             match runtime_context.current_game {
                 Some(game_module) => Ok(Value::Table(debug_info_table::build_game_info_table(

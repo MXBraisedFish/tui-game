@@ -107,8 +107,8 @@ fn empty_keybind_profile() -> Value {
 fn default_global_keybinds() -> Map<String, Value> {
     let mut global_keybinds = Map::new();
     global_keybinds.insert(
-        "screen_saver".to_string(),
-        keybind_entry(&Value::String("f2".to_string()), "global.key.screen_saver"),
+        "saver".to_string(),
+        keybind_entry(&Value::String("f2".to_string()), "global.key.saver"),
     );
     global_keybinds.insert(
         "boss_key".to_string(),

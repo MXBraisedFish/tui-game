@@ -7,8 +7,8 @@ pub enum ApiConsumer {
     GamePackage,
     /// 官方 UI 包脚本。
     OfficialUiPackage,
-    /// 屏保覆盖层脚本。
-    ScreenPackage,
+    /// Saver 覆盖层脚本。
+    SaverPackage,
     /// 老板键覆盖层脚本。
     BossPackage,
 }
@@ -34,10 +34,10 @@ impl ApiScope {
         }
     }
 
-    /// 屏保覆盖层 API 作用域。
-    pub fn screen_package() -> Self {
+    /// Saver 覆盖层 API 作用域。
+    pub fn saver_package() -> Self {
         Self {
-            consumer: ApiConsumer::ScreenPackage,
+            consumer: ApiConsumer::SaverPackage,
         }
     }
 
@@ -67,7 +67,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }
@@ -109,7 +109,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }
@@ -120,7 +120,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }
@@ -131,7 +131,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }
@@ -142,7 +142,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }
@@ -158,7 +158,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }
@@ -169,7 +169,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }
@@ -180,7 +180,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }
@@ -191,7 +191,7 @@ impl ApiScope {
             self.consumer,
             ApiConsumer::GamePackage
                 | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreenPackage
+                | ApiConsumer::SaverPackage
                 | ApiConsumer::BossPackage
         )
     }

@@ -189,7 +189,10 @@ fn handle_crossterm_key_event(
     if let Ok(mut key_state) = shared_key_state.lock() {
         key_state.last_crossterm_output = Some((semantic_key.clone(), Instant::now()));
     }
-    let _ = input_sender.send(HostInputEvent::Key { key: semantic_key, status: "press".to_string() });
+    let _ = input_sender.send(HostInputEvent::Key {
+        key: semantic_key,
+        status: "press".to_string(),
+    });
 }
 
 fn drain_ready_rdev_keys(
@@ -234,11 +237,17 @@ fn drain_ready_rdev_keys(
                         })
                         .unwrap_or(false);
                     if !should_suppress {
-                        output_events.push(HostInputEvent::Key { key: semantic_key, status: "press".to_string() });
+                        output_events.push(HostInputEvent::Key {
+                            key: semantic_key,
+                            status: "press".to_string(),
+                        });
                     }
                 }
                 RdevKeyEventType::Release => {
-                    output_events.push(HostInputEvent::Key { key: semantic_key, status: "release".to_string() });
+                    output_events.push(HostInputEvent::Key {
+                        key: semantic_key,
+                        status: "release".to_string(),
+                    });
                 }
             }
         }

@@ -18,11 +18,12 @@
     "keybind_system": "keybind/keybind_system.lua",
     "keybind_game": "keybind/keybind_game.lua",
     "setting_boss": "setting/setting_boss.lua",
-    "setting_screen": "setting/setting_screen.lua",
-    "screen_list": "screen/list.lua",
-    "screen_display": "screen/display.lua",
-    "boss_list": "boss/list.lua",
-    "boss_display": "boss/display.lua"
+    "mod_game_list": "game/list.lua",
+    "mod_boss_list": "boss/list.lua",
+    "mod_boss_display": "boss/display.lua",
+    "setting_saver": "setting/setting_saver.lua",
+    "mod_saver_list": "saver/list.lua",
+    "mod_saver_display": "saver/display.lua"
   },
   "actions": {
     "home": {
@@ -257,59 +258,34 @@
     "setting_mods": {
       "prev_option": {
         "key": "up",
-        "name": "MOD_LIST_PREV_OPTION"
+        "name": "MOD_PREV_OPTION"
       },
       "next_option": {
         "key": "down",
-        "name": "MOD_LIST_NEXT_OPTION"
-      },
-      "prev_page": {
-        "key": "q",
-        "name": "MOD_LIST_PREV_PAGE"
-      },
-      "next_page": {
-        "key": "e",
-        "name": "MOD_LIST_NEXT_PAGE"
-      },
-      "scroll_up": {
-        "key": "w",
-        "name": "MOD_LIST_SCROLL_UP"
-      },
-      "scroll_down": {
-        "key": "s",
-        "name": "MOD_LIST_SCROLL_DOWN"
-      },
-      "jump": {
-        "key": "j",
-        "name": "MOD_LIST_JUMP"
+        "name": "MOD_NEXT_OPTION"
       },
       "confirm": {
         "key": "enter",
-        "name": "MOD_LIST_TOGGLE_CONFIRM"
+        "name": "MOD_HUB_CONFIRM"
+      },
+      "option1": {
+        "key": "1",
+        "name": "MOD_LIST_OPTION1"
+      },
+      "option2": {
+        "key": "2",
+        "name": "MOD_LIST_OPTION2"
+      },
+      "option3": {
+        "key": "3",
+        "name": "MOD_LIST_OPTION3"
       },
       "return": {
-        "key": "esc",
-        "name": "MOD_LIST_BACK_CANCEL"
-      },
-      "order": {
-        "key": "z",
-        "name": "MOD_LIST_ORDER"
-      },
-      "sort": {
-        "key": "x",
-        "name": "MOD_LIST_SORT"
-      },
-      "debug": {
-        "key": "d",
-        "name": "MOD_LIST_DEBUG"
-      },
-      "list": {
-        "key": "l",
-        "name": "MOD_LIST_LIST"
-      },
-      "safe_mode": {
-        "key": "r",
-        "name": "MOD_LIST_SAFE_MODE"
+        "key": [
+          "esc",
+          "q"
+        ],
+        "name": "MOD_HUB_BACK"
       }
     },
     "setting_keybind": {
@@ -479,6 +455,64 @@
       "page_reset": {
         "key": "t",
         "name": "SETTING_KEYBIND_SYSTEM_RESET_PAGE"
+      }
+    },
+    "mod_game_list": {
+      "prev_option": {
+        "key": "up",
+        "name": "MOD_LIST_PREV_OPTION"
+      },
+      "next_option": {
+        "key": "down",
+        "name": "MOD_LIST_NEXT_OPTION"
+      },
+      "prev_page": {
+        "key": "q",
+        "name": "MOD_LIST_PREV_PAGE"
+      },
+      "next_page": {
+        "key": "e",
+        "name": "MOD_LIST_NEXT_PAGE"
+      },
+      "scroll_up": {
+        "key": "w",
+        "name": "MOD_LIST_SCROLL_UP"
+      },
+      "scroll_down": {
+        "key": "s",
+        "name": "MOD_LIST_SCROLL_DOWN"
+      },
+      "jump": {
+        "key": "j",
+        "name": "MOD_LIST_JUMP"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "MOD_LIST_TOGGLE_CONFIRM"
+      },
+      "return": {
+        "key": "esc",
+        "name": "MOD_LIST_BACK_CANCEL"
+      },
+      "order": {
+        "key": "z",
+        "name": "MOD_LIST_ORDER"
+      },
+      "sort": {
+        "key": "x",
+        "name": "MOD_LIST_SORT"
+      },
+      "debug": {
+        "key": "d",
+        "name": "MOD_LIST_DEBUG"
+      },
+      "list": {
+        "key": "l",
+        "name": "MOD_LIST_LIST"
+      },
+      "safe_mode": {
+        "key": "r",
+        "name": "MOD_LIST_SAFE_MODE"
       }
     }
   }

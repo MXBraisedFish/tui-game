@@ -1,7 +1,6 @@
 {
   "namespace": "official",
   "package": "TUI-GAME Official",
-  "mod_name": "TUI-GAME Official",
   "introduction": "game.lights_out.package_introduction",
   "author": "TUI-GAME",
   "game_name": "game.lights_out.name",
@@ -21,5 +20,6 @@
     " | |___| | (_| | | | | |_\\__ \\ |_| | |_| | |_ ",
     " |_____|_|\\__, |_| |_|\\__|___/\\___/ \\__,_|\\__|",
     "          |___/                                  "
-  ]
+  ],
+  "package_name": "TUI-GAME Official"
 }

@@ -365,7 +365,7 @@ local function fixed_info_lines(root_state, wrap_width)
 
   add(tostring(info.game_name or info.name or ""), C.TITLE_COLOR)
   add_separator(lines, wrap_width)
-  add_rich_value(lines, L.language(root_state, "GAME_LIST_INFO_MOD", C.DEFAULT_TEXT.info_mod), info.mod_name)
+  add_rich_value(lines, L.language(root_state, "GAME_LIST_INFO_MOD", C.DEFAULT_TEXT.info_mod), info.package_name)
   add_rich_value(lines, L.language(root_state, "GAME_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.info_author), info.author)
   add_rich_value(lines, L.language(root_state, "GAME_LIST_INFO_VERSION", C.DEFAULT_TEXT.info_version), info.version)
   if info.best_score ~= nil and tostring(info.best_score) ~= "" then
@@ -566,7 +566,7 @@ local function wrap_segments(segments, separator, max_width)
   return lines
 end
 
-local function draw_action_line(layout, root_state)
+local function action_segments(root_state)
   local segments = {}
   if root_state.jump then
     table.insert(segments, "[1]-[9] " .. L.language(root_state, "GAME_LIST_SELECT", C.DEFAULT_TEXT.select))
@@ -587,6 +587,11 @@ local function draw_action_line(layout, root_state)
     end
     table.insert(segments, C.DEFAULT_TEXT.return_key .. " " .. L.language(root_state, "GAME_LIST_BACK", C.DEFAULT_TEXT.back))
   end
+  return segments
+end
+
+local function draw_action_line(layout, root_state)
+  local segments = action_segments(root_state)
   local wrap_width = math.max(1, layout.terminal_width - 2)
   local lines = wrap_segments(segments, "  ", wrap_width)
   local base_y = math.max(0, layout.terminal_height - #lines)
@@ -600,9 +605,10 @@ function M.render(root_state)
   canvas_clear()
   root_state = root_state or {}
   State.set_root_state(root_state)
-  local layout = State.layout()
   root_state.pages = State.pages()
   root_state.page = math.max(1, math.min(root_state.pages, root_state.page or 1))
+  local hint_lines = #wrap_segments(action_segments(root_state), "  ", math.max(1, (L.terminal_size()) - 2))
+  local layout = L.layout(hint_lines)
 
   draw_panel(layout.left_x, layout.left_y, layout.left_width, layout.content_height, "")
   draw_colored_header(layout, root_state)

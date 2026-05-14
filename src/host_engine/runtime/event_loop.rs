@@ -14,6 +14,7 @@ use crate::host_engine::boot::preload::overlay_modules::OverlayRegistry;
 use crate::host_engine::boot::preload::state_machine::HostStateMachine;
 use crate::host_engine::constant::{ROOT_UI_MIN_HEIGHT, ROOT_UI_MIN_WIDTH};
 use crate::host_engine::runtime::frame_rate::FrameRateController;
+use crate::host_engine::runtime::game_engine::best_score_store;
 use crate::host_engine::runtime::overlay::{OverlaySession, OverlaySessionKind};
 use crate::host_engine::runtime::renderer::RendererState;
 use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
@@ -24,7 +25,6 @@ use crate::host_engine::runtime::ui_state::needed_size_state::{
 
 type RuntimeLoopResult<T> = Result<T, Box<dyn std::error::Error>>;
 const UI_EVENT_QUEUE_LIMIT: usize = 256;
-const RESIZE_DEBOUNCE_MS: u64 = 50;
 
 /// 运行最小宿主事件循环。
 ///
@@ -53,7 +53,6 @@ pub(crate) fn run(
     let mut was_running_game = false;
     let mut is_focused = true;
     let mut overlay_session: Option<OverlaySession> = None;
-    let mut pending_resize: Option<(ResizeEvent, Instant)> = None;
     loop {
         if active_ui_page.has_game_session() && !was_running_game {
             if let Some(game_session) = active_ui_page.game_session() {
@@ -99,7 +98,8 @@ pub(crate) fn run(
                         },
                     );
                 }
-                pending_resize = Some((resize_event, Instant::now()));
+                update_resize_surface(host_bridge, resize_event)?;
+                renderer_state.request_full_redraw();
             }
             Ok(HostInputEvent::Key { key, status }) if is_focused => {
                 frame_rate_controller.mark_input();
@@ -119,7 +119,13 @@ pub(crate) fn run(
                     if overlay_session.is_some() {
                         continue;
                     }
-                    enqueue_key_events(&mut event_queue, host_bridge, active_ui_page, key.as_str(), status.as_str());
+                    enqueue_key_events(
+                        &mut event_queue,
+                        host_bridge,
+                        active_ui_page,
+                        key.as_str(),
+                        status.as_str(),
+                    );
                 } else {
                     if overlay_session.is_none() {
                         enqueue_limited(&mut event_queue, LuaEvent::Key { name: key, status });
@@ -136,15 +142,6 @@ pub(crate) fn run(
         let now = Instant::now();
         let tick_dt_ms = now.duration_since(last_tick_at).as_millis() as u64;
         last_tick_at = now;
-
-        if let Some((resize_event, recorded_at)) = pending_resize.take() {
-            if now.duration_since(recorded_at).as_millis() as u64 >= RESIZE_DEBOUNCE_MS {
-                update_resize_surface(host_bridge, resize_event)?;
-                renderer_state.request_full_redraw();
-            } else {
-                pending_resize = Some((resize_event, recorded_at));
-            }
-        }
 
         if let Some(overlay_session) = overlay_session.as_mut() {
             overlay_session.update_and_render()?;
@@ -242,8 +239,8 @@ fn handle_global_key(
         "f2" => {
             toggle_overlay(
                 host_bridge,
-                overlay_registry.default_screen().cloned(),
-                OverlaySessionKind::Screen,
+                overlay_registry.default_saver().cloned(),
+                OverlaySessionKind::Saver,
                 overlay_session,
                 renderer_state,
             )?;
@@ -356,13 +353,25 @@ fn enqueue_key_events(
     if let Some(game_session) = active_ui_page.game_session() {
         let runtime_context = host_bridge.runtime_context();
         if let Some(action) = game_session.action_for_key(&runtime_context.keybinds, key) {
-            enqueue_limited(event_queue, LuaEvent::Action { name: action, status: status.to_string() });
+            enqueue_limited(
+                event_queue,
+                LuaEvent::Action {
+                    name: action,
+                    status: status.to_string(),
+                },
+            );
             return;
         }
     }
 
     if let Some(action) = active_ui_page.action_for_key(key) {
-        enqueue_limited(event_queue, LuaEvent::Action { name: action, status: status.to_string() });
+        enqueue_limited(
+            event_queue,
+            LuaEvent::Action {
+                name: action,
+                status: status.to_string(),
+            },
+        );
         return;
     }
 
@@ -421,8 +430,11 @@ fn handle_game_messages(
             HostLuaMessage::ClearEventQueue => event_queue.clear(),
             HostLuaMessage::SkipEventQueue => event_queue.clear(),
             HostLuaMessage::RenderNow => {}
-            HostLuaMessage::SaveBestScore | HostLuaMessage::SaveGame => {
-                // TODO: 接入持久化存储后在这里调用 save_best_score/save_game。
+            HostLuaMessage::SaveBestScore => {
+                save_current_best_score(lua_runtime, host_bridge, active_ui_page)?;
+            }
+            HostLuaMessage::SaveGame => {
+                // TODO: 接入持久化存储后在这里调用 save_game。
             }
         }
     }
@@ -435,6 +447,26 @@ fn handle_game_messages(
         host_state_machine.game_list_state =
             crate::host_engine::boot::preload::state_machine::GameListState::List;
     }
+
+    Ok(())
+}
+
+fn save_current_best_score(
+    lua_runtime: &LuaRuntimeState,
+    host_bridge: &HostLuaBridge,
+    active_ui_page: &mut ActiveUiPage,
+) -> RuntimeLoopResult<()> {
+    let Some(game_session) = active_ui_page.game_session() else {
+        return Ok(());
+    };
+
+    let best_string = game_session.save_best_score(lua_runtime)?;
+    let best_scores = best_score_store::save_best_score(game_session.uid(), best_string.as_str())?;
+
+    let mut runtime_context = host_bridge.runtime_context();
+    runtime_context.best_scores = best_scores.clone();
+    host_bridge.set_runtime_context(runtime_context);
+    active_ui_page.refresh_best_scores(best_scores);
 
     Ok(())
 }

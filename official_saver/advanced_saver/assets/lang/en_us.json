@@ -1,0 +1,9 @@
+{
+  "advanced_saver.package_name": "Official Advanced Saver Package",
+  "advanced_saver.author": "TUI GAME",
+  "advanced_saver.saver_name": "Advanced Saver",
+  "advanced_saver.introduction": "A richer official saver overlay using language keys, image paths, timers and random movement.",
+  "advanced_saver.title": "Advanced Saver",
+  "advanced_saver.hint": "Press F2 again to return.",
+  "advanced_saver.time": "Runtime"
+}

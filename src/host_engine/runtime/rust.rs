@@ -9,11 +9,11 @@ pub struct ReservedGlobalKey {
     pub description: &'static str,
 }
 
-/// 屏保键。
-pub const SCREEN_SAVER_KEY: ReservedGlobalKey = ReservedGlobalKey {
+/// Saver 键。
+pub const SAVER_KEY: ReservedGlobalKey = ReservedGlobalKey {
     key: "f2",
-    action: "screen_saver",
-    description: "屏保键",
+    action: "saver",
+    description: "Saver 键",
 };
 
 /// 老板键。
@@ -32,4 +32,4 @@ pub const FORCE_STOP_GAME_KEY: ReservedGlobalKey = ReservedGlobalKey {
 
 /// 全局按键占用列表。
 pub const RESERVED_GLOBAL_KEYS: [ReservedGlobalKey; 3] =
-    [SCREEN_SAVER_KEY, BOSS_KEY, FORCE_STOP_GAME_KEY];
+    [SAVER_KEY, BOSS_KEY, FORCE_STOP_GAME_KEY];

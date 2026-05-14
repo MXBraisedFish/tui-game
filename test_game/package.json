@@ -1,6 +1,5 @@
 {
   "package": "test_game",
-  "mod_name": "test_game.mod_name",
   "introduction": "test_game.introduction",
   "author": "test_game.author",
   "game_name": "test_game.game_name",
@@ -20,6 +19,6 @@
     "   ██║   ██╔══╝  ╚════██║   ██║       ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  ",
     "   ██║   ███████╗███████║   ██║       ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗",
     "   ╚═╝   ╚══════╝╚══════╝   ╚═╝        ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝"
-  ]
+  ],
+  "package_name": "test_game.package_name"
 }
-

@@ -249,12 +249,12 @@ impl ModListUiState {
     }
 
     /// 指定模组包显示名。
-    pub fn mod_name(&self, uid: &str) -> String {
+    pub fn package_name(&self, uid: &str) -> String {
         self.root_state
             .mods
             .iter()
             .find(|item| item.uid == uid)
-            .map(|item| item.mod_name.clone())
+            .map(|item| item.package_name.clone())
             .unwrap_or_else(|| uid.to_string())
     }
 
@@ -537,11 +537,11 @@ pub struct ModListItem {
     pub uid: String,
     pub package: String,
     pub root_dir: PathBuf,
-    pub mod_name_raw: String,
+    pub package_name_raw: String,
     pub introduction_raw: String,
     pub author_raw: String,
     pub version: String,
-    pub mod_name: String,
+    pub package_name: String,
     pub introduction: String,
     pub author: String,
     pub enabled: bool,
@@ -564,11 +564,11 @@ impl ModListItem {
             uid: game_module.uid.clone(),
             package: game_module.package.package.clone(),
             root_dir: game_module.root_dir.clone(),
-            mod_name_raw: game_module.package.mod_name.clone(),
+            package_name_raw: game_module.package.package_name.clone(),
             introduction_raw: game_module.package.introduction.clone(),
             author_raw: game_module.package.author.clone(),
             version: game_module.package.version.clone(),
-            mod_name: String::new(),
+            package_name: String::new(),
             introduction: String::new(),
             author: String::new(),
             enabled: state
@@ -607,7 +607,7 @@ impl ModListItem {
 
     fn refresh_display(&mut self, language_code: &str) {
         let language_texts = load_package_language_texts(&self.root_dir, language_code);
-        self.mod_name = resolve_package_text(&language_texts, &self.mod_name_raw);
+        self.package_name = resolve_package_text(&language_texts, &self.package_name_raw);
         self.introduction = resolve_package_text(&language_texts, &self.introduction_raw);
         self.author = resolve_package_text(&language_texts, &self.author_raw);
     }
@@ -616,8 +616,8 @@ impl ModListItem {
         let table = lua.create_table()?;
         table.set("uid", self.uid.as_str())?;
         table.set("package", self.package.as_str())?;
-        table.set("mod_name", self.mod_name.as_str())?;
-        table.set("name", self.mod_name.as_str())?;
+        table.set("package_name", self.package_name.as_str())?;
+        table.set("name", self.package_name.as_str())?;
         table.set("introduction", self.introduction.as_str())?;
         table.set("author", self.author.as_str())?;
         table.set("version", self.version.as_str())?;
@@ -635,7 +635,7 @@ impl ModListItem {
 fn compare_mod(left: &ModListItem, right: &ModListItem, sort_mode: ModListSortMode) -> Ordering {
     match sort_mode {
         ModListSortMode::Name => {
-            compare_text_by_width_then_dictionary(left.mod_name.as_str(), right.mod_name.as_str())
+            compare_text_by_width_then_dictionary(left.package_name.as_str(), right.package_name.as_str())
         }
         ModListSortMode::Author => {
             compare_text_by_width_then_dictionary(left.author.as_str(), right.author.as_str())
@@ -644,7 +644,7 @@ fn compare_mod(left: &ModListItem, right: &ModListItem, sort_mode: ModListSortMo
         ModListSortMode::Toggle => left.enabled.cmp(&right.enabled),
     }
     .then_with(|| {
-        compare_text_by_width_then_dictionary(left.mod_name.as_str(), right.mod_name.as_str())
+        compare_text_by_width_then_dictionary(left.package_name.as_str(), right.package_name.as_str())
     })
     .then_with(|| {
         compare_text_by_width_then_dictionary(left.author.as_str(), right.author.as_str())
@@ -867,7 +867,21 @@ fn image_lines(uid: &str, slot: &str, raw_value: &JsonValue) -> Vec<String> {
         return lines;
     }
 
+    if is_image_reference(raw_value) {
+        return Vec::new();
+    }
+
     value_to_lines(raw_value)
+}
+
+fn is_image_reference(value: &JsonValue) -> bool {
+    value
+        .as_str()
+        .map(|text| {
+            let text = text.trim();
+            text.starts_with("image:") || text.starts_with("color:image:")
+        })
+        .unwrap_or(false)
 }
 
 fn value_to_lines(value: &JsonValue) -> Vec<String> {

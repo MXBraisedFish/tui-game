@@ -32,10 +32,10 @@ local function build_lines(root_state, started_at)
     lines[#lines + 1] = { text = line, color = C.WARN_COLOR }
   end
 
-  local mod_name = tostring(root_state.mod_name or root_state.mod_uid or "")
+  local package_name = tostring(root_state.package_name or root_state.mod_uid or "")
   local mod_label = L.language(root_state, "MOD_SECURITY_MOD", C.DEFAULT_TEXT.mod)
   lines[#lines + 1] = { text = "", color = C.MOD_COLOR }
-  lines[#lines + 1] = { text = mod_label .. mod_name, color = C.MOD_COLOR }
+  lines[#lines + 1] = { text = mod_label .. package_name, color = C.MOD_COLOR }
 
   local cancel = L.language(root_state, "MOD_SECURITY_CANCEL", C.DEFAULT_TEXT.cancel)
   local close_temporary = L.language(root_state, "MOD_SECURITY_CLOSE_TEMPORARY", C.DEFAULT_TEXT.close_temporary)

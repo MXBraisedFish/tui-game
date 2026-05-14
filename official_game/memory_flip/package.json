@@ -1,7 +1,6 @@
 {
   "namespace": "official",
   "package": "TUI-GAME Official",
-  "mod_name": "TUI-GAME Official",
   "introduction": "game.memory_flip.package_introduction",
   "author": "TUI-GAME",
   "game_name": "game.memory_flip.name",
@@ -21,5 +20,6 @@
     " | |  | |  __/ | | | | | (_) | |  | |_| |  _| | | | |_) |",
     " |_|  |_|\\___|_| |_| |_|\\___/|_|   \\__, |_|   |_|_| .__/ ",
     "                                      |___/          |_|    "
-  ]
+  ],
+  "package_name": "TUI-GAME Official"
 }

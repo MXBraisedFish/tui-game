@@ -1,5 +1,4 @@
 {
-  "advanced_example.mod_name": "官方高级示例",
   "advanced_example.introduction": "一个更完整的官方示例游戏，用于测试语言键元信息、图片路径、计时器、随机数、存档、最佳记录和富文本。",
   "advanced_example.author": "TUI GAME",
   "advanced_example.game_name": "高级示例",
@@ -19,5 +18,6 @@
   "advanced_example.saved": "已请求保存。",
   "advanced_example.collected": "已收集。",
   "advanced_example.missed": "请先移动到星星上。",
-  "advanced_example.reset": "已重置。"
+  "advanced_example.reset": "已重置。",
+  "advanced_example.package_name": "官方高级示例"
 }

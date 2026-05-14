@@ -34,17 +34,16 @@
   "key.setting.confirm": "Confirm",
   "key.setting.option1": "Option - Language",
   "key.setting.option2": "Option - Key Bindings",
-  "key.setting.option3": "Option - Mod List",
+  "key.setting.option3": "Option - Mod Settings",
   "key.setting.option4": "Option - Memory Management",
   "key.setting.option5": "Option - Security Settings",
   "key.setting.back": "Back",
   "setting.title": "Setting",
   "setting.language": "Language",
   "setting.keybind": "Key Bindings",
-  "setting.mods": "Mod List",
+  "setting.mods": "Mod Settings",
   "setting.memory": "Memory Management",
   "setting.security": "Security Settings",
-
   "key.language.up_option": "Move Up",
   "key.language.down_option": "Move Down",
   "key.language.left_option": "Move Left",
@@ -61,7 +60,6 @@
   "key.language.flip": "Flip",
   "language.title": "Language",
   "language.name": "English",
-
   "key.memory.prev_option": "Previous option",
   "key.memory.next_option": "Next option",
   "key.memory.select": "Select",
@@ -84,16 +82,13 @@
   "memory.info.name.log": "Log",
   "memory.info.name.mod": "Mod",
   "memory.tip": "Size is calculated in base 1024 (binary prefix)",
-
   "key.storage_details.back": "Back",
-
   "key.clear_data.confirm": "Confirm",
   "key.clear_data.cancel": "Cancel",
   "clear_data.title": "Clear Data Warning",
   "clear_data.warn": "Clearing data will permanently delete all records. This action cannot be undone. \nAre you sure you want to proceed?",
   "clear_data.path": "Directory: ",
   "clear_data.second": "s",
-
   "key.clear_cache.confirm": "Confirm",
   "key.clear_cache.cancel": "Cancel",
   "clear_cache.title": "Clear Cache Warning",
@@ -101,7 +96,17 @@
   "clear_cache.cache_path": "Cache Directory: ",
   "clear_cache.log_path": "Log Directory: ",
   "clear_cache.second": "s",
-
+  "key.mod.prev_option": "Previous option",
+  "key.mod.next_option": "Next option",
+  "key.mod.list.option1": "Option - Game Pack",
+  "key.mod.list.option2": "Option - Saver Pack",
+  "key.mod.list.option3": "Option - Boss Pack",
+  "key.mod.list.select": "Select",
+  "key.mod.list.confirm": "Confirm",
+  "key.mod.list.back": "Back",
+  "key.mod.list.title": "Mod Settings",
+  "mod.list.game": "Game Pack",
+  "mod.list.boss": "Boss Pack",
   "key.game_list.prev_option": "Previous option",
   "key.game_list.next_option": "Next option",
   "key.game_list.prev_page": "Previous page",
@@ -133,7 +138,6 @@
   "game_list.source.mod": "MOD",
   "game_list.none.game": "No games found",
   "game_list.none.info": "No game information found",
-
   "key.mod_list.prev_option": "Previous option",
   "key.mod_list.next_option": "Next option",
   "key.mod_list.prev_page": "Previous page",
@@ -186,7 +190,6 @@
   "mod_list.toggle.safe_mode.off.temporary": "Disable (Only this session)",
   "mod_list.toggle.safe_mode.off.permanent": "Disable (Permanent)",
   "mod_list.status": "Status: ",
-  
   "key.mod_security.close.temporary": "Disable (Only this session)",
   "key.mod_security.close.permanent": "Disable (Permanent)",
   "key.mod_security.cancel": "Cancel",
@@ -194,14 +197,11 @@
   "mod_security.warn": "Safe mode is designed to protect your computer and personal information.\nDisabling this allows mod to perform high-risk operations (e.g., write access)\nPlease ensure that you fully trust the author of this mod.\nAre you sure you want to disable it?",
   "mod_security.mod": "Mod: ",
   "mod_security.second": "s",
-
   "key.default_security.close.permanent": "Disable (Permanent)",
   "key.default_security.cancel": "Cancel",
   "default_security.title": "Disable Default Safe Mode Warning",
   "default_security.warn": "Safe mode is designed to protect your computer and personal information.\nDisabling this allows mod to perform high-risk operations (e.g., write access)\nPlease ensure that you fully trust the author of all mods.\nAre you sure you want to disable it?",
   "default_security.second": "s",
-
-
   "key.security.prev_option": "Previous option",
   "key.security.next_option": "Next option",
   "key.security.select": "Select",
@@ -225,7 +225,6 @@
   "security.reset.mod": "Reset all mod states to Disabled",
   "security.reset.success": "Reset successful",
   "security.reset.failed": "Reset failed",
-
   "key.setting_keybind.list.option1": "Option - Global Keys",
   "key.setting_keybind.list.option2": "Option - System Keys",
   "key.setting_keybind.list.option3": "Option - Game Keys",
@@ -238,7 +237,6 @@
   "setting_keybind.list.global": "Global Keys",
   "setting_keybind.list.system": "System Keys",
   "setting_keybind.list.game": "Game Keys",
-
   "key.setting_keybind.system.prev_option": "Previous option",
   "key.setting_keybind.system.next_option": "Next option",
   "key.setting_keybind.system.select": "Select",
@@ -283,7 +281,6 @@
   "setting_keybind.system.table.key3": "Key 3",
   "setting_keybind.system.table.key4": "Key 4",
   "setting_keybind.system.case_sensitive": "Keys are case-sensitive",
-
   "setting_keybind.system.page.home": "Home",
   "setting_keybind.system.page.setting": "Settings",
   "setting_keybind.system.page.game_list": "Start Game",
@@ -291,9 +288,10 @@
   "setting_keybind.system.page.setting_keybind": "Key Bindings",
   "setting_keybind.system.page.setting_memory": "Memory Management",
   "setting_keybind.system.page.setting_language": "Language",
-  "setting_keybind.system.page.setting_mods": "Mod List",
+  "setting_keybind.system.page.setting_mods": "Mod Settings",
   "setting_keybind.system.page.setting_security": "Security Settings",
   "setting_keybind.system.page.keybind_system": "System Keys",
   "setting_keybind.system.page.keybind_global": "Global Keys",
-  "setting_keybind.system.page.keybind_game": "Game Keys"
+  "setting_keybind.system.page.keybind_game": "Game Keys",
+  "mod.list.saver": "Saver Pack"
 }

@@ -33,9 +33,10 @@ function M.language(root_state, key, fallback)
   return fallback
 end
 
-function M.layout()
+function M.layout(bottom_reserve)
   local terminal_width, terminal_height = M.terminal_size()
-  local content_height = math.max(3, terminal_height - 1)
+  local reserve = math.max(1, math.floor(tonumber(bottom_reserve) or 1))
+  local content_height = math.max(3, terminal_height - reserve)
   local left_width = math.max(C.MIN_PANEL_WIDTH, math.floor(terminal_width * C.LEFT_RATIO))
   left_width = math.min(left_width, terminal_width - C.MIN_PANEL_WIDTH)
   local right_width = math.max(C.MIN_PANEL_WIDTH, terminal_width - left_width)

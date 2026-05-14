@@ -267,7 +267,7 @@ fn resolve_key_text(parameter_text: &str, runtime_context: &LuaRuntimeContext) -
     match runtime_context.consumer {
         LuaRuntimeConsumer::GamePackage => resolve_game_key_text(action, mode, runtime_context),
         LuaRuntimeConsumer::OfficialUiPackage => resolve_ui_key_text(action, mode, runtime_context),
-        LuaRuntimeConsumer::ScreenPackage | LuaRuntimeConsumer::BossPackage => {
+        LuaRuntimeConsumer::SaverPackage | LuaRuntimeConsumer::BossPackage => {
             MISSING_KEY_TEXT.to_string()
         }
     }

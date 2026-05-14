@@ -109,4 +109,3 @@ pub fn diff_frames(previous_frame: &FrameCache, current_frame: &FrameCache) -> V
 
     segments
 }
-

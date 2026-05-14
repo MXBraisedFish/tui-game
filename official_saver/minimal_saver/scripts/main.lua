@@ -11,9 +11,9 @@ end
 function render(state)
   canvas_clear()
   local width, height = get_terminal_size()
-  local title = translate("minimal_screen.title")
+  local title = translate("minimal_saver.title")
   canvas_draw_text(resolve_x(ANCHOR_CENTER, get_text_width(title)), 2, title, "yellow", nil, BOLD)
   canvas_draw_text(state.x or 0, state.y or math.floor(height / 2), "*", "light_cyan", nil, BOLD)
-  local hint = translate("minimal_screen.hint")
+  local hint = translate("minimal_saver.hint")
   canvas_draw_text(resolve_x(ANCHOR_CENTER, get_text_width(hint)), math.max(0, height - 2), hint, "grey")
 end

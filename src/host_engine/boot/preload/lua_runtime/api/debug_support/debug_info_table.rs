@@ -11,7 +11,7 @@ pub fn build_game_info_table(lua: &Lua, game_module: &GameModule) -> mlua::Resul
 
     table.set("uid", game_module.uid.as_str())?;
     table.set("package", game_module.package.package.as_str())?;
-    table.set("mod_name", game_module.package.mod_name.as_str())?;
+    table.set("package_name", game_module.package.package_name.as_str())?;
     table.set("introduction", game_module.package.introduction.as_str())?;
     table.set("author", game_module.package.author.as_str())?;
     table.set("game_name", game_module.package.game_name.as_str())?;

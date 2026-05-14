@@ -1,0 +1,26 @@
+{
+  "api": -1,
+  "entry": "main.lua",
+  "package": "minimal_saver",
+  "package_name": "official_minimal_saver",
+  "author": "TUI GAME",
+  "version": "0.1.0",
+  "saver_name": "Minimal Saver",
+  "introduction": "A minimal official saver overlay.",
+  "icon": [
+    "+------+",
+    "|SAVER|",
+    "+------+",
+    "      "
+  ],
+  "banner": [
+    ":::::::::  :::     ::: ::::::::: ",
+    ":+:    :+: :+:     :+: :+:    :+:",
+    "+:+    +:+ +:+     +:+ +:+    +:+",
+    "+#+    +:+ +#+     +:+ +#+    +:+",
+    "+#+    +#+  +#+   +#+  +#+    +#+",
+    "#+#    #+#   #+#+#     #+#    #+#",
+    "#########      ###     ######### "
+  ]
+}
+

@@ -17,12 +17,12 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
     }
 
     let globals = lua.globals();
-    install_write_api(lua, &globals, host_bridge.clone(), "write_text")?;
-    install_write_api(lua, &globals, host_bridge.clone(), "write_json")?;
-    install_write_api(lua, &globals, host_bridge.clone(), "write_xml")?;
-    install_write_api(lua, &globals, host_bridge.clone(), "write_yaml")?;
-    install_write_api(lua, &globals, host_bridge.clone(), "write_toml")?;
-    install_write_api(lua, &globals, host_bridge, "write_csv")?;
+    install_write_api(lua, &globals, host_bridge.clone(), "write_text", "txt")?;
+    install_write_api(lua, &globals, host_bridge.clone(), "write_json", "json")?;
+    install_write_api(lua, &globals, host_bridge.clone(), "write_xml", "xml")?;
+    install_write_api(lua, &globals, host_bridge.clone(), "write_yaml", "yaml")?;
+    install_write_api(lua, &globals, host_bridge.clone(), "write_toml", "toml")?;
+    install_write_api(lua, &globals, host_bridge, "write_csv", "csv")?;
 
     Ok(())
 }
@@ -32,6 +32,7 @@ fn install_write_api(
     globals: &mlua::Table,
     host_bridge: HostLuaBridge,
     api_name: &'static str,
+    file_extension: &'static str,
 ) -> mlua::Result<()> {
     globals.set(
         api_name,
@@ -45,8 +46,13 @@ fn install_write_api(
                 .as_ref()
                 .map(|game_module| game_module.root_dir.as_path())
                 .ok_or_else(|| mlua::Error::external("current package is unavailable"))?;
-            let resolved_path =
-                asset_path::resolve_asset_path(package_root, logical_path.as_str())?;
+            let Ok(resolved_path) = asset_path::resolve_asset_file_path(
+                package_root,
+                logical_path.as_str(),
+                Some(file_extension),
+            ) else {
+                return Ok(false);
+            };
             let can_write = write_permission::can_write_assets(&host_bridge);
 
             if !can_write {

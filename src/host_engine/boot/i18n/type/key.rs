@@ -40,6 +40,15 @@ pub static GAME_LIST_CANCEL: MutableText = MutableText::new();
 pub static GAME_LIST_SELECT: MutableText = MutableText::new();
 pub static GAME_LIST_FLIP: MutableText = MutableText::new();
 pub static GAME_LIST_SCROLL: MutableText = MutableText::new();
+pub static MOD_PREV_OPTION: MutableText = MutableText::new();
+pub static MOD_NEXT_OPTION: MutableText = MutableText::new();
+pub static MOD_LIST_OPTION1: MutableText = MutableText::new();
+pub static MOD_LIST_OPTION2: MutableText = MutableText::new();
+pub static MOD_LIST_OPTION3: MutableText = MutableText::new();
+pub static MOD_HUB_SELECT: MutableText = MutableText::new();
+pub static MOD_HUB_CONFIRM: MutableText = MutableText::new();
+pub static MOD_HUB_BACK: MutableText = MutableText::new();
+pub static MOD_HUB_TITLE: MutableText = MutableText::new();
 pub static MOD_LIST_PREV_OPTION: MutableText = MutableText::new();
 pub static MOD_LIST_NEXT_OPTION: MutableText = MutableText::new();
 pub static MOD_LIST_PREV_PAGE: MutableText = MutableText::new();
@@ -186,6 +195,15 @@ pub struct KeyText {
     pub game_list_select: String,
     pub game_list_flip: String,
     pub game_list_scroll: String,
+    pub mod_prev_option: String,
+    pub mod_next_option: String,
+    pub mod_list_option1: String,
+    pub mod_list_option2: String,
+    pub mod_list_option3: String,
+    pub mod_hub_select: String,
+    pub mod_hub_confirm: String,
+    pub mod_hub_back: String,
+    pub mod_hub_title: String,
     pub mod_list_prev_option: String,
     pub mod_list_next_option: String,
     pub mod_list_prev_page: String,
@@ -372,6 +390,15 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
     set_text(&GAME_LIST_SELECT, language_source, "key.game_list.select");
     set_text(&GAME_LIST_FLIP, language_source, "key.game_list.flip");
     set_text(&GAME_LIST_SCROLL, language_source, "key.game_list.scroll");
+    set_text(&MOD_PREV_OPTION, language_source, "key.mod.prev_option");
+    set_text(&MOD_NEXT_OPTION, language_source, "key.mod.next_option");
+    set_text(&MOD_LIST_OPTION1, language_source, "key.mod.list.option1");
+    set_text(&MOD_LIST_OPTION2, language_source, "key.mod.list.option2");
+    set_text(&MOD_LIST_OPTION3, language_source, "key.mod.list.option3");
+    set_text(&MOD_HUB_SELECT, language_source, "key.mod.list.select");
+    set_text(&MOD_HUB_CONFIRM, language_source, "key.mod.list.confirm");
+    set_text(&MOD_HUB_BACK, language_source, "key.mod.list.back");
+    set_text(&MOD_HUB_TITLE, language_source, "key.mod.list.title");
     set_text(
         &MOD_LIST_PREV_OPTION,
         language_source,
@@ -796,6 +823,15 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         game_list_select: text(&GAME_LIST_SELECT),
         game_list_flip: text(&GAME_LIST_FLIP),
         game_list_scroll: text(&GAME_LIST_SCROLL),
+        mod_prev_option: text(&MOD_PREV_OPTION),
+        mod_next_option: text(&MOD_NEXT_OPTION),
+        mod_list_option1: text(&MOD_LIST_OPTION1),
+        mod_list_option2: text(&MOD_LIST_OPTION2),
+        mod_list_option3: text(&MOD_LIST_OPTION3),
+        mod_hub_select: text(&MOD_HUB_SELECT),
+        mod_hub_confirm: text(&MOD_HUB_CONFIRM),
+        mod_hub_back: text(&MOD_HUB_BACK),
+        mod_hub_title: text(&MOD_HUB_TITLE),
         mod_list_prev_option: text(&MOD_LIST_PREV_OPTION),
         mod_list_next_option: text(&MOD_LIST_NEXT_OPTION),
         mod_list_prev_page: text(&MOD_LIST_PREV_PAGE),

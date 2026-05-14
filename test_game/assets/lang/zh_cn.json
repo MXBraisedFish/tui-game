@@ -1,5 +1,4 @@
 {
-  "test_game.mod_name": "测试包",
   "test_game.introduction": "一个最小的临时测试游戏包。",
   "test_game.author": "TUI GAME",
   "test_game.game_name": "测试游戏",
@@ -21,5 +20,6 @@
   "test_game.message.exit": "正在退出。",
   "test_game.help.move": "移动",
   "test_game.help.confirm": "确认",
-  "test_game.help.quit": "退出"
+  "test_game.help.quit": "退出",
+  "test_game.package_name": "测试包"
 }

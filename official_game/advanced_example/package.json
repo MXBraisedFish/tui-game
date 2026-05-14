@@ -1,6 +1,5 @@
 {
   "package": "official_advanced_example",
-  "mod_name": "advanced_example.mod_name",
   "introduction": "advanced_example.introduction",
   "author": "advanced_example.author",
   "game_name": "advanced_example.game_name",
@@ -8,5 +7,6 @@
   "detail": "advanced_example.detail",
   "version": "0.2.0",
   "icon": "color:image:images/icon.png",
-  "banner": "color:image:images/banner.png"
+  "banner": "color:image:images/banner.png",
+  "package_name": "advanced_example.package_name"
 }

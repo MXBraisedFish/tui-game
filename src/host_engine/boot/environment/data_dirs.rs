@@ -22,6 +22,14 @@ pub fn ensure() -> EnvironmentResult<()> {
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
+        &root_dir.join("data/cache/saver_scan_cache"),
+        EMPTY_JSON_OBJECT,
+    )?;
+    ensure_file(
+        &root_dir.join("data/cache/boss_scan_cache"),
+        EMPTY_JSON_OBJECT,
+    )?;
+    ensure_file(
         &root_dir.join("data/cache/language_ui_cache.json"),
         EMPTY_JSON_OBJECT,
     )?;
@@ -48,7 +56,11 @@ pub fn ensure() -> EnvironmentResult<()> {
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
-        &root_dir.join("data/profiles/overlay_state.json"),
+        &root_dir.join("data/profiles/saver_state"),
+        EMPTY_JSON_OBJECT,
+    )?;
+    ensure_file(
+        &root_dir.join("data/profiles/boss_state"),
         EMPTY_JSON_OBJECT,
     )?;
 
@@ -56,8 +68,9 @@ pub fn ensure() -> EnvironmentResult<()> {
     ensure_file(&root_dir.join("data/log/tui_log.txt"), "")?;
 
     ensure_dir(&root_dir.join("data/mod"))?;
-    ensure_dir(&root_dir.join("data/screen"))?;
-    ensure_dir(&root_dir.join("data/boss"))?;
+    ensure_dir(&root_dir.join("data/mod/game"))?;
+    ensure_dir(&root_dir.join("data/mod/saver"))?;
+    ensure_dir(&root_dir.join("data/mod/boss"))?;
 
     Ok(())
 }

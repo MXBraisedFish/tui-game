@@ -3,11 +3,13 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use serde_json::{Map, Value};
 
-use crate::host_engine::constant::{API_VERSION, MAX_ACTION_KEYS};
+use crate::host_engine::constant::{
+    API_VERSION, DEFAULT_GAME_BANNER, DEFAULT_PACKAGE_ICON, MAX_ACTION_KEYS,
+};
 
 use super::manifest::{
     GameActionBinding, GameManifest, GameModule, GameModuleRegistry, GameModuleScanError,
@@ -67,16 +69,95 @@ fn read_package_manifest(package_dir: &Path) -> ScannerResult<PackageManifest> {
 
     Ok(PackageManifest {
         package: require_string(&value, "package.json", "package")?,
-        mod_name: require_string(&value, "package.json", "mod_name")?,
+        package_name: require_string(&value, "package.json", "package_name")?,
         introduction: require_string(&value, "package.json", "introduction")?,
         author: require_string(&value, "package.json", "author")?,
         game_name: require_string(&value, "package.json", "game_name")?,
         description: require_string(&value, "package.json", "description")?,
         detail: require_string(&value, "package.json", "detail")?,
         version: require_string(&value, "package.json", "version")?,
-        icon: require_value(&value, "package.json", "icon")?.clone(),
-        banner: require_value(&value, "package.json", "banner")?.clone(),
+        icon: image_or_default(&value, package_dir, "icon", DEFAULT_PACKAGE_ICON),
+        banner: image_or_default(&value, package_dir, "banner", DEFAULT_GAME_BANNER),
     })
+}
+
+fn image_or_default(
+    object: &Map<String, Value>,
+    package_dir: &Path,
+    field_name: &str,
+    default_lines: &[&str],
+) -> Value {
+    object
+        .get(field_name)
+        .filter(|value| is_valid_image_field(package_dir, value))
+        .cloned()
+        .unwrap_or_else(|| default_lines_value(default_lines))
+}
+
+fn default_lines_value(lines: &[&str]) -> Value {
+    Value::Array(
+        lines
+            .iter()
+            .map(|line| Value::String((*line).to_string()))
+            .collect(),
+    )
+}
+
+fn is_valid_image_field(package_dir: &Path, value: &Value) -> bool {
+    match value {
+        Value::Array(values) => {
+            !values.is_empty()
+                && values
+                    .iter()
+                    .all(|value| value.as_str().is_some_and(|text| !text.is_empty()))
+        }
+        Value::String(text) => {
+            let text = text.trim();
+            if text.is_empty() {
+                return false;
+            }
+            if text.starts_with("image:") || text.starts_with("color:image:") {
+                return image_reference_exists(package_dir, text);
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+fn image_reference_exists(package_dir: &Path, text: &str) -> bool {
+    let image_path = text
+        .strip_prefix("color:")
+        .unwrap_or(text)
+        .strip_prefix("image:")
+        .unwrap_or("")
+        .trim();
+    let Some(clean_path) = normalize_image_path(image_path) else {
+        return false;
+    };
+    package_dir.join("assets").join(clean_path).is_file()
+}
+
+fn normalize_image_path(path: &str) -> Option<PathBuf> {
+    if path.is_empty() || Path::new(path).is_absolute() {
+        return None;
+    }
+
+    let mut clean_path = PathBuf::new();
+    for component in PathBuf::from(path).components() {
+        match component {
+            Component::Normal(part) => clean_path.push(part),
+            Component::CurDir
+            | Component::ParentDir
+            | Component::Prefix(_)
+            | Component::RootDir => {
+                return None;
+            }
+        }
+    }
+
+    let extension = clean_path.extension()?.to_str()?.to_ascii_lowercase();
+    matches!(extension.as_str(), "png" | "jpg" | "jpeg").then_some(clean_path)
 }
 
 fn read_game_manifest(package_dir: &Path) -> ScannerResult<GameManifest> {

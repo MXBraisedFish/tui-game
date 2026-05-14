@@ -1,4 +1,4 @@
-//! 屏保/老板覆盖层包清单。
+//! Saver/老板覆盖层包清单。
 
 use std::path::PathBuf;
 
@@ -41,20 +41,20 @@ pub struct OverlayScanError {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OverlayRegistry {
-    pub screens: Vec<OverlayPackage>,
+    pub savers: Vec<OverlayPackage>,
     pub bosses: Vec<OverlayPackage>,
     pub errors: Vec<OverlayScanError>,
 }
 
 impl OverlayRegistry {
     pub fn extend(&mut self, other: Self) {
-        self.screens.extend(other.screens);
+        self.savers.extend(other.savers);
         self.bosses.extend(other.bosses);
         self.errors.extend(other.errors);
     }
 
-    pub fn default_screen(&self) -> Option<&OverlayPackage> {
-        self.screens.first()
+    pub fn default_saver(&self) -> Option<&OverlayPackage> {
+        self.savers.first()
     }
 
     pub fn default_boss(&self) -> Option<&OverlayPackage> {

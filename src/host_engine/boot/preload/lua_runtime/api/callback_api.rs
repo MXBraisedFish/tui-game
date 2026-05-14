@@ -20,7 +20,7 @@ pub fn install(_lua: &Lua, _api_scope: ApiScope) -> mlua::Result<()> {
 pub fn validate_required_callbacks(lua: &Lua, api_scope: ApiScope) -> mlua::Result<()> {
     if matches!(
         api_scope.consumer,
-        super::scope::ApiConsumer::ScreenPackage | super::scope::ApiConsumer::BossPackage
+        super::scope::ApiConsumer::SaverPackage | super::scope::ApiConsumer::BossPackage
     ) {
         callback_contract::require_function(lua, "update")?;
         callback_contract::require_function(lua, "render")?;
@@ -90,12 +90,17 @@ pub fn call_exit_game(lua: &Lua, state_key: &RegistryKey) -> mlua::Result<Regist
 }
 
 /// 调用最佳记录保存函数 save_best_score(state)。
-pub fn call_save_best_score(lua: &Lua, state_key: &RegistryKey) -> mlua::Result<Value> {
+pub fn call_save_best_score(lua: &Lua, state_key: &RegistryKey) -> mlua::Result<String> {
     let save_best_score: Function = lua.globals().get("save_best_score")?;
     let state = lua.registry_value::<Value>(state_key)?;
     let best_score = save_best_score.call::<Value>(state)?;
     callback_contract::ensure_returned_value(&best_score)?;
-    Ok(best_score)
+    match best_score {
+        Value::String(best_string) => Ok(best_string.to_str()?.to_string()),
+        _ => Err(mlua::Error::external(
+            "save_best_score must return a best_string string",
+        )),
+    }
 }
 
 /// 调用游戏存档函数 save_game(state)。
