@@ -1,4 +1,4 @@
-//! mod_list.* 语言文本注册
+//! mod_game_list.* 语言文本注册
 
 use crate::host_engine::boot::i18n::i18n::{LanguageSource, resolve_text};
 use crate::host_engine::boot::i18n::pseudo_text::MutableText;
@@ -8,6 +8,7 @@ pub static INFO_SORT_NAME: MutableText = MutableText::new();
 pub static INFO_SORT_AUTHOR: MutableText = MutableText::new();
 pub static INFO_SORT_SAFE_MODE: MutableText = MutableText::new();
 pub static INFO_SORT_TOGGLE: MutableText = MutableText::new();
+pub static INFO_SORT_DEBUG: MutableText = MutableText::new();
 pub static INFO_ORDER_ASCENDING: MutableText = MutableText::new();
 pub static INFO_ORDER_DESCENDING: MutableText = MutableText::new();
 pub static INFO_AUTHOR: MutableText = MutableText::new();
@@ -35,7 +36,7 @@ pub static TOGGLE_SAFE_MODE_ON: MutableText = MutableText::new();
 pub static TOGGLE_SAFE_MODE_OFF_TEMPORARY: MutableText = MutableText::new();
 pub static TOGGLE_SAFE_MODE_OFF_PERMANENT: MutableText = MutableText::new();
 
-/// mod_list.* 文本集合
+/// mod_game_list.* 文本集合
 #[derive(Clone, Debug)]
 pub struct ModListText {
     pub list_title: String,
@@ -43,6 +44,7 @@ pub struct ModListText {
     pub info_sort_author: String,
     pub info_sort_safe_mode: String,
     pub info_sort_toggle: String,
+    pub info_sort_debug: String,
     pub info_order_ascending: String,
     pub info_order_descending: String,
     pub info_author: String,
@@ -71,114 +73,131 @@ pub struct ModListText {
     pub toggle_safe_mode_off_permanent: String,
 }
 
-/// 注册 mod_list.* 文本
+/// 注册 mod_game_list.* 文本
 pub fn register(language_source: &LanguageSource) -> ModListText {
-    set_text(&LIST_TITLE, language_source, "mod_list.list.title");
-    set_text(&INFO_SORT_NAME, language_source, "mod_list.info.sort.name");
+    set_text(&LIST_TITLE, language_source, "mod_game_list.list.title");
+    set_text(
+        &INFO_SORT_NAME,
+        language_source,
+        "mod_game_list.info.sort.name",
+    );
     set_text(
         &INFO_SORT_AUTHOR,
         language_source,
-        "mod_list.info.sort.author",
+        "mod_game_list.info.sort.author",
     );
     set_text(
         &INFO_SORT_SAFE_MODE,
         language_source,
-        "mod_list.info.sort.safe_mode",
+        "mod_game_list.info.sort.safe_mode",
     );
     set_text(
         &INFO_SORT_TOGGLE,
         language_source,
-        "mod_list.info.sort.toggle",
+        "mod_game_list.info.sort.toggle",
+    );
+    set_text(
+        &INFO_SORT_DEBUG,
+        language_source,
+        "mod_game_list.info.sort.debug",
     );
     set_text(
         &INFO_ORDER_ASCENDING,
         language_source,
-        "mod_list.info.order.ascending",
+        "mod_game_list.info.order.ascending",
     );
     set_text(
         &INFO_ORDER_DESCENDING,
         language_source,
-        "mod_list.info.order.descending",
+        "mod_game_list.info.order.descending",
     );
-    set_text(&INFO_AUTHOR, language_source, "mod_list.info.author");
-    set_text(&INFO_VERSION, language_source, "mod_list.info.version");
-    set_text(&INFO_BASE, language_source, "mod_list.info.base");
-    set_text(&INFO_SAFE, language_source, "mod_list.info.safe");
+    set_text(&INFO_AUTHOR, language_source, "mod_game_list.info.author");
+    set_text(&INFO_VERSION, language_source, "mod_game_list.info.version");
+    set_text(&INFO_BASE, language_source, "mod_game_list.info.base");
+    set_text(&INFO_SAFE, language_source, "mod_game_list.info.safe");
     set_text(
         &INFO_SAFE_SWITCH,
         language_source,
-        "mod_list.info.safe.switch",
+        "mod_game_list.info.safe.switch",
     );
     set_text(
         &INFO_SAFE_DEBUG,
         language_source,
-        "mod_list.info.safe.debug",
+        "mod_game_list.info.safe.debug",
     );
     set_text(
         &INFO_SAFE_WRITE,
         language_source,
-        "mod_list.info.safe.write",
+        "mod_game_list.info.safe.write",
     );
     set_text(
         &INFO_SAFE_SAFE_MODE,
         language_source,
-        "mod_list.info.safe.safe_mode",
+        "mod_game_list.info.safe.safe_mode",
     );
     set_text(
         &INFO_INTRODUCTION,
         language_source,
-        "mod_list.info.introduction",
+        "mod_game_list.info.introduction",
     );
-    set_text(&INFO_TITLE, language_source, "mod_list.info.title");
-    set_text(&STATUS, language_source, "mod_list.status");
-    set_text(&NONE_MOD, language_source, "mod_list.none.mod");
-    set_text(&NONE_INFO, language_source, "mod_list.none.info");
-    set_text(&TOGGLE_MOD_ON, language_source, "mod_list.toggle.mod.on");
-    set_text(&TOGGLE_MOD_OFF, language_source, "mod_list.toggle.mod.off");
+    set_text(&INFO_TITLE, language_source, "mod_game_list.info.title");
+    set_text(&STATUS, language_source, "mod_game_list.status");
+    set_text(&NONE_MOD, language_source, "mod_game_list.none.mod");
+    set_text(&NONE_INFO, language_source, "mod_game_list.none.info");
+    set_text(
+        &TOGGLE_MOD_ON,
+        language_source,
+        "mod_game_list.toggle.mod.on",
+    );
+    set_text(
+        &TOGGLE_MOD_OFF,
+        language_source,
+        "mod_game_list.toggle.mod.off",
+    );
     set_text(
         &TOGGLE_MOD_ON_BRIEF,
         language_source,
-        "mod_list.toggle.mod.on.brief",
+        "mod_game_list.toggle.mod.on.brief",
     );
     set_text(
         &TOGGLE_MOD_OFF_BRIEF,
         language_source,
-        "mod_list.toggle.mod.off.brief",
+        "mod_game_list.toggle.mod.off.brief",
     );
     set_text(
         &TOGGLE_WRITE_ON,
         language_source,
-        "mod_list.toggle.write.on",
+        "mod_game_list.toggle.write.on",
     );
     set_text(
         &TOGGLE_WRITE_OFF,
         language_source,
-        "mod_list.toggle.write.off",
+        "mod_game_list.toggle.write.off",
     );
     set_text(
         &TOGGLE_DEBUG_ON,
         language_source,
-        "mod_list.toggle.debug.on",
+        "mod_game_list.toggle.debug.on",
     );
     set_text(
         &TOGGLE_DEBUG_OFF,
         language_source,
-        "mod_list.toggle.debug.off",
+        "mod_game_list.toggle.debug.off",
     );
     set_text(
         &TOGGLE_SAFE_MODE_ON,
         language_source,
-        "mod_list.toggle.safe_mode.on",
+        "mod_game_list.toggle.safe_mode.on",
     );
     set_text(
         &TOGGLE_SAFE_MODE_OFF_TEMPORARY,
         language_source,
-        "mod_list.toggle.safe_mode.off.temporary",
+        "mod_game_list.toggle.safe_mode.off.temporary",
     );
     set_text(
         &TOGGLE_SAFE_MODE_OFF_PERMANENT,
         language_source,
-        "mod_list.toggle.safe_mode.off.permanent",
+        "mod_game_list.toggle.safe_mode.off.permanent",
     );
 
     ModListText {
@@ -187,6 +206,7 @@ pub fn register(language_source: &LanguageSource) -> ModListText {
         info_sort_author: text(&INFO_SORT_AUTHOR),
         info_sort_safe_mode: text(&INFO_SORT_SAFE_MODE),
         info_sort_toggle: text(&INFO_SORT_TOGGLE),
+        info_sort_debug: text(&INFO_SORT_DEBUG),
         info_order_ascending: text(&INFO_ORDER_ASCENDING),
         info_order_descending: text(&INFO_ORDER_DESCENDING),
         info_author: text(&INFO_AUTHOR),

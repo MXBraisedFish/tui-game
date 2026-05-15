@@ -22,9 +22,17 @@
 
 # 适用范围
 
-**配置文件 `game.json` 以下字段：**
+**扩展宿主语言**
 
-`mad_name`
+> 直接写入即可，由宿主处理
+
+根据已有的文件字段对照填写（极少，若文本不带富文本写法均为普通渲染）
+
+**游戏包配置文件 `game.json` 以下字段：**
+
+>  直接写入即可，由宿主处理
+
+`package_name`
 `introduction`
 `author`
 `game_name`
@@ -34,25 +42,65 @@
 `icon`
 `banner`
 
-**配置文件 `package.json` 以下字段：**
+**游戏包配置文件 `package.json` 以下字段：**
 
-`best_none`
+>  直接写入即可，由宿主处理
 
-**传递值 `best` 表以下字段：**
+`best_none` - 直接写入即可，由宿主处理
 
-`best_string`
+屏保包配置文件 `package.json` 以下字段：**
+
+>  直接写入即可，由宿主处理
+
+`package_name`
+`saver_name`
+`author`
+`version`
+`introduction`
+`icon`
+`banner`
+
+**老板包配置文件 `package.json` 以下字段：**
+
+>  直接写入即可，由宿主处理
+
+`package_name`
+`boss_name`
+`author`
+`version`
+`introduction`
+`icon`
+`banner`
 
 **游戏包自定义语言：**
 
-`任意字段` - 使用 `canvas_draw_rich_text` API 处理
+>  使用特殊 API 处理
+
+`任意字段`
 
 **屏保包自定义语言：**
 
-`任意字段` - 使用 `canvas_draw_rich_text` API 处理
+>  使用特殊 API 处理
+
+`任意字段`
 
 **游戏包自定义语言：**
 
-`任意字段` - 使用 `canvas_draw_rich_text` API 处理
+>  使用特殊 API 处理
+
+`任意字段`
+
+**API 传递值 `best_string` 字符串：**
+
+>  直接写入即可，由宿主处理
+
+`best_string`
+
+**API 参数 `warp_width` 表以下字段：**
+
+>  直接写入即可，由宿主处理
+
+ `text_overflow`
 
 ---
 
@@ -94,6 +142,7 @@
 
 | 参数等级 | 参数          | 说明  |
 | ---- | ----------- | --- |
+| 一级参数 | `normal`    | 默认  |
 | 一级参数 | `bold`      | 加粗  |
 | 一级参数 | `italic`    | 斜体  |
 | 一级参数 | `underline` | 下划线 |
@@ -121,10 +170,10 @@
 
 # 公共参数
 
-| 支持指令                 | 参数等级 | 参数         | 说明                                       |
-| :--------------------: | ---- | ---------- | ---------------------------------------- |
-| `tc`<br>`ts`<br>`bg` | 二级参数 | `^[!count` | 可填写整数，应用的字符数（该参数未填写时必须使用 `clear` 参数结束样式） |
-| `tc`<br>`ts`<br>`bg` | 一级参数 | `^clear`   | 结束样式（有 `[!count` 参数时该参数可省略）              |
+| 支持指令                 | 参数等级 | 参数         | 说明           |
+| :------------------: | ---- | ---------- | ------------ |
+| `tc`<br>`ts`<br>`bg` | 二级参数 | `^[!count` | 可填写整数，应用的字符数 |
+| `tc`<br>`ts`<br>`bg` | 一级参数 | `^clear`   | 结束样式         |
 
 ---
 
@@ -241,35 +290,30 @@
 
 > 注：以下颜色值为逻辑名称，实际显示效果取决于终端的颜色映射。
 
-| 颜色值          | 映射的终端颜色 |
-| --------------- | -------------- |
-| `black`         | Black          |
-| `white`         | White          |
-| `red`           | Red            |
-| `light_red`     | Red            |
-| `dark_red`      | DarkRed        |
-| `yellow`        | Yellow         |
-| `light_yellow`  | Yellow         |
-| `dark_yellow`   | DarkYellow     |
-| `orange`        | DarkYellow     |
-| `green`         | Green          |
-| `light_green`   | Green          |
-| `blue`          | Blue           |
-| `light_blue`    | Blue           |
-| `cyan`          | Cyan           |
-| `light_cyan`    | Cyan           |
-| `magenta`       | Magenta        |
-| `light_magenta` | Magenta        |
-| `grey`          | Grey           |
-| `gray`          | Grey           |
-| `dark_grey`     | DarkGrey       |
-| `dark_gray`     | DarkGrey       |
+| 参数                    | 颜色   |
+| :-------------------- | ---- |
+| black                 | 黑色   |
+| red                   | 红色   |
+| green                 | 绿色   |
+| yellow                | 黄色   |
+| blue                  | 蓝色   |
+| magenta               | 品红色  |
+| cyan                  | 青色   |
+| white                 | 白色   |
+| gray / grey           | 淡灰色  |
+| dark_red              | 亮红色  |
+| dark_green            | 亮绿色  |
+| dark_yellow           | 亮黄色  |
+| dark_blue             | 亮蓝色  |
+| dark_magenta          | 亮品红色 |
+| dark_cyan             | 亮青色  |
+| dark_gray / dark_grey | 深灰色  |
 
 ### 自定义颜色格式
 
 > 注：值以字符串的形式传递。
 
-| 格式           | 示例                | 注意事项                                          |
-| ------------ | ----------------- | --------------------------------------------- |
-| `rgb(r,g,b)` | `rgb(255,128,64)` | 标准 RGB 颜色，括号内为 0–255 的整数值。**请勿在字母与括号之间添加空格**。 |
-| `#rrggbb`    | `#ff8040`         | 十六进制颜色表示（6 位）。**不支持 `#rgb` 缩写格式**。            |
+| 格式           | 示例                | 注意事项                               |
+| ------------ | ----------------- | ---------------------------------- |
+| `rgb(r,g,b)` | `rgb(255,128,64)` | 标准 RGB 颜色，括号内为 0–255 的整数值。         |
+| `#rrggbb`    | `#ff8040`         | 十六进制颜色表示（6 位）。**不支持 `#rgb` 缩写格式**。 |

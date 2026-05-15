@@ -6,35 +6,53 @@
   "min_width": 60,
   "min_height": 20,
   "write": false,
-  "afk_time": 0,
   "case_sensitive": false,
   "actions": {
     "move_up": {
-      "key": ["up", "w"],
+      "key": [
+        "up",
+        "w"
+      ],
       "key_name": "test_game.action.move_up"
     },
     "move_down": {
-      "key": ["down", "s"],
+      "key": [
+        "down",
+        "s"
+      ],
       "key_name": "test_game.action.move_down"
     },
     "move_left": {
-      "key": ["left", "a"],
+      "key": [
+        "left",
+        "a"
+      ],
       "key_name": "test_game.action.move_left"
     },
     "move_right": {
-      "key": ["right", "d"],
+      "key": [
+        "right",
+        "d"
+      ],
       "key_name": "test_game.action.move_right"
     },
     "confirm": {
-      "key": ["enter", "space"],
+      "key": [
+        "enter",
+        "space"
+      ],
       "key_name": "test_game.action.confirm"
     },
     "quit": {
-      "key": ["esc", "q"],
+      "key": [
+        "esc",
+        "q"
+      ],
       "key_name": "test_game.action.quit"
     }
   },
   "runtime": {
-    "target_fps": 60
+    "target_fps": 60,
+    "afk_time": 0
   }
 }

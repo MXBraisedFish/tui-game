@@ -13,7 +13,7 @@ local state = {
     best_streak = 0,
     loss_streak = 0,
     message = "",
-    message_color = "dark_gray",
+    message_color = DARK_GRAY,
     dirty = true,
     last_term_w = 0,
     last_term_h = 0,
@@ -260,7 +260,7 @@ local function reset_round()
     state.current_streak = 0
     state.loss_streak = 0
     state.message = tr("game.rock_paper_scissors.ready_banner")
-    state.message_color = "dark_gray"
+    state.message_color = DARK_GRAY
     state.dirty = true
 end
 
@@ -367,8 +367,8 @@ local function render_scene()
 
     local top1 = tr("game.rock_paper_scissors.best_streak") .. ": " .. tostring(state.best_streak)
     local top2 = tr("game.rock_paper_scissors.current_streak") .. ": " .. tostring(state.current_streak)
-    draw_text(centered_x(top1, 1, term_w), y0, top1, "dark_gray", "black")
-    draw_text(centered_x(top2, 1, term_w), y0 + 1, top2, "light_cyan", "black")
+    draw_text(centered_x(top1, 1, term_w), y0, top1, DARK_GRAY, "black")
+    draw_text(centered_x(top2, 1, term_w), y0 + 1, top2, DARK_CYAN, "black")
 
     if state.message ~= "" then
         draw_text(centered_x(state.message, 1, term_w), y0 + 2, state.message, state.message_color, "black")

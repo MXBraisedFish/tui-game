@@ -56,7 +56,7 @@ function M.render(state)
 
   local player_x = math.max(0, math.min(state.player_x or math.floor(terminal_width / 2), terminal_width - 1))
   local player_y = math.max(0, math.min(state.player_y or math.floor(terminal_height / 2), terminal_height - 1))
-  canvas_draw_text(player_x, player_y, "@", "orange", nil, BOLD)
+  canvas_draw_text(player_x, player_y, "@", "#ffa500", nil, BOLD)
 
   if state.message ~= nil then
     draw_centered(math.max(7, terminal_height - 4), tostring(state.message), "green")

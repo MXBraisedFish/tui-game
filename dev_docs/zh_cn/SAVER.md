@@ -45,6 +45,14 @@
 
 ---
 
+# 屏保包制作注意事项
+
+- **每个屏保包仅限实现一个屏保界面**（由配置层面约束）。
+- **包与包之间完全独立**：不支持共享依赖，也不允许跨包调用。
+- **屏保界面仅用于装饰性暂停，不具备任何实际功能。**
+- **屏保界面帧率锁定为 24 FPS。**
+
+---
 # 屏保包放置目录
 
 所有 屏保包文件必须放置在宿主执行目录下的 `data/mod/saver/` 目录中，按命名空间组织。
@@ -111,9 +119,9 @@
   "entry": path,                    -- 入口脚本路径
   "package": string,                -- 包名
   "package_name": string | key,     -- 屏保包显示名称
-  "saver_name": string | key,        -- Saver 显示名称
-  "author": string | key,           -- 作者信息
-  "version": string,                -- 版本号
+  "saver_name": string | key,       -- 屏保界面显示名称
+  "author": string | key,           -- 作者
+  "version": string,                -- 包版本号
   "introduction": string | key,     -- 屏保包简介
   "icon": Array | string | image,   -- 图标
   "banner": Array | string | image  -- 横幅
@@ -126,9 +134,9 @@
 | -------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `api`          | <font color="#92cddc">Array</font> \| <font color="#92cddc">int</font>                                          | 支持的 API 版本。数组格式 $[min, max]$ 表示支持从 `min` 到 `max` 的版本（含端点）；整数表示仅支持该单一版本。 |
 | `entry`        | <font color="#92cddc">path</font>                                                                               | 入口脚本路径，相对于 `scripts/` 目录。                                               |
-| `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同 屏保包，全局唯一。仅允许字符串。                                               |
+| `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同屏保包，包内全局唯一。仅允许字符串。                                             |
 | `package_name` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 屏保包显示名称，在屏保包列表展示的包名。可填写字符串或语言键。                                         |
-| `saver_name`  | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | Saver 界面展示名称，在屏保包设置列表中展示。可填写字符串或语言键。                                        |
+| `saver_name`   | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | Saver 界面展示名称，在屏保包设置列表中展示。可填写字符串或语言键。                                    |
 | `author`       | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 作者名称。可填写字符串或语言键。                                                        |
 | `version`      | <font color="#92cddc">string</font>                                                                             | 屏保包版本号，由作者自行定义。推荐格式：主版本号.次版本号。仅允许字符串。                                   |
 | `introduction` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 屏保包简介，在屏保包列表中展示。可填写字符串或语言键。                                             |

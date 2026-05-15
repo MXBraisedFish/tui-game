@@ -5,12 +5,14 @@ use std::time::{Duration, Instant};
 const ROOT_UI_NORMAL_FPS: u64 = 60;
 const LOW_RESOURCE_FPS: u64 = 10;
 const ROOT_UI_IDLE_TIMEOUT_SECS: u64 = 60;
+const OVERLAY_FPS: u64 = 24;
 
 /// 帧率运行模式。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FrameRateMode {
     RootUi,
     Game { afk_time_secs: u64, target_fps: u64 },
+    Overlay,
 }
 
 /// 帧率控制器。
@@ -38,6 +40,14 @@ impl FrameRateController {
                 afk_time_secs,
                 target_fps,
             },
+            last_input_at: Instant::now(),
+        }
+    }
+
+    /// 创建覆盖层帧率控制器。
+    pub fn overlay() -> Self {
+        Self {
+            mode: FrameRateMode::Overlay,
             last_input_at: Instant::now(),
         }
     }
@@ -72,6 +82,7 @@ impl FrameRateController {
                     target_fps.max(1)
                 }
             }
+            FrameRateMode::Overlay => OVERLAY_FPS,
         }
     }
 

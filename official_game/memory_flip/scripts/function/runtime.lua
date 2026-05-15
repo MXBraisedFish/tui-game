@@ -779,12 +779,12 @@ local function draw_board(x, y, frame_w, frame_h)
     
     for c = 1, state.size do
         local cx = grid_x + (c - 1) * CELL_STEP_X + 1
-        draw_text(cx, inner_y, string.format("%2d", c), "dark_gray", "black")
+        draw_text(cx, inner_y, string.format("%2d", c), DARK_GRAY, "black")
     end
 
     for r = 1, state.size do
         local row_base = inner_y + 1 + (r - 1) * CELL_STEP_Y
-        draw_text(grid_block_x, row_base + 1, string.format("%2d", r), "dark_gray", "black")
+        draw_text(grid_block_x, row_base + 1, string.format("%2d", r), DARK_GRAY, "black")
 
         for c = 1, state.size do
             local cx = grid_x + (c - 1) * CELL_STEP_X
@@ -832,9 +832,9 @@ local function draw_status(x, y, frame_w)
     draw_text(1, y - 2, string.rep(" ", term_w), "white", "black")
     draw_text(1, y - 1, string.rep(" ", term_w), "white", "black")
 
-    draw_text(x, y - 3, best_line(), "dark_gray", "black")
-    draw_text(x, y - 2, time_text, "light_cyan", "black")
-    draw_text(right_x, y - 2, steps_text, "light_cyan", "black")
+    draw_text(x, y - 3, best_line(), DARK_GRAY, "black")
+    draw_text(x, y - 2, time_text, DARK_CYAN, "black")
+    draw_text(right_x, y - 2, steps_text, DARK_CYAN, "black")
 
     if state.input_mode == "difficulty" then
         if state.input_buffer == "" then
@@ -842,7 +842,7 @@ local function draw_status(x, y, frame_w)
                 x,
                 y - 1,
                 tr("game.memory_flip.input_size_hint"),
-                "dark_gray",
+                DARK_GRAY,
                 "black"
             )
         else
@@ -854,7 +854,7 @@ local function draw_status(x, y, frame_w)
                 x,
                 y - 1,
                 tr("game.memory_flip.input_jump_hint"),
-                "dark_gray",
+                DARK_GRAY,
                 "black"
             )
         else

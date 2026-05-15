@@ -3,6 +3,7 @@
 pub mod keybind_profile;
 mod loader;
 mod profile_data;
+pub mod security_profile;
 
 pub use profile_data::PersistentData;
 

@@ -112,9 +112,9 @@ local function draw_status(state, x, y, frame_w)
       .. U.format_duration(math.max(0, state.best_time_sec))
   local best_x = math.floor((term_w - U.text_width(best_line)) / 2)
   if best_x < 1 then best_x = 1 end
-  U.draw_text(best_x, y - 3, best_line, "dark_gray", "black")
-  U.draw_text(x, y - 2, left, "light_cyan", "black")
-  U.draw_text(right_x, y - 2, right, "light_cyan", "black")
+  U.draw_text(best_x, y - 3, best_line, DARK_GRAY, "black")
+  U.draw_text(x, y - 2, left, DARK_CYAN, "black")
+  U.draw_text(right_x, y - 2, right, DARK_CYAN, "black")
 
   local notice = nil
   local notice_fg = "white"

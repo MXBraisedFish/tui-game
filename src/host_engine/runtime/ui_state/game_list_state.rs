@@ -506,7 +506,10 @@ fn compare_game(
         compare_text_by_width_then_dictionary(left.author.as_str(), right.author.as_str())
     })
     .then_with(|| {
-        compare_text_by_width_then_dictionary(left.package_name.as_str(), right.package_name.as_str())
+        compare_text_by_width_then_dictionary(
+            left.package_name.as_str(),
+            right.package_name.as_str(),
+        )
     })
     .then_with(|| {
         compare_text_by_width_then_dictionary(left.package.as_str(), right.package.as_str())

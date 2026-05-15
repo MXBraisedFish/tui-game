@@ -61,7 +61,7 @@ local state = {
 
     -- 消息提示
     msg_text = "",           -- 消息文本
-    msg_color = "dark_gray", -- 消息颜色
+    msg_color = DARK_GRAY, -- 消息颜色
     msg_until = 0,           -- 消息显示的截止帧
     msg_persistent = false,  -- 消息是否持续显示（不自动消失）
 
@@ -246,7 +246,7 @@ end
 -- 显示消息
 local function show_message(text, color, dur_sec, persistent)
     state.msg_text = text or ""
-    state.msg_color = color or "dark_gray"
+    state.msg_color = color or DARK_GRAY
     state.msg_persistent = persistent == true
     if dur_sec ~= nil and dur_sec > 0 then
         state.msg_until = state.frame + math.floor(dur_sec * FPS + 0.5)
@@ -260,7 +260,7 @@ end
 local function clear_message()
     if state.msg_text ~= "" then
         state.msg_text = ""
-        state.msg_color = "dark_gray"
+        state.msg_color = DARK_GRAY
         state.msg_until = 0
         state.msg_persistent = false
         state.bottom_dirty = true
@@ -559,7 +559,7 @@ end
 -- 弹出撤销栈
 local function pop_undo()
     if #state.undo_stack == 0 then
-        show_message(tr("game.solitaire.undo_empty"), "dark_gray", 2, false)
+        show_message(tr("game.solitaire.undo_empty"), DARK_GRAY, 2, false)
         return false
     end
     local snap = state.undo_stack[#state.undo_stack]
@@ -1041,7 +1041,7 @@ local function draw_from_stock_klondike()
 
     if #state.stock == 0 then
         if #state.waste == 0 then
-            show_message(tr("game.solitaire.stock_empty"), "dark_gray", 2, false)
+            show_message(tr("game.solitaire.stock_empty"), DARK_GRAY, 2, false)
             return false
         end
 
@@ -1072,7 +1072,7 @@ end
 local function draw_spider_row()
     if state.mode ~= MODE_SPIDER then return false end
     if #state.stock < 10 then
-        show_message(tr("game.solitaire.spider_no_stock"), "dark_gray", 2, false)
+        show_message(tr("game.solitaire.spider_no_stock"), DARK_GRAY, 2, false)
         return false
     end
 
@@ -1238,8 +1238,8 @@ local function draw_size_warning(term_w, term_h, min_w, min_h)
     draw_text(centered_x(title, 1, term_w), y, title, "yellow", "black")
     draw_text(centered_x(req, 1, term_w), y + 1, req, "white", "black")
     draw_text(centered_x(cur, 1, term_w), y + 2, cur, "white", "black")
-    draw_text(centered_x(hint, 1, term_w), y + 3, hint, "dark_gray", "black")
-    draw_text(centered_x(quit_hint, 1, term_w), y + 4, quit_hint, "dark_gray", "black")
+    draw_text(centered_x(hint, 1, term_w), y + 3, hint, DARK_GRAY, "black")
+    draw_text(centered_x(quit_hint, 1, term_w), y + 4, quit_hint, DARK_GRAY, "black")
 end
 
 -- 获取牌的两字符表示
@@ -1282,13 +1282,13 @@ local function draw_cards_grid(g, max_visible_rows)
 
     -- 绘制行号
     for r = 1, rows_to_draw do
-        draw_text(g.x, g.y + r - 1, string.format("R%-2d", r), "dark_gray", "black")
+        draw_text(g.x, g.y + r - 1, string.format("R%-2d", r), DARK_GRAY, "black")
     end
 
     -- 绘制列号和牌
     for c = 1, cols do
         local cx = g.x + 5 + (c - 1) * 5
-        draw_text(cx, g.y - 1, string.format("C%-2d", c), "dark_gray", "black")
+        draw_text(cx, g.y - 1, string.format("C%-2d", c), DARK_GRAY, "black")
 
         local pile = state.tableau[c]
         for line = 0, rows_to_draw do
@@ -1296,7 +1296,7 @@ local function draw_cards_grid(g, max_visible_rows)
         end
         for r = 1, rows_to_draw do
             local text = "  "
-            local fg = "dark_gray"
+            local fg = DARK_GRAY
             if r <= #pile then
                 local card = pile[r]
                 if card.face_up then
@@ -1304,7 +1304,7 @@ local function draw_cards_grid(g, max_visible_rows)
                     fg = card_color(card)
                 else
                     text = "##"
-                    fg = "dark_gray"
+                    fg = DARK_GRAY
                 end
             end
             draw_text(cx + 1, g.y + r - 1, text, fg, "black")
@@ -1384,13 +1384,13 @@ local function draw_color_hint(term_w, y)
         { "[A]",      "red" },
         { " ",        "white" },
         { "[A]",      "rgb(255,165,0)" },
-        { " -> ",     "dark_gray" },
+        { " -> ",     DARK_GRAY },
         { red_text,   "white" },
         { "   ",      "white" },
         { "[A]",      "cyan" },
         { " ",        "white" },
         { "[A]",      "white" },
-        { " -> ",     "dark_gray" },
+        { " -> ",     DARK_GRAY },
         { black_text, "white" },
     }
 
@@ -1518,7 +1518,7 @@ local function current_message()
     if state.msg_text ~= "" then
         return state.msg_text, state.msg_color
     end
-    return "", "dark_gray"
+    return "", DARK_GRAY
 end
 
 -- 获取控制说明文本
@@ -1745,7 +1745,7 @@ local function handle_normal_key(key)
             state.selected_pick_depth = clamp(state.cursor_pick_depth or 1, 1, math.max(1, maxd))
             state.grid_dirty = true
         else
-            show_message(tr("game.solitaire.select_empty"), "dark_gray", 2, false)
+            show_message(tr("game.solitaire.select_empty"), DARK_GRAY, 2, false)
         end
         return
     end
@@ -1798,7 +1798,7 @@ local function handle_normal_key(key)
             remove_spider_complete_runs()
         else
             if not move_column_to_cell(state.cursor_col) then
-                show_message(tr("game.solitaire.cell_full"), "dark_gray", 2, false)
+                show_message(tr("game.solitaire.cell_full"), DARK_GRAY, 2, false)
             else
                 auto_collect_freecell()
             end
@@ -1814,7 +1814,7 @@ local function handle_normal_key(key)
             end
         elseif state.mode == MODE_FREECELL then
             if not move_cell_to_column(state.cursor_col) then
-                show_message(tr("game.solitaire.cell_empty"), "dark_gray", 2, false)
+                show_message(tr("game.solitaire.cell_empty"), DARK_GRAY, 2, false)
             else
                 auto_collect_freecell()
             end

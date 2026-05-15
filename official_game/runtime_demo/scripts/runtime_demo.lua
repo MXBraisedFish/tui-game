@@ -157,7 +157,7 @@ function render(state)
   local field_origin_y = math.max(4, math.floor((term_h - (FIELD_HEIGHT + 2)) / 2))
 
   canvas_draw_text(rt_centered_x(title), 1, title, "cyan", nil)
-  canvas_draw_text(rt_centered_x(desc), 2, desc, "dark_gray", nil)
+  canvas_draw_text(rt_centered_x(desc), 2, desc, DARK_GRAY, nil)
   canvas_draw_text(math.max(0, term_w - 12), 1, tr("game.runtime_demo.steps") .. ": " .. tostring(state.steps), "yellow", nil)
   canvas_draw_text(math.max(0, term_w - 20), 2, tr("game.runtime_demo.best") .. ": " .. best, "green", nil)
 
@@ -165,7 +165,7 @@ function render(state)
 
   canvas_draw_text(rt_centered_x(tr(state.message)), math.max(0, term_h - 3), tr(state.message), state.finished and "green" or "white", nil)
   local controls = controls_text()
-  canvas_draw_text(rt_centered_x(controls), math.max(0, term_h - 1), controls, "dark_gray", nil)
+  canvas_draw_text(rt_centered_x(controls), math.max(0, term_h - 1), controls, DARK_GRAY, nil)
 end
 
 function best_score(state)

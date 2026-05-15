@@ -1,11 +1,11 @@
 local M = {}
 
 M.NORMAL_COLOR = "white"
-M.KEY_COLOR = "dark_gray"
+M.KEY_COLOR = DARK_GRAY
 M.TITLE_COLOR = "white"
 M.HEADER_COLOR = "yellow"
-M.TIP_COLOR = "dark_gray"
-M.PATH_COLOR = "dark_gray"
+M.TIP_COLOR = DARK_GRAY
+M.PATH_COLOR = DARK_GRAY
 
 local function key_label(keys)
   if type(keys) == "string" then

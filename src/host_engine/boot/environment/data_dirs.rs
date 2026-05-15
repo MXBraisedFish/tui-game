@@ -63,6 +63,15 @@ pub fn ensure() -> EnvironmentResult<()> {
         &root_dir.join("data/profiles/boss_state"),
         EMPTY_JSON_OBJECT,
     )?;
+    ensure_file(
+        &root_dir.join("data/profiles/security_state.json"),
+        r#"{
+  "default_safe_mode": true,
+  "default_mod_game_enabled": true,
+  "default_mod_saver_enabled": true,
+  "default_mod_boss_enabled": true
+}"#,
+    )?;
 
     ensure_dir(&root_dir.join("data/log"))?;
     ensure_file(&root_dir.join("data/log/tui_log.txt"), "")?;

@@ -564,7 +564,7 @@ end
 local function adjust_bet_multiplier(delta)
     local h = active_hand_ref()
     if not can_adjust_multiplier(h) then
-        add_toast(tr("game.blackjack.action_unavailable"), "dark_gray")
+        add_toast(tr("game.blackjack.action_unavailable"), DARK_GRAY)
         return
     end
 
@@ -750,7 +750,7 @@ local function render_once()
 
     local best_text = tr("game.blackjack.best") .. ": " .. tostring(state.best_net)
     local net = net_value()
-    local net_color = "dark_gray"
+    local net_color = DARK_GRAY
     if net > 0 then
         net_color = "green"
     elseif net < 0 then
@@ -763,7 +763,7 @@ local function render_once()
     local best_w = text_width(best_text)
     local sep_w = text_width(status_sep)
     local sx = centered_x(best_text .. status_sep .. net_text, 1, w)
-    draw_text(sx, status_y, best_text, "dark_gray", "black")
+    draw_text(sx, status_y, best_text, DARK_GRAY, "black")
     draw_text(sx + best_w + sep_w, status_y, net_text, net_color, "black")
 
 
@@ -848,7 +848,7 @@ local function render_once()
     if not state.dealer_hidden then
         dealer_points = hand_value_text(state.dealer_cards)
     end
-    draw_points_line(tr("game.blackjack.msg_dealer_points") .. ": " .. dealer_points, dealer_y + CARD_H, "dark_gray")
+    draw_points_line(tr("game.blackjack.msg_dealer_points") .. ": " .. dealer_points, dealer_y + CARD_H, DARK_GRAY)
 
 
     local deck_x = table_x + TABLE_W - 16
@@ -896,7 +896,7 @@ local function render_once()
     local phase_color = "yellow"
     if state.phase == "dealer" then
         phase_key = "game.blackjack.phase_dealer"
-        phase_color = "light_cyan"
+        phase_color = DARK_CYAN
     elseif state.phase == "settle" then
         phase_key = "game.blackjack.phase_settle"
         phase_color = "rgb(255,165,0)"
@@ -958,12 +958,12 @@ local function render_once()
         draw_points_line(
             tr("game.blackjack.msg_left_points") .. ": " .. hand_value_text(state.hands[1].cards),
             player_points_y,
-            "dark_gray"
+            DARK_GRAY
         )
         draw_points_line(
             tr("game.blackjack.msg_right_points") .. ": " .. hand_value_text(state.hands[2].cards),
             player_points_y + 1,
-            "dark_gray"
+            DARK_GRAY
         )
 
         local indicator_y = player_cards_y + CARD_H
@@ -981,7 +981,7 @@ local function render_once()
         draw_points_line(
             tr("game.blackjack.msg_player_points") .. ": " .. hand_value_text(state.hands[1].cards),
             player_points_y,
-            "dark_gray"
+            DARK_GRAY
         )
     end
 
@@ -989,7 +989,7 @@ local function render_once()
     fill_line(warn_y, w)
     local warning = tr("game.blackjack.warning")
     local wx = centered_x(warning, 1, w)
-    draw_text(wx, warn_y, warning, "dark_gray", "black")
+    draw_text(wx, warn_y, warning, DARK_GRAY, "black")
 
 
     for i = 0, 2 do
@@ -1049,7 +1049,7 @@ local function apply_initial_dealer_results()
             resolve_hand(h, "lose", 0, "game.blackjack.msg_player_bust", "Player bust! Lose bet.", "red")
         elseif h.insured_skip and (not dealer_bj) then
             resolve_hand(h, "push", 0, "game.blackjack.msg_insurance_skip_round", "Player insurance: round skipped.",
-                "light_cyan")
+                DARK_CYAN)
         elseif player_bj and not dealer_bj then
             if state.insurance then
                 resolve_hand(h, "win", 2.0, "game.blackjack.msg_player_blackjack_insured",
@@ -1060,7 +1060,7 @@ local function apply_initial_dealer_results()
         elseif dealer_bj and not player_bj then
             resolve_hand(h, "lose", -0.5, "game.blackjack.msg_dealer_blackjack", "Dealer blackjack! Lose bet.", "red")
         elseif dealer_bj and player_bj then
-            resolve_hand(h, "push", 0, "game.blackjack.msg_both_blackjack", "Both blackjack. Push.", "dark_gray")
+            resolve_hand(h, "push", 0, "game.blackjack.msg_both_blackjack", "Both blackjack. Push.", DARK_GRAY)
         end
     end
     return dealer_bj
@@ -1088,7 +1088,7 @@ local function finish_settle_phase()
             elseif player_total < dealer_total then
                 resolve_hand(h, "lose", 0, "game.blackjack.msg_dealer_higher", "Dealer higher, lose bet!", "red")
             else
-                resolve_hand(h, "push", 0, "game.blackjack.msg_push", "Push.", "dark_gray")
+                resolve_hand(h, "push", 0, "game.blackjack.msg_push", "Push.", DARK_GRAY)
             end
         end
     end
@@ -1164,7 +1164,7 @@ local function advance_dealer_animation(dt_ms)
         local dealer_bj = apply_initial_dealer_results()
         if has_unresolved_hands() and not dealer_bj and hand_total(state.dealer_cards) <= 16 then
             set_center_lines({
-                { text = tr("game.blackjack.msg_dealer_drawing") .. " " .. SPINNER[state.spinner_idx], color = "light_cyan" }
+                { text = tr("game.blackjack.msg_dealer_drawing") .. " " .. SPINNER[state.spinner_idx], color = DARK_CYAN }
             })
             state.spinner_idx = state.spinner_idx + 1
             if state.spinner_idx > #SPINNER then state.spinner_idx = 1 end
@@ -1185,7 +1185,7 @@ local function advance_dealer_animation(dt_ms)
     if anim.kind == "dealer_post_draw" then
         if hand_total(state.dealer_cards) <= 16 then
             set_center_lines({
-                { text = tr("game.blackjack.msg_dealer_drawing") .. " " .. SPINNER[state.spinner_idx], color = "light_cyan" }
+                { text = tr("game.blackjack.msg_dealer_drawing") .. " " .. SPINNER[state.spinner_idx], color = DARK_CYAN }
             })
             state.spinner_idx = state.spinner_idx + 1
             if state.spinner_idx > #SPINNER then state.spinner_idx = 1 end
@@ -1211,7 +1211,7 @@ local function dealer_phase_and_settle()
     state.await_next_round = false
     state.dealer_hidden = false
     set_center_lines({
-        { text = tr("game.blackjack.msg_player_stand_dealer"), color = "light_cyan" }
+        { text = tr("game.blackjack.msg_player_stand_dealer"), color = DARK_CYAN }
     })
     state.anim = { kind = "dealer_reveal", timer_ms = DEALER_REVEAL_PAUSE_MS }
     state.dirty = true

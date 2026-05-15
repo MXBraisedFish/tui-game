@@ -401,8 +401,8 @@ local function stage_color()
     if key == "game.tetris.stage.dusk" then return "rgb(232,158,36)" end
     if key == "game.tetris.stage.darkness" then return "gray" end
     if key == "game.tetris.stage.marathon" then return "green" end
-    if key == "game.tetris.stage.dawn" then return "light_red" end
-    if key == "game.tetris.stage.rebirth" then return "light_cyan" end
+    if key == "game.tetris.stage.dawn" then return DARK_RED end
+    if key == "game.tetris.stage.rebirth" then return DARK_CYAN end
     if key == "game.tetris.stage.crash" then return "yellow" end
     return "white"
 end
@@ -1074,14 +1074,14 @@ end
 
 local function draw_right_panel(layout)
     local x, y = layout.right_x, layout.right_y
-    draw_padded(x, y + 0, RIGHT_W, tr("game.tetris.best_score"), "dark_gray", "black", "left")
+    draw_padded(x, y + 0, RIGHT_W, tr("game.tetris.best_score"), DARK_GRAY, "black", "left")
     draw_padded(x, y + 1, RIGHT_W, tostring(state.best_score), "white", "black", "left")
 
-    draw_padded(x, y + 3, RIGHT_W, tr("game.tetris.current_score"), "dark_gray", "black", "left")
+    draw_padded(x, y + 3, RIGHT_W, tr("game.tetris.current_score"), DARK_GRAY, "black", "left")
     draw_padded(x, y + 4, RIGHT_W, tostring(state.score), "white", "black", "left")
 
-    draw_padded(x, y + 6, RIGHT_W, tr("game.tetris.time"), "dark_gray", "black", "left")
-    draw_padded(x, y + 7, RIGHT_W, format_duration(elapsed_seconds()), "light_cyan", "black", "left")
+    draw_padded(x, y + 6, RIGHT_W, tr("game.tetris.time"), DARK_GRAY, "black", "left")
+    draw_padded(x, y + 7, RIGHT_W, format_duration(elapsed_seconds()), DARK_CYAN, "black", "left")
 
     draw_padded(x, y + 9, RIGHT_W, tr("game.tetris.next"), "white", "black", "left")
     draw_next_preview(layout)
@@ -1109,7 +1109,7 @@ local function current_message()
         return p .. state.input_buffer, "yellow"
     end
     if state.toast_text ~= nil and state.frame < state.toast_until then
-        return state.toast_text, "light_green"
+        return state.toast_text, DARK_GREEN
     end
     return "", "white"
 end

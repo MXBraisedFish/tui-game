@@ -474,9 +474,9 @@ local function draw_status(x, y, frame_w)
     draw_text(1, y - 1, string.rep(" ", term_w), "white", "black")
 
     -- 鏄剧ず鏈€浣宠褰曘€佹椂闂淬€佹鏁?
-    draw_text(x, y - 3, best_line_text(), "dark_gray", "black")
-    draw_text(x, y - 2, left, "light_cyan", "black")
-    draw_text(right_x, y - 2, right, "light_cyan", "black")
+    draw_text(x, y - 3, best_line_text(), DARK_GRAY, "black")
+    draw_text(x, y - 2, left, DARK_CYAN, "black")
+    draw_text(right_x, y - 2, right, DARK_CYAN, "black")
 
     -- 鏄剧ず鎻愮ず淇℃伅
     if state.won then
@@ -531,7 +531,7 @@ local function draw_move_mode(y_bottom)
     local cx = math.floor((term_w - text_width(line)) / 2)
     if cx < 1 then cx = 1 end
     draw_text(1, y_bottom, string.rep(" ", term_w), "white", "black")
-    draw_text(cx, y_bottom, line, "dark_gray", "black")
+    draw_text(cx, y_bottom, line, DARK_GRAY, "black")
 end
 
 -- 娓呴櫎涓婃娓叉煋鐨勫尯鍩?

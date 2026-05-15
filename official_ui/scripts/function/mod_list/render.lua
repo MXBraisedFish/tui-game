@@ -12,9 +12,9 @@ local function draw_panel(x, y, width, height, title)
 end
 
 local function draw_debug_mark(x, y, bg)
-  canvas_draw_text(x, y, "[", C.NORMAL_COLOR, bg, nil, nil)
+  canvas_draw_text(x, y, "[", C.NORMAL_COLOR, bg, nil, nil, nil)
   canvas_draw_text(x + 1, y, "D", C.DEBUG_COLOR, bg, BOLD, nil)
-  canvas_draw_text(x + 2, y, "]", C.NORMAL_COLOR, bg, nil, nil)
+  canvas_draw_text(x + 2, y, "]", C.NORMAL_COLOR, bg, nil, nil, nil)
   return x + 3
 end
 
@@ -74,7 +74,7 @@ local function draw_icon(icon, x, y, bg)
   for row = 1, C.ICON_HEIGHT do
     local line = tostring(icon[row] or "")
     if line ~= "" then
-      canvas_draw_rich_text(x, y + row - 1, line, C.NORMAL_COLOR, bg, nil, C.ICON_WIDTH)
+      canvas_draw_rich_text(x, y + row - 1, line, C.NORMAL_COLOR, bg, nil, nil, C.ICON_WIDTH)
     end
   end
 end
@@ -101,14 +101,14 @@ local function draw_full_item(layout, root_state, item, row_y, is_selected)
     name_x = draw_debug_mark(text_x, row_y, bg) + 1
   end
   canvas_draw_text(name_x, row_y, tostring(item.package_name or item.name or ""), fg, bg, BOLD, nil, math.max(1, max_width - (name_x - text_x)))
-  canvas_draw_text(text_x, row_y + 1, L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author), C.NORMAL_COLOR, bg, nil, nil)
-  canvas_draw_rich_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author)), row_y + 1, tostring(item.author or ""), fg, bg, nil, max_width)
-  canvas_draw_text(text_x, row_y + 2, L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version), C.NORMAL_COLOR, bg, nil, nil)
-  canvas_draw_rich_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version)), row_y + 2, tostring(item.version or ""), fg, bg, nil, max_width)
+  canvas_draw_text(text_x, row_y + 1, L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author), C.NORMAL_COLOR, bg, nil, nil, nil)
+  canvas_draw_rich_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_AUTHOR", C.DEFAULT_TEXT.author)), row_y + 1, tostring(item.author or ""), fg, bg, nil, nil, max_width)
+  canvas_draw_text(text_x, row_y + 2, L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version), C.NORMAL_COLOR, bg, nil, nil, nil)
+  canvas_draw_rich_text(text_x + L.text_width(L.language(root_state, "MOD_LIST_INFO_VERSION", C.DEFAULT_TEXT.version)), row_y + 2, tostring(item.version or ""), fg, bg, nil, nil, max_width)
   local status, status_color = status_text(root_state, item.enabled == true, false)
   local prefix = L.language(root_state, "MOD_LIST_STATUS", C.DEFAULT_TEXT.status)
-  canvas_draw_text(text_x, row_y + 3, prefix, C.NORMAL_COLOR, bg, nil, nil)
-  canvas_draw_text(text_x + L.text_width(prefix), row_y + 3, status, status_color, bg, BOLD, nil, max_width)
+  canvas_draw_text(text_x, row_y + 3, prefix, C.NORMAL_COLOR, bg, nil, nil, nil)
+  canvas_draw_text(text_x + L.text_width(prefix), row_y + 3, status, status_color, bg, BOLD, ALIGN_LEFT, max_width)
 
   if item.safe_mode == false then
     draw_safe_bar(layout.left_x + layout.left_width - 2, row_y, 4)
@@ -137,9 +137,9 @@ local function draw_brief_item(layout, root_state, item, row_y, is_selected)
   local max_name_width = math.max(1, inner_width - (x - inner_x) - status_width - safe_bar_space - 2)
   canvas_draw_text(x, row_y, tostring(item.package_name or item.name or ""), fg, bg, BOLD, nil, max_name_width)
   local status_x = layout.left_x + layout.left_width - status_width - safe_bar_space - 2
-  canvas_draw_text(status_x, row_y, "[", C.NORMAL_COLOR, bg, nil, nil)
+  canvas_draw_text(status_x, row_y, "[", C.NORMAL_COLOR, bg, nil, nil, nil)
   canvas_draw_text(status_x + 1, row_y, status, status_color, bg, BOLD, nil)
-  canvas_draw_text(status_x + 1 + L.text_width(status), row_y, "]", C.NORMAL_COLOR, bg, nil, nil)
+  canvas_draw_text(status_x + 1 + L.text_width(status), row_y, "]", C.NORMAL_COLOR, bg, nil, nil, nil)
 
   if item.safe_mode == false then
     draw_safe_bar(layout.left_x + layout.left_width - 2, row_y, 1)
@@ -648,7 +648,7 @@ local function draw_info(layout, root_state)
       if row.rich2 then
         canvas_draw_rich_text(x2, y + drawn, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, ALIGN_LEFT, remaining_width)
       else
-        canvas_draw_text(x2, y + drawn, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, BOLD, nil, remaining_width)
+        canvas_draw_text(x2, y + drawn, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, BOLD, ALIGN_LEFT, remaining_width)
       end
     end
     drawn = drawn + row_draw_height

@@ -4,7 +4,7 @@ M.TITLE_COLOR = "white"
 M.WARN_COLOR = "yellow"
 M.CANCEL_COLOR = "green"
 M.CONFIRM_COLOR = "blue"
-M.DISABLED_COLOR = "dark_gray"
+M.DISABLED_COLOR = DARK_GRAY
 M.CONFIRM_DELAY_MS = 10000
 
 local function key_label(keys)

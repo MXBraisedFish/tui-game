@@ -75,15 +75,22 @@ mod state {
 
     use serde_json::{Map, Value, json};
 
-    use super::OverlayRegistry;
+    use crate::host_engine::boot::preload::persistent_data::security_profile;
+
+    use super::{OverlayRegistry, OverlaySource};
 
     pub fn sync_saver_state(registry: &OverlayRegistry) -> Result<(), Box<dyn std::error::Error>> {
         let path = root_dir().join("data/profiles/saver_state");
+        let security = security_profile::load_from_default_path();
         let mut state = read_state(&path)?;
-        for package in registry.savers.iter() {
-            state
-                .entry(package.uid.clone())
-                .or_insert_with(|| json!({ "debug": false }));
+        for package in registry
+            .savers
+            .iter()
+            .filter(|package| package.source == OverlaySource::ThirdParty)
+        {
+            state.entry(package.uid.clone()).or_insert_with(
+                || json!({ "enabled": security.default_mod_saver_enabled, "debug": false }),
+            );
         }
         write_state(&path, &state)?;
         Ok(())
@@ -91,11 +98,16 @@ mod state {
 
     pub fn sync_boss_state(registry: &OverlayRegistry) -> Result<(), Box<dyn std::error::Error>> {
         let path = root_dir().join("data/profiles/boss_state");
+        let security = security_profile::load_from_default_path();
         let mut state = read_state(&path)?;
-        for package in registry.bosses.iter() {
-            state
-                .entry(package.uid.clone())
-                .or_insert_with(|| json!({ "debug": false }));
+        for package in registry
+            .bosses
+            .iter()
+            .filter(|package| package.source == OverlaySource::ThirdParty)
+        {
+            state.entry(package.uid.clone()).or_insert_with(
+                || json!({ "enabled": security.default_mod_boss_enabled, "debug": false }),
+            );
         }
         write_state(&path, &state)?;
         Ok(())

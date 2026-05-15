@@ -175,11 +175,11 @@ fn read_game_manifest(package_dir: &Path) -> ScannerResult<GameManifest> {
         min_width: require_integer(&value, "game.json", "min_width")?,
         min_height: require_integer(&value, "game.json", "min_height")?,
         write: require_bool(&value, "game.json", "write")?,
-        afk_time: require_non_negative_u64(&value, "game.json", "afk_time")?,
         case_sensitive: require_bool(&value, "game.json", "case_sensitive")?,
         actions: require_actions(&value)?,
         runtime: GameRuntimeManifest {
-            target_fps: require_u16(runtime, "game.json", "runtime.target_fps")?,
+            target_fps: require_u16(runtime, "game.json", "runtime.target_fps", "target_fps")?,
+            afk_time: require_non_negative_u64(runtime, "game.json", "runtime.afk_time")?,
         },
     })
 }
@@ -278,9 +278,10 @@ fn require_u16(
     object: &Map<String, Value>,
     file_name: &str,
     field_name: &str,
+    json_key: &str,
 ) -> ScannerResult<u16> {
     let value = object
-        .get("target_fps")
+        .get(json_key)
         .ok_or_else(|| field_missing_error(file_name, field_name))?;
     let number = value
         .as_u64()

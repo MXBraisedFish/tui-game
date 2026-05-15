@@ -642,6 +642,9 @@ fn resolve_page_name(page_id: &str) -> String {
         "setting_language" => text.setting_keybind.system_page_setting_language,
         "setting_mods" => text.setting_keybind.system_page_setting_mods,
         "setting_security" => text.setting_keybind.system_page_setting_security,
+        "mod_game_list" => text.mod_hub.game,
+        "mod_saver_list" => text.mod_hub.saver,
+        "mod_boss_list" => text.mod_hub.boss,
         "keybind_system" => text.setting_keybind.system_page_keybind_system,
         "keybind_global" => text.setting_keybind.system_page_keybind_global,
         "keybind_game" => text.setting_keybind.system_page_keybind_game,
@@ -705,6 +708,14 @@ fn keybind_system_language_map() -> Map<String, JsonValue> {
     insert!("MOD_LIST_DEBUG", text.key.mod_list_debug);
     insert!("MOD_LIST_LIST", text.key.mod_list_list);
     insert!("MOD_LIST_SAFE_MODE", text.key.mod_list_safe_mode);
+    insert!("MOD_PREV_OPTION", text.key.mod_prev_option);
+    insert!("MOD_NEXT_OPTION", text.key.mod_next_option);
+    insert!("MOD_LIST_OPTION1", text.key.mod_list_option1);
+    insert!("MOD_LIST_OPTION2", text.key.mod_list_option2);
+    insert!("MOD_LIST_OPTION3", text.key.mod_list_option3);
+    insert!("MOD_HUB_SELECT", text.key.mod_hub_select);
+    insert!("MOD_HUB_CONFIRM", text.key.mod_hub_confirm);
+    insert!("MOD_HUB_BACK", text.key.mod_hub_back);
     insert!("LANGUAGE_UP_OPTION", text.key.language_up_option);
     insert!("LANGUAGE_DOWN_OPTION", text.key.language_down_option);
     insert!("LANGUAGE_LEFT_OPTION", text.key.language_left_option);
@@ -728,6 +739,10 @@ fn keybind_system_language_map() -> Map<String, JsonValue> {
     insert!("SECURITY_OPTION2", text.key.security_option2);
     insert!("SECURITY_OPTION3", text.key.security_option3);
     insert!("SECURITY_OPTION4", text.key.security_option4);
+    insert!("SECURITY_OPTION5", text.key.security_option5);
+    insert!("SECURITY_OPTION6", text.key.security_option6);
+    insert!("SECURITY_OPTION7", text.key.security_option7);
+    insert!("SECURITY_OPTION8", text.key.security_option8);
     insert!("SECURITY_BACK", text.key.security_back);
     insert!(
         "SETTING_KEYBIND_LIST_PREV_OPTION",

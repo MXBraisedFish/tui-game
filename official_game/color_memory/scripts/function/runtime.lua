@@ -533,7 +533,7 @@ local function draw_show_section(g)
     elseif state.phase == "input" then
         status_text = tr("game.color_memory.status_input")
     end
-    draw_text(centered_x(status_text, inner_x, inner_x + inner_w - 1), inner_y + 6, status_text, "dark_gray", "black")
+    draw_text(centered_x(status_text, inner_x, inner_x + inner_w - 1), inner_y + 6, status_text, DARK_GRAY, "black")
 end
 
 local function draw_input_section(g)
@@ -575,12 +575,12 @@ local function draw_header(g)
     local best_line = tr("game.color_memory.best_score") .. ": " .. tostring(state.best_score)
         .. "  "
         .. tr("game.color_memory.best_time") .. ": " .. format_duration(state.best_time_sec)
-    draw_text(centered_x(best_line, 1, g.term_w), g.best_y, best_line, "dark_gray", "black")
+    draw_text(centered_x(best_line, 1, g.term_w), g.best_y, best_line, DARK_GRAY, "black")
 
     local current_line = tr("game.color_memory.time") .. ": " .. format_duration(elapsed_seconds())
         .. "  "
         .. tr("game.color_memory.score") .. ": " .. tostring(state.score)
-    draw_text(centered_x(current_line, 1, g.term_w), g.current_y, current_line, "light_cyan", "black")
+    draw_text(centered_x(current_line, 1, g.term_w), g.current_y, current_line, DARK_CYAN, "black")
 
     local info = ""
     local info_color = "yellow"

@@ -481,7 +481,7 @@ local function draw_info(layout, root_state)
       if row.rich2 then
         canvas_draw_rich_text(x2, y + row_index, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, ALIGN_LEFT, remaining_width)
       else
-        canvas_draw_text(x2, y + row_index, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, BOLD, nil, remaining_width)
+        canvas_draw_text(x2, y + row_index, tostring(row.text2), row.color2 or C.INFO_TEXT_COLOR, nil, BOLD, ALIGN_LEFT, remaining_width)
       end
     end
     row_index = row_index + height
@@ -517,7 +517,7 @@ local function draw_info(layout, root_state)
       end
       local line = detail_lines[index]
       if line.rich then
-        canvas_draw_rich_text(content_x, y + row_index + draw_index, line.text or "", line.color, nil, nil, nil)
+        canvas_draw_rich_text(content_x, y + row_index + draw_index, line.text or "", line.color, nil, nil, nil, nil)
       else
         canvas_draw_text(content_x, y + row_index + draw_index, line.text or "", line.color, nil, nil, nil, nil)
       end

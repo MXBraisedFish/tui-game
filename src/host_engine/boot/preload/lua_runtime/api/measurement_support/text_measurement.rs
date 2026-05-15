@@ -2,6 +2,9 @@
 
 use unicode_width::UnicodeWidthStr;
 
+use crate::host_engine::boot::preload::lua_runtime::api::drawing_support::drawing_parser::{
+    WrapLimit, WrapOptions,
+};
 use crate::host_engine::boot::preload::lua_runtime::api::text_support::text_wrapping;
 
 /// 文本尺寸。
@@ -13,6 +16,17 @@ pub struct TextSize {
 
 /// 计算文本占用的终端字符宽高。
 pub fn measure_text(text: &str, wrap_width: Option<u16>) -> TextSize {
+    measure_text_with_options(
+        text,
+        &WrapOptions {
+            wrap_width: wrap_width.map_or(WrapLimit::Disabled, WrapLimit::Fixed),
+            ..WrapOptions::default()
+        },
+    )
+}
+
+/// 按换行配置计算文本占用的终端字符宽高。
+pub fn measure_text_with_options(text: &str, wrap_options: &WrapOptions) -> TextSize {
     if text.is_empty() {
         return TextSize {
             width: 0,
@@ -20,8 +34,8 @@ pub fn measure_text(text: &str, wrap_width: Option<u16>) -> TextSize {
         };
     }
 
-    let lines = text_wrapping::wrap_text_lines(text, wrap_width);
-    let width = if wrap_width.is_some() {
+    let lines = text_wrapping::wrap_text_lines_with_options(text, wrap_options);
+    let width = if wrap_options.wrap_width != WrapLimit::Disabled {
         text_wrapping::max_line_width(&lines)
     } else {
         lines

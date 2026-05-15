@@ -16,7 +16,10 @@ impl ModHubUiState {
     pub fn new() -> Self {
         let root_state = ModHubRootState::new();
         let lua_state = ModHubLuaState::from_root_state(&root_state);
-        Self { root_state, lua_state }
+        Self {
+            root_state,
+            lua_state,
+        }
     }
 
     pub fn reset_lua_state(&mut self) {
@@ -67,7 +70,11 @@ pub struct ModHubLuaState {
 
 impl ModHubLuaState {
     fn from_root_state(root_state: &ModHubRootState) -> Self {
-        Self { select: root_state.select, confirm: false, back: false }
+        Self {
+            select: root_state.select,
+            confirm: false,
+            back: false,
+        }
     }
 
     pub fn to_lua_table(&self, lua: &Lua) -> mlua::Result<Table> {
@@ -81,7 +88,11 @@ impl ModHubLuaState {
     pub fn from_lua_value(value: Value) -> mlua::Result<Self> {
         let table = match value {
             Value::Table(table) => table,
-            _ => return Err(mlua::Error::external("mod hub lua state must be returned as table")),
+            _ => {
+                return Err(mlua::Error::external(
+                    "mod hub lua state must be returned as table",
+                ));
+            }
         };
         Ok(Self {
             select: normalize_select(table.get::<Option<i64>>("select")?.unwrap_or(1)),
@@ -99,7 +110,10 @@ pub struct ModHubRootState {
 
 impl ModHubRootState {
     fn new() -> Self {
-        Self { language: mod_hub_language_pairs(), select: 1 }
+        Self {
+            language: mod_hub_language_pairs(),
+            select: 1,
+        }
     }
 
     fn refresh_language(&mut self) {
@@ -141,7 +155,11 @@ fn pairs_to_table(lua: &Lua, pairs: &[(String, String)]) -> mlua::Result<Table> 
 }
 
 fn normalize_select(select: i64) -> i64 {
-    if select < 1 { return MOD_HUB_OPTION_COUNT; }
-    if select > MOD_HUB_OPTION_COUNT { return 1; }
+    if select < 1 {
+        return MOD_HUB_OPTION_COUNT;
+    }
+    if select > MOD_HUB_OPTION_COUNT {
+        return 1;
+    }
     select
 }

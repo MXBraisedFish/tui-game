@@ -5,9 +5,9 @@ M.TITLE_COLOR = "white"
 M.WARN_COLOR = "yellow"
 M.CANCEL_COLOR = "green"
 M.CONFIRM_COLOR = "red"
-M.DISABLED_COLOR = "dark_gray"
+M.DISABLED_COLOR = DARK_GRAY
 M.KEY_COLOR = "white"
-M.PATH_COLOR = "dark_gray"
+M.PATH_COLOR = DARK_GRAY
 
 local function key_label(keys)
   if type(keys) == "string" then

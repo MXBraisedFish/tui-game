@@ -28,7 +28,6 @@ impl OverlayKind {
             Self::Boss => "boss_name",
         }
     }
-
 }
 
 impl OverlaySource {
@@ -38,7 +37,6 @@ impl OverlaySource {
             Self::ThirdParty => "third_party",
         }
     }
-
 
     pub fn uid_prefix(self, kind: OverlayKind) -> &'static str {
         match (self, kind) {

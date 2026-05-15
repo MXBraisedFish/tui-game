@@ -138,7 +138,7 @@ local state = {
 
     -- 提示信息
     info_message = "",
-    info_color = "dark_gray",
+    info_color = DARK_GRAY,
     info_message_until = nil,
 
     -- 收集的水果记录
@@ -793,7 +793,7 @@ end
 
 -- 设置提示信息
 local function set_info_message(text, color, duration_sec)
-    state.info_message, state.info_color = text, (color or "dark_gray")
+    state.info_message, state.info_color = text, (color or DARK_GRAY)
     if duration_sec ~= nil and duration_sec > 0 then
         state.info_message_until = state.frame + math.floor(duration_sec * FPS)
         start_timer_field("info_timer_id", duration_sec * 1000, "pacman_info")
@@ -844,9 +844,9 @@ local function current_banner_message()
     end
 
     if state.info_message == "" then
-        return "", state.info_color or "dark_gray"
+        return "", state.info_color or DARK_GRAY
     end
-    return state.info_message, state.info_color or "dark_gray"
+    return state.info_message, state.info_color or DARK_GRAY
 end
 
 -- 重置能量状态
@@ -1400,7 +1400,7 @@ end
 -- 获取单元格显示字符和颜色
 local function cell_visual(r, c)
     if state.player.r == r and state.player.c == c then
-        return "@", (is_power_active() and "light_cyan" or "light_yellow")
+        return "@", (is_power_active() and DARK_CYAN or DARK_YELLOW)
     end
 
     local g = ghost_at(r, c)
@@ -1409,7 +1409,7 @@ local function cell_visual(r, c)
             return "&", "white"
         end
         if g.state == "frightened" and (not state.power_eaten[g.id]) then
-            return "&", "light_blue"
+            return "&", DARK_BLUE
         end
         return "&", g.color
     end
@@ -1569,9 +1569,9 @@ local function draw_info(layout)
     local score_line = tr("game.pacman.current_score") .. ": " .. tostring(state.score)
     local time_line = tr("game.pacman.game_time") .. ": " .. format_duration(elapsed_seconds())
 
-    draw_text(layout.info_x, top_y, best_line, "dark_gray", "black")
+    draw_text(layout.info_x, top_y, best_line, DARK_GRAY, "black")
     draw_text(layout.info_x, top_y + 1, score_line, "white", "black")
-    draw_text(layout.info_x, top_y + 2, time_line, "light_cyan", "black")
+    draw_text(layout.info_x, top_y + 2, time_line, DARK_CYAN, "black")
 
     local level_line = tr("game.pacman.level") .. ": " .. tostring(state.level)
     draw_text(layout.info_x, mid_y, level_line, "white", "black")
@@ -1586,7 +1586,7 @@ local function draw_info(layout)
     local power_line = tr("game.pacman.power_left") .. " " .. tostring(remain) .. tr("game.pacman.seconds_unit")
     draw_text(layout.info_x, mid_y + 2, power_line, "white", "black")
 
-    draw_text(layout.info_x, layout.info_fruits_y, collected_fruit_symbols(), "light_magenta", "black")
+    draw_text(layout.info_x, layout.info_fruits_y, collected_fruit_symbols(), DARK_MAGENTA, "black")
 end
 
 -- 绘制消息行
@@ -1596,7 +1596,7 @@ local function draw_message(layout)
 
     local msg, color = current_banner_message()
     if msg ~= "" then
-        draw_text(centered_x(msg, 1, term_w), layout.message_y, msg, color or "dark_gray", "black")
+        draw_text(centered_x(msg, 1, term_w), layout.message_y, msg, color or DARK_GRAY, "black")
     end
 end
 

@@ -9,7 +9,6 @@ pub static LIST_GAME: MutableText = MutableText::new();
 pub static SYSTEM_LIST_TITLE: MutableText = MutableText::new();
 pub static SYSTEM_KEY_TITLE: MutableText = MutableText::new();
 pub static SYSTEM_KEY_ANY: MutableText = MutableText::new();
-pub static SYSTEM_MOD: MutableText = MutableText::new();
 pub static SYSTEM_SORT_NAME: MutableText = MutableText::new();
 pub static SYSTEM_SORT_CONFLICT: MutableText = MutableText::new();
 pub static SYSTEM_ORDER_ASCENDING: MutableText = MutableText::new();
@@ -42,7 +41,6 @@ pub struct SettingKeybindText {
     pub system_list_title: String,
     pub system_key_title: String,
     pub system_key_any: String,
-    pub system_mod: String,
     pub system_sort_name: String,
     pub system_sort_conflict: String,
     pub system_order_ascending: String,
@@ -87,7 +85,6 @@ pub fn register(language_source: &LanguageSource) -> SettingKeybindText {
         language_source,
         "setting_keybind.system.key.any",
     );
-    set_text(&SYSTEM_MOD, language_source, "setting_keybind.system.mod");
     set_text(
         &SYSTEM_SORT_NAME,
         language_source,
@@ -206,7 +203,6 @@ pub fn register(language_source: &LanguageSource) -> SettingKeybindText {
         system_list_title: text(&SYSTEM_LIST_TITLE),
         system_key_title: text(&SYSTEM_KEY_TITLE),
         system_key_any: text(&SYSTEM_KEY_ANY),
-        system_mod: text(&SYSTEM_MOD),
         system_sort_name: text(&SYSTEM_SORT_NAME),
         system_sort_conflict: text(&SYSTEM_SORT_CONFLICT),
         system_order_ascending: text(&SYSTEM_ORDER_ASCENDING),

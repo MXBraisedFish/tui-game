@@ -3,10 +3,10 @@ local M = {}
 M.MIN_WIDTH = 98
 M.MIN_HEIGHT = 26
 M.TEXT_COLOR = "white"
-M.HINT_COLOR = "dark_gray"
-M.VALUE_COLOR = "light_cyan"
+M.HINT_COLOR = DARK_GRAY
+M.VALUE_COLOR = DARK_CYAN
 M.WARNING_COLOR = "yellow"
-M.KEY_COLOR = "dark_gray"
+M.KEY_COLOR = DARK_GRAY
 M.BORDER_COLOR = "white"
 
 function key_label(keys)

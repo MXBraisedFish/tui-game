@@ -4,13 +4,15 @@ use std::collections::VecDeque;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Instant;
 
+use serde_json::Value as JsonValue;
+
 use crate::LuaRuntimeState;
 use crate::host_engine::boot::preload::init_environment::{
     HostInputEvent, ResizeEvent, TerminalSize,
 };
 use crate::host_engine::boot::preload::lua_runtime::api::LuaEvent;
 use crate::host_engine::boot::preload::lua_runtime::{HostLuaBridge, HostLuaMessage};
-use crate::host_engine::boot::preload::overlay_modules::OverlayRegistry;
+use crate::host_engine::boot::preload::overlay_modules::{OverlayPackage, OverlayRegistry};
 use crate::host_engine::boot::preload::state_machine::HostStateMachine;
 use crate::host_engine::constant::{ROOT_UI_MIN_HEIGHT, ROOT_UI_MIN_WIDTH};
 use crate::host_engine::runtime::frame_rate::FrameRateController;
@@ -54,17 +56,19 @@ pub(crate) fn run(
     let mut is_focused = true;
     let mut overlay_session: Option<OverlaySession> = None;
     loop {
-        if active_ui_page.has_game_session() && !was_running_game {
-            if let Some(game_session) = active_ui_page.game_session() {
-                frame_rate_controller = FrameRateController::game(
-                    game_session.afk_time_secs(),
-                    game_session.target_fps(),
-                );
+        if overlay_session.is_none() {
+            if active_ui_page.has_game_session() && !was_running_game {
+                if let Some(game_session) = active_ui_page.game_session() {
+                    frame_rate_controller = FrameRateController::game(
+                        game_session.afk_time_secs(),
+                        game_session.target_fps(),
+                    );
+                }
+                was_running_game = true;
+            } else if !active_ui_page.has_game_session() && was_running_game {
+                frame_rate_controller = FrameRateController::root_ui();
+                was_running_game = false;
             }
-            was_running_game = true;
-        } else if !active_ui_page.has_game_session() && was_running_game {
-            frame_rate_controller = FrameRateController::root_ui();
-            was_running_game = false;
         }
 
         match input_receiver.recv_timeout(frame_rate_controller.frame_interval()) {
@@ -104,6 +108,7 @@ pub(crate) fn run(
             Ok(HostInputEvent::Key { key, status }) if is_focused => {
                 frame_rate_controller.mark_input();
                 if status == "press" {
+                    let overlay_was_active = overlay_session.is_some();
                     if handle_global_key(
                         key.as_str(),
                         host_bridge,
@@ -113,6 +118,12 @@ pub(crate) fn run(
                         &mut overlay_session,
                         &mut renderer_state,
                     )? {
+                        if overlay_session.is_some() {
+                            frame_rate_controller = FrameRateController::overlay();
+                        } else if overlay_was_active {
+                            frame_rate_controller = frame_rate_for_current_runtime(active_ui_page);
+                            was_running_game = active_ui_page.has_game_session();
+                        }
                         event_queue.clear();
                         continue;
                     }
@@ -231,15 +242,20 @@ fn handle_global_key(
     host_bridge: &HostLuaBridge,
     active_ui_page: &mut ActiveUiPage,
     host_state_machine: &mut HostStateMachine,
-    overlay_registry: &OverlayRegistry,
+    _overlay_registry: &OverlayRegistry,
     overlay_session: &mut Option<OverlaySession>,
     renderer_state: &mut RendererState,
 ) -> RuntimeLoopResult<bool> {
+    let current_overlay_registry = active_ui_page.overlay_registry();
     match key.to_ascii_lowercase().as_str() {
         "f2" => {
+            let runtime_context = host_bridge.runtime_context();
             toggle_overlay(
                 host_bridge,
-                overlay_registry.default_saver().cloned(),
+                enabled_overlay_package(
+                    &current_overlay_registry.savers,
+                    &runtime_context.saver_state,
+                ),
                 OverlaySessionKind::Saver,
                 overlay_session,
                 renderer_state,
@@ -247,9 +263,13 @@ fn handle_global_key(
             Ok(true)
         }
         "f3" => {
+            let runtime_context = host_bridge.runtime_context();
             toggle_overlay(
                 host_bridge,
-                overlay_registry.default_boss().cloned(),
+                enabled_overlay_package(
+                    &current_overlay_registry.bosses,
+                    &runtime_context.boss_state,
+                ),
                 OverlaySessionKind::Boss,
                 overlay_session,
                 renderer_state,
@@ -267,6 +287,22 @@ fn handle_global_key(
         }
         _ => Ok(false),
     }
+}
+
+fn enabled_overlay_package(
+    packages: &[OverlayPackage],
+    state: &JsonValue,
+) -> Option<OverlayPackage> {
+    packages
+        .iter()
+        .find(|package| {
+            state
+                .get(package.uid.as_str())
+                .and_then(|value| value.get("enabled"))
+                .and_then(JsonValue::as_bool)
+                .unwrap_or(true)
+        })
+        .cloned()
 }
 
 fn toggle_overlay(
@@ -297,6 +333,14 @@ fn toggle_overlay(
         renderer_state.request_full_redraw();
     }
     Ok(())
+}
+
+fn frame_rate_for_current_runtime(active_ui_page: &ActiveUiPage) -> FrameRateController {
+    if let Some(game_session) = active_ui_page.game_session() {
+        FrameRateController::game(game_session.afk_time_secs(), game_session.target_fps())
+    } else {
+        FrameRateController::root_ui()
+    }
 }
 
 fn current_page_key(

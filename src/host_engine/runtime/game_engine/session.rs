@@ -28,7 +28,7 @@ impl GameSession {
 
     /// 游戏无操作低资源模式秒数。
     pub(crate) fn afk_time_secs(&self) -> u64 {
-        self.game_module.game.afk_time
+        self.game_module.game.runtime.afk_time
     }
 
     /// 当前游戏 UID。

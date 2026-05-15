@@ -87,6 +87,10 @@ pub static SECURITY_OPTION1: MutableText = MutableText::new();
 pub static SECURITY_OPTION2: MutableText = MutableText::new();
 pub static SECURITY_OPTION3: MutableText = MutableText::new();
 pub static SECURITY_OPTION4: MutableText = MutableText::new();
+pub static SECURITY_OPTION5: MutableText = MutableText::new();
+pub static SECURITY_OPTION6: MutableText = MutableText::new();
+pub static SECURITY_OPTION7: MutableText = MutableText::new();
+pub static SECURITY_OPTION8: MutableText = MutableText::new();
 pub static LANGUAGE_UP_OPTION: MutableText = MutableText::new();
 pub static LANGUAGE_DOWN_OPTION: MutableText = MutableText::new();
 pub static LANGUAGE_LEFT_OPTION: MutableText = MutableText::new();
@@ -242,6 +246,10 @@ pub struct KeyText {
     pub security_option2: String,
     pub security_option3: String,
     pub security_option4: String,
+    pub security_option5: String,
+    pub security_option6: String,
+    pub security_option7: String,
+    pub security_option8: String,
     pub language_up_option: String,
     pub language_down_option: String,
     pub language_left_option: String,
@@ -402,59 +410,79 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
     set_text(
         &MOD_LIST_PREV_OPTION,
         language_source,
-        "key.mod_list.prev_option",
+        "key.mod_game_list.prev_option",
     );
     set_text(
         &MOD_LIST_NEXT_OPTION,
         language_source,
-        "key.mod_list.next_option",
+        "key.mod_game_list.next_option",
     );
     set_text(
         &MOD_LIST_PREV_PAGE,
         language_source,
-        "key.mod_list.prev_page",
+        "key.mod_game_list.prev_page",
     );
     set_text(
         &MOD_LIST_NEXT_PAGE,
         language_source,
-        "key.mod_list.next_page",
+        "key.mod_game_list.next_page",
     );
     set_text(
         &MOD_LIST_SCROLL_UP,
         language_source,
-        "key.mod_list.scroll_up",
+        "key.mod_game_list.scroll_up",
     );
     set_text(
         &MOD_LIST_SCROLL_DOWN,
         language_source,
-        "key.mod_list.scroll_down",
+        "key.mod_game_list.scroll_down",
     );
-    set_text(&MOD_LIST_JUMP, language_source, "key.mod_list.jump");
-    set_text(&MOD_LIST_ORDER, language_source, "key.mod_list.order");
-    set_text(&MOD_LIST_SORT, language_source, "key.mod_list.sort");
-    set_text(&MOD_LIST_BACK, language_source, "key.mod_list.back");
+    set_text(&MOD_LIST_JUMP, language_source, "key.mod_game_list.jump");
+    set_text(&MOD_LIST_ORDER, language_source, "key.mod_game_list.order");
+    set_text(&MOD_LIST_SORT, language_source, "key.mod_game_list.sort");
+    set_text(&MOD_LIST_BACK, language_source, "key.mod_game_list.back");
     set_text(
         &MOD_LIST_TOGGLE_CONFIRM,
         language_source,
-        "key.mod_list.toggle_confirm",
+        "key.mod_game_list.toggle_confirm",
     );
     set_text(
         &MOD_LIST_BACK_CANCEL,
         language_source,
-        "key.mod_list.back_cancel",
+        "key.mod_game_list.back_cancel",
     );
-    set_text(&MOD_LIST_TOGGLE, language_source, "key.mod_list.toggle");
-    set_text(&MOD_LIST_CONFIRM, language_source, "key.mod_list.confirm");
-    set_text(&MOD_LIST_CANCEL, language_source, "key.mod_list.cancel");
-    set_text(&MOD_LIST_SELECT, language_source, "key.mod_list.select");
-    set_text(&MOD_LIST_FLIP, language_source, "key.mod_list.flip");
-    set_text(&MOD_LIST_SCROLL, language_source, "key.mod_list.scroll");
-    set_text(&MOD_LIST_DEBUG, language_source, "key.mod_list.debug");
-    set_text(&MOD_LIST_LIST, language_source, "key.mod_list.list");
+    set_text(
+        &MOD_LIST_TOGGLE,
+        language_source,
+        "key.mod_game_list.toggle",
+    );
+    set_text(
+        &MOD_LIST_CONFIRM,
+        language_source,
+        "key.mod_game_list.confirm",
+    );
+    set_text(
+        &MOD_LIST_CANCEL,
+        language_source,
+        "key.mod_game_list.cancel",
+    );
+    set_text(
+        &MOD_LIST_SELECT,
+        language_source,
+        "key.mod_game_list.select",
+    );
+    set_text(&MOD_LIST_FLIP, language_source, "key.mod_game_list.flip");
+    set_text(
+        &MOD_LIST_SCROLL,
+        language_source,
+        "key.mod_game_list.scroll",
+    );
+    set_text(&MOD_LIST_DEBUG, language_source, "key.mod_game_list.debug");
+    set_text(&MOD_LIST_LIST, language_source, "key.mod_game_list.list");
     set_text(
         &MOD_LIST_SAFE_MODE,
         language_source,
-        "key.mod_list.safe_mode",
+        "key.mod_game_list.safe_mode",
     );
     set_text(
         &MOD_SECURITY_CLOSE_PERMANENT,
@@ -509,6 +537,10 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
     set_text(&SECURITY_OPTION2, language_source, "key.security.option2");
     set_text(&SECURITY_OPTION3, language_source, "key.security.option3");
     set_text(&SECURITY_OPTION4, language_source, "key.security.option4");
+    set_text(&SECURITY_OPTION5, language_source, "key.security.option5");
+    set_text(&SECURITY_OPTION6, language_source, "key.security.option6");
+    set_text(&SECURITY_OPTION7, language_source, "key.security.option7");
+    set_text(&SECURITY_OPTION8, language_source, "key.security.option8");
     set_text(
         &LANGUAGE_UP_OPTION,
         language_source,
@@ -870,6 +902,10 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         security_option2: text(&SECURITY_OPTION2),
         security_option3: text(&SECURITY_OPTION3),
         security_option4: text(&SECURITY_OPTION4),
+        security_option5: text(&SECURITY_OPTION5),
+        security_option6: text(&SECURITY_OPTION6),
+        security_option7: text(&SECURITY_OPTION7),
+        security_option8: text(&SECURITY_OPTION8),
         language_up_option: text(&LANGUAGE_UP_OPTION),
         language_down_option: text(&LANGUAGE_DOWN_OPTION),
         language_left_option: text(&LANGUAGE_LEFT_OPTION),

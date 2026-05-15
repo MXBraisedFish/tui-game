@@ -7,7 +7,9 @@ use mlua::Value;
 
 use super::debug_log_path;
 use super::lua_stringify;
+use crate::host_engine::boot::preload::game_modules::GameModuleSource;
 use crate::host_engine::boot::preload::lua_runtime::{HostLuaBridge, LuaRuntimeConsumer};
+use crate::host_engine::boot::preload::overlay_modules::OverlaySource;
 
 /// 写入一行调试日志。
 pub fn write_debug_line(
@@ -80,29 +82,47 @@ pub(crate) fn is_debug_enabled(host_bridge: &HostLuaBridge) -> bool {
         LuaRuntimeConsumer::GamePackage => runtime_context
             .current_game
             .as_ref()
-            .and_then(|game_module| runtime_context.mod_state.get(game_module.uid.as_str()))
-            .and_then(|state| state.get("debug"))
-            .and_then(|debug| debug.as_bool())
+            .map(|game_module| {
+                if game_module.source == GameModuleSource::Office {
+                    return true;
+                }
+                runtime_context
+                    .mod_state
+                    .get(game_module.uid.as_str())
+                    .and_then(|state| state.get("debug"))
+                    .and_then(|debug| debug.as_bool())
+                    .unwrap_or(false)
+            })
             .unwrap_or(false),
         LuaRuntimeConsumer::SaverPackage => runtime_context
             .current_overlay
             .as_ref()
-            .and_then(|overlay_package| {
+            .map(|overlay_package| {
+                if overlay_package.source == OverlaySource::Office {
+                    return true;
+                }
                 runtime_context
                     .saver_state
                     .get(overlay_package.uid.as_str())
+                    .and_then(|state| state.get("debug"))
+                    .and_then(|debug| debug.as_bool())
+                    .unwrap_or(false)
             })
-            .and_then(|state| state.get("debug"))
-            .and_then(|debug| debug.as_bool())
             .unwrap_or(false),
         LuaRuntimeConsumer::BossPackage => runtime_context
             .current_overlay
             .as_ref()
-            .and_then(|overlay_package| {
-                runtime_context.boss_state.get(overlay_package.uid.as_str())
+            .map(|overlay_package| {
+                if overlay_package.source == OverlaySource::Office {
+                    return true;
+                }
+                runtime_context
+                    .boss_state
+                    .get(overlay_package.uid.as_str())
+                    .and_then(|state| state.get("debug"))
+                    .and_then(|debug| debug.as_bool())
+                    .unwrap_or(false)
             })
-            .and_then(|state| state.get("debug"))
-            .and_then(|debug| debug.as_bool())
             .unwrap_or(false),
     }
 }

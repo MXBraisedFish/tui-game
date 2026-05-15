@@ -2,17 +2,19 @@
 
 use serde_json::Value as JsonValue;
 
+use crate::host_engine::boot::i18n::i18n;
 use crate::host_engine::boot::preload::lua_runtime::api::debug_support::key_display;
 use crate::host_engine::boot::preload::lua_runtime::{LuaRuntimeConsumer, LuaRuntimeContext};
 use crate::host_engine::boot::preload::persistent_data::keybind_profile;
 
 use super::drawing_parser::{
-    STYLE_BLINK, STYLE_BOLD, STYLE_DIM, STYLE_HIDDEN, STYLE_ITALIC, STYLE_REVERSE, STYLE_STRIKE,
-    STYLE_UNDERLINE,
+    STYLE_BLINK, STYLE_BOLD, STYLE_DIM, STYLE_HIDDEN, STYLE_ITALIC, STYLE_NORMAL, STYLE_REVERSE,
+    STYLE_STRIKE, STYLE_UNDERLINE,
 };
 
 const RICH_TEXT_PREFIX: &str = "f%";
 const MISSING_KEY_TEXT: &str = "[None]";
+const ERROR_FG_COLOR: &str = "red";
 
 /// 带样式的单个终端字符。
 #[derive(Clone, Debug)]
@@ -21,6 +23,7 @@ pub struct StyledCharacter {
     pub fg: Option<String>,
     pub bg: Option<String>,
     pub styles: Vec<i64>,
+    pub style_explicit: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -46,60 +49,74 @@ pub fn parse_rich_text(
         .unwrap_or(rich_text);
     let mut output = Vec::new();
     let mut active_style = ActiveStyle::default();
-    let mut source_chars = source.chars().peekable();
+    let source_chars = source.chars().collect::<Vec<_>>();
+    let mut index = 0usize;
 
-    while let Some(character) = source_chars.next() {
+    while index < source_chars.len() {
+        let character = source_chars[index];
         match character {
             '\\' => {
-                let escaped_character = source_chars.next().unwrap_or('\\');
-                emit_character(escaped_char(escaped_character), &active_style, &mut output);
-                active_style.tick();
-            }
-            '{' => {
-                let command_text = read_command_text(&mut source_chars)?;
-                if command_text.trim().is_empty() {
-                    return Err(mlua::Error::external("rich text command is empty"));
-                }
-                apply_command_block(
-                    command_text.as_str(),
-                    runtime_context,
+                emit_escaped_or_literal_backslash(
+                    &source_chars,
+                    &mut index,
                     &mut active_style,
                     &mut output,
-                )?;
+                );
             }
-            '}' => return Err(mlua::Error::external("rich text command is invalid")),
+            '{' => {
+                if let Some((command_text, end_index)) = read_command_text(&source_chars, index + 1)
+                {
+                    apply_command_block(
+                        command_text.as_str(),
+                        runtime_context,
+                        &mut active_style,
+                        &mut output,
+                    );
+                    index = end_index + 1;
+                } else {
+                    emit_character(character, &active_style, &mut output);
+                    active_style.tick();
+                    index += 1;
+                }
+            }
+            '}' => {
+                emit_character(character, &active_style, &mut output);
+                active_style.tick();
+                index += 1;
+            }
             _ => {
                 emit_character(character, &active_style, &mut output);
                 active_style.tick();
+                index += 1;
             }
         }
-    }
-
-    if active_style.has_unclosed_style() {
-        return Err(mlua::Error::external("rich text style is not closed"));
     }
 
     Ok(output)
 }
 
-fn read_command_text(
-    source_chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
-) -> mlua::Result<String> {
+fn read_command_text(source_chars: &[char], mut index: usize) -> Option<(String, usize)> {
     let mut command_text = String::new();
-    while let Some(character) = source_chars.next() {
+    while index < source_chars.len() {
+        let character = source_chars[index];
         match character {
             '\\' => {
                 command_text.push(character);
-                if let Some(escaped_character) = source_chars.next() {
-                    command_text.push(escaped_character);
+                index += 1;
+                if let Some(escaped_character) = source_chars.get(index) {
+                    command_text.push(*escaped_character);
+                    index += 1;
                 }
             }
-            '}' => return Ok(command_text),
-            '{' => return Err(mlua::Error::external("rich text command is invalid")),
-            _ => command_text.push(character),
+            '}' => return Some((command_text, index)),
+            '{' => return None,
+            _ => {
+                command_text.push(character);
+                index += 1;
+            }
         }
     }
-    Err(mlua::Error::external("rich text command is not closed"))
+    None
 }
 
 fn apply_command_block(
@@ -107,15 +124,15 @@ fn apply_command_block(
     runtime_context: &LuaRuntimeContext,
     active_style: &mut ActiveStyle,
     output: &mut Vec<StyledCharacter>,
-) -> mlua::Result<()> {
+) {
     for command in split_command_block(command_text) {
         let command = command.trim();
         if command.is_empty() {
-            return Err(mlua::Error::external("rich text command is empty"));
+            emit_unknown_command(output);
+            continue;
         }
-        apply_single_command(command, runtime_context, active_style, output)?;
+        apply_single_command(command, runtime_context, active_style, output);
     }
-    Ok(())
 }
 
 fn split_command_block(command_text: &str) -> Vec<String> {
@@ -152,55 +169,85 @@ fn apply_single_command(
     runtime_context: &LuaRuntimeContext,
     active_style: &mut ActiveStyle,
     output: &mut Vec<StyledCharacter>,
-) -> mlua::Result<()> {
+) {
     let Some((command_name, parameter_text)) = command.split_once(':') else {
-        return Err(mlua::Error::external("rich text command is invalid"));
+        emit_unknown_command(output);
+        return;
     };
 
     match command_name.trim() {
-        "tc" => apply_color_command(parameter_text, &mut active_style.fg),
-        "bg" => apply_color_command(parameter_text, &mut active_style.bg),
-        "ts" => apply_text_style_command(parameter_text, active_style),
+        "tc" => apply_color_command(parameter_text, &mut active_style.fg, output),
+        "bg" => apply_color_command(parameter_text, &mut active_style.bg, output),
+        "ts" => apply_text_style_command(parameter_text, active_style, output),
         "key" => {
             let key_text = resolve_key_text(parameter_text, runtime_context);
             for character in key_text.chars() {
                 emit_character(character, active_style, output);
                 active_style.tick();
             }
-            Ok(())
         }
-        _ => Err(mlua::Error::external("rich text command is invalid")),
+        _ => emit_unknown_command(output),
     }
 }
 
 fn apply_color_command(
     parameter_text: &str,
     target: &mut Option<TimedValue<String>>,
-) -> mlua::Result<()> {
-    let (value, remaining_chars) = parse_value_and_count(parameter_text)?;
+    output: &mut Vec<StyledCharacter>,
+) {
+    let Some((value, remaining_chars)) = parse_value_and_count(parameter_text) else {
+        emit_unknown_parameter(output);
+        return;
+    };
     if value == "clear" {
         *target = None;
-        return Ok(());
+        return;
+    }
+    if !is_valid_color(value.as_str()) {
+        emit_unknown_parameter(output);
+        return;
     }
     *target = Some(TimedValue {
         value,
         remaining_chars,
     });
-    Ok(())
 }
 
 fn apply_text_style_command(
     parameter_text: &str,
     active_style: &mut ActiveStyle,
-) -> mlua::Result<()> {
-    let (style_text, remaining_chars) = parse_value_and_count(parameter_text)?;
+    output: &mut Vec<StyledCharacter>,
+) {
+    let Some((style_text, remaining_chars)) = parse_value_and_count(parameter_text) else {
+        emit_unknown_parameter(output);
+        return;
+    };
     if style_text == "clear" {
         active_style.styles.clear();
-        return Ok(());
+        return;
+    }
+    if style_text == "normal" {
+        active_style.styles.clear();
+        active_style.styles.push(TimedValue {
+            value: STYLE_NORMAL,
+            remaining_chars: remaining_chars.or(Some(usize::MAX)),
+        });
+        return;
     }
 
     for style_name in style_text.split('+') {
-        let style = parse_style_name(style_name.trim())?;
+        let Some(style) = parse_style_name(style_name.trim()) else {
+            emit_unknown_parameter(output);
+            return;
+        };
+        if style == STYLE_NORMAL {
+            active_style.styles.clear();
+            active_style.styles.push(TimedValue {
+                value: STYLE_NORMAL,
+                remaining_chars: remaining_chars.or(Some(usize::MAX)),
+            });
+            continue;
+        }
         if let Some(existing_style) = active_style
             .styles
             .iter_mut()
@@ -214,45 +261,40 @@ fn apply_text_style_command(
             });
         }
     }
-    Ok(())
 }
 
-fn parse_value_and_count(parameter_text: &str) -> mlua::Result<(String, Option<usize>)> {
+fn parse_value_and_count(parameter_text: &str) -> Option<(String, Option<usize>)> {
     let mut parts = parameter_text.splitn(2, '>');
     let value = parts.next().unwrap_or_default().trim();
     if value.is_empty() {
-        return Err(mlua::Error::external("rich text parameter is invalid"));
+        return None;
     }
-    let count = parts
-        .next()
-        .map(|count_text| {
-            let count = count_text
-                .trim()
-                .parse::<usize>()
-                .map_err(|_| mlua::Error::external("rich text parameter count is invalid"))?;
+    let count = match parts.next() {
+        Some(count_text) => {
+            let count = count_text.trim().parse::<usize>().ok()?;
             if count == 0 {
-                return Err(mlua::Error::external(
-                    "rich text parameter count is invalid",
-                ));
+                return None;
             }
-            Ok(count)
-        })
-        .transpose()?;
+            Some(count)
+        }
+        None => None,
+    };
 
-    Ok((value.to_string(), count))
+    Some((value.to_string(), count))
 }
 
-fn parse_style_name(style_name: &str) -> mlua::Result<i64> {
+fn parse_style_name(style_name: &str) -> Option<i64> {
     match style_name {
-        "bold" => Ok(STYLE_BOLD),
-        "italic" => Ok(STYLE_ITALIC),
-        "underline" => Ok(STYLE_UNDERLINE),
-        "strike" => Ok(STYLE_STRIKE),
-        "blink" => Ok(STYLE_BLINK),
-        "reverse" => Ok(STYLE_REVERSE),
-        "hidden" => Ok(STYLE_HIDDEN),
-        "dim" => Ok(STYLE_DIM),
-        _ => Err(mlua::Error::external("rich text parameter is invalid")),
+        "normal" => Some(STYLE_NORMAL),
+        "bold" => Some(STYLE_BOLD),
+        "italic" => Some(STYLE_ITALIC),
+        "underline" => Some(STYLE_UNDERLINE),
+        "strike" => Some(STYLE_STRIKE),
+        "blink" => Some(STYLE_BLINK),
+        "reverse" => Some(STYLE_REVERSE),
+        "hidden" => Some(STYLE_HIDDEN),
+        "dim" => Some(STYLE_DIM),
+        _ => None,
     }
 }
 
@@ -349,15 +391,44 @@ fn emit_character(character: char, active_style: &ActiveStyle, output: &mut Vec<
         styles: active_style
             .styles
             .iter()
+            .filter(|style| style.value != STYLE_NORMAL)
             .map(|style| style.value)
             .collect(),
+        style_explicit: !active_style.styles.is_empty(),
     });
 }
 
-fn escaped_char(character: char) -> char {
-    match character {
-        'n' => '\n',
-        other => other,
+fn emit_escaped_or_literal_backslash(
+    source_chars: &[char],
+    index: &mut usize,
+    active_style: &mut ActiveStyle,
+    output: &mut Vec<StyledCharacter>,
+) {
+    *index += 1;
+    let Some(next_character) = source_chars.get(*index).copied() else {
+        emit_character('\\', active_style, output);
+        active_style.tick();
+        return;
+    };
+
+    match next_character {
+        'n' => {
+            emit_character('\n', active_style, output);
+            active_style.tick();
+            *index += 1;
+        }
+        '\\' | '{' | '}' | '|' => {
+            emit_character(next_character, active_style, output);
+            active_style.tick();
+            *index += 1;
+        }
+        other => {
+            emit_character('\\', active_style, output);
+            active_style.tick();
+            emit_character(other, active_style, output);
+            active_style.tick();
+            *index += 1;
+        }
     }
 }
 
@@ -372,20 +443,6 @@ impl ActiveStyle {
         }
         self.styles.retain(|style| style.remaining_chars != Some(0));
     }
-
-    fn has_unclosed_style(&self) -> bool {
-        self.fg
-            .as_ref()
-            .is_some_and(|value| value.remaining_chars.is_none())
-            || self
-                .bg
-                .as_ref()
-                .is_some_and(|value| value.remaining_chars.is_none())
-            || self
-                .styles
-                .iter()
-                .any(|style| style.remaining_chars.is_none())
-    }
 }
 
 fn tick_timed_option<T>(value: &mut Option<TimedValue<T>>) {
@@ -399,5 +456,83 @@ fn tick_timed_option<T>(value: &mut Option<TimedValue<T>>) {
         .is_some_and(|value| value.remaining_chars == Some(0))
     {
         *value = None;
+    }
+}
+
+fn is_valid_color(color: &str) -> bool {
+    if is_valid_hex_color(color) || is_valid_rgb_color(color) {
+        return true;
+    }
+    if color
+        .trim()
+        .parse::<i64>()
+        .is_ok_and(|value| (0..=15).contains(&value))
+    {
+        return true;
+    }
+
+    matches!(
+        color,
+        "black"
+            | "red"
+            | "green"
+            | "yellow"
+            | "blue"
+            | "magenta"
+            | "cyan"
+            | "white"
+            | "grey"
+            | "gray"
+            | "dark_red"
+            | "dark_green"
+            | "dark_yellow"
+            | "dark_blue"
+            | "dark_magenta"
+            | "dark_cyan"
+            | "dark_grey"
+            | "dark_gray"
+    )
+}
+
+fn is_valid_hex_color(color: &str) -> bool {
+    let Some(hex) = color.strip_prefix('#') else {
+        return false;
+    };
+    hex.len() == 6 && hex.chars().all(|character| character.is_ascii_hexdigit())
+}
+
+fn is_valid_rgb_color(color: &str) -> bool {
+    let Some(body) = color
+        .strip_prefix("rgb(")
+        .and_then(|body| body.strip_suffix(')'))
+    else {
+        return false;
+    };
+    let values = body
+        .split(',')
+        .map(|value| value.trim().parse::<u8>().ok())
+        .collect::<Option<Vec<_>>>();
+    values.is_some_and(|values| values.len() == 3)
+}
+
+fn emit_unknown_command(output: &mut Vec<StyledCharacter>) {
+    let message = i18n::text().error.unknown_command;
+    emit_error_text(message.as_str(), output);
+}
+
+fn emit_unknown_parameter(output: &mut Vec<StyledCharacter>) {
+    let message = i18n::text().error.unknown_parameter;
+    emit_error_text(message.as_str(), output);
+}
+
+fn emit_error_text(message: &str, output: &mut Vec<StyledCharacter>) {
+    for character in message.chars() {
+        output.push(StyledCharacter {
+            character,
+            fg: Some(ERROR_FG_COLOR.to_string()),
+            bg: None,
+            styles: Vec::new(),
+            style_explicit: true,
+        });
     }
 }

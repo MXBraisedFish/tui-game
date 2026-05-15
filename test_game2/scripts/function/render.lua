@@ -57,14 +57,14 @@ function M.render(state)
   draw_centered(5, translate("test_game2.subtitle"), "grey", nil)
 
   local play_y = math.max(7, math.floor(height / 2))
-  canvas_fill_rect(0, play_y - 2, width, 5, " ", nil, "dark_gray")
+  canvas_fill_rect(0, play_y - 2, width, 5, " ", nil, DARK_GRAY)
 
   if state.star ~= nil and state.star_visible ~= false then
     canvas_draw_text(state.star.x or 0, state.star.y or play_y, "*", "yellow", nil, BOLD, nil)
   end
 
   if state.player ~= nil then
-    canvas_draw_text(state.player.x or 0, state.player.y or play_y, "@", "orange", nil, BOLD, nil)
+    canvas_draw_text(state.player.x or 0, state.player.y or play_y, "@", "#ffa500", nil, BOLD, nil)
   end
 
   if state.message ~= nil then

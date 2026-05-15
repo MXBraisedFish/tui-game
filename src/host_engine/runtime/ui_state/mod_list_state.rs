@@ -23,6 +23,7 @@ pub enum ModListSortMode {
     Author,
     SafeMode,
     Toggle,
+    Debug,
 }
 
 impl ModListSortMode {
@@ -31,6 +32,7 @@ impl ModListSortMode {
             "author" => Self::Author,
             "safe_mode" => Self::SafeMode,
             "toggle" => Self::Toggle,
+            "debug" => Self::Debug,
             _ => Self::Name,
         }
     }
@@ -41,6 +43,7 @@ impl ModListSortMode {
             Self::Author => "author",
             Self::SafeMode => "safe_mode",
             Self::Toggle => "toggle",
+            Self::Debug => "debug",
         }
     }
 }
@@ -634,17 +637,22 @@ impl ModListItem {
 
 fn compare_mod(left: &ModListItem, right: &ModListItem, sort_mode: ModListSortMode) -> Ordering {
     match sort_mode {
-        ModListSortMode::Name => {
-            compare_text_by_width_then_dictionary(left.package_name.as_str(), right.package_name.as_str())
-        }
+        ModListSortMode::Name => compare_text_by_width_then_dictionary(
+            left.package_name.as_str(),
+            right.package_name.as_str(),
+        ),
         ModListSortMode::Author => {
             compare_text_by_width_then_dictionary(left.author.as_str(), right.author.as_str())
         }
         ModListSortMode::SafeMode => left.safe_mode.cmp(&right.safe_mode),
         ModListSortMode::Toggle => left.enabled.cmp(&right.enabled),
+        ModListSortMode::Debug => left.debug.cmp(&right.debug),
     }
     .then_with(|| {
-        compare_text_by_width_then_dictionary(left.package_name.as_str(), right.package_name.as_str())
+        compare_text_by_width_then_dictionary(
+            left.package_name.as_str(),
+            right.package_name.as_str(),
+        )
     })
     .then_with(|| {
         compare_text_by_width_then_dictionary(left.author.as_str(), right.author.as_str())
@@ -732,6 +740,10 @@ fn mod_list_language_pairs() -> Vec<(String, String)> {
         (
             "MOD_LIST_INFO_SORT_TOGGLE".to_string(),
             text.mod_list.info_sort_toggle,
+        ),
+        (
+            "MOD_LIST_INFO_SORT_DEBUG".to_string(),
+            text.mod_list.info_sort_debug,
         ),
         (
             "MOD_LIST_INFO_ORDER_ASCENDING".to_string(),

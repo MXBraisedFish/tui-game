@@ -813,24 +813,24 @@ local function draw_board(x, y, frame_w, frame_h)
     local _, row_mark_set = marker_positions(state.rows)
 
     -- 清空标头区域
-    draw_text(base_x, inner_y, string.rep(" ", ROW_LABEL_W + state.cols), "dark_gray", "black")
-    draw_text(base_x, inner_y + 1, string.rep(" ", ROW_LABEL_W + state.cols), "dark_gray", "black")
+    draw_text(base_x, inner_y, string.rep(" ", ROW_LABEL_W + state.cols), DARK_GRAY, "black")
+    draw_text(base_x, inner_y + 1, string.rep(" ", ROW_LABEL_W + state.cols), DARK_GRAY, "black")
 
     -- 绘制列号
     for _, c in ipairs(col_markers) do
         local text = tostring(c)
         local text_x = base_x + ROW_LABEL_W + c - math.floor(#text / 2) - 1
-        draw_text(text_x, inner_y, text, "dark_gray", "black")
-        draw_text(base_x + ROW_LABEL_W + c - 1, inner_y + 1, "|", "dark_gray", "black")
+        draw_text(text_x, inner_y, text, DARK_GRAY, "black")
+        draw_text(base_x + ROW_LABEL_W + c - 1, inner_y + 1, "|", DARK_GRAY, "black")
     end
 
     -- 绘制行号和棋盘格子
     for r = 1, state.rows do
         local row_y = inner_y + 1 + r
         if row_mark_set[r] then
-            draw_text(base_x, row_y, string.format("%2d -", r), "dark_gray", "black")
+            draw_text(base_x, row_y, string.format("%2d -", r), DARK_GRAY, "black")
         else
-            draw_text(base_x, row_y, "    ", "dark_gray", "black")
+            draw_text(base_x, row_y, "    ", DARK_GRAY, "black")
         end
 
         for c = 1, state.cols do
@@ -865,21 +865,21 @@ local function draw_status(x, y, frame_w)
     end
 
     -- 绘制信息
-    draw_text(x, y - 3, best_line(), "dark_gray", "black")
-    draw_text(left_x, y - 2, left, "light_cyan", "black")
+    draw_text(x, y - 3, best_line(), DARK_GRAY, "black")
+    draw_text(left_x, y - 2, left, DARK_CYAN, "black")
     draw_text(center_x, y - 2, center, "yellow", "black")
-    draw_text(right_x, y - 2, right, "light_cyan", "black")
+    draw_text(right_x, y - 2, right, DARK_CYAN, "black")
 
     -- 显示输入提示或状态信息
     if state.input_mode == "config" then
         if state.input_buffer == "" then
-            draw_text(x, y - 1, tr("game.minesweeper.input_config_hint"), "dark_gray", "black")
+            draw_text(x, y - 1, tr("game.minesweeper.input_config_hint"), DARK_GRAY, "black")
         else
             draw_text(x, y - 1, state.input_buffer, "white", "black")
         end
     elseif state.input_mode == "jump" then
         if state.input_buffer == "" then
-            draw_text(x, y - 1, tr("game.minesweeper.input_jump_hint"), "dark_gray", "black")
+            draw_text(x, y - 1, tr("game.minesweeper.input_jump_hint"), DARK_GRAY, "black")
         else
             draw_text(x, y - 1, state.input_buffer, "white", "black")
         end

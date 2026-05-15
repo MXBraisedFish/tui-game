@@ -577,14 +577,14 @@ local function draw_status(x, y)
         .. "  "
         .. tr("game.snake.best_time")
         .. " " .. format_duration(state.best_time_sec)
-    draw_centered_line(y - 3, best, "dark_gray")
+    draw_centered_line(y - 3, best, DARK_GRAY)
 
     local middle = tr("game.snake.time")
         .. " " .. format_duration(elapsed_seconds())
         .. "  "
         .. tr("game.snake.score")
         .. " " .. tostring(state.score)
-    draw_centered_line(y - 2, middle, "light_cyan")
+    draw_centered_line(y - 2, middle, DARK_CYAN)
 
     if state.won then
         local line = tr("game.snake.win_banner")
@@ -605,7 +605,7 @@ local function draw_status(x, y)
     elseif is_boosting() then
         local sec = math.max(0, math.ceil((state.boost_until_frame - state.frame) / FPS))
         local line = tr("game.snake.boosting") .. " " .. tostring(sec) .. "s"
-        draw_centered_line(y - 1, line, "light_cyan")
+        draw_centered_line(y - 1, line, DARK_CYAN)
     end
 end
 
@@ -619,7 +619,7 @@ local function draw_board(x, y)
         draw_text(x + state.normal_food.x, y + state.normal_food.y, "$", "rgb(255,165,0)", "black")
     end
     if state.special_food ~= nil then
-        draw_text(x + state.special_food.x, y + state.special_food.y, "%", "light_cyan", "black")
+        draw_text(x + state.special_food.x, y + state.special_food.y, "%", DARK_CYAN, "black")
     end
 
     for i = #state.snake, 1, -1 do

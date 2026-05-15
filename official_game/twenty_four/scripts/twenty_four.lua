@@ -14,7 +14,7 @@ local FPS, FRAME_MS, EPS = 60, 16, 1e-6
 local M_CLASSIC, M_FIXED_NEG, M_FLEX_NEG = 1, 2, 3 
 local OP_EMPTY = "_"                               
 
-local PAREN_COLORS = { "magenta", "light_cyan", "light_green", "orange" }
+local PAREN_COLORS = { "magenta", DARK_CYAN, DARK_GREEN, "#ffa500" }
 
 local S = {
     
@@ -472,7 +472,7 @@ local function current_message()
     end
     if S.input_mode == "paren_add" then
         if S.input_buf == "" then
-            return tr("game.twenty_four.prompt_add_paren"), "dark_gray"
+            return tr("game.twenty_four.prompt_add_paren"), DARK_GRAY
         end
         return S.input_buf, "yellow"
     end
@@ -480,7 +480,7 @@ local function current_message()
         return "", "yellow"
     end
     if S.input_mode == "difficulty" then
-        return tr("game.twenty_four.prompt_difficulty"), "dark_gray"
+        return tr("game.twenty_four.prompt_difficulty"), DARK_GRAY
     end
     if S.win then
         return tr("game.twenty_four.win_banner") .. "  " .. tr("game.twenty_four.result_controls"), "green"
@@ -488,7 +488,7 @@ local function current_message()
     if S.toast and S.frame <= S.toast_until then
         return S.toast, S.toast_color
     end
-    return tr("game.twenty_four.ready"), "dark_gray"
+    return tr("game.twenty_four.ready"), DARK_GRAY
 end
 
 local function result_text()
@@ -555,7 +555,7 @@ local function render_mid(y, tw)
             local ni = math.floor((b + 1) / 2)
             local hit = (f.k == "num" and f.i == ni)
             fg = hit and "black" or "white"
-            if hit then bg = "light_yellow" end
+            if hit then bg = DARK_YELLOW end
         else
             local oi = math.floor(b / 2)
             local hit = (f.k == "op" and f.i == oi)
@@ -564,7 +564,7 @@ local function render_mid(y, tw)
             else
                 fg = hit and "#3f48cc" or "cyan"
             end
-            if hit then bg = "light_yellow" end
+            if hit then bg = DARK_YELLOW end
         end
 
         seg[#seg + 1] = { t = toks[b], fg = fg, bg = bg }
@@ -684,7 +684,7 @@ local function draw_paren_remove_prompt(y, tw)
 
     if #segs == 0 then
         local t = tr("game.twenty_four.no_parens")
-        draw_text(centered_x(t, 1, tw), y, t, "dark_gray", "black")
+        draw_text(centered_x(t, 1, tw), y, t, DARK_GRAY, "black")
         return
     end
 
@@ -708,8 +708,8 @@ local function render_frame()
     local stat = status_line_text()
     local m, mc = current_message()
     for i = 0, 2 do draw_text(1, top + i, string.rep(" ", tw), "white", "black") end
-    draw_text(centered_x(best, 1, tw), top, best, "dark_gray", "black")
-    draw_text(centered_x(stat, 1, tw), top + 1, stat, "light_cyan", "black")
+    draw_text(centered_x(best, 1, tw), top, best, DARK_GRAY, "black")
+    draw_text(centered_x(stat, 1, tw), top + 1, stat, DARK_CYAN, "black")
     S.last_stat = stat
     if S.input_mode == "paren_remove" then
         draw_paren_remove_prompt(top + 2, tw)
@@ -737,7 +737,7 @@ local function render_time_only()
     local cw = math.max(text_width(old), text_width(stat))
     local clear_x = centered_x(string.rep(" ", cw), 1, tw)
     draw_text(clear_x, top + 1, string.rep(" ", cw), "white", "black")
-    draw_text(centered_x(stat, 1, tw), top + 1, stat, "light_cyan", "black")
+    draw_text(centered_x(stat, 1, tw), top + 1, stat, DARK_CYAN, "black")
     S.last_stat = stat
 end
 
@@ -910,7 +910,7 @@ local function handle_input(k)
             S.input_mode, S.input_buf = "paren_remove", ""
         else
             S.toast = tr("game.twenty_four.no_parens")
-            S.toast_color = "dark_gray"
+            S.toast_color = DARK_GRAY
             S.toast_until = S.frame + FPS * 2
         end
         S.dirty = true

@@ -148,7 +148,11 @@ local function draw_key_table(layout, root_state)
       canvas_fill_rect(content_x + content_width - 1, row_y, 1, 1, " ", nil, C.EMPTY_BG_COLOR)
     end
     local fg = row_bg ~= nil and C.SELECTED_FG_COLOR or C.NORMAL_COLOR
-    canvas_draw_text(content_x + 1, row_y, tostring(action.name or action.id or ""), fg, row_bg, BOLD, nil, action_width - 1)
+    canvas_draw_text(content_x + 1, row_y, tostring(action.name or action.id or ""), fg, row_bg, BOLD, ALIGN_LEFT, {
+      warp_width = WINDOW,
+      warp_height = 1,
+      text_overflow = "..."
+    })
 
     local display = action.key_display or {}
     local keys = key_array(display.key_user)

@@ -13,40 +13,54 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "RICH_TEXT.md",
+                "file": "LANGUAGE.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "RICH_TEXT"
+              "title": "LANGUAGE"
             }
           },
           {
-            "id": "0924ea3c5c7701f8",
+            "id": "409d12d7eff610b3",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "API.md",
+                "file": "GAME.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "API"
+              "title": "GAME"
             }
           },
           {
-            "id": "684b21e39fc34f80",
+            "id": "8417832f79390008",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "BOSS.md",
+                "file": "GAME.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "BOSS"
+              "title": "GAME"
+            }
+          },
+          {
+            "id": "909cec7f46048800",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "SAVER.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "SAVER"
             }
           },
           {
@@ -69,12 +83,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "MOD.md",
+                "file": "RICH_TEXT.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "MOD"
+              "title": "RICH_TEXT"
             }
           }
         ],
@@ -135,7 +149,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 277.5
   },
   "right": {
     "id": "01dccebdc1b64e84",
@@ -240,22 +254,26 @@
       "bases:新建数据库": false
     }
   },
-  "active": "0924ea3c5c7701f8",
+  "active": "409d12d7eff610b3",
   "lastOpenFiles": [
-    "image/saver_banner.png",
+    "未命名.md",
+    "GAME.md",
+    "LANGUAGE.md",
+    "RICH_TEXT.md",
     "SAVER.md",
-    "SCREEN.md",
     "BOSS.md",
-    "MOD.md",
     "API.md",
+    "image/game_banner.png",
+    "image/boss_saver_program_flowchart.png",
+    "image/boss_screen_program_flowchart.png",
+    "image/boss_screen_program_flowchart_zh_cn.png",
+    "image/saver_banner.png",
+    "SCREEN.md",
     "image/screen_banner.png",
     "image/boss_banner.png",
-    "RICH_TEXT.md",
-    "LANGUAGE.md",
     "API.md.tmp.31024.45c5566c4009",
     "API.md.tmp.31024.8f7ff4ad28b5",
     "API.md.tmp.31024.2d50d3e4a1b4",
-    "image/boss_screen_program_flowchart.png",
     "image/boss_screen.png",
     "image/boss_screen_zh_cn.png",
     "UI.md"

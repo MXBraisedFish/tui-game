@@ -4,6 +4,7 @@ use mlua::{Lua, Table, Value};
 
 use super::lua_table_value;
 use crate::host_engine::boot::preload::game_modules::GameModule;
+use crate::host_engine::boot::preload::overlay_modules::OverlayPackage;
 
 /// 构造 game_info 表。
 pub fn build_game_info_table(lua: &Lua, game_module: &GameModule) -> mlua::Result<Table> {
@@ -17,6 +18,7 @@ pub fn build_game_info_table(lua: &Lua, game_module: &GameModule) -> mlua::Resul
     table.set("game_name", game_module.package.game_name.as_str())?;
     table.set("description", game_module.package.description.as_str())?;
     table.set("detail", game_module.package.detail.as_str())?;
+    table.set("version", game_module.package.version.as_str())?;
     table.set(
         "icon",
         lua_table_value::json_to_lua_value(lua, &game_module.package.icon)?,
@@ -38,10 +40,51 @@ pub fn build_game_info_table(lua: &Lua, game_module: &GameModule) -> mlua::Resul
     table.set("min_width", game_module.game.min_width)?;
     table.set("min_height", game_module.game.min_height)?;
     table.set("write", game_module.game.write)?;
-    table.set("afk_time", game_module.game.afk_time)?;
     table.set("case_sensitive", game_module.game.case_sensitive)?;
     table.set("actions", build_actions_table(lua, game_module)?)?;
     table.set("runtime", build_runtime_table(lua, game_module)?)?;
+
+    Ok(table)
+}
+
+/// 构造 saver_info 表。
+pub fn build_saver_info_table(lua: &Lua, overlay_package: &OverlayPackage) -> mlua::Result<Table> {
+    build_overlay_info_table(lua, overlay_package, "saver_name")
+}
+
+/// 构造 boss_info 表。
+pub fn build_boss_info_table(lua: &Lua, overlay_package: &OverlayPackage) -> mlua::Result<Table> {
+    build_overlay_info_table(lua, overlay_package, "boss_name")
+}
+
+fn build_overlay_info_table(
+    lua: &Lua,
+    overlay_package: &OverlayPackage,
+    display_name_key: &str,
+) -> mlua::Result<Table> {
+    let table = lua.create_table()?;
+    let manifest = &overlay_package.manifest;
+
+    table.set("uid", overlay_package.uid.as_str())?;
+    table.set(
+        "api",
+        lua_table_value::json_to_lua_value(lua, &manifest.api)?,
+    )?;
+    table.set("entry", manifest.entry.as_str())?;
+    table.set("package", manifest.package.as_str())?;
+    table.set("package_name", manifest.package_name.as_str())?;
+    table.set(display_name_key, manifest.display_name.as_str())?;
+    table.set("author", manifest.author.as_str())?;
+    table.set("version", manifest.version.as_str())?;
+    table.set("introduction", manifest.introduction.as_str())?;
+    table.set(
+        "icon",
+        lua_table_value::json_to_lua_value(lua, &manifest.icon)?,
+    )?;
+    table.set(
+        "banner",
+        lua_table_value::json_to_lua_value(lua, &manifest.banner)?,
+    )?;
 
     Ok(table)
 }
@@ -63,6 +106,7 @@ fn build_actions_table(lua: &Lua, game_module: &GameModule) -> mlua::Result<Tabl
 fn build_runtime_table(lua: &Lua, game_module: &GameModule) -> mlua::Result<Table> {
     let table = lua.create_table()?;
     table.set("target_fps", game_module.game.runtime.target_fps)?;
+    table.set("afk_time", game_module.game.runtime.afk_time)?;
     Ok(table)
 }
 

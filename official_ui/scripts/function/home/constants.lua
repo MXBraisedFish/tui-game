@@ -9,11 +9,11 @@ M.MENU_HEIGHT = 5
 M.CONTENT_HEIGHT = 15
 M.LOGO_COLOR = "#ffa500"
 M.LOGO_EMPTY_COLOR = "white"
-M.SELECTED_COLOR = "light_cyan"
+M.SELECTED_COLOR = DARK_CYAN
 M.NORMAL_COLOR = "white"
-M.DISABLED_COLOR = "dark_gray"
-M.KEY_COLOR = "dark_gray"
-M.VERSION_COLOR = "dark_gray"
+M.DISABLED_COLOR = DARK_GRAY
+M.KEY_COLOR = DARK_GRAY
+M.VERSION_COLOR = DARK_GRAY
 
 local function append_key_labels(value, formatted)
   if type(value) == "table" then

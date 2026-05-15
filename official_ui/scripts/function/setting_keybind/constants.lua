@@ -1,8 +1,8 @@
 local M = {}
 
-M.SELECTED_COLOR = "light_cyan"
+M.SELECTED_COLOR = DARK_CYAN
 M.NORMAL_COLOR = "white"
-M.KEY_COLOR = "dark_gray"
+M.KEY_COLOR = DARK_GRAY
 M.TITLE_COLOR = "white"
 M.MENU_HEIGHT = 3
 

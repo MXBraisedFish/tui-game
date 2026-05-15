@@ -77,6 +77,16 @@ impl ApiScope {
         matches!(self.consumer, ApiConsumer::GamePackage)
     }
 
+    /// 当前作用域是否允许查询 Saver 覆盖层元信息。
+    pub fn allows_saver_debug_info(self) -> bool {
+        matches!(self.consumer, ApiConsumer::SaverPackage)
+    }
+
+    /// 当前作用域是否允许查询老板键覆盖层元信息。
+    pub fn allows_boss_debug_info(self) -> bool {
+        matches!(self.consumer, ApiConsumer::BossPackage)
+    }
+
     /// 当前作用域是否允许查询按键映射。
     pub fn allows_key_query(self) -> bool {
         matches!(

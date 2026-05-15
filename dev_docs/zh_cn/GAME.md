@@ -1,4 +1,4 @@
-# 游戏包制作规范
+   # 游戏包制作规范
 
 # 文档信息
 
@@ -43,6 +43,14 @@
 - [附录](#附录)
   - [物理按键语义映射表](#物理按键语义映射表)
   - [默认图标](#默认图标)
+
+---
+
+# 游戏包制作注意事项
+
+- **每个游戏包仅限实现一款游戏**（由配置层面约束）。
+- **包与包之间完全独立**：不支持共享依赖，也不允许跨包调用。
+- **游戏玩法建议从简设计，单次游玩时长控制在 1–15 分钟为佳**。
 
 ---
 
@@ -110,13 +118,13 @@
 ```json
 {
   "package": string,                -- 包名
-  "package_name": string | key,         -- 游戏包显示名称
+  "package_name": string | key,     -- 游戏包显示名称
   "introduction": string | key,     -- 游戏包简介
-  "author": string | key,           -- 作者信息
+  "author": string | key,           -- 作者
   "game_name": string | key,        -- 游戏显示名称
   "description": string | key,      -- 游戏简短描述
   "detail": string | key,           -- 游戏详细描述
-  "version": string,                -- 游戏版本号
+  "version": string,                -- 包版本号
   "icon": Array | string | image,   -- 图标
   "banner": Array | string | image  -- 横幅
 }
@@ -126,7 +134,7 @@
 
 | 字段             | 类型                                                                                                              | 说明                                           |
 | -------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同游戏包，全局唯一。仅允许字符串。                    |
+| `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同游戏包，包内全局唯一。仅允许字符串。                  |
 | `package_name` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏包显示名称，在游戏包列表展示的包名。可填写字符串或语言键。              |
 | `introduction` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏包简介，在游戏包列表中展示。可填写字符串或语言键。                  |
 | `author`       | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 作者名称。可填写字符串或语言键。                             |
@@ -156,11 +164,11 @@
   "min_width": int,                  -- 最小终端宽度（终端字符列数）
   "min_height": int,                 -- 最小终端高度（终端字符行数）
   "write": boolean,                  -- 是否请求直写权限
-  "afk_time": int,                   -- 低资源运行时间阈值
   "case_sensitive": boolean,         -- 按键是否区分大小写
   "actions": object,                 -- 按键动作注册表
   "runtime": {
     "target_fps": int                -- 目标帧率
+    "afk_time": int,                 -- 低资源运行时间阈值
   }
 }
 ```
@@ -176,11 +184,11 @@
 | `min_width`          | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端宽度（终端字符列数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
 | `min_height`         | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端高度（终端字符行数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
 | `write`              | <font color="#92cddc">boolean</font>                                                                         | 是否请求直写权限。`true` 表示游戏包需要文件写入权限，加载时会向用户申请；`false` 表示不需要权限，所有直写请求将被宿主忽略。<font color="red">直写操作为高风险操作，请最大程度避免使用！</font> |
-| `afk_time`           | <font color="#92cddc">int</font>                                                                             | 低资源运行时间阈值。填写正整数，单位为秒。值为 0 则表示永不进入低资源运行模式。                                                                           |
 | `case_sensitive`     | <font color="#92cddc">boolean</font>                                                                         | 按键是否区分大小写。`true` 表示字母按键区分大小写；`false` 表示字母按键不区分大小写。                                                                  |
 | `actions`            | <font color="#92cddc">object</font>                                                                          | 按键动作注册表，格式见『游戏包配置文件-[注册表格式](#注册表格式)』。宿主会将物理按键映射为语义化动作。填写空对象代表不注册任何按键。                                               |
 | `runtime`            | <font color="#92cddc">object</font>                                                                          | 运行时设置。                                                                                                              |
 | `runtime.target_fps` | <font color="#92cddc">int</font>                                                                             | 目标帧率，支持 `30`、`60`、`120`。其它值将被忽略并回退为 `60`。实际帧率受机器性能影响，该值为上限。                                                         |
+| `runtime.afk_time`   | <font color="#92cddc">int</font>                                                                             | 低资源运行时间阈值。填写正整数，单位为秒。值为 0 则表示永不进入低资源运行模式。                                                                           |
 
 ## 注册表格式
 
@@ -697,4 +705,4 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 ```
 
 **样图**
-![默认头图](./image/mod_banner.png)
+![默认头图](./image/game_banner.png)

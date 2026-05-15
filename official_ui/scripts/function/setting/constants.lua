@@ -3,10 +3,10 @@ local M = {}
 M.MENU_WIDTH = 34
 M.MENU_HEIGHT = 5
 M.CONTENT_HEIGHT = 9
-M.SELECTED_COLOR = "light_cyan"
+M.SELECTED_COLOR = DARK_CYAN
 M.NORMAL_COLOR = "white"
-M.KEY_COLOR = "dark_gray"
-M.VERSION_COLOR = "dark_gray"
+M.KEY_COLOR = DARK_GRAY
+M.VERSION_COLOR = DARK_GRAY
 M.TITLE_COLOR = "white"
 
 local function append_key_labels(value, formatted)

@@ -47,7 +47,7 @@ function render(state)
   local width, height = get_terminal_size()
   canvas_draw_text(resolve_x(ANCHOR_CENTER, 15), 1, translate("minimal_example.title"), "yellow", nil, BOLD)
   canvas_draw_rich_text(2, math.max(0, height - 2), translate("minimal_example.help"), "grey", nil, ALIGN_LEFT, math.max(1, width - 4))
-  canvas_draw_text(state.x, state.y, "@", "light_cyan", nil, BOLD)
+  canvas_draw_text(state.x, state.y, "@", DARK_CYAN, nil, BOLD)
   canvas_draw_text(2, 3, "Moves: " .. tostring(state.moves), "white")
 end
 

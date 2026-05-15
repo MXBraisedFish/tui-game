@@ -27,10 +27,31 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
 }
 
 fn install_constants(globals: &mlua::Table) -> mlua::Result<()> {
+    globals.set("BLACK", 0)?;
+    globals.set("RED", 1)?;
+    globals.set("GREEN", 2)?;
+    globals.set("YELLOW", 3)?;
+    globals.set("BLUE", 4)?;
+    globals.set("MAGENTA", 5)?;
+    globals.set("CYAN", 6)?;
+    globals.set("WHITE", 7)?;
+    globals.set("GRAY", 8)?;
+    globals.set("GREY", 8)?;
+    globals.set("DARK_RED", 9)?;
+    globals.set("DARK_GREEN", 10)?;
+    globals.set("DARK_YELLOW", 11)?;
+    globals.set("DARK_BLUE", 12)?;
+    globals.set("DARK_MAGENTA", 13)?;
+    globals.set("DARK_CYAN", 14)?;
+    globals.set("DARK_GRAY", 15)?;
+    globals.set("DARK_GREY", 15)?;
+
     globals.set("ALIGN_LEFT", drawing_parser::ALIGN_LEFT)?;
     globals.set("ALIGN_CENTER", drawing_parser::ALIGN_CENTER)?;
     globals.set("ALIGN_RIGHT", drawing_parser::ALIGN_RIGHT)?;
+    globals.set("WINDOW", drawing_parser::WRAP_WINDOW)?;
 
+    globals.set("NORMAL", drawing_parser::STYLE_NORMAL)?;
     globals.set("BOLD", drawing_parser::STYLE_BOLD)?;
     globals.set("ITALIC", drawing_parser::STYLE_ITALIC)?;
     globals.set("UNDERLINE", drawing_parser::STYLE_UNDERLINE)?;

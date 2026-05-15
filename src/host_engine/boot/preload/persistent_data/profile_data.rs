@@ -12,4 +12,5 @@ pub struct PersistentData {
     pub mod_state: Value,
     pub saver_state: Value,
     pub boss_state: Value,
+    pub security_state: Value,
 }

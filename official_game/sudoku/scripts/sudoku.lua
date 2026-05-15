@@ -711,7 +711,7 @@ local function drow(bx, y, r)
         end
         local bg = "black"
         if cur then
-            bg = "light_yellow"
+            bg = DARK_YELLOW
         elseif S.hl then
             local cb = math.floor((c - 1) / B)
             if r == S.r or c == S.c or (rb == crb and cb == ccb) then bg = "#B3B3B3" end
@@ -755,14 +755,14 @@ local function dnotice(g)
     elseif S.im == "difficulty" then
         if S.ib == "" then
             l = tr("game.sudoku.input_difficulty_hint")
-            col = "dark_gray"
+            col = DARK_GRAY
         else
             l = S.ib
         end
     elseif S.im == "jump" then
         if S.ib == "" then
             l = tr("game.sudoku.input_jump_hint")
-            col = "dark_gray"
+            col = DARK_GRAY
         else
             l = S.ib
         end
@@ -819,10 +819,10 @@ local function render_frame()
     
     local bx = math.floor((g.tw - text_width(g.best)) / 2)
     if bx < 1 then bx = 1 end
-    draw_text(bx, g.ty, g.best, "dark_gray", "black")
+    draw_text(bx, g.ty, g.best, DARK_GRAY, "black")
 
     
-    draw_text(g.tx, g.ty + 1, g.st, "light_cyan", "black")
+    draw_text(g.tx, g.ty + 1, g.st, DARK_CYAN, "black")
 
     
     draw_board(g)

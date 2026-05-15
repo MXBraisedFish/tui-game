@@ -26,6 +26,7 @@ pub fn load_persistent_data() -> LoaderResult<PersistentData> {
         mod_state: read_json_object(&profiles_dir.join("mod_state.json"))?,
         saver_state: read_json_object(&profiles_dir.join("saver_state"))?,
         boss_state: read_json_object(&profiles_dir.join("boss_state"))?,
+        security_state: read_json_object(&profiles_dir.join("security_state.json"))?,
     })
 }
 

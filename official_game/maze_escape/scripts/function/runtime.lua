@@ -1041,9 +1041,9 @@ local function draw_status(x, y, w)
     end
 
     -- 绘制时间、步数、钥匙数
-    draw_text(left_x, y, left, "light_cyan", "black")
-    draw_text(mid_x, y, mid, "light_cyan", "black")
-    draw_text(right_x, y, right, "light_cyan", "black")
+    draw_text(left_x, y, left, DARK_CYAN, "black")
+    draw_text(mid_x, y, mid, DARK_CYAN, "black")
+    draw_text(right_x, y, right, DARK_CYAN, "black")
 
     -- 绘制模式和计时信息
     local mode_text = tr("game.maze_escape.mode") .. ": " .. mode_label(state.mode)
@@ -1053,13 +1053,13 @@ local function draw_status(x, y, w)
         timer_text = tr("game.maze_escape.remaining") .. ": " .. format_duration(remain)
     end
     local mode_line = mode_text .. "  " .. timer_text
-    draw_text(centered_x(mode_line, x, w), y + 1, mode_line, "dark_gray", "black")
+    draw_text(centered_x(mode_line, x, w), y + 1, mode_line, DARK_GRAY, "black")
 
     -- 绘制提示信息
     if state.input_mode == "config" then
         if state.input_buffer == "" then
             local hint = tr("game.maze_escape.input_config_hint")
-            draw_text(centered_x(hint, x, w), y + 2, hint, "dark_gray", "black")
+            draw_text(centered_x(hint, x, w), y + 2, hint, DARK_GRAY, "black")
         else
             draw_text(centered_x(state.input_buffer, x, w), y + 2, state.input_buffer, "white", "black")
         end
@@ -1103,7 +1103,7 @@ local function draw_maze(x, y, w)
                 fg = "rgb(120,255,120)"
             elseif tile == TILE_EXIT then
                 ch = "&"
-                fg = "light_cyan"
+                fg = DARK_CYAN
             end
             if r == state.player_r and c == state.player_c then
                 ch = "@"

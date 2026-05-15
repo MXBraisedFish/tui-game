@@ -5,19 +5,51 @@ use mlua::{Table, Value, Variadic};
 use super::border_chars::BorderChars;
 use crate::host_engine::boot::preload::lua_runtime::api::validation::argument;
 
-pub const ALIGN_NO_WRAP: i64 = 0;
-pub const ALIGN_LEFT: i64 = 1;
-pub const ALIGN_CENTER: i64 = 2;
-pub const ALIGN_RIGHT: i64 = 3;
+pub const ALIGN_LEFT: i64 = 0;
+pub const ALIGN_CENTER: i64 = 1;
+pub const ALIGN_RIGHT: i64 = 2;
+pub const WRAP_WINDOW: i64 = -1;
 
-pub const STYLE_BOLD: i64 = 0;
-pub const STYLE_ITALIC: i64 = 1;
-pub const STYLE_UNDERLINE: i64 = 2;
-pub const STYLE_STRIKE: i64 = 3;
-pub const STYLE_BLINK: i64 = 4;
-pub const STYLE_REVERSE: i64 = 5;
-pub const STYLE_HIDDEN: i64 = 6;
-pub const STYLE_DIM: i64 = 7;
+pub const STYLE_NORMAL: i64 = 0;
+pub const STYLE_BOLD: i64 = 1;
+pub const STYLE_ITALIC: i64 = 2;
+pub const STYLE_UNDERLINE: i64 = 3;
+pub const STYLE_STRIKE: i64 = 4;
+pub const STYLE_BLINK: i64 = 5;
+pub const STYLE_REVERSE: i64 = 6;
+pub const STYLE_HIDDEN: i64 = 7;
+pub const STYLE_DIM: i64 = 8;
+
+/// 文本换行和截断配置。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WrapLimit {
+    Disabled,
+    Fixed(u16),
+    Window,
+}
+
+impl Default for WrapLimit {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct WrapOptions {
+    pub wrap_width: WrapLimit,
+    pub wrap_height: WrapLimit,
+    pub text_overflow: Option<String>,
+}
+
+impl WrapOptions {
+    pub fn resolved(&self, window_width: u16, window_height: u16) -> Self {
+        Self {
+            wrap_width: resolve_wrap_limit(self.wrap_width, window_width),
+            wrap_height: resolve_wrap_limit(self.wrap_height, window_height),
+            text_overflow: self.text_overflow.clone(),
+        }
+    }
+}
 
 /// 绘制文本参数。
 #[derive(Clone, Debug)]
@@ -29,7 +61,7 @@ pub struct DrawTextArgs {
     pub bg: Option<String>,
     pub styles: Vec<i64>,
     pub align: i64,
-    pub wrap_width: Option<u16>,
+    pub wrap_options: WrapOptions,
 }
 
 /// 绘制富文本参数。
@@ -40,8 +72,9 @@ pub struct DrawRichTextArgs {
     pub rich_text: String,
     pub fg: Option<String>,
     pub bg: Option<String>,
+    pub styles: Vec<i64>,
     pub align: i64,
-    pub wrap_width: Option<u16>,
+    pub wrap_options: WrapOptions,
 }
 
 /// 矩形填充参数。
@@ -83,15 +116,15 @@ pub fn parse_draw_text_args(args: &Variadic<Value>) -> mlua::Result<DrawTextArgs
     let x = parse_coordinate(args, 0)?;
     let y = parse_coordinate(args, 1)?;
     let text = argument::expect_string_arg(args, 2)?;
-    let fg = argument::expect_optional_string_arg(args, 3)?;
-    let bg = argument::expect_optional_string_arg(args, 4)?;
+    let fg = parse_optional_color_arg(args, 3)?;
+    let bg = parse_optional_color_arg(args, 4)?;
     let styles = parse_optional_styles(args, 5)?;
     let align = match args.get(6) {
         None => ALIGN_LEFT,
-        Some(Value::Nil) => ALIGN_NO_WRAP,
+        Some(Value::Nil) => ALIGN_LEFT,
         Some(_) => argument::expect_i64_arg(args, 6)?,
     };
-    let wrap_width = parse_optional_wrap_width(args, 7)?;
+    let wrap_options = parse_optional_wrap_options(args, 7)?;
 
     Ok(DrawTextArgs {
         x,
@@ -101,24 +134,25 @@ pub fn parse_draw_text_args(args: &Variadic<Value>) -> mlua::Result<DrawTextArgs
         bg,
         styles,
         align,
-        wrap_width,
+        wrap_options,
     })
 }
 
 /// 解析 canvas_draw_rich_text 参数。
 pub fn parse_draw_rich_text_args(args: &Variadic<Value>) -> mlua::Result<DrawRichTextArgs> {
-    argument::expect_arg_count_range(args, 3, 7)?;
+    argument::expect_arg_count_range(args, 3, 8)?;
     let x = parse_coordinate(args, 0)?;
     let y = parse_coordinate(args, 1)?;
     let rich_text = argument::expect_string_arg(args, 2)?;
-    let fg = argument::expect_optional_string_arg(args, 3)?;
-    let bg = argument::expect_optional_string_arg(args, 4)?;
-    let align = match args.get(5) {
+    let fg = parse_optional_color_arg(args, 3)?;
+    let bg = parse_optional_color_arg(args, 4)?;
+    let styles = parse_optional_styles(args, 5)?;
+    let align = match args.get(6) {
         None => ALIGN_LEFT,
-        Some(Value::Nil) => ALIGN_NO_WRAP,
-        Some(_) => argument::expect_i64_arg(args, 5)?,
+        Some(Value::Nil) => ALIGN_LEFT,
+        Some(_) => argument::expect_i64_arg(args, 6)?,
     };
-    let wrap_width = parse_optional_wrap_width(args, 6)?;
+    let wrap_options = parse_optional_wrap_options(args, 7)?;
 
     Ok(DrawRichTextArgs {
         x,
@@ -126,8 +160,9 @@ pub fn parse_draw_rich_text_args(args: &Variadic<Value>) -> mlua::Result<DrawRic
         rich_text,
         fg,
         bg,
+        styles,
         align,
-        wrap_width,
+        wrap_options,
     })
 }
 
@@ -140,8 +175,8 @@ pub fn parse_fill_rect_args(args: &Variadic<Value>) -> mlua::Result<FillRectArgs
         width: parse_positive_size(args, 2)?,
         height: parse_positive_size(args, 3)?,
         fill_char: parse_optional_char(args.get(4), ' '),
-        fg: argument::expect_optional_string_arg(args, 5)?,
-        bg: argument::expect_optional_string_arg(args, 6)?,
+        fg: parse_optional_color_arg(args, 5)?,
+        bg: parse_optional_color_arg(args, 6)?,
     })
 }
 
@@ -170,8 +205,8 @@ pub fn parse_border_rect_args(args: &Variadic<Value>) -> mlua::Result<BorderRect
         width: parse_positive_size(args, 2)?,
         height: parse_positive_size(args, 3)?,
         border_chars,
-        fg: argument::expect_optional_string_arg(args, 5)?,
-        bg: argument::expect_optional_string_arg(args, 6)?,
+        fg: parse_optional_color_arg(args, 5)?,
+        bg: parse_optional_color_arg(args, 6)?,
     })
 }
 
@@ -195,22 +230,126 @@ fn parse_positive_size(args: &Variadic<Value>, index: usize) -> mlua::Result<u16
     u16::try_from(value).map_err(mlua::Error::external)
 }
 
+fn parse_optional_color_arg(args: &Variadic<Value>, index: usize) -> mlua::Result<Option<String>> {
+    match args.get(index) {
+        Some(Value::Nil) | None => Ok(None),
+        Some(Value::String(value)) => Ok(Some(value.to_str()?.to_string())),
+        Some(Value::Integer(value)) => Ok(Some(value.to_string())),
+        Some(Value::Number(value)) => Ok(Some((*value as i64).to_string())),
+        Some(value) => Err(mlua::Error::external(format!(
+            "argument type mismatch: expected string or integer, got {}",
+            style_lua_type_name(value)
+        ))),
+    }
+}
+
+pub fn parse_optional_wrap_options(
+    args: &Variadic<Value>,
+    index: usize,
+) -> mlua::Result<WrapOptions> {
+    match args.get(index) {
+        None | Some(Value::Nil) => Ok(WrapOptions::default()),
+        Some(Value::Integer(width)) => Ok(WrapOptions {
+            wrap_width: parse_wrap_width(*width)?,
+            ..WrapOptions::default()
+        }),
+        Some(Value::Number(width)) => Ok(WrapOptions {
+            wrap_width: parse_wrap_width(*width as i64)?,
+            ..WrapOptions::default()
+        }),
+        Some(Value::Table(table)) => parse_wrap_options_table(table),
+        Some(_) => Ok(WrapOptions {
+            wrap_width: WrapLimit::Window,
+            wrap_height: WrapLimit::Window,
+            ..WrapOptions::default()
+        }),
+    }
+}
+
 pub fn parse_optional_wrap_width(
     args: &Variadic<Value>,
     index: usize,
 ) -> mlua::Result<Option<u16>> {
-    let Some(value) = argument::expect_optional_i64_arg(args, index)? else {
-        return Ok(None);
-    };
-    if value == 0 {
-        return Ok(None);
+    Ok(match parse_optional_wrap_options(args, index)?.wrap_width {
+        WrapLimit::Fixed(width) => Some(width),
+        WrapLimit::Disabled | WrapLimit::Window => None,
+    })
+}
+
+fn parse_wrap_options_table(table: &Table) -> mlua::Result<WrapOptions> {
+    let width_value = optional_table_wrap_limit(table, "wrap_width")?
+        .or(optional_table_wrap_limit(table, "warp_width")?)
+        .unwrap_or(WrapLimit::Window);
+    let height_value = optional_table_wrap_limit(table, "wrap_height")?
+        .or(optional_table_wrap_limit(table, "warp_height")?)
+        .unwrap_or(WrapLimit::Disabled);
+    let text_overflow = optional_table_string(table, "text_overflow")?
+        .or(optional_table_string(table, "text-overflow")?)
+        .filter(|value| !value.is_empty());
+
+    Ok(WrapOptions {
+        wrap_width: width_value,
+        wrap_height: height_value,
+        text_overflow,
+    })
+}
+
+fn parse_wrap_width(width: i64) -> mlua::Result<WrapLimit> {
+    if width == WRAP_WINDOW {
+        return Ok(WrapLimit::Window);
     }
-    if value < 0 {
-        return Err(mlua::Error::external(
-            "wrap_width must be nil, 0, or a positive integer",
-        ));
+    if width <= 0 {
+        return Ok(WrapLimit::Window);
     }
-    Ok(Some(u16::try_from(value).map_err(mlua::Error::external)?))
+    Ok(WrapLimit::Fixed(
+        u16::try_from(width).map_err(mlua::Error::external)?,
+    ))
+}
+
+fn parse_table_wrap_limit(value: Value) -> WrapLimit {
+    match value {
+        Value::Nil => WrapLimit::Disabled,
+        Value::Integer(value) if value == WRAP_WINDOW => WrapLimit::Window,
+        Value::Integer(value) if value > 0 => {
+            WrapLimit::Fixed(u16::try_from(value).unwrap_or(u16::MAX))
+        }
+        Value::Number(value) if value as i64 == WRAP_WINDOW => WrapLimit::Window,
+        Value::Number(value) if value > 0.0 => {
+            WrapLimit::Fixed(u16::try_from(value as i64).unwrap_or(u16::MAX))
+        }
+        _ => WrapLimit::Window,
+    }
+}
+
+fn optional_table_wrap_limit(table: &Table, key: &str) -> mlua::Result<Option<WrapLimit>> {
+    match table.get::<Value>(key)? {
+        Value::Nil => Ok(None),
+        value => Ok(Some(parse_table_wrap_limit(value))),
+    }
+}
+
+fn optional_table_string(table: &Table, key: &str) -> mlua::Result<Option<String>> {
+    match table.get::<Value>(key)? {
+        Value::Nil => Ok(None),
+        Value::String(value) => Ok(Some(value.to_string_lossy())),
+        value => Err(mlua::Error::external(format!(
+            "invalid wrap option value type: {}",
+            style_lua_type_name(&value)
+        ))),
+    }
+}
+
+fn resolve_wrap_limit(wrap_limit: WrapLimit, window_value: u16) -> WrapLimit {
+    match wrap_limit {
+        WrapLimit::Window => {
+            if window_value == 0 {
+                WrapLimit::Disabled
+            } else {
+                WrapLimit::Fixed(window_value)
+            }
+        }
+        other => other,
+    }
 }
 
 fn parse_optional_styles(args: &Variadic<Value>, index: usize) -> mlua::Result<Vec<i64>> {
@@ -253,10 +392,14 @@ fn parse_style_list<const LENGTH: usize>(styles: [i64; LENGTH]) -> mlua::Result<
 }
 
 fn push_unique_style(styles: &mut Vec<i64>, style: i64) -> mlua::Result<()> {
-    if !(STYLE_BOLD..=STYLE_DIM).contains(&style) {
+    if !(STYLE_NORMAL..=STYLE_DIM).contains(&style) {
         return Err(mlua::Error::external(format!(
             "invalid text style value: {style}"
         )));
+    }
+    if style == STYLE_NORMAL {
+        styles.clear();
+        return Ok(());
     }
     if !styles.contains(&style) {
         styles.push(style);

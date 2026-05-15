@@ -662,14 +662,14 @@ local function draw_board(x, y, frame_w, frame_h)
     -- 绘制列号
     for c = 1, state.size do
         local cx = grid_x + (c - 1) * CELL_STEP_X + 1
-        draw_text(cx, inner_y, string.format("%2d", c), "dark_gray", "black")
+        draw_text(cx, inner_y, string.format("%2d", c), DARK_GRAY, "black")
     end
 
     -- 绘制行号和灯泡
     for r = 1, state.size do
         local row_base = inner_y + 1 + (r - 1) * CELL_STEP_Y
         -- 行号
-        draw_text(grid_block_x, row_base + 1, string.format("%2d", r), "dark_gray", "black")
+        draw_text(grid_block_x, row_base + 1, string.format("%2d", r), DARK_GRAY, "black")
 
         -- 该行的灯泡
         for c = 1, state.size do
@@ -722,20 +722,20 @@ local function draw_status(x, y, frame_w)
     draw_text(1, y - 1, string.rep(" ", term_w), "white", "black")
 
     -- 显示最佳记录、时间、步数
-    draw_text(x, y - 3, best_line(), "dark_gray", "black")
-    draw_text(x, y - 2, time_text, "light_cyan", "black")
-    draw_text(right_x, y - 2, steps_text, "light_cyan", "black")
+    draw_text(x, y - 3, best_line(), DARK_GRAY, "black")
+    draw_text(x, y - 2, time_text, DARK_CYAN, "black")
+    draw_text(right_x, y - 2, steps_text, DARK_CYAN, "black")
 
     -- 显示输入提示或状态信息
     if state.input_mode == "size" then
         if state.input_buffer == "" then
-            draw_text(x, y - 1, tr("game.lights_out.input_size_hint"), "dark_gray", "black")
+            draw_text(x, y - 1, tr("game.lights_out.input_size_hint"), DARK_GRAY, "black")
         else
             draw_text(x, y - 1, state.input_buffer, "white", "black")
         end
     elseif state.input_mode == "jump" then
         if state.input_buffer == "" then
-            draw_text(x, y - 1, tr("game.lights_out.input_jump_hint"), "dark_gray", "black")
+            draw_text(x, y - 1, tr("game.lights_out.input_jump_hint"), DARK_GRAY, "black")
         else
             draw_text(x, y - 1, state.input_buffer, "white", "black")
         end

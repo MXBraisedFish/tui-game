@@ -348,7 +348,7 @@ local function status_text()
     if S.mode == "action" then
         return tr("game.wordle.mode_action"), "yellow"
     end
-    return tr("game.wordle.mode_input"), "dark_gray"
+    return tr("game.wordle.mode_input"), DARK_GRAY
 end
 
 local function controls_text()
@@ -435,7 +435,7 @@ local function draw_guess_row(y, tw, idx)
             elseif mark == "present" then
                 fg, bg = "black", "yellow"
             else
-                fg, bg = "dark_gray", "black"
+                fg, bg = DARK_GRAY, "black"
             end
         end
         draw_text(x, y, ch, fg, bg)
@@ -455,7 +455,7 @@ local function draw_input_row(y, tw)
         show = S.secret
     end
     for i = 1, S.word_len do
-        local ch, fg = "_", "dark_gray"
+        local ch, fg = "_", DARK_GRAY
         if i <= #show then
             ch = string.upper(char_at(show, i))
             if S.settled then
@@ -478,8 +478,8 @@ local function render_frame()
     local tline = top_time_line()
     local msg, mc = status_text()
     for i = 0, 2 do clear_line(top + i, tw) end
-    draw_text(centered_x(best, 1, tw), top, best, "dark_gray", "black")
-    draw_text(centered_x(tline, 1, tw), top + 1, tline, "light_cyan", "black")
+    draw_text(centered_x(best, 1, tw), top, best, DARK_GRAY, "black")
+    draw_text(centered_x(tline, 1, tw), top + 1, tline, DARK_CYAN, "black")
     S.last_time_line = tline
     draw_text(centered_x(msg, 1, tw), top + 2, msg, mc, "black")
     local y0 = top + 4

@@ -12,36 +12,33 @@ end
 
 local function option_items(root_state)
   local safe_mode_on = root_state.default_safe_mode ~= false
-  local mod_enabled = root_state.default_mod_enabled ~= false
+  local game_enabled = root_state.default_mod_game_enabled ~= false
+  local saver_enabled = root_state.default_mod_saver_enabled ~= false
+  local boss_enabled = root_state.default_mod_boss_enabled ~= false
+  local function toggle_item(key, label_key, fallback, enabled, on_key, off_key)
+    return {
+      key = key,
+      label = L.language(root_state, label_key, fallback),
+      value = enabled and L.language(root_state, "SECURITY_TOGGLE_MOD_ON", C.DEFAULT_TEXT.mod_on) or L.language(root_state, "SECURITY_TOGGLE_MOD_OFF", C.DEFAULT_TEXT.mod_off),
+      value_color = enabled and C.ON_COLOR or C.OFF_COLOR,
+      is_toggle = true
+    }
+  end
   return {
     {
       key = C.DEFAULT_TEXT.option1,
       label = L.language(root_state, "SECURITY_DEFAULT_SAFE_MODE", C.DEFAULT_TEXT.default_safe_mode),
-      value = safe_mode_on
-        and L.language(root_state, "SECURITY_TOGGLE_SAFE_MODE_ON", C.DEFAULT_TEXT.safe_mode_on)
-        or L.language(root_state, "SECURITY_TOGGLE_SAFE_MODE_OFF_PERMANENT", C.DEFAULT_TEXT.safe_mode_off),
+      value = safe_mode_on and L.language(root_state, "SECURITY_TOGGLE_SAFE_MODE_ON", C.DEFAULT_TEXT.safe_mode_on) or L.language(root_state, "SECURITY_TOGGLE_SAFE_MODE_OFF_PERMANENT", C.DEFAULT_TEXT.safe_mode_off),
       value_color = safe_mode_on and C.ON_COLOR or C.OFF_COLOR,
       is_toggle = true
     },
-    {
-      key = C.DEFAULT_TEXT.option2,
-      label = L.language(root_state, "SECURITY_DEFAULT_MOD", C.DEFAULT_TEXT.default_mod),
-      value = mod_enabled
-        and L.language(root_state, "SECURITY_TOGGLE_MOD_ON", C.DEFAULT_TEXT.mod_on)
-        or L.language(root_state, "SECURITY_TOGGLE_MOD_OFF", C.DEFAULT_TEXT.mod_off),
-      value_color = mod_enabled and C.ON_COLOR or C.OFF_COLOR,
-      is_toggle = true
-    },
-    {
-      key = C.DEFAULT_TEXT.option3,
-      label = L.language(root_state, "SECURITY_RESET_SAFE_MODE", C.DEFAULT_TEXT.reset_safe_mode),
-      is_toggle = false
-    },
-    {
-      key = C.DEFAULT_TEXT.option4,
-      label = L.language(root_state, "SECURITY_RESET_MOD", C.DEFAULT_TEXT.reset_mod),
-      is_toggle = false
-    }
+    toggle_item(C.DEFAULT_TEXT.option2, "SECURITY_DEFAULT_MOD_GAME", C.DEFAULT_TEXT.default_mod_game, game_enabled),
+    toggle_item(C.DEFAULT_TEXT.option3, "SECURITY_DEFAULT_MOD_SAVER", C.DEFAULT_TEXT.default_mod_saver, saver_enabled),
+    toggle_item(C.DEFAULT_TEXT.option4, "SECURITY_DEFAULT_MOD_BOSS", C.DEFAULT_TEXT.default_mod_boss, boss_enabled),
+    { key = C.DEFAULT_TEXT.option5, label = L.language(root_state, "SECURITY_RESET_SAFE_MODE", C.DEFAULT_TEXT.reset_safe_mode), is_toggle = false },
+    { key = C.DEFAULT_TEXT.option6, label = L.language(root_state, "SECURITY_RESET_MOD_GAME", C.DEFAULT_TEXT.reset_mod_game), is_toggle = false },
+    { key = C.DEFAULT_TEXT.option7, label = L.language(root_state, "SECURITY_RESET_MOD_SAVER", C.DEFAULT_TEXT.reset_mod_saver), is_toggle = false },
+    { key = C.DEFAULT_TEXT.option8, label = L.language(root_state, "SECURITY_RESET_MOD_BOSS", C.DEFAULT_TEXT.reset_mod_boss), is_toggle = false }
   }
 end
 
@@ -94,6 +91,16 @@ local function draw_options(root_state)
   end
 end
 
+local function draw_reset_message(root_state)
+  local message = tostring(root_state.reset_message or "")
+  if message == "" then
+    return
+  end
+  local _, terminal_height = L.terminal_size()
+  local y = math.max(0, terminal_height - 3)
+  canvas_draw_text(L.center_x(L.text_width(message), 0), y, message, C.ON_COLOR, nil, BOLD, nil)
+end
+
 local function draw_title(root_state)
   local title = L.language(root_state, "SECURITY_TITLE", C.DEFAULT_TEXT.title)
   canvas_draw_text(L.center_x(L.text_width(title), 0), 1, title, C.TITLE_COLOR, nil, BOLD, nil)
@@ -120,6 +127,7 @@ function M.render(root_state)
   root_state = root_state or {}
   draw_title(root_state)
   draw_options(root_state)
+  draw_reset_message(root_state)
   draw_action_line(root_state)
 end
 

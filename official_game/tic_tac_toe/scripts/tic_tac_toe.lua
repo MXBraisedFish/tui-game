@@ -632,9 +632,9 @@ local function current_message()
         return tr("game.tic_tac_toe.confirm_exit"), "yellow"
     end
     if state.toast_text ~= nil and state.frame <= state.toast_until then
-        return state.toast_text, "light_cyan"
+        return state.toast_text, DARK_CYAN
     end
-    return tr("game.tic_tac_toe.ready"), "dark_gray"
+    return tr("game.tic_tac_toe.ready"), DARK_GRAY
 end
 
 local function draw_controls(y, term_w)

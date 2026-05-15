@@ -146,7 +146,7 @@ local state                        = {
     next_item_spawn_at = 0,
 
     msg_text = "",
-    msg_color = "dark_gray",
+    msg_color = DARK_GRAY,
     msg_until = 0,
     msg_persistent = false,
 
@@ -290,7 +290,7 @@ end
 
 local function show_message(text, color, dur_sec, persistent)
     state.msg_text = text or ""
-    state.msg_color = color or "dark_gray"
+    state.msg_color = color or DARK_GRAY
     state.msg_persistent = persistent == true
     if dur_sec ~= nil and dur_sec > 0 then
         state.msg_until = state.frame + sec_to_frames(dur_sec)
@@ -303,7 +303,7 @@ end
 local function clear_message()
     if state.msg_text ~= "" then
         state.msg_text = ""
-        state.msg_color = "dark_gray"
+        state.msg_color = DARK_GRAY
         state.msg_until = 0
         state.msg_persistent = false
         state.dirty = true
@@ -436,7 +436,7 @@ local function player_color()
         if (state.frame // 6) % 2 == 0 then
             return "yellow"
         end
-        return "light_cyan"
+        return DARK_CYAN
     end
     return "yellow"
 end
@@ -708,7 +708,7 @@ local function restore_snapshot(snap)
     state.end_frame = nil
     state.result_committed = false
     state.last_elapsed = -1
-    state.msg_text, state.msg_color, state.msg_until, state.msg_persistent = "", "dark_gray", 0, false
+    state.msg_text, state.msg_color, state.msg_until, state.msg_persistent = "", DARK_GRAY, 0, false
 
     state.dirty = true
     return true
@@ -770,7 +770,7 @@ local function reset_run()
     state.last_player_fire = state.frame
     reset_spawn_timers()
 
-    state.msg_text, state.msg_color, state.msg_until, state.msg_persistent = "", "dark_gray", 0, false
+    state.msg_text, state.msg_color, state.msg_until, state.msg_persistent = "", DARK_GRAY, 0, false
     state.result_committed = false
     state.last_elapsed = -1
     state.dirty = true
@@ -928,7 +928,7 @@ local function activate_function_item(symbol)
         end
     end
 
-    show_message(tr("game.shooter.item." .. symbol) .. " " .. tr("game.shooter.msg_item_get"), "light_cyan", 3, false)
+    show_message(tr("game.shooter.item." .. symbol) .. " " .. tr("game.shooter.msg_item_get"), DARK_CYAN, 3, false)
 end
 
 local function nuke_spawn_permille()
@@ -973,7 +973,7 @@ local function spawn_item()
                 { sym = "+", w = 10 }
             })
             symbol = pick.sym
-            color = "light_cyan"
+            color = DARK_CYAN
         end
     end
 
@@ -1612,7 +1612,7 @@ end
 
 local function use_nuke()
     if state.nuke_stock <= 0 then
-        show_message(tr("game.shooter.msg_nuke_empty"), "dark_gray", 2, false)
+        show_message(tr("game.shooter.msg_nuke_empty"), DARK_GRAY, 2, false)
         return
     end
 
@@ -1767,11 +1767,11 @@ local function draw_life_block(x, y)
     local b = math.max(0, state.hp - 5)
     draw_text(x, y + 1, string.rep("A", a), "yellow", "black")
     if a < 5 then
-        draw_text(x + a, y + 1, string.rep("-", 5 - a), "dark_gray", "black")
+        draw_text(x + a, y + 1, string.rep("-", 5 - a), DARK_GRAY, "black")
     end
     draw_text(x, y + 2, string.rep("A", b), "yellow", "black")
     if b < 5 then
-        draw_text(x + b, y + 2, string.rep("-", 5 - b), "dark_gray", "black")
+        draw_text(x + b, y + 2, string.rep("-", 5 - b), DARK_GRAY, "black")
     end
 end
 
@@ -1788,7 +1788,7 @@ local function draw_buff_line(x, y, sym, remain, total)
         draw_text(x + 2, y, string.rep(CH_BLOCK, filled), "green", "black")
     end
     if filled < blocks then
-        draw_text(x + 2 + filled, y, string.rep(CH_BLOCK, blocks - filled), "dark_gray", "black")
+        draw_text(x + 2 + filled, y, string.rep(CH_BLOCK, blocks - filled), DARK_GRAY, "black")
     end
     draw_text(x + 2 + blocks + 1, y, tostring(remain) .. tr("game.shooter.seconds"), "white", "black")
 end
@@ -1797,10 +1797,10 @@ local function draw_info(layout)
     local x, y, w = layout.info_x, layout.info_y, layout.info_w
     fill_rect(x, y, w, BOARD_H, "black")
 
-    draw_text(x, y + 0, tr("game.shooter.best_score") .. ": " .. tostring(state.best_score), "dark_gray", "black")
-    draw_text(x, y + 1, tr("game.shooter.best_stage") .. ": " .. tostring(state.best_stage), "dark_gray", "black")
+    draw_text(x, y + 0, tr("game.shooter.best_score") .. ": " .. tostring(state.best_score), DARK_GRAY, "black")
+    draw_text(x, y + 1, tr("game.shooter.best_stage") .. ": " .. tostring(state.best_stage), DARK_GRAY, "black")
     draw_text(x, y + 2, tr("game.shooter.score") .. ": " .. tostring(state.score), "white", "black")
-    draw_text(x, y + 3, tr("game.shooter.time") .. ": " .. format_duration(elapsed_seconds()), "light_cyan", "black")
+    draw_text(x, y + 3, tr("game.shooter.time") .. ": " .. format_duration(elapsed_seconds()), DARK_CYAN, "black")
 
     draw_text(x, y + 4,
         tr("game.shooter.fire_mode") ..
@@ -1852,7 +1852,7 @@ local function draw_message_controls(layout)
 
     local m, c = current_msg()
     if m ~= nil and m ~= "" then
-        draw_text(centered_x(m, 1, term_w), layout.message_y, m, c or "dark_gray", "black")
+        draw_text(centered_x(m, 1, term_w), layout.message_y, m, c or DARK_GRAY, "black")
     end
 
     local txt = shooter_controls_text()

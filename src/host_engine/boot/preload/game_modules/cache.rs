@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value, json};
 
-use crate::host_engine::boot::preload::persistent_data::keybind_profile;
+use crate::host_engine::boot::preload::persistent_data::{keybind_profile, security_profile};
 
 use super::manifest::GameModuleRegistry;
 use super::source::GameModuleSource;
@@ -43,6 +43,7 @@ pub fn persist_default_keybinds(registry: &GameModuleRegistry) -> CacheResult<()
 /// 将第三方模块默认状态写入 mod_state。已有用户状态不会被覆盖。
 pub fn persist_default_mod_state(registry: &GameModuleRegistry) -> CacheResult<()> {
     let path = root_dir().join("data/profiles/mod_state.json");
+    let security = security_profile::load_from_default_path();
     let mut root = read_json_object(&path);
 
     for game_module in &registry.games {
@@ -53,9 +54,10 @@ pub fn persist_default_mod_state(registry: &GameModuleRegistry) -> CacheResult<(
         root.entry(game_module.uid.clone()).or_insert_with(|| {
             json!({
                 "package": game_module.package.package,
-                "enabled": true,
+                "enabled": security.default_mod_game_enabled,
                 "debug": false,
-                "safe_mode": true
+                "safe_mode": security.default_safe_mode,
+                "safe_mode_permanent": !security.default_safe_mode
             })
         });
     }

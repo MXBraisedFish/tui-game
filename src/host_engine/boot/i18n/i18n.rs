@@ -9,8 +9,9 @@ use std::sync::RwLock;
 use once_cell::sync::OnceCell;
 
 use super::r#type::{
-    clear_cache, clear_data, default_security, game_list, global, home, key, language, loading,
-    memory, mod_hub, mod_list, mod_security, security, setting, setting_keybind, start, warning,
+    clear_cache, clear_data, default_security, error, game_list, global, home, key, language,
+    loading, memory, mod_hub, mod_list, mod_security, security, setting, setting_keybind, start,
+    warning,
 };
 
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
@@ -27,6 +28,7 @@ pub struct I18nText {
     pub clear_cache: clear_cache::ClearCacheText,
     pub clear_data: clear_data::ClearDataText,
     pub default_security: default_security::DefaultSecurityText,
+    pub error: error::ErrorText,
     pub game_list: game_list::GameListText,
     pub global: global::GlobalText,
     pub home: home::HomeText,
@@ -137,6 +139,7 @@ fn register_texts(language_source: &LanguageSource) -> I18nText {
         clear_cache: clear_cache::register(language_source),
         clear_data: clear_data::register(language_source),
         default_security: default_security::register(language_source),
+        error: error::register(language_source),
         game_list: game_list::register(language_source),
         global: global::register(language_source),
         home: home::register(language_source),

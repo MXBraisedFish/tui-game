@@ -4,8 +4,8 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::canvas_state::{CanvasCell, CanvasState};
 use super::drawing_parser::{
-    ALIGN_CENTER, ALIGN_LEFT, ALIGN_NO_WRAP, ALIGN_RIGHT, BorderRectArgs, DrawRichTextArgs,
-    DrawTextArgs, EraserArgs, FillRectArgs,
+    ALIGN_CENTER, ALIGN_LEFT, ALIGN_RIGHT, BorderRectArgs, DrawRichTextArgs, DrawTextArgs,
+    EraserArgs, FillRectArgs, WrapLimit, WrapOptions,
 };
 use super::rich_text_parser::{StyledCharacter, parse_rich_text};
 use crate::host_engine::boot::preload::lua_runtime::LuaRuntimeContext;
@@ -13,7 +13,8 @@ use crate::host_engine::boot::preload::lua_runtime::api::text_support::text_wrap
 
 /// 执行文本绘制。
 pub fn draw_text(canvas_state: &mut CanvasState, args: DrawTextArgs) {
-    let lines = text_lines(args.text.as_str(), args.align, args.wrap_width);
+    let wrap_options = drawing_wrap_options(canvas_state, args.x, args.y, &args.wrap_options);
+    let lines = text_lines(args.text.as_str(), args.align, &wrap_options);
     let first_line_width = lines
         .first()
         .map(|line| UnicodeWidthStr::width(line.as_str()) as i64)
@@ -24,7 +25,7 @@ pub fn draw_text(canvas_state: &mut CanvasState, args: DrawTextArgs) {
         let x = match args.align {
             ALIGN_CENTER => i64::from(args.x) + ((first_line_width - line_width) / 2),
             ALIGN_RIGHT => i64::from(args.x) + first_line_width - line_width,
-            ALIGN_LEFT | ALIGN_NO_WRAP => i64::from(args.x),
+            ALIGN_LEFT => i64::from(args.x),
             _ => i64::from(args.x),
         };
         let y = i64::from(args.y) + line_index as i64;
@@ -47,7 +48,8 @@ pub fn draw_rich_text(
     runtime_context: &LuaRuntimeContext,
 ) -> mlua::Result<()> {
     let characters = parse_rich_text(args.rich_text.as_str(), runtime_context)?;
-    let lines = rich_text_lines(&characters, args.align, args.wrap_width);
+    let wrap_options = drawing_wrap_options(canvas_state, args.x, args.y, &args.wrap_options);
+    let lines = rich_text_lines(&characters, args.align, &wrap_options, runtime_context)?;
     let first_line_width = lines
         .first()
         .map(|line| rich_line_width(line))
@@ -58,11 +60,19 @@ pub fn draw_rich_text(
         let x = match args.align {
             ALIGN_CENTER => i64::from(args.x) + ((first_line_width - line_width) / 2),
             ALIGN_RIGHT => i64::from(args.x) + first_line_width - line_width,
-            ALIGN_LEFT | ALIGN_NO_WRAP => i64::from(args.x),
+            ALIGN_LEFT => i64::from(args.x),
             _ => i64::from(args.x),
         };
         let y = i64::from(args.y) + line_index as i64;
-        draw_styled_line(canvas_state, x, y, line, args.fg.clone(), args.bg.clone());
+        draw_styled_line(
+            canvas_state,
+            x,
+            y,
+            line,
+            args.fg.clone(),
+            args.bg.clone(),
+            args.styles.clone(),
+        );
     }
 
     Ok(())
@@ -168,11 +178,11 @@ pub fn border_rect(canvas_state: &mut CanvasState, args: BorderRectArgs) {
     );
 }
 
-fn text_lines(text: &str, align: i64, wrap_width: Option<u16>) -> Vec<String> {
-    if wrap_width.is_none() && align == ALIGN_NO_WRAP {
+fn text_lines(text: &str, _align: i64, wrap_options: &WrapOptions) -> Vec<String> {
+    if wrap_options.wrap_width == WrapLimit::Disabled {
         text_wrapping::no_wrap_line(text)
     } else {
-        text_wrapping::wrap_text_lines(text, wrap_width)
+        text_wrapping::wrap_text_lines_with_options(text, wrap_options)
     }
 }
 
@@ -294,20 +304,28 @@ fn set_border_cell(
 
 fn rich_text_lines(
     characters: &[StyledCharacter],
-    align: i64,
-    wrap_width: Option<u16>,
-) -> Vec<Vec<StyledCharacter>> {
-    if wrap_width.is_none() && align == ALIGN_NO_WRAP {
-        return no_wrap_rich_lines(characters);
-    }
-    wrap_rich_lines(characters, wrap_width)
+    _align: i64,
+    wrap_options: &WrapOptions,
+    runtime_context: &LuaRuntimeContext,
+) -> mlua::Result<Vec<Vec<StyledCharacter>>> {
+    let mut lines = if wrap_options.wrap_width == WrapLimit::Disabled {
+        no_wrap_rich_lines(characters)
+    } else {
+        wrap_rich_lines(characters, wrap_options.wrap_width)
+    };
+    apply_rich_line_limit(&mut lines, wrap_options, runtime_context)?;
+    Ok(lines)
 }
 
 fn no_wrap_rich_lines(characters: &[StyledCharacter]) -> Vec<Vec<StyledCharacter>> {
     let mut lines = vec![Vec::new()];
     for character in characters {
         if character.character == '\n' {
-            lines.push(Vec::new());
+            let mut character = character.clone();
+            character.character = ' ';
+            if let Some(line) = lines.last_mut() {
+                line.push(character);
+            }
         } else if let Some(line) = lines.last_mut() {
             line.push(character.clone());
         }
@@ -317,9 +335,9 @@ fn no_wrap_rich_lines(characters: &[StyledCharacter]) -> Vec<Vec<StyledCharacter
 
 fn wrap_rich_lines(
     characters: &[StyledCharacter],
-    wrap_width: Option<u16>,
+    wrap_width: WrapLimit,
 ) -> Vec<Vec<StyledCharacter>> {
-    let Some(wrap_width) = wrap_width.filter(|wrap_width| *wrap_width > 0) else {
+    let WrapLimit::Fixed(wrap_width) = wrap_width else {
         return no_wrap_rich_lines(characters);
     };
 
@@ -362,6 +380,7 @@ fn draw_styled_line(
     line: &[StyledCharacter],
     default_fg: Option<String>,
     default_bg: Option<String>,
+    default_styles: Vec<i64>,
 ) {
     if y < 0 {
         return;
@@ -389,7 +408,11 @@ fn draw_styled_line(
                 text: character.character.to_string(),
                 fg: character.fg.clone().or_else(|| default_fg.clone()),
                 bg: character.bg.clone().or_else(|| default_bg.clone()),
-                styles: character.styles.clone(),
+                styles: if character.style_explicit {
+                    character.styles.clone()
+                } else {
+                    default_styles.clone()
+                },
                 is_continuation: false,
             },
         );
@@ -403,7 +426,11 @@ fn draw_styled_line(
                         text: String::new(),
                         fg: character.fg.clone().or_else(|| default_fg.clone()),
                         bg: character.bg.clone().or_else(|| default_bg.clone()),
-                        styles: character.styles.clone(),
+                        styles: if character.style_explicit {
+                            character.styles.clone()
+                        } else {
+                            default_styles.clone()
+                        },
                         is_continuation: true,
                     },
                 );
@@ -412,4 +439,83 @@ fn draw_styled_line(
 
         x += character_width as i64;
     }
+}
+
+fn apply_rich_line_limit(
+    lines: &mut Vec<Vec<StyledCharacter>>,
+    wrap_options: &WrapOptions,
+    runtime_context: &LuaRuntimeContext,
+) -> mlua::Result<()> {
+    let WrapLimit::Fixed(wrap_height) = wrap_options.wrap_height else {
+        return Ok(());
+    };
+    let wrap_height = usize::from(wrap_height).max(1);
+    if lines.len() <= wrap_height {
+        return Ok(());
+    }
+
+    lines.truncate(wrap_height);
+    let Some(text_overflow) = wrap_options.text_overflow.as_deref() else {
+        return Ok(());
+    };
+    if text_overflow.is_empty() {
+        return Ok(());
+    }
+    if let Some(last_line) = lines.last_mut() {
+        let overflow_characters = parse_rich_text(text_overflow, runtime_context)?;
+        replace_rich_tail_by_char_count(last_line, overflow_characters);
+    }
+    Ok(())
+}
+
+fn drawing_wrap_options(
+    canvas_state: &CanvasState,
+    x: u16,
+    y: u16,
+    wrap_options: &WrapOptions,
+) -> WrapOptions {
+    let window_width = canvas_state.width().saturating_sub(x);
+    let window_height = canvas_state.height().saturating_sub(y);
+    wrap_options.resolved(window_width, window_height)
+}
+
+fn replace_rich_tail_by_char_count(
+    line: &mut Vec<StyledCharacter>,
+    overflow_characters: Vec<StyledCharacter>,
+) {
+    let overflow_count = overflow_characters.len();
+    if overflow_count == 0 {
+        return;
+    }
+    let keep_count = line.len().saturating_sub(overflow_count);
+    let style_template = line
+        .get(keep_count.saturating_sub(1))
+        .or_else(|| line.first())
+        .cloned();
+    line.truncate(keep_count);
+    line.extend(
+        overflow_characters
+            .into_iter()
+            .map(|character| inherit_overflow_style(character, style_template.as_ref())),
+    );
+}
+
+fn inherit_overflow_style(
+    mut character: StyledCharacter,
+    style_template: Option<&StyledCharacter>,
+) -> StyledCharacter {
+    let Some(style_template) = style_template else {
+        return character;
+    };
+    if character.fg.is_none() {
+        character.fg = style_template.fg.clone();
+    }
+    if character.bg.is_none() {
+        character.bg = style_template.bg.clone();
+    }
+    if !character.style_explicit {
+        character.styles = style_template.styles.clone();
+        character.style_explicit = style_template.style_explicit;
+    }
+    character
 }
