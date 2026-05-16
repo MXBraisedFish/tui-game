@@ -8,6 +8,7 @@
     "setting_language": "setting/setting_language.lua",
     "setting_memory": "setting/setting_memory.lua",
     "setting_keybind": "setting/setting_keybind.lua",
+    "setting_display": "setting/setting_display.lua",
     "warning_security": "warning/warning_security.lua",
     "warning_mod": "warning/warning_mod.lua",
     "warning_clear_cache": "warning/warning_clear_cache.lua",
@@ -21,9 +22,7 @@
     "setting_saver": "setting/setting_saver.lua",
     "mod_game_list": "game/list.lua",
     "mod_boss_list": "boss/list.lua",
-    "mod_saver_list": "saver/list.lua",
-    "mod_boss_display": "boss/display.lua",
-    "mod_saver_display": "saver/display.lua"
+    "mod_saver_list": "saver/list.lua"
   },
   "actions": {
     "home": {

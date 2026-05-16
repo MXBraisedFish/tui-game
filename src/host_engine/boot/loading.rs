@@ -215,7 +215,7 @@ fn stage_text(stage: LoadingStage) -> String {
     let loading_text = i18n::text().loading;
     match stage {
         LoadingStage::InitEnv => loading_text.init_env,
-        LoadingStage::ScanGame => loading_text.scan_game,
+        LoadingStage::ScanGame => loading_text.scan_mod,
         LoadingStage::ScanUi => loading_text.scan_ui,
         LoadingStage::ReadData => loading_text.read_data,
         LoadingStage::PreCache => loading_text.pre_cache,

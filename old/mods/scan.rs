@@ -171,7 +171,7 @@ fn scan_package(
             .unwrap_or("game")
             .to_string();
         script_mtimes.insert(script_name.clone(), mtime_secs(&script_path));
-        match scan_game_manifest(&namespace, dir, &package.package, game_manifest) {
+        match scan_mod_manifest(&namespace, dir, &package.package, game_manifest) {
             Ok(game) => {
                 state_entry
                     .games
@@ -236,7 +236,7 @@ fn scan_package(
 }
 
 // 解析单个游戏清单：验证入口脚本存在、解析名称/描述/详情/介绍/最佳成绩文本
-fn scan_game_manifest(
+fn scan_mod_manifest(
     namespace: &str,
     package_dir: &Path,
     package_manifest: &crate::game::manifest::PackageManifest,

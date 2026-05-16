@@ -45,7 +45,7 @@ pub fn reload_with_progress(mut on_progress: impl FnMut(LoadingProgress)) {
 
     on_progress(LoadingProgress {
         percent: 12,
-        message: i18n::t_or("loading.startup.scan_games", "Scanning games..."),
+        message: i18n::t_or("loading.startup.scan_mods", "Scanning games..."),
     });
     let mut games = match GameRegistry::scan_all() {
         Ok(registry) => registry.into_games(),
@@ -56,7 +56,7 @@ pub fn reload_with_progress(mut on_progress: impl FnMut(LoadingProgress)) {
     };
     on_progress(LoadingProgress {
         percent: 32,
-        message: i18n::t_or("loading.startup.scan_games_done", "Game scan complete"),
+        message: i18n::t_or("loading.startup.scan_mods_done", "Game scan complete"),
     });
 
     on_progress(LoadingProgress {

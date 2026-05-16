@@ -170,6 +170,11 @@ fn apply_single_command(
     active_style: &mut ActiveStyle,
     output: &mut Vec<StyledCharacter>,
 ) {
+    if command.trim() == "reset" {
+        *active_style = ActiveStyle::default();
+        return;
+    }
+
     let Some((command_name, parameter_text)) = command.split_once(':') else {
         emit_unknown_command(output);
         return;

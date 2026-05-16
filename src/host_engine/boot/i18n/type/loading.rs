@@ -4,7 +4,7 @@ use crate::host_engine::boot::i18n::i18n::{LanguageSource, resolve_text};
 use crate::host_engine::boot::i18n::pseudo_text::MutableText;
 
 pub static INIT_ENV: MutableText = MutableText::new();
-pub static SCAN_GAME: MutableText = MutableText::new();
+pub static SCAN_MOD: MutableText = MutableText::new();
 pub static SCAN_UI: MutableText = MutableText::new();
 pub static READ_DATA: MutableText = MutableText::new();
 pub static PRE_CACHE: MutableText = MutableText::new();
@@ -15,7 +15,7 @@ pub static COMPLETE: MutableText = MutableText::new();
 #[derive(Clone, Debug)]
 pub struct LoadingText {
     pub init_env: String,
-    pub scan_game: String,
+    pub scan_mod: String,
     pub scan_ui: String,
     pub read_data: String,
     pub pre_cache: String,
@@ -26,7 +26,7 @@ pub struct LoadingText {
 /// 注册 loading.* 文本
 pub fn register(language_source: &LanguageSource) -> LoadingText {
     set_text(&INIT_ENV, language_source, "loading.init_env");
-    set_text(&SCAN_GAME, language_source, "loading.scan_game");
+    set_text(&SCAN_MOD, language_source, "loading.scan_mod");
     set_text(&SCAN_UI, language_source, "loading.scan_ui");
     set_text(&READ_DATA, language_source, "loading.read_data");
     set_text(&PRE_CACHE, language_source, "loading.pre_cache");
@@ -35,7 +35,7 @@ pub fn register(language_source: &LanguageSource) -> LoadingText {
 
     LoadingText {
         init_env: text(&INIT_ENV),
-        scan_game: text(&SCAN_GAME),
+        scan_mod: text(&SCAN_MOD),
         scan_ui: text(&SCAN_UI),
         read_data: text(&READ_DATA),
         pre_cache: text(&PRE_CACHE),

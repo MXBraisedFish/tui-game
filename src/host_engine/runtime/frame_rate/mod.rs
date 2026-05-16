@@ -3,7 +3,7 @@
 use std::time::{Duration, Instant};
 
 const ROOT_UI_NORMAL_FPS: u64 = 60;
-const LOW_RESOURCE_FPS: u64 = 10;
+const LOW_RESOURCE_FPS: u64 = 24;
 const ROOT_UI_IDLE_TIMEOUT_SECS: u64 = 60;
 const OVERLAY_FPS: u64 = 24;
 
