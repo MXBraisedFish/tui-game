@@ -90,7 +90,7 @@ fn validate_persistent_data(
     validate_json_object(&persistent_data.saves, "saves")?;
     validate_json_object(&persistent_data.best_scores, "best_scores")?;
     validate_json_object(&persistent_data.keybinds, "keybinds")?;
-    validate_json_object(&persistent_data.mod_state, "mod_state")?;
+    validate_json_object(&persistent_data.game_state, "game_state")?;
 
     Ok(())
 }

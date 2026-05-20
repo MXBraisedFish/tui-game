@@ -1,7 +1,9 @@
 //! 游戏模块扫描缓存与持久化默认数据
+// TODO: 迁移至 storage::CacheStore
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::{Map, Value, json};
 
@@ -14,7 +16,7 @@ type CacheResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 /// 将默认按键信息写入持久化按键偏好。已有用户数据不会被覆盖。
 pub fn persist_default_keybinds(registry: &GameModuleRegistry) -> CacheResult<()> {
-    let path = root_dir().join("data/profiles/keybind.json");
+    let path = data_dirs::root_dir().join("data/profiles/keybind.json");
     let mut root = keybind_profile::read_keybind_profile(&path);
     let game_section = root
         .as_object_mut()
@@ -40,9 +42,9 @@ pub fn persist_default_keybinds(registry: &GameModuleRegistry) -> CacheResult<()
     keybind_profile::write_keybind_profile(&path, &root)
 }
 
-/// 将第三方模块默认状态写入 mod_state。已有用户状态不会被覆盖。
-pub fn persist_default_mod_state(registry: &GameModuleRegistry) -> CacheResult<()> {
-    let path = root_dir().join("data/profiles/mod_state.json");
+/// 将第三方模块默认状态写入 game_state。已有用户状态不会被覆盖。
+pub fn persist_default_game_state(registry: &GameModuleRegistry) -> CacheResult<()> {
+    let path = data_dirs::root_dir().join("data/profiles/game_state.json");
     let security = security_profile::load_from_default_path();
     let mut root = read_json_object(&path);
 
@@ -79,16 +81,4 @@ fn write_json_pretty<T: serde::Serialize>(path: &Path, value: &T) -> CacheResult
     }
     fs::write(path, serde_json::to_string_pretty(value)?)?;
     Ok(())
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(PathBuf::from))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

@@ -1,4 +1,5 @@
 //! 游戏包图片预渲染缓存
+// TODO: 迁移至 storage::CacheStore
 
 mod hash;
 mod raster;

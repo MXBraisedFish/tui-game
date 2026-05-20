@@ -1,5 +1,6 @@
 //! UI Memory 状态聚合
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -137,7 +138,7 @@ pub struct MemoryRootState {
 impl MemoryRootState {
     /// 创建新的 Memory root state。
     pub fn new(select: i64) -> Self {
-        let directories = MemoryDirectories::from_root(root_dir());
+        let directories = MemoryDirectories::from_root(data_dirs::root_dir());
         let sizes = MemorySizes::from_directories(&directories);
         Self {
             language: memory_language_pairs(),
@@ -337,16 +338,4 @@ fn directory_size(path: &Path) -> u64 {
         .filter_map(Result::ok)
         .map(|entry| directory_size(&entry.path()))
         .sum()
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

@@ -43,6 +43,7 @@
   "key.setting.option3": "选项-模组设置",
   "key.setting.option4": "选项-内存管理",
   "key.setting.option5": "选项-安全设置",
+  "key.setting.option6": "选项-显示设置",
   "key.setting.back": "返回",
   "setting.title": "设置",
   "setting.language": "语言设置",
@@ -90,7 +91,7 @@
   "memory.info.name.profiles": "配置目录",
   "memory.info.name.log": "日志目录",
   "memory.info.name.mod": "模组目录",
-  "memory.tip": "大小按照 1024 进制换算",
+  "memory.tip": "数据大小按照 1024 进制换算",
 
   "key.storage_details.back": "返回",
   "key.clear_data.confirm": "确认",
@@ -210,7 +211,6 @@
   "key.mod_security.close.temporary": "关闭（仅本次运行）",
   "key.mod_security.close.permanent": "关闭（永久）",
   "key.mod_security.cancel": "取消",
-
   "mod_security.title": "关闭安全模式警告",
   "mod_security.warn": "安全模式旨在保护您的电脑以及信息安全。\n若关闭宿主将无法拦截脚本执行高危操作，例如直写操作等。\n请确保您完全信任该模组包的作者。\n是否确认关闭？",
   "mod_security.mod": "模组包：",
@@ -320,6 +320,7 @@
   "setting_keybind.system.page.setting_language": "语言设置",
   "setting_keybind.system.page.setting_mods": "模组设置",
   "setting_keybind.system.page.setting_security": "安全设置",
+  "setting_keybind.system.page.setting_display": "显示设置",
   "setting_keybind.system.page.keybind_system": "系统按键",
   "setting_keybind.system.page.keybind_global": "全局按键",
   "setting_keybind.system.page.keybind_game": "游戏按键",
@@ -421,9 +422,8 @@
   "key.display.scroll": "滚动",
   "key.display.select": "选择",
   "key.display.back": "返回",
-  "key.display.switch_toggle_confirm": "切换/开关/确认",
+  "key.display.toggle_confirm": "开关/确认",
   "key.display.toggle": "开关",
-  "key.display.switch": "切换",
   "key.display.confirm": "确认",
   "key.display.order": "排序",
   "key.display.position": "切换位置",
@@ -460,5 +460,6 @@
   "display.option.saver.list": "屏保界面列表",
   "display.option.boss.list": "老板界面列表",
   "display.option.list.on": "启用",
-  "display.option.list.off": "禁用"
+  "display.option.list.off": "关闭",
+  "display.option.list.mod": "模组"
 }

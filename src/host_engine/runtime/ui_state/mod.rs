@@ -1,6 +1,7 @@
 //! UI 包宿主状态处理
 
 pub mod action_map;
+pub mod display_state;
 pub mod game_list_state;
 pub mod home_state;
 pub mod keybind_state;

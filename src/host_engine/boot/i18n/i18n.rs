@@ -1,17 +1,18 @@
 //! 宿主界面语言加载模块
 //! 只负责读取语言文件、处理 fallback、调用分类模块注册文本
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::RwLock;
 
 use once_cell::sync::OnceCell;
 
 use super::r#type::{
-    clear_cache, clear_data, default_security, error, game_list, global, home, key, language,
-    loading, memory, mod_hub, mod_list, mod_security, security, setting, setting_keybind, start,
-    warning,
+    clear_cache, clear_data, default_security, display, error, game_list, global, home, key,
+    language, loading, memory, mod_hub, mod_list, mod_security, security, setting,
+    setting_keybind, start, warning,
 };
 
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
@@ -28,6 +29,7 @@ pub struct I18nText {
     pub clear_cache: clear_cache::ClearCacheText,
     pub clear_data: clear_data::ClearDataText,
     pub default_security: default_security::DefaultSecurityText,
+    pub display: display::DisplayText,
     pub error: error::ErrorText,
     pub game_list: game_list::GameListText,
     pub global: global::GlobalText,
@@ -107,7 +109,7 @@ pub fn resolve_text(language_source: &LanguageSource, key: &str) -> String {
 
 /// 加载语言源数据
 fn load_language_source() -> LanguageSource {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
     let preferred_code =
         read_language_preference(&root_dir).unwrap_or_else(|| DEFAULT_LANGUAGE_CODE.to_string());
     let language_code = fallback_language_code_if_missing(&root_dir, &preferred_code);
@@ -115,7 +117,7 @@ fn load_language_source() -> LanguageSource {
 }
 
 fn load_language_source_for_code(language_code: &str) -> LanguageSource {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
     load_language_source_from_root(&root_dir, language_code)
 }
 
@@ -139,6 +141,7 @@ fn register_texts(language_source: &LanguageSource) -> I18nText {
         clear_cache: clear_cache::register(language_source),
         clear_data: clear_data::register(language_source),
         default_security: default_security::register(language_source),
+        display: display::register(language_source),
         error: error::register(language_source),
         game_list: game_list::register(language_source),
         global: global::register(language_source),
@@ -230,15 +233,3 @@ fn repair_language_files() {
     // Placeholder: official file repair will be implemented later.
 }
 
-/// 获取宿主根目录。开发环境优先使用当前目录，打包环境退回可执行文件目录。
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
-}

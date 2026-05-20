@@ -68,7 +68,7 @@ local function draw_game_list(layout, root_state)
     end
 
     local name = tostring(game.name or game.game_name or "")
-    local mark = tostring(game.source or "") == "mod" and (" " .. label_mod) or ""
+    local mark = ((root_state.show_mod_badge ~= false) and tostring(game.source or "") == "mod") and (" " .. label_mod) or ""
     local max_name_width = inner_width - L.text_width(mark) - 1
     if max_name_width < 1 then
       max_name_width = inner_width

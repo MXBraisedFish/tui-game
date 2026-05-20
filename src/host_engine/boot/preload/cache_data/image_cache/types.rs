@@ -1,4 +1,5 @@
 //! 游戏包图片缓存类型
+// TODO: 迁移至 storage::CacheStore
 
 use std::path::PathBuf;
 

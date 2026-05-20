@@ -28,6 +28,7 @@ pub static SYSTEM_PAGE_SETTING_MEMORY: MutableText = MutableText::new();
 pub static SYSTEM_PAGE_SETTING_LANGUAGE: MutableText = MutableText::new();
 pub static SYSTEM_PAGE_SETTING_MODS: MutableText = MutableText::new();
 pub static SYSTEM_PAGE_SETTING_SECURITY: MutableText = MutableText::new();
+pub static SYSTEM_PAGE_SETTING_DISPLAY: MutableText = MutableText::new();
 pub static SYSTEM_PAGE_KEYBIND_SYSTEM: MutableText = MutableText::new();
 pub static SYSTEM_PAGE_KEYBIND_GLOBAL: MutableText = MutableText::new();
 pub static SYSTEM_PAGE_KEYBIND_GAME: MutableText = MutableText::new();
@@ -60,6 +61,7 @@ pub struct SettingKeybindText {
     pub system_page_setting_language: String,
     pub system_page_setting_mods: String,
     pub system_page_setting_security: String,
+    pub system_page_setting_display: String,
     pub system_page_keybind_system: String,
     pub system_page_keybind_global: String,
     pub system_page_keybind_game: String,
@@ -181,6 +183,11 @@ pub fn register(language_source: &LanguageSource) -> SettingKeybindText {
         "setting_keybind.system.page.setting_security",
     );
     set_text(
+        &SYSTEM_PAGE_SETTING_DISPLAY,
+        language_source,
+        "setting_keybind.system.page.setting_display",
+    );
+    set_text(
         &SYSTEM_PAGE_KEYBIND_SYSTEM,
         language_source,
         "setting_keybind.system.page.keybind_system",
@@ -222,6 +229,7 @@ pub fn register(language_source: &LanguageSource) -> SettingKeybindText {
         system_page_setting_language: text(&SYSTEM_PAGE_SETTING_LANGUAGE),
         system_page_setting_mods: text(&SYSTEM_PAGE_SETTING_MODS),
         system_page_setting_security: text(&SYSTEM_PAGE_SETTING_SECURITY),
+        system_page_setting_display: text(&SYSTEM_PAGE_SETTING_DISPLAY),
         system_page_keybind_system: text(&SYSTEM_PAGE_KEYBIND_SYSTEM),
         system_page_keybind_global: text(&SYSTEM_PAGE_KEYBIND_GLOBAL),
         system_page_keybind_game: text(&SYSTEM_PAGE_KEYBIND_GAME),

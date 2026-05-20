@@ -1,8 +1,9 @@
 //! CLI 功能函数模块 - 清空缓存
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::host_engine::boot::cli::language;
 
@@ -12,7 +13,7 @@ type CommandResult<T> = Result<T, Box<dyn std::error::Error>>;
 /// 执行清空缓存命令
 /// 清空 data/cache 和 data/log 目录
 pub fn execute() -> CommandResult<()> {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
     let cache_dir = root_dir.join("data").join("cache");
     let log_dir = root_dir.join("data").join("log");
 
@@ -67,11 +68,3 @@ fn clear_dir(path: &Path) -> CommandResult<()> {
     Ok(())
 }
 
-/// 获取程序运行根目录（可执行文件所在目录或当前目录）
-fn root_dir() -> PathBuf {
-    std::env::current_exe()
-        .ok()
-        .and_then(|path| path.parent().map(Path::to_path_buf))
-        .or_else(|| std::env::current_dir().ok())
-        .unwrap_or_else(|| PathBuf::from("."))
-}

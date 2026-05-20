@@ -1,4 +1,5 @@
 //! package.json 图片字段解析
+// TODO: 迁移至 storage::CacheStore
 
 use std::io;
 use std::path::{Component, Path, PathBuf};

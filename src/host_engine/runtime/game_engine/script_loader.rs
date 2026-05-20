@@ -36,7 +36,7 @@ pub fn load_new_game(
         language_code: current_context.language_code,
         keybinds: current_context.keybinds,
         best_scores: current_context.best_scores,
-        mod_state: current_context.mod_state,
+        game_state: current_context.game_state,
         saver_state: current_context.saver_state,
         boss_state: current_context.boss_state,
         launch_mode: LaunchMode::New,

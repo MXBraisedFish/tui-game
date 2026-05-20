@@ -1,5 +1,6 @@
 //! Saver/老板覆盖层包扫描。
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::io::Write;
@@ -81,7 +82,7 @@ fn append_scan_error_log(
         "[{timestamp}][{namespace}] [异常] {} package scan failed: {error_text}\n",
         kind.as_str()
     );
-    let log_path = root_dir().join("data/log/tui_log.txt");
+    let log_path = data_dirs::root_dir().join("data/log/tui_log.txt");
     if let Some(parent_dir) = log_path.parent() {
         fs::create_dir_all(parent_dir)?;
     }
@@ -433,16 +434,4 @@ fn json_type_name(value: &Value) -> &'static str {
         Value::Array(_) => "array",
         Value::Object(_) => "object",
     }
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

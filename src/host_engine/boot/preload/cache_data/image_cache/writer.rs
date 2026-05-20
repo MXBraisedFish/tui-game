@@ -1,4 +1,5 @@
 //! 图片缓存读写
+// TODO: 迁移至 storage::CacheStore
 
 use std::fs;
 use std::path::{Path, PathBuf};

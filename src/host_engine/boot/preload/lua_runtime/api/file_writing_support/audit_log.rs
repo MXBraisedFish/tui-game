@@ -1,8 +1,9 @@
 //! 高风险写入审计日志
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::Local;
 
@@ -44,7 +45,7 @@ pub fn append_write_request(
         status.as_zh_text()
     );
 
-    let log_path = root_dir().join("data/log/tui_log.txt");
+    let log_path = data_dirs::root_dir().join("data/log/tui_log.txt");
     if let Some(parent_dir) = log_path.parent() {
         fs::create_dir_all(parent_dir).map_err(mlua::Error::external)?;
     }
@@ -55,16 +56,4 @@ pub fn append_write_request(
         .map_err(mlua::Error::external)?;
     file.write_all(log_line.as_bytes())
         .map_err(mlua::Error::external)
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

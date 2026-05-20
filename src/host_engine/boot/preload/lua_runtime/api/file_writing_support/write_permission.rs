@@ -19,13 +19,13 @@ pub fn can_write_assets(host_bridge: &HostLuaBridge) -> bool {
     match game_module.source {
         GameModuleSource::Office => true,
         GameModuleSource::Mod => {
-            is_mod_fully_trusted(&runtime_context.mod_state, game_module.uid.as_str())
+            is_mod_fully_trusted(&runtime_context.game_state, game_module.uid.as_str())
         }
     }
 }
 
-fn is_mod_fully_trusted(mod_state: &Value, game_uid: &str) -> bool {
-    mod_state
+fn is_mod_fully_trusted(game_state: &Value, game_uid: &str) -> bool {
+    game_state
         .get(game_uid)
         .and_then(|state| state.get("safe_mode"))
         .and_then(Value::as_bool)

@@ -138,6 +138,10 @@
         "key": "5",
         "name": "SETTING_OPTION5"
       },
+      "option6": {
+        "key": "6",
+        "name": "SETTING_OPTION6"
+      },
       "return": {
         "key": [
           "esc",
@@ -636,6 +640,79 @@
       "list": {
         "key": "l",
         "name": "MOD_LIST_LIST"
+      }
+    },
+    "setting_display": {
+      "prev_option": {
+        "key": "up",
+        "name": "DISPLAY_PREV_OPTION"
+      },
+      "next_option": {
+        "key": "down",
+        "name": "DISPLAY_NEXT_OPTION"
+      },
+      "scroll_up": {
+        "key": "w",
+        "name": "DISPLAY_SCROLL_UP"
+      },
+      "scroll_down": {
+        "key": "s",
+        "name": "DISPLAY_SCROLL_DOWN"
+      },
+      "confirm": {
+        "key": "enter",
+        "name": "DISPLAY_TOGGLE_CONFIRM"
+      },
+      "return": {
+        "key": [
+          "esc",
+          "q"
+        ],
+        "name": "DISPLAY_BACK"
+      },
+      "order": {
+        "key": "z",
+        "name": "DISPLAY_ORDER"
+      },
+      "position": {
+        "key": "j",
+        "name": "DISPLAY_POSITION"
+      },
+      "option1": {
+        "key": "1",
+        "name": "DISPLAY_OPTION1"
+      },
+      "option2": {
+        "key": "2",
+        "name": "DISPLAY_OPTION2"
+      },
+      "option3": {
+        "key": "3",
+        "name": "DISPLAY_OPTION3"
+      },
+      "option4": {
+        "key": "4",
+        "name": "DISPLAY_OPTION4"
+      },
+      "option5": {
+        "key": "5",
+        "name": "DISPLAY_OPTION5"
+      },
+      "option6": {
+        "key": "6",
+        "name": "DISPLAY_OPTION6"
+      },
+      "option7": {
+        "key": "7",
+        "name": "DISPLAY_OPTION7"
+      },
+      "option8": {
+        "key": "8",
+        "name": "DISPLAY_OPTION8"
+      },
+      "option9": {
+        "key": "9",
+        "name": "DISPLAY_OPTION9"
       }
     }
   }

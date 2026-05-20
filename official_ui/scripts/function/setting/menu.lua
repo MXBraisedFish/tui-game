@@ -25,12 +25,16 @@ local function menu_texts(root_state)
       key = C.DEFAULT_TEXT.option5,
       label = L.language(root_state, "SETTING_SECURITY", C.DEFAULT_TEXT.security),
     },
+    {
+      key = C.DEFAULT_TEXT.option6,
+      label = L.language(root_state, "SETTING_DISPLAY", C.DEFAULT_TEXT.display),
+    },
   }
 end
 
 local function selected_index(root_state)
   if type(root_state) == "table" and type(root_state.select) == "number" then
-    return math.max(1, math.min(5, math.floor(root_state.select)))
+    return math.max(1, math.min(6, math.floor(root_state.select)))
   end
   return 1
 end

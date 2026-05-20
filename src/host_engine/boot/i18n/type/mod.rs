@@ -1,6 +1,7 @@
 pub mod clear_cache;
 pub mod clear_data;
 pub mod default_security;
+pub mod display;
 pub mod error;
 pub mod game_list;
 pub mod global;

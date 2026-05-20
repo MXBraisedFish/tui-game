@@ -1,5 +1,7 @@
 //! 安全默认设置持久化。
+// TODO: 迁移至 storage::ProfileStore，完成后删除此文件
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -78,17 +80,5 @@ fn write_profile(path: &Path, profile: &SecurityProfile) -> std::io::Result<()> 
 }
 
 fn profile_path() -> PathBuf {
-    root_dir().join("data/profiles/security_state.json")
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
+    data_dirs::root_dir().join("data/profiles/security_state.json")
 }

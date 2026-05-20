@@ -1,9 +1,10 @@
 //! CLI 命令行的国际化语言模块
 //! 负责加载命令行的多语言文本，提供文本获取和格式化功能
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use once_cell::sync::OnceCell;
 
@@ -207,7 +208,7 @@ pub fn format_text(cell: &'static OnceCell<String>, replacements: &[(&str, &str)
 
 /// 加载命令行语言数据
 fn load_command_language() -> CommandLanguage {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
     // 从配置文件读取用户首选语言
     let preferred_code =
         load_language_preference(&root_dir).unwrap_or_else(|| DEFAULT_LANGUAGE_CODE.to_string());
@@ -248,18 +249,6 @@ fn load_language_file(root_dir: &Path, language_code: &str) -> Option<HashMap<St
 }
 
 /// 获取程序根目录（可执行文件所在目录或当前目录）
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
-}
-
 /// 设置静态文本的值
 fn set_text(cell: &'static OnceCell<String>, command_language: &CommandLanguage, key: &str) {
     let _ = cell.set(

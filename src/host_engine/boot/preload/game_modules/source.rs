@@ -1,5 +1,6 @@
 //! 游戏模块来源定义
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::path::PathBuf;
 
 /// 游戏模块来源
@@ -13,8 +14,8 @@ impl GameModuleSource {
     /// 来源扫描目录
     pub fn root_dir(self) -> PathBuf {
         match self {
-            Self::Office => root_dir().join("scripts/game"),
-            Self::Mod => root_dir().join("data/mod/game"),
+            Self::Office => data_dirs::root_dir().join("scripts/game"),
+            Self::Mod => data_dirs::root_dir().join("data/mod/game"),
         }
     }
 
@@ -35,15 +36,3 @@ impl GameModuleSource {
     }
 }
 
-/// 获取宿主根目录。开发环境优先使用当前目录，打包环境退回可执行文件目录。
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(PathBuf::from))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
-}

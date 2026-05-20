@@ -1,11 +1,13 @@
 //! 持久化数据读取与校验
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
+use super::display_profile;
 use super::keybind_profile;
 use super::profile_data::PersistentData;
 
@@ -15,7 +17,7 @@ const LANGUAGE_DIR: &str = "assets/lang";
 
 /// 读取 data/profiles 下的持久化数据。
 pub fn load_persistent_data() -> LoaderResult<PersistentData> {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
     let profiles_dir = root_dir.join("data/profiles");
 
     Ok(PersistentData {
@@ -23,10 +25,11 @@ pub fn load_persistent_data() -> LoaderResult<PersistentData> {
         best_scores: read_json_object(&profiles_dir.join("best_scores.json"))?,
         language_code: read_language_code(&root_dir, &profiles_dir.join("language.txt"))?,
         keybinds: keybind_profile::load_keybind_profile(&profiles_dir.join("keybind.json"))?,
-        mod_state: read_json_object(&profiles_dir.join("mod_state.json"))?,
+        game_state: read_json_object(&profiles_dir.join("game_state.json"))?,
         saver_state: read_json_object(&profiles_dir.join("saver_state"))?,
         boss_state: read_json_object(&profiles_dir.join("boss_state"))?,
         security_state: read_json_object(&profiles_dir.join("security_state.json"))?,
+        display_state: display_profile::load_display_profile(&profiles_dir.join("display_state.json"))?,
     })
 }
 
@@ -89,16 +92,4 @@ fn write_default_language_code(path: &Path) -> LoaderResult<()> {
     }
     fs::write(path, DEFAULT_LANGUAGE_CODE)?;
     Ok(())
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

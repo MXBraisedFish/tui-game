@@ -21,6 +21,7 @@ pub static SETTING_OPTION2: MutableText = MutableText::new();
 pub static SETTING_OPTION3: MutableText = MutableText::new();
 pub static SETTING_OPTION4: MutableText = MutableText::new();
 pub static SETTING_OPTION5: MutableText = MutableText::new();
+pub static SETTING_OPTION6: MutableText = MutableText::new();
 pub static SETTING_BACK: MutableText = MutableText::new();
 pub static GAME_LIST_PREV_OPTION: MutableText = MutableText::new();
 pub static GAME_LIST_NEXT_OPTION: MutableText = MutableText::new();
@@ -152,6 +153,27 @@ pub static SETTING_KEYBIND_SYSTEM_KEY_MODE: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_RESET_ONLY: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_RESET_GAME: MutableText = MutableText::new();
 pub static SETTING_KEYBIND_SYSTEM_RESET_PAGE: MutableText = MutableText::new();
+pub static DISPLAY_PREV_OPTION: MutableText = MutableText::new();
+pub static DISPLAY_NEXT_OPTION: MutableText = MutableText::new();
+pub static DISPLAY_SCROLL_UP: MutableText = MutableText::new();
+pub static DISPLAY_SCROLL_DOWN: MutableText = MutableText::new();
+pub static DISPLAY_SCROLL: MutableText = MutableText::new();
+pub static DISPLAY_SELECT: MutableText = MutableText::new();
+pub static DISPLAY_BACK: MutableText = MutableText::new();
+pub static DISPLAY_TOGGLE_CONFIRM: MutableText = MutableText::new();
+pub static DISPLAY_TOGGLE: MutableText = MutableText::new();
+pub static DISPLAY_CONFIRM: MutableText = MutableText::new();
+pub static DISPLAY_ORDER: MutableText = MutableText::new();
+pub static DISPLAY_POSITION: MutableText = MutableText::new();
+pub static DISPLAY_OPTION1: MutableText = MutableText::new();
+pub static DISPLAY_OPTION2: MutableText = MutableText::new();
+pub static DISPLAY_OPTION3: MutableText = MutableText::new();
+pub static DISPLAY_OPTION4: MutableText = MutableText::new();
+pub static DISPLAY_OPTION5: MutableText = MutableText::new();
+pub static DISPLAY_OPTION6: MutableText = MutableText::new();
+pub static DISPLAY_OPTION7: MutableText = MutableText::new();
+pub static DISPLAY_OPTION8: MutableText = MutableText::new();
+pub static DISPLAY_OPTION9: MutableText = MutableText::new();
 pub static STORAGE_DETAILS_BACK: MutableText = MutableText::new();
 pub static CLEAR_DATA_CONFIRM: MutableText = MutableText::new();
 pub static CLEAR_DATA_CANCEL: MutableText = MutableText::new();
@@ -180,6 +202,7 @@ pub struct KeyText {
     pub setting_option3: String,
     pub setting_option4: String,
     pub setting_option5: String,
+    pub setting_option6: String,
     pub setting_back: String,
     pub game_list_prev_option: String,
     pub game_list_next_option: String,
@@ -311,6 +334,27 @@ pub struct KeyText {
     pub setting_keybind_system_reset_only: String,
     pub setting_keybind_system_reset_game: String,
     pub setting_keybind_system_reset_page: String,
+    pub display_prev_option: String,
+    pub display_next_option: String,
+    pub display_scroll_up: String,
+    pub display_scroll_down: String,
+    pub display_scroll: String,
+    pub display_select: String,
+    pub display_back: String,
+    pub display_toggle_confirm: String,
+    pub display_toggle: String,
+    pub display_confirm: String,
+    pub display_order: String,
+    pub display_position: String,
+    pub display_option1: String,
+    pub display_option2: String,
+    pub display_option3: String,
+    pub display_option4: String,
+    pub display_option5: String,
+    pub display_option6: String,
+    pub display_option7: String,
+    pub display_option8: String,
+    pub display_option9: String,
     pub storage_details_back: String,
     pub clear_data_confirm: String,
     pub clear_data_cancel: String,
@@ -347,6 +391,7 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
     set_text(&SETTING_OPTION3, language_source, "key.setting.option3");
     set_text(&SETTING_OPTION4, language_source, "key.setting.option4");
     set_text(&SETTING_OPTION5, language_source, "key.setting.option5");
+    set_text(&SETTING_OPTION6, language_source, "key.setting.option6");
     set_text(&SETTING_BACK, language_source, "key.setting.back");
     set_text(
         &GAME_LIST_PREV_OPTION,
@@ -794,6 +839,27 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         language_source,
         "key.setting_keybind.system.reset.page",
     );
+    set_text(&DISPLAY_PREV_OPTION, language_source, "key.display.prev_option");
+    set_text(&DISPLAY_NEXT_OPTION, language_source, "key.display.next_option");
+    set_text(&DISPLAY_SCROLL_UP, language_source, "key.display.scroll_up");
+    set_text(&DISPLAY_SCROLL_DOWN, language_source, "key.display.scroll_down");
+    set_text(&DISPLAY_SCROLL, language_source, "key.display.scroll");
+    set_text(&DISPLAY_SELECT, language_source, "key.display.select");
+    set_text(&DISPLAY_BACK, language_source, "key.display.back");
+    set_text(&DISPLAY_TOGGLE_CONFIRM, language_source, "key.display.toggle_confirm");
+    set_text(&DISPLAY_TOGGLE, language_source, "key.display.toggle");
+    set_text(&DISPLAY_CONFIRM, language_source, "key.display.confirm");
+    set_text(&DISPLAY_ORDER, language_source, "key.display.order");
+    set_text(&DISPLAY_POSITION, language_source, "key.display.position");
+    set_text(&DISPLAY_OPTION1, language_source, "key.display.option1");
+    set_text(&DISPLAY_OPTION2, language_source, "key.display.option2");
+    set_text(&DISPLAY_OPTION3, language_source, "key.display.option3");
+    set_text(&DISPLAY_OPTION4, language_source, "key.display.option4");
+    set_text(&DISPLAY_OPTION5, language_source, "key.display.option5");
+    set_text(&DISPLAY_OPTION6, language_source, "key.display.option6");
+    set_text(&DISPLAY_OPTION7, language_source, "key.display.option7");
+    set_text(&DISPLAY_OPTION8, language_source, "key.display.option8");
+    set_text(&DISPLAY_OPTION9, language_source, "key.display.option9");
     set_text(
         &STORAGE_DETAILS_BACK,
         language_source,
@@ -836,6 +902,7 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         setting_option3: text(&SETTING_OPTION3),
         setting_option4: text(&SETTING_OPTION4),
         setting_option5: text(&SETTING_OPTION5),
+        setting_option6: text(&SETTING_OPTION6),
         setting_back: text(&SETTING_BACK),
         game_list_prev_option: text(&GAME_LIST_PREV_OPTION),
         game_list_next_option: text(&GAME_LIST_NEXT_OPTION),
@@ -967,6 +1034,27 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         setting_keybind_system_reset_only: text(&SETTING_KEYBIND_SYSTEM_RESET_ONLY),
         setting_keybind_system_reset_game: text(&SETTING_KEYBIND_SYSTEM_RESET_GAME),
         setting_keybind_system_reset_page: text(&SETTING_KEYBIND_SYSTEM_RESET_PAGE),
+        display_prev_option: text(&DISPLAY_PREV_OPTION),
+        display_next_option: text(&DISPLAY_NEXT_OPTION),
+        display_scroll_up: text(&DISPLAY_SCROLL_UP),
+        display_scroll_down: text(&DISPLAY_SCROLL_DOWN),
+        display_scroll: text(&DISPLAY_SCROLL),
+        display_select: text(&DISPLAY_SELECT),
+        display_back: text(&DISPLAY_BACK),
+        display_toggle_confirm: text(&DISPLAY_TOGGLE_CONFIRM),
+        display_toggle: text(&DISPLAY_TOGGLE),
+        display_confirm: text(&DISPLAY_CONFIRM),
+        display_order: text(&DISPLAY_ORDER),
+        display_position: text(&DISPLAY_POSITION),
+        display_option1: text(&DISPLAY_OPTION1),
+        display_option2: text(&DISPLAY_OPTION2),
+        display_option3: text(&DISPLAY_OPTION3),
+        display_option4: text(&DISPLAY_OPTION4),
+        display_option5: text(&DISPLAY_OPTION5),
+        display_option6: text(&DISPLAY_OPTION6),
+        display_option7: text(&DISPLAY_OPTION7),
+        display_option8: text(&DISPLAY_OPTION8),
+        display_option9: text(&DISPLAY_OPTION9),
         storage_details_back: text(&STORAGE_DETAILS_BACK),
         clear_data_confirm: text(&CLEAR_DATA_CONFIRM),
         clear_data_cancel: text(&CLEAR_DATA_CANCEL),

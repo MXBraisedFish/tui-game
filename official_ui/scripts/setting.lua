@@ -6,9 +6,9 @@ local function normalize_select(select)
   end
   select = math.floor(select)
   if select < 1 then
-    return 5
+    return 6
   end
-  if select > 5 then
+  if select > 6 then
     return 1
   end
   return select
@@ -49,6 +49,8 @@ function handle_event(lua_state, event)
       lua_state.select = 4
     elseif event.name == "option5" then
       lua_state.select = 5
+    elseif event.name == "option6" then
+      lua_state.select = 6
     end
   end
 

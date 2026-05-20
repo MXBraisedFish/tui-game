@@ -1,8 +1,9 @@
 //! 官方 UI 包扫描
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::Value;
 
@@ -17,7 +18,7 @@ const DEFAULT_OFFICIAL_UI_ID: &str = "official";
 /// - scripts/ui/package.json 作为单个官方 UI 包
 /// - scripts/ui/<package>/package.json 作为多个官方 UI 包
 pub fn scan_official_ui() -> ScannerResult<OfficialUiRegistry> {
-    let root_dir = root_dir().join("scripts/ui");
+    let root_dir = data_dirs::root_dir().join("scripts/ui");
     let mut registry = OfficialUiRegistry::default();
 
     if !root_dir.is_dir() {
@@ -88,16 +89,4 @@ fn read_json_object(path: &Path) -> ScannerResult<Value> {
         )
         .into())
     }
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

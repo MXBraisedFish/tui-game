@@ -9,6 +9,7 @@ pub static KEYBIND: MutableText = MutableText::new();
 pub static MODS: MutableText = MutableText::new();
 pub static MEMORY: MutableText = MutableText::new();
 pub static SECURITY: MutableText = MutableText::new();
+pub static DISPLAY: MutableText = MutableText::new();
 
 /// setting.* 文本集合
 #[derive(Clone, Debug)]
@@ -19,6 +20,7 @@ pub struct SettingText {
     pub mods: String,
     pub memory: String,
     pub security: String,
+    pub display: String,
 }
 
 /// 注册 setting.* 文本
@@ -29,6 +31,7 @@ pub fn register(language_source: &LanguageSource) -> SettingText {
     set_text(&MODS, language_source, "setting.mods");
     set_text(&MEMORY, language_source, "setting.memory");
     set_text(&SECURITY, language_source, "setting.security");
+    set_text(&DISPLAY, language_source, "setting.display");
 
     SettingText {
         title: text(&TITLE),
@@ -37,6 +40,7 @@ pub fn register(language_source: &LanguageSource) -> SettingText {
         mods: text(&MODS),
         memory: text(&MEMORY),
         security: text(&SECURITY),
+        display: text(&DISPLAY),
     }
 }
 

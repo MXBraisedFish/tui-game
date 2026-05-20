@@ -1,5 +1,6 @@
 //! UI ModList 状态聚合
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs;
@@ -80,8 +81,8 @@ pub struct ModListUiState {
 
 impl ModListUiState {
     /// 创建模组列表状态。
-    pub fn new(registry: GameModuleRegistry, mod_state: JsonValue, language_code: String) -> Self {
-        let root_state = ModListRootState::new(registry, mod_state, language_code);
+    pub fn new(registry: GameModuleRegistry, game_state: JsonValue, language_code: String) -> Self {
+        let root_state = ModListRootState::new(registry, game_state, language_code);
         let lua_state = ModListLuaState::from_root_state(&root_state);
         Self {
             root_state,
@@ -157,8 +158,8 @@ impl ModListUiState {
         if let Some(item) = self.root_state.item_mut(selected_uid.as_str()) {
             item.enabled = !item.enabled;
             self.root_state.write_item_state(selected_uid.as_str());
-            let _ = persist_mod_state(&self.root_state.mod_state);
-            return ModListLuaAction::StateChanged(self.root_state.mod_state.clone());
+            let _ = persist_game_state(&self.root_state.game_state);
+            return ModListLuaAction::StateChanged(self.root_state.game_state.clone());
         }
         ModListLuaAction::None
     }
@@ -171,8 +172,8 @@ impl ModListUiState {
         if let Some(item) = self.root_state.item_mut(selected_uid.as_str()) {
             item.debug = !item.debug;
             self.root_state.write_item_state(selected_uid.as_str());
-            let _ = persist_mod_state(&self.root_state.mod_state);
-            return ModListLuaAction::StateChanged(self.root_state.mod_state.clone());
+            let _ = persist_game_state(&self.root_state.game_state);
+            return ModListLuaAction::StateChanged(self.root_state.game_state.clone());
         }
         ModListLuaAction::None
     }
@@ -189,8 +190,8 @@ impl ModListUiState {
             item.safe_mode = true;
             item.safe_mode_permanent = false;
             self.root_state.write_item_state(selected_uid.as_str());
-            let _ = persist_mod_state(&self.root_state.mod_state);
-            return ModListLuaAction::StateChanged(self.root_state.mod_state.clone());
+            let _ = persist_game_state(&self.root_state.game_state);
+            return ModListLuaAction::StateChanged(self.root_state.game_state.clone());
         }
         ModListLuaAction::None
     }
@@ -207,9 +208,9 @@ impl ModListUiState {
             item.safe_mode_permanent = permanent;
             self.root_state.write_item_state(uid);
             if permanent {
-                let _ = persist_mod_state(&self.root_state.mod_state);
+                let _ = persist_game_state(&self.root_state.game_state);
             }
-            return ModListLuaAction::StateChanged(self.root_state.mod_state.clone());
+            return ModListLuaAction::StateChanged(self.root_state.game_state.clone());
         }
         ModListLuaAction::None
     }
@@ -229,8 +230,8 @@ impl ModListUiState {
             }
             self.root_state.write_item_state(uid.as_str());
         }
-        let _ = persist_mod_state(&self.root_state.mod_state);
-        ModListLuaAction::StateChanged(self.root_state.mod_state.clone())
+        let _ = persist_game_state(&self.root_state.game_state);
+        ModListLuaAction::StateChanged(self.root_state.game_state.clone())
     }
 
     /// 重置所有模组包启用状态为禁用。
@@ -247,8 +248,8 @@ impl ModListUiState {
             }
             self.root_state.write_item_state(uid.as_str());
         }
-        let _ = persist_mod_state(&self.root_state.mod_state);
-        ModListLuaAction::StateChanged(self.root_state.mod_state.clone())
+        let _ = persist_game_state(&self.root_state.game_state);
+        ModListLuaAction::StateChanged(self.root_state.game_state.clone())
     }
 
     /// 指定模组包显示名。
@@ -400,7 +401,7 @@ impl ModListLuaState {
 pub struct ModListRootState {
     pub language: Vec<(String, String)>,
     pub mods: Vec<ModListItem>,
-    pub mod_state: JsonValue,
+    pub game_state: JsonValue,
     pub language_code: String,
     pub selected_uid: String,
     pub sort_order: ModListSortOrder,
@@ -414,13 +415,13 @@ pub struct ModListRootState {
 }
 
 impl ModListRootState {
-    fn new(registry: GameModuleRegistry, mod_state: JsonValue, language_code: String) -> Self {
+    fn new(registry: GameModuleRegistry, game_state: JsonValue, language_code: String) -> Self {
         let mut mods = registry
             .games
             .iter()
             .filter(|game_module| game_module.source == GameModuleSource::Mod)
             .map(|game_module| {
-                ModListItem::from_game_module(game_module, &mod_state, language_code.as_str())
+                ModListItem::from_game_module(game_module, &game_state, language_code.as_str())
             })
             .collect::<Vec<_>>();
         let selected_uid = mods
@@ -430,7 +431,7 @@ impl ModListRootState {
         let mut root_state = Self {
             language: mod_list_language_pairs(),
             mods: Vec::new(),
-            mod_state,
+            game_state,
             language_code,
             selected_uid,
             sort_order: ModListSortOrder::Asc,
@@ -485,10 +486,10 @@ impl ModListRootState {
         let Some(item) = self.mods.iter().find(|item| item.uid == uid) else {
             return;
         };
-        if !self.mod_state.is_object() {
-            self.mod_state = JsonValue::Object(Map::new());
+        if !self.game_state.is_object() {
+            self.game_state = JsonValue::Object(Map::new());
         }
-        let Some(root) = self.mod_state.as_object_mut() else {
+        let Some(root) = self.game_state.as_object_mut() else {
             return;
         };
         root.insert(
@@ -559,10 +560,10 @@ pub struct ModListItem {
 impl ModListItem {
     fn from_game_module(
         game_module: &GameModule,
-        mod_state: &JsonValue,
+        game_state: &JsonValue,
         language_code: &str,
     ) -> Self {
-        let state = mod_state.get(game_module.uid.as_str());
+        let state = game_state.get(game_module.uid.as_str());
         let mut item = Self {
             uid: game_module.uid.clone(),
             package: game_module.package.package.clone(),
@@ -859,7 +860,7 @@ fn string_vec_to_table(lua: &Lua, values: &[String]) -> mlua::Result<Table> {
 }
 
 fn image_lines(uid: &str, slot: &str, raw_value: &JsonValue) -> Vec<String> {
-    let cache_path = root_dir()
+    let cache_path = data_dirs::root_dir()
         .join("data/cache/images")
         .join(format!("{uid}.{slot}.json"));
     if let Some(lines) = fs::read_to_string(cache_path)
@@ -936,22 +937,10 @@ fn resolve_package_text(language_texts: &HashMap<String, String>, raw_value: &st
         .unwrap_or_else(|| raw_value.to_string())
 }
 
-fn persist_mod_state(mod_state: &JsonValue) -> std::io::Result<()> {
-    let path = root_dir().join("data/profiles/mod_state.json");
+fn persist_game_state(game_state: &JsonValue) -> std::io::Result<()> {
+    let path = data_dirs::root_dir().join("data/profiles/game_state.json");
     if let Some(parent_dir) = path.parent() {
         fs::create_dir_all(parent_dir)?;
     }
-    fs::write(path, serde_json::to_string_pretty(mod_state)?)
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(PathBuf::from))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
+    fs::write(path, serde_json::to_string_pretty(game_state)?)
 }

@@ -1,6 +1,6 @@
 //! 官方 UI 按键默认值持久化。
 
-use std::path::{Path, PathBuf};
+use crate::host_engine::boot::environment::data_dirs;
 
 use serde_json::Value;
 
@@ -12,7 +12,7 @@ type CacheResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 /// 将官方 UI 默认按键信息写入 system 分区。已有用户数据不会被覆盖。
 pub fn persist_default_system_keybinds(registry: &OfficialUiRegistry) -> CacheResult<()> {
-    let path = root_dir().join("data/profiles/keybind.json");
+    let path = data_dirs::root_dir().join("data/profiles/keybind.json");
     let mut root = keybind_profile::read_keybind_profile(&path);
     let system_section = root
         .as_object_mut()
@@ -53,16 +53,4 @@ pub fn persist_default_system_keybinds(registry: &OfficialUiRegistry) -> CacheRe
     }
 
     keybind_profile::write_keybind_profile(&path, &root)
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

@@ -52,7 +52,7 @@ pub fn ensure() -> EnvironmentResult<()> {
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
-        &root_dir.join("data/profiles/mod_state.json"),
+        &root_dir.join("data/profiles/game_state.json"),
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
@@ -62,6 +62,20 @@ pub fn ensure() -> EnvironmentResult<()> {
     ensure_file(
         &root_dir.join("data/profiles/boss_state"),
         EMPTY_JSON_OBJECT,
+    )?;
+    ensure_file(
+        &root_dir.join("data/profiles/display_state.json"),
+        r#"{
+  "mod_badge": true,
+  "theme": "system",
+  "idle_threshold": 60,
+  "idle_enter_saver": false,
+  "host_status": false,
+  "saver_mode": "ordered",
+  "boss_mode": "ordered",
+  "saver_list": { "order": [], "enabled": {}, "cursor": 0 },
+  "boss_list": { "order": [], "enabled": {}, "cursor": 0 }
+}"#,
     )?;
     ensure_file(
         &root_dir.join("data/profiles/security_state.json"),
@@ -105,7 +119,7 @@ fn ensure_file(path: &Path, default_content: &str) -> EnvironmentResult<()> {
 }
 
 /// 获取宿主根目录。开发环境优先使用当前目录，打包环境退回可执行文件目录。
-fn root_dir() -> PathBuf {
+pub fn root_dir() -> PathBuf {
     std::env::current_dir()
         .ok()
         .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())

@@ -1,7 +1,7 @@
 //! System keybind UI state aggregation.
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use mlua::{Lua, Table, Value};
 use serde_json::{Map, Value as JsonValue, json};
@@ -642,6 +642,7 @@ fn resolve_page_name(page_id: &str) -> String {
         "setting_language" => text.setting_keybind.system_page_setting_language,
         "setting_mods" => text.setting_keybind.system_page_setting_mods,
         "setting_security" => text.setting_keybind.system_page_setting_security,
+        "setting_display" => text.setting_keybind.system_page_setting_display,
         "mod_game_list" => text.mod_hub.game,
         "mod_saver_list" => text.mod_hub.saver,
         "mod_boss_list" => text.mod_hub.boss,
@@ -681,6 +682,7 @@ fn keybind_system_language_map() -> Map<String, JsonValue> {
     insert!("SETTING_OPTION3", text.key.setting_option3);
     insert!("SETTING_OPTION4", text.key.setting_option4);
     insert!("SETTING_OPTION5", text.key.setting_option5);
+    insert!("SETTING_OPTION6", text.key.setting_option6);
     insert!("SETTING_BACK", text.key.setting_back);
     insert!("GAME_LIST_PREV_OPTION", text.key.game_list_prev_option);
     insert!("GAME_LIST_NEXT_OPTION", text.key.game_list_next_option);
@@ -772,6 +774,23 @@ fn keybind_system_language_map() -> Map<String, JsonValue> {
         "SETTING_KEYBIND_LIST_BACK",
         text.key.setting_keybind_list_back
     );
+    insert!("DISPLAY_PREV_OPTION", text.key.display_prev_option);
+    insert!("DISPLAY_NEXT_OPTION", text.key.display_next_option);
+    insert!("DISPLAY_SCROLL_UP", text.key.display_scroll_up);
+    insert!("DISPLAY_SCROLL_DOWN", text.key.display_scroll_down);
+    insert!("DISPLAY_CONFIRM", text.key.display_confirm);
+    insert!("DISPLAY_BACK", text.key.display_back);
+    insert!("DISPLAY_ORDER", text.key.display_order);
+    insert!("DISPLAY_POSITION", text.key.display_position);
+    insert!("DISPLAY_OPTION1", text.key.display_option1);
+    insert!("DISPLAY_OPTION2", text.key.display_option2);
+    insert!("DISPLAY_OPTION3", text.key.display_option3);
+    insert!("DISPLAY_OPTION4", text.key.display_option4);
+    insert!("DISPLAY_OPTION5", text.key.display_option5);
+    insert!("DISPLAY_OPTION6", text.key.display_option6);
+    insert!("DISPLAY_OPTION7", text.key.display_option7);
+    insert!("DISPLAY_OPTION8", text.key.display_option8);
+    insert!("DISPLAY_OPTION9", text.key.display_option9);
     insert!("STORAGE_DETAILS_BACK", text.key.storage_details_back);
     map
 }
@@ -1251,22 +1270,10 @@ fn json_to_lua_value(lua: &Lua, value: &JsonValue) -> mlua::Result<Value> {
 }
 
 pub fn persist_system_keybinds(keybinds: &JsonValue) -> std::io::Result<()> {
-    let path = root_dir().join("data/profiles/keybind.json");
+    let path = data_dirs::root_dir().join("data/profiles/keybind.json");
     if let Some(parent_dir) = path.parent() {
         fs::create_dir_all(parent_dir)?;
     }
     fs::write(path, serde_json::to_string_pretty(keybinds)?)?;
     Ok(())
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

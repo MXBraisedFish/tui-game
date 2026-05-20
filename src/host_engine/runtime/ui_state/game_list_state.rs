@@ -78,9 +78,9 @@ impl GameListUiState {
         registry: GameModuleRegistry,
         best_scores: JsonValue,
         language_code: String,
-        mod_state: JsonValue,
+        game_state: JsonValue,
     ) -> Self {
-        let root_state = GameListRootState::new(registry, best_scores, language_code, mod_state);
+        let root_state = GameListRootState::new(registry, best_scores, language_code, game_state);
         let lua_state = GameListLuaState::from_root_state(&root_state);
         Self {
             root_state,
@@ -103,8 +103,8 @@ impl GameListUiState {
     }
 
     /// 刷新模组启用状态。
-    pub fn refresh_mod_state(&mut self, mod_state: JsonValue) {
-        self.root_state.mod_state = mod_state;
+    pub fn refresh_game_state(&mut self, game_state: JsonValue) {
+        self.root_state.game_state = game_state;
         self.root_state.refresh_enabled_state();
         self.root_state.normalize_select();
     }
@@ -112,6 +112,10 @@ impl GameListUiState {
     /// 刷新最佳记录快照。
     pub fn refresh_best_scores(&mut self, best_scores: JsonValue) {
         self.root_state.best_scores = best_scores;
+    }
+
+    pub fn set_show_mod_badge(&mut self, show_mod_badge: bool) {
+        self.root_state.show_mod_badge = show_mod_badge;
     }
 
     /// 应用 Lua 返回状态。
@@ -244,7 +248,7 @@ pub struct GameListRootState {
     pub language: Vec<(String, String)>,
     pub games: Vec<GameListItem>,
     pub best_scores: JsonValue,
-    pub mod_state: JsonValue,
+    pub game_state: JsonValue,
     pub language_code: String,
     pub selected_uid: String,
     pub sort_order: GameListSortOrder,
@@ -254,6 +258,7 @@ pub struct GameListRootState {
     pub user_page: i64,
     pub jump: bool,
     pub info_scroll: i64,
+    pub show_mod_badge: bool,
 }
 
 impl GameListRootState {
@@ -261,13 +266,13 @@ impl GameListRootState {
         registry: GameModuleRegistry,
         best_scores: JsonValue,
         language_code: String,
-        mod_state: JsonValue,
+        game_state: JsonValue,
     ) -> Self {
         let mut games = registry
             .games
             .iter()
             .map(|game_module| {
-                GameListItem::from_game_module(game_module, language_code.as_str(), &mod_state)
+                GameListItem::from_game_module(game_module, language_code.as_str(), &game_state)
             })
             .collect::<Vec<_>>();
         let selected_uid = games
@@ -278,7 +283,7 @@ impl GameListRootState {
             language: game_list_language_pairs(),
             games: Vec::new(),
             best_scores,
-            mod_state,
+            game_state,
             language_code,
             selected_uid,
             sort_order: GameListSortOrder::Asc,
@@ -288,6 +293,7 @@ impl GameListRootState {
             user_page: 0,
             jump: false,
             info_scroll: 0,
+            show_mod_badge: true,
         };
         root_state.games.append(&mut games);
         root_state.sort_games();
@@ -307,7 +313,7 @@ impl GameListRootState {
 
     fn refresh_enabled_state(&mut self) {
         for game in &mut self.games {
-            game.refresh_enabled(&self.mod_state);
+            game.refresh_enabled(&self.game_state);
         }
     }
 
@@ -352,6 +358,7 @@ impl GameListRootState {
         table.set("user_page", if self.jump { self.user_page } else { 0 })?;
         table.set("jump", self.jump)?;
         table.set("info_scroll", self.info_scroll.max(0))?;
+        table.set("show_mod_badge", self.show_mod_badge)?;
         Ok(table)
     }
 
@@ -412,7 +419,7 @@ impl GameListItem {
     fn from_game_module(
         game_module: &GameModule,
         language_code: &str,
-        mod_state: &JsonValue,
+        game_state: &JsonValue,
     ) -> Self {
         let mut item = Self {
             uid: game_module.uid.clone(),
@@ -435,7 +442,7 @@ impl GameListItem {
             description: String::new(),
             detail: String::new(),
             best_none: None,
-            enabled: module_enabled(game_module, mod_state),
+            enabled: module_enabled(game_module, game_state),
         };
         item.refresh_display(language_code);
         item
@@ -455,9 +462,9 @@ impl GameListItem {
             .map(|raw_value| resolve_package_text(&language_texts, raw_value));
     }
 
-    fn refresh_enabled(&mut self, mod_state: &JsonValue) {
+    fn refresh_enabled(&mut self, game_state: &JsonValue) {
         if self.source == GameModuleSource::Mod {
-            self.enabled = mod_state
+            self.enabled = game_state
                 .get(self.uid.as_str())
                 .and_then(|value| value.get("enabled"))
                 .and_then(JsonValue::as_bool)
@@ -534,12 +541,12 @@ fn source_rank(source: GameModuleSource) -> u8 {
     }
 }
 
-fn module_enabled(game_module: &GameModule, mod_state: &JsonValue) -> bool {
+fn module_enabled(game_module: &GameModule, game_state: &JsonValue) -> bool {
     if game_module.source != GameModuleSource::Mod {
         return true;
     }
 
-    mod_state
+    game_state
         .get(game_module.uid.as_str())
         .and_then(|value| value.get("enabled"))
         .and_then(JsonValue::as_bool)

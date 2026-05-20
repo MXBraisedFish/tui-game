@@ -1,5 +1,6 @@
 //! 内存管理清理操作
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -8,7 +9,7 @@ type CleanupResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 /// 清理缓存：删除 data/cache 和 data/log 后重建运行期必要数据文件。
 pub fn clear_cache() -> CleanupResult<()> {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
     let data_dir = root_dir.join("data");
     remove_runtime_dir(&data_dir, &data_dir.join("cache"))?;
     remove_runtime_dir(&data_dir, &data_dir.join("log"))?;
@@ -18,7 +19,7 @@ pub fn clear_cache() -> CleanupResult<()> {
 
 /// 清理全部数据：删除 data 后重建运行期必要数据文件。
 pub fn clear_data() -> CleanupResult<()> {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
     let data_dir = root_dir.join("data");
     let language_code = read_language_preference(&data_dir);
     remove_runtime_dir(&root_dir, &data_dir)?;
@@ -83,16 +84,4 @@ fn normalize_path(path: &Path) -> io::Result<PathBuf> {
         })?;
         Ok(parent.canonicalize()?.join(file_name))
     }
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

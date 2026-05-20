@@ -1,4 +1,5 @@
 //! 按键偏好持久化结构。
+// TODO: 迁移至 storage::ProfileStore，完成后删除此文件
 
 use std::fs;
 use std::path::Path;

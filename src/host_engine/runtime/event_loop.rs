@@ -4,8 +4,6 @@ use std::collections::VecDeque;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Instant;
 
-use serde_json::Value as JsonValue;
-
 use crate::LuaRuntimeState;
 use crate::host_engine::boot::preload::init_environment::{
     HostInputEvent, ResizeEvent, TerminalSize,
@@ -51,12 +49,15 @@ pub(crate) fn run(
     crate::host_engine::runtime::renderer::render_canvas(host_bridge, &mut renderer_state)?;
     let mut event_queue = VecDeque::new();
     let mut last_tick_at = Instant::now();
-    let mut frame_rate_controller = FrameRateController::root_ui();
+    let mut frame_rate_controller = FrameRateController::root_ui(active_ui_page.root_idle_threshold());
     let mut was_running_game = false;
     let mut is_focused = true;
     let mut overlay_session: Option<OverlaySession> = None;
     loop {
         if overlay_session.is_none() {
+            if !active_ui_page.has_game_session() {
+                frame_rate_controller.set_root_idle_timeout(active_ui_page.root_idle_threshold());
+            }
             if active_ui_page.has_game_session() && !was_running_game {
                 if let Some(game_session) = active_ui_page.game_session() {
                     frame_rate_controller = FrameRateController::game(
@@ -66,7 +67,7 @@ pub(crate) fn run(
                 }
                 was_running_game = true;
             } else if !active_ui_page.has_game_session() && was_running_game {
-                frame_rate_controller = FrameRateController::root_ui();
+                frame_rate_controller = FrameRateController::root_ui(active_ui_page.root_idle_threshold());
                 was_running_game = false;
             }
         }
@@ -179,6 +180,24 @@ pub(crate) fn run(
             continue;
         }
 
+        if frame_rate_controller.is_root_idle() && active_ui_page.should_auto_enter_saver() {
+            if let Some(uid) = active_ui_page.next_saver_overlay_uid() {
+                let package = overlay_package_by_uid(&active_ui_page.overlay_registry().savers, uid.as_str());
+                toggle_overlay(
+                    host_bridge,
+                    package,
+                    OverlaySessionKind::Saver,
+                    &mut overlay_session,
+                    &mut renderer_state,
+                )?;
+                if overlay_session.is_some() {
+                    frame_rate_controller = FrameRateController::overlay();
+                    event_queue.clear();
+                    continue;
+                }
+            }
+        }
+
         let page_key = current_page_key(host_bridge, host_state_machine);
         if active_ui_page.page_key() != page_key {
             renderer_state.request_full_redraw();
@@ -246,16 +265,14 @@ fn handle_global_key(
     overlay_session: &mut Option<OverlaySession>,
     renderer_state: &mut RendererState,
 ) -> RuntimeLoopResult<bool> {
-    let current_overlay_registry = active_ui_page.overlay_registry();
     match key.to_ascii_lowercase().as_str() {
         "f2" => {
-            let runtime_context = host_bridge.runtime_context();
+            let package = active_ui_page
+                .next_saver_overlay_uid()
+                .and_then(|uid| overlay_package_by_uid(&active_ui_page.overlay_registry().savers, uid.as_str()));
             toggle_overlay(
                 host_bridge,
-                enabled_overlay_package(
-                    &current_overlay_registry.savers,
-                    &runtime_context.saver_state,
-                ),
+                package,
                 OverlaySessionKind::Saver,
                 overlay_session,
                 renderer_state,
@@ -263,13 +280,12 @@ fn handle_global_key(
             Ok(true)
         }
         "f3" => {
-            let runtime_context = host_bridge.runtime_context();
+            let package = active_ui_page
+                .next_boss_overlay_uid()
+                .and_then(|uid| overlay_package_by_uid(&active_ui_page.overlay_registry().bosses, uid.as_str()));
             toggle_overlay(
                 host_bridge,
-                enabled_overlay_package(
-                    &current_overlay_registry.bosses,
-                    &runtime_context.boss_state,
-                ),
+                package,
                 OverlaySessionKind::Boss,
                 overlay_session,
                 renderer_state,
@@ -289,20 +305,8 @@ fn handle_global_key(
     }
 }
 
-fn enabled_overlay_package(
-    packages: &[OverlayPackage],
-    state: &JsonValue,
-) -> Option<OverlayPackage> {
-    packages
-        .iter()
-        .find(|package| {
-            state
-                .get(package.uid.as_str())
-                .and_then(|value| value.get("enabled"))
-                .and_then(JsonValue::as_bool)
-                .unwrap_or(true)
-        })
-        .cloned()
+fn overlay_package_by_uid(packages: &[OverlayPackage], uid: &str) -> Option<OverlayPackage> {
+    packages.iter().find(|package| package.uid == uid).cloned()
 }
 
 fn toggle_overlay(
@@ -339,7 +343,7 @@ fn frame_rate_for_current_runtime(active_ui_page: &ActiveUiPage) -> FrameRateCon
     if let Some(game_session) = active_ui_page.game_session() {
         FrameRateController::game(game_session.afk_time_secs(), game_session.target_fps())
     } else {
-        FrameRateController::root_ui()
+        FrameRateController::root_ui(active_ui_page.root_idle_threshold())
     }
 }
 

@@ -87,7 +87,7 @@ pub(crate) fn is_debug_enabled(host_bridge: &HostLuaBridge) -> bool {
                     return true;
                 }
                 runtime_context
-                    .mod_state
+                    .game_state
                     .get(game_module.uid.as_str())
                     .and_then(|state| state.get("debug"))
                     .and_then(|debug| debug.as_bool())

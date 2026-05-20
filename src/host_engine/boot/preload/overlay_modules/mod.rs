@@ -1,4 +1,5 @@
 //! Saver/老板覆盖层包预加载入口。
+// TODO: 迁移至 storage::CacheStore
 
 mod manifest;
 mod scanner;
@@ -20,9 +21,11 @@ pub fn load() -> OverlayModuleResult<OverlayRegistry> {
 
 mod scan_cache {
     use std::fs;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     use serde::Serialize;
+
+    use crate::host_engine::boot::environment::data_dirs;
 
     use super::{OverlayPackage, OverlayRegistry};
 
@@ -35,11 +38,11 @@ mod scan_cache {
         registry: &OverlayRegistry,
     ) -> Result<(), Box<dyn std::error::Error>> {
         write_scan_cache(
-            &root_dir().join("data/cache/saver_scan_cache"),
+            &data_dirs::root_dir().join("data/cache/saver_scan_cache"),
             &registry.savers,
         )?;
         write_scan_cache(
-            &root_dir().join("data/cache/boss_scan_cache"),
+            &data_dirs::root_dir().join("data/cache/boss_scan_cache"),
             &registry.bosses,
         )?;
         Ok(())
@@ -55,32 +58,21 @@ mod scan_cache {
         fs::write(path, serde_json::to_string_pretty(&ScanCache { packages })?)?;
         Ok(())
     }
-
-    fn root_dir() -> PathBuf {
-        std::env::current_dir()
-            .ok()
-            .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-            .or_else(|| {
-                std::env::current_exe()
-                    .ok()
-                    .and_then(|path| path.parent().map(Path::to_path_buf))
-            })
-            .unwrap_or_else(|| PathBuf::from("."))
-    }
 }
 
 mod state {
     use std::fs;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     use serde_json::{Map, Value, json};
 
+    use crate::host_engine::boot::environment::data_dirs;
     use crate::host_engine::boot::preload::persistent_data::security_profile;
 
     use super::{OverlayRegistry, OverlaySource};
 
     pub fn sync_saver_state(registry: &OverlayRegistry) -> Result<(), Box<dyn std::error::Error>> {
-        let path = root_dir().join("data/profiles/saver_state");
+        let path = data_dirs::root_dir().join("data/profiles/saver_state");
         let security = security_profile::load_from_default_path();
         let mut state = read_state(&path)?;
         for package in registry
@@ -97,7 +89,7 @@ mod state {
     }
 
     pub fn sync_boss_state(registry: &OverlayRegistry) -> Result<(), Box<dyn std::error::Error>> {
-        let path = root_dir().join("data/profiles/boss_state");
+        let path = data_dirs::root_dir().join("data/profiles/boss_state");
         let security = security_profile::load_from_default_path();
         let mut state = read_state(&path)?;
         for package in registry
@@ -133,15 +125,4 @@ mod state {
         Ok(())
     }
 
-    fn root_dir() -> PathBuf {
-        std::env::current_dir()
-            .ok()
-            .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-            .or_else(|| {
-                std::env::current_exe()
-                    .ok()
-                    .and_then(|path| path.parent().map(Path::to_path_buf))
-            })
-            .unwrap_or_else(|| PathBuf::from("."))
-    }
 }

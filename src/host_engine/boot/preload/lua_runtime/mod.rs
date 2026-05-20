@@ -38,7 +38,7 @@ pub(crate) fn load(
         language_code: loaded_resources.persistent_data.language_code.clone(),
         keybinds: loaded_resources.persistent_data.keybinds.clone(),
         best_scores: loaded_resources.persistent_data.best_scores.clone(),
-        mod_state: loaded_resources.persistent_data.mod_state.clone(),
+        game_state: loaded_resources.persistent_data.game_state.clone(),
         saver_state: loaded_resources.persistent_data.saver_state.clone(),
         boss_state: loaded_resources.persistent_data.boss_state.clone(),
         launch_mode: LaunchMode::New,

@@ -4,13 +4,12 @@ use std::time::{Duration, Instant};
 
 const ROOT_UI_NORMAL_FPS: u64 = 60;
 const LOW_RESOURCE_FPS: u64 = 24;
-const ROOT_UI_IDLE_TIMEOUT_SECS: u64 = 60;
 const OVERLAY_FPS: u64 = 24;
 
 /// 帧率运行模式。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FrameRateMode {
-    RootUi,
+    RootUi { idle_timeout_secs: u64 },
     Game { afk_time_secs: u64, target_fps: u64 },
     Overlay,
 }
@@ -24,9 +23,9 @@ pub struct FrameRateController {
 
 impl FrameRateController {
     /// 创建宿主 UI 帧率控制器。
-    pub fn root_ui() -> Self {
+    pub fn root_ui(idle_timeout_secs: u64) -> Self {
         Self {
-            mode: FrameRateMode::RootUi,
+            mode: FrameRateMode::RootUi { idle_timeout_secs },
             last_input_at: Instant::now(),
         }
     }
@@ -52,6 +51,12 @@ impl FrameRateController {
         }
     }
 
+    pub fn set_root_idle_timeout(&mut self, idle_timeout_secs: u64) {
+        if matches!(self.mode, FrameRateMode::RootUi { .. }) {
+            self.mode = FrameRateMode::RootUi { idle_timeout_secs };
+        }
+    }
+
     /// 标记用户输入，恢复正常帧率。
     pub fn mark_input(&mut self) {
         self.last_input_at = Instant::now();
@@ -65,8 +70,8 @@ impl FrameRateController {
     /// 当前目标 FPS。
     pub fn current_fps(&self) -> u64 {
         match self.mode {
-            FrameRateMode::RootUi => {
-                if self.is_idle_for(ROOT_UI_IDLE_TIMEOUT_SECS) {
+            FrameRateMode::RootUi { idle_timeout_secs } => {
+                if idle_timeout_secs > 0 && self.is_idle_for(idle_timeout_secs) {
                     LOW_RESOURCE_FPS
                 } else {
                     ROOT_UI_NORMAL_FPS
@@ -83,6 +88,15 @@ impl FrameRateController {
                 }
             }
             FrameRateMode::Overlay => OVERLAY_FPS,
+        }
+    }
+
+    pub fn is_root_idle(&self) -> bool {
+        match self.mode {
+            FrameRateMode::RootUi { idle_timeout_secs } => {
+                idle_timeout_secs > 0 && self.is_idle_for(idle_timeout_secs)
+            }
+            _ => false,
         }
     }
 

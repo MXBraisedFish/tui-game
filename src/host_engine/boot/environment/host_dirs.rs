@@ -1,9 +1,10 @@
 //! 宿主静态资源目录检查
 //! 静态资源缺失或不符合要求时进入官方维修流程
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::repair;
 
@@ -22,7 +23,7 @@ pub fn verify() -> EnvironmentResult<()> {
 
 /// 执行实际检查。此函数不修复，只返回检查结果。
 fn verify_required_files() -> EnvironmentResult<()> {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
 
     ensure_dir(&root_dir.join("assets"))?;
     ensure_dir(&root_dir.join("assets/lang"))?;
@@ -87,15 +88,3 @@ fn ensure_non_empty_file(path: &Path) -> EnvironmentResult<()> {
     Ok(())
 }
 
-/// 获取宿主根目录。开发环境优先使用当前目录，打包环境退回可执行文件目录。
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
-}

@@ -1,5 +1,6 @@
 //! Saver/老板覆盖层包来源。
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -49,20 +50,8 @@ impl OverlaySource {
 
     pub fn root_dir(self, kind: OverlayKind) -> PathBuf {
         match self {
-            Self::Office => root_dir().join("scripts").join(kind.as_str()),
-            Self::ThirdParty => root_dir().join("data").join("mod").join(kind.as_str()),
+            Self::Office => data_dirs::root_dir().join("scripts").join(kind.as_str()),
+            Self::ThirdParty => data_dirs::root_dir().join("data").join("mod").join(kind.as_str()),
         }
     }
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(PathBuf::from))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

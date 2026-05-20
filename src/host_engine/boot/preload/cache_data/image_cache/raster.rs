@@ -1,4 +1,5 @@
 //! 光栅图片到终端 ASCII 行转换
+// TODO: 迁移至 storage::CacheStore
 
 use image::{DynamicImage, GenericImageView, RgbaImage, imageops::FilterType};
 

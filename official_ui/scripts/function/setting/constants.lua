@@ -1,9 +1,9 @@
 local M = {}
 
 M.MENU_WIDTH = 34
-M.MENU_HEIGHT = 5
+M.MENU_HEIGHT = 6
 M.CONTENT_HEIGHT = 9
-M.SELECTED_COLOR = DARK_CYAN
+M.SELECTED_COLOR = CYAN
 M.NORMAL_COLOR = "white"
 M.KEY_COLOR = DARK_GRAY
 M.VERSION_COLOR = DARK_GRAY
@@ -55,12 +55,14 @@ M.DEFAULT_TEXT = {
   mods = "Mod List",
   memory = "Memory Management",
   security = "Security Settings",
+  display = "Display Settings",
   enter = safe_key_label("confirm"),
   option1 = safe_key_label("option1"),
   option2 = safe_key_label("option2"),
   option3 = safe_key_label("option3"),
   option4 = safe_key_label("option4"),
   option5 = safe_key_label("option5"),
+  option6 = safe_key_label("option6"),
   back_key = safe_key_label("return"),
   select_key = key_label({safe_key_value("prev_option"), safe_key_value("next_option")}),
   confirm_key = safe_key_label("confirm"),

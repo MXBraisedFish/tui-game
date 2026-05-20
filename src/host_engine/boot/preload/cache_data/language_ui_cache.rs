@@ -1,8 +1,10 @@
 //! 语言选择 UI 文本缓存
+// TODO: 迁移至 storage::CacheStore
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::cache_snapshot::LanguageUiText;
 
@@ -14,7 +16,7 @@ const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 
 /// 扫描 assets/lang，并同步语言选择 UI 需要的文本缓存。
 pub fn sync_language_ui_cache() -> LanguageUiCacheResult<BTreeMap<String, LanguageUiText>> {
-    let root_dir = root_dir();
+    let root_dir = data_dirs::root_dir();
     let language_dir = root_dir.join(LANGUAGE_DIR);
     let fallback_texts =
         read_language_json(&language_dir.join(format!("{DEFAULT_LANGUAGE_CODE}.json")))
@@ -99,16 +101,4 @@ fn write_language_ui_cache(
     }
     fs::write(path, serde_json::to_string_pretty(language_ui_texts)?)?;
     Ok(())
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

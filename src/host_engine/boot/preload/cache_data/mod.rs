@@ -1,4 +1,5 @@
 //! 运行缓存预加载与同步入口
+// TODO: 迁移至 storage::CacheStore
 
 mod cache_snapshot;
 mod game_package_cache;

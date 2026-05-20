@@ -6,7 +6,7 @@ use crate::host_engine::boot::i18n;
 use crate::host_engine::boot::preload::state_machine::SettingState;
 
 /// Setting 页面选项数量。
-pub const SETTING_OPTION_COUNT: i64 = 5;
+pub const SETTING_OPTION_COUNT: i64 = 6;
 
 /// Setting 页面确认动作。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -16,6 +16,7 @@ pub enum SettingConfirmAction {
     ModList,
     Memory,
     Security,
+    Display,
 }
 
 impl SettingConfirmAction {
@@ -27,6 +28,7 @@ impl SettingConfirmAction {
             Self::ModList => SettingState::ModList,
             Self::Memory => SettingState::Memory,
             Self::Security => SettingState::Security,
+            Self::Display => SettingState::Display,
         }
     }
 }
@@ -160,6 +162,7 @@ impl SettingRootState {
             3 => SettingConfirmAction::ModList,
             4 => SettingConfirmAction::Memory,
             5 => SettingConfirmAction::Security,
+            6 => SettingConfirmAction::Display,
             _ => SettingConfirmAction::Language,
         }
     }
@@ -173,7 +176,7 @@ impl SettingRootState {
     }
 }
 
-/// 将 Setting 选项限制在 1-5。
+/// 将 Setting 选项限制在可用范围内。
 pub fn normalize_setting_select(select: i64) -> i64 {
     select.clamp(1, SETTING_OPTION_COUNT)
 }
@@ -218,6 +221,10 @@ fn setting_language_pairs() -> Vec<(String, String)> {
             text.key.setting_option5.to_string(),
         ),
         (
+            "SETTING_OPTION6".to_string(),
+            text.key.setting_option6.to_string(),
+        ),
+        (
             "SETTING_BACK".to_string(),
             text.key.setting_back.to_string(),
         ),
@@ -238,6 +245,10 @@ fn setting_language_pairs() -> Vec<(String, String)> {
         (
             "SETTING_SECURITY".to_string(),
             text.setting.security.to_string(),
+        ),
+        (
+            "SETTING_DISPLAY".to_string(),
+            text.setting.display.to_string(),
         ),
     ]
 }

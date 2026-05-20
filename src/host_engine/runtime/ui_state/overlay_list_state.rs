@@ -1,5 +1,6 @@
 //! UI Saver/Boss 列表状态聚合
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs;
@@ -23,7 +24,7 @@ pub enum OverlayListKind {
 
 impl OverlayListKind {
     fn state_path(self) -> PathBuf {
-        root_dir().join(match self {
+        data_dirs::root_dir().join(match self {
             Self::Saver => "data/profiles/saver_state",
             Self::Boss => "data/profiles/boss_state",
         })
@@ -638,14 +639,14 @@ fn resolve_current_i18n(key: &str) -> String {
         .unwrap_or_else(|| format!("[Missing i18n key: {key}]"))
 }
 fn read_language_code() -> String {
-    fs::read_to_string(root_dir().join("data/profiles/language.txt"))
+    fs::read_to_string(data_dirs::root_dir().join("data/profiles/language.txt"))
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| DEFAULT_LANGUAGE_CODE.to_string())
 }
 fn read_host_language(code: &str) -> HashMap<String, String> {
-    fs::read_to_string(root_dir().join("assets/lang").join(format!("{code}.json")))
+    fs::read_to_string(data_dirs::root_dir().join("assets/lang").join(format!("{code}.json")))
         .ok()
         .and_then(|s| {
             serde_json::from_str::<HashMap<String, String>>(s.trim_start_matches('\u{feff}')).ok()
@@ -674,7 +675,7 @@ fn string_vec_to_table(lua: &Lua, values: &[String]) -> mlua::Result<Table> {
     Ok(t)
 }
 fn image_lines(uid: &str, slot: &str, raw: &JsonValue) -> Vec<String> {
-    let cache = root_dir()
+    let cache = data_dirs::root_dir()
         .join("data/cache/images")
         .join(format!("{uid}.{slot}.json"));
     if let Some(lines) = fs::read_to_string(cache)
@@ -733,15 +734,4 @@ fn persist_state(kind: OverlayListKind, state: &JsonValue) -> std::io::Result<()
         fs::create_dir_all(parent)?;
     }
     fs::write(path, serde_json::to_string_pretty(state)?)
-}
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|p| p.join("assets").exists() || p.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }

@@ -43,6 +43,7 @@
   "key.setting.option3": "Focus: Mod Settings",
   "key.setting.option4": "Focus: Memory Management",
   "key.setting.option5": "Focus: Security Settings",
+  "key.setting.option6": "Option - Display Settings",
   "key.setting.back": "Back",
   "setting.title": "Settings",
   "setting.language": "Language Settings",
@@ -309,6 +310,7 @@
   "setting_keybind.system.table.key3": "Key 3",
   "setting_keybind.system.table.key4": "Key 4",
   "setting_keybind.system.case_sensitive": "Keys are case-sensitive",
+
   "setting_keybind.system.page.home": "Home",
   "setting_keybind.system.page.setting": "Settings",
   "setting_keybind.system.page.game_list": "Start Game",
@@ -318,6 +320,7 @@
   "setting_keybind.system.page.setting_language": "Language",
   "setting_keybind.system.page.setting_mods": "Mod Settings",
   "setting_keybind.system.page.setting_security": "Security Settings",
+  "setting_keybind.system.page.setting_display": "Display Settings",
   "setting_keybind.system.page.keybind_system": "System Keys",
   "setting_keybind.system.page.keybind_global": "Global Keys",
   "setting_keybind.system.page.keybind_game": "Game Keys",
@@ -419,7 +422,7 @@
   "key.display.scroll": "Scroll",
   "key.display.select": "Select",
   "key.display.back": "Back",
-  "key.display.switch_toggle_confirm": "Toggle / Confirm",
+  "key.display.toggle_confirm": "Toggle / Confirm",
   "key.display.toggle": "Toggle",
   "key.display.confirm": "Confirm",
   "key.display.order": "Order",
@@ -457,5 +460,6 @@
   "display.option.saver.list": "Screen Saver List",
   "display.option.boss.list": "Boss Screen List",
   "display.option.list.on": "Enable",
-  "display.option.list.off": "Disable"
+  "display.option.list.off": "Disable",
+  "display.option.list.mod": "MOD"
 }

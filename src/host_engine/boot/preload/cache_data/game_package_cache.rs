@@ -1,8 +1,10 @@
 //! 游戏包缓存读取、拼合与清理
+// TODO: 迁移至 storage::CacheStore
 
+use crate::host_engine::boot::environment::data_dirs;
 use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::host_engine::boot::preload::game_modules::GameModuleRegistry;
 
@@ -18,7 +20,7 @@ const IMAGE_CACHE_DIR: &str = "images";
 pub fn sync_game_package_cache(
     game_module_registry: &GameModuleRegistry,
 ) -> CacheResult<CacheData> {
-    let cache_dir = root_dir().join("data/cache");
+    let cache_dir = data_dirs::root_dir().join("data/cache");
     let image_cache_dir = cache_dir.join(IMAGE_CACHE_DIR);
     let scan_cache_path = cache_dir.join(GAME_SCAN_CACHE_FILE);
 
@@ -115,16 +117,4 @@ fn is_removed_game_cache_name(file_name: &str, removed_game_uid_set: &HashSet<&s
     removed_game_uid_set.iter().any(|removed_game_uid| {
         file_name == *removed_game_uid || file_name.starts_with(&format!("{removed_game_uid}."))
     })
-}
-
-fn root_dir() -> PathBuf {
-    std::env::current_dir()
-        .ok()
-        .filter(|path| path.join("assets").exists() || path.join("Cargo.toml").exists())
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(Path::to_path_buf))
-        })
-        .unwrap_or_else(|| PathBuf::from("."))
 }
