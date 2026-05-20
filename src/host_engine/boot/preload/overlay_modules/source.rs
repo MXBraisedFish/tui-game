@@ -51,7 +51,10 @@ impl OverlaySource {
     pub fn root_dir(self, kind: OverlayKind) -> PathBuf {
         match self {
             Self::Office => data_dirs::root_dir().join("scripts").join(kind.as_str()),
-            Self::ThirdParty => data_dirs::root_dir().join("data").join("mod").join(kind.as_str()),
+            Self::ThirdParty => data_dirs::root_dir()
+                .join("data")
+                .join("mod")
+                .join(kind.as_str()),
         }
     }
 }

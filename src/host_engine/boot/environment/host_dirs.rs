@@ -87,4 +87,3 @@ fn ensure_non_empty_file(path: &Path) -> EnvironmentResult<()> {
 
     Ok(())
 }
-

@@ -33,12 +33,7 @@ pub fn force_restore() {
     let _ = disable_raw_mode();
 
     let mut stdout = std::io::stdout();
-    let _ = execute!(
-        stdout,
-        Show,
-        DisableMouseCapture,
-        LeaveAlternateScreen
-    );
+    let _ = execute!(stdout, Show, DisableMouseCapture, LeaveAlternateScreen);
     let _ = stdout.flush();
     let _ = std::io::stderr().flush();
 }

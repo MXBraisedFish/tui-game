@@ -9,6 +9,7 @@ mod language_ui_cache;
 pub use cache_snapshot::{CacheData, LanguageUiText};
 
 use crate::host_engine::boot::preload::game_modules::GameModuleRegistry;
+use crate::host_engine::storage::cache_store::CacheStore;
 
 /// 读取并更新 data/cache 下的运行缓存。
 ///
@@ -16,7 +17,9 @@ use crate::host_engine::boot::preload::game_modules::GameModuleRegistry;
 pub fn load(
     game_module_registry: &GameModuleRegistry,
 ) -> Result<CacheData, Box<dyn std::error::Error>> {
-    let mut cache_data = game_package_cache::sync_game_package_cache(game_module_registry)?;
-    cache_data.language_ui_texts = language_ui_cache::sync_language_ui_cache()?;
+    let cache_store = CacheStore::open()?;
+    let mut cache_data =
+        game_package_cache::sync_game_package_cache(&cache_store, game_module_registry)?;
+    cache_data.language_ui_texts = language_ui_cache::sync_language_ui_cache(&cache_store)?;
     Ok(cache_data)
 }

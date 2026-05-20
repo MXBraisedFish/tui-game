@@ -83,14 +83,18 @@ pub fn load_display_profile(path: &Path) -> Result<Value, Box<dyn std::error::Er
         return Ok(profile.to_value());
     }
     let raw_json = fs::read_to_string(path)?;
-    let value = serde_json::from_str::<Value>(raw_json.trim_start_matches('\u{feff}')).unwrap_or_else(|_| DisplayProfile::default().to_value());
+    let value = serde_json::from_str::<Value>(raw_json.trim_start_matches('\u{feff}'))
+        .unwrap_or_else(|_| DisplayProfile::default().to_value());
     let mut profile = DisplayProfile::from_value(&value);
     profile.normalize();
     persist_display_profile(path, &profile)?;
     Ok(profile.to_value())
 }
 
-pub fn persist_display_profile(path: &Path, profile: &DisplayProfile) -> Result<(), Box<dyn std::error::Error>> {
+pub fn persist_display_profile(
+    path: &Path,
+    profile: &DisplayProfile,
+) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(parent_dir) = path.parent() {
         fs::create_dir_all(parent_dir)?;
     }

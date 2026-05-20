@@ -10,6 +10,8 @@ use crate::host_engine::boot::environment::data_dirs;
 use crate::host_engine::boot::preload::persistent_data::display_profile::DisplayProfile;
 use crate::host_engine::boot::preload::persistent_data::keybind_profile;
 use crate::host_engine::boot::preload::persistent_data::security_profile::SecurityProfile;
+use crate::host_engine::package::package_id::PackageId;
+use crate::host_engine::package::package_id_registry::PackageIdRegistry;
 
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 
@@ -48,14 +50,16 @@ impl ProfileStore {
         let saves = read_json_object_or_default(&profiles_dir.join("saves.json"), json!({}))?;
         let best_scores =
             read_json_object_or_default(&profiles_dir.join("best_scores.json"), json!({}))?;
-        let keybinds =
-            keybind_profile::load_keybind_profile(&profiles_dir.join("keybind.json"))?;
+        let keybinds = keybind_profile::load_keybind_profile(&profiles_dir.join("keybind.json"))?;
         let security_value = read_json_object_or_default(
             &profiles_dir.join("security_state.json"),
             SecurityProfile::default().to_value(),
         )?;
         let security = SecurityProfile::from_value(&security_value);
-        write_json_pretty(&profiles_dir.join("security_state.json"), &security.to_value())?;
+        write_json_pretty(
+            &profiles_dir.join("security_state.json"),
+            &security.to_value(),
+        )?;
 
         let display_value = read_json_object_or_default(
             &profiles_dir.join("display_state.json"),
@@ -63,7 +67,10 @@ impl ProfileStore {
         )?;
         let mut display = DisplayProfile::from_value(&display_value);
         display.normalize();
-        write_json_pretty(&profiles_dir.join("display_state.json"), &display.to_value())?;
+        write_json_pretty(
+            &profiles_dir.join("display_state.json"),
+            &display.to_value(),
+        )?;
 
         let game_state = read_json_object_map(&profiles_dir.join("game_state.json"))?;
         let saver_state = read_json_object_map(&profiles_dir.join("saver_state"))?;
@@ -75,8 +82,18 @@ impl ProfileStore {
         extend_package_states(&mut package_states, &boss_state);
 
         let games = ordered_entries_from_state(&game_state);
-        let savers = ordered_overlay_entries(&display.saver_list.order, &display.saver_list.enabled, &saver_state);
-        let bosses = ordered_overlay_entries(&display.boss_list.order, &display.boss_list.enabled, &boss_state);
+        let savers = ordered_overlay_entries(
+            &display.saver_list.order,
+            &display.saver_list.enabled,
+            &saver_state,
+        );
+        let bosses = ordered_overlay_entries(
+            &display.boss_list.order,
+            &display.boss_list.enabled,
+            &boss_state,
+        );
+
+        warn_profile_uid_conflicts(&games, &savers, &bosses);
 
         Ok(Self {
             language,
@@ -201,7 +218,9 @@ fn read_json_object_or_default(path: &Path, default_value: Value) -> ProfileStor
 
     match fs::read_to_string(path)
         .ok()
-        .and_then(|raw_json| serde_json::from_str::<Value>(raw_json.trim_start_matches('\u{feff}')).ok())
+        .and_then(|raw_json| {
+            serde_json::from_str::<Value>(raw_json.trim_start_matches('\u{feff}')).ok()
+        })
         .filter(Value::is_object)
     {
         Some(value) => Ok(value),
@@ -319,5 +338,38 @@ fn package_state_kind(uid: &str) -> PackageStateKind {
         PackageStateKind::Boss
     } else {
         PackageStateKind::Game
+    }
+}
+
+fn warn_profile_uid_conflicts(
+    games: &[OrderedPackageEntry],
+    savers: &[OrderedPackageEntry],
+    bosses: &[OrderedPackageEntry],
+) {
+    let mut registry = PackageIdRegistry::default();
+
+    for game in games {
+        register_or_warn(
+            &mut registry,
+            PackageId::from_legacy("game", "game", &game.uid),
+        );
+    }
+    for saver in savers {
+        register_or_warn(
+            &mut registry,
+            PackageId::from_legacy("mod", "saver", &saver.uid),
+        );
+    }
+    for boss in bosses {
+        register_or_warn(
+            &mut registry,
+            PackageId::from_legacy("mod", "boss", &boss.uid),
+        );
+    }
+}
+
+fn register_or_warn(registry: &mut PackageIdRegistry, package_id: PackageId) {
+    if let Err(error) = registry.register(&package_id) {
+        eprintln!("[warning] package uid conflict: {error}");
     }
 }

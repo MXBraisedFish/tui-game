@@ -7,15 +7,17 @@ use std::fs;
 use std::path::Path;
 
 use super::cache_snapshot::LanguageUiText;
+use crate::host_engine::storage::cache_store::CacheStore;
 
 type LanguageUiCacheResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 const LANGUAGE_DIR: &str = "assets/lang";
-const CACHE_FILE: &str = "data/cache/language_ui_cache.json";
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 
 /// 扫描 assets/lang，并同步语言选择 UI 需要的文本缓存。
-pub fn sync_language_ui_cache() -> LanguageUiCacheResult<BTreeMap<String, LanguageUiText>> {
+pub fn sync_language_ui_cache(
+    cache_store: &CacheStore,
+) -> LanguageUiCacheResult<BTreeMap<String, LanguageUiText>> {
     let root_dir = data_dirs::root_dir();
     let language_dir = root_dir.join(LANGUAGE_DIR);
     let fallback_texts =
@@ -42,7 +44,7 @@ pub fn sync_language_ui_cache() -> LanguageUiCacheResult<BTreeMap<String, Langua
         }
     }
 
-    write_language_ui_cache(&root_dir.join(CACHE_FILE), &language_ui_texts)?;
+    cache_store.write_language_ui_cache(&language_ui_texts)?;
     Ok(language_ui_texts)
 }
 
@@ -90,15 +92,4 @@ fn text(
         })
         .cloned()
         .unwrap_or_else(|| format!("[Missing i18n key: {key}]"))
-}
-
-fn write_language_ui_cache(
-    path: &Path,
-    language_ui_texts: &BTreeMap<String, LanguageUiText>,
-) -> LanguageUiCacheResult<()> {
-    if let Some(parent_dir) = path.parent() {
-        fs::create_dir_all(parent_dir)?;
-    }
-    fs::write(path, serde_json::to_string_pretty(language_ui_texts)?)?;
-    Ok(())
 }

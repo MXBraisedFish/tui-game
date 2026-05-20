@@ -49,7 +49,8 @@ pub(crate) fn run(
     crate::host_engine::runtime::renderer::render_canvas(host_bridge, &mut renderer_state)?;
     let mut event_queue = VecDeque::new();
     let mut last_tick_at = Instant::now();
-    let mut frame_rate_controller = FrameRateController::root_ui(active_ui_page.root_idle_threshold());
+    let mut frame_rate_controller =
+        FrameRateController::root_ui(active_ui_page.root_idle_threshold());
     let mut was_running_game = false;
     let mut is_focused = true;
     let mut overlay_session: Option<OverlaySession> = None;
@@ -67,7 +68,8 @@ pub(crate) fn run(
                 }
                 was_running_game = true;
             } else if !active_ui_page.has_game_session() && was_running_game {
-                frame_rate_controller = FrameRateController::root_ui(active_ui_page.root_idle_threshold());
+                frame_rate_controller =
+                    FrameRateController::root_ui(active_ui_page.root_idle_threshold());
                 was_running_game = false;
             }
         }
@@ -182,7 +184,8 @@ pub(crate) fn run(
 
         if frame_rate_controller.is_root_idle() && active_ui_page.should_auto_enter_saver() {
             if let Some(uid) = active_ui_page.next_saver_overlay_uid() {
-                let package = overlay_package_by_uid(&active_ui_page.overlay_registry().savers, uid.as_str());
+                let package =
+                    overlay_package_by_uid(&active_ui_page.overlay_registry().savers, uid.as_str());
                 toggle_overlay(
                     host_bridge,
                     package,
@@ -267,9 +270,9 @@ fn handle_global_key(
 ) -> RuntimeLoopResult<bool> {
     match key.to_ascii_lowercase().as_str() {
         "f2" => {
-            let package = active_ui_page
-                .next_saver_overlay_uid()
-                .and_then(|uid| overlay_package_by_uid(&active_ui_page.overlay_registry().savers, uid.as_str()));
+            let package = active_ui_page.next_saver_overlay_uid().and_then(|uid| {
+                overlay_package_by_uid(&active_ui_page.overlay_registry().savers, uid.as_str())
+            });
             toggle_overlay(
                 host_bridge,
                 package,
@@ -280,9 +283,9 @@ fn handle_global_key(
             Ok(true)
         }
         "f3" => {
-            let package = active_ui_page
-                .next_boss_overlay_uid()
-                .and_then(|uid| overlay_package_by_uid(&active_ui_page.overlay_registry().bosses, uid.as_str()));
+            let package = active_ui_page.next_boss_overlay_uid().and_then(|uid| {
+                overlay_package_by_uid(&active_ui_page.overlay_registry().bosses, uid.as_str())
+            });
             toggle_overlay(
                 host_bridge,
                 package,

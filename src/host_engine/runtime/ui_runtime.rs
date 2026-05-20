@@ -292,11 +292,13 @@ impl ActiveUiPage {
     }
 
     pub(crate) fn next_saver_overlay_uid(&mut self) -> Option<String> {
-        self.display_state.selected_overlay_uid(DisplayPanelKind::Saver)
+        self.display_state
+            .selected_overlay_uid(DisplayPanelKind::Saver)
     }
 
     pub(crate) fn next_boss_overlay_uid(&mut self) -> Option<String> {
-        self.display_state.selected_overlay_uid(DisplayPanelKind::Boss)
+        self.display_state
+            .selected_overlay_uid(DisplayPanelKind::Boss)
     }
 }
 
@@ -897,7 +899,6 @@ fn handle_setting_lua_state(
     }
 }
 
-
 fn handle_display_lua_state(
     active_ui_page: &mut ActiveUiPage,
     host_state_machine: &mut HostStateMachine,
@@ -1110,7 +1111,9 @@ fn handle_language_lua_state(
             active_ui_page.setting_state.refresh_language();
             active_ui_page.keybind_state.refresh_language();
             active_ui_page.keybind_system_state.refresh_language();
-            active_ui_page.display_state.refresh_language(language_code.clone());
+            active_ui_page
+                .display_state
+                .refresh_language(language_code.clone());
             active_ui_page.memory_state.refresh_language();
             active_ui_page.security_state.refresh_language();
             host_bridge.set_language_code(language_code);
@@ -1425,7 +1428,10 @@ fn clear_data_root_state(lua: &mlua::Lua) -> mlua::Result<Table> {
     language.set("CLEAR_DATA_SECOND", text.clear_data.second)?;
 
     let dir = lua.create_table()?;
-    dir.set("data_dir", data_dirs::root_dir().join("data").display().to_string())?;
+    dir.set(
+        "data_dir",
+        data_dirs::root_dir().join("data").display().to_string(),
+    )?;
 
     let table = lua.create_table()?;
     table.set("language", language)?;

@@ -646,12 +646,16 @@ fn read_language_code() -> String {
         .unwrap_or_else(|| DEFAULT_LANGUAGE_CODE.to_string())
 }
 fn read_host_language(code: &str) -> HashMap<String, String> {
-    fs::read_to_string(data_dirs::root_dir().join("assets/lang").join(format!("{code}.json")))
-        .ok()
-        .and_then(|s| {
-            serde_json::from_str::<HashMap<String, String>>(s.trim_start_matches('\u{feff}')).ok()
-        })
-        .unwrap_or_default()
+    fs::read_to_string(
+        data_dirs::root_dir()
+            .join("assets/lang")
+            .join(format!("{code}.json")),
+    )
+    .ok()
+    .and_then(|s| {
+        serde_json::from_str::<HashMap<String, String>>(s.trim_start_matches('\u{feff}')).ok()
+    })
+    .unwrap_or_default()
 }
 fn pairs_to_table(lua: &Lua, pairs: &[(String, String)]) -> mlua::Result<Table> {
     let t = lua.create_table()?;

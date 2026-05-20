@@ -839,14 +839,30 @@ pub fn register(language_source: &LanguageSource) -> KeyText {
         language_source,
         "key.setting_keybind.system.reset.page",
     );
-    set_text(&DISPLAY_PREV_OPTION, language_source, "key.display.prev_option");
-    set_text(&DISPLAY_NEXT_OPTION, language_source, "key.display.next_option");
+    set_text(
+        &DISPLAY_PREV_OPTION,
+        language_source,
+        "key.display.prev_option",
+    );
+    set_text(
+        &DISPLAY_NEXT_OPTION,
+        language_source,
+        "key.display.next_option",
+    );
     set_text(&DISPLAY_SCROLL_UP, language_source, "key.display.scroll_up");
-    set_text(&DISPLAY_SCROLL_DOWN, language_source, "key.display.scroll_down");
+    set_text(
+        &DISPLAY_SCROLL_DOWN,
+        language_source,
+        "key.display.scroll_down",
+    );
     set_text(&DISPLAY_SCROLL, language_source, "key.display.scroll");
     set_text(&DISPLAY_SELECT, language_source, "key.display.select");
     set_text(&DISPLAY_BACK, language_source, "key.display.back");
-    set_text(&DISPLAY_TOGGLE_CONFIRM, language_source, "key.display.toggle_confirm");
+    set_text(
+        &DISPLAY_TOGGLE_CONFIRM,
+        language_source,
+        "key.display.toggle_confirm",
+    );
     set_text(&DISPLAY_TOGGLE, language_source, "key.display.toggle");
     set_text(&DISPLAY_CONFIRM, language_source, "key.display.confirm");
     set_text(&DISPLAY_ORDER, language_source, "key.display.order");

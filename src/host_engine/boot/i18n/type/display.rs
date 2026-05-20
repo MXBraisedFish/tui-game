@@ -64,26 +64,78 @@ pub fn register(language_source: &LanguageSource) -> DisplayText {
     set_text(&TITLE, language_source, "display.title");
     set_text(&TOGGLE_MOD_ON, language_source, "display.toggle.mod.on");
     set_text(&TOGGLE_MOD_OFF, language_source, "display.toggle.mod.off");
-    set_text(&TOGGLE_AFK_SAVER_ON, language_source, "display.toggle.afk.saver.on");
-    set_text(&TOGGLE_AFK_SAVER_OFF, language_source, "display.toggle.afk.saver.off");
-    set_text(&TOGGLE_AFK_TIME_SECOND, language_source, "display.toggle.afk.time.second");
-    set_text(&TOGGLE_AFK_TIME_MINUTE, language_source, "display.toggle.afk.time.minute");
-    set_text(&TOGGLE_AFK_TIME_NEVER, language_source, "display.toggle.afk.time.never");
-    set_text(&TOGGLE_SORT_ORDER, language_source, "display.toggle.sort.order");
-    set_text(&TOGGLE_SORT_RANDOM, language_source, "display.toggle.sort.random");
+    set_text(
+        &TOGGLE_AFK_SAVER_ON,
+        language_source,
+        "display.toggle.afk.saver.on",
+    );
+    set_text(
+        &TOGGLE_AFK_SAVER_OFF,
+        language_source,
+        "display.toggle.afk.saver.off",
+    );
+    set_text(
+        &TOGGLE_AFK_TIME_SECOND,
+        language_source,
+        "display.toggle.afk.time.second",
+    );
+    set_text(
+        &TOGGLE_AFK_TIME_MINUTE,
+        language_source,
+        "display.toggle.afk.time.minute",
+    );
+    set_text(
+        &TOGGLE_AFK_TIME_NEVER,
+        language_source,
+        "display.toggle.afk.time.never",
+    );
+    set_text(
+        &TOGGLE_SORT_ORDER,
+        language_source,
+        "display.toggle.sort.order",
+    );
+    set_text(
+        &TOGGLE_SORT_RANDOM,
+        language_source,
+        "display.toggle.sort.random",
+    );
     set_text(&TOGGLE_SORT_OFF, language_source, "display.toggle.sort.off");
     set_text(&OPTION_INFO_ON, language_source, "display.option.info.on");
     set_text(&OPTION_INFO_OFF, language_source, "display.option.info.off");
-    set_text(&TOGGLE_THEME_SYSTEM, language_source, "display.toggle.theme.system");
+    set_text(
+        &TOGGLE_THEME_SYSTEM,
+        language_source,
+        "display.toggle.theme.system",
+    );
     set_text(&OPTION_MOD, language_source, "display.option.mod");
     set_text(&OPTION_THEME, language_source, "display.option.theme");
     set_text(&OPTION_AFK_TIME, language_source, "display.option.afk.time");
-    set_text(&OPTION_AFK_SAVER, language_source, "display.option.afk.saver");
+    set_text(
+        &OPTION_AFK_SAVER,
+        language_source,
+        "display.option.afk.saver",
+    );
     set_text(&OPTION_INFO, language_source, "display.option.info");
-    set_text(&OPTION_SAVER_SORT, language_source, "display.option.saver.sort");
-    set_text(&OPTION_BOSS_SORT, language_source, "display.option.boss.sort");
-    set_text(&OPTION_SAVER_LIST, language_source, "display.option.saver.list");
-    set_text(&OPTION_BOSS_LIST, language_source, "display.option.boss.list");
+    set_text(
+        &OPTION_SAVER_SORT,
+        language_source,
+        "display.option.saver.sort",
+    );
+    set_text(
+        &OPTION_BOSS_SORT,
+        language_source,
+        "display.option.boss.sort",
+    );
+    set_text(
+        &OPTION_SAVER_LIST,
+        language_source,
+        "display.option.saver.list",
+    );
+    set_text(
+        &OPTION_BOSS_LIST,
+        language_source,
+        "display.option.boss.list",
+    );
     set_text(&OPTION_LIST_ON, language_source, "display.option.list.on");
     set_text(&OPTION_LIST_OFF, language_source, "display.option.list.off");
     set_text(&OPTION_LIST_MOD, language_source, "display.option.list.mod");

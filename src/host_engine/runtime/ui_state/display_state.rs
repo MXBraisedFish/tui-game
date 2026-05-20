@@ -8,8 +8,12 @@ use mlua::{Lua, Table, Value};
 use serde_json::Value as JsonValue;
 
 use crate::host_engine::boot::i18n;
-use crate::host_engine::boot::preload::overlay_modules::{OverlayPackage, OverlayRegistry, OverlaySource};
-use crate::host_engine::boot::preload::persistent_data::display_profile::{DisplayOverlayProfile, DisplayProfile};
+use crate::host_engine::boot::preload::overlay_modules::{
+    OverlayPackage, OverlayRegistry, OverlaySource,
+};
+use crate::host_engine::boot::preload::persistent_data::display_profile::{
+    DisplayOverlayProfile, DisplayProfile,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DisplayPanelKind {
@@ -50,9 +54,18 @@ impl DisplayUiState {
         language_code: String,
     ) -> Self {
         let profile = DisplayProfile::from_value(&display_state);
-        let root_state = DisplayRootState::new(profile, overlay_registry, saver_state, boss_state, language_code);
+        let root_state = DisplayRootState::new(
+            profile,
+            overlay_registry,
+            saver_state,
+            boss_state,
+            language_code,
+        );
         let lua_state = DisplayLuaState::from_root_state(&root_state);
-        Self { root_state, lua_state }
+        Self {
+            root_state,
+            lua_state,
+        }
     }
 
     pub fn reset_lua_state(&mut self) {
@@ -67,7 +80,12 @@ impl DisplayUiState {
         self.root_state.refresh_items();
     }
 
-    pub fn replace_overlay_data(&mut self, overlay_registry: OverlayRegistry, saver_state: JsonValue, boss_state: JsonValue) {
+    pub fn replace_overlay_data(
+        &mut self,
+        overlay_registry: OverlayRegistry,
+        saver_state: JsonValue,
+        boss_state: JsonValue,
+    ) {
         self.root_state.overlay_registry = overlay_registry;
         self.root_state.saver_state = saver_state;
         self.root_state.boss_state = boss_state;
@@ -87,7 +105,11 @@ impl DisplayUiState {
     pub fn should_auto_enter_saver(&self) -> bool {
         self.root_state.profile.idle_enter_saver
             && self.root_state.profile.saver_mode != "off"
-            && self.root_state.display_candidates(DisplayPanelKind::Saver).next().is_some()
+            && self
+                .root_state
+                .display_candidates(DisplayPanelKind::Saver)
+                .next()
+                .is_some()
     }
 
     pub fn selected_overlay_uid(&mut self, panel: DisplayPanelKind) -> Option<String> {
@@ -99,7 +121,11 @@ impl DisplayUiState {
         if mode == "off" {
             return None;
         }
-        let candidates = self.root_state.display_candidates(panel).cloned().collect::<Vec<_>>();
+        let candidates = self
+            .root_state
+            .display_candidates(panel)
+            .cloned()
+            .collect::<Vec<_>>();
         if candidates.is_empty() {
             return None;
         }
@@ -116,7 +142,11 @@ impl DisplayUiState {
                 profile.cursor = 0;
             }
             let index = profile.cursor;
-            profile.cursor = if candidates.is_empty() { 0 } else { (index + 1) % candidates.len() };
+            profile.cursor = if candidates.is_empty() {
+                0
+            } else {
+                (index + 1) % candidates.len()
+            };
             let _ = self.root_state.persist_profile();
             candidates.get(index).cloned()
         };
@@ -159,7 +189,8 @@ impl DisplayUiState {
                 return DisplayLuaAction::StateChanged(self.root_state.profile.to_value());
             }
             if self.lua_state.position_target > 0 {
-                self.root_state.move_selected_to(self.lua_state.position_target as usize);
+                self.root_state
+                    .move_selected_to(self.lua_state.position_target as usize);
                 self.root_state.position_mode = false;
                 self.root_state.position_input = 0;
                 let _ = self.root_state.persist_profile();
@@ -186,10 +217,17 @@ impl DisplayUiState {
         match self.root_state.select {
             1 => self.root_state.profile.mod_badge = !self.root_state.profile.mod_badge,
             2 => self.root_state.profile.theme = "system".to_string(),
-            3 => self.root_state.profile.idle_threshold = next_idle_threshold(self.root_state.profile.idle_threshold),
-            4 => self.root_state.profile.idle_enter_saver = !self.root_state.profile.idle_enter_saver,
+            3 => {
+                self.root_state.profile.idle_threshold =
+                    next_idle_threshold(self.root_state.profile.idle_threshold)
+            }
+            4 => {
+                self.root_state.profile.idle_enter_saver = !self.root_state.profile.idle_enter_saver
+            }
             5 => self.root_state.profile.host_status = !self.root_state.profile.host_status,
-            6 => self.root_state.profile.saver_mode = next_mode(&self.root_state.profile.saver_mode),
+            6 => {
+                self.root_state.profile.saver_mode = next_mode(&self.root_state.profile.saver_mode)
+            }
             7 => self.root_state.profile.boss_mode = next_mode(&self.root_state.profile.boss_mode),
             8 => self.root_state.panel = DisplayPanelKind::Saver,
             9 => self.root_state.panel = DisplayPanelKind::Boss,
@@ -257,20 +295,34 @@ impl DisplayLuaState {
     pub fn from_lua_value(value: Value) -> mlua::Result<Self> {
         let table = match value {
             Value::Table(table) => table,
-            _ => return Err(mlua::Error::external("display lua state must be returned as table")),
+            _ => {
+                return Err(mlua::Error::external(
+                    "display lua state must be returned as table",
+                ));
+            }
         };
         Ok(Self {
             select: table.get::<Option<i64>>("select")?.unwrap_or(1).clamp(1, 9),
             confirm: table.get::<Option<bool>>("confirm")?.unwrap_or(false),
             back: table.get::<Option<bool>>("back")?.unwrap_or(false),
-            panel: table.get::<Option<String>>("panel")?.unwrap_or_else(|| "none".to_string()),
-            list_select: table.get::<Option<String>>("list_select")?.unwrap_or_default(),
+            panel: table
+                .get::<Option<String>>("panel")?
+                .unwrap_or_else(|| "none".to_string()),
+            list_select: table
+                .get::<Option<String>>("list_select")?
+                .unwrap_or_default(),
             list_scroll: table.get::<Option<i64>>("list_scroll")?.unwrap_or(0).max(0),
             move_mode: table.get::<Option<bool>>("move_mode")?.unwrap_or(false),
             move_delta: table.get::<Option<i64>>("move_delta")?.unwrap_or(0),
             position_mode: table.get::<Option<bool>>("position_mode")?.unwrap_or(false),
-            position_input: table.get::<Option<i64>>("position_input")?.unwrap_or(0).max(0),
-            position_target: table.get::<Option<i64>>("position_target")?.unwrap_or(0).max(0),
+            position_input: table
+                .get::<Option<i64>>("position_input")?
+                .unwrap_or(0)
+                .max(0),
+            position_target: table
+                .get::<Option<i64>>("position_target")?
+                .unwrap_or(0)
+                .max(0),
         })
     }
 }
@@ -295,7 +347,13 @@ pub struct DisplayRootState {
 }
 
 impl DisplayRootState {
-    fn new(profile: DisplayProfile, overlay_registry: OverlayRegistry, saver_state: JsonValue, boss_state: JsonValue, language_code: String) -> Self {
+    fn new(
+        profile: DisplayProfile,
+        overlay_registry: OverlayRegistry,
+        saver_state: JsonValue,
+        boss_state: JsonValue,
+        language_code: String,
+    ) -> Self {
         let mut root = Self {
             language: display_language_pairs(),
             profile,
@@ -370,18 +428,25 @@ impl DisplayRootState {
         }
     }
 
-    fn display_candidates(&self, panel: DisplayPanelKind) -> impl Iterator<Item = &DisplayOverlayItem> {
+    fn display_candidates(
+        &self,
+        panel: DisplayPanelKind,
+    ) -> impl Iterator<Item = &DisplayOverlayItem> {
         let items = match panel {
             DisplayPanelKind::Saver => &self.saver_items,
             DisplayPanelKind::Boss => &self.boss_items,
             DisplayPanelKind::None => &self.saver_items,
         };
-        items.iter().filter(|item| item.scan_enabled && item.display_enabled)
+        items
+            .iter()
+            .filter(|item| item.scan_enabled && item.display_enabled)
     }
 
     fn toggle_selected_display_enabled(&mut self) {
         let uid = self.list_select_uid.clone();
-        let Some(profile) = self.active_profile_mut() else { return; };
+        let Some(profile) = self.active_profile_mut() else {
+            return;
+        };
         let enabled = profile.enabled.get(&uid).copied().unwrap_or(true);
         profile.enabled.insert(uid, !enabled);
         self.refresh_items();
@@ -392,9 +457,17 @@ impl DisplayRootState {
             return;
         }
         let uid = self.list_select_uid.clone();
-        let Some(profile) = self.active_profile_mut() else { return; };
-        let Some(index) = profile.order.iter().position(|item| item == &uid) else { return; };
-        let target = if delta < 0 { index.saturating_sub(1) } else { (index + 1).min(profile.order.len().saturating_sub(1)) };
+        let Some(profile) = self.active_profile_mut() else {
+            return;
+        };
+        let Some(index) = profile.order.iter().position(|item| item == &uid) else {
+            return;
+        };
+        let target = if delta < 0 {
+            index.saturating_sub(1)
+        } else {
+            (index + 1).min(profile.order.len().saturating_sub(1))
+        };
         if target != index {
             profile.order.swap(index, target);
             self.refresh_items();
@@ -406,8 +479,12 @@ impl DisplayRootState {
             return;
         }
         let uid = self.list_select_uid.clone();
-        let Some(profile) = self.active_profile_mut() else { return; };
-        let Some(index) = profile.order.iter().position(|item| item == &uid) else { return; };
+        let Some(profile) = self.active_profile_mut() else {
+            return;
+        };
+        let Some(index) = profile.order.iter().position(|item| item == &uid) else {
+            return;
+        };
         let item = profile.order.remove(index);
         let target = target_one_based.saturating_sub(1).min(profile.order.len());
         profile.order.insert(target, item);
@@ -446,34 +523,52 @@ pub struct DisplayOverlayItem {
     pub display_enabled: bool,
 }
 
-fn build_overlay_items(packages: &[OverlayPackage], state: &JsonValue, profile: &mut DisplayOverlayProfile, language_code: &str) -> Vec<DisplayOverlayItem> {
+fn build_overlay_items(
+    packages: &[OverlayPackage],
+    state: &JsonValue,
+    profile: &mut DisplayOverlayProfile,
+    language_code: &str,
+) -> Vec<DisplayOverlayItem> {
     let mut by_uid = BTreeMap::new();
     for package in packages {
         let scan_enabled = package.source == OverlaySource::Office
-            || state.get(package.uid.as_str()).and_then(|value| value.get("enabled")).and_then(JsonValue::as_bool).unwrap_or(true);
+            || state
+                .get(package.uid.as_str())
+                .and_then(|value| value.get("enabled"))
+                .and_then(JsonValue::as_bool)
+                .unwrap_or(true);
         if !scan_enabled {
             continue;
         }
         profile.enabled.entry(package.uid.clone()).or_insert(true);
         let texts = load_package_language_texts(&package.root_dir, language_code);
-        by_uid.insert(package.uid.clone(), DisplayOverlayItem {
-            uid: package.uid.clone(),
-            name: resolve_package_text(&texts, &package.manifest.display_name),
-            package_name: resolve_package_text(&texts, &package.manifest.package_name),
-            source: package.source.as_str().to_string(),
-            is_mod: package.source == OverlaySource::ThirdParty,
-            scan_enabled,
-            display_enabled: profile.enabled.get(&package.uid).copied().unwrap_or(true),
-        });
+        by_uid.insert(
+            package.uid.clone(),
+            DisplayOverlayItem {
+                uid: package.uid.clone(),
+                name: resolve_package_text(&texts, &package.manifest.display_name),
+                package_name: resolve_package_text(&texts, &package.manifest.package_name),
+                source: package.source.as_str().to_string(),
+                is_mod: package.source == OverlaySource::ThirdParty,
+                scan_enabled,
+                display_enabled: profile.enabled.get(&package.uid).copied().unwrap_or(true),
+            },
+        );
     }
     profile.order.retain(|uid| by_uid.contains_key(uid));
     profile.enabled.retain(|uid, _| by_uid.contains_key(uid));
     for package in packages {
-        if by_uid.contains_key(&package.uid) && !profile.order.iter().any(|item| item == &package.uid) {
+        if by_uid.contains_key(&package.uid)
+            && !profile.order.iter().any(|item| item == &package.uid)
+        {
             profile.order.push(package.uid.clone());
         }
     }
-    let items = profile.order.iter().filter_map(|uid| by_uid.remove(uid)).collect::<Vec<_>>();
+    let items = profile
+        .order
+        .iter()
+        .filter_map(|uid| by_uid.remove(uid))
+        .collect::<Vec<_>>();
     if profile.cursor >= items.len() {
         profile.cursor = 0;
     }
@@ -525,7 +620,10 @@ fn display_language_pairs() -> Vec<(String, String)> {
         ("DISPLAY_SCROLL".into(), text.key.display_scroll),
         ("DISPLAY_SELECT".into(), text.key.display_select),
         ("DISPLAY_BACK".into(), text.key.display_back),
-        ("DISPLAY_TOGGLE_CONFIRM".into(), text.key.display_toggle_confirm),
+        (
+            "DISPLAY_TOGGLE_CONFIRM".into(),
+            text.key.display_toggle_confirm,
+        ),
         ("DISPLAY_TOGGLE".into(), text.key.display_toggle),
         ("DISPLAY_CONFIRM".into(), text.key.display_confirm),
         ("DISPLAY_ORDER".into(), text.key.display_order),
@@ -542,29 +640,83 @@ fn display_language_pairs() -> Vec<(String, String)> {
         ("DISPLAY_TITLE".into(), text.display.title),
         ("DISPLAY_TOGGLE_MOD_ON".into(), text.display.toggle_mod_on),
         ("DISPLAY_TOGGLE_MOD_OFF".into(), text.display.toggle_mod_off),
-        ("DISPLAY_TOGGLE_AFK_SAVER_ON".into(), text.display.toggle_afk_saver_on),
-        ("DISPLAY_TOGGLE_AFK_SAVER_OFF".into(), text.display.toggle_afk_saver_off),
-        ("DISPLAY_TOGGLE_AFK_TIME_SECOND".into(), text.display.toggle_afk_time_second),
-        ("DISPLAY_TOGGLE_AFK_TIME_MINUTE".into(), text.display.toggle_afk_time_minute),
-        ("DISPLAY_TOGGLE_AFK_TIME_NEVER".into(), text.display.toggle_afk_time_never),
-        ("DISPLAY_TOGGLE_SORT_ORDER".into(), text.display.toggle_sort_order),
-        ("DISPLAY_TOGGLE_SORT_RANDOM".into(), text.display.toggle_sort_random),
-        ("DISPLAY_TOGGLE_SORT_OFF".into(), text.display.toggle_sort_off),
+        (
+            "DISPLAY_TOGGLE_AFK_SAVER_ON".into(),
+            text.display.toggle_afk_saver_on,
+        ),
+        (
+            "DISPLAY_TOGGLE_AFK_SAVER_OFF".into(),
+            text.display.toggle_afk_saver_off,
+        ),
+        (
+            "DISPLAY_TOGGLE_AFK_TIME_SECOND".into(),
+            text.display.toggle_afk_time_second,
+        ),
+        (
+            "DISPLAY_TOGGLE_AFK_TIME_MINUTE".into(),
+            text.display.toggle_afk_time_minute,
+        ),
+        (
+            "DISPLAY_TOGGLE_AFK_TIME_NEVER".into(),
+            text.display.toggle_afk_time_never,
+        ),
+        (
+            "DISPLAY_TOGGLE_SORT_ORDER".into(),
+            text.display.toggle_sort_order,
+        ),
+        (
+            "DISPLAY_TOGGLE_SORT_RANDOM".into(),
+            text.display.toggle_sort_random,
+        ),
+        (
+            "DISPLAY_TOGGLE_SORT_OFF".into(),
+            text.display.toggle_sort_off,
+        ),
         ("DISPLAY_OPTION_INFO_ON".into(), text.display.option_info_on),
-        ("DISPLAY_OPTION_INFO_OFF".into(), text.display.option_info_off),
-        ("DISPLAY_TOGGLE_THEME_SYSTEM".into(), text.display.toggle_theme_system),
+        (
+            "DISPLAY_OPTION_INFO_OFF".into(),
+            text.display.option_info_off,
+        ),
+        (
+            "DISPLAY_TOGGLE_THEME_SYSTEM".into(),
+            text.display.toggle_theme_system,
+        ),
         ("DISPLAY_OPTION_MOD".into(), text.display.option_mod),
         ("DISPLAY_OPTION_THEME".into(), text.display.option_theme),
-        ("DISPLAY_OPTION_AFK_TIME".into(), text.display.option_afk_time),
-        ("DISPLAY_OPTION_AFK_SAVER".into(), text.display.option_afk_saver),
+        (
+            "DISPLAY_OPTION_AFK_TIME".into(),
+            text.display.option_afk_time,
+        ),
+        (
+            "DISPLAY_OPTION_AFK_SAVER".into(),
+            text.display.option_afk_saver,
+        ),
         ("DISPLAY_OPTION_INFO".into(), text.display.option_info),
-        ("DISPLAY_OPTION_SAVER_SORT".into(), text.display.option_saver_sort),
-        ("DISPLAY_OPTION_BOSS_SORT".into(), text.display.option_boss_sort),
-        ("DISPLAY_OPTION_SAVER_LIST".into(), text.display.option_saver_list),
-        ("DISPLAY_OPTION_BOSS_LIST".into(), text.display.option_boss_list),
+        (
+            "DISPLAY_OPTION_SAVER_SORT".into(),
+            text.display.option_saver_sort,
+        ),
+        (
+            "DISPLAY_OPTION_BOSS_SORT".into(),
+            text.display.option_boss_sort,
+        ),
+        (
+            "DISPLAY_OPTION_SAVER_LIST".into(),
+            text.display.option_saver_list,
+        ),
+        (
+            "DISPLAY_OPTION_BOSS_LIST".into(),
+            text.display.option_boss_list,
+        ),
         ("DISPLAY_OPTION_LIST_ON".into(), text.display.option_list_on),
-        ("DISPLAY_OPTION_LIST_OFF".into(), text.display.option_list_off),
-        ("DISPLAY_OPTION_LIST_MOD".into(), text.display.option_list_mod),
+        (
+            "DISPLAY_OPTION_LIST_OFF".into(),
+            text.display.option_list_off,
+        ),
+        (
+            "DISPLAY_OPTION_LIST_MOD".into(),
+            text.display.option_list_mod,
+        ),
     ]
 }
 
@@ -606,13 +758,20 @@ fn load_package_language_texts(root_dir: &Path, language_code: &str) -> BTreeMap
 }
 
 fn read_language_file(root_dir: &Path, language_code: &str) -> BTreeMap<String, String> {
-    let path = root_dir.join("assets/lang").join(format!("{language_code}.json"));
+    let path = root_dir
+        .join("assets/lang")
+        .join(format!("{language_code}.json"));
     let Ok(raw_json) = fs::read_to_string(path) else {
         return BTreeMap::new();
     };
-    serde_json::from_str::<BTreeMap<String, String>>(raw_json.trim_start_matches('\u{feff}')).unwrap_or_default()
+    serde_json::from_str::<BTreeMap<String, String>>(raw_json.trim_start_matches('\u{feff}'))
+        .unwrap_or_default()
 }
 
 fn resolve_package_text(texts: &BTreeMap<String, String>, value: &str) -> String {
-    texts.get(value).filter(|text| !text.trim().is_empty()).cloned().unwrap_or_else(|| value.to_string())
+    texts
+        .get(value)
+        .filter(|text| !text.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| value.to_string())
 }

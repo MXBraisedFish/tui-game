@@ -9,14 +9,58 @@ mod uid;
 pub use manifest::{OverlayPackage, OverlayPackageManifest, OverlayRegistry, OverlayScanError};
 pub use source::{OverlayKind, OverlaySource};
 
+use crate::host_engine::package::package_id::PackageId;
+use crate::host_engine::package::package_id_registry::PackageIdRegistry;
+
 type OverlayModuleResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 pub fn load() -> OverlayModuleResult<OverlayRegistry> {
     let registry = scanner::scan_all()?;
+    warn_uid_conflicts(&registry);
     scan_cache::persist_scan_cache(&registry)?;
     state::sync_saver_state(&registry)?;
     state::sync_boss_state(&registry)?;
     Ok(registry)
+}
+
+fn warn_uid_conflicts(registry: &OverlayRegistry) {
+    let mut package_id_registry = PackageIdRegistry::default();
+
+    for saver in &registry.savers {
+        let package_id = PackageId::from_legacy(
+            source_legacy_text(saver.source),
+            kind_legacy_text(saver.kind),
+            &saver.uid,
+        );
+        if let Err(error) = package_id_registry.register(&package_id) {
+            eprintln!("[warning] package uid conflict: {error}");
+        }
+    }
+
+    for boss in &registry.bosses {
+        let package_id = PackageId::from_legacy(
+            source_legacy_text(boss.source),
+            kind_legacy_text(boss.kind),
+            &boss.uid,
+        );
+        if let Err(error) = package_id_registry.register(&package_id) {
+            eprintln!("[warning] package uid conflict: {error}");
+        }
+    }
+}
+
+fn source_legacy_text(source: OverlaySource) -> &'static str {
+    match source {
+        OverlaySource::Office => "official",
+        OverlaySource::ThirdParty => "mod",
+    }
+}
+
+fn kind_legacy_text(kind: OverlayKind) -> &'static str {
+    match kind {
+        OverlayKind::Saver => "saver",
+        OverlayKind::Boss => "boss",
+    }
 }
 
 mod scan_cache {
@@ -124,5 +168,4 @@ mod state {
         fs::write(path, serde_json::to_string_pretty(state)?)?;
         Ok(())
     }
-
 }

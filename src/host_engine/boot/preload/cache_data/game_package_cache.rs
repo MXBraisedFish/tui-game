@@ -7,33 +7,35 @@ use std::fs;
 use std::path::Path;
 
 use crate::host_engine::boot::preload::game_modules::GameModuleRegistry;
+use crate::host_engine::storage::cache_store::CacheStore;
 
 use super::cache_snapshot::CacheData;
 use super::image_cache;
 
 type CacheResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-const GAME_SCAN_CACHE_FILE: &str = "mod_scan_cache.json";
 const IMAGE_CACHE_DIR: &str = "images";
 
 /// 同步游戏包扫描缓存。
 pub fn sync_game_package_cache(
+    cache_store: &CacheStore,
     game_module_registry: &GameModuleRegistry,
 ) -> CacheResult<CacheData> {
     let cache_dir = data_dirs::root_dir().join("data/cache");
     let image_cache_dir = cache_dir.join(IMAGE_CACHE_DIR);
-    let scan_cache_path = cache_dir.join(GAME_SCAN_CACHE_FILE);
 
     fs::create_dir_all(&cache_dir)?;
     fs::create_dir_all(&image_cache_dir)?;
 
-    let previous_game_module_registry = read_game_scan_cache(&scan_cache_path);
+    let previous_game_module_registry = cache_store.read_scan_cache().games.clone();
     let removed_game_uids =
         find_removed_game_uids(&previous_game_module_registry, game_module_registry);
 
     remove_unused_game_cache(&image_cache_dir, &removed_game_uids)?;
     image_cache::sync_image_cache(game_module_registry, &image_cache_dir)?;
-    write_game_scan_cache(&scan_cache_path, game_module_registry)?;
+    // ScanCache 仅包含可持久化的注册表快照；diff/cleanup 等运行时中间数据
+    // 保留在 CacheData 中，不进入存储层。
+    cache_store.write_game_scan_cache(game_module_registry)?;
 
     Ok(CacheData {
         previous_game_module_registry,
@@ -42,24 +44,6 @@ pub fn sync_game_package_cache(
         image_cache_dir,
         language_ui_texts: Default::default(),
     })
-}
-
-fn read_game_scan_cache(path: &Path) -> GameModuleRegistry {
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|raw_json| serde_json::from_str::<GameModuleRegistry>(&raw_json).ok())
-        .unwrap_or_default()
-}
-
-fn write_game_scan_cache(
-    path: &Path,
-    game_module_registry: &GameModuleRegistry,
-) -> CacheResult<()> {
-    if let Some(parent_dir) = path.parent() {
-        fs::create_dir_all(parent_dir)?;
-    }
-    fs::write(path, serde_json::to_string_pretty(game_module_registry)?)?;
-    Ok(())
 }
 
 fn find_removed_game_uids(

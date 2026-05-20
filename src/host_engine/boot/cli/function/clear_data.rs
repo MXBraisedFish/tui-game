@@ -57,4 +57,3 @@ fn clear_dir(path: &Path) -> CommandResult<()> {
     fs::create_dir_all(path)?;
     Ok(())
 }
-

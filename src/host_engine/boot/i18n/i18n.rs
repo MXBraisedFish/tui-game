@@ -11,8 +11,8 @@ use once_cell::sync::OnceCell;
 
 use super::r#type::{
     clear_cache, clear_data, default_security, display, error, game_list, global, home, key,
-    language, loading, memory, mod_hub, mod_list, mod_security, security, setting,
-    setting_keybind, start, warning,
+    language, loading, memory, mod_hub, mod_list, mod_security, security, setting, setting_keybind,
+    start, warning,
 };
 
 const DEFAULT_LANGUAGE_CODE: &str = "en_us";
@@ -232,4 +232,3 @@ fn missing_text(key: &str, language_source: &LanguageSource) -> String {
 fn repair_language_files() {
     // Placeholder: official file repair will be implemented later.
 }
-

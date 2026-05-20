@@ -2,3 +2,4 @@
 
 pub mod cache_store;
 pub mod profile_store;
+pub mod types;
