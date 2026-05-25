@@ -7,7 +7,6 @@ pub use readiness::LaunchReadiness;
 
 use crate::host_engine::boot::preload::cache_data::CacheData;
 use crate::host_engine::boot::preload::game_modules::GameModuleRegistry;
-use crate::host_engine::boot::preload::official_ui::OfficialUiRegistry;
 use crate::host_engine::boot::preload::persistent_data::PersistentData;
 use crate::host_engine::boot::preload::state_machine::HostStateMachine;
 
@@ -19,14 +18,12 @@ use crate::host_engine::boot::preload::state_machine::HostStateMachine;
 /// TODO: 后续在这里确认所有图片缓存、语言缓存、按键映射缓存已可直接供运行时使用。
 pub fn load(
     game_module_registry: &GameModuleRegistry,
-    official_ui_registry: &OfficialUiRegistry,
     persistent_data: &PersistentData,
     cache_data: &CacheData,
     host_state_machine: &HostStateMachine,
 ) -> Result<LaunchReadiness, Box<dyn std::error::Error>> {
     validator::validate_launch_readiness(
         game_module_registry,
-        official_ui_registry,
         persistent_data,
         cache_data,
         host_state_machine,

@@ -7,7 +7,6 @@ use crate::host_engine::boot::preload::cache_data::CacheData;
 use crate::host_engine::boot::preload::finalize_launch::LaunchReadiness;
 use crate::host_engine::boot::preload::game_modules::GameModuleRegistry;
 use crate::host_engine::boot::preload::init_environment::{InitializedEnvironment, TerminalSize};
-use crate::host_engine::boot::preload::official_ui::OfficialUiRegistry;
 use crate::host_engine::boot::preload::overlay_modules::OverlayRegistry;
 use crate::host_engine::boot::preload::persistent_data::PersistentData;
 use crate::host_engine::boot::preload::state_machine::HostStateMachine;
@@ -50,7 +49,6 @@ pub struct RuntimeContext {
 
     pub initialized_environment: InitializedEnvironment,
     pub game_module_registry: GameModuleRegistry,
-    pub official_ui_registry: OfficialUiRegistry,
     pub overlay_registry: OverlayRegistry,
     pub persistent_data: PersistentData,
     pub cache_data: CacheData,

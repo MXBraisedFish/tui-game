@@ -78,7 +78,6 @@ pub fn clear_debug_log(host_bridge: &HostLuaBridge) -> mlua::Result<()> {
 pub(crate) fn is_debug_enabled(host_bridge: &HostLuaBridge) -> bool {
     let runtime_context = host_bridge.runtime_context();
     match runtime_context.consumer {
-        LuaRuntimeConsumer::OfficialUiPackage => true,
         LuaRuntimeConsumer::GamePackage => runtime_context
             .current_game
             .as_ref()

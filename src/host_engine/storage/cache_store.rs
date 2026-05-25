@@ -51,7 +51,10 @@ impl CacheStore {
         Ok(Self {
             scan_cache: ScanCache {
                 games: read_json_or_default(&cache_path(GAME_SCAN_CACHE_FILE)),
-                screensavers: read_json_value_or_default(&cache_path(SCREENSAVER_SCAN_CACHE_FILE), json!({})),
+                screensavers: read_json_value_or_default(
+                    &cache_path(SCREENSAVER_SCAN_CACHE_FILE),
+                    json!({}),
+                ),
                 bosses: read_json_value_or_default(&cache_path(BOSS_SCAN_CACHE_FILE), json!({})),
             },
             image_cache: ImageCache {
@@ -75,7 +78,10 @@ impl CacheStore {
     /// 保存扫描缓存。
     pub fn save_scan_cache(&self) -> CacheStoreResult<()> {
         write_json_pretty(&cache_path(GAME_SCAN_CACHE_FILE), &self.scan_cache.games)?;
-        write_json_pretty(&cache_path(SCREENSAVER_SCAN_CACHE_FILE), &self.scan_cache.screensavers)?;
+        write_json_pretty(
+            &cache_path(SCREENSAVER_SCAN_CACHE_FILE),
+            &self.scan_cache.screensavers,
+        )?;
         write_json_pretty(&cache_path(BOSS_SCAN_CACHE_FILE), &self.scan_cache.bosses)?;
         Ok(())
     }

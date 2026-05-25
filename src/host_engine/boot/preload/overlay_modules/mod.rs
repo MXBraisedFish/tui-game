@@ -115,7 +115,9 @@ mod state {
 
     use super::{OverlayRegistry, OverlaySource};
 
-    pub fn sync_screensaver_state(registry: &OverlayRegistry) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn sync_screensaver_state(
+        registry: &OverlayRegistry,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let path = data_dirs::root_dir().join("data/profiles/screensaver_state");
         let security = security_profile::load_from_default_path();
         let mut state = read_state(&path)?;

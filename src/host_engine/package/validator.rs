@@ -80,7 +80,11 @@ pub fn validate_package_at(
         }
         PackageKind::Screensaver => {
             require_text(&mut result, manifest.entry.as_deref(), "entry");
-            require_text(&mut result, manifest.screensaver_name.as_deref(), "screensaver_name");
+            require_text(
+                &mut result,
+                manifest.screensaver_name.as_deref(),
+                "screensaver_name",
+            );
         }
         PackageKind::Boss => {
             require_text(&mut result, manifest.entry.as_deref(), "entry");

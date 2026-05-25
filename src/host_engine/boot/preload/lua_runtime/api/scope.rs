@@ -5,8 +5,6 @@
 pub enum ApiConsumer {
     /// 游戏包脚本。
     GamePackage,
-    /// 官方 UI 包脚本。
-    OfficialUiPackage,
     /// Screensaver 覆盖层脚本。
     ScreensaverPackage,
     /// 老板键覆盖层脚本。
@@ -24,13 +22,6 @@ impl ApiScope {
     pub fn game_package() -> Self {
         Self {
             consumer: ApiConsumer::GamePackage,
-        }
-    }
-
-    /// 官方 UI 包 API 作用域。
-    pub fn official_ui_package() -> Self {
-        Self {
-            consumer: ApiConsumer::OfficialUiPackage,
         }
     }
 
@@ -55,20 +46,14 @@ impl ApiScope {
 
     /// 当前作用域是否允许使用 UI 共享声明式 API。
     pub fn allows_ui_callbacks(self) -> bool {
-        matches!(
-            self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
-        )
+        matches!(self.consumer, ApiConsumer::GamePackage)
     }
 
     /// 当前作用域是否允许使用调试日志 API。
     pub fn allows_debug_log(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 
@@ -89,10 +74,7 @@ impl ApiScope {
 
     /// 当前作用域是否允许查询按键映射。
     pub fn allows_key_query(self) -> bool {
-        matches!(
-            self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
-        )
+        matches!(self.consumer, ApiConsumer::GamePackage)
     }
 
     /// 当前作用域是否允许使用游戏系统查询 API。
@@ -102,10 +84,7 @@ impl ApiScope {
 
     /// 当前作用域是否允许发送通用系统请求。
     pub fn allows_common_system_request(self) -> bool {
-        matches!(
-            self.consumer,
-            ApiConsumer::GamePackage | ApiConsumer::OfficialUiPackage
-        )
+        matches!(self.consumer, ApiConsumer::GamePackage)
     }
 
     /// 当前作用域是否允许发送游戏存储请求。
@@ -117,10 +96,7 @@ impl ApiScope {
     pub fn allows_canvas_drawing(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 
@@ -128,10 +104,7 @@ impl ApiScope {
     pub fn allows_measurement(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 
@@ -139,10 +112,7 @@ impl ApiScope {
     pub fn allows_layout(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 
@@ -150,10 +120,7 @@ impl ApiScope {
     pub fn allows_file_reading(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 
@@ -166,10 +133,7 @@ impl ApiScope {
     pub fn allows_table_utilities(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 
@@ -177,10 +141,7 @@ impl ApiScope {
     pub fn allows_module_loading(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 
@@ -188,10 +149,7 @@ impl ApiScope {
     pub fn allows_timer(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 
@@ -199,10 +157,7 @@ impl ApiScope {
     pub fn allows_random(self) -> bool {
         matches!(
             self.consumer,
-            ApiConsumer::GamePackage
-                | ApiConsumer::OfficialUiPackage
-                | ApiConsumer::ScreensaverPackage
-                | ApiConsumer::BossPackage
+            ApiConsumer::GamePackage | ApiConsumer::ScreensaverPackage | ApiConsumer::BossPackage
         )
     }
 }

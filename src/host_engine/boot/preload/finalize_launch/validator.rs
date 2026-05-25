@@ -5,7 +5,6 @@ use std::io;
 
 use crate::host_engine::boot::preload::cache_data::CacheData;
 use crate::host_engine::boot::preload::game_modules::GameModuleRegistry;
-use crate::host_engine::boot::preload::official_ui::OfficialUiRegistry;
 use crate::host_engine::boot::preload::persistent_data::PersistentData;
 use crate::host_engine::boot::preload::state_machine::{HostStateMachine, TopLevelState};
 
@@ -13,8 +12,6 @@ use super::readiness::LaunchReadiness;
 
 const TODO_BUILD_RUNTIME_CONTEXT: &str =
     "TODO: build merged runtime context from game modules, profiles, and cache data";
-const TODO_VALIDATE_UI_ENTRY: &str =
-    "TODO: validate official UI Lua entry scripts and UI API contracts";
 const TODO_PREPARE_IMAGE_CACHE: &str =
     "TODO: prepare game icon/banner render cache for runtime consumption";
 const TODO_PREPARE_KEYBIND_CONTEXT: &str =
@@ -23,7 +20,6 @@ const TODO_PREPARE_KEYBIND_CONTEXT: &str =
 /// 校验启动前资源是否具备最低可运行条件。
 pub fn validate_launch_readiness(
     game_module_registry: &GameModuleRegistry,
-    official_ui_registry: &OfficialUiRegistry,
     persistent_data: &PersistentData,
     cache_data: &CacheData,
     host_state_machine: &HostStateMachine,
@@ -36,13 +32,10 @@ pub fn validate_launch_readiness(
     Ok(LaunchReadiness {
         game_count: game_module_registry.games.len(),
         game_scan_error_count: game_module_registry.errors.len(),
-        official_ui_package_count: official_ui_registry.packages.len(),
-        official_ui_scan_error_count: official_ui_registry.errors.len(),
         removed_game_cache_count: cache_data.removed_game_uids.len(),
         image_cache_dir: cache_data.image_cache_dir.clone(),
         todo_items: vec![
             TODO_BUILD_RUNTIME_CONTEXT,
-            TODO_VALIDATE_UI_ENTRY,
             TODO_PREPARE_IMAGE_CACHE,
             TODO_PREPARE_KEYBIND_CONTEXT,
         ],

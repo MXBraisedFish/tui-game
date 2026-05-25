@@ -7,13 +7,13 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::host_engine::boot::environment::data_dirs;
 use crate::host_engine::boot::preload::lua_runtime::api::drawing_support::drawing_parser::STYLE_BOLD;
+use crate::host_engine::constant::{ROOT_UI_MIN_HEIGHT, ROOT_UI_MIN_WIDTH};
 use crate::host_engine::runtime::memory_cleanup;
 use crate::host_engine::runtime::ui::pages::common::{
     draw_title, is_press, key_hint, take_navigation, theme_color,
 };
 use crate::host_engine::runtime::ui::{Canvas, UiContext, UiEvent, UiNavigation, UiPage, UiResult};
 use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
-use crate::host_engine::constant::{ROOT_UI_MIN_HEIGHT, ROOT_UI_MIN_WIDTH};
 use crate::host_engine::runtime::ui_state::needed_size_state::NeededSizeMode;
 
 const CONFIRM_DELAY: Duration = Duration::from_secs(5);
@@ -24,9 +24,9 @@ const WARN_WRAP_WIDTH: usize = 72;
 
 // ---------------------------------------------------------------------------
 // WarningNeededSizePage — standalone impl
-// Matches official_ui/scripts/function/warning_needed_size/render.lua
+// Matches the legacy needed-size warning layout.
 // ---------------------------------------------------------------------------
-// Matches official_ui/scripts/function/warning_needed_size/render.lua
+// Matches the legacy needed-size warning layout.
 // ---------------------------------------------------------------------------
 
 pub struct WarningNeededSizePage {
@@ -128,7 +128,14 @@ impl UiPage for WarningNeededSizePage {
 
         // Row 3: hint (dark_gray, normal, centered)
         let hint_x = centered_x(ctx, hint);
-        canvas.draw_text_styled(hint_x, top.saturating_add(3), hint, Some(hint_color.clone()), None, Vec::new())?;
+        canvas.draw_text_styled(
+            hint_x,
+            top.saturating_add(3),
+            hint,
+            Some(hint_color.clone()),
+            None,
+            Vec::new(),
+        )?;
 
         // Row 5: action line (dark_gray, normal, centered)
         let action_x = centered_x(ctx, &action_line);

@@ -64,11 +64,11 @@ impl PackageManager {
 
     pub fn refresh_all(&mut self, progress: &LoadingHandle) -> PackageManagerResult<()> {
         self.uid_registry = PackageIdRegistry::default();
-        progress.update(LoadingStage::ScanPackages, 25)?;
+        progress.update(LoadingStage::ScanGame, 25)?;
         self.refresh_games()?;
-        progress.update(LoadingStage::ScanPackages, 35)?;
+        progress.update(LoadingStage::ScanGame, 35)?;
         self.refresh_overlays()?;
-        progress.update(LoadingStage::ScanPackages, 45)?;
+        progress.update(LoadingStage::ScanGame, 45)?;
         self.reconcile_states()?;
         self.rebuild_display_orders()?;
         self.persist_scan_cache()?;
@@ -98,8 +98,9 @@ impl PackageManager {
         self.game_scan_errors = registry.errors.clone();
         self.games = PackageRegistry::new();
         for game_module in registry.games {
-            self.register_package_id(&game_module.package_id)?;
-            self.games.insert(GamePackage::from(game_module))?;
+            let package = GamePackage::from(game_module);
+            self.register_package_id(&package.id)?;
+            self.games.insert(package)?;
         }
         Ok(())
     }
@@ -111,13 +112,15 @@ impl PackageManager {
         self.overlay_scan_errors = registry.errors.clone();
         self.screensavers = PackageRegistry::new();
         for package in registry.screensavers {
-            self.register_package_id(&package.package_id)?;
-            self.screensavers.insert(OverlayPackage::from(package))?;
+            let package = OverlayPackage::from(package);
+            self.register_package_id(&package.id)?;
+            self.screensavers.insert(package)?;
         }
         self.bosses = PackageRegistry::new();
         for package in registry.bosses {
-            self.register_package_id(&package.package_id)?;
-            self.bosses.insert(OverlayPackage::from(package))?;
+            let package = OverlayPackage::from(package);
+            self.register_package_id(&package.id)?;
+            self.bosses.insert(package)?;
         }
         Ok(())
     }
@@ -325,10 +328,9 @@ impl PackageManager {
             .iter()
             .map(OverlayPackage::to_legacy)
             .collect::<Vec<_>>();
-        self.cache_store
-            .write_screensaver_scan_cache(&json!({ "packages": screensaver_packages }))?;
-        self.cache_store
-            .write_boss_scan_cache(&json!({ "packages": boss_packages }))?;
+        let _ = screensaver_packages;
+        let _ = boss_packages;
+        self.cache_store.save_scan_cache()?;
         Ok(())
     }
 

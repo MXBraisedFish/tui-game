@@ -222,11 +222,13 @@ impl DisplayUiState {
                     next_idle_threshold(self.root_state.profile.idle_threshold)
             }
             4 => {
-                self.root_state.profile.idle_enter_screensaver = !self.root_state.profile.idle_enter_screensaver
+                self.root_state.profile.idle_enter_screensaver =
+                    !self.root_state.profile.idle_enter_screensaver
             }
             5 => self.root_state.profile.host_status = !self.root_state.profile.host_status,
             6 => {
-                self.root_state.profile.screensaver_mode = next_mode(&self.root_state.profile.screensaver_mode)
+                self.root_state.profile.screensaver_mode =
+                    next_mode(&self.root_state.profile.screensaver_mode)
             }
             7 => self.root_state.profile.boss_mode = next_mode(&self.root_state.profile.boss_mode),
             8 => self.root_state.panel = DisplayPanelKind::Screensaver,
@@ -506,7 +508,10 @@ impl DisplayRootState {
         table.set("position_mode", self.position_mode)?;
         table.set("position_input", self.position_input.max(0))?;
         table.set("settings", profile_to_lua(lua, &self.profile)?)?;
-        table.set("screensaver_list", items_to_table(lua, &self.screensaver_items)?)?;
+        table.set(
+            "screensaver_list",
+            items_to_table(lua, &self.screensaver_items)?,
+        )?;
         table.set("boss_list", items_to_table(lua, &self.boss_items)?)?;
         Ok(table)
     }

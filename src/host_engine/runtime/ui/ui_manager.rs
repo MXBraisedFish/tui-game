@@ -34,7 +34,7 @@ pub struct UiContext {
     pub packages: Arc<PackageManager>,
     /// Shared profile store snapshot. Pages may call explicit save methods for simple preferences.
     pub profiles: Arc<ProfileStore>,
-    /// Current page key hints resolved from official_ui actions and user keybinds.
+    /// Current page key hints resolved from built-in actions and user keybinds.
     pub action_hints: HashMap<String, String>,
     /// Package name to show in the mod security warning dialog.
     pub mod_warning_package_name: String,
@@ -61,9 +61,10 @@ pub enum UiEvent {
     FocusLost,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UiNavigation {
     Page(UiPageKey),
+    StartGame(String),
     Exit,
 }
 

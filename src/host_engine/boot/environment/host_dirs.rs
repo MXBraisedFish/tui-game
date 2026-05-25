@@ -34,7 +34,6 @@ fn verify_required_files() -> EnvironmentResult<()> {
 
     ensure_dir(&root_dir.join("scripts"))?;
     ensure_dir(&root_dir.join("scripts/game"))?;
-    ensure_dir(&root_dir.join("scripts/ui"))?;
     ensure_creatable_dir(&root_dir.join("scripts/screensaver"))?;
     ensure_creatable_dir(&root_dir.join("scripts/boss"))?;
 

@@ -21,20 +21,18 @@ use crate::LoadedResources;
 /// - 安装沙箱限制。
 ///
 /// TODO: 后续在这里按模块公开宿主自定义 API。
-/// TODO: 后续在这里加载官方 UI Lua 脚本和游戏脚本运行上下文。
+/// TODO: 后续在这里加载游戏脚本运行上下文。
 pub(crate) fn load(
     loaded_resources: &LoadedResources,
 ) -> Result<LuaRuntimeEnvironment, Box<dyn std::error::Error>> {
     let host_bridge = HostLuaBridge::new();
-    let official_ui_package = loaded_resources.official_ui_registry.packages.first();
     let terminal_size = loaded_resources.initialized_environment.terminal_size;
     host_bridge.set_runtime_context(LuaRuntimeContext {
-        consumer: LuaRuntimeConsumer::OfficialUiPackage,
+        consumer: LuaRuntimeConsumer::GamePackage,
         current_game: None,
         current_overlay: None,
         current_ui_actions: serde_json::Value::Null,
-        current_script_root: official_ui_package
-            .map(|ui_package| ui_package.root_dir.join("scripts")),
+        current_script_root: None,
         language_code: loaded_resources.persistent_data.language_code.clone(),
         keybinds: loaded_resources.persistent_data.keybinds.clone(),
         best_scores: loaded_resources.persistent_data.best_scores.clone(),
@@ -47,7 +45,7 @@ pub(crate) fn load(
     });
     host_bridge.resize_canvas(terminal_size)?;
     let lua_runtime_environment =
-        environment::create_lua_runtime_environment(host_bridge, ApiScope::official_ui_package())?;
+        environment::create_lua_runtime_environment(host_bridge, ApiScope::game_package())?;
     Ok(lua_runtime_environment)
 }
 

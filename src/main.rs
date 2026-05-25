@@ -82,6 +82,8 @@ fn open_loading_screen() -> HostResult<LoadingScreenState> {
 
 /// 加载资源（图片、字体、配置文件等），过程中可更新加载屏进度
 fn load_resources(loading_screen: &mut LoadingScreenState) -> HostResult<LoadedResources> {
+    use std::sync::Arc;
+
     let initialized_environment = host_engine::boot::preload::init_environment::initialize()?;
     let _ = initialized_environment.is_input_listener_running();
 
@@ -92,7 +94,6 @@ fn load_resources(loading_screen: &mut LoadingScreenState) -> HostResult<LoadedR
     loading_screen
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::ScanUi, 40)?;
-    let official_ui_registry = host_engine::boot::preload::official_ui::load()?;
     let overlay_registry = host_engine::boot::preload::overlay_modules::load()?;
     loading_screen
         .loading_handle
@@ -102,13 +103,22 @@ fn load_resources(loading_screen: &mut LoadingScreenState) -> HostResult<LoadedR
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::PreCache, 80)?;
     let cache_data = host_engine::boot::preload::cache_data::load(&game_module_registry)?;
+    let profile_store = Arc::new(host_engine::storage::profile_store::ProfileStore::open()?);
+    let cache_store = Arc::new(host_engine::storage::cache_store::CacheStore::open()?);
+    let mut package_manager = host_engine::package::package_manager::PackageManager::new(
+        profile_store.clone(),
+        cache_store.clone(),
+    );
+    package_manager.refresh_all(&loading_screen.loading_handle)?;
+    let mut keybind_manager = host_engine::keybind::keybind_manager::KeybindManager::new();
+    let _ = keybind_manager.resolve(&package_manager, &profile_store);
+    let theme_manager = host_engine::theme::ThemeManager::load(&profile_store, &package_manager)?;
     let host_state_machine = host_engine::boot::preload::state_machine::load();
     loading_screen
         .loading_handle
         .update(host_engine::boot::loading::LoadingStage::ReadyLaunch, 95)?;
     let launch_readiness = host_engine::boot::preload::finalize_launch::load(
         &game_module_registry,
-        &official_ui_registry,
         &persistent_data,
         &cache_data,
         &host_state_machine,
@@ -117,10 +127,14 @@ fn load_resources(loading_screen: &mut LoadingScreenState) -> HostResult<LoadedR
     Ok(LoadedResources {
         initialized_environment,
         game_module_registry,
-        official_ui_registry,
         overlay_registry,
         persistent_data,
         cache_data,
+        profile_store,
+        cache_store,
+        package_manager,
+        keybind_manager,
+        theme_manager,
         host_state_machine,
         launch_readiness,
     })
@@ -151,7 +165,6 @@ fn run_runtime_loop(
         .initialized_environment
         .is_input_listener_running();
     let _ = loaded_resources.game_module_registry.games.len();
-    let _ = loaded_resources.official_ui_registry.packages.len();
     let _ = loaded_resources.overlay_registry.screensavers.len();
     let _ = loaded_resources.overlay_registry.bosses.len();
     let _ = loaded_resources.persistent_data.language_code.len();
@@ -180,6 +193,11 @@ fn run_runtime_loop(
         &mut active_ui_page,
         &mut loaded_resources.host_state_machine,
         &loaded_resources.overlay_registry,
+        loaded_resources.profile_store.clone(),
+        loaded_resources.cache_store.clone(),
+        std::sync::Arc::new(loaded_resources.package_manager.clone()),
+        std::sync::Arc::new(loaded_resources.keybind_manager.clone()),
+        std::sync::Arc::new(loaded_resources.theme_manager.clone()),
     )?;
     Ok(ExitState {})
 }
@@ -198,10 +216,14 @@ struct LoadingScreenState {
 struct LoadedResources {
     initialized_environment: host_engine::boot::preload::init_environment::InitializedEnvironment,
     game_module_registry: host_engine::boot::preload::game_modules::GameModuleRegistry,
-    official_ui_registry: host_engine::boot::preload::official_ui::OfficialUiRegistry,
     overlay_registry: host_engine::boot::preload::overlay_modules::OverlayRegistry,
     persistent_data: host_engine::boot::preload::persistent_data::PersistentData,
     cache_data: host_engine::boot::preload::cache_data::CacheData,
+    profile_store: std::sync::Arc<host_engine::storage::profile_store::ProfileStore>,
+    cache_store: std::sync::Arc<host_engine::storage::cache_store::CacheStore>,
+    package_manager: host_engine::package::package_manager::PackageManager,
+    keybind_manager: host_engine::keybind::keybind_manager::KeybindManager,
+    theme_manager: host_engine::theme::ThemeManager,
     host_state_machine: host_engine::boot::preload::state_machine::HostStateMachine,
     launch_readiness: host_engine::boot::preload::finalize_launch::LaunchReadiness,
 }

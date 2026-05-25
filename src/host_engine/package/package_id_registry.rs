@@ -51,7 +51,11 @@ mod tests {
     fn register_rejects_duplicate_uid_across_kinds() {
         let mut registry = PackageIdRegistry::default();
         let game_id = PackageId::new(PackageSource::Office, PackageKind::Game, "shared_uid");
-        let screensaver_id = PackageId::new(PackageSource::ThirdParty, PackageKind::Screensaver, "shared_uid");
+        let screensaver_id = PackageId::new(
+            PackageSource::ThirdParty,
+            PackageKind::Screensaver,
+            "shared_uid",
+        );
 
         registry.register(&game_id).unwrap();
         let error = registry.register(&screensaver_id).unwrap_err();

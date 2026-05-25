@@ -78,7 +78,6 @@ pub struct GamePackage {
 impl GamePackage {
     pub fn to_legacy(&self) -> GameModule {
         GameModule {
-            package_id: self.id.clone(),
             uid: self.uid.clone(),
             source: self.source,
             source_label: self.source_label.clone(),
@@ -131,7 +130,7 @@ impl From<GameModule> for GamePackage {
         let banner = value_display_text(&module.package.banner);
         let best_none_text = module.game.best_none.clone();
         Self {
-            id: module.package_id.clone(),
+            id: PackageId::from_legacy(module.source.as_str(), "game", module.uid.as_str()),
             uid: module.uid.clone(),
             source: module.source,
             source_label: module.source_label.clone(),
@@ -216,7 +215,6 @@ pub struct OverlayPackage {
 impl OverlayPackage {
     pub fn to_legacy(&self) -> LegacyOverlayPackage {
         LegacyOverlayPackage {
-            package_id: self.id.clone(),
             uid: self.uid.clone(),
             kind: self.kind,
             source: self.source,
@@ -246,7 +244,11 @@ impl OverlayPackage {
 impl From<LegacyOverlayPackage> for OverlayPackage {
     fn from(package: LegacyOverlayPackage) -> Self {
         Self {
-            id: package.package_id.clone(),
+            id: PackageId::from_legacy(
+                package.source.as_str(),
+                package.kind.as_str(),
+                package.uid.as_str(),
+            ),
             uid: package.uid.clone(),
             kind: package.kind,
             source: package.source,
@@ -356,7 +358,6 @@ mod tests {
     #[test]
     fn game_package_round_trips_legacy_identity() {
         let legacy = GameModule {
-            package_id: PackageId::new(PackageSource::Office, PackageKind::Game, "game_test"),
             uid: "game_test".to_string(),
             source: GameModuleSource::Office,
             source_label: "game".to_string(),
@@ -392,7 +393,7 @@ mod tests {
 
         let package = GamePackage::from(legacy.clone());
         let restored = package.to_legacy();
-        assert_eq!(restored.package_id, legacy.package_id);
+        assert_eq!(restored.uid, legacy.uid);
         assert_eq!(restored.package.package_name, legacy.package.package_name);
         assert_eq!(restored.game.entry, legacy.game.entry);
     }

@@ -1,13 +1,13 @@
 //! Rust implementation of the Mod hub page.
 
-use crate::host_engine::runtime::ui::pages::common::{
-    MenuCommand, draw_center_menu, draw_title, key_hint, selected_menu_event,
-    take_navigation, theme_color,
-};
 use crate::host_engine::boot::preload::lua_runtime::api::drawing_support::drawing_parser::STYLE_BOLD;
-use unicode_width::UnicodeWidthStr;
+use crate::host_engine::runtime::ui::pages::common::{
+    MenuCommand, draw_center_menu, draw_title, key_hint, selected_menu_event, take_navigation,
+    theme_color,
+};
 use crate::host_engine::runtime::ui::{Canvas, UiContext, UiEvent, UiNavigation, UiPage, UiResult};
 use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
+use unicode_width::UnicodeWidthStr;
 
 const ACTIONS: [&str; 3] = ["option1", "option2", "option3"];
 const FALLBACK_KEYS: [&str; 3] = ["1", "2", "3"];

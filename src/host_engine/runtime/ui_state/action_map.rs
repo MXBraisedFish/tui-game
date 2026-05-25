@@ -1,4 +1,4 @@
-//! UI 包动作映射
+//! 宿主 UI 动作映射
 
 use std::collections::HashMap;
 
@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use crate::host_engine::boot::preload::persistent_data::keybind_profile;
 use crate::host_engine::constant::MAX_ACTION_KEYS;
+use crate::host_engine::runtime::ui_page::action_defaults;
 
 /// 单个 UI 动作定义。
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -22,14 +23,11 @@ pub struct UiActionMap {
 }
 
 impl UiActionMap {
-    /// 从 official_ui package.json 中读取指定页面的 actions。
-    pub fn from_manifest_page(manifest: &Value, page_name: &str, keybinds: &Value) -> Self {
+    /// 从宿主内置 actions 中读取指定页面动作。
+    pub fn from_page(page_name: &str, keybinds: &Value) -> Self {
         let mut action_map = Self::default();
-        let Some(page_actions) = manifest
-            .get("actions")
-            .and_then(Value::as_object)
-            .and_then(|actions| actions.get(page_name))
-            .and_then(Value::as_object)
+        let Some(page_actions) =
+            action_defaults::page_actions(page_name).and_then(Value::as_object)
         else {
             return action_map;
         };
@@ -51,6 +49,12 @@ impl UiActionMap {
         }
 
         action_map
+    }
+
+    /// Compatibility wrapper for older state code. The manifest argument is ignored because
+    /// official host UI actions are now hardcoded in Rust.
+    pub fn from_manifest_page(_manifest: &Value, page_name: &str, keybinds: &Value) -> Self {
+        Self::from_page(page_name, keybinds)
     }
 
     /// 查找物理键对应动作。

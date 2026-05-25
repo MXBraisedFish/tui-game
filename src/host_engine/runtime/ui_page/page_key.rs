@@ -4,10 +4,10 @@ use crate::host_engine::boot::preload::state_machine::{
     DialogState, GameListState, HostStateMachine, SettingState, TopLevelState,
 };
 
-/// UI 包页面键。
+/// 宿主 UI 页面键。
 ///
-/// 该枚举只负责与 official_ui/package.json 的 entry/actions 键保持一致。
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// 该枚举负责与内置 action defaults 的页面键保持一致。
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum UiPageKey {
     Home,
     GameList,
@@ -31,7 +31,7 @@ pub enum UiPageKey {
 }
 
 impl UiPageKey {
-    /// 返回 official_ui/package.json 使用的页面键。
+    /// 返回宿主内置 action defaults 使用的页面键。
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Home => "home",

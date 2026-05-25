@@ -197,7 +197,10 @@ impl UiPage for GameListPage {
                 self.pending_navigation = Some(UiNavigation::Page(UiPageKey::Home));
             }
             "confirm" | "enter" => {
-                // TODO: Connect Rust UI selection to game runtime start.
+                let games = sorted_games(ctx.packages.games(), self.sort_mode, self.sort_order);
+                if let Some(game) = games.get(self.selected_index) {
+                    self.pending_navigation = Some(UiNavigation::StartGame(game.uid.clone()));
+                }
             }
             _ => {}
         }

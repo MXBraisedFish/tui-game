@@ -82,7 +82,6 @@ impl Default for LuaRuntimeContext {
 pub enum LuaRuntimeConsumer {
     #[default]
     GamePackage,
-    OfficialUiPackage,
     ScreensaverPackage,
     BossPackage,
 }

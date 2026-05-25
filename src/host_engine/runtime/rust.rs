@@ -31,4 +31,5 @@ pub const FORCE_STOP_GAME_KEY: ReservedGlobalKey = ReservedGlobalKey {
 };
 
 /// 全局按键占用列表。
-pub const RESERVED_GLOBAL_KEYS: [ReservedGlobalKey; 3] = [SCREENSAVER_KEY, BOSS_KEY, FORCE_STOP_GAME_KEY];
+pub const RESERVED_GLOBAL_KEYS: [ReservedGlobalKey; 3] =
+    [SCREENSAVER_KEY, BOSS_KEY, FORCE_STOP_GAME_KEY];

@@ -181,7 +181,6 @@ impl ModListKind {
             },
         }
     }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -244,9 +243,7 @@ fn compare_text(a: &str, b: &str) -> Ordering {
     let b_lower = b.to_lowercase();
     let a_width = UnicodeWidthStr::width(a_lower.as_str());
     let b_width = UnicodeWidthStr::width(b_lower.as_str());
-    a_width
-        .cmp(&b_width)
-        .then_with(|| a_lower.cmp(&b_lower))
+    a_width.cmp(&b_width).then_with(|| a_lower.cmp(&b_lower))
 }
 
 // ---------------------------------------------------------------------------
@@ -307,19 +304,54 @@ fn draw_colored_header(
 
     // Draw header text
     let header_prefix = format!(" {title} *");
-    canvas.draw_text_styled(x, y, &header_prefix, Some(title_color.clone()), None, vec![STYLE_BOLD])?;
+    canvas.draw_text_styled(
+        x,
+        y,
+        &header_prefix,
+        Some(title_color.clone()),
+        None,
+        vec![STYLE_BOLD],
+    )?;
     let mut cursor = x + UnicodeWidthStr::width(header_prefix.as_str()) as u16;
 
-    canvas.draw_text_styled(cursor, y, "[", Some(title_color.clone()), None, vec![STYLE_BOLD])?;
+    canvas.draw_text_styled(
+        cursor,
+        y,
+        "[",
+        Some(title_color.clone()),
+        None,
+        vec![STYLE_BOLD],
+    )?;
     cursor += 1;
 
-    canvas.draw_text_styled(cursor, y, order_text, Some(order_color), None, vec![STYLE_BOLD])?;
+    canvas.draw_text_styled(
+        cursor,
+        y,
+        order_text,
+        Some(order_color),
+        None,
+        vec![STYLE_BOLD],
+    )?;
     cursor += UnicodeWidthStr::width(order_text.as_str()) as u16;
 
-    canvas.draw_text_styled(cursor, y, "] ", Some(title_color.clone()), None, vec![STYLE_BOLD])?;
+    canvas.draw_text_styled(
+        cursor,
+        y,
+        "] ",
+        Some(title_color.clone()),
+        None,
+        vec![STYLE_BOLD],
+    )?;
     cursor += 2;
 
-    canvas.draw_text_styled(cursor, y, sort_text, Some(sort_color), None, vec![STYLE_BOLD])?;
+    canvas.draw_text_styled(
+        cursor,
+        y,
+        sort_text,
+        Some(sort_color),
+        None,
+        vec![STYLE_BOLD],
+    )?;
 
     Ok(())
 }
@@ -340,7 +372,11 @@ fn draw_full_item(
 ) -> UiResult<()> {
     let inner_x = x.saturating_add(1);
     let inner_width = width.saturating_sub(2).max(1);
-    let bg = if selected { Some("dark_gray".to_string()) } else { None };
+    let bg = if selected {
+        Some("dark_gray".to_string())
+    } else {
+        None
+    };
     let fg = if selected {
         theme_color(ctx, "text.primary", "white")
     } else {
@@ -349,7 +385,15 @@ fn draw_full_item(
 
     // Selected background fill (4 rows)
     if selected {
-        canvas.fill_rect(inner_x, y, inner_width, 4, ' ', None, Some("dark_gray".to_string()))?;
+        canvas.fill_rect(
+            inner_x,
+            y,
+            inner_width,
+            4,
+            ' ',
+            None,
+            Some("dark_gray".to_string()),
+        )?;
     }
 
     // Icon area (8 cols x 4 rows)
@@ -386,7 +430,14 @@ fn draw_full_item(
 
     // Author line
     let author_label = &ctx.i18n.mod_list.info_author;
-    canvas.draw_text_styled(text_x, y.saturating_add(1), author_label, Some(fg.clone()), bg.clone(), Vec::new())?;
+    canvas.draw_text_styled(
+        text_x,
+        y.saturating_add(1),
+        author_label,
+        Some(fg.clone()),
+        bg.clone(),
+        Vec::new(),
+    )?;
     canvas.draw_rich_text_styled(
         text_x.saturating_add(UnicodeWidthStr::width(author_label.as_str()) as u16),
         y.saturating_add(1),
@@ -398,7 +449,14 @@ fn draw_full_item(
 
     // Version line
     let version_label = &ctx.i18n.mod_list.info_version;
-    canvas.draw_text_styled(text_x, y.saturating_add(2), version_label, Some(fg.clone()), bg.clone(), Vec::new())?;
+    canvas.draw_text_styled(
+        text_x,
+        y.saturating_add(2),
+        version_label,
+        Some(fg.clone()),
+        bg.clone(),
+        Vec::new(),
+    )?;
     canvas.draw_rich_text_styled(
         text_x.saturating_add(UnicodeWidthStr::width(version_label.as_str()) as u16),
         y.saturating_add(2),
@@ -412,11 +470,24 @@ fn draw_full_item(
     let status_label = &ctx.i18n.mod_list.status;
     let enabled = is_package_enabled(ctx, kind, item.uid());
     let (status_text, status_color) = if enabled {
-        (ctx.i18n.mod_list.toggle_mod_on.as_str(), theme_color(ctx, "state.success", "green"))
+        (
+            ctx.i18n.mod_list.toggle_mod_on.as_str(),
+            theme_color(ctx, "state.success", "green"),
+        )
     } else {
-        (ctx.i18n.mod_list.toggle_mod_off.as_str(), theme_color(ctx, "state.danger", "red"))
+        (
+            ctx.i18n.mod_list.toggle_mod_off.as_str(),
+            theme_color(ctx, "state.danger", "red"),
+        )
     };
-    canvas.draw_text_styled(text_x, y.saturating_add(3), status_label, Some(fg.clone()), bg.clone(), Vec::new())?;
+    canvas.draw_text_styled(
+        text_x,
+        y.saturating_add(3),
+        status_label,
+        Some(fg.clone()),
+        bg.clone(),
+        Vec::new(),
+    )?;
     canvas.draw_text_styled(
         text_x.saturating_add(UnicodeWidthStr::width(status_label.as_str()) as u16),
         y.saturating_add(3),
@@ -458,7 +529,11 @@ fn draw_brief_item(
 ) -> UiResult<()> {
     let inner_x = x.saturating_add(1);
     let inner_width = width.saturating_sub(2).max(1);
-    let bg = if selected { Some("dark_gray".to_string()) } else { None };
+    let bg = if selected {
+        Some("dark_gray".to_string())
+    } else {
+        None
+    };
     let fg = if selected {
         theme_color(ctx, "text.primary", "white")
     } else {
@@ -466,7 +541,15 @@ fn draw_brief_item(
     };
 
     if selected {
-        canvas.fill_rect(inner_x, y, inner_width, 1, ' ', None, Some("dark_gray".to_string()))?;
+        canvas.fill_rect(
+            inner_x,
+            y,
+            inner_width,
+            1,
+            ' ',
+            None,
+            Some("dark_gray".to_string()),
+        )?;
     }
 
     let cursor = inner_x.saturating_add(1);
@@ -474,14 +557,24 @@ fn draw_brief_item(
     // Enabled status badge on the right
     let enabled = is_package_enabled(ctx, kind, item.uid());
     let (status_text, status_color) = if enabled {
-        (ctx.i18n.mod_list.toggle_mod_on_brief.as_str(), theme_color(ctx, "state.success", "green"))
+        (
+            ctx.i18n.mod_list.toggle_mod_on_brief.as_str(),
+            theme_color(ctx, "state.success", "green"),
+        )
     } else {
-        (ctx.i18n.mod_list.toggle_mod_off_brief.as_str(), theme_color(ctx, "state.danger", "red"))
+        (
+            ctx.i18n.mod_list.toggle_mod_off_brief.as_str(),
+            theme_color(ctx, "state.danger", "red"),
+        )
     };
     let status_full = format!("[{status_text}]");
     let status_width = UnicodeWidthStr::width(status_full.as_str()) as u16;
     let bar_space: u16 = if kind.has_safe_mode() { 2 } else { 0 };
-    let status_x = x.saturating_add(width).saturating_sub(status_width).saturating_sub(bar_space).saturating_sub(2);
+    let status_x = x
+        .saturating_add(width)
+        .saturating_sub(status_width)
+        .saturating_sub(bar_space)
+        .saturating_sub(2);
 
     // Package name (cropped)
     let _max_name_width = status_x.saturating_sub(cursor).saturating_sub(1).max(1);
@@ -496,9 +589,18 @@ fn draw_brief_item(
 
     // Status badge
     canvas.draw_text_styled(status_x, y, "[", Some(fg.clone()), bg.clone(), Vec::new())?;
-    canvas.draw_text_styled(status_x.saturating_add(1), y, status_text, Some(status_color), bg.clone(), vec![STYLE_BOLD])?;
     canvas.draw_text_styled(
-        status_x.saturating_add(1).saturating_add(UnicodeWidthStr::width(status_text) as u16),
+        status_x.saturating_add(1),
+        y,
+        status_text,
+        Some(status_color),
+        bg.clone(),
+        vec![STYLE_BOLD],
+    )?;
+    canvas.draw_text_styled(
+        status_x
+            .saturating_add(1)
+            .saturating_add(UnicodeWidthStr::width(status_text) as u16),
         y,
         "]",
         Some(fg),
@@ -508,7 +610,15 @@ fn draw_brief_item(
 
     // Safe mode off red bar
     if kind.has_safe_mode() {
-        canvas.fill_rect(x.saturating_add(width).saturating_sub(2), y, 1, 1, ' ', None, Some("red".to_string()))?;
+        canvas.fill_rect(
+            x.saturating_add(width).saturating_sub(2),
+            y,
+            1,
+            1,
+            ' ',
+            None,
+            Some("red".to_string()),
+        )?;
     }
 
     Ok(())
@@ -525,7 +635,10 @@ fn draw_page_line(
     state: &ModListPageState,
     total_pages: usize,
 ) -> UiResult<()> {
-    let y = layout.left_y.saturating_add(layout.height).saturating_sub(2);
+    let y = layout
+        .left_y
+        .saturating_add(layout.height)
+        .saturating_sub(2);
     let page_color = theme_color(ctx, "text.muted", "dark_gray");
 
     if state.jump_mode {
@@ -536,7 +649,10 @@ fn draw_page_line(
         };
         let page_text = format!("{current}/{total_pages}");
         let page_x = layout.left_x.saturating_add(
-            (layout.left_width.saturating_sub(UnicodeWidthStr::width(page_text.as_str()) as u16)) / 2,
+            (layout
+                .left_width
+                .saturating_sub(UnicodeWidthStr::width(page_text.as_str()) as u16))
+                / 2,
         );
         canvas.draw_text_styled(
             page_x,
@@ -557,9 +673,19 @@ fn draw_page_line(
     } else {
         let page_text = format!("{}/{}", state.page, total_pages);
         let page_x = layout.left_x.saturating_add(
-            (layout.left_width.saturating_sub(UnicodeWidthStr::width(page_text.as_str()) as u16)) / 2,
+            (layout
+                .left_width
+                .saturating_sub(UnicodeWidthStr::width(page_text.as_str()) as u16))
+                / 2,
         );
-        canvas.draw_text_styled(page_x, y, &page_text, Some(page_color.clone()), None, vec![STYLE_BOLD])?;
+        canvas.draw_text_styled(
+            page_x,
+            y,
+            &page_text,
+            Some(page_color.clone()),
+            None,
+            vec![STYLE_BOLD],
+        )?;
     }
 
     // Left arrow + prev_page key
@@ -582,7 +708,11 @@ fn draw_page_line(
         let right_text = format!("[{next_key}] ▶");
         let right_width = UnicodeWidthStr::width(right_text.as_str()) as u16;
         canvas.draw_text_styled(
-            layout.left_x.saturating_add(layout.left_width).saturating_sub(right_width).saturating_sub(2),
+            layout
+                .left_x
+                .saturating_add(layout.left_width)
+                .saturating_sub(right_width)
+                .saturating_sub(2),
             y,
             &right_text,
             Some(page_color),
@@ -615,15 +745,16 @@ fn draw_info_panel(
     let max_y = panel.right_y.saturating_add(panel.height).saturating_sub(1);
     let mut y = panel.right_y.saturating_add(1);
 
-    let draw_line = |canvas: &mut Canvas, y: u16, text: &str, color: &str, bold: bool| -> UiResult<u16> {
-        let _ = content_width; // used implicitly via content_x positioning
-        if y >= max_y {
-            return Ok(y);
-        }
-        let styles = if bold { vec![STYLE_BOLD] } else { Vec::new() };
-        canvas.draw_text_styled(content_x, y, text, Some(color.to_string()), None, styles)?;
-        Ok(y.saturating_add(1))
-    };
+    let draw_line =
+        |canvas: &mut Canvas, y: u16, text: &str, color: &str, bold: bool| -> UiResult<u16> {
+            let _ = content_width; // used implicitly via content_x positioning
+            if y >= max_y {
+                return Ok(y);
+            }
+            let styles = if bold { vec![STYLE_BOLD] } else { Vec::new() };
+            canvas.draw_text_styled(content_x, y, text, Some(color.to_string()), None, styles)?;
+            Ok(y.saturating_add(1))
+        };
 
     // Banner area (max 13 lines)
     let banner_str = item.banner();
@@ -642,7 +773,14 @@ fn draw_info_panel(
                 0
             };
             let padded = format!("{}{}", " ".repeat(pad as usize), line);
-            canvas.draw_rich_text_styled(content_x, y, &padded, Some(text_color.clone()), None, Vec::new())?;
+            canvas.draw_rich_text_styled(
+                content_x,
+                y,
+                &padded,
+                Some(text_color.clone()),
+                None,
+                Vec::new(),
+            )?;
             y = y.saturating_add(1);
             banner_drawn += 1;
         }
@@ -669,19 +807,53 @@ fn draw_info_panel(
 
     let enabled = is_package_enabled(ctx, kind, item.uid());
     let (en_status, en_color) = if enabled {
-        (ctx.i18n.mod_list.toggle_mod_on.as_str(), theme_color(ctx, "state.success", "green"))
+        (
+            ctx.i18n.mod_list.toggle_mod_on.as_str(),
+            theme_color(ctx, "state.success", "green"),
+        )
     } else {
-        (ctx.i18n.mod_list.toggle_mod_off.as_str(), theme_color(ctx, "state.danger", "red"))
+        (
+            ctx.i18n.mod_list.toggle_mod_off.as_str(),
+            theme_color(ctx, "state.danger", "red"),
+        )
     };
     let en_label_w = UnicodeWidthStr::width(ctx.i18n.mod_list.info_safe_switch.as_str()) as u16;
-    canvas.draw_text_styled(content_x, y, &ctx.i18n.mod_list.info_safe_switch, Some(text_color.clone()), None, Vec::new())?;
-    canvas.draw_text_styled(content_x.saturating_add(en_label_w), y, en_status, Some(en_color), None, vec![STYLE_BOLD])?;
+    canvas.draw_text_styled(
+        content_x,
+        y,
+        &ctx.i18n.mod_list.info_safe_switch,
+        Some(text_color.clone()),
+        None,
+        Vec::new(),
+    )?;
+    canvas.draw_text_styled(
+        content_x.saturating_add(en_label_w),
+        y,
+        en_status,
+        Some(en_color),
+        None,
+        vec![STYLE_BOLD],
+    )?;
     y = y.saturating_add(1);
 
     // Debug line (state from game_state not accessible — default false)
     let dbg_label_w = UnicodeWidthStr::width(ctx.i18n.mod_list.info_safe_debug.as_str()) as u16;
-    canvas.draw_text_styled(content_x, y, &ctx.i18n.mod_list.info_safe_debug, Some(text_color.clone()), None, Vec::new())?;
-    canvas.draw_text_styled(content_x.saturating_add(dbg_label_w), y, &ctx.i18n.mod_list.toggle_debug_off, Some(muted_color.clone()), None, Vec::new())?;
+    canvas.draw_text_styled(
+        content_x,
+        y,
+        &ctx.i18n.mod_list.info_safe_debug,
+        Some(text_color.clone()),
+        None,
+        Vec::new(),
+    )?;
+    canvas.draw_text_styled(
+        content_x.saturating_add(dbg_label_w),
+        y,
+        &ctx.i18n.mod_list.toggle_debug_off,
+        Some(muted_color.clone()),
+        None,
+        Vec::new(),
+    )?;
     y = y.saturating_add(1);
 
     // Write permission (Game only)
@@ -696,31 +868,74 @@ fn draw_info_panel(
         } else {
             muted_color.clone()
         };
-        let write_label_w = UnicodeWidthStr::width(ctx.i18n.mod_list.info_safe_write.as_str()) as u16;
-        canvas.draw_text_styled(content_x, y, &ctx.i18n.mod_list.info_safe_write, Some(text_color.clone()), None, Vec::new())?;
-        canvas.draw_text_styled(content_x.saturating_add(write_label_w), y, write_text, Some(write_color), None, Vec::new())?;
+        let write_label_w =
+            UnicodeWidthStr::width(ctx.i18n.mod_list.info_safe_write.as_str()) as u16;
+        canvas.draw_text_styled(
+            content_x,
+            y,
+            &ctx.i18n.mod_list.info_safe_write,
+            Some(text_color.clone()),
+            None,
+            Vec::new(),
+        )?;
+        canvas.draw_text_styled(
+            content_x.saturating_add(write_label_w),
+            y,
+            write_text,
+            Some(write_color),
+            None,
+            Vec::new(),
+        )?;
         y = y.saturating_add(1);
 
         // Safe Mode line
         let safe_text = &ctx.i18n.mod_list.toggle_safe_mode_on;
         let safe_color = theme_color(ctx, "state.success", "green");
-        let safe_label_w = UnicodeWidthStr::width(ctx.i18n.mod_list.info_safe_safe_mode.as_str()) as u16;
-        canvas.draw_text_styled(content_x, y, &ctx.i18n.mod_list.info_safe_safe_mode, Some(text_color.clone()), None, Vec::new())?;
-        canvas.draw_text_styled(content_x.saturating_add(safe_label_w), y, safe_text, Some(safe_color), None, vec![STYLE_BOLD])?;
+        let safe_label_w =
+            UnicodeWidthStr::width(ctx.i18n.mod_list.info_safe_safe_mode.as_str()) as u16;
+        canvas.draw_text_styled(
+            content_x,
+            y,
+            &ctx.i18n.mod_list.info_safe_safe_mode,
+            Some(text_color.clone()),
+            None,
+            Vec::new(),
+        )?;
+        canvas.draw_text_styled(
+            content_x.saturating_add(safe_label_w),
+            y,
+            safe_text,
+            Some(safe_color),
+            None,
+            vec![STYLE_BOLD],
+        )?;
         y = y.saturating_add(1);
     }
 
     y = draw_line(canvas, y, "", &text_color, false)?;
 
     // Introduction section
-    y = draw_line(canvas, y, &ctx.i18n.mod_list.info_introduction, &label_color, true)?;
+    y = draw_line(
+        canvas,
+        y,
+        &ctx.i18n.mod_list.info_introduction,
+        &label_color,
+        true,
+    )?;
     let intro = item.introduction();
     if !intro.is_empty() {
         for line in intro.lines() {
             if y >= max_y {
                 break;
             }
-            canvas.draw_rich_text_styled(content_x, y, line, Some(text_color.clone()), None, Vec::new())?;
+            canvas.draw_rich_text_styled(
+                content_x,
+                y,
+                line,
+                Some(text_color.clone()),
+                None,
+                Vec::new(),
+            )?;
             y = y.saturating_add(1);
         }
     }
@@ -741,10 +956,7 @@ fn build_action_segments(
     let mut segments: Vec<String> = Vec::new();
 
     if state.jump_mode {
-        segments.push(format!(
-            "[1]-[9] {}",
-            ctx.i18n.key.mod_list_select
-        ));
+        segments.push(format!("[1]-[9] {}", ctx.i18n.key.mod_list_select));
         segments.push(format!(
             "[{}] {}",
             key_hint(ctx, "confirm", "Enter"),
@@ -917,7 +1129,11 @@ fn render_mod_list_page(
         lines.len().max(1) as u16
     };
 
-    let panel = SplitPanel::new(ctx.terminal_size.width, ctx.terminal_size.height, footer_lines);
+    let panel = SplitPanel::new(
+        ctx.terminal_size.width,
+        ctx.terminal_size.height,
+        footer_lines,
+    );
     let capacity = {
         let item_h: u16 = match state.list_mode {
             ModListDisplayMode::Full => 4,
@@ -925,7 +1141,11 @@ fn render_mod_list_page(
         };
         (panel.height.saturating_sub(4).saturating_sub(1) / item_h) as usize
     };
-    let actual_pages = if capacity == 0 { 1 } else { ((items.len() + capacity - 1) / capacity).max(1) };
+    let actual_pages = if capacity == 0 {
+        1
+    } else {
+        ((items.len() + capacity - 1) / capacity).max(1)
+    };
 
     // Normalize page
     let page = state.page.min(actual_pages).max(1);
@@ -958,7 +1178,9 @@ fn render_mod_list_page(
     if items.is_empty() {
         let empty_text = &ctx.i18n.mod_list.none_mod;
         let empty_w = UnicodeWidthStr::width(empty_text.as_str()) as u16;
-        let ex = panel.left_x.saturating_add((panel.left_width.saturating_sub(empty_w)) / 2);
+        let ex = panel
+            .left_x
+            .saturating_add((panel.left_width.saturating_sub(empty_w)) / 2);
         let ey = panel.left_y.saturating_add(panel.height / 2);
         canvas.draw_text_styled(
             ex,
@@ -969,7 +1191,12 @@ fn render_mod_list_page(
             vec![STYLE_BOLD],
         )?;
     } else {
-        for (i, item) in items.iter().enumerate().skip(start_idx).take(end_idx - start_idx) {
+        for (i, item) in items
+            .iter()
+            .enumerate()
+            .skip(start_idx)
+            .take(end_idx - start_idx)
+        {
             let row = i - start_idx;
             let item_h: u16 = match state.list_mode {
                 ModListDisplayMode::Full => 4,
@@ -979,10 +1206,28 @@ fn render_mod_list_page(
             let selected = i == state.selected_index;
             match state.list_mode {
                 ModListDisplayMode::Full => {
-                    draw_full_item(canvas, ctx, item, panel.left_x, item_y, panel.left_width, selected, kind)?;
+                    draw_full_item(
+                        canvas,
+                        ctx,
+                        item,
+                        panel.left_x,
+                        item_y,
+                        panel.left_width,
+                        selected,
+                        kind,
+                    )?;
                 }
                 ModListDisplayMode::Brief => {
-                    draw_brief_item(canvas, ctx, item, panel.left_x, item_y, panel.left_width, selected, kind)?;
+                    draw_brief_item(
+                        canvas,
+                        ctx,
+                        item,
+                        panel.left_x,
+                        item_y,
+                        panel.left_width,
+                        selected,
+                        kind,
+                    )?;
                 }
             }
         }

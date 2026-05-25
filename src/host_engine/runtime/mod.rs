@@ -1,3 +1,4 @@
+pub mod event_dispatch;
 pub mod event_loop;
 pub mod frame_rate;
 pub mod game_engine;
@@ -7,6 +8,7 @@ pub mod overlay;
 pub mod renderer;
 pub mod rust;
 pub mod terminal;
+pub mod ui;
 pub mod ui_page;
 pub mod ui_runtime;
 pub mod ui_state;

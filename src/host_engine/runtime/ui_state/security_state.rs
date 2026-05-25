@@ -153,7 +153,10 @@ impl SecurityRootState {
         t.set("select", normalize_security_select(self.select))?;
         t.set("default_safe_mode", self.default_safe_mode)?;
         t.set("default_mod_game_enabled", self.default_mod_game_enabled)?;
-        t.set("default_mod_screensaver_enabled", self.default_mod_screensaver_enabled)?;
+        t.set(
+            "default_mod_screensaver_enabled",
+            self.default_mod_screensaver_enabled,
+        )?;
         t.set("default_mod_boss_enabled", self.default_mod_boss_enabled)?;
         t.set(
             "reset_message",

@@ -13,6 +13,7 @@ use crate::host_engine::runtime::ui::pages::common::{
     is_press, key_hint, take_navigation, theme_color,
 };
 use crate::host_engine::runtime::ui::{Canvas, UiContext, UiEvent, UiNavigation, UiPage, UiResult};
+use crate::host_engine::runtime::ui_page::action_defaults;
 use crate::host_engine::runtime::ui_page::page_key::UiPageKey;
 
 const PAGE_SIZE_PADDING: u16 = 4;
@@ -941,10 +942,7 @@ fn page_actions_from_package_json(
     page_key: &str,
     language_texts: &HashMap<String, String>,
 ) -> Vec<ActionRow> {
-    let value = read_official_ui_package();
-    value
-        .get("actions")
-        .and_then(|actions| actions.get(page_key))
+    action_defaults::page_actions(page_key)
         .and_then(Value::as_object)
         .map(|actions| {
             actions
@@ -961,20 +959,6 @@ fn page_actions_from_package_json(
                 .collect()
         })
         .unwrap_or_default()
-}
-
-fn read_official_ui_package() -> Value {
-    let root = data_dirs::root_dir();
-    let candidates = [
-        root.join("scripts/ui/package.json"),
-        root.join("official_ui/package.json"),
-        root.join("official_ui").join("package.json"),
-    ];
-    candidates
-        .iter()
-        .find_map(|path| fs::read_to_string(path).ok())
-        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
-        .unwrap_or_else(|| Value::Object(Default::default()))
 }
 
 fn keys_from_value(value: &Value) -> Vec<String> {

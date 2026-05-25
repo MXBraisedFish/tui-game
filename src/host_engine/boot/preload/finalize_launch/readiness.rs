@@ -7,8 +7,6 @@ use std::path::PathBuf;
 pub struct LaunchReadiness {
     pub game_count: usize,
     pub game_scan_error_count: usize,
-    pub official_ui_package_count: usize,
-    pub official_ui_scan_error_count: usize,
     pub removed_game_cache_count: usize,
     pub image_cache_dir: PathBuf,
     pub todo_items: Vec<&'static str>,
