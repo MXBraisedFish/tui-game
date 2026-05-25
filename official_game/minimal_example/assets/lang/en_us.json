@@ -1,9 +1,0 @@
-{
-  "minimal_example.action.up": "Move up",
-  "minimal_example.action.down": "Move down",
-  "minimal_example.action.left": "Move left",
-  "minimal_example.action.right": "Move right",
-  "minimal_example.action.quit": "Quit",
-  "minimal_example.title": "Minimal Example",
-  "minimal_example.help": "Move with {key:up}/{key:down}/{key:left}/{key:right}, quit with {key:quit}."
-}
