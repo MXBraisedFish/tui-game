@@ -53,7 +53,7 @@
 >  直接写入即可，由宿主处理
 
 `package_name`
-`saver_name`
+`screensaver_name`
 `author`
 `version`
 `introduction`

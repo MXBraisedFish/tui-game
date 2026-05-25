@@ -1,4 +1,4 @@
-//! Saver/老板覆盖层包扫描。
+//! Screensaver/老板覆盖层包扫描。
 
 use crate::host_engine::boot::environment::data_dirs;
 use std::fs::{self, OpenOptions};
@@ -10,7 +10,7 @@ use chrono::Local;
 use serde_json::{Map, Value};
 
 use crate::host_engine::constant::{
-    API_VERSION, DEFAULT_BOSS_BANNER, DEFAULT_PACKAGE_ICON, DEFAULT_SAVER_BANNER,
+    API_VERSION, DEFAULT_BOSS_BANNER, DEFAULT_PACKAGE_ICON, DEFAULT_SCREENSAVER_BANNER,
 };
 
 use super::manifest::{OverlayPackage, OverlayPackageManifest, OverlayRegistry, OverlayScanError};
@@ -22,13 +22,13 @@ type ScannerResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub fn scan_all() -> ScannerResult<OverlayRegistry> {
     let mut registry = OverlayRegistry::default();
 
-    for kind in [OverlayKind::Saver, OverlayKind::Boss] {
+    for kind in [OverlayKind::Screensaver, OverlayKind::Boss] {
         for source in [OverlaySource::Office, OverlaySource::ThirdParty] {
             registry.extend(scan_source(kind, source)?);
         }
     }
 
-    sort_packages(&mut registry.savers);
+    sort_packages(&mut registry.screensavers);
     sort_packages(&mut registry.bosses);
     Ok(registry)
 }
@@ -49,7 +49,7 @@ fn scan_source(kind: OverlayKind, source: OverlaySource) -> ScannerResult<Overla
     for package_dir in entries {
         match read_overlay_package(kind, source, &package_dir) {
             Ok(package) => match kind {
-                OverlayKind::Saver => registry.savers.push(package),
+                OverlayKind::Screensaver => registry.screensavers.push(package),
                 OverlayKind::Boss => registry.bosses.push(package),
             },
             Err(error) => registry.errors.push(OverlayScanError {
@@ -189,7 +189,7 @@ fn read_manifest(kind: OverlayKind, package_dir: &Path) -> ScannerResult<Overlay
             package_dir,
             "banner",
             match kind {
-                OverlayKind::Saver => DEFAULT_SAVER_BANNER,
+                OverlayKind::Screensaver => DEFAULT_SCREENSAVER_BANNER,
                 OverlayKind::Boss => DEFAULT_BOSS_BANNER,
             },
         ),

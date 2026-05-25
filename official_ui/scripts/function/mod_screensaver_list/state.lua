@@ -1,4 +1,4 @@
-local L = load_function("mod_saver_list/layout.lua")
+local L = load_function("mod_screensaver_list/layout.lua")
 
 local M = {}
 

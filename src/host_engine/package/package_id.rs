@@ -10,7 +10,7 @@ pub enum PackageSource {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum PackageKind {
     Game,
-    Saver,
+    Screensaver,
     Boss,
     ColorPack,
     UiPack,
@@ -90,7 +90,7 @@ impl PackageSource {
 
     fn from_legacy(value: &str) -> Self {
         match value {
-            "official" | "office" | "game" | "saver" | "boss" => PackageSource::Office,
+            "official" | "office" | "game" | "screensaver" | "boss" => PackageSource::Office,
             "mod" | "third_party" | "thirdparty" | "third-party" => PackageSource::ThirdParty,
             _ => PackageSource::ThirdParty,
         }
@@ -101,7 +101,7 @@ impl PackageKind {
     fn as_text(self) -> &'static str {
         match self {
             PackageKind::Game => "game",
-            PackageKind::Saver => "saver",
+            PackageKind::Screensaver => "screensaver",
             PackageKind::Boss => "boss",
             PackageKind::ColorPack => "color_pack",
             PackageKind::UiPack => "ui_pack",
@@ -111,7 +111,7 @@ impl PackageKind {
     fn from_string(value: &str) -> Option<Self> {
         match value {
             "game" => Some(PackageKind::Game),
-            "saver" => Some(PackageKind::Saver),
+            "screensaver" => Some(PackageKind::Screensaver),
             "boss" => Some(PackageKind::Boss),
             "color_pack" => Some(PackageKind::ColorPack),
             "ui_pack" => Some(PackageKind::UiPack),
@@ -122,7 +122,7 @@ impl PackageKind {
     fn from_legacy(value: &str) -> Self {
         match value {
             "game" | "mod_game" => PackageKind::Game,
-            "saver" | "screen" | "mod_saver" | "mod_screen" => PackageKind::Saver,
+            "screensaver" | "screen" | "mod_screensaver" | "mod_screen" => PackageKind::Screensaver,
             "boss" | "mod_boss" => PackageKind::Boss,
             "color_pack" | "colorpack" | "color" => PackageKind::ColorPack,
             "ui_pack" | "uipack" | "ui" | "texture_pack" | "texturepack" => PackageKind::UiPack,
@@ -139,12 +139,12 @@ mod tests {
     fn package_id_round_trips_string_format() {
         let package_id = PackageId::new(
             PackageSource::ThirdParty,
-            PackageKind::Saver,
-            "author.saver_name",
+            PackageKind::Screensaver,
+            "author.screensaver_name",
         );
 
         let encoded = package_id.to_string();
-        assert_eq!(encoded, "mod:saver:author.saver_name");
+        assert_eq!(encoded, "mod:screensaver:author.screensaver_name");
         assert_eq!(PackageId::from_string(&encoded), Some(package_id));
     }
 
@@ -165,6 +165,6 @@ mod tests {
     #[test]
     fn legacy_values_convert_without_panicking() {
         let package_id = PackageId::from_legacy("office", "screen", "legacy_uid");
-        assert_eq!(package_id.to_string(), "official:saver:legacy_uid");
+        assert_eq!(package_id.to_string(), "official:screensaver:legacy_uid");
     }
 }

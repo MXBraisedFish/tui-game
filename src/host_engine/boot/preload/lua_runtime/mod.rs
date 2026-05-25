@@ -39,7 +39,7 @@ pub(crate) fn load(
         keybinds: loaded_resources.persistent_data.keybinds.clone(),
         best_scores: loaded_resources.persistent_data.best_scores.clone(),
         game_state: loaded_resources.persistent_data.game_state.clone(),
-        saver_state: loaded_resources.persistent_data.saver_state.clone(),
+        screensaver_state: loaded_resources.persistent_data.screensaver_state.clone(),
         boss_state: loaded_resources.persistent_data.boss_state.clone(),
         launch_mode: LaunchMode::New,
         terminal_size,

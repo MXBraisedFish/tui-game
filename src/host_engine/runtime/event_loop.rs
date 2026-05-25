@@ -182,14 +182,14 @@ pub(crate) fn run(
             continue;
         }
 
-        if frame_rate_controller.is_root_idle() && active_ui_page.should_auto_enter_saver() {
-            if let Some(uid) = active_ui_page.next_saver_overlay_uid() {
+        if frame_rate_controller.is_root_idle() && active_ui_page.should_auto_enter_screensaver() {
+            if let Some(uid) = active_ui_page.next_screensaver_overlay_uid() {
                 let package =
-                    overlay_package_by_uid(&active_ui_page.overlay_registry().savers, uid.as_str());
+                    overlay_package_by_uid(&active_ui_page.overlay_registry().screensavers, uid.as_str());
                 toggle_overlay(
                     host_bridge,
                     package,
-                    OverlaySessionKind::Saver,
+                    OverlaySessionKind::Screensaver,
                     &mut overlay_session,
                     &mut renderer_state,
                 )?;
@@ -270,13 +270,13 @@ fn handle_global_key(
 ) -> RuntimeLoopResult<bool> {
     match key.to_ascii_lowercase().as_str() {
         "f2" => {
-            let package = active_ui_page.next_saver_overlay_uid().and_then(|uid| {
-                overlay_package_by_uid(&active_ui_page.overlay_registry().savers, uid.as_str())
+            let package = active_ui_page.next_screensaver_overlay_uid().and_then(|uid| {
+                overlay_package_by_uid(&active_ui_page.overlay_registry().screensavers, uid.as_str())
             });
             toggle_overlay(
                 host_bridge,
                 package,
-                OverlaySessionKind::Saver,
+                OverlaySessionKind::Screensaver,
                 overlay_session,
                 renderer_state,
             )?;

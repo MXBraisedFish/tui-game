@@ -55,13 +55,13 @@
 ---
 # 屏保包放置目录
 
-所有 屏保包文件必须放置在宿主执行目录下的 `data/mod/saver/` 目录中，按命名空间组织。
+所有 屏保包文件必须放置在宿主执行目录下的 `data/mod/screensaver/` 目录中，按命名空间组织。
 
 ```text
 宿主执行目录/
 └─ data/
    └─ mod/
-      └─ saver/
+      └─ screensaver/
          └─ <namespace>/    -- 命名空间
             └─ *            -- 该 屏保包的所有文件
 ```
@@ -119,7 +119,7 @@
   "entry": path,                    -- 入口脚本路径
   "package": string,                -- 包名
   "package_name": string | key,     -- 屏保包显示名称
-  "saver_name": string | key,       -- 屏保界面显示名称
+  "screensaver_name": string | key,       -- 屏保界面显示名称
   "author": string | key,           -- 作者
   "version": string,                -- 包版本号
   "introduction": string | key,     -- 屏保包简介
@@ -136,7 +136,7 @@
 | `entry`        | <font color="#92cddc">path</font>                                                                               | 入口脚本路径，相对于 `scripts/` 目录。                                               |
 | `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同屏保包，包内全局唯一。仅允许字符串。                                             |
 | `package_name` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 屏保包显示名称，在屏保包列表展示的包名。可填写字符串或语言键。                                         |
-| `saver_name`   | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | Saver 界面展示名称，在屏保包设置列表中展示。可填写字符串或语言键。                                    |
+| `screensaver_name`   | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | Screensaver 界面展示名称，在屏保包设置列表中展示。可填写字符串或语言键。                                    |
 | `author`       | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 作者名称。可填写字符串或语言键。                                                        |
 | `version`      | <font color="#92cddc">string</font>                                                                             | 屏保包版本号，由作者自行定义。推荐格式：主版本号.次版本号。仅允许字符串。                                   |
 | `introduction` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 屏保包简介，在屏保包列表中展示。可填写字符串或语言键。                                             |
@@ -147,20 +147,20 @@
 
 UID 是宿主为每个包生成的唯一标识码，用于内部区分不同包，是最终的识别 ID。
 
-**构成格式**：`saver_{编码}`
+**构成格式**：`screensaver_{编码}`
 
 **编码生成规则**：
 
-1. 将 屏保包的 `来源（source）`、`命名空间（namespace）`、`包名（package）`、`Saver 界面显示名称（saver_name）`、`作者（author）`、`入口（entry）` 按特定格式拼接成一个字符串。
+1. 将 屏保包的 `来源（source）`、`命名空间（namespace）`、`包名（package）`、`Screensaver 界面显示名称（screensaver_name）`、`作者（author）`、`入口（entry）` 按特定格式拼接成一个字符串。
 2. 对该字符串进行特定运算编码。
 
 上述过程可用以下伪代码表示：
 ```python
-encoding = function(source + namespace + package + saver_name + author + entry)
-uid = "saver_" + encoding
+encoding = function(source + namespace + package + screensaver_name + author + entry)
+uid = "screensaver_" + encoding
 ```
 
-**稳定性**：只要 `来源`、`命名空间`、`包名`、`Saver 名`、`作者`、`入口` 保持不变，生成的 UID 就不会改变。
+**稳定性**：只要 `来源`、`命名空间`、`包名`、`Screensaver 名`、`作者`、`入口` 保持不变，生成的 UID 就不会改变。
 
 **符号**：由`0-9` `a-z` `A-Z`组成。
 
@@ -329,9 +329,9 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ```json
 {
-  "saver.title": "DVD",
-  "saver.collision": "碰撞次数：{times}",                  -- 提供score替换内容
-  "saver.exit": "{tc:green}按 {key:exit} 键返回{tc:clear}" -- 使用可以解析富文本的相关 API
+  "screensaver.title": "DVD",
+  "screensaver.collision": "碰撞次数：{times}",                  -- 提供score替换内容
+  "screensaver.exit": "{tc:green}按 {key:exit} 键返回{tc:clear}" -- 使用可以解析富文本的相关 API
 }
 ```
 
@@ -478,4 +478,4 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 ```
 
 **样图**
-![默认头图](./image/saver_banner.png)
+![默认头图](./image/screensaver_banner.png)

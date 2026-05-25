@@ -6,8 +6,8 @@ use crate::host_engine::boot::i18n::pseudo_text::MutableText;
 pub static TITLE: MutableText = MutableText::new();
 pub static TOGGLE_MOD_ON: MutableText = MutableText::new();
 pub static TOGGLE_MOD_OFF: MutableText = MutableText::new();
-pub static TOGGLE_AFK_SAVER_ON: MutableText = MutableText::new();
-pub static TOGGLE_AFK_SAVER_OFF: MutableText = MutableText::new();
+pub static TOGGLE_AFK_SCREENSAVER_ON: MutableText = MutableText::new();
+pub static TOGGLE_AFK_SCREENSAVER_OFF: MutableText = MutableText::new();
 pub static TOGGLE_AFK_TIME_SECOND: MutableText = MutableText::new();
 pub static TOGGLE_AFK_TIME_MINUTE: MutableText = MutableText::new();
 pub static TOGGLE_AFK_TIME_NEVER: MutableText = MutableText::new();
@@ -20,11 +20,11 @@ pub static TOGGLE_THEME_SYSTEM: MutableText = MutableText::new();
 pub static OPTION_MOD: MutableText = MutableText::new();
 pub static OPTION_THEME: MutableText = MutableText::new();
 pub static OPTION_AFK_TIME: MutableText = MutableText::new();
-pub static OPTION_AFK_SAVER: MutableText = MutableText::new();
+pub static OPTION_AFK_SCREENSAVER: MutableText = MutableText::new();
 pub static OPTION_INFO: MutableText = MutableText::new();
-pub static OPTION_SAVER_SORT: MutableText = MutableText::new();
+pub static OPTION_SCREENSAVER_SORT: MutableText = MutableText::new();
 pub static OPTION_BOSS_SORT: MutableText = MutableText::new();
-pub static OPTION_SAVER_LIST: MutableText = MutableText::new();
+pub static OPTION_SCREENSAVER_LIST: MutableText = MutableText::new();
 pub static OPTION_BOSS_LIST: MutableText = MutableText::new();
 pub static OPTION_LIST_ON: MutableText = MutableText::new();
 pub static OPTION_LIST_OFF: MutableText = MutableText::new();
@@ -35,8 +35,8 @@ pub struct DisplayText {
     pub title: String,
     pub toggle_mod_on: String,
     pub toggle_mod_off: String,
-    pub toggle_afk_saver_on: String,
-    pub toggle_afk_saver_off: String,
+    pub toggle_afk_screensaver_on: String,
+    pub toggle_afk_screensaver_off: String,
     pub toggle_afk_time_second: String,
     pub toggle_afk_time_minute: String,
     pub toggle_afk_time_never: String,
@@ -49,11 +49,11 @@ pub struct DisplayText {
     pub option_mod: String,
     pub option_theme: String,
     pub option_afk_time: String,
-    pub option_afk_saver: String,
+    pub option_afk_screensaver: String,
     pub option_info: String,
-    pub option_saver_sort: String,
+    pub option_screensaver_sort: String,
     pub option_boss_sort: String,
-    pub option_saver_list: String,
+    pub option_screensaver_list: String,
     pub option_boss_list: String,
     pub option_list_on: String,
     pub option_list_off: String,
@@ -65,14 +65,14 @@ pub fn register(language_source: &LanguageSource) -> DisplayText {
     set_text(&TOGGLE_MOD_ON, language_source, "display.toggle.mod.on");
     set_text(&TOGGLE_MOD_OFF, language_source, "display.toggle.mod.off");
     set_text(
-        &TOGGLE_AFK_SAVER_ON,
+        &TOGGLE_AFK_SCREENSAVER_ON,
         language_source,
-        "display.toggle.afk.saver.on",
+        "display.toggle.afk.screensaver.on",
     );
     set_text(
-        &TOGGLE_AFK_SAVER_OFF,
+        &TOGGLE_AFK_SCREENSAVER_OFF,
         language_source,
-        "display.toggle.afk.saver.off",
+        "display.toggle.afk.screensaver.off",
     );
     set_text(
         &TOGGLE_AFK_TIME_SECOND,
@@ -111,15 +111,15 @@ pub fn register(language_source: &LanguageSource) -> DisplayText {
     set_text(&OPTION_THEME, language_source, "display.option.theme");
     set_text(&OPTION_AFK_TIME, language_source, "display.option.afk.time");
     set_text(
-        &OPTION_AFK_SAVER,
+        &OPTION_AFK_SCREENSAVER,
         language_source,
-        "display.option.afk.saver",
+        "display.option.afk.screensaver",
     );
     set_text(&OPTION_INFO, language_source, "display.option.info");
     set_text(
-        &OPTION_SAVER_SORT,
+        &OPTION_SCREENSAVER_SORT,
         language_source,
-        "display.option.saver.sort",
+        "display.option.screensaver.sort",
     );
     set_text(
         &OPTION_BOSS_SORT,
@@ -127,9 +127,9 @@ pub fn register(language_source: &LanguageSource) -> DisplayText {
         "display.option.boss.sort",
     );
     set_text(
-        &OPTION_SAVER_LIST,
+        &OPTION_SCREENSAVER_LIST,
         language_source,
-        "display.option.saver.list",
+        "display.option.screensaver.list",
     );
     set_text(
         &OPTION_BOSS_LIST,
@@ -144,8 +144,8 @@ pub fn register(language_source: &LanguageSource) -> DisplayText {
         title: text(&TITLE),
         toggle_mod_on: text(&TOGGLE_MOD_ON),
         toggle_mod_off: text(&TOGGLE_MOD_OFF),
-        toggle_afk_saver_on: text(&TOGGLE_AFK_SAVER_ON),
-        toggle_afk_saver_off: text(&TOGGLE_AFK_SAVER_OFF),
+        toggle_afk_screensaver_on: text(&TOGGLE_AFK_SCREENSAVER_ON),
+        toggle_afk_screensaver_off: text(&TOGGLE_AFK_SCREENSAVER_OFF),
         toggle_afk_time_second: text(&TOGGLE_AFK_TIME_SECOND),
         toggle_afk_time_minute: text(&TOGGLE_AFK_TIME_MINUTE),
         toggle_afk_time_never: text(&TOGGLE_AFK_TIME_NEVER),
@@ -158,11 +158,11 @@ pub fn register(language_source: &LanguageSource) -> DisplayText {
         option_mod: text(&OPTION_MOD),
         option_theme: text(&OPTION_THEME),
         option_afk_time: text(&OPTION_AFK_TIME),
-        option_afk_saver: text(&OPTION_AFK_SAVER),
+        option_afk_screensaver: text(&OPTION_AFK_SCREENSAVER),
         option_info: text(&OPTION_INFO),
-        option_saver_sort: text(&OPTION_SAVER_SORT),
+        option_screensaver_sort: text(&OPTION_SCREENSAVER_SORT),
         option_boss_sort: text(&OPTION_BOSS_SORT),
-        option_saver_list: text(&OPTION_SAVER_LIST),
+        option_screensaver_list: text(&OPTION_SCREENSAVER_LIST),
         option_boss_list: text(&OPTION_BOSS_LIST),
         option_list_on: text(&OPTION_LIST_ON),
         option_list_off: text(&OPTION_LIST_OFF),

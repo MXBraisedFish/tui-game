@@ -20,7 +20,7 @@ pub fn install(_lua: &Lua, _api_scope: ApiScope) -> mlua::Result<()> {
 pub fn validate_required_callbacks(lua: &Lua, api_scope: ApiScope) -> mlua::Result<()> {
     if matches!(
         api_scope.consumer,
-        super::scope::ApiConsumer::SaverPackage | super::scope::ApiConsumer::BossPackage
+        super::scope::ApiConsumer::ScreensaverPackage | super::scope::ApiConsumer::BossPackage
     ) {
         callback_contract::require_function(lua, "update")?;
         callback_contract::require_function(lua, "render")?;

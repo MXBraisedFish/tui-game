@@ -13,7 +13,7 @@ end
 local function option_items(root_state)
   local safe_mode_on = root_state.default_safe_mode ~= false
   local game_enabled = root_state.default_mod_game_enabled ~= false
-  local saver_enabled = root_state.default_mod_saver_enabled ~= false
+  local screensaver_enabled = root_state.default_mod_screensaver_enabled ~= false
   local boss_enabled = root_state.default_mod_boss_enabled ~= false
   local function toggle_item(key, label_key, fallback, enabled, on_key, off_key)
     return {
@@ -33,11 +33,11 @@ local function option_items(root_state)
       is_toggle = true
     },
     toggle_item(C.DEFAULT_TEXT.option2, "SECURITY_DEFAULT_MOD_GAME", C.DEFAULT_TEXT.default_mod_game, game_enabled),
-    toggle_item(C.DEFAULT_TEXT.option3, "SECURITY_DEFAULT_MOD_SAVER", C.DEFAULT_TEXT.default_mod_saver, saver_enabled),
+    toggle_item(C.DEFAULT_TEXT.option3, "SECURITY_DEFAULT_MOD_SCREENSAVER", C.DEFAULT_TEXT.default_mod_screensaver, screensaver_enabled),
     toggle_item(C.DEFAULT_TEXT.option4, "SECURITY_DEFAULT_MOD_BOSS", C.DEFAULT_TEXT.default_mod_boss, boss_enabled),
     { key = C.DEFAULT_TEXT.option5, label = L.language(root_state, "SECURITY_RESET_SAFE_MODE", C.DEFAULT_TEXT.reset_safe_mode), is_toggle = false },
     { key = C.DEFAULT_TEXT.option6, label = L.language(root_state, "SECURITY_RESET_MOD_GAME", C.DEFAULT_TEXT.reset_mod_game), is_toggle = false },
-    { key = C.DEFAULT_TEXT.option7, label = L.language(root_state, "SECURITY_RESET_MOD_SAVER", C.DEFAULT_TEXT.reset_mod_saver), is_toggle = false },
+    { key = C.DEFAULT_TEXT.option7, label = L.language(root_state, "SECURITY_RESET_MOD_SCREENSAVER", C.DEFAULT_TEXT.reset_mod_screensaver), is_toggle = false },
     { key = C.DEFAULT_TEXT.option8, label = L.language(root_state, "SECURITY_RESET_MOD_BOSS", C.DEFAULT_TEXT.reset_mod_boss), is_toggle = false }
   }
 end

@@ -1,5 +1,5 @@
-local Render = load_function("mod_saver_list/render.lua")
-local State = load_function("mod_saver_list/state.lua")
+local Render = load_function("mod_screensaver_list/render.lua")
+local State = load_function("mod_screensaver_list/state.lua")
 
 function handle_event(lua_state, event)
   lua_state = lua_state or {}

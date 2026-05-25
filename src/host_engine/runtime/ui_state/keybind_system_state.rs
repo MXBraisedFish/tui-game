@@ -644,7 +644,7 @@ fn resolve_page_name(page_id: &str) -> String {
         "setting_security" => text.setting_keybind.system_page_setting_security,
         "setting_display" => text.setting_keybind.system_page_setting_display,
         "mod_game_list" => text.mod_hub.game,
-        "mod_saver_list" => text.mod_hub.saver,
+        "mod_screensaver_list" => text.mod_hub.screensaver,
         "mod_boss_list" => text.mod_hub.boss,
         "keybind_system" => text.setting_keybind.system_page_keybind_system,
         "keybind_global" => text.setting_keybind.system_page_keybind_global,

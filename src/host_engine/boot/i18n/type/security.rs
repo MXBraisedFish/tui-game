@@ -10,11 +10,11 @@ pub static TOGGLE_SAFE_MODE_ON: MutableText = MutableText::new();
 pub static TOGGLE_SAFE_MODE_OFF_PERMANENT: MutableText = MutableText::new();
 pub static DEFAULT_SAFE_MODE: MutableText = MutableText::new();
 pub static DEFAULT_MOD_GAME: MutableText = MutableText::new();
-pub static DEFAULT_MOD_SAVER: MutableText = MutableText::new();
+pub static DEFAULT_MOD_SCREENSAVER: MutableText = MutableText::new();
 pub static DEFAULT_MOD_BOSS: MutableText = MutableText::new();
 pub static RESET_SAFE_MODE: MutableText = MutableText::new();
 pub static RESET_MOD_GAME: MutableText = MutableText::new();
-pub static RESET_MOD_SAVER: MutableText = MutableText::new();
+pub static RESET_MOD_SCREENSAVER: MutableText = MutableText::new();
 pub static RESET_MOD_BOSS: MutableText = MutableText::new();
 pub static RESET_SUCCESS: MutableText = MutableText::new();
 pub static RESET_FAILED: MutableText = MutableText::new();
@@ -29,11 +29,11 @@ pub struct SecurityText {
     pub toggle_safe_mode_off_permanent: String,
     pub default_safe_mode: String,
     pub default_mod_game: String,
-    pub default_mod_saver: String,
+    pub default_mod_screensaver: String,
     pub default_mod_boss: String,
     pub reset_safe_mode: String,
     pub reset_mod_game: String,
-    pub reset_mod_saver: String,
+    pub reset_mod_screensaver: String,
     pub reset_mod_boss: String,
     pub reset_success: String,
     pub reset_failed: String,
@@ -65,9 +65,9 @@ pub fn register(language_source: &LanguageSource) -> SecurityText {
         "security.default.mod_game",
     );
     set_text(
-        &DEFAULT_MOD_SAVER,
+        &DEFAULT_MOD_SCREENSAVER,
         language_source,
-        "security.default.mod_saver",
+        "security.default.mod_screensaver",
     );
     set_text(
         &DEFAULT_MOD_BOSS,
@@ -81,9 +81,9 @@ pub fn register(language_source: &LanguageSource) -> SecurityText {
     );
     set_text(&RESET_MOD_GAME, language_source, "security.reset.mod_game");
     set_text(
-        &RESET_MOD_SAVER,
+        &RESET_MOD_SCREENSAVER,
         language_source,
-        "security.reset.mod_saver",
+        "security.reset.mod_screensaver",
     );
     set_text(&RESET_MOD_BOSS, language_source, "security.reset.mod_boss");
     set_text(&RESET_SUCCESS, language_source, "security.reset.success");
@@ -97,11 +97,11 @@ pub fn register(language_source: &LanguageSource) -> SecurityText {
         toggle_safe_mode_off_permanent: text(&TOGGLE_SAFE_MODE_OFF_PERMANENT),
         default_safe_mode: text(&DEFAULT_SAFE_MODE),
         default_mod_game: text(&DEFAULT_MOD_GAME),
-        default_mod_saver: text(&DEFAULT_MOD_SAVER),
+        default_mod_screensaver: text(&DEFAULT_MOD_SCREENSAVER),
         default_mod_boss: text(&DEFAULT_MOD_BOSS),
         reset_safe_mode: text(&RESET_SAFE_MODE),
         reset_mod_game: text(&RESET_MOD_GAME),
-        reset_mod_saver: text(&RESET_MOD_SAVER),
+        reset_mod_screensaver: text(&RESET_MOD_SCREENSAVER),
         reset_mod_boss: text(&RESET_MOD_BOSS),
         reset_success: text(&RESET_SUCCESS),
         reset_failed: text(&RESET_FAILED),

@@ -1,4 +1,4 @@
-//! Saver/老板覆盖层包预加载入口。
+//! Screensaver/老板覆盖层包预加载入口。
 // TODO: 迁移至 storage::CacheStore
 
 mod manifest;
@@ -18,7 +18,7 @@ pub fn load() -> OverlayModuleResult<OverlayRegistry> {
     let registry = scanner::scan_all()?;
     warn_uid_conflicts(&registry);
     scan_cache::persist_scan_cache(&registry)?;
-    state::sync_saver_state(&registry)?;
+    state::sync_screensaver_state(&registry)?;
     state::sync_boss_state(&registry)?;
     Ok(registry)
 }
@@ -26,11 +26,11 @@ pub fn load() -> OverlayModuleResult<OverlayRegistry> {
 fn warn_uid_conflicts(registry: &OverlayRegistry) {
     let mut package_id_registry = PackageIdRegistry::default();
 
-    for saver in &registry.savers {
+    for screensaver in &registry.screensavers {
         let package_id = PackageId::from_legacy(
-            source_legacy_text(saver.source),
-            kind_legacy_text(saver.kind),
-            &saver.uid,
+            source_legacy_text(screensaver.source),
+            kind_legacy_text(screensaver.kind),
+            &screensaver.uid,
         );
         if let Err(error) = package_id_registry.register(&package_id) {
             eprintln!("[warning] package uid conflict: {error}");
@@ -58,7 +58,7 @@ fn source_legacy_text(source: OverlaySource) -> &'static str {
 
 fn kind_legacy_text(kind: OverlayKind) -> &'static str {
     match kind {
-        OverlayKind::Saver => "saver",
+        OverlayKind::Screensaver => "screensaver",
         OverlayKind::Boss => "boss",
     }
 }
@@ -82,8 +82,8 @@ mod scan_cache {
         registry: &OverlayRegistry,
     ) -> Result<(), Box<dyn std::error::Error>> {
         write_scan_cache(
-            &data_dirs::root_dir().join("data/cache/saver_scan_cache"),
-            &registry.savers,
+            &data_dirs::root_dir().join("data/cache/screensaver_scan_cache"),
+            &registry.screensavers,
         )?;
         write_scan_cache(
             &data_dirs::root_dir().join("data/cache/boss_scan_cache"),
@@ -115,17 +115,17 @@ mod state {
 
     use super::{OverlayRegistry, OverlaySource};
 
-    pub fn sync_saver_state(registry: &OverlayRegistry) -> Result<(), Box<dyn std::error::Error>> {
-        let path = data_dirs::root_dir().join("data/profiles/saver_state");
+    pub fn sync_screensaver_state(registry: &OverlayRegistry) -> Result<(), Box<dyn std::error::Error>> {
+        let path = data_dirs::root_dir().join("data/profiles/screensaver_state");
         let security = security_profile::load_from_default_path();
         let mut state = read_state(&path)?;
         for package in registry
-            .savers
+            .screensavers
             .iter()
             .filter(|package| package.source == OverlaySource::ThirdParty)
         {
             state.entry(package.uid.clone()).or_insert_with(
-                || json!({ "enabled": security.default_mod_saver_enabled, "debug": false }),
+                || json!({ "enabled": security.default_mod_screensaver_enabled, "debug": false }),
             );
         }
         write_state(&path, &state)?;

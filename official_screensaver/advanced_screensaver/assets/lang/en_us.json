@@ -1,9 +1,9 @@
 {
-  "advanced_saver.package_name": "Official Advanced Saver Package",
-  "advanced_saver.author": "TUI GAME",
-  "advanced_saver.saver_name": "Advanced Saver",
-  "advanced_saver.introduction": "A richer official saver overlay using language keys, image paths, timers and random movement.",
-  "advanced_saver.title": "Advanced Saver",
-  "advanced_saver.hint": "Press F2 again to return.",
-  "advanced_saver.time": "Runtime"
+  "advanced_screensaver.package_name": "Official Advanced Screensaver Package",
+  "advanced_screensaver.author": "TUI GAME",
+  "advanced_screensaver.screensaver_name": "Advanced Screensaver",
+  "advanced_screensaver.introduction": "A richer official screensaver overlay using language keys, image paths, timers and random movement.",
+  "advanced_screensaver.title": "Advanced Screensaver",
+  "advanced_screensaver.hint": "Press F2 again to return.",
+  "advanced_screensaver.time": "Runtime"
 }

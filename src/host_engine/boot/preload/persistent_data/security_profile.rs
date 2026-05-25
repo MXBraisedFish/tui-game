@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 pub struct SecurityProfile {
     pub default_safe_mode: bool,
     pub default_mod_game_enabled: bool,
-    pub default_mod_saver_enabled: bool,
+    pub default_mod_screensaver_enabled: bool,
     pub default_mod_boss_enabled: bool,
 }
 
@@ -20,7 +20,7 @@ impl Default for SecurityProfile {
         Self {
             default_safe_mode: true,
             default_mod_game_enabled: true,
-            default_mod_saver_enabled: true,
+            default_mod_screensaver_enabled: true,
             default_mod_boss_enabled: true,
         }
     }
@@ -37,8 +37,8 @@ impl SecurityProfile {
                 .get("default_mod_game_enabled")
                 .and_then(Value::as_bool)
                 .unwrap_or(true),
-            default_mod_saver_enabled: value
-                .get("default_mod_saver_enabled")
+            default_mod_screensaver_enabled: value
+                .get("default_mod_screensaver_enabled")
                 .and_then(Value::as_bool)
                 .unwrap_or(true),
             default_mod_boss_enabled: value
@@ -52,7 +52,7 @@ impl SecurityProfile {
         json!({
             "default_safe_mode": self.default_safe_mode,
             "default_mod_game_enabled": self.default_mod_game_enabled,
-            "default_mod_saver_enabled": self.default_mod_saver_enabled,
+            "default_mod_screensaver_enabled": self.default_mod_screensaver_enabled,
             "default_mod_boss_enabled": self.default_mod_boss_enabled,
         })
     }

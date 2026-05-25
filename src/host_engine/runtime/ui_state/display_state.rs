@@ -18,7 +18,7 @@ use crate::host_engine::boot::preload::persistent_data::display_profile::{
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DisplayPanelKind {
     None,
-    Saver,
+    Screensaver,
     Boss,
 }
 
@@ -26,13 +26,13 @@ impl DisplayPanelKind {
     fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
-            Self::Saver => "saver",
+            Self::Screensaver => "screensaver",
             Self::Boss => "boss",
         }
     }
     fn from_str(value: &str) -> Self {
         match value {
-            "saver" => Self::Saver,
+            "screensaver" => Self::Screensaver,
             "boss" => Self::Boss,
             _ => Self::None,
         }
@@ -49,7 +49,7 @@ impl DisplayUiState {
     pub fn new(
         display_state: JsonValue,
         overlay_registry: OverlayRegistry,
-        saver_state: JsonValue,
+        screensaver_state: JsonValue,
         boss_state: JsonValue,
         language_code: String,
     ) -> Self {
@@ -57,7 +57,7 @@ impl DisplayUiState {
         let root_state = DisplayRootState::new(
             profile,
             overlay_registry,
-            saver_state,
+            screensaver_state,
             boss_state,
             language_code,
         );
@@ -83,11 +83,11 @@ impl DisplayUiState {
     pub fn replace_overlay_data(
         &mut self,
         overlay_registry: OverlayRegistry,
-        saver_state: JsonValue,
+        screensaver_state: JsonValue,
         boss_state: JsonValue,
     ) {
         self.root_state.overlay_registry = overlay_registry;
-        self.root_state.saver_state = saver_state;
+        self.root_state.screensaver_state = screensaver_state;
         self.root_state.boss_state = boss_state;
         self.root_state.refresh_items();
         self.root_state.normalize_list_select();
@@ -102,19 +102,19 @@ impl DisplayUiState {
         self.root_state.profile.idle_threshold
     }
 
-    pub fn should_auto_enter_saver(&self) -> bool {
-        self.root_state.profile.idle_enter_saver
-            && self.root_state.profile.saver_mode != "off"
+    pub fn should_auto_enter_screensaver(&self) -> bool {
+        self.root_state.profile.idle_enter_screensaver
+            && self.root_state.profile.screensaver_mode != "off"
             && self
                 .root_state
-                .display_candidates(DisplayPanelKind::Saver)
+                .display_candidates(DisplayPanelKind::Screensaver)
                 .next()
                 .is_some()
     }
 
     pub fn selected_overlay_uid(&mut self, panel: DisplayPanelKind) -> Option<String> {
         let mode = match panel {
-            DisplayPanelKind::Saver => self.root_state.profile.saver_mode.as_str(),
+            DisplayPanelKind::Screensaver => self.root_state.profile.screensaver_mode.as_str(),
             DisplayPanelKind::Boss => self.root_state.profile.boss_mode.as_str(),
             DisplayPanelKind::None => return None,
         };
@@ -134,7 +134,7 @@ impl DisplayUiState {
             candidates.get(index).cloned()
         } else {
             let profile = match panel {
-                DisplayPanelKind::Saver => &mut self.root_state.profile.saver_list,
+                DisplayPanelKind::Screensaver => &mut self.root_state.profile.screensaver_list,
                 DisplayPanelKind::Boss => &mut self.root_state.profile.boss_list,
                 DisplayPanelKind::None => unreachable!(),
             };
@@ -222,14 +222,14 @@ impl DisplayUiState {
                     next_idle_threshold(self.root_state.profile.idle_threshold)
             }
             4 => {
-                self.root_state.profile.idle_enter_saver = !self.root_state.profile.idle_enter_saver
+                self.root_state.profile.idle_enter_screensaver = !self.root_state.profile.idle_enter_screensaver
             }
             5 => self.root_state.profile.host_status = !self.root_state.profile.host_status,
             6 => {
-                self.root_state.profile.saver_mode = next_mode(&self.root_state.profile.saver_mode)
+                self.root_state.profile.screensaver_mode = next_mode(&self.root_state.profile.screensaver_mode)
             }
             7 => self.root_state.profile.boss_mode = next_mode(&self.root_state.profile.boss_mode),
-            8 => self.root_state.panel = DisplayPanelKind::Saver,
+            8 => self.root_state.panel = DisplayPanelKind::Screensaver,
             9 => self.root_state.panel = DisplayPanelKind::Boss,
             _ => {}
         }
@@ -332,7 +332,7 @@ pub struct DisplayRootState {
     pub language: Vec<(String, String)>,
     pub profile: DisplayProfile,
     pub overlay_registry: OverlayRegistry,
-    pub saver_state: JsonValue,
+    pub screensaver_state: JsonValue,
     pub boss_state: JsonValue,
     pub language_code: String,
     pub select: i64,
@@ -342,7 +342,7 @@ pub struct DisplayRootState {
     pub move_mode: bool,
     pub position_mode: bool,
     pub position_input: i64,
-    pub saver_items: Vec<DisplayOverlayItem>,
+    pub screensaver_items: Vec<DisplayOverlayItem>,
     pub boss_items: Vec<DisplayOverlayItem>,
 }
 
@@ -350,7 +350,7 @@ impl DisplayRootState {
     fn new(
         profile: DisplayProfile,
         overlay_registry: OverlayRegistry,
-        saver_state: JsonValue,
+        screensaver_state: JsonValue,
         boss_state: JsonValue,
         language_code: String,
     ) -> Self {
@@ -358,7 +358,7 @@ impl DisplayRootState {
             language: display_language_pairs(),
             profile,
             overlay_registry,
-            saver_state,
+            screensaver_state,
             boss_state,
             language_code,
             select: 1,
@@ -368,7 +368,7 @@ impl DisplayRootState {
             move_mode: false,
             position_mode: false,
             position_input: 0,
-            saver_items: Vec::new(),
+            screensaver_items: Vec::new(),
             boss_items: Vec::new(),
         };
         root.refresh_items();
@@ -382,10 +382,10 @@ impl DisplayRootState {
 
     fn refresh_items(&mut self) {
         self.profile.normalize();
-        self.saver_items = build_overlay_items(
-            &self.overlay_registry.savers,
-            &self.saver_state,
-            &mut self.profile.saver_list,
+        self.screensaver_items = build_overlay_items(
+            &self.overlay_registry.screensavers,
+            &self.screensaver_state,
+            &mut self.profile.screensaver_list,
             &self.language_code,
         );
         self.boss_items = build_overlay_items(
@@ -403,7 +403,7 @@ impl DisplayRootState {
 
     fn active_items(&self) -> &[DisplayOverlayItem] {
         match self.panel {
-            DisplayPanelKind::Saver => &self.saver_items,
+            DisplayPanelKind::Screensaver => &self.screensaver_items,
             DisplayPanelKind::Boss => &self.boss_items,
             DisplayPanelKind::None => &[],
         }
@@ -411,7 +411,7 @@ impl DisplayRootState {
 
     fn active_profile_mut(&mut self) -> Option<&mut DisplayOverlayProfile> {
         match self.panel {
-            DisplayPanelKind::Saver => Some(&mut self.profile.saver_list),
+            DisplayPanelKind::Screensaver => Some(&mut self.profile.screensaver_list),
             DisplayPanelKind::Boss => Some(&mut self.profile.boss_list),
             DisplayPanelKind::None => None,
         }
@@ -433,9 +433,9 @@ impl DisplayRootState {
         panel: DisplayPanelKind,
     ) -> impl Iterator<Item = &DisplayOverlayItem> {
         let items = match panel {
-            DisplayPanelKind::Saver => &self.saver_items,
+            DisplayPanelKind::Screensaver => &self.screensaver_items,
             DisplayPanelKind::Boss => &self.boss_items,
-            DisplayPanelKind::None => &self.saver_items,
+            DisplayPanelKind::None => &self.screensaver_items,
         };
         items
             .iter()
@@ -506,7 +506,7 @@ impl DisplayRootState {
         table.set("position_mode", self.position_mode)?;
         table.set("position_input", self.position_input.max(0))?;
         table.set("settings", profile_to_lua(lua, &self.profile)?)?;
-        table.set("saver_list", items_to_table(lua, &self.saver_items)?)?;
+        table.set("screensaver_list", items_to_table(lua, &self.screensaver_items)?)?;
         table.set("boss_list", items_to_table(lua, &self.boss_items)?)?;
         Ok(table)
     }
@@ -580,9 +580,9 @@ fn profile_to_lua(lua: &Lua, profile: &DisplayProfile) -> mlua::Result<Table> {
     table.set("mod_badge", profile.mod_badge)?;
     table.set("theme", profile.theme.as_str())?;
     table.set("idle_threshold", profile.idle_threshold as i64)?;
-    table.set("idle_enter_saver", profile.idle_enter_saver)?;
+    table.set("idle_enter_screensaver", profile.idle_enter_screensaver)?;
     table.set("host_status", profile.host_status)?;
-    table.set("saver_mode", profile.saver_mode.as_str())?;
+    table.set("screensaver_mode", profile.screensaver_mode.as_str())?;
     table.set("boss_mode", profile.boss_mode.as_str())?;
     Ok(table)
 }
@@ -641,12 +641,12 @@ fn display_language_pairs() -> Vec<(String, String)> {
         ("DISPLAY_TOGGLE_MOD_ON".into(), text.display.toggle_mod_on),
         ("DISPLAY_TOGGLE_MOD_OFF".into(), text.display.toggle_mod_off),
         (
-            "DISPLAY_TOGGLE_AFK_SAVER_ON".into(),
-            text.display.toggle_afk_saver_on,
+            "DISPLAY_TOGGLE_AFK_SCREENSAVER_ON".into(),
+            text.display.toggle_afk_screensaver_on,
         ),
         (
-            "DISPLAY_TOGGLE_AFK_SAVER_OFF".into(),
-            text.display.toggle_afk_saver_off,
+            "DISPLAY_TOGGLE_AFK_SCREENSAVER_OFF".into(),
+            text.display.toggle_afk_screensaver_off,
         ),
         (
             "DISPLAY_TOGGLE_AFK_TIME_SECOND".into(),
@@ -688,21 +688,21 @@ fn display_language_pairs() -> Vec<(String, String)> {
             text.display.option_afk_time,
         ),
         (
-            "DISPLAY_OPTION_AFK_SAVER".into(),
-            text.display.option_afk_saver,
+            "DISPLAY_OPTION_AFK_SCREENSAVER".into(),
+            text.display.option_afk_screensaver,
         ),
         ("DISPLAY_OPTION_INFO".into(), text.display.option_info),
         (
-            "DISPLAY_OPTION_SAVER_SORT".into(),
-            text.display.option_saver_sort,
+            "DISPLAY_OPTION_SCREENSAVER_SORT".into(),
+            text.display.option_screensaver_sort,
         ),
         (
             "DISPLAY_OPTION_BOSS_SORT".into(),
             text.display.option_boss_sort,
         ),
         (
-            "DISPLAY_OPTION_SAVER_LIST".into(),
-            text.display.option_saver_list,
+            "DISPLAY_OPTION_SCREENSAVER_LIST".into(),
+            text.display.option_screensaver_list,
         ),
         (
             "DISPLAY_OPTION_BOSS_LIST".into(),

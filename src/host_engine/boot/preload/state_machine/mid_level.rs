@@ -49,8 +49,8 @@ pub enum SettingState {
     /// TODO: 关闭单个 Mod 安全模式时打开 `DialogState::ModSecurityWarning`。
     ModGameList,
 
-    /// Saver 包列表。
-    ModSaverList,
+    /// Screensaver 包列表。
+    ModScreensaverList,
 
     /// 老板包列表。
     ModBossList,

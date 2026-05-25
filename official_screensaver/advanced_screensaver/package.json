@@ -1,12 +1,12 @@
 {
   "api": -1,
   "entry": "main.lua",
-  "package": "advanced_saver",
-  "package_name": "advanced_saver.package_name",
-  "author": "advanced_saver.author",
+  "package": "advanced_screensaver",
+  "package_name": "advanced_screensaver.package_name",
+  "author": "advanced_screensaver.author",
   "version": "0.2.0",
-  "saver_name": "advanced_saver.saver_name",
-  "introduction": "advanced_saver.introduction",
+  "screensaver_name": "advanced_screensaver.screensaver_name",
+  "introduction": "advanced_screensaver.introduction",
   "icon": "color:image:images/icon.png",
   "banner": "color:image:images/banner.png"
 }

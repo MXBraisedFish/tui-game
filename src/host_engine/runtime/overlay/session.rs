@@ -16,21 +16,21 @@ type OverlayResult<T> = Result<T, Box<dyn std::error::Error>>;
 /// 当前覆盖层类别。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OverlaySessionKind {
-    Saver,
+    Screensaver,
     Boss,
 }
 
 impl OverlaySessionKind {
     fn api_scope(self) -> ApiScope {
         match self {
-            Self::Saver => ApiScope::saver_package(),
+            Self::Screensaver => ApiScope::screensaver_package(),
             Self::Boss => ApiScope::boss_package(),
         }
     }
 
     fn consumer(self) -> LuaRuntimeConsumer {
         match self {
-            Self::Saver => LuaRuntimeConsumer::SaverPackage,
+            Self::Screensaver => LuaRuntimeConsumer::ScreensaverPackage,
             Self::Boss => LuaRuntimeConsumer::BossPackage,
         }
     }
@@ -39,7 +39,7 @@ impl OverlaySessionKind {
 impl From<OverlayKind> for OverlaySessionKind {
     fn from(value: OverlayKind) -> Self {
         match value {
-            OverlayKind::Saver => Self::Saver,
+            OverlayKind::Screensaver => Self::Screensaver,
             OverlayKind::Boss => Self::Boss,
         }
     }

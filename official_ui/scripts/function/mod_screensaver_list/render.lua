@@ -1,6 +1,6 @@
-local C = load_function("mod_saver_list/constants.lua")
-local L = load_function("mod_saver_list/layout.lua")
-local State = load_function("mod_saver_list/state.lua")
+local C = load_function("mod_screensaver_list/constants.lua")
+local L = load_function("mod_screensaver_list/layout.lua")
+local State = load_function("mod_screensaver_list/state.lua")
 
 local M = {}
 

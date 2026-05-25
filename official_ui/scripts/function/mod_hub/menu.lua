@@ -6,7 +6,7 @@ local M = {}
 local function menu_texts(root_state)
   return {
     { key = C.DEFAULT_TEXT.option1, label = L.language(root_state, "MOD_HUB_GAME", C.DEFAULT_TEXT.game) },
-    { key = C.DEFAULT_TEXT.option2, label = L.language(root_state, "MOD_HUB_SAVER", C.DEFAULT_TEXT.saver) },
+    { key = C.DEFAULT_TEXT.option2, label = L.language(root_state, "MOD_HUB_SCREENSAVER", C.DEFAULT_TEXT.screensaver) },
     { key = C.DEFAULT_TEXT.option3, label = L.language(root_state, "MOD_HUB_BOSS", C.DEFAULT_TEXT.boss) },
   }
 end

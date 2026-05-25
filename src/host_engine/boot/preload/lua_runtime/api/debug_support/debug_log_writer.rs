@@ -94,7 +94,7 @@ pub(crate) fn is_debug_enabled(host_bridge: &HostLuaBridge) -> bool {
                     .unwrap_or(false)
             })
             .unwrap_or(false),
-        LuaRuntimeConsumer::SaverPackage => runtime_context
+        LuaRuntimeConsumer::ScreensaverPackage => runtime_context
             .current_overlay
             .as_ref()
             .map(|overlay_package| {
@@ -102,7 +102,7 @@ pub(crate) fn is_debug_enabled(host_bridge: &HostLuaBridge) -> bool {
                     return true;
                 }
                 runtime_context
-                    .saver_state
+                    .screensaver_state
                     .get(overlay_package.uid.as_str())
                     .and_then(|state| state.get("debug"))
                     .and_then(|debug| debug.as_bool())

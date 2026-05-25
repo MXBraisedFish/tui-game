@@ -15,7 +15,7 @@ pub const ROOT_UI_MIN_HEIGHT: u16 = 26;
 /// 单个动作最多允许绑定的物理按键数量。
 pub const MAX_ACTION_KEYS: usize = 4;
 
-/// 宿主默认 icon，供游戏包、Saver 包、老板包共享。
+/// 宿主默认 icon，供游戏包、Screensaver 包、老板包共享。
 pub const DEFAULT_PACKAGE_ICON: &[&str] = &["████████", "██ ██ ██", "   ██   ", "  ████  "];
 
 /// 游戏包默认 banner。
@@ -39,8 +39,8 @@ pub const DEFAULT_BOSS_BANNER: &[&str] = &[
     "\"`-0-0-'\"`-0-0-'\"`-0-0-'\"`-0-0-' ",
 ];
 
-/// Saver 包默认 banner。
-pub const DEFAULT_SAVER_BANNER: &[&str] = &[
+/// Screensaver 包默认 banner。
+pub const DEFAULT_SCREENSAVER_BANNER: &[&str] = &[
     ":::::::::  :::     ::: ::::::::: ",
     ":+:    :+: :+:     :+: :+:    :+:",
     "+:+    +:+ +:+     +:+ +:+    +:+",

@@ -1,15 +1,15 @@
 {
   "api": -1,
   "entry": "main.lua",
-  "package": "minimal_saver",
-  "package_name": "official_minimal_saver",
+  "package": "minimal_screensaver",
+  "package_name": "official_minimal_screensaver",
   "author": "TUI GAME",
   "version": "0.1.0",
-  "saver_name": "Minimal Saver",
-  "introduction": "A minimal official saver overlay.",
+  "screensaver_name": "Minimal Screensaver",
+  "introduction": "A minimal official screensaver overlay.",
   "icon": [
     "+------+",
-    "|SAVER|",
+    "|SCREENSAVER|",
     "+------+",
     "      "
   ],

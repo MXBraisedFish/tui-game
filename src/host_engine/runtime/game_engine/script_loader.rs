@@ -37,7 +37,7 @@ pub fn load_new_game(
         keybinds: current_context.keybinds,
         best_scores: current_context.best_scores,
         game_state: current_context.game_state,
-        saver_state: current_context.saver_state,
+        screensaver_state: current_context.screensaver_state,
         boss_state: current_context.boss_state,
         launch_mode: LaunchMode::New,
         terminal_size: current_context.terminal_size,

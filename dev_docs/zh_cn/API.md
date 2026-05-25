@@ -89,7 +89,7 @@
 **老板包** 与 **屏保包**
 宿主与脚本运行链如下图所示：
 
-![执行流程图](./image/boss_saver_program_flowchart.png)
+![执行流程图](./image/boss_screensaver_program_flowchart.png)
 
 ---
 
@@ -600,10 +600,10 @@
 |  <font color="green">是</font>  |  <font color="green">是</font>  |  <font color="green">是</font>  | <font color="red">是</font>     | `debug_print(title, message)` | 在日志文件中写入一条带自定义标题的调试信息。  | `title` - <font color="#92cddc">string</font>：日志标题。 <br>`message` - <font color="#92cddc">任意</font>：要写入的信息。 | <font color="#7f7f7f">无</font>                                     |
 |  <font color="green">是</font>  |  <font color="green">是</font>  |  <font color="green">是</font>  | <font color="red">是</font>     | `clear_debug_log()`           | 清空游戏日志文件。               | <font color="#7f7f7f">无</font>                                                                              | <font color="#7f7f7f">无</font>                                     |
 | <font color="#7f7f7f">否</font> | <font color="#7f7f7f">否</font> |  <font color="green">是</font>  | <font color="red">是</font>     | `get_game_uid()`              | 获取当前游戏包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `game_uid` - <font color="#92cddc">string</font>：游戏包 UID。          |
-| <font color="#7f7f7f">否</font> |  <font color="green">是</font>  | <font color="#7f7f7f">否</font> | <font color="red">是</font>     | `get_saver_uid()`             | 获取当前屏保包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `saver_uid` - <font color="#92cddc">string</font>：屏保包 UID。         |
+| <font color="#7f7f7f">否</font> |  <font color="green">是</font>  | <font color="#7f7f7f">否</font> | <font color="red">是</font>     | `get_screensaver_uid()`             | 获取当前屏保包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `screensaver_uid` - <font color="#92cddc">string</font>：屏保包 UID。         |
 |  <font color="green">是</font>  | <font color="#7f7f7f">否</font> | <font color="#7f7f7f">否</font> | <font color="red">是</font>     | `get_boss_uid()`              | 获取当前老板包在宿主中的唯一标识符（UID）。 | <font color="#7f7f7f">无</font>                                                                              | `boss_uid` - <font color="#92cddc">string</font>：老板包 UID。          |
 | <font color="#7f7f7f">否</font> | <font color="#7f7f7f">否</font> |  <font color="green">是</font>  | <font color="red">是</font>     | `get_game_info()`             | 获取当前游戏包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `game_info` - <font color="#92cddc">table</font>：游戏包元信息表，结构见下文。    |
-| <font color="#7f7f7f">否</font> |  <font color="green">是</font>  | <font color="#7f7f7f">否</font> | <font color="red">是</font>     | `get_saver_info()`            | 获取当前游戏包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `saver_info` - <font color="#92cddc">table</font>：游戏包元信息表，结构见下文。   |
+| <font color="#7f7f7f">否</font> |  <font color="green">是</font>  | <font color="#7f7f7f">否</font> | <font color="red">是</font>     | `get_screensaver_info()`            | 获取当前游戏包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `screensaver_info` - <font color="#92cddc">table</font>：游戏包元信息表，结构见下文。   |
 |  <font color="green">是</font>  | <font color="#7f7f7f">否</font> | <font color="#7f7f7f">否</font> | <font color="red">是</font>     | `get_boss_info()`             | 获取当前游戏包的完整元信息。          | <font color="#7f7f7f">无</font>                                                                              | `boss_info` - <font color="#92cddc">table</font>：游戏包元信息表，结构见下文。    |
 | <font color="#7f7f7f">否</font> | <font color="#7f7f7f">否</font> |  <font color="green">是</font>  | <font color="#7f7f7f">否</font> | `get_key([action)`            | 获取按键动作注册表信息。            | `[action` - <font color="#92cddc">string</font>：可选，动作，不填写时返回所有动作信息。                                         | `action_value` - <font color="#92cddc">table</font>：动作的按键信息，结构见下文。 |
 
@@ -645,7 +645,7 @@
 }
 ```
 
-### `saver_info` 数据格式
+### `screensaver_info` 数据格式
 
 ```lua
 {
@@ -654,7 +654,7 @@
   entry = path,                    -- 入口脚本路径
   package = string,                -- 包名
   package_name = string | key,     -- 屏保包显示名称
-  saver_name = string | key,       -- 屏保界面显示名称
+  screensaver_name = string | key,       -- 屏保界面显示名称
   author = string | key,           -- 作者
   version = string,                -- 包版本号
   introduction = string | key,     -- 包简介

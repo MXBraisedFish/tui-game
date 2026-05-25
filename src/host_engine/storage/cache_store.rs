@@ -15,7 +15,7 @@ use super::types::LanguageUiText;
 const CACHE_DIR: &str = "data/cache";
 const IMAGE_CACHE_DIR: &str = "data/cache/images";
 const GAME_SCAN_CACHE_FILE: &str = "data/cache/mod_scan_cache.json";
-const SAVER_SCAN_CACHE_FILE: &str = "data/cache/saver_scan_cache";
+const SCREENSAVER_SCAN_CACHE_FILE: &str = "data/cache/screensaver_scan_cache";
 const BOSS_SCAN_CACHE_FILE: &str = "data/cache/boss_scan_cache";
 const LANGUAGE_UI_CACHE_FILE: &str = "data/cache/language_ui_cache.json";
 
@@ -25,7 +25,7 @@ type CacheStoreResult<T> = Result<T, Box<dyn std::error::Error>>;
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ScanCache {
     pub games: GameModuleRegistry,
-    pub savers: Value,
+    pub screensavers: Value,
     pub bosses: Value,
 }
 
@@ -51,7 +51,7 @@ impl CacheStore {
         Ok(Self {
             scan_cache: ScanCache {
                 games: read_json_or_default(&cache_path(GAME_SCAN_CACHE_FILE)),
-                savers: read_json_value_or_default(&cache_path(SAVER_SCAN_CACHE_FILE), json!({})),
+                screensavers: read_json_value_or_default(&cache_path(SCREENSAVER_SCAN_CACHE_FILE), json!({})),
                 bosses: read_json_value_or_default(&cache_path(BOSS_SCAN_CACHE_FILE), json!({})),
             },
             image_cache: ImageCache {
@@ -75,7 +75,7 @@ impl CacheStore {
     /// 保存扫描缓存。
     pub fn save_scan_cache(&self) -> CacheStoreResult<()> {
         write_json_pretty(&cache_path(GAME_SCAN_CACHE_FILE), &self.scan_cache.games)?;
-        write_json_pretty(&cache_path(SAVER_SCAN_CACHE_FILE), &self.scan_cache.savers)?;
+        write_json_pretty(&cache_path(SCREENSAVER_SCAN_CACHE_FILE), &self.scan_cache.screensavers)?;
         write_json_pretty(&cache_path(BOSS_SCAN_CACHE_FILE), &self.scan_cache.bosses)?;
         Ok(())
     }
@@ -112,7 +112,7 @@ impl CacheStore {
             &cache_path(GAME_SCAN_CACHE_FILE),
             &GameModuleRegistry::default(),
         )?;
-        write_json_pretty(&cache_path(SAVER_SCAN_CACHE_FILE), &json!({}))?;
+        write_json_pretty(&cache_path(SCREENSAVER_SCAN_CACHE_FILE), &json!({}))?;
         write_json_pretty(&cache_path(BOSS_SCAN_CACHE_FILE), &json!({}))?;
         write_json_pretty(
             &cache_path(LANGUAGE_UI_CACHE_FILE),
@@ -128,7 +128,7 @@ impl CacheStore {
             &cache_path(GAME_SCAN_CACHE_FILE),
             &GameModuleRegistry::default(),
         )?;
-        write_json_pretty(&cache_path(SAVER_SCAN_CACHE_FILE), &json!({}))?;
+        write_json_pretty(&cache_path(SCREENSAVER_SCAN_CACHE_FILE), &json!({}))?;
         write_json_pretty(&cache_path(BOSS_SCAN_CACHE_FILE), &json!({}))?;
         Ok(())
     }

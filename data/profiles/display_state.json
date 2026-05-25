@@ -1,0 +1,19 @@
+{
+  "mod_badge": true,
+  "theme": "system",
+  "idle_threshold": 60,
+  "idle_enter_screensaver": false,
+  "host_status": false,
+  "screensaver_mode": "ordered",
+  "boss_mode": "ordered",
+  "screensaver_list": {
+    "order": [],
+    "enabled": {},
+    "cursor": 0
+  },
+  "boss_list": {
+    "order": [],
+    "enabled": {},
+    "cursor": 0
+  }
+}

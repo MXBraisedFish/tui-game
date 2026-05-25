@@ -10,7 +10,7 @@ pub struct PersistentData {
     pub language_code: String,
     pub keybinds: Value,
     pub game_state: Value,
-    pub saver_state: Value,
+    pub screensaver_state: Value,
     pub boss_state: Value,
     pub security_state: Value,
     pub display_state: Value,

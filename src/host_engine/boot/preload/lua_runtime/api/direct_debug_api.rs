@@ -28,9 +28,9 @@ pub fn install(lua: &Lua, api_scope: ApiScope, host_bridge: HostLuaBridge) -> ml
         install_get_game_info(lua, &globals, host_bridge.clone())?;
     }
 
-    if api_scope.allows_saver_debug_info() {
-        install_get_saver_uid(lua, &globals, host_bridge.clone())?;
-        install_get_saver_info(lua, &globals, host_bridge.clone())?;
+    if api_scope.allows_screensaver_debug_info() {
+        install_get_screensaver_uid(lua, &globals, host_bridge.clone())?;
+        install_get_screensaver_info(lua, &globals, host_bridge.clone())?;
     }
 
     if api_scope.allows_boss_debug_info() {
@@ -162,13 +162,13 @@ fn install_get_game_info(
     )
 }
 
-fn install_get_saver_uid(
+fn install_get_screensaver_uid(
     lua: &Lua,
     globals: &mlua::Table,
     host_bridge: HostLuaBridge,
 ) -> mlua::Result<()> {
     globals.set(
-        "get_saver_uid",
+        "get_screensaver_uid",
         lua.create_function(move |lua, args: Variadic<Value>| {
             argument::expect_exact_arg_count(&args, 0)?;
             if !debug_log_writer::is_debug_enabled(&host_bridge) {
@@ -183,13 +183,13 @@ fn install_get_saver_uid(
     )
 }
 
-fn install_get_saver_info(
+fn install_get_screensaver_info(
     lua: &Lua,
     globals: &mlua::Table,
     host_bridge: HostLuaBridge,
 ) -> mlua::Result<()> {
     globals.set(
-        "get_saver_info",
+        "get_screensaver_info",
         lua.create_function(move |lua, args: Variadic<Value>| {
             argument::expect_exact_arg_count(&args, 0)?;
             if !debug_log_writer::is_debug_enabled(&host_bridge) {
@@ -198,7 +198,7 @@ fn install_get_saver_info(
             let runtime_context = host_bridge.runtime_context();
             match runtime_context.current_overlay {
                 Some(overlay_package) => Ok(Value::Table(
-                    debug_info_table::build_saver_info_table(lua, &overlay_package)?,
+                    debug_info_table::build_screensaver_info_table(lua, &overlay_package)?,
                 )),
                 None => Ok(Value::Nil),
             }

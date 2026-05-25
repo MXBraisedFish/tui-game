@@ -14,7 +14,7 @@ pub use profile_data::PersistentData;
 pub fn load() -> Result<PersistentData, Box<dyn std::error::Error>> {
     let store = crate::host_engine::storage::profile_store::ProfileStore::open()?;
     let game_state = store.game_state_value();
-    let saver_state = store.saver_state_value();
+    let screensaver_state = store.screensaver_state_value();
     let boss_state = store.boss_state_value();
     Ok(PersistentData {
         saves: store.saves,
@@ -22,7 +22,7 @@ pub fn load() -> Result<PersistentData, Box<dyn std::error::Error>> {
         language_code: store.language,
         keybinds: store.keybinds,
         game_state,
-        saver_state,
+        screensaver_state,
         boss_state,
         security_state: store.security.to_value(),
         display_state: store.display.to_value(),

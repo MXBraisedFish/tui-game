@@ -43,7 +43,7 @@ impl ModHubUiState {
             self.lua_state.confirm = false;
             return match self.root_state.select {
                 1 => ModHubLuaAction::OpenGamePackList,
-                2 => ModHubLuaAction::OpenSaverPackList,
+                2 => ModHubLuaAction::OpenScreensaverPackList,
                 3 => ModHubLuaAction::OpenBossPackList,
                 _ => ModHubLuaAction::None,
             };
@@ -57,7 +57,7 @@ pub enum ModHubLuaAction {
     None,
     Back,
     OpenGamePackList,
-    OpenSaverPackList,
+    OpenScreensaverPackList,
     OpenBossPackList,
 }
 
@@ -141,7 +141,7 @@ fn mod_hub_language_pairs() -> Vec<(String, String)> {
         ("MOD_LIST_BACK".to_string(), text.key.mod_hub_back),
         ("MOD_LIST_TITLE".to_string(), text.key.mod_hub_title),
         ("MOD_HUB_GAME".to_string(), text.mod_hub.game),
-        ("MOD_HUB_SAVER".to_string(), text.mod_hub.saver),
+        ("MOD_HUB_SCREENSAVER".to_string(), text.mod_hub.screensaver),
         ("MOD_HUB_BOSS".to_string(), text.mod_hub.boss),
     ]
 }

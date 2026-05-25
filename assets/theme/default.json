@@ -1,0 +1,40 @@
+{
+  "active_theme": "system",
+  "colors": {
+    "colors": {
+      "text.primary": "white",
+      "text.secondary": "gray",
+      "text.muted": "dark_gray",
+      "text.on_selected": "black",
+      "text.warning": "yellow",
+      "text.danger": "red",
+      "text.success": "green",
+      "logo.primary": "#ffa500",
+      "accent.primary": "cyan",
+      "accent.selected": "#78a8da",
+      "background.selected": "#78a8da",
+      "border.primary": "white",
+      "panel.background": "black"
+    }
+  },
+  "layout": {
+    "margin": 2,
+    "spacing": 1,
+    "min_width": 98,
+    "min_height": 26
+  },
+  "styles": {
+    "title": {
+      "fg": "text.primary",
+      "styles": ["bold"]
+    },
+    "footer": {
+      "fg": "text.muted",
+      "styles": ["bold"]
+    },
+    "selected": {
+      "fg": "accent.primary",
+      "styles": ["bold"]
+    }
+  }
+}

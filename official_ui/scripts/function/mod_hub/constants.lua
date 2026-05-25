@@ -37,7 +37,7 @@ end
 M.DEFAULT_TEXT = {
   title = "Mod Settings",
   game = "Game Pack",
-  saver = "Saver Pack",
+  screensaver = "Screensaver Pack",
   boss = "Boss Pack",
   select = "Select",
   confirm = "Confirm",

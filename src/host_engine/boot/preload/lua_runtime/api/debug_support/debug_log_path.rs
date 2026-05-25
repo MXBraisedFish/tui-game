@@ -18,7 +18,7 @@ pub fn debug_log_path(host_bridge: &HostLuaBridge) -> PathBuf {
             .current_game
             .map(|game_module| format!("{}.txt", game_module.uid))
             .unwrap_or_else(|| UI_LOG_FILE_NAME.to_string()),
-        LuaRuntimeConsumer::SaverPackage | LuaRuntimeConsumer::BossPackage => runtime_context
+        LuaRuntimeConsumer::ScreensaverPackage | LuaRuntimeConsumer::BossPackage => runtime_context
             .current_overlay
             .map(|overlay_package| format!("{}.txt", overlay_package.uid))
             .unwrap_or_else(|| UI_LOG_FILE_NAME.to_string()),

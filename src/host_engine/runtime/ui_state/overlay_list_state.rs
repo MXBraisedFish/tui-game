@@ -1,4 +1,4 @@
-//! UI Saver/Boss 列表状态聚合
+//! UI Screensaver/Boss 列表状态聚合
 
 use crate::host_engine::boot::environment::data_dirs;
 use std::cmp::Ordering;
@@ -18,26 +18,26 @@ const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OverlayListKind {
-    Saver,
+    Screensaver,
     Boss,
 }
 
 impl OverlayListKind {
     fn state_path(self) -> PathBuf {
         data_dirs::root_dir().join(match self {
-            Self::Saver => "data/profiles/saver_state",
+            Self::Screensaver => "data/profiles/screensaver_state",
             Self::Boss => "data/profiles/boss_state",
         })
     }
     fn key_prefix(self) -> &'static str {
         match self {
-            Self::Saver => "mod_saver_list",
+            Self::Screensaver => "mod_screensaver_list",
             Self::Boss => "mod_boss_list",
         }
     }
     fn packages<'a>(self, registry: &'a OverlayRegistry) -> &'a [OverlayPackage] {
         match self {
-            Self::Saver => &registry.savers,
+            Self::Screensaver => &registry.screensavers,
             Self::Boss => &registry.bosses,
         }
     }

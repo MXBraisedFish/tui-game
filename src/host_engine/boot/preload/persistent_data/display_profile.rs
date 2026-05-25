@@ -16,11 +16,11 @@ pub struct DisplayProfile {
     pub mod_badge: bool,
     pub theme: String,
     pub idle_threshold: u64,
-    pub idle_enter_saver: bool,
+    pub idle_enter_screensaver: bool,
     pub host_status: bool,
-    pub saver_mode: String,
+    pub screensaver_mode: String,
     pub boss_mode: String,
-    pub saver_list: DisplayOverlayProfile,
+    pub screensaver_list: DisplayOverlayProfile,
     pub boss_list: DisplayOverlayProfile,
 }
 
@@ -37,11 +37,11 @@ impl Default for DisplayProfile {
             mod_badge: true,
             theme: "system".to_string(),
             idle_threshold: DEFAULT_IDLE_THRESHOLD_SECS,
-            idle_enter_saver: false,
+            idle_enter_screensaver: false,
             host_status: false,
-            saver_mode: "ordered".to_string(),
+            screensaver_mode: "ordered".to_string(),
             boss_mode: "ordered".to_string(),
-            saver_list: DisplayOverlayProfile::default(),
+            screensaver_list: DisplayOverlayProfile::default(),
             boss_list: DisplayOverlayProfile::default(),
         }
     }
@@ -64,8 +64,8 @@ impl DisplayProfile {
         if self.theme.trim().is_empty() {
             self.theme = "system".to_string();
         }
-        if !matches!(self.saver_mode.as_str(), "ordered" | "random" | "off") {
-            self.saver_mode = "ordered".to_string();
+        if !matches!(self.screensaver_mode.as_str(), "ordered" | "random" | "off") {
+            self.screensaver_mode = "ordered".to_string();
         }
         if !matches!(self.boss_mode.as_str(), "ordered" | "random" | "off") {
             self.boss_mode = "ordered".to_string();

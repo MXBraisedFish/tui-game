@@ -1,4 +1,4 @@
-local C = load_function("mod_saver_list/constants.lua")
+local C = load_function("mod_screensaver_list/constants.lua")
 
 local M = {}
 

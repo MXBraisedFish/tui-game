@@ -47,9 +47,9 @@ pub fn build_game_info_table(lua: &Lua, game_module: &GameModule) -> mlua::Resul
     Ok(table)
 }
 
-/// 构造 saver_info 表。
-pub fn build_saver_info_table(lua: &Lua, overlay_package: &OverlayPackage) -> mlua::Result<Table> {
-    build_overlay_info_table(lua, overlay_package, "saver_name")
+/// 构造 screensaver_info 表。
+pub fn build_screensaver_info_table(lua: &Lua, overlay_package: &OverlayPackage) -> mlua::Result<Table> {
+    build_overlay_info_table(lua, overlay_package, "screensaver_name")
 }
 
 /// 构造 boss_info 表。

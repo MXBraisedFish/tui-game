@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(cargo check *)",
-      "Bash(cargo build *)"
+      "Bash(cargo build *)",
+      "Bash(/c/Users/123/.cargo/bin/cargo check *)",
+      "Bash(/c/Users/123/.cargo/bin/cargo test *)"
     ]
   }
 }

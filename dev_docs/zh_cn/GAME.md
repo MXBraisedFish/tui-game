@@ -151,7 +151,7 @@
 > 
 > - `key` 表示语言键。
 > - `path` 表示脚本路径，相对于 `scripts/` 目录。
-> - `低资源运行模式`：帧率限制为 10 FPS。
+> - `低资源运行模式`：帧率限制为 24 FPS。
 
 该文件用于声明游戏的核心配置，格式如下：
 
@@ -164,7 +164,6 @@
   "min_width": int,                  -- 最小终端宽度（终端字符列数）
   "min_height": int,                 -- 最小终端高度（终端字符行数）
   "write": boolean,                  -- 是否请求直写权限
-  "case_sensitive": boolean,         -- 按键是否区分大小写
   "actions": object,                 -- 按键动作注册表
   "runtime": {
     "target_fps": int                -- 目标帧率

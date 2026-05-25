@@ -9,8 +9,8 @@ local function normalize_select(value)
 end
 
 local function current_list(root_state, panel)
-  if panel == "saver" then
-    return root_state.saver_list or {}
+  if panel == "screensaver" then
+    return root_state.screensaver_list or {}
   elseif panel == "boss" then
     return root_state.boss_list or {}
   end
@@ -157,7 +157,7 @@ function M.handle_event(state, root_state, event)
     state.select = normalize_select(state.select + 1)
   elseif event.name == "confirm" then
     if state.select == 8 or state.select == 9 then
-      state.panel = state.select == 8 and "saver" or "boss"
+      state.panel = state.select == 8 and "screensaver" or "boss"
       normalize_list_select(state, root_state)
     else
       state.confirm = true

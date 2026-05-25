@@ -49,7 +49,7 @@ pub struct LuaRuntimeContext {
     pub keybinds: Value,
     pub best_scores: Value,
     pub game_state: Value,
-    pub saver_state: Value,
+    pub screensaver_state: Value,
     pub boss_state: Value,
     pub launch_mode: LaunchMode,
     pub terminal_size: TerminalSize,
@@ -68,7 +68,7 @@ impl Default for LuaRuntimeContext {
             keybinds: Value::Null,
             best_scores: Value::Null,
             game_state: Value::Null,
-            saver_state: Value::Null,
+            screensaver_state: Value::Null,
             boss_state: Value::Null,
             launch_mode: LaunchMode::default(),
             terminal_size: TerminalSize::default(),
@@ -83,7 +83,7 @@ pub enum LuaRuntimeConsumer {
     #[default]
     GamePackage,
     OfficialUiPackage,
-    SaverPackage,
+    ScreensaverPackage,
     BossPackage,
 }
 

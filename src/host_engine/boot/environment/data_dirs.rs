@@ -22,7 +22,7 @@ pub fn ensure() -> EnvironmentResult<()> {
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
-        &root_dir.join("data/cache/saver_scan_cache"),
+        &root_dir.join("data/cache/screensaver_scan_cache"),
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
@@ -56,7 +56,7 @@ pub fn ensure() -> EnvironmentResult<()> {
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
-        &root_dir.join("data/profiles/saver_state"),
+        &root_dir.join("data/profiles/screensaver_state"),
         EMPTY_JSON_OBJECT,
     )?;
     ensure_file(
@@ -69,11 +69,11 @@ pub fn ensure() -> EnvironmentResult<()> {
   "mod_badge": true,
   "theme": "system",
   "idle_threshold": 60,
-  "idle_enter_saver": false,
+  "idle_enter_screensaver": false,
   "host_status": false,
-  "saver_mode": "ordered",
+  "screensaver_mode": "ordered",
   "boss_mode": "ordered",
-  "saver_list": { "order": [], "enabled": {}, "cursor": 0 },
+  "screensaver_list": { "order": [], "enabled": {}, "cursor": 0 },
   "boss_list": { "order": [], "enabled": {}, "cursor": 0 }
 }"#,
     )?;
@@ -82,7 +82,7 @@ pub fn ensure() -> EnvironmentResult<()> {
         r#"{
   "default_safe_mode": true,
   "default_mod_game_enabled": true,
-  "default_mod_saver_enabled": true,
+  "default_mod_screensaver_enabled": true,
   "default_mod_boss_enabled": true
 }"#,
     )?;
@@ -92,7 +92,7 @@ pub fn ensure() -> EnvironmentResult<()> {
 
     ensure_dir(&root_dir.join("data/mod"))?;
     ensure_dir(&root_dir.join("data/mod/game"))?;
-    ensure_dir(&root_dir.join("data/mod/saver"))?;
+    ensure_dir(&root_dir.join("data/mod/screensaver"))?;
     ensure_dir(&root_dir.join("data/mod/boss"))?;
 
     Ok(())

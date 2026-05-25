@@ -31,11 +31,11 @@ local function setting_value(root_state, index)
     end
     return tostring(value) .. L.language(root_state, "DISPLAY_TOGGLE_AFK_TIME_SECOND", C.DEFAULT_TEXT.second)
   elseif index == 4 then
-    return settings.idle_enter_saver and L.language(root_state, "DISPLAY_TOGGLE_AFK_SAVER_ON", C.DEFAULT_TEXT.saver_on) or L.language(root_state, "DISPLAY_TOGGLE_AFK_SAVER_OFF", C.DEFAULT_TEXT.saver_off)
+    return settings.idle_enter_screensaver and L.language(root_state, "DISPLAY_TOGGLE_AFK_SCREENSAVER_ON", C.DEFAULT_TEXT.screensaver_on) or L.language(root_state, "DISPLAY_TOGGLE_AFK_SCREENSAVER_OFF", C.DEFAULT_TEXT.screensaver_off)
   elseif index == 5 then
     return settings.host_status and L.language(root_state, "DISPLAY_OPTION_INFO_ON", C.DEFAULT_TEXT.info_on) or L.language(root_state, "DISPLAY_OPTION_INFO_OFF", C.DEFAULT_TEXT.info_off)
   elseif index == 6 then
-    return mode_text(root_state, settings.saver_mode)
+    return mode_text(root_state, settings.screensaver_mode)
   elseif index == 7 then
     return mode_text(root_state, settings.boss_mode)
   end
@@ -50,11 +50,11 @@ local function value_color(root_state, index)
     local value = tonumber(settings.idle_threshold or 60) or 60
     return value > 0 and C.VALUE_COLOR or C.OFF_COLOR
   elseif index == 4 then
-    return settings.idle_enter_saver ~= false and C.VALUE_COLOR or C.OFF_COLOR
+    return settings.idle_enter_screensaver ~= false and C.VALUE_COLOR or C.OFF_COLOR
   elseif index == 5 then
     return settings.host_status ~= false and C.VALUE_COLOR or C.OFF_COLOR
   elseif index == 6 then
-    return (settings.saver_mode or "ordered") ~= "off" and C.VALUE_COLOR or C.OFF_COLOR
+    return (settings.screensaver_mode or "ordered") ~= "off" and C.VALUE_COLOR or C.OFF_COLOR
   elseif index == 7 then
     return (settings.boss_mode or "ordered") ~= "off" and C.VALUE_COLOR or C.OFF_COLOR
   end
@@ -66,11 +66,11 @@ local function option_rows(root_state)
     { label = L.language(root_state, "DISPLAY_OPTION_MOD", C.DEFAULT_TEXT.option_mod), value = setting_value(root_state, 1) },
     { label = L.language(root_state, "DISPLAY_OPTION_THEME", C.DEFAULT_TEXT.option_theme), value = setting_value(root_state, 2) },
     { label = L.language(root_state, "DISPLAY_OPTION_AFK_TIME", C.DEFAULT_TEXT.option_afk_time), value = setting_value(root_state, 3) },
-    { label = L.language(root_state, "DISPLAY_OPTION_AFK_SAVER", C.DEFAULT_TEXT.option_afk_saver), value = setting_value(root_state, 4) },
+    { label = L.language(root_state, "DISPLAY_OPTION_AFK_SCREENSAVER", C.DEFAULT_TEXT.option_afk_screensaver), value = setting_value(root_state, 4) },
     { label = L.language(root_state, "DISPLAY_OPTION_INFO", C.DEFAULT_TEXT.option_info), value = setting_value(root_state, 5) },
-    { label = L.language(root_state, "DISPLAY_OPTION_SAVER_SORT", C.DEFAULT_TEXT.option_saver_sort), value = setting_value(root_state, 6) },
+    { label = L.language(root_state, "DISPLAY_OPTION_SCREENSAVER_SORT", C.DEFAULT_TEXT.option_screensaver_sort), value = setting_value(root_state, 6) },
     { label = L.language(root_state, "DISPLAY_OPTION_BOSS_SORT", C.DEFAULT_TEXT.option_boss_sort), value = setting_value(root_state, 7) },
-    { label = L.language(root_state, "DISPLAY_OPTION_SAVER_LIST", C.DEFAULT_TEXT.option_saver_list), value = "" },
+    { label = L.language(root_state, "DISPLAY_OPTION_SCREENSAVER_LIST", C.DEFAULT_TEXT.option_screensaver_list), value = "" },
     { label = L.language(root_state, "DISPLAY_OPTION_BOSS_LIST", C.DEFAULT_TEXT.option_boss_list), value = "" },
   }
 end
@@ -149,7 +149,7 @@ local function draw_settings(root_state, x, y, width, rows, key_w, readonly)
 end
 
 local function list_items(root_state)
-  if root_state.panel == "saver" then return root_state.saver_list or {} end
+  if root_state.panel == "screensaver" then return root_state.screensaver_list or {} end
   if root_state.panel == "boss" then return root_state.boss_list or {} end
   return {}
 end

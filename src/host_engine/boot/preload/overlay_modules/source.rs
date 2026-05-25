@@ -1,11 +1,11 @@
-//! Saver/老板覆盖层包来源。
+//! Screensaver/老板覆盖层包来源。
 
 use crate::host_engine::boot::environment::data_dirs;
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum OverlayKind {
-    Saver,
+    Screensaver,
     Boss,
 }
 
@@ -18,14 +18,14 @@ pub enum OverlaySource {
 impl OverlayKind {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Saver => "saver",
+            Self::Screensaver => "screensaver",
             Self::Boss => "boss",
         }
     }
 
     pub fn name_field(self) -> &'static str {
         match self {
-            Self::Saver => "saver_name",
+            Self::Screensaver => "screensaver_name",
             Self::Boss => "boss_name",
         }
     }
@@ -41,8 +41,8 @@ impl OverlaySource {
 
     pub fn uid_prefix(self, kind: OverlayKind) -> &'static str {
         match (self, kind) {
-            (Self::Office, OverlayKind::Saver) => "saver_",
-            (Self::ThirdParty, OverlayKind::Saver) => "mod_saver_",
+            (Self::Office, OverlayKind::Screensaver) => "screensaver_",
+            (Self::ThirdParty, OverlayKind::Screensaver) => "mod_screensaver_",
             (Self::Office, OverlayKind::Boss) => "boss_",
             (Self::ThirdParty, OverlayKind::Boss) => "mod_boss_",
         }

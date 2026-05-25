@@ -35,7 +35,7 @@ pub struct ProfileStore {
     pub saves: Value,
     pub best_scores: Value,
     pub package_states: HashMap<String, Value>,
-    pub savers: Vec<OrderedPackageEntry>,
+    pub screensavers: Vec<OrderedPackageEntry>,
     pub bosses: Vec<OrderedPackageEntry>,
     pub games: Vec<OrderedPackageEntry>,
 }
@@ -73,19 +73,19 @@ impl ProfileStore {
         )?;
 
         let game_state = read_json_object_map(&profiles_dir.join("game_state.json"))?;
-        let saver_state = read_json_object_map(&profiles_dir.join("saver_state"))?;
+        let screensaver_state = read_json_object_map(&profiles_dir.join("screensaver_state"))?;
         let boss_state = read_json_object_map(&profiles_dir.join("boss_state"))?;
 
         let mut package_states = HashMap::new();
         extend_package_states(&mut package_states, &game_state);
-        extend_package_states(&mut package_states, &saver_state);
+        extend_package_states(&mut package_states, &screensaver_state);
         extend_package_states(&mut package_states, &boss_state);
 
         let games = ordered_entries_from_state(&game_state);
-        let savers = ordered_overlay_entries(
-            &display.saver_list.order,
-            &display.saver_list.enabled,
-            &saver_state,
+        let screensavers = ordered_overlay_entries(
+            &display.screensaver_list.order,
+            &display.screensaver_list.enabled,
+            &screensaver_state,
         );
         let bosses = ordered_overlay_entries(
             &display.boss_list.order,
@@ -93,7 +93,7 @@ impl ProfileStore {
             &boss_state,
         );
 
-        warn_profile_uid_conflicts(&games, &savers, &bosses);
+        warn_profile_uid_conflicts(&games, &screensavers, &bosses);
 
         Ok(Self {
             language,
@@ -103,7 +103,7 @@ impl ProfileStore {
             saves,
             best_scores,
             package_states,
-            savers,
+            screensavers,
             bosses,
             games,
         })
@@ -154,9 +154,9 @@ impl ProfileStore {
         self.state_value_for_kind(PackageStateKind::Game)
     }
 
-    /// 以现有文件格式导出 Saver 包状态。
-    pub fn saver_state_value(&self) -> Value {
-        self.state_value_for_kind(PackageStateKind::Saver)
+    /// 以现有文件格式导出 Screensaver 包状态。
+    pub fn screensaver_state_value(&self) -> Value {
+        self.state_value_for_kind(PackageStateKind::Screensaver)
     }
 
     /// 以现有文件格式导出 Boss 包状态。
@@ -178,7 +178,7 @@ impl ProfileStore {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PackageStateKind {
     Game,
-    Saver,
+    Screensaver,
     Boss,
 }
 
@@ -322,8 +322,8 @@ fn compare_uid(left: &str, right: &str) -> std::cmp::Ordering {
 
 fn package_state_path(uid: &str) -> PathBuf {
     let profiles = profiles_dir();
-    if uid.starts_with("mod_saver_") || uid.starts_with("saver_") {
-        profiles.join("saver_state")
+    if uid.starts_with("mod_screensaver_") || uid.starts_with("screensaver_") {
+        profiles.join("screensaver_state")
     } else if uid.starts_with("mod_boss_") || uid.starts_with("boss_") {
         profiles.join("boss_state")
     } else {
@@ -332,8 +332,8 @@ fn package_state_path(uid: &str) -> PathBuf {
 }
 
 fn package_state_kind(uid: &str) -> PackageStateKind {
-    if uid.starts_with("mod_saver_") || uid.starts_with("saver_") {
-        PackageStateKind::Saver
+    if uid.starts_with("mod_screensaver_") || uid.starts_with("screensaver_") {
+        PackageStateKind::Screensaver
     } else if uid.starts_with("mod_boss_") || uid.starts_with("boss_") {
         PackageStateKind::Boss
     } else {
@@ -343,7 +343,7 @@ fn package_state_kind(uid: &str) -> PackageStateKind {
 
 fn warn_profile_uid_conflicts(
     games: &[OrderedPackageEntry],
-    savers: &[OrderedPackageEntry],
+    screensavers: &[OrderedPackageEntry],
     bosses: &[OrderedPackageEntry],
 ) {
     let mut registry = PackageIdRegistry::default();
@@ -354,10 +354,10 @@ fn warn_profile_uid_conflicts(
             PackageId::from_legacy("game", "game", &game.uid),
         );
     }
-    for saver in savers {
+    for screensaver in screensavers {
         register_or_warn(
             &mut registry,
-            PackageId::from_legacy("mod", "saver", &saver.uid),
+            PackageId::from_legacy("mod", "screensaver", &screensaver.uid),
         );
     }
     for boss in bosses {

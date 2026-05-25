@@ -11,11 +11,11 @@ pub const SECURITY_OPTION_COUNT: i64 = 8;
 pub enum SecurityConfirmAction {
     ToggleDefaultSafeMode,
     ToggleDefaultModGame,
-    ToggleDefaultModSaver,
+    ToggleDefaultModScreensaver,
     ToggleDefaultModBoss,
     ResetSafeMode,
     ResetModGame,
-    ResetModSaver,
+    ResetModScreensaver,
     ResetModBoss,
 }
 
@@ -44,7 +44,7 @@ impl SecurityUiState {
         SecurityProfile {
             default_safe_mode: self.root_state.default_safe_mode,
             default_mod_game_enabled: self.root_state.default_mod_game_enabled,
-            default_mod_saver_enabled: self.root_state.default_mod_saver_enabled,
+            default_mod_screensaver_enabled: self.root_state.default_mod_screensaver_enabled,
             default_mod_boss_enabled: self.root_state.default_mod_boss_enabled,
         }
     }
@@ -115,7 +115,7 @@ pub struct SecurityRootState {
     pub select: i64,
     pub default_safe_mode: bool,
     pub default_mod_game_enabled: bool,
-    pub default_mod_saver_enabled: bool,
+    pub default_mod_screensaver_enabled: bool,
     pub default_mod_boss_enabled: bool,
     pub reset_message: Option<String>,
 }
@@ -126,7 +126,7 @@ impl SecurityRootState {
             select: normalize_security_select(select),
             default_safe_mode: profile.default_safe_mode,
             default_mod_game_enabled: profile.default_mod_game_enabled,
-            default_mod_saver_enabled: profile.default_mod_saver_enabled,
+            default_mod_screensaver_enabled: profile.default_mod_screensaver_enabled,
             default_mod_boss_enabled: profile.default_mod_boss_enabled,
             reset_message: None,
         }
@@ -138,11 +138,11 @@ impl SecurityRootState {
         match normalize_security_select(self.select) {
             1 => SecurityConfirmAction::ToggleDefaultSafeMode,
             2 => SecurityConfirmAction::ToggleDefaultModGame,
-            3 => SecurityConfirmAction::ToggleDefaultModSaver,
+            3 => SecurityConfirmAction::ToggleDefaultModScreensaver,
             4 => SecurityConfirmAction::ToggleDefaultModBoss,
             5 => SecurityConfirmAction::ResetSafeMode,
             6 => SecurityConfirmAction::ResetModGame,
-            7 => SecurityConfirmAction::ResetModSaver,
+            7 => SecurityConfirmAction::ResetModScreensaver,
             8 => SecurityConfirmAction::ResetModBoss,
             _ => SecurityConfirmAction::ToggleDefaultSafeMode,
         }
@@ -153,7 +153,7 @@ impl SecurityRootState {
         t.set("select", normalize_security_select(self.select))?;
         t.set("default_safe_mode", self.default_safe_mode)?;
         t.set("default_mod_game_enabled", self.default_mod_game_enabled)?;
-        t.set("default_mod_saver_enabled", self.default_mod_saver_enabled)?;
+        t.set("default_mod_screensaver_enabled", self.default_mod_screensaver_enabled)?;
         t.set("default_mod_boss_enabled", self.default_mod_boss_enabled)?;
         t.set(
             "reset_message",
@@ -221,8 +221,8 @@ fn security_language_pairs() -> Vec<(String, String)> {
             text.security.default_mod_game,
         ),
         (
-            "SECURITY_DEFAULT_MOD_SAVER".into(),
-            text.security.default_mod_saver,
+            "SECURITY_DEFAULT_MOD_SCREENSAVER".into(),
+            text.security.default_mod_screensaver,
         ),
         (
             "SECURITY_DEFAULT_MOD_BOSS".into(),
@@ -237,8 +237,8 @@ fn security_language_pairs() -> Vec<(String, String)> {
             text.security.reset_mod_game,
         ),
         (
-            "SECURITY_RESET_MOD_SAVER".into(),
-            text.security.reset_mod_saver,
+            "SECURITY_RESET_MOD_SCREENSAVER".into(),
+            text.security.reset_mod_screensaver,
         ),
         (
             "SECURITY_RESET_MOD_BOSS".into(),

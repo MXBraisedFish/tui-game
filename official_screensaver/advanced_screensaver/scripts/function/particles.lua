@@ -16,7 +16,7 @@ function M.update(state)
   local width, height = get_terminal_size()
   state.started_ms = state.started_ms or running_time()
   state.particles = state.particles or {}
-  state.timer = state.timer or timer_create(120, "saver particle step")
+  state.timer = state.timer or timer_create(120, "screensaver particle step")
   if get_timer_status(state.timer) == "init" then
     timer_start(state.timer)
   end

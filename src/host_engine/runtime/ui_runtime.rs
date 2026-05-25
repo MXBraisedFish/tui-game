@@ -87,7 +87,7 @@ pub struct ActiveUiPage {
     security_state: SecurityUiState,
     mod_hub_state: ModHubUiState,
     mod_list_state: ModListUiState,
-    saver_list_state: OverlayListUiState,
+    screensaver_list_state: OverlayListUiState,
     boss_list_state: OverlayListUiState,
     needed_size_mode: NeededSizeMode,
     action_map: UiActionMap,
@@ -128,7 +128,7 @@ pub(crate) fn load_home_page(
         keybinds: loaded_resources.persistent_data.keybinds.clone(),
         best_scores: loaded_resources.persistent_data.best_scores.clone(),
         game_state: loaded_resources.persistent_data.game_state.clone(),
-        saver_state: loaded_resources.persistent_data.saver_state.clone(),
+        screensaver_state: loaded_resources.persistent_data.screensaver_state.clone(),
         boss_state: loaded_resources.persistent_data.boss_state.clone(),
         launch_mode: Default::default(),
         terminal_size,
@@ -157,7 +157,7 @@ pub(crate) fn load_home_page(
     let mut display_state = DisplayUiState::new(
         loaded_resources.persistent_data.display_state.clone(),
         loaded_resources.overlay_registry.clone(),
-        loaded_resources.persistent_data.saver_state.clone(),
+        loaded_resources.persistent_data.screensaver_state.clone(),
         loaded_resources.persistent_data.boss_state.clone(),
         loaded_resources.persistent_data.language_code.clone(),
     );
@@ -191,13 +191,13 @@ pub(crate) fn load_home_page(
         loaded_resources.persistent_data.language_code.clone(),
     );
     mod_list_state.reset_lua_state();
-    let mut saver_list_state = OverlayListUiState::new(
-        OverlayListKind::Saver,
+    let mut screensaver_list_state = OverlayListUiState::new(
+        OverlayListKind::Screensaver,
         loaded_resources.overlay_registry.clone(),
-        loaded_resources.persistent_data.saver_state.clone(),
+        loaded_resources.persistent_data.screensaver_state.clone(),
         loaded_resources.persistent_data.language_code.clone(),
     );
-    saver_list_state.reset_lua_state();
+    screensaver_list_state.reset_lua_state();
     let mut boss_list_state = OverlayListUiState::new(
         OverlayListKind::Boss,
         loaded_resources.overlay_registry.clone(),
@@ -224,7 +224,7 @@ pub(crate) fn load_home_page(
         security_state,
         mod_hub_state,
         mod_list_state,
-        saver_list_state,
+        screensaver_list_state,
         boss_list_state,
         needed_size_mode: NeededSizeMode::Root,
         action_map,
@@ -287,13 +287,13 @@ impl ActiveUiPage {
         self.display_state.idle_threshold()
     }
 
-    pub(crate) fn should_auto_enter_saver(&self) -> bool {
-        self.display_state.should_auto_enter_saver()
+    pub(crate) fn should_auto_enter_screensaver(&self) -> bool {
+        self.display_state.should_auto_enter_screensaver()
     }
 
-    pub(crate) fn next_saver_overlay_uid(&mut self) -> Option<String> {
+    pub(crate) fn next_screensaver_overlay_uid(&mut self) -> Option<String> {
         self.display_state
-            .selected_overlay_uid(DisplayPanelKind::Saver)
+            .selected_overlay_uid(DisplayPanelKind::Screensaver)
     }
 
     pub(crate) fn next_boss_overlay_uid(&mut self) -> Option<String> {
@@ -310,7 +310,7 @@ pub(crate) fn ensure_page(
 ) -> UiRuntimeResult<()> {
     if matches!(
         page_key,
-        UiPageKey::ModGameList | UiPageKey::ModSaverList | UiPageKey::ModBossList
+        UiPageKey::ModGameList | UiPageKey::ModScreensaverList | UiPageKey::ModBossList
     ) {
         refresh_mod_modules_if_needed(lua_runtime, active_ui_page)?;
     }
@@ -363,8 +363,8 @@ pub(crate) fn ensure_page(
     if page_key == UiPageKey::ModGameList {
         active_ui_page.mod_list_state.reset_lua_state();
     }
-    if page_key == UiPageKey::ModSaverList {
-        active_ui_page.saver_list_state.reset_lua_state();
+    if page_key == UiPageKey::ModScreensaverList {
+        active_ui_page.screensaver_list_state.reset_lua_state();
     }
     if page_key == UiPageKey::ModBossList {
         active_ui_page.boss_list_state.reset_lua_state();
@@ -414,9 +414,9 @@ fn refresh_mod_modules_if_needed(
         persistent_data.language_code.clone(),
     );
     active_ui_page.mod_list_state.reset_lua_state();
-    active_ui_page.saver_list_state.replace_registry_and_state(
+    active_ui_page.screensaver_list_state.replace_registry_and_state(
         overlay_registry.clone(),
-        persistent_data.saver_state.clone(),
+        persistent_data.screensaver_state.clone(),
         persistent_data.language_code.clone(),
     );
     active_ui_page.boss_list_state.replace_registry_and_state(
@@ -426,7 +426,7 @@ fn refresh_mod_modules_if_needed(
     );
     active_ui_page.display_state.replace_overlay_data(
         overlay_registry,
-        persistent_data.saver_state.clone(),
+        persistent_data.screensaver_state.clone(),
         persistent_data.boss_state.clone(),
     );
     active_ui_page
@@ -439,7 +439,7 @@ fn refresh_mod_modules_if_needed(
     current_context.keybinds = persistent_data.keybinds;
     current_context.best_scores = persistent_data.best_scores;
     current_context.game_state = persistent_data.game_state;
-    current_context.saver_state = persistent_data.saver_state;
+    current_context.screensaver_state = persistent_data.screensaver_state;
     current_context.boss_state = persistent_data.boss_state;
     host_bridge.set_runtime_context(current_context);
 
@@ -502,8 +502,8 @@ pub(crate) fn handle_event(
             .to_lua_table(lua)?,
         UiPageKey::SettingMods => active_ui_page.mod_hub_state.lua_state.to_lua_table(lua)?,
         UiPageKey::ModGameList => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
-        UiPageKey::ModSaverList => active_ui_page
-            .saver_list_state
+        UiPageKey::ModScreensaverList => active_ui_page
+            .screensaver_list_state
             .root_state
             .to_lua_table(lua)?,
         UiPageKey::ModBossList => active_ui_page
@@ -572,13 +572,13 @@ pub(crate) fn handle_event(
             handle_mod_list_lua_state(lua_runtime, active_ui_page, host_state_machine, lua_state)?;
             return Ok(());
         }
-        if active_ui_page.page_key == UiPageKey::ModSaverList {
+        if active_ui_page.page_key == UiPageKey::ModScreensaverList {
             let lua_state = OverlayListLuaState::from_lua_value(returned_state)?;
             handle_overlay_list_lua_state(
                 lua_runtime,
                 active_ui_page,
                 host_state_machine,
-                OverlayListKind::Saver,
+                OverlayListKind::Screensaver,
                 lua_state,
             )?;
             return Ok(());
@@ -672,7 +672,7 @@ fn sync_page_script_state(
 ) -> UiRuntimeResult<()> {
     if active_ui_page.page_key != UiPageKey::GameList
         && active_ui_page.page_key != UiPageKey::ModGameList
-        && active_ui_page.page_key != UiPageKey::ModSaverList
+        && active_ui_page.page_key != UiPageKey::ModScreensaverList
         && active_ui_page.page_key != UiPageKey::ModBossList
         && active_ui_page.page_key != UiPageKey::KeybindSystem
         && active_ui_page.page_key != UiPageKey::SettingDisplay
@@ -689,8 +689,8 @@ fn sync_page_script_state(
             .to_lua_table(lua)?,
         UiPageKey::SettingMods => active_ui_page.mod_hub_state.lua_state.to_lua_table(lua)?,
         UiPageKey::ModGameList => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
-        UiPageKey::ModSaverList => active_ui_page
-            .saver_list_state
+        UiPageKey::ModScreensaverList => active_ui_page
+            .screensaver_list_state
             .root_state
             .to_lua_table(lua)?,
         UiPageKey::ModBossList => active_ui_page
@@ -722,8 +722,8 @@ pub(crate) fn render(
             .to_lua_table(lua)?,
         UiPageKey::SettingMods => active_ui_page.mod_hub_state.root_state.to_lua_table(lua)?,
         UiPageKey::ModGameList => active_ui_page.mod_list_state.root_state.to_lua_table(lua)?,
-        UiPageKey::ModSaverList => active_ui_page
-            .saver_list_state
+        UiPageKey::ModScreensaverList => active_ui_page
+            .screensaver_list_state
             .root_state
             .to_lua_table(lua)?,
         UiPageKey::ModBossList => active_ui_page
@@ -847,7 +847,7 @@ fn switch_to_ui_context(
         keybinds: current_context.keybinds,
         best_scores: current_context.best_scores,
         game_state: current_context.game_state,
-        saver_state: current_context.saver_state,
+        screensaver_state: current_context.screensaver_state,
         boss_state: current_context.boss_state,
         launch_mode: current_context.launch_mode,
         terminal_size: current_context.terminal_size,
@@ -1011,8 +1011,8 @@ fn handle_mod_hub_lua_state(
         ModHubLuaAction::OpenGamePackList => {
             host_state_machine.setting_state = SettingState::ModGameList;
         }
-        ModHubLuaAction::OpenSaverPackList => {
-            host_state_machine.setting_state = SettingState::ModSaverList;
+        ModHubLuaAction::OpenScreensaverPackList => {
+            host_state_machine.setting_state = SettingState::ModScreensaverList;
         }
         ModHubLuaAction::OpenBossPackList => {
             host_state_machine.setting_state = SettingState::ModBossList;
@@ -1056,7 +1056,7 @@ fn handle_overlay_list_lua_state(
     lua_state: OverlayListLuaState,
 ) -> UiRuntimeResult<()> {
     let action = match kind {
-        OverlayListKind::Saver => active_ui_page.saver_list_state.apply_lua_state(lua_state),
+        OverlayListKind::Screensaver => active_ui_page.screensaver_list_state.apply_lua_state(lua_state),
         OverlayListKind::Boss => active_ui_page.boss_list_state.apply_lua_state(lua_state),
     };
     match action {
@@ -1066,12 +1066,12 @@ fn handle_overlay_list_lua_state(
             let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
             let mut current_context = host_bridge.runtime_context();
             match kind {
-                OverlayListKind::Saver => current_context.saver_state = state,
+                OverlayListKind::Screensaver => current_context.screensaver_state = state,
                 OverlayListKind::Boss => current_context.boss_state = state,
             }
             active_ui_page.display_state.replace_overlay_data(
                 active_ui_page.overlay_registry.clone(),
-                current_context.saver_state.clone(),
+                current_context.screensaver_state.clone(),
                 current_context.boss_state.clone(),
             );
             host_bridge.set_runtime_context(current_context);
@@ -1103,7 +1103,7 @@ fn handle_language_lua_state(
                 .mod_list_state
                 .refresh_language(language_code.clone());
             active_ui_page
-                .saver_list_state
+                .screensaver_list_state
                 .refresh_language(language_code.clone());
             active_ui_page
                 .boss_list_state
@@ -1178,15 +1178,15 @@ fn handle_security_lua_state(
                     .default_mod_game_enabled;
                 persist_security_profile(active_ui_page);
             }
-            SecurityConfirmAction::ToggleDefaultModSaver => {
+            SecurityConfirmAction::ToggleDefaultModScreensaver => {
                 active_ui_page.security_state.root_state.reset_message = None;
                 active_ui_page
                     .security_state
                     .root_state
-                    .default_mod_saver_enabled = !active_ui_page
+                    .default_mod_screensaver_enabled = !active_ui_page
                     .security_state
                     .root_state
-                    .default_mod_saver_enabled;
+                    .default_mod_screensaver_enabled;
                 persist_security_profile(active_ui_page);
             }
             SecurityConfirmAction::ToggleDefaultModBoss => {
@@ -1218,8 +1218,8 @@ fn handle_security_lua_state(
                         .reset_success,
                 );
             }
-            SecurityConfirmAction::ResetModSaver => {
-                let action = active_ui_page.saver_list_state.reset_all_enabled_off();
+            SecurityConfirmAction::ResetModScreensaver => {
+                let action = active_ui_page.screensaver_list_state.reset_all_enabled_off();
                 apply_overlay_state_change(lua_runtime, action);
                 active_ui_page.security_state.root_state.reset_message = Some(
                     crate::host_engine::boot::i18n::i18n::text()
@@ -1247,7 +1247,7 @@ fn apply_overlay_state_change(lua_runtime: &LuaRuntimeState, action: OverlayList
     let host_bridge = &lua_runtime.lua_runtime_environment.host_bridge;
     let mut current_context = host_bridge.runtime_context();
     match kind {
-        OverlayListKind::Saver => current_context.saver_state = state,
+        OverlayListKind::Screensaver => current_context.screensaver_state = state,
         OverlayListKind::Boss => current_context.boss_state = state,
     }
     host_bridge.set_runtime_context(current_context);
