@@ -1,0 +1,108 @@
+// 引入标准线程库
+use std::thread;
+use std::time::Duration;
+
+// 引用结构体
+use crate::host_engine::core::{
+  RuntimeWorld,
+  ExitState,
+  FrameScheduler
+};
+use crate::host_engine::services::{
+  EngineServices,
+  KeyInput
+};
+
+// 引用按键枚举
+use crossterm::event::KeyCode;
+
+// 运行函数
+pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
+  // 启用终端模式
+  services.terminal.enter();
+  
+  // 构建一个帧循环
+  let mut scheduler = FrameScheduler::new();
+  let mut running = true;
+
+  // 开始循环
+  while running {
+    // 获取帧信息
+    let frame = scheduler.begin_frame();
+
+    // 更新帧时间
+    world.clock.tick();
+
+    // 更新按键事件队列
+    services.input.poll();
+
+    let mut consumed_input = false;
+
+    // 若用户摁下ESC则终止运行（但不打断本轮循环）
+    if services.input.consume_key(KeyCode::Esc) {
+      running = false;
+      consumed_input = true;
+    }
+
+    if services.input.consume_key(KeyCode::Right) {
+      services.ui.navigate_next();
+      consumed_input = true;
+    }
+
+    if services.input.consume_key(KeyCode::Left) {
+      services.ui.navigate_prev();
+      consumed_input = true;
+    }
+
+    // 当前帧未处理队头事件时，弹出一个事件避免阻塞后续输入
+    let last_key = if consumed_input {
+      None
+    } else {
+      services.input.next_key()
+    };
+
+    update(services, world, frame);
+    render(services, world, frame, last_key);
+
+    thread::sleep(Duration::from_millis(16));
+  }
+
+  // 退出终端模式
+  services.terminal.exit();
+
+  // 返回退出信息块
+  ExitState::new()
+}
+
+// 更新函数
+fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
+  let _ = &services.package;
+  let _ = &services.input;
+  let _ = &services.ui;
+  let _ = &services.game;
+  let _ = &services.overlay;
+  let _ = &services.storage;
+  let _ = &services.lua;
+  let _ = &services.render;
+  let _ = &services.terminal;
+}
+
+// 绘制函数
+fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64, last_key: Option<KeyInput>) {
+  services.render.clear();
+
+  services.render.draw_centered(0, "TUI Game Engine");
+
+  let status = format!(
+    "Page: {} | Frame: {} | dt: {:.1}ms",
+    services.ui.active_page().name(),
+    frame,
+    world.clock.delta_time().as_secs_f64() * 1000.0,
+  );
+
+  services.render.draw_centered(2, &status);
+
+  services.ui.render_active(&mut services.render);
+
+  let _ = services.render.present();
+}

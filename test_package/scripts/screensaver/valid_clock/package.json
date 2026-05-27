@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "type": "screensaver",
+  "package": "com.example.clock_saver",
+  "namespace": "clock_saver",
+  "version": "1.0.0",
+  "version_code": 1,
+  "api": 1,
+  "entry": "init.lua",
+  "display": {
+    "title": "Clock Saver",
+    "description": "A simple terminal clock screensaver.",
+    "author": "Example",
+    "icon": "clock_icon.png",
+    "banner": "clock_banner.png"
+  }
+}

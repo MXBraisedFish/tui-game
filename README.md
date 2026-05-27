@@ -1,5 +1,17 @@
 ![LOGO](./README-i18n/image/logo.png)
 
+# Warning
+
+This project is undergoing a major architectural refactor. The current code is highly unstable.
+
+- This documentation and code are based on the 1.0 stable release
+- The 2.0 version is currently being refactored. Development documentation is for internal testing only
+- The development documentation currently has no practical value. Please do not use it as a reference.
+
+This warning will be removed after the stable release.
+
+---
+
 # Language
 
 **[中文](./README-i18n/README-zh-cn.md)**
@@ -14,6 +26,8 @@ Basically supports all system terminals: Windows, Linux, MacOS
 > Latest stable version:<br />[![Release](https://img.shields.io/github/v/release/MXBraisedFish/TUI-GAME?maxAge=3600&label=Release&labelColor=cc8400&color=ffa500)](https://github.com/MXBraisedFish/TUI-GAME/releases/latest)
 
 > Official website<br />[TUI GAME](https://tui-game.vercel.app/)
+
+---
 
 ## Table of Contents
 

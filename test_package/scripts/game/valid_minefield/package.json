@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "type": "game",
+  "package": "com.example.minefield",
+  "namespace": "minefield",
+  "version": "1.0.0",
+  "version_code": 1,
+  "api": {
+    "min": 1,
+    "max": 2
+  },
+  "entry": "init.lua",
+  "display": {
+    "title": "Minefield",
+    "description": "A small terminal minefield game.",
+    "author": "Example",
+    "icon": "pack_icon.png",
+    "banner": "pack_banner.png"
+  }
+}

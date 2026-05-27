@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "type": "screensaver",
+  "package": "com.example.invalid_api_range",
+  "namespace": "invalid_api_range",
+  "version": "1.0.0",
+  "version_code": 1,
+  "api": {
+    "min": 3,
+    "max": 1
+  },
+  "entry": "init.lua",
+  "display": {
+    "title": "Invalid API Range",
+    "description": "This package is invalid because api.min is greater than api.max.",
+    "author": "Example",
+    "icon": "api_icon.png",
+    "banner": "api_banner.png"
+  }
+}
