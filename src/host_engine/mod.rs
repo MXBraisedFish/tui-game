@@ -1,3 +1,5 @@
+use std::result;
+
 // 统一模块导出
 // 启动阶段
 pub mod boot;
@@ -18,6 +20,11 @@ pub fn run() {
   // 分离引擎服务和运行时世界
   let mut services = boot_output.services;
   let mut world = boot_output.world;
+
+  match services.lua.eval("return 'Lua VM active'") {
+    Ok(result) => println!("[Boot] Lua: {}", result),
+    Err(error) => eprintln!("[Boot] Lua error: {}", error)
+  }
 
   // 运行，返回退出状态
   let exit_state = runtime::run(&mut services, &mut world);

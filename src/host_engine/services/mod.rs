@@ -8,10 +8,10 @@ mod storage;
 mod ui;
 mod terminal;
 
-pub use game::GameService;
+pub use game::{GameService, GameSessionState};
 pub use input::{InputService, KeyInput};
 pub use lua::LuaService;
-pub use overlay::OverlayService;
+pub use overlay::{OverlayKind, OverlayService, OverlaySessionState};
 pub use package::PackageService;
 pub use render::RenderService;
 pub use storage::StorageService;

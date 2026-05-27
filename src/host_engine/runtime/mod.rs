@@ -2,15 +2,14 @@
 use std::thread;
 use std::time::Duration;
 
-// 引用结构体
+// 引用结构体和枚举
 use crate::host_engine::core::{
   RuntimeWorld,
   ExitState,
   FrameScheduler
 };
 use crate::host_engine::services::{
-  EngineServices,
-  KeyInput
+  EngineServices, GameSessionState, KeyInput, OverlayKind
 };
 
 // 引用按键枚举
@@ -42,15 +41,19 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     if services.input.consume_key(KeyCode::Esc) {
       running = false;
       consumed_input = true;
-    }
-
-    if services.input.consume_key(KeyCode::Right) {
+    } else if services.input.consume_key(KeyCode::Right) {
       services.ui.navigate_next();
       consumed_input = true;
-    }
-
-    if services.input.consume_key(KeyCode::Left) {
+    } else if services.input.consume_key(KeyCode::Left) {
       services.ui.navigate_prev();
+      consumed_input = true;
+    } else if services.input.consume_key(KeyCode::F(2)) {
+      if services.game.state() == GameSessionState::Inactive {
+        services.game.start("1");
+      } else {
+        services.game.stop();
+      }
+
       consumed_input = true;
     }
 
@@ -76,15 +79,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
 // 更新函数
 fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
-  let _ = &services.package;
-  let _ = &services.input;
-  let _ = &services.ui;
-  let _ = &services.game;
-  let _ = &services.overlay;
-  let _ = &services.storage;
-  let _ = &services.lua;
-  let _ = &services.render;
-  let _ = &services.terminal;
+  services.game.update();
+  services.overlay.update();
 }
 
 // 绘制函数
@@ -103,6 +99,32 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64, l
   services.render.draw_centered(2, &status);
 
   services.ui.render_active(&mut services.render);
+
+  let game_status = match services.game.state() {
+    GameSessionState::Inactive => "idle",
+    GameSessionState::Running => "RUNNING",
+    GameSessionState::Paused => "PAUSED",
+  };
+
+  let overlay_status = if services.overlay.any_active() {
+    "OVERLAY"
+  } else {
+    "idle"
+  };
+
+  let lua_status = match services.lua.eval("return 'ok'") {
+    Ok(_) => "Lua:ok",
+    Err(_) => "Lua:err",
+  };
+
+  let status = format!(
+    "Game:{} | Overlay:{} | {} | <- -> Nav | ESC Exit",
+    game_status,
+    overlay_status,
+    lua_status,
+  );
+
+  services.render.draw_centered(9, &status);
 
   let _ = services.render.present();
 }
