@@ -62,6 +62,8 @@ impl RenderService {
     // 获取终端输出流控制权
     let mut stdout = stdout();
 
+    // 强制移动光标
+    stdout.queue(MoveTo(0, 0))?;
     // 清空屏幕
     stdout.queue(Clear(ClearType::All))?;
 
