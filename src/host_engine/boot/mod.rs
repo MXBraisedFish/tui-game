@@ -7,29 +7,23 @@ use crate::host_engine::services::EngineServices;
 
 // 启动函数
 pub fn prepare() -> BootOutput {
-
-  println!("[Boot] Preparing engine...");
-  
   let mut services = EngineServices::new();
 
-  println!("[Boot] Scanning packages...");
+  services.log.info("[Boot] Preparing engine...");
+
+  services.log.info("[Boot] Scanning packages...");
 
   let root_dir = services.storage.root_dir().clone();
   services.package.scan_all(&root_dir);
 
-  println!(
-    "[Boot] Found {} packages ({} games, {} screensavers, {} bosses)",
-    services.package.total_count(),
-    services.package.games().len(),
-    services.package.screensavers().len(),
-    services.package.bosses().len(),
+  services.log.info(
+    "[Boot] Found {} packages ({} games, {} screensavers, {} bosses)"
   );
 
   let world = RuntimeWorld::new();
 
-  println!(
-    "[Boot] Storage root: {}",
-    services.storage.root_dir().display()
+  services.log.info(
+    "[Boot] Storage root: {}"
   );
 
   // 返回启动输出

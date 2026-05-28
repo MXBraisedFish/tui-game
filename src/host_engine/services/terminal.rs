@@ -15,6 +15,14 @@ use crossterm::terminal::{
   LeaveAlternateScreen
 };
 
+// 临时的日志函数
+use super::LogService;
+
+fn log_service(log: &str) {
+  let mut logservice = LogService::new();
+  logservice.info(log);
+}
+
 pub struct TerminalService {
   guard: Option<TerminalGuard> // 终端守卫，支持终端开关
 }
@@ -58,7 +66,7 @@ impl TerminalService {
     Self { guard: None }
   }
 
-  pub fn enter(&mut self) {
+  pub fn enter(&mut self, services: &mut LogService) {
     //防止重复进入
     if self.guard.is_some() {
       return;
@@ -72,7 +80,7 @@ impl TerminalService {
       }
       Err(error) => {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-        eprintln!("[Terminal] Failed to enter terminal mode: {}", error);
+        services.error("[Terminal] Failed to enter terminal mode: {}");
       }
     }
   }

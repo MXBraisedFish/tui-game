@@ -2,26 +2,44 @@
 use std::fs;
 use std::path::PathBuf;
 
+// 临时的日志函数
+use super::LogService;
+
+pub struct ProfilesStore {
+  pub language: String,
+  pub package_states: std::collections::HashMap<String, serde_json::Value>
+}
+
+pub struct CacheStore {
+  pub game_scan_cache: serde_json::Value,
+  pub screensaver_scan_cache: serde_json::Value,
+  pub boss_scan_cache: serde_json::Value
+}
+
 pub struct StorageService {
-  root_dir: PathBuf
+  root_dir: PathBuf,
+  // profile: ProfilesStore,
+  // cache: CacheStore
 }
 
 impl StorageService {
-  pub fn new() -> Self {
+  pub fn new(log: &mut LogService) -> Self {
     // 获取根目录
     let root_dir = resolve_root_dir();
     // 创建对象
-    let service = Self { root_dir };
+    let service = Self { 
+      root_dir
+    };
 
     // 确保目录
-    service.ensure_directories();
+    service.ensure_directories(log);
 
     // 返回
     service
   }
 
   // 确保应有的目录存在
-  fn ensure_directories(&self) {
+  fn ensure_directories(&self, services: &mut LogService) {
     // 目录数组
     let dirs = [
       "data",
@@ -46,11 +64,7 @@ impl StorageService {
       // 如果创建目录有错误捕获并打印
       if let Err(error) = fs::create_dir_all(&path) {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-        eprintln!(
-          "[Boot] Warning: failed to create {}: {}",
-          path.display(),
-          error
-        )
+        services.error("[Boot] Warning: failed to create {}: {}");
       }
     }
 
@@ -81,10 +95,8 @@ impl StorageService {
         Err(error) => {
           if error.kind() != std::io::ErrorKind::NotFound {
             // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-            eprintln!(
-              "[Boot] Warning: cannot access {}: {}",
-              path.display(),
-              error
+            services.error(
+              "[Boot] Warning: cannot access {}: {}"
             )
           }
         }
@@ -98,10 +110,8 @@ impl StorageService {
       // 创建文件并写入默认内容
       if let Err(error) = fs::write(&path, &default_context) {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-        eprintln!(
-          "[Boot] Warning: failed to create {}: {}",
-          path.display(),
-          error
+        services.error(
+          "[Boot] Warning: failed to create {}: {}"
         )
       }
     }

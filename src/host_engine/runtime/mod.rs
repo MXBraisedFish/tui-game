@@ -18,7 +18,7 @@ use crossterm::event::KeyCode;
 // 运行函数
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   // 启用终端模式
-  services.terminal.enter();
+  services.terminal.enter(&mut services.log);
   
   // 构建一个帧循环
   let mut scheduler = FrameScheduler::new();
@@ -125,6 +125,16 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64, l
   );
 
   services.render.draw_centered(9, &status);
+
+  let logs = services.log.entries();
+
+  let start = logs.len().saturating_sub(5);
+
+  for (i, log) in logs.iter().skip(start).enumerate() {
+    let line = format!("[{:?}] {}", log.level, log.message);
+    services.render.draw_centered(20 + i, &line);
+  }
+
 
   let _ = services.render.present();
 }

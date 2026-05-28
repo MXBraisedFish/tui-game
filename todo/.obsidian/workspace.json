@@ -13,26 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "todo12.md",
+                "file": "todo_terminal.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "todo12"
-            }
-          },
-          {
-            "id": "469f91211b575c1d",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "todo10.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "todo10"
+              "title": "todo_terminal"
             }
           }
         ]
@@ -199,13 +185,31 @@
   },
   "active": "cafb19ddd17c869a",
   "lastOpenFiles": [
+    "self_todo.md",
+    "todo_terminal.md",
+    "todo_01_基础设施.md",
+    "todo_terminal.md.tmp.27732.6b38e1e29105",
+    "todo_08_宿主编排与生命周期.md",
+    "todo_08_宿主编排与生命周期.md.tmp.14268.9d48e6b1001a",
+    "todo_07_运行时与游戏会话.md",
+    "todo_07_运行时与游戏会话.md.tmp.14268.47acae696bcf",
+    "todo_06_脚本与Lua.md",
+    "todo_06_脚本与Lua.md.tmp.14268.9e6d67a3ad84",
+    "todo_05_包管理.md",
+    "todo_05_包管理.md.tmp.14268.6d31285c58fe",
+    "todo_04_UI框架.md",
+    "todo_03_渲染与绘制.md",
+    "todo_03_渲染与绘制.md.tmp.14268.d6f0bbde166b",
+    "todo_02_终端与输入.md",
+    "todo_02_终端与输入.md.tmp.14268.04c2d0da71ae",
+    "todo_01_基础设施.md.tmp.14268.c4950e67959d",
+    "todo13.md",
+    "todo12.md",
     "todo11.md",
     "todo10.md",
     "dir tree.md",
     "todo9.md",
     "todo8.md",
-    "todo12.md",
-    "todo13.md",
     "todo7.md",
     "todo6.md",
     "todo5.md",

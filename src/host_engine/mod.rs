@@ -22,13 +22,13 @@ pub fn run() {
   let mut world = boot_output.world;
 
   match services.lua.eval("return 'Lua VM active'") {
-    Ok(result) => println!("[Boot] Lua: {}", result),
-    Err(error) => eprintln!("[Boot] Lua error: {}", error)
+    Ok(result) => services.log.info("[Boot] Lua: {}"),
+    Err(error) => services.log.error("[Boot] Lua error: {}")
   }
 
   // 运行，返回退出状态
   let exit_state = runtime::run(&mut services, &mut world);
 
   // 关闭
-  shutdown::close(services, world, exit_state);
+  shutdown::close(&mut services, world, exit_state);
 }
