@@ -78,9 +78,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     thread::sleep(Duration::from_millis(16));
   }
 
-  // 退出终端模式
-  services.terminal.exit();
-
   // 返回退出信息块
   ExitState::new()
 }
