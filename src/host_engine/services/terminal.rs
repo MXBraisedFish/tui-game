@@ -20,62 +20,70 @@ use super::terminal_capabilities::TerminalCapabilities;
 use super::LogService;
 
 pub struct TerminalService {
-  guard: Option<TerminalGuard>, // 终端守卫，支持终端开关
+  surface: Option<TerminalSurface>, // 终端守卫，支持终端开关
   capabilities: TerminalCapabilities // 终端能力
 }
 
-struct TerminalGuard {
-  _stdout: Stdout // 保证持有所有权
+// 终端表面活动结构体
+struct TerminalSurface {
+  stdout: Stdout, // 终端输出流
+  active: bool // 恢复是否仍然需要运行
 }
 
-impl TerminalGuard {
+impl TerminalSurface {
   fn enter() -> io::Result<Self> {
+    // 启用原始模式
+    enable_raw_mode()?;
+
     // 获取标准输出
     let mut stdout = stdout();
 
-    // 启用原始模式
-    enable_raw_mode()?;
     // 切换屏幕，隐藏光标
-    execute!(stdout, EnterAlternateScreen, Hide)?;
+    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, Hide)?;
     stdout.flush()?;
 
     // 返回守卫
-    Ok(Self {_stdout: stdout})
+    Ok(Self {
+      stdout,
+      active: true
+    })
   }
 
-  pub fn force_restore() {
-    // 禁用原始模式
-    let _ = disable_raw_mode();
-    // 获取标准输句柄
-    let mut stdout = stdout();
+  // 写入访问
+  fn writer(&mut self) -> &mut Stdout {
+    &mut self.stdout
+  }
+
+  fn restore(&mut self) {
+    if !self.active {
+      return;
+    }
+
     // 恢复终端
-    let _ = execute!(stdout, Show, DisableMouseCapture, LeaveAlternateScreen);
-    // 刷新缓冲区
-    let _ = stdout.flush();
-    // 刷新错误输出缓冲区
+    let _ = execute!(self.stdout, Show);
+    let _ = execute!(self.stdout, DisableMouseCapture);
+    let _ = execute!(self.stdout, LeaveAlternateScreen);
+    let _ = self.stdout.flush();
+
+    // 关闭原始模式
+    let _ = disable_raw_mode();
     let _ = io::stderr().flush();
+
+    self.active = false;
   }
 }
 
-impl Drop for TerminalGuard {
+impl Drop for TerminalSurface {
   fn drop(&mut self) {
-    // 禁用原始模式
-    let _ = disable_raw_mode();
-    // 获取标准输句柄
-    let stdout = &mut self._stdout;
-    // 恢复终端
-    let _ = execute!(stdout, Show, DisableMouseCapture, LeaveAlternateScreen);
-    // 刷新缓冲区
-    let _ = stdout.flush();
-    // 刷新错误输出缓冲区
-    let _ = io::stderr().flush();
+    self.restore();
   }
 }
 
 impl TerminalService {
   pub fn new() -> Self {
     Self { 
-      guard: None,
+      surface: None,
       capabilities: TerminalCapabilities::detect()
     }
   }
@@ -87,15 +95,15 @@ impl TerminalService {
 
   pub fn enter(&mut self, services: &mut LogService) {
     //防止重复进入
-    if self.guard.is_some() {
+    if self.surface.is_some() {
       return;
     }
 
     // 尝试进入终端模式
-    match TerminalGuard::enter() {
-      Ok(guard) => {
+    match TerminalSurface::enter() {
+      Ok(surface) => {
         // 创建守卫
-        self.guard = Some(guard);
+        self.surface = Some(surface);
       }
       Err(error) => {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
@@ -106,16 +114,30 @@ impl TerminalService {
 
   // 退出，丢弃守卫，触发drop
   pub fn exit(&mut self) {
-    self.guard = None;
+    self.surface = None;
   }
 
   // 状态检查
   pub fn is_active(&self) -> bool {
-    self.guard.is_some()
+    self.surface.is_some()
   }
 
-  // 
-  pub fn stdout_mut(&mut self) -> Option<&mut Stdout> {
-    self.guard.as_mut().map(|guard| &mut guard._stdout)
+  // 写访问
+  pub fn writer_mut(&mut self) -> Option<&mut Stdout> {
+    self.surface.as_mut().map(|surface| surface.writer())
   }
+
+  // 紧急恢复
+  pub fn force_restore() {
+    let _ = disable_raw_mode();
+
+    let mut stdout = stdout();
+
+    let _ = execute!(stdout, Show);
+    let _ = execute!(stdout, DisableMouseCapture);
+    let _ = execute!(stdout, LeaveAlternateScreen);
+    let _ = stdout.flush();
+
+    let _ = io::stderr().flush();
+}
 }

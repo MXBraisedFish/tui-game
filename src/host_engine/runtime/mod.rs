@@ -152,7 +152,7 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64, l
   let terminal = &mut services.terminal;
   let render = &mut services.render;
 
-  if let Some(stdout) = terminal.stdout_mut() {
+  if let Some(stdout) = terminal.writer_mut() {
     let _ = render.present(stdout);
   }
 }

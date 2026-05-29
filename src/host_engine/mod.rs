@@ -1,5 +1,3 @@
-use std::result;
-
 // 统一模块导出
 // 启动阶段
 pub mod boot;
@@ -12,8 +10,12 @@ pub mod core;
 // 引擎服务
 pub mod services;
 
+use crate::host_engine::core::install_panic_hook;
+
 // 主流程运行程序
 pub fn run() {
+  install_panic_hook();
+
   // 启动，返回启动输出
   let boot_output = boot::prepare();
 
