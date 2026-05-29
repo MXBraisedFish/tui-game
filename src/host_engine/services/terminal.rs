@@ -14,17 +14,14 @@ use crossterm::terminal::{
   EnterAlternateScreen,
   LeaveAlternateScreen
 };
+use super::terminal_capabilities::TerminalCapabilities;
 
 // 临时的日志函数
 use super::LogService;
 
-fn log_service(log: &str) {
-  let mut logservice = LogService::new();
-  logservice.info(log);
-}
-
 pub struct TerminalService {
-  guard: Option<TerminalGuard> // 终端守卫，支持终端开关
+  guard: Option<TerminalGuard>, // 终端守卫，支持终端开关
+  capabilities: TerminalCapabilities // 终端能力
 }
 
 struct TerminalGuard {
@@ -44,6 +41,20 @@ impl TerminalGuard {
     // 返回守卫
     Ok(Self {_stdout: stdout})
   }
+
+  pub fn force_restore() {
+    // 禁用原始模式
+    let _ = disable_raw_mode();
+
+    // 获取标准输句柄
+    let mut stdout = stdout();
+    // 恢复终端
+    let _ = execute!(stdout, Show, DisableMouseCapture, LeaveAlternateScreen);
+    // 刷新缓冲区
+    let _ = stdout.flush();
+    // 刷新错误输出缓冲区
+    let _ = io::stderr().flush();
+  }
 }
 
 impl Drop for TerminalGuard {
@@ -53,8 +64,8 @@ impl Drop for TerminalGuard {
 
     // 恢复屏幕显示
     let stdout = &mut self._stdout;
-    let _ = stdout.flush();
     let _ = execute!(stdout, Show, DisableMouseCapture, LeaveAlternateScreen);
+    let _ = stdout.flush();
 
     // 清理错误输出缓冲
     let _ = io::stderr().flush();
@@ -63,7 +74,15 @@ impl Drop for TerminalGuard {
 
 impl TerminalService {
   pub fn new() -> Self {
-    Self { guard: None }
+    Self { 
+      guard: None,
+      capabilities: TerminalCapabilities::detected()
+    }
+  }
+
+  // 终端能力获取函数
+  pub fn capabilities(&self) -> &TerminalCapabilities {
+    &self.capabilities
   }
 
   pub fn enter(&mut self, services: &mut LogService) {
@@ -80,7 +99,7 @@ impl TerminalService {
       }
       Err(error) => {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-        services.error("[Terminal] Failed to enter terminal mode: {}");
+        services.error(format!("[Terminal] Failed to enter terminal mode: {}", error));
       }
     }
   }

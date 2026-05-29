@@ -1,3 +1,4 @@
+use std::fmt::format;
 // 引入标准线程库
 use std::thread;
 use std::time::Duration;
@@ -9,7 +10,7 @@ use crate::host_engine::core::{
   FrameScheduler
 };
 use crate::host_engine::services::{
-  EngineServices, GameSessionState, KeyInput, OverlayKind
+  EngineServices, GameSessionState, KeyInput, InputEvent
 };
 
 // 引用按键枚举
@@ -34,6 +35,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     // 更新按键事件队列
     services.input.poll();
+
+    if let Some((width, height)) = services.input.consume_resize() {
+      services.render.resize(width, height);
+      services.ui.on_resize(width, height);
+
+      services.log.info(format!("[Terminal Resize detected: {}x{}]", width, height));
+    }
 
     let mut consumed_input = false;
 
@@ -125,6 +133,12 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64, l
   );
 
   services.render.draw_centered(9, &status);
+
+  let caps = services.terminal.capabilities();
+  let capability_text = format!("RGB: {} Unicode: {} Image: {:?}",
+  caps.truecolor, caps.unicode, caps.image_protocol);
+
+  services.render.draw_centered(12, &capability_text);
 
   let logs = services.log.entries();
 

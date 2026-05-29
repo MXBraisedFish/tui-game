@@ -90,6 +90,11 @@ impl UiService {
       page.render(renderer)
     }
   }
+
+  // 尺寸大小重绘
+  pub fn on_resize(&mut self, width: u16, height: u16) {
+    // TODO(render): 当增量渲染器存在时，在窗口大小调整后强制执行完整的重新绘制。
+  }
 }
 
 struct HomePage;

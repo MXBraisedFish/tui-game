@@ -7,10 +7,11 @@ mod render;
 mod storage;
 mod ui;
 mod terminal;
+mod terminal_capabilities;
 mod log;
 
 pub use game::{GameService, GameSessionState};
-pub use input::{InputService, KeyInput};
+pub use input::{InputEvent, InputService, KeyEventKind, KeyInput};
 pub use lua::LuaService;
 pub use overlay::{OverlayKind, OverlayService};
 pub use package::PackageService;
@@ -18,6 +19,7 @@ pub use render::RenderService;
 pub use storage::StorageService;
 pub use ui::UiService;
 pub use terminal::TerminalService;
+pub use terminal_capabilities::{ImageProtocol, TerminalCapabilities};
 pub use log::{LogEntry, LogLevel, LogService};
 
 pub struct EngineServices {

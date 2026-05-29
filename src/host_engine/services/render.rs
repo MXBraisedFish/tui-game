@@ -91,4 +91,13 @@ impl RenderService {
   pub fn size(&self) -> (u16, u16) {
     (self.width, self.height)
   }
+
+  // 终端尺寸大小更新宽高
+  pub fn resize(&mut self, width: u16, height: u16) {
+    self.width = width;
+    self.height = height;
+    self.clear();
+
+    // TODO(render): 当增量渲染器存在时，在窗口大小调整后强制执行完整的重新绘制。
+  }
 }
