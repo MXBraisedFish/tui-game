@@ -1,5 +1,5 @@
 // 引入官方标准输入输出库
-use std::io::{self, stdout, Write};
+use std::io::{self, Stdout, Write};
 
 // 光标移动
 use crossterm::cursor::MoveTo;
@@ -58,10 +58,7 @@ impl RenderService {
     self.lines[row] = format!("{}{}", padding, text);
   }
 
-  pub fn present(&mut self) -> io::Result<()> {
-    // 获取终端输出流控制权
-    let mut stdout = stdout();
-
+  pub fn present(&mut self, stdout: &mut Stdout) -> io::Result<()> {
     // 强制移动光标
     stdout.queue(MoveTo(0, 0))?;
     // 清空屏幕

@@ -19,7 +19,7 @@ pub struct TerminalCapabilities {
 }
 
 impl TerminalCapabilities {
-  pub fn detected() -> Self {
+  pub fn detect() -> Self {
     Self {
       unicode: detect_unicode(),
       truecolor: detect_truecolor(),

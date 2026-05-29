@@ -148,7 +148,11 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64, l
     let line = format!("[{:?}] {}", log.level, log.message);
     services.render.draw_centered(20 + i, &line);
   }
+  
+  let terminal = &mut services.terminal;
+  let render = &mut services.render;
 
-
-  let _ = services.render.present();
+  if let Some(stdout) = terminal.stdout_mut() {
+    let _ = render.present(stdout);
+  }
 }

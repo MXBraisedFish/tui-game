@@ -37,6 +37,7 @@ impl TerminalGuard {
     enable_raw_mode()?;
     // 切换屏幕，隐藏光标
     execute!(stdout, EnterAlternateScreen, Hide)?;
+    stdout.flush()?;
 
     // 返回守卫
     Ok(Self {_stdout: stdout})
@@ -45,7 +46,6 @@ impl TerminalGuard {
   pub fn force_restore() {
     // 禁用原始模式
     let _ = disable_raw_mode();
-
     // 获取标准输句柄
     let mut stdout = stdout();
     // 恢复终端
@@ -59,15 +59,15 @@ impl TerminalGuard {
 
 impl Drop for TerminalGuard {
   fn drop(&mut self) {
-    // 恢复输入模式
+    // 禁用原始模式
     let _ = disable_raw_mode();
-
-    // 恢复屏幕显示
+    // 获取标准输句柄
     let stdout = &mut self._stdout;
+    // 恢复终端
     let _ = execute!(stdout, Show, DisableMouseCapture, LeaveAlternateScreen);
+    // 刷新缓冲区
     let _ = stdout.flush();
-
-    // 清理错误输出缓冲
+    // 刷新错误输出缓冲区
     let _ = io::stderr().flush();
   }
 }
@@ -76,7 +76,7 @@ impl TerminalService {
   pub fn new() -> Self {
     Self { 
       guard: None,
-      capabilities: TerminalCapabilities::detected()
+      capabilities: TerminalCapabilities::detect()
     }
   }
 
@@ -112,5 +112,10 @@ impl TerminalService {
   // 状态检查
   pub fn is_active(&self) -> bool {
     self.guard.is_some()
+  }
+
+  // 
+  pub fn stdout_mut(&mut self) -> Option<&mut Stdout> {
+    self.guard.as_mut().map(|guard| &mut guard._stdout)
   }
 }
