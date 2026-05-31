@@ -29,7 +29,8 @@ pub enum LogSource {
   Game, // 游戏服务
   Overlay, // 覆盖屏幕服务
   Ui, // 引擎UI服务
-  Crash // 异常恢复服务
+  Crash, // 异常恢复服务
+  I18n // 国际化服务
 }
 
 // 日志信息
@@ -139,6 +140,7 @@ impl LogService {
     }
   }
 
+  // 打印所有字符串
   pub fn flush_to_console(&self) {
     for entry in & self.queue {
       println!("{}", format_log_entry(entry));

@@ -54,7 +54,9 @@ impl StorageService {
       "scripts",
       "scripts/game",
       "scripts/screensaver",
-      "scripts/boss"
+      "scripts/boss",
+      "assets",
+      "assets/language"
     ];
 
     // 遍历目录数组
@@ -119,6 +121,25 @@ impl StorageService {
 
   pub fn root_dir(&self) -> &PathBuf {
     &self.root_dir
+  }
+
+  // 语言文件路径
+  pub fn language_profile_path(&self) -> PathBuf {
+    self.root_dir.join("data/profiles/language.txt")
+  }
+
+  // 读取语言文件
+  pub fn read_language_code(&self) -> Option<String> {
+    let path = self.language_profile_path();
+
+    let content = std::fs::read_to_string(path).ok()?;
+    let code = content.trim();
+
+    if code.is_empty() {
+      None
+    } else {
+      Some(code.to_string())
+    }
   }
 }
 
