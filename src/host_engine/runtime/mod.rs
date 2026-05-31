@@ -1,4 +1,3 @@
-use std::fmt::format;
 // 引入标准线程库
 use std::thread;
 use std::time::Duration;
@@ -15,6 +14,9 @@ use crate::host_engine::services::{
 
 // 引用按键枚举
 use crossterm::event::KeyCode;
+
+// 临时日志
+use super::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
 
 // 运行函数
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
@@ -40,7 +42,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       services.render.resize(width, height);
       services.ui.on_resize(width, height);
 
-      services.log.info(format!("[Terminal Resize detected: {}x{}]", width, height));
+      services.log.info(LogSource::Runtime, format!("[Terminal Resize detected: {}x{}]", width, height));
     }
 
     let mut consumed_input = false;

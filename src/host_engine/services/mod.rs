@@ -20,7 +20,7 @@ pub use storage::StorageService;
 pub use ui::UiService;
 pub use terminal::TerminalService;
 pub use terminal_capabilities::{ImageProtocol, TerminalCapabilities};
-pub use log::{LogEntry, LogLevel, LogService};
+pub use log::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
 
 pub struct EngineServices {
   pub package: PackageService,

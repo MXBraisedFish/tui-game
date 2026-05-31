@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 // 临时的日志函数
-use super::LogService;
+use super::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
 
 pub struct ProfilesStore {
   pub language: String,
@@ -64,7 +64,7 @@ impl StorageService {
       // 如果创建目录有错误捕获并打印
       if let Err(error) = fs::create_dir_all(&path) {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-        services.error("[Boot] Warning: failed to create {}: {}");
+        services.error(LogSource::Storage, "[Boot] Warning: failed to create {}: {}");
       }
     }
 
@@ -95,7 +95,7 @@ impl StorageService {
         Err(error) => {
           if error.kind() != std::io::ErrorKind::NotFound {
             // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-            services.error(
+            services.error(LogSource::Storage,
               "[Boot] Warning: cannot access {}: {}"
             )
           }
@@ -110,7 +110,7 @@ impl StorageService {
       // 创建文件并写入默认内容
       if let Err(error) = fs::write(&path, &default_context) {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-        services.error(
+        services.error(LogSource::Storage,
           "[Boot] Warning: failed to create {}: {}"
         )
       }

@@ -5,24 +5,27 @@ use crate::host_engine::core::{
 };
 use crate::host_engine::services::EngineServices;
 
+// 临时日志
+use super::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
+
 // 启动函数
 pub fn prepare() -> BootOutput {
   let mut services = EngineServices::new();
 
-  services.log.info("[Boot] Preparing engine...");
+  services.log.info(LogSource::Boot, "[Boot] Preparing engine...");
 
-  services.log.info("[Boot] Scanning packages...");
+  services.log.info(LogSource::Boot, "[Boot] Scanning packages...");
 
   let root_dir = services.storage.root_dir().clone();
   services.package.scan_all(&root_dir);
 
-  services.log.info(
+  services.log.info(LogSource::Boot, 
     "[Boot] Found {} packages ({} games, {} screensavers, {} bosses)"
   );
 
   let world = RuntimeWorld::new();
 
-  services.log.info(
+  services.log.info(LogSource::Boot, 
     "[Boot] Storage root: {}"
   );
 

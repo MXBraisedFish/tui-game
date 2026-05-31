@@ -16,6 +16,9 @@ use crate::host_engine::core::{
   set_crash_phase,
 };
 
+// 临时日志
+use self::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
+
 // 主流程运行程序
 pub fn run() {
   install_panic_hook();
@@ -30,8 +33,8 @@ pub fn run() {
   let mut world = boot_output.world;
 
   match services.lua.eval("return 'Lua VM active'") {
-    Ok(result) => services.log.info("[Boot] Lua: {}"),
-    Err(error) => services.log.error("[Boot] Lua error: {}")
+    Ok(result) => services.log.info(LogSource::Boot, "[Boot] Lua: {}"),
+    Err(error) => services.log.error(LogSource::Boot, "[Boot] Lua error: {}")
   }
 
   // 将panic钩子改为运行阶段

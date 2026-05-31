@@ -17,7 +17,7 @@ use crossterm::terminal::{
 use super::terminal_capabilities::TerminalCapabilities;
 
 // 临时的日志函数
-use super::LogService;
+use super::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
 
 pub struct TerminalService {
   surface: Option<TerminalSurface>, // 终端守卫，支持终端开关
@@ -107,7 +107,7 @@ impl TerminalService {
       }
       Err(error) => {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-        services.error(format!("[Terminal] Failed to enter terminal mode: {}", error));
+        services.error(LogSource::Storage, format!("[Terminal] Failed to enter terminal mode: {}", error));
       }
     }
   }
