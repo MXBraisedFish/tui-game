@@ -94,7 +94,8 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64, last_key: Option<KeyInput>) {
   services.render.clear();
 
-  services.render.draw_centered(0, "TUI Game Engine");
+  let title = services.i18n.get_runtime_text("test", "engine.title");
+  services.render.draw_centered(0, &title);
 
   let status = format!(
     "Page: {} | Frame: {} | dt: {:.1}ms",
@@ -124,20 +125,8 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64, l
     Err(_) => "Lua:err",
   };
 
-  let status = format!(
-    "Game:{} | Overlay:{} | {} | <- -> Nav | ESC Exit",
-    game_status,
-    overlay_status,
-    lua_status,
-  );
-
-  services.render.draw_centered(9, &status);
-
-  let caps = services.terminal.capabilities();
-  let capability_text = format!("RGB: {} Unicode: {} Image: {:?}",
-  caps.truecolor, caps.unicode, caps.image_protocol);
-
-  services.render.draw_centered(12, &capability_text);
+  let exit_hint = services.i18n.get_runtime_text("test", "engine.exit_hint");
+  services.render.draw_centered(6, &exit_hint);
 
   let logs = services.log.entries();
 

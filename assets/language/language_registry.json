@@ -1,0 +1,14 @@
+[
+  {
+    "code": "en_us",
+    "name": "English",
+    "title": "Language",
+    "hint": "[↑]/[↓] Select  [ESC] Exit  [Enter] Confirm"
+  },
+  {
+    "code": "zh_cn",
+    "name": "简体中文",
+    "title": "选择语言",
+    "hint": "[↑]/[↓] 切换语言  [ESC] 退出  [Enter] 确认"
+  }
+]

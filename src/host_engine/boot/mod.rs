@@ -16,7 +16,20 @@ pub fn prepare() -> BootOutput {
 
   services.log.info(LogSource::Boot, "[Boot] Scanning packages...");
 
-  let root_dir = services.storage.root_dir().clone();
+  // 临时语言测试
+  let language_code = services
+    .storage
+    .read_language_code()
+    .unwrap_or_else(|| services.storage.default_language_code().to_string());
+
+  services.i18n.load_runtime_test_language(
+    &services.storage,
+    &mut services.log,
+    &language_code,
+  );
+  // 临时语言测试
+
+  let root_dir = services.storage.root_dir();
   services.package.scan_all(&root_dir);
 
   services.log.info(LogSource::Boot, 
