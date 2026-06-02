@@ -10,11 +10,7 @@ pub mod core;
 // 引擎服务
 pub mod services;
 
-use crate::host_engine::core::{
-  CrashPhase,
-  install_panic_hook,
-  set_crash_phase,
-};
+use crate::host_engine::core::{CrashPhase, install_panic_hook, set_crash_phase};
 
 // 临时日志
 use self::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
@@ -22,7 +18,7 @@ use self::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entry
 // 主流程运行程序
 pub fn run() {
   install_panic_hook();
-  
+
   // 将panic钩子改为准备阶段
   set_crash_phase(CrashPhase::Preparing);
   // 启动，返回启动输出
@@ -34,7 +30,7 @@ pub fn run() {
 
   match services.lua.eval("return 'Lua VM active'") {
     Ok(result) => services.log.info(LogSource::Boot, "[Boot] Lua: {}"),
-    Err(error) => services.log.error(LogSource::Boot, "[Boot] Lua error: {}")
+    Err(error) => services.log.error(LogSource::Boot, "[Boot] Lua error: {}"),
   }
 
   // 将panic钩子改为运行阶段

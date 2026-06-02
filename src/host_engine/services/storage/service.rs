@@ -57,7 +57,16 @@ impl StorageService {
 
   // 命名空间文件
   pub fn language_runtime_namespace_path(&self, language_code: &str, namespace: &str) -> PathBuf {
-    self.language_runtime_path(language_code).join(format!("{}.json", namespace))
+    self
+      .language_runtime_path(language_code)
+      .join(format!("{}.json", namespace))
+  }
+
+  // 语言信息文件
+  pub fn language_info_path(&self, language_code: &str) -> PathBuf {
+    self
+      .language_package_path(language_code)
+      .join("language.json")
   }
 }
 

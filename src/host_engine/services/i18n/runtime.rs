@@ -5,18 +5,16 @@ use super::service::I18nService;
 use crate::host_engine::services::{LogService, LogSource, StorageService};
 
 // 语言命名空间
-const RUNTIME_NAMESPACES: &[&str] = &[
-  "ui",
-  "key",
-  "terminal",
-  "error",
-  "package",
-  "dialog",
-];
+const RUNTIME_NAMESPACES: &[&str] = &["ui", "key", "terminal", "error", "package", "dialog"];
 
 impl I18nService {
   // 加载语言
-  pub fn load_runtime_language(&mut self, storage: &StorageService, log: &mut LogService, language_code: &str) {
+  pub fn load_runtime_language(
+    &mut self,
+    storage: &StorageService,
+    log: &mut LogService,
+    language_code: &str,
+  ) {
     // 清理缓存
     self.clear_runtime_texts();
 
@@ -45,14 +43,16 @@ impl I18nService {
 
     // 若都失败了则发出错误
     // TODO：这里到时候会接入把英语文件内嵌一份
-    log.error(
-      LogSource::I18n,
-      "Failed to load runtime i18n language.",
-    );
+    log.error(LogSource::I18n, "Failed to load runtime i18n language.");
   }
 
   // 批量加载命名空间
-  fn load_runtime_namespaces(&mut self, storage: &StorageService, log: &mut LogService, language_code: &str) -> bool {
+  fn load_runtime_namespaces(
+    &mut self,
+    storage: &StorageService,
+    log: &mut LogService,
+    language_code: &str,
+  ) -> bool {
     // 尚未加载任何一个语言内容
     let mut loaded_any = false;
 
@@ -70,7 +70,13 @@ impl I18nService {
   }
 
   // 尝试加载语言文件
-  fn try_load_runtime_namespace(&mut self, storage: &StorageService, language_code: &str, namespace: &str, log: &mut LogService) -> bool {
+  fn try_load_runtime_namespace(
+    &mut self,
+    storage: &StorageService,
+    language_code: &str,
+    namespace: &str,
+    log: &mut LogService,
+  ) -> bool {
     // 构建路径
     let path = storage.language_runtime_namespace_path(language_code, namespace);
 

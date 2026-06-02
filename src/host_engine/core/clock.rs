@@ -3,20 +3,20 @@ use std::time::{Duration, Instant};
 
 // 引擎时钟结构体
 pub struct EngineClock {
-  epoch: Instant, // 引擎启动的绝对时间点
+  epoch: Instant,       // 引擎启动的绝对时间点
   frame_start: Instant, // 帧开始时间点
-  dt: Duration // 上一帧的持续时间
+  dt: Duration,         // 上一帧的持续时间
 }
 
 // 引擎时钟实现块
 impl EngineClock {
-  pub fn new()-> Self {
+  pub fn new() -> Self {
     let now = Instant::now();
 
     Self {
       epoch: now,
       frame_start: now,
-      dt: Duration::ZERO
+      dt: Duration::ZERO,
     }
   }
 

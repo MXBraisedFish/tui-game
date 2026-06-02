@@ -2,14 +2,12 @@
 use mlua::Lua;
 
 pub struct LuaService {
-  lua: Lua
+  lua: Lua,
 }
 
 impl LuaService {
   pub fn new() -> Self {
-    Self {
-      lua: Lua::new()
-    }
+    Self { lua: Lua::new() }
   }
 
   // 只读引用
@@ -19,6 +17,10 @@ impl LuaService {
 
   // 执行Lua代码并返回结果
   pub fn eval(&self, code: &str) -> Result<String, String> {
-    self.lua.load(code).eval::<String>().map_err(|error| error.to_string())
+    self
+      .lua
+      .load(code)
+      .eval::<String>()
+      .map_err(|error| error.to_string())
   }
 }

@@ -1,5 +1,5 @@
 // 官方标准输入输出
-use std::io::{self, stdout, Stdout, Write};
+use std::io::{self, Stdout, Write, stdout};
 
 // 光标控制
 use crossterm::cursor::{Hide, Show};
@@ -8,26 +8,23 @@ use crossterm::event::DisableMouseCapture;
 // 终端命令执行
 use crossterm::execute;
 // 终端模式控制
-use crossterm::terminal::{
-  disable_raw_mode,
-  enable_raw_mode,
-  EnterAlternateScreen,
-  LeaveAlternateScreen
-};
 use super::terminal_capabilities::TerminalCapabilities;
+use crossterm::terminal::{
+  EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+};
 
 // 临时的日志函数
 use super::{LogLevel, LogService, LogSource};
 
 pub struct TerminalService {
-  surface: Option<TerminalSurface>, // 终端守卫，支持终端开关
-  capabilities: TerminalCapabilities // 终端能力
+  surface: Option<TerminalSurface>,   // 终端守卫，支持终端开关
+  capabilities: TerminalCapabilities, // 终端能力
 }
 
 // 终端表面活动结构体
 struct TerminalSurface {
   stdout: Stdout, // 终端输出流
-  active: bool // 恢复是否仍然需要运行
+  active: bool,   // 恢复是否仍然需要运行
 }
 
 impl TerminalSurface {
@@ -46,7 +43,7 @@ impl TerminalSurface {
     // 返回守卫
     Ok(Self {
       stdout,
-      active: true
+      active: true,
     })
   }
 
@@ -82,9 +79,9 @@ impl Drop for TerminalSurface {
 
 impl TerminalService {
   pub fn new() -> Self {
-    Self { 
+    Self {
       surface: None,
-      capabilities: TerminalCapabilities::detect()
+      capabilities: TerminalCapabilities::detect(),
     }
   }
 
@@ -107,7 +104,10 @@ impl TerminalService {
       }
       Err(error) => {
         // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
-        services.error(LogSource::Storage, format!("[Terminal] Failed to enter terminal mode: {}", error));
+        services.error(
+          LogSource::Storage,
+          format!("[Terminal] Failed to enter terminal mode: {}", error),
+        );
       }
     }
   }
@@ -139,5 +139,5 @@ impl TerminalService {
     let _ = stdout.flush();
 
     let _ = io::stderr().flush();
-}
+  }
 }

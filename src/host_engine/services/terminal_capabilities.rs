@@ -6,7 +6,7 @@ pub enum ImageProtocol {
   None,
   Kitty,
   Sixel,
-  ITerm2
+  ITerm2,
 }
 
 // 终端能力结构体
@@ -15,7 +15,7 @@ pub struct TerminalCapabilities {
   pub unicode: bool,
   pub truecolor: bool,
   pub mouse: bool,
-  pub image_protocol: ImageProtocol
+  pub image_protocol: ImageProtocol,
 }
 
 impl TerminalCapabilities {
@@ -24,7 +24,7 @@ impl TerminalCapabilities {
       unicode: detect_unicode(),
       truecolor: detect_truecolor(),
       mouse: false,
-      image_protocol: detect_image_protocol()
+      image_protocol: detect_image_protocol(),
     }
   }
 }
@@ -37,12 +37,14 @@ fn detect_unicode() -> bool {
 // 是否支持真彩
 fn detect_truecolor() -> bool {
   // 读取环境变量的颜色支持
-  std::env::var("COLOTERM").map(|v| {
-    // 闭包内的小写转换
-    let v = v.to_lowercase();
-    // 是否包含真彩或者24位色彩（其实俩一样）
-    v.contains("truecolor") || v.contains("24bit")
-  }).unwrap_or(false)
+  std::env::var("COLOTERM")
+    .map(|v| {
+      // 闭包内的小写转换
+      let v = v.to_lowercase();
+      // 是否包含真彩或者24位色彩（其实俩一样）
+      v.contains("truecolor") || v.contains("24bit")
+    })
+    .unwrap_or(false)
 }
 
 // 是否支持图片协议

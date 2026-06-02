@@ -8,27 +8,24 @@ use rdev::Key;
 
 // 按键输入
 #[derive(Clone, Debug)]
-pub struct  KeyInput {
-  pub code: KeyCode, // 按键码
-  pub kind: KeyEventKind // 按键类型
+pub struct KeyInput {
+  pub code: KeyCode,      // 按键码
+  pub kind: KeyEventKind, // 按键类型
 }
 
 // 输入事件
 #[derive(Clone, Debug)]
 pub enum InputEvent {
   Key(KeyInput),
-  Resize {
-    width: u16,
-    height: u16
-  }
+  Resize { width: u16, height: u16 },
 }
 
 // 按键输入状态
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyEventKind {
-  Press, // 按下
+  Press,   // 按下
   Release, // 松开
-  Repeat // 持续按下
+  Repeat,  // 持续按下
 }
 
 impl From<KeyEvent> for KeyInput {
@@ -38,20 +35,20 @@ impl From<KeyEvent> for KeyInput {
       kind: match event.kind {
         crossterm::event::KeyEventKind::Press => KeyEventKind::Press,
         crossterm::event::KeyEventKind::Release => KeyEventKind::Release,
-        crossterm::event::KeyEventKind::Repeat => KeyEventKind::Repeat
-      }
+        crossterm::event::KeyEventKind::Repeat => KeyEventKind::Repeat,
+      },
     }
   }
 }
 
 pub struct InputService {
-  queue: VecDeque<InputEvent> // 使用双端队列做按键列表缓冲
+  queue: VecDeque<InputEvent>, // 使用双端队列做按键列表缓冲
 }
 
 impl InputService {
   pub fn new() -> Self {
     Self {
-      queue: VecDeque::new()
+      queue: VecDeque::new(),
     }
   }
 
@@ -63,7 +60,9 @@ impl InputService {
       match event::read() {
         // 按键事件
         Ok(Event::Key(key_event)) => {
-          self.queue.push_back(InputEvent::Key(KeyInput::from(key_event)));
+          self
+            .queue
+            .push_back(InputEvent::Key(KeyInput::from(key_event)));
         }
         // 尺寸变化事件
         Ok(Event::Resize(width, height)) => {
@@ -79,7 +78,7 @@ impl InputService {
   pub fn next_key(&mut self) -> Option<KeyInput> {
     match self.queue.pop_front() {
       Some(InputEvent::Key(key)) => Some(key),
-      _ => None
+      _ => None,
     }
   }
 
@@ -96,11 +95,9 @@ impl InputService {
       match event {
         // 判断键码和状态类型
         InputEvent::Key(key) => {
-          key.code == code && matches!(
-            key.kind, KeyEventKind::Press | KeyEventKind::Repeat
-          )
+          key.code == code && matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
         }
-        _ => false
+        _ => false,
       }
     });
 
@@ -122,7 +119,7 @@ impl InputService {
       match event {
         // 这里有个解引用
         InputEvent::Resize { width, height } => Some((*width, *height)),
-        _ => None
+        _ => None,
       }
     });
 

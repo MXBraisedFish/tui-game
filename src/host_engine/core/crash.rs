@@ -8,10 +8,10 @@ use crate::host_engine::services::TerminalService;
 // 阶段枚举
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CrashPhase {
-  Initial = 0, // 初始化
+  Initial = 0,   // 初始化
   Preparing = 1, // 准备阶段
-  Runtime = 2, // 运行阶段
-  Shutdown = 3 // 关闭阶段
+  Runtime = 2,   // 运行阶段
+  Shutdown = 3,  // 关闭阶段
 }
 
 // 全局静态且唯一，每个线程都用这个变量
@@ -29,7 +29,7 @@ pub fn current_crash_phase() -> CrashPhase {
     1 => CrashPhase::Preparing,
     2 => CrashPhase::Runtime,
     3 => CrashPhase::Shutdown,
-    _ => CrashPhase::Initial
+    _ => CrashPhase::Initial,
   }
 }
 

@@ -6,6 +6,7 @@ mod lua;
 mod overlay;
 mod package;
 mod render;
+mod rich_text;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
@@ -19,6 +20,7 @@ pub use lua::LuaService;
 pub use overlay::{OverlayKind, OverlayService};
 pub use package::PackageService;
 pub use render::RenderService;
+pub use rich_text::RichTextService;
 pub use storage::StorageService;
 pub use terminal::TerminalService;
 pub use terminal_capabilities::{ImageProtocol, TerminalCapabilities};
@@ -35,7 +37,8 @@ pub struct EngineServices {
   pub render: RenderService,
   pub terminal: TerminalService,
   pub log: LogService,
-  pub i18n: I18nService
+  pub i18n: I18nService,
+  pub rich_text: RichTextService,
 }
 
 impl EngineServices {
@@ -53,7 +56,8 @@ impl EngineServices {
       lua: LuaService::new(),
       render: RenderService::new(),
       log,
-      i18n: I18nService::new()
+      i18n: I18nService::new(),
+      rich_text: RichTextService::new(),
     }
   }
 }

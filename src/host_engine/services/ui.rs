@@ -8,7 +8,7 @@ use crate::host_engine::services::{RenderService, render};
 pub enum PageKey {
   Home,
   Packages,
-  Settings
+  Settings,
 }
 
 impl PageKey {
@@ -17,7 +17,7 @@ impl PageKey {
     match self {
       PageKey::Home => "Home",
       PageKey::Packages => "Packages",
-      PageKey::Settings => "Settings"
+      PageKey::Settings => "Settings",
     }
   }
 
@@ -26,7 +26,7 @@ impl PageKey {
     match self {
       PageKey::Home => PageKey::Packages,
       PageKey::Packages => PageKey::Settings,
-      PageKey::Settings => PageKey::Home
+      PageKey::Settings => PageKey::Home,
     }
   }
 
@@ -35,7 +35,7 @@ impl PageKey {
     match self {
       PageKey::Home => PageKey::Settings,
       PageKey::Packages => PageKey::Home,
-      PageKey::Settings => PageKey::Packages
+      PageKey::Settings => PageKey::Packages,
     }
   }
 }
@@ -47,14 +47,14 @@ pub trait Page {
 
 pub struct UiService {
   pages: HashMap<PageKey, Box<dyn Page>>,
-  active_page: PageKey
+  active_page: PageKey,
 }
 
 impl UiService {
   pub fn new() -> Self {
     let mut service = Self {
       pages: HashMap::new(),
-      active_page: PageKey::Home
+      active_page: PageKey::Home,
     };
 
     service.register(Box::new(HomePage));

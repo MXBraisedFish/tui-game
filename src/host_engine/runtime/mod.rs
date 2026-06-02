@@ -3,14 +3,8 @@ use std::thread;
 use std::time::Duration;
 
 // 引用结构体和枚举
-use crate::host_engine::core::{
-  RuntimeWorld,
-  ExitState,
-  FrameScheduler
-};
-use crate::host_engine::services::{
-  EngineServices, GameSessionState, KeyInput, InputEvent
-};
+use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
+use crate::host_engine::services::{EngineServices, GameSessionState, InputEvent, KeyInput};
 
 // 引用按键枚举
 use crossterm::event::KeyCode;
@@ -22,7 +16,7 @@ use super::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entr
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   // 启用终端模式
   services.terminal.enter(&mut services.log);
-  
+
   // 构建一个帧循环
   let mut scheduler = FrameScheduler::new();
   let mut running = true;
@@ -42,7 +36,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       services.render.resize(width, height);
       services.ui.on_resize(width, height);
 
-      services.log.info(LogSource::Runtime, format!("[Terminal Resize detected: {}x{}]", width, height));
+      services.log.info(
+        LogSource::Runtime,
+        format!("[Terminal Resize detected: {}x{}]", width, height),
+      );
     }
 
     let mut consumed_input = false;
@@ -95,7 +92,7 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   services.render.draw_centered(4, &esc);
   services.render.draw_centered(5, &left);
   services.render.draw_centered(6, &right);
-  
+
   let terminal = &mut services.terminal;
   let render = &mut services.render;
 

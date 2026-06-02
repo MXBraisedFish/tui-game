@@ -35,21 +35,21 @@ fn ensure_default_files(storage: &StorageService, log: &mut LogService) {
 
     // 确保文件存在且有应由的内容
     match fs::metadata(&path) {
-        Ok(metadata) => {
-          // 如果是文件且有内容，跳过
-          if metadata.is_file() && metadata.len() > 0 {
-            continue;
-          }
+      Ok(metadata) => {
+        // 如果是文件且有内容，跳过
+        if metadata.is_file() && metadata.len() > 0 {
+          continue;
         }
-        Err(error) => {
-          // 如果不是没找到就跳过
-          if error.kind() != ErrorKind::NotFound {
-            log.warn(
-              LogSource::Storage,
-              format!("Cannot access file {}: {}", path.display(), error),
-            );
-          }
+      }
+      Err(error) => {
+        // 如果不是没找到就跳过
+        if error.kind() != ErrorKind::NotFound {
+          log.warn(
+            LogSource::Storage,
+            format!("Cannot access file {}: {}", path.display(), error),
+          );
         }
+      }
     }
 
     // 创建父目录

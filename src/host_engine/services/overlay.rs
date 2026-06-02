@@ -2,21 +2,21 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayKind {
   Screensaver, // 屏保
-  Boss // 老板界面
+  Boss,        // 老板界面
 }
 
 // 覆盖层状态
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlaySessionState {
   Inactive, // 未激活
-  Running // 激活
+  Running,  // 激活
 }
 
 pub struct OverlayService {
   screensaver_state: OverlaySessionState, // 屏保状态
-  boss_state: OverlaySessionState, // 屏保状态
+  boss_state: OverlaySessionState,        // 屏保状态
   active_screensaver_uid: Option<String>, // 屏保id
-  active_boss_uid: Option<String> // 老板界面id
+  active_boss_uid: Option<String>,        // 老板界面id
 }
 
 impl OverlayService {
@@ -25,7 +25,7 @@ impl OverlayService {
       screensaver_state: OverlaySessionState::Inactive,
       boss_state: OverlaySessionState::Inactive,
       active_screensaver_uid: None,
-      active_boss_uid: None
+      active_boss_uid: None,
     }
   }
 
@@ -61,7 +61,7 @@ impl OverlayService {
   pub fn is_active(&self, kind: OverlayKind) -> bool {
     match kind {
       OverlayKind::Screensaver => self.screensaver_state == OverlaySessionState::Running,
-      OverlayKind::Boss => self.boss_state == OverlaySessionState::Running
+      OverlayKind::Boss => self.boss_state == OverlaySessionState::Running,
     }
   }
 

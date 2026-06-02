@@ -11,9 +11,9 @@ use crossterm::terminal::{Clear, ClearType};
 use crossterm::QueueableCommand;
 
 pub struct RenderService {
-  width: u16, // 终端字符宽度
-  height: u16, // 终端字符高度
-  lines: Vec<String> // 帧缓冲区
+  width: u16,         // 终端字符宽度
+  height: u16,        // 终端字符高度
+  lines: Vec<String>, // 帧缓冲区
 }
 
 impl RenderService {
@@ -23,7 +23,7 @@ impl RenderService {
     Self {
       width,
       height,
-      lines: Vec::new()
+      lines: Vec::new(),
     }
   }
 

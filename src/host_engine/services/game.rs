@@ -2,21 +2,21 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameSessionState {
   Inactive, // 未激活（没有游戏运行）
-  Running, // 运行
-  Paused // 暂停
+  Running,  // 运行
+  Paused,   // 暂停
 }
 
 // 游戏服务结构体
 pub struct GameService {
-  state: GameSessionState, // 游戏状态
-  active_package_uid: Option<String> // 当前包运行id
+  state: GameSessionState,            // 游戏状态
+  active_package_uid: Option<String>, // 当前包运行id
 }
 
 impl GameService {
   pub fn new() -> Self {
     Self {
       state: GameSessionState::Inactive,
-      active_package_uid: None
+      active_package_uid: None,
     }
   }
 

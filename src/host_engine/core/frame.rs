@@ -1,14 +1,12 @@
 // 帧调度器结构体
 pub struct FrameScheduler {
-  current_frame: u64 // 当前帧序号
+  current_frame: u64, // 当前帧序号
 }
 
 // 帧调度器实现块
 impl FrameScheduler {
   pub fn new() -> Self {
-    Self {
-      current_frame: 0
-    }
+    Self { current_frame: 0 }
   }
 
   // 起始帧计算

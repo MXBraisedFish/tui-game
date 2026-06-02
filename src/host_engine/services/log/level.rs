@@ -3,10 +3,10 @@
 pub enum LogLevel {
   Trace, // 追踪
   Debug, // 调试
-  Info, // 信息
-  Warn, // 警告
+  Info,  // 信息
+  Warn,  // 警告
   Error, // 错误
-  Fatal // 异常
+  Fatal, // 异常
 }
 
 // 等级字符串

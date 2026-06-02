@@ -1,12 +1,12 @@
 use std::collections::VecDeque;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::{format_log_entry, LogEntry, LogLevel, LogSource};
+use super::{LogEntry, LogLevel, LogSource, format_log_entry};
 
 pub struct LogService {
   queue: VecDeque<LogEntry>,
   next_sequence: u64, // 下个序号
-  max_entries: usize // 最大数量
+  max_entries: usize, // 最大数量
 }
 
 impl LogService {
@@ -100,11 +100,14 @@ impl LogService {
     // TODO(log): 增加文件输出与控制台输出的双重保证。
     // TODO(log): 增加异步输出，避免阻塞主运行时。
     for entry in &self.queue {
-        println!("{}", format_log_entry(entry));
+      println!("{}", format_log_entry(entry));
     }
   }
 }
 
 fn now_ms() -> u128 {
-  SystemTime::now().duration_since(UNIX_EPOCH).map(|duration| duration.as_millis()).unwrap_or(0)
+  SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map(|duration| duration.as_millis())
+    .unwrap_or(0)
 }

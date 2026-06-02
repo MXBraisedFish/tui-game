@@ -10,7 +10,7 @@ pub struct RuntimeWorld {
 impl RuntimeWorld {
   pub fn new() -> Self {
     Self {
-      clock: EngineClock::new()
+      clock: EngineClock::new(),
     }
   }
 }
