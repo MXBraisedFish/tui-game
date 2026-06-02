@@ -22,7 +22,7 @@ pub fn prepare() -> BootOutput {
     .read_language_code()
     .unwrap_or_else(|| services.storage.default_language_code().to_string());
 
-  services.i18n.load_runtime_test_language(
+  services.i18n.load_runtime_language(
     &services.storage,
     &mut services.log,
     &language_code,

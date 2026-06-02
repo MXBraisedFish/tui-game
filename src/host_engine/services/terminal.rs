@@ -17,7 +17,7 @@ use crossterm::terminal::{
 use super::terminal_capabilities::TerminalCapabilities;
 
 // 临时的日志函数
-use super::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
+use super::{LogLevel, LogService, LogSource};
 
 pub struct TerminalService {
   surface: Option<TerminalSurface>, // 终端守卫，支持终端开关
