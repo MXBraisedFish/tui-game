@@ -1,5 +1,7 @@
 mod buffer;
 mod cell;
+mod layout;
+mod present;
 mod rich_text;
 mod service;
 mod style;
@@ -7,6 +9,8 @@ mod text;
 
 pub use buffer::CanvasBuffer;
 pub use cell::{CanvasCell, CanvasCellContent};
+pub use layout::write_centered_text;
+pub use present::present_buffer;
 pub use rich_text::write_rich_text;
 pub use service::CanvasService;
 pub use style::CanvasStyle;

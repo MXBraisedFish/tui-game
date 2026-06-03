@@ -33,11 +33,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     // 更新按键事件队列
     services.input.poll();
 
+    // 临时的响应尺寸变化
     if let Some((width, height)) = services.input.consume_resize() {
-      services.render.resize(width, height);
+      services.canvas.resize(width, height);
       services.ui.on_resize(width, height);
 
-      services.canvas.resize(width, height);
+      // TODO(render):
+      // Remove RenderService after Canvas presenter fully replaces it.
+      services.render.resize(width, height);
 
       services.log.info(
         LogSource::Runtime,
@@ -85,18 +88,25 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 
   services
     .canvas
-    .write_text(0, 0, "ABC中文😀", CanvasStyle::default());
-
-  let canvas_line = services.canvas.line_as_string(0);
+    .write_centered_text(2, "Canvas Presenter Test", CanvasStyle::default());
 
   services
-    .render
-    .draw_centered(22, &format!("Canvas line: {}", canvas_line.trim_end()));
+    .canvas
+    .write_centered_text(4, "ABC中文😀", CanvasStyle::default());
+
+  services.canvas.write_centered_text(
+    6,
+    &format!(
+      "Frame: {} | dt: {:.1}ms",
+      frame,
+      world.clock.delta_time().as_secs_f64() * 1000.0
+    ),
+    CanvasStyle::default(),
+  );
 
   let terminal = &mut services.terminal;
-  let render = &mut services.render;
 
   if let Some(stdout) = terminal.writer_mut() {
-    let _ = render.present(stdout);
+    let _ = services.canvas.present(stdout);
   }
 }

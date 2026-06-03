@@ -1,4 +1,8 @@
-use super::{CanvasBuffer, CanvasStyle, write_rich_text, write_text};
+use std::io::{self, Stdout};
+
+use super::{
+  CanvasBuffer, CanvasStyle, present_buffer, write_centered_text, write_rich_text, write_text,
+};
 use crate::host_engine::services::rich_text::RichText;
 
 pub struct CanvasService {
@@ -46,6 +50,16 @@ impl CanvasService {
   // 绘制富文本字符
   pub fn write_rich_text(&mut self, x: u16, y: u16, rich_text: &RichText) {
     write_rich_text(&mut self.back_buffer, x, y, rich_text);
+  }
+
+  // 提交画布到终端
+  pub fn present(&self, stdout: &mut Stdout) -> io::Result<()> {
+    present_buffer(&self.back_buffer, stdout)
+  }
+
+  // 居中绘制普通文本
+  pub fn write_centered_text(&mut self, y: u16, text: &str, style: CanvasStyle) {
+    write_centered_text(&mut self.back_buffer, y, text, style);
   }
 
   // 临时的行转字符
