@@ -45,14 +45,14 @@ impl TextStyle {
   // 将样式标记为启用
   pub fn enable_style(&mut self, tag: &str) -> bool {
     match tag {
-      "bold" => self.bold = true,
-      "italic" => self.italic = true,
-      "underline" => self.underline = true,
-      "strike" => self.strike = true,
-      "blink" => self.blink = true,
-      "reverse" => self.reverse = true,
-      "hidden" => self.hidden = true,
-      "dim" => self.dim = true,
+      "bold" | "b" => self.bold = true,
+      "italic" | "i" => self.italic = true,
+      "underline" | "u" => self.underline = true,
+      "strike" | "s" => self.strike = true,
+      "blink" | "l" => self.blink = true,
+      "reverse" | "r" => self.reverse = true,
+      "hidden" | "h" => self.hidden = true,
+      "dim" | "d" => self.dim = true,
       _ => return false,
     }
     true
@@ -61,14 +61,14 @@ impl TextStyle {
   // 将样式标记为关闭
   pub fn disable_style(&mut self, tag: &str) -> bool {
     match tag {
-      "bold" => self.bold = false,
-      "italic" => self.italic = false,
-      "underline" => self.underline = false,
-      "strike" => self.strike = false,
-      "blink" => self.blink = false,
-      "reverse" => self.reverse = false,
-      "hidden" => self.hidden = false,
-      "dim" => self.dim = false,
+      "bold" | "b" => self.bold = false,
+      "italic" | "i" => self.italic = false,
+      "underline" | "u" => self.underline = false,
+      "strike" | "s" => self.strike = false,
+      "blink" | "l" => self.blink = false,
+      "reverse" | "r" => self.reverse = false,
+      "hidden" | "h" => self.hidden = false,
+      "dim" | "d" => self.dim = false,
       _ => return false,
     }
     true

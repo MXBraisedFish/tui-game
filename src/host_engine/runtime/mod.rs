@@ -4,7 +4,7 @@ use std::time::Duration;
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
-use crate::host_engine::services::CanvasStyle;
+use crate::host_engine::services::{CanvasStyle, TerminalColor, TextColor};
 use crate::host_engine::services::{EngineServices, GameSessionState, InputEvent, KeyInput};
 
 // 引用按键枚举
@@ -86,23 +86,39 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   services.canvas.clear();
 
-  services
-    .canvas
-    .write_centered_text(2, "Canvas Presenter Test", CanvasStyle::default());
+  let mut red_style = CanvasStyle::default();
+  red_style.foreground = Some(TextColor::Terminal(TerminalColor::Red));
+  red_style.bold = true;
 
   services
     .canvas
-    .write_centered_text(4, "ABC中文😀", CanvasStyle::default());
+    .write_centered_text(2, "Canvas Style Test", red_style);
 
-  services.canvas.write_centered_text(
-    6,
-    &format!(
-      "Frame: {} | dt: {:.1}ms",
-      frame,
-      world.clock.delta_time().as_secs_f64() * 1000.0
-    ),
-    CanvasStyle::default(),
+  let mut rgb_style = CanvasStyle::default();
+  rgb_style.foreground = Some(TextColor::Rgb {
+    r: 255,
+    g: 128,
+    b: 64,
+  });
+
+  services
+    .canvas
+    .write_centered_text(4, "RGB Color Test", rgb_style);
+
+  let mut bg_style = CanvasStyle::default();
+  bg_style.background = Some(TextColor::Terminal(TerminalColor::Blue));
+  bg_style.foreground = Some(TextColor::Terminal(TerminalColor::BrightWhite));
+
+  services
+    .canvas
+    .write_centered_text(6, "Background Test", bg_style);
+
+  let rich = services.rich_text.parse(
+    "f%Normal <bold>Bold</bold> Normal <i>abcd</i> <b><i>abcd</i>你好</b> <fg:red>Red</fg> <bg:blue><fg:bright_white>BG</fg></bg>",
+    None,
   );
+
+  services.canvas.write_rich_text(0, 8, &rich);
 
   let terminal = &mut services.terminal;
 

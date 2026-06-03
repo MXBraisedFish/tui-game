@@ -23,7 +23,7 @@ pub use lua::LuaService;
 pub use overlay::{OverlayKind, OverlayService};
 pub use package::PackageService;
 pub use render::RenderService;
-pub use rich_text::RichTextService;
+pub use rich_text::{RichText, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
 pub use terminal_capabilities::{ImageProtocol, TerminalCapabilities};

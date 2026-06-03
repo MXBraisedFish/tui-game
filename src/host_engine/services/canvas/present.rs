@@ -1,10 +1,43 @@
+use crossterm::style::Attribute;
 use std::io::{self, Stdout, Write};
 
 use crossterm::QueueableCommand;
 use crossterm::cursor::MoveTo;
-use crossterm::style::Print;
+use crossterm::style::{Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor};
 
-use super::{CanvasBuffer, CanvasCellContent};
+use super::{
+  CanvasBuffer, CanvasCellContent, CanvasStyle, style_attributes, text_color_to_crossterm_color,
+};
+
+// 应用画布样式
+fn apply_canvas_style(stdout: &mut Stdout, style: &CanvasStyle) -> io::Result<()> {
+  stdout.queue(ResetColor)?;
+
+  if let Some(foreground) = &style.foreground {
+    stdout.queue(SetForegroundColor(text_color_to_crossterm_color(
+      foreground,
+    )))?;
+  }
+
+  if let Some(background) = &style.background {
+    stdout.queue(SetBackgroundColor(text_color_to_crossterm_color(
+      background,
+    )))?;
+  }
+
+  for attribute in style_attributes(style) {
+    stdout.queue(SetAttribute(attribute))?;
+  }
+
+  Ok(())
+}
+
+// 重置画布样式
+fn reset_canvas_style(stdout: &mut Stdout) -> io::Result<()> {
+  stdout.queue(ResetColor)?;
+  stdout.queue(SetAttribute(Attribute::Reset))?;
+  Ok(())
+}
 
 // 将缓冲区会知到终端上
 pub fn present_buffer(buffer: &CanvasBuffer, stdout: &mut Stdout) -> io::Result<()> {
@@ -24,6 +57,7 @@ pub fn present_buffer(buffer: &CanvasBuffer, stdout: &mut Stdout) -> io::Result<
       match cell.content {
         // 正常字符直接输出
         CanvasCellContent::Character(ch) => {
+          apply_canvas_style(stdout, &cell.style)?;
           stdout.queue(Print(ch))?;
         }
         CanvasCellContent::WideContinuation => {
@@ -34,6 +68,7 @@ pub fn present_buffer(buffer: &CanvasBuffer, stdout: &mut Stdout) -> io::Result<
   }
 
   // 刷新缓冲区
+  reset_canvas_style(stdout)?;
   stdout.flush()?;
   Ok(())
 }
