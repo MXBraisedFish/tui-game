@@ -1,14 +1,11 @@
-// 引入官方标准输入输出库
 use std::io::{self, Stdout, Write};
 
-// 光标移动
-use crossterm::cursor::MoveTo;
-// 打印
-use crossterm::style::Print;
-// 清屏
-use crossterm::terminal::{Clear, ClearType};
-// 命令队列
 use crossterm::QueueableCommand;
+use crossterm::cursor::MoveTo;
+use crossterm::style::Print;
+use crossterm::terminal::{Clear, ClearType};
+
+use crate::host_engine::services::display_width;
 
 pub struct RenderService {
   width: u16,         // 终端字符宽度
@@ -35,8 +32,7 @@ impl RenderService {
   // 居中绘制
   pub fn draw_centered(&mut self, row: usize, text: &str) {
     // 计算字符宽度(这里是字符数)
-    // TODO：应当使用Unicode宽度
-    let text_width = text.chars().count() as u16;
+    let text_width = display_width(text) as u16;
 
     // 水平居中算法
     // 若小于终端长度，则计算，否则直接从边缘开始
@@ -47,7 +43,6 @@ impl RenderService {
     };
 
     // 确保行存在，没有就补充空行
-    // 注意0行也需要填充
     while self.lines.len() <= row {
       self.lines.push(String::new());
     }

@@ -4,6 +4,7 @@ use std::time::Duration;
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
+use crate::host_engine::services::CanvasStyle;
 use crate::host_engine::services::{EngineServices, GameSessionState, InputEvent, KeyInput};
 
 // 引用按键枚举
@@ -35,6 +36,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     if let Some((width, height)) = services.input.consume_resize() {
       services.render.resize(width, height);
       services.ui.on_resize(width, height);
+
+      services.canvas.resize(width, height);
 
       services.log.info(
         LogSource::Runtime,
@@ -78,20 +81,17 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 // 然后使用draw_centered入栈
 // 使用复制
 fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
-  services.render.clear();
+  services.canvas.clear();
 
-  let title = services.i18n.get_runtime_text("ui", "engine.title");
-  let page = services.i18n.get_runtime_text("ui", "engine.page_home");
+  services
+    .canvas
+    .write_text(0, 0, "ABC中文😀", CanvasStyle::default());
 
-  let esc = services.i18n.get_runtime_text("key", "escape");
-  let left = services.i18n.get_runtime_text("key", "arrow_left");
-  let right = services.i18n.get_runtime_text("key", "arrow_right");
+  let canvas_line = services.canvas.line_as_string(0);
 
-  services.render.draw_centered(1, &title);
-  services.render.draw_centered(2, &page);
-  services.render.draw_centered(4, &esc);
-  services.render.draw_centered(5, &left);
-  services.render.draw_centered(6, &right);
+  services
+    .render
+    .draw_centered(22, &format!("Canvas line: {}", canvas_line.trim_end()));
 
   let terminal = &mut services.terminal;
   let render = &mut services.render;

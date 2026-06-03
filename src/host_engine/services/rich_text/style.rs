@@ -14,14 +14,14 @@ pub struct TextStyle {
 }
 
 // 颜色
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TextColor {
   Terminal(TerminalColor),
   Rgb { r: u8, g: u8, b: u8 },
 }
 
 // 终端默认16色
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TerminalColor {
   Black,
   Red,
