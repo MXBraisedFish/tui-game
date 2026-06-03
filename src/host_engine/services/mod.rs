@@ -14,7 +14,7 @@ mod terminal_capabilities;
 mod ui;
 mod unicode;
 
-pub use canvas::{CanvasBuffer, CanvasCell, CanvasService, CanvasStyle};
+pub use canvas::{CanvasBuffer, CanvasCell, CanvasCellContent, CanvasService, CanvasStyle};
 pub use game::{GameService, GameSessionState};
 pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
 pub use input::{InputEvent, InputService, KeyEventKind, KeyInput};

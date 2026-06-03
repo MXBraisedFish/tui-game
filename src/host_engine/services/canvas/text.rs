@@ -12,9 +12,11 @@ pub fn write_text(buffer: &mut CanvasBuffer, x: u16, y: u16, text: &str, style: 
     let width = char_width(ch);
 
     // 零宽字符处理
+    // TODO(unicode):
+    // zero-width characters should eventually attach to previous visible cell.
     if width == 0 {
       // 渲染零宽字符
-      buffer.set(cursor_x, y, CanvasCell::new(ch, style.clone()));
+      buffer.set(cursor_x, y, CanvasCell::character(ch, style.clone()));
       continue; // 跳过移动光标
     }
 
@@ -24,13 +26,13 @@ pub fn write_text(buffer: &mut CanvasBuffer, x: u16, y: u16, text: &str, style: 
     }
 
     // 正常字符（宽度 >= 1）
-    buffer.set(cursor_x, y, CanvasCell::new(ch, style.clone()));
+    buffer.set(cursor_x, y, CanvasCell::character(ch, style.clone()));
 
     // 占位填充（宽度 > 1）
     for offset in 1..width {
       let next_x = cursor_x.saturating_add(offset as u16);
       if next_x < buffer.width() {
-        buffer.set(next_x, y, CanvasCell::blank());
+        buffer.set(next_x, y, CanvasCell::wide_continuation(style.clone()));
       }
     }
 

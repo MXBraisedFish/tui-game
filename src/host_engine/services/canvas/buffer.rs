@@ -65,17 +65,22 @@ impl CanvasBuffer {
     Some(y as usize * self.width as usize + x as usize)
   }
 
-  // 临时的行转字符串
+  // 临时行转字符串
   pub fn line_as_string(&self, y: u16) -> String {
+    // 边界检查
     if y >= self.height {
       return String::new();
     }
 
+    // 创建空字符串
     let mut line = String::new();
 
+    // 遍历改行的每一列
     for x in 0..self.width {
       if let Some(cell) = self.get(x, y) {
-        line.push(cell.ch);
+        if !cell.is_wide_continuation() {
+          line.push(cell.display_char());
+        }
       }
     }
 

@@ -1,4 +1,5 @@
-use super::{CanvasBuffer, CanvasStyle, write_text};
+use super::{CanvasBuffer, CanvasStyle, write_rich_text, write_text};
+use crate::host_engine::services::rich_text::RichText;
 
 pub struct CanvasService {
   back_buffer: CanvasBuffer,
@@ -40,6 +41,11 @@ impl CanvasService {
   // 绘制普通字符
   pub fn write_text(&mut self, x: u16, y: u16, text: &str, style: CanvasStyle) {
     write_text(&mut self.back_buffer, x, y, text, style);
+  }
+
+  // 绘制富文本字符
+  pub fn write_rich_text(&mut self, x: u16, y: u16, rich_text: &RichText) {
+    write_rich_text(&mut self.back_buffer, x, y, rich_text);
   }
 
   // 临时的行转字符
