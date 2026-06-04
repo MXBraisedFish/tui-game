@@ -90,6 +90,13 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
     .canvas
     .write_centered_text(12, wide_test, CanvasStyle::default());
 
+  // 临时调试指示器：显示当前脏行数量
+  services.canvas.write_centered_text(
+    14,
+    &format!("Dirty rows: {}", services.canvas.dirty_rows().len()),
+    CanvasStyle::default(),
+  );
+
   if let Some(stdout) = services.terminal.writer_mut() {
     let _ = services.canvas.present(stdout);
   }

@@ -3,6 +3,7 @@
 //! 通过对比前后两帧画布缓冲区的差异，仅重绘发生变化的区域，
 //! 从而减少终端 I/O 操作，提升渲染性能。
 
+use std::collections::BTreeSet;
 use std::io::{self, Stdout, Write};
 
 use crossterm::QueueableCommand;
@@ -155,18 +156,26 @@ fn needs_wide_cleanup(
   }
 }
 
-/// 对比前后两帧画布，仅将差异区域渲染到终端
+/// 对比前后两帧画布，仅将脏行的差异区域渲染到终端
 ///
-/// 对比 front_buffer（前一帧）和 back_buffer（当前帧），找出每行中
-/// 发生变化的内容和样式，只对这些差异区域执行终端 I/O 操作。
+/// 对比 front_buffer（前一帧）和 back_buffer（当前帧），仅在 `dirty_rows`
+/// 标记的行中找出发生变化的内容和样式，对这些差异区域执行终端 I/O 操作。
 /// 这是 diff 渲染的入口函数，相比全量渲染能大幅减少终端输出量。
+///
+/// - `dirty_rows` — 本帧中被修改过的行号集合，跳过未修改的行
 pub fn present_buffer_diff(
   front_buffer: &CanvasBuffer,
   back_buffer: &CanvasBuffer,
+  dirty_rows: &BTreeSet<u16>,
   stdout: &mut Stdout,
 ) -> io::Result<()> {
-  // 遍历后帧缓冲区的每一行
-  for y in 0..back_buffer.height() {
+  // 仅遍历被标记为脏的行，跳过未修改的行
+  for &y in dirty_rows {
+    // 防御性检查：行号超出缓冲区范围则跳过
+    if y >= back_buffer.height() {
+      continue;
+    }
+
     // 第一遍：清理宽字符占位符残留
     // 当前帧的宽字符被移除后，需要在其占位符位置输出空格进行清理
     for x in 0..back_buffer.width() {
