@@ -4,14 +4,12 @@ use std::time::Duration;
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
-use crate::host_engine::services::{CanvasStyle, TerminalColor, TextColor};
-use crate::host_engine::services::{EngineServices, GameSessionState, InputEvent, KeyInput};
+use crate::host_engine::services::{
+  CanvasStyle, EngineServices, LogSource, TerminalColor, TextColor,
+};
 
 // 引用按键枚举
 use crossterm::event::KeyCode;
-
-// 临时日志
-use super::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
 
 // 运行函数
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
@@ -37,10 +35,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     if let Some((width, height)) = services.input.consume_resize() {
       services.canvas.resize(width, height);
       services.ui.on_resize(width, height);
-
-      // TODO(render):
-      // Remove RenderService after Canvas presenter fully replaces it.
-      services.render.resize(width, height);
 
       services.log.info(
         LogSource::Runtime,
@@ -86,39 +80,33 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   services.canvas.clear();
 
-  let mut red_style = CanvasStyle::default();
-  red_style.foreground = Some(TextColor::Terminal(TerminalColor::Red));
-  red_style.bold = true;
+  services
+    .canvas
+    .write_centered_text(0, "TUI Game Engine", CanvasStyle::default());
+
+  services.canvas.write_centered_text(
+    2,
+    &format!(
+      "Frame: {} | dt: {:.1}ms",
+      frame,
+      world.clock.delta_time().as_secs_f64() * 1000.0
+    ),
+    CanvasStyle::default(),
+  );
+
+  let mut info_style = CanvasStyle::default();
+  info_style.foreground = Some(TextColor::Terminal(TerminalColor::Cyan));
 
   services
     .canvas
-    .write_centered_text(2, "Canvas Style Test", red_style);
-
-  let mut rgb_style = CanvasStyle::default();
-  rgb_style.foreground = Some(TextColor::Rgb {
-    r: 255,
-    g: 128,
-    b: 64,
-  });
-
-  services
-    .canvas
-    .write_centered_text(4, "RGB Color Test", rgb_style);
-
-  let mut bg_style = CanvasStyle::default();
-  bg_style.background = Some(TextColor::Terminal(TerminalColor::Blue));
-  bg_style.foreground = Some(TextColor::Terminal(TerminalColor::BrightWhite));
-
-  services
-    .canvas
-    .write_centered_text(6, "Background Test", bg_style);
+    .write_centered_text(4, "Canvas renderer active | ESC to exit", info_style);
 
   let rich = services.rich_text.parse(
-    "f%Normal <bold>Bold</bold> Normal <i>abcd</i> <b><i>abcd</i>你好</b> <fg:red>Red</fg> <bg:blue><fg:bright_white>BG</fg></bg>",
+    "f%RichText: <bold>bold</bold> <fg:red>red</fg> <bg:blue><fg:bright_white>bg</fg></bg> 中文😀",
     None,
   );
 
-  services.canvas.write_rich_text(0, 8, &rich);
+  services.canvas.write_rich_text(2, 6, &rich);
 
   let terminal = &mut services.terminal;
 

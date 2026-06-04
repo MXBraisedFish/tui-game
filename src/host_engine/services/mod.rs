@@ -1,3 +1,6 @@
+// TODO(render):
+// Remove transitional RenderService after Canvas fully replaces old renderer.
+
 mod canvas;
 mod game;
 mod i18n;
