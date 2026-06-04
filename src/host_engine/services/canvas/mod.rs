@@ -1,6 +1,5 @@
 mod buffer;
 mod cell;
-mod layout;
 mod present_diff;
 mod present_full;
 mod present_style;
@@ -12,7 +11,6 @@ mod text;
 
 pub use buffer::CanvasBuffer;
 pub use cell::{CanvasCell, CanvasCellContent};
-pub use layout::write_centered_text;
 pub use present_diff::present_buffer_diff;
 pub use present_full::present_buffer;
 pub use present_style::{apply_canvas_style, reset_canvas_style};

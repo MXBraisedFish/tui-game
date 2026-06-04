@@ -82,18 +82,6 @@ fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) 
   // 开始新帧（保留模式，不自动清空缓冲区）
   services.canvas.begin_frame();
 
-  // 首帧或全量重绘时绘制静态内容（标题、富文本）
-  if frame == 1 || services.canvas.needs_full_redraw() {
-    services.canvas.write_centered_text(2, "Retained Canvas Test", CanvasStyle::default());
-
-    let rich = services.rich_text.parse(
-      "f%Static RichText: <bold>bold</bold> <fg:red>red</fg> 中文😀",
-      None,
-    );
-
-    services.canvas.write_rich_text(2, 4, &rich);
-  }
-
   // 动态内容：每隔 60 帧切换显示文本，测试宽字符清理
   let wide_test = if frame % 120 < 60 {
     "Wide cleanup: 中文😀"
@@ -101,22 +89,5 @@ fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) 
     "Wide cleanup: ABCD"
   };
 
-  // 先清除第 12 行再写入，确保旧内容被擦除
-  services.canvas.clear_row(12);
-  services
-    .canvas
-    .write_centered_text(12, wide_test, CanvasStyle::default());
 
-  // 临时调试指示器：显示当前脏行数量
-  services.canvas.clear_row(14);
-  services.canvas.write_centered_text(
-    14,
-    &format!("Dirty rows: {}", services.canvas.dirty_rows().len()),
-    CanvasStyle::default(),
-  );
-
-  // 提交画布到终端
-  if let Some(stdout) = services.terminal.writer_mut() {
-    let _ = services.canvas.present(stdout);
-  }
 }

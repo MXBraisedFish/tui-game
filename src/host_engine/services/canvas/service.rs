@@ -2,8 +2,7 @@ use std::collections::BTreeSet;
 use std::io::{self, Stdout};
 
 use super::{
-  CanvasBuffer, CanvasStyle, present_buffer, present_buffer_diff, write_centered_text,
-  write_rich_text, write_text,
+  CanvasBuffer, CanvasStyle, present_buffer, present_buffer_diff, write_rich_text, write_text,
 };
 use crate::host_engine::services::RichText;
 
@@ -96,7 +95,12 @@ impl CanvasService {
     if self.needs_full_redraw {
       present_buffer(&self.back_buffer, stdout)?;
     } else {
-      present_buffer_diff(&self.front_buffer, &self.back_buffer, &self.dirty_rows, stdout)?;
+      present_buffer_diff(
+        &self.front_buffer,
+        &self.back_buffer,
+        &self.dirty_rows,
+        stdout,
+      )?;
     }
 
     self.front_buffer.clone_from(&self.back_buffer);
@@ -131,19 +135,8 @@ impl CanvasService {
     &self.dirty_rows
   }
 
-  // 居中绘制普通文本
-  pub fn write_centered_text(&mut self, y: u16, text: &str, style: CanvasStyle) {
-    write_centered_text(&mut self.back_buffer, y, text, style);
-    self.mark_dirty_row(y);
-  }
-
   // 完全重绘
   pub fn needs_full_redraw(&self) -> bool {
     self.needs_full_redraw
-  }
-
-  // 临时的行转字符
-  pub fn line_as_string(&self, y: u16) -> String {
-    self.back_buffer.line_as_string(y)
   }
 }
