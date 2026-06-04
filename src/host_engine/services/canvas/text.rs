@@ -1,8 +1,18 @@
 use super::{CanvasBuffer, CanvasCell, CanvasStyle};
 use crate::host_engine::services::char_width;
 
-// 绘制文本
-pub fn write_text(buffer: &mut CanvasBuffer, x: u16, y: u16, text: &str, style: CanvasStyle) {
+/// 绘制文本到画布缓冲区
+///
+/// 从指定坐标开始逐字写入，自动处理宽字符占位符。
+/// 返回实际写入的列宽（光标移动的总距离），
+/// 调用方可使用该返回值精确标记脏区间。
+pub fn write_text(
+  buffer: &mut CanvasBuffer,
+  x: u16,
+  y: u16,
+  text: &str,
+  style: CanvasStyle,
+) -> u16 {
   // 光标位置
   let mut cursor_x = x;
 
@@ -38,4 +48,8 @@ pub fn write_text(buffer: &mut CanvasBuffer, x: u16, y: u16, text: &str, style: 
 
     cursor_x = cursor_x.saturating_add(width as u16);
   }
+
+  // 返回实际写入的列宽
+  cursor_x.saturating_sub(x)
 }
+

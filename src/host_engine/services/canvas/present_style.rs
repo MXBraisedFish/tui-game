@@ -15,7 +15,13 @@ use super::{style_attributes, text_color_to_crossterm_color, CanvasStyle};
 ///
 /// 依次设置前景色、背景色以及各种文字属性（粗体、斜体等）。
 /// 在应用新样式前会先重置当前样式，避免样式残留。
-pub fn apply_canvas_style(stdout: &mut Stdout, style: &CanvasStyle) -> io::Result<()> {
+///
+/// - `truecolor` — 是否使用真彩色；false 时降级为 ANSI256
+pub fn apply_canvas_style(
+  stdout: &mut Stdout,
+  style: &CanvasStyle,
+  truecolor: bool,
+) -> io::Result<()> {
   // 先重置所有颜色，确保新样式不被旧样式污染
   stdout.queue(ResetColor)?;
 
@@ -23,6 +29,7 @@ pub fn apply_canvas_style(stdout: &mut Stdout, style: &CanvasStyle) -> io::Resul
   if let Some(foreground) = &style.foreground {
     stdout.queue(SetForegroundColor(text_color_to_crossterm_color(
       foreground,
+      truecolor,
     )))?;
   }
 
@@ -30,6 +37,7 @@ pub fn apply_canvas_style(stdout: &mut Stdout, style: &CanvasStyle) -> io::Resul
   if let Some(background) = &style.background {
     stdout.queue(SetBackgroundColor(text_color_to_crossterm_color(
       background,
+      truecolor,
     )))?;
   }
 

@@ -1,17 +1,19 @@
-use std::collections::BTreeSet;
 use std::io::{self, Stdout};
 
 use super::{
-  CanvasBuffer, CanvasStyle, present_buffer, present_buffer_diff, write_rich_text, write_text,
+  CanvasBuffer, CanvasStyle, DirtySpan, present_buffer, present_buffer_diff, write_rich_text,
+  write_text,
 };
-use crate::host_engine::services::RichText;
+use crate::host_engine::services::{RichText, TerminalService};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CanvasService {
   front_buffer: CanvasBuffer, // 上一帧缓冲
   back_buffer: CanvasBuffer,  // 下一帧缓冲
-  dirty_rows: BTreeSet<u16>,  // 本帧被修改的行
+  dirty_spans: Vec<DirtySpan>, // 本帧被修改的区域
   needs_full_redraw: bool,    // 是否需要全量重绘
+  truecolor: bool,            // 是否使用真彩色（false 降级为 ANSI256）
+  is_drawing_frame: bool,     // 是否正在绘制帧
 }
 
 impl CanvasService {
@@ -20,8 +22,10 @@ impl CanvasService {
     Self {
       front_buffer: CanvasBuffer::new(width, height),
       back_buffer: CanvasBuffer::new(width, height),
-      dirty_rows: BTreeSet::new(),
+      dirty_spans: Vec::new(),
       needs_full_redraw: true,
+      truecolor: true,
+      is_drawing_frame: false,
     }
   }
 
@@ -47,22 +51,22 @@ impl CanvasService {
   // 清空画布
   pub fn clear(&mut self) {
     self.back_buffer.clear();
-    self.mark_all_rows_dirty();
+    self.mark_all_dirty();
   }
 
   // 清理指定行
   pub fn clear_row(&mut self, y: u16) {
     self.back_buffer.clear_row(y);
-    self.mark_dirty_row(y);
+    self.mark_dirty_line(y);
   }
 
   // 开始新帧
   //
-  // 当前保留模式：不在此处清空整个后缓冲区。
+  // 标记进入绘制状态，不清空缓冲区（保留模式）。
   // 绘制代码自行负责清除需要重写的行/区域。
   // 后续可扩展为处理脏矩形重置、帧标记、绘制命令队列重置等。
   pub fn begin_frame(&mut self) {
-    // 当前为空实现，仅作为生命周期钩子占位
+    self.is_drawing_frame = true;
   }
 
   // 调整大小
@@ -70,7 +74,7 @@ impl CanvasService {
     self.front_buffer.resize(width, height);
     self.back_buffer.resize(width, height);
     self.needs_full_redraw = true;
-    self.mark_all_rows_dirty();
+    self.mark_all_dirty();
   }
 
   // 获取尺寸
@@ -80,63 +84,129 @@ impl CanvasService {
 
   // 绘制普通字符
   pub fn write_text(&mut self, x: u16, y: u16, text: &str, style: CanvasStyle) {
-    write_text(&mut self.back_buffer, x, y, text, style);
-    self.mark_dirty_row(y);
+    let width = write_text(&mut self.back_buffer, x, y, text, style);
+    self.mark_dirty_span(y, x, x.saturating_add(width));
   }
 
   // 绘制富文本字符
   pub fn write_rich_text(&mut self, x: u16, y: u16, rich_text: &RichText) {
-    write_rich_text(&mut self.back_buffer, x, y, rich_text);
-    self.mark_dirty_row(y);
+    let width = write_rich_text(&mut self.back_buffer, x, y, rich_text);
+    self.mark_dirty_span(y, x, x.saturating_add(width));
   }
 
   // 提交画布到终端
   pub fn present(&mut self, stdout: &mut Stdout) -> io::Result<()> {
     if self.needs_full_redraw {
-      present_buffer(&self.back_buffer, stdout)?;
+      present_buffer(&self.back_buffer, stdout, self.truecolor)?;
     } else {
       present_buffer_diff(
         &self.front_buffer,
         &self.back_buffer,
-        &self.dirty_rows,
+        &self.dirty_spans,
         stdout,
+        self.truecolor,
       )?;
     }
 
     self.front_buffer.clone_from(&self.back_buffer);
     self.needs_full_redraw = false;
-    self.clear_dirty_rows();
+    self.clear_dirty_spans();
+    self.finish_frame();
 
     Ok(())
   }
 
-  // 标记单行需要重绘
-  fn mark_dirty_row(&mut self, y: u16) {
-    if y < self.back_buffer.height() {
-      self.dirty_rows.insert(y);
+  // 结束当前帧
+  //
+  // 由 present() 成功后自动调用，标记绘制状态结束。
+  fn finish_frame(&mut self) {
+    self.is_drawing_frame = false;
+  }
+
+  // 请求帧更新
+  //
+  // 封装终端交互逻辑：
+  // 1. 从 TerminalService 获取真彩色能力并同步
+  // 2. 获取终端 writer 并调用 present() 提交画布
+  pub fn request_frame_update(
+    &mut self,
+    terminal: &mut TerminalService,
+  ) -> io::Result<()> {
+    // 同步终端的真彩色能力到画布
+    self.set_truecolor(terminal.capabilities().truecolor);
+
+    // 获取终端 writer，若终端未激活则跳过本次渲染
+    if let Some(stdout) = terminal.writer_mut() {
+      self.present(stdout)?;
     }
+
+    Ok(())
+  }
+
+  // 是否正在绘制帧
+  pub fn is_drawing_frame(&self) -> bool {
+    self.is_drawing_frame
+  }
+
+  // 标记指定行的脏区间
+  fn mark_dirty_span(&mut self, y: u16, start_x: u16, end_x: u16) {
+    if y >= self.back_buffer.height() {
+      return;
+    }
+
+    let new_span = DirtySpan::new(y, start_x, end_x);
+    if new_span.is_empty() {
+      return;
+    }
+
+    // 尝试与现有同行的区间合并，避免冗余记录
+    for span in &mut self.dirty_spans {
+      if span.merge_if_possible(new_span) {
+        return;
+      }
+    }
+
+    self.dirty_spans.push(new_span);
+  }
+
+  // 标记整行需要重绘
+  fn mark_dirty_line(&mut self, y: u16) {
+    if y >= self.back_buffer.height() {
+      return;
+    }
+    self.mark_dirty_span(y, 0, self.back_buffer.width());
   }
 
   // 标记所有行需要重绘
-  fn mark_all_rows_dirty(&mut self) {
-    self.dirty_rows.clear();
+  fn mark_all_dirty(&mut self) {
+    self.dirty_spans.clear();
     for y in 0..self.back_buffer.height() {
-      self.dirty_rows.insert(y);
+      self.dirty_spans.push(DirtySpan::new(y, 0, self.back_buffer.width()));
     }
   }
 
-  // 清空脏行记录
-  fn clear_dirty_rows(&mut self) {
-    self.dirty_rows.clear();
+  // 清空脏区间记录
+  fn clear_dirty_spans(&mut self) {
+    self.dirty_spans.clear();
   }
 
-  // 只读脏行
-  pub fn dirty_rows(&self) -> &BTreeSet<u16> {
-    &self.dirty_rows
+  // 只读脏区间列表
+  pub fn dirty_spans(&self) -> &[DirtySpan] {
+    &self.dirty_spans
   }
 
   // 完全重绘
   pub fn needs_full_redraw(&self) -> bool {
     self.needs_full_redraw
+  }
+
+  // 设置是否使用真彩色（false 时 RGB 降级为 ANSI256）
+  pub fn set_truecolor(&mut self, truecolor: bool) {
+    self.truecolor = truecolor;
+  }
+
+  // 是否正在使用真彩色
+  pub fn truecolor(&self) -> bool {
+    self.truecolor
   }
 }

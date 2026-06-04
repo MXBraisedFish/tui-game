@@ -60,6 +60,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     update(services, world, frame);
     render(services, world, frame);
 
+    // 请求帧更新：由 CanvasService 封装终端交互
+    if let Err(err) = services.canvas.request_frame_update(&mut services.terminal) {
+      services.log.warn(LogSource::Runtime, format!("[Render] Frame update failed: {}", err));
+    }
+
     thread::sleep(Duration::from_millis(16));
   }
 
@@ -77,7 +82,10 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 //
 // 不再每帧 clear() 清空全部缓冲区。
 // 每帧调用 begin_frame() 后，仅对需要更新的行调用 clear_row()，
-// 脏行机制自动记录被修改的行，diff 渲染时只重绘这些行。
+// 脏区间机制自动记录被修改的区域，diff 渲染时只重绘这些区域。
+//
+// 注意：此函数只负责绘图调用，不处理终端 I/O。
+// 帧提交由主循环中的 request_frame_update() 统一完成。
 fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) {
   // 开始新帧（保留模式，不自动清空缓冲区）
   services.canvas.begin_frame();
@@ -89,5 +97,26 @@ fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) 
     "Wide cleanup: ABCD"
   };
 
+  // 先清除第 12 行再写入，确保旧内容被擦除
+  let (canvas_width, _) = services.canvas.size();
+  services.canvas.clear_row(12);
+  let centered_x_12 = canvas_width
+    .saturating_sub(wide_test.len() as u16)
+    .saturating_div(2);
+  services
+    .canvas
+    .write_text(centered_x_12, 12, wide_test, CanvasStyle::default());
 
+  // 临时调试指示器：显示当前脏区间数量
+  let dirty_info = format!("Dirty spans: {}", services.canvas.dirty_spans().len());
+  let centered_x_14 = canvas_width
+    .saturating_sub(dirty_info.len() as u16)
+    .saturating_div(2);
+  services.canvas.clear_row(14);
+  services.canvas.write_text(
+    centered_x_14,
+    14,
+    &dirty_info,
+    CanvasStyle::default(),
+  );
 }

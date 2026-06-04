@@ -3,14 +3,16 @@
 //! 通过对比前后两帧画布缓冲区的差异，仅重绘发生变化的区域，
 //! 从而减少终端 I/O 操作，提升渲染性能。
 
-use std::collections::BTreeSet;
 use std::io::{self, Stdout, Write};
 
 use crossterm::QueueableCommand;
 use crossterm::cursor::MoveTo;
 use crossterm::style::Print;
 
-use super::{CanvasBuffer, CanvasCellContent, CanvasStyle, apply_canvas_style, reset_canvas_style};
+use super::{
+  CanvasBuffer, CanvasCellContent, CanvasStyle, DirtySpan, apply_canvas_style,
+  reset_canvas_style,
+};
 
 /// 差异渲染块
 ///
@@ -59,15 +61,19 @@ fn flush_diff_span(
   *current_style = None;
 }
 
-/// 收集指定行的所有差异渲染块
+/// 收集脏区间内的所有差异渲染块
 ///
-/// 逐列对比前后两帧缓冲区，找出内容或样式发生变化的单元格，
+/// 仅在脏区间的列范围内逐列对比前后两帧缓冲区，找出内容或样式发生变化的单元格，
 /// 将连续的差异单元格合并为一个 DiffSpan 以提高渲染效率。
-fn collect_diff_spans_for_row(
+fn collect_diff_spans_for_dirty_span(
   front_buffer: &CanvasBuffer,
   back_buffer: &CanvasBuffer,
-  y: u16,
+  dirty: DirtySpan,
 ) -> Vec<DiffSpan> {
+  let y = dirty.y;
+  let x_start = dirty.start_x;
+  let x_end = dirty.end_x.min(back_buffer.width());
+
   // 差异块列表
   let mut spans = Vec::new();
 
@@ -78,8 +84,8 @@ fn collect_diff_spans_for_row(
   // 当前差异块的样式
   let mut current_style: Option<CanvasStyle> = None;
 
-  // 遍历当前行的每一列
-  for x in 0..back_buffer.width() {
+  // 仅遍历脏区间范围内的列
+  for x in x_start..x_end {
     let Some(front_cell) = front_buffer.get(x, y) else {
       continue;
     };
@@ -120,7 +126,7 @@ fn collect_diff_spans_for_row(
     }
   }
 
-  // 行遍历结束，刷新最后累积的差异块
+  // 区间遍历结束，刷新最后累积的差异块
   flush_diff_span(&mut spans, current_x, &mut current_text, &mut current_style);
 
   spans
@@ -156,29 +162,33 @@ fn needs_wide_cleanup(
   }
 }
 
-/// 对比前后两帧画布，仅将脏行的差异区域渲染到终端
+/// 对比前后两帧画布，仅将脏区间的差异区域渲染到终端
 ///
-/// 对比 front_buffer（前一帧）和 back_buffer（当前帧），仅在 `dirty_rows`
-/// 标记的行中找出发生变化的内容和样式，对这些差异区域执行终端 I/O 操作。
+/// 对比 front_buffer（前一帧）和 back_buffer（当前帧），仅在 `dirty_spans`
+/// 标记的行区间中找出发生变化的内容和样式，对这些差异区域执行终端 I/O 操作。
 /// 这是 diff 渲染的入口函数，相比全量渲染能大幅减少终端输出量。
 ///
-/// - `dirty_rows` — 本帧中被修改过的行号集合，跳过未修改的行
+/// - `dirty_spans` — 本帧中被修改的行区间列表，跳过未修改的行和列区间
+/// - `truecolor` — 是否使用真彩色；false 时降级为 ANSI256
 pub fn present_buffer_diff(
   front_buffer: &CanvasBuffer,
   back_buffer: &CanvasBuffer,
-  dirty_rows: &BTreeSet<u16>,
+  dirty_spans: &[DirtySpan],
   stdout: &mut Stdout,
+  truecolor: bool,
 ) -> io::Result<()> {
-  // 仅遍历被标记为脏的行，跳过未修改的行
-  for &y in dirty_rows {
+  // 仅遍历被标记为脏的行区间，跳过未修改的行
+  for span in dirty_spans {
+    let y = span.y;
+
     // 防御性检查：行号超出缓冲区范围则跳过
     if y >= back_buffer.height() {
       continue;
     }
 
-    // 第一遍：清理宽字符占位符残留
+    // 第一遍：在脏区间范围内清理宽字符占位符残留
     // 当前帧的宽字符被移除后，需要在其占位符位置输出空格进行清理
-    for x in 0..back_buffer.width() {
+    for x in span.start_x..span.end_x.min(back_buffer.width()) {
       if needs_wide_cleanup(front_buffer, back_buffer, x, y) {
         stdout.queue(MoveTo(x, y))?;
         reset_canvas_style(stdout)?;
@@ -187,16 +197,16 @@ pub fn present_buffer_diff(
     }
 
     // 第二遍：渲染差异化的内容片段
-    // 收集当前行的所有差异块，然后逐个渲染
-    let spans = collect_diff_spans_for_row(front_buffer, back_buffer, y);
+    // 仅收集脏区间范围内的差异块，无需额外过滤
+    let spans = collect_diff_spans_for_dirty_span(front_buffer, back_buffer, *span);
 
-    for span in spans {
+    for diff_span in spans {
       // 光标移动到差异块的起始位置
-      stdout.queue(MoveTo(span.x, y))?;
+      stdout.queue(MoveTo(diff_span.x, y))?;
       // 应用该差异块的样式
-      apply_canvas_style(stdout, &span.style)?;
+      apply_canvas_style(stdout, &diff_span.style, truecolor)?;
       // 输出差异文本
-      stdout.queue(Print(span.text))?;
+      stdout.queue(Print(&diff_span.text))?;
     }
   }
 

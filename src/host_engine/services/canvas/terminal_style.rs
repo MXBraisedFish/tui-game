@@ -2,7 +2,7 @@ use crossterm::style::{Attribute, Color};
 
 use crate::host_engine::services::{TerminalColor, TextColor};
 
-use super::CanvasStyle;
+use super::{rgb_to_ansi256, CanvasStyle};
 
 // 转换终端16色
 pub fn terminal_color_to_crossterm_color(color: &TerminalColor) -> Color {
@@ -28,17 +28,21 @@ pub fn terminal_color_to_crossterm_color(color: &TerminalColor) -> Color {
 }
 
 // 转换文本颜色
-pub fn text_color_to_crossterm_color(color: &TextColor) -> Color {
+//
+// 当 `truecolor` 为 true 时直接使用 RGB 真彩色输出；
+// 为 false 时将 RGB 降级为 ANSI256 调色板中最接近的颜色。
+pub fn text_color_to_crossterm_color(color: &TextColor, truecolor: bool) -> Color {
   match color {
     TextColor::Terminal(color) => terminal_color_to_crossterm_color(color),
     TextColor::Rgb { r, g, b } => {
-      // TODO(renderer):
-      // If terminal does not support truecolor,
-      // downgrade RGB to 256-color or 16-color.
-      Color::Rgb {
-        r: *r,
-        g: *g,
-        b: *b,
+      if truecolor {
+        Color::Rgb {
+          r: *r,
+          g: *g,
+          b: *b,
+        }
+      } else {
+        Color::AnsiValue(rgb_to_ansi256(*r, *g, *b))
       }
     }
   }
