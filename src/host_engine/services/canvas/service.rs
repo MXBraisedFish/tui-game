@@ -51,6 +51,21 @@ impl CanvasService {
     self.mark_all_rows_dirty();
   }
 
+  // 清理指定行
+  pub fn clear_row(&mut self, y: u16) {
+    self.back_buffer.clear_row(y);
+    self.mark_dirty_row(y);
+  }
+
+  // 开始新帧
+  //
+  // 当前保留模式：不在此处清空整个后缓冲区。
+  // 绘制代码自行负责清除需要重写的行/区域。
+  // 后续可扩展为处理脏矩形重置、帧标记、绘制命令队列重置等。
+  pub fn begin_frame(&mut self) {
+    // 当前为空实现，仅作为生命周期钩子占位
+  }
+
   // 调整大小
   pub fn resize(&mut self, width: u16, height: u16) {
     self.front_buffer.resize(width, height);

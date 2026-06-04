@@ -43,6 +43,17 @@ impl CanvasBuffer {
     }
   }
 
+  // 清理指定行，将该行所有单元格重置为空白
+  pub fn clear_row(&mut self, y: u16) {
+    if y >= self.height {
+      return;
+    }
+
+    for x in 0..self.width {
+      self.set(x, y, CanvasCell::blank());
+    }
+  }
+
   // 读取单元格
   pub fn get(&self, x: u16, y: u16) -> Option<&CanvasCell> {
     let index = self.index(x, y)?;
