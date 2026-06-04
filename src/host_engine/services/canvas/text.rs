@@ -22,12 +22,30 @@ pub fn write_text(
     let width = char_width(ch);
 
     // 零宽字符处理
-    // TODO(unicode):
-    // zero-width characters should eventually attach to previous visible cell.
+    //
+    // 当前不支持组合标记、字形簇、表情符号组合等复杂 Unicode 结构。
+    // 零宽字符跳过渲染以保持画布一致性（不写缓冲区、不移动光标、不标记脏区间）。
+    //
+    // TODO(Canvas Unicode Phase 2): 完整的字形簇渲染
+    //   目标: 迭代字形簇而非单个字符
+    //   所需工作:
+    //     1. 添加 unicode-segmentation 依赖
+    //     2. 迭代 .graphemes(true) 替代 .chars()
+    //     3. 添加 grapheme_width() 替代 char_width()
+    //     4. CanvasCell 从单字符存储改为字形字符串存储
+    //     5. 呈现器打印字形字符串而非单字符
+    //     6. 差异渲染器比较字形内容
+    //     7. 表情符号 ZWJ 序列支持
+    //     8. 组合标记支持（e + ◌́ → é 视为一个单元）
+    //
+    //   当前架构:  char → char_width() → CanvasCell(char)
+    //   未来架构:  grapheme cluster → grapheme_width() → CanvasCell(grapheme_str)
+    //
+    // 当前支持范围:
+    //   ✅ ASCII / Unicode 标量值 / CJK 宽字符
+    //   ❌ 组合标记 / 字形簇 / 表情符号组合 / ZWJ 序列
     if width == 0 {
-      // 渲染零宽字符
-      buffer.set(cursor_x, y, CanvasCell::character(ch, style.clone()));
-      continue; // 跳过移动光标
+      continue; // 不写入缓冲区，不移动光标，不标记脏区间
     }
 
     // 边界检查

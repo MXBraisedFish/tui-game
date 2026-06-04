@@ -39,11 +39,6 @@ impl CanvasService {
     &self.back_buffer
   }
 
-  // 可变访问后缓存区
-  pub fn back_buffer_mut(&mut self) -> &mut CanvasBuffer {
-    &mut self.back_buffer
-  }
-
   // TODO(canvas):
   // 当前运行时每帧都会清空整个后缓冲区，导致所有行都变成脏行。
   // 后续改为保留模式绘制后，应避免不必要的全量清除，以充分发挥脏行优化的效果。
@@ -135,12 +130,13 @@ impl CanvasService {
     // 同步终端的真彩色能力到画布
     self.set_truecolor(terminal.capabilities().truecolor);
 
-    // 获取终端 writer，若终端未激活则跳过本次渲染
-    if let Some(stdout) = terminal.writer_mut() {
-      self.present(stdout)?;
-    }
+    // 获取终端 writer；若终端未激活，仍需关闭帧生命周期
+    let Some(stdout) = terminal.writer_mut() else {
+      self.finish_frame();
+      return Ok(());
+    };
 
-    Ok(())
+    self.present(stdout)
   }
 
   // 是否正在绘制帧

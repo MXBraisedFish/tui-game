@@ -1,5 +1,4 @@
 use super::{CanvasBuffer, CanvasStyle, write_text};
-use crate::host_engine::services::display_width;
 use crate::host_engine::services::rich_text::{RichText, TextStyle};
 
 // 富文本转换为画布样式
@@ -29,14 +28,16 @@ pub fn write_rich_text(
   rich_text: &RichText,
 ) -> u16 {
   let mut cursor_x = x;
+  let mut total_width: u16 = 0;
 
   for segment in &rich_text.segments {
     let canvas_style = rich_text_style_to_canvas_style(&segment.style);
 
-    write_text(buffer, cursor_x, y, &segment.text, canvas_style);
+    // 使用 write_text 返回的实际写入宽度，而非预估的 display_width
+    let written_width = write_text(buffer, cursor_x, y, &segment.text, canvas_style);
 
-    let segment_width = display_width(&segment.text) as u16;
-    cursor_x = cursor_x.saturating_add(segment_width);
+    cursor_x = cursor_x.saturating_add(written_width);
+    total_width = total_width.saturating_add(written_width);
 
     if cursor_x >= buffer.width() {
       break;
@@ -44,6 +45,6 @@ pub fn write_rich_text(
   }
 
   // 返回实际写入的总列宽
-  cursor_x.saturating_sub(x)
+  total_width
 }
 
