@@ -55,6 +55,16 @@ impl CanvasService {
     self.mark_dirty_line(y);
   }
 
+  // 清理指定水平区间
+  //
+  // 仅清除一行中的 [start_x, end_x) 列范围，
+  // 脏区间标记与实际清除范围一致，不会扩大为整行。
+  // 适合替换有界文本区域（如标签、数值显示）时使用。
+  pub fn clear_span(&mut self, y: u16, start_x: u16, end_x: u16) {
+    self.back_buffer.clear_span(y, start_x, end_x);
+    self.mark_dirty_span(y, start_x, end_x);
+  }
+
   // 开始新帧
   //
   // 标记进入绘制状态，不清空缓冲区（保留模式）。

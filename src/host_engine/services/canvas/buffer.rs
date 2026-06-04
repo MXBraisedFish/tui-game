@@ -54,6 +54,27 @@ impl CanvasBuffer {
     }
   }
 
+  // 清理指定水平区间，将该范围内的单元格重置为空白
+  //
+  // 自动将坐标规范化为缓冲区边界内的有效范围，
+  // 只清除 [start_x, end_x) 之间的列，行中其他列保持不变。
+  pub fn clear_span(&mut self, y: u16, start_x: u16, end_x: u16) {
+    if y >= self.height {
+      return;
+    }
+
+    let normalized_start_x = start_x.min(self.width);
+    let normalized_end_x = end_x.min(self.width);
+
+    if normalized_start_x >= normalized_end_x {
+      return;
+    }
+
+    for x in normalized_start_x..normalized_end_x {
+      self.set(x, y, CanvasCell::blank());
+    }
+  }
+
   // 读取单元格
   pub fn get(&self, x: u16, y: u16) -> Option<&CanvasCell> {
     let index = self.index(x, y)?;

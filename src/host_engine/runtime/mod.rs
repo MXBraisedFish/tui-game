@@ -97,12 +97,14 @@ fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) 
     "Wide cleanup: ABCD"
   };
 
-  // 先清除第 12 行再写入，确保旧内容被擦除
+  // 仅清除文本实际占用的水平区间，而非整行
   let (canvas_width, _) = services.canvas.size();
-  services.canvas.clear_row(12);
   let centered_x_12 = canvas_width
     .saturating_sub(wide_test.len() as u16)
     .saturating_div(2);
+  services
+    .canvas
+    .clear_span(12, centered_x_12, centered_x_12.saturating_add(wide_test.len() as u16));
   services
     .canvas
     .write_text(centered_x_12, 12, wide_test, CanvasStyle::default());
@@ -112,7 +114,9 @@ fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) 
   let centered_x_14 = canvas_width
     .saturating_sub(dirty_info.len() as u16)
     .saturating_div(2);
-  services.canvas.clear_row(14);
+  services
+    .canvas
+    .clear_span(14, centered_x_14, centered_x_14.saturating_add(dirty_info.len() as u16));
   services.canvas.write_text(
     centered_x_14,
     14,
