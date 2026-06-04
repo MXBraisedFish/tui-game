@@ -145,12 +145,22 @@ impl CanvasService {
   }
 
   // 标记指定行的脏区间
+  //
+  // 自动将 start_x 和 end_x 规范化为缓冲区边界内的有效范围，
+  // 确保下游的差异渲染始终接收干净的数据。
   fn mark_dirty_span(&mut self, y: u16, start_x: u16, end_x: u16) {
     if y >= self.back_buffer.height() {
       return;
     }
 
-    let new_span = DirtySpan::new(y, start_x, end_x);
+    let buffer_width = self.back_buffer.width();
+
+    // 将坐标钳制在缓冲区范围内，防止越界
+    let normalized_start_x = start_x.min(buffer_width);
+    let normalized_end_x = end_x.min(buffer_width);
+
+    let new_span = DirtySpan::new(y, normalized_start_x, normalized_end_x);
+
     if new_span.is_empty() {
       return;
     }
