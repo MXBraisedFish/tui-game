@@ -1,6 +1,7 @@
 use super::CanvasCell;
 
 // 画布缓冲区
+#[derive(Clone, Debug, PartialEq)]
 pub struct CanvasBuffer {
   width: u16,             // 宽
   height: u16,            // 高

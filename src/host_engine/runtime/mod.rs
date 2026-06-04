@@ -108,9 +108,7 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 
   services.canvas.write_rich_text(2, 6, &rich);
 
-  let terminal = &mut services.terminal;
-
-  if let Some(stdout) = terminal.writer_mut() {
+  if let Some(stdout) = services.terminal.writer_mut() {
     let _ = services.canvas.present(stdout);
   }
 }
