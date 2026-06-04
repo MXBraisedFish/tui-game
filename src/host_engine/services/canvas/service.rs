@@ -1,9 +1,10 @@
 use std::io::{self, Stdout};
 
 use super::{
-  CanvasBuffer, CanvasStyle, present_buffer, write_centered_text, write_rich_text, write_text,
+  CanvasBuffer, CanvasStyle, present_buffer, present_buffer_diff, write_centered_text,
+  write_rich_text, write_text,
 };
-use crate::host_engine::services::rich_text::RichText;
+use crate::host_engine::services::RichText;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CanvasService {
@@ -66,9 +67,15 @@ impl CanvasService {
 
   // 提交画布到终端
   pub fn present(&mut self, stdout: &mut Stdout) -> io::Result<()> {
-    present_buffer(&self.back_buffer, stdout)?;
+    if self.needs_full_redraw {
+      present_buffer(&self.back_buffer, stdout)?;
+    } else {
+      present_buffer_diff(&self.front_buffer, &self.back_buffer, stdout)?;
+    }
+
     self.front_buffer.clone_from(&self.back_buffer);
     self.needs_full_redraw = false;
+
     Ok(())
   }
 

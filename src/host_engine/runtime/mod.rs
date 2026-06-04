@@ -106,6 +106,12 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
     None,
   );
 
+  services.canvas.write_centered_text(
+    10,
+    &format!("Diff frame test: {}", frame),
+    CanvasStyle::default(),
+  );
+
   services.canvas.write_rich_text(2, 6, &rich);
 
   if let Some(stdout) = services.terminal.writer_mut() {

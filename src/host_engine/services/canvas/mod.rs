@@ -11,7 +11,7 @@ mod text;
 pub use buffer::CanvasBuffer;
 pub use cell::{CanvasCell, CanvasCellContent};
 pub use layout::write_centered_text;
-pub use present::present_buffer;
+pub use present::{present_buffer, present_buffer_diff};
 pub use rich_text::write_rich_text;
 pub use service::CanvasService;
 pub use style::CanvasStyle;

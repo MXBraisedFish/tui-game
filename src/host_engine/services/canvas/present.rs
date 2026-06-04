@@ -72,3 +72,44 @@ pub fn present_buffer(buffer: &CanvasBuffer, stdout: &mut Stdout) -> io::Result<
   stdout.flush()?;
   Ok(())
 }
+
+// 对比提交画布到终端
+pub fn present_buffer_diff(
+  front_buffer: &CanvasBuffer,
+  back_buffer: &CanvasBuffer,
+  stdout: &mut Stdout,
+) -> io::Result<()> {
+  // TODO(canvas):
+  // Wide character replacement needs stricter cleanup rules.
+  // Example: replacing "中" with "A" must clear the second occupied cell.
+  for y in 0..back_buffer.height() {
+    for x in 0..back_buffer.width() {
+      let Some(front_cell) = front_buffer.get(x, y) else {
+        continue;
+      };
+      let Some(back_cell) = back_buffer.get(x, y) else {
+        continue;
+      };
+
+      if front_cell == back_cell {
+        continue;
+      }
+
+      match back_cell.content {
+        CanvasCellContent::Character(ch) => {
+          stdout.queue(MoveTo(x, y))?;
+          apply_canvas_style(stdout, &back_cell.style)?;
+          stdout.queue(Print(ch))?;
+        }
+        CanvasCellContent::WideContinuation => {
+          // 宽字符占位由前一个字符控制，不单独输出
+        }
+      }
+    }
+  }
+
+  reset_canvas_style(stdout)?;
+  stdout.flush()?;
+
+  Ok(())
+}
