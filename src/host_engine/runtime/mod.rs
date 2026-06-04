@@ -80,22 +80,15 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   services.canvas.clear();
 
+  let wide_test = if frame % 120 < 60 {
+    "Wide cleanup: 中文😀"
+  } else {
+    "Wide cleanup: ABCD"
+  };
+
   services
     .canvas
-    .write_centered_text(0, "TUI Game Engine", CanvasStyle::default());
-
-  services.canvas.write_centered_text(
-    10,
-    &format!("Diff frame test: {}", frame),
-    CanvasStyle::default(),
-  );
-
-  let rich = services.rich_text.parse(
-    "f%Span test: <fg:red>Red</fg> <fg:green>Green</fg> <bold>Bold</bold>",
-    None,
-  );
-
-  services.canvas.write_rich_text(8, 12, &rich);
+    .write_centered_text(12, wide_test, CanvasStyle::default());
 
   if let Some(stdout) = services.terminal.writer_mut() {
     let _ = services.canvas.present(stdout);

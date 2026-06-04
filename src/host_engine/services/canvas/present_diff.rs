@@ -1,0 +1,199 @@
+//! 差异化画布渲染模块
+//!
+//! 通过对比前后两帧画布缓冲区的差异，仅重绘发生变化的区域，
+//! 从而减少终端 I/O 操作，提升渲染性能。
+
+use std::io::{self, Stdout, Write};
+
+use crossterm::QueueableCommand;
+use crossterm::cursor::MoveTo;
+use crossterm::style::Print;
+
+use super::{CanvasBuffer, CanvasCellContent, CanvasStyle, apply_canvas_style, reset_canvas_style};
+
+/// 差异渲染块
+///
+/// 表示画布上一段连续的需要重绘的区域。
+/// 同一行的多个相邻差异单元格会被合并为一个 DiffSpan。
+struct DiffSpan {
+  x: u16,             // 该差异块在行内的起始列位置
+  text: String,       // 该差异块包含的文本内容
+  style: CanvasStyle, // 该差异块使用的样式
+}
+
+/// 将当前累积的文本缓冲刷新为一个差异块
+///
+/// 当遇到样式变化、单元格内容相同、或行结束时，
+/// 需要将之前累积的文本打包为一个 DiffSpan。
+/// 如果当前文本为空、起始位置未确定、或样式未设置，则跳过本次刷新。
+fn flush_diff_span(
+  spans: &mut Vec<DiffSpan>,
+  current_x: Option<u16>,
+  current_text: &mut String,
+  current_style: &mut Option<CanvasStyle>,
+) {
+  // 如果当前文本为空，无需刷新
+  if current_text.is_empty() {
+    return;
+  }
+
+  // 确保起始列位置已确定
+  let Some(x) = current_x else {
+    return;
+  };
+
+  // 确保当前样式已设置
+  let Some(style) = current_style.clone() else {
+    return;
+  };
+
+  // 入队一个差异渲染块，并将累积文本清空
+  spans.push(DiffSpan {
+    x,
+    text: std::mem::take(current_text),
+    style,
+  });
+
+  // 重置当前样式，准备下一轮的差异收集
+  *current_style = None;
+}
+
+/// 收集指定行的所有差异渲染块
+///
+/// 逐列对比前后两帧缓冲区，找出内容或样式发生变化的单元格，
+/// 将连续的差异单元格合并为一个 DiffSpan 以提高渲染效率。
+fn collect_diff_spans_for_row(
+  front_buffer: &CanvasBuffer,
+  back_buffer: &CanvasBuffer,
+  y: u16,
+) -> Vec<DiffSpan> {
+  // 差异块列表
+  let mut spans = Vec::new();
+
+  // 当前差异块的起始列位置
+  let mut current_x: Option<u16> = None;
+  // 当前差异块累积的文本
+  let mut current_text = String::new();
+  // 当前差异块的样式
+  let mut current_style: Option<CanvasStyle> = None;
+
+  // 遍历当前行的每一列
+  for x in 0..back_buffer.width() {
+    let Some(front_cell) = front_buffer.get(x, y) else {
+      continue;
+    };
+    let Some(back_cell) = back_buffer.get(x, y) else {
+      continue;
+    };
+
+    // 前后帧单元格完全相同，结束当前差异块
+    if front_cell == back_cell {
+      flush_diff_span(&mut spans, current_x, &mut current_text, &mut current_style);
+      current_x = None;
+      continue;
+    }
+
+    // 单元格内容不同，开始构建差异块
+    match back_cell.content {
+      // 普通字符：累积到当前差异块的文本中
+      CanvasCellContent::Character(ch) => {
+        let same_style = current_style.as_ref() == Some(&back_cell.style);
+
+        // 样式相同则继续累积，样式不同则刷新当前块并开始新的差异块
+        if current_x.is_none() {
+          current_x = Some(x);
+          current_style = Some(back_cell.style.clone());
+        } else if !same_style {
+          flush_diff_span(&mut spans, current_x, &mut current_text, &mut current_style);
+          current_x = Some(x);
+          current_style = Some(back_cell.style.clone());
+        }
+
+        current_text.push(ch);
+      }
+      // 宽字符占位符：不直接打印，但会打断当前可打印区域
+      CanvasCellContent::WideContinuation => {
+        flush_diff_span(&mut spans, current_x, &mut current_text, &mut current_style);
+        current_x = None;
+      }
+    }
+  }
+
+  // 行遍历结束，刷新最后累积的差异块
+  flush_diff_span(&mut spans, current_x, &mut current_text, &mut current_style);
+
+  spans
+}
+
+/// 检查是否需要清理旧帧中的宽字符占位符
+///
+/// 当前帧是宽字符占位符但后帧不再是占位符时，
+/// 需要清理该位置以避免终端上残留半个宽字符的显示。
+fn needs_wide_cleanup(
+  front_buffer: &CanvasBuffer,
+  back_buffer: &CanvasBuffer,
+  x: u16,
+  y: u16,
+) -> bool {
+  // 获取前后帧对应位置的单元格
+  let Some(front_cell) = front_buffer.get(x, y) else {
+    return false;
+  };
+  let Some(back_cell) = back_buffer.get(x, y) else {
+    return false;
+  };
+
+  // 前后相同则无需清理
+  if front_cell == back_cell {
+    return false;
+  }
+
+  // 前帧是宽字符占位符，且前后帧不匹配时才需要清理
+  match front_cell.content {
+    CanvasCellContent::WideContinuation => !back_cell.is_wide_continuation(),
+    _ => false,
+  }
+}
+
+/// 对比前后两帧画布，仅将差异区域渲染到终端
+///
+/// 对比 front_buffer（前一帧）和 back_buffer（当前帧），找出每行中
+/// 发生变化的内容和样式，只对这些差异区域执行终端 I/O 操作。
+/// 这是 diff 渲染的入口函数，相比全量渲染能大幅减少终端输出量。
+pub fn present_buffer_diff(
+  front_buffer: &CanvasBuffer,
+  back_buffer: &CanvasBuffer,
+  stdout: &mut Stdout,
+) -> io::Result<()> {
+  // 遍历后帧缓冲区的每一行
+  for y in 0..back_buffer.height() {
+    // 第一遍：清理宽字符占位符残留
+    // 当前帧的宽字符被移除后，需要在其占位符位置输出空格进行清理
+    for x in 0..back_buffer.width() {
+      if needs_wide_cleanup(front_buffer, back_buffer, x, y) {
+        stdout.queue(MoveTo(x, y))?;
+        reset_canvas_style(stdout)?;
+        stdout.queue(Print(' '))?;
+      }
+    }
+
+    // 第二遍：渲染差异化的内容片段
+    // 收集当前行的所有差异块，然后逐个渲染
+    let spans = collect_diff_spans_for_row(front_buffer, back_buffer, y);
+
+    for span in spans {
+      // 光标移动到差异块的起始位置
+      stdout.queue(MoveTo(span.x, y))?;
+      // 应用该差异块的样式
+      apply_canvas_style(stdout, &span.style)?;
+      // 输出差异文本
+      stdout.queue(Print(span.text))?;
+    }
+  }
+
+  // 渲染完成后重置样式并刷新输出缓冲区
+  reset_canvas_style(stdout)?;
+  stdout.flush()?;
+
+  Ok(())
+}
