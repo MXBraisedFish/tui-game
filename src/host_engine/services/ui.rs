@@ -1,7 +1,7 @@
 // 引入官方哈希表
 use std::collections::HashMap;
 
-use crate::host_engine::services::{RenderService, render};
+use crate::host_engine::services::{CanvasService, CanvasStyle};
 
 // 页面枚举
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -40,9 +40,21 @@ impl PageKey {
   }
 }
 
+// 页面特征：每个页面实现自身的绘制逻辑
+//
+// 注意：此 API 当前未被运行时调用，为后续 UI 系统预留。
+// 绘制时使用 CanvasService 替代旧的 RenderService。
 pub trait Page {
   fn key(&self) -> PageKey;
-  fn render(&self, renderer: &mut RenderService);
+  fn render(&self, canvas: &mut CanvasService);
+}
+
+/// 居中绘制文本的便捷辅助函数
+fn draw_centered(canvas: &mut CanvasService, y: u16, text: &str) {
+  let (width, _) = canvas.size();
+  let centered_x = width.saturating_sub(text.len() as u16).saturating_div(2);
+  canvas.clear_row(y);
+  canvas.write_text(centered_x, y, text, CanvasStyle::default());
 }
 
 pub struct UiService {
@@ -85,9 +97,9 @@ impl UiService {
   }
 
   // 绘制活跃页面
-  pub fn render_active(&self, renderer: &mut RenderService) {
+  pub fn render_active(&self, canvas: &mut CanvasService) {
     if let Some(page) = self.pages.get(&self.active_page) {
-      page.render(renderer)
+      page.render(canvas)
     }
   }
 
@@ -104,9 +116,9 @@ impl Page for HomePage {
     PageKey::Home
   }
 
-  fn render(&self, renderer: &mut RenderService) {
-    renderer.draw_centered(5, "Welcome to TUI Game Engine");
-    renderer.draw_centered(7, "<- / -> to navigate | ESC to exit");
+  fn render(&self, canvas: &mut CanvasService) {
+    draw_centered(canvas, 5, "Welcome to TUI Game Engine");
+    draw_centered(canvas, 7, "<- / -> to navigate | ESC to exit");
   }
 }
 
@@ -117,9 +129,9 @@ impl Page for PackagesPage {
     PageKey::Packages
   }
 
-  fn render(&self, renderer: &mut RenderService) {
-    renderer.draw_centered(5, "Package List");
-    renderer.draw_centered(7, "(package list will appear here)");
+  fn render(&self, canvas: &mut CanvasService) {
+    draw_centered(canvas, 5, "Package List");
+    draw_centered(canvas, 7, "(package list will appear here)");
   }
 }
 
@@ -130,8 +142,8 @@ impl Page for SettingsPage {
     PageKey::Settings
   }
 
-  fn render(&self, renderer: &mut RenderService) {
-    renderer.draw_centered(5, "Settings");
-    renderer.draw_centered(7, "(settings will appear here)");
+  fn render(&self, canvas: &mut CanvasService) {
+    draw_centered(canvas, 5, "Settings");
+    draw_centered(canvas, 7, "(settings will appear here)");
   }
 }

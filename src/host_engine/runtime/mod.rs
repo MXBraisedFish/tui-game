@@ -4,9 +4,7 @@ use std::time::Duration;
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
-use crate::host_engine::services::{
-  CanvasStyle, EngineServices, LogSource, TerminalColor, TextColor,
-};
+use crate::host_engine::services::{EngineServices, LogSource};
 
 // 引用按键枚举
 use crossterm::event::KeyCode;
@@ -81,8 +79,8 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 // 绘制函数（保留模式）
 //
 // 不再每帧 clear() 清空全部缓冲区。
-// 每帧调用 begin_frame() 后，仅对需要更新的行调用 clear_row()，
-// 脏区间机制自动记录被修改的区域，diff 渲染时只重绘这些区域。
+// 每帧调用 begin_frame() 后，仅清除并重绘需要更新的区域。
+// 绘图通过 RenderService 的文本 API 完成，不直接操作画布。
 //
 // 注意：此函数只负责绘图调用，不处理终端 I/O。
 // 帧提交由主循环中的 request_frame_update() 统一完成。
@@ -90,37 +88,39 @@ fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) 
   // 开始新帧（保留模式，不自动清空缓冲区）
   services.canvas.begin_frame();
 
-  // 动态内容：每隔 60 帧切换显示文本，测试宽字符清理
-  let wide_test = if frame % 120 < 60 {
-    "Wide cleanup: 中文😀"
-  } else {
-    "Wide cleanup: ABCD"
-  };
+  // 静态文本：通过 RenderService 绘制
+  services.canvas.clear_span(2, 0, 40);
+  services
+    .render
+    .draw_normal_text(&mut services.canvas, 2, 2, "Normal text");
 
-  // 仅清除文本实际占用的水平区间，而非整行
-  let (canvas_width, _) = services.canvas.size();
-  let centered_x_12 = canvas_width
-    .saturating_sub(wide_test.len() as u16)
-    .saturating_div(2);
-  services
-    .canvas
-    .clear_span(12, centered_x_12, centered_x_12.saturating_add(wide_test.len() as u16));
-  services
-    .canvas
-    .write_text(centered_x_12, 12, wide_test, CanvasStyle::default());
-
-  // 临时调试指示器：显示当前脏区间数量
-  let dirty_info = format!("Dirty spans: {}", services.canvas.dirty_spans().len());
-  let centered_x_14 = canvas_width
-    .saturating_sub(dirty_info.len() as u16)
-    .saturating_div(2);
-  services
-    .canvas
-    .clear_span(14, centered_x_14, centered_x_14.saturating_add(dirty_info.len() as u16));
-  services.canvas.write_text(
-    centered_x_14,
-    14,
-    &dirty_info,
-    CanvasStyle::default(),
+  services.canvas.clear_span(4, 0, 40);
+  services.render.draw_rich_text(
+    &mut services.canvas,
+    &services.rich_text,
+    2,
+    4,
+    "f%<fg:red>Forced rich text</fg>",
   );
+
+  services.canvas.clear_span(6, 0, 40);
+  services
+    .render
+    .draw_text(&mut services.canvas, &services.rich_text, 2, 6, "Auto normal text");
+
+  services.canvas.clear_span(8, 0, 40);
+  services.render.draw_text(
+    &mut services.canvas,
+    &services.rich_text,
+    2,
+    8,
+    "f%Auto <bold>rich</bold> text",
+  );
+
+  // 调试指示器：脏区间计数
+  let dirty_info = format!("Dirty spans: {}", services.canvas.dirty_spans().len());
+  services.canvas.clear_span(14, 0, dirty_info.len() as u16);
+  services
+    .render
+    .draw_normal_text(&mut services.canvas, 0, 14, &dirty_info);
 }
