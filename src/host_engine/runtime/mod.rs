@@ -85,34 +85,17 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
     .write_centered_text(0, "TUI Game Engine", CanvasStyle::default());
 
   services.canvas.write_centered_text(
-    2,
-    &format!(
-      "Frame: {} | dt: {:.1}ms",
-      frame,
-      world.clock.delta_time().as_secs_f64() * 1000.0
-    ),
-    CanvasStyle::default(),
-  );
-
-  let mut info_style = CanvasStyle::default();
-  info_style.foreground = Some(TextColor::Terminal(TerminalColor::Cyan));
-
-  services
-    .canvas
-    .write_centered_text(4, "Canvas renderer active | ESC to exit", info_style);
-
-  let rich = services.rich_text.parse(
-    "f%RichText: <bold>bold</bold> <fg:red>red</fg> <bg:blue><fg:bright_white>bg</fg></bg> 中文😀",
-    None,
-  );
-
-  services.canvas.write_centered_text(
     10,
     &format!("Diff frame test: {}", frame),
     CanvasStyle::default(),
   );
 
-  services.canvas.write_rich_text(2, 6, &rich);
+  let rich = services.rich_text.parse(
+    "f%Span test: <fg:red>Red</fg> <fg:green>Green</fg> <bold>Bold</bold>",
+    None,
+  );
+
+  services.canvas.write_rich_text(8, 12, &rich);
 
   if let Some(stdout) = services.terminal.writer_mut() {
     let _ = services.canvas.present(stdout);
