@@ -1,13 +1,31 @@
 use crate::host_engine::core::RuntimeAction;
 use crate::host_engine::services::{
-  KeyboardActionBinding, KeyboardActionMap, KeyboardActionTrigger, KeyboardFrameState,
+  KeyboardActionBinding,
+  KeyboardActionLayer,
+  KeyboardActionLayerKind,
+  KeyboardActionMap,
+  KeyboardActionResolver,
+  KeyboardActionTrigger,
+  KeyboardFrameState,
 };
 
 use crossterm::event::KeyCode;
 
 pub fn resolve_runtime_keyboard_actions(state: &KeyboardFrameState) -> Vec<RuntimeAction> {
-  let map = runtime_keyboard_action_map();
-  map.resolve(state)
+  let resolver = runtime_keyboard_action_resolver();
+  resolver.resolve(state)
+}
+
+fn runtime_keyboard_action_resolver() -> KeyboardActionResolver<RuntimeAction> {
+  let mut resolver = KeyboardActionResolver::new();
+
+  resolver.add_layer(KeyboardActionLayer::new(
+    KeyboardActionLayerKind::Root,
+    1000,
+    runtime_keyboard_action_map(),
+  ));
+
+  resolver
 }
 
 fn runtime_keyboard_action_map() -> KeyboardActionMap<RuntimeAction> {
