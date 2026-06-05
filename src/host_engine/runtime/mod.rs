@@ -2,14 +2,12 @@
 use std::thread;
 use std::time::Duration;
 
+// 引入运行时动作辅助函数
+mod input_action;
+use input_action::key_to_runtime_action;
+
 // 引用结构体和枚举
-use crate::host_engine::core::{
-  ExitState,
-  FrameScheduler,
-  OverlayKind,
-  RuntimeAction,
-  RuntimeWorld,
-};
+use crate::host_engine::core::{ExitState, FrameScheduler, OverlayKind, RuntimeWorld};
 use crate::host_engine::services::{EngineServices, LogSource};
 
 // 引用按键枚举
@@ -55,15 +53,12 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     let mut consumed_input = false;
 
-    // ESC 行为：有覆盖层则关闭覆盖层，否则请求停止
+    // ESC 行为：通过输入映射函数决定动作
     if services.input.consume_key(KeyCode::Esc) {
-      let action = if world.session.is_overlay_active() {
-        RuntimeAction::CloseOverlay
-      } else {
-        RuntimeAction::RequestStop
-      };
+      if let Some(action) = key_to_runtime_action(KeyCode::Esc, &world.session) {
+        world.session.handle_runtime_action(action);
+      }
 
-      world.session.handle_runtime_action(action);
       consumed_input = true;
     }
 
