@@ -29,9 +29,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     // 更新帧时间
     world.clock.tick();
 
-    // 输入帧：开始帧 → 收集终端事件
+    // 输入帧：开始帧 → 收集终端事件 → 外部事件
     services.input.begin_frame();
     services.input.poll_terminal_events();
+    services.input.drain_external_raw_events();
 
     // 消费所有事件并路由到对应的处理函数
     while let Some(event) = services.input.next_event() {

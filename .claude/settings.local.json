@@ -6,7 +6,9 @@
       "Bash(/c/Users/123/.cargo/bin/cargo check *)",
       "Bash(/c/Users/123/.cargo/bin/cargo test *)",
       "Bash(timeout 3 cargo run)",
-      "Bash(timeout 2 cargo run)"
+      "Bash(timeout 2 cargo run)",
+      "Bash(cargo update *)",
+      "Bash(cargo search *)"
     ]
   }
 }

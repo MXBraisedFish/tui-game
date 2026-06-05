@@ -10,6 +10,10 @@ use crossterm::event::{
 };
 
 use super::{
+  ExternalRawInputQueue,
+  ExternalRawInputSender,
+  GlobalKeyboardControl,
+  GlobalKeyboardListener,
   InputEvent,
   InputEventQueue,
   KeyboardFrameState,
@@ -63,6 +67,8 @@ fn mouse_event_from_crossterm(event: MouseEvent) -> Option<MouseInputEvent> {
 
 pub struct InputService {
   queue: InputEventQueue,
+  external_raw_queue: ExternalRawInputQueue,
+  global_keyboard: GlobalKeyboardListener,
   keyboard_state: KeyboardFrameState,
 }
 
@@ -70,6 +76,8 @@ impl InputService {
   pub fn new() -> Self {
     Self {
       queue: InputEventQueue::new(),
+      external_raw_queue: ExternalRawInputQueue::new(),
+      global_keyboard: GlobalKeyboardListener::new(),
       keyboard_state: KeyboardFrameState::new(),
     }
   }
@@ -109,6 +117,52 @@ impl InputService {
     for event in events {
       self.push_raw_event(event);
     }
+  }
+
+  pub fn push_external_raw_event(&mut self, event: RawInputEvent) {
+    self.external_raw_queue.push(event);
+  }
+
+  pub fn push_external_raw_events<I>(&mut self, events: I)
+  where
+    I: IntoIterator<Item = RawInputEvent>,
+  {
+    for event in events {
+      self.push_external_raw_event(event);
+    }
+  }
+
+  pub fn queued_external_raw_event_count(&self) -> usize {
+    self.external_raw_queue.len()
+  }
+
+  pub fn clear_external_raw_events(&mut self) {
+    self.external_raw_queue.clear();
+  }
+
+  pub fn external_raw_input_sender(&self) -> ExternalRawInputSender {
+    self.external_raw_queue.sender()
+  }
+
+  pub fn start_global_keyboard_listener(&mut self) {
+    let sender = self.external_raw_input_sender();
+    self.global_keyboard.start(sender);
+  }
+
+  pub fn enable_global_keyboard(&self) {
+    self.global_keyboard.enable();
+  }
+
+  pub fn disable_global_keyboard(&self) {
+    self.global_keyboard.disable();
+  }
+
+  pub fn global_keyboard_control(&self) -> GlobalKeyboardControl {
+    self.global_keyboard.control()
+  }
+
+  pub fn is_global_keyboard_started(&self) -> bool {
+    self.global_keyboard.is_started()
   }
 
   pub fn begin_frame(&mut self) {
@@ -160,9 +214,16 @@ impl InputService {
     }
   }
 
+  pub fn drain_external_raw_events(&mut self) {
+    while let Some(event) = self.external_raw_queue.pop() {
+      self.push_raw_event(event);
+    }
+  }
+
   pub fn poll(&mut self) {
     self.begin_frame();
     self.poll_terminal_events();
+    self.drain_external_raw_events();
   }
 
   // 消费下一个事件

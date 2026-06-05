@@ -21,6 +21,10 @@ pub use canvas::{CanvasBuffer, CanvasCell, CanvasCellContent, CanvasService, Can
 pub use game::{GameService, GameSessionState};
 pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
 pub use input::{
+  ExternalRawInputQueue,
+  ExternalRawInputSender,
+  GlobalKeyboardControl,
+  GlobalKeyboardListener,
   InputEvent,
   InputEventQueue,
   InputService,
