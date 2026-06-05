@@ -13,6 +13,7 @@ use crossterm::event::{
 
 use super::{
   InputEvent,
+  KeyboardFrameState,
   KeyboardInputEvent,
   KeyboardInputKind,
   MouseButton,
@@ -94,27 +95,40 @@ impl From<KeyboardInputEvent> for KeyInput {
 
 pub struct InputService {
   queue: VecDeque<InputEvent>,
+  keyboard_state: KeyboardFrameState,
 }
 
 impl InputService {
   pub fn new() -> Self {
     Self {
       queue: VecDeque::new(),
+      keyboard_state: KeyboardFrameState::new(),
     }
+  }
+
+  pub fn keyboard_state(&self) -> &KeyboardFrameState {
+    &self.keyboard_state
+  }
+
+  pub fn keyboard_state_mut(&mut self) -> &mut KeyboardFrameState {
+    &mut self.keyboard_state
   }
 
   // 收集所有待处理事件（键盘、鼠标、窗口）
   pub fn poll(&mut self) {
+    self.keyboard_state.begin_frame();
+
     while poll(Duration::ZERO).unwrap_or(false) {
       match event::read() {
         Ok(Event::Key(key_event)) => {
-          self
-            .queue
-            .push_back(InputEvent::Keyboard(KeyboardInputEvent::new(
-              key_event.code,
-              key_event.modifiers,
-              keyboard_kind_from_crossterm(key_event.kind),
-            )));
+          let keyboard_event = KeyboardInputEvent::new(
+            key_event.code,
+            key_event.modifiers,
+            keyboard_kind_from_crossterm(key_event.kind),
+          );
+
+          self.keyboard_state.apply_event(keyboard_event);
+          self.queue.push_back(InputEvent::Keyboard(keyboard_event));
         }
         Ok(Event::Mouse(mouse_event)) => {
           if let Some(mouse_event) = mouse_event_from_crossterm(mouse_event) {
