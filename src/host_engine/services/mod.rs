@@ -23,6 +23,9 @@ pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
 pub use input::{
   InputEvent,
   InputService,
+  KeyboardActionBinding,
+  KeyboardActionMap,
+  KeyboardActionTrigger,
   KeyboardFrameState,
   KeyboardInputEvent,
   KeyboardInputKind,
