@@ -89,6 +89,13 @@ impl RuntimeSession {
 
   pub fn handle_runtime_action(&mut self, action: RuntimeAction) {
     match action {
+      RuntimeAction::Cancel => {
+        if self.is_overlay_active() {
+          self.pop_overlay();
+        } else {
+          self.request_stop();
+        }
+      }
       RuntimeAction::RequestStop => {
         self.request_stop();
       }

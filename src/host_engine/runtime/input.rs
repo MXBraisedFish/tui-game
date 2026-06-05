@@ -1,13 +1,7 @@
 use crate::host_engine::core::RuntimeWorld;
-use crate::host_engine::services::{
-  EngineServices,
-  InputEvent,
-  KeyboardInputKind,
-  LogSource,
-  WindowInputEvent,
-};
+use crate::host_engine::services::{EngineServices, InputEvent, LogSource, WindowInputEvent};
 
-use super::input_action::key_to_runtime_action;
+use super::input_action::resolve_runtime_keyboard_actions;
 
 pub fn handle_runtime_input_event(
   event: InputEvent,
@@ -15,9 +9,7 @@ pub fn handle_runtime_input_event(
   world: &mut RuntimeWorld,
 ) {
   match event {
-    InputEvent::Keyboard(key) => {
-      handle_runtime_keyboard_event(key.code, key.kind, world);
-    }
+    InputEvent::Keyboard(_) => {}
     InputEvent::Window(window) => {
       handle_runtime_window_event(window, services, world);
     }
@@ -25,20 +17,14 @@ pub fn handle_runtime_input_event(
   }
 }
 
-fn handle_runtime_keyboard_event(
-  code: crossterm::event::KeyCode,
-  kind: KeyboardInputKind,
-  world: &mut RuntimeWorld,
-) {
+pub fn handle_runtime_keyboard_actions(services: &EngineServices, world: &mut RuntimeWorld) {
   if !world.session.should_accept_keyboard_input() {
     return;
   }
 
-  if !matches!(kind, KeyboardInputKind::Press | KeyboardInputKind::Repeat) {
-    return;
-  }
+  let actions = resolve_runtime_keyboard_actions(services.input.keyboard_state());
 
-  if let Some(action) = key_to_runtime_action(code, &world.session) {
+  for action in actions {
     world.session.handle_runtime_action(action);
   }
 }

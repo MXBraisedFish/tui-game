@@ -1,18 +1,36 @@
-use crate::host_engine::core::{RuntimeAction, RuntimeSession};
+use crate::host_engine::core::RuntimeAction;
+use crate::host_engine::services::{
+  KeyboardActionBinding, KeyboardActionMap, KeyboardActionTrigger, KeyboardFrameState,
+};
+
 use crossterm::event::KeyCode;
 
-pub fn key_to_runtime_action(key: KeyCode, session: &RuntimeSession) -> Option<RuntimeAction> {
-  match key {
-    KeyCode::Esc => {
-      if session.is_overlay_active() {
-        Some(RuntimeAction::CloseOverlay)
-      } else {
-        Some(RuntimeAction::RequestStop)
-      }
-    }
-    // 临时测试映射，后续删除
-    KeyCode::F(1) => Some(RuntimeAction::PushDebugOverlay),
-    KeyCode::F(2) => Some(RuntimeAction::PopDebugOverlay),
-    _ => None,
-  }
+pub fn resolve_runtime_keyboard_actions(state: &KeyboardFrameState) -> Vec<RuntimeAction> {
+  let map = runtime_keyboard_action_map();
+  map.resolve(state)
+}
+
+fn runtime_keyboard_action_map() -> KeyboardActionMap<RuntimeAction> {
+  let mut map = KeyboardActionMap::new();
+
+  map.add_binding(KeyboardActionBinding::new(
+    KeyCode::Esc,
+    KeyboardActionTrigger::Pressed,
+    RuntimeAction::Cancel,
+  ));
+
+  // 临时测试映射，后续删除
+  map.add_binding(KeyboardActionBinding::new(
+    KeyCode::F(1),
+    KeyboardActionTrigger::Pressed,
+    RuntimeAction::PushDebugOverlay,
+  ));
+
+  map.add_binding(KeyboardActionBinding::new(
+    KeyCode::F(2),
+    KeyboardActionTrigger::Pressed,
+    RuntimeAction::PopDebugOverlay,
+  ));
+
+  map
 }

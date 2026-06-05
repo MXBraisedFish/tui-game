@@ -6,7 +6,7 @@ use std::time::Duration;
 mod input;
 mod input_action;
 
-use input::handle_runtime_input_event;
+use input::{handle_runtime_input_event, handle_runtime_keyboard_actions};
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
@@ -35,6 +35,9 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     while let Some(event) = services.input.next_event() {
       handle_runtime_input_event(event, services, world);
     }
+
+    // 帧级键盘动作解析（从 KeyboardFrameState 批量映射）
+    handle_runtime_keyboard_actions(services, world);
 
     update(services, world, frame);
     render(services, world, frame);
