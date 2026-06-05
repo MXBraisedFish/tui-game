@@ -18,6 +18,7 @@ where
   pub key: KeyCode,
   pub trigger: KeyboardActionTrigger,
   pub action: Action,
+  pub priority: i32,
 }
 
 impl<Action> KeyboardActionBinding<Action>
@@ -25,7 +26,16 @@ where
   Action: Copy,
 {
   pub fn new(key: KeyCode, trigger: KeyboardActionTrigger, action: Action) -> Self {
-    Self { key, trigger, action }
+    Self::with_priority(key, trigger, action, 0)
+  }
+
+  pub fn with_priority(key: KeyCode, trigger: KeyboardActionTrigger, action: Action, priority: i32) -> Self {
+    Self {
+      key,
+      trigger,
+      action,
+      priority,
+    }
   }
 
   pub fn matches(&self, state: &KeyboardFrameState) -> bool {
@@ -66,14 +76,16 @@ where
   }
 
   pub fn resolve(&self, state: &KeyboardFrameState) -> Vec<Action> {
-    let mut actions = Vec::new();
+    let mut matched = Vec::new();
 
-    for binding in &self.bindings {
+    for (index, binding) in self.bindings.iter().enumerate() {
       if binding.matches(state) {
-        actions.push(binding.action);
+        matched.push((binding.priority, index, binding.action));
       }
     }
 
-    actions
+    matched.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| left.1.cmp(&right.1)));
+
+    matched.into_iter().map(|(_, _, action)| action).collect()
   }
 }
