@@ -13,5 +13,12 @@ pub use clock::EngineClock;
 pub use crash::{CrashPhase, current_crash_phase, install_panic_hook, set_crash_phase};
 pub use exit_state::ExitState;
 pub use frame::FrameScheduler;
-pub use runtime_session::ExecutionContext;
+pub use runtime_session::{
+    ExecutionContext,
+    HostSurface,
+    OverlayKind,
+    OverlayStack,
+    UiNode,
+    UiTree,
+};
 pub use world::RuntimeWorld;
