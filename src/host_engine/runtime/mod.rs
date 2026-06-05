@@ -44,7 +44,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     // 请求帧更新：由 CanvasService 封装终端交互
     if let Err(err) = services.canvas.request_frame_update(&mut services.terminal) {
-      services.log.warn(LogSource::Runtime, format!("[Render] Frame update failed: {}", err));
+      services.log.warn(
+        LogSource::Runtime,
+        format!("[Render] Frame update failed: {}", err),
+      );
     }
 
     thread::sleep(Duration::from_millis(16));
@@ -88,9 +91,13 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   );
 
   services.canvas.clear_span(6, 0, 40);
-  services
-    .render
-    .draw_text(&mut services.canvas, &services.rich_text, 2, 6, "Auto normal text");
+  services.render.draw_text(
+    &mut services.canvas,
+    &services.rich_text,
+    2,
+    6,
+    "Auto normal text",
+  );
 
   services.canvas.clear_span(8, 0, 40);
   services.render.draw_text(
