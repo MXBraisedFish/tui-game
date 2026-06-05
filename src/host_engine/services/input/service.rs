@@ -13,7 +13,7 @@ pub struct KeyInput {
   pub kind: KeyEventKind, // 按键类型
 }
 
-// 输入事件
+// 输入事件（内部遗留类型，由 InputService 内部使用）
 #[derive(Clone, Debug)]
 pub enum InputEvent {
   Key(KeyInput),

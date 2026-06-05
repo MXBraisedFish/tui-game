@@ -20,7 +20,17 @@ mod unicode;
 pub use canvas::{CanvasBuffer, CanvasCell, CanvasCellContent, CanvasService, CanvasStyle};
 pub use game::{GameService, GameSessionState};
 pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
-pub use input::{InputEvent, InputService, KeyEventKind, KeyInput};
+pub use input::{
+  InputEvent,
+  InputService,
+  KeyboardInputEvent,
+  KeyboardInputKind,
+  KeyEventKind,
+  KeyInput,
+  MouseInputEvent,
+  MouseInputKind,
+  WindowInputEvent,
+};
 pub use log::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
 pub use lua::LuaService;
 pub use overlay::{OverlayKind, OverlayService};
