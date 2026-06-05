@@ -1,4 +1,4 @@
-use crate::host_engine::core::{HostSurface, RuntimeAction, UiNode};
+use crate::host_engine::core::{ExecutionContext, HostSurface, RuntimeAction, UiNode};
 use crate::host_engine::services::{
   KeyboardActionBinding,
   KeyboardActionLayer,
@@ -35,14 +35,20 @@ fn runtime_keyboard_action_resolver(context: RuntimeKeyboardContext) -> Keyboard
   } else {
     resolver.add_layer(KeyboardActionLayer::new(
       KeyboardActionLayerKind::UiNode,
-      200,
+      300,
       runtime_ui_node_keyboard_action_map(context.current_ui_node()),
     ));
 
     resolver.add_layer(KeyboardActionLayer::new(
       KeyboardActionLayerKind::Surface,
-      100,
+      200,
       runtime_surface_keyboard_action_map(context.host_surface()),
+    ));
+
+    resolver.add_layer(KeyboardActionLayer::new(
+      KeyboardActionLayerKind::ExecutionContext,
+      100,
+      runtime_execution_context_keyboard_action_map(context.execution_context()),
     ));
   }
 
@@ -95,6 +101,12 @@ fn runtime_ui_node_keyboard_action_map(node: Option<UiNode>) -> KeyboardActionMa
 fn runtime_surface_keyboard_action_map(surface: HostSurface) -> KeyboardActionMap<RuntimeAction> {
   match surface {
     HostSurface::MainMenu => main_menu_keyboard_action_map(),
+  }
+}
+
+fn runtime_execution_context_keyboard_action_map(context: ExecutionContext) -> KeyboardActionMap<RuntimeAction> {
+  match context {
+    ExecutionContext::Host => KeyboardActionMap::new(),
   }
 }
 
