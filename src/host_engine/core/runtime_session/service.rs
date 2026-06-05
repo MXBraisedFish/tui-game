@@ -76,6 +76,12 @@ impl RuntimeSession {
       RuntimeAction::CloseOverlay => {
         self.pop_overlay();
       }
+      RuntimeAction::PushDebugOverlay => {
+        self.push_overlay(OverlayKind::ConfirmExit);
+      }
+      RuntimeAction::PopDebugOverlay => {
+        self.pop_overlay();
+      }
     }
   }
 

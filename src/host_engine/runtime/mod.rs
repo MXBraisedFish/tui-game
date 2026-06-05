@@ -7,7 +7,7 @@ mod input_action;
 use input_action::key_to_runtime_action;
 
 // 引用结构体和枚举
-use crate::host_engine::core::{ExitState, FrameScheduler, OverlayKind, RuntimeWorld};
+use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
 use crate::host_engine::services::{EngineServices, LogSource};
 
 // 引用按键枚举
@@ -32,7 +32,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     // 更新按键事件队列
     services.input.poll();
 
-    // 临时的响应尺寸变化
+    // 临时的响应尺寸变化（后续由正式的 resize 事件处理替换）
     if let Some((width, height)) = services.input.consume_resize() {
       services.canvas.resize(width, height);
       services.ui.on_resize(width, height);
@@ -43,30 +43,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       );
     }
 
-    // 临时覆盖层测试：F1 压入，F2 弹出
-    if services.input.consume_key(KeyCode::F(1)) {
-      world.session.push_overlay(OverlayKind::ConfirmExit);
-    }
-    if services.input.consume_key(KeyCode::F(2)) {
-      world.session.pop_overlay();
-    }
-
-    let mut consumed_input = false;
-
-    // ESC 行为：通过输入映射函数决定动作
-    if services.input.consume_key(KeyCode::Esc) {
-      if let Some(action) = key_to_runtime_action(KeyCode::Esc, &world.session) {
-        world.session.handle_runtime_action(action);
-      }
-
-      consumed_input = true;
-    }
-
-    // 当前帧未处理队头事件时，弹出一个事件避免阻塞后续输入
-    if consumed_input {
-      None
+    // 消费一个键并路由到运行时动作映射
+    let _consumed = if let Some(key) = services.input.next_key() {
+      handle_runtime_key(key.code, world)
     } else {
-      services.input.next_key()
+      false
     };
 
     update(services, world, frame);
@@ -88,6 +69,15 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   services.game.update();
   services.overlay.update();
+}
+
+// 运行时键处理辅助函数
+fn handle_runtime_key(key: KeyCode, world: &mut RuntimeWorld) -> bool {
+  if let Some(action) = key_to_runtime_action(key, &world.session) {
+    world.session.handle_runtime_action(action);
+    return true;
+  }
+  false
 }
 
 // 绘制函数（保留模式）
@@ -138,7 +128,7 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
     .render
     .draw_normal_text(&mut services.canvas, 0, 14, &dirty_info);
 
-  // 临时调试：运行时状态检查
+  // 临时调试：运行时状态检查（后续由正式 UI 渲染替换）
   let state_info = format!(
     "Runtime: {:?} | Context: {:?} | Surface: {:?} | UI: {:?} | Overlays: {}",
     world.session.runtime_state(),
