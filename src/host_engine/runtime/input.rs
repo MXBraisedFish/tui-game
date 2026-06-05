@@ -19,7 +19,7 @@ pub fn handle_runtime_input_event(
       handle_runtime_keyboard_event(key.code, key.kind, world);
     }
     InputEvent::Window(window) => {
-      handle_runtime_window_event(window, services);
+      handle_runtime_window_event(window, services, world);
     }
     InputEvent::Mouse(_) => {}
   }
@@ -39,7 +39,7 @@ fn handle_runtime_keyboard_event(
   }
 }
 
-fn handle_runtime_window_event(event: WindowInputEvent, services: &mut EngineServices) {
+fn handle_runtime_window_event(event: WindowInputEvent, services: &mut EngineServices, world: &mut RuntimeWorld) {
   match event {
     WindowInputEvent::Resize { width, height } => {
       services.canvas.resize(width, height);
@@ -49,7 +49,11 @@ fn handle_runtime_window_event(event: WindowInputEvent, services: &mut EngineSer
         format!("[Terminal Resize detected: {}x{}]", width, height),
       );
     }
-    WindowInputEvent::FocusGained => {}
-    WindowInputEvent::FocusLost => {}
+    WindowInputEvent::FocusGained => {
+      world.session.set_terminal_focused(true);
+    }
+    WindowInputEvent::FocusLost => {
+      world.session.set_terminal_focused(false);
+    }
   }
 }

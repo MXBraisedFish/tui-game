@@ -3,8 +3,10 @@ use std::io::{self, Stdout, Write, stdout};
 
 // 光标控制
 use crossterm::cursor::{Hide, Show};
-// 鼠标事件控制
-use crossterm::event::DisableMouseCapture;
+// 鼠标和焦点事件控制
+use crossterm::event::{
+  DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture,
+};
 // 终端命令执行
 use crossterm::execute;
 // 终端模式控制
@@ -35,8 +37,10 @@ impl TerminalSurface {
     // 获取标准输出
     let mut stdout = stdout();
 
-    // 切换屏幕，隐藏光标
+    // 进入屏幕 → 启用输入报告 → 隐藏光标 → 刷新
     execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnableMouseCapture)?;
+    execute!(stdout, EnableFocusChange)?;
     execute!(stdout, Hide)?;
     stdout.flush()?;
 
@@ -59,6 +63,7 @@ impl TerminalSurface {
 
     // 恢复终端
     let _ = execute!(self.stdout, Show);
+    let _ = execute!(self.stdout, DisableFocusChange);
     let _ = execute!(self.stdout, DisableMouseCapture);
     let _ = execute!(self.stdout, LeaveAlternateScreen);
     let _ = self.stdout.flush();
@@ -134,6 +139,7 @@ impl TerminalService {
     let mut stdout = stdout();
 
     let _ = execute!(stdout, Show);
+    let _ = execute!(stdout, DisableFocusChange);
     let _ = execute!(stdout, DisableMouseCapture);
     let _ = execute!(stdout, LeaveAlternateScreen);
     let _ = stdout.flush();

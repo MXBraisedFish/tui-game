@@ -107,8 +107,9 @@ fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 
   // 临时调试：运行时状态检查（后续由正式 UI 渲染替换）
   let state_info = format!(
-    "Runtime: {:?} | Context: {:?} | Surface: {:?} | UI: {:?} | Overlays: {}",
+    "Runtime: {:?} | Focus: {:?} | Context: {:?} | Surface: {:?} | UI: {:?} | Overlays: {}",
     world.session.runtime_state(),
+    world.session.focus_state(),
     world.session.execution_context(),
     world.session.host_surface(),
     world.session.current_ui_node(),

@@ -14,7 +14,7 @@ pub use crash::{CrashPhase, current_crash_phase, install_panic_hook, set_crash_p
 pub use exit_state::ExitState;
 pub use frame::FrameScheduler;
 pub use runtime_session::{
-  ExecutionContext, HostSurface, OverlayKind, OverlayStack, RuntimeAction, RuntimeSession,
-  RuntimeState, UiNode, UiTree,
+  ExecutionContext, FocusState, HostSurface, OverlayKind, OverlayStack, RuntimeAction,
+  RuntimeSession, RuntimeState, UiNode, UiTree,
 };
 pub use world::RuntimeWorld;

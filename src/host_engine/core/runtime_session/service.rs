@@ -1,5 +1,6 @@
 use super::{
   ExecutionContext,
+  FocusState,
   HostSurface,
   OverlayKind,
   OverlayStack,
@@ -11,6 +12,7 @@ use super::{
 
 pub struct RuntimeSession {
   runtime_state: RuntimeState,
+  focus_state: FocusState,
   execution_context: ExecutionContext,
   host_surface: HostSurface,
   ui_tree: UiTree,
@@ -21,6 +23,7 @@ impl RuntimeSession {
   pub fn new() -> Self {
     Self {
       runtime_state: RuntimeState::Running,
+      focus_state: FocusState::Focused,
       execution_context: ExecutionContext::Host,
       host_surface: HostSurface::MainMenu,
       ui_tree: UiTree::new(),
@@ -38,6 +41,18 @@ impl RuntimeSession {
 
   pub fn request_stop(&mut self) {
     self.runtime_state = RuntimeState::Stopping;
+  }
+
+  pub fn focus_state(&self) -> FocusState {
+    self.focus_state
+  }
+
+  pub fn is_terminal_focused(&self) -> bool {
+    matches!(self.focus_state, FocusState::Focused)
+  }
+
+  pub fn set_terminal_focused(&mut self, focused: bool) {
+    self.focus_state = if focused { FocusState::Focused } else { FocusState::Unfocused };
   }
 
   pub fn push_overlay(&mut self, overlay: OverlayKind) {
