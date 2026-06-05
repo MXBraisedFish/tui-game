@@ -18,6 +18,8 @@ use super::{
   MouseButton,
   MouseInputEvent,
   MouseInputKind,
+  RawInputEvent,
+  RawInputSource,
   WindowInputEvent,
 };
 
@@ -88,10 +90,32 @@ impl InputService {
     self.queue.clear();
   }
 
-  // 收集所有待处理事件（键盘、鼠标、窗口）
-  pub fn poll(&mut self) {
-    self.keyboard_state.begin_frame();
+  pub fn push_raw_event(&mut self, event: RawInputEvent) {
+    match event {
+      RawInputEvent::Keyboard { event, .. } => {
+        self.keyboard_state.apply_event(event);
+        self.queue.push(InputEvent::Keyboard(event));
+      }
+      RawInputEvent::Mouse { .. } | RawInputEvent::Window { .. } => {
+        self.queue.push(event.into_input_event());
+      }
+    }
+  }
 
+  pub fn push_raw_events<I>(&mut self, events: I)
+  where
+    I: IntoIterator<Item = RawInputEvent>,
+  {
+    for event in events {
+      self.push_raw_event(event);
+    }
+  }
+
+  pub fn begin_frame(&mut self) {
+    self.keyboard_state.begin_frame();
+  }
+
+  pub fn poll_terminal_events(&mut self) {
     while poll(Duration::ZERO).unwrap_or(false) {
       match event::read() {
         Ok(Event::Key(key_event)) => {
@@ -100,27 +124,45 @@ impl InputService {
             key_event.modifiers,
             keyboard_kind_from_crossterm(key_event.kind),
           );
-
-          self.keyboard_state.apply_event(keyboard_event);
-          self.queue.push(InputEvent::Keyboard(keyboard_event));
+          self.push_raw_event(RawInputEvent::Keyboard {
+            source: RawInputSource::Terminal,
+            event: keyboard_event,
+          });
         }
         Ok(Event::Mouse(mouse_event)) => {
           if let Some(mouse_event) = mouse_event_from_crossterm(mouse_event) {
-            self.queue.push(InputEvent::Mouse(mouse_event));
+            self.push_raw_event(RawInputEvent::Mouse {
+              source: RawInputSource::Terminal,
+              event: mouse_event,
+            });
           }
         }
         Ok(Event::Resize(width, height)) => {
-          self.queue.push(InputEvent::Window(WindowInputEvent::Resize { width, height }));
+          self.push_raw_event(RawInputEvent::Window {
+            source: RawInputSource::Terminal,
+            event: WindowInputEvent::Resize { width, height },
+          });
         }
         Ok(Event::FocusGained) => {
-          self.queue.push(InputEvent::Window(WindowInputEvent::FocusGained));
+          self.push_raw_event(RawInputEvent::Window {
+            source: RawInputSource::Terminal,
+            event: WindowInputEvent::FocusGained,
+          });
         }
         Ok(Event::FocusLost) => {
-          self.queue.push(InputEvent::Window(WindowInputEvent::FocusLost));
+          self.push_raw_event(RawInputEvent::Window {
+            source: RawInputSource::Terminal,
+            event: WindowInputEvent::FocusLost,
+          });
         }
         _ => {}
       }
     }
+  }
+
+  pub fn poll(&mut self) {
+    self.begin_frame();
+    self.poll_terminal_events();
   }
 
   // 消费下一个事件
