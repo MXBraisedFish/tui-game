@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crossterm::event::KeyCode;
 
 use super::KeyboardFrameState;
@@ -94,10 +96,29 @@ where
 
   pub fn resolve(&self, state: &KeyboardFrameState) -> Vec<Action> {
     self
-      .resolve_detailed(state)
+      .resolve_consumed(state)
       .into_iter()
       .map(|resolved| resolved.action)
       .collect()
+  }
+
+  pub fn resolve_consumed(&self, state: &KeyboardFrameState) -> Vec<ResolvedKeyboardAction<Action>> {
+    let mut consumed_keys = HashSet::new();
+    let mut actions = Vec::new();
+
+    for resolved in self.resolve_detailed(state) {
+      if consumed_keys.contains(&resolved.key) {
+        continue;
+      }
+
+      if resolved.consume {
+        consumed_keys.insert(resolved.key);
+      }
+
+      actions.push(resolved);
+    }
+
+    actions
   }
 
   pub fn resolve_detailed(&self, state: &KeyboardFrameState) -> Vec<ResolvedKeyboardAction<Action>> {
