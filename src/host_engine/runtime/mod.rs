@@ -16,10 +16,9 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
   // 构建一个帧循环
   let mut scheduler = FrameScheduler::new();
-  let mut running = true;
 
   // 开始循环
-  while running {
+  while world.session.is_running() {
     // 获取帧信息
     let frame = scheduler.begin_frame();
 
@@ -44,7 +43,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     // 若用户摁下ESC则终止运行（但不打断本轮循环）
     if services.input.consume_key(KeyCode::Esc) {
-      running = false;
+      world.session.request_stop();
       consumed_input = true;
     }
 
