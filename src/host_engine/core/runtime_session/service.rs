@@ -55,6 +55,10 @@ impl RuntimeSession {
     self.focus_state = if focused { FocusState::Focused } else { FocusState::Unfocused };
   }
 
+  pub fn should_accept_keyboard_input(&self) -> bool {
+    self.is_terminal_focused()
+  }
+
   pub fn push_overlay(&mut self, overlay: OverlayKind) {
     self.overlay_stack.push(overlay);
   }

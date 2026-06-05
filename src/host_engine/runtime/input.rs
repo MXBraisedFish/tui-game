@@ -30,6 +30,10 @@ fn handle_runtime_keyboard_event(
   kind: KeyboardInputKind,
   world: &mut RuntimeWorld,
 ) {
+  if !world.session.should_accept_keyboard_input() {
+    return;
+  }
+
   if !matches!(kind, KeyboardInputKind::Press | KeyboardInputKind::Repeat) {
     return;
   }
