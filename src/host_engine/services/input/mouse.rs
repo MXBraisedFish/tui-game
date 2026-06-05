@@ -1,8 +1,16 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MouseButton {
+  Left,
+  Right,
+  Middle,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MouseInputKind {
   Move,
-  Down,
-  Up,
+  Down(MouseButton),
+  Up(MouseButton),
+  Drag(MouseButton),
   ScrollUp,
   ScrollDown,
   ScrollLeft,

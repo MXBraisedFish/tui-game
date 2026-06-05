@@ -27,6 +27,7 @@ pub use input::{
   KeyboardInputKind,
   KeyEventKind,
   KeyInput,
+  MouseButton,
   MouseInputEvent,
   MouseInputKind,
   WindowInputEvent,

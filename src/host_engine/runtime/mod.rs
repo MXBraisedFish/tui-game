@@ -2,19 +2,15 @@
 use std::thread;
 use std::time::Duration;
 
-// 引入运行时动作辅助函数
+// 引入运行时输入处理
+mod input;
 mod input_action;
-use input_action::key_to_runtime_action;
+
+use input::handle_runtime_input_event;
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
-use crate::host_engine::services::{
-  EngineServices,
-  InputEvent,
-  KeyboardInputKind,
-  LogSource,
-  WindowInputEvent,
-};
+use crate::host_engine::services::{EngineServices, LogSource};
 
 // 运行函数
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
@@ -59,54 +55,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   services.game.update();
   services.overlay.update();
-}
-
-// 运行时输入事件分派
-fn handle_runtime_input_event(
-  event: InputEvent,
-  services: &mut EngineServices,
-  world: &mut RuntimeWorld,
-) {
-  match event {
-    InputEvent::Keyboard(key) => {
-      handle_runtime_keyboard_event(key.code, key.kind, world);
-    }
-    InputEvent::Window(window) => {
-      handle_runtime_window_event(window, services);
-    }
-    InputEvent::Mouse(_) => {}
-  }
-}
-
-// 运行时键盘事件处理
-fn handle_runtime_keyboard_event(
-  code: crossterm::event::KeyCode,
-  kind: KeyboardInputKind,
-  world: &mut RuntimeWorld,
-) {
-  if !matches!(kind, KeyboardInputKind::Press | KeyboardInputKind::Repeat) {
-    return;
-  }
-
-  if let Some(action) = key_to_runtime_action(code, &world.session) {
-    world.session.handle_runtime_action(action);
-  }
-}
-
-// 运行时窗口事件处理
-fn handle_runtime_window_event(event: WindowInputEvent, services: &mut EngineServices) {
-  match event {
-    WindowInputEvent::Resize { width, height } => {
-      services.canvas.resize(width, height);
-      services.ui.on_resize(width, height);
-      services.log.info(
-        LogSource::Runtime,
-        format!("[Terminal Resize detected: {}x{}]", width, height),
-      );
-    }
-    WindowInputEvent::FocusGained => {}
-    WindowInputEvent::FocusLost => {}
-  }
 }
 
 // 绘制函数（保留模式）
