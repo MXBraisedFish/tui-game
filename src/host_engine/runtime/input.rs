@@ -2,6 +2,7 @@ use crate::host_engine::core::RuntimeWorld;
 use crate::host_engine::services::{EngineServices, InputEvent, LogSource, WindowInputEvent};
 
 use super::input_action::resolve_runtime_keyboard_actions;
+use super::input_context::RuntimeKeyboardContext;
 
 pub fn handle_runtime_input_event(
   event: InputEvent,
@@ -22,7 +23,8 @@ pub fn handle_runtime_keyboard_actions(services: &EngineServices, world: &mut Ru
     return;
   }
 
-  let actions = resolve_runtime_keyboard_actions(services.input.keyboard_state(), &world.session);
+  let context = RuntimeKeyboardContext::from_session(&world.session);
+  let actions = resolve_runtime_keyboard_actions(services.input.keyboard_state(), context);
 
   for action in actions {
     world.session.handle_runtime_action(action);
