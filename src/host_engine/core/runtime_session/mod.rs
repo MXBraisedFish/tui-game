@@ -1,3 +1,4 @@
+mod action;
 mod execution_context;
 mod host_surface;
 mod overlay_stack;
@@ -5,6 +6,7 @@ mod runtime_state;
 mod service;
 mod ui_tree;
 
+pub use action::RuntimeAction;
 pub use execution_context::ExecutionContext;
 pub use host_surface::HostSurface;
 pub use overlay_stack::{OverlayKind, OverlayStack};

@@ -3,6 +3,7 @@ use super::{
   HostSurface,
   OverlayKind,
   OverlayStack,
+  RuntimeAction,
   RuntimeState,
   UiNode,
   UiTree,
@@ -65,6 +66,17 @@ impl RuntimeSession {
 
   pub fn overlay_depth(&self) -> usize {
     self.overlay_stack().len()
+  }
+
+  pub fn handle_runtime_action(&mut self, action: RuntimeAction) {
+    match action {
+      RuntimeAction::RequestStop => {
+        self.request_stop();
+      }
+      RuntimeAction::CloseOverlay => {
+        self.pop_overlay();
+      }
+    }
   }
 
   pub fn ui_path(&self) -> &[UiNode] {

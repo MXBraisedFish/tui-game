@@ -3,7 +3,13 @@ use std::thread;
 use std::time::Duration;
 
 // 引用结构体和枚举
-use crate::host_engine::core::{ExitState, FrameScheduler, OverlayKind, RuntimeWorld};
+use crate::host_engine::core::{
+  ExitState,
+  FrameScheduler,
+  OverlayKind,
+  RuntimeAction,
+  RuntimeWorld,
+};
 use crate::host_engine::services::{EngineServices, LogSource};
 
 // 引用按键枚举
@@ -49,9 +55,15 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     let mut consumed_input = false;
 
-    // 若用户摁下ESC则终止运行（但不打断本轮循环）
+    // ESC 行为：有覆盖层则关闭覆盖层，否则请求停止
     if services.input.consume_key(KeyCode::Esc) {
-      world.session.request_stop();
+      let action = if world.session.is_overlay_active() {
+        RuntimeAction::CloseOverlay
+      } else {
+        RuntimeAction::RequestStop
+      };
+
+      world.session.handle_runtime_action(action);
       consumed_input = true;
     }
 
