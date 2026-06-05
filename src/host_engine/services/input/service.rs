@@ -1,48 +1,54 @@
-// 引入官方标准双端队列库和间隔库
 use std::collections::VecDeque;
 use std::time::Duration;
 
-// 引入crossterm事件库
-use crossterm::event::{self, Event, KeyCode, KeyEvent, poll};
-use rdev::Key;
+use crossterm::event::{self, Event, KeyCode, poll};
 
-// 按键输入
+use super::{InputEvent, KeyboardInputEvent, KeyboardInputKind, WindowInputEvent};
+
+// 按键输入（兼容性类型，后续由 InputEvent::Keyboard 直接替代）
 #[derive(Clone, Debug)]
 pub struct KeyInput {
-  pub code: KeyCode,      // 按键码
-  pub kind: KeyEventKind, // 按键类型
-}
-
-// 输入事件（内部遗留类型，由 InputService 内部使用）
-#[derive(Clone, Debug)]
-pub enum InputEvent {
-  Key(KeyInput),
-  Resize { width: u16, height: u16 },
+  pub code: KeyCode,
+  pub kind: KeyEventKind,
 }
 
 // 按键输入状态
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyEventKind {
-  Press,   // 按下
-  Release, // 松开
-  Repeat,  // 持续按下
+  Press,
+  Release,
+  Repeat,
 }
 
-impl From<KeyEvent> for KeyInput {
-  fn from(event: KeyEvent) -> Self {
+// 辅助：crossterm KeyEventKind → KeyboardInputKind
+fn keyboard_kind_from_crossterm(kind: crossterm::event::KeyEventKind) -> KeyboardInputKind {
+  match kind {
+    crossterm::event::KeyEventKind::Press => KeyboardInputKind::Press,
+    crossterm::event::KeyEventKind::Release => KeyboardInputKind::Release,
+    crossterm::event::KeyEventKind::Repeat => KeyboardInputKind::Repeat,
+  }
+}
+
+// 辅助：KeyboardInputKind → 遗留 KeyEventKind
+fn legacy_key_kind_from_keyboard(kind: KeyboardInputKind) -> KeyEventKind {
+  match kind {
+    KeyboardInputKind::Press => KeyEventKind::Press,
+    KeyboardInputKind::Release => KeyEventKind::Release,
+    KeyboardInputKind::Repeat => KeyEventKind::Repeat,
+  }
+}
+
+impl From<KeyboardInputEvent> for KeyInput {
+  fn from(event: KeyboardInputEvent) -> Self {
     Self {
       code: event.code,
-      kind: match event.kind {
-        crossterm::event::KeyEventKind::Press => KeyEventKind::Press,
-        crossterm::event::KeyEventKind::Release => KeyEventKind::Release,
-        crossterm::event::KeyEventKind::Repeat => KeyEventKind::Repeat,
-      },
+      kind: legacy_key_kind_from_keyboard(event.kind),
     }
   }
 }
 
 pub struct InputService {
-  queue: VecDeque<InputEvent>, // 使用双端队列做按键列表缓冲
+  queue: VecDeque<InputEvent>,
 }
 
 impl InputService {
@@ -54,30 +60,31 @@ impl InputService {
 
   // 收集所有待处理按键
   pub fn poll(&mut self) {
-    // 只要还有按键事件就不断处理
     while poll(Duration::ZERO).unwrap_or(false) {
-      // 从系统读取事件
       match event::read() {
-        // 按键事件
         Ok(Event::Key(key_event)) => {
           self
             .queue
-            .push_back(InputEvent::Key(KeyInput::from(key_event)));
+            .push_back(InputEvent::Keyboard(KeyboardInputEvent::new(
+              key_event.code,
+              key_event.modifiers,
+              keyboard_kind_from_crossterm(key_event.kind),
+            )));
         }
-        // 尺寸变化事件
         Ok(Event::Resize(width, height)) => {
-          self.queue.push_back(InputEvent::Resize { width, height });
+          self
+            .queue
+            .push_back(InputEvent::Window(WindowInputEvent::Resize { width, height }));
         }
-        // 其它事件一律忽略
         _ => {}
       }
     }
   }
 
-  // 获取下一个按键（头部出队并返回）
+  // 获取下一个按键（头部出队并返回兼容性类型）
   pub fn next_key(&mut self) -> Option<KeyInput> {
     match self.queue.pop_front() {
-      Some(InputEvent::Key(key)) => Some(key),
+      Some(InputEvent::Keyboard(key)) => Some(KeyInput::from(key)),
       _ => None,
     }
   }
@@ -89,46 +96,37 @@ impl InputService {
 
   // 消费按键事件
   pub fn consume_key(&mut self, code: KeyCode) -> bool {
-    // 检查队头是否满足匹配
-    // 先获取队头元素，然后为Some类型进入闭包
     let matched = self.queue.front().is_some_and(|event| {
       match event {
-        // 判断键码和状态类型
-        InputEvent::Key(key) => {
-          key.code == code && matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
+        InputEvent::Keyboard(key) => {
+          key.code == code
+            && matches!(key.kind, KeyboardInputKind::Press | KeyboardInputKind::Repeat)
         }
         _ => false,
       }
     });
 
-    // 消费匹配到的按键
     if matched {
-      // 移除头部
       self.queue.pop_front();
-      true
-    } else {
-      false
+      return true;
     }
+
+    false
   }
 
   // 消费尺寸变化事件
   pub fn consume_resize(&mut self) -> Option<(u16, u16)> {
-    // 检查队头是否满足匹配
-    // 先获取队头元素，然后为Some类型进入闭包
     let matched = self.queue.front().and_then(|event| {
       match event {
-        // 这里有个解引用
-        InputEvent::Resize { width, height } => Some((*width, *height)),
+        InputEvent::Window(WindowInputEvent::Resize { width, height }) => Some((*width, *height)),
         _ => None,
       }
     });
 
-    // 消费事件
     if matched.is_some() {
       self.queue.pop_front();
     }
 
-    // 返回提取到的数据
     matched
   }
 }
