@@ -22,7 +22,7 @@ pub fn handle_runtime_keyboard_actions(services: &EngineServices, world: &mut Ru
     return;
   }
 
-  let actions = resolve_runtime_keyboard_actions(services.input.keyboard_state());
+  let actions = resolve_runtime_keyboard_actions(services.input.keyboard_state(), &world.session);
 
   for action in actions {
     world.session.handle_runtime_action(action);
