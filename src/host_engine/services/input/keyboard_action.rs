@@ -19,6 +19,7 @@ where
   pub trigger: KeyboardActionTrigger,
   pub action: Action,
   pub priority: i32,
+  pub consume: bool,
 }
 
 impl<Action> KeyboardActionBinding<Action>
@@ -30,11 +31,16 @@ where
   }
 
   pub fn with_priority(key: KeyCode, trigger: KeyboardActionTrigger, action: Action, priority: i32) -> Self {
+    Self::with_options(key, trigger, action, priority, true)
+  }
+
+  pub fn with_options(key: KeyCode, trigger: KeyboardActionTrigger, action: Action, priority: i32, consume: bool) -> Self {
     Self {
       key,
       trigger,
       action,
       priority,
+      consume,
     }
   }
 
@@ -46,6 +52,17 @@ where
       KeyboardActionTrigger::Held => state.is_held(self.key),
     }
   }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResolvedKeyboardAction<Action>
+where
+  Action: Copy,
+{
+  pub action: Action,
+  pub key: KeyCode,
+  pub priority: i32,
+  pub consume: bool,
 }
 
 pub struct KeyboardActionMap<Action>
@@ -76,11 +93,28 @@ where
   }
 
   pub fn resolve(&self, state: &KeyboardFrameState) -> Vec<Action> {
+    self
+      .resolve_detailed(state)
+      .into_iter()
+      .map(|resolved| resolved.action)
+      .collect()
+  }
+
+  pub fn resolve_detailed(&self, state: &KeyboardFrameState) -> Vec<ResolvedKeyboardAction<Action>> {
     let mut matched = Vec::new();
 
     for (index, binding) in self.bindings.iter().enumerate() {
       if binding.matches(state) {
-        matched.push((binding.priority, index, binding.action));
+        matched.push((
+          binding.priority,
+          index,
+          ResolvedKeyboardAction {
+            action: binding.action,
+            key: binding.key,
+            priority: binding.priority,
+            consume: binding.consume,
+          },
+        ));
       }
     }
 

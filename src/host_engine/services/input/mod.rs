@@ -8,7 +8,9 @@ mod window;
 
 pub use event::InputEvent;
 pub use keyboard::{KeyboardInputEvent, KeyboardInputKind};
-pub use keyboard_action::{KeyboardActionBinding, KeyboardActionMap, KeyboardActionTrigger};
+pub use keyboard_action::{
+  KeyboardActionBinding, KeyboardActionMap, KeyboardActionTrigger, ResolvedKeyboardAction,
+};
 pub use keyboard_state::KeyboardFrameState;
 pub use mouse::{MouseButton, MouseInputEvent, MouseInputKind};
 pub use service::{InputService, KeyEventKind, KeyInput};

@@ -26,6 +26,7 @@ pub use input::{
   KeyboardActionBinding,
   KeyboardActionMap,
   KeyboardActionTrigger,
+  ResolvedKeyboardAction,
   KeyboardFrameState,
   KeyboardInputEvent,
   KeyboardInputKind,
