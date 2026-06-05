@@ -22,6 +22,7 @@ pub use game::{GameService, GameSessionState};
 pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
 pub use input::{
   InputEvent,
+  InputEventQueue,
   InputService,
   KeyboardActionBinding,
   KeyboardActionLayer,
@@ -29,15 +30,15 @@ pub use input::{
   KeyboardActionMap,
   KeyboardActionResolver,
   KeyboardActionTrigger,
-  ResolvedKeyboardAction,
   KeyboardFrameState,
   KeyboardInputEvent,
   KeyboardInputKind,
-  KeyEventKind,
-  KeyInput,
   MouseButton,
   MouseInputEvent,
   MouseInputKind,
+  RawInputEvent,
+  RawInputSource,
+  ResolvedKeyboardAction,
   WindowInputEvent,
 };
 pub use log::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};

@@ -5,6 +5,8 @@ mod keyboard_layer;
 mod keyboard_resolver;
 mod keyboard_state;
 mod mouse;
+mod queue;
+mod raw_event;
 mod service;
 mod window;
 
@@ -17,5 +19,7 @@ pub use keyboard_layer::{KeyboardActionLayer, KeyboardActionLayerKind};
 pub use keyboard_resolver::KeyboardActionResolver;
 pub use keyboard_state::KeyboardFrameState;
 pub use mouse::{MouseButton, MouseInputEvent, MouseInputKind};
-pub use service::{InputService, KeyEventKind, KeyInput};
+pub use queue::InputEventQueue;
+pub use raw_event::{RawInputEvent, RawInputSource};
+pub use service::InputService;
 pub use window::WindowInputEvent;
