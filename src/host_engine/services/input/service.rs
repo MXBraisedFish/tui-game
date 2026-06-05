@@ -17,6 +17,7 @@ use super::{
   InputEvent,
   InputEventQueue,
   KeyboardFrameState,
+  KeyboardInputBackend,
   KeyboardInputEvent,
   KeyboardInputKind,
   MouseButton,
@@ -69,6 +70,7 @@ pub struct InputService {
   queue: InputEventQueue,
   external_raw_queue: ExternalRawInputQueue,
   global_keyboard: GlobalKeyboardListener,
+  keyboard_backend: KeyboardInputBackend,
   keyboard_state: KeyboardFrameState,
 }
 
@@ -78,6 +80,7 @@ impl InputService {
       queue: InputEventQueue::new(),
       external_raw_queue: ExternalRawInputQueue::new(),
       global_keyboard: GlobalKeyboardListener::new(),
+      keyboard_backend: KeyboardInputBackend::Terminal,
       keyboard_state: KeyboardFrameState::new(),
     }
   }
@@ -98,7 +101,25 @@ impl InputService {
     self.queue.clear();
   }
 
+  fn should_accept_raw_input_event(&self, event: &RawInputEvent) -> bool {
+    match event {
+      RawInputEvent::Keyboard { source, .. } => {
+        match source {
+          RawInputSource::Terminal => self.uses_terminal_keyboard_backend(),
+          RawInputSource::GlobalKeyboard => self.uses_global_keyboard_backend(),
+        }
+      }
+      RawInputEvent::Mouse { source, .. } | RawInputEvent::Window { source, .. } => {
+        matches!(source, RawInputSource::Terminal)
+      }
+    }
+  }
+
   pub fn push_raw_event(&mut self, event: RawInputEvent) {
+    if !self.should_accept_raw_input_event(&event) {
+      return;
+    }
+
     match event {
       RawInputEvent::Keyboard { event, .. } => {
         self.keyboard_state.apply_event(event);
@@ -165,6 +186,45 @@ impl InputService {
     self.global_keyboard.is_started()
   }
 
+  pub fn keyboard_backend(&self) -> KeyboardInputBackend {
+    self.keyboard_backend
+  }
+
+  pub fn use_terminal_keyboard_backend(&mut self) {
+    self.keyboard_backend = KeyboardInputBackend::Terminal;
+    self.disable_global_keyboard();
+    self.clear_external_raw_events();
+    self.keyboard_state.clear();
+  }
+
+  pub fn use_global_keyboard_backend(&mut self) {
+    self.keyboard_backend = KeyboardInputBackend::Global;
+    self.clear_external_raw_events();
+    self.keyboard_state.clear();
+    self.start_global_keyboard_listener();
+    self.enable_global_keyboard();
+  }
+
+  pub fn uses_terminal_keyboard_backend(&self) -> bool {
+    matches!(self.keyboard_backend, KeyboardInputBackend::Terminal)
+  }
+
+  pub fn uses_global_keyboard_backend(&self) -> bool {
+    matches!(self.keyboard_backend, KeyboardInputBackend::Global)
+  }
+
+  pub fn suspend_keyboard_input(&mut self) {
+    self.disable_global_keyboard();
+    self.clear_external_raw_events();
+    self.keyboard_state.clear();
+  }
+
+  pub fn resume_keyboard_input(&mut self) {
+    if self.uses_global_keyboard_backend() {
+      self.enable_global_keyboard();
+    }
+  }
+
   pub fn begin_frame(&mut self) {
     self.keyboard_state.begin_frame();
   }
@@ -173,15 +233,17 @@ impl InputService {
     while poll(Duration::ZERO).unwrap_or(false) {
       match event::read() {
         Ok(Event::Key(key_event)) => {
-          let keyboard_event = KeyboardInputEvent::new(
-            key_event.code,
-            key_event.modifiers,
-            keyboard_kind_from_crossterm(key_event.kind),
-          );
-          self.push_raw_event(RawInputEvent::Keyboard {
-            source: RawInputSource::Terminal,
-            event: keyboard_event,
-          });
+          if self.uses_terminal_keyboard_backend() {
+            let keyboard_event = KeyboardInputEvent::new(
+              key_event.code,
+              key_event.modifiers,
+              keyboard_kind_from_crossterm(key_event.kind),
+            );
+            self.push_raw_event(RawInputEvent::Keyboard {
+              source: RawInputSource::Terminal,
+              event: keyboard_event,
+            });
+          }
         }
         Ok(Event::Mouse(mouse_event)) => {
           if let Some(mouse_event) = mouse_event_from_crossterm(mouse_event) {

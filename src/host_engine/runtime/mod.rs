@@ -18,6 +18,9 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   // 启用终端模式
   services.terminal.enter(&mut services.log);
 
+  // 默认使用终端键盘后端
+  services.input.use_terminal_keyboard_backend();
+
   // 构建一个帧循环
   let mut scheduler = FrameScheduler::new();
 

@@ -33,6 +33,7 @@ pub use input::{
   KeyboardActionLayerKind,
   KeyboardActionMap,
   KeyboardActionResolver,
+  KeyboardInputBackend,
   KeyboardActionTrigger,
   KeyboardFrameState,
   KeyboardInputEvent,

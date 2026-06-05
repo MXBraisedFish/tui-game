@@ -3,6 +3,7 @@ mod external_queue;
 mod global_keyboard;
 mod keyboard;
 mod keyboard_action;
+mod keyboard_backend;
 mod keyboard_layer;
 mod keyboard_resolver;
 mod keyboard_state;
@@ -20,6 +21,7 @@ pub use keyboard::{KeyboardInputEvent, KeyboardInputKind};
 pub use keyboard_action::{
   KeyboardActionBinding, KeyboardActionMap, KeyboardActionTrigger, ResolvedKeyboardAction,
 };
+pub use keyboard_backend::KeyboardInputBackend;
 pub use keyboard_layer::{KeyboardActionLayer, KeyboardActionLayerKind};
 pub use keyboard_resolver::KeyboardActionResolver;
 pub use keyboard_state::KeyboardFrameState;

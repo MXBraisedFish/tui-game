@@ -43,9 +43,11 @@ fn handle_runtime_window_event(event: WindowInputEvent, services: &mut EngineSer
     }
     WindowInputEvent::FocusGained => {
       world.session.set_terminal_focused(true);
+      services.input.resume_keyboard_input();
     }
     WindowInputEvent::FocusLost => {
       world.session.set_terminal_focused(false);
+      services.input.suspend_keyboard_input();
     }
   }
 }

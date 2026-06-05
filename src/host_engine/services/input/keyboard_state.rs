@@ -21,6 +21,13 @@ impl KeyboardFrameState {
     }
   }
 
+  pub fn clear(&mut self) {
+    self.held_keys.clear();
+    self.pressed_keys.clear();
+    self.released_keys.clear();
+    self.repeated_keys.clear();
+  }
+
   pub fn begin_frame(&mut self) {
     self.pressed_keys.clear();
     self.released_keys.clear();
