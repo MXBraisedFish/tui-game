@@ -8,10 +8,13 @@ use input_action::key_to_runtime_action;
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
-use crate::host_engine::services::{EngineServices, LogSource};
-
-// 引用按键枚举
-use crossterm::event::KeyCode;
+use crate::host_engine::services::{
+  EngineServices,
+  InputEvent,
+  KeyboardInputKind,
+  LogSource,
+  WindowInputEvent,
+};
 
 // 运行函数
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
@@ -32,23 +35,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     // 更新按键事件队列
     services.input.poll();
 
-    // 临时的响应尺寸变化（后续由正式的 resize 事件处理替换）
-    if let Some((width, height)) = services.input.consume_resize() {
-      services.canvas.resize(width, height);
-      services.ui.on_resize(width, height);
-
-      services.log.info(
-        LogSource::Runtime,
-        format!("[Terminal Resize detected: {}x{}]", width, height),
-      );
+    // 消费所有事件并路由到对应的处理函数
+    while let Some(event) = services.input.next_event() {
+      handle_runtime_input_event(event, services, world);
     }
-
-    // 消费一个键并路由到运行时动作映射
-    let _consumed = if let Some(key) = services.input.next_key() {
-      handle_runtime_key(key.code, world)
-    } else {
-      false
-    };
 
     update(services, world, frame);
     render(services, world, frame);
@@ -71,13 +61,52 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   services.overlay.update();
 }
 
-// 运行时键处理辅助函数
-fn handle_runtime_key(key: KeyCode, world: &mut RuntimeWorld) -> bool {
-  if let Some(action) = key_to_runtime_action(key, &world.session) {
-    world.session.handle_runtime_action(action);
-    return true;
+// 运行时输入事件分派
+fn handle_runtime_input_event(
+  event: InputEvent,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match event {
+    InputEvent::Keyboard(key) => {
+      handle_runtime_keyboard_event(key.code, key.kind, world);
+    }
+    InputEvent::Window(window) => {
+      handle_runtime_window_event(window, services);
+    }
+    InputEvent::Mouse(_) => {}
   }
-  false
+}
+
+// 运行时键盘事件处理
+fn handle_runtime_keyboard_event(
+  code: crossterm::event::KeyCode,
+  kind: KeyboardInputKind,
+  world: &mut RuntimeWorld,
+) {
+  if !matches!(kind, KeyboardInputKind::Press | KeyboardInputKind::Repeat) {
+    return;
+  }
+
+  if let Some(action) = key_to_runtime_action(code, &world.session) {
+    world.session.handle_runtime_action(action);
+  }
+}
+
+// 运行时窗口事件处理
+fn handle_runtime_window_event(event: WindowInputEvent, services: &mut EngineServices) {
+  match event {
+    WindowInputEvent::Resize { width, height } => {
+      services.canvas.resize(width, height);
+      services.ui.on_resize(width, height);
+      services.log.info(
+        LogSource::Runtime,
+        format!("[Terminal Resize detected: {}x{}]", width, height),
+      );
+    }
+    WindowInputEvent::FocusGained => {}
+    WindowInputEvent::FocusLost => {}
+  }
 }
 
 // 绘制函数（保留模式）
