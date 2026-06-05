@@ -1,6 +1,7 @@
-use super::{ExecutionContext, HostSurface, OverlayStack, UiTree};
+use super::{ExecutionContext, HostSurface, OverlayStack, RuntimeState, UiTree};
 
 pub struct RuntimeSession {
+  runtime_state: RuntimeState,
   execution_context: ExecutionContext,
   host_surface: HostSurface,
   ui_tree: UiTree,
@@ -10,11 +11,24 @@ pub struct RuntimeSession {
 impl RuntimeSession {
   pub fn new() -> Self {
     Self {
+      runtime_state: RuntimeState::Running,
       execution_context: ExecutionContext::Host,
       host_surface: HostSurface::MainMenu,
       ui_tree: UiTree::new(),
       overlay_stack: OverlayStack::new(),
     }
+  }
+
+  pub fn runtime_state(&self) -> RuntimeState {
+    self.runtime_state
+  }
+
+  pub fn is_running(&self) -> bool {
+    matches!(self.runtime_state, RuntimeState::Running)
+  }
+
+  pub fn request_stop(&mut self) {
+    self.runtime_state = RuntimeState::Stopping;
   }
 
   pub fn execution_context(&self) -> ExecutionContext {
