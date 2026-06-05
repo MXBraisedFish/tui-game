@@ -3,7 +3,7 @@ use std::thread;
 use std::time::Duration;
 
 // 引用结构体和枚举
-use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
+use crate::host_engine::core::{ExitState, FrameScheduler, OverlayKind, RuntimeWorld};
 use crate::host_engine::services::{EngineServices, LogSource};
 
 // 引用按键枚举
@@ -37,6 +37,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         LogSource::Runtime,
         format!("[Terminal Resize detected: {}x{}]", width, height),
       );
+    }
+
+    // 临时覆盖层测试：F1 压入，F2 弹出
+    if services.input.consume_key(KeyCode::F(1)) {
+      world.session.push_overlay(OverlayKind::ConfirmExit);
+    }
+    if services.input.consume_key(KeyCode::F(2)) {
+      world.session.pop_overlay();
     }
 
     let mut consumed_input = false;
@@ -83,7 +91,7 @@ fn update(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
 //
 // 注意：此函数只负责绘图调用，不处理终端 I/O。
 // 帧提交由主循环中的 request_frame_update() 统一完成。
-fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) {
+fn render(services: &mut EngineServices, world: &mut RuntimeWorld, frame: u64) {
   // 开始新帧（保留模式，不自动清空缓冲区）
   services.canvas.begin_frame();
 
@@ -122,4 +130,18 @@ fn render(services: &mut EngineServices, _world: &mut RuntimeWorld, frame: u64) 
   services
     .render
     .draw_normal_text(&mut services.canvas, 0, 14, &dirty_info);
+
+  // 临时调试：运行时状态检查
+  let state_info = format!(
+    "Runtime: {:?} | Context: {:?} | Surface: {:?} | UI: {:?} | Overlays: {}",
+    world.session.runtime_state(),
+    world.session.execution_context(),
+    world.session.host_surface(),
+    world.session.current_ui_node(),
+    world.session.overlay_depth(),
+  );
+  services.canvas.clear_span(16, 0, state_info.len() as u16);
+  services
+    .render
+    .draw_normal_text(&mut services.canvas, 0, 16, &state_info);
 }
