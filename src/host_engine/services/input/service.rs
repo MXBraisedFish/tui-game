@@ -244,6 +244,36 @@ impl InputService {
     &self.bindings
   }
 
+  fn pattern_state(&self, pattern: KeyPattern) -> Option<KeyState> {
+    match pattern {
+      KeyPattern::Single(key) => self.key_state(key),
+
+      KeyPattern::Combo(first, second) => {
+        if !self.is_down(first) {
+          return None;
+        }
+
+        self.key_state(second)
+      }
+    }
+  }
+
+  pub fn collect_action_events(&self) -> Vec<InputActionEvent> {
+    let mut events = Vec::new();
+
+    for binding in &self.bindings {
+      if let Some(state) = self.pattern_state(binding.pattern) {
+        events.push(InputActionEvent {
+          event_type: InputEventType::Keyboard,
+          action: binding.action.clone(),
+          state,
+        });
+      }
+    }
+
+    events
+  }
+
   fn apply_key_event(&mut self, event: KeyEvent) {
     match event.kind {
       KeyEventKind::Press => {
