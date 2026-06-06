@@ -1,53 +1,18 @@
-use crate::host_engine::core::RuntimeWorld;
-use crate::host_engine::services::{EngineServices, InputEvent, LogSource, WindowInputEvent};
+use rdev::Key;
 
-use super::input_action::resolve_runtime_keyboard_actions;
-use super::input_context::RuntimeKeyboardContext;
+use crate::host_engine::core::{RuntimeAction, RuntimeWorld};
+use crate::host_engine::services::EngineServices;
 
-pub fn handle_runtime_input_event(
-  event: InputEvent,
-  services: &mut EngineServices,
-  world: &mut RuntimeWorld,
-) {
-  match event {
-    InputEvent::Keyboard(_) => {}
-    InputEvent::Window(window) => {
-      handle_runtime_window_event(window, services, world);
-    }
-    InputEvent::Mouse(_) => {}
-  }
-}
-
-pub fn handle_runtime_keyboard_actions(services: &EngineServices, world: &mut RuntimeWorld) {
-  if !world.session.should_accept_keyboard_input() {
-    return;
+pub fn handle_runtime_keyboard(services: &mut EngineServices, world: &mut RuntimeWorld) {
+  if services.input.was_pressed(Key::F1) {
+    world.session.handle_runtime_action(RuntimeAction::PushDebugOverlay);
   }
 
-  let context = RuntimeKeyboardContext::from_session(&world.session);
-  let actions = resolve_runtime_keyboard_actions(services.input.keyboard_state(), context);
-
-  for action in actions {
-    world.session.handle_runtime_action(action);
+  if services.input.was_pressed(Key::F2) {
+    world.session.handle_runtime_action(RuntimeAction::PopDebugOverlay);
   }
-}
 
-fn handle_runtime_window_event(event: WindowInputEvent, services: &mut EngineServices, world: &mut RuntimeWorld) {
-  match event {
-    WindowInputEvent::Resize { width, height } => {
-      services.canvas.resize(width, height);
-      services.ui.on_resize(width, height);
-      services.log.info(
-        LogSource::Runtime,
-        format!("[Terminal Resize detected: {}x{}]", width, height),
-      );
-    }
-    WindowInputEvent::FocusGained => {
-      world.session.set_terminal_focused(true);
-      services.input.resume_keyboard_input();
-    }
-    WindowInputEvent::FocusLost => {
-      world.session.set_terminal_focused(false);
-      services.input.suspend_keyboard_input();
-    }
+  if services.input.was_pressed(Key::Escape) {
+    world.session.handle_runtime_action(RuntimeAction::Cancel);
   }
 }

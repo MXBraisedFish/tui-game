@@ -4,10 +4,8 @@ use std::time::Duration;
 
 // 引入运行时输入处理
 mod input;
-mod input_action;
-mod input_context;
 
-use input::{handle_runtime_input_event, handle_runtime_keyboard_actions};
+use input::handle_runtime_keyboard;
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
@@ -18,8 +16,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   // 启用终端模式
   services.terminal.enter(&mut services.log);
 
-  // 默认使用终端键盘后端
-  services.input.use_terminal_keyboard_backend();
+  // 启动全局键盘监听器
+  services.input.start_key_listener();
 
   // 构建一个帧循环
   let mut scheduler = FrameScheduler::new();
@@ -32,18 +30,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     // 更新帧时间
     world.clock.tick();
 
-    // 输入帧：开始帧 → 收集终端事件 → 外部事件
+    // 输入帧：开始帧 → 轮询按键 → 处理键盘动作
     services.input.begin_frame();
-    services.input.poll_terminal_events();
-    services.input.drain_external_raw_events();
+    services.input.poll();
 
-    // 消费所有事件并路由到对应的处理函数
-    while let Some(event) = services.input.next_event() {
-      handle_runtime_input_event(event, services, world);
-    }
-
-    // 帧级键盘动作解析（从 KeyboardFrameState 批量映射）
-    handle_runtime_keyboard_actions(services, world);
+    handle_runtime_keyboard(services, world);
 
     update(services, world, frame);
     render(services, world, frame);
