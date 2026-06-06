@@ -32,6 +32,7 @@ pub enum Key {
   End,
   PageUp,
   PageDown,
+  Insert,
   Delete,
 
   Fn(u8),
@@ -66,10 +67,40 @@ pub enum Key {
   Y,
   Z,
 
-  Ctrl,
-  Shift,
-  Alt,
-  Meta,
+  LeftCtrl,
+  RightCtrl,
+  LeftShift,
+  RightShift,
+  LeftAlt,
+  RightAlt,
+  LeftMeta,
+  RightMeta,
+
+  CapsLock,
+  NumLock,
+  ScrollLock,
+
+  PrintScreen,
+  Pause,
+
+  BackQuote,
+  Minus,
+  Equal,
+  LeftBracket,
+  RightBracket,
+  BackSlash,
+  Semicolon,
+  Quote,
+  Comma,
+  Dot,
+  Slash,
+
+  NumpadAdd,
+  NumpadSubtract,
+  NumpadMultiply,
+  NumpadDivide,
+  NumpadEnter,
+  NumpadDelete,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -184,6 +215,7 @@ fn key_from_rdev(key: RdevKey) -> Option<Key> {
     RdevKey::End => Some(Key::End),
     RdevKey::PageUp => Some(Key::PageUp),
     RdevKey::PageDown => Some(Key::PageDown),
+    RdevKey::Insert => Some(Key::Insert),
     RdevKey::Delete => Some(Key::Delete),
 
     RdevKey::F1 => Some(Key::Fn(1)),
@@ -237,10 +269,54 @@ fn key_from_rdev(key: RdevKey) -> Option<Key> {
     RdevKey::KeyY => Some(Key::Y),
     RdevKey::KeyZ => Some(Key::Z),
 
-    RdevKey::ControlLeft | RdevKey::ControlRight => Some(Key::Ctrl),
-    RdevKey::ShiftLeft | RdevKey::ShiftRight => Some(Key::Shift),
-    RdevKey::Alt | RdevKey::AltGr => Some(Key::Alt),
-    RdevKey::MetaLeft | RdevKey::MetaRight => Some(Key::Meta),
+    RdevKey::ControlLeft => Some(Key::LeftCtrl),
+    RdevKey::ControlRight => Some(Key::RightCtrl),
+
+    RdevKey::ShiftLeft => Some(Key::LeftShift),
+    RdevKey::ShiftRight => Some(Key::RightShift),
+
+    RdevKey::Alt => Some(Key::LeftAlt),
+    RdevKey::AltGr => Some(Key::RightAlt),
+
+    RdevKey::MetaLeft => Some(Key::LeftMeta),
+    RdevKey::MetaRight => Some(Key::RightMeta),
+
+    RdevKey::CapsLock => Some(Key::CapsLock),
+    RdevKey::NumLock => Some(Key::NumLock),
+    RdevKey::ScrollLock => Some(Key::ScrollLock),
+
+    RdevKey::PrintScreen => Some(Key::PrintScreen),
+    RdevKey::Pause => Some(Key::Pause),
+
+    RdevKey::BackQuote => Some(Key::BackQuote),
+    RdevKey::Minus => Some(Key::Minus),
+    RdevKey::Equal => Some(Key::Equal),
+    RdevKey::LeftBracket => Some(Key::LeftBracket),
+    RdevKey::RightBracket => Some(Key::RightBracket),
+    RdevKey::BackSlash => Some(Key::BackSlash),
+    RdevKey::SemiColon => Some(Key::Semicolon),
+    RdevKey::Quote => Some(Key::Quote),
+    RdevKey::Comma => Some(Key::Comma),
+    RdevKey::Dot => Some(Key::Dot),
+    RdevKey::Slash => Some(Key::Slash),
+
+    RdevKey::Kp0 => Some(Key::Numpad(0)),
+    RdevKey::Kp1 => Some(Key::Numpad(1)),
+    RdevKey::Kp2 => Some(Key::Numpad(2)),
+    RdevKey::Kp3 => Some(Key::Numpad(3)),
+    RdevKey::Kp4 => Some(Key::Numpad(4)),
+    RdevKey::Kp5 => Some(Key::Numpad(5)),
+    RdevKey::Kp6 => Some(Key::Numpad(6)),
+    RdevKey::Kp7 => Some(Key::Numpad(7)),
+    RdevKey::Kp8 => Some(Key::Numpad(8)),
+    RdevKey::Kp9 => Some(Key::Numpad(9)),
+
+    RdevKey::KpPlus => Some(Key::NumpadAdd),
+    RdevKey::KpMinus => Some(Key::NumpadSubtract),
+    RdevKey::KpMultiply => Some(Key::NumpadMultiply),
+    RdevKey::KpDivide => Some(Key::NumpadDivide),
+    RdevKey::KpReturn => Some(Key::NumpadEnter),
+    RdevKey::KpDelete => Some(Key::NumpadDelete),
 
     _ => None,
   }
