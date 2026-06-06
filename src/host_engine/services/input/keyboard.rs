@@ -1,4 +1,5 @@
-use crossterm::event::{KeyCode, KeyModifiers};
+use crossterm::event::KeyModifiers;
+use super::PhysicalKey;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyboardInputKind {
@@ -9,15 +10,15 @@ pub enum KeyboardInputKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KeyboardInputEvent {
-  pub code: KeyCode,
+  pub key: PhysicalKey,
   pub modifiers: KeyModifiers,
   pub kind: KeyboardInputKind,
 }
 
 impl KeyboardInputEvent {
-  pub fn new(code: KeyCode, modifiers: KeyModifiers, kind: KeyboardInputKind) -> Self {
+  pub fn new(key: PhysicalKey, modifiers: KeyModifiers, kind: KeyboardInputKind) -> Self {
     Self {
-      code,
+      key,
       modifiers,
       kind,
     }

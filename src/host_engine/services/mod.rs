@@ -41,6 +41,7 @@ pub use input::{
   MouseButton,
   MouseInputEvent,
   MouseInputKind,
+  PhysicalKey,
   RawInputEvent,
   RawInputSource,
   ResolvedKeyboardAction,

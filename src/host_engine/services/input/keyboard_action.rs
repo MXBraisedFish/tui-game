@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
-use crossterm::event::KeyCode;
-
-use super::KeyboardFrameState;
+use super::{KeyboardFrameState, PhysicalKey};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyboardActionTrigger {
@@ -17,7 +15,7 @@ pub struct KeyboardActionBinding<Action>
 where
   Action: Copy,
 {
-  pub key: KeyCode,
+  pub key: PhysicalKey,
   pub trigger: KeyboardActionTrigger,
   pub action: Action,
   pub priority: i32,
@@ -28,15 +26,15 @@ impl<Action> KeyboardActionBinding<Action>
 where
   Action: Copy,
 {
-  pub fn new(key: KeyCode, trigger: KeyboardActionTrigger, action: Action) -> Self {
+  pub fn new(key: PhysicalKey, trigger: KeyboardActionTrigger, action: Action) -> Self {
     Self::with_priority(key, trigger, action, 0)
   }
 
-  pub fn with_priority(key: KeyCode, trigger: KeyboardActionTrigger, action: Action, priority: i32) -> Self {
+  pub fn with_priority(key: PhysicalKey, trigger: KeyboardActionTrigger, action: Action, priority: i32) -> Self {
     Self::with_options(key, trigger, action, priority, true)
   }
 
-  pub fn with_options(key: KeyCode, trigger: KeyboardActionTrigger, action: Action, priority: i32, consume: bool) -> Self {
+  pub fn with_options(key: PhysicalKey, trigger: KeyboardActionTrigger, action: Action, priority: i32, consume: bool) -> Self {
     Self {
       key,
       trigger,
@@ -62,7 +60,7 @@ where
   Action: Copy,
 {
   pub action: Action,
-  pub key: KeyCode,
+  pub key: PhysicalKey,
   pub priority: i32,
   pub consume: bool,
 }

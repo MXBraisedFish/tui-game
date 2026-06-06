@@ -7,10 +7,10 @@ use crate::host_engine::services::{
   KeyboardActionResolver,
   KeyboardActionTrigger,
   KeyboardFrameState,
+  PhysicalKey,
 };
 
 use super::input_context::RuntimeKeyboardContext;
-use crossterm::event::KeyCode;
 
 pub fn resolve_runtime_keyboard_actions(state: &KeyboardFrameState, context: RuntimeKeyboardContext) -> Vec<RuntimeAction> {
   let resolver = runtime_keyboard_action_resolver(context);
@@ -60,7 +60,7 @@ fn runtime_root_keyboard_action_map() -> KeyboardActionMap<RuntimeAction> {
 
   // 临时测试映射，后续删除
   map.add_binding(KeyboardActionBinding::with_options(
-    KeyCode::F(1),
+    PhysicalKey::F(1),
     KeyboardActionTrigger::Pressed,
     RuntimeAction::PushDebugOverlay,
     10,
@@ -68,7 +68,7 @@ fn runtime_root_keyboard_action_map() -> KeyboardActionMap<RuntimeAction> {
   ));
 
   map.add_binding(KeyboardActionBinding::with_options(
-    KeyCode::F(2),
+    PhysicalKey::F(2),
     KeyboardActionTrigger::Pressed,
     RuntimeAction::PopDebugOverlay,
     10,
@@ -82,7 +82,7 @@ fn runtime_overlay_keyboard_action_map() -> KeyboardActionMap<RuntimeAction> {
   let mut map = KeyboardActionMap::new();
 
   map.add_binding(KeyboardActionBinding::with_options(
-    KeyCode::Esc,
+    PhysicalKey::Escape,
     KeyboardActionTrigger::Pressed,
     RuntimeAction::CloseOverlay,
     100,
@@ -114,7 +114,7 @@ fn main_menu_keyboard_action_map() -> KeyboardActionMap<RuntimeAction> {
   let mut map = KeyboardActionMap::new();
 
   map.add_binding(KeyboardActionBinding::with_options(
-    KeyCode::Esc,
+    PhysicalKey::Escape,
     KeyboardActionTrigger::Pressed,
     RuntimeAction::Cancel,
     100,

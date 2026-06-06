@@ -26,6 +26,7 @@ use super::{
   RawInputEvent,
   RawInputSource,
   WindowInputEvent,
+  physical_key_from_crossterm,
 };
 
 // 辅助：crossterm KeyEventKind → KeyboardInputKind
@@ -234,15 +235,17 @@ impl InputService {
       match event::read() {
         Ok(Event::Key(key_event)) => {
           if self.uses_terminal_keyboard_backend() {
-            let keyboard_event = KeyboardInputEvent::new(
-              key_event.code,
-              key_event.modifiers,
-              keyboard_kind_from_crossterm(key_event.kind),
-            );
-            self.push_raw_event(RawInputEvent::Keyboard {
-              source: RawInputSource::Terminal,
-              event: keyboard_event,
-            });
+            if let Some(key) = physical_key_from_crossterm(key_event.code) {
+              let keyboard_event = KeyboardInputEvent::new(
+                key,
+                key_event.modifiers,
+                keyboard_kind_from_crossterm(key_event.kind),
+              );
+              self.push_raw_event(RawInputEvent::Keyboard {
+                source: RawInputSource::Terminal,
+                event: keyboard_event,
+              });
+            }
           }
         }
         Ok(Event::Mouse(mouse_event)) => {

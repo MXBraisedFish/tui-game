@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
-use crossterm::event::KeyCode;
-
-use super::{KeyboardActionLayer, KeyboardFrameState, ResolvedKeyboardAction};
+use super::{KeyboardActionLayer, KeyboardFrameState, PhysicalKey, ResolvedKeyboardAction};
 
 pub struct KeyboardActionResolver<Action>
 where
@@ -56,7 +54,7 @@ where
         .then_with(|| right.2.cmp(&left.2))
     });
 
-    let mut consumed_keys = HashSet::<KeyCode>::new();
+    let mut consumed_keys = HashSet::<PhysicalKey>::new();
     let mut resolved_actions = Vec::new();
 
     for (_, _, _, action) in matched {

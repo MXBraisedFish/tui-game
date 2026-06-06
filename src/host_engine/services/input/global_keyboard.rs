@@ -7,7 +7,7 @@ use std::thread;
 use crossterm::event::KeyModifiers;
 use rdev::{Event, EventType, listen};
 
-use super::key_code_from_rdev;
+use super::physical_key_from_rdev;
 use super::{ExternalRawInputSender, KeyboardInputEvent, KeyboardInputKind, RawInputEvent, RawInputSource};
 
 #[derive(Clone)]
@@ -92,18 +92,18 @@ impl GlobalKeyboardListener {
 fn raw_event_from_rdev(event: Event) -> Option<RawInputEvent> {
   match event.event_type {
     EventType::KeyPress(key) => {
-      key_code_from_rdev(key).map(|code| {
+      physical_key_from_rdev(key).map(|key| {
         RawInputEvent::Keyboard {
           source: RawInputSource::GlobalKeyboard,
-          event: KeyboardInputEvent::new(code, KeyModifiers::empty(), KeyboardInputKind::Press),
+          event: KeyboardInputEvent::new(key, KeyModifiers::empty(), KeyboardInputKind::Press),
         }
       })
     }
     EventType::KeyRelease(key) => {
-      key_code_from_rdev(key).map(|code| {
+      physical_key_from_rdev(key).map(|key| {
         RawInputEvent::Keyboard {
           source: RawInputSource::GlobalKeyboard,
-          event: KeyboardInputEvent::new(code, KeyModifiers::empty(), KeyboardInputKind::Release),
+          event: KeyboardInputEvent::new(key, KeyModifiers::empty(), KeyboardInputKind::Release),
         }
       })
     }
