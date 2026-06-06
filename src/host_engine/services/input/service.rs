@@ -7,12 +7,7 @@ use std::thread;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
-use rdev::{
-  Event,
-  EventType,
-  Key as RdevKey,
-  listen,
-};
+use rdev::{Event, EventType, Key as RdevKey, listen};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Key {
@@ -115,6 +110,46 @@ pub struct KeyEvent {
   pub kind: KeyEventKind,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum KeyState {
+  Pressed,
+  Held,
+  Released,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum KeyPattern {
+  Single(Key),
+  Combo(Key, Key),
+}
+
+impl KeyPattern {
+  pub fn main_key(&self) -> Key {
+    match self {
+      KeyPattern::Single(key) => *key,
+      KeyPattern::Combo(_, key) => *key,
+    }
+  }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeyBinding {
+  pub pattern: KeyPattern,
+  pub action: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InputEventType {
+  Keyboard,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InputActionEvent {
+  pub event_type: InputEventType,
+  pub action: String,
+  pub state: KeyState,
+}
+
 pub struct InputService {
   sender: Sender<KeyEvent>,
   receiver: Receiver<KeyEvent>,
@@ -122,6 +157,7 @@ pub struct InputService {
   held_keys: HashSet<Key>,
   pressed_keys: HashSet<Key>,
   released_keys: HashSet<Key>,
+  bindings: Vec<KeyBinding>,
 }
 
 impl InputService {
@@ -134,6 +170,7 @@ impl InputService {
       held_keys: HashSet::new(),
       pressed_keys: HashSet::new(),
       released_keys: HashSet::new(),
+      bindings: Vec::new(),
     }
   }
 
@@ -177,21 +214,48 @@ impl InputService {
     self.released_keys.contains(&key)
   }
 
+  pub fn key_state(&self, key: Key) -> Option<KeyState> {
+    if self.pressed_keys.contains(&key) {
+      return Some(KeyState::Pressed);
+    }
+
+    if self.released_keys.contains(&key) {
+      return Some(KeyState::Released);
+    }
+
+    if self.held_keys.contains(&key) {
+      return Some(KeyState::Held);
+    }
+
+    None
+  }
+
   pub fn clear(&mut self) {
     self.held_keys.clear();
     self.pressed_keys.clear();
     self.released_keys.clear();
   }
 
+  pub fn load_key_bindings(&mut self, bindings: Vec<KeyBinding>) {
+    self.bindings = bindings;
+  }
+
+  pub fn key_bindings(&self) -> &[KeyBinding] {
+    &self.bindings
+  }
+
   fn apply_key_event(&mut self, event: KeyEvent) {
     match event.kind {
       KeyEventKind::Press => {
-        self.held_keys.insert(event.key);
-        self.pressed_keys.insert(event.key);
+        if self.held_keys.insert(event.key) {
+          self.pressed_keys.insert(event.key);
+        }
       }
+
       KeyEventKind::Release => {
-        self.held_keys.remove(&event.key);
-        self.released_keys.insert(event.key);
+        if self.held_keys.remove(&event.key) {
+          self.released_keys.insert(event.key);
+        }
       }
     }
   }
@@ -324,18 +388,14 @@ fn key_from_rdev(key: RdevKey) -> Option<Key> {
 
 fn key_event_from_rdev(event: Event) -> Option<KeyEvent> {
   match event.event_type {
-    EventType::KeyPress(key) => {
-      key_from_rdev(key).map(|key| KeyEvent {
-        key,
-        kind: KeyEventKind::Press,
-      })
-    }
-    EventType::KeyRelease(key) => {
-      key_from_rdev(key).map(|key| KeyEvent {
-        key,
-        kind: KeyEventKind::Release,
-      })
-    }
+    EventType::KeyPress(key) => key_from_rdev(key).map(|key| KeyEvent {
+      key,
+      kind: KeyEventKind::Press,
+    }),
+    EventType::KeyRelease(key) => key_from_rdev(key).map(|key| KeyEvent {
+      key,
+      kind: KeyEventKind::Release,
+    }),
     _ => None,
   }
 }
