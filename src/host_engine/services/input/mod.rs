@@ -1,3 +1,8 @@
 mod service;
 
-pub use service::{InputService, KeyEvent, KeyEventKind};
+pub use service::{
+  InputService,
+  Key,
+  KeyEvent,
+  KeyEventKind,
+};

@@ -7,7 +7,70 @@ use std::thread;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
-use rdev::{Event, EventType, Key, listen};
+use rdev::{
+  Event,
+  EventType,
+  Key as RdevKey,
+  listen,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Key {
+  Esc,
+
+  Enter,
+  Tab,
+  Backspace,
+  Space,
+
+  Up,
+  Down,
+  Left,
+  Right,
+
+  Home,
+  End,
+  PageUp,
+  PageDown,
+  Delete,
+
+  Fn(u8),
+
+  Num(u8),
+  Numpad(u8),
+
+  A,
+  B,
+  C,
+  D,
+  E,
+  F,
+  G,
+  H,
+  I,
+  J,
+  K,
+  L,
+  M,
+  N,
+  O,
+  P,
+  Q,
+  R,
+  S,
+  T,
+  U,
+  V,
+  W,
+  X,
+  Y,
+  Z,
+
+  Ctrl,
+  Shift,
+  Alt,
+  Meta,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyEventKind {
@@ -103,10 +166,100 @@ impl InputService {
   }
 }
 
+fn key_from_rdev(key: RdevKey) -> Option<Key> {
+  match key {
+    RdevKey::Escape => Some(Key::Esc),
+
+    RdevKey::Return => Some(Key::Enter),
+    RdevKey::Tab => Some(Key::Tab),
+    RdevKey::Backspace => Some(Key::Backspace),
+    RdevKey::Space => Some(Key::Space),
+
+    RdevKey::UpArrow => Some(Key::Up),
+    RdevKey::DownArrow => Some(Key::Down),
+    RdevKey::LeftArrow => Some(Key::Left),
+    RdevKey::RightArrow => Some(Key::Right),
+
+    RdevKey::Home => Some(Key::Home),
+    RdevKey::End => Some(Key::End),
+    RdevKey::PageUp => Some(Key::PageUp),
+    RdevKey::PageDown => Some(Key::PageDown),
+    RdevKey::Delete => Some(Key::Delete),
+
+    RdevKey::F1 => Some(Key::Fn(1)),
+    RdevKey::F2 => Some(Key::Fn(2)),
+    RdevKey::F3 => Some(Key::Fn(3)),
+    RdevKey::F4 => Some(Key::Fn(4)),
+    RdevKey::F5 => Some(Key::Fn(5)),
+    RdevKey::F6 => Some(Key::Fn(6)),
+    RdevKey::F7 => Some(Key::Fn(7)),
+    RdevKey::F8 => Some(Key::Fn(8)),
+    RdevKey::F9 => Some(Key::Fn(9)),
+    RdevKey::F10 => Some(Key::Fn(10)),
+    RdevKey::F11 => Some(Key::Fn(11)),
+    RdevKey::F12 => Some(Key::Fn(12)),
+
+    RdevKey::Num0 => Some(Key::Num(0)),
+    RdevKey::Num1 => Some(Key::Num(1)),
+    RdevKey::Num2 => Some(Key::Num(2)),
+    RdevKey::Num3 => Some(Key::Num(3)),
+    RdevKey::Num4 => Some(Key::Num(4)),
+    RdevKey::Num5 => Some(Key::Num(5)),
+    RdevKey::Num6 => Some(Key::Num(6)),
+    RdevKey::Num7 => Some(Key::Num(7)),
+    RdevKey::Num8 => Some(Key::Num(8)),
+    RdevKey::Num9 => Some(Key::Num(9)),
+
+    RdevKey::KeyA => Some(Key::A),
+    RdevKey::KeyB => Some(Key::B),
+    RdevKey::KeyC => Some(Key::C),
+    RdevKey::KeyD => Some(Key::D),
+    RdevKey::KeyE => Some(Key::E),
+    RdevKey::KeyF => Some(Key::F),
+    RdevKey::KeyG => Some(Key::G),
+    RdevKey::KeyH => Some(Key::H),
+    RdevKey::KeyI => Some(Key::I),
+    RdevKey::KeyJ => Some(Key::J),
+    RdevKey::KeyK => Some(Key::K),
+    RdevKey::KeyL => Some(Key::L),
+    RdevKey::KeyM => Some(Key::M),
+    RdevKey::KeyN => Some(Key::N),
+    RdevKey::KeyO => Some(Key::O),
+    RdevKey::KeyP => Some(Key::P),
+    RdevKey::KeyQ => Some(Key::Q),
+    RdevKey::KeyR => Some(Key::R),
+    RdevKey::KeyS => Some(Key::S),
+    RdevKey::KeyT => Some(Key::T),
+    RdevKey::KeyU => Some(Key::U),
+    RdevKey::KeyV => Some(Key::V),
+    RdevKey::KeyW => Some(Key::W),
+    RdevKey::KeyX => Some(Key::X),
+    RdevKey::KeyY => Some(Key::Y),
+    RdevKey::KeyZ => Some(Key::Z),
+
+    RdevKey::ControlLeft | RdevKey::ControlRight => Some(Key::Ctrl),
+    RdevKey::ShiftLeft | RdevKey::ShiftRight => Some(Key::Shift),
+    RdevKey::Alt | RdevKey::AltGr => Some(Key::Alt),
+    RdevKey::MetaLeft | RdevKey::MetaRight => Some(Key::Meta),
+
+    _ => None,
+  }
+}
+
 fn key_event_from_rdev(event: Event) -> Option<KeyEvent> {
   match event.event_type {
-    EventType::KeyPress(key) => Some(KeyEvent { key, kind: KeyEventKind::Press }),
-    EventType::KeyRelease(key) => Some(KeyEvent { key, kind: KeyEventKind::Release }),
+    EventType::KeyPress(key) => {
+      key_from_rdev(key).map(|key| KeyEvent {
+        key,
+        kind: KeyEventKind::Press,
+      })
+    }
+    EventType::KeyRelease(key) => {
+      key_from_rdev(key).map(|key| KeyEvent {
+        key,
+        kind: KeyEventKind::Release,
+      })
+    }
     _ => None,
   }
 }
