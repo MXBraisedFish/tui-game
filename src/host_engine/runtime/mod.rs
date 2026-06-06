@@ -25,34 +25,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   // 启动全局键盘监听器
   services.input.start_key_listener();
 
-  // 临时测试动作表：后续由正式动作表解析器替换
-  services.input.load_key_bindings(vec![
-    KeyBinding {
-      pattern: KeyPattern::Single(Key::Esc),
-      action: "quit".to_string(),
-    },
-
-    KeyBinding {
-      pattern: KeyPattern::Single(Key::Fn(1)),
-      action: "overlay.push".to_string(),
-    },
-
-    KeyBinding {
-      pattern: KeyPattern::Single(Key::Fn(2)),
-      action: "overlay.pop".to_string(),
-    },
-
-    KeyBinding {
-      pattern: KeyPattern::Combo(Key::LeftCtrl, Key::S),
-      action: "save".to_string(),
-    },
-
-    KeyBinding {
-      pattern: KeyPattern::Single(Key::S),
-      action: "single.s".to_string(),
-    },
-  ]);
-
   // 构建一个帧循环
   let mut scheduler = FrameScheduler::new();
 
