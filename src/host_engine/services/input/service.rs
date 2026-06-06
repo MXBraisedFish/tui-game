@@ -9,7 +9,7 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use rdev::{Event, EventType, Key as RdevKey, listen};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Key {
   Esc,
 
@@ -124,10 +124,40 @@ pub enum KeyPattern {
 }
 
 impl KeyPattern {
-  pub fn main_key(&self) -> Key {
+  pub fn normalized(self) -> Self {
     match self {
-      KeyPattern::Single(key) => *key,
-      KeyPattern::Combo(_, key) => *key,
+      KeyPattern::Single(key) => KeyPattern::Single(key),
+
+      KeyPattern::Combo(first, second) => {
+        if first <= second {
+          KeyPattern::Combo(first, second)
+        } else {
+          KeyPattern::Combo(second, first)
+        }
+      }
+    }
+  }
+
+  pub fn has_consumed_key(&self, consumed_keys: &HashSet<Key>) -> bool {
+    match self.normalized() {
+      KeyPattern::Single(key) => consumed_keys.contains(&key),
+
+      KeyPattern::Combo(first, second) => {
+        consumed_keys.contains(&first) || consumed_keys.contains(&second)
+      }
+    }
+  }
+
+  pub fn consume_keys(&self, consumed_keys: &mut HashSet<Key>) {
+    match self.normalized() {
+      KeyPattern::Single(key) => {
+        consumed_keys.insert(key);
+      }
+
+      KeyPattern::Combo(first, second) => {
+        consumed_keys.insert(first);
+        consumed_keys.insert(second);
+      }
     }
   }
 }
@@ -153,6 +183,8 @@ pub struct InputActionEvent {
 pub struct InputService {
   sender: Sender<KeyEvent>,
   receiver: Receiver<KeyEvent>,
+  action_sender: Sender<InputActionEvent>,
+  action_receiver: Receiver<InputActionEvent>,
   listener_started: Arc<AtomicBool>,
   held_keys: HashSet<Key>,
   pressed_keys: HashSet<Key>,
@@ -163,9 +195,13 @@ pub struct InputService {
 impl InputService {
   pub fn new() -> Self {
     let (sender, receiver) = unbounded();
+    let (action_sender, action_receiver) = unbounded();
+
     Self {
       sender,
       receiver,
+      action_sender,
+      action_receiver,
       listener_started: Arc::new(AtomicBool::new(false)),
       held_keys: HashSet::new(),
       pressed_keys: HashSet::new(),
@@ -237,7 +273,13 @@ impl InputService {
   }
 
   pub fn load_key_bindings(&mut self, bindings: Vec<KeyBinding>) {
-    self.bindings = bindings;
+    self.bindings = bindings
+      .into_iter()
+      .map(|binding| KeyBinding {
+        pattern: binding.pattern.normalized(),
+        action: binding.action,
+      })
+      .collect();
   }
 
   pub fn key_bindings(&self) -> &[KeyBinding] {
@@ -245,33 +287,83 @@ impl InputService {
   }
 
   fn pattern_state(&self, pattern: KeyPattern) -> Option<KeyState> {
-    match pattern {
+    match pattern.normalized() {
       KeyPattern::Single(key) => self.key_state(key),
 
-      KeyPattern::Combo(first, second) => {
-        if !self.is_down(first) {
-          return None;
-        }
-
-        self.key_state(second)
-      }
+      KeyPattern::Combo(first, second) => self.combo_state(first, second),
     }
+  }
+
+  fn combo_state(&self, first: Key, second: Key) -> Option<KeyState> {
+    let first_released = self.was_released(first);
+    let second_released = self.was_released(second);
+
+    let first_pressed = self.was_pressed(first);
+    let second_pressed = self.was_pressed(second);
+
+    let first_down = self.is_down(first);
+    let second_down = self.is_down(second);
+
+    if first_released && self.key_is_active_or_changed(second) {
+      return Some(KeyState::Released);
+    }
+
+    if second_released && self.key_is_active_or_changed(first) {
+      return Some(KeyState::Released);
+    }
+
+    if first_pressed && second_down {
+      return Some(KeyState::Pressed);
+    }
+
+    if second_pressed && first_down {
+      return Some(KeyState::Pressed);
+    }
+
+    if first_down && second_down {
+      return Some(KeyState::Held);
+    }
+
+    None
+  }
+
+  fn key_is_active_or_changed(&self, key: Key) -> bool {
+    self.is_down(key) || self.was_pressed(key) || self.was_released(key)
   }
 
   pub fn collect_action_events(&self) -> Vec<InputActionEvent> {
     let mut events = Vec::new();
+    let mut consumed_keys = HashSet::new();
 
     for binding in &self.bindings {
-      if let Some(state) = self.pattern_state(binding.pattern) {
+      let pattern = binding.pattern.normalized();
+
+      if pattern.has_consumed_key(&consumed_keys) {
+        continue;
+      }
+
+      if let Some(state) = self.pattern_state(pattern) {
         events.push(InputActionEvent {
           event_type: InputEventType::Keyboard,
           action: binding.action.clone(),
           state,
         });
+
+        pattern.consume_keys(&mut consumed_keys);
       }
     }
 
     events
+  }
+
+  pub fn dispatch_action_events(&self) {
+    for event in self.collect_action_events() {
+      let _ = self.action_sender.send(event);
+    }
+  }
+
+  pub fn next_action_event(&self) -> Option<InputActionEvent> {
+    self.action_receiver.try_recv().ok()
   }
 
   fn apply_key_event(&mut self, event: KeyEvent) {
