@@ -13,7 +13,8 @@
       "Bash(rg \"rdev::Key|use rdev\" src/ --include=\"*.rs\")",
       "Bash(rg \"\\\\bKey::\" src/ --include=\"*.rs\")",
       "Bash(tui-game)",
-      "Bash(grep -E \"error|warning: `tui-game`|Finished\")"
+      "Bash(grep -E \"error|warning: `tui-game`|Finished\")",
+      "Bash(grep -E \"^error|warning: `tui-game`|Finished\")"
     ]
   }
 }
