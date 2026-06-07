@@ -1,4 +1,1 @@
-mod service;
-mod text;
-
-pub use service::RenderService;
+// Render 服务模块（重构占位）
