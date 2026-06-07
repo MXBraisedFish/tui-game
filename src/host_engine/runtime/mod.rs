@@ -5,7 +5,7 @@ use std::time::Duration;
 // 引入运行时输入处理
 mod input;
 
-use input::handle_runtime_keyboard;
+// use input::handle_runtime_keyboard;
 
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
@@ -29,7 +29,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut scheduler = FrameScheduler::new();
 
   // 开始循环
-  while world.session.is_running() {
+  // while world.session.is_running() {
     // 1. 帧起始
 
     // 2. 全局时间处理
@@ -41,7 +41,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     // 5. 呈现
 
     // 6. 帧等待（结束）
-  }
+  // }
 
   // 返回退出信息块
   ExitState::new()

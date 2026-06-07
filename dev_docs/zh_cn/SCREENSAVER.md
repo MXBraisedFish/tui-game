@@ -479,3 +479,17 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 **样图**
 ![默认头图](./image/screensaver_banner.png)
+
+
+ALL
+- Boot
+- Init
+- Runtime
+	- MainHost
+		- Hsot
+			- UiTree
+		- Game
+			- GameLoop
+	- Overlay
+- Shutdown
+- Stopped
