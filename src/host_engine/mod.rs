@@ -26,6 +26,8 @@ pub mod shutdown;
 pub mod core;
 // 引擎服务：渲染画布、日志记录、Lua 虚拟机等
 pub mod services;
+// 用户界面：UI 树节点与页面实现
+pub mod ui;
 
 // --- 内部依赖 ---
 
