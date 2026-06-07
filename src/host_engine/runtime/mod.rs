@@ -2,11 +2,6 @@
 use std::thread;
 use std::time::Duration;
 
-// 引入运行时输入处理
-mod input;
-
-// use input::handle_runtime_keyboard;
-
 // 引用结构体和枚举
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld};
 use crate::host_engine::services::{
@@ -31,10 +26,12 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   // 开始循环
   // while world.session.is_running() {
     // 1. 帧起始
+    // - 画布起始帧
+    // - 时间起始帧
 
-    // 2. 全局时间处理
+    // 2. 输入处理 -> 路由到状态机
 
-    // 3. 输入处理 -> 路由到状态机
+    // 3. 更新 -> 路由到状态机
 
     // 4. 绘制 -> 路由到状态机
 
