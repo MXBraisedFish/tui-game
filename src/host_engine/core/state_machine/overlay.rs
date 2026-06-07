@@ -1,18 +1,18 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverlayStackState {
-  pub stack: Vec<OverlayState>,
+    pub stack: Vec<OverlayState>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverlayState {
-  pub kind: OverlayKind,
-  pub logic: OverlayLogicState,
-  pub render: OverlayRenderState,
+    pub kind: OverlayKind,
+    pub logic: OverlayLogicState,
+    pub render: OverlayRenderState,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayKind {
-  ConfirmExit,
+    ConfirmExit,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,38 +23,43 @@ pub struct OverlayRenderState;
 
 // 覆盖层状态
 impl OverlayStackState {
-  // 覆盖层是否为空
-  pub fn is_empty(&self) -> bool {
-    self.stack.is_empty()
-  }
+    // 创建空的覆盖层栈
+    pub fn new() -> Self {
+        Self { stack: Vec::new() }
+    }
 
-  // 覆盖层可用数量
-  pub fn len(&self) -> usize {
-    self.stack.len()
-  }
+    // 覆盖层是否为空
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
 
-  // 获取顶层覆盖层
-  pub fn top(&self) -> Option<&OverlayState> {
-    self.stack.last()
-  }
+    // 覆盖层可用数量
+    pub fn len(&self) -> usize {
+        self.stack.len()
+    }
 
-  // 获取顶层覆盖层（可变）
-  pub fn top_mut(&mut self) -> Option<&mut OverlayState> {
-    self.stack.last_mut()
-  }
+    // 获取顶层覆盖层
+    pub fn top(&self) -> Option<&OverlayState> {
+        self.stack.last()
+    }
 
-  // 添加覆盖层
-  pub fn push(&mut self, overlay: OverlayState) {
-    self.stack.push(overlay);
-  }
+    // 获取顶层覆盖层（可变）
+    pub fn top_mut(&mut self) -> Option<&mut OverlayState> {
+        self.stack.last_mut()
+    }
 
-  // 弹出覆盖层
-  pub fn pop(&mut self) -> Option<OverlayState> {
-    self.stack.pop()
-  }
+    // 添加覆盖层
+    pub fn push(&mut self, overlay: OverlayState) {
+        self.stack.push(overlay);
+    }
 
-  // 清理覆盖层
-  pub fn clear(&mut self) {
-    self.stack.clear();
-  }
+    // 弹出覆盖层
+    pub fn pop(&mut self) -> Option<OverlayState> {
+        self.stack.pop()
+    }
+
+    // 清理覆盖层
+    pub fn clear(&mut self) {
+        self.stack.clear();
+    }
 }

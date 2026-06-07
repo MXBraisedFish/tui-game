@@ -48,7 +48,7 @@ pub fn run() {
   install_panic_hook();
 
   // --- 启动阶段 ---
-  set_crash_phase(CrashPhase::Preparing);
+  set_crash_phase(CrashPhase::Init);
   let boot_output = boot::prepare();
 
   // 分离引擎服务和游戏世界

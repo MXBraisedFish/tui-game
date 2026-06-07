@@ -7,6 +7,12 @@ pub struct HostState {
 
 // 宿主状态
 impl HostState {
+    pub fn new() -> Self {
+        Self {
+            ui_tree: UiTreeState::new(),
+        }
+    }
+
     pub fn ui_tree(&self) -> &UiTreeState {
         &self.ui_tree
     }

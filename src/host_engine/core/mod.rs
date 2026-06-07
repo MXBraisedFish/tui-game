@@ -13,4 +13,5 @@ pub use clock::EngineClock;
 pub use crash::{CrashPhase, current_crash_phase, install_panic_hook, set_crash_phase};
 pub use exit_state::ExitState;
 pub use frame::FrameScheduler;
+pub use state_machine::HostMachineState;
 pub use world::RuntimeWorld;
