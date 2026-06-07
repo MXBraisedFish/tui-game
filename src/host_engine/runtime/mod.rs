@@ -17,26 +17,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     // 构建一个帧循环
     let mut scheduler = FrameScheduler::new(60);
 
-    // ── 调试：固定帧数测试循环（~5秒，300帧 @ 60fps）──
-    // TODO(debug): 状态机接入后替换为正式循环
-    for _ in 0..300 {
-        let frame = scheduler.begin_frame();
-
-        world.clock.tick();
-
-        services.canvas.begin_frame();
-        services.canvas.clear();
-
-        // 调试渲染
-        render_debug_frame(services, world, frame);
-
-        // TODO(error): 错误处理之后统一处理
-        let _ = services.canvas.present(&mut services.terminal);
-
-        scheduler.wait_for_next_frame();
-    }
-    // ── 调试循环结束 ──
-
     // TODO(runtime): 正式循环（状态机接入后启用）
     // 开始循环
     // while world.session.is_running() {
@@ -64,44 +44,3 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     ExitState::new()
 }
 
-// ── 调试渲染函数（状态机接入后删除）──
-// TODO(debug): 临时渲染，用于验证 FrameScheduler + EngineClock + Canvas + Render 联调
-fn render_debug_frame(
-    services: &mut EngineServices,
-    world: &RuntimeWorld,
-    frame: u64,
-) {
-    services.render.draw_text(
-        &mut services.canvas,
-        0,
-        0,
-        "Runtime heartbeat test",
-    );
-
-    services.render.draw_text(
-        &mut services.canvas,
-        0,
-        1,
-        &format!("Frame: {}", frame),
-    );
-
-    services.render.draw_text(
-        &mut services.canvas,
-        0,
-        2,
-        &format!(
-            "dt: {:.3} ms",
-            world.clock.delta_time().as_secs_f64() * 1000.0,
-        ),
-    );
-
-    services.render.draw_text(
-        &mut services.canvas,
-        0,
-        3,
-        &format!(
-            "elapsed: {:.2} s",
-            world.clock.elapsed().as_secs_f64(),
-        ),
-    );
-}
