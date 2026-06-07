@@ -5,6 +5,7 @@ pub mod crash;
 pub mod exit_state;
 pub mod frame;
 pub mod world;
+pub mod state_machine;
 
 // 引用结构体
 pub use boot_output::BootOutput;
