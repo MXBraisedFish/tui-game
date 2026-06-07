@@ -21,7 +21,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   services.input.start_key_listener();
 
   // 构建一个帧循环
-  let mut scheduler = FrameScheduler::new();
+  let mut scheduler = FrameScheduler::new(60);
 
   // 开始循环
   // while world.session.is_running() {
