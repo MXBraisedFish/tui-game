@@ -6,7 +6,6 @@ mod log;
 mod lua;
 mod overlay;
 mod package;
-mod render;
 mod rich_text;
 mod storage;
 mod terminal;
@@ -14,6 +13,7 @@ mod terminal_capabilities;
 mod ui;
 mod unicode;
 
+pub use canvas::CanvasService;
 pub use game::{GameService, GameSessionState};
 pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
 pub use input::{
@@ -51,6 +51,7 @@ pub struct EngineServices {
     pub i18n: I18nService,
     pub rich_text: RichTextService,
     pub unicode: UnicodeService,
+    pub canvas: CanvasService,
 }
 
 impl EngineServices {
@@ -70,6 +71,7 @@ impl EngineServices {
             i18n: I18nService::new(),
             rich_text: RichTextService::new(),
             unicode: UnicodeService::new(),
+            canvas: CanvasService::new(),
         }
     }
 }
