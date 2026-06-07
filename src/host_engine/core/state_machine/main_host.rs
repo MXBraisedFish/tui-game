@@ -49,4 +49,14 @@ impl MainHostState {
       _ => None,
     }
   }
+
+  // 切换到Host状态
+  pub fn switch_to_host(&mut self, host: HostState) {
+    *self = MainHostState::Host(host);
+  }
+
+  // 切换到Game状态
+  pub fn switch_to_game(&mut self, game: GameState) {
+    *self = MainHostState::Game(game);
+  }
 }
