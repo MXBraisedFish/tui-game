@@ -14,7 +14,8 @@
       "Bash(rg \"\\\\bKey::\" src/ --include=\"*.rs\")",
       "Bash(tui-game)",
       "Bash(grep -E \"error|warning: `tui-game`|Finished\")",
-      "Bash(grep -E \"^error|warning: `tui-game`|Finished\")"
+      "Bash(grep -E \"^error|warning: `tui-game`|Finished\")",
+      "Bash(cargo run *)"
     ]
   }
 }
