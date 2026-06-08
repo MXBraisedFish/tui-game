@@ -18,6 +18,8 @@ pub use canvas::CanvasService;
 pub use game::{GameService, GameSessionState};
 pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
 pub use input::{
+    ActionMapEntry,
+    ActionMapTranslateError,
     InputActionEvent,
     InputEventType,
     InputService,
@@ -27,6 +29,7 @@ pub use input::{
     KeyEventKind,
     KeyPattern,
     KeyState,
+    translate_action_map,
 };
 pub use log::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
 pub use lua::LuaService;

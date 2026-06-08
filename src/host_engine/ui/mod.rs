@@ -1,3 +1,3 @@
 mod home;
 
-pub use home::MainUi;
+pub use home::{HomeUi, HomeUiCommand};
