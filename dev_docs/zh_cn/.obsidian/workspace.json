@@ -55,12 +55,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "SCREENSAVER.md",
+                "file": "GAME.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "SCREENSAVER"
+              "title": "GAME"
             }
           },
           {
@@ -242,12 +242,12 @@
   },
   "active": "ce366b45f5f687f4",
   "lastOpenFiles": [
-    "API.md",
     "BOSS.md",
     "GAME.md",
+    "SCREENSAVER.md",
+    "API.md",
     "LANGUAGE.md",
     "RICH_TEXT.md",
-    "SCREENSAVER.md",
     "image/boss_screensaver_program_flowchart.png",
     "image/screensaver_banner.png",
     "未命名.md",

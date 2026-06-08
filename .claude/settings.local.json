@@ -15,7 +15,9 @@
       "Bash(tui-game)",
       "Bash(grep -E \"error|warning: `tui-game`|Finished\")",
       "Bash(grep -E \"^error|warning: `tui-game`|Finished\")",
-      "Bash(cargo run *)"
+      "Bash(cargo run *)",
+      "Bash(cargo doc *)",
+      "Bash(rg Unknown *)"
     ]
   }
 }

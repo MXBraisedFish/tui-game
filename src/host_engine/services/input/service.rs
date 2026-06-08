@@ -96,6 +96,8 @@ pub enum Key {
   NumpadDivide,
   NumpadEnter,
   NumpadDelete,
+
+  Unknown(u32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -504,6 +506,7 @@ fn key_from_rdev(key: RdevKey) -> Option<Key> {
     RdevKey::KpReturn => Some(Key::NumpadEnter),
     RdevKey::KpDelete => Some(Key::NumpadDelete),
 
+    RdevKey::Unknown(code) => Some(Key::Unknown(code)),
     _ => None,
   }
 }
