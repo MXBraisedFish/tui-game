@@ -1,5 +1,7 @@
 {
-  "engine.title": "TUI Game Engine",
-  "engine.page_home": "Home",
-  "engine.exit_hint": "ESC to exit"
+  "home.settings": "Settings",
+  "home.game_list": "Start Game",
+  "home.countinue": "Countine",
+  "home.about": "About",
+  "home.exit": "Exit"
 }

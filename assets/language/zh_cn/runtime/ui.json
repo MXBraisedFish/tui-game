@@ -1,5 +1,7 @@
 {
-  "engine.title": "TUI 游戏引擎",
-  "engine.page_home": "主页",
-  "engine.exit_hint": "ESC 退出"
+  "home.settings": "设置",
+  "home.game_list": "开始游戏",
+  "home.countinue": "继续游戏",
+  "home.about": "关于",
+  "home.exit": "退出"
 }
