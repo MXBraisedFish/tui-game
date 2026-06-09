@@ -23,6 +23,18 @@ impl CanvasService {
     }
   }
 
+  pub fn width(&self) -> u16 {
+    self.buffer.width()
+  }
+
+  pub fn height(&self) -> u16 {
+    self.buffer.height()
+  }
+
+  pub fn size(&self) -> (u16, u16) {
+    (self.width(), self.height())
+  }
+
   pub fn begin_frame(&mut self) {
     // 为运行生命周期保留。当前最小画布没有帧局部状态。
   }

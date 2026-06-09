@@ -2,6 +2,7 @@ mod canvas;
 mod game;
 mod i18n;
 mod input;
+mod layout;
 mod log;
 mod lua;
 mod overlay;
@@ -32,6 +33,7 @@ pub use input::{
     translate_action_map,
 };
 pub use log::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
+pub use layout::LayoutService;
 pub use lua::LuaService;
 pub use overlay::{OverlayKind, OverlayService};
 pub use package::PackageService;
@@ -58,6 +60,7 @@ pub struct EngineServices {
     pub rich_text: RichTextService,
     pub unicode: UnicodeService,
     pub canvas: CanvasService,
+    pub layout: LayoutService,
 }
 
 impl EngineServices {
@@ -79,6 +82,7 @@ impl EngineServices {
             rich_text: RichTextService::new(),
             unicode: UnicodeService::new(),
             canvas: CanvasService::new(),
+            layout: LayoutService::new(),
         }
     }
 }

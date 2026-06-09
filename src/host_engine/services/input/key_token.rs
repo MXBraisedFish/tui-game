@@ -58,13 +58,11 @@ pub fn parse_key_token(token: &str) -> Option<Key> {
     "kenter" => Some(Key::NumpadEnter),
     "kdel" => Some(Key::NumpadDelete),
 
-    _ => {
-      parse_letter(&token)
-        .or_else(|| parse_number(&token))
-        .or_else(|| parse_function_key(&token))
-        .or_else(|| parse_numpad_number(&token))
-        .or_else(|| parse_unknown_key(&token))
-    }
+    _ => parse_letter(&token)
+      .or_else(|| parse_number(&token))
+      .or_else(|| parse_function_key(&token))
+      .or_else(|| parse_numpad_number(&token))
+      .or_else(|| parse_unknown_key(&token)),
   }
 }
 
