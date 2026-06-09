@@ -9,7 +9,7 @@ pub use about::AboutUi;
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, InputActionEvent, LayoutService, RenderService,
+  ActionMapEntry, CanvasService, InputActionEvent, KeyState, LayoutService, RenderService,
 };
 
 const LOGO_LINES: &[&str] = &[
@@ -93,6 +93,10 @@ impl HomeUi {
     &mut self,
     event: &InputActionEvent,
   ) -> Option<HomeUiCommand> {
+    if event.state != KeyState::Pressed {
+      return None;
+    }
+
     match event.action.as_str() {
       "home.focus_exit" => {
         self.selected_index = 4;

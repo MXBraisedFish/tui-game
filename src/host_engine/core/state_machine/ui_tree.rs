@@ -13,6 +13,7 @@ pub struct UiNodeState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UiNodeKind {
     Root,
+    Home,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,10 +24,17 @@ pub struct UiNodeRenderState;
 
 // UI节点状态
 impl UiNodeState {
-    // 创建根节点
     pub fn root() -> Self {
         Self {
             kind: UiNodeKind::Root,
+            logic: UiNodeLogicState,
+            render: UiNodeRenderState,
+        }
+    }
+
+    pub fn home() -> Self {
+        Self {
+            kind: UiNodeKind::Home,
             logic: UiNodeLogicState,
             render: UiNodeRenderState,
         }
@@ -38,7 +46,7 @@ impl UiTreeState {
     // 创建以根节点初始化的 UI 树
     pub fn new() -> Self {
         Self {
-            path: vec![UiNodeState::root()],
+            path: vec![UiNodeState::home()],
         }
     }
 

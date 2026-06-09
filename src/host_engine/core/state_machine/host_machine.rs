@@ -1,4 +1,4 @@
-use super::RuntimeState;
+use super::{MainHostState, RuntimeState, UiNodeKind};
 use crate::host_engine::core::CrashPhase;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -104,5 +104,18 @@ impl HostMachineState {
 
     pub fn set_stopped(&mut self) {
         *self = HostMachineState::Stopped;
+    }
+
+    // ── UI 查询 ──
+
+    /// 查询当前 UI 节点类型。
+    /// 仅在 Runtime(Host) 状态下返回有意义的值。
+    pub fn current_ui_kind(&self) -> Option<UiNodeKind> {
+        let runtime = self.runtime()?;
+        let MainHostState::Host(host) = runtime.main_host() else {
+            return None;
+        };
+        let node = host.ui_tree().current()?;
+        Some(node.kind)
     }
 }
