@@ -4,10 +4,19 @@ use std::sync::{
   atomic::{AtomicBool, Ordering},
 };
 use std::thread;
+use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
+use crossterm::event::{
+  self as ct_event, Event as CtEvent, MouseEvent as CtMouseEvent,
+  MouseEventKind as CtMouseEventKind,
+};
 use rdev::{Event, EventType, Key as RdevKey, listen};
+
+use super::events::{
+  FocusEvent, MouseButton, MouseEvent, MouseEventKind, ResizeEvent, ScrollDirection, SystemEvent,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Key {
@@ -187,10 +196,16 @@ pub struct InputService {
   receiver: Receiver<KeyEvent>,
   action_sender: Sender<InputActionEvent>,
   action_receiver: Receiver<InputActionEvent>,
-  listener_started: Arc<AtomicBool>,
+  system_sender: Sender<SystemEvent>,
+  system_receiver: Receiver<SystemEvent>,
+  key_listener_started: Arc<AtomicBool>,
+  system_listener_started: Arc<AtomicBool>,
   held_keys: HashSet<Key>,
   pressed_keys: HashSet<Key>,
   released_keys: HashSet<Key>,
+  mouse_held_buttons: HashSet<MouseButton>,
+  mouse_x: u16,
+  mouse_y: u16,
   bindings: Vec<KeyBinding>,
 }
 
@@ -198,22 +213,29 @@ impl InputService {
   pub fn new() -> Self {
     let (sender, receiver) = unbounded();
     let (action_sender, action_receiver) = unbounded();
+    let (system_sender, system_receiver) = unbounded();
 
     Self {
       sender,
       receiver,
       action_sender,
       action_receiver,
-      listener_started: Arc::new(AtomicBool::new(false)),
+      system_sender,
+      system_receiver,
+      key_listener_started: Arc::new(AtomicBool::new(false)),
+      system_listener_started: Arc::new(AtomicBool::new(false)),
       held_keys: HashSet::new(),
       pressed_keys: HashSet::new(),
       released_keys: HashSet::new(),
+      mouse_held_buttons: HashSet::new(),
+      mouse_x: 0,
+      mouse_y: 0,
       bindings: Vec::new(),
     }
   }
 
   pub fn start_key_listener(&self) {
-    if self.listener_started.swap(true, Ordering::SeqCst) {
+    if self.key_listener_started.swap(true, Ordering::SeqCst) {
       return;
     }
 
@@ -227,6 +249,96 @@ impl InputService {
       };
       let _ = listen(callback);
     });
+  }
+
+  /// 启动 crossterm 系统事件监听线程（resize / focus / mouse）。
+  pub fn start_system_listener(&self) {
+    if self.system_listener_started.swap(true, Ordering::SeqCst) {
+      return;
+    }
+
+    let sender = self.system_sender.clone();
+
+    thread::spawn(move || {
+      // 长轮询间隔，避免空转
+      let poll_interval = Duration::from_millis(50);
+      loop {
+        if ct_event::poll(poll_interval).unwrap_or(false) {
+          if let Ok(ct_event) = ct_event::read() {
+            if let Some(sys_event) = system_event_from_crossterm(ct_event) {
+              let _ = sender.send(sys_event);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /// 消费所有待处理的系统事件，每帧调用一次。
+  pub fn poll_system_events(&mut self) {
+    while let Ok(event) = self.system_receiver.try_recv() {
+      self.apply_system_event(&event);
+    }
+  }
+
+  /// 获取所有系统事件并合成 Hold 事件（每帧调用一次）。
+  ///
+  /// 对于当前处于按下状态、但本帧没有 Press/Drag 事件的按钮，
+  /// 在事件列表末尾追加一个 Hold 事件（使用最后已知的鼠标坐标）。
+  pub fn drain_system_events(&mut self) -> Vec<SystemEvent> {
+    let mut events = Vec::new();
+    let mut active_buttons: HashSet<MouseButton> = HashSet::new();
+
+    while let Ok(event) = self.system_receiver.try_recv() {
+      // 记录本帧有 Press / Drag 的按钮
+      if let SystemEvent::Mouse(me) = &event {
+        if let Some(button) = me.button {
+          match me.kind {
+            MouseEventKind::Press | MouseEventKind::Drag => {
+              active_buttons.insert(button);
+            }
+            _ => {}
+          }
+        }
+      }
+      self.apply_system_event(&event);
+      events.push(event);
+    }
+
+    // 合成 Hold 事件：按钮处于按下状态，但本帧没有活跃事件
+    for button in &self.mouse_held_buttons {
+      if !active_buttons.contains(button) {
+        events.push(SystemEvent::Mouse(MouseEvent {
+          kind: MouseEventKind::Hold,
+          button: Some(*button),
+          scroll: None,
+          x: self.mouse_x,
+          y: self.mouse_y,
+        }));
+      }
+    }
+
+    events
+  }
+
+  fn apply_system_event(&mut self, event: &SystemEvent) {
+    if let SystemEvent::Mouse(me) = &event {
+      // 追踪鼠标位置
+      self.mouse_x = me.x;
+      self.mouse_y = me.y;
+
+      if let Some(button) = me.button {
+        match me.kind {
+          MouseEventKind::Press => {
+            self.mouse_held_buttons.insert(button);
+          }
+          MouseEventKind::Release => {
+            self.mouse_held_buttons.remove(&button);
+          }
+          _ => {}
+        }
+      }
+    }
   }
 
   pub fn begin_frame(&mut self) {
@@ -522,5 +634,58 @@ fn key_event_from_rdev(event: Event) -> Option<KeyEvent> {
       kind: KeyEventKind::Release,
     }),
     _ => None,
+  }
+}
+
+// ── crossterm 系统事件转换 ──
+
+fn system_event_from_crossterm(event: CtEvent) -> Option<SystemEvent> {
+  match event {
+    CtEvent::Resize(width, height) => Some(SystemEvent::Resize(ResizeEvent { width, height })),
+    CtEvent::FocusGained => Some(SystemEvent::Focus(FocusEvent { gained: true })),
+    CtEvent::FocusLost => Some(SystemEvent::Focus(FocusEvent { gained: false })),
+    CtEvent::Mouse(me) => Some(SystemEvent::Mouse(mouse_event_from_crossterm(me))),
+    _ => None,
+  }
+}
+
+fn mouse_event_from_crossterm(me: CtMouseEvent) -> MouseEvent {
+  let (kind, button, scroll) = match me.kind {
+    CtMouseEventKind::Down(btn) => (
+      MouseEventKind::Press,
+      Some(mouse_button_from_crossterm(btn)),
+      None,
+    ),
+    CtMouseEventKind::Up(btn) => (
+      MouseEventKind::Release,
+      Some(mouse_button_from_crossterm(btn)),
+      None,
+    ),
+    CtMouseEventKind::Drag(btn) => (
+      MouseEventKind::Drag,
+      Some(mouse_button_from_crossterm(btn)),
+      None,
+    ),
+    CtMouseEventKind::Moved => (MouseEventKind::Move, None, None),
+    CtMouseEventKind::ScrollDown => (MouseEventKind::Scroll, None, Some(ScrollDirection::Down)),
+    CtMouseEventKind::ScrollUp => (MouseEventKind::Scroll, None, Some(ScrollDirection::Up)),
+    CtMouseEventKind::ScrollLeft => (MouseEventKind::Scroll, None, Some(ScrollDirection::Left)),
+    CtMouseEventKind::ScrollRight => (MouseEventKind::Scroll, None, Some(ScrollDirection::Right)),
+  };
+
+  MouseEvent {
+    kind,
+    button,
+    scroll,
+    x: me.column,
+    y: me.row,
+  }
+}
+
+fn mouse_button_from_crossterm(button: crossterm::event::MouseButton) -> MouseButton {
+  match button {
+    crossterm::event::MouseButton::Left => MouseButton::Left,
+    crossterm::event::MouseButton::Middle => MouseButton::Middle,
+    crossterm::event::MouseButton::Right => MouseButton::Right,
   }
 }

@@ -1,5 +1,5 @@
 // 文本样式
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TextStyle {
   pub foreground: Option<TextColor>, // 前景颜色
   pub background: Option<TextColor>, // 背景颜色
@@ -14,14 +14,14 @@ pub struct TextStyle {
 }
 
 // 颜色
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TextColor {
   Terminal(TerminalColor),
   Rgb { r: u8, g: u8, b: u8 },
 }
 
 // 终端默认16色
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TerminalColor {
   Black,
   Red,

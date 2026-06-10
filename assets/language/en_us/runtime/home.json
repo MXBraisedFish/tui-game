@@ -1,0 +1,10 @@
+{
+  "home.settings": "Settings",
+  "home.game_list": "Start Game",
+  "home.countinue": "Countine",
+  "home.about": "About",
+  "home.exit": "Exit",
+  "home.action.focus": "{key:home.focus_start_game}/{key:home.focus_continue_game}/{key:home.focus_settings}/{key:focus_about}/{key:home.focus_exit} Focus",
+  "home.action.select": "{key:home.focus_up}/{key:home.focus_down} Select",
+  "home.action.confirm": "{key:home.confirm} Confirm"
+}

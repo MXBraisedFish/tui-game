@@ -1,5 +1,6 @@
-use super::RichTextParams;
+use super::params::RichTextParams;
 use super::{RichText, RichTextSegment, TextStyle, parse_text_color};
+use crate::host_engine::services::input::format_key_display;
 
 // 富文本前缀
 const RICH_TEXT_PREFIX: &str = "f%";
@@ -154,9 +155,27 @@ fn write_resolved_parameter(output: &mut String, name: &str, params: Option<&Ric
   }
 }
 
-// 替换键
+// 命名空间解析：{value:xxx} | {key:xxx} | {xxx}（向后兼容）
 fn resolve_parameter(name: &str, params: Option<&RichTextParams>) -> Option<String> {
-  params.and_then(|params| params.get(name)).cloned()
+  if let Some((ns, key)) = name.split_once(':') {
+    match ns {
+      "value" => resolve_value(key, params),
+      "key" => resolve_key(key, params),
+      _ => None, // 未知命名空间，保留原文
+    }
+  } else {
+    // 向后兼容：无前缀等同于 value:
+    resolve_value(name, params)
+  }
+}
+
+fn resolve_value(key: &str, params: Option<&RichTextParams>) -> Option<String> {
+  params.and_then(|p| p.values.get(key)).cloned()
+}
+
+fn resolve_key(action: &str, params: Option<&RichTextParams>) -> Option<String> {
+  let patterns = params?.key_actions.get(action)?;
+  Some(format_key_display(patterns))
 }
 
 // 解析标签
@@ -267,4 +286,77 @@ fn apply_tag(tag: &str, current_style: &mut TextStyle) -> bool {
 
   // 输出启用的样式
   current_style.enable_style(tag)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::collections::HashMap;
+
+  fn make_params(
+    values: HashMap<String, String>,
+    key_actions: HashMap<String, Vec<Vec<String>>>,
+  ) -> RichTextParams {
+    RichTextParams {
+      values,
+      key_actions,
+    }
+  }
+
+  #[test]
+  fn key_param_single() {
+    let mut ka = HashMap::new();
+    ka.insert("jump".to_string(), vec![vec!["shift".to_string()]]);
+    let params = make_params(HashMap::new(), ka);
+    let rt = parse("f%{key:jump}", Some(&params));
+    assert_eq!(rt.segments[0].text, "[Shift]");
+  }
+
+  #[test]
+  fn key_param_multi_pattern() {
+    let mut ka = HashMap::new();
+    ka.insert(
+      "move".to_string(),
+      vec![vec!["d".to_string()], vec!["left".to_string(), "shift".to_string()]],
+    );
+    let params = make_params(HashMap::new(), ka);
+    let rt = parse("f%{key:move}", Some(&params));
+    assert_eq!(rt.segments[0].text, "[D]/[Shift + ←]");
+  }
+
+  #[test]
+  fn value_param() {
+    let mut values = HashMap::new();
+    values.insert("name".to_string(), "Alice".to_string());
+    let params = make_params(values, HashMap::new());
+    let rt = parse("f%{value:name}", Some(&params));
+    assert_eq!(rt.segments[0].text, "Alice");
+  }
+
+  #[test]
+  fn backward_compat_no_prefix() {
+    let mut values = HashMap::new();
+    values.insert("name".to_string(), "Bob".to_string());
+    let params = make_params(values, HashMap::new());
+    let rt = parse("f%{name}", Some(&params));
+    assert_eq!(rt.segments[0].text, "Bob");
+  }
+
+  #[test]
+  fn key_not_found_keeps_original() {
+    let params = make_params(HashMap::new(), HashMap::new());
+    let rt = parse("f%{key:unknown}", Some(&params));
+    assert_eq!(rt.segments[0].text, "{key:unknown}");
+  }
+
+  #[test]
+  fn mixed_value_and_key() {
+    let mut values = HashMap::new();
+    values.insert("action".to_string(), "Jump".to_string());
+    let mut ka = HashMap::new();
+    ka.insert("jump".to_string(), vec![vec!["space".to_string()]]);
+    let params = make_params(values, ka);
+    let rt = parse("f%{value:action}: press {key:jump}", Some(&params));
+    assert_eq!(rt.segments[0].text, "Jump: press [Space]");
+  }
 }

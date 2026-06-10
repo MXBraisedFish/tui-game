@@ -14,6 +14,7 @@ pub struct UiNodeState {
 pub enum UiNodeKind {
     Root,
     Home,
+    Settings,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -35,6 +36,14 @@ impl UiNodeState {
     pub fn home() -> Self {
         Self {
             kind: UiNodeKind::Home,
+            logic: UiNodeLogicState,
+            render: UiNodeRenderState,
+        }
+    }
+
+    pub fn settings() -> Self {
+        Self {
+            kind: UiNodeKind::Settings,
             logic: UiNodeLogicState,
             render: UiNodeRenderState,
         }

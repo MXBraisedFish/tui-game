@@ -38,9 +38,6 @@ fn parse_terminal_color(value: &str) -> Option<TerminalColor> {
     "bright_cyan" => Some(TerminalColor::BrightCyan),
     "bright_white" => Some(TerminalColor::BrightWhite),
 
-    "gray" | "grey" => Some(TerminalColor::BrightBlack),
-    "dark_gray" | "dark_grey" => Some(TerminalColor::Black),
-
     _ => None,
   }
 }

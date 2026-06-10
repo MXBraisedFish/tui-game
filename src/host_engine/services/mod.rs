@@ -15,12 +15,13 @@ mod terminal_capabilities;
 mod ui;
 mod unicode;
 
-pub use canvas::CanvasService;
+pub use canvas::{CanvasService, DrawTextParams};
 pub use game::{GameService, GameSessionState};
 pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
 pub use input::{
     ActionMapEntry,
     ActionMapTranslateError,
+    FocusEvent,
     InputActionEvent,
     InputEventType,
     InputService,
@@ -30,20 +31,34 @@ pub use input::{
     KeyEventKind,
     KeyPattern,
     KeyState,
+    MouseButton,
+    MouseEvent,
+    MouseEventKind,
+    ResizeEvent,
+    ScrollDirection,
+    SystemEvent,
+    format_key_display,
     translate_action_map,
 };
 pub use log::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
-pub use layout::LayoutService;
+pub use layout::{
+  LayoutService, Position, Rect, Size, get_terminal_size, get_text_height, get_text_size,
+  get_text_width, resolve_rect, resolve_x, resolve_y, ALIGN_BOTTOM, ALIGN_CENTER,
+  ALIGN_LEFT, ALIGN_MIDDLE, ALIGN_RIGHT, ALIGN_TOP,
+};
 pub use lua::LuaService;
 pub use overlay::{OverlayKind, OverlayService};
 pub use package::PackageService;
 pub use render::RenderService;
-pub use rich_text::{RichText, RichTextService, TerminalColor, TextColor, TextStyle};
+pub use rich_text::{RichText, RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
 pub use terminal_capabilities::{ImageProtocol, TerminalCapabilities};
 pub use ui::UiService;
-pub use unicode::{UnicodeService, char_width, display_width, rich_text_width};
+pub use unicode::{
+    BidiRun, GraphemeInfo, TextDirection, UnicodeService, char_width, display_width, graphemes,
+    line_display_width, rich_text_width,
+};
 
 pub struct EngineServices {
     pub package: PackageService,

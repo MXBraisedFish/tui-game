@@ -35,13 +35,13 @@ pub fn parse_key_token(token: &str) -> Option<Key> {
     "." => Some(Key::Dot),
     "/" => Some(Key::Slash),
 
-    "left_ctrl" => Some(Key::LeftCtrl),
+    "left_ctrl" | "ctrl" => Some(Key::LeftCtrl),
     "right_ctrl" => Some(Key::RightCtrl),
-    "left_shift" => Some(Key::LeftShift),
+    "left_shift" | "shift" => Some(Key::LeftShift),
     "right_shift" => Some(Key::RightShift),
-    "left_alt" => Some(Key::LeftAlt),
+    "left_alt" | "alt" => Some(Key::LeftAlt),
     "right_alt" => Some(Key::RightAlt),
-    "left_meta" => Some(Key::LeftMeta),
+    "left_meta" | "meta" => Some(Key::LeftMeta),
     "right_meta" => Some(Key::RightMeta),
 
     "capslock" => Some(Key::CapsLock),
@@ -133,6 +133,79 @@ fn parse_unknown_key(token: &str) -> Option<Key> {
   Some(Key::Unknown(code))
 }
 
+/// 将原始按键配置格式化为人类可读的显示字符串。
+///
+/// 每个 pattern 内部 key 按固定优先级排序（保证 `[Shift + D]` 而非 `[D + Shift]`），
+/// 再调用 `display_key_token` 显示，格式化后包裹在 `[...]` 中，
+/// 多个 pattern 之间用 `/` 分隔。
+///
+/// 示例：
+/// - `[["shift"]]` → `"[Shift]"`
+/// - `[["d"], ["left", "shift"]]` → `"[D]/[← + Shift]"`
+/// - `[["d", "shift"]]` → `"[Shift + D]"`（Shift 优先级高于字母）
+pub fn format_key_display(patterns: &[Vec<String>]) -> String {
+  patterns
+    .iter()
+    .map(|pattern| {
+      let mut keys: Vec<Key> = pattern
+        .iter()
+        .filter_map(|token| parse_key_token(token))
+        .collect();
+      // 按显示优先级排序
+      keys.sort_by(|a, b| key_display_order(a).cmp(&key_display_order(b)));
+      let display: Vec<String> = keys.iter().map(|k| display_key_token(*k)).collect();
+      if display.is_empty() {
+        // 全部 token 解析失败，回退到原始文本
+        pattern.join(" + ")
+      } else {
+        display.join(" + ")
+      }
+    })
+    .map(|s| format!("[{}]", s))
+    .collect::<Vec<_>>()
+    .join("/")
+}
+
+/// 按键显示优先级。值越小越靠前。
+fn key_display_order(key: &Key) -> u8 {
+  match key {
+    // 1. 功能键
+    Key::LeftCtrl | Key::RightCtrl => 0,
+    Key::LeftShift | Key::RightShift => 1,
+    Key::LeftAlt | Key::RightAlt => 2,
+    Key::LeftMeta | Key::RightMeta => 3,
+    // 2. 字母
+    Key::A | Key::B | Key::C | Key::D | Key::E | Key::F | Key::G | Key::H | Key::I
+    | Key::J | Key::K | Key::L | Key::M | Key::N | Key::O | Key::P | Key::Q | Key::R
+    | Key::S | Key::T | Key::U | Key::V | Key::W | Key::X | Key::Y | Key::Z => 10,
+    // 3. 数字
+    Key::Num(_) => 20,
+    // 4. 小键盘数字
+    Key::Numpad(_) => 30,
+    // 5. 其它符号
+    Key::BackQuote
+    | Key::Minus
+    | Key::Equal
+    | Key::LeftBracket
+    | Key::RightBracket
+    | Key::BackSlash
+    | Key::Semicolon
+    | Key::Quote
+    | Key::Comma
+    | Key::Dot
+    | Key::Slash => 40,
+    // 6. 小键盘其它符号
+    Key::NumpadAdd
+    | Key::NumpadSubtract
+    | Key::NumpadMultiply
+    | Key::NumpadDivide
+    | Key::NumpadEnter
+    | Key::NumpadDelete => 50,
+    // 7. 未知键 & 其它
+    _ => 60,
+  }
+}
+
 pub fn display_key_token(key: Key) -> String {
   match key {
     Key::Esc => "Esc".to_string(),
@@ -153,40 +226,36 @@ pub fn display_key_token(key: Key) -> String {
     Key::Fn(number) => format!("F{}", number),
     Key::Num(number) => number.to_string(),
     Key::Numpad(number) => format!("K{}", number),
-    Key::A => "a".to_string(),
-    Key::B => "b".to_string(),
-    Key::C => "c".to_string(),
-    Key::D => "d".to_string(),
-    Key::E => "e".to_string(),
-    Key::F => "f".to_string(),
-    Key::G => "g".to_string(),
-    Key::H => "h".to_string(),
-    Key::I => "i".to_string(),
-    Key::J => "j".to_string(),
-    Key::K => "k".to_string(),
-    Key::L => "l".to_string(),
-    Key::M => "m".to_string(),
-    Key::N => "n".to_string(),
-    Key::O => "o".to_string(),
-    Key::P => "p".to_string(),
-    Key::Q => "q".to_string(),
-    Key::R => "r".to_string(),
-    Key::S => "s".to_string(),
-    Key::T => "t".to_string(),
-    Key::U => "u".to_string(),
-    Key::V => "v".to_string(),
-    Key::W => "w".to_string(),
-    Key::X => "x".to_string(),
-    Key::Y => "y".to_string(),
-    Key::Z => "z".to_string(),
-    Key::LeftCtrl => "LCtrl".to_string(),
-    Key::RightCtrl => "RCtrl".to_string(),
-    Key::LeftShift => "LShift".to_string(),
-    Key::RightShift => "RShift".to_string(),
-    Key::LeftAlt => "LAlt".to_string(),
-    Key::RightAlt => "RAlt".to_string(),
-    Key::LeftMeta => "LMeta".to_string(),
-    Key::RightMeta => "RMeta".to_string(),
+    Key::A => "a".to_uppercase().to_string(),
+    Key::B => "b".to_uppercase().to_string(),
+    Key::C => "c".to_uppercase().to_string(),
+    Key::D => "d".to_uppercase().to_string(),
+    Key::E => "e".to_uppercase().to_string(),
+    Key::F => "f".to_uppercase().to_string(),
+    Key::G => "g".to_uppercase().to_string(),
+    Key::H => "h".to_uppercase().to_string(),
+    Key::I => "i".to_uppercase().to_string(),
+    Key::J => "j".to_uppercase().to_string(),
+    Key::K => "k".to_uppercase().to_string(),
+    Key::L => "l".to_uppercase().to_string(),
+    Key::M => "m".to_uppercase().to_string(),
+    Key::N => "n".to_uppercase().to_string(),
+    Key::O => "o".to_uppercase().to_string(),
+    Key::P => "p".to_uppercase().to_string(),
+    Key::Q => "q".to_uppercase().to_string(),
+    Key::R => "r".to_uppercase().to_string(),
+    Key::S => "s".to_uppercase().to_string(),
+    Key::T => "t".to_uppercase().to_string(),
+    Key::U => "u".to_uppercase().to_string(),
+    Key::V => "v".to_uppercase().to_string(),
+    Key::W => "w".to_uppercase().to_string(),
+    Key::X => "x".to_uppercase().to_string(),
+    Key::Y => "y".to_uppercase().to_string(),
+    Key::Z => "z".to_uppercase().to_string(),
+    Key::LeftCtrl | Key::RightCtrl => "Ctrl".to_string(),
+    Key::LeftShift | Key::RightShift => "Shift".to_string(),
+    Key::LeftAlt | Key::RightAlt => "Alt".to_string(),
+    Key::LeftMeta | Key::RightMeta => "Meta".to_string(),
     Key::CapsLock => "Caps".to_string(),
     Key::NumLock => "Num".to_string(),
     Key::ScrollLock => "Scrl".to_string(),
@@ -210,5 +279,59 @@ pub fn display_key_token(key: Key) -> String {
     Key::NumpadEnter => "KEnter".to_string(),
     Key::NumpadDelete => "KDel".to_string(),
     Key::Unknown(code) => format!("key({})", code),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn single_key() {
+    assert_eq!(format_key_display(&[vec!["shift".into()]]), "[Shift]");
+    assert_eq!(format_key_display(&[vec!["d".into()]]), "[D]");
+    assert_eq!(format_key_display(&[vec!["enter".into()]]), "[Enter]");
+  }
+
+  #[test]
+  fn combo_sorted_modifier_first() {
+    // d + shift → Shift 优先级 > 字母，所以 [Shift + D]
+    assert_eq!(
+      format_key_display(&[vec!["d".into(), "shift".into()]]),
+      "[Shift + D]"
+    );
+    // shift + d（参数顺序无所谓，内部排序）
+    assert_eq!(
+      format_key_display(&[vec!["shift".into(), "d".into()]]),
+      "[Shift + D]"
+    );
+  }
+
+  #[test]
+  fn multi_pattern() {
+    assert_eq!(
+      format_key_display(&[vec!["d".into()], vec!["left".into(), "shift".into()]]),
+      "[D]/[Shift + ←]"
+    );
+  }
+
+  #[test]
+  fn empty_patterns() {
+    assert_eq!(format_key_display(&[]), "");
+  }
+
+  #[test]
+  fn unknown_token_fallback() {
+    // 未知 token 回退到原始文本
+    assert_eq!(
+      format_key_display(&[vec!["not_a_real_key".into()]]),
+      "[not_a_real_key]"
+    );
+  }
+
+  #[test]
+  fn arrow_keys() {
+    assert_eq!(format_key_display(&[vec!["up".into()]]), "[↑]");
+    assert_eq!(format_key_display(&[vec!["left".into()]]), "[←]");
   }
 }

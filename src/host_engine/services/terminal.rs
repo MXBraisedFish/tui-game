@@ -1,5 +1,5 @@
 // 官方标准输入输出
-use std::io::{self, Read, Stdout, Write, stdout};
+use std::io::{self, Stdout, Write, stdout};
 
 // 光标控制
 use crossterm::cursor::{Hide, Show};
@@ -43,11 +43,6 @@ impl TerminalSurface {
     execute!(stdout, EnableFocusChange)?;
     execute!(stdout, Hide)?;
     stdout.flush()?;
-
-    // 消费 stdin 防止按键泄漏到原始终端。
-    // rdev 通过 OS 钩子捕获键盘，控制台输入缓冲区里的残留事件
-    // 必须被消费掉，否则 raw mode 下仍然可能漏到终端。
-    spawn_stdin_drain();
 
     // 返回守卫
     Ok(Self {
@@ -153,19 +148,3 @@ impl TerminalService {
   }
 }
 
-/// 后台消费 stdin，防止按键事件泄漏到原始终端。
-///
-/// 当前架构中键盘输入由 rdev 通过 OS 钩子捕获，不走 stdin。
-/// 但控制台输入缓冲区仍会收到按键事件——如果不消费，
-/// raw mode 下也可能有少量事件漏到终端（如 Enter 换行）。
-/// 这个线程持续读取 stdin 并丢弃数据。
-///
-/// 后续改用 crossterm 原生事件轮询后可移除。
-fn spawn_stdin_drain() {
-  std::thread::spawn(|| {
-    let mut buf = [0u8; 64];
-    loop {
-      let _ = std::io::stdin().read(&mut buf);
-    }
-  });
-}

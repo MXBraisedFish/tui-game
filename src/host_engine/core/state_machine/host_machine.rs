@@ -1,4 +1,4 @@
-use super::{MainHostState, RuntimeState, UiNodeKind};
+use super::{MainHostState, RuntimeState, UiNodeKind, UiNodeState};
 use crate::host_engine::core::CrashPhase;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -117,5 +117,24 @@ impl HostMachineState {
         };
         let node = host.ui_tree().current()?;
         Some(node.kind)
+    }
+
+    /// 向 UI 树压入一个新节点。
+    pub fn enter_ui_node(&mut self, node: UiNodeState) {
+        if let Some(runtime) = self.runtime_mut() {
+            if let Some(host) = runtime.main_host_mut().host_mut() {
+                host.ui_tree_mut().enter(node);
+            }
+        }
+    }
+
+    /// 从 UI 树弹出一个节点（返回上一级）。
+    pub fn pop_ui_node(&mut self) -> Option<UiNodeState> {
+        self
+            .runtime_mut()?
+            .main_host_mut()
+            .host_mut()?
+            .ui_tree_mut()
+            .back()
     }
 }

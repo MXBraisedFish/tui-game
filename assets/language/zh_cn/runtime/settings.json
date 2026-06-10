@@ -1,0 +1,13 @@
+{
+  "settings.title": "设置",
+  "settings.language": "语言",
+  "settings.key_bindings": "按键设置",
+  "settings.mod": "模组",
+  "settings.storage_management": "存储管理",
+  "settings.security_settings": "安全设置",
+  "settings.display_settings": "显示设置",
+  "settings.action.focus": "{key:settings.focus_language}/{key:settings.focus_key_bindings}/{key:settings.focus_mod}/{key:settings.focus_storage_management}/{key:settings.focus_security_settings}/{key:settings.focus_display_settings} 聚焦",
+  "settings.action.select": "{key:settings.focus_up}/{key:settings.focus_down} 选择",
+  "settings.action.confirm": "{key:settings.confirm} 确认",
+  "settings.action.back": "{key:settings.back} 返回"
+}
