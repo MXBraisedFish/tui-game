@@ -1,0 +1,23 @@
+{
+  "terminal.unicode.title": "Unicode 检测",
+  "terminal.unicode.tip": "请确认您的终端能否正常显示以下文本：",
+  "terminal.unicode.yes": "支持",
+  "terminal.unicode.no": "不支持 (No)",
+
+  "terminal.truecolor.title": "色彩检测",
+  "terminal.truecolor.tip": "请确认以下色带是否为连续平滑过渡（无明显色块边界或条纹）：",
+  "terminal.truecolor.yes": "支持（平滑过渡）",
+  "terminal.truecolor.no-256": "不支持（仅支持256色）",
+  "terminal.truecolor.no-other": "不支持（颜色支持低于256色）",
+
+  "terminal.image.title": "图片协议检测",
+  "terminal.image.tip": "请选择能正确显示下方图片的协议（支持预览切换）：",
+  "terminal.image.kitty": "Kitty",
+  "terminal.image.sixel": "Sixel",
+  "terminal.image.iterm": "iTerm2",
+  "terminal.image.none": "不支持/未知",
+
+  "terminal.action.select": "{key:terminal.focus_up}/{key:terminal.focus_down} 选择",
+  "terminal.action.confirm": "{key:terminal.confirm} 确认",
+  "terminal.action.exit": "{key:terminal.exit} 退出"
+}

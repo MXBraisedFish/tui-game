@@ -4,7 +4,7 @@
 pub struct UiService;
 
 impl UiService {
-    pub fn new() -> Self {
-        Self
-    }
+  pub fn new() -> Self {
+    Self
+  }
 }

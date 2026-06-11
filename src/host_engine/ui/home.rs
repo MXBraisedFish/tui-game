@@ -4,16 +4,16 @@ mod settings;
 
 pub use about::AboutUi;
 pub use game_list::GameListUi;
-pub use settings::{SettingsUi, SettingsUiCommand};
 pub(crate) use settings::SettingsLayout;
+pub use settings::{SettingsUi, SettingsUiCommand};
 
-use std::collections::HashMap;
 use std::fmt::format;
 use std::time::Duration;
 
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, InputActionEvent, KeyState, LayoutService,
-  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, TerminalColor, TextColor,
+  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, TerminalColor,
+  TextColor,
 };
 
 use crate::host_engine::services::I18nService;
@@ -273,30 +273,15 @@ impl HomeUi {
 
     std::array::from_fn(|i| {
       if i == self.selected_index {
-        format!("f%<fg:bright_cyan>▶ {} ◀</fg>", labels[i])
+        format!("f%<fg:bright_cyan>❯ {} ❮</fg>", labels[i])
       } else {
         labels[i].to_string()
       }
     })
   }
 
-  /// 从当前 UI 的 action_map 构建 RichTextParams（含 key_actions）。
-  ///
-  /// 自动为 `home.xxx` 前缀的动作注册短别名（去掉 `home.`），
-  /// 方便 i18n 文本中直接写 `{key:focus_about}` 而非 `{key:home.focus_about}`。
   fn build_key_params(&self) -> RichTextParams {
-    let mut key_actions = HashMap::new();
-    for entry in Self::action_map() {
-      key_actions.insert(entry.action.clone(), entry.keys.clone());
-      // 注册去掉 "home." 前缀的短别名
-      if let Some(short) = entry.action.strip_prefix("home.") {
-        key_actions.insert(short.to_string(), entry.keys.clone());
-      }
-    }
-    RichTextParams {
-      values: HashMap::new(),
-      key_actions,
-    }
+    RichTextParams::from_action_map(&Self::action_map(), "home.")
   }
 
   /// 纯定位计算 —— 不碰画布，不碰绘制

@@ -47,10 +47,7 @@ mod overlay;
 mod runtime;
 mod ui_tree;
 
-pub use game::{
-    GameLoopState,
-    GameState,
-};
+pub use game::{GameLoopState, GameState};
 
 pub use host::HostState;
 
@@ -59,19 +56,9 @@ pub use host_machine::HostMachineState;
 pub use main_host::MainHostState;
 
 pub use overlay::{
-    OverlayKind,
-    OverlayLogicState,
-    OverlayRenderState,
-    OverlayStackState,
-    OverlayState,
+  OverlayKind, OverlayLogicState, OverlayRenderState, OverlayStackState, OverlayState,
 };
 
 pub use runtime::RuntimeState;
 
-pub use ui_tree::{
-    UiNodeKind,
-    UiNodeLogicState,
-    UiNodeRenderState,
-    UiNodeState,
-    UiTreeState,
-};
+pub use ui_tree::{UiNodeKind, UiNodeLogicState, UiNodeRenderState, UiNodeState, UiTreeState};

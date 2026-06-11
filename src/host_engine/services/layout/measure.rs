@@ -8,10 +8,7 @@ use crate::host_engine::services::display_width;
 /// 自动处理富文本标签和 `{param}` 模板替换。
 /// 宽度使用 Unicode 显示宽度（`unicode_width`），正确处理
 /// CJK（宽 2）、emoji（宽 2）、零宽字符（宽 0）等。
-pub fn get_text_size(
-  text: &str,
-  params: Option<&RichTextParams>,
-) -> Size {
+pub fn get_text_size(text: &str, params: Option<&RichTextParams>) -> Size {
   let visible = visible_content(text, params);
   let width = visible
     .lines()
@@ -23,18 +20,12 @@ pub fn get_text_size(
 }
 
 /// 获取文本渲染后的宽度。
-pub fn get_text_width(
-  text: &str,
-  params: Option<&RichTextParams>,
-) -> u16 {
+pub fn get_text_width(text: &str, params: Option<&RichTextParams>) -> u16 {
   get_text_size(text, params).width
 }
 
 /// 获取文本渲染后的高度。
-pub fn get_text_height(
-  text: &str,
-  params: Option<&RichTextParams>,
-) -> u16 {
+pub fn get_text_height(text: &str, params: Option<&RichTextParams>) -> u16 {
   get_text_size(text, params).height
 }
 
@@ -45,11 +36,8 @@ pub fn get_terminal_size() -> Size {
 }
 
 /// 去除 f% 前缀、富文本标签、并进行模板替换，返回纯可见文本。
-fn visible_content(
-  text: &str,
-  params: Option<&RichTextParams>,
-) -> String {
-  if !text.starts_with("f%") {
+fn visible_content(text: &str, params: Option<&RichTextParams>) -> String {
+  if params.is_none() && !text.starts_with("f%") {
     return text.to_string();
   }
   RichTextService::new().visible_text(text, params)

@@ -17,7 +17,11 @@
       "Bash(grep -E \"^error|warning: `tui-game`|Finished\")",
       "Bash(cargo run *)",
       "Bash(cargo doc *)",
-      "Bash(rg Unknown *)"
+      "Bash(rg Unknown *)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

@@ -22,21 +22,23 @@ pub fn resolve_x(x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
   match x_anchor {
     ALIGN_LEFT => offset_x,
     ALIGN_CENTER => term_w.saturating_sub(content_width) / 2 + offset_x,
-    ALIGN_RIGHT => term_w.saturating_sub(content_width).saturating_sub(offset_x),
+    ALIGN_RIGHT => term_w
+      .saturating_sub(content_width)
+      .saturating_sub(offset_x),
     _ => offset_x,
   }
 }
 
 /// 根据垂直锚点和内容高度，计算 y 起始坐标（均相对于终端画布）。
 pub fn resolve_y(y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
-  let Size {
-    height: term_h, ..
-  } = get_terminal_size();
+  let Size { height: term_h, .. } = get_terminal_size();
 
   match y_anchor {
     ALIGN_TOP => offset_y,
     ALIGN_MIDDLE => term_h.saturating_sub(content_height) / 2 + offset_y,
-    ALIGN_BOTTOM => term_h.saturating_sub(content_height).saturating_sub(offset_y),
+    ALIGN_BOTTOM => term_h
+      .saturating_sub(content_height)
+      .saturating_sub(offset_y),
     _ => offset_y,
   }
 }

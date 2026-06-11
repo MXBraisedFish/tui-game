@@ -1,0 +1,23 @@
+{
+  "terminal.unicode.title": "Unicode Check",
+  "terminal.unicode.tip": "Verify that the following text displays correctly in your terminal.",
+  "terminal.unicode.yes": "Yes",
+  "terminal.unicode.no": "No",
+
+  "terminal.truecolor.title": "Color Check",
+  "terminal.truecolor.tip": "Verify that the gradient appears smooth.",
+  "terminal.truecolor.yes": "Supported (Smooth Gradient)",
+  "terminal.truecolor.no-256": "Not Supported (256 Colors Only)",
+  "terminal.truecolor.no-other": "Not Supported (Less Than 256 Colors)",
+
+  "terminal.image.title": "Image Protocol Detection",
+  "terminal.image.tip": "Select the protocol that displays the image correctly.",
+  "terminal.image.kitty": "Kitty",
+  "terminal.image.sixel": "Sixel",
+  "terminal.image.iterm": "iTerm2",
+  "terminal.image.none": "None/Unknown",
+
+  "terminal.action.select": "{key:terminal.focus_up}/{key:terminal.focus_down} Select",
+  "terminal.action.confirm": "{key:terminal.confirm} Confirm",
+  "terminal.action.exit": "{key:terminal.exit} Exit"
+}

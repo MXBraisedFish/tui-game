@@ -13,12 +13,8 @@ impl RichTextService {
 
   /// 提取纯可见文本（去除 f% 前缀、所有富文本标签，并进行模板替换）。
   /// 用于长度测量等场景。
-  pub fn visible_text(
-    &self,
-    text: &str,
-    params: Option<&RichTextParams>,
-  ) -> String {
-    if !text.starts_with("f%") {
+  pub fn visible_text(&self, text: &str, params: Option<&RichTextParams>) -> String {
+    if params.is_none() && !text.starts_with("f%") {
       return text.to_string();
     }
 

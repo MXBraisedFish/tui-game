@@ -19,13 +19,18 @@ enum TagReadResult {
 
 // 解析入口
 pub fn parse(text: &str, params: Option<&RichTextParams>) -> RichText {
-  // 前缀判断
-  if !text.starts_with(RICH_TEXT_PREFIX) {
+  let body = if text.starts_with(RICH_TEXT_PREFIX) {
+    // f% 前缀 → 去掉前缀，走完整富文本解析（标签 + 模板）
+    &text[RICH_TEXT_PREFIX.len()..]
+  } else if params.is_some() {
+    // 无 f% 但有参数 → 只做 {key:}/{value:} 模板替换，不解析标签
+    return parse_formatted_text(text, params);
+  } else {
+    // 无 f% 无参数 → 纯文本
     return plain_text(text);
-  }
+  };
 
-  // 进行富文本解析
-  parse_formatted_text(&text[RICH_TEXT_PREFIX.len()..], params)
+  parse_formatted_text(body, params)
 }
 
 // 普通文本
@@ -317,7 +322,10 @@ mod tests {
     let mut ka = HashMap::new();
     ka.insert(
       "move".to_string(),
-      vec![vec!["d".to_string()], vec!["left".to_string(), "shift".to_string()]],
+      vec![
+        vec!["d".to_string()],
+        vec!["left".to_string(), "shift".to_string()],
+      ],
     );
     let params = make_params(HashMap::new(), ka);
     let rt = parse("f%{key:move}", Some(&params));

@@ -45,6 +45,8 @@ pub const LANGUAGE_UI_CACHE_FILE: &str = "data/cache/language_ui_cache.json";
 
 // 配置-语言
 pub const PROFILE_LANGUAGE_FILE: &str = "data/profiles/language.txt";
+// 配置-终端能力
+pub const PROFILE_TERMINAL_FILE: &str = "data/profiles/terminal_profile.json";
 
 // 日志-宿主
 pub const TUI_LOG_FILE: &str = "data/log/tui_log.txt";
@@ -81,7 +83,10 @@ pub const DEFAULT_FILES: &[(&str, &str)] = &[
   (SCREENSAVER_SCAN_CACHE_FILE, "{}"),
   (BOSS_SCAN_CACHE_FILE, "{}"),
   (LANGUAGE_UI_CACHE_FILE, "{}"),
-  (PROFILE_LANGUAGE_FILE, DEFAULT_LANGUAGE_CODE),
+  (
+    PROFILE_TERMINAL_FILE,
+    r#"{"unicode":null,"color":null,"image_protocol":null,"mouse":null}"#,
+  ),
   (TUI_LOG_FILE, ""),
   (LANGUAGE_REGISTRY_FILE, "{}"),
 ];

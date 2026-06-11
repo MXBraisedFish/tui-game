@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -278,7 +277,7 @@ impl SettingsUi {
     std::array::from_fn(|i| {
       let label = i18n.get_runtime_text("settings", MENU_KEYS[i]);
       if i == self.selected_index {
-        format!("f%<fg:bright_cyan>▶ {} ◀</fg>", label)
+        format!("f%<fg:bright_cyan>❯ {} ❮</fg>", label)
       } else {
         label
       }
@@ -286,17 +285,7 @@ impl SettingsUi {
   }
 
   fn build_key_params(&self) -> RichTextParams {
-    let mut key_actions = HashMap::new();
-    for entry in Self::action_map() {
-      key_actions.insert(entry.action.clone(), entry.keys.clone());
-      if let Some(short) = entry.action.strip_prefix("settings.") {
-        key_actions.insert(short.to_string(), entry.keys.clone());
-      }
-    }
-    RichTextParams {
-      values: HashMap::new(),
-      key_actions,
-    }
+    RichTextParams::from_action_map(&Self::action_map(), "settings.")
   }
 
   fn draw_content(

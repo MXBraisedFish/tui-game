@@ -12,12 +12,7 @@ impl RenderService {
 
   /// 唯一的绘制入口。
   /// 委托给 `canvas.text()`，由其内部完成 f% 路由和样式解析。
-  pub fn draw_text(
-    &mut self,
-    canvas: &mut CanvasService,
-    params: &DrawTextParams,
-  ) {
+  pub fn draw_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     canvas.text(params);
   }
 }
-

@@ -8,18 +8,18 @@
 /// 画布写入时必须以 grapheme 为单位整体处理，不能逐 char 推进光标。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphemeInfo {
-    /// grapheme 原始文本（可能含多个 char）
-    pub text: String,
-    /// 在终端中占用的列数：0（零宽/组合标记）、1（普通）、2（宽字符）、>2（极罕见）
-    pub display_width: usize,
+  /// grapheme 原始文本（可能含多个 char）
+  pub text: String,
+  /// 在终端中占用的列数：0（零宽/组合标记）、1（普通）、2（宽字符）、>2（极罕见）
+  pub display_width: usize,
 }
 
 /// 文字方向
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TextDirection {
-    LTR,
-    RTL,
-    Neutral,
+  LTR,
+  RTL,
+  Neutral,
 }
 
 /// 一个方向连续的文字段。
@@ -28,7 +28,7 @@ pub enum TextDirection {
 /// 然后 RTL run 在写入 canvas 时反转视觉位置。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BidiRun {
-    pub text: String,
-    pub graphemes: Vec<GraphemeInfo>,
-    pub direction: TextDirection,
+  pub text: String,
+  pub graphemes: Vec<GraphemeInfo>,
+  pub direction: TextDirection,
 }

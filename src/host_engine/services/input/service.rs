@@ -206,6 +206,7 @@ pub struct InputService {
   mouse_held_buttons: HashSet<MouseButton>,
   mouse_x: u16,
   mouse_y: u16,
+  focused: bool,
   bindings: Vec<KeyBinding>,
 }
 
@@ -230,6 +231,7 @@ impl InputService {
       mouse_held_buttons: HashSet::new(),
       mouse_x: 0,
       mouse_y: 0,
+      focused: true,
       bindings: Vec::new(),
     }
   }
@@ -281,6 +283,28 @@ impl InputService {
     }
   }
 
+  /// 消费系统事件中的 Resize 事件，用回调更新画布尺寸并标记重绘。
+  /// 其余事件（Mouse 等）留到 `drain_system_events` 中处理。
+  pub fn poll_resize_events(&mut self, mut on_resize: impl FnMut(u16, u16)) {
+    // drain 出所有事件，只处理 Resize，其他的塞回...
+    // 但跨线程 channel 不支持 peek/unget。
+    // 改为在 drain 时一次性处理 resize。
+    let mut others = Vec::new();
+    while let Ok(event) = self.system_receiver.try_recv() {
+      match &event {
+        SystemEvent::Resize(re) => {
+          self.apply_system_event(&event);
+          on_resize(re.width, re.height);
+        }
+        _ => others.push(event),
+      }
+    }
+    // 非 resize 事件放回 channel
+    for event in others {
+      let _ = self.system_sender.send(event);
+    }
+  }
+
   /// 获取所有系统事件并合成 Hold 事件（每帧调用一次）。
   ///
   /// 对于当前处于按下状态、但本帧没有 Press/Drag 事件的按钮，
@@ -322,22 +346,34 @@ impl InputService {
   }
 
   fn apply_system_event(&mut self, event: &SystemEvent) {
-    if let SystemEvent::Mouse(me) = &event {
-      // 追踪鼠标位置
-      self.mouse_x = me.x;
-      self.mouse_y = me.y;
-
-      if let Some(button) = me.button {
-        match me.kind {
-          MouseEventKind::Press => {
-            self.mouse_held_buttons.insert(button);
-          }
-          MouseEventKind::Release => {
-            self.mouse_held_buttons.remove(&button);
-          }
-          _ => {}
+    match event {
+      SystemEvent::Focus(focus) => {
+        self.focused = focus.gained;
+        if !focus.gained {
+          // 失焦时清空按键状态，防止按键卡住
+          self.held_keys.clear();
+          self.pressed_keys.clear();
+          self.released_keys.clear();
+          self.mouse_held_buttons.clear();
         }
       }
+      SystemEvent::Mouse(me) => {
+        self.mouse_x = me.x;
+        self.mouse_y = me.y;
+
+        if let Some(button) = me.button {
+          match me.kind {
+            MouseEventKind::Press => {
+              self.mouse_held_buttons.insert(button);
+            }
+            MouseEventKind::Release => {
+              self.mouse_held_buttons.remove(&button);
+            }
+            _ => {}
+          }
+        }
+      }
+      _ => {}
     }
   }
 
@@ -481,6 +517,11 @@ impl InputService {
   }
 
   fn apply_key_event(&mut self, event: KeyEvent) {
+    // 失焦时拦截所有按键
+    if !self.focused {
+      return;
+    }
+
     match event.kind {
       KeyEventKind::Press => {
         if self.held_keys.insert(event.key) {

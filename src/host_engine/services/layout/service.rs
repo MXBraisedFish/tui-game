@@ -13,27 +13,15 @@ impl LayoutService {
 
   // ── 测量 ──
 
-  pub fn get_text_size(
-    &self,
-    text: &str,
-    params: Option<&RichTextParams>,
-  ) -> Size {
+  pub fn get_text_size(&self, text: &str, params: Option<&RichTextParams>) -> Size {
     measure::get_text_size(text, params)
   }
 
-  pub fn get_text_width(
-    &self,
-    text: &str,
-    params: Option<&RichTextParams>,
-  ) -> u16 {
+  pub fn get_text_width(&self, text: &str, params: Option<&RichTextParams>) -> u16 {
     measure::get_text_width(text, params)
   }
 
-  pub fn get_text_height(
-    &self,
-    text: &str,
-    params: Option<&RichTextParams>,
-  ) -> u16 {
+  pub fn get_text_height(&self, text: &str, params: Option<&RichTextParams>) -> u16 {
     measure::get_text_height(text, params)
   }
 
@@ -43,21 +31,11 @@ impl LayoutService {
 
   // ── 定位 ──
 
-  pub fn resolve_x(
-    &self,
-    x_anchor: &str,
-    content_width: u16,
-    offset_x: u16,
-  ) -> u16 {
+  pub fn resolve_x(&self, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
     position::resolve_x(x_anchor, content_width, offset_x)
   }
 
-  pub fn resolve_y(
-    &self,
-    y_anchor: &str,
-    content_height: u16,
-    offset_y: u16,
-  ) -> u16 {
+  pub fn resolve_y(&self, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
     position::resolve_y(y_anchor, content_height, offset_y)
   }
 
@@ -71,7 +49,12 @@ impl LayoutService {
     offset_y: u16,
   ) -> Position {
     position::resolve_rect(
-      x_anchor, y_anchor, content_width, content_height, offset_x, offset_y,
+      x_anchor,
+      y_anchor,
+      content_width,
+      content_height,
+      offset_x,
+      offset_y,
     )
   }
 

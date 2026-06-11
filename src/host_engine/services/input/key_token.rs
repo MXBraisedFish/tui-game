@@ -175,9 +175,32 @@ fn key_display_order(key: &Key) -> u8 {
     Key::LeftAlt | Key::RightAlt => 2,
     Key::LeftMeta | Key::RightMeta => 3,
     // 2. 字母
-    Key::A | Key::B | Key::C | Key::D | Key::E | Key::F | Key::G | Key::H | Key::I
-    | Key::J | Key::K | Key::L | Key::M | Key::N | Key::O | Key::P | Key::Q | Key::R
-    | Key::S | Key::T | Key::U | Key::V | Key::W | Key::X | Key::Y | Key::Z => 10,
+    Key::A
+    | Key::B
+    | Key::C
+    | Key::D
+    | Key::E
+    | Key::F
+    | Key::G
+    | Key::H
+    | Key::I
+    | Key::J
+    | Key::K
+    | Key::L
+    | Key::M
+    | Key::N
+    | Key::O
+    | Key::P
+    | Key::Q
+    | Key::R
+    | Key::S
+    | Key::T
+    | Key::U
+    | Key::V
+    | Key::W
+    | Key::X
+    | Key::Y
+    | Key::Z => 10,
     // 3. 数字
     Key::Num(_) => 20,
     // 4. 小键盘数字

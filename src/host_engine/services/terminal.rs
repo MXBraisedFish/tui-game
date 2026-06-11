@@ -147,4 +147,3 @@ impl TerminalService {
     let _ = io::stderr().flush();
   }
 }
-
