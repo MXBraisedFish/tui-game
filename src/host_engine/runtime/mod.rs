@@ -4,7 +4,7 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::UiNodeKind;
 
 use crate::host_engine::services::{
-  EngineServices, ImageProtocol, ImageSize, InputActionEvent, MouseEvent, SystemEvent,
+  EngineServices, InputActionEvent, MouseEvent, SystemEvent,
   translate_action_map,
 };
 
@@ -17,13 +17,8 @@ use crate::host_engine::ui::{
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   services.terminal.enter(&mut services.log);
 
-  // 在 alt screen/raw mode 内检测，但必须早于 crossterm 输入监听线程，
-  // 否则 stdin 查询响应可能被 event::read() 抢走。
-  let detection = if let Some(stdout) = services.terminal.writer_mut() {
-    crate::host_engine::services::TerminalDetector::detect_in_terminal(stdout)
-  } else {
-    crate::host_engine::services::TerminalDetector::detect()
-  };
+  // 使用默认检测结果（自动检测器已迁移至 old_auto/）
+  let detection = crate::host_engine::services::DetectionResult::default();
 
   services.input.start_key_listener();
   services.input.start_system_listener();
@@ -46,33 +41,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   } else {
     Some(LanguageSelectUi::init(registry))
   };
-  // 预计算检测图片等比缩放后的高度（宽=20字符格）
-  let test_path = services.storage.assets_images_path().join("test/test.jpg");
-  let img_h = services
-    .image
-    .dimensions_for_size(&test_path, ImageSize::Width(20))
-    .map(|(_, h)| h)
-    .unwrap_or(8);
+  // 图片尺寸固定为 8 行（ImageService 已迁移至 old_auto/）
+  let img_h: u16 = 8;
   let mut terminal_check_ui = TerminalCheckUi::init(&detection, img_h);
-  let mut last_image_preview: Option<(ImageProtocol, u16, u16, u16, u16)> = None;
 
   // 初始 UI 节点
   // 1) 无语言 → LanguageSelect
   // 2) 终端能力不完整 → TerminalCheck
   // 3) 否则 → Home（默认已在树中）
-  // 根据已保存的终端配置初始化 ImageService
-  if let Some(profile) = services.storage.read_terminal_profile() {
-    if let Some(ref proto_str) = profile.image_protocol {
-      let protocol = match proto_str.as_str() {
-        "kitty" => ImageProtocol::Kitty,
-        "sixel" => ImageProtocol::Sixel,
-        "iterm2" => ImageProtocol::ITerm2,
-        _ => ImageProtocol::None,
-      };
-      services.image = crate::host_engine::services::ImageService::new(protocol);
-    }
-  }
-
   if services.storage.read_language_code().is_none() && language_select_ui.is_some() {
     world.state.enter_ui_node(UiNodeState::language_select());
   } else if !services.storage.is_terminal_profile_complete() {
@@ -90,15 +66,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services.input.dispatch_action_events();
 
     // resize 事件：更新画布尺寸并标记强制重绘
-    let mut resized = false;
     services.input.poll_resize_events(|w, h| {
       services.canvas.resize(w, h);
       services.canvas.request_render();
-      resized = true;
     });
-    if resized {
-      last_image_preview = None;
-    }
 
     services.canvas.begin_frame();
     services.canvas.clear();
@@ -146,70 +117,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &terminal_check_ui,
     );
 
-    let current_image_preview = if world.state.current_ui_kind() == Some(UiNodeKind::TerminalCheck)
-    {
-      terminal_check_ui
-        .image_rect(&services.layout, &services.i18n)
-        .and_then(|rect| {
-          services
-            .image
-            .dimensions_for_size(&test_path, ImageSize::Width(rect.width))
-            .ok()
-            .map(|(width, height)| {
-              (
-                terminal_check_ui.selected_image_protocol(),
-                rect.x,
-                rect.y,
-                width,
-                height,
-              )
-            })
-        })
-    } else {
-      None
-    };
-
-    let image_preview_changed = current_image_preview != last_image_preview;
-    if image_preview_changed {
-      use crossterm::QueueableCommand;
-      use crossterm::cursor::MoveTo;
-      use crossterm::terminal::{Clear, ClearType};
-      use std::io::Write;
-
-      if let Some(stdout) = services.terminal.writer_mut() {
-        let _ = stdout.queue(Clear(ClearType::All));
-        let _ = stdout.queue(MoveTo(0, 0));
-        let _ = stdout.flush();
-      }
-      services.canvas.request_render();
-    }
-
     let _ = services.canvas.present(&mut services.terminal);
-
-    // 图片检测步骤：canvas present 之后输出测试图片（使用用户选择的协议）
-    if let Some((protocol, x, y, width, height)) = current_image_preview {
-      if image_preview_changed {
-        if let Ok(img) = services.image.load(&test_path) {
-          if let Ok((seq, _w, _h)) =
-            crate::host_engine::services::ImageService::encode_with_protocol(
-              protocol, &img, x, y, width, height,
-            )
-          {
-            use crossterm::QueueableCommand;
-            use crossterm::cursor::MoveTo;
-            use std::io::Write;
-
-            if let Some(stdout) = services.terminal.writer_mut() {
-              let _ = stdout.queue(MoveTo(x, y));
-              let _ = write!(stdout, "{}", seq);
-              let _ = stdout.queue(MoveTo(0, 0));
-              let _ = stdout.flush();
-            }
-          }
-        }
-      }
-    }
-    last_image_preview = current_image_preview;
 
     scheduler.wait_for_next_frame();
   }

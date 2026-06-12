@@ -267,8 +267,13 @@ impl InputService {
       loop {
         if ct_event::poll(poll_interval).unwrap_or(false) {
           if let Ok(ct_event) = ct_event::read() {
-            if let Some(sys_event) = system_event_from_crossterm(ct_event) {
-              let _ = sender.send(sys_event);
+            match ct_event {
+              CtEvent::Key(_) => {}
+              other_event => {
+                if let Some(sys_event) = system_event_from_crossterm(other_event) {
+                  let _ = sender.send(sys_event);
+                }
+              }
             }
           }
         }

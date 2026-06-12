@@ -1,7 +1,6 @@
 mod canvas;
 mod game;
 mod i18n;
-mod image;
 mod input;
 mod layout;
 mod log;
@@ -13,14 +12,12 @@ mod rich_text;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
-mod terminal_detector;
 mod ui;
 mod unicode;
 
 pub use canvas::{CanvasService, DrawTextParams, TextAlign, TextWrapMode};
 pub use game::{GameService, GameSessionState};
 pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
-pub use image::{ImageService, ImageSize};
 pub use input::{
   ActionMapEntry, ActionMapTranslateError, FocusEvent, InputActionEvent, InputEventType,
   InputService, Key, KeyBinding, KeyEvent, KeyEventKind, KeyPattern, KeyState, MouseButton,
@@ -42,8 +39,7 @@ pub use rich_text::{
 };
 pub use storage::{StorageService, TerminalProfile};
 pub use terminal::TerminalService;
-pub use terminal_capabilities::{ImageProtocol, TerminalCapabilities};
-pub use terminal_detector::{DetectionResult, TerminalDetector};
+pub use terminal_capabilities::{DetectionResult, ImageProtocol, TerminalCapabilities};
 pub use ui::UiService;
 pub use unicode::{
   BidiRun, GraphemeInfo, TextDirection, UnicodeService, char_width, display_width, graphemes,
@@ -66,7 +62,6 @@ pub struct EngineServices {
   pub unicode: UnicodeService,
   pub canvas: CanvasService,
   pub layout: LayoutService,
-  pub image: ImageService,
 }
 
 impl EngineServices {
@@ -89,7 +84,6 @@ impl EngineServices {
       unicode: UnicodeService::new(),
       canvas: CanvasService::new(),
       layout: LayoutService::new(),
-      image: ImageService::new(ImageProtocol::None),
     }
   }
 }
