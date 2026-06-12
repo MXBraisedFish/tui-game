@@ -67,10 +67,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services.input.poll_resize_events(|w, h| {
       services.canvas.resize(w, h);
       services.canvas.request_render();
+      services.image.request_render();
     });
 
     services.canvas.begin_frame();
     services.canvas.clear();
+
+    services.image.begin_frame();
 
     // 按当前 UI 节点加载对应的 action map
     match world.state.current_ui_kind() {
@@ -115,7 +118,27 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &terminal_check_ui,
     );
 
+    // 图片请求：TerminalCheck 页面时同步协议并提交绘图请求
+    if world.state.current_ui_kind() == Some(UiNodeKind::TerminalCheck) {
+      services
+        .image
+        .set_protocol(terminal_check_ui.selected_image_protocol());
+      let test_path = services.storage.assets_images_path().join("test/test.jpg");
+      if let Some(request) =
+        terminal_check_ui.image_request(&services.layout, &services.i18n, test_path)
+      {
+        let _ = services.image.draw(request);
+      }
+    }
+
     let _ = services.canvas.present(&mut services.terminal);
+
+    // 图片层：Canvas 之后输出
+    if services.image.needs_terminal_clear(&services.layout).unwrap_or(false) {
+      let _ = services.terminal.clear_all_and_home();
+      services.canvas.request_render();
+    }
+    let _ = services.image.present(&mut services.terminal, &services.layout);
 
     scheduler.wait_for_next_frame();
   }

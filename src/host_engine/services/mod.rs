@@ -1,6 +1,7 @@
 mod canvas;
 mod game;
 mod i18n;
+mod image;
 mod input;
 mod layout;
 mod log;
@@ -20,6 +21,7 @@ mod unicode;
 pub use canvas::CanvasService;
 pub use game::GameService;
 pub use i18n::{I18nService, LanguageRegistryEntry};
+pub use image::{DrawImageParams, ImageCellRect, ImageError, ImageFit, ImageService};
 pub use input::{
   translate_action_map, ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton,
   MouseEvent, MouseEventKind, SystemEvent,
@@ -55,6 +57,7 @@ pub struct EngineServices {
   pub unicode: UnicodeService,
   pub canvas: CanvasService,
   pub layout: LayoutService,
+  pub image: ImageService,
 }
 
 impl EngineServices {
@@ -77,6 +80,7 @@ impl EngineServices {
       unicode: UnicodeService::new(),
       canvas: CanvasService::new(),
       layout: LayoutService::new(),
+      image: ImageService::new(ImageProtocol::None),
     }
   }
 }

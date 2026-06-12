@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DetectionResult, DrawTextParams, I18nService, ImageProtocol,
-  InputActionEvent, KeyState, LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect,
-  RenderService, RichTextParams, TextColor, TextStyle,
+  ActionMapEntry, CanvasService, DetectionResult, DrawImageParams, DrawTextParams,
+  I18nService, ImageFit, ImageProtocol, InputActionEvent, KeyState, LayoutService,
+  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, TextColor,
+  TextStyle,
 };
 
 /// 检测步骤
@@ -580,6 +581,42 @@ impl TerminalCheckUi {
   }
 
   // ── 图片步骤 ──
+
+  /// 返回当前图片步骤的绘图请求（供 runtime 提交给 ImageService）。
+  /// 非图片步骤返回 `None`。
+  pub fn image_request(
+    &self,
+    layout: &LayoutService,
+    i18n: &I18nService,
+    path: std::path::PathBuf,
+  ) -> Option<DrawImageParams> {
+    if self.step != STEP_IMAGE {
+      return None;
+    }
+    let positions = self.compute_image_positions(layout, i18n);
+    let term_w = layout.get_terminal_size().width;
+    let img_w = Self::IMG_WIDTH;
+    let img_x = (term_w - img_w) / 2;
+    let img_y = positions.tip_y.saturating_add(2);
+
+    Some(DrawImageParams {
+      x: img_x,
+      y: img_y,
+      path,
+      fit: ImageFit::Width(img_w),
+      preserve_aspect_ratio: true,
+    })
+  }
+
+  /// 获取当前图片步骤选中的协议。
+  pub fn selected_image_protocol(&self) -> ImageProtocol {
+    match self.selected_index {
+      0 => ImageProtocol::Kitty,
+      1 => ImageProtocol::Sixel,
+      2 => ImageProtocol::ITerm2,
+      _ => ImageProtocol::None,
+    }
+  }
 
   const IMG_WIDTH: u16 = 20;
 

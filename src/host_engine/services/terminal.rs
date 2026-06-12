@@ -132,6 +132,23 @@ impl TerminalService {
     self.surface.as_mut().map(|surface| surface.writer())
   }
 
+  /// 清屏并归位光标。
+  ///
+  /// 图片变化时由 runtime 调用，确保旧图片残留被清除后再重绘字符层。
+  pub fn clear_all_and_home(&mut self) -> io::Result<()> {
+    use crossterm::terminal::{Clear, ClearType};
+    use crossterm::QueueableCommand;
+    use crossterm::cursor::MoveTo;
+
+    if let Some(stdout) = self.writer_mut() {
+      stdout.queue(Clear(ClearType::All))?;
+      stdout.queue(MoveTo(0, 0))?;
+      stdout.flush()?;
+    }
+
+    Ok(())
+  }
+
   // 紧急恢复
   pub fn force_restore() {
     let _ = disable_raw_mode();

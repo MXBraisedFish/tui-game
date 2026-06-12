@@ -1,5 +1,5 @@
 // 图片协议枚举
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ImageProtocol {
   None,
   Kitty,
