@@ -1,5 +1,5 @@
 // 官方标准输入输出
-use std::io::{self, Stdout, Write, stdout};
+use std::io::{self, stdout, Stdout, Write};
 
 // 光标控制
 use crossterm::cursor::{Hide, Show};
@@ -12,7 +12,7 @@ use crossterm::execute;
 // 终端模式控制
 use super::terminal_capabilities::TerminalCapabilities;
 use crossterm::terminal::{
-  EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+  disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 
 // 日志

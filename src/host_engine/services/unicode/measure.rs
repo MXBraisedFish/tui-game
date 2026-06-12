@@ -2,7 +2,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::types::GraphemeInfo;
-use crate::host_engine::services::rich_text::{RichText, RichTextSegment};
+use crate::host_engine::services::rich_text::RichText;
 
 // ── 基础宽度计算 ──
 
@@ -59,6 +59,7 @@ pub fn line_display_width(line: &str) -> usize {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::host_engine::services::rich_text::RichTextSegment;
 
   // ── 零宽字符 ──
 

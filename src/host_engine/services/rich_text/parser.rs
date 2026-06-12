@@ -1,5 +1,5 @@
 use super::params::RichTextParams;
-use super::{RichText, RichTextSegment, TextStyle, parse_text_color};
+use super::{parse_text_color, RichText, RichTextSegment, TextStyle};
 use crate::host_engine::services::input::format_key_display;
 
 // 富文本前缀

@@ -13,15 +13,16 @@ mod storage;
 mod terminal;
 mod terminal_capabilities;
 mod terminal_detector;
+pub mod text_layout;
 mod ui;
 mod unicode;
 
-pub use canvas::{CanvasService, DrawTextParams};
+pub use canvas::CanvasService;
 pub use game::GameService;
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use input::{
-  ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton, MouseEvent,
-  MouseEventKind, SystemEvent, translate_action_map,
+  translate_action_map, ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton,
+  MouseEvent, MouseEventKind, SystemEvent,
 };
 pub use layout::{LayoutService, Rect};
 pub use log::{LogService, LogSource};
@@ -34,8 +35,9 @@ pub use storage::StorageService;
 pub use terminal::TerminalService;
 pub use terminal_capabilities::ImageProtocol;
 pub use terminal_detector::{DetectionResult, TerminalDetector};
+pub use text_layout::DrawTextParams;
 pub use ui::UiService;
-pub use unicode::{UnicodeService, display_width};
+pub use unicode::UnicodeService;
 
 pub struct EngineServices {
   pub package: PackageService,

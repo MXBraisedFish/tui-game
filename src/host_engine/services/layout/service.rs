@@ -1,5 +1,6 @@
 use super::types::{Position, Size};
 use super::{measure, position};
+use crate::host_engine::services::DrawTextParams;
 use crate::host_engine::services::RichTextParams;
 
 /// 布局服务：提供文本测量和定位计算的宿主侧 API。
@@ -23,6 +24,18 @@ impl LayoutService {
 
   pub fn get_text_height(&self, text: &str, params: Option<&RichTextParams>) -> u16 {
     measure::get_text_height(text, params)
+  }
+
+  pub fn get_draw_text_size(&self, params: &DrawTextParams) -> Size {
+    measure::get_draw_text_size(params)
+  }
+
+  pub fn get_draw_text_width(&self, params: &DrawTextParams) -> u16 {
+    measure::get_draw_text_width(params)
+  }
+
+  pub fn get_draw_text_height(&self, params: &DrawTextParams) -> u16 {
+    measure::get_draw_text_height(params)
   }
 
   pub fn get_terminal_size(&self) -> Size {

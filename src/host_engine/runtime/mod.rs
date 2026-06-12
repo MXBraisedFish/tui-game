@@ -4,8 +4,8 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::UiNodeKind;
 
 use crate::host_engine::services::{
-  DetectionResult, EngineServices, InputActionEvent, MouseEvent, SystemEvent,
-  TerminalDetector, translate_action_map,
+  EngineServices, InputActionEvent, MouseEvent, SystemEvent, TerminalDetector,
+  translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -17,11 +17,8 @@ use crate::host_engine::ui::{
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   services.terminal.enter(&mut services.log);
 
-  // 图片协议自动检测：必须在 crossterm 事件监听启动前完成（stdin 尚未被占用）
-  let detection = match services.terminal.writer_mut() {
-    Some(stdout) => TerminalDetector::detect_in_terminal(stdout),
-    None => DetectionResult::default(),
-  };
+  // 图片协议推荐：只读取环境变量，不占用 stdin。最终协议由 TerminalCheck 可视确认。
+  let detection = TerminalDetector::detect();
 
   services.input.start_key_listener();
   services.input.start_system_listener();

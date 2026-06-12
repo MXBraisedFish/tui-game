@@ -1,18 +1,18 @@
 use std::collections::HashSet;
 use std::sync::{
-  Arc,
   atomic::{AtomicBool, Ordering},
+  Arc,
 };
 use std::thread;
 use std::time::Duration;
 
-use crossbeam_channel::{Receiver, Sender, unbounded};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crossterm::event::{
   self as ct_event, Event as CtEvent, MouseEvent as CtMouseEvent,
   MouseEventKind as CtMouseEventKind,
 };
-use rdev::{Event, EventType, Key as RdevKey, listen};
+use rdev::{listen, Event, EventType, Key as RdevKey};
 
 use super::events::{
   FocusEvent, MouseButton, MouseEvent, MouseEventKind, ResizeEvent, ScrollDirection, SystemEvent,
@@ -253,7 +253,11 @@ impl InputService {
     });
   }
 
-  /// 启动 crossterm 系统事件监听线程（resize / focus / mouse）。
+  /// 运行时 stdin 所有者。
+  ///
+  /// 此线程通过 crossterm 消费终端事件（resize / focus / mouse），
+  /// 阻止键盘字节泄漏回终端。按键语义仍由 rdev 提供。
+  /// 启动后任何其他模块不得直接读取 `io::stdin()`。
   pub fn start_system_listener(&self) {
     if self.system_listener_started.swap(true, Ordering::SeqCst) {
       return;
