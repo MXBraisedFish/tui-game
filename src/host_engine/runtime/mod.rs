@@ -4,8 +4,8 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::UiNodeKind;
 
 use crate::host_engine::services::{
-  EngineServices, InputActionEvent, MouseEvent, SystemEvent,
-  translate_action_map,
+  DetectionResult, EngineServices, InputActionEvent, MouseEvent, SystemEvent,
+  TerminalDetector, translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -17,8 +17,11 @@ use crate::host_engine::ui::{
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   services.terminal.enter(&mut services.log);
 
-  // 使用默认检测结果（自动检测器已迁移至 old_auto/）
-  let detection = crate::host_engine::services::DetectionResult::default();
+  // 图片协议自动检测：必须在 crossterm 事件监听启动前完成（stdin 尚未被占用）
+  let detection = match services.terminal.writer_mut() {
+    Some(stdout) => TerminalDetector::detect_in_terminal(stdout),
+    None => DetectionResult::default(),
+  };
 
   services.input.start_key_listener();
   services.input.start_system_listener();

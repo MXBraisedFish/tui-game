@@ -2,7 +2,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::types::GraphemeInfo;
-use crate::host_engine::services::rich_text::RichText;
+use crate::host_engine::services::rich_text::{RichText, RichTextSegment};
 
 // ── 基础宽度计算 ──
 
@@ -166,7 +166,7 @@ mod tests {
   #[test]
   fn rich_text_width_basic() {
     let rt = RichText {
-      segments: vec![crate::host_engine::services::RichTextSegment {
+      segments: vec![RichTextSegment {
         text: "Hello世界".to_string(),
         style: Default::default(),
       }],

@@ -89,9 +89,7 @@ impl TerminalCheckUi {
   fn apply_detection(&mut self) {
     self.selected_index = match self.step {
       STEP_UNICODE => 0, // 总是"支持"
-      STEP_COLOR => {
-        if self.detection.truecolor { 0 } else { 0 } // 预选"支持"或默认第一项
-      }
+      STEP_COLOR => 0, // 预选"支持"（truecolor 不在自动检测范围）
       STEP_IMAGE => match self.detection.image_protocol {
         ImageProtocol::Kitty => 0,
         ImageProtocol::Sixel => 1,

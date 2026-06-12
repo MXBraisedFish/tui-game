@@ -12,6 +12,7 @@ mod rich_text;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
+mod terminal_detector;
 mod ui;
 mod unicode;
 
@@ -31,7 +32,8 @@ pub use render::RenderService;
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
-pub use terminal_capabilities::{DetectionResult, ImageProtocol};
+pub use terminal_capabilities::ImageProtocol;
+pub use terminal_detector::{DetectionResult, TerminalDetector};
 pub use ui::UiService;
 pub use unicode::{UnicodeService, display_width};
 
