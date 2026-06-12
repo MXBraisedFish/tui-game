@@ -10,7 +10,5 @@ mod request;
 mod service;
 mod sizing;
 
-pub use error::ImageError;
-pub use request::{DrawImageParams, ImageCellRect, ImageFit};
+pub use request::{DrawImageParams, ImageFit};
 pub use service::ImageService;
-pub use sizing::{CellPixelSize, ImagePixelSize, current_cell_pixel_size, pixel_size_for_rect};

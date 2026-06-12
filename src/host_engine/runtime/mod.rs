@@ -131,13 +131,20 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       }
     }
 
-    let _ = services.canvas.present(&mut services.terminal);
+    // 图片层：必须在 Canvas present 之前判断清屏，
+    // 这样 Clear(All) 之后 Canvas 会在同一帧重绘字符层，Image 再输出图片。
+    let image_needs_clear = services
+      .image
+      .needs_terminal_clear(&services.layout)
+      .unwrap_or(false);
 
-    // 图片层：Canvas 之后输出
-    if services.image.needs_terminal_clear(&services.layout).unwrap_or(false) {
+    if image_needs_clear {
       let _ = services.terminal.clear_all_and_home();
       services.canvas.request_render();
+      services.image.request_render();
     }
+
+    let _ = services.canvas.present(&mut services.terminal);
     let _ = services.image.present(&mut services.terminal, &services.layout);
 
     scheduler.wait_for_next_frame();

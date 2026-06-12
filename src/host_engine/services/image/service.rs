@@ -1,8 +1,6 @@
 use std::path::PathBuf;
 
-use crate::host_engine::services::{
-  ImageProtocol, LayoutService, TerminalService,
-};
+use crate::host_engine::services::{ImageProtocol, LayoutService, TerminalService};
 
 use super::encoders::{ImageEncoder, ITerm2Encoder, KittyEncoder, SixelEncoder};
 use super::error::ImageError;
@@ -10,17 +8,20 @@ use super::request::{DrawImageParams, ImageCellRect};
 use super::sizing::{CellPixelSize, current_cell_pixel_size, resolve_image_rect};
 
 /// 图片请求签名，用于帧间差异比较。
+/// 含 `cell` 是因为 resize/DPI/字体变化时 rect 可能相同但像素尺寸已变。
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct ImageSignature {
   protocol: ImageProtocol,
   path: PathBuf,
   rect: ImageCellRect,
+  cell: CellPixelSize,
   preserve_aspect_ratio: bool,
 }
 
 /// 图片渲染服务。
 ///
 /// 只负责图片层的编码与输出。
+/// 变化时重新编码，每帧均可重放已缓存的转义序列。
 /// 当前版本只支持每帧一个图片请求。
 /// TODO: 多图支持时替换 `pending` 为 `Vec<DrawImageParams>`。
 pub struct ImageService {
@@ -28,6 +29,10 @@ pub struct ImageService {
   pending: Option<DrawImageParams>,
   previous_signature: Option<ImageSignature>,
   current_signature: Option<ImageSignature>,
+  /// 上次编码对应的签名
+  cached_signature: Option<ImageSignature>,
+  /// 已缓存的转义序列（变化时重新编码，每帧可重放）
+  cached_sequence: Option<String>,
   force_redraw: bool,
 }
 
@@ -38,6 +43,8 @@ impl ImageService {
       pending: None,
       previous_signature: None,
       current_signature: None,
+      cached_signature: None,
+      cached_sequence: None,
       force_redraw: true,
     }
   }
@@ -77,6 +84,7 @@ impl ImageService {
   /// 检查是否需要清屏（图片请求发生变化时）。
   ///
   /// 解析 pending 图片尺寸，生成 current_signature，与 previous 比较。
+  /// 只负责清屏判断，不决定 present 是否输出。
   pub fn needs_terminal_clear(
     &mut self,
     layout: &LayoutService,
@@ -102,7 +110,6 @@ impl ImageService {
         terminal_size.height,
       )?
     } else {
-      // 不保持宽高比：直接使用 fit 中的尺寸
       match pending.fit {
         super::request::ImageFit::Exact { width, height } => ImageCellRect {
           x: pending.x,
@@ -127,6 +134,7 @@ impl ImageService {
       protocol: self.protocol,
       path: pending.path.clone(),
       rect,
+      cell,
       preserve_aspect_ratio: pending.preserve_aspect_ratio,
     };
 
@@ -137,29 +145,50 @@ impl ImageService {
   }
 
   /// 输出本帧图片（在 Canvas present 之后调用）。
+  ///
+  /// 每帧只要有 current_signature 就输出 cached_sequence。
+  /// 签名变化或 force_redraw 时重新编码并更新缓存。
+  /// 不变化 → 不重新编码，但仍重放已缓存序列。
   pub fn present(
     &mut self,
     terminal: &mut TerminalService,
     _layout: &LayoutService,
   ) -> Result<(), ImageError> {
-    if let Some(ref sig) = self.current_signature {
-      if sig != self.previous_signature.as_ref().unwrap_or(&sig) || self.force_redraw {
-        let img = load_image(&sig.path)?;
-        let cell = current_cell_pixel_size();
-        let seq = encode_with_protocol(self.protocol, &img, sig.rect, cell)?;
+    let Some(sig) = self.current_signature.clone() else {
+      self.previous_signature = None;
+      self.force_redraw = false;
+      return Ok(());
+    };
 
-        let stdout = terminal.writer_mut().ok_or(ImageError::MissingTerminalWriter)?;
-        use crossterm::QueueableCommand;
-        use crossterm::cursor::MoveTo;
-        use std::io::Write;
-        stdout.queue(MoveTo(sig.rect.x, sig.rect.y))?;
-        write!(stdout, "{seq}")?;
-        stdout.queue(MoveTo(0, 0))?;
-        stdout.flush()?;
-      }
+    let need_encode =
+      self.cached_signature.as_ref() != Some(&sig) || self.cached_sequence.is_none();
+
+    if need_encode {
+      let img = load_image(&sig.path)?;
+      let seq = encode_with_protocol(self.protocol, &img, sig.rect, sig.cell)?;
+      self.cached_signature = Some(sig.clone());
+      self.cached_sequence = Some(seq);
     }
 
-    self.previous_signature = self.current_signature.clone();
+    let seq = self
+      .cached_sequence
+      .as_ref()
+      .ok_or(ImageError::UnsupportedProtocol)?;
+
+    let stdout = terminal
+      .writer_mut()
+      .ok_or(ImageError::MissingTerminalWriter)?;
+
+    use crossterm::QueueableCommand;
+    use crossterm::cursor::MoveTo;
+    use std::io::Write;
+
+    stdout.queue(MoveTo(sig.rect.x, sig.rect.y))?;
+    write!(stdout, "{seq}")?;
+    stdout.queue(MoveTo(0, 0))?;
+    stdout.flush()?;
+
+    self.previous_signature = Some(sig);
     self.force_redraw = false;
 
     Ok(())

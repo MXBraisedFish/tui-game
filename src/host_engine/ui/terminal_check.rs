@@ -596,15 +596,19 @@ impl TerminalCheckUi {
     let positions = self.compute_image_positions(layout, i18n);
     let term_w = layout.get_terminal_size().width;
     let img_w = Self::IMG_WIDTH;
-    let img_x = (term_w - img_w) / 2;
+    let img_x = term_w.saturating_sub(img_w) / 2;
     let img_y = positions.tip_y.saturating_add(2);
 
+    // 使用 Exact 确保图片尺寸与 UI 占位高度一致，避免偏移
     Some(DrawImageParams {
       x: img_x,
       y: img_y,
       path,
-      fit: ImageFit::Width(img_w),
-      preserve_aspect_ratio: true,
+      fit: ImageFit::Exact {
+        width: img_w,
+        height: IMG_PLACEHOLDER_H,
+      },
+      preserve_aspect_ratio: false,
     })
   }
 

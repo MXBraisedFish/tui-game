@@ -21,7 +21,7 @@ mod unicode;
 pub use canvas::CanvasService;
 pub use game::GameService;
 pub use i18n::{I18nService, LanguageRegistryEntry};
-pub use image::{DrawImageParams, ImageCellRect, ImageError, ImageFit, ImageService};
+pub use image::{DrawImageParams, ImageFit, ImageService};
 pub use input::{
   translate_action_map, ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton,
   MouseEvent, MouseEventKind, SystemEvent,
