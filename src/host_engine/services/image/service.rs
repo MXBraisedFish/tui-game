@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use crate::host_engine::services::{ImageProtocol, LayoutService, TerminalService};
+use crate::host_engine::services::{
+  CanvasService, ImageProtocol, LayoutService, Rect, TerminalService,
+};
 
 use super::encoders::{ITerm2Encoder, ImageEncoder, KittyEncoder, SixelEncoder};
 use super::error::ImageError;
@@ -171,12 +173,16 @@ impl ImageService {
       return Ok(());
     };
 
+    if sig.protocol == ImageProtocol::ITerm2 {
+      return Ok(());
+    }
+
     let need_encode =
       self.cached_signature.as_ref() != Some(&sig) || self.cached_sequence.is_none();
 
     if need_encode {
       let img = load_image(&sig.path)?;
-      let seq = encode_with_protocol(self.protocol, &img, sig.rect, sig.cell)?;
+      let seq = encode_with_protocol(sig.protocol, &img, sig.rect, sig.cell)?;
       self.cached_signature = Some(sig.clone());
       self.cached_sequence = Some(seq);
     }
@@ -198,6 +204,41 @@ impl ImageService {
     write!(stdout, "{seq}")?;
     stdout.queue(MoveTo(0, 0))?;
     stdout.flush()?;
+
+    Ok(())
+  }
+
+  pub fn draw_iterm2_into_canvas(&mut self, canvas: &mut CanvasService) -> Result<(), ImageError> {
+    let Some(sig) = self.current_signature.clone() else {
+      return Ok(());
+    };
+
+    if sig.protocol != ImageProtocol::ITerm2 {
+      return Ok(());
+    }
+
+    let need_encode =
+      self.cached_signature.as_ref() != Some(&sig) || self.cached_sequence.is_none();
+
+    if need_encode {
+      let img = load_image(&sig.path)?;
+      let seq = encode_with_protocol(sig.protocol, &img, sig.rect, sig.cell)?;
+      self.cached_signature = Some(sig.clone());
+      self.cached_sequence = Some(seq);
+    }
+
+    let seq = self
+      .cached_sequence
+      .clone()
+      .ok_or(ImageError::UnsupportedProtocol)?;
+
+    canvas.raw_cell(sig.rect.x, sig.rect.y, seq);
+    canvas.reserve_rect_except_anchor(Rect {
+      x: sig.rect.x,
+      y: sig.rect.y,
+      width: sig.rect.width,
+      height: sig.rect.height,
+    });
 
     Ok(())
   }

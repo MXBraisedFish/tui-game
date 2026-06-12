@@ -4,8 +4,8 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::UiNodeKind;
 
 use crate::host_engine::services::{
-  EngineServices, ImageFramePlan, ImagePresentPhase, InputActionEvent, MouseEvent, Rect,
-  SystemEvent, TerminalDetector, translate_action_map,
+  EngineServices, ImageFramePlan, ImagePresentPhase, ImageProtocol, InputActionEvent, MouseEvent,
+  Rect, SystemEvent, TerminalDetector, translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -146,24 +146,26 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       services.image.request_render();
     }
 
-    if let Some(rect) = image_plan.rect {
-      services.canvas.reserve_rect(Rect {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-      });
+    let image_protocol = services.image.protocol();
+
+    if image_protocol != ImageProtocol::ITerm2 {
+      if let Some(rect) = image_plan.rect {
+        services.canvas.reserve_rect(Rect {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
     }
 
-    if image_plan.phase == ImagePresentPhase::BeforeCanvas {
-      let _ = services
-        .image
-        .present(&mut services.terminal, &services.layout);
+    if image_protocol == ImageProtocol::ITerm2 {
+      let _ = services.image.draw_iterm2_into_canvas(&mut services.canvas);
     }
 
     let _ = services.canvas.present(&mut services.terminal);
 
-    if image_plan.phase == ImagePresentPhase::AfterCanvas {
+    if image_protocol != ImageProtocol::ITerm2 {
       let _ = services
         .image
         .present(&mut services.terminal, &services.layout);

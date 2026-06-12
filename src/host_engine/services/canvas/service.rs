@@ -6,7 +6,10 @@ use crossterm::{
   style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
 };
 
-use super::{buffer::CanvasBuffer, cell::CanvasCell};
+use super::{
+  buffer::CanvasBuffer,
+  cell::{CanvasCell, CanvasCellContent},
+};
 use crate::host_engine::services::Rect;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
@@ -130,6 +133,29 @@ impl CanvasService {
     self.reserved_rects.push(rect);
   }
 
+  pub fn raw_cell(&mut self, x: u16, y: u16, seq: String) {
+    self.current.set(x, y, CanvasCell::raw(seq));
+  }
+
+  pub fn skip_cell(&mut self, x: u16, y: u16) {
+    self.current.set(x, y, CanvasCell::skip());
+  }
+
+  pub fn reserve_rect_except_anchor(&mut self, rect: Rect) {
+    if rect.width == 0 || rect.height == 0 {
+      return;
+    }
+
+    for y in rect.y..rect.y.saturating_add(rect.height) {
+      for x in rect.x..rect.x.saturating_add(rect.width) {
+        if x == rect.x && y == rect.y {
+          continue;
+        }
+        self.skip_cell(x, y);
+      }
+    }
+  }
+
   pub fn present(&mut self, terminal: &mut TerminalService) -> io::Result<()> {
     let Some(stdout) = terminal.writer_mut() else {
       return Ok(());
@@ -142,21 +168,7 @@ impl CanvasService {
       for x in 0..self.current.width() {
         if self.is_reserved(x, y) {
           if let Some((start, style)) = run {
-            let run_text: String = (start..x)
-              .filter_map(|rx| {
-                self.current.get(rx, y).and_then(|cell| {
-                  if cell.is_continuation() {
-                    None
-                  } else {
-                    Some(cell.ch)
-                  }
-                })
-              })
-              .collect();
-
-            stdout.queue(MoveTo(start, y))?;
-            queue_style(stdout, style)?;
-            stdout.queue(Print(run_text))?;
+            queue_text_run(stdout, &self.current, y, start, x, style)?;
           }
 
           run = None;
@@ -164,6 +176,27 @@ impl CanvasService {
         }
 
         let current_cell = self.current.get(x, y).unwrap_or(&BLANK_CELL);
+
+        match &current_cell.content {
+          CanvasCellContent::Skip => {
+            if let Some((start, style)) = run {
+              queue_text_run(stdout, &self.current, y, start, x, style)?;
+            }
+            run = None;
+            continue;
+          }
+          CanvasCellContent::Raw(seq) => {
+            if let Some((start, style)) = run {
+              queue_text_run(stdout, &self.current, y, start, x, style)?;
+            }
+            run = None;
+
+            stdout.queue(MoveTo(x, y))?;
+            write!(stdout, "{seq}")?;
+            continue;
+          }
+          CanvasCellContent::Text(_) => {}
+        }
 
         // 跳过宽字符延续格 —— 它们属于左侧的宽字符，
         // 不应打断当前 run，也不应启动新 run。
@@ -189,21 +222,7 @@ impl CanvasService {
           // 在 run 内，但样式变了 或 单元格未变化 → 输出当前 run
           _ => {
             if let Some((start, style)) = run {
-              let run_text: String = (start..x)
-                .filter_map(|rx| {
-                  self.current.get(rx, y).and_then(|cell| {
-                    if cell.is_continuation() {
-                      None
-                    } else {
-                      Some(cell.ch)
-                    }
-                  })
-                })
-                .collect();
-
-              stdout.queue(MoveTo(start, y))?;
-              queue_style(stdout, style)?;
-              stdout.queue(Print(run_text))?;
+              queue_text_run(stdout, &self.current, y, start, x, style)?;
             }
 
             // 如果当前单元格变了但样式不同，启动新 run
@@ -218,21 +237,7 @@ impl CanvasService {
 
       // 行尾残留 run
       if let Some((start, style)) = run {
-        let run_text: String = (start..self.current.width())
-          .filter_map(|rx| {
-            self.current.get(rx, y).and_then(|cell| {
-              if cell.is_continuation() {
-                None
-              } else {
-                Some(cell.ch)
-              }
-            })
-          })
-          .collect();
-
-        stdout.queue(MoveTo(start, y))?;
-        queue_style(stdout, style)?;
-        stdout.queue(Print(run_text))?;
+        queue_text_run(stdout, &self.current, y, start, self.current.width(), style)?;
       }
     }
 
@@ -295,7 +300,7 @@ impl CanvasService {
 // ── 终端颜色转换 ──
 
 static BLANK_CELL: CanvasCell = CanvasCell {
-  ch: ' ',
+  content: CanvasCellContent::Text(' '),
   style: TextStyle {
     foreground: None,
     background: None,
@@ -309,6 +314,33 @@ static BLANK_CELL: CanvasCell = CanvasCell {
     dim: false,
   },
 };
+
+fn queue_text_run(
+  stdout: &mut impl Write,
+  buffer: &CanvasBuffer,
+  y: u16,
+  start: u16,
+  end: u16,
+  style: &TextStyle,
+) -> io::Result<()> {
+  let run_text: String = (start..end)
+    .filter_map(|rx| {
+      buffer.get(rx, y).and_then(|cell| {
+        if cell.is_continuation() {
+          None
+        } else {
+          cell.text_char()
+        }
+      })
+    })
+    .collect();
+
+  stdout.queue(MoveTo(start, y))?;
+  queue_style(stdout, style)?;
+  stdout.queue(Print(run_text))?;
+
+  Ok(())
+}
 
 fn terminal_color_to_crossterm(color: &TerminalColor) -> Color {
   match color {
@@ -367,10 +399,11 @@ mod tests {
     (0..canvas.width())
       .filter_map(|x| {
         canvas.current.get(x, y).and_then(|cell| {
-          if cell.is_continuation() || cell.ch == ' ' {
+          let ch = cell.text_char()?;
+          if cell.is_continuation() || ch == ' ' {
             None
           } else {
-            Some(cell.ch)
+            Some(ch)
           }
         })
       })
@@ -379,7 +412,13 @@ mod tests {
 
   fn raw_row_prefix(canvas: &CanvasService, y: u16, width: u16) -> String {
     (0..width)
-      .map(|x| canvas.current.get(x, y).map(|cell| cell.ch).unwrap_or(' '))
+      .map(|x| {
+        canvas
+          .current
+          .get(x, y)
+          .and_then(|cell| cell.text_char())
+          .unwrap_or(' ')
+      })
       .collect()
   }
 
@@ -524,8 +563,8 @@ mod tests {
 
     let c = canvas.current.get(2, 0).expect("c cell");
     let d = canvas.current.get(0, 1).expect("d cell");
-    assert_eq!(c.ch, 'c');
-    assert_eq!(d.ch, 'd');
+    assert_eq!(c.text_char(), Some('c'));
+    assert_eq!(d.text_char(), Some('d'));
     assert_eq!(
       c.style.foreground,
       Some(TextColor::Terminal(TerminalColor::Blue))
@@ -570,5 +609,25 @@ mod tests {
     assert!(canvas.is_reserved(3, 3));
     assert!(!canvas.is_reserved(4, 3));
     assert!(!canvas.is_reserved(3, 4));
+  }
+
+  #[test]
+  fn raw_cell_and_skip_cells_are_written_to_current_buffer() {
+    let mut canvas = CanvasService::new();
+
+    canvas.raw_cell(2, 3, "raw-seq".to_string());
+    canvas.reserve_rect_except_anchor(Rect {
+      x: 2,
+      y: 3,
+      width: 3,
+      height: 2,
+    });
+
+    assert!(matches!(
+      canvas.current.get(2, 3).map(|cell| &cell.content),
+      Some(CanvasCellContent::Raw(seq)) if seq == "raw-seq"
+    ));
+    assert!(canvas.current.get(3, 3).is_some_and(CanvasCell::is_skip));
+    assert!(canvas.current.get(2, 4).is_some_and(CanvasCell::is_skip));
   }
 }
