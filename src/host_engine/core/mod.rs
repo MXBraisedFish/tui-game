@@ -10,7 +10,7 @@ pub mod world;
 // 引用结构体
 pub use boot_output::BootOutput;
 pub use clock::EngineClock;
-pub use crash::{CrashPhase, current_crash_phase, install_panic_hook, set_crash_phase};
+pub use crash::{CrashPhase, install_panic_hook, set_crash_phase};
 pub use exit_state::ExitState;
 pub use frame::FrameScheduler;
 pub use state_machine::HostMachineState;

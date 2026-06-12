@@ -3,7 +3,6 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, I18nService, InputActionEvent, KeyState,
   LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams,
-  TerminalColor::BrightMagenta, TextColor,
 };
 
 const SETTINGS_MENU_LEN: usize = 6;

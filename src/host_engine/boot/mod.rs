@@ -2,8 +2,8 @@
 use crate::host_engine::core::{BootOutput, RuntimeWorld};
 use crate::host_engine::services::EngineServices;
 
-// 临时日志
-use super::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
+// 日志
+use super::services::LogSource;
 
 // 启动函数
 pub fn prepare() -> BootOutput {
@@ -51,16 +51,15 @@ pub fn prepare() -> BootOutput {
   let root_dir = services.storage.root_dir();
   services.package.scan_all(&root_dir);
 
-  services.log.info(
-    LogSource::Boot,
-    "[Boot] Found {} packages ({} games, {} screensavers, {} bosses)",
-  );
+  services
+    .log
+    .info(LogSource::Boot, "[Boot] Packages scan completed.");
 
   let world = RuntimeWorld::new();
 
   services
     .log
-    .info(LogSource::Boot, "[Boot] Storage root: {}");
+    .info(LogSource::Boot, &format!("[Boot] Storage root: {}", root_dir.display()));
 
   // 返回启动输出
   BootOutput { services, world }

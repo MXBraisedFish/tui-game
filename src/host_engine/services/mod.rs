@@ -15,36 +15,25 @@ mod terminal_capabilities;
 mod ui;
 mod unicode;
 
-pub use canvas::{CanvasService, DrawTextParams, TextAlign, TextWrapMode};
-pub use game::{GameService, GameSessionState};
-pub use i18n::{I18nService, LanguageInfo, LanguageRegistryEntry};
+pub use canvas::{CanvasService, DrawTextParams};
+pub use game::GameService;
+pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use input::{
-  ActionMapEntry, ActionMapTranslateError, FocusEvent, InputActionEvent, InputEventType,
-  InputService, Key, KeyBinding, KeyEvent, KeyEventKind, KeyPattern, KeyState, MouseButton,
-  MouseEvent, MouseEventKind, ResizeEvent, ScrollDirection, SystemEvent, format_key_display,
-  translate_action_map,
+  ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton, MouseEvent,
+  MouseEventKind, SystemEvent, translate_action_map,
 };
-pub use layout::{
-  ALIGN_BOTTOM, ALIGN_CENTER, ALIGN_LEFT, ALIGN_MIDDLE, ALIGN_RIGHT, ALIGN_TOP, LayoutService,
-  Position, Rect, Size, get_terminal_size, get_text_height, get_text_size, get_text_width,
-  resolve_rect, resolve_x, resolve_y,
-};
-pub use log::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
+pub use layout::{LayoutService, Rect};
+pub use log::{LogService, LogSource};
 pub use lua::LuaService;
-pub use overlay::{OverlayKind, OverlayService};
+pub use overlay::OverlayService;
 pub use package::PackageService;
 pub use render::RenderService;
-pub use rich_text::{
-  RichText, RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextStyle,
-};
-pub use storage::{StorageService, TerminalProfile};
+pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
+pub use storage::StorageService;
 pub use terminal::TerminalService;
-pub use terminal_capabilities::{DetectionResult, ImageProtocol, TerminalCapabilities};
+pub use terminal_capabilities::{DetectionResult, ImageProtocol};
 pub use ui::UiService;
-pub use unicode::{
-  BidiRun, GraphemeInfo, TextDirection, UnicodeService, char_width, display_width, graphemes,
-  line_display_width, rich_text_width,
-};
+pub use unicode::{UnicodeService, display_width};
 
 pub struct EngineServices {
   pub package: PackageService,

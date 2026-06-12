@@ -33,8 +33,8 @@ pub mod ui;
 
 use crate::host_engine::core::{CrashPhase, install_panic_hook, set_crash_phase};
 
-// 日志相关类型与工具函数
-use self::services::{LogEntry, LogLevel, LogService, LogSource, format_log_entry};
+// 日志
+use self::services::LogSource;
 
 // --- 入口函数 ---
 
@@ -59,8 +59,8 @@ pub fn run() {
 
   // 验证 Lua 虚拟机是否正常启动
   match services.lua.eval("return 'Lua VM active'") {
-    Ok(result) => services.log.info(LogSource::Boot, "[Boot] Lua: {}"),
-    Err(error) => services.log.error(LogSource::Boot, "[Boot] Lua error: {}"),
+    Ok(result) => services.log.info(LogSource::Boot, &format!("[Boot] Lua: {result}")),
+    Err(error) => services.log.error(LogSource::Boot, &format!("[Boot] Lua error: {error}")),
   }
 
   // --- 运行阶段 ---

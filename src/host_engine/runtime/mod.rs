@@ -41,9 +41,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   } else {
     Some(LanguageSelectUi::init(registry))
   };
-  // 图片尺寸固定为 8 行（ImageService 已迁移至 old_auto/）
-  let img_h: u16 = 8;
-  let mut terminal_check_ui = TerminalCheckUi::init(&detection, img_h);
+  let mut terminal_check_ui = TerminalCheckUi::init(&detection);
 
   // 初始 UI 节点
   // 1) 无语言 → LanguageSelect

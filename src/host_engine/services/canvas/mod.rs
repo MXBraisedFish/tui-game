@@ -2,4 +2,4 @@ mod buffer;
 mod cell;
 mod service;
 
-pub use service::{CanvasService, DrawTextParams, TextAlign, TextWrapMode};
+pub use service::{CanvasService, DrawTextParams};

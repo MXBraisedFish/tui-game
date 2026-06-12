@@ -2,18 +2,14 @@ mod about;
 mod game_list;
 mod settings;
 
-pub use about::AboutUi;
-pub use game_list::GameListUi;
 pub(crate) use settings::SettingsLayout;
 pub use settings::{SettingsUi, SettingsUiCommand};
 
-use std::fmt::format;
 use std::time::Duration;
 
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, InputActionEvent, KeyState, LayoutService,
-  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, TerminalColor,
-  TextColor,
+  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, TextColor,
 };
 
 use crate::host_engine::services::I18nService;

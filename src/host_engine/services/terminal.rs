@@ -15,8 +15,8 @@ use crossterm::terminal::{
   EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 
-// 临时的日志函数
-use super::{LogLevel, LogService, LogSource};
+// 日志
+use super::{LogService, LogSource};
 
 pub struct TerminalService {
   surface: Option<TerminalSurface>,   // 终端守卫，支持终端开关

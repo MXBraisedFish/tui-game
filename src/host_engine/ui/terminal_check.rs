@@ -11,7 +11,7 @@ const STEP_UNICODE: usize = 0;
 const STEP_COLOR: usize = 1;
 const STEP_IMAGE: usize = 2;
 const STEP_MOUSE: usize = 3;
-const STEP_DONE: usize = 4;
+
 
 /// Unicode 检测的选项数
 const UNICODE_OPTIONS: usize = 2;
@@ -52,9 +52,10 @@ pub(crate) struct TerminalCheckLayout {
   option_xs: Vec<u16>,
   hint_x: u16,
   hint_y: u16,
-  /// 图片区域（图片检测步骤使用）
-  img_rect: Option<Rect>,
 }
+
+/// 图片步骤预留的占位高度（字符格）
+const IMG_PLACEHOLDER_H: u16 = 8;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TerminalCheckUi {
@@ -63,8 +64,6 @@ pub struct TerminalCheckUi {
   selected_index: usize,
   /// 自动检测结果
   detection: DetectionResult,
-  /// 检测图片以 width=20 等比缩放后的高度（字符格）
-  img_h: u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -78,12 +77,11 @@ pub enum TerminalCheckCommand {
 }
 
 impl TerminalCheckUi {
-  pub fn init(detection: &DetectionResult, img_h: u16) -> Self {
+  pub fn init(detection: &DetectionResult) -> Self {
     Self {
       step: STEP_UNICODE,
       selected_index: 0,
       detection: detection.clone(),
-      img_h: img_h.max(1),
     }
   }
 
@@ -218,24 +216,6 @@ impl TerminalCheckUi {
     }
   }
 
-  /// 返回图片区域（供 runtime 在 present 后输出检测图片）。
-  pub fn image_rect(&self, layout: &LayoutService, i18n: &I18nService) -> Option<Rect> {
-    if self.step != STEP_IMAGE {
-      return None;
-    }
-    self.compute_image_positions(layout, i18n).img_rect
-  }
-
-  /// 获取当前图片步骤选中的协议（供 runtime 使用）。
-  pub fn selected_image_protocol(&self) -> crate::host_engine::services::ImageProtocol {
-    match self.selected_index {
-      0 => crate::host_engine::services::ImageProtocol::Kitty,
-      1 => crate::host_engine::services::ImageProtocol::Sixel,
-      2 => crate::host_engine::services::ImageProtocol::ITerm2,
-      _ => crate::host_engine::services::ImageProtocol::None,
-    }
-  }
-
   // ── Unicode 步骤 ──
 
   fn compute_unicode_positions(
@@ -314,7 +294,7 @@ impl TerminalCheckUi {
       hint_y,
       option_rects,
       option_xs,
-      img_rect: None,
+
     }
   }
 
@@ -492,7 +472,7 @@ impl TerminalCheckUi {
       hint_y,
       option_rects,
       option_xs,
-      img_rect: None,
+
     }
   }
 
@@ -625,7 +605,6 @@ impl TerminalCheckUi {
       i18n.get_runtime_text("terminal", "terminal.action.exit"),
     );
 
-    let term_w = layout.get_terminal_size().width;
     let term_h = layout.get_terminal_size().height;
 
     let title_y: u16 = 1;
@@ -637,9 +616,8 @@ impl TerminalCheckUi {
 
     let tip_x = centered_x(layout, &tip);
 
-    // 图片尺寸：宽 20 格，高度由外部传入（等比缩放结果）
-    let img_w = Self::IMG_WIDTH;
-    let img_h = self.img_h;
+    // 图片占位区域高度（字符格），无实际图片渲染
+    let img_h = IMG_PLACEHOLDER_H;
 
     // 选项（直接用语言文件中的简短名称）
     let option_names: [&str; IMAGE_OPTIONS] = [&kitty_name, &sixel_name, &iterm_name, &none_name];
@@ -649,7 +627,7 @@ impl TerminalCheckUi {
     let option_xs: Vec<u16> = option_texts.iter().map(|t| centered_x(layout, t)).collect();
     let options_height = IMAGE_OPTIONS as u16;
 
-    // 内容块：tip(1) + 空行(1) + 图片(img_h) + 空行(1) + 选项(options_height)
+    // 内容块：tip(1) + 空行(1) + 占位(img_h) + 空行(1) + 选项(options_height)
     let content_height = 1 + 1 + img_h + 1 + options_height;
     let available = hint_y.saturating_sub(title_y).saturating_sub(1);
     let content_start_y = if available > content_height {
@@ -662,8 +640,7 @@ impl TerminalCheckUi {
 
     let tip_y = content_start_y;
     let img_y = tip_y.saturating_add(2); // tip + 空行
-    let img_x = (term_w - img_w) / 2;
-    let option_start_y = img_y.saturating_add(img_h).saturating_add(1); // 图片 + 空行
+    let option_start_y = img_y.saturating_add(img_h).saturating_add(1); // 占位 + 空行
 
     let option_widths: Vec<u16> = option_texts
       .iter()
@@ -689,12 +666,6 @@ impl TerminalCheckUi {
       hint_y,
       option_rects,
       option_xs,
-      img_rect: Some(Rect {
-        x: img_x,
-        y: img_y,
-        width: img_w,
-        height: img_h,
-      }),
     }
   }
 
@@ -799,7 +770,7 @@ impl TerminalCheckUi {
       option_xs: Vec::new(),
       hint_x: 0,
       hint_y: layout.get_terminal_size().height.saturating_sub(1),
-      img_rect: None,
+
     }
   }
 
