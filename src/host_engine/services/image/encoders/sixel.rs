@@ -3,19 +3,15 @@ use std::io;
 use icy_sixel::SixelImage;
 use image::DynamicImage;
 
-use super::ImageEncoder;
 use super::super::request::ImageCellRect;
 use super::super::sizing::{CellPixelSize, pixel_size_for_rect};
+use super::ImageEncoder;
 
 /// Sixel 图形协议编码器。
 pub struct SixelEncoder;
 
 impl ImageEncoder for SixelEncoder {
-  fn encode(
-    image: &DynamicImage,
-    rect: ImageCellRect,
-    cell: CellPixelSize,
-  ) -> io::Result<String> {
+  fn encode(image: &DynamicImage, rect: ImageCellRect, cell: CellPixelSize) -> io::Result<String> {
     let pixel = pixel_size_for_rect(rect, cell);
 
     let scaled = image.resize_exact(

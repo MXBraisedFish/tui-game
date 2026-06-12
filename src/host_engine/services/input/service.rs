@@ -1,18 +1,18 @@
 use std::collections::HashSet;
 use std::sync::{
-  atomic::{AtomicBool, Ordering},
   Arc,
+  atomic::{AtomicBool, Ordering},
 };
 use std::thread;
 use std::time::Duration;
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use crossterm::event::{
   self as ct_event, Event as CtEvent, MouseEvent as CtMouseEvent,
   MouseEventKind as CtMouseEventKind,
 };
-use rdev::{listen, Event, EventType, Key as RdevKey};
+use rdev::{Event, EventType, Key as RdevKey, listen};
 
 use super::events::{
   FocusEvent, MouseButton, MouseEvent, MouseEventKind, ResizeEvent, ScrollDirection, SystemEvent,

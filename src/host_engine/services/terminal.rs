@@ -1,5 +1,5 @@
 // 官方标准输入输出
-use std::io::{self, stdout, Stdout, Write};
+use std::io::{self, Stdout, Write, stdout};
 
 // 光标控制
 use crossterm::cursor::{Hide, Show};
@@ -12,7 +12,7 @@ use crossterm::execute;
 // 终端模式控制
 use super::terminal_capabilities::TerminalCapabilities;
 use crossterm::terminal::{
-  disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+  EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 
 // 日志
@@ -136,9 +136,9 @@ impl TerminalService {
   ///
   /// 图片变化时由 runtime 调用，确保旧图片残留被清除后再重绘字符层。
   pub fn clear_all_and_home(&mut self) -> io::Result<()> {
-    use crossterm::terminal::{Clear, ClearType};
     use crossterm::QueueableCommand;
     use crossterm::cursor::MoveTo;
+    use crossterm::terminal::{Clear, ClearType};
 
     if let Some(stdout) = self.writer_mut() {
       stdout.queue(Clear(ClearType::All))?;

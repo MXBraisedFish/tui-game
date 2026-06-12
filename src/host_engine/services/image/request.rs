@@ -1,5 +1,11 @@
 use std::path::PathBuf;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImagePresentPhase {
+  BeforeCanvas,
+  AfterCanvas,
+}
+
 /// 图片缩放策略。
 ///
 /// 所有尺寸均以终端字符格为单位，不暴露像素。

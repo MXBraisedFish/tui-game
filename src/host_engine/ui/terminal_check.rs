@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DetectionResult, DrawImageParams, DrawTextParams,
-  I18nService, ImageFit, ImageProtocol, InputActionEvent, KeyState, LayoutService,
-  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, TextColor,
-  TextStyle,
+  ActionMapEntry, CanvasService, DetectionResult, DrawImageParams, DrawTextParams, I18nService,
+  ImageFit, ImageProtocol, InputActionEvent, KeyState, LayoutService, MouseButton, MouseEvent,
+  MouseEventKind, Rect, RenderService, RichTextParams, TextColor, TextStyle,
 };
 
 /// 检测步骤
@@ -12,7 +11,6 @@ const STEP_UNICODE: usize = 0;
 const STEP_COLOR: usize = 1;
 const STEP_IMAGE: usize = 2;
 const STEP_MOUSE: usize = 3;
-
 
 /// Unicode 检测的选项数
 const UNICODE_OPTIONS: usize = 2;
@@ -90,7 +88,7 @@ impl TerminalCheckUi {
   fn apply_detection(&mut self) {
     self.selected_index = match self.step {
       STEP_UNICODE => 0, // 总是"支持"
-      STEP_COLOR => 0, // 预选"支持"（truecolor 不在自动检测范围）
+      STEP_COLOR => 0,   // 预选"支持"（truecolor 不在自动检测范围）
       STEP_IMAGE => match self.detection.image_protocol {
         ImageProtocol::Kitty => 0,
         ImageProtocol::Sixel => 1,
@@ -293,7 +291,6 @@ impl TerminalCheckUi {
       hint_y,
       option_rects,
       option_xs,
-
     }
   }
 
@@ -471,7 +468,6 @@ impl TerminalCheckUi {
       hint_y,
       option_rects,
       option_xs,
-
     }
   }
 
@@ -809,7 +805,6 @@ impl TerminalCheckUi {
       option_xs: Vec::new(),
       hint_x: 0,
       hint_y: layout.get_terminal_size().height.saturating_sub(1),
-
     }
   }
 

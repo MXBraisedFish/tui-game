@@ -1,12 +1,13 @@
 use std::io::{self, Write};
 
 use crossterm::{
+  QueueableCommand,
   cursor::MoveTo,
   style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
-  QueueableCommand,
 };
 
 use super::{buffer::CanvasBuffer, cell::CanvasCell};
+use crate::host_engine::services::Rect;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
 use crate::host_engine::services::{TerminalColor, TerminalService, TextColor, TextStyle};
@@ -17,6 +18,7 @@ use crate::host_engine::services::{TerminalColor, TerminalService, TextColor, Te
 pub struct CanvasService {
   current: CanvasBuffer,
   previous: CanvasBuffer,
+  reserved_rects: Vec<Rect>,
   force_full_redraw: bool,
 }
 
@@ -26,6 +28,7 @@ impl CanvasService {
     Self {
       current: CanvasBuffer::new(width, height),
       previous: CanvasBuffer::new(width, height),
+      reserved_rects: Vec::new(),
       force_full_redraw: true,
     }
   }
@@ -43,7 +46,7 @@ impl CanvasService {
   }
 
   pub fn begin_frame(&mut self) {
-    // 为运行生命周期保留。
+    self.reserved_rects.clear();
   }
 
   pub fn clear(&mut self) {
@@ -119,6 +122,14 @@ impl CanvasService {
     self.force_full_redraw = true;
   }
 
+  pub fn reserve_rect(&mut self, rect: Rect) {
+    if rect.width == 0 || rect.height == 0 {
+      return;
+    }
+
+    self.reserved_rects.push(rect);
+  }
+
   pub fn present(&mut self, terminal: &mut TerminalService) -> io::Result<()> {
     let Some(stdout) = terminal.writer_mut() else {
       return Ok(());
@@ -129,6 +140,29 @@ impl CanvasService {
       let mut run: Option<(u16, &TextStyle)> = None;
 
       for x in 0..self.current.width() {
+        if self.is_reserved(x, y) {
+          if let Some((start, style)) = run {
+            let run_text: String = (start..x)
+              .filter_map(|rx| {
+                self.current.get(rx, y).and_then(|cell| {
+                  if cell.is_continuation() {
+                    None
+                  } else {
+                    Some(cell.ch)
+                  }
+                })
+              })
+              .collect();
+
+            stdout.queue(MoveTo(start, y))?;
+            queue_style(stdout, style)?;
+            stdout.queue(Print(run_text))?;
+          }
+
+          run = None;
+          continue;
+        }
+
         let current_cell = self.current.get(x, y).unwrap_or(&BLANK_CELL);
 
         // 跳过宽字符延续格 —— 它们属于左侧的宽字符，
@@ -209,6 +243,15 @@ impl CanvasService {
     self.force_full_redraw = false;
 
     Ok(())
+  }
+
+  fn is_reserved(&self, x: u16, y: u16) -> bool {
+    self.reserved_rects.iter().any(|rect| {
+      x >= rect.x
+        && x < rect.x.saturating_add(rect.width)
+        && y >= rect.y
+        && y < rect.y.saturating_add(rect.height)
+    })
   }
 
   fn draw_layout_lines(&mut self, x: u16, y: u16, align: TextAlign, lines: &[LayoutLine]) {
@@ -316,8 +359,8 @@ fn queue_style(stdout: &mut impl Write, style: &TextStyle) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::text_layout::TextWrapMode;
   use crate::host_engine::services::RichTextParams;
+  use crate::host_engine::services::text_layout::TextWrapMode;
   use std::collections::HashMap;
 
   fn visible_row(canvas: &CanvasService, y: u16) -> String {
@@ -502,5 +545,30 @@ mod tests {
     assert_eq!(params.text, "hello");
     assert_eq!(params.wrap_mode, TextWrapMode::Normal);
     assert_eq!(params.line_align, TextAlign::Left);
+  }
+
+  #[test]
+  fn reserve_rect_tracks_reserved_cells() {
+    let mut canvas = CanvasService::new();
+
+    canvas.reserve_rect(Rect {
+      x: 1,
+      y: 2,
+      width: 0,
+      height: 3,
+    });
+    assert!(!canvas.is_reserved(1, 2));
+
+    canvas.reserve_rect(Rect {
+      x: 1,
+      y: 2,
+      width: 3,
+      height: 2,
+    });
+
+    assert!(canvas.is_reserved(1, 2));
+    assert!(canvas.is_reserved(3, 3));
+    assert!(!canvas.is_reserved(4, 3));
+    assert!(!canvas.is_reserved(3, 4));
   }
 }

@@ -1,4 +1,4 @@
-use super::{format_log_level, LogEntry};
+use super::{LogEntry, format_log_level};
 
 // 格式化日志字符串
 pub fn format_log_entry(entry: &LogEntry) -> String {

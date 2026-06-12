@@ -1,4 +1,4 @@
-use super::{load_language_info, load_language_registry, I18nService};
+use super::{I18nService, load_language_info, load_language_registry};
 
 use crate::host_engine::services::{LogService, LogSource, StorageService};
 

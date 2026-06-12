@@ -4,8 +4,8 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::UiNodeKind;
 
 use crate::host_engine::services::{
-  EngineServices, InputActionEvent, MouseEvent, SystemEvent, TerminalDetector,
-  translate_action_map,
+  EngineServices, ImageFramePlan, ImagePresentPhase, InputActionEvent, MouseEvent, Rect,
+  SystemEvent, TerminalDetector, translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -131,21 +131,45 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       }
     }
 
-    // 图片层：必须在 Canvas present 之前判断清屏，
-    // 这样 Clear(All) 之后 Canvas 会在同一帧重绘字符层，Image 再输出图片。
-    let image_needs_clear = services
+    let image_plan = services
       .image
-      .needs_terminal_clear(&services.layout)
-      .unwrap_or(false);
+      .prepare_frame(&services.layout)
+      .unwrap_or(ImageFramePlan {
+        rect: None,
+        phase: ImagePresentPhase::AfterCanvas,
+        needs_terminal_clear: false,
+      });
 
-    if image_needs_clear {
+    if image_plan.needs_terminal_clear {
       let _ = services.terminal.clear_all_and_home();
       services.canvas.request_render();
       services.image.request_render();
     }
 
+    if let Some(rect) = image_plan.rect {
+      services.canvas.reserve_rect(Rect {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      });
+    }
+
+    if image_plan.phase == ImagePresentPhase::BeforeCanvas {
+      let _ = services
+        .image
+        .present(&mut services.terminal, &services.layout);
+    }
+
     let _ = services.canvas.present(&mut services.terminal);
-    let _ = services.image.present(&mut services.terminal, &services.layout);
+
+    if image_plan.phase == ImagePresentPhase::AfterCanvas {
+      let _ = services
+        .image
+        .present(&mut services.terminal, &services.layout);
+    }
+
+    services.image.end_frame();
 
     scheduler.wait_for_next_frame();
   }

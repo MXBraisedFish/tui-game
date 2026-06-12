@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::{format_log_entry, LogEntry, LogLevel, LogSource};
+use super::{LogEntry, LogLevel, LogSource, format_log_entry};
 
 pub struct LogService {
   queue: VecDeque<LogEntry>,

@@ -1,7 +1,7 @@
 use super::types::Size;
-use crate::host_engine::services::text_layout;
 use crate::host_engine::services::DrawTextParams;
 use crate::host_engine::services::RichTextParams;
+use crate::host_engine::services::text_layout;
 
 /// 获取文本渲染后的尺寸。
 ///

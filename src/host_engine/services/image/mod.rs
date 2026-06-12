@@ -10,5 +10,5 @@ mod request;
 mod service;
 mod sizing;
 
-pub use request::{DrawImageParams, ImageFit};
-pub use service::ImageService;
+pub use request::{DrawImageParams, ImageFit, ImagePresentPhase};
+pub use service::{ImageFramePlan, ImageService};

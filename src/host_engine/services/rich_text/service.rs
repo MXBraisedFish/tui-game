@@ -1,4 +1,4 @@
-use super::{parser, RichText, RichTextParams};
+use super::{RichText, RichTextParams, parser};
 
 pub struct RichTextService;
 
