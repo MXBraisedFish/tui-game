@@ -9,6 +9,7 @@ mod lua;
 mod overlay;
 mod package;
 mod render;
+mod render_pipeline;
 mod rich_text;
 mod storage;
 mod terminal;
@@ -18,10 +19,13 @@ pub mod text_layout;
 mod ui;
 mod unicode;
 
-pub use canvas::CanvasService;
+pub use canvas::{CanvasCell, CanvasService};
 pub use game::GameService;
 pub use i18n::{I18nService, LanguageRegistryEntry};
-pub use image::{DrawImageParams, ImageFit, ImageFramePlan, ImagePresentPhase, ImageService};
+pub use image::{
+  CellPixelSize, DrawImageParams, ImageCellRect, ImageFit, ImageLayerFrame, ImageService,
+  ImageSignature, LayerImage,
+};
 pub use input::{
   ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton, MouseEvent,
   MouseEventKind, SystemEvent, translate_action_map,
@@ -32,6 +36,9 @@ pub use lua::LuaService;
 pub use overlay::OverlayService;
 pub use package::PackageService;
 pub use render::RenderService;
+pub use render_pipeline::{
+  ComposedCell, ComposedFrame, ComposedImage, FrameCompositor, FramePresenter, ImageId,
+};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
@@ -58,6 +65,8 @@ pub struct EngineServices {
   pub canvas: CanvasService,
   pub layout: LayoutService,
   pub image: ImageService,
+  pub compositor: FrameCompositor,
+  pub presenter: FramePresenter,
 }
 
 impl EngineServices {
@@ -81,6 +90,8 @@ impl EngineServices {
       canvas: CanvasService::new(),
       layout: LayoutService::new(),
       image: ImageService::new(ImageProtocol::None),
+      compositor: FrameCompositor::new(),
+      presenter: FramePresenter::new(),
     }
   }
 }

@@ -1,27 +1,13 @@
-use std::io::{self, Write};
-
-use crossterm::{
-  QueueableCommand,
-  cursor::MoveTo,
-  style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
-};
-
-use super::{
-  buffer::CanvasBuffer,
-  cell::{CanvasCell, CanvasCellContent},
-};
-use crate::host_engine::services::Rect;
+use super::{buffer::CanvasBuffer, cell::CanvasCell};
+use crate::host_engine::services::TextStyle;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
-use crate::host_engine::services::{TerminalColor, TerminalService, TextColor, TextStyle};
 
 // ── 画布服务 ──
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasService {
   current: CanvasBuffer,
-  previous: CanvasBuffer,
-  reserved_rects: Vec<Rect>,
   force_full_redraw: bool,
 }
 
@@ -30,8 +16,6 @@ impl CanvasService {
     let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
     Self {
       current: CanvasBuffer::new(width, height),
-      previous: CanvasBuffer::new(width, height),
-      reserved_rects: Vec::new(),
       force_full_redraw: true,
     }
   }
@@ -48,9 +32,7 @@ impl CanvasService {
     (self.width(), self.height())
   }
 
-  pub fn begin_frame(&mut self) {
-    self.reserved_rects.clear();
-  }
+  pub fn begin_frame(&mut self) {}
 
   pub fn clear(&mut self) {
     self.current.clear();
@@ -117,7 +99,7 @@ impl CanvasService {
   /// 需要重绘时由调用方显式调用 `request_render()`。
   pub fn resize(&mut self, width: u16, height: u16) {
     self.current.resize(width, height);
-    self.previous.resize(width, height);
+    self.force_full_redraw = true;
   }
 
   /// 标记下一帧为强制全屏重绘。收到 resize / focus 等系统事件时调用。
@@ -125,138 +107,14 @@ impl CanvasService {
     self.force_full_redraw = true;
   }
 
-  pub fn reserve_rect(&mut self, rect: Rect) {
-    if rect.width == 0 || rect.height == 0 {
-      return;
-    }
-
-    self.reserved_rects.push(rect);
-  }
-
-  pub fn raw_cell(&mut self, x: u16, y: u16, seq: String) {
-    self.current.set(x, y, CanvasCell::raw(seq));
-  }
-
-  pub fn skip_cell(&mut self, x: u16, y: u16) {
-    self.current.set(x, y, CanvasCell::skip());
-  }
-
-  pub fn reserve_rect_except_anchor(&mut self, rect: Rect) {
-    if rect.width == 0 || rect.height == 0 {
-      return;
-    }
-
-    for y in rect.y..rect.y.saturating_add(rect.height) {
-      for x in rect.x..rect.x.saturating_add(rect.width) {
-        if x == rect.x && y == rect.y {
-          continue;
-        }
-        self.skip_cell(x, y);
-      }
-    }
-  }
-
-  pub fn present(&mut self, terminal: &mut TerminalService) -> io::Result<()> {
-    let Some(stdout) = terminal.writer_mut() else {
-      return Ok(());
-    };
-
-    for y in 0..self.current.height() {
-      // (起始 x, 参考样式) —— 样式变了就切新 run
-      let mut run: Option<(u16, &TextStyle)> = None;
-
-      for x in 0..self.current.width() {
-        if self.is_reserved(x, y) {
-          if let Some((start, style)) = run {
-            queue_text_run(stdout, &self.current, y, start, x, style)?;
-          }
-
-          run = None;
-          continue;
-        }
-
-        let current_cell = self.current.get(x, y).unwrap_or(&BLANK_CELL);
-
-        match &current_cell.content {
-          CanvasCellContent::Skip => {
-            if let Some((start, style)) = run {
-              queue_text_run(stdout, &self.current, y, start, x, style)?;
-            }
-            run = None;
-            continue;
-          }
-          CanvasCellContent::Raw(seq) => {
-            if let Some((start, style)) = run {
-              queue_text_run(stdout, &self.current, y, start, x, style)?;
-            }
-            run = None;
-
-            stdout.queue(MoveTo(x, y))?;
-            write!(stdout, "{seq}")?;
-            continue;
-          }
-          CanvasCellContent::Text(_) => {}
-        }
-
-        // 跳过宽字符延续格 —— 它们属于左侧的宽字符，
-        // 不应打断当前 run，也不应启动新 run。
-        if current_cell.is_continuation() {
-          continue;
-        }
-
-        let previous_cell = self.previous.get(x, y).unwrap_or(&BLANK_CELL);
-
-        let cell_changed = self.force_full_redraw || current_cell != previous_cell;
-
-        match &run {
-          // 当前不在 run 内，新变化启动 run
-          None if cell_changed => {
-            run = Some((x, &current_cell.style));
-          }
-
-          // 在 run 内，样式相同 → 继续
-          Some((_, run_style)) if cell_changed && *run_style == &current_cell.style => {
-            // 继续累积
-          }
-
-          // 在 run 内，但样式变了 或 单元格未变化 → 输出当前 run
-          _ => {
-            if let Some((start, style)) = run {
-              queue_text_run(stdout, &self.current, y, start, x, style)?;
-            }
-
-            // 如果当前单元格变了但样式不同，启动新 run
-            if cell_changed {
-              run = Some((x, &current_cell.style));
-            } else {
-              run = None;
-            }
-          }
-        }
-      }
-
-      // 行尾残留 run
-      if let Some((start, style)) = run {
-        queue_text_run(stdout, &self.current, y, start, self.current.width(), style)?;
-      }
-    }
-
-    stdout.queue(ResetColor)?;
-    stdout.flush()?;
-
-    self.previous = self.current.clone();
+  pub fn take_render_requested(&mut self) -> bool {
+    let requested = self.force_full_redraw;
     self.force_full_redraw = false;
-
-    Ok(())
+    requested
   }
 
-  fn is_reserved(&self, x: u16, y: u16) -> bool {
-    self.reserved_rects.iter().any(|rect| {
-      x >= rect.x
-        && x < rect.x.saturating_add(rect.width)
-        && y >= rect.y
-        && y < rect.y.saturating_add(rect.height)
-    })
+  pub fn cell_at(&self, x: u16, y: u16) -> Option<&CanvasCell> {
+    self.current.get(x, y)
   }
 
   fn draw_layout_lines(&mut self, x: u16, y: u16, align: TextAlign, lines: &[LayoutLine]) {
@@ -297,109 +155,18 @@ impl CanvasService {
   }
 }
 
-// ── 终端颜色转换 ──
-
-static BLANK_CELL: CanvasCell = CanvasCell {
-  content: CanvasCellContent::Text(' '),
-  style: TextStyle {
-    foreground: None,
-    background: None,
-    bold: false,
-    italic: false,
-    underline: false,
-    strike: false,
-    blink: false,
-    reverse: false,
-    hidden: false,
-    dim: false,
-  },
-};
-
-fn queue_text_run(
-  stdout: &mut impl Write,
-  buffer: &CanvasBuffer,
-  y: u16,
-  start: u16,
-  end: u16,
-  style: &TextStyle,
-) -> io::Result<()> {
-  let run_text: String = (start..end)
-    .filter_map(|rx| {
-      buffer.get(rx, y).and_then(|cell| {
-        if cell.is_continuation() {
-          None
-        } else {
-          cell.text_char()
-        }
-      })
-    })
-    .collect();
-
-  stdout.queue(MoveTo(start, y))?;
-  queue_style(stdout, style)?;
-  stdout.queue(Print(run_text))?;
-
-  Ok(())
-}
-
-fn terminal_color_to_crossterm(color: &TerminalColor) -> Color {
-  match color {
-    TerminalColor::Black => Color::Black,
-    TerminalColor::Red => Color::DarkRed,
-    TerminalColor::Green => Color::DarkGreen,
-    TerminalColor::Yellow => Color::DarkYellow,
-    TerminalColor::Blue => Color::DarkBlue,
-    TerminalColor::Magenta => Color::DarkMagenta,
-    TerminalColor::Cyan => Color::DarkCyan,
-    TerminalColor::White => Color::White,
-    TerminalColor::BrightBlack => Color::Grey,
-    TerminalColor::BrightRed => Color::Red,
-    TerminalColor::BrightGreen => Color::Green,
-    TerminalColor::BrightYellow => Color::Yellow,
-    TerminalColor::BrightBlue => Color::Blue,
-    TerminalColor::BrightMagenta => Color::Magenta,
-    TerminalColor::BrightCyan => Color::Cyan,
-    TerminalColor::BrightWhite => Color::White,
-  }
-}
-
-fn text_color_to_crossterm(color: &TextColor) -> Color {
-  match color {
-    TextColor::Terminal(color) => terminal_color_to_crossterm(color),
-    TextColor::Rgb { r, g, b } => Color::Rgb {
-      r: *r,
-      g: *g,
-      b: *b,
-    },
-  }
-}
-
-fn queue_style(stdout: &mut impl Write, style: &TextStyle) -> io::Result<()> {
-  stdout.queue(ResetColor)?;
-
-  if let Some(foreground) = &style.foreground {
-    stdout.queue(SetForegroundColor(text_color_to_crossterm(foreground)))?;
-  }
-
-  if let Some(background) = &style.background {
-    stdout.queue(SetBackgroundColor(text_color_to_crossterm(background)))?;
-  }
-
-  Ok(())
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::RichTextParams;
   use crate::host_engine::services::text_layout::TextWrapMode;
+  use crate::host_engine::services::{RichTextParams, TerminalColor, TextColor};
   use std::collections::HashMap;
 
   fn visible_row(canvas: &CanvasService, y: u16) -> String {
     (0..canvas.width())
       .filter_map(|x| {
         canvas.current.get(x, y).and_then(|cell| {
-          let ch = cell.text_char()?;
+          let ch = cell.ch;
           if cell.is_continuation() || ch == ' ' {
             None
           } else {
@@ -412,13 +179,7 @@ mod tests {
 
   fn raw_row_prefix(canvas: &CanvasService, y: u16, width: u16) -> String {
     (0..width)
-      .map(|x| {
-        canvas
-          .current
-          .get(x, y)
-          .and_then(|cell| cell.text_char())
-          .unwrap_or(' ')
-      })
+      .map(|x| canvas.current.get(x, y).map(|cell| cell.ch).unwrap_or(' '))
       .collect()
   }
 
@@ -563,8 +324,8 @@ mod tests {
 
     let c = canvas.current.get(2, 0).expect("c cell");
     let d = canvas.current.get(0, 1).expect("d cell");
-    assert_eq!(c.text_char(), Some('c'));
-    assert_eq!(d.text_char(), Some('d'));
+    assert_eq!(c.ch, 'c');
+    assert_eq!(d.ch, 'd');
     assert_eq!(
       c.style.foreground,
       Some(TextColor::Terminal(TerminalColor::Blue))
@@ -587,47 +348,11 @@ mod tests {
   }
 
   #[test]
-  fn reserve_rect_tracks_reserved_cells() {
+  fn cell_at_reads_current_text_cell() {
     let mut canvas = CanvasService::new();
+    canvas.styled_text(2, 3, "a", TextStyle::default());
 
-    canvas.reserve_rect(Rect {
-      x: 1,
-      y: 2,
-      width: 0,
-      height: 3,
-    });
-    assert!(!canvas.is_reserved(1, 2));
-
-    canvas.reserve_rect(Rect {
-      x: 1,
-      y: 2,
-      width: 3,
-      height: 2,
-    });
-
-    assert!(canvas.is_reserved(1, 2));
-    assert!(canvas.is_reserved(3, 3));
-    assert!(!canvas.is_reserved(4, 3));
-    assert!(!canvas.is_reserved(3, 4));
-  }
-
-  #[test]
-  fn raw_cell_and_skip_cells_are_written_to_current_buffer() {
-    let mut canvas = CanvasService::new();
-
-    canvas.raw_cell(2, 3, "raw-seq".to_string());
-    canvas.reserve_rect_except_anchor(Rect {
-      x: 2,
-      y: 3,
-      width: 3,
-      height: 2,
-    });
-
-    assert!(matches!(
-      canvas.current.get(2, 3).map(|cell| &cell.content),
-      Some(CanvasCellContent::Raw(seq)) if seq == "raw-seq"
-    ));
-    assert!(canvas.current.get(3, 3).is_some_and(CanvasCell::is_skip));
-    assert!(canvas.current.get(2, 4).is_some_and(CanvasCell::is_skip));
+    let cell = canvas.cell_at(2, 3).expect("cell");
+    assert_eq!(cell.ch, 'a');
   }
 }

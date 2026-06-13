@@ -4,8 +4,8 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::UiNodeKind;
 
 use crate::host_engine::services::{
-  EngineServices, ImageFramePlan, ImagePresentPhase, ImageProtocol, InputActionEvent, MouseEvent,
-  Rect, SystemEvent, TerminalDetector, translate_action_map,
+  EngineServices, ImageLayerFrame, InputActionEvent, MouseEvent, SystemEvent, TerminalDetector,
+  translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -68,6 +68,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       services.canvas.resize(w, h);
       services.canvas.request_render();
       services.image.request_render();
+      services.presenter.request_render();
     });
 
     services.canvas.begin_frame();
@@ -131,45 +132,20 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       }
     }
 
-    let image_plan = services
+    let image_layer = services
       .image
-      .prepare_frame(&services.layout)
-      .unwrap_or(ImageFramePlan {
-        rect: None,
-        phase: ImagePresentPhase::AfterCanvas,
-        needs_terminal_clear: false,
+      .build_layer(&services.layout)
+      .unwrap_or(ImageLayerFrame {
+        images: Vec::new(),
+        dirty: false,
+        removed_regions: Vec::new(),
       });
 
-    if image_plan.needs_terminal_clear {
-      let _ = services.terminal.clear_all_and_home();
-      services.canvas.request_render();
-      services.image.request_render();
-    }
-
-    let image_protocol = services.image.protocol();
-
-    if image_protocol != ImageProtocol::ITerm2 {
-      if let Some(rect) = image_plan.rect {
-        services.canvas.reserve_rect(Rect {
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-        });
-      }
-    }
-
-    if image_protocol == ImageProtocol::ITerm2 {
-      let _ = services.image.draw_iterm2_into_canvas(&mut services.canvas);
-    }
-
-    let _ = services.canvas.present(&mut services.terminal);
-
-    if image_protocol != ImageProtocol::ITerm2 {
-      let _ = services
-        .image
-        .present(&mut services.terminal, &services.layout);
-    }
+    let text_force_redraw = services.canvas.take_render_requested();
+    let composed = services.compositor.compose(&services.canvas, &image_layer);
+    let _ = services
+      .presenter
+      .present(&composed, &mut services.terminal, text_force_redraw);
 
     services.image.end_frame();
 

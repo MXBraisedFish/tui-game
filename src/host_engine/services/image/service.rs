@@ -1,36 +1,42 @@
 use std::path::PathBuf;
 
-use crate::host_engine::services::{
-  CanvasService, ImageProtocol, LayoutService, Rect, TerminalService,
-};
+use crate::host_engine::services::{ImageProtocol, LayoutService};
 
 use super::encoders::{ITerm2Encoder, ImageEncoder, KittyEncoder, SixelEncoder};
 use super::error::ImageError;
-use super::request::{DrawImageParams, ImageCellRect, ImagePresentPhase};
+use super::request::{DrawImageParams, ImageCellRect};
 use super::sizing::{CellPixelSize, current_cell_pixel_size, resolve_image_rect};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ImageFramePlan {
-  pub rect: Option<ImageCellRect>,
-  pub phase: ImagePresentPhase,
-  pub needs_terminal_clear: bool,
+pub struct ImageLayerFrame {
+  pub images: Vec<LayerImage>,
+  pub dirty: bool,
+  pub removed_regions: Vec<ImageCellRect>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LayerImage {
+  pub id: u64,
+  pub protocol: ImageProtocol,
+  pub rect: ImageCellRect,
+  pub signature: ImageSignature,
+  pub sequence: String,
 }
 
 /// 图片请求签名，用于帧间差异比较。
 /// 含 `cell` 是因为 resize/DPI/字体变化时 rect 可能相同但像素尺寸已变。
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct ImageSignature {
-  protocol: ImageProtocol,
-  path: PathBuf,
-  rect: ImageCellRect,
-  cell: CellPixelSize,
-  preserve_aspect_ratio: bool,
+pub struct ImageSignature {
+  pub protocol: ImageProtocol,
+  pub path: PathBuf,
+  pub rect: ImageCellRect,
+  pub cell: CellPixelSize,
+  pub preserve_aspect_ratio: bool,
 }
 
 /// 图片渲染服务。
 ///
-/// 只负责图片层的编码与输出。
-/// 变化时重新编码，每帧均可重放已缓存的转义序列。
+/// 只负责图片层请求、尺寸解析与协议编码缓存。
 /// 当前版本只支持每帧一个图片请求。
 /// TODO: 多图支持时替换 `pending` 为 `Vec<DrawImageParams>`。
 pub struct ImageService {
@@ -90,22 +96,22 @@ impl ImageService {
     self.force_redraw = true;
   }
 
-  pub fn prepare_frame(&mut self, layout: &LayoutService) -> Result<ImageFramePlan, ImageError> {
+  pub fn build_layer(&mut self, layout: &LayoutService) -> Result<ImageLayerFrame, ImageError> {
     let Some(ref pending) = self.pending else {
       self.current_signature = None;
-      return Ok(ImageFramePlan {
-        rect: None,
-        phase: ImagePresentPhase::AfterCanvas,
-        needs_terminal_clear: self.previous_signature.is_some(),
+      return Ok(ImageLayerFrame {
+        images: Vec::new(),
+        dirty: self.previous_signature.is_some(),
+        removed_regions: previous_rects(&self.previous_signature),
       });
     };
 
     if self.protocol == ImageProtocol::None {
       self.current_signature = None;
-      return Ok(ImageFramePlan {
-        rect: None,
-        phase: ImagePresentPhase::AfterCanvas,
-        needs_terminal_clear: self.previous_signature.is_some(),
+      return Ok(ImageLayerFrame {
+        images: Vec::new(),
+        dirty: self.previous_signature.is_some(),
+        removed_regions: previous_rects(&self.previous_signature),
       });
     }
 
@@ -154,93 +160,27 @@ impl ImageService {
     };
 
     let changed = self.previous_signature.as_ref() != Some(&sig);
-    self.current_signature = Some(sig);
+    self.current_signature = Some(sig.clone());
 
-    Ok(ImageFramePlan {
-      rect: Some(rect),
-      phase: present_phase(self.protocol),
-      needs_terminal_clear: changed || self.force_redraw,
+    let sequence = self.sequence_for_signature(&sig, &img)?;
+
+    let removed_regions = match &self.previous_signature {
+      Some(previous) if previous.rect != rect => vec![previous.rect],
+      Some(previous) if previous.protocol != self.protocol => vec![previous.rect],
+      _ => Vec::new(),
+    };
+
+    Ok(ImageLayerFrame {
+      images: vec![LayerImage {
+        id: 1,
+        protocol: self.protocol,
+        rect,
+        signature: sig,
+        sequence,
+      }],
+      dirty: changed || self.force_redraw,
+      removed_regions,
     })
-  }
-
-  /// 输出当前图片。帧状态统一由 `end_frame()` 更新。
-  pub fn present(
-    &mut self,
-    terminal: &mut TerminalService,
-    _layout: &LayoutService,
-  ) -> Result<(), ImageError> {
-    let Some(sig) = self.current_signature.clone() else {
-      return Ok(());
-    };
-
-    if sig.protocol == ImageProtocol::ITerm2 {
-      return Ok(());
-    }
-
-    let need_encode =
-      self.cached_signature.as_ref() != Some(&sig) || self.cached_sequence.is_none();
-
-    if need_encode {
-      let img = load_image(&sig.path)?;
-      let seq = encode_with_protocol(sig.protocol, &img, sig.rect, sig.cell)?;
-      self.cached_signature = Some(sig.clone());
-      self.cached_sequence = Some(seq);
-    }
-
-    let seq = self
-      .cached_sequence
-      .as_ref()
-      .ok_or(ImageError::UnsupportedProtocol)?;
-
-    let stdout = terminal
-      .writer_mut()
-      .ok_or(ImageError::MissingTerminalWriter)?;
-
-    use crossterm::QueueableCommand;
-    use crossterm::cursor::MoveTo;
-    use std::io::Write;
-
-    stdout.queue(MoveTo(sig.rect.x, sig.rect.y))?;
-    write!(stdout, "{seq}")?;
-    stdout.queue(MoveTo(0, 0))?;
-    stdout.flush()?;
-
-    Ok(())
-  }
-
-  pub fn draw_iterm2_into_canvas(&mut self, canvas: &mut CanvasService) -> Result<(), ImageError> {
-    let Some(sig) = self.current_signature.clone() else {
-      return Ok(());
-    };
-
-    if sig.protocol != ImageProtocol::ITerm2 {
-      return Ok(());
-    }
-
-    let need_encode =
-      self.cached_signature.as_ref() != Some(&sig) || self.cached_sequence.is_none();
-
-    if need_encode {
-      let img = load_image(&sig.path)?;
-      let seq = encode_with_protocol(sig.protocol, &img, sig.rect, sig.cell)?;
-      self.cached_signature = Some(sig.clone());
-      self.cached_sequence = Some(seq);
-    }
-
-    let seq = self
-      .cached_sequence
-      .clone()
-      .ok_or(ImageError::UnsupportedProtocol)?;
-
-    canvas.raw_cell(sig.rect.x, sig.rect.y, seq);
-    canvas.reserve_rect_except_anchor(Rect {
-      x: sig.rect.x,
-      y: sig.rect.y,
-      width: sig.rect.width,
-      height: sig.rect.height,
-    });
-
-    Ok(())
   }
 
   pub fn end_frame(&mut self) {
@@ -251,6 +191,25 @@ impl ImageService {
       self.cached_signature = None;
       self.cached_sequence = None;
     }
+  }
+
+  fn sequence_for_signature(
+    &mut self,
+    sig: &ImageSignature,
+    image: &image::DynamicImage,
+  ) -> Result<String, ImageError> {
+    let need_encode = self.cached_signature.as_ref() != Some(sig) || self.cached_sequence.is_none();
+
+    if need_encode {
+      let seq = encode_with_protocol(sig.protocol, image, sig.rect, sig.cell)?;
+      self.cached_signature = Some(sig.clone());
+      self.cached_sequence = Some(seq);
+    }
+
+    self
+      .cached_sequence
+      .clone()
+      .ok_or(ImageError::UnsupportedProtocol)
   }
 }
 
@@ -293,13 +252,11 @@ fn encode_with_protocol(
   }
 }
 
-fn present_phase(protocol: ImageProtocol) -> ImagePresentPhase {
-  match protocol {
-    ImageProtocol::ITerm2 => ImagePresentPhase::BeforeCanvas,
-    ImageProtocol::Kitty | ImageProtocol::Sixel | ImageProtocol::None => {
-      ImagePresentPhase::AfterCanvas
-    }
-  }
+fn previous_rects(signature: &Option<ImageSignature>) -> Vec<ImageCellRect> {
+  signature
+    .as_ref()
+    .map(|sig| vec![sig.rect])
+    .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -319,27 +276,7 @@ mod tests {
   }
 
   #[test]
-  fn iterm2_uses_before_canvas_phase() {
-    assert_eq!(
-      present_phase(ImageProtocol::ITerm2),
-      ImagePresentPhase::BeforeCanvas
-    );
-    assert_eq!(
-      present_phase(ImageProtocol::Kitty),
-      ImagePresentPhase::AfterCanvas
-    );
-    assert_eq!(
-      present_phase(ImageProtocol::Sixel),
-      ImagePresentPhase::AfterCanvas
-    );
-    assert_eq!(
-      present_phase(ImageProtocol::None),
-      ImagePresentPhase::AfterCanvas
-    );
-  }
-
-  #[test]
-  fn none_protocol_clears_previous_image_without_rect() {
+  fn none_protocol_builds_empty_dirty_layer_with_removed_region() {
     let mut service = ImageService::new(ImageProtocol::None);
     service.previous_signature = Some(ImageSignature {
       protocol: ImageProtocol::Kitty,
@@ -357,18 +294,26 @@ mod tests {
       preserve_aspect_ratio: false,
     });
 
-    let plan = service
-      .prepare_frame(&LayoutService::new())
-      .expect("prepare none frame");
+    let layer = service
+      .build_layer(&LayoutService::new())
+      .expect("build none layer");
 
-    assert_eq!(plan.rect, None);
-    assert_eq!(plan.phase, ImagePresentPhase::AfterCanvas);
-    assert!(plan.needs_terminal_clear);
+    assert!(layer.images.is_empty());
+    assert!(layer.dirty);
+    assert_eq!(
+      layer.removed_regions,
+      vec![ImageCellRect {
+        x: 1,
+        y: 2,
+        width: 3,
+        height: 4,
+      }]
+    );
     assert_eq!(service.current_signature, None);
   }
 
   #[test]
-  fn prepare_frame_uses_exact_rect_and_before_canvas_for_iterm2() {
+  fn build_layer_uses_exact_rect_for_iterm2() {
     let path = write_test_png("tui-game-image-service-iterm2.png");
     let mut service = ImageService::new(ImageProtocol::ITerm2);
     service
@@ -384,21 +329,23 @@ mod tests {
       })
       .expect("draw image");
 
-    let plan = service
-      .prepare_frame(&LayoutService::new())
-      .expect("prepare image frame");
+    let layer = service
+      .build_layer(&LayoutService::new())
+      .expect("build image layer");
 
+    assert_eq!(layer.images.len(), 1);
     assert_eq!(
-      plan.rect,
-      Some(ImageCellRect {
+      layer.images[0].rect,
+      ImageCellRect {
         x: 3,
         y: 4,
         width: 20,
         height: 8,
-      })
+      }
     );
-    assert_eq!(plan.phase, ImagePresentPhase::BeforeCanvas);
-    assert!(plan.needs_terminal_clear);
+    assert_eq!(layer.images[0].protocol, ImageProtocol::ITerm2);
+    assert!(layer.dirty);
+    assert!(!layer.images[0].sequence.is_empty());
   }
 
   #[test]
@@ -425,5 +372,36 @@ mod tests {
 
     assert_eq!(service.previous_signature, service.current_signature);
     assert!(!service.force_redraw);
+  }
+
+  #[test]
+  fn build_layer_reuses_cached_sequence_when_signature_is_unchanged() {
+    let path = write_test_png("tui-game-image-service-cache.png");
+    let mut service = ImageService::new(ImageProtocol::Kitty);
+    let request = DrawImageParams {
+      x: 1,
+      y: 2,
+      path,
+      fit: ImageFit::Exact {
+        width: 4,
+        height: 3,
+      },
+      preserve_aspect_ratio: false,
+    };
+
+    service.draw(request.clone()).expect("draw first image");
+    let first = service
+      .build_layer(&LayoutService::new())
+      .expect("first layer");
+    service.end_frame();
+
+    service.begin_frame();
+    service.draw(request).expect("draw same image");
+    let second = service
+      .build_layer(&LayoutService::new())
+      .expect("second layer");
+
+    assert_eq!(first.images[0].sequence, second.images[0].sequence);
+    assert!(!second.dirty);
   }
 }

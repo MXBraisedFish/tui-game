@@ -65,10 +65,7 @@ impl CanvasBuffer {
     }
     let mut text = String::new();
     for x in 0..self.width {
-      let ch = self
-        .get(x, y)
-        .and_then(|cell| cell.text_char())
-        .unwrap_or(' ');
+      let ch = self.get(x, y).map(|cell| cell.ch).unwrap_or(' ');
       text.push(ch);
     }
     text

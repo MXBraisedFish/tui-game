@@ -1,7 +1,7 @@
-//! 图片渲染服务。
+//! 图片层服务。
 //!
-//! 只负责图片层的编码与输出。
-//! 不操作 Canvas，不直接写 stdout（通过 TerminalService）。
+//! 只负责图片请求、尺寸解析与协议编码缓存。
+//! 不操作 Canvas，不直接写 stdout。
 //! 上层通过 `DrawImageParams` 声明绘图意图。
 
 mod encoders;
@@ -10,5 +10,6 @@ mod request;
 mod service;
 mod sizing;
 
-pub use request::{DrawImageParams, ImageFit, ImagePresentPhase};
-pub use service::{ImageFramePlan, ImageService};
+pub use request::{DrawImageParams, ImageCellRect, ImageFit};
+pub use service::{ImageLayerFrame, ImageService, ImageSignature, LayerImage};
+pub use sizing::CellPixelSize;
