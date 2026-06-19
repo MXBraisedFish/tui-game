@@ -10,12 +10,9 @@
   "terminal.truecolor.no-256": "Not Supported (256 Colors Only)",
   "terminal.truecolor.no-other": "Not Supported (Less Than 256 Colors)",
 
-  "terminal.image.title": "Image Protocol Detection",
-  "terminal.image.tip": "Select the protocol that displays the image correctly.",
-  "terminal.image.kitty": "Kitty",
-  "terminal.image.sixel": "Sixel",
-  "terminal.image.iterm": "iTerm2",
-  "terminal.image.none": "None/Unknown",
+  "terminal.mouse.title": "Mouse Check",
+  "terminal.mouse.tip": "Click here",
+  "terminal.mouse.no": "Not Supported",
 
   "terminal.action.select": "{key:terminal.focus_up}/{key:terminal.focus_down} Select",
   "terminal.action.confirm": "{key:terminal.confirm} Confirm",

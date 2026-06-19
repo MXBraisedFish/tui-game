@@ -1,0 +1,9 @@
+{
+  "language.title": "语言",
+  "language.flip.forward": "❮ {key:language.flip_forward}",
+  "language.flip.backward": "{key:language.flip_backward} ❯",
+  "language.action.focus": "{key:language.focus_up}/{key:language.focus_down}/{key:language.focus_left}/{key:language.right} 选择",
+  "language.action.flip": "{key:language.flip_forward}/{key:language.flip_backward} 翻页",
+  "language.action.confirm": "{key:language.confirm} 确认",
+  "language.action.back": "{key:language.back} 返回"
+}

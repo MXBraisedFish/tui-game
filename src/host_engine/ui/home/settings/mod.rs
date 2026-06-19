@@ -5,6 +5,10 @@ use crate::host_engine::services::{
   LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams,
 };
 
+pub mod language;
+pub(crate) use language::LanguageSelectLayout;
+pub use language::{LanguageSelectCommand, LanguageSelectUi};
+
 const SETTINGS_MENU_LEN: usize = 6;
 
 const MENU_KEYS: &[&str] = &[
@@ -33,6 +37,7 @@ pub struct SettingsUi {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsUiCommand {
   Back,
+  OpenLanguageSelect,
 }
 
 impl SettingsUi {
@@ -114,7 +119,9 @@ impl SettingsUi {
         None
       }
       "settings.confirm" => {
-        // 暂无路由
+        if self.selected_index == 0 {
+          return Some(SettingsUiCommand::OpenLanguageSelect);
+        }
         None
       }
       "settings.back" => Some(SettingsUiCommand::Back),
@@ -164,8 +171,11 @@ impl SettingsUi {
       }
       MouseEventKind::Press => match event.button {
         Some(MouseButton::Left) => {
-          if let Some(_index) = Self::hit_test_menu(positions, event.x, event.y) {
-            // 确认 —— 暂无路由
+          if let Some(index) = Self::hit_test_menu(positions, event.x, event.y) {
+            self.selected_index = index;
+            if index == 0 {
+              return Some(SettingsUiCommand::OpenLanguageSelect);
+            }
           }
           None
         }

@@ -1,23 +1,20 @@
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DetectionResult, DrawImageParams, DrawTextParams, I18nService,
-  ImageFit, ImageProtocol, InputActionEvent, KeyState, LayoutService, MouseButton, MouseEvent,
-  MouseEventKind, Rect, RenderService, RichTextParams, TextColor, TextStyle,
+  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, InputActionEvent,
+  KeyState, LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService,
+  RichTextParams, StorageService, TextColor, TextStyle,
 };
 
 /// 检测步骤
 const STEP_UNICODE: usize = 0;
 const STEP_COLOR: usize = 1;
-const STEP_IMAGE: usize = 2;
-const STEP_MOUSE: usize = 3;
+const STEP_MOUSE: usize = 2;
 
 /// Unicode 检测的选项数
 const UNICODE_OPTIONS: usize = 2;
 /// 色彩检测的选项数
 const COLOR_OPTIONS: usize = 3;
-/// 图片协议检测的选项数
-const IMAGE_OPTIONS: usize = 4;
 
 /// Unicode 示例文本
 const UNICODE_SAMPLE: &str = "你好 World \u{1F30D} ȧb عربى";
@@ -27,6 +24,11 @@ const BAND_LEFT_PCT: u16 = 20;
 const BAND_RIGHT_PCT: u16 = 80;
 /// 色带行数
 const BAND_ROWS: u16 = 3;
+
+/// 鼠标检测矩形框高度
+const MOUSE_BOX_HEIGHT: u16 = 5;
+/// 鼠标检测矩形框内边距（tip 左右各留空格数）
+const MOUSE_BOX_PADDING: u16 = 5;
 
 /// 彩虹色带关键色 (红→橙→黄→绿→青→蓝→紫)
 const RAINBOW: &[(u8, u8, u8)] = &[
@@ -53,16 +55,11 @@ pub(crate) struct TerminalCheckLayout {
   hint_y: u16,
 }
 
-/// 图片步骤预留的占位高度（字符格）
-const IMG_PLACEHOLDER_H: u16 = 8;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TerminalCheckUi {
   step: usize,
   /// 每个步骤内部的选择索引
   selected_index: usize,
-  /// 自动检测结果
-  detection: DetectionResult,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,16 +68,15 @@ pub enum TerminalCheckCommand {
   Next,
   /// 退出程序（Unicode / Color 失败）
   Exit,
-  /// 全部完成
-  Done,
+  /// 全部完成（携带鼠标检测结果）
+  Done { mouse: bool },
 }
 
 impl TerminalCheckUi {
-  pub fn init(detection: &DetectionResult) -> Self {
+  pub fn init() -> Self {
     Self {
       step: STEP_UNICODE,
       selected_index: 0,
-      detection: detection.clone(),
     }
   }
 
@@ -89,12 +85,7 @@ impl TerminalCheckUi {
     self.selected_index = match self.step {
       STEP_UNICODE => 0, // 总是"支持"
       STEP_COLOR => 0,   // 预选"支持"（truecolor 不在自动检测范围）
-      STEP_IMAGE => match self.detection.image_protocol {
-        ImageProtocol::Kitty => 0,
-        ImageProtocol::Sixel => 1,
-        ImageProtocol::ITerm2 => 2,
-        ImageProtocol::None => 3,
-      },
+      STEP_MOUSE => 1,   // 默认聚焦"不支持"，必须鼠标点击矩形才能切换
       _ => 0,
     };
   }
@@ -135,12 +126,18 @@ impl TerminalCheckUi {
 
     match event.action.as_str() {
       "terminal.focus_up" => {
+        if self.step == STEP_MOUSE {
+          return None;
+        }
         if self.selected_index > 0 {
           self.selected_index -= 1;
         }
         None
       }
       "terminal.focus_down" => {
+        if self.step == STEP_MOUSE {
+          return None;
+        }
         let max = self.option_count().saturating_sub(1);
         if self.selected_index < max {
           self.selected_index += 1;
@@ -167,6 +164,9 @@ impl TerminalCheckUi {
         None
       }
       MouseEventKind::Press => {
+        if event.button == Some(MouseButton::Right) {
+          return Some(TerminalCheckCommand::Exit);
+        }
         if event.button == Some(MouseButton::Left) {
           if Self::hit_test(positions, event.x, event.y).is_some() {
             return self.confirm_current();
@@ -195,7 +195,7 @@ impl TerminalCheckUi {
     match self.step {
       STEP_UNICODE => self.render_unicode_step(render, canvas, layout, i18n),
       STEP_COLOR => self.render_color_step(render, canvas, layout, i18n),
-      STEP_IMAGE => self.render_image_step(render, canvas, layout, i18n),
+      STEP_MOUSE => self.render_mouse_step(render, canvas, layout, i18n),
       _ => self.render_placeholder(render, canvas, layout),
     }
   }
@@ -208,7 +208,7 @@ impl TerminalCheckUi {
     match self.step {
       STEP_UNICODE => self.compute_unicode_positions(layout, i18n),
       STEP_COLOR => self.compute_color_positions(layout, i18n),
-      STEP_IMAGE => self.compute_image_positions(layout, i18n),
+      STEP_MOUSE => self.compute_mouse_positions(layout, i18n),
       _ => self.compute_placeholder_positions(layout),
     }
   }
@@ -355,7 +355,8 @@ impl TerminalCheckUi {
       .collect();
     for i in 0..UNICODE_OPTIONS {
       let text = if i == self.selected_index {
-        format!("f%<fg:bright_cyan>{}</fg>", option_texts[i])
+        let fg = if self.is_exit_option(i) { "bright_red" } else { "bright_cyan" };
+        format!("f%<fg:{}>{}</fg>", fg, option_texts[i])
       } else {
         option_texts[i].clone()
       };
@@ -548,217 +549,8 @@ impl TerminalCheckUi {
       .collect();
     for i in 0..COLOR_OPTIONS {
       let text = if i == self.selected_index {
-        format!("f%<fg:bright_cyan>{}</fg>", option_texts[i])
-      } else {
-        option_texts[i].clone()
-      };
-      render.draw_text(
-        canvas,
-        &DrawTextParams {
-          x: positions.option_xs[i],
-          y: positions.option_rects[i].y,
-          text,
-          ..Default::default()
-        },
-      );
-    }
-
-    // hint
-    render.draw_text(
-      canvas,
-      &DrawTextParams {
-        x: positions.hint_x,
-        y: positions.hint_y,
-        text: format!("f%<fg:rgb(85,87,83)>{}</fg>", hint),
-        params: Some(key_params),
-        ..Default::default()
-      },
-    );
-  }
-
-  // ── 图片步骤 ──
-
-  /// 返回当前图片步骤的绘图请求（供 runtime 提交给 ImageService）。
-  /// 非图片步骤返回 `None`。
-  pub fn image_request(
-    &self,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    path: std::path::PathBuf,
-  ) -> Option<DrawImageParams> {
-    if self.step != STEP_IMAGE {
-      return None;
-    }
-    let positions = self.compute_image_positions(layout, i18n);
-    let term_w = layout.get_terminal_size().width;
-    let img_w = Self::IMG_WIDTH;
-    let img_x = term_w.saturating_sub(img_w) / 2;
-    let img_y = positions.tip_y.saturating_add(2);
-
-    // 使用 Exact 确保图片尺寸与 UI 占位高度一致，避免偏移
-    Some(DrawImageParams {
-      x: img_x,
-      y: img_y,
-      path,
-      fit: ImageFit::Exact {
-        width: img_w,
-        height: IMG_PLACEHOLDER_H,
-      },
-      preserve_aspect_ratio: false,
-    })
-  }
-
-  /// 获取当前图片步骤选中的协议。
-  pub fn selected_image_protocol(&self) -> ImageProtocol {
-    match self.selected_index {
-      0 => ImageProtocol::Kitty,
-      1 => ImageProtocol::Sixel,
-      2 => ImageProtocol::ITerm2,
-      _ => ImageProtocol::None,
-    }
-  }
-
-  const IMG_WIDTH: u16 = 20;
-
-  fn compute_image_positions(
-    &self,
-    layout: &LayoutService,
-    i18n: &I18nService,
-  ) -> TerminalCheckLayout {
-    let title = i18n.get_runtime_text("terminal", "terminal.image.title");
-    let tip = i18n.get_runtime_text("terminal", "terminal.image.tip");
-    let kitty_name = i18n.get_runtime_text("terminal", "terminal.image.kitty");
-    let sixel_name = i18n.get_runtime_text("terminal", "terminal.image.sixel");
-    let iterm_name = i18n.get_runtime_text("terminal", "terminal.image.iterm");
-    let none_name = i18n.get_runtime_text("terminal", "terminal.image.none");
-
-    let key_params = self.build_key_params();
-    let hint = format!(
-      "{}  {}  {}",
-      i18n.get_runtime_text("terminal", "terminal.action.select"),
-      i18n.get_runtime_text("terminal", "terminal.action.confirm"),
-      i18n.get_runtime_text("terminal", "terminal.action.exit"),
-    );
-
-    let term_h = layout.get_terminal_size().height;
-
-    let title_y: u16 = 1;
-    let hint_y = term_h.saturating_sub(1);
-
-    let title_x = centered_x(layout, &title);
-    let hint_w = layout.get_text_width(&hint, Some(&key_params));
-    let hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0);
-
-    let tip_x = centered_x(layout, &tip);
-
-    // 图片占位区域高度（字符格），无实际图片渲染
-    let img_h = IMG_PLACEHOLDER_H;
-
-    // 选项（直接用语言文件中的简短名称）
-    let option_names: [&str; IMAGE_OPTIONS] = [&kitty_name, &sixel_name, &iterm_name, &none_name];
-    let option_texts: Vec<String> = (0..IMAGE_OPTIONS)
-      .map(|i| self.option_display_name(&option_names, i))
-      .collect();
-    let option_xs: Vec<u16> = option_texts.iter().map(|t| centered_x(layout, t)).collect();
-    let options_height = IMAGE_OPTIONS as u16;
-
-    // 内容块：tip(1) + 空行(1) + 占位(img_h) + 空行(1) + 选项(options_height)
-    let content_height = 1 + 1 + img_h + 1 + options_height;
-    let available = hint_y.saturating_sub(title_y).saturating_sub(1);
-    let content_start_y = if available > content_height {
-      title_y
-        .saturating_add(1)
-        .saturating_add((available - content_height) / 2)
-    } else {
-      title_y.saturating_add(1)
-    };
-
-    let tip_y = content_start_y;
-    let img_y = tip_y.saturating_add(2); // tip + 空行
-    let option_start_y = img_y.saturating_add(img_h).saturating_add(1); // 占位 + 空行
-
-    let option_widths: Vec<u16> = option_texts
-      .iter()
-      .map(|t| layout.get_text_width(t, None))
-      .collect();
-    let option_rects: Vec<Rect> = (0..IMAGE_OPTIONS)
-      .map(|i| Rect {
-        x: option_xs[i],
-        y: option_start_y.saturating_add(i as u16),
-        width: option_widths[i],
-        height: 1,
-      })
-      .collect();
-
-    TerminalCheckLayout {
-      title_x,
-      title_y,
-      tip_x,
-      tip_y,
-      sample_x: 0,
-      sample_y: 0,
-      hint_x,
-      hint_y,
-      option_rects,
-      option_xs,
-    }
-  }
-
-  fn render_image_step(
-    &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-  ) {
-    let positions = self.compute_image_positions(layout, i18n);
-    let key_params = self.build_key_params();
-
-    let title = i18n.get_runtime_text("terminal", "terminal.image.title");
-    let tip = i18n.get_runtime_text("terminal", "terminal.image.tip");
-    let kitty_name = i18n.get_runtime_text("terminal", "terminal.image.kitty");
-    let sixel_name = i18n.get_runtime_text("terminal", "terminal.image.sixel");
-    let iterm_name = i18n.get_runtime_text("terminal", "terminal.image.iterm");
-    let none_name = i18n.get_runtime_text("terminal", "terminal.image.none");
-    let hint = format!(
-      "{}  {}  {}",
-      i18n.get_runtime_text("terminal", "terminal.action.select"),
-      i18n.get_runtime_text("terminal", "terminal.action.confirm"),
-      i18n.get_runtime_text("terminal", "terminal.action.exit"),
-    );
-
-    // title
-    render.draw_text(
-      canvas,
-      &DrawTextParams {
-        x: positions.title_x,
-        y: positions.title_y,
-        text: format!("f%<fg:bright_magenta><b>{}</b></fg>", title),
-        ..Default::default()
-      },
-    );
-
-    // tip — 黄色
-    render.draw_text(
-      canvas,
-      &DrawTextParams {
-        x: positions.tip_x,
-        y: positions.tip_y,
-        text: format!("f%<fg:yellow>{}</fg>", tip),
-        ..Default::default()
-      },
-    );
-
-    // 图片区域留白（由 runtime 在 present 后输出图片），不绘制边框
-
-    // 选项
-    let option_names: [&str; IMAGE_OPTIONS] = [&kitty_name, &sixel_name, &iterm_name, &none_name];
-    let option_texts: Vec<String> = (0..IMAGE_OPTIONS)
-      .map(|i| self.option_display_name(&option_names, i))
-      .collect();
-    for i in 0..IMAGE_OPTIONS {
-      let text = if i == self.selected_index {
-        format!("f%<fg:bright_cyan>{}</fg>", option_texts[i])
+        let fg = if self.is_exit_option(i) { "bright_red" } else { "bright_cyan" };
+        format!("f%<fg:{}>{}</fg>", fg, option_texts[i])
       } else {
         option_texts[i].clone()
       };
@@ -815,7 +607,7 @@ impl TerminalCheckUi {
     layout_svc: &LayoutService,
   ) {
     let positions = self.compute_placeholder_positions(layout_svc);
-    let title = format!("{} ({}/{})", self._step_title(), self.step + 1, 4);
+    let title = format!("{} ({}/{})", self._step_title(), self.step + 1, 3);
     let title_w = layout_svc.get_text_width(&title, None);
     let title_x = layout_svc.resolve_x(LayoutService::ALIGN_CENTER, title_w, 0);
 
@@ -840,13 +632,203 @@ impl TerminalCheckUi {
     );
   }
 
+  // ── 鼠标步骤 ──
+
+  fn compute_mouse_positions(
+    &self,
+    layout: &LayoutService,
+    i18n: &I18nService,
+  ) -> TerminalCheckLayout {
+    let title = i18n.get_runtime_text("terminal", "terminal.mouse.title");
+    let tip = i18n.get_runtime_text("terminal", "terminal.mouse.tip");
+    let no_text = i18n.get_runtime_text("terminal", "terminal.mouse.no");
+
+    let key_params = self.build_key_params();
+    let hint = format!(
+      "{}  {}",
+      i18n.get_runtime_text("terminal", "terminal.action.confirm"),
+      i18n.get_runtime_text("terminal", "terminal.action.exit"),
+    );
+
+    let term_h = layout.get_terminal_size().height;
+
+    let title_y: u16 = 1;
+    let hint_y = term_h.saturating_sub(1);
+
+    let title_x = centered_x(layout, &title);
+    let hint_w = layout.get_text_width(&hint, Some(&key_params));
+    let hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0);
+
+    // 矩形框：tip 宽度 + 左右内边距 + 左右边框
+    let tip_w = layout.get_text_width(&tip, None);
+    let box_w = tip_w + MOUSE_BOX_PADDING * 2 + 2;
+    let box_x = layout.resolve_x(LayoutService::ALIGN_CENTER, box_w, 0);
+
+    // 垂直居中（title 与 hint 之间）
+    let available = hint_y.saturating_sub(title_y).saturating_sub(5);
+    let box_y = if available > MOUSE_BOX_HEIGHT {
+      title_y
+        .saturating_add(1)
+        .saturating_add((available - MOUSE_BOX_HEIGHT) / 2)
+    } else {
+      title_y.saturating_add(1)
+    };
+
+    let tip_x = box_x + 1 + MOUSE_BOX_PADDING;
+    let tip_y = box_y + (MOUSE_BOX_HEIGHT - 1) / 2;
+
+    // "不支持" 选项（index 1），在矩形下方一行
+    // 聚焦时显示 ❯ 不支持 ❮，非聚焦时纯文本
+    let no_display = if self.selected_index == 1 {
+      format!("❯ {} ❮", no_text)
+    } else {
+      no_text.clone()
+    };
+    let no_x = centered_x(layout, &no_display);
+    let no_y = box_y + MOUSE_BOX_HEIGHT + 1;
+    let no_w = layout.get_text_width(&no_display, None);
+
+    let option_rects = vec![
+      Rect {
+        x: box_x,
+        y: box_y,
+        width: box_w,
+        height: MOUSE_BOX_HEIGHT,
+      },
+      Rect {
+        x: no_x,
+        y: no_y,
+        width: no_w,
+        height: 1,
+      },
+    ];
+
+    TerminalCheckLayout {
+      title_x,
+      title_y,
+      tip_x,
+      tip_y,
+      sample_x: 0,
+      sample_y: 0,
+      hint_x,
+      hint_y,
+      option_rects,
+      option_xs: vec![box_x, no_x],
+    }
+  }
+
+  fn render_mouse_step(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    i18n: &I18nService,
+  ) {
+    let positions = self.compute_mouse_positions(layout, i18n);
+    let key_params = self.build_key_params();
+
+    let title = i18n.get_runtime_text("terminal", "terminal.mouse.title");
+    let tip = i18n.get_runtime_text("terminal", "terminal.mouse.tip");
+    let no_text = i18n.get_runtime_text("terminal", "terminal.mouse.no");
+    let hint = format!(
+      "{}  {}",
+      i18n.get_runtime_text("terminal", "terminal.action.confirm"),
+      i18n.get_runtime_text("terminal", "terminal.action.exit"),
+    );
+
+    // title
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: positions.title_x,
+        y: positions.title_y,
+        text: format!("f%<fg:bright_magenta><b>{}</b></fg>", title),
+        ..Default::default()
+      },
+    );
+
+    // 聚焦颜色：矩形聚焦=亮青，"不支持"聚焦=白色
+    let rect_focused = self.selected_index == 0;
+    let border_fg = if rect_focused {
+      TextColor::Terminal(crate::host_engine::services::TerminalColor::BrightCyan)
+    } else {
+      TextColor::Terminal(crate::host_engine::services::TerminalColor::White)
+    };
+    let tip_fg = if rect_focused {
+      Some(TextColor::Terminal(
+        crate::host_engine::services::TerminalColor::BrightCyan,
+      ))
+    } else {
+      None
+    };
+
+    // 边框矩形
+    render.draw_border_rect(
+      canvas,
+      positions.option_rects[0].x,
+      positions.option_rects[0].y,
+      positions.option_rects[0].width,
+      positions.option_rects[0].height,
+      &BorderStyle::Line,
+      Some(border_fg),
+      None,
+      None,
+      None,
+    );
+
+    // tip 文本（矩形内部居中，颜色跟随边框）
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: positions.tip_x,
+        y: positions.tip_y,
+        text: tip,
+        fg: tip_fg,
+        ..Default::default()
+      },
+    );
+
+    // "不支持" 选项：聚焦=亮青+箭头，否则=白字
+    let no_display = if self.selected_index == 1 {
+      format!("❯ {} ❮", no_text)
+    } else {
+      no_text
+    };
+    let no_text_final = if self.selected_index == 1 {
+      format!("f%<fg:bright_cyan>{}</fg>", no_display)
+    } else {
+      format!("f%<fg:white>{}</fg>", no_display)
+    };
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: positions.option_xs[1],
+        y: positions.option_rects[1].y,
+        text: no_text_final,
+        ..Default::default()
+      },
+    );
+
+    // hint
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: positions.hint_x,
+        y: positions.hint_y,
+        text: format!("f%<fg:rgb(85,87,83)>{}</fg>", hint),
+        params: Some(key_params),
+        ..Default::default()
+      },
+    );
+  }
+
   // ── 内部辅助 ──
 
   fn option_count(&self) -> usize {
     match self.step {
       STEP_UNICODE => UNICODE_OPTIONS,
       STEP_COLOR => COLOR_OPTIONS,
-      STEP_IMAGE => IMAGE_OPTIONS,
+      STEP_MOUSE => 2,
       _ => 0,
     }
   }
@@ -878,9 +860,19 @@ impl TerminalCheckUi {
         2 => Some(TerminalCheckCommand::Exit),
         _ => None,
       },
-      STEP_IMAGE => Some(TerminalCheckCommand::Next), // 不强制，选啥都行
-      STEP_MOUSE => Some(TerminalCheckCommand::Done),
+      STEP_MOUSE => Some(TerminalCheckCommand::Done {
+        mouse: self.selected_index == 0,
+      }),
       _ => None,
+    }
+  }
+
+  /// 该选项确认后是否会导致退出（用于聚焦时红色高亮）。
+  fn is_exit_option(&self, index: usize) -> bool {
+    match self.step {
+      STEP_UNICODE => index == 1, // "No" → Exit
+      STEP_COLOR => index == 2,   // "Less Than 256" → Exit
+      _ => false,
     }
   }
 
@@ -888,6 +880,28 @@ impl TerminalCheckUi {
   pub fn advance_step(&mut self) {
     self.step += 1;
     self.apply_detection();
+  }
+
+  /// 持久化当前步骤的检测结果到 profile。
+  pub fn persist_current_step(&self, storage: &mut StorageService) {
+    match self.step {
+      STEP_UNICODE => {
+        let _ = storage.update_terminal_profile(|p| {
+          p.unicode = Some(self.selected_index == 0);
+        });
+      }
+      STEP_COLOR => {
+        let color = if self.selected_index == 0 {
+          "truecolor"
+        } else {
+          "256"
+        };
+        let _ = storage.update_terminal_profile(|p| {
+          p.color = Some(color.to_string());
+        });
+      }
+      _ => {}
+    }
   }
 
   fn build_key_params(&self) -> RichTextParams {
@@ -898,7 +912,6 @@ impl TerminalCheckUi {
     match self.step {
       STEP_UNICODE => "Unicode Support",
       STEP_COLOR => "Color Support",
-      STEP_IMAGE => "Image Protocol",
       STEP_MOUSE => "Mouse Support",
       _ => "Done",
     }

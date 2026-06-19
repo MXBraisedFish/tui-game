@@ -17,24 +17,46 @@ pub fn prepare() -> BootOutput {
     .log
     .info(LogSource::Boot, "[Boot] Scanning packages...");
 
-  // 临时语言测试
+  // ── 语言加载（含多层保底） ──
   services
     .i18n
     .refresh_language_registry(&services.storage, &mut services.log);
 
-  let preferred_language = services
-    .storage
-    .read_language_code()
-    .unwrap_or_else(|| services.storage.default_language_code().to_string());
+  let default_code = services.storage.default_language_code().to_string();
+  let preferred = services.storage.read_language_code();
 
-  let selected_language = if services.i18n.is_language_package_available(
-    &services.storage,
-    &mut services.log,
-    &preferred_language,
-  ) {
-    preferred_language
-  } else {
-    services.storage.default_language_code().to_string()
+  let selected_language = match preferred {
+    None => {
+      // 无已保存语言 → runtime 会进入 LanguageSelect
+      default_code
+    }
+    Some(ref code) => {
+      // 校验：注册表是否有该 code
+      let in_registry = services
+        .i18n
+        .language_registry()
+        .iter()
+        .any(|e| e.code == *code);
+      // 校验：语言目录是否存在
+      let dir_ok =
+        services
+          .i18n
+          .is_language_package_available(&services.storage, &mut services.log, code);
+      if in_registry && dir_ok {
+        code.clone()
+      } else {
+        // 非法 → 清空 profile 让 runtime 进入 LanguageSelect
+        services.log.warn(
+          LogSource::Boot,
+          format!(
+            "Saved language '{}' invalid (registry={}, dir={}), will re-select",
+            code, in_registry, dir_ok
+          ),
+        );
+        let _ = services.storage.write_language_code("");
+        default_code
+      }
+    }
   };
 
   services.i18n.load_language_package_info(
@@ -46,10 +68,9 @@ pub fn prepare() -> BootOutput {
   services
     .i18n
     .load_runtime_language(&services.storage, &mut services.log, &selected_language);
-  // 临时语言测试
 
   let root_dir = services.storage.root_dir();
-  services.package.scan_all(&root_dir);
+  services.package.scan_all(&root_dir, &mut services.log);
 
   services
     .log
@@ -57,9 +78,10 @@ pub fn prepare() -> BootOutput {
 
   let world = RuntimeWorld::new();
 
-  services
-    .log
-    .info(LogSource::Boot, &format!("[Boot] Storage root: {}", root_dir.display()));
+  services.log.info(
+    LogSource::Boot,
+    &format!("[Boot] Storage root: {}", root_dir.display()),
+  );
 
   // 返回启动输出
   BootOutput { services, world }

@@ -12,8 +12,6 @@ pub struct TerminalProfile {
   pub unicode: Option<bool>,
   /// `"truecolor"` | `"256"`，`null` = 未检测
   pub color: Option<String>,
-  /// `"kitty"` | `"sixel"` | `"iterm2"` | `"none"`，`null` = 未检测
-  pub image_protocol: Option<String>,
   /// `null` = 未检测
   pub mouse: Option<bool>,
 }
@@ -23,7 +21,6 @@ impl Default for TerminalProfile {
     Self {
       unicode: None,
       color: None,
-      image_protocol: None,
       mouse: None,
     }
   }
@@ -37,9 +34,6 @@ impl TerminalProfile {
         .color
         .as_deref()
         .map_or(false, |c| c == "truecolor" || c == "256")
-      && self.image_protocol.as_deref().map_or(false, |p| {
-        p == "kitty" || p == "sixel" || p == "iterm2" || p == "none"
-      })
       && self.mouse.is_some()
   }
 }

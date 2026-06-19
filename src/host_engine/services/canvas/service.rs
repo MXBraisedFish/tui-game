@@ -69,17 +69,29 @@ impl CanvasService {
 
       if g.display_width == 0 {
         // 零宽字符：写入当前格但不推进光标（与前一字符合并于同一 Print 输出）
+        let mut final_style = style.clone();
+        if final_style.background.is_none() {
+          if let Some(existing) = self.current.get(cursor_x, y) {
+            final_style.background = existing.style.background.clone();
+          }
+        }
         self
           .current
-          .set(cursor_x, y, CanvasCell::styled(ch, style.clone()));
+          .set(cursor_x, y, CanvasCell::styled(ch, final_style));
         // cursor_x 不变
         continue;
       }
 
       // 宽字符 ≥1：写入首格
+      let mut final_style = style.clone();
+      if final_style.background.is_none() {
+        if let Some(existing) = self.current.get(cursor_x, y) {
+          final_style.background = existing.style.background.clone();
+        }
+      }
       self
         .current
-        .set(cursor_x, y, CanvasCell::styled(ch, style.clone()));
+        .set(cursor_x, y, CanvasCell::styled(ch, final_style));
 
       // 宽字符 ≥2：标记右侧连续格为 CONTINUATION
       for offset in 1..g.display_width {

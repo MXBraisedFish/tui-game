@@ -1,7 +1,6 @@
 mod canvas;
 mod game;
 mod i18n;
-mod image;
 mod input;
 mod layout;
 mod log;
@@ -14,7 +13,6 @@ mod rich_text;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
-mod terminal_detector;
 pub mod text_layout;
 mod ui;
 mod unicode;
@@ -22,10 +20,6 @@ mod unicode;
 pub use canvas::{CanvasCell, CanvasService};
 pub use game::GameService;
 pub use i18n::{I18nService, LanguageRegistryEntry};
-pub use image::{
-  CellPixelSize, DrawImageParams, ImageCellRect, ImageFit, ImageLayerFrame, ImageService,
-  ImageSignature, LayerImage,
-};
 pub use input::{
   ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton, MouseEvent,
   MouseEventKind, SystemEvent, translate_action_map,
@@ -35,15 +29,11 @@ pub use log::{LogService, LogSource};
 pub use lua::LuaService;
 pub use overlay::OverlayService;
 pub use package::PackageService;
-pub use render::RenderService;
-pub use render_pipeline::{
-  ComposedCell, ComposedFrame, ComposedImage, FrameCompositor, FramePresenter, ImageId,
-};
+pub use render::{BorderStyle, RenderService};
+pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
-pub use terminal_capabilities::ImageProtocol;
-pub use terminal_detector::{DetectionResult, TerminalDetector};
 pub use text_layout::DrawTextParams;
 pub use ui::UiService;
 pub use unicode::UnicodeService;
@@ -64,7 +54,6 @@ pub struct EngineServices {
   pub unicode: UnicodeService,
   pub canvas: CanvasService,
   pub layout: LayoutService,
-  pub image: ImageService,
   pub compositor: FrameCompositor,
   pub presenter: FramePresenter,
 }
@@ -89,7 +78,6 @@ impl EngineServices {
       unicode: UnicodeService::new(),
       canvas: CanvasService::new(),
       layout: LayoutService::new(),
-      image: ImageService::new(ImageProtocol::None),
       compositor: FrameCompositor::new(),
       presenter: FramePresenter::new(),
     }

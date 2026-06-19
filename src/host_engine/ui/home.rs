@@ -3,6 +3,8 @@ mod game_list;
 mod settings;
 
 pub(crate) use settings::SettingsLayout;
+pub(crate) use settings::language::LanguageSelectLayout;
+pub use settings::language::{LanguageSelectCommand, LanguageSelectUi};
 pub use settings::{SettingsUi, SettingsUiCommand};
 
 use std::time::Duration;
@@ -269,7 +271,8 @@ impl HomeUi {
 
     std::array::from_fn(|i| {
       if i == self.selected_index {
-        format!("f%<fg:bright_cyan>❯ {} ❮</fg>", labels[i])
+        let fg = if i >= 4 { "bright_red" } else { "bright_cyan" };
+        format!("f%<fg:{}>❯ {} ❮</fg>", fg, labels[i])
       } else {
         labels[i].to_string()
       }

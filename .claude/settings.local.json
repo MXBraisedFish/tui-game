@@ -21,7 +21,10 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.rs)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(mkdir -p \"E:\\\\Code\\\\tui-game\\\\src\\\\host_engine\\\\ui\\\\home\\\\settings\")",
+      "Bash(mv \"E:\\\\Code\\\\tui-game\\\\src\\\\host_engine\\\\ui\\\\home\\\\settings.rs\" \"E:\\\\Code\\\\tui-game\\\\src\\\\host_engine\\\\ui\\\\home\\\\settings\\\\mod.rs\")",
+      "Bash(mv \"E:\\\\Code\\\\tui-game\\\\src\\\\host_engine\\\\ui\\\\language_select.rs\" \"E:\\\\Code\\\\tui-game\\\\src\\\\host_engine\\\\ui\\\\home\\\\settings\\\\language.rs\")"
     ]
   }
 }

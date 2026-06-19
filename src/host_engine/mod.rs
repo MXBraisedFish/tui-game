@@ -59,8 +59,12 @@ pub fn run() {
 
   // 验证 Lua 虚拟机是否正常启动
   match services.lua.eval("return 'Lua VM active'") {
-    Ok(result) => services.log.info(LogSource::Boot, &format!("[Boot] Lua: {result}")),
-    Err(error) => services.log.error(LogSource::Boot, &format!("[Boot] Lua error: {error}")),
+    Ok(result) => services
+      .log
+      .info(LogSource::Boot, &format!("[Boot] Lua: {result}")),
+    Err(error) => services
+      .log
+      .error(LogSource::Boot, &format!("[Boot] Lua error: {error}")),
   }
 
   // --- 运行阶段 ---

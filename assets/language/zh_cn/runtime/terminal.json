@@ -10,12 +10,9 @@
   "terminal.truecolor.no-256": "不支持（仅支持256色）",
   "terminal.truecolor.no-other": "不支持（颜色支持低于256色）",
 
-  "terminal.image.title": "图片协议检测",
-  "terminal.image.tip": "请选择能正确显示下方图片的协议（支持预览切换）：",
-  "terminal.image.kitty": "Kitty",
-  "terminal.image.sixel": "Sixel",
-  "terminal.image.iterm": "iTerm2",
-  "terminal.image.none": "不支持/未知",
+  "terminal.mouse.title": "鼠标检测",
+  "terminal.mouse.tip": "请点击这里",
+  "terminal.mouse.no": "不支持",
 
   "terminal.action.select": "{key:terminal.focus_up}/{key:terminal.focus_down} 选择",
   "terminal.action.confirm": "{key:terminal.confirm} 确认",

@@ -1,3 +1,4 @@
+mod embedded;
 mod language_info;
 mod manage;
 mod registry;

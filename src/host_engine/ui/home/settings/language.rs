@@ -1,0 +1,678 @@
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::time::Duration;
+
+use crate::host_engine::services::text_layout::TextWrapMode;
+use crate::host_engine::services::{
+  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, InputActionEvent,
+  KeyState, LanguageRegistryEntry, LayoutService, LogService, LogSource, MouseButton, MouseEvent,
+  MouseEventKind, Rect, RenderService, RichTextParams, StorageService, TerminalColor, TextColor,
+};
+
+// ── 常量 ──
+
+const GRID_START_Y: u16 = 3;
+const CELL_HEIGHT: u16 = 3;
+const MIN_CELL_WIDTH: u16 = 14; // 12 + 2（左右边框各占1格）
+const MAX_NAME_LEN: u16 = 20;
+
+// ── 布局 ──
+
+pub(crate) struct LanguageSelectLayout {
+  title_x: u16,
+  title_y: u16,
+  cell_rects: Vec<Rect>,
+  cell_text_xs: Vec<u16>,
+  page_start: usize,
+  columns: usize,
+  cell_width: u16,
+  pages: usize,
+  page_center: u16,
+  page_y: u16,
+  flip_forward_x: u16,
+  flip_backward_max_x: u16,
+  hint_x: u16,
+  hint_y: u16,
+}
+
+// ── UI ──
+
+pub struct LanguageSelectUi {
+  selected_index: usize,
+  page: usize,
+  registry: Vec<LanguageRegistryEntry>,
+  runtime_cache: HashMap<String, HashMap<String, String>>,
+  active_code: String,
+  /// 缓存最近一次布局计算的列数、每页条数（Cell 允许 &self 写入）
+  columns: Cell<usize>,
+  per_page: Cell<usize>,
+}
+
+#[derive(Clone, Debug)]
+pub enum LanguageSelectCommand {
+  Confirm(String),
+  Back,
+}
+
+impl LanguageSelectUi {
+  pub fn init(
+    mut registry: Vec<LanguageRegistryEntry>,
+    storage: &StorageService,
+    log: &mut LogService,
+  ) -> Self {
+    registry.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let active_code = storage
+      .read_language_code()
+      .unwrap_or_else(|| storage.default_language_code().to_string());
+
+    let selected_index = registry
+      .iter()
+      .position(|e| e.code == active_code)
+      .unwrap_or(0);
+
+    let runtime_cache = Self::preload_runtime_cache(storage, log, &registry);
+
+    Self {
+      selected_index,
+      page: 1,
+      registry,
+      runtime_cache,
+      active_code,
+      columns: Cell::new(4),
+      per_page: Cell::new(12),
+    }
+  }
+
+  // ── 运行时文本缓存 ──
+
+  fn preload_runtime_cache(
+    storage: &StorageService,
+    log: &mut LogService,
+    registry: &[LanguageRegistryEntry],
+  ) -> HashMap<String, HashMap<String, String>> {
+    let mut cache = HashMap::new();
+    for entry in registry {
+      let path = storage.language_runtime_namespace_path(&entry.code, "language");
+      if let Ok(content) = std::fs::read_to_string(&path) {
+        if let Ok(texts) = serde_json::from_str::<HashMap<String, String>>(&content) {
+          cache.insert(entry.code.clone(), texts);
+          continue;
+        }
+      }
+      log.warn(
+        LogSource::I18n,
+        format!("Failed to load language runtime: {}", path.display()),
+      );
+    }
+    cache
+  }
+
+  fn get_text(&self, key: &str) -> String {
+    let code = self
+      .registry
+      .get(self.selected_index)
+      .map(|e| e.code.as_str())
+      .unwrap_or("en_us");
+    self
+      .runtime_cache
+      .get(code)
+      .and_then(|m| m.get(key))
+      .cloned()
+      .unwrap_or_else(|| key.to_string())
+  }
+
+  fn normalize_page(&mut self) {
+    let per_page = self.per_page.get();
+    if self.registry.is_empty() || per_page == 0 {
+      return;
+    }
+    let pages = self.registry.len().max(1).div_ceil(per_page).max(1);
+    self.page = self
+      .selected_index
+      .saturating_div(per_page)
+      .saturating_add(1)
+      .clamp(1, pages);
+  }
+
+  // ── 输入绑定 ──
+
+  pub fn action_map() -> Vec<ActionMapEntry> {
+    vec![
+      ActionMapEntry {
+        action: "language_select.focus_up".to_string(),
+        description: "Focus up".to_string(),
+        keys: vec![vec!["up".to_string()]],
+      },
+      ActionMapEntry {
+        action: "language_select.focus_down".to_string(),
+        description: "Focus down".to_string(),
+        keys: vec![vec!["down".to_string()]],
+      },
+      ActionMapEntry {
+        action: "language_select.focus_left".to_string(),
+        description: "Focus left".to_string(),
+        keys: vec![vec!["left".to_string()]],
+      },
+      ActionMapEntry {
+        action: "language_select.focus_right".to_string(),
+        description: "Focus right".to_string(),
+        keys: vec![vec!["right".to_string()]],
+      },
+      ActionMapEntry {
+        action: "language_select.flip_forward".to_string(),
+        description: "Previous page".to_string(),
+        keys: vec![vec!["q".to_string()]],
+      },
+      ActionMapEntry {
+        action: "language_select.flip_backward".to_string(),
+        description: "Next page".to_string(),
+        keys: vec![vec!["e".to_string()]],
+      },
+      ActionMapEntry {
+        action: "language_select.confirm".to_string(),
+        description: "Confirm language".to_string(),
+        keys: vec![vec!["enter".to_string()]],
+      },
+      ActionMapEntry {
+        action: "language_select.back".to_string(),
+        description: "Go back".to_string(),
+        keys: vec![vec!["esc".to_string()]],
+      },
+    ]
+  }
+
+  // ── 输入处理 ──
+
+  pub fn handle_event(&mut self, event: &InputActionEvent) -> Option<LanguageSelectCommand> {
+    if event.state != KeyState::Pressed {
+      return None;
+    }
+    match event.action.as_str() {
+      "language_select.focus_up" => {
+        self.focus_up();
+        None
+      }
+      "language_select.focus_down" => {
+        self.focus_down();
+        None
+      }
+      "language_select.focus_left" => {
+        self.focus_left();
+        None
+      }
+      "language_select.focus_right" => {
+        self.focus_right();
+        None
+      }
+      "language_select.flip_forward" => self.flip_page(false),
+      "language_select.flip_backward" => self.flip_page(true),
+      "language_select.confirm" => {
+        let code = self.registry[self.selected_index].code.clone();
+        self.active_code = code.clone();
+        Some(LanguageSelectCommand::Confirm(code))
+      }
+      "language_select.back" => Some(LanguageSelectCommand::Back),
+      _ => None,
+    }
+  }
+
+  pub fn handle_mouse_event(
+    &mut self,
+    event: &MouseEvent,
+    positions: &LanguageSelectLayout,
+  ) -> Option<LanguageSelectCommand> {
+    match event.kind {
+      MouseEventKind::Move | MouseEventKind::Hold => {
+        if let Some(idx) = Self::hit_test(positions, event.x, event.y) {
+          self.selected_index = idx;
+          self.normalize_page();
+        }
+        None
+      }
+      MouseEventKind::Press => match event.button {
+        Some(MouseButton::Left) => {
+          if let Some(idx) = Self::hit_test(positions, event.x, event.y) {
+            self.selected_index = idx;
+            let code = self.registry[idx].code.clone();
+            self.active_code = code.clone();
+            return Some(LanguageSelectCommand::Confirm(code));
+          }
+          None
+        }
+        Some(MouseButton::Right) => Some(LanguageSelectCommand::Back),
+        _ => None,
+      },
+      _ => None,
+    }
+  }
+
+  pub fn update(&mut self, dt: Duration) -> Option<LanguageSelectCommand> {
+    let _ = dt;
+    None
+  }
+
+  // ── 渲染 ──
+
+  pub fn render(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    _i18n: &I18nService,
+  ) {
+    let positions = self.compute_positions(layout);
+    self.draw_content(render, canvas, layout, &positions);
+  }
+
+  pub fn compute_positions(&self, layout: &LayoutService) -> LanguageSelectLayout {
+    let term_w = layout.get_terminal_size().width;
+    let term_h = layout.get_terminal_size().height;
+
+    // 名称宽度（MAX_NAME_LEN 截断）
+    let name_widths: Vec<u16> = self
+      .registry
+      .iter()
+      .map(|e| {
+        let dp = DrawTextParams {
+          text: e.name.clone(),
+          max_width: Some(MAX_NAME_LEN),
+          overflow_marker: Some("...".to_string()),
+          wrap_mode: TextWrapMode::None,
+          ..Default::default()
+        };
+        layout.get_draw_text_width(&dp)
+      })
+      .collect();
+    let max_name_w = name_widths
+      .iter()
+      .max()
+      .copied()
+      .unwrap_or(MIN_CELL_WIDTH - 2)
+      .max(MIN_CELL_WIDTH - 2);
+    // cell_width = 文字宽度 + 2（左右边框各占1列）
+    let cell_width = max_name_w + 2;
+
+    // 网格
+    let grid_available_h = term_h.saturating_sub(GRID_START_Y).saturating_sub(4);
+    let rows = (grid_available_h / CELL_HEIGHT).max(1) as usize;
+    let columns = (term_w / cell_width).max(1) as usize;
+    let per_page = columns * rows;
+    let pages = self.registry.len().max(1).div_ceil(per_page).max(1);
+
+    // 回写供导航用
+    self.columns.set(columns);
+    self.per_page.set(per_page);
+
+    let page = self.page.clamp(1, pages);
+    let page_start = (page - 1) * per_page;
+    let page_end = (page_start + per_page).min(self.registry.len());
+    let visible_count = page_end - page_start;
+
+    let grid_total_w = (columns as u16).saturating_mul(cell_width);
+    let grid_x = term_w.saturating_sub(grid_total_w) / 2;
+
+    let mut cell_rects = Vec::with_capacity(visible_count);
+    let mut cell_text_xs = Vec::with_capacity(visible_count);
+    for vi in 0..visible_count {
+      let col = vi % columns;
+      let row = vi / columns;
+      let cx = grid_x + (col as u16) * cell_width;
+      let cy = GRID_START_Y + (row as u16) * CELL_HEIGHT;
+      cell_rects.push(Rect {
+        x: cx,
+        y: cy,
+        width: cell_width,
+        height: CELL_HEIGHT,
+      });
+      // 文字缩进 1 列（避开左边框 │），在剩余空间内居中
+      let nw = name_widths[page_start + vi];
+      let inner_w = cell_width.saturating_sub(2);
+      let tx = cx + 1 + (inner_w.saturating_sub(nw)) / 2;
+      cell_text_xs.push(tx);
+    }
+
+    // 标题
+    let title = self.get_text("language.title");
+    let title_w = layout.get_text_width(&title, None);
+    let title_x = layout.resolve_x(LayoutService::ALIGN_CENTER, title_w, 0);
+
+    // 翻页行
+    let page_y = term_h.saturating_sub(3);
+    let page_center = term_w / 2;
+    let flip_forward_x = 0u16;
+    let flip_backward_max_x = term_w;
+
+    // hint
+    let key_params = self.build_key_params();
+    let hint = format!(
+      "{}  {}  {}  {}",
+      self.get_text("language.action.focus"),
+      self.get_text("language.action.flip"),
+      self.get_text("language.action.confirm"),
+      self.get_text("language.action.back"),
+    );
+    let hint_w = layout.get_text_width(&hint, Some(&key_params));
+    let hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0);
+    let hint_y = term_h.saturating_sub(1);
+
+    LanguageSelectLayout {
+      title_x,
+      title_y: 1,
+      cell_rects,
+      cell_text_xs,
+      page_start,
+      columns,
+      cell_width,
+      pages,
+      page_center,
+      page_y,
+      flip_forward_x,
+      flip_backward_max_x,
+      hint_x,
+      hint_y,
+    }
+  }
+
+  // ── 导航 ──
+
+  /// 当前页内的边界。
+  fn page_bounds(&self) -> (usize, usize, usize, usize) {
+    let per_page = self.per_page.get();
+    let cols = self.columns.get();
+    let total = self.registry.len().max(1);
+    let pages = total.div_ceil(per_page).max(1);
+    let page = self.page.clamp(1, pages);
+    let start = (page - 1) * per_page;
+    let end = (start + per_page).min(total);
+    (start, end, cols, pages)
+  }
+
+  fn focus_up(&mut self) {
+    if self.registry.is_empty() {
+      return;
+    }
+    let (start, _end, cols, _pages) = self.page_bounds();
+    let col = self.selected_index % cols;
+
+    if self.selected_index >= start + cols {
+      // 本页内上方有格子
+      self.selected_index -= cols;
+    } else if self.page > 1 {
+      // 跨到上一页同列
+      self.page -= 1;
+      let (prev_start, prev_end, prev_cols, _) = self.page_bounds();
+      self.selected_index = (prev_start + col).min(prev_end - 1);
+    }
+    // 已在第一页第一行：不动
+  }
+
+  fn focus_down(&mut self) {
+    if self.registry.is_empty() {
+      return;
+    }
+    let (start, end, cols, pages) = self.page_bounds();
+    let col = self.selected_index % cols;
+    let candidate = self.selected_index + cols;
+
+    if candidate < end {
+      self.selected_index = candidate;
+    } else if self.page < pages {
+      // 跨到下一页同列
+      self.page += 1;
+      let (next_start, next_end, _, _) = self.page_bounds();
+      self.selected_index = (next_start + col).min(next_end - 1);
+    }
+    // 已在最后一页最后一行：不动
+  }
+
+  fn focus_left(&mut self) {
+    if self.registry.is_empty() {
+      return;
+    }
+    let cols = self.columns.get();
+    let col = self.selected_index % cols;
+
+    if col > 0 {
+      // 本行内左移
+      self.selected_index -= 1;
+    } else if self.page > 1 {
+      // 跨到上一页最右列
+      self.page -= 1;
+      let (prev_start, prev_end, _, _) = self.page_bounds();
+      self.selected_index = prev_end - 1;
+    }
+    // 已在第一页第一列：不动
+  }
+
+  fn focus_right(&mut self) {
+    if self.registry.is_empty() {
+      return;
+    }
+    let (start, end, cols, pages) = self.page_bounds();
+    let col = self.selected_index % cols;
+
+    if col + 1 < cols && self.selected_index + 1 < end {
+      // 本行内右移
+      self.selected_index += 1;
+    } else if self.page < pages {
+      // 跨到下一页第一列
+      self.page += 1;
+      let (next_start, _, _, _) = self.page_bounds();
+      self.selected_index = next_start;
+    }
+    // 已在最后一页最后一列且是最后一个 item：不动
+  }
+
+  fn flip_page(&mut self, forward: bool) -> Option<LanguageSelectCommand> {
+    let per_page = self.per_page.get();
+    if per_page == 0 {
+      return None;
+    }
+    let pages = self.registry.len().max(1).div_ceil(per_page).max(1);
+    if forward {
+      if self.page < pages {
+        self.page += 1;
+        self.selected_index = (self.page - 1) * per_page;
+      }
+    } else {
+      if self.page > 1 {
+        self.page -= 1;
+        self.selected_index = (self.page - 1) * per_page;
+      }
+    }
+    None
+  }
+
+  fn hit_test(positions: &LanguageSelectLayout, x: u16, y: u16) -> Option<usize> {
+    positions
+      .cell_rects
+      .iter()
+      .position(|r| r.contains(x, y))
+      .map(|vi| positions.page_start + vi)
+  }
+
+  // ── 键参数（桥接 language.* → language_select.*） ──
+
+  fn build_key_params(&self) -> RichTextParams {
+    let action_map = Self::action_map();
+    let mut key_actions: HashMap<String, Vec<Vec<String>>> = HashMap::new();
+    for entry in &action_map {
+      key_actions.insert(entry.action.clone(), entry.keys.clone());
+    }
+    let aliases: &[(&str, &str)] = &[
+      ("language.focus_up", "language_select.focus_up"),
+      ("language.focus_down", "language_select.focus_down"),
+      ("language.focus_left", "language_select.focus_left"),
+      ("language.right", "language_select.focus_right"),
+      ("language.flip_forward", "language_select.flip_forward"),
+      ("language.flip_backward", "language_select.flip_backward"),
+      ("language.confirm", "language_select.confirm"),
+      ("language.back", "language_select.back"),
+    ];
+    for &(alias, action) in aliases {
+      if let Some(keys) = key_actions.get(action) {
+        key_actions.insert(alias.to_string(), keys.clone());
+      }
+    }
+    RichTextParams {
+      values: HashMap::new(),
+      key_actions,
+    }
+  }
+
+  // ── 绘制 ──
+
+  fn draw_content(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    pos: &LanguageSelectLayout,
+  ) {
+    let key_params = self.build_key_params();
+
+    // 标题
+    let title = self.get_text("language.title");
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: pos.title_x,
+        y: pos.title_y,
+        text: format!("f%<fg:bright_magenta><b>{}</b></fg>", title),
+        ..Default::default()
+      },
+    );
+
+    // 网格
+    for vi in 0..pos.cell_rects.len() {
+      let gi = pos.page_start + vi;
+      let entry = &self.registry[gi];
+      let is_active = entry.code == self.active_code;
+      let is_focused = gi == self.selected_index;
+
+      let fg = if is_active {
+        TextColor::Terminal(TerminalColor::Green)
+      } else if is_focused {
+        TextColor::Terminal(TerminalColor::BrightCyan)
+      } else {
+        TextColor::Terminal(TerminalColor::White)
+      };
+
+      // 聚焦格子先绘制外框，文本再盖在上面
+      if is_focused {
+        let r = &pos.cell_rects[vi];
+        render.draw_border_rect(
+          canvas,
+          r.x,
+          r.y,
+          r.width,
+          r.height,
+          &BorderStyle::Line,
+          Some(TextColor::Terminal(TerminalColor::BrightCyan)),
+          None,
+          None,
+          None,
+        );
+      }
+
+      render.draw_text(
+        canvas,
+        &DrawTextParams {
+          x: pos.cell_text_xs[vi],
+          y: pos.cell_rects[vi].y + 1,
+          text: entry.name.clone(),
+          fg: Some(fg),
+          max_width: Some(MAX_NAME_LEN),
+          overflow_marker: Some("...".to_string()),
+          wrap_mode: TextWrapMode::None,
+          ..Default::default()
+        },
+      );
+    }
+
+    // 页指示符：| 位于绝对中心
+    let cur_str = self.page.to_string();
+    let tot_str = pos.pages.to_string();
+    let cur_x = pos.page_center.saturating_sub(cur_str.len() as u16);
+    let sep_x = pos.page_center;
+    let tot_x = pos.page_center + 1;
+
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: cur_x,
+        y: pos.page_y,
+        text: cur_str,
+        ..Default::default()
+      },
+    );
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: sep_x,
+        y: pos.page_y,
+        text: "|".to_string(),
+        ..Default::default()
+      },
+    );
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: tot_x,
+        y: pos.page_y,
+        text: tot_str,
+        ..Default::default()
+      },
+    );
+
+    // 翻页提示
+    if self.page > 1 {
+      let fwd = self.get_text("language.flip.forward");
+      render.draw_text(
+        canvas,
+        &DrawTextParams {
+          x: pos.flip_forward_x,
+          y: pos.page_y,
+          text: fwd,
+          params: Some(key_params.clone()),
+          ..Default::default()
+        },
+      );
+    }
+    if self.page < pos.pages {
+      let bwd = self.get_text("language.flip.backward");
+      let bwd_w = layout.get_text_width(&bwd, Some(&key_params));
+      let bwd_x = pos.flip_backward_max_x.saturating_sub(bwd_w);
+      render.draw_text(
+        canvas,
+        &DrawTextParams {
+          x: bwd_x,
+          y: pos.page_y,
+          text: bwd,
+          params: Some(key_params.clone()),
+          ..Default::default()
+        },
+      );
+    }
+
+    // hint
+    let hint = format!(
+      "{}  {}  {}  {}",
+      self.get_text("language.action.focus"),
+      self.get_text("language.action.flip"),
+      self.get_text("language.action.confirm"),
+      self.get_text("language.action.back"),
+    );
+    render.draw_text(
+      canvas,
+      &DrawTextParams {
+        x: pos.hint_x,
+        y: pos.hint_y,
+        text: format!("f%<fg:rgb(85,87,83)>{}</fg>", hint),
+        params: Some(key_params),
+        ..Default::default()
+      },
+    );
+  }
+}

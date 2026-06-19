@@ -30,11 +30,6 @@ impl StorageService {
     self.root_dir.join(relative_path)
   }
 
-  // 图片资源目录
-  pub fn assets_images_path(&self) -> PathBuf {
-    self.path(layout::ASSETS_IMAGES_DIR)
-  }
-
   // 配置文件路径
   pub fn profile_language_path(&self) -> PathBuf {
     self.path(layout::PROFILE_LANGUAGE_FILE)

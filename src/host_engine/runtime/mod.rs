@@ -4,8 +4,7 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::UiNodeKind;
 
 use crate::host_engine::services::{
-  EngineServices, ImageLayerFrame, InputActionEvent, MouseEvent, SystemEvent, TerminalDetector,
-  translate_action_map,
+  EngineServices, InputActionEvent, MouseEvent, SystemEvent, translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -16,9 +15,6 @@ use crate::host_engine::ui::{
 
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   services.terminal.enter(&mut services.log);
-
-  // 图片协议推荐：只读取环境变量，不占用 stdin。最终协议由 TerminalCheck 可视确认。
-  let detection = TerminalDetector::detect();
 
   services.input.start_key_listener();
   services.input.start_system_listener();
@@ -39,9 +35,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut language_select_ui = if registry.is_empty() {
     None
   } else {
-    Some(LanguageSelectUi::init(registry))
+    Some(LanguageSelectUi::init(
+      registry,
+      &services.storage,
+      &mut services.log,
+    ))
   };
-  let mut terminal_check_ui = TerminalCheckUi::init(&detection);
+  let mut terminal_check_ui = TerminalCheckUi::init();
 
   // 初始 UI 节点
   // 1) 无语言 → LanguageSelect
@@ -67,14 +67,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services.input.poll_resize_events(|w, h| {
       services.canvas.resize(w, h);
       services.canvas.request_render();
-      services.image.request_render();
       services.presenter.request_render();
     });
 
     services.canvas.begin_frame();
     services.canvas.clear();
-
-    services.image.begin_frame();
 
     // 按当前 UI 节点加载对应的 action map
     match world.state.current_ui_kind() {
@@ -99,6 +96,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     }
 
     route_update(
+      services,
       world,
       &mut home_ui,
       &mut settings_ui,
@@ -119,35 +117,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &terminal_check_ui,
     );
 
-    // 图片请求：TerminalCheck 页面时同步协议并提交绘图请求
-    if world.state.current_ui_kind() == Some(UiNodeKind::TerminalCheck) {
-      services
-        .image
-        .set_protocol(terminal_check_ui.selected_image_protocol());
-      let test_path = services.storage.assets_images_path().join("test/test.jpg");
-      if let Some(request) =
-        terminal_check_ui.image_request(&services.layout, &services.i18n, test_path)
-      {
-        let _ = services.image.draw(request);
-      }
-    }
-
-    let image_layer = services
-      .image
-      .build_layer(&services.layout)
-      .unwrap_or(ImageLayerFrame {
-        images: Vec::new(),
-        dirty: false,
-        removed_regions: Vec::new(),
-      });
-
     let text_force_redraw = services.canvas.take_render_requested();
-    let composed = services.compositor.compose(&services.canvas, &image_layer);
+    let composed = services.compositor.compose(&services.canvas);
     let _ = services
       .presenter
       .present(&composed, &mut services.terminal, text_force_redraw);
-
-    services.image.end_frame();
 
     scheduler.wait_for_next_frame();
   }
@@ -260,7 +234,7 @@ fn route_input_events(
       let positions = terminal_check_ui.compute_positions(&services.layout, &services.i18n);
       for sys_event in services.input.drain_system_events() {
         if let SystemEvent::Mouse(me) = sys_event {
-          route_terminal_check_mouse_event(&me, &positions, world, terminal_check_ui);
+          route_terminal_check_mouse_event(&me, &positions, services, world, terminal_check_ui);
           if world.is_stopped() {
             break;
           }
@@ -279,7 +253,7 @@ fn route_input_event(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
-  mut language_select_ui: Option<&mut LanguageSelectUi>,
+  language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
 ) {
   match world.state.current_ui_kind() {
@@ -302,7 +276,7 @@ fn route_input_event(
     }
     Some(UiNodeKind::TerminalCheck) => {
       if let Some(command) = terminal_check_ui.handle_event(event) {
-        apply_terminal_check_command(command, terminal_check_ui, world);
+        apply_terminal_check_command(command, terminal_check_ui, services, world);
       }
     }
     _ => {}
@@ -363,13 +337,14 @@ fn route_language_select_mouse_event(
 fn route_terminal_check_mouse_event(
   event: &MouseEvent,
   positions: &TerminalCheckLayout,
+  services: &mut EngineServices,
   world: &mut RuntimeWorld,
   terminal_check_ui: &mut TerminalCheckUi,
 ) {
   match world.state.current_ui_kind() {
     Some(UiNodeKind::TerminalCheck) => {
       if let Some(command) = terminal_check_ui.handle_mouse_event(event, positions) {
-        apply_terminal_check_command(command, terminal_check_ui, world);
+        apply_terminal_check_command(command, terminal_check_ui, services, world);
       }
     }
     _ => {}
@@ -377,6 +352,7 @@ fn route_terminal_check_mouse_event(
 }
 
 fn route_update(
+  services: &mut EngineServices,
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
@@ -401,7 +377,7 @@ fn route_update(
     Some(UiNodeKind::TerminalCheck) => {
       let dt = world.clock.delta_time();
       if let Some(command) = terminal_check_ui.update(dt) {
-        apply_terminal_check_command(command, terminal_check_ui, world);
+        apply_terminal_check_command(command, terminal_check_ui, services, world);
       }
     }
     _ => {}
@@ -479,6 +455,9 @@ fn apply_settings_command(command: SettingsUiCommand, world: &mut RuntimeWorld) 
     SettingsUiCommand::Back => {
       world.state.pop_ui_node();
     }
+    SettingsUiCommand::OpenLanguageSelect => {
+      world.state.enter_ui_node(UiNodeState::language_select());
+    }
   }
 }
 
@@ -489,25 +468,18 @@ fn apply_language_select_command(
 ) {
   match command {
     LanguageSelectCommand::Confirm(code) => {
-      // 持久化语言
       let _ = services.storage.write_language_code(&code);
-      // 重新加载运行时文本
       services
         .i18n
         .load_runtime_language(&services.storage, &mut services.log, &code);
       services.i18n.set_current_language(code);
-      // 返回上一级
+      // 不退出，留在语言页面让用户看到效果
+    }
+    LanguageSelectCommand::Back => {
       world.state.pop_ui_node();
-      // 检查终端能力 → 决定下一步
       if !services.storage.is_terminal_profile_complete() {
         world.state.enter_ui_node(UiNodeState::terminal_check());
       }
-    }
-    LanguageSelectCommand::Exit => {
-      world.state.enter_shutdown();
-      set_crash_phase(world.state.crash_phase());
-      world.state.enter_stopped();
-      set_crash_phase(world.state.crash_phase());
     }
   }
 }
@@ -515,13 +487,18 @@ fn apply_language_select_command(
 fn apply_terminal_check_command(
   command: TerminalCheckCommand,
   terminal_check_ui: &mut TerminalCheckUi,
+  services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
   match command {
     TerminalCheckCommand::Next => {
+      terminal_check_ui.persist_current_step(&mut services.storage);
       terminal_check_ui.advance_step();
     }
-    TerminalCheckCommand::Done => {
+    TerminalCheckCommand::Done { mouse } => {
+      let _ = services.storage.update_terminal_profile(|p| {
+        p.mouse = Some(mouse);
+      });
       world.state.pop_ui_node();
     }
     TerminalCheckCommand::Exit => {
