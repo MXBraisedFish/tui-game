@@ -16,6 +16,7 @@ pub enum UiNodeKind {
   Home,
   Settings,
   LanguageSelect,
+  Mods,
   TerminalCheck,
 }
 
@@ -46,6 +47,14 @@ impl UiNodeState {
   pub fn settings() -> Self {
     Self {
       kind: UiNodeKind::Settings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn mods() -> Self {
+    Self {
+      kind: UiNodeKind::Mods,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

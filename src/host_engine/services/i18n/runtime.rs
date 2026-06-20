@@ -6,7 +6,7 @@ use super::service::I18nService;
 use crate::host_engine::services::{LogService, LogSource, StorageService};
 
 // 语言命名空间白名单：文件名即 namespace，文件内键值由用户自由命名
-const RUNTIME_NAMESPACES: &[&str] = &["home", "settings", "terminal", "language"];
+const RUNTIME_NAMESPACES: &[&str] = &["home", "settings", "terminal", "language", "mods"];
 
 impl I18nService {
   /// 加载运行时语言包。

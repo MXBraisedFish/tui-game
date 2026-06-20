@@ -5,6 +5,8 @@ mod settings;
 pub(crate) use settings::SettingsLayout;
 pub(crate) use settings::language::LanguageSelectLayout;
 pub use settings::language::{LanguageSelectCommand, LanguageSelectUi};
+pub(crate) use settings::mods::ModsLayout;
+pub use settings::mods::{ModsCommand, ModsUi};
 pub use settings::{SettingsUi, SettingsUiCommand};
 
 use std::time::Duration;

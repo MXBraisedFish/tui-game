@@ -1,0 +1,9 @@
+{
+  "mods.title": "Mods",
+  "mods.game": "Game Pack",
+  "mods.screensaver": "Screensaver Pack",
+  "mods.action.focus": "{key:settings.focus_game}/{key:settings.screensaver} Focus",
+  "mods.action.select": "{key:settings.focus_up}/{key:settings.focus_down} Select",
+  "mods.action.confirm": "{key:settings.confirm} Confirm",
+  "mods.action.back": "{key:settings.back} Back"
+}

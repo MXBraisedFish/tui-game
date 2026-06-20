@@ -552,7 +552,7 @@ impl LanguageSelectUi {
       let is_focused = gi == self.selected_index;
 
       let fg = if is_active {
-        TextColor::Terminal(TerminalColor::Green)
+        TextColor::Terminal(TerminalColor::BrightGreen)
       } else if is_focused {
         TextColor::Terminal(TerminalColor::BrightCyan)
       } else {

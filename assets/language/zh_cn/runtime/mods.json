@@ -1,0 +1,9 @@
+{
+  "mods.title": "模组",
+  "mods.game": "游戏包",
+  "mods.screensaver": "屏保包",
+  "mods.action.focus": "{key:settings.focus_game}/{key:settings.screensaver} 聚焦",
+  "mods.action.select": "{key:settings.focus_up}/{key:settings.focus_down} 选择",
+  "mods.action.confirm": "{key:settings.confirm} 确认",
+  "mods.action.back": "{key:settings.back} 返回"
+}

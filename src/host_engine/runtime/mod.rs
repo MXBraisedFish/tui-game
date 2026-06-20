@@ -9,8 +9,8 @@ use crate::host_engine::services::{
 
 use crate::host_engine::ui::{
   HomeLayout, HomeUi, HomeUiCommand, LanguageSelectCommand, LanguageSelectLayout, LanguageSelectUi,
-  SettingsLayout, SettingsUi, SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout,
-  TerminalCheckUi,
+  ModsCommand, ModsLayout, ModsUi, SettingsLayout, SettingsUi, SettingsUiCommand,
+  TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
 };
 
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
@@ -42,6 +42,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     ))
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
+  let mut mods_ui = ModsUi::init();
 
   // 初始 UI 节点
   // 1) 无语言 → LanguageSelect
@@ -78,6 +79,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       Some(UiNodeKind::Home) => load_home_action_map(services),
       Some(UiNodeKind::Settings) => load_settings_action_map(services),
       Some(UiNodeKind::LanguageSelect) => load_language_select_action_map(services),
+      Some(UiNodeKind::Mods) => load_mods_action_map(services),
       Some(UiNodeKind::TerminalCheck) => load_terminal_check_action_map(services),
       _ => {}
     }
@@ -89,6 +91,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut settings_ui,
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
+      &mut mods_ui,
     );
 
     if world.is_stopped() {
@@ -102,6 +105,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut settings_ui,
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
+      &mut mods_ui,
     );
 
     if world.is_stopped() {
@@ -115,6 +119,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &settings_ui,
       language_select_ui.as_ref(),
       &terminal_check_ui,
+      &mods_ui,
     );
 
     let text_force_redraw = services.canvas.take_render_requested();
@@ -152,6 +157,13 @@ fn load_language_select_action_map(services: &mut EngineServices) {
   services.input.load_key_bindings(bindings);
 }
 
+fn load_mods_action_map(services: &mut EngineServices) {
+  let bindings =
+    translate_action_map(&ModsUi::action_map()).expect("failed to translate ModsUi action map");
+
+  services.input.load_key_bindings(bindings);
+}
+
 fn load_terminal_check_action_map(services: &mut EngineServices) {
   let bindings = translate_action_map(&TerminalCheckUi::action_map())
     .expect("failed to translate TerminalCheckUi action map");
@@ -166,6 +178,7 @@ fn route_input_events(
   settings_ui: &mut SettingsUi,
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
 ) {
   // 键盘事件
   while let Some(event) = services.input.next_action_event() {
@@ -177,6 +190,7 @@ fn route_input_events(
       settings_ui,
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
+      mods_ui,
     );
 
     if world.is_stopped() {
@@ -230,6 +244,17 @@ fn route_input_events(
         }
       }
     }
+    Some(UiNodeKind::Mods) => {
+      let positions = mods_ui.compute_positions(&services.layout, &services.i18n);
+      for sys_event in services.input.drain_system_events() {
+        if let SystemEvent::Mouse(me) = sys_event {
+          route_mods_mouse_event(&me, &positions, world, mods_ui);
+          if world.is_stopped() {
+            break;
+          }
+        }
+      }
+    }
     Some(UiNodeKind::TerminalCheck) => {
       let positions = terminal_check_ui.compute_positions(&services.layout, &services.i18n);
       for sys_event in services.input.drain_system_events() {
@@ -255,6 +280,7 @@ fn route_input_event(
   settings_ui: &mut SettingsUi,
   language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
 ) {
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
@@ -272,6 +298,11 @@ fn route_input_event(
         if let Some(command) = ui.handle_event(event) {
           apply_language_select_command(command, services, world);
         }
+      }
+    }
+    Some(UiNodeKind::Mods) => {
+      if let Some(command) = mods_ui.handle_event(event) {
+        apply_mods_command(command, world);
       }
     }
     Some(UiNodeKind::TerminalCheck) => {
@@ -334,6 +365,22 @@ fn route_language_select_mouse_event(
   }
 }
 
+fn route_mods_mouse_event(
+  event: &MouseEvent,
+  positions: &ModsLayout,
+  world: &mut RuntimeWorld,
+  mods_ui: &mut ModsUi,
+) {
+  match world.state.current_ui_kind() {
+    Some(UiNodeKind::Mods) => {
+      if let Some(command) = mods_ui.handle_mouse_event(event, positions) {
+        apply_mods_command(command, world);
+      }
+    }
+    _ => {}
+  }
+}
+
 fn route_terminal_check_mouse_event(
   event: &MouseEvent,
   positions: &TerminalCheckLayout,
@@ -358,6 +405,7 @@ fn route_update(
   settings_ui: &mut SettingsUi,
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
 ) {
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
@@ -373,6 +421,10 @@ fn route_update(
     Some(UiNodeKind::LanguageSelect) => {
       let dt = world.clock.delta_time();
       let _ = language_select_ui.as_mut().and_then(|ui| ui.update(dt));
+    }
+    Some(UiNodeKind::Mods) => {
+      let dt = world.clock.delta_time();
+      let _ = mods_ui.update(dt);
     }
     Some(UiNodeKind::TerminalCheck) => {
       let dt = world.clock.delta_time();
@@ -391,6 +443,7 @@ fn route_render(
   settings_ui: &SettingsUi,
   language_select_ui: Option<&LanguageSelectUi>,
   terminal_check_ui: &TerminalCheckUi,
+  mods_ui: &ModsUi,
 ) {
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
@@ -418,6 +471,14 @@ fn route_render(
           &services.i18n,
         );
       }
+    }
+    Some(UiNodeKind::Mods) => {
+      mods_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+      );
     }
     Some(UiNodeKind::TerminalCheck) => {
       terminal_check_ui.render(
@@ -458,6 +519,19 @@ fn apply_settings_command(command: SettingsUiCommand, world: &mut RuntimeWorld) 
     SettingsUiCommand::OpenLanguageSelect => {
       world.state.enter_ui_node(UiNodeState::language_select());
     }
+    SettingsUiCommand::OpenMods => {
+      world.state.enter_ui_node(UiNodeState::mods());
+    }
+  }
+}
+
+fn apply_mods_command(command: ModsCommand, world: &mut RuntimeWorld) {
+  match command {
+    ModsCommand::Back => {
+      world.state.pop_ui_node();
+    }
+    ModsCommand::OpenGame => {}
+    ModsCommand::OpenScreensaver => {}
   }
 }
 

@@ -9,6 +9,8 @@ pub mod language;
 pub(crate) use language::LanguageSelectLayout;
 pub use language::{LanguageSelectCommand, LanguageSelectUi};
 
+pub mod mods;
+
 const SETTINGS_MENU_LEN: usize = 6;
 
 const MENU_KEYS: &[&str] = &[
@@ -38,6 +40,7 @@ pub struct SettingsUi {
 pub enum SettingsUiCommand {
   Back,
   OpenLanguageSelect,
+  OpenMods,
 }
 
 impl SettingsUi {
@@ -118,12 +121,11 @@ impl SettingsUi {
         self.focus_next();
         None
       }
-      "settings.confirm" => {
-        if self.selected_index == 0 {
-          return Some(SettingsUiCommand::OpenLanguageSelect);
-        }
-        None
-      }
+      "settings.confirm" => match self.selected_index {
+        0 => Some(SettingsUiCommand::OpenLanguageSelect),
+        2 => Some(SettingsUiCommand::OpenMods),
+        _ => None,
+      },
       "settings.back" => Some(SettingsUiCommand::Back),
 
       // 数字键快速聚焦
@@ -173,9 +175,11 @@ impl SettingsUi {
         Some(MouseButton::Left) => {
           if let Some(index) = Self::hit_test_menu(positions, event.x, event.y) {
             self.selected_index = index;
-            if index == 0 {
-              return Some(SettingsUiCommand::OpenLanguageSelect);
-            }
+            return match index {
+              0 => Some(SettingsUiCommand::OpenLanguageSelect),
+              2 => Some(SettingsUiCommand::OpenMods),
+              _ => None,
+            };
           }
           None
         }

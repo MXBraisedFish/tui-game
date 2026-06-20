@@ -1,0 +1,8 @@
+{
+  "window_size.title": "Terminal Size Warning",
+  "window_size.current": "Current Size:",
+  "window_size.required": "Required Size",
+  "window_size.tip": "Resize your terminal to the required size.",
+  "window_size.action.exit.host": "{key:window_size.exit} Exit",
+  "window_size.action.exit.game": "{key:window_size.exit} Back to Game List"
+}
