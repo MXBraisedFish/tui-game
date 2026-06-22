@@ -1,5 +1,6 @@
 mod canvas;
 mod game;
+mod image;
 mod i18n;
 mod input;
 mod layout;
@@ -19,6 +20,7 @@ mod unicode;
 
 pub use canvas::{CanvasCell, CanvasService};
 pub use game::GameService;
+pub use image::{ImageConvertParams, ImageService};
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use input::{
   ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton, MouseEvent,
@@ -43,6 +45,7 @@ pub struct EngineServices {
   pub input: InputService,
   pub ui: UiService,
   pub game: GameService,
+  pub image: ImageService,
   pub overlay: OverlayService,
   pub storage: StorageService,
   pub lua: LuaService,
@@ -68,6 +71,7 @@ impl EngineServices {
       input: InputService::new(),
       ui: UiService::new(),
       game: GameService::new(),
+      image: ImageService::new(),
       overlay: OverlayService::new(),
       storage: StorageService::new(&mut log),
       lua: LuaService::new(),

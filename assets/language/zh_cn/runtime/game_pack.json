@@ -3,60 +3,55 @@
   "game_pack.info": "信息",
   "game_pack.no.pack": "未发现游戏包",
   "game_pack.no.info": "未发现信息",
-  "game_pack.debug": "调试",
-  "game_pack.author": "作者：",
-  "game_pack.version": "版本：",
-  "game_pack.status": "状态：",
-  "game_pack.pack.on": "启用",
-  "game_pack.pack.off": "禁用",
-  "game_pack.action.focus": "{key:settings.focus_game}/{key:settings.screensaver} 聚焦",
-  "game_pack.action.select": "{key:settings.focus_up}/{key:settings.focus_down} 选择",
-  "game_pack.action.confirm": "{key:settings.confirm} 确认",
-  "game_pack.action.back": "{key:settings.back} 返回"
+  "game_pack.action.flip": "{key:game_pack.flip_forward}/{key:game_pack.flip_backward} 翻页",
+  "game_pack.action.focus": "{key:game_pack.focus_game}/{key:game_pack.screensaver} 聚焦",
+  "game_pack.action.select": "{key:game_pack.focus_up}/{key:game_pack.focus_down} 选择",
+  "game_pack.action.confirm": "{key:game_pack.confirm} 开关",
+  "game_pack.action.list.back": "{key:game_pack.list.back} 返回",
+  "game_pack.action.search.back": "{key:game_pack.search.back} 退出搜索",
+  "game_pack.flip.forward": "❮ {key:game_pack.flip_forward}",
+  "game_pack.flip.backward": "{key:game_pack.flip_backward} ❯",
+  "game_pack.action.safe_mode.off": "{key:game_pack.safe_mode} 安全模式",
+  "game_pack.action.safe_mode.on": "{key:game_pack.safe_mode} 安全模式",
+  "game_pack.action.debug.off": "{key:game_pack.debug} 调试",
+  "game_pack.action.debug.on": "{key:game_pack.debug} 调试",
+  "game_pack.action.list.detail2simple": "{key:game_pack.list} 切换为简洁表",
+  "game_pack.action.list.simple2detail": "{key:game_pack.list} 切换为详细表",
+  "game_pack.action.list.search": "{key:game_pack.search} 搜索",
+  "game_pack.list.debug": "调试",
+  "game_pack.list.author": "作者：",
+  "game_pack.list.version": "版本：",
+  "game_pack.list.status": "状态：",
+  "game_pack.list.status.off": "禁用",
+  "game_pack.list.status.on": "启用",
+  "game_pack.info.subtitle.base": "基本信息：",
+  "game_pack.info.subtitle.config": "配置信息：",
+  "game_pack.info.subtitle.description": "简介：",
+  "game_pack.info.pack_name": "包名：",
+  "game_pack.info.author": "作者：",
+  "game_pack.info.version": "版本：",
+  "game_pack.info.mouse": "鼠标需求：",
+  "game_pack.info.write": "直写需求：",
+  "game_pack.info.safe_mode": "安全模式：",
+  "game_pack.info.debug": "调试模式：",
+  "game_pack.info.status": "启用状态：",
+  "game_pack.info.mouse.off": "需要",
+  "game_pack.info.mouse.on": "无需",
+  "game_pack.info.write.off": "需要",
+  "game_pack.info.write.on": "无需",
+  "game_pack.info.debug.off": "关闭",
+  "game_pack.info.debug.on": "开启",
+  "game_pack.info.status.off": "禁用",
+  "game_pack.info.status.on": "启用",
+
+  "game_pack.list.sort.title": "包标题",
+  "game_pack.list.sort.author": "作者",
+  "game_pack.list.sort.status": "启用状态",
+  "game_pack.list.sort.debug": "调试模式",
+  "game_pack.list.sort.safe_mode": "安全模式",
+
+  "game_pack.list.order.ascending": "正序↓",
+  "game_pack.list.order.descending": "倒序↑",
+
+  "game_pack.list.search.placeholder": "🔍搜索游戏包"
 }
-
-完整表
-████████ [调试]包名      █
-████████ 作者：          █
-████████ 版本：          █
-████████ 状态：启用/禁用 █
-
-简洁表
-[调试]包名           状态 █
-
-信息展示
-
-████████████████████████████████████████
-████████████████████████████████████████
-████████████████████████████████████████
-████████████████████████████████████████
-████████████████████████████████████████
-████████████████████████████████████████
-████████████████████████████████████████
-████████████████████████████████████████
-████████████████████████████████████████
-████████████████████████████████████████
-
-基本信息：
-包名：
-作者：
-版本：
-
-配置信息：
-鼠标需求：
-直写需求：
-安全模式：
-调试模式：
-启用状态：
-
-简介：
-
-
-操作：
-Q/E翻页
-↑/↓切换选项
-Enter切换启用状态
-D开启或关闭Debug模式
-J跳页
-L切换想写/简表
-S开启/关闭当前包的安全模式

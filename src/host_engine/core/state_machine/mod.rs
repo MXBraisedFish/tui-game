@@ -55,7 +55,7 @@ pub use host_machine::HostMachineState;
 
 pub use main_host::MainHostState;
 
-pub use overlay::OverlayStackState;
+pub use overlay::{OverlayKind, OverlayLogicState, OverlayRenderState, OverlayStackState, OverlayState};
 
 pub use runtime::RuntimeState;
 

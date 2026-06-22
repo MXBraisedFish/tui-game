@@ -1,0 +1,59 @@
+{
+  "game_pack.list": "List",
+  "game_pack.info": "Info",
+  "game_pack.no.pack": "No Game Packs Found",
+  "game_pack.no.info": "No Information Available",
+
+  "game_pack.action.flip": "{key:game_pack.flip_forward}/{key:game_pack.flip_backward} Page",
+  "game_pack.action.focus": "{key:game_pack.focus_game}/{key:game_pack.screensaver} Focus",
+  "game_pack.action.select": "{key:game_pack.focus_up}/{key:game_pack.focus_down} Select",
+  "game_pack.action.confirm": "{key:game_pack.confirm} Toggle",
+  "game_pack.action.back": "{key:game_pack.back} Back",
+
+  "game_pack.flip.forward": "❮ {key:game_pack.flip_forward}",
+  "game_pack.flip.backward": "{key:game_pack.flip_backward} ❯",
+
+  "game_pack.action.safe_mode.off": "{key:game_pack.safe_mode} Safe Mode",
+  "game_pack.action.safe_mode.on": "{key:game_pack.safe_mode} Safe Mode",
+
+  "game_pack.action.debug.off": "{key:game_pack.debug} Debug",
+  "game_pack.action.debug.on": "{key:game_pack.debug} Debug",
+
+  "game_pack.action.list.detail2simple": "{key:game_pack.list} Simple View",
+  "game_pack.action.list.simple2detail": "{key:game_pack.list} Detailed View",
+
+  "game_pack.list.debug": "Debug",
+
+  "game_pack.list.author": "Author:",
+  "game_pack.list.version": "Version:",
+  "game_pack.list.status": "Status:",
+
+  "game_pack.list.status.off": "Disabled",
+  "game_pack.list.status.on": "Enabled",
+
+  "game_pack.info.subtitle.base": "General",
+  "game_pack.info.subtitle.config": "Configuration",
+  "game_pack.info.subtitle.description": "Description",
+
+  "game_pack.info.pack_name": "Pack Name:",
+  "game_pack.info.author": "Author:",
+  "game_pack.info.version": "Version:",
+
+  "game_pack.info.mouse": "Mouse Required:",
+  "game_pack.info.write": "Direct Write Required:",
+  "game_pack.info.safe_mode": "Safe Mode:",
+  "game_pack.info.debug": "Debug Mode:",
+  "game_pack.info.status": "Status:",
+
+  "game_pack.info.mouse.off": "Yes",
+  "game_pack.info.mouse.on": "No",
+
+  "game_pack.info.write.off": "Yes",
+  "game_pack.info.write.on": "No",
+
+  "game_pack.info.debug.off": "Off",
+  "game_pack.info.debug.on": "On",
+
+  "game_pack.info.status.off": "Disabled",
+  "game_pack.info.status.on": "Enabled"
+}

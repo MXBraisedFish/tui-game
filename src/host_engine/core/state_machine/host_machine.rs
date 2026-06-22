@@ -1,4 +1,4 @@
-use super::{MainHostState, RuntimeState, UiNodeKind, UiNodeState};
+use super::{MainHostState, OverlayKind, OverlayState, RuntimeState, UiNodeKind, UiNodeState};
 use crate::host_engine::core::CrashPhase;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -136,5 +136,35 @@ impl HostMachineState {
       .host_mut()?
       .ui_tree_mut()
       .back()
+  }
+
+  // ── 覆盖层查询 ──
+
+  pub fn current_overlay_kind(&self) -> Option<OverlayKind> {
+    self.runtime()?.overlays().current_kind()
+  }
+
+  pub fn push_window_size_overlay(&mut self, min_w: u32, min_h: u32) {
+    if let Some(runtime) = self.runtime_mut() {
+      runtime.overlays_mut().push(OverlayState {
+        kind: OverlayKind::WindowSizeWarning,
+        logic: super::OverlayLogicState,
+        render: super::OverlayRenderState {
+          required_width: min_w,
+          required_height: min_h,
+        },
+      });
+    }
+  }
+
+  pub fn pop_overlay(&mut self) -> Option<OverlayState> {
+    self.runtime_mut()?.overlays_mut().pop()
+  }
+
+  pub fn is_host_mode(&self) -> bool {
+    self
+      .runtime()
+      .map(|r| r.main_host().is_host())
+      .unwrap_or(true)
   }
 }

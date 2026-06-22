@@ -1,16 +1,18 @@
-use crate::host_engine::core::state_machine::UiNodeState;
+use crate::host_engine::core::state_machine::{MainHostState, OverlayKind, UiNodeState};
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
 
-use crate::host_engine::core::state_machine::UiNodeKind;
+use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
-  EngineServices, InputActionEvent, MouseEvent, SystemEvent, translate_action_map,
+  EngineServices, InputActionEvent, MouseButton, MouseEvent, MouseEventKind, SystemEvent,
+  translate_action_map,
 };
 
 use crate::host_engine::ui::{
-  HomeLayout, HomeUi, HomeUiCommand, LanguageSelectCommand, LanguageSelectLayout, LanguageSelectUi,
-  ModsCommand, ModsLayout, ModsUi, SettingsLayout, SettingsUi, SettingsUiCommand,
-  TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
+  self, HomeLayout, HomeUi, HomeUiCommand, LanguageSelectCommand, LanguageSelectLayout,
+  LanguageSelectUi, ModsCommand, ModsLayout, ModsUi, SettingsLayout, SettingsUi,
+  SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
+  WindowSizeWarningCommand,
 };
 
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
@@ -74,14 +76,21 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services.canvas.begin_frame();
     services.canvas.clear();
 
-    // 按当前 UI 节点加载对应的 action map
-    match world.state.current_ui_kind() {
-      Some(UiNodeKind::Home) => load_home_action_map(services),
-      Some(UiNodeKind::Settings) => load_settings_action_map(services),
-      Some(UiNodeKind::LanguageSelect) => load_language_select_action_map(services),
-      Some(UiNodeKind::Mods) => load_mods_action_map(services),
-      Some(UiNodeKind::TerminalCheck) => load_terminal_check_action_map(services),
-      _ => {}
+    // 窗口尺寸检查与覆盖层管理
+    manage_window_size_overlay(services, world);
+
+    // 按当前状态加载 action map：覆盖层优先
+    if world.state.current_overlay_kind().is_some() {
+      load_window_size_action_map(services);
+    } else {
+      match world.state.current_ui_kind() {
+        Some(UiNodeKind::Home) => load_home_action_map(services),
+        Some(UiNodeKind::Settings) => load_settings_action_map(services),
+        Some(UiNodeKind::LanguageSelect) => load_language_select_action_map(services),
+        Some(UiNodeKind::Mods) => load_mods_action_map(services),
+        Some(UiNodeKind::TerminalCheck) => load_terminal_check_action_map(services),
+        _ => {}
+      }
     }
 
     route_input_events(
@@ -171,6 +180,13 @@ fn load_terminal_check_action_map(services: &mut EngineServices) {
   services.input.load_key_bindings(bindings);
 }
 
+fn load_window_size_action_map(services: &mut EngineServices) {
+  let bindings = translate_action_map(&ui::window_size_warning::action_map())
+    .expect("failed to translate window_size action map");
+
+  services.input.load_key_bindings(bindings);
+}
+
 fn route_input_events(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
@@ -180,6 +196,30 @@ fn route_input_events(
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
 ) {
+  // 覆盖层输入优先
+  if world.state.current_overlay_kind().is_some() {
+    while let Some(event) = services.input.next_action_event() {
+      if let Some(cmd) = ui::window_size_warning::handle_event(&event) {
+        apply_window_size_command(cmd, world);
+      }
+      if world.is_stopped() {
+        break;
+      }
+    }
+    // 鼠标右键等同于 Esc
+    for sys_event in services.input.drain_system_events() {
+      if let SystemEvent::Mouse(me) = sys_event {
+        if me.kind == MouseEventKind::Press && me.button == Some(MouseButton::Right) {
+          apply_window_size_command(WindowSizeWarningCommand::Exit, world);
+        }
+      }
+      if world.is_stopped() {
+        break;
+      }
+    }
+    return;
+  }
+
   // 键盘事件
   while let Some(event) = services.input.next_action_event() {
     route_input_event(
@@ -407,6 +447,11 @@ fn route_update(
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
 ) {
+  // 覆盖层无逐帧逻辑
+  if world.state.current_overlay_kind().is_some() {
+    return;
+  }
+
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
       let dt = world.clock.delta_time();
@@ -445,6 +490,28 @@ fn route_render(
   terminal_check_ui: &TerminalCheckUi,
   mods_ui: &ModsUi,
 ) {
+  // 覆盖层渲染优先
+  if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
+    let runtime = world.state.runtime().unwrap();
+    let overlay = runtime.overlays().top().unwrap();
+    let req_w = overlay.render.required_width;
+    let req_h = overlay.render.required_height;
+    let term = services.layout.get_terminal_size();
+
+    ui::window_size_warning::render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.i18n,
+      req_w,
+      req_h,
+      term.width,
+      term.height,
+      world.state.is_host_mode(),
+    );
+    return;
+  }
+
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
       home_ui.render(
@@ -580,6 +647,68 @@ fn apply_terminal_check_command(
       set_crash_phase(world.state.crash_phase());
       world.state.enter_stopped();
       set_crash_phase(world.state.crash_phase());
+    }
+  }
+}
+
+// ── 窗口尺寸覆盖层 ──
+
+/// 每帧调用：当终端过小时推入覆盖层，尺寸恢复时自动弹出。
+fn manage_window_size_overlay(services: &EngineServices, world: &mut RuntimeWorld) {
+  let term = services.layout.get_terminal_size();
+
+  match world.state.current_overlay_kind() {
+    Some(OverlayKind::WindowSizeWarning) => {
+      // 自动解除：终端尺寸已满足需求
+      let runtime = world.state.runtime().unwrap();
+      if let Some(overlay) = runtime.overlays().top() {
+        let req_w = overlay.render.required_width as u16;
+        let req_h = overlay.render.required_height as u16;
+        if term.width >= req_w && term.height >= req_h {
+          world.state.pop_overlay();
+        }
+      }
+    }
+    None => {
+      // 无覆盖层时，检查终端尺寸是否达标
+      let (min_w, min_h) = get_min_window_size(world);
+      if (term.width as u32) < min_w || (term.height as u32) < min_h {
+        world.state.push_window_size_overlay(min_w, min_h);
+      }
+    }
+    _ => {} // 其他覆盖层：跳过尺寸检查
+  }
+}
+
+/// 获取当前模式下的最小窗口尺寸。
+/// Host 模式：固定 80×24。
+/// Game 模式：占位，后续读取活跃游戏包的 PackageRuntime。
+fn get_min_window_size(world: &RuntimeWorld) -> (u32, u32) {
+  if world.state.is_host_mode() {
+    (80, 24)
+  } else {
+    // 游戏模式占位：暂用与 Host 相同的默认值
+    (80, 24)
+  }
+}
+
+fn apply_window_size_command(cmd: WindowSizeWarningCommand, world: &mut RuntimeWorld) {
+  match cmd {
+    WindowSizeWarningCommand::Exit => {
+      if world.state.is_host_mode() {
+        // Host 模式：退出程序
+        world.state.pop_overlay();
+        world.state.enter_shutdown();
+        set_crash_phase(world.state.crash_phase());
+        world.state.enter_stopped();
+        set_crash_phase(world.state.crash_phase());
+      } else {
+        // Game 模式：返回游戏列表（切回 Host）
+        world.state.pop_overlay();
+        if let Some(runtime) = world.state.runtime_mut() {
+          runtime.set_main_host(MainHostState::Host(HostState::new()));
+        }
+      }
     }
   }
 }

@@ -13,13 +13,17 @@ pub struct OverlayState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayKind {
   ConfirmExit,
+  WindowSizeWarning,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverlayLogicState;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OverlayRenderState;
+pub struct OverlayRenderState {
+  pub required_width: u32,
+  pub required_height: u32,
+}
 
 // 覆盖层状态
 impl OverlayStackState {
@@ -56,6 +60,11 @@ impl OverlayStackState {
   // 弹出覆盖层
   pub fn pop(&mut self) -> Option<OverlayState> {
     self.stack.pop()
+  }
+
+  // 当前覆盖层类型
+  pub fn current_kind(&self) -> Option<OverlayKind> {
+    self.top().map(|o| o.kind)
   }
 
   // 清理覆盖层
