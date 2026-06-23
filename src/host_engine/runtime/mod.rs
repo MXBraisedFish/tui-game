@@ -5,7 +5,7 @@ use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
   EngineServices, InputActionEvent, MouseButton, MouseEvent, MouseEventKind, SystemEvent,
-  translate_action_map,
+  UiObjectPoolOwner, translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -45,7 +45,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
   let mut mods_ui = ModsUi::init();
-  let mut input_demo_ui = InputDemoUi::init();
+  let mut input_demo_ui = InputDemoUi::init(&services.text_input);
 
   // 初始 UI 节点
   // 1) 无语言 → LanguageSelect
@@ -94,7 +94,16 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         &mut input_demo_ui,
       );
     } else if services.text_input.is_active() {
-      route_text_input_events(services, world, &mut input_demo_ui);
+      route_text_input_events(
+        services,
+        world,
+        &mut home_ui,
+        &mut settings_ui,
+        language_select_ui.as_mut(),
+        &mut terminal_check_ui,
+        &mut mods_ui,
+        &mut input_demo_ui,
+      );
     } else {
       match world.state.current_ui_kind() {
         Some(UiNodeKind::Home) => load_home_action_map(services),
@@ -216,12 +225,28 @@ fn load_input_demo_action_map(services: &mut EngineServices) {
 fn route_text_input_events(
   services: &mut EngineServices,
   world: &RuntimeWorld,
+  home_ui: &mut HomeUi,
+  settings_ui: &mut SettingsUi,
+  mut language_select_ui: Option<&mut LanguageSelectUi>,
+  terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
   input_demo_ui: &mut InputDemoUi,
 ) {
   for event in services.input.drain_system_events() {
     if let SystemEvent::TerminalKey(key) = event {
-      if world.state.current_ui_kind() == Some(UiNodeKind::InputDemo) {
-        input_demo_ui.route_terminal_key(&mut services.text_input, key);
+      let objects = match world.state.current_ui_kind() {
+        Some(UiNodeKind::Home) => Some(home_ui.objects_mut()),
+        Some(UiNodeKind::Settings) => Some(settings_ui.objects_mut()),
+        Some(UiNodeKind::LanguageSelect) => language_select_ui
+          .as_deref_mut()
+          .map(UiObjectPoolOwner::objects_mut),
+        Some(UiNodeKind::Mods) => Some(mods_ui.objects_mut()),
+        Some(UiNodeKind::TerminalCheck) => Some(terminal_check_ui.objects_mut()),
+        Some(UiNodeKind::InputDemo) => Some(input_demo_ui.objects_mut()),
+        _ => None,
+      };
+      if let Some(objects) = objects {
+        services.text_input.route_terminal_key(objects, key);
       }
     }
   }
@@ -620,7 +645,7 @@ fn route_render(
       &mut services.render,
       &mut services.canvas,
       &services.layout,
-      services.text_input.active_input(),
+      &services.text_input,
     ),
     _ => None,
   }
@@ -654,6 +679,8 @@ fn apply_input_demo_command(
   world: &mut RuntimeWorld,
 ) {
   match command {
+    InputDemoCommand::SelectPrevious => input_demo_ui.select_previous(),
+    InputDemoCommand::SelectNext => input_demo_ui.select_next(),
     InputDemoCommand::FocusInput => input_demo_ui.focus(&mut services.text_input),
     InputDemoCommand::Back => {
       world.state.pop_ui_node();

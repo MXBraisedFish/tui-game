@@ -7,6 +7,7 @@ use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, InputActionEvent,
   KeyState, LanguageRegistryEntry, LayoutService, LogService, LogSource, MouseButton, MouseEvent,
   MouseEventKind, Rect, RenderService, RichTextParams, StorageService, TerminalColor, TextColor,
+  UiObjectPool, UiObjectPoolOwner,
 };
 
 // ── 常量 ──
@@ -46,6 +47,17 @@ pub struct LanguageSelectUi {
   /// 缓存最近一次布局计算的列数、每页条数（Cell 允许 &self 写入）
   columns: Cell<usize>,
   per_page: Cell<usize>,
+  objects: UiObjectPool,
+}
+
+impl UiObjectPoolOwner for LanguageSelectUi {
+  fn objects(&self) -> &UiObjectPool {
+    &self.objects
+  }
+
+  fn objects_mut(&mut self) -> &mut UiObjectPool {
+    &mut self.objects
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -81,6 +93,7 @@ impl LanguageSelectUi {
       active_code,
       columns: Cell::new(4),
       per_page: Cell::new(12),
+      objects: UiObjectPool::new(),
     }
   }
 

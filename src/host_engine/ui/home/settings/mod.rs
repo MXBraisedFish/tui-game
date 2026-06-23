@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, I18nService, InputActionEvent, KeyState,
   LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams,
+  UiObjectPool, UiObjectPoolOwner,
 };
 
 pub mod language;
@@ -31,9 +32,19 @@ pub(crate) struct SettingsLayout {
   action_hint_y: u16,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SettingsUi {
   selected_index: usize,
+  objects: UiObjectPool,
+}
+
+impl UiObjectPoolOwner for SettingsUi {
+  fn objects(&self) -> &UiObjectPool {
+    &self.objects
+  }
+
+  fn objects_mut(&mut self) -> &mut UiObjectPool {
+    &mut self.objects
+  }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,7 +56,10 @@ pub enum SettingsUiCommand {
 
 impl SettingsUi {
   pub fn init() -> Self {
-    Self { selected_index: 0 }
+    Self {
+      selected_index: 0,
+      objects: UiObjectPool::new(),
+    }
   }
 
   // ── 输入绑定 ──

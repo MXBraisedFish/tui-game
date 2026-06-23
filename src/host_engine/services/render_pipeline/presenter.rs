@@ -3,7 +3,9 @@ use std::io::{self, Write};
 use crossterm::{
   QueueableCommand,
   cursor::MoveTo,
-  style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+  style::{
+    Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
+  },
 };
 
 use super::{ComposedCell, ComposedFrame};
@@ -181,6 +183,7 @@ fn text_color_to_crossterm(color: &TextColor) -> Color {
 
 fn queue_style(stdout: &mut impl Write, style: &TextStyle) -> io::Result<()> {
   stdout.queue(ResetColor)?;
+  stdout.queue(SetAttribute(Attribute::Reset))?;
 
   if let Some(foreground) = &style.foreground {
     stdout.queue(SetForegroundColor(text_color_to_crossterm(foreground)))?;
@@ -188,6 +191,10 @@ fn queue_style(stdout: &mut impl Write, style: &TextStyle) -> io::Result<()> {
 
   if let Some(background) = &style.background {
     stdout.queue(SetBackgroundColor(text_color_to_crossterm(background)))?;
+  }
+
+  if style.reverse {
+    stdout.queue(SetAttribute(Attribute::Reverse))?;
   }
 
   Ok(())
@@ -225,5 +232,22 @@ mod tests {
 
     let output = String::from_utf8(output).unwrap();
     assert!(output.ends_with("e\u{301}👨‍👩"));
+  }
+
+  #[test]
+  fn queue_style_emits_and_resets_reverse_attribute() {
+    let mut output = Vec::new();
+    queue_style(
+      &mut output,
+      &TextStyle {
+        reverse: true,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+    let output = String::from_utf8(output).unwrap();
+
+    assert!(output.contains("\x1b[0m"));
+    assert!(output.contains("\x1b[7m"));
   }
 }

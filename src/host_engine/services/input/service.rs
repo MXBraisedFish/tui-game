@@ -702,6 +702,7 @@ fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
 
   let allowed_modifiers = match event.code {
     CtKeyCode::Char(_) => event.modifiers.is_empty() || event.modifiers == CtKeyModifiers::SHIFT,
+    CtKeyCode::Enter => event.modifiers.is_empty() || event.modifiers == CtKeyModifiers::CONTROL,
     _ => event.modifiers.is_empty(),
   };
   if !allowed_modifiers {
@@ -721,7 +722,10 @@ fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
     _ => return None,
   };
 
-  Some(SystemEvent::TerminalKey(TerminalKeyEvent { code }))
+  Some(SystemEvent::TerminalKey(TerminalKeyEvent {
+    code,
+    ctrl: event.modifiers == CtKeyModifiers::CONTROL,
+  }))
 }
 
 fn system_event_from_crossterm(event: CtEvent) -> Option<SystemEvent> {
@@ -790,6 +794,13 @@ mod tests {
     }
   }
 
+  fn terminal_event(event: CtKeyEvent) -> Option<TerminalKeyEvent> {
+    match terminal_key_event_from_crossterm(event) {
+      Some(SystemEvent::TerminalKey(event)) => Some(event),
+      _ => None,
+    }
+  }
+
   #[test]
   fn terminal_key_event_from_crossterm_maps_supported_keys() {
     let cases = [
@@ -834,6 +845,13 @@ mod tests {
       terminal_code(CtKeyEvent::new(CtKeyCode::Char('A'), CtKeyModifiers::SHIFT,)),
       Some(TerminalKeyCode::Char('A'))
     );
+    assert_eq!(
+      terminal_event(CtKeyEvent::new(CtKeyCode::Enter, CtKeyModifiers::CONTROL)),
+      Some(TerminalKeyEvent {
+        code: TerminalKeyCode::Enter,
+        ctrl: true,
+      })
+    );
     for modifiers in [
       CtKeyModifiers::CONTROL,
       CtKeyModifiers::ALT,
@@ -853,9 +871,11 @@ mod tests {
     let mut input = InputService::new();
     let a = SystemEvent::TerminalKey(TerminalKeyEvent {
       code: TerminalKeyCode::Char('a'),
+      ctrl: false,
     });
     let b = SystemEvent::TerminalKey(TerminalKeyEvent {
       code: TerminalKeyCode::Char('b'),
+      ctrl: false,
     });
     input.system_sender.send(a).unwrap();
     input

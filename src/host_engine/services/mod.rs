@@ -38,10 +38,11 @@ pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, T
 pub use storage::StorageService;
 pub use terminal::TerminalService;
 pub use text_input::{
-  InputDrawParams, InputEvent, InputId, InputOptions, TextInputService, UiObjectPool,
+  TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
+  TextInputRenderParams, TextInputService, VerticalAlign,
 };
 pub use text_layout::DrawTextParams;
-pub use ui::UiService;
+pub use ui::{UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
 
 pub struct EngineServices {

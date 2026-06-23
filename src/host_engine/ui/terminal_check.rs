@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, InputActionEvent,
   KeyState, LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService,
-  RichTextParams, StorageService, TextColor, TextStyle,
+  RichTextParams, StorageService, TextColor, TextStyle, UiObjectPool, UiObjectPoolOwner,
 };
 
 /// 检测步骤
@@ -55,11 +55,21 @@ pub(crate) struct TerminalCheckLayout {
   hint_y: u16,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TerminalCheckUi {
   step: usize,
   /// 每个步骤内部的选择索引
   selected_index: usize,
+  objects: UiObjectPool,
+}
+
+impl UiObjectPoolOwner for TerminalCheckUi {
+  fn objects(&self) -> &UiObjectPool {
+    &self.objects
+  }
+
+  fn objects_mut(&mut self) -> &mut UiObjectPool {
+    &mut self.objects
+  }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -77,6 +87,7 @@ impl TerminalCheckUi {
     Self {
       step: STEP_UNICODE,
       selected_index: 0,
+      objects: UiObjectPool::new(),
     }
   }
 
@@ -355,7 +366,11 @@ impl TerminalCheckUi {
       .collect();
     for i in 0..UNICODE_OPTIONS {
       let text = if i == self.selected_index {
-        let fg = if self.is_exit_option(i) { "bright_red" } else { "bright_cyan" };
+        let fg = if self.is_exit_option(i) {
+          "bright_red"
+        } else {
+          "bright_cyan"
+        };
         format!("f%<fg:{}>{}</fg>", fg, option_texts[i])
       } else {
         option_texts[i].clone()
@@ -549,7 +564,11 @@ impl TerminalCheckUi {
       .collect();
     for i in 0..COLOR_OPTIONS {
       let text = if i == self.selected_index {
-        let fg = if self.is_exit_option(i) { "bright_red" } else { "bright_cyan" };
+        let fg = if self.is_exit_option(i) {
+          "bright_red"
+        } else {
+          "bright_cyan"
+        };
         format!("f%<fg:{}>{}</fg>", fg, option_texts[i])
       } else {
         option_texts[i].clone()

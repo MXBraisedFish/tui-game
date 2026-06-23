@@ -17,6 +17,7 @@ pub enum TerminalKeyCode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TerminalKeyEvent {
   pub code: TerminalKeyCode,
+  pub ctrl: bool,
 }
 
 /// 终端尺寸变化事件。
@@ -96,12 +97,14 @@ mod tests {
   fn terminal_key_event_can_be_constructed() {
     let event = SystemEvent::TerminalKey(TerminalKeyEvent {
       code: TerminalKeyCode::Char('我'),
+      ctrl: false,
     });
 
     assert_eq!(
       event,
       SystemEvent::TerminalKey(TerminalKeyEvent {
         code: TerminalKeyCode::Char('我'),
+        ctrl: false,
       })
     );
   }

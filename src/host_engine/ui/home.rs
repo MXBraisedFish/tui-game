@@ -15,6 +15,7 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, InputActionEvent, KeyState, LayoutService,
   MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, TextColor,
+  UiObjectPool, UiObjectPoolOwner,
 };
 
 use crate::host_engine::services::I18nService;
@@ -72,9 +73,19 @@ pub(crate) struct HomeLayout {
   action_hint_y: u16,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HomeUi {
   selected_index: usize,
+  objects: UiObjectPool,
+}
+
+impl UiObjectPoolOwner for HomeUi {
+  fn objects(&self) -> &UiObjectPool {
+    &self.objects
+  }
+
+  fn objects_mut(&mut self) -> &mut UiObjectPool {
+    &mut self.objects
+  }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -88,7 +99,10 @@ pub enum HomeUiCommand {
 
 impl HomeUi {
   pub fn init() -> Self {
-    Self { selected_index: 0 }
+    Self {
+      selected_index: 0,
+      objects: UiObjectPool::new(),
+    }
   }
 
   // ── 输入绑定 ──
