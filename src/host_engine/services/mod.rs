@@ -1,4 +1,5 @@
 mod canvas;
+mod clipboard;
 mod game;
 mod i18n;
 mod image;
@@ -20,12 +21,14 @@ mod ui;
 mod unicode;
 
 pub use canvas::{CanvasCell, CanvasService};
+pub use clipboard::ClipboardService;
 pub use game::GameService;
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};
 pub use input::{
-  ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton, MouseEvent,
-  MouseEventKind, SystemEvent, TerminalKeyCode, TerminalKeyEvent, translate_action_map,
+  ActionMapEntry, InputActionEvent, InputEventType, InputService, Key, KeyEventKind, KeyState,
+  MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, SystemEvent, TerminalKeyCode,
+  TerminalKeyEvent, translate_action_map,
 };
 pub use layout::{LayoutService, Rect};
 pub use log::{LogService, LogSource};
@@ -47,6 +50,7 @@ pub use unicode::UnicodeService;
 
 pub struct EngineServices {
   pub package: PackageService,
+  pub clipboard: ClipboardService,
   pub input: InputService,
   pub ui: UiService,
   pub game: GameService,
@@ -73,6 +77,7 @@ impl EngineServices {
 
     Self {
       terminal: TerminalService::new(),
+      clipboard: ClipboardService::new(),
       text_input: TextInputService::new(),
       package: PackageService::new(),
       input: InputService::new(),

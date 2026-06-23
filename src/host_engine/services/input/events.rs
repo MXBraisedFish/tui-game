@@ -10,6 +10,8 @@ pub enum TerminalKeyCode {
   Delete,
   Left,
   Right,
+  Up,
+  Down,
   Home,
   End,
 }
@@ -18,6 +20,7 @@ pub enum TerminalKeyCode {
 pub struct TerminalKeyEvent {
   pub code: TerminalKeyCode,
   pub ctrl: bool,
+  pub shift: bool,
 }
 
 /// 终端尺寸变化事件。
@@ -98,6 +101,7 @@ mod tests {
     let event = SystemEvent::TerminalKey(TerminalKeyEvent {
       code: TerminalKeyCode::Char('我'),
       ctrl: false,
+      shift: false,
     });
 
     assert_eq!(
@@ -105,6 +109,7 @@ mod tests {
       SystemEvent::TerminalKey(TerminalKeyEvent {
         code: TerminalKeyCode::Char('我'),
         ctrl: false,
+        shift: false,
       })
     );
   }

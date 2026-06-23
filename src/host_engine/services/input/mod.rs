@@ -8,4 +8,6 @@ pub use events::{
   MouseButton, MouseEvent, MouseEventKind, SystemEvent, TerminalKeyCode, TerminalKeyEvent,
 };
 pub use key_token::format_key_display;
-pub use service::{InputActionEvent, InputService, KeyState};
+pub use service::{
+  InputActionEvent, InputEventType, InputService, Key, KeyEventKind, KeyState, RawKeyEvent,
+};

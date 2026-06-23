@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::sync::{
   Arc,
   atomic::{AtomicBool, Ordering},
@@ -19,6 +19,7 @@ use super::events::{
   FocusEvent, MouseButton, MouseEvent, MouseEventKind, ResizeEvent, ScrollDirection, SystemEvent,
   TerminalKeyCode, TerminalKeyEvent,
 };
+use super::key_token::display_key_token;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Key {
@@ -123,6 +124,13 @@ pub struct KeyEvent {
   pub kind: KeyEventKind,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RawKeyEvent {
+  pub key: Key,
+  pub display: String,
+  pub kind: KeyEventKind,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeyState {
   Pressed,
@@ -210,6 +218,8 @@ pub struct InputService {
   mouse_y: u16,
   focused: bool,
   bindings: Vec<KeyBinding>,
+  raw_key_capture_enabled: bool,
+  raw_key_events: VecDeque<RawKeyEvent>,
 }
 
 impl InputService {
@@ -235,6 +245,8 @@ impl InputService {
       mouse_y: 0,
       focused: true,
       bindings: Vec::new(),
+      raw_key_capture_enabled: false,
+      raw_key_events: VecDeque::new(),
     }
   }
 
@@ -399,8 +411,40 @@ impl InputService {
 
   pub fn poll(&mut self) {
     while let Ok(event) = self.receiver.try_recv() {
+      if self.focused && self.raw_key_capture_enabled {
+        self.raw_key_events.push_back(RawKeyEvent {
+          key: event.key,
+          display: display_key_token(event.key),
+          kind: event.kind,
+        });
+      }
       self.apply_key_event(event);
     }
+  }
+
+  pub fn enable_raw_key_capture(&mut self) -> bool {
+    if self.raw_key_capture_enabled {
+      return false;
+    }
+    self.raw_key_events.clear();
+    self.raw_key_capture_enabled = true;
+    true
+  }
+
+  pub fn disable_raw_key_capture(&mut self) -> bool {
+    if !self.raw_key_capture_enabled {
+      return false;
+    }
+    self.raw_key_capture_enabled = false;
+    true
+  }
+
+  pub fn is_raw_key_capture_enabled(&self) -> bool {
+    self.raw_key_capture_enabled
+  }
+
+  pub fn take_raw_key_events(&mut self) -> Vec<RawKeyEvent> {
+    self.raw_key_events.drain(..).collect()
   }
 
   pub fn is_down(&self, key: Key) -> bool {
@@ -700,10 +744,20 @@ fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
     return None;
   }
 
+  let ctrl = event.modifiers.contains(CtKeyModifiers::CONTROL);
+  let shift = event.modifiers.contains(CtKeyModifiers::SHIFT);
+  let rejected =
+    CtKeyModifiers::ALT | CtKeyModifiers::SUPER | CtKeyModifiers::HYPER | CtKeyModifiers::META;
+  if event.modifiers.intersects(rejected) {
+    return None;
+  }
   let allowed_modifiers = match event.code {
-    CtKeyCode::Char(_) => event.modifiers.is_empty() || event.modifiers == CtKeyModifiers::SHIFT,
-    CtKeyCode::Enter => event.modifiers.is_empty() || event.modifiers == CtKeyModifiers::CONTROL,
-    _ => event.modifiers.is_empty(),
+    CtKeyCode::Char(ch) if ctrl => "acxv".contains(ch.to_ascii_lowercase()) && !shift,
+    CtKeyCode::Char(_) => !ctrl,
+    CtKeyCode::Enter => !shift,
+    CtKeyCode::Left | CtKeyCode::Right => true,
+    CtKeyCode::Up | CtKeyCode::Down | CtKeyCode::Home | CtKeyCode::End => !ctrl,
+    _ => !ctrl && !shift,
   };
   if !allowed_modifiers {
     return None;
@@ -717,6 +771,8 @@ fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
     CtKeyCode::Delete => TerminalKeyCode::Delete,
     CtKeyCode::Left => TerminalKeyCode::Left,
     CtKeyCode::Right => TerminalKeyCode::Right,
+    CtKeyCode::Up => TerminalKeyCode::Up,
+    CtKeyCode::Down => TerminalKeyCode::Down,
     CtKeyCode::Home => TerminalKeyCode::Home,
     CtKeyCode::End => TerminalKeyCode::End,
     _ => return None,
@@ -724,7 +780,8 @@ fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
 
   Some(SystemEvent::TerminalKey(TerminalKeyEvent {
     code,
-    ctrl: event.modifiers == CtKeyModifiers::CONTROL,
+    ctrl,
+    shift,
   }))
 }
 
@@ -802,6 +859,77 @@ mod tests {
   }
 
   #[test]
+  fn raw_key_capture_runs_alongside_action_map() {
+    let mut input = InputService::new();
+    input.load_key_bindings(vec![KeyBinding {
+      pattern: KeyPattern::Single(Key::A),
+      action: "test.a".to_string(),
+    }]);
+    assert!(input.enable_raw_key_capture());
+    assert!(!input.enable_raw_key_capture());
+
+    input
+      .sender
+      .send(KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Press,
+      })
+      .unwrap();
+    input.poll();
+
+    assert_eq!(
+      input.take_raw_key_events(),
+      vec![RawKeyEvent {
+        key: Key::A,
+        display: "A".to_string(),
+        kind: KeyEventKind::Press,
+      }]
+    );
+    assert_eq!(input.collect_action_events()[0].action, "test.a");
+    assert_eq!(input.collect_action_events()[0].state, KeyState::Pressed);
+  }
+
+  #[test]
+  fn raw_key_capture_disable_preserves_events_and_enable_starts_clean() {
+    let mut input = InputService::new();
+    input.enable_raw_key_capture();
+    input
+      .sender
+      .send(KeyEvent {
+        key: Key::Left,
+        kind: KeyEventKind::Press,
+      })
+      .unwrap();
+    input.poll();
+    assert!(input.disable_raw_key_capture());
+    assert!(!input.disable_raw_key_capture());
+    assert_eq!(input.take_raw_key_events()[0].display, "←");
+
+    input.enable_raw_key_capture();
+    input
+      .sender
+      .send(KeyEvent {
+        key: Key::Left,
+        kind: KeyEventKind::Release,
+      })
+      .unwrap();
+    input.poll();
+    assert_eq!(input.take_raw_key_events()[0].kind, KeyEventKind::Release);
+
+    input
+      .sender
+      .send(KeyEvent {
+        key: Key::B,
+        kind: KeyEventKind::Press,
+      })
+      .unwrap();
+    input.poll();
+    input.disable_raw_key_capture();
+    input.enable_raw_key_capture();
+    assert!(input.take_raw_key_events().is_empty());
+  }
+
+  #[test]
   fn terminal_key_event_from_crossterm_maps_supported_keys() {
     let cases = [
       (CtKeyCode::Char('a'), TerminalKeyCode::Char('a')),
@@ -812,6 +940,8 @@ mod tests {
       (CtKeyCode::Delete, TerminalKeyCode::Delete),
       (CtKeyCode::Left, TerminalKeyCode::Left),
       (CtKeyCode::Right, TerminalKeyCode::Right),
+      (CtKeyCode::Up, TerminalKeyCode::Up),
+      (CtKeyCode::Down, TerminalKeyCode::Down),
       (CtKeyCode::Home, TerminalKeyCode::Home),
       (CtKeyCode::End, TerminalKeyCode::End),
     ];
@@ -850,10 +980,35 @@ mod tests {
       Some(TerminalKeyEvent {
         code: TerminalKeyCode::Enter,
         ctrl: true,
+        shift: false,
       })
     );
+    assert_eq!(
+      terminal_event(CtKeyEvent::new(
+        CtKeyCode::Char('a'),
+        CtKeyModifiers::CONTROL,
+      )),
+      Some(TerminalKeyEvent {
+        code: TerminalKeyCode::Char('a'),
+        ctrl: true,
+        shift: false,
+      })
+    );
+    assert_eq!(
+      terminal_code(CtKeyEvent::new(
+        CtKeyCode::Left,
+        CtKeyModifiers::CONTROL | CtKeyModifiers::SHIFT,
+      )),
+      Some(TerminalKeyCode::Left)
+    );
+    assert_eq!(
+      terminal_code(CtKeyEvent::new(
+        CtKeyCode::Char('z'),
+        CtKeyModifiers::CONTROL,
+      )),
+      None
+    );
     for modifiers in [
-      CtKeyModifiers::CONTROL,
       CtKeyModifiers::ALT,
       CtKeyModifiers::SUPER,
       CtKeyModifiers::HYPER,
@@ -872,10 +1027,12 @@ mod tests {
     let a = SystemEvent::TerminalKey(TerminalKeyEvent {
       code: TerminalKeyCode::Char('a'),
       ctrl: false,
+      shift: false,
     });
     let b = SystemEvent::TerminalKey(TerminalKeyEvent {
       code: TerminalKeyCode::Char('b'),
       ctrl: false,
+      shift: false,
     });
     input.system_sender.send(a).unwrap();
     input
