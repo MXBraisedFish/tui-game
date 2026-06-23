@@ -9,9 +9,9 @@ use crate::host_engine::services::{
 };
 
 use crate::host_engine::ui::{
-  self, HomeLayout, HomeUi, HomeUiCommand, LanguageSelectCommand, LanguageSelectLayout,
-  LanguageSelectUi, ModsCommand, ModsLayout, ModsUi, SettingsLayout, SettingsUi,
-  SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
+  self, HomeLayout, HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageSelectCommand,
+  LanguageSelectLayout, LanguageSelectUi, ModsCommand, ModsLayout, ModsUi, SettingsLayout,
+  SettingsUi, SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
   WindowSizeWarningCommand,
 };
 
@@ -45,6 +45,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
   let mut mods_ui = ModsUi::init();
+  let mut input_demo_ui = InputDemoUi::init();
 
   // 初始 UI 节点
   // 1) 无语言 → LanguageSelect
@@ -64,7 +65,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     services.input.begin_frame();
     services.input.poll();
-    services.input.dispatch_action_events();
 
     // resize 事件：更新画布尺寸并标记强制重绘
     services.input.poll_resize_events(|w, h| {
@@ -79,9 +79,22 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     // 窗口尺寸检查与覆盖层管理
     manage_window_size_overlay(services, world);
 
-    // 按当前状态加载 action map：覆盖层优先
+    // 输入所有权：覆盖层 > 文本输入 > 当前页面 action map
     if world.state.current_overlay_kind().is_some() {
       load_window_size_action_map(services);
+      services.input.dispatch_action_events();
+      route_input_events(
+        services,
+        world,
+        &mut home_ui,
+        &mut settings_ui,
+        language_select_ui.as_mut(),
+        &mut terminal_check_ui,
+        &mut mods_ui,
+        &mut input_demo_ui,
+      );
+    } else if services.text_input.is_active() {
+      route_text_input_events(services, world, &mut input_demo_ui);
     } else {
       match world.state.current_ui_kind() {
         Some(UiNodeKind::Home) => load_home_action_map(services),
@@ -89,19 +102,21 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         Some(UiNodeKind::LanguageSelect) => load_language_select_action_map(services),
         Some(UiNodeKind::Mods) => load_mods_action_map(services),
         Some(UiNodeKind::TerminalCheck) => load_terminal_check_action_map(services),
+        Some(UiNodeKind::InputDemo) => load_input_demo_action_map(services),
         _ => {}
       }
+      services.input.dispatch_action_events();
+      route_input_events(
+        services,
+        world,
+        &mut home_ui,
+        &mut settings_ui,
+        language_select_ui.as_mut(),
+        &mut terminal_check_ui,
+        &mut mods_ui,
+        &mut input_demo_ui,
+      );
     }
-
-    route_input_events(
-      services,
-      world,
-      &mut home_ui,
-      &mut settings_ui,
-      language_select_ui.as_mut(),
-      &mut terminal_check_ui,
-      &mut mods_ui,
-    );
 
     if world.is_stopped() {
       break;
@@ -115,13 +130,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
+      &mut input_demo_ui,
     );
 
     if world.is_stopped() {
       break;
     }
 
-    route_render(
+    let input_cursor = route_render(
       services,
       world,
       &home_ui,
@@ -129,13 +145,17 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_ref(),
       &terminal_check_ui,
       &mods_ui,
+      &input_demo_ui,
     );
 
     let text_force_redraw = services.canvas.take_render_requested();
     let composed = services.compositor.compose(&services.canvas);
-    let _ = services
-      .presenter
-      .present(&composed, &mut services.terminal, text_force_redraw);
+    let _ = services.presenter.present(
+      &composed,
+      &mut services.terminal,
+      text_force_redraw,
+      input_cursor,
+    );
 
     scheduler.wait_for_next_frame();
   }
@@ -187,6 +207,26 @@ fn load_window_size_action_map(services: &mut EngineServices) {
   services.input.load_key_bindings(bindings);
 }
 
+fn load_input_demo_action_map(services: &mut EngineServices) {
+  let bindings = translate_action_map(&InputDemoUi::action_map())
+    .expect("failed to translate InputDemoUi action map");
+  services.input.load_key_bindings(bindings);
+}
+
+fn route_text_input_events(
+  services: &mut EngineServices,
+  world: &RuntimeWorld,
+  input_demo_ui: &mut InputDemoUi,
+) {
+  for event in services.input.drain_system_events() {
+    if let SystemEvent::TerminalKey(key) = event {
+      if world.state.current_ui_kind() == Some(UiNodeKind::InputDemo) {
+        input_demo_ui.route_terminal_key(&mut services.text_input, key);
+      }
+    }
+  }
+}
+
 fn route_input_events(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
@@ -195,6 +235,7 @@ fn route_input_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  input_demo_ui: &mut InputDemoUi,
 ) {
   // 覆盖层输入优先
   if world.state.current_overlay_kind().is_some() {
@@ -231,6 +272,7 @@ fn route_input_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      input_demo_ui,
     );
 
     if world.is_stopped() {
@@ -306,6 +348,9 @@ fn route_input_events(
         }
       }
     }
+    Some(UiNodeKind::InputDemo) => {
+      let _ = services.input.drain_system_events();
+    }
     _ => {
       let _ = services.input.drain_system_events();
     }
@@ -321,6 +366,7 @@ fn route_input_event(
   language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  input_demo_ui: &mut InputDemoUi,
 ) {
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
@@ -348,6 +394,11 @@ fn route_input_event(
     Some(UiNodeKind::TerminalCheck) => {
       if let Some(command) = terminal_check_ui.handle_event(event) {
         apply_terminal_check_command(command, terminal_check_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::InputDemo) => {
+      if let Some(command) = input_demo_ui.handle_event(event) {
+        apply_input_demo_command(command, input_demo_ui, services, world);
       }
     }
     _ => {}
@@ -446,6 +497,7 @@ fn route_update(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  input_demo_ui: &mut InputDemoUi,
 ) {
   // 覆盖层无逐帧逻辑
   if world.state.current_overlay_kind().is_some() {
@@ -477,6 +529,9 @@ fn route_update(
         apply_terminal_check_command(command, terminal_check_ui, services, world);
       }
     }
+    Some(UiNodeKind::InputDemo) => {
+      input_demo_ui.update(&mut services.text_input);
+    }
     _ => {}
   }
 }
@@ -489,7 +544,8 @@ fn route_render(
   language_select_ui: Option<&LanguageSelectUi>,
   terminal_check_ui: &TerminalCheckUi,
   mods_ui: &ModsUi,
-) {
+  input_demo_ui: &InputDemoUi,
+) -> Option<(u16, u16)> {
   // 覆盖层渲染优先
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
     let runtime = world.state.runtime().unwrap();
@@ -509,7 +565,7 @@ fn route_render(
       term.height,
       world.state.is_host_mode(),
     );
-    return;
+    return None;
   }
 
   match world.state.current_ui_kind() {
@@ -520,6 +576,7 @@ fn route_render(
         &services.layout,
         &services.i18n,
       );
+      None
     }
     Some(UiNodeKind::Settings) => {
       settings_ui.render(
@@ -528,6 +585,7 @@ fn route_render(
         &services.layout,
         &services.i18n,
       );
+      None
     }
     Some(UiNodeKind::LanguageSelect) => {
       if let Some(ui) = language_select_ui {
@@ -538,6 +596,7 @@ fn route_render(
           &services.i18n,
         );
       }
+      None
     }
     Some(UiNodeKind::Mods) => {
       mods_ui.render(
@@ -546,6 +605,7 @@ fn route_render(
         &services.layout,
         &services.i18n,
       );
+      None
     }
     Some(UiNodeKind::TerminalCheck) => {
       terminal_check_ui.render(
@@ -554,8 +614,15 @@ fn route_render(
         &services.layout,
         &services.i18n,
       );
+      None
     }
-    _ => {}
+    Some(UiNodeKind::InputDemo) => input_demo_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      services.text_input.active_input(),
+    ),
+    _ => None,
   }
 }
 
@@ -574,7 +641,23 @@ fn apply_home_command(command: HomeUiCommand, world: &mut RuntimeWorld) {
     HomeUiCommand::OpenSettings => {
       world.state.enter_ui_node(UiNodeState::settings());
     }
-    HomeUiCommand::OpenAbout => {}
+    HomeUiCommand::OpenAbout => {
+      world.state.enter_ui_node(UiNodeState::input_demo());
+    }
+  }
+}
+
+fn apply_input_demo_command(
+  command: InputDemoCommand,
+  input_demo_ui: &mut InputDemoUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    InputDemoCommand::FocusInput => input_demo_ui.focus(&mut services.text_input),
+    InputDemoCommand::Back => {
+      world.state.pop_ui_node();
+    }
   }
 }
 

@@ -2,6 +2,7 @@ mod about;
 mod game_list;
 mod settings;
 
+pub use about::{InputDemoCommand, InputDemoUi};
 pub(crate) use settings::SettingsLayout;
 pub(crate) use settings::language::LanguageSelectLayout;
 pub use settings::language::{LanguageSelectCommand, LanguageSelectUi};

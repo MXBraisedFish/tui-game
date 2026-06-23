@@ -9,13 +9,15 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use crossterm::event::{
-  self as ct_event, Event as CtEvent, MouseEvent as CtMouseEvent,
+  self as ct_event, Event as CtEvent, KeyCode as CtKeyCode, KeyEvent as CtKeyEvent,
+  KeyEventKind as CtKeyEventKind, KeyModifiers as CtKeyModifiers, MouseEvent as CtMouseEvent,
   MouseEventKind as CtMouseEventKind,
 };
 use rdev::{Event, EventType, Key as RdevKey, listen};
 
 use super::events::{
   FocusEvent, MouseButton, MouseEvent, MouseEventKind, ResizeEvent, ScrollDirection, SystemEvent,
+  TerminalKeyCode, TerminalKeyEvent,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -272,7 +274,11 @@ impl InputService {
         if ct_event::poll(poll_interval).unwrap_or(false) {
           if let Ok(ct_event) = ct_event::read() {
             match ct_event {
-              CtEvent::Key(_) => {}
+              CtEvent::Key(key_event) => {
+                if let Some(event) = terminal_key_event_from_crossterm(key_event) {
+                  let _ = sender.send(event);
+                }
+              }
               other_event => {
                 if let Some(sys_event) = system_event_from_crossterm(other_event) {
                   let _ = sender.send(sys_event);
@@ -689,6 +695,35 @@ fn key_event_from_rdev(event: Event) -> Option<KeyEvent> {
 
 // ── crossterm 系统事件转换 ──
 
+fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
+  if event.kind == CtKeyEventKind::Release {
+    return None;
+  }
+
+  let allowed_modifiers = match event.code {
+    CtKeyCode::Char(_) => event.modifiers.is_empty() || event.modifiers == CtKeyModifiers::SHIFT,
+    _ => event.modifiers.is_empty(),
+  };
+  if !allowed_modifiers {
+    return None;
+  }
+
+  let code = match event.code {
+    CtKeyCode::Char(ch) if !ch.is_control() => TerminalKeyCode::Char(ch),
+    CtKeyCode::Enter => TerminalKeyCode::Enter,
+    CtKeyCode::Esc => TerminalKeyCode::Esc,
+    CtKeyCode::Backspace => TerminalKeyCode::Backspace,
+    CtKeyCode::Delete => TerminalKeyCode::Delete,
+    CtKeyCode::Left => TerminalKeyCode::Left,
+    CtKeyCode::Right => TerminalKeyCode::Right,
+    CtKeyCode::Home => TerminalKeyCode::Home,
+    CtKeyCode::End => TerminalKeyCode::End,
+    _ => return None,
+  };
+
+  Some(SystemEvent::TerminalKey(TerminalKeyEvent { code }))
+}
+
 fn system_event_from_crossterm(event: CtEvent) -> Option<SystemEvent> {
   match event {
     CtEvent::Resize(width, height) => Some(SystemEvent::Resize(ResizeEvent { width, height })),
@@ -737,5 +772,105 @@ fn mouse_button_from_crossterm(button: crossterm::event::MouseButton) -> MouseBu
     crossterm::event::MouseButton::Left => MouseButton::Left,
     crossterm::event::MouseButton::Middle => MouseButton::Middle,
     crossterm::event::MouseButton::Right => MouseButton::Right,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn key(code: CtKeyCode) -> CtKeyEvent {
+    CtKeyEvent::new(code, CtKeyModifiers::NONE)
+  }
+
+  fn terminal_code(event: CtKeyEvent) -> Option<TerminalKeyCode> {
+    match terminal_key_event_from_crossterm(event) {
+      Some(SystemEvent::TerminalKey(event)) => Some(event.code),
+      _ => None,
+    }
+  }
+
+  #[test]
+  fn terminal_key_event_from_crossterm_maps_supported_keys() {
+    let cases = [
+      (CtKeyCode::Char('a'), TerminalKeyCode::Char('a')),
+      (CtKeyCode::Char('我'), TerminalKeyCode::Char('我')),
+      (CtKeyCode::Enter, TerminalKeyCode::Enter),
+      (CtKeyCode::Esc, TerminalKeyCode::Esc),
+      (CtKeyCode::Backspace, TerminalKeyCode::Backspace),
+      (CtKeyCode::Delete, TerminalKeyCode::Delete),
+      (CtKeyCode::Left, TerminalKeyCode::Left),
+      (CtKeyCode::Right, TerminalKeyCode::Right),
+      (CtKeyCode::Home, TerminalKeyCode::Home),
+      (CtKeyCode::End, TerminalKeyCode::End),
+    ];
+
+    for (input, expected) in cases {
+      assert_eq!(terminal_code(key(input)), Some(expected));
+    }
+    assert_eq!(terminal_code(key(CtKeyCode::F(1))), None);
+    assert_eq!(terminal_code(key(CtKeyCode::Tab)), None);
+  }
+
+  #[test]
+  fn terminal_key_event_from_crossterm_filters_kind_and_modifiers() {
+    assert_eq!(
+      terminal_code(CtKeyEvent::new_with_kind(
+        CtKeyCode::Char('a'),
+        CtKeyModifiers::NONE,
+        CtKeyEventKind::Repeat,
+      )),
+      Some(TerminalKeyCode::Char('a'))
+    );
+    assert_eq!(
+      terminal_code(CtKeyEvent::new_with_kind(
+        CtKeyCode::Char('a'),
+        CtKeyModifiers::NONE,
+        CtKeyEventKind::Release,
+      )),
+      None
+    );
+    assert_eq!(
+      terminal_code(CtKeyEvent::new(CtKeyCode::Char('A'), CtKeyModifiers::SHIFT,)),
+      Some(TerminalKeyCode::Char('A'))
+    );
+    for modifiers in [
+      CtKeyModifiers::CONTROL,
+      CtKeyModifiers::ALT,
+      CtKeyModifiers::SUPER,
+      CtKeyModifiers::HYPER,
+      CtKeyModifiers::META,
+    ] {
+      assert_eq!(
+        terminal_code(CtKeyEvent::new(CtKeyCode::Char('a'), modifiers)),
+        None
+      );
+    }
+  }
+
+  #[test]
+  fn terminal_key_survives_resize_poll() {
+    let mut input = InputService::new();
+    let a = SystemEvent::TerminalKey(TerminalKeyEvent {
+      code: TerminalKeyCode::Char('a'),
+    });
+    let b = SystemEvent::TerminalKey(TerminalKeyEvent {
+      code: TerminalKeyCode::Char('b'),
+    });
+    input.system_sender.send(a).unwrap();
+    input
+      .system_sender
+      .send(SystemEvent::Resize(ResizeEvent {
+        width: 100,
+        height: 30,
+      }))
+      .unwrap();
+    input.system_sender.send(b).unwrap();
+
+    let mut resize = None;
+    input.poll_resize_events(|width, height| resize = Some((width, height)));
+
+    assert_eq!(resize, Some((100, 30)));
+    assert_eq!(input.drain_system_events(), vec![a, b]);
   }
 }

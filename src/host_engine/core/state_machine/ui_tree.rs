@@ -18,6 +18,7 @@ pub enum UiNodeKind {
   LanguageSelect,
   Mods,
   TerminalCheck,
+  InputDemo,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,6 +72,14 @@ impl UiNodeState {
   pub fn language_select() -> Self {
     Self {
       kind: UiNodeKind::LanguageSelect,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn input_demo() -> Self {
+    Self {
+      kind: UiNodeKind::InputDemo,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

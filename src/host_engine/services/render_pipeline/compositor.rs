@@ -37,7 +37,7 @@ mod tests {
 
     assert!(matches!(
       frame.get(1, 2),
-      Some(ComposedCell::Text(cell)) if cell.ch == 'a'
+      Some(ComposedCell::Text(cell)) if cell.text == "a"
     ));
   }
 }

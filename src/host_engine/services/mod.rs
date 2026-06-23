@@ -1,7 +1,7 @@
 mod canvas;
 mod game;
-mod image;
 mod i18n;
+mod image;
 mod input;
 mod layout;
 mod log;
@@ -14,17 +14,18 @@ mod rich_text;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
+mod text_input;
 pub mod text_layout;
 mod ui;
 mod unicode;
 
 pub use canvas::{CanvasCell, CanvasService};
 pub use game::GameService;
-pub use image::{ImageConvertParams, ImageService};
 pub use i18n::{I18nService, LanguageRegistryEntry};
+pub use image::{ImageConvertParams, ImageService};
 pub use input::{
   ActionMapEntry, InputActionEvent, InputService, KeyState, MouseButton, MouseEvent,
-  MouseEventKind, SystemEvent, translate_action_map,
+  MouseEventKind, SystemEvent, TerminalKeyCode, TerminalKeyEvent, translate_action_map,
 };
 pub use layout::{LayoutService, Rect};
 pub use log::{LogService, LogSource};
@@ -36,6 +37,9 @@ pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
+pub use text_input::{
+  InputDrawParams, InputEvent, InputId, InputOptions, TextInputService, UiObjectPool,
+};
 pub use text_layout::DrawTextParams;
 pub use ui::UiService;
 pub use unicode::UnicodeService;
@@ -51,6 +55,7 @@ pub struct EngineServices {
   pub lua: LuaService,
   pub render: RenderService,
   pub terminal: TerminalService,
+  pub text_input: TextInputService,
   pub log: LogService,
   pub i18n: I18nService,
   pub rich_text: RichTextService,
@@ -67,6 +72,7 @@ impl EngineServices {
 
     Self {
       terminal: TerminalService::new(),
+      text_input: TextInputService::new(),
       package: PackageService::new(),
       input: InputService::new(),
       ui: UiService::new(),

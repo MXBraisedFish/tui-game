@@ -1,45 +1,49 @@
 use crate::host_engine::services::TextStyle;
 
-/// 标记被左侧宽字符"占用"的单元格。
-/// 终端中宽字符（如 CJK、emoji）占 2 列，
-/// 它右侧的那一格不写入独立字符，仅作为视觉延续。
-pub const WIDE_CONTINUATION: char = '\0';
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasCell {
-  pub ch: char,
+  /// 当前单元格起始位置保存的完整 grapheme cluster。
+  pub text: String,
   pub style: TextStyle,
+  continuation: bool,
 }
 
 impl CanvasCell {
   pub fn blank() -> Self {
     Self {
-      ch: ' ',
+      text: " ".to_string(),
       style: TextStyle::default(),
+      continuation: false,
     }
   }
 
-  pub fn new(ch: char) -> Self {
+  pub fn new(text: impl Into<String>) -> Self {
     Self {
-      ch,
+      text: text.into(),
       style: TextStyle::default(),
+      continuation: false,
     }
   }
 
-  pub fn styled(ch: char, style: TextStyle) -> Self {
-    Self { ch, style }
+  pub fn styled(text: impl Into<String>, style: TextStyle) -> Self {
+    Self {
+      text: text.into(),
+      style,
+      continuation: false,
+    }
   }
 
   /// 构造一个"宽字符延续"占位格。
   pub fn continuation() -> Self {
     Self {
-      ch: WIDE_CONTINUATION,
+      text: String::new(),
       style: TextStyle::default(),
+      continuation: true,
     }
   }
 
   /// 是否为"宽字符延续"占位格。
   pub fn is_continuation(&self) -> bool {
-    self.ch == WIDE_CONTINUATION
+    self.continuation
   }
 }

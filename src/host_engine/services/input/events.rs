@@ -1,4 +1,23 @@
-// ── 系统事件（resize / focus / mouse） ──
+// ── 系统事件 ──
+
+/// 文本输入关心的终端按键。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TerminalKeyCode {
+  Char(char),
+  Enter,
+  Esc,
+  Backspace,
+  Delete,
+  Left,
+  Right,
+  Home,
+  End,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TerminalKeyEvent {
+  pub code: TerminalKeyCode,
+}
 
 /// 终端尺寸变化事件。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,10 +79,30 @@ pub struct MouseEvent {
   pub y: u16,
 }
 
-/// 系统事件（键盘以外的所有输入事件）。
+/// 由终端直接提供的系统事件。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SystemEvent {
   Resize(ResizeEvent),
   Focus(FocusEvent),
   Mouse(MouseEvent),
+  TerminalKey(TerminalKeyEvent),
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn terminal_key_event_can_be_constructed() {
+    let event = SystemEvent::TerminalKey(TerminalKeyEvent {
+      code: TerminalKeyCode::Char('我'),
+    });
+
+    assert_eq!(
+      event,
+      SystemEvent::TerminalKey(TerminalKeyEvent {
+        code: TerminalKeyCode::Char('我'),
+      })
+    );
+  }
 }

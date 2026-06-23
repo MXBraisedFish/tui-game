@@ -1,4 +1,4 @@
-use crate::host_engine::services::{CanvasCell, TextStyle};
+use crate::host_engine::services::CanvasCell;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ComposedCell {
@@ -46,10 +46,7 @@ impl ComposedFrame {
   }
 
   pub fn blank_text_cell() -> CanvasCell {
-    CanvasCell {
-      ch: ' ',
-      style: TextStyle::default(),
-    }
+    CanvasCell::blank()
   }
 
   fn index(&self, x: u16, y: u16) -> Option<usize> {

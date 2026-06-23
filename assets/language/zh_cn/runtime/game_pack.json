@@ -31,7 +31,7 @@
   "game_pack.info.author": "作者：",
   "game_pack.info.version": "版本：",
   "game_pack.info.mouse": "鼠标需求：",
-  "game_pack.info.write": "直写需求：",
+  "game_pack.info.write": "文件写入：",
   "game_pack.info.safe_mode": "安全模式：",
   "game_pack.info.debug": "调试模式：",
   "game_pack.info.status": "启用状态：",
@@ -43,15 +43,12 @@
   "game_pack.info.debug.on": "开启",
   "game_pack.info.status.off": "禁用",
   "game_pack.info.status.on": "启用",
-
   "game_pack.list.sort.title": "包标题",
   "game_pack.list.sort.author": "作者",
   "game_pack.list.sort.status": "启用状态",
   "game_pack.list.sort.debug": "调试模式",
   "game_pack.list.sort.safe_mode": "安全模式",
-
   "game_pack.list.order.ascending": "正序↓",
   "game_pack.list.order.descending": "倒序↑",
-
   "game_pack.list.search.placeholder": "🔍搜索游戏包"
 }

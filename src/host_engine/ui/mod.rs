@@ -4,8 +4,8 @@ pub(crate) mod window_size_warning;
 
 pub(crate) use home::{HomeLayout, LanguageSelectLayout, ModsLayout, SettingsLayout};
 pub use home::{
-  HomeUi, HomeUiCommand, LanguageSelectCommand, LanguageSelectUi, ModsCommand, ModsUi,
-  SettingsUi, SettingsUiCommand,
+  HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageSelectCommand, LanguageSelectUi,
+  ModsCommand, ModsUi, SettingsUi, SettingsUiCommand,
 };
 pub(crate) use terminal_check::TerminalCheckLayout;
 pub use terminal_check::{TerminalCheckCommand, TerminalCheckUi};

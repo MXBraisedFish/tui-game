@@ -54,7 +54,7 @@ impl CanvasService {
   /// 正确处理 Unicode 显示宽度：
   /// - 零宽字符（ZWJ、ZWS、组合标记）写入单元格但不推进光标
   /// - 普通字符（ASCII、拉丁）推进 1 格
-  /// - 宽字符（CJK、emoji、全角）推进 2 格，并标记右侧格为 WIDE_CONTINUATION
+  /// - 宽字符（CJK、emoji、全角）推进 2 格，并标记右侧格为 continuation
   pub fn styled_text(&mut self, x: u16, y: u16, text: &str, style: TextStyle) {
     let gs = graphemes(text);
     let mut cursor_x = x;
@@ -63,9 +63,6 @@ impl CanvasService {
       if cursor_x >= self.current.width() || y >= self.current.height() {
         break;
       }
-
-      // 取 grapheme 的首个 char 作为单元格内容
-      let ch = g.text.chars().next().unwrap_or(' ');
 
       if g.display_width == 0 {
         // 零宽字符：写入当前格但不推进光标（与前一字符合并于同一 Print 输出）
@@ -77,7 +74,7 @@ impl CanvasService {
         }
         self
           .current
-          .set(cursor_x, y, CanvasCell::styled(ch, final_style));
+          .set(cursor_x, y, CanvasCell::styled(&g.text, final_style));
         // cursor_x 不变
         continue;
       }
@@ -91,7 +88,7 @@ impl CanvasService {
       }
       self
         .current
-        .set(cursor_x, y, CanvasCell::styled(ch, final_style));
+        .set(cursor_x, y, CanvasCell::styled(&g.text, final_style));
 
       // 宽字符 ≥2：标记右侧连续格为 CONTINUATION
       for offset in 1..g.display_width {
@@ -178,11 +175,10 @@ mod tests {
     (0..canvas.width())
       .filter_map(|x| {
         canvas.current.get(x, y).and_then(|cell| {
-          let ch = cell.ch;
-          if cell.is_continuation() || ch == ' ' {
+          if cell.is_continuation() || cell.text == " " {
             None
           } else {
-            Some(ch)
+            Some(cell.text.as_str())
           }
         })
       })
@@ -190,9 +186,17 @@ mod tests {
   }
 
   fn raw_row_prefix(canvas: &CanvasService, y: u16, width: u16) -> String {
-    (0..width)
-      .map(|x| canvas.current.get(x, y).map(|cell| cell.ch).unwrap_or(' '))
-      .collect()
+    let mut text = String::new();
+    for x in 0..width {
+      text.push_str(
+        canvas
+          .current
+          .get(x, y)
+          .map(|cell| cell.text.as_str())
+          .unwrap_or(" "),
+      );
+    }
+    text
   }
 
   /// 模拟 home 界面的 action 提示渲染：{key:} + CJK 尾随文本。
@@ -336,8 +340,8 @@ mod tests {
 
     let c = canvas.current.get(2, 0).expect("c cell");
     let d = canvas.current.get(0, 1).expect("d cell");
-    assert_eq!(c.ch, 'c');
-    assert_eq!(d.ch, 'd');
+    assert_eq!(c.text, "c");
+    assert_eq!(d.text, "d");
     assert_eq!(
       c.style.foreground,
       Some(TextColor::Terminal(TerminalColor::Blue))
@@ -365,6 +369,16 @@ mod tests {
     canvas.styled_text(2, 3, "a", TextStyle::default());
 
     let cell = canvas.cell_at(2, 3).expect("cell");
-    assert_eq!(cell.ch, 'a');
+    assert_eq!(cell.text, "a");
+  }
+
+  #[test]
+  fn styled_text_preserves_complete_graphemes() {
+    let mut canvas = CanvasService::new();
+    canvas.styled_text(0, 0, "e\u{301}👨‍👩", TextStyle::default());
+
+    assert_eq!(canvas.cell_at(0, 0).unwrap().text, "e\u{301}");
+    assert_eq!(canvas.cell_at(1, 0).unwrap().text, "👨‍👩");
+    assert!(canvas.cell_at(2, 0).unwrap().is_continuation());
   }
 }

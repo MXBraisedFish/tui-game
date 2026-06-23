@@ -7,9 +7,7 @@ use crossterm::{
 };
 
 use super::{ComposedCell, ComposedFrame};
-use crate::host_engine::services::{
-  CanvasCell, TerminalColor, TerminalService, TextColor, TextStyle,
-};
+use crate::host_engine::services::{TerminalColor, TerminalService, TextColor, TextStyle};
 
 pub struct FramePresenter {
   previous: Option<ComposedFrame>,
@@ -33,6 +31,7 @@ impl FramePresenter {
     frame: &ComposedFrame,
     terminal: &mut TerminalService,
     text_force_redraw: bool,
+    final_cursor: Option<(u16, u16)>,
   ) -> io::Result<()> {
     let Some(stdout) = terminal.writer_mut() else {
       return Ok(());
@@ -47,6 +46,9 @@ impl FramePresenter {
     self.present_cells(stdout, frame, full_redraw)?;
 
     stdout.queue(ResetColor)?;
+    if let Some((x, y)) = final_cursor {
+      stdout.queue(MoveTo(x, y))?;
+    }
     stdout.flush()?;
 
     self.previous = Some(frame.clone());
@@ -125,12 +127,14 @@ fn queue_text_run(
   end: u16,
   style: &TextStyle,
 ) -> io::Result<()> {
-  let run_text: String = (start..end)
-    .filter_map(|x| match frame.get(x, y) {
-      Some(ComposedCell::Text(CanvasCell { ch, .. })) if *ch != '\0' => Some(*ch),
-      _ => None,
-    })
-    .collect();
+  let mut run_text = String::new();
+  for x in start..end {
+    if let Some(ComposedCell::Text(cell)) = frame.get(x, y) {
+      if !cell.is_continuation() {
+        run_text.push_str(&cell.text);
+      }
+    }
+  }
 
   if run_text.is_empty() {
     return Ok(());
@@ -192,11 +196,34 @@ fn queue_style(stdout: &mut impl Write, style: &TextStyle) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::host_engine::services::CanvasCell;
 
   #[test]
   fn previous_cell_returns_empty_for_missing_previous_frame() {
     let presenter = FramePresenter::new();
 
     assert_eq!(presenter.previous_cell(0, 0), &ComposedCell::Empty);
+  }
+
+  #[test]
+  fn queue_text_run_writes_complete_graphemes() {
+    let mut frame = ComposedFrame::new(3, 1);
+    frame.set(
+      0,
+      0,
+      ComposedCell::Text(CanvasCell::styled("e\u{301}", TextStyle::default())),
+    );
+    frame.set(
+      1,
+      0,
+      ComposedCell::Text(CanvasCell::styled("👨‍👩", TextStyle::default())),
+    );
+    frame.set(2, 0, ComposedCell::Text(CanvasCell::continuation()));
+    let mut output = Vec::new();
+
+    queue_text_run(&mut output, &frame, 0, 0, 3, &TextStyle::default()).unwrap();
+
+    let output = String::from_utf8(output).unwrap();
+    assert!(output.ends_with("e\u{301}👨‍👩"));
   }
 }
