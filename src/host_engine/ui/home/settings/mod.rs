@@ -210,8 +210,8 @@ impl SettingsUi {
   ) {
     let positions = self.compute_positions(layout, i18n);
     self.draw_content(render, canvas, &positions, i18n);
-    let terminal = layout.get_terminal_size();
-    hit_area.render(
+    let terminal = layout.physical_size();
+    hit_area.render_host(
       &mut self.objects,
       self.back_area,
       Rect {
@@ -220,9 +220,10 @@ impl SettingsUi {
         width: terminal.width,
         height: terminal.height,
       },
+      canvas,
     );
     for (id, rect) in self.menu_areas.into_iter().zip(positions.menu_item_rects) {
-      hit_area.render(&mut self.objects, id, rect);
+      hit_area.render_host(&mut self.objects, id, rect, canvas);
     }
   }
 
@@ -232,7 +233,7 @@ impl SettingsUi {
     // title —— 距离顶部 1 行，水平居中
     let title = i18n.get_runtime_text("settings", "settings.title");
     let title_w = layout.get_text_width(&format!("f%<b>{}<b>", title), None);
-    let title_x = layout.resolve_x(LayoutService::ALIGN_CENTER, title_w, 0);
+    let title_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, title_w, 0);
     let title_y: u16 = 1;
 
     // 菜单项
@@ -240,7 +241,7 @@ impl SettingsUi {
     let menu_item_widths: [u16; SETTINGS_MENU_LEN] =
       std::array::from_fn(|i| layout.get_text_width(&menu_items[i], None));
     let menu_item_xs: [u16; SETTINGS_MENU_LEN] = std::array::from_fn(|i| {
-      layout.resolve_x(LayoutService::ALIGN_CENTER, menu_item_widths[i], 0)
+      layout.resolve_host_x(LayoutService::ALIGN_CENTER, menu_item_widths[i], 0)
     });
     let menu_height = SETTINGS_MENU_LEN as u16;
 
@@ -253,8 +254,8 @@ impl SettingsUi {
       i18n.get_runtime_text("settings", "settings.action.back"),
     );
     let action_hint_w = layout.get_text_width(&action_hint, Some(&params));
-    let action_hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, action_hint_w, 0);
-    let terminal_height = layout.get_terminal_size().height;
+    let action_hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, action_hint_w, 0);
+    let terminal_height = layout.physical_size().height;
     let action_hint_y = terminal_height.saturating_sub(1);
 
     // 菜单垂直居中（在 title 和 action_hint 之间）
@@ -321,7 +322,7 @@ impl SettingsUi {
   ) {
     // title
     let title = i18n.get_runtime_text("settings", "settings.title");
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.title_x,
@@ -335,7 +336,7 @@ impl SettingsUi {
     // 菜单项
     let menu_items = self.menu_items(i18n);
     for (i, item) in menu_items.iter().enumerate() {
-      render.draw_text(
+      render.draw_host_text(
         canvas,
         &DrawTextParams {
           x: positions.menu_item_rects[i].x,
@@ -355,7 +356,7 @@ impl SettingsUi {
       i18n.get_runtime_text("settings", "settings.action.confirm"),
       i18n.get_runtime_text("settings", "settings.action.back"),
     );
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.action_hint_x,

@@ -4,4 +4,4 @@ mod service;
 mod types;
 
 pub use service::LayoutService;
-pub use types::Rect;
+pub use types::{Rect, Size};

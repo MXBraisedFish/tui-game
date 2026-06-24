@@ -230,7 +230,7 @@ impl HomeUi {
     let positions = self.compute_positions(layout, i18n);
     self.draw_content(render, canvas, &positions, i18n);
     for (id, rect) in self.menu_areas.into_iter().zip(positions.menu_item_rects) {
-      hit_area.render(&mut self.objects, id, rect);
+      hit_area.render_host(&mut self.objects, id, rect, canvas);
     }
   }
 
@@ -293,7 +293,7 @@ impl HomeUi {
       std::array::from_fn(|i| layout.get_text_width(&menu_items[i], None));
     // 每个菜单项单独居中
     let menu_item_xs: [u16; HOME_MENU_LEN] = std::array::from_fn(|i| {
-      layout.resolve_x(LayoutService::ALIGN_CENTER, menu_item_widths[i], 0)
+      layout.resolve_host_x(LayoutService::ALIGN_CENTER, menu_item_widths[i], 0)
     });
     let menu_height = HOME_MENU_LEN as u16;
 
@@ -321,9 +321,9 @@ impl HomeUi {
       .saturating_add(1) // gap
       .saturating_add(1); // 1 action hint line
 
-    let start_y = layout.resolve_y(LayoutService::ALIGN_MIDDLE, total_height, 0);
+    let start_y = layout.resolve_host_y(LayoutService::ALIGN_MIDDLE, total_height, 0);
 
-    let logo_x = layout.resolve_x(LayoutService::ALIGN_CENTER, logo_size.width, 0);
+    let logo_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, logo_size.width, 0);
     let logo_y = start_y;
 
     let menu_y = logo_y.saturating_add(logo_size.height).saturating_add(2);
@@ -335,10 +335,10 @@ impl HomeUi {
       height: 1,
     });
 
-    let version_x = layout.resolve_x(LayoutService::ALIGN_CENTER, version_width, 0);
+    let version_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, version_width, 0);
     let version_y = menu_y.saturating_add(menu_height).saturating_add(2);
 
-    let action_hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, action_hint_w, 0);
+    let action_hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, action_hint_w, 0);
     let action_hint_y = version_y.saturating_add(2);
 
     HomeLayout {
@@ -363,7 +363,7 @@ impl HomeUi {
     i18n: &I18nService,
   ) {
     let logo = style_logo(LOGO_LINES);
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.logo_x,
@@ -380,7 +380,7 @@ impl HomeUi {
 
     let menu_items = self.menu_items(i18n);
     for (i, item) in menu_items.iter().enumerate() {
-      render.draw_text(
+      render.draw_host_text(
         canvas,
         &DrawTextParams {
           x: positions.menu_item_xs[i],
@@ -392,7 +392,7 @@ impl HomeUi {
     }
 
     let version = env!("CARGO_PKG_VERSION").to_string();
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.version_x,
@@ -410,7 +410,7 @@ impl HomeUi {
       i18n.get_runtime_text("home", "home.action.select"),
       i18n.get_runtime_text("home", "home.action.confirm"),
     );
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.action_hint_x,

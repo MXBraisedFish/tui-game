@@ -69,13 +69,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     // resize 事件：更新画布尺寸并标记强制重绘
     services.input.poll_resize_events(|w, h| {
+      services.layout.resize_physical(w, h);
       services.canvas.resize(w, h);
       services.canvas.request_render();
       services.presenter.request_render();
     });
 
-    services.canvas.begin_frame();
-    services.canvas.clear();
+    services.canvas.begin_frame(&services.layout);
 
     // 窗口尺寸检查与覆盖层管理
     manage_window_size_overlay(services, world);
@@ -320,7 +320,7 @@ fn route_component_mouse(
   };
   services
     .hit_area
-    .route_mouse_event(pool, &mut services.text_input, event)
+    .route_mouse_event(pool, &mut services.text_input, &services.canvas, event)
 }
 
 fn route_mouse_and_events(
@@ -492,6 +492,7 @@ fn route_input_events(
           services.hit_area.route_mouse_event(
             window_size_ui.objects_mut(),
             &mut services.text_input,
+            &services.canvas,
             mouse,
           );
         }
@@ -733,9 +734,12 @@ fn route_render(
     let overlay = runtime.overlays().top().unwrap();
     let req_w = overlay.render.required_width;
     let req_h = overlay.render.required_height;
-    let term = services.layout.get_terminal_size();
+    let term = services.layout.physical_size();
 
     window_size_ui.objects_mut().begin_render();
+    services
+      .canvas
+      .prepare(window_size_ui.objects(), &services.layout);
     window_size_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -761,6 +765,7 @@ fn route_render(
     input_demo_ui,
   ) {
     objects.begin_render();
+    services.canvas.prepare(objects, &services.layout);
   }
 
   match world.state.current_ui_kind() {
@@ -942,7 +947,7 @@ fn apply_terminal_check_command(
 
 /// 每帧调用：当终端过小时推入覆盖层，尺寸恢复时自动弹出。
 fn manage_window_size_overlay(services: &EngineServices, world: &mut RuntimeWorld) {
-  let term = services.layout.get_terminal_size();
+  let term = services.layout.physical_size();
 
   match world.state.current_overlay_kind() {
     Some(OverlayKind::WindowSizeWarning) => {

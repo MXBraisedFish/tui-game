@@ -247,7 +247,7 @@ impl TerminalCheckUi {
       i18n.get_runtime_text("terminal", "terminal.action.exit"),
     );
 
-    let term_h = layout.get_terminal_size().height;
+    let term_h = layout.physical_size().height;
 
     let title_y: u16 = 1;
     let hint_y = term_h.saturating_sub(1);
@@ -255,7 +255,7 @@ impl TerminalCheckUi {
     let title_x = centered_x(layout, &title);
     // hint 的 {key:} 需要用 params 展开后量宽度，否则 x 位置偏左
     let hint_w = layout.get_text_width(&hint, Some(&key_params));
-    let hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0);
+    let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
 
     let option_names: [&str; UNICODE_OPTIONS] = [&yes_text, &no_text];
     let option_texts: Vec<String> = (0..UNICODE_OPTIONS)
@@ -330,7 +330,7 @@ impl TerminalCheckUi {
     );
 
     // title
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.title_x,
@@ -341,7 +341,7 @@ impl TerminalCheckUi {
     );
 
     // tip
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.tip_x,
@@ -352,7 +352,7 @@ impl TerminalCheckUi {
     );
 
     // sample
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.sample_x,
@@ -378,7 +378,7 @@ impl TerminalCheckUi {
       } else {
         option_texts[i].clone()
       };
-      render.draw_text(
+      render.draw_host_text(
         canvas,
         &DrawTextParams {
           x: positions.option_xs[i],
@@ -390,7 +390,7 @@ impl TerminalCheckUi {
     }
 
     // hint
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.hint_x,
@@ -422,14 +422,14 @@ impl TerminalCheckUi {
       i18n.get_runtime_text("terminal", "terminal.action.exit"),
     );
 
-    let term_h = layout.get_terminal_size().height;
+    let term_h = layout.physical_size().height;
 
     let title_y: u16 = 1;
     let hint_y = term_h.saturating_sub(1);
 
     let title_x = centered_x(layout, &title);
     let hint_w = layout.get_text_width(&hint, Some(&key_params));
-    let hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0);
+    let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
 
     // 选项
     let option_names: [&str; COLOR_OPTIONS] = [&yes_text, &no256_text, &no_other_text];
@@ -513,7 +513,7 @@ impl TerminalCheckUi {
     );
 
     // title
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.title_x,
@@ -524,7 +524,7 @@ impl TerminalCheckUi {
     );
 
     // tip — 黄色
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.tip_x,
@@ -535,7 +535,7 @@ impl TerminalCheckUi {
     );
 
     // 色带
-    let term_w = layout.get_terminal_size().width;
+    let term_w = layout.physical_size().width;
     let left = term_w * BAND_LEFT_PCT / 100;
     let right = term_w * BAND_RIGHT_PCT / 100;
     let band_w = right.saturating_sub(left);
@@ -548,7 +548,7 @@ impl TerminalCheckUi {
           0.0
         };
         let (r, g, b) = rainbow_at(t);
-        canvas.styled_text(
+        canvas.host_styled_text(
           left + col,
           y,
           " ",
@@ -576,7 +576,7 @@ impl TerminalCheckUi {
       } else {
         option_texts[i].clone()
       };
-      render.draw_text(
+      render.draw_host_text(
         canvas,
         &DrawTextParams {
           x: positions.option_xs[i],
@@ -588,7 +588,7 @@ impl TerminalCheckUi {
     }
 
     // hint
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.hint_x,
@@ -605,7 +605,7 @@ impl TerminalCheckUi {
   fn compute_placeholder_positions(&self, layout: &LayoutService) -> TerminalCheckLayout {
     let title = "---";
     let title_w = layout.get_text_width(title, None);
-    let title_x = layout.resolve_x(LayoutService::ALIGN_CENTER, title_w, 0);
+    let title_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, title_w, 0);
     let title_y: u16 = 1;
 
     TerminalCheckLayout {
@@ -618,7 +618,7 @@ impl TerminalCheckUi {
       option_rects: Vec::new(),
       option_xs: Vec::new(),
       hint_x: 0,
-      hint_y: layout.get_terminal_size().height.saturating_sub(1),
+      hint_y: layout.physical_size().height.saturating_sub(1),
     }
   }
 
@@ -631,9 +631,9 @@ impl TerminalCheckUi {
     let positions = self.compute_placeholder_positions(layout_svc);
     let title = format!("{} ({}/{})", self._step_title(), self.step + 1, 3);
     let title_w = layout_svc.get_text_width(&title, None);
-    let title_x = layout_svc.resolve_x(LayoutService::ALIGN_CENTER, title_w, 0);
+    let title_x = layout_svc.resolve_host_x(LayoutService::ALIGN_CENTER, title_w, 0);
 
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: title_x,
@@ -643,7 +643,7 @@ impl TerminalCheckUi {
       },
     );
 
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.hint_x,
@@ -672,19 +672,19 @@ impl TerminalCheckUi {
       i18n.get_runtime_text("terminal", "terminal.action.exit"),
     );
 
-    let term_h = layout.get_terminal_size().height;
+    let term_h = layout.physical_size().height;
 
     let title_y: u16 = 1;
     let hint_y = term_h.saturating_sub(1);
 
     let title_x = centered_x(layout, &title);
     let hint_w = layout.get_text_width(&hint, Some(&key_params));
-    let hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0);
+    let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
 
     // 矩形框：tip 宽度 + 左右内边距 + 左右边框
     let tip_w = layout.get_text_width(&tip, None);
     let box_w = tip_w + MOUSE_BOX_PADDING * 2 + 2;
-    let box_x = layout.resolve_x(LayoutService::ALIGN_CENTER, box_w, 0);
+    let box_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, box_w, 0);
 
     // 垂直居中（title 与 hint 之间）
     let available = hint_y.saturating_sub(title_y).saturating_sub(5);
@@ -759,7 +759,7 @@ impl TerminalCheckUi {
     );
 
     // title
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.title_x,
@@ -785,7 +785,7 @@ impl TerminalCheckUi {
     };
 
     // 边框矩形
-    render.draw_border_rect(
+    render.draw_host_border_rect(
       canvas,
       positions.option_rects[0].x,
       positions.option_rects[0].y,
@@ -799,7 +799,7 @@ impl TerminalCheckUi {
     );
 
     // tip 文本（矩形内部居中，颜色跟随边框）
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.tip_x,
@@ -821,7 +821,7 @@ impl TerminalCheckUi {
     } else {
       format!("f%<fg:white>{}</fg>", no_display)
     };
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.option_xs[1],
@@ -832,7 +832,7 @@ impl TerminalCheckUi {
     );
 
     // hint
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.hint_x,
@@ -950,7 +950,7 @@ impl TerminalCheckUi {
 /// 便捷函数：计算文本水平居中的 x 起始坐标。
 fn centered_x(layout: &LayoutService, text: &str) -> u16 {
   let w = layout.get_text_width(text, None);
-  layout.resolve_x(LayoutService::ALIGN_CENTER, w, 0)
+  layout.resolve_host_x(LayoutService::ALIGN_CENTER, w, 0)
 }
 
 /// 彩虹色带插值。t ∈ [0, 1]，在红橙黄绿青蓝紫之间平滑过渡。

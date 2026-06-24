@@ -5,6 +5,7 @@ pub struct CanvasBuffer {
   width: u16,
   height: u16,
   cells: Vec<CanvasCell>,
+  written: Vec<bool>,
 }
 
 impl CanvasBuffer {
@@ -14,6 +15,7 @@ impl CanvasBuffer {
       width,
       height,
       cells: vec![CanvasCell::blank(); size],
+      written: vec![false; size],
     }
   }
 
@@ -33,12 +35,14 @@ impl CanvasBuffer {
     self.height = height;
     let size = width as usize * height as usize;
     self.cells = vec![CanvasCell::blank(); size];
+    self.written = vec![false; size];
   }
 
   // 清理画布
   pub fn clear(&mut self) {
-    for cell in &mut self.cells {
+    for (cell, written) in self.cells.iter_mut().zip(&mut self.written) {
       *cell = CanvasCell::blank();
+      *written = false;
     }
   }
 
@@ -49,6 +53,7 @@ impl CanvasBuffer {
     };
     if let Some(target) = self.cells.get_mut(index) {
       *target = cell;
+      self.written[index] = true;
     }
   }
 
@@ -56,6 +61,14 @@ impl CanvasBuffer {
   pub fn get(&self, x: u16, y: u16) -> Option<&CanvasCell> {
     let index = self.index(x, y)?;
     self.cells.get(index)
+  }
+
+  pub fn is_written(&self, x: u16, y: u16) -> bool {
+    self
+      .index(x, y)
+      .and_then(|index| self.written.get(index))
+      .copied()
+      .unwrap_or(false)
   }
 
   // 获取整行文本

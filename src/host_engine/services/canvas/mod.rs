@@ -1,4 +1,4 @@
-mod buffer;
+pub(crate) mod buffer;
 mod cell;
 mod service;
 

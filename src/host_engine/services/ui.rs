@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::TextInputEvent;
 use super::hit_area::{HitAreaEvent, HitAreaId, HitAreaObjects};
 use super::input::InputActionEvent;
+use super::slice::SliceObjects;
 use super::text_input::TextInputObjects;
 
 static NEXT_POOL_ID: AtomicU64 = AtomicU64::new(1);
@@ -24,6 +25,7 @@ pub struct UiObjectPool {
   pub(crate) events: VecDeque<UiComponentEvent>,
   pub(crate) hit_areas: HitAreaObjects,
   pub(crate) text_inputs: TextInputObjects,
+  pub(crate) slices: SliceObjects,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -79,6 +81,7 @@ impl UiObjectPool {
       events: VecDeque::new(),
       hit_areas: HitAreaObjects::new(),
       text_inputs: TextInputObjects::new(),
+      slices: SliceObjects::new(),
     }
   }
 

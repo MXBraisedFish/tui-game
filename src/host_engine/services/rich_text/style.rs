@@ -18,6 +18,11 @@ pub struct TextStyle {
 pub enum TextColor {
   Terminal(TerminalColor),
   Rgb { r: u8, g: u8, b: u8 },
+  /// 透明：不覆盖画布上已有的背景色，继承底层颜色。
+  ///
+  /// 仅对 [`TextStyle::background`] 有意义；前景色使用 `Transparent` 等效于
+  /// [`None`]，不设置前景色。
+  Transparent,
 }
 
 // 终端默认16色

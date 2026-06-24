@@ -275,8 +275,8 @@ impl LanguageSelectUi {
   ) {
     let positions = self.compute_positions(layout);
     self.draw_content(render, canvas, layout, &positions);
-    let terminal = layout.get_terminal_size();
-    hit_area.render(
+    let terminal = layout.physical_size();
+    hit_area.render_host(
       &mut self.objects,
       self.back_area,
       Rect {
@@ -285,6 +285,7 @@ impl LanguageSelectUi {
         width: terminal.width,
         height: terminal.height,
       },
+      canvas,
     );
     let (start, _, _, _) = self.page_bounds();
     for (id, rect) in self.cell_areas[start..]
@@ -292,13 +293,13 @@ impl LanguageSelectUi {
       .copied()
       .zip(positions.cell_rects.iter().copied())
     {
-      hit_area.render(&mut self.objects, id, rect);
+      hit_area.render_host(&mut self.objects, id, rect, canvas);
     }
   }
 
   pub fn compute_positions(&self, layout: &LayoutService) -> LanguageSelectLayout {
-    let term_w = layout.get_terminal_size().width;
-    let term_h = layout.get_terminal_size().height;
+    let term_w = layout.physical_size().width;
+    let term_h = layout.physical_size().height;
 
     // 名称宽度（MAX_NAME_LEN 截断）
     let name_widths: Vec<u16> = self
@@ -366,7 +367,7 @@ impl LanguageSelectUi {
     // 标题
     let title = self.get_text("language.title");
     let title_w = layout.get_text_width(&title, None);
-    let title_x = layout.resolve_x(LayoutService::ALIGN_CENTER, title_w, 0);
+    let title_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, title_w, 0);
 
     // 翻页行
     let page_y = term_h.saturating_sub(3);
@@ -384,7 +385,7 @@ impl LanguageSelectUi {
       self.get_text("language.action.back"),
     );
     let hint_w = layout.get_text_width(&hint, Some(&key_params));
-    let hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0);
+    let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
     let hint_y = term_h.saturating_sub(1);
 
     LanguageSelectLayout {
@@ -555,7 +556,7 @@ impl LanguageSelectUi {
 
     // 标题
     let title = self.get_text("language.title");
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: pos.title_x,
@@ -583,7 +584,7 @@ impl LanguageSelectUi {
       // 聚焦格子先绘制外框，文本再盖在上面
       if is_focused {
         let r = &pos.cell_rects[vi];
-        render.draw_border_rect(
+        render.draw_host_border_rect(
           canvas,
           r.x,
           r.y,
@@ -597,7 +598,7 @@ impl LanguageSelectUi {
         );
       }
 
-      render.draw_text(
+      render.draw_host_text(
         canvas,
         &DrawTextParams {
           x: pos.cell_text_xs[vi],
@@ -619,7 +620,7 @@ impl LanguageSelectUi {
     let sep_x = pos.page_center;
     let tot_x = pos.page_center + 1;
 
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: cur_x,
@@ -628,7 +629,7 @@ impl LanguageSelectUi {
         ..Default::default()
       },
     );
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: sep_x,
@@ -637,7 +638,7 @@ impl LanguageSelectUi {
         ..Default::default()
       },
     );
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: tot_x,
@@ -650,7 +651,7 @@ impl LanguageSelectUi {
     // 翻页提示
     if self.page > 1 {
       let fwd = self.get_text("language.flip.forward");
-      render.draw_text(
+      render.draw_host_text(
         canvas,
         &DrawTextParams {
           x: pos.flip_forward_x,
@@ -665,7 +666,7 @@ impl LanguageSelectUi {
       let bwd = self.get_text("language.flip.backward");
       let bwd_w = layout.get_text_width(&bwd, Some(&key_params));
       let bwd_x = pos.flip_backward_max_x.saturating_sub(bwd_w);
-      render.draw_text(
+      render.draw_host_text(
         canvas,
         &DrawTextParams {
           x: bwd_x,
@@ -685,7 +686,7 @@ impl LanguageSelectUi {
       self.get_text("language.action.confirm"),
       self.get_text("language.action.back"),
     );
-    render.draw_text(
+    render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: pos.hint_x,

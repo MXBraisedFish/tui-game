@@ -1,6 +1,13 @@
 use super::BorderStyle;
 use crate::host_engine::services::unicode::char_width;
-use crate::host_engine::services::{CanvasService, DrawTextParams, TextColor, TextStyle};
+use crate::host_engine::services::{CanvasService, DrawTextParams, SliceId, TextColor, TextStyle};
+
+#[derive(Clone, Copy)]
+enum Target {
+  Base,
+  Slice(SliceId),
+  Host,
+}
 
 /// 渲染服务 —— 当前为薄壳，直接委托给 CanvasService。
 ///
@@ -15,7 +22,20 @@ impl RenderService {
   /// 唯一的绘制入口。
   /// 委托给 `canvas.text()`，由其内部完成 f% 路由和样式解析。
   pub fn draw_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
-    canvas.text(params);
+    self.draw_text_target(canvas, Target::Base, params);
+  }
+
+  pub fn draw_text_on(
+    &mut self,
+    canvas: &mut CanvasService,
+    slice: SliceId,
+    params: &DrawTextParams,
+  ) -> bool {
+    canvas.text_on(slice, params)
+  }
+
+  pub(crate) fn draw_host_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
+    self.draw_text_target(canvas, Target::Host, params);
   }
 
   // ── 矩形绘制 ──
@@ -34,6 +54,87 @@ impl RenderService {
     fill_fg: Option<TextColor>,
     fill_bg: Option<TextColor>,
   ) {
+    self.draw_filled_rect_target(
+      canvas,
+      Target::Base,
+      x,
+      y,
+      width,
+      height,
+      fill_char,
+      fill_fg,
+      fill_bg,
+    );
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub fn draw_filled_rect_on(
+    &mut self,
+    canvas: &mut CanvasService,
+    slice: SliceId,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    fill_char: Option<String>,
+    fill_fg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+  ) -> bool {
+    if canvas.slice_rect(slice).is_none() {
+      return false;
+    }
+    self.draw_filled_rect_target(
+      canvas,
+      Target::Slice(slice),
+      x,
+      y,
+      width,
+      height,
+      fill_char,
+      fill_fg,
+      fill_bg,
+    );
+    true
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub(crate) fn draw_host_filled_rect(
+    &mut self,
+    canvas: &mut CanvasService,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    fill_char: Option<String>,
+    fill_fg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+  ) {
+    self.draw_filled_rect_target(
+      canvas,
+      Target::Host,
+      x,
+      y,
+      width,
+      height,
+      fill_char,
+      fill_fg,
+      fill_bg,
+    );
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  fn draw_filled_rect_target(
+    &mut self,
+    canvas: &mut CanvasService,
+    target: Target,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    fill_char: Option<String>,
+    fill_fg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+  ) {
     let ch = match fill_char {
       Some(ref s) if !s.is_empty() => {
         let c = s.chars().next().unwrap_or(' ');
@@ -44,8 +145,9 @@ impl RenderService {
 
     let fill_str: String = std::iter::repeat(ch).take(width as usize).collect();
     for row in 0..height {
-      self.draw_text(
+      self.draw_text_target(
         canvas,
+        target,
         &DrawTextParams {
           x,
           y: y.saturating_add(row),
@@ -67,6 +169,99 @@ impl RenderService {
   pub fn draw_border_rect(
     &mut self,
     canvas: &mut CanvasService,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    border_style: &BorderStyle,
+    border_fg: Option<TextColor>,
+    border_bg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+    border_attrs: Option<TextStyle>,
+  ) {
+    self.draw_border_rect_target(
+      canvas,
+      Target::Base,
+      x,
+      y,
+      width,
+      height,
+      border_style,
+      border_fg,
+      border_bg,
+      fill_bg,
+      border_attrs,
+    );
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub fn draw_border_rect_on(
+    &mut self,
+    canvas: &mut CanvasService,
+    slice: SliceId,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    border_style: &BorderStyle,
+    border_fg: Option<TextColor>,
+    border_bg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+    border_attrs: Option<TextStyle>,
+  ) -> bool {
+    if canvas.slice_rect(slice).is_none() {
+      return false;
+    }
+    self.draw_border_rect_target(
+      canvas,
+      Target::Slice(slice),
+      x,
+      y,
+      width,
+      height,
+      border_style,
+      border_fg,
+      border_bg,
+      fill_bg,
+      border_attrs,
+    );
+    true
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub(crate) fn draw_host_border_rect(
+    &mut self,
+    canvas: &mut CanvasService,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    border_style: &BorderStyle,
+    border_fg: Option<TextColor>,
+    border_bg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+    border_attrs: Option<TextStyle>,
+  ) {
+    self.draw_border_rect_target(
+      canvas,
+      Target::Host,
+      x,
+      y,
+      width,
+      height,
+      border_style,
+      border_fg,
+      border_bg,
+      fill_bg,
+      border_attrs,
+    );
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  fn draw_border_rect_target(
+    &mut self,
+    canvas: &mut CanvasService,
+    target: Target,
     x: u16,
     y: u16,
     width: u16,
@@ -121,17 +316,18 @@ impl RenderService {
     };
 
     // 顶行
-    self.draw_border_cell(canvas, x, y, lt_ch, &lt_s);
-    self.draw_border_span(canvas, x.saturating_add(1), y, t_ch, mid_w, &t_s);
-    self.draw_border_cell(canvas, x.saturating_add(width - 1), y, rt_ch, &rt_s);
+    self.draw_border_cell(canvas, target, x, y, lt_ch, &lt_s);
+    self.draw_border_span(canvas, target, x.saturating_add(1), y, t_ch, mid_w, &t_s);
+    self.draw_border_cell(canvas, target, x.saturating_add(width - 1), y, rt_ch, &rt_s);
 
     // 中间行
     let space_str: String = std::iter::repeat(' ').take(mid_w as usize).collect();
     for row in 1..=mid_h {
       let cy = y.saturating_add(row);
-      self.draw_border_cell(canvas, x, cy, l_ch, &l_s);
-      self.draw_text(
+      self.draw_border_cell(canvas, target, x, cy, l_ch, &l_s);
+      self.draw_text_target(
         canvas,
+        target,
         &DrawTextParams {
           x: x.saturating_add(1),
           y: cy,
@@ -140,14 +336,29 @@ impl RenderService {
           ..Default::default()
         },
       );
-      self.draw_border_cell(canvas, x.saturating_add(width - 1), cy, r_ch, &r_s);
+      self.draw_border_cell(canvas, target, x.saturating_add(width - 1), cy, r_ch, &r_s);
     }
 
     // 底行
     let bot_y = y.saturating_add(height - 1);
-    self.draw_border_cell(canvas, x, bot_y, lb_ch, &lb_s);
-    self.draw_border_span(canvas, x.saturating_add(1), bot_y, b_ch, mid_w, &b_s);
-    self.draw_border_cell(canvas, x.saturating_add(width - 1), bot_y, rb_ch, &rb_s);
+    self.draw_border_cell(canvas, target, x, bot_y, lb_ch, &lb_s);
+    self.draw_border_span(
+      canvas,
+      target,
+      x.saturating_add(1),
+      bot_y,
+      b_ch,
+      mid_w,
+      &b_s,
+    );
+    self.draw_border_cell(
+      canvas,
+      target,
+      x.saturating_add(width - 1),
+      bot_y,
+      rb_ch,
+      &rb_s,
+    );
   }
 
   // ── 内部辅助 ──
@@ -156,13 +367,15 @@ impl RenderService {
   fn draw_border_cell(
     &mut self,
     canvas: &mut CanvasService,
+    target: Target,
     x: u16,
     y: u16,
     ch: char,
     style: &TextStyle,
   ) {
-    self.draw_text(
+    self.draw_text_target(
       canvas,
+      target,
       &DrawTextParams {
         x,
         y,
@@ -186,6 +399,7 @@ impl RenderService {
   fn draw_border_span(
     &mut self,
     canvas: &mut CanvasService,
+    target: Target,
     x: u16,
     y: u16,
     ch: char,
@@ -193,8 +407,9 @@ impl RenderService {
     style: &TextStyle,
   ) {
     let text: String = std::iter::repeat(ch).take(count as usize).collect();
-    self.draw_text(
+    self.draw_text_target(
       canvas,
+      target,
       &DrawTextParams {
         x,
         y,
@@ -212,5 +427,20 @@ impl RenderService {
         ..Default::default()
       },
     );
+  }
+
+  fn draw_text_target(
+    &mut self,
+    canvas: &mut CanvasService,
+    target: Target,
+    params: &DrawTextParams,
+  ) {
+    match target {
+      Target::Base => canvas.text(params),
+      Target::Slice(id) => {
+        canvas.text_on(id, params);
+      }
+      Target::Host => canvas.host_text(params),
+    }
   }
 }

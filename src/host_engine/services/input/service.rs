@@ -219,6 +219,8 @@ pub struct InputService {
   bindings: Vec<KeyBinding>,
   raw_key_capture_enabled: bool,
   raw_key_events: VecDeque<RawKeyEvent>,
+  raw_mouse_capture_enabled: bool,
+  raw_mouse_events: VecDeque<MouseEvent>,
 }
 
 impl InputService {
@@ -245,6 +247,8 @@ impl InputService {
       bindings: Vec::new(),
       raw_key_capture_enabled: false,
       raw_key_events: VecDeque::new(),
+      raw_mouse_capture_enabled: false,
+      raw_mouse_events: VecDeque::new(),
     }
   }
 
@@ -350,22 +354,32 @@ impl InputService {
           }
         }
       }
+      if self.focused
+        && self.raw_mouse_capture_enabled
+        && let SystemEvent::Mouse(mouse) = &event
+      {
+        self.raw_mouse_events.push_back(*mouse);
+      }
       self.apply_system_event(&event);
       events.push(event);
     }
 
-    // 合成 Hold 事件：按钮处于按下状态，但本帧没有活跃事件
+    // 合成 Hold 也推入 raw mouse 缓冲区
     for button in &self.mouse_held_buttons {
       if !active_buttons.contains(button)
         && let Some((x, y)) = self.mouse_position
       {
-        events.push(SystemEvent::Mouse(MouseEvent {
+        let hold = MouseEvent {
           kind: MouseEventKind::Hold,
           button: Some(*button),
           scroll: None,
           x,
           y,
-        }));
+        };
+        if self.focused && self.raw_mouse_capture_enabled {
+          self.raw_mouse_events.push_back(hold);
+        }
+        events.push(SystemEvent::Mouse(hold));
       }
     }
 
@@ -444,6 +458,45 @@ impl InputService {
 
   pub fn take_raw_key_events(&mut self) -> Vec<RawKeyEvent> {
     self.raw_key_events.drain(..).collect()
+  }
+
+  /// 开启原始鼠标事件捕获。
+  ///
+  /// 开启后，`drain_system_events()` 会将所有 [`MouseEvent`]
+  /// 同时存入内部缓冲区，通过 [`take_raw_mouse_events`] 获取。
+  /// 重复开启无效果，返回 `false`。
+  pub fn enable_raw_mouse_capture(&mut self) -> bool {
+    if self.raw_mouse_capture_enabled {
+      return false;
+    }
+    self.raw_mouse_events.clear();
+    self.raw_mouse_capture_enabled = true;
+    true
+  }
+
+  /// 关闭原始鼠标事件捕获。
+  ///
+  /// 已采集的事件保留在缓冲区中，可继续通过
+  /// [`take_raw_mouse_events`] 取出。
+  pub fn disable_raw_mouse_capture(&mut self) -> bool {
+    if !self.raw_mouse_capture_enabled {
+      return false;
+    }
+    self.raw_mouse_capture_enabled = false;
+    true
+  }
+
+  /// 返回原始鼠标事件捕获是否已开启。
+  pub fn is_raw_mouse_capture_enabled(&self) -> bool {
+    self.raw_mouse_capture_enabled
+  }
+
+  /// 取出并清空原始鼠标事件缓冲区。
+  ///
+  /// 包含 [`MouseEventKind::Scroll`]、[`MouseEventKind::Hold`]、
+  /// [`MouseEventKind::Move`] 等 HitArea 不暴露的事件类型。
+  pub fn take_raw_mouse_events(&mut self) -> Vec<MouseEvent> {
+    self.raw_mouse_events.drain(..).collect()
   }
 
   pub fn is_down(&self, key: Key) -> bool {
@@ -1096,5 +1149,100 @@ mod tests {
 
     assert_eq!(resize, Some((100, 30)));
     assert_eq!(input.drain_system_events(), vec![a, b]);
+  }
+
+  #[test]
+  fn raw_mouse_capture_runs_alongside_system_events() {
+    let mut input = InputService::new();
+    assert!(!input.is_raw_mouse_capture_enabled());
+    assert!(input.enable_raw_mouse_capture());
+    assert!(!input.enable_raw_mouse_capture()); // 重复开启无效
+
+    let move_evt = SystemEvent::Mouse(MouseEvent {
+      kind: MouseEventKind::Move,
+      button: None,
+      scroll: None,
+      x: 10,
+      y: 5,
+    });
+    let scroll_evt = SystemEvent::Mouse(MouseEvent {
+      kind: MouseEventKind::Scroll,
+      button: None,
+      scroll: Some(ScrollDirection::Down),
+      x: 20,
+      y: 10,
+    });
+    input.system_sender.send(move_evt).unwrap();
+    input.system_sender.send(scroll_evt).unwrap();
+
+    let system_events = input.drain_system_events();
+    assert_eq!(system_events, vec![move_evt, scroll_evt]);
+
+    let raw_mouse = input.take_raw_mouse_events();
+    assert_eq!(raw_mouse.len(), 2);
+    assert!(matches!(raw_mouse[0].kind, MouseEventKind::Move));
+    assert!(matches!(raw_mouse[1].kind, MouseEventKind::Scroll));
+    // 取出后缓冲区清空
+    assert!(input.take_raw_mouse_events().is_empty());
+  }
+
+  #[test]
+  fn raw_mouse_capture_respects_focus() {
+    let mut input = InputService::new();
+    input.enable_raw_mouse_capture();
+
+    // 失去焦点后不采集
+    input.focused = false;
+    input
+      .system_sender
+      .send(SystemEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Move,
+        button: None,
+        scroll: None,
+        x: 1,
+        y: 1,
+      }))
+      .unwrap();
+    input.drain_system_events();
+    assert!(input.take_raw_mouse_events().is_empty());
+
+    // 恢复焦点后恢复采集
+    input.focused = true;
+    input
+      .system_sender
+      .send(SystemEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Move,
+        button: None,
+        scroll: None,
+        x: 2,
+        y: 2,
+      }))
+      .unwrap();
+    input.drain_system_events();
+    assert_eq!(input.take_raw_mouse_events().len(), 1);
+  }
+
+  #[test]
+  fn raw_mouse_disable_preserves_events_and_enable_starts_clean() {
+    let mut input = InputService::new();
+    input.enable_raw_mouse_capture();
+    input
+      .system_sender
+      .send(SystemEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Move,
+        button: None,
+        scroll: None,
+        x: 3,
+        y: 3,
+      }))
+      .unwrap();
+    input.drain_system_events();
+    assert!(input.disable_raw_mouse_capture());
+    assert!(!input.disable_raw_mouse_capture()); // 重复关闭无效
+    assert_eq!(input.take_raw_mouse_events().len(), 1); // 已采集的不丢失
+
+    // 重新开启后清空
+    input.enable_raw_mouse_capture();
+    assert!(input.take_raw_mouse_events().is_empty());
   }
 }

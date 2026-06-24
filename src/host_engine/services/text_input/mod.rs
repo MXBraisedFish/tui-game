@@ -10,8 +10,8 @@ use unicode_width::UnicodeWidthStr;
 use self::buffer::TextBuffer;
 use super::ui::{UiComponentEvent, UiObjectPool};
 use super::{
-  CanvasService, ClipboardService, MouseButton, MouseEvent, MouseEventKind, Rect, TerminalKeyCode,
-  TerminalKeyEvent, TextColor, TextStyle,
+  CanvasService, ClipboardService, MouseButton, MouseEvent, MouseEventKind, Rect, SliceId,
+  TerminalKeyCode, TerminalKeyEvent, TextColor, TextStyle,
 };
 
 const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
@@ -99,10 +99,19 @@ pub enum TextInputEvent {
 #[derive(Clone, Copy)]
 struct HitSnapshot {
   rect: Rect,
+  origin: (u16, u16),
+  surface_rank: usize,
   width: usize,
   first_line: usize,
   single_start: usize,
   order: u64,
+}
+
+#[derive(Clone, Copy)]
+enum TextSurface {
+  Base,
+  Slice(SliceId),
+  Host,
 }
 
 struct TextInputState {
@@ -205,28 +214,91 @@ impl TextInputService {
     params: &TextInputRenderParams,
     canvas: &mut CanvasService,
   ) -> Option<(u16, u16)> {
+    self.render_target(pool, id, params, canvas, TextSurface::Base)
+  }
+
+  pub fn render_on(
+    &self,
+    pool: &mut UiObjectPool,
+    id: TextInputId,
+    slice: SliceId,
+    params: &TextInputRenderParams,
+    canvas: &mut CanvasService,
+  ) -> Option<(u16, u16)> {
+    self.render_target(pool, id, params, canvas, TextSurface::Slice(slice))
+  }
+
+  pub(crate) fn render_host(
+    &self,
+    pool: &mut UiObjectPool,
+    id: TextInputId,
+    params: &TextInputRenderParams,
+    canvas: &mut CanvasService,
+  ) -> Option<(u16, u16)> {
+    self.render_target(pool, id, params, canvas, TextSurface::Host)
+  }
+
+  fn render_target(
+    &self,
+    pool: &mut UiObjectPool,
+    id: TextInputId,
+    params: &TextInputRenderParams,
+    canvas: &mut CanvasService,
+    surface: TextSurface,
+  ) -> Option<(u16, u16)> {
     if params.rect.width == 0 || params.rect.height == 0 {
       if let Some(state) = pool.text_inputs.inputs.get_mut(&id) {
         state.hit = None;
       }
       return None;
     }
+    let resolved = match surface {
+      TextSurface::Base => canvas.base_hit_rect(params.rect),
+      TextSurface::Slice(slice) => canvas.slice_hit_rect(slice, params.rect),
+      TextSurface::Host => canvas.host_hit_rect(params.rect),
+    };
+    let Some((physical_rect, origin, surface_rank)) = resolved else {
+      if let Some(state) = pool.text_inputs.inputs.get_mut(&id) {
+        state.hit = None;
+      }
+      return None;
+    };
+    let mut params = params.clone();
+    params.rect.width = physical_rect.width;
+    params.rect.height = physical_rect.height;
     let order = pool.next_render_order();
     let active = self.is_focused(pool, id);
     let state = pool.text_inputs.inputs.get_mut(&id)?;
-    fill_input_background(canvas, params);
+    fill_input_background(canvas, surface, &params);
     let cursor_visible = active
       && params.cursor_shape.unwrap_or_default() != TextInputCursorShape::None
       && (!params.cursor_blink || self.cursor_blink_visible());
     let result = match state.mode {
-      TextInputMode::SingleLine => {
-        render_single_line(state, active, cursor_visible, params, canvas, order)
-      }
-      TextInputMode::MultiLine => {
-        render_multi_line(state, active, cursor_visible, params, canvas, order)
-      }
+      TextInputMode::SingleLine => render_single_line(
+        state,
+        active,
+        cursor_visible,
+        &params,
+        canvas,
+        surface,
+        order,
+      ),
+      TextInputMode::MultiLine => render_multi_line(
+        state,
+        active,
+        cursor_visible,
+        &params,
+        canvas,
+        surface,
+        order,
+      ),
     };
-    result
+    if let Some(hit) = state.hit.as_mut() {
+      hit.rect = physical_rect;
+      hit.origin = origin;
+      hit.surface_rank = surface_rank;
+    }
+    result.map(|(x, y)| (origin.0.saturating_add(x), origin.1.saturating_add(y)))
   }
 
   pub fn focus(&mut self, pool: &mut UiObjectPool, id: TextInputId) -> bool {
@@ -324,7 +396,12 @@ impl TextInputService {
     self.set_text(pool, id, String::new())
   }
 
-  pub(crate) fn mouse_hit_order(&self, pool: &UiObjectPool, x: u16, y: u16) -> Option<u64> {
+  pub(crate) fn mouse_hit_order(
+    &self,
+    pool: &UiObjectPool,
+    x: u16,
+    y: u16,
+  ) -> Option<(usize, u64)> {
     pool
       .text_inputs
       .inputs
@@ -335,7 +412,7 @@ impl TextInputService {
           .then_some(state.hit?)
           .filter(|hit| hit.rect.contains(x, y))
       })
-      .map(|hit| hit.order)
+      .map(|hit| (hit.surface_rank, hit.order))
       .max()
   }
 
@@ -749,6 +826,7 @@ fn render_single_line(
   cursor_visible: bool,
   params: &TextInputRenderParams,
   canvas: &mut CanvasService,
+  surface: TextSurface,
   order: u64,
 ) -> Option<(u16, u16)> {
   let y = match params.vertical_align {
@@ -757,11 +835,13 @@ fn render_single_line(
     VerticalAlign::Bottom => params.rect.y + params.rect.height - 1,
   };
   if state.buffer.text().is_empty() {
-    draw_placeholder(canvas, y, params);
+    draw_placeholder(canvas, surface, y, params);
   }
   if state.buffer.text().is_empty() && !active {
     state.hit = Some(HitSnapshot {
       rect: params.rect,
+      origin: (0, 0),
+      surface_rank: 0,
       width: params.rect.width as usize,
       first_line: 0,
       single_start: 0,
@@ -810,13 +890,22 @@ fn render_single_line(
     } else {
       input_text_style(params)
     };
-    canvas.styled_text(params.rect.x + x as u16, y, &glyph.text, style);
+    draw_styled(
+      canvas,
+      surface,
+      params.rect.x + x as u16,
+      y,
+      &glyph.text,
+      style,
+    );
     x += glyph.width;
   }
   let cursor_x = cursor_x_full.saturating_sub(start_x);
   if active && cursor_glyph.is_none() && cursor_visible {
     if let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default()) {
-      canvas.styled_text(
+      draw_styled(
+        canvas,
+        surface,
         params.rect.x + cursor_x as u16,
         y,
         marker,
@@ -826,6 +915,8 @@ fn render_single_line(
   }
   state.hit = Some(HitSnapshot {
     rect: params.rect,
+    origin: (0, 0),
+    surface_rank: 0,
     width: params.rect.width as usize,
     first_line: 0,
     single_start: start,
@@ -840,14 +931,17 @@ fn render_multi_line(
   cursor_visible: bool,
   params: &TextInputRenderParams,
   canvas: &mut CanvasService,
+  surface: TextSurface,
   order: u64,
 ) -> Option<(u16, u16)> {
   if state.buffer.text().is_empty() {
-    draw_placeholder(canvas, params.rect.y, params);
+    draw_placeholder(canvas, surface, params.rect.y, params);
   }
   if state.buffer.text().is_empty() && !active {
     state.hit = Some(HitSnapshot {
       rect: params.rect,
+      origin: (0, 0),
+      surface_rank: 0,
       width: params.rect.width as usize,
       first_line: 0,
       single_start: 0,
@@ -887,7 +981,9 @@ fn render_multi_line(
     } else {
       input_text_style(params)
     };
-    canvas.styled_text(
+    draw_styled(
+      canvas,
+      surface,
       params.rect.x + glyph.x as u16,
       params.rect.y + (glyph.line - first_line) as u16,
       &glyph.text,
@@ -902,7 +998,9 @@ fn render_multi_line(
     && cursor_visible
   {
     if let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default()) {
-      canvas.styled_text(
+      draw_styled(
+        canvas,
+        surface,
         params.rect.x + cursor_x as u16,
         params.rect.y + (cursor_line - first_line) as u16,
         marker,
@@ -912,6 +1010,8 @@ fn render_multi_line(
   }
   state.hit = Some(HitSnapshot {
     rect: params.rect,
+    origin: (0, 0),
+    surface_rank: 0,
     width: params.rect.width as usize,
     first_line,
     single_start: 0,
@@ -932,14 +1032,25 @@ fn cursor_marker(shape: TextInputCursorShape) -> Option<&'static str> {
   }
 }
 
-fn fill_input_background(canvas: &mut CanvasService, params: &TextInputRenderParams) {
+fn fill_input_background(
+  canvas: &mut CanvasService,
+  surface: TextSurface,
+  params: &TextInputRenderParams,
+) {
   let line = " ".repeat(params.rect.width as usize);
   let style = TextStyle {
     background: params.bg.clone(),
     ..Default::default()
   };
   for y in 0..params.rect.height {
-    canvas.styled_text(params.rect.x, params.rect.y + y, &line, style.clone());
+    draw_styled(
+      canvas,
+      surface,
+      params.rect.x,
+      params.rect.y + y,
+      &line,
+      style.clone(),
+    );
   }
 }
 
@@ -971,6 +1082,7 @@ fn reversed_text_style(params: &TextInputRenderParams) -> TextStyle {
 
 fn draw_prefix(
   canvas: &mut CanvasService,
+  surface: TextSurface,
   x: u16,
   y: u16,
   text: &str,
@@ -990,12 +1102,18 @@ fn draw_prefix(
       }
     })
     .collect();
-  canvas.styled_text(x, y, &text, style);
+  draw_styled(canvas, surface, x, y, &text, style);
 }
 
-fn draw_placeholder(canvas: &mut CanvasService, y: u16, params: &TextInputRenderParams) {
+fn draw_placeholder(
+  canvas: &mut CanvasService,
+  surface: TextSurface,
+  y: u16,
+  params: &TextInputRenderParams,
+) {
   draw_prefix(
     canvas,
+    surface,
     params.rect.x.saturating_add(1),
     y,
     &params.placeholder,
@@ -1004,9 +1122,29 @@ fn draw_placeholder(canvas: &mut CanvasService, y: u16, params: &TextInputRender
   );
 }
 
+fn draw_styled(
+  canvas: &mut CanvasService,
+  surface: TextSurface,
+  x: u16,
+  y: u16,
+  text: &str,
+  style: TextStyle,
+) {
+  match surface {
+    TextSurface::Base => canvas.styled_text(x, y, text, style),
+    TextSurface::Slice(id) => {
+      canvas.styled_text_on(id, x, y, text, style);
+    }
+    TextSurface::Host => canvas.host_styled_text(x, y, text, style),
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::host_engine::services::{
+    LayoutService, SliceLength, SliceOptions, SliceRect, SliceService,
+  };
 
   fn options(text: &str, mode: TextInputMode) -> TextInputOptions {
     TextInputOptions {
@@ -1208,6 +1346,59 @@ mod tests {
       pool.text_inputs.inputs[&id].buffer.selected_text(),
       Some("ab")
     );
+  }
+
+  #[test]
+  fn slice_render_uses_physical_ime_anchor_and_mouse_coordinates() {
+    let slices = SliceService::new();
+    let mut pool = UiObjectPool::new();
+    let mut service = TextInputService::new();
+    let id = service.create(&mut pool, options("a", TextInputMode::SingleLine));
+    let mut layout = LayoutService::new();
+    layout.resize_physical(20, 10);
+    layout.set_developer_viewport(Rect {
+      x: 3,
+      y: 2,
+      width: 10,
+      height: 6,
+    });
+    let slice = slices
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: SliceRect {
+            x: 2,
+            y: 1,
+            width: SliceLength::Fixed(5),
+            height: SliceLength::Fixed(3),
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    service.focus(&mut pool, id);
+    let mut render_params = params(4, 1);
+    render_params.rect.x = 1;
+    render_params.rect.y = 1;
+
+    assert_eq!(
+      service.render_on(&mut pool, id, slice, &render_params, &mut canvas),
+      Some((7, 4))
+    );
+    assert!(service.route_mouse_event(
+      &mut pool,
+      MouseEvent {
+        kind: MouseEventKind::Press,
+        button: Some(MouseButton::Left),
+        scroll: None,
+        x: 6,
+        y: 4,
+      },
+    ));
+    assert_eq!(service.cursor(&pool, id), Some(0));
   }
 
   #[test]

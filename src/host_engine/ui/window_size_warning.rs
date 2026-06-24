@@ -64,7 +64,7 @@ impl WindowSizeWarningUi {
       current_height,
       is_host_mode,
     );
-    hit_area.render(
+    hit_area.render_host(
       &mut self.objects,
       self.area,
       Rect {
@@ -73,6 +73,7 @@ impl WindowSizeWarningUi {
         width: current_width,
         height: current_height,
       },
+      canvas,
     );
   }
 }
@@ -128,7 +129,7 @@ pub fn compute_positions(
   let required_line = format!("{} {}×{}", required_prefix, required_width, required_height);
   let current_line = format!("{} {}×{}", current_prefix, current_width, current_height);
 
-  let term_h = layout.get_terminal_size().height;
+  let term_h = layout.physical_size().height;
 
   let title_y: u16 = 1;
   let hint_y = term_h.saturating_sub(1);
@@ -162,7 +163,7 @@ pub fn compute_positions(
   let hint_w_game = layout.get_text_width(&hint_game, Some(&key_params));
   let hint_w = hint_w_host.max(hint_w_game);
 
-  let hint_x = layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0);
+  let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
 
   WindowSizeWarningLayout {
     title_x,
@@ -218,7 +219,7 @@ fn draw_content(
   let current_line = format!("{}{}×{}", current_prefix, current_width, current_height);
 
   // title — bright_magenta + bold
-  render.draw_text(
+  render.draw_host_text(
     canvas,
     &DrawTextParams {
       x: positions.title_x,
@@ -229,7 +230,7 @@ fn draw_content(
   );
 
   // tip
-  render.draw_text(
+  render.draw_host_text(
     canvas,
     &DrawTextParams {
       x: positions.tip_x,
@@ -240,7 +241,7 @@ fn draw_content(
   );
 
   // required — yellow
-  render.draw_text(
+  render.draw_host_text(
     canvas,
     &DrawTextParams {
       x: positions.required_x,
@@ -251,7 +252,7 @@ fn draw_content(
   );
 
   // current — red
-  render.draw_text(
+  render.draw_host_text(
     canvas,
     &DrawTextParams {
       x: positions.current_x,
@@ -262,7 +263,7 @@ fn draw_content(
   );
 
   // hint
-  render.draw_text(
+  render.draw_host_text(
     canvas,
     &DrawTextParams {
       x: positions.hint_x,
@@ -282,5 +283,5 @@ fn build_key_params() -> RichTextParams {
 
 fn centered_x(layout: &LayoutService, text: &str) -> u16 {
   let w = layout.get_text_width(text, None);
-  layout.resolve_x(LayoutService::ALIGN_CENTER, w, 0)
+  layout.resolve_host_x(LayoutService::ALIGN_CENTER, w, 0)
 }

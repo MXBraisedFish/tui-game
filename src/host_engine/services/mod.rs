@@ -13,6 +13,7 @@ mod package;
 mod render;
 mod render_pipeline;
 mod rich_text;
+mod slice;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
@@ -32,7 +33,7 @@ pub use input::{
   MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, SystemEvent, TerminalKeyCode,
   TerminalKeyEvent, translate_action_map,
 };
-pub use layout::{LayoutService, Rect};
+pub use layout::{LayoutService, Rect, Size};
 pub use log::{LogService, LogSource};
 pub use lua::LuaService;
 pub use overlay::OverlayService;
@@ -40,6 +41,7 @@ pub use package::PackageService;
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
+pub use slice::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
 pub use text_input::{
@@ -54,6 +56,7 @@ pub struct EngineServices {
   pub package: PackageService,
   pub clipboard: ClipboardService,
   pub hit_area: HitAreaService,
+  pub slice: SliceService,
   pub input: InputService,
   pub ui: UiService,
   pub game: GameService,
@@ -82,6 +85,7 @@ impl EngineServices {
       terminal: TerminalService::new(),
       clipboard: ClipboardService::new(),
       hit_area: HitAreaService::new(),
+      slice: SliceService::new(),
       text_input: TextInputService::new(),
       package: PackageService::new(),
       input: InputService::new(),

@@ -1,41 +1,124 @@
+use std::collections::HashMap;
+
 use super::{buffer::CanvasBuffer, cell::CanvasCell};
-use crate::host_engine::services::TextStyle;
+use crate::host_engine::services::slice::resolve_rect;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
+use crate::host_engine::services::{
+  LayoutService, Rect, SliceId, TextColor, TextStyle, UiObjectPool,
+};
 
 // ── 画布服务 ──
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasService {
-  current: CanvasBuffer,
+  base: CanvasBuffer,
+  host: CanvasBuffer,
+  slices: HashMap<SliceId, PreparedSlice>,
+  slice_order: Vec<SliceId>,
+  viewport: Rect,
+  active_pool: Option<u64>,
   force_full_redraw: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PreparedSlice {
+  pub buffer: CanvasBuffer,
+  pub rect: Rect,
+  pub visible: bool,
+  pub opaque: bool,
+  pub order: usize,
 }
 
 impl CanvasService {
   pub fn new() -> Self {
     let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
     Self {
-      current: CanvasBuffer::new(width, height),
+      base: CanvasBuffer::new(width, height),
+      host: CanvasBuffer::new(width, height),
+      slices: HashMap::new(),
+      slice_order: Vec::new(),
+      viewport: Rect {
+        x: 0,
+        y: 0,
+        width,
+        height,
+      },
+      active_pool: None,
       force_full_redraw: true,
     }
   }
 
   pub fn width(&self) -> u16 {
-    self.current.width()
+    self.base.width()
   }
 
   pub fn height(&self) -> u16 {
-    self.current.height()
+    self.base.height()
   }
 
   pub fn size(&self) -> (u16, u16) {
     (self.width(), self.height())
   }
 
-  pub fn begin_frame(&mut self) {}
+  pub(crate) fn physical_width(&self) -> u16 {
+    self.host.width()
+  }
+
+  pub(crate) fn physical_height(&self) -> u16 {
+    self.host.height()
+  }
+
+  pub fn begin_frame(&mut self, layout: &LayoutService) {
+    let physical = layout.physical_size();
+    if self.host.width() != physical.width || self.host.height() != physical.height {
+      self.host.resize(physical.width, physical.height);
+      self.force_full_redraw = true;
+    } else {
+      self.host.clear();
+    }
+  }
+
+  pub fn prepare(&mut self, pool: &UiObjectPool, layout: &LayoutService) {
+    self.viewport = layout.developer_viewport();
+    let size = layout.viewport_size();
+    if self.base.width() != size.width || self.base.height() != size.height {
+      self.base.resize(size.width, size.height);
+    } else {
+      self.base.clear();
+    }
+    if self.active_pool != Some(pool.id()) {
+      self.slices.clear();
+    }
+    self.active_pool = Some(pool.id());
+    self.slice_order = pool.slices.order.clone();
+    self
+      .slices
+      .retain(|id, _| pool.slices.slices.contains_key(id));
+    for (order, id) in self.slice_order.iter().copied().enumerate() {
+      let state = pool.slices.slices[&id];
+      let rect = resolve_rect(state.rect, layout);
+      let prepared = self.slices.entry(id).or_insert_with(|| PreparedSlice {
+        buffer: CanvasBuffer::new(rect.width, rect.height),
+        rect,
+        visible: state.visible,
+        opaque: state.opaque,
+        order,
+      });
+      if prepared.buffer.width() != rect.width || prepared.buffer.height() != rect.height {
+        prepared.buffer.resize(rect.width, rect.height);
+      } else {
+        prepared.buffer.clear();
+      }
+      prepared.rect = rect;
+      prepared.visible = state.visible;
+      prepared.opaque = state.opaque;
+      prepared.order = order;
+    }
+  }
 
   pub fn clear(&mut self) {
-    self.current.clear();
+    self.base.clear();
   }
 
   // ── 文本绘制 ──
@@ -45,7 +128,39 @@ impl CanvasService {
   /// 最终都汇聚到 `styled_text()` 写入画布单元格。
   pub fn text(&mut self, params: &DrawTextParams) {
     let lines = text_layout::layout_text_lines(params);
-    self.draw_layout_lines(params.x, params.y, params.line_align, &lines);
+    Self::draw_layout_lines(
+      &mut self.base,
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
+  }
+
+  pub fn text_on(&mut self, id: SliceId, params: &DrawTextParams) -> bool {
+    let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
+      return false;
+    };
+    let lines = text_layout::layout_text_lines(params);
+    Self::draw_layout_lines(
+      &mut slice.buffer,
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
+    true
+  }
+
+  pub(crate) fn host_text(&mut self, params: &DrawTextParams) {
+    let lines = text_layout::layout_text_lines(params);
+    Self::draw_layout_lines(
+      &mut self.host,
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
   }
 
   /// 画布底层基元：在 (x, y) 处以指定样式绘制文本。
@@ -56,45 +171,58 @@ impl CanvasService {
   /// - 普通字符（ASCII、拉丁）推进 1 格
   /// - 宽字符（CJK、emoji、全角）推进 2 格，并标记右侧格为 continuation
   pub fn styled_text(&mut self, x: u16, y: u16, text: &str, style: TextStyle) {
+    Self::styled_text_to(&mut self.base, x, y, text, style);
+  }
+
+  pub fn styled_text_on(
+    &mut self,
+    id: SliceId,
+    x: u16,
+    y: u16,
+    text: &str,
+    style: TextStyle,
+  ) -> bool {
+    let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
+      return false;
+    };
+    Self::styled_text_to(&mut slice.buffer, x, y, text, style);
+    true
+  }
+
+  pub(crate) fn host_styled_text(&mut self, x: u16, y: u16, text: &str, style: TextStyle) {
+    Self::styled_text_to(&mut self.host, x, y, text, style);
+  }
+
+  fn styled_text_to(buffer: &mut CanvasBuffer, x: u16, y: u16, text: &str, style: TextStyle) {
     let gs = graphemes(text);
     let mut cursor_x = x;
 
     for g in &gs {
-      if cursor_x >= self.current.width() || y >= self.current.height() {
+      if cursor_x >= buffer.width() || y >= buffer.height() {
         break;
       }
 
       if g.display_width == 0 {
         // 零宽字符：写入当前格但不推进光标（与前一字符合并于同一 Print 输出）
-        let mut final_style = style.clone();
-        if final_style.background.is_none() {
-          if let Some(existing) = self.current.get(cursor_x, y) {
-            final_style.background = existing.style.background.clone();
-          }
-        }
-        self
-          .current
-          .set(cursor_x, y, CanvasCell::styled(&g.text, final_style));
+        let final_style = resolve_background(style.clone(), buffer, cursor_x, y);
+        buffer.set(cursor_x, y, CanvasCell::styled(&g.text, final_style));
         // cursor_x 不变
         continue;
       }
 
-      // 宽字符 ≥1：写入首格
-      let mut final_style = style.clone();
-      if final_style.background.is_none() {
-        if let Some(existing) = self.current.get(cursor_x, y) {
-          final_style.background = existing.style.background.clone();
-        }
+      if cursor_x as usize + g.display_width > buffer.width() as usize {
+        break;
       }
-      self
-        .current
-        .set(cursor_x, y, CanvasCell::styled(&g.text, final_style));
+
+      // 宽字符 ≥1：写入首格
+      let final_style = resolve_background(style.clone(), buffer, cursor_x, y);
+      buffer.set(cursor_x, y, CanvasCell::styled(&g.text, final_style));
 
       // 宽字符 ≥2：标记右侧连续格为 CONTINUATION
       for offset in 1..g.display_width {
         let cont_x = cursor_x.saturating_add(offset as u16);
-        if cont_x < self.current.width() {
-          self.current.set(cont_x, y, CanvasCell::continuation());
+        if cont_x < buffer.width() {
+          buffer.set(cont_x, y, CanvasCell::continuation());
         }
       }
 
@@ -107,7 +235,7 @@ impl CanvasService {
   /// 仅更新画布缓冲尺寸，不触发强制重绘。
   /// 需要重绘时由调用方显式调用 `request_render()`。
   pub fn resize(&mut self, width: u16, height: u16) {
-    self.current.resize(width, height);
+    self.host.resize(width, height);
     self.force_full_redraw = true;
   }
 
@@ -123,10 +251,85 @@ impl CanvasService {
   }
 
   pub fn cell_at(&self, x: u16, y: u16) -> Option<&CanvasCell> {
-    self.current.get(x, y)
+    self.base.get(x, y)
   }
 
-  fn draw_layout_lines(&mut self, x: u16, y: u16, align: TextAlign, lines: &[LayoutLine]) {
+  pub(crate) fn host_buffer(&self) -> &CanvasBuffer {
+    &self.host
+  }
+
+  pub(crate) fn base_buffer(&self) -> &CanvasBuffer {
+    &self.base
+  }
+
+  pub(crate) fn prepared_slices(&self) -> impl Iterator<Item = (SliceId, &PreparedSlice)> {
+    self
+      .slice_order
+      .iter()
+      .filter_map(|id| self.slices.get(id).map(|slice| (*id, slice)))
+  }
+
+  pub(crate) fn viewport(&self) -> Rect {
+    self.viewport
+  }
+
+  pub(crate) fn slice_rect(&self, id: SliceId) -> Option<Rect> {
+    let slice = self.slices.get(&id)?;
+    slice.visible.then_some(slice.rect)
+  }
+
+  pub(crate) fn viewport_point(&self, x: u16, y: u16) -> Option<(u16, u16)> {
+    self
+      .viewport
+      .contains(x, y)
+      .then_some((x - self.viewport.x, y - self.viewport.y))
+  }
+
+  pub(crate) fn base_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
+    surface_hit_rect(
+      rect,
+      self.viewport.x,
+      self.viewport.y,
+      self.base.width(),
+      self.base.height(),
+      0,
+    )
+  }
+
+  pub(crate) fn slice_hit_rect(
+    &self,
+    id: SliceId,
+    rect: Rect,
+  ) -> Option<(Rect, (u16, u16), usize)> {
+    let slice = self.slices.get(&id).filter(|slice| slice.visible)?;
+    surface_hit_rect(
+      rect,
+      self.viewport.x.saturating_add(slice.rect.x),
+      self.viewport.y.saturating_add(slice.rect.y),
+      slice.buffer.width(),
+      slice.buffer.height(),
+      slice.order + 1,
+    )
+  }
+
+  pub(crate) fn host_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
+    surface_hit_rect(
+      rect,
+      0,
+      0,
+      self.host.width(),
+      self.host.height(),
+      usize::MAX,
+    )
+  }
+
+  fn draw_layout_lines(
+    buffer: &mut CanvasBuffer,
+    x: u16,
+    y: u16,
+    align: TextAlign,
+    lines: &[LayoutLine],
+  ) {
     let base_width = lines.first().map(|line| line.width).unwrap_or(0);
 
     for (line_index, line) in lines.iter().enumerate() {
@@ -145,7 +348,7 @@ impl CanvasService {
         match run_style {
           Some(style) if style == &item.style => {}
           Some(style) => {
-            self.styled_text(cursor_x, cursor_y, &run_text, style.clone());
+            Self::styled_text_to(buffer, cursor_x, cursor_y, &run_text, style.clone());
             cursor_x = cursor_x.saturating_add(run_width as u16);
             run_text.clear();
             run_width = 0;
@@ -158,10 +361,49 @@ impl CanvasService {
       }
 
       if let Some(style) = run_style {
-        self.styled_text(cursor_x, cursor_y, &run_text, style.clone());
+        Self::styled_text_to(buffer, cursor_x, cursor_y, &run_text, style.clone());
       }
     }
   }
+}
+
+fn surface_hit_rect(
+  rect: Rect,
+  ox: u16,
+  oy: u16,
+  width: u16,
+  height: u16,
+  rank: usize,
+) -> Option<(Rect, (u16, u16), usize)> {
+  let x = rect.x.min(width);
+  let y = rect.y.min(height);
+  let width = rect.width.min(width.saturating_sub(x));
+  let height = rect.height.min(height.saturating_sub(y));
+  (width > 0 && height > 0).then_some((
+    Rect {
+      x: ox.saturating_add(x),
+      y: oy.saturating_add(y),
+      width,
+      height,
+    },
+    (ox, oy),
+    rank,
+  ))
+}
+
+/// 解析背景色：`Transparent` 从画布继承，`None` / 具体颜色保持原样。
+fn resolve_background(mut style: TextStyle, buffer: &CanvasBuffer, x: u16, y: u16) -> TextStyle {
+  match &style.background {
+    Some(TextColor::Transparent) => {
+      if buffer.is_written(x, y)
+        && let Some(existing) = buffer.get(x, y)
+      {
+        style.background = existing.style.background.clone();
+      }
+    }
+    _ => {} // None 或具体颜色：不继承
+  }
+  style
 }
 
 #[cfg(test)]
@@ -174,7 +416,7 @@ mod tests {
   fn visible_row(canvas: &CanvasService, y: u16) -> String {
     (0..canvas.width())
       .filter_map(|x| {
-        canvas.current.get(x, y).and_then(|cell| {
+        canvas.base.get(x, y).and_then(|cell| {
           if cell.is_continuation() || cell.text == " " {
             None
           } else {
@@ -190,7 +432,7 @@ mod tests {
     for x in 0..width {
       text.push_str(
         canvas
-          .current
+          .base
           .get(x, y)
           .map(|cell| cell.text.as_str())
           .unwrap_or(" "),
@@ -338,8 +580,8 @@ mod tests {
       ..Default::default()
     });
 
-    let c = canvas.current.get(2, 0).expect("c cell");
-    let d = canvas.current.get(0, 1).expect("d cell");
+    let c = canvas.base.get(2, 0).expect("c cell");
+    let d = canvas.base.get(0, 1).expect("d cell");
     assert_eq!(c.text, "c");
     assert_eq!(d.text, "d");
     assert_eq!(
