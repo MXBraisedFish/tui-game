@@ -6,6 +6,12 @@ use super::{MouseButton, MouseEvent, MouseEventKind, Rect, TextInputService};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HitAreaId(pub u64);
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HitAreaOptions {
+  pub hover_move: bool,
+  pub drag: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HitAreaEvent {
   HoverEnter {
@@ -66,6 +72,7 @@ struct PressState {
 
 struct HitAreaState {
   hit: Option<HitSnapshot>,
+  options: HitAreaOptions,
 }
 
 pub(crate) struct HitAreaObjects {
@@ -112,10 +119,13 @@ impl HitAreaService {
     Self
   }
 
-  pub fn create(&self, pool: &mut UiObjectPool) -> HitAreaId {
+  pub fn create(&self, pool: &mut UiObjectPool, options: HitAreaOptions) -> HitAreaId {
     let id = HitAreaId(pool.hit_areas.next_id);
     pool.hit_areas.next_id += 1;
-    pool.hit_areas.areas.insert(id, HitAreaState { hit: None });
+    pool
+      .hit_areas
+      .areas
+      .insert(id, HitAreaState { hit: None, options });
     id
   }
 
@@ -133,6 +143,31 @@ impl HitAreaService {
 
   pub fn exists(&self, pool: &UiObjectPool, id: HitAreaId) -> bool {
     pool.hit_areas.areas.contains_key(&id)
+  }
+
+  pub fn is_hovered(&self, pool: &UiObjectPool, id: HitAreaId) -> bool {
+    pool.hit_areas.areas.contains_key(&id) && pool.hit_areas.hovered == Some(id)
+  }
+
+  pub fn is_pressed(&self, pool: &UiObjectPool, id: HitAreaId, button: MouseButton) -> bool {
+    pool
+      .hit_areas
+      .pressed
+      .get(&button)
+      .is_some_and(|pressed| pressed.id == id)
+  }
+
+  pub fn pointer_position(&self, pool: &UiObjectPool) -> Option<(u16, u16)> {
+    pool.hit_areas.pointer
+  }
+
+  pub fn local_pointer_position(&self, pool: &UiObjectPool, id: HitAreaId) -> Option<(u16, u16)> {
+    let (x, y) = pool.hit_areas.pointer?;
+    let hit = pool.hit_areas.areas.get(&id)?.hit?;
+    hit
+      .rect
+      .contains(x, y)
+      .then_some((x - hit.rect.x, y - hit.rect.y))
   }
 
   pub fn render(&self, pool: &mut UiObjectPool, id: HitAreaId, rect: Rect) -> bool {
@@ -208,14 +243,16 @@ impl HitAreaService {
           );
           press.last_x = event.x;
           press.last_y = event.y;
-          pool.push_hit_event(HitAreaEvent::Drag {
-            id,
-            button,
-            x: event.x,
-            y: event.y,
-            dx,
-            dy,
-          });
+          if pool.hit_areas.areas[&id].options.drag {
+            pool.push_hit_event(HitAreaEvent::Drag {
+              id,
+              button,
+              x: event.x,
+              y: event.y,
+              dx,
+              dy,
+            });
+          }
           true
         } else {
           text_input.route_mouse_event(pool, event) || top_hit.is_some() || text_order.is_some()
@@ -273,7 +310,9 @@ impl HitAreaService {
     pool.hit_areas.pointer = Some((x, y));
     match (previous, current) {
       (Some(old), Some(new)) if old == new => {
-        pool.push_hit_event(HitAreaEvent::HoverMove { id: new, x, y });
+        if pool.hit_areas.areas[&new].options.hover_move {
+          pool.push_hit_event(HitAreaEvent::HoverMove { id: new, x, y });
+        }
       }
       (Some(old), Some(new)) => {
         pool.push_hit_event(HitAreaEvent::HoverLeave { id: old, x, y });
@@ -322,8 +361,8 @@ mod tests {
     let service = HitAreaService::new();
     let mut text_input = TextInputService::new();
     let mut pool = UiObjectPool::new();
-    let first = service.create(&mut pool);
-    let second = service.create(&mut pool);
+    let first = service.create(&mut pool, HitAreaOptions::default());
+    let second = service.create(&mut pool, HitAreaOptions::default());
     assert_eq!((first, second), (HitAreaId(1), HitAreaId(2)));
     assert!(service.exists(&pool, first));
     assert!(service.render(&mut pool, first, rect(0, 0, 0, 2)));
@@ -354,8 +393,8 @@ mod tests {
     let service = HitAreaService::new();
     let mut text_input = TextInputService::new();
     let mut pool = UiObjectPool::new();
-    let a = service.create(&mut pool);
-    let b = service.create(&mut pool);
+    let a = service.create(&mut pool, HitAreaOptions::default());
+    let b = service.create(&mut pool, HitAreaOptions::default());
     service.render(&mut pool, a, rect(0, 0, 4, 4));
     service.render(&mut pool, b, rect(2, 0, 4, 4));
 
@@ -400,12 +439,94 @@ mod tests {
   }
 
   #[test]
+  fn default_continuous_events_are_query_only() {
+    let service = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service.create(&mut pool, HitAreaOptions::default());
+    service.render(&mut pool, id, rect(10, 5, 4, 3));
+
+    assert_eq!(service.pointer_position(&pool), None);
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 11, 6),
+    );
+    events(&mut pool);
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 12, 6),
+    );
+    assert!(events(&mut pool).is_empty());
+    assert!(service.is_hovered(&pool, id));
+    assert_eq!(service.pointer_position(&pool), Some((12, 6)));
+    assert_eq!(service.local_pointer_position(&pool, id), Some((2, 1)));
+
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Press, Some(MouseButton::Left), 12, 6),
+    );
+    events(&mut pool);
+    assert!(service.is_pressed(&pool, id, MouseButton::Left));
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Drag, Some(MouseButton::Left), 20, 6),
+    );
+    assert!(
+      events(&mut pool)
+        .iter()
+        .all(|event| !matches!(event, UiEvent::HitArea(HitAreaEvent::Drag { .. })))
+    );
+    assert!(service.is_pressed(&pool, id, MouseButton::Left));
+    assert_eq!(service.local_pointer_position(&pool, id), None);
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Release, Some(MouseButton::Left), 20, 6),
+    );
+    assert!(!service.is_pressed(&pool, id, MouseButton::Left));
+  }
+
+  #[test]
+  fn subscribed_hover_move_is_queued() {
+    let service = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service.create(
+      &mut pool,
+      HitAreaOptions {
+        hover_move: true,
+        drag: false,
+      },
+    );
+    service.render(&mut pool, id, rect(0, 0, 3, 3));
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 1, 1),
+    );
+    events(&mut pool);
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 2, 1),
+    );
+    assert_eq!(
+      events(&mut pool),
+      vec![UiEvent::HitArea(HitAreaEvent::HoverMove { id, x: 2, y: 1 })]
+    );
+  }
+
+  #[test]
   fn all_mouse_buttons_have_press_release_and_click() {
     for button in [MouseButton::Left, MouseButton::Middle, MouseButton::Right] {
       let service = HitAreaService::new();
       let mut text_input = TextInputService::new();
       let mut pool = UiObjectPool::new();
-      let id = service.create(&mut pool);
+      let id = service.create(&mut pool, HitAreaOptions::default());
       service.render(&mut pool, id, rect(0, 0, 3, 3));
       service.route_mouse_event(
         &mut pool,
@@ -442,8 +563,14 @@ mod tests {
     let service = HitAreaService::new();
     let mut text_input = TextInputService::new();
     let mut pool = UiObjectPool::new();
-    let a = service.create(&mut pool);
-    let b = service.create(&mut pool);
+    let a = service.create(
+      &mut pool,
+      HitAreaOptions {
+        hover_move: false,
+        drag: true,
+      },
+    );
+    let b = service.create(&mut pool, HitAreaOptions::default());
     service.render(&mut pool, a, rect(0, 0, 3, 3));
     service.render(&mut pool, b, rect(5, 0, 3, 3));
     service.route_mouse_event(
@@ -495,7 +622,7 @@ mod tests {
     let hit_area = HitAreaService::new();
     let mut text_input = TextInputService::new();
     let mut pool = UiObjectPool::new();
-    let area = hit_area.create(&mut pool);
+    let area = hit_area.create(&mut pool, HitAreaOptions::default());
     let input = text_input.create(
       &mut pool,
       TextInputOptions {
@@ -562,7 +689,7 @@ mod tests {
     let service = HitAreaService::new();
     let mut text_input = TextInputService::new();
     let mut pool = UiObjectPool::new();
-    let id = service.create(&mut pool);
+    let id = service.create(&mut pool, HitAreaOptions::default());
     service.render(&mut pool, id, rect(0, 0, 3, 3));
     service.route_mouse_event(
       &mut pool,
@@ -593,7 +720,7 @@ mod tests {
     let service = HitAreaService::new();
     let mut text_input = TextInputService::new();
     let mut pool = UiObjectPool::new();
-    let id = service.create(&mut pool);
+    let id = service.create(&mut pool, HitAreaOptions::default());
     service.render(&mut pool, id, rect(0, 0, 3, 3));
     service.route_mouse_event(
       &mut pool,

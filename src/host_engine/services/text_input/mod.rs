@@ -1,6 +1,7 @@
 mod buffer;
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::time::{Duration, Instant};
 
 use unicode_segmentation::UnicodeSegmentation;
@@ -283,6 +284,22 @@ impl TextInputService {
       .inputs
       .get(&id)
       .map(|state| state.buffer.text())
+  }
+
+  pub fn cursor(&self, pool: &UiObjectPool, id: TextInputId) -> Option<usize> {
+    pool
+      .text_inputs
+      .inputs
+      .get(&id)
+      .map(|state| state.buffer.cursor())
+  }
+
+  pub fn selection(&self, pool: &UiObjectPool, id: TextInputId) -> Option<Range<usize>> {
+    pool
+      .text_inputs
+      .inputs
+      .get(&id)
+      .and_then(|state| state.buffer.selection())
   }
 
   pub fn set_text(
@@ -1046,6 +1063,38 @@ mod tests {
       key(TerminalKeyCode::Char('x'), false, false),
     );
     assert_eq!(service.get_text(&pool, id), Some("我x"));
+  }
+
+  #[test]
+  fn cursor_and_selection_queries_return_grapheme_boundary_bytes() {
+    let text = "a我e\u{301}👨‍👩";
+    let mut pool = UiObjectPool::new();
+    let mut service = TextInputService::new();
+    let mut clipboard = ClipboardService::new();
+    let id = service.create(&mut pool, options(text, TextInputMode::SingleLine));
+    assert_eq!(service.cursor(&pool, id), Some(text.len()));
+    assert_eq!(service.selection(&pool, id), None);
+
+    service.focus(&mut pool, id);
+    service.route_terminal_key(
+      &mut pool,
+      &mut clipboard,
+      key(TerminalKeyCode::Left, false, true),
+    );
+    assert_eq!(
+      service.selection(&pool, id),
+      Some("a我e\u{301}".len()..text.len())
+    );
+    service.route_terminal_key(
+      &mut pool,
+      &mut clipboard,
+      key(TerminalKeyCode::Left, false, true),
+    );
+    let selection = service.selection(&pool, id).unwrap();
+    assert_eq!(selection, "a我".len()..text.len());
+    assert!(text.is_char_boundary(selection.start));
+    assert!(text.is_char_boundary(selection.end));
+    assert_eq!(service.cursor(&pool, TextInputId(99)), None);
   }
 
   #[test]

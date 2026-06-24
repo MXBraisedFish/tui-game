@@ -214,8 +214,7 @@ pub struct InputService {
   pressed_keys: HashSet<Key>,
   released_keys: HashSet<Key>,
   mouse_held_buttons: HashSet<MouseButton>,
-  mouse_x: u16,
-  mouse_y: u16,
+  mouse_position: Option<(u16, u16)>,
   focused: bool,
   bindings: Vec<KeyBinding>,
   raw_key_capture_enabled: bool,
@@ -241,8 +240,7 @@ impl InputService {
       pressed_keys: HashSet::new(),
       released_keys: HashSet::new(),
       mouse_held_buttons: HashSet::new(),
-      mouse_x: 0,
-      mouse_y: 0,
+      mouse_position: None,
       focused: true,
       bindings: Vec::new(),
       raw_key_capture_enabled: false,
@@ -358,13 +356,15 @@ impl InputService {
 
     // 合成 Hold 事件：按钮处于按下状态，但本帧没有活跃事件
     for button in &self.mouse_held_buttons {
-      if !active_buttons.contains(button) {
+      if !active_buttons.contains(button)
+        && let Some((x, y)) = self.mouse_position
+      {
         events.push(SystemEvent::Mouse(MouseEvent {
           kind: MouseEventKind::Hold,
           button: Some(*button),
           scroll: None,
-          x: self.mouse_x,
-          y: self.mouse_y,
+          x,
+          y,
         }));
       }
     }
@@ -385,8 +385,7 @@ impl InputService {
         }
       }
       SystemEvent::Mouse(me) => {
-        self.mouse_x = me.x;
-        self.mouse_y = me.y;
+        self.mouse_position = Some((me.x, me.y));
 
         if let Some(button) = me.button {
           match me.kind {
@@ -473,6 +472,14 @@ impl InputService {
     }
 
     None
+  }
+
+  pub fn mouse_position(&self) -> Option<(u16, u16)> {
+    self.mouse_position
+  }
+
+  pub fn is_mouse_down(&self, button: MouseButton) -> bool {
+    self.mouse_held_buttons.contains(&button)
   }
 
   pub fn clear(&mut self) {
@@ -927,6 +934,46 @@ mod tests {
     input.disable_raw_key_capture();
     input.enable_raw_key_capture();
     assert!(input.take_raw_key_events().is_empty());
+  }
+
+  #[test]
+  fn action_map_still_reports_pressed_held_and_released() {
+    let mut input = InputService::new();
+    input.load_key_bindings(vec![KeyBinding {
+      pattern: KeyPattern::Single(Key::A),
+      action: "test.a".to_string(),
+    }]);
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Press,
+    });
+    assert_eq!(input.collect_action_events()[0].state, KeyState::Pressed);
+    input.begin_frame();
+    assert_eq!(input.collect_action_events()[0].state, KeyState::Held);
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Release,
+    });
+    assert_eq!(input.collect_action_events()[0].state, KeyState::Released);
+  }
+
+  #[test]
+  fn mouse_queries_track_position_buttons_and_focus_loss() {
+    let mut input = InputService::new();
+    assert_eq!(input.mouse_position(), None);
+    assert!(!input.is_mouse_down(MouseButton::Middle));
+    input.apply_system_event(&SystemEvent::Mouse(MouseEvent {
+      kind: MouseEventKind::Press,
+      button: Some(MouseButton::Middle),
+      scroll: None,
+      x: 7,
+      y: 9,
+    }));
+    assert_eq!(input.mouse_position(), Some((7, 9)));
+    assert!(input.is_mouse_down(MouseButton::Middle));
+    input.apply_system_event(&SystemEvent::Focus(FocusEvent { gained: false }));
+    assert!(!input.is_mouse_down(MouseButton::Middle));
+    assert_eq!(input.mouse_position(), Some((7, 9)));
   }
 
   #[test]

@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaService,
-  I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams, UiEvent,
-  UiObjectPool, UiObjectPoolOwner,
+  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
+  HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
+  RichTextParams, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 const MODS_MENU_LEN: usize = 2;
@@ -49,8 +49,8 @@ impl ModsUi {
     let mut objects = UiObjectPool::new();
     Self {
       selected_index: 0,
-      back_area: hit_area.create(&mut objects),
-      menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects)),
+      back_area: hit_area.create(&mut objects, HitAreaOptions::default()),
+      menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       objects,
     }
   }
@@ -96,9 +96,7 @@ impl ModsUi {
 
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ModsCommand> {
     match event {
-      UiEvent::HitArea(
-        HitAreaEvent::HoverEnter { id, .. } | HitAreaEvent::HoverMove { id, .. },
-      ) => {
+      UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
         self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
         None
       }

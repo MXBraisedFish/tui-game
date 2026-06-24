@@ -1,7 +1,7 @@
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaService,
-  InputService, KeyState, LayoutService, Rect, RenderService, TerminalColor, TextColor, TextStyle,
-  UiEvent, UiObjectPool, UiObjectPoolOwner,
+  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
+  HitAreaService, InputService, KeyState, LayoutService, Rect, RenderService, TerminalColor,
+  TextColor, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub struct InputDemoUi {
@@ -35,7 +35,14 @@ pub enum InputDemoCommand {
 impl InputDemoUi {
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
-    let areas = [hit_area.create(&mut objects), hit_area.create(&mut objects)];
+    let options = HitAreaOptions {
+      hover_move: true,
+      drag: true,
+    };
+    let areas = [
+      hit_area.create(&mut objects, options),
+      hit_area.create(&mut objects, options),
+    ];
     Self {
       objects,
       areas,

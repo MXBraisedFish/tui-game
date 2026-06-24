@@ -24,7 +24,7 @@ mod unicode;
 pub use canvas::{CanvasCell, CanvasService};
 pub use clipboard::ClipboardService;
 pub use game::GameService;
-pub use hit_area::{HitAreaEvent, HitAreaId, HitAreaService};
+pub use hit_area::{HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService};
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};
 pub use input::{

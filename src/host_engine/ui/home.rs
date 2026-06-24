@@ -10,9 +10,9 @@ pub use settings::{SettingsUi, SettingsUiCommand};
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaService, KeyState,
-  LayoutService, MouseButton, Rect, RenderService, RichTextParams, TextColor, UiEvent,
-  UiObjectPool, UiObjectPoolOwner,
+  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
+  HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams,
+  TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 use crate::host_engine::services::I18nService;
@@ -100,7 +100,7 @@ impl HomeUi {
     let mut objects = UiObjectPool::new();
     Self {
       selected_index: 0,
-      menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects)),
+      menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       objects,
     }
   }
@@ -156,9 +156,7 @@ impl HomeUi {
 
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<HomeUiCommand> {
     match event {
-      UiEvent::HitArea(
-        HitAreaEvent::HoverEnter { id, .. } | HitAreaEvent::HoverMove { id, .. },
-      ) => {
+      UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
         self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
         None
       }

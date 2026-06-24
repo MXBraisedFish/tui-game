@@ -5,9 +5,9 @@ use std::time::Duration;
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
-  HitAreaService, I18nService, KeyState, LanguageRegistryEntry, LayoutService, LogService,
-  LogSource, MouseButton, Rect, RenderService, RichTextParams, StorageService, TerminalColor,
-  TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  HitAreaOptions, HitAreaService, I18nService, KeyState, LanguageRegistryEntry, LayoutService,
+  LogService, LogSource, MouseButton, Rect, RenderService, RichTextParams, StorageService,
+  TerminalColor, TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 // ── 常量 ──
@@ -86,9 +86,9 @@ impl LanguageSelectUi {
 
     let runtime_cache = Self::preload_runtime_cache(storage, log, &registry);
     let mut objects = UiObjectPool::new();
-    let back_area = hit_area.create(&mut objects);
+    let back_area = hit_area.create(&mut objects, HitAreaOptions::default());
     let cell_areas = (0..registry.len())
-      .map(|_| hit_area.create(&mut objects))
+      .map(|_| hit_area.create(&mut objects, HitAreaOptions::default()))
       .collect();
 
     Self {
@@ -207,9 +207,7 @@ impl LanguageSelectUi {
 
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<LanguageSelectCommand> {
     match event {
-      UiEvent::HitArea(
-        HitAreaEvent::HoverEnter { id, .. } | HitAreaEvent::HoverMove { id, .. },
-      ) => {
+      UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
         self.selected_index = self.cell_areas.iter().position(|area| area == id)?;
         self.normalize_page();
         None

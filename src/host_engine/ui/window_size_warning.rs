@@ -1,7 +1,7 @@
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaService,
-  I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams, UiEvent,
-  UiObjectPool, UiObjectPoolOwner,
+  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
+  HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
+  RichTextParams, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub struct WindowSizeWarningUi {
@@ -12,7 +12,7 @@ pub struct WindowSizeWarningUi {
 impl WindowSizeWarningUi {
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
-    let area = hit_area.create(&mut objects);
+    let area = hit_area.create(&mut objects, HitAreaOptions::default());
     Self { objects, area }
   }
 
