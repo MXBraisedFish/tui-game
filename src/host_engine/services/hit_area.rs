@@ -1,0 +1,611 @@
+use std::collections::HashMap;
+
+use super::ui::UiObjectPool;
+use super::{MouseButton, MouseEvent, MouseEventKind, Rect, TextInputService};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct HitAreaId(pub u64);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HitAreaEvent {
+  HoverEnter {
+    id: HitAreaId,
+    x: u16,
+    y: u16,
+  },
+  HoverMove {
+    id: HitAreaId,
+    x: u16,
+    y: u16,
+  },
+  HoverLeave {
+    id: HitAreaId,
+    x: u16,
+    y: u16,
+  },
+  Press {
+    id: HitAreaId,
+    button: MouseButton,
+    x: u16,
+    y: u16,
+  },
+  Release {
+    id: HitAreaId,
+    button: MouseButton,
+    x: u16,
+    y: u16,
+  },
+  Click {
+    id: HitAreaId,
+    button: MouseButton,
+    x: u16,
+    y: u16,
+  },
+  Drag {
+    id: HitAreaId,
+    button: MouseButton,
+    x: u16,
+    y: u16,
+    dx: i32,
+    dy: i32,
+  },
+}
+
+#[derive(Clone, Copy)]
+struct HitSnapshot {
+  rect: Rect,
+  order: u64,
+}
+
+#[derive(Clone, Copy)]
+struct PressState {
+  id: HitAreaId,
+  last_x: u16,
+  last_y: u16,
+}
+
+struct HitAreaState {
+  hit: Option<HitSnapshot>,
+}
+
+pub(crate) struct HitAreaObjects {
+  next_id: u64,
+  areas: HashMap<HitAreaId, HitAreaState>,
+  hovered: Option<HitAreaId>,
+  pressed: HashMap<MouseButton, PressState>,
+  pointer: Option<(u16, u16)>,
+}
+
+impl HitAreaObjects {
+  pub(crate) fn new() -> Self {
+    Self {
+      next_id: 1,
+      areas: HashMap::new(),
+      hovered: None,
+      pressed: HashMap::new(),
+      pointer: None,
+    }
+  }
+
+  fn hit(&self, x: u16, y: u16) -> Option<(HitAreaId, u64)> {
+    self
+      .areas
+      .iter()
+      .filter_map(|(id, state)| {
+        let hit = state.hit?;
+        hit.rect.contains(x, y).then_some((*id, hit.order))
+      })
+      .max_by_key(|(_, order)| *order)
+  }
+
+  pub(crate) fn clear_hits(&mut self) {
+    for state in self.areas.values_mut() {
+      state.hit = None;
+    }
+  }
+}
+
+pub struct HitAreaService;
+
+impl HitAreaService {
+  pub fn new() -> Self {
+    Self
+  }
+
+  pub fn create(&self, pool: &mut UiObjectPool) -> HitAreaId {
+    let id = HitAreaId(pool.hit_areas.next_id);
+    pool.hit_areas.next_id += 1;
+    pool.hit_areas.areas.insert(id, HitAreaState { hit: None });
+    id
+  }
+
+  pub fn remove(&self, pool: &mut UiObjectPool, id: HitAreaId) -> bool {
+    if pool.hit_areas.areas.remove(&id).is_none() {
+      return false;
+    }
+    if pool.hit_areas.hovered == Some(id) {
+      pool.hit_areas.hovered = None;
+    }
+    pool.hit_areas.pressed.retain(|_, state| state.id != id);
+    pool.events.retain(|event| event.hit_area_id() != Some(id));
+    true
+  }
+
+  pub fn exists(&self, pool: &UiObjectPool, id: HitAreaId) -> bool {
+    pool.hit_areas.areas.contains_key(&id)
+  }
+
+  pub fn render(&self, pool: &mut UiObjectPool, id: HitAreaId, rect: Rect) -> bool {
+    if !pool.hit_areas.areas.contains_key(&id) {
+      return false;
+    }
+    let order = pool.next_render_order();
+    let state = pool.hit_areas.areas.get_mut(&id).unwrap();
+    state.hit = (rect.width > 0 && rect.height > 0).then_some(HitSnapshot { rect, order });
+    true
+  }
+
+  pub(crate) fn route_mouse_event(
+    &self,
+    pool: &mut UiObjectPool,
+    text_input: &mut TextInputService,
+    event: MouseEvent,
+  ) -> bool {
+    if event.kind == MouseEventKind::Hold {
+      let captured = event
+        .button
+        .is_some_and(|button| pool.hit_areas.pressed.contains_key(&button));
+      return text_input.route_mouse_event(pool, event) || captured;
+    }
+    if event.kind == MouseEventKind::Scroll {
+      return text_input.route_mouse_event(pool, event);
+    }
+
+    let hit = pool.hit_areas.hit(event.x, event.y);
+    let text_order = text_input.mouse_hit_order(pool, event.x, event.y);
+    let top_hit = hit.filter(|(_, order)| text_order.is_none_or(|text| *order > text));
+    self.update_hover(pool, top_hit.map(|(id, _)| id), event.x, event.y);
+
+    match event.kind {
+      MouseEventKind::Move => top_hit.is_some() || text_order.is_some(),
+      MouseEventKind::Press => {
+        let Some(button) = event.button else {
+          return false;
+        };
+        if let Some((id, _)) = top_hit {
+          text_input.push_pressed_outside(pool);
+          pool.hit_areas.pressed.insert(
+            button,
+            PressState {
+              id,
+              last_x: event.x,
+              last_y: event.y,
+            },
+          );
+          pool.push_hit_event(HitAreaEvent::Press {
+            id,
+            button,
+            x: event.x,
+            y: event.y,
+          });
+          true
+        } else if text_order.is_some() {
+          text_input.route_mouse_event(pool, event);
+          true
+        } else {
+          text_input.route_mouse_event(pool, event)
+        }
+      }
+      MouseEventKind::Drag => {
+        let Some(button) = event.button else {
+          return false;
+        };
+        if let Some(press) = pool.hit_areas.pressed.get_mut(&button) {
+          let (id, dx, dy) = (
+            press.id,
+            event.x as i32 - press.last_x as i32,
+            event.y as i32 - press.last_y as i32,
+          );
+          press.last_x = event.x;
+          press.last_y = event.y;
+          pool.push_hit_event(HitAreaEvent::Drag {
+            id,
+            button,
+            x: event.x,
+            y: event.y,
+            dx,
+            dy,
+          });
+          true
+        } else {
+          text_input.route_mouse_event(pool, event) || top_hit.is_some() || text_order.is_some()
+        }
+      }
+      MouseEventKind::Release => {
+        let Some(button) = event.button else {
+          return false;
+        };
+        let pressed = pool.hit_areas.pressed.remove(&button);
+        let text_consumed = text_input.route_mouse_event(pool, event);
+        if let Some((id, _)) = top_hit {
+          pool.push_hit_event(HitAreaEvent::Release {
+            id,
+            button,
+            x: event.x,
+            y: event.y,
+          });
+          if pressed.is_some_and(|press| press.id == id) {
+            pool.push_hit_event(HitAreaEvent::Click {
+              id,
+              button,
+              x: event.x,
+              y: event.y,
+            });
+          }
+          true
+        } else {
+          text_consumed || pressed.is_some() || text_order.is_some()
+        }
+      }
+      _ => false,
+    }
+  }
+
+  pub(crate) fn focus_lost(&self, pool: &mut UiObjectPool) {
+    if let (Some(id), Some((x, y))) = (pool.hit_areas.hovered.take(), pool.hit_areas.pointer) {
+      pool.push_hit_event(HitAreaEvent::HoverLeave { id, x, y });
+    }
+    pool.hit_areas.pressed.clear();
+  }
+
+  pub(crate) fn deactivate(&self, pool: &mut UiObjectPool) {
+    pool.hit_areas.hovered = None;
+    pool.hit_areas.pressed.clear();
+    pool.hit_areas.pointer = None;
+    for state in pool.hit_areas.areas.values_mut() {
+      state.hit = None;
+    }
+    pool.events.clear();
+  }
+
+  fn update_hover(&self, pool: &mut UiObjectPool, current: Option<HitAreaId>, x: u16, y: u16) {
+    let previous = pool.hit_areas.hovered;
+    pool.hit_areas.pointer = Some((x, y));
+    match (previous, current) {
+      (Some(old), Some(new)) if old == new => {
+        pool.push_hit_event(HitAreaEvent::HoverMove { id: new, x, y });
+      }
+      (Some(old), Some(new)) => {
+        pool.push_hit_event(HitAreaEvent::HoverLeave { id: old, x, y });
+        pool.push_hit_event(HitAreaEvent::HoverEnter { id: new, x, y });
+      }
+      (Some(old), None) => pool.push_hit_event(HitAreaEvent::HoverLeave { id: old, x, y }),
+      (None, Some(new)) => pool.push_hit_event(HitAreaEvent::HoverEnter { id: new, x, y }),
+      (None, None) => {}
+    }
+    pool.hit_areas.hovered = current;
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::host_engine::services::{
+    CanvasService, TextInputEvent, TextInputMode, TextInputOptions, TextInputRenderParams, UiEvent,
+  };
+
+  fn mouse(kind: MouseEventKind, button: Option<MouseButton>, x: u16, y: u16) -> MouseEvent {
+    MouseEvent {
+      kind,
+      button,
+      scroll: None,
+      x,
+      y,
+    }
+  }
+
+  fn events(pool: &mut UiObjectPool) -> Vec<UiEvent> {
+    std::iter::from_fn(|| pool.pop_event()).collect()
+  }
+
+  fn rect(x: u16, y: u16, width: u16, height: u16) -> Rect {
+    Rect {
+      x,
+      y,
+      width,
+      height,
+    }
+  }
+
+  #[test]
+  fn lifecycle_zero_rect_and_missing_render_are_consistent() {
+    let service = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let first = service.create(&mut pool);
+    let second = service.create(&mut pool);
+    assert_eq!((first, second), (HitAreaId(1), HitAreaId(2)));
+    assert!(service.exists(&pool, first));
+    assert!(service.render(&mut pool, first, rect(0, 0, 0, 2)));
+    assert!(!service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 0, 0),
+    ));
+
+    service.render(&mut pool, first, rect(0, 0, 3, 2));
+    assert!(service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 1, 1),
+    ));
+    pool.begin_render();
+    assert!(!service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 1, 1),
+    ));
+    assert!(service.remove(&mut pool, first));
+    assert!(!service.remove(&mut pool, first));
+  }
+
+  #[test]
+  fn overlap_hover_and_click_use_last_rendered_area() {
+    let service = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let a = service.create(&mut pool);
+    let b = service.create(&mut pool);
+    service.render(&mut pool, a, rect(0, 0, 4, 4));
+    service.render(&mut pool, b, rect(2, 0, 4, 4));
+
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 1, 1),
+    );
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Move, None, 2, 1),
+    );
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Press, Some(MouseButton::Right), 2, 1),
+    );
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Release, Some(MouseButton::Right), 2, 1),
+    );
+
+    let events = events(&mut pool);
+    assert!(events.contains(&UiEvent::HitArea(HitAreaEvent::HoverLeave {
+      id: a,
+      x: 2,
+      y: 1,
+    })));
+    assert!(events.contains(&UiEvent::HitArea(HitAreaEvent::HoverEnter {
+      id: b,
+      x: 2,
+      y: 1,
+    })));
+    assert!(events.contains(&UiEvent::HitArea(HitAreaEvent::Click {
+      id: b,
+      button: MouseButton::Right,
+      x: 2,
+      y: 1,
+    })));
+  }
+
+  #[test]
+  fn all_mouse_buttons_have_press_release_and_click() {
+    for button in [MouseButton::Left, MouseButton::Middle, MouseButton::Right] {
+      let service = HitAreaService::new();
+      let mut text_input = TextInputService::new();
+      let mut pool = UiObjectPool::new();
+      let id = service.create(&mut pool);
+      service.render(&mut pool, id, rect(0, 0, 3, 3));
+      service.route_mouse_event(
+        &mut pool,
+        &mut text_input,
+        mouse(MouseEventKind::Press, Some(button), 1, 1),
+      );
+      service.route_mouse_event(
+        &mut pool,
+        &mut text_input,
+        mouse(MouseEventKind::Release, Some(button), 1, 1),
+      );
+      let events = events(&mut pool);
+      let kinds = events
+        .iter()
+        .filter_map(|event| match event {
+          UiEvent::HitArea(HitAreaEvent::Press { button: actual, .. }) if *actual == button => {
+            Some("press")
+          }
+          UiEvent::HitArea(HitAreaEvent::Release { button: actual, .. }) if *actual == button => {
+            Some("release")
+          }
+          UiEvent::HitArea(HitAreaEvent::Click { button: actual, .. }) if *actual == button => {
+            Some("click")
+          }
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(kinds, ["press", "release", "click"]);
+    }
+  }
+
+  #[test]
+  fn drag_is_captured_and_click_requires_matching_release_target() {
+    let service = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let a = service.create(&mut pool);
+    let b = service.create(&mut pool);
+    service.render(&mut pool, a, rect(0, 0, 3, 3));
+    service.render(&mut pool, b, rect(5, 0, 3, 3));
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Press, Some(MouseButton::Left), 1, 1),
+    );
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Drag, Some(MouseButton::Left), 4, 2),
+    );
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Drag, Some(MouseButton::Left), 6, 1),
+    );
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Release, Some(MouseButton::Left), 6, 1),
+    );
+    let events = events(&mut pool);
+    assert!(events.contains(&UiEvent::HitArea(HitAreaEvent::Drag {
+      id: a,
+      button: MouseButton::Left,
+      x: 4,
+      y: 2,
+      dx: 3,
+      dy: 1,
+    })));
+    assert!(events.contains(&UiEvent::HitArea(HitAreaEvent::Drag {
+      id: a,
+      button: MouseButton::Left,
+      x: 6,
+      y: 1,
+      dx: 2,
+      dy: -1,
+    })));
+    assert!(
+      !events
+        .iter()
+        .any(|event| matches!(event, UiEvent::HitArea(HitAreaEvent::Click { .. })))
+    );
+  }
+
+  #[test]
+  fn later_text_input_blocks_hit_area_and_hit_area_can_report_pressed_outside() {
+    let hit_area = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let area = hit_area.create(&mut pool);
+    let input = text_input.create(
+      &mut pool,
+      TextInputOptions {
+        mode: TextInputMode::SingleLine,
+        mouse: true,
+        ..Default::default()
+      },
+    );
+    let mut canvas = CanvasService::new();
+    hit_area.render(&mut pool, area, rect(0, 0, 5, 1));
+    text_input.render(
+      &mut pool,
+      input,
+      &TextInputRenderParams {
+        rect: rect(0, 0, 5, 1),
+        ..Default::default()
+      },
+      &mut canvas,
+    );
+    hit_area.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Press, Some(MouseButton::Left), 1, 0),
+    );
+    assert_eq!(
+      events(&mut pool),
+      vec![UiEvent::TextInput(TextInputEvent::Pressed { id: input })]
+    );
+
+    pool.begin_render();
+    text_input.render(
+      &mut pool,
+      input,
+      &TextInputRenderParams {
+        rect: rect(0, 0, 5, 1),
+        ..Default::default()
+      },
+      &mut canvas,
+    );
+    hit_area.render(&mut pool, area, rect(0, 0, 5, 1));
+    text_input.focus(&mut pool, input);
+    events(&mut pool);
+    hit_area.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Press, Some(MouseButton::Left), 1, 0),
+    );
+    let events = events(&mut pool);
+    assert!(
+      events.contains(&UiEvent::TextInput(TextInputEvent::PressedOutside {
+        id: input
+      }))
+    );
+    assert!(events.contains(&UiEvent::HitArea(HitAreaEvent::Press {
+      id: area,
+      button: MouseButton::Left,
+      x: 1,
+      y: 0,
+    })));
+  }
+
+  #[test]
+  fn focus_lost_leaves_hover_and_cancels_click() {
+    let service = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service.create(&mut pool);
+    service.render(&mut pool, id, rect(0, 0, 3, 3));
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Press, Some(MouseButton::Middle), 1, 1),
+    );
+    events(&mut pool);
+    service.focus_lost(&mut pool);
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Release, Some(MouseButton::Middle), 1, 1),
+    );
+    let events = events(&mut pool);
+    assert_eq!(
+      events[0],
+      UiEvent::HitArea(HitAreaEvent::HoverLeave { id, x: 1, y: 1 })
+    );
+    assert!(
+      !events
+        .iter()
+        .any(|event| matches!(event, UiEvent::HitArea(HitAreaEvent::Click { .. })))
+    );
+  }
+
+  #[test]
+  fn deactivate_silently_clears_hits_events_and_capture() {
+    let service = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service.create(&mut pool);
+    service.render(&mut pool, id, rect(0, 0, 3, 3));
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Press, Some(MouseButton::Left), 1, 1),
+    );
+    service.deactivate(&mut pool);
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      mouse(MouseEventKind::Release, Some(MouseButton::Left), 1, 1),
+    );
+    assert!(events(&mut pool).is_empty());
+  }
+}

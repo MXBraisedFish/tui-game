@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, InputActionEvent,
-  KeyState, LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService,
-  RichTextParams, StorageService, TextColor, TextStyle, UiObjectPool, UiObjectPoolOwner,
+  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, KeyState, LayoutService,
+  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, StorageService,
+  TextColor, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 /// 检测步骤
@@ -130,7 +130,10 @@ impl TerminalCheckUi {
 
   // ── 输入处理 ──
 
-  pub fn handle_event(&mut self, event: &InputActionEvent) -> Option<TerminalCheckCommand> {
+  pub fn handle_event(&mut self, event: &UiEvent) -> Option<TerminalCheckCommand> {
+    let UiEvent::Action(event) = event else {
+      return None;
+    };
     if event.state != KeyState::Pressed {
       return None;
     }

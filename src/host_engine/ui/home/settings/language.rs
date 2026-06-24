@@ -4,10 +4,10 @@ use std::time::Duration;
 
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
-  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, InputActionEvent,
-  KeyState, LanguageRegistryEntry, LayoutService, LogService, LogSource, MouseButton, MouseEvent,
-  MouseEventKind, Rect, RenderService, RichTextParams, StorageService, TerminalColor, TextColor,
-  UiObjectPool, UiObjectPoolOwner,
+  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
+  HitAreaService, I18nService, KeyState, LanguageRegistryEntry, LayoutService, LogService,
+  LogSource, MouseButton, Rect, RenderService, RichTextParams, StorageService, TerminalColor,
+  TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 // ── 常量 ──
@@ -25,8 +25,6 @@ pub(crate) struct LanguageSelectLayout {
   cell_rects: Vec<Rect>,
   cell_text_xs: Vec<u16>,
   page_start: usize,
-  columns: usize,
-  cell_width: u16,
   pages: usize,
   page_center: u16,
   page_y: u16,
@@ -48,6 +46,8 @@ pub struct LanguageSelectUi {
   columns: Cell<usize>,
   per_page: Cell<usize>,
   objects: UiObjectPool,
+  back_area: HitAreaId,
+  cell_areas: Vec<HitAreaId>,
 }
 
 impl UiObjectPoolOwner for LanguageSelectUi {
@@ -71,6 +71,7 @@ impl LanguageSelectUi {
     mut registry: Vec<LanguageRegistryEntry>,
     storage: &StorageService,
     log: &mut LogService,
+    hit_area: &HitAreaService,
   ) -> Self {
     registry.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -84,6 +85,11 @@ impl LanguageSelectUi {
       .unwrap_or(0);
 
     let runtime_cache = Self::preload_runtime_cache(storage, log, &registry);
+    let mut objects = UiObjectPool::new();
+    let back_area = hit_area.create(&mut objects);
+    let cell_areas = (0..registry.len())
+      .map(|_| hit_area.create(&mut objects))
+      .collect();
 
     Self {
       selected_index,
@@ -93,7 +99,9 @@ impl LanguageSelectUi {
       active_code,
       columns: Cell::new(4),
       per_page: Cell::new(12),
-      objects: UiObjectPool::new(),
+      objects,
+      back_area,
+      cell_areas,
     }
   }
 
@@ -197,63 +205,55 @@ impl LanguageSelectUi {
 
   // ── 输入处理 ──
 
-  pub fn handle_event(&mut self, event: &InputActionEvent) -> Option<LanguageSelectCommand> {
-    if event.state != KeyState::Pressed {
-      return None;
-    }
-    match event.action.as_str() {
-      "language_select.focus_up" => {
-        self.focus_up();
+  pub fn handle_event(&mut self, event: &UiEvent) -> Option<LanguageSelectCommand> {
+    match event {
+      UiEvent::HitArea(
+        HitAreaEvent::HoverEnter { id, .. } | HitAreaEvent::HoverMove { id, .. },
+      ) => {
+        self.selected_index = self.cell_areas.iter().position(|area| area == id)?;
+        self.normalize_page();
         None
       }
-      "language_select.focus_down" => {
-        self.focus_down();
-        None
-      }
-      "language_select.focus_left" => {
-        self.focus_left();
-        None
-      }
-      "language_select.focus_right" => {
-        self.focus_right();
-        None
-      }
-      "language_select.flip_forward" => self.flip_page(false),
-      "language_select.flip_backward" => self.flip_page(true),
-      "language_select.confirm" => {
-        let code = self.registry[self.selected_index].code.clone();
+      UiEvent::HitArea(HitAreaEvent::Click {
+        id,
+        button: MouseButton::Left,
+        ..
+      }) => {
+        let index = self.cell_areas.iter().position(|area| area == id)?;
+        self.selected_index = index;
+        let code = self.registry[index].code.clone();
         self.active_code = code.clone();
         Some(LanguageSelectCommand::Confirm(code))
       }
-      "language_select.back" => Some(LanguageSelectCommand::Back),
-      _ => None,
-    }
-  }
-
-  pub fn handle_mouse_event(
-    &mut self,
-    event: &MouseEvent,
-    positions: &LanguageSelectLayout,
-  ) -> Option<LanguageSelectCommand> {
-    match event.kind {
-      MouseEventKind::Move | MouseEventKind::Hold => {
-        if let Some(idx) = Self::hit_test(positions, event.x, event.y) {
-          self.selected_index = idx;
-          self.normalize_page();
-        }
-        None
-      }
-      MouseEventKind::Press => match event.button {
-        Some(MouseButton::Left) => {
-          if let Some(idx) = Self::hit_test(positions, event.x, event.y) {
-            self.selected_index = idx;
-            let code = self.registry[idx].code.clone();
-            self.active_code = code.clone();
-            return Some(LanguageSelectCommand::Confirm(code));
-          }
+      UiEvent::HitArea(HitAreaEvent::Press {
+        button: MouseButton::Right,
+        ..
+      }) => Some(LanguageSelectCommand::Back),
+      UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
+        "language_select.focus_up" => {
+          self.focus_up();
           None
         }
-        Some(MouseButton::Right) => Some(LanguageSelectCommand::Back),
+        "language_select.focus_down" => {
+          self.focus_down();
+          None
+        }
+        "language_select.focus_left" => {
+          self.focus_left();
+          None
+        }
+        "language_select.focus_right" => {
+          self.focus_right();
+          None
+        }
+        "language_select.flip_forward" => self.flip_page(false),
+        "language_select.flip_backward" => self.flip_page(true),
+        "language_select.confirm" => {
+          let code = self.registry[self.selected_index].code.clone();
+          self.active_code = code.clone();
+          Some(LanguageSelectCommand::Confirm(code))
+        }
+        "language_select.back" => Some(LanguageSelectCommand::Back),
         _ => None,
       },
       _ => None,
@@ -268,14 +268,34 @@ impl LanguageSelectUi {
   // ── 渲染 ──
 
   pub fn render(
-    &self,
+    &mut self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     layout: &LayoutService,
     _i18n: &I18nService,
+    hit_area: &HitAreaService,
   ) {
     let positions = self.compute_positions(layout);
     self.draw_content(render, canvas, layout, &positions);
+    let terminal = layout.get_terminal_size();
+    hit_area.render(
+      &mut self.objects,
+      self.back_area,
+      Rect {
+        x: 0,
+        y: 0,
+        width: terminal.width,
+        height: terminal.height,
+      },
+    );
+    let (start, _, _, _) = self.page_bounds();
+    for (id, rect) in self.cell_areas[start..]
+      .iter()
+      .copied()
+      .zip(positions.cell_rects.iter().copied())
+    {
+      hit_area.render(&mut self.objects, id, rect);
+    }
   }
 
   pub fn compute_positions(&self, layout: &LayoutService) -> LanguageSelectLayout {
@@ -375,8 +395,6 @@ impl LanguageSelectUi {
       cell_rects,
       cell_text_xs,
       page_start,
-      columns,
-      cell_width,
       pages,
       page_center,
       page_y,
@@ -495,14 +513,6 @@ impl LanguageSelectUi {
       }
     }
     None
-  }
-
-  fn hit_test(positions: &LanguageSelectLayout, x: u16, y: u16) -> Option<usize> {
-    positions
-      .cell_rects
-      .iter()
-      .position(|r| r.contains(x, y))
-      .map(|vi| positions.page_start + vi)
   }
 
   // ── 键参数（桥接 language.* → language_select.*） ──

@@ -4,15 +4,14 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
-  EngineServices, InputActionEvent, MouseButton, MouseEvent, MouseEventKind, SystemEvent,
-  UiObjectPoolOwner, translate_action_map,
+  EngineServices, MouseEvent, SystemEvent, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  translate_action_map,
 };
 
 use crate::host_engine::ui::{
-  self, HomeLayout, HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageSelectCommand,
-  LanguageSelectLayout, LanguageSelectUi, ModsCommand, ModsLayout, ModsUi, SettingsLayout,
-  SettingsUi, SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
-  WindowSizeWarningCommand,
+  HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageSelectCommand, LanguageSelectUi,
+  ModsCommand, ModsUi, SettingsUi, SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout,
+  TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
@@ -32,8 +31,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
   // ── 创建 UI ──
   let registry = services.i18n.language_registry().to_vec();
-  let mut home_ui = HomeUi::init();
-  let mut settings_ui = SettingsUi::init();
+  let mut home_ui = HomeUi::init(&services.hit_area);
+  let mut settings_ui = SettingsUi::init(&services.hit_area);
   let mut language_select_ui = if registry.is_empty() {
     None
   } else {
@@ -41,11 +40,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       registry,
       &services.storage,
       &mut services.log,
+      &services.hit_area,
     ))
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
-  let mut mods_ui = ModsUi::init();
-  let mut input_demo_ui = InputDemoUi::init();
+  let mut mods_ui = ModsUi::init(&services.hit_area);
+  let mut input_demo_ui = InputDemoUi::init(&services.hit_area);
+  let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
 
   // 初始 UI 节点
   // 1) 无语言 → LanguageSelect
@@ -78,6 +79,17 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     // 窗口尺寸检查与覆盖层管理
     manage_window_size_overlay(services, world);
+    deactivate_hidden_pools(
+      services,
+      world,
+      &mut home_ui,
+      &mut settings_ui,
+      language_select_ui.as_mut(),
+      &mut terminal_check_ui,
+      &mut mods_ui,
+      &mut input_demo_ui,
+      &mut window_size_ui,
+    );
 
     // 输入所有权：覆盖层 > 输入组件 > 当前页面 action map。
     // rdev 原始按键捕获在 InputService 中与 action map 并行，不参与输入所有权。
@@ -93,6 +105,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         &mut terminal_check_ui,
         &mut mods_ui,
         &mut input_demo_ui,
+        &mut window_size_ui,
       );
     } else if services.text_input.is_active() {
       route_text_input_events(
@@ -125,6 +138,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         &mut terminal_check_ui,
         &mut mods_ui,
         &mut input_demo_ui,
+        &mut window_size_ui,
       );
     }
 
@@ -150,12 +164,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     let input_cursor = route_render(
       services,
       world,
-      &home_ui,
-      &settings_ui,
-      language_select_ui.as_ref(),
-      &terminal_check_ui,
-      &mods_ui,
-      &input_demo_ui,
+      &mut home_ui,
+      &mut settings_ui,
+      language_select_ui.as_mut(),
+      &mut terminal_check_ui,
+      &mut mods_ui,
+      &mut input_demo_ui,
+      &mut window_size_ui,
     );
     let text_force_redraw = services.canvas.take_render_requested();
     let composed = services.compositor.compose(&services.canvas);
@@ -210,7 +225,7 @@ fn load_terminal_check_action_map(services: &mut EngineServices) {
 }
 
 fn load_window_size_action_map(services: &mut EngineServices) {
-  let bindings = translate_action_map(&ui::window_size_warning::action_map())
+  let bindings = translate_action_map(&WindowSizeWarningUi::action_map())
     .expect("failed to translate window_size action map");
 
   services.input.load_key_bindings(bindings);
@@ -222,9 +237,169 @@ fn load_input_demo_action_map(services: &mut EngineServices) {
   services.input.load_key_bindings(bindings);
 }
 
-fn route_text_input_events(
+fn current_objects_mut<'a>(
+  world: &RuntimeWorld,
+  home_ui: &'a mut HomeUi,
+  settings_ui: &'a mut SettingsUi,
+  language_select_ui: Option<&'a mut LanguageSelectUi>,
+  terminal_check_ui: &'a mut TerminalCheckUi,
+  mods_ui: &'a mut ModsUi,
+  input_demo_ui: &'a mut InputDemoUi,
+) -> Option<&'a mut UiObjectPool> {
+  match world.state.current_ui_kind() {
+    Some(UiNodeKind::Home) => Some(home_ui.objects_mut()),
+    Some(UiNodeKind::Settings) => Some(settings_ui.objects_mut()),
+    Some(UiNodeKind::LanguageSelect) => language_select_ui.map(UiObjectPoolOwner::objects_mut),
+    Some(UiNodeKind::TerminalCheck) => Some(terminal_check_ui.objects_mut()),
+    Some(UiNodeKind::Mods) => Some(mods_ui.objects_mut()),
+    Some(UiNodeKind::InputDemo) => Some(input_demo_ui.objects_mut()),
+    _ => None,
+  }
+}
+
+fn deactivate_hidden_pools(
   services: &mut EngineServices,
   world: &RuntimeWorld,
+  home_ui: &mut HomeUi,
+  settings_ui: &mut SettingsUi,
+  language_select_ui: Option<&mut LanguageSelectUi>,
+  terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
+  input_demo_ui: &mut InputDemoUi,
+  window_size_ui: &mut WindowSizeWarningUi,
+) {
+  let active = world
+    .state
+    .current_overlay_kind()
+    .is_none()
+    .then(|| world.state.current_ui_kind())
+    .flatten();
+  let mut deactivate = |kind, pool: &mut UiObjectPool| {
+    if active != Some(kind) {
+      services.text_input.deactivate_pool(pool);
+      services.hit_area.deactivate(pool);
+    }
+  };
+  deactivate(UiNodeKind::Home, home_ui.objects_mut());
+  deactivate(UiNodeKind::Settings, settings_ui.objects_mut());
+  if let Some(ui) = language_select_ui {
+    deactivate(UiNodeKind::LanguageSelect, ui.objects_mut());
+  }
+  deactivate(UiNodeKind::TerminalCheck, terminal_check_ui.objects_mut());
+  deactivate(UiNodeKind::Mods, mods_ui.objects_mut());
+  deactivate(UiNodeKind::InputDemo, input_demo_ui.objects_mut());
+  if world.state.current_overlay_kind() != Some(OverlayKind::WindowSizeWarning) {
+    services
+      .text_input
+      .deactivate_pool(window_size_ui.objects_mut());
+    services.hit_area.deactivate(window_size_ui.objects_mut());
+  }
+}
+
+fn route_component_mouse(
+  services: &mut EngineServices,
+  world: &RuntimeWorld,
+  home_ui: &mut HomeUi,
+  settings_ui: &mut SettingsUi,
+  language_select_ui: Option<&mut LanguageSelectUi>,
+  terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
+  input_demo_ui: &mut InputDemoUi,
+  event: MouseEvent,
+) -> bool {
+  let Some(pool) = current_objects_mut(
+    world,
+    home_ui,
+    settings_ui,
+    language_select_ui,
+    terminal_check_ui,
+    mods_ui,
+    input_demo_ui,
+  ) else {
+    return false;
+  };
+  services
+    .hit_area
+    .route_mouse_event(pool, &mut services.text_input, event)
+}
+
+fn route_mouse_and_events(
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+  home_ui: &mut HomeUi,
+  settings_ui: &mut SettingsUi,
+  mut language_select_ui: Option<&mut LanguageSelectUi>,
+  terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
+  input_demo_ui: &mut InputDemoUi,
+  event: MouseEvent,
+) -> bool {
+  let consumed = route_component_mouse(
+    services,
+    world,
+    home_ui,
+    settings_ui,
+    language_select_ui.as_deref_mut(),
+    terminal_check_ui,
+    mods_ui,
+    input_demo_ui,
+    event,
+  );
+  route_component_events(
+    services,
+    world,
+    home_ui,
+    settings_ui,
+    language_select_ui,
+    terminal_check_ui,
+    mods_ui,
+    input_demo_ui,
+  );
+  consumed
+}
+
+fn route_component_events(
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+  home_ui: &mut HomeUi,
+  settings_ui: &mut SettingsUi,
+  mut language_select_ui: Option<&mut LanguageSelectUi>,
+  terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
+  input_demo_ui: &mut InputDemoUi,
+) {
+  loop {
+    let event = current_objects_mut(
+      world,
+      home_ui,
+      settings_ui,
+      language_select_ui.as_deref_mut(),
+      terminal_check_ui,
+      mods_ui,
+      input_demo_ui,
+    )
+    .and_then(UiObjectPool::pop_event);
+    let Some(event) = event else { break };
+    route_input_event(
+      &event,
+      services,
+      world,
+      home_ui,
+      settings_ui,
+      language_select_ui.as_deref_mut(),
+      terminal_check_ui,
+      mods_ui,
+      input_demo_ui,
+    );
+    if world.is_stopped() {
+      break;
+    }
+  }
+}
+
+fn route_text_input_events(
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   mut language_select_ui: Option<&mut LanguageSelectUi>,
@@ -233,30 +408,60 @@ fn route_text_input_events(
   input_demo_ui: &mut InputDemoUi,
 ) {
   for event in services.input.drain_system_events() {
-    let objects = match world.state.current_ui_kind() {
-      Some(UiNodeKind::Home) => Some(home_ui.objects_mut()),
-      Some(UiNodeKind::Settings) => Some(settings_ui.objects_mut()),
-      Some(UiNodeKind::LanguageSelect) => language_select_ui
-        .as_deref_mut()
-        .map(UiObjectPoolOwner::objects_mut),
-      Some(UiNodeKind::Mods) => Some(mods_ui.objects_mut()),
-      Some(UiNodeKind::TerminalCheck) => Some(terminal_check_ui.objects_mut()),
-      Some(UiNodeKind::InputDemo) => Some(input_demo_ui.objects_mut()),
-      _ => None,
-    };
-    if let Some(objects) = objects {
-      match event {
-        SystemEvent::TerminalKey(key) => {
+    match event {
+      SystemEvent::TerminalKey(key) => {
+        if let Some(objects) = current_objects_mut(
+          world,
+          home_ui,
+          settings_ui,
+          language_select_ui.as_deref_mut(),
+          terminal_check_ui,
+          mods_ui,
+          input_demo_ui,
+        ) {
           services
             .text_input
-            .route_terminal_key(objects, &mut services.clipboard, key)
+            .route_terminal_key(objects, &mut services.clipboard, key);
         }
-        SystemEvent::Mouse(mouse) => {
-          services.text_input.route_mouse_event(objects, mouse);
-        }
-        _ => {}
       }
+      SystemEvent::Mouse(mouse) => {
+        route_component_mouse(
+          services,
+          world,
+          home_ui,
+          settings_ui,
+          language_select_ui.as_deref_mut(),
+          terminal_check_ui,
+          mods_ui,
+          input_demo_ui,
+          mouse,
+        );
+      }
+      SystemEvent::Focus(focus) if !focus.gained => {
+        if let Some(objects) = current_objects_mut(
+          world,
+          home_ui,
+          settings_ui,
+          language_select_ui.as_deref_mut(),
+          terminal_check_ui,
+          mods_ui,
+          input_demo_ui,
+        ) {
+          services.hit_area.focus_lost(objects);
+        }
+      }
+      _ => {}
     }
+    route_component_events(
+      services,
+      world,
+      home_ui,
+      settings_ui,
+      language_select_ui.as_deref_mut(),
+      terminal_check_ui,
+      mods_ui,
+      input_demo_ui,
+    );
   }
 }
 
@@ -269,22 +474,35 @@ fn route_input_events(
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
   input_demo_ui: &mut InputDemoUi,
+  window_size_ui: &mut WindowSizeWarningUi,
 ) {
   // 覆盖层输入优先
   if world.state.current_overlay_kind().is_some() {
     while let Some(event) = services.input.next_action_event() {
-      if let Some(cmd) = ui::window_size_warning::handle_event(&event) {
+      if let Some(cmd) = window_size_ui.handle_event(&UiEvent::Action(event)) {
         apply_window_size_command(cmd, world);
       }
       if world.is_stopped() {
         break;
       }
     }
-    // 鼠标右键等同于 Esc
     for sys_event in services.input.drain_system_events() {
-      if let SystemEvent::Mouse(me) = sys_event {
-        if me.kind == MouseEventKind::Press && me.button == Some(MouseButton::Right) {
-          apply_window_size_command(WindowSizeWarningCommand::Exit, world);
+      match sys_event {
+        SystemEvent::Mouse(mouse) => {
+          services.hit_area.route_mouse_event(
+            window_size_ui.objects_mut(),
+            &mut services.text_input,
+            mouse,
+          );
+        }
+        SystemEvent::Focus(focus) if !focus.gained => {
+          services.hit_area.focus_lost(window_size_ui.objects_mut());
+        }
+        _ => {}
+      }
+      while let Some(event) = window_size_ui.objects_mut().pop_event() {
+        if let Some(command) = window_size_ui.handle_event(&event) {
+          apply_window_size_command(command, world);
         }
       }
       if world.is_stopped() {
@@ -297,7 +515,17 @@ fn route_input_events(
   // 键盘事件
   while let Some(event) = services.input.next_action_event() {
     route_input_event(
-      &event,
+      &UiEvent::Action(event),
+      services,
+      world,
+      home_ui,
+      settings_ui,
+      language_select_ui.as_deref_mut(),
+      terminal_check_ui,
+      mods_ui,
+      input_demo_ui,
+    );
+    route_component_events(
       services,
       world,
       home_ui,
@@ -313,116 +541,61 @@ fn route_input_events(
     }
   }
 
-  // 鼠标事件
-  match world.state.current_ui_kind() {
-    Some(UiNodeKind::Home) => {
-      let positions = home_ui.compute_positions(&services.layout, &services.i18n);
-      for sys_event in services.input.drain_system_events() {
-        if let SystemEvent::Mouse(me) = sys_event {
-          if !services
-            .text_input
-            .route_mouse_event(home_ui.objects_mut(), me)
-          {
-            route_mouse_event(
-              &me,
-              &positions,
-              world,
-              home_ui,
-              settings_ui,
-              terminal_check_ui,
-            );
-          }
-          if world.is_stopped() {
-            break;
+  let terminal_positions = (world.state.current_ui_kind() == Some(UiNodeKind::TerminalCheck))
+    .then(|| terminal_check_ui.compute_positions(&services.layout, &services.i18n));
+  for event in services.input.drain_system_events() {
+    match event {
+      SystemEvent::Mouse(mouse) => {
+        let consumed = route_mouse_and_events(
+          services,
+          world,
+          home_ui,
+          settings_ui,
+          language_select_ui.as_deref_mut(),
+          terminal_check_ui,
+          mods_ui,
+          input_demo_ui,
+          mouse,
+        );
+        if !consumed {
+          if let Some(positions) = terminal_positions.as_ref() {
+            route_terminal_check_mouse_event(&mouse, positions, services, world, terminal_check_ui);
           }
         }
       }
-    }
-    Some(UiNodeKind::Settings) => {
-      let positions = settings_ui.compute_positions(&services.layout, &services.i18n);
-      for sys_event in services.input.drain_system_events() {
-        if let SystemEvent::Mouse(me) = sys_event {
-          if !services
-            .text_input
-            .route_mouse_event(settings_ui.objects_mut(), me)
-          {
-            route_settings_mouse_event(&me, &positions, world, settings_ui);
-          }
-          if world.is_stopped() {
-            break;
-          }
+      SystemEvent::Focus(focus) if !focus.gained => {
+        if let Some(pool) = current_objects_mut(
+          world,
+          home_ui,
+          settings_ui,
+          language_select_ui.as_deref_mut(),
+          terminal_check_ui,
+          mods_ui,
+          input_demo_ui,
+        ) {
+          services.hit_area.focus_lost(pool);
         }
+        route_component_events(
+          services,
+          world,
+          home_ui,
+          settings_ui,
+          language_select_ui.as_deref_mut(),
+          terminal_check_ui,
+          mods_ui,
+          input_demo_ui,
+        );
       }
+      _ => {}
     }
-    Some(UiNodeKind::LanguageSelect) => {
-      if let Some(ui) = language_select_ui.as_ref() {
-        let positions = ui.compute_positions(&services.layout);
-        for sys_event in services.input.drain_system_events() {
-          if let SystemEvent::Mouse(me) = sys_event {
-            if let Some(ui_mut) = language_select_ui.as_mut() {
-              if !services
-                .text_input
-                .route_mouse_event(ui_mut.objects_mut(), me)
-              {
-                route_language_select_mouse_event(&me, &positions, services, world, ui_mut);
-              }
-            }
-            if world.is_stopped() {
-              break;
-            }
-          }
-        }
-      }
-    }
-    Some(UiNodeKind::Mods) => {
-      let positions = mods_ui.compute_positions(&services.layout, &services.i18n);
-      for sys_event in services.input.drain_system_events() {
-        if let SystemEvent::Mouse(me) = sys_event {
-          if !services
-            .text_input
-            .route_mouse_event(mods_ui.objects_mut(), me)
-          {
-            route_mods_mouse_event(&me, &positions, world, mods_ui);
-          }
-          if world.is_stopped() {
-            break;
-          }
-        }
-      }
-    }
-    Some(UiNodeKind::TerminalCheck) => {
-      let positions = terminal_check_ui.compute_positions(&services.layout, &services.i18n);
-      for sys_event in services.input.drain_system_events() {
-        if let SystemEvent::Mouse(me) = sys_event {
-          if !services
-            .text_input
-            .route_mouse_event(terminal_check_ui.objects_mut(), me)
-          {
-            route_terminal_check_mouse_event(&me, &positions, services, world, terminal_check_ui);
-          }
-          if world.is_stopped() {
-            break;
-          }
-        }
-      }
-    }
-    Some(UiNodeKind::InputDemo) => {
-      for sys_event in services.input.drain_system_events() {
-        if let SystemEvent::Mouse(mouse) = sys_event {
-          services
-            .text_input
-            .route_mouse_event(input_demo_ui.objects_mut(), mouse);
-        }
-      }
-    }
-    _ => {
-      let _ = services.input.drain_system_events();
+    if world.is_stopped() {
+      break;
     }
   }
 }
 
 fn route_input_event(
-  event: &InputActionEvent,
+  event: &UiEvent,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
@@ -463,73 +636,6 @@ fn route_input_event(
     Some(UiNodeKind::InputDemo) => {
       if let Some(command) = input_demo_ui.handle_event(event) {
         apply_input_demo_command(command, input_demo_ui, services, world);
-      }
-    }
-    _ => {}
-  }
-}
-
-fn route_mouse_event(
-  event: &MouseEvent,
-  positions: &HomeLayout,
-  world: &mut RuntimeWorld,
-  home_ui: &mut HomeUi,
-  _settings_ui: &mut SettingsUi,
-  _terminal_check_ui: &mut TerminalCheckUi,
-) {
-  match world.state.current_ui_kind() {
-    Some(UiNodeKind::Home) => {
-      if let Some(command) = home_ui.handle_mouse_event(event, positions) {
-        apply_home_command(command, world);
-      }
-    }
-    _ => {}
-  }
-}
-
-fn route_settings_mouse_event(
-  event: &MouseEvent,
-  positions: &SettingsLayout,
-  world: &mut RuntimeWorld,
-  settings_ui: &mut SettingsUi,
-) {
-  match world.state.current_ui_kind() {
-    Some(UiNodeKind::Settings) => {
-      if let Some(command) = settings_ui.handle_mouse_event(event, positions) {
-        apply_settings_command(command, world);
-      }
-    }
-    _ => {}
-  }
-}
-
-fn route_language_select_mouse_event(
-  event: &MouseEvent,
-  positions: &LanguageSelectLayout,
-  services: &mut EngineServices,
-  world: &mut RuntimeWorld,
-  language_select_ui: &mut LanguageSelectUi,
-) {
-  match world.state.current_ui_kind() {
-    Some(UiNodeKind::LanguageSelect) => {
-      if let Some(command) = language_select_ui.handle_mouse_event(event, positions) {
-        apply_language_select_command(command, services, world);
-      }
-    }
-    _ => {}
-  }
-}
-
-fn route_mods_mouse_event(
-  event: &MouseEvent,
-  positions: &ModsLayout,
-  world: &mut RuntimeWorld,
-  mods_ui: &mut ModsUi,
-) {
-  match world.state.current_ui_kind() {
-    Some(UiNodeKind::Mods) => {
-      if let Some(command) = mods_ui.handle_mouse_event(event, positions) {
-        apply_mods_command(command, world);
       }
     }
     _ => {}
@@ -598,17 +704,28 @@ fn route_update(
     }
     _ => {}
   }
+  route_component_events(
+    services,
+    world,
+    home_ui,
+    settings_ui,
+    language_select_ui.as_deref_mut(),
+    terminal_check_ui,
+    mods_ui,
+    input_demo_ui,
+  );
 }
 
 fn route_render(
   services: &mut EngineServices,
   world: &RuntimeWorld,
-  home_ui: &HomeUi,
-  settings_ui: &SettingsUi,
-  language_select_ui: Option<&LanguageSelectUi>,
-  terminal_check_ui: &TerminalCheckUi,
-  mods_ui: &ModsUi,
-  input_demo_ui: &InputDemoUi,
+  home_ui: &mut HomeUi,
+  settings_ui: &mut SettingsUi,
+  mut language_select_ui: Option<&mut LanguageSelectUi>,
+  terminal_check_ui: &mut TerminalCheckUi,
+  mods_ui: &mut ModsUi,
+  input_demo_ui: &mut InputDemoUi,
+  window_size_ui: &mut WindowSizeWarningUi,
 ) -> Option<(u16, u16)> {
   // 覆盖层渲染优先
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
@@ -618,11 +735,13 @@ fn route_render(
     let req_h = overlay.render.required_height;
     let term = services.layout.get_terminal_size();
 
-    ui::window_size_warning::render(
+    window_size_ui.objects_mut().begin_render();
+    window_size_ui.render(
       &mut services.render,
       &mut services.canvas,
       &services.layout,
       &services.i18n,
+      &services.hit_area,
       req_w,
       req_h,
       term.width,
@@ -632,6 +751,18 @@ fn route_render(
     return None;
   }
 
+  if let Some(objects) = current_objects_mut(
+    world,
+    home_ui,
+    settings_ui,
+    language_select_ui.as_deref_mut(),
+    terminal_check_ui,
+    mods_ui,
+    input_demo_ui,
+  ) {
+    objects.begin_render();
+  }
+
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
       home_ui.render(
@@ -639,6 +770,7 @@ fn route_render(
         &mut services.canvas,
         &services.layout,
         &services.i18n,
+        &services.hit_area,
       );
       None
     }
@@ -648,6 +780,7 @@ fn route_render(
         &mut services.canvas,
         &services.layout,
         &services.i18n,
+        &services.hit_area,
       );
       None
     }
@@ -658,6 +791,7 @@ fn route_render(
           &mut services.canvas,
           &services.layout,
           &services.i18n,
+          &services.hit_area,
         );
       }
       None
@@ -668,6 +802,7 @@ fn route_render(
         &mut services.canvas,
         &services.layout,
         &services.i18n,
+        &services.hit_area,
       );
       None
     }
@@ -686,6 +821,7 @@ fn route_render(
         &mut services.canvas,
         &services.layout,
         &services.input,
+        &services.hit_area,
       );
       None
     }

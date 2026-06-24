@@ -1,7 +1,91 @@
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, I18nService, InputActionEvent, KeyState,
-  LayoutService, RenderService, RichTextParams,
+  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaService,
+  I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams, UiEvent,
+  UiObjectPool, UiObjectPoolOwner,
 };
+
+pub struct WindowSizeWarningUi {
+  objects: UiObjectPool,
+  area: HitAreaId,
+}
+
+impl WindowSizeWarningUi {
+  pub fn init(hit_area: &HitAreaService) -> Self {
+    let mut objects = UiObjectPool::new();
+    let area = hit_area.create(&mut objects);
+    Self { objects, area }
+  }
+
+  pub fn action_map() -> Vec<ActionMapEntry> {
+    vec![ActionMapEntry {
+      action: "window_size.exit".to_string(),
+      description: "Exit / Back".to_string(),
+      keys: vec![vec!["esc".to_string()]],
+    }]
+  }
+
+  pub fn handle_event(&mut self, event: &UiEvent) -> Option<WindowSizeWarningCommand> {
+    match event {
+      UiEvent::Action(event)
+        if event.state == KeyState::Pressed && event.action == "window_size.exit" =>
+      {
+        Some(WindowSizeWarningCommand::Exit)
+      }
+      UiEvent::HitArea(HitAreaEvent::Press {
+        button: MouseButton::Right,
+        ..
+      }) => Some(WindowSizeWarningCommand::Exit),
+      _ => None,
+    }
+  }
+
+  #[allow(clippy::too_many_arguments)]
+  pub fn render(
+    &mut self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    i18n: &I18nService,
+    hit_area: &HitAreaService,
+    required_width: u32,
+    required_height: u32,
+    current_width: u16,
+    current_height: u16,
+    is_host_mode: bool,
+  ) {
+    draw_content(
+      render,
+      canvas,
+      layout,
+      i18n,
+      required_width,
+      required_height,
+      current_width,
+      current_height,
+      is_host_mode,
+    );
+    hit_area.render(
+      &mut self.objects,
+      self.area,
+      Rect {
+        x: 0,
+        y: 0,
+        width: current_width,
+        height: current_height,
+      },
+    );
+  }
+}
+
+impl UiObjectPoolOwner for WindowSizeWarningUi {
+  fn objects(&self) -> &UiObjectPool {
+    &self.objects
+  }
+
+  fn objects_mut(&mut self) -> &mut UiObjectPool {
+    &mut self.objects
+  }
+}
 
 // ── 布局 ──
 
@@ -18,33 +102,11 @@ pub(crate) struct WindowSizeWarningLayout {
   pub hint_y: u16,
 }
 
-// ── 动作映射 ──
-
-pub fn action_map() -> Vec<ActionMapEntry> {
-  vec![ActionMapEntry {
-    action: "window_size.exit".to_string(),
-    description: "Exit / Back".to_string(),
-    keys: vec![vec!["esc".to_string()]],
-  }]
-}
-
 // ── 命令 ──
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WindowSizeWarningCommand {
   Exit,
-}
-
-// ── 输入处理 ──
-
-pub fn handle_event(event: &InputActionEvent) -> Option<WindowSizeWarningCommand> {
-  if event.state != KeyState::Pressed {
-    return None;
-  }
-  match event.action.as_str() {
-    "window_size.exit" => Some(WindowSizeWarningCommand::Exit),
-    _ => None,
-  }
 }
 
 // ── 布局计算 ──
@@ -120,7 +182,7 @@ pub fn compute_positions(
 
 /// 绘制窗口尺寸警告界面。
 #[allow(clippy::too_many_arguments)]
-pub fn render(
+fn draw_content(
   render: &mut RenderService,
   canvas: &mut CanvasService,
   layout: &LayoutService,
@@ -215,7 +277,7 @@ pub fn render(
 // ── 内部辅助 ──
 
 fn build_key_params() -> RichTextParams {
-  RichTextParams::from_action_map(&action_map(), "window_size.")
+  RichTextParams::from_action_map(&WindowSizeWarningUi::action_map(), "window_size.")
 }
 
 fn centered_x(layout: &LayoutService, text: &str) -> u16 {

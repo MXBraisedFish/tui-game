@@ -1,6 +1,7 @@
 mod canvas;
 mod clipboard;
 mod game;
+mod hit_area;
 mod i18n;
 mod image;
 mod input;
@@ -23,6 +24,7 @@ mod unicode;
 pub use canvas::{CanvasCell, CanvasService};
 pub use clipboard::ClipboardService;
 pub use game::GameService;
+pub use hit_area::{HitAreaEvent, HitAreaId, HitAreaService};
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};
 pub use input::{
@@ -45,12 +47,13 @@ pub use text_input::{
   TextInputRenderParams, TextInputService, VerticalAlign,
 };
 pub use text_layout::DrawTextParams;
-pub use ui::{UiObjectPool, UiObjectPoolOwner, UiService};
+pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
 
 pub struct EngineServices {
   pub package: PackageService,
   pub clipboard: ClipboardService,
+  pub hit_area: HitAreaService,
   pub input: InputService,
   pub ui: UiService,
   pub game: GameService,
@@ -78,6 +81,7 @@ impl EngineServices {
     Self {
       terminal: TerminalService::new(),
       clipboard: ClipboardService::new(),
+      hit_area: HitAreaService::new(),
       text_input: TextInputService::new(),
       package: PackageService::new(),
       input: InputService::new(),

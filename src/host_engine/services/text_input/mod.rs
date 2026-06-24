@@ -1,13 +1,13 @@
 mod buffer;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use self::buffer::TextBuffer;
-use super::ui::UiObjectPool;
+use super::ui::{UiComponentEvent, UiObjectPool};
 use super::{
   CanvasService, ClipboardService, MouseButton, MouseEvent, MouseEventKind, Rect, TerminalKeyCode,
   TerminalKeyEvent, TextColor, TextStyle,
@@ -91,8 +91,8 @@ pub enum TextInputEvent {
   Changed { id: TextInputId, value: String },
   Submit { id: TextInputId, value: String },
   Cancel { id: TextInputId, value: String },
-  Clicked { id: TextInputId },
-  ClickedOutside { id: TextInputId },
+  Pressed { id: TextInputId },
+  PressedOutside { id: TextInputId },
 }
 
 #[derive(Clone, Copy)]
@@ -115,18 +115,20 @@ struct TextInputState {
 
 pub(crate) struct TextInputObjects {
   next_input_id: u64,
-  render_order: u64,
   inputs: HashMap<TextInputId, TextInputState>,
-  input_events: VecDeque<TextInputEvent>,
 }
 
 impl TextInputObjects {
   pub(crate) fn new() -> Self {
     Self {
       next_input_id: 1,
-      render_order: 0,
       inputs: HashMap::new(),
-      input_events: VecDeque::new(),
+    }
+  }
+
+  pub(crate) fn clear_hits(&mut self) {
+    for state in self.inputs.values_mut() {
+      state.hit = None;
     }
   }
 }
@@ -189,9 +191,8 @@ impl TextInputService {
     let removed = pool.text_inputs.inputs.remove(&id).is_some();
     if removed {
       pool
-        .text_inputs
-        .input_events
-        .retain(|event| event_id(event) != id);
+        .events
+        .retain(|event| event.text_input_id() != Some(id));
     }
     removed
   }
@@ -209,8 +210,7 @@ impl TextInputService {
       }
       return None;
     }
-    pool.text_inputs.render_order = pool.text_inputs.render_order.wrapping_add(1);
-    let order = pool.text_inputs.render_order;
+    let order = pool.next_render_order();
     let active = self.is_focused(pool, id);
     let state = pool.text_inputs.inputs.get_mut(&id)?;
     fill_input_background(canvas, params);
@@ -242,10 +242,7 @@ impl TextInputService {
       state.visual_line = Some(line);
     }
     self.cursor_blink_started = Instant::now();
-    pool
-      .text_inputs
-      .input_events
-      .push_back(TextInputEvent::Focused { id });
+    pool.push_text_event(TextInputEvent::Focused { id });
     true
   }
 
@@ -258,12 +255,9 @@ impl TextInputService {
     }
     self.active = TextInputActive::Inactive;
     self.drag = None;
-    pool
-      .text_inputs
-      .input_events
-      .push_back(TextInputEvent::Blurred {
-        id: active.input_id,
-      });
+    pool.push_text_event(TextInputEvent::Blurred {
+      id: active.input_id,
+    });
     true
   }
 
@@ -304,7 +298,8 @@ impl TextInputService {
       return false;
     }
     state.visual_line = None;
-    push_changed(&mut pool.text_inputs.input_events, id, state.buffer.text());
+    let value = state.buffer.text().to_string();
+    pool.push_text_event(TextInputEvent::Changed { id, value });
     true
   }
 
@@ -312,18 +307,47 @@ impl TextInputService {
     self.set_text(pool, id, String::new())
   }
 
-  pub fn take_events(&self, pool: &mut UiObjectPool, id: TextInputId) -> Vec<TextInputEvent> {
-    let mut selected = Vec::new();
-    let mut others = VecDeque::new();
-    while let Some(event) = pool.text_inputs.input_events.pop_front() {
-      if event_id(&event) == id {
-        selected.push(event);
-      } else {
-        others.push_back(event);
-      }
+  pub(crate) fn mouse_hit_order(&self, pool: &UiObjectPool, x: u16, y: u16) -> Option<u64> {
+    pool
+      .text_inputs
+      .inputs
+      .values()
+      .filter_map(|state| {
+        state
+          .mouse
+          .then_some(state.hit?)
+          .filter(|hit| hit.rect.contains(x, y))
+      })
+      .map(|hit| hit.order)
+      .max()
+  }
+
+  pub(crate) fn push_pressed_outside(&self, pool: &mut UiObjectPool) {
+    let TextInputActive::Focused(active) = self.active else {
+      return;
+    };
+    if active.pool_id == pool.id()
+      && pool
+        .text_inputs
+        .inputs
+        .get(&active.input_id)
+        .is_some_and(|state| state.mouse)
+    {
+      pool.push_text_event(TextInputEvent::PressedOutside {
+        id: active.input_id,
+      });
     }
-    pool.text_inputs.input_events = others;
-    selected
+  }
+
+  pub(crate) fn deactivate_pool(&mut self, pool: &mut UiObjectPool) {
+    pool.text_inputs.clear_hits();
+    if self
+      .drag
+      .as_ref()
+      .is_some_and(|drag| drag.active.pool_id == pool.id())
+    {
+      self.drag = None;
+    }
   }
 
   pub(crate) fn route_terminal_key(
@@ -390,28 +414,31 @@ impl TextInputService {
       }
       TerminalKeyCode::Enter => {
         pool
-          .text_inputs
-          .input_events
-          .push_back(TextInputEvent::Submit {
+          .events
+          .push_back(UiComponentEvent::TextInput(TextInputEvent::Submit {
             id,
             value: state.buffer.text().to_string(),
-          });
+          }));
         return;
       }
       TerminalKeyCode::Esc => {
         pool
-          .text_inputs
-          .input_events
-          .push_back(TextInputEvent::Cancel {
+          .events
+          .push_back(UiComponentEvent::TextInput(TextInputEvent::Cancel {
             id,
             value: state.buffer.text().to_string(),
-          });
+          }));
         return;
       }
     }
     if changed {
       state.visual_line = None;
-      push_changed(&mut pool.text_inputs.input_events, id, state.buffer.text());
+      pool
+        .events
+        .push_back(UiComponentEvent::TextInput(TextInputEvent::Changed {
+          id,
+          value: state.buffer.text().to_string(),
+        }));
     }
   }
 
@@ -439,9 +466,8 @@ impl TextInputService {
           let (cursor, line) = cursor_from_point(state, event.x, event.y);
           state.pending_cursor = Some((cursor, line));
           pool
-            .text_inputs
-            .input_events
-            .push_back(TextInputEvent::Clicked { id });
+            .events
+            .push_back(UiComponentEvent::TextInput(TextInputEvent::Pressed { id }));
           if focused {
             state.buffer.move_to(cursor, false);
             state.visual_line = Some(line);
@@ -466,12 +492,11 @@ impl TextInputService {
             .get(&active.input_id)
             .is_some_and(|state| state.mouse)
           {
-            pool
-              .text_inputs
-              .input_events
-              .push_back(TextInputEvent::ClickedOutside {
+            pool.events.push_back(UiComponentEvent::TextInput(
+              TextInputEvent::PressedOutside {
                 id: active.input_id,
-              });
+              },
+            ));
             true
           } else {
             false
@@ -530,25 +555,6 @@ impl TextInputService {
 
   fn cursor_blink_visible(&self) -> bool {
     (self.cursor_blink_started.elapsed().as_millis() / CURSOR_BLINK_INTERVAL.as_millis()) % 2 == 0
-  }
-}
-
-fn push_changed(events: &mut VecDeque<TextInputEvent>, id: TextInputId, value: &str) {
-  events.push_back(TextInputEvent::Changed {
-    id,
-    value: value.to_string(),
-  });
-}
-
-fn event_id(event: &TextInputEvent) -> TextInputId {
-  match event {
-    TextInputEvent::Focused { id }
-    | TextInputEvent::Blurred { id }
-    | TextInputEvent::Changed { id, .. }
-    | TextInputEvent::Submit { id, .. }
-    | TextInputEvent::Cancel { id, .. }
-    | TextInputEvent::Clicked { id }
-    | TextInputEvent::ClickedOutside { id } => *id,
   }
 }
 
@@ -1008,6 +1014,14 @@ mod tests {
   fn key(code: TerminalKeyCode, ctrl: bool, shift: bool) -> TerminalKeyEvent {
     TerminalKeyEvent { code, ctrl, shift }
   }
+  fn text_events(pool: &mut UiObjectPool) -> Vec<TextInputEvent> {
+    std::iter::from_fn(|| pool.pop_event())
+      .filter_map(|event| match event {
+        super::super::UiEvent::TextInput(event) => Some(event),
+        _ => None,
+      })
+      .collect()
+  }
 
   #[test]
   fn selection_navigation_and_replacement_are_grapheme_safe() {
@@ -1119,10 +1133,7 @@ mod tests {
         y: 0
       }
     ));
-    assert_eq!(
-      service.take_events(&mut pool, id),
-      vec![TextInputEvent::Clicked { id }]
-    );
+    assert_eq!(text_events(&mut pool), vec![TextInputEvent::Pressed { id }]);
     assert!(service.focus(&mut pool, id));
     assert!(service.route_mouse_event(
       &mut pool,
@@ -1177,7 +1188,7 @@ mod tests {
     let mut service = TextInputService::new();
     let id = service.create(&mut pool, options("abc", TextInputMode::MultiLine));
     service.focus(&mut pool, id);
-    service.take_events(&mut pool, id);
+    text_events(&mut pool);
 
     let mut unavailable = ClipboardService::unavailable();
     service.route_terminal_key(
@@ -1205,7 +1216,7 @@ mod tests {
       key(TerminalKeyCode::Char('x'), true, false),
     );
     assert_eq!(service.get_text(&pool, id), Some(""));
-    assert_eq!(service.take_events(&mut pool, id).len(), 1);
+    assert_eq!(text_events(&mut pool).len(), 1);
 
     clipboard.write_text("我\r\n🌍");
     service.route_terminal_key(
@@ -1214,7 +1225,7 @@ mod tests {
       key(TerminalKeyCode::Char('v'), true, false),
     );
     assert_eq!(service.get_text(&pool, id), Some("我\n🌍"));
-    assert_eq!(service.take_events(&mut pool, id).len(), 1);
+    assert_eq!(text_events(&mut pool).len(), 1);
   }
 
   #[test]
@@ -1240,11 +1251,7 @@ mod tests {
         y: 0,
       },
     ));
-    assert!(
-      service
-        .take_events(&mut pool, first)
-        .contains(&TextInputEvent::ClickedOutside { id: first })
-    );
+    assert!(text_events(&mut pool).contains(&TextInputEvent::PressedOutside { id: first }));
     assert!(service.blur(&mut pool));
     assert!(service.remove(&mut pool, first));
     assert!(!service.exists(&pool, first));

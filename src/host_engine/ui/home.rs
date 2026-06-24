@@ -3,18 +3,15 @@ mod game_list;
 mod settings;
 
 pub use about::{InputDemoCommand, InputDemoUi};
-pub(crate) use settings::SettingsLayout;
-pub(crate) use settings::language::LanguageSelectLayout;
 pub use settings::language::{LanguageSelectCommand, LanguageSelectUi};
-pub(crate) use settings::mods::ModsLayout;
 pub use settings::mods::{ModsCommand, ModsUi};
 pub use settings::{SettingsUi, SettingsUiCommand};
 
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, InputActionEvent, KeyState, LayoutService,
-  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, TextColor,
+  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaService, KeyState,
+  LayoutService, MouseButton, Rect, RenderService, RichTextParams, TextColor, UiEvent,
   UiObjectPool, UiObjectPoolOwner,
 };
 
@@ -76,6 +73,7 @@ pub(crate) struct HomeLayout {
 pub struct HomeUi {
   selected_index: usize,
   objects: UiObjectPool,
+  menu_areas: [HitAreaId; HOME_MENU_LEN],
 }
 
 impl UiObjectPoolOwner for HomeUi {
@@ -98,10 +96,12 @@ pub enum HomeUiCommand {
 }
 
 impl HomeUi {
-  pub fn init() -> Self {
+  pub fn init(hit_area: &HitAreaService) -> Self {
+    let mut objects = UiObjectPool::new();
     Self {
       selected_index: 0,
-      objects: UiObjectPool::new(),
+      menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects)),
+      objects,
     }
   }
 
@@ -154,49 +154,62 @@ impl HomeUi {
 
   // ── 输入处理 ──
 
-  pub fn handle_event(&mut self, event: &InputActionEvent) -> Option<HomeUiCommand> {
-    if event.state != KeyState::Pressed {
-      return None;
-    }
-
-    match event.action.as_str() {
-      "home.focus_exit" => {
-        self.selected_index = 4;
+  pub fn handle_event(&mut self, event: &UiEvent) -> Option<HomeUiCommand> {
+    match event {
+      UiEvent::HitArea(
+        HitAreaEvent::HoverEnter { id, .. } | HitAreaEvent::HoverMove { id, .. },
+      ) => {
+        self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
         None
       }
-
-      "home.focus_start_game" => {
-        self.selected_index = 0;
-        None
+      UiEvent::HitArea(HitAreaEvent::Click {
+        id,
+        button: MouseButton::Left,
+        ..
+      }) => {
+        self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
+        Some(self.confirm_selected())
       }
+      UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
+        "home.focus_exit" => {
+          self.selected_index = 4;
+          None
+        }
 
-      "home.focus_continue_game" => {
-        self.selected_index = 1;
-        None
-      }
+        "home.focus_start_game" => {
+          self.selected_index = 0;
+          None
+        }
 
-      "home.focus_settings" => {
-        self.selected_index = 2;
-        None
-      }
+        "home.focus_continue_game" => {
+          self.selected_index = 1;
+          None
+        }
 
-      "home.focus_about" => {
-        self.selected_index = 3;
-        None
-      }
+        "home.focus_settings" => {
+          self.selected_index = 2;
+          None
+        }
 
-      "home.focus_up" => {
-        self.focus_previous();
-        None
-      }
+        "home.focus_about" => {
+          self.selected_index = 3;
+          None
+        }
 
-      "home.focus_down" => {
-        self.focus_next();
-        None
-      }
+        "home.focus_up" => {
+          self.focus_previous();
+          None
+        }
 
-      "home.confirm" => Some(self.confirm_selected()),
+        "home.focus_down" => {
+          self.focus_next();
+          None
+        }
 
+        "home.confirm" => Some(self.confirm_selected()),
+
+        _ => None,
+      },
       _ => None,
     }
   }
@@ -209,14 +222,18 @@ impl HomeUi {
   // ── 渲染 ──
 
   pub fn render(
-    &self,
+    &mut self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     layout: &LayoutService,
     i18n: &I18nService,
+    hit_area: &HitAreaService,
   ) {
     let positions = self.compute_positions(layout, i18n);
     self.draw_content(render, canvas, &positions, i18n);
+    for (id, rect) in self.menu_areas.into_iter().zip(positions.menu_item_rects) {
+      hit_area.render(&mut self.objects, id, rect);
+    }
   }
 
   // ── 内部辅助 ──
@@ -241,40 +258,6 @@ impl HomeUi {
       3 => HomeUiCommand::OpenAbout,
       _ => HomeUiCommand::Exit,
     }
-  }
-
-  /// 处理鼠标事件：hover 自动聚焦，左键点击确认。
-  pub fn handle_mouse_event(
-    &mut self,
-    event: &MouseEvent,
-    positions: &HomeLayout,
-  ) -> Option<HomeUiCommand> {
-    match event.kind {
-      MouseEventKind::Move | MouseEventKind::Hold => {
-        if let Some(index) = Self::hit_test_menu(positions, event.x, event.y) {
-          self.selected_index = index;
-        }
-        None
-      }
-      MouseEventKind::Press => {
-        if event.button == Some(MouseButton::Left) {
-          if let Some(index) = Self::hit_test_menu(positions, event.x, event.y) {
-            self.selected_index = index;
-            return Some(self.confirm_selected());
-          }
-        }
-        None
-      }
-      _ => None,
-    }
-  }
-
-  /// 命中测试：返回鼠标坐标命中的菜单项索引（None 表示未命中任何项）。
-  fn hit_test_menu(positions: &HomeLayout, x: u16, y: u16) -> Option<usize> {
-    positions
-      .menu_item_rects
-      .iter()
-      .position(|rect| rect.contains(x, y))
   }
 
   fn menu_items(&self, i18n: &I18nService) -> [String; HOME_MENU_LEN] {

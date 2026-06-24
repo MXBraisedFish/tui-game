@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, I18nService, InputActionEvent, KeyState,
-  LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams,
+  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaService,
+  I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams, UiEvent,
   UiObjectPool, UiObjectPoolOwner,
 };
 
@@ -23,6 +23,8 @@ pub(crate) struct ModsLayout {
 pub struct ModsUi {
   selected_index: usize,
   objects: UiObjectPool,
+  back_area: HitAreaId,
+  menu_areas: [HitAreaId; MODS_MENU_LEN],
 }
 
 impl UiObjectPoolOwner for ModsUi {
@@ -43,10 +45,13 @@ pub enum ModsCommand {
 }
 
 impl ModsUi {
-  pub fn init() -> Self {
+  pub fn init(hit_area: &HitAreaService) -> Self {
+    let mut objects = UiObjectPool::new();
     Self {
       selected_index: 0,
-      objects: UiObjectPool::new(),
+      back_area: hit_area.create(&mut objects),
+      menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects)),
+      objects,
     }
   }
 
@@ -89,55 +94,45 @@ impl ModsUi {
 
   // ── 输入处理 ──
 
-  pub fn handle_event(&mut self, event: &InputActionEvent) -> Option<ModsCommand> {
-    if event.state != KeyState::Pressed {
-      return None;
-    }
-
-    match event.action.as_str() {
-      "mods.focus_game" => {
-        self.selected_index = 0;
+  pub fn handle_event(&mut self, event: &UiEvent) -> Option<ModsCommand> {
+    match event {
+      UiEvent::HitArea(
+        HitAreaEvent::HoverEnter { id, .. } | HitAreaEvent::HoverMove { id, .. },
+      ) => {
+        self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
         None
       }
-      "mods.focus_screensaver" => {
-        self.selected_index = 1;
-        None
+      UiEvent::HitArea(HitAreaEvent::Click {
+        id,
+        button: MouseButton::Left,
+        ..
+      }) => {
+        self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
+        Some(self.confirm_selected())
       }
-      "mods.focus_up" => {
-        self.focus_previous();
-        None
-      }
-      "mods.focus_down" => {
-        self.focus_next();
-        None
-      }
-      "mods.confirm" => Some(self.confirm_selected()),
-      "mods.back" => Some(ModsCommand::Back),
-      _ => None,
-    }
-  }
-
-  pub fn handle_mouse_event(
-    &mut self,
-    event: &MouseEvent,
-    positions: &ModsLayout,
-  ) -> Option<ModsCommand> {
-    match event.kind {
-      MouseEventKind::Move | MouseEventKind::Hold => {
-        if let Some(index) = Self::hit_test_menu(positions, event.x, event.y) {
-          self.selected_index = index;
-        }
-        None
-      }
-      MouseEventKind::Press => match event.button {
-        Some(MouseButton::Left) => {
-          if let Some(index) = Self::hit_test_menu(positions, event.x, event.y) {
-            self.selected_index = index;
-            return Some(self.confirm_selected());
-          }
+      UiEvent::HitArea(HitAreaEvent::Press {
+        button: MouseButton::Right,
+        ..
+      }) => Some(ModsCommand::Back),
+      UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
+        "mods.focus_game" => {
+          self.selected_index = 0;
           None
         }
-        Some(MouseButton::Right) => Some(ModsCommand::Back),
+        "mods.focus_screensaver" => {
+          self.selected_index = 1;
+          None
+        }
+        "mods.focus_up" => {
+          self.focus_previous();
+          None
+        }
+        "mods.focus_down" => {
+          self.focus_next();
+          None
+        }
+        "mods.confirm" => Some(self.confirm_selected()),
+        "mods.back" => Some(ModsCommand::Back),
         _ => None,
       },
       _ => None,
@@ -152,14 +147,29 @@ impl ModsUi {
   // ── 渲染 ──
 
   pub fn render(
-    &self,
+    &mut self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     layout: &LayoutService,
     i18n: &I18nService,
+    hit_area: &HitAreaService,
   ) {
     let positions = self.compute_positions(layout, i18n);
     self.draw_content(render, canvas, &positions, i18n);
+    let terminal = layout.get_terminal_size();
+    hit_area.render(
+      &mut self.objects,
+      self.back_area,
+      Rect {
+        x: 0,
+        y: 0,
+        width: terminal.width,
+        height: terminal.height,
+      },
+    );
+    for (id, rect) in self.menu_areas.into_iter().zip(positions.menu_item_rects) {
+      hit_area.render(&mut self.objects, id, rect);
+    }
   }
 
   pub fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> ModsLayout {
@@ -238,13 +248,6 @@ impl ModsUi {
       0 => ModsCommand::OpenGame,
       _ => ModsCommand::OpenScreensaver,
     }
-  }
-
-  fn hit_test_menu(positions: &ModsLayout, x: u16, y: u16) -> Option<usize> {
-    positions
-      .menu_item_rects
-      .iter()
-      .position(|rect| rect.contains(x, y))
   }
 
   fn menu_items(&self, i18n: &I18nService) -> [String; MODS_MENU_LEN] {

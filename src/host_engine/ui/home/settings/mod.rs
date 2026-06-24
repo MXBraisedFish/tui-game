@@ -1,15 +1,12 @@
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, I18nService, InputActionEvent, KeyState,
-  LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams,
+  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaService,
+  I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams, UiEvent,
   UiObjectPool, UiObjectPoolOwner,
 };
 
 pub mod language;
-pub(crate) use language::LanguageSelectLayout;
-pub use language::{LanguageSelectCommand, LanguageSelectUi};
-
 pub mod mods;
 
 const SETTINGS_MENU_LEN: usize = 6;
@@ -35,6 +32,8 @@ pub(crate) struct SettingsLayout {
 pub struct SettingsUi {
   selected_index: usize,
   objects: UiObjectPool,
+  back_area: HitAreaId,
+  menu_areas: [HitAreaId; SETTINGS_MENU_LEN],
 }
 
 impl UiObjectPoolOwner for SettingsUi {
@@ -55,10 +54,13 @@ pub enum SettingsUiCommand {
 }
 
 impl SettingsUi {
-  pub fn init() -> Self {
+  pub fn init(hit_area: &HitAreaService) -> Self {
+    let mut objects = UiObjectPool::new();
     Self {
       selected_index: 0,
-      objects: UiObjectPool::new(),
+      back_area: hit_area.create(&mut objects),
+      menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects)),
+      objects,
     }
   }
 
@@ -121,83 +123,72 @@ impl SettingsUi {
 
   // ── 输入处理 ──
 
-  pub fn handle_event(&mut self, event: &InputActionEvent) -> Option<SettingsUiCommand> {
-    if event.state != KeyState::Pressed {
-      return None;
-    }
-
-    match event.action.as_str() {
-      "settings.focus_up" => {
-        self.focus_previous();
+  pub fn handle_event(&mut self, event: &UiEvent) -> Option<SettingsUiCommand> {
+    match event {
+      UiEvent::HitArea(
+        HitAreaEvent::HoverEnter { id, .. } | HitAreaEvent::HoverMove { id, .. },
+      ) => {
+        self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
         None
       }
-      "settings.focus_down" => {
-        self.focus_next();
-        None
-      }
-      "settings.confirm" => match self.selected_index {
-        0 => Some(SettingsUiCommand::OpenLanguageSelect),
-        2 => Some(SettingsUiCommand::OpenMods),
-        _ => None,
-      },
-      "settings.back" => Some(SettingsUiCommand::Back),
-
-      // 数字键快速聚焦
-      "settings.focus_language" => {
-        self.selected_index = 0;
-        None
-      }
-      "settings.focus_key_bindings" => {
-        self.selected_index = 1;
-        None
-      }
-      "settings.focus_mod" => {
-        self.selected_index = 2;
-        None
-      }
-      "settings.focus_storage_management" => {
-        self.selected_index = 3;
-        None
-      }
-      "settings.focus_security_settings" => {
-        self.selected_index = 4;
-        None
-      }
-      "settings.focus_display_settings" => {
-        self.selected_index = 5;
-        None
-      }
-
-      _ => None,
-    }
-  }
-
-  /// 鼠标事件：hover 聚焦、左键确认、右键返回。
-  pub fn handle_mouse_event(
-    &mut self,
-    event: &MouseEvent,
-    positions: &SettingsLayout,
-  ) -> Option<SettingsUiCommand> {
-    match event.kind {
-      MouseEventKind::Move | MouseEventKind::Hold => {
-        if let Some(index) = Self::hit_test_menu(positions, event.x, event.y) {
-          self.selected_index = index;
+      UiEvent::HitArea(HitAreaEvent::Click {
+        id,
+        button: MouseButton::Left,
+        ..
+      }) => {
+        self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
+        match self.selected_index {
+          0 => Some(SettingsUiCommand::OpenLanguageSelect),
+          2 => Some(SettingsUiCommand::OpenMods),
+          _ => None,
         }
-        None
       }
-      MouseEventKind::Press => match event.button {
-        Some(MouseButton::Left) => {
-          if let Some(index) = Self::hit_test_menu(positions, event.x, event.y) {
-            self.selected_index = index;
-            return match index {
-              0 => Some(SettingsUiCommand::OpenLanguageSelect),
-              2 => Some(SettingsUiCommand::OpenMods),
-              _ => None,
-            };
-          }
+      UiEvent::HitArea(HitAreaEvent::Press {
+        button: MouseButton::Right,
+        ..
+      }) => Some(SettingsUiCommand::Back),
+      UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
+        "settings.focus_up" => {
+          self.focus_previous();
           None
         }
-        Some(MouseButton::Right) => Some(SettingsUiCommand::Back),
+        "settings.focus_down" => {
+          self.focus_next();
+          None
+        }
+        "settings.confirm" => match self.selected_index {
+          0 => Some(SettingsUiCommand::OpenLanguageSelect),
+          2 => Some(SettingsUiCommand::OpenMods),
+          _ => None,
+        },
+        "settings.back" => Some(SettingsUiCommand::Back),
+
+        // 数字键快速聚焦
+        "settings.focus_language" => {
+          self.selected_index = 0;
+          None
+        }
+        "settings.focus_key_bindings" => {
+          self.selected_index = 1;
+          None
+        }
+        "settings.focus_mod" => {
+          self.selected_index = 2;
+          None
+        }
+        "settings.focus_storage_management" => {
+          self.selected_index = 3;
+          None
+        }
+        "settings.focus_security_settings" => {
+          self.selected_index = 4;
+          None
+        }
+        "settings.focus_display_settings" => {
+          self.selected_index = 5;
+          None
+        }
+
         _ => None,
       },
       _ => None,
@@ -212,14 +203,29 @@ impl SettingsUi {
   // ── 渲染 ──
 
   pub fn render(
-    &self,
+    &mut self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     layout: &LayoutService,
     i18n: &I18nService,
+    hit_area: &HitAreaService,
   ) {
     let positions = self.compute_positions(layout, i18n);
     self.draw_content(render, canvas, &positions, i18n);
+    let terminal = layout.get_terminal_size();
+    hit_area.render(
+      &mut self.objects,
+      self.back_area,
+      Rect {
+        x: 0,
+        y: 0,
+        width: terminal.width,
+        height: terminal.height,
+      },
+    );
+    for (id, rect) in self.menu_areas.into_iter().zip(positions.menu_item_rects) {
+      hit_area.render(&mut self.objects, id, rect);
+    }
   }
 
   pub fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> SettingsLayout {
@@ -291,13 +297,6 @@ impl SettingsUi {
 
   fn focus_next(&mut self) {
     self.selected_index = (self.selected_index + 1) % SETTINGS_MENU_LEN;
-  }
-
-  fn hit_test_menu(positions: &SettingsLayout, x: u16, y: u16) -> Option<usize> {
-    positions
-      .menu_item_rects
-      .iter()
-      .position(|rect| rect.contains(x, y))
   }
 
   fn menu_items(&self, i18n: &I18nService) -> [String; SETTINGS_MENU_LEN] {
