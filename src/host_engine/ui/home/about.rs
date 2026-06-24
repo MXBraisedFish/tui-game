@@ -1,46 +1,23 @@
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService,
-  InputService, KeyState, LayoutService, MouseButton, Rect, RenderService, TerminalColor,
-  TextColor, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  ActionMapEntry, BorderStyle, CanvasService, HitAreaEvent, HitAreaId, HitAreaOptions,
+  HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService, SliceId, SliceLength,
+  SliceOptions, SliceRect, SliceService, TerminalColor, TextColor, TextInputEvent, TextInputId,
+  TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent,
+  UiObjectPool, UiObjectPoolOwner,
 };
-
-// ── 拖拽窗口常量 ──
-
-const WIN_MIN_WIDTH: u16 = 24;
-const WIN_MIN_HEIGHT: u16 = 7;
-const WIN_DEFAULT_WIDTH: u16 = 46;
-const WIN_DEFAULT_HEIGHT: u16 = 14;
-
-// ── 窗口子区域枚举 ──
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum WindowZone {
-  TitleBar,
-  CloseButton,
-  ResizeHandle,
-  Body,
-}
 
 pub struct InputDemoUi {
   objects: UiObjectPool,
-  /// 窗口位置（左上角）
-  window_x: u16,
-  window_y: u16,
-  /// 窗口尺寸
-  window_width: u16,
-  window_height: u16,
-  /// 窗口子区域 → HitAreaId
-  areas: [HitAreaId; 4],
-  /// 拖拽状态（用于在 drag 和 click 之间区分）
-  drag_active: bool,
-  /// 原始输入事件（保留原有 demo 功能）
-  raw_events: Vec<String>,
-  raw_event_count: usize,
-  action_event_count: usize,
-  hit_event_count: usize,
+  opaque_slice: SliceId,
+  transparent_slice: SliceId,
+  base_area: HitAreaId,
+  opaque_area: HitAreaId,
+  transparent_area: HitAreaId,
+  input: TextInputId,
+  transparent_visible: bool,
+  transparent_in_front: bool,
   click_count: usize,
-  last_action: String,
-  last_hit_event: String,
+  last_event: String,
 }
 
 impl UiObjectPoolOwner for InputDemoUi {
@@ -55,517 +32,512 @@ impl UiObjectPoolOwner for InputDemoUi {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputDemoCommand {
-  ToggleCapture,
+  ToggleTransparent,
+  SwapLayers,
+  FocusInput,
+  BlurInput,
   Back,
 }
 
 impl InputDemoUi {
-  pub fn init(hit_area: &HitAreaService) -> Self {
+  pub fn init(
+    hit_area: &HitAreaService,
+    slices: &SliceService,
+    text_input: &TextInputService,
+  ) -> Self {
     let mut objects = UiObjectPool::new();
-
-    // title bar: drag 用于移动窗口
-    let title_bar = hit_area.create(
+    let opaque_slice = slices
+      .create(
+        &mut objects,
+        SliceOptions {
+          rect: SliceRect {
+            x: 3,
+            y: 3,
+            width: SliceLength::Percent(55),
+            height: SliceLength::Fixed(10),
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let transparent_slice = slices
+      .create(
+        &mut objects,
+        SliceOptions {
+          rect: SliceRect {
+            x: 15,
+            y: 6,
+            width: SliceLength::Percent(60),
+            height: SliceLength::Fixed(10),
+          },
+          opaque: false,
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let base_area = hit_area.create(&mut objects, HitAreaOptions::default());
+    let opaque_area = hit_area.create(&mut objects, HitAreaOptions::default());
+    let transparent_area = hit_area.create(&mut objects, HitAreaOptions::default());
+    let input = text_input.create(
       &mut objects,
-      HitAreaOptions {
-        hover_move: false,
-        drag: true,
-      },
-    );
-    // close button: 点击关闭/重置窗口
-    let close_btn = hit_area.create(&mut objects, HitAreaOptions::default());
-    // resize handle: drag 用于调整窗口大小
-    let resize_handle = hit_area.create(
-      &mut objects,
-      HitAreaOptions {
-        hover_move: false,
-        drag: true,
-      },
-    );
-    // body: 用于报告统计
-    let body = hit_area.create(
-      &mut objects,
-      HitAreaOptions {
-        hover_move: true,
-        drag: false,
+      TextInputOptions {
+        initial_text: "中文 / 日本語 / emoji 👨‍👩‍👧".into(),
+        max_chars: Some(40),
+        mode: TextInputMode::SingleLine,
+        mouse: true,
       },
     );
 
     Self {
       objects,
-      window_x: 0,
-      window_y: 0,
-      window_width: WIN_DEFAULT_WIDTH,
-      window_height: WIN_DEFAULT_HEIGHT,
-      areas: [title_bar, close_btn, resize_handle, body],
-      drag_active: false,
-      raw_events: Vec::new(),
-      raw_event_count: 0,
-      action_event_count: 0,
-      hit_event_count: 0,
+      opaque_slice,
+      transparent_slice,
+      base_area,
+      opaque_area,
+      transparent_area,
+      input,
+      transparent_visible: true,
+      transparent_in_front: true,
       click_count: 0,
-      last_action: "None".to_string(),
-      last_hit_event: "None".to_string(),
+      last_event: "None".into(),
     }
   }
 
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
-        action: "input_demo.capture".to_string(),
-        description: "Toggle raw rdev key capture".to_string(),
-        keys: vec![vec!["enter".to_string()]],
+        action: "input_demo.focus".into(),
+        description: "Focus the Slice TextInput".into(),
+        keys: vec![vec!["enter".into()]],
       },
       ActionMapEntry {
-        action: "input_demo.reset".to_string(),
-        description: "Reset window position".to_string(),
-        keys: vec![vec!["r".to_string()]],
+        action: "input_demo.visible".into(),
+        description: "Toggle transparent Slice".into(),
+        keys: vec![vec!["v".into()]],
       },
       ActionMapEntry {
-        action: "input_demo.back".to_string(),
-        description: "Back to home".to_string(),
-        keys: vec![vec!["esc".to_string()]],
+        action: "input_demo.order".into(),
+        description: "Swap Slice order".into(),
+        keys: vec![vec!["f".into()]],
+      },
+      ActionMapEntry {
+        action: "input_demo.back".into(),
+        description: "Back to home".into(),
+        keys: vec![vec!["esc".into()]],
       },
     ]
   }
 
-  // ── 事件处理 ──
-
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<InputDemoCommand> {
     match event {
-      UiEvent::Action(event) if event.state == KeyState::Pressed => {
-        self.action_event_count += 1;
-        self.last_action = event.action.clone();
-        match event.action.as_str() {
-          "input_demo.capture" => Some(InputDemoCommand::ToggleCapture),
-          "input_demo.reset" => {
-            self.reset_window();
-            None
-          }
-          "input_demo.back" => Some(InputDemoCommand::Back),
-          _ => None,
-        }
-      }
+      UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
+        "input_demo.focus" => Some(InputDemoCommand::FocusInput),
+        "input_demo.visible" => Some(InputDemoCommand::ToggleTransparent),
+        "input_demo.order" => Some(InputDemoCommand::SwapLayers),
+        "input_demo.back" => Some(InputDemoCommand::Back),
+        _ => None,
+      },
       UiEvent::HitArea(event) => {
-        self.hit_event_count += 1;
-        self.last_hit_event = format_hit_event(event);
-
-        let zone = self.zone_of(event);
-
-        match event {
-          // ── 标题栏拖拽 → 移动窗口 ──
-          HitAreaEvent::Drag { dx, dy, .. } if zone == Some(WindowZone::TitleBar) => {
-            self.drag_active = true;
-            self.move_window(*dx, *dy);
-          }
-          // ── 右下角拖拽 → 调整窗口大小 ──
-          HitAreaEvent::Drag { dx, dy, .. } if zone == Some(WindowZone::ResizeHandle) => {
-            self.drag_active = true;
-            self.resize_window(*dx, *dy);
-          }
-          // ── 关闭按钮点击 → 重置窗口 ──
+        self.last_event = format_hit_event(event, self);
+        if matches!(
+          event,
           HitAreaEvent::Click {
             button: MouseButton::Left,
             ..
-          } if zone == Some(WindowZone::CloseButton) => {
-            if !self.drag_active {
-              self.reset_window();
-            }
-            self.drag_active = false;
           }
-          HitAreaEvent::Release { .. } => {
-            self.drag_active = false;
-          }
-          HitAreaEvent::Click { .. } => {
-            self.click_count += 1;
-          }
-          _ => {}
+        ) {
+          self.click_count += 1;
         }
         None
+      }
+      UiEvent::TextInput(event) => {
+        self.last_event = format_text_event(event);
+        match event {
+          TextInputEvent::Pressed { id } if *id == self.input => Some(InputDemoCommand::FocusInput),
+          TextInputEvent::PressedOutside { id } | TextInputEvent::Cancel { id, .. }
+            if *id == self.input =>
+          {
+            Some(InputDemoCommand::BlurInput)
+          }
+          _ => None,
+        }
       }
       _ => None,
     }
   }
 
-  pub fn toggle_capture(&mut self, input: &mut InputService) {
-    if input.is_raw_key_capture_enabled() {
-      input.disable_raw_key_capture();
+  pub fn toggle_transparent(&mut self, slices: &SliceService) {
+    self.transparent_visible = !self.transparent_visible;
+    slices.set_visible(
+      &mut self.objects,
+      self.transparent_slice,
+      self.transparent_visible,
+    );
+  }
+
+  pub fn swap_layers(&mut self, slices: &SliceService) {
+    self.transparent_in_front = !self.transparent_in_front;
+    if self.transparent_in_front {
+      slices.bring_to_front(&mut self.objects, self.transparent_slice);
     } else {
-      input.enable_raw_key_capture();
-      self.raw_events.clear();
-      self.raw_event_count = 0;
+      slices.send_to_back(&mut self.objects, self.transparent_slice);
     }
   }
 
-  pub fn leave(&mut self, input: &mut InputService) {
-    if input.is_raw_key_capture_enabled() {
-      input.disable_raw_key_capture();
+  pub fn focus_input(&mut self, text_input: &mut TextInputService) {
+    text_input.focus(&mut self.objects, self.input);
+  }
+
+  pub fn blur_input(&mut self, text_input: &mut TextInputService) {
+    text_input.blur(&mut self.objects);
+  }
+
+  pub fn leave(&mut self, text_input: &mut TextInputService) {
+    if text_input.is_focused(&self.objects, self.input) {
+      text_input.blur(&mut self.objects);
     }
   }
 
-  pub fn update(&mut self, input: &mut InputService) {
-    for event in input.take_raw_key_events() {
-      self.raw_event_count += 1;
-      self.raw_events.push(format!(
-        "{}  {:?}  {:?}",
-        event.display, event.key, event.kind
-      ));
-    }
-    if self.raw_events.len() > 5 {
-      self.raw_events.drain(..self.raw_events.len() - 5);
-    }
-  }
-
-  // ── 渲染 ──
+  pub fn update(&mut self) {}
 
   pub fn render(
     &mut self,
-    _render: &mut RenderService,
+    render: &mut RenderService,
     canvas: &mut CanvasService,
     layout: &LayoutService,
-    input: &InputService,
+    hit_area: &HitAreaService,
+    text_input: &TextInputService,
+  ) -> Option<(u16, u16)> {
+    self.draw_base(render, canvas, layout, hit_area);
+    self.draw_opaque_slice(render, canvas, hit_area);
+    let cursor = self.draw_transparent_slice(canvas, hit_area, text_input);
+    self.draw_host(canvas, layout);
+    cursor
+  }
+
+  fn draw_base(
+    &mut self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
     hit_area: &HitAreaService,
   ) {
-    // 每帧 clamp 到终端范围（首次进入时 x=0,y=0 会自动居中）
-    self.clamp_to_terminal(canvas.physical_width(), canvas.physical_height());
-
-    self.draw_window(canvas, layout, hit_area);
-
-    // ── 底部状态栏 ──
-    let term_h = canvas.physical_height();
-    self.draw_status_bar(canvas, input, term_h);
+    let size = layout.viewport_size();
+    render.draw_filled_rect(
+      canvas,
+      0,
+      0,
+      size.width,
+      size.height,
+      Some("·".into()),
+      Some(TextColor::Terminal(TerminalColor::BrightBlack)),
+      Some(TextColor::Rgb { r: 8, g: 16, b: 24 }),
+    );
+    render.draw_border_rect(
+      canvas,
+      0,
+      0,
+      size.width,
+      size.height,
+      &BorderStyle::Double,
+      Some(TextColor::Terminal(TerminalColor::BrightCyan)),
+      None,
+      Some(TextColor::Rgb { r: 8, g: 16, b: 24 }),
+      None,
+    );
+    canvas.styled_text(
+      2,
+      1,
+      "Developer Base (viewport-local 0,0)",
+      bright(TerminalColor::BrightCyan),
+    );
+    hit_area.render(
+      &mut self.objects,
+      self.base_area,
+      Rect {
+        x: 0,
+        y: 0,
+        width: size.width,
+        height: size.height,
+      },
+      canvas,
+    );
   }
 
-  // ── 内部: 子区域判断 ──
-
-  fn zone_of(&self, event: &HitAreaEvent) -> Option<WindowZone> {
-    let id = match event {
-      HitAreaEvent::HoverEnter { id, .. }
-      | HitAreaEvent::HoverMove { id, .. }
-      | HitAreaEvent::HoverLeave { id, .. }
-      | HitAreaEvent::Press { id, .. }
-      | HitAreaEvent::Release { id, .. }
-      | HitAreaEvent::Click { id, .. }
-      | HitAreaEvent::Drag { id, .. } => *id,
+  fn draw_opaque_slice(
+    &mut self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    hit_area: &HitAreaService,
+  ) {
+    let Some(rect) = canvas.slice_rect(self.opaque_slice) else {
+      return;
     };
-    if id == self.areas[0] {
-      Some(WindowZone::TitleBar)
-    } else if id == self.areas[1] {
-      Some(WindowZone::CloseButton)
-    } else if id == self.areas[2] {
-      Some(WindowZone::ResizeHandle)
-    } else if id == self.areas[3] {
-      Some(WindowZone::Body)
-    } else {
-      None
-    }
+    render.draw_filled_rect_on(
+      canvas,
+      self.opaque_slice,
+      0,
+      0,
+      rect.width,
+      rect.height,
+      Some(" ".into()),
+      None,
+      Some(TextColor::Rgb {
+        r: 16,
+        g: 48,
+        b: 96,
+      }),
+    );
+    render.draw_border_rect_on(
+      canvas,
+      self.opaque_slice,
+      0,
+      0,
+      rect.width,
+      rect.height,
+      &BorderStyle::Line,
+      Some(TextColor::Terminal(TerminalColor::BrightBlue)),
+      None,
+      Some(TextColor::Rgb {
+        r: 16,
+        g: 48,
+        b: 96,
+      }),
+      None,
+    );
+    canvas.styled_text_on(
+      self.opaque_slice,
+      2,
+      1,
+      "Opaque Slice",
+      bright(TerminalColor::BrightWhite),
+    );
+    canvas.styled_text_on(
+      self.opaque_slice,
+      2,
+      3,
+      "Unwritten cells cover Base",
+      bright(TerminalColor::BrightBlue),
+    );
+    hit_area.render_on(
+      &mut self.objects,
+      self.opaque_area,
+      self.opaque_slice,
+      Rect {
+        x: 0,
+        y: 0,
+        width: rect.width,
+        height: rect.height,
+      },
+      canvas,
+    );
   }
 
-  // ── 内部: 窗口定位 ──
-
-  fn clamp_to_terminal(&mut self, term_w: u16, term_h: u16) {
-    // 首次居中
-    if self.window_x == 0 && self.window_y == 0 {
-      self.window_x = term_w.saturating_sub(self.window_width) / 2;
-      self.window_y = term_h.saturating_sub(self.window_height) / 2;
-    }
-    // 尺寸限制
-    self.window_width = self.window_width.clamp(WIN_MIN_WIDTH, term_w);
-    self.window_height = self.window_height.clamp(WIN_MIN_HEIGHT, term_h);
-    // 位置 clamp：至少留一行标题栏可见
-    self.window_x = self.window_x.min(term_w.saturating_sub(WIN_MIN_WIDTH / 2));
-    self.window_y = self.window_y.min(term_h.saturating_sub(WIN_MIN_HEIGHT / 2));
-  }
-
-  fn move_window(&mut self, dx: i32, dy: i32) {
-    self.window_x = add_delta(self.window_x, dx);
-    self.window_y = add_delta(self.window_y, dy);
-  }
-
-  fn resize_window(&mut self, dx: i32, dy: i32) {
-    self.window_width = add_delta_dim(self.window_width, dx, WIN_MIN_WIDTH, 120);
-    self.window_height = add_delta_dim(self.window_height, dy, WIN_MIN_HEIGHT, 60);
-  }
-
-  fn reset_window(&mut self) {
-    self.window_x = 0;
-    self.window_y = 0;
-    self.window_width = WIN_DEFAULT_WIDTH;
-    self.window_height = WIN_DEFAULT_HEIGHT;
-    // 下一帧 clamp_to_terminal 会重新居中
-  }
-
-  // ── 内部: 绘制 ──
-
-  fn draw_window(
+  fn draw_transparent_slice(
     &mut self,
     canvas: &mut CanvasService,
-    _layout: &LayoutService,
     hit_area: &HitAreaService,
-  ) {
-    let wx = self.window_x;
-    let wy = self.window_y;
-    let ww = self.window_width;
-    let wh = self.window_height;
-
-    let fg = TextColor::Terminal(TerminalColor::BrightWhite);
-    let bg = TextColor::Rgb {
-      r: 30,
-      g: 30,
-      b: 40,
-    };
-    let title_bg = TextColor::Rgb {
-      r: 50,
-      g: 50,
-      b: 120,
-    };
-    let style = |fg: TextColor, bg: TextColor| TextStyle {
-      foreground: Some(fg),
-      background: Some(bg),
-      ..Default::default()
-    };
-
-    // ── 填充背景 ──
-    for row in 0..wh {
-      canvas.host_styled_text(
-        wx,
-        wy + row,
-        &" ".repeat(ww as usize),
-        style(fg.clone(), bg.clone()),
-      );
-    }
-
-    // ── 标题栏背景 ──
-    canvas.host_styled_text(
-      wx,
-      wy,
-      &" ".repeat(ww as usize),
-      style(fg.clone(), title_bg.clone()),
+    text_input: &TextInputService,
+  ) -> Option<(u16, u16)> {
+    let rect = canvas.slice_rect(self.transparent_slice)?;
+    draw_slice_frame(
+      canvas,
+      self.transparent_slice,
+      rect.width,
+      rect.height,
+      bright(TerminalColor::BrightMagenta),
     );
-
-    // ── 边框 ──
-    // 顶边
-    canvas.host_styled_text(wx, wy, "┌", style(fg.clone(), title_bg.clone()));
-    canvas.host_styled_text(wx + ww - 1, wy, "┐", style(fg.clone(), title_bg.clone()));
-    // 底边
-    canvas.host_styled_text(wx, wy + wh - 1, "└", style(fg.clone(), bg.clone()));
-    canvas.host_styled_text(wx + ww - 1, wy + wh - 1, "┘", style(fg.clone(), bg.clone()));
-    // 左右边
-    for row in 1..wh - 1 {
-      canvas.host_styled_text(wx, wy + row, "│", style(fg.clone(), bg.clone()));
-      canvas.host_styled_text(wx + ww - 1, wy + row, "│", style(fg.clone(), bg.clone()));
-    }
-
-    // ── 标题文本 ──
-    let title = " Draggable Window ";
-    canvas.host_styled_text(wx + 2, wy, title, style(fg.clone(), title_bg.clone()));
-
-    // ── 关闭按钮 [X] ──
-    let close_x = wx + ww - 4;
-    canvas.host_styled_text(
-      close_x,
-      wy,
-      "[X]",
-      style(
-        TextColor::Terminal(TerminalColor::BrightRed),
-        title_bg.clone(),
-      ),
+    canvas.styled_text_on(
+      self.transparent_slice,
+      2,
+      1,
+      "Transparent Slice",
+      bright(TerminalColor::BrightMagenta),
     );
-
-    // ── 窗口内容 ──
-    if wh >= 5 {
-      canvas.host_styled_text(
-        wx + 2,
-        wy + 1,
-        "┌─ Drag title bar to move",
-        style(fg.clone(), bg.clone()),
-      );
-      canvas.host_styled_text(
-        wx + 2,
-        wy + 2,
-        "│  Drag [::] corner to resize",
-        style(fg.clone(), bg.clone()),
-      );
-      canvas.host_styled_text(
-        wx + 2,
-        wy + 3,
-        "│  Click [X] or press R to reset",
-        style(fg.clone(), bg.clone()),
-      );
-      canvas.host_styled_text(
-        wx + 2,
-        wy + 4,
-        "└─ Esc to go back",
-        style(fg.clone(), bg.clone()),
-      );
-    }
-    // 窗口尺寸信息
-    if wh >= 7 {
-      let info = format!(
-        "  Window: ({wx},{wy})  {ww}×{wh}",
-        wx = self.window_x,
-        wy = self.window_y,
-        ww = self.window_width,
-        wh = self.window_height,
-      );
-      canvas.host_styled_text(wx + 2, wy + 6, &info, style(fg.clone(), bg.clone()));
-    }
-
-    // ── 右下角 resize handle ──
-    let handle_x = wx + ww - 4;
-    let handle_y = wy + wh - 1;
-    canvas.host_styled_text(
-      handle_x,
-      handle_y,
-      "[::]",
-      style(TextColor::Terminal(TerminalColor::BrightCyan), bg.clone()),
+    canvas.styled_text_on(
+      self.transparent_slice,
+      2,
+      2,
+      "Unwritten cells show lower surfaces",
+      bright(TerminalColor::BrightWhite),
     );
-
-    // ── 注册 HitArea ──
-    // 标题栏（不含关闭按钮的区域）
-    hit_area.render_host(
+    canvas.styled_text_on(
+      self.transparent_slice,
+      2,
+      3,
+      " explicit spaces ",
+      TextStyle {
+        foreground: Some(TextColor::Terminal(TerminalColor::Black)),
+        background: Some(TextColor::Terminal(TerminalColor::BrightYellow)),
+        ..Default::default()
+      },
+    );
+    hit_area.render_on(
       &mut self.objects,
-      self.areas[0],
+      self.transparent_area,
+      self.transparent_slice,
       Rect {
-        x: wx + 1,
-        y: wy,
-        width: ww.saturating_sub(6), // 留出边框和关闭按钮
-        height: 1,
+        x: 0,
+        y: 0,
+        width: rect.width,
+        height: rect.height,
       },
       canvas,
     );
-    // 关闭按钮
-    hit_area.render_host(
+    text_input.render_on(
       &mut self.objects,
-      self.areas[1],
-      Rect {
-        x: close_x,
-        y: wy,
-        width: 3,
-        height: 1,
-      },
-      canvas,
-    );
-    // resize handle
-    hit_area.render_host(
-      &mut self.objects,
-      self.areas[2],
-      Rect {
-        x: handle_x,
-        y: handle_y,
-        width: 4,
-        height: 1,
-      },
-      canvas,
-    );
-    // body
-    if ww > 2 && wh > 2 {
-      hit_area.render_host(
-        &mut self.objects,
-        self.areas[3],
-        Rect {
-          x: wx + 1,
-          y: wy + 1,
-          width: ww - 2,
-          height: wh - 2,
+      self.input,
+      self.transparent_slice,
+      &TextInputRenderParams {
+        rect: Rect {
+          x: 2,
+          y: 5,
+          width: rect.width.saturating_sub(4),
+          height: 1,
         },
-        canvas,
-      );
-    }
+        placeholder: "type here".into(),
+        fg: Some(TextColor::Terminal(TerminalColor::BrightWhite)),
+        bg: Some(TextColor::Rgb {
+          r: 64,
+          g: 16,
+          b: 72,
+        }),
+        placeholder_fg: Some(TextColor::Terminal(TerminalColor::BrightBlack)),
+        cursor_blink: true,
+        ..Default::default()
+      },
+      canvas,
+    )
   }
 
-  fn draw_status_bar(&self, canvas: &mut CanvasService, input: &InputService, term_h: u16) {
-    let fg = TextColor::Terminal(TerminalColor::BrightBlack);
-    let style = TextStyle {
-      foreground: Some(fg.clone()),
-      ..Default::default()
-    };
-
-    let status = format!(
-      "Capture: {}  raw: {}  actions: {}  hits: {}  clicks: {}  last: {} | {}",
-      input.is_raw_key_capture_enabled(),
-      self.raw_event_count,
-      self.action_event_count,
-      self.hit_event_count,
-      self.click_count,
-      self.last_action,
-      self.last_hit_event,
+  fn draw_host(&self, canvas: &mut CanvasService, layout: &LayoutService) {
+    let physical = layout.physical_size();
+    let viewport = layout.developer_viewport();
+    canvas.host_styled_text(
+      0,
+      0,
+      &format!(
+        "HOST SURFACE  physical={}x{}  viewport=({}, {}) {}x{}",
+        physical.width, physical.height, viewport.x, viewport.y, viewport.width, viewport.height
+      ),
+      bright(TerminalColor::BrightGreen),
     );
-    // 截断到终端宽度
-    let max_w = canvas.physical_width() as usize;
-    let status: String = status.chars().take(max_w).collect();
-    canvas.host_styled_text(0, term_h.saturating_sub(1), &status, style.clone());
-
-    // raw events
-    for (i, event) in self.raw_events.iter().enumerate() {
-      let event: String = event.chars().take(max_w).collect();
-      canvas.host_styled_text(
-        0,
-        term_h.saturating_sub(3 + i as u16),
-        &event,
-        style.clone(),
-      );
-    }
+    let front = if self.transparent_in_front {
+      "transparent"
+    } else {
+      "opaque"
+    };
+    let status = format!(
+      "[V] visible={}  [F] front={}  [Enter/click] focus  [Esc] blur/back  clicks={}  last={}",
+      self.transparent_visible, front, self.click_count, self.last_event
+    );
+    let status: String = status.chars().take(physical.width as usize).collect();
+    canvas.host_styled_text(
+      0,
+      physical.height.saturating_sub(1),
+      &status,
+      bright(TerminalColor::BrightGreen),
+    );
+    draw_host_frame(canvas, viewport, bright(TerminalColor::BrightGreen));
   }
 }
 
-// ── 辅助 ──
+fn bright(color: TerminalColor) -> TextStyle {
+  TextStyle {
+    foreground: Some(TextColor::Terminal(color)),
+    ..Default::default()
+  }
+}
 
-fn add_delta(val: u16, delta: i32) -> u16 {
-  if delta >= 0 {
-    val.saturating_add(delta as u16)
+fn draw_slice_frame(
+  canvas: &mut CanvasService,
+  slice: SliceId,
+  width: u16,
+  height: u16,
+  style: TextStyle,
+) {
+  if width < 2 || height < 2 {
+    return;
+  }
+  canvas.styled_text_on(
+    slice,
+    0,
+    0,
+    &format!("┌{}┐", "─".repeat((width - 2) as usize)),
+    style.clone(),
+  );
+  for y in 1..height - 1 {
+    canvas.styled_text_on(slice, 0, y, "│", style.clone());
+    canvas.styled_text_on(slice, width - 1, y, "│", style.clone());
+  }
+  canvas.styled_text_on(
+    slice,
+    0,
+    height - 1,
+    &format!("└{}┘", "─".repeat((width - 2) as usize)),
+    style,
+  );
+}
+
+fn draw_host_frame(canvas: &mut CanvasService, rect: Rect, style: TextStyle) {
+  if rect.width < 2 || rect.height < 2 {
+    return;
+  }
+  canvas.host_styled_text(
+    rect.x,
+    rect.y,
+    &format!("┏{}┓", "━".repeat((rect.width - 2) as usize)),
+    style.clone(),
+  );
+  for y in rect.y + 1..rect.y + rect.height - 1 {
+    canvas.host_styled_text(rect.x, y, "┃", style.clone());
+    canvas.host_styled_text(rect.x + rect.width - 1, y, "┃", style.clone());
+  }
+  canvas.host_styled_text(
+    rect.x,
+    rect.y + rect.height - 1,
+    &format!("┗{}┛", "━".repeat((rect.width - 2) as usize)),
+    style,
+  );
+}
+
+fn format_hit_event(event: &HitAreaEvent, ui: &InputDemoUi) -> String {
+  let (id, x, y) = match event {
+    HitAreaEvent::HoverEnter { id, x, y }
+    | HitAreaEvent::HoverMove { id, x, y }
+    | HitAreaEvent::HoverLeave { id, x, y }
+    | HitAreaEvent::Press { id, x, y, .. }
+    | HitAreaEvent::Release { id, x, y, .. }
+    | HitAreaEvent::Click { id, x, y, .. }
+    | HitAreaEvent::Drag { id, x, y, .. } => (*id, *x, *y),
+  };
+  let surface = if id == ui.base_area {
+    "Base"
+  } else if id == ui.opaque_area {
+    "Opaque"
   } else {
-    val.saturating_sub((-delta) as u16)
-  }
+    "Transparent"
+  };
+  let kind = match event {
+    HitAreaEvent::HoverEnter { .. } => "Enter",
+    HitAreaEvent::HoverMove { .. } => "Move",
+    HitAreaEvent::HoverLeave { .. } => "Leave",
+    HitAreaEvent::Press { .. } => "Press",
+    HitAreaEvent::Release { .. } => "Release",
+    HitAreaEvent::Click { .. } => "Click",
+    HitAreaEvent::Drag { .. } => "Drag",
+  };
+  format!("{surface}:{kind}@{x},{y}")
 }
 
-fn add_delta_dim(val: u16, delta: i32, min: u16, max: u16) -> u16 {
-  if delta >= 0 {
-    val.saturating_add(delta as u16).min(max)
-  } else {
-    val.saturating_sub((-delta) as u16).max(min)
-  }
-}
-
-fn format_hit_event(event: &HitAreaEvent) -> String {
+fn format_text_event(event: &TextInputEvent) -> String {
   match event {
-    HitAreaEvent::HoverEnter { id, x, y } => format!("Enter {id:?} @({x},{y})"),
-    HitAreaEvent::HoverMove { id, x, y } => format!("Move {id:?} @({x},{y})"),
-    HitAreaEvent::HoverLeave { id, x, y } => format!("Leave {id:?} @({x},{y})"),
-    HitAreaEvent::Press { id, button, x, y } => {
-      format!("Press {id:?} {button:?} @({x},{y})")
-    }
-    HitAreaEvent::Release { id, button, x, y } => {
-      format!("Release {id:?} {button:?} @({x},{y})")
-    }
-    HitAreaEvent::Click { id, button, x, y } => {
-      format!("Click {id:?} {button:?} @({x},{y})")
-    }
-    HitAreaEvent::Drag {
-      id,
-      button,
-      x,
-      y,
-      dx,
-      dy,
-    } => {
-      format!("Drag {id:?} {button:?} @({x},{y}) d({dx},{dy})")
-    }
-  }
-}
-
-// ── 测试 ──
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn delta_arithmetic() {
-    assert_eq!(add_delta(10, 5), 15);
-    assert_eq!(add_delta(10, -5), 5);
-    assert_eq!(add_delta(3, -10), 0); // saturating at 0
-    assert_eq!(add_delta_dim(30, 10, 20, 100), 40);
-    assert_eq!(add_delta_dim(30, -20, 20, 100), 20); // clamped to min
-    assert_eq!(add_delta_dim(90, 20, 20, 100), 100); // clamped to max
+    TextInputEvent::Focused { .. } => "TextInput:Focused".into(),
+    TextInputEvent::Blurred { .. } => "TextInput:Blurred".into(),
+    TextInputEvent::Changed { value, .. } => format!("TextInput:Changed({value})"),
+    TextInputEvent::Submit { value, .. } => format!("TextInput:Submit({value})"),
+    TextInputEvent::Cancel { .. } => "TextInput:Cancel".into(),
+    TextInputEvent::Pressed { .. } => "TextInput:Pressed".into(),
+    TextInputEvent::PressedOutside { .. } => "TextInput:PressedOutside".into(),
   }
 }

@@ -4,7 +4,7 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
-  EngineServices, MouseEvent, SystemEvent, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  EngineServices, MouseEvent, Rect, SystemEvent, UiEvent, UiObjectPool, UiObjectPoolOwner,
   translate_action_map,
 };
 
@@ -45,7 +45,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
   let mut mods_ui = ModsUi::init(&services.hit_area);
-  let mut input_demo_ui = InputDemoUi::init(&services.hit_area);
+  let mut input_demo_ui =
+    InputDemoUi::init(&services.hit_area, &services.slice, &services.text_input);
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
 
   // 初始 UI 节点
@@ -701,7 +702,7 @@ fn route_update(
       }
     }
     Some(UiNodeKind::InputDemo) => {
-      input_demo_ui.update(&mut services.input);
+      input_demo_ui.update();
     }
     _ => {}
   }
@@ -753,6 +754,18 @@ fn route_render(
       world.state.is_host_mode(),
     );
     return None;
+  }
+
+  if world.state.current_ui_kind() == Some(UiNodeKind::InputDemo) {
+    let physical = services.layout.physical_size();
+    services.layout.set_developer_viewport(Rect {
+      x: 2,
+      y: 2,
+      width: physical.width.saturating_sub(4),
+      height: physical.height.saturating_sub(4),
+    });
+  } else {
+    services.layout.reset_developer_viewport();
   }
 
   if let Some(objects) = current_objects_mut(
@@ -820,16 +833,13 @@ fn route_render(
       );
       None
     }
-    Some(UiNodeKind::InputDemo) => {
-      input_demo_ui.render(
-        &mut services.render,
-        &mut services.canvas,
-        &services.layout,
-        &services.input,
-        &services.hit_area,
-      );
-      None
-    }
+    Some(UiNodeKind::InputDemo) => input_demo_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.hit_area,
+      &services.text_input,
+    ),
     _ => None,
   }
 }
@@ -862,9 +872,12 @@ fn apply_input_demo_command(
   world: &mut RuntimeWorld,
 ) {
   match command {
-    InputDemoCommand::ToggleCapture => input_demo_ui.toggle_capture(&mut services.input),
+    InputDemoCommand::ToggleTransparent => input_demo_ui.toggle_transparent(&services.slice),
+    InputDemoCommand::SwapLayers => input_demo_ui.swap_layers(&services.slice),
+    InputDemoCommand::FocusInput => input_demo_ui.focus_input(&mut services.text_input),
+    InputDemoCommand::BlurInput => input_demo_ui.blur_input(&mut services.text_input),
     InputDemoCommand::Back => {
-      input_demo_ui.leave(&mut services.input);
+      input_demo_ui.leave(&mut services.text_input);
       world.state.pop_ui_node();
     }
   }

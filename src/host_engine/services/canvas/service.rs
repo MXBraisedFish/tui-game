@@ -282,7 +282,7 @@ impl CanvasService {
     self
       .viewport
       .contains(x, y)
-      .then_some((x - self.viewport.x, y - self.viewport.y))
+      .then(|| (x - self.viewport.x, y - self.viewport.y))
   }
 
   pub(crate) fn base_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
@@ -612,6 +612,25 @@ mod tests {
 
     let cell = canvas.cell_at(2, 3).expect("cell");
     assert_eq!(cell.text, "a");
+  }
+
+  #[test]
+  fn viewport_point_ignores_physical_coordinates_before_viewport_origin() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(20, 10);
+    layout.set_developer_viewport(Rect {
+      x: 2,
+      y: 2,
+      width: 16,
+      height: 6,
+    });
+    let pool = UiObjectPool::new();
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+
+    assert_eq!(canvas.viewport_point(0, 0), None);
+    assert_eq!(canvas.viewport_point(2, 2), Some((0, 0)));
   }
 
   #[test]

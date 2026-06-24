@@ -176,7 +176,7 @@ impl HitAreaService {
     hit
       .rect
       .contains(x, y)
-      .then_some((x - hit.rect.x, y - hit.rect.y))
+      .then(|| (x - hit.rect.x, y - hit.rect.y))
   }
 
   pub fn render(
@@ -631,6 +631,13 @@ mod tests {
       mouse(MouseEventKind::Release, Some(MouseButton::Left), 20, 6),
     );
     assert!(!service.is_pressed(&pool, id, MouseButton::Left));
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      &canvas,
+      mouse(MouseEventKind::Move, None, 5, 5),
+    );
+    assert_eq!(service.local_pointer_position(&pool, id), None);
   }
 
   #[test]
