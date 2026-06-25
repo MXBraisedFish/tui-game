@@ -44,8 +44,12 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
   let mut mods_ui = ModsUi::init(&services.hit_area);
-  let mut input_demo_ui =
-    InputDemoUi::init(&services.hit_area, &services.slice, &services.text_input);
+  let mut input_demo_ui = InputDemoUi::init(
+    &services.hit_area,
+    &services.slice,
+    &services.scroll_box,
+    &services.text_input,
+  );
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
 
   if services.storage.read_language_code().is_none() && language_select_ui.is_some() {
@@ -308,6 +312,13 @@ fn route_component_mouse(
   ) else {
     return false;
   };
+  if services
+    .scroll_box
+    .route_mouse_event(pool, &services.canvas, &services.layout, event)
+  {
+    services.canvas.request_render();
+    return true;
+  }
   services
     .hit_area
     .route_mouse_event(pool, &mut services.text_input, &services.canvas, event)
@@ -814,6 +825,7 @@ fn route_render(
       &mut services.canvas,
       &services.layout,
       &services.hit_area,
+      &services.scroll_box,
       &services.text_input,
     ),
     _ => None,
@@ -949,7 +961,9 @@ fn apply_input_demo_command(
 ) {
   match command {
     InputDemoCommand::ToggleTransparent => input_demo_ui.toggle_transparent(&services.slice),
-    InputDemoCommand::SwapLayers => input_demo_ui.swap_layers(&services.slice),
+    InputDemoCommand::SwapLayers => {
+      input_demo_ui.swap_layers(&services.slice, &services.scroll_box)
+    }
     InputDemoCommand::FocusInput => input_demo_ui.focus_input(&mut services.text_input),
     InputDemoCommand::BlurInput => input_demo_ui.blur_input(&mut services.text_input),
     InputDemoCommand::Back => {

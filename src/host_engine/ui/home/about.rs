@@ -1,9 +1,10 @@
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, HitAreaEvent, HitAreaId, HitAreaOptions,
-  HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService, SliceId, SliceLength,
-  SliceOptions, SliceRect, SliceService, TerminalColor, TextColor, TextInputEvent, TextInputId,
-  TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent,
-  UiObjectPool, UiObjectPoolOwner,
+  HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService, ScrollBoxId,
+  ScrollBoxOptions, ScrollBoxService, SliceId, SliceLength, SliceOptions, SliceRect, SliceService,
+  SurfaceId, TerminalColor, TextColor, TextInputEvent, TextInputId, TextInputMode,
+  TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 /// 输入演示 UI：展示基础层、不透明切片、透明切片和文本输入的叠加渲染效果。
@@ -11,12 +12,15 @@ pub struct InputDemoUi {
   objects: UiObjectPool,
   opaque_slice: SliceId,
   transparent_slice: SliceId,
+  empty_scroll_box: ScrollBoxId,
+  text_scroll_box: ScrollBoxId,
   base_area: HitAreaId,
   opaque_area: HitAreaId,
   transparent_area: HitAreaId,
   input: TextInputId,
   transparent_visible: bool,
   transparent_in_front: bool,
+  scroll_box_in_front: bool,
   click_count: usize,
   last_event: String,
 }
@@ -46,6 +50,7 @@ impl InputDemoUi {
   pub fn init(
     hit_area: &HitAreaService,
     slices: &SliceService,
+    scroll_box: &ScrollBoxService,
     text_input: &TextInputService,
   ) -> Self {
     let mut objects = UiObjectPool::new();
@@ -78,6 +83,38 @@ impl InputDemoUi {
         },
       )
       .unwrap();
+    let empty_scroll_box = scroll_box
+      .create(
+        &mut objects,
+        ScrollBoxOptions {
+          rect: Rect {
+            x: 6,
+            y: 13,
+            width: 28,
+            height: 9,
+          },
+          content_width: 28,
+          content_height: 9,
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let text_scroll_box = scroll_box
+      .create(
+        &mut objects,
+        ScrollBoxOptions {
+          rect: Rect {
+            x: 38,
+            y: 13,
+            width: 38,
+            height: 9,
+          },
+          content_width: 38,
+          content_height: 60,
+          ..Default::default()
+        },
+      )
+      .unwrap();
     let base_area = hit_area.create(&mut objects, HitAreaOptions::default());
     let opaque_area = hit_area.create(&mut objects, HitAreaOptions::default());
     let transparent_area = hit_area.create(&mut objects, HitAreaOptions::default());
@@ -95,12 +132,15 @@ impl InputDemoUi {
       objects,
       opaque_slice,
       transparent_slice,
+      empty_scroll_box,
+      text_scroll_box,
       base_area,
       opaque_area,
       transparent_area,
       input,
       transparent_visible: true,
       transparent_in_front: true,
+      scroll_box_in_front: true,
       click_count: 0,
       last_event: "None".into(),
     }
@@ -182,13 +222,22 @@ impl InputDemoUi {
   }
 
   /// 交换透明切片和不透明切片的绘制顺序。
-  pub fn swap_layers(&mut self, slices: &SliceService) {
-    self.transparent_in_front = !self.transparent_in_front;
-    if self.transparent_in_front {
-      slices.bring_to_front(&mut self.objects, self.transparent_slice);
+  pub fn swap_layers(&mut self, _slices: &SliceService, scroll_box: &ScrollBoxService) {
+    self.scroll_box_in_front = !self.scroll_box_in_front;
+    if self.scroll_box_in_front {
+      scroll_box.move_above(
+        &mut self.objects,
+        self.text_scroll_box,
+        SurfaceId::Slice(self.transparent_slice),
+      );
     } else {
-      slices.send_to_back(&mut self.objects, self.transparent_slice);
+      scroll_box.move_below(
+        &mut self.objects,
+        self.text_scroll_box,
+        SurfaceId::Slice(self.transparent_slice),
+      );
     }
+    self.transparent_in_front = !self.scroll_box_in_front;
   }
 
   /// 聚焦文本输入组件。
@@ -217,10 +266,12 @@ impl InputDemoUi {
     canvas: &mut CanvasService,
     layout: &LayoutService,
     hit_area: &HitAreaService,
+    scroll_box: &ScrollBoxService,
     text_input: &TextInputService,
   ) -> Option<(u16, u16)> {
     self.draw_base(render, canvas, layout, hit_area);
     self.draw_opaque_slice(render, canvas, hit_area);
+    self.draw_scroll_box(render, canvas, layout, scroll_box);
     let cursor = self.draw_transparent_slice(canvas, hit_area, text_input);
     self.draw_host(canvas, layout);
     cursor
@@ -344,6 +395,40 @@ impl InputDemoUi {
     );
   }
 
+  fn draw_scroll_box(
+    &mut self,
+    _render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    scroll_box: &ScrollBoxService,
+  ) {
+    let Some(rect) = canvas.prepared_scroll_box_rect(self.text_scroll_box) else {
+      return;
+    };
+    let _ = canvas.prepared_scroll_box_rect(self.empty_scroll_box);
+    for line in 0..56u16 {
+      canvas.styled_text_in_scroll_box(
+        self.text_scroll_box,
+        0,
+        line,
+        &format!("Line {line:02}  only text / 中文 / emoji 😀"),
+        bright(TerminalColor::BrightWhite),
+      );
+    }
+    let scroll_y = scroll_box
+      .scroll_y(&self.objects, self.text_scroll_box)
+      .unwrap_or(0);
+    let max_y = scroll_box
+      .max_scroll_y(&self.objects, self.text_scroll_box, layout)
+      .unwrap_or(0);
+    canvas.styled_text(
+      rect.x,
+      rect.y.saturating_sub(1),
+      &format!("Scroll y={scroll_y}/{max_y}"),
+      bright(TerminalColor::BrightYellow),
+    );
+  }
+
   fn draw_transparent_slice(
     &mut self,
     canvas: &mut CanvasService,
@@ -433,13 +518,13 @@ impl InputDemoUi {
       ),
       bright(TerminalColor::BrightGreen),
     );
-    let front = if self.transparent_in_front {
-      "transparent"
+    let front = if self.scroll_box_in_front {
+      "scrollbox"
     } else {
-      "opaque"
+      "transparent slice"
     };
     let status = format!(
-      "[V] visible={}  [F] front={}  [Enter/click] focus  [Esc] blur/back  clicks={}  last={}",
+      "[V] visible={}  [F] top={}  wheel scrolls only when ScrollBox is top  [Enter/click] focus  [Esc] blur/back  clicks={}  last={}",
       self.transparent_visible, front, self.click_count, self.last_event
     );
     let status: String = status.chars().take(physical.width as usize).collect();

@@ -1,6 +1,8 @@
 use super::{ComposedCell, ComposedFrame};
 use crate::host_engine::services::canvas::buffer::CanvasBuffer;
-use crate::host_engine::services::{CanvasCell, CanvasService, TextColor};
+use crate::host_engine::services::canvas::{PreparedScrollBox, PreparedSurface};
+use crate::host_engine::services::unicode::graphemes;
+use crate::host_engine::services::{CanvasCell, CanvasService, ScrollbarVisibility, TextColor};
 
 /// 帧合成器：将基础层、切片层和宿主层按顺序叠加为一张合成帧。
 pub struct FrameCompositor;
@@ -28,14 +30,20 @@ impl FrameCompositor {
       viewport.y,
       true,
     );
-    for (_, slice) in canvas.prepared_slices().filter(|(_, slice)| slice.visible) {
-      overlay(
-        &mut frame,
-        &slice.buffer,
-        viewport.x.saturating_add(slice.rect.x),
-        viewport.y.saturating_add(slice.rect.y),
-        slice.opaque,
-      );
+    for surface in canvas.prepared_surfaces() {
+      match surface {
+        PreparedSurface::Slice(slice) if slice.visible => overlay(
+          &mut frame,
+          &slice.buffer,
+          viewport.x.saturating_add(slice.rect.x),
+          viewport.y.saturating_add(slice.rect.y),
+          slice.opaque,
+        ),
+        PreparedSurface::ScrollBox(scroll_box) if scroll_box.visible => {
+          overlay_scroll_box(&mut frame, scroll_box, viewport.x, viewport.y)
+        }
+        _ => {}
+      }
     }
     overlay(&mut frame, host, 0, 0, false);
 
@@ -54,27 +62,122 @@ fn overlay(frame: &mut ComposedFrame, buffer: &CanvasBuffer, ox: u16, oy: u16, o
       };
       let px = ox.saturating_add(x);
       let py = oy.saturating_add(y);
-      let Some(lower) = frame.get(px, py) else {
-        continue;
-      };
-      let mut cell = source.clone();
-      if cell.style.background == Some(TextColor::Transparent) {
-        cell.style.background = match lower {
-          ComposedCell::Text(lower) => lower.style.background.clone(),
-          ComposedCell::Empty => None,
-        };
-      }
-      frame.set(px, py, ComposedCell::Text(cell));
+      write_cell(frame, px, py, source);
     }
   }
+}
+
+fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox, ox: u16, oy: u16) {
+  let x0 = ox.saturating_add(scroll_box.rect.x);
+  let y0 = oy.saturating_add(scroll_box.rect.y);
+  for y in 0..scroll_box.rect.height {
+    for x in 0..scroll_box.rect.width {
+      let sx = scroll_box.scroll_x.saturating_add(x);
+      let sy = scroll_box.scroll_y.saturating_add(y);
+      let px = x0.saturating_add(x);
+      let py = y0.saturating_add(y);
+      if !scroll_box.opaque && !scroll_box.buffer.is_written(sx, sy) {
+        continue;
+      }
+      let Some(source) = scroll_box.buffer.get(sx, sy) else {
+        write_cell(frame, px, py, &CanvasCell::blank());
+        continue;
+      };
+      if source.is_continuation() || is_clipped_wide_cell(source, sx, scroll_box) {
+        if scroll_box.opaque {
+          write_cell(frame, px, py, &CanvasCell::blank());
+        }
+        continue;
+      }
+      write_cell(frame, px, py, source);
+    }
+  }
+  draw_vertical_scrollbar(frame, scroll_box, x0, y0);
+}
+
+fn draw_vertical_scrollbar(
+  frame: &mut ComposedFrame,
+  scroll_box: &PreparedScrollBox,
+  x0: u16,
+  y0: u16,
+) {
+  let height = scroll_box.rect.height;
+  if height == 0 || scroll_box.rect.width == 0 || !shows_scrollbar(scroll_box) {
+    return;
+  }
+  let x = x0.saturating_add(scroll_box.rect.width - 1);
+  let max_scroll = scroll_box.content_size.height.saturating_sub(height);
+  let thumb_height = if max_scroll == 0 {
+    height
+  } else {
+    ((height as u32 * height as u32) / scroll_box.content_size.height.max(1) as u32)
+      .max(1)
+      .min(height as u32) as u16
+  };
+  let travel = height.saturating_sub(thumb_height);
+  let thumb_y = if max_scroll == 0 {
+    0
+  } else {
+    (scroll_box.scroll_y as u32 * travel as u32 / max_scroll as u32) as u16
+  };
+  for y in 0..height {
+    let is_thumb = y >= thumb_y && y < thumb_y.saturating_add(thumb_height);
+    let (ch, style) = if is_thumb {
+      (
+        scroll_box.scrollbar_style.thumb_char,
+        scroll_box.scrollbar_style.thumb_style.clone(),
+      )
+    } else {
+      (
+        scroll_box.scrollbar_style.track_char,
+        scroll_box.scrollbar_style.track_style.clone(),
+      )
+    };
+    write_cell(
+      frame,
+      x,
+      y0.saturating_add(y),
+      &CanvasCell::styled(ch.to_string(), style),
+    );
+  }
+}
+
+fn shows_scrollbar(scroll_box: &PreparedScrollBox) -> bool {
+  match scroll_box.scrollbar.vertical {
+    ScrollbarVisibility::Always => scroll_box.rect.height > 0,
+    ScrollbarVisibility::Auto => scroll_box.content_size.height > scroll_box.rect.height,
+    ScrollbarVisibility::Never => false,
+  }
+}
+
+fn is_clipped_wide_cell(cell: &CanvasCell, sx: u16, scroll_box: &PreparedScrollBox) -> bool {
+  let width = graphemes(&cell.text)
+    .first()
+    .map(|grapheme| grapheme.display_width)
+    .unwrap_or(1);
+  width > 1 && sx as usize + width > scroll_box.scroll_x as usize + scroll_box.rect.width as usize
+}
+
+fn write_cell(frame: &mut ComposedFrame, x: u16, y: u16, source: &CanvasCell) {
+  let Some(lower) = frame.get(x, y) else {
+    return;
+  };
+  let mut cell = source.clone();
+  if cell.style.background == Some(TextColor::Transparent) {
+    cell.style.background = match lower {
+      ComposedCell::Text(lower) => lower.style.background.clone(),
+      ComposedCell::Empty => None,
+    };
+  }
+  frame.set(x, y, ComposedCell::Text(cell));
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::host_engine::services::{
-    LayoutService, SliceLength, SliceOptions, SliceRect, SliceService, TerminalColor, TextColor,
-    TextStyle, UiObjectPool,
+    LayoutService, ScrollBoxOptions, ScrollBoxService, SliceLength, SliceOptions, SliceRect,
+    SliceService, SurfaceId, TerminalColor, TextColor, TextStyle, UiObjectPool,
   };
 
   #[test]
@@ -245,5 +348,85 @@ mod tests {
     canvas.prepare(&pool, &layout);
     assert!(!canvas.styled_text_on(slice, 0, 0, "B", TextStyle::default()));
     assert_eq!(text(&FrameCompositor::new().compose(&canvas), 0, 0), " ");
+  }
+
+  #[test]
+  fn scroll_box_clips_content_by_scroll_y_and_draws_scrollbar() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(8, 4);
+    let service = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: crate::host_engine::services::Rect {
+            x: 0,
+            y: 0,
+            width: 6,
+            height: 2,
+          },
+          content_width: 6,
+          content_height: 4,
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    service.scroll_to(&mut pool, id, 0, 1, &layout);
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    canvas.styled_text_in_scroll_box(id, 0, 0, "row0", TextStyle::default());
+    canvas.styled_text_in_scroll_box(id, 0, 1, "row1", TextStyle::default());
+    canvas.styled_text_in_scroll_box(id, 0, 2, "row2", TextStyle::default());
+
+    let frame = FrameCompositor::new().compose(&canvas);
+
+    assert_eq!(text(&frame, 0, 0), "r");
+    assert_eq!(text(&frame, 3, 0), "1");
+    assert_eq!(text(&frame, 3, 1), "2");
+    assert_eq!(text(&frame, 5, 0), "█");
+  }
+
+  #[test]
+  fn scroll_box_and_slice_share_surface_order() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(4, 2);
+    let slices = SliceService::new();
+    let scroll = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let slice = slices.create(&mut pool, SliceOptions::default()).unwrap();
+    let box_id = scroll
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: crate::host_engine::services::Rect {
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+          },
+          content_width: 1,
+          content_height: 1,
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    scroll.move_below(&mut pool, box_id, SurfaceId::Slice(slice));
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    canvas.styled_text_on(slice, 0, 0, "S", TextStyle::default());
+    canvas.styled_text_in_scroll_box(box_id, 0, 0, "B", TextStyle::default());
+
+    assert_eq!(text(&FrameCompositor::new().compose(&canvas), 0, 0), "S");
+
+    scroll.move_above(&mut pool, box_id, SurfaceId::Slice(slice));
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    canvas.styled_text_on(slice, 0, 0, "S", TextStyle::default());
+    canvas.styled_text_in_scroll_box(box_id, 0, 0, "B", TextStyle::default());
+
+    assert_eq!(text(&FrameCompositor::new().compose(&canvas), 0, 0), "B");
   }
 }

@@ -1,11 +1,14 @@
 use super::BorderStyle;
 use crate::host_engine::services::unicode::char_width;
-use crate::host_engine::services::{CanvasService, DrawTextParams, SliceId, TextColor, TextStyle};
+use crate::host_engine::services::{
+  CanvasService, DrawTextParams, ScrollBoxId, SliceId, TextColor, TextStyle,
+};
 
 #[derive(Clone, Copy)]
 enum Target {
   Base,
   Slice(SliceId),
+  ScrollBox(ScrollBoxId),
   Host,
 }
 
@@ -30,6 +33,16 @@ impl RenderService {
     params: &DrawTextParams,
   ) -> bool {
     canvas.text_on(slice, params)
+  }
+
+  /// 在指定滚动盒子的虚拟内容区上绘制文本。
+  pub fn draw_text_in_scroll_box(
+    &mut self,
+    canvas: &mut CanvasService,
+    id: ScrollBoxId,
+    params: &DrawTextParams,
+  ) -> bool {
+    canvas.text_in_scroll_box(id, params)
   }
 
   /// 在宿主层上绘制文本（用于顶层 UI 元素）。
@@ -82,6 +95,37 @@ impl RenderService {
     self.draw_filled_rect_target(
       canvas,
       Target::Slice(slice),
+      x,
+      y,
+      width,
+      height,
+      fill_char,
+      fill_fg,
+      fill_bg,
+    );
+    true
+  }
+
+  /// 在指定滚动盒子的虚拟内容区上绘制填充矩形。
+  #[allow(clippy::too_many_arguments)]
+  pub fn draw_filled_rect_in_scroll_box(
+    &mut self,
+    canvas: &mut CanvasService,
+    id: ScrollBoxId,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    fill_char: Option<String>,
+    fill_fg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+  ) -> bool {
+    if canvas.prepared_scroll_box_rect(id).is_none() {
+      return false;
+    }
+    self.draw_filled_rect_target(
+      canvas,
+      Target::ScrollBox(id),
       x,
       y,
       width,
@@ -208,6 +252,41 @@ impl RenderService {
     self.draw_border_rect_target(
       canvas,
       Target::Slice(slice),
+      x,
+      y,
+      width,
+      height,
+      border_style,
+      border_fg,
+      border_bg,
+      fill_bg,
+      border_attrs,
+    );
+    true
+  }
+
+  /// 在指定滚动盒子的虚拟内容区上绘制边框矩形。
+  #[allow(clippy::too_many_arguments)]
+  pub fn draw_border_rect_in_scroll_box(
+    &mut self,
+    canvas: &mut CanvasService,
+    id: ScrollBoxId,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    border_style: &BorderStyle,
+    border_fg: Option<TextColor>,
+    border_bg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+    border_attrs: Option<TextStyle>,
+  ) -> bool {
+    if canvas.prepared_scroll_box_rect(id).is_none() {
+      return false;
+    }
+    self.draw_border_rect_target(
+      canvas,
+      Target::ScrollBox(id),
       x,
       y,
       width,
@@ -423,6 +502,9 @@ impl RenderService {
       Target::Base => canvas.text(params),
       Target::Slice(id) => {
         canvas.text_on(id, params);
+      }
+      Target::ScrollBox(id) => {
+        canvas.text_in_scroll_box(id, params);
       }
       Target::Host => canvas.host_text(params),
     }

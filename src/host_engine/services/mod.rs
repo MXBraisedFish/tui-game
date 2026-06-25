@@ -14,8 +14,10 @@ mod package;
 mod render;
 mod render_pipeline;
 mod rich_text;
+mod scroll_box;
 mod slice;
 mod storage;
+mod surface;
 mod terminal;
 mod terminal_capabilities;
 mod text_input;
@@ -32,8 +34,8 @@ pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};
 pub use input::{
   ActionMapEntry, InputActionEvent, InputEventType, InputService, Key, KeyEventKind, KeyState,
-  MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, SystemEvent, TerminalKeyCode,
-  TerminalKeyEvent, translate_action_map,
+  MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, ScrollDirection, SystemEvent,
+  TerminalKeyCode, TerminalKeyEvent, translate_action_map,
 };
 pub use layout::{LayoutService, Rect, Size};
 pub use log::{LogService, LogSource};
@@ -43,8 +45,13 @@ pub use package::PackageService;
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
+pub use scroll_box::{
+  Overflow, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarStyle,
+  ScrollbarVisibility,
+};
 pub use slice::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
 pub use storage::StorageService;
+pub use surface::SurfaceId;
 pub use terminal::TerminalService;
 pub use text_input::{
   TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
@@ -60,6 +67,7 @@ pub struct EngineServices {
   pub clipboard: ClipboardService,
   pub host_objects: HostObjectPool,
   pub hit_area: HitAreaService,
+  pub scroll_box: ScrollBoxService,
   pub slice: SliceService,
   pub input: InputService,
   pub ui: UiService,
@@ -90,6 +98,7 @@ impl EngineServices {
       clipboard: ClipboardService::new(),
       host_objects: HostObjectPool::new(),
       hit_area: HitAreaService::new(),
+      scroll_box: ScrollBoxService::new(),
       slice: SliceService::new(),
       text_input: TextInputService::new(),
       package: PackageService::new(),

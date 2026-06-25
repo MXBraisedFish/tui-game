@@ -4,7 +4,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::TextInputEvent;
 use super::hit_area::{HitAreaEvent, HitAreaId, HitAreaObjects};
 use super::input::InputActionEvent;
+use super::scroll_box::ScrollBoxObjects;
 use super::slice::SliceObjects;
+use super::surface::SurfaceId;
 use super::text_input::TextInputObjects;
 
 static NEXT_POOL_ID: AtomicU64 = AtomicU64::new(1);
@@ -24,9 +26,11 @@ pub struct UiObjectPool {
   id: u64,
   render_order: u64,
   pub(crate) events: VecDeque<UiComponentEvent>,
+  pub(crate) surfaces: Vec<SurfaceId>,
   pub(crate) hit_areas: HitAreaObjects,
   pub(crate) text_inputs: TextInputObjects,
   pub(crate) slices: SliceObjects,
+  pub(crate) scroll_boxes: ScrollBoxObjects,
 }
 
 /// UI 事件（动作 / 点击区域 / 文本输入）
@@ -81,9 +85,11 @@ impl UiObjectPool {
       id: NEXT_POOL_ID.fetch_add(1, Ordering::Relaxed),
       render_order: 0,
       events: VecDeque::new(),
+      surfaces: Vec::new(),
       hit_areas: HitAreaObjects::new(),
       text_inputs: TextInputObjects::new(),
       slices: SliceObjects::new(),
+      scroll_boxes: ScrollBoxObjects::new(),
     }
   }
 
@@ -115,6 +121,45 @@ impl UiObjectPool {
       UiComponentEvent::HitArea(event) => UiEvent::HitArea(event),
       UiComponentEvent::TextInput(event) => UiEvent::TextInput(event),
     })
+  }
+
+  pub(crate) fn surface_exists(&self, surface: SurfaceId) -> bool {
+    match surface {
+      SurfaceId::Slice(id) => self.slices.slices.contains_key(&id),
+      SurfaceId::ScrollBox(id) => self.scroll_boxes.boxes.contains_key(&id),
+    }
+  }
+
+  pub(crate) fn move_surface_to_edge(&mut self, surface: SurfaceId, back: bool) -> bool {
+    let Some(index) = self.surfaces.iter().position(|current| *current == surface) else {
+      return false;
+    };
+    self.surfaces.remove(index);
+    if back {
+      self.surfaces.insert(0, surface);
+    } else {
+      self.surfaces.push(surface);
+    }
+    true
+  }
+
+  pub(crate) fn move_surface_relative(
+    &mut self,
+    surface: SurfaceId,
+    target: SurfaceId,
+    above: bool,
+  ) -> bool {
+    if surface == target || !self.surface_exists(surface) || !self.surface_exists(target) {
+      return false;
+    }
+    self.surfaces.retain(|current| *current != surface);
+    let Some(target_index) = self.surfaces.iter().position(|current| *current == target) else {
+      return false;
+    };
+    self
+      .surfaces
+      .insert(target_index + usize::from(above), surface);
+    true
   }
 }
 

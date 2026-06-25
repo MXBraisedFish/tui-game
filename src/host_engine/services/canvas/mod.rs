@@ -5,3 +5,4 @@ mod service;
 pub use cell::CanvasCell;
 
 pub use service::CanvasService;
+pub(crate) use service::{PreparedScrollBox, PreparedSurface};

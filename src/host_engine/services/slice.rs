@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::ui::UiObjectPool;
-use super::{LayoutService, Rect, Size};
+use super::{LayoutService, Rect, Size, SurfaceId};
 
 /// 切片唯一标识
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -57,7 +57,6 @@ pub(crate) struct SliceState {
 pub(crate) struct SliceObjects {
   pub next_id: u64,
   pub slices: HashMap<SliceId, SliceState>,
-  pub order: Vec<SliceId>,
 }
 
 impl SliceObjects {
@@ -65,7 +64,6 @@ impl SliceObjects {
     Self {
       next_id: 1,
       slices: HashMap::new(),
-      order: Vec::new(),
     }
   }
 }
@@ -91,7 +89,7 @@ impl SliceService {
           opaque: options.opaque,
         },
       );
-      pool.slices.order.push(id);
+      pool.surfaces.push(SurfaceId::Slice(id));
       id
     })
   }
@@ -101,7 +99,9 @@ impl SliceService {
     if pool.slices.slices.remove(&id).is_none() {
       return false;
     }
-    pool.slices.order.retain(|current| *current != id);
+    pool
+      .surfaces
+      .retain(|current| *current != SurfaceId::Slice(id));
     true
   }
 
@@ -195,22 +195,22 @@ impl SliceService {
 
   /// 将切片移至层级最前
   pub fn bring_to_front(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
-    move_to_edge(&mut pool.slices, id, false)
+    pool.move_surface_to_edge(SurfaceId::Slice(id), false)
   }
 
   /// 将切片移至层级最后
   pub fn send_to_back(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
-    move_to_edge(&mut pool.slices, id, true)
+    pool.move_surface_to_edge(SurfaceId::Slice(id), true)
   }
 
   /// 将切片移动到目标切片上方
   pub fn move_above(&self, pool: &mut UiObjectPool, id: SliceId, target: SliceId) -> bool {
-    move_relative(&mut pool.slices, id, target, true)
+    pool.move_surface_relative(SurfaceId::Slice(id), SurfaceId::Slice(target), true)
   }
 
   /// 将切片移动到目标切片下方
   pub fn move_below(&self, pool: &mut UiObjectPool, id: SliceId, target: SliceId) -> bool {
-    move_relative(&mut pool.slices, id, target, false)
+    pool.move_surface_relative(SurfaceId::Slice(id), SurfaceId::Slice(target), false)
   }
 }
 
@@ -235,35 +235,6 @@ pub(crate) fn resolve_rect(rect: SliceRect, layout: &LayoutService) -> Rect {
 fn valid_rect(rect: SliceRect) -> bool {
   let valid = |length| !matches!(length, SliceLength::Percent(value) if value > 100);
   valid(rect.width) && valid(rect.height)
-}
-
-// 将切片移动到层级顺序的边界（最前或最后）
-fn move_to_edge(objects: &mut SliceObjects, id: SliceId, back: bool) -> bool {
-  let Some(index) = objects.order.iter().position(|current| *current == id) else {
-    return false;
-  };
-  objects.order.remove(index);
-  if back {
-    objects.order.insert(0, id);
-  } else {
-    objects.order.push(id);
-  }
-  true
-}
-
-// 将切片移动到目标切片的相对位置（上方或下方）
-fn move_relative(objects: &mut SliceObjects, id: SliceId, target: SliceId, above: bool) -> bool {
-  if id == target || !objects.slices.contains_key(&id) || !objects.slices.contains_key(&target) {
-    return false;
-  }
-  objects.order.retain(|current| *current != id);
-  let target_index = objects
-    .order
-    .iter()
-    .position(|current| *current == target)
-    .unwrap();
-  objects.order.insert(target_index + usize::from(above), id);
-  true
 }
 
 #[cfg(test)]
@@ -330,13 +301,25 @@ mod tests {
     assert!(!service.is_visible(&pool, b));
     assert!(!service.is_opaque(&pool, b));
     assert!(service.send_to_back(&mut pool, b));
-    assert_eq!(pool.slices.order, vec![b, a]);
+    assert_eq!(
+      pool.surfaces,
+      vec![SurfaceId::Slice(b), SurfaceId::Slice(a)]
+    );
     assert!(service.move_above(&mut pool, b, a));
-    assert_eq!(pool.slices.order, vec![a, b]);
+    assert_eq!(
+      pool.surfaces,
+      vec![SurfaceId::Slice(a), SurfaceId::Slice(b)]
+    );
     assert!(service.move_below(&mut pool, b, a));
-    assert_eq!(pool.slices.order, vec![b, a]);
+    assert_eq!(
+      pool.surfaces,
+      vec![SurfaceId::Slice(b), SurfaceId::Slice(a)]
+    );
     assert!(service.bring_to_front(&mut pool, b));
-    assert_eq!(pool.slices.order, vec![a, b]);
+    assert_eq!(
+      pool.surfaces,
+      vec![SurfaceId::Slice(a), SurfaceId::Slice(b)]
+    );
     assert!(!service.move_above(&mut pool, a, a));
     assert!(service.remove(&mut pool, a));
     assert!(!service.exists(&pool, a));

@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
 use super::{buffer::CanvasBuffer, cell::CanvasCell};
+use crate::host_engine::services::scroll_box::clamp_rect;
 use crate::host_engine::services::slice::resolve_rect;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
 use crate::host_engine::services::{
-  LayoutService, Rect, Size, SliceId, TextColor, TextStyle, UiObjectPool,
+  LayoutService, Rect, ScrollBoxId, ScrollbarPolicy, ScrollbarStyle, Size, SliceId, SurfaceId,
+  TextColor, TextStyle, UiObjectPool,
 };
 
 /// 画布服务：管理基础层、宿主层和多切片缓冲区，协调文本绘制与区域查询。
@@ -14,7 +16,8 @@ pub struct CanvasService {
   base: CanvasBuffer,
   host: CanvasBuffer,
   slices: HashMap<SliceId, PreparedSlice>,
-  slice_order: Vec<SliceId>,
+  scroll_boxes: HashMap<ScrollBoxId, PreparedScrollBox>,
+  surface_order: Vec<SurfaceId>,
   viewport: Rect,
   active_pool: Option<u64>,
   force_full_redraw: bool,
@@ -30,6 +33,27 @@ pub(crate) struct PreparedSlice {
   pub order: usize,
 }
 
+/// 已预处理完成的滚动盒子：包含虚拟内容缓冲区和可视窗口元数据。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PreparedScrollBox {
+  pub buffer: CanvasBuffer,
+  pub rect: Rect,
+  pub content_size: Size,
+  pub scroll_x: u16,
+  pub scroll_y: u16,
+  pub visible: bool,
+  pub opaque: bool,
+  pub order: usize,
+  pub scrollbar: ScrollbarPolicy,
+  pub scrollbar_style: ScrollbarStyle,
+}
+
+/// 已预处理开发者 Surface 的只读引用。
+pub(crate) enum PreparedSurface<'a> {
+  Slice(&'a PreparedSlice),
+  ScrollBox(&'a PreparedScrollBox),
+}
+
 impl CanvasService {
   pub fn new() -> Self {
     let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
@@ -37,7 +61,8 @@ impl CanvasService {
       base: CanvasBuffer::new(width, height),
       host: CanvasBuffer::new(width, height),
       slices: HashMap::new(),
-      slice_order: Vec::new(),
+      scroll_boxes: HashMap::new(),
+      surface_order: Vec::new(),
       viewport: Rect {
         x: 0,
         y: 0,
@@ -86,32 +111,103 @@ impl CanvasService {
     }
     if self.active_pool != Some(pool.id()) {
       self.slices.clear();
+      self.scroll_boxes.clear();
     }
     self.active_pool = Some(pool.id());
-    self.slice_order = pool.slices.order.clone();
+    self.surface_order = pool.surfaces.clone();
     self
       .slices
       .retain(|id, _| pool.slices.slices.contains_key(id));
-    for (order, id) in self.slice_order.iter().copied().enumerate() {
-      let state = pool.slices.slices[&id];
-      let rect = resolve_rect(state.rect, layout);
-      let prepared = self.slices.entry(id).or_insert_with(|| PreparedSlice {
-        buffer: CanvasBuffer::new(rect.width, rect.height),
-        rect,
-        visible: state.visible,
-        opaque: state.opaque,
-        order,
-      });
-      if prepared.buffer.width() != rect.width || prepared.buffer.height() != rect.height {
-        prepared.buffer.resize(rect.width, rect.height);
-      } else {
-        prepared.buffer.clear();
+    self
+      .scroll_boxes
+      .retain(|id, _| pool.scroll_boxes.boxes.contains_key(id));
+    let order = self.surface_order.clone();
+    for (order, surface) in order.into_iter().enumerate() {
+      match surface {
+        SurfaceId::Slice(id) => self.prepare_slice(pool, order, id, layout),
+        SurfaceId::ScrollBox(id) => self.prepare_scroll_box(pool, order, id, layout),
       }
-      prepared.rect = rect;
-      prepared.visible = state.visible;
-      prepared.opaque = state.opaque;
-      prepared.order = order;
     }
+  }
+
+  fn prepare_slice(
+    &mut self,
+    pool: &UiObjectPool,
+    order: usize,
+    id: SliceId,
+    layout: &LayoutService,
+  ) {
+    let Some(state) = pool.slices.slices.get(&id).copied() else {
+      return;
+    };
+    let rect = resolve_rect(state.rect, layout);
+    let prepared = self.slices.entry(id).or_insert_with(|| PreparedSlice {
+      buffer: CanvasBuffer::new(rect.width, rect.height),
+      rect,
+      visible: state.visible,
+      opaque: state.opaque,
+      order,
+    });
+    if prepared.buffer.width() != rect.width || prepared.buffer.height() != rect.height {
+      prepared.buffer.resize(rect.width, rect.height);
+    } else {
+      prepared.buffer.clear();
+    }
+    prepared.rect = rect;
+    prepared.visible = state.visible;
+    prepared.opaque = state.opaque;
+    prepared.order = order;
+  }
+
+  fn prepare_scroll_box(
+    &mut self,
+    pool: &UiObjectPool,
+    order: usize,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) {
+    let Some(state) = pool.scroll_boxes.boxes.get(&id) else {
+      return;
+    };
+    let options = &state.options;
+    let rect = clamp_rect(options.rect, layout.developer_size());
+    let content_size = Size {
+      width: options.content_width,
+      height: options.content_height,
+    };
+    let prepared = self
+      .scroll_boxes
+      .entry(id)
+      .or_insert_with(|| PreparedScrollBox {
+        buffer: CanvasBuffer::new(content_size.width, content_size.height),
+        rect,
+        content_size,
+        scroll_x: 0,
+        scroll_y: 0,
+        visible: options.visible,
+        opaque: options.opaque,
+        order,
+        scrollbar: options.scrollbar,
+        scrollbar_style: options.scrollbar_style.clone(),
+      });
+    if prepared.buffer.width() != content_size.width
+      || prepared.buffer.height() != content_size.height
+    {
+      prepared
+        .buffer
+        .resize(content_size.width, content_size.height);
+    } else {
+      prepared.buffer.clear();
+    }
+    prepared.rect = rect;
+    prepared.content_size = content_size;
+    prepared.scroll_x = state.scroll_x;
+    prepared.scroll_y = state.scroll_y;
+    prepared.visible = options.visible;
+    prepared.opaque = options.opaque;
+    prepared.order = order;
+    prepared.scrollbar = options.scrollbar;
+    prepared.scrollbar_style = options.scrollbar_style.clone();
   }
 
   pub fn clear(&mut self) {
@@ -138,6 +234,26 @@ impl CanvasService {
     let lines = text_layout::layout_text_lines(params);
     Self::draw_layout_lines(
       &mut slice.buffer,
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
+    true
+  }
+
+  /// 在指定滚动盒子的虚拟内容缓冲区上绘制富文本。
+  pub fn text_in_scroll_box(&mut self, id: ScrollBoxId, params: &DrawTextParams) -> bool {
+    let Some(scroll_box) = self
+      .scroll_boxes
+      .get_mut(&id)
+      .filter(|scroll_box| scroll_box.visible)
+    else {
+      return false;
+    };
+    let lines = text_layout::layout_text_lines(params);
+    Self::draw_layout_lines(
+      &mut scroll_box.buffer,
       params.x,
       params.y,
       params.line_align,
@@ -176,6 +292,26 @@ impl CanvasService {
       return false;
     };
     Self::styled_text_to(&mut slice.buffer, x, y, text, style);
+    true
+  }
+
+  /// 在指定滚动盒子的虚拟内容缓冲区上以指定样式绘制纯文本。
+  pub fn styled_text_in_scroll_box(
+    &mut self,
+    id: ScrollBoxId,
+    x: u16,
+    y: u16,
+    text: &str,
+    style: TextStyle,
+  ) -> bool {
+    let Some(scroll_box) = self
+      .scroll_boxes
+      .get_mut(&id)
+      .filter(|scroll_box| scroll_box.visible)
+    else {
+      return false;
+    };
+    Self::styled_text_to(&mut scroll_box.buffer, x, y, text, style);
     true
   }
 
@@ -250,9 +386,23 @@ impl CanvasService {
   /// 按绘制顺序迭代所有预处理切片。
   pub(crate) fn prepared_slices(&self) -> impl Iterator<Item = (SliceId, &PreparedSlice)> {
     self
-      .slice_order
+      .surface_order
       .iter()
-      .filter_map(|id| self.slices.get(id).map(|slice| (*id, slice)))
+      .filter_map(|surface| match surface {
+        SurfaceId::Slice(id) => self.slices.get(id).map(|slice| (*id, slice)),
+        SurfaceId::ScrollBox(_) => None,
+      })
+  }
+
+  /// 按共享层级顺序迭代所有开发者 Surface。
+  pub(crate) fn prepared_surfaces(&self) -> impl Iterator<Item = PreparedSurface<'_>> {
+    self
+      .surface_order
+      .iter()
+      .filter_map(|surface| match surface {
+        SurfaceId::Slice(id) => self.slices.get(id).map(PreparedSurface::Slice),
+        SurfaceId::ScrollBox(id) => self.scroll_boxes.get(id).map(PreparedSurface::ScrollBox),
+      })
   }
 
   pub(crate) fn viewport(&self) -> Rect {
@@ -279,6 +429,41 @@ impl CanvasService {
 
   pub fn prepared_slice_height(&self, id: SliceId) -> Option<u16> {
     Some(self.prepared_slice_size(id)?.height)
+  }
+
+  pub fn prepared_scroll_box_rect(&self, id: ScrollBoxId) -> Option<Rect> {
+    let scroll_box = self.scroll_boxes.get(&id)?;
+    scroll_box.visible.then_some(scroll_box.rect)
+  }
+
+  pub fn prepared_scroll_box_size(&self, id: ScrollBoxId) -> Option<Size> {
+    let rect = self.prepared_scroll_box_rect(id)?;
+    Some(Size {
+      width: rect.width,
+      height: rect.height,
+    })
+  }
+
+  pub(crate) fn top_scroll_box_at(&self, x: u16, y: u16) -> Option<ScrollBoxId> {
+    self
+      .surface_order
+      .iter()
+      .filter_map(|surface| match surface {
+        SurfaceId::ScrollBox(id) => {
+          let scroll_box = self.scroll_boxes.get(id)?;
+          let rect = physical_rect(self.viewport, scroll_box.rect);
+          (scroll_box.visible && rect.width > 0 && rect.height > 0 && rect.contains(x, y))
+            .then_some((*id, scroll_box.order))
+        }
+        SurfaceId::Slice(id) => {
+          let slice = self.slices.get(id)?;
+          let rect = physical_rect(self.viewport, slice.rect);
+          (slice.visible && rect.width > 0 && rect.height > 0 && rect.contains(x, y))
+            .then_some((ScrollBoxId(0), slice.order))
+        }
+      })
+      .max_by_key(|(_, order)| *order)
+      .and_then(|(id, _)| (id != ScrollBoxId(0)).then_some(id))
   }
 
   /// 将物理坐标转换为视口内的相对坐标。
@@ -399,6 +584,15 @@ fn surface_hit_rect(
   ))
 }
 
+fn physical_rect(viewport: Rect, rect: Rect) -> Rect {
+  Rect {
+    x: viewport.x.saturating_add(rect.x),
+    y: viewport.y.saturating_add(rect.y),
+    width: rect.width,
+    height: rect.height,
+  }
+}
+
 // 解析背景色：当样式背景为 Transparent 时，继承已写入单元格的背景色。
 fn resolve_background(mut style: TextStyle, buffer: &CanvasBuffer, x: u16, y: u16) -> TextStyle {
   match &style.background {
@@ -419,7 +613,8 @@ mod tests {
   use super::*;
   use crate::host_engine::services::text_layout::TextWrapMode;
   use crate::host_engine::services::{
-    RichTextParams, SliceLength, SliceOptions, SliceRect, SliceService, TerminalColor, TextColor,
+    RichTextParams, ScrollBoxOptions, ScrollBoxService, SliceLength, SliceOptions, SliceRect,
+    SliceService, TerminalColor, TextColor,
   };
   use std::collections::HashMap;
 
@@ -685,6 +880,50 @@ mod tests {
     );
     assert_eq!(canvas.prepared_slice_width(slice), Some(5));
     assert_eq!(canvas.prepared_slice_height(slice), Some(3));
+  }
+
+  #[test]
+  fn prepared_scroll_box_queries_return_visible_prepared_size() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(20, 10);
+    let mut pool = UiObjectPool::new();
+    let id = ScrollBoxService::new()
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: Rect {
+            x: 18,
+            y: 8,
+            width: 10,
+            height: 10,
+          },
+          content_width: 10,
+          content_height: 20,
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let mut canvas = CanvasService::new();
+
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+
+    assert_eq!(
+      canvas.prepared_scroll_box_rect(id),
+      Some(Rect {
+        x: 18,
+        y: 8,
+        width: 2,
+        height: 2
+      })
+    );
+    assert_eq!(
+      canvas.prepared_scroll_box_size(id),
+      Some(Size {
+        width: 2,
+        height: 2
+      })
+    );
   }
 
   #[test]
