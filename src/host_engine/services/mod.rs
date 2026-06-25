@@ -1,7 +1,6 @@
 mod canvas;
 mod clipboard;
 mod game;
-mod hit_area;
 mod host_object;
 mod i18n;
 mod image;
@@ -14,21 +13,17 @@ mod package;
 mod render;
 mod render_pipeline;
 mod rich_text;
-mod scroll_box;
-mod slice;
 mod storage;
-mod surface;
 mod terminal;
 mod terminal_capabilities;
-mod text_input;
 pub mod text_layout;
 mod ui;
 mod unicode;
+pub(crate) mod widget;
 
 pub use canvas::{CanvasCell, CanvasService};
 pub use clipboard::ClipboardService;
 pub use game::GameService;
-pub use hit_area::{HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService};
 pub use host_object::{HostArea, HostAreaId, HostAreaKind, HostObjectPool};
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};
@@ -45,21 +40,18 @@ pub use package::PackageService;
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
-pub use scroll_box::{
-  Overflow, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout,
-  ScrollbarPolicy, ScrollbarSide, ScrollbarStyle, ScrollbarVisibility,
-};
-pub use slice::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
 pub use storage::StorageService;
-pub use surface::SurfaceId;
 pub use terminal::TerminalService;
-pub use text_input::{
-  TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
-  TextInputRenderParams, TextInputService, VerticalAlign,
-};
 pub use text_layout::DrawTextParams;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
+pub use widget::{
+  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, Overflow, ScrollBoxEvent, ScrollBoxId,
+  ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide,
+  ScrollbarStyle, ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService,
+  SurfaceId, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
+  TextInputRenderParams, TextInputService, VerticalAlign,
+};
 
 /// 引擎核心服务集合，持有所有子服务的实例
 pub struct EngineServices {

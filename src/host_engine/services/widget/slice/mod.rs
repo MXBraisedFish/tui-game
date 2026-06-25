@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use super::ui::UiObjectPool;
-use super::{LayoutService, Rect, Size, SurfaceId};
+use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::{LayoutService, Rect, Size, SurfaceId};
 
 /// 切片唯一标识
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

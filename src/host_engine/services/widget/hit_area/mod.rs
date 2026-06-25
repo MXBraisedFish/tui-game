@@ -1,129 +1,13 @@
-use std::collections::HashMap;
+mod state;
+mod types;
 
-use super::ui::UiObjectPool;
-use super::{
+pub(crate) use self::state::HitAreaObjects;
+use self::state::{HitAreaState, HitSnapshot, PressState};
+pub use self::types::{HitAreaEvent, HitAreaId, HitAreaOptions};
+use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::{
   CanvasService, MouseButton, MouseEvent, MouseEventKind, Rect, SliceId, TextInputService,
 };
-
-/// 点击区域唯一标识
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct HitAreaId(pub u64);
-
-/// 点击区域配置选项
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct HitAreaOptions {
-  pub hover_move: bool,
-
-  pub drag: bool,
-}
-
-/// 点击区域事件
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HitAreaEvent {
-  HoverEnter {
-    id: HitAreaId,
-    x: u16,
-    y: u16,
-  },
-  HoverMove {
-    id: HitAreaId,
-    x: u16,
-    y: u16,
-  },
-  HoverLeave {
-    id: HitAreaId,
-    x: u16,
-    y: u16,
-  },
-  Press {
-    id: HitAreaId,
-    button: MouseButton,
-    x: u16,
-    y: u16,
-  },
-  Release {
-    id: HitAreaId,
-    button: MouseButton,
-    x: u16,
-    y: u16,
-  },
-  Click {
-    id: HitAreaId,
-    button: MouseButton,
-    x: u16,
-    y: u16,
-  },
-  Drag {
-    id: HitAreaId,
-    button: MouseButton,
-    x: u16,
-    y: u16,
-    dx: i32,
-    dy: i32,
-  },
-}
-
-#[derive(Clone, Copy)]
-struct HitSnapshot {
-  rect: Rect,
-  order: u64,
-  origin: (u16, u16),
-  surface_rank: usize,
-}
-
-#[derive(Clone, Copy)]
-struct PressState {
-  id: HitAreaId,
-  last_x: u16,
-  last_y: u16,
-}
-
-struct HitAreaState {
-  hit: Option<HitSnapshot>,
-  options: HitAreaOptions,
-}
-
-pub(crate) struct HitAreaObjects {
-  next_id: u64,
-  areas: HashMap<HitAreaId, HitAreaState>,
-  hovered: Option<HitAreaId>,
-  pressed: HashMap<MouseButton, PressState>,
-  pointer: Option<(u16, u16)>,
-  physical_pointer: Option<(u16, u16)>,
-}
-
-impl HitAreaObjects {
-  pub(crate) fn new() -> Self {
-    Self {
-      next_id: 1,
-      areas: HashMap::new(),
-      hovered: None,
-      pressed: HashMap::new(),
-      pointer: None,
-      physical_pointer: None,
-    }
-  }
-
-  fn hit(&self, x: u16, y: u16) -> Option<(HitAreaId, (usize, u64))> {
-    self
-      .areas
-      .iter()
-      .filter_map(|(id, state)| {
-        let hit = state.hit?;
-        hit
-          .rect
-          .contains(x, y)
-          .then_some((*id, (hit.surface_rank, hit.order)))
-      })
-      .max_by_key(|(_, order)| *order)
-  }
-
-  pub(crate) fn clear_hits(&mut self) {
-    for state in self.areas.values_mut() {
-      state.hit = None;
-    }
-  }
-}
 
 /// 点击区域服务，管理鼠标交互区域
 pub struct HitAreaService;

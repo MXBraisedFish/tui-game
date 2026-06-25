@@ -1,230 +1,18 @@
-use std::collections::{HashMap, VecDeque};
+mod state;
+mod types;
 
-use super::surface::SurfaceId;
-use super::ui::UiObjectPool;
-use super::{
-  CanvasService, LayoutService, MouseButton, MouseEvent, MouseEventKind, Rect, ScrollDirection,
-  Size, TextColor, TextStyle,
+pub(crate) use self::state::ScrollBoxObjects;
+use self::state::{ScrollBoxDragState, ScrollBoxState};
+use self::types::ScrollbarAxis;
+pub use self::types::{
+  Overflow, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollbarLayout, ScrollbarPolicy,
+  ScrollbarSide, ScrollbarStyle, ScrollbarVisibility,
 };
-
-/// 可滚动绘制面唯一标识。
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ScrollBoxId(pub u64);
-
-/// 溢出处理方式。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Overflow {
-  Hidden,
-  Auto,
-}
-
-/// 滚动条显示策略。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ScrollbarVisibility {
-  Auto,
-  Always,
-  Never,
-}
-
-/// 滚动条占位策略。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ScrollbarLayout {
-  /// 滚动条覆盖内容，不改变内容 viewport 宽度。
-  Overlay,
-  /// 滚动条占用一列/行，内容可视区域减少 1。
-  ReserveSpace,
-}
-
-impl Default for ScrollbarLayout {
-  fn default() -> Self {
-    Self::Overlay
-  }
-}
-
-/// 滚动条放置侧。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ScrollbarSide {
-  Right,
-}
-
-/// 滚动条轴向（内部使用）。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ScrollbarAxis {
-  Vertical,
-  Horizontal,
-}
-
-/// 滚动条策略。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ScrollbarPolicy {
-  pub vertical: ScrollbarVisibility,
-  pub horizontal: ScrollbarVisibility,
-}
-
-impl Default for ScrollbarPolicy {
-  fn default() -> Self {
-    Self {
-      vertical: ScrollbarVisibility::Auto,
-      horizontal: ScrollbarVisibility::Never,
-    }
-  }
-}
-
-/// 滚动条样式。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ScrollbarStyle {
-  /// 垂直滚动条轨道字符。
-  pub track_char: char,
-  /// 垂直滚动条滑块字符。
-  pub thumb_char: char,
-  /// 垂直滚动条轨道样式。
-  pub track_style: TextStyle,
-  /// 垂直滚动条滑块样式。
-  pub thumb_style: TextStyle,
-  /// 水平滚动条轨道字符。
-  pub h_track_char: char,
-  /// 水平滚动条滑块字符。
-  pub h_thumb_char: char,
-  /// 水平滚动条轨道样式。
-  pub h_track_style: TextStyle,
-  /// 水平滚动条滑块样式。
-  pub h_thumb_style: TextStyle,
-  /// 滑块最小高度/宽度（默认 1）。
-  pub minimum_thumb_height: u16,
-  /// 滚动条放置侧。
-  pub side: ScrollbarSide,
-}
-
-impl Default for ScrollbarStyle {
-  fn default() -> Self {
-    Self {
-      track_char: '│',
-      thumb_char: '█',
-      track_style: TextStyle {
-        foreground: Some(TextColor::Terminal(super::TerminalColor::BrightBlack)),
-        ..Default::default()
-      },
-      thumb_style: TextStyle {
-        foreground: Some(TextColor::Terminal(super::TerminalColor::BrightWhite)),
-        ..Default::default()
-      },
-      h_track_char: '─',
-      h_thumb_char: '█',
-      h_track_style: TextStyle {
-        foreground: Some(TextColor::Terminal(super::TerminalColor::BrightBlack)),
-        ..Default::default()
-      },
-      h_thumb_style: TextStyle {
-        foreground: Some(TextColor::Terminal(super::TerminalColor::BrightWhite)),
-        ..Default::default()
-      },
-      minimum_thumb_height: 1,
-      side: ScrollbarSide::Right,
-    }
-  }
-}
-
-/// 可滚动绘制面配置。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ScrollBoxOptions {
-  pub rect: Rect,
-  pub content_width: u16,
-  pub content_height: u16,
-  pub overflow_y: Overflow,
-  pub overflow_x: Overflow,
-  pub scrollbar: ScrollbarPolicy,
-  pub scrollbar_style: ScrollbarStyle,
-  pub scrollbar_layout: ScrollbarLayout,
-  pub visible: bool,
-  pub opaque: bool,
-  pub mouse_wheel: bool,
-  pub wheel_step: u16,
-  pub emit_scroll_events: bool,
-}
-
-impl Default for ScrollBoxOptions {
-  fn default() -> Self {
-    Self {
-      rect: Rect::default(),
-      content_width: 0,
-      content_height: 0,
-      overflow_y: Overflow::Auto,
-      overflow_x: Overflow::Hidden,
-      scrollbar: ScrollbarPolicy::default(),
-      scrollbar_style: ScrollbarStyle::default(),
-      scrollbar_layout: ScrollbarLayout::default(),
-      visible: true,
-      opaque: true,
-      mouse_wheel: true,
-      wheel_step: 3,
-      emit_scroll_events: false,
-    }
-  }
-}
-
-/// 滚动盒子事件。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ScrollBoxEvent {
-  Scrolled { id: ScrollBoxId, x: u16, y: u16 },
-}
-
-/// 滚动条拖动状态（内部使用）。
-#[derive(Clone, Copy, Debug)]
-struct ScrollBoxDragState {
-  scroll_box_id: ScrollBoxId,
-  axis: ScrollbarAxis,
-  button: MouseButton,
-  /// 拖动开始时鼠标在轨道内的位置（物理坐标）。
-  drag_start_mouse: u16,
-  /// 拖动开始时的滚动位置。
-  drag_start_scroll: u16,
-  /// 滑块尺寸。
-  thumb_size: u16,
-  /// 轨道尺寸。
-  track_size: u16,
-  /// 最大滚动值。
-  max_scroll: u16,
-}
-
-impl ScrollBoxDragState {
-  /// 根据当前鼠标位置计算新的滚动值。
-  fn scroll_from_mouse(&self, mouse_pos: u16) -> u16 {
-    let travel = self.track_size.saturating_sub(self.thumb_size);
-    if travel == 0 {
-      return 0;
-    }
-    let thumb_pos = (mouse_pos as i32 - self.drag_start_mouse as i32
-      + self.drag_start_scroll as i32 * travel as i32 / self.max_scroll.max(1) as i32)
-      .max(0)
-      .min(travel as i32) as u16;
-    (thumb_pos as u32 * self.max_scroll as u32 / travel as u32) as u16
-  }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ScrollBoxState {
-  pub options: ScrollBoxOptions,
-  pub scroll_x: u16,
-  pub scroll_y: u16,
-}
-
-pub(crate) struct ScrollBoxObjects {
-  pub next_id: u64,
-  pub boxes: HashMap<ScrollBoxId, ScrollBoxState>,
-  pub(crate) events: VecDeque<ScrollBoxEvent>,
-  pub(crate) drag: Option<ScrollBoxDragState>,
-}
-
-impl ScrollBoxObjects {
-  pub(crate) fn new() -> Self {
-    Self {
-      next_id: 1,
-      boxes: HashMap::new(),
-      events: VecDeque::new(),
-      drag: None,
-    }
-  }
-}
+use super::surface::SurfaceId;
+use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::{
+  CanvasService, LayoutService, MouseEvent, MouseEventKind, Rect, ScrollDirection, Size,
+};
 
 /// 可滚动绘制面服务。
 pub struct ScrollBoxService;
@@ -393,11 +181,7 @@ impl ScrollBoxService {
   }
 
   /// 查询完整的滚动位置。
-  pub fn scroll_position(
-    &self,
-    pool: &UiObjectPool,
-    id: ScrollBoxId,
-  ) -> Option<(u16, u16)> {
+  pub fn scroll_position(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<(u16, u16)> {
     let state = pool.scroll_boxes.boxes.get(&id)?;
     Some((state.scroll_x, state.scroll_y))
   }
@@ -501,7 +285,11 @@ impl ScrollBoxService {
       pool
         .scroll_boxes
         .events
-        .push_back(ScrollBoxEvent::Scrolled { id, x: new.0, y: new.1 });
+        .push_back(ScrollBoxEvent::Scrolled {
+          id,
+          x: new.0,
+          y: new.1,
+        });
     }
     true
   }
@@ -531,7 +319,11 @@ impl ScrollBoxService {
       pool
         .scroll_boxes
         .events
-        .push_back(ScrollBoxEvent::Scrolled { id, x: new.0, y: new.1 });
+        .push_back(ScrollBoxEvent::Scrolled {
+          id,
+          x: new.0,
+          y: new.1,
+        });
     }
     true
   }
@@ -550,7 +342,11 @@ impl ScrollBoxService {
       pool
         .scroll_boxes
         .events
-        .push_back(ScrollBoxEvent::Scrolled { id, x: new.0, y: new.1 });
+        .push_back(ScrollBoxEvent::Scrolled {
+          id,
+          x: new.0,
+          y: new.1,
+        });
     }
     true
   }
@@ -574,7 +370,11 @@ impl ScrollBoxService {
       pool
         .scroll_boxes
         .events
-        .push_back(ScrollBoxEvent::Scrolled { id, x: new.0, y: new.1 });
+        .push_back(ScrollBoxEvent::Scrolled {
+          id,
+          x: new.0,
+          y: new.1,
+        });
     }
     true
   }
@@ -593,7 +393,11 @@ impl ScrollBoxService {
       pool
         .scroll_boxes
         .events
-        .push_back(ScrollBoxEvent::Scrolled { id, x: new.0, y: new.1 });
+        .push_back(ScrollBoxEvent::Scrolled {
+          id,
+          x: new.0,
+          y: new.1,
+        });
     }
     true
   }
@@ -617,7 +421,11 @@ impl ScrollBoxService {
       pool
         .scroll_boxes
         .events
-        .push_back(ScrollBoxEvent::Scrolled { id, x: new.0, y: new.1 });
+        .push_back(ScrollBoxEvent::Scrolled {
+          id,
+          x: new.0,
+          y: new.1,
+        });
     }
     true
   }
@@ -749,11 +557,13 @@ impl ScrollBoxService {
       let physical = scrollbar_physical_rect(bar, canvas.viewport());
       if physical.contains(event.x, event.y) {
         let step = clamped.height as i32;
-        if event.y < physical.y.saturating_add(
-          vertical_thumb_rect(state, viewport)
-            .map(|t| t.y.saturating_sub(clamped.y))
-            .unwrap_or(0),
-        ) {
+        if event.y
+          < physical.y.saturating_add(
+            vertical_thumb_rect(state, viewport)
+              .map(|t| t.y.saturating_sub(clamped.y))
+              .unwrap_or(0),
+          )
+        {
           self.scroll_by(pool, id, 0, -step, layout);
         } else {
           self.scroll_by(pool, id, 0, step, layout);
@@ -786,11 +596,13 @@ impl ScrollBoxService {
       let physical = scrollbar_physical_rect(bar, canvas.viewport());
       if physical.contains(event.x, event.y) {
         let step = clamped.width as i32;
-        if event.x < physical.x.saturating_add(
-          horizontal_thumb_rect(state, viewport)
-            .map(|t| t.x.saturating_sub(clamped.x))
-            .unwrap_or(0),
-        ) {
+        if event.x
+          < physical.x.saturating_add(
+            horizontal_thumb_rect(state, viewport)
+              .map(|t| t.x.saturating_sub(clamped.x))
+              .unwrap_or(0),
+          )
+        {
           self.scroll_by(pool, id, -step, 0, layout);
         } else {
           self.scroll_by(pool, id, step, 0, layout);
@@ -845,7 +657,11 @@ impl ScrollBoxService {
           pool
             .scroll_boxes
             .events
-            .push_back(ScrollBoxEvent::Scrolled { id, x: new.0, y: new.1 });
+            .push_back(ScrollBoxEvent::Scrolled {
+              id,
+              x: new.0,
+              y: new.1,
+            });
         }
         // 更新拖动起点为当前滚动位置对应的轨道位置。
         if let Some(drag_state) = pool.scroll_boxes.drag.as_mut() {
@@ -863,7 +679,6 @@ impl ScrollBoxService {
       }
     }
   }
-
 }
 
 fn valid_options(options: &ScrollBoxOptions) -> bool {
@@ -951,10 +766,7 @@ pub(crate) fn clamp_scroll(state: &mut ScrollBoxState, viewport: Size) {
 }
 
 /// 垂直滚动条轨道矩形（开发者坐标）。
-pub(crate) fn vertical_scrollbar_rect(
-  state: &ScrollBoxState,
-  viewport: Size,
-) -> Option<Rect> {
+pub(crate) fn vertical_scrollbar_rect(state: &ScrollBoxState, viewport: Size) -> Option<Rect> {
   if !shows_vertical_scrollbar(state, viewport) {
     return None;
   }
@@ -975,10 +787,7 @@ pub(crate) fn vertical_scrollbar_rect(
 }
 
 /// 水平滚动条轨道矩形（开发者坐标）。
-pub(crate) fn horizontal_scrollbar_rect(
-  state: &ScrollBoxState,
-  viewport: Size,
-) -> Option<Rect> {
+pub(crate) fn horizontal_scrollbar_rect(state: &ScrollBoxState, viewport: Size) -> Option<Rect> {
   if !shows_horizontal_scrollbar(state, viewport) {
     return None;
   }
@@ -1007,10 +816,7 @@ pub(crate) fn horizontal_scrollbar_rect(
 }
 
 /// 垂直滚动条滑块矩形（开发者坐标）。
-pub(crate) fn vertical_thumb_rect(
-  state: &ScrollBoxState,
-  viewport: Size,
-) -> Option<Rect> {
+pub(crate) fn vertical_thumb_rect(state: &ScrollBoxState, viewport: Size) -> Option<Rect> {
   let bar = vertical_scrollbar_rect(state, viewport)?;
   let max_scroll = max_scroll_y(state, viewport);
   let height = bar.height;
@@ -1036,10 +842,7 @@ pub(crate) fn vertical_thumb_rect(
 }
 
 /// 水平滚动条滑块矩形（开发者坐标）。
-pub(crate) fn horizontal_thumb_rect(
-  state: &ScrollBoxState,
-  viewport: Size,
-) -> Option<Rect> {
+pub(crate) fn horizontal_thumb_rect(state: &ScrollBoxState, viewport: Size) -> Option<Rect> {
   let bar = horizontal_scrollbar_rect(state, viewport)?;
   let max_scroll = max_scroll_x(state, viewport);
   let width = bar.width;
@@ -1130,25 +933,29 @@ mod tests {
     let service = ScrollBoxService::new();
     let mut pool = UiObjectPool::new();
     // 水平溢出现在允许。
-    assert!(service
-      .create(
-        &mut pool,
-        ScrollBoxOptions {
-          overflow_x: Overflow::Auto,
-          ..Default::default()
-        }
-      )
-      .is_some());
+    assert!(
+      service
+        .create(
+          &mut pool,
+          ScrollBoxOptions {
+            overflow_x: Overflow::Auto,
+            ..Default::default()
+          }
+        )
+        .is_some()
+    );
     // wheel_step = 0 仍然拒绝。
-    assert!(service
-      .create(
-        &mut pool,
-        ScrollBoxOptions {
-          wheel_step: 0,
-          ..Default::default()
-        }
-      )
-      .is_none());
+    assert!(
+      service
+        .create(
+          &mut pool,
+          ScrollBoxOptions {
+            wheel_step: 0,
+            ..Default::default()
+          }
+        )
+        .is_none()
+    );
   }
 
   #[test]
@@ -1265,10 +1072,7 @@ mod tests {
       service.content_to_viewport_point(&pool, id, 3, 5),
       Some((0, 0))
     );
-    assert_eq!(
-      service.content_to_viewport_point(&pool, id, 0, 0),
-      None
-    ); // 内容坐标 < scroll → None
+    assert_eq!(service.content_to_viewport_point(&pool, id, 0, 0), None); // 内容坐标 < scroll → None
 
     // 视口 → 内容。
     assert_eq!(
@@ -1308,10 +1112,7 @@ mod tests {
     service.scroll_by(&mut pool, id, 0, 3, &layout);
     let events = service.drain_scroll_events(&mut pool);
     assert_eq!(events.len(), 1);
-    assert_eq!(
-      events[0],
-      ScrollBoxEvent::Scrolled { id, x: 0, y: 3 }
-    );
+    assert_eq!(events[0], ScrollBoxEvent::Scrolled { id, x: 0, y: 3 });
 
     // 再次滚动到相同位置不应发射事件。
     service.scroll_to(&mut pool, id, 0, 3, &layout);
