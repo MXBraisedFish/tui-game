@@ -1,7 +1,7 @@
 use super::BorderStyle;
 use crate::host_engine::services::unicode::char_width;
 use crate::host_engine::services::{
-  CanvasService, DrawTextParams, ScrollBoxId, SliceId, TextColor, TextStyle,
+  CanvasService, DrawTextParams, ScrollBoxId, SliceId, SurfaceId, TextColor, TextStyle,
 };
 
 #[derive(Clone, Copy)]
@@ -490,6 +490,69 @@ impl RenderService {
         ..Default::default()
       },
     );
+  }
+
+  // ─── 统一 Surface 绘制 API ──────────────────────────
+
+  /// 在指定 Surface 上绘制文本。
+  pub fn draw_text_on_surface(
+    &mut self,
+    canvas: &mut CanvasService,
+    surface: SurfaceId,
+    params: &DrawTextParams,
+  ) -> bool {
+    match surface {
+      SurfaceId::Slice(id) => self.draw_text_on(canvas, id, params),
+      SurfaceId::ScrollBox(id) => self.draw_text_in_scroll_box(canvas, id, params),
+    }
+  }
+
+  /// 在指定 Surface 上绘制填充矩形。
+  pub fn draw_filled_rect_on_surface(
+    &mut self,
+    canvas: &mut CanvasService,
+    surface: SurfaceId,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    fill_char: Option<String>,
+    fill_fg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+  ) -> bool {
+    match surface {
+      SurfaceId::Slice(id) => self.draw_filled_rect_on(
+        canvas, id, x, y, width, height, fill_char, fill_fg, fill_bg,
+      ),
+      SurfaceId::ScrollBox(id) => self.draw_filled_rect_in_scroll_box(
+        canvas, id, x, y, width, height, fill_char, fill_fg, fill_bg,
+      ),
+    }
+  }
+
+  /// 在指定 Surface 上绘制边框矩形。
+  pub fn draw_border_rect_on_surface(
+    &mut self,
+    canvas: &mut CanvasService,
+    surface: SurfaceId,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    border_style: &BorderStyle,
+    border_fg: Option<TextColor>,
+    border_bg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+    border_attrs: Option<TextStyle>,
+  ) -> bool {
+    match surface {
+      SurfaceId::Slice(id) => self.draw_border_rect_on(
+        canvas, id, x, y, width, height, border_style, border_fg, border_bg, fill_bg, border_attrs,
+      ),
+      SurfaceId::ScrollBox(id) => self.draw_border_rect_in_scroll_box(
+        canvas, id, x, y, width, height, border_style, border_fg, border_bg, fill_bg, border_attrs,
+      ),
+    }
   }
 
   fn draw_text_target(

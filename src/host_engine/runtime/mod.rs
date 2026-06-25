@@ -48,7 +48,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     &services.hit_area,
     &services.slice,
     &services.scroll_box,
-    &services.text_input,
   );
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
 
@@ -820,14 +819,16 @@ fn route_render(
       );
       None
     }
-    Some(UiNodeKind::InputDemo) => input_demo_ui.render(
-      &mut services.render,
-      &mut services.canvas,
-      &services.layout,
-      &services.hit_area,
-      &services.scroll_box,
-      &services.text_input,
-    ),
+    Some(UiNodeKind::InputDemo) => {
+      input_demo_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.hit_area,
+        &services.scroll_box,
+      );
+      None
+    }
     _ => None,
   };
   draw_host_chrome(services);
@@ -956,18 +957,12 @@ fn apply_home_command(command: HomeUiCommand, world: &mut RuntimeWorld) {
 fn apply_input_demo_command(
   command: InputDemoCommand,
   input_demo_ui: &mut InputDemoUi,
-  services: &mut EngineServices,
+  _services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
   match command {
-    InputDemoCommand::ToggleTransparent => input_demo_ui.toggle_transparent(&services.slice),
-    InputDemoCommand::SwapLayers => {
-      input_demo_ui.swap_layers(&services.slice, &services.scroll_box)
-    }
-    InputDemoCommand::FocusInput => input_demo_ui.focus_input(&mut services.text_input),
-    InputDemoCommand::BlurInput => input_demo_ui.blur_input(&mut services.text_input),
     InputDemoCommand::Back => {
-      input_demo_ui.leave(&mut services.text_input);
+      input_demo_ui.leave();
       world.state.pop_ui_node();
     }
   }

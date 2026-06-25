@@ -46,8 +46,8 @@ pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use scroll_box::{
-  Overflow, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarStyle,
-  ScrollbarVisibility,
+  Overflow, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout,
+  ScrollbarPolicy, ScrollbarSide, ScrollbarStyle, ScrollbarVisibility,
 };
 pub use slice::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
 pub use storage::StorageService;

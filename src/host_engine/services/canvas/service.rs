@@ -6,8 +6,8 @@ use crate::host_engine::services::slice::resolve_rect;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
 use crate::host_engine::services::{
-  LayoutService, Rect, ScrollBoxId, ScrollbarPolicy, ScrollbarStyle, Size, SliceId, SurfaceId,
-  TextColor, TextStyle, UiObjectPool,
+  LayoutService, Rect, ScrollBoxId, ScrollbarLayout, ScrollbarPolicy, ScrollbarStyle, Size,
+  SliceId, SurfaceId, TextColor, TextStyle, UiObjectPool,
 };
 
 /// 画布服务：管理基础层、宿主层和多切片缓冲区，协调文本绘制与区域查询。
@@ -46,6 +46,7 @@ pub(crate) struct PreparedScrollBox {
   pub order: usize,
   pub scrollbar: ScrollbarPolicy,
   pub scrollbar_style: ScrollbarStyle,
+  pub scrollbar_layout: ScrollbarLayout,
 }
 
 /// 已预处理开发者 Surface 的只读引用。
@@ -189,6 +190,7 @@ impl CanvasService {
         order,
         scrollbar: options.scrollbar,
         scrollbar_style: options.scrollbar_style.clone(),
+        scrollbar_layout: options.scrollbar_layout,
       });
     if prepared.buffer.width() != content_size.width
       || prepared.buffer.height() != content_size.height
@@ -208,6 +210,7 @@ impl CanvasService {
     prepared.order = order;
     prepared.scrollbar = options.scrollbar;
     prepared.scrollbar_style = options.scrollbar_style.clone();
+    prepared.scrollbar_layout = options.scrollbar_layout;
   }
 
   pub fn clear(&mut self) {
@@ -442,6 +445,35 @@ impl CanvasService {
       width: rect.width,
       height: rect.height,
     })
+  }
+
+  /// 查询预处理滚动盒子的内容区尺寸。
+  pub fn prepared_scroll_box_content_size(&self, id: ScrollBoxId) -> Option<Size> {
+    self
+      .scroll_boxes
+      .get(&id)
+      .filter(|sb| sb.visible)
+      .map(|sb| sb.content_size)
+  }
+
+  /// 查询预处理滚动盒子的 viewport 尺寸。
+  pub fn prepared_scroll_box_viewport_size(&self, id: ScrollBoxId) -> Option<Size> {
+    let sb = self.scroll_boxes.get(&id)?;
+    sb.visible.then_some(Size {
+      width: sb.rect.width,
+      height: sb.rect.height,
+    })
+  }
+
+  /// 查询预处理滚动盒子的滚动位置。
+  pub fn prepared_scroll_box_scroll_position(&self, id: ScrollBoxId) -> Option<(u16, u16)> {
+    let sb = self.scroll_boxes.get(&id)?;
+    sb.visible.then_some((sb.scroll_x, sb.scroll_y))
+  }
+
+  /// 返回 Surface 层级顺序的只读切片。
+  pub(crate) fn surface_order(&self) -> &[SurfaceId] {
+    &self.surface_order
   }
 
   pub(crate) fn top_scroll_box_at(&self, x: u16, y: u16) -> Option<ScrollBoxId> {

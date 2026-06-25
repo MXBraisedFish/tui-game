@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::TextInputEvent;
 use super::hit_area::{HitAreaEvent, HitAreaId, HitAreaObjects};
 use super::input::InputActionEvent;
-use super::scroll_box::ScrollBoxObjects;
+use super::scroll_box::{ScrollBoxEvent, ScrollBoxObjects};
 use super::slice::SliceObjects;
 use super::surface::SurfaceId;
 use super::text_input::TextInputObjects;
@@ -33,18 +33,20 @@ pub struct UiObjectPool {
   pub(crate) scroll_boxes: ScrollBoxObjects,
 }
 
-/// UI 事件（动作 / 点击区域 / 文本输入）
+/// UI 事件（动作 / 点击区域 / 文本输入 / 滚动盒子）
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UiEvent {
   Action(InputActionEvent),
   HitArea(HitAreaEvent),
   TextInput(TextInputEvent),
+  ScrollBox(ScrollBoxEvent),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum UiComponentEvent {
   HitArea(HitAreaEvent),
   TextInput(TextInputEvent),
+  ScrollBox(ScrollBoxEvent),
 }
 
 impl UiComponentEvent {
@@ -59,7 +61,7 @@ impl UiComponentEvent {
         | HitAreaEvent::Click { id, .. }
         | HitAreaEvent::Drag { id, .. } => *id,
       }),
-      Self::TextInput(_) => None,
+      Self::TextInput(_) | Self::ScrollBox(_) => None,
     }
   }
 
@@ -74,7 +76,7 @@ impl UiComponentEvent {
         | TextInputEvent::Pressed { id }
         | TextInputEvent::PressedOutside { id } => *id,
       }),
-      Self::HitArea(_) => None,
+      Self::HitArea(_) | Self::ScrollBox(_) => None,
     }
   }
 }
@@ -112,6 +114,10 @@ impl UiObjectPool {
     self.events.push_back(UiComponentEvent::HitArea(event));
   }
 
+  pub(crate) fn push_scroll_event(&mut self, event: ScrollBoxEvent) {
+    self.events.push_back(UiComponentEvent::ScrollBox(event));
+  }
+
   pub(crate) fn push_text_event(&mut self, event: TextInputEvent) {
     self.events.push_back(UiComponentEvent::TextInput(event));
   }
@@ -120,6 +126,7 @@ impl UiObjectPool {
     self.events.pop_front().map(|event| match event {
       UiComponentEvent::HitArea(event) => UiEvent::HitArea(event),
       UiComponentEvent::TextInput(event) => UiEvent::TextInput(event),
+      UiComponentEvent::ScrollBox(event) => UiEvent::ScrollBox(event),
     })
   }
 

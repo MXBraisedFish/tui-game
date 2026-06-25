@@ -2,7 +2,9 @@ use super::{ComposedCell, ComposedFrame};
 use crate::host_engine::services::canvas::buffer::CanvasBuffer;
 use crate::host_engine::services::canvas::{PreparedScrollBox, PreparedSurface};
 use crate::host_engine::services::unicode::graphemes;
-use crate::host_engine::services::{CanvasCell, CanvasService, ScrollbarVisibility, TextColor};
+use crate::host_engine::services::{
+  CanvasCell, CanvasService, ScrollbarLayout, ScrollbarVisibility, TextColor,
+};
 
 /// 帧合成器：将基础层、切片层和宿主层按顺序叠加为一张合成帧。
 pub struct FrameCompositor;
@@ -70,8 +72,22 @@ fn overlay(frame: &mut ComposedFrame, buffer: &CanvasBuffer, ox: u16, oy: u16, o
 fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox, ox: u16, oy: u16) {
   let x0 = ox.saturating_add(scroll_box.rect.x);
   let y0 = oy.saturating_add(scroll_box.rect.y);
-  for y in 0..scroll_box.rect.height {
-    for x in 0..scroll_box.rect.width {
+  let visible_width = if scroll_box.scrollbar_layout == ScrollbarLayout::ReserveSpace
+    && shows_vertical_scrollbar(scroll_box)
+  {
+    scroll_box.rect.width.saturating_sub(1)
+  } else {
+    scroll_box.rect.width
+  };
+  let visible_height = if scroll_box.scrollbar_layout == ScrollbarLayout::ReserveSpace
+    && shows_horizontal_scrollbar(scroll_box)
+  {
+    scroll_box.rect.height.saturating_sub(1)
+  } else {
+    scroll_box.rect.height
+  };
+  for y in 0..visible_height {
+    for x in 0..visible_width {
       let sx = scroll_box.scroll_x.saturating_add(x);
       let sy = scroll_box.scroll_y.saturating_add(y);
       let px = x0.saturating_add(x);
@@ -92,6 +108,8 @@ fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox,
       write_cell(frame, px, py, source);
     }
   }
+  // 垂直滚动条最后绘制（覆盖角落）。
+  draw_horizontal_scrollbar(frame, scroll_box, x0, y0);
   draw_vertical_scrollbar(frame, scroll_box, x0, y0);
 }
 
@@ -102,16 +120,19 @@ fn draw_vertical_scrollbar(
   y0: u16,
 ) {
   let height = scroll_box.rect.height;
-  if height == 0 || scroll_box.rect.width == 0 || !shows_scrollbar(scroll_box) {
+  if height == 0 || scroll_box.rect.width == 0 || !shows_vertical_scrollbar(scroll_box) {
     return;
   }
-  let x = x0.saturating_add(scroll_box.rect.width - 1);
+  let x = match scroll_box.scrollbar_layout {
+    ScrollbarLayout::Overlay => x0.saturating_add(scroll_box.rect.width - 1),
+    ScrollbarLayout::ReserveSpace => x0.saturating_add(scroll_box.rect.width),
+  };
   let max_scroll = scroll_box.content_size.height.saturating_sub(height);
   let thumb_height = if max_scroll == 0 {
     height
   } else {
     ((height as u32 * height as u32) / scroll_box.content_size.height.max(1) as u32)
-      .max(1)
+      .max(scroll_box.scrollbar_style.minimum_thumb_height as u32)
       .min(height as u32) as u16
   };
   let travel = height.saturating_sub(thumb_height);
@@ -142,10 +163,68 @@ fn draw_vertical_scrollbar(
   }
 }
 
-fn shows_scrollbar(scroll_box: &PreparedScrollBox) -> bool {
+fn draw_horizontal_scrollbar(
+  frame: &mut ComposedFrame,
+  scroll_box: &PreparedScrollBox,
+  x0: u16,
+  y0: u16,
+) {
+  let width = scroll_box.rect.width;
+  if width == 0 || scroll_box.rect.height == 0 || !shows_horizontal_scrollbar(scroll_box) {
+    return;
+  }
+  let y = match scroll_box.scrollbar_layout {
+    ScrollbarLayout::Overlay => y0.saturating_add(scroll_box.rect.height - 1),
+    ScrollbarLayout::ReserveSpace => y0.saturating_add(scroll_box.rect.height),
+  };
+  let max_scroll = scroll_box.content_size.width.saturating_sub(width);
+  let thumb_width = if max_scroll == 0 {
+    width
+  } else {
+    ((width as u32 * width as u32) / scroll_box.content_size.width.max(1) as u32)
+      .max(scroll_box.scrollbar_style.minimum_thumb_height as u32)
+      .min(width as u32) as u16
+  };
+  let travel = width.saturating_sub(thumb_width);
+  let thumb_x = if max_scroll == 0 {
+    0
+  } else {
+    (scroll_box.scroll_x as u32 * travel as u32 / max_scroll as u32) as u16
+  };
+  for x in 0..width {
+    let is_thumb = x >= thumb_x && x < thumb_x.saturating_add(thumb_width);
+    let (ch, style) = if is_thumb {
+      (
+        scroll_box.scrollbar_style.h_thumb_char,
+        scroll_box.scrollbar_style.h_thumb_style.clone(),
+      )
+    } else {
+      (
+        scroll_box.scrollbar_style.h_track_char,
+        scroll_box.scrollbar_style.h_track_style.clone(),
+      )
+    };
+    write_cell(
+      frame,
+      x0.saturating_add(x),
+      y,
+      &CanvasCell::styled(ch.to_string(), style),
+    );
+  }
+}
+
+fn shows_vertical_scrollbar(scroll_box: &PreparedScrollBox) -> bool {
   match scroll_box.scrollbar.vertical {
     ScrollbarVisibility::Always => scroll_box.rect.height > 0,
     ScrollbarVisibility::Auto => scroll_box.content_size.height > scroll_box.rect.height,
+    ScrollbarVisibility::Never => false,
+  }
+}
+
+fn shows_horizontal_scrollbar(scroll_box: &PreparedScrollBox) -> bool {
+  match scroll_box.scrollbar.horizontal {
+    ScrollbarVisibility::Always => scroll_box.rect.width > 0,
+    ScrollbarVisibility::Auto => scroll_box.content_size.width > scroll_box.rect.width,
     ScrollbarVisibility::Never => false,
   }
 }
@@ -155,7 +234,17 @@ fn is_clipped_wide_cell(cell: &CanvasCell, sx: u16, scroll_box: &PreparedScrollB
     .first()
     .map(|grapheme| grapheme.display_width)
     .unwrap_or(1);
-  width > 1 && sx as usize + width > scroll_box.scroll_x as usize + scroll_box.rect.width as usize
+  // 右侧裁剪：宽字符超出 viewport 右边缘。
+  if width > 1 && sx as usize + width > scroll_box.scroll_x as usize + scroll_box.rect.width as usize
+  {
+    return true;
+  }
+  // 左侧裁剪：延续单元的基础宽字符已被滚出视口左侧。
+  if cell.is_continuation() && sx > scroll_box.scroll_x && sx.saturating_sub(1) < scroll_box.scroll_x
+  {
+    return true;
+  }
+  false
 }
 
 fn write_cell(frame: &mut ComposedFrame, x: u16, y: u16, source: &CanvasCell) {
