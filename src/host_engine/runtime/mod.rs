@@ -4,8 +4,8 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
-  EngineServices, MouseEvent, Rect, SystemEvent, UiEvent, UiObjectPool, UiObjectPoolOwner,
-  translate_action_map,
+  DrawTextParams, EngineServices, MouseEvent, Rect, SystemEvent, UiEvent, UiObjectPool,
+  UiObjectPoolOwner, translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -466,7 +466,6 @@ fn route_input_events(
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
 ) {
-
   if world.state.current_overlay_kind().is_some() {
     while let Some(event) = services.input.next_action_event() {
       if let Some(cmd) = window_size_ui.handle_event(&UiEvent::Action(event)) {
@@ -716,8 +715,8 @@ fn route_render(
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
 ) -> Option<(u16, u16)> {
-
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
+    apply_host_viewport(services, true);
     let runtime = world.state.runtime().unwrap();
     let overlay = runtime.overlays().top().unwrap();
     let req_w = overlay.render.required_width;
@@ -743,17 +742,7 @@ fn route_render(
     return None;
   }
 
-  if world.state.current_ui_kind() == Some(UiNodeKind::InputDemo) {
-    let physical = services.layout.physical_size();
-    services.layout.set_developer_viewport(Rect {
-      x: 2,
-      y: 2,
-      width: physical.width.saturating_sub(4),
-      height: physical.height.saturating_sub(4),
-    });
-  } else {
-    services.layout.reset_developer_viewport();
-  }
+  apply_host_viewport(services, false);
 
   if let Some(objects) = current_objects_mut(
     world,
@@ -768,7 +757,7 @@ fn route_render(
     services.canvas.prepare(objects, &services.layout);
   }
 
-  match world.state.current_ui_kind() {
+  let input_cursor = match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
       home_ui.render(
         &mut services.render,
@@ -828,6 +817,50 @@ fn route_render(
       &services.text_input,
     ),
     _ => None,
+  };
+  draw_host_chrome(services);
+  input_cursor
+}
+
+fn apply_host_viewport(services: &mut EngineServices, overlay_active: bool) {
+  apply_developer_viewport(&mut services.layout, overlay_active);
+}
+
+fn apply_developer_viewport(
+  layout: &mut crate::host_engine::services::LayoutService,
+  overlay_active: bool,
+) {
+  if overlay_active {
+    layout.reset_developer_viewport();
+    return;
+  }
+  let physical = layout.physical_size();
+  layout.set_developer_viewport(Rect {
+    x: 0,
+    y: physical.height.min(2),
+    width: physical.width,
+    height: physical.height.saturating_sub(2),
+  });
+}
+
+fn draw_host_chrome(services: &mut EngineServices) {
+  let physical = services.layout.physical_size();
+  if physical.width == 0 || physical.height == 0 {
+    return;
+  }
+
+  let title = "Host Layout / Developer Viewport Split";
+  let title_x = physical.width.saturating_sub(title.chars().count() as u16) / 2;
+  services.render.draw_host_text(
+    &mut services.canvas,
+    &DrawTextParams::new(title_x, 0, title),
+  );
+
+  if physical.height > 1 {
+    services.render.draw_host_text(
+      &mut services.canvas,
+      &DrawTextParams::new(0, 1, "─".repeat(physical.width as usize)),
+    );
   }
 }
 
@@ -906,7 +939,6 @@ fn apply_language_select_command(
         .i18n
         .load_runtime_language(&services.storage, &mut services.log, &code);
       services.i18n.set_current_language(code);
-
     }
     LanguageSelectCommand::Back => {
       world.state.pop_ui_node();
@@ -914,6 +946,56 @@ fn apply_language_select_command(
         world.state.enter_ui_node(UiNodeState::terminal_check());
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::host_engine::services::{LayoutService, Size};
+
+  #[test]
+  fn host_viewport_reserves_two_top_rows_without_overlay() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(120, 40);
+
+    apply_developer_viewport(&mut layout, false);
+
+    assert_eq!(
+      layout.developer_viewport(),
+      Rect {
+        x: 0,
+        y: 2,
+        width: 120,
+        height: 38
+      }
+    );
+    assert_eq!(
+      layout.viewport_size(),
+      Size {
+        width: 120,
+        height: 38
+      }
+    );
+  }
+
+  #[test]
+  fn overlay_restores_full_terminal_base() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(120, 40);
+    apply_developer_viewport(&mut layout, false);
+
+    apply_developer_viewport(&mut layout, true);
+
+    assert_eq!(
+      layout.developer_viewport(),
+      Rect {
+        x: 0,
+        y: 0,
+        width: 120,
+        height: 40
+      }
+    );
   }
 }
 
@@ -979,14 +1061,12 @@ fn apply_window_size_command(cmd: WindowSizeWarningCommand, world: &mut RuntimeW
   match cmd {
     WindowSizeWarningCommand::Exit => {
       if world.state.is_host_mode() {
-
         world.state.pop_overlay();
         world.state.enter_shutdown();
         set_crash_phase(world.state.crash_phase());
         world.state.enter_stopped();
         set_crash_phase(world.state.crash_phase());
       } else {
-
         world.state.pop_overlay();
         if let Some(runtime) = world.state.runtime_mut() {
           runtime.set_main_host(MainHostState::Host(HostState::new()));
