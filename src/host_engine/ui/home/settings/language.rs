@@ -271,18 +271,8 @@ impl LanguageSelectUi {
   ) {
     let positions = self.compute_positions(layout);
     self.draw_content(render, canvas, layout, &positions);
-    let terminal = layout.physical_size();
-    hit_area.render_host(
-      &mut self.objects,
-      self.back_area,
-      Rect {
-        x: 0,
-        y: 0,
-        width: terminal.width,
-        height: terminal.height,
-      },
-      canvas,
-    );
+    let viewport = layout.developer_viewport_rect();
+    hit_area.render_host(&mut self.objects, self.back_area, viewport, canvas);
     let (start, _, _, _) = self.page_bounds();
     for (id, rect) in self.cell_areas[start..]
       .iter()
@@ -295,8 +285,10 @@ impl LanguageSelectUi {
 
   /// 根据布局服务计算语言选择页面各元素的宿主坐标。
   pub fn compute_positions(&self, layout: &LayoutService) -> LanguageSelectLayout {
-    let term_w = layout.physical_size().width;
-    let term_h = layout.physical_size().height;
+    let viewport = layout.developer_viewport_rect();
+    let size = layout.developer_size();
+    let term_w = size.width;
+    let term_h = size.height;
     let name_widths: Vec<u16> = self
       .registry
       .iter()
@@ -333,7 +325,7 @@ impl LanguageSelectUi {
     let visible_count = page_end - page_start;
 
     let grid_total_w = (columns as u16).saturating_mul(cell_width);
-    let grid_x = term_w.saturating_sub(grid_total_w) / 2;
+    let grid_x = viewport.x + term_w.saturating_sub(grid_total_w) / 2;
 
     let mut cell_rects = Vec::with_capacity(visible_count);
     let mut cell_text_xs = Vec::with_capacity(visible_count);
@@ -341,7 +333,7 @@ impl LanguageSelectUi {
       let col = vi % columns;
       let row = vi / columns;
       let cx = grid_x + (col as u16) * cell_width;
-      let cy = GRID_START_Y + (row as u16) * CELL_HEIGHT;
+      let cy = viewport.y + GRID_START_Y + (row as u16) * CELL_HEIGHT;
       cell_rects.push(Rect {
         x: cx,
         y: cy,
@@ -356,11 +348,14 @@ impl LanguageSelectUi {
     }
     let title = self.get_text("language.title");
     let title_w = layout.get_text_width(&title, None);
-    let title_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, title_w, 0);
-    let page_y = term_h.saturating_sub(3);
-    let page_center = term_w / 2;
-    let flip_forward_x = 0u16;
-    let flip_backward_max_x = term_w;
+    let title_x =
+      viewport
+        .x
+        .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, title_w, 0));
+    let page_y = viewport.y + term_h.saturating_sub(3);
+    let page_center = viewport.x + term_w / 2;
+    let flip_forward_x = viewport.x;
+    let flip_backward_max_x = viewport.x.saturating_add(term_w);
     let key_params = self.build_key_params();
     let hint = format!(
       "{}  {}  {}  {}",
@@ -370,12 +365,15 @@ impl LanguageSelectUi {
       self.get_text("language.action.back"),
     );
     let hint_w = layout.get_text_width(&hint, Some(&key_params));
-    let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
-    let hint_y = term_h.saturating_sub(1);
+    let hint_x =
+      viewport
+        .x
+        .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0));
+    let hint_y = viewport.y + term_h.saturating_sub(1);
 
     LanguageSelectLayout {
       title_x,
-      title_y: 1,
+      title_y: viewport.y.saturating_add(1),
       cell_rects,
       cell_text_xs,
       page_start,

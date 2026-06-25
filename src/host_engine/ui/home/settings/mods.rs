@@ -154,18 +154,8 @@ impl ModsUi {
   ) {
     let positions = self.compute_positions(layout, i18n);
     self.draw_content(render, canvas, &positions, i18n);
-    let terminal = layout.physical_size();
-    hit_area.render_host(
-      &mut self.objects,
-      self.back_area,
-      Rect {
-        x: 0,
-        y: 0,
-        width: terminal.width,
-        height: terminal.height,
-      },
-      canvas,
-    );
+    let viewport = layout.developer_viewport_rect();
+    hit_area.render_host(&mut self.objects, self.back_area, viewport, canvas);
     for (id, rect) in self.menu_areas.into_iter().zip(positions.menu_item_rects) {
       hit_area.render_host(&mut self.objects, id, rect, canvas);
     }
@@ -174,15 +164,23 @@ impl ModsUi {
   /// 根据布局服务计算模组管理页面各元素的宿主坐标。
   pub fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> ModsLayout {
     let params = self.build_key_params();
+    let viewport = layout.developer_viewport_rect();
     let title = i18n.get_runtime_text("mods", "mods.title");
     let title_w = layout.get_text_width(&title, None);
-    let title_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, title_w, 0);
-    let title_y: u16 = 1;
+    let title_x =
+      viewport
+        .x
+        .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, title_w, 0));
+    let title_y = viewport.y.saturating_add(1);
     let menu_items = self.menu_items(i18n);
     let menu_item_widths: [u16; MODS_MENU_LEN] =
       std::array::from_fn(|i| layout.get_text_width(&menu_items[i], None));
     let menu_item_xs: [u16; MODS_MENU_LEN] = std::array::from_fn(|i| {
-      layout.resolve_host_x(LayoutService::ALIGN_CENTER, menu_item_widths[i], 0)
+      viewport.x.saturating_add(layout.resolve_x(
+        LayoutService::ALIGN_CENTER,
+        menu_item_widths[i],
+        0,
+      ))
     });
     let menu_height = MODS_MENU_LEN as u16;
     let hint = format!(
@@ -193,9 +191,13 @@ impl ModsUi {
       i18n.get_runtime_text("mods", "mods.action.back"),
     );
     let hint_w = layout.get_text_width(&hint, Some(&params));
-    let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
-    let terminal_height = layout.physical_size().height;
-    let hint_y = terminal_height.saturating_sub(1);
+    let hint_x =
+      viewport
+        .x
+        .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, hint_w, 0));
+    let hint_y = viewport
+      .y
+      .saturating_add(layout.developer_height().saturating_sub(1));
     let available = hint_y.saturating_sub(title_y).saturating_sub(1);
     let menu_y = if available > menu_height {
       title_y

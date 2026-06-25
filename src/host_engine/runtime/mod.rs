@@ -845,10 +845,14 @@ fn refresh_host_areas(
   physical: crate::host_engine::services::Size,
   overlay_active: bool,
 ) {
-  host_objects.clear();
+  let top = host_objects.ensure_area(HostAreaKind::TopBar);
+  let separator = host_objects.ensure_area(HostAreaKind::Separator);
+  let viewport = host_objects.ensure_area(HostAreaKind::DeveloperViewport);
   if overlay_active {
-    host_objects.set_area(
-      HostAreaKind::DeveloperViewport,
+    host_objects.update_area(top, Rect::default(), false);
+    host_objects.update_area(separator, Rect::default(), false);
+    host_objects.update_area(
+      viewport,
       Rect {
         x: 0,
         y: 0,
@@ -857,12 +861,10 @@ fn refresh_host_areas(
       },
       true,
     );
-    host_objects.set_area(HostAreaKind::TopBar, Rect::default(), false);
-    host_objects.set_area(HostAreaKind::Separator, Rect::default(), false);
     return;
   }
-  host_objects.set_area(
-    HostAreaKind::TopBar,
+  host_objects.update_area(
+    top,
     Rect {
       x: 0,
       y: 0,
@@ -871,8 +873,8 @@ fn refresh_host_areas(
     },
     physical.height > 0,
   );
-  host_objects.set_area(
-    HostAreaKind::Separator,
+  host_objects.update_area(
+    separator,
     Rect {
       x: 0,
       y: 1,
@@ -881,8 +883,8 @@ fn refresh_host_areas(
     },
     physical.height > 1,
   );
-  host_objects.set_area(
-    HostAreaKind::DeveloperViewport,
+  host_objects.update_area(
+    viewport,
     Rect {
       x: 0,
       y: physical.height.min(2),

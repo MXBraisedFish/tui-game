@@ -95,7 +95,6 @@ pub enum HomeUiCommand {
 }
 
 impl HomeUi {
-
   /// 初始化首页 UI，创建命中检测区域。
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
@@ -280,6 +279,7 @@ impl HomeUi {
   /// 根据布局服务计算首页各元素的宿主坐标。
   pub(crate) fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> HomeLayout {
     let params = self.build_key_params();
+    let viewport = layout.developer_viewport_rect();
 
     let logo = style_logo(LOGO_LINES);
     let logo_size = layout.get_text_size(&logo, None);
@@ -289,7 +289,11 @@ impl HomeUi {
       std::array::from_fn(|i| layout.get_text_width(&menu_items[i], None));
 
     let menu_item_xs: [u16; HOME_MENU_LEN] = std::array::from_fn(|i| {
-      layout.resolve_host_x(LayoutService::ALIGN_CENTER, menu_item_widths[i], 0)
+      viewport.x.saturating_add(layout.resolve_x(
+        LayoutService::ALIGN_CENTER,
+        menu_item_widths[i],
+        0,
+      ))
     });
     let menu_height = HOME_MENU_LEN as u16;
 
@@ -313,9 +317,15 @@ impl HomeUi {
       .saturating_add(1)
       .saturating_add(1);
 
-    let start_y = layout.resolve_host_y(LayoutService::ALIGN_MIDDLE, total_height, 0);
+    let start_y =
+      viewport
+        .y
+        .saturating_add(layout.resolve_y(LayoutService::ALIGN_MIDDLE, total_height, 0));
 
-    let logo_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, logo_size.width, 0);
+    let logo_x =
+      viewport
+        .x
+        .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, logo_size.width, 0));
     let logo_y = start_y;
 
     let menu_y = logo_y.saturating_add(logo_size.height).saturating_add(2);
@@ -327,10 +337,16 @@ impl HomeUi {
       height: 1,
     });
 
-    let version_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, version_width, 0);
+    let version_x =
+      viewport
+        .x
+        .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, version_width, 0));
     let version_y = menu_y.saturating_add(menu_height).saturating_add(2);
 
-    let action_hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, action_hint_w, 0);
+    let action_hint_x =
+      viewport
+        .x
+        .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, action_hint_w, 0));
     let action_hint_y = version_y.saturating_add(2);
 
     HomeLayout {

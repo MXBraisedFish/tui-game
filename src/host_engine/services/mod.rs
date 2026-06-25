@@ -27,7 +27,7 @@ pub use canvas::{CanvasCell, CanvasService};
 pub use clipboard::ClipboardService;
 pub use game::GameService;
 pub use hit_area::{HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService};
-pub use host_object::{HostArea, HostAreaKind, HostObjectPool};
+pub use host_object::{HostArea, HostAreaId, HostAreaKind, HostObjectPool};
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};
 pub use input::{

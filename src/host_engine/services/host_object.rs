@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use super::{Rect, Size};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct HostAreaId(pub u64);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum HostAreaKind {
   TopBar,
   Separator,
@@ -11,26 +14,58 @@ pub enum HostAreaKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HostArea {
+  pub id: HostAreaId,
   pub kind: HostAreaKind,
   pub rect: Rect,
   pub visible: bool,
 }
 
 pub struct HostObjectPool {
-  areas: HashMap<HostAreaKind, HostArea>,
+  next_area_id: u64,
+  areas: HashMap<HostAreaId, HostArea>,
+  areas_by_kind: HashMap<HostAreaKind, HostAreaId>,
 }
 
 impl HostObjectPool {
   pub fn new() -> Self {
     Self {
+      next_area_id: 1,
       areas: HashMap::new(),
+      areas_by_kind: HashMap::new(),
     }
+  }
+
+  pub fn create_area(
+    &mut self,
+    kind: HostAreaKind,
+    rect: Rect,
+    visible: bool,
+  ) -> Option<HostAreaId> {
+    if self.areas_by_kind.contains_key(&kind) {
+      return None;
+    }
+    let id = HostAreaId(self.next_area_id);
+    self.next_area_id += 1;
+    self.areas.insert(
+      id,
+      HostArea {
+        id,
+        kind,
+        rect,
+        visible,
+      },
+    );
+    self.areas_by_kind.insert(kind, id);
+    Some(id)
+  }
+
+  pub fn area_id(&self, kind: HostAreaKind) -> Option<HostAreaId> {
+    self.areas_by_kind.get(&kind).copied()
   }
 
   pub fn area_rect(&self, kind: HostAreaKind) -> Option<Rect> {
     self
-      .areas
-      .get(&kind)
+      .area_by_kind(kind)
       .filter(|area| area.visible)
       .map(|area| area.rect)
   }
@@ -52,22 +87,34 @@ impl HostObjectPool {
   }
 
   pub fn is_visible(&self, kind: HostAreaKind) -> bool {
-    self.areas.get(&kind).is_some_and(|area| area.visible)
+    self.area_by_kind(kind).is_some_and(|area| area.visible)
   }
 
-  pub(crate) fn set_area(&mut self, kind: HostAreaKind, rect: Rect, visible: bool) {
-    self.areas.insert(
-      kind,
-      HostArea {
-        kind,
-        rect,
-        visible,
-      },
-    );
+  pub(crate) fn ensure_area(&mut self, kind: HostAreaKind) -> HostAreaId {
+    if let Some(id) = self.area_id(kind) {
+      return id;
+    }
+    self
+      .create_area(kind, Rect::default(), false)
+      .expect("host area kind should be unique")
+  }
+
+  pub(crate) fn update_area(&mut self, id: HostAreaId, rect: Rect, visible: bool) -> bool {
+    let Some(area) = self.areas.get_mut(&id) else {
+      return false;
+    };
+    area.rect = rect;
+    area.visible = visible;
+    true
   }
 
   pub(crate) fn clear(&mut self) {
     self.areas.clear();
+    self.areas_by_kind.clear();
+  }
+
+  fn area_by_kind(&self, kind: HostAreaKind) -> Option<&HostArea> {
+    self.area_id(kind).and_then(|id| self.areas.get(&id))
   }
 }
 
@@ -84,8 +131,16 @@ mod tests {
       width: 80,
       height: 22,
     };
-    pool.set_area(HostAreaKind::DeveloperViewport, rect, true);
-    pool.set_area(HostAreaKind::TopBar, Rect { height: 1, ..rect }, false);
+    assert_eq!(
+      pool.create_area(HostAreaKind::DeveloperViewport, rect, true),
+      Some(HostAreaId(1))
+    );
+    assert_eq!(
+      pool.create_area(HostAreaKind::DeveloperViewport, rect, true),
+      None
+    );
+    let top = pool.ensure_area(HostAreaKind::TopBar);
+    assert!(pool.update_area(top, Rect { height: 1, ..rect }, false));
 
     assert_eq!(pool.area_rect(HostAreaKind::DeveloperViewport), Some(rect));
     assert_eq!(
