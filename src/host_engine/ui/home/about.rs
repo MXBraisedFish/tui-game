@@ -55,7 +55,7 @@ impl InputDemoUi {
   ) -> Self {
     let mut objects = UiObjectPool::new();
 
-    // ── 1. 基础纵向滚动 ──
+    // ── 1. 基础纵向滚动（Overlay 模式，用于对比） ──
     let v_scroll = scroll_box
       .create(
         &mut objects,
@@ -63,6 +63,7 @@ impl InputDemoUi {
           rect: Rect { x: 1, y: 2, width: 24, height: 11 },
           content_width: 24,
           content_height: 40,
+          scrollbar_layout: ScrollbarLayout::Overlay,
           emit_scroll_events: true,
           ..Default::default()
         },

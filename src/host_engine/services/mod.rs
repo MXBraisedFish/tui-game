@@ -84,6 +84,8 @@ pub struct EngineServices {
 impl EngineServices {
   pub fn new() -> Self {
     let mut log = LogService::new();
+    let storage = StorageService::new(&mut log);
+    let image_cache_dir = storage.path("data/cache/images");
 
     Self {
       terminal: TerminalService::new(),
@@ -97,9 +99,9 @@ impl EngineServices {
       input: InputService::new(),
       ui: UiService::new(),
       game: GameService::new(),
-      image: ImageService::new(),
+      image: ImageService::new(Some(image_cache_dir)),
       overlay: OverlayService::new(),
-      storage: StorageService::new(&mut log),
+      storage,
       lua: LuaService::new(),
       render: RenderService::new(),
       log,

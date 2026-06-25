@@ -10,6 +10,7 @@ pub use self::types::{
 };
 use super::surface::SurfaceId;
 use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::unicode::char_width;
 use crate::host_engine::services::{
   CanvasService, LayoutService, MouseEvent, MouseEventKind, Rect, ScrollDirection, Size,
 };
@@ -22,7 +23,8 @@ impl ScrollBoxService {
     Self
   }
 
-  pub fn create(&self, pool: &mut UiObjectPool, options: ScrollBoxOptions) -> Option<ScrollBoxId> {
+  pub fn create(&self, pool: &mut UiObjectPool, mut options: ScrollBoxOptions) -> Option<ScrollBoxId> {
+    validate_scrollbar_chars(&mut options);
     valid_options(&options).then(|| {
       let id = ScrollBoxId(pool.scroll_boxes.next_id);
       pool.scroll_boxes.next_id += 1;
@@ -225,6 +227,26 @@ impl ScrollBoxService {
         .height
         .min(state.options.content_height.saturating_sub(state.scroll_y)),
     })
+  }
+
+  /// 查询当前可见内容区域的宽度。
+  pub fn visible_content_width(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) -> Option<u16> {
+    Some(self.visible_content_rect(pool, id, layout)?.width)
+  }
+
+  /// 查询当前可见内容区域的高度。
+  pub fn visible_content_height(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) -> Option<u16> {
+    Some(self.visible_content_rect(pool, id, layout)?.height)
   }
 
   /// 将内容坐标转换为视口坐标。
@@ -483,13 +505,14 @@ impl ScrollBoxService {
     if !state.options.mouse_wheel {
       return false;
     }
-    let step = state.options.wheel_step as i32;
+    let v_step = state.options.wheel_step as i32;
+    let h_step = state.options.h_wheel_step as i32;
 
     let (dx, dy) = match event.scroll {
-      Some(ScrollDirection::Up) => (0, -step),
-      Some(ScrollDirection::Down) => (0, step),
-      Some(ScrollDirection::Left) => (-step, 0),
-      Some(ScrollDirection::Right) => (step, 0),
+      Some(ScrollDirection::Up) => (0, -v_step),
+      Some(ScrollDirection::Down) => (0, v_step),
+      Some(ScrollDirection::Left) => (-h_step, 0),
+      Some(ScrollDirection::Right) => (h_step, 0),
       _ => return false,
     };
 
@@ -538,12 +561,14 @@ impl ScrollBoxService {
       let physical = scrollbar_physical_rect(thumb, canvas.viewport());
       if physical.contains(event.x, event.y) {
         let bar = vertical_scrollbar_rect(state, viewport).unwrap();
+        // 滑块在轨道内的本地偏移（开发者坐标）。
+        let thumb_local = thumb.y.saturating_sub(bar.y);
         pool.scroll_boxes.drag = Some(ScrollBoxDragState {
           scroll_box_id: id,
           axis: ScrollbarAxis::Vertical,
           button,
           drag_start_mouse: event.y,
-          drag_start_scroll: state.scroll_y,
+          drag_start_thumb_pos: thumb_local,
           thumb_size: thumb.height,
           track_size: bar.height,
           max_scroll: max_scroll_y(state, viewport),
@@ -577,12 +602,14 @@ impl ScrollBoxService {
       let physical = scrollbar_physical_rect(thumb, canvas.viewport());
       if physical.contains(event.x, event.y) {
         let bar = horizontal_scrollbar_rect(state, viewport).unwrap();
+        // 滑块在轨道内的本地偏移（开发者坐标）。
+        let thumb_local = thumb.x.saturating_sub(bar.x);
         pool.scroll_boxes.drag = Some(ScrollBoxDragState {
           scroll_box_id: id,
           axis: ScrollbarAxis::Horizontal,
           button,
           drag_start_mouse: event.x,
-          drag_start_scroll: state.scroll_x,
+          drag_start_thumb_pos: thumb_local,
           thumb_size: thumb.width,
           track_size: bar.width,
           max_scroll: max_scroll_x(state, viewport),
@@ -663,14 +690,9 @@ impl ScrollBoxService {
               y: new.1,
             });
         }
-        // 更新拖动起点为当前滚动位置对应的轨道位置。
-        if let Some(drag_state) = pool.scroll_boxes.drag.as_mut() {
-          drag_state.drag_start_scroll = match drag.axis {
-            ScrollbarAxis::Vertical => new.1,
-            ScrollbarAxis::Horizontal => new.0,
-          };
-          drag_state.drag_start_mouse = mouse_pos;
-        }
+        // 注意：不更新 drag_start_mouse / drag_start_thumb_pos。
+        // 始终以按下时的锚点计算，避免 scroll→thumb→scroll 往返
+        // 整数除法累积误差导致滑块漂移/回弹。
         true
       }
       _ => {
@@ -678,6 +700,22 @@ impl ScrollBoxService {
         true
       }
     }
+  }
+}
+
+fn validate_scrollbar_chars(options: &mut ScrollBoxOptions) {
+  let default = ScrollbarStyle::default();
+  if char_width(options.scrollbar_style.track_char) != 1 {
+    options.scrollbar_style.track_char = default.track_char;
+  }
+  if char_width(options.scrollbar_style.thumb_char) != 1 {
+    options.scrollbar_style.thumb_char = default.thumb_char;
+  }
+  if char_width(options.scrollbar_style.h_track_char) != 1 {
+    options.scrollbar_style.h_track_char = default.h_track_char;
+  }
+  if char_width(options.scrollbar_style.h_thumb_char) != 1 {
+    options.scrollbar_style.h_thumb_char = default.h_thumb_char;
   }
 }
 
@@ -701,8 +739,8 @@ pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size
   let rect = clamp_rect(state.options.rect, viewport);
   let mut w = rect.width;
   let mut h = rect.height;
-  if state.options.scrollbar_layout == ScrollbarLayout::ReserveSpace {
-    // 只使用原始 viewport 尺寸来判断是否需要滚动条，避免循环依赖。
+  // Inside 和 ReserveSpace 都需要缩减 viewport，Overlay 不需要。
+  if state.options.scrollbar_layout != ScrollbarLayout::Overlay {
     if shows_vertical_scrollbar_raw(state, rect) {
       w = w.saturating_sub(1);
     }
@@ -772,7 +810,9 @@ pub(crate) fn vertical_scrollbar_rect(state: &ScrollBoxState, viewport: Size) ->
   }
   let rect = clamp_rect(state.options.rect, viewport);
   let x = match state.options.scrollbar_layout {
-    ScrollbarLayout::Overlay => rect.x.saturating_add(rect.width).saturating_sub(1),
+    ScrollbarLayout::Overlay | ScrollbarLayout::Inside => {
+      rect.x.saturating_add(rect.width).saturating_sub(1)
+    }
     ScrollbarLayout::ReserveSpace => rect.x.saturating_add(rect.width),
   };
   if x >= viewport.width {
@@ -793,14 +833,16 @@ pub(crate) fn horizontal_scrollbar_rect(state: &ScrollBoxState, viewport: Size) 
   }
   let rect = clamp_rect(state.options.rect, viewport);
   let y = match state.options.scrollbar_layout {
-    ScrollbarLayout::Overlay => rect.y.saturating_add(rect.height).saturating_sub(1),
+    ScrollbarLayout::Overlay | ScrollbarLayout::Inside => {
+      rect.y.saturating_add(rect.height).saturating_sub(1)
+    }
     ScrollbarLayout::ReserveSpace => rect.y.saturating_add(rect.height),
   };
   if y >= viewport.height {
     return None;
   }
-  // ReserveSpace 下水平滚动条不延伸至垂直滚动条占位列。
-  let width = if state.options.scrollbar_layout == ScrollbarLayout::ReserveSpace
+  // ReserveSpace 和 Inside 下水平滚动条不延伸至垂直滚动条占位列。
+  let width = if state.options.scrollbar_layout != ScrollbarLayout::Overlay
     && shows_vertical_scrollbar(state, viewport)
   {
     rect.width
@@ -977,6 +1019,7 @@ mod tests {
           content_width: 20,
           content_height: 10,
           overflow_x: Overflow::Auto,
+          scrollbar_layout: ScrollbarLayout::Overlay,
           ..Default::default()
         },
       )
@@ -1020,6 +1063,7 @@ mod tests {
           content_width: 16,
           content_height: 12,
           overflow_x: Overflow::Auto,
+          scrollbar_layout: ScrollbarLayout::Overlay,
           ..Default::default()
         },
       )
@@ -1478,5 +1522,60 @@ mod tests {
     // content_height=5 == rect.height=5 → 垂直滚动条不显示
     // content_width=20 > rect.width=10 → 水平滚动条显示 → 高度减 1，宽度不变
     assert_eq!(max_scroll_x(&state, viewport), 10); // 20 - 10
+  }
+
+  #[test]
+  fn inside_layout_reduces_viewport() {
+    let state = ScrollBoxState {
+      options: ScrollBoxOptions {
+        rect: Rect { x: 0, y: 0, width: 10, height: 5 },
+        content_width: 10,
+        content_height: 10,
+        scrollbar_layout: ScrollbarLayout::Inside, // 默认
+        scrollbar: ScrollbarPolicy {
+          vertical: ScrollbarVisibility::Auto,
+          horizontal: ScrollbarVisibility::Never,
+        },
+        ..Default::default()
+      },
+      scroll_x: 0,
+      scroll_y: 0,
+    };
+    let viewport = Size { width: 20, height: 15 };
+    // 垂直滚动条显示 → 宽度减 1，高度不变。
+    let eff = effective_viewport(&state, viewport);
+    assert_eq!(eff.width, 9);
+    assert_eq!(eff.height, 5);
+    assert_eq!(max_scroll_y(&state, viewport), 5); // 10 - 5
+  }
+
+  #[test]
+  fn scrollbar_chars_fall_back_to_default_when_invalid_width() {
+    let service = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: Rect { x: 0, y: 0, width: 8, height: 4 },
+          content_width: 8,
+          content_height: 1,
+          scrollbar_style: ScrollbarStyle {
+            track_char: '中',  // CJK 宽 2，应退回默认 '│'
+            thumb_char: '\u{200D}', // ZWJ 宽 0，应退回默认 '█'
+            h_track_char: '━', // 宽 1，OK
+            h_thumb_char: '\u{200D}', // 宽 0，应退回默认 '█'
+            ..Default::default()
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let state = pool.scroll_boxes.boxes.get(&id).unwrap();
+    let style = &state.options.scrollbar_style;
+    assert_eq!(style.track_char, '│'); // 退回默认
+    assert_eq!(style.thumb_char, '█'); // 退回默认
+    assert_eq!(style.h_track_char, '━'); // 合法宽度
+    assert_eq!(style.h_thumb_char, '█'); // 退回默认
   }
 }

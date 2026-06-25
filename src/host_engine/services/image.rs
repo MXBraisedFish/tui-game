@@ -1,8 +1,12 @@
 use std::collections::HashMap;
+use std::fs;
 use std::hash::{DefaultHasher, Hasher};
+use std::io;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 use image::GenericImageView;
+use serde::{Deserialize, Serialize};
 
 /// 图片转换参数
 #[derive(Clone, Debug)]
@@ -34,15 +38,25 @@ impl Default for ImageConvertParams {
   }
 }
 
-/// 图片服务，将图片转换为终端半块字符画格式
+/// 图片服务，将图片转换为终端半块字符画格式（支持内存 + 磁盘缓存）
 pub struct ImageService {
   cache: HashMap<u64, String>,
+  cache_dir: Option<PathBuf>,
+}
+
+/// 磁盘缓存条目格式。
+#[derive(Serialize, Deserialize)]
+struct DiskCacheEntry {
+  source_modified: u64,
+  rendered: String,
 }
 
 impl ImageService {
-  pub fn new() -> Self {
+  /// `cache_dir` 为 `None` 时不启用磁盘缓存。
+  pub fn new(cache_dir: Option<PathBuf>) -> Self {
     Self {
       cache: HashMap::new(),
+      cache_dir,
     }
   }
 
@@ -54,8 +68,14 @@ impl ImageService {
     let hash = compute_hash(&resolved, &params);
 
     if params.cache {
+      // 1. 内存缓存。
       if let Some(cached) = self.cache.get(&hash) {
         return Ok(cached.clone());
+      }
+      // 2. 磁盘缓存。
+      if let Some(disk) = self.read_disk_cache(hash, &resolved) {
+        self.cache.insert(hash, disk.clone());
+        return Ok(disk);
       }
     }
 
@@ -66,9 +86,62 @@ impl ImageService {
 
     if params.cache {
       self.cache.insert(hash, result.clone());
+      self.write_disk_cache(hash, &resolved, &result);
     }
     Ok(result)
   }
+
+  // ─── 磁盘缓存辅助方法 ──────────────────────────────
+
+  fn disk_cache_path(&self, hash: u64) -> Option<PathBuf> {
+    self
+      .cache_dir
+      .as_ref()
+      .map(|dir| dir.join(format!("{hash}.json")))
+  }
+
+  fn read_disk_cache(&self, hash: u64, source_path: &Path) -> Option<String> {
+    let path = self.disk_cache_path(hash)?;
+    let data = fs::read_to_string(&path).ok()?;
+    let entry: DiskCacheEntry = serde_json::from_str(&data).ok()?;
+    let current_mtime = source_modified(source_path).unwrap_or(0);
+    if entry.source_modified == current_mtime {
+      Some(entry.rendered)
+    } else {
+      // 过期则删除。
+      let _ = fs::remove_file(&path);
+      None
+    }
+  }
+
+  fn write_disk_cache(&self, hash: u64, source_path: &Path, rendered: &str) {
+    let Some(path) = self.disk_cache_path(hash) else {
+      return;
+    };
+    let mtime = match source_modified(source_path) {
+      Ok(m) => m,
+      Err(_) => return,
+    };
+    if let Some(parent) = path.parent() {
+      let _ = fs::create_dir_all(parent);
+    }
+    let entry = DiskCacheEntry {
+      source_modified: mtime,
+      rendered: rendered.to_string(),
+    };
+    if let Ok(json) = serde_json::to_string(&entry) {
+      let _ = fs::write(&path, json);
+    }
+  }
+}
+
+/// 获取源文件的修改时间（Unix 秒）。
+fn source_modified(path: &Path) -> io::Result<u64> {
+  let meta = fs::metadata(path)?;
+  let dur = meta.modified()?.duration_since(UNIX_EPOCH).map_err(|e| {
+    io::Error::new(io::ErrorKind::Other, format!("mtime before epoch: {e:?}"))
+  })?;
+  Ok(dur.as_secs())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -324,7 +397,7 @@ mod tests {
 
   #[test]
   fn convert_returns_f_percent_prefix() {
-    let mut svc = ImageService::new();
+    let mut svc = ImageService::new(None);
     let abs = std::path::absolute("assets/images/test/test.jpg").expect("test image should exist");
     let p = ImageConvertParams {
       image_path: abs.to_string_lossy().into(),
@@ -342,7 +415,7 @@ mod tests {
 
   #[test]
   fn cache_returns_same_result() {
-    let mut svc = ImageService::new();
+    let mut svc = ImageService::new(None);
     let abs = std::path::absolute("assets/images/test/test.jpg").expect("test image should exist");
     let p = ImageConvertParams {
       image_path: abs.to_string_lossy().into(),
@@ -359,7 +432,7 @@ mod tests {
 
   #[test]
   fn no_cache_returns_different_call() {
-    let mut svc = ImageService::new();
+    let mut svc = ImageService::new(None);
     let abs = std::path::absolute("assets/images/test/test.jpg").expect("test image should exist");
     let p = ImageConvertParams {
       image_path: abs.to_string_lossy().into(),
@@ -375,7 +448,7 @@ mod tests {
 
   #[test]
   fn output_dimensions_match_params() {
-    let mut svc = ImageService::new();
+    let mut svc = ImageService::new(None);
     let abs = std::path::absolute("assets/images/test/test.jpg").expect("test image should exist");
     let (w, h) = (15u32, 8u32);
     let p = ImageConvertParams {
@@ -389,5 +462,83 @@ mod tests {
 
     let block_count = result.chars().filter(|&c| c == '\u{2585}').count();
     assert_eq!(block_count, (w * h) as usize);
+  }
+
+  #[test]
+  fn disk_cache_writes_and_reads() {
+    let tmp = std::env::temp_dir().join(format!("tg_image_test_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp);
+
+    let abs = std::path::absolute("assets/images/test/test.jpg").expect("test image should exist");
+    let p = ImageConvertParams {
+      image_path: abs.to_string_lossy().into(),
+      output_width: 10,
+      output_height: 5,
+      scale: 0.3,
+      cache: true,
+      ..Default::default()
+    };
+
+    // 第一次调用：渲染并写入磁盘缓存。
+    let r1 = {
+      let mut svc = ImageService::new(Some(tmp.clone()));
+      svc.convert(p.clone()).expect("first convert")
+    };
+
+    // 第二次调用：新实例应从磁盘缓存读取。
+    let r2 = {
+      let mut svc = ImageService::new(Some(tmp.clone()));
+      svc.convert(p.clone()).expect("second convert (from disk)")
+    };
+
+    assert_eq!(r1, r2, "disk-cached result must match");
+
+    // 清理。
+    let _ = fs::remove_dir_all(&tmp);
+  }
+
+  #[test]
+  fn disk_cache_stale_when_source_changed() {
+    let tmp = std::env::temp_dir().join(format!("tg_image_test2_{}", std::process::id()));
+    let _ = fs::create_dir_all(&tmp);
+
+    let abs = std::path::absolute("assets/images/test/test.jpg").expect("test image should exist");
+    let p = ImageConvertParams {
+      image_path: abs.to_string_lossy().into(),
+      output_width: 10,
+      output_height: 5,
+      scale: 0.3,
+      cache: true,
+      ..Default::default()
+    };
+
+    let mut svc = ImageService::new(Some(tmp.clone()));
+    let _r1 = svc.convert(p.clone()).expect("first convert");
+
+    // 篡改磁盘缓存文件的 mtime 以制造过期。
+    let hash = {
+      let resolved = resolve_path(&p.image_path).unwrap();
+      compute_hash(&resolved, &p)
+    };
+    let cache_file = tmp.join(format!("{hash}.json"));
+    assert!(cache_file.exists(), "cache file should exist");
+
+    // 将 source_modified 改为 0，使其与源文件 mtime 不匹配。
+    let raw = fs::read_to_string(&cache_file).unwrap();
+    let stale = raw.replace(
+      &format!("\"source_modified\":{}", {
+        let meta = fs::metadata(&abs).unwrap();
+        meta.modified().unwrap().duration_since(UNIX_EPOCH).unwrap().as_secs()
+      }),
+      "\"source_modified\":0",
+    );
+    fs::write(&cache_file, stale).unwrap();
+
+    // 新实例读取时发现过期，应重新渲染。
+    let mut svc2 = ImageService::new(Some(tmp.clone()));
+    let r2 = svc2.convert(p).expect("stale cache should re-render");
+    assert!(r2.starts_with("f%"));
+
+    let _ = fs::remove_dir_all(&tmp);
   }
 }

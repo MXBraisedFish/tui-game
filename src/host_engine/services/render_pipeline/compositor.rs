@@ -72,16 +72,14 @@ fn overlay(frame: &mut ComposedFrame, buffer: &CanvasBuffer, ox: u16, oy: u16, o
 fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox, ox: u16, oy: u16) {
   let x0 = ox.saturating_add(scroll_box.rect.x);
   let y0 = oy.saturating_add(scroll_box.rect.y);
-  let visible_width = if scroll_box.scrollbar_layout == ScrollbarLayout::ReserveSpace
-    && shows_vertical_scrollbar(scroll_box)
-  {
+  // Inside 和 ReserveSpace 都需要缩减内容区域，Overlay 不需要。
+  let needs_reduction = scroll_box.scrollbar_layout != ScrollbarLayout::Overlay;
+  let visible_width = if needs_reduction && shows_vertical_scrollbar(scroll_box) {
     scroll_box.rect.width.saturating_sub(1)
   } else {
     scroll_box.rect.width
   };
-  let visible_height = if scroll_box.scrollbar_layout == ScrollbarLayout::ReserveSpace
-    && shows_horizontal_scrollbar(scroll_box)
-  {
+  let visible_height = if needs_reduction && shows_horizontal_scrollbar(scroll_box) {
     scroll_box.rect.height.saturating_sub(1)
   } else {
     scroll_box.rect.height
@@ -124,7 +122,9 @@ fn draw_vertical_scrollbar(
     return;
   }
   let x = match scroll_box.scrollbar_layout {
-    ScrollbarLayout::Overlay => x0.saturating_add(scroll_box.rect.width - 1),
+    ScrollbarLayout::Overlay | ScrollbarLayout::Inside => {
+      x0.saturating_add(scroll_box.rect.width - 1)
+    }
     ScrollbarLayout::ReserveSpace => x0.saturating_add(scroll_box.rect.width),
   };
   let max_scroll = scroll_box.content_size.height.saturating_sub(height);
@@ -174,7 +174,9 @@ fn draw_horizontal_scrollbar(
     return;
   }
   let y = match scroll_box.scrollbar_layout {
-    ScrollbarLayout::Overlay => y0.saturating_add(scroll_box.rect.height - 1),
+    ScrollbarLayout::Overlay | ScrollbarLayout::Inside => {
+      y0.saturating_add(scroll_box.rect.height - 1)
+    }
     ScrollbarLayout::ReserveSpace => y0.saturating_add(scroll_box.rect.height),
   };
   let max_scroll = scroll_box.content_size.width.saturating_sub(width);

@@ -4,8 +4,8 @@ use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_cras
 use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
-  DrawTextParams, EngineServices, HostAreaKind, MouseEvent, Rect, SystemEvent, UiEvent,
-  UiObjectPool, UiObjectPoolOwner, translate_action_map,
+  EngineServices, HostAreaKind, MouseEvent, Rect, SystemEvent, UiEvent, UiObjectPool,
+  UiObjectPoolOwner, translate_action_map,
 };
 
 use crate::host_engine::ui::{
@@ -44,11 +44,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
   let mut mods_ui = ModsUi::init(&services.hit_area);
-  let mut input_demo_ui = InputDemoUi::init(
-    &services.hit_area,
-    &services.slice,
-    &services.scroll_box,
-  );
+  let mut input_demo_ui =
+    InputDemoUi::init(&services.hit_area, &services.slice, &services.scroll_box);
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
 
   if services.storage.read_language_code().is_none() && language_select_ui.is_some() {
@@ -726,7 +723,7 @@ fn route_render(
   window_size_ui: &mut WindowSizeWarningUi,
 ) -> Option<(u16, u16)> {
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
-    apply_host_viewport(services, true);
+    apply_host_viewport(services);
     let runtime = world.state.runtime().unwrap();
     let overlay = runtime.overlays().top().unwrap();
     let req_w = overlay.render.required_width;
@@ -752,7 +749,7 @@ fn route_render(
     return None;
   }
 
-  apply_host_viewport(services, false);
+  apply_host_viewport(services);
 
   if let Some(objects) = current_objects_mut(
     world,
@@ -831,16 +828,11 @@ fn route_render(
     }
     _ => None,
   };
-  draw_host_chrome(services);
   input_cursor
 }
 
-fn apply_host_viewport(services: &mut EngineServices, overlay_active: bool) {
-  refresh_host_areas(
-    &mut services.host_objects,
-    services.layout.physical_size(),
-    overlay_active,
-  );
+fn apply_host_viewport(services: &mut EngineServices) {
+  refresh_host_areas(&mut services.host_objects, services.layout.physical_size());
   apply_developer_viewport(&mut services.layout, &services.host_objects);
 }
 
@@ -856,81 +848,22 @@ fn apply_developer_viewport(
 fn refresh_host_areas(
   host_objects: &mut crate::host_engine::services::HostObjectPool,
   physical: crate::host_engine::services::Size,
-  overlay_active: bool,
 ) {
   let top = host_objects.ensure_area(HostAreaKind::TopBar);
   let separator = host_objects.ensure_area(HostAreaKind::Separator);
   let viewport = host_objects.ensure_area(HostAreaKind::DeveloperViewport);
-  if overlay_active {
-    host_objects.update_area(top, Rect::default(), false);
-    host_objects.update_area(separator, Rect::default(), false);
-    host_objects.update_area(
-      viewport,
-      Rect {
-        x: 0,
-        y: 0,
-        width: physical.width,
-        height: physical.height,
-      },
-      true,
-    );
-    return;
-  }
-  host_objects.update_area(
-    top,
-    Rect {
-      x: 0,
-      y: 0,
-      width: physical.width,
-      height: 1,
-    },
-    physical.height > 0,
-  );
-  host_objects.update_area(
-    separator,
-    Rect {
-      x: 0,
-      y: 1,
-      width: physical.width,
-      height: 1,
-    },
-    physical.height > 1,
-  );
+  host_objects.update_area(top, Rect::default(), false);
+  host_objects.update_area(separator, Rect::default(), false);
   host_objects.update_area(
     viewport,
     Rect {
       x: 0,
-      y: physical.height.min(2),
+      y: 0,
       width: physical.width,
-      height: physical.height.saturating_sub(2),
+      height: physical.height,
     },
     true,
   );
-}
-
-fn draw_host_chrome(services: &mut EngineServices) {
-  let Some(top_bar) = services.host_objects.area_rect(HostAreaKind::TopBar) else {
-    return;
-  };
-  let title = "Host Layout / Developer Viewport Split";
-  let title_x = top_bar
-    .x
-    .saturating_add(top_bar.width.saturating_sub(title.chars().count() as u16) / 2);
-  services.render.draw_host_text(
-    &mut services.canvas,
-    &DrawTextParams::new(title_x, top_bar.y, title),
-  );
-
-  if let Some(separator) = services.host_objects.area_rect(HostAreaKind::Separator) {
-    services.render.draw_host_text(
-      &mut services.canvas,
-      &DrawTextParams::new(
-        separator.x,
-        separator.y,
-        "─".repeat(separator.width as usize),
-      ),
-    );
-  }
 }
 
 fn apply_home_command(command: HomeUiCommand, world: &mut RuntimeWorld) {
@@ -1020,52 +953,44 @@ mod tests {
   use crate::host_engine::services::{HostObjectPool, LayoutService, Size};
 
   #[test]
-  fn host_viewport_reserves_two_top_rows_without_overlay() {
+  fn host_viewport_uses_full_terminal_by_default() {
     let mut layout = LayoutService::new();
     let mut host_objects = HostObjectPool::new();
     layout.resize_physical(120, 40);
 
-    refresh_host_areas(&mut host_objects, layout.physical_size(), false);
+    refresh_host_areas(&mut host_objects, layout.physical_size());
     apply_developer_viewport(&mut layout, &host_objects);
 
-    assert_eq!(
-      host_objects.area_rect(HostAreaKind::TopBar),
-      Some(Rect {
-        x: 0,
-        y: 0,
-        width: 120,
-        height: 1
-      })
-    );
-    assert_eq!(host_objects.area_height(HostAreaKind::Separator), Some(1));
+    assert_eq!(host_objects.area_rect(HostAreaKind::TopBar), None);
+    assert_eq!(host_objects.area_rect(HostAreaKind::Separator), None);
     assert!(host_objects.is_visible(HostAreaKind::DeveloperViewport));
     assert_eq!(
       layout.developer_viewport_rect(),
       Rect {
         x: 0,
-        y: 2,
+        y: 0,
         width: 120,
-        height: 38
+        height: 40
       }
     );
     assert_eq!(
       layout.developer_size(),
       Size {
         width: 120,
-        height: 38
+        height: 40
       }
     );
   }
 
   #[test]
-  fn overlay_restores_full_terminal_base() {
+  fn repeated_host_viewport_refresh_keeps_full_terminal_base() {
     let mut layout = LayoutService::new();
     let mut host_objects = HostObjectPool::new();
     layout.resize_physical(120, 40);
-    refresh_host_areas(&mut host_objects, layout.physical_size(), false);
+    refresh_host_areas(&mut host_objects, layout.physical_size());
     apply_developer_viewport(&mut layout, &host_objects);
 
-    refresh_host_areas(&mut host_objects, layout.physical_size(), true);
+    refresh_host_areas(&mut host_objects, layout.physical_size());
     apply_developer_viewport(&mut layout, &host_objects);
 
     assert!(!host_objects.is_visible(HostAreaKind::TopBar));

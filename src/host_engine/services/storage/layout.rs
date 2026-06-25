@@ -3,6 +3,8 @@ pub const DATA_DIR: &str = "data";
 
 pub const DATA_CACHE_DIR: &str = "data/cache";
 
+pub const IMAGE_CACHE_DIR: &str = "data/cache/images";
+
 pub const DATA_PROFILES_DIR: &str = "data/profiles";
 
 pub const DATA_LOG_DIR: &str = "data/log";
@@ -42,6 +44,7 @@ pub const LANGUAGE_REGISTRY_FILE: &str = "assets/language/language_registry.json
 pub const REQUIRED_DIRECTORIES: &[&str] = &[
   DATA_DIR,
   DATA_CACHE_DIR,
+  IMAGE_CACHE_DIR,
   DATA_PROFILES_DIR,
   DATA_LOG_DIR,
   DATA_MOD_DIR,

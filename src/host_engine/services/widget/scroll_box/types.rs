@@ -22,15 +22,17 @@ pub enum ScrollbarVisibility {
 /// 滚动条占位策略。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScrollbarLayout {
-  /// 滚动条覆盖内容，不改变内容 viewport 宽度。
+  /// 滚动条覆盖内容，不改变 content viewport 宽度（内容最右列被遮挡）。
   Overlay,
-  /// 滚动条占用一列/行，内容可视区域减少 1。
+  /// 滚动条占用一列/行，绘制在 viewport 外部，内容可视区域减少 1。
   ReserveSpace,
+  /// 滚动条绘制在 viewport 内部最右侧/最底部，内容可视区域减少 1（不被遮挡）。
+  Inside,
 }
 
 impl Default for ScrollbarLayout {
   fn default() -> Self {
-    Self::Overlay
+    Self::Inside
   }
 }
 
@@ -131,7 +133,10 @@ pub struct ScrollBoxOptions {
   pub visible: bool,
   pub opaque: bool,
   pub mouse_wheel: bool,
+  /// 纵向滚轮步长（每次滚轮滚动的行数）。
   pub wheel_step: u16,
+  /// 横向滚轮步长（每次滚轮滚动的列数）。
+  pub h_wheel_step: u16,
   pub emit_scroll_events: bool,
 }
 
@@ -150,6 +155,7 @@ impl Default for ScrollBoxOptions {
       opaque: true,
       mouse_wheel: true,
       wheel_step: 3,
+      h_wheel_step: 2,
       emit_scroll_events: false,
     }
   }
