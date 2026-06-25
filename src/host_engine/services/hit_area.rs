@@ -5,15 +5,19 @@ use super::{
   CanvasService, MouseButton, MouseEvent, MouseEventKind, Rect, SliceId, TextInputService,
 };
 
+/// 点击区域唯一标识
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HitAreaId(pub u64);
 
+/// 点击区域配置选项
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct HitAreaOptions {
   pub hover_move: bool,
+
   pub drag: bool,
 }
 
+/// 点击区域事件
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HitAreaEvent {
   HoverEnter {
@@ -121,6 +125,7 @@ impl HitAreaObjects {
   }
 }
 
+/// 点击区域服务，管理鼠标交互区域
 pub struct HitAreaService;
 
 impl HitAreaService {
@@ -128,6 +133,7 @@ impl HitAreaService {
     Self
   }
 
+  /// 创建一个新的点击区域
   pub fn create(&self, pool: &mut UiObjectPool, options: HitAreaOptions) -> HitAreaId {
     let id = HitAreaId(pool.hit_areas.next_id);
     pool.hit_areas.next_id += 1;
@@ -138,6 +144,7 @@ impl HitAreaService {
     id
   }
 
+  /// 移除一个点击区域
   pub fn remove(&self, pool: &mut UiObjectPool, id: HitAreaId) -> bool {
     if pool.hit_areas.areas.remove(&id).is_none() {
       return false;
@@ -150,14 +157,17 @@ impl HitAreaService {
     true
   }
 
+  /// 检查点击区域是否存在
   pub fn exists(&self, pool: &UiObjectPool, id: HitAreaId) -> bool {
     pool.hit_areas.areas.contains_key(&id)
   }
 
+  /// 检查点击区域是否被悬停
   pub fn is_hovered(&self, pool: &UiObjectPool, id: HitAreaId) -> bool {
     pool.hit_areas.areas.contains_key(&id) && pool.hit_areas.hovered == Some(id)
   }
 
+  /// 检查指定按键的点击区域是否被按下
   pub fn is_pressed(&self, pool: &UiObjectPool, id: HitAreaId, button: MouseButton) -> bool {
     pool
       .hit_areas
@@ -166,10 +176,12 @@ impl HitAreaService {
       .is_some_and(|pressed| pressed.id == id)
   }
 
+  /// 获取当前指针在视口内的位置
   pub fn pointer_position(&self, pool: &UiObjectPool) -> Option<(u16, u16)> {
     pool.hit_areas.pointer
   }
 
+  /// 获取指针在指定点击区域内的本地坐标
   pub fn local_pointer_position(&self, pool: &UiObjectPool, id: HitAreaId) -> Option<(u16, u16)> {
     let (x, y) = pool.hit_areas.physical_pointer?;
     let hit = pool.hit_areas.areas.get(&id)?.hit?;
@@ -179,6 +191,7 @@ impl HitAreaService {
       .then(|| (x - hit.rect.x, y - hit.rect.y))
   }
 
+  /// 渲染点击区域的基础命中矩形
   pub fn render(
     &self,
     pool: &mut UiObjectPool,
@@ -189,6 +202,7 @@ impl HitAreaService {
     self.render_resolved(pool, id, canvas.base_hit_rect(rect))
   }
 
+  /// 在指定切片上渲染点击区域的命中矩形
   pub fn render_on(
     &self,
     pool: &mut UiObjectPool,
@@ -388,6 +402,7 @@ impl HitAreaService {
   }
 }
 
+// 计算相对于点击区域原点（切片偏移）的本地坐标
 fn event_point(pool: &UiObjectPool, id: HitAreaId, x: u16, y: u16) -> (u16, u16) {
   pool.hit_areas.areas[&id]
     .hit

@@ -1,6 +1,7 @@
 use super::key_token::parse_key_token;
 use super::service::{KeyBinding, KeyPattern};
 
+/// 动作映射条目
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActionMapEntry {
   pub action: String,
@@ -8,6 +9,7 @@ pub struct ActionMapEntry {
   pub keys: Vec<Vec<String>>,
 }
 
+/// 动作映射翻译错误
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ActionMapTranslateError {
   EmptyAction {
@@ -28,6 +30,7 @@ pub enum ActionMapTranslateError {
   },
 }
 
+/// 将动作映射条目翻译为按键绑定列表
 pub fn translate_action_map(
   entries: &[ActionMapEntry],
 ) -> Result<Vec<KeyBinding>, ActionMapTranslateError> {

@@ -1,5 +1,6 @@
 use super::{TerminalColor, TextColor};
 
+/// 解析颜色字符串为 TextColor，支持终端色名、十六进制和 rgb() 格式。
 pub fn parse_text_color(value: &str) -> Option<TextColor> {
   let value = value.trim();
 

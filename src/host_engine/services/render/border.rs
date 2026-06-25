@@ -1,9 +1,6 @@
 use crate::host_engine::services::{TextColor, TextStyle};
 
-// ── 边框样式类型 ──
-
-/// 每个位置的边框字符配置。
-/// 所有字段均为可选，`None` 表示继承 API 级默认值或使用固定样式默认字符。
+/// 边框单个位置的字符与样式配置。
 #[derive(Clone, Debug, Default)]
 pub struct BorderCharacter {
   pub char: Option<char>,
@@ -13,7 +10,8 @@ pub struct BorderCharacter {
 }
 
 impl BorderCharacter {
-  /// 按优先级解析最终字符与样式：本位置覆盖 > API 参数 > 固定样式默认。
+
+  /// 将位置样式与默认样式合并，生成最终渲染用的 TextStyle。
   pub fn resolve(
     &self,
     default_fg: Option<&TextColor>,
@@ -39,7 +37,7 @@ impl BorderCharacter {
   }
 }
 
-/// 8 位置自定义边框（上排 l_t / top / r_t，中排 left / right，下排 l_b / bottom / r_b）。
+/// 自定义边框的八个方位字符与样式定义。
 #[derive(Clone, Debug, Default)]
 pub struct CustomBorder {
   pub left_top: BorderCharacter,
@@ -52,9 +50,7 @@ pub struct CustomBorder {
   pub left: BorderCharacter,
 }
 
-// ── 固定边框样式 → CustomBorder 映射 ──
-
-/// 边框样式枚举。
+/// 预定义的边框样式枚举，支持无边框、单线、粗线、双线、圆角和自定义。
 #[derive(Clone, Debug)]
 pub enum BorderStyle {
   None,
@@ -66,7 +62,8 @@ pub enum BorderStyle {
 }
 
 impl BorderStyle {
-  /// 将枚举转为具体的 `CustomBorder`。`None` 返回 `None`（不绘制）。
+
+  /// 将预定义样式展开为具体的 CustomBorder 描述（None 返回 None）。
   pub fn to_custom(&self) -> Option<CustomBorder> {
     match self {
       Self::None => None,

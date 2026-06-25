@@ -11,7 +11,7 @@ const MODS_MENU_LEN: usize = 2;
 
 const MENU_KEYS: &[&str] = &["mods.game", "mods.screensaver"];
 
-/// 布局计算结果
+/// 模组管理页面布局信息。
 pub(crate) struct ModsLayout {
   title_x: u16,
   title_y: u16,
@@ -20,6 +20,7 @@ pub(crate) struct ModsLayout {
   hint_y: u16,
 }
 
+/// 模组管理 UI：提供游戏包和屏保包的管理入口。
 pub struct ModsUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -37,6 +38,7 @@ impl UiObjectPoolOwner for ModsUi {
   }
 }
 
+/// 模组管理页面的命令。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModsCommand {
   OpenGame,
@@ -45,6 +47,7 @@ pub enum ModsCommand {
 }
 
 impl ModsUi {
+  /// 初始化模组管理页面 UI。
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -55,8 +58,7 @@ impl ModsUi {
     }
   }
 
-  // ── 输入绑定 ──
-
+  /// 返回模组管理页面的按键映射定义。
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -92,8 +94,7 @@ impl ModsUi {
     ]
   }
 
-  // ── 输入处理 ──
-
+  /// 处理 UI 事件，返回导航或确认命令。
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ModsCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -142,8 +143,7 @@ impl ModsUi {
     None
   }
 
-  // ── 渲染 ──
-
+  /// 渲染模组管理页面到宿主层。
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -171,16 +171,13 @@ impl ModsUi {
     }
   }
 
+  /// 根据布局服务计算模组管理页面各元素的宿主坐标。
   pub fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> ModsLayout {
     let params = self.build_key_params();
-
-    // title —— 距离顶部 1 行，水平居中
     let title = i18n.get_runtime_text("mods", "mods.title");
     let title_w = layout.get_text_width(&title, None);
     let title_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, title_w, 0);
     let title_y: u16 = 1;
-
-    // 菜单项
     let menu_items = self.menu_items(i18n);
     let menu_item_widths: [u16; MODS_MENU_LEN] =
       std::array::from_fn(|i| layout.get_text_width(&menu_items[i], None));
@@ -188,8 +185,6 @@ impl ModsUi {
       layout.resolve_host_x(LayoutService::ALIGN_CENTER, menu_item_widths[i], 0)
     });
     let menu_height = MODS_MENU_LEN as u16;
-
-    // 操作提示（底部）
     let hint = format!(
       "f%<fg:bright_black>{}  {}  {}  {}</fg>",
       i18n.get_runtime_text("mods", "mods.action.focus"),
@@ -201,8 +196,6 @@ impl ModsUi {
     let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
     let terminal_height = layout.physical_size().height;
     let hint_y = terminal_height.saturating_sub(1);
-
-    // 菜单垂直居中（在 title 和 hint 之间）
     let available = hint_y.saturating_sub(title_y).saturating_sub(1);
     let menu_y = if available > menu_height {
       title_y
@@ -227,8 +220,6 @@ impl ModsUi {
       hint_y,
     }
   }
-
-  // ── 内部辅助 ──
 
   fn focus_previous(&mut self) {
     if self.selected_index == 0 {
@@ -261,9 +252,8 @@ impl ModsUi {
   }
 
   fn build_key_params(&self) -> RichTextParams {
-    // 基础：from_action_map 生成 mods.xxx 和短别名 xxx
     let base = RichTextParams::from_action_map(&Self::action_map(), "mods.");
-    // 语言文件里 {key:...} 用的是 settings.xxx 前缀，桥接过去
+
     let mut key_actions = base.key_actions;
     let aliases: &[(&str, &str)] = &[
       ("settings.focus_game", "mods.focus_game"),
@@ -291,7 +281,6 @@ impl ModsUi {
     positions: &ModsLayout,
     i18n: &I18nService,
   ) {
-    // title
     let title = i18n.get_runtime_text("mods", "mods.title");
     render.draw_host_text(
       canvas,
@@ -303,8 +292,6 @@ impl ModsUi {
         ..Default::default()
       },
     );
-
-    // 菜单项
     let menu_items = self.menu_items(i18n);
     for (i, item) in menu_items.iter().enumerate() {
       render.draw_host_text(
@@ -317,8 +304,6 @@ impl ModsUi {
         },
       );
     }
-
-    // 操作提示
     let params = self.build_key_params();
     let hint = format!(
       "f%<fg:rgb(85,87,83)>{}  {}  {}  {}</fg>",

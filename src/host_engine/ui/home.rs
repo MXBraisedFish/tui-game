@@ -28,9 +28,6 @@ const LOGO_LINES: &[&str] = &[
 
 const HOME_MENU_LEN: usize = 5;
 
-/// 将纯文本 Logo 转换为富文本：
-/// - `█` 块使用默认前景色（红）
-/// - 制表符（╗╔╝╚║═ 等）自动包裹 `<fg:white>...</fg>`
 fn style_logo(lines: &[&str]) -> String {
   let plain = lines.join("\n");
   let mut result = String::from("f%");
@@ -57,7 +54,7 @@ fn style_logo(lines: &[&str]) -> String {
   result
 }
 
-/// 布局计算结果 —— 把定位从绘制里拆出来
+/// 首页布局信息：Logo、菜单项、版本号和操作提示的坐标与区域。
 pub(crate) struct HomeLayout {
   logo_x: u16,
   logo_y: u16,
@@ -70,6 +67,7 @@ pub(crate) struct HomeLayout {
   action_hint_y: u16,
 }
 
+/// 首页 UI：包含 Logo 展示、菜单导航和操作提示。
 pub struct HomeUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -86,6 +84,7 @@ impl UiObjectPoolOwner for HomeUi {
   }
 }
 
+/// 首页发出的命令。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HomeUiCommand {
   StartGame,
@@ -96,6 +95,8 @@ pub enum HomeUiCommand {
 }
 
 impl HomeUi {
+
+  /// 初始化首页 UI，创建命中检测区域。
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -105,8 +106,7 @@ impl HomeUi {
     }
   }
 
-  // ── 输入绑定 ──
-
+  /// 返回首页的按键映射定义。
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -152,8 +152,7 @@ impl HomeUi {
     ]
   }
 
-  // ── 输入处理 ──
-
+  /// 处理 UI 事件，返回用户选中项对应的命令。
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<HomeUiCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -217,8 +216,7 @@ impl HomeUi {
     None
   }
 
-  // ── 渲染 ──
-
+  /// 渲染首页内容到宿主层。
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -233,8 +231,6 @@ impl HomeUi {
       hit_area.render_host(&mut self.objects, id, rect, canvas);
     }
   }
-
-  // ── 内部辅助 ──
 
   fn focus_previous(&mut self) {
     if self.selected_index == 0 {
@@ -281,7 +277,7 @@ impl HomeUi {
     RichTextParams::from_action_map(&Self::action_map(), "home.")
   }
 
-  /// 纯定位计算 —— 不碰画布，不碰绘制
+  /// 根据布局服务计算首页各元素的宿主坐标。
   pub(crate) fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> HomeLayout {
     let params = self.build_key_params();
 
@@ -291,7 +287,7 @@ impl HomeUi {
     let menu_items = self.menu_items(i18n);
     let menu_item_widths: [u16; HOME_MENU_LEN] =
       std::array::from_fn(|i| layout.get_text_width(&menu_items[i], None));
-    // 每个菜单项单独居中
+
     let menu_item_xs: [u16; HOME_MENU_LEN] = std::array::from_fn(|i| {
       layout.resolve_host_x(LayoutService::ALIGN_CENTER, menu_item_widths[i], 0)
     });
@@ -302,8 +298,6 @@ impl HomeUi {
       &format!("f%<fg:rgb(85,87,83)>v{}</fg>", version).to_string(),
       None,
     );
-
-    // 操作提示（单行，三个提示用两个空格分隔，灰色）
     let action_hint = format!(
       "f%<fg:bright_black>{}  {}  {}</fg>",
       i18n.get_runtime_text("home", "home.action.focus"),
@@ -311,15 +305,13 @@ impl HomeUi {
       i18n.get_runtime_text("home", "home.action.confirm"),
     );
     let action_hint_w = layout.get_text_width(&action_hint, Some(&params));
-
-    // 整体垂直居中
     let total_height = logo_size
       .height
       .saturating_add(2)
       .saturating_add(menu_height)
-      .saturating_add(2) // version height = 1
-      .saturating_add(1) // gap
-      .saturating_add(1); // 1 action hint line
+      .saturating_add(2)
+      .saturating_add(1)
+      .saturating_add(1);
 
     let start_y = layout.resolve_host_y(LayoutService::ALIGN_MIDDLE, total_height, 0);
 
@@ -354,7 +346,6 @@ impl HomeUi {
     }
   }
 
-  /// 纯绘制 —— 不计算位置
   fn draw_content(
     &self,
     render: &mut RenderService,
@@ -401,8 +392,6 @@ impl HomeUi {
         ..Default::default()
       },
     );
-
-    // ── 操作提示（淡灰色，单行） ──
     let params = self.build_key_params();
     let action_hint = format!(
       "f%<fg:rgb(85,87,83)>{}  {}  {}</fg>",

@@ -14,6 +14,7 @@ use crate::host_engine::ui::{
   TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 
+/// 运行引擎主循环：初始化 UI 并循环处理输入、更新与渲染，直到退出
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   services.terminal.enter(&mut services.log);
 
@@ -22,14 +23,12 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
   let mut scheduler = FrameScheduler::new(60);
 
-  // ── 顶层状态转换：Boot → Init → Runtime ──
   world.state.enter_init();
   set_crash_phase(world.state.crash_phase());
 
   world.state.enter_runtime();
   set_crash_phase(world.state.crash_phase());
 
-  // ── 创建 UI ──
   let registry = services.i18n.language_registry().to_vec();
   let mut home_ui = HomeUi::init(&services.hit_area);
   let mut settings_ui = SettingsUi::init(&services.hit_area);
@@ -49,17 +48,12 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     InputDemoUi::init(&services.hit_area, &services.slice, &services.text_input);
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
 
-  // 初始 UI 节点
-  // 1) 无语言 → LanguageSelect
-  // 2) 终端能力不完整 → TerminalCheck
-  // 3) 否则 → Home（默认已在树中）
   if services.storage.read_language_code().is_none() && language_select_ui.is_some() {
     world.state.enter_ui_node(UiNodeState::language_select());
   } else if !services.storage.is_terminal_profile_complete() {
     world.state.enter_ui_node(UiNodeState::terminal_check());
   }
 
-  // ── 主循环 ──
   while !world.is_stopped() {
     let _frame = scheduler.begin_frame();
 
@@ -68,7 +62,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services.input.begin_frame();
     services.input.poll();
 
-    // resize 事件：更新画布尺寸并标记强制重绘
     services.input.poll_resize_events(|w, h| {
       services.layout.resize_physical(w, h);
       services.canvas.resize(w, h);
@@ -78,7 +71,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     services.canvas.begin_frame(&services.layout);
 
-    // 窗口尺寸检查与覆盖层管理
     manage_window_size_overlay(services, world);
     deactivate_hidden_pools(
       services,
@@ -92,8 +84,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut window_size_ui,
     );
 
-    // 输入所有权：覆盖层 > 输入组件 > 当前页面 action map。
-    // rdev 原始按键捕获在 InputService 中与 action map 并行，不参与输入所有权。
     if world.state.current_overlay_kind().is_some() {
       load_window_size_action_map(services);
       services.input.dispatch_action_events();
@@ -188,8 +178,6 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   ExitState::new()
 }
 
-// ── 辅助函数 ──
-
 fn load_home_action_map(services: &mut EngineServices) {
   let bindings =
     translate_action_map(&HomeUi::action_map()).expect("failed to translate HomeUi action map");
@@ -258,6 +246,7 @@ fn current_objects_mut<'a>(
   }
 }
 
+// 将非活跃 UI 对应的对象池反激活，确保只有当前界面响应点击和输入
 fn deactivate_hidden_pools(
   services: &mut EngineServices,
   world: &RuntimeWorld,
@@ -477,7 +466,7 @@ fn route_input_events(
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
 ) {
-  // 覆盖层输入优先
+
   if world.state.current_overlay_kind().is_some() {
     while let Some(event) = services.input.next_action_event() {
       if let Some(cmd) = window_size_ui.handle_event(&UiEvent::Action(event)) {
@@ -514,7 +503,6 @@ fn route_input_events(
     return;
   }
 
-  // 键盘事件
   while let Some(event) = services.input.next_action_event() {
     route_input_event(
       &UiEvent::Action(event),
@@ -671,7 +659,6 @@ fn route_update(
   mods_ui: &mut ModsUi,
   input_demo_ui: &mut InputDemoUi,
 ) {
-  // 覆盖层无逐帧逻辑
   if world.state.current_overlay_kind().is_some() {
     return;
   }
@@ -729,7 +716,7 @@ fn route_render(
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
 ) -> Option<(u16, u16)> {
-  // 覆盖层渲染优先
+
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
     let runtime = world.state.runtime().unwrap();
     let overlay = runtime.overlays().top().unwrap();
@@ -919,7 +906,7 @@ fn apply_language_select_command(
         .i18n
         .load_runtime_language(&services.storage, &mut services.log, &code);
       services.i18n.set_current_language(code);
-      // 不退出，留在语言页面让用户看到效果
+
     }
     LanguageSelectCommand::Back => {
       world.state.pop_ui_node();
@@ -956,15 +943,11 @@ fn apply_terminal_check_command(
   }
 }
 
-// ── 窗口尺寸覆盖层 ──
-
-/// 每帧调用：当终端过小时推入覆盖层，尺寸恢复时自动弹出。
 fn manage_window_size_overlay(services: &EngineServices, world: &mut RuntimeWorld) {
   let term = services.layout.physical_size();
 
   match world.state.current_overlay_kind() {
     Some(OverlayKind::WindowSizeWarning) => {
-      // 自动解除：终端尺寸已满足需求
       let runtime = world.state.runtime().unwrap();
       if let Some(overlay) = runtime.overlays().top() {
         let req_w = overlay.render.required_width as u16;
@@ -975,24 +958,19 @@ fn manage_window_size_overlay(services: &EngineServices, world: &mut RuntimeWorl
       }
     }
     None => {
-      // 无覆盖层时，检查终端尺寸是否达标
       let (min_w, min_h) = get_min_window_size(world);
       if (term.width as u32) < min_w || (term.height as u32) < min_h {
         world.state.push_window_size_overlay(min_w, min_h);
       }
     }
-    _ => {} // 其他覆盖层：跳过尺寸检查
+    _ => {}
   }
 }
 
-/// 获取当前模式下的最小窗口尺寸。
-/// Host 模式：固定 80×24。
-/// Game 模式：占位，后续读取活跃游戏包的 PackageRuntime。
 fn get_min_window_size(world: &RuntimeWorld) -> (u32, u32) {
   if world.state.is_host_mode() {
     (80, 24)
   } else {
-    // 游戏模式占位：暂用与 Host 相同的默认值
     (80, 24)
   }
 }
@@ -1001,14 +979,14 @@ fn apply_window_size_command(cmd: WindowSizeWarningCommand, world: &mut RuntimeW
   match cmd {
     WindowSizeWarningCommand::Exit => {
       if world.state.is_host_mode() {
-        // Host 模式：退出程序
+
         world.state.pop_overlay();
         world.state.enter_shutdown();
         set_crash_phase(world.state.crash_phase());
         world.state.enter_stopped();
         set_crash_phase(world.state.crash_phase());
       } else {
-        // Game 模式：返回游戏列表（切回 Host）
+
         world.state.pop_overlay();
         if let Some(runtime) = world.state.runtime_mut() {
           runtime.set_main_host(MainHostState::Host(HostState::new()));

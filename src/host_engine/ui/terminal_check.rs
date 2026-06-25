@@ -6,31 +6,28 @@ use crate::host_engine::services::{
   TextColor, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
-/// 检测步骤
 const STEP_UNICODE: usize = 0;
+
 const STEP_COLOR: usize = 1;
+
 const STEP_MOUSE: usize = 2;
 
-/// Unicode 检测的选项数
 const UNICODE_OPTIONS: usize = 2;
-/// 色彩检测的选项数
+
 const COLOR_OPTIONS: usize = 3;
 
-/// Unicode 示例文本
 const UNICODE_SAMPLE: &str = "你好 World \u{1F30D} ȧb عربى";
 
-/// 色带占据终端宽度的比例范围
 const BAND_LEFT_PCT: u16 = 20;
+
 const BAND_RIGHT_PCT: u16 = 80;
-/// 色带行数
+
 const BAND_ROWS: u16 = 3;
 
-/// 鼠标检测矩形框高度
 const MOUSE_BOX_HEIGHT: u16 = 5;
-/// 鼠标检测矩形框内边距（tip 左右各留空格数）
+
 const MOUSE_BOX_PADDING: u16 = 5;
 
-/// 彩虹色带关键色 (红→橙→黄→绿→青→蓝→紫)
 const RAINBOW: &[(u8, u8, u8)] = &[
   (255, 0, 0),
   (255, 165, 0),
@@ -41,7 +38,7 @@ const RAINBOW: &[(u8, u8, u8)] = &[
   (128, 0, 255),
 ];
 
-/// 布局计算结果
+/// 终端检测页面的布局信息。
 pub(crate) struct TerminalCheckLayout {
   title_x: u16,
   title_y: u16,
@@ -55,9 +52,10 @@ pub(crate) struct TerminalCheckLayout {
   hint_y: u16,
 }
 
+/// 终端能力检测 UI：分步检测 Unicode 支持、真彩色支持和鼠标支持。
 pub struct TerminalCheckUi {
   step: usize,
-  /// 每个步骤内部的选择索引
+
   selected_index: usize,
   objects: UiObjectPool,
 }
@@ -72,17 +70,20 @@ impl UiObjectPoolOwner for TerminalCheckUi {
   }
 }
 
+/// 终端检测页面的命令。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TerminalCheckCommand {
-  /// 进入下一步
+
   Next,
-  /// 退出程序（Unicode / Color 失败）
+
   Exit,
-  /// 全部完成（携带鼠标检测结果）
+
   Done { mouse: bool },
 }
 
 impl TerminalCheckUi {
+
+  /// 初始化终端检测 UI。
   pub fn init() -> Self {
     Self {
       step: STEP_UNICODE,
@@ -91,18 +92,16 @@ impl TerminalCheckUi {
     }
   }
 
-  /// 根据检测结果设置当前步骤的预选项。
   fn apply_detection(&mut self) {
     self.selected_index = match self.step {
-      STEP_UNICODE => 0, // 总是"支持"
-      STEP_COLOR => 0,   // 预选"支持"（truecolor 不在自动检测范围）
-      STEP_MOUSE => 1,   // 默认聚焦"不支持"，必须鼠标点击矩形才能切换
+      STEP_UNICODE => 0,
+      STEP_COLOR => 0,
+      STEP_MOUSE => 1,
       _ => 0,
     };
   }
 
-  // ── 输入绑定 ──
-
+  /// 返回终端检测页面的按键映射定义。
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -128,8 +127,7 @@ impl TerminalCheckUi {
     ]
   }
 
-  // ── 输入处理 ──
-
+  /// 处理键盘事件。
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<TerminalCheckCommand> {
     let UiEvent::Action(event) = event else {
       return None;
@@ -164,7 +162,7 @@ impl TerminalCheckUi {
     }
   }
 
-  /// 鼠标事件：hover 聚焦、左键确认。
+  /// 处理鼠标事件（移动、点击、右键返回）。
   pub fn handle_mouse_event(
     &mut self,
     event: &MouseEvent,
@@ -197,8 +195,7 @@ impl TerminalCheckUi {
     None
   }
 
-  // ── 渲染 ──
-
+  /// 根据当前步骤渲染对应内容。
   pub fn render(
     &self,
     render: &mut RenderService,
@@ -214,6 +211,7 @@ impl TerminalCheckUi {
     }
   }
 
+  /// 根据当前步骤计算布局信息。
   pub fn compute_positions(
     &self,
     layout: &LayoutService,
@@ -226,8 +224,6 @@ impl TerminalCheckUi {
       _ => self.compute_placeholder_positions(layout),
     }
   }
-
-  // ── Unicode 步骤 ──
 
   fn compute_unicode_positions(
     &self,
@@ -253,7 +249,7 @@ impl TerminalCheckUi {
     let hint_y = term_h.saturating_sub(1);
 
     let title_x = centered_x(layout, &title);
-    // hint 的 {key:} 需要用 params 展开后量宽度，否则 x 位置偏左
+
     let hint_w = layout.get_text_width(&hint, Some(&key_params));
     let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
 
@@ -263,8 +259,6 @@ impl TerminalCheckUi {
       .collect();
     let option_xs: Vec<u16> = option_texts.iter().map(|t| centered_x(layout, t)).collect();
     let options_height = UNICODE_OPTIONS as u16;
-
-    // 选项在 title 和 hint 之间垂直居中
     let available = hint_y.saturating_sub(title_y).saturating_sub(1);
     let option_start_y = if available > options_height {
       title_y
@@ -273,8 +267,6 @@ impl TerminalCheckUi {
     } else {
       title_y.saturating_add(1)
     };
-
-    // tip / sample 相对选项向上 1 行和 2 行
     let sample_y = option_start_y.saturating_sub(2);
     let tip_y = option_start_y.saturating_sub(4);
 
@@ -328,8 +320,6 @@ impl TerminalCheckUi {
       i18n.get_runtime_text("terminal", "terminal.action.confirm"),
       i18n.get_runtime_text("terminal", "terminal.action.exit"),
     );
-
-    // title
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -339,8 +329,6 @@ impl TerminalCheckUi {
         ..Default::default()
       },
     );
-
-    // tip
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -350,8 +338,6 @@ impl TerminalCheckUi {
         ..Default::default()
       },
     );
-
-    // sample
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -361,8 +347,6 @@ impl TerminalCheckUi {
         ..Default::default()
       },
     );
-
-    // options
     let option_names: [&str; UNICODE_OPTIONS] = [&yes_text, &no_text];
     let option_texts: Vec<String> = (0..UNICODE_OPTIONS)
       .map(|i| self.option_display_name(&option_names, i))
@@ -388,8 +372,6 @@ impl TerminalCheckUi {
         },
       );
     }
-
-    // hint
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -401,8 +383,6 @@ impl TerminalCheckUi {
       },
     );
   }
-
-  // ── 色彩步骤 ──
 
   fn compute_color_positions(
     &self,
@@ -430,26 +410,18 @@ impl TerminalCheckUi {
     let title_x = centered_x(layout, &title);
     let hint_w = layout.get_text_width(&hint, Some(&key_params));
     let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
-
-    // 选项
     let option_names: [&str; COLOR_OPTIONS] = [&yes_text, &no256_text, &no_other_text];
     let option_texts: Vec<String> = (0..COLOR_OPTIONS)
       .map(|i| self.option_display_name(&option_names, i))
       .collect();
     let option_xs: Vec<u16> = option_texts.iter().map(|t| centered_x(layout, t)).collect();
     let options_height = COLOR_OPTIONS as u16;
-
-    // tip 行
     let tip = i18n.get_runtime_text("terminal", "terminal.truecolor.tip");
     let tip_x = centered_x(layout, &tip);
-
-    // 色带区域：tip + 空行 + BAND_ROWS + 空行 = 1 + 1 + 3 + 1 = 6 行
     let band_block_height: u16 = 1 + 1 + BAND_ROWS + 1;
-
-    // 色带块 + 选项整体在 title 和 hint 之间垂直居中
     let total_content = band_block_height
       .saturating_add(1)
-      .saturating_add(options_height); // +1 gap
+      .saturating_add(options_height);
     let available = hint_y.saturating_sub(title_y).saturating_sub(1);
     let content_start_y = if available > total_content {
       title_y
@@ -460,8 +432,8 @@ impl TerminalCheckUi {
     };
 
     let tip_y = content_start_y;
-    let band_y = tip_y.saturating_add(2); // tip + 空行
-    let option_start_y = band_y.saturating_add(BAND_ROWS).saturating_add(1); // band + 空行
+    let band_y = tip_y.saturating_add(2);
+    let option_start_y = band_y.saturating_add(BAND_ROWS).saturating_add(1);
 
     let option_widths: Vec<u16> = option_texts
       .iter()
@@ -511,8 +483,6 @@ impl TerminalCheckUi {
       i18n.get_runtime_text("terminal", "terminal.action.confirm"),
       i18n.get_runtime_text("terminal", "terminal.action.exit"),
     );
-
-    // title
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -522,8 +492,6 @@ impl TerminalCheckUi {
         ..Default::default()
       },
     );
-
-    // tip — 黄色
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -533,8 +501,6 @@ impl TerminalCheckUi {
         ..Default::default()
       },
     );
-
-    // 色带
     let term_w = layout.physical_size().width;
     let left = term_w * BAND_LEFT_PCT / 100;
     let right = term_w * BAND_RIGHT_PCT / 100;
@@ -559,8 +525,6 @@ impl TerminalCheckUi {
         );
       }
     }
-
-    // 选项
     let option_names: [&str; COLOR_OPTIONS] = [&yes_text, &no256_text, &no_other_text];
     let option_texts: Vec<String> = (0..COLOR_OPTIONS)
       .map(|i| self.option_display_name(&option_names, i))
@@ -586,8 +550,6 @@ impl TerminalCheckUi {
         },
       );
     }
-
-    // hint
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -599,8 +561,6 @@ impl TerminalCheckUi {
       },
     );
   }
-
-  // ── 占位 ──
 
   fn compute_placeholder_positions(&self, layout: &LayoutService) -> TerminalCheckLayout {
     let title = "---";
@@ -654,8 +614,6 @@ impl TerminalCheckUi {
     );
   }
 
-  // ── 鼠标步骤 ──
-
   fn compute_mouse_positions(
     &self,
     layout: &LayoutService,
@@ -680,13 +638,9 @@ impl TerminalCheckUi {
     let title_x = centered_x(layout, &title);
     let hint_w = layout.get_text_width(&hint, Some(&key_params));
     let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
-
-    // 矩形框：tip 宽度 + 左右内边距 + 左右边框
     let tip_w = layout.get_text_width(&tip, None);
     let box_w = tip_w + MOUSE_BOX_PADDING * 2 + 2;
     let box_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, box_w, 0);
-
-    // 垂直居中（title 与 hint 之间）
     let available = hint_y.saturating_sub(title_y).saturating_sub(5);
     let box_y = if available > MOUSE_BOX_HEIGHT {
       title_y
@@ -699,8 +653,6 @@ impl TerminalCheckUi {
     let tip_x = box_x + 1 + MOUSE_BOX_PADDING;
     let tip_y = box_y + (MOUSE_BOX_HEIGHT - 1) / 2;
 
-    // "不支持" 选项（index 1），在矩形下方一行
-    // 聚焦时显示 ❯ 不支持 ❮，非聚焦时纯文本
     let no_display = if self.selected_index == 1 {
       format!("❯ {} ❮", no_text)
     } else {
@@ -757,8 +709,6 @@ impl TerminalCheckUi {
       i18n.get_runtime_text("terminal", "terminal.action.confirm"),
       i18n.get_runtime_text("terminal", "terminal.action.exit"),
     );
-
-    // title
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -768,8 +718,6 @@ impl TerminalCheckUi {
         ..Default::default()
       },
     );
-
-    // 聚焦颜色：矩形聚焦=亮青，"不支持"聚焦=白色
     let rect_focused = self.selected_index == 0;
     let border_fg = if rect_focused {
       TextColor::Terminal(crate::host_engine::services::TerminalColor::BrightCyan)
@@ -783,8 +731,6 @@ impl TerminalCheckUi {
     } else {
       None
     };
-
-    // 边框矩形
     render.draw_host_border_rect(
       canvas,
       positions.option_rects[0].x,
@@ -797,8 +743,6 @@ impl TerminalCheckUi {
       None,
       None,
     );
-
-    // tip 文本（矩形内部居中，颜色跟随边框）
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -809,8 +753,6 @@ impl TerminalCheckUi {
         ..Default::default()
       },
     );
-
-    // "不支持" 选项：聚焦=亮青+箭头，否则=白字
     let no_display = if self.selected_index == 1 {
       format!("❯ {} ❮", no_text)
     } else {
@@ -830,8 +772,6 @@ impl TerminalCheckUi {
         ..Default::default()
       },
     );
-
-    // hint
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -844,8 +784,6 @@ impl TerminalCheckUi {
     );
   }
 
-  // ── 内部辅助 ──
-
   fn option_count(&self) -> usize {
     match self.step {
       STEP_UNICODE => UNICODE_OPTIONS,
@@ -855,7 +793,6 @@ impl TerminalCheckUi {
     }
   }
 
-  /// 选项显示名（选中带箭头，非选中等宽占位）。
   fn option_display_name(&self, names: &[&str], index: usize) -> String {
     let name = names[index];
     if index == self.selected_index {
@@ -869,10 +806,10 @@ impl TerminalCheckUi {
     match self.step {
       STEP_UNICODE => {
         if self.selected_index == 0 {
-          // "支持" → 通过
+
           Some(TerminalCheckCommand::Next)
         } else {
-          // "不支持" → 退出
+
           Some(TerminalCheckCommand::Exit)
         }
       }
@@ -889,22 +826,21 @@ impl TerminalCheckUi {
     }
   }
 
-  /// 该选项确认后是否会导致退出（用于聚焦时红色高亮）。
   fn is_exit_option(&self, index: usize) -> bool {
     match self.step {
-      STEP_UNICODE => index == 1, // "No" → Exit
-      STEP_COLOR => index == 2,   // "Less Than 256" → Exit
+      STEP_UNICODE => index == 1,
+      STEP_COLOR => index == 2,
       _ => false,
     }
   }
 
-  /// 应用 Next 命令时步进到下一步，自动应用检测结果预选项。
+  /// 进入下一个检测步骤。
   pub fn advance_step(&mut self) {
     self.step += 1;
     self.apply_detection();
   }
 
-  /// 持久化当前步骤的检测结果到 profile。
+  /// 将当前步骤的检测结果持久化到终端配置文件。
   pub fn persist_current_step(&self, storage: &mut StorageService) {
     match self.step {
       STEP_UNICODE => {
@@ -947,13 +883,11 @@ impl TerminalCheckUi {
   }
 }
 
-/// 便捷函数：计算文本水平居中的 x 起始坐标。
 fn centered_x(layout: &LayoutService, text: &str) -> u16 {
   let w = layout.get_text_width(text, None);
   layout.resolve_host_x(LayoutService::ALIGN_CENTER, w, 0)
 }
 
-/// 彩虹色带插值。t ∈ [0, 1]，在红橙黄绿青蓝紫之间平滑过渡。
 fn rainbow_at(t: f32) -> (u8, u8, u8) {
   let t = t.clamp(0.0, 1.0);
   let segments = (RAINBOW.len() - 1) as f32;

@@ -17,9 +17,11 @@ use super::{
 const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 const DRAG_SCROLL_INTERVAL: Duration = Duration::from_millis(100);
 
+/// 文本输入组件的唯一标识符。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TextInputId(pub u64);
 
+/// 文本输入模式：单行或多行。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextInputMode {
   #[default]
@@ -27,6 +29,7 @@ pub enum TextInputMode {
   MultiLine,
 }
 
+/// 垂直对齐方式。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum VerticalAlign {
   #[default]
@@ -35,6 +38,7 @@ pub enum VerticalAlign {
   Bottom,
 }
 
+/// 光标形状。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextInputCursorShape {
   #[default]
@@ -44,6 +48,7 @@ pub enum TextInputCursorShape {
   Line,
 }
 
+/// 文本输入组件创建选项。
 #[derive(Clone, Debug, Default)]
 pub struct TextInputOptions {
   pub initial_text: String,
@@ -52,6 +57,7 @@ pub struct TextInputOptions {
   pub mouse: bool,
 }
 
+/// 文本输入组件的渲染参数。
 #[derive(Clone, Debug)]
 pub struct TextInputRenderParams {
   pub rect: Rect,
@@ -85,6 +91,7 @@ impl Default for TextInputRenderParams {
   }
 }
 
+/// 文本输入组件事件。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TextInputEvent {
   Focused { id: TextInputId },
@@ -119,10 +126,12 @@ struct TextInputState {
   mode: TextInputMode,
   mouse: bool,
   hit: Option<HitSnapshot>,
+
   pending_cursor: Option<(usize, usize)>,
   visual_line: Option<usize>,
 }
 
+/// UI 对象池中文本输入组件的集合。
 pub(crate) struct TextInputObjects {
   next_input_id: u64,
   inputs: HashMap<TextInputId, TextInputState>,
@@ -136,6 +145,7 @@ impl TextInputObjects {
     }
   }
 
+  /// 清除所有输入组件的命中区域缓存（每帧开始时调用）。
   pub(crate) fn clear_hits(&mut self) {
     for state in self.inputs.values_mut() {
       state.hit = None;
@@ -161,6 +171,7 @@ struct DragSelection {
   last_scroll: Instant,
 }
 
+/// 文本输入服务：管理输入焦点、光标、选区、键盘和鼠标路由及渲染。
 pub struct TextInputService {
   active: TextInputActive,
   drag: Option<DragSelection>,
@@ -176,6 +187,7 @@ impl TextInputService {
     }
   }
 
+  /// 在对象池中创建一个新的文本输入组件。
   pub fn create(&self, pool: &mut UiObjectPool, options: TextInputOptions) -> TextInputId {
     let objects = &mut pool.text_inputs;
     let id = TextInputId(objects.next_input_id);
@@ -194,6 +206,7 @@ impl TextInputService {
     id
   }
 
+  /// 移除文本输入组件（已聚焦时不允许移除）。
   pub fn remove(&mut self, pool: &mut UiObjectPool, id: TextInputId) -> bool {
     if self.is_focused(pool, id) {
       return false;
@@ -207,6 +220,7 @@ impl TextInputService {
     removed
   }
 
+  /// 渲染文本输入组件到基础层，返回光标物理坐标。
   pub fn render(
     &self,
     pool: &mut UiObjectPool,
@@ -217,6 +231,7 @@ impl TextInputService {
     self.render_target(pool, id, params, canvas, TextSurface::Base)
   }
 
+  /// 渲染文本输入组件到指定切片，返回光标物理坐标。
   pub fn render_on(
     &self,
     pool: &mut UiObjectPool,
@@ -228,6 +243,7 @@ impl TextInputService {
     self.render_target(pool, id, params, canvas, TextSurface::Slice(slice))
   }
 
+  /// 渲染文本输入组件到宿主层。
   pub(crate) fn render_host(
     &self,
     pool: &mut UiObjectPool,
@@ -301,6 +317,7 @@ impl TextInputService {
     result.map(|(x, y)| (origin.0.saturating_add(x), origin.1.saturating_add(y)))
   }
 
+  /// 聚焦指定文本输入组件，若之前有点击暂存则移动光标到该位置。
   pub fn focus(&mut self, pool: &mut UiObjectPool, id: TextInputId) -> bool {
     if self.active != TextInputActive::Inactive || !self.exists(pool, id) {
       return false;
@@ -319,6 +336,7 @@ impl TextInputService {
     true
   }
 
+  /// 取消当前焦点。
   pub fn blur(&mut self, pool: &mut UiObjectPool) -> bool {
     let TextInputActive::Focused(active) = self.active else {
       return false;
@@ -374,6 +392,7 @@ impl TextInputService {
       .and_then(|state| state.buffer.selection())
   }
 
+  /// 设置输入框文本内容，触发 Changed 事件。
   pub fn set_text(
     &self,
     pool: &mut UiObjectPool,
@@ -396,6 +415,7 @@ impl TextInputService {
     self.set_text(pool, id, String::new())
   }
 
+  /// 查找鼠标坐标下可命中的输入组件，返回（层级, 渲染顺序）用于排序。
   pub(crate) fn mouse_hit_order(
     &self,
     pool: &UiObjectPool,
@@ -416,6 +436,7 @@ impl TextInputService {
       .max()
   }
 
+  /// 向当前聚焦的输入组件发送"外部按下"事件。
   pub(crate) fn push_pressed_outside(&self, pool: &mut UiObjectPool) {
     let TextInputActive::Focused(active) = self.active else {
       return;
@@ -433,6 +454,7 @@ impl TextInputService {
     }
   }
 
+  /// 反激活指定对象池的命中区域和拖拽选区。
   pub(crate) fn deactivate_pool(&mut self, pool: &mut UiObjectPool) {
     pool.text_inputs.clear_hits();
     if self
@@ -444,6 +466,7 @@ impl TextInputService {
     }
   }
 
+  /// 将终端按键事件路由到当前聚焦的输入组件，执行编辑操作。
   pub(crate) fn route_terminal_key(
     &mut self,
     pool: &mut UiObjectPool,
@@ -536,6 +559,7 @@ impl TextInputService {
     }
   }
 
+  /// 将鼠标事件路由到对应输入组件，处理点击聚焦和拖拽选区。
   pub(crate) fn route_mouse_event(&mut self, pool: &mut UiObjectPool, event: MouseEvent) -> bool {
     if event.button != Some(MouseButton::Left) && event.kind != MouseEventKind::Hold {
       if event.kind == MouseEventKind::Release {
@@ -1061,6 +1085,7 @@ fn input_text_style(params: &TextInputRenderParams) -> TextStyle {
     ..params.text_style.clone()
   }
 }
+
 fn input_placeholder_style(params: &TextInputRenderParams) -> TextStyle {
   TextStyle {
     foreground: params.placeholder_fg.clone(),
@@ -1068,12 +1093,14 @@ fn input_placeholder_style(params: &TextInputRenderParams) -> TextStyle {
     ..params.placeholder_style.clone()
   }
 }
+
 fn input_cursor_style(params: &TextInputRenderParams) -> TextStyle {
   TextStyle {
     background: params.bg.clone(),
     ..params.cursor_style.clone()
   }
 }
+
 fn reversed_text_style(params: &TextInputRenderParams) -> TextStyle {
   let mut style = input_text_style(params);
   style.reverse = !style.reverse;

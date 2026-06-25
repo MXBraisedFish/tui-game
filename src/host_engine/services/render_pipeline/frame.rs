@@ -1,11 +1,13 @@
 use crate::host_engine::services::CanvasCell;
 
+/// 合成后的单元：要么为空，要么包含一个已着色的 CanvasCell。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ComposedCell {
   Empty,
   Text(CanvasCell),
 }
 
+/// 合成后的帧缓冲区，用于最终输出到终端。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ComposedFrame {
   width: u16,
@@ -14,6 +16,7 @@ pub struct ComposedFrame {
 }
 
 impl ComposedFrame {
+
   pub fn new(width: u16, height: u16) -> Self {
     let len = width as usize * height as usize;
     Self {
@@ -45,6 +48,7 @@ impl ComposedFrame {
     }
   }
 
+  /// 返回一个标准空白文本单元格，用于初始化帧。
   pub fn blank_text_cell() -> CanvasCell {
     CanvasCell::blank()
   }

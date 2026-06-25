@@ -4,18 +4,22 @@ use crate::host_engine::services::{
   RichTextParams, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
+/// 窗口尺寸警告 UI：当终端窗口小于最低要求时显示提示信息。
 pub struct WindowSizeWarningUi {
   objects: UiObjectPool,
   area: HitAreaId,
 }
 
 impl WindowSizeWarningUi {
+
+  /// 初始化窗口尺寸警告 UI。
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     let area = hit_area.create(&mut objects, HitAreaOptions::default());
     Self { objects, area }
   }
 
+  /// 返回警告页面的按键映射定义。
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![ActionMapEntry {
       action: "window_size.exit".to_string(),
@@ -24,6 +28,7 @@ impl WindowSizeWarningUi {
     }]
   }
 
+  /// 处理 UI 事件。
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<WindowSizeWarningCommand> {
     match event {
       UiEvent::Action(event)
@@ -39,6 +44,7 @@ impl WindowSizeWarningUi {
     }
   }
 
+  /// 渲染窗口尺寸警告信息到宿主层。
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
@@ -88,8 +94,7 @@ impl UiObjectPoolOwner for WindowSizeWarningUi {
   }
 }
 
-// ── 布局 ──
-
+/// 窗口尺寸警告页面的布局信息。
 pub(crate) struct WindowSizeWarningLayout {
   pub title_x: u16,
   pub title_y: u16,
@@ -103,16 +108,13 @@ pub(crate) struct WindowSizeWarningLayout {
   pub hint_y: u16,
 }
 
-// ── 命令 ──
-
+/// 窗口尺寸警告页面的命令。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WindowSizeWarningCommand {
   Exit,
 }
 
-// ── 布局计算 ──
-
-/// 计算所有文本的像素位置。无副作用。
+/// 计算窗口尺寸警告页面的布局信息。
 pub fn compute_positions(
   layout: &LayoutService,
   i18n: &I18nService,
@@ -135,8 +137,6 @@ pub fn compute_positions(
   let hint_y = term_h.saturating_sub(1);
 
   let title_x = centered_x(layout, &title);
-
-  // 内容块：tip + required + current，共 3 行，在 title 和 hint 之间垂直居中
   let content_lines: u16 = 3;
   let available = hint_y.saturating_sub(title_y).saturating_sub(1);
   let content_start_y = if available > content_lines {
@@ -153,12 +153,10 @@ pub fn compute_positions(
   let required_y = content_start_y + 1;
   let current_x = centered_x(layout, &current_line);
   let current_y = content_start_y + 2;
-
-  // hint 需要用 params 展开 {key:} 后量宽度
   let key_params = build_key_params();
   let hint_host = i18n.get_runtime_text("window_size", "window_size.action.exit.host");
   let hint_game = i18n.get_runtime_text("window_size", "window_size.action.exit.game");
-  // 取两者中较宽的用于布局（确保切换语言时不偏移）
+
   let hint_w_host = layout.get_text_width(&hint_host, Some(&key_params));
   let hint_w_game = layout.get_text_width(&hint_game, Some(&key_params));
   let hint_w = hint_w_host.max(hint_w_game);
@@ -179,9 +177,6 @@ pub fn compute_positions(
   }
 }
 
-// ── 渲染 ──
-
-/// 绘制窗口尺寸警告界面。
 #[allow(clippy::too_many_arguments)]
 fn draw_content(
   render: &mut RenderService,
@@ -217,8 +212,6 @@ fn draw_content(
 
   let required_line = format!("{}{}×{}", required_prefix, required_width, required_height);
   let current_line = format!("{}{}×{}", current_prefix, current_width, current_height);
-
-  // title — bright_magenta + bold
   render.draw_host_text(
     canvas,
     &DrawTextParams {
@@ -228,8 +221,6 @@ fn draw_content(
       ..Default::default()
     },
   );
-
-  // tip
   render.draw_host_text(
     canvas,
     &DrawTextParams {
@@ -239,8 +230,6 @@ fn draw_content(
       ..Default::default()
     },
   );
-
-  // required — yellow
   render.draw_host_text(
     canvas,
     &DrawTextParams {
@@ -250,8 +239,6 @@ fn draw_content(
       ..Default::default()
     },
   );
-
-  // current — red
   render.draw_host_text(
     canvas,
     &DrawTextParams {
@@ -261,8 +248,6 @@ fn draw_content(
       ..Default::default()
     },
   );
-
-  // hint
   render.draw_host_text(
     canvas,
     &DrawTextParams {
@@ -274,8 +259,6 @@ fn draw_content(
     },
   );
 }
-
-// ── 内部辅助 ──
 
 fn build_key_params() -> RichTextParams {
   RichTextParams::from_action_map(&WindowSizeWarningUi::action_map(), "window_size.")

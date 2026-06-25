@@ -1,11 +1,6 @@
 use std::time::{Duration, Instant};
 
-/// 世界运行时时钟。
-///
-/// 职责：
-/// - 记录世界总运行时间
-/// - 记录帧间隔时间
-/// - 向 update(dt) 提供 dt
+/// 引擎时钟，追踪帧时间增量与运行时长
 pub struct EngineClock {
   epoch: Instant,
   last_tick: Instant,
@@ -23,19 +18,17 @@ impl EngineClock {
     }
   }
 
-  /// 记录自上次 tick 以来经过的时间
+  /// 记录一次时钟滴答，更新上一帧到当前帧的时间增量
   pub fn tick(&mut self) {
     let now = Instant::now();
     self.dt = now.duration_since(self.last_tick);
     self.last_tick = now;
   }
 
-  /// 获取当前帧的时间增量
   pub fn delta_time(&self) -> Duration {
     self.dt
   }
 
-  /// 获取自时钟创建以来经过的总时间
   pub fn elapsed(&self) -> Duration {
     self.epoch.elapsed()
   }

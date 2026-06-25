@@ -1,31 +1,29 @@
-// 文本样式
+
+/// 终端文本样式：包含前景色、背景色及各种文本修饰属性。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TextStyle {
-  pub foreground: Option<TextColor>, // 前景颜色
-  pub background: Option<TextColor>, // 背景颜色
-  pub bold: bool,                    // 加粗
-  pub italic: bool,                  // 斜体
-  pub underline: bool,               // 下划线
-  pub strike: bool,                  // 删除线
-  pub blink: bool,                   // 闪烁
-  pub reverse: bool,                 // 反转
-  pub hidden: bool,                  // 隐藏
-  pub dim: bool,                     // 变暗
+  pub foreground: Option<TextColor>,
+  pub background: Option<TextColor>,
+  pub bold: bool,
+  pub italic: bool,
+  pub underline: bool,
+  pub strike: bool,
+  pub blink: bool,
+  pub reverse: bool,
+  pub hidden: bool,
+  pub dim: bool,
 }
 
-// 颜色
+/// 文本颜色：终端色、RGB 真彩色或透明。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TextColor {
   Terminal(TerminalColor),
   Rgb { r: u8, g: u8, b: u8 },
-  /// 透明：不覆盖画布上已有的背景色，继承底层颜色。
-  ///
-  /// 仅对 [`TextStyle::background`] 有意义；前景色使用 `Transparent` 等效于
-  /// [`None`]，不设置前景色。
+
   Transparent,
 }
 
-// 终端默认16色
+/// ANSI 16 色终端颜色枚举。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TerminalColor {
   Black,
@@ -47,7 +45,8 @@ pub enum TerminalColor {
 }
 
 impl TextStyle {
-  // 将样式标记为启用
+
+  /// 按标签名启用一种文本修饰（如 "bold"、"italic" 等），返回是否识别成功。
   pub fn enable_style(&mut self, tag: &str) -> bool {
     match tag {
       "bold" | "b" => self.bold = true,
@@ -63,7 +62,7 @@ impl TextStyle {
     true
   }
 
-  // 将样式标记为关闭
+  /// 按标签名禁用一个文本修饰，返回是否识别成功。
   pub fn disable_style(&mut self, tag: &str) -> bool {
     match tag {
       "bold" | "b" => self.bold = false,
@@ -79,27 +78,23 @@ impl TextStyle {
     true
   }
 
-  // 设置前景色
   pub fn set_foreground(&mut self, color: TextColor) {
     self.foreground = Some(color);
   }
 
-  // 清理前景色
   pub fn clear_foreground(&mut self) {
     self.foreground = None;
   }
 
-  // 设置背景色
   pub fn set_background(&mut self, color: TextColor) {
     self.background = Some(color);
   }
 
-  // 清理背景色
   pub fn clear_background(&mut self) {
     self.background = None;
   }
 
-  // 重置
+  /// 将样式重置为默认值。
   pub fn reset(&mut self) {
     *self = Self::default();
   }

@@ -10,15 +10,15 @@ use crate::host_engine::services::{
   TerminalColor, TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
-// ── 常量 ──
-
 const GRID_START_Y: u16 = 3;
+
 const CELL_HEIGHT: u16 = 3;
-const MIN_CELL_WIDTH: u16 = 14; // 12 + 2（左右边框各占1格）
+
+const MIN_CELL_WIDTH: u16 = 14;
+
 const MAX_NAME_LEN: u16 = 20;
 
-// ── 布局 ──
-
+/// 语言选择页面布局信息。
 pub(crate) struct LanguageSelectLayout {
   title_x: u16,
   title_y: u16,
@@ -34,15 +34,14 @@ pub(crate) struct LanguageSelectLayout {
   hint_y: u16,
 }
 
-// ── UI ──
-
+/// 语言选择 UI：以网格形式展示可用的语言包，支持翻页和键盘/鼠标导航。
 pub struct LanguageSelectUi {
   selected_index: usize,
   page: usize,
   registry: Vec<LanguageRegistryEntry>,
   runtime_cache: HashMap<String, HashMap<String, String>>,
   active_code: String,
-  /// 缓存最近一次布局计算的列数、每页条数（Cell 允许 &self 写入）
+
   columns: Cell<usize>,
   per_page: Cell<usize>,
   objects: UiObjectPool,
@@ -60,6 +59,7 @@ impl UiObjectPoolOwner for LanguageSelectUi {
   }
 }
 
+/// 语言选择页面的命令。
 #[derive(Clone, Debug)]
 pub enum LanguageSelectCommand {
   Confirm(String),
@@ -67,6 +67,7 @@ pub enum LanguageSelectCommand {
 }
 
 impl LanguageSelectUi {
+  /// 初始化语言选择页面：加载语言注册表、预加载运行时文本缓存。
   pub fn init(
     mut registry: Vec<LanguageRegistryEntry>,
     storage: &StorageService,
@@ -104,8 +105,6 @@ impl LanguageSelectUi {
       cell_areas,
     }
   }
-
-  // ── 运行时文本缓存 ──
 
   fn preload_runtime_cache(
     storage: &StorageService,
@@ -156,8 +155,7 @@ impl LanguageSelectUi {
       .clamp(1, pages);
   }
 
-  // ── 输入绑定 ──
-
+  /// 返回语言选择页面的按键映射定义。
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -203,8 +201,7 @@ impl LanguageSelectUi {
     ]
   }
 
-  // ── 输入处理 ──
-
+  /// 处理 UI 事件，返回语言确认或返回命令。
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<LanguageSelectCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -263,8 +260,7 @@ impl LanguageSelectUi {
     None
   }
 
-  // ── 渲染 ──
-
+  /// 渲染语言选择页面到宿主层。
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -297,11 +293,10 @@ impl LanguageSelectUi {
     }
   }
 
+  /// 根据布局服务计算语言选择页面各元素的宿主坐标。
   pub fn compute_positions(&self, layout: &LayoutService) -> LanguageSelectLayout {
     let term_w = layout.physical_size().width;
     let term_h = layout.physical_size().height;
-
-    // 名称宽度（MAX_NAME_LEN 截断）
     let name_widths: Vec<u16> = self
       .registry
       .iter()
@@ -322,17 +317,13 @@ impl LanguageSelectUi {
       .copied()
       .unwrap_or(MIN_CELL_WIDTH - 2)
       .max(MIN_CELL_WIDTH - 2);
-    // cell_width = 文字宽度 + 2（左右边框各占1列）
-    let cell_width = max_name_w + 2;
 
-    // 网格
+    let cell_width = max_name_w + 2;
     let grid_available_h = term_h.saturating_sub(GRID_START_Y).saturating_sub(4);
     let rows = (grid_available_h / CELL_HEIGHT).max(1) as usize;
     let columns = (term_w / cell_width).max(1) as usize;
     let per_page = columns * rows;
     let pages = self.registry.len().max(1).div_ceil(per_page).max(1);
-
-    // 回写供导航用
     self.columns.set(columns);
     self.per_page.set(per_page);
 
@@ -357,25 +348,19 @@ impl LanguageSelectUi {
         width: cell_width,
         height: CELL_HEIGHT,
       });
-      // 文字缩进 1 列（避开左边框 │），在剩余空间内居中
+
       let nw = name_widths[page_start + vi];
       let inner_w = cell_width.saturating_sub(2);
       let tx = cx + 1 + (inner_w.saturating_sub(nw)) / 2;
       cell_text_xs.push(tx);
     }
-
-    // 标题
     let title = self.get_text("language.title");
     let title_w = layout.get_text_width(&title, None);
     let title_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, title_w, 0);
-
-    // 翻页行
     let page_y = term_h.saturating_sub(3);
     let page_center = term_w / 2;
     let flip_forward_x = 0u16;
     let flip_backward_max_x = term_w;
-
-    // hint
     let key_params = self.build_key_params();
     let hint = format!(
       "{}  {}  {}  {}",
@@ -404,9 +389,6 @@ impl LanguageSelectUi {
     }
   }
 
-  // ── 导航 ──
-
-  /// 当前页内的边界。
   fn page_bounds(&self) -> (usize, usize, usize, usize) {
     let per_page = self.per_page.get();
     let cols = self.columns.get();
@@ -426,15 +408,12 @@ impl LanguageSelectUi {
     let col = self.selected_index % cols;
 
     if self.selected_index >= start + cols {
-      // 本页内上方有格子
       self.selected_index -= cols;
     } else if self.page > 1 {
-      // 跨到上一页同列
       self.page -= 1;
       let (prev_start, prev_end, prev_cols, _) = self.page_bounds();
       self.selected_index = (prev_start + col).min(prev_end - 1);
     }
-    // 已在第一页第一行：不动
   }
 
   fn focus_down(&mut self) {
@@ -448,12 +427,10 @@ impl LanguageSelectUi {
     if candidate < end {
       self.selected_index = candidate;
     } else if self.page < pages {
-      // 跨到下一页同列
       self.page += 1;
       let (next_start, next_end, _, _) = self.page_bounds();
       self.selected_index = (next_start + col).min(next_end - 1);
     }
-    // 已在最后一页最后一行：不动
   }
 
   fn focus_left(&mut self) {
@@ -464,15 +441,12 @@ impl LanguageSelectUi {
     let col = self.selected_index % cols;
 
     if col > 0 {
-      // 本行内左移
       self.selected_index -= 1;
     } else if self.page > 1 {
-      // 跨到上一页最右列
       self.page -= 1;
       let (prev_start, prev_end, _, _) = self.page_bounds();
       self.selected_index = prev_end - 1;
     }
-    // 已在第一页第一列：不动
   }
 
   fn focus_right(&mut self) {
@@ -483,15 +457,12 @@ impl LanguageSelectUi {
     let col = self.selected_index % cols;
 
     if col + 1 < cols && self.selected_index + 1 < end {
-      // 本行内右移
       self.selected_index += 1;
     } else if self.page < pages {
-      // 跨到下一页第一列
       self.page += 1;
       let (next_start, _, _, _) = self.page_bounds();
       self.selected_index = next_start;
     }
-    // 已在最后一页最后一列且是最后一个 item：不动
   }
 
   fn flip_page(&mut self, forward: bool) -> Option<LanguageSelectCommand> {
@@ -513,8 +484,6 @@ impl LanguageSelectUi {
     }
     None
   }
-
-  // ── 键参数（桥接 language.* → language_select.*） ──
 
   fn build_key_params(&self) -> RichTextParams {
     let action_map = Self::action_map();
@@ -543,8 +512,6 @@ impl LanguageSelectUi {
     }
   }
 
-  // ── 绘制 ──
-
   fn draw_content(
     &self,
     render: &mut RenderService,
@@ -553,8 +520,6 @@ impl LanguageSelectUi {
     pos: &LanguageSelectLayout,
   ) {
     let key_params = self.build_key_params();
-
-    // 标题
     let title = self.get_text("language.title");
     render.draw_host_text(
       canvas,
@@ -565,8 +530,6 @@ impl LanguageSelectUi {
         ..Default::default()
       },
     );
-
-    // 网格
     for vi in 0..pos.cell_rects.len() {
       let gi = pos.page_start + vi;
       let entry = &self.registry[gi];
@@ -580,8 +543,6 @@ impl LanguageSelectUi {
       } else {
         TextColor::Terminal(TerminalColor::White)
       };
-
-      // 聚焦格子先绘制外框，文本再盖在上面
       if is_focused {
         let r = &pos.cell_rects[vi];
         render.draw_host_border_rect(
@@ -612,8 +573,6 @@ impl LanguageSelectUi {
         },
       );
     }
-
-    // 页指示符：| 位于绝对中心
     let cur_str = self.page.to_string();
     let tot_str = pos.pages.to_string();
     let cur_x = pos.page_center.saturating_sub(cur_str.len() as u16);
@@ -647,8 +606,6 @@ impl LanguageSelectUi {
         ..Default::default()
       },
     );
-
-    // 翻页提示
     if self.page > 1 {
       let fwd = self.get_text("language.flip.forward");
       render.draw_host_text(
@@ -677,8 +634,6 @@ impl LanguageSelectUi {
         },
       );
     }
-
-    // hint
     let hint = format!(
       "{}  {}  {}  {}",
       self.get_text("language.action.focus"),

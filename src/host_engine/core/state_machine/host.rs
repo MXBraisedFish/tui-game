@@ -1,11 +1,11 @@
 use super::UiTreeState;
 
+/// Host 界面状态，持有 UI 树
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostState {
   pub ui_tree: UiTreeState,
 }
 
-// 宿主状态
 impl HostState {
   pub fn new() -> Self {
     Self {

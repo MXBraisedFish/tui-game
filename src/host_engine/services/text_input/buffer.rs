@@ -4,12 +4,14 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use super::TextInputMode;
 
+/// 文本缓冲区：管理文本内容、光标位置、选区，所有操作以字素（grapheme）为边界。
 pub(super) struct TextBuffer {
   text: String,
   cursor: usize,
   anchor: Option<usize>,
   max_graphemes: Option<usize>,
   mode: TextInputMode,
+
   preferred_column: Option<usize>,
 }
 
@@ -32,6 +34,7 @@ impl TextBuffer {
     &self.text
   }
 
+  /// 替换全部文本，自动规范化和截断，返回是否实际变化。
   pub fn set_text(&mut self, text: String) -> bool {
     let text = truncate_graphemes(normalize(text, self.mode), self.max_graphemes);
     let changed = self.text != text;
@@ -59,6 +62,7 @@ impl TextBuffer {
     self.selection().map(|range| &self.text[range])
   }
 
+  /// 全选文本，返回是否实际改变了选区。
   pub fn select_all(&mut self) -> bool {
     if self.text.is_empty() || self.selection() == Some(0..self.text.len()) {
       return false;
@@ -69,6 +73,7 @@ impl TextBuffer {
     true
   }
 
+  /// 设置光标到最近的合法边界，可选扩展选区。
   pub fn set_cursor(&mut self, cursor: usize, extend: bool) -> bool {
     let cursor = self.closest_boundary(cursor);
     if cursor == self.cursor {
@@ -89,12 +94,14 @@ impl TextBuffer {
     true
   }
 
+  /// 插入单个字符（控制字符被忽略）。
   pub fn insert_char(&mut self, ch: char) -> bool {
     (!ch.is_control())
       .then(|| ch.to_string())
       .is_some_and(|text| self.insert(&text))
   }
 
+  /// 插入文本字符串，自动规范化处理。
   pub fn insert_text(&mut self, text: &str) -> bool {
     let text = normalize(text.to_string(), self.mode);
     if text.is_empty() {
@@ -103,10 +110,12 @@ impl TextBuffer {
     self.insert(&text)
   }
 
+  /// 插入换行符（仅多行模式有效）。
   pub fn insert_newline(&mut self) -> bool {
     self.mode == TextInputMode::MultiLine && self.insert("\n")
   }
 
+  /// 删除光标前一个字素（有选区时先删除选区）。
   pub fn delete_prev(&mut self) -> bool {
     if self.delete_selection() {
       return true;
@@ -125,6 +134,7 @@ impl TextBuffer {
     true
   }
 
+  /// 删除光标后一个字素（有选区时先删除选区）。
   pub fn delete_next(&mut self) -> bool {
     if self.delete_selection() {
       return true;
@@ -137,6 +147,7 @@ impl TextBuffer {
     true
   }
 
+  /// 删除当前选区内容，返回是否执行了删除。
   pub fn delete_selection(&mut self) -> bool {
     let Some(range) = self.selection() else {
       return false;
@@ -156,6 +167,7 @@ impl TextBuffer {
     self.move_right_select(false, false)
   }
 
+  /// 向左移动一个字素或一个单词，可选扩展选区。
   pub fn move_left_select(&mut self, extend: bool, word: bool) -> bool {
     if !extend && self.selection().is_some() {
       let start = self.selection().unwrap().start;
@@ -173,6 +185,7 @@ impl TextBuffer {
     target.is_some_and(|target| self.move_to(target, extend))
   }
 
+  /// 向右移动一个字素或一个单词，可选扩展选区。
   pub fn move_right_select(&mut self, extend: bool, word: bool) -> bool {
     if !extend && self.selection().is_some() {
       let end = self.selection().unwrap().end;
@@ -194,6 +207,7 @@ impl TextBuffer {
     self.move_to(self.text.len(), false)
   }
 
+  /// 移动光标到指定位置（自动对齐边界），可选扩展选区。
   pub fn move_to(&mut self, cursor: usize, extend: bool) -> bool {
     let changed = self.set_cursor(cursor, extend);
     self.preferred_column = None;

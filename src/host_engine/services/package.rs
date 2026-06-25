@@ -5,26 +5,28 @@ use serde::Deserialize;
 
 use crate::host_engine::services::log::{LogService, LogSource};
 
-// ── 宿主常量 ──
-
+/// 宿主机 API 版本号
 pub const HOST_API_VERSION: u32 = 1;
+
+/// 包清单 schema 版本号
 pub const HOST_SCHEMA_VERSION: u32 = 1;
 const VALID_TARGET_FPS: &[u32] = &[30, 60, 120];
 
-// ── 公开类型 ──
-
+/// 包来源（官方或模组）
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PackageSource {
   Official,
   Mod,
 }
 
+/// 包类型（游戏或屏保）
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PackageType {
   Game,
   Screensaver,
 }
 
+/// 包完整信息
 #[derive(Clone, Debug)]
 pub struct PackageInfo {
   pub source: PackageSource,
@@ -43,6 +45,7 @@ pub struct PackageInfo {
   pub path: PathBuf,
 }
 
+/// 包显示信息
 #[derive(Clone, Debug)]
 pub struct PackageDisplay {
   pub title: String,
@@ -52,18 +55,21 @@ pub struct PackageDisplay {
   pub banner: IconOrImage,
 }
 
+/// 图标或图片资源
 #[derive(Clone, Debug)]
 pub enum IconOrImage {
   Image(String),
   ArtArray,
 }
 
+/// 包运行时要求
 #[derive(Clone, Debug)]
 pub struct PackageRuntime {
   pub min_width: u32,
   pub min_height: u32,
 }
 
+/// 游戏配置
 #[derive(Clone, Debug)]
 pub struct GameConfig {
   pub name: String,
@@ -76,25 +82,27 @@ pub struct GameConfig {
   pub actions: HashMap<String, ActionConfig>,
 }
 
+/// 分数配置
 #[derive(Clone, Debug)]
 pub struct ScoreConfig {
   pub enabled: bool,
   pub empty_text: String,
 }
 
+/// 动作绑定配置
 #[derive(Clone, Debug)]
 pub struct ActionConfig {
   pub description: String,
   pub keys: Vec<Vec<String>>,
 }
 
+/// 屏保配置
 #[derive(Clone, Debug)]
 pub struct ScreensaverConfig {
   pub name: String,
 }
 
-// ── 服务 ──
-
+/// 包管理服务，负责扫描和加载游戏/屏保包
 pub struct PackageService {
   games: Vec<PackageInfo>,
   screensavers: Vec<PackageInfo>,
@@ -108,6 +116,7 @@ impl PackageService {
     }
   }
 
+  /// 扫描所有目录下的包（官方和模组的游戏与屏保）
   pub fn scan_all(&mut self, root_dir: &Path, log: &mut LogService) {
     self.games.clear();
     self.screensavers.clear();
@@ -165,6 +174,7 @@ impl PackageService {
     );
   }
 
+  // 递归扫描指定目录下的所有包并加载
   fn scan_dir(
     &mut self,
     root_dir: &Path,
@@ -214,6 +224,7 @@ impl PackageService {
     }
   }
 
+  // 读取并验证单个包的 package.json 文件
   fn read_package(
     &self,
     dir: &Path,
@@ -227,8 +238,6 @@ impl PackageService {
 
     let raw: RawPackageJson =
       serde_json::from_str(&content).map_err(|e| format!("Invalid JSON: {}", e))?;
-
-    // ── 校验 ──
 
     if raw.mod_id.trim().is_empty() {
       return Err("mod_id is empty".into());
@@ -381,8 +390,6 @@ impl PackageService {
   }
 }
 
-// ── JSON 反序列化结构 ──
-
 #[derive(Deserialize)]
 struct RawPackageJson {
   mod_id: String,
@@ -451,8 +458,6 @@ struct RawScreensaverConfig {
   name: Option<String>,
 }
 
-// ── 辅助 ──
-
 fn parse_package_type(s: &str) -> Result<PackageType, String> {
   match s {
     "game" => Ok(PackageType::Game),
@@ -471,6 +476,7 @@ fn parse_icon_or_image(raw: &Option<String>) -> IconOrImage {
   }
 }
 
+// 解析包入口脚本路径，支持 .lua 后缀自动补全
 fn resolve_entry(pkg_dir: &Path, entry: &str) -> Result<String, String> {
   let scripts = pkg_dir.join("scripts");
   let candidates: &[PathBuf] = if entry.ends_with(".lua") {

@@ -6,6 +6,7 @@ use crate::host_engine::services::{
   UiObjectPool, UiObjectPoolOwner,
 };
 
+/// 输入演示 UI：展示基础层、不透明切片、透明切片和文本输入的叠加渲染效果。
 pub struct InputDemoUi {
   objects: UiObjectPool,
   opaque_slice: SliceId,
@@ -30,6 +31,7 @@ impl UiObjectPoolOwner for InputDemoUi {
   }
 }
 
+/// 输入演示页面的命令。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputDemoCommand {
   ToggleTransparent,
@@ -40,6 +42,8 @@ pub enum InputDemoCommand {
 }
 
 impl InputDemoUi {
+
+  /// 初始化演示页面：创建切片、命中区域和文本输入组件。
   pub fn init(
     hit_area: &HitAreaService,
     slices: &SliceService,
@@ -103,6 +107,7 @@ impl InputDemoUi {
     }
   }
 
+  /// 返回演示页面的按键映射定义。
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -128,6 +133,7 @@ impl InputDemoUi {
     ]
   }
 
+  /// 处理 UI 事件，包含命中区域、文本输入事件的转发。
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<InputDemoCommand> {
     match event {
       UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
@@ -166,6 +172,7 @@ impl InputDemoUi {
     }
   }
 
+  /// 切换透明切片的可见性。
   pub fn toggle_transparent(&mut self, slices: &SliceService) {
     self.transparent_visible = !self.transparent_visible;
     slices.set_visible(
@@ -175,6 +182,7 @@ impl InputDemoUi {
     );
   }
 
+  /// 交换透明切片和不透明切片的绘制顺序。
   pub fn swap_layers(&mut self, slices: &SliceService) {
     self.transparent_in_front = !self.transparent_in_front;
     if self.transparent_in_front {
@@ -184,14 +192,17 @@ impl InputDemoUi {
     }
   }
 
+  /// 聚焦文本输入组件。
   pub fn focus_input(&mut self, text_input: &mut TextInputService) {
     text_input.focus(&mut self.objects, self.input);
   }
 
+  /// 取消文本输入聚焦。
   pub fn blur_input(&mut self, text_input: &mut TextInputService) {
     text_input.blur(&mut self.objects);
   }
 
+  /// 离开页面时取消输入聚焦。
   pub fn leave(&mut self, text_input: &mut TextInputService) {
     if text_input.is_focused(&self.objects, self.input) {
       text_input.blur(&mut self.objects);
@@ -200,6 +211,7 @@ impl InputDemoUi {
 
   pub fn update(&mut self) {}
 
+  /// 渲染基础层、不透明切片、透明切片和宿主层，返回光标物理坐标。
   pub fn render(
     &mut self,
     render: &mut RenderService,

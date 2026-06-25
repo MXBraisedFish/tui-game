@@ -1,12 +1,7 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// 宿主循环帧调度器。
-///
-/// 职责：
-/// - 统计帧数
-/// - 记录当前帧开始时间
-/// - 仅休眠目标帧持续时间的剩余时间
+/// 帧调度器，按目标帧率控制每帧的时长，提供帧间休眠
 pub struct FrameScheduler {
   current_frame: u64,
   frame_start: Instant,
@@ -25,14 +20,14 @@ impl FrameScheduler {
     }
   }
 
-  /// 开始新的一帧，返回当前帧序号
+  /// 开始新一帧，返回自调度开始以来的累计帧号
   pub fn begin_frame(&mut self) -> u64 {
     self.current_frame = self.current_frame.saturating_add(1);
     self.frame_start = Instant::now();
     self.current_frame
   }
 
-  /// 等待至目标帧时间结束
+  /// 等待直到当前帧的目标时长用完，控制帧率上限
   pub fn wait_for_next_frame(&self) {
     let elapsed = self.frame_start.elapsed();
 
@@ -43,7 +38,6 @@ impl FrameScheduler {
     thread::sleep(self.target_frame_duration - elapsed);
   }
 
-  /// 获取当前帧序号
   pub fn current_frame(&self) -> u64 {
     self.current_frame
   }

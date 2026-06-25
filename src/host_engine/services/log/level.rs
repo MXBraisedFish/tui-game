@@ -1,17 +1,18 @@
-// 日志级别枚举
+
+/// 日志严重级别，按升序排列（Trace 最低，Fatal 最高）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogLevel {
-  Trace, // 追踪
-  Debug, // 调试
-  Info,  // 信息
-  Warn,  // 警告
-  Error, // 错误
-  Fatal, // 异常
+  Trace,
+  Debug,
+  Info,
+  Warn,
+  Error,
+  Fatal,
 }
 
-// 等级字符串
+/// 将日志级别转为固定宽度的大写字符串标识。
 pub fn format_log_level(level: LogLevel) -> &'static str {
-  // TODO(log/i18n): log level text can be localized later.
+
   match level {
     LogLevel::Trace => "TRACE",
     LogLevel::Debug => "DEBUG",

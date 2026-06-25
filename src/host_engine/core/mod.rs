@@ -1,4 +1,4 @@
-// 模块统一导出
+
 pub mod boot_output;
 pub mod clock;
 pub mod crash;
@@ -6,8 +6,6 @@ pub mod exit_state;
 pub mod frame;
 pub mod state_machine;
 pub mod world;
-
-// 引用结构体
 pub use boot_output::BootOutput;
 pub use clock::EngineClock;
 pub use crash::{CrashPhase, install_panic_hook, set_crash_phase};

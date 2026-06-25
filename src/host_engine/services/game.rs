@@ -1,15 +1,15 @@
-// 游戏状态枚举
+/// 游戏会话状态
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameSessionState {
-  Inactive, // 未激活（没有游戏运行）
-  Running,  // 运行
-  Paused,   // 暂停
+  Inactive,
+  Running,
+  Paused,
 }
 
-// 游戏服务结构体
+/// 游戏服务，管理游戏会话的启停
 pub struct GameService {
-  state: GameSessionState,            // 游戏状态
-  active_package_uid: Option<String>, // 当前包运行id
+  state: GameSessionState,
+  active_package_uid: Option<String>,
 }
 
 impl GameService {
@@ -20,23 +20,21 @@ impl GameService {
     }
   }
 
-  // 启动
+  /// 启动指定包的游戏会话
   pub fn start(&mut self, package_uid: &str) {
     self.active_package_uid = Some(package_uid.to_string());
     self.state = GameSessionState::Running;
   }
 
-  // 停止
+  /// 停止当前游戏会话
   pub fn stop(&mut self) {
     self.active_package_uid = None;
     self.state = GameSessionState::Inactive;
   }
 
-  // 查询状态
   pub fn state(&self) -> GameSessionState {
     self.state
   }
 
-  // 更新
   pub fn update(&mut self) {}
 }

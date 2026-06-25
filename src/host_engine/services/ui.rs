@@ -9,6 +9,7 @@ use super::text_input::TextInputObjects;
 
 static NEXT_POOL_ID: AtomicU64 = AtomicU64::new(1);
 
+/// UI 服务（无状态标记类型）
 #[derive(Clone, Debug)]
 pub struct UiService;
 
@@ -18,7 +19,7 @@ impl UiService {
   }
 }
 
-/// 页面级 UI 对象池。每个页面持有一个独立实例。
+/// UI 对象池，存储所有 UI 组件的共享状态
 pub struct UiObjectPool {
   id: u64,
   render_order: u64,
@@ -28,6 +29,7 @@ pub struct UiObjectPool {
   pub(crate) slices: SliceObjects,
 }
 
+/// UI 事件（动作 / 点击区域 / 文本输入）
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UiEvent {
   Action(InputActionEvent),
@@ -116,7 +118,7 @@ impl UiObjectPool {
   }
 }
 
-/// 所有有状态 Host UI 页面的对象池访问规范。
+/// UI 对象池持有者 trait
 pub trait UiObjectPoolOwner {
   fn objects(&self) -> &UiObjectPool;
   fn objects_mut(&mut self) -> &mut UiObjectPool;

@@ -1,74 +1,66 @@
-// 官方标准输入输出
 use std::io::{self, Stdout, Write, stdout};
 
-// 光标控制
 use crossterm::cursor::{Hide, Show};
-// 鼠标和焦点事件控制
+
 use crossterm::event::{
   DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture,
 };
-// 终端命令执行
+
 use crossterm::execute;
-// 终端模式控制
+
 use super::terminal_capabilities::TerminalCapabilities;
 use crossterm::terminal::{
   EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 
-// 日志
 use super::{LogService, LogSource};
 
+/// 终端服务，管理原始模式和交替屏幕的进入与退出
 pub struct TerminalService {
-  surface: Option<TerminalSurface>,   // 终端守卫，支持终端开关
-  capabilities: TerminalCapabilities, // 终端能力
+  surface: Option<TerminalSurface>,
+  capabilities: TerminalCapabilities,
 }
 
-// 终端表面活动结构体
 struct TerminalSurface {
-  stdout: Stdout, // 终端输出流
-  active: bool,   // 恢复是否仍然需要运行
+  stdout: Stdout,
+  active: bool,
 }
 
 impl TerminalSurface {
+  // 初始化终端原始模式：启用 raw mode、交替屏幕、鼠标捕获、焦点事件，隐藏光标
   fn enter() -> io::Result<Self> {
-    // 启用原始模式
     enable_raw_mode()?;
 
-    // 获取标准输出
     let mut stdout = stdout();
 
-    // 进入屏幕 → 启用输入报告 → 隐藏光标 → 刷新
     execute!(stdout, EnterAlternateScreen)?;
     execute!(stdout, EnableMouseCapture)?;
     execute!(stdout, EnableFocusChange)?;
     execute!(stdout, Hide)?;
     stdout.flush()?;
 
-    // 返回守卫
     Ok(Self {
       stdout,
       active: true,
     })
   }
 
-  // 写入访问
   fn writer(&mut self) -> &mut Stdout {
     &mut self.stdout
   }
 
+  // 恢复终端到正常模式：显示光标、禁用交替屏幕、鼠标捕获和 raw mode
   fn restore(&mut self) {
     if !self.active {
       return;
     }
 
-    // 恢复终端
     let _ = execute!(self.stdout, Show);
     let _ = execute!(self.stdout, DisableFocusChange);
     let _ = execute!(self.stdout, DisableMouseCapture);
     let _ = execute!(self.stdout, LeaveAlternateScreen);
     let _ = self.stdout.flush();
 
-    // 关闭原始模式
     let _ = disable_raw_mode();
     let _ = io::stderr().flush();
 
@@ -90,25 +82,21 @@ impl TerminalService {
     }
   }
 
-  // 终端能力获取函数
   pub fn capabilities(&self) -> &TerminalCapabilities {
     &self.capabilities
   }
 
+  /// 进入终端原始模式（启用交替屏幕、鼠标捕获和焦点事件）
   pub fn enter(&mut self, services: &mut LogService) {
-    //防止重复进入
     if self.surface.is_some() {
       return;
     }
 
-    // 尝试进入终端模式
     match TerminalSurface::enter() {
       Ok(surface) => {
-        // 创建守卫
         self.surface = Some(surface);
       }
       Err(error) => {
-        // TODO: 这里的警告应该国际化或者写入日志而不是直接打印
         services.error(
           LogSource::Storage,
           format!("[Terminal] Failed to enter terminal mode: {}", error),
@@ -117,24 +105,20 @@ impl TerminalService {
     }
   }
 
-  // 退出，丢弃守卫，触发drop
+  /// 退出终端原始模式
   pub fn exit(&mut self) {
     self.surface = None;
   }
 
-  // 状态检查
   pub fn is_active(&self) -> bool {
     self.surface.is_some()
   }
 
-  // 写访问
   pub fn writer_mut(&mut self) -> Option<&mut Stdout> {
     self.surface.as_mut().map(|surface| surface.writer())
   }
 
-  /// 清屏并归位光标。
-  ///
-  /// 图片变化时由 runtime 调用，确保旧图片残留被清除后再重绘字符层。
+  /// 清屏并将光标归位到 (0, 0)
   pub fn clear_all_and_home(&mut self) -> io::Result<()> {
     use crossterm::QueueableCommand;
     use crossterm::cursor::MoveTo;
@@ -149,7 +133,7 @@ impl TerminalService {
     Ok(())
   }
 
-  // 紧急恢复
+  /// 强制恢复终端设置（用于异常退出时的清理）
   pub fn force_restore() {
     let _ = disable_raw_mode();
 

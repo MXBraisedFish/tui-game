@@ -13,10 +13,11 @@ use palette::{IntoColor, Lab, Srgb, color_difference::Ciede2000};
 use super::{ComposedCell, ComposedFrame};
 use crate::host_engine::services::{TerminalColor, TerminalService, TextColor, TextStyle};
 
+/// 帧呈现器：将 ComposedFrame 转换为 crossterm 指令并输出到终端，支持增量刷新。
 pub struct FramePresenter {
   previous: Option<ComposedFrame>,
   force_full_redraw: bool,
-  /// 从终端能力读取：`true` 时直接输出 RGB，`false` 时将 RGB 转为 256 色。
+
   truecolor: bool,
 }
 
@@ -29,10 +30,12 @@ impl FramePresenter {
     }
   }
 
+  /// 标记下次呈现时需要全量重绘。
   pub fn request_render(&mut self) {
     self.force_full_redraw = true;
   }
 
+  /// 将帧输出到终端，仅重绘变化区域（除非要求全量重绘或尺寸变化）。
   pub fn present(
     &mut self,
     frame: &ComposedFrame,
@@ -40,7 +43,7 @@ impl FramePresenter {
     text_force_redraw: bool,
     final_cursor: Option<(u16, u16)>,
   ) -> io::Result<()> {
-    // 每帧同步终端能力（必须在 writer_mut 前读取，避免借冲突）
+
     self.truecolor = terminal.capabilities().truecolor;
 
     let Some(stdout) = terminal.writer_mut() else {
@@ -194,21 +197,16 @@ fn text_color_to_crossterm(color: &TextColor, truecolor: bool) -> Color {
         nearest_ansi256(*r, *g, *b)
       }
     }
-    // Transparent 在 canvas 层已解析为具体颜色，不应到达这里
+
     TextColor::Transparent => Color::Reset,
   }
 }
 
-// ── CIEDE2000 真彩 → 256 色 ──
-
-/// 256 色调色板条目：(AnsiValue 码, CIELAB 坐标)
 type LabPalette = Vec<(u8, Lab)>;
 
-/// 预计算 code 16–255 共 240 个颜色的 CIELAB 值。
 static LAB_PALETTE: Lazy<LabPalette> = Lazy::new(|| {
   let mut entries = Vec::with_capacity(240);
 
-  // 6×6×6 色立方：code 16–231
   for r_idx in 0u8..6 {
     for g_idx in 0u8..6 {
       for b_idx in 0u8..6 {
@@ -220,7 +218,6 @@ static LAB_PALETTE: Lazy<LabPalette> = Lazy::new(|| {
     }
   }
 
-  // 灰度阶：code 232–255
   for gray in 0u8..24 {
     let code = 232 + gray;
     let v = gray * 10 + 8;
@@ -232,7 +229,6 @@ static LAB_PALETTE: Lazy<LabPalette> = Lazy::new(|| {
   entries
 });
 
-/// 6×6×6 色立方等级 → 实际 RGB。
 fn cube_level_to_rgb(r: u8, g: u8, b: u8) -> (u8, u8, u8) {
   fn level(l: u8) -> u8 {
     if l == 0 {
@@ -244,7 +240,6 @@ fn cube_level_to_rgb(r: u8, g: u8, b: u8) -> (u8, u8, u8) {
   (level(r), level(g), level(b))
 }
 
-/// sRGB → CIELAB（D65 白点）。
 fn rgb_to_lab(rgb: (u8, u8, u8)) -> Lab {
   let linear = Srgb::new(
     rgb.0 as f32 / 255.0,
@@ -254,7 +249,6 @@ fn rgb_to_lab(rgb: (u8, u8, u8)) -> Lab {
   linear.into_color()
 }
 
-/// 在 256 色调色板中查找 CIEDE2000 距离最近的条目。
 fn nearest_ansi256(r: u8, g: u8, b: u8) -> Color {
   let target = rgb_to_lab((r, g, b));
 
@@ -345,7 +339,7 @@ mod tests {
 
   #[test]
   fn nearest_ansi256_maps_primary_colors() {
-    // 黑色和白色均应落在调色板内（CIEDE2000 下具体码值不做断言）
+
     assert!(matches!(nearest_ansi256(0, 0, 0), Color::AnsiValue(_)));
     assert!(matches!(nearest_ansi256(255, 255, 255), Color::AnsiValue(_)));
     assert!(matches!(nearest_ansi256(255, 0, 0), Color::AnsiValue(_)));
@@ -354,7 +348,7 @@ mod tests {
 
   #[test]
   fn nearest_ansi256_gray_vs_cube_is_consistent() {
-    // 纯灰 (128,128,128) 不应映射到有色差的色立方入口
+
     let gray128 = nearest_ansi256(128, 128, 128);
     assert!(matches!(gray128, Color::AnsiValue(_)));
   }
@@ -366,7 +360,7 @@ mod tests {
       g: 0,
       b: 0,
     };
-    // truecolor 开启 → 直接 RGB
+
     assert_eq!(
       text_color_to_crossterm(&rgb, true),
       Color::Rgb {
@@ -375,7 +369,7 @@ mod tests {
         b: 0
       }
     );
-    // truecolor 关闭 → 转 AnsiValue
+
     assert!(matches!(
       text_color_to_crossterm(&rgb, false),
       Color::AnsiValue(_)

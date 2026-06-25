@@ -1,30 +1,27 @@
-// panic模块
 use std::panic;
-// 线程原子化和内存顺序
+
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::host_engine::services::TerminalService;
 
-// 阶段枚举（与顶层状态机命名同步）
+/// 崩溃阶段枚举，用于在 panic 时标识当前所处的生命周期阶段
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CrashPhase {
-  Boot = 0,     // 启动阶段
-  Init = 1,     // 初始化阶段
-  Runtime = 2,  // 运行阶段
-  Shutdown = 3, // 关闭阶段
-  Stopped = 4,  // 停止阶段
+  Boot = 0,
+  Init = 1,
+  Runtime = 2,
+  Shutdown = 3,
+  Stopped = 4,
 }
 
-// 全局静态且唯一，每个线程都用这个变量
-// 内存顺序安全确保读值干净
 static CRASH_PHASE: AtomicU8 = AtomicU8::new(CrashPhase::Boot as u8);
 
-// 设置运行阶段
+/// 设置当前崩溃阶段的值
 pub fn set_crash_phase(phase: CrashPhase) {
   CRASH_PHASE.store(phase as u8, Ordering::SeqCst);
 }
 
-// 获取当前运行阶段
+/// 读取当前崩溃阶段
 pub fn current_crash_phase() -> CrashPhase {
   match CRASH_PHASE.load(Ordering::SeqCst) {
     1 => CrashPhase::Init,
@@ -35,6 +32,7 @@ pub fn current_crash_phase() -> CrashPhase {
   }
 }
 
+/// 安装自定义 panic 钩子，在崩溃时恢复终端状态并打印当前阶段
 pub fn install_panic_hook() {
   let previous_hook = panic::take_hook();
 

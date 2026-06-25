@@ -1,53 +1,44 @@
-// 数据根目录
+
 pub const DATA_DIR: &str = "data";
-// 缓存目录
+
 pub const DATA_CACHE_DIR: &str = "data/cache";
-// 配置目录
+
 pub const DATA_PROFILES_DIR: &str = "data/profiles";
-// 日志目录
+
 pub const DATA_LOG_DIR: &str = "data/log";
 
-// 模组目录
 pub const DATA_MOD_DIR: &str = "data/mod";
-// 游戏包
+
 pub const DATA_MOD_GAME_DIR: &str = "data/mod/game";
-// 屏保包
+
 pub const DATA_MOD_SCREENSAVER_DIR: &str = "data/mod/screensaver";
 
-// 默认脚本包
 pub const SCRIPTS_DIR: &str = "scripts";
-// 游戏包
+
 pub const SCRIPTS_GAME_DIR: &str = "scripts/game";
-// 屏保包
+
 pub const SCRIPTS_SCREENSAVER_DIR: &str = "scripts/screensaver";
 
-// 默认资源包
 pub const ASSETS_DIR: &str = "assets";
-// 默认语言包
+
 pub const ASSETS_LANGUAGE_DIR: &str = "assets/language";
 
-// 游戏包扫描缓存
 pub const GAME_SCAN_CACHE_FILE: &str = "data/cache/game_scan_cache.json";
-// 屏保包扫描缓存
+
 pub const SCREENSAVER_SCAN_CACHE_FILE: &str = "data/cache/screensaver_scan_cache.json";
-// ui语言缓存
+
 pub const LANGUAGE_UI_CACHE_FILE: &str = "data/cache/language_ui_cache.json";
 
-// 配置-语言
 pub const PROFILE_LANGUAGE_FILE: &str = "data/profiles/language.txt";
-// 配置-终端能力
+
 pub const PROFILE_TERMINAL_FILE: &str = "data/profiles/terminal_profile.json";
 
-// 日志-宿主
 pub const TUI_LOG_FILE: &str = "data/log/tui_log.txt";
 
-// 默认语言代码（英文）
 pub const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 
-// 语言注册表文件
 pub const LANGUAGE_REGISTRY_FILE: &str = "assets/language/language_registry.json";
 
-// 必须有的目录
 pub const REQUIRED_DIRECTORIES: &[&str] = &[
   DATA_DIR,
   DATA_CACHE_DIR,
@@ -63,7 +54,6 @@ pub const REQUIRED_DIRECTORIES: &[&str] = &[
   ASSETS_LANGUAGE_DIR,
 ];
 
-// 默认文件以及内容
 pub const DEFAULT_FILES: &[(&str, &str)] = &[
   (GAME_SCAN_CACHE_FILE, "{}"),
   (SCREENSAVER_SCAN_CACHE_FILE, "{}"),

@@ -1,6 +1,7 @@
 use super::{MainHostState, OverlayKind, OverlayState, RuntimeState, UiNodeKind, UiNodeState};
 use crate::host_engine::core::CrashPhase;
 
+/// 主机状态机枚举，管理引擎的完整生命周期：引导 -> 初始化 -> 运行时 -> 关闭 -> 停止
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HostMachineState {
   Boot,
@@ -10,13 +11,10 @@ pub enum HostMachineState {
   Stopped,
 }
 
-// 顶层状态机切换逻辑
 impl HostMachineState {
   pub fn new() -> Self {
     HostMachineState::Boot
   }
-
-  // ── 阶段查询方法 ──
 
   pub fn is_boot(&self) -> bool {
     matches!(self, HostMachineState::Boot)
@@ -38,8 +36,6 @@ impl HostMachineState {
     matches!(self, HostMachineState::Stopped)
   }
 
-  // ── Runtime状态访问方法 ──
-
   pub fn runtime(&self) -> Option<&RuntimeState> {
     match self {
       HostMachineState::Runtime(runtime) => Some(runtime),
@@ -54,8 +50,6 @@ impl HostMachineState {
     }
   }
 
-  // ── 崩溃阶段映射 ──
-
   pub fn crash_phase(&self) -> CrashPhase {
     match self {
       HostMachineState::Boot => CrashPhase::Boot,
@@ -66,25 +60,25 @@ impl HostMachineState {
     }
   }
 
-  // ── 生命周期转换方法 ──
-
+  /// 切换到初始化状态
   pub fn enter_init(&mut self) {
     *self = HostMachineState::Init;
   }
 
+  /// 切换到运行时状态，以 Host 模式启动
   pub fn enter_runtime(&mut self) {
     *self = HostMachineState::Runtime(RuntimeState::new_host_runtime());
   }
 
+  /// 切换到关闭状态
   pub fn enter_shutdown(&mut self) {
     *self = HostMachineState::Shutdown;
   }
 
+  /// 切换到停止状态
   pub fn enter_stopped(&mut self) {
     *self = HostMachineState::Stopped;
   }
-
-  // ── 原始赋值方法 ──
 
   pub fn set_boot(&mut self) {
     *self = HostMachineState::Boot;
@@ -106,10 +100,6 @@ impl HostMachineState {
     *self = HostMachineState::Stopped;
   }
 
-  // ── UI 查询 ──
-
-  /// 查询当前 UI 节点类型。
-  /// 仅在 Runtime(Host) 状态下返回有意义的值。
   pub fn current_ui_kind(&self) -> Option<UiNodeKind> {
     let runtime = self.runtime()?;
     let MainHostState::Host(host) = runtime.main_host() else {
@@ -119,7 +109,7 @@ impl HostMachineState {
     Some(node.kind)
   }
 
-  /// 向 UI 树压入一个新节点。
+  /// 进入指定的 UI 节点，将其压入 UI 导航栈
   pub fn enter_ui_node(&mut self, node: UiNodeState) {
     if let Some(runtime) = self.runtime_mut() {
       if let Some(host) = runtime.main_host_mut().host_mut() {
@@ -128,7 +118,7 @@ impl HostMachineState {
     }
   }
 
-  /// 从 UI 树弹出一个节点（返回上一级）。
+  /// 弹出当前 UI 节点，返回上一级
   pub fn pop_ui_node(&mut self) -> Option<UiNodeState> {
     self
       .runtime_mut()?
@@ -138,12 +128,11 @@ impl HostMachineState {
       .back()
   }
 
-  // ── 覆盖层查询 ──
-
   pub fn current_overlay_kind(&self) -> Option<OverlayKind> {
     self.runtime()?.overlays().current_kind()
   }
 
+  /// 压入一个窗口尺寸过小的警告覆盖层
   pub fn push_window_size_overlay(&mut self, min_w: u32, min_h: u32) {
     if let Some(runtime) = self.runtime_mut() {
       runtime.overlays_mut().push(OverlayState {
@@ -157,6 +146,7 @@ impl HostMachineState {
     }
   }
 
+  /// 弹出当前覆盖层的顶部项
   pub fn pop_overlay(&mut self) -> Option<OverlayState> {
     self.runtime_mut()?.overlays_mut().pop()
   }

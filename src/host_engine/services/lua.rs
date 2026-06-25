@@ -1,7 +1,6 @@
 use mlua::{Lua, LuaOptions, StdLib, Value};
 
-/// 安全沙箱 Lua 虚拟机。
-/// 仅加载 math/string/table/utf8 四个安全库，禁用危险全局函数。
+/// Lua 沙箱服务，提供安全的脚本执行环境
 pub struct LuaService {
   lua: Lua,
 }
@@ -21,6 +20,7 @@ impl LuaService {
     &self.lua
   }
 
+  /// 在沙箱化 Lua 虚拟机中执行代码并返回结果
   pub fn eval(&self, code: &str) -> Result<String, String> {
     self
       .lua
@@ -30,7 +30,7 @@ impl LuaService {
   }
 }
 
-/// 置空危险全局函数：文件加载、调试、元表操作、GC 控制。
+// 移除危险的 Lua 全局函数（文件操作、元表操作等），创建安全沙箱环境
 fn install_sandbox(lua: &Lua) {
   let globals = lua.globals();
   for name in [

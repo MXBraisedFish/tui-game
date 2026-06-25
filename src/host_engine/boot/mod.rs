@@ -1,11 +1,9 @@
-// 引用结构体
 use crate::host_engine::core::{BootOutput, RuntimeWorld};
 use crate::host_engine::services::EngineServices;
 
-// 日志
 use super::services::LogSource;
 
-// 启动函数
+/// 执行引擎启动准备：扫描语言包与资源包、初始化运行时世界
 pub fn prepare() -> BootOutput {
   let mut services = EngineServices::new();
 
@@ -17,7 +15,6 @@ pub fn prepare() -> BootOutput {
     .log
     .info(LogSource::Boot, "[Boot] Scanning packages...");
 
-  // ── 语言加载（含多层保底） ──
   services
     .i18n
     .refresh_language_registry(&services.storage, &mut services.log);
@@ -27,17 +24,15 @@ pub fn prepare() -> BootOutput {
 
   let selected_language = match preferred {
     None => {
-      // 无已保存语言 → runtime 会进入 LanguageSelect
       default_code
     }
     Some(ref code) => {
-      // 校验：注册表是否有该 code
       let in_registry = services
         .i18n
         .language_registry()
         .iter()
         .any(|e| e.code == *code);
-      // 校验：语言目录是否存在
+
       let dir_ok =
         services
           .i18n
@@ -45,7 +40,6 @@ pub fn prepare() -> BootOutput {
       if in_registry && dir_ok {
         code.clone()
       } else {
-        // 非法 → 清空 profile 让 runtime 进入 LanguageSelect
         services.log.warn(
           LogSource::Boot,
           format!(
@@ -83,6 +77,5 @@ pub fn prepare() -> BootOutput {
     &format!("[Boot] Storage root: {}", root_dir.display()),
   );
 
-  // 返回启动输出
   BootOutput { services, world }
 }

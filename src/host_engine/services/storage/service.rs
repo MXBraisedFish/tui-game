@@ -4,13 +4,15 @@ use super::bootstrap::ensure_storage_layout;
 use super::layout;
 use crate::host_engine::services::LogService;
 
+/// 存储服务：管理应用根目录，提供各子路径的构建方法，并在初始化时确保目录结构存在。
 pub struct StorageService {
   root_dir: PathBuf,
 }
 
 impl StorageService {
+
   pub fn new(log: &mut LogService) -> Self {
-    // 根目录
+
     let root_dir = resolve_root_dir();
 
     let service = Self { root_dir };
@@ -20,17 +22,15 @@ impl StorageService {
     service
   }
 
-  // 获取根目录
   pub fn root_dir(&self) -> &Path {
     &self.root_dir
   }
 
-  // 拼接绝对路径
+  /// 拼装根目录下的相对路径为完整路径。
   pub fn path(&self, relative_path: &str) -> PathBuf {
     self.root_dir.join(relative_path)
   }
 
-  // 配置文件路径
   pub fn profile_language_path(&self) -> PathBuf {
     self.path(layout::PROFILE_LANGUAGE_FILE)
   }
@@ -39,34 +39,28 @@ impl StorageService {
     self.path(layout::PROFILE_TERMINAL_FILE)
   }
 
-  // 语言资源路径
   pub fn language_assets_root_path(&self) -> PathBuf {
     self.path(layout::ASSETS_LANGUAGE_DIR)
   }
 
-  // 语言注册表路径
   pub fn language_registry_path(&self) -> PathBuf {
     self.path(layout::LANGUAGE_REGISTRY_FILE)
   }
 
-  // 语言包路径
   pub fn language_package_path(&self, language_code: &str) -> PathBuf {
     self.language_assets_root_path().join(language_code)
   }
 
-  // 语言包路径
   pub fn language_runtime_path(&self, language_code: &str) -> PathBuf {
     self.language_package_path(language_code).join("runtime")
   }
 
-  // 命名空间文件
   pub fn language_runtime_namespace_path(&self, language_code: &str, namespace: &str) -> PathBuf {
     self
       .language_runtime_path(language_code)
       .join(format!("{}.json", namespace))
   }
 
-  // 语言信息文件
   pub fn language_info_path(&self, language_code: &str) -> PathBuf {
     self
       .language_package_path(language_code)
@@ -74,22 +68,18 @@ impl StorageService {
   }
 }
 
-// 获取根目录
+// 自动探测应用根目录：依次尝试当前目录、可执行文件目录。
 fn resolve_root_dir() -> PathBuf {
-  // 开发模式
+
   if let Ok(current_dir) = std::env::current_dir() {
     if current_dir.join("assets").exists() || current_dir.join("Cargo.toml").exists() {
       return current_dir;
     }
   }
-
-  // 运行目录
   if let Ok(exe_path) = std::env::current_exe() {
     if let Some(exe_dir) = exe_path.parent() {
       return exe_dir.to_path_buf();
     }
   }
-
-  // 最后保底
   PathBuf::from(".")
 }

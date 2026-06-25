@@ -3,9 +3,11 @@ use std::collections::HashMap;
 use super::ui::UiObjectPool;
 use super::{LayoutService, Rect};
 
+/// 切片唯一标识
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SliceId(pub u64);
 
+/// 切片尺寸描述（固定值/自适应/百分比）
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SliceLength {
   Fixed(u16),
@@ -13,6 +15,7 @@ pub enum SliceLength {
   Percent(u8),
 }
 
+/// 切片矩形区域
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SliceRect {
   pub x: u16,
@@ -21,6 +24,7 @@ pub struct SliceRect {
   pub height: SliceLength,
 }
 
+/// 切片创建选项
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SliceOptions {
   pub rect: SliceRect,
@@ -66,6 +70,7 @@ impl SliceObjects {
   }
 }
 
+/// 切片服务，管理视口子区域的分割与层级排序
 pub struct SliceService;
 
 impl SliceService {
@@ -73,6 +78,7 @@ impl SliceService {
     Self
   }
 
+  /// 创建新切片
   pub fn create(&self, pool: &mut UiObjectPool, options: SliceOptions) -> Option<SliceId> {
     valid_rect(options.rect).then(|| {
       let id = SliceId(pool.slices.next_id);
@@ -90,6 +96,7 @@ impl SliceService {
     })
   }
 
+  /// 移除切片
   pub fn remove(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
     if pool.slices.slices.remove(&id).is_none() {
       return false;
@@ -98,14 +105,17 @@ impl SliceService {
     true
   }
 
+  /// 检查切片是否存在
   pub fn exists(&self, pool: &UiObjectPool, id: SliceId) -> bool {
     pool.slices.slices.contains_key(&id)
   }
 
+  /// 获取切片的原始矩形配置
   pub fn rect(&self, pool: &UiObjectPool, id: SliceId) -> Option<SliceRect> {
     Some(pool.slices.slices.get(&id)?.rect)
   }
 
+  /// 获取切片解析后的实际像素矩形
   pub fn resolved_rect(
     &self,
     pool: &UiObjectPool,
@@ -115,6 +125,7 @@ impl SliceService {
     Some(resolve_rect(pool.slices.slices.get(&id)?.rect, layout))
   }
 
+  /// 修改切片的矩形配置
   pub fn set_rect(&self, pool: &mut UiObjectPool, id: SliceId, rect: SliceRect) -> bool {
     if !valid_rect(rect) {
       return false;
@@ -134,6 +145,7 @@ impl SliceService {
       .is_some_and(|state| state.visible)
   }
 
+  /// 设置切片可见性
   pub fn set_visible(&self, pool: &mut UiObjectPool, id: SliceId, visible: bool) -> bool {
     let Some(state) = pool.slices.slices.get_mut(&id) else {
       return false;
@@ -150,23 +162,28 @@ impl SliceService {
       .is_some_and(|state| state.opaque)
   }
 
+  /// 将切片移至层级最前
   pub fn bring_to_front(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
     move_to_edge(&mut pool.slices, id, false)
   }
 
+  /// 将切片移至层级最后
   pub fn send_to_back(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
     move_to_edge(&mut pool.slices, id, true)
   }
 
+  /// 将切片移动到目标切片上方
   pub fn move_above(&self, pool: &mut UiObjectPool, id: SliceId, target: SliceId) -> bool {
     move_relative(&mut pool.slices, id, target, true)
   }
 
+  /// 将切片移动到目标切片下方
   pub fn move_below(&self, pool: &mut UiObjectPool, id: SliceId, target: SliceId) -> bool {
     move_relative(&mut pool.slices, id, target, false)
   }
 }
 
+// 根据布局将切片相对坐标解析为绝对像素坐标
 pub(crate) fn resolve_rect(rect: SliceRect, layout: &LayoutService) -> Rect {
   let viewport = layout.viewport_size();
   let x = rect.x.min(viewport.width);
@@ -189,6 +206,7 @@ fn valid_rect(rect: SliceRect) -> bool {
   valid(rect.width) && valid(rect.height)
 }
 
+// 将切片移动到层级顺序的边界（最前或最后）
 fn move_to_edge(objects: &mut SliceObjects, id: SliceId, back: bool) -> bool {
   let Some(index) = objects.order.iter().position(|current| *current == id) else {
     return false;
@@ -202,6 +220,7 @@ fn move_to_edge(objects: &mut SliceObjects, id: SliceId, back: bool) -> bool {
   true
 }
 
+// 将切片移动到目标切片的相对位置（上方或下方）
 fn move_relative(objects: &mut SliceObjects, id: SliceId, target: SliceId, above: bool) -> bool {
   if id == target || !objects.slices.contains_key(&id) || !objects.slices.contains_key(&target) {
     return false;

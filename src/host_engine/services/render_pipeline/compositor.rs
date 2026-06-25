@@ -2,6 +2,7 @@ use super::{ComposedCell, ComposedFrame};
 use crate::host_engine::services::canvas::buffer::CanvasBuffer;
 use crate::host_engine::services::{CanvasCell, CanvasService, TextColor};
 
+/// 帧合成器：将基础层、切片层和宿主层按顺序叠加为一张合成帧。
 pub struct FrameCompositor;
 
 impl FrameCompositor {
@@ -9,6 +10,7 @@ impl FrameCompositor {
     Self
   }
 
+  /// 执行合成：按照分层顺序（底层 → 切片 → 宿主层）合并各层像素。
   pub fn compose(&self, canvas: &CanvasService) -> ComposedFrame {
     let host = canvas.host_buffer();
     let mut frame = ComposedFrame::new(host.width(), host.height());

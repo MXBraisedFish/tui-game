@@ -1,4 +1,4 @@
-// 终端能力结构体
+/// 终端能力描述（Unicode / 真彩色 / 鼠标支持）
 #[derive(Clone, Debug)]
 pub struct TerminalCapabilities {
   pub unicode: bool,
@@ -7,6 +7,7 @@ pub struct TerminalCapabilities {
 }
 
 impl TerminalCapabilities {
+  /// 检测当前终端的能力
   pub fn detect() -> Self {
     Self {
       unicode: true,

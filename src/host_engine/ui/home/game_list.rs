@@ -1,10 +1,13 @@
 use crate::host_engine::services::{UiObjectPool, UiObjectPoolOwner};
 
+/// 游戏列表 UI（占位组件，尚未实现具体功能）。
 pub struct GameListUi {
   objects: UiObjectPool,
 }
 
 impl GameListUi {
+
+  /// 初始化游戏列表 UI。
   pub fn init() -> Self {
     Self {
       objects: UiObjectPool::new(),

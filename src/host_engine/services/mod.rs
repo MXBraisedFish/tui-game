@@ -52,6 +52,7 @@ pub use text_layout::DrawTextParams;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
 
+/// 引擎核心服务集合，持有所有子服务的实例
 pub struct EngineServices {
   pub package: PackageService,
   pub clipboard: ClipboardService,

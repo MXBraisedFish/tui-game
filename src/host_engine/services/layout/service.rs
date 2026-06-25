@@ -3,7 +3,7 @@ use super::{measure, position};
 use crate::host_engine::services::DrawTextParams;
 use crate::host_engine::services::RichTextParams;
 
-/// 物理终端与 Developer Viewport 的唯一布局状态源。
+/// 布局服务，管理终端尺寸、视口和坐标计算
 pub struct LayoutService {
   physical: Size,
   viewport_request: Option<Rect>,
@@ -24,8 +24,6 @@ impl LayoutService {
       },
     }
   }
-
-  // ── 测量 ──
 
   pub fn get_text_size(&self, text: &str, params: Option<&RichTextParams>) -> Size {
     measure::get_text_size(text, params)
@@ -81,16 +79,17 @@ impl LayoutService {
     self.resolve_viewport();
   }
 
-  // ── 定位 ──
-
+  /// 在视口内根据水平锚点和内容宽度计算 X 坐标
   pub fn resolve_x(&self, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
     position::resolve_x(self.viewport_size(), x_anchor, content_width, offset_x)
   }
 
+  /// 在视口内根据垂直锚点和内容高度计算 Y 坐标
   pub fn resolve_y(&self, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
     position::resolve_y(self.viewport_size(), y_anchor, content_height, offset_y)
   }
 
+  /// 在视口内根据锚点和内容尺寸计算位置
   pub fn resolve_rect(
     &self,
     x_anchor: &str,
@@ -119,6 +118,7 @@ impl LayoutService {
     position::resolve_y(self.physical, y_anchor, content_height, offset_y)
   }
 
+  // 根据物理尺寸和开发者视口请求计算最终视口，并裁剪到物理边界内
   fn resolve_viewport(&mut self) {
     let requested = self.viewport_request.unwrap_or(Rect {
       x: 0,
@@ -137,8 +137,6 @@ impl LayoutService {
         .min(self.physical.height.saturating_sub(requested.y)),
     };
   }
-
-  // ── 对齐常量（透传） ──
 
   pub const ALIGN_LEFT: &'static str = position::ALIGN_LEFT;
   pub const ALIGN_CENTER: &'static str = position::ALIGN_CENTER;

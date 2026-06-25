@@ -9,9 +9,7 @@ enum Target {
   Host,
 }
 
-/// 渲染服务 —— 当前为薄壳，直接委托给 CanvasService。
-///
-/// 未来可在此层加入视口裁剪、坐标变换等宿主侧渲染逻辑。
+/// 渲染服务：提供文本、填充矩形和边框矩形等高层绘制操作。
 pub struct RenderService;
 
 impl RenderService {
@@ -19,12 +17,12 @@ impl RenderService {
     Self
   }
 
-  /// 唯一的绘制入口。
-  /// 委托给 `canvas.text()`，由其内部完成 f% 路由和样式解析。
+  /// 在基础层上绘制文本。
   pub fn draw_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     self.draw_text_target(canvas, Target::Base, params);
   }
 
+  /// 在指定切片上绘制文本，返回是否绘制成功（切片不可见时返回 false）。
   pub fn draw_text_on(
     &mut self,
     canvas: &mut CanvasService,
@@ -34,15 +32,12 @@ impl RenderService {
     canvas.text_on(slice, params)
   }
 
+  /// 在宿主层上绘制文本（用于顶层 UI 元素）。
   pub(crate) fn draw_host_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     self.draw_text_target(canvas, Target::Host, params);
   }
 
-  // ── 矩形绘制 ──
-
-  /// 绘制填充矩形。
-  ///
-  /// `fill_char`: 填充字符（可选）。空串→空格；长度>1→取首字符并校验显示宽度==1，否则回退空格。
+  /// 在基础层上绘制填充矩形。
   pub fn draw_filled_rect(
     &mut self,
     canvas: &mut CanvasService,
@@ -67,6 +62,7 @@ impl RenderService {
     );
   }
 
+  /// 在指定切片上绘制填充矩形，返回是否绘制成功。
   #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect_on(
     &mut self,
@@ -97,6 +93,7 @@ impl RenderService {
     true
   }
 
+  /// 在宿主层上绘制填充矩形。
   #[allow(clippy::too_many_arguments)]
   pub(crate) fn draw_host_filled_rect(
     &mut self,
@@ -160,12 +157,7 @@ impl RenderService {
     }
   }
 
-  /// 绘制带边框矩形。
-  ///
-  /// 边框样式可为固定样式（Line/Bold/Double/Circle/None）或自定义 8 位置表。
-  /// `border_attrs` 为边框字符的 TextStyle 属性（bold/italic 等），
-  /// 会被各位置的 per-position style 覆盖。
-  /// `fill_bg` 控制矩形内部的背景色。
+  /// 在基础层上绘制带样式的边框矩形。
   pub fn draw_border_rect(
     &mut self,
     canvas: &mut CanvasService,
@@ -194,6 +186,7 @@ impl RenderService {
     );
   }
 
+  /// 在指定切片上绘制带样式的边框矩形，返回是否绘制成功。
   #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect_on(
     &mut self,
@@ -228,6 +221,7 @@ impl RenderService {
     true
   }
 
+  /// 在宿主层上绘制带样式的边框矩形。
   #[allow(clippy::too_many_arguments)]
   pub(crate) fn draw_host_border_rect(
     &mut self,
@@ -286,7 +280,6 @@ impl RenderService {
     let bg_ref = border_bg.as_ref();
     let attrs_ref = border_attrs.as_ref();
 
-    // 解析各位置最终样式
     let lt_s = custom.left_top.resolve(fg_ref, bg_ref, attrs_ref);
     let t_s = custom.top.resolve(fg_ref, bg_ref, attrs_ref);
     let rt_s = custom.right_top.resolve(fg_ref, bg_ref, attrs_ref);
@@ -296,7 +289,6 @@ impl RenderService {
     let lb_s = custom.left_bottom.resolve(fg_ref, bg_ref, attrs_ref);
     let l_s = custom.left.resolve(fg_ref, bg_ref, attrs_ref);
 
-    // 边框字符
     let lt_ch = custom.left_top.char.unwrap_or(' ');
     let t_ch = custom.top.char.unwrap_or(' ');
     let rt_ch = custom.right_top.char.unwrap_or(' ');
@@ -306,7 +298,6 @@ impl RenderService {
     let lb_ch = custom.left_bottom.char.unwrap_or(' ');
     let l_ch = custom.left.char.unwrap_or(' ');
 
-    // 内部填充空格样式
     let fill_dp = DrawTextParams {
       x: 0,
       y: 0,
@@ -315,12 +306,10 @@ impl RenderService {
       ..Default::default()
     };
 
-    // 顶行
     self.draw_border_cell(canvas, target, x, y, lt_ch, &lt_s);
     self.draw_border_span(canvas, target, x.saturating_add(1), y, t_ch, mid_w, &t_s);
     self.draw_border_cell(canvas, target, x.saturating_add(width - 1), y, rt_ch, &rt_s);
 
-    // 中间行
     let space_str: String = std::iter::repeat(' ').take(mid_w as usize).collect();
     for row in 1..=mid_h {
       let cy = y.saturating_add(row);
@@ -339,7 +328,6 @@ impl RenderService {
       self.draw_border_cell(canvas, target, x.saturating_add(width - 1), cy, r_ch, &r_s);
     }
 
-    // 底行
     let bot_y = y.saturating_add(height - 1);
     self.draw_border_cell(canvas, target, x, bot_y, lb_ch, &lb_s);
     self.draw_border_span(
@@ -361,9 +349,6 @@ impl RenderService {
     );
   }
 
-  // ── 内部辅助 ──
-
-  /// 绘制单个边框字符。
   fn draw_border_cell(
     &mut self,
     canvas: &mut CanvasService,
@@ -395,7 +380,6 @@ impl RenderService {
     );
   }
 
-  /// 绘制重复的边框跨度（用于水平边框线）。
   fn draw_border_span(
     &mut self,
     canvas: &mut CanvasService,

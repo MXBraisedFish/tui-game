@@ -1,20 +1,24 @@
 use super::types::{Position, Size};
 
-// ── 水平对齐常量 ──
-
+/// 水平对齐常量：左对齐
 pub const ALIGN_LEFT: &str = "left";
+
+/// 水平对齐常量：居中
 pub const ALIGN_CENTER: &str = "center";
+
+/// 水平对齐常量：右对齐
 pub const ALIGN_RIGHT: &str = "right";
 
-// ── 垂直对齐常量 ──
-
+/// 垂直对齐常量：顶部对齐
 pub const ALIGN_TOP: &str = "top";
+
+/// 垂直对齐常量：居中
 pub const ALIGN_MIDDLE: &str = "middle";
+
+/// 垂直对齐常量：底部对齐
 pub const ALIGN_BOTTOM: &str = "bottom";
 
-// ── 定位计算 ──
-
-/// 根据水平锚点和内容宽度，计算 x 起始坐标（均相对于终端画布）。
+/// 根据水平锚点和内容宽度计算 X 坐标
 pub fn resolve_x(size: Size, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
   let term_w = size.width;
   match x_anchor {
@@ -27,7 +31,7 @@ pub fn resolve_x(size: Size, x_anchor: &str, content_width: u16, offset_x: u16) 
   }
 }
 
-/// 根据垂直锚点和内容高度，计算 y 起始坐标（均相对于终端画布）。
+/// 根据垂直锚点和内容高度计算 Y 坐标
 pub fn resolve_y(size: Size, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
   let term_h = size.height;
   match y_anchor {
@@ -40,7 +44,7 @@ pub fn resolve_y(size: Size, y_anchor: &str, content_height: u16, offset_y: u16)
   }
 }
 
-/// 同时计算水平和垂直起始坐标，返回 Position。
+/// 根据锚点和内容尺寸计算位置矩形
 pub fn resolve_rect(
   size: Size,
   x_anchor: &str,

@@ -21,6 +21,7 @@ use super::events::{
 };
 use super::key_token::display_key_token;
 
+/// 键盘按键枚举
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Key {
   Esc,
@@ -112,6 +113,7 @@ pub enum Key {
   Unknown(u32),
 }
 
+/// 按键事件类型（按下 / 释放）
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyEventKind {
   Press,
@@ -124,6 +126,7 @@ pub struct KeyEvent {
   pub kind: KeyEventKind,
 }
 
+/// 原始按键事件（含可读显示文本）
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RawKeyEvent {
   pub key: Key,
@@ -131,6 +134,7 @@ pub struct RawKeyEvent {
   pub kind: KeyEventKind,
 }
 
+/// 按键状态（按下 / 按住 / 释放）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeyState {
   Pressed,
@@ -138,6 +142,7 @@ pub enum KeyState {
   Released,
 }
 
+/// 按键模式（单键或双键组合）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeyPattern {
   Single(Key),
@@ -145,10 +150,11 @@ pub enum KeyPattern {
 }
 
 impl KeyPattern {
+
+  /// 将键位规范化排序，使组合键的匹配与按键顺序无关
   pub fn normalized(self) -> Self {
     match self {
       KeyPattern::Single(key) => KeyPattern::Single(key),
-
       KeyPattern::Combo(first, second) => {
         if first <= second {
           KeyPattern::Combo(first, second)
@@ -162,7 +168,6 @@ impl KeyPattern {
   pub fn has_consumed_key(&self, consumed_keys: &HashSet<Key>) -> bool {
     match self.normalized() {
       KeyPattern::Single(key) => consumed_keys.contains(&key),
-
       KeyPattern::Combo(first, second) => {
         consumed_keys.contains(&first) || consumed_keys.contains(&second)
       }
@@ -174,7 +179,6 @@ impl KeyPattern {
       KeyPattern::Single(key) => {
         consumed_keys.insert(key);
       }
-
       KeyPattern::Combo(first, second) => {
         consumed_keys.insert(first);
         consumed_keys.insert(second);
@@ -183,17 +187,20 @@ impl KeyPattern {
   }
 }
 
+/// 按键绑定（按键模式到动作的映射）
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyBinding {
   pub pattern: KeyPattern,
   pub action: String,
 }
 
+/// 输入事件类型
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputEventType {
   Keyboard,
 }
 
+/// 输入动作事件
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InputActionEvent {
   pub event_type: InputEventType,
@@ -201,6 +208,7 @@ pub struct InputActionEvent {
   pub state: KeyState,
 }
 
+/// 输入服务，管理键盘/鼠标/系统事件的采集与动作分发
 pub struct InputService {
   sender: Sender<KeyEvent>,
   receiver: Receiver<KeyEvent>,
@@ -252,6 +260,7 @@ impl InputService {
     }
   }
 
+  /// 启动全局键盘监听线程（仅首次调用生效）
   pub fn start_key_listener(&self) {
     if self.key_listener_started.swap(true, Ordering::SeqCst) {
       return;
@@ -269,11 +278,7 @@ impl InputService {
     });
   }
 
-  /// 运行时 stdin 所有者。
-  ///
-  /// 此线程通过 crossterm 消费终端事件（resize / focus / mouse），
-  /// 阻止键盘字节泄漏回终端。按键语义仍由 rdev 提供。
-  /// 启动后任何其他模块不得直接读取 `io::stdin()`。
+  /// 启动系统事件监听线程（终端按键/鼠标/窗口大小/焦点）
   pub fn start_system_listener(&self) {
     if self.system_listener_started.swap(true, Ordering::SeqCst) {
       return;
@@ -282,7 +287,6 @@ impl InputService {
     let sender = self.system_sender.clone();
 
     thread::spawn(move || {
-      // 长轮询间隔，避免空转
       let poll_interval = Duration::from_millis(50);
       loop {
         if ct_event::poll(poll_interval).unwrap_or(false) {
@@ -305,19 +309,15 @@ impl InputService {
     });
   }
 
-  /// 消费所有待处理的系统事件，每帧调用一次。
+  /// 轮询并应用系统事件队列
   pub fn poll_system_events(&mut self) {
     while let Ok(event) = self.system_receiver.try_recv() {
       self.apply_system_event(&event);
     }
   }
 
-  /// 消费系统事件中的 Resize 事件，用回调更新画布尺寸并标记重绘。
-  /// 其余事件（Mouse 等）留到 `drain_system_events` 中处理。
+  /// 轮询系统事件并优先处理窗口大小变化
   pub fn poll_resize_events(&mut self, mut on_resize: impl FnMut(u16, u16)) {
-    // drain 出所有事件，只处理 Resize，其他的塞回...
-    // 但跨线程 channel 不支持 peek/unget。
-    // 改为在 drain 时一次性处理 resize。
     let mut others = Vec::new();
     while let Ok(event) = self.system_receiver.try_recv() {
       match &event {
@@ -328,22 +328,18 @@ impl InputService {
         _ => others.push(event),
       }
     }
-    // 非 resize 事件放回 channel
+
     for event in others {
       let _ = self.system_sender.send(event);
     }
   }
 
-  /// 获取所有系统事件并合成 Hold 事件（每帧调用一次）。
-  ///
-  /// 对于当前处于按下状态、但本帧没有 Press/Drag 事件的按钮，
-  /// 在事件列表末尾追加一个 Hold 事件（使用最后已知的鼠标坐标）。
+  /// 排空系统事件队列并返回，同时补齐鼠标 Hold 事件
   pub fn drain_system_events(&mut self) -> Vec<SystemEvent> {
     let mut events = Vec::new();
     let mut active_buttons: HashSet<MouseButton> = HashSet::new();
 
     while let Ok(event) = self.system_receiver.try_recv() {
-      // 记录本帧有 Press / Drag 的按钮
       if let SystemEvent::Mouse(me) = &event {
         if let Some(button) = me.button {
           match me.kind {
@@ -364,7 +360,6 @@ impl InputService {
       events.push(event);
     }
 
-    // 合成 Hold 也推入 raw mouse 缓冲区
     for button in &self.mouse_held_buttons {
       if !active_buttons.contains(button)
         && let Some((x, y)) = self.mouse_position
@@ -391,7 +386,6 @@ impl InputService {
       SystemEvent::Focus(focus) => {
         self.focused = focus.gained;
         if !focus.gained {
-          // 失焦时清空按键状态，防止按键卡住
           self.held_keys.clear();
           self.pressed_keys.clear();
           self.released_keys.clear();
@@ -417,11 +411,13 @@ impl InputService {
     }
   }
 
+  /// 开始新的一帧，清空单帧按键状态
   pub fn begin_frame(&mut self) {
     self.pressed_keys.clear();
     self.released_keys.clear();
   }
 
+  /// 轮询并应用全局键盘事件
   pub fn poll(&mut self) {
     while let Ok(event) = self.receiver.try_recv() {
       if self.focused && self.raw_key_capture_enabled {
@@ -435,6 +431,7 @@ impl InputService {
     }
   }
 
+  /// 启用原始按键捕获
   pub fn enable_raw_key_capture(&mut self) -> bool {
     if self.raw_key_capture_enabled {
       return false;
@@ -444,6 +441,7 @@ impl InputService {
     true
   }
 
+  /// 禁用原始按键捕获
   pub fn disable_raw_key_capture(&mut self) -> bool {
     if !self.raw_key_capture_enabled {
       return false;
@@ -456,15 +454,12 @@ impl InputService {
     self.raw_key_capture_enabled
   }
 
+  /// 取出所有原始按键事件
   pub fn take_raw_key_events(&mut self) -> Vec<RawKeyEvent> {
     self.raw_key_events.drain(..).collect()
   }
 
-  /// 开启原始鼠标事件捕获。
-  ///
-  /// 开启后，`drain_system_events()` 会将所有 [`MouseEvent`]
-  /// 同时存入内部缓冲区，通过 [`take_raw_mouse_events`] 获取。
-  /// 重复开启无效果，返回 `false`。
+  /// 启用原始鼠标事件捕获
   pub fn enable_raw_mouse_capture(&mut self) -> bool {
     if self.raw_mouse_capture_enabled {
       return false;
@@ -474,10 +469,7 @@ impl InputService {
     true
   }
 
-  /// 关闭原始鼠标事件捕获。
-  ///
-  /// 已采集的事件保留在缓冲区中，可继续通过
-  /// [`take_raw_mouse_events`] 取出。
+  /// 禁用原始鼠标事件捕获
   pub fn disable_raw_mouse_capture(&mut self) -> bool {
     if !self.raw_mouse_capture_enabled {
       return false;
@@ -486,15 +478,11 @@ impl InputService {
     true
   }
 
-  /// 返回原始鼠标事件捕获是否已开启。
   pub fn is_raw_mouse_capture_enabled(&self) -> bool {
     self.raw_mouse_capture_enabled
   }
 
-  /// 取出并清空原始鼠标事件缓冲区。
-  ///
-  /// 包含 [`MouseEventKind::Scroll`]、[`MouseEventKind::Hold`]、
-  /// [`MouseEventKind::Move`] 等 HitArea 不暴露的事件类型。
+  /// 取出所有原始鼠标事件
   pub fn take_raw_mouse_events(&mut self) -> Vec<MouseEvent> {
     self.raw_mouse_events.drain(..).collect()
   }
@@ -511,6 +499,7 @@ impl InputService {
     self.released_keys.contains(&key)
   }
 
+  /// 查询按键在当前帧的状态
   pub fn key_state(&self, key: Key) -> Option<KeyState> {
     if self.pressed_keys.contains(&key) {
       return Some(KeyState::Pressed);
@@ -535,12 +524,14 @@ impl InputService {
     self.mouse_held_buttons.contains(&button)
   }
 
+  /// 清空所有按键状态
   pub fn clear(&mut self) {
     self.held_keys.clear();
     self.pressed_keys.clear();
     self.released_keys.clear();
   }
 
+  /// 加载按键绑定配置
   pub fn load_key_bindings(&mut self, bindings: Vec<KeyBinding>) {
     self.bindings = bindings
       .into_iter()
@@ -558,11 +549,11 @@ impl InputService {
   fn pattern_state(&self, pattern: KeyPattern) -> Option<KeyState> {
     match pattern.normalized() {
       KeyPattern::Single(key) => self.key_state(key),
-
       KeyPattern::Combo(first, second) => self.combo_state(first, second),
     }
   }
 
+  // 组合键状态判定：任意键释放即认为组合键释放，后按的键触发按下
   fn combo_state(&self, first: Key, second: Key) -> Option<KeyState> {
     let first_released = self.was_released(first);
     let second_released = self.was_released(second);
@@ -600,6 +591,7 @@ impl InputService {
     self.is_down(key) || self.was_pressed(key) || self.was_released(key)
   }
 
+  /// 根据当前按键状态和绑定表收集动作事件
   pub fn collect_action_events(&self) -> Vec<InputActionEvent> {
     let mut events = Vec::new();
     let mut consumed_keys = HashSet::new();
@@ -625,18 +617,19 @@ impl InputService {
     events
   }
 
+  /// 收集动作事件并发送到动作通道
   pub fn dispatch_action_events(&self) {
     for event in self.collect_action_events() {
       let _ = self.action_sender.send(event);
     }
   }
 
+  /// 获取下一个动作事件
   pub fn next_action_event(&self) -> Option<InputActionEvent> {
     self.action_receiver.try_recv().ok()
   }
 
   fn apply_key_event(&mut self, event: KeyEvent) {
-    // 失焦时拦截所有按键
     if !self.focused {
       return;
     }
@@ -657,6 +650,7 @@ impl InputService {
   }
 }
 
+// 将 rdev 按键映射为内部 Key 枚举
 fn key_from_rdev(key: RdevKey) -> Option<Key> {
   match key {
     RdevKey::Escape => Some(Key::Esc),
@@ -797,8 +791,7 @@ fn key_event_from_rdev(event: Event) -> Option<KeyEvent> {
   }
 }
 
-// ── crossterm 系统事件转换 ──
-
+// 将 crossterm 按键事件转换为终端按键系统事件，过滤释放/修饰键组合
 fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
   if event.kind == CtKeyEventKind::Release {
     return None;
@@ -1156,7 +1149,7 @@ mod tests {
     let mut input = InputService::new();
     assert!(!input.is_raw_mouse_capture_enabled());
     assert!(input.enable_raw_mouse_capture());
-    assert!(!input.enable_raw_mouse_capture()); // 重复开启无效
+    assert!(!input.enable_raw_mouse_capture());
 
     let move_evt = SystemEvent::Mouse(MouseEvent {
       kind: MouseEventKind::Move,
@@ -1182,7 +1175,7 @@ mod tests {
     assert_eq!(raw_mouse.len(), 2);
     assert!(matches!(raw_mouse[0].kind, MouseEventKind::Move));
     assert!(matches!(raw_mouse[1].kind, MouseEventKind::Scroll));
-    // 取出后缓冲区清空
+
     assert!(input.take_raw_mouse_events().is_empty());
   }
 
@@ -1191,7 +1184,6 @@ mod tests {
     let mut input = InputService::new();
     input.enable_raw_mouse_capture();
 
-    // 失去焦点后不采集
     input.focused = false;
     input
       .system_sender
@@ -1206,7 +1198,6 @@ mod tests {
     input.drain_system_events();
     assert!(input.take_raw_mouse_events().is_empty());
 
-    // 恢复焦点后恢复采集
     input.focused = true;
     input
       .system_sender
@@ -1238,10 +1229,9 @@ mod tests {
       .unwrap();
     input.drain_system_events();
     assert!(input.disable_raw_mouse_capture());
-    assert!(!input.disable_raw_mouse_capture()); // 重复关闭无效
-    assert_eq!(input.take_raw_mouse_events().len(), 1); // 已采集的不丢失
+    assert!(!input.disable_raw_mouse_capture());
+    assert_eq!(input.take_raw_mouse_events().len(), 1);
 
-    // 重新开启后清空
     input.enable_raw_mouse_capture();
     assert!(input.take_raw_mouse_events().is_empty());
   }

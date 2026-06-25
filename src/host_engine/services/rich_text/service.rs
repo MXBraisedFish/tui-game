@@ -1,5 +1,6 @@
 use super::{RichText, RichTextParams, parser};
 
+/// 富文本服务：提供解析和纯文本提取功能。
 pub struct RichTextService;
 
 impl RichTextService {
@@ -7,12 +8,12 @@ impl RichTextService {
     Self
   }
 
+  /// 解析富文本字符串，返回包含样式信息的分段列表。
   pub fn parse(&self, text: &str, params: Option<&RichTextParams>) -> RichText {
     parser::parse(text, params)
   }
 
-  /// 提取纯可见文本（去除 f% 前缀、所有富文本标签，并进行模板替换）。
-  /// 用于长度测量等场景。
+  /// 解析富文本后仅提取可见文本内容（去除所有样式标签）。
   pub fn visible_text(&self, text: &str, params: Option<&RichTextParams>) -> String {
     if params.is_none() && !text.starts_with("f%") {
       return text.to_string();

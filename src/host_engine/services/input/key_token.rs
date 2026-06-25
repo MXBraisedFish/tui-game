@@ -1,5 +1,6 @@
 use super::service::Key;
 
+/// 将按键标记字符串（如 "shift", "a", "f1"）解析为 Key 枚举
 pub fn parse_key_token(token: &str) -> Option<Key> {
   let token = token.trim().to_ascii_lowercase();
 
@@ -133,16 +134,7 @@ fn parse_unknown_key(token: &str) -> Option<Key> {
   Some(Key::Unknown(code))
 }
 
-/// 将原始按键配置格式化为人类可读的显示字符串。
-///
-/// 每个 pattern 内部 key 按固定优先级排序（保证 `[Shift + D]` 而非 `[D + Shift]`），
-/// 再调用 `display_key_token` 显示，格式化后包裹在 `[...]` 中，
-/// 多个 pattern 之间用 `/` 分隔。
-///
-/// 示例：
-/// - `[["shift"]]` → `"[Shift]"`
-/// - `[["d"], ["left", "shift"]]` → `"[D]/[← + Shift]"`
-/// - `[["d", "shift"]]` → `"[Shift + D]"`（Shift 优先级高于字母）
+/// 将按键模式格式化为用户可读的显示文本（如 "[Shift + D]/[Ctrl + C]"）
 pub fn format_key_display(patterns: &[Vec<String>]) -> String {
   patterns
     .iter()
@@ -151,11 +143,10 @@ pub fn format_key_display(patterns: &[Vec<String>]) -> String {
         .iter()
         .filter_map(|token| parse_key_token(token))
         .collect();
-      // 按显示优先级排序
+
       keys.sort_by(|a, b| key_display_order(a).cmp(&key_display_order(b)));
       let display: Vec<String> = keys.iter().map(|k| display_key_token(*k)).collect();
       if display.is_empty() {
-        // 全部 token 解析失败，回退到原始文本
         pattern.join(" + ")
       } else {
         display.join(" + ")
@@ -166,15 +157,14 @@ pub fn format_key_display(patterns: &[Vec<String>]) -> String {
     .join("/")
 }
 
-/// 按键显示优先级。值越小越靠前。
+// 按键显示排序权重：修饰键 < 字母 < 数字 < 小键盘 < 符号 < 其他
 fn key_display_order(key: &Key) -> u8 {
   match key {
-    // 1. 功能键
     Key::LeftCtrl | Key::RightCtrl => 0,
     Key::LeftShift | Key::RightShift => 1,
     Key::LeftAlt | Key::RightAlt => 2,
     Key::LeftMeta | Key::RightMeta => 3,
-    // 2. 字母
+
     Key::A
     | Key::B
     | Key::C
@@ -201,11 +191,11 @@ fn key_display_order(key: &Key) -> u8 {
     | Key::X
     | Key::Y
     | Key::Z => 10,
-    // 3. 数字
+
     Key::Num(_) => 20,
-    // 4. 小键盘数字
+
     Key::Numpad(_) => 30,
-    // 5. 其它符号
+
     Key::BackQuote
     | Key::Minus
     | Key::Equal
@@ -217,18 +207,19 @@ fn key_display_order(key: &Key) -> u8 {
     | Key::Comma
     | Key::Dot
     | Key::Slash => 40,
-    // 6. 小键盘其它符号
+
     Key::NumpadAdd
     | Key::NumpadSubtract
     | Key::NumpadMultiply
     | Key::NumpadDivide
     | Key::NumpadEnter
     | Key::NumpadDelete => 50,
-    // 7. 未知键 & 其它
+
     _ => 60,
   }
 }
 
+/// 将 Key 枚举转换为可读的显示字符串
 pub fn display_key_token(key: Key) -> String {
   match key {
     Key::Esc => "Esc".to_string(),
@@ -318,12 +309,10 @@ mod tests {
 
   #[test]
   fn combo_sorted_modifier_first() {
-    // d + shift → Shift 优先级 > 字母，所以 [Shift + D]
     assert_eq!(
       format_key_display(&[vec!["d".into(), "shift".into()]]),
       "[Shift + D]"
     );
-    // shift + d（参数顺序无所谓，内部排序）
     assert_eq!(
       format_key_display(&[vec!["shift".into(), "d".into()]]),
       "[Shift + D]"
@@ -345,7 +334,6 @@ mod tests {
 
   #[test]
   fn unknown_token_fallback() {
-    // 未知 token 回退到原始文本
     assert_eq!(
       format_key_display(&[vec!["not_a_real_key".into()]]),
       "[not_a_real_key]"

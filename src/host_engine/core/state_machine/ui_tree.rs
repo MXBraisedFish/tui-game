@@ -1,8 +1,11 @@
+
+/// UI 树状态，以栈形式管理界面节点的导航路径
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UiTreeState {
   pub path: Vec<UiNodeState>,
 }
 
+/// UI 节点状态，包含节点类型及其逻辑与渲染状态
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UiNodeState {
   pub kind: UiNodeKind,
@@ -10,6 +13,7 @@ pub struct UiNodeState {
   pub render: UiNodeRenderState,
 }
 
+/// UI 节点类型枚举
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UiNodeKind {
   Root,
@@ -21,13 +25,14 @@ pub enum UiNodeKind {
   InputDemo,
 }
 
+/// UI 节点逻辑状态
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UiNodeLogicState;
 
+/// UI 节点渲染状态
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UiNodeRenderState;
 
-// UI节点状态
 impl UiNodeState {
   pub fn root() -> Self {
     Self {
@@ -86,36 +91,31 @@ impl UiNodeState {
   }
 }
 
-// UI树状态
 impl UiTreeState {
-  // 创建以根节点初始化的 UI 树
   pub fn new() -> Self {
     Self {
       path: vec![UiNodeState::home()],
     }
   }
 
-  // UI树节点
   pub fn path(&self) -> &[UiNodeState] {
     &self.path
   }
 
-  // 当前节点
   pub fn current(&self) -> Option<&UiNodeState> {
     self.path.last()
   }
 
-  // 当前结点（可变）
   pub fn current_mut(&mut self) -> Option<&mut UiNodeState> {
     self.path.last_mut()
   }
 
-  // 进入新节点
+  /// 进入一个 UI 节点，将其压入导航栈
   pub fn enter(&mut self, node: UiNodeState) {
     self.path.push(node);
   }
 
-  // 返回上一级节点
+  /// 返回上一层 UI 节点，仅在栈深度大于 1 时执行
   pub fn back(&mut self) -> Option<UiNodeState> {
     if self.path.len() <= 1 {
       return None;
@@ -124,13 +124,13 @@ impl UiTreeState {
     self.path.pop()
   }
 
-  // 重置UI树
+  /// 重置 UI 树，以指定根节点替换整个导航栈
   pub fn reset(&mut self, root: UiNodeState) {
     self.path.clear();
     self.path.push(root);
   }
 
-  // 替换当前节点
+  /// 替换当前栈顶 UI 节点
   pub fn replace_current(&mut self, node: UiNodeState) {
     if let Some(current) = self.path.last_mut() {
       *current = node;

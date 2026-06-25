@@ -3,6 +3,7 @@ use crate::host_engine::services::rich_text::{
 };
 use crate::host_engine::services::unicode::graphemes;
 
+/// 文本对齐方式
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TextAlign {
   Left,
@@ -16,13 +17,13 @@ impl Default for TextAlign {
   }
 }
 
+/// 文本换行模式
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TextWrapMode {
-  /// 拒绝任何换行，包括文本中的 `\n`。
   None,
-  /// 根据 `max_width` 自动换行，同时保留文本中的 `\n`。
+
   Auto,
-  /// 只使用文本中的 `\n` 换行。
+
   Normal,
 }
 
@@ -32,28 +33,21 @@ impl Default for TextWrapMode {
   }
 }
 
-/// 单次 `draw_text()` 调用的全部参数。
-///
-/// `x`、`y`、`text` 是必填语义，推荐使用 [`DrawTextParams::new`] 构造。
-/// 其余字段都是可选排版或样式参数，默认保持关闭。
+/// 绘制文本的参数
 #[derive(Clone, Debug, Default)]
 pub struct DrawTextParams {
   pub x: u16,
   pub y: u16,
   pub text: String,
 
-  /// 富文本参数替换表（`{value:xxx}` / `{key:xxx}`）。
   pub params: Option<RichTextParams>,
-
   pub fg: Option<TextColor>,
   pub bg: Option<TextColor>,
-
   pub line_align: TextAlign,
   pub wrap_mode: TextWrapMode,
   pub max_width: Option<u16>,
   pub max_height: Option<u16>,
   pub overflow_marker: Option<String>,
-
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -116,12 +110,14 @@ enum TextToken {
   Newline,
 }
 
+// 将绘制文本参数转换为已排版好的文本行列表
 pub(crate) fn layout_text_lines(params: &DrawTextParams) -> Vec<LayoutLine> {
   let default_style = params.to_text_style();
   let tokens = build_text_tokens(params, &default_style);
   layout_tokens(&tokens, params, &default_style)
 }
 
+// 测量绘制文本所需的尺寸（宽度 x 高度）
 pub(crate) fn measure_draw_text(params: &DrawTextParams) -> (u16, u16) {
   let lines = layout_text_lines(params);
   let width = lines
@@ -139,6 +135,7 @@ pub(crate) fn measure_draw_text(params: &DrawTextParams) -> (u16, u16) {
   (width, height)
 }
 
+// 将富文本解析为字素 token 流，每个 token 携带样式信息
 fn build_text_tokens(params: &DrawTextParams, style: &TextStyle) -> Vec<TextToken> {
   let rich_text = RichTextService::new().parse(&params.text, params.params.as_ref());
   let mut tokens = Vec::new();
@@ -161,6 +158,7 @@ fn build_text_tokens(params: &DrawTextParams, style: &TextStyle) -> Vec<TextToke
   tokens
 }
 
+// 将 token 流按最大宽度/高度/换行模式排版为文本行
 fn layout_tokens(
   tokens: &[TextToken],
   params: &DrawTextParams,
@@ -249,6 +247,7 @@ fn first_grapheme_style(tokens: &[TextToken]) -> Option<TextStyle> {
   })
 }
 
+// 在行尾添加溢出标记（如 "..."），必要时裁剪字符以腾出空间
 fn apply_overflow_marker(
   line: &mut LayoutLine,
   marker: Option<&str>,
@@ -292,6 +291,7 @@ fn apply_overflow_marker(
   }
 }
 
+// 将溢出标记字符串按字素拆分，并限制总宽度
 fn marker_graphemes(marker: &str, max_width: usize, style: &TextStyle) -> Vec<StyledGrapheme> {
   let mut result = Vec::new();
   let mut width = 0usize;
@@ -309,6 +309,7 @@ fn marker_graphemes(marker: &str, max_width: usize, style: &TextStyle) -> Vec<St
   result
 }
 
+// 合并基础样式和覆盖样式，覆盖样式的非默认值优先
 fn merge_style(base: &TextStyle, overrides: &TextStyle) -> TextStyle {
   let mut merged = base.clone();
 
