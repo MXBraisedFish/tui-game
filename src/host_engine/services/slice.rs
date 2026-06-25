@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::ui::UiObjectPool;
-use super::{LayoutService, Rect};
+use super::{LayoutService, Rect, Size};
 
 /// 切片唯一标识
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -111,7 +111,7 @@ impl SliceService {
   }
 
   /// 获取切片的原始矩形配置
-  pub fn rect(&self, pool: &UiObjectPool, id: SliceId) -> Option<SliceRect> {
+  pub fn configured_rect(&self, pool: &UiObjectPool, id: SliceId) -> Option<SliceRect> {
     Some(pool.slices.slices.get(&id)?.rect)
   }
 
@@ -123,6 +123,37 @@ impl SliceService {
     layout: &LayoutService,
   ) -> Option<Rect> {
     Some(resolve_rect(pool.slices.slices.get(&id)?.rect, layout))
+  }
+
+  pub fn resolved_size(
+    &self,
+    pool: &UiObjectPool,
+    id: SliceId,
+    layout: &LayoutService,
+  ) -> Option<Size> {
+    let rect = self.resolved_rect(pool, id, layout)?;
+    Some(Size {
+      width: rect.width,
+      height: rect.height,
+    })
+  }
+
+  pub fn resolved_width(
+    &self,
+    pool: &UiObjectPool,
+    id: SliceId,
+    layout: &LayoutService,
+  ) -> Option<u16> {
+    Some(self.resolved_size(pool, id, layout)?.width)
+  }
+
+  pub fn resolved_height(
+    &self,
+    pool: &UiObjectPool,
+    id: SliceId,
+    layout: &LayoutService,
+  ) -> Option<u16> {
+    Some(self.resolved_size(pool, id, layout)?.height)
   }
 
   /// 修改切片的矩形配置
@@ -185,7 +216,7 @@ impl SliceService {
 
 // 根据布局将切片相对坐标解析为绝对像素坐标
 pub(crate) fn resolve_rect(rect: SliceRect, layout: &LayoutService) -> Rect {
-  let viewport = layout.viewport_size();
+  let viewport = layout.developer_size();
   let x = rect.x.min(viewport.width);
   let y = rect.y.min(viewport.height);
   let resolve = |length: SliceLength, total: u16, offset: u16| match length {
@@ -283,6 +314,19 @@ mod tests {
         height: 35
       })
     );
+    assert_eq!(
+      service.configured_rect(&pool, a),
+      Some(rect(10, 5, SliceLength::Percent(50), SliceLength::Auto))
+    );
+    assert_eq!(
+      service.resolved_size(&pool, a, &layout),
+      Some(Size {
+        width: 50,
+        height: 35
+      })
+    );
+    assert_eq!(service.resolved_width(&pool, a, &layout), Some(50));
+    assert_eq!(service.resolved_height(&pool, a, &layout), Some(35));
     assert!(!service.is_visible(&pool, b));
     assert!(!service.is_opaque(&pool, b));
     assert!(service.send_to_back(&mut pool, b));

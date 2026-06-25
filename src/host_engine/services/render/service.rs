@@ -76,7 +76,7 @@ impl RenderService {
     fill_fg: Option<TextColor>,
     fill_bg: Option<TextColor>,
   ) -> bool {
-    if canvas.slice_rect(slice).is_none() {
+    if canvas.prepared_slice_rect(slice).is_none() {
       return false;
     }
     self.draw_filled_rect_target(
@@ -202,7 +202,7 @@ impl RenderService {
     fill_bg: Option<TextColor>,
     border_attrs: Option<TextStyle>,
   ) -> bool {
-    if canvas.slice_rect(slice).is_none() {
+    if canvas.prepared_slice_rect(slice).is_none() {
       return false;
     }
     self.draw_border_rect_target(

@@ -5,7 +5,7 @@ use crate::host_engine::services::slice::resolve_rect;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
 use crate::host_engine::services::{
-  LayoutService, Rect, SliceId, TextColor, TextStyle, UiObjectPool,
+  LayoutService, Rect, Size, SliceId, TextColor, TextStyle, UiObjectPool,
 };
 
 /// 画布服务：管理基础层、宿主层和多切片缓冲区，协调文本绘制与区域查询。
@@ -49,24 +49,19 @@ impl CanvasService {
     }
   }
 
-  pub fn width(&self) -> u16 {
+  pub fn base_width(&self) -> u16 {
     self.base.width()
   }
 
-  pub fn height(&self) -> u16 {
+  pub fn base_height(&self) -> u16 {
     self.base.height()
   }
 
-  pub fn size(&self) -> (u16, u16) {
-    (self.width(), self.height())
-  }
-
-  pub(crate) fn physical_width(&self) -> u16 {
-    self.host.width()
-  }
-
-  pub(crate) fn physical_height(&self) -> u16 {
-    self.host.height()
+  pub fn base_size(&self) -> Size {
+    Size {
+      width: self.base.width(),
+      height: self.base.height(),
+    }
   }
 
   /// 开始新的一帧：调整宿主缓冲区尺寸，必要时标记全量重绘。
@@ -82,8 +77,8 @@ impl CanvasService {
 
   /// 根据 UI 对象池和布局服务预处理所有切片缓冲区。
   pub fn prepare(&mut self, pool: &UiObjectPool, layout: &LayoutService) {
-    self.viewport = layout.developer_viewport();
-    let size = layout.viewport_size();
+    self.viewport = layout.developer_viewport_rect();
+    let size = layout.developer_size();
     if self.base.width() != size.width || self.base.height() != size.height {
       self.base.resize(size.width, size.height);
     } else {
@@ -199,7 +194,6 @@ impl CanvasService {
       }
 
       if g.display_width == 0 {
-
         let final_style = resolve_background(style.clone(), buffer, cursor_x, y);
         buffer.set(cursor_x, y, CanvasCell::styled(&g.text, final_style));
 
@@ -266,9 +260,25 @@ impl CanvasService {
   }
 
   /// 获取指定切片在视口坐标系中的矩形区域（切片不可见时返回 None）。
-  pub(crate) fn slice_rect(&self, id: SliceId) -> Option<Rect> {
+  pub fn prepared_slice_rect(&self, id: SliceId) -> Option<Rect> {
     let slice = self.slices.get(&id)?;
     slice.visible.then_some(slice.rect)
+  }
+
+  pub fn prepared_slice_size(&self, id: SliceId) -> Option<Size> {
+    let rect = self.prepared_slice_rect(id)?;
+    Some(Size {
+      width: rect.width,
+      height: rect.height,
+    })
+  }
+
+  pub fn prepared_slice_width(&self, id: SliceId) -> Option<u16> {
+    Some(self.prepared_slice_size(id)?.width)
+  }
+
+  pub fn prepared_slice_height(&self, id: SliceId) -> Option<u16> {
+    Some(self.prepared_slice_size(id)?.height)
   }
 
   /// 将物理坐标转换为视口内的相对坐标。
@@ -408,11 +418,13 @@ fn resolve_background(mut style: TextStyle, buffer: &CanvasBuffer, x: u16, y: u1
 mod tests {
   use super::*;
   use crate::host_engine::services::text_layout::TextWrapMode;
-  use crate::host_engine::services::{RichTextParams, TerminalColor, TextColor};
+  use crate::host_engine::services::{
+    RichTextParams, SliceLength, SliceOptions, SliceRect, SliceService, TerminalColor, TextColor,
+  };
   use std::collections::HashMap;
 
   fn visible_row(canvas: &CanvasService, y: u16) -> String {
-    (0..canvas.width())
+    (0..canvas.base_width())
       .filter_map(|x| {
         canvas.base.get(x, y).and_then(|cell| {
           if cell.is_continuation() || cell.text == " " {
@@ -619,8 +631,60 @@ mod tests {
     canvas.begin_frame(&layout);
     canvas.prepare(&pool, &layout);
 
+    assert_eq!(
+      canvas.base_size(),
+      Size {
+        width: 16,
+        height: 6
+      }
+    );
+    assert_eq!(canvas.base_height(), 6);
     assert_eq!(canvas.viewport_point(0, 0), None);
     assert_eq!(canvas.viewport_point(2, 2), Some((0, 0)));
+  }
+
+  #[test]
+  fn prepared_slice_queries_return_visible_prepared_size() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(20, 10);
+    let mut pool = UiObjectPool::new();
+    let slice = SliceService::new()
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: SliceRect {
+            x: 1,
+            y: 2,
+            width: SliceLength::Fixed(5),
+            height: SliceLength::Fixed(3),
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let mut canvas = CanvasService::new();
+
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+
+    assert_eq!(
+      canvas.prepared_slice_rect(slice),
+      Some(Rect {
+        x: 1,
+        y: 2,
+        width: 5,
+        height: 3
+      })
+    );
+    assert_eq!(
+      canvas.prepared_slice_size(slice),
+      Some(Size {
+        width: 5,
+        height: 3
+      })
+    );
+    assert_eq!(canvas.prepared_slice_width(slice), Some(5));
+    assert_eq!(canvas.prepared_slice_height(slice), Some(3));
   }
 
   #[test]

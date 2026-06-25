@@ -42,7 +42,6 @@ pub enum InputDemoCommand {
 }
 
 impl InputDemoUi {
-
   /// 初始化演示页面：创建切片、命中区域和文本输入组件。
   pub fn init(
     hit_area: &HitAreaService,
@@ -234,7 +233,7 @@ impl InputDemoUi {
     layout: &LayoutService,
     hit_area: &HitAreaService,
   ) {
-    let size = layout.viewport_size();
+    let size = layout.developer_size();
     render.draw_filled_rect(
       canvas,
       0,
@@ -282,7 +281,7 @@ impl InputDemoUi {
     canvas: &mut CanvasService,
     hit_area: &HitAreaService,
   ) {
-    let Some(rect) = canvas.slice_rect(self.opaque_slice) else {
+    let Some(rect) = canvas.prepared_slice_rect(self.opaque_slice) else {
       return;
     };
     render.draw_filled_rect_on(
@@ -351,7 +350,7 @@ impl InputDemoUi {
     hit_area: &HitAreaService,
     text_input: &TextInputService,
   ) -> Option<(u16, u16)> {
-    let rect = canvas.slice_rect(self.transparent_slice)?;
+    let rect = canvas.prepared_slice_rect(self.transparent_slice)?;
     draw_slice_frame(
       canvas,
       self.transparent_slice,
@@ -424,7 +423,7 @@ impl InputDemoUi {
 
   fn draw_host(&self, canvas: &mut CanvasService, layout: &LayoutService) {
     let physical = layout.physical_size();
-    let viewport = layout.developer_viewport();
+    let viewport = layout.developer_viewport_rect();
     canvas.host_styled_text(
       0,
       0,

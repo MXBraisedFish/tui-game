@@ -49,18 +49,34 @@ impl LayoutService {
     measure::get_draw_text_height(params)
   }
 
-  pub(crate) fn physical_size(&self) -> Size {
+  pub fn physical_size(&self) -> Size {
     self.physical
   }
 
-  pub fn viewport_size(&self) -> Size {
+  pub fn physical_width(&self) -> u16 {
+    self.physical.width
+  }
+
+  pub fn physical_height(&self) -> u16 {
+    self.physical.height
+  }
+
+  pub fn developer_size(&self) -> Size {
     Size {
       width: self.viewport.width,
       height: self.viewport.height,
     }
   }
 
-  pub(crate) fn developer_viewport(&self) -> Rect {
+  pub fn developer_width(&self) -> u16 {
+    self.viewport.width
+  }
+
+  pub fn developer_height(&self) -> u16 {
+    self.viewport.height
+  }
+
+  pub fn developer_viewport_rect(&self) -> Rect {
     self.viewport
   }
 
@@ -81,12 +97,12 @@ impl LayoutService {
 
   /// 在视口内根据水平锚点和内容宽度计算 X 坐标
   pub fn resolve_x(&self, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
-    position::resolve_x(self.viewport_size(), x_anchor, content_width, offset_x)
+    position::resolve_x(self.developer_size(), x_anchor, content_width, offset_x)
   }
 
   /// 在视口内根据垂直锚点和内容高度计算 Y 坐标
   pub fn resolve_y(&self, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
-    position::resolve_y(self.viewport_size(), y_anchor, content_height, offset_y)
+    position::resolve_y(self.developer_size(), y_anchor, content_height, offset_y)
   }
 
   /// 在视口内根据锚点和内容尺寸计算位置
@@ -100,7 +116,7 @@ impl LayoutService {
     offset_y: u16,
   ) -> Position {
     position::resolve_rect(
-      self.viewport_size(),
+      self.developer_size(),
       x_anchor,
       y_anchor,
       content_width,
@@ -154,8 +170,10 @@ mod tests {
   fn viewport_clips_resizes_and_resets() {
     let mut layout = LayoutService::new();
     layout.resize_physical(100, 40);
+    assert_eq!(layout.physical_width(), 100);
+    assert_eq!(layout.physical_height(), 40);
     assert_eq!(
-      layout.viewport_size(),
+      layout.developer_size(),
       Size {
         width: 100,
         height: 40
@@ -168,7 +186,7 @@ mod tests {
       height: 20,
     });
     assert_eq!(
-      layout.developer_viewport(),
+      layout.developer_viewport_rect(),
       Rect {
         x: 80,
         y: 30,
@@ -176,9 +194,11 @@ mod tests {
         height: 10
       }
     );
+    assert_eq!(layout.developer_width(), 20);
+    assert_eq!(layout.developer_height(), 10);
     layout.resize_physical(90, 35);
     assert_eq!(
-      layout.developer_viewport(),
+      layout.developer_viewport_rect(),
       Rect {
         x: 80,
         y: 30,
@@ -188,7 +208,7 @@ mod tests {
     );
     layout.reset_developer_viewport();
     assert_eq!(
-      layout.developer_viewport(),
+      layout.developer_viewport_rect(),
       Rect {
         x: 0,
         y: 0,

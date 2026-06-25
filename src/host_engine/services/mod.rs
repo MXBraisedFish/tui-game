@@ -2,6 +2,7 @@ mod canvas;
 mod clipboard;
 mod game;
 mod hit_area;
+mod host_object;
 mod i18n;
 mod image;
 mod input;
@@ -26,6 +27,7 @@ pub use canvas::{CanvasCell, CanvasService};
 pub use clipboard::ClipboardService;
 pub use game::GameService;
 pub use hit_area::{HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService};
+pub use host_object::{HostArea, HostAreaKind, HostObjectPool};
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};
 pub use input::{
@@ -56,6 +58,7 @@ pub use unicode::UnicodeService;
 pub struct EngineServices {
   pub package: PackageService,
   pub clipboard: ClipboardService,
+  pub host_objects: HostObjectPool,
   pub hit_area: HitAreaService,
   pub slice: SliceService,
   pub input: InputService,
@@ -85,6 +88,7 @@ impl EngineServices {
     Self {
       terminal: TerminalService::new(),
       clipboard: ClipboardService::new(),
+      host_objects: HostObjectPool::new(),
       hit_area: HitAreaService::new(),
       slice: SliceService::new(),
       text_input: TextInputService::new(),

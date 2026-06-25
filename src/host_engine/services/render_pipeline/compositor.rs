@@ -149,7 +149,7 @@ mod tests {
     assert_eq!(text(&frame, 4, 2), " ");
     assert_eq!(text(&frame, 5, 2), "H");
     assert_eq!(text(&frame, 6, 2), " ");
-    assert!(canvas.slice_rect(opaque).is_some());
+    assert!(canvas.prepared_slice_rect(opaque).is_some());
   }
 
   #[test]
