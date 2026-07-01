@@ -1,4 +1,3 @@
-
 mod color;
 mod params;
 mod parser;

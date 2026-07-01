@@ -237,12 +237,15 @@ fn is_clipped_wide_cell(cell: &CanvasCell, sx: u16, scroll_box: &PreparedScrollB
     .map(|grapheme| grapheme.display_width)
     .unwrap_or(1);
   // 右侧裁剪：宽字符超出 viewport 右边缘。
-  if width > 1 && sx as usize + width > scroll_box.scroll_x as usize + scroll_box.rect.width as usize
+  if width > 1
+    && sx as usize + width > scroll_box.scroll_x as usize + scroll_box.rect.width as usize
   {
     return true;
   }
   // 左侧裁剪：延续单元的基础宽字符已被滚出视口左侧。
-  if cell.is_continuation() && sx > scroll_box.scroll_x && sx.saturating_sub(1) < scroll_box.scroll_x
+  if cell.is_continuation()
+    && sx > scroll_box.scroll_x
+    && sx.saturating_sub(1) < scroll_box.scroll_x
   {
     return true;
   }

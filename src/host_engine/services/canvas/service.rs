@@ -57,7 +57,7 @@ pub(crate) enum PreparedSurface<'a> {
 
 impl CanvasService {
   pub fn new() -> Self {
-    let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
+    let (width, height) = crossterm::terminal::size().unwrap_or((95, 24));
     Self {
       base: CanvasBuffer::new(width, height),
       host: CanvasBuffer::new(width, height),

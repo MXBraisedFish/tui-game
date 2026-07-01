@@ -1,16 +1,17 @@
 use crate::host_engine::core::state_machine::{MainHostState, OverlayKind, UiNodeState};
-use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
+use crate::host_engine::core::{set_crash_phase, ExitState, FrameScheduler, RuntimeWorld};
 
 use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
-  EngineServices, HostAreaKind, MouseEvent, Rect, SystemEvent, UiEvent, UiObjectPool,
-  UiObjectPoolOwner, translate_action_map,
+  translate_action_map, EngineServices, HostAreaKind, MouseEvent, Rect, SystemEvent, UiEvent,
+  UiObjectPool, UiObjectPoolOwner,
 };
 
 use crate::host_engine::ui::{
-  HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageSelectCommand, LanguageSelectUi,
-  ModsCommand, ModsUi, SettingsUi, SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout,
+  GamePackageCommand, GamePackageUi, HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi,
+  LanguageSelectCommand, LanguageSelectUi, ModsCommand, ModsUi, ScreensaverPackageCommand,
+  ScreensaverPackageUi, SettingsUi, SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout,
   TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 
@@ -44,6 +45,16 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
   let mut mods_ui = ModsUi::init(&services.hit_area);
+  let mut game_package_ui = GamePackageUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
+  let mut screensaver_package_ui = ScreensaverPackageUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
   let mut input_demo_ui =
     InputDemoUi::init(&services.hit_area, &services.slice, &services.scroll_box);
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
@@ -61,6 +72,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     services.input.begin_frame();
     services.input.poll();
+    services.package.poll_events(&mut services.log);
 
     services.input.poll_resize_events(|w, h| {
       services.layout.resize_physical(w, h);
@@ -80,6 +92,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
+      &mut game_package_ui,
+      &mut screensaver_package_ui,
       &mut input_demo_ui,
       &mut window_size_ui,
     );
@@ -95,6 +109,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         language_select_ui.as_mut(),
         &mut terminal_check_ui,
         &mut mods_ui,
+        &mut game_package_ui,
+        &mut screensaver_package_ui,
         &mut input_demo_ui,
         &mut window_size_ui,
       );
@@ -107,6 +123,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         language_select_ui.as_mut(),
         &mut terminal_check_ui,
         &mut mods_ui,
+        &mut game_package_ui,
+        &mut screensaver_package_ui,
         &mut input_demo_ui,
       );
     } else {
@@ -115,6 +133,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         Some(UiNodeKind::Settings) => load_settings_action_map(services),
         Some(UiNodeKind::LanguageSelect) => load_language_select_action_map(services),
         Some(UiNodeKind::Mods) => load_mods_action_map(services),
+        Some(UiNodeKind::GamePackage) => load_game_package_action_map(services),
+        Some(UiNodeKind::ScreensaverPackage) => load_screensaver_package_action_map(services),
         Some(UiNodeKind::TerminalCheck) => load_terminal_check_action_map(services),
         Some(UiNodeKind::InputDemo) => load_input_demo_action_map(services),
         _ => {}
@@ -128,6 +148,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         language_select_ui.as_mut(),
         &mut terminal_check_ui,
         &mut mods_ui,
+        &mut game_package_ui,
+        &mut screensaver_package_ui,
         &mut input_demo_ui,
         &mut window_size_ui,
       );
@@ -145,6 +167,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
+      &mut game_package_ui,
+      &mut screensaver_package_ui,
       &mut input_demo_ui,
     );
 
@@ -160,6 +184,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
+      &mut game_package_ui,
+      &mut screensaver_package_ui,
       &mut input_demo_ui,
       &mut window_size_ui,
     );
@@ -206,6 +232,20 @@ fn load_mods_action_map(services: &mut EngineServices) {
   services.input.load_key_bindings(bindings);
 }
 
+fn load_game_package_action_map(services: &mut EngineServices) {
+  let bindings = translate_action_map(&GamePackageUi::action_map())
+    .expect("failed to translate GamePackageUi action map");
+
+  services.input.load_key_bindings(bindings);
+}
+
+fn load_screensaver_package_action_map(services: &mut EngineServices) {
+  let bindings = translate_action_map(&ScreensaverPackageUi::action_map())
+    .expect("failed to translate ScreensaverPackageUi action map");
+
+  services.input.load_key_bindings(bindings);
+}
+
 fn load_terminal_check_action_map(services: &mut EngineServices) {
   let bindings = translate_action_map(&TerminalCheckUi::action_map())
     .expect("failed to translate TerminalCheckUi action map");
@@ -233,6 +273,8 @@ fn current_objects_mut<'a>(
   language_select_ui: Option<&'a mut LanguageSelectUi>,
   terminal_check_ui: &'a mut TerminalCheckUi,
   mods_ui: &'a mut ModsUi,
+  game_package_ui: &'a mut GamePackageUi,
+  screensaver_package_ui: &'a mut ScreensaverPackageUi,
   input_demo_ui: &'a mut InputDemoUi,
 ) -> Option<&'a mut UiObjectPool> {
   match world.state.current_ui_kind() {
@@ -241,6 +283,8 @@ fn current_objects_mut<'a>(
     Some(UiNodeKind::LanguageSelect) => language_select_ui.map(UiObjectPoolOwner::objects_mut),
     Some(UiNodeKind::TerminalCheck) => Some(terminal_check_ui.objects_mut()),
     Some(UiNodeKind::Mods) => Some(mods_ui.objects_mut()),
+    Some(UiNodeKind::GamePackage) => Some(game_package_ui.objects_mut()),
+    Some(UiNodeKind::ScreensaverPackage) => Some(screensaver_package_ui.objects_mut()),
     Some(UiNodeKind::InputDemo) => Some(input_demo_ui.objects_mut()),
     _ => None,
   }
@@ -255,6 +299,8 @@ fn deactivate_hidden_pools(
   language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
 ) {
@@ -277,6 +323,11 @@ fn deactivate_hidden_pools(
   }
   deactivate(UiNodeKind::TerminalCheck, terminal_check_ui.objects_mut());
   deactivate(UiNodeKind::Mods, mods_ui.objects_mut());
+  deactivate(UiNodeKind::GamePackage, game_package_ui.objects_mut());
+  deactivate(
+    UiNodeKind::ScreensaverPackage,
+    screensaver_package_ui.objects_mut(),
+  );
   deactivate(UiNodeKind::InputDemo, input_demo_ui.objects_mut());
   if world.state.current_overlay_kind() != Some(OverlayKind::WindowSizeWarning) {
     services
@@ -294,6 +345,8 @@ fn route_component_mouse(
   language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   event: MouseEvent,
 ) -> bool {
@@ -304,6 +357,8 @@ fn route_component_mouse(
     language_select_ui,
     terminal_check_ui,
     mods_ui,
+    game_package_ui,
+    screensaver_package_ui,
     input_demo_ui,
   ) else {
     return false;
@@ -328,6 +383,8 @@ fn route_mouse_and_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   event: MouseEvent,
 ) -> bool {
@@ -339,6 +396,8 @@ fn route_mouse_and_events(
     language_select_ui.as_deref_mut(),
     terminal_check_ui,
     mods_ui,
+    game_package_ui,
+    screensaver_package_ui,
     input_demo_ui,
     event,
   );
@@ -350,6 +409,8 @@ fn route_mouse_and_events(
     language_select_ui,
     terminal_check_ui,
     mods_ui,
+    game_package_ui,
+    screensaver_package_ui,
     input_demo_ui,
   );
   consumed
@@ -363,6 +424,8 @@ fn route_component_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
 ) {
   loop {
@@ -373,6 +436,8 @@ fn route_component_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_package_ui,
+      screensaver_package_ui,
       input_demo_ui,
     )
     .and_then(UiObjectPool::pop_event);
@@ -386,6 +451,8 @@ fn route_component_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_package_ui,
+      screensaver_package_ui,
       input_demo_ui,
     );
     if world.is_stopped() {
@@ -402,6 +469,8 @@ fn route_text_input_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
 ) {
   for event in services.input.drain_system_events() {
@@ -414,6 +483,8 @@ fn route_text_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_package_ui,
+          screensaver_package_ui,
           input_demo_ui,
         ) {
           services
@@ -430,6 +501,8 @@ fn route_text_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_package_ui,
+          screensaver_package_ui,
           input_demo_ui,
           mouse,
         );
@@ -442,6 +515,8 @@ fn route_text_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_package_ui,
+          screensaver_package_ui,
           input_demo_ui,
         ) {
           services.hit_area.focus_lost(objects);
@@ -457,6 +532,8 @@ fn route_text_input_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_package_ui,
+      screensaver_package_ui,
       input_demo_ui,
     );
   }
@@ -470,6 +547,8 @@ fn route_input_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
 ) {
@@ -519,6 +598,8 @@ fn route_input_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_package_ui,
+      screensaver_package_ui,
       input_demo_ui,
     );
     route_component_events(
@@ -529,6 +610,8 @@ fn route_input_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_package_ui,
+      screensaver_package_ui,
       input_demo_ui,
     );
 
@@ -550,6 +633,8 @@ fn route_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_package_ui,
+          screensaver_package_ui,
           input_demo_ui,
           mouse,
         );
@@ -567,6 +652,8 @@ fn route_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_package_ui,
+          screensaver_package_ui,
           input_demo_ui,
         ) {
           services.hit_area.focus_lost(pool);
@@ -579,6 +666,8 @@ fn route_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_package_ui,
+          screensaver_package_ui,
           input_demo_ui,
         );
       }
@@ -596,9 +685,11 @@ fn route_input_event(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
-  language_select_ui: Option<&mut LanguageSelectUi>,
+  mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
 ) {
   match world.state.current_ui_kind() {
@@ -609,19 +700,29 @@ fn route_input_event(
     }
     Some(UiNodeKind::Settings) => {
       if let Some(command) = settings_ui.handle_event(event) {
-        apply_settings_command(command, world);
+        apply_settings_command(command, settings_ui, services, world);
       }
     }
     Some(UiNodeKind::LanguageSelect) => {
-      if let Some(ui) = language_select_ui {
+      if let Some(ui) = language_select_ui.as_deref_mut() {
         if let Some(command) = ui.handle_event(event) {
-          apply_language_select_command(command, services, world);
+          apply_language_select_command(command, ui, services, world);
         }
       }
     }
     Some(UiNodeKind::Mods) => {
       if let Some(command) = mods_ui.handle_event(event) {
-        apply_mods_command(command, world);
+        apply_mods_command(command, mods_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::GamePackage) => {
+      if let Some(command) = game_package_ui.handle_event(event) {
+        apply_game_package_command(command, game_package_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::ScreensaverPackage) => {
+      if let Some(command) = screensaver_package_ui.handle_event(event) {
+        apply_screensaver_package_command(command, screensaver_package_ui, services, world);
       }
     }
     Some(UiNodeKind::TerminalCheck) => {
@@ -663,6 +764,8 @@ fn route_update(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
 ) {
   if world.state.current_overlay_kind().is_some() {
@@ -688,6 +791,14 @@ fn route_update(
       let dt = world.clock.delta_time();
       let _ = mods_ui.update(dt);
     }
+    Some(UiNodeKind::GamePackage) => {
+      let dt = world.clock.delta_time();
+      let _ = game_package_ui.update(dt);
+    }
+    Some(UiNodeKind::ScreensaverPackage) => {
+      let dt = world.clock.delta_time();
+      let _ = screensaver_package_ui.update(dt);
+    }
     Some(UiNodeKind::TerminalCheck) => {
       let dt = world.clock.delta_time();
       if let Some(command) = terminal_check_ui.update(dt) {
@@ -707,6 +818,8 @@ fn route_update(
     language_select_ui.as_deref_mut(),
     terminal_check_ui,
     mods_ui,
+    game_package_ui,
+    screensaver_package_ui,
     input_demo_ui,
   );
 }
@@ -719,6 +832,8 @@ fn route_render(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_package_ui: &mut GamePackageUi,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
 ) -> Option<(u16, u16)> {
@@ -758,6 +873,8 @@ fn route_render(
     language_select_ui.as_deref_mut(),
     terminal_check_ui,
     mods_ui,
+    game_package_ui,
+    screensaver_package_ui,
     input_demo_ui,
   ) {
     objects.begin_render();
@@ -804,6 +921,34 @@ fn route_render(
         &services.layout,
         &services.i18n,
         &services.hit_area,
+      );
+      None
+    }
+    Some(UiNodeKind::GamePackage) => {
+      game_package_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+        &services.text_input,
+        &services.scroll_box,
+        &services.package,
+        &mut services.image,
+      );
+      None
+    }
+    Some(UiNodeKind::ScreensaverPackage) => {
+      screensaver_package_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+        &services.text_input,
+        &services.scroll_box,
+        &services.package,
+        &mut services.image,
       );
       None
     }
@@ -890,21 +1035,28 @@ fn apply_home_command(command: HomeUiCommand, world: &mut RuntimeWorld) {
 fn apply_input_demo_command(
   command: InputDemoCommand,
   input_demo_ui: &mut InputDemoUi,
-  _services: &mut EngineServices,
+  services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
   match command {
     InputDemoCommand::Back => {
       input_demo_ui.leave();
       world.state.pop_ui_node();
+      reset_input_demo_ui(input_demo_ui, services);
     }
   }
 }
 
-fn apply_settings_command(command: SettingsUiCommand, world: &mut RuntimeWorld) {
+fn apply_settings_command(
+  command: SettingsUiCommand,
+  settings_ui: &mut SettingsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
   match command {
     SettingsUiCommand::Back => {
       world.state.pop_ui_node();
+      reset_settings_ui(settings_ui, services);
     }
     SettingsUiCommand::OpenLanguageSelect => {
       world.state.enter_ui_node(UiNodeState::language_select());
@@ -915,18 +1067,89 @@ fn apply_settings_command(command: SettingsUiCommand, world: &mut RuntimeWorld) 
   }
 }
 
-fn apply_mods_command(command: ModsCommand, world: &mut RuntimeWorld) {
+fn apply_mods_command(
+  command: ModsCommand,
+  mods_ui: &mut ModsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
   match command {
     ModsCommand::Back => {
       world.state.pop_ui_node();
+      reset_mods_ui(mods_ui, services);
     }
-    ModsCommand::OpenGame => {}
-    ModsCommand::OpenScreensaver => {}
+    ModsCommand::OpenGame => {
+      world.state.enter_ui_node(UiNodeState::game_package());
+    }
+    ModsCommand::OpenScreensaver => {
+      world
+        .state
+        .enter_ui_node(UiNodeState::screensaver_package());
+    }
+  }
+}
+
+fn apply_game_package_command(
+  command: GamePackageCommand,
+  game_package_ui: &mut GamePackageUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    GamePackageCommand::Back => {
+      world.state.pop_ui_node();
+      reset_game_package_ui(game_package_ui, services);
+    }
+    GamePackageCommand::FocusSearch => {
+      game_package_ui.focus_search(&mut services.text_input);
+    }
+    GamePackageCommand::BlurSearch => {
+      game_package_ui.blur_search(&mut services.text_input);
+    }
+    GamePackageCommand::FocusJump => {
+      game_package_ui.focus_jump(&mut services.text_input);
+    }
+    GamePackageCommand::BlurJump => {
+      game_package_ui.blur_jump(&mut services.text_input);
+    }
+    GamePackageCommand::SubmitJump(value) => {
+      game_package_ui.submit_jump(&mut services.text_input, value);
+    }
+  }
+}
+
+fn apply_screensaver_package_command(
+  command: ScreensaverPackageCommand,
+  screensaver_package_ui: &mut ScreensaverPackageUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    ScreensaverPackageCommand::Back => {
+      world.state.pop_ui_node();
+      reset_screensaver_package_ui(screensaver_package_ui, services);
+    }
+    ScreensaverPackageCommand::FocusSearch => {
+      screensaver_package_ui.focus_search(&mut services.text_input);
+    }
+    ScreensaverPackageCommand::BlurSearch => {
+      screensaver_package_ui.blur_search(&mut services.text_input);
+    }
+    ScreensaverPackageCommand::FocusJump => {
+      screensaver_package_ui.focus_jump(&mut services.text_input);
+    }
+    ScreensaverPackageCommand::BlurJump => {
+      screensaver_package_ui.blur_jump(&mut services.text_input);
+    }
+    ScreensaverPackageCommand::SubmitJump(value) => {
+      screensaver_package_ui.submit_jump(&mut services.text_input, value);
+    }
   }
 }
 
 fn apply_language_select_command(
   command: LanguageSelectCommand,
+  language_select_ui: &mut LanguageSelectUi,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
@@ -936,15 +1159,71 @@ fn apply_language_select_command(
       services
         .i18n
         .load_runtime_language(&services.storage, &mut services.log, &code);
-      services.i18n.set_current_language(code);
+      let package_language = services.i18n.current_language().to_string();
+      let missing_template = services
+        .i18n
+        .get_runtime_text("language_warning", "language_warning.missing");
+      let _ = services
+        .package
+        .request_rescan_for_language(&package_language, &missing_template);
     }
     LanguageSelectCommand::Back => {
       world.state.pop_ui_node();
+      reset_language_select_ui(language_select_ui, services);
       if !services.storage.is_terminal_profile_complete() {
         world.state.enter_ui_node(UiNodeState::terminal_check());
       }
     }
   }
+}
+
+fn clear_exiting_pool(pool: &mut UiObjectPool, services: &mut EngineServices) {
+  let _ = services.text_input.blur(pool);
+  services.text_input.deactivate_pool(pool);
+  services.hit_area.deactivate(pool);
+}
+
+fn reset_settings_ui(ui: &mut SettingsUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = SettingsUi::init(&services.hit_area);
+}
+
+fn reset_mods_ui(ui: &mut ModsUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = ModsUi::init(&services.hit_area);
+}
+
+fn reset_game_package_ui(ui: &mut GamePackageUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = GamePackageUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
+}
+
+fn reset_screensaver_package_ui(ui: &mut ScreensaverPackageUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = ScreensaverPackageUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
+}
+
+fn reset_language_select_ui(ui: &mut LanguageSelectUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = LanguageSelectUi::init(
+    services.i18n.language_registry().to_vec(),
+    &services.storage,
+    &mut services.log,
+    &services.hit_area,
+  );
+}
+
+fn reset_input_demo_ui(ui: &mut InputDemoUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = InputDemoUi::init(&services.hit_area, &services.slice, &services.scroll_box);
 }
 
 #[cfg(test)]
@@ -1063,9 +1342,9 @@ fn manage_window_size_overlay(services: &EngineServices, world: &mut RuntimeWorl
 
 fn get_min_window_size(world: &RuntimeWorld) -> (u32, u32) {
   if world.state.is_host_mode() {
-    (80, 24)
+    (95, 24)
   } else {
-    (80, 24)
+    (95, 24)
   }
 }
 

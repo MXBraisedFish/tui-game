@@ -10,7 +10,6 @@ pub struct BorderCharacter {
 }
 
 impl BorderCharacter {
-
   /// 将位置样式与默认样式合并，生成最终渲染用的 TextStyle。
   pub fn resolve(
     &self,
@@ -62,7 +61,6 @@ pub enum BorderStyle {
 }
 
 impl BorderStyle {
-
   /// 将预定义样式展开为具体的 CustomBorder 描述（None 返回 None）。
   pub fn to_custom(&self) -> Option<CustomBorder> {
     match self {

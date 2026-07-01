@@ -1,4 +1,3 @@
-
 /// 游戏状态，持有游戏循环
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GameState {

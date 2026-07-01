@@ -56,7 +56,6 @@ mod tests {
 
   #[test]
   fn zero_width_combining_mark() {
-
     assert_eq!(display_width("\u{0301}"), 0);
   }
 
@@ -98,13 +97,11 @@ mod tests {
 
   #[test]
   fn mixed_with_zwj() {
-
     assert_eq!(display_width("a\u{200D}b"), 2);
   }
 
   #[test]
   fn grapheme_combining_accent() {
-
     let gs = graphemes("e\u{0301}");
     assert_eq!(gs.len(), 1);
     assert_eq!(gs[0].text, "e\u{0301}");

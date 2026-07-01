@@ -1,4 +1,3 @@
-
 /// UI 树状态，以栈形式管理界面节点的导航路径
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UiTreeState {
@@ -22,6 +21,8 @@ pub enum UiNodeKind {
   LanguageSelect,
   Mods,
   TerminalCheck,
+  GamePackage,
+  ScreensaverPackage,
   InputDemo,
 }
 
@@ -77,6 +78,22 @@ impl UiNodeState {
   pub fn language_select() -> Self {
     Self {
       kind: UiNodeKind::LanguageSelect,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn game_package() -> Self {
+    Self {
+      kind: UiNodeKind::GamePackage,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screensaver_package() -> Self {
+    Self {
+      kind: UiNodeKind::ScreensaverPackage,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

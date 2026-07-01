@@ -4,6 +4,8 @@ mod settings;
 
 pub use about::{InputDemoCommand, InputDemoUi};
 pub use settings::language::{LanguageSelectCommand, LanguageSelectUi};
+pub use settings::mods::game::{GamePackageCommand, GamePackageUi};
+pub use settings::mods::screensaver::{ScreensaverPackageCommand, ScreensaverPackageUi};
 pub use settings::mods::{ModsCommand, ModsUi};
 pub use settings::{SettingsUi, SettingsUiCommand};
 

@@ -2,6 +2,10 @@ use super::types::{Position, Rect, Size};
 use super::{measure, position};
 use crate::host_engine::services::DrawTextParams;
 use crate::host_engine::services::RichTextParams;
+use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::widget::scroll_box::effective_viewport;
+use crate::host_engine::services::widget::slice::resolve_rect as resolve_slice_rect;
+use crate::host_engine::services::widget::{ScrollBoxId, SliceId};
 
 /// 布局服务，管理终端尺寸、视口和坐标计算
 pub struct LayoutService {
@@ -100,9 +104,17 @@ impl LayoutService {
     position::resolve_x(self.developer_size(), x_anchor, content_width, offset_x)
   }
 
+  pub fn resolve_base_x(&self, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
+    self.resolve_x(x_anchor, content_width, offset_x)
+  }
+
   /// 在视口内根据垂直锚点和内容高度计算 Y 坐标
   pub fn resolve_y(&self, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
     position::resolve_y(self.developer_size(), y_anchor, content_height, offset_y)
+  }
+
+  pub fn resolve_base_y(&self, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
+    self.resolve_y(y_anchor, content_height, offset_y)
   }
 
   /// 在视口内根据锚点和内容尺寸计算位置
@@ -126,12 +138,154 @@ impl LayoutService {
     )
   }
 
+  pub fn resolve_base_rect(
+    &self,
+    x_anchor: &str,
+    y_anchor: &str,
+    content_width: u16,
+    content_height: u16,
+    offset_x: u16,
+    offset_y: u16,
+  ) -> Position {
+    self.resolve_rect(
+      x_anchor,
+      y_anchor,
+      content_width,
+      content_height,
+      offset_x,
+      offset_y,
+    )
+  }
+
+  pub fn resolve_slice_x(
+    &self,
+    pool: &UiObjectPool,
+    id: SliceId,
+    x_anchor: &str,
+    content_width: u16,
+    offset_x: u16,
+  ) -> Option<u16> {
+    Some(position::resolve_x(
+      self.slice_size(pool, id)?,
+      x_anchor,
+      content_width,
+      offset_x,
+    ))
+  }
+
+  pub fn resolve_slice_y(
+    &self,
+    pool: &UiObjectPool,
+    id: SliceId,
+    y_anchor: &str,
+    content_height: u16,
+    offset_y: u16,
+  ) -> Option<u16> {
+    Some(position::resolve_y(
+      self.slice_size(pool, id)?,
+      y_anchor,
+      content_height,
+      offset_y,
+    ))
+  }
+
+  pub fn resolve_slice_rect(
+    &self,
+    pool: &UiObjectPool,
+    id: SliceId,
+    x_anchor: &str,
+    y_anchor: &str,
+    content_width: u16,
+    content_height: u16,
+    offset_x: u16,
+    offset_y: u16,
+  ) -> Option<Position> {
+    Some(position::resolve_rect(
+      self.slice_size(pool, id)?,
+      x_anchor,
+      y_anchor,
+      content_width,
+      content_height,
+      offset_x,
+      offset_y,
+    ))
+  }
+
+  pub fn resolve_scroll_box_x(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    x_anchor: &str,
+    content_width: u16,
+    offset_x: u16,
+  ) -> Option<u16> {
+    Some(position::resolve_x(
+      self.scroll_box_visible_size(pool, id)?,
+      x_anchor,
+      content_width,
+      offset_x,
+    ))
+  }
+
+  pub fn resolve_scroll_box_y(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    y_anchor: &str,
+    content_height: u16,
+    offset_y: u16,
+  ) -> Option<u16> {
+    Some(position::resolve_y(
+      self.scroll_box_visible_size(pool, id)?,
+      y_anchor,
+      content_height,
+      offset_y,
+    ))
+  }
+
+  pub fn resolve_scroll_box_rect(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    x_anchor: &str,
+    y_anchor: &str,
+    content_width: u16,
+    content_height: u16,
+    offset_x: u16,
+    offset_y: u16,
+  ) -> Option<Position> {
+    Some(position::resolve_rect(
+      self.scroll_box_visible_size(pool, id)?,
+      x_anchor,
+      y_anchor,
+      content_width,
+      content_height,
+      offset_x,
+      offset_y,
+    ))
+  }
+
   pub(crate) fn resolve_host_x(&self, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
     position::resolve_x(self.physical, x_anchor, content_width, offset_x)
   }
 
   pub(crate) fn resolve_host_y(&self, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
     position::resolve_y(self.physical, y_anchor, content_height, offset_y)
+  }
+
+  fn slice_size(&self, pool: &UiObjectPool, id: SliceId) -> Option<Size> {
+    let rect = resolve_slice_rect(pool.slices.slices.get(&id)?.rect, self);
+    Some(Size {
+      width: rect.width,
+      height: rect.height,
+    })
+  }
+
+  fn scroll_box_visible_size(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<Size> {
+    Some(effective_viewport(
+      pool.scroll_boxes.boxes.get(&id)?,
+      self.developer_size(),
+    ))
   }
 
   // 根据物理尺寸和开发者视口请求计算最终视口，并裁剪到物理边界内
@@ -165,6 +319,10 @@ impl LayoutService {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::host_engine::services::{
+    Overflow, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy,
+    ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService, UiObjectPool,
+  };
 
   #[test]
   fn viewport_clips_resizes_and_resets() {
@@ -215,6 +373,124 @@ mod tests {
         width: 90,
         height: 35
       }
+    );
+  }
+
+  #[test]
+  fn base_layout_aliases_match_developer_layout() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(100, 40);
+
+    assert_eq!(
+      layout.resolve_base_x(LayoutService::ALIGN_CENTER, 20, 0),
+      layout.resolve_x(LayoutService::ALIGN_CENTER, 20, 0)
+    );
+    assert_eq!(
+      layout.resolve_base_y(LayoutService::ALIGN_MIDDLE, 10, 0),
+      layout.resolve_y(LayoutService::ALIGN_MIDDLE, 10, 0)
+    );
+    assert_eq!(
+      layout.resolve_base_rect(
+        LayoutService::ALIGN_CENTER,
+        LayoutService::ALIGN_MIDDLE,
+        20,
+        10,
+        0,
+        0,
+      ),
+      layout.resolve_rect(
+        LayoutService::ALIGN_CENTER,
+        LayoutService::ALIGN_MIDDLE,
+        20,
+        10,
+        0,
+        0,
+      )
+    );
+  }
+
+  #[test]
+  fn slice_layout_uses_slice_local_size() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(100, 40);
+    let mut pool = UiObjectPool::new();
+    let slice = SliceService::new()
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: SliceRect {
+            x: 5,
+            y: 5,
+            width: SliceLength::Fixed(30),
+            height: SliceLength::Fixed(10),
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+
+    assert_eq!(
+      layout.resolve_slice_rect(
+        &pool,
+        slice,
+        LayoutService::ALIGN_CENTER,
+        LayoutService::ALIGN_MIDDLE,
+        10,
+        4,
+        0,
+        0,
+      ),
+      Some(Position { x: 10, y: 3 })
+    );
+    assert_eq!(
+      layout.resolve_slice_x(&pool, SliceId(999), LayoutService::ALIGN_CENTER, 10, 0),
+      None
+    );
+  }
+
+  #[test]
+  fn scroll_box_layout_uses_visible_content_size() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(100, 40);
+    let mut pool = UiObjectPool::new();
+    let scroll_box = ScrollBoxService::new()
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: Rect {
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 5,
+          },
+          content_width: 20,
+          content_height: 10,
+          overflow_y: Overflow::Auto,
+          scrollbar: ScrollbarPolicy {
+            vertical: ScrollbarVisibility::Auto,
+            horizontal: ScrollbarVisibility::Never,
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+
+    assert_eq!(
+      layout.resolve_scroll_box_rect(
+        &pool,
+        scroll_box,
+        LayoutService::ALIGN_CENTER,
+        LayoutService::ALIGN_MIDDLE,
+        9,
+        1,
+        0,
+        0,
+      ),
+      Some(Position { x: 5, y: 2 })
+    );
+    assert_eq!(
+      layout.resolve_scroll_box_y(&pool, ScrollBoxId(999), LayoutService::ALIGN_MIDDLE, 1, 0,),
+      None
     );
   }
 }

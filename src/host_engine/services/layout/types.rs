@@ -1,4 +1,3 @@
-
 /// 尺寸（宽 x 高）
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Size {
@@ -23,7 +22,6 @@ pub struct Rect {
 }
 
 impl Rect {
-
   /// 判断点是否在矩形内部（不含右边界和下边界）
   pub fn contains(&self, px: u16, py: u16) -> bool {
     px >= self.x

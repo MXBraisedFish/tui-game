@@ -17,13 +17,10 @@ enum TagReadResult {
 /// 解析富文本字符串，将 `<tag>` 标签转换为样式段、`{param}` 替换为实际值。
 pub fn parse(text: &str, params: Option<&RichTextParams>) -> RichText {
   let body = if text.starts_with(RICH_TEXT_PREFIX) {
-
     &text[RICH_TEXT_PREFIX.len()..]
   } else if params.is_some() {
-
     return parse_formatted_text(text, params);
   } else {
-
     return plain_text(text);
   };
 
@@ -40,7 +37,6 @@ fn plain_text(text: &str) -> RichText {
 }
 
 fn parse_formatted_text(text: &str, params: Option<&RichTextParams>) -> RichText {
-
   let mut segments = Vec::new();
 
   let mut output = String::new();
@@ -50,7 +46,6 @@ fn parse_formatted_text(text: &str, params: Option<&RichTextParams>) -> RichText
   let mut chars = text.chars().peekable();
 
   while let Some(ch) = chars.next() {
-
     if ch == '\\' {
       if let Some(escaped) = read_escaped_char(&mut chars) {
         output.push(escaped);
@@ -79,7 +74,6 @@ fn parse_formatted_text(text: &str, params: Option<&RichTextParams>) -> RichText
           flush_segment(&mut segments, &mut output, &current_style);
 
           if !apply_tag(&tag, &mut current_style) {
-
             output.push('<');
             output.push_str(&tag);
             output.push('>');
@@ -108,7 +102,6 @@ where
   let mut name = String::new();
 
   while let Some(next) = chars.peek() {
-
     if *next == '{' {
       return ParameterReadResult::Broken(name);
     }
@@ -157,7 +150,6 @@ fn resolve_parameter(name: &str, params: Option<&RichTextParams>) -> Option<Stri
       _ => None,
     }
   } else {
-
     resolve_value(name, params)
   }
 }
@@ -175,11 +167,9 @@ fn read_tag<I>(chars: &mut std::iter::Peekable<I>) -> TagReadResult
 where
   I: Iterator<Item = char>,
 {
-
   let mut tag = String::new();
 
   while let Some(next) = chars.peek() {
-
     if *next == '<' {
       return TagReadResult::Broken(tag);
     }
@@ -227,7 +217,6 @@ fn flush_segment(segments: &mut Vec<RichTextSegment>, output: &mut String, style
 }
 
 fn apply_tag(tag: &str, current_style: &mut TextStyle) -> bool {
-
   let tag = tag.trim();
 
   if tag == "reset" {

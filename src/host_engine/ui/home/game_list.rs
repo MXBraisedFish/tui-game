@@ -6,7 +6,6 @@ pub struct GameListUi {
 }
 
 impl GameListUi {
-
   /// 初始化游戏列表 UI。
   pub fn init() -> Self {
     Self {

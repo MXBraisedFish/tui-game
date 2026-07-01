@@ -46,6 +46,8 @@ pub struct LanguageSelectUi {
   per_page: Cell<usize>,
   objects: UiObjectPool,
   back_area: HitAreaId,
+  flip_forward_area: HitAreaId,
+  flip_backward_area: HitAreaId,
   cell_areas: Vec<HitAreaId>,
 }
 
@@ -88,6 +90,8 @@ impl LanguageSelectUi {
     let runtime_cache = Self::preload_runtime_cache(storage, log, &registry);
     let mut objects = UiObjectPool::new();
     let back_area = hit_area.create(&mut objects, HitAreaOptions::default());
+    let flip_forward_area = hit_area.create(&mut objects, HitAreaOptions::default());
+    let flip_backward_area = hit_area.create(&mut objects, HitAreaOptions::default());
     let cell_areas = (0..registry.len())
       .map(|_| hit_area.create(&mut objects, HitAreaOptions::default()))
       .collect();
@@ -102,6 +106,8 @@ impl LanguageSelectUi {
       per_page: Cell::new(12),
       objects,
       back_area,
+      flip_forward_area,
+      flip_backward_area,
       cell_areas,
     }
   }
@@ -213,6 +219,16 @@ impl LanguageSelectUi {
         id,
         button: MouseButton::Left,
         ..
+      }) if *id == self.flip_forward_area => self.flip_page(false),
+      UiEvent::HitArea(HitAreaEvent::Click {
+        id,
+        button: MouseButton::Left,
+        ..
+      }) if *id == self.flip_backward_area => self.flip_page(true),
+      UiEvent::HitArea(HitAreaEvent::Click {
+        id,
+        button: MouseButton::Left,
+        ..
       }) => {
         let index = self.cell_areas.iter().position(|area| area == id)?;
         self.selected_index = index;
@@ -255,6 +271,32 @@ impl LanguageSelectUi {
     }
   }
 
+  fn flip_forward_rect(&self, layout: &LayoutService, pos: &LanguageSelectLayout) -> Option<Rect> {
+    (self.page > 1).then(|| Rect {
+      x: pos.flip_forward_x,
+      y: pos.page_y,
+      width: layout.get_text_width(
+        &self.get_text("language.flip.forward"),
+        Some(&self.build_key_params()),
+      ),
+      height: 1,
+    })
+  }
+
+  fn flip_backward_rect(&self, layout: &LayoutService, pos: &LanguageSelectLayout) -> Option<Rect> {
+    if self.page >= pos.pages {
+      return None;
+    }
+    let key_params = self.build_key_params();
+    let width = layout.get_text_width(&self.get_text("language.flip.backward"), Some(&key_params));
+    Some(Rect {
+      x: pos.flip_backward_max_x.saturating_sub(width),
+      y: pos.page_y,
+      width,
+      height: 1,
+    })
+  }
+
   pub fn update(&mut self, dt: Duration) -> Option<LanguageSelectCommand> {
     let _ = dt;
     None
@@ -273,6 +315,12 @@ impl LanguageSelectUi {
     self.draw_content(render, canvas, layout, &positions);
     let viewport = layout.developer_viewport_rect();
     hit_area.render_host(&mut self.objects, self.back_area, viewport, canvas);
+    if let Some(rect) = self.flip_forward_rect(layout, &positions) {
+      hit_area.render_host(&mut self.objects, self.flip_forward_area, rect, canvas);
+    }
+    if let Some(rect) = self.flip_backward_rect(layout, &positions) {
+      hit_area.render_host(&mut self.objects, self.flip_backward_area, rect, canvas);
+    }
     let (start, _, _, _) = self.page_bounds();
     for (id, rect) in self.cell_areas[start..]
       .iter()

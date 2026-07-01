@@ -16,7 +16,6 @@ pub struct ComposedFrame {
 }
 
 impl ComposedFrame {
-
   pub fn new(width: u16, height: u16) -> Self {
     let len = width as usize * height as usize;
     Self {

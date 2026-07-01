@@ -1,4 +1,3 @@
-
 pub mod boot_output;
 pub mod clock;
 pub mod crash;

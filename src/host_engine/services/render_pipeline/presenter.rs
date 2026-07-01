@@ -43,7 +43,6 @@ impl FramePresenter {
     text_force_redraw: bool,
     final_cursor: Option<(u16, u16)>,
   ) -> io::Result<()> {
-
     self.truecolor = terminal.capabilities().truecolor;
 
     let Some(stdout) = terminal.writer_mut() else {
@@ -231,11 +230,7 @@ static LAB_PALETTE: Lazy<LabPalette> = Lazy::new(|| {
 
 fn cube_level_to_rgb(r: u8, g: u8, b: u8) -> (u8, u8, u8) {
   fn level(l: u8) -> u8 {
-    if l == 0 {
-      0
-    } else {
-      l * 40 + 55
-    }
+    if l == 0 { 0 } else { l * 40 + 55 }
   }
   (level(r), level(g), level(b))
 }
@@ -269,12 +264,16 @@ fn queue_style(stdout: &mut impl Write, style: &TextStyle, truecolor: bool) -> i
   stdout.queue(SetAttribute(Attribute::Reset))?;
 
   if let Some(foreground) = &style.foreground {
-    stdout.queue(SetForegroundColor(text_color_to_crossterm(foreground, truecolor)))?;
+    stdout.queue(SetForegroundColor(text_color_to_crossterm(
+      foreground, truecolor,
+    )))?;
   }
 
   if let Some(background) = &style.background {
     if !matches!(background, TextColor::Transparent) {
-      stdout.queue(SetBackgroundColor(text_color_to_crossterm(background, truecolor)))?;
+      stdout.queue(SetBackgroundColor(text_color_to_crossterm(
+        background, truecolor,
+      )))?;
     }
   }
 
@@ -339,35 +338,28 @@ mod tests {
 
   #[test]
   fn nearest_ansi256_maps_primary_colors() {
-
     assert!(matches!(nearest_ansi256(0, 0, 0), Color::AnsiValue(_)));
-    assert!(matches!(nearest_ansi256(255, 255, 255), Color::AnsiValue(_)));
+    assert!(matches!(
+      nearest_ansi256(255, 255, 255),
+      Color::AnsiValue(_)
+    ));
     assert!(matches!(nearest_ansi256(255, 0, 0), Color::AnsiValue(_)));
     assert!(matches!(nearest_ansi256(0, 0, 255), Color::AnsiValue(_)));
   }
 
   #[test]
   fn nearest_ansi256_gray_vs_cube_is_consistent() {
-
     let gray128 = nearest_ansi256(128, 128, 128);
     assert!(matches!(gray128, Color::AnsiValue(_)));
   }
 
   #[test]
   fn text_color_to_crossterm_falls_back_to_256_when_truecolor_disabled() {
-    let rgb = TextColor::Rgb {
-      r: 255,
-      g: 0,
-      b: 0,
-    };
+    let rgb = TextColor::Rgb { r: 255, g: 0, b: 0 };
 
     assert_eq!(
       text_color_to_crossterm(&rgb, true),
-      Color::Rgb {
-        r: 255,
-        g: 0,
-        b: 0
-      }
+      Color::Rgb { r: 255, g: 0, b: 0 }
     );
 
     assert!(matches!(

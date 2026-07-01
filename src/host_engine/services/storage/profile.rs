@@ -8,7 +8,6 @@ use super::service::StorageService;
 /// 终端配置文件：存储 Unicode 支持、颜色模式和鼠标支持的用户偏好。
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TerminalProfile {
-
   pub unicode: Option<bool>,
 
   pub color: Option<String>,
@@ -27,7 +26,6 @@ impl Default for TerminalProfile {
 }
 
 impl TerminalProfile {
-
   /// 检查三项配置是否已全部填写完毕。
   pub fn is_complete(&self) -> bool {
     self.unicode.is_some()
@@ -40,7 +38,6 @@ impl TerminalProfile {
 }
 
 impl StorageService {
-
   /// 读取保存的语言代码。
   pub fn read_language_code(&self) -> Option<String> {
     let content = fs::read_to_string(self.profile_language_path()).ok()?;

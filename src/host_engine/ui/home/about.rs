@@ -60,7 +60,12 @@ impl InputDemoUi {
       .create(
         &mut objects,
         ScrollBoxOptions {
-          rect: Rect { x: 1, y: 2, width: 24, height: 11 },
+          rect: Rect {
+            x: 1,
+            y: 2,
+            width: 24,
+            height: 11,
+          },
           content_width: 24,
           content_height: 40,
           scrollbar_layout: ScrollbarLayout::Overlay,
@@ -75,7 +80,12 @@ impl InputDemoUi {
       .create(
         &mut objects,
         ScrollBoxOptions {
-          rect: Rect { x: 27, y: 2, width: 24, height: 11 },
+          rect: Rect {
+            x: 27,
+            y: 2,
+            width: 24,
+            height: 11,
+          },
           content_width: 80,
           content_height: 11,
           overflow_x: Overflow::Auto,
@@ -94,7 +104,12 @@ impl InputDemoUi {
       .create(
         &mut objects,
         ScrollBoxOptions {
-          rect: Rect { x: 53, y: 2, width: 24, height: 11 },
+          rect: Rect {
+            x: 53,
+            y: 2,
+            width: 24,
+            height: 11,
+          },
           content_width: 60,
           content_height: 30,
           overflow_x: Overflow::Auto,
@@ -113,7 +128,12 @@ impl InputDemoUi {
       .create(
         &mut objects,
         ScrollBoxOptions {
-          rect: Rect { x: 1, y: 14, width: 24, height: 6 },
+          rect: Rect {
+            x: 1,
+            y: 14,
+            width: 24,
+            height: 6,
+          },
           content_width: 24,
           content_height: 20,
           scrollbar_layout: ScrollbarLayout::ReserveSpace,
@@ -127,7 +147,12 @@ impl InputDemoUi {
       .create(
         &mut objects,
         ScrollBoxOptions {
-          rect: Rect { x: 27, y: 14, width: 24, height: 6 },
+          rect: Rect {
+            x: 27,
+            y: 14,
+            width: 24,
+            height: 6,
+          },
           content_width: 24,
           content_height: 6, // 内容正好等于 viewport 高度
           scrollbar: ScrollbarPolicy {
@@ -144,7 +169,12 @@ impl InputDemoUi {
       .create(
         &mut objects,
         ScrollBoxOptions {
-          rect: Rect { x: 1, y: 21, width: 24, height: 4 },
+          rect: Rect {
+            x: 1,
+            y: 21,
+            width: 24,
+            height: 4,
+          },
           content_width: 24,
           content_height: 20,
           overflow_y: Overflow::Hidden,
@@ -162,7 +192,12 @@ impl InputDemoUi {
       .create(
         &mut objects,
         ScrollBoxOptions {
-          rect: Rect { x: 27, y: 21, width: 24, height: 4 },
+          rect: Rect {
+            x: 27,
+            y: 21,
+            width: 24,
+            height: 4,
+          },
           content_width: 24,
           content_height: 20,
           opaque: false,
@@ -191,11 +226,7 @@ impl InputDemoUi {
     let cover_hit = hit_area.create(&mut objects, HitAreaOptions::default());
 
     // 初始层级：slice 在 scroll boxes 之上（遮挡命中测试）。
-    scroll_box.move_below(
-      &mut objects,
-      both_scroll,
-      SurfaceId::Slice(cover_slice),
-    );
+    scroll_box.move_below(&mut objects, both_scroll, SurfaceId::Slice(cover_slice));
 
     Self {
       objects,
@@ -245,11 +276,7 @@ impl InputDemoUi {
   pub fn update(&mut self) {}
 
   /// 后续帧的布局微调（仅在首帧后执行）。
-  pub fn apply_layout(
-    &mut self,
-    _layout: &LayoutService,
-    _scroll_box: &ScrollBoxService,
-  ) {
+  pub fn apply_layout(&mut self, _layout: &LayoutService, _scroll_box: &ScrollBoxService) {
     self.first_layout = true;
   }
 
@@ -286,7 +313,11 @@ impl InputDemoUi {
   ) {
     let size = layout.developer_size();
     render.draw_filled_rect(
-      canvas, 0, 0, size.width, size.height,
+      canvas,
+      0,
+      0,
+      size.width,
+      size.height,
       Some(" ".into()),
       None,
       Some(TextColor::Rgb { r: 4, g: 8, b: 16 }),
@@ -311,9 +342,16 @@ impl InputDemoUi {
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
   ) {
-    let Some(rect) = canvas.prepared_scroll_box_rect(self.v_scroll) else { return };
+    let Some(rect) = canvas.prepared_scroll_box_rect(self.v_scroll) else {
+      return;
+    };
     // 绘制边框。
-    draw_box_border(canvas, rect, self.v_scroll, bright(TerminalColor::BrightBlue));
+    draw_box_border(
+      canvas,
+      rect,
+      self.v_scroll,
+      bright(TerminalColor::BrightBlue),
+    );
 
     // 填充内容。
     for line in 0..40u16 {
@@ -323,18 +361,27 @@ impl InputDemoUi {
         bright(TerminalColor::BrightWhite)
       };
       canvas.styled_text_in_scroll_box(
-        self.v_scroll, 1, line,
-        &format!("Line {line:02}  中文测试 😀 あいう", ),
+        self.v_scroll,
+        1,
+        line,
+        &format!("Line {line:02}  中文测试 😀 あいう",),
         style,
       );
     }
 
     // 滚动状态显示。
-    let sy = scroll_box.scroll_y(&self.objects, self.v_scroll).unwrap_or(0);
-    let max_y = scroll_box.max_scroll_y(&self.objects, self.v_scroll, layout).unwrap_or(0);
-    let pos = scroll_box.scroll_position(&self.objects, self.v_scroll).unwrap_or((0, 0));
+    let sy = scroll_box
+      .scroll_y(&self.objects, self.v_scroll)
+      .unwrap_or(0);
+    let max_y = scroll_box
+      .max_scroll_y(&self.objects, self.v_scroll, layout)
+      .unwrap_or(0);
+    let pos = scroll_box
+      .scroll_position(&self.objects, self.v_scroll)
+      .unwrap_or((0, 0));
     canvas.styled_text(
-      rect.x, rect.y.saturating_sub(1),
+      rect.x,
+      rect.y.saturating_sub(1),
       &format!("V y={}/{} pos=({},{})", sy, max_y, pos.0, pos.1),
       bright(TerminalColor::BrightBlue),
     );
@@ -347,8 +394,15 @@ impl InputDemoUi {
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
   ) {
-    let Some(rect) = canvas.prepared_scroll_box_rect(self.h_scroll) else { return };
-    draw_box_border(canvas, rect, self.h_scroll, bright(TerminalColor::BrightCyan));
+    let Some(rect) = canvas.prepared_scroll_box_rect(self.h_scroll) else {
+      return;
+    };
+    draw_box_border(
+      canvas,
+      rect,
+      self.h_scroll,
+      bright(TerminalColor::BrightCyan),
+    );
 
     // 一行宽内容。
     for col in 0..80u16 {
@@ -358,21 +412,31 @@ impl InputDemoUi {
         format!("{col:02}")
       };
       canvas.styled_text_in_scroll_box(
-        self.h_scroll, col, 1, &ch,
+        self.h_scroll,
+        col,
+        1,
+        &ch,
         bright(TerminalColor::BrightCyan),
       );
     }
     // 第二行显示标记。
     canvas.styled_text_in_scroll_box(
-      self.h_scroll, 0, 3,
+      self.h_scroll,
+      0,
+      3,
       "←─ scroll horizontally ─→ 水平滚动测试",
       bright(TerminalColor::BrightGreen),
     );
 
-    let sx = scroll_box.scroll_x(&self.objects, self.h_scroll).unwrap_or(0);
-    let max_x = scroll_box.max_scroll_x(&self.objects, self.h_scroll, layout).unwrap_or(0);
+    let sx = scroll_box
+      .scroll_x(&self.objects, self.h_scroll)
+      .unwrap_or(0);
+    let max_x = scroll_box
+      .max_scroll_x(&self.objects, self.h_scroll, layout)
+      .unwrap_or(0);
     canvas.styled_text(
-      rect.x, rect.y.saturating_sub(1),
+      rect.x,
+      rect.y.saturating_sub(1),
       &format!("H x={}/{}", sx, max_x),
       bright(TerminalColor::BrightCyan),
     );
@@ -385,8 +449,15 @@ impl InputDemoUi {
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
   ) {
-    let Some(rect) = canvas.prepared_scroll_box_rect(self.both_scroll) else { return };
-    draw_box_border(canvas, rect, self.both_scroll, bright(TerminalColor::BrightMagenta));
+    let Some(rect) = canvas.prepared_scroll_box_rect(self.both_scroll) else {
+      return;
+    };
+    draw_box_border(
+      canvas,
+      rect,
+      self.both_scroll,
+      bright(TerminalColor::BrightMagenta),
+    );
 
     for row in 0..30u16 {
       for col in 0..15u16 {
@@ -398,19 +469,30 @@ impl InputDemoUi {
           bright(TerminalColor::BrightWhite)
         };
         canvas.styled_text_in_scroll_box(
-          self.both_scroll, cx, row,
+          self.both_scroll,
+          cx,
+          row,
           &format!("({},{})", col, row),
           style,
         );
       }
     }
 
-    let sx = scroll_box.scroll_x(&self.objects, self.both_scroll).unwrap_or(0);
-    let sy = scroll_box.scroll_y(&self.objects, self.both_scroll).unwrap_or(0);
-    let max_x = scroll_box.max_scroll_x(&self.objects, self.both_scroll, layout).unwrap_or(0);
-    let max_y = scroll_box.max_scroll_y(&self.objects, self.both_scroll, layout).unwrap_or(0);
+    let sx = scroll_box
+      .scroll_x(&self.objects, self.both_scroll)
+      .unwrap_or(0);
+    let sy = scroll_box
+      .scroll_y(&self.objects, self.both_scroll)
+      .unwrap_or(0);
+    let max_x = scroll_box
+      .max_scroll_x(&self.objects, self.both_scroll, layout)
+      .unwrap_or(0);
+    let max_y = scroll_box
+      .max_scroll_y(&self.objects, self.both_scroll, layout)
+      .unwrap_or(0);
     canvas.styled_text(
-      rect.x, rect.y.saturating_sub(1),
+      rect.x,
+      rect.y.saturating_sub(1),
       &format!("XY x={}/{} y={}/{}", sx, max_x, sy, max_y),
       bright(TerminalColor::BrightMagenta),
     );
@@ -423,24 +505,38 @@ impl InputDemoUi {
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
   ) {
-    let Some(rect) = canvas.prepared_scroll_box_rect(self.reserve_scroll) else { return };
-    draw_box_border(canvas, rect, self.reserve_scroll, bright(TerminalColor::BrightYellow));
+    let Some(rect) = canvas.prepared_scroll_box_rect(self.reserve_scroll) else {
+      return;
+    };
+    draw_box_border(
+      canvas,
+      rect,
+      self.reserve_scroll,
+      bright(TerminalColor::BrightYellow),
+    );
 
     for line in 0..20u16 {
       let marker = if line % 3 == 0 { "█" } else { "·" };
       canvas.styled_text_in_scroll_box(
-        self.reserve_scroll, 1, line,
+        self.reserve_scroll,
+        1,
+        line,
         &format!("Rsv {marker} Ln {line:02}"),
         bright(TerminalColor::BrightYellow),
       );
     }
 
-    let sy = scroll_box.scroll_y(&self.objects, self.reserve_scroll).unwrap_or(0);
-    let max_y = scroll_box.max_scroll_y(&self.objects, self.reserve_scroll, layout).unwrap_or(0);
+    let sy = scroll_box
+      .scroll_y(&self.objects, self.reserve_scroll)
+      .unwrap_or(0);
+    let max_y = scroll_box
+      .max_scroll_y(&self.objects, self.reserve_scroll, layout)
+      .unwrap_or(0);
     // 显示 viewport 与 content 尺寸。
     let vsz = scroll_box.viewport_size(&self.objects, self.reserve_scroll, layout);
     canvas.styled_text(
-      rect.x, rect.y.saturating_sub(1),
+      rect.x,
+      rect.y.saturating_sub(1),
       &format!("RSV y={}/{} vsz={:?}", sy, max_y, vsz),
       bright(TerminalColor::BrightYellow),
     );
@@ -453,20 +549,32 @@ impl InputDemoUi {
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
   ) {
-    let Some(rect) = canvas.prepared_scroll_box_rect(self.always_scroll) else { return };
-    draw_box_border(canvas, rect, self.always_scroll, bright(TerminalColor::BrightGreen));
+    let Some(rect) = canvas.prepared_scroll_box_rect(self.always_scroll) else {
+      return;
+    };
+    draw_box_border(
+      canvas,
+      rect,
+      self.always_scroll,
+      bright(TerminalColor::BrightGreen),
+    );
 
     for line in 0..6u16 {
       canvas.styled_text_in_scroll_box(
-        self.always_scroll, 1, line,
+        self.always_scroll,
+        1,
+        line,
         &format!("Always bar — line {}", line),
         bright(TerminalColor::BrightGreen),
       );
     }
 
-    let max_y = scroll_box.max_scroll_y(&self.objects, self.always_scroll, layout).unwrap_or(0);
+    let max_y = scroll_box
+      .max_scroll_y(&self.objects, self.always_scroll, layout)
+      .unwrap_or(0);
     canvas.styled_text(
-      rect.x, rect.y.saturating_sub(1),
+      rect.x,
+      rect.y.saturating_sub(1),
       &format!("ALW max_y={} (should be 0)", max_y),
       bright(TerminalColor::BrightGreen),
     );
@@ -474,18 +582,28 @@ impl InputDemoUi {
 
   /// overflow_y = Hidden — 内容被裁剪，无法滚动。
   fn draw_hidden_scroll(&mut self, canvas: &mut CanvasService) {
-    let Some(rect) = canvas.prepared_scroll_box_rect(self.hidden_scroll) else { return };
-    draw_box_border(canvas, rect, self.hidden_scroll, bright(TerminalColor::BrightRed));
+    let Some(rect) = canvas.prepared_scroll_box_rect(self.hidden_scroll) else {
+      return;
+    };
+    draw_box_border(
+      canvas,
+      rect,
+      self.hidden_scroll,
+      bright(TerminalColor::BrightRed),
+    );
 
     for line in 0..20u16 {
       canvas.styled_text_in_scroll_box(
-        self.hidden_scroll, 1, line,
+        self.hidden_scroll,
+        1,
+        line,
         &format!("HIDDEN line {} — should be clipped", line),
         bright(TerminalColor::BrightRed),
       );
     }
     canvas.styled_text(
-      rect.x, rect.y.saturating_sub(1),
+      rect.x,
+      rect.y.saturating_sub(1),
       "Hidden — wheel blocked, content clipped",
       bright(TerminalColor::BrightRed),
     );
@@ -493,19 +611,29 @@ impl InputDemoUi {
 
   /// 透明滚动盒子 — 未写入部分可看到底层。
   fn draw_transparent_scroll(&mut self, canvas: &mut CanvasService) {
-    let Some(rect) = canvas.prepared_scroll_box_rect(self.transparent_scroll) else { return };
-    draw_box_border(canvas, rect, self.transparent_scroll, bright(TerminalColor::BrightWhite));
+    let Some(rect) = canvas.prepared_scroll_box_rect(self.transparent_scroll) else {
+      return;
+    };
+    draw_box_border(
+      canvas,
+      rect,
+      self.transparent_scroll,
+      bright(TerminalColor::BrightWhite),
+    );
 
     // 仅写入部分行——其余位置应透露底层。
     for line in [0u16, 3, 6, 9, 12, 15, 18] {
       canvas.styled_text_in_scroll_box(
-        self.transparent_scroll, 1, line,
+        self.transparent_scroll,
+        1,
+        line,
         &format!("Opaque line {}", line),
         bright(TerminalColor::BrightWhite),
       );
     }
     canvas.styled_text(
-      rect.x, rect.y.saturating_sub(1),
+      rect.x,
+      rect.y.saturating_sub(1),
       "Transparent — unwritten cells show base",
       bright(TerminalColor::BrightWhite),
     );
@@ -518,22 +646,41 @@ impl InputDemoUi {
     hit_area: &HitAreaService,
     _layout: &LayoutService,
   ) {
-    let Some(rect) = canvas.prepared_slice_rect(self.cover_slice) else { return };
+    let Some(rect) = canvas.prepared_slice_rect(self.cover_slice) else {
+      return;
+    };
     // 不透明 Slice 背景。
     canvas.styled_text_on(
-      self.cover_slice, 0, 1, "  SLICE COVER  ", bright(TerminalColor::BrightBlack),
+      self.cover_slice,
+      0,
+      1,
+      "  SLICE COVER  ",
+      bright(TerminalColor::BrightBlack),
     );
     canvas.styled_text_on(
-      self.cover_slice, 0, 2, " blocks scroll  ", bright(TerminalColor::BrightBlack),
+      self.cover_slice,
+      0,
+      2,
+      " blocks scroll  ",
+      bright(TerminalColor::BrightBlack),
     );
     canvas.styled_text_on(
-      self.cover_slice, 0, 3, " events below   ", bright(TerminalColor::BrightBlack),
+      self.cover_slice,
+      0,
+      3,
+      " events below   ",
+      bright(TerminalColor::BrightBlack),
     );
     hit_area.render_on(
       &mut self.objects,
       self.cover_hit,
       self.cover_slice,
-      Rect { x: 0, y: 0, width: rect.width, height: rect.height },
+      Rect {
+        x: 0,
+        y: 0,
+        width: rect.width,
+        height: rect.height,
+      },
       canvas,
     );
   }
@@ -554,23 +701,38 @@ impl InputDemoUi {
       &self.last_event
     );
     let status: String = status.chars().take(physical.width as usize).collect();
-    canvas.host_styled_text(0, physical.height.saturating_sub(1), &status, bright(TerminalColor::BrightGreen));
+    canvas.host_styled_text(
+      0,
+      physical.height.saturating_sub(1),
+      &status,
+      bright(TerminalColor::BrightGreen),
+    );
   }
 
   fn scroll_name(&self, id: ScrollBoxId) -> &'static str {
-    if id == self.v_scroll { "V" }
-    else if id == self.h_scroll { "H" }
-    else if id == self.both_scroll { "XY" }
-    else if id == self.reserve_scroll { "RSV" }
-    else if id == self.always_scroll { "ALW" }
-    else { "?" }
+    if id == self.v_scroll {
+      "V"
+    } else if id == self.h_scroll {
+      "H"
+    } else if id == self.both_scroll {
+      "XY"
+    } else if id == self.reserve_scroll {
+      "RSV"
+    } else if id == self.always_scroll {
+      "ALW"
+    } else {
+      "?"
+    }
   }
 }
 
 // ─── 辅助函数 ───────────────────────────────────────────
 
 fn bright(color: TerminalColor) -> TextStyle {
-  TextStyle { foreground: Some(TextColor::Terminal(color)), ..Default::default() }
+  TextStyle {
+    foreground: Some(TextColor::Terminal(color)),
+    ..Default::default()
+  }
 }
 
 fn label() -> TextStyle {
@@ -582,7 +744,9 @@ fn label() -> TextStyle {
 }
 
 fn draw_box_border(canvas: &mut CanvasService, rect: Rect, id: ScrollBoxId, style: TextStyle) {
-  if rect.width < 2 || rect.height < 2 { return; }
+  if rect.width < 2 || rect.height < 2 {
+    return;
+  }
   let w = rect.width as usize;
   canvas.styled_text_in_scroll_box(id, 0, 0, &format!("┌{}┐", "─".repeat(w - 2)), style.clone());
   for y in 1..rect.height - 1 {
@@ -590,15 +754,22 @@ fn draw_box_border(canvas: &mut CanvasService, rect: Rect, id: ScrollBoxId, styl
     canvas.styled_text_in_scroll_box(id, rect.width - 1, y, "│", style.clone());
   }
   canvas.styled_text_in_scroll_box(
-    id, 0, rect.height - 1, &format!("└{}┘", "─".repeat(w - 2)), style,
+    id,
+    0,
+    rect.height - 1,
+    &format!("└{}┘", "─".repeat(w - 2)),
+    style,
   );
 }
 
 fn format_hit_event(event: &HitAreaEvent) -> String {
   let (x, y) = match event {
-    HitAreaEvent::HoverEnter { x, y, .. } | HitAreaEvent::HoverMove { x, y, .. }
-    | HitAreaEvent::HoverLeave { x, y, .. } | HitAreaEvent::Press { x, y, .. }
-    | HitAreaEvent::Release { x, y, .. } | HitAreaEvent::Click { x, y, .. }
+    HitAreaEvent::HoverEnter { x, y, .. }
+    | HitAreaEvent::HoverMove { x, y, .. }
+    | HitAreaEvent::HoverLeave { x, y, .. }
+    | HitAreaEvent::Press { x, y, .. }
+    | HitAreaEvent::Release { x, y, .. }
+    | HitAreaEvent::Click { x, y, .. }
     | HitAreaEvent::Drag { x, y, .. } => (*x, *y),
   };
   let kind = match event {

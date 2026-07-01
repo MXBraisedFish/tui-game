@@ -1,4 +1,3 @@
-
 /// 日志来源分类，标识产生日志的子系统。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogSource {

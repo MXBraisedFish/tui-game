@@ -13,7 +13,6 @@ pub fn ensure_storage_layout(storage: &StorageService, log: &mut LogService) {
 
 fn ensure_required_directories(storage: &StorageService, log: &mut LogService) {
   for relative_dir in layout::REQUIRED_DIRECTORIES {
-
     let path = storage.path(relative_dir);
     if let Err(error) = fs::create_dir_all(&path) {
       log.error(
@@ -26,17 +25,14 @@ fn ensure_required_directories(storage: &StorageService, log: &mut LogService) {
 
 fn ensure_default_files(storage: &StorageService, log: &mut LogService) {
   for (relative_file, default_content) in layout::DEFAULT_FILES {
-
     let path = storage.path(relative_file);
     match fs::metadata(&path) {
       Ok(metadata) => {
-
         if metadata.is_file() && metadata.len() > 0 {
           continue;
         }
       }
       Err(error) => {
-
         if error.kind() != ErrorKind::NotFound {
           log.warn(
             LogSource::Storage,

@@ -521,9 +521,9 @@ impl RenderService {
     fill_bg: Option<TextColor>,
   ) -> bool {
     match surface {
-      SurfaceId::Slice(id) => self.draw_filled_rect_on(
-        canvas, id, x, y, width, height, fill_char, fill_fg, fill_bg,
-      ),
+      SurfaceId::Slice(id) => {
+        self.draw_filled_rect_on(canvas, id, x, y, width, height, fill_char, fill_fg, fill_bg)
+      }
       SurfaceId::ScrollBox(id) => self.draw_filled_rect_in_scroll_box(
         canvas, id, x, y, width, height, fill_char, fill_fg, fill_bg,
       ),
@@ -547,10 +547,30 @@ impl RenderService {
   ) -> bool {
     match surface {
       SurfaceId::Slice(id) => self.draw_border_rect_on(
-        canvas, id, x, y, width, height, border_style, border_fg, border_bg, fill_bg, border_attrs,
+        canvas,
+        id,
+        x,
+        y,
+        width,
+        height,
+        border_style,
+        border_fg,
+        border_bg,
+        fill_bg,
+        border_attrs,
       ),
       SurfaceId::ScrollBox(id) => self.draw_border_rect_in_scroll_box(
-        canvas, id, x, y, width, height, border_style, border_fg, border_bg, fill_bg, border_attrs,
+        canvas,
+        id,
+        x,
+        y,
+        width,
+        height,
+        border_style,
+        border_fg,
+        border_bg,
+        fill_bg,
+        border_attrs,
       ),
     }
   }

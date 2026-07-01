@@ -1,4 +1,3 @@
-
 /// 终端文本样式：包含前景色、背景色及各种文本修饰属性。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TextStyle {
@@ -45,7 +44,6 @@ pub enum TerminalColor {
 }
 
 impl TextStyle {
-
   /// 按标签名启用一种文本修饰（如 "bold"、"italic" 等），返回是否识别成功。
   pub fn enable_style(&mut self, tag: &str) -> bool {
     match tag {

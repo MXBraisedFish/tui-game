@@ -8,7 +8,6 @@ pub struct RuntimeState {
 }
 
 impl RuntimeState {
-
   /// 创建以 Host 模式启动的运行时状态
   pub fn new_host_runtime() -> Self {
     Self {

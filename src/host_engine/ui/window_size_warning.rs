@@ -11,7 +11,6 @@ pub struct WindowSizeWarningUi {
 }
 
 impl WindowSizeWarningUi {
-
   /// 初始化窗口尺寸警告 UI。
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
@@ -122,6 +121,7 @@ pub fn compute_positions(
   required_height: u32,
   current_width: u16,
   current_height: u16,
+  is_host_mode: bool,
 ) -> WindowSizeWarningLayout {
   let title = i18n.get_runtime_text("window_size", "window_size.title");
   let tip = i18n.get_runtime_text("window_size", "window_size.tip");
@@ -154,13 +154,13 @@ pub fn compute_positions(
   let current_x = centered_x(layout, &current_line);
   let current_y = content_start_y + 2;
   let key_params = build_key_params();
-  let hint_host = i18n.get_runtime_text("window_size", "window_size.action.exit.host");
-  let hint_game = i18n.get_runtime_text("window_size", "window_size.action.exit.game");
-
-  let hint_w_host = layout.get_text_width(&hint_host, Some(&key_params));
-  let hint_w_game = layout.get_text_width(&hint_game, Some(&key_params));
-  let hint_w = hint_w_host.max(hint_w_game);
-
+  let hint_key = if is_host_mode {
+    "window_size.action.exit.host"
+  } else {
+    "window_size.action.exit.game"
+  };
+  let hint = i18n.get_runtime_text("window_size", hint_key);
+  let hint_w = layout.get_text_width(&hint, Some(&key_params));
   let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
 
   WindowSizeWarningLayout {
@@ -196,6 +196,7 @@ fn draw_content(
     required_height,
     current_width,
     current_height,
+    is_host_mode,
   );
   let key_params = build_key_params();
 

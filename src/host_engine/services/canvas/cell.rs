@@ -3,14 +3,12 @@ use crate::host_engine::services::TextStyle;
 /// 画布上的单个字符单元，包含文本内容、样式和是否为宽字符延续标记。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasCell {
-
   pub text: String,
   pub style: TextStyle,
   continuation: bool,
 }
 
 impl CanvasCell {
-
   /// 创建一个空白占位单元格。
   pub fn blank() -> Self {
     Self {

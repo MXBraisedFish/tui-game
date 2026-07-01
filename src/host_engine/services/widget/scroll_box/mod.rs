@@ -23,7 +23,11 @@ impl ScrollBoxService {
     Self
   }
 
-  pub fn create(&self, pool: &mut UiObjectPool, mut options: ScrollBoxOptions) -> Option<ScrollBoxId> {
+  pub fn create(
+    &self,
+    pool: &mut UiObjectPool,
+    mut options: ScrollBoxOptions,
+  ) -> Option<ScrollBoxId> {
     validate_scrollbar_chars(&mut options);
     valid_options(&options).then(|| {
       let id = ScrollBoxId(pool.scroll_boxes.next_id);
@@ -80,6 +84,24 @@ impl ScrollBoxService {
       width: rect.width,
       height: rect.height,
     })
+  }
+
+  pub fn viewport_width(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) -> Option<u16> {
+    Some(self.viewport_size(pool, id, layout)?.width)
+  }
+
+  pub fn viewport_height(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) -> Option<u16> {
+    Some(self.viewport_size(pool, id, layout)?.height)
   }
 
   pub fn set_rect(
@@ -230,6 +252,19 @@ impl ScrollBoxService {
   }
 
   /// 查询当前可见内容区域的宽度。
+  pub fn visible_content_size(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) -> Option<Size> {
+    let rect = self.visible_content_rect(pool, id, layout)?;
+    Some(Size {
+      width: rect.width,
+      height: rect.height,
+    })
+  }
+
   pub fn visible_content_width(
     &self,
     pool: &UiObjectPool,
@@ -1494,6 +1529,96 @@ mod tests {
   }
 
   #[test]
+  fn viewport_and_visible_content_queries_use_distinct_sizes() {
+    let service = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(20, 15);
+    let id = service
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 5,
+          },
+          content_width: 10,
+          content_height: 10,
+          scrollbar_layout: ScrollbarLayout::Inside,
+          scrollbar: ScrollbarPolicy {
+            vertical: ScrollbarVisibility::Auto,
+            horizontal: ScrollbarVisibility::Never,
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+
+    assert_eq!(
+      service.viewport_size(&pool, id, &layout),
+      Some(Size {
+        width: 10,
+        height: 5
+      })
+    );
+    assert_eq!(service.viewport_width(&pool, id, &layout), Some(10));
+    assert_eq!(service.viewport_height(&pool, id, &layout), Some(5));
+    assert_eq!(
+      service.visible_content_size(&pool, id, &layout),
+      Some(Size {
+        width: 9,
+        height: 5
+      })
+    );
+    assert_eq!(
+      service.content_size(&pool, id),
+      Some(Size {
+        width: 10,
+        height: 10
+      })
+    );
+  }
+
+  #[test]
+  fn overlay_scrollbar_does_not_reduce_visible_content_queries() {
+    let service = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(20, 15);
+    let id = service
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 5,
+          },
+          content_width: 10,
+          content_height: 10,
+          scrollbar_layout: ScrollbarLayout::Overlay,
+          scrollbar: ScrollbarPolicy {
+            vertical: ScrollbarVisibility::Auto,
+            horizontal: ScrollbarVisibility::Never,
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+
+    assert_eq!(
+      service.visible_content_size(&pool, id, &layout),
+      Some(Size {
+        width: 10,
+        height: 5
+      })
+    );
+  }
+
+  #[test]
   fn max_scroll_x_uses_effective_viewport() {
     let state = ScrollBoxState {
       options: ScrollBoxOptions {
@@ -1528,7 +1653,12 @@ mod tests {
   fn inside_layout_reduces_viewport() {
     let state = ScrollBoxState {
       options: ScrollBoxOptions {
-        rect: Rect { x: 0, y: 0, width: 10, height: 5 },
+        rect: Rect {
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 5,
+        },
         content_width: 10,
         content_height: 10,
         scrollbar_layout: ScrollbarLayout::Inside, // 默认
@@ -1541,7 +1671,10 @@ mod tests {
       scroll_x: 0,
       scroll_y: 0,
     };
-    let viewport = Size { width: 20, height: 15 };
+    let viewport = Size {
+      width: 20,
+      height: 15,
+    };
     // 垂直滚动条显示 → 宽度减 1，高度不变。
     let eff = effective_viewport(&state, viewport);
     assert_eq!(eff.width, 9);
@@ -1557,13 +1690,18 @@ mod tests {
       .create(
         &mut pool,
         ScrollBoxOptions {
-          rect: Rect { x: 0, y: 0, width: 8, height: 4 },
+          rect: Rect {
+            x: 0,
+            y: 0,
+            width: 8,
+            height: 4,
+          },
           content_width: 8,
           content_height: 1,
           scrollbar_style: ScrollbarStyle {
-            track_char: '中',  // CJK 宽 2，应退回默认 '│'
-            thumb_char: '\u{200D}', // ZWJ 宽 0，应退回默认 '█'
-            h_track_char: '━', // 宽 1，OK
+            track_char: '中',         // CJK 宽 2，应退回默认 '│'
+            thumb_char: '\u{200D}',   // ZWJ 宽 0，应退回默认 '█'
+            h_track_char: '━',        // 宽 1，OK
             h_thumb_char: '\u{200D}', // 宽 0，应退回默认 '█'
             ..Default::default()
           },

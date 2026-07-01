@@ -3,8 +3,19 @@ use unicode_width::UnicodeWidthStr;
 
 use super::layout::VisualLayout;
 use super::state::{HitSnapshot, TextInputState};
-use super::types::{TextInputCursorShape, TextInputRenderParams, TextSurface, VerticalAlign};
+use super::types::{
+  TextAlign, TextInputCursorShape, TextInputRenderParams, TextSurface, VerticalAlign,
+};
 use crate::host_engine::services::{CanvasService, TextStyle};
+
+fn align_offset(align: TextAlign, container: u16, content: u16) -> u16 {
+  let clamped = content.min(container);
+  match align {
+    TextAlign::Left => 0,
+    TextAlign::Center => (container - clamped) / 2,
+    TextAlign::Right => container - clamped,
+  }
+}
 
 pub(super) fn render_single_line(
   state: &mut TextInputState,
@@ -60,6 +71,7 @@ pub(super) fn render_single_line(
     used += glyph.width;
     start = glyph.start;
   }
+  let offset_x = align_offset(params.text_align, params.rect.width, used as u16);
   let start_x = layout.position(start, Some(0)).1;
   let mut x = 0;
   let selection = active.then(|| state.buffer.selection()).flatten();
@@ -79,7 +91,7 @@ pub(super) fn render_single_line(
     draw_styled(
       canvas,
       surface,
-      params.rect.x + x as u16,
+      params.rect.x + offset_x + x as u16,
       y,
       &glyph.text,
       style,
@@ -92,7 +104,7 @@ pub(super) fn render_single_line(
       draw_styled(
         canvas,
         surface,
-        params.rect.x + cursor_x as u16,
+        params.rect.x + offset_x + cursor_x as u16,
         y,
         marker,
         input_cursor_style(params),
@@ -108,7 +120,7 @@ pub(super) fn render_single_line(
     single_start: start,
     order,
   });
-  active.then_some((params.rect.x + cursor_x as u16, y))
+  active.then_some((params.rect.x + offset_x + cursor_x as u16, y))
 }
 
 pub(super) fn render_multi_line(
@@ -152,12 +164,27 @@ pub(super) fn render_multi_line(
   } else {
     0
   };
+
+  // 预计算每行的最大宽度（用于水平对齐）
+  let mut line_widths: Vec<usize> = Vec::new();
+  for glyph in &layout.glyphs {
+    let line_end = glyph.x + glyph.width;
+    while line_widths.len() <= glyph.line {
+      line_widths.push(0);
+    }
+    if line_end > line_widths[glyph.line] {
+      line_widths[glyph.line] = line_end;
+    }
+  }
+
   let selection = active.then(|| state.buffer.selection()).flatten();
   for glyph in layout
     .glyphs
     .iter()
     .filter(|glyph| (first_line..first_line + params.rect.height as usize).contains(&glyph.line))
   {
+    let line_w = line_widths.get(glyph.line).copied().unwrap_or(0) as u16;
+    let offset_x = align_offset(params.text_align, params.rect.width, line_w);
     let at_cursor = active && glyph.start == state.buffer.cursor();
     let selected = selection
       .as_ref()
@@ -170,7 +197,7 @@ pub(super) fn render_multi_line(
     draw_styled(
       canvas,
       surface,
-      params.rect.x + glyph.x as u16,
+      params.rect.x + offset_x + glyph.x as u16,
       params.rect.y + (glyph.line - first_line) as u16,
       &glyph.text,
       style,
@@ -184,10 +211,12 @@ pub(super) fn render_multi_line(
     && cursor_visible
   {
     if let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default()) {
+      let line_w = line_widths.get(cursor_line).copied().unwrap_or(0) as u16;
+      let offset_x = align_offset(params.text_align, params.rect.width, line_w);
       draw_styled(
         canvas,
         surface,
-        params.rect.x + cursor_x as u16,
+        params.rect.x + offset_x + cursor_x as u16,
         params.rect.y + (cursor_line - first_line) as u16,
         marker,
         input_cursor_style(params),
@@ -203,8 +232,10 @@ pub(super) fn render_multi_line(
     single_start: 0,
     order,
   });
+  let cursor_line_w = line_widths.get(cursor_line).copied().unwrap_or(0) as u16;
+  let cursor_offset_x = align_offset(params.text_align, params.rect.width, cursor_line_w);
   active.then_some((
-    params.rect.x + cursor_x as u16,
+    params.rect.x + cursor_offset_x + cursor_x as u16,
     params.rect.y + (cursor_line - first_line) as u16,
   ))
 }
@@ -300,13 +331,19 @@ fn draw_placeholder(
   y: u16,
   params: &TextInputRenderParams,
 ) {
+  let max_w = params.rect.width.saturating_sub(1) as usize;
+  let placeholder_w = params.placeholder.graphemes(true).fold(0usize, |acc, g| {
+    let w = UnicodeWidthStr::width(g);
+    if acc + w > max_w { acc } else { acc + w }
+  }) as u16;
+  let offset = align_offset(params.text_align, params.rect.width, placeholder_w + 1);
   draw_prefix(
     canvas,
     surface,
-    params.rect.x.saturating_add(1),
+    params.rect.x + offset + 1,
     y,
     &params.placeholder,
-    params.rect.width.saturating_sub(1),
+    params.rect.width.saturating_sub(offset + 1),
     input_placeholder_style(params),
   );
 }

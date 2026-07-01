@@ -7,6 +7,9 @@ use crate::host_engine::services::{
   RichTextParams, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
+pub mod game;
+pub mod screensaver;
+
 const MODS_MENU_LEN: usize = 2;
 
 const MENU_KEYS: &[&str] = &["mods.game", "mods.screensaver"];

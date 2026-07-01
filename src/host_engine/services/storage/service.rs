@@ -10,9 +10,7 @@ pub struct StorageService {
 }
 
 impl StorageService {
-
   pub fn new(log: &mut LogService) -> Self {
-
     let root_dir = resolve_root_dir();
 
     let service = Self { root_dir };
@@ -70,7 +68,6 @@ impl StorageService {
 
 // 自动探测应用根目录：依次尝试当前目录、可执行文件目录。
 fn resolve_root_dir() -> PathBuf {
-
   if let Ok(current_dir) = std::env::current_dir() {
     if current_dir.join("assets").exists() || current_dir.join("Cargo.toml").exists() {
       return current_dir;

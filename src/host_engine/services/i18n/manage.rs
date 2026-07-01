@@ -3,7 +3,6 @@ use super::{I18nService, load_language_info, load_language_registry};
 use crate::host_engine::services::{LogService, LogSource, StorageService};
 
 impl I18nService {
-
   /// 刷新语言注册表
   pub fn refresh_language_registry(&mut self, storage: &StorageService, log: &mut LogService) {
     let registry = load_language_registry(storage, log);

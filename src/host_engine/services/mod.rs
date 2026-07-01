@@ -36,7 +36,7 @@ pub use layout::{LayoutService, Rect, Size};
 pub use log::{LogService, LogSource};
 pub use lua::LuaService;
 pub use overlay::OverlayService;
-pub use package::PackageService;
+pub use package::{PackageListEntry, PackageService};
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
@@ -49,8 +49,8 @@ pub use widget::{
   HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, Overflow, ScrollBoxEvent, ScrollBoxId,
   ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide,
   ScrollbarStyle, ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService,
-  SurfaceId, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
-  TextInputRenderParams, TextInputService, VerticalAlign,
+  SurfaceId, TextAlign, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode,
+  TextInputOptions, TextInputRenderParams, TextInputService, VerticalAlign,
 };
 
 /// 引擎核心服务集合，持有所有子服务的实例

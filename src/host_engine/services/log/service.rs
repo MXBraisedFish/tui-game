@@ -50,7 +50,6 @@ impl LogService {
   }
 
   fn push(&mut self, level: LogLevel, source: LogSource, message: impl Into<String>) {
-
     let entry = LogEntry {
       timestamp_ms: now_ms(),
       sequence: self.next_sequence,
@@ -71,7 +70,6 @@ impl LogService {
 
   /// 取出队列中所有日志并清空。
   pub fn drain(&mut self) -> Vec<LogEntry> {
-
     self.queue.drain(..).collect()
   }
   pub fn is_empty(&self) -> bool {

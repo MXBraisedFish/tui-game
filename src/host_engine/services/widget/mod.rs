@@ -12,6 +12,6 @@ pub use scroll_box::{
 pub use slice::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
 pub use surface::SurfaceId;
 pub use text_input::{
-  TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
+  TextAlign, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
   TextInputRenderParams, TextInputService, VerticalAlign,
 };

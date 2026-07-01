@@ -1,3 +1,5 @@
+pub use crate::host_engine::services::text_layout::TextAlign;
+
 use crate::host_engine::services::{Rect, SliceId, TextColor, TextStyle};
 
 /// 文本输入组件的唯一标识符。
@@ -54,6 +56,7 @@ pub struct TextInputRenderParams {
   pub cursor_shape: Option<TextInputCursorShape>,
   pub cursor_blink: bool,
   pub vertical_align: VerticalAlign,
+  pub text_align: TextAlign,
 }
 
 impl Default for TextInputRenderParams {
@@ -70,6 +73,7 @@ impl Default for TextInputRenderParams {
       cursor_shape: None,
       cursor_blink: true,
       vertical_align: VerticalAlign::Top,
+      text_align: TextAlign::Left,
     }
   }
 }

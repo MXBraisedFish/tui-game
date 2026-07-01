@@ -73,7 +73,6 @@ impl UiObjectPoolOwner for TerminalCheckUi {
 /// 终端检测页面的命令。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TerminalCheckCommand {
-
   Next,
 
   Exit,
@@ -82,7 +81,6 @@ pub enum TerminalCheckCommand {
 }
 
 impl TerminalCheckUi {
-
   /// 初始化终端检测 UI。
   pub fn init() -> Self {
     Self {
@@ -806,10 +804,8 @@ impl TerminalCheckUi {
     match self.step {
       STEP_UNICODE => {
         if self.selected_index == 0 {
-
           Some(TerminalCheckCommand::Next)
         } else {
-
           Some(TerminalCheckCommand::Exit)
         }
       }

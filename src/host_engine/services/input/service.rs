@@ -150,7 +150,6 @@ pub enum KeyPattern {
 }
 
 impl KeyPattern {
-
   /// 将键位规范化排序，使组合键的匹配与按键顺序无关
   pub fn normalized(self) -> Self {
     match self {

@@ -18,6 +18,7 @@ pub struct ImageConvertParams {
   pub crop_y: i32,
   pub crop_width: Option<u32>,
   pub crop_height: Option<u32>,
+  pub square_crop: bool,
   pub scale: f64,
   pub cache: bool,
 }
@@ -32,6 +33,7 @@ impl Default for ImageConvertParams {
       crop_y: 0,
       crop_width: None,
       crop_height: None,
+      square_crop: false,
       scale: 1.0,
       cache: true,
     }
@@ -138,9 +140,10 @@ impl ImageService {
 /// 获取源文件的修改时间（Unix 秒）。
 fn source_modified(path: &Path) -> io::Result<u64> {
   let meta = fs::metadata(path)?;
-  let dur = meta.modified()?.duration_since(UNIX_EPOCH).map_err(|e| {
-    io::Error::new(io::ErrorKind::Other, format!("mtime before epoch: {e:?}"))
-  })?;
+  let dur = meta
+    .modified()?
+    .duration_since(UNIX_EPOCH)
+    .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("mtime before epoch: {e:?}")))?;
   Ok(dur.as_secs())
 }
 
@@ -208,7 +211,7 @@ fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
   let mut h = DefaultHasher::new();
 
   let input = format!(
-    "{}\x00{}\x00{}\x00{}\x00{}\x00{:?}\x00{:?}\x00{:.6}\x00{}",
+    "{}\x00{}\x00{}\x00{}\x00{}\x00{:?}\x00{:?}\x00{}\x00{:.6}\x00{}",
     resolved.display(),
     p.output_width,
     p.output_height,
@@ -216,6 +219,7 @@ fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
     p.crop_y,
     p.crop_width,
     p.crop_height,
+    p.square_crop,
     p.scale,
     p.cache,
   );
@@ -227,16 +231,22 @@ fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
 fn process(img: &image::DynamicImage, p: &ImageConvertParams) -> Result<String, String> {
   let (src_w, src_h) = img.dimensions();
 
-  let cx = p.crop_x.max(0) as u32;
-  let cy = p.crop_y.max(0) as u32;
-  let cw = p
-    .crop_width
-    .unwrap_or(src_w.saturating_sub(cx))
-    .min(src_w.saturating_sub(cx));
-  let ch = p
-    .crop_height
-    .unwrap_or(src_h.saturating_sub(cy))
-    .min(src_h.saturating_sub(cy));
+  let (cx, cy, cw, ch) = if p.square_crop {
+    let side = src_w.min(src_h);
+    ((src_w - side) / 2, (src_h - side) / 2, side, side)
+  } else {
+    let cx = p.crop_x.max(0) as u32;
+    let cy = p.crop_y.max(0) as u32;
+    let cw = p
+      .crop_width
+      .unwrap_or(src_w.saturating_sub(cx))
+      .min(src_w.saturating_sub(cx));
+    let ch = p
+      .crop_height
+      .unwrap_or(src_h.saturating_sub(cy))
+      .min(src_h.saturating_sub(cy));
+    (cx, cy, cw, ch)
+  };
   if cw == 0 || ch == 0 {
     return Err("裁剪区域为空".into());
   }
@@ -528,7 +538,12 @@ mod tests {
     let stale = raw.replace(
       &format!("\"source_modified\":{}", {
         let meta = fs::metadata(&abs).unwrap();
-        meta.modified().unwrap().duration_since(UNIX_EPOCH).unwrap().as_secs()
+        meta
+          .modified()
+          .unwrap()
+          .duration_since(UNIX_EPOCH)
+          .unwrap()
+          .as_secs()
       }),
       "\"source_modified\":0",
     );

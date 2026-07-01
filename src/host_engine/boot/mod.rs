@@ -23,9 +23,7 @@ pub fn prepare() -> BootOutput {
   let preferred = services.storage.read_language_code();
 
   let selected_language = match preferred {
-    None => {
-      default_code
-    }
+    None => default_code,
     Some(ref code) => {
       let in_registry = services
         .i18n
@@ -63,8 +61,17 @@ pub fn prepare() -> BootOutput {
     .i18n
     .load_runtime_language(&services.storage, &mut services.log, &selected_language);
 
-  let root_dir = services.storage.root_dir();
-  services.package.scan_all(&root_dir, &mut services.log);
+  let root_dir = services.storage.root_dir().to_path_buf();
+  let package_language = services.i18n.current_language().to_string();
+  let missing_template = services
+    .i18n
+    .get_runtime_text("language_warning", "language_warning.missing");
+  services.package.scan_all(
+    &root_dir,
+    &mut services.log,
+    &package_language,
+    &missing_template,
+  );
 
   services
     .log
