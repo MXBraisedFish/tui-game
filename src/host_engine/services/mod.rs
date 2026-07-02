@@ -36,7 +36,7 @@ pub use layout::{LayoutService, Rect, Size};
 pub use log::{LogService, LogSource};
 pub use lua::LuaService;
 pub use overlay::OverlayService;
-pub use package::{PackageListEntry, PackageService};
+pub use package::{PackageEvent, PackageListEntry, PackageService};
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
@@ -46,8 +46,9 @@ pub use text_layout::DrawTextParams;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
 pub use widget::{
-  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, Overflow, ScrollBoxEvent, ScrollBoxId,
-  ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide,
+  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, Overflow, ProgressBarFillOrigin,
+  ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService, ScrollBoxEvent,
+  ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide,
   ScrollbarStyle, ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService,
   SurfaceId, TextAlign, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode,
   TextInputOptions, TextInputRenderParams, TextInputService, VerticalAlign,
@@ -60,6 +61,7 @@ pub struct EngineServices {
   pub host_objects: HostObjectPool,
   pub hit_area: HitAreaService,
   pub scroll_box: ScrollBoxService,
+  pub progress_bar: ProgressBarService,
   pub slice: SliceService,
   pub input: InputService,
   pub ui: UiService,
@@ -93,6 +95,7 @@ impl EngineServices {
       host_objects: HostObjectPool::new(),
       hit_area: HitAreaService::new(),
       scroll_box: ScrollBoxService::new(),
+      progress_bar: ProgressBarService::new(),
       slice: SliceService::new(),
       text_input: TextInputService::new(),
       package: PackageService::new(),

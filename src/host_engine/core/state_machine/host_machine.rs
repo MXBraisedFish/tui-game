@@ -146,9 +146,26 @@ impl HostMachineState {
     }
   }
 
+  pub fn push_language_loading_overlay(&mut self) {
+    if let Some(runtime) = self.runtime_mut() {
+      runtime.overlays_mut().push(OverlayState {
+        kind: OverlayKind::LanguageLoading,
+        logic: super::OverlayLogicState,
+        render: super::OverlayRenderState {
+          required_width: 0,
+          required_height: 0,
+        },
+      });
+    }
+  }
+
   /// 弹出当前覆盖层的顶部项
   pub fn pop_overlay(&mut self) -> Option<OverlayState> {
     self.runtime_mut()?.overlays_mut().pop()
+  }
+
+  pub fn remove_overlay_kind(&mut self, kind: OverlayKind) -> Option<OverlayState> {
+    self.runtime_mut()?.overlays_mut().remove_kind(kind)
   }
 
   pub fn is_host_mode(&self) -> bool {

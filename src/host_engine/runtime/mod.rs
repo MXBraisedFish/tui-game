@@ -1,19 +1,27 @@
 use crate::host_engine::core::state_machine::{MainHostState, OverlayKind, UiNodeState};
-use crate::host_engine::core::{set_crash_phase, ExitState, FrameScheduler, RuntimeWorld};
+use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
 
 use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
-  translate_action_map, EngineServices, HostAreaKind, MouseEvent, Rect, SystemEvent, UiEvent,
-  UiObjectPool, UiObjectPoolOwner,
+  EngineServices, HostAreaKind, MouseEvent, PackageEvent, Rect, SystemEvent, UiEvent, UiObjectPool,
+  UiObjectPoolOwner, translate_action_map,
 };
 
 use crate::host_engine::ui::{
   GamePackageCommand, GamePackageUi, HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi,
-  LanguageSelectCommand, LanguageSelectUi, ModsCommand, ModsUi, ScreensaverPackageCommand,
-  ScreensaverPackageUi, SettingsUi, SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout,
-  TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
+  LanguageLoadingUi, LanguageSelectCommand, LanguageSelectUi, ModsCommand, ModsUi,
+  ScreensaverPackageCommand, ScreensaverPackageUi, SettingsUi, SettingsUiCommand,
+  TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi, WindowSizeWarningCommand,
+  WindowSizeWarningUi,
 };
+
+#[derive(Default)]
+struct LanguageLoadingRuntime {
+  active: bool,
+  pending_language: Option<String>,
+  enter_terminal_check_after_finish: bool,
+}
 
 /// 运行引擎主循环：初始化 UI 并循环处理输入、更新与渲染，直到退出
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
@@ -58,6 +66,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut input_demo_ui =
     InputDemoUi::init(&services.hit_area, &services.slice, &services.scroll_box);
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
+  let mut language_loading_ui = LanguageLoadingUi::init(&services.progress_bar);
+  let mut language_loading = LanguageLoadingRuntime::default();
 
   if services.storage.read_language_code().is_none() && language_select_ui.is_some() {
     world.state.enter_ui_node(UiNodeState::language_select());
@@ -72,7 +82,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     services.input.begin_frame();
     services.input.poll();
-    services.package.poll_events(&mut services.log);
+    let package_events = services.package.poll_events(&mut services.log);
+    apply_language_loading_package_events(
+      &package_events,
+      &mut language_loading,
+      &mut language_loading_ui,
+      services,
+      world,
+    );
 
     services.input.poll_resize_events(|w, h| {
       services.layout.resize_physical(w, h);
@@ -98,7 +115,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut window_size_ui,
     );
 
-    if world.state.current_overlay_kind().is_some() {
+    if world.state.current_overlay_kind() == Some(OverlayKind::WindowSizeWarning) {
       load_window_size_action_map(services);
       services.input.dispatch_action_events();
       route_input_events(
@@ -113,7 +130,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         &mut screensaver_package_ui,
         &mut input_demo_ui,
         &mut window_size_ui,
+        &mut language_loading_ui,
+        &mut language_loading,
       );
+    } else if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
+      while services.input.next_action_event().is_some() {}
+      services.input.clear();
+      let _ = services.input.drain_system_events();
     } else if services.text_input.is_active() {
       route_text_input_events(
         services,
@@ -126,6 +149,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         &mut game_package_ui,
         &mut screensaver_package_ui,
         &mut input_demo_ui,
+        &mut language_loading_ui,
+        &mut language_loading,
       );
     } else {
       match world.state.current_ui_kind() {
@@ -152,6 +177,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         &mut screensaver_package_ui,
         &mut input_demo_ui,
         &mut window_size_ui,
+        &mut language_loading_ui,
+        &mut language_loading,
       );
     }
 
@@ -170,6 +197,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut game_package_ui,
       &mut screensaver_package_ui,
       &mut input_demo_ui,
+      &mut language_loading_ui,
+      &mut language_loading,
     );
 
     if world.is_stopped() {
@@ -188,6 +217,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut screensaver_package_ui,
       &mut input_demo_ui,
       &mut window_size_ui,
+      &mut language_loading_ui,
     );
     let text_force_redraw = services.canvas.take_render_requested();
     let composed = services.compositor.compose(&services.canvas);
@@ -386,6 +416,8 @@ fn route_mouse_and_events(
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
+  language_loading_ui: &mut LanguageLoadingUi,
+  language_loading: &mut LanguageLoadingRuntime,
   event: MouseEvent,
 ) -> bool {
   let consumed = route_component_mouse(
@@ -412,6 +444,8 @@ fn route_mouse_and_events(
     game_package_ui,
     screensaver_package_ui,
     input_demo_ui,
+    language_loading_ui,
+    language_loading,
   );
   consumed
 }
@@ -427,6 +461,8 @@ fn route_component_events(
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
+  language_loading_ui: &mut LanguageLoadingUi,
+  language_loading: &mut LanguageLoadingRuntime,
 ) {
   loop {
     let event = current_objects_mut(
@@ -454,6 +490,8 @@ fn route_component_events(
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
+      language_loading_ui,
+      language_loading,
     );
     if world.is_stopped() {
       break;
@@ -472,6 +510,8 @@ fn route_text_input_events(
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
+  language_loading_ui: &mut LanguageLoadingUi,
+  language_loading: &mut LanguageLoadingRuntime,
 ) {
   for event in services.input.drain_system_events() {
     match event {
@@ -535,6 +575,8 @@ fn route_text_input_events(
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
+      language_loading_ui,
+      language_loading,
     );
   }
 }
@@ -551,6 +593,8 @@ fn route_input_events(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
+  language_loading_ui: &mut LanguageLoadingUi,
+  language_loading: &mut LanguageLoadingRuntime,
 ) {
   if world.state.current_overlay_kind().is_some() {
     while let Some(event) = services.input.next_action_event() {
@@ -601,6 +645,8 @@ fn route_input_events(
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
+      language_loading_ui,
+      language_loading,
     );
     route_component_events(
       services,
@@ -613,6 +659,8 @@ fn route_input_events(
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
+      language_loading_ui,
+      language_loading,
     );
 
     if world.is_stopped() {
@@ -636,6 +684,8 @@ fn route_input_events(
           game_package_ui,
           screensaver_package_ui,
           input_demo_ui,
+          language_loading_ui,
+          language_loading,
           mouse,
         );
         if !consumed {
@@ -669,6 +719,8 @@ fn route_input_events(
           game_package_ui,
           screensaver_package_ui,
           input_demo_ui,
+          language_loading_ui,
+          language_loading,
         );
       }
       _ => {}
@@ -691,6 +743,8 @@ fn route_input_event(
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
+  language_loading_ui: &mut LanguageLoadingUi,
+  language_loading: &mut LanguageLoadingRuntime,
 ) {
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
@@ -706,7 +760,14 @@ fn route_input_event(
     Some(UiNodeKind::LanguageSelect) => {
       if let Some(ui) = language_select_ui.as_deref_mut() {
         if let Some(command) = ui.handle_event(event) {
-          apply_language_select_command(command, ui, services, world);
+          apply_language_select_command(
+            command,
+            ui,
+            services,
+            world,
+            language_loading_ui,
+            language_loading,
+          );
         }
       }
     }
@@ -767,8 +828,13 @@ fn route_update(
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
+  language_loading_ui: &mut LanguageLoadingUi,
+  language_loading: &mut LanguageLoadingRuntime,
 ) {
   if world.state.current_overlay_kind().is_some() {
+    if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
+      language_loading_ui.update(world.clock.delta_time());
+    }
     return;
   }
 
@@ -821,6 +887,8 @@ fn route_update(
     game_package_ui,
     screensaver_package_ui,
     input_demo_ui,
+    language_loading_ui,
+    language_loading,
   );
 }
 
@@ -836,6 +904,7 @@ fn route_render(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
+  language_loading_ui: &mut LanguageLoadingUi,
 ) -> Option<(u16, u16)> {
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
     apply_host_viewport(services);
@@ -860,6 +929,22 @@ fn route_render(
       term.width,
       term.height,
       world.state.is_host_mode(),
+    );
+    return None;
+  }
+
+  if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
+    apply_host_viewport(services);
+    language_loading_ui.objects_mut().begin_render();
+    services
+      .canvas
+      .prepare(language_loading_ui.objects(), &services.layout);
+    language_loading_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.i18n,
+      &services.progress_bar,
     );
     return None;
   }
@@ -1152,28 +1237,119 @@ fn apply_language_select_command(
   language_select_ui: &mut LanguageSelectUi,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
+  language_loading_ui: &mut LanguageLoadingUi,
+  language_loading: &mut LanguageLoadingRuntime,
 ) {
   match command {
     LanguageSelectCommand::Confirm(code) => {
-      let _ = services.storage.write_language_code(&code);
-      services
-        .i18n
-        .load_runtime_language(&services.storage, &mut services.log, &code);
-      let package_language = services.i18n.current_language().to_string();
-      let missing_template = services
-        .i18n
-        .get_runtime_text("language_warning", "language_warning.missing");
-      let _ = services
-        .package
-        .request_rescan_for_language(&package_language, &missing_template);
+      language_loading.pending_language = Some(code);
     }
     LanguageSelectCommand::Back => {
+      let pending_language = language_loading.pending_language.take();
+      let enter_terminal_check_after_finish = !services.storage.is_terminal_profile_complete();
       world.state.pop_ui_node();
-      reset_language_select_ui(language_select_ui, services);
-      if !services.storage.is_terminal_profile_complete() {
+      if let Some(code) = pending_language {
+        start_language_loading(
+          &code,
+          enter_terminal_check_after_finish,
+          language_loading,
+          language_loading_ui,
+          services,
+          world,
+        );
+        reset_language_select_ui(language_select_ui, services);
+      } else if enter_terminal_check_after_finish {
+        reset_language_select_ui(language_select_ui, services);
         world.state.enter_ui_node(UiNodeState::terminal_check());
+      } else {
+        reset_language_select_ui(language_select_ui, services);
       }
     }
+  }
+}
+
+fn start_language_loading(
+  code: &str,
+  enter_terminal_check_after_finish: bool,
+  language_loading: &mut LanguageLoadingRuntime,
+  language_loading_ui: &mut LanguageLoadingUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  language_loading.active = true;
+  language_loading.enter_terminal_check_after_finish = enter_terminal_check_after_finish;
+  language_loading_ui.set_progress(&services.progress_bar, 0.0, 0.0);
+  world.state.push_language_loading_overlay();
+  let _ = services.storage.write_language_code(code);
+  services
+    .i18n
+    .load_runtime_language(&services.storage, &mut services.log, code);
+  language_loading_ui.set_progress(&services.progress_bar, 0.5, 0.5);
+  let package_language = services.i18n.current_language().to_string();
+  let missing_template = services
+    .i18n
+    .get_runtime_text("language_warning", "language_warning.missing");
+  let requested = services
+    .package
+    .request_rescan_for_language(&package_language, &missing_template);
+  if !requested {
+    finish_language_loading(language_loading, language_loading_ui, services, world);
+  }
+}
+
+fn apply_language_loading_package_events(
+  events: &[PackageEvent],
+  language_loading: &mut LanguageLoadingRuntime,
+  language_loading_ui: &mut LanguageLoadingUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  if !language_loading.active {
+    return;
+  }
+
+  for event in events {
+    match *event {
+      PackageEvent::ScanStarted { total } if total == 0 => {
+        language_loading_ui.set_progress(&services.progress_bar, 0.5, 1.0);
+      }
+      PackageEvent::ScanStarted { .. } => {
+        language_loading_ui.set_progress(&services.progress_bar, 0.5, 0.5);
+      }
+      PackageEvent::ScanProgress { scanned, total } => {
+        let package_progress = if total == 0 {
+          1.0
+        } else {
+          (scanned as f32 / total as f32).clamp(0.0, 1.0)
+        };
+        language_loading_ui.set_progress(&services.progress_bar, 0.5, 0.5 + package_progress * 0.5);
+      }
+      PackageEvent::ScanFinished { .. } => {
+        finish_language_loading(language_loading, language_loading_ui, services, world);
+      }
+      _ => {}
+    }
+  }
+}
+
+fn finish_language_loading(
+  language_loading: &mut LanguageLoadingRuntime,
+  language_loading_ui: &mut LanguageLoadingUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  if !language_loading.active {
+    return;
+  }
+  language_loading.active = false;
+  let enter_terminal_check = language_loading.enter_terminal_check_after_finish;
+  language_loading.enter_terminal_check_after_finish = false;
+  language_loading_ui.set_progress(&services.progress_bar, 1.0, 1.0);
+  let _ = world
+    .state
+    .remove_overlay_kind(OverlayKind::LanguageLoading);
+  if enter_terminal_check {
+    world.state.enter_ui_node(UiNodeState::terminal_check());
   }
 }
 

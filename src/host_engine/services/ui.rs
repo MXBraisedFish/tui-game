@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::TextInputEvent;
 use super::input::InputActionEvent;
 use super::widget::hit_area::{HitAreaEvent, HitAreaId, HitAreaObjects};
+use super::widget::progress_bar::ProgressBarObjects;
 use super::widget::scroll_box::{ScrollBoxEvent, ScrollBoxObjects};
 use super::widget::slice::SliceObjects;
 use super::widget::surface::SurfaceId;
@@ -31,6 +32,7 @@ pub struct UiObjectPool {
   pub(crate) text_inputs: TextInputObjects,
   pub(crate) slices: SliceObjects,
   pub(crate) scroll_boxes: ScrollBoxObjects,
+  pub(crate) progress_bars: ProgressBarObjects,
 }
 
 /// UI 事件（动作 / 点击区域 / 文本输入 / 滚动盒子）
@@ -92,6 +94,7 @@ impl UiObjectPool {
       text_inputs: TextInputObjects::new(),
       slices: SliceObjects::new(),
       scroll_boxes: ScrollBoxObjects::new(),
+      progress_bars: ProgressBarObjects::new(),
     }
   }
 

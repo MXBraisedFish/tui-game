@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{
-  mpsc::{self, Receiver, Sender},
   Arc, RwLock,
+  mpsc::{self, Receiver, Sender},
 };
 use std::thread::{self, JoinHandle};
 
@@ -152,6 +152,13 @@ enum PackageCommand {
 pub enum PackageEvent {
   Info(String),
   Warn(String),
+  ScanStarted {
+    total: usize,
+  },
+  ScanProgress {
+    scanned: usize,
+    total: usize,
+  },
   ScanFinished {
     total: usize,
     games: usize,
@@ -187,7 +194,11 @@ impl PackageService {
       while let Ok(command) = command_rx.recv() {
         match command {
           PackageCommand::Scan(request) => {
-            let report = scan_all_packages(&request);
+            let total_candidates = count_package_candidates(&request);
+            let _ = event_tx.send(PackageEvent::ScanStarted {
+              total: total_candidates,
+            });
+            let report = scan_all_packages(&request, &event_tx, total_candidates);
             let total = report.snapshot.games.len() + report.snapshot.screensavers.len();
             let games = report.snapshot.games.len();
             let screensavers = report.snapshot.screensavers.len();
@@ -267,10 +278,13 @@ impl PackageService {
   }
 
   /// 拉取后台扫描事件。应在主线程调用并写日志。
-  pub fn poll_events(&mut self, log: &mut LogService) {
+  pub fn poll_events(&mut self, log: &mut LogService) -> Vec<PackageEvent> {
+    let mut events = Vec::new();
     while let Ok(event) = self.event_rx.try_recv() {
-      log_package_event(log, event);
+      log_package_event(log, event.clone());
+      events.push(event);
     }
+    events
   }
 
   pub fn games(&self) -> Vec<PackageInfo> {
@@ -329,6 +343,11 @@ fn log_package_event(log: &mut LogService, event: PackageEvent) {
   match event {
     PackageEvent::Info(message) => log.info(LogSource::Pack, message),
     PackageEvent::Warn(message) => log.warn(LogSource::Pack, message),
+    PackageEvent::ScanStarted { total } => log.info(
+      LogSource::Pack,
+      format!("Started package scan ({} candidates)", total),
+    ),
+    PackageEvent::ScanProgress { .. } => {}
     PackageEvent::ScanFinished {
       total,
       games,
@@ -364,17 +383,25 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
   }
 }
 
-fn scan_all_packages(request: &ScanRequest) -> ScanReport {
+fn scan_all_packages(
+  request: &ScanRequest,
+  event_tx: &Sender<PackageEvent>,
+  total: usize,
+) -> ScanReport {
   let mut report = ScanReport {
     snapshot: PackageSnapshot::default(),
     events: Vec::new(),
     errors: 0,
     duplicates: 0,
   };
+  let mut scanned = 0;
 
   scan_dir(
     &mut report,
     request,
+    event_tx,
+    total,
+    &mut scanned,
     "scripts/game",
     PackageType::Game,
     PackageSource::Official,
@@ -382,6 +409,9 @@ fn scan_all_packages(request: &ScanRequest) -> ScanReport {
   scan_dir(
     &mut report,
     request,
+    event_tx,
+    total,
+    &mut scanned,
     "scripts/screensaver",
     PackageType::Screensaver,
     PackageSource::Official,
@@ -389,6 +419,9 @@ fn scan_all_packages(request: &ScanRequest) -> ScanReport {
   scan_dir(
     &mut report,
     request,
+    event_tx,
+    total,
+    &mut scanned,
     "data/mod/game",
     PackageType::Game,
     PackageSource::Mod,
@@ -396,6 +429,9 @@ fn scan_all_packages(request: &ScanRequest) -> ScanReport {
   scan_dir(
     &mut report,
     request,
+    event_tx,
+    total,
+    &mut scanned,
     "data/mod/screensaver",
     PackageType::Screensaver,
     PackageSource::Mod,
@@ -408,6 +444,9 @@ fn scan_all_packages(request: &ScanRequest) -> ScanReport {
 fn scan_dir(
   report: &mut ScanReport,
   request: &ScanRequest,
+  event_tx: &Sender<PackageEvent>,
+  total: usize,
+  scanned: &mut usize,
   relative: &str,
   expected_type: PackageType,
   source: PackageSource,
@@ -445,7 +484,35 @@ fn scan_dir(
         report.errors += 1;
       }
     }
+    *scanned += 1;
+    let _ = event_tx.send(PackageEvent::ScanProgress {
+      scanned: *scanned,
+      total,
+    });
   }
+}
+
+fn count_package_candidates(request: &ScanRequest) -> usize {
+  [
+    "scripts/game",
+    "scripts/screensaver",
+    "data/mod/game",
+    "data/mod/screensaver",
+  ]
+  .into_iter()
+  .map(|relative| count_child_dirs(&request.root.join(relative)))
+  .sum()
+}
+
+fn count_child_dirs(dir: &Path) -> usize {
+  std::fs::read_dir(dir)
+    .map(|entries| {
+      entries
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .count()
+    })
+    .unwrap_or(0)
 }
 
 // 读取并验证单个包的 package.json 文件
@@ -950,6 +1017,46 @@ mod tests {
       std::thread::sleep(std::time::Duration::from_millis(10));
     }
     panic!("rescan did not replace package snapshot");
+  }
+
+  #[test]
+  fn request_rescan_emits_started_progress_and_finished_events() {
+    let root = temp_root("rescan_progress");
+    write_game(&root, "data/mod/game", "first", "First");
+    write_screensaver(&root, "data/mod/screensaver", "screen", "Screen");
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+    assert!(service.request_rescan());
+
+    let mut events = Vec::new();
+    for _ in 0..100 {
+      events.extend(service.poll_events(&mut log));
+      if events
+        .iter()
+        .any(|event| matches!(event, PackageEvent::ScanFinished { .. }))
+      {
+        break;
+      }
+      std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+
+    assert!(matches!(
+      events.first(),
+      Some(PackageEvent::ScanStarted { total: 2 })
+    ));
+    assert!(events.iter().any(|event| matches!(
+      event,
+      PackageEvent::ScanProgress { scanned, total: 2 } if *scanned <= 2
+    )));
+    assert!(
+      events
+        .iter()
+        .any(|event| matches!(event, PackageEvent::ScanFinished { total: 2, .. }))
+    );
+
+    let _ = std::fs::remove_dir_all(root);
   }
 
   #[test]

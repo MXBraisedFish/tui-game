@@ -13,6 +13,7 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "mods",
   "window_size",
   "language_warning",
+  "language_loading",
   "game_pack",
   "screensaver_pack",
 ];
