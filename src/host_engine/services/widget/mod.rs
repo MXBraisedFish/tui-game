@@ -1,6 +1,8 @@
 pub(crate) mod runtime_object;
 pub(crate) mod ui_object;
 
+pub use runtime_object::time::{TimerEvent, TimerId, TimerMode, TimerOptions, TimerState};
+pub use runtime_object::{RuntimeObjectPool, RuntimeObjectPoolOwner};
 pub use ui_object::interactives::hit_area::{
   HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService,
 };

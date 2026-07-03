@@ -1,11 +1,11 @@
 use crate::host_engine::core::state_machine::{MainHostState, OverlayKind, UiNodeState};
-use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
+use crate::host_engine::core::{set_crash_phase, ExitState, FrameScheduler, RuntimeWorld};
 
 use crate::host_engine::core::state_machine::{HostState, UiNodeKind};
 
 use crate::host_engine::services::{
-  EngineServices, HostAreaKind, MouseEvent, PackageEvent, Rect, SystemEvent, UiEvent, UiObjectPool,
-  UiObjectPoolOwner, translate_action_map,
+  translate_action_map, EngineServices, HostAreaKind, MouseEvent, PackageEvent, Rect, SystemEvent,
+  UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 use crate::host_engine::ui::{
@@ -66,7 +66,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut input_demo_ui =
     InputDemoUi::init(&services.hit_area, &services.slice, &services.scroll_box);
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
-  let mut language_loading_ui = LanguageLoadingUi::init(&services.progress_bar);
+  let mut language_loading_ui = LanguageLoadingUi::init(&services.progress_bar, &services.time);
   let mut language_loading = LanguageLoadingRuntime::default();
 
   if services.storage.read_language_code().is_none() && language_select_ui.is_some() {
@@ -79,6 +79,9 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     let _frame = scheduler.begin_frame();
 
     world.clock.tick();
+    services
+      .time
+      .update(&mut services.runtime_objects, world.clock.delta_time());
 
     services.input.begin_frame();
     services.input.poll();
@@ -833,7 +836,7 @@ fn route_update(
 ) {
   if world.state.current_overlay_kind().is_some() {
     if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
-      language_loading_ui.update(world.clock.delta_time());
+      language_loading_ui.update(&services.time, world.clock.delta_time());
     }
     return;
   }
@@ -945,6 +948,7 @@ fn route_render(
       &services.layout,
       &services.i18n,
       &services.progress_bar,
+      &services.time,
     );
     return None;
   }
@@ -1279,6 +1283,7 @@ fn start_language_loading(
   language_loading.active = true;
   language_loading.enter_terminal_check_after_finish = enter_terminal_check_after_finish;
   language_loading_ui.set_progress(&services.progress_bar, 0.0, 0.0);
+  language_loading_ui.restart_animation(&services.time);
   world.state.push_language_loading_overlay();
   let _ = services.storage.write_language_code(code);
   services

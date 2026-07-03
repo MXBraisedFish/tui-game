@@ -8,9 +8,10 @@ use crate::host_engine::services::{
   HitAreaOptions, HitAreaService, I18nService, ImageConvertParams, ImageService, KeyState,
   LayoutService, MouseButton, Overflow, PackageListEntry, PackageService, Rect, RenderService,
   RichTextParams, RichTextService, ScrollBoxId, ScrollBoxOptions, ScrollBoxService,
-  ScrollbarPolicy, ScrollbarVisibility, TerminalColor, TextAlign, TextColor, TextInputCursorShape,
-  TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
-  TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollbarPolicy, ScrollbarVisibility, TerminalColor,
+  TextAlign, TextColor, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode,
+  TextInputOptions, TextInputRenderParams, TextInputService, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 /// 游戏包详情页面的命令。
@@ -87,6 +88,7 @@ impl GameSortField {
 /// 底部：操作提示栏。
 pub struct GamePackageUi {
   objects: UiObjectPool,
+  runtime_objects: RuntimeObjectPool,
   search_input: TextInputId,
   jump_input: TextInputId,
   info_scroll: ScrollBoxId,
@@ -114,6 +116,16 @@ impl UiObjectPoolOwner for GamePackageUi {
 
   fn objects_mut(&mut self) -> &mut UiObjectPool {
     &mut self.objects
+  }
+}
+
+impl RuntimeObjectPoolOwner for GamePackageUi {
+  fn runtime_objects(&self) -> &RuntimeObjectPool {
+    &self.runtime_objects
+  }
+
+  fn runtime_objects_mut(&mut self) -> &mut RuntimeObjectPool {
+    &mut self.runtime_objects
   }
 }
 
@@ -171,6 +183,7 @@ impl GamePackageUi {
 
     Self {
       objects,
+      runtime_objects: RuntimeObjectPool::new(),
       search_input,
       jump_input,
       info_scroll,

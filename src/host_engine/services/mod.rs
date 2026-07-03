@@ -16,6 +16,7 @@ mod rich_text;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
+mod time;
 pub mod text_layout;
 mod ui;
 mod unicode;
@@ -42,6 +43,7 @@ pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
+pub use time::TimeService;
 pub use text_layout::DrawTextParams;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
@@ -49,15 +51,18 @@ pub use widget::{
   HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, Overflow, ProgressBarFillOrigin,
   ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService, ScrollBoxEvent,
   ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide,
-  ScrollbarStyle, ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService,
-  SurfaceId, TextAlign, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode,
-  TextInputOptions, TextInputRenderParams, TextInputService, VerticalAlign,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollbarStyle, ScrollbarVisibility, SliceId,
+  SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId, TextAlign, TextInputCursorShape,
+  TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
+  TextInputService, TimerEvent, TimerId, TimerMode, TimerOptions, TimerState, VerticalAlign,
 };
 
 /// 引擎核心服务集合，持有所有子服务的实例
 pub struct EngineServices {
   pub package: PackageService,
   pub clipboard: ClipboardService,
+  pub runtime_objects: RuntimeObjectPool,
+  pub time: TimeService,
   pub host_objects: HostObjectPool,
   pub hit_area: HitAreaService,
   pub scroll_box: ScrollBoxService,
@@ -92,6 +97,8 @@ impl EngineServices {
     Self {
       terminal: TerminalService::new(),
       clipboard: ClipboardService::new(),
+      runtime_objects: RuntimeObjectPool::new(),
+      time: TimeService::new(),
       host_objects: HostObjectPool::new(),
       hit_area: HitAreaService::new(),
       scroll_box: ScrollBoxService::new(),

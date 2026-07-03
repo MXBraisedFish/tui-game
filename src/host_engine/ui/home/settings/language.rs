@@ -7,7 +7,8 @@ use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
   HitAreaOptions, HitAreaService, I18nService, KeyState, LanguageRegistryEntry, LayoutService,
   LogService, LogSource, MouseButton, Rect, RenderService, RichTextParams, StorageService,
-  TerminalColor, TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, TerminalColor, TextColor, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 const GRID_START_Y: u16 = 3;
@@ -45,6 +46,7 @@ pub struct LanguageSelectUi {
   columns: Cell<usize>,
   per_page: Cell<usize>,
   objects: UiObjectPool,
+  runtime_objects: RuntimeObjectPool,
   back_area: HitAreaId,
   flip_forward_area: HitAreaId,
   flip_backward_area: HitAreaId,
@@ -58,6 +60,16 @@ impl UiObjectPoolOwner for LanguageSelectUi {
 
   fn objects_mut(&mut self) -> &mut UiObjectPool {
     &mut self.objects
+  }
+}
+
+impl RuntimeObjectPoolOwner for LanguageSelectUi {
+  fn runtime_objects(&self) -> &RuntimeObjectPool {
+    &self.runtime_objects
+  }
+
+  fn runtime_objects_mut(&mut self) -> &mut RuntimeObjectPool {
+    &mut self.runtime_objects
   }
 }
 
@@ -105,6 +117,7 @@ impl LanguageSelectUi {
       columns: Cell::new(4),
       per_page: Cell::new(12),
       objects,
+      runtime_objects: RuntimeObjectPool::new(),
       back_area,
       flip_forward_area,
       flip_backward_area,

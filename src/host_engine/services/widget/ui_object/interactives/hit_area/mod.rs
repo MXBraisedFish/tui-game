@@ -516,11 +516,9 @@ mod tests {
       &canvas,
       mouse(MouseEventKind::Drag, Some(MouseButton::Left), 20, 6),
     );
-    assert!(
-      events(&mut pool)
-        .iter()
-        .all(|event| !matches!(event, UiEvent::HitArea(HitAreaEvent::Drag { .. })))
-    );
+    assert!(events(&mut pool)
+      .iter()
+      .all(|event| !matches!(event, UiEvent::HitArea(HitAreaEvent::Drag { .. }))));
     assert!(service.is_pressed(&pool, id, MouseButton::Left));
     assert_eq!(service.local_pointer_position(&pool, id), None);
     service.route_mouse_event(
@@ -670,11 +668,9 @@ mod tests {
       dx: 2,
       dy: -1,
     })));
-    assert!(
-      !events
-        .iter()
-        .any(|event| matches!(event, UiEvent::HitArea(HitAreaEvent::Click { .. })))
-    );
+    assert!(!events
+      .iter()
+      .any(|event| matches!(event, UiEvent::HitArea(HitAreaEvent::Click { .. }))));
   }
 
   #[test]
@@ -773,11 +769,9 @@ mod tests {
       events[0],
       UiEvent::HitArea(HitAreaEvent::HoverLeave { id, x: 1, y: 1 })
     );
-    assert!(
-      !events
-        .iter()
-        .any(|event| matches!(event, UiEvent::HitArea(HitAreaEvent::Click { .. })))
-    );
+    assert!(!events
+      .iter()
+      .any(|event| matches!(event, UiEvent::HitArea(HitAreaEvent::Click { .. }))));
   }
 
   #[test]

@@ -329,17 +329,15 @@ mod tests {
   fn invalid_percent_is_rejected_and_rect_is_clipped() {
     let service = SliceService::new();
     let mut pool = UiObjectPool::new();
-    assert!(
-      service
-        .create(
-          &mut pool,
-          SliceOptions {
-            rect: rect(0, 0, SliceLength::Percent(101), SliceLength::Auto),
-            ..Default::default()
-          }
-        )
-        .is_none()
-    );
+    assert!(service
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: rect(0, 0, SliceLength::Percent(101), SliceLength::Auto),
+          ..Default::default()
+        }
+      )
+      .is_none());
     let mut layout = LayoutService::new();
     layout.resize_physical(20, 10);
     let id = service

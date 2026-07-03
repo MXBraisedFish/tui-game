@@ -3,7 +3,8 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 pub mod language;
@@ -33,6 +34,7 @@ pub(crate) struct SettingsLayout {
 pub struct SettingsUi {
   selected_index: usize,
   objects: UiObjectPool,
+  runtime_objects: RuntimeObjectPool,
   back_area: HitAreaId,
   menu_areas: [HitAreaId; SETTINGS_MENU_LEN],
 }
@@ -44,6 +46,16 @@ impl UiObjectPoolOwner for SettingsUi {
 
   fn objects_mut(&mut self) -> &mut UiObjectPool {
     &mut self.objects
+  }
+}
+
+impl RuntimeObjectPoolOwner for SettingsUi {
+  fn runtime_objects(&self) -> &RuntimeObjectPool {
+    &self.runtime_objects
+  }
+
+  fn runtime_objects_mut(&mut self) -> &mut RuntimeObjectPool {
+    &mut self.runtime_objects
   }
 }
 
@@ -64,6 +76,7 @@ impl SettingsUi {
       back_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       objects,
+      runtime_objects: RuntimeObjectPool::new(),
     }
   }
 

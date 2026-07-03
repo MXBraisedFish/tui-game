@@ -3,30 +3,41 @@ use std::time::Duration;
 use crate::host_engine::services::{
   CanvasService, DrawTextParams, I18nService, LayoutService, ProgressBarFillOrigin, ProgressBarId,
   ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService, Rect, RenderService,
-  TerminalColor, TextColor, TextStyle, UiObjectPool, UiObjectPoolOwner,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, TerminalColor, TextColor, TextStyle, UiObjectPool,
+  UiObjectPoolOwner, TimeService, TimerId,
 };
 
 pub struct LanguageLoadingUi {
   objects: UiObjectPool,
+  runtime_objects: RuntimeObjectPool,
   bar: ProgressBarId,
-  elapsed: Duration,
+  animation_timer: TimerId,
 }
 
 impl LanguageLoadingUi {
-  pub fn init(progress_bar: &ProgressBarService) -> Self {
+  pub fn init(progress_bar: &ProgressBarService, time: &TimeService) -> Self {
     let mut objects = UiObjectPool::new();
+    let mut runtime_objects = RuntimeObjectPool::new();
     let bar = progress_bar
       .create(&mut objects, block_options())
       .expect("valid language loading progress bar options");
+    let animation_timer = time.create_count_up(&mut runtime_objects);
+    let _ = time.start(&mut runtime_objects, animation_timer);
     Self {
       objects,
+      runtime_objects,
       bar,
-      elapsed: Duration::ZERO,
+      animation_timer,
     }
   }
 
-  pub fn update(&mut self, dt: Duration) {
-    self.elapsed += dt;
+  pub fn restart_animation(&mut self, time: &TimeService) {
+    let _ = time.reset(&mut self.runtime_objects, self.animation_timer);
+    let _ = time.start(&mut self.runtime_objects, self.animation_timer);
+  }
+
+  pub fn update(&mut self, time: &TimeService, dt: Duration) {
+    time.update(&mut self.runtime_objects, dt);
   }
 
   pub fn set_progress(&mut self, progress_bar: &ProgressBarService, completed: f32, preview: f32) {
@@ -40,12 +51,16 @@ impl LanguageLoadingUi {
     layout: &LayoutService,
     i18n: &I18nService,
     progress_bar: &ProgressBarService,
+    time: &TimeService,
   ) {
     let size = layout.physical_size();
+    let elapsed = time
+      .elapsed(&self.runtime_objects, self.animation_timer)
+      .unwrap_or(Duration::ZERO);
     let tip = format!(
       "{}{}",
       i18n.get_runtime_text("language_loading", "language_loading.tip"),
-      ".".repeat((self.elapsed.as_millis() / 500 % 3 + 1) as usize),
+      ".".repeat((elapsed.as_millis() / 500 % 3 + 1) as usize),
     );
     let tip_w = layout.get_text_width(&tip, None);
     let start_y = size.height.saturating_sub(3) / 2;
@@ -83,6 +98,16 @@ impl UiObjectPoolOwner for LanguageLoadingUi {
 
   fn objects_mut(&mut self) -> &mut UiObjectPool {
     &mut self.objects
+  }
+}
+
+impl RuntimeObjectPoolOwner for LanguageLoadingUi {
+  fn runtime_objects(&self) -> &RuntimeObjectPool {
+    &self.runtime_objects
+  }
+
+  fn runtime_objects_mut(&mut self) -> &mut RuntimeObjectPool {
+    &mut self.runtime_objects
   }
 }
 

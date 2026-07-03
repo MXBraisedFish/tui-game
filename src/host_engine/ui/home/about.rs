@@ -1,14 +1,15 @@
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, KeyState,
   LayoutService, Overflow, Rect, RenderService, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions,
-  ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, SliceId, SliceLength,
-  SliceOptions, SliceRect, SliceService, SurfaceId, TerminalColor, TextColor, TextStyle, UiEvent,
-  UiObjectPool, UiObjectPoolOwner,
+  ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, RuntimeObjectPool,
+  RuntimeObjectPoolOwner, SliceId, SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId,
+  TerminalColor, TextColor, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 /// ScrollBox v2 综合测试 UI。
 pub struct InputDemoUi {
   objects: UiObjectPool,
+  runtime_objects: RuntimeObjectPool,
   /// 基础纵向滚动盒子（Auto 滚动条 + 事件）。
   v_scroll: ScrollBoxId,
   /// 纯横向滚动盒子（Overlay 布局，宽内容）。
@@ -39,6 +40,16 @@ impl UiObjectPoolOwner for InputDemoUi {
   }
   fn objects_mut(&mut self) -> &mut UiObjectPool {
     &mut self.objects
+  }
+}
+
+impl RuntimeObjectPoolOwner for InputDemoUi {
+  fn runtime_objects(&self) -> &RuntimeObjectPool {
+    &self.runtime_objects
+  }
+
+  fn runtime_objects_mut(&mut self) -> &mut RuntimeObjectPool {
+    &mut self.runtime_objects
   }
 }
 
@@ -230,6 +241,7 @@ impl InputDemoUi {
 
     Self {
       objects,
+      runtime_objects: RuntimeObjectPool::new(),
       v_scroll,
       h_scroll,
       both_scroll,

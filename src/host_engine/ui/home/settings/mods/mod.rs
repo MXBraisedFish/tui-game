@@ -4,7 +4,8 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 pub mod game;
@@ -27,6 +28,7 @@ pub(crate) struct ModsLayout {
 pub struct ModsUi {
   selected_index: usize,
   objects: UiObjectPool,
+  runtime_objects: RuntimeObjectPool,
   back_area: HitAreaId,
   menu_areas: [HitAreaId; MODS_MENU_LEN],
 }
@@ -38,6 +40,16 @@ impl UiObjectPoolOwner for ModsUi {
 
   fn objects_mut(&mut self) -> &mut UiObjectPool {
     &mut self.objects
+  }
+}
+
+impl RuntimeObjectPoolOwner for ModsUi {
+  fn runtime_objects(&self) -> &RuntimeObjectPool {
+    &self.runtime_objects
+  }
+
+  fn runtime_objects_mut(&mut self) -> &mut RuntimeObjectPool {
+    &mut self.runtime_objects
   }
 }
 
@@ -58,6 +70,7 @@ impl ModsUi {
       back_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       objects,
+      runtime_objects: RuntimeObjectPool::new(),
     }
   }
 

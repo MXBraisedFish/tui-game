@@ -3,7 +3,8 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, KeyState, LayoutService,
   MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, StorageService,
-  TextColor, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, TextColor, TextStyle, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 const STEP_UNICODE: usize = 0;
@@ -58,6 +59,7 @@ pub struct TerminalCheckUi {
 
   selected_index: usize,
   objects: UiObjectPool,
+  runtime_objects: RuntimeObjectPool,
 }
 
 impl UiObjectPoolOwner for TerminalCheckUi {
@@ -67,6 +69,16 @@ impl UiObjectPoolOwner for TerminalCheckUi {
 
   fn objects_mut(&mut self) -> &mut UiObjectPool {
     &mut self.objects
+  }
+}
+
+impl RuntimeObjectPoolOwner for TerminalCheckUi {
+  fn runtime_objects(&self) -> &RuntimeObjectPool {
+    &self.runtime_objects
+  }
+
+  fn runtime_objects_mut(&mut self) -> &mut RuntimeObjectPool {
+    &mut self.runtime_objects
   }
 }
 
@@ -87,6 +99,7 @@ impl TerminalCheckUi {
       step: STEP_UNICODE,
       selected_index: 0,
       objects: UiObjectPool::new(),
+      runtime_objects: RuntimeObjectPool::new(),
     }
   }
 
