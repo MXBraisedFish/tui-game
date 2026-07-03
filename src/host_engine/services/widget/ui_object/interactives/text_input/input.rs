@@ -4,7 +4,8 @@ use super::layout::{VisualLayout, cursor_from_point, move_line_edge, move_vertic
 use super::service::TextInputService;
 use super::state::{ActiveTextInput, DragSelection, TextInputActive};
 use super::types::{TextInputEvent, TextInputMode};
-use crate::host_engine::services::ui::{UiComponentEvent, UiObjectPool};
+use crate::host_engine::services::UiObjectPool;
+use crate::host_engine::services::widget::ui_object::UiComponentEvent;
 use crate::host_engine::services::{
   ClipboardService, MouseButton, MouseEvent, MouseEventKind, TerminalKeyCode, TerminalKeyEvent,
 };

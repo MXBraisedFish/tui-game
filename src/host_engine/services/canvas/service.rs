@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use super::{buffer::CanvasBuffer, cell::CanvasCell};
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
-use crate::host_engine::services::widget::scroll_box::clamp_rect;
-use crate::host_engine::services::widget::slice::resolve_rect;
+use crate::host_engine::services::widget::ui_object::surfaces::scroll_box::clamp_rect;
+use crate::host_engine::services::widget::ui_object::surfaces::slice::resolve_rect;
 use crate::host_engine::services::{
   LayoutService, Rect, ScrollBoxId, ScrollbarLayout, ScrollbarPolicy, ScrollbarStyle, Size,
   SliceId, SurfaceId, TextColor, TextStyle, UiObjectPool,

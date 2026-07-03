@@ -3,8 +3,8 @@ use super::{measure, position};
 use crate::host_engine::services::DrawTextParams;
 use crate::host_engine::services::RichTextParams;
 use crate::host_engine::services::ui::UiObjectPool;
-use crate::host_engine::services::widget::scroll_box::effective_viewport;
-use crate::host_engine::services::widget::slice::resolve_rect as resolve_slice_rect;
+use crate::host_engine::services::widget::ui_object::surfaces::scroll_box::effective_viewport;
+use crate::host_engine::services::widget::ui_object::surfaces::slice::resolve_rect as resolve_slice_rect;
 use crate::host_engine::services::widget::{ScrollBoxId, SliceId};
 
 /// 布局服务，管理终端尺寸、视口和坐标计算
