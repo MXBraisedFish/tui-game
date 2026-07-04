@@ -1,5 +1,7 @@
+pub(crate) mod random;
 pub(crate) mod time;
 
+use self::random::RandomGeneratorObjects;
 use self::time::{
   DelayTimerEvent, DelayTimerId, DelayTimerObjects, RepeatTimerEvent, RepeatTimerId,
   RepeatTimerObjects, TimeCallbackRequest, TimerEvent, TimerObjects,
@@ -10,6 +12,7 @@ pub struct RuntimeObjectPool {
   pub(crate) timers: TimerObjects,
   pub(crate) delay_timers: DelayTimerObjects,
   pub(crate) repeat_timers: RepeatTimerObjects,
+  pub(crate) random_generators: RandomGeneratorObjects,
   pub(crate) time_callback_requests: Vec<TimeCallbackRequest>,
 }
 
@@ -19,6 +22,7 @@ impl RuntimeObjectPool {
       timers: TimerObjects::new(),
       delay_timers: DelayTimerObjects::new(),
       repeat_timers: RepeatTimerObjects::new(),
+      random_generators: RandomGeneratorObjects::new(),
       time_callback_requests: Vec::new(),
     }
   }
