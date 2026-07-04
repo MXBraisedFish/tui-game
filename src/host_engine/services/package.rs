@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{
-  Arc, RwLock,
-  mpsc::{self, Receiver, Sender},
-};
-use std::thread::{self, JoinHandle};
 
+use crossbeam_channel::Sender;
 use serde::Deserialize;
 
-use crate::host_engine::services::log::{LogService, LogSource};
+use crate::host_engine::services::{
+  async_runtime::{AsyncRuntime, EngineEvent, EngineTask, TaskId},
+  log::{LogService, LogSource},
+};
 
 /// 宿主机 API 版本号
 pub const HOST_API_VERSION: u32 = 1;
@@ -131,21 +130,30 @@ pub struct ScreensaverConfig {
 }
 
 #[derive(Clone, Debug, Default)]
-struct PackageSnapshot {
+pub(crate) struct PackageSnapshot {
   games: Vec<PackageInfo>,
   screensavers: Vec<PackageInfo>,
 }
 
 #[derive(Clone, Debug)]
-struct ScanRequest {
+pub(crate) struct ScanRequest {
   root: PathBuf,
   language_code: String,
   missing_template: String,
 }
 
-enum PackageCommand {
+#[derive(Clone, Debug)]
+pub enum PackageTask {
   Scan(ScanRequest),
-  Shutdown,
+}
+
+#[derive(Clone, Debug)]
+pub enum PackageAsyncEvent {
+  Event(PackageEvent),
+  SnapshotReady {
+    snapshot: PackageSnapshot,
+    finished: PackageEvent,
+  },
 }
 
 #[derive(Clone, Debug)]
@@ -177,57 +185,24 @@ struct ScanReport {
 
 /// 包管理服务，负责扫描和加载游戏/屏保包。
 pub struct PackageService {
-  snapshot: Arc<RwLock<PackageSnapshot>>,
-  command_tx: Sender<PackageCommand>,
-  event_rx: Receiver<PackageEvent>,
-  worker: Option<JoinHandle<()>>,
+  snapshot: PackageSnapshot,
   last_scan: Option<ScanRequest>,
 }
 
 impl PackageService {
   pub fn new() -> Self {
-    let snapshot = Arc::new(RwLock::new(PackageSnapshot::default()));
-    let (command_tx, command_rx) = mpsc::channel();
-    let (event_tx, event_rx) = mpsc::channel();
-    let worker_snapshot = Arc::clone(&snapshot);
-    let worker = thread::spawn(move || {
-      while let Ok(command) = command_rx.recv() {
-        match command {
-          PackageCommand::Scan(request) => {
-            let total_candidates = count_package_candidates(&request);
-            let _ = event_tx.send(PackageEvent::ScanStarted {
-              total: total_candidates,
-            });
-            let report = scan_all_packages(&request, &event_tx, total_candidates);
-            let total = report.snapshot.games.len() + report.snapshot.screensavers.len();
-            let games = report.snapshot.games.len();
-            let screensavers = report.snapshot.screensavers.len();
-            if let Ok(mut snapshot) = worker_snapshot.write() {
-              *snapshot = report.snapshot;
-            }
-            for event in report.events {
-              let _ = event_tx.send(event);
-            }
-            let _ = event_tx.send(PackageEvent::ScanFinished {
-              total,
-              games,
-              screensavers,
-              errors: report.errors,
-              duplicates: report.duplicates,
-            });
-          }
-          PackageCommand::Shutdown => break,
-        }
-      }
-    });
-
     Self {
-      snapshot,
-      command_tx,
-      event_rx,
-      worker: Some(worker),
+      snapshot: PackageSnapshot::default(),
       last_scan: None,
     }
+  }
+
+  pub fn configure_scan(&mut self, root_dir: &Path, language_code: &str, missing_template: &str) {
+    self.last_scan = Some(ScanRequest {
+      root: root_dir.to_path_buf(),
+      language_code: language_code.to_string(),
+      missing_template: missing_template.to_string(),
+    });
   }
 
   /// 扫描所有目录下的包（官方和模组的游戏与屏保），启动期同步等待完成。
@@ -238,33 +213,42 @@ impl PackageService {
     language_code: &str,
     missing_template: &str,
   ) {
-    let request = ScanRequest {
-      root: root_dir.to_path_buf(),
-      language_code: language_code.to_string(),
-      missing_template: missing_template.to_string(),
-    };
-    self.last_scan = Some(request.clone());
-    let _ = self.command_tx.send(PackageCommand::Scan(request));
-    while let Ok(event) = self.event_rx.recv() {
-      let finished = matches!(event, PackageEvent::ScanFinished { .. });
+    self.configure_scan(root_dir, language_code, missing_template);
+    let request = self.last_scan.clone().unwrap();
+    let mut scan_events = Vec::new();
+    let total_candidates = count_package_candidates(&request);
+    scan_events.push(PackageEvent::ScanStarted {
+      total: total_candidates,
+    });
+    let report = scan_all_packages(
+      &request,
+      &mut |event| scan_events.push(event),
+      total_candidates,
+    );
+    let finished = scan_finished_event(&report);
+    self.snapshot = report.snapshot;
+    for event in scan_events
+      .into_iter()
+      .chain(report.events)
+      .chain([finished])
+    {
       log_package_event(log, event);
-      if finished {
-        break;
-      }
     }
   }
 
   /// 请求后台重新扫描。热加载后续只需调用这个入口。
-  pub fn request_rescan(&self) -> bool {
+  pub fn request_rescan(&self, async_runtime: &AsyncRuntime) -> bool {
     let Some(request) = self.last_scan.clone() else {
       return false;
     };
-    self.command_tx.send(PackageCommand::Scan(request)).is_ok()
+    async_runtime.submit(EngineTask::Package(PackageTask::Scan(request)));
+    true
   }
 
   /// 请求使用指定语言重新扫描。语言切换后调用。
   pub fn request_rescan_for_language(
     &mut self,
+    async_runtime: &AsyncRuntime,
     language_code: &str,
     missing_template: &str,
   ) -> bool {
@@ -274,33 +258,40 @@ impl PackageService {
     request.language_code = language_code.to_string();
     request.missing_template = missing_template.to_string();
     self.last_scan = Some(request.clone());
-    self.command_tx.send(PackageCommand::Scan(request)).is_ok()
+    async_runtime.submit(EngineTask::Package(PackageTask::Scan(request)));
+    true
   }
 
-  /// 拉取后台扫描事件。应在主线程调用并写日志。
+  /// 兼容旧调用；统一异步架构下扫描事件从 EngineEventQueue 输入。
   pub fn poll_events(&mut self, log: &mut LogService) -> Vec<PackageEvent> {
-    let mut events = Vec::new();
-    while let Ok(event) = self.event_rx.try_recv() {
-      log_package_event(log, event.clone());
-      events.push(event);
+    let _ = log;
+    Vec::new()
+  }
+
+  pub fn handle_async_event(
+    &mut self,
+    event: PackageAsyncEvent,
+    log: &mut LogService,
+  ) -> PackageEvent {
+    match event {
+      PackageAsyncEvent::Event(event) => {
+        log_package_event(log, event.clone());
+        event
+      }
+      PackageAsyncEvent::SnapshotReady { snapshot, finished } => {
+        self.snapshot = snapshot;
+        log_package_event(log, finished.clone());
+        finished
+      }
     }
-    events
   }
 
   pub fn games(&self) -> Vec<PackageInfo> {
-    self
-      .snapshot
-      .read()
-      .map(|snapshot| snapshot.games.clone())
-      .unwrap_or_default()
+    self.snapshot.games.clone()
   }
 
   pub fn screensavers(&self) -> Vec<PackageInfo> {
-    self
-      .snapshot
-      .read()
-      .map(|snapshot| snapshot.screensavers.clone())
-      .unwrap_or_default()
+    self.snapshot.screensavers.clone()
   }
 
   pub fn mod_games(&self) -> Vec<PackageListEntry> {
@@ -322,20 +313,51 @@ impl PackageService {
   }
 
   pub fn total_count(&self) -> usize {
-    self
-      .snapshot
-      .read()
-      .map(|snapshot| snapshot.games.len() + snapshot.screensavers.len())
-      .unwrap_or(0)
+    self.snapshot.games.len() + self.snapshot.screensavers.len()
   }
 }
 
-impl Drop for PackageService {
-  fn drop(&mut self) {
-    let _ = self.command_tx.send(PackageCommand::Shutdown);
-    if let Some(worker) = self.worker.take() {
-      let _ = worker.join();
+pub(crate) fn run_package_task(
+  task_id: TaskId,
+  task: PackageTask,
+  event_tx: &Sender<EngineEvent>,
+) -> Result<(), String> {
+  match task {
+    PackageTask::Scan(request) => {
+      let total_candidates = count_package_candidates(&request);
+      send_package_event(
+        event_tx,
+        PackageEvent::ScanStarted {
+          total: total_candidates,
+        },
+      );
+      let report = scan_all_packages(
+        &request,
+        &mut |event| send_package_event(event_tx, event),
+        total_candidates,
+      );
+      let finished = scan_finished_event(&report);
+      let _ = event_tx.send(EngineEvent::Package(PackageAsyncEvent::SnapshotReady {
+        snapshot: report.snapshot,
+        finished,
+      }));
+      let _ = task_id;
+      Ok(())
     }
+  }
+}
+
+fn send_package_event(event_tx: &Sender<EngineEvent>, event: PackageEvent) {
+  let _ = event_tx.send(EngineEvent::Package(PackageAsyncEvent::Event(event)));
+}
+
+fn scan_finished_event(report: &ScanReport) -> PackageEvent {
+  PackageEvent::ScanFinished {
+    total: report.snapshot.games.len() + report.snapshot.screensavers.len(),
+    games: report.snapshot.games.len(),
+    screensavers: report.snapshot.screensavers.len(),
+    errors: report.errors,
+    duplicates: report.duplicates,
   }
 }
 
@@ -385,7 +407,7 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
 
 fn scan_all_packages(
   request: &ScanRequest,
-  event_tx: &Sender<PackageEvent>,
+  emit_event: &mut impl FnMut(PackageEvent),
   total: usize,
 ) -> ScanReport {
   let mut report = ScanReport {
@@ -399,7 +421,7 @@ fn scan_all_packages(
   scan_dir(
     &mut report,
     request,
-    event_tx,
+    emit_event,
     total,
     &mut scanned,
     "scripts/game",
@@ -409,7 +431,7 @@ fn scan_all_packages(
   scan_dir(
     &mut report,
     request,
-    event_tx,
+    emit_event,
     total,
     &mut scanned,
     "scripts/screensaver",
@@ -419,7 +441,7 @@ fn scan_all_packages(
   scan_dir(
     &mut report,
     request,
-    event_tx,
+    emit_event,
     total,
     &mut scanned,
     "data/mod/game",
@@ -429,7 +451,7 @@ fn scan_all_packages(
   scan_dir(
     &mut report,
     request,
-    event_tx,
+    emit_event,
     total,
     &mut scanned,
     "data/mod/screensaver",
@@ -444,7 +466,7 @@ fn scan_all_packages(
 fn scan_dir(
   report: &mut ScanReport,
   request: &ScanRequest,
-  event_tx: &Sender<PackageEvent>,
+  emit_event: &mut impl FnMut(PackageEvent),
   total: usize,
   scanned: &mut usize,
   relative: &str,
@@ -485,7 +507,7 @@ fn scan_dir(
       }
     }
     *scanned += 1;
-    let _ = event_tx.send(PackageEvent::ScanProgress {
+    emit_event(PackageEvent::ScanProgress {
       scanned: *scanned,
       total,
     });
@@ -862,6 +884,7 @@ fn resolve_entry(pkg_dir: &Path, entry: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::host_engine::services::async_runtime::{AsyncRuntime, EngineEvent};
 
   const MISSING: &str = "[Missing i18n Key: {value:missing_key}]";
 
@@ -869,6 +892,21 @@ mod tests {
     let root = std::env::temp_dir().join(format!("tg_package_{name}_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     root
+  }
+
+  fn poll_async_package_events(
+    runtime: &AsyncRuntime,
+    service: &mut PackageService,
+    log: &mut LogService,
+  ) -> Vec<PackageEvent> {
+    runtime
+      .poll_events()
+      .into_iter()
+      .filter_map(|event| match event {
+        EngineEvent::Package(event) => Some(service.handle_async_event(event, log)),
+        _ => None,
+      })
+      .collect()
   }
 
   fn write_game(root: &Path, relative: &str, id: &str, title: &str) {
@@ -1001,10 +1039,11 @@ mod tests {
 
     std::fs::remove_dir_all(root.join("data/mod/game/first")).unwrap();
     write_game(&root, "data/mod/game", "second", "Second");
-    assert!(service.request_rescan());
+    let runtime = AsyncRuntime::with_worker_count(1);
+    assert!(service.request_rescan(&runtime));
 
     for _ in 0..100 {
-      service.poll_events(&mut log);
+      let _ = poll_async_package_events(&runtime, &mut service, &mut log);
       if service
         .mod_games()
         .first()
@@ -1028,11 +1067,12 @@ mod tests {
     let mut service = PackageService::new();
     let mut log = LogService::new();
     scan(&mut service, &root, &mut log, "en_us");
-    assert!(service.request_rescan());
+    let runtime = AsyncRuntime::with_worker_count(1);
+    assert!(service.request_rescan(&runtime));
 
     let mut events = Vec::new();
     for _ in 0..100 {
-      events.extend(service.poll_events(&mut log));
+      events.extend(poll_async_package_events(&runtime, &mut service, &mut log));
       if events
         .iter()
         .any(|event| matches!(event, PackageEvent::ScanFinished { .. }))

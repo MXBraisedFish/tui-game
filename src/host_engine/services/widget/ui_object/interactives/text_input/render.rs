@@ -334,11 +334,7 @@ fn draw_placeholder(
   let max_w = params.rect.width.saturating_sub(1) as usize;
   let placeholder_w = params.placeholder.graphemes(true).fold(0usize, |acc, g| {
     let w = UnicodeWidthStr::width(g);
-    if acc + w > max_w {
-      acc
-    } else {
-      acc + w
-    }
+    if acc + w > max_w { acc } else { acc + w }
   }) as u16;
   let offset = align_offset(params.text_align, params.rect.width, placeholder_w + 1);
   draw_prefix(

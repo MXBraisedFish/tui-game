@@ -3,8 +3,8 @@ use std::time::Duration;
 use crate::host_engine::services::{
   CanvasService, DrawTextParams, I18nService, LayoutService, ProgressBarFillOrigin, ProgressBarId,
   ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService, Rect, RenderService,
-  RuntimeObjectPool, RuntimeObjectPoolOwner, TerminalColor, TextColor, TextStyle, UiObjectPool,
-  UiObjectPoolOwner, TimeService, TimerId,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, TerminalColor, TextColor, TextStyle, TimeService,
+  TimerId, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub struct LanguageLoadingUi {

@@ -1010,25 +1010,29 @@ mod tests {
     let service = ScrollBoxService::new();
     let mut pool = UiObjectPool::new();
     // 水平溢出现在允许。
-    assert!(service
-      .create(
-        &mut pool,
-        ScrollBoxOptions {
-          overflow_x: Overflow::Auto,
-          ..Default::default()
-        }
-      )
-      .is_some());
+    assert!(
+      service
+        .create(
+          &mut pool,
+          ScrollBoxOptions {
+            overflow_x: Overflow::Auto,
+            ..Default::default()
+          }
+        )
+        .is_some()
+    );
     // wheel_step = 0 仍然拒绝。
-    assert!(service
-      .create(
-        &mut pool,
-        ScrollBoxOptions {
-          wheel_step: 0,
-          ..Default::default()
-        }
-      )
-      .is_none());
+    assert!(
+      service
+        .create(
+          &mut pool,
+          ScrollBoxOptions {
+            wheel_step: 0,
+            ..Default::default()
+          }
+        )
+        .is_none()
+    );
   }
 
   #[test]

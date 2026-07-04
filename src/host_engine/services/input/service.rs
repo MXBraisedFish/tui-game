@@ -15,6 +15,8 @@ use crossterm::event::{
 };
 use rdev::{Event, EventType, Key as RdevKey, listen};
 
+use crate::host_engine::services::async_runtime::{AsyncRuntime, EngineEvent};
+
 use super::events::{
   FocusEvent, MouseButton, MouseEvent, MouseEventKind, ResizeEvent, ScrollDirection, SystemEvent,
   TerminalKeyCode, TerminalKeyEvent,
@@ -260,52 +262,60 @@ impl InputService {
   }
 
   /// 启动全局键盘监听线程（仅首次调用生效）
-  pub fn start_key_listener(&self) {
+  pub fn start_key_listener(&self, async_runtime: &mut AsyncRuntime) {
     if self.key_listener_started.swap(true, Ordering::SeqCst) {
       return;
     }
 
-    let sender = self.sender.clone();
-
-    thread::spawn(move || {
-      let callback = move |event: Event| {
-        if let Some(key_event) = key_event_from_rdev(event) {
-          let _ = sender.send(key_event);
-        }
-      };
-      let _ = listen(callback);
+    async_runtime.spawn_managed_listener(false, |sender, _stop| {
+      thread::spawn(move || {
+        let callback = move |event: Event| {
+          if let Some(key_event) = key_event_from_rdev(event) {
+            let _ = sender.send(EngineEvent::InputKey(key_event));
+          }
+        };
+        let _ = listen(callback);
+      })
     });
   }
 
   /// 启动系统事件监听线程（终端按键/鼠标/窗口大小/焦点）
-  pub fn start_system_listener(&self) {
+  pub fn start_system_listener(&self, async_runtime: &mut AsyncRuntime) {
     if self.system_listener_started.swap(true, Ordering::SeqCst) {
       return;
     }
 
-    let sender = self.system_sender.clone();
-
-    thread::spawn(move || {
-      let poll_interval = Duration::from_millis(50);
-      loop {
-        if ct_event::poll(poll_interval).unwrap_or(false) {
-          if let Ok(ct_event) = ct_event::read() {
-            match ct_event {
-              CtEvent::Key(key_event) => {
-                if let Some(event) = terminal_key_event_from_crossterm(key_event) {
-                  let _ = sender.send(event);
+    async_runtime.spawn_managed_listener(true, |sender, stop| {
+      thread::spawn(move || {
+        let poll_interval = Duration::from_millis(50);
+        while !stop.load(Ordering::SeqCst) {
+          if ct_event::poll(poll_interval).unwrap_or(false) {
+            if let Ok(ct_event) = ct_event::read() {
+              match ct_event {
+                CtEvent::Key(key_event) => {
+                  if let Some(event) = terminal_key_event_from_crossterm(key_event) {
+                    let _ = sender.send(EngineEvent::System(event));
+                  }
                 }
-              }
-              other_event => {
-                if let Some(sys_event) = system_event_from_crossterm(other_event) {
-                  let _ = sender.send(sys_event);
+                other_event => {
+                  if let Some(sys_event) = system_event_from_crossterm(other_event) {
+                    let _ = sender.send(EngineEvent::System(sys_event));
+                  }
                 }
               }
             }
           }
         }
-      }
+      })
     });
+  }
+
+  pub fn queue_key_event(&self, event: KeyEvent) {
+    let _ = self.sender.send(event);
+  }
+
+  pub fn queue_system_event(&self, event: SystemEvent) {
+    let _ = self.system_sender.send(event);
   }
 
   /// 轮询并应用系统事件队列

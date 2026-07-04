@@ -6,8 +6,8 @@ use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
   HitAreaOptions, HitAreaService, I18nService, KeyState, LanguageRegistryEntry, LayoutService,
-  LogService, LogSource, MouseButton, Rect, RenderService, RichTextParams, StorageService,
-  RuntimeObjectPool, RuntimeObjectPoolOwner, TerminalColor, TextColor, UiEvent, UiObjectPool,
+  LogService, LogSource, MouseButton, Rect, RenderService, RichTextParams, RuntimeObjectPool,
+  RuntimeObjectPoolOwner, StorageService, TerminalColor, TextColor, UiEvent, UiObjectPool,
   UiObjectPoolOwner,
 };
 

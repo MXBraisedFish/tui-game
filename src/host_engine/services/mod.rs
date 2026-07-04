@@ -1,5 +1,8 @@
+mod async_runtime;
 mod canvas;
 mod clipboard;
+mod event;
+mod file;
 mod game;
 mod host_object;
 mod i18n;
@@ -8,6 +11,7 @@ mod input;
 mod layout;
 mod log;
 mod lua;
+mod network;
 mod overlay;
 mod package;
 mod render;
@@ -16,14 +20,20 @@ mod rich_text;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
-mod time;
 pub mod text_layout;
+mod time;
 mod ui;
 mod unicode;
 pub(crate) mod widget;
 
+pub use async_runtime::{
+  AsyncRuntime, EngineEvent, EngineTask, FileEvent, FileTask, ImageEvent, ImageTask,
+  ManagedThreadId, NetworkEvent, NetworkTask, SleepTask, TaskId, TaskState, TimeAsyncEvent,
+};
 pub use canvas::{CanvasCell, CanvasService};
 pub use clipboard::ClipboardService;
+pub use event::EngineEventQueue;
+pub use file::FileService;
 pub use game::GameService;
 pub use host_object::{HostArea, HostAreaId, HostAreaKind, HostObjectPool};
 pub use i18n::{I18nService, LanguageRegistryEntry};
@@ -36,6 +46,7 @@ pub use input::{
 pub use layout::{LayoutService, Rect, Size};
 pub use log::{LogService, LogSource};
 pub use lua::LuaService;
+pub use network::NetworkService;
 pub use overlay::OverlayService;
 pub use package::{PackageEvent, PackageListEntry, PackageService};
 pub use render::{BorderStyle, RenderService};
@@ -43,22 +54,28 @@ pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
-pub use time::TimeService;
 pub use text_layout::DrawTextParams;
+pub use time::TimeService;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
 pub use widget::{
-  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, Overflow, ProgressBarFillOrigin,
-  ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService, ScrollBoxEvent,
-  ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide,
-  RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollbarStyle, ScrollbarVisibility, SliceId,
-  SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId, TextAlign, TextInputCursorShape,
-  TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
-  TextInputService, TimerEvent, TimerId, TimerMode, TimerOptions, TimerState, VerticalAlign,
+  DelayTimerEvent, DelayTimerId, DelayTimerOptions, HitAreaEvent, HitAreaId, HitAreaOptions,
+  HitAreaService, Overflow, ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions,
+  ProgressBarSegmentStyle, ProgressBarService, RepeatMode, RepeatTimerEvent, RepeatTimerId,
+  RepeatTimerOptions, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId,
+  ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide,
+  ScrollbarStyle, ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService,
+  SurfaceId, TextAlign, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode,
+  TextInputOptions, TextInputRenderParams, TextInputService, TimeCallbackId, TimeCallbackRequest,
+  TimerEvent, TimerId, TimerMode, TimerOptions, TimerState, VerticalAlign,
 };
 
 /// 引擎核心服务集合，持有所有子服务的实例
 pub struct EngineServices {
+  pub async_runtime: AsyncRuntime,
+  pub engine_events: EngineEventQueue,
+  pub file: FileService,
+  pub network: NetworkService,
   pub package: PackageService,
   pub clipboard: ClipboardService,
   pub runtime_objects: RuntimeObjectPool,
@@ -95,6 +112,10 @@ impl EngineServices {
     let image_cache_dir = storage.path("data/cache/images");
 
     Self {
+      async_runtime: AsyncRuntime::new(),
+      engine_events: EngineEventQueue::new(),
+      file: FileService::new(),
+      network: NetworkService::new(),
       terminal: TerminalService::new(),
       clipboard: ClipboardService::new(),
       runtime_objects: RuntimeObjectPool::new(),

@@ -10,5 +10,6 @@ pub use events::{
 };
 pub use key_token::format_key_display;
 pub use service::{
-  InputActionEvent, InputEventType, InputService, Key, KeyEventKind, KeyState, RawKeyEvent,
+  InputActionEvent, InputEventType, InputService, Key, KeyEvent, KeyEventKind, KeyState,
+  RawKeyEvent,
 };

@@ -8,6 +8,8 @@ use std::time::UNIX_EPOCH;
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 
+use super::async_runtime::{AsyncRuntime, EngineTask, ImageTask, TaskId};
+
 /// 图片转换参数
 #[derive(Clone, Debug)]
 pub struct ImageConvertParams {
@@ -91,6 +93,13 @@ impl ImageService {
       self.write_disk_cache(hash, &resolved, &result);
     }
     Ok(result)
+  }
+
+  pub fn convert_async(&self, async_runtime: &AsyncRuntime, params: ImageConvertParams) -> TaskId {
+    async_runtime.submit(EngineTask::Image(ImageTask::Convert {
+      params,
+      cache_dir: self.cache_dir.clone(),
+    }))
   }
 
   // ─── 磁盘缓存辅助方法 ──────────────────────────────

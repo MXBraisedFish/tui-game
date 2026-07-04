@@ -13,7 +13,7 @@ pub fn prepare() -> BootOutput {
 
   services
     .log
-    .info(LogSource::Boot, "[Boot] Scanning packages...");
+    .info(LogSource::Boot, "[Boot] Preparing package scan...");
 
   services
     .i18n
@@ -66,16 +66,14 @@ pub fn prepare() -> BootOutput {
   let missing_template = services
     .i18n
     .get_runtime_text("language_warning", "language_warning.missing");
-  services.package.scan_all(
-    &root_dir,
-    &mut services.log,
-    &package_language,
-    &missing_template,
-  );
+  services
+    .package
+    .configure_scan(&root_dir, &package_language, &missing_template);
+  let _ = services.package.request_rescan(&services.async_runtime);
 
   services
     .log
-    .info(LogSource::Boot, "[Boot] Packages scan completed.");
+    .info(LogSource::Boot, "[Boot] Package scan scheduled.");
 
   let world = RuntimeWorld::new();
 
