@@ -17,6 +17,7 @@ pub struct OverlayState {
 pub enum OverlayKind {
   ConfirmExit,
   LanguageLoading,
+  SafeModeWarning,
   WindowSizeWarning,
 }
 
@@ -52,6 +53,21 @@ impl OverlayStackState {
     self.stack.last_mut()
   }
 
+  fn current_index(&self) -> Option<usize> {
+    self
+      .stack
+      .iter()
+      .enumerate()
+      .max_by(|(left_index, left), (right_index, right)| {
+        left
+          .kind
+          .priority()
+          .cmp(&right.kind.priority())
+          .then_with(|| right_index.cmp(left_index))
+      })
+      .map(|(index, _)| index)
+  }
+
   /// 压入一个覆盖层到栈顶
   pub fn push(&mut self, overlay: OverlayState) {
     self.stack.retain(|item| item.kind != overlay.kind);
@@ -65,7 +81,7 @@ impl OverlayStackState {
   }
 
   pub fn current_kind(&self) -> Option<OverlayKind> {
-    self.top().map(|o| o.kind)
+    self.current_index().map(|index| self.stack[index].kind)
   }
 
   pub fn remove_kind(&mut self, kind: OverlayKind) -> Option<OverlayState> {
@@ -84,6 +100,7 @@ impl OverlayKind {
     match self {
       OverlayKind::ConfirmExit => 10,
       OverlayKind::LanguageLoading => 20,
+      OverlayKind::SafeModeWarning => 20,
       OverlayKind::WindowSizeWarning => 30,
     }
   }
@@ -124,5 +141,17 @@ mod tests {
 
     assert_eq!(stack.len(), 1);
     assert_eq!(stack.current_kind(), Some(OverlayKind::LanguageLoading));
+  }
+
+  #[test]
+  fn same_priority_keeps_first_pushed_on_top() {
+    let mut stack = OverlayStackState::new();
+    stack.push(overlay(OverlayKind::LanguageLoading));
+    stack.push(overlay(OverlayKind::SafeModeWarning));
+
+    assert_eq!(stack.current_kind(), Some(OverlayKind::LanguageLoading));
+
+    stack.remove_kind(OverlayKind::LanguageLoading);
+    assert_eq!(stack.current_kind(), Some(OverlayKind::SafeModeWarning));
   }
 }

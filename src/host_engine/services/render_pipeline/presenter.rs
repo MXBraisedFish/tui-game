@@ -196,6 +196,11 @@ fn text_color_to_crossterm(color: &TextColor, truecolor: bool) -> Color {
         nearest_ansi256(*r, *g, *b)
       }
     }
+    TextColor::ForceRgb { r, g, b } => Color::Rgb {
+      r: *r,
+      g: *g,
+      b: *b,
+    },
 
     TextColor::Transparent => Color::Reset,
   }
@@ -366,5 +371,15 @@ mod tests {
       text_color_to_crossterm(&rgb, false),
       Color::AnsiValue(_)
     ));
+  }
+
+  #[test]
+  fn forced_rgb_ignores_truecolor_capability_flag() {
+    let rgb = TextColor::ForceRgb { r: 1, g: 2, b: 3 };
+
+    assert_eq!(
+      text_color_to_crossterm(&rgb, false),
+      Color::Rgb { r: 1, g: 2, b: 3 }
+    );
   }
 }

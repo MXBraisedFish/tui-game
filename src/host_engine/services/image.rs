@@ -182,6 +182,7 @@ fn validate(p: &ImageConvertParams) -> Result<(), String> {
 }
 
 const VALID_EXTS: &[&str] = &["png", "jpg", "jpeg"];
+const CACHE_FORMAT_VERSION: u8 = 2;
 
 // 解析图片路径，支持无后缀时自动查找 png/jpg/jpeg 文件
 fn resolve_path(raw: &str) -> Result<PathBuf, String> {
@@ -220,7 +221,7 @@ fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
   let mut h = DefaultHasher::new();
 
   let input = format!(
-    "{}\x00{}\x00{}\x00{}\x00{}\x00{:?}\x00{:?}\x00{}\x00{:.6}\x00{}",
+    "{}\x00{}\x00{}\x00{}\x00{}\x00{:?}\x00{:?}\x00{}\x00{:.6}\x00{}\x00{}",
     resolved.display(),
     p.output_width,
     p.output_height,
@@ -231,6 +232,7 @@ fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
     p.square_crop,
     p.scale,
     p.cache,
+    CACHE_FORMAT_VERSION,
   );
   h.write(input.as_bytes());
   h.finish()
@@ -285,10 +287,12 @@ fn sample_halfblock(rgba: &image::RgbaImage, w: u32, h: u32) -> String {
   let mut out = String::with_capacity(cap);
   out.push_str("f%");
 
-  let mut prev_fg: Option<Rgb> = None;
-  let mut prev_bg: Option<Rgb> = None;
-
   for cy in 0..char_rows {
+    if cy > 0 {
+      out.push('\n');
+    }
+    let mut prev_fg: Option<Rgb> = None;
+    let mut prev_bg: Option<Rgb> = None;
     for cx in 0..w {
       let top = get_rgb(rgba, cx, cy * 2);
       let bot = get_rgb(rgba, cx, cy * 2 + 1);
@@ -481,6 +485,7 @@ mod tests {
 
     let block_count = result.chars().filter(|&c| c == '\u{2585}').count();
     assert_eq!(block_count, (w * h) as usize);
+    assert_eq!(result.lines().count(), h as usize);
   }
 
   #[test]

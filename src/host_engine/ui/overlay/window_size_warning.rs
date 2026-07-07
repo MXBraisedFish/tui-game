@@ -234,7 +234,7 @@ fn draw_content(
     &DrawTextParams {
       x: positions.title_x,
       y: positions.title_y,
-      text: format!("f%<fg:bright_magenta><b>{}</b></fg>", title),
+      text: format!("f%<fg:bright_yellow><b>{}</b></fg>", title),
       ..Default::default()
     },
   );

@@ -1,0 +1,8 @@
+{
+  "safe_mode_warning.title": "Disable Safe Mode、",
+  "safe_mode_warning.description.one": "Safe Mode helps protect your system from potentially unsafe operations.\nDisabling Safe Mode allows this pack to perform high-risk actions, such as writing files or accessing system information.\nOnly disable Safe Mode if you fully trust the pack author and understand the associated risks.\nFor more details, see [Settings -> Security Settings -> Security Details].",
+  "safe_mode_warning.yes.temporary": "{key:safe_mode_warning.yes.temporary} Disable (This Session Only)",
+  "safe_mode_warning.yes.permanent": "{key:safe_mode_warning.yes.permanent} Disable (Permanent)",
+  "safe_mode_warning.no": "{key:safe_mode_warning.no} Cancel",
+  "safe_mode_warning.second": "s"
+}

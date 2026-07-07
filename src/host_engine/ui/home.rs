@@ -13,7 +13,8 @@ use std::time::Duration;
 
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
-  HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams,
+  HitAreaService, HOST_VERSION, KeyState, LayoutService, MouseButton, Rect, RenderService,
+  RichTextParams,
   RuntimeObjectPool, RuntimeObjectPoolOwner, TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
@@ -311,9 +312,8 @@ impl HomeUi {
     });
     let menu_height = HOME_MENU_LEN as u16;
 
-    let version = env!("CARGO_PKG_VERSION");
     let version_width = layout.get_text_width(
-      &format!("f%<fg:rgb(85,87,83)>v{}</fg>", version).to_string(),
+      &format!("f%<fg:rgb(85,87,83)>v{}</fg>", HOST_VERSION).to_string(),
       None,
     );
     let action_hint = format!(
@@ -412,13 +412,12 @@ impl HomeUi {
       );
     }
 
-    let version = env!("CARGO_PKG_VERSION").to_string();
     render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.version_x,
         y: positions.version_y,
-        text: format!("f%<fg:rgb(85,87,83)>v{}</fg>", version),
+        text: format!("f%<fg:rgb(85,87,83)>v{}</fg>", HOST_VERSION),
         ..Default::default()
       },
     );

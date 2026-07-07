@@ -226,6 +226,7 @@ pub struct InputService {
   mouse_position: Option<(u16, u16)>,
   focused: bool,
   bindings: Vec<KeyBinding>,
+  action_map_dispatch_enabled: bool,
   raw_key_capture_enabled: bool,
   raw_key_events: VecDeque<RawKeyEvent>,
   raw_mouse_capture_enabled: bool,
@@ -254,6 +255,7 @@ impl InputService {
       mouse_position: None,
       focused: true,
       bindings: Vec::new(),
+      action_map_dispatch_enabled: true,
       raw_key_capture_enabled: false,
       raw_key_events: VecDeque::new(),
       raw_mouse_capture_enabled: false,
@@ -359,31 +361,30 @@ impl InputService {
           }
         }
       }
-      if self.focused
-        && self.raw_mouse_capture_enabled
-        && let SystemEvent::Mouse(mouse) = &event
-      {
-        self.raw_mouse_events.push_back(*mouse);
+      if self.focused && self.raw_mouse_capture_enabled {
+        if let SystemEvent::Mouse(mouse) = &event {
+          self.raw_mouse_events.push_back(*mouse);
+        }
       }
       self.apply_system_event(&event);
       events.push(event);
     }
 
     for button in &self.mouse_held_buttons {
-      if !active_buttons.contains(button)
-        && let Some((x, y)) = self.mouse_position
-      {
-        let hold = MouseEvent {
-          kind: MouseEventKind::Hold,
-          button: Some(*button),
-          scroll: None,
-          x,
-          y,
-        };
-        if self.focused && self.raw_mouse_capture_enabled {
-          self.raw_mouse_events.push_back(hold);
+      if !active_buttons.contains(button) {
+        if let Some((x, y)) = self.mouse_position {
+          let hold = MouseEvent {
+            kind: MouseEventKind::Hold,
+            button: Some(*button),
+            scroll: None,
+            x,
+            y,
+          };
+          if self.focused && self.raw_mouse_capture_enabled {
+            self.raw_mouse_events.push_back(hold);
+          }
+          events.push(SystemEvent::Mouse(hold));
         }
-        events.push(SystemEvent::Mouse(hold));
       }
     }
 
@@ -395,6 +396,8 @@ impl InputService {
       SystemEvent::Focus(focus) => {
         self.focused = focus.gained;
         if !focus.gained {
+          self.raw_key_events.clear();
+          self.raw_mouse_events.clear();
           self.held_keys.clear();
           self.pressed_keys.clear();
           self.released_keys.clear();
@@ -461,6 +464,10 @@ impl InputService {
 
   pub fn is_raw_key_capture_enabled(&self) -> bool {
     self.raw_key_capture_enabled
+  }
+
+  pub fn is_focused(&self) -> bool {
+    self.focused
   }
 
   /// 取出所有原始按键事件
@@ -555,6 +562,26 @@ impl InputService {
     &self.bindings
   }
 
+  pub fn enable_action_map_dispatch(&mut self) -> bool {
+    if self.action_map_dispatch_enabled {
+      return false;
+    }
+    self.action_map_dispatch_enabled = true;
+    true
+  }
+
+  pub fn disable_action_map_dispatch(&mut self) -> bool {
+    if !self.action_map_dispatch_enabled {
+      return false;
+    }
+    self.action_map_dispatch_enabled = false;
+    true
+  }
+
+  pub fn is_action_map_dispatch_enabled(&self) -> bool {
+    self.action_map_dispatch_enabled
+  }
+
   fn pattern_state(&self, pattern: KeyPattern) -> Option<KeyState> {
     match pattern.normalized() {
       KeyPattern::Single(key) => self.key_state(key),
@@ -628,6 +655,9 @@ impl InputService {
 
   /// 收集动作事件并发送到动作通道
   pub fn dispatch_action_events(&self) {
+    if !self.action_map_dispatch_enabled {
+      return;
+    }
     for event in self.collect_action_events() {
       let _ = self.action_sender.send(event);
     }
@@ -1010,6 +1040,38 @@ mod tests {
       kind: KeyEventKind::Release,
     });
     assert_eq!(input.collect_action_events()[0].state, KeyState::Released);
+  }
+
+  #[test]
+  fn action_map_dispatch_can_be_disabled_without_affecting_raw_capture() {
+    let mut input = InputService::new();
+    input.load_key_bindings(vec![KeyBinding {
+      pattern: KeyPattern::Single(Key::A),
+      action: "test.a".to_string(),
+    }]);
+    assert!(input.is_action_map_dispatch_enabled());
+    assert!(input.disable_action_map_dispatch());
+    assert!(!input.disable_action_map_dispatch());
+    assert!(input.enable_raw_key_capture());
+
+    input
+      .sender
+      .send(KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Press,
+      })
+      .unwrap();
+    input.poll();
+    input.dispatch_action_events();
+
+    assert!(input.next_action_event().is_none());
+    assert_eq!(input.take_raw_key_events()[0].display, "A");
+    assert_eq!(input.collect_action_events()[0].action, "test.a");
+
+    assert!(input.enable_action_map_dispatch());
+    assert!(!input.enable_action_map_dispatch());
+    input.dispatch_action_events();
+    assert_eq!(input.next_action_event().unwrap().action, "test.a");
   }
 
   #[test]

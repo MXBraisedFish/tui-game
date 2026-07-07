@@ -18,6 +18,14 @@ pub(super) fn load_window_size_action_map(services: &mut EngineServices) {
   load_action_map(services, &WindowSizeWarningUi::action_map(), "window_size");
 }
 
+pub(super) fn load_safe_mode_warning_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &SafeModeWarningUi::action_map(),
+    "safe_mode_warning",
+  );
+}
+
 fn load_home_action_map(services: &mut EngineServices) {
   load_action_map(services, &HomeUi::action_map(), "HomeUi");
 }

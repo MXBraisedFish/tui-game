@@ -1,6 +1,6 @@
 [package]
 name = "tui-game"
-version = "1.0.0"
+version = "2.0.0"
 edition = "2024"
 default-run = "tg"
 
@@ -16,19 +16,20 @@ serde_json = "1.0.150"
 arboard = { version = "3.6.1", default-features = false }
 crossbeam-channel = "0.5"
 crossterm = "0.29.0"
-mlua = { version = "0.11.6", features = ["lua54", "vendored"] }
-anyhow = "1.0.102"
+mlua = { version = "0.12.0", features = ["lua54", "vendored"] }
+anyhow = "1.0.103"
+notify = "8"
 unicode-width = "0.2.2"
-unicode-segmentation = "1.12"
+unicode-segmentation = "1.13.3"
 once_cell = "1.19"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
 serde_yaml = "0.9"
 toml = "1.1.2+spec-1.1.0"
 csv = "1.3"
-quick-xml = "0.40.1"
+quick-xml = "0.41.0"
 chrono = { version = "0.4.45", default-features = true, features = ["clock"] }
-rand = "0.10.1"
+rand = "0.10.2"
 rand_chacha = "0.10"
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
@@ -36,3 +37,4 @@ base64 = "0.22"
 icy_sixel = "0.5"
 rdev = "0.5"
 palette = "0.7"
+im-switch = "0.1"

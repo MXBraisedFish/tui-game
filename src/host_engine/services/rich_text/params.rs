@@ -11,6 +11,13 @@ pub struct RichTextParams {
 }
 
 impl RichTextParams {
+  pub fn from_key_actions(key_actions: &HashMap<String, Vec<Vec<String>>>) -> Self {
+    Self {
+      values: HashMap::new(),
+      key_actions: key_actions.clone(),
+    }
+  }
+
   /// 从按键映射表创建参数，自动为每个 action 注册带前缀和不带前缀的键。
   pub fn from_action_map(entries: &[ActionMapEntry], prefix: &str) -> Self {
     let mut key_actions = HashMap::new();

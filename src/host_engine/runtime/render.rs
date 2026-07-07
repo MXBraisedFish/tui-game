@@ -14,6 +14,7 @@ pub(super) fn route_render(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
+  safe_mode_warning_ui: &mut SafeModeWarningUi,
   language_loading_ui: &mut LanguageLoadingUi,
 ) -> Option<(u16, u16)> {
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
@@ -56,6 +57,22 @@ pub(super) fn route_render(
       &services.i18n,
       &services.progress_bar,
       &services.time,
+    );
+    return None;
+  }
+
+  if world.state.current_overlay_kind() == Some(OverlayKind::SafeModeWarning) {
+    apply_host_viewport(services);
+    safe_mode_warning_ui.objects_mut().begin_render();
+    services
+      .canvas
+      .prepare(safe_mode_warning_ui.objects(), &services.layout);
+    safe_mode_warning_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.i18n,
+      &services.hit_area,
     );
     return None;
   }
@@ -117,6 +134,7 @@ pub(super) fn route_render(
       );
     }
     Some(UiNodeKind::GamePackage) => {
+      let mouse_supported = services.terminal.capabilities().mouse;
       game_package_ui.render(
         &mut services.render,
         &mut services.canvas,
@@ -126,10 +144,14 @@ pub(super) fn route_render(
         &services.text_input,
         &services.scroll_box,
         &services.package,
+        &services.storage,
+        &world.temporary_safe_mode_disabled,
         &mut services.image,
+        mouse_supported,
       );
     }
     Some(UiNodeKind::ScreensaverPackage) => {
+      let mouse_supported = services.terminal.capabilities().mouse;
       screensaver_package_ui.render(
         &mut services.render,
         &mut services.canvas,
@@ -139,7 +161,9 @@ pub(super) fn route_render(
         &services.text_input,
         &services.scroll_box,
         &services.package,
+        &services.storage,
         &mut services.image,
+        mouse_supported,
       );
     }
     Some(UiNodeKind::TerminalCheck) => {

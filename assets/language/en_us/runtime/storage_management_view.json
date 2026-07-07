@@ -1,0 +1,17 @@
+{
+  "storage_management_view.title": "Storage Details",
+  "storage_management_view.name": "Item",
+  "storage_management_view.size": "Size",
+  "storage_management_view.path": "Path",
+  "storage_management_view.name.root": "Application Root",
+  "storage_management_view.name.data": "Data Directory",
+  "storage_management_view.name.cache": "Cache Directory",
+  "storage_management_view.name.log": "Log Directory",
+  "storage_management_view.name.profile": "Settings Directory",
+  "storage_management_view.name.mod": "Mods Directory",
+  "storage_management_view.size.k": "KB",
+  "storage_management_view.size.m": "MB",
+  "storage_management_view.size.g": "GB",
+  "storage_management_view.tip": "Sizes are calculated using a 1024-based scale.",
+  "storage_management_view.action.back": "{key:storage_management_view.back} Back"
+}

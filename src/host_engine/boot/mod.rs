@@ -6,6 +6,12 @@ use super::services::LogSource;
 /// 执行引擎启动准备：扫描语言包与资源包、初始化运行时世界
 pub fn prepare() -> BootOutput {
   let mut services = EngineServices::new();
+  let terminal_profile = services.storage.read_terminal_profile_or_default();
+  services.terminal.apply_capability_profile(
+    terminal_profile.unicode,
+    terminal_profile.color.as_deref(),
+    terminal_profile.mouse,
+  );
 
   services
     .log

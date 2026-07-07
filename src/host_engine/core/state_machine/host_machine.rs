@@ -109,6 +109,16 @@ impl HostMachineState {
     Some(node.kind)
   }
 
+  pub fn current_ui_path_kinds(&self) -> Vec<UiNodeKind> {
+    let Some(runtime) = self.runtime() else {
+      return Vec::new();
+    };
+    let MainHostState::Host(host) = runtime.main_host() else {
+      return Vec::new();
+    };
+    host.ui_tree().path().iter().map(|node| node.kind).collect()
+  }
+
   /// 进入指定的 UI 节点，将其压入 UI 导航栈
   pub fn enter_ui_node(&mut self, node: UiNodeState) {
     if let Some(runtime) = self.runtime_mut() {
@@ -150,6 +160,19 @@ impl HostMachineState {
     if let Some(runtime) = self.runtime_mut() {
       runtime.overlays_mut().push(OverlayState {
         kind: OverlayKind::LanguageLoading,
+        logic: super::OverlayLogicState,
+        render: super::OverlayRenderState {
+          required_width: 0,
+          required_height: 0,
+        },
+      });
+    }
+  }
+
+  pub fn push_safe_mode_warning_overlay(&mut self) {
+    if let Some(runtime) = self.runtime_mut() {
+      runtime.overlays_mut().push(OverlayState {
+        kind: OverlayKind::SafeModeWarning,
         logic: super::OverlayLogicState,
         render: super::OverlayRenderState {
           required_width: 0,

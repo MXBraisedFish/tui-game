@@ -276,9 +276,18 @@ mod tests {
   fn key_param_single() {
     let mut ka = HashMap::new();
     ka.insert("jump".to_string(), vec![vec!["shift".to_string()]]);
-    let params = make_params(HashMap::new(), ka);
+    let params = RichTextParams::from_key_actions(&ka);
     let rt = parse("f%{key:jump}", Some(&params));
     assert_eq!(rt.segments[0].text, "[Shift]");
+  }
+
+  #[test]
+  fn package_key_params_do_not_resolve_values() {
+    let mut ka = HashMap::new();
+    ka.insert("move_up".to_string(), vec![vec!["w".to_string()]]);
+    let params = RichTextParams::from_key_actions(&ka);
+    let rt = parse("f%{key:move_up} {value:name}", Some(&params));
+    assert_eq!(rt.segments[0].text, "[W] {value:name}");
   }
 
   #[test]

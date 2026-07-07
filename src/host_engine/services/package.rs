@@ -1,19 +1,24 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
+use std::sync::{
+  Arc,
+  atomic::{AtomicBool, Ordering},
+};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
-use crossbeam_channel::Sender;
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 
 use crate::host_engine::services::{
-  async_runtime::{AsyncRuntime, EngineEvent, EngineTask, TaskId},
+  async_runtime::{AsyncRuntime, EngineEvent, EngineTask, ManagedThreadId, TaskId},
   log::{LogService, LogSource},
+  version::{HOST_API_VERSION, PACKAGE_MANIFEST_VERSION},
 };
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 
-/// 宿主机 API 版本号
-pub const HOST_API_VERSION: u32 = 1;
-
-/// 包清单 schema 版本号
-pub const HOST_SCHEMA_VERSION: u32 = 1;
 const VALID_TARGET_FPS: &[u32] = &[30, 60, 120];
 
 /// 包来源（官方或模组）
@@ -54,6 +59,7 @@ pub struct PackageInfo {
   pub game: Option<GameConfig>,
   pub screensaver: Option<ScreensaverConfig>,
   pub path: PathBuf,
+  watched_files: Vec<PathBuf>,
 }
 
 /// 面向 UI 列表的轻量包条目快照。
@@ -62,14 +68,20 @@ pub struct PackageListEntry {
   pub mod_id: String,
   pub source: PackageSource,
   pub package_type: PackageType,
+  pub key_actions: HashMap<String, Vec<Vec<String>>>,
   pub title: String,
+  pub description: String,
   pub author: String,
   pub version: String,
+  pub icon: PackageAsset,
   pub icon_path: Option<String>,
+  pub banner: PackageAsset,
   pub path: PathBuf,
   pub enabled: bool,
   pub debug: bool,
   pub safe_mode: bool,
+  pub mouse_required: bool,
+  pub write_required: bool,
 }
 
 /// 包显示信息
@@ -78,15 +90,25 @@ pub struct PackageDisplay {
   pub title: String,
   pub description: String,
   pub author: String,
-  pub icon: IconOrImage,
-  pub banner: IconOrImage,
+  pub icon: PackageAsset,
+  pub banner: PackageAsset,
 }
 
-/// 图标或图片资源
-#[derive(Clone, Debug)]
-pub enum IconOrImage {
-  Image(String),
-  ArtArray,
+/// 包展示资源。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PackageAsset {
+  Image { path: String },
+  Text { path: String, lines: Vec<String> },
+}
+
+impl PackageAsset {
+  pub fn default_icon() -> Self {
+    default_icon_asset()
+  }
+
+  pub fn default_banner() -> Self {
+    default_banner_asset()
+  }
 }
 
 /// 包运行时要求
@@ -127,6 +149,7 @@ pub struct ActionConfig {
 #[derive(Clone, Debug)]
 pub struct ScreensaverConfig {
   pub name: String,
+  pub mouse: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -150,9 +173,13 @@ pub enum PackageTask {
 #[derive(Clone, Debug)]
 pub enum PackageAsyncEvent {
   Event(PackageEvent),
+  WatchChanged {
+    package_dirs: Vec<PathBuf>,
+  },
   SnapshotReady {
     snapshot: PackageSnapshot,
     finished: PackageEvent,
+    watched_files: Vec<PathBuf>,
   },
 }
 
@@ -166,6 +193,9 @@ pub enum PackageEvent {
   ScanProgress {
     scanned: usize,
     total: usize,
+  },
+  WatchChanged {
+    folders: usize,
   },
   ScanFinished {
     total: usize,
@@ -181,12 +211,19 @@ struct ScanReport {
   events: Vec<PackageEvent>,
   errors: u32,
   duplicates: u32,
+  watched_files: Vec<PathBuf>,
 }
 
 /// 包管理服务，负责扫描和加载游戏/屏保包。
 pub struct PackageService {
   snapshot: PackageSnapshot,
   last_scan: Option<ScanRequest>,
+  watcher_thread: Option<ManagedThreadId>,
+  watcher_tx: Option<Sender<PackageWatcherCommand>>,
+}
+
+enum PackageWatcherCommand {
+  SetFiles(Vec<PathBuf>),
 }
 
 impl PackageService {
@@ -194,6 +231,8 @@ impl PackageService {
     Self {
       snapshot: PackageSnapshot::default(),
       last_scan: None,
+      watcher_thread: None,
+      watcher_tx: None,
     }
   }
 
@@ -245,6 +284,27 @@ impl PackageService {
     true
   }
 
+  /// 启动 package.json 热更新监听。监听线程只产生事件；快照仍由主线程替换。
+  pub fn start_watcher(&mut self, async_runtime: &mut AsyncRuntime) -> bool {
+    if self.watcher_thread.is_some() {
+      return false;
+    }
+    let Some(request) = self.last_scan.clone() else {
+      return false;
+    };
+
+    let (watcher_tx, watcher_rx) = unbounded();
+    let id = async_runtime.spawn_managed_listener(true, move |event_tx, stop| {
+      run_package_watcher(request, watcher_rx, event_tx, stop)
+    });
+    self.watcher_thread = Some(id);
+    self.watcher_tx = Some(watcher_tx.clone());
+    let _ = watcher_tx.send(PackageWatcherCommand::SetFiles(snapshot_watched_files(
+      &self.snapshot,
+    )));
+    true
+  }
+
   /// 请求使用指定语言重新扫描。语言切换后调用。
   pub fn request_rescan_for_language(
     &mut self,
@@ -278,8 +338,22 @@ impl PackageService {
         log_package_event(log, event.clone());
         event
       }
-      PackageAsyncEvent::SnapshotReady { snapshot, finished } => {
+      PackageAsyncEvent::WatchChanged { package_dirs } => {
+        let event = PackageEvent::WatchChanged {
+          folders: package_dirs.len(),
+        };
+        log_package_event(log, event.clone());
+        event
+      }
+      PackageAsyncEvent::SnapshotReady {
+        snapshot,
+        finished,
+        watched_files,
+      } => {
         self.snapshot = snapshot;
+        if let Some(tx) = &self.watcher_tx {
+          let _ = tx.send(PackageWatcherCommand::SetFiles(watched_files));
+        }
         log_package_event(log, finished.clone());
         finished
       }
@@ -340,6 +414,7 @@ pub(crate) fn run_package_task(
       let _ = event_tx.send(EngineEvent::Package(PackageAsyncEvent::SnapshotReady {
         snapshot: report.snapshot,
         finished,
+        watched_files: report.watched_files,
       }));
       let _ = task_id;
       Ok(())
@@ -370,6 +445,13 @@ fn log_package_event(log: &mut LogService, event: PackageEvent) {
       format!("Started package scan ({} candidates)", total),
     ),
     PackageEvent::ScanProgress { .. } => {}
+    PackageEvent::WatchChanged { folders } => log.info(
+      LogSource::Pack,
+      format!(
+        "Package manifest changed in {} folder(s), requesting rescan",
+        folders
+      ),
+    ),
     PackageEvent::ScanFinished {
       total,
       games,
@@ -386,22 +468,333 @@ fn log_package_event(log: &mut LogService, event: PackageEvent) {
   }
 }
 
+fn run_package_watcher(
+  request: ScanRequest,
+  command_rx: Receiver<PackageWatcherCommand>,
+  event_tx: Sender<EngineEvent>,
+  stop: Arc<AtomicBool>,
+) -> JoinHandle<()> {
+  std::thread::spawn(move || {
+    let roots = package_scan_roots(&request);
+    let (raw_event_tx, raw_event_rx) = unbounded::<Event>();
+
+    let mut watcher = match RecommendedWatcher::new(
+      move |result: notify::Result<Event>| {
+        if let Ok(event) = result {
+          let _ = raw_event_tx.send(event);
+        }
+      },
+      Config::default(),
+    ) {
+      Ok(watcher) => watcher,
+      Err(error) => {
+        send_package_event(
+          &event_tx,
+          PackageEvent::Warn(format!("Cannot start package watcher: {}", error)),
+        );
+        return;
+      }
+    };
+
+    let mut watched_dirs = HashSet::<PathBuf>::new();
+    let mut watched_files = HashMap::<PathBuf, PathBuf>::new();
+
+    for root in &roots {
+      if root.exists() {
+        watch_package_dir(&mut watcher, &mut watched_dirs, root, &event_tx);
+      } else {
+        send_package_event(
+          &event_tx,
+          PackageEvent::Warn(format!(
+            "Package watch root does not exist: {}",
+            root.display()
+          )),
+        );
+      }
+    }
+    send_package_event(
+      &event_tx,
+      PackageEvent::Info(format!(
+        "Package watcher started on {} root(s)",
+        roots.len()
+      )),
+    );
+
+    let debounce = Duration::from_millis(500);
+    let mut pending = HashSet::<PathBuf>::new();
+    let mut last_event_at: Option<Instant> = None;
+
+    while !stop.load(Ordering::SeqCst) {
+      for command in command_rx.try_iter() {
+        match command {
+          PackageWatcherCommand::SetFiles(files) => {
+            watched_files = watched_file_package_dirs(&roots, files);
+            sync_package_watch_dirs(
+              &mut watcher,
+              &mut watched_dirs,
+              &roots,
+              watched_files.keys(),
+              &event_tx,
+            );
+          }
+        }
+      }
+
+      match raw_event_rx.recv_timeout(Duration::from_millis(100)) {
+        Ok(event) => {
+          queue_package_watch_event(
+            &mut watcher,
+            &mut watched_dirs,
+            &roots,
+            &watched_files,
+            event,
+            &event_tx,
+            &mut pending,
+          );
+          last_event_at = Some(Instant::now());
+        }
+        Err(RecvTimeoutError::Timeout) => {}
+        Err(RecvTimeoutError::Disconnected) => break,
+      }
+
+      for event in raw_event_rx.try_iter() {
+        queue_package_watch_event(
+          &mut watcher,
+          &mut watched_dirs,
+          &roots,
+          &watched_files,
+          event,
+          &event_tx,
+          &mut pending,
+        );
+        last_event_at = Some(Instant::now());
+      }
+
+      if !pending.is_empty() && last_event_at.is_some_and(|time| time.elapsed() >= debounce) {
+        let mut package_dirs = pending.drain().collect::<Vec<_>>();
+        package_dirs.sort();
+        let _ = event_tx.send(EngineEvent::Package(PackageAsyncEvent::WatchChanged {
+          package_dirs,
+        }));
+        last_event_at = None;
+      }
+    }
+  })
+}
+
+fn snapshot_watched_files(snapshot: &PackageSnapshot) -> Vec<PathBuf> {
+  snapshot
+    .games
+    .iter()
+    .chain(snapshot.screensavers.iter())
+    .flat_map(|info| info.watched_files.clone())
+    .collect()
+}
+
+fn watched_file_package_dirs(roots: &[PathBuf], files: Vec<PathBuf>) -> HashMap<PathBuf, PathBuf> {
+  files
+    .into_iter()
+    .filter_map(|file| watched_file_package_dir(roots, &file).map(|dir| (file, dir)))
+    .collect()
+}
+
+fn sync_package_watch_dirs<'a>(
+  watcher: &mut RecommendedWatcher,
+  watched_dirs: &mut HashSet<PathBuf>,
+  roots: &[PathBuf],
+  files: impl Iterator<Item = &'a PathBuf>,
+  event_tx: &Sender<EngineEvent>,
+) {
+  let mut next_dirs = roots.iter().cloned().collect::<HashSet<_>>();
+  next_dirs.extend(roots.iter().flat_map(first_level_package_dirs));
+  next_dirs.extend(files.filter_map(|file| file.parent().map(Path::to_path_buf)));
+
+  for dir in watched_dirs
+    .difference(&next_dirs)
+    .cloned()
+    .collect::<Vec<_>>()
+  {
+    let _ = watcher.unwatch(&dir);
+    watched_dirs.remove(&dir);
+  }
+
+  for dir in next_dirs {
+    if dir.exists() {
+      watch_package_dir(watcher, watched_dirs, &dir, event_tx);
+    }
+  }
+}
+
+fn first_level_package_dirs(root: &PathBuf) -> Vec<PathBuf> {
+  std::fs::read_dir(root)
+    .map(|entries| {
+      entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn watch_package_dir(
+  watcher: &mut RecommendedWatcher,
+  watched_dirs: &mut HashSet<PathBuf>,
+  dir: &Path,
+  event_tx: &Sender<EngineEvent>,
+) {
+  let dir = dir.to_path_buf();
+  if !watched_dirs.insert(dir.clone()) {
+    return;
+  }
+
+  if let Err(error) = watcher.watch(&dir, RecursiveMode::NonRecursive) {
+    watched_dirs.remove(&dir);
+    send_package_event(
+      event_tx,
+      PackageEvent::Warn(format!(
+        "Cannot watch package path {}: {}",
+        dir.display(),
+        error
+      )),
+    );
+  }
+}
+
+fn queue_package_watch_event(
+  watcher: &mut RecommendedWatcher,
+  watched_dirs: &mut HashSet<PathBuf>,
+  roots: &[PathBuf],
+  watched_files: &HashMap<PathBuf, PathBuf>,
+  event: Event,
+  event_tx: &Sender<EngineEvent>,
+  pending: &mut HashSet<PathBuf>,
+) {
+  if !matches!(
+    event.kind,
+    EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+  ) {
+    return;
+  }
+
+  for path in event.paths {
+    if let Some(package_dir) = watched_package_dir(roots, &path) {
+      if package_dir.exists() {
+        watch_package_dir(watcher, watched_dirs, &package_dir, event_tx);
+      }
+      pending.insert(package_dir);
+      continue;
+    }
+
+    if let Some(package_dir) = watched_files.get(&path) {
+      pending.insert(package_dir.clone());
+    }
+  }
+}
+
+fn watched_package_dir(roots: &[PathBuf], path: &Path) -> Option<PathBuf> {
+  if path.file_name().and_then(|name| name.to_str()) == Some("package.json") {
+    let dir = path.parent()?;
+    return roots
+      .iter()
+      .any(|root| dir.parent().is_some_and(|parent| parent == root))
+      .then(|| dir.to_path_buf());
+  }
+
+  roots
+    .iter()
+    .any(|root| path.parent().is_some_and(|parent| parent == root))
+    .then(|| path.to_path_buf())
+}
+
+fn watched_file_package_dir(roots: &[PathBuf], path: &Path) -> Option<PathBuf> {
+  roots.iter().find_map(|root| {
+    let relative = path.strip_prefix(root).ok()?;
+    let mut components = relative.components();
+    let package_name = components.next()?;
+    components.next()?;
+    match package_name {
+      Component::Normal(name) => Some(root.join(name)),
+      _ => None,
+    }
+  })
+}
+
+fn package_scan_roots(request: &ScanRequest) -> Vec<PathBuf> {
+  [
+    "scripts/game",
+    "scripts/screensaver",
+    "data/mod/game",
+    "data/mod/screensaver",
+  ]
+  .into_iter()
+  .map(|relative| request.root.join(relative))
+  .collect()
+}
+
 fn package_list_entry(info: PackageInfo) -> PackageListEntry {
+  let icon_path = match &info.display.icon {
+    PackageAsset::Image { path } => Some(
+      info
+        .path
+        .join("assets")
+        .join(path)
+        .to_string_lossy()
+        .to_string(),
+    ),
+    _ => None,
+  };
+  let icon = icon_path
+    .as_ref()
+    .map(|path| PackageAsset::Image { path: path.clone() })
+    .unwrap_or_else(|| info.display.icon.clone());
+  let banner = match &info.display.banner {
+    PackageAsset::Image { path } => PackageAsset::Image {
+      path: info
+        .path
+        .join("assets")
+        .join(path)
+        .to_string_lossy()
+        .to_string(),
+    },
+    PackageAsset::Text { .. } => info.display.banner.clone(),
+  };
+  let mouse_required = info.game.as_ref().is_some_and(|game| game.mouse)
+    || info
+      .screensaver
+      .as_ref()
+      .is_some_and(|screensaver| screensaver.mouse);
+  let write_required = info.game.as_ref().is_some_and(|game| game.write);
+  let key_actions = info
+    .game
+    .as_ref()
+    .map(|game| {
+      game
+        .actions
+        .iter()
+        .map(|(name, action)| (name.clone(), action.keys.clone()))
+        .collect()
+    })
+    .unwrap_or_default();
+
   PackageListEntry {
     mod_id: info.mod_id,
     source: info.source,
     package_type: info.package_type,
+    key_actions,
     title: info.display.title,
+    description: info.display.description,
     author: info.display.author,
     version: info.version,
-    icon_path: match info.display.icon {
-      IconOrImage::Image(path) => Some(info.path.join(path).to_string_lossy().to_string()),
-      IconOrImage::ArtArray => None,
-    },
+    icon,
+    icon_path,
+    banner,
     path: info.path,
     enabled: true,
     debug: false,
     safe_mode: true,
+    mouse_required,
+    write_required,
   }
 }
 
@@ -415,6 +808,7 @@ fn scan_all_packages(
     events: Vec::new(),
     errors: 0,
     duplicates: 0,
+    watched_files: Vec::new(),
   };
   let mut scanned = 0;
 
@@ -496,6 +890,7 @@ fn scan_dir(
           report.duplicates += 1;
           continue;
         }
+        report.watched_files.extend(info.watched_files.clone());
         insert(&mut report.snapshot, info);
       }
       Err(msg) => {
@@ -548,6 +943,7 @@ fn read_package(
   let json_path = dir.join("package.json");
   let content =
     std::fs::read_to_string(&json_path).map_err(|e| format!("Cannot read package.json: {}", e))?;
+  let mut watched_files = vec![json_path.clone()];
 
   let raw: RawPackageJson =
     serde_json::from_str(&content).map_err(|e| format!("Invalid JSON: {}", e))?;
@@ -556,10 +952,10 @@ fn read_package(
     return Err("mod_id is empty".into());
   }
 
-  if raw.schema_version != HOST_SCHEMA_VERSION {
+  if raw.schema_version != PACKAGE_MANIFEST_VERSION {
     return Err(format!(
       "schema_version {} != host {}",
-      raw.schema_version, HOST_SCHEMA_VERSION
+      raw.schema_version, PACKAGE_MANIFEST_VERSION
     ));
   }
 
@@ -597,13 +993,13 @@ fn read_package(
   let entry = resolve_entry(dir, &raw.entry)?;
 
   let display = raw.display.unwrap_or_default();
-  let title = resolve_package_text(dir, display.title, request);
+  let title = resolve_package_text(dir, display.title, request, &mut watched_files);
   if title.trim().is_empty() {
     return Err("display.title is empty".into());
   }
   let version = raw
     .version
-    .map(|value| resolve_package_text(dir, value, request))
+    .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
     .unwrap_or_default();
 
   let runtime = raw.runtime.unwrap_or_default();
@@ -628,7 +1024,7 @@ fn read_package(
             ActionConfig {
               description: a
                 .description
-                .map(|value| resolve_package_text(dir, value, request))
+                .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
                 .unwrap_or_default(),
               keys: a.keys,
             },
@@ -638,11 +1034,11 @@ fn read_package(
       Some(GameConfig {
         name: g
           .name
-          .map(|value| resolve_package_text(dir, value, request))
+          .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
           .unwrap_or_default(),
         detail: g
           .detail
-          .map(|value| resolve_package_text(dir, value, request))
+          .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
           .unwrap_or_default(),
         write: g.write.unwrap_or(false),
         mouse: g.mouse.unwrap_or(false),
@@ -652,7 +1048,7 @@ fn read_package(
           enabled: s.enabled,
           empty_text: s
             .empty_text
-            .map(|value| resolve_package_text(dir, value, request))
+            .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
             .unwrap_or_default(),
         }),
         actions,
@@ -667,8 +1063,9 @@ fn read_package(
       Some(ScreensaverConfig {
         name: s
           .name
-          .map(|value| resolve_package_text(dir, value, request))
+          .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
           .unwrap_or_default(),
+        mouse: s.mouse.unwrap_or(false),
       })
     }
     PackageType::Game => None,
@@ -688,14 +1085,16 @@ fn read_package(
       title,
       description: display
         .description
-        .map(|value| resolve_package_text(dir, value, request))
+        .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
         .unwrap_or_default(),
       author: display
         .author
-        .map(|value| resolve_package_text(dir, value, request))
+        .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
         .unwrap_or_default(),
-      icon: parse_icon_or_image(&display.icon),
-      banner: parse_icon_or_image(&display.banner),
+      icon: parse_package_asset(dir, &display.icon, AssetShape::Icon, &mut watched_files)
+        .unwrap_or_else(default_icon_asset),
+      banner: parse_package_asset(dir, &display.banner, AssetShape::Banner, &mut watched_files)
+        .unwrap_or_else(default_banner_asset),
     },
     runtime: PackageRuntime {
       min_width: runtime.min_width.unwrap_or(0),
@@ -704,6 +1103,7 @@ fn read_package(
     game,
     screensaver,
     path: dir.to_path_buf(),
+    watched_files,
   })
 }
 
@@ -747,9 +1147,16 @@ struct RawDisplay {
   description: Option<String>,
   author: Option<String>,
   #[serde(default)]
-  icon: Option<String>,
+  icon: Option<RawDisplayAsset>,
   #[serde(default)]
-  banner: Option<String>,
+  banner: Option<RawDisplayAsset>,
+}
+
+#[derive(Deserialize)]
+struct RawDisplayAsset {
+  #[serde(rename = "type")]
+  asset_type: String,
+  path: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -785,6 +1192,7 @@ struct RawActionConfig {
 #[derive(Deserialize)]
 struct RawScreensaverConfig {
   name: Option<String>,
+  mouse: Option<bool>,
 }
 
 fn parse_package_type(s: &str) -> Result<PackageType, String> {
@@ -795,20 +1203,176 @@ fn parse_package_type(s: &str) -> Result<PackageType, String> {
   }
 }
 
-fn parse_icon_or_image(raw: &Option<String>) -> IconOrImage {
-  match raw {
-    Some(s) if s.starts_with("image:") => {
-      IconOrImage::Image(s.strip_prefix("image:").unwrap().to_string())
+#[derive(Clone, Copy)]
+enum AssetShape {
+  Icon,
+  Banner,
+}
+
+impl AssetShape {
+  fn size(self) -> (usize, usize) {
+    match self {
+      AssetShape::Icon => (8, 4),
+      AssetShape::Banner => (60, 14),
     }
-    Some(_) => IconOrImage::ArtArray,
-    None => IconOrImage::ArtArray,
   }
 }
 
-fn resolve_package_text(pkg_dir: &Path, value: String, request: &ScanRequest) -> String {
+fn parse_package_asset(
+  package_dir: &Path,
+  raw: &Option<RawDisplayAsset>,
+  shape: AssetShape,
+  watched_files: &mut Vec<PathBuf>,
+) -> Option<PackageAsset> {
+  let raw = raw.as_ref()?;
+  let path = safe_asset_path(&raw.path)?;
+  let asset_path = package_dir.join("assets").join(&path);
+  match raw.asset_type.as_str() {
+    "image" if is_supported_image_path(&path) => {
+      watched_files.push(asset_path);
+      Some(PackageAsset::Image { path })
+    }
+    "text" if is_supported_text_path(&path) => {
+      watched_files.push(asset_path.clone());
+      let content = std::fs::read_to_string(asset_path).ok()?;
+      Some(PackageAsset::Text {
+        path,
+        lines: normalize_asset_text(&content, shape),
+      })
+    }
+    _ => None,
+  }
+}
+
+pub(crate) fn default_icon_lines() -> Vec<String> {
+  normalize_asset_lines(
+    ["████████", "██ ██ ██", "   ██   ", "  ████  "],
+    AssetShape::Icon,
+  )
+}
+
+fn default_icon_asset() -> PackageAsset {
+  PackageAsset::Text {
+    path: String::new(),
+    lines: default_icon_lines(),
+  }
+}
+
+fn default_banner_asset() -> PackageAsset {
+  PackageAsset::Text {
+    path: String::new(),
+    lines: normalize_asset_lines(
+      [
+        "`7MMM.     ,MMF' .g8\"\"8q. `7MM\"\"\"Yb.   ",
+        "  MMMb    dPMM .dP'    `YM. MM    `Yb. ",
+        "  M YM   ,M MM dM'      `MM MM     `Mb ",
+        "  M  Mb  M' MM MM        MM MM      MM ",
+        "  M  YM.P'  MM MM.      ,MP MM     ,MP ",
+        "  M  `YM'   MM `Mb.    ,dP' MM    ,dP' ",
+        ".JML. `'  .JMML. `\"bmmd\"' .JMMmmmdP'   ",
+      ],
+      AssetShape::Banner,
+    ),
+  }
+}
+
+fn normalize_asset_lines<const N: usize>(lines: [&str; N], shape: AssetShape) -> Vec<String> {
+  normalize_asset_text(&lines.join("\n"), shape)
+}
+
+fn safe_asset_path(path: &str) -> Option<String> {
+  let trimmed = path.trim();
+  if trimmed.is_empty() {
+    return None;
+  }
+
+  let mut parts = Vec::new();
+  for component in Path::new(trimmed).components() {
+    match component {
+      Component::Normal(part) => parts.push(part.to_string_lossy().to_string()),
+      _ => return None,
+    }
+  }
+
+  (!parts.is_empty()).then(|| parts.join("/"))
+}
+
+fn is_supported_image_path(path: &str) -> bool {
+  extension_is(path, &["png", "jpg", "jpeg"])
+}
+
+fn is_supported_text_path(path: &str) -> bool {
+  extension_is(path, &["txt"])
+}
+
+fn extension_is(path: &str, allowed: &[&str]) -> bool {
+  Path::new(path)
+    .extension()
+    .and_then(|ext| ext.to_str())
+    .map(|ext| allowed.iter().any(|item| ext.eq_ignore_ascii_case(item)))
+    .unwrap_or(false)
+}
+
+fn normalize_asset_text(content: &str, shape: AssetShape) -> Vec<String> {
+  let (width, height) = shape.size();
+  let mut lines: Vec<String> = content
+    .lines()
+    .map(|line| {
+      let line = line.trim_end_matches('\r');
+      if line.trim_start().starts_with("f%") {
+        line.to_string()
+      } else {
+        fit_line_width(line, width)
+      }
+    })
+    .collect();
+
+  if lines.len() > height {
+    let start = (lines.len() - height) / 2;
+    lines = lines[start..start + height].to_vec();
+  }
+
+  while lines.len() < height {
+    if (height - lines.len()) % 2 == 1 {
+      lines.insert(0, " ".repeat(width));
+    } else {
+      lines.push(" ".repeat(width));
+    }
+  }
+
+  lines
+}
+
+fn fit_line_width(line: &str, width: usize) -> String {
+  let mut result = String::new();
+  let mut used = 0;
+  for grapheme in UnicodeSegmentation::graphemes(line.trim_end_matches('\r'), true) {
+    let grapheme_width = UnicodeWidthStr::width(grapheme);
+    if used + grapheme_width > width {
+      break;
+    }
+    used += grapheme_width;
+    result.push_str(grapheme);
+  }
+  let padding = width.saturating_sub(UnicodeWidthStr::width(result.as_str()));
+  let left = padding.div_ceil(2);
+  format!(
+    "{}{}{}",
+    " ".repeat(left),
+    result,
+    " ".repeat(padding - left)
+  )
+}
+
+fn resolve_package_text(
+  pkg_dir: &Path,
+  value: String,
+  request: &ScanRequest,
+  watched_files: &mut Vec<PathBuf>,
+) -> String {
   match package_text(value) {
     PackageText::Literal(text) => text,
-    PackageText::I18n(key) => resolve_package_i18n(pkg_dir, &key, request),
+    PackageText::I18n(key) => resolve_package_i18n(pkg_dir, &key, request, watched_files),
   }
 }
 
@@ -819,7 +1383,14 @@ fn package_text(value: String) -> PackageText {
     .unwrap_or(PackageText::Literal(value))
 }
 
-fn resolve_package_i18n(pkg_dir: &Path, key: &str, request: &ScanRequest) -> String {
+fn resolve_package_i18n(
+  pkg_dir: &Path,
+  key: &str,
+  request: &ScanRequest,
+  watched_files: &mut Vec<PathBuf>,
+) -> String {
+  push_package_i18n_watch_path(pkg_dir, &request.language_code, key, watched_files);
+  push_package_i18n_watch_path(pkg_dir, "en_us", key, watched_files);
   load_package_i18n_value(pkg_dir, &request.language_code, key)
     .or_else(|| load_package_i18n_value(pkg_dir, "en_us", key))
     .unwrap_or_else(|| {
@@ -829,31 +1400,70 @@ fn resolve_package_i18n(pkg_dir: &Path, key: &str, request: &ScanRequest) -> Str
     })
 }
 
-fn load_package_i18n_value(pkg_dir: &Path, language_code: &str, key: &str) -> Option<String> {
-  let (path, field) = package_i18n_path(pkg_dir, language_code, key)?;
-  let content = std::fs::read_to_string(path).ok()?;
-  serde_json::from_str::<HashMap<String, String>>(&content)
-    .ok()?
-    .get(&field)
-    .cloned()
+fn push_package_i18n_watch_path(
+  pkg_dir: &Path,
+  language_code: &str,
+  key: &str,
+  watched_files: &mut Vec<PathBuf>,
+) {
+  for (path, _) in package_i18n_paths(pkg_dir, language_code, key) {
+    watched_files.push(path);
+  }
 }
 
-fn package_i18n_path(pkg_dir: &Path, language_code: &str, key: &str) -> Option<(PathBuf, String)> {
+fn load_package_i18n_value(pkg_dir: &Path, language_code: &str, key: &str) -> Option<String> {
+  package_i18n_paths(pkg_dir, language_code, key)
+    .into_iter()
+    .find_map(|(path, field)| {
+      let content = std::fs::read_to_string(path).ok()?;
+      serde_json::from_str::<HashMap<String, String>>(&content)
+        .ok()?
+        .get(&field)
+        .cloned()
+    })
+}
+
+fn package_i18n_paths(pkg_dir: &Path, language_code: &str, key: &str) -> Vec<(PathBuf, String)> {
   let parts: Vec<&str> = key.split('/').filter(|part| !part.is_empty()).collect();
   let language_root = pkg_dir.join("assets").join("language").join(language_code);
   match parts.as_slice() {
-    [] => None,
-    [field] => Some((language_root.with_extension("json"), (*field).to_string())),
+    [] => Vec::new(),
+    [field] => vec![(language_root.with_extension("json"), (*field).to_string())],
     many => {
-      let (field, prefix) = many.split_last()?;
-      let (file, dirs) = prefix.split_last()?;
-      let mut path = language_root;
-      for dir in dirs {
-        path = path.join(dir);
+      let Some((last, dirs)) = many.split_last() else {
+        return Vec::new();
+      };
+      let mut paths = Vec::new();
+
+      if let Some((file, field)) = last.rsplit_once('.') {
+        paths.push(package_i18n_file_path(&language_root, dirs, file, field));
       }
-      Some((path.join(format!("{file}.json")), (*field).to_string()))
+
+      if let Some((field, prefix)) = many.split_last() {
+        if let Some((file, old_dirs)) = prefix.split_last() {
+          let old_path = package_i18n_file_path(&language_root, old_dirs, file, field);
+          if !paths.contains(&old_path) {
+            paths.push(old_path);
+          }
+        }
+      }
+
+      paths
     }
   }
+}
+
+fn package_i18n_file_path(
+  language_root: &Path,
+  dirs: &[&str],
+  file: &str,
+  field: &str,
+) -> (PathBuf, String) {
+  let mut path = language_root.to_path_buf();
+  for dir in dirs {
+    path = path.join(dir);
+  }
+  (path.join(format!("{file}.json")), field.to_string())
 }
 
 // 规范化包入口脚本路径。扫描阶段只验证路径语义，不验证脚本文件是否存在。
@@ -1117,6 +1727,45 @@ mod tests {
   }
 
   #[test]
+  fn package_list_entry_carries_game_action_keys() {
+    let root = temp_root("entry_action_keys");
+    let dir = root.join("data/mod/game/action_keys");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+      dir.join("package.json"),
+      r#"{
+        "mod_id":"action_keys",
+        "schema_version":1,
+        "type":"game",
+        "version":"1.0.0",
+        "version_code":1,
+        "api":{"min":1,"max":1},
+        "entry":"main",
+        "display":{"title":"f%{key:move_up} Move","author":"Tester"},
+        "game":{
+          "target_fps":60,
+          "actions":{
+            "move_up":{"description":"Move up","keys":[["w"],["arrow_up"]]}
+          }
+        }
+      }"#,
+    )
+    .unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+
+    let entry = service.mod_games().remove(0);
+    assert_eq!(
+      entry.key_actions.get("move_up"),
+      Some(&vec![vec!["w".to_string()], vec!["arrow_up".to_string()]])
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
   fn package_i18n_fields_are_resolved_during_scan() {
     let root = temp_root("i18n_fields");
     write_game_manifest_only(&root, "data/mod/game", "i18n_game", "@display/title");
@@ -1215,6 +1864,60 @@ mod tests {
   }
 
   #[test]
+  fn package_i18n_dot_file_key_path_is_resolved() {
+    let root = temp_root("i18n_dot_path");
+    write_game_manifest_only(&root, "data/mod/game", "i18n_dot_game", "Dot Path Game");
+    let package_json = root.join("data/mod/game/i18n_dot_game/package.json");
+    let content = std::fs::read_to_string(&package_json)
+      .unwrap()
+      .replace(
+        r#""author":"Tester""#,
+        r#""author":"@creator/identity/author.name""#,
+      )
+      .replace(r#""version":"1.0.0""#, r#""version":"@meta/version.text""#)
+      .replace(
+        r#""title":"Dot Path Game""#,
+        r#""title":"@long/path/display/title.text""#,
+      );
+    std::fs::write(package_json, content).unwrap();
+    write_package_language(
+      &root,
+      "data/mod/game",
+      "i18n_dot_game",
+      "zh_cn",
+      "creator/identity/author.json",
+      r#"{"name":"点号作者"}"#,
+    );
+    write_package_language(
+      &root,
+      "data/mod/game",
+      "i18n_dot_game",
+      "zh_cn",
+      "meta/version.json",
+      r#"{"text":"点号版本"}"#,
+    );
+    write_package_language(
+      &root,
+      "data/mod/game",
+      "i18n_dot_game",
+      "zh_cn",
+      "long/path/display/title.json",
+      r#"{"text":"点号标题"}"#,
+    );
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "zh_cn");
+
+    let game = service.games().remove(0);
+    assert_eq!(game.display.author, "点号作者");
+    assert_eq!(game.version, "点号版本");
+    assert_eq!(game.display.title, "点号标题");
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
   fn package_i18n_falls_back_to_en_us_then_missing_template() {
     let root = temp_root("i18n_fallback");
     write_game_manifest_only(&root, "data/mod/game", "fallback_game", "@display/title");
@@ -1269,6 +1972,253 @@ mod tests {
       service.screensavers()[0].screensaver.as_ref().unwrap().name,
       "屏保名"
     );
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn screensaver_mouse_flag_reaches_list_entry() {
+    let root = temp_root("screensaver_mouse");
+    write_screensaver(
+      &root,
+      "data/mod/screensaver",
+      "mouse_screen",
+      "Mouse Screen",
+    );
+    let package_json = root.join("data/mod/screensaver/mouse_screen/package.json");
+    let content = std::fs::read_to_string(&package_json).unwrap().replace(
+      r#""screensaver":{"name":"Mouse Screen"}"#,
+      r#""screensaver":{"name":"Mouse Screen","mouse":true}"#,
+    );
+    std::fs::write(package_json, content).unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+
+    assert!(service.mod_screensavers()[0].mouse_required);
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn display_assets_parse_new_image_and_text_structure() {
+    let root = temp_root("display_assets");
+    write_game_manifest_only(&root, "data/mod/game", "asset_game", "Asset Game");
+    let dir = root.join("data/mod/game/asset_game");
+    std::fs::create_dir_all(dir.join("assets/ui")).unwrap();
+    std::fs::write(dir.join("assets/ui/icon.txt"), "abc\n一二三四五\nx").unwrap();
+    std::fs::write(
+      dir.join("assets/ui/banner.txt"),
+      [
+        "line00", "line01", "line02", "line03", "line04", "line05", "line06", "line07", "line08",
+        "line09", "line10",
+      ]
+      .join("\n"),
+    )
+    .unwrap();
+
+    let package_json = dir.join("package.json");
+    let content = std::fs::read_to_string(&package_json)
+      .unwrap()
+      .replace(
+        r#""author":"Tester""#,
+        r#""author":"Tester","icon":{"type":"image","path":"ui/icon.png"},"banner":{"type":"text","path":"ui/banner.txt"}"#,
+      );
+    std::fs::write(package_json, content).unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+
+    let game = service.games().remove(0);
+    assert_eq!(
+      game.display.icon,
+      PackageAsset::Image {
+        path: "ui/icon.png".to_string()
+      }
+    );
+    let PackageAsset::Text { path, lines } = game.display.banner else {
+      panic!("banner should be parsed as text asset");
+    };
+    assert_eq!(path, "ui/banner.txt");
+    assert_eq!(lines.len(), 14);
+    assert_eq!(lines[0].trim_end(), "");
+    assert_eq!(lines[1].trim_end(), "");
+    assert_eq!(lines[2].trim(), "line00");
+    assert_eq!(lines[12].trim(), "line10");
+    assert!(
+      lines
+        .iter()
+        .all(|line| UnicodeWidthStr::width(line.as_str()) == 60)
+    );
+
+    let entry = service.mod_games().remove(0);
+    let icon_path = entry.icon_path.unwrap();
+    assert!(Path::new(&icon_path).ends_with(Path::new("assets").join("ui").join("icon.png")));
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn text_asset_normalizes_icon_to_four_lines_and_eight_columns() {
+    let lines = normalize_asset_text("abcdefghi\n中中中中中\nx", AssetShape::Icon);
+    assert_eq!(lines.len(), 4);
+    assert!(
+      lines
+        .iter()
+        .all(|line| UnicodeWidthStr::width(line.as_str()) == 8)
+    );
+    assert_eq!(lines[0], "        ");
+    assert_eq!(lines[1], "abcdefghi".chars().take(8).collect::<String>());
+    assert_eq!(lines[2], "中中中中");
+    assert_eq!(lines[3], "    x   ");
+  }
+
+  #[test]
+  fn rich_text_asset_lines_are_preserved_for_ui_clipping() {
+    let rich_line = "f%<fg:red>RICH</fg> + plain text that is longer than the icon width";
+    let lines = normalize_asset_text(&format!("{rich_line}\nx"), AssetShape::Icon);
+
+    assert_eq!(lines.len(), 4);
+    assert_eq!(lines[1], rich_line);
+    assert_eq!(lines[2], "    x   ");
+  }
+
+  #[test]
+  fn package_watcher_filters_first_level_package_json_only() {
+    let root = PathBuf::from("root/data/mod/game");
+    let roots = vec![root.clone()];
+
+    assert_eq!(
+      watched_package_dir(&roots, &root.join("alpha/package.json")),
+      Some(root.join("alpha"))
+    );
+    assert_eq!(
+      watched_package_dir(&roots, &root.join("alpha")),
+      Some(root.join("alpha"))
+    );
+    assert_eq!(
+      watched_package_dir(&roots, &root.join("alpha/nested/package.json")),
+      None
+    );
+    assert_eq!(
+      watched_package_dir(&roots, &root.join("alpha/nested")),
+      None
+    );
+    assert_eq!(
+      watched_package_dir(&roots, &root.join("alpha/readme.md")),
+      None
+    );
+  }
+
+  #[test]
+  fn watched_resource_files_map_back_to_package_dir() {
+    let root = PathBuf::from("root/data/mod/game");
+    let roots = vec![root.clone()];
+    let package_dir = root.join("alpha");
+    let files = vec![
+      package_dir.join("package.json"),
+      package_dir.join("assets/ui/icon.txt"),
+      package_dir.join("assets/language/zh_cn.json"),
+      root.join("beta/assets/language/zh_cn/display.json"),
+      root.join("package.json"),
+    ];
+
+    let watched = watched_file_package_dirs(&roots, files);
+
+    assert_eq!(
+      watched.get(&package_dir.join("assets/ui/icon.txt")),
+      Some(&package_dir)
+    );
+    assert_eq!(
+      watched.get(&package_dir.join("assets/language/zh_cn.json")),
+      Some(&package_dir)
+    );
+    assert_eq!(
+      watched.get(&root.join("beta/assets/language/zh_cn/display.json")),
+      Some(&root.join("beta"))
+    );
+    assert!(!watched.contains_key(&root.join("package.json")));
+  }
+
+  #[test]
+  fn scan_collects_manifest_asset_and_i18n_watch_files() {
+    let root = temp_root("watch_files");
+    write_game_manifest_only(&root, "data/mod/game", "watch_game", "@display/title");
+    let dir = root.join("data/mod/game/watch_game");
+    std::fs::create_dir_all(dir.join("assets/ui")).unwrap();
+    std::fs::write(dir.join("assets/ui/icon.txt"), "icon").unwrap();
+    write_package_language(
+      &root,
+      "data/mod/game",
+      "watch_game",
+      "zh_cn",
+      "display.json",
+      r#"{"title":"监听标题"}"#,
+    );
+    let package_json = dir.join("package.json");
+    let content = std::fs::read_to_string(&package_json).unwrap().replace(
+      r#""author":"Tester""#,
+      r#""author":"Tester","icon":{"type":"text","path":"ui/icon.txt"}"#,
+    );
+    std::fs::write(&package_json, content).unwrap();
+
+    let request = ScanRequest {
+      root: root.clone(),
+      language_code: "zh_cn".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+    let total = count_package_candidates(&request);
+    let report = scan_all_packages(&request, &mut |_| {}, total);
+    let files = report.watched_files;
+
+    assert!(files.contains(&package_json));
+    assert!(files.contains(&dir.join("assets/ui/icon.txt")));
+    assert!(files.contains(&dir.join("assets/language/zh_cn/display.json")));
+    assert!(files.contains(&dir.join("assets/language/en_us/display.json")));
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn missing_or_invalid_assets_fall_back_to_default_text_assets() {
+    let root = temp_root("default_assets");
+    write_game_manifest_only(
+      &root,
+      "data/mod/game",
+      "default_asset_game",
+      "Default Asset Game",
+    );
+    let dir = root.join("data/mod/game/default_asset_game");
+    let package_json = dir.join("package.json");
+    let content = std::fs::read_to_string(&package_json)
+      .unwrap()
+      .replace(
+        r#""author":"Tester""#,
+        r#""author":"Tester","icon":{"type":"image","path":"bad/icon.gif"},"banner":{"type":"text","path":"missing/banner.txt"}"#,
+      );
+    std::fs::write(package_json, content).unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+
+    let game = service.games().remove(0);
+    let PackageAsset::Text { lines: icon, .. } = game.display.icon else {
+      panic!("invalid icon should fall back to default text icon");
+    };
+    let PackageAsset::Text { lines: banner, .. } = game.display.banner else {
+      panic!("missing banner should fall back to default text banner");
+    };
+    assert_eq!(icon, default_icon_lines());
+    assert_eq!(banner.len(), 14);
+    assert!(
+      banner
+        .iter()
+        .all(|line| UnicodeWidthStr::width(line.as_str()) == 60)
+    );
+    assert!(service.mod_games()[0].icon_path.is_none());
 
     let _ = std::fs::remove_dir_all(root);
   }

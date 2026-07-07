@@ -12,6 +12,9 @@ pub(super) fn drain_engine_events(services: &mut EngineServices) -> Vec<PackageE
         let event = services
           .package
           .handle_async_event(event, &mut services.log);
+        if matches!(event, PackageEvent::WatchChanged { .. }) {
+          let _ = services.package.request_rescan(&services.async_runtime);
+        }
         package_events.push(event);
       }
       EngineEvent::File(_)

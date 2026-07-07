@@ -1,4 +1,4 @@
-use std::fs;
+use std::{collections::HashMap, fs};
 
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +13,63 @@ pub struct TerminalProfile {
   pub color: Option<String>,
 
   pub mouse: Option<bool>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PackageStateProfile {
+  #[serde(default)]
+  pub games: HashMap<String, GamePackageState>,
+
+  #[serde(default)]
+  pub screensavers: HashMap<String, ScreensaverPackageState>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GamePackageState {
+  #[serde(default = "default_enabled")]
+  pub enabled: bool,
+
+  #[serde(default)]
+  pub debug: bool,
+
+  #[serde(default = "default_safe_mode")]
+  pub safe_mode: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ScreensaverPackageState {
+  #[serde(default = "default_enabled")]
+  pub enabled: bool,
+
+  #[serde(default)]
+  pub debug: bool,
+}
+
+impl Default for GamePackageState {
+  fn default() -> Self {
+    Self {
+      enabled: true,
+      debug: false,
+      safe_mode: true,
+    }
+  }
+}
+
+impl Default for ScreensaverPackageState {
+  fn default() -> Self {
+    Self {
+      enabled: true,
+      debug: false,
+    }
+  }
+}
+
+fn default_enabled() -> bool {
+  true
+}
+
+fn default_safe_mode() -> bool {
+  true
 }
 
 impl Default for TerminalProfile {
@@ -91,5 +148,106 @@ impl StorageService {
     self
       .read_terminal_profile()
       .map_or(false, |p| p.is_complete())
+  }
+
+  pub fn read_package_state(&self) -> Option<PackageStateProfile> {
+    let content = fs::read_to_string(self.profile_package_state_path()).ok()?;
+    serde_json::from_str(&content).ok()
+  }
+
+  pub fn read_package_state_or_default(&self) -> PackageStateProfile {
+    self.read_package_state().unwrap_or_default()
+  }
+
+  pub fn write_package_state(&self, profile: &PackageStateProfile) -> std::io::Result<()> {
+    let json = serde_json::to_string_pretty(profile).unwrap_or_default();
+    fs::write(self.profile_package_state_path(), json)
+  }
+
+  pub fn update_game_package_state(
+    &self,
+    mod_id: &str,
+    f: impl FnOnce(&mut GamePackageState),
+  ) -> std::io::Result<()> {
+    let mut profile = self.read_package_state_or_default();
+    f(profile.games.entry(mod_id.to_string()).or_default());
+    self.write_package_state(&profile)
+  }
+
+  pub fn update_screensaver_package_state(
+    &self,
+    mod_id: &str,
+    f: impl FnOnce(&mut ScreensaverPackageState),
+  ) -> std::io::Result<()> {
+    let mut profile = self.read_package_state_or_default();
+    f(profile.screensavers.entry(mod_id.to_string()).or_default());
+    self.write_package_state(&profile)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn temp_storage(name: &str) -> StorageService {
+    let root = std::env::temp_dir().join(format!("tg_storage_{name}_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("data/profiles")).unwrap();
+    StorageService::from_root_for_test(root)
+  }
+
+  #[test]
+  fn missing_package_state_returns_default() {
+    let storage = temp_storage("missing_package_state");
+    assert_eq!(
+      storage.read_package_state_or_default(),
+      PackageStateProfile::default()
+    );
+  }
+
+  #[test]
+  fn package_state_persists_game_and_screensaver_independently() {
+    let storage = temp_storage("package_state_persists");
+
+    storage
+      .update_game_package_state("same_id", |state| {
+        state.enabled = false;
+        state.debug = true;
+        state.safe_mode = false;
+      })
+      .unwrap();
+    storage
+      .update_screensaver_package_state("same_id", |state| {
+        state.enabled = false;
+        state.debug = true;
+      })
+      .unwrap();
+
+    let profile = storage.read_package_state_or_default();
+    assert_eq!(
+      profile.games.get("same_id"),
+      Some(&GamePackageState {
+        enabled: false,
+        debug: true,
+        safe_mode: false,
+      })
+    );
+    assert_eq!(
+      profile.screensavers.get("same_id"),
+      Some(&ScreensaverPackageState {
+        enabled: false,
+        debug: true,
+      })
+    );
+  }
+
+  #[test]
+  fn invalid_package_state_json_falls_back_to_default() {
+    let storage = temp_storage("invalid_package_state");
+    fs::write(storage.profile_package_state_path(), "{").unwrap();
+    assert_eq!(
+      storage.read_package_state_or_default(),
+      PackageStateProfile::default()
+    );
   }
 }

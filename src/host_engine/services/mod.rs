@@ -8,6 +8,7 @@ mod host_object;
 mod i18n;
 mod image;
 mod input;
+mod input_method;
 mod layout;
 mod log;
 mod lua;
@@ -25,6 +26,7 @@ pub mod text_layout;
 mod time;
 mod ui;
 mod unicode;
+mod version;
 pub(crate) mod widget;
 
 pub use async_runtime::{
@@ -44,12 +46,13 @@ pub use input::{
   MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, ScrollDirection, SystemEvent,
   TerminalKeyCode, TerminalKeyEvent, translate_action_map,
 };
+pub use input_method::{ImPolicy, InputMethodService};
 pub use layout::{LayoutService, Rect, Size};
 pub use log::{LogService, LogSource};
 pub use lua::LuaService;
 pub use network::NetworkService;
 pub use overlay::OverlayService;
-pub use package::{PackageEvent, PackageListEntry, PackageService};
+pub use package::{PackageAsset, PackageEvent, PackageListEntry, PackageService};
 pub use random::RandomService;
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};
@@ -60,6 +63,7 @@ pub use text_layout::DrawTextParams;
 pub use time::TimeService;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
+pub use version::{HOST_API_VERSION, HOST_VERSION, PACKAGE_MANIFEST_VERSION};
 pub use widget::{
   DelayTimerEvent, DelayTimerId, DelayTimerOptions, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, Overflow, ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions,
@@ -90,6 +94,7 @@ pub struct EngineServices {
   pub progress_bar: ProgressBarService,
   pub slice: SliceService,
   pub input: InputService,
+  pub input_method: InputMethodService,
   pub ui: UiService,
   pub game: GameService,
   pub image: ImageService,
@@ -133,6 +138,7 @@ impl EngineServices {
       text_input: TextInputService::new(),
       package: PackageService::new(),
       input: InputService::new(),
+      input_method: InputMethodService::new(),
       ui: UiService::new(),
       game: GameService::new(),
       image: ImageService::new(Some(image_cache_dir)),

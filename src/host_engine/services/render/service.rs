@@ -377,33 +377,31 @@ impl RenderService {
     let lb_ch = custom.left_bottom.char.unwrap_or(' ');
     let l_ch = custom.left.char.unwrap_or(' ');
 
-    let fill_dp = DrawTextParams {
-      x: 0,
-      y: 0,
-      text: String::new(),
-      bg: fill_bg.clone(),
-      ..Default::default()
-    };
-
     self.draw_border_cell(canvas, target, x, y, lt_ch, &lt_s);
     self.draw_border_span(canvas, target, x.saturating_add(1), y, t_ch, mid_w, &t_s);
     self.draw_border_cell(canvas, target, x.saturating_add(width - 1), y, rt_ch, &rt_s);
 
-    let space_str: String = std::iter::repeat(' ').take(mid_w as usize).collect();
+    let fill_text = fill_bg.as_ref().map(|_| {
+      std::iter::repeat(' ')
+        .take(mid_w as usize)
+        .collect::<String>()
+    });
     for row in 1..=mid_h {
       let cy = y.saturating_add(row);
       self.draw_border_cell(canvas, target, x, cy, l_ch, &l_s);
-      self.draw_text_target(
-        canvas,
-        target,
-        &DrawTextParams {
-          x: x.saturating_add(1),
-          y: cy,
-          text: space_str.clone(),
-          bg: fill_dp.bg.clone(),
-          ..Default::default()
-        },
-      );
+      if let Some(fill_text) = &fill_text {
+        self.draw_text_target(
+          canvas,
+          target,
+          &DrawTextParams {
+            x: x.saturating_add(1),
+            y: cy,
+            text: fill_text.clone(),
+            bg: fill_bg.clone(),
+            ..Default::default()
+          },
+        );
+      }
       self.draw_border_cell(canvas, target, x.saturating_add(width - 1), cy, r_ch, &r_s);
     }
 

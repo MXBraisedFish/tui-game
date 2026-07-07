@@ -1,0 +1,12 @@
+{
+  "clear_warning.title": "Clear Data",
+  "clear_warning.description.data": "The f%data/ directory stores all core application data, including cache, mods, settings, logs, and other related files.\nClearing this directory will permanently remove all contents. Missing files and directories will be recreated automatically, but all historical data and personalized settings will be lost.\nIf you need to proceed, it is recommended to create a backup via <fg:bright_blue>[Settings -> Storage Management -> Export Data]</fg> first.\n<fg:red>This action cannot be undone!</fg>",
+  "clear_warning.description.cache": "The f%cache/ directory stores all cached assets.\nClearing this directory will permanently remove all contents. Missing files and directories will be recreated automatically, but all cached assets will be lost.\nIf you need to proceed, it is recommended to create a backup via <fg:bright_blue>[Settings -> Storage Management -> Export Data]</fg> first.\n<fg:red>This action cannot be undone!</fg>",
+  "clear_warning.description.log": "The f%log/ directory stores all application and script logs.\nClearing this directory will permanently remove all contents. Missing files and directories will be recreated automatically, but all historical logs will be lost.\nIf you need to proceed, it is recommended to create a backup via <fg:bright_blue>[Settings -> Storage Management -> Export Data]</fg> first.\n<fg:red>This action cannot be undone!</fg>",
+  "clear_warning.description.mod": "The f%mod/ directory stores all installed mods.\nClearing this directory will permanently remove all contents. Missing files and directories will be recreated automatically, but all installed mod data will be lost.\nIf you need to proceed, it is recommended to create a backup via <fg:bright_blue>[Settings -> Storage Management -> Export Data]</fg> first.\n<fg:red>This action cannot be undone!</fg>",
+  "clear_warning.description.profile": "The f%profile/ directory stores all settings files.\nClearing this directory will permanently remove all contents. Missing files and directories will be recreated automatically, but all saved settings and personal preferences will be lost.\nIf you need to proceed, it is recommended to create a backup via <fg:bright_blue>[Settings -> Storage Management -> Export Data]</fg> first.\n<fg:red>This action cannot be undone!</fg>",
+  "clear_warning.path": "Path:",
+  "clear_warning.yes": "{key:clear_warning.yes.temporary} Clear",
+  "clear_warning.no": "{key:clear_warning.no} Cancel",
+  "clear_warning.second": "s"
+}

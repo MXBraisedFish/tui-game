@@ -1,0 +1,10 @@
+{
+  "storage_management.title": "Storage Management",
+  "storage_management.view": "Storage Details",
+  "storage_management.clear": "Clear Data",
+  "storage_management.export": "Export Data",
+  "storage_management.action.select": "{key:storage_management.focus_up}/{key:storage_management.focus_down} Select",
+  "storage_management.action.confirm": "{key:storage_management.confirm} Confirm",
+  "storage_management.action.back": "{key:storage_management.back} Back",
+  "storage_management.action.focus": "{key:storage_management.focus_view}/{key:storage_management.focus_clear}/{key:storage_management.focus_export} Focus"
+}

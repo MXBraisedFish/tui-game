@@ -86,6 +86,23 @@ impl TerminalService {
     &self.capabilities
   }
 
+  pub fn apply_capability_profile(
+    &mut self,
+    unicode: Option<bool>,
+    color: Option<&str>,
+    mouse: Option<bool>,
+  ) {
+    if let Some(unicode) = unicode {
+      self.capabilities.unicode = unicode;
+    }
+    if let Some(color) = color {
+      self.capabilities.truecolor = color == "truecolor";
+    }
+    if let Some(mouse) = mouse {
+      self.capabilities.mouse = mouse;
+    }
+  }
+
   /// 进入终端原始模式（启用交替屏幕、鼠标捕获和焦点事件）
   pub fn enter(&mut self, services: &mut LogService) {
     if self.surface.is_some() {
@@ -146,5 +163,21 @@ impl TerminalService {
     let _ = stdout.flush();
 
     let _ = io::stderr().flush();
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn capability_profile_updates_runtime_capabilities() {
+    let mut terminal = TerminalService::new();
+
+    terminal.apply_capability_profile(Some(false), Some("truecolor"), Some(true));
+
+    assert!(!terminal.capabilities().unicode);
+    assert!(terminal.capabilities().truecolor);
+    assert!(terminal.capabilities().mouse);
   }
 }

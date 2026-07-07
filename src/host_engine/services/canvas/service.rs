@@ -107,12 +107,14 @@ impl CanvasService {
     let size = layout.developer_size();
     if self.base.width() != size.width || self.base.height() != size.height {
       self.base.resize(size.width, size.height);
+      self.force_full_redraw = true;
     } else {
       self.base.clear();
     }
     if self.active_pool != Some(pool.id()) {
       self.slices.clear();
       self.scroll_boxes.clear();
+      self.force_full_redraw = true;
     }
     self.active_pool = Some(pool.id());
     self.surface_order = pool.surfaces.clone();
@@ -151,6 +153,7 @@ impl CanvasService {
     });
     if prepared.buffer.width() != rect.width || prepared.buffer.height() != rect.height {
       prepared.buffer.resize(rect.width, rect.height);
+      self.force_full_redraw = true;
     } else {
       prepared.buffer.clear();
     }
@@ -198,6 +201,7 @@ impl CanvasService {
       prepared
         .buffer
         .resize(content_size.width, content_size.height);
+      self.force_full_redraw = true;
     } else {
       prepared.buffer.clear();
     }
@@ -762,6 +766,23 @@ mod tests {
     assert_eq!(visible_row(&canvas, 1), "d");
     assert_eq!(visible_row(&canvas, 2), "efg");
     assert_eq!(visible_row(&canvas, 3), "h");
+  }
+
+  #[test]
+  fn auto_wrap_draws_multiline_rich_image_text() {
+    let mut canvas = CanvasService::new();
+    canvas.text(&DrawTextParams {
+      x: 0,
+      y: 0,
+      text: "f%<bg:#111111><fg:#eeeeee>▅▅▅▅\n<bg:#222222><fg:#dddddd>▅▅▅▅".to_string(),
+      wrap_mode: TextWrapMode::Auto,
+      max_width: Some(4),
+      max_height: Some(2),
+      ..Default::default()
+    });
+
+    assert_eq!(visible_row(&canvas, 0), "▅▅▅▅");
+    assert_eq!(visible_row(&canvas, 1), "▅▅▅▅");
   }
 
   #[test]

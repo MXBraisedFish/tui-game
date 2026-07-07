@@ -1,0 +1,17 @@
+{
+  "storage_management_view.title": "存储详情",
+  "storage_management_view.name": "存储内容",
+  "storage_management_view.size": "占用大小",
+  "storage_management_view.path": "存储路径",
+  "storage_management_view.name.root": "程序根目录",
+  "storage_management_view.name.data": "数据目录",
+  "storage_management_view.name.cache": "缓存目录",
+  "storage_management_view.name.log": "日志目录",
+  "storage_management_view.name.profile": "配置目录",
+  "storage_management_view.name.mod": "模组目录",
+  "storage_management_view.size.k": "KB",
+  "storage_management_view.size.m": "MB",
+  "storage_management_view.size.g": "GB",
+  "storage_management_view.tip": "占用大小按照 1024 进制计算",
+  "storage_management_view.action.back": "{key:storage_management_view.back} 返回"
+}

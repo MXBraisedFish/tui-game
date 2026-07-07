@@ -37,6 +37,10 @@ impl StorageService {
     self.path(layout::PROFILE_TERMINAL_FILE)
   }
 
+  pub fn profile_package_state_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_PACKAGE_STATE_FILE)
+  }
+
   pub fn language_assets_root_path(&self) -> PathBuf {
     self.path(layout::ASSETS_LANGUAGE_DIR)
   }
@@ -63,6 +67,13 @@ impl StorageService {
     self
       .language_package_path(language_code)
       .join("language.json")
+  }
+}
+
+#[cfg(test)]
+impl StorageService {
+  pub(crate) fn from_root_for_test(root_dir: PathBuf) -> Self {
+    Self { root_dir }
   }
 }
 

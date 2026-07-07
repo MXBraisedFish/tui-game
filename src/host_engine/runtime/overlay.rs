@@ -2,6 +2,8 @@ use super::*;
 
 pub(super) fn manage_window_size_overlay(services: &EngineServices, world: &mut RuntimeWorld) {
   let term = services.layout.physical_size();
+  let (min_w, min_h) = get_min_window_size(world);
+  let too_small = (term.width as u32) < min_w || (term.height as u32) < min_h;
 
   match world.state.current_overlay_kind() {
     Some(OverlayKind::WindowSizeWarning) => {
@@ -10,15 +12,14 @@ pub(super) fn manage_window_size_overlay(services: &EngineServices, world: &mut 
         let req_w = overlay.render.required_width as u16;
         let req_h = overlay.render.required_height as u16;
         if term.width >= req_w && term.height >= req_h {
-          world.state.pop_overlay();
+          world
+            .state
+            .remove_overlay_kind(OverlayKind::WindowSizeWarning);
         }
       }
     }
-    None => {
-      let (min_w, min_h) = get_min_window_size(world);
-      if (term.width as u32) < min_w || (term.height as u32) < min_h {
-        world.state.push_window_size_overlay(min_w, min_h);
-      }
+    _ if too_small => {
+      world.state.push_window_size_overlay(min_w, min_h);
     }
     _ => {}
   }

@@ -24,15 +24,11 @@ pub const ASSETS_DIR: &str = "assets";
 
 pub const ASSETS_LANGUAGE_DIR: &str = "assets/language";
 
-pub const GAME_SCAN_CACHE_FILE: &str = "data/cache/game_scan_cache.json";
-
-pub const SCREENSAVER_SCAN_CACHE_FILE: &str = "data/cache/screensaver_scan_cache.json";
-
-pub const LANGUAGE_UI_CACHE_FILE: &str = "data/cache/language_ui_cache.json";
-
 pub const PROFILE_LANGUAGE_FILE: &str = "data/profiles/language.txt";
 
 pub const PROFILE_TERMINAL_FILE: &str = "data/profiles/terminal_profile.json";
+
+pub const PROFILE_PACKAGE_STATE_FILE: &str = "data/profiles/package_state.json";
 
 pub const TUI_LOG_FILE: &str = "data/log/tui_log.txt";
 
@@ -57,12 +53,13 @@ pub const REQUIRED_DIRECTORIES: &[&str] = &[
 ];
 
 pub const DEFAULT_FILES: &[(&str, &str)] = &[
-  (GAME_SCAN_CACHE_FILE, "{}"),
-  (SCREENSAVER_SCAN_CACHE_FILE, "{}"),
-  (LANGUAGE_UI_CACHE_FILE, "{}"),
   (
     PROFILE_TERMINAL_FILE,
     r#"{"unicode":null,"color":null,"mouse":null}"#,
+  ),
+  (
+    PROFILE_PACKAGE_STATE_FILE,
+    r#"{"games":{},"screensavers":{}}"#,
   ),
   (TUI_LOG_FILE, ""),
   (LANGUAGE_REGISTRY_FILE, "{}"),

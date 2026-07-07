@@ -39,6 +39,7 @@ pub(super) fn deactivate_hidden_pools(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
+  safe_mode_warning_ui: &mut SafeModeWarningUi,
 ) {
   let active = world
     .state
@@ -70,6 +71,14 @@ pub(super) fn deactivate_hidden_pools(
       .text_input
       .deactivate_pool(window_size_ui.objects_mut());
     services.hit_area.deactivate(window_size_ui.objects_mut());
+  }
+  if world.state.current_overlay_kind() != Some(OverlayKind::SafeModeWarning) {
+    services
+      .text_input
+      .deactivate_pool(safe_mode_warning_ui.objects_mut());
+    services
+      .hit_area
+      .deactivate(safe_mode_warning_ui.objects_mut());
   }
 }
 
@@ -167,11 +176,25 @@ pub(super) fn route_input_events(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
+  safe_mode_warning_ui: &mut SafeModeWarningUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
 ) {
   if world.state.current_overlay_kind().is_some() {
-    route_window_size_overlay_events(services, world, window_size_ui);
+    match world.state.current_overlay_kind() {
+      Some(OverlayKind::WindowSizeWarning) => {
+        route_window_size_overlay_events(services, world, window_size_ui);
+      }
+      Some(OverlayKind::SafeModeWarning) => {
+        route_safe_mode_warning_overlay_events(
+          services,
+          world,
+          game_package_ui,
+          safe_mode_warning_ui,
+        );
+      }
+      _ => {}
+    }
     return;
   }
 
@@ -285,12 +308,15 @@ pub(super) fn route_update(
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
+  safe_mode_warning_ui: &mut SafeModeWarningUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
 ) {
   if world.state.current_overlay_kind().is_some() {
     if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
       language_loading_ui.update(&services.time, world.clock.delta_time());
+    } else if world.state.current_overlay_kind() == Some(OverlayKind::SafeModeWarning) {
+      safe_mode_warning_ui.update(world.clock.delta_time());
     }
     return;
   }
@@ -377,6 +403,45 @@ fn route_window_size_overlay_events(
     }
     if world.is_stopped() {
       break;
+    }
+  }
+}
+
+fn route_safe_mode_warning_overlay_events(
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+  game_package_ui: &mut GamePackageUi,
+  safe_mode_warning_ui: &mut SafeModeWarningUi,
+) {
+  while services.input.next_action_event().is_some() {}
+  if let Some(command) = safe_mode_warning_ui.handle_raw_key_events(&mut services.input) {
+    safe_mode_warning_ui.start();
+    apply_safe_mode_warning_command(command, game_package_ui, services, world);
+    return;
+  }
+  for sys_event in services.input.drain_system_events() {
+    match sys_event {
+      SystemEvent::Mouse(mouse) => {
+        services.hit_area.route_mouse_event(
+          safe_mode_warning_ui.objects_mut(),
+          &mut services.text_input,
+          &services.canvas,
+          mouse,
+        );
+      }
+      SystemEvent::Focus(focus) if !focus.gained => {
+        services
+          .hit_area
+          .focus_lost(safe_mode_warning_ui.objects_mut());
+      }
+      _ => {}
+    }
+    while let Some(event) = safe_mode_warning_ui.objects_mut().pop_event() {
+      if let Some(command) = safe_mode_warning_ui.handle_event(&event) {
+        safe_mode_warning_ui.start();
+        apply_safe_mode_warning_command(command, game_package_ui, services, world);
+        return;
+      }
     }
   }
 }

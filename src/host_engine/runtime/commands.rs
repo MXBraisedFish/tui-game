@@ -82,10 +82,58 @@ pub(super) fn apply_game_package_command(
     GamePackageCommand::BlurSearch => game_package_ui.blur_search(&mut services.text_input),
     GamePackageCommand::FocusJump => game_package_ui.focus_jump(&mut services.text_input),
     GamePackageCommand::BlurJump => game_package_ui.blur_jump(&mut services.text_input),
+    GamePackageCommand::ScrollInfoUp => {
+      game_package_ui.scroll_info(&services.scroll_box, &services.layout, -3);
+    }
+    GamePackageCommand::ScrollInfoDown => {
+      game_package_ui.scroll_info(&services.scroll_box, &services.layout, 3);
+    }
     GamePackageCommand::SubmitJump(value) => {
       game_package_ui.submit_jump(&mut services.text_input, value);
     }
+    GamePackageCommand::ToggleEnabled => {
+      game_package_ui.toggle_selected_enabled(&services.storage);
+    }
+    GamePackageCommand::ToggleDebug => {
+      game_package_ui.toggle_selected_debug(&services.storage);
+    }
+    GamePackageCommand::RequestToggleSafeMode => {
+      if game_package_ui.selected_safe_mode().unwrap_or(true) {
+        world.state.push_safe_mode_warning_overlay();
+      } else {
+        if let Some(mod_id) = game_package_ui.selected_mod_id() {
+          world.temporary_safe_mode_disabled.remove(&mod_id);
+        }
+        game_package_ui.enable_selected_safe_mode(&services.storage);
+      }
+    }
   }
+}
+
+pub(super) fn apply_safe_mode_warning_command(
+  command: SafeModeWarningCommand,
+  game_package_ui: &mut GamePackageUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    SafeModeWarningCommand::Cancel => {}
+    SafeModeWarningCommand::DisableTemporary => {
+      if let Some(mod_id) = game_package_ui.selected_mod_id() {
+        world.temporary_safe_mode_disabled.insert(mod_id);
+      }
+      game_package_ui.disable_selected_safe_mode_temporary();
+    }
+    SafeModeWarningCommand::DisablePermanent => {
+      if let Some(mod_id) = game_package_ui.selected_mod_id() {
+        world.temporary_safe_mode_disabled.remove(&mod_id);
+      }
+      game_package_ui.disable_selected_safe_mode_permanent(&services.storage);
+    }
+  }
+  let _ = world
+    .state
+    .remove_overlay_kind(OverlayKind::SafeModeWarning);
 }
 
 pub(super) fn apply_screensaver_package_command(
@@ -111,8 +159,20 @@ pub(super) fn apply_screensaver_package_command(
     ScreensaverPackageCommand::BlurJump => {
       screensaver_package_ui.blur_jump(&mut services.text_input);
     }
+    ScreensaverPackageCommand::ScrollInfoUp => {
+      screensaver_package_ui.scroll_info(&services.scroll_box, &services.layout, -3);
+    }
+    ScreensaverPackageCommand::ScrollInfoDown => {
+      screensaver_package_ui.scroll_info(&services.scroll_box, &services.layout, 3);
+    }
     ScreensaverPackageCommand::SubmitJump(value) => {
       screensaver_package_ui.submit_jump(&mut services.text_input, value);
+    }
+    ScreensaverPackageCommand::ToggleEnabled => {
+      screensaver_package_ui.toggle_selected_enabled(&services.storage);
+    }
+    ScreensaverPackageCommand::ToggleDebug => {
+      screensaver_package_ui.toggle_selected_debug(&services.storage);
     }
   }
 }
@@ -162,12 +222,14 @@ pub(super) fn apply_terminal_check_command(
   match command {
     TerminalCheckCommand::Next => {
       terminal_check_ui.persist_current_step(&mut services.storage);
+      sync_terminal_capabilities_from_profile(services);
       terminal_check_ui.advance_step();
     }
     TerminalCheckCommand::Done { mouse } => {
       let _ = services.storage.update_terminal_profile(|p| {
         p.mouse = Some(mouse);
       });
+      sync_terminal_capabilities_from_profile(services);
       world.state.pop_ui_node();
     }
     TerminalCheckCommand::Exit => {
@@ -177,6 +239,15 @@ pub(super) fn apply_terminal_check_command(
       set_crash_phase(world.state.crash_phase());
     }
   }
+}
+
+fn sync_terminal_capabilities_from_profile(services: &mut EngineServices) {
+  let profile = services.storage.read_terminal_profile_or_default();
+  services.terminal.apply_capability_profile(
+    profile.unicode,
+    profile.color.as_deref(),
+    profile.mouse,
+  );
 }
 
 pub(super) fn apply_language_loading_package_events(

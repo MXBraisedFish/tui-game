@@ -1,0 +1,10 @@
+{
+  "storage_management.title": "存储管理",
+  "storage_management.view": "存储详情",
+  "storage_management.clear": "清理数据",
+  "storage_management.export": "导出数据",
+  "storage_management.action.select": "{key:storage_management.focus_up}/{key:storage_management.focus_down} 选择",
+  "storage_management.action.confirm": "{key:storage_management.confirm} 确认",
+  "storage_management.action.back": "{key:storage_management.back} 返回",
+  "storage_management.action.focus": "{key:storage_management.focus_view}/{key:storage_management.focus_clear}/{key:storage_management.focus_export} 聚焦"
+}

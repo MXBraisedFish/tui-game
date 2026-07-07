@@ -1,5 +1,5 @@
 {
-  "window_size.title": "Terminal Size Warning",
+  "window_size.title": "Terminal Too Small",
   "window_size.current": "Current Size: ",
   "window_size.required": "Required Size: ",
   "window_size.tip": "Resize your terminal to the required size.",

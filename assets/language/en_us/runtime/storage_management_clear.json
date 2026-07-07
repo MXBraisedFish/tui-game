@@ -1,0 +1,11 @@
+{
+  "storage_management_clear.title": "Clear Data",
+  "storage_management.clear.cache": "Clear Cache",
+  "storage_management.clear.log": "Clear Logs",
+  "storage_management.clear.mod": "Remove Mods",
+  "storage_management.clear.profile": "Reset Settings",
+  "storage_management.clear.data": "Reset Data",
+  "storage_management_clear.action.select": "{key:storage_management_clear.focus_up}/{key:storage_management_clear.focus_down} Select",
+  "storage_management_clear.action.focus": "{key:storage_management_clear.focus_cache}/{key:storage_management_clear.focus_log}/{key:storage_management_clear.focus_mod}/{key:storage_management_clear.focus_profile}/{key:storage_management_clear.focus_data} Focus",
+  "storage_management_clear.action.back": "{key:storage_management_clear.back} Back"
+}

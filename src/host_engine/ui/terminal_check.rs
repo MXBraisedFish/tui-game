@@ -530,7 +530,7 @@ impl TerminalCheckUi {
           y,
           " ",
           TextStyle {
-            background: Some(TextColor::Rgb { r, g, b }),
+            background: Some(TextColor::ForceRgb { r, g, b }),
             ..Default::default()
           },
         );

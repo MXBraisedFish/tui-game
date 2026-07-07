@@ -14,6 +14,7 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "window_size",
   "language_warning",
   "language_loading",
+  "safe_mode_warning",
   "game_pack",
   "screensaver_pack",
 ];

@@ -18,6 +18,7 @@ pub struct TextStyle {
 pub enum TextColor {
   Terminal(TerminalColor),
   Rgb { r: u8, g: u8, b: u8 },
+  ForceRgb { r: u8, g: u8, b: u8 },
 
   Transparent,
 }
