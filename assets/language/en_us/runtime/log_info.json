@@ -1,0 +1,68 @@
+{
+  "_comment": "Log message templates. {err} = dynamic error detail from the system.",
+
+  "log_info.storage.dir_create_fatal": "Critical directory creation failed: {path} {err}",
+  "log_info.storage.root_fallback_warn": "Could not resolve root directory, falling back to '.'",
+  "log_info.storage.read_failed": "Failed to read {file}: {err}",
+  "log_info.storage.parse_failed": "Failed to parse {file} JSON: {err}",
+  "log_info.storage.serialize_failed": "Failed to serialize {file}: {err}",
+  "log_info.storage.clear_failed": "Failed to clear storage target {target}: {err}",
+  "log_info.storage.export_source_missing": "Export source directory does not exist: {path}",
+  "log_info.storage.export_complete": "Export completed: {path}",
+  "log_info.storage.export_failed": "Export failed: {err}",
+
+  "log_info.terminal.enter_failed": "Failed to enter terminal raw mode: {err}",
+  "log_info.terminal.restore_warn": "Terminal restore may have failed — screen may be in raw mode",
+
+  "log_info.input.key_listener_failed": "Global key listener failed to start: {err}",
+  "log_info.input.channel_disconnected": "{channel} event channel disconnected",
+  "log_info.input.event_poll_failed": "Event poll error: {err}",
+  "log_info.input.clipboard_failed": "Clipboard operation failed",
+
+  "log_info.input_method.switch_failed": "IME switch failed: {err}",
+  "log_info.input_method.drop_restore_failed": "IME drop restore failed: {err}",
+
+  "log_info.boot.language_fallback": "Saved language '{code}' invalid (registry={in_reg}, available={avail}), will re-select",
+  "log_info.boot.profile_read_warn": "Terminal profile read failed, using defaults",
+  "log_info.boot.rescan_failed": "Package rescan request failed: {err}",
+  "log_info.boot.prepare_start": "Preparing engine...",
+  "log_info.boot.prepare_package_scan": "Preparing package scan...",
+  "log_info.boot.package_scan_scheduled": "Package scan scheduled.",
+  "log_info.boot.storage_root": "Storage root: {path}",
+
+  "log_info.engine.task_failed": "Async task {id} failed: {err}",
+  "log_info.engine.thread_spawn_fatal": "Failed to spawn worker thread — OS resource exhaustion",
+  "log_info.engine.channel_send_failed": "Task channel disconnected — workers may have crashed",
+  "log_info.engine.mutex_poisoned": "Mutex poisoned — a previous task panicked",
+
+  "log_info.render.present_failed": "Frame presentation failed: {err}",
+  "log_info.render.terminal_size_fallback": "Terminal size query failed, using fallback 95x24",
+  "log_info.render.writer_missing": "Terminal writer is missing (headless mode) — rendering skipped",
+
+  "log_info.package.nameless_entry": "Directory entry with no file name — skipped",
+  "log_info.package.i18n_unresolved": "Unresolved i18n key in package: {key}",
+  "log_info.package.i18n_parse_failed": "Failed to parse package i18n JSON: {path}",
+  "log_info.package.asset_missing": "Package asset file missing or unreadable: {path}",
+  "log_info.package.asset_path_rejected": "Package asset path rejected (traversal): {path}",
+  "log_info.package.json_parse_failed": "Failed to parse package.json: {err}",
+
+  "log_info.lua.eval_failed": "Lua eval error: {err}",
+  "log_info.lua.sandbox_failed": "Failed to sandbox global '{name}': {err}",
+  "log_info.lua.vm_init_fatal": "Failed to create sandboxed Lua VM",
+
+  "log_info.i18n.language_not_available": "Language package '{code}' not available",
+  "log_info.i18n.all_disk_loads_failed": "All disk language loads failed, falling back to embedded en_us",
+  "log_info.i18n.embedded_fallback_empty": "Embedded language fallback for '{code}' is empty!",
+  "log_info.i18n.registry_parse_failed": "Failed to parse language registry: {err}",
+  "log_info.i18n.namespace_load_failed": "Failed to load i18n namespace '{ns}': {err}",
+
+  "log_info.crash.panic_hook": "Panic occurred during {phase} phase.",
+  "log_info.crash.write_failed": "Failed to write crash log",
+
+  "log_info.ui.clipboard_write_failed": "Clipboard write failed: {err}",
+  "log_info.ui.scrollbar_char_replaced": "Invalid scrollbar character replaced with default",
+  "log_info.ui.progress_char_rejected": "Non-single-width progress bar character rejected",
+
+  "log_info.game.already_running": "Game start called while session already running",
+  "log_info.overlay.already_active": "Overlay start called while already active"
+}

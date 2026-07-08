@@ -21,6 +21,7 @@ impl OverlayService {
 
   /// 启动指定包的屏保覆盖层
   pub fn start(&mut self, package_uid: &str) {
+    // TODO: log warn when start() called while already active
     self.active_screensaver_uid = Some(package_uid.to_string());
     self.state = OverlaySessionState::Running;
   }

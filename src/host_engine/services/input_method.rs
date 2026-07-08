@@ -137,6 +137,7 @@ impl InputMethodService {
     }
 
     let Some(ascii_im) = self.ascii_im.clone() else {
+      // TODO: add log warn when LogService is available
       self.last_error = Some("ASCII input method is unavailable".to_string());
       return false;
     };
@@ -145,6 +146,7 @@ impl InputMethodService {
       Ok(current) if current == ascii_im => true,
       Ok(_) => self.set_ascii_input_method(&ascii_im),
       Err(err) => {
+        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to get current input method: {err}"));
         false
       }
@@ -173,6 +175,7 @@ impl InputMethodService {
     }
 
     let Some(ascii_im) = self.ascii_im.clone() else {
+      // TODO: add log warn when LogService is available
       self.last_error = Some("ASCII input method is unavailable".to_string());
       return false;
     };
@@ -180,6 +183,7 @@ impl InputMethodService {
     let current = match self.backend.get_input_method() {
       Ok(current) => current,
       Err(err) => {
+        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to get current input method: {err}"));
         return false;
       }
@@ -224,6 +228,7 @@ impl InputMethodService {
       if let Err(err) = self.backend.set_input_method(&saved) {
         self.saved_im = Some(saved);
         self.saved_ime_state = saved_ime_state;
+        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to restore input method: {err}"));
         return false;
       }
@@ -232,6 +237,7 @@ impl InputMethodService {
     if let Some(saved_ime_state) = saved_ime_state {
       if let Err(err) = self.backend.set_ime_state(saved_ime_state) {
         self.saved_ime_state = Some(saved_ime_state);
+        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to restore IME state: {err}"));
         false
       } else {
@@ -255,6 +261,7 @@ impl InputMethodService {
         true
       }
       Err(err) => {
+        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to switch to ASCII input method: {err}"));
         false
       }
@@ -266,12 +273,14 @@ impl InputMethodService {
       Ok(Some(true)) => match self.backend.set_ime_state(false) {
         Ok(()) => true,
         Err(err) => {
+          // TODO: add log warn when LogService is available
           self.last_error = Some(format!("failed to close IME: {err}"));
           false
         }
       },
       Ok(Some(false)) | Ok(None) => true,
       Err(err) => {
+        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to get IME state: {err}"));
         false
       }
@@ -287,7 +296,12 @@ impl Default for InputMethodService {
 
 impl Drop for InputMethodService {
   fn drop(&mut self) {
-    let _ = self.release_input_method();
+    // TODO: add log warn when LogService is available
+    if !self.release_input_method() {
+      if let Some(ref err) = self.last_error {
+        eprintln!("[InputMethodService] drop restore failed: {err}");
+      }
+    }
   }
 }
 

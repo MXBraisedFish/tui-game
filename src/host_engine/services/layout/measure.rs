@@ -38,7 +38,10 @@ pub fn get_draw_text_height(params: &DrawTextParams) -> u16 {
 
 /// 获取当前终端尺寸
 pub fn get_terminal_size() -> Size {
-  let (width, height) = crossterm::terminal::size().unwrap_or((95, 24));
+  let (width, height) = crossterm::terminal::size().unwrap_or_else(|_e| {
+    // TODO: log warn when terminal size query fails — fallback to (95, 24)
+    (95, 24)
+  });
   Size { width, height }
 }
 

@@ -1,0 +1,19 @@
+{
+  "security_settings.title": "安全设置",
+  "security_settings.security_details": "安全详情",
+  "security_settings.mod.reset.status": "重置全部模组状态为关闭",
+  "security_settings.mod.reset.debug": "重置全部模组调试为关闭",
+  "security_settings.mod.reset.safe_mode": "重置全部模组安全模式为打开",
+  "security_settings.mod.default.status": "模组状态默认值",
+  "security_settings.mod.default.debug": "模组调试默认值",
+  "security_settings.mod.default.safe_mode": "模组安全模式默认值",
+  "security_settings.reset.status.off": "禁用",
+  "security_settings.reset.status.on": "启用",
+  "security_settings.reset.debug.off": "关闭",
+  "security_settings.reset.debug.on": "开启",
+  "security_settings.reset.safe_mode.on": "开启",
+  "security_settings.reset.safe_mode.off.temporary": "关闭（仅本次运行）",
+  "security_settings.reset.safe_mode.off.permanent": "关闭（永久）",
+  "security_settings.reset.success": "重置成功",
+  "security_settings.reset.fail": "重置失败"
+}

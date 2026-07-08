@@ -14,12 +14,14 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "window_size",
   "language_warning",
   "language_loading",
+  "export_loading",
   "safe_mode_warning",
   "storage_management",
   "storage_management_view",
   "storage_management_clear",
   "storage_management_export",
   "clear_warning",
+  "log",
   "export_settings",
   "game_pack",
   "screensaver_pack",
@@ -57,6 +59,14 @@ impl I18nService {
       "All disk language loads failed, falling back to embedded en_us".to_string(),
     );
     self.load_embedded_fallback();
+
+    if self.is_runtime_empty() {
+      log.error(
+        LogSource::I18n,
+        format!("Embedded language fallback for '{}' is empty!", fallback),
+      );
+    }
+
     self.set_current_language(fallback);
   }
 

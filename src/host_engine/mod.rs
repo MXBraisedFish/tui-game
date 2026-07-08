@@ -24,7 +24,8 @@ pub fn run() {
   let mut services = boot_output.services;
   let mut world = boot_output.world;
 
-  match services.lua.eval("return 'Lua VM active'") {
+  let eval_result = services.lua.eval("return 'Lua VM active'", &mut services.log);
+  match eval_result {
     Ok(result) => services
       .log
       .info(LogSource::Boot, &format!("[Boot] Lua: {result}")),

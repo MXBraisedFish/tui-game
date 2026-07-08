@@ -32,6 +32,11 @@ impl I18nService {
     self.runtime_texts.clear();
   }
 
+  /// 检查运行时文本是否为空
+  pub fn is_runtime_empty(&self) -> bool {
+    self.runtime_texts.is_empty()
+  }
+
   pub fn insert_runtime_namespace(
     &mut self,
     namespace: impl Into<String>,

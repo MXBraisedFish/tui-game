@@ -5,7 +5,7 @@ use std::{
 
 use super::bootstrap::ensure_storage_layout;
 use super::layout;
-use crate::host_engine::services::LogService;
+use crate::host_engine::services::{LogService, LogSource};
 
 /// 存储服务：管理应用根目录，提供各子路径的构建方法，并在初始化时确保目录结构存在。
 pub struct StorageService {
@@ -14,7 +14,7 @@ pub struct StorageService {
 
 impl StorageService {
   pub fn new(log: &mut LogService) -> Self {
-    let root_dir = resolve_root_dir();
+    let root_dir = resolve_root_dir(log);
 
     let service = Self { root_dir };
 
@@ -37,6 +37,10 @@ impl StorageService {
 
   pub fn log_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_LOG_DIR)
+  }
+
+  pub fn tui_log_path(&self) -> PathBuf {
+    self.path(layout::TUI_LOG_FILE)
   }
 
   pub fn mod_dir_path(&self) -> PathBuf {
@@ -123,7 +127,7 @@ impl StorageService {
 }
 
 // 自动探测应用根目录：依次尝试当前目录、可执行文件目录。
-fn resolve_root_dir() -> PathBuf {
+fn resolve_root_dir(log: &mut LogService) -> PathBuf {
   if let Ok(current_dir) = std::env::current_dir() {
     if current_dir.join("assets").exists() || current_dir.join("Cargo.toml").exists() {
       return current_dir;
@@ -134,5 +138,9 @@ fn resolve_root_dir() -> PathBuf {
       return exe_dir.to_path_buf();
     }
   }
+  log.warn(
+    LogSource::Boot,
+    "Could not resolve root directory, falling back to '.'",
+  );
   PathBuf::from(".")
 }

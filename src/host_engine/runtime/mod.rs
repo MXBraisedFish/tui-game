@@ -16,13 +16,14 @@ use router::*;
 use crate::host_engine::core::state_machine::{
   HostState, MainHostState, OverlayKind, UiNodeKind, UiNodeState,
 };
-use crate::host_engine::core::{set_crash_phase, ExitState, FrameScheduler, RuntimeWorld};
+use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
 use crate::host_engine::services::{
-  translate_action_map, EngineServices, HostAreaKind, ImPolicy, LogSource, PackageEvent,
+  EngineServices, HostAreaKind, ImPolicy, LogSource, PackageEvent, TaskId, translate_action_map,
 };
 use crate::host_engine::ui::{
-  ClearWarningCommand, ClearWarningTarget, ClearWarningUi, GamePackageCommand, GamePackageUi,
-  HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
+  ClearWarningCommand, ClearWarningTarget, ClearWarningUi, ExportFormat, ExportLoadingUi,
+  ExportSettingsCommand, ExportSettingsUi, ExportType, GamePackageCommand, GamePackageUi, HomeUi,
+  HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
   LanguageSelectUi, ModsCommand, ModsUi, SafeModeWarningCommand, SafeModeWarningUi,
   ScreensaverPackageCommand, ScreensaverPackageUi, SettingsUi, SettingsUiCommand,
   StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
@@ -36,6 +37,12 @@ pub(super) struct LanguageLoadingRuntime {
   active: bool,
   pending_language: Option<String>,
   enter_terminal_check_after_finish: bool,
+}
+
+#[derive(Default)]
+pub(super) struct ExportLoadingRuntime {
+  active: bool,
+  task_id: Option<TaskId>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,14 +125,25 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     InputDemoUi::init(&services.hit_area, &services.slice, &services.scroll_box);
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
   let mut language_loading_ui = LanguageLoadingUi::init(&services.progress_bar, &services.time);
+  let mut export_loading_ui = ExportLoadingUi::init(&services.progress_bar, &services.time);
   let mut safe_mode_warning_ui = SafeModeWarningUi::init(&services.hit_area);
   let mut clear_warning_ui = ClearWarningUi::init(&services.hit_area);
+  let mut export_settings_ui = ExportSettingsUi::init(&services.hit_area, &services.text_input);
   let mut language_loading = LanguageLoadingRuntime::default();
+  let mut export_loading = ExportLoadingRuntime::default();
   let mut input_mode_scope = None;
 
-  if services.storage.read_language_code().is_none() && language_select_ui.is_some() {
+  if services
+    .storage
+    .read_language_code(&mut services.log)
+    .is_none()
+    && language_select_ui.is_some()
+  {
     world.state.enter_ui_node(UiNodeState::language_select());
-  } else if !services.storage.is_terminal_profile_complete() {
+  } else if !services
+    .storage
+    .is_terminal_profile_complete(&mut services.log)
+  {
     world.state.enter_ui_node(UiNodeState::terminal_check());
   }
 
@@ -140,14 +158,21 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services
       .engine_events
       .extend(services.async_runtime.poll_events());
-    let package_events = drain_engine_events(services);
+    let engine_events = drain_engine_events(services);
 
     services.input.begin_frame();
     services.input.poll();
     apply_language_loading_package_events(
-      &package_events,
+      &engine_events.package,
       &mut language_loading,
       &mut language_loading_ui,
+      services,
+      world,
+    );
+    apply_export_loading_events(
+      &engine_events.export,
+      &mut export_loading,
+      &mut export_loading_ui,
       services,
       world,
     );
@@ -181,6 +206,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut window_size_ui,
       &mut safe_mode_warning_ui,
       &mut clear_warning_ui,
+      &mut export_settings_ui,
+      &mut export_loading_ui,
     );
 
     route_frame_input(
@@ -201,8 +228,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut window_size_ui,
       &mut safe_mode_warning_ui,
       &mut clear_warning_ui,
+      &mut export_settings_ui,
+      &mut export_loading_ui,
       &mut language_loading_ui,
       &mut language_loading,
+      &mut export_loading,
     );
     sync_input_method_policy(services);
     restore_input_modes_if_scope_changed(services, world, &mut input_mode_scope);
@@ -228,8 +258,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut input_demo_ui,
       &mut safe_mode_warning_ui,
       &mut clear_warning_ui,
+      &mut export_settings_ui,
+      &mut export_loading_ui,
       &mut language_loading_ui,
       &mut language_loading,
+      &mut export_loading,
     );
     sync_input_method_policy(services);
     services.input_method.update(world.clock.delta_time());
@@ -257,16 +290,23 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut window_size_ui,
       &mut safe_mode_warning_ui,
       &mut clear_warning_ui,
+      &mut export_settings_ui,
+      &mut export_loading_ui,
       &mut language_loading_ui,
     );
     let text_force_redraw = services.canvas.take_render_requested();
     let composed = services.compositor.compose(&services.canvas);
-    let _ = services.presenter.present(
+    if let Err(error) = services.presenter.present(
       &composed,
       &mut services.terminal,
       text_force_redraw,
       input_cursor,
-    );
+    ) {
+      services.log.error(
+        LogSource::Render,
+        format!("Frame presentation failed: {error}"),
+      );
+    }
 
     scheduler.wait_for_next_frame();
   }
@@ -340,12 +380,15 @@ fn route_frame_input(
   window_size_ui: &mut WindowSizeWarningUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
+  _export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
+  _export_loading: &mut ExportLoadingRuntime,
 ) {
   if world.state.current_overlay_kind() == Some(OverlayKind::WindowSizeWarning) {
     load_window_size_action_map(services);
-    services.input.dispatch_action_events();
+    services.input.dispatch_action_events(&mut services.log);
     route_input_events(
       services,
       world,
@@ -364,12 +407,15 @@ fn route_frame_input(
       window_size_ui,
       safe_mode_warning_ui,
       clear_warning_ui,
+      export_settings_ui,
+      _export_loading_ui,
       language_loading_ui,
       language_loading,
+      _export_loading,
     );
   } else if world.state.current_overlay_kind() == Some(OverlayKind::SafeModeWarning) {
     load_safe_mode_warning_action_map(services);
-    services.input.dispatch_action_events();
+    services.input.dispatch_action_events(&mut services.log);
     route_input_events(
       services,
       world,
@@ -388,11 +434,14 @@ fn route_frame_input(
       window_size_ui,
       safe_mode_warning_ui,
       clear_warning_ui,
+      export_settings_ui,
+      _export_loading_ui,
       language_loading_ui,
       language_loading,
+      _export_loading,
     );
   } else if world.state.current_overlay_kind() == Some(OverlayKind::ClearWarning) {
-    services.input.dispatch_action_events();
+    services.input.dispatch_action_events(&mut services.log);
     route_input_events(
       services,
       world,
@@ -411,10 +460,38 @@ fn route_frame_input(
       window_size_ui,
       safe_mode_warning_ui,
       clear_warning_ui,
+      export_settings_ui,
+      _export_loading_ui,
       language_loading_ui,
       language_loading,
+      _export_loading,
     );
-  } else if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
+  } else if world.state.current_overlay_kind() == Some(OverlayKind::ExportSettings) {
+    if services.text_input.is_active() {
+      // 输入中不 dispatch action——避免 Enter 被当作 action 而打断 IME 组字
+      while services.input.next_action_event().is_some() {}
+      route_export_settings_text_input_events(
+        services,
+        world,
+        export_settings_ui,
+        _export_loading_ui,
+        _export_loading,
+      );
+    } else {
+      load_export_settings_action_map(services);
+      services.input.dispatch_action_events(&mut services.log);
+      route_export_settings_overlay_events(
+        services,
+        world,
+        export_settings_ui,
+        _export_loading_ui,
+        _export_loading,
+      );
+    }
+  } else if matches!(
+    world.state.current_overlay_kind(),
+    Some(OverlayKind::LanguageLoading | OverlayKind::ExportLoading)
+  ) {
     while services.input.next_action_event().is_some() {}
     services.input.clear();
     let _ = services.input.drain_system_events();
@@ -435,12 +512,13 @@ fn route_frame_input(
       screensaver_package_ui,
       input_demo_ui,
       clear_warning_ui,
+      export_settings_ui,
       language_loading_ui,
       language_loading,
     );
   } else {
     load_current_action_map(services, world);
-    services.input.dispatch_action_events();
+    services.input.dispatch_action_events(&mut services.log);
     route_input_events(
       services,
       world,
@@ -459,8 +537,11 @@ fn route_frame_input(
       window_size_ui,
       safe_mode_warning_ui,
       clear_warning_ui,
+      export_settings_ui,
+      _export_loading_ui,
       language_loading_ui,
       language_loading,
+      _export_loading,
     );
   }
 }

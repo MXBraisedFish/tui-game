@@ -13,8 +13,10 @@ use std::{
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use super::{
+  export::{self, ExportAsyncEvent, ExportTask},
   image::{ImageConvertParams, ImageService},
   input::{KeyEvent, SystemEvent},
+  log::LogSource,
   package::{self, PackageAsyncEvent, PackageTask},
   widget::runtime_object::time::TimeCallbackId,
 };
@@ -120,6 +122,7 @@ pub enum TimeAsyncEvent {
 #[derive(Clone, Debug)]
 pub enum EngineTask {
   Package(PackageTask),
+  Export(ExportTask),
   File(FileTask),
   Image(ImageTask),
   Network(NetworkTask),
@@ -131,12 +134,14 @@ pub enum EngineEvent {
   InputKey(KeyEvent),
   System(SystemEvent),
   Package(PackageAsyncEvent),
+  Export(ExportAsyncEvent),
   File(FileEvent),
   Image(ImageEvent),
   Network(NetworkEvent),
   Time(TimeAsyncEvent),
   TaskFinished { id: TaskId },
   TaskFailed { id: TaskId, error: String },
+  Log { source: LogSource, message: String },
 }
 
 enum WorkerMessage {
@@ -176,6 +181,8 @@ impl AsyncRuntime {
       let task_rx = task_rx.clone();
       let event_tx = event_tx.clone();
       let task_states = task_states.clone();
+      // Note: thread::spawn failure (e.g. OOM) is a process-level abort in std;
+      // no recoverable error to log here.
       workers.push(thread::spawn(move || {
         worker_loop(task_rx, event_tx, task_states);
       }));
@@ -196,16 +203,20 @@ impl AsyncRuntime {
   pub fn submit(&self, task: EngineTask) -> TaskId {
     let id = TaskId(self.next_task_id.fetch_add(1, Ordering::SeqCst));
     set_task_state(&self.task_states, id, TaskState::Pending);
-    let _ = self.task_tx.send(WorkerMessage::Run(id, task));
+    if self.task_tx.send(WorkerMessage::Run(id, task)).is_err() {
+      // Workers have crashed — the channel is closed.
+      // This file has no LogService access.
+      // TODO: report worker crash via EngineEvent
+    }
     id
   }
 
   pub fn task_state(&self, id: TaskId) -> Option<TaskState> {
-    self
-      .task_states
-      .lock()
-      .ok()
-      .and_then(|states| states.get(&id).copied())
+    let states = self.task_states.lock().unwrap_or_else(|poison| {
+      // Mutex poisoned — a previous task panicked. Recover the guard.
+      poison.into_inner()
+    });
+    states.get(&id).copied()
   }
 
   pub fn poll_events(&self) -> Vec<EngineEvent> {
@@ -263,7 +274,10 @@ impl Default for AsyncRuntime {
 impl Drop for AsyncRuntime {
   fn drop(&mut self) {
     for _ in &self.workers {
-      let _ = self.task_tx.send(WorkerMessage::Shutdown);
+      if self.task_tx.send(WorkerMessage::Shutdown).is_err() {
+        // Workers have already stopped — the channel is closed.
+        // TODO: report worker crash via EngineEvent
+      }
     }
 
     while let Some(worker) = self.workers.pop() {
@@ -309,6 +323,7 @@ fn worker_loop(
 fn run_task(id: TaskId, task: EngineTask, event_tx: &Sender<EngineEvent>) -> Result<(), String> {
   match task {
     EngineTask::Package(task) => package::run_package_task(id, task, event_tx),
+    EngineTask::Export(task) => export::run_export_task(id, task, event_tx),
     EngineTask::File(task) => run_file_task(id, task, event_tx),
     EngineTask::Image(task) => run_image_task(id, task, event_tx),
     EngineTask::Network(task) => run_network_task(id, task, event_tx),
@@ -467,9 +482,11 @@ fn set_task_state(
   id: TaskId,
   state: TaskState,
 ) {
-  if let Ok(mut states) = task_states.lock() {
-    states.insert(id, state);
-  }
+  let mut states = task_states.lock().unwrap_or_else(|poison| {
+    // Mutex poisoned — a previous task panicked. Recover the guard.
+    poison.into_inner()
+  });
+  states.insert(id, state);
 }
 
 #[cfg(test)]

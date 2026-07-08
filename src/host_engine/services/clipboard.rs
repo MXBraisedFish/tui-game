@@ -1,14 +1,21 @@
 /// 剪贴板服务，提供系统剪贴板的读写能力
 pub struct ClipboardService {
   clipboard: Option<arboard::Clipboard>,
+  last_error: Option<String>,
   #[cfg(test)]
   memory: Option<String>,
 }
 
 impl ClipboardService {
   pub fn new() -> Self {
+    let clipboard = arboard::Clipboard::new().ok();
+    // TODO: add log warn when LogService is available
+    let last_error = clipboard
+      .is_none()
+      .then(|| "Failed to open system clipboard".to_string());
     Self {
-      clipboard: arboard::Clipboard::new().ok(),
+      clipboard,
+      last_error,
       #[cfg(test)]
       memory: None,
     }
@@ -20,7 +27,15 @@ impl ClipboardService {
     if let Some(text) = &self.memory {
       return Some(text.clone());
     }
-    self.clipboard.as_mut()?.get_text().ok()
+    let clipboard = self.clipboard.as_mut()?;
+    // TODO: add log warn when LogService is available
+    match clipboard.get_text() {
+      Ok(text) => Some(text),
+      Err(_) => {
+        self.last_error = Some("Failed to read from clipboard".to_string());
+        None
+      }
+    }
   }
 
   /// 向剪贴板写入文本
@@ -30,16 +45,27 @@ impl ClipboardService {
       self.memory = Some(text.to_string());
       return true;
     }
-    self
-      .clipboard
-      .as_mut()
-      .is_some_and(|clipboard| clipboard.set_text(text).is_ok())
+    // TODO: add log warn when LogService is available
+    match self.clipboard.as_mut() {
+      Some(clipboard) => match clipboard.set_text(text) {
+        Ok(()) => true,
+        Err(_) => {
+          self.last_error = Some("Failed to write to clipboard".to_string());
+          false
+        }
+      },
+      None => {
+        self.last_error = Some("Clipboard not available".to_string());
+        false
+      }
+    }
   }
 
   #[cfg(test)]
   pub(crate) fn memory(text: &str) -> Self {
     Self {
       clipboard: None,
+      last_error: None,
       memory: Some(text.to_string()),
     }
   }
@@ -48,6 +74,7 @@ impl ClipboardService {
   pub(crate) fn unavailable() -> Self {
     Self {
       clipboard: None,
+      last_error: None,
       memory: None,
     }
   }

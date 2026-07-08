@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::panic;
 
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -42,6 +43,15 @@ pub fn install_panic_hook() {
     TerminalService::force_restore();
 
     eprintln!("[Crash] Panic occurred during {:?} phase.", phase);
+
+    // Try writing crash info to file
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+      .create(true)
+      .append(true)
+      .open("tui_crash.log")
+    {
+      let _ = writeln!(file, "[Crash] {:?} phase: {}", phase, panic_info);
+    }
 
     previous_hook(panic_info);
   }))

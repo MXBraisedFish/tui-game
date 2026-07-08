@@ -1,9 +1,10 @@
-use std::{collections::HashMap, fs};
+use std::{collections::HashMap, fs, io};
 
 use serde::{Deserialize, Serialize};
 
 use super::layout;
 use super::service::StorageService;
+use crate::host_engine::services::{LogService, LogSource};
 
 /// 终端配置文件：存储 Unicode 支持、颜色模式和鼠标支持的用户偏好。
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -96,8 +97,16 @@ impl TerminalProfile {
 
 impl StorageService {
   /// 读取保存的语言代码。
-  pub fn read_language_code(&self) -> Option<String> {
-    let content = fs::read_to_string(self.profile_language_path()).ok()?;
+  pub fn read_language_code(&self, log: &mut LogService) -> Option<String> {
+    let content = fs::read_to_string(self.profile_language_path())
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to read language code: {err}", err = error),
+        );
+        error
+      })
+      .ok()?;
     let code = content.trim();
     if code.is_empty() {
       None
@@ -117,71 +126,138 @@ impl StorageService {
   }
 
   /// 从文件读取终端配置。
-  pub fn read_terminal_profile(&self) -> Option<TerminalProfile> {
-    let content = fs::read_to_string(self.profile_terminal_path()).ok()?;
-    serde_json::from_str(&content).ok()
+  pub fn read_terminal_profile(&self, log: &mut LogService) -> Option<TerminalProfile> {
+    let content = fs::read_to_string(self.profile_terminal_path())
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to read terminal profile: {err}", err = error),
+        );
+        error
+      })
+      .ok()?;
+    serde_json::from_str(&content)
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to parse terminal profile JSON: {err}", err = error),
+        );
+        error
+      })
+      .ok()
   }
 
   /// 读取终端配置，缺失时返回默认值。
-  pub fn read_terminal_profile_or_default(&self) -> TerminalProfile {
-    self.read_terminal_profile().unwrap_or_default()
+  pub fn read_terminal_profile_or_default(&self, log: &mut LogService) -> TerminalProfile {
+    self.read_terminal_profile(log).unwrap_or_default()
   }
 
   /// 读取并修改终端配置后写回。
   pub fn update_terminal_profile(
     &self,
+    log: &mut LogService,
     f: impl FnOnce(&mut TerminalProfile),
   ) -> std::io::Result<()> {
-    let mut profile = self.read_terminal_profile_or_default();
+    let mut profile = self.read_terminal_profile_or_default(log);
     f(&mut profile);
-    self.write_terminal_profile(&profile)
+    self.write_terminal_profile(&profile, log)
   }
 
   /// 将终端配置序列化后写入文件。
-  pub fn write_terminal_profile(&self, profile: &TerminalProfile) -> std::io::Result<()> {
-    let json = serde_json::to_string_pretty(profile).unwrap_or_default();
+  pub fn write_terminal_profile(
+    &self,
+    profile: &TerminalProfile,
+    log: &mut LogService,
+  ) -> std::io::Result<()> {
+    let json = match serde_json::to_string_pretty(profile) {
+      Ok(json) => json,
+      Err(error) => {
+        log.error(
+          LogSource::Storage,
+          format!("Failed to serialize terminal profile: {err}", err = error),
+        );
+        return Err(io::Error::new(
+          io::ErrorKind::InvalidData,
+          format!("Serialization failed: {error}"),
+        ));
+      }
+    };
     fs::write(self.profile_terminal_path(), json)
   }
 
   /// 检查终端配置文件是否已填写完整。
-  pub fn is_terminal_profile_complete(&self) -> bool {
+  pub fn is_terminal_profile_complete(&self, log: &mut LogService) -> bool {
     self
-      .read_terminal_profile()
+      .read_terminal_profile(log)
       .map_or(false, |p| p.is_complete())
   }
 
-  pub fn read_package_state(&self) -> Option<PackageStateProfile> {
-    let content = fs::read_to_string(self.profile_package_state_path()).ok()?;
-    serde_json::from_str(&content).ok()
+  pub fn read_package_state(&self, log: &mut LogService) -> Option<PackageStateProfile> {
+    let content = fs::read_to_string(self.profile_package_state_path())
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to read package state: {err}", err = error),
+        );
+        error
+      })
+      .ok()?;
+    serde_json::from_str(&content)
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to parse package state JSON: {err}", err = error),
+        );
+        error
+      })
+      .ok()
   }
 
-  pub fn read_package_state_or_default(&self) -> PackageStateProfile {
-    self.read_package_state().unwrap_or_default()
+  pub fn read_package_state_or_default(&self, log: &mut LogService) -> PackageStateProfile {
+    self.read_package_state(log).unwrap_or_default()
   }
 
-  pub fn write_package_state(&self, profile: &PackageStateProfile) -> std::io::Result<()> {
-    let json = serde_json::to_string_pretty(profile).unwrap_or_default();
+  pub fn write_package_state(
+    &self,
+    profile: &PackageStateProfile,
+    log: &mut LogService,
+  ) -> std::io::Result<()> {
+    let json = match serde_json::to_string_pretty(profile) {
+      Ok(json) => json,
+      Err(error) => {
+        log.error(
+          LogSource::Storage,
+          format!("Failed to serialize package state: {err}", err = error),
+        );
+        return Err(io::Error::new(
+          io::ErrorKind::InvalidData,
+          format!("Serialization failed: {error}"),
+        ));
+      }
+    };
     fs::write(self.profile_package_state_path(), json)
   }
 
   pub fn update_game_package_state(
     &self,
     mod_id: &str,
+    log: &mut LogService,
     f: impl FnOnce(&mut GamePackageState),
   ) -> std::io::Result<()> {
-    let mut profile = self.read_package_state_or_default();
+    let mut profile = self.read_package_state_or_default(log);
     f(profile.games.entry(mod_id.to_string()).or_default());
-    self.write_package_state(&profile)
+    self.write_package_state(&profile, log)
   }
 
   pub fn update_screensaver_package_state(
     &self,
     mod_id: &str,
+    log: &mut LogService,
     f: impl FnOnce(&mut ScreensaverPackageState),
   ) -> std::io::Result<()> {
-    let mut profile = self.read_package_state_or_default();
+    let mut profile = self.read_package_state_or_default(log);
     f(profile.screensavers.entry(mod_id.to_string()).or_default());
-    self.write_package_state(&profile)
+    self.write_package_state(&profile, log)
   }
 }
 
@@ -199,8 +275,9 @@ mod tests {
   #[test]
   fn missing_package_state_returns_default() {
     let storage = temp_storage("missing_package_state");
+    let mut log = LogService::new();
     assert_eq!(
-      storage.read_package_state_or_default(),
+      storage.read_package_state_or_default(&mut log),
       PackageStateProfile::default()
     );
   }
@@ -208,22 +285,23 @@ mod tests {
   #[test]
   fn package_state_persists_game_and_screensaver_independently() {
     let storage = temp_storage("package_state_persists");
+    let mut log = LogService::new();
 
     storage
-      .update_game_package_state("same_id", |state| {
+      .update_game_package_state("same_id", &mut log, |state| {
         state.enabled = false;
         state.debug = true;
         state.safe_mode = false;
       })
       .unwrap();
     storage
-      .update_screensaver_package_state("same_id", |state| {
+      .update_screensaver_package_state("same_id", &mut log, |state| {
         state.enabled = false;
         state.debug = true;
       })
       .unwrap();
 
-    let profile = storage.read_package_state_or_default();
+    let profile = storage.read_package_state_or_default(&mut log);
     assert_eq!(
       profile.games.get("same_id"),
       Some(&GamePackageState {
@@ -244,9 +322,10 @@ mod tests {
   #[test]
   fn invalid_package_state_json_falls_back_to_default() {
     let storage = temp_storage("invalid_package_state");
+    let mut log = LogService::new();
     fs::write(storage.profile_package_state_path(), "{").unwrap();
     assert_eq!(
-      storage.read_package_state_or_default(),
+      storage.read_package_state_or_default(&mut log),
       PackageStateProfile::default()
     );
   }

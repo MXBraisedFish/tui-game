@@ -20,6 +20,8 @@ pub(super) fn route_render(
   window_size_ui: &mut WindowSizeWarningUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
+  export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
 ) -> Option<(u16, u16)> {
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
@@ -66,6 +68,23 @@ pub(super) fn route_render(
     return None;
   }
 
+  if world.state.current_overlay_kind() == Some(OverlayKind::ExportLoading) {
+    apply_host_viewport(services);
+    export_loading_ui.objects_mut().begin_render();
+    services
+      .canvas
+      .prepare(export_loading_ui.objects(), &services.layout);
+    export_loading_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.i18n,
+      &services.progress_bar,
+      &services.time,
+    );
+    return None;
+  }
+
   if world.state.current_overlay_kind() == Some(OverlayKind::SafeModeWarning) {
     apply_host_viewport(services);
     safe_mode_warning_ui.objects_mut().begin_render();
@@ -94,6 +113,23 @@ pub(super) fn route_render(
       &services.layout,
       &services.i18n,
       &services.hit_area,
+    );
+    return None;
+  }
+
+  if world.state.current_overlay_kind() == Some(OverlayKind::ExportSettings) {
+    apply_host_viewport(services);
+    export_settings_ui.objects_mut().begin_render();
+    services
+      .canvas
+      .prepare(export_settings_ui.objects(), &services.layout);
+    export_settings_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.i18n,
+      &services.hit_area,
+      &services.text_input,
     );
     return None;
   }
@@ -207,6 +243,7 @@ pub(super) fn route_render(
         &services.scroll_box,
         &services.package,
         &services.storage,
+        &mut services.log,
         &world.temporary_safe_mode_disabled,
         &mut services.image,
         mouse_supported,
@@ -224,6 +261,7 @@ pub(super) fn route_render(
         &services.scroll_box,
         &services.package,
         &services.storage,
+        &mut services.log,
         &mut services.image,
         mouse_supported,
       );

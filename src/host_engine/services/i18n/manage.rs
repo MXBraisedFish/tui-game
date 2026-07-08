@@ -1,4 +1,4 @@
-use super::{load_language_registry, I18nService, LanguageInfo};
+use super::{I18nService, LanguageInfo, load_language_registry};
 
 use crate::host_engine::services::{LogService, LogSource, StorageService};
 
@@ -22,7 +22,7 @@ impl I18nService {
     log: &mut LogService,
     language_code: &str,
   ) -> bool {
-    let _ = (storage, log);
+    let _ = storage;
     if let Some(entry) = self
       .language_registry()
       .iter()
@@ -35,6 +35,10 @@ impl I18nService {
       return true;
     }
 
+    log.warn(
+      LogSource::I18n,
+      format!("Language package '{}' not available", language_code),
+    );
     self.set_current_language_info(None);
     false
   }

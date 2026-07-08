@@ -91,7 +91,7 @@ impl LanguageSelectUi {
     registry.sort_by(|a, b| a.name.cmp(&b.name));
 
     let active_code = storage
-      .read_language_code()
+      .read_language_code(log)
       .unwrap_or_else(|| storage.default_language_code().to_string());
 
     let selected_index = registry

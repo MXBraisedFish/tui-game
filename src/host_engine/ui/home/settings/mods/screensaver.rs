@@ -6,8 +6,8 @@ use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
   HitAreaOptions, HitAreaService, I18nService, ImageConvertParams, ImageService, KeyState,
-  LayoutService, MouseButton, Overflow, PackageAsset, PackageListEntry, PackageService, Rect,
-  RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
+  LayoutService, LogService, MouseButton, Overflow, PackageAsset, PackageListEntry, PackageService,
+  Rect, RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
   ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility,
   StorageService, TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent,
   TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle,
@@ -431,24 +431,24 @@ impl ScreensaverPackageUi {
     let _ = text_input.blur(&mut self.objects);
   }
 
-  pub fn toggle_selected_enabled(&mut self, storage: &StorageService) {
+  pub fn toggle_selected_enabled(&mut self, storage: &StorageService, log: &mut LogService) {
     let Some((mod_id, enabled)) =
       self.selected_entry_state(|entry| (entry.mod_id.clone(), !entry.enabled))
     else {
       return;
     };
     self.update_entry(&mod_id, |entry| entry.enabled = enabled);
-    let _ = storage.update_screensaver_package_state(&mod_id, |state| state.enabled = enabled);
+    let _ = storage.update_screensaver_package_state(&mod_id, log, |state| state.enabled = enabled);
   }
 
-  pub fn toggle_selected_debug(&mut self, storage: &StorageService) {
+  pub fn toggle_selected_debug(&mut self, storage: &StorageService, log: &mut LogService) {
     let Some((mod_id, debug)) =
       self.selected_entry_state(|entry| (entry.mod_id.clone(), !entry.debug))
     else {
       return;
     };
     self.update_entry(&mod_id, |entry| entry.debug = debug);
-    let _ = storage.update_screensaver_package_state(&mod_id, |state| state.debug = debug);
+    let _ = storage.update_screensaver_package_state(&mod_id, log, |state| state.debug = debug);
   }
 
   pub fn scroll_info(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, lines: i32) {
@@ -472,10 +472,11 @@ impl ScreensaverPackageUi {
     scroll_box: &ScrollBoxService,
     package: &PackageService,
     storage: &StorageService,
+    log: &mut LogService,
     image: &mut ImageService,
     mouse_supported: bool,
   ) {
-    self.sync_entries(package.mod_screensavers(), storage);
+    self.sync_entries(package.mod_screensavers(), storage, log);
     let positions = self.compute_positions(layout, i18n, text_input);
 
     self.sync_selection_for_per_page(positions.visible_items);
@@ -1997,8 +1998,13 @@ impl ScreensaverPackageUi {
     }
   }
 
-  fn sync_entries(&mut self, mut entries: Vec<PackageListEntry>, storage: &StorageService) {
-    let profile = storage.read_package_state_or_default();
+  fn sync_entries(
+    &mut self,
+    mut entries: Vec<PackageListEntry>,
+    storage: &StorageService,
+    log: &mut LogService,
+  ) {
+    let profile = storage.read_package_state_or_default(log);
     for entry in &mut entries {
       if let Some(state) = profile.screensavers.get(&entry.mod_id) {
         entry.enabled = state.enabled;

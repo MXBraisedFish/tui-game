@@ -17,10 +17,10 @@ pub use settings::{SettingsUi, SettingsUiCommand};
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
-  HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams,
-  RuntimeObjectPool, RuntimeObjectPoolOwner, TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
-  HOST_VERSION,
+  ActionMapEntry, CanvasService, DrawTextParams, HOST_VERSION, HitAreaEvent, HitAreaId,
+  HitAreaOptions, HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService,
+  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, TextColor, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 use crate::host_engine::services::I18nService;

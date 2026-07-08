@@ -72,6 +72,14 @@ fn load_storage_management_view_action_map(services: &mut EngineServices) {
   );
 }
 
+pub(super) fn load_export_settings_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &ExportSettingsUi::action_map(),
+    "ExportSettingsUi",
+  );
+}
+
 fn load_language_select_action_map(services: &mut EngineServices) {
   load_action_map(
     services,

@@ -134,6 +134,7 @@ impl ImageService {
       Err(_) => return,
     };
     if let Some(parent) = path.parent() {
+      // TODO: add log warn when LogService is available
       let _ = fs::create_dir_all(parent);
     }
     let entry = DiskCacheEntry {
@@ -141,6 +142,7 @@ impl ImageService {
       rendered: rendered.to_string(),
     };
     if let Ok(json) = serde_json::to_string(&entry) {
+      // TODO: add log warn when LogService is available
       let _ = fs::write(&path, json);
     }
   }

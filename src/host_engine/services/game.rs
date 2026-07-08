@@ -22,6 +22,7 @@ impl GameService {
 
   /// 启动指定包的游戏会话
   pub fn start(&mut self, package_uid: &str) {
+    // TODO: log warn when start() called while already active
     self.active_package_uid = Some(package_uid.to_string());
     self.state = GameSessionState::Running;
   }

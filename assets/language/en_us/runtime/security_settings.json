@@ -1,0 +1,19 @@
+{
+  "security_settings.title": "Security Settings",
+  "security_settings.security_details": "Security Details",
+  "security_settings.mod.reset.status": "Reset All Mod Statuses",
+  "security_settings.mod.reset.debug": "Reset All Mod Debug Settings",
+  "security_settings.mod.reset.safe_mode": "Reset All Mod Safe Mode Settings",
+  "security_settings.mod.default.status": "Default Mod Status",
+  "security_settings.mod.default.debug": "Default Mod Debug Mode",
+  "security_settings.mod.default.safe_mode": "Default Mod Safe Mode",
+  "security_settings.reset.status.off": "Disabled",
+  "security_settings.reset.status.on": "Enabled",
+  "security_settings.reset.debug.off": "Off",
+  "security_settings.reset.debug.on": "On",
+  "security_settings.reset.safe_mode.on": "On",
+  "security_settings.reset.safe_mode.off.temporary": "Off (Temporary)",
+  "security_settings.reset.safe_mode.off.permanent": "Off (Permanent)",
+  "security_settings.reset.success": "Reset Successful",
+  "security_settings.reset.fail": "Reset Failed"
+}

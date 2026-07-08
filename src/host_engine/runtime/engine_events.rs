@@ -1,13 +1,19 @@
 use super::*;
-use crate::host_engine::services::EngineEvent;
+use crate::host_engine::services::{EngineEvent, ExportAsyncEvent};
 
-pub(super) fn drain_engine_events(services: &mut EngineServices) -> Vec<PackageEvent> {
+pub(super) struct RuntimeEngineEvents {
+  pub package: Vec<PackageEvent>,
+  pub export: Vec<ExportAsyncEvent>,
+}
+
+pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngineEvents {
   let mut package_events = Vec::new();
+  let mut export_events = Vec::new();
 
   for event in services.engine_events.drain() {
     match event {
-      EngineEvent::InputKey(event) => services.input.queue_key_event(event),
-      EngineEvent::System(event) => services.input.queue_system_event(event),
+      EngineEvent::InputKey(event) => services.input.queue_key_event(event, &mut services.log),
+      EngineEvent::System(event) => services.input.queue_system_event(event, &mut services.log),
       EngineEvent::Package(event) => {
         let event = services
           .package
@@ -17,14 +23,26 @@ pub(super) fn drain_engine_events(services: &mut EngineServices) -> Vec<PackageE
         }
         package_events.push(event);
       }
+      EngineEvent::Export(event) => export_events.push(event),
       EngineEvent::File(_)
       | EngineEvent::Image(_)
       | EngineEvent::Network(_)
       | EngineEvent::Time(_)
-      | EngineEvent::TaskFinished { .. }
-      | EngineEvent::TaskFailed { .. } => {}
+      | EngineEvent::TaskFinished { .. } => {}
+      EngineEvent::TaskFailed { id, error } => {
+        services.log.warn(
+          LogSource::Engine,
+          format!("Async task {id:?} failed: {error}"),
+        );
+      }
+      EngineEvent::Log { source, message } => {
+        services.log.warn(source, message);
+      }
     }
   }
 
-  package_events
+  RuntimeEngineEvents {
+    package: package_events,
+    export: export_events,
+  }
 }

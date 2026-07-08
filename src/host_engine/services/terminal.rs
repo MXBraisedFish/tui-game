@@ -55,6 +55,8 @@ impl TerminalSurface {
       return;
     }
 
+    // TODO: log warning — TerminalSurface does not have access to LogService here,
+    // so I/O errors during terminal restore are silently discarded.
     let _ = execute!(self.stdout, Show);
     let _ = execute!(self.stdout, DisableFocusChange);
     let _ = execute!(self.stdout, DisableMouseCapture);
@@ -115,7 +117,7 @@ impl TerminalService {
       }
       Err(error) => {
         services.error(
-          LogSource::Storage,
+          LogSource::Termianl,
           format!("[Terminal] Failed to enter terminal mode: {}", error),
         );
       }
@@ -152,6 +154,8 @@ impl TerminalService {
 
   /// 强制恢复终端设置（用于异常退出时的清理）
   pub fn force_restore() {
+    // TODO: log warning — static method has no access to LogService,
+    // so I/O errors during forced terminal restore are silently discarded.
     let _ = disable_raw_mode();
 
     let mut stdout = stdout();

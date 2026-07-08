@@ -2,6 +2,7 @@ mod async_runtime;
 mod canvas;
 mod clipboard;
 mod event;
+pub(crate) mod export;
 mod file;
 mod game;
 mod host_object;
@@ -36,6 +37,7 @@ pub use async_runtime::{
 pub use canvas::{CanvasCell, CanvasService};
 pub use clipboard::ClipboardService;
 pub use event::EngineEventQueue;
+pub use export::{ExportAsyncEvent, ExportService, ExportTask};
 pub use file::FileService;
 pub use game::GameService;
 pub use host_object::{HostArea, HostAreaId, HostAreaKind, HostObjectPool};
@@ -100,6 +102,7 @@ pub struct EngineServices {
   pub image: ImageService,
   pub overlay: OverlayService,
   pub storage: StorageService,
+  pub export: ExportService,
   pub lua: LuaService,
   pub render: RenderService,
   pub terminal: TerminalService,
@@ -118,6 +121,7 @@ impl EngineServices {
   pub fn new() -> Self {
     let mut log = LogService::new();
     let storage = StorageService::new(&mut log);
+    let _ = log.set_output_path(storage.tui_log_path());
     let image_cache_dir = storage.path("data/cache/images");
 
     Self {
@@ -144,7 +148,8 @@ impl EngineServices {
       image: ImageService::new(Some(image_cache_dir)),
       overlay: OverlayService::new(),
       storage,
-      lua: LuaService::new(),
+      export: ExportService::new(),
+      lua: LuaService::new(&mut log),
       render: RenderService::new(),
       log,
       i18n: I18nService::new(),

@@ -6,8 +6,8 @@ use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
   HitAreaOptions, HitAreaService, I18nService, ImageConvertParams, ImageService, KeyState,
-  LayoutService, MouseButton, Overflow, PackageAsset, PackageListEntry, PackageService, Rect,
-  RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
+  LayoutService, LogService, MouseButton, Overflow, PackageAsset, PackageListEntry, PackageService,
+  Rect, RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
   ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility,
   StorageService, TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent,
   TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle,
@@ -476,32 +476,32 @@ impl GamePackageUi {
       .map(|entry| entry.mod_id.clone())
   }
 
-  pub fn toggle_selected_enabled(&mut self, storage: &StorageService) {
+  pub fn toggle_selected_enabled(&mut self, storage: &StorageService, log: &mut LogService) {
     let Some((mod_id, enabled)) =
       self.selected_entry_state(|entry| (entry.mod_id.clone(), !entry.enabled))
     else {
       return;
     };
     self.update_entry(&mod_id, |entry| entry.enabled = enabled);
-    let _ = storage.update_game_package_state(&mod_id, |state| state.enabled = enabled);
+    let _ = storage.update_game_package_state(&mod_id, log, |state| state.enabled = enabled);
   }
 
-  pub fn toggle_selected_debug(&mut self, storage: &StorageService) {
+  pub fn toggle_selected_debug(&mut self, storage: &StorageService, log: &mut LogService) {
     let Some((mod_id, debug)) =
       self.selected_entry_state(|entry| (entry.mod_id.clone(), !entry.debug))
     else {
       return;
     };
     self.update_entry(&mod_id, |entry| entry.debug = debug);
-    let _ = storage.update_game_package_state(&mod_id, |state| state.debug = debug);
+    let _ = storage.update_game_package_state(&mod_id, log, |state| state.debug = debug);
   }
 
-  pub fn enable_selected_safe_mode(&mut self, storage: &StorageService) {
+  pub fn enable_selected_safe_mode(&mut self, storage: &StorageService, log: &mut LogService) {
     let Some(mod_id) = self.selected_entry_state(|entry| entry.mod_id.clone()) else {
       return;
     };
     self.update_entry(&mod_id, |entry| entry.safe_mode = true);
-    let _ = storage.update_game_package_state(&mod_id, |state| state.safe_mode = true);
+    let _ = storage.update_game_package_state(&mod_id, log, |state| state.safe_mode = true);
   }
 
   pub fn disable_selected_safe_mode_temporary(&mut self) {
@@ -516,12 +516,16 @@ impl GamePackageUi {
     self.needs_rebuild_areas = true;
   }
 
-  pub fn disable_selected_safe_mode_permanent(&mut self, storage: &StorageService) {
+  pub fn disable_selected_safe_mode_permanent(
+    &mut self,
+    storage: &StorageService,
+    log: &mut LogService,
+  ) {
     let Some(mod_id) = self.selected_entry_state(|entry| entry.mod_id.clone()) else {
       return;
     };
     self.update_entry(&mod_id, |entry| entry.safe_mode = false);
-    let _ = storage.update_game_package_state(&mod_id, |state| state.safe_mode = false);
+    let _ = storage.update_game_package_state(&mod_id, log, |state| state.safe_mode = false);
   }
 
   pub fn scroll_info(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, lines: i32) {
@@ -545,11 +549,17 @@ impl GamePackageUi {
     scroll_box: &ScrollBoxService,
     package: &PackageService,
     storage: &StorageService,
+    log: &mut LogService,
     temporary_safe_mode_disabled: &HashSet<String>,
     image: &mut ImageService,
     mouse_supported: bool,
   ) {
-    self.sync_entries(package.mod_games(), storage, temporary_safe_mode_disabled);
+    self.sync_entries(
+      package.mod_games(),
+      storage,
+      log,
+      temporary_safe_mode_disabled,
+    );
     let positions = self.compute_positions(layout, i18n, text_input);
 
     self.sync_selection_for_per_page(positions.visible_items);
@@ -2144,10 +2154,11 @@ impl GamePackageUi {
     &mut self,
     mut entries: Vec<PackageListEntry>,
     storage: &StorageService,
+    log: &mut LogService,
     temporary_safe_mode_disabled: &HashSet<String>,
   ) {
     self.temporary_safe_mode_disabled = temporary_safe_mode_disabled.clone();
-    let profile = storage.read_package_state_or_default();
+    let profile = storage.read_package_state_or_default(log);
     for entry in &mut entries {
       if let Some(state) = profile.games.get(&entry.mod_id) {
         entry.enabled = state.enabled;

@@ -46,6 +46,7 @@ impl FramePresenter {
     self.truecolor = terminal.capabilities().truecolor;
 
     let Some(stdout) = terminal.writer_mut() else {
+      // TODO: log warn when terminal writer is missing (headless mode)
       return Ok(());
     };
 

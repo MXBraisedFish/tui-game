@@ -39,3 +39,6 @@ icy_sixel = "0.5"
 rdev = "0.5"
 palette = "0.7"
 im-switch = "0.1"
+zip = { version = "2.3", default-features = false, features = ["deflate"] }
+tar = "0.4"
+flate2 = "1.1"

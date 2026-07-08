@@ -6,7 +6,7 @@ use super::services::LogSource;
 /// 执行引擎启动准备：扫描语言包与资源包、初始化运行时世界
 pub fn prepare() -> BootOutput {
   let mut services = EngineServices::new();
-  let terminal_profile = services.storage.read_terminal_profile_or_default();
+  let terminal_profile = services.storage.read_terminal_profile_or_default(&mut services.log);
   services.terminal.apply_capability_profile(
     terminal_profile.unicode,
     terminal_profile.color.as_deref(),
@@ -26,7 +26,7 @@ pub fn prepare() -> BootOutput {
     .refresh_language_registry(&services.storage, &mut services.log);
 
   let default_code = services.storage.default_language_code().to_string();
-  let preferred = services.storage.read_language_code();
+  let preferred = services.storage.read_language_code(&mut services.log);
 
   let selected_language = match preferred {
     None => default_code,
@@ -66,6 +66,7 @@ pub fn prepare() -> BootOutput {
   services
     .i18n
     .load_runtime_language(&services.storage, &mut services.log, &selected_language);
+  let _ = services.log.refresh_labels_from_i18n(&services.i18n);
 
   let root_dir = services.storage.root_dir().to_path_buf();
   let package_language = services.i18n.current_language().to_string();

@@ -20,3 +20,20 @@ pub fn format_log_level(level: LogLevel) -> &'static str {
     LogLevel::Fatal => "FATAL",
   }
 }
+
+impl LogLevel {
+  pub fn key(self) -> &'static str {
+    match self {
+      Self::Trace => "log.level.trace",
+      Self::Debug => "log.level.debug",
+      Self::Info => "log.level.info",
+      Self::Warn => "log.level.warn",
+      Self::Error => "log.level.error",
+      Self::Fatal => "log.level.fatal",
+    }
+  }
+
+  pub fn default_label(self) -> &'static str {
+    format_log_level(self)
+  }
+}

@@ -1,6 +1,6 @@
 use super::*;
 use crate::host_engine::services::{
-  MouseEvent, SystemEvent, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  MouseEvent, SystemEvent, TerminalKeyCode, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub(super) fn current_objects_mut<'a>(
@@ -53,6 +53,8 @@ pub(super) fn deactivate_hidden_pools(
   window_size_ui: &mut WindowSizeWarningUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
+  export_loading_ui: &mut ExportLoadingUi,
 ) {
   let active = world
     .state
@@ -115,6 +117,22 @@ pub(super) fn deactivate_hidden_pools(
       .deactivate_pool(clear_warning_ui.objects_mut());
     services.hit_area.deactivate(clear_warning_ui.objects_mut());
   }
+  if world.state.current_overlay_kind() != Some(OverlayKind::ExportSettings) {
+    services
+      .text_input
+      .deactivate_pool(export_settings_ui.objects_mut());
+    services
+      .hit_area
+      .deactivate(export_settings_ui.objects_mut());
+  }
+  if world.state.current_overlay_kind() != Some(OverlayKind::ExportLoading) {
+    services
+      .text_input
+      .deactivate_pool(export_loading_ui.objects_mut());
+    services
+      .hit_area
+      .deactivate(export_loading_ui.objects_mut());
+  }
 }
 
 pub(super) fn route_text_input_events(
@@ -133,6 +151,7 @@ pub(super) fn route_text_input_events(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
 ) {
@@ -215,6 +234,7 @@ pub(super) fn route_text_input_events(
       screensaver_package_ui,
       input_demo_ui,
       clear_warning_ui,
+      export_settings_ui,
       language_loading_ui,
       language_loading,
     );
@@ -239,8 +259,11 @@ pub(super) fn route_input_events(
   window_size_ui: &mut WindowSizeWarningUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
+  export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
+  export_loading: &mut ExportLoadingRuntime,
 ) {
   if world.state.current_overlay_kind().is_some() {
     match world.state.current_overlay_kind() {
@@ -257,6 +280,15 @@ pub(super) fn route_input_events(
       }
       Some(OverlayKind::ClearWarning) => {
         route_clear_warning_overlay_events(services, world, clear_warning_ui);
+      }
+      Some(OverlayKind::ExportSettings) => {
+        route_export_settings_overlay_events(
+          services,
+          world,
+          export_settings_ui,
+          export_loading_ui,
+          export_loading,
+        );
       }
       _ => {}
     }
@@ -281,6 +313,7 @@ pub(super) fn route_input_events(
       screensaver_package_ui,
       input_demo_ui,
       clear_warning_ui,
+      export_settings_ui,
       language_loading_ui,
       language_loading,
     );
@@ -300,6 +333,7 @@ pub(super) fn route_input_events(
       screensaver_package_ui,
       input_demo_ui,
       clear_warning_ui,
+      export_settings_ui,
       language_loading_ui,
       language_loading,
     );
@@ -330,6 +364,7 @@ pub(super) fn route_input_events(
           screensaver_package_ui,
           input_demo_ui,
           clear_warning_ui,
+          export_settings_ui,
           language_loading_ui,
           language_loading,
           mouse,
@@ -374,6 +409,7 @@ pub(super) fn route_input_events(
           screensaver_package_ui,
           input_demo_ui,
           clear_warning_ui,
+          export_settings_ui,
           language_loading_ui,
           language_loading,
         );
@@ -403,12 +439,17 @@ pub(super) fn route_update(
   input_demo_ui: &mut InputDemoUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
+  export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
+  _export_loading: &mut ExportLoadingRuntime,
 ) {
   if world.state.current_overlay_kind().is_some() {
     if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
       language_loading_ui.update(&services.time, world.clock.delta_time());
+    } else if world.state.current_overlay_kind() == Some(OverlayKind::ExportLoading) {
+      export_loading_ui.update(&services.time, world.clock.delta_time());
     } else if world.state.current_overlay_kind() == Some(OverlayKind::SafeModeWarning) {
       safe_mode_warning_ui.update(world.clock.delta_time());
     } else if world.state.current_overlay_kind() == Some(OverlayKind::ClearWarning) {
@@ -476,6 +517,7 @@ pub(super) fn route_update(
     screensaver_package_ui,
     input_demo_ui,
     clear_warning_ui,
+    export_settings_ui,
     language_loading_ui,
     language_loading,
   );
@@ -655,6 +697,7 @@ fn route_mouse_and_events(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
   event: MouseEvent,
@@ -692,6 +735,7 @@ fn route_mouse_and_events(
     screensaver_package_ui,
     input_demo_ui,
     clear_warning_ui,
+    export_settings_ui,
     language_loading_ui,
     language_loading,
   );
@@ -714,6 +758,7 @@ fn route_component_events(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
 ) {
@@ -752,6 +797,7 @@ fn route_component_events(
       screensaver_package_ui,
       input_demo_ui,
       clear_warning_ui,
+      export_settings_ui,
       language_loading_ui,
       language_loading,
     );
@@ -778,6 +824,7 @@ fn route_input_event(
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
   clear_warning_ui: &mut ClearWarningUi,
+  export_settings_ui: &mut ExportSettingsUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
 ) {
@@ -813,6 +860,7 @@ fn route_input_event(
         apply_storage_management_export_command(
           command,
           storage_management_export_ui,
+          export_settings_ui,
           services,
           world,
         );
@@ -876,6 +924,129 @@ fn route_terminal_check_mouse_event(
   if world.state.current_ui_kind() == Some(UiNodeKind::TerminalCheck) {
     if let Some(command) = terminal_check_ui.handle_mouse_event(event, positions) {
       apply_terminal_check_command(command, terminal_check_ui, services, world);
+    }
+  }
+}
+
+pub(super) fn route_export_settings_overlay_events(
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+  export_settings_ui: &mut ExportSettingsUi,
+  export_loading_ui: &mut ExportLoadingUi,
+  export_loading: &mut ExportLoadingRuntime,
+) {
+  let was_active = services.text_input.is_active();
+  while let Some(event) = services.input.next_action_event() {
+    if let Some(command) = export_settings_ui.handle_event(&UiEvent::Action(event)) {
+      apply_export_settings_command(
+        command,
+        export_settings_ui,
+        export_loading_ui,
+        export_loading,
+        services,
+        world,
+      );
+    }
+    if world.is_stopped() {
+      break;
+    }
+  }
+  // 若 action 刚激活了 text_input，跳过 Enter 的 TerminalKey 避免瞬间 Submit
+  let just_activated = !was_active && services.text_input.is_active();
+  for sys_event in services.input.drain_system_events() {
+    match sys_event {
+      SystemEvent::Mouse(mouse) => {
+        services.hit_area.route_mouse_event(
+          export_settings_ui.objects_mut(),
+          &mut services.text_input,
+          &services.canvas,
+          mouse,
+        );
+      }
+      SystemEvent::TerminalKey(key) => {
+        if just_activated && key.code == TerminalKeyCode::Enter {
+          continue; // 跳过触发 FocusInput 的 Enter，避免立刻 Submit
+        }
+        services.text_input.route_terminal_key(
+          export_settings_ui.objects_mut(),
+          &mut services.clipboard,
+          key,
+        );
+      }
+      SystemEvent::Focus(focus) if !focus.gained => {
+        services
+          .hit_area
+          .focus_lost(export_settings_ui.objects_mut());
+      }
+      _ => {}
+    }
+    while let Some(event) = export_settings_ui.objects_mut().pop_event() {
+      if let Some(command) = export_settings_ui.handle_event(&event) {
+        apply_export_settings_command(
+          command,
+          export_settings_ui,
+          export_loading_ui,
+          export_loading,
+          services,
+          world,
+        );
+        return;
+      }
+    }
+    if world.is_stopped() {
+      break;
+    }
+  }
+}
+
+/// ExportSettings overlay 输入中路由——只走 system events，不 dispatch action，
+/// 避免 Enter 被 action map 拦截而打断 IME 组字。
+pub(super) fn route_export_settings_text_input_events(
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+  export_settings_ui: &mut ExportSettingsUi,
+  export_loading_ui: &mut ExportLoadingUi,
+  export_loading: &mut ExportLoadingRuntime,
+) {
+  for sys_event in services.input.drain_system_events() {
+    match sys_event {
+      SystemEvent::Mouse(mouse) => {
+        services.hit_area.route_mouse_event(
+          export_settings_ui.objects_mut(),
+          &mut services.text_input,
+          &services.canvas,
+          mouse,
+        );
+      }
+      SystemEvent::TerminalKey(key) => {
+        services.text_input.route_terminal_key(
+          export_settings_ui.objects_mut(),
+          &mut services.clipboard,
+          key,
+        );
+      }
+      SystemEvent::Focus(focus) if !focus.gained => {
+        services
+          .hit_area
+          .focus_lost(export_settings_ui.objects_mut());
+      }
+      _ => {}
+    }
+    while let Some(event) = export_settings_ui.objects_mut().pop_event() {
+      if let Some(command) = export_settings_ui.handle_event(&event) {
+        apply_export_settings_command(
+          command,
+          export_settings_ui,
+          export_loading_ui,
+          export_loading,
+          services,
+          world,
+        );
+        return;
+      }
+    }
+    if world.is_stopped() {
+      break;
     }
   }
 }

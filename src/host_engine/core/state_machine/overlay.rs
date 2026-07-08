@@ -17,6 +17,8 @@ pub struct OverlayState {
 pub enum OverlayKind {
   ConfirmExit,
   ClearWarning,
+  ExportLoading,
+  ExportSettings,
   LanguageLoading,
   SafeModeWarning,
   WindowSizeWarning,
@@ -101,6 +103,8 @@ impl OverlayKind {
     match self {
       OverlayKind::ConfirmExit => 10,
       OverlayKind::ClearWarning => 20,
+      OverlayKind::ExportLoading => 20,
+      OverlayKind::ExportSettings => 20,
       OverlayKind::LanguageLoading => 20,
       OverlayKind::SafeModeWarning => 20,
       OverlayKind::WindowSizeWarning => 30,

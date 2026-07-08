@@ -162,6 +162,7 @@ pub(super) fn apply_clear_warning_command(
 pub(super) fn apply_storage_management_export_command(
   command: StorageManagementExportCommand,
   storage_management_export_ui: &mut StorageManagementExportUi,
+  export_settings_ui: &mut ExportSettingsUi,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
@@ -174,7 +175,18 @@ pub(super) fn apply_storage_management_export_command(
     | StorageManagementExportCommand::ExportLog
     | StorageManagementExportCommand::ExportMod
     | StorageManagementExportCommand::ExportProfile
-    | StorageManagementExportCommand::ExportData => {}
+    | StorageManagementExportCommand::ExportData => {
+      let export_type = match command {
+        StorageManagementExportCommand::ExportCache => ExportType::Cache,
+        StorageManagementExportCommand::ExportLog => ExportType::Log,
+        StorageManagementExportCommand::ExportMod => ExportType::Mod,
+        StorageManagementExportCommand::ExportProfile => ExportType::Profile,
+        StorageManagementExportCommand::ExportData => ExportType::Data,
+        StorageManagementExportCommand::Back => unreachable!(),
+      };
+      export_settings_ui.start(export_type, services.storage.root_dir().to_path_buf());
+      world.state.push_export_settings_overlay();
+    }
   }
 }
 
@@ -190,7 +202,11 @@ pub(super) fn apply_storage_management_view_command(
       reset_storage_management_view_ui(storage_management_view_ui, services);
     }
     StorageManagementViewCommand::CopyAll(text) | StorageManagementViewCommand::CopyPath(text) => {
-      let _ = services.clipboard.write_text(&text);
+      if !services.clipboard.write_text(&text) {
+        services
+          .log
+          .warn(LogSource::Ui, "Clipboard write failed".to_string());
+      }
     }
   }
 }
@@ -238,10 +254,10 @@ pub(super) fn apply_game_package_command(
       game_package_ui.submit_jump(&mut services.text_input, value);
     }
     GamePackageCommand::ToggleEnabled => {
-      game_package_ui.toggle_selected_enabled(&services.storage);
+      game_package_ui.toggle_selected_enabled(&services.storage, &mut services.log);
     }
     GamePackageCommand::ToggleDebug => {
-      game_package_ui.toggle_selected_debug(&services.storage);
+      game_package_ui.toggle_selected_debug(&services.storage, &mut services.log);
     }
     GamePackageCommand::RequestToggleSafeMode => {
       if game_package_ui.selected_safe_mode().unwrap_or(true) {
@@ -250,7 +266,7 @@ pub(super) fn apply_game_package_command(
         if let Some(mod_id) = game_package_ui.selected_mod_id() {
           world.temporary_safe_mode_disabled.remove(&mod_id);
         }
-        game_package_ui.enable_selected_safe_mode(&services.storage);
+        game_package_ui.enable_selected_safe_mode(&services.storage, &mut services.log);
       }
     }
   }
@@ -274,7 +290,8 @@ pub(super) fn apply_safe_mode_warning_command(
       if let Some(mod_id) = game_package_ui.selected_mod_id() {
         world.temporary_safe_mode_disabled.remove(&mod_id);
       }
-      game_package_ui.disable_selected_safe_mode_permanent(&services.storage);
+      // TODO: log warn when storage write fails inside disable_selected_safe_mode_permanent
+      game_package_ui.disable_selected_safe_mode_permanent(&services.storage, &mut services.log);
     }
   }
   let _ = world
@@ -315,10 +332,10 @@ pub(super) fn apply_screensaver_package_command(
       screensaver_package_ui.submit_jump(&mut services.text_input, value);
     }
     ScreensaverPackageCommand::ToggleEnabled => {
-      screensaver_package_ui.toggle_selected_enabled(&services.storage);
+      screensaver_package_ui.toggle_selected_enabled(&services.storage, &mut services.log);
     }
     ScreensaverPackageCommand::ToggleDebug => {
-      screensaver_package_ui.toggle_selected_debug(&services.storage);
+      screensaver_package_ui.toggle_selected_debug(&services.storage, &mut services.log);
     }
   }
 }
@@ -337,7 +354,9 @@ pub(super) fn apply_language_select_command(
     }
     LanguageSelectCommand::Back => {
       let pending_language = language_loading.pending_language.take();
-      let enter_terminal_check_after_finish = !services.storage.is_terminal_profile_complete();
+      let enter_terminal_check_after_finish = !services
+        .storage
+        .is_terminal_profile_complete(&mut services.log);
       world.state.pop_ui_node();
       if let Some(code) = pending_language {
         start_language_loading(
@@ -367,14 +386,22 @@ pub(super) fn apply_terminal_check_command(
 ) {
   match command {
     TerminalCheckCommand::Next => {
-      terminal_check_ui.persist_current_step(&mut services.storage);
+      terminal_check_ui.persist_current_step(&mut services.storage, &mut services.log);
       sync_terminal_capabilities_from_profile(services);
       terminal_check_ui.advance_step();
     }
     TerminalCheckCommand::Done { mouse } => {
-      let _ = services.storage.update_terminal_profile(|p| {
-        p.mouse = Some(mouse);
-      });
+      if let Err(e) = services
+        .storage
+        .update_terminal_profile(&mut services.log, |p| {
+          p.mouse = Some(mouse);
+        })
+      {
+        services.log.warn(
+          LogSource::Storage,
+          format!("Failed to update terminal profile: {e}"),
+        );
+      }
       sync_terminal_capabilities_from_profile(services);
       world.state.pop_ui_node();
     }
@@ -388,7 +415,9 @@ pub(super) fn apply_terminal_check_command(
 }
 
 fn sync_terminal_capabilities_from_profile(services: &mut EngineServices) {
-  let profile = services.storage.read_terminal_profile_or_default();
+  let profile = services
+    .storage
+    .read_terminal_profile_or_default(&mut services.log);
   services.terminal.apply_capability_profile(
     profile.unicode,
     profile.color.as_deref(),
@@ -448,6 +477,7 @@ fn start_language_loading(
   services
     .i18n
     .load_runtime_language(&services.storage, &mut services.log, code);
+  let _ = services.log.refresh_labels_from_i18n(&services.i18n);
   language_loading_ui.set_progress(&services.progress_bar, 0.5, 0.5);
   let package_language = services.i18n.current_language().to_string();
   let missing_template = services
@@ -560,4 +590,127 @@ fn reset_language_select_ui(ui: &mut LanguageSelectUi, services: &mut EngineServ
 fn reset_input_demo_ui(ui: &mut InputDemoUi, services: &mut EngineServices) {
   clear_exiting_pool(ui.objects_mut(), services);
   *ui = InputDemoUi::init(&services.hit_area, &services.slice, &services.scroll_box);
+}
+
+pub(super) fn apply_export_settings_command(
+  command: ExportSettingsCommand,
+  export_settings_ui: &mut ExportSettingsUi,
+  export_loading_ui: &mut ExportLoadingUi,
+  export_loading: &mut ExportLoadingRuntime,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    ExportSettingsCommand::Cancel => {
+      export_settings_ui.blur_input(&mut services.text_input);
+      let _ = world.state.remove_overlay_kind(OverlayKind::ExportSettings);
+    }
+    ExportSettingsCommand::FocusInput => {
+      export_settings_ui.focus_input(&mut services.text_input);
+    }
+    ExportSettingsCommand::BlurInput => {
+      export_settings_ui.blur_input(&mut services.text_input);
+    }
+    ExportSettingsCommand::CancelInput => {
+      export_settings_ui.cancel_input(&mut services.text_input);
+    }
+    ExportSettingsCommand::ConfirmExport => {
+      export_settings_ui.blur_input(&mut services.text_input);
+
+      let name = export_settings_ui.resolved_name();
+      let out_dir = std::path::PathBuf::from(export_settings_ui.resolved_path());
+      let format = match export_settings_ui.format() {
+        ExportFormat::Zip => crate::host_engine::services::export::ExportFormat::Zip,
+        ExportFormat::Tar => crate::host_engine::services::export::ExportFormat::Tar,
+        ExportFormat::TarGz => crate::host_engine::services::export::ExportFormat::TarGz,
+      };
+      let scope = match export_settings_ui.export_scope() {
+        Some(ExportType::Cache) => crate::host_engine::services::export::ExportScope::Cache,
+        Some(ExportType::Log) => crate::host_engine::services::export::ExportScope::Log,
+        Some(ExportType::Mod) => crate::host_engine::services::export::ExportScope::Mod,
+        Some(ExportType::Profile) => crate::host_engine::services::export::ExportScope::Profile,
+        Some(ExportType::Data) => crate::host_engine::services::export::ExportScope::Data,
+        None => {
+          let _ = world.state.remove_overlay_kind(OverlayKind::ExportSettings);
+          return;
+        }
+      };
+
+      let task_id = services.export.submit_export(
+        &services.async_runtime,
+        crate::host_engine::services::ExportTask {
+          scope,
+          output_dir: out_dir,
+          file_stem: name,
+          format,
+          root_dir: services.storage.root_dir().to_path_buf(),
+        },
+      );
+      export_loading.active = true;
+      export_loading.task_id = Some(task_id);
+      export_loading_ui.set_progress(&services.progress_bar, 0.0, 0.0);
+      export_loading_ui.restart_animation(&services.time);
+      let _ = world.state.remove_overlay_kind(OverlayKind::ExportSettings);
+      world.state.push_export_loading_overlay();
+    }
+  }
+}
+
+pub(super) fn apply_export_loading_events(
+  events: &[crate::host_engine::services::ExportAsyncEvent],
+  export_loading: &mut ExportLoadingRuntime,
+  export_loading_ui: &mut ExportLoadingUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  let Some(active_task) = export_loading.task_id else {
+    return;
+  };
+
+  for event in events {
+    match event {
+      crate::host_engine::services::ExportAsyncEvent::Started { task_id, total }
+        if *task_id == active_task =>
+      {
+        let preview = if *total == 0 { 1.0 } else { 0.0 };
+        export_loading_ui.set_progress(&services.progress_bar, 0.0, preview);
+      }
+      crate::host_engine::services::ExportAsyncEvent::Progress {
+        task_id,
+        packed,
+        total,
+      } if *task_id == active_task => {
+        let progress = if *total == 0 {
+          1.0
+        } else {
+          (*packed as f32 / *total as f32).clamp(0.0, 1.0)
+        };
+        export_loading_ui.set_progress(&services.progress_bar, progress, progress);
+      }
+      crate::host_engine::services::ExportAsyncEvent::Finished { task_id, path }
+        if *task_id == active_task =>
+      {
+        export_loading_ui.set_progress(&services.progress_bar, 1.0, 1.0);
+        services
+          .log
+          .info(LogSource::Storage, format!("导出成功: {}", path.display()));
+        finish_export_loading(export_loading, world);
+      }
+      crate::host_engine::services::ExportAsyncEvent::Failed { task_id, error }
+        if *task_id == active_task =>
+      {
+        services
+          .log
+          .error(LogSource::Storage, format!("导出失败: {error}"));
+        finish_export_loading(export_loading, world);
+      }
+      _ => {}
+    }
+  }
+}
+
+fn finish_export_loading(export_loading: &mut ExportLoadingRuntime, world: &mut RuntimeWorld) {
+  export_loading.active = false;
+  export_loading.task_id = None;
+  let _ = world.state.remove_overlay_kind(OverlayKind::ExportLoading);
 }

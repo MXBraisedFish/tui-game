@@ -16,6 +16,7 @@ use crossterm::event::{
 use rdev::{Event, EventType, Key as RdevKey, listen};
 
 use crate::host_engine::services::async_runtime::{AsyncRuntime, EngineEvent};
+use crate::host_engine::services::{LogService, LogSource};
 
 use super::events::{
   FocusEvent, MouseButton, MouseEvent, MouseEventKind, ResizeEvent, ScrollDirection, SystemEvent,
@@ -271,12 +272,23 @@ impl InputService {
 
     async_runtime.spawn_managed_listener(false, |sender, _stop| {
       thread::spawn(move || {
+        let sender_for_callback = sender.clone();
         let callback = move |event: Event| {
           if let Some(key_event) = key_event_from_rdev(event) {
-            let _ = sender.send(EngineEvent::InputKey(key_event));
+            if sender_for_callback
+              .send(EngineEvent::InputKey(key_event))
+              .is_err()
+            {
+              // Channel disconnected — likely during shutdown
+            }
           }
         };
-        let _ = listen(callback);
+        if let Err(error) = listen(callback) {
+          let _ = sender.send(EngineEvent::Log {
+            source: LogSource::Input,
+            message: format!("Global key listener failed to start: {err:?}", err = error),
+          });
+        }
       })
     });
   }
@@ -291,20 +303,38 @@ impl InputService {
       thread::spawn(move || {
         let poll_interval = Duration::from_millis(50);
         while !stop.load(Ordering::SeqCst) {
-          if ct_event::poll(poll_interval).unwrap_or(false) {
+          let has_event = match ct_event::poll(poll_interval) {
+            Ok(has) => has,
+            Err(error) => {
+              let _ = sender.send(EngineEvent::Log {
+                source: LogSource::Input,
+                message: format!("Event poll error: {err}", err = error),
+              });
+              false
+            }
+          };
+          if has_event {
             if let Ok(ct_event) = ct_event::read() {
               match ct_event {
                 CtEvent::Key(key_event) => {
                   if let Some(event) = terminal_key_event_from_crossterm(key_event) {
-                    let _ = sender.send(EngineEvent::System(event));
+                    if sender.send(EngineEvent::System(event)).is_err() {
+                      // Channel disconnected — likely during shutdown.
+                    }
                   }
                 }
                 other_event => {
                   if let Some(sys_event) = system_event_from_crossterm(other_event) {
-                    let _ = sender.send(EngineEvent::System(sys_event));
+                    if sender.send(EngineEvent::System(sys_event)).is_err() {
+                      // Channel disconnected — likely during shutdown.
+                    }
                   }
                 }
               }
+            } else {
+              // ct_event::read() failed despite poll() reporting an event.
+              // This is unusual but can happen if the event is consumed between
+              // poll and read (e.g. signal interrupt). The poll error is logged above.
             }
           }
         }
@@ -312,12 +342,16 @@ impl InputService {
     });
   }
 
-  pub fn queue_key_event(&self, event: KeyEvent) {
-    let _ = self.sender.send(event);
+  pub fn queue_key_event(&self, event: KeyEvent, log: &mut LogService) {
+    if self.sender.send(event).is_err() {
+      log.warn(LogSource::Input, "Key event channel disconnected");
+    }
   }
 
-  pub fn queue_system_event(&self, event: SystemEvent) {
-    let _ = self.system_sender.send(event);
+  pub fn queue_system_event(&self, event: SystemEvent, log: &mut LogService) {
+    if self.system_sender.send(event).is_err() {
+      log.warn(LogSource::Input, "System event channel disconnected");
+    }
   }
 
   /// 轮询并应用系统事件队列
@@ -341,7 +375,10 @@ impl InputService {
     }
 
     for event in others {
-      let _ = self.system_sender.send(event);
+      if self.system_sender.send(event).is_err() {
+        // Channel disconnected — the main loop has exited. Cannot log here
+        // because LogService is not available in &self methods on the polling path.
+      }
     }
   }
 
@@ -654,12 +691,14 @@ impl InputService {
   }
 
   /// 收集动作事件并发送到动作通道
-  pub fn dispatch_action_events(&self) {
+  pub fn dispatch_action_events(&self, log: &mut LogService) {
     if !self.action_map_dispatch_enabled {
       return;
     }
     for event in self.collect_action_events() {
-      let _ = self.action_sender.send(event);
+      if self.action_sender.send(event).is_err() {
+        log.warn(LogSource::Input, "Action event channel disconnected");
+      }
     }
   }
 
@@ -1062,7 +1101,7 @@ mod tests {
       })
       .unwrap();
     input.poll();
-    input.dispatch_action_events();
+    input.dispatch_action_events(&mut LogService::new());
 
     assert!(input.next_action_event().is_none());
     assert_eq!(input.take_raw_key_events()[0].display, "A");
@@ -1070,7 +1109,7 @@ mod tests {
 
     assert!(input.enable_action_map_dispatch());
     assert!(!input.enable_action_map_dispatch());
-    input.dispatch_action_events();
+    input.dispatch_action_events(&mut LogService::new());
     assert_eq!(input.next_action_event().unwrap().action, "test.a");
   }
 

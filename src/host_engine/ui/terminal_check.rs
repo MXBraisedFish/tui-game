@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, KeyState, LayoutService,
-  MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams, RuntimeObjectPool,
-  RuntimeObjectPoolOwner, StorageService, TextColor, TextStyle, UiEvent, UiObjectPool,
-  UiObjectPoolOwner,
+  LogService, MouseButton, MouseEvent, MouseEventKind, Rect, RenderService, RichTextParams,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, StorageService, TextColor, TextStyle, UiEvent,
+  UiObjectPool, UiObjectPoolOwner,
 };
 
 const STEP_UNICODE: usize = 0;
@@ -850,10 +850,10 @@ impl TerminalCheckUi {
   }
 
   /// 将当前步骤的检测结果持久化到终端配置文件。
-  pub fn persist_current_step(&self, storage: &mut StorageService) {
+  pub fn persist_current_step(&self, storage: &mut StorageService, log: &mut LogService) {
     match self.step {
       STEP_UNICODE => {
-        let _ = storage.update_terminal_profile(|p| {
+        let _ = storage.update_terminal_profile(log, |p| {
           p.unicode = Some(self.selected_index == 0);
         });
       }
@@ -863,7 +863,7 @@ impl TerminalCheckUi {
         } else {
           "256"
         };
-        let _ = storage.update_terminal_profile(|p| {
+        let _ = storage.update_terminal_profile(log, |p| {
           p.color = Some(color.to_string());
         });
       }

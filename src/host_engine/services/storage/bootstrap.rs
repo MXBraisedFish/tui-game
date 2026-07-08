@@ -19,6 +19,14 @@ fn ensure_required_directories(storage: &StorageService, log: &mut LogService) {
         LogSource::Storage,
         format!("Failed to create directory {}: {}", path.display(), error),
       );
+      log.fatal(
+        LogSource::Boot,
+        format!(
+          "Critical directory creation failed: {}: {err}",
+          path.display(),
+          err = error
+        ),
+      );
     }
   }
 }
