@@ -16,16 +16,19 @@ use router::*;
 use crate::host_engine::core::state_machine::{
   HostState, MainHostState, OverlayKind, UiNodeKind, UiNodeState,
 };
-use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
+use crate::host_engine::core::{set_crash_phase, ExitState, FrameScheduler, RuntimeWorld};
 use crate::host_engine::services::{
-  EngineServices, HostAreaKind, ImPolicy, PackageEvent, translate_action_map,
+  translate_action_map, EngineServices, HostAreaKind, ImPolicy, LogSource, PackageEvent,
 };
 use crate::host_engine::ui::{
-  GamePackageCommand, GamePackageUi, HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi,
-  LanguageLoadingUi, LanguageSelectCommand, LanguageSelectUi, ModsCommand, ModsUi,
-  SafeModeWarningCommand, SafeModeWarningUi, ScreensaverPackageCommand, ScreensaverPackageUi,
-  SettingsUi, SettingsUiCommand, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
-  WindowSizeWarningCommand, WindowSizeWarningUi,
+  ClearWarningCommand, ClearWarningTarget, ClearWarningUi, GamePackageCommand, GamePackageUi,
+  HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
+  LanguageSelectUi, ModsCommand, ModsUi, SafeModeWarningCommand, SafeModeWarningUi,
+  ScreensaverPackageCommand, ScreensaverPackageUi, SettingsUi, SettingsUiCommand,
+  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
+  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
+  StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
+  TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 
 #[derive(Default)]
@@ -85,6 +88,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let registry = services.i18n.language_registry().to_vec();
   let mut home_ui = HomeUi::init(&services.hit_area);
   let mut settings_ui = SettingsUi::init(&services.hit_area);
+  let mut storage_management_ui = StorageManagementUi::init(&services.hit_area);
+  let mut storage_management_clear_ui = StorageManagementClearUi::init(&services.hit_area);
+  let mut storage_management_export_ui = StorageManagementExportUi::init(&services.hit_area);
+  let mut storage_management_view_ui = StorageManagementViewUi::init(&services.hit_area);
   let mut language_select_ui = if registry.is_empty() {
     None
   } else {
@@ -112,6 +119,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut window_size_ui = WindowSizeWarningUi::init(&services.hit_area);
   let mut language_loading_ui = LanguageLoadingUi::init(&services.progress_bar, &services.time);
   let mut safe_mode_warning_ui = SafeModeWarningUi::init(&services.hit_area);
+  let mut clear_warning_ui = ClearWarningUi::init(&services.hit_area);
   let mut language_loading = LanguageLoadingRuntime::default();
   let mut input_mode_scope = None;
 
@@ -160,6 +168,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut storage_management_ui,
+      &mut storage_management_clear_ui,
+      &mut storage_management_export_ui,
+      &mut storage_management_view_ui,
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
@@ -168,6 +180,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut input_demo_ui,
       &mut window_size_ui,
       &mut safe_mode_warning_ui,
+      &mut clear_warning_ui,
     );
 
     route_frame_input(
@@ -175,6 +188,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut storage_management_ui,
+      &mut storage_management_clear_ui,
+      &mut storage_management_export_ui,
+      &mut storage_management_view_ui,
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
@@ -183,6 +200,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut input_demo_ui,
       &mut window_size_ui,
       &mut safe_mode_warning_ui,
+      &mut clear_warning_ui,
       &mut language_loading_ui,
       &mut language_loading,
     );
@@ -198,6 +216,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut storage_management_ui,
+      &mut storage_management_clear_ui,
+      &mut storage_management_export_ui,
+      &mut storage_management_view_ui,
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
@@ -205,6 +227,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut screensaver_package_ui,
       &mut input_demo_ui,
       &mut safe_mode_warning_ui,
+      &mut clear_warning_ui,
       &mut language_loading_ui,
       &mut language_loading,
     );
@@ -221,6 +244,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut storage_management_ui,
+      &mut storage_management_clear_ui,
+      &mut storage_management_export_ui,
+      &mut storage_management_view_ui,
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
@@ -229,6 +256,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut input_demo_ui,
       &mut window_size_ui,
       &mut safe_mode_warning_ui,
+      &mut clear_warning_ui,
       &mut language_loading_ui,
     );
     let text_force_redraw = services.canvas.take_render_requested();
@@ -273,7 +301,9 @@ fn restore_input_modes_if_scope_changed(
 
 fn input_mode_policy(world: &RuntimeWorld) -> InputModePolicy {
   match world.state.current_overlay_kind() {
-    Some(OverlayKind::SafeModeWarning) => InputModePolicy::safe_mode_warning(),
+    Some(OverlayKind::SafeModeWarning | OverlayKind::ClearWarning) => {
+      InputModePolicy::safe_mode_warning()
+    }
     _ => InputModePolicy::normal(),
   }
 }
@@ -297,6 +327,10 @@ fn route_frame_input(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  storage_management_ui: &mut StorageManagementUi,
+  storage_management_clear_ui: &mut StorageManagementClearUi,
+  storage_management_export_ui: &mut StorageManagementExportUi,
+  storage_management_view_ui: &mut StorageManagementViewUi,
   language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
@@ -305,6 +339,7 @@ fn route_frame_input(
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
+  clear_warning_ui: &mut ClearWarningUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
 ) {
@@ -316,6 +351,10 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      storage_management_ui,
+      storage_management_clear_ui,
+      storage_management_export_ui,
+      storage_management_view_ui,
       language_select_ui,
       terminal_check_ui,
       mods_ui,
@@ -324,6 +363,7 @@ fn route_frame_input(
       input_demo_ui,
       window_size_ui,
       safe_mode_warning_ui,
+      clear_warning_ui,
       language_loading_ui,
       language_loading,
     );
@@ -335,6 +375,10 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      storage_management_ui,
+      storage_management_clear_ui,
+      storage_management_export_ui,
+      storage_management_view_ui,
       language_select_ui,
       terminal_check_ui,
       mods_ui,
@@ -343,6 +387,30 @@ fn route_frame_input(
       input_demo_ui,
       window_size_ui,
       safe_mode_warning_ui,
+      clear_warning_ui,
+      language_loading_ui,
+      language_loading,
+    );
+  } else if world.state.current_overlay_kind() == Some(OverlayKind::ClearWarning) {
+    services.input.dispatch_action_events();
+    route_input_events(
+      services,
+      world,
+      home_ui,
+      settings_ui,
+      storage_management_ui,
+      storage_management_clear_ui,
+      storage_management_export_ui,
+      storage_management_view_ui,
+      language_select_ui,
+      terminal_check_ui,
+      mods_ui,
+      game_package_ui,
+      screensaver_package_ui,
+      input_demo_ui,
+      window_size_ui,
+      safe_mode_warning_ui,
+      clear_warning_ui,
       language_loading_ui,
       language_loading,
     );
@@ -356,12 +424,17 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      storage_management_ui,
+      storage_management_clear_ui,
+      storage_management_export_ui,
+      storage_management_view_ui,
       language_select_ui,
       terminal_check_ui,
       mods_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
+      clear_warning_ui,
       language_loading_ui,
       language_loading,
     );
@@ -373,6 +446,10 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      storage_management_ui,
+      storage_management_clear_ui,
+      storage_management_export_ui,
+      storage_management_view_ui,
       language_select_ui,
       terminal_check_ui,
       mods_ui,
@@ -381,6 +458,7 @@ fn route_frame_input(
       input_demo_ui,
       window_size_ui,
       safe_mode_warning_ui,
+      clear_warning_ui,
       language_loading_ui,
       language_loading,
     );

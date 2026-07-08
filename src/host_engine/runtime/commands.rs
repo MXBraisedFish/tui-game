@@ -46,6 +46,152 @@ pub(super) fn apply_settings_command(
       world.state.enter_ui_node(UiNodeState::language_select())
     }
     SettingsUiCommand::OpenMods => world.state.enter_ui_node(UiNodeState::mods()),
+    SettingsUiCommand::OpenStorageManagement => {
+      world.state.enter_ui_node(UiNodeState::storage_management())
+    }
+  }
+}
+
+pub(super) fn apply_storage_management_command(
+  command: StorageManagementCommand,
+  storage_management_ui: &mut StorageManagementUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    StorageManagementCommand::Back => {
+      world.state.pop_ui_node();
+      reset_storage_management_ui(storage_management_ui, services);
+    }
+    StorageManagementCommand::OpenView => {
+      world
+        .state
+        .enter_ui_node(UiNodeState::storage_management_view());
+    }
+    StorageManagementCommand::OpenClear => {
+      world
+        .state
+        .enter_ui_node(UiNodeState::storage_management_clear());
+    }
+    StorageManagementCommand::OpenExport => {
+      world
+        .state
+        .enter_ui_node(UiNodeState::storage_management_export());
+    }
+  }
+}
+
+pub(super) fn apply_storage_management_clear_command(
+  command: StorageManagementClearCommand,
+  storage_management_clear_ui: &mut StorageManagementClearUi,
+  clear_warning_ui: &mut ClearWarningUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    StorageManagementClearCommand::Back => {
+      world.state.pop_ui_node();
+      reset_storage_management_clear_ui(storage_management_clear_ui, services);
+    }
+    StorageManagementClearCommand::ClearCache
+    | StorageManagementClearCommand::ClearLog
+    | StorageManagementClearCommand::ClearMod
+    | StorageManagementClearCommand::ClearProfile
+    | StorageManagementClearCommand::ClearData => {
+      let (target, path) = match command {
+        StorageManagementClearCommand::ClearCache => {
+          (ClearWarningTarget::Cache, services.storage.cache_dir_path())
+        }
+        StorageManagementClearCommand::ClearLog => {
+          (ClearWarningTarget::Log, services.storage.log_dir_path())
+        }
+        StorageManagementClearCommand::ClearMod => {
+          (ClearWarningTarget::Mod, services.storage.mod_dir_path())
+        }
+        StorageManagementClearCommand::ClearProfile => (
+          ClearWarningTarget::Profile,
+          services.storage.profiles_dir_path(),
+        ),
+        StorageManagementClearCommand::ClearData => {
+          (ClearWarningTarget::Data, services.storage.data_dir_path())
+        }
+        StorageManagementClearCommand::Back => unreachable!(),
+      };
+      clear_warning_ui.start(target, path);
+      world.state.push_clear_warning_overlay();
+    }
+  }
+}
+
+pub(super) fn apply_clear_warning_command(
+  command: ClearWarningCommand,
+  clear_warning_ui: &mut ClearWarningUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  if command == ClearWarningCommand::Confirm {
+    if let Some(target) = clear_warning_ui.target() {
+      let result = match target {
+        ClearWarningTarget::Cache => services.storage.clear_cache(&mut services.log),
+        ClearWarningTarget::Log => services.storage.clear_log(&mut services.log),
+        ClearWarningTarget::Mod => services.storage.clear_mod(&mut services.log),
+        ClearWarningTarget::Profile => services.storage.clear_profiles(&mut services.log),
+        ClearWarningTarget::Data => services.storage.clear_data(&mut services.log),
+      };
+      if let Err(error) = result {
+        services.log.error(
+          LogSource::Storage,
+          format!("Failed to clear storage target {:?}: {}", target, error),
+        );
+      } else if matches!(target, ClearWarningTarget::Mod | ClearWarningTarget::Data) {
+        let package_language = services.i18n.current_language().to_string();
+        let missing_template = services
+          .i18n
+          .get_runtime_text("language_warning", "language_warning.missing");
+        let _ = services.package.request_rescan_for_language(
+          &services.async_runtime,
+          &package_language,
+          &missing_template,
+        );
+      }
+    }
+  }
+  let _ = world.state.remove_overlay_kind(OverlayKind::ClearWarning);
+}
+
+pub(super) fn apply_storage_management_export_command(
+  command: StorageManagementExportCommand,
+  storage_management_export_ui: &mut StorageManagementExportUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    StorageManagementExportCommand::Back => {
+      world.state.pop_ui_node();
+      reset_storage_management_export_ui(storage_management_export_ui, services);
+    }
+    StorageManagementExportCommand::ExportCache
+    | StorageManagementExportCommand::ExportLog
+    | StorageManagementExportCommand::ExportMod
+    | StorageManagementExportCommand::ExportProfile
+    | StorageManagementExportCommand::ExportData => {}
+  }
+}
+
+pub(super) fn apply_storage_management_view_command(
+  command: StorageManagementViewCommand,
+  storage_management_view_ui: &mut StorageManagementViewUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    StorageManagementViewCommand::Back => {
+      world.state.pop_ui_node();
+      reset_storage_management_view_ui(storage_management_view_ui, services);
+    }
+    StorageManagementViewCommand::CopyAll(text) | StorageManagementViewCommand::CopyPath(text) => {
+      let _ = services.clipboard.write_text(&text);
+    }
   }
 }
 
@@ -347,6 +493,35 @@ fn clear_exiting_pool(pool: &mut UiObjectPool, services: &mut EngineServices) {
 fn reset_settings_ui(ui: &mut SettingsUi, services: &mut EngineServices) {
   clear_exiting_pool(ui.objects_mut(), services);
   *ui = SettingsUi::init(&services.hit_area);
+}
+
+fn reset_storage_management_ui(ui: &mut StorageManagementUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = StorageManagementUi::init(&services.hit_area);
+}
+
+fn reset_storage_management_clear_ui(
+  ui: &mut StorageManagementClearUi,
+  services: &mut EngineServices,
+) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = StorageManagementClearUi::init(&services.hit_area);
+}
+
+fn reset_storage_management_export_ui(
+  ui: &mut StorageManagementExportUi,
+  services: &mut EngineServices,
+) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = StorageManagementExportUi::init(&services.hit_area);
+}
+
+fn reset_storage_management_view_ui(
+  ui: &mut StorageManagementViewUi,
+  services: &mut EngineServices,
+) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = StorageManagementViewUi::init(&services.hit_area);
 }
 
 fn reset_mods_ui(ui: &mut ModsUi, services: &mut EngineServices) {

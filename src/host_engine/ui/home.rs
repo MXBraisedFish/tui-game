@@ -7,15 +7,20 @@ pub use settings::language::{LanguageSelectCommand, LanguageSelectUi};
 pub use settings::mods::game::{GamePackageCommand, GamePackageUi};
 pub use settings::mods::screensaver::{ScreensaverPackageCommand, ScreensaverPackageUi};
 pub use settings::mods::{ModsCommand, ModsUi};
+pub use settings::storage_management::{
+  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
+  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
+  StorageManagementViewCommand, StorageManagementViewUi,
+};
 pub use settings::{SettingsUi, SettingsUiCommand};
 
 use std::time::Duration;
 
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
-  HitAreaService, HOST_VERSION, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams,
+  HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService, RichTextParams,
   RuntimeObjectPool, RuntimeObjectPoolOwner, TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  HOST_VERSION,
 };
 
 use crate::host_engine::services::I18nService;

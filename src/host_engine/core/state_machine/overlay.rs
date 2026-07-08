@@ -16,6 +16,7 @@ pub struct OverlayState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayKind {
   ConfirmExit,
+  ClearWarning,
   LanguageLoading,
   SafeModeWarning,
   WindowSizeWarning,
@@ -63,7 +64,7 @@ impl OverlayStackState {
           .kind
           .priority()
           .cmp(&right.kind.priority())
-          .then_with(|| right_index.cmp(left_index))
+          .then_with(|| left_index.cmp(right_index))
       })
       .map(|(index, _)| index)
   }
@@ -99,6 +100,7 @@ impl OverlayKind {
   fn priority(self) -> u8 {
     match self {
       OverlayKind::ConfirmExit => 10,
+      OverlayKind::ClearWarning => 20,
       OverlayKind::LanguageLoading => 20,
       OverlayKind::SafeModeWarning => 20,
       OverlayKind::WindowSizeWarning => 30,
@@ -144,14 +146,14 @@ mod tests {
   }
 
   #[test]
-  fn same_priority_keeps_first_pushed_on_top() {
+  fn same_priority_uses_last_pushed_as_current() {
     let mut stack = OverlayStackState::new();
     stack.push(overlay(OverlayKind::LanguageLoading));
     stack.push(overlay(OverlayKind::SafeModeWarning));
 
-    assert_eq!(stack.current_kind(), Some(OverlayKind::LanguageLoading));
-
-    stack.remove_kind(OverlayKind::LanguageLoading);
     assert_eq!(stack.current_kind(), Some(OverlayKind::SafeModeWarning));
+
+    stack.remove_kind(OverlayKind::SafeModeWarning);
+    assert_eq!(stack.current_kind(), Some(OverlayKind::LanguageLoading));
   }
 }

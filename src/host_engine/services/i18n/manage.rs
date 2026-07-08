@@ -1,4 +1,4 @@
-use super::{I18nService, load_language_info, load_language_registry};
+use super::{load_language_registry, I18nService, LanguageInfo};
 
 use crate::host_engine::services::{LogService, LogSource, StorageService};
 
@@ -22,10 +22,16 @@ impl I18nService {
     log: &mut LogService,
     language_code: &str,
   ) -> bool {
-    let info = load_language_info(storage, log, language_code);
-
-    if info.is_some() {
-      self.set_current_language_info(info);
+    let _ = (storage, log);
+    if let Some(entry) = self
+      .language_registry()
+      .iter()
+      .find(|entry| entry.code == language_code)
+    {
+      self.set_current_language_info(Some(LanguageInfo {
+        code: entry.code.clone(),
+        direction: entry.direction.clone(),
+      }));
       return true;
     }
 
@@ -40,6 +46,7 @@ impl I18nService {
     log: &mut LogService,
     language_code: &str,
   ) -> bool {
-    load_language_info(storage, log, language_code).is_some()
+    let _ = (storage, log);
+    self.is_registered_language(language_code)
   }
 }

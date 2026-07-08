@@ -4,6 +4,12 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => load_home_action_map(services),
     Some(UiNodeKind::Settings) => load_settings_action_map(services),
+    Some(UiNodeKind::StorageManagement) => load_storage_management_action_map(services),
+    Some(UiNodeKind::StorageManagementClear) => load_storage_management_clear_action_map(services),
+    Some(UiNodeKind::StorageManagementExport) => {
+      load_storage_management_export_action_map(services)
+    }
+    Some(UiNodeKind::StorageManagementView) => load_storage_management_view_action_map(services),
     Some(UiNodeKind::LanguageSelect) => load_language_select_action_map(services),
     Some(UiNodeKind::Mods) => load_mods_action_map(services),
     Some(UiNodeKind::GamePackage) => load_game_package_action_map(services),
@@ -32,6 +38,38 @@ fn load_home_action_map(services: &mut EngineServices) {
 
 fn load_settings_action_map(services: &mut EngineServices) {
   load_action_map(services, &SettingsUi::action_map(), "SettingsUi");
+}
+
+fn load_storage_management_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &StorageManagementUi::action_map(),
+    "StorageManagementUi",
+  );
+}
+
+fn load_storage_management_clear_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &StorageManagementClearUi::action_map(),
+    "StorageManagementClearUi",
+  );
+}
+
+fn load_storage_management_export_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &StorageManagementExportUi::action_map(),
+    "StorageManagementExportUi",
+  );
+}
+
+fn load_storage_management_view_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &StorageManagementViewUi::action_map(),
+    "StorageManagementViewUi",
+  );
 }
 
 fn load_language_select_action_map(services: &mut EngineServices) {

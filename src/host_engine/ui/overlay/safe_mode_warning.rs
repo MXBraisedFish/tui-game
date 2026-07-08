@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-use unicode_width::UnicodeWidthChar;
-
+use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, InputService, Key, KeyEventKind, LayoutService, MouseButton, Rect,
@@ -135,7 +134,12 @@ impl SafeModeWarningUi {
 
     let content_w = size.width.saturating_sub(32).max(1);
     let desc = i18n.get_runtime_text("safe_mode_warning", "safe_mode_warning.description.one");
-    let desc_lines = wrap_plain_lines(&desc, content_w);
+    let desc_size = layout.get_draw_text_size(&DrawTextParams {
+      text: desc.clone(),
+      wrap_mode: TextWrapMode::Auto,
+      max_width: Some(content_w),
+      ..Default::default()
+    });
     let no = i18n.get_runtime_text("safe_mode_warning", "safe_mode_warning.no");
     let temporary = i18n.get_runtime_text("safe_mode_warning", "safe_mode_warning.yes.temporary");
     let permanent = i18n.get_runtime_text("safe_mode_warning", "safe_mode_warning.yes.permanent");
@@ -145,36 +149,35 @@ impl SafeModeWarningUi {
       self.option_text(&temporary, TEMPORARY_DELAY, self.temporary_ready(), &second);
     let permanent_text =
       self.option_text(&permanent, PERMANENT_DELAY, self.permanent_ready(), &second);
-    let block_w = desc_lines
-      .iter()
-      .map(|line| layout.get_text_width(line, None))
-      .chain([
-        layout.get_text_width(&no_text, Some(&params)),
-        layout.get_text_width(&temporary_text, Some(&params)),
-        layout.get_text_width(&permanent_text, Some(&params)),
-      ])
-      .max()
-      .unwrap_or(1)
-      .min(content_w)
-      .max(1);
+    let block_w = [
+      desc_size.width.max(1),
+      layout.get_text_width(&no_text, Some(&params)),
+      layout.get_text_width(&temporary_text, Some(&params)),
+      layout.get_text_width(&permanent_text, Some(&params)),
+    ]
+    .into_iter()
+    .max()
+    .unwrap_or(1)
+    .min(content_w)
+    .max(1);
     let content_x = size.width.saturating_sub(block_w) / 2;
-    let block_h = desc_lines.len() as u16 + 4;
+    let desc_h = desc_size.height.max(1);
+    let block_h = desc_h + 4;
     let start_y = size.height.saturating_sub(block_h) / 2;
 
-    for (row, line) in desc_lines.iter().enumerate() {
-      render.draw_host_text(
-        canvas,
-        &DrawTextParams {
-          x: content_x,
-          y: start_y.saturating_add(row as u16),
-          text: line.clone(),
-          max_width: Some(block_w),
-          ..Default::default()
-        },
-      );
-    }
+    render.draw_host_text(
+      canvas,
+      &DrawTextParams {
+        x: content_x,
+        y: start_y,
+        text: desc,
+        wrap_mode: TextWrapMode::Auto,
+        max_width: Some(block_w),
+        ..Default::default()
+      },
+    );
 
-    let no_y = start_y.saturating_add(desc_lines.len() as u16 + 1);
+    let no_y = start_y.saturating_add(desc_h + 1);
     let temporary_y = no_y.saturating_add(1);
     let permanent_y = no_y.saturating_add(2);
 
@@ -326,31 +329,4 @@ pub enum SafeModeWarningCommand {
   Cancel,
   DisableTemporary,
   DisablePermanent,
-}
-
-fn wrap_plain_lines(text: &str, width: u16) -> Vec<String> {
-  let limit = width as usize;
-  if limit == 0 {
-    return vec![String::new()];
-  }
-  let mut lines = Vec::new();
-  for source in text.split('\n') {
-    let mut line = String::new();
-    let mut used = 0usize;
-    for ch in source.chars() {
-      let w = ch.width().unwrap_or(0);
-      if used > 0 && used + w > limit {
-        lines.push(line);
-        line = String::new();
-        used = 0;
-      }
-      line.push(ch);
-      used += w.min(limit);
-    }
-    lines.push(line);
-  }
-  if lines.is_empty() {
-    lines.push(String::new());
-  }
-  lines
 }

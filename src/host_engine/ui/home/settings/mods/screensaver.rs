@@ -1,6 +1,5 @@
 use std::{cmp::Ordering, time::Duration};
 
-use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use crate::host_engine::services::text_layout::TextWrapMode;
@@ -494,7 +493,7 @@ impl ScreensaverPackageUi {
       positions.right_inner,
       layout,
     );
-    let info_content_height = self.info_content_height(i18n, positions.right_inner.width);
+    let info_content_height = self.info_content_height(layout, positions.right_inner.width);
     scroll_box.set_content_size(
       &mut self.objects,
       self.info_scroll,
@@ -630,8 +629,10 @@ impl ScreensaverPackageUi {
     };
 
     let sort_text = self.sort_bar_text(i18n);
-    let order_w = self.order_bar_text(i18n).width().min(u16::MAX as usize) as u16 + 2;
-    let sort_w = sort_text.width().min(u16::MAX as usize) as u16;
+    let order_w = layout
+      .get_text_width(&self.order_bar_text(i18n), None)
+      .saturating_add(2);
+    let sort_w = layout.get_text_width(&sort_text, None);
     let sort_bar_y = search_rect.y.saturating_add(1);
     let order_rect = Rect {
       x: left_rect.x.saturating_add(1),
@@ -819,7 +820,7 @@ impl ScreensaverPackageUi {
 
     if entries.is_empty() {
       let text = i18n.get_runtime_text("screensaver_pack", "screensaver_pack.no.pack");
-      let width = text.width().min(pos.left_inner.width as usize) as u16;
+      let width = layout.get_text_width(&text, None).min(pos.left_inner.width);
       render.draw_host_text(
         canvas,
         &DrawTextParams {
@@ -1217,7 +1218,9 @@ impl ScreensaverPackageUi {
     let page_entries = self.page_entries();
     let Some(entry) = page_entries.get(self.selected_index) else {
       let text = i18n.get_runtime_text("screensaver_pack", "screensaver_pack.no.info");
-      let width = text.width().min(pos.right_inner.width as usize) as u16;
+      let width = layout
+        .get_text_width(&text, None)
+        .min(pos.right_inner.width);
       render.draw_host_text(
         canvas,
         &DrawTextParams {
@@ -1416,21 +1419,19 @@ impl ScreensaverPackageUi {
       "screensaver_pack.info.subtitle.description",
     );
     y += 1;
-    let description = Self::package_visible_text(entry, &entry.description);
-    for (offset, line) in Self::wrap_plain_lines(&description, rect.width)
-      .into_iter()
-      .enumerate()
-    {
-      self.draw_info_text(
-        canvas,
-        rect,
-        scroll_y,
-        0,
-        y.saturating_add(offset as u16),
-        &line,
-        TextStyle::default(),
-      );
-    }
+    let _ = render.draw_text_in_scroll_box(
+      canvas,
+      self.info_scroll,
+      &DrawTextParams {
+        x: 0,
+        y,
+        text: entry.description.clone(),
+        params: Some(package_params),
+        wrap_mode: TextWrapMode::Auto,
+        max_width: Some(rect.width),
+        ..Default::default()
+      },
+    );
   }
 
   fn draw_info_banner(
@@ -1728,33 +1729,6 @@ impl ScreensaverPackageUi {
     );
   }
 
-  fn wrap_plain_lines(text: &str, width: u16) -> Vec<String> {
-    if width == 0 {
-      return Vec::new();
-    }
-
-    let mut lines = Vec::new();
-    for raw_line in text.lines() {
-      let mut line = String::new();
-      let mut line_width = 0usize;
-      for grapheme in raw_line.graphemes(true) {
-        let grapheme_width = grapheme.width();
-        if line_width > 0 && line_width + grapheme_width > width as usize {
-          lines.push(std::mem::take(&mut line));
-          line_width = 0;
-        }
-        line.push_str(grapheme);
-        line_width += grapheme_width;
-      }
-      lines.push(line);
-    }
-
-    if lines.is_empty() {
-      lines.push(String::new());
-    }
-    lines
-  }
-
   fn style(color: TerminalColor) -> TextStyle {
     TextStyle {
       foreground: Some(TextColor::Terminal(color)),
@@ -1922,36 +1896,22 @@ impl ScreensaverPackageUi {
     self.selected_index = index % self.per_page;
   }
 
-  fn info_content_height(&self, _i18n: &I18nService, width: u16) -> u16 {
+  fn info_content_height(&self, layout: &LayoutService, width: u16) -> u16 {
     let page_entries = self.page_entries();
     let Some(entry) = page_entries.get(self.selected_index) else {
       return 1;
     };
-    let description_lines = Self::wrapped_plain_line_count(&entry.description, width).max(1);
+    let description_lines = layout
+      .get_draw_text_size(&DrawTextParams {
+        text: entry.description.clone(),
+        params: Some(Self::package_rich_params(entry)),
+        wrap_mode: TextWrapMode::Auto,
+        max_width: Some(width),
+        ..Default::default()
+      })
+      .height
+      .max(1);
     14 + 1 + 1 + 1 + 4 + 1 + 4 + 1 + 1 + description_lines
-  }
-
-  fn wrapped_plain_line_count(text: &str, width: u16) -> u16 {
-    let limit = width as usize;
-    if limit == 0 || text.is_empty() {
-      return 1;
-    }
-    let mut lines = 1;
-    let mut used = 0;
-    for grapheme in UnicodeSegmentation::graphemes(text, true) {
-      if grapheme == "\n" {
-        lines += 1;
-        used = 0;
-        continue;
-      }
-      let w = grapheme.width();
-      if used > 0 && used + w > limit {
-        lines += 1;
-        used = 0;
-      }
-      used += w.min(limit);
-    }
-    lines
   }
 
   fn handle_hover(&mut self, id: HitAreaId) {

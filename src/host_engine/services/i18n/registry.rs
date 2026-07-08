@@ -9,8 +9,7 @@ use crate::host_engine::services::{LogService, LogSource, StorageService};
 pub struct LanguageRegistryEntry {
   pub code: String,
   pub name: String,
-  pub title: String,
-  pub hint: String,
+  pub direction: String,
 }
 
 /// 从磁盘加载语言注册表

@@ -13,5 +13,6 @@
   "storage_management_view.size.m": "MB",
   "storage_management_view.size.g": "GB",
   "storage_management_view.tip": "占用大小按照 1024 进制计算",
-  "storage_management_view.action.back": "{key:storage_management_view.back} 返回"
+  "storage_management_view.action.back": "{key:storage_management_view.back} 返回",
+  "storage_management_view.action.copy": "{key:storage_management_view.copy} 复制全部路径"
 }

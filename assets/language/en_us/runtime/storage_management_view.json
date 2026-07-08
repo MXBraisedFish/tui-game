@@ -13,5 +13,6 @@
   "storage_management_view.size.m": "MB",
   "storage_management_view.size.g": "GB",
   "storage_management_view.tip": "Sizes are calculated using a 1024-based scale.",
-  "storage_management_view.action.back": "{key:storage_management_view.back} Back"
+  "storage_management_view.action.back": "{key:storage_management_view.back} Back",
+  "storage_management_view.action.copy": "{key:storage_management_view.copy} Copy All Paths"
 }

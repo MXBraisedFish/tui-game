@@ -19,6 +19,10 @@ pub enum UiNodeKind {
   Home,
   Settings,
   LanguageSelect,
+  StorageManagement,
+  StorageManagementClear,
+  StorageManagementExport,
+  StorageManagementView,
   Mods,
   TerminalCheck,
   GamePackage,
@@ -78,6 +82,38 @@ impl UiNodeState {
   pub fn language_select() -> Self {
     Self {
       kind: UiNodeKind::LanguageSelect,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn storage_management() -> Self {
+    Self {
+      kind: UiNodeKind::StorageManagement,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn storage_management_clear() -> Self {
+    Self {
+      kind: UiNodeKind::StorageManagementClear,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn storage_management_export() -> Self {
+    Self {
+      kind: UiNodeKind::StorageManagementExport,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn storage_management_view() -> Self {
+    Self {
+      kind: UiNodeKind::StorageManagementView,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

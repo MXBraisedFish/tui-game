@@ -2,13 +2,11 @@
   {
     "code": "en_us",
     "name": "English",
-    "title": "Language",
-    "hint": "[↑]/[↓] Select  [ESC] Exit  [Enter] Confirm"
+    "direction": "ltr"
   },
   {
     "code": "zh_cn",
     "name": "简体中文",
-    "title": "语言",
-    "hint": "[↑]/[↓] 选择  [ESC] 退出  [Enter] 确认"
+    "direction": "ltr"
   }
 ]

@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+  io,
+  path::{Path, PathBuf},
+};
 
 use super::bootstrap::ensure_storage_layout;
 use super::layout;
@@ -22,6 +25,26 @@ impl StorageService {
 
   pub fn root_dir(&self) -> &Path {
     &self.root_dir
+  }
+
+  pub fn data_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_DIR)
+  }
+
+  pub fn cache_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_CACHE_DIR)
+  }
+
+  pub fn log_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_LOG_DIR)
+  }
+
+  pub fn mod_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_MOD_DIR)
+  }
+
+  pub fn profiles_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_PROFILES_DIR)
   }
 
   /// 拼装根目录下的相对路径为完整路径。
@@ -63,10 +86,32 @@ impl StorageService {
       .join(format!("{}.json", namespace))
   }
 
-  pub fn language_info_path(&self, language_code: &str) -> PathBuf {
-    self
-      .language_package_path(language_code)
-      .join("language.json")
+  pub fn clear_data(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.data_dir_path(), log)
+  }
+
+  pub fn clear_cache(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.cache_dir_path(), log)
+  }
+
+  pub fn clear_log(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.log_dir_path(), log)
+  }
+
+  pub fn clear_mod(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.mod_dir_path(), log)
+  }
+
+  pub fn clear_profiles(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.profiles_dir_path(), log)
+  }
+
+  fn remove_recreate(&self, path: PathBuf, log: &mut LogService) -> io::Result<()> {
+    if path.exists() {
+      std::fs::remove_dir_all(path)?;
+    }
+    ensure_storage_layout(self, log);
+    Ok(())
   }
 }
 

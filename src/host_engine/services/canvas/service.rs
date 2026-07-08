@@ -845,6 +845,40 @@ mod tests {
   }
 
   #[test]
+  fn rich_text_auto_wrap_preserves_long_segment_style() {
+    let mut canvas = CanvasService::new();
+    let blue_text = "[Settings -> Storage Management -> Export Data]";
+    canvas.text(&DrawTextParams {
+      x: 0,
+      y: 0,
+      text: format!(
+        "f%If you need to proceed, create a backup via <fg:blue>{}</fg> first.",
+        blue_text
+      ),
+      wrap_mode: TextWrapMode::Auto,
+      max_width: Some(76),
+      ..Default::default()
+    });
+
+    let mut blue = String::new();
+    for y in 0..4 {
+      for x in 0..canvas.base_width() {
+        let Some(cell) = canvas.base.get(x, y) else {
+          continue;
+        };
+        if cell.is_continuation() || cell.text == " " {
+          continue;
+        }
+        if cell.style.foreground == Some(TextColor::Terminal(TerminalColor::Blue)) {
+          blue.push_str(&cell.text);
+        }
+      }
+    }
+
+    assert!(blue.replace(' ', "").contains(&blue_text.replace(' ', "")));
+  }
+
+  #[test]
   fn draw_text_params_new_sets_required_fields() {
     let params = DrawTextParams::new(3, 4, "hello");
 

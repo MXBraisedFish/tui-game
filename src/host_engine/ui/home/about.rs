@@ -1,9 +1,9 @@
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, KeyState,
-  LayoutService, Overflow, Rect, RenderService, RuntimeObjectPool, RuntimeObjectPoolOwner,
-  ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout,
-  ScrollbarPolicy, ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect,
-  SliceService, SurfaceId, TerminalColor, TextColor, TextStyle, UiEvent, UiObjectPool,
+  ActionMapEntry, BorderStyle, CanvasService, HitAreaEvent, HitAreaId, HitAreaOptions,
+  HitAreaService, KeyState, LayoutService, Overflow, Rect, RenderService, RuntimeObjectPool,
+  RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollBoxService,
+  ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, SliceId, SliceLength, SliceOptions,
+  SliceRect, SliceService, SurfaceId, TerminalColor, TextColor, TextStyle, UiEvent, UiObjectPool,
   UiObjectPoolOwner,
 };
 
@@ -305,13 +305,13 @@ impl InputDemoUi {
   ) {
     self.draw_base(render, canvas, layout, hit_area);
     self.draw_cover_slice(canvas, hit_area, layout);
-    self.draw_v_scroll(canvas, scroll_box, layout);
-    self.draw_h_scroll(canvas, scroll_box, layout);
-    self.draw_both_scroll(canvas, scroll_box, layout);
-    self.draw_reserve_scroll(canvas, scroll_box, layout);
-    self.draw_always_scroll(canvas, scroll_box, layout);
-    self.draw_hidden_scroll(canvas);
-    self.draw_transparent_scroll(canvas);
+    self.draw_v_scroll(render, canvas, scroll_box, layout);
+    self.draw_h_scroll(render, canvas, scroll_box, layout);
+    self.draw_both_scroll(render, canvas, scroll_box, layout);
+    self.draw_reserve_scroll(render, canvas, scroll_box, layout);
+    self.draw_always_scroll(render, canvas, scroll_box, layout);
+    self.draw_hidden_scroll(render, canvas);
+    self.draw_transparent_scroll(render, canvas);
     self.draw_host(canvas, layout, scroll_box);
   }
 
@@ -351,6 +351,7 @@ impl InputDemoUi {
   /// 基础纵向滚动 — 多行文本 + 滚轮 + 拖动 + 事件。
   fn draw_v_scroll(
     &mut self,
+    render: &mut RenderService,
     canvas: &mut CanvasService,
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
@@ -358,8 +359,8 @@ impl InputDemoUi {
     let Some(rect) = canvas.prepared_scroll_box_rect(self.v_scroll) else {
       return;
     };
-    // 绘制边框。
-    draw_box_border(
+    render_scroll_box_border(
+      render,
       canvas,
       rect,
       self.v_scroll,
@@ -403,6 +404,7 @@ impl InputDemoUi {
   /// 纯横向滚动 — 宽内容 + 水平滚动条。
   fn draw_h_scroll(
     &mut self,
+    render: &mut RenderService,
     canvas: &mut CanvasService,
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
@@ -410,7 +412,8 @@ impl InputDemoUi {
     let Some(rect) = canvas.prepared_scroll_box_rect(self.h_scroll) else {
       return;
     };
-    draw_box_border(
+    render_scroll_box_border(
+      render,
       canvas,
       rect,
       self.h_scroll,
@@ -458,6 +461,7 @@ impl InputDemoUi {
   /// 双轴滚动 — 网格内容 + 两条滚动条。
   fn draw_both_scroll(
     &mut self,
+    render: &mut RenderService,
     canvas: &mut CanvasService,
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
@@ -465,7 +469,8 @@ impl InputDemoUi {
     let Some(rect) = canvas.prepared_scroll_box_rect(self.both_scroll) else {
       return;
     };
-    draw_box_border(
+    render_scroll_box_border(
+      render,
       canvas,
       rect,
       self.both_scroll,
@@ -514,6 +519,7 @@ impl InputDemoUi {
   /// ReserveSpace — 滚动条不覆盖内容。
   fn draw_reserve_scroll(
     &mut self,
+    render: &mut RenderService,
     canvas: &mut CanvasService,
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
@@ -521,7 +527,8 @@ impl InputDemoUi {
     let Some(rect) = canvas.prepared_scroll_box_rect(self.reserve_scroll) else {
       return;
     };
-    draw_box_border(
+    render_scroll_box_border(
+      render,
       canvas,
       rect,
       self.reserve_scroll,
@@ -558,6 +565,7 @@ impl InputDemoUi {
   /// Always 滚动条 — 内容刚好等于 viewport 高度但滚动条仍然显示。
   fn draw_always_scroll(
     &mut self,
+    render: &mut RenderService,
     canvas: &mut CanvasService,
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
@@ -565,7 +573,8 @@ impl InputDemoUi {
     let Some(rect) = canvas.prepared_scroll_box_rect(self.always_scroll) else {
       return;
     };
-    draw_box_border(
+    render_scroll_box_border(
+      render,
       canvas,
       rect,
       self.always_scroll,
@@ -594,11 +603,12 @@ impl InputDemoUi {
   }
 
   /// overflow_y = Hidden — 内容被裁剪，无法滚动。
-  fn draw_hidden_scroll(&mut self, canvas: &mut CanvasService) {
+  fn draw_hidden_scroll(&mut self, render: &mut RenderService, canvas: &mut CanvasService) {
     let Some(rect) = canvas.prepared_scroll_box_rect(self.hidden_scroll) else {
       return;
     };
-    draw_box_border(
+    render_scroll_box_border(
+      render,
       canvas,
       rect,
       self.hidden_scroll,
@@ -623,11 +633,12 @@ impl InputDemoUi {
   }
 
   /// 透明滚动盒子 — 未写入部分可看到底层。
-  fn draw_transparent_scroll(&mut self, canvas: &mut CanvasService) {
+  fn draw_transparent_scroll(&mut self, render: &mut RenderService, canvas: &mut CanvasService) {
     let Some(rect) = canvas.prepared_scroll_box_rect(self.transparent_scroll) else {
       return;
     };
-    draw_box_border(
+    render_scroll_box_border(
+      render,
       canvas,
       rect,
       self.transparent_scroll,
@@ -756,22 +767,28 @@ fn label() -> TextStyle {
   }
 }
 
-fn draw_box_border(canvas: &mut CanvasService, rect: Rect, id: ScrollBoxId, style: TextStyle) {
+fn render_scroll_box_border(
+  render: &mut RenderService,
+  canvas: &mut CanvasService,
+  rect: Rect,
+  id: ScrollBoxId,
+  style: TextStyle,
+) {
   if rect.width < 2 || rect.height < 2 {
     return;
   }
-  let w = rect.width as usize;
-  canvas.styled_text_in_scroll_box(id, 0, 0, &format!("┌{}┐", "─".repeat(w - 2)), style.clone());
-  for y in 1..rect.height - 1 {
-    canvas.styled_text_in_scroll_box(id, 0, y, "│", style.clone());
-    canvas.styled_text_in_scroll_box(id, rect.width - 1, y, "│", style.clone());
-  }
-  canvas.styled_text_in_scroll_box(
+  let _ = render.draw_border_rect_in_scroll_box(
+    canvas,
     id,
     0,
-    rect.height - 1,
-    &format!("└{}┘", "─".repeat(w - 2)),
-    style,
+    0,
+    rect.width,
+    rect.height,
+    &BorderStyle::Line,
+    style.foreground.clone(),
+    style.background.clone(),
+    None,
+    Some(style),
   );
 }
 

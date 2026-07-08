@@ -37,18 +37,18 @@ pub fn prepare() -> BootOutput {
         .iter()
         .any(|e| e.code == *code);
 
-      let dir_ok =
+      let registry_ok =
         services
           .i18n
           .is_language_package_available(&services.storage, &mut services.log, code);
-      if in_registry && dir_ok {
+      if in_registry && registry_ok {
         code.clone()
       } else {
         services.log.warn(
           LogSource::Boot,
           format!(
-            "Saved language '{}' invalid (registry={}, dir={}), will re-select",
-            code, in_registry, dir_ok
+            "Saved language '{}' invalid (registry={}, available={}), will re-select",
+            code, in_registry, registry_ok
           ),
         );
         let _ = services.storage.write_language_code("");

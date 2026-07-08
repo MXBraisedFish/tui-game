@@ -7,15 +7,18 @@ use crate::host_engine::services::{
   UiObjectPoolOwner,
 };
 
-const MENU_LEN: usize = 3;
+const MENU_LEN: usize = 5;
+const NS: &str = "storage_management_export";
 
 const MENU_KEYS: &[&str] = &[
-  "storage_management.view",
-  "storage_management.clear",
-  "storage_management.export",
+  "storage_management_export.export.cache",
+  "storage_management_export.export.log",
+  "storage_management_export.export.mod",
+  "storage_management_export.export.profile",
+  "storage_management_export.export.data",
 ];
 
-pub struct StorageManagementUi {
+pub struct StorageManagementExportUi {
   selected_index: usize,
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -23,7 +26,7 @@ pub struct StorageManagementUi {
   menu_areas: [HitAreaId; MENU_LEN],
 }
 
-pub(crate) struct StorageManagementLayout {
+pub(crate) struct StorageManagementExportLayout {
   title_x: u16,
   title_y: u16,
   menu_item_rects: [Rect; MENU_LEN],
@@ -32,14 +35,16 @@ pub(crate) struct StorageManagementLayout {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StorageManagementCommand {
+pub enum StorageManagementExportCommand {
   Back,
-  OpenView,
-  OpenClear,
-  OpenExport,
+  ExportCache,
+  ExportLog,
+  ExportMod,
+  ExportProfile,
+  ExportData,
 }
 
-impl UiObjectPoolOwner for StorageManagementUi {
+impl UiObjectPoolOwner for StorageManagementExportUi {
   fn objects(&self) -> &UiObjectPool {
     &self.objects
   }
@@ -49,7 +54,7 @@ impl UiObjectPoolOwner for StorageManagementUi {
   }
 }
 
-impl RuntimeObjectPoolOwner for StorageManagementUi {
+impl RuntimeObjectPoolOwner for StorageManagementExportUi {
   fn runtime_objects(&self) -> &RuntimeObjectPool {
     &self.runtime_objects
   }
@@ -59,7 +64,7 @@ impl RuntimeObjectPoolOwner for StorageManagementUi {
   }
 }
 
-impl StorageManagementUi {
+impl StorageManagementExportUi {
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -74,44 +79,54 @@ impl StorageManagementUi {
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
-        action: "storage_management.focus_up".to_string(),
-        description: "Focus previous option".to_string(),
+        action: "storage_management_export.focus_up".to_string(),
+        description: "Focus previous export option".to_string(),
         keys: vec![vec!["up".to_string()]],
       },
       ActionMapEntry {
-        action: "storage_management.focus_down".to_string(),
-        description: "Focus next option".to_string(),
+        action: "storage_management_export.focus_down".to_string(),
+        description: "Focus next export option".to_string(),
         keys: vec![vec!["down".to_string()]],
       },
       ActionMapEntry {
-        action: "storage_management.confirm".to_string(),
-        description: "Confirm selected option".to_string(),
+        action: "storage_management_export.confirm".to_string(),
+        description: "Confirm selected export option".to_string(),
         keys: vec![vec!["enter".to_string()]],
       },
       ActionMapEntry {
-        action: "storage_management.back".to_string(),
-        description: "Back to settings".to_string(),
+        action: "storage_management_export.back".to_string(),
+        description: "Back to storage management".to_string(),
         keys: vec![vec!["esc".to_string()]],
       },
       ActionMapEntry {
-        action: "storage_management.focus_view".to_string(),
-        description: "Focus storage details".to_string(),
+        action: "storage_management_export.focus_cache".to_string(),
+        description: "Focus export cache".to_string(),
         keys: vec![vec!["1".to_string()]],
       },
       ActionMapEntry {
-        action: "storage_management.focus_clear".to_string(),
-        description: "Focus clear data".to_string(),
+        action: "storage_management_export.focus_log".to_string(),
+        description: "Focus export log".to_string(),
         keys: vec![vec!["2".to_string()]],
       },
       ActionMapEntry {
-        action: "storage_management.focus_export".to_string(),
-        description: "Focus export data".to_string(),
+        action: "storage_management_export.focus_mod".to_string(),
+        description: "Focus export mod".to_string(),
         keys: vec![vec!["3".to_string()]],
+      },
+      ActionMapEntry {
+        action: "storage_management_export.focus_profile".to_string(),
+        description: "Focus export profile".to_string(),
+        keys: vec![vec!["4".to_string()]],
+      },
+      ActionMapEntry {
+        action: "storage_management_export.focus_data".to_string(),
+        description: "Focus export data".to_string(),
+        keys: vec![vec!["5".to_string()]],
       },
     ]
   }
 
-  pub fn handle_event(&mut self, event: &UiEvent) -> Option<StorageManagementCommand> {
+  pub fn handle_event(&mut self, event: &UiEvent) -> Option<StorageManagementExportCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
         self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
@@ -128,28 +143,36 @@ impl StorageManagementUi {
       UiEvent::HitArea(HitAreaEvent::Press {
         button: MouseButton::Right,
         ..
-      }) => Some(StorageManagementCommand::Back),
+      }) => Some(StorageManagementExportCommand::Back),
       UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
-        "storage_management.focus_up" => {
+        "storage_management_export.focus_up" => {
           self.focus_previous();
           None
         }
-        "storage_management.focus_down" => {
+        "storage_management_export.focus_down" => {
           self.focus_next();
           None
         }
-        "storage_management.confirm" => Some(self.confirm_selected()),
-        "storage_management.back" => Some(StorageManagementCommand::Back),
-        "storage_management.focus_view" => {
+        "storage_management_export.confirm" => Some(self.confirm_selected()),
+        "storage_management_export.back" => Some(StorageManagementExportCommand::Back),
+        "storage_management_export.focus_cache" => {
           self.selected_index = 0;
           None
         }
-        "storage_management.focus_clear" => {
+        "storage_management_export.focus_log" => {
           self.selected_index = 1;
           None
         }
-        "storage_management.focus_export" => {
+        "storage_management_export.focus_mod" => {
           self.selected_index = 2;
+          None
+        }
+        "storage_management_export.focus_profile" => {
+          self.selected_index = 3;
+          None
+        }
+        "storage_management_export.focus_data" => {
+          self.selected_index = 4;
           None
         }
         _ => None,
@@ -158,7 +181,7 @@ impl StorageManagementUi {
     }
   }
 
-  pub fn update(&mut self, dt: Duration) -> Option<StorageManagementCommand> {
+  pub fn update(&mut self, dt: Duration) -> Option<StorageManagementExportCommand> {
     let _ = dt;
     None
   }
@@ -180,14 +203,14 @@ impl StorageManagementUi {
     }
   }
 
-  pub fn compute_positions(
+  fn compute_positions(
     &self,
     layout: &LayoutService,
     i18n: &I18nService,
-  ) -> StorageManagementLayout {
+  ) -> StorageManagementExportLayout {
     let params = self.build_key_params();
     let viewport = layout.developer_viewport_rect();
-    let title = i18n.get_runtime_text("storage_management", "storage_management.title");
+    let title = i18n.get_runtime_text(NS, "storage_management_export.title");
     let title_w = layout.get_text_width(&title, None);
     let title_x =
       viewport
@@ -224,7 +247,7 @@ impl StorageManagementUi {
       title_y.saturating_add(1)
     };
 
-    StorageManagementLayout {
+    StorageManagementExportLayout {
       title_x,
       title_y,
       menu_item_rects: std::array::from_fn(|i| Rect {
@@ -238,11 +261,13 @@ impl StorageManagementUi {
     }
   }
 
-  fn confirm_selected(&self) -> StorageManagementCommand {
+  fn confirm_selected(&self) -> StorageManagementExportCommand {
     match self.selected_index {
-      0 => StorageManagementCommand::OpenView,
-      1 => StorageManagementCommand::OpenClear,
-      _ => StorageManagementCommand::OpenExport,
+      0 => StorageManagementExportCommand::ExportCache,
+      1 => StorageManagementExportCommand::ExportLog,
+      2 => StorageManagementExportCommand::ExportMod,
+      3 => StorageManagementExportCommand::ExportProfile,
+      _ => StorageManagementExportCommand::ExportData,
     }
   }
 
@@ -260,7 +285,7 @@ impl StorageManagementUi {
 
   fn menu_items(&self, i18n: &I18nService) -> [String; MENU_LEN] {
     std::array::from_fn(|i| {
-      let label = i18n.get_runtime_text("storage_management", MENU_KEYS[i]);
+      let label = i18n.get_runtime_text(NS, MENU_KEYS[i]);
       if i == self.selected_index {
         format!("f%<fg:bright_cyan>❯ {} ❮</fg>", label)
       } else {
@@ -271,26 +296,25 @@ impl StorageManagementUi {
 
   fn hint(&self, i18n: &I18nService) -> String {
     format!(
-      "f%<fg:rgb(85,87,83)>{}  {}  {}  {}</fg>",
-      i18n.get_runtime_text("storage_management", "storage_management.action.focus"),
-      i18n.get_runtime_text("storage_management", "storage_management.action.select"),
-      i18n.get_runtime_text("storage_management", "storage_management.action.confirm"),
-      i18n.get_runtime_text("storage_management", "storage_management.action.back"),
+      "f%<fg:rgb(85,87,83)>{}  {}  {}</fg>",
+      i18n.get_runtime_text(NS, "storage_management_export.action.focus"),
+      i18n.get_runtime_text(NS, "storage_management_export.action.select"),
+      i18n.get_runtime_text(NS, "storage_management_export.action.back"),
     )
   }
 
   fn build_key_params(&self) -> RichTextParams {
-    RichTextParams::from_action_map(&Self::action_map(), "storage_management.")
+    RichTextParams::from_action_map(&Self::action_map(), "storage_management_export.")
   }
 
   fn draw_content(
     &self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
-    positions: &StorageManagementLayout,
+    positions: &StorageManagementExportLayout,
     i18n: &I18nService,
   ) {
-    let title = i18n.get_runtime_text("storage_management", "storage_management.title");
+    let title = i18n.get_runtime_text(NS, "storage_management_export.title");
     render.draw_host_text(
       canvas,
       &DrawTextParams {

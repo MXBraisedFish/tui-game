@@ -7,6 +7,10 @@ pub(super) fn route_render(
   world: &RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  storage_management_ui: &mut StorageManagementUi,
+  storage_management_clear_ui: &mut StorageManagementClearUi,
+  storage_management_export_ui: &mut StorageManagementExportUi,
+  storage_management_view_ui: &mut StorageManagementViewUi,
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
@@ -15,6 +19,7 @@ pub(super) fn route_render(
   input_demo_ui: &mut InputDemoUi,
   window_size_ui: &mut WindowSizeWarningUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
+  clear_warning_ui: &mut ClearWarningUi,
   language_loading_ui: &mut LanguageLoadingUi,
 ) -> Option<(u16, u16)> {
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
@@ -77,12 +82,32 @@ pub(super) fn route_render(
     return None;
   }
 
+  if world.state.current_overlay_kind() == Some(OverlayKind::ClearWarning) {
+    apply_host_viewport(services);
+    clear_warning_ui.objects_mut().begin_render();
+    services
+      .canvas
+      .prepare(clear_warning_ui.objects(), &services.layout);
+    clear_warning_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.i18n,
+      &services.hit_area,
+    );
+    return None;
+  }
+
   apply_host_viewport(services);
 
   if let Some(objects) = current_objects_mut(
     world,
     home_ui,
     settings_ui,
+    storage_management_ui,
+    storage_management_clear_ui,
+    storage_management_export_ui,
+    storage_management_view_ui,
     language_select_ui.as_deref_mut(),
     terminal_check_ui,
     mods_ui,
@@ -110,6 +135,43 @@ pub(super) fn route_render(
         &mut services.canvas,
         &services.layout,
         &services.i18n,
+        &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::StorageManagement) => {
+      storage_management_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::StorageManagementClear) => {
+      storage_management_clear_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::StorageManagementExport) => {
+      storage_management_export_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::StorageManagementView) => {
+      storage_management_view_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.storage,
         &services.hit_area,
       );
     }

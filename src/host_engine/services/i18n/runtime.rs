@@ -15,6 +15,12 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "language_warning",
   "language_loading",
   "safe_mode_warning",
+  "storage_management",
+  "storage_management_view",
+  "storage_management_clear",
+  "storage_management_export",
+  "clear_warning",
+  "export_settings",
   "game_pack",
   "screensaver_pack",
 ];
