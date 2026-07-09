@@ -5,8 +5,9 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, StorageService, UiEvent, UiObjectPool,
-  UiObjectPoolOwner,
+  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, StorageService, TableBorderMode,
+  TableColumn, TableDrawParams, TableId, TableOptions, TableOverflow, TableRow, TableService,
+  TableStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 const ROW_LEN: usize = 6;
@@ -44,6 +45,7 @@ pub struct StorageManagementViewUi {
   runtime_objects: RuntimeObjectPool,
   back_area: HitAreaId,
   path_areas: [HitAreaId; ROW_LEN],
+  table: TableId,
   rows: Vec<StorageRow>,
   root_scroll_x: u16,
   root_scroll_forward: bool,
@@ -61,28 +63,6 @@ pub(crate) struct StorageManagementViewLayout {
   tip_y: u16,
   hint_x: u16,
   hint_y: u16,
-}
-
-#[derive(Clone, Copy)]
-enum StorageRowStyle {
-  Header,
-  Body,
-}
-
-impl StorageRowStyle {
-  fn name_color(self) -> Option<&'static str> {
-    match self {
-      Self::Header => Some("bright_yellow"),
-      Self::Body => Some("bright_cyan"),
-    }
-  }
-
-  fn other_color(self) -> Option<&'static str> {
-    match self {
-      Self::Header => Some("bright_yellow"),
-      Self::Body => None,
-    }
-  }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,11 +93,15 @@ impl RuntimeObjectPoolOwner for StorageManagementViewUi {
 }
 
 impl StorageManagementViewUi {
-  pub fn init(hit_area: &HitAreaService) -> Self {
+  pub fn init(hit_area: &HitAreaService, table: &TableService) -> Self {
     let mut objects = UiObjectPool::new();
+    let table_id = table
+      .create(&mut objects, Self::table_options(8, 8, 20))
+      .expect("storage management table options are valid");
     Self {
       back_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       path_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
+      table: table_id,
       objects,
       runtime_objects: RuntimeObjectPool::new(),
       rows: Vec::new(),
@@ -139,6 +123,55 @@ impl StorageManagementViewUi {
         description: "Copy all storage paths".to_string(),
         keys: vec![vec!["ctrl".to_string(), "c".to_string()]],
       },
+    ]
+  }
+
+  fn table_options(name_col: u16, size_col: u16, path_col: u16) -> TableOptions {
+    TableOptions {
+      columns: vec![
+        TableColumn::fixed("name", "", name_col).overflow(TableOverflow::Ellipsis),
+        TableColumn::fixed("size", "", size_col).overflow(TableOverflow::Ellipsis),
+        TableColumn::fixed("path", "", path_col).overflow(TableOverflow::Ellipsis),
+      ],
+      style: TableStyle {
+        border_mode: TableBorderMode::Full,
+        column_gap: 0,
+        show_header: true,
+        show_empty_message: false,
+        empty_message: String::new(),
+      },
+    }
+  }
+
+  fn table_columns(
+    positions: &StorageManagementViewLayout,
+    i18n: &I18nService,
+  ) -> Vec<TableColumn> {
+    vec![
+      TableColumn::fixed(
+        "name",
+        format!(
+          "f%<fg:bright_yellow>{}</fg>",
+          i18n.get_runtime_text(NS, "storage_management_view.name")
+        ),
+        positions.name_col,
+      ),
+      TableColumn::fixed(
+        "size",
+        format!(
+          "f%<fg:bright_yellow>{}</fg>",
+          i18n.get_runtime_text(NS, "storage_management_view.size")
+        ),
+        positions.size_col,
+      ),
+      TableColumn::fixed(
+        "path",
+        format!(
+          "f%<fg:bright_yellow>{}</fg>",
+          i18n.get_runtime_text(NS, "storage_management_view.path")
+        ),
+        positions.path_col,
+      ),
     ]
   }
 
@@ -205,13 +238,14 @@ impl StorageManagementViewUi {
     i18n: &I18nService,
     storage: &StorageService,
     hit_area: &HitAreaService,
+    table: &TableService,
   ) {
     if self.rows.is_empty() {
       self.refresh(storage);
     }
 
     let positions = self.compute_positions(layout, i18n);
-    self.draw_content(render, canvas, layout, &positions, i18n);
+    self.draw_content(render, canvas, layout, &positions, i18n, table);
 
     let viewport = layout.developer_viewport_rect();
     hit_area.render_host(&mut self.objects, self.back_area, viewport, canvas);
@@ -380,12 +414,13 @@ impl StorageManagementViewUi {
   }
 
   fn draw_content(
-    &self,
+    &mut self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     layout: &LayoutService,
     positions: &StorageManagementViewLayout,
     i18n: &I18nService,
+    table: &TableService,
   ) {
     self.draw_text(
       render,
@@ -397,7 +432,7 @@ impl StorageManagementViewUi {
         i18n.get_runtime_text(NS, "storage_management_view.title")
       ),
     );
-    self.draw_table(render, canvas, layout, positions, i18n);
+    self.draw_table(canvas, layout, positions, i18n, table);
     self.draw_text(
       render,
       canvas,
@@ -419,182 +454,44 @@ impl StorageManagementViewUi {
   }
 
   fn draw_table(
-    &self,
-    render: &mut RenderService,
+    &mut self,
     canvas: &mut CanvasService,
     layout: &LayoutService,
     positions: &StorageManagementViewLayout,
     i18n: &I18nService,
+    table: &TableService,
   ) {
-    let x = positions.table.x;
-    let y = positions.table.y;
-    let n = positions.name_col;
-    let s = positions.size_col;
-    let p = positions.path_col;
-    self.draw_grid_line(render, canvas, x, y, "┌", "┬", "┐", positions);
-    self.draw_row(
-      render,
-      canvas,
-      layout,
-      y.saturating_add(1),
-      positions,
-      &i18n.get_runtime_text(NS, "storage_management_view.name"),
-      &i18n.get_runtime_text(NS, "storage_management_view.size"),
-      &i18n.get_runtime_text(NS, "storage_management_view.path"),
-      StorageRowStyle::Header,
+    let _ = table.set_columns(
+      &mut self.objects,
+      self.table,
+      Self::table_columns(positions, i18n),
     );
-    self.draw_grid_line(
-      render,
+    let rows = self
+      .rows
+      .iter()
+      .enumerate()
+      .map(|(index, row)| {
+        TableRow::from_texts([
+          format!(
+            "f%<fg:bright_cyan>{}</fg>",
+            i18n.get_runtime_text(NS, row.label_key)
+          ),
+          self.format_size(row.bytes, i18n),
+          self.visible_path(index, row, layout, positions.path_col),
+        ])
+      })
+      .collect::<Vec<_>>();
+    let _ = table.draw_host(
+      &self.objects,
       canvas,
-      x,
-      y.saturating_add(2),
-      "├",
-      "┼",
-      "┤",
-      positions,
-    );
-    for (index, row) in self.rows.iter().enumerate() {
-      self.draw_row(
-        render,
-        canvas,
-        layout,
-        y.saturating_add(3).saturating_add(index as u16),
-        positions,
-        &i18n.get_runtime_text(NS, row.label_key),
-        &self.format_size(row.bytes, i18n),
-        &self.visible_path(index, row, layout, p),
-        StorageRowStyle::Body,
-      );
-    }
-    self.draw_grid_line(
-      render,
-      canvas,
-      x,
-      y.saturating_add(positions.table.height.saturating_sub(1)),
-      "└",
-      "┴",
-      "┘",
-      positions,
-    );
-    let _ = (n, s, p);
-  }
-
-  fn draw_grid_line(
-    &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    x: u16,
-    y: u16,
-    left: &str,
-    sep: &str,
-    right: &str,
-    positions: &StorageManagementViewLayout,
-  ) {
-    let line = format!(
-      "{}{}{}{}{}{}{}",
-      left,
-      "─".repeat(positions.name_col as usize),
-      sep,
-      "─".repeat(positions.size_col as usize),
-      sep,
-      "─".repeat(positions.path_col as usize),
-      right
-    );
-    self.draw_text(render, canvas, x, y, line);
-  }
-
-  #[allow(clippy::too_many_arguments)]
-  fn draw_row(
-    &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    y: u16,
-    positions: &StorageManagementViewLayout,
-    name: &str,
-    size: &str,
-    path: &str,
-    style: StorageRowStyle,
-  ) {
-    let x = positions.table.x;
-    self.draw_text(render, canvas, x, y, "│");
-    self.draw_cell(
-      render,
-      canvas,
-      layout,
-      x.saturating_add(1),
-      y,
-      positions.name_col,
-      name,
-      style.name_color(),
-    );
-    self.draw_text(
-      render,
-      canvas,
-      x.saturating_add(1 + positions.name_col),
-      y,
-      "│",
-    );
-    self.draw_cell(
-      render,
-      canvas,
-      layout,
-      x.saturating_add(2 + positions.name_col),
-      y,
-      positions.size_col,
-      size,
-      style.other_color(),
-    );
-    self.draw_text(
-      render,
-      canvas,
-      x.saturating_add(2 + positions.name_col + positions.size_col),
-      y,
-      "│",
-    );
-    self.draw_cell(
-      render,
-      canvas,
-      layout,
-      x.saturating_add(3 + positions.name_col + positions.size_col),
-      y,
-      positions.path_col,
-      path,
-      style.other_color(),
-    );
-    self.draw_text(
-      render,
-      canvas,
-      x.saturating_add(3 + positions.name_col + positions.size_col + positions.path_col),
-      y,
-      "│",
-    );
-  }
-
-  fn draw_cell(
-    &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    _layout: &LayoutService,
-    x: u16,
-    y: u16,
-    width: u16,
-    text: &str,
-    color: Option<&str>,
-  ) {
-    let text = match color {
-      Some(color) => format!("f%<fg:{}> {}</fg>", color, text),
-      None => format!(" {}", text),
-    };
-    render.draw_host_text(
-      canvas,
-      &DrawTextParams {
-        x,
-        y,
-        text,
-        max_width: Some(width),
-        overflow_marker: Some("...".to_string()),
-        ..Default::default()
+      TableDrawParams {
+        id: self.table,
+        x: positions.table.x,
+        y: positions.table.y,
+        width: positions.table.width,
+        height: positions.table.height,
+        rows: &rows,
+        row_offset: 0,
       },
     );
   }

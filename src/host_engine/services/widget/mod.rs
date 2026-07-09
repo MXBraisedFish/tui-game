@@ -25,4 +25,8 @@ pub use ui_object::surfaces::scroll_box::{
 };
 pub use ui_object::surfaces::slice::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
 pub use ui_object::surfaces::surface::SurfaceId;
+pub use ui_object::surfaces::table::{
+  TableAlign, TableBorderMode, TableCell, TableColumn, TableDrawParams, TableId, TableOptions,
+  TableOverflow, TableRow, TableService, TableStyle,
+};
 pub use ui_object::{UiEvent, UiObjectPool, UiObjectPoolOwner};

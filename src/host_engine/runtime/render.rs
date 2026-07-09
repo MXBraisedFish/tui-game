@@ -209,6 +209,7 @@ pub(super) fn route_render(
         &services.i18n,
         &services.storage,
         &services.hit_area,
+        &services.table,
       );
     }
     Some(UiNodeKind::LanguageSelect) => {

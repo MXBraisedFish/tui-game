@@ -11,6 +11,7 @@ use surfaces::progress_bar::ProgressBarObjects;
 use surfaces::scroll_box::{ScrollBoxEvent, ScrollBoxObjects};
 use surfaces::slice::SliceObjects;
 use surfaces::surface::SurfaceId;
+use surfaces::table::TableObjects;
 
 static NEXT_POOL_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -25,6 +26,7 @@ pub struct UiObjectPool {
   pub(crate) slices: SliceObjects,
   pub(crate) scroll_boxes: ScrollBoxObjects,
   pub(crate) progress_bars: ProgressBarObjects,
+  pub(crate) tables: TableObjects,
 }
 
 /// UI 事件（动作 / 点击区域 / 文本输入 / 滚动盒子）
@@ -87,6 +89,7 @@ impl UiObjectPool {
       slices: SliceObjects::new(),
       scroll_boxes: ScrollBoxObjects::new(),
       progress_bars: ProgressBarObjects::new(),
+      tables: TableObjects::new(),
     }
   }
 

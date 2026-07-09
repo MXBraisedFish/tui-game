@@ -551,7 +551,7 @@ fn reset_storage_management_view_ui(
   services: &mut EngineServices,
 ) {
   clear_exiting_pool(ui.objects_mut(), services);
-  *ui = StorageManagementViewUi::init(&services.hit_area);
+  *ui = StorageManagementViewUi::init(&services.hit_area, &services.table);
 }
 
 fn reset_mods_ui(ui: &mut ModsUi, services: &mut EngineServices) {

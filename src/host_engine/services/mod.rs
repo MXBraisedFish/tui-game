@@ -74,9 +74,11 @@ pub use widget::{
   RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions,
   ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide, ScrollbarStyle,
   ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId,
-  TextAlign, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
-  TextInputRenderParams, TextInputService, TimeCallbackId, TimeCallbackRequest, TimerEvent,
-  TimerId, TimerMode, TimerOptions, TimerState, VerticalAlign,
+  TableAlign, TableBorderMode, TableCell, TableColumn, TableDrawParams, TableId, TableOptions,
+  TableOverflow, TableRow, TableService, TableStyle, TextAlign, TextInputCursorShape,
+  TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
+  TextInputService, TimeCallbackId, TimeCallbackRequest, TimerEvent, TimerId, TimerMode,
+  TimerOptions, TimerState, VerticalAlign,
 };
 
 /// 引擎核心服务集合，持有所有子服务的实例
@@ -94,6 +96,7 @@ pub struct EngineServices {
   pub hit_area: HitAreaService,
   pub scroll_box: ScrollBoxService,
   pub progress_bar: ProgressBarService,
+  pub table: TableService,
   pub slice: SliceService,
   pub input: InputService,
   pub input_method: InputMethodService,
@@ -138,6 +141,7 @@ impl EngineServices {
       hit_area: HitAreaService::new(),
       scroll_box: ScrollBoxService::new(),
       progress_bar: ProgressBarService::new(),
+      table: TableService::new(),
       slice: SliceService::new(),
       text_input: TextInputService::new(),
       package: PackageService::new(),

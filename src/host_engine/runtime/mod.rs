@@ -98,7 +98,8 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut storage_management_ui = StorageManagementUi::init(&services.hit_area);
   let mut storage_management_clear_ui = StorageManagementClearUi::init(&services.hit_area);
   let mut storage_management_export_ui = StorageManagementExportUi::init(&services.hit_area);
-  let mut storage_management_view_ui = StorageManagementViewUi::init(&services.hit_area);
+  let mut storage_management_view_ui =
+    StorageManagementViewUi::init(&services.hit_area, &services.table);
   let mut language_select_ui = if registry.is_empty() {
     None
   } else {
