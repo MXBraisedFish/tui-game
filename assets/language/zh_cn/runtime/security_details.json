@@ -1,4 +1,5 @@
 {
   "security_details.title": "安全详情",
-  "security_details.content": ""
+  "security_details.action.scroll": "{key:security_details.scroll_up}/{key:security_details.scroll_down} 滚动",
+  "security_details.action.back": "{key:security_details.back} 返回"
 }
