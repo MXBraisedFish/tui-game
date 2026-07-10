@@ -6,8 +6,8 @@ use std::collections::HashSet;
 pub(crate) use self::state::TableObjects;
 use self::state::TableState;
 pub use self::types::{
-  TableAlign, TableBorderMode, TableCell, TableColumn, TableDrawParams, TableId, TableOptions,
-  TableOverflow, TableRow, TableStyle,
+  TableAlign, TableBorderMode, TableBorderStyle, TableCell, TableColumn, TableDrawParams, TableId,
+  TableOptions, TableOverflow, TableRow, TableStyle,
 };
 use crate::host_engine::services::text_layout::{self, DrawTextParams, TextWrapMode};
 use crate::host_engine::services::ui::UiObjectPool;
@@ -129,7 +129,15 @@ impl TableService {
       if y >= bottom {
         return true;
       }
-      self.draw_full_border_line(canvas, target, params.x, y, &columns, "┌", "┬", "┐");
+      self.draw_full_border_line(
+        canvas,
+        target,
+        params.x,
+        y,
+        &columns,
+        &options.style,
+        BorderLine::Top,
+      );
       y = y.saturating_add(1);
     }
 
@@ -161,7 +169,15 @@ impl TableService {
     {
       match options.style.border_mode {
         TableBorderMode::Full => {
-          self.draw_full_border_line(canvas, target, params.x, y, &columns, "├", "┼", "┤");
+          self.draw_full_border_line(
+            canvas,
+            target,
+            params.x,
+            y,
+            &columns,
+            &options.style,
+            BorderLine::Middle,
+          );
         }
         _ => self.draw_header_line(canvas, target, params.x, y, &columns, &options.style),
       }
@@ -209,9 +225,8 @@ impl TableService {
         params.x,
         bottom.saturating_sub(1),
         &columns,
-        "└",
-        "┴",
-        "┘",
+        &options.style,
+        BorderLine::Bottom,
       );
     }
 
@@ -230,7 +245,7 @@ impl TableService {
   ) {
     let mut cursor = x;
     if style.border_mode == TableBorderMode::Full {
-      self.draw_plain(canvas, target, cursor, y, "│");
+      self.draw_plain(canvas, target, cursor, y, border_chars(style).outer_v);
       cursor = cursor.saturating_add(1);
     }
 
@@ -243,7 +258,12 @@ impl TableService {
       cursor = cursor.saturating_add(column.width);
 
       if style.border_mode == TableBorderMode::Full {
-        self.draw_plain(canvas, target, cursor, y, "│");
+        let ch = if index + 1 == columns.len() {
+          border_chars(style).outer_v
+        } else {
+          border_chars(style).inner_v
+        };
+        self.draw_plain(canvas, target, cursor, y, ch);
         cursor = cursor.saturating_add(1);
       } else if index + 1 < columns.len() {
         cursor = cursor.saturating_add(style.column_gap);
@@ -298,7 +318,13 @@ impl TableService {
     style: &TableStyle,
   ) {
     let width = content_width(columns, style);
-    self.draw_plain(canvas, target, x, y, &"─".repeat(width as usize));
+    self.draw_plain(
+      canvas,
+      target,
+      x,
+      y,
+      &border_chars(style).inner_h.repeat(width as usize),
+    );
   }
 
   fn draw_full_border_line(
@@ -308,13 +334,33 @@ impl TableService {
     x: u16,
     y: u16,
     columns: &[EffectiveColumn],
-    left: &str,
-    sep: &str,
-    right: &str,
+    style: &TableStyle,
+    line_kind: BorderLine,
   ) {
+    let chars = border_chars(style);
+    let (left, sep, right, h) = match line_kind {
+      BorderLine::Top => (
+        chars.top_left,
+        chars.top_sep,
+        chars.top_right,
+        chars.outer_h,
+      ),
+      BorderLine::Middle => (
+        chars.mid_left,
+        chars.mid_sep,
+        chars.mid_right,
+        chars.inner_h,
+      ),
+      BorderLine::Bottom => (
+        chars.bottom_left,
+        chars.bottom_sep,
+        chars.bottom_right,
+        chars.outer_h,
+      ),
+    };
     let mut line = String::from(left);
     for (index, column) in columns.iter().enumerate() {
-      line.push_str(&"─".repeat(column.width as usize));
+      line.push_str(&h.repeat(column.width as usize));
       line.push_str(if index + 1 == columns.len() {
         right
       } else {
@@ -362,6 +408,79 @@ struct EffectiveColumn {
   min_width: u16,
   align: TableAlign,
   overflow: TableOverflow,
+}
+
+#[derive(Clone, Copy)]
+enum BorderLine {
+  Top,
+  Middle,
+  Bottom,
+}
+
+struct BorderChars {
+  top_left: &'static str,
+  top_sep: &'static str,
+  top_right: &'static str,
+  mid_left: &'static str,
+  mid_sep: &'static str,
+  mid_right: &'static str,
+  bottom_left: &'static str,
+  bottom_sep: &'static str,
+  bottom_right: &'static str,
+  outer_h: &'static str,
+  inner_h: &'static str,
+  outer_v: &'static str,
+  inner_v: &'static str,
+}
+
+fn border_chars(style: &TableStyle) -> BorderChars {
+  match style.border_style {
+    TableBorderStyle::Single => BorderChars {
+      top_left: "┌",
+      top_sep: "┬",
+      top_right: "┐",
+      mid_left: "├",
+      mid_sep: "┼",
+      mid_right: "┤",
+      bottom_left: "└",
+      bottom_sep: "┴",
+      bottom_right: "┘",
+      outer_h: "─",
+      inner_h: "─",
+      outer_v: "│",
+      inner_v: "│",
+    },
+    TableBorderStyle::Double => BorderChars {
+      top_left: "╔",
+      top_sep: "╦",
+      top_right: "╗",
+      mid_left: "╠",
+      mid_sep: "╬",
+      mid_right: "╣",
+      bottom_left: "╚",
+      bottom_sep: "╩",
+      bottom_right: "╝",
+      outer_h: "═",
+      inner_h: "═",
+      outer_v: "║",
+      inner_v: "║",
+    },
+    TableBorderStyle::DoubleOuterSingleInner => BorderChars {
+      top_left: "╔",
+      top_sep: "╤",
+      top_right: "╗",
+      mid_left: "╟",
+      mid_sep: "┼",
+      mid_right: "╢",
+      bottom_left: "╚",
+      bottom_sep: "╧",
+      bottom_right: "╝",
+      outer_h: "═",
+      inner_h: "─",
+      outer_v: "║",
+      inner_v: "│",
+    },
+  }
 }
 
 fn validate_options(options: &TableOptions) -> bool {
@@ -470,6 +589,12 @@ mod tests {
   use crate::host_engine::services::CanvasService;
 
   fn table() -> (TableService, UiObjectPool, TableId) {
+    table_with_border_style(TableBorderStyle::Single)
+  }
+
+  fn table_with_border_style(
+    border_style: TableBorderStyle,
+  ) -> (TableService, UiObjectPool, TableId) {
     let service = TableService::new();
     let mut pool = UiObjectPool::new();
     let id = service
@@ -482,6 +607,7 @@ mod tests {
           ],
           style: TableStyle {
             border_mode: TableBorderMode::Full,
+            border_style,
             column_gap: 1,
             show_header: true,
             show_empty_message: true,
@@ -543,6 +669,54 @@ mod tests {
     ));
     assert_eq!(canvas.cell_at(0, 0).unwrap().text, "┌");
     assert_eq!(canvas.cell_at(2, 3).unwrap().text, "o");
+  }
+
+  #[test]
+  fn double_border_uses_double_chars() {
+    let (service, pool, id) = table_with_border_style(TableBorderStyle::Double);
+    let mut canvas = CanvasService::new();
+    assert!(service.draw(
+      &pool,
+      &mut canvas,
+      TableDrawParams {
+        id,
+        x: 0,
+        y: 0,
+        width: 11,
+        height: 5,
+        rows: &[],
+        row_offset: 0,
+      },
+    ));
+    assert_eq!(canvas.cell_at(0, 0).unwrap().text, "╔");
+    assert_eq!(canvas.cell_at(5, 0).unwrap().text, "╦");
+    assert_eq!(canvas.cell_at(0, 2).unwrap().text, "╠");
+    assert_eq!(canvas.cell_at(5, 2).unwrap().text, "╬");
+    assert_eq!(canvas.cell_at(0, 4).unwrap().text, "╚");
+  }
+
+  #[test]
+  fn double_outer_single_inner_border_uses_mixed_chars() {
+    let (service, pool, id) = table_with_border_style(TableBorderStyle::DoubleOuterSingleInner);
+    let mut canvas = CanvasService::new();
+    assert!(service.draw(
+      &pool,
+      &mut canvas,
+      TableDrawParams {
+        id,
+        x: 0,
+        y: 0,
+        width: 11,
+        height: 5,
+        rows: &[],
+        row_offset: 0,
+      },
+    ));
+    assert_eq!(canvas.cell_at(0, 0).unwrap().text, "╔");
+    assert_eq!(canvas.cell_at(5, 0).unwrap().text, "╤");
+    assert_eq!(canvas.cell_at(0, 2).unwrap().text, "╟");
+    assert_eq!(canvas.cell_at(5, 2).unwrap().text, "┼");
+    assert_eq!(canvas.cell_at(5, 4).unwrap().text, "╧");
   }
 
   #[test]

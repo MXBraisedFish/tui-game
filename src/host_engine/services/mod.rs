@@ -1,6 +1,7 @@
 mod async_runtime;
 mod canvas;
 mod clipboard;
+mod code_highlight;
 mod event;
 pub(crate) mod export;
 mod file;
@@ -36,6 +37,9 @@ pub use async_runtime::{
 };
 pub use canvas::{CanvasCell, CanvasService};
 pub use clipboard::ClipboardService;
+pub use code_highlight::{
+  CodeHighlightService, CodeHighlightTheme, CodeHighlightToken, CodeLanguage, CodeTokenKind,
+};
 pub use event::EngineEventQueue;
 pub use export::{ExportAsyncEvent, ExportService, ExportTask};
 pub use file::FileService;
@@ -58,7 +62,9 @@ pub use package::{PackageAsset, PackageEvent, PackageListEntry, PackageService};
 pub use random::RandomService;
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};
-pub use rich_text::{RichTextParams, RichTextService, TerminalColor, TextColor, TextStyle};
+pub use rich_text::{
+  RichText, RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextStyle,
+};
 pub use storage::StorageService;
 pub use terminal::TerminalService;
 pub use text_layout::DrawTextParams;
@@ -68,17 +74,18 @@ pub use unicode::UnicodeService;
 pub use version::{HOST_API_VERSION, HOST_VERSION, PACKAGE_MANIFEST_VERSION};
 pub use widget::{
   DelayTimerEvent, DelayTimerId, DelayTimerOptions, HitAreaEvent, HitAreaId, HitAreaOptions,
-  HitAreaService, Overflow, ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions,
-  ProgressBarSegmentStyle, ProgressBarService, RandomAlgorithm, RandomGeneratorId, RandomSeed,
-  RandomSnapshot, RepeatMode, RepeatTimerEvent, RepeatTimerId, RepeatTimerOptions,
-  RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions,
-  ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarSide, ScrollbarStyle,
-  ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId,
-  TableAlign, TableBorderMode, TableCell, TableColumn, TableDrawParams, TableId, TableOptions,
-  TableOverflow, TableRow, TableService, TableStyle, TextAlign, TextInputCursorShape,
-  TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
-  TextInputService, TimeCallbackId, TimeCallbackRequest, TimerEvent, TimerId, TimerMode,
-  TimerOptions, TimerState, VerticalAlign,
+  HitAreaService, HyperlinkEvent, HyperlinkId, HyperlinkOptions, HyperlinkService, MarkdownEvent,
+  MarkdownRenderParams, MarkdownService, MarkdownTheme, MarkdownViewId, MarkdownViewOptions,
+  Overflow, ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle,
+  ProgressBarService, RandomAlgorithm, RandomGeneratorId, RandomSeed, RandomSnapshot, RepeatMode,
+  RepeatTimerEvent, RepeatTimerId, RepeatTimerOptions, RuntimeObjectPool, RuntimeObjectPoolOwner,
+  ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout,
+  ScrollbarPolicy, ScrollbarSide, ScrollbarStyle, ScrollbarVisibility, SliceId, SliceLength,
+  SliceOptions, SliceRect, SliceService, SurfaceId, TableAlign, TableBorderMode, TableBorderStyle,
+  TableCell, TableColumn, TableDrawParams, TableId, TableOptions, TableOverflow, TableRow,
+  TableService, TableStyle, TextAlign, TextInputCursorShape, TextInputEvent, TextInputId,
+  TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TimeCallbackId,
+  TimeCallbackRequest, TimerEvent, TimerId, TimerMode, TimerOptions, TimerState, VerticalAlign,
 };
 
 /// 引擎核心服务集合，持有所有子服务的实例
@@ -94,7 +101,10 @@ pub struct EngineServices {
   pub time: TimeService,
   pub host_objects: HostObjectPool,
   pub hit_area: HitAreaService,
+  pub hyperlink: HyperlinkService,
   pub scroll_box: ScrollBoxService,
+  pub markdown: MarkdownService,
+  pub code_highlight: CodeHighlightService,
   pub progress_bar: ProgressBarService,
   pub table: TableService,
   pub slice: SliceService,
@@ -139,7 +149,10 @@ impl EngineServices {
       time: TimeService::new(),
       host_objects: HostObjectPool::new(),
       hit_area: HitAreaService::new(),
+      hyperlink: HyperlinkService::new(),
       scroll_box: ScrollBoxService::new(),
+      markdown: MarkdownService::new(),
+      code_highlight: CodeHighlightService::new(),
       progress_bar: ProgressBarService::new(),
       table: TableService::new(),
       slice: SliceService::new(),

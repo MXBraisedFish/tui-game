@@ -21,6 +21,19 @@ pub enum TableBorderMode {
   Full,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TableBorderStyle {
+  Single,
+  Double,
+  DoubleOuterSingleInner,
+}
+
+impl Default for TableBorderStyle {
+  fn default() -> Self {
+    Self::Single
+  }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TableColumn {
   pub key: String,
@@ -87,6 +100,7 @@ impl TableRow {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TableStyle {
   pub border_mode: TableBorderMode,
+  pub border_style: TableBorderStyle,
   pub column_gap: u16,
   pub show_header: bool,
   pub show_empty_message: bool,
@@ -97,6 +111,7 @@ impl Default for TableStyle {
   fn default() -> Self {
     Self {
       border_mode: TableBorderMode::HeaderOnly,
+      border_style: TableBorderStyle::Single,
       column_gap: 2,
       show_header: true,
       show_empty_message: true,

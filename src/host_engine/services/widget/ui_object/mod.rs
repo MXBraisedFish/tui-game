@@ -6,7 +6,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::host_engine::services::input::InputActionEvent;
 use interactives::hit_area::{HitAreaEvent, HitAreaId, HitAreaObjects};
+use interactives::hyperlink::{HyperlinkEvent, HyperlinkId, HyperlinkObjects};
 use interactives::text_input::{TextInputEvent, TextInputObjects};
+use surfaces::markdown_view::{MarkdownEvent, MarkdownViewId, MarkdownViewObjects};
 use surfaces::progress_bar::ProgressBarObjects;
 use surfaces::scroll_box::{ScrollBoxEvent, ScrollBoxObjects};
 use surfaces::slice::SliceObjects;
@@ -22,6 +24,8 @@ pub struct UiObjectPool {
   pub(crate) events: VecDeque<UiComponentEvent>,
   pub(crate) surfaces: Vec<SurfaceId>,
   pub(crate) hit_areas: HitAreaObjects,
+  pub(crate) hyperlinks: HyperlinkObjects,
+  pub(crate) markdown_views: MarkdownViewObjects,
   pub(crate) text_inputs: TextInputObjects,
   pub(crate) slices: SliceObjects,
   pub(crate) scroll_boxes: ScrollBoxObjects,
@@ -34,6 +38,8 @@ pub struct UiObjectPool {
 pub enum UiEvent {
   Action(InputActionEvent),
   HitArea(HitAreaEvent),
+  Hyperlink(HyperlinkEvent),
+  Markdown(MarkdownEvent),
   TextInput(TextInputEvent),
   ScrollBox(ScrollBoxEvent),
 }
@@ -41,6 +47,8 @@ pub enum UiEvent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum UiComponentEvent {
   HitArea(HitAreaEvent),
+  Hyperlink(HyperlinkEvent),
+  Markdown(MarkdownEvent),
   TextInput(TextInputEvent),
   ScrollBox(ScrollBoxEvent),
 }
@@ -57,7 +65,21 @@ impl UiComponentEvent {
         | HitAreaEvent::Click { id, .. }
         | HitAreaEvent::Drag { id, .. } => *id,
       }),
-      Self::TextInput(_) | Self::ScrollBox(_) => None,
+      Self::Hyperlink(_) | Self::Markdown(_) | Self::TextInput(_) | Self::ScrollBox(_) => None,
+    }
+  }
+
+  pub(crate) fn hyperlink_id(&self) -> Option<HyperlinkId> {
+    match self {
+      Self::Hyperlink(HyperlinkEvent::Clicked { id, .. }) => Some(*id),
+      Self::HitArea(_) | Self::Markdown(_) | Self::TextInput(_) | Self::ScrollBox(_) => None,
+    }
+  }
+
+  pub(crate) fn markdown_id(&self) -> Option<MarkdownViewId> {
+    match self {
+      Self::Markdown(MarkdownEvent::LinkClicked { id, .. }) => Some(*id),
+      Self::HitArea(_) | Self::Hyperlink(_) | Self::TextInput(_) | Self::ScrollBox(_) => None,
     }
   }
 
@@ -72,7 +94,7 @@ impl UiComponentEvent {
         | TextInputEvent::Pressed { id }
         | TextInputEvent::PressedOutside { id } => *id,
       }),
-      Self::HitArea(_) | Self::ScrollBox(_) => None,
+      Self::HitArea(_) | Self::Hyperlink(_) | Self::Markdown(_) | Self::ScrollBox(_) => None,
     }
   }
 }
@@ -85,6 +107,8 @@ impl UiObjectPool {
       events: VecDeque::new(),
       surfaces: Vec::new(),
       hit_areas: HitAreaObjects::new(),
+      hyperlinks: HyperlinkObjects::new(),
+      markdown_views: MarkdownViewObjects::new(),
       text_inputs: TextInputObjects::new(),
       slices: SliceObjects::new(),
       scroll_boxes: ScrollBoxObjects::new(),
@@ -105,6 +129,8 @@ impl UiObjectPool {
   pub(crate) fn begin_render(&mut self) {
     self.render_order = 0;
     self.hit_areas.clear_hits();
+    self.hyperlinks.clear_hits();
+    self.markdown_views.clear_hits();
     self.text_inputs.clear_hits();
   }
 
@@ -116,6 +142,14 @@ impl UiObjectPool {
     self.events.push_back(UiComponentEvent::ScrollBox(event));
   }
 
+  pub(crate) fn push_hyperlink_event(&mut self, event: HyperlinkEvent) {
+    self.events.push_back(UiComponentEvent::Hyperlink(event));
+  }
+
+  pub(crate) fn push_markdown_event(&mut self, event: MarkdownEvent) {
+    self.events.push_back(UiComponentEvent::Markdown(event));
+  }
+
   pub(crate) fn push_text_event(&mut self, event: TextInputEvent) {
     self.events.push_back(UiComponentEvent::TextInput(event));
   }
@@ -123,6 +157,8 @@ impl UiObjectPool {
   pub(crate) fn pop_event(&mut self) -> Option<UiEvent> {
     self.events.pop_front().map(|event| match event {
       UiComponentEvent::HitArea(event) => UiEvent::HitArea(event),
+      UiComponentEvent::Hyperlink(event) => UiEvent::Hyperlink(event),
+      UiComponentEvent::Markdown(event) => UiEvent::Markdown(event),
       UiComponentEvent::TextInput(event) => UiEvent::TextInput(event),
       UiComponentEvent::ScrollBox(event) => UiEvent::ScrollBox(event),
     })

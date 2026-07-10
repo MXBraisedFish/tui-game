@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::{buffer::CanvasBuffer, cell::CanvasCell};
+use crate::host_engine::services::rich_text::RichTextSegment;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
 use crate::host_engine::services::widget::ui_object::surfaces::scroll_box::clamp_rect;
@@ -236,12 +237,43 @@ impl CanvasService {
     );
   }
 
+  pub fn rich_text_segments(&mut self, segments: &[RichTextSegment], params: &DrawTextParams) {
+    let lines = text_layout::layout_rich_text_segments(segments, params);
+    Self::draw_layout_lines(
+      &mut self.base,
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
+  }
+
   /// 在指定切片的缓冲区上绘制富文本，返回是否成功（切片不可见时返回 false）。
   pub fn text_on(&mut self, id: SliceId, params: &DrawTextParams) -> bool {
     let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
       return false;
     };
     let lines = text_layout::layout_text_lines(params);
+    Self::draw_layout_lines(
+      &mut slice.buffer,
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
+    true
+  }
+
+  pub fn rich_text_segments_on(
+    &mut self,
+    id: SliceId,
+    segments: &[RichTextSegment],
+    params: &DrawTextParams,
+  ) -> bool {
+    let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
+      return false;
+    };
+    let lines = text_layout::layout_rich_text_segments(segments, params);
     Self::draw_layout_lines(
       &mut slice.buffer,
       params.x,
@@ -272,9 +304,48 @@ impl CanvasService {
     true
   }
 
+  pub fn rich_text_segments_in_scroll_box(
+    &mut self,
+    id: ScrollBoxId,
+    segments: &[RichTextSegment],
+    params: &DrawTextParams,
+  ) -> bool {
+    let Some(scroll_box) = self
+      .scroll_boxes
+      .get_mut(&id)
+      .filter(|scroll_box| scroll_box.visible)
+    else {
+      return false;
+    };
+    let lines = text_layout::layout_rich_text_segments(segments, params);
+    Self::draw_layout_lines(
+      &mut scroll_box.buffer,
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
+    true
+  }
+
   /// 在宿主层上绘制富文本（用于覆盖层等）。
   pub(crate) fn host_text(&mut self, params: &DrawTextParams) {
     let lines = text_layout::layout_text_lines(params);
+    Self::draw_layout_lines(
+      &mut self.host,
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
+  }
+
+  pub(crate) fn host_rich_text_segments(
+    &mut self,
+    segments: &[RichTextSegment],
+    params: &DrawTextParams,
+  ) {
+    let lines = text_layout::layout_rich_text_segments(segments, params);
     Self::draw_layout_lines(
       &mut self.host,
       params.x,
@@ -540,6 +611,58 @@ impl CanvasService {
       slice.buffer.height(),
       slice.order + 1,
     )
+  }
+
+  pub(crate) fn scroll_box_hit_rect(
+    &self,
+    id: ScrollBoxId,
+    rect: Rect,
+  ) -> Option<(Rect, (u16, u16), usize)> {
+    let scroll_box = self
+      .scroll_boxes
+      .get(&id)
+      .filter(|scroll_box| scroll_box.visible)?;
+    let viewport = Rect {
+      x: scroll_box.scroll_x,
+      y: scroll_box.scroll_y,
+      width: scroll_box.rect.width,
+      height: scroll_box.rect.height,
+    };
+    let x1 = rect.x.max(viewport.x);
+    let y1 = rect.y.max(viewport.y);
+    let x2 = rect
+      .x
+      .saturating_add(rect.width)
+      .min(viewport.x.saturating_add(viewport.width));
+    let y2 = rect
+      .y
+      .saturating_add(rect.height)
+      .min(viewport.y.saturating_add(viewport.height));
+    if x2 <= x1 || y2 <= y1 {
+      return None;
+    }
+    let visible = Rect {
+      x: self
+        .viewport
+        .x
+        .saturating_add(scroll_box.rect.x)
+        .saturating_add(x1.saturating_sub(scroll_box.scroll_x)),
+      y: self
+        .viewport
+        .y
+        .saturating_add(scroll_box.rect.y)
+        .saturating_add(y1.saturating_sub(scroll_box.scroll_y)),
+      width: x2 - x1,
+      height: y2 - y1,
+    };
+    Some((
+      visible,
+      (
+        self.viewport.x.saturating_add(scroll_box.rect.x),
+        self.viewport.y.saturating_add(scroll_box.rect.y),
+      ),
+      scroll_box.order + 1,
+    ))
   }
 
   /// 计算宿主层上矩形区域的命中检测结果。

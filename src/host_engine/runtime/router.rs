@@ -676,6 +676,18 @@ fn route_component_mouse(
     services.canvas.request_render();
     return true;
   }
+  if services
+    .markdown
+    .route_mouse_event(pool, &services.text_input, event)
+  {
+    return true;
+  }
+  if services
+    .hyperlink
+    .route_mouse_event(pool, &services.text_input, event)
+  {
+    return true;
+  }
   services
     .hit_area
     .route_mouse_event(pool, &mut services.text_input, &services.canvas, event)
