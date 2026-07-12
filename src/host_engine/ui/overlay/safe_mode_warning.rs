@@ -10,6 +10,7 @@ use crate::host_engine::services::{
 
 const TEMPORARY_DELAY: Duration = Duration::from_secs(3);
 const PERMANENT_DELAY: Duration = Duration::from_secs(5);
+const ALL_PERMANENT_DELAY: Duration = Duration::from_secs(7);
 
 pub struct SafeModeWarningUi {
   objects: UiObjectPool,
@@ -64,17 +65,31 @@ impl SafeModeWarningUi {
     self.elapsed = self.elapsed.saturating_add(dt);
   }
 
-  pub fn handle_raw_key_events(&self, input: &mut InputService) -> Option<SafeModeWarningCommand> {
+  pub fn handle_raw_key_events(
+    &self,
+    input: &mut InputService,
+    all_packages: bool,
+  ) -> Option<SafeModeWarningCommand> {
     for event in input.take_raw_key_events() {
       if event.kind != KeyEventKind::Press {
         continue;
+      }
+      if all_packages {
+        return match event.key {
+          Key::Num(2) | Key::Numpad(2) if self.permanent_ready(true) => {
+            Some(SafeModeWarningCommand::DisablePermanent)
+          }
+          Key::Num(2) | Key::Numpad(2) => None,
+          Key::Esc => Some(SafeModeWarningCommand::Cancel),
+          _ => Some(SafeModeWarningCommand::Cancel),
+        };
       }
       return match event.key {
         Key::Num(1) | Key::Numpad(1) if self.temporary_ready() => {
           Some(SafeModeWarningCommand::DisableTemporary)
         }
         Key::Num(1) | Key::Numpad(1) => None,
-        Key::Num(2) | Key::Numpad(2) if self.permanent_ready() => {
+        Key::Num(2) | Key::Numpad(2) if self.permanent_ready(false) => {
           Some(SafeModeWarningCommand::DisablePermanent)
         }
         Key::Num(2) | Key::Numpad(2) => None,
@@ -85,7 +100,11 @@ impl SafeModeWarningUi {
     None
   }
 
-  pub fn handle_event(&self, event: &UiEvent) -> Option<SafeModeWarningCommand> {
+  pub fn handle_event(
+    &self,
+    event: &UiEvent,
+    all_packages: bool,
+  ) -> Option<SafeModeWarningCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::Click {
         id,
@@ -96,14 +115,14 @@ impl SafeModeWarningUi {
         id,
         button: MouseButton::Left,
         ..
-      }) if *id == self.temporary_area && self.temporary_ready() => {
+      }) if !all_packages && *id == self.temporary_area && self.temporary_ready() => {
         Some(SafeModeWarningCommand::DisableTemporary)
       }
       UiEvent::HitArea(HitAreaEvent::Click {
         id,
         button: MouseButton::Left,
         ..
-      }) if *id == self.permanent_area && self.permanent_ready() => {
+      }) if *id == self.permanent_area && self.permanent_ready(all_packages) => {
         Some(SafeModeWarningCommand::DisablePermanent)
       }
       _ => None,
@@ -117,6 +136,7 @@ impl SafeModeWarningUi {
     layout: &LayoutService,
     i18n: &I18nService,
     hit_area: &HitAreaService,
+    all_packages: bool,
   ) {
     let size = layout.physical_size();
     let params = Self::key_params();
@@ -133,7 +153,12 @@ impl SafeModeWarningUi {
     );
 
     let content_w = size.width.saturating_sub(32).max(1);
-    let desc = i18n.get_runtime_text("safe_mode_warning", "safe_mode_warning.description.one");
+    let description_key = if all_packages {
+      "safe_mode_warning.description.all"
+    } else {
+      "safe_mode_warning.description.one"
+    };
+    let desc = i18n.get_runtime_text("safe_mode_warning", description_key);
     let desc_size = layout.get_draw_text_size(&DrawTextParams {
       text: desc.clone(),
       wrap_mode: TextWrapMode::Auto,
@@ -147,22 +172,29 @@ impl SafeModeWarningUi {
     let no_text = format!("f%<fg:bright_green>{}</fg>", no);
     let temporary_text =
       self.option_text(&temporary, TEMPORARY_DELAY, self.temporary_ready(), &second);
-    let permanent_text =
-      self.option_text(&permanent, PERMANENT_DELAY, self.permanent_ready(), &second);
-    let block_w = [
+    let permanent_delay = if all_packages {
+      ALL_PERMANENT_DELAY
+    } else {
+      PERMANENT_DELAY
+    };
+    let permanent_text = self.option_text(
+      &permanent,
+      permanent_delay,
+      self.permanent_ready(all_packages),
+      &second,
+    );
+    let mut widths = vec![
       desc_size.width.max(1),
       layout.get_text_width(&no_text, Some(&params)),
-      layout.get_text_width(&temporary_text, Some(&params)),
       layout.get_text_width(&permanent_text, Some(&params)),
-    ]
-    .into_iter()
-    .max()
-    .unwrap_or(1)
-    .min(content_w)
-    .max(1);
+    ];
+    if !all_packages {
+      widths.push(layout.get_text_width(&temporary_text, Some(&params)));
+    }
+    let block_w = widths.into_iter().max().unwrap_or(1).min(content_w).max(1);
     let content_x = size.width.saturating_sub(block_w) / 2;
     let desc_h = desc_size.height.max(1);
-    let block_h = desc_h + 4;
+    let block_h = desc_h + if all_packages { 3 } else { 4 };
     let start_y = size.height.saturating_sub(block_h) / 2;
 
     render.draw_host_text(
@@ -179,17 +211,19 @@ impl SafeModeWarningUi {
 
     let no_y = start_y.saturating_add(desc_h + 1);
     let temporary_y = no_y.saturating_add(1);
-    let permanent_y = no_y.saturating_add(2);
+    let permanent_y = no_y.saturating_add(if all_packages { 1 } else { 2 });
 
     self.draw_option(render, canvas, content_x, no_y, &no_text, &params);
-    self.draw_option(
-      render,
-      canvas,
-      content_x,
-      temporary_y,
-      &temporary_text,
-      &params,
-    );
+    if !all_packages {
+      self.draw_option(
+        render,
+        canvas,
+        content_x,
+        temporary_y,
+        &temporary_text,
+        &params,
+      );
+    }
     self.draw_option(
       render,
       canvas,
@@ -209,16 +243,18 @@ impl SafeModeWarningUi {
       &no,
       &params,
     );
-    self.register_area(
-      hit_area,
-      canvas,
-      layout,
-      self.temporary_area,
-      content_x,
-      temporary_y,
-      &temporary_text,
-      &params,
-    );
+    if !all_packages {
+      self.register_area(
+        hit_area,
+        canvas,
+        layout,
+        self.temporary_area,
+        content_x,
+        temporary_y,
+        &temporary_text,
+        &params,
+      );
+    }
     self.register_area(
       hit_area,
       canvas,
@@ -299,8 +335,13 @@ impl SafeModeWarningUi {
     self.elapsed >= TEMPORARY_DELAY
   }
 
-  fn permanent_ready(&self) -> bool {
-    self.elapsed >= PERMANENT_DELAY
+  fn permanent_ready(&self, all_packages: bool) -> bool {
+    self.elapsed
+      >= if all_packages {
+        ALL_PERMANENT_DELAY
+      } else {
+        PERMANENT_DELAY
+      }
   }
 }
 
@@ -329,4 +370,19 @@ pub enum SafeModeWarningCommand {
   Cancel,
   DisableTemporary,
   DisablePermanent,
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn all_packages_permanent_option_requires_seven_seconds() {
+    let mut ui = SafeModeWarningUi::init(&HitAreaService::new());
+    ui.update(Duration::from_secs(6));
+    assert!(!ui.permanent_ready(true));
+    assert!(ui.permanent_ready(false));
+    ui.update(Duration::from_secs(1));
+    assert!(ui.permanent_ready(true));
+  }
 }

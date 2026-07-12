@@ -7,6 +7,7 @@ pub(super) fn current_objects_mut<'a>(
   world: &RuntimeWorld,
   home_ui: &'a mut HomeUi,
   settings_ui: &'a mut SettingsUi,
+  security_uis: &'a mut SecurityUis,
   storage_management_ui: &'a mut StorageManagementUi,
   storage_management_clear_ui: &'a mut StorageManagementClearUi,
   storage_management_export_ui: &'a mut StorageManagementExportUi,
@@ -21,6 +22,8 @@ pub(super) fn current_objects_mut<'a>(
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => Some(home_ui.objects_mut()),
     Some(UiNodeKind::Settings) => Some(settings_ui.objects_mut()),
+    Some(UiNodeKind::SecuritySettings) => Some(security_uis.settings.objects_mut()),
+    Some(UiNodeKind::SecurityDetails) => Some(security_uis.details.objects_mut()),
     Some(UiNodeKind::StorageManagement) => Some(storage_management_ui.objects_mut()),
     Some(UiNodeKind::StorageManagementClear) => Some(storage_management_clear_ui.objects_mut()),
     Some(UiNodeKind::StorageManagementExport) => Some(storage_management_export_ui.objects_mut()),
@@ -40,6 +43,7 @@ pub(super) fn deactivate_hidden_pools(
   world: &RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -70,6 +74,14 @@ pub(super) fn deactivate_hidden_pools(
   };
   deactivate(UiNodeKind::Home, home_ui.objects_mut());
   deactivate(UiNodeKind::Settings, settings_ui.objects_mut());
+  deactivate(
+    UiNodeKind::SecuritySettings,
+    security_uis.settings.objects_mut(),
+  );
+  deactivate(
+    UiNodeKind::SecurityDetails,
+    security_uis.details.objects_mut(),
+  );
   deactivate(
     UiNodeKind::StorageManagement,
     storage_management_ui.objects_mut(),
@@ -140,6 +152,7 @@ pub(super) fn route_text_input_events(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -162,6 +175,7 @@ pub(super) fn route_text_input_events(
           world,
           home_ui,
           settings_ui,
+          security_uis,
           storage_management_ui,
           storage_management_clear_ui,
           storage_management_export_ui,
@@ -184,6 +198,7 @@ pub(super) fn route_text_input_events(
           world,
           home_ui,
           settings_ui,
+          security_uis,
           storage_management_ui,
           storage_management_clear_ui,
           storage_management_export_ui,
@@ -202,6 +217,7 @@ pub(super) fn route_text_input_events(
           world,
           home_ui,
           settings_ui,
+          security_uis,
           storage_management_ui,
           storage_management_clear_ui,
           storage_management_export_ui,
@@ -223,6 +239,7 @@ pub(super) fn route_text_input_events(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -246,6 +263,7 @@ pub(super) fn route_input_events(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -274,6 +292,7 @@ pub(super) fn route_input_events(
         route_safe_mode_warning_overlay_events(
           services,
           world,
+          security_uis,
           game_package_ui,
           safe_mode_warning_ui,
         );
@@ -302,6 +321,7 @@ pub(super) fn route_input_events(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -322,6 +342,7 @@ pub(super) fn route_input_events(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -353,6 +374,7 @@ pub(super) fn route_input_events(
           world,
           home_ui,
           settings_ui,
+          security_uis,
           storage_management_ui,
           storage_management_clear_ui,
           storage_management_export_ui,
@@ -380,6 +402,7 @@ pub(super) fn route_input_events(
           world,
           home_ui,
           settings_ui,
+          security_uis,
           storage_management_ui,
           storage_management_clear_ui,
           storage_management_export_ui,
@@ -398,6 +421,7 @@ pub(super) fn route_input_events(
           world,
           home_ui,
           settings_ui,
+          security_uis,
           storage_management_ui,
           storage_management_clear_ui,
           storage_management_export_ui,
@@ -427,6 +451,7 @@ pub(super) fn route_update(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -467,6 +492,10 @@ pub(super) fn route_update(
     Some(UiNodeKind::Settings) => {
       let _ = settings_ui.update(world.clock.delta_time());
     }
+    Some(UiNodeKind::SecuritySettings) => {
+      security_uis.settings.update(world.clock.delta_time());
+    }
+    Some(UiNodeKind::SecurityDetails) => {}
     Some(UiNodeKind::StorageManagement) => {
       let _ = storage_management_ui.update(world.clock.delta_time());
     }
@@ -506,6 +535,7 @@ pub(super) fn route_update(
     world,
     home_ui,
     settings_ui,
+    security_uis,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -565,13 +595,16 @@ fn route_window_size_overlay_events(
 fn route_safe_mode_warning_overlay_events(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
+  security_uis: &mut SecurityUis,
   game_package_ui: &mut GamePackageUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
 ) {
   while services.input.next_action_event().is_some() {}
-  if let Some(command) = safe_mode_warning_ui.handle_raw_key_events(&mut services.input) {
+  if let Some(command) =
+    safe_mode_warning_ui.handle_raw_key_events(&mut services.input, world.safe_mode_warning_all)
+  {
     safe_mode_warning_ui.start();
-    apply_safe_mode_warning_command(command, game_package_ui, services, world);
+    apply_safe_mode_warning_command(command, security_uis, game_package_ui, services, world);
     return;
   }
   for sys_event in services.input.drain_system_events() {
@@ -592,9 +625,10 @@ fn route_safe_mode_warning_overlay_events(
       _ => {}
     }
     while let Some(event) = safe_mode_warning_ui.objects_mut().pop_event() {
-      if let Some(command) = safe_mode_warning_ui.handle_event(&event) {
+      if let Some(command) = safe_mode_warning_ui.handle_event(&event, world.safe_mode_warning_all)
+      {
         safe_mode_warning_ui.start();
-        apply_safe_mode_warning_command(command, game_package_ui, services, world);
+        apply_safe_mode_warning_command(command, security_uis, game_package_ui, services, world);
         return;
       }
     }
@@ -640,6 +674,7 @@ fn route_component_mouse(
   world: &RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -656,6 +691,7 @@ fn route_component_mouse(
     world,
     home_ui,
     settings_ui,
+    security_uis,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -698,6 +734,7 @@ fn route_mouse_and_events(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -719,6 +756,7 @@ fn route_mouse_and_events(
     world,
     home_ui,
     settings_ui,
+    security_uis,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -736,6 +774,7 @@ fn route_mouse_and_events(
     world,
     home_ui,
     settings_ui,
+    security_uis,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -759,6 +798,7 @@ fn route_component_events(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -779,6 +819,7 @@ fn route_component_events(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -798,6 +839,7 @@ fn route_component_events(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -825,6 +867,7 @@ fn route_input_event(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -848,7 +891,17 @@ fn route_input_event(
     }
     Some(UiNodeKind::Settings) => {
       if let Some(command) = settings_ui.handle_event(event) {
-        apply_settings_command(command, settings_ui, services, world);
+        apply_settings_command(command, settings_ui, security_uis, services, world);
+      }
+    }
+    Some(UiNodeKind::SecuritySettings) => {
+      if let Some(command) = security_uis.settings.handle_event(event) {
+        apply_security_settings_command(command, security_uis, services, world);
+      }
+    }
+    Some(UiNodeKind::SecurityDetails) => {
+      if let Some(command) = security_uis.details.handle_event(event) {
+        apply_security_details_command(command, security_uis, services, world);
       }
     }
     Some(UiNodeKind::StorageManagement) => {

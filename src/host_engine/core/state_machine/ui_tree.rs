@@ -18,6 +18,8 @@ pub enum UiNodeKind {
   Root,
   Home,
   Settings,
+  SecuritySettings,
+  SecurityDetails,
   LanguageSelect,
   StorageManagement,
   StorageManagementClear,
@@ -58,6 +60,22 @@ impl UiNodeState {
   pub fn settings() -> Self {
     Self {
       kind: UiNodeKind::Settings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn security_settings() -> Self {
+    Self {
+      kind: UiNodeKind::SecuritySettings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn security_details() -> Self {
+    Self {
+      kind: UiNodeKind::SecurityDetails,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

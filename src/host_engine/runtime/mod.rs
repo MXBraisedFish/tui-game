@@ -25,7 +25,8 @@ use crate::host_engine::ui::{
   ExportSettingsCommand, ExportSettingsUi, ExportType, GamePackageCommand, GamePackageUi, HomeUi,
   HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
   LanguageSelectUi, ModsCommand, ModsUi, SafeModeWarningCommand, SafeModeWarningUi,
-  ScreensaverPackageCommand, ScreensaverPackageUi, SettingsUi, SettingsUiCommand,
+  ScreensaverPackageCommand, ScreensaverPackageUi, SecurityDetailsCommand, SecurityDetailsUi,
+  SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
   StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
   StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
   StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
@@ -55,6 +56,11 @@ struct InputModeScope {
 struct InputModePolicy {
   action_map_dispatch: bool,
   raw_key_capture: bool,
+}
+
+struct SecurityUis {
+  settings: SecuritySettingsUi,
+  details: SecurityDetailsUi,
 }
 
 impl InputModePolicy {
@@ -95,6 +101,16 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let registry = services.i18n.language_registry().to_vec();
   let mut home_ui = HomeUi::init(&services.hit_area);
   let mut settings_ui = SettingsUi::init(&services.hit_area);
+  let mut security_uis = SecurityUis {
+    settings: SecuritySettingsUi::init(&services.hit_area),
+    details: SecurityDetailsUi::init(
+      &services.hit_area,
+      &services.scroll_box,
+      &services.markdown,
+      &services.storage,
+      &services.i18n,
+    ),
+  };
   let mut storage_management_ui = StorageManagementUi::init(&services.hit_area);
   let mut storage_management_clear_ui = StorageManagementClearUi::init(&services.hit_area);
   let mut storage_management_export_ui = StorageManagementExportUi::init(&services.hit_area);
@@ -194,6 +210,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
       &mut storage_management_export_ui,
@@ -216,6 +233,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
       &mut storage_management_export_ui,
@@ -247,6 +265,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
       &mut storage_management_export_ui,
@@ -278,6 +297,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
       &mut storage_management_export_ui,
@@ -368,6 +388,7 @@ fn route_frame_input(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -395,6 +416,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -422,6 +444,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -448,6 +471,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -502,6 +526,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -525,6 +550,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      security_uis,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,

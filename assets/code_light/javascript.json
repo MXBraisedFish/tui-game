@@ -1,0 +1,21 @@
+{
+  "language": "javascript",
+  "extensions": ["js", "mjs", "cjs"],
+  "keywords": [
+    "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger",
+    "default", "delete", "do", "else", "export", "extends", "finally", "for", "from",
+    "function", "if", "import", "in", "instanceof", "let", "new", "of", "return", "super",
+    "switch", "throw", "try", "typeof", "var", "void", "while", "with", "yield", "this"
+  ],
+  "builtins": [
+    "Array", "BigInt", "Boolean", "console", "Date", "Error", "JSON", "Map", "Math",
+    "Number", "Object", "Promise", "Reflect", "RegExp", "Set", "String", "Symbol",
+    "WeakMap", "WeakSet", "log", "require"
+  ],
+  "constants": ["true", "false", "null", "undefined", "NaN", "Infinity"],
+  "operators": [
+    "+", "-", "*", "/", "%", "**", "=", "+=", "-=", "*=", "/=", "%=", "**=", "==",
+    "===", "!=", "!==", "<", ">", "<=", ">=", "&&", "||", "!", "&", "|", "^", "~",
+    "<<", ">>", ">>>", "?", "??", "?.", "=>", ".", "..."
+  ]
+}

@@ -65,7 +65,9 @@ pub use render_pipeline::{FrameCompositor, FramePresenter};
 pub use rich_text::{
   RichText, RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextStyle,
 };
-pub use storage::StorageService;
+pub use storage::{
+  GamePackageState, PackageDefaultState, SafeModeDefault, ScreensaverPackageState, StorageService,
+};
 pub use terminal::TerminalService;
 pub use text_layout::DrawTextParams;
 pub use time::TimeService;

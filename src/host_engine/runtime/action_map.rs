@@ -4,6 +4,8 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => load_home_action_map(services),
     Some(UiNodeKind::Settings) => load_settings_action_map(services),
+    Some(UiNodeKind::SecuritySettings) => load_security_settings_action_map(services),
+    Some(UiNodeKind::SecurityDetails) => load_security_details_action_map(services),
     Some(UiNodeKind::StorageManagement) => load_storage_management_action_map(services),
     Some(UiNodeKind::StorageManagementClear) => load_storage_management_clear_action_map(services),
     Some(UiNodeKind::StorageManagementExport) => {
@@ -38,6 +40,22 @@ fn load_home_action_map(services: &mut EngineServices) {
 
 fn load_settings_action_map(services: &mut EngineServices) {
   load_action_map(services, &SettingsUi::action_map(), "SettingsUi");
+}
+
+fn load_security_settings_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &SecuritySettingsUi::action_map(),
+    "SecuritySettingsUi",
+  );
+}
+
+fn load_security_details_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &SecurityDetailsUi::action_map(),
+    "SecurityDetailsUi",
+  );
 }
 
 fn load_storage_management_action_map(services: &mut EngineServices) {

@@ -11,9 +11,9 @@ use crate::host_engine::services::ui::UiObjectPool;
 use crate::host_engine::services::unicode::display_width;
 use crate::host_engine::services::{
   CanvasService, CodeHighlightService, MouseButton, MouseEvent, MouseEventKind, Rect,
-  RichTextSegment, ScrollBoxId, Size, SliceId, TextAlign, TextStyle,
+  RichTextSegment, ScrollBoxId, Size, SliceId, TextAlign, TextColor, TextStyle,
 };
-use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{Alignment, CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 pub struct MarkdownService;
 
@@ -38,6 +38,7 @@ enum MdBlock {
   Rule,
   Table {
     rows: Vec<Vec<String>>,
+    aligns: Vec<TextAlign>,
   },
   Blank,
 }
@@ -363,6 +364,7 @@ fn parse_markdown(
   let mut quote_depth = 0usize;
   let mut code: Option<(Option<String>, String)> = None;
   let mut table_rows: Option<Vec<Vec<String>>> = None;
+  let mut table_aligns = Vec::new();
   let mut table_row: Option<Vec<String>> = None;
   let mut table_cell = String::new();
   let mut in_table_cell = false;
@@ -440,8 +442,16 @@ fn parse_markdown(
             }
           })
           .unwrap_or_else(|| "• ".to_string());
+        let marker_style = TextStyle {
+          foreground: Some(TextColor::Rgb {
+            r: 255,
+            g: 255,
+            b: 255,
+          }),
+          ..Default::default()
+        };
         let mut state = InlineState::new(options.theme.paragraph.clone());
-        state.push_text(&marker, &options.theme.paragraph);
+        state.push_text(&marker, &marker_style);
         inline = Some(state);
       }
       Event::End(TagEnd::Item) => finish_text(&mut blocks, inline.take(), false),
@@ -467,10 +477,14 @@ fn parse_markdown(
         blocks.push(MdBlock::Rule);
         blocks.push(MdBlock::Blank);
       }
-      Event::Start(Tag::Table(_)) => table_rows = Some(Vec::new()),
+      Event::Start(Tag::Table(aligns)) => {
+        table_aligns = aligns.into_iter().map(markdown_table_align).collect();
+        table_rows = Some(Vec::new());
+      }
       Event::End(TagEnd::Table) => {
         blocks.push(MdBlock::Table {
           rows: table_rows.take().unwrap_or_default(),
+          aligns: std::mem::take(&mut table_aligns),
         });
         blocks.push(MdBlock::Blank);
       }
@@ -575,7 +589,9 @@ fn draw_block(
       );
       y.saturating_add(1)
     }
-    MdBlock::Table { rows } => draw_table(canvas, target, x, y, width, rows, &options.theme),
+    MdBlock::Table { rows, aligns } => {
+      draw_table(canvas, target, x, y, width, rows, aligns, &options.theme)
+    }
     MdBlock::Blank => y.saturating_add(1),
   }
 }
@@ -676,36 +692,80 @@ fn draw_table(
   y: u16,
   width: u16,
   rows: &[Vec<String>],
+  aligns: &[TextAlign],
   theme: &MarkdownTheme,
 ) -> u16 {
   if rows.is_empty() || width < 3 {
     return y;
   }
   let columns = rows.iter().map(Vec::len).max().unwrap_or(0).max(1);
-  let cell_width = ((width.saturating_sub(columns as u16 + 1)) / columns as u16).max(1);
+  let cell_widths = markdown_table_widths(rows, width, columns);
   let mut row_y = y;
   draw_plain(
     canvas,
     target,
     x,
     row_y,
-    &table_border(columns, cell_width, '┌', '┬', '┐'),
+    &table_border(&cell_widths, '┌', '┬', '┐'),
     theme.table_border.clone(),
   );
   row_y = row_y.saturating_add(1);
   for (index, row) in rows.iter().enumerate() {
-    let mut line = String::from("│");
+    let row_style = if index == 0 {
+      theme.table_header.clone()
+    } else {
+      theme.paragraph.clone()
+    };
+    let row_height = markdown_table_row_height(row, &cell_widths).max(1);
+    for line in 0..row_height {
+      draw_plain(
+        canvas,
+        target,
+        x,
+        row_y.saturating_add(line),
+        "│",
+        theme.table_border.clone(),
+      );
+    }
+    let mut cell_x = x.saturating_add(1);
     for col in 0..columns {
       let text = row.get(col).map(String::as_str).unwrap_or("");
-      line.push_str(&fit_plain(text, cell_width as usize));
-      line.push('│');
+      draw_segments(
+        canvas,
+        target,
+        &[RichTextSegment {
+          text: text.to_string(),
+          style: row_style.clone(),
+        }],
+        &DrawTextParams {
+          x: cell_x,
+          y: row_y,
+          max_width: Some(cell_widths[col]),
+          max_height: Some(row_height),
+          wrap_mode: TextWrapMode::Auto,
+          non_truncate_word_wrap: true,
+          line_align: *aligns.get(col).unwrap_or(&TextAlign::Left),
+          ..Default::default()
+        },
+      );
+      cell_x = cell_x.saturating_add(cell_widths[col]);
+      for line in 0..row_height {
+        draw_plain(
+          canvas,
+          target,
+          cell_x,
+          row_y.saturating_add(line),
+          "│",
+          theme.table_border.clone(),
+        );
+      }
+      cell_x = cell_x.saturating_add(1);
     }
-    draw_plain(canvas, target, x, row_y, &line, theme.paragraph.clone());
-    row_y = row_y.saturating_add(1);
+    row_y = row_y.saturating_add(row_height);
     let sep = if index + 1 == rows.len() {
-      table_border(columns, cell_width, '└', '┴', '┘')
+      table_border(&cell_widths, '└', '┴', '┘')
     } else {
-      table_border(columns, cell_width, '├', '┼', '┤')
+      table_border(&cell_widths, '├', '┼', '┤')
     };
     draw_plain(canvas, target, x, row_y, &sep, theme.table_border.clone());
     row_y = row_y.saturating_add(1);
@@ -729,7 +789,21 @@ fn measure_blocks(
         .saturating_add(code.lines().count() as u16)
         .saturating_add(2),
       MdBlock::Rule => height.saturating_add(1),
-      MdBlock::Table { rows } => height.saturating_add(rows.len() as u16 * 2 + 1),
+      MdBlock::Table { rows, .. } => {
+        let widths =
+          markdown_table_widths(rows, width, rows.iter().map(Vec::len).max().unwrap_or(1));
+        height.saturating_add(
+          rows
+            .iter()
+            .map(|row| {
+              markdown_table_row_height(row, &widths)
+                .max(1)
+                .saturating_add(1)
+            })
+            .sum::<u16>()
+            .saturating_add(1),
+        )
+      }
       MdBlock::Blank => height.saturating_add(1),
     };
   }
@@ -996,28 +1070,100 @@ fn merge_style(base: &TextStyle, overlay: &TextStyle) -> TextStyle {
   }
 }
 
-fn table_border(columns: usize, width: u16, left: char, middle: char, right: char) -> String {
-  let mut line = String::new();
-  line.push(left);
-  for index in 0..columns {
-    line.push_str(&"─".repeat(width as usize));
-    line.push(if index + 1 == columns { right } else { middle });
+fn markdown_table_align(align: Alignment) -> TextAlign {
+  match align {
+    Alignment::Left | Alignment::None => TextAlign::Left,
+    Alignment::Center => TextAlign::Center,
+    Alignment::Right => TextAlign::Right,
   }
-  line
 }
 
-fn fit_plain(text: &str, width: usize) -> String {
-  let mut result = String::new();
-  let mut used = 0usize;
-  for grapheme in crate::host_engine::services::unicode::graphemes(text) {
-    if used + grapheme.display_width > width {
-      break;
-    }
-    used += grapheme.display_width;
-    result.push_str(&grapheme.text);
+fn markdown_table_widths(rows: &[Vec<String>], width: u16, columns: usize) -> Vec<u16> {
+  if columns == 0 {
+    return Vec::new();
   }
-  result.push_str(&" ".repeat(width.saturating_sub(used)));
-  result
+  let borders = columns as u16 + 1;
+  let available = width.saturating_sub(borders).max(columns as u16);
+  let mut widths = (0..columns)
+    .map(|col| {
+      rows
+        .iter()
+        .filter_map(|row| row.get(col))
+        .map(|text| visible_width(text))
+        .max()
+        .unwrap_or(1)
+        .max(1)
+    })
+    .collect::<Vec<_>>();
+
+  while widths.iter().sum::<u16>() > available {
+    let Some(index) = widths
+      .iter()
+      .enumerate()
+      .filter(|(_, width)| **width > 3)
+      .max_by_key(|(_, width)| **width)
+      .map(|(index, _)| index)
+    else {
+      break;
+    };
+    widths[index] -= 1;
+  }
+
+  while widths.iter().sum::<u16>() < available {
+    let Some(index) = widths
+      .iter()
+      .enumerate()
+      .min_by_key(|(_, width)| **width)
+      .map(|(index, _)| index)
+    else {
+      break;
+    };
+    widths[index] += 1;
+  }
+  widths
+}
+
+fn markdown_table_row_height(row: &[String], widths: &[u16]) -> u16 {
+  widths
+    .iter()
+    .enumerate()
+    .map(|(index, width)| {
+      text_layout::measure_draw_text(&DrawTextParams {
+        text: row.get(index).cloned().unwrap_or_default(),
+        max_width: Some(*width),
+        wrap_mode: TextWrapMode::Auto,
+        non_truncate_word_wrap: true,
+        ..Default::default()
+      })
+      .1
+      .max(1)
+    })
+    .max()
+    .unwrap_or(1)
+}
+
+fn visible_width(text: &str) -> u16 {
+  text_layout::measure_draw_text(&DrawTextParams {
+    text: text.to_string(),
+    max_height: Some(1),
+    wrap_mode: TextWrapMode::None,
+    ..Default::default()
+  })
+  .0
+}
+
+fn table_border(widths: &[u16], left: char, middle: char, right: char) -> String {
+  let mut line = String::new();
+  line.push(left);
+  for (index, width) in widths.iter().enumerate() {
+    line.push_str(&"─".repeat(*width as usize));
+    line.push(if index + 1 == widths.len() {
+      right
+    } else {
+      middle
+    });
+  }
+  line
 }
 
 #[cfg(test)]
@@ -1082,5 +1228,132 @@ mod tests {
       .map(|segment| segment.text.as_str())
       .collect::<String>();
     assert_eq!(text, "before  after");
+  }
+
+  #[test]
+  fn markdown_default_theme_uses_configured_rgb_styles() {
+    let theme = MarkdownTheme::default();
+    assert_style_color(&theme.h1, 170, 105, 225);
+    assert_style_color(&theme.h2, 184, 122, 232);
+    assert_style_color(&theme.h3, 198, 140, 238);
+    assert_style_color(&theme.h4_to_h6, 234, 198, 250);
+    assert_style_color(&theme.inline_code, 249, 232, 147);
+    assert_style_color(&theme.quote, 255, 164, 209);
+    assert_style_color(&theme.table_border, 255, 255, 255);
+    assert_style_color(&theme.table_header, 86, 182, 194);
+    assert_style_color(&theme.task_checked, 95, 215, 105);
+    assert_style_color(&theme.task_unchecked, 85, 87, 83);
+    assert!(theme.h1.bold);
+    assert!(theme.h4_to_h6.bold);
+  }
+
+  #[test]
+  fn markdown_list_markers_use_plain_white() {
+    let code = CodeHighlightService::new();
+    let options = MarkdownViewOptions::new("- item");
+    let blocks = parse_markdown(&options, &code);
+    let MdBlock::Text { segments, .. } = &blocks[0] else {
+      panic!("expected text block");
+    };
+    assert_eq!(segments[0].text, "• ");
+    assert_style_color(&segments[0].style, 255, 255, 255);
+  }
+
+  #[test]
+  fn markdown_table_uses_white_border_and_cyan_header() {
+    let service = MarkdownService::new();
+    let code = CodeHighlightService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        MarkdownViewOptions::new("| A | B |\n|---|---|\n| 1 | 2 |"),
+      )
+      .unwrap();
+    let mut canvas = CanvasService::new();
+    let layout = crate::host_engine::services::LayoutService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    assert!(service.render(
+      &mut pool,
+      id,
+      MarkdownRenderParams {
+        x: 0,
+        y: 0,
+        width: 12,
+        max_height: None,
+      },
+      &mut canvas,
+      &code,
+    ));
+    assert_style_color(&canvas.cell_at(0, 0).unwrap().style, 255, 255, 255);
+    assert_style_color(&canvas.cell_at(1, 1).unwrap().style, 86, 182, 194);
+    assert_style_color(&canvas.cell_at(0, 1).unwrap().style, 255, 255, 255);
+  }
+
+  #[test]
+  fn markdown_table_wraps_long_cells() {
+    let service = MarkdownService::new();
+    let code = CodeHighlightService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        MarkdownViewOptions::new(
+          "| abc | dbe | ppppppppppp |\n|:--------|:----:|----:|\n|1|2|3|\n|4|5|ausgdhkjlasdhgiupwyitryqdhksdhfuipqweiuorqoiweyouiwer|",
+        ),
+      )
+      .unwrap();
+    let size = service.measure(&pool, id, 24, &code).unwrap();
+
+    assert!(size.height > 7);
+  }
+
+  #[test]
+  fn markdown_render_keeps_long_cjk_paragraph_complete() {
+    let service = MarkdownService::new();
+    let code = CodeHighlightService::new();
+    let mut pool = UiObjectPool::new();
+    let source = "当安全模式开启时，程序会限制部分高风险 API 的访问权限，以降低脚本对本地数据和系统环境造成影响的可能性。";
+    let id = service
+      .create(&mut pool, MarkdownViewOptions::new(source))
+      .unwrap();
+    let mut canvas = CanvasService::new();
+    let layout = crate::host_engine::services::LayoutService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    assert!(service.render(
+      &mut pool,
+      id,
+      MarkdownRenderParams {
+        x: 0,
+        y: 0,
+        width: 54,
+        max_height: None,
+      },
+      &mut canvas,
+      &code,
+    ));
+
+    let mut rendered = String::new();
+    for y in 0..4 {
+      for x in 0..54 {
+        let Some(cell) = canvas.cell_at(x, y) else {
+          continue;
+        };
+        if !cell.is_continuation() && cell.text != " " {
+          rendered.push_str(&cell.text);
+        }
+      }
+    }
+    assert_eq!(rendered, source.replace(' ', ""));
+  }
+
+  fn assert_style_color(style: &TextStyle, r: u8, g: u8, b: u8) {
+    assert_eq!(
+      style.foreground,
+      Some(TextColor::Rgb { r, g, b }),
+      "{style:?}"
+    );
   }
 }

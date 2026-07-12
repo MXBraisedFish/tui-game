@@ -286,6 +286,27 @@ fn queue_style(stdout: &mut impl Write, style: &TextStyle, truecolor: bool) -> i
   if style.reverse {
     stdout.queue(SetAttribute(Attribute::Reverse))?;
   }
+  if style.bold {
+    stdout.queue(SetAttribute(Attribute::Bold))?;
+  }
+  if style.italic {
+    stdout.queue(SetAttribute(Attribute::Italic))?;
+  }
+  if style.underline {
+    stdout.queue(SetAttribute(Attribute::Underlined))?;
+  }
+  if style.strike {
+    stdout.queue(SetAttribute(Attribute::CrossedOut))?;
+  }
+  if style.blink {
+    stdout.queue(SetAttribute(Attribute::SlowBlink))?;
+  }
+  if style.hidden {
+    stdout.queue(SetAttribute(Attribute::Hidden))?;
+  }
+  if style.dim {
+    stdout.queue(SetAttribute(Attribute::Dim))?;
+  }
 
   Ok(())
 }

@@ -1,0 +1,21 @@
+{
+  "language": "tsx",
+  "extensions": ["tsx"],
+  "keywords": [
+    "abstract", "as", "async", "await", "break", "case", "catch", "class", "const",
+    "continue", "default", "delete", "do", "else", "enum", "export", "extends", "finally",
+    "for", "from", "function", "if", "implements", "import", "in", "interface", "keyof",
+    "let", "namespace", "new", "of", "private", "protected", "public", "readonly", "return",
+    "static", "super", "switch", "this", "throw", "try", "type", "typeof", "var", "while"
+  ],
+  "builtins": [
+    "Array", "Boolean", "Date", "Error", "Fragment", "JSX", "React", "Record", "String",
+    "console", "log", "require", "useEffect", "useMemo", "useRef", "useState"
+  ],
+  "constants": ["true", "false", "null", "undefined", "NaN", "Infinity"],
+  "operators": [
+    "+", "-", "*", "/", "%", "**", "=", "+=", "-=", "*=", "/=", "%=", "==", "===",
+    "!=", "!==", "<", ">", "<=", ">=", "&&", "||", "!", "&", "|", "^", "~", "?", "??",
+    "?.", "=>", ".", "...", ":"
+  ]
+}

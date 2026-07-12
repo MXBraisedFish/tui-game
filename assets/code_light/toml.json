@@ -1,0 +1,8 @@
+{
+  "language": "toml",
+  "extensions": ["toml"],
+  "keywords": [],
+  "builtins": [],
+  "constants": ["true", "false", "inf", "nan"],
+  "operators": ["=", ".", ",", "[", "]", "{", "}"]
+}

@@ -12,6 +12,7 @@ pub enum TableAlign {
 pub enum TableOverflow {
   Clip,
   Ellipsis,
+  Wrap,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

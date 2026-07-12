@@ -650,6 +650,13 @@ mod tests {
   }
 
   #[test]
+  fn auto_wrap_keeps_long_mixed_security_text_complete() {
+    let input = "当安全模式开启时，程序会限制部分高风险 API 的访问权限，以降低脚本对本地数据和系统环境造成影响的可能性。";
+    let lines = auto_lines(input, 54);
+    assert_eq!(lines.join("").replace(' ', ""), input.replace(' ', ""));
+  }
+
+  #[test]
   fn auto_wrap_mixed_text_keeps_ascii_words() {
     let lines = auto_lines("你好World，这是mixed text测试。", 12);
 

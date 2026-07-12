@@ -1,0 +1,19 @@
+{
+  "language": "shell",
+  "extensions": ["sh", "bash"],
+  "keywords": [
+    "case", "do", "done", "elif", "else", "esac", "fi", "for", "function", "if", "in",
+    "select", "then", "time", "until", "while"
+  ],
+  "builtins": [
+    "alias", "awk", "bg", "bind", "break", "cd", "command", "continue", "declare", "echo",
+    "eval", "exec", "exit", "export", "fg", "grep", "jobs", "let", "local", "printf",
+    "pwd", "read", "readonly", "return", "sed", "set", "shift", "source", "test", "trap",
+    "type", "ulimit", "umask", "unalias", "unset"
+  ],
+  "constants": ["true", "false"],
+  "operators": [
+    "|", "||", "&", "&&", ";", ";;", ";&", ";;&", ">", ">>", "<", "<<", "<<<", "=", "==",
+    "!=", "=~", "-eq", "-ne", "-lt", "-le", "-gt", "-ge", "$", "$(", "${", "`"
+  ]
+}

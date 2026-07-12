@@ -1,0 +1,22 @@
+{
+  "language": "rust",
+  "extensions": ["rs"],
+  "keywords": [
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
+    "extern", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move",
+    "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super", "trait",
+    "type", "unsafe", "use", "where", "while"
+  ],
+  "builtins": [
+    "bool", "char", "f32", "f64", "i8", "i16", "i32", "i64", "i128", "isize",
+    "u8", "u16", "u32", "u64", "u128", "usize", "str", "String", "Vec", "Option",
+    "Result", "Some", "None", "Ok", "Err", "Box", "Clone", "Copy", "Debug", "Default",
+    "Drop", "From", "Into", "Iterator", "println", "println!", "format", "format!", "vec!"
+  ],
+  "constants": ["true", "false"],
+  "operators": [
+    "+", "-", "*", "/", "%", "^", "=", "+=", "-=", "*=", "/=", "%=", "==", "!=", "<",
+    ">", "<=", ">=", "&&", "||", "!", "&", "|", "~", "<<", ">>", "::", "->", "=>",
+    "..", "..=", ".", "?", "@"
+  ]
+}

@@ -20,6 +20,7 @@ pub struct MarkdownTheme {
   pub quote_marker: String,
   pub link: TextStyle,
   pub table_border: TextStyle,
+  pub table_header: TextStyle,
   pub task_checked: TextStyle,
   pub task_unchecked: TextStyle,
   pub horizontal_rule: TextStyle,
@@ -61,13 +62,13 @@ impl MarkdownViewOptions {
 
 impl Default for MarkdownTheme {
   fn default() -> Self {
-    use crate::host_engine::services::{TerminalColor, TextColor};
+    use crate::host_engine::services::TextColor;
     Self {
-      h1: style(TerminalColor::Yellow, true),
-      h2: style(TerminalColor::BrightYellow, true),
-      h3: style(TerminalColor::Cyan, true),
-      h4_to_h6: style(TerminalColor::Magenta, true),
-      paragraph: TextStyle::default(),
+      h1: style(170, 105, 225, true),
+      h2: style(184, 122, 232, true),
+      h3: style(198, 140, 238, true),
+      h4_to_h6: style(234, 198, 250, true),
+      paragraph: style(220, 223, 218, false),
       bold: TextStyle {
         bold: true,
         ..Default::default()
@@ -81,34 +82,51 @@ impl Default for MarkdownTheme {
         ..Default::default()
       },
       inline_code: TextStyle {
-        foreground: Some(TextColor::Terminal(TerminalColor::Yellow)),
-        background: Some(TextColor::Terminal(TerminalColor::BrightBlack)),
+        foreground: Some(TextColor::Rgb {
+          r: 249,
+          g: 232,
+          b: 147,
+        }),
+        background: Some(TextColor::Rgb {
+          r: 45,
+          g: 47,
+          b: 45,
+        }),
         ..Default::default()
       },
       code_block: TextStyle {
-        foreground: Some(TextColor::Terminal(TerminalColor::White)),
-        background: Some(TextColor::Terminal(TerminalColor::Black)),
+        foreground: Some(TextColor::Rgb {
+          r: 220,
+          g: 223,
+          b: 218,
+        }),
+        background: Some(TextColor::Rgb { r: 0, g: 0, b: 0 }),
         ..Default::default()
       },
-      code_border: style(TerminalColor::BrightBlack, false),
-      quote: style(TerminalColor::BrightBlack, false),
+      code_border: style(85, 87, 83, false),
+      quote: style(255, 164, 209, false),
       quote_marker: "▌ ".to_string(),
       link: TextStyle {
-        foreground: Some(TextColor::Terminal(TerminalColor::BrightBlue)),
+        foreground: Some(TextColor::Rgb {
+          r: 80,
+          g: 165,
+          b: 255,
+        }),
         underline: true,
         ..Default::default()
       },
-      table_border: style(TerminalColor::BrightBlack, false),
-      task_checked: style(TerminalColor::Green, false),
-      task_unchecked: style(TerminalColor::BrightBlack, false),
-      horizontal_rule: style(TerminalColor::BrightBlack, false),
+      table_border: style(255, 255, 255, false),
+      table_header: style(86, 182, 194, true),
+      task_checked: style(95, 215, 105, false),
+      task_unchecked: style(85, 87, 83, false),
+      horizontal_rule: style(85, 87, 83, false),
     }
   }
 }
 
-fn style(color: crate::host_engine::services::TerminalColor, bold: bool) -> TextStyle {
+fn style(r: u8, g: u8, b: u8, bold: bool) -> TextStyle {
   crate::host_engine::services::TextStyle {
-    foreground: Some(crate::host_engine::services::TextColor::Terminal(color)),
+    foreground: Some(crate::host_engine::services::TextColor::Rgb { r, g, b }),
     bold,
     ..Default::default()
   }

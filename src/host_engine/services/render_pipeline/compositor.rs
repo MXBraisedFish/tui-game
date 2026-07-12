@@ -97,7 +97,17 @@ fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox,
         write_cell(frame, px, py, &CanvasCell::blank());
         continue;
       };
-      if source.is_continuation() || is_clipped_wide_cell(source, sx, scroll_box) {
+      if source.is_continuation() {
+        if x == 0 {
+          if scroll_box.opaque {
+            write_cell(frame, px, py, &CanvasCell::blank());
+          }
+        } else {
+          write_cell(frame, px, py, source);
+        }
+        continue;
+      }
+      if is_clipped_wide_cell(source, sx, scroll_box.scroll_x, visible_width) {
         if scroll_box.opaque {
           write_cell(frame, px, py, &CanvasCell::blank());
         }
@@ -231,25 +241,12 @@ fn shows_horizontal_scrollbar(scroll_box: &PreparedScrollBox) -> bool {
   }
 }
 
-fn is_clipped_wide_cell(cell: &CanvasCell, sx: u16, scroll_box: &PreparedScrollBox) -> bool {
+fn is_clipped_wide_cell(cell: &CanvasCell, sx: u16, scroll_x: u16, visible_width: u16) -> bool {
   let width = graphemes(&cell.text)
     .first()
     .map(|grapheme| grapheme.display_width)
     .unwrap_or(1);
-  // 右侧裁剪：宽字符超出 viewport 右边缘。
-  if width > 1
-    && sx as usize + width > scroll_box.scroll_x as usize + scroll_box.rect.width as usize
-  {
-    return true;
-  }
-  // 左侧裁剪：延续单元的基础宽字符已被滚出视口左侧。
-  if cell.is_continuation()
-    && sx > scroll_box.scroll_x
-    && sx.saturating_sub(1) < scroll_box.scroll_x
-  {
-    return true;
-  }
-  false
+  width > 1 && sx as usize + width > scroll_x as usize + visible_width as usize
 }
 
 fn write_cell(frame: &mut ComposedFrame, x: u16, y: u16, source: &CanvasCell) {
@@ -480,6 +477,46 @@ mod tests {
     assert_eq!(text(&frame, 3, 0), "1");
     assert_eq!(text(&frame, 3, 1), "2");
     assert_eq!(text(&frame, 5, 0), "█");
+  }
+
+  #[test]
+  fn scroll_box_preserves_wide_character_continuations() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(4, 1);
+    let service = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: crate::host_engine::services::Rect {
+            x: 0,
+            y: 0,
+            width: 4,
+            height: 1,
+          },
+          content_width: 4,
+          content_height: 1,
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    canvas.styled_text_in_scroll_box(id, 0, 0, "中文", TextStyle::default());
+
+    let frame = FrameCompositor::new().compose(&canvas);
+    assert_eq!(text(&frame, 0, 0), "中");
+    assert!(matches!(
+      frame.get(1, 0),
+      Some(ComposedCell::Text(cell)) if cell.is_continuation()
+    ));
+    assert_eq!(text(&frame, 2, 0), "文");
+    assert!(matches!(
+      frame.get(3, 0),
+      Some(ComposedCell::Text(cell)) if cell.is_continuation()
+    ));
   }
 
   #[test]

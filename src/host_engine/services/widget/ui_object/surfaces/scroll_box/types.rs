@@ -1,4 +1,4 @@
-use crate::host_engine::services::{Rect, TerminalColor, TextColor, TextStyle};
+use crate::host_engine::services::{Rect, TextColor, TextStyle};
 
 /// 可滚动绘制面唯一标识。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -96,21 +96,37 @@ impl Default for ScrollbarStyle {
       track_char: '│',
       thumb_char: '█',
       track_style: TextStyle {
-        foreground: Some(TextColor::Terminal(TerminalColor::BrightBlack)),
+        foreground: Some(TextColor::Rgb {
+          r: 85,
+          g: 87,
+          b: 83,
+        }),
         ..Default::default()
       },
       thumb_style: TextStyle {
-        foreground: Some(TextColor::Terminal(TerminalColor::BrightWhite)),
+        foreground: Some(TextColor::Rgb {
+          r: 220,
+          g: 223,
+          b: 218,
+        }),
         ..Default::default()
       },
       h_track_char: '─',
       h_thumb_char: '█',
       h_track_style: TextStyle {
-        foreground: Some(TextColor::Terminal(TerminalColor::BrightBlack)),
+        foreground: Some(TextColor::Rgb {
+          r: 85,
+          g: 87,
+          b: 83,
+        }),
         ..Default::default()
       },
       h_thumb_style: TextStyle {
-        foreground: Some(TextColor::Terminal(TerminalColor::BrightWhite)),
+        foreground: Some(TextColor::Rgb {
+          r: 220,
+          g: 223,
+          b: 218,
+        }),
         ..Default::default()
       },
       minimum_thumb_height: 1,

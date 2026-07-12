@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::{collections::HashSet, path::Path, sync::OnceLock};
 
-use crate::host_engine::services::{RichTextSegment, TerminalColor, TextColor, TextStyle};
+use crate::host_engine::services::{RichTextSegment, TextColor, TextStyle};
+use serde::Deserialize;
 use tree_sitter::{Node, Parser, Tree};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -62,6 +63,21 @@ pub struct CodeHighlightTheme {
 
 pub struct CodeHighlightService;
 
+#[derive(Deserialize)]
+struct CodeLightWords {
+  keywords: Vec<String>,
+  builtins: Vec<String>,
+  constants: Vec<String>,
+  operators: Vec<String>,
+}
+
+struct CodeLightLexicon {
+  keywords: HashSet<String>,
+  builtins: HashSet<String>,
+  constants: HashSet<String>,
+  operators: HashSet<String>,
+}
+
 const SUPPORTED: &[CodeLanguage] = &[
   CodeLanguage::Rust,
   CodeLanguage::Python,
@@ -103,7 +119,7 @@ impl CodeHighlightService {
     let Some(tree) = parser.parse(source, None) else {
       return Vec::new();
     };
-    collect_tokens(&tree, source)
+    collect_tokens(&tree, source, language)
   }
 
   pub fn highlight_segments(
@@ -148,22 +164,24 @@ impl CodeHighlightService {
 
 impl Default for CodeHighlightTheme {
   fn default() -> Self {
-    use TerminalColor::*;
     Self {
-      keyword: fg(Cyan),
-      string: fg(Green),
-      comment: fg(BrightBlack),
-      function: fg(Blue),
-      type_name: fg(Yellow),
-      number: fg(Magenta),
-      operator: fg(Yellow),
-      punctuation: fg(White),
-      variable: TextStyle::default(),
-      property: fg(Blue),
-      constant: fg(Red),
-      builtin: fg(Cyan),
-      attribute: fg(Yellow),
-      text: TextStyle::default(),
+      keyword: fg(210, 204, 255),
+      string: fg(164, 223, 174),
+      comment: fg(153, 153, 153),
+      function: fg(143, 199, 255),
+      type_name: TextStyle {
+        bold: true,
+        ..fg(240, 192, 168)
+      },
+      number: fg(213, 242, 136),
+      operator: fg(184, 215, 249),
+      punctuation: fg(184, 215, 249),
+      variable: fg(238, 207, 160),
+      property: fg(222, 214, 207),
+      constant: fg(240, 192, 168),
+      builtin: fg(213, 242, 136),
+      attribute: fg(143, 199, 255),
+      text: fg(203, 213, 225),
     }
   }
 }
@@ -225,22 +243,28 @@ fn tree_sitter_language(language: CodeLanguage) -> Option<tree_sitter::Language>
   })
 }
 
-fn collect_tokens(tree: &Tree, source: &str) -> Vec<CodeHighlightToken> {
+fn collect_tokens(tree: &Tree, source: &str, language: CodeLanguage) -> Vec<CodeHighlightToken> {
   let mut tokens = Vec::new();
   let root = tree.root_node();
   let root_kind = root.kind().to_string();
-  walk_tree(root, source, &mut tokens, &root_kind);
+  walk_tree(root, source, &mut tokens, &root_kind, language);
   tokens.sort_by_key(|token| token.start_byte);
   tokens
 }
 
-fn walk_tree(node: Node, source: &str, tokens: &mut Vec<CodeHighlightToken>, root_kind: &str) {
+fn walk_tree(
+  node: Node,
+  source: &str,
+  tokens: &mut Vec<CodeHighlightToken>,
+  root_kind: &str,
+  language: CodeLanguage,
+) {
   let kind = node.kind();
   if node.start_byte() >= node.end_byte() {
     return;
   }
   if node.child_count() == 0 {
-    add_leaf_token(node, kind, source, tokens, root_kind);
+    add_leaf_token(node, kind, source, tokens, root_kind, language);
     return;
   }
   let kind = categorize_node(kind);
@@ -254,7 +278,7 @@ fn walk_tree(node: Node, source: &str, tokens: &mut Vec<CodeHighlightToken>, roo
   }
   for i in 0..node.child_count() {
     if let Some(child) = node.child(i as u32) {
-      walk_tree(child, source, tokens, root_kind);
+      walk_tree(child, source, tokens, root_kind, language);
     }
   }
 }
@@ -265,6 +289,7 @@ fn add_leaf_token(
   source: &str,
   tokens: &mut Vec<CodeHighlightToken>,
   root_kind: &str,
+  language: CodeLanguage,
 ) {
   let text = &source[node.start_byte()..node.end_byte()];
   if text.trim().is_empty() {
@@ -273,7 +298,7 @@ fn add_leaf_token(
   tokens.push(CodeHighlightToken {
     start_byte: node.start_byte(),
     end_byte: node.end_byte(),
-    kind: categorize_leaf(kind, node, source, root_kind),
+    kind: categorize_leaf(kind, node, source, root_kind, language),
   });
 }
 
@@ -291,7 +316,13 @@ fn categorize_node(kind: &str) -> CodeTokenKind {
   CodeTokenKind::Text
 }
 
-fn categorize_leaf(kind: &str, node: Node, source: &str, root_kind: &str) -> CodeTokenKind {
+fn categorize_leaf(
+  kind: &str,
+  node: Node,
+  source: &str,
+  root_kind: &str,
+  language: CodeLanguage,
+) -> CodeTokenKind {
   let kl = kind.to_ascii_lowercase();
   let parent = node.parent();
   let parent_kind = parent
@@ -325,13 +356,13 @@ fn categorize_leaf(kind: &str, node: Node, source: &str, root_kind: &str) -> Cod
   if kl == "number" || kl == "integer" || kl == "float" || trimmed.parse::<f64>().is_ok() {
     return CodeTokenKind::Number;
   }
-  if is_keyword(kind) || is_keyword(trimmed) {
+  if is_keyword(language, kind) || is_keyword(language, trimmed) {
     return CodeTokenKind::Keyword;
   }
-  if is_builtin(kind) || is_builtin(trimmed) {
+  if is_builtin(language, kind) || is_builtin(language, trimmed) {
     return CodeTokenKind::Builtin;
   }
-  if is_constant(kind) || is_constant(trimmed) {
+  if is_constant(language, kind) || is_constant(language, trimmed) {
     return CodeTokenKind::Constant;
   }
   if kl.contains("type") || kl == "type_identifier" || kl == "primitive_type" {
@@ -347,7 +378,7 @@ fn categorize_leaf(kind: &str, node: Node, source: &str, root_kind: &str) -> Cod
   {
     return CodeTokenKind::Attribute;
   }
-  if kl.contains("operator") || is_operator_symbol(text) {
+  if kl.contains("operator") || is_operator_symbol(language, text) {
     return CodeTokenKind::Operator;
   }
   if kl.contains("punctuation")
@@ -380,160 +411,78 @@ fn is_function_like(kind: &str, parent_kind: &str) -> bool {
       || parent_kind == "function_definition")
 }
 
-fn is_keyword(s: &str) -> bool {
-  matches!(
-    s,
-    "if"
-      | "else"
-      | "for"
-      | "while"
-      | "loop"
-      | "match"
-      | "switch"
-      | "case"
-      | "break"
-      | "continue"
-      | "return"
-      | "yield"
-      | "await"
-      | "async"
-      | "fn"
-      | "function"
-      | "def"
-      | "class"
-      | "struct"
-      | "enum"
-      | "trait"
-      | "interface"
-      | "impl"
-      | "type"
-      | "let"
-      | "var"
-      | "const"
-      | "mut"
-      | "static"
-      | "pub"
-      | "public"
-      | "private"
-      | "protected"
-      | "extern"
-      | "crate"
-      | "self"
-      | "Self"
-      | "super"
-      | "where"
-      | "in"
-      | "of"
-      | "is"
-      | "as"
-      | "new"
-      | "try"
-      | "catch"
-      | "throw"
-      | "finally"
-      | "raise"
-      | "except"
-      | "with"
-      | "import"
-      | "export"
-      | "from"
-      | "module"
-      | "use"
-      | "mod"
-      | "namespace"
-      | "local"
-      | "then"
-      | "end"
-      | "do"
-      | "and"
-      | "or"
-      | "not"
-      | "nil"
-  )
+fn is_keyword(language: CodeLanguage, s: &str) -> bool {
+  code_light(language).keywords.contains(s)
 }
 
-fn is_builtin(s: &str) -> bool {
-  matches!(
-    s,
-    "print"
-      | "len"
-      | "range"
-      | "int"
-      | "str"
-      | "float"
-      | "list"
-      | "dict"
-      | "bool"
-      | "println"
-      | "format!"
-      | "vec!"
-      | "String"
-      | "Option"
-      | "Some"
-      | "None"
-      | "Ok"
-      | "Err"
-      | "console"
-      | "log"
-      | "Math"
-      | "JSON"
-      | "Object"
-      | "Array"
-      | "require"
-      | "echo"
-      | "cd"
-      | "grep"
-      | "sed"
-      | "awk"
-  )
+fn is_builtin(language: CodeLanguage, s: &str) -> bool {
+  code_light(language).builtins.contains(s)
 }
 
-fn is_constant(s: &str) -> bool {
-  matches!(
-    s,
-    "true" | "false" | "null" | "nil" | "undefined" | "True" | "False" | "None" | "NaN"
-  )
+fn is_constant(language: CodeLanguage, s: &str) -> bool {
+  code_light(language).constants.contains(s)
 }
 
-fn is_operator_symbol(text: &str) -> bool {
-  matches!(
-    text,
-    "+"
-      | "-"
-      | "*"
-      | "/"
-      | "%"
-      | "^"
-      | "="
-      | "+="
-      | "-="
-      | "*="
-      | "/="
-      | "%="
-      | "=="
-      | "!="
-      | "<"
-      | ">"
-      | "<="
-      | ">="
-      | "&&"
-      | "||"
-      | "!"
-      | "&"
-      | "|"
-      | "~"
-      | "<<"
-      | ">>"
-      | "::"
-      | "->"
-      | "=>"
-      | ".."
-      | "..="
-      | "."
-      | "?"
-      | "??"
-      | "?."
-  )
+fn is_operator_symbol(language: CodeLanguage, text: &str) -> bool {
+  code_light(language).operators.contains(text)
+}
+
+fn code_light(language: CodeLanguage) -> &'static CodeLightLexicon {
+  static RUST: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static PYTHON: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static JAVASCRIPT: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static TYPESCRIPT: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static TSX: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static JSON: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static TOML: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static YAML: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static LUA: OnceLock<CodeLightLexicon> = OnceLock::new();
+  static SHELL: OnceLock<CodeLightLexicon> = OnceLock::new();
+
+  match language {
+    CodeLanguage::Rust => {
+      RUST.get_or_init(|| parse_code_light(include_str!("../../../../assets/code_light/rust.json")))
+    }
+    CodeLanguage::Python => PYTHON
+      .get_or_init(|| parse_code_light(include_str!("../../../../assets/code_light/python.json"))),
+    CodeLanguage::JavaScript => JAVASCRIPT.get_or_init(|| {
+      parse_code_light(include_str!(
+        "../../../../assets/code_light/javascript.json"
+      ))
+    }),
+    CodeLanguage::TypeScript => TYPESCRIPT.get_or_init(|| {
+      parse_code_light(include_str!(
+        "../../../../assets/code_light/typescript.json"
+      ))
+    }),
+    CodeLanguage::Tsx => {
+      TSX.get_or_init(|| parse_code_light(include_str!("../../../../assets/code_light/tsx.json")))
+    }
+    CodeLanguage::Json => {
+      JSON.get_or_init(|| parse_code_light(include_str!("../../../../assets/code_light/json.json")))
+    }
+    CodeLanguage::Toml => {
+      TOML.get_or_init(|| parse_code_light(include_str!("../../../../assets/code_light/toml.json")))
+    }
+    CodeLanguage::Yaml => {
+      YAML.get_or_init(|| parse_code_light(include_str!("../../../../assets/code_light/yaml.json")))
+    }
+    CodeLanguage::Lua => {
+      LUA.get_or_init(|| parse_code_light(include_str!("../../../../assets/code_light/lua.json")))
+    }
+    CodeLanguage::Shell => SHELL
+      .get_or_init(|| parse_code_light(include_str!("../../../../assets/code_light/shell.json"))),
+  }
+}
+
+fn parse_code_light(json: &str) -> CodeLightLexicon {
+  let words: CodeLightWords = serde_json::from_str(json).expect("valid code_light json");
+  CodeLightLexicon {
+    keywords: words.keywords.into_iter().collect(),
+    builtins: words.builtins.into_iter().collect(),
+    constants: words.constants.into_iter().collect(),
+    operators: words.operators.into_iter().collect(),
+  }
 }
 
 fn push_segment(segments: &mut Vec<RichTextSegment>, text: &str, style: &TextStyle) {
@@ -545,9 +494,9 @@ fn push_segment(segments: &mut Vec<RichTextSegment>, text: &str, style: &TextSty
   }
 }
 
-fn fg(color: TerminalColor) -> TextStyle {
+fn fg(r: u8, g: u8, b: u8) -> TextStyle {
   TextStyle {
-    foreground: Some(TextColor::Terminal(color)),
+    foreground: Some(TextColor::Rgb { r, g, b }),
     ..Default::default()
   }
 }
@@ -613,5 +562,45 @@ mod tests {
         "{language:?}"
       );
     }
+  }
+
+  #[test]
+  fn maple_dark_theme_uses_expected_palette() {
+    let theme = CodeHighlightTheme::default();
+
+    assert_rgb(&theme.text, 203, 213, 225);
+    assert_rgb(&theme.comment, 153, 153, 153);
+    assert_rgb(&theme.keyword, 210, 204, 255);
+    assert_rgb(&theme.function, 143, 199, 255);
+    assert_rgb(&theme.variable, 238, 207, 160);
+    assert_rgb(&theme.property, 222, 214, 207);
+    assert_rgb(&theme.type_name, 240, 192, 168);
+    assert_rgb(&theme.string, 164, 223, 174);
+    assert_rgb(&theme.number, 213, 242, 136);
+    assert_rgb(&theme.operator, 184, 215, 249);
+    assert!(theme.type_name.bold);
+  }
+
+  #[test]
+  fn code_light_assets_drive_word_categories() {
+    for language in SUPPORTED {
+      let lexicon = code_light(*language);
+      assert!(
+        !lexicon.keywords.is_empty()
+          || !lexicon.builtins.is_empty()
+          || !lexicon.constants.is_empty(),
+        "{language:?} words"
+      );
+      assert!(!lexicon.operators.is_empty(), "{language:?} operators");
+    }
+
+    assert!(is_keyword(CodeLanguage::Rust, "fn"));
+    assert!(is_builtin(CodeLanguage::Python, "print"));
+    assert!(is_constant(CodeLanguage::JavaScript, "undefined"));
+    assert!(is_operator_symbol(CodeLanguage::Shell, "&&"));
+  }
+
+  fn assert_rgb(style: &TextStyle, r: u8, g: u8, b: u8) {
+    assert_eq!(style.foreground, Some(TextColor::Rgb { r, g, b }));
   }
 }
