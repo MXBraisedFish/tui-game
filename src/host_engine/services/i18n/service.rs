@@ -24,6 +24,10 @@ impl I18nService {
     &self.current_language
   }
 
+  pub fn current_language_code(&self) -> &str {
+    &self.current_language
+  }
+
   pub fn set_current_language(&mut self, language_code: impl Into<String>) {
     self.current_language = language_code.into();
   }
@@ -77,5 +81,18 @@ impl I18nService {
       .language_registry
       .iter()
       .any(|entry| entry.code == language_code)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::I18nService;
+
+  #[test]
+  fn current_language_code_returns_active_language_code() {
+    let mut service = I18nService::new();
+    service.set_current_language("zh_cn");
+
+    assert_eq!(service.current_language_code(), "zh_cn");
   }
 }

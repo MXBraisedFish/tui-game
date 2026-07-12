@@ -1,0 +1,5 @@
+{
+  "security_details.title": "Security Details",
+  "security_details.action.scroll": "{key:security_details.scroll_up}/{key:security_details.scroll_down} Scroll",
+  "security_details.action.back": "{key:security_details.back} Back"
+}

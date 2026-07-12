@@ -475,6 +475,7 @@ impl ScreensaverPackageUi {
     log: &mut LogService,
     image: &mut ImageService,
     mouse_supported: bool,
+    truecolor_supported: bool,
   ) {
     self.sync_entries(package.mod_screensavers(), storage, log);
     let positions = self.compute_positions(layout, i18n, text_input);
@@ -514,6 +515,7 @@ impl ScreensaverPackageUi {
       i18n,
       image,
       mouse_supported,
+      truecolor_supported,
       &positions,
       info_scroll_y,
     );
@@ -1194,6 +1196,7 @@ impl ScreensaverPackageUi {
     i18n: &I18nService,
     image: &mut ImageService,
     mouse_supported: bool,
+    truecolor_supported: bool,
     pos: &ScreensaverPackageLayout,
     scroll_y: u16,
   ) {
@@ -1251,6 +1254,7 @@ impl ScreensaverPackageUi {
       pos.right_inner,
       scroll_y,
       mouse_supported,
+      truecolor_supported,
     );
   }
 
@@ -1265,6 +1269,7 @@ impl ScreensaverPackageUi {
     rect: Rect,
     scroll_y: u16,
     mouse_supported: bool,
+    truecolor_supported: bool,
   ) {
     let package_params = Self::package_rich_params(entry);
     let mut y = 0;
@@ -1407,6 +1412,29 @@ impl ScreensaverPackageUi {
       i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.mouse"),
       i18n.get_runtime_text("screensaver_pack", mouse_key),
       mouse_color,
+    );
+    y += 1;
+    let (truecolor_key, truecolor_color) = if !entry.truecolor_required {
+      ("screensaver_pack.info.truecolor.off", Self::hint_style())
+    } else if truecolor_supported {
+      (
+        "screensaver_pack.info.truecolor.on.support",
+        Self::style(TerminalColor::BrightGreen),
+      )
+    } else {
+      (
+        "screensaver_pack.info.truecolor.on.unsupport",
+        Self::style(TerminalColor::BrightRed),
+      )
+    };
+    self.draw_info_status(
+      canvas,
+      rect,
+      scroll_y,
+      y,
+      i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.truecolor"),
+      i18n.get_runtime_text("screensaver_pack", truecolor_key),
+      truecolor_color,
     );
     y += 2;
 
@@ -1912,7 +1940,7 @@ impl ScreensaverPackageUi {
       })
       .height
       .max(1);
-    14 + 1 + 1 + 1 + 4 + 1 + 4 + 1 + 1 + description_lines
+    14 + 1 + 1 + 1 + 4 + 1 + 5 + 1 + 1 + description_lines
   }
 
   fn handle_hover(&mut self, id: HitAreaId) {
@@ -2009,6 +2037,9 @@ impl ScreensaverPackageUi {
       if let Some(state) = profile.screensavers.get(&entry.mod_id) {
         entry.enabled = state.enabled;
         entry.debug = state.debug;
+      } else {
+        entry.enabled = profile.defaults.enabled;
+        entry.debug = profile.defaults.debug;
       }
     }
     if self

@@ -6,8 +6,8 @@ use std::collections::HashSet;
 pub(crate) use self::state::TableObjects;
 use self::state::TableState;
 pub use self::types::{
-  TableAlign, TableBorderMode, TableCell, TableColumn, TableDrawParams, TableId, TableOptions,
-  TableOverflow, TableRow, TableStyle,
+  TableAlign, TableBorderMode, TableBorderStyle, TableCell, TableColumn, TableDrawParams, TableId,
+  TableOptions, TableOverflow, TableRow, TableStyle,
 };
 use crate::host_engine::services::text_layout::{self, DrawTextParams, TextWrapMode};
 use crate::host_engine::services::ui::UiObjectPool;
@@ -121,7 +121,13 @@ impl TableService {
       return false;
     }
 
-    let columns = effective_columns(&options.columns, &options.style, params.width);
+    let columns = effective_columns(
+      &options.columns,
+      &options.style,
+      params.width,
+      params.rows,
+      options.style.show_header,
+    );
     let mut y = params.y;
     let bottom = params.y.saturating_add(params.height);
 
@@ -129,12 +135,20 @@ impl TableService {
       if y >= bottom {
         return true;
       }
-      self.draw_full_border_line(canvas, target, params.x, y, &columns, "┌", "┬", "┐");
+      self.draw_full_border_line(
+        canvas,
+        target,
+        params.x,
+        y,
+        &columns,
+        &options.style,
+        BorderLine::Top,
+      );
       y = y.saturating_add(1);
     }
 
     if options.style.show_header && y < bottom {
-      self.draw_row(
+      let header_height = self.draw_row(
         canvas,
         target,
         params.x,
@@ -149,7 +163,7 @@ impl TableService {
           .collect::<Vec<_>>(),
         &options.style,
       );
-      y = y.saturating_add(1);
+      y = y.saturating_add(header_height);
     }
 
     if options.style.show_header
@@ -161,7 +175,15 @@ impl TableService {
     {
       match options.style.border_mode {
         TableBorderMode::Full => {
-          self.draw_full_border_line(canvas, target, params.x, y, &columns, "├", "┼", "┤");
+          self.draw_full_border_line(
+            canvas,
+            target,
+            params.x,
+            y,
+            &columns,
+            &options.style,
+            BorderLine::Middle,
+          );
         }
         _ => self.draw_header_line(canvas, target, params.x, y, &columns, &options.style),
       }
@@ -189,7 +211,7 @@ impl TableService {
         if y >= bottom {
           break;
         }
-        self.draw_row(
+        let row_height = self.draw_row(
           canvas,
           target,
           params.x,
@@ -198,7 +220,7 @@ impl TableService {
           &row.cells,
           &options.style,
         );
-        y = y.saturating_add(1);
+        y = y.saturating_add(row_height);
       }
     }
 
@@ -209,9 +231,8 @@ impl TableService {
         params.x,
         bottom.saturating_sub(1),
         &columns,
-        "└",
-        "┴",
-        "┘",
+        &options.style,
+        BorderLine::Bottom,
       );
     }
 
@@ -227,10 +248,18 @@ impl TableService {
     columns: &[EffectiveColumn],
     cells: &[TableCell],
     style: &TableStyle,
-  ) {
+  ) -> u16 {
+    let row_height = row_height(columns, cells);
     let mut cursor = x;
     if style.border_mode == TableBorderMode::Full {
-      self.draw_plain(canvas, target, cursor, y, "│");
+      self.draw_vertical(
+        canvas,
+        target,
+        cursor,
+        y,
+        row_height,
+        border_chars(style).outer_v,
+      );
       cursor = cursor.saturating_add(1);
     }
 
@@ -239,16 +268,22 @@ impl TableService {
         .get(index)
         .map(|cell| cell.text.as_str())
         .unwrap_or("");
-      self.draw_cell(canvas, target, cursor, y, column, text);
+      self.draw_cell(canvas, target, cursor, y, row_height, column, text);
       cursor = cursor.saturating_add(column.width);
 
       if style.border_mode == TableBorderMode::Full {
-        self.draw_plain(canvas, target, cursor, y, "│");
+        let ch = if index + 1 == columns.len() {
+          border_chars(style).outer_v
+        } else {
+          border_chars(style).inner_v
+        };
+        self.draw_vertical(canvas, target, cursor, y, row_height, ch);
         cursor = cursor.saturating_add(1);
       } else if index + 1 < columns.len() {
         cursor = cursor.saturating_add(style.column_gap);
       }
     }
+    row_height
   }
 
   fn draw_cell(
@@ -257,6 +292,7 @@ impl TableService {
     target: TableTarget,
     x: u16,
     y: u16,
+    height: u16,
     column: &EffectiveColumn,
     text: &str,
   ) {
@@ -268,24 +304,52 @@ impl TableService {
     if text_width == 0 {
       return;
     }
-    let text = align_cell_text(text, text_width, column.align);
+    let wrap = column.overflow == TableOverflow::Wrap;
     self.draw_text(
       canvas,
       target,
       &DrawTextParams {
         x: text_x,
         y,
-        text,
+        text: if wrap {
+          text.to_string()
+        } else {
+          align_cell_text(text, text_width, column.align)
+        },
         max_width: Some(text_width),
-        max_height: Some(1),
-        wrap_mode: TextWrapMode::Normal,
+        max_height: Some(if wrap { height } else { 1 }),
+        wrap_mode: if wrap {
+          TextWrapMode::Auto
+        } else {
+          TextWrapMode::Normal
+        },
+        non_truncate_word_wrap: true,
+        line_align: match column.align {
+          TableAlign::Left => crate::host_engine::services::TextAlign::Left,
+          TableAlign::Center => crate::host_engine::services::TextAlign::Center,
+          TableAlign::Right => crate::host_engine::services::TextAlign::Right,
+        },
         overflow_marker: match column.overflow {
-          TableOverflow::Clip => None,
+          TableOverflow::Clip | TableOverflow::Wrap => None,
           TableOverflow::Ellipsis => Some("...".to_string()),
         },
         ..Default::default()
       },
     );
+  }
+
+  fn draw_vertical(
+    &self,
+    canvas: &mut CanvasService,
+    target: TableTarget,
+    x: u16,
+    y: u16,
+    height: u16,
+    ch: &str,
+  ) {
+    for offset in 0..height {
+      self.draw_plain(canvas, target, x, y.saturating_add(offset), ch);
+    }
   }
 
   fn draw_header_line(
@@ -298,7 +362,13 @@ impl TableService {
     style: &TableStyle,
   ) {
     let width = content_width(columns, style);
-    self.draw_plain(canvas, target, x, y, &"─".repeat(width as usize));
+    self.draw_plain(
+      canvas,
+      target,
+      x,
+      y,
+      &border_chars(style).inner_h.repeat(width as usize),
+    );
   }
 
   fn draw_full_border_line(
@@ -308,13 +378,33 @@ impl TableService {
     x: u16,
     y: u16,
     columns: &[EffectiveColumn],
-    left: &str,
-    sep: &str,
-    right: &str,
+    style: &TableStyle,
+    line_kind: BorderLine,
   ) {
+    let chars = border_chars(style);
+    let (left, sep, right, h) = match line_kind {
+      BorderLine::Top => (
+        chars.top_left,
+        chars.top_sep,
+        chars.top_right,
+        chars.outer_h,
+      ),
+      BorderLine::Middle => (
+        chars.mid_left,
+        chars.mid_sep,
+        chars.mid_right,
+        chars.inner_h,
+      ),
+      BorderLine::Bottom => (
+        chars.bottom_left,
+        chars.bottom_sep,
+        chars.bottom_right,
+        chars.outer_h,
+      ),
+    };
     let mut line = String::from(left);
     for (index, column) in columns.iter().enumerate() {
-      line.push_str(&"─".repeat(column.width as usize));
+      line.push_str(&h.repeat(column.width as usize));
       line.push_str(if index + 1 == columns.len() {
         right
       } else {
@@ -364,6 +454,79 @@ struct EffectiveColumn {
   overflow: TableOverflow,
 }
 
+#[derive(Clone, Copy)]
+enum BorderLine {
+  Top,
+  Middle,
+  Bottom,
+}
+
+struct BorderChars {
+  top_left: &'static str,
+  top_sep: &'static str,
+  top_right: &'static str,
+  mid_left: &'static str,
+  mid_sep: &'static str,
+  mid_right: &'static str,
+  bottom_left: &'static str,
+  bottom_sep: &'static str,
+  bottom_right: &'static str,
+  outer_h: &'static str,
+  inner_h: &'static str,
+  outer_v: &'static str,
+  inner_v: &'static str,
+}
+
+fn border_chars(style: &TableStyle) -> BorderChars {
+  match style.border_style {
+    TableBorderStyle::Single => BorderChars {
+      top_left: "┌",
+      top_sep: "┬",
+      top_right: "┐",
+      mid_left: "├",
+      mid_sep: "┼",
+      mid_right: "┤",
+      bottom_left: "└",
+      bottom_sep: "┴",
+      bottom_right: "┘",
+      outer_h: "─",
+      inner_h: "─",
+      outer_v: "│",
+      inner_v: "│",
+    },
+    TableBorderStyle::Double => BorderChars {
+      top_left: "╔",
+      top_sep: "╦",
+      top_right: "╗",
+      mid_left: "╠",
+      mid_sep: "╬",
+      mid_right: "╣",
+      bottom_left: "╚",
+      bottom_sep: "╩",
+      bottom_right: "╝",
+      outer_h: "═",
+      inner_h: "═",
+      outer_v: "║",
+      inner_v: "║",
+    },
+    TableBorderStyle::DoubleOuterSingleInner => BorderChars {
+      top_left: "╔",
+      top_sep: "╤",
+      top_right: "╗",
+      mid_left: "╟",
+      mid_sep: "┼",
+      mid_right: "╢",
+      bottom_left: "╚",
+      bottom_sep: "╧",
+      bottom_right: "╝",
+      outer_h: "═",
+      inner_h: "─",
+      outer_v: "║",
+      inner_v: "│",
+    },
+  }
+}
+
 fn validate_options(options: &TableOptions) -> bool {
   if options.columns.is_empty() {
     return false;
@@ -382,34 +545,79 @@ fn effective_columns(
   columns: &[TableColumn],
   style: &TableStyle,
   available_width: u16,
+  rows: &[TableRow],
+  show_header: bool,
 ) -> Vec<EffectiveColumn> {
   let mut result = columns
     .iter()
-    .map(|column| EffectiveColumn {
-      width: column.width,
-      min_width: column.min_width,
-      align: column.align,
-      overflow: column.overflow,
+    .enumerate()
+    .map(|(index, column)| {
+      let natural = natural_column_width(column, rows, index, show_header);
+      EffectiveColumn {
+        width: column.width.max(natural).max(column.min_width),
+        min_width: column.min_width,
+        align: column.align,
+        overflow: column.overflow,
+      }
     })
     .collect::<Vec<_>>();
 
   while required_width(&result, style) > available_width {
-    let mut changed = false;
-    for index in (0..result.len()).rev() {
-      if required_width(&result, style) <= available_width {
-        break;
-      }
-      let column = &mut result[index];
-      if column.width > column.min_width {
-        column.width -= 1;
-        changed = true;
-      }
-    }
-    if !changed {
+    let Some(index) = result
+      .iter()
+      .enumerate()
+      .filter(|(_, column)| column.width > column.min_width)
+      .max_by_key(|(_, column)| column.width)
+      .map(|(index, _)| index)
+    else {
       break;
-    }
+    };
+    result[index].width -= 1;
   }
+
+  while required_width(&result, style) < available_width {
+    let Some(index) = result
+      .iter()
+      .enumerate()
+      .min_by_key(|(_, column)| column.width)
+      .map(|(index, _)| index)
+    else {
+      break;
+    };
+    result[index].width += 1;
+  }
+
   result
+}
+
+fn natural_column_width(
+  column: &TableColumn,
+  rows: &[TableRow],
+  index: usize,
+  show_header: bool,
+) -> u16 {
+  let header = show_header
+    .then(|| visible_width(&column.title))
+    .unwrap_or(0);
+  let body = rows
+    .iter()
+    .filter_map(|row| row.cells.get(index))
+    .map(|cell| visible_width(&cell.text))
+    .max()
+    .unwrap_or(0);
+  header
+    .max(body)
+    .saturating_add(u16::from(header.max(body) > 0))
+}
+
+fn visible_width(text: &str) -> u16 {
+  text_layout::measure_draw_text(&DrawTextParams {
+    text: text.to_string(),
+    max_height: Some(1),
+    wrap_mode: TextWrapMode::None,
+    ..Default::default()
+  })
+  .0
 }
 
 fn required_width(columns: &[EffectiveColumn], style: &TableStyle) -> u16 {
@@ -436,12 +644,7 @@ fn content_width(columns: &[EffectiveColumn], style: &TableStyle) -> u16 {
 }
 
 fn align_cell_text(text: &str, width: u16, align: TableAlign) -> String {
-  let text_width = text_layout::measure_draw_text(&DrawTextParams {
-    text: text.to_string(),
-    max_height: Some(1),
-    ..Default::default()
-  })
-  .0;
+  let text_width = visible_width(text);
   if text_width >= width {
     return text.to_string();
   }
@@ -452,6 +655,36 @@ fn align_cell_text(text: &str, width: u16, align: TableAlign) -> String {
     TableAlign::Right => (pad, 0),
   };
   pad_rich_text(text, left as usize, right as usize)
+}
+
+fn row_height(columns: &[EffectiveColumn], cells: &[TableCell]) -> u16 {
+  columns
+    .iter()
+    .enumerate()
+    .map(|(index, column)| {
+      let text_width = column.width.saturating_sub(u16::from(column.width > 1));
+      if text_width == 0 {
+        return 1;
+      }
+      let text = cells
+        .get(index)
+        .map(|cell| cell.text.as_str())
+        .unwrap_or("");
+      if column.overflow != TableOverflow::Wrap {
+        return 1;
+      }
+      text_layout::measure_draw_text(&DrawTextParams {
+        text: text.to_string(),
+        max_width: Some(text_width),
+        wrap_mode: TextWrapMode::Auto,
+        non_truncate_word_wrap: true,
+        ..Default::default()
+      })
+      .1
+      .max(1)
+    })
+    .max()
+    .unwrap_or(1)
 }
 
 fn pad_rich_text(text: &str, left: usize, right: usize) -> String {
@@ -470,6 +703,12 @@ mod tests {
   use crate::host_engine::services::CanvasService;
 
   fn table() -> (TableService, UiObjectPool, TableId) {
+    table_with_border_style(TableBorderStyle::Single)
+  }
+
+  fn table_with_border_style(
+    border_style: TableBorderStyle,
+  ) -> (TableService, UiObjectPool, TableId) {
     let service = TableService::new();
     let mut pool = UiObjectPool::new();
     let id = service
@@ -482,6 +721,7 @@ mod tests {
           ],
           style: TableStyle {
             border_mode: TableBorderMode::Full,
+            border_style,
             column_gap: 1,
             show_header: true,
             show_empty_message: true,
@@ -546,10 +786,104 @@ mod tests {
   }
 
   #[test]
+  fn double_border_uses_double_chars() {
+    let (service, pool, id) = table_with_border_style(TableBorderStyle::Double);
+    let mut canvas = CanvasService::new();
+    assert!(service.draw(
+      &pool,
+      &mut canvas,
+      TableDrawParams {
+        id,
+        x: 0,
+        y: 0,
+        width: 11,
+        height: 5,
+        rows: &[],
+        row_offset: 0,
+      },
+    ));
+    assert_eq!(canvas.cell_at(0, 0).unwrap().text, "╔");
+    assert_eq!(canvas.cell_at(5, 0).unwrap().text, "╦");
+    assert_eq!(canvas.cell_at(0, 2).unwrap().text, "╠");
+    assert_eq!(canvas.cell_at(5, 2).unwrap().text, "╬");
+    assert_eq!(canvas.cell_at(0, 4).unwrap().text, "╚");
+  }
+
+  #[test]
+  fn double_outer_single_inner_border_uses_mixed_chars() {
+    let (service, pool, id) = table_with_border_style(TableBorderStyle::DoubleOuterSingleInner);
+    let mut canvas = CanvasService::new();
+    assert!(service.draw(
+      &pool,
+      &mut canvas,
+      TableDrawParams {
+        id,
+        x: 0,
+        y: 0,
+        width: 11,
+        height: 5,
+        rows: &[],
+        row_offset: 0,
+      },
+    ));
+    assert_eq!(canvas.cell_at(0, 0).unwrap().text, "╔");
+    assert_eq!(canvas.cell_at(5, 0).unwrap().text, "╤");
+    assert_eq!(canvas.cell_at(0, 2).unwrap().text, "╟");
+    assert_eq!(canvas.cell_at(5, 2).unwrap().text, "┼");
+    assert_eq!(canvas.cell_at(5, 4).unwrap().text, "╧");
+  }
+
+  #[test]
   fn padding_keeps_rich_text_prefix() {
     assert_eq!(
       pad_rich_text("f%<fg:red>A</fg>", 1, 1),
       "f% <fg:red>A</fg> "
     );
+  }
+
+  #[test]
+  fn wrap_columns_make_rows_taller() {
+    let columns = vec![
+      EffectiveColumn {
+        width: 5,
+        min_width: 3,
+        align: TableAlign::Left,
+        overflow: TableOverflow::Wrap,
+      },
+      EffectiveColumn {
+        width: 5,
+        min_width: 3,
+        align: TableAlign::Left,
+        overflow: TableOverflow::Ellipsis,
+      },
+    ];
+    let cells = vec![
+      TableCell {
+        text: "supercalifragilistic".to_string(),
+      },
+      TableCell {
+        text: "ok".to_string(),
+      },
+    ];
+
+    assert!(row_height(&columns, &cells) > 1);
+  }
+
+  #[test]
+  fn dynamic_columns_fill_available_width() {
+    let columns = vec![
+      TableColumn::fixed("a", "A", 4),
+      TableColumn::fixed("b", "B", 4),
+      TableColumn::fixed("c", "C", 4),
+    ];
+    let style = TableStyle {
+      border_mode: TableBorderMode::Full,
+      ..Default::default()
+    };
+    let rows = vec![TableRow::from_texts(["1", "2", "long long long value"])];
+    let effective = effective_columns(&columns, &style, 30, &rows, true);
+
+    assert_eq!(required_width(&effective, &style), 30);
+    assert!(effective[2].width >= effective[0].width);
   }
 }

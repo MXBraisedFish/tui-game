@@ -1,5 +1,5 @@
 use crate::host_engine::services::rich_text::{
-  RichTextParams, RichTextService, TextColor, TextStyle,
+  RichTextParams, RichTextSegment, RichTextService, TextColor, TextStyle,
 };
 use crate::host_engine::services::unicode::graphemes;
 use std::collections::{HashMap, HashSet};
@@ -147,9 +147,30 @@ pub(crate) fn layout_text_lines(params: &DrawTextParams) -> Vec<LayoutLine> {
   layout_tokens(&tokens, params, &default_style)
 }
 
+pub(crate) fn layout_rich_text_segments(
+  segments: &[RichTextSegment],
+  params: &DrawTextParams,
+) -> Vec<LayoutLine> {
+  let default_style = params.to_text_style();
+  let tokens = build_segment_tokens(segments, &default_style);
+  layout_tokens(&tokens, params, &default_style)
+}
+
 // 测量绘制文本所需的尺寸（宽度 x 高度）
 pub(crate) fn measure_draw_text(params: &DrawTextParams) -> (u16, u16) {
   let lines = layout_text_lines(params);
+  measure_lines(&lines)
+}
+
+pub(crate) fn measure_rich_text_segments(
+  segments: &[RichTextSegment],
+  params: &DrawTextParams,
+) -> (u16, u16) {
+  let lines = layout_rich_text_segments(segments, params);
+  measure_lines(&lines)
+}
+
+fn measure_lines(lines: &[LayoutLine]) -> (u16, u16) {
   let width = lines
     .iter()
     .map(|line| line.width)
@@ -168,9 +189,13 @@ pub(crate) fn measure_draw_text(params: &DrawTextParams) -> (u16, u16) {
 // 将富文本解析为字素 token 流，每个 token 携带样式信息
 fn build_text_tokens(params: &DrawTextParams, style: &TextStyle) -> Vec<TextToken> {
   let rich_text = RichTextService::new().parse(&params.text, params.params.as_ref());
+  build_segment_tokens(&rich_text.segments, style)
+}
+
+fn build_segment_tokens(segments: &[RichTextSegment], style: &TextStyle) -> Vec<TextToken> {
   let mut tokens = Vec::new();
 
-  for segment in &rich_text.segments {
+  for segment in segments {
     let merged = merge_style(style, &segment.style);
     for g in graphemes(&segment.text) {
       if g.text == "\n" {
@@ -622,6 +647,13 @@ mod tests {
 
     assert!(lines.iter().all(|line| line_width(line) <= 10));
     assert_eq!(lines.join(""), input);
+  }
+
+  #[test]
+  fn auto_wrap_keeps_long_mixed_security_text_complete() {
+    let input = "当安全模式开启时，程序会限制部分高风险 API 的访问权限，以降低脚本对本地数据和系统环境造成影响的可能性。";
+    let lines = auto_lines(input, 54);
+    assert_eq!(lines.join("").replace(' ', ""), input.replace(' ', ""));
   }
 
   #[test]

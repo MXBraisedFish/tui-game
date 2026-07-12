@@ -1,6 +1,7 @@
 {
   "safe_mode_warning.title": "关闭安全模式警告",
   "safe_mode_warning.description.one": "f%安全模式旨在保护您的电脑信息安全。\n关闭安全模式将允许该模组调用高风险操作，例如文件写入、系统查询等。\n如果您需要关闭安全模式，请确保您完全信任该模组包的作者且已了解所有可能的风险。\n如果您有疑问，可查看<fg:bright_blue>[设置 -> 安全设置 -> 安全详情]</fg>了解具体信息。",
+  "safe_mode_warning.description.all": "f%安全模式旨在保护您的电脑信息安全。\n关闭安全模式将允许该模组调用高风险操作，例如文件写入、系统查询等。\n如果您需要关闭安全模式，请确保您完全信任所有模组包的作者且已了解所有可能的风险。\n如果您有疑问，可查看<fg:bright_blue>[设置 -> 安全设置 -> 安全详情]</fg>了解具体信息。",
   "safe_mode_warning.yes.temporary": "{key:safe_mode_warning.yes.temporary} 关闭（仅本次运行）",
   "safe_mode_warning.yes.permanent": "{key:safe_mode_warning.yes.permanent} 关闭（永久）",
   "safe_mode_warning.no": "{key:safe_mode_warning.no} 取消",

@@ -1,0 +1,19 @@
+{
+  "language": "lua",
+  "extensions": ["lua"],
+  "keywords": [
+    "and", "break", "do", "else", "elseif", "end", "for", "function", "goto", "if", "in",
+    "local", "not", "or", "repeat", "return", "then", "until", "while"
+  ],
+  "builtins": [
+    "assert", "collectgarbage", "coroutine", "debug", "error", "getmetatable", "io", "ipairs",
+    "math", "next", "os", "pairs", "pcall", "print", "rawequal", "rawget", "rawlen",
+    "rawset", "require", "select", "setmetatable", "string", "table", "tonumber", "tostring",
+    "type", "utf8", "xpcall"
+  ],
+  "constants": ["true", "false", "nil"],
+  "operators": [
+    "+", "-", "*", "/", "//", "%", "^", "#", "==", "~=", "<", ">", "<=", ">=", "=",
+    "(", ")", "{", "}", "[", "]", "::", ";", ":", ",", ".", "..", "..."
+  ]
+}

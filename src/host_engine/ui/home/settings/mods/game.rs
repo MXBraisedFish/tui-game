@@ -553,6 +553,7 @@ impl GamePackageUi {
     temporary_safe_mode_disabled: &HashSet<String>,
     image: &mut ImageService,
     mouse_supported: bool,
+    truecolor_supported: bool,
   ) {
     self.sync_entries(
       package.mod_games(),
@@ -597,6 +598,7 @@ impl GamePackageUi {
       i18n,
       image,
       mouse_supported,
+      truecolor_supported,
       &positions,
       info_scroll_y,
     );
@@ -1292,6 +1294,7 @@ impl GamePackageUi {
     i18n: &I18nService,
     image: &mut ImageService,
     mouse_supported: bool,
+    truecolor_supported: bool,
     pos: &GamePackageLayout,
     scroll_y: u16,
   ) {
@@ -1349,6 +1352,7 @@ impl GamePackageUi {
       pos.right_inner,
       scroll_y,
       mouse_supported,
+      truecolor_supported,
     );
   }
 
@@ -1363,6 +1367,7 @@ impl GamePackageUi {
     rect: Rect,
     scroll_y: u16,
     mouse_supported: bool,
+    truecolor_supported: bool,
   ) {
     let package_params = Self::package_rich_params(entry);
     let mut y = 0;
@@ -1508,21 +1513,44 @@ impl GamePackageUi {
       mouse_color,
     );
     y += 1;
+    let (truecolor_key, truecolor_color) = if !entry.truecolor_required {
+      ("game_pack.info.truecolor.off", Self::hint_style())
+    } else if truecolor_supported {
+      (
+        "game_pack.info.truecolor.on.support",
+        Self::style(TerminalColor::BrightGreen),
+      )
+    } else {
+      (
+        "game_pack.info.truecolor.on.unsupport",
+        Self::style(TerminalColor::BrightRed),
+      )
+    };
     self.draw_info_status(
       canvas,
       rect,
       scroll_y,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.write"),
+      i18n.get_runtime_text("game_pack", "game_pack.info.truecolor"),
+      i18n.get_runtime_text("game_pack", truecolor_key),
+      truecolor_color,
+    );
+    y += 1;
+    self.draw_info_status(
+      canvas,
+      rect,
+      scroll_y,
+      y,
+      i18n.get_runtime_text("game_pack", "game_pack.info.high_privilege"),
       i18n.get_runtime_text(
         "game_pack",
-        if entry.write_required {
-          "game_pack.info.write.on"
+        if entry.high_privilege_required {
+          "game_pack.info.high_privilege.on"
         } else {
-          "game_pack.info.write.off"
+          "game_pack.info.high_privilege.off"
         },
       ),
-      if entry.write_required {
+      if entry.high_privilege_required {
         Self::style(TerminalColor::BrightRed)
       } else {
         Self::hint_style()
@@ -2053,7 +2081,7 @@ impl GamePackageUi {
       })
       .height
       .max(1);
-    14 + 1 + 1 + 1 + 4 + 1 + 6 + 1 + 1 + description_lines
+    14 + 1 + 1 + 1 + 4 + 1 + 7 + 1 + 1 + description_lines
   }
 
   fn handle_hover(&mut self, id: HitAreaId) {
@@ -2164,6 +2192,13 @@ impl GamePackageUi {
         entry.enabled = state.enabled;
         entry.debug = state.debug;
         entry.safe_mode = state.safe_mode;
+      } else {
+        entry.enabled = profile.defaults.enabled;
+        entry.debug = profile.defaults.debug;
+        entry.safe_mode = matches!(
+          profile.defaults.safe_mode,
+          crate::host_engine::services::SafeModeDefault::On
+        );
       }
       if temporary_safe_mode_disabled.contains(&entry.mod_id) {
         entry.safe_mode = false;

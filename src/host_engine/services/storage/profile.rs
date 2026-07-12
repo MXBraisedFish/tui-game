@@ -19,10 +19,33 @@ pub struct TerminalProfile {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PackageStateProfile {
   #[serde(default)]
+  pub defaults: PackageDefaultState,
+
+  #[serde(default)]
   pub games: HashMap<String, GamePackageState>,
 
   #[serde(default)]
   pub screensavers: HashMap<String, ScreensaverPackageState>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SafeModeDefault {
+  On,
+  #[serde(alias = "off_temporary")]
+  OffPermanent,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PackageDefaultState {
+  #[serde(default = "default_enabled")]
+  pub enabled: bool,
+
+  #[serde(default)]
+  pub debug: bool,
+
+  #[serde(default)]
+  pub safe_mode: SafeModeDefault,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -61,6 +84,22 @@ impl Default for ScreensaverPackageState {
     Self {
       enabled: true,
       debug: false,
+    }
+  }
+}
+
+impl Default for SafeModeDefault {
+  fn default() -> Self {
+    Self::On
+  }
+}
+
+impl Default for PackageDefaultState {
+  fn default() -> Self {
+    Self {
+      enabled: true,
+      debug: false,
+      safe_mode: SafeModeDefault::On,
     }
   }
 }
@@ -245,7 +284,13 @@ impl StorageService {
     f: impl FnOnce(&mut GamePackageState),
   ) -> std::io::Result<()> {
     let mut profile = self.read_package_state_or_default(log);
-    f(profile.games.entry(mod_id.to_string()).or_default());
+    let defaults = &profile.defaults;
+    let initial = GamePackageState {
+      enabled: defaults.enabled,
+      debug: defaults.debug,
+      safe_mode: defaults.safe_mode == SafeModeDefault::On,
+    };
+    f(profile.games.entry(mod_id.to_string()).or_insert(initial));
     self.write_package_state(&profile, log)
   }
 
@@ -256,7 +301,14 @@ impl StorageService {
     f: impl FnOnce(&mut ScreensaverPackageState),
   ) -> std::io::Result<()> {
     let mut profile = self.read_package_state_or_default(log);
-    f(profile.screensavers.entry(mod_id.to_string()).or_default());
+    let initial = ScreensaverPackageState {
+      enabled: profile.defaults.enabled,
+      debug: profile.defaults.debug,
+    };
+    f(profile
+      .screensavers
+      .entry(mod_id.to_string())
+      .or_insert(initial));
     self.write_package_state(&profile, log)
   }
 }
@@ -328,5 +380,47 @@ mod tests {
       storage.read_package_state_or_default(&mut log),
       PackageStateProfile::default()
     );
+  }
+
+  #[test]
+  fn package_defaults_are_persisted_and_seed_new_package_states() {
+    let storage = temp_storage("package_defaults");
+    let mut log = LogService::new();
+    let mut profile = PackageStateProfile::default();
+    profile.defaults = PackageDefaultState {
+      enabled: false,
+      debug: true,
+      safe_mode: SafeModeDefault::OffPermanent,
+    };
+    storage.write_package_state(&profile, &mut log).unwrap();
+
+    storage
+      .update_game_package_state("game", &mut log, |state| state.debug = false)
+      .unwrap();
+    storage
+      .update_screensaver_package_state("screen", &mut log, |state| state.debug = false)
+      .unwrap();
+
+    let profile = storage.read_package_state_or_default(&mut log);
+    assert_eq!(profile.defaults.safe_mode, SafeModeDefault::OffPermanent);
+    assert_eq!(profile.games["game"].enabled, false);
+    assert_eq!(profile.games["game"].safe_mode, false);
+    assert_eq!(profile.screensavers["screen"].enabled, false);
+  }
+
+  #[test]
+  fn old_package_profile_uses_default_settings() {
+    let profile: PackageStateProfile =
+      serde_json::from_str(r#"{"games":{},"screensavers":{}}"#).unwrap();
+    assert_eq!(profile.defaults, PackageDefaultState::default());
+  }
+
+  #[test]
+  fn temporary_default_from_older_profile_becomes_permanent() {
+    let profile: PackageStateProfile = serde_json::from_str(
+      r#"{"defaults":{"enabled":true,"debug":false,"safe_mode":"off_temporary"}}"#,
+    )
+    .unwrap();
+    assert_eq!(profile.defaults.safe_mode, SafeModeDefault::OffPermanent);
   }
 }

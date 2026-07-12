@@ -135,6 +135,7 @@ impl StorageManagementViewUi {
       ],
       style: TableStyle {
         border_mode: TableBorderMode::Full,
+        border_style: Default::default(),
         column_gap: 0,
         show_header: true,
         show_empty_message: false,

@@ -34,6 +34,7 @@ pub(super) fn apply_input_demo_command(
 pub(super) fn apply_settings_command(
   command: SettingsUiCommand,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
@@ -48,6 +49,147 @@ pub(super) fn apply_settings_command(
     SettingsUiCommand::OpenMods => world.state.enter_ui_node(UiNodeState::mods()),
     SettingsUiCommand::OpenStorageManagement => {
       world.state.enter_ui_node(UiNodeState::storage_management())
+    }
+    SettingsUiCommand::OpenSecuritySettings => {
+      let defaults = services
+        .storage
+        .read_package_state_or_default(&mut services.log)
+        .defaults;
+      security_uis
+        .settings
+        .set_defaults(defaults.enabled, defaults.debug, defaults.safe_mode);
+      world.state.enter_ui_node(UiNodeState::security_settings())
+    }
+  }
+}
+
+pub(super) fn apply_security_settings_command(
+  command: SecuritySettingsCommand,
+  security_uis: &mut SecurityUis,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    SecuritySettingsCommand::Back => {
+      world.state.pop_ui_node();
+      clear_exiting_pool(security_uis.settings.objects_mut(), services);
+      security_uis.settings = SecuritySettingsUi::init(&services.hit_area);
+    }
+    SecuritySettingsCommand::OpenDetails => {
+      world.state.enter_ui_node(UiNodeState::security_details());
+    }
+    SecuritySettingsCommand::ResetStatus
+    | SecuritySettingsCommand::ResetDebug
+    | SecuritySettingsCommand::ResetSafeMode => {
+      let mut profile = services
+        .storage
+        .read_package_state_or_default(&mut services.log);
+      for entry in services.package.mod_games() {
+        let mod_id = entry.mod_id;
+        let mut initial = crate::host_engine::services::GamePackageState::default();
+        initial.enabled = profile.defaults.enabled;
+        initial.debug = profile.defaults.debug;
+        initial.safe_mode =
+          profile.defaults.safe_mode == crate::host_engine::services::SafeModeDefault::On;
+        let state = profile.games.entry(mod_id.clone()).or_insert(initial);
+        match command {
+          SecuritySettingsCommand::ResetStatus => state.enabled = false,
+          SecuritySettingsCommand::ResetDebug => state.debug = false,
+          SecuritySettingsCommand::ResetSafeMode => {
+            state.safe_mode = true;
+            world.temporary_safe_mode_disabled.remove(&mod_id);
+          }
+          _ => unreachable!(),
+        }
+      }
+      for entry in services.package.mod_screensavers() {
+        let mut initial = crate::host_engine::services::ScreensaverPackageState::default();
+        initial.enabled = profile.defaults.enabled;
+        initial.debug = profile.defaults.debug;
+        let state = profile.screensavers.entry(entry.mod_id).or_insert(initial);
+        match command {
+          SecuritySettingsCommand::ResetStatus => state.enabled = false,
+          SecuritySettingsCommand::ResetDebug => state.debug = false,
+          SecuritySettingsCommand::ResetSafeMode => {}
+          _ => unreachable!(),
+        }
+      }
+      let success = services
+        .storage
+        .write_package_state(&profile, &mut services.log)
+        .is_ok();
+      security_uis.settings.set_reset_result(success);
+    }
+    SecuritySettingsCommand::SetDefaultStatus(enabled) => {
+      update_package_defaults(security_uis, services, |defaults| {
+        defaults.enabled = enabled;
+      });
+    }
+    SecuritySettingsCommand::SetDefaultDebug(debug) => {
+      update_package_defaults(security_uis, services, |defaults| {
+        defaults.debug = debug;
+      });
+    }
+    SecuritySettingsCommand::SetDefaultSafeMode(safe_mode) => {
+      if safe_mode == crate::host_engine::services::SafeModeDefault::OffPermanent {
+        world.safe_mode_warning_all = true;
+        world.state.push_safe_mode_warning_overlay();
+      } else {
+        update_package_defaults(security_uis, services, |defaults| {
+          defaults.safe_mode = safe_mode;
+        });
+      }
+    }
+  }
+}
+
+fn update_package_defaults(
+  security_uis: &mut SecurityUis,
+  services: &mut EngineServices,
+  update: impl FnOnce(&mut crate::host_engine::services::PackageDefaultState),
+) {
+  let mut profile = services
+    .storage
+    .read_package_state_or_default(&mut services.log);
+  update(&mut profile.defaults);
+  if services
+    .storage
+    .write_package_state(&profile, &mut services.log)
+    .is_ok()
+  {
+    security_uis.settings.set_defaults(
+      profile.defaults.enabled,
+      profile.defaults.debug,
+      profile.defaults.safe_mode,
+    );
+  } else {
+    security_uis.settings.set_reset_result(false);
+  }
+}
+
+pub(super) fn apply_security_details_command(
+  command: SecurityDetailsCommand,
+  security_uis: &mut SecurityUis,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    SecurityDetailsCommand::Back => {
+      world.state.pop_ui_node();
+      clear_exiting_pool(security_uis.details.objects_mut(), services);
+      security_uis.details = SecurityDetailsUi::init(
+        &services.hit_area,
+        &services.scroll_box,
+        &services.markdown,
+        &services.storage,
+        &services.i18n,
+      );
+    }
+    SecurityDetailsCommand::Scroll(amount) => {
+      security_uis
+        .details
+        .scroll(amount, &services.scroll_box, &services.layout);
+      services.canvas.request_render();
     }
   }
 }
@@ -261,6 +403,7 @@ pub(super) fn apply_game_package_command(
     }
     GamePackageCommand::RequestToggleSafeMode => {
       if game_package_ui.selected_safe_mode().unwrap_or(true) {
+        world.safe_mode_warning_all = false;
         world.state.push_safe_mode_warning_overlay();
       } else {
         if let Some(mod_id) = game_package_ui.selected_mod_id() {
@@ -274,10 +417,50 @@ pub(super) fn apply_game_package_command(
 
 pub(super) fn apply_safe_mode_warning_command(
   command: SafeModeWarningCommand,
+  security_uis: &mut SecurityUis,
   game_package_ui: &mut GamePackageUi,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
+  if world.safe_mode_warning_all {
+    if command == SafeModeWarningCommand::DisablePermanent {
+      let mut profile = services
+        .storage
+        .read_package_state_or_default(&mut services.log);
+      profile.defaults.safe_mode = crate::host_engine::services::SafeModeDefault::OffPermanent;
+      for entry in services.package.mod_games() {
+        let initial = crate::host_engine::services::GamePackageState {
+          enabled: profile.defaults.enabled,
+          debug: profile.defaults.debug,
+          safe_mode: false,
+        };
+        profile
+          .games
+          .entry(entry.mod_id)
+          .or_insert(initial)
+          .safe_mode = false;
+      }
+      if services
+        .storage
+        .write_package_state(&profile, &mut services.log)
+        .is_ok()
+      {
+        world.temporary_safe_mode_disabled.clear();
+        security_uis.settings.set_defaults(
+          profile.defaults.enabled,
+          profile.defaults.debug,
+          profile.defaults.safe_mode,
+        );
+      } else {
+        security_uis.settings.set_reset_result(false);
+      }
+    }
+    world.safe_mode_warning_all = false;
+    let _ = world
+      .state
+      .remove_overlay_kind(OverlayKind::SafeModeWarning);
+    return;
+  }
   match command {
     SafeModeWarningCommand::Cancel => {}
     SafeModeWarningCommand::DisableTemporary => {

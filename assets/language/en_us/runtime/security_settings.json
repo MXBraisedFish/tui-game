@@ -12,8 +12,10 @@
   "security_settings.reset.debug.off": "Off",
   "security_settings.reset.debug.on": "On",
   "security_settings.reset.safe_mode.on": "On",
-  "security_settings.reset.safe_mode.off.temporary": "Off (Temporary)",
-  "security_settings.reset.safe_mode.off.permanent": "Off (Permanent)",
+  "security_settings.reset.safe_mode.off": "Off (Permanent)",
   "security_settings.reset.success": "Reset Successful",
-  "security_settings.reset.fail": "Reset Failed"
+  "security_settings.reset.fail": "Reset Failed",
+  "security_settings.action.select": "{key:security_settings.focus_up}/{key:security_settings.focus_down} Select",
+  "security_settings.action.switch": "{key:security_settings.confirm} Switch",
+  "security_settings.action.back": "{key:security_settings.back} Back"
 }

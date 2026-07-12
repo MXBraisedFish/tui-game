@@ -1,0 +1,8 @@
+{
+  "language": "json",
+  "extensions": ["json"],
+  "keywords": [],
+  "builtins": [],
+  "constants": ["true", "false", "null"],
+  "operators": [":", ",", "{", "}", "[", "]"]
+}

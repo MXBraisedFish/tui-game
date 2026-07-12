@@ -5,7 +5,8 @@ mod terminal_check;
 pub use home::{
   GamePackageCommand, GamePackageUi, HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi,
   LanguageSelectCommand, LanguageSelectUi, ModsCommand, ModsUi, ScreensaverPackageCommand,
-  ScreensaverPackageUi, SettingsUi, SettingsUiCommand, StorageManagementClearCommand,
+  ScreensaverPackageUi, SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand,
+  SecuritySettingsUi, SettingsUi, SettingsUiCommand, StorageManagementClearCommand,
   StorageManagementClearUi, StorageManagementCommand, StorageManagementExportCommand,
   StorageManagementExportUi, StorageManagementUi, StorageManagementViewCommand,
   StorageManagementViewUi,

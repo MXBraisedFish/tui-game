@@ -12,8 +12,10 @@
   "security_settings.reset.debug.off": "关闭",
   "security_settings.reset.debug.on": "开启",
   "security_settings.reset.safe_mode.on": "开启",
-  "security_settings.reset.safe_mode.off.temporary": "关闭（仅本次运行）",
-  "security_settings.reset.safe_mode.off.permanent": "关闭（永久）",
+  "security_settings.reset.safe_mode.off": "关闭（永久）",
   "security_settings.reset.success": "重置成功",
-  "security_settings.reset.fail": "重置失败"
+  "security_settings.reset.fail": "重置失败",
+  "security_settings.action.select": "{key:security_settings.focus_up}/{key:security_settings.focus_down} 选择",
+  "security_settings.action.switch": "{key:security_settings.confirm} 切换",
+  "security_settings.action.back": "{key:security_settings.back} 返回"
 }

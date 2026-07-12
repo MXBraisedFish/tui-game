@@ -1,0 +1,8 @@
+{
+  "language": "yaml",
+  "extensions": ["yaml", "yml"],
+  "keywords": [],
+  "builtins": [],
+  "constants": ["true", "false", "True", "False", "null", "Null", "NULL", "~", "yes", "no"],
+  "operators": [":", "-", "?", "|", ">", "&", "*", "!", "%", "{", "}", "[", "]", ","]
+}

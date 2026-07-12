@@ -81,7 +81,8 @@ pub struct PackageListEntry {
   pub debug: bool,
   pub safe_mode: bool,
   pub mouse_required: bool,
-  pub write_required: bool,
+  pub truecolor_required: bool,
+  pub high_privilege_required: bool,
 }
 
 /// 包显示信息
@@ -123,8 +124,9 @@ pub struct PackageRuntime {
 pub struct GameConfig {
   pub name: String,
   pub detail: String,
-  pub write: bool,
+  pub high_privilege: bool,
   pub mouse: bool,
+  pub truecolor: bool,
   pub target_fps: u32,
   pub save: bool,
   pub score: Option<ScoreConfig>,
@@ -150,6 +152,8 @@ pub struct ActionConfig {
 pub struct ScreensaverConfig {
   pub name: String,
   pub mouse: bool,
+  pub truecolor: bool,
+  pub command: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -764,7 +768,12 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
       .screensaver
       .as_ref()
       .is_some_and(|screensaver| screensaver.mouse);
-  let write_required = info.game.as_ref().is_some_and(|game| game.write);
+  let truecolor_required = info.game.as_ref().is_some_and(|game| game.truecolor)
+    || info
+      .screensaver
+      .as_ref()
+      .is_some_and(|screensaver| screensaver.truecolor);
+  let high_privilege_required = info.game.as_ref().is_some_and(|game| game.high_privilege);
   let key_actions = info
     .game
     .as_ref()
@@ -794,7 +803,8 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     debug: false,
     safe_mode: true,
     mouse_required,
-    write_required,
+    truecolor_required,
+    high_privilege_required,
   }
 }
 
@@ -1040,8 +1050,9 @@ fn read_package(
           .detail
           .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
           .unwrap_or_default(),
-        write: g.write.unwrap_or(false),
+        high_privilege: g.high_privilege.or(g.write).unwrap_or(false),
         mouse: g.mouse.unwrap_or(false),
+        truecolor: g.truecolor.unwrap_or(false),
         target_fps: g.target_fps,
         save: g.save.unwrap_or(false),
         score: g.score.map(|s| ScoreConfig {
@@ -1066,6 +1077,8 @@ fn read_package(
           .map(|value| resolve_package_text(dir, value, request, &mut watched_files))
           .unwrap_or_default(),
         mouse: s.mouse.unwrap_or(false),
+        truecolor: s.truecolor.unwrap_or(false),
+        command: s.command.unwrap_or_default(),
       })
     }
     PackageType::Game => None,
@@ -1169,8 +1182,10 @@ struct RawRuntime {
 struct RawGameConfig {
   name: Option<String>,
   detail: Option<String>,
+  high_privilege: Option<bool>,
   write: Option<bool>,
   mouse: Option<bool>,
+  truecolor: Option<bool>,
   target_fps: u32,
   save: Option<bool>,
   score: Option<RawScoreConfig>,
@@ -1193,6 +1208,8 @@ struct RawActionConfig {
 struct RawScreensaverConfig {
   name: Option<String>,
   mouse: Option<bool>,
+  truecolor: Option<bool>,
+  command: Option<String>,
 }
 
 fn parse_package_type(s: &str) -> Result<PackageType, String> {
@@ -1997,6 +2014,85 @@ mod tests {
     scan(&mut service, &root, &mut log, "en_us");
 
     assert!(service.mod_screensavers()[0].mouse_required);
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn game_high_privilege_and_truecolor_flags_reach_list_entry() {
+    let root = temp_root("game_privilege_truecolor");
+    write_game(&root, "data/mod/game", "flag_game", "Flag Game");
+    let package_json = root.join("data/mod/game/flag_game/package.json");
+    let content = std::fs::read_to_string(&package_json).unwrap().replace(
+      r#""game":{"target_fps":60}"#,
+      r#""game":{"target_fps":60,"high_privilege":true,"truecolor":true}"#,
+    );
+    std::fs::write(package_json, content).unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+
+    let entry = service.mod_games().remove(0);
+    assert!(entry.high_privilege_required);
+    assert!(entry.truecolor_required);
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn legacy_game_write_field_maps_to_high_privilege() {
+    let root = temp_root("legacy_write");
+    write_game(&root, "data/mod/game", "legacy_game", "Legacy Game");
+    let package_json = root.join("data/mod/game/legacy_game/package.json");
+    let content = std::fs::read_to_string(&package_json).unwrap().replace(
+      r#""game":{"target_fps":60}"#,
+      r#""game":{"target_fps":60,"write":true}"#,
+    );
+    std::fs::write(package_json, content).unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+
+    assert!(service.mod_games()[0].high_privilege_required);
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn screensaver_truecolor_command_and_i18n_name_are_scanned() {
+    let root = temp_root("screensaver_flags");
+    write_screensaver(&root, "data/mod/screensaver", "flag_screen", "Flag Screen");
+    let package_json = root.join("data/mod/screensaver/flag_screen/package.json");
+    let content = std::fs::read_to_string(&package_json).unwrap().replace(
+      r#""screensaver":{"name":"Flag Screen"}"#,
+      r#""screensaver":{"name":"@screen.name","mouse":true,"truecolor":true,"command":"flag-screen"}"#,
+    );
+    std::fs::write(package_json, content).unwrap();
+    write_package_language(
+      &root,
+      "data/mod/screensaver",
+      "flag_screen",
+      "zh_cn",
+      "",
+      r#"{"screen.name":"旗标屏保"}"#,
+    );
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "zh_cn");
+
+    let screen = service.screensavers().remove(0);
+    let config = screen.screensaver.as_ref().unwrap();
+    assert_eq!(config.name, "旗标屏保");
+    assert!(config.mouse);
+    assert!(config.truecolor);
+    assert_eq!(config.command, "flag-screen");
+
+    let entry = service.mod_screensavers().remove(0);
+    assert!(entry.mouse_required);
+    assert!(entry.truecolor_required);
 
     let _ = std::fs::remove_dir_all(root);
   }

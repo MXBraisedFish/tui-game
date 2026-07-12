@@ -1,0 +1,22 @@
+{
+  "language": "typescript",
+  "extensions": ["ts"],
+  "keywords": [
+    "abstract", "as", "async", "await", "break", "case", "catch", "class", "const",
+    "continue", "declare", "default", "delete", "do", "else", "enum", "export", "extends",
+    "finally", "for", "from", "function", "if", "implements", "import", "in", "infer",
+    "interface", "is", "keyof", "let", "module", "namespace", "new", "of", "private",
+    "protected", "public", "readonly", "return", "satisfies", "static", "super", "switch",
+    "this", "throw", "try", "type", "typeof", "var", "while", "with", "yield"
+  ],
+  "builtins": [
+    "Array", "Boolean", "Date", "Error", "JSON", "Map", "Math", "Number", "Object",
+    "Promise", "Record", "RegExp", "Set", "String", "Symbol", "console", "log", "require"
+  ],
+  "constants": ["true", "false", "null", "undefined", "NaN", "Infinity"],
+  "operators": [
+    "+", "-", "*", "/", "%", "**", "=", "+=", "-=", "*=", "/=", "%=", "**=", "==",
+    "===", "!=", "!==", "<", ">", "<=", ">=", "&&", "||", "!", "&", "|", "^", "~",
+    "<<", ">>", ">>>", "?", "??", "?.", "=>", ".", "...", ":"
+  ]
+}

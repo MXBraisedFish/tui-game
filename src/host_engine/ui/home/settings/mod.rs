@@ -9,6 +9,7 @@ use crate::host_engine::services::{
 
 pub mod language;
 pub mod mods;
+pub mod security;
 pub mod storage_management;
 
 const SETTINGS_MENU_LEN: usize = 6;
@@ -67,6 +68,7 @@ pub enum SettingsUiCommand {
   OpenLanguageSelect,
   OpenMods,
   OpenStorageManagement,
+  OpenSecuritySettings,
 }
 
 impl SettingsUi {
@@ -155,6 +157,7 @@ impl SettingsUi {
           0 => Some(SettingsUiCommand::OpenLanguageSelect),
           2 => Some(SettingsUiCommand::OpenMods),
           3 => Some(SettingsUiCommand::OpenStorageManagement),
+          4 => Some(SettingsUiCommand::OpenSecuritySettings),
           _ => None,
         }
       }
@@ -175,6 +178,7 @@ impl SettingsUi {
           0 => Some(SettingsUiCommand::OpenLanguageSelect),
           2 => Some(SettingsUiCommand::OpenMods),
           3 => Some(SettingsUiCommand::OpenStorageManagement),
+          4 => Some(SettingsUiCommand::OpenSecuritySettings),
           _ => None,
         },
         "settings.back" => Some(SettingsUiCommand::Back),

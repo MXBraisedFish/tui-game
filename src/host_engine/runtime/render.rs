@@ -7,6 +7,7 @@ pub(super) fn route_render(
   world: &RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -97,6 +98,7 @@ pub(super) fn route_render(
       &services.layout,
       &services.i18n,
       &services.hit_area,
+      world.safe_mode_warning_all,
     );
     return None;
   }
@@ -140,6 +142,7 @@ pub(super) fn route_render(
     world,
     home_ui,
     settings_ui,
+    security_uis,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -172,6 +175,27 @@ pub(super) fn route_render(
         &services.layout,
         &services.i18n,
         &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::SecuritySettings) => {
+      security_uis.settings.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::SecurityDetails) => {
+      security_uis.details.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+        &services.scroll_box,
+        &services.markdown,
+        &services.code_highlight,
       );
     }
     Some(UiNodeKind::StorageManagement) => {
@@ -233,7 +257,7 @@ pub(super) fn route_render(
       );
     }
     Some(UiNodeKind::GamePackage) => {
-      let mouse_supported = services.terminal.capabilities().mouse;
+      let capabilities = services.terminal.capabilities();
       game_package_ui.render(
         &mut services.render,
         &mut services.canvas,
@@ -247,11 +271,12 @@ pub(super) fn route_render(
         &mut services.log,
         &world.temporary_safe_mode_disabled,
         &mut services.image,
-        mouse_supported,
+        capabilities.mouse,
+        capabilities.truecolor,
       );
     }
     Some(UiNodeKind::ScreensaverPackage) => {
-      let mouse_supported = services.terminal.capabilities().mouse;
+      let capabilities = services.terminal.capabilities();
       screensaver_package_ui.render(
         &mut services.render,
         &mut services.canvas,
@@ -264,7 +289,8 @@ pub(super) fn route_render(
         &services.storage,
         &mut services.log,
         &mut services.image,
-        mouse_supported,
+        capabilities.mouse,
+        capabilities.truecolor,
       );
     }
     Some(UiNodeKind::TerminalCheck) => {
