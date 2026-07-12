@@ -14,6 +14,7 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
     Some(UiNodeKind::StorageManagementView) => load_storage_management_view_action_map(services),
     Some(UiNodeKind::LanguageSelect) => load_language_select_action_map(services),
     Some(UiNodeKind::Mods) => load_mods_action_map(services),
+    Some(UiNodeKind::GameList) => load_game_list_action_map(services),
     Some(UiNodeKind::GamePackage) => load_game_package_action_map(services),
     Some(UiNodeKind::ScreensaverPackage) => load_screensaver_package_action_map(services),
     Some(UiNodeKind::TerminalCheck) => load_terminal_check_action_map(services),
@@ -108,6 +109,10 @@ fn load_language_select_action_map(services: &mut EngineServices) {
 
 fn load_mods_action_map(services: &mut EngineServices) {
   load_action_map(services, &ModsUi::action_map(), "ModsUi");
+}
+
+fn load_game_list_action_map(services: &mut EngineServices) {
+  load_action_map(services, &GameListUi::action_map(), "GameListUi");
 }
 
 fn load_game_package_action_map(services: &mut EngineServices) {

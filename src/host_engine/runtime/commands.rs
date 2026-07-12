@@ -9,10 +9,38 @@ pub(super) fn apply_home_command(command: HomeUiCommand, world: &mut RuntimeWorl
       world.state.enter_stopped();
       set_crash_phase(world.state.crash_phase());
     }
-    HomeUiCommand::StartGame => {}
+    HomeUiCommand::StartGame => world.state.enter_ui_node(UiNodeState::game_list()),
     HomeUiCommand::ContinueGame => {}
     HomeUiCommand::OpenSettings => world.state.enter_ui_node(UiNodeState::settings()),
     HomeUiCommand::OpenAbout => world.state.enter_ui_node(UiNodeState::input_demo()),
+  }
+}
+
+pub(super) fn apply_game_list_command(
+  command: GameListCommand,
+  game_list_ui: &mut GameListUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    GameListCommand::Back => {
+      world.state.pop_ui_node();
+      reset_game_list_ui(game_list_ui, services);
+    }
+    GameListCommand::FocusSearch => game_list_ui.focus_search(&mut services.text_input),
+    GameListCommand::BlurSearch => game_list_ui.blur_search(&mut services.text_input),
+    GameListCommand::FocusJump => game_list_ui.focus_jump(&mut services.text_input),
+    GameListCommand::BlurJump => game_list_ui.blur_jump(&mut services.text_input),
+    GameListCommand::ScrollInfoUp => {
+      game_list_ui.scroll_info(&services.scroll_box, &services.layout, -3)
+    }
+    GameListCommand::ScrollInfoDown => {
+      game_list_ui.scroll_info(&services.scroll_box, &services.layout, 3)
+    }
+    GameListCommand::SubmitJump(value) => {
+      game_list_ui.submit_jump(&mut services.text_input, value);
+    }
+    GameListCommand::Confirm => {}
   }
 }
 
@@ -740,6 +768,15 @@ fn reset_storage_management_view_ui(
 fn reset_mods_ui(ui: &mut ModsUi, services: &mut EngineServices) {
   clear_exiting_pool(ui.objects_mut(), services);
   *ui = ModsUi::init(&services.hit_area);
+}
+
+fn reset_game_list_ui(ui: &mut GameListUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = GameListUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
 }
 
 fn reset_game_package_ui(ui: &mut GamePackageUi, services: &mut EngineServices) {

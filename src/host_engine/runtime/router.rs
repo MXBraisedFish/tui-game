@@ -15,6 +15,7 @@ pub(super) fn current_objects_mut<'a>(
   language_select_ui: Option<&'a mut LanguageSelectUi>,
   terminal_check_ui: &'a mut TerminalCheckUi,
   mods_ui: &'a mut ModsUi,
+  game_list_ui: &'a mut GameListUi,
   game_package_ui: &'a mut GamePackageUi,
   screensaver_package_ui: &'a mut ScreensaverPackageUi,
   input_demo_ui: &'a mut InputDemoUi,
@@ -31,6 +32,7 @@ pub(super) fn current_objects_mut<'a>(
     Some(UiNodeKind::LanguageSelect) => language_select_ui.map(UiObjectPoolOwner::objects_mut),
     Some(UiNodeKind::TerminalCheck) => Some(terminal_check_ui.objects_mut()),
     Some(UiNodeKind::Mods) => Some(mods_ui.objects_mut()),
+    Some(UiNodeKind::GameList) => Some(game_list_ui.objects_mut()),
     Some(UiNodeKind::GamePackage) => Some(game_package_ui.objects_mut()),
     Some(UiNodeKind::ScreensaverPackage) => Some(screensaver_package_ui.objects_mut()),
     Some(UiNodeKind::InputDemo) => Some(input_demo_ui.objects_mut()),
@@ -51,6 +53,7 @@ pub(super) fn deactivate_hidden_pools(
   language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -103,6 +106,7 @@ pub(super) fn deactivate_hidden_pools(
   }
   deactivate(UiNodeKind::TerminalCheck, terminal_check_ui.objects_mut());
   deactivate(UiNodeKind::Mods, mods_ui.objects_mut());
+  deactivate(UiNodeKind::GameList, game_list_ui.objects_mut());
   deactivate(UiNodeKind::GamePackage, game_package_ui.objects_mut());
   deactivate(
     UiNodeKind::ScreensaverPackage,
@@ -160,6 +164,7 @@ pub(super) fn route_text_input_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -183,6 +188,7 @@ pub(super) fn route_text_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_list_ui,
           game_package_ui,
           screensaver_package_ui,
           input_demo_ui,
@@ -206,6 +212,7 @@ pub(super) fn route_text_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_list_ui,
           game_package_ui,
           screensaver_package_ui,
           input_demo_ui,
@@ -225,6 +232,7 @@ pub(super) fn route_text_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_list_ui,
           game_package_ui,
           screensaver_package_ui,
           input_demo_ui,
@@ -247,6 +255,7 @@ pub(super) fn route_text_input_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -271,6 +280,7 @@ pub(super) fn route_input_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -329,6 +339,7 @@ pub(super) fn route_input_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -350,6 +361,7 @@ pub(super) fn route_input_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -382,6 +394,7 @@ pub(super) fn route_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_list_ui,
           game_package_ui,
           screensaver_package_ui,
           input_demo_ui,
@@ -410,6 +423,7 @@ pub(super) fn route_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_list_ui,
           game_package_ui,
           screensaver_package_ui,
           input_demo_ui,
@@ -429,6 +443,7 @@ pub(super) fn route_input_events(
           language_select_ui.as_deref_mut(),
           terminal_check_ui,
           mods_ui,
+          game_list_ui,
           game_package_ui,
           screensaver_package_ui,
           input_demo_ui,
@@ -459,6 +474,7 @@ pub(super) fn route_update(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -516,6 +532,9 @@ pub(super) fn route_update(
     Some(UiNodeKind::Mods) => {
       let _ = mods_ui.update(world.clock.delta_time());
     }
+    Some(UiNodeKind::GameList) => {
+      let _ = game_list_ui.update(world.clock.delta_time());
+    }
     Some(UiNodeKind::GamePackage) => {
       let _ = game_package_ui.update(world.clock.delta_time());
     }
@@ -543,6 +562,7 @@ pub(super) fn route_update(
     language_select_ui.as_deref_mut(),
     terminal_check_ui,
     mods_ui,
+    game_list_ui,
     game_package_ui,
     screensaver_package_ui,
     input_demo_ui,
@@ -682,6 +702,7 @@ fn route_component_mouse(
   language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -699,6 +720,7 @@ fn route_component_mouse(
     language_select_ui,
     terminal_check_ui,
     mods_ui,
+    game_list_ui,
     game_package_ui,
     screensaver_package_ui,
     input_demo_ui,
@@ -742,6 +764,7 @@ fn route_mouse_and_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -764,6 +787,7 @@ fn route_mouse_and_events(
     language_select_ui.as_deref_mut(),
     terminal_check_ui,
     mods_ui,
+    game_list_ui,
     game_package_ui,
     screensaver_package_ui,
     input_demo_ui,
@@ -782,6 +806,7 @@ fn route_mouse_and_events(
     language_select_ui,
     terminal_check_ui,
     mods_ui,
+    game_list_ui,
     game_package_ui,
     screensaver_package_ui,
     input_demo_ui,
@@ -806,6 +831,7 @@ fn route_component_events(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -827,6 +853,7 @@ fn route_component_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -847,6 +874,7 @@ fn route_component_events(
       language_select_ui.as_deref_mut(),
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -875,6 +903,7 @@ fn route_input_event(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -953,6 +982,11 @@ fn route_input_event(
     Some(UiNodeKind::Mods) => {
       if let Some(command) = mods_ui.handle_event(event) {
         apply_mods_command(command, mods_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::GameList) => {
+      if let Some(command) = game_list_ui.handle_event(event) {
+        apply_game_list_command(command, game_list_ui, services, world);
       }
     }
     Some(UiNodeKind::GamePackage) => {

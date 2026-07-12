@@ -27,6 +27,7 @@ pub enum UiNodeKind {
   StorageManagementView,
   Mods,
   TerminalCheck,
+  GameList,
   GamePackage,
   ScreensaverPackage,
   InputDemo,
@@ -92,6 +93,14 @@ impl UiNodeState {
   pub fn terminal_check() -> Self {
     Self {
       kind: UiNodeKind::TerminalCheck,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn game_list() -> Self {
+    Self {
+      kind: UiNodeKind::GameList,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }
