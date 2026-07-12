@@ -381,6 +381,10 @@ impl PackageService {
       .collect()
   }
 
+  pub fn game_list(&self) -> Vec<PackageListEntry> {
+    self.games().into_iter().map(package_list_entry).collect()
+  }
+
   pub fn mod_screensavers(&self) -> Vec<PackageListEntry> {
     self
       .screensavers()

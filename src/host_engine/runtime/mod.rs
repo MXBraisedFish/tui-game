@@ -22,15 +22,15 @@ use crate::host_engine::services::{
 };
 use crate::host_engine::ui::{
   ClearWarningCommand, ClearWarningTarget, ClearWarningUi, ExportFormat, ExportLoadingUi,
-  ExportSettingsCommand, ExportSettingsUi, ExportType, GamePackageCommand, GamePackageUi, HomeUi,
-  HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
-  LanguageSelectUi, ModsCommand, ModsUi, SafeModeWarningCommand, SafeModeWarningUi,
-  ScreensaverPackageCommand, ScreensaverPackageUi, SecurityDetailsCommand, SecurityDetailsUi,
-  SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
-  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
-  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
-  StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
-  TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
+  ExportSettingsCommand, ExportSettingsUi, ExportType, GameListCommand, GameListUi,
+  GamePackageCommand, GamePackageUi, HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi,
+  LanguageLoadingUi, LanguageSelectCommand, LanguageSelectUi, ModsCommand, ModsUi,
+  SafeModeWarningCommand, SafeModeWarningUi, ScreensaverPackageCommand, ScreensaverPackageUi,
+  SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi,
+  SettingsUi, SettingsUiCommand, StorageManagementClearCommand, StorageManagementClearUi,
+  StorageManagementCommand, StorageManagementExportCommand, StorageManagementExportUi,
+  StorageManagementUi, StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand,
+  TerminalCheckLayout, TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 
 #[derive(Default)]
@@ -128,6 +128,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   };
   let mut terminal_check_ui = TerminalCheckUi::init();
   let mut mods_ui = ModsUi::init(&services.hit_area);
+  let mut game_list_ui = GameListUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
   let mut game_package_ui = GamePackageUi::init(
     &services.hit_area,
     &services.text_input,
@@ -218,6 +223,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
+      &mut game_list_ui,
       &mut game_package_ui,
       &mut screensaver_package_ui,
       &mut input_demo_ui,
@@ -241,6 +247,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
+      &mut game_list_ui,
       &mut game_package_ui,
       &mut screensaver_package_ui,
       &mut input_demo_ui,
@@ -273,6 +280,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
+      &mut game_list_ui,
       &mut game_package_ui,
       &mut screensaver_package_ui,
       &mut input_demo_ui,
@@ -305,6 +313,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       language_select_ui.as_mut(),
       &mut terminal_check_ui,
       &mut mods_ui,
+      &mut game_list_ui,
       &mut game_package_ui,
       &mut screensaver_package_ui,
       &mut input_demo_ui,
@@ -396,6 +405,7 @@ fn route_frame_input(
   language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -424,6 +434,7 @@ fn route_frame_input(
       language_select_ui,
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -452,6 +463,7 @@ fn route_frame_input(
       language_select_ui,
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -479,6 +491,7 @@ fn route_frame_input(
       language_select_ui,
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -534,6 +547,7 @@ fn route_frame_input(
       language_select_ui,
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,
@@ -558,6 +572,7 @@ fn route_frame_input(
       language_select_ui,
       terminal_check_ui,
       mods_ui,
+      game_list_ui,
       game_package_ui,
       screensaver_package_ui,
       input_demo_ui,

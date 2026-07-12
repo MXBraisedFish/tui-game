@@ -15,6 +15,7 @@ pub(super) fn route_render(
   mut language_select_ui: Option<&mut LanguageSelectUi>,
   terminal_check_ui: &mut TerminalCheckUi,
   mods_ui: &mut ModsUi,
+  game_list_ui: &mut GameListUi,
   game_package_ui: &mut GamePackageUi,
   screensaver_package_ui: &mut ScreensaverPackageUi,
   input_demo_ui: &mut InputDemoUi,
@@ -150,6 +151,7 @@ pub(super) fn route_render(
     language_select_ui.as_deref_mut(),
     terminal_check_ui,
     mods_ui,
+    game_list_ui,
     game_package_ui,
     screensaver_package_ui,
     input_demo_ui,
@@ -254,6 +256,24 @@ pub(super) fn route_render(
         &services.layout,
         &services.i18n,
         &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::GameList) => {
+      game_list_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+        &services.text_input,
+        &services.scroll_box,
+        &services.package,
+        &services.storage,
+        &mut services.log,
+        &world.temporary_safe_mode_disabled,
+        &mut services.image,
+        services.terminal.capabilities().mouse,
+        services.terminal.capabilities().truecolor,
       );
     }
     Some(UiNodeKind::GamePackage) => {

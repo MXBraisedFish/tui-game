@@ -25,26 +25,3 @@
 ## 网络请求 API
 
 限制脚本主动访问网络资源。
-
-[后续补充具体 API]
-
-- [ ] xxxxx
-
-- [x] xxxxx
-
-| abc | dbe | ppppppppppp |
-|:--------|:----:|----:|
-|1|2|3|
-|4|5|ausgdhkjlasdhgiupwyitryqdhksdhfuipqweiuorqoiweyouiwer|
-
-```rust
-pub fn Hi(&mut a) {
-  let b = 1;
-
-  c = a + b.sub();
-
-  c
-}
-```
-
-> aaaaaaaaaaaaaassssssssdasdqewioyasdfhkczvbm,
