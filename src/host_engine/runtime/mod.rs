@@ -16,9 +16,10 @@ use router::*;
 use crate::host_engine::core::state_machine::{
   HostState, MainHostState, OverlayKind, UiNodeKind, UiNodeState,
 };
-use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
+use crate::host_engine::core::{set_crash_phase, ExitState, FrameScheduler, RuntimeWorld};
 use crate::host_engine::services::{
-  EngineServices, HostAreaKind, ImPolicy, LogSource, PackageEvent, TaskId, translate_action_map,
+  translate_action_map, ActionMapEntry, EngineServices, HostAreaKind, ImPolicy, LogSource,
+  PackageEvent, TaskId,
 };
 use crate::host_engine::ui::{
   ClearWarningCommand, ClearWarningTarget, ClearWarningUi, ExportFormat, ExportLoadingUi,
@@ -90,6 +91,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     .input
     .start_system_listener(&mut services.async_runtime);
   services.package.start_watcher(&mut services.async_runtime);
+  load_host_key_action_map(services);
 
   let mut scheduler = FrameScheduler::new(60);
 
@@ -507,7 +509,12 @@ fn route_frame_input(
   } else if world.state.current_overlay_kind() == Some(OverlayKind::ExportSettings) {
     if services.text_input.is_active() {
       // 输入中不 dispatch action——避免 Enter 被当作 action 而打断 IME 组字
-      while services.input.next_action_event().is_some() {}
+      services
+        .input
+        .dispatch_system_action_events(&mut services.log);
+      while let Some(event) = services.input.next_action_event() {
+        let _ = handle_host_key_action(event.action.as_str(), event.state, world);
+      }
       route_export_settings_text_input_events(
         services,
         world,
@@ -530,10 +537,21 @@ fn route_frame_input(
     world.state.current_overlay_kind(),
     Some(OverlayKind::LanguageLoading | OverlayKind::ExportLoading)
   ) {
-    while services.input.next_action_event().is_some() {}
+    services
+      .input
+      .dispatch_system_action_events(&mut services.log);
+    while let Some(event) = services.input.next_action_event() {
+      let _ = handle_host_key_action(event.action.as_str(), event.state, world);
+    }
     services.input.clear();
     let _ = services.input.drain_system_events();
   } else if services.text_input.is_active() {
+    services
+      .input
+      .dispatch_system_action_events(&mut services.log);
+    while let Some(event) = services.input.next_action_event() {
+      let _ = handle_host_key_action(event.action.as_str(), event.state, world);
+    }
     route_text_input_events(
       services,
       world,

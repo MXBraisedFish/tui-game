@@ -226,6 +226,7 @@ pub struct InputService {
   mouse_held_buttons: HashSet<MouseButton>,
   mouse_position: Option<(u16, u16)>,
   focused: bool,
+  system_bindings: Vec<KeyBinding>,
   bindings: Vec<KeyBinding>,
   action_map_dispatch_enabled: bool,
   raw_key_capture_enabled: bool,
@@ -255,6 +256,7 @@ impl InputService {
       mouse_held_buttons: HashSet::new(),
       mouse_position: None,
       focused: true,
+      system_bindings: Vec::new(),
       bindings: Vec::new(),
       action_map_dispatch_enabled: true,
       raw_key_capture_enabled: false,
@@ -595,6 +597,17 @@ impl InputService {
       .collect();
   }
 
+  /// 加载系统级按键绑定。系统绑定优先级高于页面绑定，并且不受 action map 禁用影响。
+  pub fn load_system_key_bindings(&mut self, bindings: Vec<KeyBinding>) {
+    self.system_bindings = bindings
+      .into_iter()
+      .map(|binding| KeyBinding {
+        pattern: binding.pattern.normalized(),
+        action: binding.action,
+      })
+      .collect();
+  }
+
   pub fn key_bindings(&self) -> &[KeyBinding] {
     &self.bindings
   }
@@ -669,7 +682,22 @@ impl InputService {
     let mut events = Vec::new();
     let mut consumed_keys = HashSet::new();
 
-    for binding in &self.bindings {
+    self.collect_events_from_bindings(&self.system_bindings, &mut consumed_keys, &mut events);
+
+    if self.action_map_dispatch_enabled {
+      self.collect_events_from_bindings(&self.bindings, &mut consumed_keys, &mut events);
+    }
+
+    events
+  }
+
+  fn collect_events_from_bindings(
+    &self,
+    bindings: &[KeyBinding],
+    consumed_keys: &mut HashSet<Key>,
+    events: &mut Vec<InputActionEvent>,
+  ) {
+    for binding in bindings {
       let pattern = binding.pattern.normalized();
 
       if pattern.has_consumed_key(&consumed_keys) {
@@ -683,19 +711,27 @@ impl InputService {
           state,
         });
 
-        pattern.consume_keys(&mut consumed_keys);
+        pattern.consume_keys(consumed_keys);
       }
     }
-
-    events
   }
 
   /// 收集动作事件并发送到动作通道
   pub fn dispatch_action_events(&self, log: &mut LogService) {
-    if !self.action_map_dispatch_enabled {
-      return;
-    }
     for event in self.collect_action_events() {
+      if self.action_sender.send(event).is_err() {
+        log.warn(LogSource::Input, "Action event channel disconnected");
+      }
+    }
+  }
+
+  /// 只分发系统级动作事件。用于文本输入、加载覆盖层等暂停页面 action map 的场景。
+  pub fn dispatch_system_action_events(&self, log: &mut LogService) {
+    let mut events = Vec::new();
+    let mut consumed_keys = HashSet::new();
+    self.collect_events_from_bindings(&self.system_bindings, &mut consumed_keys, &mut events);
+
+    for event in events {
       if self.action_sender.send(event).is_err() {
         log.warn(LogSource::Input, "Action event channel disconnected");
       }
@@ -1105,7 +1141,31 @@ mod tests {
 
     assert!(input.next_action_event().is_none());
     assert_eq!(input.take_raw_key_events()[0].display, "A");
-    assert_eq!(input.collect_action_events()[0].action, "test.a");
+    assert!(input.collect_action_events().is_empty());
+
+    input.load_system_key_bindings(vec![KeyBinding {
+      pattern: KeyPattern::Single(Key::Fn(4)),
+      action: "host_key.force_stop".to_string(),
+    }]);
+    input.apply_key_event(KeyEvent {
+      key: Key::Fn(4),
+      kind: KeyEventKind::Press,
+    });
+    input.dispatch_action_events(&mut LogService::new());
+    assert_eq!(
+      input.next_action_event().unwrap().action,
+      "host_key.force_stop"
+    );
+    input.apply_key_event(KeyEvent {
+      key: Key::Fn(4),
+      kind: KeyEventKind::Release,
+    });
+    input.dispatch_action_events(&mut LogService::new());
+    assert_eq!(
+      input.next_action_event().unwrap().action,
+      "host_key.force_stop"
+    );
+    input.begin_frame();
 
     assert!(input.enable_action_map_dispatch());
     assert!(!input.enable_action_map_dispatch());

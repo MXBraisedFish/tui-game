@@ -7,6 +7,7 @@ use crate::host_engine::services::{LogService, LogSource, StorageService};
 
 const RUNTIME_NAMESPACES: &[&str] = &[
   "home",
+  "host_key",
   "settings",
   "terminal",
   "language",

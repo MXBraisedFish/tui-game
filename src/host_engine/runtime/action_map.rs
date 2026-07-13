@@ -1,5 +1,38 @@
 use super::*;
 
+pub(super) const HOST_KEY_SCREENSHOT: &str = "host_key.screenshot";
+pub(super) const HOST_KEY_RECORDING: &str = "host_key.recording";
+pub(super) const HOST_KEY_FORCE_STOP: &str = "host_key.force_stop";
+
+pub(super) fn load_host_key_action_map(services: &mut EngineServices) {
+  let entries = vec![
+    ActionMapEntry {
+      action: HOST_KEY_SCREENSHOT.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.screenshot"),
+      keys: vec![vec!["f1".to_string()]],
+    },
+    ActionMapEntry {
+      action: HOST_KEY_RECORDING.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.recording"),
+      keys: vec![vec!["f2".to_string()]],
+    },
+    ActionMapEntry {
+      action: HOST_KEY_FORCE_STOP.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.force_stop"),
+      keys: vec![vec!["f4".to_string()]],
+    },
+  ];
+
+  let bindings = translate_action_map(&entries).expect("failed to translate host key action map");
+  services.input.load_system_key_bindings(bindings);
+}
+
 pub(super) fn load_current_action_map(services: &mut EngineServices, world: &RuntimeWorld) {
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => load_home_action_map(services),

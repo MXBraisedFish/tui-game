@@ -1,6 +1,6 @@
 use super::*;
 use crate::host_engine::services::{
-  MouseEvent, SystemEvent, TerminalKeyCode, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  KeyState, MouseEvent, SystemEvent, TerminalKeyCode, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub(super) fn current_objects_mut<'a>(
@@ -325,6 +325,12 @@ pub(super) fn route_input_events(
   }
 
   while let Some(event) = services.input.next_action_event() {
+    if handle_host_key_action(event.action.as_str(), event.state, world) {
+      if world.is_stopped() {
+        break;
+      }
+      continue;
+    }
     route_input_event(
       &UiEvent::Action(event),
       services,
@@ -579,6 +585,12 @@ fn route_window_size_overlay_events(
   window_size_ui: &mut WindowSizeWarningUi,
 ) {
   while let Some(event) = services.input.next_action_event() {
+    if handle_host_key_action(event.action.as_str(), event.state, world) {
+      if world.is_stopped() {
+        break;
+      }
+      continue;
+    }
     if let Some(cmd) = window_size_ui.handle_event(&UiEvent::Action(event)) {
       apply_window_size_command(cmd, world);
     }
@@ -619,7 +631,12 @@ fn route_safe_mode_warning_overlay_events(
   game_package_ui: &mut GamePackageUi,
   safe_mode_warning_ui: &mut SafeModeWarningUi,
 ) {
-  while services.input.next_action_event().is_some() {}
+  while let Some(event) = services.input.next_action_event() {
+    let _ = handle_host_key_action(event.action.as_str(), event.state, world);
+    if world.is_stopped() {
+      return;
+    }
+  }
   if let Some(command) =
     safe_mode_warning_ui.handle_raw_key_events(&mut services.input, world.safe_mode_warning_all)
   {
@@ -660,7 +677,12 @@ fn route_clear_warning_overlay_events(
   world: &mut RuntimeWorld,
   clear_warning_ui: &mut ClearWarningUi,
 ) {
-  while services.input.next_action_event().is_some() {}
+  while let Some(event) = services.input.next_action_event() {
+    let _ = handle_host_key_action(event.action.as_str(), event.state, world);
+    if world.is_stopped() {
+      return;
+    }
+  }
   if let Some(command) = clear_warning_ui.handle_raw_key_events(&mut services.input) {
     apply_clear_warning_command(command, clear_warning_ui, services, world);
     return;
@@ -912,6 +934,12 @@ fn route_input_event(
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
 ) {
+  if let UiEvent::Action(action) = event {
+    if handle_host_key_action(action.action.as_str(), action.state, world) {
+      return;
+    }
+  }
+
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
       if let Some(command) = home_ui.handle_event(event) {
@@ -1013,6 +1041,26 @@ fn route_input_event(
   }
 }
 
+pub(super) fn handle_host_key_action(
+  action: &str,
+  state: KeyState,
+  world: &mut RuntimeWorld,
+) -> bool {
+  match action {
+    HOST_KEY_SCREENSHOT | HOST_KEY_RECORDING => true,
+    HOST_KEY_FORCE_STOP => {
+      if state == KeyState::Pressed {
+        world.state.enter_shutdown();
+        set_crash_phase(world.state.crash_phase());
+        world.state.enter_stopped();
+        set_crash_phase(world.state.crash_phase());
+      }
+      true
+    }
+    _ => false,
+  }
+}
+
 fn route_terminal_check_mouse_event(
   event: &MouseEvent,
   positions: &TerminalCheckLayout,
@@ -1036,6 +1084,12 @@ pub(super) fn route_export_settings_overlay_events(
 ) {
   let was_active = services.text_input.is_active();
   while let Some(event) = services.input.next_action_event() {
+    if handle_host_key_action(event.action.as_str(), event.state, world) {
+      if world.is_stopped() {
+        break;
+      }
+      continue;
+    }
     if let Some(command) = export_settings_ui.handle_event(&UiEvent::Action(event)) {
       apply_export_settings_command(
         command,
