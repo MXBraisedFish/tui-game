@@ -37,5 +37,8 @@
   "game_list.list.sort.source": "Official & Mod",
   "game_list.list.order.ascending": "Asc↓",
   "game_list.list.order.descending": "Des↑",
-  "game_list.list.search.placeholder": "🔍 Search"
+  "game_list.list.search.placeholder": "🔍 Search",
+  "game_list.list.source.official": "Official",
+  "game_list.list.source.mod": "Mod",
+  "game_list.info.high_score.no": "No High Score"
 }

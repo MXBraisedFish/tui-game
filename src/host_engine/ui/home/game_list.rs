@@ -5,13 +5,13 @@ use unicode_width::UnicodeWidthStr;
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
-  HitAreaOptions, HitAreaService, I18nService, ImageConvertParams, ImageService, KeyState,
-  LayoutService, LogService, MouseButton, Overflow, PackageAsset, PackageListEntry, PackageService,
-  Rect, RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
-  ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility,
-  StorageService, TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent,
-  TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle,
-  UiEvent, UiObjectPool, UiObjectPoolOwner,
+  HitAreaOptions, HitAreaService, I18nService, ImageService, KeyState, LayoutService, LogService,
+  MouseButton, Overflow, PackageListEntry, PackageService, PackageSource, Rect, RenderService,
+  RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxId,
+  ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, StorageService,
+  TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent, TextInputId,
+  TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent,
+  UiObjectPool, UiObjectPoolOwner,
 };
 
 /// 游戏列表页面的命令。
@@ -473,7 +473,13 @@ impl GameListUi {
       positions.right_inner,
       layout,
     );
-    let info_content_height = self.info_content_height(layout, positions.right_inner.width);
+    let info_content_height = self.info_content_height(
+      layout,
+      i18n,
+      positions.right_inner.width,
+      mouse_supported,
+      truecolor_supported,
+    );
     scroll_box.set_content_size(
       &mut self.objects,
       self.info_scroll,
@@ -483,9 +489,6 @@ impl GameListUi {
     );
     canvas.prepare(&self.objects, layout);
 
-    let info_scroll_y = scroll_box
-      .scroll_y(&self.objects, self.info_scroll)
-      .unwrap_or(0);
     self.draw_right_panel(
       render,
       canvas,
@@ -495,7 +498,6 @@ impl GameListUi {
       mouse_supported,
       truecolor_supported,
       &positions,
-      info_scroll_y,
     );
     self.draw_left_panel(render, canvas, layout, i18n, image, &positions, text_input);
     self.draw_action_hint(render, canvas, i18n, text_input, &positions);
@@ -634,9 +636,9 @@ impl GameListUi {
       height: 1,
     };
 
-    let list_area_y = search_rect.y.saturating_add(3);
-    let list_item_height: u16 = if self.simple_list { 1 } else { 4 };
-    let list_item_gap: u16 = if self.simple_list { 0 } else { 1 };
+    let list_area_y = sort_bar_y.saturating_add(1);
+    let list_item_height: u16 = 1;
+    let list_item_gap: u16 = 0;
     let page_y = left_inner
       .y
       .saturating_add(left_inner.height)
@@ -647,17 +649,7 @@ impl GameListUi {
     } else {
       0
     };
-    let used_height = if visible_items == 0 {
-      0
-    } else {
-      visible_items as u16 * list_item_height
-        + visible_items.saturating_sub(1) as u16 * list_item_gap
-    };
-    let list_start_y = if self.simple_list {
-      list_area_y
-    } else {
-      list_area_y.saturating_add(list_area_height.saturating_sub(used_height) / 2)
-    };
+    let list_start_y = list_area_y;
 
     let page_separator_x = left_inner.x.saturating_add(left_inner.width / 2);
     let jump_width: u16 = 4;
@@ -724,7 +716,7 @@ impl GameListUi {
     canvas: &mut CanvasService,
     layout: &LayoutService,
     i18n: &I18nService,
-    image: &mut ImageService,
+    _image: &mut ImageService,
     pos: &GameListLayout,
     text_input: &TextInputService,
   ) {
@@ -771,29 +763,16 @@ impl GameListUi {
       let y = pos
         .list_start_y
         .saturating_add(i as u16 * (pos.list_item_height + pos.list_item_gap));
-      if self.simple_list {
-        self.draw_entry_simple(
-          render,
-          canvas,
-          i18n,
-          pos,
-          entry,
-          y,
-          i == self.selected_index,
-        );
-      } else {
-        self.draw_entry_card(
-          render,
-          canvas,
-          layout,
-          image,
-          i18n,
-          pos,
-          entry,
-          y,
-          i == self.selected_index,
-        );
-      }
+      self.draw_entry_row(
+        render,
+        canvas,
+        layout,
+        i18n,
+        pos,
+        entry,
+        y,
+        i == self.selected_index,
+      );
     }
 
     if entries.is_empty() {
@@ -900,140 +879,11 @@ impl GameListUi {
     );
   }
 
-  fn draw_entry_card(
+  fn draw_entry_row(
     &self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     layout: &LayoutService,
-    image: &mut ImageService,
-    i18n: &I18nService,
-    pos: &GameListLayout,
-    entry: &PackageListEntry,
-    y: u16,
-    focused: bool,
-  ) {
-    let marker_x = pos.left_inner.x;
-    let image_x = marker_x.saturating_add(1);
-    let text_x = image_x.saturating_add(9);
-    let safe_x = pos
-      .left_inner
-      .x
-      .saturating_add(pos.left_inner.width.saturating_sub(1));
-    let text_width = safe_x.saturating_sub(text_x).max(1);
-
-    for row in 0..4 {
-      render.draw_host_text(
-        canvas,
-        &DrawTextParams {
-          x: marker_x,
-          y: y.saturating_add(row),
-          text: if focused {
-            "f%<fg:bright_cyan>▌</fg>".to_string()
-          } else {
-            " ".to_string()
-          },
-          ..Default::default()
-        },
-      );
-    }
-
-    render.draw_host_filled_rect(
-      canvas,
-      image_x,
-      y,
-      8,
-      4,
-      Some(" ".to_string()),
-      None,
-      Some(TextColor::Rgb {
-        r: 85,
-        g: 87,
-        b: 83,
-      }),
-    );
-    let package_params = Self::package_rich_params(entry);
-    self.draw_icon_asset(
-      render,
-      canvas,
-      layout,
-      image,
-      &entry.icon,
-      image_x,
-      y,
-      &package_params,
-    );
-
-    let status_key = if entry.enabled {
-      "game_list.list.status.on"
-    } else {
-      "game_list.list.status.off"
-    };
-    let lines = [
-      if entry.debug {
-        format!(
-          "f%[<fg:bright_magenta>{}</fg>]{}",
-          i18n.get_runtime_text("game_list", "game_list.list.debug"),
-          entry.title
-        )
-      } else {
-        entry.title.clone()
-      },
-      format!(
-        "f%<fg:bright_yellow>{}</fg>{}",
-        i18n.get_runtime_text("game_list", "game_list.info.author"),
-        entry.author
-      ),
-      format!(
-        "f%<fg:bright_yellow>{}</fg>{}",
-        i18n.get_runtime_text("game_list", "game_list.list.version"),
-        entry.version
-      ),
-      format!(
-        "f%<fg:bright_yellow>{}</fg>{}{}</fg>",
-        i18n.get_runtime_text("game_list", "game_list.list.status"),
-        if status_key == "game_list.list.status.on" {
-          "<fg:bright_green>"
-        } else {
-          "<fg:bright_red>"
-        },
-        i18n.get_runtime_text("game_list", status_key)
-      ),
-    ];
-    for (row, text) in lines.into_iter().enumerate() {
-      render.draw_host_text(
-        canvas,
-        &DrawTextParams {
-          x: text_x,
-          y: y.saturating_add(row as u16),
-          text,
-          params: Some(package_params.clone()),
-          wrap_mode: TextWrapMode::None,
-          max_width: Some(text_width),
-          overflow_marker: Some("...".to_string()),
-          ..Default::default()
-        },
-      );
-    }
-
-    if !entry.safe_mode {
-      for row in 0..4 {
-        render.draw_host_text(
-          canvas,
-          &DrawTextParams {
-            x: safe_x,
-            y: y.saturating_add(row),
-            text: "f%<fg:red>█</fg>".to_string(),
-            ..Default::default()
-          },
-        );
-      }
-    }
-  }
-
-  fn draw_entry_simple(
-    &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
     i18n: &I18nService,
     pos: &GameListLayout,
     entry: &PackageListEntry,
@@ -1041,20 +891,26 @@ impl GameListUi {
     focused: bool,
   ) {
     let package_params = Self::package_rich_params(entry);
-    let marker_x = pos.left_inner.x;
-    let text_x = marker_x.saturating_add(1);
-    let status_key = if entry.enabled {
-      "game_list.list.status.on"
-    } else {
-      "game_list.list.status.off"
+    let source_key = match entry.source {
+      PackageSource::Official => "game_list.list.source.official",
+      PackageSource::Mod => "game_list.list.source.mod",
     };
-    let status = i18n.get_runtime_text("game_list", status_key);
-    let right_width = status.width().saturating_add(3).min(u16::MAX as usize) as u16;
-    let right_x = pos
+    let source = i18n.get_runtime_text("game_list", source_key);
+    let source_color = match entry.source {
+      PackageSource::Official => "bright_magenta",
+      PackageSource::Mod => "bright_yellow",
+    };
+    let source_text = format!("f%[<fg:{}>{}</fg>]", source_color, source);
+    let source_width = layout
+      .get_text_width(&source_text, None)
+      .min(pos.left_inner.width);
+    let source_x = pos
       .left_inner
       .x
-      .saturating_add(pos.left_inner.width.saturating_sub(right_width));
-    let text_width = right_x.saturating_sub(text_x).max(1);
+      .saturating_add(pos.left_inner.width.saturating_sub(source_width));
+    let marker_x = pos.left_inner.x;
+    let title_x = marker_x.saturating_add(1);
+    let title_width = source_x.saturating_sub(title_x).max(1);
 
     render.draw_host_text(
       canvas,
@@ -1066,162 +922,48 @@ impl GameListUi {
         } else {
           " ".to_string()
         },
+        wrap_mode: TextWrapMode::None,
+        max_width: Some(1),
         ..Default::default()
       },
     );
 
-    let title = if entry.debug {
-      format!(
-        "f%[<fg:bright_magenta>{}</fg>]{}",
-        i18n.get_runtime_text("game_list", "game_list.list.debug"),
-        entry.title
-      )
-    } else {
-      entry.title.clone()
-    };
     render.draw_host_text(
       canvas,
       &DrawTextParams {
-        x: text_x,
+        x: title_x,
         y,
-        text: title,
+        text: Self::game_display_name(entry).to_string(),
         params: Some(package_params),
         wrap_mode: TextWrapMode::None,
-        max_width: Some(text_width),
+        max_width: Some(title_width),
         overflow_marker: Some("...".to_string()),
         ..Default::default()
       },
     );
-
-    let status_color = if entry.enabled {
-      "bright_green"
-    } else {
-      "bright_red"
-    };
-    let safe_mark = if entry.safe_mode {
-      " "
-    } else {
-      "<fg:red>█</fg>"
-    };
     render.draw_host_text(
       canvas,
       &DrawTextParams {
-        x: right_x,
+        x: source_x,
         y,
-        text: format!("f%[<fg:{}>{}</fg>]{}", status_color, status, safe_mark),
-        max_width: Some(right_width),
+        text: source_text,
+        wrap_mode: TextWrapMode::None,
+        max_width: Some(source_width),
         ..Default::default()
       },
     );
-  }
-
-  fn draw_icon_asset(
-    &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    image: &mut ImageService,
-    asset: &PackageAsset,
-    x: u16,
-    y: u16,
-    params: &RichTextParams,
-  ) {
-    if let PackageAsset::Image { path } = asset {
-      if let Ok(text) = image.convert(ImageConvertParams {
-        image_path: path.clone(),
-        output_width: 8,
-        output_height: 4,
-        square_crop: true,
-        scale: 1.0,
-        cache: true,
-        ..Default::default()
-      }) {
-        render.draw_host_text(
-          canvas,
-          &DrawTextParams {
-            x,
-            y,
-            text,
-            wrap_mode: TextWrapMode::Auto,
-            max_width: Some(8),
-            max_height: Some(4),
-            ..Default::default()
-          },
-        );
-        return;
-      }
-    }
-
-    let fallback = PackageAsset::default_icon();
-    let lines = match asset {
-      PackageAsset::Text { lines, .. } => lines,
-      PackageAsset::Image { .. } => match &fallback {
-        PackageAsset::Text { lines, .. } => lines,
-        PackageAsset::Image { .. } => return,
-      },
-    };
-    for (row, line) in lines.iter().take(4).enumerate() {
-      if line.trim_start().starts_with("f%") {
-        render.draw_host_text(
-          canvas,
-          &DrawTextParams {
-            x,
-            y: y.saturating_add(row as u16),
-            text: Self::fit_asset_rich_line(line, false, 8, layout, Some(params)),
-            params: Some(params.clone()),
-            wrap_mode: TextWrapMode::None,
-            max_width: Some(8),
-            max_height: Some(1),
-            ..Default::default()
-          },
-        );
-      } else {
-        canvas.host_styled_text(x, y.saturating_add(row as u16), line, TextStyle::default());
-      }
-    }
-  }
-
-  fn fit_asset_rich_line(
-    line: &str,
-    full_text_is_rich: bool,
-    width: u16,
-    layout: &LayoutService,
-    params: Option<&RichTextParams>,
-  ) -> String {
-    let source = if full_text_is_rich && !line.starts_with("f%") {
-      format!("f%{}", line)
-    } else {
-      line.to_string()
-    };
-    let Some(body) = source.trim_start().strip_prefix("f%") else {
-      return source;
-    };
-
-    let body = body.trim_end();
-    let rich_body = format!("f%{}", body);
-    let text_width = layout.get_text_width(&rich_body, params).min(width);
-    let padding = width.saturating_sub(text_width);
-    let left = padding.saturating_add(1) / 2;
-    let right = padding.saturating_sub(left);
-    format!(
-      "f%{}{}{}",
-      " ".repeat(left as usize),
-      body,
-      " ".repeat(right as usize)
-    )
   }
 
   fn draw_right_panel(
     &mut self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
-    _layout: &LayoutService,
+    layout: &LayoutService,
     i18n: &I18nService,
     _image: &mut ImageService,
-    _mouse_supported: bool,
-    _truecolor_supported: bool,
+    mouse_supported: bool,
+    truecolor_supported: bool,
     pos: &GameListLayout,
-    _scroll_y: u16,
   ) {
     render.draw_host_border_rect(
       canvas,
@@ -1240,6 +982,90 @@ impl GameListUi {
       canvas,
       pos.right_rect,
       &i18n.get_runtime_text("game_list", "game_list.info"),
+    );
+
+    let Some(entry) = self.selected_entry() else {
+      return;
+    };
+
+    let width = pos.right_inner.width.max(1);
+    let params = Self::package_rich_params(&entry);
+    let mut y = 0;
+
+    self.draw_info_value(
+      render,
+      canvas,
+      width,
+      &mut y,
+      Self::game_display_name(&entry),
+      &params,
+    );
+    self.draw_info_separator(canvas, width, &mut y);
+    self.draw_info_pair(
+      render,
+      canvas,
+      layout,
+      width,
+      &mut y,
+      &i18n.get_runtime_text("game_list", "game_list.info.author"),
+      &entry.author,
+      &params,
+    );
+    self.draw_info_pair(
+      render,
+      canvas,
+      layout,
+      width,
+      &mut y,
+      &i18n.get_runtime_text("game_list", "game_list.info.version"),
+      &entry.version,
+      &params,
+    );
+    self.draw_info_pair(
+      render,
+      canvas,
+      layout,
+      width,
+      &mut y,
+      &i18n.get_runtime_text("game_list", "game_list.info.pack_title"),
+      &entry.title,
+      &params,
+    );
+    self.draw_info_separator(canvas, width, &mut y);
+
+    let warnings = self.info_warnings(i18n, &entry, mouse_supported, truecolor_supported);
+    if !warnings.is_empty() {
+      for warning in warnings {
+        self.draw_info_warning(render, canvas, width, &mut y, warning);
+      }
+      self.draw_info_separator(canvas, width, &mut y);
+    }
+
+    if entry.score_enabled {
+      let score = self.info_score_text(i18n, &entry);
+      self.draw_info_wrapped(
+        render,
+        canvas,
+        layout,
+        width,
+        &mut y,
+        score,
+        Some(&params),
+        None,
+      );
+      self.draw_info_separator(canvas, width, &mut y);
+    }
+
+    self.draw_info_description_label(canvas, &mut y, i18n);
+    self.draw_info_wrapped(
+      render,
+      canvas,
+      layout,
+      width,
+      &mut y,
+      entry.game_detail.clone(),
+      Some(&params),
+      None,
     );
   }
 
@@ -1341,6 +1167,18 @@ impl GameListUi {
     RichTextService::new().visible_text(text, Some(&Self::package_rich_params(entry)))
   }
 
+  fn selected_entry(&self) -> Option<PackageListEntry> {
+    self.page_entries().get(self.selected_index).cloned()
+  }
+
+  fn game_display_name(entry: &PackageListEntry) -> &str {
+    if entry.game_name.trim().is_empty() {
+      &entry.title
+    } else {
+      &entry.game_name
+    }
+  }
+
   fn focus_previous(&mut self) {
     let page_len = self.page_entries().len();
     if page_len == 0 {
@@ -1392,8 +1230,270 @@ impl GameListUi {
     self.selected_index = index % self.per_page;
   }
 
-  fn info_content_height(&self, _layout: &LayoutService, _width: u16) -> u16 {
-    1
+  fn selected_entry_key(&self) -> Option<(PackageSource, String)> {
+    self
+      .page_entries()
+      .get(self.selected_index)
+      .map(|entry| (entry.source.clone(), entry.mod_id.clone()))
+  }
+
+  fn restore_selection(&mut self, key: Option<(PackageSource, String)>) {
+    let Some((source, mod_id)) = key else {
+      self.apply_global_selection(0);
+      return;
+    };
+    let entries = self.filtered_entries();
+    let Some(index) = entries
+      .iter()
+      .position(|entry| entry.source == source && entry.mod_id == mod_id)
+    else {
+      self.apply_global_selection(0);
+      return;
+    };
+    self.apply_global_selection(index);
+  }
+
+  fn info_content_height(
+    &self,
+    layout: &LayoutService,
+    i18n: &I18nService,
+    width: u16,
+    mouse_supported: bool,
+    truecolor_supported: bool,
+  ) -> u16 {
+    let Some(entry) = self.selected_entry() else {
+      return 1;
+    };
+
+    let width = width.max(1);
+    let params = Self::package_rich_params(&entry);
+    let mut height = 6;
+    let warnings = self.info_warnings(i18n, &entry, mouse_supported, truecolor_supported);
+    if !warnings.is_empty() {
+      height += warnings.len() as u16 + 1;
+    }
+    if entry.score_enabled {
+      height += self.measure_info_text(
+        layout,
+        width,
+        self.info_score_text(i18n, &entry),
+        TextWrapMode::Auto,
+        Some(&params),
+      ) + 1;
+    }
+    height += 1;
+    height += self.measure_info_text(
+      layout,
+      width,
+      entry.game_detail.clone(),
+      TextWrapMode::Auto,
+      Some(&params),
+    );
+    height.max(1)
+  }
+
+  fn measure_info_text(
+    &self,
+    layout: &LayoutService,
+    width: u16,
+    text: String,
+    wrap_mode: TextWrapMode,
+    params: Option<&RichTextParams>,
+  ) -> u16 {
+    layout
+      .get_draw_text_size(&DrawTextParams {
+        text,
+        params: params.cloned(),
+        wrap_mode,
+        max_width: Some(width),
+        ..Default::default()
+      })
+      .height
+      .max(1)
+  }
+
+  fn info_warnings(
+    &self,
+    i18n: &I18nService,
+    entry: &PackageListEntry,
+    mouse_supported: bool,
+    truecolor_supported: bool,
+  ) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if entry.mouse_required && !mouse_supported {
+      warnings.push(i18n.get_runtime_text("game_list", "game_list.info.mouse.error"));
+    }
+    if entry.truecolor_required && !truecolor_supported {
+      warnings.push(i18n.get_runtime_text("game_list", "game_list.info.true_color.error"));
+    }
+    if entry.high_privilege_required && entry.safe_mode {
+      warnings.push(i18n.get_runtime_text("game_list", "game_list.info.high_privilege.error"));
+    }
+    warnings
+  }
+
+  fn info_score_text(&self, i18n: &I18nService, entry: &PackageListEntry) -> String {
+    if entry.score_empty_text.trim().is_empty() {
+      i18n.get_runtime_text("game_list", "game_list.info.high_score.no")
+    } else {
+      entry.score_empty_text.clone()
+    }
+  }
+
+  fn draw_info_separator(&self, canvas: &mut CanvasService, width: u16, y: &mut u16) {
+    canvas.styled_text_in_scroll_box(
+      self.info_scroll,
+      0,
+      *y,
+      &"─".repeat(width as usize),
+      TextStyle {
+        foreground: Some(TextColor::Terminal(TerminalColor::BrightBlack)),
+        ..Default::default()
+      },
+    );
+    *y = (*y).saturating_add(1);
+  }
+
+  fn draw_info_value(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    width: u16,
+    y: &mut u16,
+    value: &str,
+    params: &RichTextParams,
+  ) {
+    render.draw_text_in_scroll_box(
+      canvas,
+      self.info_scroll,
+      &DrawTextParams {
+        y: *y,
+        text: value.to_string(),
+        params: Some(params.clone()),
+        wrap_mode: TextWrapMode::None,
+        max_width: Some(width),
+        overflow_marker: Some("...".to_string()),
+        ..Default::default()
+      },
+    );
+    *y = (*y).saturating_add(1);
+  }
+
+  fn draw_info_pair(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    width: u16,
+    y: &mut u16,
+    label: &str,
+    value: &str,
+    params: &RichTextParams,
+  ) {
+    let label_text = format!("f%<fg:bright_blue>{}</fg>", label);
+    let label_width = layout.get_text_width(&label_text, None).min(width);
+    render.draw_text_in_scroll_box(
+      canvas,
+      self.info_scroll,
+      &DrawTextParams {
+        y: *y,
+        text: label_text,
+        wrap_mode: TextWrapMode::None,
+        max_width: Some(label_width),
+        ..Default::default()
+      },
+    );
+    if label_width < width {
+      render.draw_text_in_scroll_box(
+        canvas,
+        self.info_scroll,
+        &DrawTextParams {
+          x: label_width,
+          y: *y,
+          text: value.to_string(),
+          params: Some(params.clone()),
+          wrap_mode: TextWrapMode::None,
+          max_width: Some(width - label_width),
+          overflow_marker: Some("...".to_string()),
+          ..Default::default()
+        },
+      );
+    }
+    *y = (*y).saturating_add(1);
+  }
+
+  fn draw_info_warning(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    width: u16,
+    y: &mut u16,
+    text: String,
+  ) {
+    render.draw_text_in_scroll_box(
+      canvas,
+      self.info_scroll,
+      &DrawTextParams {
+        y: *y,
+        text,
+        fg: Some(TextColor::Terminal(TerminalColor::BrightRed)),
+        bold: true,
+        wrap_mode: TextWrapMode::None,
+        max_width: Some(width),
+        overflow_marker: Some("...".to_string()),
+        ..Default::default()
+      },
+    );
+    *y = (*y).saturating_add(1);
+  }
+
+  fn draw_info_description_label(
+    &self,
+    canvas: &mut CanvasService,
+    y: &mut u16,
+    i18n: &I18nService,
+  ) {
+    let label = i18n.get_runtime_text("game_list", "game_list.info.description");
+    canvas.styled_text_in_scroll_box(
+      self.info_scroll,
+      0,
+      *y,
+      &label,
+      TextStyle {
+        foreground: Some(TextColor::Rgb {
+          r: 255,
+          g: 190,
+          b: 120,
+        }),
+        bold: true,
+        ..Default::default()
+      },
+    );
+    *y = (*y).saturating_add(1);
+  }
+
+  fn draw_info_wrapped(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    width: u16,
+    y: &mut u16,
+    text: String,
+    params: Option<&RichTextParams>,
+    fg: Option<TextColor>,
+  ) {
+    let draw_params = DrawTextParams {
+      y: *y,
+      text,
+      params: params.cloned(),
+      fg,
+      wrap_mode: TextWrapMode::Auto,
+      max_width: Some(width),
+      ..Default::default()
+    };
+    render.draw_text_in_scroll_box(canvas, self.info_scroll, &draw_params);
+    *y = (*y).saturating_add(layout.get_draw_text_size(&draw_params).height.max(1));
   }
 
   fn handle_hover(&mut self, id: HitAreaId) {
@@ -1446,6 +1546,9 @@ impl GameListUi {
           || Self::package_visible_text(entry, &entry.title)
             .to_lowercase()
             .contains(&query)
+          || Self::package_visible_text(entry, Self::game_display_name(entry))
+            .to_lowercase()
+            .contains(&query)
       })
       .cloned()
       .collect::<Vec<_>>();
@@ -1461,18 +1564,21 @@ impl GameListUi {
       .sort_value(a)
       .cmp(&self.sort_value(b))
       .then(
-        Self::package_visible_text(a, &a.title)
+        Self::package_visible_text(a, Self::game_display_name(a))
           .width()
-          .cmp(&Self::package_visible_text(b, &b.title).width()),
+          .cmp(&Self::package_visible_text(b, Self::game_display_name(b)).width()),
       )
-      .then(Self::package_visible_text(a, &a.title).cmp(&Self::package_visible_text(b, &b.title)))
+      .then(
+        Self::package_visible_text(a, Self::game_display_name(a))
+          .cmp(&Self::package_visible_text(b, Self::game_display_name(b))),
+      )
       .then(a.mod_id.width().cmp(&b.mod_id.width()))
       .then(a.mod_id.cmp(&b.mod_id))
   }
 
   fn sort_value(&self, entry: &PackageListEntry) -> String {
     match self.sort_field {
-      GameListSortField::Title => Self::package_visible_text(entry, &entry.title),
+      GameListSortField::Title => Self::package_visible_text(entry, Self::game_display_name(entry)),
       GameListSortField::Author => Self::package_visible_text(entry, &entry.author),
       GameListSortField::Source => format!("{:?}", entry.source),
     }
@@ -1504,6 +1610,7 @@ impl GameListUi {
         entry.safe_mode = false;
       }
     }
+    let selected = self.selected_entry_key();
     if self
       .entries
       .iter()
@@ -1511,25 +1618,25 @@ impl GameListUi {
       .eq(entries.iter().map(|entry| &entry.mod_id))
     {
       self.entries = entries;
+      self.restore_selection(selected);
       return;
     }
     self.entries = entries;
-    self.page = 1;
-    self.selected_index = 0;
+    self.restore_selection(selected);
     self.needs_rebuild_areas = true;
   }
 
   fn toggle_order(&mut self) {
+    let selected = self.selected_entry_key();
     self.ascending = !self.ascending;
-    self.page = 1;
-    self.selected_index = 0;
+    self.restore_selection(selected);
     self.needs_rebuild_areas = true;
   }
 
   fn next_sort_field(&mut self) {
+    let selected = self.selected_entry_key();
     self.sort_field = self.sort_field.next();
-    self.page = 1;
-    self.selected_index = 0;
+    self.restore_selection(selected);
     self.needs_rebuild_areas = true;
   }
 

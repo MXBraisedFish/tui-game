@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{
-  Arc,
   atomic::{AtomicBool, Ordering},
+  Arc,
 };
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
+use crossbeam_channel::{unbounded, Receiver, RecvTimeoutError, Sender};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 
@@ -70,6 +70,8 @@ pub struct PackageListEntry {
   pub package_type: PackageType,
   pub key_actions: HashMap<String, Vec<Vec<String>>>,
   pub title: String,
+  pub game_name: String,
+  pub game_detail: String,
   pub description: String,
   pub author: String,
   pub version: String,
@@ -83,6 +85,8 @@ pub struct PackageListEntry {
   pub mouse_required: bool,
   pub truecolor_required: bool,
   pub high_privilege_required: bool,
+  pub score_enabled: bool,
+  pub score_empty_text: String,
 }
 
 /// 包显示信息
@@ -789,6 +793,27 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
         .collect()
     })
     .unwrap_or_default();
+  let game_name = info
+    .game
+    .as_ref()
+    .map(|game| game.name.clone())
+    .unwrap_or_default();
+  let game_detail = info
+    .game
+    .as_ref()
+    .map(|game| game.detail.clone())
+    .unwrap_or_else(|| info.display.description.clone());
+  let score_enabled = info
+    .game
+    .as_ref()
+    .and_then(|game| game.score.as_ref())
+    .is_some_and(|score| score.enabled);
+  let score_empty_text = info
+    .game
+    .as_ref()
+    .and_then(|game| game.score.as_ref())
+    .map(|score| score.empty_text.clone())
+    .unwrap_or_default();
 
   PackageListEntry {
     mod_id: info.mod_id,
@@ -796,6 +821,8 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     package_type: info.package_type,
     key_actions,
     title: info.display.title,
+    game_name,
+    game_detail,
     description: info.display.description,
     author: info.display.author,
     version: info.version,
@@ -809,6 +836,8 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     mouse_required,
     truecolor_required,
     high_privilege_required,
+    score_enabled,
+    score_empty_text,
   }
 }
 
@@ -1721,11 +1750,9 @@ mod tests {
       event,
       PackageEvent::ScanProgress { scanned, total: 2 } if *scanned <= 2
     )));
-    assert!(
-      events
-        .iter()
-        .any(|event| matches!(event, PackageEvent::ScanFinished { total: 2, .. }))
-    );
+    assert!(events
+      .iter()
+      .any(|event| matches!(event, PackageEvent::ScanFinished { total: 2, .. })));
 
     let _ = std::fs::remove_dir_all(root);
   }
@@ -1880,6 +1907,7 @@ mod tests {
     assert_eq!(game_config.detail, "游戏详情");
     assert_eq!(game_config.score.as_ref().unwrap().empty_text, "无记录");
     assert_eq!(game_config.actions["move_up"].description, "上移");
+    assert_eq!(package_list_entry(game).game_name, "游戏名");
 
     let _ = std::fs::remove_dir_all(root);
   }
@@ -2147,11 +2175,9 @@ mod tests {
     assert_eq!(lines[1].trim_end(), "");
     assert_eq!(lines[2].trim(), "line00");
     assert_eq!(lines[12].trim(), "line10");
-    assert!(
-      lines
-        .iter()
-        .all(|line| UnicodeWidthStr::width(line.as_str()) == 60)
-    );
+    assert!(lines
+      .iter()
+      .all(|line| UnicodeWidthStr::width(line.as_str()) == 60));
 
     let entry = service.mod_games().remove(0);
     let icon_path = entry.icon_path.unwrap();
@@ -2164,11 +2190,9 @@ mod tests {
   fn text_asset_normalizes_icon_to_four_lines_and_eight_columns() {
     let lines = normalize_asset_text("abcdefghi\n中中中中中\nx", AssetShape::Icon);
     assert_eq!(lines.len(), 4);
-    assert!(
-      lines
-        .iter()
-        .all(|line| UnicodeWidthStr::width(line.as_str()) == 8)
-    );
+    assert!(lines
+      .iter()
+      .all(|line| UnicodeWidthStr::width(line.as_str()) == 8));
     assert_eq!(lines[0], "        ");
     assert_eq!(lines[1], "abcdefghi".chars().take(8).collect::<String>());
     assert_eq!(lines[2], "中中中中");
@@ -2313,11 +2337,9 @@ mod tests {
     };
     assert_eq!(icon, default_icon_lines());
     assert_eq!(banner.len(), 14);
-    assert!(
-      banner
-        .iter()
-        .all(|line| UnicodeWidthStr::width(line.as_str()) == 60)
-    );
+    assert!(banner
+      .iter()
+      .all(|line| UnicodeWidthStr::width(line.as_str()) == 60));
     assert!(service.mod_games()[0].icon_path.is_none());
 
     let _ = std::fs::remove_dir_all(root);

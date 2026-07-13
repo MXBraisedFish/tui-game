@@ -6,7 +6,9 @@
   "settings.storage_management": "Storage Management",
   "settings.security_settings": "Security Settings",
   "settings.display_settings": "Display Settings",
-  "settings.action.focus": "{key:settings.focus_language}/{key:settings.focus_key_bindings}/{key:settings.focus_mod}/{key:settings.focus_storage_management}/{key:settings.focus_security_settings}/{key:settings.focus_display_settings} Focus",
+  "settings.screensaver_list": "Screensaver List",
+  "settings.screenshot_recording": "Screenshots & Recording",
+  "settings.action.focus": "{key:settings.focus_language}/{key:settings.focus_key_bindings}/{key:settings.focus_mod}/{key:settings.focus_storage_management}/{key:settings.focus_security_settings}/{key:settings.focus_display_settings}/{key:settings.focus_screensaver_list}/{key:settings.focus_screenshot_recording} Focus",
   "settings.action.select": "{key:settings.focus_up}/{key:settings.focus_down} Select",
   "settings.action.confirm": "{key:settings.confirm} Confirm",
   "settings.action.back": "{key:settings.back} Back"

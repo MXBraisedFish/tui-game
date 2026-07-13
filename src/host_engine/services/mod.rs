@@ -58,7 +58,7 @@ pub use log::{LogService, LogSource};
 pub use lua::LuaService;
 pub use network::NetworkService;
 pub use overlay::OverlayService;
-pub use package::{PackageAsset, PackageEvent, PackageListEntry, PackageService};
+pub use package::{PackageAsset, PackageEvent, PackageListEntry, PackageService, PackageSource};
 pub use random::RandomService;
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{FrameCompositor, FramePresenter};

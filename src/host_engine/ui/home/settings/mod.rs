@@ -12,7 +12,7 @@ pub mod mods;
 pub mod security;
 pub mod storage_management;
 
-const SETTINGS_MENU_LEN: usize = 6;
+const SETTINGS_MENU_LEN: usize = 8;
 
 const MENU_KEYS: &[&str] = &[
   "settings.language",
@@ -21,6 +21,8 @@ const MENU_KEYS: &[&str] = &[
   "settings.storage_management",
   "settings.security_settings",
   "settings.display_settings",
+  "settings.screensaver_list",
+  "settings.screenshot_recording",
 ];
 
 /// 设置页面布局信息。
@@ -137,6 +139,16 @@ impl SettingsUi {
         description: "Focus display settings option".to_string(),
         keys: vec![vec!["6".to_string()]],
       },
+      ActionMapEntry {
+        action: "settings.focus_screensaver_list".to_string(),
+        description: "Focus screensaver list option".to_string(),
+        keys: vec![vec!["7".to_string()]],
+      },
+      ActionMapEntry {
+        action: "settings.focus_screenshot_recording".to_string(),
+        description: "Focus screenshot and recording option".to_string(),
+        keys: vec![vec!["8".to_string()]],
+      },
     ]
   }
 
@@ -204,6 +216,14 @@ impl SettingsUi {
         }
         "settings.focus_display_settings" => {
           self.selected_index = 5;
+          None
+        }
+        "settings.focus_screensaver_list" => {
+          self.selected_index = 6;
+          None
+        }
+        "settings.focus_screenshot_recording" => {
+          self.selected_index = 7;
           None
         }
 

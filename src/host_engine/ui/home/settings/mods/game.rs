@@ -2066,6 +2066,26 @@ impl GamePackageUi {
     self.selected_index = index % self.per_page;
   }
 
+  fn selected_entry_id(&self) -> Option<String> {
+    self
+      .page_entries()
+      .get(self.selected_index)
+      .map(|entry| entry.mod_id.clone())
+  }
+
+  fn restore_selection(&mut self, selected_id: Option<String>) {
+    let Some(selected_id) = selected_id else {
+      self.apply_global_selection(0);
+      return;
+    };
+    let entries = self.filtered_entries();
+    let Some(index) = entries.iter().position(|entry| entry.mod_id == selected_id) else {
+      self.apply_global_selection(0);
+      return;
+    };
+    self.apply_global_selection(index);
+  }
+
   fn info_content_height(&self, layout: &LayoutService, width: u16) -> u16 {
     let page_entries = self.page_entries();
     let Some(entry) = page_entries.get(self.selected_index) else {
@@ -2204,6 +2224,7 @@ impl GamePackageUi {
         entry.safe_mode = false;
       }
     }
+    let selected = self.selected_entry_id();
     if self
       .entries
       .iter()
@@ -2211,11 +2232,11 @@ impl GamePackageUi {
       .eq(entries.iter().map(|entry| &entry.mod_id))
     {
       self.entries = entries;
+      self.restore_selection(selected);
       return;
     }
     self.entries = entries;
-    self.page = 1;
-    self.selected_index = 0;
+    self.restore_selection(selected);
     self.needs_rebuild_areas = true;
   }
 
@@ -2224,25 +2245,27 @@ impl GamePackageUi {
   }
 
   fn update_entry(&mut self, mod_id: &str, f: impl Fn(&mut PackageListEntry)) {
+    let selected = self.selected_entry_id();
     for entry in &mut self.entries {
       if entry.mod_id == mod_id {
         f(entry);
       }
     }
+    self.restore_selection(selected);
     self.needs_rebuild_areas = true;
   }
 
   fn toggle_order(&mut self) {
+    let selected = self.selected_entry_id();
     self.ascending = !self.ascending;
-    self.page = 1;
-    self.selected_index = 0;
+    self.restore_selection(selected);
     self.needs_rebuild_areas = true;
   }
 
   fn next_sort_field(&mut self) {
+    let selected = self.selected_entry_id();
     self.sort_field = self.sort_field.next();
-    self.page = 1;
-    self.selected_index = 0;
+    self.restore_selection(selected);
     self.needs_rebuild_areas = true;
   }
 

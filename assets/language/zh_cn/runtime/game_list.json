@@ -37,5 +37,8 @@
   "game_list.list.sort.source": "官方&模组",
   "game_list.list.order.ascending": "正序↓",
   "game_list.list.order.descending": "倒序↑",
-  "game_list.list.search.placeholder": "🔍 搜索"
+  "game_list.list.search.placeholder": "🔍 搜索",
+  "game_list.list.source.official": "官方",
+  "game_list.list.source.mod": "模组",
+  "game_list.info.high_score.no": "暂无最佳成绩"
 }
