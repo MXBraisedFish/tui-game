@@ -135,6 +135,23 @@ impl ScreenshotService {
     lines.join("\n")
   }
 
+  pub fn rich_text(frame: &ComposedFrame, rect: ScreenshotRect) -> String {
+    let mut output = String::from("f%");
+    for y in rect.y..rect.y.saturating_add(rect.height) {
+      if y != rect.y {
+        output.push('\n');
+      }
+      for x in rect.x..rect.x.saturating_add(rect.width) {
+        match frame.get(x, y) {
+          Some(ComposedCell::Text(cell)) if cell.is_continuation() => {}
+          Some(ComposedCell::Text(cell)) => push_rich_cell(&mut output, cell),
+          _ => output.push(' '),
+        }
+      }
+    }
+    output
+  }
+
   pub fn write_json(
     &self,
     storage: &StorageService,
@@ -200,6 +217,88 @@ fn rich_text_json(frame: &ComposedFrame, rect: ScreenshotRect) -> Vec<Vec<serde_
         .collect()
     })
     .collect()
+}
+
+fn push_rich_cell(output: &mut String, cell: &CanvasCell) {
+  let tags = style_open_tags(&cell.style);
+  if tags.is_empty() {
+    output.push_str(&escape_rich_text(&cell.text));
+    return;
+  }
+  for tag in &tags {
+    output.push_str(tag);
+  }
+  output.push_str(&escape_rich_text(&cell.text));
+  output.push_str("<reset>");
+}
+
+fn style_open_tags(style: &TextStyle) -> Vec<String> {
+  let mut tags = Vec::new();
+  if let Some(color) = &style.foreground {
+    tags.push(format!("<fg:{}>", rich_color_name(color)));
+  }
+  if let Some(color) = &style.background
+    && !matches!(color, TextColor::Transparent)
+  {
+    tags.push(format!("<bg:{}>", rich_color_name(color)));
+  }
+  for (enabled, tag) in [
+    (style.bold, "b"),
+    (style.italic, "i"),
+    (style.underline, "u"),
+    (style.strike, "s"),
+    (style.blink, "l"),
+    (style.reverse, "r"),
+    (style.hidden, "h"),
+    (style.dim, "d"),
+  ] {
+    if enabled {
+      tags.push(format!("<{tag}>"));
+    }
+  }
+  tags
+}
+
+fn escape_rich_text(text: &str) -> String {
+  let mut output = String::new();
+  for ch in text.chars() {
+    if matches!(ch, '\\' | '<' | '{') {
+      output.push('\\');
+    }
+    output.push(ch);
+  }
+  output
+}
+
+fn rich_color_name(color: &TextColor) -> String {
+  match color {
+    TextColor::Terminal(color) => terminal_color_name(color).to_string(),
+    TextColor::Rgb { r, g, b } | TextColor::ForceRgb { r, g, b } => {
+      format!("#{r:02X}{g:02X}{b:02X}")
+    }
+    TextColor::Transparent => "transparent".to_string(),
+  }
+}
+
+fn terminal_color_name(color: &TerminalColor) -> &'static str {
+  match color {
+    TerminalColor::Black => "black",
+    TerminalColor::Red => "red",
+    TerminalColor::Green => "green",
+    TerminalColor::Yellow => "yellow",
+    TerminalColor::Blue => "blue",
+    TerminalColor::Magenta => "magenta",
+    TerminalColor::Cyan => "cyan",
+    TerminalColor::White => "white",
+    TerminalColor::BrightBlack => "bright_black",
+    TerminalColor::BrightRed => "bright_red",
+    TerminalColor::BrightGreen => "bright_green",
+    TerminalColor::BrightYellow => "bright_yellow",
+    TerminalColor::BrightBlue => "bright_blue",
+    TerminalColor::BrightMagenta => "bright_magenta",
+    TerminalColor::BrightCyan => "bright_cyan",
+    TerminalColor::BrightWhite => "bright_white",
+  }
 }
 
 fn style_json(style: &TextStyle) -> serde_json::Value {

@@ -8,12 +8,13 @@ use crate::host_engine::services::{
   SystemEvent, TerminalColor, TextColor,
 };
 
-const DOUBLE_F1_WINDOW: Duration = Duration::from_millis(500);
+const DOUBLE_F1_WINDOW: Duration = Duration::from_millis(300);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScreenshotCaptureCommand {
   Exit,
   Copy,
+  CopyRichText,
   SavePng,
   All,
   FullFrameSave,
@@ -57,6 +58,11 @@ impl ScreenshotCaptureUi {
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       entry("screenshot.copy", "Copy screenshot", "c"),
+      entry(
+        "screenshot.copy_rich_text",
+        "Copy screenshot rich text",
+        "r",
+      ),
       entry("screenshot.save_png", "Save screenshot PNG", "s"),
       entry("screenshot.all", "Copy and save screenshot", "a"),
     ]
@@ -102,7 +108,10 @@ impl ScreenshotCaptureUi {
   ) -> Option<ScreenshotCaptureCommand> {
     let raw_keys = input.take_raw_key_events();
     let system_events = input.drain_system_events();
-    if self.guide_visible && guide_should_close(self.opened_elapsed, &raw_keys, &system_events) {
+    if self.guide_visible
+      && (guide_direct_key_should_close(input, self.opened_elapsed)
+        || guide_should_close(self.opened_elapsed, &raw_keys, &system_events))
+    {
       self.close_guide(storage, log);
       self.mode_toast_dismiss_requested = true;
       return None;
@@ -113,6 +122,11 @@ impl ScreenshotCaptureUi {
 
     if mode_toast_should_close(&raw_keys, &system_events) {
       self.mode_toast_dismiss_requested = true;
+    }
+
+    if let Some(command) = direct_key_command(input) {
+      self.user_touched = true;
+      return Some(command);
     }
 
     for event in raw_keys {
@@ -129,6 +143,7 @@ impl ScreenshotCaptureUi {
         Key::A => Some(ScreenshotCaptureCommand::All),
         Key::S => Some(ScreenshotCaptureCommand::SavePng),
         Key::C => Some(ScreenshotCaptureCommand::Copy),
+        Key::R => Some(ScreenshotCaptureCommand::CopyRichText),
         _ => None,
       };
     }
@@ -282,8 +297,9 @@ impl ScreenshotCaptureUi {
     }
     match y.saturating_sub(menu.y) {
       0 => Some(ScreenshotCaptureCommand::Copy),
-      1 => Some(ScreenshotCaptureCommand::SavePng),
-      2 => Some(ScreenshotCaptureCommand::All),
+      1 => Some(ScreenshotCaptureCommand::CopyRichText),
+      2 => Some(ScreenshotCaptureCommand::SavePng),
+      3 => Some(ScreenshotCaptureCommand::All),
       _ => None,
     }
   }
@@ -400,12 +416,32 @@ fn guide_rich_text_params() -> RichTextParams {
   RichTextParams::from_action_map(&entries, "screenshot.")
 }
 
-fn menu_labels(i18n: &I18nService) -> [String; 3] {
+fn menu_labels(i18n: &I18nService) -> [String; 4] {
   [
     i18n.get_runtime_text("screenshot", "screenshot.menu.copy"),
+    i18n.get_runtime_text("screenshot", "screenshot.menu.copy_rich_text"),
     i18n.get_runtime_text("screenshot", "screenshot.menu.save_png"),
     i18n.get_runtime_text("screenshot", "screenshot.menu.all"),
   ]
+}
+
+fn direct_key_command(input: &InputService) -> Option<ScreenshotCaptureCommand> {
+  if input.was_pressed(Key::A) {
+    Some(ScreenshotCaptureCommand::All)
+  } else if input.was_pressed(Key::S) {
+    Some(ScreenshotCaptureCommand::SavePng)
+  } else if input.was_pressed(Key::C) {
+    Some(ScreenshotCaptureCommand::Copy)
+  } else if input.was_pressed(Key::R) {
+    Some(ScreenshotCaptureCommand::CopyRichText)
+  } else {
+    None
+  }
+}
+
+fn guide_direct_key_should_close(input: &InputService, opened_elapsed: Duration) -> bool {
+  direct_key_command(input).is_some()
+    || (input.was_pressed(Key::Fn(1)) && opened_elapsed >= Duration::from_millis(1000))
 }
 
 fn contains(rect: ScreenshotRect, x: u16, y: u16) -> bool {
@@ -421,7 +457,7 @@ fn guide_should_close(
   system_events: &[SystemEvent],
 ) -> bool {
   raw_keys.iter().any(|event| {
-    event.kind == KeyEventKind::Press && matches!(event.key, Key::A | Key::S | Key::C)
+    event.kind == KeyEventKind::Press && matches!(event.key, Key::A | Key::S | Key::C | Key::R)
       || event.kind == KeyEventKind::Press
         && event.key == Key::Fn(1)
         && opened_elapsed >= Duration::from_millis(1000)

@@ -37,7 +37,7 @@ use crate::host_engine::ui::{
 };
 use std::time::Duration;
 
-const SCREENSHOT_DOUBLE_F1_WINDOW: Duration = Duration::from_millis(500);
+const SCREENSHOT_DOUBLE_F1_WINDOW: Duration = Duration::from_millis(300);
 
 #[derive(Default)]
 pub(super) struct LanguageLoadingRuntime {
@@ -344,7 +344,10 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut screenshot_mode_toast,
       &mut pending_screenshot_hotkey,
     );
-    if screenshot_capture_ui.take_mode_toast_dismiss_requested() {
+    let dismiss_screenshot_toast = screenshot_capture_ui.take_mode_toast_dismiss_requested();
+    if dismiss_screenshot_toast
+      && world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture)
+    {
       screenshot_mode_toast = None;
     }
     sync_input_method_policy(services);
@@ -898,6 +901,21 @@ fn apply_screenshot_capture_command(
           services
             .screenshot
             .write_json(&services.storage, &frame, rect, None, &mut services.log);
+        let _ = world
+          .state
+          .remove_overlay_kind(OverlayKind::ScreenshotCapture);
+      }
+    }
+    ScreenshotCaptureCommand::CopyRichText => {
+      if let Some((frame, rect)) = screenshot_ui.current_selection() {
+        copy_screenshot_rich_text(services, &frame, rect);
+        let _ =
+          services
+            .screenshot
+            .write_json(&services.storage, &frame, rect, None, &mut services.log);
+        let _ = world
+          .state
+          .remove_overlay_kind(OverlayKind::ScreenshotCapture);
       }
     }
     ScreenshotCaptureCommand::SavePng => {
@@ -938,6 +956,20 @@ fn copy_screenshot_text(
     services.log.warn(
       LogSource::Storage,
       "Failed to copy screenshot text to clipboard",
+    );
+  }
+}
+
+fn copy_screenshot_rich_text(
+  services: &mut EngineServices,
+  frame: &crate::host_engine::services::ComposedFrame,
+  rect: crate::host_engine::services::ScreenshotRect,
+) {
+  let text = ScreenshotService::rich_text(frame, rect);
+  if !services.clipboard.write_text(&text) {
+    services.log.warn(
+      LogSource::Storage,
+      "Failed to copy screenshot rich text to clipboard",
     );
   }
 }
