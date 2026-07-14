@@ -8,6 +8,10 @@ pub const DATA_PROFILES_DIR: &str = "data/profiles";
 
 pub const DATA_LOG_DIR: &str = "data/log";
 
+pub const DATA_SCREENSHOT_DIR: &str = "data/screenshot";
+
+pub const DATA_RECORDING_DIR: &str = "data/recording";
+
 pub const DATA_MOD_DIR: &str = "data/mod";
 
 pub const DATA_MOD_GAME_DIR: &str = "data/mod/game";
@@ -42,6 +46,8 @@ pub const REQUIRED_DIRECTORIES: &[&str] = &[
   IMAGE_CACHE_DIR,
   DATA_PROFILES_DIR,
   DATA_LOG_DIR,
+  DATA_SCREENSHOT_DIR,
+  DATA_RECORDING_DIR,
   DATA_MOD_DIR,
   DATA_MOD_GAME_DIR,
   DATA_MOD_SCREENSAVER_DIR,

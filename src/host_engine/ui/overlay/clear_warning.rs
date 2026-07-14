@@ -17,6 +17,8 @@ pub enum ClearWarningTarget {
   Log,
   Mod,
   Profile,
+  Screenshot,
+  Recording,
   Data,
 }
 
@@ -27,6 +29,8 @@ impl ClearWarningTarget {
       Self::Log => "clear_warning.description.log",
       Self::Mod => "clear_warning.description.mod",
       Self::Profile => "clear_warning.description.profile",
+      Self::Screenshot => "clear_warning.description.screenshot",
+      Self::Recording => "clear_warning.description.recording",
       Self::Data => "clear_warning.description.data",
     }
   }

@@ -39,6 +39,14 @@ impl StorageService {
     self.path(layout::DATA_LOG_DIR)
   }
 
+  pub fn screenshot_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_SCREENSHOT_DIR)
+  }
+
+  pub fn recording_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_RECORDING_DIR)
+  }
+
   pub fn tui_log_path(&self) -> PathBuf {
     self.path(layout::TUI_LOG_FILE)
   }
@@ -100,6 +108,14 @@ impl StorageService {
 
   pub fn clear_log(&self, log: &mut LogService) -> io::Result<()> {
     self.remove_recreate(self.log_dir_path(), log)
+  }
+
+  pub fn clear_screenshot(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.screenshot_dir_path(), log)
+  }
+
+  pub fn clear_recording(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.recording_dir_path(), log)
   }
 
   pub fn clear_mod(&self, log: &mut LogService) -> io::Result<()> {

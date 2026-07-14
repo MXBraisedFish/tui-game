@@ -4,8 +4,10 @@
   "storage_management_export.export.log": "导出日志",
   "storage_management_export.export.mod": "导出模组",
   "storage_management_export.export.profile": "导出配置",
+  "storage_management_export.export.screenshot": "导出截屏",
+  "storage_management_export.export.recording": "导出录屏",
   "storage_management_export.export.data": "导出数据",
   "storage_management_export.action.select": "{key:storage_management_export.focus_up}/{key:storage_management_export.focus_down} 选择",
-  "storage_management_export.action.focus": "{key:storage_management_export.focus_cache}/{key:storage_management_export.focus_log}/{key:storage_management_export.focus_mod}/{key:storage_management_export.focus_profile}/{key:storage_management_export.focus_data} 聚焦",
+  "storage_management_export.action.focus": "{key:storage_management_export.focus_cache}/{key:storage_management_export.focus_log}/{key:storage_management_export.focus_mod}/{key:storage_management_export.focus_profile}/{key:storage_management_export.focus_screenshot}/{key:storage_management_export.focus_recording}/{key:storage_management_export.focus_data} 聚焦",
   "storage_management_export.action.back": "{key:storage_management_export.back} 返回"
 }

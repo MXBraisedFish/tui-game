@@ -267,6 +267,8 @@ pub(super) fn apply_storage_management_clear_command(
     | StorageManagementClearCommand::ClearLog
     | StorageManagementClearCommand::ClearMod
     | StorageManagementClearCommand::ClearProfile
+    | StorageManagementClearCommand::ClearScreenshot
+    | StorageManagementClearCommand::ClearRecording
     | StorageManagementClearCommand::ClearData => {
       let (target, path) = match command {
         StorageManagementClearCommand::ClearCache => {
@@ -281,6 +283,14 @@ pub(super) fn apply_storage_management_clear_command(
         StorageManagementClearCommand::ClearProfile => (
           ClearWarningTarget::Profile,
           services.storage.profiles_dir_path(),
+        ),
+        StorageManagementClearCommand::ClearScreenshot => (
+          ClearWarningTarget::Screenshot,
+          services.storage.screenshot_dir_path(),
+        ),
+        StorageManagementClearCommand::ClearRecording => (
+          ClearWarningTarget::Recording,
+          services.storage.recording_dir_path(),
         ),
         StorageManagementClearCommand::ClearData => {
           (ClearWarningTarget::Data, services.storage.data_dir_path())
@@ -306,6 +316,8 @@ pub(super) fn apply_clear_warning_command(
         ClearWarningTarget::Log => services.storage.clear_log(&mut services.log),
         ClearWarningTarget::Mod => services.storage.clear_mod(&mut services.log),
         ClearWarningTarget::Profile => services.storage.clear_profiles(&mut services.log),
+        ClearWarningTarget::Screenshot => services.storage.clear_screenshot(&mut services.log),
+        ClearWarningTarget::Recording => services.storage.clear_recording(&mut services.log),
         ClearWarningTarget::Data => services.storage.clear_data(&mut services.log),
       };
       if let Err(error) = result {
@@ -345,12 +357,16 @@ pub(super) fn apply_storage_management_export_command(
     | StorageManagementExportCommand::ExportLog
     | StorageManagementExportCommand::ExportMod
     | StorageManagementExportCommand::ExportProfile
+    | StorageManagementExportCommand::ExportScreenshot
+    | StorageManagementExportCommand::ExportRecording
     | StorageManagementExportCommand::ExportData => {
       let export_type = match command {
         StorageManagementExportCommand::ExportCache => ExportType::Cache,
         StorageManagementExportCommand::ExportLog => ExportType::Log,
         StorageManagementExportCommand::ExportMod => ExportType::Mod,
         StorageManagementExportCommand::ExportProfile => ExportType::Profile,
+        StorageManagementExportCommand::ExportScreenshot => ExportType::Screenshot,
+        StorageManagementExportCommand::ExportRecording => ExportType::Recording,
         StorageManagementExportCommand::ExportData => ExportType::Data,
         StorageManagementExportCommand::Back => unreachable!(),
       };
@@ -849,6 +865,12 @@ pub(super) fn apply_export_settings_command(
         Some(ExportType::Log) => crate::host_engine::services::export::ExportScope::Log,
         Some(ExportType::Mod) => crate::host_engine::services::export::ExportScope::Mod,
         Some(ExportType::Profile) => crate::host_engine::services::export::ExportScope::Profile,
+        Some(ExportType::Screenshot) => {
+          crate::host_engine::services::export::ExportScope::Screenshot
+        }
+        Some(ExportType::Recording) => {
+          crate::host_engine::services::export::ExportScope::Recording
+        }
         Some(ExportType::Data) => crate::host_engine::services::export::ExportScope::Data,
         None => {
           let _ = world.state.remove_overlay_kind(OverlayKind::ExportSettings);

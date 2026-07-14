@@ -9,6 +9,8 @@
   "storage_management_view.name.log": "日志目录",
   "storage_management_view.name.profile": "配置目录",
   "storage_management_view.name.mod": "模组目录",
+  "storage_management_view.name.screenshot": "截屏目录",
+  "storage_management_view.name.recording": "录屏目录",
   "storage_management_view.size.k": "KB",
   "storage_management_view.size.m": "MB",
   "storage_management_view.size.g": "GB",

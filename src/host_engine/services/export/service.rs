@@ -34,6 +34,8 @@ pub enum ExportScope {
   Log,
   Mod,
   Profile,
+  Screenshot,
+  Recording,
   Data,
 }
 
@@ -44,6 +46,8 @@ impl ExportScope {
       Self::Log => storage.log_dir_path(),
       Self::Mod => storage.mod_dir_path(),
       Self::Profile => storage.profiles_dir_path(),
+      Self::Screenshot => storage.screenshot_dir_path(),
+      Self::Recording => storage.recording_dir_path(),
       Self::Data => storage.data_dir_path(),
     }
   }
@@ -54,6 +58,8 @@ impl ExportScope {
       Self::Log => root_dir.join("data/log"),
       Self::Mod => root_dir.join("data/mod"),
       Self::Profile => root_dir.join("data/profiles"),
+      Self::Screenshot => root_dir.join("data/screenshot"),
+      Self::Recording => root_dir.join("data/recording"),
       Self::Data => root_dir.join("data"),
     }
   }

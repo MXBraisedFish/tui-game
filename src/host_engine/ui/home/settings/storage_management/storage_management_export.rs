@@ -7,7 +7,7 @@ use crate::host_engine::services::{
   UiObjectPoolOwner,
 };
 
-const MENU_LEN: usize = 5;
+const MENU_LEN: usize = 7;
 const NS: &str = "storage_management_export";
 
 const MENU_KEYS: &[&str] = &[
@@ -15,6 +15,8 @@ const MENU_KEYS: &[&str] = &[
   "storage_management_export.export.log",
   "storage_management_export.export.mod",
   "storage_management_export.export.profile",
+  "storage_management_export.export.screenshot",
+  "storage_management_export.export.recording",
   "storage_management_export.export.data",
 ];
 
@@ -41,6 +43,8 @@ pub enum StorageManagementExportCommand {
   ExportLog,
   ExportMod,
   ExportProfile,
+  ExportScreenshot,
+  ExportRecording,
   ExportData,
 }
 
@@ -119,9 +123,19 @@ impl StorageManagementExportUi {
         keys: vec![vec!["4".to_string()]],
       },
       ActionMapEntry {
+        action: "storage_management_export.focus_screenshot".to_string(),
+        description: "Focus export screenshot".to_string(),
+        keys: vec![vec!["5".to_string()]],
+      },
+      ActionMapEntry {
+        action: "storage_management_export.focus_recording".to_string(),
+        description: "Focus export recording".to_string(),
+        keys: vec![vec!["6".to_string()]],
+      },
+      ActionMapEntry {
         action: "storage_management_export.focus_data".to_string(),
         description: "Focus export data".to_string(),
-        keys: vec![vec!["5".to_string()]],
+        keys: vec![vec!["7".to_string()]],
       },
     ]
   }
@@ -171,8 +185,16 @@ impl StorageManagementExportUi {
           self.selected_index = 3;
           None
         }
-        "storage_management_export.focus_data" => {
+        "storage_management_export.focus_screenshot" => {
           self.selected_index = 4;
+          None
+        }
+        "storage_management_export.focus_recording" => {
+          self.selected_index = 5;
+          None
+        }
+        "storage_management_export.focus_data" => {
+          self.selected_index = 6;
           None
         }
         _ => None,
@@ -267,6 +289,8 @@ impl StorageManagementExportUi {
       1 => StorageManagementExportCommand::ExportLog,
       2 => StorageManagementExportCommand::ExportMod,
       3 => StorageManagementExportCommand::ExportProfile,
+      4 => StorageManagementExportCommand::ExportScreenshot,
+      5 => StorageManagementExportCommand::ExportRecording,
       _ => StorageManagementExportCommand::ExportData,
     }
   }

@@ -7,7 +7,7 @@ use crate::host_engine::services::{
   UiObjectPoolOwner,
 };
 
-const MENU_LEN: usize = 5;
+const MENU_LEN: usize = 7;
 const NS: &str = "storage_management_clear";
 
 const MENU_KEYS: &[&str] = &[
@@ -15,6 +15,8 @@ const MENU_KEYS: &[&str] = &[
   "storage_management.clear.log",
   "storage_management.clear.mod",
   "storage_management.clear.profile",
+  "storage_management.clear.screenshot",
+  "storage_management.clear.recording",
   "storage_management.clear.data",
 ];
 
@@ -41,6 +43,8 @@ pub enum StorageManagementClearCommand {
   ClearLog,
   ClearMod,
   ClearProfile,
+  ClearScreenshot,
+  ClearRecording,
   ClearData,
 }
 
@@ -119,9 +123,19 @@ impl StorageManagementClearUi {
         keys: vec![vec!["4".to_string()]],
       },
       ActionMapEntry {
+        action: "storage_management_clear.focus_screenshot".to_string(),
+        description: "Focus clear screenshot".to_string(),
+        keys: vec![vec!["5".to_string()]],
+      },
+      ActionMapEntry {
+        action: "storage_management_clear.focus_recording".to_string(),
+        description: "Focus clear recording".to_string(),
+        keys: vec![vec!["6".to_string()]],
+      },
+      ActionMapEntry {
         action: "storage_management_clear.focus_data".to_string(),
         description: "Focus clear data".to_string(),
-        keys: vec![vec!["5".to_string()]],
+        keys: vec![vec!["7".to_string()]],
       },
     ]
   }
@@ -171,8 +185,16 @@ impl StorageManagementClearUi {
           self.selected_index = 3;
           None
         }
-        "storage_management_clear.focus_data" => {
+        "storage_management_clear.focus_screenshot" => {
           self.selected_index = 4;
+          None
+        }
+        "storage_management_clear.focus_recording" => {
+          self.selected_index = 5;
+          None
+        }
+        "storage_management_clear.focus_data" => {
+          self.selected_index = 6;
           None
         }
         _ => None,
@@ -267,6 +289,8 @@ impl StorageManagementClearUi {
       1 => StorageManagementClearCommand::ClearLog,
       2 => StorageManagementClearCommand::ClearMod,
       3 => StorageManagementClearCommand::ClearProfile,
+      4 => StorageManagementClearCommand::ClearScreenshot,
+      5 => StorageManagementClearCommand::ClearRecording,
       _ => StorageManagementClearCommand::ClearData,
     }
   }

@@ -63,6 +63,8 @@ pub enum ExportType {
   Log,
   Mod,
   Profile,
+  Screenshot,
+  Recording,
   Data,
 }
 
@@ -74,8 +76,23 @@ impl ExportType {
       Self::Log => "log",
       Self::Mod => "mod",
       Self::Profile => "profile",
+      Self::Screenshot => "screenshot",
+      Self::Recording => "recording",
       Self::Data => "data",
     }
+  }
+
+  fn dynamic_type_text(self, i18n: &I18nService) -> String {
+    let key = match self {
+      Self::Cache => "export_settings.scope.cache",
+      Self::Log => "export_settings.scope.log",
+      Self::Mod => "export_settings.scope.mod",
+      Self::Profile => "export_settings.scope.profile",
+      Self::Screenshot => "export_settings.scope.screenshot",
+      Self::Recording => "export_settings.scope.recording",
+      Self::Data => "export_settings.scope.data",
+    };
+    i18n.get_runtime_text(NS, key)
   }
 }
 
@@ -112,6 +129,7 @@ pub struct ExportSettingsUi {
   focus: ExportSettingsFocus,
   name_input_id: TextInputId,
   path_input_id: TextInputId,
+  back_area: HitAreaId,
   name_area: HitAreaId,
   path_area: HitAreaId,
   type_area: HitAreaId,
@@ -154,6 +172,7 @@ impl ExportSettingsUi {
       },
     );
     Self {
+      back_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       name_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       path_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       type_area: hit_area.create(&mut objects, HitAreaOptions::default()),
@@ -287,13 +306,19 @@ impl ExportSettingsUi {
           return Some(ExportSettingsCommand::FocusInput);
         } else if *id == self.type_area {
           self.focus = ExportSettingsFocus::Type;
+          self.format = self.format.next();
         }
         None
       }
       UiEvent::HitArea(HitAreaEvent::Press {
+        id,
         button: MouseButton::Right,
         ..
-      }) => {
+      }) if *id == self.back_area
+        || *id == self.name_area
+        || *id == self.path_area
+        || *id == self.type_area =>
+      {
         if self.input_active {
           Some(ExportSettingsCommand::CancelInput)
         } else {
@@ -491,14 +516,14 @@ impl ExportSettingsUi {
 
     // Resolved defaults for validation
     let _export_type = self.export_type.unwrap_or(ExportType::Data);
-    let type_str = _export_type.dynamic_type_str();
+    let type_str = _export_type.dynamic_type_text(i18n);
     let now = chrono::Local::now();
     let time_str = now.format("%Y-%m-%d %H-%M-%S").to_string();
     let root_str = self.root_dir.to_string_lossy().replace('\\', "/");
 
     let default_name_resolved = i18n
       .get_runtime_text(NS, "export_settings.set.name.default")
-      .replace("{type}", type_str)
+      .replace("{type}", &type_str)
       .replace("{time}", &time_str);
     let default_path_resolved = i18n
       .get_runtime_text(NS, "export_settings.set.path.default")
@@ -826,6 +851,17 @@ impl ExportSettingsUi {
 
     // Hit areas — content-width, skip when text input active
     if !self.input_active {
+      hit_area.render_host(
+        &mut self.objects,
+        self.back_area,
+        Rect {
+          x: 0,
+          y: 0,
+          width: size.width,
+          height: size.height,
+        },
+        canvas,
+      );
       hit_area.render_host(
         &mut self.objects,
         self.name_area,

@@ -10,7 +10,7 @@ use crate::host_engine::services::{
   TableStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
-const ROW_LEN: usize = 6;
+const ROW_LEN: usize = 8;
 const NS: &str = "storage_management_view";
 const SCROLL_STEP: Duration = Duration::from_millis(160);
 
@@ -21,6 +21,8 @@ const ROW_KEYS: &[&str] = &[
   "storage_management_view.name.log",
   "storage_management_view.name.profile",
   "storage_management_view.name.mod",
+  "storage_management_view.name.screenshot",
+  "storage_management_view.name.recording",
 ];
 
 const ROW_RELATIVE_PATHS: &[&str] = &[
@@ -30,6 +32,8 @@ const ROW_RELATIVE_PATHS: &[&str] = &[
   "data/log",
   "data/profiles",
   "data/mod",
+  "data/screenshot",
+  "data/recording",
 ];
 
 #[derive(Clone)]

@@ -7,7 +7,7 @@
   "settings.security_settings": "安全设置",
   "settings.display_settings": "显示设置",
   "settings.screensaver_list": "屏保列表",
-  "settings.screenshot_recording": "截屏与录制",
+  "settings.screenshot_recording": "截屏与录屏",
   "settings.action.focus": "{key:settings.focus_language}/{key:settings.focus_key_bindings}/{key:settings.focus_mod}/{key:settings.focus_storage_management}/{key:settings.focus_security_settings}/{key:settings.focus_display_settings}/{key:settings.focus_screensaver_list}/{key:settings.focus_screenshot_recording} 聚焦",
   "settings.action.select": "{key:settings.focus_up}/{key:settings.focus_down} 选择",
   "settings.action.confirm": "{key:settings.confirm} 确认",
