@@ -1,6 +1,13 @@
 use super::*;
 
 pub(super) fn manage_window_size_overlay(services: &EngineServices, world: &mut RuntimeWorld) {
+  if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
+    let _ = world
+      .state
+      .remove_overlay_kind(OverlayKind::WindowSizeWarning);
+    return;
+  }
+
   let term = services.layout.physical_size();
   let (min_w, min_h) = get_min_window_size(world);
   let too_small = (term.width as u32) < min_w || (term.height as u32) < min_h;

@@ -43,6 +43,10 @@ impl StorageService {
     self.path(layout::DATA_SCREENSHOT_DIR)
   }
 
+  pub fn screenshot_cache_dir_path(&self) -> PathBuf {
+    self.path(layout::SCREENSHOT_CACHE_DIR)
+  }
+
   pub fn recording_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_RECORDING_DIR)
   }
@@ -74,6 +78,10 @@ impl StorageService {
 
   pub fn profile_package_state_path(&self) -> PathBuf {
     self.path(layout::PROFILE_PACKAGE_STATE_FILE)
+  }
+
+  pub fn profile_screenshot_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_SCREENSHOT_FILE)
   }
 
   pub fn language_assets_root_path(&self) -> PathBuf {

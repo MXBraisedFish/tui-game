@@ -23,6 +23,7 @@ pub(super) fn route_render(
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
   export_settings_ui: &mut ExportSettingsUi,
+  screenshot_capture_ui: &mut ScreenshotCaptureUi,
   export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
 ) -> Option<(u16, u16)> {
@@ -49,6 +50,17 @@ pub(super) fn route_render(
       term.width,
       term.height,
       world.state.is_host_mode(),
+    );
+    return None;
+  }
+
+  if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
+    apply_host_viewport(services);
+    screenshot_capture_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.i18n,
     );
     return None;
   }

@@ -21,6 +21,7 @@ pub enum OverlayKind {
   ExportSettings,
   LanguageLoading,
   SafeModeWarning,
+  ScreenshotCapture,
   WindowSizeWarning,
 }
 
@@ -108,6 +109,7 @@ impl OverlayKind {
       OverlayKind::LanguageLoading => 20,
       OverlayKind::SafeModeWarning => 20,
       OverlayKind::WindowSizeWarning => 30,
+      OverlayKind::ScreenshotCapture => 40,
     }
   }
 }
@@ -137,6 +139,15 @@ mod tests {
 
     stack.remove_kind(OverlayKind::WindowSizeWarning);
     assert_eq!(stack.current_kind(), Some(OverlayKind::LanguageLoading));
+  }
+
+  #[test]
+  fn screenshot_capture_overrides_window_size_warning() {
+    let mut stack = OverlayStackState::new();
+    stack.push(overlay(OverlayKind::WindowSizeWarning));
+    stack.push(overlay(OverlayKind::ScreenshotCapture));
+
+    assert_eq!(stack.current_kind(), Some(OverlayKind::ScreenshotCapture));
   }
 
   #[test]

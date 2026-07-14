@@ -1,0 +1,3 @@
+{
+  "toolbar.system_info": "f%<fg:brghit_red>CPU</fg> {cpu}  <fg:bright_blue>GPU</fg> {gpu}  <fg:yellow>MEM</fg> {mem}  <fg:bright_cyan>NET</fg> <fg:bright_green>↑</fg>{upload} <fg:bright_red>↓</fg>{download}  <fg:bright_magenta>FPS</fg> {fps}"
+}

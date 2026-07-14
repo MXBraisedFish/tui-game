@@ -18,6 +18,7 @@ use super::{
   input::{KeyEvent, SystemEvent},
   log::LogSource,
   package::{self, PackageAsyncEvent, PackageTask},
+  screenshot::{self, ScreenshotAsyncEvent, ScreenshotTask},
   widget::runtime_object::time::TimeCallbackId,
 };
 
@@ -123,6 +124,7 @@ pub enum TimeAsyncEvent {
 pub enum EngineTask {
   Package(PackageTask),
   Export(ExportTask),
+  Screenshot(ScreenshotTask),
   File(FileTask),
   Image(ImageTask),
   Network(NetworkTask),
@@ -135,6 +137,7 @@ pub enum EngineEvent {
   System(SystemEvent),
   Package(PackageAsyncEvent),
   Export(ExportAsyncEvent),
+  Screenshot(ScreenshotAsyncEvent),
   File(FileEvent),
   Image(ImageEvent),
   Network(NetworkEvent),
@@ -324,6 +327,7 @@ fn run_task(id: TaskId, task: EngineTask, event_tx: &Sender<EngineEvent>) -> Res
   match task {
     EngineTask::Package(task) => package::run_package_task(id, task, event_tx),
     EngineTask::Export(task) => export::run_export_task(id, task, event_tx),
+    EngineTask::Screenshot(task) => screenshot::run_screenshot_task(id, task, event_tx),
     EngineTask::File(task) => run_file_task(id, task, event_tx),
     EngineTask::Image(task) => run_image_task(id, task, event_tx),
     EngineTask::Network(task) => run_network_task(id, task, event_tx),

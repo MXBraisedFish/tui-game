@@ -48,6 +48,7 @@ impl FrameCompositor {
       }
     }
     overlay(&mut frame, host, 0, 0, false);
+    overlay(&mut frame, canvas.top_buffer(), 0, 0, false);
 
     frame
   }

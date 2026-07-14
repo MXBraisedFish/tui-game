@@ -28,6 +28,12 @@ pub struct PackageStateProfile {
   pub screensavers: HashMap<String, ScreensaverPackageState>,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ScreenshotProfile {
+  #[serde(default)]
+  pub guide_seen: bool,
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SafeModeDefault {
@@ -310,6 +316,66 @@ impl StorageService {
       .entry(mod_id.to_string())
       .or_insert(initial));
     self.write_package_state(&profile, log)
+  }
+
+  pub fn read_screenshot_profile(&self, log: &mut LogService) -> Option<ScreenshotProfile> {
+    let content = fs::read_to_string(self.profile_screenshot_path())
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to read screenshot profile: {err}", err = error),
+        );
+        error
+      })
+      .ok()?;
+    serde_json::from_str(&content)
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!(
+            "Failed to parse screenshot profile JSON: {err}",
+            err = error
+          ),
+        );
+        error
+      })
+      .ok()
+  }
+
+  pub fn read_screenshot_profile_or_default(&self, log: &mut LogService) -> ScreenshotProfile {
+    self.read_screenshot_profile(log).unwrap_or_default()
+  }
+
+  pub fn write_screenshot_profile(
+    &self,
+    profile: &ScreenshotProfile,
+    log: &mut LogService,
+  ) -> std::io::Result<()> {
+    let json = serde_json::to_string_pretty(profile).map_err(|error| {
+      log.error(
+        LogSource::Storage,
+        format!("Failed to serialize screenshot profile: {err}", err = error),
+      );
+      io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("Serialization failed: {error}"),
+      )
+    })?;
+    fs::write(self.profile_screenshot_path(), json)
+  }
+
+  pub fn mark_screenshot_guide_seen(&self, log: &mut LogService) {
+    let mut profile = self.read_screenshot_profile_or_default(log);
+    if profile.guide_seen {
+      return;
+    }
+    profile.guide_seen = true;
+    if let Err(error) = self.write_screenshot_profile(&profile, log) {
+      log.warn(
+        LogSource::Storage,
+        format!("Failed to write screenshot profile: {error}"),
+      );
+    }
   }
 }
 

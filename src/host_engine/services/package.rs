@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{
-  atomic::{AtomicBool, Ordering},
   Arc,
+  atomic::{AtomicBool, Ordering},
 };
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{unbounded, Receiver, RecvTimeoutError, Sender};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 
@@ -1750,9 +1750,11 @@ mod tests {
       event,
       PackageEvent::ScanProgress { scanned, total: 2 } if *scanned <= 2
     )));
-    assert!(events
-      .iter()
-      .any(|event| matches!(event, PackageEvent::ScanFinished { total: 2, .. })));
+    assert!(
+      events
+        .iter()
+        .any(|event| matches!(event, PackageEvent::ScanFinished { total: 2, .. }))
+    );
 
     let _ = std::fs::remove_dir_all(root);
   }
@@ -2175,9 +2177,11 @@ mod tests {
     assert_eq!(lines[1].trim_end(), "");
     assert_eq!(lines[2].trim(), "line00");
     assert_eq!(lines[12].trim(), "line10");
-    assert!(lines
-      .iter()
-      .all(|line| UnicodeWidthStr::width(line.as_str()) == 60));
+    assert!(
+      lines
+        .iter()
+        .all(|line| UnicodeWidthStr::width(line.as_str()) == 60)
+    );
 
     let entry = service.mod_games().remove(0);
     let icon_path = entry.icon_path.unwrap();
@@ -2190,9 +2194,11 @@ mod tests {
   fn text_asset_normalizes_icon_to_four_lines_and_eight_columns() {
     let lines = normalize_asset_text("abcdefghi\n中中中中中\nx", AssetShape::Icon);
     assert_eq!(lines.len(), 4);
-    assert!(lines
-      .iter()
-      .all(|line| UnicodeWidthStr::width(line.as_str()) == 8));
+    assert!(
+      lines
+        .iter()
+        .all(|line| UnicodeWidthStr::width(line.as_str()) == 8)
+    );
     assert_eq!(lines[0], "        ");
     assert_eq!(lines[1], "abcdefghi".chars().take(8).collect::<String>());
     assert_eq!(lines[2], "中中中中");
@@ -2337,9 +2343,11 @@ mod tests {
     };
     assert_eq!(icon, default_icon_lines());
     assert_eq!(banner.len(), 14);
-    assert!(banner
-      .iter()
-      .all(|line| UnicodeWidthStr::width(line.as_str()) == 60));
+    assert!(
+      banner
+        .iter()
+        .all(|line| UnicodeWidthStr::width(line.as_str()) == 60)
+    );
     assert!(service.mod_games()[0].icon_path.is_none());
 
     let _ = std::fs::remove_dir_all(root);

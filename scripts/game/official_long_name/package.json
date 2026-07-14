@@ -1,0 +1,26 @@
+{
+  "mod_id": "official.long_name",
+  "schema_version": 1,
+  "type": "game",
+  "version": "official-long",
+  "version_code": 1,
+  "api": {
+    "min": 1,
+    "max": 1
+  },
+  "entry": "official_long_name",
+  "display": {
+    "title": "Official Long Name Pack",
+    "description": "Official package with a long rich game name.",
+    "author": "TUI Game"
+  },
+  "game": {
+    "name": "f%<fg:bright_magenta>Official</fg> <fg:bright_yellow>Very Very Long Game Name For Overflow Test</fg>",
+    "detail": "This official package tests one-line clipping before the source label.",
+    "target_fps": 30,
+    "mouse": false,
+    "truecolor": false,
+    "high_privilege": false,
+    "save": false
+  }
+}

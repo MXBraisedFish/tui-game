@@ -1,0 +1,9 @@
+{
+  "screenshot.guide": "f%截屏模式用于保存当前终端显示内容。\n拖动鼠标可框选区域，双击鼠标可全选终端内容。\n框选后右键打开菜单，点击空白处关闭菜单。\n<fg:bright_red>注：截屏模式不会暂停当前界面的运行。</fg>\n再次按下 {key:host_key.screenshot} 可退出截屏模式。\n在非截屏模式下，快速双击 {key:host_key.screenshot} 可直接截取整个终端画面。\n<fg:bright_blue>[任意操作后关闭引导]</fg>",
+  "screenshot.menu.copy": "复制到剪切板 {key:screenshot.copy}",
+  "screenshot.menu.save_png": "保存为图片 {key:screenshot.save_png}",
+  "screenshot.menu.all": "复制并保存为图片 {key:screenshot.all}",,
+  "screenshot.menu.all": "复制并保存为图片 {key:screenshot.all}",
+  "screenshot.mode.enter": "进入截屏模式",
+  "screenshot.mode.exit": "退出截屏模式"
+}

@@ -1,14 +1,16 @@
 use super::*;
-use crate::host_engine::services::{EngineEvent, ExportAsyncEvent};
+use crate::host_engine::services::{EngineEvent, ExportAsyncEvent, ScreenshotAsyncEvent};
 
 pub(super) struct RuntimeEngineEvents {
   pub package: Vec<PackageEvent>,
   pub export: Vec<ExportAsyncEvent>,
+  pub screenshot: Vec<ScreenshotAsyncEvent>,
 }
 
 pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngineEvents {
   let mut package_events = Vec::new();
   let mut export_events = Vec::new();
+  let mut screenshot_events = Vec::new();
 
   for event in services.engine_events.drain() {
     match event {
@@ -24,6 +26,25 @@ pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngin
         package_events.push(event);
       }
       EngineEvent::Export(event) => export_events.push(event),
+      EngineEvent::Screenshot(event) => match event {
+        ScreenshotAsyncEvent::Saved { task_id, png_path } => {
+          services.log.info(
+            LogSource::Storage,
+            format!(
+              "Screenshot task {task_id:?} saved PNG: {}",
+              png_path.display()
+            ),
+          );
+          screenshot_events.push(ScreenshotAsyncEvent::Saved { task_id, png_path });
+        }
+        ScreenshotAsyncEvent::Failed { task_id, error } => {
+          services.log.warn(
+            LogSource::Storage,
+            format!("Screenshot task {task_id:?} failed: {error}"),
+          );
+          screenshot_events.push(ScreenshotAsyncEvent::Failed { task_id, error });
+        }
+      },
       EngineEvent::File(_)
       | EngineEvent::Image(_)
       | EngineEvent::Network(_)
@@ -44,5 +65,6 @@ pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngin
   RuntimeEngineEvents {
     package: package_events,
     export: export_events,
+    screenshot: screenshot_events,
   }
 }

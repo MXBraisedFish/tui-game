@@ -868,9 +868,7 @@ pub(super) fn apply_export_settings_command(
         Some(ExportType::Screenshot) => {
           crate::host_engine::services::export::ExportScope::Screenshot
         }
-        Some(ExportType::Recording) => {
-          crate::host_engine::services::export::ExportScope::Recording
-        }
+        Some(ExportType::Recording) => crate::host_engine::services::export::ExportScope::Recording,
         Some(ExportType::Data) => crate::host_engine::services::export::ExportScope::Data,
         None => {
           let _ = world.state.remove_overlay_kind(OverlayKind::ExportSettings);

@@ -1,0 +1,26 @@
+{
+  "mod_id": "official.arcade",
+  "schema_version": 1,
+  "type": "game",
+  "version": "official-1",
+  "version_code": 1,
+  "api": {
+    "min": 1,
+    "max": 1
+  },
+  "entry": "official_arcade",
+  "display": {
+    "title": "Official Arcade Pack",
+    "description": "Official arcade test package.",
+    "author": "TUI Game"
+  },
+  "game": {
+    "name": "f%<fg:bright_green>Official</fg> Arcade",
+    "detail": "Official source package used to test game list source label.",
+    "target_fps": 60,
+    "mouse": false,
+    "truecolor": false,
+    "high_privilege": false,
+    "save": false
+  }
+}

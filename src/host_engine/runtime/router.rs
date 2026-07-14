@@ -61,6 +61,7 @@ pub(super) fn deactivate_hidden_pools(
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
   export_settings_ui: &mut ExportSettingsUi,
+  _screenshot_capture_ui: &mut ScreenshotCaptureUi,
   export_loading_ui: &mut ExportLoadingUi,
 ) {
   let active = world
@@ -288,6 +289,7 @@ pub(super) fn route_input_events(
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
   export_settings_ui: &mut ExportSettingsUi,
+  _screenshot_capture_ui: &mut ScreenshotCaptureUi,
   export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
@@ -487,6 +489,7 @@ pub(super) fn route_update(
   safe_mode_warning_ui: &mut SafeModeWarningUi,
   clear_warning_ui: &mut ClearWarningUi,
   export_settings_ui: &mut ExportSettingsUi,
+  screenshot_capture_ui: &mut ScreenshotCaptureUi,
   export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
@@ -501,8 +504,12 @@ pub(super) fn route_update(
       safe_mode_warning_ui.update(world.clock.delta_time());
     } else if world.state.current_overlay_kind() == Some(OverlayKind::ClearWarning) {
       clear_warning_ui.update(world.clock.delta_time());
+    } else if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
+      screenshot_capture_ui.update(world.clock.delta_time());
     }
-    return;
+    if world.state.current_overlay_kind() != Some(OverlayKind::ScreenshotCapture) {
+      return;
+    }
   }
 
   match world.state.current_ui_kind() {

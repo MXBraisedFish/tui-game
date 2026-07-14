@@ -21,6 +21,7 @@ mod random;
 mod render;
 mod render_pipeline;
 mod rich_text;
+mod screenshot;
 mod storage;
 mod terminal;
 mod terminal_capabilities;
@@ -61,12 +62,14 @@ pub use overlay::OverlayService;
 pub use package::{PackageAsset, PackageEvent, PackageListEntry, PackageService, PackageSource};
 pub use random::RandomService;
 pub use render::{BorderStyle, RenderService};
-pub use render_pipeline::{FrameCompositor, FramePresenter};
+pub use render_pipeline::{ComposedCell, ComposedFrame, FrameCompositor, FramePresenter};
 pub use rich_text::{
   RichText, RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextStyle,
 };
+pub use screenshot::{ScreenshotAsyncEvent, ScreenshotRect, ScreenshotService, ScreenshotTask};
 pub use storage::{
-  GamePackageState, PackageDefaultState, SafeModeDefault, ScreensaverPackageState, StorageService,
+  GamePackageState, PackageDefaultState, SafeModeDefault, ScreensaverPackageState,
+  ScreenshotProfile, StorageService,
 };
 pub use terminal::TerminalService;
 pub use text_layout::DrawTextParams;
@@ -97,6 +100,7 @@ pub struct EngineServices {
   pub file: FileService,
   pub network: NetworkService,
   pub random: RandomService,
+  pub screenshot: ScreenshotService,
   pub package: PackageService,
   pub clipboard: ClipboardService,
   pub runtime_objects: RuntimeObjectPool,
@@ -145,6 +149,7 @@ impl EngineServices {
       file: FileService::new(),
       network: NetworkService::new(),
       random: RandomService::new(),
+      screenshot: ScreenshotService::new(),
       terminal: TerminalService::new(),
       clipboard: ClipboardService::new(),
       runtime_objects: RuntimeObjectPool::new(),

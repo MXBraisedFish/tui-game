@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{buffer::CanvasBuffer, cell::CanvasCell};
+use super::{buffer::CanvasBuffer, cell::CanvasCell, top_layer::TopLayer};
 use crate::host_engine::services::rich_text::RichTextSegment;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
@@ -16,6 +16,7 @@ use crate::host_engine::services::{
 pub struct CanvasService {
   base: CanvasBuffer,
   host: CanvasBuffer,
+  top: TopLayer,
   slices: HashMap<SliceId, PreparedSlice>,
   scroll_boxes: HashMap<ScrollBoxId, PreparedScrollBox>,
   surface_order: Vec<SurfaceId>,
@@ -65,6 +66,7 @@ impl CanvasService {
     Self {
       base: CanvasBuffer::new(width, height),
       host: CanvasBuffer::new(width, height),
+      top: TopLayer::new(width, height),
       slices: HashMap::new(),
       scroll_boxes: HashMap::new(),
       surface_order: Vec::new(),
@@ -102,6 +104,9 @@ impl CanvasService {
       self.force_full_redraw = true;
     } else {
       self.host.clear();
+    }
+    if self.top.resize_or_clear(physical.width, physical.height) {
+      self.force_full_redraw = true;
     }
   }
 
@@ -340,6 +345,18 @@ impl CanvasService {
     );
   }
 
+  /// 在宿主最高层上绘制富文本。
+  pub(crate) fn top_text(&mut self, params: &DrawTextParams) {
+    let lines = text_layout::layout_text_lines(params);
+    Self::draw_layout_lines(
+      &mut self.top.buffer_mut(),
+      params.x,
+      params.y,
+      params.line_align,
+      &lines,
+    );
+  }
+
   pub(crate) fn host_rich_text_segments(
     &mut self,
     segments: &[RichTextSegment],
@@ -401,6 +418,15 @@ impl CanvasService {
     Self::styled_text_to(&mut self.host, x, y, text, style);
   }
 
+  pub(crate) fn host_cell(&mut self, x: u16, y: u16, cell: CanvasCell) {
+    self.host.set(x, y, cell);
+  }
+
+  /// 在宿主最高层上以指定样式绘制纯文本。
+  pub(crate) fn top_styled_text(&mut self, x: u16, y: u16, text: &str, style: TextStyle) {
+    Self::styled_text_to(self.top.buffer_mut(), x, y, text, style);
+  }
+
   fn styled_text_to(buffer: &mut CanvasBuffer, x: u16, y: u16, text: &str, style: TextStyle) {
     let gs = graphemes(text);
     let mut cursor_x = x;
@@ -436,6 +462,7 @@ impl CanvasService {
   /// 重置画布尺寸并标记需要全量重绘。
   pub fn resize(&mut self, width: u16, height: u16) {
     self.host.resize(width, height);
+    let _ = self.top.resize_or_clear(width, height);
     self.force_full_redraw = true;
   }
 
@@ -458,6 +485,10 @@ impl CanvasService {
 
   pub(crate) fn host_buffer(&self) -> &CanvasBuffer {
     &self.host
+  }
+
+  pub(crate) fn top_buffer(&self) -> &CanvasBuffer {
+    self.top.buffer()
   }
 
   pub(crate) fn base_buffer(&self) -> &CanvasBuffer {

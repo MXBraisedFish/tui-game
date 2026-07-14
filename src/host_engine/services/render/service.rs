@@ -10,6 +10,7 @@ enum Target {
   Slice(SliceId),
   ScrollBox(ScrollBoxId),
   Host,
+  Top,
 }
 
 /// 渲染服务：提供文本、填充矩形和边框矩形等高层绘制操作。
@@ -48,6 +49,11 @@ impl RenderService {
   /// 在宿主层上绘制文本（用于顶层 UI 元素）。
   pub(crate) fn draw_host_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     self.draw_text_target(canvas, Target::Host, params);
+  }
+
+  /// 在宿主最高层上绘制文本。
+  pub(crate) fn draw_top_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
+    self.draw_text_target(canvas, Target::Top, params);
   }
 
   /// 在基础层上绘制填充矩形。
@@ -153,6 +159,32 @@ impl RenderService {
     self.draw_filled_rect_target(
       canvas,
       Target::Host,
+      x,
+      y,
+      width,
+      height,
+      fill_char,
+      fill_fg,
+      fill_bg,
+    );
+  }
+
+  /// 在宿主最高层上绘制填充矩形。
+  #[allow(clippy::too_many_arguments)]
+  pub(crate) fn draw_top_filled_rect(
+    &mut self,
+    canvas: &mut CanvasService,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    fill_char: Option<String>,
+    fill_fg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+  ) {
+    self.draw_filled_rect_target(
+      canvas,
+      Target::Top,
       x,
       y,
       width,
@@ -318,6 +350,36 @@ impl RenderService {
     self.draw_border_rect_target(
       canvas,
       Target::Host,
+      x,
+      y,
+      width,
+      height,
+      border_style,
+      border_fg,
+      border_bg,
+      fill_bg,
+      border_attrs,
+    );
+  }
+
+  /// 在宿主最高层上绘制带样式的边框矩形。
+  #[allow(clippy::too_many_arguments)]
+  pub(crate) fn draw_top_border_rect(
+    &mut self,
+    canvas: &mut CanvasService,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    border_style: &BorderStyle,
+    border_fg: Option<TextColor>,
+    border_bg: Option<TextColor>,
+    fill_bg: Option<TextColor>,
+    border_attrs: Option<TextStyle>,
+  ) {
+    self.draw_border_rect_target(
+      canvas,
+      Target::Top,
       x,
       y,
       width,
@@ -588,6 +650,7 @@ impl RenderService {
         canvas.text_in_scroll_box(id, params);
       }
       Target::Host => canvas.host_text(params),
+      Target::Top => canvas.top_text(params),
     }
   }
 }

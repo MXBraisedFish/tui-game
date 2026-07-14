@@ -1,0 +1,8 @@
+{
+  "screenshot.guide": "f%Screenshot Mode lets you capture the current terminal display.\nDrag to select an area, or double-click to select the entire terminal.\nRight-click the selection to open the menu, then click anywhere outside to close it.\n<fg:bright_red>Note: Screenshot Mode does not pause the current screen.</fg>\nPress {key:host_key.screenshot} again to exit Screenshot Mode.\nOutside Screenshot Mode, quickly press {key:host_key.screenshot} twice to capture the entire terminal.\n<fg:bright_blue>[Guide closes after any action]</fg>",
+  "screenshot.menu.copy": "Copy to Clipboard {key:screenshot.copy}",
+  "screenshot.menu.save_png": "Save as PNG {key:screenshot.save_png}",
+  "screenshot.menu.all": "Copy & Save as PNG {key:screenshot.all}",
+  "screenshot.mode.enter": "Enter Screenshot Mode",
+  "screenshot.mode.exit": "Exit Screenshot Mode"
+}

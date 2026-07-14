@@ -14,7 +14,8 @@ pub use home::{
 pub use overlay::{
   ClearWarningCommand, ClearWarningTarget, ClearWarningUi, ExportFormat, ExportLoadingUi,
   ExportSettingsCommand, ExportSettingsUi, ExportType, LanguageLoadingUi, SafeModeWarningCommand,
-  SafeModeWarningUi, WindowSizeWarningCommand, WindowSizeWarningUi,
+  SafeModeWarningUi, ScreenshotCaptureCommand, ScreenshotCaptureUi, WindowSizeWarningCommand,
+  WindowSizeWarningUi,
 };
 pub(crate) use terminal_check::TerminalCheckLayout;
 pub use terminal_check::{TerminalCheckCommand, TerminalCheckUi};
