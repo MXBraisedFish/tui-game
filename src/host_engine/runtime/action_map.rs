@@ -37,6 +37,7 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => load_home_action_map(services),
     Some(UiNodeKind::Settings) => load_settings_action_map(services),
+    Some(UiNodeKind::DisplaySettings) => load_display_settings_action_map(services),
     Some(UiNodeKind::SecuritySettings) => load_security_settings_action_map(services),
     Some(UiNodeKind::SecurityDetails) => load_security_details_action_map(services),
     Some(UiNodeKind::StorageManagement) => load_storage_management_action_map(services),
@@ -74,6 +75,14 @@ fn load_home_action_map(services: &mut EngineServices) {
 
 fn load_settings_action_map(services: &mut EngineServices) {
   load_action_map(services, &SettingsUi::action_map(), "SettingsUi");
+}
+
+fn load_display_settings_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &DisplaySettingsUi::action_map(),
+    "DisplaySettingsUi",
+  );
 }
 
 fn load_security_settings_action_map(services: &mut EngineServices) {

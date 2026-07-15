@@ -7,6 +7,7 @@ pub(super) fn route_render(
   world: &RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -155,6 +156,7 @@ pub(super) fn route_render(
     world,
     home_ui,
     settings_ui,
+    display_settings_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -184,6 +186,15 @@ pub(super) fn route_render(
     }
     Some(UiNodeKind::Settings) => {
       settings_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::DisplaySettings) => {
+      display_settings_ui.render(
         &mut services.render,
         &mut services.canvas,
         &services.layout,

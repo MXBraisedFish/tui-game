@@ -23,17 +23,17 @@ use crate::host_engine::services::{
   translate_action_map,
 };
 use crate::host_engine::ui::{
-  ClearWarningCommand, ClearWarningTarget, ClearWarningUi, ExportFormat, ExportLoadingUi,
-  ExportSettingsCommand, ExportSettingsUi, ExportType, GameListCommand, GameListUi,
-  GamePackageCommand, GamePackageUi, HomeUi, HomeUiCommand, InputDemoCommand, InputDemoUi,
-  LanguageLoadingUi, LanguageSelectCommand, LanguageSelectUi, ModsCommand, ModsUi,
-  SafeModeWarningCommand, SafeModeWarningUi, ScreensaverPackageCommand, ScreensaverPackageUi,
-  ScreenshotCaptureCommand, ScreenshotCaptureUi, SecurityDetailsCommand, SecurityDetailsUi,
-  SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
-  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
-  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
-  StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
-  TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
+  ClearWarningCommand, ClearWarningTarget, ClearWarningUi, DisplaySettingsCommand,
+  DisplaySettingsUi, ExportFormat, ExportLoadingUi, ExportSettingsCommand, ExportSettingsUi,
+  ExportType, GameListCommand, GameListUi, GamePackageCommand, GamePackageUi, HomeUi,
+  HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
+  LanguageSelectUi, ModsCommand, ModsUi, SafeModeWarningCommand, SafeModeWarningUi,
+  ScreensaverPackageCommand, ScreensaverPackageUi, ScreenshotCaptureCommand, ScreenshotCaptureUi,
+  SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi,
+  SettingsUi, SettingsUiCommand, StorageManagementClearCommand, StorageManagementClearUi,
+  StorageManagementCommand, StorageManagementExportCommand, StorageManagementExportUi,
+  StorageManagementUi, StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand,
+  TerminalCheckLayout, TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 use std::time::Duration;
 
@@ -166,6 +166,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let registry = services.i18n.language_registry().to_vec();
   let mut home_ui = HomeUi::init(&services.hit_area);
   let mut settings_ui = SettingsUi::init(&services.hit_area);
+  let mut display_settings_ui = DisplaySettingsUi::init(&services.hit_area);
   let mut security_uis = SecurityUis {
     settings: SecuritySettingsUi::init(&services.hit_area),
     details: SecurityDetailsUi::init(
@@ -288,6 +289,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut display_settings_ui,
       &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
@@ -313,6 +315,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut display_settings_ui,
       &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
@@ -362,6 +365,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut display_settings_ui,
       &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
@@ -396,6 +400,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       world,
       &mut home_ui,
       &mut settings_ui,
+      &mut display_settings_ui,
       &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
@@ -548,6 +553,7 @@ fn route_frame_input(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -590,6 +596,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -620,6 +627,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -649,6 +657,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -735,6 +744,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -760,6 +770,7 @@ fn route_frame_input(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,

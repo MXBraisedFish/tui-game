@@ -7,6 +7,7 @@ pub(super) fn current_objects_mut<'a>(
   world: &RuntimeWorld,
   home_ui: &'a mut HomeUi,
   settings_ui: &'a mut SettingsUi,
+  display_settings_ui: &'a mut DisplaySettingsUi,
   security_uis: &'a mut SecurityUis,
   storage_management_ui: &'a mut StorageManagementUi,
   storage_management_clear_ui: &'a mut StorageManagementClearUi,
@@ -23,6 +24,7 @@ pub(super) fn current_objects_mut<'a>(
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => Some(home_ui.objects_mut()),
     Some(UiNodeKind::Settings) => Some(settings_ui.objects_mut()),
+    Some(UiNodeKind::DisplaySettings) => Some(display_settings_ui.objects_mut()),
     Some(UiNodeKind::SecuritySettings) => Some(security_uis.settings.objects_mut()),
     Some(UiNodeKind::SecurityDetails) => Some(security_uis.details.objects_mut()),
     Some(UiNodeKind::StorageManagement) => Some(storage_management_ui.objects_mut()),
@@ -45,6 +47,7 @@ pub(super) fn deactivate_hidden_pools(
   world: &RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -78,6 +81,10 @@ pub(super) fn deactivate_hidden_pools(
   };
   deactivate(UiNodeKind::Home, home_ui.objects_mut());
   deactivate(UiNodeKind::Settings, settings_ui.objects_mut());
+  deactivate(
+    UiNodeKind::DisplaySettings,
+    display_settings_ui.objects_mut(),
+  );
   deactivate(
     UiNodeKind::SecuritySettings,
     security_uis.settings.objects_mut(),
@@ -157,6 +164,7 @@ pub(super) fn route_text_input_events(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -181,6 +189,7 @@ pub(super) fn route_text_input_events(
           world,
           home_ui,
           settings_ui,
+          display_settings_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -205,6 +214,7 @@ pub(super) fn route_text_input_events(
           world,
           home_ui,
           settings_ui,
+          display_settings_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -225,6 +235,7 @@ pub(super) fn route_text_input_events(
           world,
           home_ui,
           settings_ui,
+          display_settings_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -248,6 +259,7 @@ pub(super) fn route_text_input_events(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -273,6 +285,7 @@ pub(super) fn route_input_events(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -339,6 +352,7 @@ pub(super) fn route_input_events(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -361,6 +375,7 @@ pub(super) fn route_input_events(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -394,6 +409,7 @@ pub(super) fn route_input_events(
           world,
           home_ui,
           settings_ui,
+          display_settings_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -423,6 +439,7 @@ pub(super) fn route_input_events(
           world,
           home_ui,
           settings_ui,
+          display_settings_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -443,6 +460,7 @@ pub(super) fn route_input_events(
           world,
           home_ui,
           settings_ui,
+          display_settings_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -474,6 +492,7 @@ pub(super) fn route_update(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -521,6 +540,9 @@ pub(super) fn route_update(
     Some(UiNodeKind::Settings) => {
       let _ = settings_ui.update(world.clock.delta_time());
     }
+    Some(UiNodeKind::DisplaySettings) => {
+      let _ = display_settings_ui.update(world.clock.delta_time());
+    }
     Some(UiNodeKind::SecuritySettings) => {
       security_uis.settings.update(world.clock.delta_time());
     }
@@ -567,6 +589,7 @@ pub(super) fn route_update(
     world,
     home_ui,
     settings_ui,
+    display_settings_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -723,6 +746,7 @@ fn route_component_mouse(
   world: &RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -741,6 +765,7 @@ fn route_component_mouse(
     world,
     home_ui,
     settings_ui,
+    display_settings_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -785,6 +810,7 @@ fn route_mouse_and_events(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -808,6 +834,7 @@ fn route_mouse_and_events(
     world,
     home_ui,
     settings_ui,
+    display_settings_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -827,6 +854,7 @@ fn route_mouse_and_events(
     world,
     home_ui,
     settings_ui,
+    display_settings_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -852,6 +880,7 @@ fn route_component_events(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -874,6 +903,7 @@ fn route_component_events(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -895,6 +925,7 @@ fn route_component_events(
       world,
       home_ui,
       settings_ui,
+      display_settings_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -924,6 +955,7 @@ fn route_input_event(
   world: &mut RuntimeWorld,
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
+  display_settings_ui: &mut DisplaySettingsUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -956,6 +988,11 @@ fn route_input_event(
     Some(UiNodeKind::Settings) => {
       if let Some(command) = settings_ui.handle_event(event) {
         apply_settings_command(command, settings_ui, security_uis, services, world);
+      }
+    }
+    Some(UiNodeKind::DisplaySettings) => {
+      if let Some(command) = display_settings_ui.handle_event(event) {
+        apply_display_settings_command(command, display_settings_ui, services, world);
       }
     }
     Some(UiNodeKind::SecuritySettings) => {

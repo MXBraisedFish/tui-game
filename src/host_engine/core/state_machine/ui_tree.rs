@@ -18,6 +18,7 @@ pub enum UiNodeKind {
   Root,
   Home,
   Settings,
+  DisplaySettings,
   SecuritySettings,
   SecurityDetails,
   LanguageSelect,
@@ -61,6 +62,14 @@ impl UiNodeState {
   pub fn settings() -> Self {
     Self {
       kind: UiNodeKind::Settings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn display_settings() -> Self {
+    Self {
+      kind: UiNodeKind::DisplaySettings,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

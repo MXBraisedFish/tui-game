@@ -88,6 +88,24 @@ pub(super) fn apply_settings_command(
         .set_defaults(defaults.enabled, defaults.debug, defaults.safe_mode);
       world.state.enter_ui_node(UiNodeState::security_settings())
     }
+    SettingsUiCommand::OpenDisplaySettings => {
+      world.state.enter_ui_node(UiNodeState::display_settings())
+    }
+  }
+}
+
+pub(super) fn apply_display_settings_command(
+  command: DisplaySettingsCommand,
+  display_settings_ui: &mut DisplaySettingsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    DisplaySettingsCommand::Back => {
+      world.state.pop_ui_node();
+      clear_exiting_pool(display_settings_ui.objects_mut(), services);
+      *display_settings_ui = DisplaySettingsUi::init(&services.hit_area);
+    }
   }
 }
 

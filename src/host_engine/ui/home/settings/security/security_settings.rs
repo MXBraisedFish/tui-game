@@ -174,6 +174,7 @@ impl SecuritySettingsUi {
     let hint_y = viewport.y.saturating_add(viewport.height.saturating_sub(1));
     let rows = self.rows(i18n, layout);
     let widths: [u16; ROW_LEN] = std::array::from_fn(|i| layout.get_text_width(&rows[i], None));
+    let default_row_width = self.default_row_width(i18n, layout);
     let start_y = title_y.saturating_add(1).saturating_add(
       hint_y
         .saturating_sub(title_y)
@@ -194,10 +195,14 @@ impl SecuritySettingsUi {
     );
     hit_area.render_host(&mut self.objects, self.back_area, viewport, canvas);
     for (index, row) in rows.iter().enumerate() {
-      let x =
-        viewport
-          .x
-          .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, widths[index], 0));
+      let width = if index >= DEFAULT_START {
+        default_row_width
+      } else {
+        widths[index]
+      };
+      let x = viewport
+        .x
+        .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, width, 0));
       let y = start_y.saturating_add(index as u16);
       render.draw_host_text(
         canvas,
@@ -215,7 +220,7 @@ impl SecuritySettingsUi {
           Rect {
             x,
             y,
-            width: widths[index],
+            width,
             height: 1,
           },
           canvas,
@@ -285,6 +290,12 @@ impl SecuritySettingsUi {
       .map(|label| layout.get_text_width(label, None))
       .max()
       .unwrap_or_default();
+    let bracket_width = (DEFAULT_START..ROW_LEN)
+      .filter_map(|index| self.value_key(index))
+      .map(|key| layout.get_text_width(&i18n.get_runtime_text(NS, key), None))
+      .max()
+      .unwrap_or_default()
+      .saturating_add(2);
     std::array::from_fn(|index| {
       let focused = index == self.selected_index;
       let label_color = if focused { "bright_cyan" } else { "white" };
@@ -293,15 +304,41 @@ impl SecuritySettingsUi {
       let Some(key) = self.value_key(index) else {
         return format!("f%<fg:{label_color}>{prefix}{}{suffix}</fg>", labels[index]);
       };
+      let prefix = if focused { "❯ " } else { "  " };
+      let suffix = if focused { " ❮" } else { "  " };
       let width = layout.get_text_width(&labels[index], None);
-      let padding = " ".repeat(label_width.saturating_sub(width) as usize);
       let value = i18n.get_runtime_text(NS, key);
+      let current_bracket_width = layout.get_text_width(&value, None).saturating_add(2);
+      let padding = " ".repeat(
+        label_width
+          .saturating_sub(width)
+          .saturating_add(bracket_width.saturating_sub(current_bracket_width)) as usize,
+      );
       format!(
         "f%<fg:{label_color}>{prefix}{}{padding}  </fg><fg:white>[</fg><fg:{}>{value}</fg><fg:white>]</fg><fg:{label_color}>{suffix}</fg>",
         labels[index],
         value_color(key),
       )
     })
+  }
+
+  fn default_row_width(&self, i18n: &I18nService, layout: &LayoutService) -> u16 {
+    let label_width = LABEL_KEYS
+      .iter()
+      .skip(DEFAULT_START)
+      .map(|key| layout.get_text_width(&i18n.get_runtime_text(NS, key), None))
+      .max()
+      .unwrap_or_default();
+    let bracket_width = (DEFAULT_START..ROW_LEN)
+      .filter_map(|index| self.value_key(index))
+      .map(|key| layout.get_text_width(&i18n.get_runtime_text(NS, key), None))
+      .max()
+      .unwrap_or_default()
+      .saturating_add(2);
+    label_width
+      .saturating_add(2)
+      .saturating_add(bracket_width)
+      .saturating_add(4)
   }
 
   fn value_key(&self, index: usize) -> Option<&'static str> {

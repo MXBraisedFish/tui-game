@@ -9,6 +9,7 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "home",
   "host_key",
   "settings",
+  "display_settings",
   "terminal",
   "language",
   "mods",

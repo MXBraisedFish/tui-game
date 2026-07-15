@@ -7,6 +7,7 @@ use crate::host_engine::services::{
   UiObjectPoolOwner,
 };
 
+pub mod display_settings;
 pub mod language;
 pub mod mods;
 pub mod security;
@@ -71,6 +72,7 @@ pub enum SettingsUiCommand {
   OpenMods,
   OpenStorageManagement,
   OpenSecuritySettings,
+  OpenDisplaySettings,
 }
 
 impl SettingsUi {
@@ -170,6 +172,7 @@ impl SettingsUi {
           2 => Some(SettingsUiCommand::OpenMods),
           3 => Some(SettingsUiCommand::OpenStorageManagement),
           4 => Some(SettingsUiCommand::OpenSecuritySettings),
+          5 => Some(SettingsUiCommand::OpenDisplaySettings),
           _ => None,
         }
       }
@@ -191,6 +194,7 @@ impl SettingsUi {
           2 => Some(SettingsUiCommand::OpenMods),
           3 => Some(SettingsUiCommand::OpenStorageManagement),
           4 => Some(SettingsUiCommand::OpenSecuritySettings),
+          5 => Some(SettingsUiCommand::OpenDisplaySettings),
           _ => None,
         },
         "settings.back" => Some(SettingsUiCommand::Back),
