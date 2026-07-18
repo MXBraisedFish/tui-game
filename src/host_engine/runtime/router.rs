@@ -8,6 +8,7 @@ pub(super) fn current_objects_mut<'a>(
   home_ui: &'a mut HomeUi,
   settings_ui: &'a mut SettingsUi,
   display_settings_ui: &'a mut DisplaySettingsUi,
+  screensaver_list_ui: &'a mut ScreensaverListUi,
   security_uis: &'a mut SecurityUis,
   storage_management_ui: &'a mut StorageManagementUi,
   storage_management_clear_ui: &'a mut StorageManagementClearUi,
@@ -25,6 +26,7 @@ pub(super) fn current_objects_mut<'a>(
     Some(UiNodeKind::Home) => Some(home_ui.objects_mut()),
     Some(UiNodeKind::Settings) => Some(settings_ui.objects_mut()),
     Some(UiNodeKind::DisplaySettings) => Some(display_settings_ui.objects_mut()),
+    Some(UiNodeKind::ScreensaverList) => Some(screensaver_list_ui.objects_mut()),
     Some(UiNodeKind::SecuritySettings) => Some(security_uis.settings.objects_mut()),
     Some(UiNodeKind::SecurityDetails) => Some(security_uis.details.objects_mut()),
     Some(UiNodeKind::StorageManagement) => Some(storage_management_ui.objects_mut()),
@@ -48,6 +50,7 @@ pub(super) fn deactivate_hidden_pools(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -84,6 +87,10 @@ pub(super) fn deactivate_hidden_pools(
   deactivate(
     UiNodeKind::DisplaySettings,
     display_settings_ui.objects_mut(),
+  );
+  deactivate(
+    UiNodeKind::ScreensaverList,
+    screensaver_list_ui.objects_mut(),
   );
   deactivate(
     UiNodeKind::SecuritySettings,
@@ -165,6 +172,7 @@ pub(super) fn route_text_input_events(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -190,6 +198,7 @@ pub(super) fn route_text_input_events(
           home_ui,
           settings_ui,
           display_settings_ui,
+          screensaver_list_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -215,6 +224,7 @@ pub(super) fn route_text_input_events(
           home_ui,
           settings_ui,
           display_settings_ui,
+          screensaver_list_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -236,6 +246,7 @@ pub(super) fn route_text_input_events(
           home_ui,
           settings_ui,
           display_settings_ui,
+          screensaver_list_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -260,6 +271,7 @@ pub(super) fn route_text_input_events(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -286,6 +298,7 @@ pub(super) fn route_input_events(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -353,6 +366,7 @@ pub(super) fn route_input_events(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -376,6 +390,7 @@ pub(super) fn route_input_events(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -410,6 +425,7 @@ pub(super) fn route_input_events(
           home_ui,
           settings_ui,
           display_settings_ui,
+          screensaver_list_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -440,6 +456,7 @@ pub(super) fn route_input_events(
           home_ui,
           settings_ui,
           display_settings_ui,
+          screensaver_list_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -461,6 +478,7 @@ pub(super) fn route_input_events(
           home_ui,
           settings_ui,
           display_settings_ui,
+          screensaver_list_ui,
           security_uis,
           storage_management_ui,
           storage_management_clear_ui,
@@ -493,6 +511,7 @@ pub(super) fn route_update(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -543,6 +562,9 @@ pub(super) fn route_update(
     Some(UiNodeKind::DisplaySettings) => {
       let _ = display_settings_ui.update(world.clock.delta_time());
     }
+    Some(UiNodeKind::ScreensaverList) => {
+      let _ = screensaver_list_ui.update(world.clock.delta_time());
+    }
     Some(UiNodeKind::SecuritySettings) => {
       security_uis.settings.update(world.clock.delta_time());
     }
@@ -590,6 +612,7 @@ pub(super) fn route_update(
     home_ui,
     settings_ui,
     display_settings_ui,
+    screensaver_list_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -747,6 +770,7 @@ fn route_component_mouse(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -766,6 +790,7 @@ fn route_component_mouse(
     home_ui,
     settings_ui,
     display_settings_ui,
+    screensaver_list_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -811,6 +836,7 @@ fn route_mouse_and_events(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -835,6 +861,7 @@ fn route_mouse_and_events(
     home_ui,
     settings_ui,
     display_settings_ui,
+    screensaver_list_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -855,6 +882,7 @@ fn route_mouse_and_events(
     home_ui,
     settings_ui,
     display_settings_ui,
+    screensaver_list_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -881,6 +909,7 @@ fn route_component_events(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -904,6 +933,7 @@ fn route_component_events(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -926,6 +956,7 @@ fn route_component_events(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -956,6 +987,7 @@ fn route_input_event(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -993,6 +1025,11 @@ fn route_input_event(
     Some(UiNodeKind::DisplaySettings) => {
       if let Some(command) = display_settings_ui.handle_event(event) {
         apply_display_settings_command(command, display_settings_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::ScreensaverList) => {
+      if let Some(command) = screensaver_list_ui.handle_event(event) {
+        apply_screensaver_list_command(command, screensaver_list_ui, services, world);
       }
     }
     Some(UiNodeKind::SecuritySettings) => {
@@ -1091,7 +1128,7 @@ pub(super) fn handle_host_key_action(
   world: &mut RuntimeWorld,
 ) -> bool {
   match action {
-    HOST_KEY_SCREENSHOT | HOST_KEY_RECORDING => true,
+    HOST_KEY_SCREENSHOT | HOST_KEY_RECORDING | HOST_KEY_SCREENSAVER => true,
     HOST_KEY_FORCE_STOP => {
       if state == KeyState::Pressed {
         world.state.enter_shutdown();

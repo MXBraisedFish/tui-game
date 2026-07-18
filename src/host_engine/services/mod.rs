@@ -59,7 +59,9 @@ pub use log::{LogService, LogSource};
 pub use lua::LuaService;
 pub use network::NetworkService;
 pub use overlay::OverlayService;
-pub use package::{PackageAsset, PackageEvent, PackageListEntry, PackageService, PackageSource};
+pub use package::{
+  PackageAsset, PackageEvent, PackageListEntry, PackageService, PackageSource, PackageType,
+};
 pub use random::RandomService;
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{ComposedCell, ComposedFrame, FrameCompositor, FramePresenter};
@@ -68,8 +70,9 @@ pub use rich_text::{
 };
 pub use screenshot::{ScreenshotAsyncEvent, ScreenshotRect, ScreenshotService, ScreenshotTask};
 pub use storage::{
-  GamePackageState, PackageDefaultState, SafeModeDefault, ScreensaverPackageState,
-  ScreenshotProfile, StorageService,
+  DisplayFpsLimit, DisplayLogoMode, DisplayOrderMode, DisplaySettingsProfile, DisplaySourceMode,
+  GamePackageState, PackageDefaultState, PackageStateProfile, SafeModeDefault,
+  ScreensaverPackageState, ScreenshotProfile, StorageService,
 };
 pub use terminal::TerminalService;
 pub use text_layout::DrawTextParams;

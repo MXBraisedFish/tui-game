@@ -63,6 +63,7 @@ impl WindowSizeWarningUi {
     current_width: u16,
     current_height: u16,
     is_host_mode: bool,
+    is_screensaver: bool,
   ) {
     draw_content(
       render,
@@ -74,6 +75,7 @@ impl WindowSizeWarningUi {
       current_width,
       current_height,
       is_host_mode,
+      is_screensaver,
     );
     hit_area.render_host(
       &mut self.objects,
@@ -138,6 +140,7 @@ pub fn compute_positions(
   current_width: u16,
   current_height: u16,
   is_host_mode: bool,
+  is_screensaver: bool,
 ) -> WindowSizeWarningLayout {
   let title = i18n.get_runtime_text("window_size", "window_size.title");
   let tip = i18n.get_runtime_text("window_size", "window_size.tip");
@@ -170,7 +173,9 @@ pub fn compute_positions(
   let current_x = centered_x(layout, &current_line);
   let current_y = content_start_y + 2;
   let key_params = build_key_params();
-  let hint_key = if is_host_mode {
+  let hint_key = if is_screensaver {
+    "window_size.action.exit.screensaver"
+  } else if is_host_mode {
     "window_size.action.exit.host"
   } else {
     "window_size.action.exit.game"
@@ -204,6 +209,7 @@ fn draw_content(
   current_width: u16,
   current_height: u16,
   is_host_mode: bool,
+  is_screensaver: bool,
 ) {
   let positions = compute_positions(
     layout,
@@ -213,6 +219,7 @@ fn draw_content(
     current_width,
     current_height,
     is_host_mode,
+    is_screensaver,
   );
   let key_params = build_key_params();
 

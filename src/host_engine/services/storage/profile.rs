@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fs, io};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::{Map, Value};
 
 use super::layout;
 use super::service::StorageService;
@@ -32,6 +33,58 @@ pub struct PackageStateProfile {
 pub struct ScreenshotProfile {
   #[serde(default)]
   pub guide_seen: bool,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DisplayLogoMode {
+  Random,
+  Order,
+  Neon,
+  Sign,
+  Water,
+  Error,
+  Glitch,
+  Building,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DisplaySourceMode {
+  All,
+  Mod,
+  Official,
+  No,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DisplayOrderMode {
+  Random,
+  Order,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DisplayFpsLimit {
+  Fps30,
+  Fps60,
+  Fps120,
+  Unlimited,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DisplaySettingsProfile {
+  pub logo_mode: DisplayLogoMode,
+  pub top_toolbar: bool,
+  pub top_toolbar_custom: bool,
+  pub screensaver_source: DisplaySourceMode,
+  pub screensaver_order: DisplayOrderMode,
+  #[serde(default)]
+  pub screensaver_sequence_cursor: u64,
+  pub game_list_source: DisplaySourceMode,
+  pub game_list_warnings: bool,
+  pub game_list_fps: DisplayFpsLimit,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -73,6 +126,10 @@ pub struct ScreensaverPackageState {
 
   #[serde(default)]
   pub debug: bool,
+
+  /// 已启用屏保的显示顺序；未启用时不参与排序。
+  #[serde(default)]
+  pub order: Option<u32>,
 }
 
 impl Default for GamePackageState {
@@ -90,6 +147,23 @@ impl Default for ScreensaverPackageState {
     Self {
       enabled: true,
       debug: false,
+      order: None,
+    }
+  }
+}
+
+impl Default for DisplaySettingsProfile {
+  fn default() -> Self {
+    Self {
+      logo_mode: DisplayLogoMode::Random,
+      top_toolbar: true,
+      top_toolbar_custom: true,
+      screensaver_source: DisplaySourceMode::All,
+      screensaver_order: DisplayOrderMode::Random,
+      screensaver_sequence_cursor: 0,
+      game_list_source: DisplaySourceMode::All,
+      game_list_warnings: true,
+      game_list_fps: DisplayFpsLimit::Fps60,
     }
   }
 }
@@ -168,6 +242,121 @@ impl StorageService {
   /// 返回默认语言代码。
   pub fn default_language_code(&self) -> &'static str {
     layout::DEFAULT_LANGUAGE_CODE
+  }
+
+  pub fn display_settings_profile(&self) -> &DisplaySettingsProfile {
+    &self.display_settings
+  }
+
+  pub fn reload_display_settings_profile(
+    &mut self,
+    log: &mut LogService,
+  ) -> DisplaySettingsProfile {
+    let path = self.profile_display_settings_path();
+    let mut values = read_json_object(&path);
+    let mut repaired = false;
+    let defaults = DisplaySettingsProfile::default();
+    let profile = DisplaySettingsProfile {
+      logo_mode: read_profile_field(&mut values, "logo_mode", defaults.logo_mode, &mut repaired),
+      top_toolbar: read_profile_field(
+        &mut values,
+        "top_toolbar",
+        defaults.top_toolbar,
+        &mut repaired,
+      ),
+      top_toolbar_custom: read_profile_field(
+        &mut values,
+        "top_toolbar_custom",
+        defaults.top_toolbar_custom,
+        &mut repaired,
+      ),
+      screensaver_source: read_profile_field(
+        &mut values,
+        "screensaver_source",
+        defaults.screensaver_source,
+        &mut repaired,
+      ),
+      screensaver_order: read_profile_field(
+        &mut values,
+        "screensaver_order",
+        defaults.screensaver_order,
+        &mut repaired,
+      ),
+      screensaver_sequence_cursor: read_profile_field(
+        &mut values,
+        "screensaver_sequence_cursor",
+        defaults.screensaver_sequence_cursor,
+        &mut repaired,
+      ),
+      game_list_source: read_profile_field(
+        &mut values,
+        "game_list_source",
+        defaults.game_list_source,
+        &mut repaired,
+      ),
+      game_list_warnings: read_profile_field(
+        &mut values,
+        "game_list_warnings",
+        defaults.game_list_warnings,
+        &mut repaired,
+      ),
+      game_list_fps: read_profile_field(
+        &mut values,
+        "game_list_fps",
+        defaults.game_list_fps,
+        &mut repaired,
+      ),
+    };
+
+    if repaired {
+      write_json_object(&path, &values, log, "display settings profile");
+    }
+    self.display_settings = profile.clone();
+    profile
+  }
+
+  pub fn write_display_settings_profile(
+    &mut self,
+    profile: &DisplaySettingsProfile,
+    log: &mut LogService,
+  ) -> io::Result<()> {
+    let path = self.profile_display_settings_path();
+    let mut values = read_json_object(&path);
+    set_profile_field(&mut values, "logo_mode", profile.logo_mode);
+    set_profile_field(&mut values, "top_toolbar", profile.top_toolbar);
+    set_profile_field(
+      &mut values,
+      "top_toolbar_custom",
+      profile.top_toolbar_custom,
+    );
+    set_profile_field(
+      &mut values,
+      "screensaver_source",
+      profile.screensaver_source,
+    );
+    set_profile_field(&mut values, "screensaver_order", profile.screensaver_order);
+    set_profile_field(
+      &mut values,
+      "screensaver_sequence_cursor",
+      profile.screensaver_sequence_cursor,
+    );
+    set_profile_field(&mut values, "game_list_source", profile.game_list_source);
+    set_profile_field(
+      &mut values,
+      "game_list_warnings",
+      profile.game_list_warnings,
+    );
+    set_profile_field(&mut values, "game_list_fps", profile.game_list_fps);
+    let content = serde_json::to_string_pretty(&values).map_err(io::Error::other)?;
+    fs::write(&path, content).map_err(|error| {
+      log.warn(
+        LogSource::Storage,
+        format!("Failed to write display settings profile: {error}"),
+      );
+      error
+    })?;
+    self.display_settings = profile.clone();
+    Ok(())
   }
 
   /// 从文件读取终端配置。
@@ -310,6 +499,7 @@ impl StorageService {
     let initial = ScreensaverPackageState {
       enabled: profile.defaults.enabled,
       debug: profile.defaults.debug,
+      order: None,
     };
     f(profile
       .screensavers
@@ -379,6 +569,57 @@ impl StorageService {
   }
 }
 
+fn read_json_object(path: &std::path::Path) -> Map<String, Value> {
+  fs::read_to_string(path)
+    .ok()
+    .and_then(|content| serde_json::from_str::<Value>(&content).ok())
+    .and_then(|value| value.as_object().cloned())
+    .unwrap_or_default()
+}
+
+fn read_profile_field<T>(
+  values: &mut Map<String, Value>,
+  key: &str,
+  default: T,
+  repaired: &mut bool,
+) -> T
+where
+  T: Clone + DeserializeOwned + Serialize,
+{
+  if let Some(value) = values
+    .get(key)
+    .and_then(|value| serde_json::from_value(value.clone()).ok())
+  {
+    return value;
+  }
+  set_profile_field(values, key, default.clone());
+  *repaired = true;
+  default
+}
+
+fn set_profile_field<T: Serialize>(values: &mut Map<String, Value>, key: &str, value: T) {
+  if let Ok(value) = serde_json::to_value(value) {
+    values.insert(key.to_string(), value);
+  }
+}
+
+fn write_json_object(
+  path: &std::path::Path,
+  values: &Map<String, Value>,
+  log: &mut LogService,
+  name: &str,
+) {
+  let result = serde_json::to_string_pretty(values)
+    .map_err(io::Error::other)
+    .and_then(|content| fs::write(path, content));
+  if let Err(error) = result {
+    log.warn(
+      LogSource::Storage,
+      format!("Failed to repair {name}: {error}"),
+    );
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -433,6 +674,7 @@ mod tests {
       Some(&ScreensaverPackageState {
         enabled: false,
         debug: true,
+        order: None,
       })
     );
   }
@@ -488,5 +730,61 @@ mod tests {
     )
     .unwrap();
     assert_eq!(profile.defaults.safe_mode, SafeModeDefault::OffPermanent);
+  }
+
+  #[test]
+  fn display_settings_repairs_only_missing_or_invalid_fields() {
+    let mut storage = temp_storage("display_settings_repair");
+    let mut log = LogService::new();
+    fs::write(
+      storage.profile_display_settings_path(),
+      r#"{
+        "logo_mode": "neon",
+        "top_toolbar": "invalid",
+        "game_list_source": "mod",
+        "custom_field": 7
+      }"#,
+    )
+    .unwrap();
+
+    let profile = storage.reload_display_settings_profile(&mut log);
+    assert_eq!(profile.logo_mode, DisplayLogoMode::Neon);
+    assert!(profile.top_toolbar);
+    assert_eq!(profile.game_list_source, DisplaySourceMode::Mod);
+    assert!(profile.game_list_warnings);
+
+    let json: Value =
+      serde_json::from_str(&fs::read_to_string(storage.profile_display_settings_path()).unwrap())
+        .unwrap();
+    assert_eq!(json["custom_field"], 7);
+    assert_eq!(json["top_toolbar"], true);
+    assert_eq!(json["screensaver_source"], "all");
+  }
+
+  #[test]
+  fn display_settings_write_updates_cache_and_preserves_unknown_fields() {
+    let mut storage = temp_storage("display_settings_write");
+    let mut log = LogService::new();
+    fs::write(
+      storage.profile_display_settings_path(),
+      r#"{"custom_field":"keep"}"#,
+    )
+    .unwrap();
+    let profile = DisplaySettingsProfile {
+      game_list_source: DisplaySourceMode::Official,
+      game_list_warnings: false,
+      ..Default::default()
+    };
+
+    storage
+      .write_display_settings_profile(&profile, &mut log)
+      .unwrap();
+    assert_eq!(storage.display_settings_profile(), &profile);
+    let json: Value =
+      serde_json::from_str(&fs::read_to_string(storage.profile_display_settings_path()).unwrap())
+        .unwrap();
+    assert_eq!(json["custom_field"], "keep");
+    assert_eq!(json["game_list_source"], "official");
+    assert_eq!(json["game_list_warnings"], false);
   }
 }

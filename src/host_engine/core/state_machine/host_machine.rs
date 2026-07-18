@@ -234,6 +234,19 @@ impl HostMachineState {
     }
   }
 
+  pub fn push_screensaver_overlay(&mut self, min_width: u32, min_height: u32) {
+    if let Some(runtime) = self.runtime_mut() {
+      runtime.overlays_mut().push(OverlayState {
+        kind: OverlayKind::Screensaver,
+        logic: super::OverlayLogicState,
+        render: super::OverlayRenderState {
+          required_width: min_width,
+          required_height: min_height,
+        },
+      });
+    }
+  }
+
   /// 弹出当前覆盖层的顶部项
   pub fn pop_overlay(&mut self) -> Option<OverlayState> {
     self.runtime_mut()?.overlays_mut().pop()

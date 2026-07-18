@@ -1,46 +1,42 @@
 {
   "display_settings.title": "Display Settings",
-
   "display_settings.logo.random": "Logo Display",
   "display_settings.tool.top_toolbar": "Top Toolbar",
-
+  "display_settings.tool.top_toolbar.custom": "Toolbar Customization",
   "display_settings.screensaver.source": "Screensaver Source",
   "display_settings.screensaver.random": "Screensaver Order",
-
   "display_settings.game_list.source": "Game Source",
   "display_settings.game_list.error": "Game Warnings",
-
+  "display_settings.game_list.fps": "Show FPS Limit",
   "display_settings.action.select": "{key:display_settings.focus_up}/{key:display_settings.focus_down} Select",
-  "display_settings.action.focus": "{key:display_settings.focus_logo_random}/{key:display_settings.focus_tool_top_toolbar}/{key:display_settings.focus_screensaver_source}/{key:display_settings.focus_screensaver_random}/{key:display_settings.focus_game_list_source}/{key:display_settings.focus_game_list_error} Focus",
+  "display_settings.action.focus": "{key:display_settings.focus_logo_random}/{key:display_settings.focus_tool_top_toolbar}/{key:display_settings.top_toolbar_custom}/{key:display_settings.focus_screensaver_source}/{key:display_settings.focus_screensaver_random}/{key:display_settings.focus_game_list_source}/{key:display_settings.focus_game_list_error}/{key:display_settings.focus_fps} Focus",
   "display_settings.action.back": "{key:display_settings.back} Back",
   "display_settings.action.type.select": "{key:display_settings.confirm} Switch",
-
+  "display_settings.game_list.fps.30": "30",
+  "display_settings.game_list.fps.60": "60",
+  "display_settings.game_list.fps.120": "120",
+  "display_settings.game_list.fps.unlimited": "Unlimited",
   "display_settings.game_list.error.yes": "Show",
   "display_settings.game_list.error.no": "Hide",
-
   "display_settings.logo.random.random": "Random",
   "display_settings.logo.random.order": "Sequential",
-
+  "display_settings.logo.random.default": "Default",
   "display_settings.logo.random.only.neon": "Neon",
   "display_settings.logo.random.only.sign": "Sign",
   "display_settings.logo.random.only.water": "Water",
   "display_settings.logo.random.only.error": "Error",
   "display_settings.logo.random.only.glitch": "Glitch",
-  "display_settings.logo.random.only.building": "Building",
-
+  "display_settings.logo.random.only.select": "Select",
   "display_settings.tool.top_toolbar.on": "On",
   "display_settings.tool.top_toolbar.off": "Off",
-
   "display_settings.screensaver.source.all": "Official & Mods",
   "display_settings.screensaver.source.mod": "Mods Only",
   "display_settings.screensaver.source.official": "Official Only",
   "display_settings.screensaver.source.no": "Hidden",
-
   "display_settings.game_list.source.all": "Official & Mods",
   "display_settings.game_list.source.mod": "Mods Only",
   "display_settings.game_list.source.official": "Official Only",
   "display_settings.game_list.source.no": "Hidden",
-
   "display_settings.screensaver.random.random": "Random",
   "display_settings.screensaver.random.order": "Sequential"
 }

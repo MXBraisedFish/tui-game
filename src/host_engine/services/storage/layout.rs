@@ -38,6 +38,8 @@ pub const PROFILE_PACKAGE_STATE_FILE: &str = "data/profiles/package_state.json";
 
 pub const PROFILE_SCREENSHOT_FILE: &str = "data/profiles/screenshot_profile.json";
 
+pub const PROFILE_DISPLAY_SETTINGS_FILE: &str = "data/profiles/display_settings.json";
+
 pub const TUI_LOG_FILE: &str = "data/log/tui_log.txt";
 
 pub const DEFAULT_LANGUAGE_CODE: &str = "en_us";
@@ -73,6 +75,10 @@ pub const DEFAULT_FILES: &[(&str, &str)] = &[
     r#"{"games":{},"screensavers":{}}"#,
   ),
   (PROFILE_SCREENSHOT_FILE, r#"{"guide_seen":false}"#),
+  (
+    PROFILE_DISPLAY_SETTINGS_FILE,
+    r#"{"logo_mode":"random","top_toolbar":true,"top_toolbar_custom":true,"screensaver_source":"all","screensaver_order":"random","screensaver_sequence_cursor":0,"game_list_source":"all","game_list_warnings":true,"game_list_fps":"fps60"}"#,
+  ),
   (TUI_LOG_FILE, ""),
   (LANGUAGE_REGISTRY_FILE, "{}"),
 ];

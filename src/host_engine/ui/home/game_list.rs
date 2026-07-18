@@ -4,14 +4,14 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
-  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
-  HitAreaOptions, HitAreaService, I18nService, ImageService, KeyState, LayoutService, LogService,
-  MouseButton, Overflow, PackageListEntry, PackageService, PackageSource, Rect, RenderService,
-  RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxId,
-  ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, StorageService,
-  TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent, TextInputId,
-  TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent,
-  UiObjectPool, UiObjectPoolOwner,
+  ActionMapEntry, BorderStyle, CanvasService, DisplaySourceMode, DrawTextParams, HitAreaEvent,
+  HitAreaId, HitAreaOptions, HitAreaService, I18nService, ImageService, KeyState, LayoutService,
+  LogService, MouseButton, Overflow, PackageListEntry, PackageService, PackageSource, Rect,
+  RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
+  ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility,
+  StorageService, TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent,
+  TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle,
+  UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 /// 游戏列表页面的命令。
@@ -105,6 +105,8 @@ pub struct GameListUi {
   search_text: String,
   jump_text: String,
   simple_list: bool,
+  source_mode: DisplaySourceMode,
+  show_warnings: bool,
   temporary_safe_mode_disabled: HashSet<String>,
   needs_rebuild_areas: bool,
 }
@@ -202,6 +204,8 @@ impl GameListUi {
       search_text: String::new(),
       jump_text: "1".to_string(),
       simple_list: false,
+      source_mode: DisplaySourceMode::All,
+      show_warnings: true,
       temporary_safe_mode_disabled: HashSet::new(),
       needs_rebuild_areas: true,
     }
@@ -450,6 +454,7 @@ impl GameListUi {
     mouse_supported: bool,
     truecolor_supported: bool,
   ) {
+    self.sync_display_settings(storage);
     self.sync_entries(
       package.game_list(),
       storage,
@@ -891,6 +896,7 @@ impl GameListUi {
     focused: bool,
   ) {
     let package_params = Self::package_rich_params(entry);
+    let show_source = self.shows_source_label(&entry.source);
     let source_key = match entry.source {
       PackageSource::Official => "game_list.list.source.official",
       PackageSource::Mod => "game_list.list.source.mod",
@@ -900,7 +906,11 @@ impl GameListUi {
       PackageSource::Official => "bright_magenta",
       PackageSource::Mod => "bright_yellow",
     };
-    let source_text = format!("f%[<fg:{}>{}</fg>]", source_color, source);
+    let source_text = if show_source {
+      format!("f%[<fg:{}>{}</fg>]", source_color, source)
+    } else {
+      String::new()
+    };
     let source_width = layout
       .get_text_width(&source_text, None)
       .min(pos.left_inner.width);
@@ -941,17 +951,19 @@ impl GameListUi {
         ..Default::default()
       },
     );
-    render.draw_host_text(
-      canvas,
-      &DrawTextParams {
-        x: source_x,
-        y,
-        text: source_text,
-        wrap_mode: TextWrapMode::None,
-        max_width: Some(source_width),
-        ..Default::default()
-      },
-    );
+    if show_source {
+      render.draw_host_text(
+        canvas,
+        &DrawTextParams {
+          x: source_x,
+          y,
+          text: source_text,
+          wrap_mode: TextWrapMode::None,
+          max_width: Some(source_width),
+          ..Default::default()
+        },
+      );
+    }
   }
 
   fn draw_right_panel(
@@ -1319,6 +1331,9 @@ impl GameListUi {
     mouse_supported: bool,
     truecolor_supported: bool,
   ) -> Vec<String> {
+    if !self.show_warnings {
+      return Vec::new();
+    }
     let mut warnings = Vec::new();
     if entry.mouse_required && !mouse_supported {
       warnings.push(i18n.get_runtime_text("game_list", "game_list.info.mouse.error"));
@@ -1559,6 +1574,21 @@ impl GameListUi {
     entries
   }
 
+  fn sync_display_settings(&mut self, storage: &StorageService) {
+    let profile = storage.display_settings_profile();
+    self.show_warnings = profile.game_list_warnings;
+    self.source_mode = profile.game_list_source;
+  }
+
+  fn shows_source_label(&self, source: &PackageSource) -> bool {
+    match self.source_mode {
+      DisplaySourceMode::All => true,
+      DisplaySourceMode::Mod => source == &PackageSource::Mod,
+      DisplaySourceMode::Official => source == &PackageSource::Official,
+      DisplaySourceMode::No => false,
+    }
+  }
+
   fn compare_entries(&self, a: &PackageListEntry, b: &PackageListEntry) -> Ordering {
     self
       .sort_value(a)
@@ -1687,18 +1717,12 @@ impl GameListUi {
         "game_list.action.jump.confirm",
       ]
     } else {
-      let list_key = if self.simple_list {
-        "game_list.action.list.simple2detail"
-      } else {
-        "game_list.action.list.detail2simple"
-      };
       vec![
         "game_list.action.select",
         "game_list.action.flip",
         "game_list.action.scroll",
         "game_list.action.confirm",
         "game_list.action.list.back",
-        list_key,
         "game_list.action.list.search",
         "game_list.action.list.order",
         "game_list.action.list.sort",

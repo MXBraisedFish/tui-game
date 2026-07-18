@@ -5,20 +5,26 @@ use std::{
 
 use super::bootstrap::ensure_storage_layout;
 use super::layout;
+use super::profile::DisplaySettingsProfile;
 use crate::host_engine::services::{LogService, LogSource};
 
 /// 存储服务：管理应用根目录，提供各子路径的构建方法，并在初始化时确保目录结构存在。
 pub struct StorageService {
   root_dir: PathBuf,
+  pub(super) display_settings: DisplaySettingsProfile,
 }
 
 impl StorageService {
   pub fn new(log: &mut LogService) -> Self {
     let root_dir = resolve_root_dir(log);
 
-    let service = Self { root_dir };
+    let mut service = Self {
+      root_dir,
+      display_settings: DisplaySettingsProfile::default(),
+    };
 
     ensure_storage_layout(&service, log);
+    service.reload_display_settings_profile(log);
 
     service
   }
@@ -84,6 +90,10 @@ impl StorageService {
     self.path(layout::PROFILE_SCREENSHOT_FILE)
   }
 
+  pub fn profile_display_settings_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_DISPLAY_SETTINGS_FILE)
+  }
+
   pub fn language_assets_root_path(&self) -> PathBuf {
     self.path(layout::ASSETS_LANGUAGE_DIR)
   }
@@ -146,7 +156,10 @@ impl StorageService {
 #[cfg(test)]
 impl StorageService {
   pub(crate) fn from_root_for_test(root_dir: PathBuf) -> Self {
-    Self { root_dir }
+    Self {
+      root_dir,
+      display_settings: DisplaySettingsProfile::default(),
+    }
   }
 }
 

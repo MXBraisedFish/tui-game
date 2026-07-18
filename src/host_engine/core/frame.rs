@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 pub struct FrameScheduler {
   current_frame: u64,
   frame_start: Instant,
-  target_frame_duration: Duration,
+  target_frame_duration: Option<Duration>,
 }
 
 impl FrameScheduler {
@@ -16,7 +16,7 @@ impl FrameScheduler {
     Self {
       current_frame: 0,
       frame_start: Instant::now(),
-      target_frame_duration,
+      target_frame_duration: Some(target_frame_duration),
     }
   }
 
@@ -29,13 +29,21 @@ impl FrameScheduler {
 
   /// 等待直到当前帧的目标时长用完，控制帧率上限
   pub fn wait_for_next_frame(&self) {
+    let Some(target_frame_duration) = self.target_frame_duration else {
+      return;
+    };
     let elapsed = self.frame_start.elapsed();
 
-    if elapsed >= self.target_frame_duration {
+    if elapsed >= target_frame_duration {
       return;
     }
 
-    thread::sleep(self.target_frame_duration - elapsed);
+    thread::sleep(target_frame_duration - elapsed);
+  }
+
+  pub fn set_target_fps(&mut self, target_fps: Option<u16>) {
+    self.target_frame_duration =
+      target_fps.map(|fps| Duration::from_secs_f64(1.0 / fps.max(1) as f64));
   }
 
   pub fn current_frame(&self) -> u64 {

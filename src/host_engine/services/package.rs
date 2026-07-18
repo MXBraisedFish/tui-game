@@ -71,6 +71,7 @@ pub struct PackageListEntry {
   pub key_actions: HashMap<String, Vec<Vec<String>>>,
   pub title: String,
   pub game_name: String,
+  pub screensaver_name: String,
   pub game_detail: String,
   pub description: String,
   pub author: String,
@@ -87,6 +88,9 @@ pub struct PackageListEntry {
   pub high_privilege_required: bool,
   pub score_enabled: bool,
   pub score_empty_text: String,
+  pub min_width: u32,
+  pub min_height: u32,
+  pub screensaver_command: String,
 }
 
 /// 包显示信息
@@ -394,6 +398,15 @@ impl PackageService {
       .screensavers()
       .into_iter()
       .filter(|info| info.source == PackageSource::Mod)
+      .map(package_list_entry)
+      .collect()
+  }
+
+  /// 返回全部官方与模组屏保的轻量 UI 快照。
+  pub fn screensaver_list(&self) -> Vec<PackageListEntry> {
+    self
+      .screensavers()
+      .into_iter()
       .map(package_list_entry)
       .collect()
   }
@@ -798,6 +811,11 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     .as_ref()
     .map(|game| game.name.clone())
     .unwrap_or_default();
+  let screensaver_name = info
+    .screensaver
+    .as_ref()
+    .map(|screensaver| screensaver.name.clone())
+    .unwrap_or_default();
   let game_detail = info
     .game
     .as_ref()
@@ -814,6 +832,11 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     .and_then(|game| game.score.as_ref())
     .map(|score| score.empty_text.clone())
     .unwrap_or_default();
+  let screensaver_command = info
+    .screensaver
+    .as_ref()
+    .map(|screensaver| screensaver.command.clone())
+    .unwrap_or_default();
 
   PackageListEntry {
     mod_id: info.mod_id,
@@ -822,6 +845,7 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     key_actions,
     title: info.display.title,
     game_name,
+    screensaver_name,
     game_detail,
     description: info.display.description,
     author: info.display.author,
@@ -838,6 +862,9 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     high_privilege_required,
     score_enabled,
     score_empty_text,
+    min_width: info.runtime.min_width,
+    min_height: info.runtime.min_height,
+    screensaver_command,
   }
 }
 

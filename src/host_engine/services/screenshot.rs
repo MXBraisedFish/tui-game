@@ -397,6 +397,16 @@ impl FontSet {
   fn load() -> Result<Self, String> {
     let mut fonts = Vec::new();
 
+    for path in [
+      Path::new("assets/fonts/mnf.ttf"),
+      Path::new("assets/fonts/asmn.otf"),
+      Path::new("assets/fonts/nsscvf.ttf"),
+    ] {
+      if path.is_file() {
+        load_font_file(path, &mut fonts)?;
+      }
+    }
+
     if let Some(paths) = env::var_os("TUI_CAPTURE_FONTS") {
       for path in env::split_paths(&paths) {
         load_font_file(&path, &mut fonts)?;

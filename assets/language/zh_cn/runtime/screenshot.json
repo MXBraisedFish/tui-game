@@ -5,5 +5,10 @@
   "screenshot.menu.save_png": "保存为图片 {key:screenshot.save_png}",
   "screenshot.menu.all": "复制并保存为图片 {key:screenshot.all}",
   "screenshot.mode.enter": "进入截屏模式",
-  "screenshot.mode.exit": "退出截屏模式"
+  "screenshot.mode.exit": "退出截屏模式",
+  "screenshot.mode.copy.success": "复制成功",
+  "screenshot.mode.copy.failed": "复制失败",
+  "screenshot.mode.save_png.loading": "图片正在导出",
+  "screenshot.mode.save_png.success": "图片已导出",
+  "screenshot.mode.save_png.failed": "图片导出失败"
 }

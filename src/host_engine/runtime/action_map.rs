@@ -2,10 +2,18 @@ use super::*;
 
 pub(super) const HOST_KEY_SCREENSHOT: &str = "host_key.screenshot";
 pub(super) const HOST_KEY_RECORDING: &str = "host_key.recording";
+pub(super) const HOST_KEY_SCREENSAVER: &str = "host_key.screensaver";
 pub(super) const HOST_KEY_FORCE_STOP: &str = "host_key.force_stop";
 
 pub(super) fn load_host_key_action_map(services: &mut EngineServices) {
   let entries = vec![
+    ActionMapEntry {
+      action: HOST_KEY_SCREENSAVER.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.screensaver"),
+      keys: vec![vec!["f3".to_string()]],
+    },
     ActionMapEntry {
       action: HOST_KEY_SCREENSHOT.to_string(),
       description: services
@@ -38,6 +46,7 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
     Some(UiNodeKind::Home) => load_home_action_map(services),
     Some(UiNodeKind::Settings) => load_settings_action_map(services),
     Some(UiNodeKind::DisplaySettings) => load_display_settings_action_map(services),
+    Some(UiNodeKind::ScreensaverList) => load_screensaver_list_action_map(services),
     Some(UiNodeKind::SecuritySettings) => load_security_settings_action_map(services),
     Some(UiNodeKind::SecurityDetails) => load_security_details_action_map(services),
     Some(UiNodeKind::StorageManagement) => load_storage_management_action_map(services),
@@ -82,6 +91,14 @@ fn load_display_settings_action_map(services: &mut EngineServices) {
     services,
     &DisplaySettingsUi::action_map(),
     "DisplaySettingsUi",
+  );
+}
+
+fn load_screensaver_list_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &ScreensaverListUi::action_map(),
+    "ScreensaverListUi",
   );
 }
 

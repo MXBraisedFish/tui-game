@@ -10,6 +10,7 @@ use crate::host_engine::services::{
 pub mod display_settings;
 pub mod language;
 pub mod mods;
+pub mod screensaver_list;
 pub mod security;
 pub mod storage_management;
 
@@ -73,6 +74,7 @@ pub enum SettingsUiCommand {
   OpenStorageManagement,
   OpenSecuritySettings,
   OpenDisplaySettings,
+  OpenScreensaverList,
 }
 
 impl SettingsUi {
@@ -173,6 +175,7 @@ impl SettingsUi {
           3 => Some(SettingsUiCommand::OpenStorageManagement),
           4 => Some(SettingsUiCommand::OpenSecuritySettings),
           5 => Some(SettingsUiCommand::OpenDisplaySettings),
+          6 => Some(SettingsUiCommand::OpenScreensaverList),
           _ => None,
         }
       }
@@ -195,6 +198,7 @@ impl SettingsUi {
           3 => Some(SettingsUiCommand::OpenStorageManagement),
           4 => Some(SettingsUiCommand::OpenSecuritySettings),
           5 => Some(SettingsUiCommand::OpenDisplaySettings),
+          6 => Some(SettingsUiCommand::OpenScreensaverList),
           _ => None,
         },
         "settings.back" => Some(SettingsUiCommand::Back),

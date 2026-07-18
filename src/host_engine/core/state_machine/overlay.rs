@@ -22,6 +22,7 @@ pub enum OverlayKind {
   LanguageLoading,
   SafeModeWarning,
   ScreenshotCapture,
+  Screensaver,
   WindowSizeWarning,
 }
 
@@ -93,6 +94,10 @@ impl OverlayStackState {
     Some(self.stack.remove(index))
   }
 
+  pub fn get(&self, kind: OverlayKind) -> Option<&OverlayState> {
+    self.stack.iter().find(|overlay| overlay.kind == kind)
+  }
+
   /// 清空所有覆盖层
   pub fn clear(&mut self) {
     self.stack.clear();
@@ -108,6 +113,7 @@ impl OverlayKind {
       OverlayKind::ExportSettings => 20,
       OverlayKind::LanguageLoading => 20,
       OverlayKind::SafeModeWarning => 20,
+      OverlayKind::Screensaver => 25,
       OverlayKind::WindowSizeWarning => 30,
       OverlayKind::ScreenshotCapture => 40,
     }
@@ -148,6 +154,21 @@ mod tests {
     stack.push(overlay(OverlayKind::ScreenshotCapture));
 
     assert_eq!(stack.current_kind(), Some(OverlayKind::ScreenshotCapture));
+  }
+
+  #[test]
+  fn screenshot_then_window_then_screensaver_then_regular_overlay() {
+    let mut stack = OverlayStackState::new();
+    stack.push(overlay(OverlayKind::LanguageLoading));
+    stack.push(overlay(OverlayKind::Screensaver));
+    stack.push(overlay(OverlayKind::WindowSizeWarning));
+    stack.push(overlay(OverlayKind::ScreenshotCapture));
+
+    assert_eq!(stack.current_kind(), Some(OverlayKind::ScreenshotCapture));
+    stack.remove_kind(OverlayKind::ScreenshotCapture);
+    assert_eq!(stack.current_kind(), Some(OverlayKind::WindowSizeWarning));
+    stack.remove_kind(OverlayKind::WindowSizeWarning);
+    assert_eq!(stack.current_kind(), Some(OverlayKind::Screensaver));
   }
 
   #[test]

@@ -4,7 +4,8 @@ mod profile;
 mod service;
 
 pub use profile::{
-  GamePackageState, PackageDefaultState, SafeModeDefault, ScreensaverPackageState,
-  ScreenshotProfile,
+  DisplayFpsLimit, DisplayLogoMode, DisplayOrderMode, DisplaySettingsProfile, DisplaySourceMode,
+  GamePackageState, PackageDefaultState, PackageStateProfile, SafeModeDefault,
+  ScreensaverPackageState, ScreenshotProfile,
 };
 pub use service::StorageService;

@@ -85,6 +85,13 @@ impl TextStyle {
     self.foreground = None;
   }
 
+  /// 反转当前显式 RGB 前景色。终端命名色由终端主题决定，保持不变。
+  pub fn reverse_foreground(&mut self) {
+    if let Some(color) = self.foreground.as_mut() {
+      color.reverse_rgb();
+    }
+  }
+
   pub fn set_background(&mut self, color: TextColor) {
     self.background = Some(color);
   }
@@ -93,8 +100,28 @@ impl TextStyle {
     self.background = None;
   }
 
+  /// 反转当前显式 RGB 背景色。终端命名色由终端主题决定，保持不变。
+  pub fn reverse_background(&mut self) {
+    if let Some(color) = self.background.as_mut() {
+      color.reverse_rgb();
+    }
+  }
+
   /// 将样式重置为默认值。
   pub fn reset(&mut self) {
     *self = Self::default();
+  }
+}
+
+impl TextColor {
+  fn reverse_rgb(&mut self) {
+    match self {
+      Self::Rgb { r, g, b } | Self::ForceRgb { r, g, b } => {
+        *r = 255 - *r;
+        *g = 255 - *g;
+        *b = 255 - *b;
+      }
+      Self::Terminal(_) | Self::Transparent => {}
+    }
   }
 }

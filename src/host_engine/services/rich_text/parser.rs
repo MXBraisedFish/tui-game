@@ -239,6 +239,10 @@ fn apply_tag(tag: &str, current_style: &mut TextStyle) -> bool {
   }
 
   if let Some(color_value) = tag.strip_prefix("fg:") {
+    if color_value.trim() == "reverse" {
+      current_style.reverse_foreground();
+      return true;
+    }
     if let Some(color) = parse_text_color(color_value) {
       current_style.set_foreground(color);
       return true;
@@ -247,6 +251,10 @@ fn apply_tag(tag: &str, current_style: &mut TextStyle) -> bool {
   }
 
   if let Some(color_value) = tag.strip_prefix("bg:") {
+    if color_value.trim() == "reverse" {
+      current_style.reverse_background();
+      return true;
+    }
     if let Some(color) = parse_text_color(color_value) {
       current_style.set_background(color);
       return true;
@@ -260,6 +268,7 @@ fn apply_tag(tag: &str, current_style: &mut TextStyle) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::host_engine::services::{TerminalColor, TextColor};
   use std::collections::HashMap;
 
   fn make_params(
@@ -339,5 +348,58 @@ mod tests {
     let params = make_params(values, ka);
     let rt = parse("f%{value:action}: press {key:jump}", Some(&params));
     assert_eq!(rt.segments[0].text, "Jump: press [Space]");
+  }
+
+  #[test]
+  fn reverse_explicit_rgb_foreground_and_background() {
+    let rt = parse(
+      "f%<fg:#102030><bg:rgb(1,2,3)>A<fg:reverse><bg:reverse>B",
+      None,
+    );
+
+    assert_eq!(rt.segments.len(), 2);
+    assert_eq!(
+      rt.segments[0].style.foreground,
+      Some(TextColor::Rgb {
+        r: 0x10,
+        g: 0x20,
+        b: 0x30,
+      })
+    );
+    assert_eq!(
+      rt.segments[1].style.foreground,
+      Some(TextColor::Rgb {
+        r: 0xef,
+        g: 0xdf,
+        b: 0xcf,
+      })
+    );
+    assert_eq!(
+      rt.segments[1].style.background,
+      Some(TextColor::Rgb {
+        r: 254,
+        g: 253,
+        b: 252,
+      })
+    );
+  }
+
+  #[test]
+  fn reverse_keeps_terminal_colors_and_is_not_rendered() {
+    let rt = parse("f%<fg:red>A<fg:reverse>B<bg:reverse>C", None);
+
+    assert_eq!(rt.segments.len(), 3);
+    assert_eq!(
+      rt.segments[2].style.foreground,
+      Some(TextColor::Terminal(TerminalColor::Red))
+    );
+    assert_eq!(rt.segments[2].style.background, None);
+    assert_eq!(
+      rt.segments
+        .iter()
+        .map(|segment| segment.text.as_str())
+        .collect::<String>(),
+      "ABC"
+    );
   }
 }

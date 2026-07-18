@@ -4,5 +4,6 @@
   "window_size.required": "需要尺寸：",
   "window_size.tip": "请调整您的终端至所需尺寸",
   "window_size.action.exit.host": "{key:window_size.exit} 退出程序",
-  "window_size.action.exit.game": "{key:window_size.exit} 返回游戏列表"
+  "window_size.action.exit.game": "{key:window_size.exit} 返回游戏列表",
+  "window_size.action.exit.screensaver": "{key:window_size.exit} 关闭屏保"
 }

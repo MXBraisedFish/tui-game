@@ -17,8 +17,6 @@
   "game_list.action.list.order": "{key:game_list.order} Order",
   "game_list.action.list.sort": "{key:game_list.sort} Sort",
   "game_list.action.list.jump": "{key:game_list.jump} Jump",
-  "game_list.action.list.detail2simple": "{key:game_list.list} Simple View",
-  "game_list.action.list.simple2detail": "{key:game_list.list} Detailed View",
   "game_list.list.debug": "Debug",
   "game_list.list.author": "Author:",
   "game_list.list.version": "Version:",

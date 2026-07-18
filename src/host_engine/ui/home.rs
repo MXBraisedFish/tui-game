@@ -9,6 +9,7 @@ pub use settings::language::{LanguageSelectCommand, LanguageSelectUi};
 pub use settings::mods::game::{GamePackageCommand, GamePackageUi};
 pub use settings::mods::screensaver::{ScreensaverPackageCommand, ScreensaverPackageUi};
 pub use settings::mods::{ModsCommand, ModsUi};
+pub use settings::screensaver_list::{ScreensaverListCommand, ScreensaverListUi};
 pub use settings::security::{
   SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi,
 };

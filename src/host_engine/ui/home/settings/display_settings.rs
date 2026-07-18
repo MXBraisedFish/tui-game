@@ -1,48 +1,25 @@
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
-  HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
+  ActionMapEntry, CanvasService, DisplayFpsLimit, DisplayLogoMode, DisplayOrderMode,
+  DisplaySettingsProfile, DisplaySourceMode, DrawTextParams, HitAreaEvent, HitAreaId,
+  HitAreaOptions, HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect,
+  RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
   UiObjectPoolOwner,
 };
 
 const NS: &str = "display_settings";
-const MENU_LEN: usize = 6;
+const MENU_LEN: usize = 8;
 const LABEL_KEYS: [&str; MENU_LEN] = [
   "display_settings.logo.random",
   "display_settings.tool.top_toolbar",
+  "display_settings.tool.top_toolbar.custom",
   "display_settings.screensaver.source",
   "display_settings.screensaver.random",
   "display_settings.game_list.source",
   "display_settings.game_list.error",
+  "display_settings.game_list.fps",
 ];
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum LogoMode {
-  Random,
-  Order,
-  Neon,
-  Sign,
-  Water,
-  Error,
-  Glitch,
-  Building,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SourceMode {
-  All,
-  Mod,
-  Official,
-  No,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum OrderMode {
-  Random,
-  Order,
-}
 
 pub struct DisplaySettingsUi {
   selected_index: usize,
@@ -50,17 +27,21 @@ pub struct DisplaySettingsUi {
   runtime_objects: RuntimeObjectPool,
   back_area: HitAreaId,
   menu_areas: [HitAreaId; MENU_LEN],
-  logo_mode: LogoMode,
+  logo_mode: DisplayLogoMode,
   top_toolbar: bool,
-  screensaver_source: SourceMode,
-  screensaver_order: OrderMode,
-  game_list_source: SourceMode,
+  top_toolbar_custom: bool,
+  screensaver_source: DisplaySourceMode,
+  screensaver_order: DisplayOrderMode,
+  screensaver_sequence_cursor: u64,
+  game_list_source: DisplaySourceMode,
   game_list_error: bool,
+  game_list_fps: DisplayFpsLimit,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DisplaySettingsCommand {
   Back,
+  Changed(DisplaySettingsProfile),
 }
 
 impl UiObjectPoolOwner for DisplaySettingsUi {
@@ -84,7 +65,7 @@ impl RuntimeObjectPoolOwner for DisplaySettingsUi {
 }
 
 impl DisplaySettingsUi {
-  pub fn init(hit_area: &HitAreaService) -> Self {
+  pub fn init(hit_area: &HitAreaService, profile: DisplaySettingsProfile) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
       selected_index: 0,
@@ -92,12 +73,15 @@ impl DisplaySettingsUi {
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       objects,
       runtime_objects: RuntimeObjectPool::new(),
-      logo_mode: LogoMode::Random,
-      top_toolbar: true,
-      screensaver_source: SourceMode::All,
-      screensaver_order: OrderMode::Random,
-      game_list_source: SourceMode::All,
-      game_list_error: true,
+      logo_mode: profile.logo_mode,
+      top_toolbar: profile.top_toolbar,
+      top_toolbar_custom: profile.top_toolbar_custom,
+      screensaver_source: profile.screensaver_source,
+      screensaver_order: profile.screensaver_order,
+      screensaver_sequence_cursor: profile.screensaver_sequence_cursor,
+      game_list_source: profile.game_list_source,
+      game_list_error: profile.game_list_warnings,
+      game_list_fps: profile.game_list_fps,
     }
   }
 
@@ -122,32 +106,41 @@ impl DisplaySettingsUi {
         "Focus top toolbar",
       ),
       action(
-        "display_settings.focus_screensaver_source",
+        "display_settings.top_toolbar_custom",
         "3",
+        "Focus toolbar customization",
+      ),
+      action(
+        "display_settings.focus_screensaver_source",
+        "4",
         "Focus screensaver source",
       ),
       action(
         "display_settings.focus_screensaver_random",
-        "4",
+        "5",
         "Focus screensaver order",
       ),
       action(
         "display_settings.focus_game_list_source",
-        "5",
+        "6",
         "Focus game list source",
       ),
       action(
         "display_settings.focus_game_list_error",
-        "6",
+        "7",
         "Focus game list warnings",
       ),
+      action("display_settings.focus_fps", "8", "Focus frame limit"),
     ]
   }
 
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<DisplaySettingsCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
-        self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
+        let index = self.menu_areas.iter().position(|area| area == id)?;
+        if self.is_enabled(index) {
+          self.selected_index = index;
+        }
         None
       }
       UiEvent::HitArea(HitAreaEvent::Click {
@@ -155,9 +148,13 @@ impl DisplaySettingsUi {
         button: MouseButton::Left,
         ..
       }) => {
-        self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
+        let index = self.menu_areas.iter().position(|area| area == id)?;
+        if !self.is_enabled(index) {
+          return None;
+        }
+        self.selected_index = index;
         self.switch_selected();
-        None
+        Some(DisplaySettingsCommand::Changed(self.profile()))
       }
       UiEvent::HitArea(HitAreaEvent::Press {
         button: MouseButton::Right,
@@ -174,7 +171,7 @@ impl DisplaySettingsUi {
         }
         "display_settings.confirm" => {
           self.switch_selected();
-          None
+          Some(DisplaySettingsCommand::Changed(self.profile()))
         }
         "display_settings.back" => Some(DisplaySettingsCommand::Back),
         "display_settings.focus_logo_random" => {
@@ -186,19 +183,27 @@ impl DisplaySettingsUi {
           None
         }
         "display_settings.focus_screensaver_source" => {
+          self.selected_index = 3;
+          None
+        }
+        "display_settings.top_toolbar_custom" if self.top_toolbar => {
           self.selected_index = 2;
           None
         }
         "display_settings.focus_screensaver_random" => {
-          self.selected_index = 3;
-          None
-        }
-        "display_settings.focus_game_list_source" => {
           self.selected_index = 4;
           None
         }
-        "display_settings.focus_game_list_error" => {
+        "display_settings.focus_game_list_source" => {
           self.selected_index = 5;
+          None
+        }
+        "display_settings.focus_game_list_error" => {
+          self.selected_index = 6;
+          None
+        }
+        "display_settings.focus_fps" => {
+          self.selected_index = 7;
           None
         }
         _ => None,
@@ -274,17 +279,22 @@ impl DisplaySettingsUi {
           ..Default::default()
         },
       );
-      hit_area.render_host(
-        &mut self.objects,
-        self.menu_areas[index],
+      let hit_rect = if self.is_enabled(index) {
         Rect {
           x,
           y,
           width: row_width,
           height: 1,
-        },
-        canvas,
-      );
+        }
+      } else {
+        Rect {
+          x,
+          y,
+          width: 0,
+          height: 0,
+        }
+      };
+      hit_area.render_host(&mut self.objects, self.menu_areas[index], hit_rect, canvas);
     }
 
     render.draw_host_text(
@@ -303,23 +313,54 @@ impl DisplaySettingsUi {
     match self.selected_index {
       0 => self.logo_mode = self.logo_mode.next(),
       1 => self.top_toolbar = !self.top_toolbar,
-      2 => self.screensaver_source = self.screensaver_source.next(),
-      3 => self.screensaver_order = self.screensaver_order.next(),
-      4 => self.game_list_source = self.game_list_source.next(),
-      _ => self.game_list_error = !self.game_list_error,
+      2 if self.top_toolbar => self.top_toolbar_custom = !self.top_toolbar_custom,
+      3 => self.screensaver_source = self.screensaver_source.next(),
+      4 => self.screensaver_order = self.screensaver_order.next(),
+      5 => self.game_list_source = self.game_list_source.next(),
+      6 => self.game_list_error = !self.game_list_error,
+      7 => self.game_list_fps = self.game_list_fps.next(),
+      _ => {}
+    }
+  }
+
+  fn profile(&self) -> DisplaySettingsProfile {
+    DisplaySettingsProfile {
+      logo_mode: self.logo_mode,
+      top_toolbar: self.top_toolbar,
+      top_toolbar_custom: self.top_toolbar_custom,
+      screensaver_source: self.screensaver_source,
+      screensaver_order: self.screensaver_order,
+      screensaver_sequence_cursor: self.screensaver_sequence_cursor,
+      game_list_source: self.game_list_source,
+      game_list_warnings: self.game_list_error,
+      game_list_fps: self.game_list_fps,
     }
   }
 
   fn focus_previous(&mut self) {
-    self.selected_index = if self.selected_index == 0 {
-      MENU_LEN - 1
-    } else {
-      self.selected_index - 1
-    };
+    loop {
+      self.selected_index = if self.selected_index == 0 {
+        MENU_LEN - 1
+      } else {
+        self.selected_index - 1
+      };
+      if self.is_enabled(self.selected_index) {
+        break;
+      }
+    }
   }
 
   fn focus_next(&mut self) {
-    self.selected_index = (self.selected_index + 1) % MENU_LEN;
+    loop {
+      self.selected_index = (self.selected_index + 1) % MENU_LEN;
+      if self.is_enabled(self.selected_index) {
+        break;
+      }
+    }
+  }
+
+  fn is_enabled(&self, index: usize) -> bool {
+    index != 2 || self.top_toolbar
   }
 
   fn rows(&self, i18n: &I18nService, layout: &LayoutService) -> [String; MENU_LEN] {
@@ -339,8 +380,15 @@ impl DisplaySettingsUi {
       .unwrap_or_default()
       .saturating_add(2);
     std::array::from_fn(|index| {
-      let focused = index == self.selected_index;
-      let label_color = if focused { "bright_cyan" } else { "white" };
+      let enabled = self.is_enabled(index);
+      let focused = enabled && index == self.selected_index;
+      let label_color = if !enabled {
+        "rgb(85,87,83)"
+      } else if focused {
+        "bright_cyan"
+      } else {
+        "white"
+      };
       let prefix = if focused { "❯ " } else { "  " };
       let suffix = if focused { " ❮" } else { "  " };
       let value_key = self.value_key(index);
@@ -356,7 +404,11 @@ impl DisplaySettingsUi {
       format!(
         "f%<fg:{label_color}>{prefix}{}{padding}  </fg><fg:white>[</fg><fg:{}>{}</fg><fg:white>]</fg><fg:{label_color}>{suffix}</fg>",
         labels[index],
-        value_color(value_key),
+        if enabled {
+          value_color(value_key)
+        } else {
+          "rgb(85,87,83)"
+        },
         values[index],
       )
     })
@@ -384,11 +436,14 @@ impl DisplaySettingsUi {
       0 => self.logo_mode.key(),
       1 if self.top_toolbar => "display_settings.tool.top_toolbar.on",
       1 => "display_settings.tool.top_toolbar.off",
-      2 => self.screensaver_source.screensaver_key(),
-      3 => self.screensaver_order.key(),
-      4 => self.game_list_source.game_list_key(),
-      5 if self.game_list_error => "display_settings.game_list.error.yes",
-      _ => "display_settings.game_list.error.no",
+      2 if self.top_toolbar_custom => "display_settings.tool.top_toolbar.on",
+      2 => "display_settings.tool.top_toolbar.off",
+      3 => self.screensaver_source.screensaver_key(),
+      4 => self.screensaver_order.key(),
+      5 => self.game_list_source.game_list_key(),
+      6 if self.game_list_error => "display_settings.game_list.error.yes",
+      6 => "display_settings.game_list.error.no",
+      _ => self.game_list_fps.key(),
     }
   }
 
@@ -407,7 +462,7 @@ impl DisplaySettingsUi {
   }
 }
 
-impl LogoMode {
+impl DisplayLogoMode {
   fn next(self) -> Self {
     match self {
       Self::Random => Self::Order,
@@ -430,12 +485,12 @@ impl LogoMode {
       Self::Water => "display_settings.logo.random.only.water",
       Self::Error => "display_settings.logo.random.only.error",
       Self::Glitch => "display_settings.logo.random.only.glitch",
-      Self::Building => "display_settings.logo.random.only.building",
+      Self::Building => "display_settings.logo.random.only.select",
     }
   }
 }
 
-impl SourceMode {
+impl DisplaySourceMode {
   fn next(self) -> Self {
     match self {
       Self::All => Self::Mod,
@@ -464,7 +519,7 @@ impl SourceMode {
   }
 }
 
-impl OrderMode {
+impl DisplayOrderMode {
   fn next(self) -> Self {
     match self {
       Self::Random => Self::Order,
@@ -476,6 +531,35 @@ impl OrderMode {
     match self {
       Self::Random => "display_settings.screensaver.random.random",
       Self::Order => "display_settings.screensaver.random.order",
+    }
+  }
+}
+
+impl DisplayFpsLimit {
+  pub fn target_fps(self) -> Option<u16> {
+    match self {
+      Self::Fps30 => Some(30),
+      Self::Fps60 => Some(60),
+      Self::Fps120 => Some(120),
+      Self::Unlimited => None,
+    }
+  }
+
+  fn next(self) -> Self {
+    match self {
+      Self::Fps30 => Self::Fps60,
+      Self::Fps60 => Self::Fps120,
+      Self::Fps120 => Self::Unlimited,
+      Self::Unlimited => Self::Fps30,
+    }
+  }
+
+  fn key(self) -> &'static str {
+    match self {
+      Self::Fps30 => "display_settings.game_list.fps.30",
+      Self::Fps60 => "display_settings.game_list.fps.60",
+      Self::Fps120 => "display_settings.game_list.fps.120",
+      Self::Unlimited => "display_settings.game_list.fps.unlimited",
     }
   }
 }

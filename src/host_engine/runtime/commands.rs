@@ -91,6 +91,9 @@ pub(super) fn apply_settings_command(
     SettingsUiCommand::OpenDisplaySettings => {
       world.state.enter_ui_node(UiNodeState::display_settings())
     }
+    SettingsUiCommand::OpenScreensaverList => {
+      world.state.enter_ui_node(UiNodeState::screensaver_list())
+    }
   }
 }
 
@@ -101,10 +104,81 @@ pub(super) fn apply_display_settings_command(
   world: &mut RuntimeWorld,
 ) {
   match command {
+    DisplaySettingsCommand::Changed(profile) => {
+      let _ = services
+        .storage
+        .write_display_settings_profile(&profile, &mut services.log);
+    }
     DisplaySettingsCommand::Back => {
       world.state.pop_ui_node();
       clear_exiting_pool(display_settings_ui.objects_mut(), services);
-      *display_settings_ui = DisplaySettingsUi::init(&services.hit_area);
+      *display_settings_ui = DisplaySettingsUi::init(
+        &services.hit_area,
+        services.storage.display_settings_profile().clone(),
+      );
+    }
+  }
+}
+
+pub(super) fn apply_screensaver_list_command(
+  command: ScreensaverListCommand,
+  ui: &mut ScreensaverListUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    ScreensaverListCommand::Back => {
+      world.state.pop_ui_node();
+      reset_screensaver_list_ui(ui, services);
+    }
+    ScreensaverListCommand::FocusSearch => ui.focus_search(&mut services.text_input),
+    ScreensaverListCommand::BlurSearch => ui.blur_search(&mut services.text_input),
+    ScreensaverListCommand::Scroll(dy) => {
+      ui.scroll_active(&services.scroll_box, &services.layout, dy)
+    }
+    ScreensaverListCommand::SetEnabled { id, enabled } => {
+      let mut profile = services
+        .storage
+        .read_package_state_or_default(&mut services.log);
+      let next_order = profile
+        .screensavers
+        .values()
+        .filter_map(|state| state.enabled.then_some(state.order).flatten())
+        .max()
+        .map_or(0, |order| order.saturating_add(1));
+      let defaults = &profile.defaults;
+      let state = profile.screensavers.entry(id).or_insert(
+        crate::host_engine::services::ScreensaverPackageState {
+          enabled: defaults.enabled,
+          debug: defaults.debug,
+          order: None,
+        },
+      );
+      state.enabled = enabled;
+      state.order = enabled.then_some(next_order);
+      let _ = services
+        .storage
+        .write_package_state(&profile, &mut services.log);
+    }
+    ScreensaverListCommand::SaveOrder(ids) => {
+      let mut profile = services
+        .storage
+        .read_package_state_or_default(&mut services.log);
+      let defaults = profile.defaults.clone();
+      for (order, id) in ids.into_iter().enumerate() {
+        let state = profile.screensavers.entry(id).or_insert(
+          crate::host_engine::services::ScreensaverPackageState {
+            enabled: defaults.enabled,
+            debug: defaults.debug,
+            order: None,
+          },
+        );
+        state.enabled = true;
+        state.order = Some(order as u32);
+      }
+      let _ = services
+        .storage
+        .write_package_state(&profile, &mut services.log);
     }
   }
 }
@@ -816,6 +890,15 @@ fn reset_game_list_ui(ui: &mut GameListUi, services: &mut EngineServices) {
 fn reset_game_package_ui(ui: &mut GamePackageUi, services: &mut EngineServices) {
   clear_exiting_pool(ui.objects_mut(), services);
   *ui = GamePackageUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
+}
+
+fn reset_screensaver_list_ui(ui: &mut ScreensaverListUi, services: &mut EngineServices) {
+  clear_exiting_pool(ui.objects_mut(), services);
+  *ui = ScreensaverListUi::init(
     &services.hit_area,
     &services.text_input,
     &services.scroll_box,

@@ -38,6 +38,7 @@ pub struct ScreenshotCaptureUi {
   opened_elapsed: Duration,
   user_touched: bool,
   mode_toast_dismiss_requested: bool,
+  operation_toast_dismiss_requested: bool,
 }
 
 impl ScreenshotCaptureUi {
@@ -52,6 +53,7 @@ impl ScreenshotCaptureUi {
       opened_elapsed: Duration::ZERO,
       user_touched: false,
       mode_toast_dismiss_requested: false,
+      operation_toast_dismiss_requested: false,
     }
   }
 
@@ -78,6 +80,7 @@ impl ScreenshotCaptureUi {
     self.opened_elapsed = Duration::ZERO;
     self.user_touched = false;
     self.mode_toast_dismiss_requested = false;
+    self.operation_toast_dismiss_requested = false;
   }
 
   pub fn update(&mut self, dt: Duration) {
@@ -95,6 +98,12 @@ impl ScreenshotCaptureUi {
   pub fn take_mode_toast_dismiss_requested(&mut self) -> bool {
     let requested = self.mode_toast_dismiss_requested;
     self.mode_toast_dismiss_requested = false;
+    requested
+  }
+
+  pub fn take_operation_toast_dismiss_requested(&mut self) -> bool {
+    let requested = self.operation_toast_dismiss_requested;
+    self.operation_toast_dismiss_requested = false;
     requested
   }
 
@@ -123,9 +132,14 @@ impl ScreenshotCaptureUi {
     if mode_toast_should_close(&raw_keys, &system_events) {
       self.mode_toast_dismiss_requested = true;
     }
+    if operation_toast_should_close(&raw_keys, &system_events) {
+      self.operation_toast_dismiss_requested = true;
+    }
 
     if let Some(command) = direct_key_command(input) {
       self.user_touched = true;
+      self.mode_toast_dismiss_requested = false;
+      self.operation_toast_dismiss_requested = false;
       return Some(command);
     }
 
@@ -158,6 +172,8 @@ impl ScreenshotCaptureUi {
       match mouse.kind {
         MouseEventKind::Press if mouse.button == Some(MouseButton::Left) => {
           if let Some(cmd) = self.menu_command_at(mouse.x, mouse.y) {
+            self.mode_toast_dismiss_requested = false;
+            self.operation_toast_dismiss_requested = false;
             return Some(cmd);
           }
           self.menu = None;
@@ -202,6 +218,13 @@ impl ScreenshotCaptureUi {
     let frame = self.frame.clone()?;
     let rect = ScreenshotService::whole_frame_rect(&frame)?;
     Some((frame, rect))
+  }
+
+  pub fn clear_selection(&mut self) {
+    self.selection = None;
+    self.drag_anchor = None;
+    self.drag_cursor = None;
+    self.menu = None;
   }
 
   pub fn render(
@@ -489,4 +512,16 @@ fn mode_toast_should_close(
           if !matches!(mouse.kind, MouseEventKind::Move | MouseEventKind::Hold)
       )
     })
+}
+
+fn operation_toast_should_close(
+  raw_keys: &[crate::host_engine::services::RawKeyEvent],
+  system_events: &[SystemEvent],
+) -> bool {
+  raw_keys
+    .iter()
+    .any(|event| event.kind == KeyEventKind::Press)
+    || system_events
+      .iter()
+      .any(|event| matches!(event, SystemEvent::Mouse(_)))
 }

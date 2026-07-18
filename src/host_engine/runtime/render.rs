@@ -8,6 +8,7 @@ pub(super) fn route_render(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -25,6 +26,7 @@ pub(super) fn route_render(
   clear_warning_ui: &mut ClearWarningUi,
   export_settings_ui: &mut ExportSettingsUi,
   screenshot_capture_ui: &mut ScreenshotCaptureUi,
+  screensaver_overlay_ui: &mut ScreensaverOverlayUi,
   export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
 ) -> Option<(u16, u16)> {
@@ -51,6 +53,7 @@ pub(super) fn route_render(
       term.width,
       term.height,
       world.state.is_host_mode(),
+      runtime.overlays().get(OverlayKind::Screensaver).is_some(),
     );
     return None;
   }
@@ -58,6 +61,21 @@ pub(super) fn route_render(
   if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
     apply_host_viewport(services);
     screenshot_capture_ui.render(
+      &mut services.render,
+      &mut services.canvas,
+      &services.layout,
+      &services.i18n,
+    );
+    return None;
+  }
+
+  if world.state.current_overlay_kind() == Some(OverlayKind::Screensaver) {
+    apply_host_viewport(services);
+    screensaver_overlay_ui.objects_mut().begin_render();
+    services
+      .canvas
+      .prepare(screensaver_overlay_ui.objects(), &services.layout);
+    screensaver_overlay_ui.render(
       &mut services.render,
       &mut services.canvas,
       &services.layout,
@@ -157,6 +175,7 @@ pub(super) fn route_render(
     home_ui,
     settings_ui,
     display_settings_ui,
+    screensaver_list_ui,
     security_uis,
     storage_management_ui,
     storage_management_clear_ui,
@@ -200,6 +219,20 @@ pub(super) fn route_render(
         &services.layout,
         &services.i18n,
         &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::ScreensaverList) => {
+      screensaver_list_ui.render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+        &services.text_input,
+        &services.scroll_box,
+        &services.package,
+        &services.storage,
+        &mut services.log,
       );
     }
     Some(UiNodeKind::SecuritySettings) => {

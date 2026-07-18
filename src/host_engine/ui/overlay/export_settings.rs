@@ -46,14 +46,6 @@ impl ExportFormat {
       Self::TarGz => Self::Zip,
     }
   }
-
-  fn prev(self) -> Self {
-    match self {
-      Self::Zip => Self::TarGz,
-      Self::Tar => Self::Zip,
-      Self::TarGz => Self::Tar,
-    }
-  }
 }
 
 /// 导出范围类型
@@ -230,16 +222,6 @@ impl ExportSettingsUi {
         keys: vec![vec!["esc".to_string()]],
       },
       ActionMapEntry {
-        action: "export_settings.type_left".to_string(),
-        description: "Previous format".to_string(),
-        keys: vec![vec!["left".to_string()]],
-      },
-      ActionMapEntry {
-        action: "export_settings.type_right".to_string(),
-        description: "Next format".to_string(),
-        keys: vec![vec!["right".to_string()]],
-      },
-      ActionMapEntry {
         action: "export_settings.confirm_export".to_string(),
         description: "Confirm export".to_string(),
         keys: vec![vec!["ctrl".to_string(), "s".to_string()]],
@@ -349,25 +331,14 @@ impl ExportSettingsUi {
             None
           }
           "export_settings.confirm" => {
-            if self.focus != ExportSettingsFocus::Type {
-              Some(ExportSettingsCommand::FocusInput)
-            } else {
+            if self.focus == ExportSettingsFocus::Type {
+              self.format = self.format.next();
               None
+            } else {
+              Some(ExportSettingsCommand::FocusInput)
             }
           }
           "export_settings.back" => Some(ExportSettingsCommand::Cancel),
-          "export_settings.type_left" => {
-            if self.focus == ExportSettingsFocus::Type {
-              self.format = self.format.prev();
-            }
-            None
-          }
-          "export_settings.type_right" => {
-            if self.focus == ExportSettingsFocus::Type {
-              self.format = self.format.next();
-            }
-            None
-          }
           "export_settings.confirm_export" => {
             if self.name_valid && self.path_valid {
               Some(ExportSettingsCommand::ConfirmExport)

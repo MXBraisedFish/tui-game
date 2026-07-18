@@ -19,6 +19,7 @@ pub enum UiNodeKind {
   Home,
   Settings,
   DisplaySettings,
+  ScreensaverList,
   SecuritySettings,
   SecurityDetails,
   LanguageSelect,
@@ -70,6 +71,14 @@ impl UiNodeState {
   pub fn display_settings() -> Self {
     Self {
       kind: UiNodeKind::DisplaySettings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screensaver_list() -> Self {
+    Self {
+      kind: UiNodeKind::ScreensaverList,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

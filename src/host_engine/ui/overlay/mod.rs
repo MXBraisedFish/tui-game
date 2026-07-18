@@ -3,6 +3,7 @@ mod export_loading;
 mod export_settings;
 mod language_loading;
 mod safe_mode_warning;
+mod screensaver;
 mod screenshot_capture;
 pub(crate) mod window_size_warning;
 
@@ -11,5 +12,6 @@ pub use export_loading::ExportLoadingUi;
 pub use export_settings::{ExportFormat, ExportSettingsCommand, ExportSettingsUi, ExportType};
 pub use language_loading::LanguageLoadingUi;
 pub use safe_mode_warning::{SafeModeWarningCommand, SafeModeWarningUi};
+pub use screensaver::ScreensaverOverlayUi;
 pub use screenshot_capture::{ScreenshotCaptureCommand, ScreenshotCaptureUi};
 pub use window_size_warning::{WindowSizeWarningCommand, WindowSizeWarningUi};

@@ -18,8 +18,9 @@ use crate::host_engine::core::state_machine::{
 };
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
 use crate::host_engine::services::{
-  ActionMapEntry, BorderStyle, DrawTextParams, EngineServices, EngineTask, HostAreaKind, ImPolicy,
-  Key, LogSource, PackageEvent, ScreenshotService, ScreenshotTask, TaskId, TextColor,
+  ActionMapEntry, BorderStyle, DisplayOrderMode, DrawTextParams, EngineServices, EngineTask,
+  HostAreaKind, ImPolicy, Key, LogSource, PackageEvent, PackageListEntry, RandomGeneratorId,
+  RandomSeed, ScreenshotAsyncEvent, ScreenshotService, ScreenshotTask, TaskId, TextColor,
   translate_action_map,
 };
 use crate::host_engine::ui::{
@@ -28,14 +29,18 @@ use crate::host_engine::ui::{
   ExportType, GameListCommand, GameListUi, GamePackageCommand, GamePackageUi, HomeUi,
   HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
   LanguageSelectUi, ModsCommand, ModsUi, SafeModeWarningCommand, SafeModeWarningUi,
-  ScreensaverPackageCommand, ScreensaverPackageUi, ScreenshotCaptureCommand, ScreenshotCaptureUi,
-  SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi,
-  SettingsUi, SettingsUiCommand, StorageManagementClearCommand, StorageManagementClearUi,
-  StorageManagementCommand, StorageManagementExportCommand, StorageManagementExportUi,
-  StorageManagementUi, StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand,
-  TerminalCheckLayout, TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
+  ScreensaverListCommand, ScreensaverListUi, ScreensaverOverlayUi, ScreensaverPackageCommand,
+  ScreensaverPackageUi, ScreenshotCaptureCommand, ScreenshotCaptureUi, SecurityDetailsCommand,
+  SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
+  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
+  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
+  StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
+  TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
-use std::time::Duration;
+use std::{
+  collections::HashMap,
+  time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 const SCREENSHOT_DOUBLE_F1_WINDOW: Duration = Duration::from_millis(300);
 
@@ -56,6 +61,17 @@ pub(super) struct ExportLoadingRuntime {
 enum ScreenshotModeToastKind {
   Enter,
   Exit,
+  Operation {
+    copy_succeeded: Option<bool>,
+    save: Option<ScreenshotSaveState>,
+  },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ScreenshotSaveState {
+  Loading,
+  Succeeded,
+  Failed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,17 +106,19 @@ impl ScreenshotModeToast {
     }
   }
 
-  fn key(self) -> &'static str {
-    match self.kind {
-      ScreenshotModeToastKind::Enter => "screenshot.mode.enter",
-      ScreenshotModeToastKind::Exit => "screenshot.mode.exit",
-    }
-  }
-
   fn update(&mut self, dt: Duration) -> bool {
     self.elapsed = self.elapsed.saturating_add(dt);
-    self.elapsed < Duration::from_secs(3)
+    let duration = match self.kind {
+      ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => Duration::from_secs(3),
+      ScreenshotModeToastKind::Operation { .. } => Duration::from_secs(2),
+    };
+    self.elapsed < duration
   }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PendingScreenshotSave {
+  copy_succeeded: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -166,7 +184,15 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let registry = services.i18n.language_registry().to_vec();
   let mut home_ui = HomeUi::init(&services.hit_area);
   let mut settings_ui = SettingsUi::init(&services.hit_area);
-  let mut display_settings_ui = DisplaySettingsUi::init(&services.hit_area);
+  let mut display_settings_ui = DisplaySettingsUi::init(
+    &services.hit_area,
+    services.storage.display_settings_profile().clone(),
+  );
+  let mut screensaver_list_ui = ScreensaverListUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
   let mut security_uis = SecurityUis {
     settings: SecuritySettingsUi::init(&services.hit_area),
     details: SecurityDetailsUi::init(
@@ -218,7 +244,18 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut clear_warning_ui = ClearWarningUi::init(&services.hit_area);
   let mut export_settings_ui = ExportSettingsUi::init(&services.hit_area, &services.text_input);
   let mut screenshot_capture_ui = ScreenshotCaptureUi::init();
+  let mut screensaver_overlay_ui = ScreensaverOverlayUi::init();
+  let screensaver_random = services.random.create(
+    &mut services.runtime_objects,
+    RandomSeed::U64(
+      SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64,
+    ),
+  );
   let mut screenshot_mode_toast: Option<ScreenshotModeToast> = None;
+  let mut pending_screenshot_saves = HashMap::new();
   let mut pending_screenshot_hotkey: Option<PendingScreenshotHotkey> = None;
   let mut language_loading = LanguageLoadingRuntime::default();
   let mut export_loading = ExportLoadingRuntime::default();
@@ -272,6 +309,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       services,
       world,
     );
+    apply_screenshot_events(
+      &engine_events.screenshot,
+      &mut pending_screenshot_saves,
+      &mut screenshot_mode_toast,
+    );
 
     services.input.poll_resize_events(|w, h| {
       services.layout.resize_physical(w, h);
@@ -290,6 +332,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut home_ui,
       &mut settings_ui,
       &mut display_settings_ui,
+      &mut screensaver_list_ui,
       &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
@@ -316,6 +359,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut home_ui,
       &mut settings_ui,
       &mut display_settings_ui,
+      &mut screensaver_list_ui,
       &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
@@ -333,11 +377,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut clear_warning_ui,
       &mut export_settings_ui,
       &mut screenshot_capture_ui,
+      &mut screensaver_overlay_ui,
+      screensaver_random,
       &mut export_loading_ui,
       &mut language_loading_ui,
       &mut language_loading,
       &mut export_loading,
       &mut screenshot_mode_toast,
+      &mut pending_screenshot_saves,
       &mut pending_screenshot_hotkey,
     );
     update_pending_screenshot_hotkey(
@@ -348,7 +395,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut pending_screenshot_hotkey,
     );
     let dismiss_screenshot_toast = screenshot_capture_ui.take_mode_toast_dismiss_requested();
-    if dismiss_screenshot_toast
+    let dismiss_screenshot_operation_toast =
+      screenshot_capture_ui.take_operation_toast_dismiss_requested();
+    let should_dismiss_screenshot_toast =
+      screenshot_mode_toast.is_some_and(|toast| match toast.kind {
+        ScreenshotModeToastKind::Operation { .. } => dismiss_screenshot_operation_toast,
+        ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => dismiss_screenshot_toast,
+      });
+    if should_dismiss_screenshot_toast
       && world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture)
     {
       screenshot_mode_toast = None;
@@ -366,6 +420,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut home_ui,
       &mut settings_ui,
       &mut display_settings_ui,
+      &mut screensaver_list_ui,
       &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
@@ -401,6 +456,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut home_ui,
       &mut settings_ui,
       &mut display_settings_ui,
+      &mut screensaver_list_ui,
       &mut security_uis,
       &mut storage_management_ui,
       &mut storage_management_clear_ui,
@@ -418,6 +474,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut clear_warning_ui,
       &mut export_settings_ui,
       &mut screenshot_capture_ui,
+      &mut screensaver_overlay_ui,
       &mut export_loading_ui,
       &mut language_loading_ui,
     );
@@ -439,6 +496,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       services.screenshot.remember_presented_frame(composed);
     }
 
+    scheduler.set_target_fps(
+      services
+        .storage
+        .display_settings_profile()
+        .game_list_fps
+        .target_fps(),
+    );
     scheduler.wait_for_next_frame();
   }
 
@@ -454,6 +518,28 @@ fn sync_input_method_policy(services: &mut EngineServices) {
   let _ = services.input_method.set_policy(policy);
 }
 
+fn apply_screenshot_events(
+  events: &[ScreenshotAsyncEvent],
+  pending: &mut HashMap<TaskId, PendingScreenshotSave>,
+  toast: &mut Option<ScreenshotModeToast>,
+) {
+  for event in events {
+    let (task_id, save) = match event {
+      ScreenshotAsyncEvent::Saved { task_id, .. } => (*task_id, ScreenshotSaveState::Succeeded),
+      ScreenshotAsyncEvent::Failed { task_id, .. } => (*task_id, ScreenshotSaveState::Failed),
+    };
+    let Some(context) = pending.remove(&task_id) else {
+      continue;
+    };
+    *toast = Some(ScreenshotModeToast::new(
+      ScreenshotModeToastKind::Operation {
+        copy_succeeded: context.copy_succeeded,
+        save: Some(save),
+      },
+    ));
+  }
+}
+
 fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<ScreenshotModeToast>) {
   let Some(toast) = toast else {
     return;
@@ -462,7 +548,7 @@ fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<Scree
   if size.width < 8 || size.height < 3 {
     return;
   }
-  let text = services.i18n.get_runtime_text("screenshot", toast.key());
+  let text = screenshot_toast_text(services, toast.kind);
   let width = services
     .layout
     .get_text_width(&text, None)
@@ -481,6 +567,30 @@ fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<Scree
       g: 76,
       b: 76,
     },
+    ScreenshotModeToastKind::Operation {
+      copy_succeeded,
+      save,
+    } => {
+      if copy_succeeded == Some(false) || save == Some(ScreenshotSaveState::Failed) {
+        TextColor::Rgb {
+          r: 255,
+          g: 76,
+          b: 76,
+        }
+      } else if save == Some(ScreenshotSaveState::Loading) {
+        TextColor::Rgb {
+          r: 249,
+          g: 232,
+          b: 147,
+        }
+      } else {
+        TextColor::Rgb {
+          r: 95,
+          g: 215,
+          b: 105,
+        }
+      }
+    }
   };
   services.render.draw_top_border_rect(
     &mut services.canvas,
@@ -506,6 +616,35 @@ fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<Scree
       ..Default::default()
     },
   );
+}
+
+fn screenshot_toast_text(services: &EngineServices, kind: ScreenshotModeToastKind) -> String {
+  let text = |key| services.i18n.get_runtime_text("screenshot", key);
+  match kind {
+    ScreenshotModeToastKind::Enter => text("screenshot.mode.enter"),
+    ScreenshotModeToastKind::Exit => text("screenshot.mode.exit"),
+    ScreenshotModeToastKind::Operation {
+      copy_succeeded,
+      save,
+    } => {
+      let mut parts = Vec::new();
+      if let Some(succeeded) = copy_succeeded {
+        parts.push(text(if succeeded {
+          "screenshot.mode.copy.success"
+        } else {
+          "screenshot.mode.copy.failed"
+        }));
+      }
+      if let Some(state) = save {
+        parts.push(text(match state {
+          ScreenshotSaveState::Loading => "screenshot.mode.save_png.loading",
+          ScreenshotSaveState::Succeeded => "screenshot.mode.save_png.success",
+          ScreenshotSaveState::Failed => "screenshot.mode.save_png.failed",
+        }));
+      }
+      parts.join(" / ")
+    }
+  }
 }
 
 fn restore_input_modes_if_scope_changed(
@@ -554,6 +693,7 @@ fn route_frame_input(
   home_ui: &mut HomeUi,
   settings_ui: &mut SettingsUi,
   display_settings_ui: &mut DisplaySettingsUi,
+  screensaver_list_ui: &mut ScreensaverListUi,
   security_uis: &mut SecurityUis,
   storage_management_ui: &mut StorageManagementUi,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -571,11 +711,14 @@ fn route_frame_input(
   clear_warning_ui: &mut ClearWarningUi,
   export_settings_ui: &mut ExportSettingsUi,
   screenshot_capture_ui: &mut ScreenshotCaptureUi,
+  screensaver_overlay_ui: &mut ScreensaverOverlayUi,
+  screensaver_random: RandomGeneratorId,
   _export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
   _export_loading: &mut ExportLoadingRuntime,
   screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
+  pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
   pending_screenshot_hotkey: &mut Option<PendingScreenshotHotkey>,
 ) {
   if handle_screenshot_hotkey(
@@ -583,8 +726,13 @@ fn route_frame_input(
     world,
     screenshot_capture_ui,
     screenshot_mode_toast,
+    pending_screenshot_saves,
     pending_screenshot_hotkey,
   ) {
+    return;
+  }
+
+  if handle_screensaver_hotkey(services, world, screensaver_overlay_ui, screensaver_random) {
     return;
   }
 
@@ -597,6 +745,7 @@ fn route_frame_input(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -628,6 +777,7 @@ fn route_frame_input(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -658,6 +808,7 @@ fn route_frame_input(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -715,11 +866,27 @@ fn route_frame_input(
       &services.storage,
       &mut services.log,
     ) {
-      apply_screenshot_capture_command(command, services, world, screenshot_capture_ui);
+      apply_screenshot_capture_command(
+        command,
+        services,
+        world,
+        screenshot_capture_ui,
+        screenshot_mode_toast,
+        pending_screenshot_saves,
+      );
       if world.state.current_overlay_kind() != Some(OverlayKind::ScreenshotCapture) {
         *screenshot_mode_toast = Some(ScreenshotModeToast::new(ScreenshotModeToastKind::Exit));
       }
     }
+  } else if world.state.current_overlay_kind() == Some(OverlayKind::Screensaver) {
+    services
+      .input
+      .dispatch_system_action_events(&mut services.log);
+    while let Some(event) = services.input.next_action_event() {
+      let _ = handle_host_key_action(event.action.as_str(), event.state, world);
+    }
+    services.input.clear();
+    let _ = services.input.drain_system_events();
   } else if matches!(
     world.state.current_overlay_kind(),
     Some(OverlayKind::LanguageLoading | OverlayKind::ExportLoading)
@@ -745,6 +912,7 @@ fn route_frame_input(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -771,6 +939,7 @@ fn route_frame_input(
       home_ui,
       settings_ui,
       display_settings_ui,
+      screensaver_list_ui,
       security_uis,
       storage_management_ui,
       storage_management_clear_ui,
@@ -801,6 +970,7 @@ fn handle_screenshot_hotkey(
   world: &mut RuntimeWorld,
   screenshot_ui: &mut ScreenshotCaptureUi,
   screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
+  pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
   pending_screenshot_hotkey: &mut Option<PendingScreenshotHotkey>,
 ) -> bool {
   if !services.input.was_pressed(Key::Fn(1)) {
@@ -816,7 +986,14 @@ fn handle_screenshot_hotkey(
     } else {
       ScreenshotCaptureCommand::Exit
     };
-    apply_screenshot_capture_command(command, services, world, screenshot_ui);
+    apply_screenshot_capture_command(
+      command,
+      services,
+      world,
+      screenshot_ui,
+      screenshot_mode_toast,
+      pending_screenshot_saves,
+    );
     if world.state.current_overlay_kind() != Some(OverlayKind::ScreenshotCapture) {
       *screenshot_mode_toast = Some(ScreenshotModeToast::new(ScreenshotModeToastKind::Exit));
     }
@@ -825,7 +1002,7 @@ fn handle_screenshot_hotkey(
   }
 
   if pending_screenshot_hotkey.take().is_some() {
-    save_last_frame_screenshot(services);
+    save_last_frame_screenshot(services, screenshot_mode_toast, pending_screenshot_saves);
     services.input.clear();
     return true;
   }
@@ -833,6 +1010,114 @@ fn handle_screenshot_hotkey(
   *pending_screenshot_hotkey = Some(PendingScreenshotHotkey::new());
   services.input.clear();
   true
+}
+
+fn handle_screensaver_hotkey(
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+  screensaver_ui: &mut ScreensaverOverlayUi,
+  random_id: RandomGeneratorId,
+) -> bool {
+  if !services.input.was_pressed(Key::Fn(3)) {
+    return false;
+  }
+  if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
+    services.input.clear();
+    return true;
+  }
+
+  let screensaver_active = world
+    .state
+    .runtime()
+    .is_some_and(|runtime| runtime.overlays().get(OverlayKind::Screensaver).is_some());
+  if screensaver_active {
+    let _ = world
+      .state
+      .remove_overlay_kind(OverlayKind::WindowSizeWarning);
+    let _ = world.state.remove_overlay_kind(OverlayKind::Screensaver);
+    services.input.clear();
+    return true;
+  }
+
+  let Some(entry) = select_screensaver(services, random_id) else {
+    services.log.info(
+      LogSource::Runtime,
+      "Screensaver hotkey ignored: no enabled screensaver",
+    );
+    services.input.clear();
+    return true;
+  };
+  let _ = world
+    .state
+    .remove_overlay_kind(OverlayKind::WindowSizeWarning);
+  screensaver_ui.start(&entry);
+  world
+    .state
+    .push_screensaver_overlay(entry.min_width, entry.min_height);
+  services.input.clear();
+  true
+}
+
+fn select_screensaver(
+  services: &mut EngineServices,
+  random_id: RandomGeneratorId,
+) -> Option<PackageListEntry> {
+  let package_state = services
+    .storage
+    .read_package_state_or_default(&mut services.log);
+  let defaults = &package_state.defaults;
+  let mut entries = services
+    .package
+    .screensaver_list()
+    .into_iter()
+    .filter(|entry| {
+      package_state
+        .screensavers
+        .get(&entry.mod_id)
+        .map_or(defaults.enabled, |state| state.enabled)
+    })
+    .collect::<Vec<_>>();
+  if entries.is_empty() {
+    return None;
+  }
+  entries.sort_by(|left, right| {
+    let left_order = package_state
+      .screensavers
+      .get(&left.mod_id)
+      .and_then(|state| state.order)
+      .unwrap_or(u32::MAX);
+    let right_order = package_state
+      .screensavers
+      .get(&right.mod_id)
+      .and_then(|state| state.order)
+      .unwrap_or(u32::MAX);
+    left_order
+      .cmp(&right_order)
+      .then_with(|| left.mod_id.cmp(&right.mod_id))
+  });
+
+  let mut display = services.storage.display_settings_profile().clone();
+  let index = match display.screensaver_order {
+    DisplayOrderMode::Random => services.random.int_range(
+      &mut services.runtime_objects,
+      random_id,
+      0,
+      entries.len() as i64,
+    )? as usize,
+    DisplayOrderMode::Order => {
+      let index = sequential_screensaver_index(display.screensaver_sequence_cursor, entries.len())?;
+      display.screensaver_sequence_cursor = display.screensaver_sequence_cursor.wrapping_add(1);
+      let _ = services
+        .storage
+        .write_display_settings_profile(&display, &mut services.log);
+      index
+    }
+  };
+  entries.get(index).cloned()
+}
+
+fn sequential_screensaver_index(cursor: u64, enabled_count: usize) -> Option<usize> {
+  (enabled_count > 0).then(|| (cursor % enabled_count as u64) as usize)
 }
 
 fn update_pending_screenshot_hotkey(
@@ -876,7 +1161,11 @@ fn start_screenshot_capture(
   services.input.clear();
 }
 
-fn save_last_frame_screenshot(services: &mut EngineServices) {
+fn save_last_frame_screenshot(
+  services: &mut EngineServices,
+  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
+  pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
+) {
   let Some(frame) = services.screenshot.capture_last_frame() else {
     services.log.warn(
       LogSource::Render,
@@ -890,7 +1179,19 @@ fn save_last_frame_screenshot(services: &mut EngineServices) {
     width: frame.width(),
     height: frame.height(),
   };
-  submit_screenshot_png(services, frame, rect);
+  let task_id = submit_screenshot_png(services, frame, rect);
+  pending_screenshot_saves.insert(
+    task_id,
+    PendingScreenshotSave {
+      copy_succeeded: None,
+    },
+  );
+  *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+    ScreenshotModeToastKind::Operation {
+      copy_succeeded: None,
+      save: Some(ScreenshotSaveState::Loading),
+    },
+  ));
 }
 
 fn apply_screenshot_capture_command(
@@ -898,6 +1199,8 @@ fn apply_screenshot_capture_command(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
   screenshot_ui: &mut ScreenshotCaptureUi,
+  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
+  pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
 ) {
   match command {
     ScreenshotCaptureCommand::Exit => {
@@ -907,48 +1210,82 @@ fn apply_screenshot_capture_command(
     }
     ScreenshotCaptureCommand::Copy => {
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
-        copy_screenshot_text(services, &frame, rect);
+        let copied = copy_screenshot_text(services, &frame, rect);
         let _ =
           services
             .screenshot
             .write_json(&services.storage, &frame, rect, None, &mut services.log);
-        let _ = world
-          .state
-          .remove_overlay_kind(OverlayKind::ScreenshotCapture);
+        screenshot_ui.clear_selection();
+        *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+          ScreenshotModeToastKind::Operation {
+            copy_succeeded: Some(copied),
+            save: None,
+          },
+        ));
       }
     }
     ScreenshotCaptureCommand::CopyRichText => {
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
-        copy_screenshot_rich_text(services, &frame, rect);
+        let copied = copy_screenshot_rich_text(services, &frame, rect);
         let _ =
           services
             .screenshot
             .write_json(&services.storage, &frame, rect, None, &mut services.log);
-        let _ = world
-          .state
-          .remove_overlay_kind(OverlayKind::ScreenshotCapture);
+        screenshot_ui.clear_selection();
+        *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+          ScreenshotModeToastKind::Operation {
+            copy_succeeded: Some(copied),
+            save: None,
+          },
+        ));
       }
     }
     ScreenshotCaptureCommand::SavePng => {
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
-        submit_screenshot_png(services, frame, rect);
-        let _ = world
-          .state
-          .remove_overlay_kind(OverlayKind::ScreenshotCapture);
+        let task_id = submit_screenshot_png(services, frame, rect);
+        pending_screenshot_saves.insert(
+          task_id,
+          PendingScreenshotSave {
+            copy_succeeded: None,
+          },
+        );
+        screenshot_ui.clear_selection();
+        *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+          ScreenshotModeToastKind::Operation {
+            copy_succeeded: None,
+            save: Some(ScreenshotSaveState::Loading),
+          },
+        ));
       }
     }
     ScreenshotCaptureCommand::All => {
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
-        copy_screenshot_text(services, &frame, rect);
-        submit_screenshot_png(services, frame, rect);
-        let _ = world
-          .state
-          .remove_overlay_kind(OverlayKind::ScreenshotCapture);
+        let copied = copy_screenshot_text(services, &frame, rect);
+        let task_id = submit_screenshot_png(services, frame, rect);
+        pending_screenshot_saves.insert(
+          task_id,
+          PendingScreenshotSave {
+            copy_succeeded: Some(copied),
+          },
+        );
+        screenshot_ui.clear_selection();
+        *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+          ScreenshotModeToastKind::Operation {
+            copy_succeeded: Some(copied),
+            save: Some(ScreenshotSaveState::Loading),
+          },
+        ));
       }
     }
     ScreenshotCaptureCommand::FullFrameSave => {
       if let Some((frame, rect)) = screenshot_ui.whole_frame() {
-        submit_screenshot_png(services, frame, rect);
+        let task_id = submit_screenshot_png(services, frame, rect);
+        pending_screenshot_saves.insert(
+          task_id,
+          PendingScreenshotSave {
+            copy_succeeded: None,
+          },
+        );
       }
       let _ = world
         .state
@@ -961,35 +1298,39 @@ fn copy_screenshot_text(
   services: &mut EngineServices,
   frame: &crate::host_engine::services::ComposedFrame,
   rect: crate::host_engine::services::ScreenshotRect,
-) {
+) -> bool {
   let text = ScreenshotService::plain_text(frame, rect);
-  if !services.clipboard.write_text(&text) {
+  let copied = services.clipboard.write_text(&text);
+  if !copied {
     services.log.warn(
       LogSource::Storage,
       "Failed to copy screenshot text to clipboard",
     );
   }
+  copied
 }
 
 fn copy_screenshot_rich_text(
   services: &mut EngineServices,
   frame: &crate::host_engine::services::ComposedFrame,
   rect: crate::host_engine::services::ScreenshotRect,
-) {
+) -> bool {
   let text = ScreenshotService::rich_text(frame, rect);
-  if !services.clipboard.write_text(&text) {
+  let copied = services.clipboard.write_text(&text);
+  if !copied {
     services.log.warn(
       LogSource::Storage,
       "Failed to copy screenshot rich text to clipboard",
     );
   }
+  copied
 }
 
 fn submit_screenshot_png(
   services: &mut EngineServices,
   frame: crate::host_engine::services::ComposedFrame,
   rect: crate::host_engine::services::ScreenshotRect,
-) {
+) -> TaskId {
   let png_path = ScreenshotService::next_png_path(&services.storage);
   let _ = services.screenshot.write_json(
     &services.storage,
@@ -998,11 +1339,23 @@ fn submit_screenshot_png(
     Some(&png_path),
     &mut services.log,
   );
-  let _ = services
+  services
     .async_runtime
     .submit(EngineTask::Screenshot(ScreenshotTask {
       frame,
       selection: rect,
       png_path,
-    }));
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::sequential_screensaver_index;
+
+  #[test]
+  fn screensaver_sequence_handles_empty_and_changed_enabled_lists() {
+    assert_eq!(sequential_screensaver_index(8, 0), None);
+    assert_eq!(sequential_screensaver_index(8, 5), Some(3));
+    assert_eq!(sequential_screensaver_index(5, 5), Some(0));
+  }
 }
