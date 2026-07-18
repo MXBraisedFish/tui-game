@@ -1128,7 +1128,12 @@ pub(super) fn handle_host_key_action(
   world: &mut RuntimeWorld,
 ) -> bool {
   match action {
-    HOST_KEY_SCREENSHOT | HOST_KEY_RECORDING | HOST_KEY_SCREENSAVER => true,
+    HOST_KEY_SCREENSHOT
+    | HOST_KEY_RECORDING
+    | HOST_KEY_SCREENSAVER
+    | HOST_KEY_TOP_TOOLBAR
+    | HOST_KEY_RECORDING_PAUSE
+    | HOST_KEY_TOP_TOOLBAR_SWITCH => true,
     HOST_KEY_FORCE_STOP => {
       if state == KeyState::Pressed {
         world.state.enter_shutdown();

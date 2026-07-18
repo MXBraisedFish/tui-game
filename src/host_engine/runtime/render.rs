@@ -29,9 +29,12 @@ pub(super) fn route_render(
   screensaver_overlay_ui: &mut ScreensaverOverlayUi,
   export_loading_ui: &mut ExportLoadingUi,
   language_loading_ui: &mut LanguageLoadingUi,
+  top_toolbar: &mut TopToolbarRuntime,
+  image_queue: usize,
+  image_progress: Option<f32>,
 ) -> Option<(u16, u16)> {
   if let Some(OverlayKind::WindowSizeWarning) = world.state.current_overlay_kind() {
-    apply_host_viewport(services);
+    apply_host_viewport(services, false);
     let runtime = world.state.runtime().unwrap();
     let overlay = runtime.overlays().top().unwrap();
     let req_w = overlay.render.required_width;
@@ -59,7 +62,7 @@ pub(super) fn route_render(
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
-    apply_host_viewport(services);
+    apply_host_viewport(services, false);
     screenshot_capture_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -70,7 +73,7 @@ pub(super) fn route_render(
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::Screensaver) {
-    apply_host_viewport(services);
+    apply_host_viewport(services, false);
     screensaver_overlay_ui.objects_mut().begin_render();
     services
       .canvas
@@ -85,7 +88,7 @@ pub(super) fn route_render(
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
-    apply_host_viewport(services);
+    apply_host_viewport(services, false);
     language_loading_ui.objects_mut().begin_render();
     services
       .canvas
@@ -102,7 +105,7 @@ pub(super) fn route_render(
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::ExportLoading) {
-    apply_host_viewport(services);
+    apply_host_viewport(services, false);
     export_loading_ui.objects_mut().begin_render();
     services
       .canvas
@@ -119,7 +122,7 @@ pub(super) fn route_render(
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::SafeModeWarning) {
-    apply_host_viewport(services);
+    apply_host_viewport(services, false);
     safe_mode_warning_ui.objects_mut().begin_render();
     services
       .canvas
@@ -136,7 +139,7 @@ pub(super) fn route_render(
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::ClearWarning) {
-    apply_host_viewport(services);
+    apply_host_viewport(services, false);
     clear_warning_ui.objects_mut().begin_render();
     services
       .canvas
@@ -152,7 +155,7 @@ pub(super) fn route_render(
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::ExportSettings) {
-    apply_host_viewport(services);
+    apply_host_viewport(services, false);
     export_settings_ui.objects_mut().begin_render();
     services
       .canvas
@@ -168,7 +171,8 @@ pub(super) fn route_render(
     return None;
   }
 
-  apply_host_viewport(services);
+  let show_top_toolbar = services.storage.display_settings_profile().top_toolbar;
+  apply_host_viewport(services, show_top_toolbar);
 
   if let Some(objects) = current_objects_mut(
     world,
@@ -387,6 +391,10 @@ pub(super) fn route_render(
       );
     }
     _ => {}
+  }
+
+  if show_top_toolbar {
+    top_toolbar.render(services, image_queue, image_progress);
   }
 
   None

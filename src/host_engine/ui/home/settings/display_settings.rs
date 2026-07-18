@@ -29,7 +29,6 @@ pub struct DisplaySettingsUi {
   menu_areas: [HitAreaId; MENU_LEN],
   logo_mode: DisplayLogoMode,
   top_toolbar: bool,
-  top_toolbar_custom: bool,
   screensaver_source: DisplaySourceMode,
   screensaver_order: DisplayOrderMode,
   screensaver_sequence_cursor: u64,
@@ -75,13 +74,19 @@ impl DisplaySettingsUi {
       runtime_objects: RuntimeObjectPool::new(),
       logo_mode: profile.logo_mode,
       top_toolbar: profile.top_toolbar,
-      top_toolbar_custom: profile.top_toolbar_custom,
       screensaver_source: profile.screensaver_source,
       screensaver_order: profile.screensaver_order,
       screensaver_sequence_cursor: profile.screensaver_sequence_cursor,
       game_list_source: profile.game_list_source,
       game_list_error: profile.game_list_warnings,
       game_list_fps: profile.game_list_fps,
+    }
+  }
+
+  pub fn set_top_toolbar(&mut self, enabled: bool) {
+    self.top_toolbar = enabled;
+    if !enabled && self.selected_index == 2 {
+      self.selected_index = 1;
     }
   }
 
@@ -153,8 +158,9 @@ impl DisplaySettingsUi {
           return None;
         }
         self.selected_index = index;
-        self.switch_selected();
-        Some(DisplaySettingsCommand::Changed(self.profile()))
+        self
+          .switch_selected()
+          .then(|| DisplaySettingsCommand::Changed(self.profile()))
       }
       UiEvent::HitArea(HitAreaEvent::Press {
         button: MouseButton::Right,
@@ -169,10 +175,9 @@ impl DisplaySettingsUi {
           self.focus_next();
           None
         }
-        "display_settings.confirm" => {
-          self.switch_selected();
-          Some(DisplaySettingsCommand::Changed(self.profile()))
-        }
+        "display_settings.confirm" => self
+          .switch_selected()
+          .then(|| DisplaySettingsCommand::Changed(self.profile())),
         "display_settings.back" => Some(DisplaySettingsCommand::Back),
         "display_settings.focus_logo_random" => {
           self.selected_index = 0;
@@ -227,7 +232,11 @@ impl DisplaySettingsUi {
   ) {
     let viewport = layout.developer_viewport_rect();
     let rows = self.rows(i18n, layout);
-    let row_width = self.row_width(i18n, layout);
+    let row_width = rows
+      .iter()
+      .map(|row| layout.get_text_width(row, None))
+      .max()
+      .unwrap_or_default();
     let title = i18n.get_runtime_text(NS, "display_settings.title");
     let title_x = viewport.x.saturating_add(layout.resolve_x(
       LayoutService::ALIGN_CENTER,
@@ -309,25 +318,25 @@ impl DisplaySettingsUi {
     );
   }
 
-  fn switch_selected(&mut self) {
+  fn switch_selected(&mut self) -> bool {
     match self.selected_index {
       0 => self.logo_mode = self.logo_mode.next(),
       1 => self.top_toolbar = !self.top_toolbar,
-      2 if self.top_toolbar => self.top_toolbar_custom = !self.top_toolbar_custom,
+      2 => return false,
       3 => self.screensaver_source = self.screensaver_source.next(),
       4 => self.screensaver_order = self.screensaver_order.next(),
       5 => self.game_list_source = self.game_list_source.next(),
       6 => self.game_list_error = !self.game_list_error,
       7 => self.game_list_fps = self.game_list_fps.next(),
-      _ => {}
+      _ => return false,
     }
+    true
   }
 
   fn profile(&self) -> DisplaySettingsProfile {
     DisplaySettingsProfile {
       logo_mode: self.logo_mode,
       top_toolbar: self.top_toolbar,
-      top_toolbar_custom: self.top_toolbar_custom,
       screensaver_source: self.screensaver_source,
       screensaver_order: self.screensaver_order,
       screensaver_sequence_cursor: self.screensaver_sequence_cursor,
@@ -366,8 +375,13 @@ impl DisplaySettingsUi {
   fn rows(&self, i18n: &I18nService, layout: &LayoutService) -> [String; MENU_LEN] {
     let labels: [String; MENU_LEN] =
       std::array::from_fn(|index| i18n.get_runtime_text(NS, LABEL_KEYS[index]));
-    let values: [String; MENU_LEN] =
-      std::array::from_fn(|index| i18n.get_runtime_text(NS, self.value_key(index)));
+    let values: [String; MENU_LEN] = std::array::from_fn(|index| {
+      if index == 2 {
+        String::new()
+      } else {
+        i18n.get_runtime_text(NS, self.value_key(index))
+      }
+    });
     let label_width = labels
       .iter()
       .map(|label| layout.get_text_width(label, None))
@@ -401,34 +415,25 @@ impl DisplaySettingsUi {
           .saturating_sub(width)
           .saturating_add(bracket_width.saturating_sub(current_bracket_width)) as usize,
       );
-      format!(
-        "f%<fg:{label_color}>{prefix}{}{padding}  </fg><fg:white>[</fg><fg:{}>{}</fg><fg:white>]</fg><fg:{label_color}>{suffix}</fg>",
-        labels[index],
-        if enabled {
-          value_color(value_key)
-        } else {
-          "rgb(85,87,83)"
-        },
-        values[index],
-      )
+      if index == 2 {
+        let trailing = " ".repeat(bracket_width.saturating_add(2) as usize);
+        format!(
+          "f%<fg:{label_color}>{prefix}{}{padding}{trailing}{suffix}</fg>",
+          labels[index]
+        )
+      } else {
+        format!(
+          "f%<fg:{label_color}>{prefix}{}{padding}  </fg><fg:white>[</fg><fg:{}>{}</fg><fg:white>]</fg><fg:{label_color}>{suffix}</fg>",
+          labels[index],
+          if enabled {
+            value_color(value_key)
+          } else {
+            "rgb(85,87,83)"
+          },
+          values[index],
+        )
+      }
     })
-  }
-
-  fn row_width(&self, i18n: &I18nService, layout: &LayoutService) -> u16 {
-    let label_width = LABEL_KEYS
-      .iter()
-      .map(|key| layout.get_text_width(&i18n.get_runtime_text(NS, key), None))
-      .max()
-      .unwrap_or_default();
-    let bracket_width = (0..MENU_LEN)
-      .map(|index| layout.get_text_width(&i18n.get_runtime_text(NS, self.value_key(index)), None))
-      .max()
-      .unwrap_or_default()
-      .saturating_add(2);
-    label_width
-      .saturating_add(2)
-      .saturating_add(bracket_width)
-      .saturating_add(4)
   }
 
   fn value_key(&self, index: usize) -> &'static str {
@@ -436,8 +441,7 @@ impl DisplaySettingsUi {
       0 => self.logo_mode.key(),
       1 if self.top_toolbar => "display_settings.tool.top_toolbar.on",
       1 => "display_settings.tool.top_toolbar.off",
-      2 if self.top_toolbar_custom => "display_settings.tool.top_toolbar.on",
-      2 => "display_settings.tool.top_toolbar.off",
+      2 => "",
       3 => self.screensaver_source.screensaver_key(),
       4 => self.screensaver_order.key(),
       5 => self.game_list_source.game_list_key(),

@@ -1,9 +1,16 @@
 {
-  "toolbar.system_info.cpu": "<fg:brghit_red>CPU</fg> {cpu}",
-  "toolbar.system_info.gpu": "<fg:bright_blue>GPU</fg> {gpu}",
-  "toolbar.system_info.mem": "<fg:yellow>MEM</fg> {mem}",
+  "toolbar.system_info.cpu": "<fg:bright_red>CPU {cpu}</fg>",
+  "toolbar.system_info.gpu": "<fg:bright_blue>GPU {gpu}</fg>",
+  "toolbar.system_info.mem": "<fg:yellow>MEM {mem}</fg>",
   "toolbar.system_info.net": "<fg:bright_cyan>NET</fg>",
   "toolbar.system_info.net.upload": " <fg:bright_green>↑</fg>{upload}",
   "toolbar.system_info.net.download": "<fg:bright_red>↓</fg>{download}",
-  "toolbar.system_info.net.fps":"<fg:bright_magenta>FPS</fg> {fps}"
+  "toolbar.system_info.net.fps":"<fg:bright_magenta>FPS {fps}</fg>",
+  "toolbar.save_image.no": "No Image Export Tasks",
+  "toolbar.save_image.queue": "Queue: <fg:bright_red>{value:done}</fg>",
+  "toolbar.save_video.no": "No Video Export Tasks",
+  "toolbar.save_video.queue": "Queue: <fg:bright_red>{value:done}</fg>",
+  "toolbar.recording.stop": "Recording Stopped",
+  "toolbar.recording.pause": "<fg:yellow>▶ Recording Paused</fg>",
+  "toolbar.recording.active": "Recording"
 }

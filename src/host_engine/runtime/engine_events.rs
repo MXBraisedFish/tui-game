@@ -27,6 +27,15 @@ pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngin
       }
       EngineEvent::Export(event) => export_events.push(event),
       EngineEvent::Screenshot(event) => match event {
+        ScreenshotAsyncEvent::Progress {
+          task_id,
+          completed_rows,
+          total_rows,
+        } => screenshot_events.push(ScreenshotAsyncEvent::Progress {
+          task_id,
+          completed_rows,
+          total_rows,
+        }),
         ScreenshotAsyncEvent::Saved { task_id, png_path } => {
           services.log.info(
             LogSource::Storage,

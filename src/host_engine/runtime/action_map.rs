@@ -4,6 +4,9 @@ pub(super) const HOST_KEY_SCREENSHOT: &str = "host_key.screenshot";
 pub(super) const HOST_KEY_RECORDING: &str = "host_key.recording";
 pub(super) const HOST_KEY_SCREENSAVER: &str = "host_key.screensaver";
 pub(super) const HOST_KEY_FORCE_STOP: &str = "host_key.force_stop";
+pub(super) const HOST_KEY_TOP_TOOLBAR: &str = "host_key.top_toolbar";
+pub(super) const HOST_KEY_RECORDING_PAUSE: &str = "host_key.recording.pause";
+pub(super) const HOST_KEY_TOP_TOOLBAR_SWITCH: &str = "host_key.top_toolbar.switch";
 
 pub(super) fn load_host_key_action_map(services: &mut EngineServices) {
   let entries = vec![
@@ -34,6 +37,27 @@ pub(super) fn load_host_key_action_map(services: &mut EngineServices) {
         .i18n
         .get_runtime_text("host_key", "host_key.force_stop"),
       keys: vec![vec!["f4".to_string()]],
+    },
+    ActionMapEntry {
+      action: HOST_KEY_TOP_TOOLBAR.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.top_toolbar"),
+      keys: vec![vec!["f5".to_string()]],
+    },
+    ActionMapEntry {
+      action: HOST_KEY_RECORDING_PAUSE.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.recording.pause"),
+      keys: vec![vec!["f3".to_string(), "q".to_string()]],
+    },
+    ActionMapEntry {
+      action: HOST_KEY_TOP_TOOLBAR_SWITCH.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.top_toolbar.switch"),
+      keys: vec![vec!["f5".to_string(), "q".to_string()]],
     },
   ];
 

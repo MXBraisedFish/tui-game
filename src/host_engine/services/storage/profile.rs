@@ -77,7 +77,6 @@ pub enum DisplayFpsLimit {
 pub struct DisplaySettingsProfile {
   pub logo_mode: DisplayLogoMode,
   pub top_toolbar: bool,
-  pub top_toolbar_custom: bool,
   pub screensaver_source: DisplaySourceMode,
   pub screensaver_order: DisplayOrderMode,
   #[serde(default)]
@@ -157,7 +156,6 @@ impl Default for DisplaySettingsProfile {
     Self {
       logo_mode: DisplayLogoMode::Random,
       top_toolbar: true,
-      top_toolbar_custom: true,
       screensaver_source: DisplaySourceMode::All,
       screensaver_order: DisplayOrderMode::Random,
       screensaver_sequence_cursor: 0,
@@ -264,12 +262,6 @@ impl StorageService {
         defaults.top_toolbar,
         &mut repaired,
       ),
-      top_toolbar_custom: read_profile_field(
-        &mut values,
-        "top_toolbar_custom",
-        defaults.top_toolbar_custom,
-        &mut repaired,
-      ),
       screensaver_source: read_profile_field(
         &mut values,
         "screensaver_source",
@@ -324,11 +316,6 @@ impl StorageService {
     let mut values = read_json_object(&path);
     set_profile_field(&mut values, "logo_mode", profile.logo_mode);
     set_profile_field(&mut values, "top_toolbar", profile.top_toolbar);
-    set_profile_field(
-      &mut values,
-      "top_toolbar_custom",
-      profile.top_toolbar_custom,
-    );
     set_profile_field(
       &mut values,
       "screensaver_source",

@@ -32,6 +32,7 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "game_list",
   "screensaver_list",
   "screensaver_pack",
+  "toolbar",
 ];
 
 impl I18nService {

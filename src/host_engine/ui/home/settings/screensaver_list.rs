@@ -806,10 +806,15 @@ impl ScreensaverListUi {
     let sort = i18n.get_runtime_text("screensaver_list", self.sort_field.key());
     let label_w = UnicodeWidthStr::width(format!("[{}]{}", order, sort).as_str()) as u16;
     let line_w = pos.left.width.saturating_sub(label_w + 2);
+    let line_color = if self.active == ActiveList::Disabled {
+      "bright_green"
+    } else {
+      "bright_white"
+    };
     render.draw_host_text(canvas, &DrawTextParams {
       x: pos.left.x,
       y: pos.left_sort_y,
-      text: format!("f%<fg:bright_white>├[</fg><fg:bright_yellow>{}</fg><fg:bright_white>]</fg><fg:bright_green>{}</fg><fg:bright_white>{}┤</fg>", order, sort, "─".repeat(line_w as usize)),
+      text: format!("f%<fg:{line_color}>├[</fg><fg:bright_yellow>{}</fg><fg:{line_color}>]</fg><fg:bright_green>{}</fg><fg:{line_color}>{}┤</fg>", order, sort, "─".repeat(line_w as usize)),
       max_width: Some(pos.left.width),
       ..Default::default()
     });

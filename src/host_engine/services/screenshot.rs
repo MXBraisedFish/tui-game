@@ -36,8 +36,19 @@ pub struct ScreenshotTask {
 
 #[derive(Clone, Debug)]
 pub enum ScreenshotAsyncEvent {
-  Saved { task_id: TaskId, png_path: PathBuf },
-  Failed { task_id: TaskId, error: String },
+  Progress {
+    task_id: TaskId,
+    completed_rows: u16,
+    total_rows: u16,
+  },
+  Saved {
+    task_id: TaskId,
+    png_path: PathBuf,
+  },
+  Failed {
+    task_id: TaskId,
+    error: String,
+  },
 }
 
 pub struct ScreenshotService {
@@ -329,7 +340,13 @@ pub fn run_screenshot_task(
   task: ScreenshotTask,
   event_tx: &Sender<EngineEvent>,
 ) -> Result<(), String> {
-  match save_png(&task.frame, task.selection, &task.png_path) {
+  match save_png(
+    task_id,
+    &task.frame,
+    task.selection,
+    &task.png_path,
+    event_tx,
+  ) {
     Ok(()) => {
       let _ = event_tx.send(EngineEvent::Screenshot(ScreenshotAsyncEvent::Saved {
         task_id,
@@ -347,7 +364,13 @@ pub fn run_screenshot_task(
   }
 }
 
-fn save_png(frame: &ComposedFrame, rect: ScreenshotRect, path: &PathBuf) -> Result<(), String> {
+fn save_png(
+  task_id: TaskId,
+  frame: &ComposedFrame,
+  rect: ScreenshotRect,
+  path: &PathBuf,
+  event_tx: &Sender<EngineEvent>,
+) -> Result<(), String> {
   fs::create_dir_all(path.parent().ok_or("PNG path has no parent directory")?)
     .map_err(|error| error.to_string())?;
   let fonts = FontSet::load()?;
@@ -373,6 +396,12 @@ fn save_png(frame: &ComposedFrame, rect: ScreenshotRect, path: &PathBuf) -> Resu
         draw_underline(&mut image, x, y, fg);
       }
     }
+    send_progress(
+      event_tx,
+      task_id,
+      y.saturating_add(1),
+      rect.height.saturating_mul(2),
+    );
   }
 
   for y in 0..rect.height {
@@ -384,9 +413,28 @@ fn save_png(frame: &ComposedFrame, rect: ScreenshotRect, path: &PathBuf) -> Resu
         draw_cell_text(&mut image, &fonts, x, y, cell);
       }
     }
+    send_progress(
+      event_tx,
+      task_id,
+      rect.height.saturating_add(y).saturating_add(1),
+      rect.height.saturating_mul(2),
+    );
   }
 
   image.save(path).map_err(|error| error.to_string())
+}
+
+fn send_progress(
+  event_tx: &Sender<EngineEvent>,
+  task_id: TaskId,
+  completed_rows: u16,
+  total_rows: u16,
+) {
+  let _ = event_tx.send(EngineEvent::Screenshot(ScreenshotAsyncEvent::Progress {
+    task_id,
+    completed_rows,
+    total_rows,
+  }));
 }
 
 struct FontSet {

@@ -55,3 +55,4 @@ tree-sitter-toml = { package = "tree-sitter-toml-ng", version = "0.7.0" }
 tree-sitter-yaml = "0.7.2"
 tree-sitter-lua = "0.5.0"
 tree-sitter-bash = "0.25.1"
+sysinfo = "0.38.3"
