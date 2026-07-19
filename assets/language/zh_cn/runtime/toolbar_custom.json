@@ -1,0 +1,5 @@
+{
+  "toolbar_custom.tip": "f%开启顶部功能栏后，可通过 {key:host_key.top_toolbar} 切换至第五项自定义内容。\n该内容支持任意长度文本，并支持使用 f% 开头的样式标签，但不支持换行或替换标签。\n输入文本后，可在上方预览显示效果。",
+  "toolbar_custom.placeholder": "输入自定义文本",
+  "toolbar_custom.action.confirm": "[Enter] 确认"
+}

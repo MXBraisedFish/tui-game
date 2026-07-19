@@ -37,7 +37,7 @@ use crate::host_engine::ui::{
   StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
   StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
   StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
-  TerminalCheckUi, WindowSizeWarningCommand, WindowSizeWarningUi,
+  TerminalCheckUi, ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 use std::{
   collections::HashMap,
@@ -201,6 +201,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   load_host_key_action_map(services);
 
   let mut scheduler = FrameScheduler::new(60);
+  scheduler.set_target_fps(
+    services
+      .storage
+      .display_settings_profile()
+      .game_list_fps
+      .target_fps(),
+  );
 
   world.state.enter_init();
   set_crash_phase(world.state.crash_phase());
@@ -212,6 +219,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut settings_ui = SettingsUi::init(&services.hit_area);
   let mut display_settings_ui = DisplaySettingsUi::init(
     &services.hit_area,
+    &services.text_input,
     services.storage.display_settings_profile().clone(),
   );
   let mut screensaver_list_ui = ScreensaverListUi::init(
@@ -1129,6 +1137,15 @@ fn handle_host_chord_input(
   let f5_pressed = services.input.was_pressed(Key::Fn(5));
   let q_pressed = services.input.was_pressed(Key::Q);
 
+  if world.state.current_ui_kind() == Some(UiNodeKind::ToolbarCustom)
+    && (f5_pressed
+      || (q_pressed && (pending_toolbar.is_some() || services.input.is_down(Key::Fn(5)))))
+  {
+    *pending_toolbar = None;
+    services.input.clear();
+    return true;
+  }
+
   if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) && f3_pressed {
     services.input.clear();
     return true;
@@ -1153,12 +1170,10 @@ fn handle_host_chord_input(
   }
   if f3_pressed {
     *pending_screensaver = Some(PendingHostHotkey::new());
-    services.input.clear();
     return true;
   }
   if f5_pressed {
     *pending_toolbar = Some(PendingHostHotkey::new());
-    services.input.clear();
     return true;
   }
   false
@@ -1187,7 +1202,9 @@ fn update_pending_host_hotkeys(
     .is_some_and(|pending| !pending.update(dt))
   {
     *pending_toolbar = None;
-    toolbar.cycle();
+    if world.state.current_ui_kind() != Some(UiNodeKind::ToolbarCustom) {
+      toolbar.cycle();
+    }
   }
 }
 

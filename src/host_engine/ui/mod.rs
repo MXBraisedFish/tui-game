@@ -10,7 +10,7 @@ pub use home::{
   SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
   StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
   StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
-  StorageManagementViewCommand, StorageManagementViewUi,
+  StorageManagementViewCommand, StorageManagementViewUi, ToolbarCustomCommand,
 };
 pub use overlay::{
   ClearWarningCommand, ClearWarningTarget, ClearWarningUi, ExportFormat, ExportLoadingUi,

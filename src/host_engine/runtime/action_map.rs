@@ -10,6 +10,21 @@ pub(super) const HOST_KEY_TOP_TOOLBAR_SWITCH: &str = "host_key.top_toolbar.switc
 
 pub(super) fn load_host_key_action_map(services: &mut EngineServices) {
   let entries = vec![
+    // 组合键必须先于它们包含的单键注册；InputService 会按顺序消费已命中的键。
+    ActionMapEntry {
+      action: HOST_KEY_RECORDING_PAUSE.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.recording.pause"),
+      keys: vec![vec!["f3".to_string(), "q".to_string()]],
+    },
+    ActionMapEntry {
+      action: HOST_KEY_TOP_TOOLBAR_SWITCH.to_string(),
+      description: services
+        .i18n
+        .get_runtime_text("host_key", "host_key.top_toolbar.switch"),
+      keys: vec![vec!["f5".to_string(), "q".to_string()]],
+    },
     ActionMapEntry {
       action: HOST_KEY_SCREENSAVER.to_string(),
       description: services
@@ -45,20 +60,6 @@ pub(super) fn load_host_key_action_map(services: &mut EngineServices) {
         .get_runtime_text("host_key", "host_key.top_toolbar"),
       keys: vec![vec!["f5".to_string()]],
     },
-    ActionMapEntry {
-      action: HOST_KEY_RECORDING_PAUSE.to_string(),
-      description: services
-        .i18n
-        .get_runtime_text("host_key", "host_key.recording.pause"),
-      keys: vec![vec!["f3".to_string(), "q".to_string()]],
-    },
-    ActionMapEntry {
-      action: HOST_KEY_TOP_TOOLBAR_SWITCH.to_string(),
-      description: services
-        .i18n
-        .get_runtime_text("host_key", "host_key.top_toolbar.switch"),
-      keys: vec![vec!["f5".to_string(), "q".to_string()]],
-    },
   ];
 
   let bindings = translate_action_map(&entries).expect("failed to translate host key action map");
@@ -70,6 +71,7 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
     Some(UiNodeKind::Home) => load_home_action_map(services),
     Some(UiNodeKind::Settings) => load_settings_action_map(services),
     Some(UiNodeKind::DisplaySettings) => load_display_settings_action_map(services),
+    Some(UiNodeKind::ToolbarCustom) => {}
     Some(UiNodeKind::ScreensaverList) => load_screensaver_list_action_map(services),
     Some(UiNodeKind::SecuritySettings) => load_security_settings_action_map(services),
     Some(UiNodeKind::SecurityDetails) => load_security_details_action_map(services),

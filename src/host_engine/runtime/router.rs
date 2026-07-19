@@ -26,6 +26,7 @@ pub(super) fn current_objects_mut<'a>(
     Some(UiNodeKind::Home) => Some(home_ui.objects_mut()),
     Some(UiNodeKind::Settings) => Some(settings_ui.objects_mut()),
     Some(UiNodeKind::DisplaySettings) => Some(display_settings_ui.objects_mut()),
+    Some(UiNodeKind::ToolbarCustom) => Some(display_settings_ui.custom_mut().objects_mut()),
     Some(UiNodeKind::ScreensaverList) => Some(screensaver_list_ui.objects_mut()),
     Some(UiNodeKind::SecuritySettings) => Some(security_uis.settings.objects_mut()),
     Some(UiNodeKind::SecurityDetails) => Some(security_uis.details.objects_mut()),
@@ -87,6 +88,10 @@ pub(super) fn deactivate_hidden_pools(
   deactivate(
     UiNodeKind::DisplaySettings,
     display_settings_ui.objects_mut(),
+  );
+  deactivate(
+    UiNodeKind::ToolbarCustom,
+    display_settings_ui.custom_mut().objects_mut(),
   );
   deactivate(
     UiNodeKind::ScreensaverList,
@@ -562,6 +567,7 @@ pub(super) fn route_update(
     Some(UiNodeKind::DisplaySettings) => {
       let _ = display_settings_ui.update(world.clock.delta_time());
     }
+    Some(UiNodeKind::ToolbarCustom) => {}
     Some(UiNodeKind::ScreensaverList) => {
       let _ = screensaver_list_ui.update(world.clock.delta_time());
     }
@@ -1025,6 +1031,11 @@ fn route_input_event(
     Some(UiNodeKind::DisplaySettings) => {
       if let Some(command) = display_settings_ui.handle_event(event) {
         apply_display_settings_command(command, display_settings_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::ToolbarCustom) => {
+      if let Some(command) = display_settings_ui.custom_mut().handle_event(event) {
+        apply_toolbar_custom_command(command, display_settings_ui, services, world);
       }
     }
     Some(UiNodeKind::ScreensaverList) => {

@@ -1,0 +1,5 @@
+{
+  "toolbar_custom.tip": "f%After enabling the Top Toolbar, use {key:host_key.top_toolbar} to switch to the fifth custom item.\nThis item supports text of any length and f% style tags, but does not support line breaks or replacement tags.\nEnter text to preview the display effect above.",
+  "toolbar_custom.placeholder": "Enter custom text",
+  "toolbar_custom.action.confirm": "[Enter] Confirm"
+}

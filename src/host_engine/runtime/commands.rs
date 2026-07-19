@@ -109,13 +109,43 @@ pub(super) fn apply_display_settings_command(
         .storage
         .write_display_settings_profile(&profile, &mut services.log);
     }
+    DisplaySettingsCommand::OpenToolbarCustom => {
+      display_settings_ui
+        .custom_mut()
+        .enter(&mut services.text_input);
+      world.state.enter_ui_node(UiNodeState::toolbar_custom());
+    }
     DisplaySettingsCommand::Back => {
       world.state.pop_ui_node();
       clear_exiting_pool(display_settings_ui.objects_mut(), services);
       *display_settings_ui = DisplaySettingsUi::init(
         &services.hit_area,
+        &services.text_input,
         services.storage.display_settings_profile().clone(),
       );
+    }
+  }
+}
+
+pub(super) fn apply_toolbar_custom_command(
+  command: ToolbarCustomCommand,
+  display_settings_ui: &mut DisplaySettingsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    ToolbarCustomCommand::Changed(text) => display_settings_ui.set_custom_text(text),
+    ToolbarCustomCommand::Submit(text) => {
+      display_settings_ui.set_custom_text(text.clone());
+      let mut profile = services.storage.display_settings_profile().clone();
+      profile.top_toolbar_custom_text = text;
+      let _ = services
+        .storage
+        .write_display_settings_profile(&profile, &mut services.log);
+      display_settings_ui
+        .custom_mut()
+        .leave(&mut services.text_input);
+      world.state.pop_ui_node();
     }
   }
 }

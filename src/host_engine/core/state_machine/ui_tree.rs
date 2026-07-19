@@ -19,6 +19,7 @@ pub enum UiNodeKind {
   Home,
   Settings,
   DisplaySettings,
+  ToolbarCustom,
   ScreensaverList,
   SecuritySettings,
   SecurityDetails,
@@ -71,6 +72,14 @@ impl UiNodeState {
   pub fn display_settings() -> Self {
     Self {
       kind: UiNodeKind::DisplaySettings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn toolbar_custom() -> Self {
+    Self {
+      kind: UiNodeKind::ToolbarCustom,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

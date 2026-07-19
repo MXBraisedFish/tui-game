@@ -1,11 +1,12 @@
 use std::time::Duration;
 
+use super::toolbar_custom::ToolbarCustomUi;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DisplayFpsLimit, DisplayLogoMode, DisplayOrderMode,
   DisplaySettingsProfile, DisplaySourceMode, DrawTextParams, HitAreaEvent, HitAreaId,
   HitAreaOptions, HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect,
-  RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
-  UiObjectPoolOwner,
+  RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, TextInputService,
+  UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 const NS: &str = "display_settings";
@@ -35,11 +36,14 @@ pub struct DisplaySettingsUi {
   game_list_source: DisplaySourceMode,
   game_list_error: bool,
   game_list_fps: DisplayFpsLimit,
+  top_toolbar_custom_text: String,
+  custom: ToolbarCustomUi,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DisplaySettingsCommand {
   Back,
+  OpenToolbarCustom,
   Changed(DisplaySettingsProfile),
 }
 
@@ -64,8 +68,13 @@ impl RuntimeObjectPoolOwner for DisplaySettingsUi {
 }
 
 impl DisplaySettingsUi {
-  pub fn init(hit_area: &HitAreaService, profile: DisplaySettingsProfile) -> Self {
+  pub fn init(
+    hit_area: &HitAreaService,
+    text_input: &TextInputService,
+    profile: DisplaySettingsProfile,
+  ) -> Self {
     let mut objects = UiObjectPool::new();
+    let custom = ToolbarCustomUi::init(text_input, profile.top_toolbar_custom_text.clone());
     Self {
       selected_index: 0,
       back_area: hit_area.create(&mut objects, HitAreaOptions::default()),
@@ -80,6 +89,8 @@ impl DisplaySettingsUi {
       game_list_source: profile.game_list_source,
       game_list_error: profile.game_list_warnings,
       game_list_fps: profile.game_list_fps,
+      top_toolbar_custom_text: profile.top_toolbar_custom_text,
+      custom,
     }
   }
 
@@ -158,6 +169,9 @@ impl DisplaySettingsUi {
           return None;
         }
         self.selected_index = index;
+        if index == 2 {
+          return Some(DisplaySettingsCommand::OpenToolbarCustom);
+        }
         self
           .switch_selected()
           .then(|| DisplaySettingsCommand::Changed(self.profile()))
@@ -174,6 +188,9 @@ impl DisplaySettingsUi {
         "display_settings.focus_down" => {
           self.focus_next();
           None
+        }
+        "display_settings.confirm" if self.selected_index == 2 => {
+          Some(DisplaySettingsCommand::OpenToolbarCustom)
         }
         "display_settings.confirm" => self
           .switch_selected()
@@ -274,10 +291,15 @@ impl DisplaySettingsUi {
 
     hit_area.render_host(&mut self.objects, self.back_area, viewport, canvas);
     for (index, row) in rows.iter().enumerate() {
+      let draw_width = if index == 2 {
+        layout.get_text_width(row, None)
+      } else {
+        row_width
+      };
       let x =
         viewport
           .x
-          .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, row_width, 0));
+          .saturating_add(layout.resolve_x(LayoutService::ALIGN_CENTER, draw_width, 0));
       let y = start_y.saturating_add(index as u16);
       render.draw_host_text(
         canvas,
@@ -292,7 +314,7 @@ impl DisplaySettingsUi {
         Rect {
           x,
           y,
-          width: row_width,
+          width: draw_width,
           height: 1,
         }
       } else {
@@ -337,6 +359,7 @@ impl DisplaySettingsUi {
     DisplaySettingsProfile {
       logo_mode: self.logo_mode,
       top_toolbar: self.top_toolbar,
+      top_toolbar_custom_text: self.top_toolbar_custom_text.clone(),
       screensaver_source: self.screensaver_source,
       screensaver_order: self.screensaver_order,
       screensaver_sequence_cursor: self.screensaver_sequence_cursor,
@@ -344,6 +367,18 @@ impl DisplaySettingsUi {
       game_list_warnings: self.game_list_error,
       game_list_fps: self.game_list_fps,
     }
+  }
+
+  pub fn custom_mut(&mut self) -> &mut ToolbarCustomUi {
+    &mut self.custom
+  }
+
+  pub fn custom_text(&self) -> &str {
+    &self.top_toolbar_custom_text
+  }
+
+  pub fn set_custom_text(&mut self, text: String) {
+    self.top_toolbar_custom_text = text;
   }
 
   fn focus_previous(&mut self) {
@@ -416,11 +451,7 @@ impl DisplaySettingsUi {
           .saturating_add(bracket_width.saturating_sub(current_bracket_width)) as usize,
       );
       if index == 2 {
-        let trailing = " ".repeat(bracket_width.saturating_add(2) as usize);
-        format!(
-          "f%<fg:{label_color}>{prefix}{}{padding}{trailing}{suffix}</fg>",
-          labels[index]
-        )
+        format!("f%<fg:{label_color}>{prefix}{}{suffix}</fg>", labels[index])
       } else {
         format!(
           "f%<fg:{label_color}>{prefix}{}{padding}  </fg><fg:white>[</fg><fg:{}>{}</fg><fg:white>]</fg><fg:{label_color}>{suffix}</fg>",
@@ -469,27 +500,29 @@ impl DisplaySettingsUi {
 impl DisplayLogoMode {
   fn next(self) -> Self {
     match self {
-      Self::Random => Self::Order,
-      Self::Order => Self::Neon,
-      Self::Neon => Self::Sign,
-      Self::Sign => Self::Water,
-      Self::Water => Self::Error,
+      Self::Order => Self::Random,
+      Self::Random => Self::Classic,
+      Self::Classic => Self::Neon,
+      Self::Neon => Self::Wave,
+      Self::Wave => Self::Error,
       Self::Error => Self::Glitch,
-      Self::Glitch => Self::Building,
-      Self::Building => Self::Random,
+      Self::Glitch => Self::Select,
+      Self::Select => Self::Char,
+      Self::Char => Self::Order,
     }
   }
 
   fn key(self) -> &'static str {
     match self {
-      Self::Random => "display_settings.logo.random.random",
       Self::Order => "display_settings.logo.random.order",
+      Self::Random => "display_settings.logo.random.random",
+      Self::Classic => "display_settings.logo.random.classic",
       Self::Neon => "display_settings.logo.random.only.neon",
-      Self::Sign => "display_settings.logo.random.only.sign",
-      Self::Water => "display_settings.logo.random.only.water",
+      Self::Wave => "display_settings.logo.random.only.wave",
       Self::Error => "display_settings.logo.random.only.error",
       Self::Glitch => "display_settings.logo.random.only.glitch",
-      Self::Building => "display_settings.logo.random.only.select",
+      Self::Select => "display_settings.logo.random.only.select",
+      Self::Char => "display_settings.logo.random.only.char",
     }
   }
 }

@@ -13,6 +13,7 @@ pub mod mods;
 pub mod screensaver_list;
 pub mod security;
 pub mod storage_management;
+pub mod toolbar_custom;
 
 const SETTINGS_MENU_LEN: usize = 8;
 

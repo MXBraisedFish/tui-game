@@ -77,7 +77,7 @@ pub const DEFAULT_FILES: &[(&str, &str)] = &[
   (PROFILE_SCREENSHOT_FILE, r#"{"guide_seen":false}"#),
   (
     PROFILE_DISPLAY_SETTINGS_FILE,
-    r#"{"logo_mode":"random","top_toolbar":true,"screensaver_source":"all","screensaver_order":"random","screensaver_sequence_cursor":0,"game_list_source":"all","game_list_warnings":true,"game_list_fps":"fps60"}"#,
+    r#"{"logo_mode":"order","top_toolbar":true,"top_toolbar_custom_text":"","screensaver_source":"all","screensaver_order":"random","screensaver_sequence_cursor":0,"game_list_source":"all","game_list_warnings":true,"game_list_fps":"fps60"}"#,
   ),
   (TUI_LOG_FILE, ""),
   (LANGUAGE_REGISTRY_FILE, "{}"),

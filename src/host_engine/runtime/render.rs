@@ -174,6 +174,18 @@ pub(super) fn route_render(
   let show_top_toolbar = services.storage.display_settings_profile().top_toolbar;
   apply_host_viewport(services, show_top_toolbar);
 
+  if world.state.current_ui_kind() == Some(UiNodeKind::ScreensaverList) {
+    screensaver_list_ui.prepare_surfaces(
+      &services.layout,
+      &services.i18n,
+      &services.text_input,
+      &services.scroll_box,
+      &services.package,
+      &services.storage,
+      &mut services.log,
+    );
+  }
+
   if let Some(objects) = current_objects_mut(
     world,
     home_ui,
@@ -197,6 +209,7 @@ pub(super) fn route_render(
     services.canvas.prepare(objects, &services.layout);
   }
 
+  let mut input_cursor = None;
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
       home_ui.render(
@@ -225,6 +238,15 @@ pub(super) fn route_render(
         &services.hit_area,
       );
     }
+    Some(UiNodeKind::ToolbarCustom) => {
+      input_cursor = display_settings_ui.custom_mut().render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.text_input,
+      );
+    }
     Some(UiNodeKind::ScreensaverList) => {
       screensaver_list_ui.render(
         &mut services.render,
@@ -234,9 +256,6 @@ pub(super) fn route_render(
         &services.hit_area,
         &services.text_input,
         &services.scroll_box,
-        &services.package,
-        &services.storage,
-        &mut services.log,
       );
     }
     Some(UiNodeKind::SecuritySettings) => {
@@ -394,8 +413,15 @@ pub(super) fn route_render(
   }
 
   if show_top_toolbar {
-    top_toolbar.render(services, image_queue, image_progress);
+    let custom_text = (world.state.current_ui_kind() == Some(UiNodeKind::ToolbarCustom))
+      .then(|| display_settings_ui.custom_text().to_string());
+    top_toolbar.render(
+      services,
+      image_queue,
+      image_progress,
+      custom_text.as_deref(),
+    );
   }
 
-  None
+  input_cursor
 }

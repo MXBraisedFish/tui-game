@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, io};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use super::layout;
@@ -38,14 +38,15 @@ pub struct ScreenshotProfile {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplayLogoMode {
-  Random,
   Order,
+  Random,
+  Classic,
   Neon,
-  Sign,
-  Water,
+  Wave,
   Error,
   Glitch,
-  Building,
+  Select,
+  Char,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -77,6 +78,8 @@ pub enum DisplayFpsLimit {
 pub struct DisplaySettingsProfile {
   pub logo_mode: DisplayLogoMode,
   pub top_toolbar: bool,
+  #[serde(default)]
+  pub top_toolbar_custom_text: String,
   pub screensaver_source: DisplaySourceMode,
   pub screensaver_order: DisplayOrderMode,
   #[serde(default)]
@@ -154,8 +157,9 @@ impl Default for ScreensaverPackageState {
 impl Default for DisplaySettingsProfile {
   fn default() -> Self {
     Self {
-      logo_mode: DisplayLogoMode::Random,
+      logo_mode: DisplayLogoMode::Order,
       top_toolbar: true,
+      top_toolbar_custom_text: String::new(),
       screensaver_source: DisplaySourceMode::All,
       screensaver_order: DisplayOrderMode::Random,
       screensaver_sequence_cursor: 0,
@@ -262,6 +266,12 @@ impl StorageService {
         defaults.top_toolbar,
         &mut repaired,
       ),
+      top_toolbar_custom_text: read_profile_field(
+        &mut values,
+        "top_toolbar_custom_text",
+        defaults.top_toolbar_custom_text,
+        &mut repaired,
+      ),
       screensaver_source: read_profile_field(
         &mut values,
         "screensaver_source",
@@ -316,6 +326,11 @@ impl StorageService {
     let mut values = read_json_object(&path);
     set_profile_field(&mut values, "logo_mode", profile.logo_mode);
     set_profile_field(&mut values, "top_toolbar", profile.top_toolbar);
+    set_profile_field(
+      &mut values,
+      "top_toolbar_custom_text",
+      &profile.top_toolbar_custom_text,
+    );
     set_profile_field(
       &mut values,
       "screensaver_source",
@@ -739,12 +754,14 @@ mod tests {
     assert!(profile.top_toolbar);
     assert_eq!(profile.game_list_source, DisplaySourceMode::Mod);
     assert!(profile.game_list_warnings);
+    assert!(profile.top_toolbar_custom_text.is_empty());
 
     let json: Value =
       serde_json::from_str(&fs::read_to_string(storage.profile_display_settings_path()).unwrap())
         .unwrap();
     assert_eq!(json["custom_field"], 7);
     assert_eq!(json["top_toolbar"], true);
+    assert_eq!(json["top_toolbar_custom_text"], "");
     assert_eq!(json["screensaver_source"], "all");
   }
 
@@ -760,6 +777,7 @@ mod tests {
     let profile = DisplaySettingsProfile {
       game_list_source: DisplaySourceMode::Official,
       game_list_warnings: false,
+      top_toolbar_custom_text: "f%<fg:red>LIVE</fg>".to_string(),
       ..Default::default()
     };
 
@@ -773,5 +791,6 @@ mod tests {
     assert_eq!(json["custom_field"], "keep");
     assert_eq!(json["game_list_source"], "official");
     assert_eq!(json["game_list_warnings"], false);
+    assert_eq!(json["top_toolbar_custom_text"], "f%<fg:red>LIVE</fg>");
   }
 }

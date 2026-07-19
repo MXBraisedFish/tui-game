@@ -7,9 +7,10 @@ use crate::host_engine::services::{
   HitAreaId, HitAreaOptions, HitAreaService, I18nService, KeyState, LayoutService, LogService,
   MouseButton, Overflow, PackageListEntry, PackageService, PackageSource, Rect, RenderService,
   RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxId,
-  ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, StorageService,
-  TerminalColor, TextColor, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
-  TextInputRenderParams, TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility,
+  StorageService, TerminalColor, TextColor, TextInputEvent, TextInputId, TextInputMode,
+  TextInputOptions, TextInputRenderParams, TextInputService, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 const ACTIVE_BORDER: TextColor = TextColor::Rgb {
@@ -143,9 +144,10 @@ impl ScreensaverListUi {
             overflow_x: Overflow::Hidden,
             overflow_y: Overflow::Auto,
             scrollbar: ScrollbarPolicy {
-              vertical: ScrollbarVisibility::Never,
+              vertical: ScrollbarVisibility::Always,
               horizontal: ScrollbarVisibility::Never,
             },
+            scrollbar_layout: ScrollbarLayout::Inside,
             ..Default::default()
           },
         )
@@ -363,6 +365,21 @@ impl ScreensaverListUi {
     hit_area: &HitAreaService,
     text_input: &TextInputService,
     scroll_box: &ScrollBoxService,
+  ) {
+    let pos = self.compute_layout(layout, i18n, text_input);
+    self.draw_frame(render, canvas, i18n, &pos);
+    self.draw_search(text_input, canvas, i18n, &pos);
+    self.draw_lists(render, canvas, layout, i18n, &pos);
+    self.draw_hints(render, canvas, layout, i18n, text_input, &pos);
+    self.register_hit_areas(hit_area, scroll_box, canvas, &pos);
+  }
+
+  pub(crate) fn prepare_surfaces(
+    &mut self,
+    layout: &LayoutService,
+    i18n: &I18nService,
+    text_input: &TextInputService,
+    scroll_box: &ScrollBoxService,
     package: &PackageService,
     storage: &StorageService,
     log: &mut LogService,
@@ -370,11 +387,6 @@ impl ScreensaverListUi {
     self.sync_entries(package, storage, log);
     let pos = self.compute_layout(layout, i18n, text_input);
     self.prepare_scroll_boxes(scroll_box, layout, &pos);
-    self.draw_frame(render, canvas, i18n, &pos);
-    self.draw_search(text_input, canvas, i18n, &pos);
-    self.draw_lists(render, canvas, layout, i18n, &pos);
-    self.draw_hints(render, canvas, layout, i18n, text_input, &pos);
-    self.register_hit_areas(hit_area, scroll_box, canvas, &pos);
   }
 
   fn sync_entries(
@@ -693,19 +705,28 @@ impl ScreensaverListUi {
   ) {
     let left_len = self.disabled_entries().len() as u16;
     let right_len = self.enabled_entries().len() as u16;
-    let _ = scroll_box.set_rect(&mut self.objects, self.left_scroll, pos.left_list, layout);
-    let _ = scroll_box.set_rect(&mut self.objects, self.right_scroll, pos.right_list, layout);
+    let viewport = layout.developer_viewport_rect();
+    let local_rect = |rect: Rect| Rect {
+      x: rect.x.saturating_sub(viewport.x),
+      y: rect.y.saturating_sub(viewport.y),
+      width: rect.width,
+      height: rect.height,
+    };
+    let left_rect = local_rect(pos.left_list);
+    let right_rect = local_rect(pos.right_list);
+    let _ = scroll_box.set_rect(&mut self.objects, self.left_scroll, left_rect, layout);
+    let _ = scroll_box.set_rect(&mut self.objects, self.right_scroll, right_rect, layout);
     let _ = scroll_box.set_content_size(
       &mut self.objects,
       self.left_scroll,
-      pos.left_list.width.max(1),
+      left_rect.width.saturating_sub(1).max(1),
       left_len.max(pos.left_list.height).max(1),
       layout,
     );
     let _ = scroll_box.set_content_size(
       &mut self.objects,
       self.right_scroll,
-      pos.right_list.width.max(1),
+      right_rect.width.saturating_sub(1).max(1),
       right_len.max(pos.right_list.height).max(1),
       layout,
     );
@@ -886,7 +907,7 @@ impl ScreensaverListUi {
         None,
         index == self.left_selected,
         false,
-        pos.left_list.width,
+        pos.left_list.width.saturating_sub(1),
         i18n,
       );
     }
@@ -900,7 +921,7 @@ impl ScreensaverListUi {
         Some(index + 1),
         index == self.right_selected,
         self.right_locked,
-        pos.right_list.width,
+        pos.right_list.width.saturating_sub(1),
         i18n,
       );
     }
@@ -909,7 +930,10 @@ impl ScreensaverListUi {
         render,
         canvas,
         layout,
-        pos.left_list,
+        Rect {
+          width: pos.left_list.width.saturating_sub(1),
+          ..pos.left_list
+        },
         i18n.get_runtime_text("screensaver_list", "screensaver_list.left.no"),
       );
     }
@@ -918,7 +942,10 @@ impl ScreensaverListUi {
         render,
         canvas,
         layout,
-        pos.right_list,
+        Rect {
+          width: pos.right_list.width.saturating_sub(1),
+          ..pos.right_list
+        },
         i18n.get_runtime_text("screensaver_list", "screensaver_list.right.no"),
       );
     }
@@ -1204,7 +1231,7 @@ impl ScreensaverListUi {
         Rect {
           x: pos.left_list.x,
           y: pos.left_list.y.saturating_add((index - left_top) as u16),
-          width: pos.left_list.width,
+          width: pos.left_list.width.saturating_sub(1),
           height: 1,
         },
         canvas,
@@ -1223,7 +1250,7 @@ impl ScreensaverListUi {
         Rect {
           x: pos.right_list.x,
           y: pos.right_list.y.saturating_add((index - right_top) as u16),
-          width: pos.right_list.width,
+          width: pos.right_list.width.saturating_sub(1),
           height: 1,
         },
         canvas,

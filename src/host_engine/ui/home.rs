@@ -18,6 +18,7 @@ pub use settings::storage_management::{
   StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
   StorageManagementViewCommand, StorageManagementViewUi,
 };
+pub use settings::toolbar_custom::ToolbarCustomCommand;
 pub use settings::{SettingsUi, SettingsUiCommand};
 
 use std::time::Duration;
