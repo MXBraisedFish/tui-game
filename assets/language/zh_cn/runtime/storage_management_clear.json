@@ -9,5 +9,6 @@
   "storage_management.clear.data": "重置数据",
   "storage_management_clear.action.select": "{key:storage_management_clear.focus_up}/{key:storage_management_clear.focus_down} 选择",
   "storage_management_clear.action.focus": "{key:storage_management_clear.focus_cache}/{key:storage_management_clear.focus_log}/{key:storage_management_clear.focus_mod}/{key:storage_management_clear.focus_profile}/{key:storage_management_clear.focus_screenshot}/{key:storage_management_clear.focus_recording}/{key:storage_management_clear.focus_data} 聚焦",
+  "storage_management_clear.action.confirm": "{key:storage_management_clear.confirm} 确认",
   "storage_management_clear.action.back": "{key:storage_management_clear.back} 返回"
 }

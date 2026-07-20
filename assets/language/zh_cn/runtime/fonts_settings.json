@@ -1,0 +1,18 @@
+{
+  "fonts_settings.title": "自定义截屏/录屏导出字体",
+  "fonts_settings.no": "暂无自定义字体",
+  "fonts_settings.placeholder": "请输入路径或字体名称",
+  "fonts_settings.hint": "支持添加多个字体，并按顺序依次使用\n支持 TTF 和 OTF 字体格式\n请输入字体文件的绝对路径，或字体名称（从系统字体中查找）\n该列表中的字体将同时用于截屏和录屏导出的文本渲染\n可导出预览图片，确认字体是否已正确应用",
+  "fonts_settings.action.scroll": "{key:fonts_settings.scroll_up}/{key:fonts_settings.scroll_down} 滚动",
+  "fonts_settings.action.select": "{key:fonts_settings.focus_up.move_up}/{key:fonts_settings.focus_down.move_down} 选择",
+  "fonts_settings.action.move": "{key:fonts_settings.focus_up.move_up}/{key:fonts_settings.focus_down.move_down} 移动",
+  "fonts_settings.action.back": "{key:fonts_settings.back} 返回",
+  "fonts_settings.action.lock": "{key:fonts_settings.lock_unlock} 锁定聚焦",
+  "fonts_settings.action.unlock": "{key:fonts_settings.lock_unlock} 解锁聚焦",
+  "fonts_settings.action.add": "{key:fonts_settings.add} 添加",
+  "fonts_settings.action.del": "{key:fonts_settings.del} 删除",
+  "fonts_settings.action.modify": "{key:fonts_settings.modify} 修改",
+  "fonts_settings.action.export_preview": "{key:fonts_settings.export_preview} 导出预览图",
+  "fonts_settings.action.cancel": "{key:fonts_settings.back} 取消",
+  "fonts_settings.action.confirm": "{key:fonts_settings.confirm} 确认"
+}

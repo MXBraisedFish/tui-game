@@ -79,7 +79,7 @@ pub const DEFAULT_FILES: &[(&str, &str)] = &[
   ),
   (
     PROFILE_SCREENSHOT_FILE,
-    r#"{"guide_seen":false,"double_action":"save_png","auto_exit":false}"#,
+    r#"{"guide_seen":false,"double_action":"save_png","auto_exit":false,"fonts":[]}"#,
   ),
   (
     PROFILE_DISPLAY_SETTINGS_FILE,

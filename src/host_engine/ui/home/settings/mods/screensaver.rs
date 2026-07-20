@@ -438,7 +438,14 @@ impl ScreensaverPackageUi {
       return;
     };
     self.update_entry(&mod_id, |entry| entry.enabled = enabled);
-    let _ = storage.update_screensaver_package_state(&mod_id, log, |state| state.enabled = enabled);
+    let _ = storage.update_screensaver_package_state(&mod_id, log, |state| {
+      state.enabled = enabled;
+      if enabled {
+        // 包总开关重新打开时只恢复可见性，不自动加入局内屏保列表。
+        state.playlist_enabled = false;
+        state.order = None;
+      }
+    });
   }
 
   pub fn toggle_selected_debug(&mut self, storage: &StorageService, log: &mut LogService) {

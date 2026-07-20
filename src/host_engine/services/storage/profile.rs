@@ -64,6 +64,10 @@ pub struct ScreenshotProfile {
 
   #[serde(default)]
   pub auto_exit: bool,
+
+  /// 截图/录屏导出时按顺序尝试的自定义字体路径或系统字体名称。
+  #[serde(default)]
+  pub fonts: Vec<String>,
 }
 
 impl Default for ScreenshotProfile {
@@ -72,6 +76,7 @@ impl Default for ScreenshotProfile {
       guide_seen: false,
       double_action: ScreenshotDoubleAction::SavePng,
       auto_exit: false,
+      fonts: Vec::new(),
     }
   }
 }
@@ -166,11 +171,16 @@ pub struct GamePackageState {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScreensaverPackageState {
+  /// 包管理器总开关：关闭后不进入屏保列表。
   #[serde(default = "default_enabled")]
   pub enabled: bool,
 
   #[serde(default)]
   pub debug: bool,
+
+  /// 屏保列表中的局内启用状态，与包总开关相互独立。
+  #[serde(default = "default_enabled")]
+  pub playlist_enabled: bool,
 
   /// 已启用屏保的显示顺序；未启用时不参与排序。
   #[serde(default)]
@@ -192,6 +202,7 @@ impl Default for ScreensaverPackageState {
     Self {
       enabled: true,
       debug: false,
+      playlist_enabled: true,
       order: None,
     }
   }
@@ -556,6 +567,7 @@ impl StorageService {
     let initial = ScreensaverPackageState {
       enabled: profile.defaults.enabled,
       debug: profile.defaults.debug,
+      playlist_enabled: true,
       order: None,
     };
     f(profile
@@ -731,6 +743,7 @@ mod tests {
       Some(&ScreensaverPackageState {
         enabled: false,
         debug: true,
+        playlist_enabled: true,
         order: None,
       })
     );

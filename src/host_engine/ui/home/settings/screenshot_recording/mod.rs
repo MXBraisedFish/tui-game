@@ -1,3 +1,4 @@
+pub mod fonts_settings;
 pub mod screenshot_recording;
 pub mod screenshot_settings;
 

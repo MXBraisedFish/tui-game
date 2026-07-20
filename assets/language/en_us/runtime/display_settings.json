@@ -12,6 +12,7 @@
   "display_settings.action.focus": "{key:display_settings.focus_logo_random}/{key:display_settings.focus_tool_top_toolbar}/{key:display_settings.focus_top_toolbar_custom}/{key:display_settings.focus_screensaver_source}/{key:display_settings.focus_screensaver_random}/{key:display_settings.focus_game_list_source}/{key:display_settings.focus_game_list_error}/{key:display_settings.focus_fps} Focus",
   "display_settings.action.back": "{key:display_settings.back} Back",
   "display_settings.action.type.select": "{key:display_settings.confirm} Switch",
+  "display_settings.action.type.confirm": "{key:display_settings.confirm} Confirm",
   "display_settings.game_list.fps.30": "30",
   "display_settings.game_list.fps.60": "60",
   "display_settings.game_list.fps.120": "120",

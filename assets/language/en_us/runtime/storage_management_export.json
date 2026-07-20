@@ -9,5 +9,6 @@
   "storage_management_export.export.data": "Export Data",
   "storage_management_export.action.select": "{key:storage_management_export.focus_up}/{key:storage_management_export.focus_down} Select",
   "storage_management_export.action.focus": "{key:storage_management_export.focus_cache}/{key:storage_management_export.focus_log}/{key:storage_management_export.focus_mod}/{key:storage_management_export.focus_profile}/{key:storage_management_export.focus_screenshot}/{key:storage_management_export.focus_recording}/{key:storage_management_export.focus_data} Focus",
+  "storage_management_export.action.confirm": "{key:storage_management_export.confirm} Confirm",
   "storage_management_export.action.back": "{key:storage_management_export.back} Back"
 }

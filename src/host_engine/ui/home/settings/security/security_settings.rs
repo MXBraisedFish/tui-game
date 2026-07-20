@@ -356,10 +356,15 @@ impl SecuritySettingsUi {
   }
 
   fn hint(&self, i18n: &I18nService) -> String {
+    let confirm = if self.selected_index < DEFAULT_START {
+      "security_settings.action.confirm"
+    } else {
+      "security_settings.action.switch"
+    };
     format!(
       "f%<fg:rgb(85,87,83)>{}  {}  {}</fg>",
       i18n.get_runtime_text(NS, "security_settings.action.select"),
-      i18n.get_runtime_text(NS, "security_settings.action.switch"),
+      i18n.get_runtime_text(NS, confirm),
       i18n.get_runtime_text(NS, "security_settings.action.back"),
     )
   }

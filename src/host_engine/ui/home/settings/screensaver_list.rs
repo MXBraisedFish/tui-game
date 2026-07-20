@@ -406,9 +406,19 @@ impl ScreensaverListUi {
     let profile = storage.read_package_state_or_default(log);
     self.source_mode = storage.display_settings_profile().screensaver_source;
     self.entries = package.screensaver_list();
+    self.entries.retain(|entry| {
+      entry.source != PackageSource::Mod
+        || profile
+          .screensavers
+          .get(&entry.mod_id)
+          .map_or(profile.defaults.enabled, |state| state.enabled)
+    });
     for entry in &mut self.entries {
       let state = profile.screensavers.get(&entry.mod_id);
-      entry.enabled = state.map_or(profile.defaults.enabled, |state| state.enabled);
+      // 此页面中的 enabled 表示局内屏保列表状态，不是包管理器总开关。
+      entry.enabled = state.map_or(true, |state| {
+        state.playlist_enabled || state.order.is_some()
+      });
       entry.debug = state.map_or(profile.defaults.debug, |state| state.debug);
     }
     let left_ids: Vec<_> = self

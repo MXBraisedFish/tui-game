@@ -1,9 +1,9 @@
 use super::{CellStyle, GLITCH_TEMPLATE, LogoCell, LogoRandom, cells_to_rich_text};
 
-const CYAN: (u8, u8, u8) = (0, 255, 255);
+const CYAN: (u8, u8, u8) = (161, 232, 229);
 const WHITE: (u8, u8, u8) = (255, 255, 255);
-const RED: (u8, u8, u8) = (255, 0, 0);
-const MAGENTA: (u8, u8, u8) = (255, 0, 255);
+const RED: (u8, u8, u8) = (255, 196, 196);
+const MAGENTA: (u8, u8, u8) = (210, 204, 255);
 
 struct LineState {
   leading: usize,
@@ -123,9 +123,15 @@ impl GlitchLogo {
 }
 
 fn block_color(row: usize, run_length: usize, index: usize) -> (u8, u8, u8) {
-  if index == 0 || row == 3 && run_length == 12 && index == 3 {
+  if index == 0
+    || row == 1 && run_length == 12 && index == 5
+    || row == 3 && run_length == 12 && (index == 4 || index + 4 == run_length)
+  {
     CYAN
-  } else if index + 1 == run_length || row == 3 && run_length == 12 && index + 4 == run_length {
+  } else if index + 1 == run_length
+    || row == 1 && run_length == 12 && index == 6
+    || row == 3 && run_length == 12 && (index == 3 || index + 5 == run_length)
+  {
     RED
   } else if row == 2 && run_length >= 10 && (index == 3 || index + 4 == run_length) {
     MAGENTA
@@ -153,17 +159,23 @@ mod tests {
   use super::*;
 
   #[test]
-  fn m_fourth_row_colors_internal_edges_without_removing_cells() {
-    let colors = (0..12)
+  fn m_internal_colors_match_the_split_columns() {
+    let second = (0..12)
+      .map(|index| block_color(1, 12, index))
+      .collect::<Vec<_>>();
+    let fourth = (0..12)
       .map(|index| block_color(3, 12, index))
       .collect::<Vec<_>>();
 
-    assert_eq!(colors[0], CYAN);
-    assert_eq!(colors[3], CYAN);
-    assert_eq!(colors[8], RED);
-    assert_eq!(colors[11], RED);
-    assert!(colors[1..3].iter().all(|color| *color == WHITE));
-    assert!(colors[4..8].iter().all(|color| *color == WHITE));
-    assert!(colors[9..11].iter().all(|color| *color == WHITE));
+    assert_eq!(second[5], CYAN);
+    assert_eq!(second[6], RED);
+    assert_eq!(fourth[3], RED);
+    assert_eq!(fourth[4], CYAN);
+    assert_eq!(fourth[7], RED);
+    assert_eq!(fourth[8], CYAN);
+    assert_eq!(second[0], CYAN);
+    assert_eq!(second[11], RED);
+    assert_eq!(fourth[0], CYAN);
+    assert_eq!(fourth[11], RED);
   }
 }

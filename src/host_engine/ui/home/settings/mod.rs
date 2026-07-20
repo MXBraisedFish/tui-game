@@ -3,8 +3,8 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
-  UiObjectPoolOwner,
+  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxService, TextInputService,
+  UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub mod display_settings;
@@ -85,7 +85,11 @@ pub enum SettingsUiCommand {
 
 impl SettingsUi {
   /// 初始化设置页面 UI。
-  pub fn init(hit_area: &HitAreaService) -> Self {
+  pub fn init(
+    hit_area: &HitAreaService,
+    text_input: &TextInputService,
+    scroll_box: &ScrollBoxService,
+  ) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
       selected_index: 0,
@@ -93,7 +97,7 @@ impl SettingsUi {
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       objects,
       runtime_objects: RuntimeObjectPool::new(),
-      screenshot_recording: ScreenshotRecordingUi::init(hit_area),
+      screenshot_recording: ScreenshotRecordingUi::init(hit_area, text_input, scroll_box),
     }
   }
 

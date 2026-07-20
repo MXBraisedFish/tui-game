@@ -17,5 +17,6 @@
   "security_settings.reset.fail": "重置失败",
   "security_settings.action.select": "{key:security_settings.focus_up}/{key:security_settings.focus_down} 选择",
   "security_settings.action.switch": "{key:security_settings.confirm} 切换",
+  "security_settings.action.confirm": "{key:security_settings.confirm} 确认",
   "security_settings.action.back": "{key:security_settings.back} 返回"
 }

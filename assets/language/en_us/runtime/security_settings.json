@@ -17,5 +17,6 @@
   "security_settings.reset.fail": "Reset Failed",
   "security_settings.action.select": "{key:security_settings.focus_up}/{key:security_settings.focus_down} Select",
   "security_settings.action.switch": "{key:security_settings.confirm} Switch",
+  "security_settings.action.confirm": "{key:security_settings.confirm} Confirm",
   "security_settings.action.back": "{key:security_settings.back} Back"
 }

@@ -320,9 +320,10 @@ impl StorageManagementClearUi {
 
   fn hint(&self, i18n: &I18nService) -> String {
     format!(
-      "f%<fg:rgb(85,87,83)>{}  {}  {}</fg>",
+      "f%<fg:rgb(85,87,83)>{}  {}  {}  {}</fg>",
       i18n.get_runtime_text(NS, "storage_management_clear.action.focus"),
       i18n.get_runtime_text(NS, "storage_management_clear.action.select"),
+      i18n.get_runtime_text(NS, "storage_management_clear.action.confirm"),
       i18n.get_runtime_text(NS, "storage_management_clear.action.back"),
     )
   }

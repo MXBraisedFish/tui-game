@@ -111,7 +111,11 @@ pub(super) fn apply_screenshot_recording_command(
       world.state.pop_ui_node();
       let ui = settings_ui.screenshot_recording_mut();
       clear_exiting_pool(ui.objects_mut(), services);
-      *ui = ScreenshotRecordingUi::init(&services.hit_area);
+      *ui = ScreenshotRecordingUi::init(
+        &services.hit_area,
+        &services.text_input,
+        &services.scroll_box,
+      );
     }
     ScreenshotRecordingCommand::OpenScreenshotSettings => {
       let profile = services
@@ -122,7 +126,12 @@ pub(super) fn apply_screenshot_recording_command(
         .write_screenshot_profile(&profile, &mut services.log);
       *settings_ui
         .screenshot_recording_mut()
-        .screenshot_settings_mut() = ScreenshotSettingsUi::init(&services.hit_area, profile);
+        .screenshot_settings_mut() = ScreenshotSettingsUi::init(
+        &services.hit_area,
+        &services.text_input,
+        &services.scroll_box,
+        profile,
+      );
       world
         .state
         .enter_ui_node(UiNodeState::screenshot_settings());
@@ -141,6 +150,42 @@ pub(super) fn apply_screenshot_settings_command(
       let _ = services
         .storage
         .write_screenshot_profile(&profile, &mut services.log);
+    }
+    ScreenshotSettingsCommand::OpenFonts => {
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .open_fonts();
+    }
+    ScreenshotSettingsCommand::StartAddFont => {
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .start_add_font(&mut services.text_input);
+    }
+    ScreenshotSettingsCommand::StartModifyFont => {
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .start_modify_font(&mut services.text_input);
+    }
+    ScreenshotSettingsCommand::FinishFontEdit(value) => {
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .finish_font_edit(&mut services.text_input, value);
+    }
+    ScreenshotSettingsCommand::CancelFontEdit => {
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .cancel_font_edit(&mut services.text_input);
+    }
+    ScreenshotSettingsCommand::ScrollFonts(dy) => {
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .scroll_fonts(&services.scroll_box, &services.layout, dy);
     }
     ScreenshotSettingsCommand::Back => {
       let ui = settings_ui
@@ -228,7 +273,7 @@ pub(super) fn apply_screensaver_list_command(
       let next_order = profile
         .screensavers
         .values()
-        .filter_map(|state| state.enabled.then_some(state.order).flatten())
+        .filter_map(|state| state.playlist_enabled.then_some(state.order).flatten())
         .max()
         .map_or(0, |order| order.saturating_add(1));
       let defaults = &profile.defaults;
@@ -236,10 +281,11 @@ pub(super) fn apply_screensaver_list_command(
         crate::host_engine::services::ScreensaverPackageState {
           enabled: defaults.enabled,
           debug: defaults.debug,
+          playlist_enabled: false,
           order: None,
         },
       );
-      state.enabled = enabled;
+      state.playlist_enabled = enabled;
       state.order = enabled.then_some(next_order);
       let _ = services
         .storage
@@ -255,10 +301,11 @@ pub(super) fn apply_screensaver_list_command(
           crate::host_engine::services::ScreensaverPackageState {
             enabled: defaults.enabled,
             debug: defaults.debug,
+            playlist_enabled: false,
             order: None,
           },
         );
-        state.enabled = true;
+        state.playlist_enabled = true;
         state.order = Some(order as u32);
       }
       let _ = services
@@ -926,7 +973,11 @@ fn clear_exiting_pool(pool: &mut UiObjectPool, services: &mut EngineServices) {
 
 fn reset_settings_ui(ui: &mut SettingsUi, services: &mut EngineServices) {
   clear_exiting_pool(ui.objects_mut(), services);
-  *ui = SettingsUi::init(&services.hit_area);
+  *ui = SettingsUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
 }
 
 fn reset_storage_management_ui(ui: &mut StorageManagementUi, services: &mut EngineServices) {

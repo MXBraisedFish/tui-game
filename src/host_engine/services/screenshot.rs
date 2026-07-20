@@ -32,6 +32,7 @@ pub struct ScreenshotTask {
   pub frame: ComposedFrame,
   pub selection: ScreenshotRect,
   pub png_path: PathBuf,
+  pub fonts: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -345,6 +346,7 @@ pub fn run_screenshot_task(
     &task.frame,
     task.selection,
     &task.png_path,
+    &task.fonts,
     event_tx,
   ) {
     Ok(()) => {
@@ -369,11 +371,12 @@ fn save_png(
   frame: &ComposedFrame,
   rect: ScreenshotRect,
   path: &PathBuf,
+  preferred_fonts: &[String],
   event_tx: &Sender<EngineEvent>,
 ) -> Result<(), String> {
   fs::create_dir_all(path.parent().ok_or("PNG path has no parent directory")?)
     .map_err(|error| error.to_string())?;
-  let fonts = FontSet::load()?;
+  let fonts = FontSet::load(preferred_fonts)?;
   let width = rect.width as u32 * CELL_WIDTH;
   let height = rect.height as u32 * CELL_HEIGHT;
   let mut image = ImageBuffer::from_pixel(width.max(1), height.max(1), Rgba([0, 0, 0, 255]));
@@ -442,8 +445,22 @@ struct FontSet {
 }
 
 impl FontSet {
-  fn load() -> Result<Self, String> {
+  fn load(preferred: &[String]) -> Result<Self, String> {
     let mut fonts = Vec::new();
+    let mut database = fontdb::Database::new();
+    database.load_system_fonts();
+
+    for value in preferred {
+      let path = Path::new(value);
+      if path.is_file() {
+        let _ = load_font_file(path, &mut fonts);
+      } else if let Some(id) = database.query(&fontdb::Query {
+        families: &[fontdb::Family::Name(value)],
+        ..fontdb::Query::default()
+      }) {
+        load_database_font(&database, id, &mut fonts);
+      }
+    }
 
     for path in [
       Path::new("assets/fonts/mnf.ttf"),
@@ -451,18 +468,15 @@ impl FontSet {
       Path::new("assets/fonts/nsscvf.ttf"),
     ] {
       if path.is_file() {
-        load_font_file(path, &mut fonts)?;
+        let _ = load_font_file(path, &mut fonts);
       }
     }
 
     if let Some(paths) = env::var_os("TUI_CAPTURE_FONTS") {
       for path in env::split_paths(&paths) {
-        load_font_file(&path, &mut fonts)?;
+        let _ = load_font_file(&path, &mut fonts);
       }
     }
-
-    let mut database = fontdb::Database::new();
-    database.load_system_fonts();
 
     let mut ids = Vec::new();
     const CANDIDATE_FAMILIES: &[&str] = &[
@@ -505,18 +519,7 @@ impl FontSet {
     }
 
     for id in ids.into_iter().take(16) {
-      if let Some(result) = database.with_face_data(id, |data, face_index| {
-        fontdue::Font::from_bytes(
-          data.to_vec(),
-          fontdue::FontSettings {
-            collection_index: face_index,
-            ..fontdue::FontSettings::default()
-          },
-        )
-      }) && let Ok(font) = result
-      {
-        fonts.push(font);
-      }
+      load_database_font(&database, id, &mut fonts);
     }
 
     if fonts.is_empty() {
@@ -530,6 +533,21 @@ impl FontSet {
 
   fn font_for(&self, character: char) -> Option<&fontdue::Font> {
     self.fonts.iter().find(|font| font.has_glyph(character))
+  }
+}
+
+fn load_database_font(database: &fontdb::Database, id: fontdb::ID, fonts: &mut Vec<fontdue::Font>) {
+  if let Some(result) = database.with_face_data(id, |data, face_index| {
+    fontdue::Font::from_bytes(
+      data.to_vec(),
+      fontdue::FontSettings {
+        collection_index: face_index,
+        ..fontdue::FontSettings::default()
+      },
+    )
+  }) && let Ok(font) = result
+  {
+    fonts.push(font);
   }
 }
 

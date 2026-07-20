@@ -9,5 +9,6 @@
   "storage_management.clear.data": "Reset Data",
   "storage_management_clear.action.select": "{key:storage_management_clear.focus_up}/{key:storage_management_clear.focus_down} Select",
   "storage_management_clear.action.focus": "{key:storage_management_clear.focus_cache}/{key:storage_management_clear.focus_log}/{key:storage_management_clear.focus_mod}/{key:storage_management_clear.focus_profile}/{key:storage_management_clear.focus_screenshot}/{key:storage_management_clear.focus_recording}/{key:storage_management_clear.focus_data} Focus",
+  "storage_management_clear.action.confirm": "{key:storage_management_clear.confirm} Confirm",
   "storage_management_clear.action.back": "{key:storage_management_clear.back} Back"
 }

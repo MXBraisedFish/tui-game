@@ -3,8 +3,8 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
-  UiObjectPoolOwner,
+  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxService, TextInputService,
+  UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 use super::ScreenshotSettingsUi;
@@ -54,7 +54,11 @@ impl RuntimeObjectPoolOwner for ScreenshotRecordingUi {
 }
 
 impl ScreenshotRecordingUi {
-  pub fn init(hit_area: &HitAreaService) -> Self {
+  pub fn init(
+    hit_area: &HitAreaService,
+    text_input: &TextInputService,
+    scroll_box: &ScrollBoxService,
+  ) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
       selected_index: 0,
@@ -64,6 +68,8 @@ impl ScreenshotRecordingUi {
       runtime_objects: RuntimeObjectPool::new(),
       screenshot_settings: ScreenshotSettingsUi::init(
         hit_area,
+        text_input,
+        scroll_box,
         crate::host_engine::services::ScreenshotProfile::default(),
       ),
     }

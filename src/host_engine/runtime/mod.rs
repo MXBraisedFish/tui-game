@@ -246,7 +246,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     logo_mode,
     logo_seed,
   );
-  let mut settings_ui = SettingsUi::init(&services.hit_area);
+  let mut settings_ui = SettingsUi::init(
+    &services.hit_area,
+    &services.text_input,
+    &services.scroll_box,
+  );
   let mut display_settings_ui = DisplaySettingsUi::init(
     &services.hit_area,
     &services.text_input,
@@ -1667,6 +1671,10 @@ fn submit_screenshot_png(
       frame,
       selection: rect,
       png_path,
+      fonts: services
+        .storage
+        .read_screenshot_profile_or_default(&mut services.log)
+        .fonts,
     }))
 }
 

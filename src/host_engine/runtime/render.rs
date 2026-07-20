@@ -185,6 +185,12 @@ pub(super) fn route_render(
       &mut services.log,
     );
   }
+  if world.state.current_ui_kind() == Some(UiNodeKind::ScreenshotSettings) {
+    settings_ui
+      .screenshot_recording_mut()
+      .screenshot_settings_mut()
+      .prepare_surfaces(&services.scroll_box, &services.layout);
+  }
 
   if let Some(objects) = current_objects_mut(
     world,
@@ -268,7 +274,7 @@ pub(super) fn route_render(
       );
     }
     Some(UiNodeKind::ScreenshotSettings) => {
-      settings_ui
+      input_cursor = settings_ui
         .screenshot_recording_mut()
         .screenshot_settings_mut()
         .render(
@@ -277,6 +283,7 @@ pub(super) fn route_render(
           &services.layout,
           &services.i18n,
           &services.hit_area,
+          &services.text_input,
         );
     }
     Some(UiNodeKind::SecuritySettings) => {

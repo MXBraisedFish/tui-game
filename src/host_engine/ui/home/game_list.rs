@@ -1556,6 +1556,7 @@ impl GameListUi {
     let mut entries = self
       .entries
       .iter()
+      .filter(|entry| entry.source != PackageSource::Mod || entry.enabled)
       .filter(|entry| {
         query.is_empty()
           || Self::package_visible_text(entry, &entry.title)

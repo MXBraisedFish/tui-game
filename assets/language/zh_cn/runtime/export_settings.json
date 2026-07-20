@@ -24,7 +24,7 @@
   "export_settings.action.select": "{key:export_settings.focus_up}/{key:export_settings.focus_up} 选择",
   "export_settings.action.focus": "{key:export_settings.focus_name}/{key:export_settings.focus_path}/{key:export_settings.focus_type} 聚焦",
   "export_settings.action.back": "{key:export_settings.back} 返回",
-  "export_settings.action.type.select": "{key:display_settings.confirm} 切换",
+  "export_settings.action.type.select": "{key:export_settings.confirm} 切换",
   "export_settings.action.confirm": "{key:export_settings.confirm} 确认",
   "export_settings.action.confirm_export": "{key:export_settings.confirm_export} 确认导出",
   "export_settings.action.input.back": "[Esc] 退出输入",

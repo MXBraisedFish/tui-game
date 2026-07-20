@@ -33,6 +33,7 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "screensaver_list",
   "screenshot_recording",
   "screenshot_settings",
+  "fonts_settings",
   "screensaver_pack",
   "toolbar",
   "toolbar_custom",

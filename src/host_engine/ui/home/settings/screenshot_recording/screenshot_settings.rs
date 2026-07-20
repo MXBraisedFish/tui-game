@@ -4,8 +4,10 @@ use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
   RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, ScreenshotDoubleAction,
-  ScreenshotProfile, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  ScreenshotProfile, ScrollBoxService, TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
+
+use super::fonts_settings::{FontsSettingsCommand, FontsSettingsUi};
 
 const NS: &str = "screenshot_settings";
 const MENU_LEN: usize = 4;
@@ -23,12 +25,20 @@ pub struct ScreenshotSettingsUi {
   runtime_objects: RuntimeObjectPool,
   back_area: HitAreaId,
   menu_areas: [HitAreaId; MENU_LEN],
+  fonts_open: bool,
+  fonts: FontsSettingsUi,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScreenshotSettingsCommand {
   Back,
   Changed(ScreenshotProfile),
+  OpenFonts,
+  StartAddFont,
+  StartModifyFont,
+  FinishFontEdit(String),
+  CancelFontEdit,
+  ScrollFonts(i32),
 }
 
 impl UiObjectPoolOwner for ScreenshotSettingsUi {
@@ -52,20 +62,28 @@ impl RuntimeObjectPoolOwner for ScreenshotSettingsUi {
 }
 
 impl ScreenshotSettingsUi {
-  pub fn init(hit_area: &HitAreaService, profile: ScreenshotProfile) -> Self {
+  pub fn init(
+    hit_area: &HitAreaService,
+    text_input: &TextInputService,
+    scroll_box: &ScrollBoxService,
+    profile: ScreenshotProfile,
+  ) -> Self {
     let mut objects = UiObjectPool::new();
+    let fonts = FontsSettingsUi::create(&mut objects, text_input, scroll_box);
     Self {
       selected_index: 0,
       profile,
       back_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
+      fonts_open: false,
+      fonts,
       objects,
       runtime_objects: RuntimeObjectPool::new(),
     }
   }
 
   pub fn action_map() -> Vec<ActionMapEntry> {
-    vec![
+    let mut actions = vec![
       action(
         "screenshot_settings.focus_up",
         "up",
@@ -98,10 +116,26 @@ impl ScreenshotSettingsUi {
         "4",
         "Focus auto exit",
       ),
-    ]
+    ];
+    actions.extend(FontsSettingsUi::action_map());
+    actions
   }
 
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ScreenshotSettingsCommand> {
+    if self.fonts_open {
+      return self.fonts.handle_event(event).map(|command| match command {
+        FontsSettingsCommand::Back(fonts) => {
+          self.profile.fonts = fonts;
+          self.fonts_open = false;
+          ScreenshotSettingsCommand::Changed(self.profile.clone())
+        }
+        FontsSettingsCommand::StartAdd => ScreenshotSettingsCommand::StartAddFont,
+        FontsSettingsCommand::StartModify => ScreenshotSettingsCommand::StartModifyFont,
+        FontsSettingsCommand::FinishEdit(value) => ScreenshotSettingsCommand::FinishFontEdit(value),
+        FontsSettingsCommand::CancelEdit => ScreenshotSettingsCommand::CancelFontEdit,
+        FontsSettingsCommand::Scroll(dy) => ScreenshotSettingsCommand::ScrollFonts(dy),
+      });
+    }
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
         self.selected_index = self.menu_areas.iter().position(|area| area == id)?;
@@ -144,6 +178,39 @@ impl ScreenshotSettingsUi {
     let _ = dt;
   }
 
+  pub fn open_fonts(&mut self) {
+    self.fonts_open = true;
+    self.fonts.enter(self.profile.fonts.clone());
+  }
+
+  pub fn start_add_font(&mut self, text_input: &mut TextInputService) {
+    self.fonts.start_add(&mut self.objects, text_input);
+  }
+
+  pub fn start_modify_font(&mut self, text_input: &mut TextInputService) {
+    self.fonts.start_modify(&mut self.objects, text_input);
+  }
+
+  pub fn finish_font_edit(&mut self, text_input: &mut TextInputService, value: String) {
+    self.fonts.finish_edit(&mut self.objects, text_input, value);
+  }
+
+  pub fn cancel_font_edit(&mut self, text_input: &mut TextInputService) {
+    self.fonts.cancel_edit(&mut self.objects, text_input);
+  }
+
+  pub fn prepare_surfaces(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService) {
+    if self.fonts_open {
+      self.fonts.prepare(&mut self.objects, scroll_box, layout);
+    }
+  }
+
+  pub fn scroll_fonts(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, dy: i32) {
+    if self.fonts_open {
+      self.fonts.scroll(&mut self.objects, scroll_box, layout, dy);
+    }
+  }
+
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -151,7 +218,13 @@ impl ScreenshotSettingsUi {
     layout: &LayoutService,
     i18n: &I18nService,
     hit_area: &HitAreaService,
-  ) {
+    text_input: &TextInputService,
+  ) -> Option<(u16, u16)> {
+    if self.fonts_open {
+      return self
+        .fonts
+        .render(&mut self.objects, render, canvas, layout, i18n, text_input);
+    }
     let viewport = layout.developer_viewport_rect();
     let title = i18n.get_runtime_text(NS, "screenshot_settings.title");
     let title_y = viewport.y.saturating_add(1);
@@ -206,12 +279,13 @@ impl ScreenshotSettingsUi {
         ..Default::default()
       },
     );
+    None
   }
 
   fn activate_selected(&mut self) -> Option<ScreenshotSettingsCommand> {
     match self.selected_index {
       0 => self.profile.guide_seen = false,
-      1 => return None,
+      1 => return Some(ScreenshotSettingsCommand::OpenFonts),
       2 => self.profile.double_action = self.profile.double_action.next(),
       3 => self.profile.auto_exit = !self.profile.auto_exit,
       _ => return None,
@@ -326,7 +400,12 @@ mod tests {
   #[test]
   fn selectable_settings_update_the_profile_snapshot() {
     let hit_area = HitAreaService::new();
-    let mut ui = ScreenshotSettingsUi::init(&hit_area, ScreenshotProfile::default());
+    let mut ui = ScreenshotSettingsUi::init(
+      &hit_area,
+      &TextInputService::new(),
+      &ScrollBoxService::new(),
+      ScreenshotProfile::default(),
+    );
     ui.selected_index = 2;
     assert_eq!(
       ui.activate_selected(),

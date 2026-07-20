@@ -1,0 +1,18 @@
+{
+  "fonts_settings.title": "Custom Screenshot / Recording Fonts",
+  "fonts_settings.no": "No custom fonts",
+  "fonts_settings.placeholder": "Enter an absolute font path or family name",
+  "fonts_settings.hint": "Multiple fonts are tried in list order\nTTF and OTF font files are supported\nEnter an absolute file path or a system font family name\nThe list is shared by screenshot and recording export\nUse preview export to verify the selected fonts",
+  "fonts_settings.action.scroll": "{key:fonts_settings.scroll_up}/{key:fonts_settings.scroll_down} Scroll",
+  "fonts_settings.action.select": "{key:fonts_settings.focus_up.move_up}/{key:fonts_settings.focus_down.move_down} Select",
+  "fonts_settings.action.move": "{key:fonts_settings.focus_up.move_up}/{key:fonts_settings.focus_down.move_down} Move",
+  "fonts_settings.action.back": "{key:fonts_settings.back} Back",
+  "fonts_settings.action.lock": "{key:fonts_settings.lock_unlock} Lock Focus",
+  "fonts_settings.action.unlock": "{key:fonts_settings.lock_unlock} Unlock Focus",
+  "fonts_settings.action.add": "{key:fonts_settings.add} Add",
+  "fonts_settings.action.del": "{key:fonts_settings.del} Delete",
+  "fonts_settings.action.modify": "{key:fonts_settings.modify} Modify",
+  "fonts_settings.action.export_preview": "{key:fonts_settings.export_preview} Export Preview",
+  "fonts_settings.action.cancel": "{key:fonts_settings.back} Cancel",
+  "fonts_settings.action.confirm": "{key:fonts_settings.confirm} Confirm"
+}

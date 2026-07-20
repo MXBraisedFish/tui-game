@@ -486,11 +486,16 @@ impl DisplaySettingsUi {
   }
 
   fn hint(&self, i18n: &I18nService) -> String {
+    let confirm = if self.selected_index == 2 {
+      "display_settings.action.type.confirm"
+    } else {
+      "display_settings.action.type.select"
+    };
     format!(
       "f%<fg:rgb(85,87,83)>{}  {}  {}  {}</fg>",
       i18n.get_runtime_text(NS, "display_settings.action.focus"),
       i18n.get_runtime_text(NS, "display_settings.action.select"),
-      i18n.get_runtime_text(NS, "display_settings.action.type.select"),
+      i18n.get_runtime_text(NS, confirm),
       i18n.get_runtime_text(NS, "display_settings.action.back"),
     )
   }

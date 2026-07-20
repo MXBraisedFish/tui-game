@@ -9,5 +9,6 @@
   "storage_management_export.export.data": "导出数据",
   "storage_management_export.action.select": "{key:storage_management_export.focus_up}/{key:storage_management_export.focus_down} 选择",
   "storage_management_export.action.focus": "{key:storage_management_export.focus_cache}/{key:storage_management_export.focus_log}/{key:storage_management_export.focus_mod}/{key:storage_management_export.focus_profile}/{key:storage_management_export.focus_screenshot}/{key:storage_management_export.focus_recording}/{key:storage_management_export.focus_data} 聚焦",
+  "storage_management_export.action.confirm": "{key:storage_management_export.confirm} 确认",
   "storage_management_export.action.back": "{key:storage_management_export.back} 返回"
 }
