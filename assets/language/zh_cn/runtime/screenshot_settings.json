@@ -1,0 +1,19 @@
+{
+  "screenshot_settings.title": "截屏设置",
+  "screenshot_settings.re_hint": "重新展示操作提示",
+  "screenshot_settings.fonts": "自定义图片字体",
+  "screenshot_settings.double": "双击快捷操作",
+  "screenshot_settings.auto_exit": "截图模式自动退出",
+  "screenshot_settings.fonts.input.placeholder": "暂无自定义字体",
+  "screenshot_settings.fonts.input.hint": "支持多个字体，按照顺序依次使用\n支持ttf和otf字体格式\n请输入文件的绝对路径",
+  "screenshot_settings.double.copy": "复制到剪切板",
+  "screenshot_settings.double.copy_rich_text": "复制富文本到剪切板",
+  "screenshot_settings.double.save_png": "保存为图片",
+  "screenshot_settings.double.all": "复制并保存为图片",
+  "screenshot_settings.auto_exit.action": "复制或保存后",
+  "screenshot_settings.auto_exit.no": "不自动退出",
+  "screenshot_settings.action.select": "{key:screenshot_settings.focus_up}/{key:screenshot_settings.focus_down} 选择",
+  "screenshot_settings.action.focus": "{key:screenshot_settings.focus_re_hint}/{key:screenshot_settings.focus_fonts}/{key:screenshot_settings.focus_double}/{key:screenshot_settings.focus_auto_exit} 聚焦",
+  "screenshot_settings.action.back": "{key:screenshot_settings.back} 返回",
+  "screenshot_settings.action.type.select": "{key:screenshot_settings.confirm} 切换"
+}

@@ -16,7 +16,7 @@ pub(super) fn load_host_key_action_map(services: &mut EngineServices) {
       description: services
         .i18n
         .get_runtime_text("host_key", "host_key.recording.pause"),
-      keys: vec![vec!["f3".to_string(), "q".to_string()]],
+      keys: vec![vec!["f2".to_string(), "q".to_string()]],
     },
     ActionMapEntry {
       action: HOST_KEY_TOP_TOOLBAR_SWITCH.to_string(),
@@ -73,6 +73,16 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
     Some(UiNodeKind::DisplaySettings) => load_display_settings_action_map(services),
     Some(UiNodeKind::ToolbarCustom) => {}
     Some(UiNodeKind::ScreensaverList) => load_screensaver_list_action_map(services),
+    Some(UiNodeKind::ScreenshotRecording) => load_action_map(
+      services,
+      &ScreenshotRecordingUi::action_map(),
+      "ScreenshotRecordingUi",
+    ),
+    Some(UiNodeKind::ScreenshotSettings) => load_action_map(
+      services,
+      &ScreenshotSettingsUi::action_map(),
+      "ScreenshotSettingsUi",
+    ),
     Some(UiNodeKind::SecuritySettings) => load_security_settings_action_map(services),
     Some(UiNodeKind::SecurityDetails) => load_security_details_action_map(services),
     Some(UiNodeKind::StorageManagement) => load_storage_management_action_map(services),
@@ -101,6 +111,14 @@ pub(super) fn load_safe_mode_warning_action_map(services: &mut EngineServices) {
     services,
     &SafeModeWarningUi::action_map(),
     "safe_mode_warning",
+  );
+}
+
+pub(super) fn load_screenshot_capture_action_map(services: &mut EngineServices) {
+  load_action_map(
+    services,
+    &ScreenshotCaptureUi::action_map(),
+    "ScreenshotCaptureUi",
   );
 }
 

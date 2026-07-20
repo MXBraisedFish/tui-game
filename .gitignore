@@ -19,9 +19,4 @@ tui_capture_demo
 tg_rich_tect.py
 print_test.py
 __pycache__
-故障logo.py
-霓虹logo.py
-错误logo.py
-裁剪logo.py
-水波logo.py
-字符logo.py
+logo_animation

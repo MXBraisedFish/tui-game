@@ -1,0 +1,14 @@
+{
+  "screenshot_recording.title": "Screenshots & Recording",
+
+  "screenshot_recording.screenshot_settings": "Screenshot Settings",
+  "screenshot_recording.recording_settings": "Recording Settings",
+
+  "screenshot_recording.screenshot_list": "Screenshot List",
+  "screenshot_recording.recording_list": "Recording List",
+
+  "screenshot_recording.action.focus": "{key:screenshot_recording.focus_screenshot_settings}/{key:screenshot_recording.focus_recording_settings}/{key:screenshot_recording.focus_screenshot_list}/{key:screenshot_recording.focus_recording_list} Focus",
+  "screenshot_recording.action.select": "{key:screenshot_recording.focus_up}/{key:screenshot_recording.focus_down} Select",
+  "screenshot_recording.action.confirm": "{key:screenshot_recording.confirm} Confirm",
+  "screenshot_recording.action.back": "{key:screenshot_recording.back} Back"
+}

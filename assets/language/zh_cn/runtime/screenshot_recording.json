@@ -1,0 +1,11 @@
+{
+  "screenshot_recording.title": "截屏与录屏",
+  "screenshot_recording.screenshot_settings": "截屏设置",
+  "screenshot_recording.recording_settings": "录屏设置",
+  "screenshot_recording.screenshot_list": "截屏列表",
+  "screenshot_recording.recording_list": "录屏列表",
+  "screenshot_recording.action.focus": "{key:screenshot_recording.focus_screenshot_settings}/{key:screenshot_recording.focus_recording_settings}/{key:screenshot_recording.focus_screenshot_list}/{key:screenshot_recording.focus_recording_list} 聚焦",
+  "screenshot_recording.action.select": "{key:screenshot_recording.focus_up}/{key:screenshot_recording.focus_down} 选择",
+  "screenshot_recording.action.confirm": "{key:screenshot_recording.confirm} 确认",
+  "screenshot_recording.action.back": "{key:screenshot_recording.back} 返回"
+}

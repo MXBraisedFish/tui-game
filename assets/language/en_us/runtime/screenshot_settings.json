@@ -1,0 +1,19 @@
+{
+  "screenshot_settings.title": "Screenshot Settings",
+  "screenshot_settings.re_hint": "Show Guide Again",
+  "screenshot_settings.fonts": "Custom Image Fonts",
+  "screenshot_settings.double": "Double-Click Action",
+  "screenshot_settings.auto_exit": "Auto Exit Screenshot Mode",
+  "screenshot_settings.fonts.input.placeholder": "No Custom Fonts",
+  "screenshot_settings.fonts.input.hint": "Multiple fonts are supported and will be used in order.\nSupports TTF and OTF font formats.\nEnter the absolute path to each font file.",
+  "screenshot_settings.double.copy": "Copy to Clipboard",
+  "screenshot_settings.double.copy_rich_text": "Copy Rich Text to Clipboard",
+  "screenshot_settings.double.save_png": "Save as PNG",
+  "screenshot_settings.double.all": "Copy & Save as PNG",
+  "screenshot_settings.auto_exit.action": "After Copying or Saving",
+  "screenshot_settings.auto_exit.no": "Never",
+  "screenshot_settings.action.select": "{key:screenshot_settings.focus_up}/{key:screenshot_settings.focus_down} Select",
+  "screenshot_settings.action.focus": "{key:screenshot_settings.focus_re_hint}/{key:screenshot_settings.focus_fonts}/{key:screenshot_settings.focus_double}/{key:screenshot_settings.focus_auto_exit} Focus",
+  "screenshot_settings.action.back": "{key:screenshot_settings.back} Back",
+  "screenshot_settings.action.type.select": "{key:screenshot_settings.confirm} Toggle"
+}

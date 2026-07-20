@@ -54,6 +54,23 @@ pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngin
           screenshot_events.push(ScreenshotAsyncEvent::Failed { task_id, error });
         }
       },
+      EngineEvent::Recording(event) => {
+        services.recording.handle_engine_event(&event);
+        match event {
+          crate::host_engine::services::RecordingAsyncEvent::Saved { task_id, path } => {
+            services.log.info(
+              LogSource::Storage,
+              format!("Recording task {task_id:?} saved: {}", path.display()),
+            );
+          }
+          crate::host_engine::services::RecordingAsyncEvent::Failed { task_id, error } => {
+            services.log.warn(
+              LogSource::Storage,
+              format!("Recording task {task_id:?} failed: {error}"),
+            );
+          }
+        }
+      }
       EngineEvent::File(_)
       | EngineEvent::Image(_)
       | EngineEvent::Network(_)

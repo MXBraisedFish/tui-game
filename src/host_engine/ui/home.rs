@@ -1,5 +1,6 @@
 mod about;
 mod game_list;
+mod logo;
 mod settings;
 
 pub use about::{InputDemoCommand, InputDemoUi};
@@ -10,6 +11,10 @@ pub use settings::mods::game::{GamePackageCommand, GamePackageUi};
 pub use settings::mods::screensaver::{ScreensaverPackageCommand, ScreensaverPackageUi};
 pub use settings::mods::{ModsCommand, ModsUi};
 pub use settings::screensaver_list::{ScreensaverListCommand, ScreensaverListUi};
+pub use settings::screenshot_recording::{
+  ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
+  ScreenshotSettingsUi,
+};
 pub use settings::security::{
   SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi,
 };
@@ -24,13 +29,14 @@ pub use settings::{SettingsUi, SettingsUiCommand};
 use std::time::Duration;
 
 use crate::host_engine::services::{
-  ActionMapEntry, CanvasService, DrawTextParams, HOST_VERSION, HitAreaEvent, HitAreaId,
-  HitAreaOptions, HitAreaService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, TextColor, UiEvent, UiObjectPool,
-  UiObjectPoolOwner,
+  ActionMapEntry, AnimationService, CanvasService, DisplayLogoMode, DrawTextParams, HOST_VERSION,
+  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, KeyState, LayoutService, MouseButton,
+  RandomService, Rect, RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner,
+  TextColor, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 use crate::host_engine::services::I18nService;
+use logo::HomeLogo;
 
 const LOGO_LINES: &[&str] = &[
   "████████╗██╗   ██╗██╗     ██████╗  █████╗ ███╗   ███╗███████╗",
@@ -88,6 +94,7 @@ pub struct HomeUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
   menu_areas: [HitAreaId; HOME_MENU_LEN],
+  logo: HomeLogo,
 }
 
 impl UiObjectPoolOwner for HomeUi {
@@ -121,14 +128,33 @@ pub enum HomeUiCommand {
 }
 
 impl HomeUi {
+  pub(crate) fn sequential_logo_mode(cursor: u64) -> DisplayLogoMode {
+    logo::dynamic_mode_for_cursor(cursor)
+  }
+
   /// 初始化首页 UI，创建命中检测区域。
-  pub fn init(hit_area: &HitAreaService) -> Self {
+  pub fn init(
+    hit_area: &HitAreaService,
+    animation: &AnimationService,
+    random: &RandomService,
+    logo_mode: DisplayLogoMode,
+    logo_seed: u64,
+  ) -> Self {
     let mut objects = UiObjectPool::new();
+    let mut runtime_objects = RuntimeObjectPool::new();
+    let logo = HomeLogo::new(
+      logo_mode,
+      logo_seed,
+      animation,
+      random,
+      &mut runtime_objects,
+    );
     Self {
       selected_index: 0,
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       objects,
-      runtime_objects: RuntimeObjectPool::new(),
+      runtime_objects,
+      logo,
     }
   }
 
@@ -237,8 +263,15 @@ impl HomeUi {
     }
   }
 
-  pub fn update(&mut self, dt: Duration) -> Option<HomeUiCommand> {
-    let _ = dt;
+  pub fn update(
+    &mut self,
+    dt: Duration,
+    animation: &AnimationService,
+    random: &RandomService,
+  ) -> Option<HomeUiCommand> {
+    self
+      .logo
+      .update(dt, animation, random, &mut self.runtime_objects);
     None
   }
 
@@ -308,7 +341,7 @@ impl HomeUi {
     let params = self.build_key_params();
     let viewport = layout.developer_viewport_rect();
 
-    let logo = style_logo(LOGO_LINES);
+    let logo = self.logo.template_text(LOGO_LINES);
     let logo_size = layout.get_text_size(&logo, None);
 
     let menu_items = self.menu_items(i18n);
@@ -395,17 +428,17 @@ impl HomeUi {
     positions: &HomeLayout,
     i18n: &I18nService,
   ) {
-    let logo = style_logo(LOGO_LINES);
+    let logo = self.logo.render_text(|| style_logo(LOGO_LINES));
     render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: positions.logo_x,
-        y: positions.logo_y,
+        y: self.logo.render_y(positions.logo_y),
         text: logo,
-        fg: Some(TextColor::Rgb {
-          r: (255),
-          g: (165),
-          b: (0),
+        fg: (self.logo.mode() == DisplayLogoMode::Classic).then_some(TextColor::Rgb {
+          r: 255,
+          g: 165,
+          b: 0,
         }),
         ..Default::default()
       },

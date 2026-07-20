@@ -20,9 +20,10 @@ use crate::host_engine::core::state_machine::{
 };
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
 use crate::host_engine::services::{
-  ActionMapEntry, BorderStyle, DisplayOrderMode, DrawTextParams, EngineServices, EngineTask,
-  HostAreaKind, ImPolicy, Key, LogSource, PackageEvent, PackageListEntry, RandomGeneratorId,
-  RandomSeed, ScreenshotAsyncEvent, ScreenshotService, ScreenshotTask, TaskId, TextColor,
+  ActionMapEntry, BorderStyle, DisplayLogoMode, DisplayOrderMode, DrawTextParams, EngineServices,
+  EngineTask, HostAreaKind, ImPolicy, InputActionEvent, KeyState, LogSource, PackageEvent,
+  PackageListEntry, RandomGeneratorId, RandomSeed, RecordingState, ScreenshotAsyncEvent,
+  ScreenshotDoubleAction, ScreenshotService, ScreenshotTask, TaskId, TextColor,
   translate_action_map,
 };
 use crate::host_engine::ui::{
@@ -32,7 +33,8 @@ use crate::host_engine::ui::{
   HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
   LanguageSelectUi, ModsCommand, ModsUi, SafeModeWarningCommand, SafeModeWarningUi,
   ScreensaverListCommand, ScreensaverListUi, ScreensaverOverlayUi, ScreensaverPackageCommand,
-  ScreensaverPackageUi, ScreenshotCaptureCommand, ScreenshotCaptureUi, SecurityDetailsCommand,
+  ScreensaverPackageUi, ScreenshotCaptureCommand, ScreenshotCaptureUi, ScreenshotRecordingCommand,
+  ScreenshotRecordingUi, ScreenshotSettingsCommand, ScreenshotSettingsUi, SecurityDetailsCommand,
   SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
   StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
   StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
@@ -44,7 +46,7 @@ use std::{
   time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-const SCREENSHOT_DOUBLE_F1_WINDOW: Duration = Duration::from_millis(300);
+const SCREENSHOT_DOUBLE_ACTION_WINDOW: Duration = Duration::from_millis(300);
 const HOST_KEY_CHORD_WINDOW: Duration = Duration::from_millis(100);
 
 #[derive(Default)]
@@ -115,7 +117,7 @@ impl PendingScreenshotHotkey {
 
   fn update(&mut self, dt: Duration) -> bool {
     self.elapsed = self.elapsed.saturating_add(dt);
-    self.elapsed < SCREENSHOT_DOUBLE_F1_WINDOW
+    self.elapsed < SCREENSHOT_DOUBLE_ACTION_WINDOW
   }
 }
 
@@ -185,6 +187,13 @@ impl InputModePolicy {
       raw_key_capture: true,
     }
   }
+
+  fn screenshot_overlay() -> Self {
+    Self {
+      action_map_dispatch: true,
+      raw_key_capture: true,
+    }
+  }
 }
 
 /// 运行引擎主循环：初始化 UI 并循环处理输入、更新与渲染，直到退出。
@@ -215,7 +224,28 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   set_crash_phase(world.state.crash_phase());
 
   let registry = services.i18n.language_registry().to_vec();
-  let mut home_ui = HomeUi::init(&services.hit_area);
+  let mut display_profile = services.storage.display_settings_profile().clone();
+  let logo_mode = if display_profile.logo_mode == DisplayLogoMode::Order {
+    let mode = HomeUi::sequential_logo_mode(display_profile.logo_sequence_cursor);
+    display_profile.logo_sequence_cursor = display_profile.logo_sequence_cursor.wrapping_add(1);
+    let _ = services
+      .storage
+      .write_display_settings_profile(&display_profile, &mut services.log);
+    mode
+  } else {
+    display_profile.logo_mode
+  };
+  let logo_seed = std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .map(|duration| duration.as_nanos() as u64)
+    .unwrap_or(0);
+  let mut home_ui = HomeUi::init(
+    &services.hit_area,
+    &services.animation,
+    &services.random,
+    logo_mode,
+    logo_seed,
+  );
   let mut settings_ui = SettingsUi::init(&services.hit_area);
   let mut display_settings_ui = DisplaySettingsUi::init(
     &services.hit_area,
@@ -292,6 +322,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut screenshot_mode_toast: Option<ScreenshotModeToast> = None;
   let mut pending_screenshot_saves = HashMap::new();
   let mut pending_screenshot_hotkey: Option<PendingScreenshotHotkey> = None;
+  let mut pending_recording_hotkey: Option<PendingHostHotkey> = None;
   let mut pending_screensaver_hotkey: Option<PendingHostHotkey> = None;
   let mut pending_toolbar_hotkey: Option<PendingHostHotkey> = None;
   let mut language_loading = LanguageLoadingRuntime::default();
@@ -316,15 +347,26 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     let _frame = scheduler.begin_frame();
 
     world.clock.tick();
+    let frame_delta = world.clock.delta_time();
     if let Some(toast) = &mut screenshot_mode_toast {
-      if !toast.update(world.clock.delta_time()) {
+      if !toast.update(frame_delta) {
         screenshot_mode_toast = None;
       }
     }
     services
       .time
-      .update(&mut services.runtime_objects, world.clock.delta_time());
-    top_toolbar.update(world.clock.delta_time());
+      .update(&mut services.runtime_objects, frame_delta);
+    services.animation.update(
+      &mut services.runtime_objects,
+      crate::host_engine::services::AnimationClock::Ui,
+      frame_delta,
+    );
+    services.animation.update(
+      &mut services.runtime_objects,
+      crate::host_engine::services::AnimationClock::Game,
+      frame_delta,
+    );
+    top_toolbar.update(frame_delta);
 
     services
       .engine_events
@@ -422,6 +464,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut screenshot_mode_toast,
       &mut pending_screenshot_saves,
       &mut pending_screenshot_hotkey,
+      &mut pending_recording_hotkey,
       &mut pending_screensaver_hotkey,
       &mut pending_toolbar_hotkey,
     );
@@ -431,6 +474,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut screensaver_overlay_ui,
       screensaver_random,
       &mut top_toolbar,
+      &mut pending_recording_hotkey,
       &mut pending_screensaver_hotkey,
       &mut pending_toolbar_hotkey,
       world.clock.delta_time(),
@@ -536,7 +580,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     draw_screenshot_mode_toast(services, screenshot_mode_toast);
     let text_force_redraw = services.canvas.take_render_requested();
     let composed = services.compositor.compose(&services.canvas);
-    if let Err(error) = services.presenter.present(
+    let presented = if let Err(error) = services.presenter.present(
       &composed,
       &mut services.terminal,
       text_force_redraw,
@@ -546,9 +590,17 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         LogSource::Render,
         format!("Frame presentation failed: {error}"),
       );
-    }
-    if world.state.current_overlay_kind() != Some(OverlayKind::ScreenshotCapture) {
-      services.screenshot.remember_presented_frame(composed);
+      false
+    } else {
+      true
+    };
+    if presented {
+      if world.state.current_overlay_kind() != Some(OverlayKind::ScreenshotCapture) {
+        services
+          .screenshot
+          .remember_presented_frame(composed.clone());
+      }
+      services.recording.capture_presented_frame(&composed);
     }
 
     scheduler.set_target_fps(
@@ -559,6 +611,13 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         .target_fps(),
     );
     scheduler.wait_for_next_frame();
+  }
+
+  if matches!(
+    services.recording.state(),
+    RecordingState::Recording | RecordingState::Paused
+  ) {
+    let _ = services.recording.stop(&services.async_runtime);
   }
 
   ExitState::new()
@@ -739,7 +798,7 @@ fn input_mode_policy(world: &RuntimeWorld) -> InputModePolicy {
     Some(OverlayKind::SafeModeWarning | OverlayKind::ClearWarning) => {
       InputModePolicy::safe_mode_warning()
     }
-    Some(OverlayKind::ScreenshotCapture) => InputModePolicy::raw_overlay(),
+    Some(OverlayKind::ScreenshotCapture) => InputModePolicy::screenshot_overlay(),
     _ => InputModePolicy::normal(),
   }
 }
@@ -789,9 +848,14 @@ fn route_frame_input(
   screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
   pending_screenshot_hotkey: &mut Option<PendingScreenshotHotkey>,
+  pending_recording_hotkey: &mut Option<PendingHostHotkey>,
   pending_screensaver_hotkey: &mut Option<PendingHostHotkey>,
   pending_toolbar_hotkey: &mut Option<PendingHostHotkey>,
 ) {
+  if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
+    load_screenshot_capture_action_map(services);
+  }
+  let host_actions = services.input.collect_action_events();
   if handle_screenshot_hotkey(
     services,
     world,
@@ -799,6 +863,7 @@ fn route_frame_input(
     screenshot_mode_toast,
     pending_screenshot_saves,
     pending_screenshot_hotkey,
+    &host_actions,
   ) {
     return;
   }
@@ -807,8 +872,10 @@ fn route_frame_input(
     services,
     world,
     display_settings_ui,
+    pending_recording_hotkey,
     pending_screensaver_hotkey,
     pending_toolbar_hotkey,
+    &host_actions,
   ) {
     return;
   }
@@ -942,6 +1009,7 @@ fn route_frame_input(
       &services.i18n,
       &services.storage,
       &mut services.log,
+      &host_actions,
     ) {
       apply_screenshot_capture_command(
         command,
@@ -1049,17 +1117,32 @@ fn handle_screenshot_hotkey(
   screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
   pending_screenshot_hotkey: &mut Option<PendingScreenshotHotkey>,
+  host_actions: &[InputActionEvent],
 ) -> bool {
-  if !services.input.was_pressed(Key::Fn(1)) {
+  if !has_pressed_action(host_actions, HOST_KEY_SCREENSHOT) {
     return false;
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
     if screenshot_ui.is_guide_visible() {
-      return false;
+      if screenshot_ui.can_dismiss_guide_by_screenshot_action() {
+        screenshot_ui.dismiss_guide(&services.storage, &mut services.log);
+      }
+      services.input.clear();
+      return true;
     }
-    let command = if screenshot_ui.can_full_save_by_double_f1() {
-      ScreenshotCaptureCommand::FullFrameSave
+    let command = if screenshot_ui.can_run_double_action() {
+      screenshot_ui.select_whole_frame();
+      match services
+        .storage
+        .read_screenshot_profile_or_default(&mut services.log)
+        .double_action
+      {
+        ScreenshotDoubleAction::Copy => ScreenshotCaptureCommand::Copy,
+        ScreenshotDoubleAction::CopyRichText => ScreenshotCaptureCommand::CopyRichText,
+        ScreenshotDoubleAction::SavePng => ScreenshotCaptureCommand::SavePng,
+        ScreenshotDoubleAction::All => ScreenshotCaptureCommand::All,
+      }
     } else {
       ScreenshotCaptureCommand::Exit
     };
@@ -1079,7 +1162,7 @@ fn handle_screenshot_hotkey(
   }
 
   if pending_screenshot_hotkey.take().is_some() {
-    save_last_frame_screenshot(services, screenshot_mode_toast, pending_screenshot_saves);
+    run_quick_screenshot_action(services, screenshot_mode_toast, pending_screenshot_saves);
     services.input.clear();
     return true;
   }
@@ -1130,53 +1213,69 @@ fn handle_host_chord_input(
   services: &mut EngineServices,
   world: &RuntimeWorld,
   display_settings_ui: &mut DisplaySettingsUi,
+  pending_recording: &mut Option<PendingHostHotkey>,
   pending_screensaver: &mut Option<PendingHostHotkey>,
   pending_toolbar: &mut Option<PendingHostHotkey>,
+  host_actions: &[InputActionEvent],
 ) -> bool {
-  let f3_pressed = services.input.was_pressed(Key::Fn(3));
-  let f5_pressed = services.input.was_pressed(Key::Fn(5));
-  let q_pressed = services.input.was_pressed(Key::Q);
+  if has_pressed_action(host_actions, HOST_KEY_RECORDING_PAUSE) {
+    *pending_recording = None;
+    match services.recording.state() {
+      RecordingState::Recording => {
+        let _ = services.recording.pause();
+      }
+      RecordingState::Paused => {
+        let _ = services.recording.resume();
+      }
+      RecordingState::Stopped | RecordingState::Finalizing => {}
+    }
+    services.input.clear();
+    return true;
+  }
+  if has_pressed_action(host_actions, HOST_KEY_RECORDING) {
+    *pending_recording = Some(PendingHostHotkey::new());
+    return true;
+  }
+  let screensaver_pressed = has_pressed_action(host_actions, HOST_KEY_SCREENSAVER);
+  let toolbar_pressed = has_pressed_action(host_actions, HOST_KEY_TOP_TOOLBAR);
+  let toolbar_switch_pressed = has_pressed_action(host_actions, HOST_KEY_TOP_TOOLBAR_SWITCH);
 
   if world.state.current_ui_kind() == Some(UiNodeKind::ToolbarCustom)
-    && (f5_pressed
-      || (q_pressed && (pending_toolbar.is_some() || services.input.is_down(Key::Fn(5)))))
+    && (toolbar_pressed || toolbar_switch_pressed)
   {
     *pending_toolbar = None;
     services.input.clear();
     return true;
   }
 
-  if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) && f3_pressed {
+  if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture)
+    && screensaver_pressed
+  {
     services.input.clear();
     return true;
   }
 
-  if q_pressed
-    && (pending_screensaver.is_some() || f3_pressed || services.input.is_down(Key::Fn(3)))
-  {
-    *pending_screensaver = None;
-    services.log.info(
-      LogSource::Runtime,
-      "Recording pause hotkey received; recording service is not connected yet",
-    );
-    services.input.clear();
-    return true;
-  }
-  if q_pressed && (pending_toolbar.is_some() || f5_pressed || services.input.is_down(Key::Fn(5))) {
+  if toolbar_switch_pressed {
     *pending_toolbar = None;
     toggle_toolbar_enabled(services, display_settings_ui);
     services.input.clear();
     return true;
   }
-  if f3_pressed {
+  if screensaver_pressed {
     *pending_screensaver = Some(PendingHostHotkey::new());
     return true;
   }
-  if f5_pressed {
+  if toolbar_pressed {
     *pending_toolbar = Some(PendingHostHotkey::new());
     return true;
   }
   false
+}
+
+fn has_pressed_action(events: &[InputActionEvent], action: &str) -> bool {
+  events
+    .iter()
+    .any(|event| event.state == KeyState::Pressed && event.action == action)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1186,10 +1285,18 @@ fn update_pending_host_hotkeys(
   screensaver_ui: &mut ScreensaverOverlayUi,
   random_id: RandomGeneratorId,
   toolbar: &mut TopToolbarRuntime,
+  pending_recording: &mut Option<PendingHostHotkey>,
   pending_screensaver: &mut Option<PendingHostHotkey>,
   pending_toolbar: &mut Option<PendingHostHotkey>,
   dt: Duration,
 ) {
+  if pending_recording
+    .as_mut()
+    .is_some_and(|pending| !pending.update(dt))
+  {
+    *pending_recording = None;
+    toggle_recording(services);
+  }
   if pending_screensaver
     .as_mut()
     .is_some_and(|pending| !pending.update(dt))
@@ -1205,6 +1312,31 @@ fn update_pending_host_hotkeys(
     if world.state.current_ui_kind() != Some(UiNodeKind::ToolbarCustom) {
       toolbar.cycle();
     }
+  }
+}
+
+fn toggle_recording(services: &mut EngineServices) {
+  match services.recording.state() {
+    RecordingState::Stopped => {
+      let Some(frame) = services.recording.capture_last_frame() else {
+        services.log.warn(
+          LogSource::Runtime,
+          "Recording start ignored: no presented frame is available",
+        );
+        return;
+      };
+      if services.recording.start(frame, &services.storage) {
+        services.log.info(LogSource::Runtime, "Recording started");
+      }
+    }
+    RecordingState::Recording | RecordingState::Paused => {
+      if services.recording.stop(&services.async_runtime) {
+        services
+          .log
+          .info(LogSource::Runtime, "Recording stopped; saving JSON");
+      }
+    }
+    RecordingState::Finalizing => {}
   }
 }
 
@@ -1326,7 +1458,7 @@ fn start_screenshot_capture(
   services.input.clear();
 }
 
-fn save_last_frame_screenshot(
+fn run_quick_screenshot_action(
   services: &mut EngineServices,
   screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
@@ -1344,18 +1476,39 @@ fn save_last_frame_screenshot(
     width: frame.width(),
     height: frame.height(),
   };
-  let task_id = submit_screenshot_png(services, frame, rect);
-  pending_screenshot_saves.insert(
-    task_id,
-    PendingScreenshotSave {
-      copy_succeeded: None,
-      progress: 0.0,
-    },
+  let action = services
+    .storage
+    .read_screenshot_profile_or_default(&mut services.log)
+    .double_action;
+  let copy_succeeded = match action {
+    ScreenshotDoubleAction::Copy => Some(copy_screenshot_text(services, &frame, rect)),
+    ScreenshotDoubleAction::CopyRichText => Some(copy_screenshot_rich_text(services, &frame, rect)),
+    ScreenshotDoubleAction::All => Some(copy_screenshot_text(services, &frame, rect)),
+    ScreenshotDoubleAction::SavePng => None,
+  };
+  let saves_png = matches!(
+    action,
+    ScreenshotDoubleAction::SavePng | ScreenshotDoubleAction::All
   );
+  if saves_png {
+    let task_id = submit_screenshot_png(services, frame.clone(), rect);
+    pending_screenshot_saves.insert(
+      task_id,
+      PendingScreenshotSave {
+        copy_succeeded,
+        progress: 0.0,
+      },
+    );
+  } else {
+    let _ =
+      services
+        .screenshot
+        .write_json(&services.storage, &frame, rect, None, &mut services.log);
+  }
   *screenshot_mode_toast = Some(ScreenshotModeToast::new(
     ScreenshotModeToastKind::Operation {
-      copy_succeeded: None,
-      save: Some(ScreenshotSaveState::Loading),
+      copy_succeeded,
+      save: saves_png.then_some(ScreenshotSaveState::Loading),
     },
   ));
 }
@@ -1368,6 +1521,7 @@ fn apply_screenshot_capture_command(
   screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
 ) {
+  let mut completed_operation = false;
   match command {
     ScreenshotCaptureCommand::Exit => {
       let _ = world
@@ -1376,6 +1530,7 @@ fn apply_screenshot_capture_command(
     }
     ScreenshotCaptureCommand::Copy => {
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
+        completed_operation = true;
         let copied = copy_screenshot_text(services, &frame, rect);
         let _ =
           services
@@ -1392,6 +1547,7 @@ fn apply_screenshot_capture_command(
     }
     ScreenshotCaptureCommand::CopyRichText => {
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
+        completed_operation = true;
         let copied = copy_screenshot_rich_text(services, &frame, rect);
         let _ =
           services
@@ -1408,6 +1564,7 @@ fn apply_screenshot_capture_command(
     }
     ScreenshotCaptureCommand::SavePng => {
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
+        completed_operation = true;
         let task_id = submit_screenshot_png(services, frame, rect);
         pending_screenshot_saves.insert(
           task_id,
@@ -1427,6 +1584,7 @@ fn apply_screenshot_capture_command(
     }
     ScreenshotCaptureCommand::All => {
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
+        completed_operation = true;
         let copied = copy_screenshot_text(services, &frame, rect);
         let task_id = submit_screenshot_png(services, frame, rect);
         pending_screenshot_saves.insert(
@@ -1445,21 +1603,16 @@ fn apply_screenshot_capture_command(
         ));
       }
     }
-    ScreenshotCaptureCommand::FullFrameSave => {
-      if let Some((frame, rect)) = screenshot_ui.whole_frame() {
-        let task_id = submit_screenshot_png(services, frame, rect);
-        pending_screenshot_saves.insert(
-          task_id,
-          PendingScreenshotSave {
-            copy_succeeded: None,
-            progress: 0.0,
-          },
-        );
-      }
-      let _ = world
-        .state
-        .remove_overlay_kind(OverlayKind::ScreenshotCapture);
-    }
+  }
+  if completed_operation
+    && services
+      .storage
+      .read_screenshot_profile_or_default(&mut services.log)
+      .auto_exit
+  {
+    let _ = world
+      .state
+      .remove_overlay_kind(OverlayKind::ScreenshotCapture);
   }
 }
 
@@ -1519,12 +1672,24 @@ fn submit_screenshot_png(
 
 #[cfg(test)]
 mod tests {
-  use super::sequential_screensaver_index;
+  use super::{has_pressed_action, sequential_screensaver_index};
+  use crate::host_engine::services::{InputActionEvent, InputEventType, KeyState};
 
   #[test]
   fn screensaver_sequence_handles_empty_and_changed_enabled_lists() {
     assert_eq!(sequential_screensaver_index(8, 0), None);
     assert_eq!(sequential_screensaver_index(8, 5), Some(3));
     assert_eq!(sequential_screensaver_index(5, 5), Some(0));
+  }
+
+  #[test]
+  fn host_hotkeys_are_matched_by_semantic_action() {
+    let events = vec![InputActionEvent {
+      event_type: InputEventType::Keyboard,
+      action: "host_key.screenshot".to_string(),
+      state: KeyState::Pressed,
+    }];
+    assert!(has_pressed_action(&events, "host_key.screenshot"));
+    assert!(!has_pressed_action(&events, "host_key.recording"));
   }
 }

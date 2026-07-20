@@ -21,6 +21,8 @@ pub enum UiNodeKind {
   DisplaySettings,
   ToolbarCustom,
   ScreensaverList,
+  ScreenshotRecording,
+  ScreenshotSettings,
   SecuritySettings,
   SecurityDetails,
   LanguageSelect,
@@ -88,6 +90,22 @@ impl UiNodeState {
   pub fn screensaver_list() -> Self {
     Self {
       kind: UiNodeKind::ScreensaverList,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screenshot_recording() -> Self {
+    Self {
+      kind: UiNodeKind::ScreenshotRecording,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screenshot_settings() -> Self {
+    Self {
+      kind: UiNodeKind::ScreenshotSettings,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

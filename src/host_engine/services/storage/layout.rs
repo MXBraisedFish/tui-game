@@ -6,6 +6,8 @@ pub const IMAGE_CACHE_DIR: &str = "data/cache/images";
 
 pub const SCREENSHOT_CACHE_DIR: &str = "data/cache/screenshot";
 
+pub const RECORDING_CACHE_DIR: &str = "data/cache/recording";
+
 pub const DATA_PROFILES_DIR: &str = "data/profiles";
 
 pub const DATA_LOG_DIR: &str = "data/log";
@@ -51,6 +53,7 @@ pub const REQUIRED_DIRECTORIES: &[&str] = &[
   DATA_CACHE_DIR,
   IMAGE_CACHE_DIR,
   SCREENSHOT_CACHE_DIR,
+  RECORDING_CACHE_DIR,
   DATA_PROFILES_DIR,
   DATA_LOG_DIR,
   DATA_SCREENSHOT_DIR,
@@ -74,10 +77,13 @@ pub const DEFAULT_FILES: &[(&str, &str)] = &[
     PROFILE_PACKAGE_STATE_FILE,
     r#"{"games":{},"screensavers":{}}"#,
   ),
-  (PROFILE_SCREENSHOT_FILE, r#"{"guide_seen":false}"#),
+  (
+    PROFILE_SCREENSHOT_FILE,
+    r#"{"guide_seen":false,"double_action":"save_png","auto_exit":false}"#,
+  ),
   (
     PROFILE_DISPLAY_SETTINGS_FILE,
-    r#"{"logo_mode":"order","top_toolbar":true,"top_toolbar_custom_text":"","screensaver_source":"all","screensaver_order":"random","screensaver_sequence_cursor":0,"game_list_source":"all","game_list_warnings":true,"game_list_fps":"fps60"}"#,
+    r#"{"logo_mode":"order","logo_sequence_cursor":0,"top_toolbar":true,"top_toolbar_custom_text":"","screensaver_source":"all","screensaver_order":"random","screensaver_sequence_cursor":0,"game_list_source":"all","game_list_warnings":true,"game_list_fps":"fps60"}"#,
   ),
   (TUI_LOG_FILE, ""),
   (LANGUAGE_REGISTRY_FILE, "{}"),

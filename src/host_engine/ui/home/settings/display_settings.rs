@@ -29,6 +29,7 @@ pub struct DisplaySettingsUi {
   back_area: HitAreaId,
   menu_areas: [HitAreaId; MENU_LEN],
   logo_mode: DisplayLogoMode,
+  logo_sequence_cursor: u64,
   top_toolbar: bool,
   screensaver_source: DisplaySourceMode,
   screensaver_order: DisplayOrderMode,
@@ -82,6 +83,7 @@ impl DisplaySettingsUi {
       objects,
       runtime_objects: RuntimeObjectPool::new(),
       logo_mode: profile.logo_mode,
+      logo_sequence_cursor: profile.logo_sequence_cursor,
       top_toolbar: profile.top_toolbar,
       screensaver_source: profile.screensaver_source,
       screensaver_order: profile.screensaver_order,
@@ -122,7 +124,7 @@ impl DisplaySettingsUi {
         "Focus top toolbar",
       ),
       action(
-        "display_settings.top_toolbar_custom",
+        "display_settings.focus_top_toolbar_custom",
         "3",
         "Focus toolbar customization",
       ),
@@ -208,7 +210,7 @@ impl DisplaySettingsUi {
           self.selected_index = 3;
           None
         }
-        "display_settings.top_toolbar_custom" if self.top_toolbar => {
+        "display_settings.focus_top_toolbar_custom" if self.top_toolbar => {
           self.selected_index = 2;
           None
         }
@@ -358,6 +360,7 @@ impl DisplaySettingsUi {
   fn profile(&self) -> DisplaySettingsProfile {
     DisplaySettingsProfile {
       logo_mode: self.logo_mode,
+      logo_sequence_cursor: self.logo_sequence_cursor,
       top_toolbar: self.top_toolbar,
       top_toolbar_custom_text: self.top_toolbar_custom_text.clone(),
       screensaver_source: self.screensaver_source,

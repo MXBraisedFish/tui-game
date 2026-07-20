@@ -9,7 +9,7 @@
   "display_settings.game_list.error": "游戏列表功能警告",
   "display_settings.game_list.fps": "显示帧数上限",
   "display_settings.action.select": "{key:display_settings.focus_up}/{key:display_settings.focus_down} 选择",
-  "display_settings.action.focus": "{key:display_settings.focus_logo_random}/{key:display_settings.focus_tool_top_toolbar}/{key:display_settings.top_toolbar_custom}/{key:display_settings.focus_screensaver_source}/{key:display_settings.focus_screensaver_random}/{key:display_settings.focus_game_list_source}/{key:display_settings.focus_game_list_error}/{key:display_settings.focus_fps} 聚焦",
+  "display_settings.action.focus": "{key:display_settings.focus_logo_random}/{key:display_settings.focus_tool_top_toolbar}/{key:display_settings.focus_top_toolbar_custom}/{key:display_settings.focus_screensaver_source}/{key:display_settings.focus_screensaver_random}/{key:display_settings.focus_game_list_source}/{key:display_settings.focus_game_list_error}/{key:display_settings.focus_fps} 聚焦",
   "display_settings.action.back": "{key:display_settings.back} 返回",
   "display_settings.action.type.select": "{key:display_settings.confirm} 切换",
   "display_settings.game_list.fps.30": "30",

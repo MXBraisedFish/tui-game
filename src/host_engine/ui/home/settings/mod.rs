@@ -11,9 +11,12 @@ pub mod display_settings;
 pub mod language;
 pub mod mods;
 pub mod screensaver_list;
+pub mod screenshot_recording;
 pub mod security;
 pub mod storage_management;
 pub mod toolbar_custom;
+
+use screenshot_recording::ScreenshotRecordingUi;
 
 const SETTINGS_MENU_LEN: usize = 8;
 
@@ -44,6 +47,7 @@ pub struct SettingsUi {
   runtime_objects: RuntimeObjectPool,
   back_area: HitAreaId,
   menu_areas: [HitAreaId; SETTINGS_MENU_LEN],
+  screenshot_recording: ScreenshotRecordingUi,
 }
 
 impl UiObjectPoolOwner for SettingsUi {
@@ -76,6 +80,7 @@ pub enum SettingsUiCommand {
   OpenSecuritySettings,
   OpenDisplaySettings,
   OpenScreensaverList,
+  OpenScreenshotRecording,
 }
 
 impl SettingsUi {
@@ -88,7 +93,12 @@ impl SettingsUi {
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       objects,
       runtime_objects: RuntimeObjectPool::new(),
+      screenshot_recording: ScreenshotRecordingUi::init(hit_area),
     }
+  }
+
+  pub fn screenshot_recording_mut(&mut self) -> &mut ScreenshotRecordingUi {
+    &mut self.screenshot_recording
   }
 
   /// 返回设置页面的按键映射定义。
@@ -177,6 +187,7 @@ impl SettingsUi {
           4 => Some(SettingsUiCommand::OpenSecuritySettings),
           5 => Some(SettingsUiCommand::OpenDisplaySettings),
           6 => Some(SettingsUiCommand::OpenScreensaverList),
+          7 => Some(SettingsUiCommand::OpenScreenshotRecording),
           _ => None,
         }
       }
@@ -200,6 +211,7 @@ impl SettingsUi {
           4 => Some(SettingsUiCommand::OpenSecuritySettings),
           5 => Some(SettingsUiCommand::OpenDisplaySettings),
           6 => Some(SettingsUiCommand::OpenScreensaverList),
+          7 => Some(SettingsUiCommand::OpenScreenshotRecording),
           _ => None,
         },
         "settings.back" => Some(SettingsUiCommand::Back),

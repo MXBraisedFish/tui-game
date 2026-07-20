@@ -53,6 +53,10 @@ impl StorageService {
     self.path(layout::SCREENSHOT_CACHE_DIR)
   }
 
+  pub fn recording_cache_dir_path(&self) -> PathBuf {
+    self.path(layout::RECORDING_CACHE_DIR)
+  }
+
   pub fn recording_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_RECORDING_DIR)
   }

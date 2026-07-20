@@ -1,3 +1,4 @@
+pub(crate) mod animation;
 mod async_runtime;
 mod canvas;
 mod clipboard;
@@ -18,6 +19,7 @@ mod network;
 mod overlay;
 mod package;
 mod random;
+mod recording;
 mod render;
 mod render_pipeline;
 mod rich_text;
@@ -32,6 +34,18 @@ mod unicode;
 mod version;
 pub(crate) mod widget;
 
+pub use animation::{
+  AnimationBinding, AnimationCallbackId, AnimationCallbackRequest, AnimationClip, AnimationClock,
+  AnimationColor, AnimationEasing, AnimationEndMode, AnimationError, AnimationEvent,
+  AnimationEventKind, AnimationHandle, AnimationId, AnimationInterpolation, AnimationKeyframe,
+  AnimationMarker, AnimationOwner, AnimationPlaybackOptions, AnimationProperty,
+  AnimationRepeatCount, AnimationRepeatMode, AnimationRepeatOptions, AnimationService,
+  AnimationSource, AnimationTarget, AnimationTargetRouter, AnimationTrack, AnimationUpdate,
+  AnimationValue, AnimationValueId, AnimationValueKind, AnimationWrite, AnimationWriteOperation,
+  CellEffectId, CharacterEffectService, CharacterFrame, EffectParameterId, GameInstanceId,
+  GameObjectRef, PlaybackDirection, PlaybackState, TweenDefinition, UiObjectKind, UiObjectRef,
+  UiPoolId,
+};
 pub use async_runtime::{
   AsyncRuntime, EngineEvent, EngineTask, FileEvent, FileTask, ImageEvent, ImageTask,
   ManagedThreadId, NetworkEvent, NetworkTask, SleepTask, TaskId, TaskState, TimeAsyncEvent,
@@ -63,6 +77,9 @@ pub use package::{
   PackageAsset, PackageEvent, PackageListEntry, PackageService, PackageSource, PackageType,
 };
 pub use random::RandomService;
+pub use recording::{
+  RecordingAsyncEvent, RecordingService, RecordingSnapshot, RecordingState, RecordingTask,
+};
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{ComposedCell, ComposedFrame, FrameCompositor, FramePresenter};
 pub use rich_text::{
@@ -72,7 +89,7 @@ pub use screenshot::{ScreenshotAsyncEvent, ScreenshotRect, ScreenshotService, Sc
 pub use storage::{
   DisplayFpsLimit, DisplayLogoMode, DisplayOrderMode, DisplaySettingsProfile, DisplaySourceMode,
   GamePackageState, PackageDefaultState, PackageStateProfile, SafeModeDefault,
-  ScreensaverPackageState, ScreenshotProfile, StorageService,
+  ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile, StorageService,
 };
 pub use terminal::TerminalService;
 pub use text_layout::DrawTextParams;
@@ -103,7 +120,10 @@ pub struct EngineServices {
   pub file: FileService,
   pub network: NetworkService,
   pub random: RandomService,
+  pub animation: AnimationService,
+  pub character_effect: CharacterEffectService,
   pub screenshot: ScreenshotService,
+  pub recording: RecordingService,
   pub package: PackageService,
   pub clipboard: ClipboardService,
   pub runtime_objects: RuntimeObjectPool,
@@ -152,7 +172,10 @@ impl EngineServices {
       file: FileService::new(),
       network: NetworkService::new(),
       random: RandomService::new(),
+      animation: AnimationService::new(),
+      character_effect: CharacterEffectService::new(),
       screenshot: ScreenshotService::new(),
+      recording: RecordingService::new(),
       terminal: TerminalService::new(),
       clipboard: ClipboardService::new(),
       runtime_objects: RuntimeObjectPool::new(),

@@ -258,6 +258,27 @@ pub(super) fn route_render(
         &services.scroll_box,
       );
     }
+    Some(UiNodeKind::ScreenshotRecording) => {
+      settings_ui.screenshot_recording_mut().render(
+        &mut services.render,
+        &mut services.canvas,
+        &services.layout,
+        &services.i18n,
+        &services.hit_area,
+      );
+    }
+    Some(UiNodeKind::ScreenshotSettings) => {
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .render(
+          &mut services.render,
+          &mut services.canvas,
+          &services.layout,
+          &services.i18n,
+          &services.hit_area,
+        );
+    }
     Some(UiNodeKind::SecuritySettings) => {
       security_uis.settings.render(
         &mut services.render,

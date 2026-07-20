@@ -28,6 +28,15 @@ pub(super) fn current_objects_mut<'a>(
     Some(UiNodeKind::DisplaySettings) => Some(display_settings_ui.objects_mut()),
     Some(UiNodeKind::ToolbarCustom) => Some(display_settings_ui.custom_mut().objects_mut()),
     Some(UiNodeKind::ScreensaverList) => Some(screensaver_list_ui.objects_mut()),
+    Some(UiNodeKind::ScreenshotRecording) => {
+      Some(settings_ui.screenshot_recording_mut().objects_mut())
+    }
+    Some(UiNodeKind::ScreenshotSettings) => Some(
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .objects_mut(),
+    ),
     Some(UiNodeKind::SecuritySettings) => Some(security_uis.settings.objects_mut()),
     Some(UiNodeKind::SecurityDetails) => Some(security_uis.details.objects_mut()),
     Some(UiNodeKind::StorageManagement) => Some(storage_management_ui.objects_mut()),
@@ -96,6 +105,17 @@ pub(super) fn deactivate_hidden_pools(
   deactivate(
     UiNodeKind::ScreensaverList,
     screensaver_list_ui.objects_mut(),
+  );
+  deactivate(
+    UiNodeKind::ScreenshotRecording,
+    settings_ui.screenshot_recording_mut().objects_mut(),
+  );
+  deactivate(
+    UiNodeKind::ScreenshotSettings,
+    settings_ui
+      .screenshot_recording_mut()
+      .screenshot_settings_mut()
+      .objects_mut(),
   );
   deactivate(
     UiNodeKind::SecuritySettings,
@@ -557,7 +577,11 @@ pub(super) fn route_update(
 
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => {
-      if let Some(command) = home_ui.update(world.clock.delta_time()) {
+      if let Some(command) = home_ui.update(
+        world.clock.delta_time(),
+        &services.animation,
+        &services.random,
+      ) {
         apply_home_command(command, world);
       }
     }
@@ -570,6 +594,17 @@ pub(super) fn route_update(
     Some(UiNodeKind::ToolbarCustom) => {}
     Some(UiNodeKind::ScreensaverList) => {
       let _ = screensaver_list_ui.update(world.clock.delta_time());
+    }
+    Some(UiNodeKind::ScreenshotRecording) => {
+      settings_ui
+        .screenshot_recording_mut()
+        .update(world.clock.delta_time());
+    }
+    Some(UiNodeKind::ScreenshotSettings) => {
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .update(world.clock.delta_time());
     }
     Some(UiNodeKind::SecuritySettings) => {
       security_uis.settings.update(world.clock.delta_time());
@@ -1041,6 +1076,20 @@ fn route_input_event(
     Some(UiNodeKind::ScreensaverList) => {
       if let Some(command) = screensaver_list_ui.handle_event(event) {
         apply_screensaver_list_command(command, screensaver_list_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::ScreenshotRecording) => {
+      if let Some(command) = settings_ui.screenshot_recording_mut().handle_event(event) {
+        apply_screenshot_recording_command(command, settings_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::ScreenshotSettings) => {
+      if let Some(command) = settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut()
+        .handle_event(event)
+      {
+        apply_screenshot_settings_command(command, settings_ui, services, world);
       }
     }
     Some(UiNodeKind::SecuritySettings) => {

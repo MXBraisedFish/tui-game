@@ -1,6 +1,6 @@
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, LayoutService, Rect,
-  RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, TextAlign, TextColor,
+  RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, TextColor,
   TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
   TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
@@ -95,18 +95,23 @@ impl ToolbarCustomUi {
       }],
       "toolbar_custom.",
     );
-    render.draw_host_text(
-      canvas,
-      &DrawTextParams {
-        x: viewport.x,
-        y: viewport.y,
-        text: i18n.get_runtime_text(NS, "toolbar_custom.tip"),
-        params: Some(tip_params),
-        line_align: TextAlign::Center,
-        max_width: Some(viewport.width),
-        ..Default::default()
-      },
-    );
+    let tip = i18n.get_runtime_text(NS, "toolbar_custom.tip");
+    for (line_index, line) in tip.strip_prefix("f%").unwrap_or(&tip).lines().enumerate() {
+      let text = format!("f%{line}");
+      let width = layout.get_text_width(&text, Some(&tip_params));
+      render.draw_host_text(
+        canvas,
+        &DrawTextParams {
+          x: viewport
+            .x
+            .saturating_add(viewport.width.saturating_sub(width) / 2),
+          y: viewport.y.saturating_add(line_index as u16),
+          text,
+          params: Some(tip_params.clone()),
+          ..Default::default()
+        },
+      );
+    }
 
     let border_width = viewport.width.saturating_sub(24).max(3);
     let border_x = viewport

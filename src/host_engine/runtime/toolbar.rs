@@ -4,8 +4,8 @@ use sysinfo::{Networks, System};
 
 use super::*;
 use crate::host_engine::services::{
-  ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService, Rect,
-  TerminalColor, TextStyle, UiObjectPool,
+  ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService, RecordingState,
+  Rect, TerminalColor, TextStyle, UiObjectPool,
 };
 
 const SAMPLE_INTERVAL: Duration = Duration::from_secs(2);
@@ -225,12 +225,7 @@ impl TopToolbarRuntime {
         None => self.draw_export(services, top, true, 0, None),
       },
       TopToolbarView::VideoExport => self.draw_export(services, top, false, 0, None),
-      TopToolbarView::Recording => {
-        let text = services
-          .i18n
-          .get_runtime_text("toolbar", "toolbar.recording.stop");
-        self.draw_centered(services, top, text);
-      }
+      TopToolbarView::Recording => self.draw_recording(services, top),
       TopToolbarView::Custom => {
         let text = custom_text.map(str::to_owned).unwrap_or_else(|| {
           services
@@ -356,6 +351,51 @@ impl TopToolbarRuntime {
       },
     );
   }
+
+  fn draw_recording(&self, services: &mut EngineServices, rect: Rect) {
+    let snapshot = services.recording.snapshot();
+    let text = match snapshot.state {
+      RecordingState::Stopped => services
+        .i18n
+        .get_runtime_text("toolbar", "toolbar.recording.stop"),
+      RecordingState::Recording => {
+        let marker = if snapshot.wall_duration.as_millis() / 500 % 2 == 0 {
+          "<fg:#FF3B30>◉</fg>"
+        } else {
+          " "
+        };
+        let label = services
+          .i18n
+          .get_runtime_text("toolbar", "toolbar.recording.active");
+        format!(
+          "f%{marker} {label}  {}",
+          format_recording_duration(snapshot.active_duration)
+        )
+      }
+      RecordingState::Paused | RecordingState::Finalizing => {
+        let label = services
+          .i18n
+          .get_runtime_text("toolbar", "toolbar.recording.pause");
+        format!(
+          "f%{label}  {}",
+          format_recording_duration(snapshot.active_duration)
+        )
+      }
+    };
+    self.draw_centered(services, rect, text);
+  }
+}
+
+fn format_recording_duration(duration: Duration) -> String {
+  let seconds = duration.as_secs();
+  let hours = seconds / 3600;
+  let minutes = seconds / 60 % 60;
+  let seconds = seconds % 60;
+  if hours == 0 {
+    format!("{minutes:02}:{seconds:02}")
+  } else {
+    format!("{hours}:{minutes:02}:{seconds:02}")
+  }
 }
 
 fn smooth(current: f32, sample: f32, initialized: bool) -> f32 {
@@ -448,5 +488,14 @@ mod tests {
   fn smoothing_keeps_only_a_fraction_of_the_new_sample() {
     assert_eq!(smooth(10.0, 30.0, false), 30.0);
     assert_eq!(smooth(10.0, 30.0, true), 15.0);
+  }
+
+  #[test]
+  fn recording_duration_uses_minutes_then_hours() {
+    assert_eq!(format_recording_duration(Duration::from_secs(65)), "01:05");
+    assert_eq!(
+      format_recording_duration(Duration::from_secs(3665)),
+      "1:01:05"
+    );
   }
 }

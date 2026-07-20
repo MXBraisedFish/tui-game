@@ -144,7 +144,7 @@ impl ScreensaverListUi {
             overflow_x: Overflow::Hidden,
             overflow_y: Overflow::Auto,
             scrollbar: ScrollbarPolicy {
-              vertical: ScrollbarVisibility::Always,
+              vertical: ScrollbarVisibility::Auto,
               horizontal: ScrollbarVisibility::Never,
             },
             scrollbar_layout: ScrollbarLayout::Inside,
@@ -1326,6 +1326,17 @@ mod tests {
       &TextInputService::new(),
       &ScrollBoxService::new(),
     )
+  }
+
+  #[test]
+  fn list_scrollbars_only_show_when_content_overflows() {
+    let ui = ui();
+
+    for id in [ui.left_scroll, ui.right_scroll] {
+      let options = &ui.objects.scroll_boxes.boxes[&id].options;
+      assert_eq!(options.scrollbar.vertical, ScrollbarVisibility::Auto);
+      assert_eq!(options.scrollbar.horizontal, ScrollbarVisibility::Never);
+    }
   }
 
   #[test]

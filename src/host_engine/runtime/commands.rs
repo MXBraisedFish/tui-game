@@ -94,6 +94,61 @@ pub(super) fn apply_settings_command(
     SettingsUiCommand::OpenScreensaverList => {
       world.state.enter_ui_node(UiNodeState::screensaver_list())
     }
+    SettingsUiCommand::OpenScreenshotRecording => world
+      .state
+      .enter_ui_node(UiNodeState::screenshot_recording()),
+  }
+}
+
+pub(super) fn apply_screenshot_recording_command(
+  command: ScreenshotRecordingCommand,
+  settings_ui: &mut SettingsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    ScreenshotRecordingCommand::Back => {
+      world.state.pop_ui_node();
+      let ui = settings_ui.screenshot_recording_mut();
+      clear_exiting_pool(ui.objects_mut(), services);
+      *ui = ScreenshotRecordingUi::init(&services.hit_area);
+    }
+    ScreenshotRecordingCommand::OpenScreenshotSettings => {
+      let profile = services
+        .storage
+        .read_screenshot_profile_or_default(&mut services.log);
+      let _ = services
+        .storage
+        .write_screenshot_profile(&profile, &mut services.log);
+      *settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut() = ScreenshotSettingsUi::init(&services.hit_area, profile);
+      world
+        .state
+        .enter_ui_node(UiNodeState::screenshot_settings());
+    }
+  }
+}
+
+pub(super) fn apply_screenshot_settings_command(
+  command: ScreenshotSettingsCommand,
+  settings_ui: &mut SettingsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  match command {
+    ScreenshotSettingsCommand::Changed(profile) => {
+      let _ = services
+        .storage
+        .write_screenshot_profile(&profile, &mut services.log);
+    }
+    ScreenshotSettingsCommand::Back => {
+      let ui = settings_ui
+        .screenshot_recording_mut()
+        .screenshot_settings_mut();
+      clear_exiting_pool(ui.objects_mut(), services);
+      world.state.pop_ui_node();
+    }
   }
 }
 

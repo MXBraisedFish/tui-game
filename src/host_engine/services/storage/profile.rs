@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, io};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value};
 
 use super::layout;
@@ -29,10 +29,51 @@ pub struct PackageStateProfile {
   pub screensavers: HashMap<String, ScreensaverPackageState>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ScreenshotDoubleAction {
+  Copy,
+  CopyRichText,
+  #[default]
+  SavePng,
+  All,
+}
+
+impl ScreenshotDoubleAction {
+  pub fn next(self) -> Self {
+    match self {
+      Self::Copy => Self::CopyRichText,
+      Self::CopyRichText => Self::SavePng,
+      Self::SavePng => Self::All,
+      Self::All => Self::Copy,
+    }
+  }
+}
+
+fn default_screenshot_double_action() -> ScreenshotDoubleAction {
+  ScreenshotDoubleAction::SavePng
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScreenshotProfile {
   #[serde(default)]
   pub guide_seen: bool,
+
+  #[serde(default = "default_screenshot_double_action")]
+  pub double_action: ScreenshotDoubleAction,
+
+  #[serde(default)]
+  pub auto_exit: bool,
+}
+
+impl Default for ScreenshotProfile {
+  fn default() -> Self {
+    Self {
+      guide_seen: false,
+      double_action: ScreenshotDoubleAction::SavePng,
+      auto_exit: false,
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -77,6 +118,8 @@ pub enum DisplayFpsLimit {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DisplaySettingsProfile {
   pub logo_mode: DisplayLogoMode,
+  #[serde(default)]
+  pub logo_sequence_cursor: u64,
   pub top_toolbar: bool,
   #[serde(default)]
   pub top_toolbar_custom_text: String,
@@ -158,6 +201,7 @@ impl Default for DisplaySettingsProfile {
   fn default() -> Self {
     Self {
       logo_mode: DisplayLogoMode::Order,
+      logo_sequence_cursor: 0,
       top_toolbar: true,
       top_toolbar_custom_text: String::new(),
       screensaver_source: DisplaySourceMode::All,
@@ -260,6 +304,12 @@ impl StorageService {
     let defaults = DisplaySettingsProfile::default();
     let profile = DisplaySettingsProfile {
       logo_mode: read_profile_field(&mut values, "logo_mode", defaults.logo_mode, &mut repaired),
+      logo_sequence_cursor: read_profile_field(
+        &mut values,
+        "logo_sequence_cursor",
+        defaults.logo_sequence_cursor,
+        &mut repaired,
+      ),
       top_toolbar: read_profile_field(
         &mut values,
         "top_toolbar",
@@ -325,6 +375,11 @@ impl StorageService {
     let path = self.profile_display_settings_path();
     let mut values = read_json_object(&path);
     set_profile_field(&mut values, "logo_mode", profile.logo_mode);
+    set_profile_field(
+      &mut values,
+      "logo_sequence_cursor",
+      profile.logo_sequence_cursor,
+    );
     set_profile_field(&mut values, "top_toolbar", profile.top_toolbar);
     set_profile_field(
       &mut values,
@@ -732,6 +787,14 @@ mod tests {
     )
     .unwrap();
     assert_eq!(profile.defaults.safe_mode, SafeModeDefault::OffPermanent);
+  }
+
+  #[test]
+  fn old_screenshot_profile_receives_new_defaults() {
+    let profile: ScreenshotProfile = serde_json::from_str(r#"{"guide_seen":true}"#).unwrap();
+    assert!(profile.guide_seen);
+    assert_eq!(profile.double_action, ScreenshotDoubleAction::SavePng);
+    assert!(!profile.auto_exit);
   }
 
   #[test]

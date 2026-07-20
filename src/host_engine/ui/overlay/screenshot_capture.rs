@@ -3,12 +3,13 @@ use std::time::Duration;
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasCell, CanvasService, ComposedCell, ComposedFrame, DrawTextParams,
-  I18nService, InputService, Key, KeyEventKind, LayoutService, LogService, MouseButton,
-  MouseEventKind, RenderService, RichTextParams, ScreenshotRect, ScreenshotService, StorageService,
-  SystemEvent, TerminalColor, TextColor,
+  I18nService, InputActionEvent, InputService, KeyEventKind, KeyState, LayoutService, LogService,
+  MouseButton, MouseEventKind, RenderService, RichTextParams, ScreenshotRect, ScreenshotService,
+  StorageService, SystemEvent, TerminalColor, TextColor,
 };
 
 const DOUBLE_F1_WINDOW: Duration = Duration::from_millis(300);
+const DOUBLE_MOUSE_CLICK_WINDOW: Duration = Duration::from_millis(300);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScreenshotCaptureCommand {
@@ -17,7 +18,6 @@ pub enum ScreenshotCaptureCommand {
   CopyRichText,
   SavePng,
   All,
-  FullFrameSave,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +33,7 @@ pub struct ScreenshotCaptureUi {
   selection: Option<ScreenshotRect>,
   drag_anchor: Option<(u16, u16)>,
   drag_cursor: Option<(u16, u16)>,
+  last_left_press: Option<((u16, u16), Duration)>,
   menu: Option<MenuState>,
   guide_visible: bool,
   opened_elapsed: Duration,
@@ -48,6 +49,7 @@ impl ScreenshotCaptureUi {
       selection: None,
       drag_anchor: None,
       drag_cursor: None,
+      last_left_press: None,
       menu: None,
       guide_visible: false,
       opened_elapsed: Duration::ZERO,
@@ -75,6 +77,7 @@ impl ScreenshotCaptureUi {
     self.selection = None;
     self.drag_anchor = None;
     self.drag_cursor = None;
+    self.last_left_press = None;
     self.menu = None;
     self.guide_visible = show_guide;
     self.opened_elapsed = Duration::ZERO;
@@ -87,12 +90,23 @@ impl ScreenshotCaptureUi {
     self.opened_elapsed = self.opened_elapsed.saturating_add(dt);
   }
 
-  pub fn can_full_save_by_double_f1(&self) -> bool {
+  pub fn can_run_double_action(&self) -> bool {
     !self.user_touched && self.opened_elapsed <= DOUBLE_F1_WINDOW
   }
 
   pub fn is_guide_visible(&self) -> bool {
     self.guide_visible
+  }
+
+  pub fn can_dismiss_guide_by_screenshot_action(&self) -> bool {
+    self.guide_visible && self.opened_elapsed >= Duration::from_millis(1000)
+  }
+
+  pub fn dismiss_guide(&mut self, storage: &StorageService, log: &mut LogService) {
+    if self.guide_visible {
+      self.close_guide(storage, log);
+      self.mode_toast_dismiss_requested = true;
+    }
   }
 
   pub fn take_mode_toast_dismiss_requested(&mut self) -> bool {
@@ -114,12 +128,12 @@ impl ScreenshotCaptureUi {
     i18n: &I18nService,
     storage: &StorageService,
     log: &mut LogService,
+    actions: &[InputActionEvent],
   ) -> Option<ScreenshotCaptureCommand> {
     let raw_keys = input.take_raw_key_events();
     let system_events = input.drain_system_events();
     if self.guide_visible
-      && (guide_direct_key_should_close(input, self.opened_elapsed)
-        || guide_should_close(self.opened_elapsed, &raw_keys, &system_events))
+      && (action_command(actions).is_some() || guide_should_close(&system_events))
     {
       self.close_guide(storage, log);
       self.mode_toast_dismiss_requested = true;
@@ -136,7 +150,7 @@ impl ScreenshotCaptureUi {
       self.operation_toast_dismiss_requested = true;
     }
 
-    if let Some(command) = direct_key_command(input) {
+    if let Some(command) = action_command(actions) {
       self.user_touched = true;
       self.mode_toast_dismiss_requested = false;
       self.operation_toast_dismiss_requested = false;
@@ -148,18 +162,7 @@ impl ScreenshotCaptureUi {
         continue;
       }
       self.user_touched = true;
-      return match event.key {
-        Key::Fn(1) => Some(if self.can_full_save_by_double_f1() {
-          ScreenshotCaptureCommand::FullFrameSave
-        } else {
-          ScreenshotCaptureCommand::Exit
-        }),
-        Key::A => Some(ScreenshotCaptureCommand::All),
-        Key::S => Some(ScreenshotCaptureCommand::SavePng),
-        Key::C => Some(ScreenshotCaptureCommand::Copy),
-        Key::R => Some(ScreenshotCaptureCommand::CopyRichText),
-        _ => None,
-      };
+      return None;
     }
 
     let frame_origin = self.frame_origin(layout);
@@ -178,26 +181,34 @@ impl ScreenshotCaptureUi {
           }
           self.menu = None;
           if let Some(pos) = local {
-            self.drag_anchor = Some(pos);
-            self.drag_cursor = Some(pos);
-            self.selection = self.selection_from_drag();
+            if self.register_left_press((mouse.x, mouse.y)) {
+              self.select_all();
+            } else {
+              self.drag_anchor = Some(pos);
+              self.drag_cursor = Some(pos);
+              self.selection = self.selection_from_drag();
+            }
           }
         }
         MouseEventKind::Drag if mouse.button == Some(MouseButton::Left) => {
+          self.last_left_press = None;
           if let Some(pos) = local {
             self.drag_cursor = Some(pos);
             self.selection = self.selection_from_drag();
           }
         }
         MouseEventKind::Release if mouse.button == Some(MouseButton::Left) => {
-          if let Some(pos) = local {
-            self.drag_cursor = Some(pos);
-            self.selection = self.selection_from_drag();
+          if self.drag_anchor.is_some() {
+            if let Some(pos) = local {
+              self.drag_cursor = Some(pos);
+              self.selection = self.selection_from_drag();
+            }
           }
           self.drag_anchor = None;
           self.drag_cursor = None;
         }
         MouseEventKind::Press if mouse.button == Some(MouseButton::Right) => {
+          self.last_left_press = None;
           if self.selection.is_some() {
             self.open_menu(mouse.x, mouse.y, layout, i18n);
           }
@@ -211,12 +222,6 @@ impl ScreenshotCaptureUi {
   pub fn current_selection(&self) -> Option<(ComposedFrame, ScreenshotRect)> {
     let frame = self.frame.clone()?;
     let rect = ScreenshotService::normalize_selection(&frame, self.selection?)?;
-    Some((frame, rect))
-  }
-
-  pub fn whole_frame(&self) -> Option<(ComposedFrame, ScreenshotRect)> {
-    let frame = self.frame.clone()?;
-    let rect = ScreenshotService::whole_frame_rect(&frame)?;
     Some((frame, rect))
   }
 
@@ -264,6 +269,28 @@ impl ScreenshotCaptureUi {
       width: ax.max(cx).saturating_sub(ax.min(cx)).saturating_add(1),
       height: ay.max(cy).saturating_sub(ay.min(cy)).saturating_add(1),
     })
+  }
+
+  fn register_left_press(&mut self, position: (u16, u16)) -> bool {
+    let is_double = self.last_left_press.is_some_and(|(previous, time)| {
+      previous == position && self.opened_elapsed.saturating_sub(time) <= DOUBLE_MOUSE_CLICK_WINDOW
+    });
+    self.last_left_press = (!is_double).then_some((position, self.opened_elapsed));
+    is_double
+  }
+
+  fn select_all(&mut self) {
+    self.selection = self
+      .frame
+      .as_ref()
+      .and_then(ScreenshotService::whole_frame_rect);
+    self.drag_anchor = None;
+    self.drag_cursor = None;
+    self.menu = None;
+  }
+
+  pub fn select_whole_frame(&mut self) {
+    self.select_all();
   }
 
   fn frame_origin(&self, layout: &LayoutService) -> (u16, u16) {
@@ -448,23 +475,17 @@ fn menu_labels(i18n: &I18nService) -> [String; 4] {
   ]
 }
 
-fn direct_key_command(input: &InputService) -> Option<ScreenshotCaptureCommand> {
-  if input.was_pressed(Key::A) {
-    Some(ScreenshotCaptureCommand::All)
-  } else if input.was_pressed(Key::S) {
-    Some(ScreenshotCaptureCommand::SavePng)
-  } else if input.was_pressed(Key::C) {
-    Some(ScreenshotCaptureCommand::Copy)
-  } else if input.was_pressed(Key::R) {
-    Some(ScreenshotCaptureCommand::CopyRichText)
-  } else {
-    None
-  }
-}
-
-fn guide_direct_key_should_close(input: &InputService, opened_elapsed: Duration) -> bool {
-  direct_key_command(input).is_some()
-    || (input.was_pressed(Key::Fn(1)) && opened_elapsed >= Duration::from_millis(1000))
+fn action_command(actions: &[InputActionEvent]) -> Option<ScreenshotCaptureCommand> {
+  actions
+    .iter()
+    .filter(|event| event.state == KeyState::Pressed)
+    .find_map(|event| match event.action.as_str() {
+      "screenshot.all" => Some(ScreenshotCaptureCommand::All),
+      "screenshot.save_png" => Some(ScreenshotCaptureCommand::SavePng),
+      "screenshot.copy" => Some(ScreenshotCaptureCommand::Copy),
+      "screenshot.copy_rich_text" => Some(ScreenshotCaptureCommand::CopyRichText),
+      _ => None,
+    })
 }
 
 fn contains(rect: ScreenshotRect, x: u16, y: u16) -> bool {
@@ -474,17 +495,8 @@ fn contains(rect: ScreenshotRect, x: u16, y: u16) -> bool {
     && y < rect.y.saturating_add(rect.height)
 }
 
-fn guide_should_close(
-  opened_elapsed: Duration,
-  raw_keys: &[crate::host_engine::services::RawKeyEvent],
-  system_events: &[SystemEvent],
-) -> bool {
-  raw_keys.iter().any(|event| {
-    event.kind == KeyEventKind::Press && matches!(event.key, Key::A | Key::S | Key::C | Key::R)
-      || event.kind == KeyEventKind::Press
-        && event.key == Key::Fn(1)
-        && opened_elapsed >= Duration::from_millis(1000)
-  }) || system_events.iter().any(|event| {
+fn guide_should_close(system_events: &[SystemEvent]) -> bool {
+  system_events.iter().any(|event| {
     matches!(
       event,
       SystemEvent::Mouse(mouse)
@@ -524,4 +536,43 @@ fn operation_toast_should_close(
     || system_events
       .iter()
       .any(|event| matches!(event, SystemEvent::Mouse(_)))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::host_engine::services::InputEventType;
+
+  #[test]
+  fn double_left_press_selects_the_whole_frozen_frame() {
+    let mut ui = ScreenshotCaptureUi::init();
+    ui.start(ComposedFrame::new(12, 7), false);
+    ui.opened_elapsed = Duration::from_millis(100);
+    assert!(!ui.register_left_press((4, 3)));
+    ui.opened_elapsed = Duration::from_millis(350);
+    assert!(ui.register_left_press((4, 3)));
+    ui.select_all();
+    assert_eq!(
+      ui.selection,
+      Some(ScreenshotRect {
+        x: 0,
+        y: 0,
+        width: 12,
+        height: 7,
+      })
+    );
+  }
+
+  #[test]
+  fn screenshot_commands_are_selected_by_action_name() {
+    let events = vec![InputActionEvent {
+      event_type: InputEventType::Keyboard,
+      action: "screenshot.copy_rich_text".to_string(),
+      state: KeyState::Pressed,
+    }];
+    assert_eq!(
+      action_command(&events),
+      Some(ScreenshotCaptureCommand::CopyRichText)
+    );
+  }
 }

@@ -1,7 +1,7 @@
 {
   "host_key.screenshot": "打开/关闭截屏",
   "host_key.recording": "开始/停止录屏",
-  "host_key.recording.pause": "暂停录屏",
+  "host_key.recording.pause": "暂停/继续录屏",
   "host_key.screensaver": "开启/关闭屏保",
   "host_key.force_stop": "强制退出",
   "host_key.top_toolbar": "切换顶部工具栏信息",
