@@ -1,6 +1,10 @@
+use std::path::Path;
+
 use crate::host_engine::services::ActionMapEntry;
 
-use super::media_list::{MediaListCommand, MediaListSpec, MediaListUi, actions};
+use super::media_list::{
+  MediaListCommand, MediaListSpec, MediaListUi, ScreenshotPreview, actions, load_screenshot_preview,
+};
 
 pub type ScreenshotListCommand = MediaListCommand;
 pub type ScreenshotListUi = MediaListUi<ScreenshotListSpec>;
@@ -10,6 +14,10 @@ pub struct ScreenshotListSpec;
 impl MediaListSpec for ScreenshotListSpec {
   const NS: &'static str = "screenshot_list";
   const SUPPORTS_DURATION: bool = false;
+
+  fn load_preview(path: &Path) -> Option<ScreenshotPreview> {
+    load_screenshot_preview(path)
+  }
 
   fn action_map() -> Vec<ActionMapEntry> {
     actions(&[

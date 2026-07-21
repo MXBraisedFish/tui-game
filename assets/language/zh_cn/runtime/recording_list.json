@@ -29,6 +29,7 @@
   "recording_list.list.order.ascending": "正序↓",
   "recording_list.list.order.descending": "倒序↑",
   "recording_list.list.search.placeholder": "🔍 搜索",
+  "recording_list.list.modify.placeholder": "请输入命名内容",
   "recording_list.modify.invalid": "命名无效",
   "recording_list.modify.duplicate": "命名重复"
 }

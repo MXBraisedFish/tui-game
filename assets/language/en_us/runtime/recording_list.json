@@ -29,6 +29,7 @@
   "recording_list.list.order.ascending": "Asc↑",
   "recording_list.list.order.descending": "Des↓",
   "recording_list.list.search.placeholder": "🔍 Search",
+  "recording_list.list.modify.placeholder": "Enter a name",
   "recording_list.modify.invalid": "Invalid Name",
   "recording_list.modify.duplicate": "Name Already Exists"
 }

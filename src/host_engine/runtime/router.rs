@@ -635,11 +635,19 @@ pub(super) fn route_update(
     Some(UiNodeKind::ScreenshotList) => settings_ui
       .screenshot_recording_mut()
       .screenshot_list_mut()
-      .update(world.clock.delta_time()),
+      .update(
+        world.clock.delta_time(),
+        &services.scroll_box,
+        &services.layout,
+      ),
     Some(UiNodeKind::RecordingList) => settings_ui
       .screenshot_recording_mut()
       .recording_list_mut()
-      .update(world.clock.delta_time()),
+      .update(
+        world.clock.delta_time(),
+        &services.scroll_box,
+        &services.layout,
+      ),
     Some(UiNodeKind::SecuritySettings) => {
       security_uis.settings.update(world.clock.delta_time());
     }

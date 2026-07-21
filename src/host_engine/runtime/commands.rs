@@ -181,8 +181,28 @@ pub(super) fn apply_screenshot_list_command(
     }
     ScreenshotListCommand::FocusSearch => ui.focus_search(&mut services.text_input),
     ScreenshotListCommand::BlurSearch => ui.blur_search(&mut services.text_input),
+    ScreenshotListCommand::SelectList(dy) => {
+      ui.select_list(&services.scroll_box, &services.layout, dy)
+    }
     ScreenshotListCommand::ScrollList(dy) => {
       ui.scroll_list(&services.scroll_box, &services.layout, dy)
+    }
+    ScreenshotListCommand::ScrollInfo { dx, dy } => {
+      ui.scroll_info(&services.scroll_box, &services.layout, dx, dy)
+    }
+    ScreenshotListCommand::BeginRename => ui.begin_rename(&mut services.text_input),
+    ScreenshotListCommand::CancelRename => ui.cancel_rename(&mut services.text_input),
+    ScreenshotListCommand::CommitRename { old_name, new_name } => {
+      let directory = services.storage.screenshot_cache_dir_path();
+      if let Err(error) =
+        ui.commit_rename(&directory, &old_name, &new_name, &mut services.text_input)
+      {
+        ui.rename_io_failed();
+        services.log.error(
+          LogSource::Ui,
+          format!("failed to rename screenshot {old_name} to {new_name}: {error}"),
+        );
+      }
     }
   }
 }
@@ -202,8 +222,28 @@ pub(super) fn apply_recording_list_command(
     }
     RecordingListCommand::FocusSearch => ui.focus_search(&mut services.text_input),
     RecordingListCommand::BlurSearch => ui.blur_search(&mut services.text_input),
+    RecordingListCommand::SelectList(dy) => {
+      ui.select_list(&services.scroll_box, &services.layout, dy)
+    }
     RecordingListCommand::ScrollList(dy) => {
       ui.scroll_list(&services.scroll_box, &services.layout, dy);
+    }
+    RecordingListCommand::ScrollInfo { dx, dy } => {
+      ui.scroll_info(&services.scroll_box, &services.layout, dx, dy)
+    }
+    RecordingListCommand::BeginRename => ui.begin_rename(&mut services.text_input),
+    RecordingListCommand::CancelRename => ui.cancel_rename(&mut services.text_input),
+    RecordingListCommand::CommitRename { old_name, new_name } => {
+      let directory = services.storage.recording_cache_dir_path();
+      if let Err(error) =
+        ui.commit_rename(&directory, &old_name, &new_name, &mut services.text_input)
+      {
+        ui.rename_io_failed();
+        services.log.error(
+          LogSource::Ui,
+          format!("failed to rename recording {old_name} to {new_name}: {error}"),
+        );
+      }
     }
   }
 }

@@ -1,11 +1,12 @@
 use std::{
   fs, io,
   marker::PhantomData,
-  path::Path,
+  path::{Path, PathBuf},
   time::{Duration, SystemTime},
 };
 
-use unicode_width::UnicodeWidthStr;
+use serde_json::Value;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
@@ -13,7 +14,7 @@ use crate::host_engine::services::{
   Rect, RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
   ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy,
   ScrollbarVisibility, TerminalColor, TextColor, TextInputEvent, TextInputId, TextInputMode,
-  TextInputOptions, TextInputRenderParams, TextInputService, UiEvent, UiObjectPool,
+  TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent, UiObjectPool,
   UiObjectPoolOwner,
 };
 
@@ -23,12 +24,61 @@ const HINT_COLOR: TextColor = TextColor::Rgb {
   b: 83,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+const ACTIVE_BORDER: TextColor = TextColor::Rgb {
+  r: 95,
+  g: 215,
+  b: 105,
+};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MediaListCommand {
   Back,
   FocusSearch,
   BlurSearch,
+  SelectList(i32),
   ScrollList(i32),
+  ScrollInfo { dx: i32, dy: i32 },
+  BeginRename,
+  CancelRename,
+  CommitRename { old_name: String, new_name: String },
+}
+
+fn display_timestamp(timestamp: &str) -> String {
+  let bytes = timestamp.as_bytes();
+  if bytes.len() >= 15 && bytes.get(8) == Some(&b'_') {
+    return format!(
+      "{}.{}.{} {}:{}:{}",
+      &timestamp[0..4],
+      &timestamp[4..6],
+      &timestamp[6..8],
+      &timestamp[9..11],
+      &timestamp[11..13],
+      &timestamp[13..15]
+    );
+  }
+  timestamp.to_string()
+}
+
+fn truncate_text(text: &str, width: u16) -> String {
+  let width = width as usize;
+  if text.width() <= width {
+    return text.to_string();
+  }
+  if width <= 3 {
+    return ".".repeat(width);
+  }
+  let mut output = String::new();
+  let mut used = 0;
+  for ch in text.chars() {
+    let ch_width = ch.width().unwrap_or(0);
+    if used + ch_width > width - 3 {
+      break;
+    }
+    output.push(ch);
+    used += ch_width;
+  }
+  output.push_str("...");
+  output
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,6 +99,135 @@ struct MediaEntry {
   name: String,
   modified: SystemTime,
   duration_us: u64,
+  preview: Option<ScreenshotPreview>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct ScreenshotPreview {
+  width: u16,
+  height: u16,
+  timestamp: String,
+  cells: Vec<PreviewCell>,
+}
+
+pub(super) fn load_screenshot_preview(path: &Path) -> Option<ScreenshotPreview> {
+  let document: Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
+  let selection = document.get("selection")?;
+  let width = json_u16(selection.get("width")?)?;
+  let height = json_u16(selection.get("height")?)?;
+  let timestamp = document.get("timestamp")?.as_str()?.to_string();
+  let mut cells = Vec::new();
+  for (row_index, row) in document.get("rich_text")?.as_array()?.iter().enumerate() {
+    let y = u16::try_from(row_index).ok()?;
+    for value in row.as_array()? {
+      cells.push(PreviewCell {
+        x: json_u16(value.get("x")?)?,
+        y,
+        text: value.get("text")?.as_str()?.to_string(),
+        style: parse_style(value.get("style")?),
+      });
+    }
+  }
+  Some(ScreenshotPreview {
+    width,
+    height,
+    timestamp,
+    cells,
+  })
+}
+
+fn json_u16(value: &Value) -> Option<u16> {
+  u16::try_from(value.as_u64()?).ok()
+}
+
+fn parse_style(value: &Value) -> TextStyle {
+  TextStyle {
+    foreground: value
+      .get("fg")
+      .and_then(Value::as_str)
+      .and_then(parse_color),
+    background: value
+      .get("bg")
+      .and_then(Value::as_str)
+      .and_then(parse_color),
+    bold: value.get("bold").and_then(Value::as_bool).unwrap_or(false),
+    italic: value
+      .get("italic")
+      .and_then(Value::as_bool)
+      .unwrap_or(false),
+    underline: value
+      .get("underline")
+      .and_then(Value::as_bool)
+      .unwrap_or(false),
+    strike: value
+      .get("strike")
+      .and_then(Value::as_bool)
+      .unwrap_or(false),
+    reverse: value
+      .get("reverse")
+      .and_then(Value::as_bool)
+      .unwrap_or(false),
+    dim: value.get("dim").and_then(Value::as_bool).unwrap_or(false),
+    ..Default::default()
+  }
+}
+
+fn parse_color(value: &str) -> Option<TextColor> {
+  if value == "transparent" {
+    return Some(TextColor::Transparent);
+  }
+  if let Some(hex) = value.strip_prefix('#')
+    && hex.len() == 6
+  {
+    return Some(TextColor::Rgb {
+      r: u8::from_str_radix(&hex[0..2], 16).ok()?,
+      g: u8::from_str_radix(&hex[2..4], 16).ok()?,
+      b: u8::from_str_radix(&hex[4..6], 16).ok()?,
+    });
+  }
+  let color = match value {
+    "black" => TerminalColor::Black,
+    "red" => TerminalColor::Red,
+    "green" => TerminalColor::Green,
+    "yellow" => TerminalColor::Yellow,
+    "blue" => TerminalColor::Blue,
+    "magenta" => TerminalColor::Magenta,
+    "cyan" => TerminalColor::Cyan,
+    "white" => TerminalColor::White,
+    "brightblack" | "bright_black" => TerminalColor::BrightBlack,
+    "brightred" | "bright_red" => TerminalColor::BrightRed,
+    "brightgreen" | "bright_green" => TerminalColor::BrightGreen,
+    "brightyellow" | "bright_yellow" => TerminalColor::BrightYellow,
+    "brightblue" | "bright_blue" => TerminalColor::BrightBlue,
+    "brightmagenta" | "bright_magenta" => TerminalColor::BrightMagenta,
+    "brightcyan" | "bright_cyan" => TerminalColor::BrightCyan,
+    "brightwhite" | "bright_white" => TerminalColor::BrightWhite,
+    _ => return None,
+  };
+  Some(TextColor::Terminal(color))
+}
+
+#[derive(Clone, Debug)]
+struct PreviewCell {
+  x: u16,
+  y: u16,
+  text: String,
+  style: TextStyle,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MediaRenameError {
+  Invalid,
+  Duplicate,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MediaListNotice {
+  RenameError {
+    namespace: &'static str,
+    error: MediaRenameError,
+  },
+  ClearRenameError,
 }
 
 #[derive(Clone, Debug)]
@@ -68,13 +247,18 @@ pub trait MediaListSpec {
   fn action_map() -> Vec<ActionMapEntry>;
   fn left_hint_keys() -> &'static [&'static str];
   fn right_hint_keys() -> &'static [&'static str];
+  fn load_preview(_path: &Path) -> Option<ScreenshotPreview> {
+    None
+  }
 }
 
 pub struct MediaListUi<S: MediaListSpec> {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
   search_input: TextInputId,
+  rename_input: TextInputId,
   list_scroll: ScrollBoxId,
+  info_scroll: ScrollBoxId,
   list_panel_area: HitAreaId,
   info_panel_area: HitAreaId,
   order_area: HitAreaId,
@@ -86,6 +270,9 @@ pub struct MediaListUi<S: MediaListSpec> {
   active: ActivePanel,
   ascending: bool,
   sort_field: SortField,
+  renaming: Option<String>,
+  pending_notice: Option<MediaListNotice>,
+  last_list_scroll_y: u16,
   marker: PhantomData<S>,
 }
 
@@ -125,6 +312,15 @@ impl<S: MediaListSpec> MediaListUi<S> {
         ..Default::default()
       },
     );
+    let rename_input = text_input.create(
+      &mut objects,
+      TextInputOptions {
+        max_chars: Some(128),
+        mode: TextInputMode::SingleLine,
+        mouse: true,
+        ..Default::default()
+      },
+    );
     let list_scroll = scroll_box
       .create(
         &mut objects,
@@ -139,13 +335,34 @@ impl<S: MediaListSpec> MediaListUi<S> {
             horizontal: ScrollbarVisibility::Never,
           },
           scrollbar_layout: ScrollbarLayout::Inside,
+          emit_scroll_events: true,
           ..Default::default()
         },
       )
       .expect("failed to create media list scroll box");
+    let info_scroll = scroll_box
+      .create(
+        &mut objects,
+        ScrollBoxOptions {
+          rect: Rect::default(),
+          content_width: 1,
+          content_height: 1,
+          overflow_x: Overflow::Auto,
+          overflow_y: Overflow::Auto,
+          scrollbar: ScrollbarPolicy {
+            vertical: ScrollbarVisibility::Auto,
+            horizontal: ScrollbarVisibility::Auto,
+          },
+          scrollbar_layout: ScrollbarLayout::Inside,
+          ..Default::default()
+        },
+      )
+      .expect("failed to create media info scroll box");
     Self {
       search_input,
+      rename_input,
       list_scroll,
+      info_scroll,
       list_panel_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       info_panel_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       order_area: hit_area.create(&mut objects, HitAreaOptions::default()),
@@ -157,6 +374,9 @@ impl<S: MediaListSpec> MediaListUi<S> {
       active: ActivePanel::List,
       ascending: true,
       sort_field: SortField::Name,
+      renaming: None,
+      pending_notice: None,
+      last_list_scroll_y: 0,
       objects,
       runtime_objects: RuntimeObjectPool::new(),
       marker: PhantomData,
@@ -191,6 +411,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
         name,
         modified: metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
         duration_us,
+        preview: S::load_preview(&path),
       });
     }
     self.entries = entries;
@@ -209,7 +430,9 @@ impl<S: MediaListSpec> MediaListUi<S> {
 
   pub fn reset_search(&mut self, text_input: &mut TextInputService) {
     self.search.clear();
+    self.renaming = None;
     let _ = text_input.clear(&mut self.objects, self.search_input);
+    let _ = text_input.clear(&mut self.objects, self.rename_input);
     let _ = text_input.blur(&mut self.objects);
   }
 
@@ -226,11 +449,112 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let _ = text_input.blur(&mut self.objects);
   }
 
-  pub fn scroll_list(&mut self, service: &ScrollBoxService, layout: &LayoutService, dy: i32) {
-    let _ = service.scroll_by(&mut self.objects, self.list_scroll, 0, dy, layout);
+  pub fn begin_rename(&mut self, text_input: &mut TextInputService) {
+    let Some(name) = self
+      .filtered_entries()
+      .get(self.selected)
+      .map(|entry| entry.name.clone())
+    else {
+      return;
+    };
+    self.renaming = Some(name.clone());
+    self.pending_notice = Some(MediaListNotice::ClearRenameError);
+    let _ = text_input.set_text(&mut self.objects, self.rename_input, name);
+    let _ = text_input.focus(&mut self.objects, self.rename_input);
   }
 
-  pub fn update(&mut self, _dt: Duration) {}
+  pub fn cancel_rename(&mut self, text_input: &mut TextInputService) {
+    self.renaming = None;
+    self.pending_notice = Some(MediaListNotice::ClearRenameError);
+    let _ = text_input.blur(&mut self.objects);
+  }
+
+  pub fn commit_rename(
+    &mut self,
+    directory: &Path,
+    old_name: &str,
+    new_name: &str,
+    text_input: &mut TextInputService,
+  ) -> io::Result<()> {
+    let old_path = media_json_path(directory, old_name);
+    let new_path = media_json_path(directory, new_name);
+    if old_name != new_name {
+      if new_path.exists() {
+        return Err(io::Error::new(
+          io::ErrorKind::AlreadyExists,
+          "target media name already exists",
+        ));
+      }
+      fs::rename(&old_path, &new_path)?;
+    }
+    if let Some(entry) = self.entries.iter_mut().find(|entry| entry.name == old_name) {
+      entry.name = new_name.to_string();
+      entry.modified = fs::metadata(&new_path)
+        .and_then(|metadata| metadata.modified())
+        .unwrap_or(entry.modified);
+    }
+    self.selected = self
+      .filtered_entries()
+      .iter()
+      .position(|entry| entry.name == new_name)
+      .unwrap_or(0);
+    self.cancel_rename(text_input);
+    Ok(())
+  }
+
+  pub fn rename_io_failed(&mut self) {
+    self.pending_notice = Some(MediaListNotice::RenameError {
+      namespace: S::NS,
+      error: MediaRenameError::Invalid,
+    });
+  }
+
+  pub fn take_notice(&mut self) -> Option<MediaListNotice> {
+    self.pending_notice.take()
+  }
+
+  pub fn scroll_list(&mut self, service: &ScrollBoxService, layout: &LayoutService, dy: i32) {
+    if dy == 0 || self.filtered_entries().is_empty() {
+      return;
+    }
+    let _ = service.scroll_by(&mut self.objects, self.list_scroll, 0, dy, layout);
+    self.clamp_selection_to_list_view(service, layout);
+    self.last_list_scroll_y = service
+      .scroll_y(&self.objects, self.list_scroll)
+      .unwrap_or(self.last_list_scroll_y);
+  }
+
+  pub fn select_list(&mut self, service: &ScrollBoxService, layout: &LayoutService, dy: i32) {
+    self.move_selection(dy as isize);
+    self.ensure_selection_visible(service, layout);
+    self.last_list_scroll_y = service
+      .scroll_y(&self.objects, self.list_scroll)
+      .unwrap_or(self.last_list_scroll_y);
+  }
+
+  pub fn scroll_info(
+    &mut self,
+    service: &ScrollBoxService,
+    layout: &LayoutService,
+    dx: i32,
+    dy: i32,
+  ) {
+    let _ = service.scroll_by(&mut self.objects, self.info_scroll, dx, dy, layout);
+  }
+
+  pub fn update(&mut self, _dt: Duration, service: &ScrollBoxService, layout: &LayoutService) {
+    for event in service.drain_scroll_events(&mut self.objects) {
+      let crate::host_engine::services::ScrollBoxEvent::Scrolled { id, y, .. } = event;
+      if id != self.list_scroll || y == self.last_list_scroll_y {
+        continue;
+      }
+      let delta = i32::from(y) - i32::from(self.last_list_scroll_y);
+      self.last_list_scroll_y = y;
+      if delta != 0 {
+        self.clamp_selection_to_list_view(service, layout);
+      }
+    }
+  }
 
   pub fn prepare_surfaces(
     &mut self,
@@ -244,6 +568,30 @@ impl<S: MediaListSpec> MediaListUi<S> {
   }
 
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<MediaListCommand> {
+    if let Some(original) = self.renaming.clone() {
+      return match event {
+        UiEvent::TextInput(TextInputEvent::Submit { id, value }) if *id == self.rename_input => {
+          let value = value.to_string();
+          match self.rename_error_for(&value, &original) {
+            Some(error) => {
+              self.pending_notice = Some(MediaListNotice::RenameError {
+                namespace: S::NS,
+                error,
+              });
+              None
+            }
+            None => Some(MediaListCommand::CommitRename {
+              old_name: original,
+              new_name: value,
+            }),
+          }
+        }
+        UiEvent::TextInput(TextInputEvent::Cancel { id, .. }) if *id == self.rename_input => {
+          Some(MediaListCommand::CancelRename)
+        }
+        _ => None,
+      };
+    }
     match event {
       UiEvent::TextInput(TextInputEvent::Pressed { id }) if *id == self.search_input => {
         self.active = ActivePanel::List;
@@ -295,16 +643,22 @@ impl<S: MediaListSpec> MediaListUi<S> {
         None
       }
       ".search" if self.active == ActivePanel::List => Some(MediaListCommand::FocusSearch),
-      ".focus_up" if self.active == ActivePanel::List => {
-        self.move_selection(-1);
-        None
-      }
-      ".focus_down" if self.active == ActivePanel::List => {
-        self.move_selection(1);
-        None
-      }
+      ".focus_up" if self.active == ActivePanel::List => Some(MediaListCommand::SelectList(-1)),
+      ".focus_down" if self.active == ActivePanel::List => Some(MediaListCommand::SelectList(1)),
       ".scroll_up" if self.active == ActivePanel::List => Some(MediaListCommand::ScrollList(-3)),
       ".scroll_down" if self.active == ActivePanel::List => Some(MediaListCommand::ScrollList(3)),
+      ".scroll_up" if self.active == ActivePanel::Info => {
+        Some(MediaListCommand::ScrollInfo { dx: 0, dy: -3 })
+      }
+      ".scroll_down" if self.active == ActivePanel::Info => {
+        Some(MediaListCommand::ScrollInfo { dx: 0, dy: 3 })
+      }
+      ".scroll_left" if self.active == ActivePanel::Info => {
+        Some(MediaListCommand::ScrollInfo { dx: -3, dy: 0 })
+      }
+      ".scroll_right" if self.active == ActivePanel::Info => {
+        Some(MediaListCommand::ScrollInfo { dx: 3, dy: 0 })
+      }
       ".order" if self.active == ActivePanel::List => {
         self.ascending = !self.ascending;
         None
@@ -316,6 +670,9 @@ impl<S: MediaListSpec> MediaListUi<S> {
           _ => SortField::Name,
         };
         None
+      }
+      ".modify" if self.active == ActivePanel::List && !self.filtered_entries().is_empty() => {
+        Some(MediaListCommand::BeginRename)
       }
       _ => None,
     }
@@ -350,8 +707,13 @@ impl<S: MediaListSpec> MediaListUi<S> {
     );
     self.draw_sort_bar(render, canvas, i18n, hit_area, &pos);
     self.draw_entries(render, canvas, layout, i18n, hit_area, scroll_box, &pos);
+    self.draw_info(render, canvas, &pos);
     self.draw_hints(render, canvas, layout, i18n, text_input, &pos);
-    cursor
+    if self.renaming.is_some() {
+      self.draw_rename_dialog(render, canvas, layout, i18n, text_input)
+    } else {
+      cursor
+    }
   }
 
   fn compute_layout(
@@ -423,6 +785,25 @@ impl<S: MediaListSpec> MediaListUi<S> {
     if self.active == ActivePanel::List {
       self.ensure_selection_visible(service, layout);
     }
+
+    let info = self.selected_preview();
+    let info_rect = Rect {
+      x: pos.right.x.saturating_add(1).saturating_sub(viewport.x),
+      y: pos.right.y.saturating_add(3).saturating_sub(viewport.y),
+      width: pos.right.width.saturating_sub(2),
+      height: pos.right.height.saturating_sub(4),
+    };
+    let (content_width, content_height) = info
+      .map(|preview| (preview.width, preview.height))
+      .unwrap_or((1, 1));
+    let _ = service.set_rect(&mut self.objects, self.info_scroll, info_rect, layout);
+    let _ = service.set_content_size(
+      &mut self.objects,
+      self.info_scroll,
+      content_width.max(info_rect.width).max(1),
+      content_height.max(info_rect.height).max(1),
+      layout,
+    );
   }
 
   fn ensure_selection_visible(&mut self, service: &ScrollBoxService, layout: &LayoutService) {
@@ -447,6 +828,23 @@ impl<S: MediaListSpec> MediaListUi<S> {
     }
   }
 
+  fn clamp_selection_to_list_view(&mut self, service: &ScrollBoxService, layout: &LayoutService) {
+    let len = self.filtered_entries().len();
+    let height = service
+      .visible_content_height(&self.objects, self.list_scroll, layout)
+      .unwrap_or(0) as usize;
+    if len == 0 || height == 0 {
+      return;
+    }
+    let top = service
+      .scroll_y(&self.objects, self.list_scroll)
+      .unwrap_or(0) as usize;
+    self.selected = self.selected.clamp(
+      top.min(len - 1),
+      top.saturating_add(height - 1).min(len - 1),
+    );
+  }
+
   fn draw_frames(
     &self,
     render: &mut RenderService,
@@ -466,7 +864,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
         rect.height,
         &BorderStyle::Line,
         Some(if active {
-          TextColor::Terminal(TerminalColor::Green)
+          ACTIVE_BORDER.clone()
         } else {
           TextColor::Terminal(TerminalColor::BrightWhite)
         }),
@@ -489,6 +887,27 @@ impl<S: MediaListSpec> MediaListUi<S> {
             i18n.get_runtime_text(S::NS, &key)
           ),
           max_width: Some(rect.width.saturating_sub(2)),
+          ..Default::default()
+        },
+      );
+    }
+    if pos.right.width >= 2 && pos.right.height >= 4 {
+      let edge = if self.active == ActivePanel::Info {
+        "rgb(95,215,105)"
+      } else {
+        "bright_white"
+      };
+      render.draw_host_text(
+        canvas,
+        &DrawTextParams {
+          x: pos.right.x,
+          y: pos.right.y.saturating_add(2),
+          text: format!(
+            "f%<fg:{edge}>├{}┤</fg>",
+            "─".repeat(pos.right.width.saturating_sub(2) as usize)
+          ),
+          max_width: Some(pos.right.width),
+          max_height: Some(1),
           ..Default::default()
         },
       );
@@ -534,13 +953,18 @@ impl<S: MediaListSpec> MediaListUi<S> {
       .width()
       .min(pos.left.width.saturating_sub(2) as usize);
     let line = "─".repeat(pos.left.width.saturating_sub(2 + label_width as u16) as usize);
+    let edge = if self.active == ActivePanel::List {
+      "rgb(95,215,105)"
+    } else {
+      "bright_black"
+    };
     render.draw_host_text(
       canvas,
       &DrawTextParams {
         x: pos.left.x,
         y: pos.sort_y,
         text: format!(
-          "f%<fg:bright_black>╟[</fg><fg:bright_yellow>{order}</fg><fg:bright_black>]</fg><fg:bright_green>{sort}</fg><fg:bright_black>{line}╢</fg>"
+          "f%<fg:{edge}>├[</fg><fg:bright_yellow>{order}</fg><fg:{edge}>]</fg><fg:bright_green>{sort}</fg><fg:{edge}>{line}┤</fg>"
         ),
         max_width: Some(pos.left.width),
         max_height: Some(1),
@@ -603,7 +1027,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
       return;
     }
     for (index, entry) in entries.iter().enumerate() {
-      if self.active == ActivePanel::List && index == self.selected {
+      if index == self.selected {
         render.draw_text_in_scroll_box(
           canvas,
           self.list_scroll,
@@ -650,12 +1074,79 @@ impl<S: MediaListSpec> MediaListUi<S> {
     }
   }
 
+  fn selected_preview(&self) -> Option<&ScreenshotPreview> {
+    self
+      .filtered_entries()
+      .get(self.selected)
+      .and_then(|entry| entry.preview.as_ref())
+  }
+
+  fn draw_info(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    pos: &MediaListLayout,
+  ) {
+    let Some(preview) = self.selected_preview() else {
+      return;
+    };
+    let inner_width = pos.right.width.saturating_sub(2);
+    if inner_width == 0 {
+      return;
+    }
+    let timestamp = display_timestamp(&preview.timestamp);
+    let size = format!("w{} xh {}", preview.width, preview.height);
+    let timestamp_width = timestamp.width().min(inner_width as usize) as u16;
+    let size_width = size.width().min(inner_width as usize) as u16;
+    let time_x = pos
+      .right
+      .x
+      .saturating_add(pos.right.width.saturating_sub(1 + timestamp_width));
+    let size_x = time_x.saturating_sub(1 + size_width);
+    let name_width = size_x.saturating_sub(pos.right.x.saturating_add(2));
+    let name = truncate_text(
+      &self
+        .filtered_entries()
+        .get(self.selected)
+        .map(|entry| entry.name.as_str())
+        .unwrap_or_default(),
+      name_width,
+    );
+    let fields: [(u16, &str, u16); 3] = [
+      (pos.right.x.saturating_add(1), name.as_str(), name_width),
+      (size_x, size.as_str(), size_width),
+      (time_x, timestamp.as_str(), timestamp_width),
+    ];
+    for (x, text, width) in fields {
+      render.draw_host_text(
+        canvas,
+        &DrawTextParams {
+          x,
+          y: pos.right.y.saturating_add(1),
+          text: text.to_string(),
+          max_width: Some(width),
+          max_height: Some(1),
+          ..Default::default()
+        },
+      );
+    }
+    for cell in &preview.cells {
+      canvas.styled_text_in_scroll_box(
+        self.info_scroll,
+        cell.x,
+        cell.y,
+        &cell.text,
+        cell.style.clone(),
+      );
+    }
+  }
+
   fn draw_hints(
     &self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     layout: &LayoutService,
-    i18n: &I18nService,
+    _i18n: &I18nService,
     _text_input: &TextInputService,
     pos: &MediaListLayout,
   ) {
@@ -681,7 +1172,9 @@ impl<S: MediaListSpec> MediaListUi<S> {
     text_input: &TextInputService,
     width: u16,
   ) -> Vec<String> {
-    let keys = if text_input.is_focused(&self.objects, self.search_input) {
+    let keys = if self.renaming.is_some() {
+      return vec![String::new()];
+    } else if text_input.is_focused(&self.objects, self.search_input) {
       &["action.cancel", "action.confirm"][..]
     } else if self.active == ActivePanel::List {
       S::left_hint_keys()
@@ -773,6 +1266,158 @@ impl<S: MediaListSpec> MediaListUi<S> {
       }
     }
   }
+
+  fn rename_error_for(&self, value: &str, original: &str) -> Option<MediaRenameError> {
+    if !valid_media_name(value) {
+      return Some(MediaRenameError::Invalid);
+    }
+    if value != original
+      && self
+        .entries
+        .iter()
+        .any(|entry| entry.name.eq_ignore_ascii_case(value))
+    {
+      return Some(MediaRenameError::Duplicate);
+    }
+    None
+  }
+
+  fn draw_rename_dialog(
+    &mut self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    i18n: &I18nService,
+    text_input: &TextInputService,
+  ) -> Option<(u16, u16)> {
+    let viewport = layout.developer_viewport_rect();
+    let original = self.renaming.clone()?;
+    let value = text_input
+      .get_text(&self.objects, self.rename_input)
+      .unwrap_or_default()
+      .to_string();
+    let invalid = self.rename_error_for(&value, &original).is_some();
+    let border = if invalid {
+      TextColor::Terminal(TerminalColor::BrightRed)
+    } else {
+      TextColor::Terminal(TerminalColor::BrightBlue)
+    };
+    let params = RichTextParams::from_action_map(&S::action_map(), &format!("{}.", S::NS));
+    let actions = format!(
+      "{}  {}",
+      i18n.get_runtime_text(S::NS, &format!("{}.action.cancel", S::NS)),
+      i18n.get_runtime_text(S::NS, &format!("{}.action.confirm", S::NS))
+    );
+    let placeholder = i18n.get_runtime_text(S::NS, &format!("{}.list.modify.placeholder", S::NS));
+    let desired = layout
+      .get_text_width(&actions, Some(&params))
+      .max(layout.get_text_width(&placeholder, None))
+      .max(layout.get_text_width(&value, None))
+      .saturating_add(4)
+      .max(32);
+    let width = desired.min(viewport.width.saturating_sub(4)).max(8);
+    let height = 5.min(viewport.height);
+    let rect = Rect {
+      x: viewport.x + viewport.width.saturating_sub(width) / 2,
+      y: viewport.y + viewport.height.saturating_sub(height) / 2,
+      width,
+      height,
+    };
+    render.draw_host_filled_rect(
+      canvas,
+      rect.x,
+      rect.y,
+      rect.width,
+      rect.height,
+      Some(" ".to_string()),
+      None,
+      Some(TextColor::Terminal(TerminalColor::Black)),
+    );
+    render.draw_host_border_rect(
+      canvas,
+      rect.x,
+      rect.y,
+      rect.width,
+      rect.height,
+      &BorderStyle::Line,
+      Some(border.clone()),
+      None,
+      None,
+      None,
+    );
+    let separator = format!("├{}┤", "─".repeat(rect.width.saturating_sub(2) as usize));
+    render.draw_host_text(
+      canvas,
+      &DrawTextParams {
+        x: rect.x,
+        y: rect.y.saturating_add(2),
+        text: separator,
+        fg: Some(border),
+        max_width: Some(rect.width),
+        max_height: Some(1),
+        ..Default::default()
+      },
+    );
+    let cursor = text_input.render_host(
+      &mut self.objects,
+      self.rename_input,
+      &TextInputRenderParams {
+        rect: Rect {
+          x: rect.x.saturating_add(1),
+          y: rect.y.saturating_add(1),
+          width: rect.width.saturating_sub(2),
+          height: 1,
+        },
+        placeholder,
+        placeholder_fg: Some(HINT_COLOR.clone()),
+        ..Default::default()
+      },
+      canvas,
+    );
+    render.draw_host_text(
+      canvas,
+      &DrawTextParams {
+        x: rect.x
+          + rect
+            .width
+            .saturating_sub(layout.get_text_width(&actions, Some(&params)))
+            / 2,
+        y: rect.y.saturating_add(3),
+        text: format!("f%<fg:rgb(85,87,83)>{actions}</fg>"),
+        params: Some(params),
+        max_width: Some(rect.width.saturating_sub(2)),
+        max_height: Some(1),
+        ..Default::default()
+      },
+    );
+    cursor
+  }
+}
+
+fn media_json_path(directory: &Path, name: &str) -> PathBuf {
+  directory.join(format!("{name}.json"))
+}
+
+fn valid_media_name(name: &str) -> bool {
+  if name.is_empty()
+    || name != name.trim()
+    || matches!(name, "." | "..")
+    || name.ends_with('.')
+    || name.chars().any(|ch| {
+      ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
+    })
+  {
+    return false;
+  }
+  let stem = name
+    .split('.')
+    .next()
+    .unwrap_or_default()
+    .to_ascii_uppercase();
+  !matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+    && !(stem.len() == 4
+      && (stem.starts_with("COM") || stem.starts_with("LPT"))
+      && matches!(stem.as_bytes()[3], b'1'..=b'9'))
 }
 
 fn action(name: &str, key: &str) -> ActionMapEntry {
@@ -793,4 +1438,21 @@ pub fn actions(entries: &[(&str, &str)]) -> Vec<ActionMapEntry> {
 fn read_duration_us(path: &Path) -> Option<u64> {
   let value: serde_json::Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
   value.get("duration_us")?.get("active")?.as_u64()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::valid_media_name;
+
+  #[test]
+  fn media_names_follow_cross_platform_file_rules() {
+    for name in ["capture", "截图 01", "capture.final"] {
+      assert!(valid_media_name(name), "expected valid name: {name}");
+    }
+    for name in [
+      "", " capture", "capture ", "a/b", "a:b", "CON", "com1.txt", ".", "..",
+    ] {
+      assert!(!valid_media_name(name), "expected invalid name: {name}");
+    }
+  }
 }

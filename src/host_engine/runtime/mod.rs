@@ -31,16 +31,17 @@ use crate::host_engine::ui::{
   DisplaySettingsUi, ExportFormat, ExportLoadingUi, ExportSettingsCommand, ExportSettingsUi,
   ExportType, GameListCommand, GameListUi, GamePackageCommand, GamePackageUi, HomeUi,
   HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
-  LanguageSelectUi, ModsCommand, ModsUi, RecordingListCommand, RecordingListUi,
-  SafeModeWarningCommand, SafeModeWarningUi, ScreensaverListCommand, ScreensaverListUi,
-  ScreensaverOverlayUi, ScreensaverPackageCommand, ScreensaverPackageUi, ScreenshotCaptureCommand,
-  ScreenshotCaptureUi, ScreenshotListCommand, ScreenshotListUi, ScreenshotRecordingCommand,
-  ScreenshotRecordingUi, ScreenshotSettingsCommand, ScreenshotSettingsUi, SecurityDetailsCommand,
-  SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
-  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
-  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
-  StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
-  TerminalCheckUi, ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
+  LanguageSelectUi, MediaListNotice, MediaRenameError, ModsCommand, ModsUi, RecordingListCommand,
+  RecordingListUi, SafeModeWarningCommand, SafeModeWarningUi, ScreensaverListCommand,
+  ScreensaverListUi, ScreensaverOverlayUi, ScreensaverPackageCommand, ScreensaverPackageUi,
+  ScreenshotCaptureCommand, ScreenshotCaptureUi, ScreenshotListCommand, ScreenshotListUi,
+  ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
+  ScreenshotSettingsUi, SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand,
+  SecuritySettingsUi, SettingsUi, SettingsUiCommand, StorageManagementClearCommand,
+  StorageManagementClearUi, StorageManagementCommand, StorageManagementExportCommand,
+  StorageManagementExportUi, StorageManagementUi, StorageManagementViewCommand,
+  StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
+  ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 use std::{
   collections::HashMap,
@@ -67,6 +68,10 @@ pub(super) struct ExportLoadingRuntime {
 enum ScreenshotModeToastKind {
   Enter,
   Exit,
+  MediaRename {
+    namespace: &'static str,
+    error: MediaRenameError,
+  },
   Operation {
     copy_succeeded: Option<bool>,
     save: Option<ScreenshotSaveState>,
@@ -134,7 +139,9 @@ impl ScreenshotModeToast {
     self.elapsed = self.elapsed.saturating_add(dt);
     let duration = match self.kind {
       ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => Duration::from_secs(3),
-      ScreenshotModeToastKind::Operation { .. } => Duration::from_secs(2),
+      ScreenshotModeToastKind::MediaRename { .. } | ScreenshotModeToastKind::Operation { .. } => {
+        Duration::from_secs(2)
+      }
     };
     self.elapsed < duration
   }
@@ -472,6 +479,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut pending_screensaver_hotkey,
       &mut pending_toolbar_hotkey,
     );
+    apply_media_list_notices(&mut screenshot_mode_toast, &mut settings_ui);
     if let Some(fonts) = services.screenshot.take_font_preview_request() {
       submit_font_preview_png(
         services,
@@ -505,6 +513,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       screenshot_mode_toast.is_some_and(|toast| match toast.kind {
         ScreenshotModeToastKind::Operation { .. } => dismiss_screenshot_operation_toast,
         ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => dismiss_screenshot_toast,
+        ScreenshotModeToastKind::MediaRename { .. } => false,
       });
     if screenshot_mode_toast.is_some_and(|toast| toast.can_dismiss())
       && should_dismiss_screenshot_toast
@@ -709,6 +718,11 @@ fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<Scree
       g: 76,
       b: 76,
     },
+    ScreenshotModeToastKind::MediaRename { .. } => TextColor::Rgb {
+      r: 255,
+      g: 76,
+      b: 76,
+    },
     ScreenshotModeToastKind::Operation {
       copy_succeeded,
       save,
@@ -765,6 +779,16 @@ fn screenshot_toast_text(services: &EngineServices, kind: ScreenshotModeToastKin
   match kind {
     ScreenshotModeToastKind::Enter => text("screenshot.mode.enter"),
     ScreenshotModeToastKind::Exit => text("screenshot.mode.exit"),
+    ScreenshotModeToastKind::MediaRename { namespace, error } => services.i18n.get_runtime_text(
+      namespace,
+      &format!(
+        "{namespace}.modify.{}",
+        match error {
+          MediaRenameError::Invalid => "invalid",
+          MediaRenameError::Duplicate => "duplicate",
+        }
+      ),
+    ),
     ScreenshotModeToastKind::Operation {
       copy_succeeded,
       save,
@@ -785,6 +809,34 @@ fn screenshot_toast_text(services: &EngineServices, kind: ScreenshotModeToastKin
         }));
       }
       parts.join(" / ")
+    }
+  }
+}
+
+fn apply_media_list_notices(toast: &mut Option<ScreenshotModeToast>, settings_ui: &mut SettingsUi) {
+  let screenshot = settings_ui
+    .screenshot_recording_mut()
+    .screenshot_list_mut()
+    .take_notice();
+  let recording = settings_ui
+    .screenshot_recording_mut()
+    .recording_list_mut()
+    .take_notice();
+  for notice in [screenshot, recording].into_iter().flatten() {
+    match notice {
+      MediaListNotice::RenameError { namespace, error } => {
+        *toast = Some(ScreenshotModeToast::new(
+          ScreenshotModeToastKind::MediaRename { namespace, error },
+        ));
+      }
+      MediaListNotice::ClearRenameError
+        if toast.is_some_and(|toast| {
+          matches!(toast.kind, ScreenshotModeToastKind::MediaRename { .. })
+        }) =>
+      {
+        *toast = None;
+      }
+      MediaListNotice::ClearRenameError => {}
     }
   }
 }

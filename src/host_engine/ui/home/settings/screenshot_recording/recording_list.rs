@@ -48,6 +48,10 @@ impl MediaListSpec for RecordingListSpec {
   }
 
   fn right_hint_keys() -> &'static [&'static str] {
-    &["action.list.play_pause", "action.list.skip_forward", "action.list.rewind"]
+    &[
+      "action.list.play_pause",
+      "action.list.skip_forward",
+      "action.list.rewind",
+    ]
   }
 }

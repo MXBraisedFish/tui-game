@@ -12,8 +12,8 @@ pub use settings::mods::screensaver::{ScreensaverPackageCommand, ScreensaverPack
 pub use settings::mods::{ModsCommand, ModsUi};
 pub use settings::screensaver_list::{ScreensaverListCommand, ScreensaverListUi};
 pub use settings::screenshot_recording::{
-  RecordingListCommand, RecordingListUi, ScreenshotListCommand, ScreenshotListUi,
-  ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
+  MediaListNotice, MediaRenameError, RecordingListCommand, RecordingListUi, ScreenshotListCommand,
+  ScreenshotListUi, ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
   ScreenshotSettingsUi,
 };
 pub use settings::security::{
