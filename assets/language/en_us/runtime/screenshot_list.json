@@ -1,0 +1,47 @@
+{
+  "screenshot_list.list": "List",
+  "screenshot_list.info": "Info",
+
+  "screenshot_list.no.image": "No Screenshots Found",
+  "screenshot_list.no.info": "No Information Available",
+
+  "screenshot_list.action.scroll.list": "{key:screenshot_list.scroll_up}/{key:screenshot_list.scroll_down} Scroll",
+  "screenshot_list.action.scroll.info": "{key:screenshot_list.scroll_up}/{key:screenshot_list.scroll_down}/{key:screenshot_list.scroll_left}/{key:screenshot_list.scroll_right} Pan",
+
+  "screenshot_list.action.select": "{key:screenshot_list.focus_up}/{key:screenshot_list.focus_down} Select",
+  "screenshot_list.action.back": "{key:screenshot_list.back} Back",
+  "screenshot_list.action.cancel": "[Esc] Cancel",
+  "screenshot_list.action.confirm": "[Enter] Confirm",
+
+  "screenshot_list.action.list.search": "{key:screenshot_list.search} Search",
+  "screenshot_list.action.list.order": "{key:screenshot_list.order} Order",
+  "screenshot_list.action.list.sort": "{key:screenshot_list.sort} Sort",
+
+  "screenshot_list.action.modify": "{key:screenshot_list.modify} Rename",
+  "screenshot_list.action.del": "{key:screenshot_list.del} Delete",
+  "screenshot_list.action.switch": "{key:screenshot_list.switch} Switch List",
+
+  "screenshot_list.action.copy": "{key:screenshot_list.copy} Copy to Clipboard",
+  "screenshot_list.action.copy_rich_text": "{key:screenshot_list.copy_rich_text} Copy Rich Text to Clipboard",
+  "screenshot_list.action.save_image": "{key:screenshot_list.save_image} Save as PNG",
+  "screenshot_list.action.all": "{key:screenshot_list.all} Copy & Save as PNG",
+
+  "screenshot_list.action.zoom.in": "{key:screenshot_list.zoom} Zoom In",
+  "screenshot_list.action.zoom.out": "{key:screenshot_list.zoom} Zoom Out",
+
+  "screenshot_list.warning": "<fg:red>Are you sure you want to delete this screenshot?\nThis action cannot be undone!</fg>",
+  "screenshot_list.warning.yes": "{key:screenshot_list.warning_yes} Delete",
+  "screenshot_list.warning.no": "{key:screenshot_list.warning_no} Cancel",
+
+  "screenshot_list.list.sort.name": "Name",
+  "screenshot_list.list.sort.time": "Date",
+
+  "screenshot_list.list.order.ascending": "Asc↑",
+  "screenshot_list.list.order.descending": "Des↓",
+
+  "screenshot_list.list.search.placeholder": "🔍 Search",
+  "screenshot_list.list.modify.placeholder": "Enter a name",
+
+  "screenshot_list.modify.invalid": "Invalid Name",
+  "screenshot_list.modify.duplicate": "Name Already Exists"
+}

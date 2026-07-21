@@ -354,6 +354,31 @@ impl ScreensaverListUi {
       ActiveList::Enabled => self.right_scroll,
     };
     let _ = scroll_box.scroll_by(&mut self.objects, id, 0, dy, layout);
+    let top = scroll_box.scroll_y(&self.objects, id).unwrap_or(0) as usize;
+    let height = scroll_box
+      .visible_content_height(&self.objects, id, layout)
+      .unwrap_or(0) as usize;
+    if height == 0 {
+      return;
+    }
+    match self.active {
+      ActiveList::Disabled => {
+        let len = self.disabled_entries().len();
+        if len > 0 {
+          self.left_selected = self
+            .left_selected
+            .clamp(top, top.saturating_add(height - 1).min(len - 1));
+        }
+      }
+      ActiveList::Enabled => {
+        let len = self.enabled_entries().len();
+        if len > 0 {
+          self.right_selected = self
+            .right_selected
+            .clamp(top, top.saturating_add(height - 1).min(len - 1));
+        }
+      }
+    }
   }
 
   pub fn render(
@@ -740,23 +765,21 @@ impl ScreensaverListUi {
       right_len.max(pos.right_list.height).max(1),
       layout,
     );
-    self.ensure_active_selection_visible(scroll_box, layout, pos);
+    self.ensure_active_selection_visible(scroll_box, layout);
   }
 
   fn ensure_active_selection_visible(
     &mut self,
     scroll_box: &ScrollBoxService,
     layout: &LayoutService,
-    pos: &ScreensaverListLayout,
   ) {
-    let (id, selected, height) = match self.active {
-      ActiveList::Disabled => (self.left_scroll, self.left_selected, pos.left_list.height),
-      ActiveList::Enabled => (
-        self.right_scroll,
-        self.right_selected,
-        pos.right_list.height,
-      ),
+    let (id, selected) = match self.active {
+      ActiveList::Disabled => (self.left_scroll, self.left_selected),
+      ActiveList::Enabled => (self.right_scroll, self.right_selected),
     };
+    let height = scroll_box
+      .visible_content_height(&self.objects, id, layout)
+      .unwrap_or(0);
     if height == 0 {
       return;
     }

@@ -33,6 +33,7 @@ pub struct ScreenshotSettingsUi {
 pub enum ScreenshotSettingsCommand {
   Back,
   Changed(ScreenshotProfile),
+  ExportFontPreview(Vec<String>),
   OpenFonts,
   StartAddFont,
   StartModifyFont,
@@ -69,7 +70,7 @@ impl ScreenshotSettingsUi {
     profile: ScreenshotProfile,
   ) -> Self {
     let mut objects = UiObjectPool::new();
-    let fonts = FontsSettingsUi::create(&mut objects, text_input, scroll_box);
+    let fonts = FontsSettingsUi::create(&mut objects, hit_area, text_input, scroll_box);
     Self {
       selected_index: 0,
       profile,
@@ -128,6 +129,9 @@ impl ScreenshotSettingsUi {
           self.profile.fonts = fonts;
           self.fonts_open = false;
           ScreenshotSettingsCommand::Changed(self.profile.clone())
+        }
+        FontsSettingsCommand::ExportPreview(fonts) => {
+          ScreenshotSettingsCommand::ExportFontPreview(fonts)
         }
         FontsSettingsCommand::StartAdd => ScreenshotSettingsCommand::StartAddFont,
         FontsSettingsCommand::StartModify => ScreenshotSettingsCommand::StartModifyFont,
@@ -199,9 +203,16 @@ impl ScreenshotSettingsUi {
     self.fonts.cancel_edit(&mut self.objects, text_input);
   }
 
-  pub fn prepare_surfaces(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService) {
+  pub fn prepare_surfaces(
+    &mut self,
+    scroll_box: &ScrollBoxService,
+    layout: &LayoutService,
+    i18n: &I18nService,
+  ) {
     if self.fonts_open {
-      self.fonts.prepare(&mut self.objects, scroll_box, layout);
+      self
+        .fonts
+        .prepare(&mut self.objects, scroll_box, layout, i18n);
     }
   }
 
@@ -219,11 +230,19 @@ impl ScreenshotSettingsUi {
     i18n: &I18nService,
     hit_area: &HitAreaService,
     text_input: &TextInputService,
+    scroll_box: &ScrollBoxService,
   ) -> Option<(u16, u16)> {
     if self.fonts_open {
-      return self
-        .fonts
-        .render(&mut self.objects, render, canvas, layout, i18n, text_input);
+      return self.fonts.render(
+        &mut self.objects,
+        render,
+        canvas,
+        layout,
+        i18n,
+        hit_area,
+        text_input,
+        scroll_box,
+      );
     }
     let viewport = layout.developer_viewport_rect();
     let title = i18n.get_runtime_text(NS, "screenshot_settings.title");

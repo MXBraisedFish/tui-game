@@ -65,7 +65,7 @@ pub struct ScreenshotProfile {
   #[serde(default)]
   pub auto_exit: bool,
 
-  /// 截图/录屏导出时按顺序尝试的自定义字体路径或系统字体名称。
+  /// 截屏/录屏导出时按顺序尝试的自定义字体路径或系统字体名称。
   #[serde(default)]
   pub fonts: Vec<String>,
 }

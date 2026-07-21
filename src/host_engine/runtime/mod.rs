@@ -31,9 +31,10 @@ use crate::host_engine::ui::{
   DisplaySettingsUi, ExportFormat, ExportLoadingUi, ExportSettingsCommand, ExportSettingsUi,
   ExportType, GameListCommand, GameListUi, GamePackageCommand, GamePackageUi, HomeUi,
   HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
-  LanguageSelectUi, ModsCommand, ModsUi, SafeModeWarningCommand, SafeModeWarningUi,
-  ScreensaverListCommand, ScreensaverListUi, ScreensaverOverlayUi, ScreensaverPackageCommand,
-  ScreensaverPackageUi, ScreenshotCaptureCommand, ScreenshotCaptureUi, ScreenshotRecordingCommand,
+  LanguageSelectUi, ModsCommand, ModsUi, RecordingListCommand, RecordingListUi,
+  SafeModeWarningCommand, SafeModeWarningUi, ScreensaverListCommand, ScreensaverListUi,
+  ScreensaverOverlayUi, ScreensaverPackageCommand, ScreensaverPackageUi, ScreenshotCaptureCommand,
+  ScreenshotCaptureUi, ScreenshotListCommand, ScreenshotListUi, ScreenshotRecordingCommand,
   ScreenshotRecordingUi, ScreenshotSettingsCommand, ScreenshotSettingsUi, SecurityDetailsCommand,
   SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
   StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
@@ -145,7 +146,6 @@ impl ScreenshotModeToast {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct PendingScreenshotSave {
-  copy_succeeded: Option<bool>,
   progress: f32,
 }
 
@@ -472,6 +472,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut pending_screensaver_hotkey,
       &mut pending_toolbar_hotkey,
     );
+    if let Some(fonts) = services.screenshot.take_font_preview_request() {
+      submit_font_preview_png(
+        services,
+        fonts,
+        &mut screenshot_mode_toast,
+        &mut pending_screenshot_saves,
+      );
+    }
     update_pending_host_hotkeys(
       services,
       world,
@@ -662,12 +670,12 @@ fn apply_screenshot_events(
       ScreenshotAsyncEvent::Failed { task_id, .. } => (*task_id, ScreenshotSaveState::Failed),
       ScreenshotAsyncEvent::Progress { .. } => unreachable!(),
     };
-    let Some(context) = pending.remove(&task_id) else {
+    if pending.remove(&task_id).is_none() {
       continue;
-    };
+    }
     *toast = Some(ScreenshotModeToast::new(
       ScreenshotModeToastKind::Operation {
-        copy_succeeded: context.copy_succeeded,
+        copy_succeeded: None,
         save: Some(save),
       },
     ));
@@ -1496,13 +1504,7 @@ fn run_quick_screenshot_action(
   );
   if saves_png {
     let task_id = submit_screenshot_png(services, frame.clone(), rect);
-    pending_screenshot_saves.insert(
-      task_id,
-      PendingScreenshotSave {
-        copy_succeeded,
-        progress: 0.0,
-      },
-    );
+    pending_screenshot_saves.insert(task_id, PendingScreenshotSave { progress: 0.0 });
   } else {
     let _ =
       services
@@ -1570,13 +1572,7 @@ fn apply_screenshot_capture_command(
       if let Some((frame, rect)) = screenshot_ui.current_selection() {
         completed_operation = true;
         let task_id = submit_screenshot_png(services, frame, rect);
-        pending_screenshot_saves.insert(
-          task_id,
-          PendingScreenshotSave {
-            copy_succeeded: None,
-            progress: 0.0,
-          },
-        );
+        pending_screenshot_saves.insert(task_id, PendingScreenshotSave { progress: 0.0 });
         screenshot_ui.clear_selection();
         *screenshot_mode_toast = Some(ScreenshotModeToast::new(
           ScreenshotModeToastKind::Operation {
@@ -1591,13 +1587,7 @@ fn apply_screenshot_capture_command(
         completed_operation = true;
         let copied = copy_screenshot_text(services, &frame, rect);
         let task_id = submit_screenshot_png(services, frame, rect);
-        pending_screenshot_saves.insert(
-          task_id,
-          PendingScreenshotSave {
-            copy_succeeded: Some(copied),
-            progress: 0.0,
-          },
-        );
+        pending_screenshot_saves.insert(task_id, PendingScreenshotSave { progress: 0.0 });
         screenshot_ui.clear_selection();
         *screenshot_mode_toast = Some(ScreenshotModeToast::new(
           ScreenshotModeToastKind::Operation {
@@ -1676,6 +1666,41 @@ fn submit_screenshot_png(
         .read_screenshot_profile_or_default(&mut services.log)
         .fonts,
     }))
+}
+
+fn submit_font_preview_png(
+  services: &mut EngineServices,
+  fonts: Vec<String>,
+  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
+  pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
+) {
+  let frame = ScreenshotService::font_preview_frame();
+  let Some(rect) = ScreenshotService::whole_frame_rect(&frame) else {
+    return;
+  };
+  let png_path = ScreenshotService::next_png_path(&services.storage);
+  let _ = services.screenshot.write_json(
+    &services.storage,
+    &frame,
+    rect,
+    Some(&png_path),
+    &mut services.log,
+  );
+  let task_id = services
+    .async_runtime
+    .submit(EngineTask::Screenshot(ScreenshotTask {
+      frame,
+      selection: rect,
+      png_path,
+      fonts,
+    }));
+  pending_screenshot_saves.insert(task_id, PendingScreenshotSave { progress: 0.0 });
+  *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+    ScreenshotModeToastKind::Operation {
+      copy_succeeded: None,
+      save: Some(ScreenshotSaveState::Loading),
+    },
+  ));
 }
 
 #[cfg(test)]

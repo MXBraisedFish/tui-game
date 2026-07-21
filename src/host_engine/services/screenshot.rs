@@ -8,6 +8,7 @@ use crossbeam_channel::Sender;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::host_engine::services::{
@@ -54,13 +55,40 @@ pub enum ScreenshotAsyncEvent {
 
 pub struct ScreenshotService {
   last_presented_frame: Option<ComposedFrame>,
+  pending_font_preview: Option<Vec<String>>,
 }
 
 impl ScreenshotService {
   pub fn new() -> Self {
     Self {
       last_presented_frame: None,
+      pending_font_preview: None,
     }
+  }
+
+  pub fn request_font_preview(&mut self, fonts: Vec<String>) {
+    self.pending_font_preview = Some(fonts);
+  }
+
+  pub fn take_font_preview_request(&mut self) -> Option<Vec<String>> {
+    self.pending_font_preview.take()
+  }
+
+  pub fn font_preview_frame() -> ComposedFrame {
+    let lines = font_preview_lines();
+    let width = lines
+      .iter()
+      .map(|line| preview_line_width(line))
+      .max()
+      .unwrap_or(1)
+      .saturating_add(4)
+      .min(u16::MAX as usize) as u16;
+    let height = lines.len().saturating_add(4).min(u16::MAX as usize) as u16;
+    let mut frame = ComposedFrame::new(width, height);
+    for (index, line) in lines.iter().enumerate() {
+      write_preview_line(&mut frame, 2, index as u16 + 2, line);
+    }
+    frame
   }
 
   pub fn remember_presented_frame(&mut self, frame: ComposedFrame) {
@@ -203,6 +231,69 @@ impl ScreenshotService {
     storage
       .screenshot_dir_path()
       .join(format!("{}.png", timestamp()))
+  }
+}
+
+fn font_preview_lines() -> &'static [&'static str] {
+  &[
+    "ASCII: !\"#$%&'()*+,-./ 0123456789 :;<=>?@ ABC xyz [\\]^_` {|}~",
+    "Latin: ÀÁÂÃÄÅ Æ Ç ÈÉÊË ÌÍÎÏ Ñ ÒÓÔÕÖ Ø Œ ÙÚÛÜ Ý ß ẞ",
+    "Combining: e\u{301} a\u{308} n\u{303} A\u{30a}  ZWJ: 👩‍💻 👨‍👩‍👧‍👦",
+    "Zero width: AB A\u{200c}B A\u{200d}B AB  VS: ✈︎ ✈️",
+    "RTL: עברית العربية فارسی اردو  | controls: ABC العربية\u{202c}",
+    "",
+    "CJK: 中文繁體 日本語かなカナ 한글 漢字 〇々〆〄〓〈〉《》「」『』【】",
+    "Kana/Bopomofo: あいうえお アイウエオ ｱｲｳｴｵ ㄅㄆㄇㄈ ㆠㆡㆢ",
+    "Indic/SEA: हिन्दी বাংলা ਪੰਜਾਬੀ ગુજરાતી தமிழ் తెలుగు ಕನ್ನಡ മലയാളം ไทย ລາວ မြန်မာ",
+    "Greek/Cyrillic: ΑΒΓΔ αβγδ  Ελληνικά  АБВГ абвг Русский Українська",
+    "Semitic/African: אבגדה العربية ሀሁሂ ትግርኛ ꦗꦮ ꧋ ߒߞߏ",
+    "",
+    "Symbols: ←↑→↓ ↔↕ ⇐⇒ ∀∂∃∅∇∈∉∑√∞∧∨∩∪≈≠≤≥ ⌘⌥⌫⏎",
+    "Box: ─│┌┐└┘├┤┬┴┼ ═║╔╗╚╝╠╣╦╩╬ ╭╮╰╯ ┏┓┗┛┣┫┳┻╋",
+    "Blocks: ▀▁▂▃▄▅▆▇█ ▏▎▍▌▋▊▉ ░▒▓ ■□▪▫●○◆◇◢◣◤◥",
+    "Braille: ⠀⠁⠃⠇⠏⠟⠿⡿⣿  Music: ♩♪♫♬♭♮♯  Cards: ♠♥♦♣",
+    "Emoji: 😀🥹🫠🚀🌍🔥✨⚙️🧪🏳️‍🌈🇨🇳👍🏽  Keycap: 1️⃣ #️⃣ *️⃣",
+    "Historic/rare: 𓀀𓂀 𐀀 𐎀 𐤀 ᚠᚢᚦᚨᚱᚲ ⰀⰁ ⸘ ※ ⁂ ‽",
+    "",
+    "Full/Half width: ＡＢＣ１２３！ ａｂｃ ﾊﾝｶｸ ｡｢｣､･  Tab→\t←Tab",
+    "Space widths: [ ] [\u{a0}] [\u{2002}] [\u{2003}] [\u{2009}] [　] end",
+  ]
+}
+
+fn preview_line_width(line: &str) -> usize {
+  let mut column = 0;
+  for grapheme in line.graphemes(true) {
+    column += if grapheme == "\t" {
+      4 - column % 4
+    } else {
+      UnicodeWidthStr::width(grapheme)
+    };
+  }
+  column
+}
+
+fn write_preview_line(frame: &mut ComposedFrame, start_x: u16, y: u16, line: &str) {
+  let mut x = start_x as usize;
+  for grapheme in line.graphemes(true) {
+    if grapheme == "\t" {
+      x += 4 - (x - start_x as usize) % 4;
+      continue;
+    }
+    let width = UnicodeWidthStr::width(grapheme);
+    if width == 0 || x >= frame.width() as usize {
+      continue;
+    }
+    frame.set(x as u16, y, ComposedCell::Text(CanvasCell::new(grapheme)));
+    for offset in 1..width {
+      if x + offset < frame.width() as usize {
+        frame.set(
+          (x + offset) as u16,
+          y,
+          ComposedCell::Text(CanvasCell::continuation()),
+        );
+      }
+    }
+    x += width;
   }
 }
 
@@ -822,5 +913,34 @@ fn terminal_rgb(color: &TerminalColor) -> (u8, u8, u8) {
     TerminalColor::BrightMagenta => (255, 85, 255),
     TerminalColor::BrightCyan => (85, 255, 255),
     TerminalColor::BrightWhite => (255, 255, 255),
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::ScreenshotService;
+
+  #[test]
+  fn font_preview_contains_representative_unicode_groups() {
+    let frame = ScreenshotService::font_preview_frame();
+    let rect = ScreenshotService::whole_frame_rect(&frame).unwrap();
+    let text = ScreenshotService::plain_text(&frame, rect);
+    assert!(text.contains("中文繁體"));
+    assert!(text.contains("👩‍💻"));
+    assert!(text.contains("עברית"));
+    assert!(text.contains("▀▁▂▃▄"));
+    assert!(frame.width() > 60);
+    assert!(frame.height() > 20);
+  }
+
+  #[test]
+  fn font_preview_request_is_consumed_once() {
+    let mut service = ScreenshotService::new();
+    service.request_font_preview(vec!["test.ttf".to_string()]);
+    assert_eq!(
+      service.take_font_preview_request(),
+      Some(vec!["test.ttf".to_string()])
+    );
+    assert_eq!(service.take_font_preview_request(), None);
   }
 }

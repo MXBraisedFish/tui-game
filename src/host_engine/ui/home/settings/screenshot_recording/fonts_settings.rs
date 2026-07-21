@@ -1,8 +1,10 @@
 use crate::host_engine::services::{
-  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, KeyState, LayoutService,
-  Overflow, Rect, RenderService, RichTextParams, ScrollBoxId, ScrollBoxOptions, ScrollBoxService,
-  ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, TextColor, TextInputEvent, TextInputId,
-  TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, UiEvent, UiObjectPool,
+  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
+  HitAreaOptions, HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Overflow,
+  Rect, RenderService, RichTextParams, RichTextService, ScrollBoxId, ScrollBoxOptions,
+  ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, TextColor,
+  TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
+  TextInputService, UiEvent, UiObjectPool,
 };
 
 const NS: &str = "fonts_settings";
@@ -10,6 +12,7 @@ const NS: &str = "fonts_settings";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FontsSettingsCommand {
   Back(Vec<String>),
+  ExportPreview(Vec<String>),
   StartAdd,
   StartModify,
   FinishEdit(String),
@@ -30,11 +33,14 @@ pub struct FontsSettingsUi {
   selected: usize,
   locked: bool,
   edit_mode: Option<FontEditMode>,
+  back_area: HitAreaId,
+  item_areas: Vec<HitAreaId>,
 }
 
 impl FontsSettingsUi {
   pub fn create(
     objects: &mut UiObjectPool,
+    hit_area: &HitAreaService,
     text_input: &TextInputService,
     scroll_box: &ScrollBoxService,
   ) -> Self {
@@ -71,6 +77,8 @@ impl FontsSettingsUi {
       selected: 0,
       locked: false,
       edit_mode: None,
+      back_area: hit_area.create(objects, HitAreaOptions::default()),
+      item_areas: Vec::new(),
     }
   }
 
@@ -160,6 +168,30 @@ impl FontsSettingsUi {
         _ => None,
       };
     }
+    match event {
+      UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
+        if let Some(index) = self.item_areas.iter().position(|area| area == id) {
+          self.selected = index;
+        }
+        return None;
+      }
+      UiEvent::HitArea(HitAreaEvent::Click {
+        id,
+        button: MouseButton::Left,
+        ..
+      }) => {
+        if let Some(index) = self.item_areas.iter().position(|area| area == id) {
+          self.selected = index;
+          return Some(FontsSettingsCommand::StartModify);
+        }
+        return None;
+      }
+      UiEvent::HitArea(HitAreaEvent::Press {
+        button: MouseButton::Right,
+        ..
+      }) => return Some(FontsSettingsCommand::Back(self.fonts.clone())),
+      _ => {}
+    }
     let UiEvent::Action(event) = event else {
       return None;
     };
@@ -167,11 +199,16 @@ impl FontsSettingsUi {
       return None;
     }
     match event.action.as_str() {
-      "fonts_settings.focus_up.move_up" => self.move_selection(-1),
-      "fonts_settings.focus_down.move_down" => self.move_selection(1),
+      "fonts_settings.focus_up.move_up" | "screenshot_settings.focus_up" => self.move_selection(-1),
+      "fonts_settings.focus_down.move_down" | "screenshot_settings.focus_down" => {
+        self.move_selection(1)
+      }
       "fonts_settings.scroll_up" => return Some(FontsSettingsCommand::Scroll(-3)),
       "fonts_settings.scroll_down" => return Some(FontsSettingsCommand::Scroll(3)),
       "fonts_settings.lock_unlock" if !self.fonts.is_empty() => self.locked = !self.locked,
+      "fonts_settings.export_preview" => {
+        return Some(FontsSettingsCommand::ExportPreview(self.fonts.clone()));
+      }
       "fonts_settings.add" => return Some(FontsSettingsCommand::StartAdd),
       "fonts_settings.modify" if !self.fonts.is_empty() => {
         return Some(FontsSettingsCommand::StartModify);
@@ -207,6 +244,29 @@ impl FontsSettingsUi {
     dy: i32,
   ) {
     let _ = service.scroll_by(objects, self.scroll, 0, dy, layout);
+    self.follow_scroll(objects, service, layout);
+  }
+
+  fn follow_scroll(
+    &mut self,
+    objects: &UiObjectPool,
+    service: &ScrollBoxService,
+    layout: &LayoutService,
+  ) {
+    if self.fonts.is_empty() {
+      return;
+    }
+    let top = service.scroll_y(objects, self.scroll).unwrap_or(0) as usize;
+    let height = service
+      .visible_content_height(objects, self.scroll, layout)
+      .unwrap_or(0) as usize;
+    if height == 0 {
+      return;
+    }
+    self.selected = self.selected.clamp(
+      top,
+      top.saturating_add(height - 1).min(self.fonts.len() - 1),
+    );
   }
 
   pub fn prepare(
@@ -214,27 +274,27 @@ impl FontsSettingsUi {
     objects: &mut UiObjectPool,
     service: &ScrollBoxService,
     layout: &LayoutService,
+    i18n: &I18nService,
   ) {
     let viewport = layout.developer_viewport_rect();
-    let hint_height = 2;
+    let hint_height = self.hint_lines(i18n, viewport.width).len().max(1) as u16;
+    let frame_height = viewport.height.saturating_sub(1 + hint_height);
     let rect = Rect {
       x: 1,
       y: 2,
       width: viewport.width.saturating_sub(2),
-      height: viewport.height.saturating_sub(2 + hint_height),
+      height: frame_height.saturating_sub(2),
     };
     let _ = service.set_rect(objects, self.scroll, rect, layout);
     let _ = service.set_content_size(
       objects,
       self.scroll,
       rect.width.saturating_sub(2).max(1),
-      (self.fonts.len() as u16)
-        .max(rect.height.saturating_sub(2))
-        .max(1),
+      (self.fonts.len() as u16).max(rect.height).max(1),
       layout,
     );
-    if rect.height > 2 {
-      let visible = rect.height.saturating_sub(2) as usize;
+    if rect.height > 0 {
+      let visible = rect.height as usize;
       let top = service.scroll_y(objects, self.scroll).unwrap_or(0) as usize;
       if self.selected < top {
         let _ = service.scroll_to(objects, self.scroll, 0, self.selected as u16, layout);
@@ -252,7 +312,9 @@ impl FontsSettingsUi {
     canvas: &mut CanvasService,
     layout: &LayoutService,
     i18n: &I18nService,
+    hit_area: &HitAreaService,
     text_input: &TextInputService,
+    scroll_box: &ScrollBoxService,
   ) -> Option<(u16, u16)> {
     let viewport = layout.developer_viewport_rect();
     let title = i18n.get_runtime_text(NS, "fonts_settings.title");
@@ -269,11 +331,13 @@ impl FontsSettingsUi {
         ..Default::default()
       },
     );
+    let hint_lines = self.hint_lines(i18n, viewport.width);
+    let hint_height = hint_lines.len().max(1) as u16;
     let frame = Rect {
       x: viewport.x,
       y: viewport.y.saturating_add(1),
       width: viewport.width,
-      height: viewport.height.saturating_sub(3),
+      height: viewport.height.saturating_sub(1 + hint_height),
     };
     render.draw_host_border_rect(
       canvas,
@@ -308,7 +372,7 @@ impl FontsSettingsUi {
           &DrawTextParams {
             x: 0,
             y: index as u16,
-            text: format!("f%<fg:rgb(170,170,170)>{number}</fg>"),
+            text: format!("f%<fg:#FFFFFF><bg:rgb(85,87,83)>{number}</bg></fg>"),
             ..Default::default()
           },
         );
@@ -345,25 +409,31 @@ impl FontsSettingsUi {
       }
     }
 
-    let hint = self.hint(i18n);
     let params = RichTextParams::from_action_map(&Self::action_map(), "fonts_settings.");
-    render.draw_host_text(
-      canvas,
-      &DrawTextParams {
-        x: viewport.x
-          + viewport
-            .width
-            .saturating_sub(layout.get_text_width(&hint, Some(&params)))
-            / 2,
-        y: viewport.y.saturating_add(viewport.height.saturating_sub(1)),
-        text: format!(
-          "f%<fg:rgb(85,87,83)>{}</fg>",
-          hint.strip_prefix("f%").unwrap_or(&hint)
-        ),
-        params: Some(params),
-        ..Default::default()
-      },
-    );
+    let hint_y = viewport
+      .y
+      .saturating_add(viewport.height.saturating_sub(hint_height));
+    for (index, hint) in hint_lines.iter().enumerate() {
+      render.draw_host_text(
+        canvas,
+        &DrawTextParams {
+          x: viewport.x
+            + viewport
+              .width
+              .saturating_sub(layout.get_text_width(hint, Some(&params)))
+              / 2,
+          y: hint_y.saturating_add(index as u16),
+          text: format!(
+            "f%<fg:rgb(85,87,83)>{}</fg>",
+            hint.strip_prefix("f%").unwrap_or(hint)
+          ),
+          params: Some(params.clone()),
+          ..Default::default()
+        },
+      );
+    }
+
+    self.register_hit_areas(objects, hit_area, scroll_box, canvas, viewport, frame);
 
     if self.edit_mode.is_none() {
       return None;
@@ -523,4 +593,66 @@ impl FontsSettingsUi {
     .collect::<Vec<_>>()
     .join("  ")
   }
+
+  fn hint_lines(&self, i18n: &I18nService, width: u16) -> Vec<String> {
+    let params = RichTextParams::from_action_map(&Self::action_map(), "fonts_settings.");
+    let rich = RichTextService::new();
+    let mut lines = vec![String::new()];
+    let mut line_width = 0usize;
+    for item in self.hint(i18n).split("  ") {
+      let item_width = layout_width(&rich.visible_text(item, Some(&params)));
+      if line_width > 0 && line_width + 2 + item_width > width as usize {
+        lines.push(String::new());
+        line_width = 0;
+      }
+      if line_width > 0 {
+        lines.last_mut().unwrap().push_str("  ");
+        line_width += 2;
+      }
+      lines.last_mut().unwrap().push_str(item);
+      line_width += item_width;
+    }
+    lines
+  }
+
+  fn register_hit_areas(
+    &mut self,
+    objects: &mut UiObjectPool,
+    hit_area: &HitAreaService,
+    scroll_box: &ScrollBoxService,
+    canvas: &mut CanvasService,
+    viewport: Rect,
+    frame: Rect,
+  ) {
+    while self.item_areas.len() < self.fonts.len() {
+      self
+        .item_areas
+        .push(hit_area.create(objects, HitAreaOptions::default()));
+    }
+    while self.item_areas.len() > self.fonts.len() {
+      if let Some(id) = self.item_areas.pop() {
+        let _ = hit_area.remove(objects, id);
+      }
+    }
+    hit_area.render_host(objects, self.back_area, viewport, canvas);
+    let top = scroll_box.scroll_y(objects, self.scroll).unwrap_or(0) as usize;
+    let height = frame.height.saturating_sub(2) as usize;
+    for (index, id) in self.item_areas.iter().enumerate().skip(top).take(height) {
+      hit_area.render_host(
+        objects,
+        *id,
+        Rect {
+          x: frame.x.saturating_add(1),
+          y: frame.y.saturating_add(1 + (index - top) as u16),
+          width: frame.width.saturating_sub(2),
+          height: 1,
+        },
+        canvas,
+      );
+    }
+  }
+}
+
+fn layout_width(text: &str) -> usize {
+  unicode_width::UnicodeWidthStr::width(text)
 }

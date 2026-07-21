@@ -37,6 +37,18 @@ pub(super) fn current_objects_mut<'a>(
         .screenshot_settings_mut()
         .objects_mut(),
     ),
+    Some(UiNodeKind::ScreenshotList) => Some(
+      settings_ui
+        .screenshot_recording_mut()
+        .screenshot_list_mut()
+        .objects_mut(),
+    ),
+    Some(UiNodeKind::RecordingList) => Some(
+      settings_ui
+        .screenshot_recording_mut()
+        .recording_list_mut()
+        .objects_mut(),
+    ),
     Some(UiNodeKind::SecuritySettings) => Some(security_uis.settings.objects_mut()),
     Some(UiNodeKind::SecurityDetails) => Some(security_uis.details.objects_mut()),
     Some(UiNodeKind::StorageManagement) => Some(storage_management_ui.objects_mut()),
@@ -115,6 +127,20 @@ pub(super) fn deactivate_hidden_pools(
     settings_ui
       .screenshot_recording_mut()
       .screenshot_settings_mut()
+      .objects_mut(),
+  );
+  deactivate(
+    UiNodeKind::ScreenshotList,
+    settings_ui
+      .screenshot_recording_mut()
+      .screenshot_list_mut()
+      .objects_mut(),
+  );
+  deactivate(
+    UiNodeKind::RecordingList,
+    settings_ui
+      .screenshot_recording_mut()
+      .recording_list_mut()
       .objects_mut(),
   );
   deactivate(
@@ -606,6 +632,14 @@ pub(super) fn route_update(
         .screenshot_settings_mut()
         .update(world.clock.delta_time());
     }
+    Some(UiNodeKind::ScreenshotList) => settings_ui
+      .screenshot_recording_mut()
+      .screenshot_list_mut()
+      .update(world.clock.delta_time()),
+    Some(UiNodeKind::RecordingList) => settings_ui
+      .screenshot_recording_mut()
+      .recording_list_mut()
+      .update(world.clock.delta_time()),
     Some(UiNodeKind::SecuritySettings) => {
       security_uis.settings.update(world.clock.delta_time());
     }
@@ -1090,6 +1124,24 @@ fn route_input_event(
         .handle_event(event)
       {
         apply_screenshot_settings_command(command, settings_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::ScreenshotList) => {
+      if let Some(command) = settings_ui
+        .screenshot_recording_mut()
+        .screenshot_list_mut()
+        .handle_event(event)
+      {
+        apply_screenshot_list_command(command, settings_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::RecordingList) => {
+      if let Some(command) = settings_ui
+        .screenshot_recording_mut()
+        .recording_list_mut()
+        .handle_event(event)
+      {
+        apply_recording_list_command(command, settings_ui, services, world);
       }
     }
     Some(UiNodeKind::SecuritySettings) => {

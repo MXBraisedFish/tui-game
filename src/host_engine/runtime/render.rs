@@ -189,7 +189,29 @@ pub(super) fn route_render(
     settings_ui
       .screenshot_recording_mut()
       .screenshot_settings_mut()
-      .prepare_surfaces(&services.scroll_box, &services.layout);
+      .prepare_surfaces(&services.scroll_box, &services.layout, &services.i18n);
+  }
+  if world.state.current_ui_kind() == Some(UiNodeKind::ScreenshotList) {
+    settings_ui
+      .screenshot_recording_mut()
+      .screenshot_list_mut()
+      .prepare_surfaces(
+        &services.layout,
+        &services.i18n,
+        &services.text_input,
+        &services.scroll_box,
+      );
+  }
+  if world.state.current_ui_kind() == Some(UiNodeKind::RecordingList) {
+    settings_ui
+      .screenshot_recording_mut()
+      .recording_list_mut()
+      .prepare_surfaces(
+        &services.layout,
+        &services.i18n,
+        &services.text_input,
+        &services.scroll_box,
+      );
   }
 
   if let Some(objects) = current_objects_mut(
@@ -284,6 +306,35 @@ pub(super) fn route_render(
           &services.i18n,
           &services.hit_area,
           &services.text_input,
+          &services.scroll_box,
+        );
+    }
+    Some(UiNodeKind::ScreenshotList) => {
+      input_cursor = settings_ui
+        .screenshot_recording_mut()
+        .screenshot_list_mut()
+        .render(
+          &mut services.render,
+          &mut services.canvas,
+          &services.layout,
+          &services.i18n,
+          &services.hit_area,
+          &services.text_input,
+          &services.scroll_box,
+        );
+    }
+    Some(UiNodeKind::RecordingList) => {
+      input_cursor = settings_ui
+        .screenshot_recording_mut()
+        .recording_list_mut()
+        .render(
+          &mut services.render,
+          &mut services.canvas,
+          &services.layout,
+          &services.i18n,
+          &services.hit_area,
+          &services.text_input,
+          &services.scroll_box,
         );
     }
     Some(UiNodeKind::SecuritySettings) => {

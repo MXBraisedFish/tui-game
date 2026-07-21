@@ -136,6 +136,75 @@ pub(super) fn apply_screenshot_recording_command(
         .state
         .enter_ui_node(UiNodeState::screenshot_settings());
     }
+    ScreenshotRecordingCommand::OpenScreenshotList => {
+      let path = services.storage.screenshot_cache_dir_path();
+      let ui = settings_ui.screenshot_recording_mut().screenshot_list_mut();
+      ui.reset_search(&mut services.text_input);
+      if let Err(error) = ui.reload(&path) {
+        services.log.error(
+          LogSource::Ui,
+          format!(
+            "failed to scan screenshot cache {}: {error}",
+            path.display()
+          ),
+        );
+      }
+      world.state.enter_ui_node(UiNodeState::screenshot_list());
+    }
+    ScreenshotRecordingCommand::OpenRecordingList => {
+      let path = services.storage.recording_cache_dir_path();
+      let ui = settings_ui.screenshot_recording_mut().recording_list_mut();
+      ui.reset_search(&mut services.text_input);
+      if let Err(error) = ui.reload(&path) {
+        services.log.error(
+          LogSource::Ui,
+          format!("failed to scan recording cache {}: {error}", path.display()),
+        );
+      }
+      world.state.enter_ui_node(UiNodeState::recording_list());
+    }
+  }
+}
+
+pub(super) fn apply_screenshot_list_command(
+  command: ScreenshotListCommand,
+  settings_ui: &mut SettingsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  let ui = settings_ui.screenshot_recording_mut().screenshot_list_mut();
+  match command {
+    ScreenshotListCommand::Back => {
+      ui.blur_search(&mut services.text_input);
+      clear_exiting_pool(ui.objects_mut(), services);
+      world.state.pop_ui_node();
+    }
+    ScreenshotListCommand::FocusSearch => ui.focus_search(&mut services.text_input),
+    ScreenshotListCommand::BlurSearch => ui.blur_search(&mut services.text_input),
+    ScreenshotListCommand::ScrollList(dy) => {
+      ui.scroll_list(&services.scroll_box, &services.layout, dy)
+    }
+  }
+}
+
+pub(super) fn apply_recording_list_command(
+  command: RecordingListCommand,
+  settings_ui: &mut SettingsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  let ui = settings_ui.screenshot_recording_mut().recording_list_mut();
+  match command {
+    RecordingListCommand::Back => {
+      ui.blur_search(&mut services.text_input);
+      clear_exiting_pool(ui.objects_mut(), services);
+      world.state.pop_ui_node();
+    }
+    RecordingListCommand::FocusSearch => ui.focus_search(&mut services.text_input),
+    RecordingListCommand::BlurSearch => ui.blur_search(&mut services.text_input),
+    RecordingListCommand::ScrollList(dy) => {
+      ui.scroll_list(&services.scroll_box, &services.layout, dy);
+    }
   }
 }
 
@@ -150,6 +219,9 @@ pub(super) fn apply_screenshot_settings_command(
       let _ = services
         .storage
         .write_screenshot_profile(&profile, &mut services.log);
+    }
+    ScreenshotSettingsCommand::ExportFontPreview(fonts) => {
+      services.screenshot.request_font_preview(fonts);
     }
     ScreenshotSettingsCommand::OpenFonts => {
       settings_ui

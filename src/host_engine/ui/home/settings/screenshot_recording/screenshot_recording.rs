@@ -7,7 +7,7 @@ use crate::host_engine::services::{
   UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
-use super::ScreenshotSettingsUi;
+use super::{RecordingListUi, ScreenshotListUi, ScreenshotSettingsUi};
 
 const NS: &str = "screenshot_recording";
 const MENU_LEN: usize = 4;
@@ -25,12 +25,16 @@ pub struct ScreenshotRecordingUi {
   back_area: HitAreaId,
   menu_areas: [HitAreaId; MENU_LEN],
   screenshot_settings: ScreenshotSettingsUi,
+  screenshot_list: ScreenshotListUi,
+  recording_list: RecordingListUi,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScreenshotRecordingCommand {
   Back,
   OpenScreenshotSettings,
+  OpenScreenshotList,
+  OpenRecordingList,
 }
 
 impl UiObjectPoolOwner for ScreenshotRecordingUi {
@@ -72,6 +76,8 @@ impl ScreenshotRecordingUi {
         scroll_box,
         crate::host_engine::services::ScreenshotProfile::default(),
       ),
+      screenshot_list: ScreenshotListUi::init(hit_area, text_input, scroll_box),
+      recording_list: RecordingListUi::init(hit_area, text_input, scroll_box),
     }
   }
 
@@ -163,6 +169,14 @@ impl ScreenshotRecordingUi {
     &mut self.screenshot_settings
   }
 
+  pub fn screenshot_list_mut(&mut self) -> &mut ScreenshotListUi {
+    &mut self.screenshot_list
+  }
+
+  pub fn recording_list_mut(&mut self) -> &mut RecordingListUi {
+    &mut self.recording_list
+  }
+
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -245,7 +259,12 @@ impl ScreenshotRecordingUi {
   }
 
   fn activate_selected(&self) -> Option<ScreenshotRecordingCommand> {
-    (self.selected_index == 0).then_some(ScreenshotRecordingCommand::OpenScreenshotSettings)
+    match self.selected_index {
+      0 => Some(ScreenshotRecordingCommand::OpenScreenshotSettings),
+      2 => Some(ScreenshotRecordingCommand::OpenScreenshotList),
+      3 => Some(ScreenshotRecordingCommand::OpenRecordingList),
+      _ => None,
+    }
   }
 
   fn menu_item(&self, i18n: &I18nService, index: usize) -> String {
