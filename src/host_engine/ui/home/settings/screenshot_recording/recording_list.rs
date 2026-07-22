@@ -30,6 +30,7 @@ impl MediaListSpec for RecordingListSpec {
       ("recording_list.skip_forward", "right"),
       ("recording_list.rewind", "left"),
       ("recording_list.zoom", "z"),
+      ("recording_list.export", "1"),
     ])
   }
 
@@ -49,9 +50,39 @@ impl MediaListSpec for RecordingListSpec {
 
   fn right_hint_keys() -> &'static [&'static str] {
     &[
-      "action.list.play_pause",
-      "action.list.skip_forward",
-      "action.list.rewind",
+      "action.scroll.info",
+      "action.back",
+      "action.play",
+      "action.skip",
+      "action.switch",
+      "action.zoom.in",
+      "action.export",
     ]
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn info_hints_use_existing_translation_keys_in_display_order() {
+    assert_eq!(
+      RecordingListSpec::right_hint_keys(),
+      &[
+        "action.scroll.info",
+        "action.back",
+        "action.play",
+        "action.skip",
+        "action.switch",
+        "action.zoom.in",
+        "action.export",
+      ]
+    );
+    assert!(
+      RecordingListSpec::action_map()
+        .iter()
+        .any(|entry| entry.action == "recording_list.export" && entry.keys == [["1"]])
+    );
   }
 }

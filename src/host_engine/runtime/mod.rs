@@ -1389,7 +1389,15 @@ fn toggle_recording(services: &mut EngineServices) {
         );
         return;
       };
-      if services.recording.start(frame, &services.storage) {
+      let frame_rate = services
+        .storage
+        .display_settings_profile()
+        .game_list_fps
+        .target_fps();
+      if services
+        .recording
+        .start(frame, frame_rate, &services.storage)
+      {
         services.log.info(LogSource::Runtime, "Recording started");
       }
     }
@@ -1662,7 +1670,7 @@ fn apply_screenshot_capture_command(
   }
 }
 
-fn copy_screenshot_text(
+pub(super) fn copy_screenshot_text(
   services: &mut EngineServices,
   frame: &crate::host_engine::services::ComposedFrame,
   rect: crate::host_engine::services::ScreenshotRect,
@@ -1678,7 +1686,7 @@ fn copy_screenshot_text(
   copied
 }
 
-fn copy_screenshot_rich_text(
+pub(super) fn copy_screenshot_rich_text(
   services: &mut EngineServices,
   frame: &crate::host_engine::services::ComposedFrame,
   rect: crate::host_engine::services::ScreenshotRect,
@@ -1694,7 +1702,7 @@ fn copy_screenshot_rich_text(
   copied
 }
 
-fn submit_screenshot_png(
+pub(super) fn submit_screenshot_png(
   services: &mut EngineServices,
   frame: crate::host_engine::services::ComposedFrame,
   rect: crate::host_engine::services::ScreenshotRect,

@@ -53,7 +53,7 @@ impl I18nService {
 
     let loaded = self.load_namespaces_for(storage, log, language_code);
     if !loaded.is_empty() {
-      self.fill_missing_namespaces(storage, log, &loaded);
+      self.fill_missing_runtime_texts(storage, log, language_code);
       self.set_current_language(language_code);
       return;
     }
@@ -62,7 +62,7 @@ impl I18nService {
     if language_code != fallback {
       let loaded = self.load_namespaces_for(storage, log, fallback);
       if !loaded.is_empty() {
-        self.fill_missing_namespaces(storage, log, &loaded);
+        self.fill_missing_runtime_texts(storage, log, fallback);
         self.set_current_language(fallback);
         return;
       }
@@ -113,27 +113,24 @@ impl I18nService {
     loaded
   }
 
-  fn fill_missing_namespaces(
+  fn fill_missing_runtime_texts(
     &mut self,
     storage: &StorageService,
     log: &mut LogService,
-    loaded: &HashSet<&'static str>,
+    language_code: &str,
   ) {
     let fallback = storage.default_language_code();
 
     for &namespace in RUNTIME_NAMESPACES {
-      if loaded.contains(namespace) {
-        continue;
-      }
-
-      if let Some(texts) = Self::load_namespace_file(storage, log, fallback, namespace) {
-        self.insert_runtime_namespace(namespace, texts);
-        continue;
+      if language_code != fallback
+        && let Some(texts) = Self::load_namespace_file(storage, log, fallback, namespace)
+      {
+        self.merge_runtime_namespace(namespace, texts);
       }
 
       let mut map = HashMap::new();
       if embedded::fill_embedded_namespace(namespace, &mut map) {
-        self.insert_runtime_namespace(namespace, map);
+        self.merge_runtime_namespace(namespace, map);
       }
     }
   }

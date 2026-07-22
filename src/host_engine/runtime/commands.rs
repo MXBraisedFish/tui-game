@@ -139,7 +139,11 @@ pub(super) fn apply_screenshot_recording_command(
     ScreenshotRecordingCommand::OpenScreenshotList => {
       let path = services.storage.screenshot_cache_dir_path();
       let ui = settings_ui.screenshot_recording_mut().screenshot_list_mut();
-      ui.reset_search(&mut services.text_input);
+      ui.reset_for_entry(
+        &mut services.text_input,
+        &services.scroll_box,
+        &services.layout,
+      );
       if let Err(error) = ui.reload(&path) {
         services.log.error(
           LogSource::Ui,
@@ -154,7 +158,11 @@ pub(super) fn apply_screenshot_recording_command(
     ScreenshotRecordingCommand::OpenRecordingList => {
       let path = services.storage.recording_cache_dir_path();
       let ui = settings_ui.screenshot_recording_mut().recording_list_mut();
-      ui.reset_search(&mut services.text_input);
+      ui.reset_for_entry(
+        &mut services.text_input,
+        &services.scroll_box,
+        &services.layout,
+      );
       if let Err(error) = ui.reload(&path) {
         services.log.error(
           LogSource::Ui,
@@ -204,6 +212,19 @@ pub(super) fn apply_screenshot_list_command(
         );
       }
     }
+    ScreenshotListCommand::CopyScreenshot { frame, rect, rich } => {
+      if rich {
+        super::copy_screenshot_rich_text(services, &frame, rect);
+      } else {
+        super::copy_screenshot_text(services, &frame, rect);
+      }
+    }
+    ScreenshotListCommand::SaveScreenshot { frame, rect, copy } => {
+      if copy {
+        super::copy_screenshot_text(services, &frame, rect);
+      }
+      super::submit_screenshot_png(services, frame, rect);
+    }
   }
 }
 
@@ -245,6 +266,7 @@ pub(super) fn apply_recording_list_command(
         );
       }
     }
+    RecordingListCommand::CopyScreenshot { .. } | RecordingListCommand::SaveScreenshot { .. } => {}
   }
 }
 

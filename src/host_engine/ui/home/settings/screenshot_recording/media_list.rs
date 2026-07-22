@@ -2,6 +2,8 @@ use std::{
   fs, io,
   marker::PhantomData,
   path::{Path, PathBuf},
+  sync::mpsc::{self, Receiver},
+  thread,
   time::{Duration, SystemTime},
 };
 
@@ -9,13 +11,13 @@ use serde_json::Value;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::host_engine::services::{
-  ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
-  HitAreaOptions, HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Overflow,
-  Rect, RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
-  ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy,
-  ScrollbarVisibility, TerminalColor, TextColor, TextInputEvent, TextInputId, TextInputMode,
-  TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent, UiObjectPool,
-  UiObjectPoolOwner,
+  ActionMapEntry, BorderStyle, CanvasCell, CanvasService, ComposedCell, ComposedFrame,
+  DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, I18nService, KeyState,
+  LayoutService, MouseButton, Overflow, Rect, RenderService, RichTextParams, RichTextService,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, ScreenshotRect, ScrollBoxId, ScrollBoxOptions,
+  ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, TerminalColor,
+  TextColor, TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
+  TextInputService, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 const HINT_COLOR: TextColor = TextColor::Rgb {
@@ -37,10 +39,26 @@ pub enum MediaListCommand {
   BlurSearch,
   SelectList(i32),
   ScrollList(i32),
-  ScrollInfo { dx: i32, dy: i32 },
+  ScrollInfo {
+    dx: i32,
+    dy: i32,
+  },
   BeginRename,
   CancelRename,
-  CommitRename { old_name: String, new_name: String },
+  CommitRename {
+    old_name: String,
+    new_name: String,
+  },
+  CopyScreenshot {
+    frame: ComposedFrame,
+    rect: ScreenshotRect,
+    rich: bool,
+  },
+  SaveScreenshot {
+    frame: ComposedFrame,
+    rect: ScreenshotRect,
+    copy: bool,
+  },
 }
 
 fn display_timestamp(timestamp: &str) -> String {
@@ -56,7 +74,32 @@ fn display_timestamp(timestamp: &str) -> String {
       &timestamp[13..15]
     );
   }
+  if bytes.len() >= 19
+    && bytes.get(4) == Some(&b'-')
+    && bytes.get(7) == Some(&b'-')
+    && bytes.get(10) == Some(&b'T')
+  {
+    return format!(
+      "{}.{}.{} {}:{}:{}",
+      &timestamp[0..4],
+      &timestamp[5..7],
+      &timestamp[8..10],
+      &timestamp[11..13],
+      &timestamp[14..16],
+      &timestamp[17..19]
+    );
+  }
   timestamp.to_string()
+}
+
+fn screenshot_size_text(width: u16, height: u16) -> String {
+  format!("w-{width} x h-{height}")
+}
+
+fn frame_rate_text(frame_rate: Option<u16>) -> String {
+  frame_rate
+    .map(|value| format!("FPS {value}"))
+    .unwrap_or_else(|| "FPS --".to_string())
 }
 
 fn truncate_text(text: &str, width: u16) -> String {
@@ -97,9 +140,28 @@ enum SortField {
 #[derive(Clone, Debug)]
 struct MediaEntry {
   name: String,
+  path: PathBuf,
   modified: SystemTime,
   duration_us: u64,
+  info: Option<MediaInfo>,
   preview: Option<ScreenshotPreview>,
+  valid: Option<bool>,
+}
+
+struct MediaLoadResult {
+  path: PathBuf,
+  duration_us: u64,
+  info: Option<MediaInfo>,
+  preview: Option<ScreenshotPreview>,
+  valid: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MediaInfo {
+  width: u16,
+  height: u16,
+  timestamp: String,
+  frame_rate: Option<u16>,
 }
 
 #[derive(Clone, Debug)]
@@ -108,6 +170,28 @@ pub(super) struct ScreenshotPreview {
   height: u16,
   timestamp: String,
   cells: Vec<PreviewCell>,
+}
+
+impl ScreenshotPreview {
+  fn frame_and_rect(&self) -> (ComposedFrame, ScreenshotRect) {
+    let mut frame = ComposedFrame::new(self.width, self.height);
+    for cell in &self.cells {
+      frame.set(
+        cell.x,
+        cell.y,
+        ComposedCell::Text(CanvasCell::styled(cell.text.clone(), cell.style.clone())),
+      );
+    }
+    (
+      frame,
+      ScreenshotRect {
+        x: 0,
+        y: 0,
+        width: self.width,
+        height: self.height,
+      },
+    )
+  }
 }
 
 pub(super) fn load_screenshot_preview(path: &Path) -> Option<ScreenshotPreview> {
@@ -138,6 +222,16 @@ pub(super) fn load_screenshot_preview(path: &Path) -> Option<ScreenshotPreview> 
 
 fn json_u16(value: &Value) -> Option<u16> {
   u16::try_from(value.as_u64()?).ok()
+}
+
+fn recording_info(document: &Value) -> Option<MediaInfo> {
+  let canvas = document.get("canvas")?;
+  Some(MediaInfo {
+    width: json_u16(canvas.get("max_width")?)?,
+    height: json_u16(canvas.get("max_height")?)?,
+    timestamp: document.get("started_at")?.as_str()?.to_string(),
+    frame_rate: document.get("frame_rate").and_then(json_u16),
+  })
 }
 
 fn parse_style(value: &Value) -> TextStyle {
@@ -241,7 +335,39 @@ struct MediaListLayout {
   hint_lines: Vec<String>,
 }
 
-pub trait MediaListSpec {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct MediaInfoHeaderLayout {
+  name_x: u16,
+  name_width: u16,
+  frame_rate_x: Option<u16>,
+  size_x: u16,
+  time_x: u16,
+}
+
+fn media_info_header_layout(
+  panel: Rect,
+  frame_rate_width: Option<u16>,
+  size_width: u16,
+  timestamp_width: u16,
+) -> MediaInfoHeaderLayout {
+  let name_x = panel.x.saturating_add(1);
+  let time_x = panel
+    .x
+    .saturating_add(panel.width.saturating_sub(1 + timestamp_width));
+  let size_x = time_x.saturating_sub(2 + size_width);
+  let frame_rate_x = frame_rate_width.map(|width| size_x.saturating_sub(2 + width));
+  let metadata_x = frame_rate_x.unwrap_or(size_x);
+  let name_width = metadata_x.saturating_sub(name_x.saturating_add(2));
+  MediaInfoHeaderLayout {
+    name_x,
+    name_width,
+    frame_rate_x,
+    size_x,
+    time_x,
+  }
+}
+
+pub trait MediaListSpec: Send + Sync + 'static {
   const NS: &'static str;
   const SUPPORTS_DURATION: bool;
   fn action_map() -> Vec<ActionMapEntry>;
@@ -273,6 +399,12 @@ pub struct MediaListUi<S: MediaListSpec> {
   renaming: Option<String>,
   pending_notice: Option<MediaListNotice>,
   last_list_scroll_y: u16,
+  zoomed: bool,
+  directory: Option<PathBuf>,
+  scan_rx: Option<Receiver<io::Result<Vec<MediaEntry>>>>,
+  load_rx: Option<Receiver<MediaLoadResult>>,
+  loading_path: Option<PathBuf>,
+  reload_elapsed: Duration,
   marker: PhantomData<S>,
 }
 
@@ -377,6 +509,12 @@ impl<S: MediaListSpec> MediaListUi<S> {
       renaming: None,
       pending_notice: None,
       last_list_scroll_y: 0,
+      zoomed: false,
+      directory: None,
+      scan_rx: None,
+      load_rx: None,
+      loading_path: None,
+      reload_elapsed: Duration::ZERO,
       objects,
       runtime_objects: RuntimeObjectPool::new(),
       marker: PhantomData,
@@ -384,56 +522,127 @@ impl<S: MediaListSpec> MediaListUi<S> {
   }
 
   pub fn reload(&mut self, directory: &Path) -> io::Result<()> {
-    let selected = self
-      .filtered_entries()
-      .get(self.selected)
-      .map(|entry| entry.name.clone());
-    let mut entries = Vec::new();
-    for item in fs::read_dir(directory)? {
-      let item = item?;
-      let path = item.path();
-      if !item.file_type()?.is_file()
-        || path.extension().and_then(|value| value.to_str()) != Some("json")
-      {
-        continue;
-      }
-      let name = path
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default()
-        .to_string();
-      let metadata = item.metadata()?;
-      let duration_us = S::SUPPORTS_DURATION
-        .then(|| read_duration_us(&path))
-        .flatten()
-        .unwrap_or(0);
-      entries.push(MediaEntry {
-        name,
-        modified: metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
-        duration_us,
-        preview: S::load_preview(&path),
-      });
-    }
-    self.entries = entries;
-    self.search.clear();
-    self.selected = selected
-      .and_then(|name| {
-        self
-          .filtered_entries()
-          .iter()
-          .position(|entry| entry.name == name)
-      })
-      .unwrap_or(0);
-    self.active = ActivePanel::List;
+    self.directory = Some(directory.to_path_buf());
+    self.start_scan();
     Ok(())
   }
 
-  pub fn reset_search(&mut self, text_input: &mut TextInputService) {
+  fn start_scan(&mut self) {
+    let Some(directory) = self.directory.clone() else {
+      return;
+    };
+    if self.scan_rx.is_some() {
+      return;
+    }
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+      let result = (|| {
+        let mut entries = Vec::new();
+        for item in fs::read_dir(directory)? {
+          let item = item?;
+          let path = item.path();
+          if !item.file_type()?.is_file()
+            || path.extension().and_then(|v| v.to_str()) != Some("json")
+          {
+            continue;
+          }
+          let metadata = item.metadata()?;
+          entries.push(MediaEntry {
+            name: path
+              .file_stem()
+              .and_then(|v| v.to_str())
+              .unwrap_or_default()
+              .to_string(),
+            path,
+            modified: metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+            duration_us: 0,
+            info: None,
+            preview: None,
+            valid: None,
+          });
+        }
+        Ok(entries)
+      })();
+      let _ = tx.send(result);
+    });
+    self.scan_rx = Some(rx);
+  }
+
+  fn request_selected_load(&mut self) {
+    if self.load_rx.is_some() {
+      return;
+    }
+    let Some(entry) = self.filtered_entries().get(self.selected).copied() else {
+      return;
+    };
+    if entry.valid.is_some() {
+      return;
+    }
+    let path = entry.path.clone();
+    let worker_path = path.clone();
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+      let document = fs::read_to_string(&worker_path)
+        .ok()
+        .and_then(|v| serde_json::from_str::<Value>(&v).ok());
+      let preview = S::load_preview(&worker_path);
+      let valid = if S::SUPPORTS_DURATION {
+        document.as_ref().is_some_and(|v| {
+          v.get("schema_version").is_some()
+            && v.get("initial").is_some()
+            && v.get("events").is_some()
+        })
+      } else {
+        preview.is_some()
+      };
+      let duration_us = document
+        .as_ref()
+        .and_then(|v| v.get("duration_us"))
+        .and_then(|v| v.get("active"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+      let info = if S::SUPPORTS_DURATION {
+        document.as_ref().and_then(recording_info)
+      } else {
+        preview.as_ref().map(|preview| MediaInfo {
+          width: preview.width,
+          height: preview.height,
+          timestamp: preview.timestamp.clone(),
+          frame_rate: None,
+        })
+      };
+      let _ = tx.send(MediaLoadResult {
+        path: worker_path,
+        duration_us,
+        info,
+        preview,
+        valid,
+      });
+    });
+    self.loading_path = Some(path);
+    self.load_rx = Some(rx);
+  }
+
+  pub fn reset_for_entry(
+    &mut self,
+    text_input: &mut TextInputService,
+    scroll_box: &ScrollBoxService,
+    layout: &LayoutService,
+  ) {
     self.search.clear();
     self.renaming = None;
+    self.selected = 0;
+    self.active = ActivePanel::List;
+    self.ascending = true;
+    self.sort_field = SortField::Name;
+    self.last_list_scroll_y = 0;
+    self.zoomed = false;
+    self.pending_notice = None;
     let _ = text_input.clear(&mut self.objects, self.search_input);
     let _ = text_input.clear(&mut self.objects, self.rename_input);
     let _ = text_input.blur(&mut self.objects);
+    let _ = scroll_box.scroll_to(&mut self.objects, self.list_scroll, 0, 0, layout);
+    let _ = scroll_box.scroll_to(&mut self.objects, self.info_scroll, 0, 0, layout);
   }
 
   pub fn action_map() -> Vec<ActionMapEntry> {
@@ -489,6 +698,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
     }
     if let Some(entry) = self.entries.iter_mut().find(|entry| entry.name == old_name) {
       entry.name = new_name.to_string();
+      entry.path = new_path.clone();
       entry.modified = fs::metadata(&new_path)
         .and_then(|metadata| metadata.modified())
         .unwrap_or(entry.modified);
@@ -542,7 +752,52 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let _ = service.scroll_by(&mut self.objects, self.info_scroll, dx, dy, layout);
   }
 
-  pub fn update(&mut self, _dt: Duration, service: &ScrollBoxService, layout: &LayoutService) {
+  pub fn update(&mut self, dt: Duration, service: &ScrollBoxService, layout: &LayoutService) {
+    self.reload_elapsed += dt;
+    if self.reload_elapsed >= Duration::from_millis(500) {
+      self.reload_elapsed = Duration::ZERO;
+      self.start_scan();
+    }
+    if let Some(result) = self.scan_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
+      self.scan_rx = None;
+      if let Ok(mut scanned) = result {
+        let selected = self
+          .filtered_entries()
+          .get(self.selected)
+          .map(|v| v.name.clone());
+        for entry in &mut scanned {
+          if let Some(old) = self
+            .entries
+            .iter()
+            .find(|old| old.path == entry.path && old.modified == entry.modified)
+          {
+            entry.duration_us = old.duration_us;
+            entry.info = old.info.clone();
+            entry.preview = old.preview.clone();
+            entry.valid = old.valid;
+          }
+        }
+        self.entries = scanned;
+        self.selected = selected
+          .and_then(|name| self.filtered_entries().iter().position(|v| v.name == name))
+          .unwrap_or(0);
+      }
+    }
+    if let Some(result) = self.load_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
+      self.load_rx = None;
+      self.loading_path = None;
+      if let Some(entry) = self
+        .entries
+        .iter_mut()
+        .find(|entry| entry.path == result.path)
+      {
+        entry.duration_us = result.duration_us;
+        entry.info = result.info;
+        entry.preview = result.preview;
+        entry.valid = Some(result.valid);
+      }
+    }
+    self.request_selected_load();
     for event in service.drain_scroll_events(&mut self.objects) {
       let crate::host_engine::services::ScrollBoxEvent::Scrolled { id, y, .. } = event;
       if id != self.list_scroll || y == self.last_list_scroll_y {
@@ -623,7 +878,13 @@ impl<S: MediaListSpec> MediaListUi<S> {
       UiEvent::HitArea(HitAreaEvent::Press {
         button: MouseButton::Right,
         ..
-      }) => return Some(MediaListCommand::Back),
+      }) => {
+        if self.zoomed {
+          self.zoomed = false;
+          return None;
+        }
+        return Some(MediaListCommand::Back);
+      }
       _ => {}
     }
     let UiEvent::Action(event) = event else {
@@ -634,8 +895,8 @@ impl<S: MediaListSpec> MediaListUi<S> {
     }
     let prefix = S::NS;
     match event.action.strip_prefix(prefix).unwrap_or_default() {
-      ".back" => Some(MediaListCommand::Back),
-      ".switch" => {
+      ".back" if !self.zoomed => Some(MediaListCommand::Back),
+      ".switch" if !self.zoomed => {
         self.active = match self.active {
           ActivePanel::List => ActivePanel::Info,
           ActivePanel::Info => ActivePanel::List,
@@ -674,8 +935,35 @@ impl<S: MediaListSpec> MediaListUi<S> {
       ".modify" if self.active == ActivePanel::List && !self.filtered_entries().is_empty() => {
         Some(MediaListCommand::BeginRename)
       }
+      ".copy" if self.active == ActivePanel::Info => self.screenshot_command(false, false),
+      ".copy_rich_text" if self.active == ActivePanel::Info => self.screenshot_command(true, false),
+      ".save_image" if self.active == ActivePanel::Info => self.screenshot_command(false, true),
+      ".all" if self.active == ActivePanel::Info => self.screenshot_command(true, true),
+      ".order" | ".zoom"
+        if self.active == ActivePanel::Info && self.selected_preview().is_some() =>
+      {
+        self.zoomed = !self.zoomed;
+        None
+      }
       _ => None,
     }
+  }
+
+  fn screenshot_command(&self, flag: bool, save: bool) -> Option<MediaListCommand> {
+    let (frame, rect) = self.selected_preview()?.frame_and_rect();
+    Some(if save {
+      MediaListCommand::SaveScreenshot {
+        frame,
+        rect,
+        copy: flag,
+      }
+    } else {
+      MediaListCommand::CopyScreenshot {
+        frame,
+        rect,
+        rich: flag,
+      }
+    })
   }
 
   pub fn render(
@@ -690,6 +978,13 @@ impl<S: MediaListSpec> MediaListUi<S> {
   ) -> Option<(u16, u16)> {
     let pos = self.compute_layout(layout, i18n, text_input);
     self.draw_frames(render, canvas, i18n, &pos);
+
+    if self.zoomed {
+      hit_area.render_host(&mut self.objects, self.info_panel_area, pos.right, canvas);
+      self.draw_info(render, canvas, i18n, &pos);
+      self.draw_hints(render, canvas, layout, i18n, text_input, &pos);
+      return None;
+    }
 
     hit_area.render_host(&mut self.objects, self.list_panel_area, pos.left, canvas);
     hit_area.render_host(&mut self.objects, self.info_panel_area, pos.right, canvas);
@@ -707,7 +1002,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
     );
     self.draw_sort_bar(render, canvas, i18n, hit_area, &pos);
     self.draw_entries(render, canvas, layout, i18n, hit_area, scroll_box, &pos);
-    self.draw_info(render, canvas, &pos);
+    self.draw_info(render, canvas, i18n, &pos);
     self.draw_hints(render, canvas, layout, i18n, text_input, &pos);
     if self.renaming.is_some() {
       self.draw_rename_dialog(render, canvas, layout, i18n, text_input)
@@ -726,6 +1021,37 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let hint_lines = self.hint_lines(i18n, text_input, viewport.width);
     let hint_h = hint_lines.len().max(1) as u16;
     let content_h = viewport.height.saturating_sub(hint_h);
+    if self.zoomed {
+      return MediaListLayout {
+        left: Rect {
+          x: viewport.x,
+          y: viewport.y,
+          width: 0,
+          height: 0,
+        },
+        right: Rect {
+          x: viewport.x,
+          y: viewport.y,
+          width: viewport.width,
+          height: content_h,
+        },
+        search: Rect {
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+        },
+        sort_y: 0,
+        list: Rect {
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+        },
+        hint_y: viewport.y.saturating_add(content_h),
+        hint_lines,
+      };
+    }
     let left_w = viewport.width / 3;
     let left = Rect {
       x: viewport.x,
@@ -787,11 +1113,20 @@ impl<S: MediaListSpec> MediaListUi<S> {
     }
 
     let info = self.selected_preview();
-    let info_rect = Rect {
-      x: pos.right.x.saturating_add(1).saturating_sub(viewport.x),
-      y: pos.right.y.saturating_add(3).saturating_sub(viewport.y),
-      width: pos.right.width.saturating_sub(2),
-      height: pos.right.height.saturating_sub(4),
+    let info_rect = if self.zoomed {
+      Rect {
+        x: pos.right.x.saturating_sub(viewport.x),
+        y: pos.right.y.saturating_sub(viewport.y),
+        width: pos.right.width,
+        height: pos.right.height,
+      }
+    } else {
+      Rect {
+        x: pos.right.x.saturating_add(1).saturating_sub(viewport.x),
+        y: pos.right.y.saturating_add(3).saturating_sub(viewport.y),
+        width: pos.right.width.saturating_sub(2),
+        height: pos.right.height.saturating_sub(4),
+      }
     };
     let (content_width, content_height) = info
       .map(|preview| (preview.width, preview.height))
@@ -852,6 +1187,9 @@ impl<S: MediaListSpec> MediaListUi<S> {
     i18n: &I18nService,
     pos: &MediaListLayout,
   ) {
+    if self.zoomed {
+      return;
+    }
     for (rect, active) in [
       (pos.left, self.active == ActivePanel::List),
       (pos.right, self.active == ActivePanel::Info),
@@ -1085,38 +1423,73 @@ impl<S: MediaListSpec> MediaListUi<S> {
     &self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
+    i18n: &I18nService,
     pos: &MediaListLayout,
   ) {
-    let Some(preview) = self.selected_preview() else {
+    let selected = self.filtered_entries().get(self.selected).copied();
+    if selected.is_none() || selected.is_some_and(|entry| entry.valid == Some(false)) {
+      let text = i18n.get_runtime_text(S::NS, &format!("{}.no.info", S::NS));
+      render.draw_host_text(
+        canvas,
+        &DrawTextParams {
+          x: pos
+            .right
+            .x
+            .saturating_add(pos.right.width.saturating_sub(text.width() as u16) / 2),
+          y: pos.right.y.saturating_add(pos.right.height / 2),
+          text: format!("f%<fg:rgb(85,87,83)>{text}</fg>"),
+          max_width: Some(pos.right.width),
+          max_height: Some(1),
+          ..Default::default()
+        },
+      );
+      return;
+    }
+    if self.zoomed {
+      let Some(preview) = self.selected_preview() else {
+        return;
+      };
+      for cell in &preview.cells {
+        canvas.styled_text_in_scroll_box(
+          self.info_scroll,
+          cell.x,
+          cell.y,
+          &cell.text,
+          cell.style.clone(),
+        );
+      }
+      return;
+    }
+    let Some(selected) = selected else {
+      return;
+    };
+    let Some(info) = selected.info.as_ref() else {
       return;
     };
     let inner_width = pos.right.width.saturating_sub(2);
     if inner_width == 0 {
       return;
     }
-    let timestamp = display_timestamp(&preview.timestamp);
-    let size = format!("w{} xh {}", preview.width, preview.height);
+    let timestamp = display_timestamp(&info.timestamp);
+    let size = screenshot_size_text(info.width, info.height);
+    let frame_rate = S::SUPPORTS_DURATION.then(|| frame_rate_text(info.frame_rate));
     let timestamp_width = timestamp.width().min(inner_width as usize) as u16;
     let size_width = size.width().min(inner_width as usize) as u16;
-    let time_x = pos
-      .right
-      .x
-      .saturating_add(pos.right.width.saturating_sub(1 + timestamp_width));
-    let size_x = time_x.saturating_sub(1 + size_width);
-    let name_width = size_x.saturating_sub(pos.right.x.saturating_add(2));
-    let name = truncate_text(
-      &self
-        .filtered_entries()
-        .get(self.selected)
-        .map(|entry| entry.name.as_str())
-        .unwrap_or_default(),
-      name_width,
-    );
-    let fields: [(u16, &str, u16); 3] = [
-      (pos.right.x.saturating_add(1), name.as_str(), name_width),
-      (size_x, size.as_str(), size_width),
-      (time_x, timestamp.as_str(), timestamp_width),
-    ];
+    let frame_rate_width = frame_rate
+      .as_ref()
+      .map(|text| text.width().min(inner_width as usize) as u16);
+    let header = media_info_header_layout(pos.right, frame_rate_width, size_width, timestamp_width);
+    let name = truncate_text(&selected.name, header.name_width);
+    let mut fields = vec![(header.name_x, name.as_str(), header.name_width)];
+    if let (Some(x), Some(text), Some(width)) =
+      (header.frame_rate_x, frame_rate.as_deref(), frame_rate_width)
+    {
+      fields.push((x, text, width));
+    }
+    fields.extend([
+      (header.size_x, size.as_str(), size_width),
+      (header.time_x, timestamp.as_str(), timestamp_width),
+    ]);
     for (x, text, width) in fields {
       render.draw_host_text(
         canvas,
@@ -1130,14 +1503,16 @@ impl<S: MediaListSpec> MediaListUi<S> {
         },
       );
     }
-    for cell in &preview.cells {
-      canvas.styled_text_in_scroll_box(
-        self.info_scroll,
-        cell.x,
-        cell.y,
-        &cell.text,
-        cell.style.clone(),
-      );
+    if let Some(preview) = self.selected_preview() {
+      for cell in &preview.cells {
+        canvas.styled_text_in_scroll_box(
+          self.info_scroll,
+          cell.x,
+          cell.y,
+          &cell.text,
+          cell.style.clone(),
+        );
+      }
     }
   }
 
@@ -1172,7 +1547,17 @@ impl<S: MediaListSpec> MediaListUi<S> {
     text_input: &TextInputService,
     width: u16,
   ) -> Vec<String> {
-    let keys = if self.renaming.is_some() {
+    let zoom_keys = [
+      "action.scroll.info",
+      "action.copy",
+      "action.copy_rich_text",
+      "action.save_image",
+      "action.all",
+      "action.zoom.out",
+    ];
+    let keys = if self.zoomed {
+      &zoom_keys[..]
+    } else if self.renaming.is_some() {
       return vec![String::new()];
     } else if text_input.is_focused(&self.objects, self.search_input) {
       &["action.cancel", "action.confirm"][..]
@@ -1442,7 +1827,69 @@ fn read_duration_us(path: &Path) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-  use super::valid_media_name;
+  use super::*;
+  use crate::host_engine::services::{InputActionEvent, InputEventType};
+
+  struct TestSpec;
+
+  impl MediaListSpec for TestSpec {
+    const NS: &'static str = "test";
+    const SUPPORTS_DURATION: bool = false;
+
+    fn action_map() -> Vec<ActionMapEntry> {
+      actions(&[
+        ("test.order", "z"),
+        ("test.zoom", "z"),
+        ("test.back", "esc"),
+        ("test.switch", "tab"),
+        ("test.copy", "1"),
+      ])
+    }
+
+    fn left_hint_keys() -> &'static [&'static str] {
+      &[]
+    }
+
+    fn right_hint_keys() -> &'static [&'static str] {
+      &[]
+    }
+  }
+
+  fn action_event(action: &str) -> UiEvent {
+    UiEvent::Action(InputActionEvent {
+      event_type: InputEventType::Keyboard,
+      action: action.to_string(),
+      state: KeyState::Pressed,
+    })
+  }
+
+  fn ui_with_preview() -> MediaListUi<TestSpec> {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let mut ui = MediaListUi::init(&hit_area, &text_input, &scroll_box);
+    ui.entries.push(MediaEntry {
+      name: "capture".to_string(),
+      path: PathBuf::from("capture.json"),
+      modified: SystemTime::UNIX_EPOCH,
+      duration_us: 0,
+      info: Some(MediaInfo {
+        width: 8,
+        height: 1,
+        timestamp: "2026-07-14T22:23:57.641".to_string(),
+        frame_rate: None,
+      }),
+      preview: Some(ScreenshotPreview {
+        width: 8,
+        height: 1,
+        timestamp: "2026-07-14T22:23:57.641".to_string(),
+        cells: Vec::new(),
+      }),
+      valid: Some(true),
+    });
+    ui.active = ActivePanel::Info;
+    ui
+  }
 
   #[test]
   fn media_names_follow_cross_platform_file_rules() {
@@ -1454,5 +1901,202 @@ mod tests {
     ] {
       assert!(!valid_media_name(name), "expected invalid name: {name}");
     }
+  }
+
+  #[test]
+  fn screenshot_size_uses_explicit_width_and_height_labels() {
+    assert_eq!(screenshot_size_text(8, 1), "w-8 x h-1");
+  }
+
+  #[test]
+  fn screenshot_size_has_two_cells_of_spacing_on_both_sides() {
+    let size_width = screenshot_size_text(8, 1).width() as u16;
+    let timestamp_width = "2026.07.14 22:23:57".width() as u16;
+    let header = media_info_header_layout(
+      Rect {
+        x: 10,
+        y: 0,
+        width: 80,
+        height: 3,
+      },
+      None,
+      size_width,
+      timestamp_width,
+    );
+
+    assert_eq!(header.size_x - (header.name_x + header.name_width), 2);
+    assert_eq!(header.time_x - (header.size_x + size_width), 2);
+  }
+
+  #[test]
+  fn recording_header_separates_each_field_by_two_cells() {
+    let frame_rate_width = "FPS 60".width() as u16;
+    let size_width = screenshot_size_text(120, 30).width() as u16;
+    let timestamp_width = "2026.07.21 20:20:32".width() as u16;
+    let header = media_info_header_layout(
+      Rect {
+        x: 10,
+        y: 0,
+        width: 100,
+        height: 3,
+      },
+      Some(frame_rate_width),
+      size_width,
+      timestamp_width,
+    );
+
+    let frame_rate_x = header.frame_rate_x.expect("recording has an FPS field");
+    assert_eq!(frame_rate_x - (header.name_x + header.name_width), 2);
+    assert_eq!(header.size_x - (frame_rate_x + frame_rate_width), 2);
+    assert_eq!(header.time_x - (header.size_x + size_width), 2);
+  }
+
+  #[test]
+  fn recording_frame_rate_uses_the_requested_display_format() {
+    assert_eq!(frame_rate_text(Some(60)), "FPS 60");
+    assert_eq!(frame_rate_text(None), "FPS --");
+  }
+
+  #[test]
+  fn recording_info_reads_optional_frame_rate_and_keeps_timestamp() {
+    let current = serde_json::json!({
+      "started_at": "2026-07-21T20:20:32.895Z",
+      "frame_rate": 60,
+      "canvas": { "max_width": 120, "max_height": 30 }
+    });
+    let legacy = serde_json::json!({
+      "started_at": "2026-07-20T09:17:05.441Z",
+      "canvas": { "max_width": 80, "max_height": 24 }
+    });
+
+    assert_eq!(recording_info(&current).unwrap().frame_rate, Some(60));
+    assert_eq!(recording_info(&legacy).unwrap().frame_rate, None);
+    assert_eq!(
+      display_timestamp(&recording_info(&current).unwrap().timestamp),
+      "2026.07.21 20:20:32"
+    );
+  }
+
+  #[test]
+  fn shared_z_binding_toggles_zoom_from_the_info_panel() {
+    let mut ui = ui_with_preview();
+
+    assert!(ui.handle_event(&action_event("test.order")).is_none());
+    assert!(ui.zoomed);
+
+    assert!(ui.handle_event(&action_event("test.order")).is_none());
+    assert!(!ui.zoomed);
+  }
+
+  #[test]
+  fn zoom_mode_ignores_back_and_panel_switch_actions() {
+    let mut ui = ui_with_preview();
+    ui.zoomed = true;
+
+    assert!(ui.handle_event(&action_event("test.back")).is_none());
+    assert!(ui.handle_event(&action_event("test.switch")).is_none());
+    assert!(ui.zoomed);
+    assert_eq!(ui.active, ActivePanel::Info);
+  }
+
+  #[test]
+  fn entering_media_list_resets_child_view_state() {
+    let mut ui = ui_with_preview();
+    let mut text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let layout = LayoutService::new();
+    ui.zoomed = true;
+    ui.ascending = false;
+    ui.sort_field = SortField::Time;
+
+    ui.reset_for_entry(&mut text_input, &scroll_box, &layout);
+
+    assert_eq!(ui.active, ActivePanel::List);
+    assert!(!ui.zoomed);
+    assert!(ui.ascending);
+    assert_eq!(ui.sort_field, SortField::Name);
+    assert_eq!(ui.selected, 0);
+    assert_eq!(
+      scroll_box.scroll_position(&ui.objects, ui.list_scroll),
+      Some((0, 0))
+    );
+    assert_eq!(
+      scroll_box.scroll_position(&ui.objects, ui.info_scroll),
+      Some((0, 0))
+    );
+  }
+
+  #[test]
+  fn zoom_mode_uses_the_full_base_area_above_its_dynamic_hints() {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let i18n = I18nService::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(120, 50);
+    layout.set_developer_viewport(Rect {
+      x: 4,
+      y: 2,
+      width: 100,
+      height: 40,
+    });
+    let mut ui = MediaListUi::<TestSpec>::init(&hit_area, &text_input, &scroll_box);
+    ui.entries.push(MediaEntry {
+      name: "capture".to_string(),
+      path: PathBuf::from("capture.json"),
+      modified: SystemTime::UNIX_EPOCH,
+      duration_us: 0,
+      info: Some(MediaInfo {
+        width: 100,
+        height: 50,
+        timestamp: String::new(),
+        frame_rate: None,
+      }),
+      preview: Some(ScreenshotPreview {
+        width: 100,
+        height: 50,
+        timestamp: String::new(),
+        cells: Vec::new(),
+      }),
+      valid: Some(true),
+    });
+    ui.zoomed = true;
+
+    let pos = ui.compute_layout(&layout, &i18n, &text_input);
+    ui.prepare_scroll_box(&scroll_box, &layout, &pos);
+
+    assert_eq!((pos.right.x, pos.right.y, pos.right.width), (4, 2, 100));
+    assert_eq!(
+      pos.right.height + pos.hint_lines.len() as u16,
+      layout.developer_height()
+    );
+    assert_eq!(
+      scroll_box.rect(&ui.objects, ui.info_scroll),
+      Some(Rect {
+        x: 0,
+        y: 0,
+        width: pos.right.width,
+        height: pos.right.height,
+      })
+    );
+    assert_eq!(
+      scroll_box.max_scroll_x(&ui.objects, ui.info_scroll, &layout),
+      Some(1)
+    );
+  }
+
+  #[test]
+  fn copy_action_rebuilds_the_cached_screenshot_frame() {
+    let mut ui = ui_with_preview();
+
+    let Some(MediaListCommand::CopyScreenshot { frame, rect, rich }) =
+      ui.handle_event(&action_event("test.copy"))
+    else {
+      panic!("copy action should emit a screenshot copy command");
+    };
+
+    assert!(!rich);
+    assert_eq!((frame.width(), frame.height()), (8, 1));
+    assert_eq!((rect.width, rect.height), (8, 1));
   }
 }

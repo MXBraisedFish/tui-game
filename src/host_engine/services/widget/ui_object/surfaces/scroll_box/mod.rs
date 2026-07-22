@@ -776,10 +776,11 @@ pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size
   let mut h = rect.height;
   // Inside 和 ReserveSpace 都需要缩减 viewport，Overlay 不需要。
   if state.options.scrollbar_layout != ScrollbarLayout::Overlay {
-    if shows_vertical_scrollbar_raw(state, rect) {
+    let (vertical, horizontal) = resolved_scrollbar_visibility(state, rect);
+    if vertical {
       w = w.saturating_sub(1);
     }
-    if shows_horizontal_scrollbar_raw(state, rect) {
+    if horizontal {
       h = h.saturating_sub(1);
     }
   }
@@ -789,20 +790,56 @@ pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size
   }
 }
 
-/// 基于原始 clamped_rect 判断垂直滚动条是否应显示（不调用 effective_viewport）。
-fn shows_vertical_scrollbar_raw(state: &ScrollBoxState, rect: Rect) -> bool {
-  match state.options.scrollbar.vertical {
-    ScrollbarVisibility::Always => rect.height > 0,
-    ScrollbarVisibility::Auto => state.options.content_height > rect.height,
-    ScrollbarVisibility::Never => false,
+fn resolved_scrollbar_visibility(state: &ScrollBoxState, rect: Rect) -> (bool, bool) {
+  let vertical_policy = state.options.scrollbar.vertical;
+  let horizontal_policy = state.options.scrollbar.horizontal;
+  let mut vertical = scrollbar_visible(
+    vertical_policy,
+    state.options.content_height,
+    rect.height,
+    rect.height,
+  );
+  let mut horizontal = scrollbar_visible(
+    horizontal_policy,
+    state.options.content_width,
+    rect.width,
+    rect.width,
+  );
+
+  if state.options.scrollbar_layout == ScrollbarLayout::Overlay {
+    return (vertical, horizontal);
+  }
+
+  loop {
+    let next_vertical = scrollbar_visible(
+      vertical_policy,
+      state.options.content_height,
+      rect.height.saturating_sub(u16::from(horizontal)),
+      rect.height,
+    );
+    let next_horizontal = scrollbar_visible(
+      horizontal_policy,
+      state.options.content_width,
+      rect.width.saturating_sub(u16::from(vertical)),
+      rect.width,
+    );
+    if next_vertical == vertical && next_horizontal == horizontal {
+      return (vertical, horizontal);
+    }
+    vertical = next_vertical;
+    horizontal = next_horizontal;
   }
 }
 
-/// 基于原始 clamped_rect 判断水平滚动条是否应显示（不调用 effective_viewport）。
-fn shows_horizontal_scrollbar_raw(state: &ScrollBoxState, rect: Rect) -> bool {
-  match state.options.scrollbar.horizontal {
-    ScrollbarVisibility::Always => rect.width > 0,
-    ScrollbarVisibility::Auto => state.options.content_width > rect.width,
+fn scrollbar_visible(
+  policy: ScrollbarVisibility,
+  content: u16,
+  available: u16,
+  axis_extent: u16,
+) -> bool {
+  match policy {
+    ScrollbarVisibility::Always => axis_extent > 0,
+    ScrollbarVisibility::Auto => content > available,
     ScrollbarVisibility::Never => false,
   }
 }
@@ -810,13 +847,13 @@ fn shows_horizontal_scrollbar_raw(state: &ScrollBoxState, rect: Rect) -> bool {
 /// 垂直滚动条是否应显示。
 pub(crate) fn shows_vertical_scrollbar(state: &ScrollBoxState, viewport: Size) -> bool {
   let rect = clamp_rect(state.options.rect, viewport);
-  shows_vertical_scrollbar_raw(state, rect)
+  resolved_scrollbar_visibility(state, rect).0
 }
 
 /// 水平滚动条是否应显示。
 pub(crate) fn shows_horizontal_scrollbar(state: &ScrollBoxState, viewport: Size) -> bool {
   let rect = clamp_rect(state.options.rect, viewport);
-  shows_horizontal_scrollbar_raw(state, rect)
+  resolved_scrollbar_visibility(state, rect).1
 }
 
 pub(crate) fn max_scroll_x(state: &ScrollBoxState, viewport: Size) -> u16 {
@@ -1529,6 +1566,122 @@ mod tests {
   }
 
   #[test]
+  fn vertical_auto_scrollbar_can_require_horizontal_scrollbar() {
+    let state = ScrollBoxState {
+      options: ScrollBoxOptions {
+        rect: Rect {
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 5,
+        },
+        content_width: 10,
+        content_height: 6,
+        scrollbar_layout: ScrollbarLayout::Inside,
+        scrollbar: ScrollbarPolicy {
+          vertical: ScrollbarVisibility::Auto,
+          horizontal: ScrollbarVisibility::Auto,
+        },
+        ..Default::default()
+      },
+      scroll_x: 0,
+      scroll_y: 0,
+    };
+    let viewport = Size {
+      width: 10,
+      height: 5,
+    };
+
+    assert!(shows_vertical_scrollbar(&state, viewport));
+    assert!(shows_horizontal_scrollbar(&state, viewport));
+    assert_eq!(
+      effective_viewport(&state, viewport),
+      Size {
+        width: 9,
+        height: 4
+      }
+    );
+    assert_eq!(max_scroll_x(&state, viewport), 1);
+  }
+
+  #[test]
+  fn horizontal_auto_scrollbar_can_require_vertical_scrollbar() {
+    let state = ScrollBoxState {
+      options: ScrollBoxOptions {
+        rect: Rect {
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 5,
+        },
+        content_width: 11,
+        content_height: 5,
+        scrollbar_layout: ScrollbarLayout::Inside,
+        scrollbar: ScrollbarPolicy {
+          vertical: ScrollbarVisibility::Auto,
+          horizontal: ScrollbarVisibility::Auto,
+        },
+        ..Default::default()
+      },
+      scroll_x: 0,
+      scroll_y: 0,
+    };
+    let viewport = Size {
+      width: 10,
+      height: 5,
+    };
+
+    assert!(shows_vertical_scrollbar(&state, viewport));
+    assert!(shows_horizontal_scrollbar(&state, viewport));
+    assert_eq!(
+      effective_viewport(&state, viewport),
+      Size {
+        width: 9,
+        height: 4
+      }
+    );
+    assert_eq!(max_scroll_y(&state, viewport), 1);
+  }
+
+  #[test]
+  fn overlay_scrollbars_do_not_require_each_other() {
+    let state = ScrollBoxState {
+      options: ScrollBoxOptions {
+        rect: Rect {
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 5,
+        },
+        content_width: 10,
+        content_height: 6,
+        scrollbar_layout: ScrollbarLayout::Overlay,
+        scrollbar: ScrollbarPolicy {
+          vertical: ScrollbarVisibility::Auto,
+          horizontal: ScrollbarVisibility::Auto,
+        },
+        ..Default::default()
+      },
+      scroll_x: 0,
+      scroll_y: 0,
+    };
+    let viewport = Size {
+      width: 10,
+      height: 5,
+    };
+
+    assert!(shows_vertical_scrollbar(&state, viewport));
+    assert!(!shows_horizontal_scrollbar(&state, viewport));
+    assert_eq!(
+      effective_viewport(&state, viewport),
+      Size {
+        width: 10,
+        height: 5
+      }
+    );
+  }
+
+  #[test]
   fn viewport_and_visible_content_queries_use_distinct_sizes() {
     let service = ScrollBoxService::new();
     let mut pool = UiObjectPool::new();
@@ -1644,9 +1797,11 @@ mod tests {
       width: 20,
       height: 15,
     };
-    // content_height=5 == rect.height=5 → 垂直滚动条不显示
-    // content_width=20 > rect.width=10 → 水平滚动条显示 → 高度减 1，宽度不变
-    assert_eq!(max_scroll_x(&state, viewport), 10); // 20 - 10
+    // content_width=20 > rect.width=10 → 水平滚动条显示，高度减 1
+    // content_height=5 > effective_height=4 → 垂直滚动条也显示，宽度减 1
+    assert!(shows_horizontal_scrollbar(&state, viewport));
+    assert!(shows_vertical_scrollbar(&state, viewport));
+    assert_eq!(max_scroll_x(&state, viewport), 11); // 20 - 9
   }
 
   #[test]

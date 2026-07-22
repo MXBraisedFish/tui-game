@@ -13,7 +13,7 @@ use crate::host_engine::services::{
   TaskId, TerminalColor, TextColor,
 };
 
-const RECORDING_SCHEMA_VERSION: u32 = 1;
+const RECORDING_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RecordingState {
@@ -54,6 +54,7 @@ pub struct RecordingService {
 
 struct RecordingSession {
   started_at: String,
+  frame_rate: Option<u16>,
   started_instant: Instant,
   active_before_run: Duration,
   run_started: Instant,
@@ -73,6 +74,8 @@ struct RecordingDocument {
   schema_version: u32,
   started_at: String,
   finished_at: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  frame_rate: Option<u16>,
   canvas: RecordedCanvas,
   duration_us: RecordedDurations,
   palette: Vec<RecordedCell>,
@@ -178,7 +181,12 @@ impl RecordingService {
     self.state == RecordingState::Paused
   }
 
-  pub fn start(&mut self, initial: ComposedFrame, storage: &StorageService) -> bool {
+  pub fn start(
+    &mut self,
+    initial: ComposedFrame,
+    frame_rate: Option<u16>,
+    storage: &StorageService,
+  ) -> bool {
     if self.state != RecordingState::Stopped || initial.width() == 0 || initial.height() == 0 {
       return false;
     }
@@ -189,6 +197,7 @@ impl RecordingService {
     let recorded_initial = encode_initial(&initial, &mut palette);
     self.session = Some(RecordingSession {
       started_at,
+      frame_rate,
       started_instant: now,
       active_before_run: Duration::ZERO,
       run_started: now,
@@ -264,6 +273,7 @@ impl RecordingService {
       schema_version: RECORDING_SCHEMA_VERSION,
       started_at: session.started_at,
       finished_at: Local::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+      frame_rate: session.frame_rate,
       canvas: RecordedCanvas {
         max_width: session.max_width,
         max_height: session.max_height,
@@ -607,5 +617,41 @@ mod tests {
       2
     );
     assert!(palette[2].continuation);
+  }
+
+  #[test]
+  fn document_keeps_frame_rate_and_event_timing() {
+    let document = RecordingDocument {
+      schema_version: RECORDING_SCHEMA_VERSION,
+      started_at: "2026-07-21T20:20:32.895Z".to_string(),
+      finished_at: "2026-07-21T20:20:34.895Z".to_string(),
+      frame_rate: Some(60),
+      canvas: RecordedCanvas {
+        max_width: 120,
+        max_height: 30,
+      },
+      duration_us: RecordedDurations {
+        active: 2_000_000,
+        paused: 0,
+        wall: 2_000_000,
+      },
+      palette: vec![RecordedCell::empty()],
+      initial: RecordedInitialFrame {
+        width: 120,
+        height: 30,
+        rows: Vec::new(),
+      },
+      events: vec![RecordedFrameEvent {
+        time_us: 16_667,
+        size: [120, 30],
+        changes: Vec::new(),
+      }],
+    };
+
+    let value = serde_json::to_value(document).unwrap();
+    assert_eq!(value["schema_version"], 2);
+    assert_eq!(value["frame_rate"], 60);
+    assert_eq!(value["duration_us"]["active"], 2_000_000);
+    assert_eq!(value["events"][0]["time_us"], 16_667);
   }
 }
