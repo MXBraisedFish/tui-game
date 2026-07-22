@@ -18,6 +18,7 @@ mod lua;
 mod network;
 mod overlay;
 mod package;
+mod popup;
 mod random;
 mod recording;
 mod render;
@@ -77,6 +78,7 @@ pub use overlay::OverlayService;
 pub use package::{
   PackageAsset, PackageEvent, PackageListEntry, PackageService, PackageSource, PackageType,
 };
+pub use popup::{PopupDismissEvent, PopupRequest, PopupService, PopupView};
 pub use random::RandomService;
 pub use recording::{
   RecordingAsyncEvent, RecordingPlayback, RecordingPlaybackMetadata, RecordingService,
@@ -90,11 +92,11 @@ pub use rich_text::{
 };
 pub use screenshot::{ScreenshotAsyncEvent, ScreenshotRect, ScreenshotService, ScreenshotTask};
 pub use storage::{
-  DisplayFpsLimit, DisplayLogoMode, DisplayOrderMode, DisplaySettingsProfile, DisplaySourceMode,
-  GamePackageState, PackageDefaultState, PackageStateProfile, RecordingExportFrameRate,
-  RecordingExportQuality, RecordingFrameRate, RecordingPixelScale, RecordingProfile,
-  SafeModeDefault, ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile,
-  StorageService,
+  AutoRecordingMode, AutoSplitDuration, DisplayFpsLimit, DisplayLogoMode, DisplayOrderMode,
+  DisplaySettingsProfile, DisplaySourceMode, GamePackageState, PackageDefaultState,
+  PackageStateProfile, RecordingExportFrameRate, RecordingExportQuality, RecordingFrameRate,
+  RecordingPixelScale, RecordingPopupMode, RecordingProfile, SafeModeDefault,
+  ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile, StorageService,
 };
 pub use terminal::TerminalService;
 pub use text_layout::DrawTextParams;
@@ -135,6 +137,7 @@ pub struct EngineServices {
   pub recording: RecordingService,
   pub video: VideoService,
   pub package: PackageService,
+  pub popup: PopupService,
   pub clipboard: ClipboardService,
   pub runtime_objects: RuntimeObjectPool,
   pub time: TimeService,
@@ -202,6 +205,7 @@ impl EngineServices {
       slice: SliceService::new(),
       text_input: TextInputService::new(),
       package: PackageService::new(),
+      popup: PopupService::new(),
       input: InputService::new(),
       input_method: InputMethodService::new(),
       ui: UiService::new(),

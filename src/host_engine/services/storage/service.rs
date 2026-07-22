@@ -1,4 +1,5 @@
 use std::{
+  cell::Cell,
   io,
   path::{Path, PathBuf},
 };
@@ -12,6 +13,7 @@ use crate::host_engine::services::{LogService, LogSource};
 pub struct StorageService {
   root_dir: PathBuf,
   pub(super) display_settings: DisplaySettingsProfile,
+  pub(super) recording_profile_revision: Cell<u64>,
 }
 
 impl StorageService {
@@ -21,6 +23,7 @@ impl StorageService {
     let mut service = Self {
       root_dir,
       display_settings: DisplaySettingsProfile::default(),
+      recording_profile_revision: Cell::new(0),
     };
 
     ensure_storage_layout(&service, log);
@@ -167,6 +170,7 @@ impl StorageService {
     Self {
       root_dir,
       display_settings: DisplaySettingsProfile::default(),
+      recording_profile_revision: Cell::new(0),
     }
   }
 }

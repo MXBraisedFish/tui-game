@@ -191,6 +191,12 @@ pub(super) fn route_render(
       .screenshot_settings_mut()
       .prepare_surfaces(&services.scroll_box, &services.layout, &services.i18n);
   }
+  if world.state.current_ui_kind() == Some(UiNodeKind::RecordingSettings) {
+    settings_ui
+      .screenshot_recording_mut()
+      .recording_settings_mut()
+      .prepare_surfaces(&services.scroll_box, &services.layout, &services.i18n);
+  }
   if world.state.current_ui_kind() == Some(UiNodeKind::ScreenshotList) {
     settings_ui
       .screenshot_recording_mut()
@@ -299,6 +305,20 @@ pub(super) fn route_render(
       input_cursor = settings_ui
         .screenshot_recording_mut()
         .screenshot_settings_mut()
+        .render(
+          &mut services.render,
+          &mut services.canvas,
+          &services.layout,
+          &services.i18n,
+          &services.hit_area,
+          &services.text_input,
+          &services.scroll_box,
+        );
+    }
+    Some(UiNodeKind::RecordingSettings) => {
+      input_cursor = settings_ui
+        .screenshot_recording_mut()
+        .recording_settings_mut()
         .render(
           &mut services.render,
           &mut services.canvas,

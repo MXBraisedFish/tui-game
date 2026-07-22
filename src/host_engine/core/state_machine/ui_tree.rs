@@ -23,6 +23,7 @@ pub enum UiNodeKind {
   ScreensaverList,
   ScreenshotRecording,
   ScreenshotSettings,
+  RecordingSettings,
   ScreenshotList,
   RecordingList,
   SecuritySettings,
@@ -108,6 +109,14 @@ impl UiNodeState {
   pub fn screenshot_settings() -> Self {
     Self {
       kind: UiNodeKind::ScreenshotSettings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn recording_settings() -> Self {
+    Self {
+      kind: UiNodeKind::RecordingSettings,
       logic: UiNodeLogicState,
       render: UiNodeRenderState,
     }

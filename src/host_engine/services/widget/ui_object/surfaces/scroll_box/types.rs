@@ -22,7 +22,7 @@ pub enum ScrollbarVisibility {
 /// 滚动条占位策略。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScrollbarLayout {
-  /// 滚动条覆盖内容，不改变 content viewport 宽度（内容最右列被遮挡）。
+  /// 滚动条绘制在 viewport 内；其占据的格子不计入内容可视区域。
   Overlay,
   /// 滚动条占用一列/行，绘制在 viewport 外部，内容可视区域减少 1。
   ReserveSpace,

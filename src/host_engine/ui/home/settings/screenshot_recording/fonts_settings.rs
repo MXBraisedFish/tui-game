@@ -27,6 +27,8 @@ enum FontEditMode {
 }
 
 pub struct FontsSettingsUi {
+  content_namespace: &'static str,
+  content_prefix: &'static str,
   scroll: ScrollBoxId,
   input: TextInputId,
   fonts: Vec<String>,
@@ -43,6 +45,40 @@ impl FontsSettingsUi {
     hit_area: &HitAreaService,
     text_input: &TextInputService,
     scroll_box: &ScrollBoxService,
+  ) -> Self {
+    Self::create_with_text(
+      objects,
+      hit_area,
+      text_input,
+      scroll_box,
+      "fonts_settings",
+      "fonts_settings",
+    )
+  }
+
+  pub fn create_recording(
+    objects: &mut UiObjectPool,
+    hit_area: &HitAreaService,
+    text_input: &TextInputService,
+    scroll_box: &ScrollBoxService,
+  ) -> Self {
+    Self::create_with_text(
+      objects,
+      hit_area,
+      text_input,
+      scroll_box,
+      "recording_settings",
+      "recording_settings.fonts",
+    )
+  }
+
+  fn create_with_text(
+    objects: &mut UiObjectPool,
+    hit_area: &HitAreaService,
+    text_input: &TextInputService,
+    scroll_box: &ScrollBoxService,
+    content_namespace: &'static str,
+    content_prefix: &'static str,
   ) -> Self {
     let scroll = scroll_box
       .create(
@@ -71,6 +107,8 @@ impl FontsSettingsUi {
       },
     );
     Self {
+      content_namespace,
+      content_prefix,
       scroll,
       input,
       fonts: Vec::new(),
@@ -317,7 +355,7 @@ impl FontsSettingsUi {
     scroll_box: &ScrollBoxService,
   ) -> Option<(u16, u16)> {
     let viewport = layout.developer_viewport_rect();
-    let title = i18n.get_runtime_text(NS, "fonts_settings.title");
+    let title = self.content_text(i18n, "title");
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -353,7 +391,7 @@ impl FontsSettingsUi {
     );
 
     if self.fonts.is_empty() {
-      let no = i18n.get_runtime_text(NS, "fonts_settings.no");
+      let no = self.content_text(i18n, "no");
       render.draw_host_text(
         canvas,
         &DrawTextParams {
@@ -451,7 +489,7 @@ impl FontsSettingsUi {
     text_input: &TextInputService,
   ) -> Option<(u16, u16)> {
     let viewport = layout.developer_viewport_rect();
-    let hint = i18n.get_runtime_text(NS, "fonts_settings.hint");
+    let hint = self.content_text(i18n, "hint");
     let lines: Vec<_> = hint.lines().collect();
     let actions = format!(
       "{}  {}",
@@ -459,7 +497,7 @@ impl FontsSettingsUi {
       i18n.get_runtime_text(NS, "fonts_settings.action.confirm")
     );
     let params = RichTextParams::from_action_map(&Self::action_map(), "fonts_settings.");
-    let placeholder = i18n.get_runtime_text(NS, "fonts_settings.placeholder");
+    let placeholder = self.content_text(i18n, "placeholder");
     let max_line = lines
       .iter()
       .map(|line| layout.get_text_width(line, None))
@@ -592,6 +630,13 @@ impl FontsSettingsUi {
     .map(|key| i18n.get_runtime_text(NS, key))
     .collect::<Vec<_>>()
     .join("  ")
+  }
+
+  fn content_text(&self, i18n: &I18nService, suffix: &str) -> String {
+    i18n.get_runtime_text(
+      self.content_namespace,
+      &format!("{}.{}", self.content_prefix, suffix),
+    )
   }
 
   fn hint_lines(&self, i18n: &I18nService, width: u16) -> Vec<String> {

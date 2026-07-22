@@ -1,0 +1,60 @@
+{
+  "recording_settings.title": "录屏设置",
+  "recording_settings.fonts": "自定义录屏导出字体",
+  "recording_settings.auto_recording": "自动录制",
+  "recording_settings.popup": "录制状态提示弹窗",
+  "recording_settings.auto_split": "录制自动分段",
+  "recording_settings.recording_fps": "录制帧率",
+  "recording_settings.video_resolution": "导出录制分辨率",
+  "recording_settings.video_fps": "导出录制帧率",
+  "recording_settings.video_codec": "导出录屏编码",
+  "recording_settings.video_bitrate": "导出录屏码率",
+  "recording_settings.video_format": "导出录屏格式",
+
+  "recording_settings.popup.no": "关闭",
+  "recording_settings.popup.all": "全部",
+  "recording_settings.popup.only.split": "仅分段",
+  "recording_settings.popup.only.state": "仅状态",
+  "recording_settings.popup.only.start_stop": "仅开始和停止",
+
+  "recording_settings.recording_fps.30": "30",
+  "recording_settings.recording_fps.60": "60",
+  "recording_settings.recording_fps.120": "120",
+
+  "recording_settings.auto_recording.nope": "关闭",
+  "recording_settings.auto_recording.host": "启动程序",
+  "recording_settings.auto_recording.game": "开始游戏",
+
+  "recording_settings.auto_split.nope": "关闭",
+  "recording_settings.auto_split.5": "5分钟",
+  "recording_settings.auto_split.10": "10分钟",
+
+  "recording_settings.video_fps.vidio": "录制帧率",
+  "recording_settings.video_fps.30": "30",
+  "recording_settings.video_fps.60": "60",
+  "recording_settings.video_fps.120": "120",
+
+  "recording_settings.video_resolution.half": "半倍",
+  "recording_settings.video_resolution.original": "原始",
+  "recording_settings.video_resolution.double": "双倍",
+  "recording_settings.video_bitrate.compact": "精简",
+  "recording_settings.video_bitrate.balanced": "平衡",
+  "recording_settings.video_bitrate.high": "高质量",
+
+  "recording_settings.fonts.title": "自定义录屏导出字体",
+  "recording_settings.fonts.no": "暂无自定义录屏字体",
+  "recording_settings.fonts.placeholder": "请输入路径或字体名称",
+  "recording_settings.fonts.hint": "支持添加多个字体，并按顺序依次用于录屏导出\n支持 TTF 和 OTF 字体格式\n请输入字体文件的绝对路径，或字体名称（从系统字体中查找）\n该列表仅用于录屏视频导出的文本渲染\n可导出预览图片，确认字体是否已正确应用",
+
+  "recording_settings.action.select": "{key:recording_settings.focus_up}/{key:recording_settings.focus_down} 选择",
+  "recording_settings.action.focus": "{key:recording_settings.focus_fonts}/{key:recording_settings.focus_auto_recording}/{key:recording_settings.focus_popup}/{key:recording_settings.focus_auto_split}/{key:recording_settings.focus_recording_fps}/{key:recording_settings.focus_video_resolution}/{key:recording_settings.focus_video_fps}/{key:recording_settings.focus_video_bitrate} 聚焦",
+  "recording_settings.action.back": "{key:recording_settings.back} 返回",
+  "recording_settings.action.confirm": "{key:recording_settings.confirm} 确认",
+  "recording_settings.action.switch": "{key:recording_settings.confirm} 切换",
+
+  "recording_settings.popup.auto_split": "录制已自动分段",
+  "recording_settings.popup.pause": "暂停录制",
+  "recording_settings.popup.start": "开始录制",
+  "recording_settings.popup.stop": "停止录制",
+  "recording_settings.popup.resume": "继续录制"
+}

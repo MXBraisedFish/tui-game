@@ -65,7 +65,7 @@ pub struct ScreenshotProfile {
   #[serde(default)]
   pub auto_exit: bool,
 
-  /// 截屏/录屏导出时按顺序尝试的自定义字体路径或系统字体名称。
+  /// 截屏导出时按顺序尝试的自定义字体路径或系统字体名称。
   #[serde(default)]
   pub fonts: Vec<String>,
 }
@@ -98,6 +98,100 @@ impl RecordingFrameRate {
       Self::Fps120 => 120,
     }
   }
+
+  pub fn next(self) -> Self {
+    match self {
+      Self::Fps30 => Self::Fps60,
+      Self::Fps60 => Self::Fps120,
+      Self::Fps120 => Self::Fps30,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingPopupMode {
+  Off,
+  #[default]
+  All,
+  SplitOnly,
+  StateOnly,
+  StartStopOnly,
+}
+
+impl RecordingPopupMode {
+  pub fn next(self) -> Self {
+    match self {
+      Self::Off => Self::All,
+      Self::All => Self::SplitOnly,
+      Self::SplitOnly => Self::StateOnly,
+      Self::StateOnly => Self::StartStopOnly,
+      Self::StartStopOnly => Self::Off,
+    }
+  }
+
+  pub fn shows_split(self) -> bool {
+    matches!(self, Self::All | Self::SplitOnly)
+  }
+
+  pub fn shows_pause_resume(self) -> bool {
+    matches!(self, Self::All | Self::StateOnly)
+  }
+
+  pub fn shows_start_stop(self) -> bool {
+    matches!(self, Self::All | Self::StartStopOnly)
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoRecordingMode {
+  #[default]
+  Off,
+  Host,
+  Game,
+}
+
+impl AutoRecordingMode {
+  pub fn next(self) -> Self {
+    match self {
+      Self::Off => Self::Host,
+      Self::Host => Self::Game,
+      Self::Game => Self::Off,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoSplitDuration {
+  Off,
+  Minutes5,
+  Minutes10,
+}
+
+impl AutoSplitDuration {
+  pub fn next(self) -> Self {
+    match self {
+      Self::Off => Self::Minutes5,
+      Self::Minutes5 => Self::Minutes10,
+      Self::Minutes10 => Self::Off,
+    }
+  }
+
+  pub fn duration(self) -> Option<std::time::Duration> {
+    match self {
+      Self::Off => None,
+      Self::Minutes5 => Some(std::time::Duration::from_secs(5 * 60)),
+      Self::Minutes10 => Some(std::time::Duration::from_secs(10 * 60)),
+    }
+  }
+}
+
+impl Default for AutoSplitDuration {
+  fn default() -> Self {
+    Self::Minutes10
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -119,6 +213,15 @@ impl RecordingExportFrameRate {
       Self::Fps120 => 120,
     }
   }
+
+  pub fn next(self) -> Self {
+    match self {
+      Self::Recorded => Self::Fps30,
+      Self::Fps30 => Self::Fps60,
+      Self::Fps60 => Self::Fps120,
+      Self::Fps120 => Self::Recorded,
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -128,6 +231,16 @@ pub enum RecordingExportQuality {
   #[default]
   Balanced,
   High,
+}
+
+impl RecordingExportQuality {
+  pub fn next(self) -> Self {
+    match self {
+      Self::Compact => Self::Balanced,
+      Self::Balanced => Self::High,
+      Self::High => Self::Compact,
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -147,10 +260,27 @@ impl RecordingPixelScale {
       Self::Double => (2, 1),
     }
   }
+
+  pub fn next(self) -> Self {
+    match self {
+      Self::Half => Self::Original,
+      Self::Original => Self::Double,
+      Self::Double => Self::Half,
+    }
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RecordingProfile {
+  /// 录屏导出时按顺序尝试的自定义字体路径或系统字体名称。
+  #[serde(default)]
+  pub fonts: Vec<String>,
+  #[serde(default, deserialize_with = "deserialize_or_default")]
+  pub popup: RecordingPopupMode,
+  #[serde(default, deserialize_with = "deserialize_or_default")]
+  pub auto_recording: AutoRecordingMode,
+  #[serde(default, deserialize_with = "deserialize_or_default")]
+  pub auto_split: AutoSplitDuration,
   #[serde(default, deserialize_with = "deserialize_or_default")]
   pub capture_frame_rate: RecordingFrameRate,
   #[serde(default, deserialize_with = "deserialize_or_default")]
@@ -232,6 +362,10 @@ impl RecordingProfile {
 impl Default for RecordingProfile {
   fn default() -> Self {
     Self {
+      fonts: Vec::new(),
+      popup: RecordingPopupMode::default(),
+      auto_recording: AutoRecordingMode::default(),
+      auto_split: AutoSplitDuration::default(),
       capture_frame_rate: RecordingFrameRate::default(),
       export_frame_rate: RecordingExportFrameRate::default(),
       legacy_frame_rate: default_legacy_frame_rate(),
@@ -793,6 +927,10 @@ impl StorageService {
     let mut repaired = profile.repair();
     let normalized = serde_json::to_value(&profile).ok()?;
     repaired |= [
+      "fonts",
+      "popup",
+      "auto_recording",
+      "auto_split",
       "capture_frame_rate",
       "export_frame_rate",
       "legacy_frame_rate",
@@ -812,6 +950,10 @@ impl StorageService {
     self.read_recording_profile(log).unwrap_or_default()
   }
 
+  pub fn recording_profile_revision(&self) -> u64 {
+    self.recording_profile_revision.get()
+  }
+
   pub fn write_recording_profile(
     &self,
     profile: &RecordingProfile,
@@ -824,7 +966,13 @@ impl StorageService {
       );
       io::Error::new(io::ErrorKind::InvalidData, error)
     })?;
-    fs::write(self.profile_recording_path(), json)
+    let result = fs::write(self.profile_recording_path(), json);
+    if result.is_ok() {
+      self
+        .recording_profile_revision
+        .set(self.recording_profile_revision.get().wrapping_add(1));
+    }
+    result
   }
 
   pub fn read_screenshot_profile_or_default(&self, log: &mut LogService) -> ScreenshotProfile {

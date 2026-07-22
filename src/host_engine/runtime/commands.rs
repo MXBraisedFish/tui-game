@@ -136,6 +136,23 @@ pub(super) fn apply_screenshot_recording_command(
         .state
         .enter_ui_node(UiNodeState::screenshot_settings());
     }
+    ScreenshotRecordingCommand::OpenRecordingSettings => {
+      let profile = services
+        .storage
+        .read_recording_profile_or_default(&mut services.log);
+      let _ = services
+        .storage
+        .write_recording_profile(&profile, &mut services.log);
+      *settings_ui
+        .screenshot_recording_mut()
+        .recording_settings_mut() = RecordingSettingsUi::init(
+        &services.hit_area,
+        &services.text_input,
+        &services.scroll_box,
+        profile,
+      );
+      world.state.enter_ui_node(UiNodeState::recording_settings());
+    }
     ScreenshotRecordingCommand::OpenScreenshotList => {
       let path = services.storage.screenshot_cache_dir_path();
       let ui = settings_ui.screenshot_recording_mut().screenshot_list_mut();
@@ -268,13 +285,10 @@ pub(super) fn apply_recording_list_command(
       }
     }
     RecordingListCommand::ExportRecording { path } => {
-      let fonts = services
-        .storage
-        .read_screenshot_profile_or_default(&mut services.log)
-        .fonts;
       let profile = services
         .storage
         .read_recording_profile_or_default(&mut services.log);
+      let fonts = profile.fonts.clone();
       if let Err(error) = services.video.submit_recording_export(
         &services.async_runtime,
         &services.storage,
@@ -294,6 +308,41 @@ pub(super) fn apply_recording_list_command(
       }
     }
     RecordingListCommand::CopyScreenshot { .. } | RecordingListCommand::SaveScreenshot { .. } => {}
+  }
+}
+
+pub(super) fn apply_recording_settings_command(
+  command: RecordingSettingsCommand,
+  settings_ui: &mut SettingsUi,
+  services: &mut EngineServices,
+  world: &mut RuntimeWorld,
+) {
+  let ui = settings_ui
+    .screenshot_recording_mut()
+    .recording_settings_mut();
+  match command {
+    RecordingSettingsCommand::Changed(profile) => {
+      let _ = services
+        .storage
+        .write_recording_profile(&profile, &mut services.log);
+    }
+    RecordingSettingsCommand::ExportFontPreview(fonts) => {
+      services.screenshot.request_font_preview(fonts);
+    }
+    RecordingSettingsCommand::OpenFonts => ui.open_fonts(),
+    RecordingSettingsCommand::StartAddFont => ui.start_add_font(&mut services.text_input),
+    RecordingSettingsCommand::StartModifyFont => ui.start_modify_font(&mut services.text_input),
+    RecordingSettingsCommand::FinishFontEdit(value) => {
+      ui.finish_font_edit(&mut services.text_input, value)
+    }
+    RecordingSettingsCommand::CancelFontEdit => ui.cancel_font_edit(&mut services.text_input),
+    RecordingSettingsCommand::ScrollFonts(dy) => {
+      ui.scroll_fonts(&services.scroll_box, &services.layout, dy)
+    }
+    RecordingSettingsCommand::Back => {
+      clear_exiting_pool(ui.objects_mut(), services);
+      world.state.pop_ui_node();
+    }
   }
 }
 

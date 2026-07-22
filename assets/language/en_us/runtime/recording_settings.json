@@ -1,0 +1,63 @@
+{
+  "recording_settings.title": "Recording Settings",
+
+  "recording_settings.fonts": "Recording Export Fonts",
+  "recording_settings.auto_recording": "Auto Recording",
+  "recording_settings.popup": "Recording Notifications",
+  "recording_settings.auto_split": "Auto Split Recording",
+
+  "recording_settings.recording_fps": "Recording FPS",
+
+  "recording_settings.video_resolution": "Export Resolution",
+  "recording_settings.video_fps": "Export FPS",
+  "recording_settings.video_codec": "Video Codec",
+  "recording_settings.video_bitrate": "Video Bitrate",
+  "recording_settings.video_format": "Video Format",
+
+  "recording_settings.popup.no": "Off",
+  "recording_settings.popup.all": "All",
+  "recording_settings.popup.only.split": "Split Only",
+  "recording_settings.popup.only.state": "Status Only",
+  "recording_settings.popup.only.start_stop": "Start & Stop Only",
+
+  "recording_settings.recording_fps.30": "30",
+  "recording_settings.recording_fps.60": "60",
+  "recording_settings.recording_fps.120": "120",
+
+  "recording_settings.auto_recording.nope": "Off",
+  "recording_settings.auto_recording.host": "On Startup",
+  "recording_settings.auto_recording.game": "On Game Start",
+
+  "recording_settings.auto_split.nope": "Off",
+  "recording_settings.auto_split.5": "5 Minutes",
+  "recording_settings.auto_split.10": "10 Minutes",
+
+  "recording_settings.video_fps.vidio": "Match Recording FPS",
+  "recording_settings.video_fps.30": "30",
+  "recording_settings.video_fps.60": "60",
+  "recording_settings.video_fps.120": "120",
+
+  "recording_settings.video_resolution.half": "Half",
+  "recording_settings.video_resolution.original": "Original",
+  "recording_settings.video_resolution.double": "Double",
+  "recording_settings.video_bitrate.compact": "Compact",
+  "recording_settings.video_bitrate.balanced": "Balanced",
+  "recording_settings.video_bitrate.high": "High Quality",
+
+  "recording_settings.fonts.title": "Custom Recording Export Fonts",
+  "recording_settings.fonts.no": "No custom recording fonts",
+  "recording_settings.fonts.placeholder": "Enter an absolute font path or family name",
+  "recording_settings.fonts.hint": "Multiple fonts are tried in list order for recording export\nTTF and OTF font files are supported\nEnter an absolute file path or a system font family name\nThis list is used only for recording video export\nUse preview export to verify the selected fonts",
+
+  "recording_settings.action.select": "{key:recording_settings.focus_up}/{key:recording_settings.focus_down} Select",
+  "recording_settings.action.focus": "{key:recording_settings.focus_fonts}/{key:recording_settings.focus_auto_recording}/{key:recording_settings.focus_popup}/{key:recording_settings.focus_auto_split}/{key:recording_settings.focus_recording_fps}/{key:recording_settings.focus_video_resolution}/{key:recording_settings.focus_video_fps}/{key:recording_settings.focus_video_bitrate} Focus",
+  "recording_settings.action.back": "{key:recording_settings.back} Back",
+  "recording_settings.action.confirm": "{key:recording_settings.confirm} Confirm",
+  "recording_settings.action.switch": "{key:recording_settings.confirm} Toggle",
+
+  "recording_settings.popup.auto_split": "Recording Split Automatically",
+  "recording_settings.popup.pause": "Recording Paused",
+  "recording_settings.popup.start": "Recording Started",
+  "recording_settings.popup.stop": "Recording Stopped",
+  "recording_settings.popup.resume": "Recording Resumed"
+}

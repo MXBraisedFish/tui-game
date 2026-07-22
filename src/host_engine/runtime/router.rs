@@ -37,6 +37,12 @@ pub(super) fn current_objects_mut<'a>(
         .screenshot_settings_mut()
         .objects_mut(),
     ),
+    Some(UiNodeKind::RecordingSettings) => Some(
+      settings_ui
+        .screenshot_recording_mut()
+        .recording_settings_mut()
+        .objects_mut(),
+    ),
     Some(UiNodeKind::ScreenshotList) => Some(
       settings_ui
         .screenshot_recording_mut()
@@ -127,6 +133,13 @@ pub(super) fn deactivate_hidden_pools(
     settings_ui
       .screenshot_recording_mut()
       .screenshot_settings_mut()
+      .objects_mut(),
+  );
+  deactivate(
+    UiNodeKind::RecordingSettings,
+    settings_ui
+      .screenshot_recording_mut()
+      .recording_settings_mut()
       .objects_mut(),
   );
   deactivate(
@@ -632,6 +645,12 @@ pub(super) fn route_update(
         .screenshot_settings_mut()
         .update(world.clock.delta_time());
     }
+    Some(UiNodeKind::RecordingSettings) => {
+      settings_ui
+        .screenshot_recording_mut()
+        .recording_settings_mut()
+        .update(world.clock.delta_time());
+    }
     Some(UiNodeKind::ScreenshotList) => settings_ui
       .screenshot_recording_mut()
       .screenshot_list_mut()
@@ -1132,6 +1151,15 @@ fn route_input_event(
         .handle_event(event)
       {
         apply_screenshot_settings_command(command, settings_ui, services, world);
+      }
+    }
+    Some(UiNodeKind::RecordingSettings) => {
+      if let Some(command) = settings_ui
+        .screenshot_recording_mut()
+        .recording_settings_mut()
+        .handle_event(event)
+      {
+        apply_recording_settings_command(command, settings_ui, services, world);
       }
     }
     Some(UiNodeKind::ScreenshotList) => {

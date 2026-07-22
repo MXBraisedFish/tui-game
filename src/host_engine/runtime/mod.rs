@@ -20,11 +20,11 @@ use crate::host_engine::core::state_machine::{
 };
 use crate::host_engine::core::{ExitState, FrameScheduler, RuntimeWorld, set_crash_phase};
 use crate::host_engine::services::{
-  ActionMapEntry, BorderStyle, DisplayLogoMode, DisplayOrderMode, DrawTextParams, EngineServices,
-  EngineTask, HostAreaKind, ImPolicy, InputActionEvent, KeyState, LogSource, PackageEvent,
-  PackageListEntry, RandomGeneratorId, RandomSeed, RecordingState, ScreenshotAsyncEvent,
-  ScreenshotDoubleAction, ScreenshotService, ScreenshotTask, TaskId, TextColor, VideoAsyncEvent,
-  translate_action_map,
+  ActionMapEntry, AutoRecordingMode, BorderStyle, DisplayLogoMode, DisplayOrderMode,
+  DrawTextParams, EngineServices, EngineTask, HostAreaKind, ImPolicy, InputActionEvent, KeyState,
+  LogSource, PackageEvent, PackageListEntry, PopupDismissEvent, PopupRequest, RandomGeneratorId,
+  RandomSeed, RecordingState, ScreenshotAsyncEvent, ScreenshotDoubleAction, ScreenshotService,
+  ScreenshotTask, TaskId, TextColor, VideoAsyncEvent, translate_action_map,
 };
 use crate::host_engine::ui::{
   ClearWarningCommand, ClearWarningTarget, ClearWarningUi, DisplaySettingsCommand,
@@ -32,16 +32,16 @@ use crate::host_engine::ui::{
   ExportType, GameListCommand, GameListUi, GamePackageCommand, GamePackageUi, HomeUi,
   HomeUiCommand, InputDemoCommand, InputDemoUi, LanguageLoadingUi, LanguageSelectCommand,
   LanguageSelectUi, MediaListNotice, MediaRenameError, ModsCommand, ModsUi, RecordingListCommand,
-  RecordingListUi, SafeModeWarningCommand, SafeModeWarningUi, ScreensaverListCommand,
-  ScreensaverListUi, ScreensaverOverlayUi, ScreensaverPackageCommand, ScreensaverPackageUi,
-  ScreenshotCaptureCommand, ScreenshotCaptureUi, ScreenshotListCommand, ScreenshotListUi,
-  ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
-  ScreenshotSettingsUi, SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand,
-  SecuritySettingsUi, SettingsUi, SettingsUiCommand, StorageManagementClearCommand,
-  StorageManagementClearUi, StorageManagementCommand, StorageManagementExportCommand,
-  StorageManagementExportUi, StorageManagementUi, StorageManagementViewCommand,
-  StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
-  ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
+  RecordingListUi, RecordingSettingsCommand, RecordingSettingsUi, SafeModeWarningCommand,
+  SafeModeWarningUi, ScreensaverListCommand, ScreensaverListUi, ScreensaverOverlayUi,
+  ScreensaverPackageCommand, ScreensaverPackageUi, ScreenshotCaptureCommand, ScreenshotCaptureUi,
+  ScreenshotListCommand, ScreenshotListUi, ScreenshotRecordingCommand, ScreenshotRecordingUi,
+  ScreenshotSettingsCommand, ScreenshotSettingsUi, SecurityDetailsCommand, SecurityDetailsUi,
+  SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
+  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
+  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
+  StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
+  TerminalCheckUi, ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 use std::{
   collections::HashMap,
@@ -94,12 +94,6 @@ enum VideoExportToastState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ScreenshotModeToast {
-  kind: ScreenshotModeToastKind,
-  elapsed: Duration,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PendingScreenshotHotkey {
   elapsed: Duration,
 }
@@ -107,6 +101,37 @@ struct PendingScreenshotHotkey {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PendingHostHotkey {
   elapsed: Duration,
+}
+
+struct AutoRecordingRuntime {
+  profile: crate::host_engine::services::RecordingProfile,
+  profile_revision: u64,
+  host_started: bool,
+  auto_started: bool,
+  manually_stopped: bool,
+  restart_after_split: bool,
+}
+
+impl AutoRecordingRuntime {
+  fn new(profile: crate::host_engine::services::RecordingProfile, profile_revision: u64) -> Self {
+    Self {
+      profile,
+      profile_revision,
+      host_started: false,
+      auto_started: false,
+      manually_stopped: false,
+      restart_after_split: false,
+    }
+  }
+}
+
+#[derive(Clone, Copy)]
+enum RecordingPopupKind {
+  AutoSplit,
+  Pause,
+  Start,
+  Stop,
+  Resume,
 }
 
 impl PendingHostHotkey {
@@ -132,30 +157,6 @@ impl PendingScreenshotHotkey {
   fn update(&mut self, dt: Duration) -> bool {
     self.elapsed = self.elapsed.saturating_add(dt);
     self.elapsed < SCREENSHOT_DOUBLE_ACTION_WINDOW
-  }
-}
-
-impl ScreenshotModeToast {
-  fn new(kind: ScreenshotModeToastKind) -> Self {
-    Self {
-      kind,
-      elapsed: Duration::ZERO,
-    }
-  }
-
-  fn update(&mut self, dt: Duration) -> bool {
-    self.elapsed = self.elapsed.saturating_add(dt);
-    let duration = match self.kind {
-      ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => Duration::from_secs(3),
-      ScreenshotModeToastKind::MediaRename { .. }
-      | ScreenshotModeToastKind::Operation { .. }
-      | ScreenshotModeToastKind::VideoExport(_) => Duration::from_secs(2),
-    };
-    self.elapsed < duration
-  }
-
-  fn can_dismiss(&self) -> bool {
-    self.elapsed >= Duration::from_millis(500)
   }
 }
 
@@ -338,10 +339,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         .as_nanos() as u64,
     ),
   );
-  let mut screenshot_mode_toast: Option<ScreenshotModeToast> = None;
   let mut pending_screenshot_saves = HashMap::new();
   let mut pending_screenshot_hotkey: Option<PendingScreenshotHotkey> = None;
   let mut pending_recording_hotkey: Option<PendingHostHotkey> = None;
+  let recording_profile = services
+    .storage
+    .read_recording_profile_or_default(&mut services.log);
+  let recording_profile_revision = services.storage.recording_profile_revision();
+  let mut auto_recording = AutoRecordingRuntime::new(recording_profile, recording_profile_revision);
   let mut pending_screensaver_hotkey: Option<PendingHostHotkey> = None;
   let mut pending_toolbar_hotkey: Option<PendingHostHotkey> = None;
   let mut language_loading = LanguageLoadingRuntime::default();
@@ -367,11 +372,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
 
     world.clock.tick();
     let frame_delta = world.clock.delta_time();
-    if let Some(toast) = &mut screenshot_mode_toast {
-      if !toast.update(frame_delta) {
-        screenshot_mode_toast = None;
-      }
-    }
+    services.popup.update(frame_delta);
     services
       .time
       .update(&mut services.runtime_objects, frame_delta);
@@ -411,9 +412,9 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     apply_screenshot_events(
       &engine_events.screenshot,
       &mut pending_screenshot_saves,
-      &mut screenshot_mode_toast,
+      services,
     );
-    apply_video_events(&engine_events.video, &mut screenshot_mode_toast);
+    apply_video_events(&engine_events.video, services);
 
     services.input.poll_resize_events(|w, h| {
       services.layout.resize_physical(w, h);
@@ -481,27 +482,17 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut language_loading_ui,
       &mut language_loading,
       &mut export_loading,
-      &mut screenshot_mode_toast,
       &mut pending_screenshot_saves,
       &mut pending_screenshot_hotkey,
       &mut pending_recording_hotkey,
       &mut pending_screensaver_hotkey,
       &mut pending_toolbar_hotkey,
     );
-    apply_screenshot_operation_feedback(
-      services,
-      &mut screenshot_mode_toast,
-      &mut pending_screenshot_saves,
-    );
-    apply_video_submission_feedback(services, &mut screenshot_mode_toast);
-    apply_media_list_notices(&mut screenshot_mode_toast, &mut settings_ui);
+    apply_screenshot_operation_feedback(services, &mut pending_screenshot_saves);
+    apply_video_submission_feedback(services);
+    apply_media_list_notices(services, &mut settings_ui);
     if let Some(fonts) = services.screenshot.take_font_preview_request() {
-      submit_font_preview_png(
-        services,
-        fonts,
-        &mut screenshot_mode_toast,
-        &mut pending_screenshot_saves,
-      );
+      submit_font_preview_png(services, fonts, &mut pending_screenshot_saves);
     }
     update_pending_host_hotkeys(
       services,
@@ -510,6 +501,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       screensaver_random,
       &mut top_toolbar,
       &mut pending_recording_hotkey,
+      &mut auto_recording,
       &mut pending_screensaver_hotkey,
       &mut pending_toolbar_hotkey,
       world.clock.delta_time(),
@@ -518,25 +510,22 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       services,
       world,
       &mut screenshot_capture_ui,
-      &mut screenshot_mode_toast,
       &mut pending_screenshot_hotkey,
     );
     let dismiss_screenshot_toast = screenshot_capture_ui.take_mode_toast_dismiss_requested();
     let dismiss_screenshot_operation_toast =
       screenshot_capture_ui.take_operation_toast_dismiss_requested();
-    let should_dismiss_screenshot_toast =
-      screenshot_mode_toast.is_some_and(|toast| match toast.kind {
-        ScreenshotModeToastKind::Operation { .. } => dismiss_screenshot_operation_toast,
-        ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => dismiss_screenshot_toast,
-        ScreenshotModeToastKind::MediaRename { .. } | ScreenshotModeToastKind::VideoExport(_) => {
-          false
-        }
-      });
-    if screenshot_mode_toast.is_some_and(|toast| toast.can_dismiss())
-      && should_dismiss_screenshot_toast
-      && world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture)
-    {
-      screenshot_mode_toast = None;
+    if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
+      if dismiss_screenshot_operation_toast {
+        services
+          .popup
+          .dismiss(PopupDismissEvent::ScreenshotOperationInput);
+      }
+      if dismiss_screenshot_toast {
+        services
+          .popup
+          .dismiss(PopupDismissEvent::ScreenshotModeInput);
+      }
     }
     sync_input_method_policy(services);
     restore_input_modes_if_scope_changed(services, world, &mut input_mode_scope);
@@ -615,7 +604,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         .min_by_key(|(task_id, _)| task_id.0)
         .map(|(_, save)| save.progress),
     );
-    draw_screenshot_mode_toast(services, screenshot_mode_toast);
+    draw_popup(services);
     let text_force_redraw = services.canvas.take_render_requested();
     let composed = services.compositor.compose(&services.canvas);
     let presented = if let Err(error) = services.presenter.present(
@@ -639,6 +628,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
           .remember_presented_frame(composed.clone());
       }
       services.recording.capture_presented_frame(&composed);
+      update_auto_recording(services, &mut auto_recording);
     }
 
     scheduler.set_target_fps(
@@ -673,7 +663,7 @@ fn sync_input_method_policy(services: &mut EngineServices) {
 fn apply_screenshot_events(
   events: &[ScreenshotAsyncEvent],
   pending: &mut HashMap<TaskId, PendingScreenshotSave>,
-  toast: &mut Option<ScreenshotModeToast>,
+  services: &mut EngineServices,
 ) {
   for event in events {
     if let ScreenshotAsyncEvent::Progress {
@@ -699,16 +689,17 @@ fn apply_screenshot_events(
     if pending.remove(&task_id).is_none() {
       continue;
     }
-    *toast = Some(ScreenshotModeToast::new(
+    show_popup(
+      services,
       ScreenshotModeToastKind::Operation {
         copy_succeeded: None,
         save: Some(save),
       },
-    ));
+    );
   }
 }
 
-fn apply_video_events(events: &[VideoAsyncEvent], toast: &mut Option<ScreenshotModeToast>) {
+fn apply_video_events(events: &[VideoAsyncEvent], services: &mut EngineServices) {
   for event in events {
     let state = match event {
       VideoAsyncEvent::Preparing { .. } => Some(VideoExportToastState::Loading),
@@ -717,32 +708,27 @@ fn apply_video_events(events: &[VideoAsyncEvent], toast: &mut Option<ScreenshotM
       VideoAsyncEvent::Progress { .. } | VideoAsyncEvent::Finalizing { .. } => None,
     };
     if let Some(state) = state {
-      *toast = Some(ScreenshotModeToast::new(
-        ScreenshotModeToastKind::VideoExport(state),
-      ));
+      show_popup(services, ScreenshotModeToastKind::VideoExport(state));
     }
   }
 }
 
-fn apply_video_submission_feedback(
-  services: &mut EngineServices,
-  toast: &mut Option<ScreenshotModeToast>,
-) {
+fn apply_video_submission_feedback(services: &mut EngineServices) {
   let Some(submitted) = services.video.take_submission_feedback() else {
     return;
   };
-  *toast = Some(ScreenshotModeToast::new(
+  show_popup(
+    services,
     ScreenshotModeToastKind::VideoExport(if submitted {
       VideoExportToastState::Loading
     } else {
       VideoExportToastState::Failed
     }),
-  ));
+  );
 }
 
 fn apply_screenshot_operation_feedback(
   services: &mut EngineServices,
-  toast: &mut Option<ScreenshotModeToast>,
   pending: &mut HashMap<TaskId, PendingScreenshotSave>,
 ) {
   let Some(feedback) = services.screenshot.take_operation_feedback() else {
@@ -751,23 +737,24 @@ fn apply_screenshot_operation_feedback(
   if let Some(task_id) = feedback.save_task {
     pending.insert(task_id, PendingScreenshotSave { progress: 0.0 });
   }
-  *toast = Some(ScreenshotModeToast::new(
+  show_popup(
+    services,
     ScreenshotModeToastKind::Operation {
       copy_succeeded: feedback.copy_succeeded,
       save: feedback.save_task.map(|_| ScreenshotSaveState::Loading),
     },
-  ));
+  );
 }
 
-fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<ScreenshotModeToast>) {
-  let Some(toast) = toast else {
+fn draw_popup(services: &mut EngineServices) {
+  let Some(popup) = services.popup.view() else {
     return;
   };
   let size = services.layout.physical_size();
   if size.width < 8 || size.height < 3 {
     return;
   }
-  let text = screenshot_toast_text(services, toast.kind);
+  let text = popup.text;
   let width = services
     .layout
     .get_text_width(&text, None)
@@ -775,7 +762,35 @@ fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<Scree
     .min(size.width);
   let x = size.width.saturating_sub(width) / 2;
   let y = 1.min(size.height.saturating_sub(3));
-  let color = match toast.kind {
+  let color = popup.color;
+  services.render.draw_top_border_rect(
+    &mut services.canvas,
+    x,
+    y,
+    width,
+    3,
+    &BorderStyle::Circle,
+    Some(color.clone()),
+    Some(TextColor::Rgb { r: 0, g: 0, b: 0 }),
+    Some(TextColor::Rgb { r: 0, g: 0, b: 0 }),
+    None,
+  );
+  services.render.draw_top_text(
+    &mut services.canvas,
+    &DrawTextParams {
+      x: x.saturating_add(2),
+      y: y.saturating_add(1),
+      text,
+      fg: Some(color),
+      bg: Some(TextColor::Rgb { r: 0, g: 0, b: 0 }),
+      max_width: Some(width.saturating_sub(4)),
+      ..Default::default()
+    },
+  );
+}
+
+fn popup_color(kind: ScreenshotModeToastKind) -> TextColor {
+  match kind {
     ScreenshotModeToastKind::Enter => TextColor::Rgb {
       r: 95,
       g: 215,
@@ -832,31 +847,36 @@ fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<Scree
         b: 76,
       },
     },
+  }
+}
+
+fn show_popup(services: &mut EngineServices, kind: ScreenshotModeToastKind) {
+  let duration = match kind {
+    ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => Duration::from_secs(3),
+    ScreenshotModeToastKind::MediaRename { .. }
+    | ScreenshotModeToastKind::Operation { .. }
+    | ScreenshotModeToastKind::VideoExport(_) => Duration::from_secs(2),
   };
-  services.render.draw_top_border_rect(
-    &mut services.canvas,
-    x,
-    y,
-    width,
-    3,
-    &BorderStyle::Circle,
-    Some(color.clone()),
-    Some(TextColor::Rgb { r: 0, g: 0, b: 0 }),
-    Some(TextColor::Rgb { r: 0, g: 0, b: 0 }),
-    None,
-  );
-  services.render.draw_top_text(
-    &mut services.canvas,
-    &DrawTextParams {
-      x: x.saturating_add(2),
-      y: y.saturating_add(1),
-      text,
-      fg: Some(color),
-      bg: Some(TextColor::Rgb { r: 0, g: 0, b: 0 }),
-      max_width: Some(width.saturating_sub(4)),
-      ..Default::default()
-    },
-  );
+  let dismiss_on = match kind {
+    ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => {
+      vec![PopupDismissEvent::ScreenshotModeInput]
+    }
+    ScreenshotModeToastKind::Operation { .. } => {
+      vec![PopupDismissEvent::ScreenshotOperationInput]
+    }
+    ScreenshotModeToastKind::MediaRename { .. } => {
+      vec![PopupDismissEvent::MediaRenameResolved]
+    }
+    ScreenshotModeToastKind::VideoExport(_) => Vec::new(),
+  };
+  let request = PopupRequest {
+    text: screenshot_toast_text(services, kind),
+    color: popup_color(kind),
+    duration,
+    dismiss_on,
+    replaceable: true,
+  };
+  services.popup.show(request);
 }
 
 fn screenshot_toast_text(services: &EngineServices, kind: ScreenshotModeToastKind) -> String {
@@ -906,7 +926,7 @@ fn screenshot_toast_text(services: &EngineServices, kind: ScreenshotModeToastKin
   }
 }
 
-fn apply_media_list_notices(toast: &mut Option<ScreenshotModeToast>, settings_ui: &mut SettingsUi) {
+fn apply_media_list_notices(services: &mut EngineServices, settings_ui: &mut SettingsUi) {
   let screenshot = settings_ui
     .screenshot_recording_mut()
     .screenshot_list_mut()
@@ -918,18 +938,16 @@ fn apply_media_list_notices(toast: &mut Option<ScreenshotModeToast>, settings_ui
   for notice in [screenshot, recording].into_iter().flatten() {
     match notice {
       MediaListNotice::RenameError { namespace, error } => {
-        *toast = Some(ScreenshotModeToast::new(
+        show_popup(
+          services,
           ScreenshotModeToastKind::MediaRename { namespace, error },
-        ));
+        );
       }
-      MediaListNotice::ClearRenameError
-        if toast.is_some_and(|toast| {
-          matches!(toast.kind, ScreenshotModeToastKind::MediaRename { .. })
-        }) =>
-      {
-        *toast = None;
+      MediaListNotice::ClearRenameError => {
+        services
+          .popup
+          .dismiss(PopupDismissEvent::MediaRenameResolved);
       }
-      MediaListNotice::ClearRenameError => {}
     }
   }
 }
@@ -1002,7 +1020,6 @@ fn route_frame_input(
   language_loading_ui: &mut LanguageLoadingUi,
   language_loading: &mut LanguageLoadingRuntime,
   _export_loading: &mut ExportLoadingRuntime,
-  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
   pending_screenshot_hotkey: &mut Option<PendingScreenshotHotkey>,
   pending_recording_hotkey: &mut Option<PendingHostHotkey>,
@@ -1017,7 +1034,6 @@ fn route_frame_input(
     services,
     world,
     screenshot_capture_ui,
-    screenshot_mode_toast,
     pending_screenshot_saves,
     pending_screenshot_hotkey,
     &host_actions,
@@ -1173,11 +1189,10 @@ fn route_frame_input(
         services,
         world,
         screenshot_capture_ui,
-        screenshot_mode_toast,
         pending_screenshot_saves,
       );
       if world.state.current_overlay_kind() != Some(OverlayKind::ScreenshotCapture) {
-        *screenshot_mode_toast = Some(ScreenshotModeToast::new(ScreenshotModeToastKind::Exit));
+        show_popup(services, ScreenshotModeToastKind::Exit);
       }
     }
   } else if world.state.current_overlay_kind() == Some(OverlayKind::Screensaver) {
@@ -1271,7 +1286,6 @@ fn handle_screenshot_hotkey(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
   screenshot_ui: &mut ScreenshotCaptureUi,
-  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
   pending_screenshot_hotkey: &mut Option<PendingScreenshotHotkey>,
   host_actions: &[InputActionEvent],
@@ -1308,18 +1322,17 @@ fn handle_screenshot_hotkey(
       services,
       world,
       screenshot_ui,
-      screenshot_mode_toast,
       pending_screenshot_saves,
     );
     if world.state.current_overlay_kind() != Some(OverlayKind::ScreenshotCapture) {
-      *screenshot_mode_toast = Some(ScreenshotModeToast::new(ScreenshotModeToastKind::Exit));
+      show_popup(services, ScreenshotModeToastKind::Exit);
     }
     services.input.clear();
     return true;
   }
 
   if pending_screenshot_hotkey.take().is_some() {
-    run_quick_screenshot_action(services, screenshot_mode_toast, pending_screenshot_saves);
+    run_quick_screenshot_action(services, pending_screenshot_saves);
     services.input.clear();
     return true;
   }
@@ -1376,13 +1389,18 @@ fn handle_host_chord_input(
   host_actions: &[InputActionEvent],
 ) -> bool {
   if has_pressed_action(host_actions, HOST_KEY_RECORDING_PAUSE) {
+    services.popup.dismiss(PopupDismissEvent::RecordingControl);
     *pending_recording = None;
     match services.recording.state() {
       RecordingState::Recording => {
-        let _ = services.recording.pause();
+        if services.recording.pause() {
+          show_recording_popup(services, RecordingPopupKind::Pause);
+        }
       }
       RecordingState::Paused => {
-        let _ = services.recording.resume();
+        if services.recording.resume() {
+          show_recording_popup(services, RecordingPopupKind::Resume);
+        }
       }
       RecordingState::Stopped | RecordingState::Finalizing => {}
     }
@@ -1390,6 +1408,7 @@ fn handle_host_chord_input(
     return true;
   }
   if has_pressed_action(host_actions, HOST_KEY_RECORDING) {
+    services.popup.dismiss(PopupDismissEvent::RecordingControl);
     *pending_recording = Some(PendingHostHotkey::new());
     return true;
   }
@@ -1443,6 +1462,7 @@ fn update_pending_host_hotkeys(
   random_id: RandomGeneratorId,
   toolbar: &mut TopToolbarRuntime,
   pending_recording: &mut Option<PendingHostHotkey>,
+  auto_recording: &mut AutoRecordingRuntime,
   pending_screensaver: &mut Option<PendingHostHotkey>,
   pending_toolbar: &mut Option<PendingHostHotkey>,
   dt: Duration,
@@ -1452,7 +1472,7 @@ fn update_pending_host_hotkeys(
     .is_some_and(|pending| !pending.update(dt))
   {
     *pending_recording = None;
-    toggle_recording(services);
+    toggle_recording(services, auto_recording);
   }
   if pending_screensaver
     .as_mut()
@@ -1472,39 +1492,158 @@ fn update_pending_host_hotkeys(
   }
 }
 
-fn toggle_recording(services: &mut EngineServices) {
+fn toggle_recording(services: &mut EngineServices, auto: &mut AutoRecordingRuntime) {
   match services.recording.state() {
     RecordingState::Stopped => {
-      let Some(frame) = services.recording.capture_last_frame() else {
-        services.log.warn(
-          LogSource::Runtime,
-          "Recording start ignored: no presented frame is available",
-        );
-        return;
-      };
-      let frame_rate = Some(
-        services
-          .storage
-          .read_recording_profile_or_default(&mut services.log)
-          .capture_frame_rate
-          .value(),
-      );
-      if services
-        .recording
-        .start(frame, frame_rate, &services.storage)
-      {
+      if start_recording(services) {
+        auto.auto_started = false;
+        auto.manually_stopped = false;
         services.log.info(LogSource::Runtime, "Recording started");
+        show_recording_popup(services, RecordingPopupKind::Start);
       }
     }
     RecordingState::Recording | RecordingState::Paused => {
       if services.recording.stop(&services.async_runtime) {
+        auto.auto_started = false;
+        auto.manually_stopped = true;
+        auto.restart_after_split = false;
         services
           .log
           .info(LogSource::Runtime, "Recording stopped; saving JSON");
+        show_recording_popup(services, RecordingPopupKind::Stop);
       }
     }
     RecordingState::Finalizing => {}
   }
+}
+
+fn start_recording(services: &mut EngineServices) -> bool {
+  let Some(frame) = services.recording.capture_last_frame() else {
+    services.log.warn(
+      LogSource::Runtime,
+      "Recording start ignored: no presented frame is available",
+    );
+    return false;
+  };
+  let frame_rate = Some(
+    services
+      .storage
+      .read_recording_profile_or_default(&mut services.log)
+      .capture_frame_rate
+      .value(),
+  );
+  services
+    .recording
+    .start(frame, frame_rate, &services.storage)
+}
+
+fn update_auto_recording(services: &mut EngineServices, auto: &mut AutoRecordingRuntime) {
+  let profile_revision = services.storage.recording_profile_revision();
+  if auto.profile_revision != profile_revision {
+    auto.profile = services
+      .storage
+      .read_recording_profile_or_default(&mut services.log);
+    auto.profile_revision = services.storage.recording_profile_revision();
+  }
+  let profile = &auto.profile;
+  if services.recording.state() == RecordingState::Recording
+    && profile
+      .auto_split
+      .duration()
+      .is_some_and(|duration| services.recording.snapshot().active_duration >= duration)
+  {
+    if services.recording.stop(&services.async_runtime) {
+      auto.restart_after_split = true;
+    }
+    return;
+  }
+
+  if services.recording.state() == RecordingState::Stopped && auto.restart_after_split {
+    if start_recording(services) {
+      auto.restart_after_split = false;
+      show_recording_popup(services, RecordingPopupKind::AutoSplit);
+    }
+    return;
+  }
+
+  if profile.auto_recording == AutoRecordingMode::Host
+    && !auto.host_started
+    && !auto.manually_stopped
+    && services.recording.state() == RecordingState::Stopped
+    && start_recording(services)
+  {
+    auto.host_started = true;
+    auto.auto_started = true;
+    services.log.info(
+      LogSource::Runtime,
+      "Recording started automatically for host session",
+    );
+    show_recording_popup(services, RecordingPopupKind::Start);
+  }
+}
+
+fn show_recording_popup(services: &mut EngineServices, kind: RecordingPopupKind) {
+  let mode = services
+    .storage
+    .read_recording_profile_or_default(&mut services.log)
+    .popup;
+  let visible = match kind {
+    RecordingPopupKind::AutoSplit => mode.shows_split(),
+    RecordingPopupKind::Pause | RecordingPopupKind::Resume => mode.shows_pause_resume(),
+    RecordingPopupKind::Start | RecordingPopupKind::Stop => mode.shows_start_stop(),
+  };
+  if !visible {
+    return;
+  }
+  let (key, color) = match kind {
+    RecordingPopupKind::AutoSplit => (
+      "recording_settings.popup.auto_split",
+      TextColor::Rgb {
+        r: 249,
+        g: 232,
+        b: 147,
+      },
+    ),
+    RecordingPopupKind::Pause => (
+      "recording_settings.popup.pause",
+      TextColor::Rgb {
+        r: 249,
+        g: 232,
+        b: 147,
+      },
+    ),
+    RecordingPopupKind::Start => (
+      "recording_settings.popup.start",
+      TextColor::Rgb {
+        r: 95,
+        g: 215,
+        b: 105,
+      },
+    ),
+    RecordingPopupKind::Resume => (
+      "recording_settings.popup.resume",
+      TextColor::Rgb {
+        r: 95,
+        g: 215,
+        b: 105,
+      },
+    ),
+    RecordingPopupKind::Stop => (
+      "recording_settings.popup.stop",
+      TextColor::Rgb {
+        r: 255,
+        g: 76,
+        b: 76,
+      },
+    ),
+  };
+  services.popup.show(PopupRequest {
+    text: services.i18n.get_runtime_text("recording_settings", key),
+    color,
+    duration: Duration::from_secs(2),
+    dismiss_on: vec![PopupDismissEvent::RecordingControl],
+    replaceable: true,
+  });
 }
 
 fn toggle_toolbar_enabled(
@@ -1588,7 +1727,6 @@ fn update_pending_screenshot_hotkey(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
   screenshot_ui: &mut ScreenshotCaptureUi,
-  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_hotkey: &mut Option<PendingScreenshotHotkey>,
 ) {
   let Some(pending) = pending_screenshot_hotkey else {
@@ -1598,14 +1736,13 @@ fn update_pending_screenshot_hotkey(
     return;
   }
   *pending_screenshot_hotkey = None;
-  start_screenshot_capture(services, world, screenshot_ui, screenshot_mode_toast);
+  start_screenshot_capture(services, world, screenshot_ui);
 }
 
 fn start_screenshot_capture(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
   screenshot_ui: &mut ScreenshotCaptureUi,
-  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
 ) {
   let Some(frame) = services.screenshot.capture_last_frame() else {
     services.log.warn(
@@ -1621,13 +1758,12 @@ fn start_screenshot_capture(
     .guide_seen;
   screenshot_ui.start(frame, show_guide);
   world.state.push_screenshot_capture_overlay();
-  *screenshot_mode_toast = Some(ScreenshotModeToast::new(ScreenshotModeToastKind::Enter));
+  show_popup(services, ScreenshotModeToastKind::Enter);
   services.input.clear();
 }
 
 fn run_quick_screenshot_action(
   services: &mut EngineServices,
-  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
 ) {
   let Some(frame) = services.screenshot.capture_last_frame() else {
@@ -1666,12 +1802,13 @@ fn run_quick_screenshot_action(
         .screenshot
         .write_json(&services.storage, &frame, rect, None, &mut services.log);
   }
-  *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+  show_popup(
+    services,
     ScreenshotModeToastKind::Operation {
       copy_succeeded,
       save: saves_png.then_some(ScreenshotSaveState::Loading),
     },
-  ));
+  );
 }
 
 fn apply_screenshot_capture_command(
@@ -1679,7 +1816,6 @@ fn apply_screenshot_capture_command(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
   screenshot_ui: &mut ScreenshotCaptureUi,
-  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
 ) {
   let mut completed_operation = false;
@@ -1698,12 +1834,13 @@ fn apply_screenshot_capture_command(
             .screenshot
             .write_json(&services.storage, &frame, rect, None, &mut services.log);
         screenshot_ui.clear_selection();
-        *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+        show_popup(
+          services,
           ScreenshotModeToastKind::Operation {
             copy_succeeded: Some(copied),
             save: None,
           },
-        ));
+        );
       }
     }
     ScreenshotCaptureCommand::CopyRichText => {
@@ -1715,12 +1852,13 @@ fn apply_screenshot_capture_command(
             .screenshot
             .write_json(&services.storage, &frame, rect, None, &mut services.log);
         screenshot_ui.clear_selection();
-        *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+        show_popup(
+          services,
           ScreenshotModeToastKind::Operation {
             copy_succeeded: Some(copied),
             save: None,
           },
-        ));
+        );
       }
     }
     ScreenshotCaptureCommand::SavePng => {
@@ -1729,12 +1867,13 @@ fn apply_screenshot_capture_command(
         let task_id = submit_screenshot_png(services, frame, rect);
         pending_screenshot_saves.insert(task_id, PendingScreenshotSave { progress: 0.0 });
         screenshot_ui.clear_selection();
-        *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+        show_popup(
+          services,
           ScreenshotModeToastKind::Operation {
             copy_succeeded: None,
             save: Some(ScreenshotSaveState::Loading),
           },
-        ));
+        );
       }
     }
     ScreenshotCaptureCommand::All => {
@@ -1744,12 +1883,13 @@ fn apply_screenshot_capture_command(
         let task_id = submit_screenshot_png(services, frame, rect);
         pending_screenshot_saves.insert(task_id, PendingScreenshotSave { progress: 0.0 });
         screenshot_ui.clear_selection();
-        *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+        show_popup(
+          services,
           ScreenshotModeToastKind::Operation {
             copy_succeeded: Some(copied),
             save: Some(ScreenshotSaveState::Loading),
           },
-        ));
+        );
       }
     }
   }
@@ -1826,7 +1966,6 @@ pub(super) fn submit_screenshot_png(
 fn submit_font_preview_png(
   services: &mut EngineServices,
   fonts: Vec<String>,
-  screenshot_mode_toast: &mut Option<ScreenshotModeToast>,
   pending_screenshot_saves: &mut HashMap<TaskId, PendingScreenshotSave>,
 ) {
   let frame = ScreenshotService::font_preview_frame();
@@ -1850,12 +1989,13 @@ fn submit_font_preview_png(
       fonts,
     }));
   pending_screenshot_saves.insert(task_id, PendingScreenshotSave { progress: 0.0 });
-  *screenshot_mode_toast = Some(ScreenshotModeToast::new(
+  show_popup(
+    services,
     ScreenshotModeToastKind::Operation {
       copy_succeeded: None,
       save: Some(ScreenshotSaveState::Loading),
     },
-  ));
+  );
 }
 
 #[cfg(test)]

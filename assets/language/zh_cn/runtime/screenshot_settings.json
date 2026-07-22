@@ -13,5 +13,6 @@
   "screenshot_settings.action.select": "{key:screenshot_settings.focus_up}/{key:screenshot_settings.focus_down} 选择",
   "screenshot_settings.action.focus": "{key:screenshot_settings.focus_re_hint}/{key:screenshot_settings.focus_fonts}/{key:screenshot_settings.focus_double}/{key:screenshot_settings.focus_auto_exit} 聚焦",
   "screenshot_settings.action.back": "{key:screenshot_settings.back} 返回",
-  "screenshot_settings.action.type.select": "{key:screenshot_settings.confirm} 切换"
+  "screenshot_settings.action.confirm": "{key:screenshot_settings.confirm} 确认",
+  "screenshot_settings.action.switch": "{key:screenshot_settings.confirm} 切换"
 }

@@ -518,7 +518,10 @@ fn encoder_config(profile: &RecordingProfile, frame_rate: u16) -> EncoderConfig 
     // OpenH264 2.6 declares SCREEN_CONTENT_NON_REAL_TIME but rejects it in
     // ParamValidationExt; screen-content real-time is the supported screen path.
     .usage_type(UsageType::ScreenContentRealTime)
-    .rate_control_mode(RateControlMode::Quality)
+    // RC_OFF keeps every timeline frame and lets the configured QP range control
+    // visual quality. OpenH264 otherwise emits an initialization warning when
+    // Quality RC is paired with frame skipping disabled.
+    .rate_control_mode(RateControlMode::Off)
     .max_frame_rate(FrameRate::from_hz(f32::from(frame_rate)))
     .complexity(complexity)
     .qp(qp)
@@ -759,7 +762,7 @@ mod tests {
       mp4::Mp4Reader::read_header(BufReader::new(File::open(&output_path).unwrap()), size).unwrap();
     let track = reader.tracks().get(&1).unwrap();
     assert_eq!(track.media_type().unwrap(), mp4::MediaType::H264);
-    assert_eq!((track.width(), track.height()), (24, 24));
+    assert_eq!((track.width(), track.height()), (36, 36));
     assert_eq!(track.timescale(), 30);
     assert_eq!(track.sample_count(), 2);
     assert_eq!(track.duration(), Duration::from_micros(66_666));
@@ -790,7 +793,7 @@ mod tests {
         offset += length;
       }
       if let Some(frame) = decoder.decode(&annex_b).unwrap() {
-        assert_eq!(frame.dimensions(), (24, 24));
+        assert_eq!(frame.dimensions(), (36, 36));
         decoded += 1;
       }
     }

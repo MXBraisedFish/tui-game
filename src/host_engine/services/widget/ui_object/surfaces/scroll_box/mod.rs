@@ -785,15 +785,14 @@ pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size
   let rect = clamp_rect(state.options.rect, viewport);
   let mut w = rect.width;
   let mut h = rect.height;
-  // Inside 和 ReserveSpace 都需要缩减 viewport，Overlay 不需要。
-  if state.options.scrollbar_layout != ScrollbarLayout::Overlay {
-    let (vertical, horizontal) = resolved_scrollbar_visibility(state, rect);
-    if vertical {
-      w = w.saturating_sub(1);
-    }
-    if horizontal {
-      h = h.saturating_sub(1);
-    }
+  // 滚动条实际占据的格子不属于内容可视区。即使使用 Overlay，内容也不能把
+  // 被轨道覆盖的最后一列/行算作可见，否则会出现“能滚动但不显示对应滚动条”。
+  let (vertical, horizontal) = resolved_scrollbar_visibility(state, rect);
+  if vertical {
+    w = w.saturating_sub(1);
+  }
+  if horizontal {
+    h = h.saturating_sub(1);
   }
   Size {
     width: w,
@@ -816,10 +815,6 @@ fn resolved_scrollbar_visibility(state: &ScrollBoxState, rect: Rect) -> (bool, b
     rect.width,
     rect.width,
   );
-
-  if state.options.scrollbar_layout == ScrollbarLayout::Overlay {
-    return (vertical, horizontal);
-  }
 
   loop {
     let next_vertical = scrollbar_visible(
@@ -905,7 +900,9 @@ pub(crate) fn vertical_scrollbar_rect(state: &ScrollBoxState, viewport: Size) ->
     x,
     y: rect.y,
     width: 1,
-    height: rect.height,
+    height: rect
+      .height
+      .saturating_sub(u16::from(shows_horizontal_scrollbar(state, viewport))),
   })
 }
 
@@ -924,14 +921,10 @@ pub(crate) fn horizontal_scrollbar_rect(state: &ScrollBoxState, viewport: Size) 
   if y >= viewport.height {
     return None;
   }
-  // ReserveSpace 和 Inside 下水平滚动条不延伸至垂直滚动条占位列。
-  let width = if state.options.scrollbar_layout != ScrollbarLayout::Overlay
-    && shows_vertical_scrollbar(state, viewport)
-  {
-    rect.width
-  } else {
-    rect.width
-  };
+  // 两个滚动条同时存在时把右下角留空，避免轨道相互覆盖。
+  let width = rect
+    .width
+    .saturating_sub(u16::from(shows_vertical_scrollbar(state, viewport)));
   Some(Rect {
     x: rect.x,
     y,
@@ -1118,11 +1111,11 @@ mod tests {
 
     // 水平夹紧。
     assert!(service.scroll_to(&mut pool, id, 99, 0, &layout));
-    assert_eq!(service.scroll_x(&pool, id), Some(12));
+    assert_eq!(service.scroll_x(&pool, id), Some(13));
     assert!(service.scroll_by(&mut pool, id, -20, 0, &layout));
     assert_eq!(service.scroll_x(&pool, id), Some(0));
     assert!(service.scroll_to_right(&mut pool, id, &layout));
-    assert_eq!(service.scroll_x(&pool, id), Some(12));
+    assert_eq!(service.scroll_x(&pool, id), Some(13));
     assert!(service.scroll_to_left(&mut pool, id));
     assert_eq!(service.scroll_x(&pool, id), Some(0));
   }
@@ -1159,7 +1152,7 @@ mod tests {
     let visible = service.visible_content_rect(&pool, id, &layout).unwrap();
     assert_eq!(visible.x, 0);
     assert_eq!(visible.y, 0);
-    assert_eq!(visible.width, 8);
+    assert_eq!(visible.width, 7);
     assert_eq!(visible.height, 4);
 
     service.scroll_to(&mut pool, id, 3, 5, &layout);
@@ -1655,7 +1648,7 @@ mod tests {
   }
 
   #[test]
-  fn overlay_scrollbars_do_not_require_each_other() {
+  fn overlay_scrollbars_use_the_uncovered_visible_area() {
     let state = ScrollBoxState {
       options: ScrollBoxOptions {
         rect: Rect {
@@ -1682,12 +1675,12 @@ mod tests {
     };
 
     assert!(shows_vertical_scrollbar(&state, viewport));
-    assert!(!shows_horizontal_scrollbar(&state, viewport));
+    assert!(shows_horizontal_scrollbar(&state, viewport));
     assert_eq!(
       effective_viewport(&state, viewport),
       Size {
-        width: 10,
-        height: 5
+        width: 9,
+        height: 4
       }
     );
   }
@@ -1753,7 +1746,7 @@ mod tests {
   }
 
   #[test]
-  fn overlay_scrollbar_does_not_reduce_visible_content_queries() {
+  fn overlay_scrollbar_reduces_visible_content_queries() {
     let service = ScrollBoxService::new();
     let mut pool = UiObjectPool::new();
     let mut layout = LayoutService::new();
@@ -1783,7 +1776,7 @@ mod tests {
     assert_eq!(
       service.visible_content_size(&pool, id, &layout),
       Some(Size {
-        width: 10,
+        width: 9,
         height: 5
       })
     );

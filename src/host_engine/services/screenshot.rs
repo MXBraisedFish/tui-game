@@ -16,9 +16,10 @@ use crate::host_engine::services::{
   StorageService, TaskId, TerminalColor, TextColor, TextStyle,
 };
 
-const CELL_WIDTH: u32 = 12;
-const CELL_HEIGHT: u32 = 24;
-const FONT_SIZE: f32 = 18.0;
+// 导出按 1.5 倍基础像素密度直接栅格化，避免先低分辨率绘制再放大造成模糊。
+const CELL_WIDTH: u32 = 18;
+const CELL_HEIGHT: u32 = 36;
+const FONT_SIZE: f32 = 27.0;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScreenshotRect {
@@ -530,8 +531,8 @@ impl TerminalFrameRasterizer {
   pub(crate) fn dimensions(width: u16, height: u16, scale: RecordingPixelScale) -> (u32, u32) {
     let (numerator, denominator) = scale.multiplier();
     (
-      (u32::from(width) * CELL_WIDTH * numerator / denominator).max(1),
-      (u32::from(height) * CELL_HEIGHT * numerator / denominator).max(1),
+      even_dimension((u32::from(width) * CELL_WIDTH * numerator / denominator).max(1)),
+      even_dimension((u32::from(height) * CELL_HEIGHT * numerator / denominator).max(1)),
     )
   }
 
@@ -589,6 +590,10 @@ impl TerminalFrameRasterizer {
       image::imageops::resize(&image, width, height, FilterType::Nearest)
     }
   }
+}
+
+fn even_dimension(value: u32) -> u32 {
+  value.saturating_add(value % 2)
 }
 
 struct FontSet {
@@ -756,6 +761,12 @@ fn draw_grapheme(
   style: &TextStyle,
   fg: (u8, u8, u8),
 ) {
+  if let Some(character) = grapheme.chars().next()
+    && grapheme.chars().count() == 1
+    && draw_block_element(image, character, origin_x, origin_y, span_width, fg)
+  {
+    return;
+  }
   let visible_width_sum: usize = grapheme
     .chars()
     .map(|character| UnicodeWidthChar::width(character).unwrap_or(0))
@@ -835,6 +846,159 @@ fn draw_grapheme(
     if char_width > 0 {
       pen_x = pen_x.saturating_add(char_width as u32 * CELL_WIDTH);
     }
+  }
+
+  if let Some(character) = grapheme.chars().next()
+    && grapheme.chars().count() == 1
+    && let Some(connections) = box_connections(character)
+  {
+    draw_box_connections(image, origin_x, origin_y, span_width, fg, connections);
+  }
+}
+
+fn draw_block_element(
+  image: &mut RgbaImage,
+  character: char,
+  x: u32,
+  y: u32,
+  width: u32,
+  color: (u8, u8, u8),
+) -> bool {
+  let eighth_w = width.div_ceil(8);
+  let eighth_h = CELL_HEIGHT.div_ceil(8);
+  let rects: &[(u32, u32, u32, u32)] = match character {
+    '█' => &[(0, 0, 8, 8)],
+    '▀' => &[(0, 0, 8, 4)],
+    '▄' => &[(0, 4, 8, 4)],
+    '▌' => &[(0, 0, 4, 8)],
+    '▐' => &[(4, 0, 4, 8)],
+    '▁' => &[(0, 7, 8, 1)],
+    '▂' => &[(0, 6, 8, 2)],
+    '▃' => &[(0, 5, 8, 3)],
+    '▅' => &[(0, 3, 8, 5)],
+    '▆' => &[(0, 2, 8, 6)],
+    '▇' => &[(0, 1, 8, 7)],
+    '▉' => &[(0, 0, 7, 8)],
+    '▊' => &[(0, 0, 6, 8)],
+    '▋' => &[(0, 0, 5, 8)],
+    '▍' => &[(0, 0, 3, 8)],
+    '▎' => &[(0, 0, 2, 8)],
+    '▏' => &[(0, 0, 1, 8)],
+    '▔' => &[(0, 0, 8, 1)],
+    '▕' => &[(7, 0, 1, 8)],
+    '▖' => &[(0, 4, 4, 4)],
+    '▗' => &[(4, 4, 4, 4)],
+    '▘' => &[(0, 0, 4, 4)],
+    '▙' => &[(0, 0, 4, 8), (4, 4, 4, 4)],
+    '▚' => &[(0, 0, 4, 4), (4, 4, 4, 4)],
+    '▛' => &[(0, 0, 4, 8), (4, 0, 4, 4)],
+    '▜' => &[(0, 0, 8, 4), (4, 4, 4, 4)],
+    '▝' => &[(4, 0, 4, 4)],
+    '▞' => &[(4, 0, 4, 4), (0, 4, 4, 4)],
+    '▟' => &[(4, 0, 4, 8), (0, 4, 4, 4)],
+    _ => return false,
+  };
+  for &(rx, ry, rw, rh) in rects {
+    let left = x.saturating_add(rx * eighth_w).min(x + width);
+    let top = y.saturating_add(ry * eighth_h).min(y + CELL_HEIGHT);
+    let right = if rx + rw == 8 {
+      x + width
+    } else {
+      x.saturating_add((rx + rw) * eighth_w).min(x + width)
+    };
+    let bottom = if ry + rh == 8 {
+      y + CELL_HEIGHT
+    } else {
+      y.saturating_add((ry + rh) * eighth_h).min(y + CELL_HEIGHT)
+    };
+    fill_rect(
+      image,
+      left,
+      top,
+      right.saturating_sub(left),
+      bottom.saturating_sub(top),
+      color,
+    );
+  }
+  true
+}
+
+#[derive(Clone, Copy)]
+struct BoxConnections {
+  left: bool,
+  right: bool,
+  up: bool,
+  down: bool,
+}
+
+fn box_connections(character: char) -> Option<BoxConnections> {
+  let code = character as u32;
+  let directions = match code {
+    0x2500..=0x2501 | 0x2504..=0x2505 | 0x2508..=0x2509 | 0x254c..=0x254d | 0x257c | 0x257e => {
+      (true, true, false, false)
+    }
+    0x2502..=0x2503 | 0x2506..=0x2507 | 0x250a..=0x250b | 0x254e..=0x254f | 0x257d | 0x257f => {
+      (false, false, true, true)
+    }
+    0x250c..=0x250f | 0x256d => (false, true, false, true),
+    0x2510..=0x2513 | 0x256e => (true, false, false, true),
+    0x2514..=0x2517 | 0x2570 => (false, true, true, false),
+    0x2518..=0x251b | 0x256f => (true, false, true, false),
+    0x251c..=0x2523 => (false, true, true, true),
+    0x2524..=0x252b => (true, false, true, true),
+    0x252c..=0x2533 => (true, true, false, true),
+    0x2534..=0x253b => (true, true, true, false),
+    0x253c..=0x254b => (true, true, true, true),
+    0x2574 | 0x2578 => (true, false, false, false),
+    0x2575 | 0x2579 => (false, false, true, false),
+    0x2576 | 0x257a => (false, true, false, false),
+    0x2577 | 0x257b => (false, false, false, true),
+    _ => return None,
+  };
+  Some(BoxConnections {
+    left: directions.0,
+    right: directions.1,
+    up: directions.2,
+    down: directions.3,
+  })
+}
+
+fn draw_box_connections(
+  image: &mut RgbaImage,
+  x: u32,
+  y: u32,
+  width: u32,
+  color: (u8, u8, u8),
+  connections: BoxConnections,
+) {
+  let center_x = x.saturating_add(width / 2);
+  let center_y = y.saturating_add(CELL_HEIGHT / 2);
+  let thickness = (CELL_WIDTH / 9).max(1);
+  if connections.left {
+    fill_rect(image, x, center_y, width / 2 + 1, thickness, color);
+  }
+  if connections.right {
+    fill_rect(
+      image,
+      center_x,
+      center_y,
+      x.saturating_add(width).saturating_sub(center_x),
+      thickness,
+      color,
+    );
+  }
+  if connections.up {
+    fill_rect(image, center_x, y, thickness, CELL_HEIGHT / 2 + 1, color);
+  }
+  if connections.down {
+    fill_rect(
+      image,
+      center_x,
+      center_y,
+      thickness,
+      y.saturating_add(CELL_HEIGHT).saturating_sub(center_y),
+      color,
+    );
   }
 }
 
@@ -978,7 +1142,7 @@ fn terminal_rgb(color: &TerminalColor) -> (u8, u8, u8) {
 
 #[cfg(test)]
 mod tests {
-  use super::ScreenshotService;
+  use super::*;
   use crate::host_engine::services::TaskId;
 
   #[test]
@@ -1014,5 +1178,27 @@ mod tests {
     assert_eq!(feedback.copy_succeeded, Some(true));
     assert_eq!(feedback.save_task, Some(TaskId(7)));
     assert_eq!(service.take_operation_feedback(), None);
+  }
+
+  #[test]
+  fn full_block_fills_the_entire_export_cell_without_font_margins() {
+    let mut image = RgbaImage::new(CELL_WIDTH, CELL_HEIGHT);
+    assert!(draw_block_element(
+      &mut image,
+      '█',
+      0,
+      0,
+      CELL_WIDTH,
+      (1, 2, 3)
+    ));
+    assert!(image.pixels().all(|pixel| pixel.0 == [1, 2, 3, 255]));
+  }
+
+  #[test]
+  fn export_density_is_one_and_a_half_times_the_previous_base_size() {
+    assert_eq!(
+      TerminalFrameRasterizer::dimensions(2, 1, RecordingPixelScale::Original),
+      (36, 36)
+    );
   }
 }

@@ -83,6 +83,11 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
       &ScreenshotSettingsUi::action_map(),
       "ScreenshotSettingsUi",
     ),
+    Some(UiNodeKind::RecordingSettings) => load_action_map(
+      services,
+      &RecordingSettingsUi::action_map(),
+      "RecordingSettingsUi",
+    ),
     Some(UiNodeKind::ScreenshotList) => load_action_map(
       services,
       &ScreenshotListUi::action_map(),

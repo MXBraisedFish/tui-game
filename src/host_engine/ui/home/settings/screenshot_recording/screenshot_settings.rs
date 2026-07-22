@@ -372,11 +372,16 @@ impl ScreenshotSettingsUi {
   }
 
   fn hint(&self, i18n: &I18nService) -> String {
+    let action = if self.selected_index < 2 {
+      "screenshot_settings.action.confirm"
+    } else {
+      "screenshot_settings.action.switch"
+    };
     format!(
       "f%<fg:rgb(85,87,83)>{}  {}  {}  {}</fg>",
       i18n.get_runtime_text(NS, "screenshot_settings.action.focus"),
       i18n.get_runtime_text(NS, "screenshot_settings.action.select"),
-      i18n.get_runtime_text(NS, "screenshot_settings.action.type.select"),
+      i18n.get_runtime_text(NS, action),
       i18n.get_runtime_text(NS, "screenshot_settings.action.back"),
     )
   }

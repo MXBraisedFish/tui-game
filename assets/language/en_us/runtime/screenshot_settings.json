@@ -13,5 +13,6 @@
   "screenshot_settings.action.select": "{key:screenshot_settings.focus_up}/{key:screenshot_settings.focus_down} Select",
   "screenshot_settings.action.focus": "{key:screenshot_settings.focus_re_hint}/{key:screenshot_settings.focus_fonts}/{key:screenshot_settings.focus_double}/{key:screenshot_settings.focus_auto_exit} Focus",
   "screenshot_settings.action.back": "{key:screenshot_settings.back} Back",
-  "screenshot_settings.action.type.select": "{key:screenshot_settings.confirm} Switch"
+  "screenshot_settings.action.confirm": "{key:screenshot_settings.confirm} Confirm",
+  "screenshot_settings.action.switch": "{key:screenshot_settings.confirm} Switch"
 }
