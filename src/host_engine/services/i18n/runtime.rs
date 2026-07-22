@@ -19,6 +19,7 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "export_loading",
   "safe_mode_warning",
   "screenshot",
+  "recording",
   "storage_management",
   "storage_management_view",
   "storage_management_clear",

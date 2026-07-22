@@ -1,16 +1,20 @@
 use super::*;
-use crate::host_engine::services::{EngineEvent, ExportAsyncEvent, ScreenshotAsyncEvent};
+use crate::host_engine::services::{
+  EngineEvent, ExportAsyncEvent, ScreenshotAsyncEvent, VideoAsyncEvent,
+};
 
 pub(super) struct RuntimeEngineEvents {
   pub package: Vec<PackageEvent>,
   pub export: Vec<ExportAsyncEvent>,
   pub screenshot: Vec<ScreenshotAsyncEvent>,
+  pub video: Vec<VideoAsyncEvent>,
 }
 
 pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngineEvents {
   let mut package_events = Vec::new();
   let mut export_events = Vec::new();
   let mut screenshot_events = Vec::new();
+  let mut video_events = Vec::new();
 
   for event in services.engine_events.drain() {
     match event {
@@ -71,6 +75,41 @@ pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngin
           }
         }
       }
+      EngineEvent::Video(event) => {
+        services.video.handle_engine_event(&event);
+        match &event {
+          VideoAsyncEvent::Saved {
+            task_id,
+            source_path,
+            mp4_path,
+          } => services.log.info(
+            LogSource::Storage,
+            format!(
+              "Video export task {task_id:?} saved {} from {}",
+              mp4_path.display(),
+              source_path.display()
+            ),
+          ),
+          VideoAsyncEvent::Failed {
+            task_id,
+            source_path,
+            output_path,
+            stage,
+            error,
+          } => services.log.warn(
+            LogSource::Storage,
+            format!(
+              "Video export task {task_id:?} failed during {stage}: source={}, output={}, error={error}",
+              source_path.display(),
+              output_path.display()
+            ),
+          ),
+          VideoAsyncEvent::Preparing { .. }
+          | VideoAsyncEvent::Progress { .. }
+          | VideoAsyncEvent::Finalizing { .. } => {}
+        }
+        video_events.push(event);
+      }
       EngineEvent::File(_)
       | EngineEvent::Image(_)
       | EngineEvent::Network(_)
@@ -92,5 +131,6 @@ pub(super) fn drain_engine_events(services: &mut EngineServices) -> RuntimeEngin
     package: package_events,
     export: export_events,
     screenshot: screenshot_events,
+    video: video_events,
   }
 }

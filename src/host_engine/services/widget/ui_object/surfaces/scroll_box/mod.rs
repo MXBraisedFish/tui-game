@@ -104,6 +104,17 @@ impl ScrollBoxService {
     Some(self.viewport_size(pool, id, layout)?.height)
   }
 
+  /// 查询扣除 Inside 或 ReserveSpace 滚动条占位后的有效 viewport 尺寸。
+  pub fn effective_viewport_size(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) -> Option<Size> {
+    let state = pool.scroll_boxes.boxes.get(&id)?;
+    Some(effective_viewport(state, layout.developer_size()))
+  }
+
   pub fn set_rect(
     &self,
     pool: &mut UiObjectPool,
@@ -1718,6 +1729,13 @@ mod tests {
     );
     assert_eq!(service.viewport_width(&pool, id, &layout), Some(10));
     assert_eq!(service.viewport_height(&pool, id, &layout), Some(5));
+    assert_eq!(
+      service.effective_viewport_size(&pool, id, &layout),
+      Some(Size {
+        width: 9,
+        height: 5
+      })
+    );
     assert_eq!(
       service.visible_content_size(&pool, id, &layout),
       Some(Size {

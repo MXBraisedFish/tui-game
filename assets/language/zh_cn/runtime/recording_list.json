@@ -3,6 +3,8 @@
   "recording_list.info": "信息",
   "recording_list.no.image": "未发现录屏",
   "recording_list.no.info": "未发现信息",
+  "recording_list.loading": "录屏解析中",
+  "recording_list.nope": "录屏解析错误",
   "recording_list.action.scroll.list": "{key:recording_list.scroll_up}/{key:recording_list.scroll_down} 滚动",
   "recording_list.action.scroll.info": "{key:recording_list.scroll_up}/{key:recording_list.scroll_down}/{key:recording_list.scroll_left}/{key:recording_list.scroll_right} 移动视图",
   "recording_list.action.select": "{key:recording_list.focus_up}/{key:recording_list.focus_down} 选择",

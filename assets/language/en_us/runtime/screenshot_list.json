@@ -5,6 +5,8 @@
   "screenshot_list.no.image": "No Screenshots Found",
   "screenshot_list.no.info": "No Information Available",
 
+  "screenshot_list.nope": "Failed to Load Screenshot",
+
   "screenshot_list.action.scroll.list": "{key:screenshot_list.scroll_up}/{key:screenshot_list.scroll_down} Scroll",
   "screenshot_list.action.scroll.info": "{key:screenshot_list.scroll_up}/{key:screenshot_list.scroll_down}/{key:screenshot_list.scroll_left}/{key:screenshot_list.scroll_right} Pan",
 

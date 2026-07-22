@@ -213,18 +213,19 @@ pub(super) fn apply_screenshot_list_command(
       }
     }
     ScreenshotListCommand::CopyScreenshot { frame, rect, rich } => {
-      if rich {
-        super::copy_screenshot_rich_text(services, &frame, rect);
+      let copied = if rich {
+        super::copy_screenshot_rich_text(services, &frame, rect)
       } else {
-        super::copy_screenshot_text(services, &frame, rect);
-      }
+        super::copy_screenshot_text(services, &frame, rect)
+      };
+      services.screenshot.report_operation(Some(copied), None);
     }
     ScreenshotListCommand::SaveScreenshot { frame, rect, copy } => {
-      if copy {
-        super::copy_screenshot_text(services, &frame, rect);
-      }
-      super::submit_screenshot_png(services, frame, rect);
+      let copied = copy.then(|| super::copy_screenshot_text(services, &frame, rect));
+      let task_id = super::submit_screenshot_png(services, frame, rect);
+      services.screenshot.report_operation(copied, Some(task_id));
     }
+    ScreenshotListCommand::ExportRecording { .. } => {}
   }
 }
 
@@ -263,6 +264,32 @@ pub(super) fn apply_recording_list_command(
         services.log.error(
           LogSource::Ui,
           format!("failed to rename recording {old_name} to {new_name}: {error}"),
+        );
+      }
+    }
+    RecordingListCommand::ExportRecording { path } => {
+      let fonts = services
+        .storage
+        .read_screenshot_profile_or_default(&mut services.log)
+        .fonts;
+      let profile = services
+        .storage
+        .read_recording_profile_or_default(&mut services.log);
+      if let Err(error) = services.video.submit_recording_export(
+        &services.async_runtime,
+        &services.storage,
+        path.clone(),
+        fonts,
+        profile,
+      ) {
+        services.log.error(
+          LogSource::Storage,
+          format!(
+            "failed to submit recording export for {} during {}: {}",
+            path.display(),
+            error.stage,
+            error.message
+          ),
         );
       }
     }

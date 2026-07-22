@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, io};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value};
 
 use super::layout;
@@ -77,6 +77,167 @@ impl Default for ScreenshotProfile {
       double_action: ScreenshotDoubleAction::SavePng,
       auto_exit: false,
       fonts: Vec::new(),
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingFrameRate {
+  Fps30,
+  #[default]
+  Fps60,
+  Fps120,
+}
+
+impl RecordingFrameRate {
+  pub fn value(self) -> u16 {
+    match self {
+      Self::Fps30 => 30,
+      Self::Fps60 => 60,
+      Self::Fps120 => 120,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingExportFrameRate {
+  #[default]
+  Recorded,
+  Fps30,
+  Fps60,
+  Fps120,
+}
+
+impl RecordingExportFrameRate {
+  pub fn resolve(self, recorded: Option<u16>, legacy: u16) -> u16 {
+    match self {
+      Self::Recorded => recorded.unwrap_or(legacy),
+      Self::Fps30 => 30,
+      Self::Fps60 => 60,
+      Self::Fps120 => 120,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingExportQuality {
+  Compact,
+  #[default]
+  Balanced,
+  High,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingPixelScale {
+  Half,
+  #[default]
+  Original,
+  Double,
+}
+
+impl RecordingPixelScale {
+  pub fn multiplier(self) -> (u32, u32) {
+    match self {
+      Self::Half => (1, 2),
+      Self::Original => (1, 1),
+      Self::Double => (2, 1),
+    }
+  }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecordingProfile {
+  #[serde(default, deserialize_with = "deserialize_or_default")]
+  pub capture_frame_rate: RecordingFrameRate,
+  #[serde(default, deserialize_with = "deserialize_or_default")]
+  pub export_frame_rate: RecordingExportFrameRate,
+  #[serde(
+    default = "default_legacy_frame_rate",
+    deserialize_with = "deserialize_legacy_frame_rate"
+  )]
+  pub legacy_frame_rate: u16,
+  #[serde(default, deserialize_with = "deserialize_or_default")]
+  pub quality: RecordingExportQuality,
+  #[serde(
+    default = "default_keyframe_interval",
+    deserialize_with = "deserialize_keyframe_interval"
+  )]
+  pub keyframe_interval_seconds: u16,
+  #[serde(default, deserialize_with = "deserialize_or_default")]
+  pub pixel_scale: RecordingPixelScale,
+}
+
+fn deserialize_or_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+  D: Deserializer<'de>,
+  T: DeserializeOwned + Default,
+{
+  let value = Value::deserialize(deserializer)?;
+  Ok(serde_json::from_value(value).unwrap_or_default())
+}
+
+fn deserialize_legacy_frame_rate<'de, D>(deserializer: D) -> Result<u16, D::Error>
+where
+  D: Deserializer<'de>,
+{
+  let value = Value::deserialize(deserializer)?;
+  Ok(
+    serde_json::from_value(value)
+      .ok()
+      .filter(|value| matches!(value, 30 | 60 | 120))
+      .unwrap_or_else(default_legacy_frame_rate),
+  )
+}
+
+fn deserialize_keyframe_interval<'de, D>(deserializer: D) -> Result<u16, D::Error>
+where
+  D: Deserializer<'de>,
+{
+  let value = Value::deserialize(deserializer)?;
+  Ok(
+    serde_json::from_value(value)
+      .ok()
+      .filter(|value| (1..=10).contains(value))
+      .unwrap_or_else(default_keyframe_interval),
+  )
+}
+
+fn default_legacy_frame_rate() -> u16 {
+  30
+}
+
+fn default_keyframe_interval() -> u16 {
+  2
+}
+
+impl RecordingProfile {
+  pub fn repair(&mut self) -> bool {
+    let mut repaired = false;
+    if !matches!(self.legacy_frame_rate, 30 | 60 | 120) {
+      self.legacy_frame_rate = default_legacy_frame_rate();
+      repaired = true;
+    }
+    if !(1..=10).contains(&self.keyframe_interval_seconds) {
+      self.keyframe_interval_seconds = default_keyframe_interval();
+      repaired = true;
+    }
+    repaired
+  }
+}
+
+impl Default for RecordingProfile {
+  fn default() -> Self {
+    Self {
+      capture_frame_rate: RecordingFrameRate::default(),
+      export_frame_rate: RecordingExportFrameRate::default(),
+      legacy_frame_rate: default_legacy_frame_rate(),
+      quality: RecordingExportQuality::default(),
+      keyframe_interval_seconds: default_keyframe_interval(),
+      pixel_scale: RecordingPixelScale::default(),
     }
   }
 }
@@ -601,6 +762,71 @@ impl StorageService {
       .ok()
   }
 
+  pub fn read_recording_profile(&self, log: &mut LogService) -> Option<RecordingProfile> {
+    let content = fs::read_to_string(self.profile_recording_path())
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to read recording profile: {error}"),
+        );
+        error
+      })
+      .ok()?;
+    let original = serde_json::from_str::<Value>(&content)
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to parse recording profile JSON: {error}"),
+        );
+        error
+      })
+      .ok()?;
+    let mut profile = serde_json::from_value::<RecordingProfile>(original.clone())
+      .map_err(|error| {
+        log.warn(
+          LogSource::Storage,
+          format!("Failed to parse recording profile values: {error}"),
+        );
+        error
+      })
+      .ok()?;
+    let mut repaired = profile.repair();
+    let normalized = serde_json::to_value(&profile).ok()?;
+    repaired |= [
+      "capture_frame_rate",
+      "export_frame_rate",
+      "legacy_frame_rate",
+      "quality",
+      "keyframe_interval_seconds",
+      "pixel_scale",
+    ]
+    .into_iter()
+    .any(|field| original.get(field) != normalized.get(field));
+    if repaired {
+      let _ = self.write_recording_profile(&profile, log);
+    }
+    Some(profile)
+  }
+
+  pub fn read_recording_profile_or_default(&self, log: &mut LogService) -> RecordingProfile {
+    self.read_recording_profile(log).unwrap_or_default()
+  }
+
+  pub fn write_recording_profile(
+    &self,
+    profile: &RecordingProfile,
+    log: &mut LogService,
+  ) -> std::io::Result<()> {
+    let json = serde_json::to_string_pretty(profile).map_err(|error| {
+      log.error(
+        LogSource::Storage,
+        format!("Failed to serialize recording profile: {error}"),
+      );
+      io::Error::new(io::ErrorKind::InvalidData, error)
+    })?;
+    fs::write(self.profile_recording_path(), json)
+  }
+
   pub fn read_screenshot_profile_or_default(&self, log: &mut LogService) -> ScreenshotProfile {
     self.read_screenshot_profile(log).unwrap_or_default()
   }
@@ -808,6 +1034,80 @@ mod tests {
     assert!(profile.guide_seen);
     assert_eq!(profile.double_action, ScreenshotDoubleAction::SavePng);
     assert!(!profile.auto_exit);
+  }
+
+  #[test]
+  fn old_recording_profile_receives_export_defaults() {
+    let profile: RecordingProfile = serde_json::from_str("{}").unwrap();
+    assert_eq!(profile.capture_frame_rate, RecordingFrameRate::Fps60);
+    assert_eq!(
+      profile.export_frame_rate,
+      RecordingExportFrameRate::Recorded
+    );
+    assert_eq!(profile.legacy_frame_rate, 30);
+    assert_eq!(profile.quality, RecordingExportQuality::Balanced);
+    assert_eq!(profile.keyframe_interval_seconds, 2);
+    assert_eq!(profile.pixel_scale, RecordingPixelScale::Original);
+  }
+
+  #[test]
+  fn recording_profile_repairs_invalid_numeric_values() {
+    let mut profile = RecordingProfile {
+      legacy_frame_rate: 59,
+      keyframe_interval_seconds: 0,
+      ..Default::default()
+    };
+    assert!(profile.repair());
+    assert_eq!(profile.legacy_frame_rate, 30);
+    assert_eq!(profile.keyframe_interval_seconds, 2);
+    assert!(!profile.repair());
+  }
+
+  #[test]
+  fn recording_profile_tolerates_invalid_persisted_options() {
+    let profile: RecordingProfile = serde_json::from_str(
+      r#"{
+        "capture_frame_rate":"fps59",
+        "export_frame_rate":"fps24",
+        "legacy_frame_rate":"bad",
+        "quality":"lossless",
+        "keyframe_interval_seconds":99,
+        "pixel_scale":"triple"
+      }"#,
+    )
+    .unwrap();
+    assert_eq!(profile, RecordingProfile::default());
+  }
+
+  #[test]
+  fn reading_recording_profile_persists_repaired_values() {
+    let storage = temp_storage("recording_profile_repair");
+    let mut log = LogService::new();
+    fs::write(
+      storage.profile_recording_path(),
+      r#"{"capture_frame_rate":"fps59","pixel_scale":"triple","keyframe_interval_seconds":99}"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+      storage.read_recording_profile(&mut log),
+      Some(RecordingProfile::default())
+    );
+    let value: Value =
+      serde_json::from_str(&fs::read_to_string(storage.profile_recording_path()).unwrap()).unwrap();
+    assert_eq!(value["capture_frame_rate"], "fps60");
+    assert_eq!(value["pixel_scale"], "original");
+    assert_eq!(value["keyframe_interval_seconds"], 2);
+  }
+
+  #[test]
+  fn recording_export_frame_rate_prefers_recorded_value_and_supports_fixed_values() {
+    assert_eq!(
+      RecordingExportFrameRate::Recorded.resolve(Some(120), 30),
+      120
+    );
+    assert_eq!(RecordingExportFrameRate::Recorded.resolve(None, 30), 30);
+    assert_eq!(RecordingExportFrameRate::Fps60.resolve(Some(120), 30), 60);
   }
 
   #[test]

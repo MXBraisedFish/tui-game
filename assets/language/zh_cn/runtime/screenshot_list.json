@@ -3,6 +3,7 @@
   "screenshot_list.info": "信息",
   "screenshot_list.no.image": "未发现截屏",
   "screenshot_list.no.info": "未发现信息",
+  "screenshot_list.nope": "截屏解析错误",
   "screenshot_list.action.scroll.list": "{key:screenshot_list.scroll_up}/{key:screenshot_list.scroll_down} 滚动",
   "screenshot_list.action.scroll.info": "{key:screenshot_list.scroll_up}/{key:screenshot_list.scroll_down}/{key:screenshot_list.scroll_left}/{key:screenshot_list.scroll_right} 移动视图",
   "screenshot_list.action.select": "{key:screenshot_list.focus_up}/{key:screenshot_list.focus_down} 选择",

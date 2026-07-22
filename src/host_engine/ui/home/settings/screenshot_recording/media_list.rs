@@ -2,7 +2,10 @@ use std::{
   fs, io,
   marker::PhantomData,
   path::{Path, PathBuf},
-  sync::mpsc::{self, Receiver},
+  sync::{
+    Arc,
+    mpsc::{self, Receiver, TryRecvError},
+  },
   thread,
   time::{Duration, SystemTime},
 };
@@ -13,11 +16,13 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasCell, CanvasService, ComposedCell, ComposedFrame,
   DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, I18nService, KeyState,
-  LayoutService, MouseButton, Overflow, Rect, RenderService, RichTextParams, RichTextService,
-  RuntimeObjectPool, RuntimeObjectPoolOwner, ScreenshotRect, ScrollBoxId, ScrollBoxOptions,
-  ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, TerminalColor,
-  TextColor, TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
-  TextInputService, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  LayoutService, MouseButton, Overflow, ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions,
+  ProgressBarSegmentStyle, ProgressBarService, RecordingPlayback, Rect, RenderService,
+  RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScreenshotRect,
+  ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy,
+  ScrollbarVisibility, Size, TerminalColor, TextColor, TextInputEvent, TextInputId, TextInputMode,
+  TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent, UiObjectPool,
+  UiObjectPoolOwner, load_recording_playback, load_recording_playback_metadata,
 };
 
 const HINT_COLOR: TextColor = TextColor::Rgb {
@@ -31,6 +36,48 @@ const ACTIVE_BORDER: TextColor = TextColor::Rgb {
   g: 215,
   b: 105,
 };
+
+const PLAYBACK_SEEK_US: u64 = 5_000_000;
+
+const PLAYBACK_GREEN: TextColor = TextColor::Rgb {
+  r: 95,
+  g: 215,
+  b: 105,
+};
+
+const PLAYBACK_YELLOW: TextColor = TextColor::Rgb {
+  r: 238,
+  g: 205,
+  b: 90,
+};
+
+const PLAYBACK_GRAY: TextColor = TextColor::Rgb {
+  r: 85,
+  g: 87,
+  b: 83,
+};
+
+fn playback_progress_options() -> ProgressBarOptions {
+  let segment = |color| ProgressBarSegmentStyle {
+    ch: '─',
+    style: TextStyle {
+      foreground: Some(color),
+      background: Some(TextColor::Transparent),
+      ..Default::default()
+    },
+  };
+  ProgressBarOptions {
+    completed: segment(PLAYBACK_GREEN),
+    preview: segment(PLAYBACK_GREEN),
+    remaining: segment(PLAYBACK_GRAY),
+    origin: ProgressBarFillOrigin::Left,
+  }
+}
+
+fn playback_time_text(time_us: u64) -> String {
+  let seconds = time_us / 1_000_000;
+  format!("{}:{:02}", seconds / 60, seconds % 60)
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MediaListCommand {
@@ -58,6 +105,9 @@ pub enum MediaListCommand {
     frame: ComposedFrame,
     rect: ScreenshotRect,
     copy: bool,
+  },
+  ExportRecording {
+    path: PathBuf,
   },
 }
 
@@ -145,15 +195,24 @@ struct MediaEntry {
   duration_us: u64,
   info: Option<MediaInfo>,
   preview: Option<ScreenshotPreview>,
+  recording: Option<Arc<RecordingPlayback>>,
   valid: Option<bool>,
 }
 
-struct MediaLoadResult {
-  path: PathBuf,
-  duration_us: u64,
-  info: Option<MediaInfo>,
-  preview: Option<ScreenshotPreview>,
-  valid: bool,
+enum MediaLoadResult {
+  Header {
+    path: PathBuf,
+    duration_us: u64,
+    info: MediaInfo,
+  },
+  Complete {
+    path: PathBuf,
+    duration_us: u64,
+    info: Option<MediaInfo>,
+    preview: Option<ScreenshotPreview>,
+    recording: Option<Arc<RecordingPlayback>>,
+    valid: bool,
+  },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -162,6 +221,70 @@ struct MediaInfo {
   height: u16,
   timestamp: String,
   frame_rate: Option<u16>,
+}
+
+struct RecordingPlayer {
+  path: PathBuf,
+  recording: Arc<RecordingPlayback>,
+  frame: ComposedFrame,
+  elapsed_us: u64,
+  next_event: usize,
+  playing: bool,
+}
+
+impl RecordingPlayer {
+  fn new(path: PathBuf, recording: Arc<RecordingPlayback>) -> Self {
+    let frame = recording.initial_frame();
+    Self {
+      path,
+      recording,
+      frame,
+      elapsed_us: 0,
+      next_event: 0,
+      playing: false,
+    }
+  }
+
+  fn update(&mut self, dt: Duration) {
+    if !self.playing {
+      return;
+    }
+    let delta_us = dt.as_micros().min(u64::MAX as u128) as u64;
+    let target = self.elapsed_us.saturating_add(delta_us);
+    self.seek_to(target);
+  }
+
+  fn seek_by(&mut self, delta_us: i64) {
+    let target = if delta_us < 0 {
+      self.elapsed_us.saturating_sub(delta_us.unsigned_abs())
+    } else {
+      self.elapsed_us.saturating_add(delta_us as u64)
+    };
+    self.seek_to(target);
+  }
+
+  fn seek_to(&mut self, target_us: u64) {
+    let duration_us = self.recording.metadata().duration_us;
+    let target_us = target_us.min(duration_us);
+    if target_us < self.elapsed_us {
+      self.frame = self.recording.initial_frame();
+      self.next_event = 0;
+    }
+    self
+      .recording
+      .apply_until(&mut self.frame, &mut self.next_event, target_us);
+    self.elapsed_us = target_us;
+    if self.elapsed_us >= duration_us {
+      self.playing = false;
+    }
+  }
+
+  fn reset(&mut self) {
+    self.frame = self.recording.initial_frame();
+    self.elapsed_us = 0;
+    self.next_event = 0;
+    self.playing = false;
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -224,14 +347,14 @@ fn json_u16(value: &Value) -> Option<u16> {
   u16::try_from(value.as_u64()?).ok()
 }
 
-fn recording_info(document: &Value) -> Option<MediaInfo> {
-  let canvas = document.get("canvas")?;
-  Some(MediaInfo {
-    width: json_u16(canvas.get("max_width")?)?,
-    height: json_u16(canvas.get("max_height")?)?,
-    timestamp: document.get("started_at")?.as_str()?.to_string(),
-    frame_rate: document.get("frame_rate").and_then(json_u16),
-  })
+fn recording_info(recording: &RecordingPlayback) -> MediaInfo {
+  let metadata = recording.metadata();
+  MediaInfo {
+    width: metadata.max_width,
+    height: metadata.max_height,
+    timestamp: metadata.started_at.clone(),
+    frame_rate: metadata.frame_rate,
+  }
 }
 
 fn parse_style(value: &Value) -> TextStyle {
@@ -385,6 +508,7 @@ pub struct MediaListUi<S: MediaListSpec> {
   rename_input: TextInputId,
   list_scroll: ScrollBoxId,
   info_scroll: ScrollBoxId,
+  playback_progress: ProgressBarId,
   list_panel_area: HitAreaId,
   info_panel_area: HitAreaId,
   order_area: HitAreaId,
@@ -404,6 +528,8 @@ pub struct MediaListUi<S: MediaListSpec> {
   scan_rx: Option<Receiver<io::Result<Vec<MediaEntry>>>>,
   load_rx: Option<Receiver<MediaLoadResult>>,
   loading_path: Option<PathBuf>,
+  player: Option<RecordingPlayer>,
+  media_offset: (u16, u16),
   reload_elapsed: Duration,
   marker: PhantomData<S>,
 }
@@ -490,11 +616,15 @@ impl<S: MediaListSpec> MediaListUi<S> {
         },
       )
       .expect("failed to create media info scroll box");
+    let playback_progress = ProgressBarService::new()
+      .create(&mut objects, playback_progress_options())
+      .expect("failed to create recording playback progress bar");
     Self {
       search_input,
       rename_input,
       list_scroll,
       info_scroll,
+      playback_progress,
       list_panel_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       info_panel_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       order_area: hit_area.create(&mut objects, HitAreaOptions::default()),
@@ -514,6 +644,8 @@ impl<S: MediaListSpec> MediaListUi<S> {
       scan_rx: None,
       load_rx: None,
       loading_path: None,
+      player: None,
+      media_offset: (0, 0),
       reload_elapsed: Duration::ZERO,
       objects,
       runtime_objects: RuntimeObjectPool::new(),
@@ -558,6 +690,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
             duration_us: 0,
             info: None,
             preview: None,
+            recording: None,
             valid: None,
           });
         }
@@ -582,40 +715,53 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let worker_path = path.clone();
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-      let document = fs::read_to_string(&worker_path)
-        .ok()
-        .and_then(|v| serde_json::from_str::<Value>(&v).ok());
+      if S::SUPPORTS_DURATION {
+        if let Some(metadata) = load_recording_playback_metadata(&worker_path) {
+          let _ = tx.send(MediaLoadResult::Header {
+            path: worker_path.clone(),
+            duration_us: metadata.duration_us,
+            info: MediaInfo {
+              width: metadata.max_width,
+              height: metadata.max_height,
+              timestamp: metadata.started_at,
+              frame_rate: metadata.frame_rate,
+            },
+          });
+        }
+        let recording = load_recording_playback(&worker_path).map(Arc::new);
+        let duration_us = recording
+          .as_ref()
+          .map(|recording| recording.metadata().duration_us)
+          .unwrap_or(0);
+        let info = recording
+          .as_ref()
+          .map(|recording| recording_info(recording));
+        let valid = recording.is_some();
+        let _ = tx.send(MediaLoadResult::Complete {
+          path: worker_path,
+          duration_us,
+          info,
+          preview: None,
+          recording,
+          valid,
+        });
+        return;
+      }
+
       let preview = S::load_preview(&worker_path);
-      let valid = if S::SUPPORTS_DURATION {
-        document.as_ref().is_some_and(|v| {
-          v.get("schema_version").is_some()
-            && v.get("initial").is_some()
-            && v.get("events").is_some()
-        })
-      } else {
-        preview.is_some()
-      };
-      let duration_us = document
-        .as_ref()
-        .and_then(|v| v.get("duration_us"))
-        .and_then(|v| v.get("active"))
-        .and_then(Value::as_u64)
-        .unwrap_or(0);
-      let info = if S::SUPPORTS_DURATION {
-        document.as_ref().and_then(recording_info)
-      } else {
-        preview.as_ref().map(|preview| MediaInfo {
-          width: preview.width,
-          height: preview.height,
-          timestamp: preview.timestamp.clone(),
-          frame_rate: None,
-        })
-      };
-      let _ = tx.send(MediaLoadResult {
+      let info = preview.as_ref().map(|preview| MediaInfo {
+        width: preview.width,
+        height: preview.height,
+        timestamp: preview.timestamp.clone(),
+        frame_rate: None,
+      });
+      let valid = preview.is_some();
+      let _ = tx.send(MediaLoadResult::Complete {
         path: worker_path,
-        duration_us,
+        duration_us: 0,
         info,
         preview,
+        recording: None,
         valid,
       });
     });
@@ -637,6 +783,8 @@ impl<S: MediaListSpec> MediaListUi<S> {
     self.sort_field = SortField::Name;
     self.last_list_scroll_y = 0;
     self.zoomed = false;
+    self.player = None;
+    self.media_offset = (0, 0);
     self.pending_notice = None;
     let _ = text_input.clear(&mut self.objects, self.search_input);
     let _ = text_input.clear(&mut self.objects, self.rename_input);
@@ -651,6 +799,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
 
   pub fn focus_search(&mut self, text_input: &mut TextInputService) {
     self.active = ActivePanel::List;
+    self.pause_player();
     let _ = text_input.focus(&mut self.objects, self.search_input);
   }
 
@@ -735,7 +884,12 @@ impl<S: MediaListSpec> MediaListUi<S> {
   }
 
   pub fn select_list(&mut self, service: &ScrollBoxService, layout: &LayoutService, dy: i32) {
+    let previous = self.selected;
     self.move_selection(dy as isize);
+    if self.selected != previous {
+      self.player = None;
+      let _ = service.scroll_to(&mut self.objects, self.info_scroll, 0, 0, layout);
+    }
     self.ensure_selection_visible(service, layout);
     self.last_list_scroll_y = service
       .scroll_y(&self.objects, self.list_scroll)
@@ -774,6 +928,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
             entry.duration_us = old.duration_us;
             entry.info = old.info.clone();
             entry.preview = old.preview.clone();
+            entry.recording = old.recording.clone();
             entry.valid = old.valid;
           }
         }
@@ -783,21 +938,63 @@ impl<S: MediaListSpec> MediaListUi<S> {
           .unwrap_or(0);
       }
     }
-    if let Some(result) = self.load_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
-      self.load_rx = None;
-      self.loading_path = None;
-      if let Some(entry) = self
-        .entries
-        .iter_mut()
-        .find(|entry| entry.path == result.path)
-      {
-        entry.duration_us = result.duration_us;
-        entry.info = result.info;
-        entry.preview = result.preview;
-        entry.valid = Some(result.valid);
+    let mut load_results = Vec::new();
+    let mut load_disconnected = false;
+    if let Some(rx) = self.load_rx.as_ref() {
+      loop {
+        match rx.try_recv() {
+          Ok(result) => load_results.push(result),
+          Err(TryRecvError::Empty) => break,
+          Err(TryRecvError::Disconnected) => {
+            load_disconnected = true;
+            break;
+          }
+        }
       }
     }
+    for result in load_results {
+      match result {
+        MediaLoadResult::Header {
+          path,
+          duration_us,
+          info,
+        } => {
+          if let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) {
+            entry.duration_us = duration_us;
+            entry.info = Some(info);
+          }
+        }
+        MediaLoadResult::Complete {
+          path,
+          duration_us,
+          info,
+          preview,
+          recording,
+          valid,
+        } => {
+          if let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) {
+            if info.is_some() {
+              entry.duration_us = duration_us;
+              entry.info = info;
+            }
+            entry.preview = preview;
+            entry.recording = recording;
+            entry.valid = Some(valid);
+          }
+          self.loading_path = None;
+        }
+      }
+    }
+    if load_disconnected {
+      self.load_rx = None;
+    }
     self.request_selected_load();
+    self.sync_player_to_selection();
+    if self.active == ActivePanel::Info {
+      if let Some(player) = self.player.as_mut() {
+        player.update(dt);
+      }
+    }
     for event in service.drain_scroll_events(&mut self.objects) {
       let crate::host_engine::services::ScrollBoxEvent::Scrolled { id, y, .. } = event;
       if id != self.list_scroll || y == self.last_list_scroll_y {
@@ -850,6 +1047,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
     match event {
       UiEvent::TextInput(TextInputEvent::Pressed { id }) if *id == self.search_input => {
         self.active = ActivePanel::List;
+        self.pause_player();
         return Some(MediaListCommand::FocusSearch);
       }
       UiEvent::TextInput(TextInputEvent::PressedOutside { id }) if *id == self.search_input => {
@@ -861,6 +1059,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
       UiEvent::TextInput(TextInputEvent::Changed { id, value }) if *id == self.search_input => {
         self.search = value.clone();
         self.selected = 0;
+        self.player = None;
         return None;
       }
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -898,8 +1097,14 @@ impl<S: MediaListSpec> MediaListUi<S> {
       ".back" if !self.zoomed => Some(MediaListCommand::Back),
       ".switch" if !self.zoomed => {
         self.active = match self.active {
-          ActivePanel::List => ActivePanel::Info,
-          ActivePanel::Info => ActivePanel::List,
+          ActivePanel::List => {
+            self.reset_selected_player();
+            ActivePanel::Info
+          }
+          ActivePanel::Info => {
+            self.pause_player();
+            ActivePanel::List
+          }
         };
         None
       }
@@ -922,6 +1127,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
       }
       ".order" if self.active == ActivePanel::List => {
         self.ascending = !self.ascending;
+        self.player = None;
         None
       }
       ".sort" if self.active == ActivePanel::List => {
@@ -930,6 +1136,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
           SortField::Time if S::SUPPORTS_DURATION => SortField::Duration,
           _ => SortField::Name,
         };
+        self.player = None;
         None
       }
       ".modify" if self.active == ActivePanel::List && !self.filtered_entries().is_empty() => {
@@ -939,8 +1146,41 @@ impl<S: MediaListSpec> MediaListUi<S> {
       ".copy_rich_text" if self.active == ActivePanel::Info => self.screenshot_command(true, false),
       ".save_image" if self.active == ActivePanel::Info => self.screenshot_command(false, true),
       ".all" if self.active == ActivePanel::Info => self.screenshot_command(true, true),
+      ".export" if self.active == ActivePanel::Info && S::SUPPORTS_DURATION => self
+        .filtered_entries()
+        .get(self.selected)
+        .filter(|entry| entry.valid != Some(false))
+        .map(|entry| MediaListCommand::ExportRecording {
+          path: entry.path.clone(),
+        }),
+      ".play_pause" if self.active == ActivePanel::Info && S::SUPPORTS_DURATION => {
+        self.sync_player_to_selection();
+        if let Some(player) = self.player.as_mut() {
+          if !player.playing && player.elapsed_us >= player.recording.metadata().duration_us {
+            player.reset();
+          }
+          player.playing = !player.playing;
+        }
+        None
+      }
+      ".skip_forward" if self.active == ActivePanel::Info && S::SUPPORTS_DURATION => {
+        self.sync_player_to_selection();
+        if let Some(player) = self.player.as_mut() {
+          player.seek_by(PLAYBACK_SEEK_US as i64);
+        }
+        None
+      }
+      ".rewind" if self.active == ActivePanel::Info && S::SUPPORTS_DURATION => {
+        self.sync_player_to_selection();
+        if let Some(player) = self.player.as_mut() {
+          player.seek_by(-(PLAYBACK_SEEK_US as i64));
+        }
+        None
+      }
       ".order" | ".zoom"
-        if self.active == ActivePanel::Info && self.selected_preview().is_some() =>
+        if self.active == ActivePanel::Info
+          && (self.selected_preview().is_some()
+            || S::SUPPORTS_DURATION && self.player.is_some()) =>
       {
         self.zoomed = !self.zoomed;
         None
@@ -1112,33 +1352,84 @@ impl<S: MediaListSpec> MediaListUi<S> {
       self.ensure_selection_visible(service, layout);
     }
 
-    let info = self.selected_preview();
-    let info_rect = if self.zoomed {
-      Rect {
-        x: pos.right.x.saturating_sub(viewport.x),
-        y: pos.right.y.saturating_sub(viewport.y),
-        width: pos.right.width,
-        height: pos.right.height,
-      }
-    } else {
-      Rect {
-        x: pos.right.x.saturating_add(1).saturating_sub(viewport.x),
-        y: pos.right.y.saturating_add(3).saturating_sub(viewport.y),
-        width: pos.right.width.saturating_sub(2),
-        height: pos.right.height.saturating_sub(4),
-      }
+    let media_rect = self.media_view_rect(pos);
+    let info_rect = Rect {
+      x: media_rect.x.saturating_sub(viewport.x),
+      y: media_rect.y.saturating_sub(viewport.y),
+      width: media_rect.width,
+      height: media_rect.height,
     };
-    let (content_width, content_height) = info
-      .map(|preview| (preview.width, preview.height))
-      .unwrap_or((1, 1));
+    let (media_width, media_height) = self.selected_media_size().unwrap_or((1, 1));
     let _ = service.set_rect(&mut self.objects, self.info_scroll, info_rect, layout);
     let _ = service.set_content_size(
       &mut self.objects,
       self.info_scroll,
-      content_width.max(info_rect.width).max(1),
-      content_height.max(info_rect.height).max(1),
+      media_width.max(1),
+      media_height.max(1),
       layout,
     );
+    let effective_viewport = service
+      .effective_viewport_size(&self.objects, self.info_scroll, layout)
+      .unwrap_or(Size {
+        width: info_rect.width,
+        height: info_rect.height,
+      });
+    let visible_width = effective_viewport.width;
+    let visible_height = effective_viewport.height;
+    self.media_offset = (
+      (media_width <= visible_width)
+        .then(|| visible_width.saturating_sub(media_width) / 2)
+        .unwrap_or(0),
+      (media_height <= visible_height)
+        .then(|| visible_height.saturating_sub(media_height) / 2)
+        .unwrap_or(0),
+    );
+    let _ = service.set_content_size(
+      &mut self.objects,
+      self.info_scroll,
+      media_width.max(visible_width).max(1),
+      media_height.max(visible_height).max(1),
+      layout,
+    );
+  }
+
+  fn media_view_rect(&self, pos: &MediaListLayout) -> Rect {
+    if self.zoomed {
+      return Rect {
+        height: pos
+          .right
+          .height
+          .saturating_sub(u16::from(S::SUPPORTS_DURATION)),
+        ..pos.right
+      };
+    }
+    Rect {
+      x: pos.right.x.saturating_add(1),
+      y: pos.right.y.saturating_add(3),
+      width: pos.right.width.saturating_sub(2),
+      height: pos
+        .right
+        .height
+        .saturating_sub(if S::SUPPORTS_DURATION { 5 } else { 4 }),
+    }
+  }
+
+  fn selected_media_size(&self) -> Option<(u16, u16)> {
+    if S::SUPPORTS_DURATION {
+      return self
+        .player
+        .as_ref()
+        .map(|player| (player.frame.width(), player.frame.height()));
+    }
+    self
+      .selected_preview()
+      .map(|preview| (preview.width, preview.height))
+  }
+
+  fn playback_row_y(&self, rect: Rect) -> u16 {
+    rect
+      .y
+      .saturating_add(rect.height.saturating_sub(if self.zoomed { 1 } else { 2 }))
   }
 
   fn ensure_selection_visible(&mut self, service: &ScrollBoxService, layout: &LayoutService) {
@@ -1419,54 +1710,134 @@ impl<S: MediaListSpec> MediaListUi<S> {
       .and_then(|entry| entry.preview.as_ref())
   }
 
+  fn sync_player_to_selection(&mut self) {
+    if !S::SUPPORTS_DURATION {
+      self.player = None;
+      return;
+    }
+    let selected = self
+      .filtered_entries()
+      .get(self.selected)
+      .and_then(|entry| {
+        entry
+          .recording
+          .as_ref()
+          .map(|recording| (entry.path.clone(), Arc::clone(recording)))
+      });
+    let Some((path, recording)) = selected else {
+      self.player = None;
+      return;
+    };
+    if self
+      .player
+      .as_ref()
+      .is_some_and(|player| player.path == path)
+    {
+      return;
+    }
+    self.player = Some(RecordingPlayer::new(path, recording));
+  }
+
+  fn reset_selected_player(&mut self) {
+    self.sync_player_to_selection();
+    if let Some(player) = self.player.as_mut() {
+      player.reset();
+    }
+  }
+
+  fn pause_player(&mut self) {
+    if let Some(player) = self.player.as_mut() {
+      player.playing = false;
+    }
+  }
+
   fn draw_info(
-    &self,
+    &mut self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     i18n: &I18nService,
     pos: &MediaListLayout,
   ) {
-    let selected = self.filtered_entries().get(self.selected).copied();
-    if selected.is_none() || selected.is_some_and(|entry| entry.valid == Some(false)) {
+    let selected = self
+      .filtered_entries()
+      .get(self.selected)
+      .map(|entry| (*entry).clone());
+    let Some(selected) = selected else {
       let text = i18n.get_runtime_text(S::NS, &format!("{}.no.info", S::NS));
-      render.draw_host_text(
-        canvas,
-        &DrawTextParams {
-          x: pos
-            .right
-            .x
-            .saturating_add(pos.right.width.saturating_sub(text.width() as u16) / 2),
-          y: pos.right.y.saturating_add(pos.right.height / 2),
-          text: format!("f%<fg:rgb(85,87,83)>{text}</fg>"),
-          max_width: Some(pos.right.width),
-          max_height: Some(1),
-          ..Default::default()
-        },
-      );
+      self.draw_media_status(render, canvas, pos.right, &text);
       return;
-    }
-    if self.zoomed {
-      let Some(preview) = self.selected_preview() else {
+    };
+    if self.zoomed && !S::SUPPORTS_DURATION {
+      let Some(preview) = selected.preview.as_ref() else {
         return;
       };
       for cell in &preview.cells {
         canvas.styled_text_in_scroll_box(
           self.info_scroll,
-          cell.x,
-          cell.y,
+          cell.x.saturating_add(self.media_offset.0),
+          cell.y.saturating_add(self.media_offset.1),
           &cell.text,
           cell.style.clone(),
         );
       }
       return;
     }
-    let Some(selected) = selected else {
+    if !self.zoomed
+      && let Some(info) = selected.info.as_ref()
+    {
+      self.draw_info_header(render, canvas, pos.right, &selected.name, info);
+    }
+
+    let media_rect = self.media_view_rect(pos);
+    if selected.valid == Some(false) {
+      let text = i18n.get_runtime_text(S::NS, &format!("{}.nope", S::NS));
+      self.draw_media_status(render, canvas, media_rect, &text);
       return;
-    };
-    let Some(info) = selected.info.as_ref() else {
-      return;
-    };
-    let inner_width = pos.right.width.saturating_sub(2);
+    }
+
+    if S::SUPPORTS_DURATION {
+      if let Some(player) = self.player.as_ref() {
+        for y in 0..player.frame.height() {
+          for x in 0..player.frame.width() {
+            let Some(ComposedCell::Text(cell)) = player.frame.get(x, y) else {
+              continue;
+            };
+            canvas.styled_text_in_scroll_box(
+              self.info_scroll,
+              x.saturating_add(self.media_offset.0),
+              y.saturating_add(self.media_offset.1),
+              &cell.text,
+              cell.style.clone(),
+            );
+          }
+        }
+      } else {
+        let text = i18n.get_runtime_text(S::NS, &format!("{}.loading", S::NS));
+        self.draw_media_status(render, canvas, media_rect, &text);
+      }
+      self.draw_playback_panel(render, canvas, pos.right, selected.duration_us);
+    } else if let Some(preview) = selected.preview.as_ref() {
+      for cell in &preview.cells {
+        canvas.styled_text_in_scroll_box(
+          self.info_scroll,
+          cell.x.saturating_add(self.media_offset.0),
+          cell.y.saturating_add(self.media_offset.1),
+          &cell.text,
+          cell.style.clone(),
+        );
+      }
+    }
+  }
+
+  fn draw_info_header(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    rect: Rect,
+    selected_name: &str,
+    info: &MediaInfo,
+  ) {
+    let inner_width = rect.width.saturating_sub(2);
     if inner_width == 0 {
       return;
     }
@@ -1478,8 +1849,8 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let frame_rate_width = frame_rate
       .as_ref()
       .map(|text| text.width().min(inner_width as usize) as u16);
-    let header = media_info_header_layout(pos.right, frame_rate_width, size_width, timestamp_width);
-    let name = truncate_text(&selected.name, header.name_width);
+    let header = media_info_header_layout(rect, frame_rate_width, size_width, timestamp_width);
+    let name = truncate_text(selected_name, header.name_width);
     let mut fields = vec![(header.name_x, name.as_str(), header.name_width)];
     if let (Some(x), Some(text), Some(width)) =
       (header.frame_rate_x, frame_rate.as_deref(), frame_rate_width)
@@ -1495,7 +1866,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
         canvas,
         &DrawTextParams {
           x,
-          y: pos.right.y.saturating_add(1),
+          y: rect.y.saturating_add(1),
           text: text.to_string(),
           max_width: Some(width),
           max_height: Some(1),
@@ -1503,17 +1874,110 @@ impl<S: MediaListSpec> MediaListUi<S> {
         },
       );
     }
-    if let Some(preview) = self.selected_preview() {
-      for cell in &preview.cells {
-        canvas.styled_text_in_scroll_box(
-          self.info_scroll,
-          cell.x,
-          cell.y,
-          &cell.text,
-          cell.style.clone(),
-        );
-      }
+  }
+
+  fn draw_media_status(
+    &self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    rect: Rect,
+    text: &str,
+  ) {
+    render.draw_host_text(
+      canvas,
+      &DrawTextParams {
+        x: rect
+          .x
+          .saturating_add(rect.width.saturating_sub(text.width() as u16) / 2),
+        y: rect.y.saturating_add(rect.height / 2),
+        text: format!("f%<fg:rgb(85,87,83)>{text}</fg>"),
+        max_width: Some(rect.width),
+        max_height: Some(1),
+        ..Default::default()
+      },
+    );
+  }
+
+  fn draw_playback_panel(
+    &mut self,
+    render: &mut RenderService,
+    canvas: &mut CanvasService,
+    rect: Rect,
+    fallback_duration_us: u64,
+  ) {
+    let (elapsed_us, duration_us, playing) = self
+      .player
+      .as_ref()
+      .map(|player| {
+        (
+          player.elapsed_us,
+          player.recording.metadata().duration_us,
+          player.playing,
+        )
+      })
+      .unwrap_or((0, fallback_duration_us, false));
+    let symbol = if playing { "◉" } else { "▶" };
+    let symbol_color = if playing {
+      PLAYBACK_GREEN
+    } else {
+      PLAYBACK_YELLOW
+    };
+    let time = format!(
+      "{}/{}",
+      playback_time_text(elapsed_us),
+      playback_time_text(duration_us)
+    );
+    let y = self.playback_row_y(rect);
+    let symbol_x = rect.x.saturating_add(1);
+    let inner_right = rect.x.saturating_add(rect.width.saturating_sub(1));
+    let time_width = time.width() as u16;
+    let time_x = inner_right.saturating_sub(time_width);
+    let progress_x = symbol_x.saturating_add(3);
+    let progress_width = time_x.saturating_sub(2).saturating_sub(progress_x);
+
+    render.draw_host_text(
+      canvas,
+      &DrawTextParams {
+        x: symbol_x,
+        y,
+        text: symbol.to_string(),
+        fg: Some(symbol_color),
+        max_width: Some(1),
+        max_height: Some(1),
+        ..Default::default()
+      },
+    );
+    if progress_width > 0 {
+      let completed = if duration_us == 0 {
+        0.0
+      } else {
+        elapsed_us as f32 / duration_us as f32
+      };
+      let progress = ProgressBarService::new();
+      progress.set_completed(&mut self.objects, self.playback_progress, completed);
+      progress.render_host(
+        &self.objects,
+        self.playback_progress,
+        Rect {
+          x: progress_x,
+          y,
+          width: progress_width,
+          height: 1,
+        },
+        canvas,
+      );
     }
+    render.draw_host_text(
+      canvas,
+      &DrawTextParams {
+        x: time_x,
+        y,
+        text: time,
+        max_width: Some(time_width.min(rect.width)),
+        max_height: Some(1),
+        ..Default::default()
+      },
+    );
   }
 
   fn draw_hints(
@@ -1547,7 +2011,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
     text_input: &TextInputService,
     width: u16,
   ) -> Vec<String> {
-    let zoom_keys = [
+    let screenshot_zoom_keys = [
       "action.scroll.info",
       "action.copy",
       "action.copy_rich_text",
@@ -1555,8 +2019,34 @@ impl<S: MediaListSpec> MediaListUi<S> {
       "action.all",
       "action.zoom.out",
     ];
-    let keys = if self.zoomed {
-      &zoom_keys[..]
+    let right_keys = S::right_hint_keys()
+      .iter()
+      .map(|key| {
+        if S::SUPPORTS_DURATION
+          && *key == "action.play"
+          && self.player.as_ref().is_some_and(|player| player.playing)
+        {
+          "action.pause"
+        } else {
+          *key
+        }
+      })
+      .collect::<Vec<_>>();
+    let recording_zoom_keys = [
+      "action.scroll.info",
+      if self.player.as_ref().is_some_and(|player| player.playing) {
+        "action.pause"
+      } else {
+        "action.play"
+      },
+      "action.skip",
+      "action.zoom.out",
+      "action.export",
+    ];
+    let keys = if self.zoomed && S::SUPPORTS_DURATION {
+      &recording_zoom_keys[..]
+    } else if self.zoomed {
+      &screenshot_zoom_keys[..]
     } else if self.renaming.is_some() {
       return vec![String::new()];
     } else if text_input.is_focused(&self.objects, self.search_input) {
@@ -1564,7 +2054,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
     } else if self.active == ActivePanel::List {
       S::left_hint_keys()
     } else {
-      S::right_hint_keys()
+      &right_keys
     };
     let params = RichTextParams::from_action_map(&S::action_map(), &format!("{}.", S::NS));
     let rich = RichTextService::new();
@@ -1621,21 +2111,32 @@ impl<S: MediaListSpec> MediaListUi<S> {
   }
 
   fn handle_pointer_target(&mut self, id: HitAreaId, clicked: bool) {
+    let previous_active = self.active;
+    let previous_selected = self.selected;
     if id == self.list_panel_area {
       self.active = ActivePanel::List;
+      self.pause_player();
     } else if id == self.info_panel_area {
       self.active = ActivePanel::Info;
     } else if id == self.order_area && clicked {
       self.ascending = !self.ascending;
+      self.player = None;
     } else if id == self.sort_area && clicked {
       self.sort_field = match self.sort_field {
         SortField::Name => SortField::Time,
         SortField::Time if S::SUPPORTS_DURATION => SortField::Duration,
         _ => SortField::Name,
       };
+      self.player = None;
     } else if let Some(index) = self.item_areas.iter().position(|area| *area == id) {
       self.active = ActivePanel::List;
+      self.pause_player();
       self.selected = index;
+    }
+    if self.selected != previous_selected {
+      self.player = None;
+    } else if previous_active != ActivePanel::Info && self.active == ActivePanel::Info {
+      self.reset_selected_player();
     }
   }
 
@@ -1820,17 +2321,14 @@ pub fn actions(entries: &[(&str, &str)]) -> Vec<ActionMapEntry> {
     .collect()
 }
 
-fn read_duration_us(path: &Path) -> Option<u64> {
-  let value: serde_json::Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
-  value.get("duration_us")?.get("active")?.as_u64()
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::host_engine::services::{InputActionEvent, InputEventType};
 
   struct TestSpec;
+
+  struct TestRecordingSpec;
 
   impl MediaListSpec for TestSpec {
     const NS: &'static str = "test";
@@ -1852,6 +2350,29 @@ mod tests {
 
     fn right_hint_keys() -> &'static [&'static str] {
       &[]
+    }
+  }
+
+  impl MediaListSpec for TestRecordingSpec {
+    const NS: &'static str = "test_recording";
+    const SUPPORTS_DURATION: bool = true;
+
+    fn action_map() -> Vec<ActionMapEntry> {
+      actions(&[
+        ("test_recording.switch", "tab"),
+        ("test_recording.play_pause", "space"),
+        ("test_recording.skip_forward", "right"),
+        ("test_recording.rewind", "left"),
+        ("test_recording.export", "1"),
+      ])
+    }
+
+    fn left_hint_keys() -> &'static [&'static str] {
+      &[]
+    }
+
+    fn right_hint_keys() -> &'static [&'static str] {
+      &["action.play"]
     }
   }
 
@@ -1885,10 +2406,36 @@ mod tests {
         timestamp: "2026-07-14T22:23:57.641".to_string(),
         cells: Vec::new(),
       }),
+      recording: None,
       valid: Some(true),
     });
     ui.active = ActivePanel::Info;
     ui
+  }
+
+  fn test_recording_playback() -> (PathBuf, Arc<RecordingPlayback>) {
+    let nonce = SystemTime::now()
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+      "tui-game-media-player-{}-{nonce}.json",
+      std::process::id()
+    ));
+    let document = serde_json::json!({
+      "schema_version": 2,
+      "started_at": "2026-07-21T20:20:32.895Z",
+      "finished_at": "2026-07-21T20:20:34.895Z",
+      "frame_rate": 60,
+      "canvas": { "max_width": 1, "max_height": 1 },
+      "duration_us": { "active": 2_000_000, "paused": 0, "wall": 2_000_000 },
+      "palette": [{ "text": "x" }, { "text": "y" }],
+      "initial": { "width": 1, "height": 1, "rows": [[[1, 0]]] },
+      "events": [{ "time_us": 1_000_000, "size": [1, 1], "changes": [[0, 0, [1]]] }]
+    });
+    fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+    let playback = Arc::new(load_recording_playback(&path).unwrap());
+    (path, playback)
   }
 
   #[test]
@@ -1958,23 +2505,263 @@ mod tests {
   }
 
   #[test]
-  fn recording_info_reads_optional_frame_rate_and_keeps_timestamp() {
-    let current = serde_json::json!({
-      "started_at": "2026-07-21T20:20:32.895Z",
-      "frame_rate": 60,
-      "canvas": { "max_width": 120, "max_height": 30 }
+  fn playback_time_uses_minutes_and_zero_padded_seconds() {
+    assert_eq!(playback_time_text(0), "0:00");
+    assert_eq!(playback_time_text(65_900_000), "1:05");
+  }
+
+  #[test]
+  fn playback_progress_uses_line_segments_and_custom_rgb_colors() {
+    let options = playback_progress_options();
+    assert_eq!(options.completed.ch, '─');
+    assert_eq!(options.remaining.ch, '─');
+    assert_eq!(options.completed.style.foreground, Some(PLAYBACK_GREEN));
+    assert_eq!(options.remaining.style.foreground, Some(PLAYBACK_GRAY));
+  }
+
+  #[test]
+  fn player_advances_by_elapsed_time_instead_of_rendered_frame_count() {
+    let (path, playback) = test_recording_playback();
+    let mut player = RecordingPlayer::new(path.clone(), playback);
+    player.playing = true;
+
+    player.update(Duration::from_millis(400));
+    let Some(ComposedCell::Text(cell)) = player.frame.get(0, 0) else {
+      panic!("initial frame should contain text");
+    };
+    assert_eq!(cell.text, "x");
+    player.update(Duration::from_millis(600));
+    let Some(ComposedCell::Text(cell)) = player.frame.get(0, 0) else {
+      panic!("recorded event should contain text");
+    };
+    assert_eq!(cell.text, "y");
+    assert_eq!(player.elapsed_us, 1_000_000);
+    fs::remove_file(path).unwrap();
+  }
+
+  #[test]
+  fn media_that_fits_is_centered_on_both_axes() {
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let i18n = I18nService::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(120, 50);
+    layout.set_developer_viewport(Rect {
+      x: 0,
+      y: 0,
+      width: 120,
+      height: 40,
     });
-    let legacy = serde_json::json!({
-      "started_at": "2026-07-20T09:17:05.441Z",
-      "canvas": { "max_width": 80, "max_height": 24 }
+    let mut ui = ui_with_preview();
+
+    let pos = ui.compute_layout(&layout, &i18n, &text_input);
+    ui.prepare_scroll_box(&scroll_box, &layout, &pos);
+    let visible_width = scroll_box
+      .visible_content_width(&ui.objects, ui.info_scroll, &layout)
+      .unwrap();
+    let visible_height = scroll_box
+      .visible_content_height(&ui.objects, ui.info_scroll, &layout)
+      .unwrap();
+
+    assert_eq!(ui.media_offset.0, (visible_width - 8) / 2);
+    assert_eq!(ui.media_offset.1, (visible_height - 1) / 2);
+  }
+
+  #[test]
+  fn screenshot_zoom_keeps_the_same_centering_rule() {
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let i18n = I18nService::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(120, 50);
+    layout.set_developer_viewport(Rect {
+      x: 0,
+      y: 0,
+      width: 120,
+      height: 50,
+    });
+    let mut ui = ui_with_preview();
+    ui.zoomed = true;
+
+    let pos = ui.compute_layout(&layout, &i18n, &text_input);
+    ui.prepare_scroll_box(&scroll_box, &layout, &pos);
+    let visible_width = scroll_box
+      .visible_content_width(&ui.objects, ui.info_scroll, &layout)
+      .unwrap();
+    let visible_height = scroll_box
+      .visible_content_height(&ui.objects, ui.info_scroll, &layout)
+      .unwrap();
+
+    assert_eq!(ui.media_offset.0, (visible_width - 8) / 2);
+    assert_eq!(ui.media_offset.1, (visible_height - 1) / 2);
+  }
+
+  #[test]
+  fn recording_view_reserves_one_row_for_playback_controls() {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let i18n = I18nService::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(120, 50);
+    let ui = MediaListUi::<TestRecordingSpec>::init(&hit_area, &text_input, &scroll_box);
+    let pos = ui.compute_layout(&layout, &i18n, &text_input);
+
+    assert_eq!(
+      ui.media_view_rect(&pos).height,
+      pos.right.height.saturating_sub(5)
+    );
+  }
+
+  #[test]
+  fn returning_focus_to_recording_starts_paused_at_zero() {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let (path, playback) = test_recording_playback();
+    let mut ui = MediaListUi::<TestRecordingSpec>::init(&hit_area, &text_input, &scroll_box);
+    ui.entries.push(MediaEntry {
+      name: "recording".to_string(),
+      path: path.clone(),
+      modified: SystemTime::UNIX_EPOCH,
+      duration_us: playback.metadata().duration_us,
+      info: Some(recording_info(&playback)),
+      preview: None,
+      recording: Some(playback),
+      valid: Some(true),
     });
 
-    assert_eq!(recording_info(&current).unwrap().frame_rate, Some(60));
-    assert_eq!(recording_info(&legacy).unwrap().frame_rate, None);
+    ui.handle_event(&action_event("test_recording.switch"));
+    let player = ui.player.as_mut().unwrap();
+    player.playing = true;
+    player.seek_to(1_000_000);
+    ui.handle_event(&action_event("test_recording.switch"));
+    let player = ui.player.as_ref().unwrap();
+    assert!(!player.playing);
+    assert_eq!(player.elapsed_us, 1_000_000);
+    ui.handle_event(&action_event("test_recording.switch"));
+
+    let player = ui.player.as_ref().unwrap();
+    assert!(!player.playing);
+    assert_eq!(player.elapsed_us, 0);
+    fs::remove_file(path).unwrap();
+  }
+
+  #[test]
+  fn recording_zoom_reserves_the_last_base_row_for_playback() {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let i18n = I18nService::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(120, 50);
+    layout.set_developer_viewport(Rect {
+      x: 0,
+      y: 0,
+      width: 120,
+      height: 50,
+    });
+    let (path, playback) = test_recording_playback();
+    let mut ui = MediaListUi::<TestRecordingSpec>::init(&hit_area, &text_input, &scroll_box);
+    ui.player = Some(RecordingPlayer::new(path.clone(), playback));
+    ui.active = ActivePanel::Info;
+    ui.zoomed = true;
+
+    let pos = ui.compute_layout(&layout, &i18n, &text_input);
+    let media = ui.media_view_rect(&pos);
+    ui.prepare_scroll_box(&scroll_box, &layout, &pos);
+
+    assert_eq!(media.height + 1, pos.right.height);
     assert_eq!(
-      display_timestamp(&recording_info(&current).unwrap().timestamp),
-      "2026.07.21 20:20:32"
+      ui.playback_row_y(pos.right),
+      pos.right.y + pos.right.height - 1
     );
+    assert!(ui.media_offset.0 > 0);
+    assert!(ui.media_offset.1 > 0);
+    fs::remove_file(path).unwrap();
+  }
+
+  #[test]
+  fn z_toggles_recording_zoom_after_playback_is_loaded() {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let (path, playback) = test_recording_playback();
+    let mut ui = MediaListUi::<TestRecordingSpec>::init(&hit_area, &text_input, &scroll_box);
+    ui.player = Some(RecordingPlayer::new(path.clone(), playback));
+    ui.active = ActivePanel::Info;
+
+    ui.handle_event(&action_event("test_recording.zoom"));
+    assert!(ui.zoomed);
+    ui.handle_event(&action_event("test_recording.zoom"));
+    assert!(!ui.zoomed);
+    fs::remove_file(path).unwrap();
+  }
+
+  #[test]
+  fn focusing_the_list_pauses_recording_without_rewinding() {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let (path, playback) = test_recording_playback();
+    let mut ui = MediaListUi::<TestRecordingSpec>::init(&hit_area, &text_input, &scroll_box);
+    let mut player = RecordingPlayer::new(path.clone(), playback);
+    player.seek_to(1_000_000);
+    player.playing = true;
+    ui.player = Some(player);
+    ui.active = ActivePanel::Info;
+
+    ui.handle_pointer_target(ui.list_panel_area, false);
+
+    let player = ui.player.as_ref().unwrap();
+    assert!(!player.playing);
+    assert_eq!(player.elapsed_us, 1_000_000);
+    fs::remove_file(path).unwrap();
+  }
+
+  #[test]
+  fn right_click_shrinks_recording_zoom() {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let mut ui = MediaListUi::<TestRecordingSpec>::init(&hit_area, &text_input, &scroll_box);
+    ui.zoomed = true;
+
+    let command = ui.handle_event(&UiEvent::HitArea(HitAreaEvent::Press {
+      id: ui.info_panel_area,
+      button: MouseButton::Right,
+      x: 0,
+      y: 0,
+    }));
+
+    assert!(command.is_none());
+    assert!(!ui.zoomed);
+  }
+
+  #[test]
+  fn recording_export_action_contains_only_the_selected_source_path() {
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let (path, playback) = test_recording_playback();
+    let mut ui = MediaListUi::<TestRecordingSpec>::init(&hit_area, &text_input, &scroll_box);
+    ui.entries.push(MediaEntry {
+      name: "recording".to_string(),
+      path: path.clone(),
+      modified: SystemTime::UNIX_EPOCH,
+      duration_us: playback.metadata().duration_us,
+      info: Some(recording_info(&playback)),
+      preview: None,
+      recording: Some(playback),
+      valid: Some(true),
+    });
+    ui.active = ActivePanel::Info;
+
+    assert_eq!(
+      ui.handle_event(&action_event("test_recording.export")),
+      Some(MediaListCommand::ExportRecording { path: path.clone() })
+    );
+    fs::remove_file(path).unwrap();
   }
 
   #[test]
@@ -2058,6 +2845,7 @@ mod tests {
         timestamp: String::new(),
         cells: Vec::new(),
       }),
+      recording: None,
       valid: Some(true),
     });
     ui.zoomed = true;

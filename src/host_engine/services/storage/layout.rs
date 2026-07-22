@@ -40,6 +40,8 @@ pub const PROFILE_PACKAGE_STATE_FILE: &str = "data/profiles/package_state.json";
 
 pub const PROFILE_SCREENSHOT_FILE: &str = "data/profiles/screenshot_profile.json";
 
+pub const PROFILE_RECORDING_FILE: &str = "data/profiles/recording_profile.json";
+
 pub const PROFILE_DISPLAY_SETTINGS_FILE: &str = "data/profiles/display_settings.json";
 
 pub const TUI_LOG_FILE: &str = "data/log/tui_log.txt";
@@ -80,6 +82,10 @@ pub const DEFAULT_FILES: &[(&str, &str)] = &[
   (
     PROFILE_SCREENSHOT_FILE,
     r#"{"guide_seen":false,"double_action":"save_png","auto_exit":false,"fonts":[]}"#,
+  ),
+  (
+    PROFILE_RECORDING_FILE,
+    r#"{"capture_frame_rate":"fps60","export_frame_rate":"recorded","legacy_frame_rate":30,"quality":"balanced","keyframe_interval_seconds":2,"pixel_scale":"original"}"#,
   ),
   (
     PROFILE_DISPLAY_SETTINGS_FILE,

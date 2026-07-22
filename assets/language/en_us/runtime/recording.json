@@ -1,0 +1,5 @@
+{
+  "recording.mode.export.loading": "Exporting Video...",
+  "recording.mode.export.success": "Video Exported",
+  "recording.mode.export.failed": "Failed to Export Video"
+}

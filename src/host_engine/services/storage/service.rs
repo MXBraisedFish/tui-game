@@ -94,6 +94,10 @@ impl StorageService {
     self.path(layout::PROFILE_SCREENSHOT_FILE)
   }
 
+  pub fn profile_recording_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_RECORDING_FILE)
+  }
+
   pub fn profile_display_settings_path(&self) -> PathBuf {
     self.path(layout::PROFILE_DISPLAY_SETTINGS_FILE)
   }

@@ -34,6 +34,8 @@ rand = "0.10.2"
 rand_chacha = "0.10"
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+mp4 = "0.14.0"
+openh264 = "0.9.7"
 fontdb = "0.23"
 fontdue = "0.9"
 base64 = "0.22"

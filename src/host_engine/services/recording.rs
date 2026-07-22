@@ -1,12 +1,13 @@
 use std::{
   fs,
-  path::PathBuf,
+  io::Read,
+  path::{Path, PathBuf},
   time::{Duration, Instant},
 };
 
 use chrono::{Local, SecondsFormat};
 use crossbeam_channel::Sender;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::host_engine::services::{
   AsyncRuntime, CanvasCell, ComposedCell, ComposedFrame, EngineEvent, EngineTask, StorageService,
@@ -30,6 +31,89 @@ pub struct RecordingSnapshot {
   pub active_duration: Duration,
   pub wall_duration: Duration,
   pub paused_duration: Duration,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordingPlaybackMetadata {
+  pub started_at: String,
+  pub frame_rate: Option<u16>,
+  pub max_width: u16,
+  pub max_height: u16,
+  pub duration_us: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct RecordingPlayback {
+  metadata: RecordingPlaybackMetadata,
+  palette: Vec<ComposedCell>,
+  initial: PlaybackInitialFrame,
+  events: Vec<PlaybackFrameEvent>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct PlaybackDocument {
+  schema_version: u32,
+  started_at: String,
+  frame_rate: Option<u16>,
+  canvas: PlaybackCanvas,
+  duration_us: PlaybackDurations,
+  palette: Vec<PlaybackCell>,
+  initial: PlaybackInitialFrame,
+  events: Vec<PlaybackFrameEvent>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct PlaybackHeader {
+  schema_version: u32,
+  started_at: String,
+  frame_rate: Option<u16>,
+  canvas: PlaybackCanvas,
+  duration_us: PlaybackDurations,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct PlaybackCanvas {
+  max_width: u16,
+  max_height: u16,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct PlaybackDurations {
+  active: u64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct PlaybackInitialFrame {
+  width: u16,
+  height: u16,
+  rows: Vec<Vec<(u32, u32)>>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct PlaybackFrameEvent {
+  time_us: u64,
+  size: [u16; 2],
+  changes: Vec<(u16, u16, Vec<u32>)>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct PlaybackCell {
+  text: String,
+  foreground: Option<PlaybackColor>,
+  background: Option<PlaybackColor>,
+  #[serde(default)]
+  flags: u16,
+  #[serde(default)]
+  continuation: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+enum PlaybackColor {
+  Terminal(String),
+  Rgb([u8; 3]),
+  ForceRgb([u8; 3]),
+  Transparent,
 }
 
 #[derive(Clone, Debug)]
@@ -347,6 +431,238 @@ impl Default for RecordingService {
   }
 }
 
+pub fn load_recording_playback_metadata(path: &Path) -> Option<RecordingPlaybackMetadata> {
+  const PALETTE_FIELD: &[u8] = b"\"palette\"";
+
+  let mut file = fs::File::open(path).ok()?;
+  let mut bytes = Vec::new();
+  let mut chunk = [0u8; 4096];
+  let palette_index = loop {
+    let read = file.read(&mut chunk).ok()?;
+    if read == 0 {
+      return None;
+    }
+    bytes.extend_from_slice(&chunk[..read]);
+    if let Some(index) = bytes
+      .windows(PALETTE_FIELD.len())
+      .position(|window| window == PALETTE_FIELD)
+    {
+      break index;
+    }
+  };
+  bytes.truncate(palette_index);
+  while bytes.last().is_some_and(|byte| byte.is_ascii_whitespace()) {
+    bytes.pop();
+  }
+  if bytes.last() == Some(&b',') {
+    bytes.pop();
+  }
+  bytes.push(b'}');
+
+  let header: PlaybackHeader = serde_json::from_slice(&bytes).ok()?;
+  playback_metadata(
+    header.schema_version,
+    header.started_at,
+    header.frame_rate,
+    header.canvas,
+    header.duration_us,
+  )
+}
+
+pub fn load_recording_playback(path: &Path) -> Option<RecordingPlayback> {
+  let document: PlaybackDocument = serde_json::from_reader(fs::File::open(path).ok()?).ok()?;
+  let metadata = playback_metadata(
+    document.schema_version,
+    document.started_at.clone(),
+    document.frame_rate,
+    document.canvas,
+    document.duration_us,
+  )?;
+  validate_playback_document(&document, &metadata)?;
+  let palette = document
+    .palette
+    .into_iter()
+    .map(playback_cell)
+    .collect::<Option<Vec<_>>>()?;
+  Some(RecordingPlayback {
+    metadata,
+    palette,
+    initial: document.initial,
+    events: document.events,
+  })
+}
+
+impl RecordingPlayback {
+  pub fn metadata(&self) -> &RecordingPlaybackMetadata {
+    &self.metadata
+  }
+
+  pub fn initial_frame(&self) -> ComposedFrame {
+    let mut frame = ComposedFrame::new(self.metadata.max_width, self.metadata.max_height);
+    for (y, row) in self.initial.rows.iter().enumerate() {
+      let mut x = 0u16;
+      for &(count, palette_id) in row {
+        for _ in 0..count {
+          frame.set(x, y as u16, self.palette[palette_id as usize].clone());
+          x = x.saturating_add(1);
+        }
+      }
+    }
+    frame
+  }
+
+  pub fn apply_until(&self, frame: &mut ComposedFrame, cursor: &mut usize, time_us: u64) {
+    while let Some(event) = self
+      .events
+      .get(*cursor)
+      .filter(|event| event.time_us <= time_us)
+    {
+      for (y, x, palette_ids) in &event.changes {
+        for (offset, palette_id) in palette_ids.iter().enumerate() {
+          frame.set(
+            x.saturating_add(offset as u16),
+            *y,
+            self.palette[*palette_id as usize].clone(),
+          );
+        }
+      }
+      *cursor += 1;
+    }
+  }
+}
+
+fn playback_metadata(
+  schema_version: u32,
+  started_at: String,
+  frame_rate: Option<u16>,
+  canvas: PlaybackCanvas,
+  duration_us: PlaybackDurations,
+) -> Option<RecordingPlaybackMetadata> {
+  if !matches!(schema_version, 1 | RECORDING_SCHEMA_VERSION)
+    || started_at.is_empty()
+    || canvas.max_width == 0
+    || canvas.max_height == 0
+    || frame_rate == Some(0)
+  {
+    return None;
+  }
+  Some(RecordingPlaybackMetadata {
+    started_at,
+    frame_rate,
+    max_width: canvas.max_width,
+    max_height: canvas.max_height,
+    duration_us: duration_us.active,
+  })
+}
+
+fn validate_playback_document(
+  document: &PlaybackDocument,
+  metadata: &RecordingPlaybackMetadata,
+) -> Option<()> {
+  let initial = &document.initial;
+  if initial.width == 0
+    || initial.height == 0
+    || initial.width > metadata.max_width
+    || initial.height > metadata.max_height
+    || initial.rows.len() != initial.height as usize
+  {
+    return None;
+  }
+  for row in &initial.rows {
+    let mut width = 0u32;
+    for &(count, palette_id) in row {
+      if count == 0 || palette_id as usize >= document.palette.len() {
+        return None;
+      }
+      width = width.checked_add(count)?;
+    }
+    if width != initial.width as u32 {
+      return None;
+    }
+  }
+
+  let mut previous_time = 0;
+  for event in &document.events {
+    if event.time_us < previous_time
+      || event.time_us > metadata.duration_us
+      || event.size[0] == 0
+      || event.size[1] == 0
+      || event.size[0] > metadata.max_width
+      || event.size[1] > metadata.max_height
+    {
+      return None;
+    }
+    previous_time = event.time_us;
+    for (y, x, palette_ids) in &event.changes {
+      if *y >= metadata.max_height
+        || usize::from(*x).saturating_add(palette_ids.len()) > metadata.max_width as usize
+        || palette_ids
+          .iter()
+          .any(|palette_id| *palette_id as usize >= document.palette.len())
+      {
+        return None;
+      }
+    }
+  }
+  Some(())
+}
+
+fn playback_cell(cell: PlaybackCell) -> Option<ComposedCell> {
+  if cell.continuation {
+    return Some(ComposedCell::Text(CanvasCell::continuation()));
+  }
+  let foreground = match cell.foreground {
+    Some(color) => Some(playback_color(color)?),
+    None => None,
+  };
+  let background = match cell.background {
+    Some(color) => Some(playback_color(color)?),
+    None => None,
+  };
+  Some(ComposedCell::Text(CanvasCell::styled(
+    cell.text,
+    crate::host_engine::services::TextStyle {
+      foreground,
+      background,
+      bold: cell.flags & 1 != 0,
+      italic: cell.flags & (1 << 1) != 0,
+      underline: cell.flags & (1 << 2) != 0,
+      strike: cell.flags & (1 << 3) != 0,
+      blink: cell.flags & (1 << 4) != 0,
+      reverse: cell.flags & (1 << 5) != 0,
+      hidden: cell.flags & (1 << 6) != 0,
+      dim: cell.flags & (1 << 7) != 0,
+    },
+  )))
+}
+
+fn playback_color(color: PlaybackColor) -> Option<TextColor> {
+  Some(match color {
+    PlaybackColor::Terminal(value) => TextColor::Terminal(match value.as_str() {
+      "black" => TerminalColor::Black,
+      "red" => TerminalColor::Red,
+      "green" => TerminalColor::Green,
+      "yellow" => TerminalColor::Yellow,
+      "blue" => TerminalColor::Blue,
+      "magenta" => TerminalColor::Magenta,
+      "cyan" => TerminalColor::Cyan,
+      "white" => TerminalColor::White,
+      "bright_black" => TerminalColor::BrightBlack,
+      "bright_red" => TerminalColor::BrightRed,
+      "bright_green" => TerminalColor::BrightGreen,
+      "bright_yellow" => TerminalColor::BrightYellow,
+      "bright_blue" => TerminalColor::BrightBlue,
+      "bright_magenta" => TerminalColor::BrightMagenta,
+      "bright_cyan" => TerminalColor::BrightCyan,
+      "bright_white" => TerminalColor::BrightWhite,
+      _ => return None,
+    }),
+    PlaybackColor::Rgb([r, g, b]) => TextColor::Rgb { r, g, b },
+    PlaybackColor::ForceRgb([r, g, b]) => TextColor::ForceRgb { r, g, b },
+    PlaybackColor::Transparent => TextColor::Transparent,
+  })
+}
+
 impl RecordingSession {
   fn active_duration(&self, now: Instant, state: RecordingState) -> Duration {
     if state == RecordingState::Recording {
@@ -547,6 +863,7 @@ pub fn run_recording_task(
 mod tests {
   use super::*;
   use crate::host_engine::services::{TextColor, TextStyle};
+  use std::time::{SystemTime, UNIX_EPOCH};
 
   fn frame(width: u16, height: u16, values: &[(u16, u16, &str)]) -> ComposedFrame {
     let mut frame = ComposedFrame::new(width, height);
@@ -558,6 +875,37 @@ mod tests {
       );
     }
     frame
+  }
+
+  fn playback_file(value: serde_json::Value) -> PathBuf {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+      "tui-game-recording-playback-{}-{nonce}.json",
+      std::process::id()
+    ));
+    fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+    path
+  }
+
+  fn playback_document(schema_version: u32, frame_rate: Option<u16>) -> serde_json::Value {
+    serde_json::json!({
+      "schema_version": schema_version,
+      "started_at": "2026-07-21T20:20:32.895Z",
+      "finished_at": "2026-07-21T20:20:34.895Z",
+      "frame_rate": frame_rate,
+      "canvas": { "max_width": 2, "max_height": 1 },
+      "duration_us": { "active": 2_000_000, "paused": 0, "wall": 2_000_000 },
+      "palette": [
+        { "text": " " },
+        { "text": "x", "foreground": { "type": "rgb", "value": [1, 2, 3] } },
+        { "text": "y" }
+      ],
+      "initial": { "width": 2, "height": 1, "rows": [[[2, 1]]] },
+      "events": [{ "time_us": 1_000_000, "size": [2, 1], "changes": [[0, 1, [2]]] }]
+    })
   }
 
   #[test]
@@ -653,5 +1001,49 @@ mod tests {
     assert_eq!(value["frame_rate"], 60);
     assert_eq!(value["duration_us"]["active"], 2_000_000);
     assert_eq!(value["events"][0]["time_us"], 16_667);
+  }
+
+  #[test]
+  fn playback_loads_header_first_and_applies_events_by_recorded_time() {
+    let path = playback_file(playback_document(RECORDING_SCHEMA_VERSION, Some(60)));
+
+    let metadata = load_recording_playback_metadata(&path).unwrap();
+    assert_eq!(metadata.frame_rate, Some(60));
+    assert_eq!(metadata.duration_us, 2_000_000);
+
+    let playback = load_recording_playback(&path).unwrap();
+    let mut frame = playback.initial_frame();
+    let mut cursor = 0;
+    playback.apply_until(&mut frame, &mut cursor, 999_999);
+    assert_eq!(frame.get(1, 0), frame.get(0, 0));
+    playback.apply_until(&mut frame, &mut cursor, 1_000_000);
+    let Some(ComposedCell::Text(cell)) = frame.get(1, 0) else {
+      panic!("event should produce a text cell");
+    };
+    assert_eq!(cell.text, "y");
+    fs::remove_file(path).unwrap();
+  }
+
+  #[test]
+  fn legacy_playback_without_frame_rate_remains_supported() {
+    let path = playback_file(playback_document(1, None));
+
+    assert_eq!(
+      load_recording_playback_metadata(&path).unwrap().frame_rate,
+      None
+    );
+    assert!(load_recording_playback(&path).is_some());
+    fs::remove_file(path).unwrap();
+  }
+
+  #[test]
+  fn structurally_invalid_recording_keeps_header_but_rejects_playback() {
+    let mut document = playback_document(RECORDING_SCHEMA_VERSION, Some(60));
+    document["events"][0]["changes"] = serde_json::json!([[0, 2, [2]]]);
+    let path = playback_file(document);
+
+    assert!(load_recording_playback_metadata(&path).is_some());
+    assert!(load_recording_playback(&path).is_none());
+    fs::remove_file(path).unwrap();
   }
 }

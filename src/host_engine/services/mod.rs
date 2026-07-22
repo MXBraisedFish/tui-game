@@ -32,6 +32,7 @@ mod time;
 mod ui;
 mod unicode;
 mod version;
+mod video;
 pub(crate) mod widget;
 
 pub use animation::{
@@ -78,7 +79,9 @@ pub use package::{
 };
 pub use random::RandomService;
 pub use recording::{
-  RecordingAsyncEvent, RecordingService, RecordingSnapshot, RecordingState, RecordingTask,
+  RecordingAsyncEvent, RecordingPlayback, RecordingPlaybackMetadata, RecordingService,
+  RecordingSnapshot, RecordingState, RecordingTask, load_recording_playback,
+  load_recording_playback_metadata,
 };
 pub use render::{BorderStyle, RenderService};
 pub use render_pipeline::{ComposedCell, ComposedFrame, FrameCompositor, FramePresenter};
@@ -88,8 +91,10 @@ pub use rich_text::{
 pub use screenshot::{ScreenshotAsyncEvent, ScreenshotRect, ScreenshotService, ScreenshotTask};
 pub use storage::{
   DisplayFpsLimit, DisplayLogoMode, DisplayOrderMode, DisplaySettingsProfile, DisplaySourceMode,
-  GamePackageState, PackageDefaultState, PackageStateProfile, SafeModeDefault,
-  ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile, StorageService,
+  GamePackageState, PackageDefaultState, PackageStateProfile, RecordingExportFrameRate,
+  RecordingExportQuality, RecordingFrameRate, RecordingPixelScale, RecordingProfile,
+  SafeModeDefault, ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile,
+  StorageService,
 };
 pub use terminal::TerminalService;
 pub use text_layout::DrawTextParams;
@@ -97,6 +102,10 @@ pub use time::TimeService;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;
 pub use version::{HOST_API_VERSION, HOST_VERSION, PACKAGE_MANIFEST_VERSION};
+pub use video::{
+  VideoAsyncEvent, VideoExportError, VideoExportProgress, VideoExportStage, VideoExportStatus,
+  VideoExportTask, VideoService,
+};
 pub use widget::{
   DelayTimerEvent, DelayTimerId, DelayTimerOptions, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, HyperlinkEvent, HyperlinkId, HyperlinkOptions, HyperlinkService, MarkdownEvent,
@@ -124,6 +133,7 @@ pub struct EngineServices {
   pub character_effect: CharacterEffectService,
   pub screenshot: ScreenshotService,
   pub recording: RecordingService,
+  pub video: VideoService,
   pub package: PackageService,
   pub clipboard: ClipboardService,
   pub runtime_objects: RuntimeObjectPool,
@@ -176,6 +186,7 @@ impl EngineServices {
       character_effect: CharacterEffectService::new(),
       screenshot: ScreenshotService::new(),
       recording: RecordingService::new(),
+      video: VideoService::new(),
       terminal: TerminalService::new(),
       clipboard: ClipboardService::new(),
       runtime_objects: RuntimeObjectPool::new(),

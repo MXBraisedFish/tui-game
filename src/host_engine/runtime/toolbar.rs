@@ -103,6 +103,7 @@ pub(super) struct TopToolbarRuntime {
   sampled_frames: u64,
   snapshot: SystemSnapshot,
   image_progress: ExportProgressAnimation,
+  video_progress: ExportProgressAnimation,
 }
 
 impl TopToolbarRuntime {
@@ -132,6 +133,7 @@ impl TopToolbarRuntime {
       sampled_frames: 0,
       snapshot: SystemSnapshot::default(),
       image_progress: ExportProgressAnimation::default(),
+      video_progress: ExportProgressAnimation::default(),
     }
   }
 
@@ -141,6 +143,7 @@ impl TopToolbarRuntime {
 
   pub(super) fn update(&mut self, dt: Duration) {
     self.image_progress.update(dt);
+    self.video_progress.update(dt);
     self.sampled_frames = self.sampled_frames.saturating_add(1);
     self.sample_elapsed = self.sample_elapsed.saturating_add(dt);
     if self.sample_elapsed < SAMPLE_INTERVAL {
@@ -192,6 +195,13 @@ impl TopToolbarRuntime {
     custom_text: Option<&str>,
   ) {
     self.image_progress.observe(image_queue, image_progress);
+    let video_queue = services.video.active_export_count();
+    let video_progress = services
+      .video
+      .first_active_progress()
+      .map(|progress| progress.ratio)
+      .or_else(|| (video_queue > 0).then_some(0.0));
+    self.video_progress.observe(video_queue, video_progress);
     let Some(top) = services.host_objects.area_rect(HostAreaKind::TopBar) else {
       return;
     };
@@ -224,7 +234,10 @@ impl TopToolbarRuntime {
         Some((queue, progress)) => self.draw_export(services, top, true, queue, Some(progress)),
         None => self.draw_export(services, top, true, 0, None),
       },
-      TopToolbarView::VideoExport => self.draw_export(services, top, false, 0, None),
+      TopToolbarView::VideoExport => match self.video_progress.value() {
+        Some((queue, progress)) => self.draw_export(services, top, false, queue, Some(progress)),
+        None => self.draw_export(services, top, false, 0, None),
+      },
       TopToolbarView::Recording => self.draw_recording(services, top),
       TopToolbarView::Custom => {
         let text = custom_text.map(str::to_owned).unwrap_or_else(|| {

@@ -23,7 +23,7 @@ use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, DisplayLogoMode, DisplayOrderMode, DrawTextParams, EngineServices,
   EngineTask, HostAreaKind, ImPolicy, InputActionEvent, KeyState, LogSource, PackageEvent,
   PackageListEntry, RandomGeneratorId, RandomSeed, RecordingState, ScreenshotAsyncEvent,
-  ScreenshotDoubleAction, ScreenshotService, ScreenshotTask, TaskId, TextColor,
+  ScreenshotDoubleAction, ScreenshotService, ScreenshotTask, TaskId, TextColor, VideoAsyncEvent,
   translate_action_map,
 };
 use crate::host_engine::ui::{
@@ -76,10 +76,18 @@ enum ScreenshotModeToastKind {
     copy_succeeded: Option<bool>,
     save: Option<ScreenshotSaveState>,
   },
+  VideoExport(VideoExportToastState),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ScreenshotSaveState {
+  Loading,
+  Succeeded,
+  Failed,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum VideoExportToastState {
   Loading,
   Succeeded,
   Failed,
@@ -139,9 +147,9 @@ impl ScreenshotModeToast {
     self.elapsed = self.elapsed.saturating_add(dt);
     let duration = match self.kind {
       ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => Duration::from_secs(3),
-      ScreenshotModeToastKind::MediaRename { .. } | ScreenshotModeToastKind::Operation { .. } => {
-        Duration::from_secs(2)
-      }
+      ScreenshotModeToastKind::MediaRename { .. }
+      | ScreenshotModeToastKind::Operation { .. }
+      | ScreenshotModeToastKind::VideoExport(_) => Duration::from_secs(2),
     };
     self.elapsed < duration
   }
@@ -405,6 +413,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut pending_screenshot_saves,
       &mut screenshot_mode_toast,
     );
+    apply_video_events(&engine_events.video, &mut screenshot_mode_toast);
 
     services.input.poll_resize_events(|w, h| {
       services.layout.resize_physical(w, h);
@@ -479,6 +488,12 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       &mut pending_screensaver_hotkey,
       &mut pending_toolbar_hotkey,
     );
+    apply_screenshot_operation_feedback(
+      services,
+      &mut screenshot_mode_toast,
+      &mut pending_screenshot_saves,
+    );
+    apply_video_submission_feedback(services, &mut screenshot_mode_toast);
     apply_media_list_notices(&mut screenshot_mode_toast, &mut settings_ui);
     if let Some(fonts) = services.screenshot.take_font_preview_request() {
       submit_font_preview_png(
@@ -513,7 +528,9 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       screenshot_mode_toast.is_some_and(|toast| match toast.kind {
         ScreenshotModeToastKind::Operation { .. } => dismiss_screenshot_operation_toast,
         ScreenshotModeToastKind::Enter | ScreenshotModeToastKind::Exit => dismiss_screenshot_toast,
-        ScreenshotModeToastKind::MediaRename { .. } => false,
+        ScreenshotModeToastKind::MediaRename { .. } | ScreenshotModeToastKind::VideoExport(_) => {
+          false
+        }
       });
     if screenshot_mode_toast.is_some_and(|toast| toast.can_dismiss())
       && should_dismiss_screenshot_toast
@@ -691,6 +708,57 @@ fn apply_screenshot_events(
   }
 }
 
+fn apply_video_events(events: &[VideoAsyncEvent], toast: &mut Option<ScreenshotModeToast>) {
+  for event in events {
+    let state = match event {
+      VideoAsyncEvent::Preparing { .. } => Some(VideoExportToastState::Loading),
+      VideoAsyncEvent::Saved { .. } => Some(VideoExportToastState::Succeeded),
+      VideoAsyncEvent::Failed { .. } => Some(VideoExportToastState::Failed),
+      VideoAsyncEvent::Progress { .. } | VideoAsyncEvent::Finalizing { .. } => None,
+    };
+    if let Some(state) = state {
+      *toast = Some(ScreenshotModeToast::new(
+        ScreenshotModeToastKind::VideoExport(state),
+      ));
+    }
+  }
+}
+
+fn apply_video_submission_feedback(
+  services: &mut EngineServices,
+  toast: &mut Option<ScreenshotModeToast>,
+) {
+  let Some(submitted) = services.video.take_submission_feedback() else {
+    return;
+  };
+  *toast = Some(ScreenshotModeToast::new(
+    ScreenshotModeToastKind::VideoExport(if submitted {
+      VideoExportToastState::Loading
+    } else {
+      VideoExportToastState::Failed
+    }),
+  ));
+}
+
+fn apply_screenshot_operation_feedback(
+  services: &mut EngineServices,
+  toast: &mut Option<ScreenshotModeToast>,
+  pending: &mut HashMap<TaskId, PendingScreenshotSave>,
+) {
+  let Some(feedback) = services.screenshot.take_operation_feedback() else {
+    return;
+  };
+  if let Some(task_id) = feedback.save_task {
+    pending.insert(task_id, PendingScreenshotSave { progress: 0.0 });
+  }
+  *toast = Some(ScreenshotModeToast::new(
+    ScreenshotModeToastKind::Operation {
+      copy_succeeded: feedback.copy_succeeded,
+      save: feedback.save_task.map(|_| ScreenshotSaveState::Loading),
+    },
+  ));
+}
+
 fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<ScreenshotModeToast>) {
   let Some(toast) = toast else {
     return;
@@ -747,6 +815,23 @@ fn draw_screenshot_mode_toast(services: &mut EngineServices, toast: Option<Scree
         }
       }
     }
+    ScreenshotModeToastKind::VideoExport(state) => match state {
+      VideoExportToastState::Loading => TextColor::Rgb {
+        r: 249,
+        g: 232,
+        b: 147,
+      },
+      VideoExportToastState::Succeeded => TextColor::Rgb {
+        r: 95,
+        g: 215,
+        b: 105,
+      },
+      VideoExportToastState::Failed => TextColor::Rgb {
+        r: 255,
+        g: 76,
+        b: 76,
+      },
+    },
   };
   services.render.draw_top_border_rect(
     &mut services.canvas,
@@ -810,6 +895,14 @@ fn screenshot_toast_text(services: &EngineServices, kind: ScreenshotModeToastKin
       }
       parts.join(" / ")
     }
+    ScreenshotModeToastKind::VideoExport(state) => services.i18n.get_runtime_text(
+      "recording",
+      match state {
+        VideoExportToastState::Loading => "recording.mode.export.loading",
+        VideoExportToastState::Succeeded => "recording.mode.export.success",
+        VideoExportToastState::Failed => "recording.mode.export.failed",
+      },
+    ),
   }
 }
 
@@ -1389,11 +1482,13 @@ fn toggle_recording(services: &mut EngineServices) {
         );
         return;
       };
-      let frame_rate = services
-        .storage
-        .display_settings_profile()
-        .game_list_fps
-        .target_fps();
+      let frame_rate = Some(
+        services
+          .storage
+          .read_recording_profile_or_default(&mut services.log)
+          .capture_frame_rate
+          .value(),
+      );
       if services
         .recording
         .start(frame, frame_rate, &services.storage)

@@ -5,15 +5,15 @@ use std::{
 
 use chrono::Local;
 use crossbeam_channel::Sender;
-use image::{ImageBuffer, Rgba, RgbaImage};
+use image::{ImageBuffer, Rgba, RgbaImage, imageops::FilterType};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::host_engine::services::{
-  CanvasCell, ComposedCell, ComposedFrame, EngineEvent, LogService, LogSource, StorageService,
-  TaskId, TerminalColor, TextColor, TextStyle,
+  CanvasCell, ComposedCell, ComposedFrame, EngineEvent, LogService, LogSource, RecordingPixelScale,
+  StorageService, TaskId, TerminalColor, TextColor, TextStyle,
 };
 
 const CELL_WIDTH: u32 = 12;
@@ -53,9 +53,16 @@ pub enum ScreenshotAsyncEvent {
   },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ScreenshotOperationFeedback {
+  pub(crate) copy_succeeded: Option<bool>,
+  pub(crate) save_task: Option<TaskId>,
+}
+
 pub struct ScreenshotService {
   last_presented_frame: Option<ComposedFrame>,
   pending_font_preview: Option<Vec<String>>,
+  pending_operation_feedback: Option<ScreenshotOperationFeedback>,
 }
 
 impl ScreenshotService {
@@ -63,6 +70,7 @@ impl ScreenshotService {
     Self {
       last_presented_frame: None,
       pending_font_preview: None,
+      pending_operation_feedback: None,
     }
   }
 
@@ -72,6 +80,21 @@ impl ScreenshotService {
 
   pub fn take_font_preview_request(&mut self) -> Option<Vec<String>> {
     self.pending_font_preview.take()
+  }
+
+  pub(crate) fn report_operation(
+    &mut self,
+    copy_succeeded: Option<bool>,
+    save_task: Option<TaskId>,
+  ) {
+    self.pending_operation_feedback = Some(ScreenshotOperationFeedback {
+      copy_succeeded,
+      save_task,
+    });
+  }
+
+  pub(crate) fn take_operation_feedback(&mut self) -> Option<ScreenshotOperationFeedback> {
+    self.pending_operation_feedback.take()
   }
 
   pub fn font_preview_frame() -> ComposedFrame {
@@ -467,53 +490,15 @@ fn save_png(
 ) -> Result<(), String> {
   fs::create_dir_all(path.parent().ok_or("PNG path has no parent directory")?)
     .map_err(|error| error.to_string())?;
-  let fonts = FontSet::load(preferred_fonts)?;
-  let width = rect.width as u32 * CELL_WIDTH;
-  let height = rect.height as u32 * CELL_HEIGHT;
-  let mut image = ImageBuffer::from_pixel(width.max(1), height.max(1), Rgba([0, 0, 0, 255]));
-
-  for y in 0..rect.height {
-    for x in 0..rect.width {
-      let Some(ComposedCell::Text(cell)) = frame.get(rect.x + x, rect.y + y) else {
-        continue;
-      };
-      let (fg, bg) = resolved_colors(&cell.style);
-      fill_rect(
-        &mut image,
-        x as u32 * CELL_WIDTH,
-        y as u32 * CELL_HEIGHT,
-        CELL_WIDTH,
-        CELL_HEIGHT,
-        bg,
-      );
-      if cell.style.underline {
-        draw_underline(&mut image, x, y, fg);
-      }
-    }
-    send_progress(
-      event_tx,
-      task_id,
-      y.saturating_add(1),
-      rect.height.saturating_mul(2),
-    );
-  }
-
-  for y in 0..rect.height {
-    for x in 0..rect.width {
-      let Some(ComposedCell::Text(cell)) = frame.get(rect.x + x, rect.y + y) else {
-        continue;
-      };
-      if !cell.is_continuation() {
-        draw_cell_text(&mut image, &fonts, x, y, cell);
-      }
-    }
-    send_progress(
-      event_tx,
-      task_id,
-      rect.height.saturating_add(y).saturating_add(1),
-      rect.height.saturating_mul(2),
-    );
-  }
+  let rasterizer = TerminalFrameRasterizer::load(preferred_fonts)?;
+  let image = rasterizer.render(
+    frame,
+    rect,
+    RecordingPixelScale::Original,
+    |completed, total| {
+      send_progress(event_tx, task_id, completed, total);
+    },
+  );
 
   image.save(path).map_err(|error| error.to_string())
 }
@@ -529,6 +514,81 @@ fn send_progress(
     completed_rows,
     total_rows,
   }));
+}
+
+pub(crate) struct TerminalFrameRasterizer {
+  fonts: FontSet,
+}
+
+impl TerminalFrameRasterizer {
+  pub(crate) fn load(preferred: &[String]) -> Result<Self, String> {
+    Ok(Self {
+      fonts: FontSet::load(preferred)?,
+    })
+  }
+
+  pub(crate) fn dimensions(width: u16, height: u16, scale: RecordingPixelScale) -> (u32, u32) {
+    let (numerator, denominator) = scale.multiplier();
+    (
+      (u32::from(width) * CELL_WIDTH * numerator / denominator).max(1),
+      (u32::from(height) * CELL_HEIGHT * numerator / denominator).max(1),
+    )
+  }
+
+  pub(crate) fn render(
+    &self,
+    frame: &ComposedFrame,
+    rect: ScreenshotRect,
+    scale: RecordingPixelScale,
+    mut progress: impl FnMut(u16, u16),
+  ) -> RgbaImage {
+    let width = u32::from(rect.width) * CELL_WIDTH;
+    let height = u32::from(rect.height) * CELL_HEIGHT;
+    let mut image = ImageBuffer::from_pixel(width.max(1), height.max(1), Rgba([0, 0, 0, 255]));
+
+    for y in 0..rect.height {
+      for x in 0..rect.width {
+        let Some(ComposedCell::Text(cell)) = frame.get(rect.x + x, rect.y + y) else {
+          continue;
+        };
+        let (fg, bg) = resolved_colors(&cell.style);
+        fill_rect(
+          &mut image,
+          u32::from(x) * CELL_WIDTH,
+          u32::from(y) * CELL_HEIGHT,
+          CELL_WIDTH,
+          CELL_HEIGHT,
+          bg,
+        );
+        if cell.style.underline {
+          draw_underline(&mut image, x, y, fg);
+        }
+      }
+      progress(y.saturating_add(1), rect.height.saturating_mul(2));
+    }
+
+    for y in 0..rect.height {
+      for x in 0..rect.width {
+        let Some(ComposedCell::Text(cell)) = frame.get(rect.x + x, rect.y + y) else {
+          continue;
+        };
+        if !cell.is_continuation() {
+          draw_cell_text(&mut image, &self.fonts, x, y, cell);
+        }
+      }
+      progress(
+        rect.height.saturating_add(y).saturating_add(1),
+        rect.height.saturating_mul(2),
+      );
+    }
+
+    if scale == RecordingPixelScale::Original {
+      image
+    } else {
+      let (width, height) = Self::dimensions(rect.width, rect.height, scale);
+      image::imageops::resize(&image, width, height, FilterType::Nearest)
+    }
+  }
 }
 
 struct FontSet {
@@ -919,6 +979,7 @@ fn terminal_rgb(color: &TerminalColor) -> (u8, u8, u8) {
 #[cfg(test)]
 mod tests {
   use super::ScreenshotService;
+  use crate::host_engine::services::TaskId;
 
   #[test]
   fn font_preview_contains_representative_unicode_groups() {
@@ -942,5 +1003,16 @@ mod tests {
       Some(vec!["test.ttf".to_string()])
     );
     assert_eq!(service.take_font_preview_request(), None);
+  }
+
+  #[test]
+  fn operation_feedback_is_consumed_once() {
+    let mut service = ScreenshotService::new();
+    service.report_operation(Some(true), Some(TaskId(7)));
+
+    let feedback = service.take_operation_feedback().unwrap();
+    assert_eq!(feedback.copy_succeeded, Some(true));
+    assert_eq!(feedback.save_task, Some(TaskId(7)));
+    assert_eq!(service.take_operation_feedback(), None);
   }
 }

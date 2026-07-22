@@ -20,6 +20,7 @@ use super::{
   package::{self, PackageAsyncEvent, PackageTask},
   recording::{self, RecordingAsyncEvent, RecordingTask},
   screenshot::{self, ScreenshotAsyncEvent, ScreenshotTask},
+  video::{self, VideoAsyncEvent, VideoExportTask},
   widget::runtime_object::time::TimeCallbackId,
 };
 
@@ -127,6 +128,7 @@ pub enum EngineTask {
   Export(ExportTask),
   Screenshot(ScreenshotTask),
   Recording(RecordingTask),
+  Video(VideoExportTask),
   File(FileTask),
   Image(ImageTask),
   Network(NetworkTask),
@@ -141,6 +143,7 @@ pub enum EngineEvent {
   Export(ExportAsyncEvent),
   Screenshot(ScreenshotAsyncEvent),
   Recording(RecordingAsyncEvent),
+  Video(VideoAsyncEvent),
   File(FileEvent),
   Image(ImageEvent),
   Network(NetworkEvent),
@@ -332,6 +335,7 @@ fn run_task(id: TaskId, task: EngineTask, event_tx: &Sender<EngineEvent>) -> Res
     EngineTask::Export(task) => export::run_export_task(id, task, event_tx),
     EngineTask::Screenshot(task) => screenshot::run_screenshot_task(id, task, event_tx),
     EngineTask::Recording(task) => recording::run_recording_task(id, task, event_tx),
+    EngineTask::Video(task) => video::run_video_task(id, task, event_tx),
     EngineTask::File(task) => run_file_task(id, task, event_tx),
     EngineTask::Image(task) => run_image_task(id, task, event_tx),
     EngineTask::Network(task) => run_network_task(id, task, event_tx),

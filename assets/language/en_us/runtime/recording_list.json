@@ -3,6 +3,8 @@
   "recording_list.info": "Info",
   "recording_list.no.image": "No Recordings Found",
   "recording_list.no.info": "No Information Available",
+  "recording_list.loading": "Processing Recording...",
+  "recording_list.nope": "Failed to Load Recording",
   "recording_list.action.scroll.list": "{key:recording_list.scroll_up}/{key:recording_list.scroll_down} Scroll",
   "recording_list.action.scroll.info": "{key:recording_list.scroll_up}/{key:recording_list.scroll_down}/{key:recording_list.scroll_left}/{key:recording_list.scroll_right} Pan",
   "recording_list.action.select": "{key:recording_list.focus_up}/{key:recording_list.focus_down} Select",
