@@ -115,6 +115,28 @@ impl ScrollBoxService {
     Some(effective_viewport(state, layout.developer_size()))
   }
 
+  /// 查询组件包含外置滚动条在内的实际占用区域。
+  pub fn occupied_rect(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) -> Option<Rect> {
+    let state = pool.scroll_boxes.boxes.get(&id)?;
+    Some(resolve_scroll_box_layout(state, layout.developer_size()).occupied_rect)
+  }
+
+  /// 查询内容真正能够显示和命中的区域。
+  pub fn content_viewport_rect(
+    &self,
+    pool: &UiObjectPool,
+    id: ScrollBoxId,
+    layout: &LayoutService,
+  ) -> Option<Rect> {
+    let state = pool.scroll_boxes.boxes.get(&id)?;
+    Some(resolve_scroll_box_layout(state, layout.developer_size()).content_viewport_rect)
+  }
+
   pub fn set_rect(
     &self,
     pool: &mut UiObjectPool,
@@ -302,11 +324,15 @@ impl ScrollBoxService {
     id: ScrollBoxId,
     content_x: u16,
     content_y: u16,
+    layout: &LayoutService,
   ) -> Option<(u16, u16)> {
     let state = pool.scroll_boxes.boxes.get(&id)?;
     let viewport_x = content_x.checked_sub(state.scroll_x)?;
     let viewport_y = content_y.checked_sub(state.scroll_y)?;
-    Some((viewport_x, viewport_y))
+    let content_viewport =
+      resolve_scroll_box_layout(state, layout.developer_size()).content_viewport_rect;
+    (viewport_x < content_viewport.width && viewport_y < content_viewport.height)
+      .then_some((viewport_x, viewport_y))
   }
 
   /// 将视口坐标转换为内容坐标。
@@ -316,8 +342,14 @@ impl ScrollBoxService {
     id: ScrollBoxId,
     viewport_x: u16,
     viewport_y: u16,
+    layout: &LayoutService,
   ) -> Option<(u16, u16)> {
     let state = pool.scroll_boxes.boxes.get(&id)?;
+    let content_viewport =
+      resolve_scroll_box_layout(state, layout.developer_size()).content_viewport_rect;
+    if viewport_x >= content_viewport.width || viewport_y >= content_viewport.height {
+      return None;
+    }
     let content_x = state.scroll_x.saturating_add(viewport_x);
     let content_y = state.scroll_y.saturating_add(viewport_y);
     Some((content_x, content_y))
@@ -600,13 +632,13 @@ impl ScrollBoxService {
     let Some(state) = pool.scroll_boxes.boxes.get(&id) else {
       return false;
     };
-    let clamped = clamp_rect(state.options.rect, viewport);
+    let resolved = resolve_scroll_box_layout(state, viewport);
 
     // 命中测试垂直滚动条滑块。
-    if let Some(thumb) = vertical_thumb_rect(state, viewport) {
+    if let Some(thumb) = resolved.vertical_thumb_rect {
       let physical = scrollbar_physical_rect(thumb, canvas.viewport());
       if physical.contains(event.x, event.y) {
-        let bar = vertical_scrollbar_rect(state, viewport).unwrap();
+        let bar = resolved.vertical_track_rect.unwrap();
         // 滑块在轨道内的本地偏移（开发者坐标）。
         let thumb_local = thumb.y.saturating_sub(bar.y);
         pool.scroll_boxes.drag = Some(ScrollBoxDragState {
@@ -617,21 +649,22 @@ impl ScrollBoxService {
           drag_start_thumb_pos: thumb_local,
           thumb_size: thumb.height,
           track_size: bar.height,
-          max_scroll: max_scroll_y(state, viewport),
+          max_scroll: resolved.max_scroll_y,
         });
         return true;
       }
     }
 
     // 命中测试垂直滚动条轨道（翻页）。
-    if let Some(bar) = vertical_scrollbar_rect(state, viewport) {
+    if let Some(bar) = resolved.vertical_track_rect {
       let physical = scrollbar_physical_rect(bar, canvas.viewport());
       if physical.contains(event.x, event.y) {
-        let step = clamped.height as i32;
+        let step = resolved.content_viewport_rect.height as i32;
         if event.y
           < physical.y.saturating_add(
-            vertical_thumb_rect(state, viewport)
-              .map(|t| t.y.saturating_sub(clamped.y))
+            resolved
+              .vertical_thumb_rect
+              .map(|thumb| thumb.y.saturating_sub(bar.y))
               .unwrap_or(0),
           )
         {
@@ -644,10 +677,10 @@ impl ScrollBoxService {
     }
 
     // 命中测试水平滚动条滑块。
-    if let Some(thumb) = horizontal_thumb_rect(state, viewport) {
+    if let Some(thumb) = resolved.horizontal_thumb_rect {
       let physical = scrollbar_physical_rect(thumb, canvas.viewport());
       if physical.contains(event.x, event.y) {
-        let bar = horizontal_scrollbar_rect(state, viewport).unwrap();
+        let bar = resolved.horizontal_track_rect.unwrap();
         // 滑块在轨道内的本地偏移（开发者坐标）。
         let thumb_local = thumb.x.saturating_sub(bar.x);
         pool.scroll_boxes.drag = Some(ScrollBoxDragState {
@@ -658,21 +691,22 @@ impl ScrollBoxService {
           drag_start_thumb_pos: thumb_local,
           thumb_size: thumb.width,
           track_size: bar.width,
-          max_scroll: max_scroll_x(state, viewport),
+          max_scroll: resolved.max_scroll_x,
         });
         return true;
       }
     }
 
     // 命中测试水平滚动条轨道（翻页）。
-    if let Some(bar) = horizontal_scrollbar_rect(state, viewport) {
+    if let Some(bar) = resolved.horizontal_track_rect {
       let physical = scrollbar_physical_rect(bar, canvas.viewport());
       if physical.contains(event.x, event.y) {
-        let step = clamped.width as i32;
+        let step = resolved.content_viewport_rect.width as i32;
         if event.x
           < physical.x.saturating_add(
-            horizontal_thumb_rect(state, viewport)
-              .map(|t| t.x.saturating_sub(clamped.x))
+            resolved
+              .horizontal_thumb_rect
+              .map(|thumb| thumb.x.saturating_sub(bar.x))
               .unwrap_or(0),
           )
         {
@@ -780,23 +814,139 @@ pub(crate) fn clamp_rect(rect: Rect, viewport: Size) -> Rect {
   }
 }
 
-/// 计算考虑滚动条占位后的有效 viewport 尺寸。
-pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size {
-  let rect = clamp_rect(state.options.rect, viewport);
-  let mut w = rect.width;
-  let mut h = rect.height;
-  // 滚动条实际占据的格子不属于内容可视区。即使使用 Overlay，内容也不能把
-  // 被轨道覆盖的最后一列/行算作可见，否则会出现“能滚动但不显示对应滚动条”。
-  let (vertical, horizontal) = resolved_scrollbar_visibility(state, rect);
-  if vertical {
-    w = w.saturating_sub(1);
-  }
-  if horizontal {
-    h = h.saturating_sub(1);
-  }
-  Size {
-    width: w,
-    height: h,
+/// ScrollBox 的完整区域解析结果。
+///
+/// 所有滚动、裁剪、绘制与命中检测都必须使用该结果，禁止再次根据 options
+/// 推导滚动条可见性，避免不同阶段对同一格子的归属产生分歧。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ResolvedScrollBoxLayout {
+  /// `options.rect` 经 Developer Viewport 裁剪后的组件 viewport。
+  pub viewport_rect: Rect,
+  /// 排除滚动条实际占用格子后的内容可视区域。
+  pub content_viewport_rect: Rect,
+  /// viewport 与外置滚动条共同占用的区域。
+  pub occupied_rect: Rect,
+  pub vertical_track_rect: Option<Rect>,
+  pub horizontal_track_rect: Option<Rect>,
+  pub vertical_thumb_rect: Option<Rect>,
+  pub horizontal_thumb_rect: Option<Rect>,
+  pub max_scroll_x: u16,
+  pub max_scroll_y: u16,
+}
+
+pub(crate) fn resolve_scroll_box_layout(
+  state: &ScrollBoxState,
+  viewport: Size,
+) -> ResolvedScrollBoxLayout {
+  let viewport_rect = clamp_rect(state.options.rect, viewport);
+  let (vertical, horizontal) = resolved_scrollbar_visibility(state, viewport_rect);
+  let content_viewport_rect = Rect {
+    x: viewport_rect.x,
+    y: viewport_rect.y,
+    width: viewport_rect.width.saturating_sub(u16::from(vertical)),
+    height: viewport_rect.height.saturating_sub(u16::from(horizontal)),
+  };
+
+  let vertical_track_rect = vertical
+    .then(|| {
+      let x = match state.options.scrollbar_layout {
+        ScrollbarLayout::Overlay | ScrollbarLayout::Inside => viewport_rect
+          .x
+          .saturating_add(viewport_rect.width)
+          .saturating_sub(1),
+        ScrollbarLayout::ReserveSpace => {
+          let outside_x = viewport_rect.x.saturating_add(viewport_rect.width);
+          if outside_x < viewport.width {
+            outside_x
+          } else {
+            outside_x.saturating_sub(1)
+          }
+        }
+      };
+      Rect {
+        x,
+        y: viewport_rect.y,
+        width: 1,
+        height: content_viewport_rect.height,
+      }
+    })
+    .filter(|rect| rect.width > 0 && rect.height > 0 && rect.x < viewport.width);
+  let horizontal_track_rect = horizontal
+    .then(|| {
+      let y = match state.options.scrollbar_layout {
+        ScrollbarLayout::Overlay | ScrollbarLayout::Inside => viewport_rect
+          .y
+          .saturating_add(viewport_rect.height)
+          .saturating_sub(1),
+        ScrollbarLayout::ReserveSpace => {
+          let outside_y = viewport_rect.y.saturating_add(viewport_rect.height);
+          if outside_y < viewport.height {
+            outside_y
+          } else {
+            outside_y.saturating_sub(1)
+          }
+        }
+      };
+      Rect {
+        x: viewport_rect.x,
+        y,
+        width: content_viewport_rect.width,
+        height: 1,
+      }
+    })
+    .filter(|rect| rect.width > 0 && rect.height > 0 && rect.y < viewport.height);
+
+  let max_scroll_x = if content_viewport_rect.width > 0 {
+    state
+      .options
+      .content_width
+      .saturating_sub(content_viewport_rect.width)
+  } else {
+    0
+  };
+  let max_scroll_y = if content_viewport_rect.height > 0 {
+    state
+      .options
+      .content_height
+      .saturating_sub(content_viewport_rect.height)
+  } else {
+    0
+  };
+  let vertical_thumb_rect = vertical_track_rect.map(|track| {
+    scrollbar_thumb_rect(
+      track,
+      ScrollbarAxis::Vertical,
+      state.scroll_y,
+      max_scroll_y,
+      state.options.content_height,
+      state.options.scrollbar_style.minimum_thumb_height,
+    )
+  });
+  let horizontal_thumb_rect = horizontal_track_rect.map(|track| {
+    scrollbar_thumb_rect(
+      track,
+      ScrollbarAxis::Horizontal,
+      state.scroll_x,
+      max_scroll_x,
+      state.options.content_width,
+      state.options.scrollbar_style.minimum_thumb_height,
+    )
+  });
+  let occupied_rect = [vertical_track_rect, horizontal_track_rect]
+    .into_iter()
+    .flatten()
+    .fold(viewport_rect, union_rect);
+
+  ResolvedScrollBoxLayout {
+    viewport_rect,
+    content_viewport_rect,
+    occupied_rect,
+    vertical_track_rect,
+    horizontal_track_rect,
+    vertical_thumb_rect,
+    horizontal_thumb_rect,
+    max_scroll_x,
+    max_scroll_y,
   }
 }
 
@@ -845,144 +995,105 @@ fn scrollbar_visible(
 ) -> bool {
   match policy {
     ScrollbarVisibility::Always => axis_extent > 0,
-    ScrollbarVisibility::Auto => content > available,
+    ScrollbarVisibility::Auto => axis_extent > 0 && content > available,
     ScrollbarVisibility::Never => false,
+  }
+}
+
+fn scrollbar_thumb_rect(
+  track: Rect,
+  axis: ScrollbarAxis,
+  scroll: u16,
+  max_scroll: u16,
+  content_extent: u16,
+  minimum_thumb_extent: u16,
+) -> Rect {
+  let track_extent = match axis {
+    ScrollbarAxis::Vertical => track.height,
+    ScrollbarAxis::Horizontal => track.width,
+  };
+  let thumb_extent = if max_scroll == 0 {
+    track_extent
+  } else {
+    ((u32::from(track_extent) * u32::from(track_extent)) / u32::from(content_extent.max(1)))
+      .max(u32::from(minimum_thumb_extent))
+      .min(u32::from(track_extent)) as u16
+  };
+  let travel = track_extent.saturating_sub(thumb_extent);
+  let thumb_offset = if max_scroll == 0 {
+    0
+  } else {
+    (u32::from(scroll.min(max_scroll)) * u32::from(travel) / u32::from(max_scroll)) as u16
+  };
+  match axis {
+    ScrollbarAxis::Vertical => Rect {
+      x: track.x,
+      y: track.y.saturating_add(thumb_offset),
+      width: track.width,
+      height: thumb_extent,
+    },
+    ScrollbarAxis::Horizontal => Rect {
+      x: track.x.saturating_add(thumb_offset),
+      y: track.y,
+      width: thumb_extent,
+      height: track.height,
+    },
+  }
+}
+
+fn union_rect(left: Rect, right: Rect) -> Rect {
+  let x = left.x.min(right.x);
+  let y = left.y.min(right.y);
+  let right_edge = left
+    .x
+    .saturating_add(left.width)
+    .max(right.x.saturating_add(right.width));
+  let bottom_edge = left
+    .y
+    .saturating_add(left.height)
+    .max(right.y.saturating_add(right.height));
+  Rect {
+    x,
+    y,
+    width: right_edge.saturating_sub(x),
+    height: bottom_edge.saturating_sub(y),
+  }
+}
+
+/// 计算滚动条占位后的内容可视尺寸。
+pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size {
+  let rect = resolve_scroll_box_layout(state, viewport).content_viewport_rect;
+  Size {
+    width: rect.width,
+    height: rect.height,
   }
 }
 
 /// 垂直滚动条是否应显示。
 pub(crate) fn shows_vertical_scrollbar(state: &ScrollBoxState, viewport: Size) -> bool {
-  let rect = clamp_rect(state.options.rect, viewport);
-  resolved_scrollbar_visibility(state, rect).0
+  resolve_scroll_box_layout(state, viewport)
+    .vertical_track_rect
+    .is_some()
 }
 
 /// 水平滚动条是否应显示。
 pub(crate) fn shows_horizontal_scrollbar(state: &ScrollBoxState, viewport: Size) -> bool {
-  let rect = clamp_rect(state.options.rect, viewport);
-  resolved_scrollbar_visibility(state, rect).1
+  resolve_scroll_box_layout(state, viewport)
+    .horizontal_track_rect
+    .is_some()
 }
 
 pub(crate) fn max_scroll_x(state: &ScrollBoxState, viewport: Size) -> u16 {
-  state
-    .options
-    .content_width
-    .saturating_sub(effective_viewport(state, viewport).width)
+  resolve_scroll_box_layout(state, viewport).max_scroll_x
 }
 
 pub(crate) fn max_scroll_y(state: &ScrollBoxState, viewport: Size) -> u16 {
-  state
-    .options
-    .content_height
-    .saturating_sub(effective_viewport(state, viewport).height)
+  resolve_scroll_box_layout(state, viewport).max_scroll_y
 }
 
 pub(crate) fn clamp_scroll(state: &mut ScrollBoxState, viewport: Size) {
   state.scroll_x = state.scroll_x.min(max_scroll_x(state, viewport));
   state.scroll_y = state.scroll_y.min(max_scroll_y(state, viewport));
-}
-
-/// 垂直滚动条轨道矩形（开发者坐标）。
-pub(crate) fn vertical_scrollbar_rect(state: &ScrollBoxState, viewport: Size) -> Option<Rect> {
-  if !shows_vertical_scrollbar(state, viewport) {
-    return None;
-  }
-  let rect = clamp_rect(state.options.rect, viewport);
-  let x = match state.options.scrollbar_layout {
-    ScrollbarLayout::Overlay | ScrollbarLayout::Inside => {
-      rect.x.saturating_add(rect.width).saturating_sub(1)
-    }
-    ScrollbarLayout::ReserveSpace => rect.x.saturating_add(rect.width),
-  };
-  if x >= viewport.width {
-    return None;
-  }
-  Some(Rect {
-    x,
-    y: rect.y,
-    width: 1,
-    height: rect
-      .height
-      .saturating_sub(u16::from(shows_horizontal_scrollbar(state, viewport))),
-  })
-}
-
-/// 水平滚动条轨道矩形（开发者坐标）。
-pub(crate) fn horizontal_scrollbar_rect(state: &ScrollBoxState, viewport: Size) -> Option<Rect> {
-  if !shows_horizontal_scrollbar(state, viewport) {
-    return None;
-  }
-  let rect = clamp_rect(state.options.rect, viewport);
-  let y = match state.options.scrollbar_layout {
-    ScrollbarLayout::Overlay | ScrollbarLayout::Inside => {
-      rect.y.saturating_add(rect.height).saturating_sub(1)
-    }
-    ScrollbarLayout::ReserveSpace => rect.y.saturating_add(rect.height),
-  };
-  if y >= viewport.height {
-    return None;
-  }
-  // 两个滚动条同时存在时把右下角留空，避免轨道相互覆盖。
-  let width = rect
-    .width
-    .saturating_sub(u16::from(shows_vertical_scrollbar(state, viewport)));
-  Some(Rect {
-    x: rect.x,
-    y,
-    width,
-    height: 1,
-  })
-}
-
-/// 垂直滚动条滑块矩形（开发者坐标）。
-pub(crate) fn vertical_thumb_rect(state: &ScrollBoxState, viewport: Size) -> Option<Rect> {
-  let bar = vertical_scrollbar_rect(state, viewport)?;
-  let max_scroll = max_scroll_y(state, viewport);
-  let height = bar.height;
-  let thumb_height = if max_scroll == 0 {
-    height
-  } else {
-    ((height as u32 * height as u32) / state.options.content_height.max(1) as u32)
-      .max(state.options.scrollbar_style.minimum_thumb_height as u32)
-      .min(height as u32) as u16
-  };
-  let travel = height.saturating_sub(thumb_height);
-  let thumb_y = if max_scroll == 0 {
-    0
-  } else {
-    (state.scroll_y as u32 * travel as u32 / max_scroll as u32) as u16
-  };
-  Some(Rect {
-    x: bar.x,
-    y: bar.y.saturating_add(thumb_y),
-    width: 1,
-    height: thumb_height,
-  })
-}
-
-/// 水平滚动条滑块矩形（开发者坐标）。
-pub(crate) fn horizontal_thumb_rect(state: &ScrollBoxState, viewport: Size) -> Option<Rect> {
-  let bar = horizontal_scrollbar_rect(state, viewport)?;
-  let max_scroll = max_scroll_x(state, viewport);
-  let width = bar.width;
-  let thumb_width = if max_scroll == 0 {
-    width
-  } else {
-    ((width as u32 * width as u32) / state.options.content_width.max(1) as u32)
-      .max(state.options.scrollbar_style.minimum_thumb_height as u32)
-      .min(width as u32) as u16
-  };
-  let travel = width.saturating_sub(thumb_width);
-  let thumb_x = if max_scroll == 0 {
-    0
-  } else {
-    (state.scroll_x as u32 * travel as u32 / max_scroll as u32) as u16
-  };
-  Some(Rect {
-    x: bar.x.saturating_add(thumb_x),
-    y: bar.y,
-    width: thumb_width,
-    height: 1,
-  })
 }
 
 /// 将开发者坐标下的滚动条矩形转换到物理坐标。
@@ -1014,25 +1125,10 @@ fn find_scroll_box_for_interaction(
         if !state.options.visible {
           return None;
         }
-        let content_rect = clamp_rect(state.options.rect, viewport_size);
-        let physical_content = scrollbar_physical_rect(content_rect, canvas.viewport());
-        if physical_content.contains(x, y) {
-          return Some(*id);
-        }
-        // 同时检查滚动条区域（ReserveSpace 下会超出内容矩形）。
-        if let Some(v_bar) = vertical_scrollbar_rect(state, viewport_size) {
-          let p = scrollbar_physical_rect(v_bar, canvas.viewport());
-          if p.contains(x, y) {
-            return Some(*id);
-          }
-        }
-        if let Some(h_bar) = horizontal_scrollbar_rect(state, viewport_size) {
-          let p = scrollbar_physical_rect(h_bar, canvas.viewport());
-          if p.contains(x, y) {
-            return Some(*id);
-          }
-        }
-        None
+        let occupied = resolve_scroll_box_layout(state, viewport_size).occupied_rect;
+        scrollbar_physical_rect(occupied, canvas.viewport())
+          .contains(x, y)
+          .then_some(*id)
       }
       _ => None,
     })
@@ -1189,18 +1285,21 @@ mod tests {
 
     // 内容 → 视口。
     assert_eq!(
-      service.content_to_viewport_point(&pool, id, 3, 5),
+      service.content_to_viewport_point(&pool, id, 3, 5, &layout),
       Some((0, 0))
     );
-    assert_eq!(service.content_to_viewport_point(&pool, id, 0, 0), None); // 内容坐标 < scroll → None
+    assert_eq!(
+      service.content_to_viewport_point(&pool, id, 0, 0, &layout),
+      None
+    ); // 内容坐标 < scroll → None
 
     // 视口 → 内容。
     assert_eq!(
-      service.viewport_to_content_point(&pool, id, 0, 0),
+      service.viewport_to_content_point(&pool, id, 0, 0, &layout),
       Some((3, 5))
     );
     assert_eq!(
-      service.viewport_to_content_point(&pool, id, 1, 1),
+      service.viewport_to_content_point(&pool, id, 1, 1, &layout),
       Some((4, 6))
     );
   }
@@ -1596,8 +1695,36 @@ mod tests {
       height: 5,
     };
 
-    assert!(shows_vertical_scrollbar(&state, viewport));
-    assert!(shows_horizontal_scrollbar(&state, viewport));
+    let resolved = resolve_scroll_box_layout(&state, viewport);
+    assert!(resolved.vertical_track_rect.is_some());
+    assert!(resolved.horizontal_track_rect.is_some());
+    assert_eq!(
+      resolved.content_viewport_rect,
+      Rect {
+        x: 0,
+        y: 0,
+        width: 9,
+        height: 4
+      }
+    );
+    assert_eq!(
+      resolved.vertical_track_rect,
+      Some(Rect {
+        x: 9,
+        y: 0,
+        width: 1,
+        height: 4
+      })
+    );
+    assert_eq!(
+      resolved.horizontal_track_rect,
+      Some(Rect {
+        x: 0,
+        y: 4,
+        width: 9,
+        height: 1
+      })
+    );
     assert_eq!(
       effective_viewport(&state, viewport),
       Size {
@@ -1779,6 +1906,112 @@ mod tests {
         width: 9,
         height: 5
       })
+    );
+  }
+
+  #[test]
+  fn scrollbar_cells_are_not_content_coordinates() {
+    let service = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(10, 5);
+    let id = service
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 5,
+          },
+          content_width: 10,
+          content_height: 6,
+          overflow_x: Overflow::Auto,
+          scrollbar: ScrollbarPolicy {
+            vertical: ScrollbarVisibility::Auto,
+            horizontal: ScrollbarVisibility::Auto,
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+
+    assert_eq!(
+      service.viewport_to_content_point(&pool, id, 8, 3, &layout),
+      Some((8, 3))
+    );
+    assert_eq!(
+      service.content_to_viewport_point(&pool, id, 8, 3, &layout),
+      Some((8, 3))
+    );
+    assert_eq!(
+      service.viewport_to_content_point(&pool, id, 9, 0, &layout),
+      None
+    );
+    assert_eq!(
+      service.viewport_to_content_point(&pool, id, 0, 4, &layout),
+      None
+    );
+    assert_eq!(
+      service.content_to_viewport_point(&pool, id, 9, 0, &layout),
+      None
+    );
+    assert_eq!(
+      service.content_to_viewport_point(&pool, id, 0, 4, &layout),
+      None
+    );
+  }
+
+  #[test]
+  fn reserve_space_scrollbars_remain_visible_at_viewport_edge() {
+    let state = ScrollBoxState {
+      options: ScrollBoxOptions {
+        rect: Rect {
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 5,
+        },
+        content_width: 20,
+        content_height: 10,
+        scrollbar_layout: ScrollbarLayout::ReserveSpace,
+        scrollbar: ScrollbarPolicy {
+          vertical: ScrollbarVisibility::Auto,
+          horizontal: ScrollbarVisibility::Auto,
+        },
+        ..Default::default()
+      },
+      scroll_x: 0,
+      scroll_y: 0,
+    };
+    let resolved = resolve_scroll_box_layout(
+      &state,
+      Size {
+        width: 10,
+        height: 5,
+      },
+    );
+
+    assert_eq!(resolved.vertical_track_rect.unwrap().x, 9);
+    assert_eq!(resolved.horizontal_track_rect.unwrap().y, 4);
+    assert_eq!(
+      resolved.content_viewport_rect,
+      Rect {
+        x: 0,
+        y: 0,
+        width: 9,
+        height: 4
+      }
+    );
+    assert_eq!(
+      resolved.occupied_rect,
+      Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 5
+      }
     );
   }
 

@@ -27,6 +27,7 @@ const LABEL_KEYS: [&str; MENU_LEN] = [
 pub struct RecordingSettingsUi {
   selected_index: usize,
   profile: RecordingProfile,
+  shared_fonts: Vec<String>,
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
   back_area: HitAreaId,
@@ -39,6 +40,7 @@ pub struct RecordingSettingsUi {
 pub enum RecordingSettingsCommand {
   Back,
   Changed(RecordingProfile),
+  ChangedFonts(Vec<String>),
   ExportFontPreview(Vec<String>),
   OpenFonts,
   StartAddFont,
@@ -74,12 +76,14 @@ impl RecordingSettingsUi {
     text_input: &TextInputService,
     scroll_box: &ScrollBoxService,
     profile: RecordingProfile,
+    shared_fonts: Vec<String>,
   ) -> Self {
     let mut objects = UiObjectPool::new();
-    let fonts = FontsSettingsUi::create_recording(&mut objects, hit_area, text_input, scroll_box);
+    let fonts = FontsSettingsUi::create(&mut objects, hit_area, text_input, scroll_box);
     Self {
       selected_index: 0,
       profile,
+      shared_fonts,
       back_area: hit_area.create(&mut objects, HitAreaOptions::default()),
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       fonts_open: false,
@@ -140,9 +144,9 @@ impl RecordingSettingsUi {
     if self.fonts_open {
       return self.fonts.handle_event(event).map(|command| match command {
         FontsSettingsCommand::Back(fonts) => {
-          self.profile.fonts = fonts;
+          self.shared_fonts = fonts.clone();
           self.fonts_open = false;
-          RecordingSettingsCommand::Changed(self.profile.clone())
+          RecordingSettingsCommand::ChangedFonts(fonts)
         }
         FontsSettingsCommand::ExportPreview(fonts) => {
           RecordingSettingsCommand::ExportFontPreview(fonts)
@@ -200,7 +204,7 @@ impl RecordingSettingsUi {
 
   pub fn open_fonts(&mut self) {
     self.fonts_open = true;
-    self.fonts.enter(self.profile.fonts.clone());
+    self.fonts.enter(self.shared_fonts.clone());
   }
 
   pub fn start_add_font(&mut self, text_input: &mut TextInputService) {

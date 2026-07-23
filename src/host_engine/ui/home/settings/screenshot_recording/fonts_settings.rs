@@ -27,8 +27,6 @@ enum FontEditMode {
 }
 
 pub struct FontsSettingsUi {
-  content_namespace: &'static str,
-  content_prefix: &'static str,
   scroll: ScrollBoxId,
   input: TextInputId,
   fonts: Vec<String>,
@@ -45,40 +43,6 @@ impl FontsSettingsUi {
     hit_area: &HitAreaService,
     text_input: &TextInputService,
     scroll_box: &ScrollBoxService,
-  ) -> Self {
-    Self::create_with_text(
-      objects,
-      hit_area,
-      text_input,
-      scroll_box,
-      "fonts_settings",
-      "fonts_settings",
-    )
-  }
-
-  pub fn create_recording(
-    objects: &mut UiObjectPool,
-    hit_area: &HitAreaService,
-    text_input: &TextInputService,
-    scroll_box: &ScrollBoxService,
-  ) -> Self {
-    Self::create_with_text(
-      objects,
-      hit_area,
-      text_input,
-      scroll_box,
-      "recording_settings",
-      "recording_settings.fonts",
-    )
-  }
-
-  fn create_with_text(
-    objects: &mut UiObjectPool,
-    hit_area: &HitAreaService,
-    text_input: &TextInputService,
-    scroll_box: &ScrollBoxService,
-    content_namespace: &'static str,
-    content_prefix: &'static str,
   ) -> Self {
     let scroll = scroll_box
       .create(
@@ -107,8 +71,6 @@ impl FontsSettingsUi {
       },
     );
     Self {
-      content_namespace,
-      content_prefix,
       scroll,
       input,
       fonts: Vec::new(),
@@ -255,7 +217,7 @@ impl FontsSettingsUi {
         self.fonts.remove(self.selected);
         self.selected = self.selected.min(self.fonts.len().saturating_sub(1));
       }
-      "fonts_settings.back" | "screenshot_settings.back" => {
+      "fonts_settings.back" | "screenshot_settings.back" | "recording_settings.back" => {
         return Some(FontsSettingsCommand::Back(self.fonts.clone()));
       }
       _ => {}
@@ -355,7 +317,7 @@ impl FontsSettingsUi {
     scroll_box: &ScrollBoxService,
   ) -> Option<(u16, u16)> {
     let viewport = layout.developer_viewport_rect();
-    let title = self.content_text(i18n, "title");
+    let title = i18n.get_runtime_text(NS, "fonts_settings.title");
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -391,7 +353,7 @@ impl FontsSettingsUi {
     );
 
     if self.fonts.is_empty() {
-      let no = self.content_text(i18n, "no");
+      let no = i18n.get_runtime_text(NS, "fonts_settings.no");
       render.draw_host_text(
         canvas,
         &DrawTextParams {
@@ -489,7 +451,7 @@ impl FontsSettingsUi {
     text_input: &TextInputService,
   ) -> Option<(u16, u16)> {
     let viewport = layout.developer_viewport_rect();
-    let hint = self.content_text(i18n, "hint");
+    let hint = i18n.get_runtime_text(NS, "fonts_settings.hint");
     let lines: Vec<_> = hint.lines().collect();
     let actions = format!(
       "{}  {}",
@@ -497,7 +459,7 @@ impl FontsSettingsUi {
       i18n.get_runtime_text(NS, "fonts_settings.action.confirm")
     );
     let params = RichTextParams::from_action_map(&Self::action_map(), "fonts_settings.");
-    let placeholder = self.content_text(i18n, "placeholder");
+    let placeholder = i18n.get_runtime_text(NS, "fonts_settings.placeholder");
     let max_line = lines
       .iter()
       .map(|line| layout.get_text_width(line, None))
@@ -632,13 +594,6 @@ impl FontsSettingsUi {
     .join("  ")
   }
 
-  fn content_text(&self, i18n: &I18nService, suffix: &str) -> String {
-    i18n.get_runtime_text(
-      self.content_namespace,
-      &format!("{}.{}", self.content_prefix, suffix),
-    )
-  }
-
   fn hint_lines(&self, i18n: &I18nService, width: u16) -> Vec<String> {
     let params = RichTextParams::from_action_map(&Self::action_map(), "fonts_settings.");
     let rich = RichTextService::new();
@@ -700,4 +655,33 @@ impl FontsSettingsUi {
 
 fn layout_width(text: &str) -> usize {
   unicode_width::UnicodeWidthStr::width(text)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::host_engine::services::{InputActionEvent, InputEventType};
+
+  #[test]
+  fn recording_settings_escape_exits_the_shared_fonts_page() {
+    let mut objects = UiObjectPool::new();
+    let mut ui = FontsSettingsUi::create(
+      &mut objects,
+      &HitAreaService::new(),
+      &TextInputService::new(),
+      &ScrollBoxService::new(),
+    );
+    ui.enter(vec!["shared-font".to_string()]);
+
+    let command = ui.handle_event(&UiEvent::Action(InputActionEvent {
+      event_type: InputEventType::Keyboard,
+      action: "recording_settings.back".to_string(),
+      state: KeyState::Pressed,
+    }));
+
+    assert_eq!(
+      command,
+      Some(FontsSettingsCommand::Back(vec!["shared-font".to_string()]))
+    );
+  }
 }

@@ -1,8 +1,8 @@
 {
-  "fonts_settings.title": "自定义截屏导出字体",
+  "fonts_settings.title": "自定义截屏/录屏导出字体",
   "fonts_settings.no": "暂无自定义字体",
   "fonts_settings.placeholder": "请输入路径或字体名称",
-  "fonts_settings.hint": "支持添加多个字体，并按顺序依次用于截屏导出\n支持 TTF 和 OTF 字体格式\n请输入字体文件的绝对路径，或字体名称（从系统字体中查找）\n该列表仅用于截屏图片导出的文本渲染\n可导出预览图片，确认字体是否已正确应用",
+  "fonts_settings.hint": "支持添加多个字体，并按顺序依次使用\n支持 TTF 和 OTF 字体格式\n请输入字体文件的绝对路径，或字体名称（从系统字体中查找）\n该列表中的字体将同时用于截屏和录屏导出的文本渲染\n可导出预览图片，确认字体是否已正确应用",
   "fonts_settings.action.scroll": "{key:fonts_settings.scroll_up}/{key:fonts_settings.scroll_down} 滚动",
   "fonts_settings.action.select": "{key:fonts_settings.focus_up.move_up}/{key:fonts_settings.focus_down.move_down} 选择",
   "fonts_settings.action.move": "{key:fonts_settings.focus_up.move_up}/{key:fonts_settings.focus_down.move_down} 移动",

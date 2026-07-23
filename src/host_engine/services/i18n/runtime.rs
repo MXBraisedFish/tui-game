@@ -26,6 +26,7 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "storage_management_export",
   "clear_warning",
   "log",
+  "log_info",
   "export_settings",
   "security_settings",
   "security_details",
@@ -40,6 +41,7 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "screensaver_pack",
   "toolbar",
   "toolbar_custom",
+  "recording_settings",
 ];
 
 impl I18nService {

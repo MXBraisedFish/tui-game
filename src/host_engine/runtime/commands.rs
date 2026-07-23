@@ -140,6 +140,10 @@ pub(super) fn apply_screenshot_recording_command(
       let profile = services
         .storage
         .read_recording_profile_or_default(&mut services.log);
+      let fonts = services
+        .storage
+        .read_screenshot_profile_or_default(&mut services.log)
+        .fonts;
       let _ = services
         .storage
         .write_recording_profile(&profile, &mut services.log);
@@ -150,6 +154,7 @@ pub(super) fn apply_screenshot_recording_command(
         &services.text_input,
         &services.scroll_box,
         profile,
+        fonts,
       );
       world.state.enter_ui_node(UiNodeState::recording_settings());
     }
@@ -288,7 +293,10 @@ pub(super) fn apply_recording_list_command(
       let profile = services
         .storage
         .read_recording_profile_or_default(&mut services.log);
-      let fonts = profile.fonts.clone();
+      let fonts = services
+        .storage
+        .read_screenshot_profile_or_default(&mut services.log)
+        .fonts;
       if let Err(error) = services.video.submit_recording_export(
         &services.async_runtime,
         &services.storage,
@@ -325,6 +333,15 @@ pub(super) fn apply_recording_settings_command(
       let _ = services
         .storage
         .write_recording_profile(&profile, &mut services.log);
+    }
+    RecordingSettingsCommand::ChangedFonts(fonts) => {
+      let mut profile = services
+        .storage
+        .read_screenshot_profile_or_default(&mut services.log);
+      profile.fonts = fonts;
+      let _ = services
+        .storage
+        .write_screenshot_profile(&profile, &mut services.log);
     }
     RecordingSettingsCommand::ExportFontPreview(fonts) => {
       services.screenshot.request_font_preview(fonts);

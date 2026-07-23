@@ -106,22 +106,30 @@ struct PendingHostHotkey {
 struct AutoRecordingRuntime {
   profile: crate::host_engine::services::RecordingProfile,
   profile_revision: u64,
+  startup_mode: AutoRecordingMode,
   host_started: bool,
-  auto_started: bool,
   manually_stopped: bool,
   restart_after_split: bool,
 }
 
 impl AutoRecordingRuntime {
   fn new(profile: crate::host_engine::services::RecordingProfile, profile_revision: u64) -> Self {
+    let startup_mode = profile.auto_recording;
     Self {
       profile,
       profile_revision,
+      startup_mode,
       host_started: false,
-      auto_started: false,
       manually_stopped: false,
       restart_after_split: false,
     }
+  }
+
+  fn should_start_host(&self, state: RecordingState) -> bool {
+    self.startup_mode == AutoRecordingMode::Host
+      && !self.host_started
+      && !self.manually_stopped
+      && state == RecordingState::Stopped
   }
 }
 
@@ -1496,7 +1504,6 @@ fn toggle_recording(services: &mut EngineServices, auto: &mut AutoRecordingRunti
   match services.recording.state() {
     RecordingState::Stopped => {
       if start_recording(services) {
-        auto.auto_started = false;
         auto.manually_stopped = false;
         services.log.info(LogSource::Runtime, "Recording started");
         show_recording_popup(services, RecordingPopupKind::Start);
@@ -1504,7 +1511,6 @@ fn toggle_recording(services: &mut EngineServices, auto: &mut AutoRecordingRunti
     }
     RecordingState::Recording | RecordingState::Paused => {
       if services.recording.stop(&services.async_runtime) {
-        auto.auto_started = false;
         auto.manually_stopped = true;
         auto.restart_after_split = false;
         services
@@ -1566,14 +1572,8 @@ fn update_auto_recording(services: &mut EngineServices, auto: &mut AutoRecording
     return;
   }
 
-  if profile.auto_recording == AutoRecordingMode::Host
-    && !auto.host_started
-    && !auto.manually_stopped
-    && services.recording.state() == RecordingState::Stopped
-    && start_recording(services)
-  {
+  if auto.should_start_host(services.recording.state()) && start_recording(services) {
     auto.host_started = true;
-    auto.auto_started = true;
     services.log.info(
       LogSource::Runtime,
       "Recording started automatically for host session",
@@ -2000,8 +2000,10 @@ fn submit_font_preview_png(
 
 #[cfg(test)]
 mod tests {
-  use super::{has_pressed_action, sequential_screensaver_index};
-  use crate::host_engine::services::{InputActionEvent, InputEventType, KeyState};
+  use super::{AutoRecordingRuntime, has_pressed_action, sequential_screensaver_index};
+  use crate::host_engine::services::{
+    AutoRecordingMode, InputActionEvent, InputEventType, KeyState, RecordingProfile, RecordingState,
+  };
 
   #[test]
   fn screensaver_sequence_handles_empty_and_changed_enabled_lists() {
@@ -2019,5 +2021,20 @@ mod tests {
     }];
     assert!(has_pressed_action(&events, "host_key.screenshot"));
     assert!(!has_pressed_action(&events, "host_key.recording"));
+  }
+
+  #[test]
+  fn host_auto_recording_uses_the_startup_snapshot() {
+    let mut disabled = AutoRecordingRuntime::new(RecordingProfile::default(), 0);
+    disabled.profile.auto_recording = AutoRecordingMode::Host;
+    assert!(!disabled.should_start_host(RecordingState::Stopped));
+
+    let mut profile = RecordingProfile::default();
+    profile.auto_recording = AutoRecordingMode::Host;
+    let mut enabled = AutoRecordingRuntime::new(profile, 0);
+    assert!(enabled.should_start_host(RecordingState::Stopped));
+    assert!(!enabled.should_start_host(RecordingState::Recording));
+    enabled.manually_stopped = true;
+    assert!(!enabled.should_start_host(RecordingState::Stopped));
   }
 }

@@ -2,9 +2,7 @@ use super::{ComposedCell, ComposedFrame};
 use crate::host_engine::services::canvas::buffer::CanvasBuffer;
 use crate::host_engine::services::canvas::{PreparedScrollBox, PreparedSurface};
 use crate::host_engine::services::unicode::graphemes;
-use crate::host_engine::services::{
-  CanvasCell, CanvasService, ScrollbarLayout, ScrollbarVisibility, TextColor,
-};
+use crate::host_engine::services::{CanvasCell, CanvasService, TextColor};
 
 /// 帧合成器：将基础层、切片层和宿主层按顺序叠加为一张合成帧。
 pub struct FrameCompositor;
@@ -71,20 +69,11 @@ fn overlay(frame: &mut ComposedFrame, buffer: &CanvasBuffer, ox: u16, oy: u16, o
 }
 
 fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox, ox: u16, oy: u16) {
-  let x0 = ox.saturating_add(scroll_box.rect.x);
-  let y0 = oy.saturating_add(scroll_box.rect.y);
-  // Inside 和 ReserveSpace 都需要缩减内容区域，Overlay 不需要。
-  let needs_reduction = scroll_box.scrollbar_layout != ScrollbarLayout::Overlay;
-  let visible_width = if needs_reduction && shows_vertical_scrollbar(scroll_box) {
-    scroll_box.rect.width.saturating_sub(1)
-  } else {
-    scroll_box.rect.width
-  };
-  let visible_height = if needs_reduction && shows_horizontal_scrollbar(scroll_box) {
-    scroll_box.rect.height.saturating_sub(1)
-  } else {
-    scroll_box.rect.height
-  };
+  let content = scroll_box.layout.content_viewport_rect;
+  let x0 = ox.saturating_add(content.x);
+  let y0 = oy.saturating_add(content.y);
+  let visible_width = content.width;
+  let visible_height = content.height;
   for y in 0..visible_height {
     for x in 0..visible_width {
       let sx = scroll_box.scroll_x.saturating_add(x);
@@ -117,43 +106,24 @@ fn overlay_scroll_box(frame: &mut ComposedFrame, scroll_box: &PreparedScrollBox,
       write_cell(frame, px, py, source);
     }
   }
-  // 垂直滚动条最后绘制（覆盖角落）。
-  draw_horizontal_scrollbar(frame, scroll_box, x0, y0);
-  draw_vertical_scrollbar(frame, scroll_box, x0, y0);
+  draw_horizontal_scrollbar(frame, scroll_box, ox, oy);
+  draw_vertical_scrollbar(frame, scroll_box, ox, oy);
 }
 
 fn draw_vertical_scrollbar(
   frame: &mut ComposedFrame,
   scroll_box: &PreparedScrollBox,
-  x0: u16,
-  y0: u16,
+  ox: u16,
+  oy: u16,
 ) {
-  let height = scroll_box.rect.height;
-  if height == 0 || scroll_box.rect.width == 0 || !shows_vertical_scrollbar(scroll_box) {
+  let Some(track) = scroll_box.layout.vertical_track_rect else {
     return;
-  }
-  let x = match scroll_box.scrollbar_layout {
-    ScrollbarLayout::Overlay | ScrollbarLayout::Inside => {
-      x0.saturating_add(scroll_box.rect.width - 1)
-    }
-    ScrollbarLayout::ReserveSpace => x0.saturating_add(scroll_box.rect.width),
   };
-  let max_scroll = scroll_box.content_size.height.saturating_sub(height);
-  let thumb_height = if max_scroll == 0 {
-    height
-  } else {
-    ((height as u32 * height as u32) / scroll_box.content_size.height.max(1) as u32)
-      .max(scroll_box.scrollbar_style.minimum_thumb_height as u32)
-      .min(height as u32) as u16
-  };
-  let travel = height.saturating_sub(thumb_height);
-  let thumb_y = if max_scroll == 0 {
-    0
-  } else {
-    (scroll_box.scroll_y as u32 * travel as u32 / max_scroll as u32) as u16
-  };
-  for y in 0..height {
-    let is_thumb = y >= thumb_y && y < thumb_y.saturating_add(thumb_height);
+  let thumb = scroll_box.layout.vertical_thumb_rect;
+  for y in 0..track.height {
+    let cell_y = track.y.saturating_add(y);
+    let is_thumb =
+      thumb.is_some_and(|thumb| cell_y >= thumb.y && cell_y < thumb.y.saturating_add(thumb.height));
     let (ch, style) = if is_thumb {
       (
         scroll_box.scrollbar_style.thumb_char,
@@ -167,8 +137,8 @@ fn draw_vertical_scrollbar(
     };
     write_cell(
       frame,
-      x,
-      y0.saturating_add(y),
+      ox.saturating_add(track.x),
+      oy.saturating_add(cell_y),
       &CanvasCell::styled(ch.to_string(), style),
     );
   }
@@ -177,35 +147,17 @@ fn draw_vertical_scrollbar(
 fn draw_horizontal_scrollbar(
   frame: &mut ComposedFrame,
   scroll_box: &PreparedScrollBox,
-  x0: u16,
-  y0: u16,
+  ox: u16,
+  oy: u16,
 ) {
-  let width = scroll_box.rect.width;
-  if width == 0 || scroll_box.rect.height == 0 || !shows_horizontal_scrollbar(scroll_box) {
+  let Some(track) = scroll_box.layout.horizontal_track_rect else {
     return;
-  }
-  let y = match scroll_box.scrollbar_layout {
-    ScrollbarLayout::Overlay | ScrollbarLayout::Inside => {
-      y0.saturating_add(scroll_box.rect.height - 1)
-    }
-    ScrollbarLayout::ReserveSpace => y0.saturating_add(scroll_box.rect.height),
   };
-  let max_scroll = scroll_box.content_size.width.saturating_sub(width);
-  let thumb_width = if max_scroll == 0 {
-    width
-  } else {
-    ((width as u32 * width as u32) / scroll_box.content_size.width.max(1) as u32)
-      .max(scroll_box.scrollbar_style.minimum_thumb_height as u32)
-      .min(width as u32) as u16
-  };
-  let travel = width.saturating_sub(thumb_width);
-  let thumb_x = if max_scroll == 0 {
-    0
-  } else {
-    (scroll_box.scroll_x as u32 * travel as u32 / max_scroll as u32) as u16
-  };
-  for x in 0..width {
-    let is_thumb = x >= thumb_x && x < thumb_x.saturating_add(thumb_width);
+  let thumb = scroll_box.layout.horizontal_thumb_rect;
+  for x in 0..track.width {
+    let cell_x = track.x.saturating_add(x);
+    let is_thumb =
+      thumb.is_some_and(|thumb| cell_x >= thumb.x && cell_x < thumb.x.saturating_add(thumb.width));
     let (ch, style) = if is_thumb {
       (
         scroll_box.scrollbar_style.h_thumb_char,
@@ -219,26 +171,10 @@ fn draw_horizontal_scrollbar(
     };
     write_cell(
       frame,
-      x0.saturating_add(x),
-      y,
+      ox.saturating_add(cell_x),
+      oy.saturating_add(track.y),
       &CanvasCell::styled(ch.to_string(), style),
     );
-  }
-}
-
-fn shows_vertical_scrollbar(scroll_box: &PreparedScrollBox) -> bool {
-  match scroll_box.scrollbar.vertical {
-    ScrollbarVisibility::Always => scroll_box.rect.height > 0,
-    ScrollbarVisibility::Auto => scroll_box.content_size.height > scroll_box.rect.height,
-    ScrollbarVisibility::Never => false,
-  }
-}
-
-fn shows_horizontal_scrollbar(scroll_box: &PreparedScrollBox) -> bool {
-  match scroll_box.scrollbar.horizontal {
-    ScrollbarVisibility::Always => scroll_box.rect.width > 0,
-    ScrollbarVisibility::Auto => scroll_box.content_size.width > scroll_box.rect.width,
-    ScrollbarVisibility::Never => false,
   }
 }
 
@@ -268,8 +204,9 @@ fn write_cell(frame: &mut ComposedFrame, x: u16, y: u16, source: &CanvasCell) {
 mod tests {
   use super::*;
   use crate::host_engine::services::{
-    LayoutService, ScrollBoxOptions, ScrollBoxService, SliceLength, SliceOptions, SliceRect,
-    SliceService, SurfaceId, TerminalColor, TextColor, TextStyle, UiObjectPool,
+    LayoutService, Overflow, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy,
+    ScrollbarVisibility, SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId,
+    TerminalColor, TextColor, TextStyle, UiObjectPool,
   };
 
   #[test]
@@ -478,6 +415,51 @@ mod tests {
     assert_eq!(text(&frame, 3, 0), "1");
     assert_eq!(text(&frame, 3, 1), "2");
     assert_eq!(text(&frame, 5, 0), "█");
+  }
+
+  #[test]
+  fn scrollbars_share_the_uncovered_viewport_without_hiding_overflow() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(4, 3);
+    let service = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: crate::host_engine::services::Rect {
+            x: 0,
+            y: 0,
+            width: 4,
+            height: 3,
+          },
+          content_width: 4,
+          content_height: 4,
+          overflow_x: Overflow::Auto,
+          scrollbar: ScrollbarPolicy {
+            vertical: ScrollbarVisibility::Auto,
+            horizontal: ScrollbarVisibility::Auto,
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    canvas.styled_text_in_scroll_box(id, 0, 0, "ABCD", TextStyle::default());
+
+    let frame = FrameCompositor::new().compose(&canvas);
+
+    assert_eq!(text(&frame, 0, 0), "A");
+    assert_eq!(text(&frame, 1, 0), "B");
+    assert_eq!(text(&frame, 2, 0), "C");
+    assert_eq!(text(&frame, 3, 0), "█");
+    assert_eq!(text(&frame, 3, 1), "│");
+    assert_eq!(text(&frame, 0, 2), "█");
+    assert_eq!(text(&frame, 1, 2), "█");
+    assert_eq!(text(&frame, 2, 2), "─");
+    assert_eq!(text(&frame, 3, 2), " ");
   }
 
   #[test]

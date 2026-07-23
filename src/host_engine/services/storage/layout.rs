@@ -85,7 +85,7 @@ pub const DEFAULT_FILES: &[(&str, &str)] = &[
   ),
   (
     PROFILE_RECORDING_FILE,
-    r#"{"fonts":[],"popup":"all","auto_recording":"off","auto_split":"minutes10","capture_frame_rate":"fps60","export_frame_rate":"recorded","legacy_frame_rate":30,"quality":"balanced","keyframe_interval_seconds":2,"pixel_scale":"original"}"#,
+    r#"{"popup":"all","auto_recording":"off","auto_split":"minutes10","capture_frame_rate":"fps60","export_frame_rate":"recorded","legacy_frame_rate":30,"quality":"balanced","keyframe_interval_seconds":2,"pixel_scale":"original"}"#,
   ),
   (
     PROFILE_DISPLAY_SETTINGS_FILE,

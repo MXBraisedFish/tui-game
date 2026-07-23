@@ -472,10 +472,17 @@ impl GameListUi {
       canvas,
     );
 
+    let viewport = layout.developer_viewport_rect();
+    let info_scroll_rect = Rect {
+      x: positions.right_inner.x.saturating_sub(viewport.x),
+      y: positions.right_inner.y.saturating_sub(viewport.y),
+      width: positions.right_inner.width,
+      height: positions.right_inner.height,
+    };
     scroll_box.set_rect(
       &mut self.objects,
       self.info_scroll,
-      positions.right_inner,
+      info_scroll_rect,
       layout,
     );
     let info_content_height = self.info_content_height(

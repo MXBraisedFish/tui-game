@@ -83,6 +83,7 @@ impl ScreenshotRecordingUi {
         text_input,
         scroll_box,
         crate::host_engine::services::RecordingProfile::default(),
+        Vec::new(),
       ),
       screenshot_list: ScreenshotListUi::init(hit_area, text_input, scroll_box),
       recording_list: RecordingListUi::init(hit_area, text_input, scroll_box),

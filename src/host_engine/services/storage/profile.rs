@@ -272,9 +272,6 @@ impl RecordingPixelScale {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RecordingProfile {
-  /// 录屏导出时按顺序尝试的自定义字体路径或系统字体名称。
-  #[serde(default)]
-  pub fonts: Vec<String>,
   #[serde(default, deserialize_with = "deserialize_or_default")]
   pub popup: RecordingPopupMode,
   #[serde(default, deserialize_with = "deserialize_or_default")]
@@ -362,7 +359,6 @@ impl RecordingProfile {
 impl Default for RecordingProfile {
   fn default() -> Self {
     Self {
-      fonts: Vec::new(),
       popup: RecordingPopupMode::default(),
       auto_recording: AutoRecordingMode::default(),
       auto_split: AutoSplitDuration::default(),
@@ -927,7 +923,6 @@ impl StorageService {
     let mut repaired = profile.repair();
     let normalized = serde_json::to_value(&profile).ok()?;
     repaired |= [
-      "fonts",
       "popup",
       "auto_recording",
       "auto_split",

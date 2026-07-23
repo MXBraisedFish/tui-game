@@ -4,11 +4,13 @@ use super::{buffer::CanvasBuffer, cell::CanvasCell, top_layer::TopLayer};
 use crate::host_engine::services::rich_text::RichTextSegment;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
-use crate::host_engine::services::widget::ui_object::surfaces::scroll_box::clamp_rect;
+use crate::host_engine::services::widget::ui_object::surfaces::scroll_box::{
+  ResolvedScrollBoxLayout, resolve_scroll_box_layout,
+};
 use crate::host_engine::services::widget::ui_object::surfaces::slice::resolve_rect;
 use crate::host_engine::services::{
-  LayoutService, Rect, ScrollBoxId, ScrollbarLayout, ScrollbarPolicy, ScrollbarStyle, Size,
-  SliceId, SurfaceId, TextColor, TextStyle, UiObjectPool,
+  LayoutService, Rect, ScrollBoxId, ScrollbarStyle, Size, SliceId, SurfaceId, TextColor, TextStyle,
+  UiObjectPool,
 };
 
 /// 画布服务：管理基础层、宿主层和多切片缓冲区，协调文本绘制与区域查询。
@@ -39,16 +41,14 @@ pub(crate) struct PreparedSlice {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PreparedScrollBox {
   pub buffer: CanvasBuffer,
-  pub rect: Rect,
+  pub layout: ResolvedScrollBoxLayout,
   pub content_size: Size,
   pub scroll_x: u16,
   pub scroll_y: u16,
   pub visible: bool,
   pub opaque: bool,
   pub order: usize,
-  pub scrollbar: ScrollbarPolicy,
   pub scrollbar_style: ScrollbarStyle,
-  pub scrollbar_layout: ScrollbarLayout,
 }
 
 /// 已预处理开发者 Surface 的只读引用。
@@ -183,7 +183,7 @@ impl CanvasService {
       return;
     };
     let options = &state.options;
-    let rect = clamp_rect(options.rect, layout.developer_size());
+    let resolved_layout = resolve_scroll_box_layout(state, layout.developer_size());
     let content_size = Size {
       width: options.content_width,
       height: options.content_height,
@@ -193,16 +193,14 @@ impl CanvasService {
       .entry(id)
       .or_insert_with(|| PreparedScrollBox {
         buffer: CanvasBuffer::new(content_size.width, content_size.height),
-        rect,
+        layout: resolved_layout,
         content_size,
         scroll_x: 0,
         scroll_y: 0,
         visible: options.visible,
         opaque: options.opaque,
         order,
-        scrollbar: options.scrollbar,
         scrollbar_style: options.scrollbar_style.clone(),
-        scrollbar_layout: options.scrollbar_layout,
       });
     if prepared.buffer.width() != content_size.width
       || prepared.buffer.height() != content_size.height
@@ -214,16 +212,14 @@ impl CanvasService {
     } else {
       prepared.buffer.clear();
     }
-    prepared.rect = rect;
+    prepared.layout = resolved_layout;
     prepared.content_size = content_size;
     prepared.scroll_x = state.scroll_x;
     prepared.scroll_y = state.scroll_y;
     prepared.visible = options.visible;
     prepared.opaque = options.opaque;
     prepared.order = order;
-    prepared.scrollbar = options.scrollbar;
     prepared.scrollbar_style = options.scrollbar_style.clone();
-    prepared.scrollbar_layout = options.scrollbar_layout;
   }
 
   pub fn clear(&mut self) {
@@ -545,7 +541,9 @@ impl CanvasService {
 
   pub fn prepared_scroll_box_rect(&self, id: ScrollBoxId) -> Option<Rect> {
     let scroll_box = self.scroll_boxes.get(&id)?;
-    scroll_box.visible.then_some(scroll_box.rect)
+    scroll_box
+      .visible
+      .then_some(scroll_box.layout.viewport_rect)
   }
 
   pub fn prepared_scroll_box_size(&self, id: ScrollBoxId) -> Option<Size> {
@@ -569,8 +567,8 @@ impl CanvasService {
   pub fn prepared_scroll_box_viewport_size(&self, id: ScrollBoxId) -> Option<Size> {
     let sb = self.scroll_boxes.get(&id)?;
     sb.visible.then_some(Size {
-      width: sb.rect.width,
-      height: sb.rect.height,
+      width: sb.layout.viewport_rect.width,
+      height: sb.layout.viewport_rect.height,
     })
   }
 
@@ -592,7 +590,7 @@ impl CanvasService {
       .filter_map(|surface| match surface {
         SurfaceId::ScrollBox(id) => {
           let scroll_box = self.scroll_boxes.get(id)?;
-          let rect = physical_rect(self.viewport, scroll_box.rect);
+          let rect = physical_rect(self.viewport, scroll_box.layout.occupied_rect);
           (scroll_box.visible && rect.width > 0 && rect.height > 0 && rect.contains(x, y))
             .then_some((*id, scroll_box.order))
         }
@@ -656,8 +654,8 @@ impl CanvasService {
     let viewport = Rect {
       x: scroll_box.scroll_x,
       y: scroll_box.scroll_y,
-      width: scroll_box.rect.width,
-      height: scroll_box.rect.height,
+      width: scroll_box.layout.content_viewport_rect.width,
+      height: scroll_box.layout.content_viewport_rect.height,
     };
     let x1 = rect.x.max(viewport.x);
     let y1 = rect.y.max(viewport.y);
@@ -676,12 +674,12 @@ impl CanvasService {
       x: self
         .viewport
         .x
-        .saturating_add(scroll_box.rect.x)
+        .saturating_add(scroll_box.layout.content_viewport_rect.x)
         .saturating_add(x1.saturating_sub(scroll_box.scroll_x)),
       y: self
         .viewport
         .y
-        .saturating_add(scroll_box.rect.y)
+        .saturating_add(scroll_box.layout.content_viewport_rect.y)
         .saturating_add(y1.saturating_sub(scroll_box.scroll_y)),
       width: x2 - x1,
       height: y2 - y1,
@@ -689,8 +687,14 @@ impl CanvasService {
     Some((
       visible,
       (
-        self.viewport.x.saturating_add(scroll_box.rect.x),
-        self.viewport.y.saturating_add(scroll_box.rect.y),
+        self
+          .viewport
+          .x
+          .saturating_add(scroll_box.layout.content_viewport_rect.x),
+        self
+          .viewport
+          .y
+          .saturating_add(scroll_box.layout.content_viewport_rect.y),
       ),
       scroll_box.order + 1,
     ))
@@ -806,8 +810,9 @@ mod tests {
   use super::*;
   use crate::host_engine::services::text_layout::TextWrapMode;
   use crate::host_engine::services::{
-    RichTextParams, ScrollBoxOptions, ScrollBoxService, SliceLength, SliceOptions, SliceRect,
-    SliceService, TerminalColor, TextColor,
+    Overflow, RichTextParams, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy,
+    ScrollbarVisibility, SliceLength, SliceOptions, SliceRect, SliceService, TerminalColor,
+    TextColor,
   };
   use std::collections::HashMap;
 
@@ -1167,6 +1172,76 @@ mod tests {
         width: 2,
         height: 2
       })
+    );
+  }
+
+  #[test]
+  fn scroll_box_hit_rect_excludes_scrollbar_cells() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(4, 3);
+    let service = ScrollBoxService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        ScrollBoxOptions {
+          rect: Rect {
+            x: 0,
+            y: 0,
+            width: 4,
+            height: 3,
+          },
+          content_width: 4,
+          content_height: 4,
+          overflow_x: Overflow::Auto,
+          scrollbar: ScrollbarPolicy {
+            vertical: ScrollbarVisibility::Auto,
+            horizontal: ScrollbarVisibility::Auto,
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+
+    assert!(
+      canvas
+        .scroll_box_hit_rect(
+          id,
+          Rect {
+            x: 2,
+            y: 1,
+            width: 1,
+            height: 1
+          }
+        )
+        .is_some()
+    );
+    assert_eq!(
+      canvas.scroll_box_hit_rect(
+        id,
+        Rect {
+          x: 3,
+          y: 0,
+          width: 1,
+          height: 1
+        }
+      ),
+      None
+    );
+    assert_eq!(
+      canvas.scroll_box_hit_rect(
+        id,
+        Rect {
+          x: 0,
+          y: 2,
+          width: 1,
+          height: 1
+        }
+      ),
+      None
     );
   }
 
