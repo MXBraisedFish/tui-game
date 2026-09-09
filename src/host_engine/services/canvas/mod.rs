@@ -6,4 +6,4 @@ mod top_layer;
 pub use cell::CanvasCell;
 
 pub use service::CanvasService;
-pub(crate) use service::{PreparedScrollBox, PreparedSurface};
+pub(crate) use service::{PreparedScrollBox, PreparedSlice, PreparedSurface};

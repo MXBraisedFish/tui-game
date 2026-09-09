@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::host_engine::services::ui::UiObjectPool;
-use crate::host_engine::services::{LayoutService, Rect, Size, SurfaceId};
+use crate::host_engine::services::{LayoutService, Rect, Size, SurfaceId, TextColor};
 
 /// 切片唯一标识
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -25,12 +25,13 @@ pub struct SliceRect {
 }
 
 /// 切片创建选项
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SliceOptions {
   pub rect: SliceRect,
   pub visible: bool,
   pub opaque: bool,
   pub layer: Option<i32>,
+  pub background: Option<TextColor>,
 }
 
 impl Default for SliceOptions {
@@ -45,22 +46,23 @@ impl Default for SliceOptions {
       visible: true,
       opaque: true,
       layer: None,
+      background: None,
     }
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct SliceState {
   pub rect: SliceRect,
   pub visible: bool,
   pub opaque: bool,
   pub layer: i32,
+  pub background: Option<TextColor>,
 }
 
 pub(crate) struct SliceObjects {
   pub next_id: u64,
   pub slices: HashMap<SliceId, SliceState>,
-  pub next_auto_layer: i32,
 }
 
 impl SliceObjects {
@@ -68,7 +70,6 @@ impl SliceObjects {
     Self {
       next_id: 1,
       slices: HashMap::new(),
-      next_auto_layer: 0,
     }
   }
 }
@@ -86,8 +87,14 @@ impl SliceService {
     valid_rect(options.rect).then(|| {
       let id = SliceId(pool.slices.next_id);
       pool.slices.next_id += 1;
-      let layer = options.layer.unwrap_or(pool.slices.next_auto_layer);
-      pool.slices.next_auto_layer = pool.slices.next_auto_layer.max(layer.saturating_add(1));
+      let highest_layer = pool.slices.slices.len() as i32;
+      let layer = options.layer.unwrap_or(highest_layer.saturating_add(1));
+      let layer = layer.clamp(1, highest_layer.saturating_add(1));
+      for state in pool.slices.slices.values_mut() {
+        if state.layer >= layer {
+          state.layer = state.layer.saturating_add(1);
+        }
+      }
       pool.slices.slices.insert(
         id,
         SliceState {
@@ -95,6 +102,7 @@ impl SliceService {
           visible: options.visible,
           opaque: options.opaque,
           layer,
+          background: options.background,
         },
       );
       pool.surfaces.push(SurfaceId::Slice(id));
@@ -105,8 +113,13 @@ impl SliceService {
 
   /// 移除切片
   pub fn remove(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
-    if pool.slices.slices.remove(&id).is_none() {
+    let Some(removed) = pool.slices.slices.remove(&id) else {
       return false;
+    };
+    for state in pool.slices.slices.values_mut() {
+      if state.layer > removed.layer {
+        state.layer -= 1;
+      }
     }
     pool
       .surfaces
@@ -191,12 +204,42 @@ impl SliceService {
   }
 
   pub fn set_layer(&self, pool: &mut UiObjectPool, id: SliceId, layer: i32) -> bool {
+    let Some(old_layer) = pool.slices.slices.get(&id).map(|state| state.layer) else {
+      return false;
+    };
+    let layer = layer.clamp(1, pool.slices.slices.len() as i32);
+    if layer < old_layer {
+      for (current_id, state) in &mut pool.slices.slices {
+        if *current_id != id && state.layer >= layer && state.layer < old_layer {
+          state.layer += 1;
+        }
+      }
+    } else if layer > old_layer {
+      for (current_id, state) in &mut pool.slices.slices {
+        if *current_id != id && state.layer > old_layer && state.layer <= layer {
+          state.layer -= 1;
+        }
+      }
+    }
+    pool.slices.slices.get_mut(&id).unwrap().layer = layer;
+    reorder_slices(pool);
+    true
+  }
+
+  pub fn background(&self, pool: &UiObjectPool, id: SliceId) -> Option<Option<TextColor>> {
+    Some(pool.slices.slices.get(&id)?.background.clone())
+  }
+
+  pub fn set_background(
+    &self,
+    pool: &mut UiObjectPool,
+    id: SliceId,
+    background: Option<TextColor>,
+  ) -> bool {
     let Some(state) = pool.slices.slices.get_mut(&id) else {
       return false;
     };
-    state.layer = layer;
-    pool.slices.next_auto_layer = pool.slices.next_auto_layer.max(layer.saturating_add(1));
-    reorder_slices(pool);
+    state.background = background;
     true
   }
 
@@ -436,6 +479,66 @@ mod tests {
         height: 2
       })
     );
+  }
+
+  #[test]
+  fn public_layers_remain_contiguous_when_inserted_moved_and_removed() {
+    let service = SliceService::new();
+    let mut pool = UiObjectPool::new();
+    let options = |layer| SliceOptions {
+      rect: rect(0, 0, SliceLength::Fixed(2), SliceLength::Fixed(2)),
+      layer,
+      ..Default::default()
+    };
+
+    let first = service.create(&mut pool, options(None)).unwrap();
+    let second = service.create(&mut pool, options(None)).unwrap();
+    let inserted = service.create(&mut pool, options(Some(1))).unwrap();
+    assert_eq!(service.layer(&pool, inserted), Some(1));
+    assert_eq!(service.layer(&pool, first), Some(2));
+    assert_eq!(service.layer(&pool, second), Some(3));
+    assert_eq!(service.ids_by_layer(&pool), vec![inserted, first, second]);
+
+    assert!(service.set_layer(&mut pool, second, 1));
+    assert_eq!(service.ids_by_layer(&pool), vec![second, inserted, first]);
+    assert_eq!(service.layer(&pool, second), Some(1));
+    assert_eq!(service.layer(&pool, inserted), Some(2));
+    assert_eq!(service.layer(&pool, first), Some(3));
+
+    assert!(service.set_layer(&mut pool, second, i32::MAX));
+    assert_eq!(service.ids_by_layer(&pool), vec![inserted, first, second]);
+    assert_eq!(service.layer(&pool, second), Some(3));
+
+    assert!(service.remove(&mut pool, first));
+    assert_eq!(service.ids_by_layer(&pool), vec![inserted, second]);
+    assert_eq!(service.layer(&pool, inserted), Some(1));
+    assert_eq!(service.layer(&pool, second), Some(2));
+  }
+
+  #[test]
+  fn background_can_be_set_cleared_and_queried() {
+    let service = SliceService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        SliceOptions {
+          background: Some(TextColor::Terminal(
+            crate::host_engine::services::TerminalColor::Blue,
+          )),
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    assert_eq!(
+      service.background(&pool, id),
+      Some(Some(TextColor::Terminal(
+        crate::host_engine::services::TerminalColor::Blue,
+      )))
+    );
+    assert!(service.set_background(&mut pool, id, None));
+    assert_eq!(service.background(&pool, id), Some(None));
+    assert!(!service.set_background(&mut pool, SliceId(999), None));
   }
 
   #[test]

@@ -6,13 +6,22 @@ local height = 24
 function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
-  panel = slice.create{ width = slice["75P"], height = slice["50P"], layer = 10 }
+  panel = slice.create{
+    width = math.max{ values = { 1, math.floor(width * 0.75) } },
+    height = math.max{ values = { 1, math.floor(height * 0.5) } },
+    layer = 10,
+  }
 end
 
 function HandleEvent(event)
   if event.type == "resize" then
     width = event.data.width
     height = event.data.height
+    slice.set_size{
+      id = panel,
+      width = math.max{ values = { 1, math.floor(width * 0.75) } },
+      height = math.max{ values = { 1, math.floor(height * 0.5) } },
+    }
   end
 end
 

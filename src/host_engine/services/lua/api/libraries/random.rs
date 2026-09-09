@@ -42,8 +42,8 @@ fn install_direct(
     lua.create_function(move |_lua, values: MultiValue| {
       let table = args::named(method, values, &["min", "max"])?;
       if integer {
-        let min = args::integer(args::required(&table, method, "min")?, method, "min")?;
-        let max = args::integer(args::required(&table, method, "max")?, method, "max")?;
+        let min = args::optional_integer(&table, method, "min", Some(i32::MIN.into()))?.unwrap();
+        let max = args::optional_integer(&table, method, "max", Some(i32::MAX.into()))?.unwrap();
         if min > max {
           return Err(args::message(
             method,
@@ -57,8 +57,8 @@ fn install_direct(
             .ok_or_else(|| args::message(method, "random generator is unavailable"))
         })
       } else {
-        let min = finite_number(args::required(&table, method, "min")?, method, "min")?;
-        let max = finite_number(args::required(&table, method, "max")?, method, "max")?;
+        let min = optional_finite_number(&table, method, "min", 0.0)?;
+        let max = optional_finite_number(&table, method, "max", 1.0)?;
         if min > max {
           return Err(args::message(
             method,
@@ -115,7 +115,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       args::no_args(method, values)?;
       with_pool_mut(&clear_state, method, |pool| {
         RandomService::new().clear_configured(pool.runtime_mut());
-        Ok(())
+        Ok(true)
       })
     })?,
   )?;
@@ -128,13 +128,13 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       args::no_args(method, values)?;
       with_pool(&list_state, method, |pool| {
         let result = lua.create_table()?;
-        for (index, id) in RandomService::new()
-          .configured_ids(pool.runtime())
-          .into_iter()
-          .enumerate()
-        {
-          result.raw_set(index + 1, format_id(id))?;
+        let service = RandomService::new();
+        let ids = service.configured_ids(pool.runtime());
+        for (index, id) in ids.iter().copied().enumerate() {
+          let configuration = service.configuration(pool.runtime(), id).unwrap();
+          result.raw_set(index + 1, configuration_table(lua, id, configuration)?)?;
         }
+        result.raw_set("n", ids.len())?;
         Ok(result)
       })
     })?,
@@ -158,13 +158,18 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       let method = "random.generate";
       let id = id_argument(values, method)?;
       with_pool_mut(&state, method, |pool| {
-        Ok(
-          match RandomService::new().generate_configured(pool.runtime_mut(), id) {
-            Some(RandomGeneratedValue::Integer(value)) => Value::Integer(value),
-            Some(RandomGeneratedValue::Float(value)) => Value::Number(value),
-            None => Value::Nil,
-          },
-        )
+        let service = RandomService::new();
+        if service
+          .configuration(pool.runtime(), id)
+          .is_some_and(|configuration| configuration.step >= i64::MAX as u64)
+        {
+          return Err(args::message(method, "generator step is exhausted"));
+        }
+        Ok(match service.generate_configured(pool.runtime_mut(), id) {
+          Some(RandomGeneratedValue::Integer(value)) => Value::Integer(value),
+          Some(RandomGeneratedValue::Float(value)) => Value::Number(value),
+          None => Value::Nil,
+        })
       })
     })?,
   )
@@ -172,17 +177,14 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
 
 fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Result<()> {
   for (name, allowed) in [
-    (
-      "set_params",
-      &["id", "type", "min", "max", "seed", "step"][..],
-    ),
+    ("set", &["id", "type", "min", "max", "seed", "step"][..]),
     ("set_type", &["id", "type"][..]),
     ("set_range", &["id", "min", "max"][..]),
     ("set_seed", &["id", "seed"][..]),
     ("set_step", &["id", "step"][..]),
   ] {
     let method: &'static str = match name {
-      "set_params" => "random.set_params",
+      "set" => "random.set",
       "set_type" => "random.set_type",
       "set_range" => "random.set_range",
       "set_seed" => "random.set_seed",
@@ -193,6 +195,12 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       name,
       lua.create_function(move |_lua, values: MultiValue| {
         let table = args::named(method, values, allowed)?;
+        if name == "set_range" {
+          args::required(&table, method, "min")?;
+          args::required(&table, method, "max")?;
+        } else if name == "set_step" {
+          args::required(&table, method, "step")?;
+        }
         let id = parse_id(args::string(
           args::required(&table, method, "id")?,
           method,
@@ -252,32 +260,31 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
   let range_state = state.clone();
   source.raw_set(
     "get_range",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "random.get_range";
       let id = id_argument(values, method)?;
       with_pool(&range_state, method, |pool| {
-        let mut result = MultiValue::new();
         match RandomService::new().configuration(pool.runtime(), id) {
           Some(RandomConfiguration {
             range: RandomConfiguredRange::Integer { min, max },
             ..
           }) => {
-            result.push_back(Value::Integer(min));
-            result.push_back(Value::Integer(max));
+            let result = lua.create_table()?;
+            result.raw_set("min", min)?;
+            result.raw_set("max", max)?;
+            Ok(Value::Table(result))
           }
           Some(RandomConfiguration {
             range: RandomConfiguredRange::Float { min, max },
             ..
           }) => {
-            result.push_back(Value::Number(min));
-            result.push_back(Value::Number(max));
+            let result = lua.create_table()?;
+            result.raw_set("min", min)?;
+            result.raw_set("max", max)?;
+            Ok(Value::Table(result))
           }
-          None => {
-            result.push_back(Value::Nil);
-            result.push_back(Value::Nil);
-          }
+          None => Ok(Value::Nil),
         }
-        Ok(result)
       })
     })?,
   )?;
@@ -291,41 +298,15 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
         let Some(configuration) = RandomService::new().configuration(pool.runtime(), id) else {
           return Ok(Value::Nil);
         };
-        let info = lua.create_table()?;
-        info.raw_set("id", format_id(id))?;
-        info.raw_set(
-          "type",
-          match configuration.range {
-            RandomConfiguredRange::Integer { .. } => "int",
-            RandomConfiguredRange::Float { .. } => "float",
-          },
-        )?;
-        match configuration.range {
-          RandomConfiguredRange::Integer { min, max } => {
-            info.raw_set("min", min)?;
-            info.raw_set("max", max)?;
-          }
-          RandomConfiguredRange::Float { min, max } => {
-            info.raw_set("min", min)?;
-            info.raw_set("max", max)?;
-          }
-        }
-        info.raw_set("seed", configuration.seed)?;
-        info.raw_set("step", configuration.step)?;
-        Ok(Value::Table(info))
+        Ok(Value::Table(configuration_table(lua, id, configuration)?))
       })
     })?,
   )
 }
 
 fn configuration_from_create(table: &Table, method: &str) -> mlua::Result<RandomConfiguration> {
-  let kind = args::string(args::required(table, method, "type")?, method, "type")?;
-  let range = parse_range(
-    kind.as_str(),
-    args::required(table, method, "min")?,
-    args::required(table, method, "max")?,
-    method,
-  )?;
+  let kind = args::optional_string(table, method, "type", Some("int"))?.unwrap();
+  let range = parse_optional_range(kind.as_str(), table, method)?;
   let seed = match table.get::<Value>("seed")? {
     Value::Nil => auto_seed() as i64,
     value => args::integer(value, method, "seed")?,
@@ -335,6 +316,40 @@ fn configuration_from_create(table: &Table, method: &str) -> mlua::Result<Random
     method,
   )?;
   Ok(RandomConfiguration { range, seed, step })
+}
+
+fn parse_optional_range(
+  kind: &str,
+  table: &Table,
+  method: &str,
+) -> mlua::Result<RandomConfiguredRange> {
+  let range = match kind {
+    "int" => RandomConfiguredRange::Integer {
+      min: args::optional_integer(table, method, "min", Some(i32::MIN.into()))?.unwrap(),
+      max: args::optional_integer(table, method, "max", Some(i32::MAX.into()))?.unwrap(),
+    },
+    "float" => RandomConfiguredRange::Float {
+      min: optional_finite_number(table, method, "min", 0.0)?,
+      max: optional_finite_number(table, method, "max", 1.0)?,
+    },
+    _ => {
+      return Err(args::message(
+        method,
+        "type must be random.INT or random.FLOAT",
+      ));
+    }
+  };
+  match range {
+    RandomConfiguredRange::Integer { min, max } if min > max => Err(args::message(
+      method,
+      "min must be less than or equal to max",
+    )),
+    RandomConfiguredRange::Float { min, max } if min > max => Err(args::message(
+      method,
+      "min must be less than or equal to max",
+    )),
+    _ => Ok(range),
+  }
 }
 
 fn update_configuration(
@@ -417,50 +432,14 @@ fn update_configuration(
   Ok(RandomConfiguration { range, seed, step })
 }
 
-fn parse_range(
-  kind: &str,
-  min: Value,
-  max: Value,
-  method: &str,
-) -> mlua::Result<RandomConfiguredRange> {
-  match kind {
-    "int" => {
-      let min = args::integer(min, method, "min")?;
-      let max = args::integer(max, method, "max")?;
-      if min > max {
-        return Err(args::message(
-          method,
-          "min must be less than or equal to max",
-        ));
-      }
-      Ok(RandomConfiguredRange::Integer { min, max })
-    }
-    "float" => {
-      let min = finite_number(min, method, "min")?;
-      let max = finite_number(max, method, "max")?;
-      if min > max {
-        return Err(args::message(
-          method,
-          "min must be less than or equal to max",
-        ));
-      }
-      Ok(RandomConfiguredRange::Float { min, max })
-    }
-    _ => Err(args::message(
-      method,
-      "type must be random.INT or random.FLOAT",
-    )),
-  }
-}
-
 fn integer_bounds(range: RandomConfiguredRange, method: &str) -> mlua::Result<(i64, i64)> {
   match range {
     RandomConfiguredRange::Integer { min, max } => Ok((min, max)),
     RandomConfiguredRange::Float { min, max }
       if min.fract() == 0.0
         && max.fract() == 0.0
-        && min >= i64::MIN as f64
-        && max <= i64::MAX as f64 =>
+        && min >= -9_223_372_036_854_775_808.0
+        && max < 9_223_372_036_854_775_808.0 =>
     {
       Ok((min as i64, max as i64))
     }
@@ -485,6 +464,42 @@ fn finite_number(value: Value, method: &str, name: &str) -> mlua::Result<f64> {
   } else {
     Err(args::message(method, format!("{name} must be finite")))
   }
+}
+
+fn optional_finite_number(
+  table: &Table,
+  method: &str,
+  name: &str,
+  default: f64,
+) -> mlua::Result<f64> {
+  match table.get::<Value>(name)? {
+    Value::Nil => Ok(default),
+    value => finite_number(value, method, name),
+  }
+}
+
+fn configuration_table(
+  lua: &Lua,
+  id: RandomGeneratorId,
+  configuration: RandomConfiguration,
+) -> mlua::Result<Table> {
+  let info = lua.create_table()?;
+  info.raw_set("id", format_id(id))?;
+  match configuration.range {
+    RandomConfiguredRange::Integer { min, max } => {
+      info.raw_set("type", "int")?;
+      info.raw_set("min", min)?;
+      info.raw_set("max", max)?;
+    }
+    RandomConfiguredRange::Float { min, max } => {
+      info.raw_set("type", "float")?;
+      info.raw_set("min", min)?;
+      info.raw_set("max", max)?;
+    }
+  }
+  info.raw_set("seed", configuration.seed)?;
+  info.raw_set("step", configuration.step)?;
+  Ok(info)
 }
 
 fn non_negative_step(value: i64, method: &str) -> mlua::Result<u64> {

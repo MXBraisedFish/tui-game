@@ -32,12 +32,11 @@ impl FrameCompositor {
     );
     for surface in canvas.prepared_surfaces() {
       match surface {
-        PreparedSurface::Slice(slice) if slice.visible => overlay(
+        PreparedSurface::Slice(slice) if slice.visible => overlay_slice(
           &mut frame,
-          &slice.buffer,
+          slice,
           viewport.x.saturating_add(slice.rect.x),
           viewport.y.saturating_add(slice.rect.y),
-          slice.opaque,
         ),
         PreparedSurface::ScrollBox(scroll_box) if scroll_box.visible => {
           overlay_scroll_box(&mut frame, scroll_box, viewport.x, viewport.y)
@@ -64,6 +63,29 @@ fn overlay(frame: &mut ComposedFrame, buffer: &CanvasBuffer, ox: u16, oy: u16, o
       let px = ox.saturating_add(x);
       let py = oy.saturating_add(y);
       write_cell(frame, px, py, source);
+    }
+  }
+}
+
+fn overlay_slice(
+  frame: &mut ComposedFrame,
+  slice: &crate::host_engine::services::canvas::PreparedSlice,
+  ox: u16,
+  oy: u16,
+) {
+  for y in 0..slice.buffer.height() {
+    for x in 0..slice.buffer.width() {
+      if !slice.opaque && !slice.buffer.is_written(x, y) {
+        continue;
+      }
+      let Some(source) = slice.buffer.get(x, y) else {
+        continue;
+      };
+      let mut source = source.clone();
+      if source.style.background.is_none() {
+        source.style.background = slice.background.clone();
+      }
+      write_cell(frame, ox.saturating_add(x), oy.saturating_add(y), &source);
     }
   }
 }
@@ -300,7 +322,7 @@ mod tests {
       opaque: false,
       ..Default::default()
     };
-    let a = service.create(&mut pool, options).unwrap();
+    let a = service.create(&mut pool, options.clone()).unwrap();
     let b = service.create(&mut pool, options).unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
@@ -357,6 +379,58 @@ mod tests {
     };
     assert_eq!(cell.text, " ");
     assert_eq!(cell.style.background, Some(background));
+  }
+
+  #[test]
+  fn slice_background_fills_blank_cells_and_is_overridden_by_cell_style() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(3, 1);
+    let slices = SliceService::new();
+    let mut pool = UiObjectPool::new();
+    let slice = slices
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: SliceRect {
+            x: 0,
+            y: 0,
+            width: SliceLength::Fixed(2),
+            height: SliceLength::Fixed(1),
+          },
+          background: Some(TextColor::Terminal(TerminalColor::Blue)),
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    canvas.styled_text_on(
+      slice,
+      1,
+      0,
+      "X",
+      TextStyle {
+        background: Some(TextColor::Terminal(TerminalColor::Red)),
+        ..Default::default()
+      },
+    );
+
+    let frame = FrameCompositor::new().compose(&canvas);
+    let ComposedCell::Text(blank) = frame.get(0, 0).unwrap() else {
+      panic!("expected text cell")
+    };
+    let ComposedCell::Text(written) = frame.get(1, 0).unwrap() else {
+      panic!("expected text cell")
+    };
+    assert_eq!(
+      blank.style.background,
+      Some(TextColor::Terminal(TerminalColor::Blue))
+    );
+    assert_eq!(
+      written.style.background,
+      Some(TextColor::Terminal(TerminalColor::Red))
+    );
   }
 
   #[test]

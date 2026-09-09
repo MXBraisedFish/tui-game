@@ -2027,11 +2027,11 @@ mod tests {
           debug.assert{ value = random.generate(first) == random.generate(second) }
           debug.assert{ value = random.generate(first) == random.generate(second) }
 
-          slice_id = slice.create{ width = 20, height = slice["50P"], layer = 3 }
+          slice_id = slice.create{ width = 20, height = 20, layer = 3 }
           slice.draw{ id = slice_id, x = -4, y = 2 }
           local info = slice.get_info(slice_id)
           debug.assert{
-            value = info.width == 20 and info.height == 20 and info.layer == 3,
+            value = info.width == 20 and info.height == 20 and info.layer == 1,
           }
 
           local json = serialization.json_encode{
@@ -2106,6 +2106,182 @@ mod tests {
         ..
       }
     )));
+  }
+
+  #[test]
+  fn random_and_slice_follow_the_documented_object_protocol() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          local direct_int = random.randint{}
+          local direct_float = random.randfloat{}
+          debug.assert{
+            value = direct_int >= -2147483648 and direct_int <= 2147483647,
+          }
+          debug.assert{ value = direct_float >= 0 and direct_float <= 1 }
+
+          local generator = random.create{}
+          local initial = random.get_info(generator)
+          debug.assert{
+            value = initial.type == random.INT
+              and initial.min == -2147483648
+              and initial.max == 2147483647
+              and initial.step == 0,
+          }
+          debug.assert{ value = random.count() == 1 and random.list().n == 1 }
+          debug.assert{
+            value = random.set{
+              id = generator,
+              type = random.FLOAT,
+              min = -2.5,
+              max = 3.5,
+              seed = 42,
+              step = 5,
+            },
+          }
+          local range = random.get_range(generator)
+          debug.assert{
+            value = random.get_type(generator) == random.FLOAT
+              and range.min == -2.5
+              and range.max == 3.5
+              and random.get_seed(generator) == 42
+              and random.get_step(generator) == 5,
+          }
+          local value = random.generate(generator)
+          debug.assert{
+            value = value >= -2.5 and value <= 3.5 and random.get_step(generator) == 6,
+          }
+          debug.assert{ value = random.set_type{ id = generator } }
+          debug.assert{ value = random.set_seed{ id = generator } }
+          local missing_step = debug.pcall{
+            func = function() random.set_step{ id = generator } end,
+          }
+          debug.assert{ value = not missing_step.ok }
+
+          debug.assert{ value = slice.exists("base") }
+          local base = slice.get_info("base")
+          debug.assert{
+            value = base.width == ctx.base.width
+              and base.height == ctx.base.height
+              and base.layer == 0
+              and base.bg == color.TRANSPARENT,
+          }
+          local first = slice.create{ width = 10, height = 4, bg = color.BLUE }
+          local inserted = slice.create{ width = 3, height = 2, layer = 1 }
+          local slices = slice.list()
+          debug.assert{
+            value = slices[1].id == inserted
+              and slices[1].layer == 1
+              and slices[2].id == first
+              and slices[2].layer == 2
+              and slices[2].bg == color.BLUE,
+          }
+          debug.assert{ value = slice.set{ id = first } }
+          debug.assert{ value = slice.set{ id = first, bg = color.RED } }
+          debug.assert{ value = slice.get_background(first) == color.RED }
+          debug.assert{
+            value = slice.set_background{ id = first, bg = color.TRANSPARENT },
+          }
+          debug.assert{
+            value = slice.get_background(first) == color.TRANSPARENT,
+          }
+          debug.assert{ value = slice.set_background{ id = first, bg = color.NONE } }
+          debug.assert{ value = slice.get_background(first) == color.NONE }
+          debug.assert{ value = slice.set_background{ id = first } }
+          debug.assert{ value = slice.get_background(first) == color.NONE }
+          debug.assert{
+            value = not slice.set_background{ id = "base", bg = color.BLUE },
+          }
+          debug.assert{
+            value = not slice.set_background{ id = "slice_999", bg = color.BLUE },
+          }
+          local invalid_background = debug.pcall{
+            func = function()
+              slice.set_background{ id = first, bg = "not-a-color" }
+            end,
+          }
+          debug.assert{ value = not invalid_background.ok }
+          debug.assert{
+            value = slice.set_size{ id = first, width = 12 }
+              and slice.get_width(first) == 12
+              and slice.get_height(first) == 4,
+          }
+          debug.assert{ value = slice.set_layer{ id = first, layer = 999 } }
+          debug.assert{ value = slice.get_layer(first) == 2 }
+          debug.assert{ value = slice.delete(inserted) }
+          debug.assert{ value = slice.get_layer(first) == 1 }
+          debug.assert{
+            value = slice["50P"] == nil
+              and slice.list_by_layer == nil
+              and random.set_params == nil,
+          }
+          debug.assert{ value = slice.clear() and slice.count() == 0 }
+          debug.assert{ value = random.clear() and random.count() == 0 }
+        end
+      "#,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn random_and_slice_objects_are_isolated_and_released_with_the_session() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          generator = random.create{ seed = 7 }
+          layer = slice.create{ width = 2, height = 2 }
+        end
+      "#,
+    );
+    let mut first =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let second = LuaSession::load(
+      spec(&source, LuaSessionKind::Screensaver),
+      LuaPolicy::default(),
+    )
+    .unwrap();
+
+    for session in [&first, &second] {
+      session
+        .with_objects(|objects| {
+          assert_eq!(
+            crate::host_engine::services::RandomService::new()
+              .configured_ids(objects.runtime())
+              .len(),
+            1
+          );
+          assert_eq!(
+            crate::host_engine::services::SliceService::new()
+              .ids(objects.ui())
+              .len(),
+            1
+          );
+        })
+        .unwrap();
+    }
+    let first_pool = first.with_objects(|objects| objects.ui().id()).unwrap();
+    let second_pool = second.with_objects(|objects| objects.ui().id()).unwrap();
+    assert_ne!(first_pool, second_pool);
+
+    first.stop();
+    assert!(!first.has_objects());
+    assert!(second.has_objects());
+    second
+      .with_objects(|objects| {
+        assert_eq!(
+          crate::host_engine::services::RandomService::new()
+            .configured_ids(objects.runtime())
+            .len(),
+          1
+        );
+        assert_eq!(
+          crate::host_engine::services::SliceService::new()
+            .ids(objects.ui())
+            .len(),
+          1
+        );
+      })
+      .unwrap();
   }
 
   #[test]

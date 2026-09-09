@@ -34,6 +34,7 @@ pub(crate) struct PreparedSlice {
   pub rect: Rect,
   pub visible: bool,
   pub opaque: bool,
+  pub background: Option<TextColor>,
   pub order: usize,
 }
 
@@ -149,7 +150,7 @@ impl CanvasService {
     id: SliceId,
     layout: &LayoutService,
   ) {
-    let Some(state) = pool.slices.slices.get(&id).copied() else {
+    let Some(state) = pool.slices.slices.get(&id).cloned() else {
       return;
     };
     let rect = resolve_rect(state.rect, layout);
@@ -158,6 +159,7 @@ impl CanvasService {
       rect,
       visible: state.visible,
       opaque: state.opaque,
+      background: state.background.clone(),
       order,
     });
     if prepared.buffer.width() != rect.width || prepared.buffer.height() != rect.height {
@@ -169,6 +171,7 @@ impl CanvasService {
     prepared.rect = rect;
     prepared.visible = state.visible;
     prepared.opaque = state.opaque;
+    prepared.background = state.background;
     prepared.order = order;
   }
 

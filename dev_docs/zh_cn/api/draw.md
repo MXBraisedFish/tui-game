@@ -35,30 +35,30 @@ draw.text{}
 
 ### 参数
 
-| 参数                 | 类型            | 必填  | 默认值           | 说明           |
-| ------------------ | ------------- | --- | ------------- | ------------ |
-| `x`                | integer       | 是   | -             | 文本起始位置的 x 坐标 |
-| `y`                | integer       | 是   | -             | 文本起始位置的 y 坐标 |
-| `text`             | string        | 是   | -             | 要绘制的文本       |
-| `fg`               | const-color   | 否   | `color.NONE`  | 前景色          |
-| `bg`               | const-color   | 否   | `color.NONE`  | 背景色          |
-| `horizontal_align` | const-align   | 否   | `align.LEFT`  | 多行文本的水平对齐方式  |
-| `auto_wrap`        | boolean       | 否   | `true`        | 是否自动换行       |
-| `word_wrap`        | boolean       | 否   | `true`        | 是否按完整单词换行    |
-| `max_width`        | integer / nil | 否   | `nil`         | 最大绘制宽度       |
-| `max_height`       | integer / nil | 否   | `nil`         | 最大绘制高度       |
-| `overflow_marker`  | string        | 否   | `"..."`       | 文本溢出时使用的省略标记 |
-| `text_mode`        | const-string  | 否   | `string.AUTO` | 文本解析模式       |
-| `rich_params`      | table / nil   | 否   | `nil`         | 富文本参数        |
-| `bold`             | boolean       | 否   | `false`       | 粗体           |
-| `italic`           | boolean       | 否   | `false`       | 斜体           |
-| `underline`        | boolean       | 否   | `false`       | 下划线          |
-| `strike`           | boolean       | 否   | `false`       | 删除线          |
-| `blink`            | boolean       | 否   | `false`       | 闪烁           |
-| `reverse`          | boolean       | 否   | `false`       | 反显           |
-| `hidden`           | boolean       | 否   | `false`       | 隐藏           |
-| `dim`              | boolean       | 否   | `false`       | 暗淡           |
-| `slice_layer`      | string        | 否   | `"base"`      | 绘制目标切片图层     |
+| 参数               | 类型                 | 必填 | 默认值        | 说明                     |
+| ------------------ | -------------------- | ---- | ------------- | ------------------------ |
+| `x`                | integer              | 是   | -             | 文本起始位置的 x 坐标    |
+| `y`                | integer              | 是   | -             | 文本起始位置的 y 坐标    |
+| `text`             | string               | 是   | -             | 要绘制的文本             |
+| `fg`               | string / const-color | 否   | `color.NONE`  | 前景色                   |
+| `bg`               | string / const-color | 否   | `color.NONE`  | 背景色                   |
+| `horizontal_align` | const-align          | 否   | `align.LEFT`  | 多行文本的水平对齐方式   |
+| `auto_wrap`        | boolean              | 否   | `true`        | 是否自动换行             |
+| `word_wrap`        | boolean              | 否   | `true`        | 是否按完整单词换行       |
+| `max_width`        | integer / nil        | 否   | `nil`         | 最大绘制宽度             |
+| `max_height`       | integer / nil        | 否   | `nil`         | 最大绘制高度             |
+| `overflow_marker`  | string               | 否   | `"..."`       | 文本溢出时使用的省略标记 |
+| `text_mode`        | const-string         | 否   | `string.AUTO` | 文本解析模式             |
+| `rich_params`      | table / nil          | 否   | `nil`         | 富文本参数               |
+| `bold`             | boolean              | 否   | `false`       | 粗体                     |
+| `italic`           | boolean              | 否   | `false`       | 斜体                     |
+| `underline`        | boolean              | 否   | `false`       | 下划线                   |
+| `strike`           | boolean              | 否   | `false`       | 删除线                   |
+| `blink`            | boolean              | 否   | `false`       | 闪烁                     |
+| `reverse`          | boolean              | 否   | `false`       | 反显                     |
+| `hidden`           | boolean              | 否   | `false`       | 隐藏                     |
+| `dim`              | boolean              | 否   | `false`       | 暗淡                     |
+| `slice_layer`      | string               | 否   | `"base"`      | 绘制目标切片图层         |
 
 ### 返回
 
@@ -106,16 +106,16 @@ draw.fill_rect{}
 
 ### 参数
 
-| 参数            | 类型           | 必填  | 默认值          | 说明          |
-| ------------- | ------------ | --- | ------------ | ----------- |
-| `x`           | integer      | 是   | -            | 矩形左上角的 x 坐标 |
-| `y`           | integer      | 是   | -            | 矩形左上角的 y 坐标 |
-| `width`       | integer      | 是   | -            | 矩形宽度        |
-| `height`      | integer      | 是   | -            | 矩形高度        |
-| `char`        | string / nil | 否   | `nil`        | 填充字符        |
-| `fg`          | const-color  | 否   | `color.NONE` | 前景色         |
-| `bg`          | const-color  | 否   | `color.NONE` | 背景色         |
-| `slice_layer` | string       | 否   | `"base"`     | 绘制目标切片图层    |
+| 参数          | 类型                 | 必填 | 默认值       | 说明                |
+| ------------- | -------------------- | ---- | ------------ | ------------------- |
+| `x`           | integer              | 是   | -            | 矩形左上角的 x 坐标 |
+| `y`           | integer              | 是   | -            | 矩形左上角的 y 坐标 |
+| `width`       | integer              | 是   | -            | 矩形宽度            |
+| `height`      | integer              | 是   | -            | 矩形高度            |
+| `char`        | string / nil         | 否   | `nil`        | 填充字符            |
+| `fg`          | string / const-color | 否   | `color.NONE` | 前景色              |
+| `bg`          | string / const-color | 否   | `color.NONE` | 背景色              |
+| `slice_layer` | string               | 否   | `"base"`     | 绘制目标切片图层    |
 
 ### 返回
 
@@ -166,16 +166,16 @@ draw.stroke_rect{}
 
 ### 参数
 
-| 参数            | 类型                 | 必填  | 默认值          | 说明          |
-| ------------- | ------------------ | --- | ------------ | ----------- |
-| `x`           | integer            | 是   | -            | 矩形左上角的 x 坐标 |
-| `y`           | integer            | 是   | -            | 矩形左上角的 y 坐标 |
-| `width`       | integer            | 是   | -            | 矩形宽度        |
-| `height`      | integer            | 是   | -            | 矩形高度        |
-| `fg`          | const-color        | 否   | `color.NONE` | 边框前景色       |
-| `bg`          | const-color        | 否   | `color.NONE` | 边框背景色       |
-| `border_char` | const-char / table | 否   | `char.LINE`  | 边框字符        |
-| `slice_layer` | string             | 否   | `"base"`     | 绘制目标切片图层    |
+| 参数          | 类型                 | 必填 | 默认值       | 说明                |
+| ------------- | -------------------- | ---- | ------------ | ------------------- |
+| `x`           | integer              | 是   | -            | 矩形左上角的 x 坐标 |
+| `y`           | integer              | 是   | -            | 矩形左上角的 y 坐标 |
+| `width`       | integer              | 是   | -            | 矩形宽度            |
+| `height`      | integer              | 是   | -            | 矩形高度            |
+| `fg`          | string / const-color | 否   | `color.NONE` | 边框前景色          |
+| `bg`          | string / const-color | 否   | `color.NONE` | 边框背景色          |
+| `border_char` | const-char / table   | 否   | `char.LINE`  | 边框字符            |
+| `slice_layer` | string               | 否   | `"base"`     | 绘制目标切片图层    |
 
 ### 返回
 

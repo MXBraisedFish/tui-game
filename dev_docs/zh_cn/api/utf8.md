@@ -292,7 +292,7 @@ utf8.char_to_codepoint{}
 
 ### 返回
 
-直接返回一个值。
+返回一个数组表。
 
 | 类型  | 说明       |
 | ----- | ---------- |
@@ -356,7 +356,7 @@ utf8.char_to_ascii{}
 
 ### 返回
 
-直接返回一个值。
+返回一个数组表。
 
 | 类型  | 说明           |
 | ----- | -------------- |
@@ -474,8 +474,8 @@ utf8.codepoints()
 
 | 字段          | 类型    | 说明                                   |
 | ------------- | ------- | -------------------------------------- |
-| byte_position | integer | 当前 Unicode 标量的一基 UTF-8 字节位置 |
-| codepoint     | integer | 当前 Unicode 标量对应的码点            |
+| `byte_position` | integer | 当前 Unicode 标量的一基 UTF-8 字节位置 |
+| `codepoint`     | integer | 当前 Unicode 标量对应的码点            |
 
 ### 示例
 

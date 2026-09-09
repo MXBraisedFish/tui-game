@@ -1082,7 +1082,7 @@ file.read{}
 | ------------- | ------------ | ---- | ------------- | ------------------------- |
 | `path`        | string       | 是   | -             | 相对 `assets/` 的文件路径 |
 | `encoding`    | const-file   | 否   | `file.AUTO`   | 文本编码                  |
-| `end_of_line` | const-file   | 否   | `"file.AUTO"` | 换行符规范                |
+| `end_of_line` | const-file   | 否   | `file.AUTO` | 换行符规范                |
 | `byte`        | boolean      | 否   | `false`       | 二进制模式                |
 | `event_tip`   | string / nil | 否   | `nil`         | 自定义事件标记            |
 
