@@ -31,7 +31,7 @@ Lua 中有**8 种**基本数据类型。
 
 ```lua
 local x
-print(x) -- nil
+print(x)
 ```
 
 输出：
@@ -46,59 +46,78 @@ nil
 
 布尔值只有 `true` 和 `false`，分别代表**真**和**假**。
 
+### 示例
+
 ```lua
 local a = true
 local b = false
 
-print(a and b)   -- false
-print(a or b)    -- true
-print(not a)     -- false
+print(a and b)
+print(a or b)
+print(not a)
+```
+
+输出：
+
+```text
+false
+true
+false
 ```
 
 ---
 
-## 3. number（数字）
+## number
 
-Lua 5.3 起区分 **integer（整数）** 和 **float（浮点数）**，但类型名统一为 `number`。
+Lua 5.3 版本前只有 `number` 一个数字类型，均保存为双精度浮点类型。
+Lua 5.3 版本后新增了 `integer` 整型和 `float` 双精度浮点类型用于区分两种数字，但依旧统一归类为 `number` 类型。
+
+### 示例
 
 ```lua
-local i = 10          -- 整数
-local f = 3.14        -- 浮点数
-local h = 0xFF        -- 十六进制 = 255
-local e = 1e3         -- 科学计数法 = 1000.0
+local i = 10
+local f = 3.14
+local h = 0xFF
+local e = 1e3
 
-print(type(i))        -- number
-print(3 / 2)          -- 1.5（除法总是浮点）
-print(7 // 2)         -- 3  （整除，5.3+）
-print(7 % 3)          -- 1
-print(2 ^ 10)         -- 1024.0（幂运算返回浮点）
-print(math.type(3))   -- integer
-print(math.type(3.0)) -- float
+print(type(i))
+print(3 / 2)
+print(7 // 2)
+print(7 % 3)
+print(2 ^ 10)
+print(math.type(3))
+print(math.type(3.0))
 ```
 
-**字符串与数字自动转换**：
+输出:
 
-```lua
-print("10" + 5)       -- 15（字符串自动转数字）
-print(10 .. 20)       -- "1020"（数字自动转字符串拼接）
+```text
+number
+1.5
+3
+1
+1024.0
+integer
+float
 ```
 
-**常用数学库**：
+### 额外补充
+
+- 在 Lua 中字符串与数字之间的运算会将字符串转换为数字处理，而非拼接字符串。
 
 ```lua
-math.floor(3.7)   -- 3
-math.ceil(3.2)    -- 4
-math.abs(-5)      -- 5
-math.max(1, 9, 3) -- 9
-math.random(1, 6) -- 1~6 随机整数
-math.huge         -- 无穷大
+print("10" + 5) -- 输出 15
 ```
 
 ---
 
-## 4. string（字符串）
+## 4. string
 
-字符串是不可变的字节序列，可以用单引号、双引号或长括号定义。
+Lua 中的字符串可以使用 `''`、`""` 包裹。
+除此之外还有一种特殊的长字符串使用 `[[]]` 包裹，在这个里面的字符串允许多行、转义失效。
+除此外如果字符串内包含 `[[`、`]]`，可以在最符号之间添加 `=`，例如 `[=[]=]`，数量任意，但是左右两侧数量必须相等。
+
+### 示例
 
 ```lua
 local s1 = 'hello'
