@@ -2173,39 +2173,13 @@ fn apply_lua_host_commands(
   world: &mut RuntimeWorld,
   router: &mut LuaEventBroker,
 ) -> LuaEventFlow {
-  let commands = match kind {
-    LuaSessionKind::Game => services.game.take_host_commands(),
-    LuaSessionKind::Screensaver => services.screensaver.take_host_commands(),
-  };
+  let commands = take_lua_host_commands(kind, services);
   let mut flow = LuaEventFlow::Continue;
   for command in commands {
+    if apply_lua_diagnostic_host_command(services, kind, &command) {
+      continue;
+    }
     match command {
-      LuaHostCommand::Log { level, message } => {
-        log_lua_session_message(services, kind, &level, message)
-      }
-      LuaHostCommand::Print {
-        message,
-        title,
-        time,
-        level,
-        type_head,
-      } => print_lua_session_message(
-        services,
-        kind,
-        message,
-        LogPrintOptions {
-          time,
-          level: level.as_deref().and_then(lua_log_level),
-          type_head,
-          title,
-        },
-      ),
-      LuaHostCommand::Ignored { method, reason } => log_lua_session_message(
-        services,
-        kind,
-        "debug",
-        format!("{method} ignored: {reason}"),
-      ),
       LuaHostCommand::RequestRender => {
         services.canvas.request_render();
         services.presenter.request_render();
@@ -2337,6 +2311,9 @@ fn apply_lua_host_commands(
       LuaHostCommand::SkipActions if kind == LuaSessionKind::Game => flow = LuaEventFlow::Skip,
       LuaHostCommand::ClearActions if kind == LuaSessionKind::Game => flow = LuaEventFlow::Clear,
       LuaHostCommand::Draw(_) => {}
+      LuaHostCommand::Log { .. }
+      | LuaHostCommand::Print { .. }
+      | LuaHostCommand::Ignored { .. } => {}
       LuaHostCommand::ExitGame
       | LuaHostCommand::SaveGame
       | LuaHostCommand::SaveBest
@@ -2347,11 +2324,68 @@ fn apply_lua_host_commands(
   flow
 }
 
+fn take_lua_host_commands(
+  kind: LuaSessionKind,
+  services: &mut EngineServices,
+) -> Vec<LuaHostCommand> {
+  match kind {
+    LuaSessionKind::Game => services.game.take_host_commands(),
+    LuaSessionKind::Screensaver => services.screensaver.take_host_commands(),
+  }
+}
+
+/// 返回命令是否属于已经完成的诊断输出。
+fn apply_lua_diagnostic_host_command(
+  services: &mut EngineServices,
+  kind: LuaSessionKind,
+  command: &LuaHostCommand,
+) -> bool {
+  match command {
+    LuaHostCommand::Log { level, message } => {
+      log_lua_session_message(services, kind, level, message.clone());
+    }
+    LuaHostCommand::Print {
+      message,
+      title,
+      time,
+      level,
+      type_head,
+    } => print_lua_session_message(
+      services,
+      kind,
+      message.clone(),
+      LogPrintOptions {
+        time: *time,
+        level: level.as_deref().and_then(lua_log_level),
+        type_head: *type_head,
+        title: title.clone(),
+      },
+    ),
+    LuaHostCommand::Ignored { method, reason } => log_lua_session_message(
+      services,
+      kind,
+      "debug",
+      format!("{method} ignored: {reason}"),
+    ),
+    _ => return false,
+  }
+  true
+}
+
+/// 故障回调可能已成功执行过若干日志调用。Session 销毁前只提交这些诊断输出；
+/// 保存、退出、文件任务和其他宿主副作用属于未完整完成的回调，必须丢弃。
+fn flush_lua_fault_diagnostics(services: &mut EngineServices, kind: LuaSessionKind) {
+  for command in take_lua_host_commands(kind, services) {
+    let _ = apply_lua_diagnostic_host_command(services, kind, &command);
+  }
+}
+
 fn handle_lua_fault(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
   error: LuaSessionError,
 ) {
+  flush_lua_fault_diagnostics(services, error.session_kind);
   let package = match error.session_kind {
     LuaSessionKind::Game => services.game.package(),
     LuaSessionKind::Screensaver => services.screensaver.package(),

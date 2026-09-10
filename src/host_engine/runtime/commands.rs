@@ -212,6 +212,7 @@ fn start_game(
       if continuing {
         let _ = services.storage.clear_continue_game_save(&mut services.log);
       }
+      show_game_start_fault(services, world);
       return false;
     }
   };
@@ -273,6 +274,15 @@ fn start_game(
   services.canvas.request_render();
   services.presenter.request_render();
   true
+}
+
+/// Lua 入口尚未成功创建 Session 时，无法走运行中 Session 的统一故障处理，
+/// 但对玩家而言仍然是一次游戏启动故障，必须给出可见反馈。
+fn show_game_start_fault(services: &mut EngineServices, world: &mut RuntimeWorld) {
+  world.state.push_game_warning_overlay();
+  services.input.clear();
+  services.canvas.request_render();
+  services.presenter.request_render();
 }
 
 pub(super) fn apply_cover_continue_command(

@@ -2170,7 +2170,8 @@ mod tests {
           local inserted = slice.create{ width = 3, height = 2, layer = 1 }
           local slices = slice.list()
           debug.assert{
-            value = slices[1].id == inserted
+            value = slices.n == 2
+              and slices[1].id == inserted
               and slices[1].layer == 1
               and slices[2].id == first
               and slices[2].layer == 2
@@ -2215,7 +2216,11 @@ mod tests {
               and slice.list_by_layer == nil
               and random.set_params == nil,
           }
-          debug.assert{ value = slice.clear() and slice.count() == 0 }
+          debug.assert{
+            value = slice.clear()
+              and slice.count() == 0
+              and slice.list().n == 0,
+          }
           debug.assert{ value = random.clear() and random.count() == 0 }
         end
       "#,
@@ -2499,6 +2504,35 @@ mod tests {
         level: None,
         type_head: false,
       } if message == "plain"
+    )));
+  }
+
+  #[test]
+  fn successful_debug_print_before_callback_fault_remains_pending() {
+    let source = valid_script(
+      r#"
+        function Update(dt)
+          debug.print{ message = 1 }
+          debug.print{ missing_message }
+        end
+      "#,
+    );
+    let mut session = LuaSession::load_with_api(
+      spec(&source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+      LuaApiConfig {
+        debug_enabled: true,
+        ..LuaApiConfig::default()
+      },
+    )
+    .unwrap();
+
+    let error = session.update().expect_err("the second print must fail");
+    assert_eq!(error.stage, LuaErrorStage::Callback);
+    assert_eq!(session.state(), LuaSessionState::Faulted);
+    assert!(session.take_host_commands().iter().any(|command| matches!(
+      command,
+      LuaHostCommand::Print { message, .. } if message == "1"
     )));
   }
 

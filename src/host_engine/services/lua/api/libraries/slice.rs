@@ -238,9 +238,11 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
       with_pool(&list_state, method, |objects| {
         let service = SliceService::new();
         let result = lua.create_table()?;
-        for (index, id) in service.ids_by_layer(objects.ui()).into_iter().enumerate() {
+        let ids = service.ids_by_layer(objects.ui());
+        for (index, id) in ids.iter().copied().enumerate() {
           result.raw_set(index + 1, object_info(lua, objects, id, size)?)?;
         }
+        result.raw_set("n", ids.len())?;
         Ok(result)
       })
     })?,

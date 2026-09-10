@@ -63,8 +63,29 @@ slice.create{}
 ### 示例
 
 ```lua
+function Init(ctx)
+  s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+  debug.print { message = table.pretty(slice.get_info(s)) }
+end
 
+function Render()
+  slice.draw { id = s, x = 5, y = 2 }
+end
 ```
+
+输出：
+
+```lua
+{
+  id = "slice_001",
+  bg = "yellow",
+  height = 10,
+  width = 20,
+  layer = 1
+}
+```
+
+![slice.create示例](../image/slice_create_example.png)
 
 ### 额外补充
 
@@ -101,7 +122,22 @@ slice.delete()
 ### 示例
 
 ```lua
+s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+debug.print { message = s }
 
+debug.print { message = slice.delete(s) }
+
+debug.print { message = table.pretty(slice.list()) }
+```
+
+输出：
+
+```lua
+slice_001
+true
+{
+  n = 0
+}
 ```
 
 ---
@@ -132,7 +168,23 @@ slice.clear()
 ### 示例
 
 ```lua
+slice.create { width = 20, height = 10, bg = color.YELLOW }
+slice.create { width = 30, height = 8, bg = color.RED }
+slice.create { width = 40, height = 6, bg = color.GREEN }
+slice.create { width = 50, height = 4, bg = color.BLUE }
 
+debug.print { message = slice.clear() }
+
+debug.print { message = table.pretty(slice.list()) }
+```
+
+输出：
+
+```lua
+true
+{
+  n = 0
+}
 ```
 
 ---
@@ -154,7 +206,7 @@ slice.list()
 
 ### 返回
 
-返回一个数组表。
+返回一个混合表。
 
 | 类型  | 说明             |
 | ----- | ---------------- |
@@ -163,16 +215,25 @@ slice.list()
 ### 示例
 
 ```lua
+slice.create { width = 20, height = 10, bg = color.YELLOW }
+slice.create { width = 30, height = 8, bg = color.RED }
+
+debug.print { message = table.pretty(slice.list()) }
+```
+
+输出：
+
+```lua
 
 ```
 
 ### 额外补充
 
-- 返回值数组表结构如下：
+- 返回值混合表结构如下：
 
 ```lua
 {
-  [1] = {
+  {
     id = ...,     -- string
     width = ...,  -- integer
     height = ..., -- integer
@@ -180,7 +241,8 @@ slice.list()
     bg = ... ,    -- string
   },
   ...
-}
+  n = x,      -- integer
+} -- 共有 x+1 个元素，所有返回值连续排序，最后 n 为返回值个数
 ```
 
 - 返回值数组表按照图层切片层级依次排序。
@@ -217,6 +279,12 @@ slice.count()
 
 ```
 
+输出：
+
+```lua
+
+```
+
 ---
 
 ## `draw`
@@ -243,6 +311,12 @@ slice.draw{}
 无。
 
 ### 示例
+
+```lua
+
+```
+
+输出：
 
 ```lua
 
@@ -280,6 +354,12 @@ slice.set{}
 | boolean | 是否修改成功 |
 
 ### 示例
+
+```lua
+
+```
+
+输出：
 
 ```lua
 
@@ -324,6 +404,12 @@ slice.set_size{}
 
 ```
 
+输出：
+
+```lua
+
+```
+
 ### 额外补充
 
 - `"base"` 图层不可修改。
@@ -357,6 +443,12 @@ slice.set_width{}
 | boolean | 是否修改成功 |
 
 ### 示例
+
+```lua
+
+```
+
+输出：
 
 ```lua
 
@@ -400,6 +492,12 @@ slice.set_height{}
 
 ```
 
+输出：
+
+```lua
+
+```
+
 ### 额外补充
 
 - `"base"` 图层不可修改。
@@ -438,6 +536,12 @@ slice.set_layer{}
 
 ```
 
+输出：
+
+```lua
+
+```
+
 ### 额外补充
 
 - 图层层级之间不允许空洞图层，参数 `layer` 超过最大层级时自动修正为置顶。
@@ -470,6 +574,12 @@ slice.set_background{}
 | boolean | 是否修改成功 |
 
 ### 示例
+
+```lua
+
+```
+
+输出：
 
 ```lua
 
@@ -513,6 +623,12 @@ slice.get_size()
 
 ```
 
+输出：
+
+```lua
+
+```
+
 ---
 
 ## `get_width`
@@ -541,6 +657,12 @@ slice.get_width()
 | integer | 图层切片宽度 |
 
 ### 示例
+
+```lua
+
+```
+
+输出：
 
 ```lua
 
@@ -579,6 +701,12 @@ slice.get_height()
 
 ```
 
+输出：
+
+```lua
+
+```
+
 ---
 
 ## `get_layer`
@@ -605,6 +733,12 @@ slice.get_layer()
 | integer | 图层层级 |
 
 ### 示例
+
+```lua
+
+```
+
+输出：
 
 ```lua
 
@@ -641,6 +775,12 @@ slice.get_background()
 | string | 背景颜色 |
 
 ### 示例
+
+```lua
+
+```
+
+输出：
 
 ```lua
 
@@ -687,6 +827,12 @@ slice.get_info()
 
 ```
 
+输出：
+
+```lua
+
+```
+
 ---
 
 ## `exists`
@@ -715,6 +861,12 @@ slice.exists()
 | boolean | 是否存在 |
 
 ### 示例
+
+```lua
+
+```
+
+输出：
 
 ```lua
 

@@ -215,7 +215,44 @@ random.create{}
 ### 示例
 
 ```lua
+r1 = random.create {}
+debug.print { message = r1 }
+debug.print { message = random.generate(r1) }
 
+r2 = random.create { type = random.INT, min = 1, max = 30, seed = 520 }
+debug.print { message = r2 }
+debug.print { message = random.generate(r2) }
+
+
+debug.print { message = table.pretty(random.list()) }
+```
+
+输出：
+
+```lua
+rng_001
+1277268617
+rng_002
+14
+{
+  [1] = {
+    id = "rng_001",
+    max = 2147483647,
+    min = -2147483648,
+    seed = 1789000067301558980,
+    step = 1,
+    type = "int"
+  },
+  [2] = {
+    id = "rng_002",
+    max = 30,
+    min = 1,
+    seed = 520,
+    step = 1,
+    type = "int"
+  },
+  n = 2
+}
 ```
 
 ### 额外补充
@@ -254,7 +291,25 @@ random.delete()
 ### 示例
 
 ```lua
+r = random.create {}
+debug.print { message = r }
+debug.print { message = random.generate(r) }
 
+debug.print { message = random.delete(r) }
+
+
+debug.print { message = table.pretty(random.list()) }
+```
+
+输出：
+
+```lua
+rng_001
+553823262
+true
+{
+  n = 0
+}
 ```
 
 ---
@@ -285,7 +340,23 @@ random.clear()
 ### 示例
 
 ```lua
+random.create {}
+random.create {}
+random.create {}
+random.create {}
 
+debug.print { message = random.clear() }
+
+debug.print { message = table.pretty(random.list()) }
+```
+
+输出：
+
+```lua
+true
+{
+  n = 0
+}
 ```
 
 ---
@@ -316,7 +387,34 @@ random.list()
 ### 示例
 
 ```lua
+random.create {}
+random.create {}
 
+debug.print { message = table.pretty(random.list()) }
+```
+
+输出：
+
+```lua
+{
+  [1] = {
+    id = "rng_001",
+    max = 2147483647,
+    min = -2147483648,
+    seed = 1789001961255729648,
+    step = 0,
+    type = "int"
+  },
+  [2] = {
+    id = "rng_002",
+    max = 2147483647,
+    min = -2147483648,
+    seed = 1789001959106153348,
+    step = 0,
+    type = "int"
+  },
+  n = 2
+}
 ```
 
 ### 额外补充
@@ -334,8 +432,8 @@ random.list()
     step = ..., -- integer
   },
   ...
-  n = ...,      -- integer
-}
+  n = x,        -- integer
+} -- 共有 x+1 个元素，所有返回值连续排序，最后 n 为返回值个数
 ```
 
 ---
@@ -366,7 +464,19 @@ random.count()
 ### 示例
 
 ```lua
+random.create {}
+random.create {}
+random.create {}
+random.create {}
+random.create {}
 
+debug.print { message = random.count() }
+```
+
+输出：
+
+```lua
+5
 ```
 
 ---
@@ -399,7 +509,23 @@ random.generate()
 ### 示例
 
 ```lua
+r = random.create { min = -5, max = 30 }
 
+debug.print { message = random.generate(r) }
+debug.print { message = random.generate(r) }
+debug.print { message = random.generate(r) }
+debug.print { message = random.generate(r) }
+debug.print { message = random.generate(r) }
+```
+
+输出：
+
+```text
+12
+18
+7
+12
+6
 ```
 
 ---
@@ -437,7 +563,34 @@ random.set{}
 ### 示例
 
 ```lua
+r = random.create {}
 
+debug.print { message = table.pretty(random.get_info(r)) }
+
+random.set { id = r,  type = random.FLOAT, min = 3.2, max = 5.8, seed = 123456 }
+
+debug.print { message = table.pretty(random.get_info(r)) }
+```
+
+输出：
+
+```lua
+{
+  id = "rng_001", 
+  max = 2147483647, 
+  min = -2147483648, 
+  seed = 1789002380334941420, 
+  step = 0, 
+  type = "int"
+}
+{
+  id = "rng_001", 
+  max = 5.8, 
+  min = 3.2, 
+  seed = 123456, 
+  step = 0, 
+  type = "float"
+}
 ```
 
 ### 额外补充
@@ -478,6 +631,13 @@ random.set_type{}
 
 ```
 
+输出;
+
+```text
+int
+float
+```
+
 ---
 
 ## `set_range`
@@ -510,7 +670,26 @@ random.set_range{}
 ### 示例
 
 ```lua
+r = random.create { min = 10, max = 20 }
 
+debug.print { message = table.pretty(random.get_range(r)) }
+
+random.set_range { id = r, min = 5, max = 7 }
+
+debug.print { message = table.pretty(random.get_range(r)) }
+```
+
+输出;
+
+```lua
+{
+  max = 20, 
+  min = 10
+}
+{
+  max = 7, 
+  min = 5
+}
 ```
 
 ### 额外补充
@@ -548,7 +727,20 @@ random.set_seed{}
 ### 示例
 
 ```lua
+r = random.create {}
 
+debug.print { message = random.get_info(r).seed }
+
+random.set_seed { id = r,  seed = 1314 }
+
+debug.print { message = random.get_info(r).seed }
+```
+
+输出;
+
+```text
+1789004668875999436
+1314
 ```
 
 ---
@@ -582,7 +774,20 @@ random.set_step{}
 ### 示例
 
 ```lua
+r = random.create {}
 
+debug.print { message = random.get_info(r).step }
+
+random.set_step { id = r,  step = 30 }
+
+debug.print { message = random.get_info(r).step }
+```
+
+输出;
+
+```text
+0
+30
 ```
 
 ---
@@ -615,7 +820,14 @@ random.get_type()
 ### 示例
 
 ```lua
+r = random.create { type = random.INT }
+debug.print { message = random.get_type(r) }
+```
 
+输出;
+
+```text
+int
 ```
 
 ---
@@ -649,7 +861,17 @@ random.get_range()
 ### 示例
 
 ```lua
+r = random.create { min = 10, max = 20 }
+debug.print { message = table.pretty(random.get_range(r)) }
+```
 
+输出;
+
+```lua
+{
+  max = 20, 
+  min = 10
+}
 ```
 
 ---
@@ -682,7 +904,14 @@ random.get_seed()
 ### 示例
 
 ```lua
+r = random.create { seed = 2233 }
+debug.print { message = random.get_seed(r) }
+```
 
+输出;
+
+```text
+2233
 ```
 
 ---
@@ -713,7 +942,14 @@ random.get_step()
 ### 示例
 
 ```lua
+r = random.create { step = 50 }
+debug.print { message = random.get_step(r) }
+```
 
+输出;
+
+```text
+50
 ```
 
 ---
@@ -751,7 +987,21 @@ random.get_info()
 ### 示例
 
 ```lua
+r = random.create {}
+debug.print { message = table.pretty(random.get_info(r)) }
+```
 
+输出;
+
+```lua
+{
+  id = "rng_001", 
+  max = 2147483647, 
+  min = -2147483648, 
+  seed = 1789005094764332964, 
+  step = 0, 
+  type = "int"
+}
 ```
 
 ---
@@ -782,5 +1032,16 @@ random.exists()
 ### 示例
 
 ```lua
+r = random.create {}
+debug.print { message = random.exists(r) }
 
+random.delete(r)
+debug.print { message = random.exists(r) }
+```
+
+输出;
+
+```text
+true
+false
 ```

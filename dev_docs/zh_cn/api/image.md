@@ -36,7 +36,7 @@ image.load{}
 | `crop_y`       | integer | 否   | 0                           | y 轴裁剪起始位置（像素）  |
 | `crop_width`   | integer | 否   | 图像原始宽度                | x 轴裁剪宽度（像素）      |
 | `crop_height`  | integer | 否   | 图像原始高度                | y 轴裁剪高度（像素）      |
-| `scale`        | number  | 否   | `1.0`                       | 缩放比例                  |
+| `scale`        | number  | 否   | `1.0`                       | 裁剪图像缩放比例          |
 | `cache`        | boolean | 否   | `true`                      | 图像缓存                  |
 
 ### 返回
@@ -60,4 +60,4 @@ image.load{}
 - 参数 `block_width` 单位为**字符格宽度**。
 - 参数 `block_height` 单位为**字符格高度**。
 - 参数 `crop_x`、参数 `crop_y`、参数 `crop_width`和参数 `crop_height` 单位为**像素**。
-- 最终输出的半方块像素画宽度和高度计算公式：
+- 若经过裁剪、缩放后的图片比例与参数 `block_width` 和参数 `block_height` 比例不同，会被强制拉伸至相同比例。
