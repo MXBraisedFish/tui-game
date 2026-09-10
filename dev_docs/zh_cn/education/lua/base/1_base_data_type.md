@@ -6,18 +6,18 @@
 
 ## 总览
 
-Lua 中有**8 种**基本数据类型。
+Lua 中有 **8 种**基本数据类型。
 
-本教程只讲解最常用的 6 种。
+本教程只讲解最常用的 **6 种**。
 
-| 类型       | 说明     | 示例                    |
-| ---------- | -------- | ----------------------- |
-| `nil`      | 空值     | `nil`                   |
-| `boolean`  | 布尔     | `true`, `false`         |
-| `number`   | 数字     | `3`, `3.14`, `0x1A`     |
-| `string`   | 字符串   | `"hello"`               |
-| `table`    | 表       | `{1, 2, 3}`             |
-| `function` | 函数     | `function() end`        |
+| 类型       | 说明   | 示例                |
+| ---------- | ------ | ------------------- |
+| `nil`      | 空值   | `nil`               |
+| `boolean`  | 布尔   | `true`, `false`     |
+| `number`   | 数字   | `3`, `3.14`, `0x1A` |
+| `string`   | 字符串 | `"hello"`           |
+| `table`    | 表     | `{1, 2, 3}`         |
+| `function` | 函数   | `function() end`    |
 
 ---
 
@@ -25,7 +25,7 @@ Lua 中有**8 种**基本数据类型。
 
 `nil` 是 Lua 中唯一的空类型，直接表示“没有值”。
 
-也就是说如果某一个变量值为 `nil`，对于解释器就表示这个变量不存在。
+在 Lua 解释器中，某一个变量值为 `nil`，对于解释器就表示这个变量不存在。
 
 ### 示例
 
@@ -39,6 +39,10 @@ print(x)
 ```text
 nil
 ```
+
+### 额外补充
+
+在 Lua 解释器中，若某个变量的值为 nil，则对该解释器而言，这个变量即视为不存在。
 
 ---
 
@@ -65,6 +69,10 @@ true
 false
 ```
 
+### 额外补充
+
+- Lua 中只有 `false` 和 `nil` 为**假**，其他类型的值均为**真**。
+
 ---
 
 ## number
@@ -81,10 +89,6 @@ local h = 0xFF
 local e = 1e3
 
 print(type(i))
-print(3 / 2)
-print(7 // 2)
-print(7 % 3)
-print(2 ^ 10)
 print(math.type(3))
 print(math.type(3.0))
 ```
@@ -93,10 +97,6 @@ print(math.type(3.0))
 
 ```text
 number
-1.5
-3
-1
-1024.0
 integer
 float
 ```
@@ -111,11 +111,11 @@ print("10" + 5) -- 输出 15
 
 ---
 
-## 4. string
+## string
 
-Lua 中的字符串可以使用 `''`、`""` 包裹。
-除此之外还有一种特殊的长字符串使用 `[[]]` 包裹，在这个里面的字符串允许多行、转义失效。
-除此外如果字符串内包含 `[[`、`]]`，可以在最符号之间添加 `=`，例如 `[=[]=]`，数量任意，但是左右两侧数量必须相等。
+Lua 中的字符串可以使用 `''` 或 `""` 包裹。
+
+除此之外，还有一种特殊的长字符串，使用 `[[]]` 包裹，其中的字符串允许多行书写，且转义失效。如果字符串内包含 `[[` 或 `]]`，可以在两边的方括号之间添加 `=`，例如 `[=[]=]`，`=` 的数量任意，但左右两侧必须相等。
 
 ### 示例
 
@@ -124,158 +124,86 @@ local s1 = 'hello'
 local s2 = "world"
 local s3 = [[多行
 字符串]]
-local s4 = [==[ 内含 ]] 的字符串 ]==]  -- 自定义分隔符
+local s4 = [==[ 内含 ]] 的字符串 ]==]
 ```
 
-**转义字符**：`\n`（换行）、`\t`（制表符）、`\\`（反斜杠）、`\"`（引号）、`\ddd`（十进制 ASCII 码）。
+### 额外补充
 
-**常用操作**：
+- Lua 中的字符串是不可变对象，任何处理都会重建一个新的字符串。
+
+---
+
+## table
+
+Lua 中唯一的数据结构被称为**表**（table）。
+
+表的强大之处有以下几点：
+
+1. 数组索引从 `1` 开始，更符合直觉。
+2. 数组之间允许存在数据空洞。
+3. 数组结构与字典（对象）结构可以混用。
+4. 长度可任意变化。
+5. 操作简单。
+
+### 示例
 
 ```lua
-local s = "Hello Lua"
+local t = {1, [3] = 3, n = 2} -- 基础表，允许下标 1 和 3 之间不存在 下标 2 数据，即数据空洞
 
-print(#s)                 -- 9（长度）
-print(s .. "!" )          -- Hello Lua!（拼接）
-print(s:upper())          -- HELLO LUA
-print(s:lower())          -- hello lua
-print(s:sub(1, 5))        -- Hello（截取，索引从1开始）
-print(s:find("Lua"))      -- 7  9（起始和结束位置）
-print(s:rep(2))           -- Hello LuaHello Lua
-print(s:gsub("Lua", "World"))  -- Hello World  替换次数
+print(t[1], t[3], t.n) -- 直接调取，数组从下标 1 开始
+
+t[4] = 4 -- 添加数组下标 4
+print(t[4]) -- 数组下标 4 正确添加
+
+t.x = "hello" -- 添加键 x
+print(t.x) -- 键 x 正确添加
+
+t[1] = nil -- 直接设为空值（该值不存在）
+t.n = nil -- 直接设为空值（该值不存在）
 ```
 
-**字符串格式化**：
+输出：
 
-```lua
-print(string.format("姓名: %s, 年龄: %d", "Alice", 25))
--- 姓名: Alice, 年龄: 25
--- %s 字符串, %d 整数, %f 浮点, %x 十六进制
-print(string.format("%.2f", 3.14159))  -- 3.14
-```
-
-**与数字转换**：
-
-```lua
-print(tonumber("123"))     -- 123
-print(tonumber("abc"))     -- nil
-print(tostring(456))       -- "456"
-print(tonumber("FF", 16))  -- 255（指定进制）
+```text
+1	3	2
+4
+hello
 ```
 
 ---
 
-## 5. table（表）
+## function
 
-表是 Lua **唯一**的数据结构，既能当数组，也能当字典/对象，功能极其强大。
+Lua 中函数也属于第一类值，即也可以被赋给变量、作为参数、作为返回值等。
 
-```lua
--- 数组（索引从 1 开始！）
-local arr = {10, 20, 30}
-print(arr[1])       -- 10
+函数有以下几种声明方式：
 
--- 字典
-local person = {name = "Alice", age = 25}
-print(person.name)  -- Alice
-print(person["age"])-- 25
-
--- 混合
-local t = {1, 2, x = "a"}
-```
-
-**引用语义**：table 是引用类型，赋值只是复制引用。
+1. 显式声明
 
 ```lua
-local a = {1, 2}
-local b = a
-b[1] = 99
-print(a[1])   -- 99（a 和 b 指向同一个表）
-```
-
-**遍历**：
-
-```lua
-local t = {10, 20, name = "Lua"}
-
-for i, v in ipairs(t) do   -- 只遍历数组部分，遇到 nil 停止
-  print(i, v)              -- 1 10 / 2 20
-end
-
-for k, v in pairs(t) do    -- 遍历所有键值对
-  print(k, v)              -- 1 10 / 2 20 / name Lua
-end
-```
-
-**常用 table 库**：
-
-```lua
-local t = {3, 1, 2}
-table.insert(t, 4)     -- 末尾插入 -> {3,1,2,4}
-table.insert(t, 1, 0)  -- 在位置1插入 -> {0,3,1,2,4}
-table.remove(t, 1)     -- 删除位置1
-table.sort(t)          -- 排序
-print(table.concat({"a","b","c"}, "-"))  -- a-b-c
-print(#t)              -- 长度
-```
-
----
-
-## 6. function（函数）
-
-函数是第一类值，可以赋给变量、作为参数传递、作为返回值。
-
-```lua
-local function add(a, b)
+function add(a, b) then
   return a + b
 end
+```
 
-local f = add          -- 赋给变量
-print(f(1, 2))         -- 3
+2. 匿名函数
 
--- 作为参数
-local function apply(fn, x, y)
-  return fn(x, y)
+```lua
+add = function(a, b)
+  return a + b
 end
-print(apply(add, 3, 4))  -- 7
-
--- 匿名函数
-local double = function(x) return x * 2 end
-print(double(5))         -- 10
 ```
 
----
-
-## 7. userdata（用户数据）
-
-用于表示由 C 语言创建、存储在 Lua 中的任意数据，Lua 本身无法直接创建或操作（需通过 C API）。常见于文件句柄、GUI 对象等。
+3. 立即调用函数
 
 ```lua
--- io.open 返回的就是 userdata（文件句柄）
-local f = io.open("test.txt", "r")
-print(type(f))   -- userdata
-f:close()
+result = (function(a, b)
+  return a + b
+end)(3, 5)
 ```
 
 ---
 
-## 8. thread（线程/协程）
-
-表示独立的执行线程，用于实现协程（coroutine），是 Lua 的协作式多任务机制。
-
-```lua
-local co = coroutine.create(function(a, b)
-  print("开始", a, b)
-  local c = coroutine.yield(a + b)  -- 挂起并返回值
-  print("恢复，收到", c)
-  return "结束"
-end)
-
-print(coroutine.resume(co, 1, 2))   -- 开始 1 2 / true 3
-print(coroutine.resume(co, 10))     -- 恢复，收到 10 / true 结束
-print(coroutine.status(co))         -- dead
-```
-
----
-
-|上一篇|下一篇|
-|---|---|
-|[Lua 简介](./0_introduction.md)|[Lua 运算符](./2_operator.md)|
+| 上一篇                          | 下一篇                        |
+| ------------------------------- | ----------------------------- |
+| [Lua 简介](./0_introduction.md) | [Lua 运算符](./2_operator.md) |

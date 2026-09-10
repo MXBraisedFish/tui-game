@@ -2895,6 +2895,14 @@ mod tests {
               values = { "a", 2, 255, 1.25 },
             } == "a   |+2|0xff|1.25|%",
           }
+          debug.assert{
+            value = string.format{ format_string = "plain", values = {} } == "plain",
+          }
+          debug.assert{
+            value = not debug.pcall{
+              func = function() string.format{ format_string = "plain" } end,
+            }.ok,
+          }
         end
       "#,
     );
@@ -2976,6 +2984,40 @@ mod tests {
             table = packed, start = 1, finish = packed.n,
           }
           debug.assert{ value = first == "a" and second == nil and third == "c" }
+
+          local sparse = {
+            [1] = "a", [3] = "c", [0] = "zero", [-1] = "negative", name = "value",
+          }
+          local count = table.count(sparse)
+          local array_count = table.count_array{ table = sparse }
+          debug.assert{
+            value = count.n == 5 and not count.contiguous
+              and array_count.n == 2 and not array_count.contiguous
+              and array_count.indexes[1] == 1 and array_count.indexes[2] == 3
+              and table.count_hash(sparse) == 3,
+          }
+          local compacted = table.compact{ table = sparse }
+          debug.assert{
+            value = compacted == sparse and sparse[1] == "a" and sparse[2] == "c"
+              and sparse[3] == nil and sparse[0] == "zero"
+              and sparse[-1] == "negative" and sparse.name == "value",
+          }
+          local compacted_count = table.count(sparse)
+          local compacted_array_count = table.count_array(sparse)
+          debug.assert{
+            value = compacted_count.n == 5 and compacted_count.contiguous
+              and compacted_array_count.n == 2 and compacted_array_count.contiguous
+              and compacted_array_count.indexes[1] == 1
+              and compacted_array_count.indexes[2] == 2,
+          }
+          local empty_count = table.count_array{}
+          debug.assert{
+            value = empty_count.n == 0 and empty_count.contiguous
+              and #empty_count.indexes == 0,
+          }
+          debug.assert{
+            value = fails(function() table.compact(char.ASCII_LETTER) end),
+          }
 
           local sortable = { 3, 1, 2 }
           table.sort{ table = sortable }
@@ -3117,24 +3159,27 @@ mod tests {
             return not debug.pcall{ func = func }.ok
           end
 
-          debug.assert{ value = math.number_type(math.PI) == "float" }
-          debug.assert{ value = math.number_type(math.E) == "float" }
+          debug.assert{ value = math.type(math.PI) == "float" }
+          debug.assert{ value = math.type(math.E) == "float" }
           debug.assert{ value = math.POSITIVE_INFINITE == math.INFINITE }
           debug.assert{ value = math.POSITIVE_INFINITE > math.MAX_INTEGER }
           debug.assert{ value = math.NEGATIVE_INFINITE < math.MIN_INTEGER }
-          debug.assert{ value = math.number_type(math.MAX_INTEGER) == "integer" }
-          debug.assert{ value = math.number_type(math.MIN_INTEGER) == "integer" }
+          debug.assert{ value = math.type(math.MAX_INTEGER) == "integer" }
+          debug.assert{ value = math.type(math.MIN_INTEGER) == "integer" }
+          debug.assert{ value = math.type{ value = 1.5 } == "float" }
+          debug.assert{ value = math.type{} == nil }
           debug.assert{ value = near(math.DEG * math.PI, 180.0, 0.000000000001) }
           debug.assert{ value = near(math.RAD * 180.0, math.PI, 0.000000000001) }
 
           debug.assert{ value = type(math.lg) == "function" }
           debug.assert{ value = type(math.ln) == "function" }
-          debug.assert{ value = type(math.number_type) == "function" }
-          debug.assert{ value = math.log10 == nil and math.type == nil }
+          debug.assert{ value = type(math.type) == "function" }
+          debug.assert{ value = math.log10 == nil and math.number_type == nil }
+          debug.assert{ value = type(1) == "number" and type(1.5) == "number" }
 
-          debug.assert{ value = math.abs(-5) == 5 and math.number_type(math.abs(-5)) == "float" }
-          debug.assert{ value = math.ceil(3.1) == 4 and math.number_type(math.ceil(3.1)) == "integer" }
-          debug.assert{ value = math.floor(-3.1) == -4 and math.number_type(math.floor(-3.1)) == "integer" }
+          debug.assert{ value = math.abs(-5) == 5 and math.type(math.abs(-5)) == "float" }
+          debug.assert{ value = math.ceil(3.1) == 4 and math.type(math.ceil(3.1)) == "integer" }
+          debug.assert{ value = math.floor(-3.1) == -4 and math.type(math.floor(-3.1)) == "integer" }
           debug.assert{ value = math.round(3.5) == 4 and math.round(-3.5) == -4 }
           debug.assert{ value = math.round_to{ value = 3.14159, digits = 2 } == 3.14 }
           debug.assert{ value = math.round_to{ value = 12345, digits = -2 } == 12300 }
@@ -3143,7 +3188,7 @@ mod tests {
           debug.assert{ value = math.fmod{ x = 7, y = 3 } == 1 }
           debug.assert{ value = math.fmod{ x = -7, y = 3 } == -1 }
           debug.assert{ value = math.fmod{ x = math.MIN_INTEGER, y = -1 } == 0 }
-          debug.assert{ value = math.number_type(math.fmod{ x = 7, y = 3 }) == "integer" }
+          debug.assert{ value = math.type(math.fmod{ x = 7, y = 3 }) == "integer" }
           debug.assert{ value = math.pow{ x = 2, y = 3 } == 8 }
           debug.assert{ value = near(math.exp(1), math.E, 0.000000000001) }
           debug.assert{ value = math.log{ value = 8, base = 2 } == 3 }
@@ -3158,7 +3203,7 @@ mod tests {
           debug.assert{
             value = near(split.mantissa, 0.8, 0.000000000001)
               and split.exponent == 4
-              and math.number_type(split.exponent) == "integer",
+              and math.type(split.exponent) == "integer",
           }
           local largest = math.frexp(1.7976931348623157e308)
           debug.assert{
@@ -3177,20 +3222,20 @@ mod tests {
           debug.assert{ value = near(math.rad(180), math.PI, 0.000000000001) }
           debug.assert{ value = math.normalize_angle(450) == 90 }
           debug.assert{ value = math.normalize_angle(-90) == 270 }
-          debug.assert{ value = math.number_type(math.normalize_angle(0)) == "float" }
+          debug.assert{ value = math.type(math.normalize_angle(0)) == "float" }
 
           debug.assert{ value = math.max{ 1, 5, 3 } == 5 }
           debug.assert{ value = math.min{ values = { 1, -2, 3 } } == -2 }
           local parts = math.modf(3.14)
           debug.assert{
             value = parts.integer_part == 3
-              and math.number_type(parts.integer_part) == "integer"
+              and math.type(parts.integer_part) == "integer"
               and near(parts.fractional_part, 0.14, 0.000000000001),
           }
           debug.assert{ value = math.tointeger(3.0) == 3 }
           debug.assert{ value = math.tointeger(3.14) == nil }
           debug.assert{ value = math.tointeger(9223372036854775808.0) == nil }
-          debug.assert{ value = math.number_type("3") == nil }
+          debug.assert{ value = math.type("3") == nil }
           debug.assert{ value = math.ult{ left = -1, right = 0 } == false }
           debug.assert{ value = math.approx_equal{ left = 0.1 + 0.2, right = 0.3 } }
           debug.assert{ value = math.approx_equal{ left = 1.0, right = 1.005, epsilon = 0.01 } }
@@ -3200,10 +3245,10 @@ mod tests {
           debug.assert{ value = near(math.percent{ value = 5, total = 16, as_percent = true }, 31.25, 0.000000000001) }
 
           debug.assert{ value = math.factorial(0) == 1 }
-          debug.assert{ value = math.number_type(math.factorial{ n = 5 }) == "float" }
+          debug.assert{ value = math.type(math.factorial{ n = 5 }) == "float" }
           debug.assert{ value = math.factorial(170) > 7e306 }
           debug.assert{ value = math.combination{ n = 5, k = 2 } == 10 }
-          debug.assert{ value = math.number_type(math.combination{ n = 5, k = 2 }) == "integer" }
+          debug.assert{ value = math.type(math.combination{ n = 5, k = 2 }) == "integer" }
 
           debug.assert{ value = fails(function() math.abs(math.INFINITE) end) }
           debug.assert{ value = fails(function() math.ceil(1e20) end) }

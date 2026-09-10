@@ -34,7 +34,7 @@ pub(super) fn math(lua: &Lua) -> mlua::Result<Table> {
   source.raw_set("min", extremum(lua, false)?)?;
   source.raw_set("modf", modf(lua)?)?;
   source.raw_set("tointeger", tointeger(lua)?)?;
-  source.raw_set("number_type", number_type(lua)?)?;
+  source.raw_set("type", numeric_type(lua)?)?;
   source.raw_set("ult", ult(lua)?)?;
   source.raw_set("approx_equal", approx_equal(lua)?)?;
   source.raw_set("percent", percent(lua)?)?;
@@ -381,9 +381,9 @@ fn tointeger(lua: &Lua) -> mlua::Result<Function> {
   })
 }
 
-fn number_type(lua: &Lua) -> mlua::Result<Function> {
+fn numeric_type(lua: &Lua) -> mlua::Result<Function> {
   lua.create_function(|lua, values: MultiValue| {
-    let value = args::one("math.number_type", "value", values)?;
+    let value = args::one("math.type", "value", values)?;
     match value {
       Value::Integer(_) => Ok(Value::String(lua.create_string("integer")?)),
       Value::Number(_) => Ok(Value::String(lua.create_string("float")?)),

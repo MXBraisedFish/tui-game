@@ -171,10 +171,7 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
         "string.format",
         "format_string",
       )?;
-      let values = match parameters.get::<Value>("values")? {
-        Value::Nil => Vec::new(),
-        _ => args::values(&parameters, "string.format")?,
-      };
+      let values = args::values(&parameters, "string.format")?;
       safe_format(&format_string, &values)
     })?,
   )?;
@@ -838,7 +835,7 @@ fn lua_value_to_replacement(method: &str, value: Value) -> mlua::Result<Option<S
     value => Err(args::message(
       method,
       format!(
-        "replacement must resolve to string, number, false, or nil, got {}",
+        "replacement must resolve to string, integer, float, false, or nil, got {}",
         args::type_name(&value)
       ),
     )),
@@ -1124,7 +1121,7 @@ pub(super) fn rich_text_params(
         return Err(args::invalid(
           method,
           "rich_params",
-          "string, number, or boolean values",
+          "string, integer, float, or boolean values",
           &value,
         ));
       }

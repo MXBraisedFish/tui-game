@@ -11,7 +11,7 @@
 | 常量名       | 说明                 | 索引                      |
 | ------------ | -------------------- | ------------------------- |
 | `AUTO`       | 自动检查文本类型     | [AUTO](#AUTO)             |
-| `PLAIN_TEXT` | 强制按普通文本解析     | [PLAIN_TEXT](#PLAIN_TEXT) |
+| `PLAIN_TEXT` | 强制按普通文本解析   | [PLAIN_TEXT](#PLAIN_TEXT) |
 | `RICH_TEXT`  | 强制按富文本语法解析 | [RICH_TEXT](#RICH_TEXT)   |
 
 ### 方法
@@ -335,10 +335,10 @@ string.sub{}
 
 ### 参数
 
-| 参数名   | 类型    | 必填 | 默认值     | 说明         |
-| -------- | ------- | ---- | ---------- | ------------ |
-| `text`   | string  | 是   | -          | 目标字符串   |
-| `start`  | integer | 是   | -          | 起始字符位置 |
+| 参数名   | 类型    | 必填 | 默认值         | 说明         |
+| -------- | ------- | ---- | -------------- | ------------ |
+| `text`   | string  | 是   | -              | 目标字符串   |
+| `start`  | integer | 是   | -              | 起始字符位置 |
 | `finish` | integer | 否   | 目标字符串长度 | 结束字符位置 |
 
 ### 返回
@@ -423,11 +423,11 @@ string.find{}
 
 ### 参数
 
-| 参数名    | 类型    | 必填 | 默认值  | 说明             |
-| --------- | ------- | ---- | ------- | ---------------- |
-| `text`    | string  | 是   | -       | 目标字符串       |
-| `pattern` | string  | 是   | -       | 模式字符串       |
-| `init`    | integer | 否   | `1`     | 起始搜索位置     |
+| 参数名    | 类型    | 必填 | 默认值  | 说明               |
+| --------- | ------- | ---- | ------- | ------------------ |
+| `text`    | string  | 是   | -       | 目标字符串         |
+| `pattern` | string  | 是   | -       | 模式字符串         |
+| `init`    | integer | 否   | `1`     | 起始搜索位置       |
 | `plain`   | boolean | 否   | `false` | 是否按普通文本查找 |
 
 ### 返回
@@ -1166,10 +1166,10 @@ string.format{}
 
 ### 参数
 
-| 参数名          | 类型   | 必填 | 默认值 | 说明       |
-| --------------- | ------ | ---- | ------ | ---------- |
-| `format_string` | string | 是   | -      | 格式串     |
-| `values`        | table  | 否   | `nil`  | 参数值数组表 |
+| 参数名          | 类型   | 必填 | 默认值 | 说明                           |
+| --------------- | ------ | ---- | ------ | ------------------------------ |
+| `format_string` | string | 是   | -      | 格式串                         |
+| `values`        | table  | 是   | -      | 按格式项顺序排列的参数值数组表 |
 
 ### 返回
 
@@ -1191,7 +1191,7 @@ debug.print { message = f2 }
 f3 = string.format { format_string = "Pi ≈ %.2f", values = { math.PI } }
 debug.print { message = f3 }
 
-f4 = string.format { format_string = "Hello, Tui Game!" }
+f4 = string.format { format_string = "Hello, Tui Game!", values = {} }
 debug.print { message = f4 }
 ```
 

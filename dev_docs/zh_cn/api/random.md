@@ -148,14 +148,14 @@ random.randfloat{}
 
 | 参数名 | 类型             | 必填 | 默认值 | 说明           |
 | ------ | ---------------- | ---- | ------ | -------------- |
-| `min`  | integer / number | 否   | `0`    | 区间下界（含） |
-| `max`  | integer / number | 否   | `1`    | 区间上界（含） |
+| `min`  | integer / float | 否   | `0`    | 区间下界（含） |
+| `max`  | integer / float | 否   | `1`    | 区间上界（含） |
 
 ### 返回
 
 | 类型   | 说明               |
 | ------ | ------------------ |
-| number | 区间内的随机浮点数 |
+| float | 区间内的随机浮点数 |
 
 ### 示例
 
@@ -200,8 +200,8 @@ random.create{}
 
 | 参数名 | 类型             | 必填 | 默认值         | 说明           |
 | ------ | ---------------- | ---- | -------------- | -------------- |
-| `min`  | number / integer | 否   | 跟随生成器类型 | 区间下界（含） |
-| `max`  | number / integer | 否   | 跟随生成器类型 | 区间上界（含） |
+| `min`  | float / integer | 否   | 跟随生成器类型 | 区间下界（含） |
+| `max`  | float / integer | 否   | 跟随生成器类型 | 区间上界（含） |
 | `type` | const-random     | 否   | `random.INT`   | 生成器类型     |
 | `seed` | integer          | 否   | 系统随机生成   | 随机种子       |
 | `step` | integer          | 否   | `0`            | 初始步进数     |
@@ -426,8 +426,8 @@ debug.print { message = table.pretty(random.list()) }
   {
     id = ...,   -- string
     type = ..., -- string
-    min = ...,  -- number / integer
-    max = ...,  -- number / integer
+    min = ...,  -- float / integer
+    max = ...,  -- float / integer
     seed = ..., -- integer,
     step = ..., -- integer
   },
@@ -504,7 +504,7 @@ random.generate()
 
 | 类型             | 说明         |
 | ---------------- | ------------ |
-| integer / number | 生成的随机数 |
+| integer / float | 生成的随机数 |
 
 ### 示例
 
@@ -547,8 +547,8 @@ random.set{}
 | ------ | ---------------- | ---- | -------- | -------------- |
 | `id`   | string           | 是   | -        | 生成器 ID      |
 | `type` | const-random     | 否   | 保持原值 | 生成器类型     |
-| `min`  | number / integer | 否   | 保持原值 | 区间下界（含） |
-| `max`  | number / integer | 否   | 保持原值 | 区间上界（含） |
+| `min`  | float / integer | 否   | 保持原值 | 区间下界（含） |
+| `max`  | float / integer | 否   | 保持原值 | 区间上界（含） |
 | `seed` | integer          | 否   | 保持原值 | 随机种子       |
 | `step` | integer          | 否   | 保持原值 | 步进数         |
 
@@ -656,8 +656,8 @@ random.set_range{}
 | 参数名 | 类型             | 必填 | 默认值   | 说明           |
 | ------ | ---------------- | ---- | -------- | -------------- |
 | `id`   | string           | 是   | -        | 生成器 ID      |
-| `min`  | number / integer | 是   | 保持原值 | 区间下界（含） |
-| `max`  | number / integer | 是   | 保持原值 | 区间上界（含） |
+| `min`  | float / integer | 是   | 保持原值 | 区间下界（含） |
+| `max`  | float / integer | 是   | 保持原值 | 区间上界（含） |
 
 ### 返回
 
@@ -855,8 +855,8 @@ random.get_range()
 
 | 字段  | 类型             | 说明     |
 | ----- | ---------------- | -------- |
-| `min` | number / integer | 区间下界 |
-| `max` | number / integer | 区间上界 |
+| `min` | float / integer | 区间下界 |
+| `max` | float / integer | 区间上界 |
 
 ### 示例
 
@@ -979,8 +979,8 @@ random.get_info()
 | ------ | ---------------- | ------------ |
 | `id`   | string           | 生成器 ID    |
 | `type` | string           | 生成器类型   |
-| `min`  | number / integer | 区间下界     |
-| `max`  | number / integer | 区间上界     |
+| `min`  | float / integer | 区间下界     |
+| `max`  | float / integer | 区间上界     |
 | `seed` | integer          | 生成器种子   |
 | `step` | integer          | 生成及步进数 |
 

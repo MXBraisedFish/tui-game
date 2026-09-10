@@ -11,7 +11,7 @@ pub fn type_name(value: &Value) -> &'static str {
     Value::Boolean(_) => "boolean",
     Value::LightUserData(_) => "lightuserdata",
     Value::Integer(_) => "integer",
-    Value::Number(_) => "number",
+    Value::Number(_) => "float",
     Value::String(_) => "string",
     Value::Table(_) => "table",
     Value::Function(_) => "function",
@@ -214,7 +214,7 @@ pub fn number(value: Value, method: &str, name: &str) -> mlua::Result<f64> {
   match value {
     Value::Integer(value) => Ok(value as f64),
     Value::Number(value) => Ok(value),
-    value => Err(invalid(method, name, "number", &value)),
+    value => Err(invalid(method, name, "float or integer", &value)),
   }
 }
 

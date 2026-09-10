@@ -283,6 +283,70 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
     })?,
   )?;
   source.raw_set(
+    "count",
+    lua.create_function(|lua, values: MultiValue| {
+      let input = table_argument("table.count", values, false)?;
+      let shape = inspect_table_shape("table.count", &input)?;
+      let output = lua.create_table()?;
+      output.raw_set("n", shape.total_count())?;
+      output.raw_set("contiguous", shape.is_contiguous())?;
+      Ok(output)
+    })?,
+  )?;
+  source.raw_set(
+    "count_array",
+    lua.create_function(|lua, values: MultiValue| {
+      let input = table_argument("table.count_array", values, false)?;
+      let shape = inspect_table_shape("table.count_array", &input)?;
+      let indexes = lua.create_table()?;
+      for (position, index) in shape.array_indexes.iter().copied().enumerate() {
+        indexes.raw_set(position + 1, index)?;
+      }
+      let output = lua.create_table()?;
+      output.raw_set("n", shape.array_indexes.len())?;
+      output.raw_set("contiguous", shape.is_contiguous())?;
+      output.raw_set("indexes", indexes)?;
+      Ok(output)
+    })?,
+  )?;
+  source.raw_set(
+    "count_hash",
+    lua.create_function(|_, values: MultiValue| {
+      let input = table_argument("table.count_hash", values, false)?;
+      let shape = inspect_table_shape("table.count_hash", &input)?;
+      Ok(shape.hash_count)
+    })?,
+  )?;
+  source.raw_set(
+    "compact",
+    lua.create_function(|_, values: MultiValue| {
+      let input = table_argument("table.compact", values, true)?;
+      let mut array_entries = Vec::new();
+      for pair in input.clone().pairs::<Value, Value>() {
+        let (key, value) = pair?;
+        if let Value::Integer(index) = key
+          && index >= 1
+        {
+          array_entries.push((index, value));
+          if array_entries.len() > args::MAX_API_TABLE_ENTRIES {
+            return Err(args::message(
+              "table.compact",
+              "table exceeds 16384 entries",
+            ));
+          }
+        }
+      }
+      array_entries.sort_by_key(|(index, _)| *index);
+      for (index, _) in &array_entries {
+        input.raw_set(*index, Value::Nil)?;
+      }
+      for (position, (_, value)) in array_entries.into_iter().enumerate() {
+        input.raw_set(position + 1, value)?;
+      }
+      Ok(input)
+    })?,
+  )?;
+  source.raw_set(
     "deepcopy",
     lua.create_function(|lua, values: MultiValue| {
       let value = args::one("table.deepcopy", "table", values)?;
@@ -309,6 +373,60 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
     })?,
   )?;
   readonly::proxy(lua, source)
+}
+
+struct TableShape {
+  array_indexes: Vec<i64>,
+  hash_count: usize,
+}
+
+impl TableShape {
+  fn total_count(&self) -> usize {
+    self.array_indexes.len().saturating_add(self.hash_count)
+  }
+
+  fn is_contiguous(&self) -> bool {
+    self
+      .array_indexes
+      .iter()
+      .copied()
+      .enumerate()
+      .all(|(position, index)| index == position as i64 + 1)
+  }
+}
+
+fn table_argument(method: &str, values: MultiValue, writable: bool) -> mlua::Result<Table> {
+  let value = args::one(method, "table", values)?;
+  if writable {
+    writable_table(value, method, "table")
+  } else {
+    mutable_or_readonly_table(value, method, "table")
+  }
+}
+
+fn inspect_table_shape(method: &str, input: &Table) -> mlua::Result<TableShape> {
+  let mut array_indexes = Vec::new();
+  let mut hash_count = 0_usize;
+  let mut total_count = 0_usize;
+  for pair in input.clone().pairs::<Value, Value>() {
+    let (key, _) = pair?;
+    total_count = total_count.saturating_add(1);
+    if total_count > args::MAX_API_TABLE_ENTRIES {
+      return Err(args::message(method, "table exceeds 16384 entries"));
+    }
+    if let Value::Integer(index) = key
+      && index >= 1
+    {
+      array_indexes.push(index);
+    } else {
+      hash_count = hash_count.saturating_add(1);
+    }
+  }
+  array_indexes.sort_unstable();
+  Ok(TableShape {
+    array_indexes,
+    hash_count,
+  })
 }
 
 fn checked_entry_count(method: &str, start: i64, finish: i64, limit: usize) -> mlua::Result<usize> {

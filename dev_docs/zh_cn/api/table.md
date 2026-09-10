@@ -8,17 +8,21 @@
 
 ### 方法
 
-| 方法名     | 说明                                           | 索引                  |
-| ---------- | ---------------------------------------------- | --------------------- |
-| `concat`   | 拼接数组表中的元素                             | [concat](#concat)     |
-| `insert`   | 在指定位置插入一个元素，并将后续元素后移       | [insert](#insert)     |
-| `move`     | 将表中的指定范围元素复制并覆盖到目标索引       | [move](#move)         |
-| `pack`     | 将数组表打包为新的表，并记录原始数组表元素数量 | [pack](#pack)         |
-| `unpack`   | 展开数组表                                     | [unpack](#unpack)     |
-| `remove`   | 删除指定位置的一个元素，并将后续元素前移       | [remove](#remove)     |
-| `sort`     | 排序数组表                                     | [sort](#sort)         |
-| `deepcopy` | 深拷贝表                                       | [deepcopy](#deepcopy) |
-| `pretty`   | 将表转换为有可读性的字符串                           | [pretty](#pretty)     |
+| 方法名        | 说明                                           | 索引                        |
+| ------------- | ---------------------------------------------- | --------------------------- |
+| `concat`      | 拼接数组表中的元素                             | [concat](#concat)           |
+| `insert`      | 在指定位置插入一个元素，并将后续元素后移       | [insert](#insert)           |
+| `move`        | 将表中的指定范围元素复制并覆盖到目标索引       | [move](#move)               |
+| `pack`        | 将数组表打包为新的表，并记录原始数组表元素数量 | [pack](#pack)               |
+| `unpack`      | 展开数组表                                     | [unpack](#unpack)           |
+| `remove`      | 删除指定位置的一个元素，并将后续元素前移       | [remove](#remove)           |
+| `sort`        | 排序数组表                                     | [sort](#sort)               |
+| `deepcopy`    | 深拷贝表                                       | [deepcopy](#deepcopy)       |
+| `pretty`      | 将表转换为有可读性的字符串                     | [pretty](#pretty)           |
+| `count`       | 查询表中真实的元素数量                         | [count](#count)             |
+| `count_array` | 查询表中真实的数组元素数量及下标               | [count_array](#count_array) |
+| `count_hash`  | 查询表中真实的哈希键数量                       | [count_hash](#count_hash)   |
+| `compact`     | 将数组部分前压为从 1 开始的连续排列            | [compact](#compact)         |
 
 ## 方法
 
@@ -137,7 +141,7 @@ table.move{}
 
 | 参数名         | 类型    | 必填 | 默认值   | 说明         |
 | -------------- | ------- | ---- | -------- | ------------ |
-| `source`       | table   | 是   | -        | 源数组表         |
+| `source`       | table   | 是   | -        | 源数组表     |
 | `start`        | integer | 是   | -        | 起始索引     |
 | `finish`       | integer | 是   | -        | 结束索引     |
 | `target_index` | integer | 是   | -        | 目标起始索引 |
@@ -169,20 +173,20 @@ debug.print { message = table.pretty(t2) }
 
 ```lua
 {
-  [1] = "a", 
-  [2] = "b", 
-  [3] = "c", 
-  [4] = "b", 
+  [1] = "a",
+  [2] = "b",
+  [3] = "c",
+  [4] = "b",
   [5] = "c"
 }
 table: 0x19be6539b30
 table: 0x19be6539b30
 
 {
-  [1] = 1, 
-  [2] = 2, 
-  [3] = 3, 
-  [4] = 1, 
+  [1] = 1,
+  [2] = 2,
+  [3] = 3,
+  [4] = 1,
   [5] = 2
 }
 ```
@@ -233,15 +237,15 @@ debug.print { message = table.pretty(packed2) }
 
 ```lua
 {
-  [1] = "a", 
-  [2] = "b", 
-  [3] = "c", 
+  [1] = "a",
+  [2] = "b",
+  [3] = "c",
   n = 3
 }
 
 {
-  [1] = 1, 
-  [3] = 3, 
+  [1] = 1,
+  [3] = 3,
   n = 3
 }
 ```
@@ -357,15 +361,15 @@ debug.print { message = removed2 .. " " .. table.pretty(t2) }
 ```lua
 d
 {
-  [1] = "a", 
-  [2] = "b", 
+  [1] = "a",
+  [2] = "b",
   [3] = "c"
 }
 
-20 
+20
 {
-  [1] = 10, 
-  [2] = 30, 
+  [1] = 10,
+  [2] = 30,
   [3] = 40
 }
 ```
@@ -406,20 +410,20 @@ table.sort { table = t2 }
 debug.print { message = table.pretty(t2) .. "\n" }
 
 t3 = { 5, 2, 8, 1 }
-table.sort { 
-  table = t3, 
-  comparator = function(left, right) 
-    return left > right 
-  end 
+table.sort {
+  table = t3,
+  comparator = function(left, right)
+    return left > right
+  end
   }
 debug.print { message = table.pretty(t3) .. "\n" }
 
 t4 = { "abc", "a", "abcdef", "ab" }
-table.sort { 
-  table = t4, 
-  comparator = function(left, right) 
-    return #left < #right 
-  end 
+table.sort {
+  table = t4,
+  comparator = function(left, right)
+    return #left < #right
+  end
 }
 debug.print { message = table.pretty(t4) }
 ```
@@ -428,30 +432,30 @@ debug.print { message = table.pretty(t4) }
 
 ```lua
 {
-  [1] = 1, 
-  [2] = 2, 
-  [3] = 3, 
+  [1] = 1,
+  [2] = 2,
+  [3] = 3,
   [4] = 4
 }
 
 {
-  [1] = "apple", 
-  [2] = "banana", 
-  [3] = "cherry", 
+  [1] = "apple",
+  [2] = "banana",
+  [3] = "cherry",
   [4] = "grape"
 }
 
 {
-  [1] = 8, 
-  [2] = 5, 
-  [3] = 2, 
+  [1] = 8,
+  [2] = 5,
+  [3] = 2,
   [4] = 1
 }
 
 {
-  [1] = "a", 
-  [2] = "ab", 
-  [3] = "abc", 
+  [1] = "a",
+  [2] = "ab",
+  [3] = "abc",
   [4] = "abcdef"
 }
 ```
@@ -551,8 +555,210 @@ debug.print { message = table.pretty(t) }
 
 ```lua
 {
-  [1] = "apple", 
-  [2] = "banana", 
+  [1] = "apple",
+  [2] = "banana",
   [3] = "grape"
 }
 ```
+
+---
+
+## `count`
+
+查询表中真实存在的元素数量。
+
+### 调用
+
+```lua
+-- 单参数
+table.count()
+```
+
+### 参数
+
+| 参数名  | 类型  | 必填 | 默认值 | 说明   |
+| ------- | ----- | ---- | ------ | ------ |
+| `table` | table | 是   | -      | 目标表 |
+
+### 返回
+
+返回一个对象表。
+
+| 字段         | 类型    | 说明                              |
+| ------------ | ------- | --------------------------------- |
+| `n`          | integer | 表中真实存在的全部元素数量        |
+| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列 |
+
+### 示例
+
+```lua
+t = { [1] = "a", [3] = "c", name = "Tui Game" }
+result = table.count(t)
+
+debug.print { message = result.n }
+debug.print { message = result.contiguous }
+```
+
+输出：
+
+```text
+3
+false
+```
+
+### 额外补充
+
+- 空数组的返回值 `contiguous` 为 `true`。
+- 值为 `nil` 的键在 Lua 表中表示该键不存在，因此不会计数。
+
+---
+
+## `count_array`
+
+查询表中真实存在的数组元素数量。
+
+### 调用
+
+```lua
+-- 单参数
+table.count_array()
+```
+
+### 参数
+
+| 参数名  | 类型  | 必填 | 默认值 | 说明   |
+| ------- | ----- | ---- | ------ | ------ |
+| `table` | table | 是   | -      | 目标表 |
+
+### 返回
+
+返回一个对象表。
+
+| 字段         | 类型    | 说明                              |
+| ------------ | ------- | --------------------------------- |
+| `n`          | integer | 真实存在的数组元素数量            |
+| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列 |
+| `indexes`    | table   | 所有有效数组下标组成的升序数组表  |
+
+### 示例
+
+```lua
+t = { [1] = "a", [3] = "c", name = "Tui Game" }
+result = table.count_array { table = t }
+
+debug.print { message = result.n }
+debug.print { message = result.contiguous }
+debug.print { message = table.pretty(result.indexes) }
+```
+
+输出：
+
+```lua
+2
+false
+{
+  [1] = 1, 
+  [2] = 3
+}
+```
+
+### 额外补充
+
+- `indexes` 按下标从小到大排序。
+
+---
+
+## `count_hash`
+
+查询表中真实存在的哈希项数量。
+
+### 调用
+
+```lua
+-- 单参数
+table.count_hash()
+```
+
+### 参数
+
+| 参数名  | 类型  | 必填 | 默认值 | 说明   |
+| ------- | ----- | ---- | ------ | ------ |
+| `table` | table | 是   | -      | 目标表 |
+
+### 返回
+
+直接返回一个值。
+
+| 类型    | 说明                 |
+| ------- | -------------------- |
+| integer | 真实存在的哈希项数量 |
+
+### 示例
+
+```lua
+t = { [1] = "a", [3] = "c", name = "Tui Game", [0] = "zero" }
+result = table.count_hash(t)
+
+debug.print { message = result }
+```
+
+输出：
+
+```text
+2
+```
+
+---
+
+## `compact`
+
+压实目标表的数组部分，将所有数组元素前压至从下标 1 开始连续排列。
+
+### 调用
+
+```lua
+-- 单参数
+table.compact()
+```
+
+### 参数
+
+| 参数名  | 类型  | 必填 | 默认值 | 说明       |
+| ------- | ----- | ---- | ------ | ---------- |
+| `table` | table | 是   | -      | 要压实的表 |
+
+### 返回
+
+直接返回一个值。
+
+| 类型  | 说明                         |
+| ----- | ---------------------------- |
+| table | 压实后的原始表，与参数表相同 |
+
+### 示例
+
+```lua
+t = { [1] = "a", [3] = "c", [8] = "h", name = "Tui Game" }
+result = table.compact { table = t }
+
+debug.print { message = tostring(result == t) }
+debug.print { message = table.pretty(t) }
+```
+
+输出：
+
+```lua
+true
+{
+  [1] = "a", 
+  [2] = "c", 
+  [3] = "h", 
+  name = "Tui Game"
+}
+```
+
+### 额外补充
+
+- 数组元素按照压实前的下标升序排列，元素之间的相对顺序不会改变。
+- 哈希项不会被删除或移动。
+- 该方法直接修改原始表，不会创建新表。

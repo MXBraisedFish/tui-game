@@ -114,7 +114,11 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
   })?;
   let type_fn = lua.create_function(|lua, args: MultiValue| {
     let value = args::one("base.type", "value", args)?;
-    lua.create_string(args::type_name(&value))
+    let type_name = match value {
+      Value::Integer(_) | Value::Number(_) => "number",
+      _ => args::type_name(&value),
+    };
+    lua.create_string(type_name)
   })?;
   readonly::library(
     lua,
