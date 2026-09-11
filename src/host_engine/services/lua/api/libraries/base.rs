@@ -13,7 +13,7 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
     let Value::Table(table) = value else {
       return Err(args::invalid("base.pairs", "table", "table", &value));
     };
-    record_iterator(lua, readonly::backing(&table)?, false)
+    pairs_iterator(lua, table)
   })?;
   let next = lua.create_function(|lua, args: MultiValue| {
     let table = args::named("base.next", args, &["table", "index"])?;
@@ -109,6 +109,24 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
   })?;
   let tostring = lua.create_function(|lua, args: MultiValue| {
     let value = args::one("base.tostring", "value", args)?;
+    if let Value::Table(table) = &value
+      && let Some(metatable) = table.metatable()
+    {
+      let metamethod = metatable.raw_get::<Value>("__tostring")?;
+      if !matches!(metamethod, Value::Nil) {
+        let Value::Function(metamethod) = metamethod else {
+          return Err(args::invalid(
+            "base.tostring",
+            "__tostring",
+            "function",
+            &metamethod,
+          ));
+        };
+        let result = metamethod.call::<Value>(table.clone())?;
+        return args::string(result, "base.tostring", "__tostring result")
+          .and_then(|text| lua.create_string(text));
+      }
+    }
     let text = args::dynamic_text(value, "base.tostring", "value")?;
     lua.create_string(text)
   })?;
@@ -119,6 +137,56 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
       _ => args::type_name(&value),
     };
     lua.create_string(type_name)
+  })?;
+  let setmetatable = lua.create_function(|_, args: MultiValue| {
+    let parameters = args::named("base.setmetatable", args, &["table", "metatable"])?;
+    let target = parameters.get::<Value>("table")?;
+    let Value::Table(target) = target else {
+      return Err(args::invalid(
+        "base.setmetatable",
+        "table",
+        "table",
+        &target,
+      ));
+    };
+    if let Some(current) = target.metatable() {
+      let protection = current.raw_get::<Value>("__metatable")?;
+      if !matches!(protection, Value::Nil) {
+        return Err(args::message(
+          "base.setmetatable",
+          "cannot change a protected metatable",
+        ));
+      }
+    }
+    let metatable = match parameters.get::<Value>("metatable")? {
+      Value::Nil => None,
+      Value::Table(metatable) => Some(metatable),
+      value => {
+        return Err(args::invalid(
+          "base.setmetatable",
+          "metatable",
+          "table or nil",
+          &value,
+        ));
+      }
+    };
+    target.set_metatable(metatable)?;
+    Ok(target)
+  })?;
+  let getmetatable = lua.create_function(|_, args: MultiValue| {
+    let value = args::one("base.getmetatable", "table", args)?;
+    let Value::Table(target) = value else {
+      return Err(args::invalid("base.getmetatable", "table", "table", &value));
+    };
+    let Some(metatable) = target.metatable() else {
+      return Ok(Value::Nil);
+    };
+    let protection = metatable.raw_get::<Value>("__metatable")?;
+    if matches!(protection, Value::Nil) {
+      Ok(Value::Table(metatable))
+    } else {
+      Ok(protection)
+    }
   })?;
   readonly::library(
     lua,
@@ -132,6 +200,8 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
       ("tonumber", function_value(tonumber)),
       ("tostring", function_value(tostring)),
       ("type", function_value(type_fn)),
+      ("setmetatable", function_value(setmetatable)),
+      ("getmetatable", function_value(getmetatable)),
     ],
   )
 }
@@ -141,7 +211,7 @@ fn record_iterator(lua: &Lua, table: Table, array_only: bool) -> mlua::Result<Fu
     let index = std::rc::Rc::new(std::cell::Cell::new(0_i64));
     lua.create_function(move |lua, _: MultiValue| {
       let next = index.get().saturating_add(1);
-      let value = table.raw_get::<Value>(next)?;
+      let value = table.get::<Value>(next)?;
       if matches!(value, Value::Nil) {
         Ok(Value::Nil)
       } else {
@@ -163,6 +233,50 @@ fn record_iterator(lua: &Lua, table: Table, array_only: bool) -> mlua::Result<Fu
       iteration_record(lua, key, value).map(Value::Table)
     })
   }
+}
+
+fn pairs_iterator(lua: &Lua, table: Table) -> mlua::Result<Function> {
+  if readonly::is_proxy(&table)? {
+    return record_iterator(lua, readonly::backing(&table)?, false);
+  }
+  if let Some(metatable) = table.metatable() {
+    let metamethod = metatable.raw_get::<Value>("__pairs")?;
+    if !matches!(metamethod, Value::Nil) {
+      let Value::Function(metamethod) = metamethod else {
+        return Err(args::invalid(
+          "base.pairs",
+          "__pairs",
+          "function",
+          &metamethod,
+        ));
+      };
+      let mut results = metamethod.call::<MultiValue>(table)?;
+      let iterator = results.pop_front().unwrap_or(Value::Nil);
+      let Value::Function(iterator) = iterator else {
+        return Err(args::invalid(
+          "base.pairs",
+          "__pairs iterator",
+          "function",
+          &iterator,
+        ));
+      };
+      let state = results.pop_front().unwrap_or(Value::Nil);
+      let initial = results.pop_front().unwrap_or(Value::Nil);
+      let control = std::rc::Rc::new(std::cell::RefCell::new(initial));
+      return lua.create_function(move |lua, _: MultiValue| {
+        let current = control.borrow().clone();
+        let mut values = iterator.call::<MultiValue>((state.clone(), current))?;
+        let index = values.pop_front().unwrap_or(Value::Nil);
+        if matches!(index, Value::Nil) {
+          return Ok(Value::Nil);
+        }
+        let value = values.pop_front().unwrap_or(Value::Nil);
+        *control.borrow_mut() = index.clone();
+        iteration_record(lua, index, value).map(Value::Table)
+      });
+    }
+  }
+  record_iterator(lua, table, false)
 }
 
 fn iteration_record(lua: &Lua, index: Value, value: Value) -> mlua::Result<Table> {

@@ -53,7 +53,17 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   let base = base::base(lua)?;
   environment.set("base", base.clone())?;
   for name in [
-    "ipairs", "pairs", "next", "select", "rawequal", "rawlen", "tonumber", "tostring", "type",
+    "ipairs",
+    "pairs",
+    "next",
+    "select",
+    "rawequal",
+    "rawlen",
+    "tonumber",
+    "tostring",
+    "type",
+    "setmetatable",
+    "getmetatable",
   ] {
     environment.set(name, base.get::<Value>(name)?)?;
   }

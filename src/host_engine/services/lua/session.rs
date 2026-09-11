@@ -1737,6 +1737,8 @@ mod tests {
       "tonumber",
       "tostring",
       "type",
+      "setmetatable",
+      "getmetatable",
     ] {
       assert_ne!(session.environment_value(name), Value::Nil, "{name}");
     }
@@ -1783,6 +1785,138 @@ mod tests {
           local first = next{ table = math, index = nil }
           debug.assert{ value = first.index ~= nil and first.value ~= nil }
           debug.assert{ value = math.PI > 3, message = "iterator leaked backing table" }
+        end
+      "#,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn base_metatable_api_uses_named_parameters_and_preserves_protection() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          local function fails(func)
+            return not debug.pcall{ func = func }.ok
+          end
+
+          local target = {}
+          local metatable = { __index = { fallback = 7 } }
+          local result = setmetatable{ table = target, metatable = metatable }
+          debug.assert{
+            value = result == target and target.fallback == 7
+              and getmetatable(target) == metatable
+              and base.getmetatable{ table = target } == metatable,
+          }
+
+          local removed = base.setmetatable{ table = target, metatable = nil }
+          debug.assert{
+            value = removed == target and getmetatable(target) == nil
+              and target.fallback == nil,
+          }
+
+          local protected = {}
+          setmetatable{
+            table = protected,
+            metatable = { __metatable = "locked" },
+          }
+          debug.assert{
+            value = getmetatable(protected) == "locked"
+              and fails(function()
+                setmetatable{ table = protected, metatable = {} }
+              end),
+          }
+
+          debug.assert{
+            value = getmetatable(base) == false
+              and fails(function() setmetatable{ table = base, metatable = {} } end)
+              and fails(function() setmetatable{ table = target, metatable = false } end)
+              and fails(function() getmetatable(1) end),
+          }
+        end
+      "#,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn lua_metamethods_work_through_vm_and_custom_base_functions() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          local function fails(func)
+            return not debug.pcall{ func = func }.ok
+          end
+
+          local writes = {}
+          local metatable = {
+            __index = function(_, key)
+              if key == "missing" then return 7 end
+            end,
+            __newindex = function(_, key, value) writes[key] = value end,
+            __len = function() return 12 end,
+            __call = function(_, value) return value * 2 end,
+            __add = function(left, right) return left.raw + right.raw end,
+            __concat = function(left, right) return left.raw .. right.raw end,
+            __eq = function(left, right) return left.raw == right.raw end,
+            __lt = function(left, right) return left.raw < right.raw end,
+            __tostring = function(value) return "value:" .. value.raw end,
+          }
+          local left = setmetatable{ table = { raw = 2 }, metatable = metatable }
+          local same = setmetatable{ table = { raw = 2 }, metatable = metatable }
+          local greater = setmetatable{ table = { raw = 3 }, metatable = metatable }
+          left.created = 9
+          debug.assert{
+            value = left.missing == 7 and writes.created == 9 and #left == 12
+              and left(4) == 8 and left + greater == 5 and left .. greater == "23"
+              and left == same and left < greater and tostring(left) == "value:2",
+          }
+
+          local custom = { left = 1, right = 2 }
+          setmetatable{
+            table = custom,
+            metatable = {
+              __pairs = function(subject)
+                local keys = { "right", "left" }
+                local position = 0
+                return function(state, previous)
+                  position = position + 1
+                  local key = keys[position]
+                  if key ~= nil then return key, state[key] end
+                end, subject, nil
+              end,
+            },
+          }
+          local iterator = pairs(custom)
+          local first = iterator()
+          local second = iterator()
+          debug.assert{
+            value = first.index == "right" and first.value == 2
+              and second.index == "left" and second.value == 1
+              and iterator() == nil,
+          }
+
+          local virtual = setmetatable{
+            table = { [1] = "a" },
+            metatable = {
+              __index = function(_, index)
+                if index == 2 then return "b" end
+              end,
+            },
+          }
+          local array_iterator = ipairs(virtual)
+          local array_first = array_iterator()
+          local array_second = array_iterator()
+          debug.assert{
+            value = array_first.index == 1 and array_first.value == "a"
+              and array_second.index == 2 and array_second.value == "b"
+              and array_iterator() == nil,
+          }
+
+          local invalid = setmetatable{
+            table = {}, metatable = { __tostring = true },
+          }
+          debug.assert{ value = fails(function() tostring(invalid) end) }
         end
       "#,
     );

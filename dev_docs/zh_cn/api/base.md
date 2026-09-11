@@ -21,6 +21,8 @@
 | `tonumber` | 将值转换为数字，可指定进制                            | [tonumber](#tonumber) |
 | `tostring` | 将任意值安全的转换为字符串                            | [tostring](#tostring) |
 | `type`     | 返回值的类型名                                        | [type](#type)         |
+| `setmetatable` | 设置或移除表的元表                                | [setmetatable](#setmetatable) |
+| `getmetatable` | 获取表的元表或元表保护值                          | [getmetatable](#getmetatable) |
 
 ---
 
@@ -76,6 +78,12 @@ end
 3 c
 ```
 
+### 额外补充
+
+- 整数下标读取遵循表的 `__index` 元方法。
+- 与 Lua 5.4 一致，不使用已经移除的 `__ipairs` 元方法。
+- 遇到第一个返回 `nil` 的数组值时结束迭代。
+
 ---
 
 ## `pairs`
@@ -107,8 +115,8 @@ pairs()
 
 | 字段    | 类型             | 说明 |
 | ------- | ---------------- | ---- |
-| `index` | integer / string | 索引 |
-| `value` | any              | 值   |
+| `index` | any | 索引 |
+| `value` | any | 值   |
 
 ### 示例
 
@@ -127,6 +135,12 @@ end
 2 b
 x 1
 ```
+
+### 额外补充
+
+- 目标表的元表存在 `__pairs` 方法时，会先调用该元方法。
+- `__pairs` 应遵循 Lua 5.4 语义，返回迭代函数、状态值和初始控制值。
+- 宿主会将每次迭代产生的键和值包装为 `{ index = ..., value = ... }` 对象表。
 
 ---
 
@@ -476,6 +490,11 @@ table: 0x114514   -- 表的内部身份指针
 10.5
 ```
 
+### 额外补充
+
+- 表的元表存在 `__tostring` 方法时，会调用该元方法。
+- `__tostring` 必须返回一个有效的 UTF-8 字符串，否则抛出错误。
+
 ---
 
 ### `type`
@@ -525,9 +544,149 @@ debug.print { message = type(false) }
 
 ```text
 nil
-integer  -- 整型
+number   -- 整数
 number   -- 浮点数
 table
 string
 boolean
 ```
+
+---
+
+## `setmetatable`
+
+设置或移除目标表的元表。
+
+### 调用
+
+```lua
+-- 表参数
+setmetatable{}
+```
+
+### 参数
+
+| 参数名      | 类型        | 必填 | 默认值 | 说明                         |
+| ----------- | ----------- | ---- | ------ | ---------------------------- |
+| `table`     | table       | 是   | -      | 要修改元表的目标表           |
+| `metatable` | table / nil | 否   | `nil`  | 新元表；为 `nil` 时移除元表  |
+
+### 返回
+
+直接返回一个值。
+
+| 类型  | 说明                 |
+| ----- | -------------------- |
+| table | 被修改的目标表本身   |
+
+### 示例
+
+```lua
+t = {}
+mt = {
+  __index = {
+    value = 10,
+  },
+}
+
+result = setmetatable { table = t, metatable = mt }
+
+debug.print { message = result == t }
+debug.print { message = t.value }
+
+setmetatable { table = t, metatable = nil }
+debug.print { message = t.value }
+```
+
+输出：
+
+```text
+true
+10
+nil
+```
+
+### 额外补充
+
+- 该方法也可通过 `base.setmetatable{}` 调用。
+- 参数 `metatable` 省略或显式传递 `nil` 时，均表示移除目标表的元表。
+- 若目标表当前元表包含非 `nil` 的 `__metatable` 字段，则该元表受保护，不能被替换或移除。
+- 宿主注入的库表、常量表和字符表均具有受保护的只读元表，不能通过该方法解除只读限制。
+- 参数表出现未知字段时抛出错误。
+
+---
+
+## `getmetatable`
+
+获取目标表的元表。
+
+### 调用
+
+```lua
+-- 单参数
+getmetatable()
+```
+
+### 参数
+
+| 参数名  | 类型  | 必填 | 默认值 | 说明               |
+| ------- | ----- | ---- | ------ | ------------------ |
+| `table` | table | 是   | -      | 要查询元表的目标表 |
+
+### 返回
+
+直接返回一个值。
+
+| 类型        | 说明                                                   |
+| ----------- | ------------------------------------------------------ |
+| table / nil | 未受保护的元表；目标表没有元表时返回 `nil`            |
+| any         | 元表具有 `__metatable` 字段时，返回该字段保存的保护值 |
+
+### 示例
+
+```lua
+t = {}
+mt = { name = "example" }
+
+setmetatable { table = t, metatable = mt }
+
+result1 = getmetatable(t)
+result2 = base.getmetatable { table = t }
+
+debug.print { message = result1 == mt }
+debug.print { message = result2.name }
+```
+
+输出：
+
+```text
+true
+example
+```
+
+### 额外补充
+
+- 单参数支持直接传递目标表或使用 `{ table = target }` 显式声明。
+- 该方法也可通过 `base.getmetatable()` 调用。
+- 若元表具有非 `nil` 的 `__metatable` 字段，不会返回真实元表，而是返回该字段的值。
+- 宿主只读 API 表的真实元表不会暴露给脚本。
+
+---
+
+## 元方法支持
+
+Lua VM 支持 Lua 5.4 的元表和元方法机制。脚本可在自己的普通表上使用下列元方法：
+
+- 索引：`__index`、`__newindex`。
+- 算术：`__add`、`__sub`、`__mul`、`__div`、`__idiv`、`__mod`、`__pow`、`__unm`。
+- 位运算：`__band`、`__bor`、`__bxor`、`__bnot`、`__shl`、`__shr`。
+- 比较：`__eq`、`__lt`、`__le`。
+- 其他操作：`__concat`、`__len`、`__call`、`__tostring`、`__pairs`。
+- 生命周期和表行为：`__gc`、`__close`、`__mode`、`__name`、`__metatable`。
+
+### 额外补充
+
+- 算术、比较、拼接、长度、调用、索引和赋值操作由 Lua VM 直接处理。
+- `pairs`、`ipairs` 和 `tostring` 已适配本项目的参数及返回结构，同时保留对应元方法语义。
+- `rawlen`、`rawequal` 和 `next` 按定义执行原始操作，不触发元方法。
+- 元方法仍受 Lua 回调的时间、指令、内存和递归限制约束。
