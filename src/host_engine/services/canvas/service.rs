@@ -153,11 +153,12 @@ impl CanvasService {
     let Some(state) = pool.slices.slices.get(&id).cloned() else {
       return;
     };
+    let visible = state.visible && (!state.frame_scoped || state.drawn_this_frame);
     let rect = resolve_rect(state.rect, layout);
     let prepared = self.slices.entry(id).or_insert_with(|| PreparedSlice {
       buffer: CanvasBuffer::new(rect.width, rect.height),
       rect,
-      visible: state.visible,
+      visible,
       opaque: state.opaque,
       background: state.background.clone(),
       order,
@@ -169,7 +170,7 @@ impl CanvasService {
       prepared.buffer.clear();
     }
     prepared.rect = rect;
-    prepared.visible = state.visible;
+    prepared.visible = visible;
     prepared.opaque = state.opaque;
     prepared.background = state.background;
     prepared.order = order;
@@ -1429,6 +1430,50 @@ mod tests {
     );
     assert_eq!(canvas.prepared_slice_width(slice), Some(5));
     assert_eq!(canvas.prepared_slice_height(slice), Some(3));
+  }
+
+  #[test]
+  fn frame_scoped_slice_is_prepared_only_after_current_frame_draw() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(20, 10);
+    let mut pool = UiObjectPool::new();
+    let service = SliceService::new();
+    let slice = service
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: SliceRect {
+            x: 0,
+            y: 0,
+            width: SliceLength::Fixed(5),
+            height: SliceLength::Fixed(3),
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    assert!(service.set_frame_scoped(&mut pool, slice, true));
+    let mut canvas = CanvasService::new();
+
+    canvas.begin_frame(&layout);
+    canvas.prepare(&pool, &layout);
+    assert_eq!(canvas.prepared_slice_rect(slice), None);
+
+    assert!(service.draw(&mut pool, slice, 2, 1));
+    canvas.prepare(&pool, &layout);
+    assert_eq!(
+      canvas.prepared_slice_rect(slice),
+      Some(Rect {
+        x: 2,
+        y: 1,
+        width: 5,
+        height: 3,
+      })
+    );
+
+    service.begin_frame(&mut pool);
+    canvas.prepare(&pool, &layout);
+    assert_eq!(canvas.prepared_slice_rect(slice), None);
   }
 
   #[test]

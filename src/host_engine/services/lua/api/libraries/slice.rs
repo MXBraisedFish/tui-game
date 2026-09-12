@@ -54,6 +54,8 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
             },
           )
           .ok_or_else(|| args::message(method, "invalid slice dimensions"))?;
+        // Lua 切片是逐帧提交的资源；创建只保留配置，不使其自动出现在画布上。
+        service.set_frame_scoped(objects.ui_mut(), id, true);
         Ok(Value::String(lua.create_string(format_id(id))?))
       })
     })?,
@@ -169,7 +171,7 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         "y",
       )?;
       with_pool_mut(&state, method, |objects| {
-        if SliceService::new().set_position(objects.ui_mut(), id, x, y) {
+        if SliceService::new().draw(objects.ui_mut(), id, x, y) {
           Ok(())
         } else {
           Err(args::message(method, "unknown slice id"))

@@ -2009,6 +2009,7 @@ fn update_lua_object_pool(
   animation: &crate::host_engine::services::AnimationService,
   frame_delta: Duration,
 ) {
+  objects.begin_frame();
   time.update(objects.runtime_mut(), frame_delta);
   animation.update(
     objects.runtime_mut(),

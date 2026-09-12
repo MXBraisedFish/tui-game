@@ -58,6 +58,8 @@ pub(crate) struct SliceState {
   pub opaque: bool,
   pub layer: i32,
   pub background: Option<TextColor>,
+  pub(crate) frame_scoped: bool,
+  pub(crate) drawn_this_frame: bool,
 }
 
 pub(crate) struct SliceObjects {
@@ -103,6 +105,8 @@ impl SliceService {
           opaque: options.opaque,
           layer,
           background: options.background,
+          frame_scoped: false,
+          drawn_this_frame: false,
         },
       );
       pool.surfaces.push(SurfaceId::Slice(id));
@@ -199,6 +203,41 @@ impl SliceService {
     true
   }
 
+  /// 将切片设置为必须逐帧显式提交后才可见。
+  pub(crate) fn set_frame_scoped(
+    &self,
+    pool: &mut UiObjectPool,
+    id: SliceId,
+    frame_scoped: bool,
+  ) -> bool {
+    let Some(state) = pool.slices.slices.get_mut(&id) else {
+      return false;
+    };
+    state.frame_scoped = frame_scoped;
+    state.drawn_this_frame = false;
+    true
+  }
+
+  /// 设置切片位置，并将逐帧切片提交到当前帧。
+  pub fn draw(&self, pool: &mut UiObjectPool, id: SliceId, x: i32, y: i32) -> bool {
+    let Some(state) = pool.slices.slices.get_mut(&id) else {
+      return false;
+    };
+    state.rect.x = x;
+    state.rect.y = y;
+    state.drawn_this_frame = true;
+    true
+  }
+
+  /// 清除上一帧对逐帧切片的提交状态。
+  pub(crate) fn begin_frame(&self, pool: &mut UiObjectPool) {
+    for state in pool.slices.slices.values_mut() {
+      if state.frame_scoped {
+        state.drawn_this_frame = false;
+      }
+    }
+  }
+
   pub fn layer(&self, pool: &UiObjectPool, id: SliceId) -> Option<i32> {
     Some(pool.slices.slices.get(&id)?.layer)
   }
@@ -260,7 +299,7 @@ impl SliceService {
       .slices
       .slices
       .get(&id)
-      .is_some_and(|state| state.visible)
+      .is_some_and(|state| state.visible && (!state.frame_scoped || state.drawn_this_frame))
   }
 
   /// 设置切片可见性
@@ -442,6 +481,35 @@ mod tests {
     assert!(!service.move_above(&mut pool, a, a));
     assert!(service.remove(&mut pool, a));
     assert!(!service.exists(&pool, a));
+  }
+
+  #[test]
+  fn frame_scoped_slice_requires_draw_on_every_frame() {
+    let service = SliceService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: rect(0, 0, SliceLength::Fixed(4), SliceLength::Fixed(2)),
+          ..Default::default()
+        },
+      )
+      .unwrap();
+
+    assert!(service.is_visible(&pool, id));
+    assert!(service.set_frame_scoped(&mut pool, id, true));
+    assert!(!service.is_visible(&pool, id));
+
+    assert!(service.set_position(&mut pool, id, 3, 4));
+    assert!(!service.is_visible(&pool, id));
+    assert!(service.draw(&mut pool, id, 5, 6));
+    assert!(service.is_visible(&pool, id));
+    assert_eq!(service.configured_rect(&pool, id).unwrap().x, 5);
+    assert_eq!(service.configured_rect(&pool, id).unwrap().y, 6);
+
+    service.begin_frame(&mut pool);
+    assert!(!service.is_visible(&pool, id));
   }
 
   #[test]
