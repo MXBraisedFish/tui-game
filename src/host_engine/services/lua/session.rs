@@ -85,13 +85,15 @@ pub struct LuaSessionSpec {
   pub save_best_enabled: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct LuaSessionError {
   pub package_id: String,
   pub session_kind: LuaSessionKind,
   pub stage: LuaErrorStage,
   pub callback: Option<&'static str>,
   pub message: String,
+  /// 会话完成注册前发生故障时，已成功产生且允许提交的诊断命令。
+  pub(crate) diagnostic_commands: Vec<LuaHostCommand>,
 }
 
 impl fmt::Display for LuaSessionError {
@@ -277,12 +279,15 @@ impl LuaSession {
     let load_budget = session.policy.budget(LuaBudgetKind::Load);
     session.record_slow_callback("Load", load_budget, load_stats);
     let context = session.context_table(spec.continue_data.as_ref(), spec.best_data.as_ref())?;
-    session.invoke_required(
+    if let Err(mut error) = session.invoke_required(
       Callback::Init,
       context,
       LuaBudgetKind::Init,
       LuaErrorStage::Callback,
-    )?;
+    ) {
+      error.diagnostic_commands = session.take_pending_diagnostic_commands();
+      return Err(error);
+    }
     session.state = LuaSessionState::Running;
     Ok(session)
   }
@@ -429,6 +434,22 @@ impl LuaSession {
       }
     });
     host
+  }
+
+  fn take_pending_diagnostic_commands(&mut self) -> Vec<LuaHostCommand> {
+    let mut state = self.api_state.borrow_mut();
+    let commands = std::mem::take(&mut state.commands);
+    commands
+      .into_iter()
+      .filter(|command| {
+        matches!(
+          command,
+          LuaHostCommand::Log { .. }
+            | LuaHostCommand::Print { .. }
+            | LuaHostCommand::Ignored { .. }
+        )
+      })
+      .collect()
   }
 
   pub fn take_draw_commands(&mut self) -> Vec<LuaDrawCommand> {
@@ -891,6 +912,7 @@ impl LuaSession {
       stage,
       callback,
       message: message.to_string(),
+      diagnostic_commands: Vec::new(),
     }
   }
 
@@ -1245,6 +1267,16 @@ where
     .map_err(LuaExecutionFailure::Lua)?;
 
   let result = thread.resume::<MultiValue>(args);
+  if result.is_err() {
+    // lua_resume 不会自行展开一个无恢复点的失败协程。Lua 5.4 的 reset
+    // 会关闭待关闭变量，并把原始错误作为 __close 的第二个参数传入。
+    // Hook 此时仍然安装，关闭元方法继续受当前回调预算约束。
+    if let Ok(noop) = lua.create_function(|_, _: MultiValue| Ok(MultiValue::new())) {
+      // Lua 5.4 在清理一个失败线程时会再次返回该线程原本的错误；这里
+      // 只需要它完成栈展开，面向调用者仍保留 resume 取得的原始错误。
+      let _ = thread.reset(noop);
+    }
+  }
   thread.remove_hook();
   let elapsed = started.elapsed();
   let values = match result {
@@ -1341,6 +1373,7 @@ fn session_error(
     stage,
     callback,
     message: message.to_string(),
+    diagnostic_commands: Vec::new(),
   }
 }
 
@@ -1917,10 +1950,63 @@ mod tests {
             table = {}, metatable = { __tostring = true },
           }
           debug.assert{ value = fails(function() tostring(invalid) end) }
+
+          local named = setmetatable{
+            table = {}, metatable = { __name = "Type" },
+          }
+          debug.assert{
+            value = string.find{
+              text = tostring(named), pattern = "^Type: 0x",
+            } ~= nil,
+          }
         end
       "#,
     );
     LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn callback_error_closes_to_be_closed_variables() {
+    let source = valid_script(
+      r#"
+        function UpdateFrame(dt, alpha)
+          local metatable = {
+            __close = function(_, error_value)
+              debug.print{
+                message = error_value == nil and "closed normally" or "closed with error",
+              }
+            end,
+          }
+          do
+            local normal <close> = setmetatable{ table = {}, metatable = metatable }
+          end
+          local failed <close> = setmetatable{ table = {}, metatable = metatable }
+          debug.assert{ value = false }
+        end
+      "#,
+    );
+    let mut session = LuaSession::load_with_api(
+      spec(&source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+      LuaApiConfig {
+        debug_enabled: true,
+        ..LuaApiConfig::default()
+      },
+    )
+    .unwrap();
+
+    session
+      .update_frame(Duration::from_millis(16), 0.5)
+      .expect_err("UpdateFrame must fail");
+    let messages = session
+      .take_host_commands()
+      .into_iter()
+      .filter_map(|command| match command {
+        LuaHostCommand::Print { message, .. } => Some(message),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(messages, ["closed normally", "closed with error"]);
   }
 
   #[test]
@@ -2638,6 +2724,73 @@ mod tests {
         level: None,
         type_head: false,
       } if message == "plain"
+    )));
+  }
+
+  #[test]
+  fn debug_assert_accepts_nil_and_reports_an_assertion_failure() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          debug.assert{ value = nil, message = "nil assertion" }
+        end
+      "#,
+    );
+    let error = match LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()) {
+      Ok(_) => panic!("nil unexpectedly passed the assertion"),
+      Err(error) => error,
+    };
+
+    assert_eq!(error.stage, LuaErrorStage::Callback);
+    assert!(
+      error.message.contains("nil assertion"),
+      "unexpected error: {}",
+      error.message
+    );
+    assert!(!error.message.contains("expected non-nil value"));
+
+    let default_source = valid_script(
+      r#"
+        function Init(ctx)
+          debug.assert{}
+        end
+      "#,
+    );
+    let default_error = match LuaSession::load(
+      spec(&default_source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+    ) {
+      Ok(_) => panic!("an omitted value unexpectedly passed the assertion"),
+      Err(error) => error,
+    };
+    assert!(default_error.message.contains("assertion failed"));
+  }
+
+  #[test]
+  fn debug_print_before_init_fault_is_returned_with_the_load_error() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          debug.print{ message = "before init fault" }
+          debug.assert{ value = false }
+        end
+      "#,
+    );
+    let error = match LuaSession::load_with_api(
+      spec(&source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+      LuaApiConfig {
+        debug_enabled: true,
+        ..LuaApiConfig::default()
+      },
+    ) {
+      Ok(_) => panic!("Init unexpectedly succeeded"),
+      Err(error) => error,
+    };
+
+    assert!(error.diagnostic_commands.iter().any(|command| matches!(
+      command,
+      LuaHostCommand::Print { message, .. } if message == "before init fault"
     )));
   }
 

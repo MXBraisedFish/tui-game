@@ -86,7 +86,9 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "assert",
     lua.create_function(|_, values: MultiValue| {
       let table = args::named("debug.assert", values, &["value", "message"])?;
-      let value = args::required(&table, "debug.assert", "value")?;
+      // Lua 的 nil 无法作为表字段保留下来，因此省略 value 与显式传入 nil
+      // 都应进入断言失败分支，而不是被通用必填参数校验拦截。
+      let value = table.get::<Value>("value")?;
       if matches!(value, Value::Nil | Value::Boolean(false)) {
         let message =
           args::optional_dynamic_text(&table, "debug.assert", "message", Some("assertion failed"))?

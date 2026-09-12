@@ -126,6 +126,13 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
         return args::string(result, "base.tostring", "__tostring result")
           .and_then(|text| lua.create_string(text));
       }
+      if let Value::String(name) = metatable.raw_get::<Value>("__name")? {
+        return lua.create_string(format!(
+          "{}: {:p}",
+          name.to_string_lossy(),
+          table.to_pointer()
+        ));
+      }
     }
     let text = args::dynamic_text(value, "base.tostring", "value")?;
     lua.create_string(text)

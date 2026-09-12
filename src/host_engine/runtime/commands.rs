@@ -202,6 +202,12 @@ fn start_game(
   let session = match services.lua.create_session_with_api(spec, api) {
     Ok(session) => session,
     Err(error) => {
+      flush_lua_startup_diagnostics(
+        services,
+        session_log,
+        crate::host_engine::services::LuaSessionKind::Game,
+        &error.diagnostic_commands,
+      );
       let message = format!("{error}; entry={}", entry_path.display());
       if let Some(id) = session_log {
         services.log.error_session(id, LogSource::Lua, message);

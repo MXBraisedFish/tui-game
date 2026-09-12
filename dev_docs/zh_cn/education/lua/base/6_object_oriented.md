@@ -172,8 +172,8 @@ function Player.new(name, hp)
   return obj
 end
 
-function Player:say()
-  print("I am " .. self.name) -- 这里的 . 改为了 :，并将原本的 name 改为 self.name
+function Player:say() -- 这里的 . 改为了 :
+  print("I am " .. self.name) -- name 改为 self.name
 end
 
 player1 = Player.new("Alice", 100)
@@ -198,8 +198,7 @@ function Player.new(name, hp)
 end
 
 function Player:say()
-  print("I am " .. self.name) -- 这里的 . 改为了 :，并将原本的 name 改为 self.name
-end
+  print("I am " .. self.name)
 
 player1 = Player.new("Alice", 100)
 player2 = Player.new("Peter", 30)

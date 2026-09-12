@@ -396,7 +396,7 @@ debug.error("This is a ERROR")
 
 ## `assert`
 
-断言值非 `nil` 且非 `false`；否则抛出错误。
+断言值非 `nil` 且非 `false`，否则抛出错误。
 
 ### 调用
 
@@ -424,7 +424,7 @@ debug.assert{}
 
 ```lua
 local v1 = debug.assert { value = 1 == 1, message = "Right" }
-debug.print { message = tostring(v1) }
+debug.print { message = tostring(v1) .. "\n" }
 
 local v2 = debug.assert { value = 0 == 1, message = "Asser Error" }
 ```
@@ -443,7 +443,7 @@ stack traceback: [Error Message]
 
 ## `pcall`
 
-受保护地调用函数，返回成功标志与结果（或错误值）。
+受保护地调用函数。
 
 ### 调用
 

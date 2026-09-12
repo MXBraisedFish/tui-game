@@ -1,4 +1,4 @@
-## Lua 关键字
+# Lua 关键字
 
 > 该教程文档使用的是原生 Lua 语言，语法本身完全合规，但 Tui Game 程序并非原生 Lua 运行器，因此无法直接运行该文档中的代码。
 
@@ -33,20 +33,7 @@ Lua 共有 **22 个**关键字。
 
 ---
 
-### 分类速记
-
-- **逻辑**：`and` `or` `not`
-- **值**：`nil` `true` `false`
-- **条件分支**：`if` `then` `elseif` `else`
-- **循环**：`while` `do` `repeat` `until` `for` `in`
-- **跳转**：`break` `goto`
-- **函数**：`function` `return`
-- **变量**：`local`
-- **结构**：`end`
-
----
-
-### 额外补充
+## 额外补充
 
 - 关键字不能用作标识符（变量名、函数名等）。
 - `end` 是使用最多的关键字之一，用于结束 `if`、`while`、`for`、`function` 等代码块。

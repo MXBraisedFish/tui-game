@@ -2043,6 +2043,7 @@ fn handle_lua_queue_overflow(
       stage: LuaErrorStage::EventQueue,
       callback: None,
       message: "pending event queue exceeded 1024 events".to_string(),
+      diagnostic_commands: Vec::new(),
     },
   );
 }
@@ -2371,6 +2372,56 @@ fn apply_lua_diagnostic_host_command(
     _ => return false,
   }
   true
+}
+
+/// Init 在 Session 注册到 Game/ScreensaverService 之前执行。若 Init 失败，
+/// 通过刚创建的日志会话提交其故障前诊断，避免随构造中的 Session 一同丢失。
+fn flush_lua_startup_diagnostics(
+  services: &mut EngineServices,
+  log_session: Option<crate::host_engine::services::LogSessionId>,
+  kind: LuaSessionKind,
+  commands: &[LuaHostCommand],
+) {
+  let Some(id) = log_session else {
+    return;
+  };
+  let print_source = match kind {
+    LuaSessionKind::Game => LogSource::Game,
+    LuaSessionKind::Screensaver => LogSource::Screensaver,
+  };
+  for command in commands {
+    match command {
+      LuaHostCommand::Log { level, message } => match level.as_str() {
+        "error" => services.log.error_session(id, LogSource::Lua, message),
+        "warn" => services.log.warn_session(id, LogSource::Lua, message),
+        "debug" => services.log.debug_session(id, LogSource::Lua, message),
+        _ => services.log.info_session(id, LogSource::Lua, message),
+      },
+      LuaHostCommand::Print {
+        message,
+        title,
+        time,
+        level,
+        type_head,
+      } => services.log.print_session(
+        id,
+        print_source,
+        message,
+        LogPrintOptions {
+          time: *time,
+          level: level.as_deref().and_then(lua_log_level),
+          type_head: *type_head,
+          title: title.clone(),
+        },
+      ),
+      LuaHostCommand::Ignored { method, reason } => {
+        services
+          .log
+          .debug_session(id, LogSource::Lua, format!("{method} ignored: {reason}"))
+      }
+      _ => {}
+    }
+  }
 }
 
 /// 故障回调可能已成功执行过若干日志调用。Session 销毁前只提交这些诊断输出；
@@ -2772,6 +2823,12 @@ fn toggle_screensaver(
   let session = match services.lua.create_session_with_api(spec, api) {
     Ok(session) => session,
     Err(error) => {
+      flush_lua_startup_diagnostics(
+        services,
+        session_log,
+        LuaSessionKind::Screensaver,
+        &error.diagnostic_commands,
+      );
       let message = format!("{error}; entry={}", log_entry_path.display());
       if let Some(id) = session_log {
         services.log.error_session(id, LogSource::Lua, message);
@@ -3535,6 +3592,7 @@ mod tests {
       stage: LuaErrorStage::ExecutionLimit,
       callback: Some("Render"),
       message: "instructions execution limit exceeded: elapsed_ms=15.000; time_limit_ms=75.000; instructions=201000; instruction_limit=200000".to_string(),
+      diagnostic_commands: Vec::new(),
     };
     let diagnostics = LuaSessionDiagnostics {
       entry_path: PathBuf::from("scripts/main.lua"),
