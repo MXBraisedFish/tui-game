@@ -330,7 +330,7 @@ math.abs()
 ### 示例
 
 ```lua
-n = math.abs(-5.20)
+local n = math.abs(-5.20)
 debug.print { message = tostring(n) }
 ```
 
@@ -370,7 +370,7 @@ math.ceil()
 ### 示例
 
 ```lua
-n = math.ceil(3.14)
+local n = math.ceil(3.14)
 debug.print { message = tostring(n) }
 ```
 
@@ -410,7 +410,7 @@ math.floor()
 ### 示例
 
 ```lua
-n = math.floor(3.14)
+local n = math.floor(3.14)
 debug.print { message = tostring(n) }
 ```
 
@@ -450,8 +450,8 @@ math.round()
 ### 示例
 
 ```lua
-n1 = math.round(3.5)
-n2 = math.round(-3.5)
+local n1 = math.round(3.5)
+local n2 = math.round(-3.5)
 debug.print { message = tostring(n1) .. ", " .. tostring(n2) }
 ```
 
@@ -492,8 +492,8 @@ math.round_to{}
 ### 示例
 
 ```lua
-r1 = math.round_to { value = 3.14159, digits = 2 }
-r2 = math.round_to { value = 12345, digits = -2 }
+local r1 = math.round_to { value = 3.14159, digits = 2 }
+local r2 = math.round_to { value = 12345, digits = -2 }
 debug.print { message = tostring(r1) .. ", " .. tostring(r2) }
 ```
 
@@ -538,7 +538,7 @@ math.fmod{}
 ### 示例
 
 ```lua
-r = math.fmod(7, 3)
+local r = math.fmod(7, 3)
 debug.print { message = tostring(r) }
 ```
 
@@ -583,7 +583,7 @@ math.pow{}
 ### 示例
 
 ```lua
-p = math.pow(2, 10)
+local p = math.pow(2, 10)
 debug.print { message = tostring(p) }
 ```
 
@@ -623,7 +623,7 @@ math.exp()
 ### 示例
 
 ```lua
-e2 = math.exp(2)
+local e2 = math.exp(2)
 debug.print { message = tostring(e2) }
 ```
 
@@ -664,7 +664,7 @@ math.log{}
 ### 示例
 
 ```lua
-log = math.log { value = 8, base = 2 }
+local log = math.log { value = 8, base = 2 }
 debug.print { message = tostring(log) }
 ```
 
@@ -704,7 +704,7 @@ math.lg()
 ### 示例
 
 ```lua
-lg = math.lg(100)
+local lg = math.lg(100)
 debug.print { message = tostring(lg) }
 ```
 
@@ -744,7 +744,7 @@ math.ln()
 ### 示例
 
 ```lua
-ln = math.ln(math.E)
+local ln = math.ln(math.E)
 debug.print { message = tostring(ln) }
 ```
 
@@ -784,7 +784,7 @@ math.sqrt()
 ### 示例
 
 ```lua
-r = math.sqrt(16)
+local r = math.sqrt(16)
 debug.print { message = tostring(r) }
 ```
 
@@ -825,7 +825,7 @@ math.ldexp{}
 ### 示例
 
 ```lua
-v = math.ldexp{ x = 3, exp = 2 }
+local v = math.ldexp{ x = 3, exp = 2 }
 debug.print { message = tostring(v) }
 ```
 
@@ -910,7 +910,7 @@ math.sin()
 ### 示例
 
 ```lua
-s = math.sin(math.PI / 2)
+local s = math.sin(math.PI / 2)
 debug.print { message = tostring(s) }
 ```
 
@@ -950,7 +950,7 @@ math.cos()
 ### 示例
 
 ```lua
-c = math.cos(math.PI)
+local c = math.cos(math.PI)
 debug.print { message = tostring(c) }
 ```
 
@@ -990,7 +990,7 @@ math.tan()
 ### 示例
 
 ```lua
-t = math.tan(math.PI / 4) -- 可能会有浮点数精度问题
+local t = math.tan(math.PI / 4) -- 可能会有浮点数精度问题
 debug.print { message = tostring(t) }
 ```
 
@@ -1030,7 +1030,7 @@ math.asin()
 ### 示例
 
 ```lua
-r = math.asin(0.5)
+local r = math.asin(0.5)
 debug.print { message = tostring(r) }
 ```
 
@@ -1074,7 +1074,7 @@ math.acos(value)
 ### 示例
 
 ```lua
-r = math.acos(0.5)
+local r = math.acos(0.5)
 debug.print { message = tostring(r) }
 ```
 
@@ -1118,7 +1118,7 @@ math.atan()
 ### 示例
 
 ```lua
-r = math.atan(1)
+local r = math.atan(1)
 debug.print { message = tostring(r) }
 ```
 
@@ -1159,7 +1159,7 @@ math.atan2{}
 ### 示例
 
 ```lua
-a = math.atan2(1, 1)
+local a = math.atan2(1, 1)
 debug.print { message = tostring(a) }
 ```
 
@@ -1199,7 +1199,7 @@ math.deg()
 ### 示例
 
 ```lua
-d = math.deg(math.PI)
+local d = math.deg(math.PI)
 debug.print { message = tostring(d) }
 ```
 
@@ -1239,7 +1239,7 @@ math.rad()
 ### 示例
 
 ```lua
-r = math.rad(180)
+local r = math.rad(180)
 debug.print { message = tostring(r) }
 ```
 
@@ -1279,8 +1279,8 @@ math.normalize_angle()
 ### 示例
 
 ```lua
-a1 = math.normalize_angle(450)
-a2 = math.normalize_angle(-90)
+local a1 = math.normalize_angle(450)
+local a2 = math.normalize_angle(-90)
 debug.print { message = tostring(a1) .. ", " .. tostring(a2) }
 ```
 
@@ -1320,7 +1320,7 @@ math.max()
 ### 示例
 
 ```lua
-m = math.max({ 1, 5, 3, 9, 2 })
+local m = math.max({ 1, 5, 3, 9, 2 })
 debug.print { message = tostring(m) }
 ```
 
@@ -1360,7 +1360,7 @@ math.min{}
 ### 示例
 
 ```lua
-m = math.min({ 1, 5, 3, 9, 2 })
+local m = math.min({ 1, 5, 3, 9, 2 })
 debug.print { message = tostring(m) }
 ```
 
@@ -1401,7 +1401,7 @@ math.modf()
 ### 示例
 
 ```lua
-n = math.modf(2.5)
+local n = math.modf(2.5)
 debug.print { message = tostring(n.integer_part) .. ", " .. tostring(n.fractional_part) }
 ```
 
@@ -1441,8 +1441,8 @@ math.tointeger(value)
 ### 示例
 
 ```lua
-i1 = math.tointeger(3.0)
-i2 = math.tointeger(3.14)
+local i1 = math.tointeger(3.0)
+local i2 = math.tointeger(3.14)
 debug.print { message = tostring(i1) .. ", " .. tostring(i2) }
 ```
 
@@ -1486,9 +1486,9 @@ math.type()
 ### 示例
 
 ```lua
-t1 = math.type(3)
-t2 = math.type(3.14)
-t3 = math.type("3")
+local t1 = math.type(3)
+local t2 = math.type(3.14)
+local t3 = math.type("3")
 debug.print { message = tostring(t1) .. ", " .. tostring(t2) .. ", " .. tostring(t3) }
 ```
 
@@ -1533,8 +1533,8 @@ math.ult{}
 ### 示例
 
 ```lua
-b1 = math.ult { left = -1, right = 1 }  -- -1 二进制码在无符号整数为 2^64-1
-b2 = math.ult { left = 1, right = -1 }
+local b1 = math.ult { left = -1, right = 1 }  -- -1 二进制码在无符号整数为 2^64-1
+local b2 = math.ult { left = 1, right = -1 }
 debug.print { message = tostring(b1) .. ", " .. tostring(b2) }
 ```
 
@@ -1581,8 +1581,8 @@ math.approx_equal{}
 ### 示例
 
 ```lua
-ae1 = math.approx_equal { left = 0.1 + 0.2, right = 0.3 }
-ae2 = math.approx_equal { left = 1000000.0, right = 1000000.0000001, epsilon = 1e-10 }
+local ae1 = math.approx_equal { left = 0.1 + 0.2, right = 0.3 }
+local ae2 = math.approx_equal { left = 1000000.0, right = 1000000.0000001, epsilon = 1e-10 }
 
 debug.print { message = tostring(ae1) }
 debug.print { message = tostring(ae2) }
@@ -1614,7 +1614,7 @@ math.percent{}
 | ------------ | ------- | ---- | ------- | ---------- |
 | `value`      | float  | 是   | -       | 分子       |
 | `total`      | float  | 是   | -       | 分母       |
-| `as_percent` | boolean | 否   | `False` | 百分比输出 |
+| `as_percent` | boolean | 否   | `false` | 百分比输出 |
 
 ### 返回
 
@@ -1627,10 +1627,10 @@ math.percent{}
 ### 示例
 
 ```lua
-p1 = math.percent { value = 25, total = 80 }
+local p1 = math.percent { value = 25, total = 80 }
 debug.print { message = tostring(p1) }
 
-p2 = math.percent { value = 25, total = 80, as_percent = True }
+local p2 = math.percent { value = 25, total = 80, as_percent = true }
 debug.print { message = tostring(p2) }
 ```
 
@@ -1671,7 +1671,7 @@ math.factorial(n)
 ### 示例
 
 ```lua
-f = math.factorial(5)
+local f = math.factorial(5)
 debug.print { message = tostring(f) }
 ```
 
@@ -1716,7 +1716,7 @@ math.combination{}
 ### 示例
 
 ```lua
-c = math.combination { n = 5, k = 2 }
+local c = math.combination { n = 5, k = 2 }
 debug.print { message = tostring(c) }
 ```
 

@@ -57,10 +57,10 @@ table.concat{}
 ### 示例
 
 ```lua
-t1 = { "apple", "banana", "grape" }
+local t1 = { "apple", "banana", "grape" }
 debug.print { message = table.concat { table = t1 } }
 
-t2 = { "a", "b", "c" }
+local t2 = { "a", "b", "c" }
 debug.print { message = table.concat { table = t2, sep = " | " } }
 ```
 
@@ -99,11 +99,11 @@ table.insert{}
 ### 示例
 
 ```lua
-t1 = { "x", "y" }
+local t1 = { "x", "y" }
 table.insert { table = t1, value = "z" }
 debug.print { message = table.pretty(t1) .. "\n" }
 
-t2 = { "a", "c" }
+local t2 = { "a", "c" }
 table.insert { table = t2, value = "b", position = 2 }
 debug.print { message = table.pretty(t2) }
 ```
@@ -158,13 +158,13 @@ table.move{}
 ### 示例
 
 ```lua
-t1 = { "a", "b", "c", "d" }
-t_m1 = table.move { source = t1, start = 2, finish = 3, target_index = 4 }
+local t1 = { "a", "b", "c", "d" }
+local t_m1 = table.move { source = t1, start = 2, finish = 3, target_index = 4 }
 debug.print { message = table.pretty(t1) }
 debug.print { message = t1 }
 debug.print { message = t_m1 .. "\n" }
 
-t2 = { 1, 2, 3, 4, 5 }
+local t2 = { 1, 2, 3, 4, 5 }
 table.move { source = t2, start = 1, finish = 2, target_index = 4 }
 debug.print { message = table.pretty(t2) }
 ```
@@ -226,10 +226,10 @@ table.pack()
 ### 示例
 
 ```lua
-packed1 = table.pack { "a", "b", "c" }
+local packed1 = table.pack { "a", "b", "c" }
 debug.print { message = table.pretty(packed1) .. "\n" }
 
-packed2 = table.pack { 1, nil, 3 }
+local packed2 = table.pack { 1, nil, 3 }
 debug.print { message = table.pretty(packed2) }
 ```
 
@@ -298,12 +298,12 @@ table.unpack{}
 ### 示例
 
 ```lua
-t1 = { "a", "b", "c" }
-a1, b1, c1 = table.unpack { table = t1 }
+local t1 = { "a", "b", "c" }
+local a1, b1, c1 = table.unpack { table = t1 }
 debug.print { message = a1 .. " " .. b1 .. " " .. c1 }
 
-t2 = { 10, 20, 30, 40 }
-a2, b2 = table.unpack { table = t2, start = 2 }
+local t2 = { 10, 20, 30, 40 }
+local a2, b2 = table.unpack { table = t2, start = 2 }
 debug.print { message = a2 .. " " .. b2 }
 ```
 
@@ -347,12 +347,12 @@ table.remove{}
 ### 示例
 
 ```lua
-t1 = { "a", "b", "c", "d" }
-removed1 = table.remove { table = t1 }
+local t1 = { "a", "b", "c", "d" }
+local removed1 = table.remove { table = t1 }
 debug.print { message = removed1 .. " " .. table.pretty(t1) .. "\n" }
 
-t2 = { 10, 20, 30, 40 }
-removed2 = table.remove { table = t2, position = 2 }
+local t2 = { 10, 20, 30, 40 }
+local removed2 = table.remove { table = t2, position = 2 }
 debug.print { message = removed2 .. " " .. table.pretty(t2) }
 ```
 
@@ -401,15 +401,15 @@ table.sort{}
 ### 示例
 
 ```lua
-t1 = { 3, 1, 4, 2 }
+local t1 = { 3, 1, 4, 2 }
 table.sort { table = t1 }
 debug.print { message = table.pretty(t1) .. "\n" }
 
-t2 = { "banana", "apple", "grape", "cherry" }
+local t2 = { "banana", "apple", "grape", "cherry" }
 table.sort { table = t2 }
 debug.print { message = table.pretty(t2) .. "\n" }
 
-t3 = { 5, 2, 8, 1 }
+local t3 = { 5, 2, 8, 1 }
 table.sort {
   table = t3,
   comparator = function(left, right)
@@ -418,7 +418,7 @@ table.sort {
   }
 debug.print { message = table.pretty(t3) .. "\n" }
 
-t4 = { "abc", "a", "abcdef", "ab" }
+local t4 = { "abc", "a", "abcdef", "ab" }
 table.sort {
   table = t4,
   comparator = function(left, right)
@@ -503,8 +503,8 @@ table.deepcopy()
 ### 示例
 
 ```lua
-t = { 1, 2, 3 }
-t_copy = table.deepcopy(t)
+local t = { 1, 2, 3 }
+local t_copy = table.deepcopy(t)
 
 debug.print { message = tostring(t) }
 debug.print { message = tostring(t_copy) }
@@ -547,7 +547,7 @@ table.pretty()
 ### 示例
 
 ```lua
-t = { "apple", "banana", "grape" }
+local t = { "apple", "banana", "grape" }
 debug.print { message = table.pretty(t) }
 ```
 
@@ -592,8 +592,8 @@ table.count()
 ### 示例
 
 ```lua
-t = { [1] = "a", [3] = "c", name = "Tui Game" }
-result = table.count(t)
+local t = { [1] = "a", [3] = "c", name = "Tui Game" }
+local result = table.count(t)
 
 debug.print { message = result.n }
 debug.print { message = result.contiguous }
@@ -643,8 +643,8 @@ table.count_array()
 ### 示例
 
 ```lua
-t = { [1] = "a", [3] = "c", name = "Tui Game" }
-result = table.count_array { table = t }
+local t = { [1] = "a", [3] = "c", name = "Tui Game" }
+local result = table.count_array { table = t }
 
 debug.print { message = result.n }
 debug.print { message = result.contiguous }
@@ -696,8 +696,8 @@ table.count_hash()
 ### 示例
 
 ```lua
-t = { [1] = "a", [3] = "c", name = "Tui Game", [0] = "zero" }
-result = table.count_hash(t)
+local t = { [1] = "a", [3] = "c", name = "Tui Game", [0] = "zero" }
+local result = table.count_hash(t)
 
 debug.print { message = result }
 ```
@@ -738,8 +738,8 @@ table.compact()
 ### 示例
 
 ```lua
-t = { [1] = "a", [3] = "c", [8] = "h", name = "Tui Game" }
-result = table.compact { table = t }
+local t = { [1] = "a", [3] = "c", [8] = "h", name = "Tui Game" }
+local result = table.compact { table = t }
 
 debug.print { message = tostring(result == t) }
 debug.print { message = table.pretty(t) }

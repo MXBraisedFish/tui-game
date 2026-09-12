@@ -122,7 +122,7 @@ slice.delete()
 ### 示例
 
 ```lua
-s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 debug.print { message = s }
 
 debug.print { message = slice.delete(s) }

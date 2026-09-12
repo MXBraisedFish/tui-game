@@ -60,8 +60,8 @@ serialization.json_encode()
 ### 示例
 
 ```lua
-data = { name = "TUI", version = 1, features = { "draw", "event" } }
-json = serialization.json_encode(data)
+local data = { name = "TUI", version = 1, features = { "draw", "event" } }
+local json = serialization.json_encode(data)
 debug.print { message = json }
 ```
 
@@ -105,8 +105,8 @@ serialization.json_decode()
 ### 示例
 
 ```lua
-json = '{"name":"TUI","version":1}'
-data = serialization.json_decode(json)
+local json = '{"name":"TUI","version":1}'
+local data = serialization.json_decode(json)
 debug.print { message = data.name .. ", v" .. tostring(data.version) }
 ```
 
@@ -150,12 +150,12 @@ serialization.csv_encode()
 ### 示例
 
 ```lua
-data = {
+local data = {
     { "Name", "Score" },
     { "Alice", 95 },
     { "Bob", 87 }
 }
-csv = serialization.csv_encode(data)
+local csv = serialization.csv_encode(data)
 debug.print { message = csv }
 ```
 
@@ -201,8 +201,8 @@ serialization.csv_decode()
 ### 示例
 
 ```lua
-csv = "Name,Score\nAlice,95\nBob,87"
-data = serialization.csv_decode(csv)
+local csv = "Name,Score\nAlice,95\nBob,87"
+local data = serialization.csv_decode(csv)
 debug.print { message = data[2][1] .. ": " .. tostring(data[2][2]) }
 ```
 
@@ -246,8 +246,8 @@ serialization.yaml_encode()
 ### 示例
 
 ```lua
-data = { name = "TUI", version = 1 }
-yaml = serialization.yaml_encode(data)
+local data = { name = "TUI", version = 1 }
+local yaml = serialization.yaml_encode(data)
 debug.print { message = yaml }
 ```
 
@@ -292,8 +292,8 @@ serialization.yaml_decode()
 ### 示例
 
 ```lua
-yaml = "name: TUI\nversion: 1"
-data = serialization.yaml_decode(yaml)
+local yaml = "name: TUI\nversion: 1"
+local data = serialization.yaml_decode(yaml)
 debug.print { message = data.name }
 ```
 
@@ -337,8 +337,8 @@ serialization.toml_encode()
 ### 示例
 
 ```lua
-data = { name = "TUI", version = 1 }
-toml = serialization.toml_encode(data)
+local data = { name = "TUI", version = 1 }
+local toml = serialization.toml_encode(data)
 debug.print { message = toml }
 ```
 
@@ -383,8 +383,8 @@ serialization.toml_decode()
 ### 示例
 
 ```lua
-toml = 'name = "TUI"\nversion = 1'
-data = serialization.toml_decode(toml)
+local toml = 'name = "TUI"\nversion = 1'
+local data = serialization.toml_decode(toml)
 debug.print { message = data.name }
 ```
 
@@ -428,11 +428,11 @@ serialization.ini_encode(t)
 ### 示例
 
 ```lua
-data = {
+local data = {
   server = { host = "127.0.0.1", port = 8080 },
   logging = { level = "debug" }
 }
-ini = serialization.ini_encode(data)
+local ini = serialization.ini_encode(data)
 debug.print { message = ini }
 ```
 
@@ -481,8 +481,8 @@ serialization.ini_decode()
 ### 示例
 
 ```lua
-ini = "[server]\nhost = 127.0.0.1\nport = 8080"
-data = serialization.ini_decode(ini)
+local ini = "[server]\nhost = 127.0.0.1\nport = 8080"
+local data = serialization.ini_decode(ini)
 debug.print { message = data.server.host }
 ```
 
@@ -526,13 +526,13 @@ serialization.xml_encode()
 ### 示例
 
 ```lua
-data = {
+local data = {
   root = {
     _attr = { version = "1.0" },
     child = { "Hello", _attr = { id = 1 } }
   }
 }
-xml = serialization.xml_encode(data)
+local xml = serialization.xml_encode(data)
 debug.print { message = xml }
 ```
 
@@ -576,8 +576,8 @@ serialization.xml_decode()
 ### 示例
 
 ```lua
-xml = '<root version="1.0"><child id="1">Hello</child></root>'
-data = serialization.xml_decode(xml)
+local xml = '<root version="1.0"><child id="1">Hello</child></root>'
+local data = serialization.xml_decode(xml)
 debug.print { message = data.root.child._text }
 ```
 
@@ -622,7 +622,7 @@ serialization.binary_pack{}
 ### 示例
 
 ```lua
-bytes = serialization.binary_pack {
+local bytes = serialization.binary_pack {
   fmt = "<I4 I4",
   values = { 100, 200 }
 }
@@ -668,11 +668,11 @@ serialization.binary_unpack{}
 ### 示例
 
 ```lua
-bytes = serialization.binary_pack {
+local bytes = serialization.binary_pack {
   fmt = "<I4 I4",
   values = { 100, 200 }
 }
-result = serialization.binary_unpack {
+local result = serialization.binary_unpack {
   fmt = "<I4 I4",
   data = bytes
 }
@@ -715,7 +715,7 @@ serialization.binary_packsize()
 ### 示例
 
 ```lua
-size = serialization.binary_packsize("<I4 I4")
+local size = serialization.binary_packsize("<I4 I4")
 debug.print { message = tostring(size) }
 ```
 

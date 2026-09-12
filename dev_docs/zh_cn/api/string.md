@@ -59,11 +59,11 @@ string.AUTO
 ### 示例
 
 ```lua
-p_str = "Hello Tui Game"
-r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
+local p_str = "Hello Tui Game"
+local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-len1 = measurement.get_text_width { text = p_str, text_mode = string.AUTO }
-len2 = measurement.get_text_width { text = r_str, text_mode = string.AUTO }
+local len1 = measurement.get_text_width { text = p_str, text_mode = string.AUTO }
+local len2 = measurement.get_text_width { text = r_str, text_mode = string.AUTO }
 
 debug.print { message = tostring(len1) }
 debug.print { message = tostring(len2) }
@@ -95,11 +95,11 @@ string.PLAIN_TEXT
 ### 示例
 
 ```lua
-p_str = "Hello Tui Game"
-r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
+local p_str = "Hello Tui Game"
+local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-len1 = measurement.get_text_width { text = p_str, text_mode = string.PLAIN_TEXT }
-len2 = measurement.get_text_width { text = r_str, text_mode = string.PLAIN_TEXT }
+local len1 = measurement.get_text_width { text = p_str, text_mode = string.PLAIN_TEXT }
+local len2 = measurement.get_text_width { text = r_str, text_mode = string.PLAIN_TEXT }
 
 debug.print { message = tostring(len1) }
 debug.print { message = tostring(len2) }
@@ -131,11 +131,11 @@ string.RICH_TEXT
 ### 示例
 
 ```lua
-nh_r_str = "<fg:red>Hello<fg:yellow> Tui Game</fg>"
-r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
+local nh_r_str = "<fg:red>Hello<fg:yellow> Tui Game</fg>"
+local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-len1 = measurement.get_text_width { text = nh_r_str, text_mode = string.RICH_TEXT }
-len2 = measurement.get_text_width { text = r_str, text_mode = string.RICH_TEXT }
+local len1 = measurement.get_text_width { text = nh_r_str, text_mode = string.RICH_TEXT }
+local len2 = measurement.get_text_width { text = r_str, text_mode = string.RICH_TEXT }
 
 debug.print { message = tostring(len1) }
 debug.print { message = tostring(len2) }
@@ -178,8 +178,8 @@ string.lower()
 ### 示例
 
 ```lua
-u_str = "HELLO TUI GAME"
-str = string.lower(u_str)
+local u_str = "HELLO TUI GAME"
+local str = string.lower(u_str)
 
 debug.print { message = str }
 ```
@@ -222,8 +222,8 @@ string.upper()
 ### 示例
 
 ```lua
-l_str = "hello tui game"
-str = string.upper(l_str)
+local l_str = "hello tui game"
+local str = string.upper(l_str)
 
 debug.print { message = str }
 ```
@@ -262,8 +262,8 @@ string.reverse()
 ### 示例
 
 ```lua
-r_str = "emaG iuT olleH"
-str = string.reverse(r_str)
+local r_str = "emaG iuT olleH"
+local str = string.reverse(r_str)
 
 debug.print { message = str }
 ```
@@ -305,7 +305,7 @@ string.split{}
 ### 示例
 
 ```lua
-parts = string.split { text = "apple,banana,grape", sep = "," }
+local parts = string.split { text = "apple,banana,grape", sep = "," }
 
 for i in ipairs(parts) do
   debug.print { message = i.value }
@@ -352,8 +352,8 @@ string.sub{}
 ### 示例
 
 ```lua
-sub_str = "Hello Tui Game"
-str = string.sub { text = sub_str, start = 1, finish = 5 }
+local sub_str = "Hello Tui Game"
+local str = string.sub { text = sub_str, start = 1, finish = 5 }
 
 debug.print { message = str }
 ```
@@ -396,8 +396,8 @@ string.rep{}
 ### 示例
 
 ```lua
-rep_str = "ABC"
-str = string.rep { text = rep_str, times = 3, sep = " | " }
+local rep_str = "ABC"
+local str = string.rep { text = rep_str, times = 3, sep = " | " }
 
 debug.print { message = str }
 ```
@@ -449,13 +449,13 @@ string.find{}
 ### 示例
 
 ```lua
-result1 = string.find { text = "Hello Tui Game", pattern = "Tui" }
+local result1 = string.find { text = "Hello Tui Game", pattern = "Tui" }
 debug.print { message = tostring(result1.start) }
 debug.print { message = tostring(result1.finish) }
 debug.print { message = result1.captures[1] }
 debug.print { message = tostring(result1.captures.n) .. "\n" }
 
-result2 = string.find { text = "Name: Alice, Age: 30", pattern = "Name: (%w+), Age: (%d+)" }
+local result2 = string.find { text = "Name: Alice, Age: 30", pattern = "Name: (%w+), Age: (%d+)" }
 debug.print { message = tostring(result2.start) }
 debug.print { message = tostring(result2.finish) }
 debug.print { message = result2.captures[1] }
@@ -532,11 +532,11 @@ string.match{}
 ### 示例
 
 ```lua
-match1 = string.match { text = "Hello 123", pattern = "%d+" }
+local match1 = string.match { text = "Hello 123", pattern = "%d+" }
 debug.print { message = match1[1] }
 debug.print { message = tostring(match1.n) .. "\n" }
 
-match2 = string.match { text = "Product: Apple, Price: 5.99", pattern = "Product: (%w+), Price: ([%d.]+)" }
+local match2 = string.match { text = "Product: Apple, Price: 5.99", pattern = "Product: (%w+), Price: ([%d.]+)" }
 debug.print { message = match2[1] }
 debug.print { message = match2[2] }
 debug.print { message = tostring(match2.n) }
@@ -605,7 +605,7 @@ string.gmatch{}
 ### 示例
 
 ```lua
-iter1 = string.gmatch { text = "a1 b2 c3", pattern = "%w+" }
+local iter1 = string.gmatch { text = "a1 b2 c3", pattern = "%w+" }
 
 for m in iter1 do
   debug.print { message = m[1] .. " " .. m.n }
@@ -613,7 +613,7 @@ end
 
 debug.print { message = "" }
 
-iter2 = string.gmatch { text = "A-1 B-2 C-3", pattern = "(%w+)-(%d+)" }
+local iter2 = string.gmatch { text = "A-1 B-2 C-3", pattern = "(%w+)-(%d+)" }
 
 for caps in iter2 do
   debug.print { message = caps[1] .. " " .. caps[2] .. " " .. caps.n }
@@ -680,16 +680,16 @@ string.gsub{}
 ### 示例
 
 ```lua
-r1 = string.gsub { text = "one two three", pattern = "%a+", repl = "X" }
+local r1 = string.gsub { text = "one two three", pattern = "%a+", repl = "X" }
 debug.print { message = r1.result .. " " .. r1.count .. "\n" }
 
-r2 = string.gsub { text = "2023-2024-2025", pattern = "(%d+)", repl = "[$1]", limit = 2 }
+local r2 = string.gsub { text = "2023-2024-2025", pattern = "(%d+)", repl = "[$1]", limit = 2 }
 debug.print { message = r2.result .. " " .. r2.count .. "\n" }
 
-r3 = string.gsub { text = "apple banana apple", pattern = "(%w+)", repl = { apple = "fruit", banana = "berry" } }
+local r3 = string.gsub { text = "apple banana apple", pattern = "(%w+)", repl = { apple = "fruit", banana = "berry" } }
 debug.print { message = r3.result .. " " .. r3.count .. "\n" }
 
-r4 = string.gsub {
+local r4 = string.gsub {
   text = "a1 b2 c3",
   pattern = "(%w)(%d)",
   repl = function(letter, num) return letter .. string.rep { text = "x", times = tonumber { value = num } } end
@@ -797,13 +797,13 @@ string.regex_find{}
 ### 示例
 
 ```lua
-f1 = string.regex_find { text = "Hello 123", pattern = [[\d+]] }
+local f1 = string.regex_find { text = "Hello 123", pattern = [[\d+]] }
 debug.print { message = tostring(f1.start) }
 debug.print { message = tostring(f1.finish) }
 debug.print { message = f1.captures[1] }
 debug.print { message = tostring(f1.captures.n) .. "\n" }
 
-f2 = string.regex_find { text = "Name: Alice, Age: 30", pattern = [[Name: (\w+), Age: (\d+)]] }
+local f2 = string.regex_find { text = "Name: Alice, Age: 30", pattern = [[Name: (\w+), Age: (\d+)]] }
 debug.print { message = tostring(f2.start) }
 debug.print { message = tostring(f2.finish) }
 debug.print { message = f2.captures[1] }
@@ -880,11 +880,11 @@ string.regex_match{}
 ### 示例
 
 ```lua
-m1 = string.regex_match { text = "Hello 123", pattern = [[\d+]] }
+local m1 = string.regex_match { text = "Hello 123", pattern = [[\d+]] }
 debug.print { message = m1[1] }
 debug.print { message = tostring(m1.n) .. "\n" }
 
-m2 = string.regex_match { text = "Name: Alice, Age: 30", pattern = [[Name: (\w+), Age: (\d+)]] }
+local m2 = string.regex_match { text = "Name: Alice, Age: 30", pattern = [[Name: (\w+), Age: (\d+)]] }
 debug.print { message = m2[1] }
 debug.print { message = m2[2] }
 debug.print { message = tostring(m2.n) }
@@ -942,7 +942,7 @@ string.regex_gmatch{}
 ### 示例
 
 ```lua
-iter1 = string.regex_gmatch { text = "a1 b2 c3", pattern = [[\w+]] }
+local iter1 = string.regex_gmatch { text = "a1 b2 c3", pattern = [[\w+]] }
 
 for m in iter1 do
   debug.print { message = m[1] .. " " .. m.n }
@@ -950,7 +950,7 @@ end
 
 debug.print { message = "" }
 
-iter2 = string.regex_gmatch { text = "A-1 B-2 C-3", pattern = [[(\w+)-(\d+)]] }
+local iter2 = string.regex_gmatch { text = "A-1 B-2 C-3", pattern = [[(\w+)-(\d+)]] }
 for caps in iter2 do
   debug.print { message = caps[1] .. " " .. caps[2] .. " " .. caps.n }
 end
@@ -1016,16 +1016,16 @@ string.regex_gsub{}
 ### 示例
 
 ```lua
-g1 = string.regex_gsub { text = "one two three", pattern = [[\w+]], repl = "X" }
+local g1 = string.regex_gsub { text = "one two three", pattern = [[\w+]], repl = "X" }
 debug.print { message = g1.result .. " " .. g1.count .. "\n" }
 
-g2 = string.regex_gsub { text = "2023-2024-2025", pattern = [[(\d+)]], repl = "[$1]", limit = 2 }
+local g2 = string.regex_gsub { text = "2023-2024-2025", pattern = [[(\d+)]], repl = "[$1]", limit = 2 }
 debug.print { message = g2.result .. " " .. g2.count .. "\n" }
 
-g3 = string.regex_gsub { text = "apple banana apple", pattern = [[(\w+)]], repl = { apple = "fruit", banana = "berry" } }
+local g3 = string.regex_gsub { text = "apple banana apple", pattern = [[(\w+)]], repl = { apple = "fruit", banana = "berry" } }
 debug.print { message = g3.result .. " " .. g3.count .. "\n" }
 
-g4 = string.regex_gsub {
+local g4 = string.regex_gsub {
   text = "a1 b2 c3",
   pattern = [[(\w)(\d)]],
   repl = function(letter, num)
@@ -1081,10 +1081,10 @@ string.regex_test{}
 ### 示例
 
 ```lua
-t1 = string.regex_test { text = "abc123", pattern = [[\d+]] }
+local t1 = string.regex_test { text = "abc123", pattern = [[\d+]] }
 debug.print { message = tostring(t1) }
 
-t2 = string.regex_test { text = "hello", pattern = [[\d+]] }
+local t2 = string.regex_test { text = "hello", pattern = [[\d+]] }
 debug.print { message = tostring(t2) }
 ```
 
@@ -1126,14 +1126,14 @@ string.regex_split{}
 ### 示例
 
 ```lua
-parts1 = string.regex_split { text = "a b c", pattern = [[\s+]] }
+local parts1 = string.regex_split { text = "a b c", pattern = [[\s+]] }
 debug.print { message = parts1[1] }
 debug.print { message = parts1[2] }
 debug.print { message = parts1[3] }
 
 debug.print { message = "" }
 
-parts2 = string.regex_split { text = "one, two;three", pattern = [[\s*[,;]\s*]] }
+local parts2 = string.regex_split { text = "one, two;three", pattern = [[\s*[,;]\s*]] }
 debug.print { message = parts2[1] }
 debug.print { message = parts2[2] }
 debug.print { message = parts2[3] }
@@ -1182,16 +1182,16 @@ string.format{}
 ### 示例
 
 ```lua
-f1 = string.format { format_string = "Hello %s!", values = { "World" } }
+local f1 = string.format { format_string = "Hello %s!", values = { "World" } }
 debug.print { message = f1 }
 
-f2 = string.format { format_string = "%s is %d years old.", values = { "Alice", 30 } }
+local f2 = string.format { format_string = "%s is %d years old.", values = { "Alice", 30 } }
 debug.print { message = f2 }
 
-f3 = string.format { format_string = "Pi ≈ %.2f", values = { math.PI } }
+local f3 = string.format { format_string = "Pi ≈ %.2f", values = { math.PI } }
 debug.print { message = f3 }
 
-f4 = string.format { format_string = "Hello, Tui Game!", values = {} }
+local f4 = string.format { format_string = "Hello, Tui Game!", values = {} }
 debug.print { message = f4 }
 ```
 
@@ -1235,16 +1235,16 @@ string.rich_text_to_plain_text{}
 ### 示例
 
 ```lua
-plain1 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello</fg>" }
+local plain1 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello</fg>" }
 debug.print { message = plain1 }
 
-plain2 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello {value:name}</fg>", rich_params = { name = "World" } }
+local plain2 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello {value:name}</fg>", rich_params = { name = "World" } }
 debug.print { message = plain2 }
 
-plain3 = string.rich_text_to_plain_text { text = "f%<fg:red>{key:exit}</fg>", key_params = false }
+local plain3 = string.rich_text_to_plain_text { text = "f%<fg:red>{key:exit}</fg>", key_params = false }
 debug.print { message = plain3 }
 
-plain4 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello</fg>", strip_header = false }
+local plain4 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello</fg>", strip_header = false }
 debug.print { message = plain4 }
 ```
 

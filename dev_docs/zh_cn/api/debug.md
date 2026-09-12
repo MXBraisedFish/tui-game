@@ -423,10 +423,10 @@ debug.assert{}
 ### 示例
 
 ```lua
-v1 = debug.assert { value = 1 == 1, message = "Right" }
+local v1 = debug.assert { value = 1 == 1, message = "Right" }
 debug.print { message = tostring(v1) }
 
-v2 = debug.assert { value = 0 == 1, message = "Asser Error" }
+local v2 = debug.assert { value = 0 == 1, message = "Asser Error" }
 ```
 
 输出
@@ -478,7 +478,7 @@ debug.pcall{}
 ### 示例
 
 ```lua
-result1 = debug.pcall {
+local result1 = debug.pcall {
   func = function(a, b)
     return a + b, "Clear"
   end,
@@ -491,7 +491,7 @@ if result1.ok then
   end
 end
 
-result2 = debug.pcall {
+local result2 = debug.pcall {
   func = function(a, b)
     debug.assert { value = a == b }
   end,
@@ -573,7 +573,7 @@ debug.xpcall{}
 ### 示例
 
 ```lua
-result1 = debug.xpcall {
+local result1 = debug.xpcall {
   func = function(a, b)
     return a + b, "Clear"
   end,
@@ -586,7 +586,7 @@ if result1.ok then
   end
 end
 
-result2 = debug.xpcall {
+local result2 = debug.xpcall {
   func = function(a, b)
     debug.assert { value = a == b }
   end,

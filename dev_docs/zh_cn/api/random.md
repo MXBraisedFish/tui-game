@@ -108,13 +108,13 @@ random.randint{}
 ### 示例
 
 ```lua
-r1 = random.randint {}
+local r1 = random.randint {}
 debug.print { message = r1 }
 
-r2 = random.randint { min = 1, max = 10 }
+local r2 = random.randint { min = 1, max = 10 }
 debug.print { message = r2 }
 
-r3 = random.randint { min = -20, max = -8 }
+local r3 = random.randint { min = -20, max = -8 }
 debug.print { message = r3 }
 ```
 
@@ -160,13 +160,13 @@ random.randfloat{}
 ### 示例
 
 ```lua
-r1 = random.randfloat {}
+local r1 = random.randfloat {}
 debug.print { message = r1 }
 
-r2 = random.randfloat { min = 1, max = 10 }
+local r2 = random.randfloat { min = 1, max = 10 }
 debug.print { message = r2 }
 
-r3 = random.randfloat { min = -20, max = -8 }
+local r3 = random.randfloat { min = -20, max = -8 }
 debug.print { message = r3 }
 ```
 
@@ -215,11 +215,11 @@ random.create{}
 ### 示例
 
 ```lua
-r1 = random.create {}
+local r1 = random.create {}
 debug.print { message = r1 }
 debug.print { message = random.generate(r1) }
 
-r2 = random.create { type = random.INT, min = 1, max = 30, seed = 520 }
+local r2 = random.create { type = random.INT, min = 1, max = 30, seed = 520 }
 debug.print { message = r2 }
 debug.print { message = random.generate(r2) }
 
@@ -291,7 +291,7 @@ random.delete()
 ### 示例
 
 ```lua
-r = random.create {}
+local r = random.create {}
 debug.print { message = r }
 debug.print { message = random.generate(r) }
 
@@ -509,7 +509,7 @@ random.generate()
 ### 示例
 
 ```lua
-r = random.create { min = -5, max = 30 }
+local r = random.create { min = -5, max = 30 }
 
 debug.print { message = random.generate(r) }
 debug.print { message = random.generate(r) }
@@ -563,7 +563,7 @@ random.set{}
 ### 示例
 
 ```lua
-r = random.create {}
+local r = random.create {}
 
 debug.print { message = table.pretty(random.get_info(r)) }
 
@@ -670,7 +670,7 @@ random.set_range{}
 ### 示例
 
 ```lua
-r = random.create { min = 10, max = 20 }
+local r = random.create { min = 10, max = 20 }
 
 debug.print { message = table.pretty(random.get_range(r)) }
 
@@ -727,7 +727,7 @@ random.set_seed{}
 ### 示例
 
 ```lua
-r = random.create {}
+local r = random.create {}
 
 debug.print { message = random.get_info(r).seed }
 
@@ -774,7 +774,7 @@ random.set_step{}
 ### 示例
 
 ```lua
-r = random.create {}
+local r = random.create {}
 
 debug.print { message = random.get_info(r).step }
 
@@ -820,7 +820,7 @@ random.get_type()
 ### 示例
 
 ```lua
-r = random.create { type = random.INT }
+local r = random.create { type = random.INT }
 debug.print { message = random.get_type(r) }
 ```
 
@@ -861,7 +861,7 @@ random.get_range()
 ### 示例
 
 ```lua
-r = random.create { min = 10, max = 20 }
+local r = random.create { min = 10, max = 20 }
 debug.print { message = table.pretty(random.get_range(r)) }
 ```
 
@@ -904,7 +904,7 @@ random.get_seed()
 ### 示例
 
 ```lua
-r = random.create { seed = 2233 }
+local r = random.create { seed = 2233 }
 debug.print { message = random.get_seed(r) }
 ```
 
@@ -942,7 +942,7 @@ random.get_step()
 ### 示例
 
 ```lua
-r = random.create { step = 50 }
+local r = random.create { step = 50 }
 debug.print { message = random.get_step(r) }
 ```
 
@@ -987,7 +987,7 @@ random.get_info()
 ### 示例
 
 ```lua
-r = random.create {}
+local r = random.create {}
 debug.print { message = table.pretty(random.get_info(r)) }
 ```
 
@@ -1032,7 +1032,7 @@ random.exists()
 ### 示例
 
 ```lua
-r = random.create {}
+local r = random.create {}
 debug.print { message = random.exists(r) }
 
 random.delete(r)

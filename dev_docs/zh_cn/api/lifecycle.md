@@ -342,7 +342,7 @@ end
 
 function SaveGame()
   -- 保存前的数据处理
-  coin = 10
+  local coin = 10
   return coin
 end
 ```
@@ -413,7 +413,7 @@ end
 
 function SaveBest()
   -- 保存前的数据处理
-  coin = 10
+  local coin = 10
   return {
     best_string = "Coin" .. coin,
     coin = coin

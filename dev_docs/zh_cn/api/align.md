@@ -51,7 +51,7 @@ align.AUTO
 ### 示例
 
 ```lua
-rect = align.resolve_rect { width = 4, height = 1, horizontal_align = align.AUTO, vertical_align = align.AUTO, offset_x = 0, offset_y = 0 }
+local rect = align.resolve_rect { width = 4, height = 1, horizontal_align = align.AUTO, vertical_align = align.AUTO, offset_x = 0, offset_y = 0 }
 draw.text { x = rect.x, y = rect.y, text = "AUTO", fg = color.BRIGHT_RED }
 ```
 
@@ -84,7 +84,7 @@ align.LEFT
 ### 示例
 
 ```lua
-x = align.resolve_x { width = 4, horizontal_align = align.LEFT }
+local x = align.resolve_x { width = 4, horizontal_align = align.LEFT }
 draw.text { x = x, y = 3, text = "LEFT", fg = color.BRIGHT_RED }
 ```
 
@@ -111,7 +111,7 @@ align.HORIZONTAL_CENTER
 ### 示例
 
 ```lua
-x = align.resolve_x { width = 8, horizontal_align = align.HORIZONTAL_CENTER }
+local x = align.resolve_x { width = 8, horizontal_align = align.HORIZONTAL_CENTER }
 draw.text { x = x, y = 3, text = "H_CENTER", fg = color.BRIGHT_RED }
 ```
 
@@ -138,7 +138,7 @@ align.RIGHT
 ### 示例
 
 ```lua
-x = align.resolve_x { width = 5, horizontal_align = align.RIGHT }
+local x = align.resolve_x { width = 5, horizontal_align = align.RIGHT }
 draw.text { x = x, y = 3, text = "RIGHT", fg = color.BRIGHT_RED }
 ```
 
@@ -165,7 +165,7 @@ align.TOP
 ### 示例
 
 ```lua
-y = align.resolve_y { height = 3, vertical_align = align.TOP }
+local y = align.resolve_y { height = 3, vertical_align = align.TOP }
 draw.text { x = 4, y = y, text = "TOP", fg = color.BRIGHT_RED, max_width = 1 }
 ```
 
@@ -192,7 +192,7 @@ align.VERTICAL_CENTER
 ### 示例
 
 ```lua
-y = align.resolve_y { height = 8, vertical_align = align.VERTICAL_CENTER }
+local y = align.resolve_y { height = 8, vertical_align = align.VERTICAL_CENTER }
 draw.text { x = 4, y = y, text = "V|CENTER", fg = color.BRIGHT_RED, max_width = 1 }
 ```
 
@@ -219,7 +219,7 @@ align.BOTTOM
 ### 示例
 
 ```lua
-y = align.resolve_y { height = 7, vertical_align = align.BOTTOM }
+local y = align.resolve_y { height = 7, vertical_align = align.BOTTOM }
 draw.text { x = 4, y = y, text = "BOTTOM", fg = color.BRIGHT_RED, max_width = 1 }
 ```
 
@@ -247,7 +247,7 @@ align.CENTER
 ### 示例
 
 ```lua
-rect = align.resolve_rect { width = 6, height = 1, horizontal_align = align.CENTER, vertical_align = align.CENTER, offset_x = 0, offset_y = 0 }
+local rect = align.resolve_rect { width = 6, height = 1, horizontal_align = align.CENTER, vertical_align = align.CENTER, offset_x = 0, offset_y = 0 }
 draw.text { x = rect.x, y = rect.y, text = "CENTER", fg = color.BRIGHT_RED }
 ```
 
@@ -296,13 +296,13 @@ align.resolve_x{}
 ### 示例
 
 ```lua
-x1 = align.resolve_x { width = 5, horizontal_align = align.LEFT }
+local x1 = align.resolve_x { width = 5, horizontal_align = align.LEFT }
 draw.text { x = x1, y = 4, text = "Hello", fg = color.BRIGHT_RED }
 
-x2 = align.resolve_x { width = 3, horizontal_align = align.CENTER, offset_x = -5 }
+local x2 = align.resolve_x { width = 3, horizontal_align = align.CENTER, offset_x = -5 }
 draw.text { x = x2, y = 4, text = "TUI", fg = color.BRIGHT_BLUE }
 
-x3 = align.resolve_x { width = 4, horizontal_align = align.RIGHT, relative_x = 60 }
+local x3 = align.resolve_x { width = 4, horizontal_align = align.RIGHT, relative_x = 60 }
 draw.text { x = x3, y = 4, text = "Game", fg = color.BRIGHT_GREEN }
 ```
 
@@ -344,13 +344,13 @@ align.resolve_y{}
 ### 示例
 
 ```lua
-y1 = align.resolve_y { height = 5, vertical_align = align.TOP }
+local y1 = align.resolve_y { height = 5, vertical_align = align.TOP }
 draw.text { x = 5, y = y1, text = "Hello", fg = color.BRIGHT_RED, max_width = 1 }
 
-y2 = align.resolve_y { height = 3, vertical_align = align.CENTER, offset_y = -2 }
+local y2 = align.resolve_y { height = 3, vertical_align = align.CENTER, offset_y = -2 }
 draw.text { x = 5, y = y2, text = "TUI", fg = color.BRIGHT_BLUE, max_width = 1 }
 
-y3 = align.resolve_y { height = 4, vertical_align = align.BOTTOM, relative_y = 23 }
+local y3 = align.resolve_y { height = 4, vertical_align = align.BOTTOM, relative_y = 23 }
 draw.text { x = 5, y = y3, text = "Game", fg = color.BRIGHT_GREEN, max_width = 1 }
 ```
 
@@ -397,10 +397,10 @@ align.resolve_rect{}
 ### 示例
 
 ```lua
-rect1 = align.resolve_rect { width = 20, height = 4, horizontal_align = align.LEFT, vertical_align = align.CENTER, offset_x = 20, offset_y = -2 }
+local rect1 = align.resolve_rect { width = 20, height = 4, horizontal_align = align.LEFT, vertical_align = align.CENTER, offset_x = 20, offset_y = -2 }
 draw.fill_rect { x = rect1.x, y = rect1.y, width = 20, height = 4, bg = color.BRIGHT_YELLOW }
 
-rect2 = align.resolve_rect { width = 10, height = 4, horizontal_align = align.CENTER, vertical_align = align.BOTTOM, offset_x = -5, offset_y = 0 }
+local rect2 = align.resolve_rect { width = 10, height = 4, horizontal_align = align.CENTER, vertical_align = align.BOTTOM, offset_x = -5, offset_y = 0 }
 draw.fill_rect { x = rect2.x, y = rect2.y, width = 10, height = 4, bg = color.BRIGHT_GREEN }
 ```
 

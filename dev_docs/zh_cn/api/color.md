@@ -759,7 +759,7 @@ color.rgb()
 ### 示例
 
 ```lua
-rgb = color.rgb { r = 123, g = 128, b = 200 }
+local rgb = color.rgb { r = 123, g = 128, b = 200 }
 draw.text { x = 0, y = 0, text = rgb, fg = rgb }
 ```
 
@@ -799,7 +799,7 @@ color.hex()
 ### 示例
 
 ```lua
-hex = color.hex { r = 176, g = 238, b = 222 }
+local hex = color.hex { r = 176, g = 238, b = 222 }
 draw.text { x = 0, y = 0, text = hex, fg = hex }
 ```
 

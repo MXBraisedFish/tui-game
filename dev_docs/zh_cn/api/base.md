@@ -63,7 +63,7 @@ ipairs()
 ### 示例
 
 ```lua
-t = {"a", "b", "c", [10] = "x"}
+local t = {"a", "b", "c", [10] = "x"}
 
 for item in ipairs(t) do
 	debug.print {message = item.index .. " " .. item.value}
@@ -121,7 +121,7 @@ pairs()
 ### 示例
 
 ```lua
-t = { "a", "b", x = 1 }
+local t = { "a", "b", x = 1 }
 
 for item in pairs(t) do
 	debug.print {message = tostring(item.index) .. " " .. tostring(item.value)}
@@ -180,11 +180,11 @@ next{}
 ### 示例
 
 ```lua
-t = { "a", "b", x = 1 }
-index = nil
+local t = { "a", "b", x = 1 }
+local index = nil
 
 while true do
-	item = next { table = t, index = index }
+	local item = next { table = t, index = index }
 
 	-- 没有后续元素时结束遍历
 	if item == nil then
@@ -243,18 +243,18 @@ select{}
 ### 示例
 
 ```lua
-t = { "a", "b", "c" , x = 1, [5] = "d" }
+local t = { "a", "b", "c" , x = 1, [5] = "d" }
 
-count = select { index = "#", values = t }
+local count = select { index = "#", values = t }
 debug.print {message = tostring(count)}
 
-value1, value2 = select { index = 2, values = t }
+local value1, value2 = select { index = 2, values = t }
 debug.print { message = tostring(value1) .. " " .. tostring(value2) }
 
-value3 = select { index = -1, values = t }
+local value3 = select { index = -1, values = t }
 debug.print { message = tostring(value3) }
 
-value4 = select { index = 4, values = t}
+local value4 = select { index = 4, values = t}
 debug.print { message = tostring(value4) }
 ```
 
@@ -302,19 +302,19 @@ rawequal{}
 ### 示例
 
 ```lua
-t1 = { "a" }
-t2 = { "a" }
+local t1 = { "a" }
+local t2 = { "a" }
 
-b1 = rawequal { left = 1, right = 1 }
+local b1 = rawequal { left = 1, right = 1 }
 debug.print { message = tostring(b1) }
 
-b2 = rawequal { left = 1, right = 2 }
+local b2 = rawequal { left = 1, right = 2 }
 debug.print { message = tostring(b2) }
 
-b3 = rawequal { left = t1, right = t1 }
+local b3 = rawequal { left = t1, right = t1 }
 debug.print { message = tostring(b3) }
 
-b4 = rawequal { left = t1, right = t2 }
+local b4 = rawequal { left = t1, right = t2 }
 debug.print { message = tostring(b4) }
 ```
 
@@ -357,18 +357,18 @@ rawlen()
 ### 示例
 
 ```lua
-t = { "a", "b", "c", x = 1, [5] = "d" }
+local t = { "a", "b", "c", x = 1, [5] = "d" }
 
-l1 = rawlen("Hello")
+local l1 = rawlen("Hello")
 debug.print { message = tostring(l1) }
 
-l2 = rawlen("你好")
+local l2 = rawlen("你好")
 debug.print { message = tostring(l2) }
 
-l3 = rawlen { value = "Hello" }
+local l3 = rawlen { value = "Hello" }
 debug.print { message = tostring(l3) }
 
-l4 = rawlen { value = t }
+local l4 = rawlen { value = t }
 debug.print { message = tostring(l4) }
 ```
 
@@ -418,16 +418,16 @@ tonumber{}
 ### 示例
 
 ```lua
-n1 = tonumber { value = "42" }
+local n1 = tonumber { value = "42" }
 debug.print { message = tostring(n1) }
 
-n2 = tonumber { value = "3.14" }
+local n2 = tonumber { value = "3.14" }
 debug.print { message = tostring(n2) }
 
-n3 = tonumber { value = "invalid" }
+local n3 = tonumber { value = "invalid" }
 debug.print { message = tostring(n3) }
 
-n4 = tonumber { value = "1010", base = 2 }
+local n4 = tonumber { value = "1010", base = 2 }
 debug.print { message = tostring(n4) }
 ```
 
@@ -470,7 +470,7 @@ tostring()
 ### 示例
 
 ```lua
-t = { "a", "b", "c" }
+local t = { "a", "b", "c" }
 
 debug.print { message = tostring(nil) }
 
@@ -525,7 +525,7 @@ type()
 ### 示例
 
 ```lua
-t = { "a", "b", "c" }
+local t = { "a", "b", "c" }
 
 debug.print { message = type(nil) }
 
@@ -582,14 +582,14 @@ setmetatable{}
 ### 示例
 
 ```lua
-t = {}
-mt = {
+local t = {}
+local mt = {
   __index = {
     value = 10,
   },
 }
 
-result = setmetatable { table = t, metatable = mt }
+local result = setmetatable { table = t, metatable = mt }
 
 debug.print { message = result == t }
 debug.print { message = t.value }
@@ -653,12 +653,12 @@ getmetatable()
 ### 示例
 
 ```lua
-t = {}
-mt = { name = "example" }
+local t = {}
+local mt = { name = "example" }
 
 setmetatable { table = t, metatable = mt }
 
-result = getmetatable(t)
+local result = getmetatable(t)
 
 debug.print { message = result == mt }
 ```

@@ -53,16 +53,16 @@ utf8.len()
 ### 示例
 
 ```lua
-s1 = "Hello"
+local s1 = "Hello"
 debug.print { message = utf8.len(s1) }
 
-s2 = "你好世界"
+local s2 = "你好世界"
 debug.print { message = utf8.len(s2) }
 
-s3 = "😊👍"
+local s3 = "😊👍"
 debug.print { message = utf8.len(s3) }
 
-s4 = "A😊B中"
+local s4 = "A😊B中"
 debug.print { message = utf8.len(s4) }
 ```
 
@@ -105,16 +105,16 @@ utf8.byte_len()
 ### 示例
 
 ```lua
-s1 = "Hello"
+local s1 = "Hello"
 debug.print { message = utf8.byte_len(s1) }
 
-s2 = "你好"
+local s2 = "你好"
 debug.print { message = utf8.byte_len(s2) }
 
-s3 = "😊👍"
+local s3 = "😊👍"
 debug.print { message = utf8.byte_len(s3) }
 
-s4 = "A😊B中"
+local s4 = "A😊B中"
 debug.print { message = utf8.byte_len(s4) }
 
 ```
@@ -162,10 +162,10 @@ utf8.is_ascii()
 ### 示例
 
 ```lua
-s1 = "Hello"
+local s1 = "Hello"
 debug.print { message = utf8.is_ascii(s1) }
 
-s2 = "😊"
+local s2 = "😊"
 debug.print { message = utf8.is_ascii(s2) }
 ```
 
@@ -206,10 +206,10 @@ utf8.codepoint_to_char()
 ### 示例
 
 ```lua
-t1 = { 72, 101, 108, 108, 111 }
+local t1 = { 72, 101, 108, 108, 111 }
 debug.print { message = utf8.codepoint_to_char(t1) }
 
-t2 = { 20320, 22909, 19990, 30028 }
+local t2 = { 20320, 22909, 19990, 30028 }
 debug.print { message = utf8.codepoint_to_char(t2) }
 ```
 
@@ -250,10 +250,10 @@ utf8.ascii_to_char()
 ### 示例
 
 ```lua
-t1 = { 65, 66, 67 }
+local t1 = { 65, 66, 67 }
 debug.print { message = utf8.ascii_to_char(t1) }
 
-t2 = { 72, 105, 10, 84, 104, 101, 114, 101 }
+local t2 = { 72, 105, 10, 84, 104, 101, 114, 101 }
 debug.print { message = utf8.ascii_to_char(t2) }
 ```
 
@@ -301,12 +301,12 @@ utf8.char_to_codepoint{}
 ### 示例
 
 ```lua
-s1 = "Hello"
-r1 = utf8.char_to_codepoint { text = s1 }
+local s1 = "Hello"
+local r1 = utf8.char_to_codepoint { text = s1 }
 debug.print { message = table.pretty(r1) }
 
-s2 = "你好世界"
-r2 = utf8.char_to_codepoint { text = s2, start = 2, finish = 3 }
+local s2 = "你好世界"
+local r2 = utf8.char_to_codepoint { text = s2, start = 2, finish = 3 }
 debug.print { message = table.pretty(r2) }
 
 ```
@@ -365,12 +365,12 @@ utf8.char_to_ascii{}
 ### 示例
 
 ```lua
-s1 = "ABC"
-r1 = utf8.char_to_ascii { text = s1 }
+local s1 = "ABC"
+local r1 = utf8.char_to_ascii { text = s1 }
 debug.print { message = table.pretty(r1) }
 
-s2 = "A中B"
-r2 = utf8.char_to_ascii { text = s2, start = 1, finish = 2 }
+local s2 = "A中B"
+local r2 = utf8.char_to_ascii { text = s2, start = 1, finish = 2 }
 debug.print { message = table.pretty(r2) }
 ```
 
@@ -429,10 +429,10 @@ utf8.char_position{}
 ### 示例
 
 ```lua
-s1 = "Hello"
+local s1 = "Hello"
 debug.print { message = utf8.char_position { text = s1, index = 1 } }
 
-s2 = "你好世界"
+local s2 = "你好世界"
 debug.print { message = utf8.char_position { text = s2, index = 3 } }
 ```
 
@@ -480,14 +480,14 @@ utf8.codepoints()
 ### 示例
 
 ```lua
-s1 = "ABC"
+local s1 = "ABC"
 for item in utf8.codepoints(s1) do
   debug.print { message = item.byte_position .. " " .. item.codepoint }
 end
 
 debug.print { message = "" }
 
-s2 = "你好"
+local s2 = "你好"
 for item in utf8.codepoints(s2) do
   debug.print { message = item.byte_position .. " " .. item.codepoint }
 end
@@ -542,11 +542,11 @@ utf8.next{}
 ### 示例
 
 ```lua
-s = "A😊B中"
-pos = nil
+local s = "A😊B中"
+local pos = nil
 
 while true do
-  item = utf8.next { text = s, pos = pos }
+  local item = utf8.next { text = s, pos = pos }
   
   if item == nil then
     break

@@ -57,7 +57,7 @@ measurement.get_text_size{}
 ### 示例
 
 ```lua
-size = measurement.get_text_size {
+local size = measurement.get_text_size {
   text = "Hello\nTUI",
   max_width = 10
 }
@@ -108,7 +108,7 @@ measurement.get_text_width{}
 ### 示例
 
 ```lua
-width = measurement.get_text_width { text = "Hello TUI", bold = true }
+local width = measurement.get_text_width { text = "Hello TUI", bold = true }
 debug.print { message = "width: " .. tostring(width) }
 ```
 
@@ -156,7 +156,7 @@ measurement.get_text_height{}
 ### 示例
 
 ```lua
-height = measurement.get_text_height {
+local height = measurement.get_text_height {
   text = "Line 1\nLine 2\nLine 3",
   max_width = 10
 }
