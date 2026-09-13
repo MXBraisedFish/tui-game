@@ -25,3 +25,4 @@ compare_json.py
 ffmpeg.exe
 .agents/
 .obsidian/
+temp/

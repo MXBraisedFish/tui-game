@@ -1,3 +1,47 @@
+# Lua 元方法使用规范
+
+## 前言
+
+元方法用于配合元表给表附上特殊的规则，扩充功能。
+
+> 元方法的语法规则与 Lua 官方原版完全一致，Tui Game 仅在签名的 API 使用上有修改。如需完整的规范说明，请参阅 Lua 语言官方文档。
+
+---
+
+## 目录
+
+| 元方法名      | 说明                                                                     | 索引                          |
+| ------------- | ------------------------------------------------------------------------ | ----------------------------- |
+| `__index`     | 访问表里不存在的键时，去哪里继续找这个值                                 | [\_\_index](#__index)         |
+| `__newindex`  | 当给表里不存在的键赋值时，把这个值实际写到哪去                           | [\_\_newindex](#__newindex)   |
+| `__call`      | 让表能像函数一样被调用                                                   | [\_\_call](#__call)           |
+| `__add`       | 定义两个值用 `+` 相加时的行为                                            | [\_\_add](#__add)             |
+| `__sub`       | 定义两个值用 `-` 相减时的行为                                            | [\_\_sub](#__sub)             |
+| `__mul`       | 定义两个值用 `*` 相乘时的行为                                            | [\_\_mul](#__mul)             |
+| `__div`       | 定义两个值用 `/` 相除时的行为                                            | [\_\_div](#__div)             |
+| `__mod`       | 定义两个值用 `%` 取模时的行为                                            | [\_\_mod](#__mod)             |
+| `__pow`       | 定义两个值用 `^` 求幂时的行为                                            | [\_\_pow](#__pow)             |
+| `__idiv`      | 定义两个值用 `//` 整除时的行为                                           | [\_\_idiv](#__idiv)           |
+| `__band`      | 定义两个值用 `&` 进行按位与运算时的行为                                  | [\_\_band](#__band)           |
+| `__bor`       | 定义两个值用 `\|` 进行按位或运算时的行为 | [\_\_bor](#__bor)             |
+| `__bxor`      | 定义两个值用 `~` 进行按位异或运算时的行为                                | [\_\_bxor](#__bxor)           |
+| `__shl`       | 定义两个值用 `<<` 进行左移运算时的行为                                   | [\_\_shl](#__shl)             |
+| `__shr`       | 定义两个值用 `>>` 进行右移运算时的行为                                   | [\_\_shr](#__shr)             |
+| `__unm`       | 定义一个值用 `-` 取负时的行为                                            | [\_\_unm](#__unm)             |
+| `__bnot`      | 定义一个值用 `~` 进行按位取反运算时的行为                                | [\_\_bnot](#__bnot)           |
+| `__len`       | 定义一个值用 `#` 求长度时的行为                                          | [\_\_len](#__len)             |
+| `__concat`    | 定义两个值用 `..` 连接时的行为                                           | [\_\_concat](#__concat)       |
+| `__eq`        | 定义两个表用 `==` 比较是否相等时的行为                                   | [\_\_eq](#__eq)               |
+| `__lt`        | 定义两个值用 `<` 比较是否小于时的行为                                    | [\_\_lt](#__lt)               |
+| `__le`        | 定义两个值用 `<=` 比较是否小于等于时的行为                               | [\_\_le](#__le)               |
+| `__gc`        | 在对象被 GC 回收时执行指定的逻辑                                         | [\_\_gc](#__gc)               |
+| `__close`     | 在变量离开作用域时自动执行清理逻辑                                       | [\_\_close](#__close)         |
+| `__mode`      | 把表变成弱表                                                             | [\_\_mode](#__mode)           |
+| `__metatable` | 保护元表                                                                 | [\_\_metatable](#__metatable) |
+| `__name`      | 给表设置一个自定义类型名                                                 | [\_\_name](#__name)           |
+
+---
+
 ## `__index`
 
 访问表里不存在的键时，去哪里继续找这个值。
@@ -61,7 +105,7 @@ local obj1 = setmetatable { table = {}, metatable = { __newindex = base } }
 obj1.a = 1
 debug.print { message = base.a }
 
-local obj2 = setmetatable { table = {}, metatable = { 
+local obj2 = setmetatable { table = {}, metatable = {
   __newindex = function(table, key, value)
     debug.print { message = "Don't have '" .. key .. "'" }
   end
@@ -94,10 +138,10 @@ Don't have 'b'
 ### 示例
 
 ```lua
-local add = setmetatable { table = {},  metatable = { 
-  __call = function(self, a, b) 
-    return a + b 
-  end 
+local add = setmetatable { table = {},  metatable = {
+  __call = function(self, a, b)
+    return a + b
+  end
 } }
 
 debug.print { message = add(3, 4)}
@@ -126,10 +170,10 @@ debug.print { message = add(3, 4)}
 ### 示例
 
 ```lua
-local mt = { 
-  __add = function(value1, value2) 
-    return value1.v + value2.v 
-  end 
+local mt = {
+  __add = function(value1, value2)
+    return value1.v + value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 1 }, metatable = mt }
@@ -166,10 +210,10 @@ debug.print { message = x + y }
 ### 示例
 
 ```lua
-local mt = { 
-  __sub = function(value1, value2) 
-    return value1.v - value2.v 
-  end 
+local mt = {
+  __sub = function(value1, value2)
+    return value1.v - value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 1 }, metatable = mt }
@@ -206,10 +250,10 @@ debug.print { message = x - y }
 ### 示例
 
 ```lua
-local mt = { 
-  __mul = function(value1, value2) 
-    return value1.v * value2.v 
-  end 
+local mt = {
+  __mul = function(value1, value2)
+    return value1.v * value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 1 }, metatable = mt }
@@ -246,10 +290,10 @@ debug.print { message = x * y }
 ### 示例
 
 ```lua
-local mt = { 
-  __div = function(value1, value2) 
-    return value1.v / value2.v 
-  end 
+local mt = {
+  __div = function(value1, value2)
+    return value1.v / value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 10 }, metatable = mt }
@@ -286,10 +330,10 @@ debug.print { message = x / y }
 ### 示例
 
 ```lua
-local mt = { 
-  __mod = function(value1, value2) 
-    return value1.v % value2.v 
-  end 
+local mt = {
+  __mod = function(value1, value2)
+    return value1.v % value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 10 }, metatable = mt }
@@ -326,10 +370,10 @@ debug.print { message = x % y }
 ### 示例
 
 ```lua
-local mt = { 
-  __pow = function(value1, value2) 
-    return value1.v ^ value2.v 
-  end 
+local mt = {
+  __pow = function(value1, value2)
+    return value1.v ^ value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 2 }, metatable = mt }
@@ -366,10 +410,10 @@ debug.print { message = x ^ y }
 ### 示例
 
 ```lua
-local mt = { 
-  __idiv = function(value1, value2) 
-    return value1.v // value2.v 
-  end 
+local mt = {
+  __idiv = function(value1, value2)
+    return value1.v // value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 10 }, metatable = mt }
@@ -406,10 +450,10 @@ debug.print { message = x // y }
 ### 示例
 
 ```lua
-local mt = { 
-  __band = function(value1, value2) 
-    return value1.v & value2.v 
-  end 
+local mt = {
+  __band = function(value1, value2)
+    return value1.v & value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 6 }, metatable = mt }
@@ -446,10 +490,10 @@ debug.print { message = x & y }
 ### 示例
 
 ```lua
-local mt = { 
-  __bor = function(value1, value2) 
-    return value1.v | value2.v 
-  end 
+local mt = {
+  __bor = function(value1, value2)
+    return value1.v | value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 6 }, metatable = mt }
@@ -486,10 +530,10 @@ debug.print { message = x | y }
 ### 示例
 
 ```lua
-local mt = { 
-  __bxor = function(value1, value2) 
-    return value1.v ~ value2.v 
-  end 
+local mt = {
+  __bxor = function(value1, value2)
+    return value1.v ~ value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 6 }, metatable = mt }
@@ -526,10 +570,10 @@ debug.print { message = x ~ y }
 ### 示例
 
 ```lua
-local mt = { 
-  __shl = function(value1, value2) 
-    return value1.v << value2.v 
-  end 
+local mt = {
+  __shl = function(value1, value2)
+    return value1.v << value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 3 }, metatable = mt }
@@ -566,10 +610,10 @@ debug.print { message = x << y }
 ### 示例
 
 ```lua
-local mt = { 
-  __shr = function(value1, value2) 
-    return value1.v >> value2.v 
-  end 
+local mt = {
+  __shr = function(value1, value2)
+    return value1.v >> value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 12 }, metatable = mt }
@@ -606,10 +650,10 @@ debug.print { message = x >> y }
 ### 示例
 
 ```lua
-local mt = { 
-  __unm = function(value) 
-    return -value.v 
-  end 
+local mt = {
+  __unm = function(value)
+    return -value.v
+  end
 }
 
 local x = setmetatable { table = { v = 5 }, metatable = mt }
@@ -640,10 +684,10 @@ debug.print { message = -x }
 ### 示例
 
 ```lua
-local mt = { 
-  __bnot = function(value) 
-    return ~value.v 
-  end 
+local mt = {
+  __bnot = function(value)
+    return ~value.v
+  end
 }
 
 local x = setmetatable { table = { v = 0 }, metatable = mt }
@@ -674,10 +718,10 @@ debug.print { message = ~x }
 ### 示例
 
 ```lua
-local mt = { 
-  __len = function(value) 
-    return value.n 
-  end 
+local mt = {
+  __len = function(value)
+    return value.n
+  end
 }
 
 local x = setmetatable { table = { n = 42 }, metatable = mt }
@@ -708,10 +752,10 @@ debug.print { message = #x }
 ### 示例
 
 ```lua
-local mt = { 
-  __concat = function(value1, value2) 
-    return value1.v .. value2.v 
-  end 
+local mt = {
+  __concat = function(value1, value2)
+    return value1.v .. value2.v
+  end
 }
 
 local x = setmetatable { table = { v = "a" }, metatable = mt }
@@ -748,10 +792,10 @@ ab
 ### 示例
 
 ```lua
-local mt = { 
-  __eq = function(table1, table2) 
-    return table1.v == table2.v 
-  end 
+local mt = {
+  __eq = function(table1, table2)
+    return table1.v == table2.v
+  end
 }
 
 local x = setmetatable { table = { v = 1 }, metatable = mt }
@@ -789,10 +833,10 @@ true
 ### 示例
 
 ```lua
-local mt = { 
-  __lt = function(value1, value2) 
-    return value1.v < value2.v 
-  end 
+local mt = {
+  __lt = function(value1, value2)
+    return value1.v < value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 1 }, metatable = mt }
@@ -830,10 +874,10 @@ true
 ### 示例
 
 ```lua
-local mt = { 
-  __le = function(value1, value2) 
-    return value1.v <= value2.v 
-  end 
+local mt = {
+  __le = function(value1, value2)
+    return value1.v <= value2.v
+  end
 }
 
 local x = setmetatable { table = { v = 2 }, metatable = mt }
@@ -871,13 +915,13 @@ true
 ### 示例
 
 ```lua
-local mt = { 
-  __gc = function(obj) 
-    debug.print { message = "collected" } 
-  end 
+local mt = {
+  __gc = function(obj)
+    debug.print { message = "collected" }
+  end
 }
 
-do 
+do
   local x = setmetatable { table = {}, metatable = mt } -- 离开作用于被 GC 回收
 end
 ```
@@ -905,14 +949,14 @@ collected
 ### 示例
 
 ```lua
-local mt = { 
+local mt = {
   __close = function(obj, err)
     if err == nil then
       debug.print { message = "closed" }
     else
       debug.print { message = "error!!!" }
     end
-  end 
+  end
 }
 
 do
