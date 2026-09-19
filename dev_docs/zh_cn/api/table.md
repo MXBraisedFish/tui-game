@@ -392,7 +392,7 @@ table.sort{}
 | 参数名       | 类型     | 必填 | 默认值 | 说明       |
 | ------------ | -------- | ---- | ------ | ---------- |
 | `table`      | table    | 是   | -      | 目标数组表 |
-| `comparator` | function | 否   | `nil`  | 比较函数   |
+| `comparator` | function / nil | 否   | `nil`  | 比较函数   |
 
 ### 返回
 
