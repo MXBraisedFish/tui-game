@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>TUI GAME 架构图</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>TUI GAME <span>架构图</span></h1>
+    <nav class="tabs">
+      <button class="tab active" data-view="flow">主循环流程图</button>
+      <button class="tab" data-view="tree">模块树</button>
+      <button class="tab" data-view="graph">依赖节点图</button>
+      <button class="tab" data-view="findings">审计发现</button>
+    </nav>
+    <select id="snapshot" title="选择快照"></select>
+    <div class="stats" id="stats"></div>
+  </header>
+  <main>
+    <section class="view active" id="view-flow">
+      <div class="canvas-wrap">
+        <div class="toolbar">
+          <button class="btn" data-action="fit">适应窗口</button>
+          <button class="btn" data-action="zoom-in">放大</button>
+          <button class="btn" data-action="zoom-out">缩小</button>
+        </div>
+        <svg id="flow-svg"></svg>
+        <div class="legend" id="flow-legend"></div>
+      </div>
+    </section>
+    <section class="view" id="view-tree">
+      <div class="canvas-wrap">
+        <div class="toolbar">
+          <button class="btn" data-action="fit">适应窗口</button>
+          <button class="btn" data-action="expand">全部展开</button>
+          <button class="btn" data-action="collapse">收起到第 3 层</button>
+          <span class="muted" style="color:var(--text-faint)">点击圆点展开或收起，点击名称查看详情</span>
+        </div>
+        <svg id="tree-svg"></svg>
+        <div class="legend" id="tree-legend"></div>
+      </div>
+    </section>
+    <section class="view" id="view-graph">
+      <div class="canvas-wrap">
+        <div class="toolbar">
+          <div class="search-wrap">
+            <input type="search" id="graph-search" placeholder="搜索模块，例如 canvas" style="width:220px">
+            <div class="search-results" id="graph-search-results"></div>
+          </div>
+          <button class="btn" data-action="overview">总览</button>
+          <button class="btn" data-action="fit">适应窗口</button>
+          <button class="btn" data-action="bad-only" title="只显示违反分层规则的依赖边">只看违规边</button>
+          <span id="graph-mode-hint" style="color:var(--text-faint)"></span>
+        </div>
+        <svg id="graph-svg"></svg>
+        <div class="legend" id="graph-legend"></div>
+      </div>
+    </section>
+    <section class="view" id="view-findings">
+      <div class="findings" id="findings"></div>
+    </section>
+    <aside class="panel" id="panel"></aside>
+  </main>
+  <script src="data/before.js"></script>
+  <script src="data/after.js" onerror="this.remove()"></script>
+  <script src="app.js"></script>
+</body>
+</html>
