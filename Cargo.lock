@@ -3498,6 +3498,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-async"
+version = "2.0.0"
+dependencies = [
+ "crossbeam-channel",
+]
+
+[[package]]
 name = "tg-service-canvas"
 version = "2.0.0"
 dependencies = [
@@ -4042,6 +4049,7 @@ dependencies = [
  "tg-core-unicode",
  "tg-core-version",
  "tg-service-animation",
+ "tg-service-async",
  "tg-service-canvas",
  "tg-service-clipboard",
  "tg-service-code-highlight",

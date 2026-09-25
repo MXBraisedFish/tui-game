@@ -26,7 +26,6 @@ mod unicode;
 use tg_core_version as version;
 mod video;
 pub(crate) mod widget;
-mod write_barrier;
 
 pub use animation::{
   AnimationBinding, AnimationClock, AnimationEasing, AnimationEvent, AnimationEventKind,
@@ -125,7 +124,7 @@ pub use widget::{
   TableService, TableStyle, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode,
   TextInputOptions, TextInputRenderParams, TextInputService,
 };
-pub use write_barrier::WriteBarrier;
+pub use tg_service_async::WriteBarrier;
 
 /// 引擎核心服务集合，持有所有子服务的实例
 pub struct EngineServices {

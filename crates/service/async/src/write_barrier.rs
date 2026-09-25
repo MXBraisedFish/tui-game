@@ -4,7 +4,7 @@ use std::{
   sync::{Arc, Condvar, Mutex},
 };
 
-use super::TaskId;
+use crate::TaskId;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct WriteBarrierSnapshot {

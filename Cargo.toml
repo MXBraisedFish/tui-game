@@ -50,6 +50,7 @@ tg-service-popup = { path = "crates/service/popup" }
 tg-service-input-method = { path = "crates/service/input_method" }
 tg-service-ffmpeg = { path = "crates/service/ffmpeg" }
 tg-service-animation = { path = "crates/service/animation" }
+tg-service-async = { path = "crates/service/async" }
 tg-service-canvas = { path = "crates/service/canvas" }
 tg-service-clipboard = { path = "crates/service/clipboard" }
 crossbeam-channel = "0.5"
@@ -90,4 +91,5 @@ pulldown-cmark = "0.13.4"
 sysinfo = "0.38.3"
 
 [dev-dependencies]
+tg-service-async = { path = "crates/service/async", features = ["test-support"] }
 tg-service-storage = { path = "crates/service/storage", features = ["test-support"] }
