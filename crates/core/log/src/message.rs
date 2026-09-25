@@ -24,7 +24,7 @@ impl HostLogMessage {
     self
   }
 
-  pub(crate) fn render<'a>(&self, template: Option<&'a str>) -> String {
+  pub fn render<'a>(&self, template: Option<&'a str>) -> String {
     let mut rendered = Cow::Borrowed(template.unwrap_or(self.english_fallback));
     for (name, value) in &self.params {
       rendered = Cow::Owned(rendered.replace(&format!("{{{name}}}"), value));

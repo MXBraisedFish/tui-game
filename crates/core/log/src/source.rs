@@ -76,3 +76,21 @@ impl LogSource {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{LogLevel, format_log_level};
+
+  #[test]
+  fn lifecycle_sources_map_to_their_phase_and_others_to_runtime() {
+    assert_eq!(LogSource::Boot.phase(), LogPhase::Boot);
+    assert_eq!(LogSource::Shutdown.phase(), LogPhase::Shutdown);
+    assert_eq!(LogSource::Crash.phase(), LogPhase::Crash);
+    assert_eq!(LogSource::Lua.phase(), LogPhase::Runtime);
+    assert_eq!(LogSource::Pack.key(), "log.service.package");
+    assert_eq!(LogSource::Pack.default_label(), "Package");
+    assert_eq!(format_log_level(LogLevel::Warn), "WARN");
+    assert_eq!(LogLevel::Fatal.key(), "log.level.fatal");
+  }
+}
