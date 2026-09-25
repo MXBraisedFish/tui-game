@@ -7,6 +7,7 @@ version = "2.0.0"
 edition = "2024"
 
 [workspace.dependencies]
+chrono = { version = "0.4.45", default-features = true, features = ["clock"] }
 crossterm = "0.29.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
@@ -39,6 +40,7 @@ tg-core-style = { path = "crates/core/style" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-log = { path = "crates/service/log" }
 tg-service-text-layout = { path = "crates/service/text_layout" }
 tg-service-rich-text = { path = "crates/service/rich_text" }
 tg-service-code-highlight = { path = "crates/service/code_highlight" }
@@ -65,7 +67,7 @@ serde_yaml = "0.9"
 toml = "1.1.2"
 csv = "1.3"
 quick-xml = "0.41.0"
-chrono = { version = "0.4.45", default-features = true, features = ["clock"] }
+chrono = { workspace = true }
 rand = "0.10.2"
 rand_chacha = "0.10"
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "rustls", "gzip", "brotli", "deflate", "zstd"] }

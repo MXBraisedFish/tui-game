@@ -4,8 +4,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::host_engine::services::storage::atomic_write;
-use crate::host_engine::services::PackageId;
+use tg_core_atomic_fs::atomic_write;
+use tg_core_package_id::PackageId;
 
 use super::{
   HostLogMessage, LogEntry, LogLabels, LogLevel, LogPrintOptions, LogSource, format_file_log_entry,
@@ -706,20 +706,20 @@ mod tests {
     log.activate_embedded_english().unwrap();
 
     let game_id = PackageId::new(
-      crate::host_engine::services::PackageSource::Mod,
-      crate::host_engine::services::PackageType::Game,
+      tg_core_package_id::PackageSource::Mod,
+      tg_core_package_id::PackageType::Game,
       "sample.game",
     )
     .unwrap();
     let screensaver_id = PackageId::new(
-      crate::host_engine::services::PackageSource::Official,
-      crate::host_engine::services::PackageType::Screensaver,
+      tg_core_package_id::PackageSource::Official,
+      tg_core_package_id::PackageType::Screensaver,
       "sample.screensaver",
     )
     .unwrap();
     let official_game_id = PackageId::new(
-      crate::host_engine::services::PackageSource::Official,
-      crate::host_engine::services::PackageType::Game,
+      tg_core_package_id::PackageSource::Official,
+      tg_core_package_id::PackageType::Game,
       "sample.game",
     )
     .unwrap();

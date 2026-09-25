@@ -9,7 +9,7 @@ mod i18n;
 mod image;
 mod input;
 mod layout;
-mod log;
+use tg_service_log as log;
 mod lua;
 mod network;
 mod package;

@@ -68,7 +68,7 @@ fn format_log_time(timestamp_ms: u128) -> String {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::{LogLevel, LogSource};
+  use crate::{LogLevel, LogSource};
 
   #[test]
   fn custom_print_has_no_header_by_default() {

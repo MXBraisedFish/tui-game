@@ -3529,6 +3529,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-log"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+ "tg-core-atomic-fs",
+ "tg-core-log",
+ "tg-core-package-id",
+]
+
+[[package]]
 name = "tg-service-popup"
 version = "2.0.0"
 dependencies = [
@@ -3971,6 +3981,7 @@ dependencies = [
  "tg-service-ffmpeg",
  "tg-service-host-object",
  "tg-service-input-method",
+ "tg-service-log",
  "tg-service-popup",
  "tg-service-rich-text",
  "tg-service-terminal",

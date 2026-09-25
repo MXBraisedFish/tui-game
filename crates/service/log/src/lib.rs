@@ -1,3 +1,5 @@
+//! Log service: buffered host/package/Lua session logs with translated labels and file output.
+
 mod formatter;
 mod labels;
 mod service;
