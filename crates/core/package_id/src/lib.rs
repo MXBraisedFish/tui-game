@@ -104,3 +104,33 @@ fn validate_mod_id(mod_id: &str) -> Result<(), String> {
   }
   Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn storage_key_joins_source_type_and_mod_id() {
+    let id = PackageId::new(PackageSource::Mod, PackageType::Game, "demo_1").unwrap();
+    assert_eq!(id.storage_key(), "mod/game/demo_1");
+    assert_eq!(id.to_string(), "mod/game/demo_1");
+  }
+
+  #[test]
+  fn unsafe_mod_ids_are_rejected() {
+    for bad in ["", "../escape", "a/b", r"a\b"] {
+      assert!(PackageId::new(PackageSource::Official, PackageType::Screensaver, bad).is_err(), "{bad:?}");
+    }
+  }
+
+  #[test]
+  fn deserialize_validates_mod_id() {
+    let ok: PackageId =
+      serde_json::from_str(r#"{"source":"official","package_type":"screensaver","mod_id":"x"}"#).unwrap();
+    assert_eq!(ok.storage_key(), "official/screensaver/x");
+    assert!(
+      serde_json::from_str::<PackageId>(r#"{"source":"mod","package_type":"game","mod_id":"../x"}"#)
+        .is_err()
+    );
+  }
+}

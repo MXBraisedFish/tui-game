@@ -3437,6 +3437,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-core-package-id"
+version = "2.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3835,6 +3843,7 @@ dependencies = [
  "serde_yaml",
  "sysinfo",
  "tar",
+ "tg-core-package-id",
  "toml",
  "tree-sitter",
  "tree-sitter-bash",

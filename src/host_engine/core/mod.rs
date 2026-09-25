@@ -4,7 +4,7 @@ pub mod crash;
 pub mod exit_state;
 pub mod fault;
 pub mod frame;
-pub mod package_id;
+pub use tg_core_package_id as package_id;
 pub mod state_machine;
 pub mod world;
 pub use boot_output::BootOutput;
