@@ -4,7 +4,7 @@ use std::{
   path::{Path, PathBuf},
 };
 
-pub(crate) fn atomic_write(path: &Path, bytes: &[u8], durable: bool) -> io::Result<()> {
+pub fn atomic_write(path: &Path, bytes: &[u8], durable: bool) -> io::Result<()> {
   atomic_replace_with(path, durable, |temporary| {
     let mut file = OpenOptions::new()
       .create(true)
@@ -16,7 +16,7 @@ pub(crate) fn atomic_write(path: &Path, bytes: &[u8], durable: bool) -> io::Resu
   })
 }
 
-pub(crate) fn atomic_replace_with(
+pub fn atomic_replace_with(
   path: &Path,
   durable: bool,
   write: impl FnOnce(&Path) -> io::Result<()>,

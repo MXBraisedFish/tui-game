@@ -1,0 +1,6 @@
+[package]
+name = "tg-core-atomic-fs"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

@@ -1,4 +1,4 @@
-mod atomic;
+use tg_core_atomic_fs as atomic;
 mod bootstrap;
 mod game_save;
 mod layout;
