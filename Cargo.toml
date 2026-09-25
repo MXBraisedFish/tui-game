@@ -39,7 +39,7 @@ tg-core-style = { path = "crates/core/style" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
-arboard = { version = "3.6.1", default-features = false }
+tg-service-clipboard = { path = "crates/service/clipboard" }
 crossbeam-channel = "0.5"
 crossterm = { workspace = true }
 mlua = { version = "0.12.0", features = ["lua54", "vendored"] }

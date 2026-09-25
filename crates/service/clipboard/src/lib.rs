@@ -1,9 +1,9 @@
+//! Clipboard service: system clipboard text read/write.
+
 /// 剪贴板服务，提供系统剪贴板的读写能力
 pub struct ClipboardService {
   clipboard: Option<arboard::Clipboard>,
   last_error: Option<String>,
-  #[cfg(test)]
-  memory: Option<String>,
 }
 
 impl ClipboardService {
@@ -16,17 +16,11 @@ impl ClipboardService {
     Self {
       clipboard,
       last_error,
-      #[cfg(test)]
-      memory: None,
     }
   }
 
   /// 读取剪贴板中的文本内容
   pub fn read_text(&mut self) -> Option<String> {
-    #[cfg(test)]
-    if let Some(text) = &self.memory {
-      return Some(text.clone());
-    }
     let clipboard = self.clipboard.as_mut()?;
     // TODO: add log warn when LogService is available
     match clipboard.get_text() {
@@ -40,11 +34,6 @@ impl ClipboardService {
 
   /// 向剪贴板写入文本
   pub fn write_text(&mut self, text: &str) -> bool {
-    #[cfg(test)]
-    if self.memory.is_some() {
-      self.memory = Some(text.to_string());
-      return true;
-    }
     // TODO: add log warn when LogService is available
     match self.clipboard.as_mut() {
       Some(clipboard) => match clipboard.set_text(text) {
@@ -62,20 +51,23 @@ impl ClipboardService {
   }
 
   #[cfg(test)]
-  pub(crate) fn memory(text: &str) -> Self {
-    Self {
-      clipboard: None,
-      last_error: None,
-      memory: Some(text.to_string()),
-    }
-  }
-
-  #[cfg(test)]
   pub(crate) fn unavailable() -> Self {
     Self {
       clipboard: None,
       last_error: None,
-      memory: None,
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn unavailable_clipboard_reads_nothing_and_rejects_writes() {
+    let mut clipboard = ClipboardService::unavailable();
+    assert_eq!(clipboard.read_text(), None);
+    assert!(!clipboard.write_text("text"));
+    assert_eq!(clipboard.last_error.as_deref(), Some("Clipboard not available"));
   }
 }

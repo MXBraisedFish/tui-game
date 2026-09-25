@@ -2,7 +2,6 @@ pub(crate) mod animation;
 mod async_runtime;
 mod audio;
 mod canvas;
-mod clipboard;
 mod code_highlight;
 mod event;
 pub(crate) mod export;
@@ -51,7 +50,7 @@ pub use audio::{
   AudioPoolId, AudioService, AudioSource, AudioState, ResolvedAudioFile,
 };
 pub use canvas::{CanvasCell, CanvasService};
-pub use clipboard::ClipboardService;
+pub use tg_service_clipboard::ClipboardService;
 pub use code_highlight::{CodeHighlightService, CodeHighlightTheme};
 pub use event::EngineEventQueue;
 pub use export::{ExportAsyncEvent, ExportService, ExportTask};

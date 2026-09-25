@@ -24,3 +24,4 @@ so callers are unchanged until the layer that owns them is migrated.
 | New location | Old location | Change | Tag |
 |---|---|---|---|
 | crates/service/terminal/src/{lib,capabilities}.rs | src/host_engine/services/terminal.rs, terminal_capabilities.rs (whole files) | terminal_capabilities (1 user) merged into the terminal crate; moved as-is; existing capability test is the behavior test; smoke never enters raw mode; crossterm moved to workspace.dependencies; workspace members now include crates/service/*; services/mod.rs re-exports TerminalService | refactor/service-terminal-done |
+| crates/service/clipboard/src/lib.rs | src/host_engine/services/clipboard.rs (whole file) | removed dead cfg(test) in-memory scaffolding (`memory` ctor/field, never used), kept `unavailable()` for a new behavior test added before the move; arboard dependency moved from root into the crate; smoke restores the previous clipboard text | refactor/service-clipboard-done |
