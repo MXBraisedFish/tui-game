@@ -1,13 +1,12 @@
 use std::time::Duration;
 
-use super::widget::runtime_object::RuntimeObjectPool;
-use super::widget::runtime_object::time::{
+use super::objects::{
   DelayTimer, DelayTimerEvent, DelayTimerId, DelayTimerOptions, RepeatMode, RepeatTimer,
-  RepeatTimerEvent, RepeatTimerId, RepeatTimerOptions, TimeCallbackId, TimeCallbackRequest, Timer,
-  TimerEvent, TimerId, TimerMode, TimerOptions, TimerState,
+  RepeatTimerEvent, RepeatTimerId, RepeatTimerOptions, TimeCallbackId, TimeCallbackRequest,
+  TimeObjects, Timer, TimerEvent, TimerId, TimerMode, TimerOptions, TimerState,
 };
 
-use super::async_runtime::{AsyncRuntime, EngineTask, SleepTask, TaskId};
+use crate::host_engine::services::async_runtime::{AsyncRuntime, EngineTask, SleepTask, TaskId};
 
 pub struct TimeService;
 
@@ -16,7 +15,7 @@ impl TimeService {
     Self
   }
 
-  pub fn update(&self, pool: &mut RuntimeObjectPool, dt: Duration) {
+  pub fn update(&self, pool: &mut TimeObjects, dt: Duration) {
     self.update_standalone_timers(pool, dt);
     self.update_delay_timers(pool, dt);
     self.update_repeat_timers(pool, dt);
@@ -31,7 +30,7 @@ impl TimeService {
     async_runtime.submit(EngineTask::Sleep(SleepTask { duration, callback }))
   }
 
-  fn update_standalone_timers(&self, pool: &mut RuntimeObjectPool, dt: Duration) {
+  fn update_standalone_timers(&self, pool: &mut TimeObjects, dt: Duration) {
     let ids = pool.timers.timers.keys().copied().collect::<Vec<_>>();
     for id in ids {
       if pool.timers.composition_owned.contains(&id) {
@@ -48,7 +47,7 @@ impl TimeService {
     }
   }
 
-  fn update_delay_timers(&self, pool: &mut RuntimeObjectPool, dt: Duration) {
+  fn update_delay_timers(&self, pool: &mut TimeObjects, dt: Duration) {
     let ids = pool.delay_timers.timers.keys().copied().collect::<Vec<_>>();
     for id in ids {
       let Some(delay) = pool.delay_timers.timers.get(&id) else {
@@ -79,7 +78,7 @@ impl TimeService {
     }
   }
 
-  fn update_repeat_timers(&self, pool: &mut RuntimeObjectPool, dt: Duration) {
+  fn update_repeat_timers(&self, pool: &mut TimeObjects, dt: Duration) {
     let ids = pool
       .repeat_timers
       .timers
@@ -148,13 +147,13 @@ impl TimeService {
     }
   }
 
-  pub fn create_count_up(&self, pool: &mut RuntimeObjectPool) -> TimerId {
+  pub fn create_count_up(&self, pool: &mut TimeObjects) -> TimerId {
     self.create(pool, TimerMode::CountUp, TimerOptions::default())
   }
 
   pub fn create_count_down(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut TimeObjects,
     duration: Duration,
     options: TimerOptions,
   ) -> Option<TimerId> {
@@ -162,7 +161,7 @@ impl TimeService {
       .then(|| self.create(pool, TimerMode::CountDown { duration }, options))
   }
 
-  pub fn remove(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn remove(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     if pool.timers.composition_owned.contains(&id) {
       return false;
     }
@@ -173,7 +172,7 @@ impl TimeService {
     removed
   }
 
-  pub fn start(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn start(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     if pool.timers.composition_owned.contains(&id) {
       return false;
     }
@@ -187,7 +186,7 @@ impl TimeService {
     true
   }
 
-  pub fn pause(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn pause(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     if pool.timers.composition_owned.contains(&id) {
       return false;
     }
@@ -201,7 +200,7 @@ impl TimeService {
     true
   }
 
-  pub fn resume(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn resume(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     if pool.timers.composition_owned.contains(&id) {
       return false;
     }
@@ -215,7 +214,7 @@ impl TimeService {
     true
   }
 
-  pub fn stop(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn stop(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     if pool.timers.composition_owned.contains(&id) {
       return false;
     }
@@ -227,7 +226,7 @@ impl TimeService {
     true
   }
 
-  pub fn reset(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn reset(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     if pool.timers.composition_owned.contains(&id) {
       return false;
     }
@@ -240,54 +239,54 @@ impl TimeService {
     true
   }
 
-  pub fn state(&self, pool: &RuntimeObjectPool, id: TimerId) -> Option<TimerState> {
+  pub fn state(&self, pool: &TimeObjects, id: TimerId) -> Option<TimerState> {
     if pool.timers.composition_owned.contains(&id) {
       return None;
     }
     Some(pool.timers.timers.get(&id)?.state)
   }
 
-  pub fn elapsed(&self, pool: &RuntimeObjectPool, id: TimerId) -> Option<Duration> {
+  pub fn elapsed(&self, pool: &TimeObjects, id: TimerId) -> Option<Duration> {
     if pool.timers.composition_owned.contains(&id) {
       return None;
     }
     Some(pool.timers.timers.get(&id)?.elapsed)
   }
 
-  pub fn duration(&self, pool: &RuntimeObjectPool, id: TimerId) -> Option<Duration> {
+  pub fn duration(&self, pool: &TimeObjects, id: TimerId) -> Option<Duration> {
     if pool.timers.composition_owned.contains(&id) {
       return None;
     }
     pool.timers.timers.get(&id)?.duration()
   }
 
-  pub fn remaining(&self, pool: &RuntimeObjectPool, id: TimerId) -> Option<Duration> {
+  pub fn remaining(&self, pool: &TimeObjects, id: TimerId) -> Option<Duration> {
     if pool.timers.composition_owned.contains(&id) {
       return None;
     }
     pool.timers.timers.get(&id)?.remaining()
   }
 
-  pub fn progress(&self, pool: &RuntimeObjectPool, id: TimerId) -> Option<f32> {
+  pub fn progress(&self, pool: &TimeObjects, id: TimerId) -> Option<f32> {
     if pool.timers.composition_owned.contains(&id) {
       return None;
     }
     pool.timers.timers.get(&id)?.progress()
   }
 
-  pub fn is_running(&self, pool: &RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn is_running(&self, pool: &TimeObjects, id: TimerId) -> bool {
     self.state(pool, id) == Some(TimerState::Running)
   }
 
-  pub fn is_paused(&self, pool: &RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn is_paused(&self, pool: &TimeObjects, id: TimerId) -> bool {
     self.state(pool, id) == Some(TimerState::Paused)
   }
 
-  pub fn is_finished(&self, pool: &RuntimeObjectPool, id: TimerId) -> bool {
+  pub fn is_finished(&self, pool: &TimeObjects, id: TimerId) -> bool {
     self.state(pool, id) == Some(TimerState::Finished)
   }
 
-  pub fn take_events(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> Vec<TimerEvent> {
+  pub fn take_events(&self, pool: &mut TimeObjects, id: TimerId) -> Vec<TimerEvent> {
     if pool.timers.composition_owned.contains(&id) {
       return Vec::new();
     }
@@ -296,7 +295,7 @@ impl TimeService {
 
   pub fn create_delay_timer(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut TimeObjects,
     options: DelayTimerOptions,
   ) -> Option<DelayTimerId> {
     if options.delay == Duration::ZERO {
@@ -317,7 +316,7 @@ impl TimeService {
     Some(id)
   }
 
-  pub fn remove_delay_timer(&self, pool: &mut RuntimeObjectPool, id: DelayTimerId) -> bool {
+  pub fn remove_delay_timer(&self, pool: &mut TimeObjects, id: DelayTimerId) -> bool {
     let Some(delay) = pool.delay_timers.timers.remove(&id) else {
       return false;
     };
@@ -326,35 +325,35 @@ impl TimeService {
     true
   }
 
-  pub fn start_delay_timer(&self, pool: &mut RuntimeObjectPool, id: DelayTimerId) -> bool {
+  pub fn start_delay_timer(&self, pool: &mut TimeObjects, id: DelayTimerId) -> bool {
     let Some(timer_id) = self.delay_timer_id(pool, id) else {
       return false;
     };
     self.start_internal(pool, timer_id)
   }
 
-  pub fn pause_delay_timer(&self, pool: &mut RuntimeObjectPool, id: DelayTimerId) -> bool {
+  pub fn pause_delay_timer(&self, pool: &mut TimeObjects, id: DelayTimerId) -> bool {
     let Some(timer_id) = self.delay_timer_id(pool, id) else {
       return false;
     };
     self.pause_internal(pool, timer_id)
   }
 
-  pub fn resume_delay_timer(&self, pool: &mut RuntimeObjectPool, id: DelayTimerId) -> bool {
+  pub fn resume_delay_timer(&self, pool: &mut TimeObjects, id: DelayTimerId) -> bool {
     let Some(timer_id) = self.delay_timer_id(pool, id) else {
       return false;
     };
     self.resume_internal(pool, timer_id)
   }
 
-  pub fn stop_delay_timer(&self, pool: &mut RuntimeObjectPool, id: DelayTimerId) -> bool {
+  pub fn stop_delay_timer(&self, pool: &mut TimeObjects, id: DelayTimerId) -> bool {
     let Some(timer_id) = self.delay_timer_id(pool, id) else {
       return false;
     };
     self.stop_internal(pool, timer_id)
   }
 
-  pub fn reset_delay_timer(&self, pool: &mut RuntimeObjectPool, id: DelayTimerId) -> bool {
+  pub fn reset_delay_timer(&self, pool: &mut TimeObjects, id: DelayTimerId) -> bool {
     let Some(timer_id) = self.delay_timer_id(pool, id) else {
       return false;
     };
@@ -364,7 +363,7 @@ impl TimeService {
 
   pub fn delay_timer_state(
     &self,
-    pool: &RuntimeObjectPool,
+    pool: &TimeObjects,
     id: DelayTimerId,
   ) -> Option<TimerState> {
     Some(
@@ -378,7 +377,7 @@ impl TimeService {
 
   pub fn delay_timer_elapsed(
     &self,
-    pool: &RuntimeObjectPool,
+    pool: &TimeObjects,
     id: DelayTimerId,
   ) -> Option<Duration> {
     Some(
@@ -392,7 +391,7 @@ impl TimeService {
 
   pub fn delay_timer_remaining(
     &self,
-    pool: &RuntimeObjectPool,
+    pool: &TimeObjects,
     id: DelayTimerId,
   ) -> Option<Duration> {
     pool
@@ -402,7 +401,7 @@ impl TimeService {
       .remaining()
   }
 
-  pub fn delay_timer_progress(&self, pool: &RuntimeObjectPool, id: DelayTimerId) -> Option<f32> {
+  pub fn delay_timer_progress(&self, pool: &TimeObjects, id: DelayTimerId) -> Option<f32> {
     pool
       .timers
       .timers
@@ -412,7 +411,7 @@ impl TimeService {
 
   pub fn take_delay_timer_events(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut TimeObjects,
     id: DelayTimerId,
   ) -> Vec<DelayTimerEvent> {
     pool.take_delay_timer_events(id)
@@ -420,7 +419,7 @@ impl TimeService {
 
   pub fn create_repeat_timer(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut TimeObjects,
     options: RepeatTimerOptions,
   ) -> Option<RepeatTimerId> {
     if options.interval == Duration::ZERO || options.repeat_mode == RepeatMode::Count(0) {
@@ -443,7 +442,7 @@ impl TimeService {
     Some(id)
   }
 
-  pub fn remove_repeat_timer(&self, pool: &mut RuntimeObjectPool, id: RepeatTimerId) -> bool {
+  pub fn remove_repeat_timer(&self, pool: &mut TimeObjects, id: RepeatTimerId) -> bool {
     let Some(repeat) = pool.repeat_timers.timers.remove(&id) else {
       return false;
     };
@@ -452,7 +451,7 @@ impl TimeService {
     true
   }
 
-  pub fn start_repeat_timer(&self, pool: &mut RuntimeObjectPool, id: RepeatTimerId) -> bool {
+  pub fn start_repeat_timer(&self, pool: &mut TimeObjects, id: RepeatTimerId) -> bool {
     let Some(timer_id) = self.repeat_timer_id(pool, id) else {
       return false;
     };
@@ -467,21 +466,21 @@ impl TimeService {
     self.start_internal(pool, timer_id)
   }
 
-  pub fn pause_repeat_timer(&self, pool: &mut RuntimeObjectPool, id: RepeatTimerId) -> bool {
+  pub fn pause_repeat_timer(&self, pool: &mut TimeObjects, id: RepeatTimerId) -> bool {
     let Some(timer_id) = self.repeat_timer_id(pool, id) else {
       return false;
     };
     self.pause_internal(pool, timer_id)
   }
 
-  pub fn resume_repeat_timer(&self, pool: &mut RuntimeObjectPool, id: RepeatTimerId) -> bool {
+  pub fn resume_repeat_timer(&self, pool: &mut TimeObjects, id: RepeatTimerId) -> bool {
     let Some(timer_id) = self.repeat_timer_id(pool, id) else {
       return false;
     };
     self.resume_internal(pool, timer_id)
   }
 
-  pub fn stop_repeat_timer(&self, pool: &mut RuntimeObjectPool, id: RepeatTimerId) -> bool {
+  pub fn stop_repeat_timer(&self, pool: &mut TimeObjects, id: RepeatTimerId) -> bool {
     let Some(timer_id) = self.repeat_timer_id(pool, id) else {
       return false;
     };
@@ -491,7 +490,7 @@ impl TimeService {
     self.stop_internal(pool, timer_id)
   }
 
-  pub fn reset_repeat_timer(&self, pool: &mut RuntimeObjectPool, id: RepeatTimerId) -> bool {
+  pub fn reset_repeat_timer(&self, pool: &mut TimeObjects, id: RepeatTimerId) -> bool {
     let Some(timer_id) = self.repeat_timer_id(pool, id) else {
       return false;
     };
@@ -504,7 +503,7 @@ impl TimeService {
 
   pub fn repeat_timer_state(
     &self,
-    pool: &RuntimeObjectPool,
+    pool: &TimeObjects,
     id: RepeatTimerId,
   ) -> Option<TimerState> {
     Some(
@@ -518,7 +517,7 @@ impl TimeService {
 
   pub fn repeat_timer_elapsed(
     &self,
-    pool: &RuntimeObjectPool,
+    pool: &TimeObjects,
     id: RepeatTimerId,
   ) -> Option<Duration> {
     Some(
@@ -532,7 +531,7 @@ impl TimeService {
 
   pub fn repeat_timer_remaining(
     &self,
-    pool: &RuntimeObjectPool,
+    pool: &TimeObjects,
     id: RepeatTimerId,
   ) -> Option<Duration> {
     pool
@@ -542,7 +541,7 @@ impl TimeService {
       .remaining()
   }
 
-  pub fn repeat_timer_progress(&self, pool: &RuntimeObjectPool, id: RepeatTimerId) -> Option<f32> {
+  pub fn repeat_timer_progress(&self, pool: &TimeObjects, id: RepeatTimerId) -> Option<f32> {
     pool
       .timers
       .timers
@@ -552,7 +551,7 @@ impl TimeService {
 
   pub fn repeat_timer_executed_count(
     &self,
-    pool: &RuntimeObjectPool,
+    pool: &TimeObjects,
     id: RepeatTimerId,
   ) -> Option<u32> {
     Some(pool.repeat_timers.timers.get(&id)?.executed_count)
@@ -560,7 +559,7 @@ impl TimeService {
 
   pub fn take_repeat_timer_events(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut TimeObjects,
     id: RepeatTimerId,
   ) -> Vec<RepeatTimerEvent> {
     pool.take_repeat_timer_events(id)
@@ -568,14 +567,14 @@ impl TimeService {
 
   pub fn take_time_callback_requests(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut TimeObjects,
   ) -> Vec<TimeCallbackRequest> {
     pool.take_time_callback_requests()
   }
 
   fn create(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut TimeObjects,
     mode: TimerMode,
     options: TimerOptions,
   ) -> TimerId {
@@ -587,7 +586,7 @@ impl TimeService {
 
   fn create_internal_count_down(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut TimeObjects,
     duration: Duration,
   ) -> TimerId {
     let id = self.create(
@@ -599,21 +598,21 @@ impl TimeService {
     id
   }
 
-  fn remove_internal_timer(&self, pool: &mut RuntimeObjectPool, id: TimerId) {
+  fn remove_internal_timer(&self, pool: &mut TimeObjects, id: TimerId) {
     pool.timers.timers.remove(&id);
     pool.timers.composition_owned.remove(&id);
     pool.clear_timer_events(id);
   }
 
-  fn delay_timer_id(&self, pool: &RuntimeObjectPool, id: DelayTimerId) -> Option<TimerId> {
+  fn delay_timer_id(&self, pool: &TimeObjects, id: DelayTimerId) -> Option<TimerId> {
     Some(pool.delay_timers.timers.get(&id)?.timer_id)
   }
 
-  fn repeat_timer_id(&self, pool: &RuntimeObjectPool, id: RepeatTimerId) -> Option<TimerId> {
+  fn repeat_timer_id(&self, pool: &TimeObjects, id: RepeatTimerId) -> Option<TimerId> {
     Some(pool.repeat_timers.timers.get(&id)?.timer_id)
   }
 
-  fn start_internal(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  fn start_internal(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     let Some(timer) = pool.timers.timers.get_mut(&id) else {
       return false;
     };
@@ -624,7 +623,7 @@ impl TimeService {
     true
   }
 
-  fn pause_internal(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  fn pause_internal(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     let Some(timer) = pool.timers.timers.get_mut(&id) else {
       return false;
     };
@@ -635,7 +634,7 @@ impl TimeService {
     true
   }
 
-  fn resume_internal(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  fn resume_internal(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     let Some(timer) = pool.timers.timers.get_mut(&id) else {
       return false;
     };
@@ -646,7 +645,7 @@ impl TimeService {
     true
   }
 
-  fn stop_internal(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  fn stop_internal(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     let Some(timer) = pool.timers.timers.get_mut(&id) else {
       return false;
     };
@@ -655,7 +654,7 @@ impl TimeService {
     true
   }
 
-  fn reset_internal(&self, pool: &mut RuntimeObjectPool, id: TimerId) -> bool {
+  fn reset_internal(&self, pool: &mut TimeObjects, id: TimerId) -> bool {
     let Some(timer) = pool.timers.timers.get_mut(&id) else {
       return false;
     };
@@ -688,8 +687,8 @@ impl TimeService {
 mod tests {
   use super::*;
 
-  fn service_pool() -> (TimeService, RuntimeObjectPool) {
-    (TimeService::new(), RuntimeObjectPool::new())
+  fn service_pool() -> (TimeService, TimeObjects) {
+    (TimeService::new(), TimeObjects::new())
   }
 
   #[test]

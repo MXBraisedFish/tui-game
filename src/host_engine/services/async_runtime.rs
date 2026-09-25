@@ -29,7 +29,7 @@ use super::{
   recording::{self, RecordingAsyncEvent, RecordingTask},
   screenshot::{self, ScreenshotAsyncEvent, ScreenshotTask},
   video::{self, VideoAsyncEvent, VideoExportTask},
-  widget::runtime_object::time::TimeCallbackId,
+  time::TimeCallbackId,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

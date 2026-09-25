@@ -21,8 +21,8 @@ impl LanguageLoadingUi {
     let bar = progress_bar
       .create(&mut objects, block_options())
       .expect("valid language loading progress bar options");
-    let animation_timer = time.create_count_up(&mut runtime_objects);
-    let _ = time.start(&mut runtime_objects, animation_timer);
+    let animation_timer = time.create_count_up(&mut runtime_objects.time);
+    let _ = time.start(&mut runtime_objects.time, animation_timer);
     Self {
       objects,
       runtime_objects,
@@ -32,12 +32,12 @@ impl LanguageLoadingUi {
   }
 
   pub fn restart_animation(&mut self, time: &TimeService) {
-    let _ = time.reset(&mut self.runtime_objects, self.animation_timer);
-    let _ = time.start(&mut self.runtime_objects, self.animation_timer);
+    let _ = time.reset(&mut self.runtime_objects.time, self.animation_timer);
+    let _ = time.start(&mut self.runtime_objects.time, self.animation_timer);
   }
 
   pub fn update(&mut self, time: &TimeService, dt: Duration) {
-    time.update(&mut self.runtime_objects, dt);
+    time.update(&mut self.runtime_objects.time, dt);
   }
 
   pub fn set_progress(&mut self, progress_bar: &ProgressBarService, completed: f32, preview: f32) {
@@ -55,7 +55,7 @@ impl LanguageLoadingUi {
   ) {
     let size = layout.physical_size();
     let elapsed = time
-      .elapsed(&self.runtime_objects, self.animation_timer)
+      .elapsed(&self.runtime_objects.time, self.animation_timer)
       .unwrap_or(Duration::ZERO);
     let tip = format!(
       "{}{}",

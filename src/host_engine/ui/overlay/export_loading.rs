@@ -22,8 +22,8 @@ impl ExportLoadingUi {
       .create(&mut objects, block_options())
       .expect("valid export loading progress bar options");
     let mut runtime_objects = RuntimeObjectPool::new();
-    let animation_timer = time.create_count_up(&mut runtime_objects);
-    let _ = time.start(&mut runtime_objects, animation_timer);
+    let animation_timer = time.create_count_up(&mut runtime_objects.time);
+    let _ = time.start(&mut runtime_objects.time, animation_timer);
     Self {
       objects,
       runtime_objects,
@@ -33,12 +33,12 @@ impl ExportLoadingUi {
   }
 
   pub fn restart_animation(&mut self, time: &TimeService) {
-    let _ = time.reset(&mut self.runtime_objects, self.animation_timer);
-    let _ = time.start(&mut self.runtime_objects, self.animation_timer);
+    let _ = time.reset(&mut self.runtime_objects.time, self.animation_timer);
+    let _ = time.start(&mut self.runtime_objects.time, self.animation_timer);
   }
 
   pub fn update(&mut self, time: &TimeService, dt: Duration) {
-    time.update(&mut self.runtime_objects, dt);
+    time.update(&mut self.runtime_objects.time, dt);
   }
 
   pub fn set_progress(&mut self, progress_bar: &ProgressBarService, completed: f32, preview: f32) {
@@ -60,7 +60,7 @@ impl ExportLoadingUi {
     }
 
     let elapsed = time
-      .elapsed(&self.runtime_objects, self.animation_timer)
+      .elapsed(&self.runtime_objects.time, self.animation_timer)
       .unwrap_or(Duration::ZERO);
     let dots = ".".repeat((elapsed.as_millis() / 500 % 3 + 1) as usize);
     let tip = format!(

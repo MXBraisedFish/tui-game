@@ -389,7 +389,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services.popup.update(frame_delta);
     services
       .time
-      .update(&mut services.runtime_objects, frame_delta);
+      .update(&mut services.runtime_objects.time, frame_delta);
     services.animation.update(
       &mut services.runtime_objects,
       crate::host_engine::services::AnimationClock::Ui,
@@ -2010,7 +2010,7 @@ fn update_lua_object_pool(
   frame_delta: Duration,
 ) {
   objects.begin_frame();
-  time.update(objects.runtime_mut(), frame_delta);
+  time.update(&mut objects.runtime_mut().time, frame_delta);
   animation.update(
     objects.runtime_mut(),
     crate::host_engine::services::AnimationClock::Ui,

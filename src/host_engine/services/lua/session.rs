@@ -1645,17 +1645,17 @@ mod tests {
 
     let time = crate::host_engine::services::TimeService::new();
     let timer = first
-      .with_objects_mut(|objects| time.create_count_up(objects.runtime_mut()))
+      .with_objects_mut(|objects| time.create_count_up(&mut objects.runtime_mut().time))
       .unwrap();
     assert_eq!(
       first
-        .with_objects(|objects| time.state(objects.runtime(), timer))
+        .with_objects(|objects| time.state(&objects.runtime().time, timer))
         .flatten(),
       Some(crate::host_engine::services::TimerState::Idle)
     );
     assert_eq!(
       second
-        .with_objects(|objects| time.state(objects.runtime(), timer))
+        .with_objects(|objects| time.state(&objects.runtime().time, timer))
         .flatten(),
       None
     );

@@ -239,3 +239,89 @@ impl Timer {
     Some((self.elapsed.as_secs_f32() / duration.as_secs_f32()).clamp(0.0, 1.0))
   }
 }
+
+/// 一个运行时对象池中的全部计时器对象与待处理的时间回调请求
+pub struct TimeObjects {
+  pub(crate) timers: TimerObjects,
+  pub(crate) delay_timers: DelayTimerObjects,
+  pub(crate) repeat_timers: RepeatTimerObjects,
+  pub(crate) time_callback_requests: Vec<TimeCallbackRequest>,
+}
+
+impl TimeObjects {
+  pub fn new() -> Self {
+    Self {
+      timers: TimerObjects::new(),
+      delay_timers: DelayTimerObjects::new(),
+      repeat_timers: RepeatTimerObjects::new(),
+      time_callback_requests: Vec::new(),
+    }
+  }
+
+  pub(crate) fn clear_timer_events(&mut self, id: TimerId) {
+    self.timers.events.retain(|event| event.id() != id);
+  }
+
+  pub(crate) fn take_timer_events(&mut self, id: TimerId) -> Vec<TimerEvent> {
+    let mut events = Vec::new();
+    self.timers.events.retain(|event| {
+      if event.id() == id {
+        events.push(*event);
+        false
+      } else {
+        true
+      }
+    });
+    events
+  }
+
+  pub(crate) fn clear_delay_timer_events(&mut self, id: DelayTimerId) {
+    self.delay_timers.events.retain(|event| event.id() != id);
+    self
+      .time_callback_requests
+      .retain(|request| request.delay_id() != Some(id));
+  }
+
+  pub(crate) fn take_delay_timer_events(&mut self, id: DelayTimerId) -> Vec<DelayTimerEvent> {
+    let mut events = Vec::new();
+    self.delay_timers.events.retain(|event| {
+      if event.id() == id {
+        events.push(*event);
+        false
+      } else {
+        true
+      }
+    });
+    events
+  }
+
+  pub(crate) fn clear_repeat_timer_events(&mut self, id: RepeatTimerId) {
+    self.repeat_timers.events.retain(|event| event.id() != id);
+    self
+      .time_callback_requests
+      .retain(|request| request.repeat_id() != Some(id));
+  }
+
+  pub(crate) fn take_repeat_timer_events(&mut self, id: RepeatTimerId) -> Vec<RepeatTimerEvent> {
+    let mut events = Vec::new();
+    self.repeat_timers.events.retain(|event| {
+      if event.id() == id {
+        events.push(*event);
+        false
+      } else {
+        true
+      }
+    });
+    events
+  }
+
+  pub(crate) fn take_time_callback_requests(&mut self) -> Vec<TimeCallbackRequest> {
+    self.time_callback_requests.drain(..).collect()
+  }
+}
+
+impl Default for TimeObjects {
+  fn default() -> Self {
+    Self::new()
+  }
+}
