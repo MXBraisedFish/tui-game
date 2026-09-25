@@ -3437,6 +3437,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-core-arena"
+version = "2.0.0"
+
+[[package]]
 name = "tg-core-atomic-fs"
 version = "2.0.0"
 
@@ -3859,6 +3863,7 @@ dependencies = [
  "serde_yaml",
  "sysinfo",
  "tar",
+ "tg-core-arena",
  "tg-core-atomic-fs",
  "tg-core-fault",
  "tg-core-geometry",

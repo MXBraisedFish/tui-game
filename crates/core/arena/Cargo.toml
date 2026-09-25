@@ -1,0 +1,6 @@
+[package]
+name = "tg-core-arena"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

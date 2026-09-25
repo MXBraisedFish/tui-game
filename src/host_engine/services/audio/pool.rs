@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use crossbeam_channel::Sender;
 
-use crate::host_engine::services::animation::Arena;
+use tg_core_arena::Arena;
 
 use super::{AudioCommand, AudioId, AudioObject, AudioPoolId, AudioType};
 

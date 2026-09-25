@@ -8,67 +8,7 @@ use super::{
   PlaybackState,
 };
 
-pub(crate) struct Arena<T> {
-  slots: Vec<ArenaSlot<T>>,
-}
-
-struct ArenaSlot<T> {
-  generation: u32,
-  value: Option<T>,
-}
-
-impl<T> Arena<T> {
-  pub(crate) fn new() -> Self {
-    Self { slots: Vec::new() }
-  }
-
-  pub(crate) fn insert(&mut self, value: T) -> (u32, u32) {
-    if let Some((index, slot)) = self
-      .slots
-      .iter_mut()
-      .enumerate()
-      .find(|(_, slot)| slot.value.is_none())
-    {
-      slot.value = Some(value);
-      return (index as u32, slot.generation);
-    }
-    let index = self.slots.len() as u32;
-    self.slots.push(ArenaSlot {
-      generation: 1,
-      value: Some(value),
-    });
-    (index, 1)
-  }
-
-  pub(crate) fn get(&self, index: u32, generation: u32) -> Option<&T> {
-    let slot = self.slots.get(index as usize)?;
-    (slot.generation == generation).then_some(slot.value.as_ref()?)
-  }
-
-  pub(crate) fn get_mut(&mut self, index: u32, generation: u32) -> Option<&mut T> {
-    let slot = self.slots.get_mut(index as usize)?;
-    (slot.generation == generation).then_some(slot.value.as_mut()?)
-  }
-
-  pub(crate) fn remove(&mut self, index: u32, generation: u32) -> Option<T> {
-    let slot = self.slots.get_mut(index as usize)?;
-    if slot.generation != generation {
-      return None;
-    }
-    let value = slot.value.take()?;
-    slot.generation = slot.generation.wrapping_add(1).max(1);
-    Some(value)
-  }
-
-  pub(crate) fn keys(&self) -> Vec<(u32, u32)> {
-    self
-      .slots
-      .iter()
-      .enumerate()
-      .filter_map(|(index, slot)| slot.value.as_ref().map(|_| (index as u32, slot.generation)))
-      .collect()
-  }
-}
+pub(crate) use tg_core_arena::Arena;
 
 #[derive(Clone)]
 pub(crate) struct AnimationPlayback {
