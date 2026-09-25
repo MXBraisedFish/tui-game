@@ -32,7 +32,7 @@ pub mod text_layout;
 mod time;
 mod ui;
 mod unicode;
-mod version;
+use tg_core_version as version;
 mod video;
 pub(crate) mod widget;
 mod write_barrier;
