@@ -1,4 +1,4 @@
-use super::cell::CanvasCell;
+use tg_core_style::CanvasCell;
 
 /// 画布缓冲区：以二维网格存储字符单元，并跟踪已写入区域。
 #[derive(Clone, Debug, PartialEq, Eq)]

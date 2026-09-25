@@ -1,4 +1,4 @@
-use crate::host_engine::services::TextStyle;
+use crate::TextStyle;
 
 /// 画布上的单个字符单元，包含文本内容、样式和是否为宽字符延续标记。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -45,5 +45,20 @@ impl CanvasCell {
   }
   pub fn is_continuation(&self) -> bool {
     self.continuation
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn only_continuation_cells_are_marked_and_they_carry_no_text() {
+    assert_eq!(CanvasCell::blank().text, " ");
+    assert!(!CanvasCell::new("a").is_continuation());
+    let continuation = CanvasCell::continuation();
+    assert!(continuation.is_continuation());
+    assert!(continuation.text.is_empty());
+    assert_ne!(continuation, CanvasCell::new(""));
   }
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{buffer::CanvasBuffer, cell::CanvasCell, top_layer::TopLayer};
+use super::{CanvasCell, buffer::CanvasBuffer, top_layer::TopLayer};
 use crate::host_engine::services::rich_text::RichTextSegment;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;

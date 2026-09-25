@@ -1,4 +1,4 @@
-use crate::host_engine::services::CanvasCell;
+use crate::CanvasCell;
 
 /// 合成后的单元：要么为空，要么包含一个已着色的 CanvasCell。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -57,5 +57,22 @@ impl ComposedFrame {
       return None;
     }
     Some(y as usize * self.width as usize + x as usize)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn out_of_bounds_access_is_ignored_and_cells_start_empty() {
+    let mut frame = ComposedFrame::new(3, 2);
+    assert_eq!(frame.get(2, 1), Some(&ComposedCell::Empty));
+    frame.set(2, 1, ComposedCell::Text(CanvasCell::new("x")));
+    assert_eq!(frame.get(2, 1), Some(&ComposedCell::Text(CanvasCell::new("x"))));
+    frame.set(3, 0, ComposedCell::Text(CanvasCell::new("y")));
+    assert_eq!(frame.get(3, 0), None);
+    assert_eq!(frame.get(0, 2), None);
+    assert_eq!(ComposedFrame::blank_text_cell(), CanvasCell::blank());
   }
 }
