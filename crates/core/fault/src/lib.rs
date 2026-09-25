@@ -69,7 +69,7 @@ impl fmt::Display for HostFault {
 impl std::error::Error for HostFault {}
 
 #[derive(Clone, Debug)]
-pub(crate) struct CapturedPanic {
+pub struct CapturedPanic {
   pub domain: HostFaultDomain,
   pub detail: String,
   pub location: Option<String>,
@@ -82,11 +82,11 @@ thread_local! {
   static CAPTURED_PANIC: RefCell<Option<CapturedPanic>> = const { RefCell::new(None) };
 }
 
-pub(crate) fn is_supervised() -> bool {
+pub fn is_supervised() -> bool {
   SUPERVISED.get()
 }
 
-pub(crate) fn current_fault_domain() -> HostFaultDomain {
+pub fn current_fault_domain() -> HostFaultDomain {
   CURRENT_DOMAIN.get()
 }
 
@@ -97,7 +97,7 @@ pub fn with_fault_domain<T>(domain: HostFaultDomain, operation: impl FnOnce() ->
   result
 }
 
-pub(crate) fn capture_panic(report: CapturedPanic) {
+pub fn capture_panic(report: CapturedPanic) {
   CAPTURED_PANIC.with_borrow_mut(|slot| *slot = Some(report));
 }
 

@@ -7,3 +7,4 @@ so callers are unchanged until the layer that owns them is migrated.
 | New location | Old location | Change | Tag |
 |---|---|---|---|
 | crates/core/package_id/src/lib.rs | src/host_engine/core/package_id.rs (whole file) | moved as-is; behavior tests added before the move; old path now `pub use tg_core_package_id as package_id` | refactor/core-package_id-done |
+| crates/core/fault/src/lib.rs | src/host_engine/core/fault.rs (whole file) | moved; `CapturedPanic`, `is_supervised`, `current_fault_domain`, `capture_panic` widened from pub(crate) to pub (used by core/crash); old path re-exports | refactor/core-fault-done |

@@ -2,7 +2,7 @@ pub mod boot_output;
 pub mod clock;
 pub mod crash;
 pub mod exit_state;
-pub mod fault;
+pub use tg_core_fault as fault;
 pub mod frame;
 pub use tg_core_package_id as package_id;
 pub mod state_machine;

@@ -3437,6 +3437,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-core-fault"
+version = "2.0.0"
+
+[[package]]
 name = "tg-core-package-id"
 version = "2.0.0"
 dependencies = [
@@ -3843,6 +3847,7 @@ dependencies = [
  "serde_yaml",
  "sysinfo",
  "tar",
+ "tg-core-fault",
  "tg-core-package-id",
  "toml",
  "tree-sitter",

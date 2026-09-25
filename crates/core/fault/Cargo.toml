@@ -1,0 +1,6 @@
+[package]
+name = "tg-core-fault"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
