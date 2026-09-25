@@ -14,10 +14,11 @@ use crossbeam_channel::Sender;
 use crate::host_engine::services::EngineEvent;
 
 pub use pool::AudioObjectPool;
-pub use types::{
-  AudioAsyncEvent, AudioCaptureId, AudioError, AudioErrorCode, AudioId, AudioObject, AudioPoolId,
-  AudioSource, AudioState, AudioType, AudioTypeId, ResolvedAudioFile,
+pub use tg_core_audio::{
+  AudioAsyncEvent, AudioCaptureId, AudioError, AudioErrorCode, AudioId, AudioPoolId, AudioSource,
+  AudioState, AudioTypeId, ResolvedAudioFile,
 };
+pub use types::{AudioObject, AudioType};
 
 use pool::AudioPoolState;
 pub(crate) use runtime::AudioCommand;
