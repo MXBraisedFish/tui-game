@@ -18,7 +18,7 @@ pub use types::{
   TweenDefinition, UiObjectKind, UiObjectRef, UiPoolId,
 };
 
-pub(crate) use pool::{AnimationPool, AnimationValuePool, Arena, CharacterEffectPool};
+pub(crate) use pool::{AnimationPool, AnimationValuePool, CharacterEffectPool};
 
 #[cfg(test)]
 mod tests;
