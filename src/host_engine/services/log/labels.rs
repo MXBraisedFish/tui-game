@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use crate::host_engine::services::i18n::I18nService;
-
 use super::{LogLevel, LogPhase, LogSource};
 
 #[derive(Clone, Debug)]
@@ -18,13 +16,12 @@ impl LogLabels {
     labels
   }
 
-  pub fn refresh_from_i18n(&mut self, i18n: &I18nService) {
+  /// Resets to the English defaults, then applies every label `translate` resolves.
+  /// `translate` returns `None` for keys the active language does not define.
+  pub fn refresh(&mut self, translate: impl Fn(&'static str) -> Option<String>) {
     self.insert_defaults();
-    let missing_template = i18n.get_runtime_text("language_warning", "language_warning.missing");
     for key in log_label_keys() {
-      let value = i18n.get_runtime_text("log", key);
-      let missing = missing_template.replace("{value:missing_key}", key);
-      if value != missing {
+      if let Some(value) = translate(key) {
         self.values.insert(key, value);
       }
     }
@@ -112,23 +109,19 @@ mod tests {
   #[test]
   fn refresh_resets_missing_labels_to_defaults() {
     let mut labels = LogLabels::new();
-    let mut translated = I18nService::new();
-    translated.insert_runtime_namespace(
-      "log",
-      HashMap::from([
+    let translated = HashMap::from([
         ("log.service.lua".to_string(), "脚本".to_string()),
         ("log.service.game".to_string(), "游戏".to_string()),
         ("log.service.screensaver".to_string(), "屏保".to_string()),
         ("log.level.warn".to_string(), "警告".to_string()),
-      ]),
-    );
-    labels.refresh_from_i18n(&translated);
+      ]);
+    labels.refresh(|key| translated.get(key).cloned());
     assert_eq!(labels.source(LogSource::Lua), "脚本");
     assert_eq!(labels.source(LogSource::Game), "游戏");
     assert_eq!(labels.source(LogSource::Screensaver), "屏保");
     assert_eq!(labels.level(LogLevel::Warn), "警告");
 
-    labels.refresh_from_i18n(&I18nService::new());
+    labels.refresh(|_| None);
     assert_eq!(labels.source(LogSource::Lua), "Lua");
   }
 }

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::host_engine::services::storage::atomic_write;
-use crate::host_engine::services::{FileService, I18nService, PackageId};
+use crate::host_engine::services::PackageId;
 
 use super::{
   HostLogMessage, LogEntry, LogLabels, LogLevel, LogPrintOptions, LogSource, format_file_log_entry,
@@ -104,12 +104,14 @@ impl LogService {
     self.push_package_scan_message(LogLevel::Warn, message);
   }
 
-  pub fn refresh_labels_from_i18n(&mut self, i18n: &I18nService) -> io::Result<()> {
-    self.labels.refresh_from_i18n(i18n);
-    self.message_templates = i18n
-      .runtime_namespace("log_info")
-      .cloned()
-      .unwrap_or_default();
+  /// Applies translated labels and `log_info` message templates, then enables file output.
+  pub fn refresh_labels(
+    &mut self,
+    translate: impl Fn(&'static str) -> Option<String>,
+    message_templates: HashMap<String, String>,
+  ) -> io::Result<()> {
+    self.labels.refresh(translate);
+    self.message_templates = message_templates;
     self.materialize_pending_messages();
     self.write_enabled = true;
     self.flush_pending_to_file()
@@ -562,7 +564,7 @@ impl LogService {
       return Ok(());
     }
 
-    match FileService::append_text_to(path, &text) {
+    match append_text(path, &text) {
       Ok(()) => {
         self.next_file_sequence = self
           .queue
@@ -584,6 +586,18 @@ impl LogService {
   }
 }
 
+fn append_text(path: &std::path::Path, text: &str) -> io::Result<()> {
+  if let Some(parent) = path.parent() {
+    std::fs::create_dir_all(parent)?;
+  }
+
+  std::fs::OpenOptions::new()
+    .create(true)
+    .append(true)
+    .open(path)?
+    .write_all(text.as_bytes())
+}
+
 fn append_capped(path: &std::path::Path, text: &str, max_bytes: usize) -> io::Result<()> {
   if let Some(parent) = path.parent() {
     std::fs::create_dir_all(parent)?;
@@ -592,7 +606,7 @@ fn append_capped(path: &std::path::Path, text: &str, max_bytes: usize) -> io::Re
     .map(|metadata| metadata.len() as usize)
     .unwrap_or_default();
   if current_len.saturating_add(text.len()) <= max_bytes {
-    return FileService::append_text_to(path, text);
+    return append_text(path, text);
   }
 
   let current = std::fs::read(path).unwrap_or_default();
