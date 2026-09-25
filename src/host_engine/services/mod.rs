@@ -26,8 +26,6 @@ mod render_pipeline;
 mod rich_text;
 mod screenshot;
 mod storage;
-mod terminal;
-mod terminal_capabilities;
 pub mod text_layout;
 mod time;
 mod ui;
@@ -108,7 +106,7 @@ pub use storage::{
   RecordingPixelScale, RecordingPopupMode, RecordingProfile, SafeModeDefault,
   ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile, StorageService,
 };
-pub use terminal::TerminalService;
+pub use tg_service_terminal::TerminalService;
 pub use text_layout::{DrawTextParams, TextAlign, TextMode, TextWrapMode};
 pub use time::TimeService;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};

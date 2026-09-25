@@ -1,3 +1,5 @@
+//! Terminal service: raw mode / alternate screen lifecycle, capability profile and forced restore.
+
 use std::io::{self, Stdout, Write, stdout};
 
 use crossterm::cursor::{Hide, Show};
@@ -8,10 +10,13 @@ use crossterm::event::{
 
 use crossterm::execute;
 
-use super::terminal_capabilities::TerminalCapabilities;
 use crossterm::terminal::{
   EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
+
+mod capabilities;
+
+pub use capabilities::TerminalCapabilities;
 
 /// 终端服务，管理原始模式和交替屏幕的进入与退出
 pub struct TerminalService {
