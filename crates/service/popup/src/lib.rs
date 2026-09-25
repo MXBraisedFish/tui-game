@@ -1,6 +1,8 @@
+//! Popup service: queues popup requests and reports dismiss events.
+
 use std::time::Duration;
 
-use crate::host_engine::services::TextColor;
+use tg_core_style::TextColor;
 
 const CONDITIONAL_DISMISS_DELAY: Duration = Duration::from_millis(500);
 

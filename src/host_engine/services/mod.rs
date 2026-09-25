@@ -15,7 +15,6 @@ mod log;
 mod lua;
 mod network;
 mod package;
-mod popup;
 mod random;
 mod recording;
 mod render;
@@ -82,7 +81,7 @@ pub use package::{
   PackageAsset, PackageEvent, PackageId, PackageInfo, PackageListEntry, PackageService,
   PackageSource, PackageType,
 };
-pub use popup::{PopupDismissEvent, PopupRequest, PopupService};
+pub use tg_service_popup::{PopupDismissEvent, PopupRequest, PopupService};
 pub use random::RandomService;
 pub use recording::{
   RecordingAsyncEvent, RecordingPlayback, RecordingService, RecordingState,
