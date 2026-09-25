@@ -3498,6 +3498,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-canvas"
+version = "2.0.0"
+dependencies = [
+ "crossterm",
+ "tg-core-geometry",
+ "tg-core-style",
+ "tg-core-unicode",
+ "tg-service-layout",
+ "tg-service-rich-text",
+ "tg-service-text-layout",
+]
+
+[[package]]
 name = "tg-service-clipboard"
 version = "2.0.0"
 dependencies = [
@@ -4029,6 +4042,7 @@ dependencies = [
  "tg-core-unicode",
  "tg-core-version",
  "tg-service-animation",
+ "tg-service-canvas",
  "tg-service-clipboard",
  "tg-service-code-highlight",
  "tg-service-ffmpeg",

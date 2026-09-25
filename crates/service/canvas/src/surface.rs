@@ -2,7 +2,8 @@
 //!
 //! 持有 UI 对象的一方（widget）每帧生成 [`SurfaceFrame`] 列表交给画布，画布不读取 UI 对象池。
 
-use crate::host_engine::services::{Rect, Size, TextColor, TextStyle};
+use tg_core_geometry::{Rect, Size};
+use tg_core_style::{TextColor, TextStyle};
 
 /// 切片唯一标识
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

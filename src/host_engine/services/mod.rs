@@ -1,7 +1,7 @@
 pub(crate) use tg_service_animation as animation;
 mod async_runtime;
 mod audio;
-mod canvas;
+use tg_service_canvas as canvas;
 mod event;
 pub(crate) mod export;
 mod file;

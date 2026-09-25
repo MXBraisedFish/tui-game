@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 
 use super::{CanvasCell, buffer::CanvasBuffer, top_layer::TopLayer};
-use crate::host_engine::services::rich_text::RichTextSegment;
-use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
-use crate::host_engine::services::unicode::graphemes;
+use tg_core_geometry::{Rect, Size};
+use tg_core_style::{TextColor, TextStyle};
+use tg_core_unicode::graphemes;
+use tg_service_layout::LayoutService;
+use tg_service_rich_text::RichTextSegment;
+use tg_service_text_layout::{self as text_layout, DrawTextParams, LayoutLine, TextAlign};
 use super::surface::{
   ResolvedScrollBoxLayout, ScrollBoxFrame, ScrollBoxId, ScrollbarStyle, SliceFrame, SliceId,
   SurfaceFrame, SurfaceId,
 };
-use crate::host_engine::services::{LayoutService, Rect, Size, TextColor, TextStyle};
 
 /// 画布服务：管理基础层、宿主层和多切片缓冲区，协调文本绘制与区域查询。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,7 +28,7 @@ pub struct CanvasService {
 
 /// 已预处理完成的切片：包含独立缓冲区、位置和可见性等元数据。
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct PreparedSlice {
+pub struct PreparedSlice {
   pub buffer: CanvasBuffer,
   pub rect: Rect,
   pub visible: bool,
@@ -37,7 +39,7 @@ pub(crate) struct PreparedSlice {
 
 /// 已预处理完成的滚动盒子：包含虚拟内容缓冲区和可视窗口元数据。
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct PreparedScrollBox {
+pub struct PreparedScrollBox {
   pub buffer: CanvasBuffer,
   pub layout: ResolvedScrollBoxLayout,
   pub content_size: Size,
@@ -50,7 +52,7 @@ pub(crate) struct PreparedScrollBox {
 }
 
 /// 已预处理开发者 Surface 的只读引用。
-pub(crate) enum PreparedSurface<'a> {
+pub enum PreparedSurface<'a> {
   Slice(&'a PreparedSlice),
   ScrollBox(&'a PreparedScrollBox),
 }
@@ -350,26 +352,26 @@ impl CanvasService {
   }
 
   /// 在宿主层上绘制富文本（用于覆盖层等）。
-  pub(crate) fn host_text(&mut self, params: &DrawTextParams) {
+  pub fn host_text(&mut self, params: &DrawTextParams) {
     self.host_text_at(i32::from(params.x), i32::from(params.y), params);
   }
 
-  pub(crate) fn host_text_at(&mut self, x: i32, y: i32, params: &DrawTextParams) {
+  pub fn host_text_at(&mut self, x: i32, y: i32, params: &DrawTextParams) {
     let lines = text_layout::layout_text_lines(params);
     Self::draw_layout_lines(&mut self.host, x, y, params.line_align, &lines);
   }
 
   /// 在宿主最高层上绘制富文本。
-  pub(crate) fn top_text(&mut self, params: &DrawTextParams) {
+  pub fn top_text(&mut self, params: &DrawTextParams) {
     self.top_text_at(i32::from(params.x), i32::from(params.y), params);
   }
 
-  pub(crate) fn top_text_at(&mut self, x: i32, y: i32, params: &DrawTextParams) {
+  pub fn top_text_at(&mut self, x: i32, y: i32, params: &DrawTextParams) {
     let lines = text_layout::layout_text_lines(params);
     Self::draw_layout_lines(self.top.buffer_mut(), x, y, params.line_align, &lines);
   }
 
-  pub(crate) fn host_rich_text_segments(
+  pub fn host_rich_text_segments(
     &mut self,
     segments: &[RichTextSegment],
     params: &DrawTextParams,
@@ -436,7 +438,7 @@ impl CanvasService {
   }
 
   /// 在宿主层上以指定样式绘制纯文本。
-  pub(crate) fn host_styled_text(
+  pub fn host_styled_text(
     &mut self,
     x: impl Into<i32>,
     y: impl Into<i32>,
@@ -446,7 +448,7 @@ impl CanvasService {
     Self::styled_text_to(&mut self.host, x.into(), y.into(), text, style);
   }
 
-  pub(crate) fn host_cell(&mut self, x: impl Into<i32>, y: impl Into<i32>, cell: CanvasCell) {
+  pub fn host_cell(&mut self, x: impl Into<i32>, y: impl Into<i32>, cell: CanvasCell) {
     let (x, y) = (x.into(), y.into());
     if let (Ok(x), Ok(y)) = (u16::try_from(x), u16::try_from(y)) {
       self.host.set(x, y, cell);
@@ -541,15 +543,15 @@ impl CanvasService {
     self.base.get(x, y)
   }
 
-  pub(crate) fn host_buffer(&self) -> &CanvasBuffer {
+  pub fn host_buffer(&self) -> &CanvasBuffer {
     &self.host
   }
 
-  pub(crate) fn top_buffer(&self) -> &CanvasBuffer {
+  pub fn top_buffer(&self) -> &CanvasBuffer {
     self.top.buffer()
   }
 
-  pub(crate) fn base_buffer(&self) -> &CanvasBuffer {
+  pub fn base_buffer(&self) -> &CanvasBuffer {
     &self.base
   }
 
@@ -565,7 +567,7 @@ impl CanvasService {
   }
 
   /// 按共享层级顺序迭代所有开发者 Surface。
-  pub(crate) fn prepared_surfaces(&self) -> impl Iterator<Item = PreparedSurface<'_>> {
+  pub fn prepared_surfaces(&self) -> impl Iterator<Item = PreparedSurface<'_>> {
     self
       .surface_order
       .iter()
@@ -575,7 +577,7 @@ impl CanvasService {
       })
   }
 
-  pub(crate) fn viewport(&self) -> Rect {
+  pub fn viewport(&self) -> Rect {
     self.viewport
   }
 
@@ -641,11 +643,11 @@ impl CanvasService {
   }
 
   /// 返回 Surface 层级顺序的只读切片。
-  pub(crate) fn surface_order(&self) -> &[SurfaceId] {
+  pub fn surface_order(&self) -> &[SurfaceId] {
     &self.surface_order
   }
 
-  pub(crate) fn top_scroll_box_at(&self, x: u16, y: u16) -> Option<ScrollBoxId> {
+  pub fn top_scroll_box_at(&self, x: u16, y: u16) -> Option<ScrollBoxId> {
     self
       .surface_order
       .iter()
@@ -668,7 +670,7 @@ impl CanvasService {
   }
 
   /// 将物理坐标转换为视口内的相对坐标。
-  pub(crate) fn viewport_point(&self, x: u16, y: u16) -> Option<(u16, u16)> {
+  pub fn viewport_point(&self, x: u16, y: u16) -> Option<(u16, u16)> {
     self
       .viewport
       .contains(x, y)
@@ -676,7 +678,7 @@ impl CanvasService {
   }
 
   /// 计算基础层上矩形区域的命中检测结果。
-  pub(crate) fn base_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
+  pub fn base_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
     surface_hit_rect(
       rect,
       self.viewport.x,
@@ -688,7 +690,7 @@ impl CanvasService {
   }
 
   /// 计算指定切片上矩形区域的命中检测结果。
-  pub(crate) fn slice_hit_rect(
+  pub fn slice_hit_rect(
     &self,
     id: SliceId,
     rect: Rect,
@@ -704,7 +706,7 @@ impl CanvasService {
     )
   }
 
-  pub(crate) fn scroll_box_hit_rect(
+  pub fn scroll_box_hit_rect(
     &self,
     id: ScrollBoxId,
     rect: Rect,
@@ -763,7 +765,7 @@ impl CanvasService {
   }
 
   /// 计算宿主层上矩形区域的命中检测结果。
-  pub(crate) fn host_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
+  pub fn host_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
     surface_hit_rect(
       rect,
       0,
@@ -890,9 +892,8 @@ fn resolve_background(mut style: TextStyle, buffer: &CanvasBuffer, x: u16, y: u1
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::rich_text::TextMode;
-  use crate::host_engine::services::text_layout::TextWrapMode;
-  use crate::host_engine::services::{RichTextParams, TerminalColor, TextColor};
+  use tg_service_rich_text::{RichTextParams, TerminalColor, TextMode};
+  use tg_service_text_layout::TextWrapMode;
   use std::collections::HashMap;
 
   /// Writes `height` rows of `ch` from (x, y) the way the render service fills a rectangle.

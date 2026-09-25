@@ -1,4 +1,6 @@
-pub(crate) mod buffer;
+//! Canvas service: base/host/top layers, per-surface buffers (slices, scroll boxes) and text drawing.
+
+pub mod buffer;
 mod service;
 mod surface;
 mod top_layer;
@@ -10,4 +12,4 @@ pub use surface::{
   ResolvedScrollBoxLayout, ScrollBoxFrame, ScrollBoxId, ScrollbarSide, ScrollbarStyle, SliceFrame,
   SliceId, SurfaceFrame, SurfaceId,
 };
-pub(crate) use service::{PreparedScrollBox, PreparedSlice, PreparedSurface};
+pub use service::{PreparedScrollBox, PreparedSlice, PreparedSurface};
