@@ -103,7 +103,7 @@ impl RandomGenerator {
   }
 }
 
-pub(crate) struct RandomGeneratorObjects {
+pub struct RandomGeneratorObjects {
   pub(crate) next_id: u64,
   pub(crate) generators: HashMap<RandomGeneratorId, RandomGenerator>,
 }

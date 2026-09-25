@@ -2471,7 +2471,7 @@ mod tests {
         .with_objects(|objects| {
           assert_eq!(
             crate::host_engine::services::RandomService::new()
-              .configured_ids(objects.runtime())
+              .configured_ids(&objects.runtime().random_generators)
               .len(),
             1
           );
@@ -2495,7 +2495,7 @@ mod tests {
       .with_objects(|objects| {
         assert_eq!(
           crate::host_engine::services::RandomService::new()
-            .configured_ids(objects.runtime())
+            .configured_ids(&objects.runtime().random_generators)
             .len(),
           1
         );

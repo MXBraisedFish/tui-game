@@ -1,7 +1,6 @@
-pub(crate) mod random;
 pub(crate) mod time;
 
-use self::random::RandomGeneratorObjects;
+use crate::host_engine::services::random::RandomGeneratorObjects;
 use self::time::{
   DelayTimerEvent, DelayTimerId, DelayTimerObjects, RepeatTimerEvent, RepeatTimerId,
   RepeatTimerObjects, TimeCallbackRequest, TimerEvent, TimerObjects,

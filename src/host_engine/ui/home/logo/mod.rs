@@ -111,25 +111,25 @@ impl<'a> LogoRandom<'a> {
   pub fn usize_inclusive(&mut self, min: usize, max: usize) -> usize {
     self
       .service
-      .int_range(self.pool, self.id, min as i64, max as i64 + 1)
+      .int_range(&mut self.pool.random_generators, self.id, min as i64, max as i64 + 1)
       .unwrap_or(min as i64) as usize
   }
 
   pub fn i32_inclusive(&mut self, min: i32, max: i32) -> i32 {
     self
       .service
-      .int_range(self.pool, self.id, min as i64, max as i64 + 1)
+      .int_range(&mut self.pool.random_generators, self.id, min as i64, max as i64 + 1)
       .unwrap_or(min as i64) as i32
   }
 
   pub fn f64(&mut self) -> f64 {
-    self.service.float_01(self.pool, self.id).unwrap_or(0.0)
+    self.service.float_01(&mut self.pool.random_generators, self.id).unwrap_or(0.0)
   }
 
   pub fn chance(&mut self, probability: f64) -> bool {
     self
       .service
-      .bool(self.pool, self.id, probability)
+      .bool(&mut self.pool.random_generators, self.id, probability)
       .unwrap_or(false)
   }
 
@@ -170,7 +170,7 @@ impl HomeLogo {
     pool: &mut RuntimeObjectPool,
   ) -> Self {
     let mut random_id = (configured_mode == DisplayLogoMode::Random)
-      .then(|| random.create(pool, RandomSeed::U64(seed)));
+      .then(|| random.create(&mut pool.random_generators, RandomSeed::U64(seed)));
     let mode = if configured_mode == DisplayLogoMode::Random {
       let mut rng = LogoRandom::new(random, pool, random_id.unwrap());
       DYNAMIC_MODES[rng.usize_inclusive(0, DYNAMIC_MODES.len() - 1)]
@@ -186,7 +186,7 @@ impl HomeLogo {
         | DisplayLogoMode::Char
     );
     if needs_random && random_id.is_none() {
-      random_id = Some(random.create(pool, RandomSeed::U64(seed)));
+      random_id = Some(random.create(&mut pool.random_generators, RandomSeed::U64(seed)));
     }
 
     let dynamic =
@@ -212,7 +212,7 @@ impl HomeLogo {
 
     if !needs_random {
       if let Some(id) = random_id.take() {
-        random.remove(pool, id);
+        random.remove(&mut pool.random_generators, id);
       }
     }
 

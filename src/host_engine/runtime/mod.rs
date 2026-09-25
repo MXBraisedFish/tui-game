@@ -342,7 +342,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut screensaver_overlay_ui = ScreensaverOverlayUi::init();
   let mut top_toolbar = TopToolbarRuntime::new(&services.progress_bar);
   let screensaver_random = services.random.create(
-    &mut services.runtime_objects,
+    &mut services.runtime_objects.random_generators,
     RandomSeed::U64(
       SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -3245,7 +3245,7 @@ fn select_screensaver(
   let mut display = services.storage.display_settings_profile().clone();
   let index = match display.screensaver_order {
     DisplayOrderMode::Random => services.random.int_range(
-      &mut services.runtime_objects,
+      &mut services.runtime_objects.random_generators,
       random_id,
       0,
       entries.len() as i64,

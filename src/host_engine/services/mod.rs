@@ -79,7 +79,10 @@ pub use package::{
   PackageSource, PackageType,
 };
 pub use tg_service_popup::{PopupDismissEvent, PopupRequest, PopupService};
-pub use random::RandomService;
+pub use random::{
+  RandomConfiguration, RandomConfiguredRange, RandomGeneratedValue, RandomGeneratorId, RandomSeed,
+  RandomService,
+};
 pub use recording::{
   RecordingAsyncEvent, RecordingPlayback, RecordingService, RecordingState,
   load_recording_playback, load_recording_playback_metadata,
@@ -113,8 +116,7 @@ pub use widget::{
   DelayTimerEvent, HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, HyperlinkEvent,
   HyperlinkService, MarkdownEvent, MarkdownRenderParams, MarkdownService, MarkdownViewId,
   MarkdownViewOptions, Overflow, ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions,
-  ProgressBarSegmentStyle, ProgressBarService, RandomConfiguration, RandomConfiguredRange,
-  RandomGeneratedValue, RandomGeneratorId, RandomSeed, RepeatTimerEvent, RepeatTimerId,
+  ProgressBarSegmentStyle, ProgressBarService, RepeatTimerEvent, RepeatTimerId,
   RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions,
   ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarStyle, ScrollbarVisibility, SliceId,
   SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId, TableBorderMode, TableColumn,

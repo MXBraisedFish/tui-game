@@ -1,9 +1,8 @@
 use rand::{Rng, SeedableRng};
 
-use super::widget::runtime_object::RuntimeObjectPool;
-use super::widget::runtime_object::random::{
+use super::objects::{
   RandomConfiguration, RandomConfiguredRange, RandomGeneratedValue, RandomGenerator,
-  RandomGeneratorId, RandomSeed, RandomSnapshot,
+  RandomGeneratorId, RandomGeneratorObjects, RandomSeed, RandomSnapshot,
 };
 
 pub struct RandomService;
@@ -13,35 +12,35 @@ impl RandomService {
     Self
   }
 
-  pub fn create(&self, pool: &mut RuntimeObjectPool, seed: RandomSeed) -> RandomGeneratorId {
-    pool.random_generators.create(RandomGenerator::new(seed))
+  pub fn create(&self, generators: &mut RandomGeneratorObjects, seed: RandomSeed) -> RandomGeneratorId {
+    generators.create(RandomGenerator::new(seed))
   }
 
   pub fn create_configured(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     configuration: RandomConfiguration,
   ) -> RandomGeneratorId {
     let mut generator = RandomGenerator::new(RandomSeed::U64(configuration.seed as u64));
     generator.configuration = Some(configuration);
-    pool.random_generators.create(generator)
+    generators.create(generator)
   }
 
   pub fn configuration(
     &self,
-    pool: &RuntimeObjectPool,
+    generators: &RandomGeneratorObjects,
     id: RandomGeneratorId,
   ) -> Option<RandomConfiguration> {
-    pool.random_generators.generators.get(&id)?.configuration
+    generators.generators.get(&id)?.configuration
   }
 
   pub fn set_configuration(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     id: RandomGeneratorId,
     configuration: RandomConfiguration,
   ) -> bool {
-    let Some(generator) = pool.random_generators.generators.get_mut(&id) else {
+    let Some(generator) = generators.generators.get_mut(&id) else {
       return false;
     };
     if generator
@@ -54,9 +53,8 @@ impl RandomService {
     true
   }
 
-  pub fn configured_ids(&self, pool: &RuntimeObjectPool) -> Vec<RandomGeneratorId> {
-    let mut ids = pool
-      .random_generators
+  pub fn configured_ids(&self, generators: &RandomGeneratorObjects) -> Vec<RandomGeneratorId> {
+    let mut ids = generators
       .generators
       .iter()
       .filter_map(|(id, generator)| generator.configuration.map(|_| *id))
@@ -65,19 +63,18 @@ impl RandomService {
     ids
   }
 
-  pub fn clear_configured(&self, pool: &mut RuntimeObjectPool) {
-    pool
-      .random_generators
+  pub fn clear_configured(&self, generators: &mut RandomGeneratorObjects) {
+    generators
       .generators
       .retain(|_, generator| generator.configuration.is_none());
   }
 
   pub fn generate_configured(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     id: RandomGeneratorId,
   ) -> Option<RandomGeneratedValue> {
-    let generator = pool.random_generators.generators.get_mut(&id)?;
+    let generator = generators.generators.get_mut(&id)?;
     let configuration = generator.configuration?;
     let mut rng = rand_chacha::ChaCha8Rng::from_seed(generator.seed);
     rng.set_stream(configuration.step);
@@ -98,7 +95,7 @@ impl RandomService {
 
   pub fn int_range_inclusive(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     id: RandomGeneratorId,
     min: i64,
     max: i64,
@@ -106,14 +103,14 @@ impl RandomService {
     if min > max {
       return None;
     }
-    let generator = pool.random_generators.generators.get_mut(&id)?;
+    let generator = generators.generators.get_mut(&id)?;
     generator.draw_count = generator.draw_count.saturating_add(1);
     Some(sample_i64_inclusive(&mut generator.rng, min, max))
   }
 
   pub fn float_range_inclusive(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     id: RandomGeneratorId,
     min: f64,
     max: f64,
@@ -121,26 +118,26 @@ impl RandomService {
     if !min.is_finite() || !max.is_finite() || min > max {
       return None;
     }
-    let generator = pool.random_generators.generators.get_mut(&id)?;
+    let generator = generators.generators.get_mut(&id)?;
     generator.draw_count = generator.draw_count.saturating_add(1);
     Some(sample_f64_inclusive(&mut generator.rng, min, max))
   }
 
-  pub fn remove(&self, pool: &mut RuntimeObjectPool, id: RandomGeneratorId) -> bool {
-    pool.random_generators.generators.remove(&id).is_some()
+  pub fn remove(&self, generators: &mut RandomGeneratorObjects, id: RandomGeneratorId) -> bool {
+    generators.generators.remove(&id).is_some()
   }
 
-  pub fn exists(&self, pool: &RuntimeObjectPool, id: RandomGeneratorId) -> bool {
-    pool.random_generators.generators.contains_key(&id)
+  pub fn exists(&self, generators: &RandomGeneratorObjects, id: RandomGeneratorId) -> bool {
+    generators.generators.contains_key(&id)
   }
 
   pub fn reseed(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     id: RandomGeneratorId,
     seed: RandomSeed,
   ) -> bool {
-    let Some(generator) = pool.random_generators.generators.get_mut(&id) else {
+    let Some(generator) = generators.generators.get_mut(&id) else {
       return false;
     };
     generator.reseed(seed);
@@ -149,38 +146,38 @@ impl RandomService {
 
   pub fn set_stream(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     id: RandomGeneratorId,
     stream: u64,
   ) -> bool {
-    let Some(generator) = pool.random_generators.generators.get_mut(&id) else {
+    let Some(generator) = generators.generators.get_mut(&id) else {
       return false;
     };
     generator.set_stream(stream);
     true
   }
 
-  pub fn next_u32(&self, pool: &mut RuntimeObjectPool, id: RandomGeneratorId) -> Option<u32> {
-    let generator = pool.random_generators.generators.get_mut(&id)?;
+  pub fn next_u32(&self, generators: &mut RandomGeneratorObjects, id: RandomGeneratorId) -> Option<u32> {
+    let generator = generators.generators.get_mut(&id)?;
     generator.draw_count += 1;
     Some(generator.rng.next_u32())
   }
 
-  pub fn next_u64(&self, pool: &mut RuntimeObjectPool, id: RandomGeneratorId) -> Option<u64> {
-    let generator = pool.random_generators.generators.get_mut(&id)?;
+  pub fn next_u64(&self, generators: &mut RandomGeneratorObjects, id: RandomGeneratorId) -> Option<u64> {
+    let generator = generators.generators.get_mut(&id)?;
     generator.draw_count += 1;
     Some(generator.rng.next_u64())
   }
 
-  pub fn float_01(&self, pool: &mut RuntimeObjectPool, id: RandomGeneratorId) -> Option<f64> {
-    let generator = pool.random_generators.generators.get_mut(&id)?;
+  pub fn float_01(&self, generators: &mut RandomGeneratorObjects, id: RandomGeneratorId) -> Option<f64> {
+    let generator = generators.generators.get_mut(&id)?;
     generator.draw_count += 1;
     Some(next_f64(&mut generator.rng))
   }
 
   pub fn int_range(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     id: RandomGeneratorId,
     min: i64,
     max: i64,
@@ -188,21 +185,21 @@ impl RandomService {
     if min >= max {
       return None;
     }
-    let generator = pool.random_generators.generators.get_mut(&id)?;
+    let generator = generators.generators.get_mut(&id)?;
     generator.draw_count += 1;
     Some(sample_i64_range(&mut generator.rng, min, max))
   }
 
   pub fn bool(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     id: RandomGeneratorId,
     probability: f64,
   ) -> Option<bool> {
     if probability.is_nan() {
       return None;
     }
-    let generator = pool.random_generators.generators.get_mut(&id)?;
+    let generator = generators.generators.get_mut(&id)?;
     generator.draw_count += 1;
     if probability <= 0.0 {
       return Some(false);
@@ -215,11 +212,10 @@ impl RandomService {
 
   pub fn snapshot(
     &self,
-    pool: &RuntimeObjectPool,
+    generators: &RandomGeneratorObjects,
     id: RandomGeneratorId,
   ) -> Option<RandomSnapshot> {
-    pool
-      .random_generators
+    generators
       .generators
       .get(&id)
       .map(|generator| generator.snapshot(id))
@@ -227,11 +223,10 @@ impl RandomService {
 
   pub fn restore(
     &self,
-    pool: &mut RuntimeObjectPool,
+    generators: &mut RandomGeneratorObjects,
     snapshot: RandomSnapshot,
   ) -> RandomGeneratorId {
-    pool
-      .random_generators
+    generators
       .create(RandomGenerator::from_snapshot(&snapshot))
   }
 }
@@ -288,22 +283,22 @@ mod tests {
   #[test]
   fn create_exists_and_remove_generator() {
     let random = RandomService::new();
-    let mut pool = RuntimeObjectPool::new();
+    let mut generators = RandomGeneratorObjects::new();
 
-    let first = random.create(&mut pool, RandomSeed::U64(1));
-    let second = random.create(&mut pool, RandomSeed::U64(2));
+    let first = random.create(&mut generators, RandomSeed::U64(1));
+    let second = random.create(&mut generators, RandomSeed::U64(2));
 
     assert_ne!(first, second);
-    assert!(random.exists(&pool, first));
-    assert!(random.remove(&mut pool, first));
-    assert!(!random.exists(&pool, first));
+    assert!(random.exists(&generators, first));
+    assert!(random.remove(&mut generators, first));
+    assert!(!random.exists(&generators, first));
   }
 
   #[test]
   fn same_seed_replays_same_sequence() {
     let random = RandomService::new();
-    let mut left = RuntimeObjectPool::new();
-    let mut right = RuntimeObjectPool::new();
+    let mut left = RandomGeneratorObjects::new();
+    let mut right = RandomGeneratorObjects::new();
     let a = random.create(&mut left, RandomSeed::U64(42));
     let b = random.create(&mut right, RandomSeed::U64(42));
 
@@ -320,41 +315,41 @@ mod tests {
   #[test]
   fn different_stream_changes_sequence() {
     let random = RandomService::new();
-    let mut pool = RuntimeObjectPool::new();
-    let first = random.create(&mut pool, RandomSeed::U64(42));
-    let second = random.create(&mut pool, RandomSeed::U64(42));
-    assert!(random.set_stream(&mut pool, second, 7));
+    let mut generators = RandomGeneratorObjects::new();
+    let first = random.create(&mut generators, RandomSeed::U64(42));
+    let second = random.create(&mut generators, RandomSeed::U64(42));
+    assert!(random.set_stream(&mut generators, second, 7));
 
     assert_ne!(
-      random.next_u64(&mut pool, first),
-      random.next_u64(&mut pool, second)
+      random.next_u64(&mut generators, first),
+      random.next_u64(&mut generators, second)
     );
   }
 
   #[test]
   fn ranges_and_probability_edges_are_checked() {
     let random = RandomService::new();
-    let mut pool = RuntimeObjectPool::new();
-    let id = random.create(&mut pool, RandomSeed::U64(3));
+    let mut generators = RandomGeneratorObjects::new();
+    let id = random.create(&mut generators, RandomSeed::U64(3));
 
     for _ in 0..64 {
-      let value = random.int_range(&mut pool, id, -5, 5).unwrap();
+      let value = random.int_range(&mut generators, id, -5, 5).unwrap();
       assert!((-5..5).contains(&value));
     }
-    assert_eq!(random.int_range(&mut pool, id, 5, 5), None);
-    assert_eq!(random.bool(&mut pool, id, 0.0), Some(false));
-    assert_eq!(random.bool(&mut pool, id, 1.0), Some(true));
-    assert_eq!(random.bool(&mut pool, id, f64::NAN), None);
+    assert_eq!(random.int_range(&mut generators, id, 5, 5), None);
+    assert_eq!(random.bool(&mut generators, id, 0.0), Some(false));
+    assert_eq!(random.bool(&mut generators, id, 1.0), Some(true));
+    assert_eq!(random.bool(&mut generators, id, f64::NAN), None);
   }
 
   #[test]
   fn float_01_is_inside_half_open_unit_range() {
     let random = RandomService::new();
-    let mut pool = RuntimeObjectPool::new();
-    let id = random.create(&mut pool, RandomSeed::U64(9));
+    let mut generators = RandomGeneratorObjects::new();
+    let id = random.create(&mut generators, RandomSeed::U64(9));
 
     for _ in 0..64 {
-      let value = random.float_01(&mut pool, id).unwrap();
+      let value = random.float_01(&mut generators, id).unwrap();
       assert!((0.0..1.0).contains(&value));
     }
   }
@@ -362,12 +357,12 @@ mod tests {
   #[test]
   fn inclusive_float_range_stays_finite_for_extreme_opposite_bounds() {
     let random = RandomService::new();
-    let mut pool = RuntimeObjectPool::new();
-    let id = random.create(&mut pool, RandomSeed::U64(19));
+    let mut generators = RandomGeneratorObjects::new();
+    let id = random.create(&mut generators, RandomSeed::U64(19));
 
     for _ in 0..64 {
       let value = random
-        .float_range_inclusive(&mut pool, id, -f64::MAX, f64::MAX)
+        .float_range_inclusive(&mut generators, id, -f64::MAX, f64::MAX)
         .unwrap();
       assert!(value.is_finite());
       assert!((-f64::MAX..=f64::MAX).contains(&value));
@@ -377,35 +372,35 @@ mod tests {
   #[test]
   fn reseed_restores_new_seed_start() {
     let random = RandomService::new();
-    let mut pool = RuntimeObjectPool::new();
-    let id = random.create(&mut pool, RandomSeed::U64(1));
-    let reference = random.create(&mut pool, RandomSeed::U64(2));
+    let mut generators = RandomGeneratorObjects::new();
+    let id = random.create(&mut generators, RandomSeed::U64(1));
+    let reference = random.create(&mut generators, RandomSeed::U64(2));
 
-    assert!(random.reseed(&mut pool, id, RandomSeed::U64(2)));
+    assert!(random.reseed(&mut generators, id, RandomSeed::U64(2)));
 
     assert_eq!(
-      random.next_u64(&mut pool, id),
-      random.next_u64(&mut pool, reference)
+      random.next_u64(&mut generators, id),
+      random.next_u64(&mut generators, reference)
     );
   }
 
   #[test]
   fn snapshot_and_restore_continue_same_sequence() {
     let random = RandomService::new();
-    let mut pool = RuntimeObjectPool::new();
-    let id = random.create(&mut pool, RandomSeed::U64(99));
+    let mut generators = RandomGeneratorObjects::new();
+    let id = random.create(&mut generators, RandomSeed::U64(99));
 
     for _ in 0..5 {
-      let _ = random.next_u64(&mut pool, id);
+      let _ = random.next_u64(&mut generators, id);
     }
-    let snapshot = random.snapshot(&pool, id).unwrap();
+    let snapshot = random.snapshot(&generators, id).unwrap();
     let expected = (0..6)
-      .map(|_| random.next_u64(&mut pool, id).unwrap())
+      .map(|_| random.next_u64(&mut generators, id).unwrap())
       .collect::<Vec<_>>();
 
-    let restored = random.restore(&mut pool, snapshot);
+    let restored = random.restore(&mut generators, snapshot);
     let actual = (0..6)
-      .map(|_| random.next_u64(&mut pool, restored).unwrap())
+      .map(|_| random.next_u64(&mut generators, restored).unwrap())
       .collect::<Vec<_>>();
 
     assert_eq!(actual, expected);
