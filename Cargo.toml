@@ -30,6 +30,7 @@ tg-core-atomic-fs = { path = "crates/core/atomic_fs" }
 tg-core-fault = { path = "crates/core/fault" }
 tg-core-geometry = { path = "crates/core/geometry" }
 tg-core-package-id = { path = "crates/core/package_id" }
+tg-core-style = { path = "crates/core/style" }
 tg-core-version = { path = "crates/core/version" }
 arboard = { version = "3.6.1", default-features = false }
 crossbeam-channel = "0.5"

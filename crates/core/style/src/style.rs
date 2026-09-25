@@ -125,3 +125,34 @@ impl TextColor {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn style_tags_toggle_flags_and_unknown_tags_are_rejected() {
+    let mut style = TextStyle::default();
+    assert!(style.enable_style("b"));
+    assert!(style.enable_style("underline"));
+    assert!(!style.enable_style("wobble"));
+    assert!(style.bold && style.underline);
+    assert!(style.disable_style("bold"));
+    assert!(!style.bold);
+    style.reset();
+    assert_eq!(style, TextStyle::default());
+  }
+
+  #[test]
+  fn reversing_only_changes_explicit_rgb_colors() {
+    let mut style = TextStyle::default();
+    style.set_foreground(TextColor::Rgb { r: 0, g: 100, b: 255 });
+    style.set_background(TextColor::Terminal(TerminalColor::Red));
+    style.reverse_foreground();
+    style.reverse_background();
+    assert_eq!(style.foreground, Some(TextColor::Rgb { r: 255, g: 155, b: 0 }));
+    assert_eq!(style.background, Some(TextColor::Terminal(TerminalColor::Red)));
+    style.clear_foreground();
+    assert_eq!(style.foreground, None);
+  }
+}
