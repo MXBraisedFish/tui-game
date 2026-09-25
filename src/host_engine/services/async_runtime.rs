@@ -14,6 +14,7 @@ use chardetng::{Iso2022JpDetection, Utf8Detection};
 use encoding_rs::Encoding;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
+use tg_core_atomic_fs::atomic_write;
 
 use super::{
   WriteBarrier,
@@ -27,7 +28,6 @@ use super::{
   package::{self, PackageAsyncEvent, PackageTask},
   recording::{self, RecordingAsyncEvent, RecordingTask},
   screenshot::{self, ScreenshotAsyncEvent, ScreenshotTask},
-  storage::atomic_write,
   video::{self, VideoAsyncEvent, VideoExportTask},
   widget::runtime_object::time::TimeCallbackId,
 };

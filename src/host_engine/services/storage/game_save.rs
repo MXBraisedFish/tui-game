@@ -3,7 +3,9 @@ use std::{collections::BTreeMap, fs, io};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{StorageService, atomic_write};
+use tg_core_atomic_fs::atomic_write;
+
+use super::StorageService;
 use crate::host_engine::services::{LogService, LogSource, PackageId};
 
 const MAX_GAME_SAVE_PROFILE_BYTES: u64 = 16 * 1024 * 1024;

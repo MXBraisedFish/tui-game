@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crossbeam_channel::Sender;
 
-use crate::host_engine::services::storage::atomic_replace_with;
+use tg_core_atomic_fs::atomic_replace_with;
 use crate::host_engine::services::version::{
   HOST_API_VERSION, HOST_VERSION, PACKAGE_MANIFEST_VERSION,
 };

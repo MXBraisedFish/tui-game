@@ -6,7 +6,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::atomic_write;
+use tg_core_atomic_fs::atomic_write;
 use super::layout;
 use super::service::StorageService;
 use crate::host_engine::services::{HostLogMessage, LogService, LogSource, PackageId};

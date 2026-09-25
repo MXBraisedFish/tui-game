@@ -8,7 +8,7 @@ use super::GameSaveProfile;
 use super::bootstrap::ensure_storage_layout;
 use super::layout;
 use super::profile::DisplaySettingsProfile;
-use crate::host_engine::services::{AudioError, AudioErrorCode, ResolvedAudioFile};
+use tg_core_audio::{AudioError, AudioErrorCode, ResolvedAudioFile};
 use crate::host_engine::services::{LogService, LogSource};
 
 /// 存储服务：管理应用根目录，提供各子路径的构建方法，并在初始化时确保目录结构存在。

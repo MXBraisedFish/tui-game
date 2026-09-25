@@ -13,7 +13,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::host_engine::services::async_runtime::TaskCancellation;
-use crate::host_engine::services::storage::{atomic_replace_with, atomic_write};
+use tg_core_atomic_fs::{atomic_replace_with, atomic_write};
 use crate::host_engine::services::{
   CanvasCell, ComposedCell, ComposedFrame, EngineEvent, LogService, LogSource,
   MEDIA_MANIFEST_VERSION, RecordingPixelScale, StorageService, TaskId, TerminalColor, TextColor,
