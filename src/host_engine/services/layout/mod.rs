@@ -1,7 +1,7 @@
 mod measure;
 mod position;
 mod service;
-mod types;
+use tg_core_geometry as types;
 
 pub use service::LayoutService;
 pub use types::{Rect, Size};

@@ -30,3 +30,23 @@ impl Rect {
       && py < self.y.saturating_add(self.height)
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn contains_is_half_open_and_saturates_at_the_edge() {
+    let rect = Rect { x: 2, y: 3, width: 4, height: 2 };
+    assert!(rect.contains(2, 3));
+    assert!(rect.contains(5, 4));
+    assert!(!rect.contains(6, 4));
+    assert!(!rect.contains(5, 5));
+    assert!(!rect.contains(1, 3));
+    let edge = Rect { x: u16::MAX - 1, y: 0, width: 10, height: 1 };
+    // The right edge saturates at u16::MAX, which itself stays outside the rect.
+    assert!(edge.contains(u16::MAX - 1, 0));
+    assert!(!edge.contains(u16::MAX, 0));
+    assert!(!Rect::default().contains(0, 0));
+  }
+}
