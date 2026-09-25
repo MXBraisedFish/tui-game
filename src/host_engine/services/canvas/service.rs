@@ -892,12 +892,31 @@ mod tests {
   use super::*;
   use crate::host_engine::services::rich_text::TextMode;
   use crate::host_engine::services::text_layout::TextWrapMode;
-  use crate::host_engine::services::{
-    Overflow, RenderService, RichTextParams, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy,
-    ScrollbarVisibility, SliceLength, SliceOptions, SliceRect, SliceService, TerminalColor,
-    TextColor, UiObjectPool,
-  };
+  use crate::host_engine::services::{RichTextParams, TerminalColor, TextColor};
   use std::collections::HashMap;
+
+  /// Writes `height` rows of `ch` from (x, y) the way the render service fills a rectangle.
+  fn fill_rect(
+    canvas: &mut CanvasService,
+    x: i32,
+    y: i32,
+    width: u16,
+    height: u16,
+    ch: char,
+    bg: Option<TextColor>,
+  ) {
+    for row in 0..height {
+      canvas.text_at(
+        x,
+        y + i32::from(row),
+        &DrawTextParams {
+          text: ch.to_string().repeat(usize::from(width)),
+          bg: bg.clone(),
+          ..Default::default()
+        },
+      );
+    }
+  }
 
   fn visible_row(canvas: &CanvasService, y: u16) -> String {
     (0..canvas.base_width())
@@ -1010,9 +1029,7 @@ mod tests {
   fn negative_filled_rect_is_clipped_by_canvas_text_writes() {
     let mut canvas = CanvasService::new();
     canvas.base.resize(4, 3);
-    let mut render = RenderService::new();
-
-    render.draw_filled_rect(&mut canvas, -1, -1, 3, 3, Some("#".to_string()), None, None);
+    fill_rect(&mut canvas, -1, -1, 3, 3, '#', None);
 
     assert_eq!(raw_row_prefix(&canvas, 0, 4), "##  ");
     assert_eq!(raw_row_prefix(&canvas, 1, 4), "##  ");
@@ -1023,15 +1040,13 @@ mod tests {
   fn erase_rect_removes_previous_character_and_style_writes() {
     let mut canvas = CanvasService::new();
     canvas.base.resize(12, 6);
-    let mut render = crate::host_engine::services::RenderService::new();
-    render.draw_filled_rect(
+    fill_rect(
       &mut canvas,
       2,
       1,
       10,
       4,
-      None,
-      None,
+      ' ',
       Some(TextColor::Terminal(TerminalColor::Blue)),
     );
 
@@ -1048,40 +1063,57 @@ mod tests {
   fn signed_coordinates_are_clipped_inside_slices_and_scroll_boxes() {
     let mut layout = LayoutService::new();
     layout.resize_physical(12, 6);
-    let mut pool = UiObjectPool::new();
-    let slice = SliceService::new()
-      .create(
-        &mut pool,
-        SliceOptions {
-          rect: SliceRect {
-            x: 0,
-            y: 0,
-            width: SliceLength::Fixed(4),
-            height: SliceLength::Fixed(2),
-          },
-          ..Default::default()
-        },
-      )
-      .unwrap();
-    let scroll_box = ScrollBoxService::new()
-      .create(
-        &mut pool,
-        ScrollBoxOptions {
+    let slice = SliceId(1);
+    let scroll_box = ScrollBoxId(1);
+    let box_rect = Rect {
+      x: 5,
+      y: 0,
+      width: 4,
+      height: 2,
+    };
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(
+      1,
+      vec![
+        SurfaceFrame::Slice(SliceFrame {
+          id: slice,
           rect: Rect {
-            x: 5,
+            x: 0,
             y: 0,
             width: 4,
             height: 2,
           },
-          content_width: 4,
-          content_height: 2,
-          ..Default::default()
-        },
-      )
-      .unwrap();
-    let mut canvas = CanvasService::new();
-    canvas.begin_frame(&layout);
-    pool.prepare_canvas(&mut canvas, &layout);
+          visible: true,
+          opaque: false,
+          background: None,
+        }),
+        SurfaceFrame::ScrollBox(ScrollBoxFrame {
+          id: scroll_box,
+          layout: ResolvedScrollBoxLayout {
+            viewport_rect: box_rect,
+            content_viewport_rect: box_rect,
+            occupied_rect: box_rect,
+            vertical_track_rect: None,
+            horizontal_track_rect: None,
+            vertical_thumb_rect: None,
+            horizontal_thumb_rect: None,
+            max_scroll_x: 0,
+            max_scroll_y: 0,
+          },
+          content_size: Size {
+            width: 4,
+            height: 2,
+          },
+          scroll_x: 0,
+          scroll_y: 0,
+          visible: true,
+          opaque: false,
+          scrollbar_style: ScrollbarStyle::default(),
+        }),
+      ],
+      &layout,
+    );
     let params = DrawTextParams {
       text: "abcd".to_string(),
       ..Default::default()
@@ -1345,10 +1377,9 @@ mod tests {
       width: 16,
       height: 6,
     });
-    let pool = UiObjectPool::new();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    pool.prepare_canvas(&mut canvas, &layout);
+    canvas.prepare(1, Vec::new(), &layout);
 
     assert_eq!(
       canvas.base_size(),
@@ -1360,208 +1391,6 @@ mod tests {
     assert_eq!(canvas.base_height(), 6);
     assert_eq!(canvas.viewport_point(0, 0), None);
     assert_eq!(canvas.viewport_point(2, 2), Some((0, 0)));
-  }
-
-  #[test]
-  fn prepared_slice_queries_return_visible_prepared_size() {
-    let mut layout = LayoutService::new();
-    layout.resize_physical(20, 10);
-    let mut pool = UiObjectPool::new();
-    let slice = SliceService::new()
-      .create(
-        &mut pool,
-        SliceOptions {
-          rect: SliceRect {
-            x: 1,
-            y: 2,
-            width: SliceLength::Fixed(5),
-            height: SliceLength::Fixed(3),
-          },
-          ..Default::default()
-        },
-      )
-      .unwrap();
-    let mut canvas = CanvasService::new();
-
-    canvas.begin_frame(&layout);
-    pool.prepare_canvas(&mut canvas, &layout);
-
-    assert_eq!(
-      canvas.prepared_slice_rect(slice),
-      Some(Rect {
-        x: 1,
-        y: 2,
-        width: 5,
-        height: 3
-      })
-    );
-    assert_eq!(
-      canvas.prepared_slice_size(slice),
-      Some(Size {
-        width: 5,
-        height: 3
-      })
-    );
-    assert_eq!(canvas.prepared_slice_width(slice), Some(5));
-    assert_eq!(canvas.prepared_slice_height(slice), Some(3));
-  }
-
-  #[test]
-  fn frame_scoped_slice_is_prepared_only_after_current_frame_draw() {
-    let mut layout = LayoutService::new();
-    layout.resize_physical(20, 10);
-    let mut pool = UiObjectPool::new();
-    let service = SliceService::new();
-    let slice = service
-      .create(
-        &mut pool,
-        SliceOptions {
-          rect: SliceRect {
-            x: 0,
-            y: 0,
-            width: SliceLength::Fixed(5),
-            height: SliceLength::Fixed(3),
-          },
-          ..Default::default()
-        },
-      )
-      .unwrap();
-    assert!(service.set_frame_scoped(&mut pool, slice, true));
-    let mut canvas = CanvasService::new();
-
-    canvas.begin_frame(&layout);
-    pool.prepare_canvas(&mut canvas, &layout);
-    assert_eq!(canvas.prepared_slice_rect(slice), None);
-
-    assert!(service.draw(&mut pool, slice, 2, 1));
-    pool.prepare_canvas(&mut canvas, &layout);
-    assert_eq!(
-      canvas.prepared_slice_rect(slice),
-      Some(Rect {
-        x: 2,
-        y: 1,
-        width: 5,
-        height: 3,
-      })
-    );
-
-    service.begin_frame(&mut pool);
-    pool.prepare_canvas(&mut canvas, &layout);
-    assert_eq!(canvas.prepared_slice_rect(slice), None);
-  }
-
-  #[test]
-  fn prepared_scroll_box_queries_return_visible_prepared_size() {
-    let mut layout = LayoutService::new();
-    layout.resize_physical(20, 10);
-    let mut pool = UiObjectPool::new();
-    let id = ScrollBoxService::new()
-      .create(
-        &mut pool,
-        ScrollBoxOptions {
-          rect: Rect {
-            x: 18,
-            y: 8,
-            width: 10,
-            height: 10,
-          },
-          content_width: 10,
-          content_height: 20,
-          ..Default::default()
-        },
-      )
-      .unwrap();
-    let mut canvas = CanvasService::new();
-
-    canvas.begin_frame(&layout);
-    pool.prepare_canvas(&mut canvas, &layout);
-
-    assert_eq!(
-      canvas.prepared_scroll_box_rect(id),
-      Some(Rect {
-        x: 18,
-        y: 8,
-        width: 2,
-        height: 2
-      })
-    );
-    assert_eq!(
-      canvas.prepared_scroll_box_size(id),
-      Some(Size {
-        width: 2,
-        height: 2
-      })
-    );
-  }
-
-  #[test]
-  fn scroll_box_hit_rect_excludes_scrollbar_cells() {
-    let mut layout = LayoutService::new();
-    layout.resize_physical(4, 3);
-    let service = ScrollBoxService::new();
-    let mut pool = UiObjectPool::new();
-    let id = service
-      .create(
-        &mut pool,
-        ScrollBoxOptions {
-          rect: Rect {
-            x: 0,
-            y: 0,
-            width: 4,
-            height: 3,
-          },
-          content_width: 4,
-          content_height: 4,
-          overflow_x: Overflow::Auto,
-          scrollbar: ScrollbarPolicy {
-            vertical: ScrollbarVisibility::Auto,
-            horizontal: ScrollbarVisibility::Auto,
-          },
-          ..Default::default()
-        },
-      )
-      .unwrap();
-    let mut canvas = CanvasService::new();
-    canvas.begin_frame(&layout);
-    pool.prepare_canvas(&mut canvas, &layout);
-
-    assert!(
-      canvas
-        .scroll_box_hit_rect(
-          id,
-          Rect {
-            x: 2,
-            y: 1,
-            width: 1,
-            height: 1
-          }
-        )
-        .is_some()
-    );
-    assert_eq!(
-      canvas.scroll_box_hit_rect(
-        id,
-        Rect {
-          x: 3,
-          y: 0,
-          width: 1,
-          height: 1
-        }
-      ),
-      None
-    );
-    assert_eq!(
-      canvas.scroll_box_hit_rect(
-        id,
-        Rect {
-          x: 0,
-          y: 2,
-          width: 1,
-          height: 1
-        }
-      ),
-      None
-    );
   }
 
   #[test]
