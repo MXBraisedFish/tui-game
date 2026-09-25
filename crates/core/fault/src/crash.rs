@@ -4,9 +4,7 @@ use std::panic;
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
-use crate::host_engine::services::TerminalService;
-
-use super::fault::{CapturedPanic, HostFault, capture_panic, current_fault_domain, is_supervised};
+use crate::{CapturedPanic, HostFault, capture_panic, current_fault_domain, is_supervised};
 
 /// 崩溃阶段枚举，用于在 panic 时标识当前所处的生命周期阶段
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,8 +35,8 @@ pub fn current_crash_phase() -> CrashPhase {
   }
 }
 
-/// 安装自定义 panic 钩子，在崩溃时恢复终端状态并打印当前阶段
-pub fn install_panic_hook() {
+/// 安装自定义 panic 钩子，在崩溃时通过 `restore_terminal` 恢复终端状态并打印当前阶段
+pub fn install_panic_hook(restore_terminal: fn()) {
   CRASH_RECORDED.store(false, Ordering::SeqCst);
   let previous_hook = panic::take_hook();
 
@@ -63,7 +61,7 @@ pub fn install_panic_hook() {
       return;
     }
 
-    let logged = final_restore_and_log(&format!(
+    let logged = final_restore_and_log(restore_terminal, &format!(
       "phase={phase:?}\nkind=Panic\nlocation={}\ndetail={}\nbacktrace={}\n",
       panic_info
         .location()
@@ -96,8 +94,8 @@ pub fn finalize_host_fault(run_id: &str, fault: &HostFault) -> bool {
   ))
 }
 
-fn final_restore_and_log(record: &str) -> bool {
-  TerminalService::force_restore();
+fn final_restore_and_log(restore_terminal: fn(), record: &str) -> bool {
+  restore_terminal();
   append_crash_record(record)
 }
 
@@ -129,4 +127,23 @@ fn crash_log_dir() -> std::path::PathBuf {
     return directory.join("data/log");
   }
   std::path::PathBuf::from("data/log")
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn crash_phase_round_trips_through_the_global_slot() {
+    for phase in [
+      CrashPhase::Init,
+      CrashPhase::Runtime,
+      CrashPhase::Shutdown,
+      CrashPhase::Stopped,
+      CrashPhase::Boot,
+    ] {
+      set_crash_phase(phase);
+      assert_eq!(current_crash_phase(), phase);
+    }
+  }
 }

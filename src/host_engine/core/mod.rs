@@ -1,6 +1,5 @@
 pub mod boot_output;
 pub mod clock;
-pub mod crash;
 pub mod exit_state;
 pub use tg_core_fault as fault;
 pub mod frame;
@@ -9,7 +8,7 @@ pub mod state_machine;
 pub mod world;
 pub use boot_output::BootOutput;
 pub use clock::EngineClock;
-pub use crash::{CrashPhase, finalize_host_fault, install_panic_hook, set_crash_phase};
+pub use fault::{CrashPhase, finalize_host_fault, install_panic_hook, set_crash_phase};
 pub use exit_state::ExitState;
 pub use fault::{HostFault, HostFaultDomain, HostFaultPhase, catch_host_fault, with_fault_domain};
 pub use frame::FrameScheduler;

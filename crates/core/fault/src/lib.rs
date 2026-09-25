@@ -3,6 +3,10 @@ use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::panic::{self, AssertUnwindSafe};
 
+mod crash;
+
+pub use crash::{CrashPhase, finalize_host_fault, install_panic_hook, set_crash_phase};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostFaultPhase {
   Boot,
