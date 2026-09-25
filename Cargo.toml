@@ -38,6 +38,7 @@ tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
 tg-service-i18n = { path = "crates/service/i18n" }
+tg-service-layout = { path = "crates/service/layout" }
 tg-service-log = { path = "crates/service/log" }
 tg-service-random = { path = "crates/service/random" }
 tg-service-storage = { path = "crates/service/storage" }

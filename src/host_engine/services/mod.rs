@@ -8,7 +8,7 @@ mod file;
 use tg_service_i18n as i18n;
 mod image;
 mod input;
-mod layout;
+use tg_service_layout as layout;
 use tg_service_log as log;
 mod lua;
 mod network;

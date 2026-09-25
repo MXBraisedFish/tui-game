@@ -1,8 +1,8 @@
 use super::types::Size;
-use crate::host_engine::services::DrawTextParams;
-use crate::host_engine::services::RichTextParams;
-use crate::host_engine::services::text_layout;
-use crate::host_engine::services::rich_text::TextMode;
+use tg_service_text_layout::DrawTextParams;
+use tg_service_rich_text::RichTextParams;
+use tg_service_text_layout as text_layout;
+use tg_service_rich_text::TextMode;
 
 /// 计算文本的渲染尺寸
 pub fn get_text_size(text: &str, params: Option<&RichTextParams>) -> Size {
@@ -62,7 +62,7 @@ pub fn get_terminal_size() -> Size {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::text_layout::TextWrapMode;
+  use tg_service_text_layout::TextWrapMode;
 
   #[test]
   fn draw_text_measure_respects_auto_wrap() {

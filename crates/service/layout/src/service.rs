@@ -1,7 +1,7 @@
 use super::types::{Position, Rect, Size};
 use super::{measure, position};
-use crate::host_engine::services::DrawTextParams;
-use crate::host_engine::services::RichTextParams;
+use tg_service_text_layout::DrawTextParams;
+use tg_service_rich_text::RichTextParams;
 
 /// 布局服务，管理终端尺寸、视口和坐标计算
 pub struct LayoutService {
@@ -80,12 +80,12 @@ impl LayoutService {
     self.viewport
   }
 
-  pub(crate) fn resize_physical(&mut self, width: u16, height: u16) {
+  pub fn resize_physical(&mut self, width: u16, height: u16) {
     self.physical = Size { width, height };
     self.resolve_viewport();
   }
 
-  pub(crate) fn set_developer_viewport(&mut self, rect: Rect) {
+  pub fn set_developer_viewport(&mut self, rect: Rect) {
     self.viewport_request = Some(rect);
     self.resolve_viewport();
   }
@@ -153,7 +153,7 @@ impl LayoutService {
     )
   }
 
-  pub(crate) fn resolve_host_x(&self, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
+  pub fn resolve_host_x(&self, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
     position::resolve_x(self.physical, x_anchor, content_width, offset_x)
   }
 

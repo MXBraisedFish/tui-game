@@ -1,3 +1,5 @@
+//! Layout service: physical/developer viewport sizes, anchor resolution and text measurement.
+
 mod measure;
 mod position;
 mod service;
