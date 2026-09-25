@@ -3489,6 +3489,15 @@ name = "tg-core-version"
 version = "2.0.0"
 
 [[package]]
+name = "tg-service-animation"
+version = "2.0.0"
+dependencies = [
+ "tg-core-arena",
+ "tg-core-style",
+ "unicode-width",
+]
+
+[[package]]
 name = "tg-service-clipboard"
 version = "2.0.0"
 dependencies = [
@@ -4009,6 +4018,7 @@ dependencies = [
  "tg-core-style",
  "tg-core-unicode",
  "tg-core-version",
+ "tg-service-animation",
  "tg-service-clipboard",
  "tg-service-code-highlight",
  "tg-service-ffmpeg",

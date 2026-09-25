@@ -1,3 +1,5 @@
+//! Animation service: tween/clip playback, animated values and character effects.
+
 mod easing;
 mod effect;
 mod pool;

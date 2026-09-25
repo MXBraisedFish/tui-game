@@ -48,6 +48,7 @@ tg-service-host-object = { path = "crates/service/host_object" }
 tg-service-popup = { path = "crates/service/popup" }
 tg-service-input-method = { path = "crates/service/input_method" }
 tg-service-ffmpeg = { path = "crates/service/ffmpeg" }
+tg-service-animation = { path = "crates/service/animation" }
 tg-service-clipboard = { path = "crates/service/clipboard" }
 crossbeam-channel = "0.5"
 crossterm = { workspace = true }

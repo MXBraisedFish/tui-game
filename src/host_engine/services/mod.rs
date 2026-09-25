@@ -1,4 +1,4 @@
-pub(crate) mod animation;
+pub(crate) use tg_service_animation as animation;
 mod async_runtime;
 mod audio;
 mod canvas;

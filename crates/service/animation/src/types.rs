@@ -1,6 +1,6 @@
 use std::{fmt, str::FromStr, sync::Arc, time::Duration};
 
-use crate::host_engine::services::TextColor;
+use tg_core_style::TextColor;
 use unicode_width::UnicodeWidthStr;
 
 const MAX_CHARACTER_FRAMES: usize = 4_096;
@@ -14,7 +14,7 @@ pub struct AnimationId {
 }
 
 impl AnimationId {
-  pub(crate) fn new(index: u32, generation: u32) -> Self {
+  pub fn new(index: u32, generation: u32) -> Self {
     Self { index, generation }
   }
 

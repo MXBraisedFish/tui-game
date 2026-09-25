@@ -224,6 +224,11 @@ impl AnimationObjects {
     }
   }
 
+  /// Number of live animation playbacks.
+  pub fn animation_count(&self) -> usize {
+    self.animations.ids().len()
+  }
+
   pub(crate) fn remove_animations_targeting(&mut self, target: AnimationTarget) {
     let ids = self
       .animations
