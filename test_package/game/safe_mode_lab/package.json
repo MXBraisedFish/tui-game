@@ -2,19 +2,19 @@
   "mod_id": "test.safe_mode_lab",
   "schema_version": 1,
   "type": "game",
-  "version": "1.0.0",
-  "version_code": 1,
+  "version": "1.1.0",
+  "version_code": 2,
   "api": { "min": 1, "max": 1 },
   "entry": "main",
   "display": {
     "title": "Safe Mode Lab",
-    "description": "Exercises per-session debug logs and high-privilege file writes.",
+    "description": "Exercises per-session debug logs and the high-privilege file API.",
     "author": "TUI GAME"
   },
   "runtime": { "min_width": 70, "min_height": 23 },
   "game": {
     "name": "f%<fg:bright_red>Safe Mode</fg> Lab",
-    "detail": "The write probe is ignored in Safe Mode and dispatched when Safe Mode is disabled.",
+    "detail": "File writes are ignored in Safe Mode and dispatched when Safe Mode is disabled. Debug output appears only in debug mode.",
     "high_privilege": true,
     "mouse": false,
     "truecolor": false,
@@ -24,6 +24,8 @@
     "score": { "enabled": true, "empty_text": "No probe run yet" },
     "actions": {
       "write_probe": { "description": "Write the Safe Mode probe", "keys": [["p"]] },
+      "read_probe": { "description": "Read the probe back", "keys": [["r"]] },
+      "list_probe": { "description": "List the state folder", "keys": [["l"]] },
       "leave": { "description": "Return to game list", "keys": [["esc"]], "lock": true }
     }
   }

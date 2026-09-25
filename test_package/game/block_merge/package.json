@@ -2,29 +2,32 @@
   "mod_id": "test.block_merge",
   "schema_version": 1,
   "type": "game",
-  "version": "1.0.0",
-  "version_code": 1,
+  "version": "1.1.0",
+  "version_code": 2,
   "api": { "min": 1, "max": 1 },
   "entry": "main",
   "display": {
     "title": "Block Merge",
-    "description": "A compact random and serialization API exercise.",
-    "author": "TUI GAME"
+    "description": "A 4x4 sliding merge puzzle that exercises loader, random, table, align and serialization APIs.",
+    "author": { "type": "text", "text": "TUI GAME" }
   },
-  "runtime": { "min_width": 64, "min_height": 22 },
+  "runtime": { "min_width": 40, "min_height": 22 },
   "game": {
     "name": "f%<fg:bright_magenta>Block</fg> Merge",
-    "detail": "Roll blocks, merge their values, and store a serializable board.",
+    "detail": "Slide the board to merge equal blocks. Each move spawns a new block from a seeded generator; the board can be continued later.",
     "high_privilege": false,
     "mouse": false,
     "truecolor": false,
     "target_fps": 60,
-    "save": false,
+    "save": true,
     "language": ["en_us"],
-    "score": { "enabled": false, "empty_text": "No merged blocks yet" },
+    "score": { "enabled": true, "empty_text": "No merged blocks yet" },
     "actions": {
-      "roll": { "description": "Roll a new block", "keys": [["space"]] },
-      "merge": { "description": "Merge all blocks", "keys": [["enter"]] },
+      "move_up": { "description": "Slide up", "keys": [["w"], ["up"]] },
+      "move_down": { "description": "Slide down", "keys": [["s"], ["down"]] },
+      "move_left": { "description": "Slide left", "keys": [["a"], ["left"]] },
+      "move_right": { "description": "Slide right", "keys": [["d"], ["right"]] },
+      "restart": { "description": "Start a new board", "keys": [["r"]] },
       "leave": { "description": "Return to game list", "keys": [["esc"]], "lock": true }
     }
   }

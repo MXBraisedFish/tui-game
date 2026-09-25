@@ -1,0 +1,9 @@
+{
+  "title": "Trail Runner",
+  "score": "Score",
+  "best": "Best",
+  "length": "Length",
+  "paused": "Paused",
+  "crashed": "The runner crossed the trail. Steer to start again.",
+  "help": "Steer with WASD or arrows, Space pauses, Esc leaves."
+}

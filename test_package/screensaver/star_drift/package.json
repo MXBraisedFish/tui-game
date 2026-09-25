@@ -2,16 +2,16 @@
   "mod_id": "test.star_drift",
   "schema_version": 1,
   "type": "screensaver",
-  "version": "1.0.0",
-  "version_code": 1,
+  "version": "1.1.0",
+  "version_code": 2,
   "api": { "min": 1, "max": 1 },
   "entry": "main",
   "display": {
     "title": "Star Drift",
-    "description": "A deterministic random star field.",
+    "description": "Three parallax star layers drift across the screen; exercises seeded random generators.",
     "author": "TUI GAME"
   },
-  "runtime": { "min_width": 48, "min_height": 18 },
+  "runtime": { "min_width": 40, "min_height": 12 },
   "screensaver": {
     "name": "Star Drift",
     "truecolor": false,
