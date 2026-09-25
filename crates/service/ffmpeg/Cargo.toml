@@ -1,0 +1,6 @@
+[package]
+name = "tg-service-ffmpeg"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

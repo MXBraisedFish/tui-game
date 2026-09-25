@@ -1,3 +1,5 @@
+//! FFmpeg service: locates an ffmpeg executable and probes its encoders.
+
 use std::{
   collections::HashSet,
   ffi::OsStr,
