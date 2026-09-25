@@ -1,5 +1,5 @@
-use super::measure;
-use super::types::GraphemeInfo;
+use tg_core_unicode as measure;
+use tg_core_unicode::GraphemeInfo;
 
 /// Unicode 服务：封装字符宽度测量、字素拆分等 Unicode 相关工具方法。
 pub struct UnicodeService;

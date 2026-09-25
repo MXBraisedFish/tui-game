@@ -1,10 +1,8 @@
-mod measure;
 mod service;
-mod types;
 
-pub use measure::char_width;
-pub use measure::display_width;
+pub use tg_core_unicode::char_width;
+pub use tg_core_unicode::display_width;
 
-pub use measure::graphemes;
+pub use tg_core_unicode::graphemes;
 
 pub use service::UnicodeService;

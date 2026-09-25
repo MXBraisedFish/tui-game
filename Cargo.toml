@@ -9,6 +9,8 @@ edition = "2024"
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
+unicode-segmentation = "1.13.3"
+unicode-width = "0.2.2"
 
 [package]
 name = "tui-game"
@@ -33,6 +35,7 @@ tg-core-input = { path = "crates/core/input" }
 tg-core-log = { path = "crates/core/log" }
 tg-core-package-id = { path = "crates/core/package_id" }
 tg-core-style = { path = "crates/core/style" }
+tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 arboard = { version = "3.6.1", default-features = false }
 crossbeam-channel = "0.5"
@@ -43,8 +46,8 @@ encoding_rs = "0.8.35"
 chardetng = "1.0.0"
 anyhow = "1.0.103"
 notify = "8"
-unicode-width = "0.2.2"
-unicode-segmentation = "1.13.3"
+unicode-width = { workspace = true }
+unicode-segmentation = { workspace = true }
 unicode-linebreak = "0.1.5"
 once_cell = "1.19"
 serde = { version = "1.0", features = ["derive"] }

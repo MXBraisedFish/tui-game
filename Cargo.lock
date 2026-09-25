@@ -3473,6 +3473,14 @@ name = "tg-core-style"
 version = "2.0.0"
 
 [[package]]
+name = "tg-core-unicode"
+version = "2.0.0"
+dependencies = [
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "tg-core-version"
 version = "2.0.0"
 
@@ -3883,6 +3891,7 @@ dependencies = [
  "tg-core-log",
  "tg-core-package-id",
  "tg-core-style",
+ "tg-core-unicode",
  "tg-core-version",
  "toml",
  "tree-sitter",
