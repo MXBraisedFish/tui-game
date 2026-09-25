@@ -2,7 +2,6 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::types::GraphemeInfo;
-use crate::host_engine::services::rich_text::RichText;
 
 /// 获取单个字符的终端列宽（0 表示组合字符或控制字符）。
 pub fn char_width(ch: char) -> usize {
@@ -12,15 +11,6 @@ pub fn char_width(ch: char) -> usize {
 /// 获取字符串在终端中的显示宽度（按 Unicode 列宽计算）。
 pub fn display_width(text: &str) -> usize {
   UnicodeWidthStr::width(text)
-}
-
-/// 计算富文本的总显示宽度（所有分段的宽度之和）。
-pub fn rich_text_width(rich_text: &RichText) -> usize {
-  rich_text
-    .segments
-    .iter()
-    .map(|segment| display_width(&segment.text))
-    .sum()
 }
 
 /// 将字符串按字素边界拆分为 GraphemeInfo 列表。
@@ -33,15 +23,10 @@ pub fn graphemes(text: &str) -> Vec<GraphemeInfo> {
     .collect()
 }
 
-/// 获取单行字符串的总显示宽度（按字素宽度求和）。
-pub fn line_display_width(line: &str) -> usize {
-  graphemes(line).iter().map(|g| g.display_width).sum()
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::rich_text::RichTextSegment;
+
   #[test]
   fn zero_width_zwj() {
     assert_eq!(display_width("\u{200D}"), 0);
@@ -123,21 +108,5 @@ mod tests {
     assert_eq!(gs.len(), 2);
     assert_eq!(gs[0].display_width, 2);
     assert_eq!(gs[1].display_width, 2);
-  }
-
-  #[test]
-  fn line_display_width_matches() {
-    assert_eq!(line_display_width("Hello世界"), display_width("Hello世界"));
-  }
-
-  #[test]
-  fn rich_text_width_basic() {
-    let rt = RichText {
-      segments: vec![RichTextSegment {
-        text: "Hello世界".to_string(),
-        style: Default::default(),
-      }],
-    };
-    assert_eq!(rich_text_width(&rt), 9);
   }
 }
