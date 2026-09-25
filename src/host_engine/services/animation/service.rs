@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::host_engine::services::widget::runtime_object::RuntimeObjectPool;
+use super::AnimationObjects;
 
 use super::easing;
 use super::pool::{AnimatedValue, AnimationPlayback};
@@ -25,7 +25,7 @@ impl AnimationService {
 
   pub fn play(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     owner: AnimationOwner,
     source: AnimationSource,
     bindings: Vec<AnimationBinding>,
@@ -49,7 +49,7 @@ impl AnimationService {
 
   pub fn update(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     clock: AnimationClock,
     dt: Duration,
   ) -> AnimationUpdate {
@@ -86,7 +86,7 @@ impl AnimationService {
 
   pub fn update_and_apply(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     clock: AnimationClock,
     dt: Duration,
     router: &mut impl AnimationTargetRouter,
@@ -118,7 +118,7 @@ impl AnimationService {
 
   pub fn start(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
   ) -> Result<(), AnimationError> {
     let id = handle.id();
@@ -140,7 +140,7 @@ impl AnimationService {
 
   pub fn pause(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
   ) -> Result<(), AnimationError> {
     let playback = pool
@@ -159,7 +159,7 @@ impl AnimationService {
 
   pub fn resume(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
   ) -> Result<(), AnimationError> {
     let playback = pool
@@ -178,7 +178,7 @@ impl AnimationService {
 
   pub fn cancel(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
   ) -> Result<AnimationUpdate, AnimationError> {
     let id = handle.id();
@@ -209,7 +209,7 @@ impl AnimationService {
 
   pub fn finish(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
   ) -> Result<AnimationUpdate, AnimationError> {
     let id = handle.id();
@@ -232,7 +232,7 @@ impl AnimationService {
 
   pub fn reset(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
   ) -> Result<AnimationUpdate, AnimationError> {
     let id = handle.id();
@@ -267,7 +267,7 @@ impl AnimationService {
 
   pub fn remove(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
   ) -> Result<AnimationUpdate, AnimationError> {
     let output = self.reset(pool, handle)?;
@@ -280,7 +280,7 @@ impl AnimationService {
 
   pub fn clear_owner(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     owner: AnimationOwner,
   ) -> AnimationUpdate {
     let mut output = AnimationUpdate::default();
@@ -293,28 +293,28 @@ impl AnimationService {
     output
   }
 
-  pub fn state(&self, pool: &RuntimeObjectPool, handle: AnimationHandle) -> Option<PlaybackState> {
+  pub fn state(&self, pool: &AnimationObjects, handle: AnimationHandle) -> Option<PlaybackState> {
     Some(pool.animations.get(handle.id())?.state)
   }
 
-  pub fn elapsed(&self, pool: &RuntimeObjectPool, handle: AnimationHandle) -> Option<Duration> {
+  pub fn elapsed(&self, pool: &AnimationObjects, handle: AnimationHandle) -> Option<Duration> {
     Some(pool.animations.get(handle.id())?.elapsed)
   }
 
-  pub fn progress(&self, pool: &RuntimeObjectPool, handle: AnimationHandle) -> Option<f64> {
+  pub fn progress(&self, pool: &AnimationObjects, handle: AnimationHandle) -> Option<f64> {
     let playback = pool.animations.get(handle.id())?;
     Some(
       (playback.elapsed.as_secs_f64() / playback.source.duration().as_secs_f64()).clamp(0.0, 1.0),
     )
   }
 
-  pub fn completed_cycles(&self, pool: &RuntimeObjectPool, handle: AnimationHandle) -> Option<u32> {
+  pub fn completed_cycles(&self, pool: &AnimationObjects, handle: AnimationHandle) -> Option<u32> {
     Some(pool.animations.get(handle.id())?.completed_cycles)
   }
 
   pub fn set_speed(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
     speed: f64,
   ) -> bool {
@@ -330,7 +330,7 @@ impl AnimationService {
 
   pub fn take_events(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     handle: AnimationHandle,
   ) -> Vec<AnimationEvent> {
     let id = handle.id();
@@ -348,20 +348,20 @@ impl AnimationService {
 
   pub fn take_callback_requests(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
   ) -> Vec<AnimationCallbackRequest> {
     pool.animations.callback_requests.drain(..).collect()
   }
 
   pub fn create_value(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     value: AnimationValue,
   ) -> AnimationValueId {
     pool.animation_values.insert(value)
   }
 
-  pub fn remove_value(&self, pool: &mut RuntimeObjectPool, id: AnimationValueId) -> bool {
+  pub fn remove_value(&self, pool: &mut AnimationObjects, id: AnimationValueId) -> bool {
     let removed = pool.animation_values.remove(id).is_some();
     if removed {
       pool.remove_animations_targeting(AnimationTarget::Value(id));
@@ -371,7 +371,7 @@ impl AnimationService {
 
   pub fn value<'a>(
     &self,
-    pool: &'a RuntimeObjectPool,
+    pool: &'a AnimationObjects,
     id: AnimationValueId,
   ) -> Option<&'a AnimationValue> {
     Some(pool.animation_values.get(id)?.resolved())
@@ -379,7 +379,7 @@ impl AnimationService {
 
   pub fn set_value(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     id: AnimationValueId,
     value: AnimationValue,
   ) -> Result<(), AnimationError> {
@@ -410,7 +410,7 @@ impl AnimationService {
 
   fn advance(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     id: AnimationId,
     playback: &mut AnimationPlayback,
     mut remaining: Duration,
@@ -458,7 +458,7 @@ impl AnimationService {
 
   fn complete(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     id: AnimationId,
     playback: &mut AnimationPlayback,
     output: &mut AnimationUpdate,
@@ -515,7 +515,7 @@ impl AnimationService {
 
   fn emit_markers(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     id: AnimationId,
     playback: &AnimationPlayback,
     previous: Duration,
@@ -553,7 +553,7 @@ impl AnimationService {
 
   fn push_event(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     id: AnimationId,
     playback: &AnimationPlayback,
     kind: AnimationEventKind,
@@ -574,7 +574,7 @@ impl AnimationService {
     }
   }
 
-  fn apply_internal_writes(&self, pool: &mut RuntimeObjectPool, writes: &[AnimationWrite]) {
+  fn apply_internal_writes(&self, pool: &mut AnimationObjects, writes: &[AnimationWrite]) {
     for write in writes {
       match write.target {
         AnimationTarget::Value(id) if write.property == AnimationProperty::Value => {
@@ -645,7 +645,7 @@ impl AnimationService {
 
   fn validate_internal_targets(
     &self,
-    pool: &RuntimeObjectPool,
+    pool: &AnimationObjects,
     bindings: &[AnimationBinding],
   ) -> Result<(), AnimationError> {
     for binding in bindings {

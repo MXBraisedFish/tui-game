@@ -270,9 +270,9 @@ impl HomeLogo {
     let Some(handle) = self.animation else {
       return;
     };
-    animation.update(pool, AnimationClock::Ui, dt);
-    let time = animation.completed_cycles(pool, handle).unwrap_or(0) as f64
-      + animation.progress(pool, handle).unwrap_or(0.0);
+    animation.update(&mut pool.animation, AnimationClock::Ui, dt);
+    let time = animation.completed_cycles(&pool.animation, handle).unwrap_or(0) as f64
+      + animation.progress(&pool.animation, handle).unwrap_or(0.0);
     let mut rng = self.random.map(|id| LogoRandom::new(random, pool, id));
     match &mut self.dynamic {
       Some(DynamicLogo::Neon(logo)) => logo.advance(time),
@@ -290,10 +290,10 @@ fn create_clock(
   animation: &AnimationService,
   pool: &mut RuntimeObjectPool,
 ) -> Option<AnimationHandle> {
-  let value = animation.create_value(pool, AnimationValue::Float(0.0));
+  let value = animation.create_value(&mut pool.animation, AnimationValue::Float(0.0));
   animation
     .play(
-      pool,
+      &mut pool.animation,
       AnimationOwner::Host,
       AnimationSource::Tween(Arc::new(TweenDefinition {
         from: AnimationValue::Float(0.0),
@@ -407,7 +407,7 @@ mod tests {
       &mut classic_pool,
     );
     assert_eq!(classic.mode(), DisplayLogoMode::Classic);
-    assert!(classic_pool.animations.ids().is_empty());
+    assert!(classic_pool.animation.animations.ids().is_empty());
     assert!(classic_pool.random_generators.is_empty());
 
     let mut neon_pool = RuntimeObjectPool::new();
@@ -419,7 +419,7 @@ mod tests {
       &mut neon_pool,
     );
     assert_eq!(neon.mode(), DisplayLogoMode::Neon);
-    assert_eq!(neon_pool.animations.ids().len(), 1);
+    assert_eq!(neon_pool.animation.animations.ids().len(), 1);
     assert!(neon_pool.random_generators.is_empty());
 
     let mut error_pool = RuntimeObjectPool::new();
@@ -431,7 +431,7 @@ mod tests {
       &mut error_pool,
     );
     assert_eq!(error.mode(), DisplayLogoMode::Error);
-    assert_eq!(error_pool.animations.ids().len(), 1);
+    assert_eq!(error_pool.animation.animations.ids().len(), 1);
     assert_eq!(error_pool.random_generators.len(), 1);
   }
 }

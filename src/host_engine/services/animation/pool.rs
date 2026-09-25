@@ -4,7 +4,7 @@ use std::time::Duration;
 use super::{
   AnimationBinding, AnimationCallbackRequest, AnimationClock, AnimationEndMode, AnimationEvent,
   AnimationId, AnimationOwner, AnimationPlaybackOptions, AnimationRepeatOptions, AnimationSource,
-  AnimationValue, AnimationValueId, CellEffectId, EffectParameterId, PlaybackDirection,
+  AnimationTarget, AnimationValue, AnimationValueId, CellEffectId, EffectParameterId, PlaybackDirection,
   PlaybackState,
 };
 
@@ -205,5 +205,53 @@ impl CharacterEffectPool {
 
   pub(crate) fn remove(&mut self, id: CellEffectId) -> Option<CharacterEffect> {
     self.effects.remove(id.index(), id.generation())
+  }
+}
+
+/// 一个运行时对象池中的全部动画对象：播放实例、动画值与字符特效
+pub struct AnimationObjects {
+  pub(crate) animations: AnimationPool,
+  pub(crate) animation_values: AnimationValuePool,
+  pub(crate) character_effects: CharacterEffectPool,
+}
+
+impl AnimationObjects {
+  pub fn new() -> Self {
+    Self {
+      animations: AnimationPool::new(),
+      animation_values: AnimationValuePool::new(),
+      character_effects: CharacterEffectPool::new(),
+    }
+  }
+
+  pub(crate) fn remove_animations_targeting(&mut self, target: AnimationTarget) {
+    let ids = self
+      .animations
+      .ids()
+      .into_iter()
+      .filter(|id| {
+        self.animations.get(*id).is_some_and(|playback| {
+          playback.owner == AnimationOwner::Object(target)
+            || playback
+              .bindings
+              .iter()
+              .any(|binding| binding.target == target)
+        })
+      })
+      .collect::<Vec<_>>();
+    for id in ids {
+      self.animations.remove(id);
+      self.animations.events.retain(|event| event.id != id);
+      self
+        .animations
+        .callback_requests
+        .retain(|request| request.event.id != id);
+    }
+  }
+}
+
+impl Default for AnimationObjects {
+  fn default() -> Self {
+    Self::new()
   }
 }

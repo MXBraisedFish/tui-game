@@ -1,7 +1,5 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
-use crate::host_engine::services::widget::runtime_object::RuntimeObjectPool;
-
 use super::*;
 
 fn float_tween(from: f64, to: f64, milliseconds: u64) -> AnimationSource {
@@ -33,7 +31,7 @@ fn float(value: Option<&AnimationValue>) -> f64 {
 #[test]
 fn tween_updates_and_commits_a_standalone_value() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let handle = service
     .play(
@@ -55,7 +53,7 @@ fn tween_updates_and_commits_a_standalone_value() {
 #[test]
 fn delay_and_clock_select_only_the_matching_playback() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let ui_value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let game_value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let delayed = AnimationPlaybackOptions {
@@ -96,7 +94,7 @@ fn delay_and_clock_select_only_the_matching_playback() {
 #[test]
 fn ping_pong_repeat_returns_to_the_start_value() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let handle = service
     .play(
@@ -123,7 +121,7 @@ fn ping_pong_repeat_returns_to_the_start_value() {
 #[test]
 fn restart_repeat_samples_the_next_cycle_start_at_the_boundary() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let handle = service
     .play(
@@ -150,7 +148,7 @@ fn restart_repeat_samples_the_next_cycle_start_at_the_boundary() {
 #[test]
 fn cancel_commits_current_value_and_reset_restores_initial_value() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(2.0));
   let handle = service
     .play(
@@ -174,7 +172,7 @@ fn cancel_commits_current_value_and_reset_restores_initial_value() {
 #[test]
 fn restore_end_mode_removes_the_override_without_changing_base() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(3.0));
   let handle = service
     .play(
@@ -196,7 +194,7 @@ fn restore_end_mode_removes_the_override_without_changing_base() {
 #[test]
 fn controls_report_invalid_state_and_generation_ids_reject_stale_handles() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let options = AnimationPlaybackOptions {
     auto_play: false,
@@ -238,7 +236,7 @@ fn controls_report_invalid_state_and_generation_ids_reject_stale_handles() {
 #[test]
 fn markers_events_and_callbacks_preserve_occurrence_order() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let clip = AnimationClip {
     duration: Duration::from_millis(100),
@@ -306,7 +304,7 @@ fn markers_events_and_callbacks_preserve_occurrence_order() {
 #[test]
 fn owner_cleanup_removes_only_owned_playbacks() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let first = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let second = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let first_handle = service
@@ -360,7 +358,7 @@ fn character_frames_normalize_newlines_and_allow_different_dimensions() {
 #[test]
 fn character_frames_use_step_sampling_and_replace_the_whole_frame() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let initial = AnimationValue::CharacterFrame(Arc::from(["old".to_string()]));
   let value = service.create_value(&mut pool, initial.clone());
   let clip = AnimationClip::character_frames_from_text(vec![
@@ -394,7 +392,7 @@ fn character_frames_use_step_sampling_and_replace_the_whole_frame() {
 fn effect_parameters_are_animatable_without_per_cell_tweens() {
   let animation = AnimationService::new();
   let effects = CharacterEffectService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let effect = effects.create(
     &mut pool,
     HashMap::from([(EffectParameterId::PHASE, AnimationValue::Float(0.0))]),
@@ -444,7 +442,7 @@ impl AnimationTargetRouter for MissingTargetRouter {
 #[test]
 fn external_targets_are_applied_only_through_the_router() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let target = AnimationTarget::Ui(UiObjectRef {
     pool: UiPoolId(4),
     kind: UiObjectKind::ProgressBar,
@@ -481,7 +479,7 @@ fn external_targets_are_applied_only_through_the_router() {
 #[test]
 fn missing_external_target_cancels_its_animation() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let target = AnimationTarget::Ui(UiObjectRef {
     pool: UiPoolId(4),
     kind: UiObjectKind::ProgressBar,
@@ -550,7 +548,7 @@ fn property_names_support_stable_aliases() {
 #[test]
 fn back_easing_can_overshoot_continuous_values() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let source = AnimationSource::Tween(Arc::new(TweenDefinition {
     from: AnimationValue::Float(0.0),
@@ -576,7 +574,7 @@ fn back_easing_can_overshoot_continuous_values() {
 #[test]
 fn step_values_switch_only_at_the_timeline_boundary() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Text("before".into()));
   let source = AnimationSource::Tween(Arc::new(TweenDefinition {
     from: AnimationValue::Text("before".into()),
@@ -615,7 +613,7 @@ fn step_values_switch_only_at_the_timeline_boundary() {
 #[test]
 fn ping_pong_markers_follow_the_current_playback_direction() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let clip = AnimationClip {
     duration: Duration::from_millis(100),
@@ -679,7 +677,7 @@ fn ping_pong_markers_follow_the_current_playback_direction() {
 #[test]
 fn clip_samples_multiple_tracks_into_separate_writes() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let target = AnimationTarget::Ui(UiObjectRef {
     pool: UiPoolId(2),
     kind: UiObjectKind::Other,
@@ -760,7 +758,7 @@ fn clip_samples_multiple_tracks_into_separate_writes() {
 #[test]
 fn unsupported_target_property_is_rejected_before_playback() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let result = service.play(
     &mut pool,
     AnimationOwner::Host,
@@ -786,7 +784,7 @@ fn unsupported_target_property_is_rejected_before_playback() {
 #[test]
 fn changing_base_value_during_restore_animation_keeps_the_override_layer() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let handle = service
     .play(
@@ -813,7 +811,7 @@ fn changing_base_value_during_restore_animation_keeps_the_override_layer() {
 #[test]
 fn playback_speed_changes_only_future_time_advancement() {
   let service = AnimationService::new();
-  let mut pool = RuntimeObjectPool::new();
+  let mut pool = AnimationObjects::new();
   let value = service.create_value(&mut pool, AnimationValue::Float(0.0));
   let handle = service
     .play(

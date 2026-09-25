@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::host_engine::services::widget::runtime_object::RuntimeObjectPool;
+use super::AnimationObjects;
 
 use super::{AnimationError, AnimationTarget, AnimationValue, CellEffectId, EffectParameterId};
 
@@ -14,13 +14,13 @@ impl CharacterEffectService {
 
   pub fn create(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     parameters: HashMap<EffectParameterId, AnimationValue>,
   ) -> CellEffectId {
     pool.character_effects.insert(parameters)
   }
 
-  pub fn remove(&self, pool: &mut RuntimeObjectPool, id: CellEffectId) -> bool {
+  pub fn remove(&self, pool: &mut AnimationObjects, id: CellEffectId) -> bool {
     let removed = pool.character_effects.remove(id).is_some();
     if removed {
       pool.remove_animations_targeting(AnimationTarget::Effect(id));
@@ -28,13 +28,13 @@ impl CharacterEffectService {
     removed
   }
 
-  pub fn exists(&self, pool: &RuntimeObjectPool, id: CellEffectId) -> bool {
+  pub fn exists(&self, pool: &AnimationObjects, id: CellEffectId) -> bool {
     pool.character_effects.get(id).is_some()
   }
 
   pub fn parameter<'a>(
     &self,
-    pool: &'a RuntimeObjectPool,
+    pool: &'a AnimationObjects,
     id: CellEffectId,
     parameter: EffectParameterId,
   ) -> Option<&'a AnimationValue> {
@@ -50,7 +50,7 @@ impl CharacterEffectService {
 
   pub fn set_parameter(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     id: CellEffectId,
     parameter: EffectParameterId,
     value: AnimationValue,
@@ -75,7 +75,7 @@ impl CharacterEffectService {
 
   pub fn clear_override(
     &self,
-    pool: &mut RuntimeObjectPool,
+    pool: &mut AnimationObjects,
     id: CellEffectId,
     parameter: EffectParameterId,
   ) -> bool {
