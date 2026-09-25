@@ -3496,6 +3496,13 @@ name = "tg-service-ffmpeg"
 version = "2.0.0"
 
 [[package]]
+name = "tg-service-host-object"
+version = "2.0.0"
+dependencies = [
+ "tg-core-geometry",
+]
+
+[[package]]
 name = "tg-service-input-method"
 version = "2.0.0"
 dependencies = [
@@ -3925,6 +3932,7 @@ dependencies = [
  "tg-core-version",
  "tg-service-clipboard",
  "tg-service-ffmpeg",
+ "tg-service-host-object",
  "tg-service-input-method",
  "tg-service-popup",
  "tg-service-terminal",

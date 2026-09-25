@@ -6,7 +6,6 @@ mod code_highlight;
 mod event;
 pub(crate) mod export;
 mod file;
-mod host_object;
 mod i18n;
 mod image;
 mod input;
@@ -53,7 +52,7 @@ pub use event::EngineEventQueue;
 pub use export::{ExportAsyncEvent, ExportService, ExportTask};
 pub use tg_service_ffmpeg::{FfmpegInstallation, FfmpegService};
 pub use file::FileService;
-pub use host_object::{HostAreaKind, HostObjectPool};
+pub use tg_service_host_object::{HostAreaKind, HostObjectPool};
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};
 pub use input::{

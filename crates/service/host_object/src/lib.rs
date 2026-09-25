@@ -1,6 +1,8 @@
+//! Host object service: named host screen areas (top bar, developer viewport, ...) and their rects.
+
 use std::collections::HashMap;
 
-use super::{Rect, Size};
+use tg_core_geometry::{Rect, Size};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HostAreaId(pub u64);
@@ -90,7 +92,7 @@ impl HostObjectPool {
     self.area_by_kind(kind).is_some_and(|area| area.visible)
   }
 
-  pub(crate) fn ensure_area(&mut self, kind: HostAreaKind) -> HostAreaId {
+  pub fn ensure_area(&mut self, kind: HostAreaKind) -> HostAreaId {
     if let Some(id) = self.area_id(kind) {
       return id;
     }
@@ -99,7 +101,7 @@ impl HostObjectPool {
       .expect("host area kind should be unique")
   }
 
-  pub(crate) fn update_area(&mut self, id: HostAreaId, rect: Rect, visible: bool) -> bool {
+  pub fn update_area(&mut self, id: HostAreaId, rect: Rect, visible: bool) -> bool {
     let Some(area) = self.areas.get_mut(&id) else {
       return false;
     };
@@ -108,7 +110,7 @@ impl HostObjectPool {
     true
   }
 
-  pub(crate) fn clear(&mut self) {
+  pub fn clear(&mut self) {
     self.areas.clear();
     self.areas_by_kind.clear();
   }
