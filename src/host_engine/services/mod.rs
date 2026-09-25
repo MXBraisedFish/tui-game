@@ -19,7 +19,7 @@ mod render;
 mod render_pipeline;
 mod screenshot;
 mod storage;
-pub mod text_layout;
+pub use tg_service_text_layout as text_layout;
 mod time;
 mod ui;
 mod unicode;
@@ -101,7 +101,7 @@ pub use storage::{
   ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile, StorageService,
 };
 pub use tg_service_terminal::TerminalService;
-pub use text_layout::{DrawTextParams, TextAlign, TextWrapMode};
+pub use tg_service_text_layout::{DrawTextParams, TextAlign, TextWrapMode};
 pub use time::TimeService;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;

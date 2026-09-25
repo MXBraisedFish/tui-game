@@ -3551,6 +3551,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-text-layout"
+version = "2.0.0"
+dependencies = [
+ "tg-core-unicode",
+ "tg-service-rich-text",
+ "unicode-linebreak",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3965,8 +3974,8 @@ dependencies = [
  "tg-service-popup",
  "tg-service-rich-text",
  "tg-service-terminal",
+ "tg-service-text-layout",
  "toml",
- "unicode-linebreak",
  "unicode-segmentation",
  "unicode-width",
  "zip",

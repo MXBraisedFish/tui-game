@@ -1,9 +1,12 @@
-use crate::host_engine::services::rich_text::{
-  RichTextParams, RichTextSegment, RichTextService, TextColor, TextMode, TextStyle,
-};
-use crate::host_engine::services::unicode::graphemes;
+//! Text layout service: wraps, aligns and measures plain or rich text into styled grapheme lines.
+
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+
+use tg_core_unicode::graphemes;
+use tg_service_rich_text::{
+  RichTextParams, RichTextSegment, RichTextService, TextColor, TextMode, TextStyle,
+};
 use unicode_linebreak::BreakOpportunity;
 
 /// 文本对齐方式
@@ -119,7 +122,7 @@ impl DrawTextParams {
   /// 宿主 UI 传入富文本参数时已经明确要求格式化解析。
   ///
   /// Lua 绘制不会调用此方法，因此 Lua 的 `AUTO` 模式仍只识别带 `f%` 前缀的文本。
-  pub(crate) fn host_formatted(&self) -> Cow<'_, Self> {
+  pub fn host_formatted(&self) -> Cow<'_, Self> {
     if self.params.is_none() || self.text_mode != TextMode::Auto {
       return Cow::Borrowed(self);
     }
@@ -136,16 +139,16 @@ impl DrawTextParams {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct StyledGrapheme {
-  pub(crate) text: String,
-  pub(crate) width: usize,
-  pub(crate) style: TextStyle,
+pub struct StyledGrapheme {
+  pub text: String,
+  pub width: usize,
+  pub style: TextStyle,
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct LayoutLine {
-  pub(crate) items: Vec<StyledGrapheme>,
-  pub(crate) width: usize,
+pub struct LayoutLine {
+  pub items: Vec<StyledGrapheme>,
+  pub width: usize,
 }
 
 impl LayoutLine {
@@ -162,13 +165,13 @@ enum TextToken {
 }
 
 // 将绘制文本参数转换为已排版好的文本行列表
-pub(crate) fn layout_text_lines(params: &DrawTextParams) -> Vec<LayoutLine> {
+pub fn layout_text_lines(params: &DrawTextParams) -> Vec<LayoutLine> {
   let default_style = params.to_text_style();
   let tokens = build_text_tokens(params, &default_style);
   layout_tokens(&tokens, params, &default_style)
 }
 
-pub(crate) fn layout_rich_text_segments(
+pub fn layout_rich_text_segments(
   segments: &[RichTextSegment],
   params: &DrawTextParams,
 ) -> Vec<LayoutLine> {
@@ -178,12 +181,12 @@ pub(crate) fn layout_rich_text_segments(
 }
 
 // 测量绘制文本所需的尺寸（宽度 x 高度）
-pub(crate) fn measure_draw_text(params: &DrawTextParams) -> (u16, u16) {
+pub fn measure_draw_text(params: &DrawTextParams) -> (u16, u16) {
   let lines = layout_text_lines(params);
   measure_lines(&lines)
 }
 
-pub(crate) fn measure_rich_text_segments(
+pub fn measure_rich_text_segments(
   segments: &[RichTextSegment],
   params: &DrawTextParams,
 ) -> (u16, u16) {
@@ -635,7 +638,7 @@ fn is_upper_ascii(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::rich_text::{TerminalColor, TextColor};
+  use tg_service_rich_text::{TerminalColor, TextColor};
 
   fn auto_lines(text: &str, width: u16) -> Vec<String> {
     let lines = layout_text_lines(&DrawTextParams {
