@@ -3496,6 +3496,13 @@ name = "tg-service-ffmpeg"
 version = "2.0.0"
 
 [[package]]
+name = "tg-service-input-method"
+version = "2.0.0"
+dependencies = [
+ "im-switch",
+]
+
+[[package]]
 name = "tg-service-terminal"
 version = "2.0.0"
 dependencies = [
@@ -3878,7 +3885,6 @@ dependencies = [
  "fontdue",
  "hound",
  "icy_sixel",
- "im-switch",
  "image",
  "mlua",
  "mp4",
@@ -3912,6 +3918,7 @@ dependencies = [
  "tg-core-version",
  "tg-service-clipboard",
  "tg-service-ffmpeg",
+ "tg-service-input-method",
  "tg-service-terminal",
  "toml",
  "tree-sitter",

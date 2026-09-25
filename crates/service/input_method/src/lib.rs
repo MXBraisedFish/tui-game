@@ -1,3 +1,5 @@
+//! Input method service: detects an ASCII input method and optionally forces it while a game runs.
+
 use std::env;
 use std::time::Duration;
 

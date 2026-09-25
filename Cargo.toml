@@ -39,6 +39,7 @@ tg-core-style = { path = "crates/core/style" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-input-method = { path = "crates/service/input_method" }
 tg-service-ffmpeg = { path = "crates/service/ffmpeg" }
 tg-service-clipboard = { path = "crates/service/clipboard" }
 crossbeam-channel = "0.5"
@@ -75,7 +76,6 @@ base64 = "0.22"
 icy_sixel = "0.5"
 rdev = "0.5"
 palette = "0.7"
-im-switch = "0.1"
 zip = { version = "2.3", default-features = false, features = ["deflate"] }
 tar = "0.4"
 flate2 = "1.1"

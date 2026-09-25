@@ -10,7 +10,6 @@ mod host_object;
 mod i18n;
 mod image;
 mod input;
-mod input_method;
 mod layout;
 mod log;
 mod lua;
@@ -63,7 +62,7 @@ pub use input::{
   KeyState, MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, ScrollDirection, SystemEvent,
   TerminalKeyCode, TerminalKeyEvent, format_key_display, key_token, translate_action_map,
 };
-pub use input_method::{ImPolicy, InputMethodService};
+pub use tg_service_input_method::{ImPolicy, InputMethodService};
 pub use layout::{LayoutService, Rect, Size};
 pub use log::{
   HostLogMessage, LogLevel, LogPrintOptions, LogService, LogSessionId, LogSessionKind, LogSource,
