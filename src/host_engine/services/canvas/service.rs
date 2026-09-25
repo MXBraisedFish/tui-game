@@ -917,7 +917,8 @@ fn resolve_background(mut style: TextStyle, buffer: &CanvasBuffer, x: u16, y: u1
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::text_layout::{TextMode, TextWrapMode};
+  use crate::host_engine::services::rich_text::TextMode;
+  use crate::host_engine::services::text_layout::TextWrapMode;
   use crate::host_engine::services::{
     Overflow, RenderService, RichTextParams, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy,
     ScrollbarVisibility, SliceLength, SliceOptions, SliceRect, SliceService, TerminalColor,

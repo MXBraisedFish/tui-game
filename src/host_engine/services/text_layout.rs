@@ -1,5 +1,5 @@
 use crate::host_engine::services::rich_text::{
-  RichTextParams, RichTextSegment, RichTextService, TextColor, TextStyle,
+  RichTextParams, RichTextSegment, RichTextService, TextColor, TextMode, TextStyle,
 };
 use crate::host_engine::services::unicode::graphemes;
 use std::borrow::Cow;
@@ -28,20 +28,6 @@ pub enum TextWrapMode {
   Auto,
 
   Normal,
-}
-
-/// 文本解析模式。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TextMode {
-  Auto,
-  Plain,
-  Rich,
-}
-
-impl Default for TextMode {
-  fn default() -> Self {
-    Self::Auto
-  }
 }
 
 impl Default for TextWrapMode {

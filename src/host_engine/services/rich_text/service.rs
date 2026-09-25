@@ -1,5 +1,18 @@
 use super::{RichText, RichTextParams, parser};
-use crate::host_engine::services::text_layout::TextMode;
+
+/// 文本解析模式。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextMode {
+  Auto,
+  Plain,
+  Rich,
+}
+
+impl Default for TextMode {
+  fn default() -> Self {
+    Self::Auto
+  }
+}
 
 /// 富文本服务：提供解析和纯文本提取功能。
 pub struct RichTextService;

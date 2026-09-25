@@ -88,7 +88,7 @@ pub use recording::{
 pub use render::{BorderCharacter, BorderStyle, CustomBorder, RenderService};
 pub use render_pipeline::{ComposedCell, ComposedFrame, FrameCompositor, FramePresenter};
 pub use rich_text::{
-  RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextStyle,
+  RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextMode, TextStyle,
   parse_text_color,
 };
 pub use screenshot::{ScreenshotAsyncEvent, ScreenshotRect, ScreenshotService, ScreenshotTask};
@@ -101,7 +101,7 @@ pub use storage::{
   ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile, StorageService,
 };
 pub use tg_service_terminal::TerminalService;
-pub use text_layout::{DrawTextParams, TextAlign, TextMode, TextWrapMode};
+pub use text_layout::{DrawTextParams, TextAlign, TextWrapMode};
 pub use time::TimeService;
 pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
 pub use unicode::UnicodeService;

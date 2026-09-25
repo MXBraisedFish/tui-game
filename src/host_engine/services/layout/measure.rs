@@ -2,7 +2,7 @@ use super::types::Size;
 use crate::host_engine::services::DrawTextParams;
 use crate::host_engine::services::RichTextParams;
 use crate::host_engine::services::text_layout;
-use crate::host_engine::services::text_layout::TextMode;
+use crate::host_engine::services::rich_text::TextMode;
 
 /// 计算文本的渲染尺寸
 pub fn get_text_size(text: &str, params: Option<&RichTextParams>) -> Size {
