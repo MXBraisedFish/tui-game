@@ -3536,6 +3536,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-rich-text"
+version = "2.0.0"
+dependencies = [
+ "tg-core-input",
+ "tg-core-style",
+]
+
+[[package]]
 name = "tg-service-terminal"
 version = "2.0.0"
 dependencies = [
@@ -3955,6 +3963,7 @@ dependencies = [
  "tg-service-host-object",
  "tg-service-input-method",
  "tg-service-popup",
+ "tg-service-rich-text",
  "tg-service-terminal",
  "toml",
  "unicode-linebreak",

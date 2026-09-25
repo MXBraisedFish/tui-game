@@ -1,6 +1,6 @@
 use super::params::RichTextParams;
 use super::{RichText, RichTextSegment, TextStyle, parse_text_color};
-use crate::host_engine::services::input::format_key_display;
+use tg_core_input::format_key_display;
 
 const RICH_TEXT_PREFIX: &str = "f%";
 
@@ -15,10 +15,6 @@ enum TagReadResult {
 }
 
 /// 解析富文本字符串，将 `<tag>` 标签转换为样式段、`{param}` 替换为实际值。
-pub fn parse(text: &str, params: Option<&RichTextParams>) -> RichText {
-  parse_auto(text, params)
-}
-
 pub(super) fn parse_auto(text: &str, params: Option<&RichTextParams>) -> RichText {
   text.strip_prefix(RICH_TEXT_PREFIX).map_or_else(
     || plain_text(text),
@@ -289,7 +285,7 @@ fn apply_tag(tag: &str, current_style: &mut TextStyle) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::{TerminalColor, TextColor};
+  use crate::{TerminalColor, TextColor};
   use std::collections::HashMap;
 
   fn make_params(
@@ -308,7 +304,7 @@ mod tests {
     let mut ka = HashMap::new();
     ka.insert("jump".to_string(), vec![vec!["shift".to_string()]]);
     let params = RichTextParams::from_key_actions(&ka);
-    let rt = parse("f%{key:jump}", Some(&params));
+    let rt = parse_auto("f%{key:jump}", Some(&params));
     assert_eq!(rt.segments[0].text, "[Shift]");
   }
 
@@ -317,7 +313,7 @@ mod tests {
     let user = HashMap::from([("jump".to_string(), vec![vec!["j".to_string()]])]);
     let defaults = HashMap::from([("jump".to_string(), vec![vec!["space".to_string()]])]);
     let params = RichTextParams::from_key_action_maps(&user, &defaults);
-    let rt = parse("f%{key:jump}/{key_default:jump}", Some(&params));
+    let rt = parse_auto("f%{key:jump}/{key_default:jump}", Some(&params));
     assert_eq!(rt.segments[0].text, "[J]/[Space]");
   }
 
@@ -325,7 +321,7 @@ mod tests {
   fn empty_key_parameter_is_visible() {
     let keys = HashMap::from([("optional".to_string(), Vec::new())]);
     let params = RichTextParams::from_key_actions(&keys);
-    let rt = parse("f%{key:optional}/{key_default:optional}", Some(&params));
+    let rt = parse_auto("f%{key:optional}/{key_default:optional}", Some(&params));
     assert_eq!(rt.segments[0].text, "[]/[]");
   }
 
@@ -334,7 +330,7 @@ mod tests {
     let mut ka = HashMap::new();
     ka.insert("move_up".to_string(), vec![vec!["w".to_string()]]);
     let params = RichTextParams::from_key_actions(&ka);
-    let rt = parse("f%{key:move_up} {value:name}", Some(&params));
+    let rt = parse_auto("f%{key:move_up} {value:name}", Some(&params));
     assert_eq!(rt.segments[0].text, "[W] {value:name}");
   }
 
@@ -349,7 +345,7 @@ mod tests {
       ],
     );
     let params = make_params(HashMap::new(), ka);
-    let rt = parse("f%{key:move}", Some(&params));
+    let rt = parse_auto("f%{key:move}", Some(&params));
     assert_eq!(rt.segments[0].text, "[D]/[Shift + ←]");
   }
 
@@ -358,7 +354,7 @@ mod tests {
     let mut values = HashMap::new();
     values.insert("name".to_string(), "Alice".to_string());
     let params = make_params(values, HashMap::new());
-    let rt = parse("f%{value:name}", Some(&params));
+    let rt = parse_auto("f%{value:name}", Some(&params));
     assert_eq!(rt.segments[0].text, "Alice");
   }
 
@@ -367,14 +363,14 @@ mod tests {
     let mut values = HashMap::new();
     values.insert("name".to_string(), "Bob".to_string());
     let params = make_params(values, HashMap::new());
-    let rt = parse("f%{name}", Some(&params));
+    let rt = parse_auto("f%{name}", Some(&params));
     assert_eq!(rt.segments[0].text, "{name}");
   }
 
   #[test]
   fn key_not_found_keeps_original() {
     let params = make_params(HashMap::new(), HashMap::new());
-    let rt = parse("f%{key:unknown}", Some(&params));
+    let rt = parse_auto("f%{key:unknown}", Some(&params));
     assert_eq!(rt.segments[0].text, "{key:unknown}");
   }
 
@@ -385,13 +381,13 @@ mod tests {
     let mut ka = HashMap::new();
     ka.insert("jump".to_string(), vec![vec!["space".to_string()]]);
     let params = make_params(values, ka);
-    let rt = parse("f%{value:action}: press {key:jump}", Some(&params));
+    let rt = parse_auto("f%{value:action}: press {key:jump}", Some(&params));
     assert_eq!(rt.segments[0].text, "Jump: press [Space]");
   }
 
   #[test]
   fn reverse_explicit_rgb_foreground_and_background() {
-    let rt = parse(
+    let rt = parse_auto(
       "f%<fg:#102030><bg:rgb(1,2,3)>A<fg:reverse><bg:reverse>B",
       None,
     );
@@ -425,7 +421,7 @@ mod tests {
 
   #[test]
   fn reverse_keeps_terminal_colors_and_is_not_rendered() {
-    let rt = parse("f%<fg:red>A<fg:reverse>B<bg:reverse>C", None);
+    let rt = parse_auto("f%<fg:red>A<fg:reverse>B<bg:reverse>C", None);
 
     assert_eq!(rt.segments.len(), 3);
     assert_eq!(
@@ -444,7 +440,7 @@ mod tests {
 
   #[test]
   fn semantic_color_aliases_apply_to_foreground_and_background() {
-    let rt = parse("f%<fg:gray>A<fg:bright_gray>B<fg:white><bg:grey>C", None);
+    let rt = parse_auto("f%<fg:gray>A<fg:bright_gray>B<fg:white><bg:grey>C", None);
 
     assert_eq!(
       rt.segments[0].style.foreground,

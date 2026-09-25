@@ -1,3 +1,5 @@
+//! Rich text service: parses tagged/plain text (colors, styles, key placeholders) into styled segments.
+
 mod params;
 mod parser;
 mod service;

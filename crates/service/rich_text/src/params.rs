@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::super::input::ActionMapEntry;
+use tg_core_input::ActionMapEntry;
 
 /// 富文本参数：包含占位变量值和按键动作映射，供解析时替换模板标记。
 #[derive(Clone, Debug, Default)]

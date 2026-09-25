@@ -39,6 +39,7 @@ tg-core-style = { path = "crates/core/style" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-rich-text = { path = "crates/service/rich_text" }
 tg-service-code-highlight = { path = "crates/service/code_highlight" }
 tg-service-host-object = { path = "crates/service/host_object" }
 tg-service-popup = { path = "crates/service/popup" }

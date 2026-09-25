@@ -27,7 +27,7 @@ impl RichTextService {
     parser::parse_auto(text, params)
   }
 
-  pub(crate) fn parse_mode(
+  pub fn parse_mode(
     &self,
     text: &str,
     params: Option<&RichTextParams>,

@@ -17,7 +17,6 @@ mod random;
 mod recording;
 mod render;
 mod render_pipeline;
-mod rich_text;
 mod screenshot;
 mod storage;
 pub mod text_layout;
@@ -87,7 +86,8 @@ pub use recording::{
 };
 pub use render::{BorderCharacter, BorderStyle, CustomBorder, RenderService};
 pub use render_pipeline::{ComposedCell, ComposedFrame, FrameCompositor, FramePresenter};
-pub use rich_text::{
+use tg_service_rich_text as rich_text;
+pub use tg_service_rich_text::{
   RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextMode, TextStyle,
   parse_text_color,
 };
