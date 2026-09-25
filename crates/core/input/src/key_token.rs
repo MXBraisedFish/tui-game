@@ -1,4 +1,4 @@
-use super::service::Key;
+use super::key::Key;
 
 /// 将按键标记字符串（如 "shift", "a", "f1"）解析为 Key 枚举
 pub fn parse_key_token(token: &str) -> Option<Key> {

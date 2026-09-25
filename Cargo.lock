@@ -3453,6 +3453,10 @@ name = "tg-core-geometry"
 version = "2.0.0"
 
 [[package]]
+name = "tg-core-input"
+version = "2.0.0"
+
+[[package]]
 name = "tg-core-package-id"
 version = "2.0.0"
 dependencies = [
@@ -3871,6 +3875,7 @@ dependencies = [
  "tg-core-atomic-fs",
  "tg-core-fault",
  "tg-core-geometry",
+ "tg-core-input",
  "tg-core-package-id",
  "tg-core-style",
  "tg-core-version",

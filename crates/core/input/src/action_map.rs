@@ -1,5 +1,5 @@
 use super::key_token::parse_key_token;
-use super::service::{KeyBinding, KeyPattern};
+use super::key::{KeyBinding, KeyPattern};
 
 /// 动作映射条目
 #[derive(Clone, Debug, PartialEq, Eq)]

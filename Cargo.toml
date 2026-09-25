@@ -29,6 +29,7 @@ tg-core-arena = { path = "crates/core/arena" }
 tg-core-atomic-fs = { path = "crates/core/atomic_fs" }
 tg-core-fault = { path = "crates/core/fault" }
 tg-core-geometry = { path = "crates/core/geometry" }
+tg-core-input = { path = "crates/core/input" }
 tg-core-package-id = { path = "crates/core/package_id" }
 tg-core-style = { path = "crates/core/style" }
 tg-core-version = { path = "crates/core/version" }
