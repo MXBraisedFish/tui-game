@@ -1,3 +1,5 @@
+//! Random service: seeded, snapshot-able ChaCha8 generators and configured value ranges.
+
 mod objects;
 mod service;
 

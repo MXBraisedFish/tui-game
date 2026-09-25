@@ -408,7 +408,7 @@ mod tests {
     );
     assert_eq!(classic.mode(), DisplayLogoMode::Classic);
     assert!(classic_pool.animations.ids().is_empty());
-    assert!(classic_pool.random_generators.generators.is_empty());
+    assert!(classic_pool.random_generators.is_empty());
 
     let mut neon_pool = RuntimeObjectPool::new();
     let neon = HomeLogo::new(
@@ -420,7 +420,7 @@ mod tests {
     );
     assert_eq!(neon.mode(), DisplayLogoMode::Neon);
     assert_eq!(neon_pool.animations.ids().len(), 1);
-    assert!(neon_pool.random_generators.generators.is_empty());
+    assert!(neon_pool.random_generators.is_empty());
 
     let mut error_pool = RuntimeObjectPool::new();
     let error = HomeLogo::new(
@@ -432,6 +432,6 @@ mod tests {
     );
     assert_eq!(error.mode(), DisplayLogoMode::Error);
     assert_eq!(error_pool.animations.ids().len(), 1);
-    assert_eq!(error_pool.random_generators.generators.len(), 1);
+    assert_eq!(error_pool.random_generators.len(), 1);
   }
 }

@@ -13,7 +13,7 @@ use tg_service_log as log;
 mod lua;
 mod network;
 mod package;
-mod random;
+use tg_service_random as random;
 mod recording;
 mod render;
 mod render_pipeline;

@@ -39,6 +39,7 @@ tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
 tg-service-i18n = { path = "crates/service/i18n" }
 tg-service-log = { path = "crates/service/log" }
+tg-service-random = { path = "crates/service/random" }
 tg-service-storage = { path = "crates/service/storage" }
 tg-service-text-layout = { path = "crates/service/text_layout" }
 tg-service-rich-text = { path = "crates/service/rich_text" }
@@ -67,8 +68,6 @@ toml = "1.1.2"
 csv = "1.3"
 quick-xml = "0.41.0"
 chrono = { workspace = true }
-rand = "0.10.2"
-rand_chacha = "0.10"
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "rustls", "gzip", "brotli", "deflate", "zstd"] }
 rodio = { version = "0.22.2", default-features = false, features = ["playback", "flac", "mp3", "mp4", "vorbis", "wav"] }
 hound = "3.5"

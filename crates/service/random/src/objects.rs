@@ -109,11 +109,19 @@ pub struct RandomGeneratorObjects {
 }
 
 impl RandomGeneratorObjects {
-  pub(crate) fn new() -> Self {
+  pub fn new() -> Self {
     Self {
       next_id: 1,
       generators: HashMap::new(),
     }
+  }
+
+  pub fn len(&self) -> usize {
+    self.generators.len()
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.generators.is_empty()
   }
 
   pub(crate) fn create(&mut self, generator: RandomGenerator) -> RandomGeneratorId {
@@ -121,6 +129,12 @@ impl RandomGeneratorObjects {
     self.next_id += 1;
     self.generators.insert(id, generator);
     id
+  }
+}
+
+impl Default for RandomGeneratorObjects {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
