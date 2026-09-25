@@ -3492,6 +3492,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-code-highlight"
+version = "2.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tg-core-style",
+ "tree-sitter",
+ "tree-sitter-bash",
+ "tree-sitter-javascript",
+ "tree-sitter-json",
+ "tree-sitter-lua",
+ "tree-sitter-python",
+ "tree-sitter-rust",
+ "tree-sitter-toml-ng",
+ "tree-sitter-typescript",
+ "tree-sitter-yaml",
+]
+
+[[package]]
 name = "tg-service-ffmpeg"
 version = "2.0.0"
 
@@ -3931,22 +3950,13 @@ dependencies = [
  "tg-core-unicode",
  "tg-core-version",
  "tg-service-clipboard",
+ "tg-service-code-highlight",
  "tg-service-ffmpeg",
  "tg-service-host-object",
  "tg-service-input-method",
  "tg-service-popup",
  "tg-service-terminal",
  "toml",
- "tree-sitter",
- "tree-sitter-bash",
- "tree-sitter-javascript",
- "tree-sitter-json",
- "tree-sitter-lua",
- "tree-sitter-python",
- "tree-sitter-rust",
- "tree-sitter-toml-ng",
- "tree-sitter-typescript",
- "tree-sitter-yaml",
  "unicode-linebreak",
  "unicode-segmentation",
  "unicode-width",

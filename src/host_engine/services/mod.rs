@@ -2,7 +2,6 @@ pub(crate) mod animation;
 mod async_runtime;
 mod audio;
 mod canvas;
-mod code_highlight;
 mod event;
 pub(crate) mod export;
 mod file;
@@ -47,7 +46,7 @@ pub use audio::{
 };
 pub use canvas::{CanvasCell, CanvasService};
 pub use tg_service_clipboard::ClipboardService;
-pub use code_highlight::{CodeHighlightService, CodeHighlightTheme};
+pub use tg_service_code_highlight::{CodeHighlightService, CodeHighlightTheme};
 pub use event::EngineEventQueue;
 pub use export::{ExportAsyncEvent, ExportService, ExportTask};
 pub use tg_service_ffmpeg::{FfmpegInstallation, FfmpegService};

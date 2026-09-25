@@ -1,7 +1,9 @@
+//! Code highlight service: tree-sitter based syntax highlighting into styled rich-text segments.
+
 use std::{collections::HashSet, path::Path, sync::OnceLock};
 
-use crate::host_engine::services::{RichTextSegment, TextColor, TextStyle};
 use serde::Deserialize;
+use tg_core_style::{RichTextSegment, TextColor, TextStyle};
 use tree_sitter::{Node, Parser, Tree};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
