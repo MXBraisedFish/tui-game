@@ -9,6 +9,7 @@ pub use self::types::{
   ScrollbarSide, ScrollbarStyle, ScrollbarVisibility,
 };
 use super::surface::SurfaceId;
+pub(crate) use crate::host_engine::services::canvas::ResolvedScrollBoxLayout;
 use crate::host_engine::services::ui::UiObjectPool;
 use crate::host_engine::services::unicode::char_width;
 use crate::host_engine::services::{
@@ -814,26 +815,6 @@ pub(crate) fn clamp_rect(rect: Rect, viewport: Size) -> Rect {
   }
 }
 
-/// ScrollBox 的完整区域解析结果。
-///
-/// 所有滚动、裁剪、绘制与命中检测都必须使用该结果，禁止再次根据 options
-/// 推导滚动条可见性，避免不同阶段对同一格子的归属产生分歧。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ResolvedScrollBoxLayout {
-  /// `options.rect` 经 Developer Viewport 裁剪后的组件 viewport。
-  pub viewport_rect: Rect,
-  /// 排除滚动条实际占用格子后的内容可视区域。
-  pub content_viewport_rect: Rect,
-  /// viewport 与外置滚动条共同占用的区域。
-  pub occupied_rect: Rect,
-  pub vertical_track_rect: Option<Rect>,
-  pub horizontal_track_rect: Option<Rect>,
-  pub vertical_thumb_rect: Option<Rect>,
-  pub horizontal_thumb_rect: Option<Rect>,
-  pub max_scroll_x: u16,
-  pub max_scroll_y: u16,
-}
-
 pub(crate) fn resolve_scroll_box_layout(
   state: &ScrollBoxState,
   viewport: Size,
@@ -1393,7 +1374,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     assert!(service.route_mouse_event(
       &mut pool,
@@ -1414,7 +1395,7 @@ mod tests {
       .unwrap();
     pool.move_surface_relative(SurfaceId::Slice(slice), SurfaceId::ScrollBox(id), true);
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     assert!(!service.route_mouse_event(
       &mut pool,
       &canvas,
@@ -1456,7 +1437,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     assert!(service.route_mouse_event(
       &mut pool,
@@ -1497,7 +1478,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     // 垂直滚动条在 x=7（Overlay 模式的最右侧列）。滑块初始在顶部。
     // 在滑块区域按下鼠标 → 开始拖动。
@@ -1557,7 +1538,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     // 点击轨道底部（滑块下方）→ 向下翻页。
     service.scroll_to_top(&mut pool, id);
@@ -1604,7 +1585,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     // 两个方向都被 blocking。
     assert!(!service.route_mouse_event(

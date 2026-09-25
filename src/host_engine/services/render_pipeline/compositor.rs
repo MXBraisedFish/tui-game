@@ -294,7 +294,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     canvas.styled_text(2, 1, "B", TextStyle::default());
     canvas.styled_text_on(transparent, 1, 0, "T", TextStyle::default());
     canvas.host_styled_text(5, 2, "H", TextStyle::default());
@@ -326,7 +326,7 @@ mod tests {
     let b = service.create(&mut pool, options).unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     canvas.styled_text_on(a, 0, 0, "A", TextStyle::default());
     canvas.styled_text_on(b, 0, 0, "B", TextStyle::default());
     canvas.styled_text_on(b, 0, 0, "我", TextStyle::default());
@@ -351,7 +351,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     let background = TextColor::Terminal(TerminalColor::Blue);
     canvas.styled_text(
       0,
@@ -404,7 +404,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     canvas.styled_text_on(
       slice,
       1,
@@ -442,13 +442,13 @@ mod tests {
     let slice = slices.create(&mut pool, SliceOptions::default()).unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     slices.set_visible(&mut pool, slice, false);
     assert!(canvas.styled_text_on(slice, 0, 0, "A", TextStyle::default()));
     assert_eq!(text(&FrameCompositor::new().compose(&canvas), 0, 0), "A");
 
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     assert!(!canvas.styled_text_on(slice, 0, 0, "B", TextStyle::default()));
     assert_eq!(text(&FrameCompositor::new().compose(&canvas), 0, 0), " ");
   }
@@ -478,7 +478,7 @@ mod tests {
     service.scroll_to(&mut pool, id, 0, 1, &layout);
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     canvas.styled_text_in_scroll_box(id, 0, 0, "row0", TextStyle::default());
     canvas.styled_text_in_scroll_box(id, 0, 1, "row1", TextStyle::default());
     canvas.styled_text_in_scroll_box(id, 0, 2, "row2", TextStyle::default());
@@ -520,7 +520,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     canvas.styled_text_in_scroll_box(id, 0, 0, "ABCD", TextStyle::default());
 
     let frame = FrameCompositor::new().compose(&canvas);
@@ -560,7 +560,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     canvas.styled_text_in_scroll_box(id, 0, 0, "中文", TextStyle::default());
 
     let frame = FrameCompositor::new().compose(&canvas);
@@ -603,7 +603,7 @@ mod tests {
     scroll.move_below(&mut pool, box_id, SurfaceId::Slice(slice));
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     canvas.styled_text_on(slice, 0, 0, "S", TextStyle::default());
     canvas.styled_text_in_scroll_box(box_id, 0, 0, "B", TextStyle::default());
 
@@ -611,7 +611,7 @@ mod tests {
 
     scroll.move_above(&mut pool, box_id, SurfaceId::Slice(slice));
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     canvas.styled_text_on(slice, 0, 0, "S", TextStyle::default());
     canvas.styled_text_in_scroll_box(box_id, 0, 0, "B", TextStyle::default());
 

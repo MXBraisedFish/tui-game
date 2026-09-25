@@ -1,8 +1,6 @@
-use crate::host_engine::services::{Rect, TextColor, TextStyle};
+use crate::host_engine::services::Rect;
 
-/// 可滚动绘制面唯一标识。
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ScrollBoxId(pub u64);
+pub use crate::host_engine::services::canvas::{ScrollBoxId, ScrollbarSide, ScrollbarStyle};
 
 /// 溢出处理方式。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,12 +34,6 @@ impl Default for ScrollbarLayout {
   }
 }
 
-/// 滚动条放置侧。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ScrollbarSide {
-  Right,
-}
-
 /// 滚动条轴向（内部使用）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ScrollbarAxis {
@@ -61,76 +53,6 @@ impl Default for ScrollbarPolicy {
     Self {
       vertical: ScrollbarVisibility::Auto,
       horizontal: ScrollbarVisibility::Never,
-    }
-  }
-}
-
-/// 滚动条样式。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ScrollbarStyle {
-  /// 垂直滚动条轨道字符。
-  pub track_char: char,
-  /// 垂直滚动条滑块字符。
-  pub thumb_char: char,
-  /// 垂直滚动条轨道样式。
-  pub track_style: TextStyle,
-  /// 垂直滚动条滑块样式。
-  pub thumb_style: TextStyle,
-  /// 水平滚动条轨道字符。
-  pub h_track_char: char,
-  /// 水平滚动条滑块字符。
-  pub h_thumb_char: char,
-  /// 水平滚动条轨道样式。
-  pub h_track_style: TextStyle,
-  /// 水平滚动条滑块样式。
-  pub h_thumb_style: TextStyle,
-  /// 滑块最小高度/宽度（默认 1）。
-  pub minimum_thumb_height: u16,
-  /// 滚动条放置侧。
-  pub side: ScrollbarSide,
-}
-
-impl Default for ScrollbarStyle {
-  fn default() -> Self {
-    Self {
-      track_char: '│',
-      thumb_char: '█',
-      track_style: TextStyle {
-        foreground: Some(TextColor::Rgb {
-          r: 85,
-          g: 87,
-          b: 83,
-        }),
-        ..Default::default()
-      },
-      thumb_style: TextStyle {
-        foreground: Some(TextColor::Rgb {
-          r: 220,
-          g: 223,
-          b: 218,
-        }),
-        ..Default::default()
-      },
-      h_track_char: '─',
-      h_thumb_char: '█',
-      h_track_style: TextStyle {
-        foreground: Some(TextColor::Rgb {
-          r: 85,
-          g: 87,
-          b: 83,
-        }),
-        ..Default::default()
-      },
-      h_thumb_style: TextStyle {
-        foreground: Some(TextColor::Rgb {
-          r: 220,
-          g: 223,
-          b: 218,
-        }),
-        ..Default::default()
-      },
-      minimum_thumb_height: 1,
-      side: ScrollbarSide::Right,
     }
   }
 }

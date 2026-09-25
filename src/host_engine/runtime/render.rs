@@ -46,9 +46,7 @@ pub(super) fn route_render(
     let term = services.layout.physical_size();
 
     window_size_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(window_size_ui.objects(), &services.layout);
+    window_size_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
     window_size_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -79,9 +77,7 @@ pub(super) fn route_render(
   if world.state.current_overlay_kind() == Some(OverlayKind::GameWarning) {
     apply_host_viewport(services, false);
     game_warning_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(game_warning_ui.objects(), &services.layout);
+    game_warning_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
     game_warning_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -98,14 +94,12 @@ pub(super) fn route_render(
       let commands = services.screensaver.take_draw_commands();
       services.screensaver.with_objects_mut(|objects| {
         objects.ui_mut().begin_render();
-        services.canvas.prepare(objects.ui(), &services.layout);
+        objects.ui().prepare_canvas(&mut services.canvas, &services.layout);
       });
       apply_lua_draw_commands(services, commands);
     } else {
       screensaver_overlay_ui.objects_mut().begin_render();
-      services
-        .canvas
-        .prepare(screensaver_overlay_ui.objects(), &services.layout);
+      screensaver_overlay_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
       screensaver_overlay_ui.render(
         &mut services.render,
         &mut services.canvas,
@@ -119,9 +113,7 @@ pub(super) fn route_render(
   if world.state.current_overlay_kind() == Some(OverlayKind::LanguageLoading) {
     apply_host_viewport(services, false);
     language_loading_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(language_loading_ui.objects(), &services.layout);
+    language_loading_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
     language_loading_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -136,9 +128,7 @@ pub(super) fn route_render(
   if world.state.current_overlay_kind() == Some(OverlayKind::ExportLoading) {
     apply_host_viewport(services, false);
     export_loading_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(export_loading_ui.objects(), &services.layout);
+    export_loading_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
     export_loading_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -153,9 +143,7 @@ pub(super) fn route_render(
   if world.state.current_overlay_kind() == Some(OverlayKind::SafeModeWarning) {
     apply_host_viewport(services, false);
     safe_mode_warning_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(safe_mode_warning_ui.objects(), &services.layout);
+    safe_mode_warning_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
     safe_mode_warning_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -170,9 +158,7 @@ pub(super) fn route_render(
   if world.state.current_overlay_kind() == Some(OverlayKind::ClearWarning) {
     apply_host_viewport(services, false);
     clear_warning_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(clear_warning_ui.objects(), &services.layout);
+    clear_warning_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
     clear_warning_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -200,9 +186,7 @@ pub(super) fn route_render(
       .unwrap_or_default();
     cover_continue_ui.start(continue_game);
     cover_continue_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(cover_continue_ui.objects(), &services.layout);
+    cover_continue_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
     cover_continue_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -216,9 +200,7 @@ pub(super) fn route_render(
   if world.state.current_overlay_kind() == Some(OverlayKind::ExportSettings) {
     apply_host_viewport(services, false);
     export_settings_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(export_settings_ui.objects(), &services.layout);
+    export_settings_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
     export_settings_ui.render(
       &mut services.render,
       &mut services.canvas,
@@ -238,7 +220,7 @@ pub(super) fn route_render(
     let commands = services.game.take_draw_commands();
     services.game.with_objects_mut(|objects| {
       objects.ui_mut().begin_render();
-      services.canvas.prepare(objects.ui(), &services.layout);
+      objects.ui().prepare_canvas(&mut services.canvas, &services.layout);
     });
     apply_lua_draw_commands(services, commands);
   }
@@ -299,9 +281,7 @@ pub(super) fn route_render(
 
   if world.state.current_ui_kind() == Some(UiNodeKind::ExitWarning) {
     exit_warning_ui.objects_mut().begin_render();
-    services
-      .canvas
-      .prepare(exit_warning_ui.objects(), &services.layout);
+    exit_warning_ui.objects().prepare_canvas(&mut services.canvas, &services.layout);
   } else if !lua_game_prepared {
     if let Some(objects) = current_objects_mut(
       world,
@@ -323,7 +303,7 @@ pub(super) fn route_render(
       input_demo_ui,
     ) {
       objects.begin_render();
-      services.canvas.prepare(objects, &services.layout);
+      objects.prepare_canvas(&mut services.canvas, &services.layout);
     }
   }
 

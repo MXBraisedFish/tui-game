@@ -4,14 +4,11 @@ use super::{CanvasCell, buffer::CanvasBuffer, top_layer::TopLayer};
 use crate::host_engine::services::rich_text::RichTextSegment;
 use crate::host_engine::services::text_layout::{self, DrawTextParams, LayoutLine, TextAlign};
 use crate::host_engine::services::unicode::graphemes;
-use crate::host_engine::services::widget::ui_object::surfaces::scroll_box::{
-  ResolvedScrollBoxLayout, resolve_scroll_box_layout,
+use super::surface::{
+  ResolvedScrollBoxLayout, ScrollBoxFrame, ScrollBoxId, ScrollbarStyle, SliceFrame, SliceId,
+  SurfaceFrame, SurfaceId,
 };
-use crate::host_engine::services::widget::ui_object::surfaces::slice::resolve_rect;
-use crate::host_engine::services::{
-  LayoutService, Rect, ScrollBoxId, ScrollbarStyle, Size, SliceId, SurfaceId, TextColor, TextStyle,
-  UiObjectPool,
-};
+use crate::host_engine::services::{LayoutService, Rect, Size, TextColor, TextStyle};
 
 /// 画布服务：管理基础层、宿主层和多切片缓冲区，协调文本绘制与区域查询。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -111,8 +108,8 @@ impl CanvasService {
     }
   }
 
-  /// 根据 UI 对象池和布局服务预处理所有切片缓冲区。
-  pub fn prepare(&mut self, pool: &UiObjectPool, layout: &LayoutService) {
+  /// 按叠放顺序预处理本帧的全部绘制面缓冲区；`pool_id` 变化时丢弃上一对象池的缓冲区。
+  pub fn prepare(&mut self, pool_id: u64, surfaces: Vec<SurfaceFrame>, layout: &LayoutService) {
     self.viewport = layout.developer_viewport_rect();
     let size = layout.developer_size();
     if self.base.width() != size.width || self.base.height() != size.height {
@@ -121,46 +118,36 @@ impl CanvasService {
     } else {
       self.base.clear();
     }
-    if self.active_pool != Some(pool.id()) {
+    if self.active_pool != Some(pool_id) {
       self.slices.clear();
       self.scroll_boxes.clear();
       self.force_full_redraw = true;
     }
-    self.active_pool = Some(pool.id());
-    self.surface_order = pool.surfaces.clone();
+    self.active_pool = Some(pool_id);
+    self.surface_order = surfaces.iter().map(SurfaceFrame::id).collect();
+    let order = &self.surface_order;
     self
       .slices
-      .retain(|id, _| pool.slices.slices.contains_key(id));
+      .retain(|id, _| order.contains(&SurfaceId::Slice(*id)));
     self
       .scroll_boxes
-      .retain(|id, _| pool.scroll_boxes.boxes.contains_key(id));
-    let order = self.surface_order.clone();
-    for (order, surface) in order.into_iter().enumerate() {
+      .retain(|id, _| order.contains(&SurfaceId::ScrollBox(*id)));
+    for (order, surface) in surfaces.into_iter().enumerate() {
       match surface {
-        SurfaceId::Slice(id) => self.prepare_slice(pool, order, id, layout),
-        SurfaceId::ScrollBox(id) => self.prepare_scroll_box(pool, order, id, layout),
+        SurfaceFrame::Slice(frame) => self.prepare_slice(order, frame),
+        SurfaceFrame::ScrollBox(frame) => self.prepare_scroll_box(order, frame),
       }
     }
   }
 
-  fn prepare_slice(
-    &mut self,
-    pool: &UiObjectPool,
-    order: usize,
-    id: SliceId,
-    layout: &LayoutService,
-  ) {
-    let Some(state) = pool.slices.slices.get(&id).cloned() else {
-      return;
-    };
-    let visible = state.visible && (!state.frame_scoped || state.drawn_this_frame);
-    let rect = resolve_rect(state.rect, layout);
-    let prepared = self.slices.entry(id).or_insert_with(|| PreparedSlice {
+  fn prepare_slice(&mut self, order: usize, frame: SliceFrame) {
+    let rect = frame.rect;
+    let prepared = self.slices.entry(frame.id).or_insert_with(|| PreparedSlice {
       buffer: CanvasBuffer::new(rect.width, rect.height),
       rect,
-      visible,
-      opaque: state.opaque,
-      background: state.background.clone(),
+      visible: frame.visible,
+      opaque: frame.opaque,
+      background: frame.background.clone(),
       order,
     });
     if prepared.buffer.width() != rect.width || prepared.buffer.height() != rect.height {
@@ -170,41 +157,27 @@ impl CanvasService {
       prepared.buffer.clear();
     }
     prepared.rect = rect;
-    prepared.visible = visible;
-    prepared.opaque = state.opaque;
-    prepared.background = state.background;
+    prepared.visible = frame.visible;
+    prepared.opaque = frame.opaque;
+    prepared.background = frame.background;
     prepared.order = order;
   }
 
-  fn prepare_scroll_box(
-    &mut self,
-    pool: &UiObjectPool,
-    order: usize,
-    id: ScrollBoxId,
-    layout: &LayoutService,
-  ) {
-    let Some(state) = pool.scroll_boxes.boxes.get(&id) else {
-      return;
-    };
-    let options = &state.options;
-    let resolved_layout = resolve_scroll_box_layout(state, layout.developer_size());
-    let content_size = Size {
-      width: options.content_width,
-      height: options.content_height,
-    };
+  fn prepare_scroll_box(&mut self, order: usize, frame: ScrollBoxFrame) {
+    let content_size = frame.content_size;
     let prepared = self
       .scroll_boxes
-      .entry(id)
+      .entry(frame.id)
       .or_insert_with(|| PreparedScrollBox {
         buffer: CanvasBuffer::new(content_size.width, content_size.height),
-        layout: resolved_layout,
+        layout: frame.layout,
         content_size,
         scroll_x: 0,
         scroll_y: 0,
-        visible: options.visible,
-        opaque: options.opaque,
+        visible: frame.visible,
+        opaque: frame.opaque,
         order,
-        scrollbar_style: options.scrollbar_style.clone(),
+        scrollbar_style: frame.scrollbar_style.clone(),
       });
     if prepared.buffer.width() != content_size.width
       || prepared.buffer.height() != content_size.height
@@ -216,14 +189,14 @@ impl CanvasService {
     } else {
       prepared.buffer.clear();
     }
-    prepared.layout = resolved_layout;
+    prepared.layout = frame.layout;
     prepared.content_size = content_size;
-    prepared.scroll_x = state.scroll_x;
-    prepared.scroll_y = state.scroll_y;
-    prepared.visible = options.visible;
-    prepared.opaque = options.opaque;
+    prepared.scroll_x = frame.scroll_x;
+    prepared.scroll_y = frame.scroll_y;
+    prepared.visible = frame.visible;
+    prepared.opaque = frame.opaque;
     prepared.order = order;
-    prepared.scrollbar_style = options.scrollbar_style.clone();
+    prepared.scrollbar_style = frame.scrollbar_style;
   }
 
   pub fn clear(&mut self) {
@@ -922,7 +895,7 @@ mod tests {
   use crate::host_engine::services::{
     Overflow, RenderService, RichTextParams, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy,
     ScrollbarVisibility, SliceLength, SliceOptions, SliceRect, SliceService, TerminalColor,
-    TextColor,
+    TextColor, UiObjectPool,
   };
   use std::collections::HashMap;
 
@@ -1108,7 +1081,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     let params = DrawTextParams {
       text: "abcd".to_string(),
       ..Default::default()
@@ -1375,7 +1348,7 @@ mod tests {
     let pool = UiObjectPool::new();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     assert_eq!(
       canvas.base_size(),
@@ -1411,7 +1384,7 @@ mod tests {
     let mut canvas = CanvasService::new();
 
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     assert_eq!(
       canvas.prepared_slice_rect(slice),
@@ -1457,11 +1430,11 @@ mod tests {
     let mut canvas = CanvasService::new();
 
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     assert_eq!(canvas.prepared_slice_rect(slice), None);
 
     assert!(service.draw(&mut pool, slice, 2, 1));
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     assert_eq!(
       canvas.prepared_slice_rect(slice),
       Some(Rect {
@@ -1473,7 +1446,7 @@ mod tests {
     );
 
     service.begin_frame(&mut pool);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     assert_eq!(canvas.prepared_slice_rect(slice), None);
   }
 
@@ -1501,7 +1474,7 @@ mod tests {
     let mut canvas = CanvasService::new();
 
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     assert_eq!(
       canvas.prepared_scroll_box_rect(id),
@@ -1550,7 +1523,7 @@ mod tests {
       .unwrap();
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     assert!(
       canvas

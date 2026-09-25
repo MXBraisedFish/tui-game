@@ -1199,7 +1199,7 @@ mod tests {
     let mut canvas = CanvasService::new();
     let layout = crate::host_engine::services::LayoutService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     assert!(service.render(
       &mut pool,
       id,
@@ -1273,7 +1273,7 @@ mod tests {
     let mut canvas = CanvasService::new();
     let layout = crate::host_engine::services::LayoutService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     assert!(service.render(
       &mut pool,
       id,
@@ -1321,7 +1321,7 @@ mod tests {
     let mut canvas = CanvasService::new();
     let layout = crate::host_engine::services::LayoutService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
     assert!(service.render(
       &mut pool,
       id,

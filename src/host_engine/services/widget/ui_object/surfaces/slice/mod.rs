@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use crate::host_engine::services::ui::UiObjectPool;
 use crate::host_engine::services::{LayoutService, Rect, Size, SurfaceId, TextColor};
 
-/// 切片唯一标识
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct SliceId(pub u64);
+pub use crate::host_engine::services::canvas::SliceId;
 
 /// 切片尺寸描述（固定值/自适应/百分比）
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

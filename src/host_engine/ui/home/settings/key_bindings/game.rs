@@ -2314,7 +2314,7 @@ mod tests {
 
     let mut canvas = CanvasService::new();
     ui.objects.begin_render();
-    canvas.prepare(&ui.objects, &layout);
+    ui.objects.prepare_canvas(&mut canvas, &layout);
     ui.render(
       &mut RenderService::new(),
       &mut canvas,

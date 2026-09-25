@@ -516,7 +516,7 @@ impl ScreensaverPackageUi {
       info_content_height,
       layout,
     );
-    canvas.prepare(&self.objects, layout);
+    self.objects.prepare_canvas(canvas, layout);
 
     let info_scroll_y = scroll_box
       .scroll_y(&self.objects, self.info_scroll)

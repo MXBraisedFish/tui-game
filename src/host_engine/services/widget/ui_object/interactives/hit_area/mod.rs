@@ -448,7 +448,7 @@ mod tests {
     let base_area = service.create(&mut pool, HitAreaOptions::default());
     let mut canvas = CanvasService::new();
     canvas.begin_frame(&layout);
-    canvas.prepare(&pool, &layout);
+    pool.prepare_canvas(&mut canvas, &layout);
 
     service.render_on(&mut pool, slice_area, slice, rect(1, 1, 2, 1), &canvas);
     service.render(&mut pool, base_area, rect(3, 2, 2, 1), &canvas);
