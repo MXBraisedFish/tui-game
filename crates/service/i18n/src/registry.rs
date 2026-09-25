@@ -2,7 +2,8 @@ use std::fs;
 
 use serde::Deserialize;
 
-use crate::host_engine::services::{LogService, LogSource, StorageService};
+use tg_service_log::{LogService, LogSource};
+use tg_service_storage::StorageService;
 
 /// 语言注册表条目
 #[derive(Clone, Debug, Deserialize)]

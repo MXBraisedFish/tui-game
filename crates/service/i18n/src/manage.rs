@@ -1,6 +1,7 @@
 use super::{I18nService, LanguageInfo, load_language_registry};
 
-use crate::host_engine::services::{LogService, LogSource, StorageService};
+use tg_service_log::{LogService, LogSource};
+use tg_service_storage::StorageService;
 
 impl I18nService {
   /// 将当前语言的日志标签与 log_info 消息模板应用到日志服务

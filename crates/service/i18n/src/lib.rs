@@ -1,3 +1,5 @@
+//! I18n service: language registry, runtime text namespaces and the embedded en_us fallback.
+
 mod embedded;
 mod language_info;
 mod manage;

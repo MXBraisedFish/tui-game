@@ -6,7 +6,8 @@ use std::path::Path;
 
 fn main() {
   let manifest = env::var("CARGO_MANIFEST_DIR").unwrap();
-  let en_us = Path::new(&manifest).join("assets/language/en_us/runtime");
+  // The crate lives at crates/service/i18n; assets/ is at the repository (deployment) root.
+  let en_us = Path::new(&manifest).join("../../../assets/language/en_us/runtime");
   let out = Path::new(&env::var("OUT_DIR").unwrap()).join("embedded_en_us.rs");
 
   let mut ns_data: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
@@ -51,5 +52,5 @@ fn main() {
   code.push_str("    false\n}\n");
 
   fs::write(&out, code).unwrap();
-  println!("cargo:rerun-if-changed=assets/language/en_us/runtime");
+  println!("cargo:rerun-if-changed=../../../assets/language/en_us/runtime");
 }

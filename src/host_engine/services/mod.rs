@@ -5,7 +5,7 @@ mod canvas;
 mod event;
 pub(crate) mod export;
 mod file;
-mod i18n;
+use tg_service_i18n as i18n;
 mod image;
 mod input;
 mod layout;

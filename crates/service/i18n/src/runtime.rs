@@ -3,7 +3,8 @@ use std::fs;
 
 use super::embedded;
 use super::service::I18nService;
-use crate::host_engine::services::{LogService, LogSource, StorageService};
+use tg_service_log::{LogService, LogSource};
+use tg_service_storage::StorageService;
 
 const RUNTIME_NAMESPACES: &[&str] = &[
   "boot_loading",
@@ -80,7 +81,7 @@ impl I18nService {
 
     log.warn_message(
       LogSource::I18n,
-      crate::host_engine::services::HostLogMessage::new(
+      tg_service_log::HostLogMessage::new(
         "log_info.fallback.activated",
         "{domain} entered fallback mode: {reason}",
       )

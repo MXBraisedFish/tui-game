@@ -1,0 +1,16 @@
+[package]
+name = "tg-service-i18n"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tg-service-log = { path = "../log" }
+tg-service-storage = { path = "../storage" }
+
+[build-dependencies]
+# Same spec as the former root build script: keeps the build-script feature set (and the
+# cached C builds of tree-sitter) unchanged.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.150"
