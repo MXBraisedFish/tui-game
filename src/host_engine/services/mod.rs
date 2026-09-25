@@ -18,7 +18,7 @@ mod recording;
 mod render;
 mod render_pipeline;
 mod screenshot;
-mod storage;
+use tg_service_storage as storage;
 pub use tg_service_text_layout as text_layout;
 mod time;
 mod ui;

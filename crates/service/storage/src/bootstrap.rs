@@ -3,7 +3,7 @@ use std::io::ErrorKind;
 
 use super::layout;
 use super::service::StorageService;
-use crate::host_engine::services::{LogService, LogSource};
+use tg_service_log::{LogService, LogSource};
 
 /// 确保存储目录和默认文件存在，缺失时自动创建。
 pub fn ensure_storage_layout(storage: &StorageService, log: &mut LogService) {
@@ -17,7 +17,7 @@ fn ensure_required_directories(storage: &StorageService, log: &mut LogService) {
     if let Err(error) = fs::create_dir_all(&path) {
       log.fatal_message(
         LogSource::Boot,
-        crate::host_engine::services::HostLogMessage::new(
+        tg_service_log::HostLogMessage::new(
           "log_info.operation.failed",
           "Host operation {operation} failed for {target}: {error}",
         )

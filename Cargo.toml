@@ -42,6 +42,7 @@ tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
 tg-service-log = { path = "crates/service/log" }
+tg-service-storage = { path = "crates/service/storage" }
 tg-service-text-layout = { path = "crates/service/text_layout" }
 tg-service-rich-text = { path = "crates/service/rich_text" }
 tg-service-code-highlight = { path = "crates/service/code_highlight" }
@@ -88,3 +89,6 @@ tar = "0.4"
 flate2 = "1.1"
 pulldown-cmark = "0.13.4"
 sysinfo = "0.38.3"
+
+[dev-dependencies]
+tg-service-storage = { path = "crates/service/storage", features = ["test-support"] }

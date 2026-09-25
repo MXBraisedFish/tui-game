@@ -6,7 +6,8 @@ use serde_json::Value;
 use tg_core_atomic_fs::atomic_write;
 
 use super::StorageService;
-use crate::host_engine::services::{LogService, LogSource, PackageId};
+use tg_core_package_id::PackageId;
+use tg_service_log::{LogService, LogSource};
 
 const MAX_GAME_SAVE_PROFILE_BYTES: u64 = 16 * 1024 * 1024;
 
@@ -225,7 +226,7 @@ impl StorageService {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::{PackageSource, PackageType};
+  use tg_core_package_id::{PackageSource, PackageType};
 
   #[test]
   fn continue_slot_is_shared_and_best_records_are_per_game() {

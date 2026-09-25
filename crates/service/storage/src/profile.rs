@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use tg_core_atomic_fs::atomic_write;
 use super::layout;
 use super::service::StorageService;
-use crate::host_engine::services::{HostLogMessage, LogService, LogSource, PackageId};
+use tg_core_package_id::PackageId;
+use tg_service_log::{HostLogMessage, LogService, LogSource};
 
 /// 终端配置文件：存储 Unicode 支持、颜色模式和鼠标支持的用户偏好。
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -427,6 +428,66 @@ pub enum DisplayFpsLimit {
   Fps60,
   Fps120,
   Unlimited,
+}
+
+impl DisplayLogoMode {
+  /// Next value in the settings page cycling order.
+  pub fn next(self) -> Self {
+    match self {
+      Self::Order => Self::Random,
+      Self::Random => Self::Classic,
+      Self::Classic => Self::Neon,
+      Self::Neon => Self::Wave,
+      Self::Wave => Self::Error,
+      Self::Error => Self::Glitch,
+      Self::Glitch => Self::Select,
+      Self::Select => Self::Char,
+      Self::Char => Self::Order,
+    }
+  }
+}
+
+impl DisplaySourceMode {
+  /// Next value in the settings page cycling order.
+  pub fn next(self) -> Self {
+    match self {
+      Self::All => Self::Mod,
+      Self::Mod => Self::Official,
+      Self::Official => Self::No,
+      Self::No => Self::All,
+    }
+  }
+}
+
+impl DisplayOrderMode {
+  /// Next value in the settings page cycling order.
+  pub fn next(self) -> Self {
+    match self {
+      Self::Random => Self::Order,
+      Self::Order => Self::Random,
+    }
+  }
+}
+
+impl DisplayFpsLimit {
+  pub fn target_fps(self) -> Option<u16> {
+    match self {
+      Self::Fps30 => Some(30),
+      Self::Fps60 => Some(60),
+      Self::Fps120 => Some(120),
+      Self::Unlimited => None,
+    }
+  }
+
+  /// Next value in the settings page cycling order.
+  pub fn next(self) -> Self {
+    match self {
+      Self::Fps30 => Self::Fps60,
+      Self::Fps60 => Self::Fps120,
+      Self::Fps120 => Self::Unlimited,
+      Self::Unlimited => Self::Fps30,
+    }
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -1047,6 +1108,21 @@ mod tests {
 
   use super::*;
 
+  #[test]
+  fn display_setting_cycles_return_to_start_and_fps_limits_map_to_targets() {
+    let mut fps = DisplayFpsLimit::Fps30;
+    let mut targets = Vec::new();
+    for _ in 0..4 {
+      targets.push(fps.target_fps());
+      fps = fps.next();
+    }
+    assert_eq!(fps, DisplayFpsLimit::Fps30);
+    assert_eq!(targets, [Some(30), Some(60), Some(120), None]);
+    assert_eq!(DisplayOrderMode::Random.next().next(), DisplayOrderMode::Random);
+    assert_eq!(DisplaySourceMode::No.next(), DisplaySourceMode::All);
+    assert_eq!(DisplayLogoMode::Char.next(), DisplayLogoMode::Order);
+  }
+
   fn temp_storage(name: &str) -> StorageService {
     let root = std::env::temp_dir().join(format!("tg_storage_{name}_{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -1099,14 +1175,14 @@ mod tests {
     let storage = temp_storage("package_state_persists");
     let mut log = LogService::new();
     let game_id = PackageId::new(
-      crate::host_engine::services::PackageSource::Official,
-      crate::host_engine::services::PackageType::Game,
+      tg_core_package_id::PackageSource::Official,
+      tg_core_package_id::PackageType::Game,
       "same_id",
     )
     .unwrap();
     let screensaver_id = PackageId::new(
-      crate::host_engine::services::PackageSource::Official,
-      crate::host_engine::services::PackageType::Screensaver,
+      tg_core_package_id::PackageSource::Official,
+      tg_core_package_id::PackageType::Screensaver,
       "same_id",
     )
     .unwrap();
@@ -1169,14 +1245,14 @@ mod tests {
     storage.write_package_state(&profile, &mut log).unwrap();
 
     let game_id = PackageId::new(
-      crate::host_engine::services::PackageSource::Official,
-      crate::host_engine::services::PackageType::Game,
+      tg_core_package_id::PackageSource::Official,
+      tg_core_package_id::PackageType::Game,
       "game",
     )
     .unwrap();
     let screensaver_id = PackageId::new(
-      crate::host_engine::services::PackageSource::Official,
-      crate::host_engine::services::PackageType::Screensaver,
+      tg_core_package_id::PackageSource::Official,
+      tg_core_package_id::PackageType::Screensaver,
       "screen",
     )
     .unwrap();

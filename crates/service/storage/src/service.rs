@@ -9,7 +9,7 @@ use super::bootstrap::ensure_storage_layout;
 use super::layout;
 use super::profile::DisplaySettingsProfile;
 use tg_core_audio::{AudioError, AudioErrorCode, ResolvedAudioFile};
-use crate::host_engine::services::{LogService, LogSource};
+use tg_service_log::{LogService, LogSource};
 
 /// 存储服务：管理应用根目录，提供各子路径的构建方法，并在初始化时确保目录结构存在。
 pub struct StorageService {
@@ -233,9 +233,9 @@ impl StorageService {
   }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl StorageService {
-  pub(crate) fn from_root_for_test(root_dir: PathBuf) -> Self {
+  pub fn from_root_for_test(root_dir: PathBuf) -> Self {
     Self {
       root_dir,
       display_settings: DisplaySettingsProfile::default(),
@@ -259,7 +259,7 @@ fn resolve_root_dir(log: &mut LogService) -> PathBuf {
   }
   log.warn_message(
     LogSource::Boot,
-    crate::host_engine::services::HostLogMessage::new(
+    tg_service_log::HostLogMessage::new(
       "log_info.fallback.activated",
       "{domain} entered fallback mode: {reason}",
     )

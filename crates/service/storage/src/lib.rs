@@ -1,3 +1,5 @@
+//! Storage service: data directory layout, profiles (settings, key bindings, package state) and game saves.
+
 mod bootstrap;
 mod game_save;
 mod layout;

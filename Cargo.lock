@@ -3558,6 +3558,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-storage"
+version = "2.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tg-core-atomic-fs",
+ "tg-core-audio",
+ "tg-core-package-id",
+ "tg-service-log",
+]
+
+[[package]]
 name = "tg-service-terminal"
 version = "2.0.0"
 dependencies = [
@@ -3989,6 +4001,7 @@ dependencies = [
  "tg-service-log",
  "tg-service-popup",
  "tg-service-rich-text",
+ "tg-service-storage",
  "tg-service-terminal",
  "tg-service-text-layout",
  "toml",
