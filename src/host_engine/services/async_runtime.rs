@@ -8,7 +8,7 @@ use super::{
   audio::AudioAsyncEvent,
   export::{self, ExportAsyncEvent, ExportTask},
   file::FileEvent,
-  image::{ImageConvertParams, ImageService},
+  image::ImageEvent,
   input::{KeyEvent, SystemEvent},
   log::LogSource,
   network::{NetworkEvent, NetworkTask},
@@ -20,27 +20,12 @@ use super::{
 };
 
 #[derive(Clone, Debug)]
-pub enum ImageTask {
-  Convert {
-    params: ImageConvertParams,
-    cache_dir: Option<PathBuf>,
-  },
-}
-
-#[derive(Clone, Debug)]
-pub enum ImageEvent {
-  ConvertFinished { task_id: TaskId, output: String },
-  Failed { task_id: TaskId, error: String },
-}
-
-#[derive(Clone, Debug)]
 pub enum EngineTask {
   Package(PackageTask),
   Export(ExportTask),
   Screenshot(ScreenshotTask),
   Recording(RecordingTask),
   Video(VideoExportTask),
-  Image(ImageTask),
   Network(NetworkTask),
 }
 
@@ -83,6 +68,12 @@ impl From<FileEvent> for EngineEvent {
   }
 }
 
+impl From<ImageEvent> for EngineEvent {
+  fn from(event: ImageEvent) -> Self {
+    Self::Image(event)
+  }
+}
+
 impl From<TimeAsyncEvent> for EngineEvent {
   fn from(event: TimeAsyncEvent) -> Self {
     Self::Time(event)
@@ -118,7 +109,7 @@ impl AsyncJob<EngineEvent> for EngineTask {
 
 fn write_target(task: &EngineTask) -> Option<PathBuf> {
   match task {
-    EngineTask::Package(_) | EngineTask::Image(_) | EngineTask::Network(_) => None,
+    EngineTask::Package(_) | EngineTask::Network(_) => None,
     EngineTask::Export(task) => Some(task.output_dir.join(format!(
       "{}.{}",
       task.file_stem,
@@ -151,35 +142,7 @@ fn run_task(
     }
     EngineTask::Recording(task) => recording::run_recording_task(id, task, event_tx),
     EngineTask::Video(task) => video::run_video_task(id, task, event_tx, cancellation),
-    EngineTask::Image(task) => run_image_task(id, task, event_tx),
     EngineTask::Network(task) => super::network::run_network_task(id, task, event_tx, cancellation),
-  }
-}
-
-fn run_image_task(
-  task_id: TaskId,
-  task: ImageTask,
-  event_tx: &Sender<EngineEvent>,
-) -> Result<(), String> {
-  match task {
-    ImageTask::Convert { params, cache_dir } => {
-      match ImageService::new(cache_dir).convert(params) {
-        Ok(output) => {
-          let _ = event_tx.send(EngineEvent::Image(ImageEvent::ConvertFinished {
-            task_id,
-            output,
-          }));
-          Ok(())
-        }
-        Err(error) => {
-          let _ = event_tx.send(EngineEvent::Image(ImageEvent::Failed {
-            task_id,
-            error: error.clone(),
-          }));
-          Err(error)
-        }
-      }
-    }
   }
 }
 

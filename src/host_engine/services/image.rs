@@ -5,10 +5,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
+use crossbeam_channel::Sender;
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
-
-use super::async_runtime::{AsyncRuntime, EngineTask, ImageTask, TaskId};
+use tg_service_async::{AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskStatusEvent};
 
 /// 图片转换参数
 #[derive(Clone, Debug)]
@@ -38,6 +38,50 @@ impl Default for ImageConvertParams {
       square_crop: false,
       scale: 1.0,
       cache: true,
+    }
+  }
+}
+
+#[derive(Clone, Debug)]
+pub enum ImageTask {
+  Convert {
+    params: ImageConvertParams,
+    cache_dir: Option<PathBuf>,
+  },
+}
+
+#[derive(Clone, Debug)]
+pub enum ImageEvent {
+  ConvertFinished { task_id: TaskId, output: String },
+  Failed { task_id: TaskId, error: String },
+}
+
+impl<E: From<ImageEvent> + Send + 'static> AsyncJob<E> for ImageTask {
+  fn run(
+    self: Box<Self>,
+    task_id: TaskId,
+    events: &Sender<E>,
+    _cancellation: &TaskCancellation,
+  ) -> Result<(), String> {
+    match *self {
+      ImageTask::Convert { params, cache_dir } => {
+        match ImageService::new(cache_dir).convert(params) {
+          Ok(output) => {
+            let _ = events.send(ImageEvent::ConvertFinished { task_id, output }.into());
+            Ok(())
+          }
+          Err(error) => {
+            let _ = events.send(
+              ImageEvent::Failed {
+                task_id,
+                error: error.clone(),
+              }
+              .into(),
+            );
+            Err(error)
+          }
+        }
+      }
     }
   }
 }
@@ -95,11 +139,18 @@ impl ImageService {
     Ok(result)
   }
 
-  pub fn convert_async(&self, async_runtime: &AsyncRuntime, params: ImageConvertParams) -> TaskId {
-    async_runtime.submit(EngineTask::Image(ImageTask::Convert {
+  pub fn convert_async<E>(
+    &self,
+    async_runtime: &AsyncRuntime<E>,
+    params: ImageConvertParams,
+  ) -> TaskId
+  where
+    E: From<ImageEvent> + From<TaskStatusEvent> + Send + 'static,
+  {
+    async_runtime.submit(ImageTask::Convert {
       params,
       cache_dir: self.cache_dir.clone(),
-    }))
+    })
   }
 
   // ─── 磁盘缓存辅助方法 ──────────────────────────────
@@ -233,7 +284,7 @@ fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
     p.square_crop,
     p.scale,
     p.cache,
-    crate::host_engine::services::IMAGE_CACHE_FORMAT_VERSION,
+    tg_core_version::IMAGE_CACHE_FORMAT_VERSION,
   );
   h.write(input.as_bytes());
   h.finish()
@@ -326,6 +377,7 @@ fn get_rgb(rgba: &image::RgbaImage, x: u32, y: u32) -> Rgb {
 mod tests {
   use super::*;
   use std::sync::atomic::{AtomicU64, Ordering};
+  use std::time::{Duration, Instant};
 
   static NEXT_TEST_IMAGE_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -602,5 +654,81 @@ mod tests {
     assert!(r2.starts_with("f%"));
 
     let _ = fs::remove_dir_all(&tmp);
+  }
+
+  #[derive(Debug)]
+  enum TestEvent {
+    Image(ImageEvent),
+    Status(TaskStatusEvent),
+  }
+
+  impl From<ImageEvent> for TestEvent {
+    fn from(event: ImageEvent) -> Self {
+      Self::Image(event)
+    }
+  }
+
+  impl From<TaskStatusEvent> for TestEvent {
+    fn from(event: TaskStatusEvent) -> Self {
+      Self::Status(event)
+    }
+  }
+
+  fn wait_for_events(runtime: &AsyncRuntime<TestEvent>, count: usize) -> Vec<TestEvent> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut events = Vec::new();
+    while events.len() < count && Instant::now() < deadline {
+      events.extend(runtime.poll_events());
+      std::thread::sleep(Duration::from_millis(2));
+    }
+    events
+  }
+
+  #[test]
+  fn convert_async_reports_the_synchronous_output_then_finishes() {
+    let source = TestImage::new();
+    let params = ImageConvertParams {
+      image_path: source.path.to_string_lossy().into(),
+      output_width: 20,
+      output_height: 10,
+      ..Default::default()
+    };
+    let expected = ImageService::new(None)
+      .convert(params.clone())
+      .expect("synchronous conversion");
+    let runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+
+    let id = ImageService::new(None).convert_async(&runtime, params);
+
+    let events = wait_for_events(&runtime, 2);
+    assert!(
+      matches!(
+        &events[..],
+        [
+          TestEvent::Image(ImageEvent::ConvertFinished { task_id, output }),
+          TestEvent::Status(TaskStatusEvent::Finished { id: finished }),
+        ] if *task_id == id && *output == expected && *finished == id
+      ),
+      "unexpected events: {events:?}"
+    );
+  }
+
+  #[test]
+  fn convert_async_reports_invalid_params_as_image_and_task_failure() {
+    let runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+
+    let id = ImageService::new(None).convert_async(&runtime, ImageConvertParams::default());
+
+    let events = wait_for_events(&runtime, 2);
+    assert!(
+      matches!(
+        &events[..],
+        [
+          TestEvent::Image(ImageEvent::Failed { task_id, error }),
+          TestEvent::Status(TaskStatusEvent::Failed { id: failed, error: status_error }),
+        ] if *task_id == id && *failed == id && error == status_error
+      ),
+      "unexpected events: {events:?}"
+    );
   }
 }
