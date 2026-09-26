@@ -1104,12 +1104,15 @@ mod tests {
   }
 
   fn playback_file(value: serde_json::Value) -> PathBuf {
+    // Parallel tests can read the same clock tick on Windows; the counter keeps names unique.
+    static NEXT_FILE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let nonce = SystemTime::now()
       .duration_since(UNIX_EPOCH)
       .unwrap()
       .as_nanos();
+    let sequence = NEXT_FILE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(
-      "tui-game-recording-playback-{}-{nonce}.json",
+      "tui-game-recording-playback-{}-{nonce}-{sequence}.json",
       std::process::id()
     ));
     fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();

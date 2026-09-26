@@ -20,3 +20,6 @@ tg-service-log = { path = "../log" }
 tg-service-storage = { path = "../storage" }
 unicode-segmentation = { workspace = true }
 unicode-width = { workspace = true }
+
+[dev-dependencies]
+tg-service-storage = { path = "../storage", features = ["test-support"] }

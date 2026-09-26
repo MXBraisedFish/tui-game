@@ -1198,12 +1198,15 @@ mod tests {
   use super::*;
 
   fn temporary_path(extension: &str) -> PathBuf {
+    // Parallel tests can read the same clock tick on Windows; the counter keeps names unique.
+    static NEXT_FILE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let nonce = SystemTime::now()
       .duration_since(UNIX_EPOCH)
       .unwrap()
       .as_nanos();
+    let sequence = NEXT_FILE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     std::env::temp_dir().join(format!(
-      "tui-game-audio-{}-{nonce}.{extension}",
+      "tui-game-audio-{}-{nonce}-{sequence}.{extension}",
       std::process::id()
     ))
   }
