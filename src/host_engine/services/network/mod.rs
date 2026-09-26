@@ -12,7 +12,7 @@ use reqwest::{
   header::{HeaderName, HeaderValue},
 };
 
-use super::{AsyncRuntime, EngineEvent, EngineTask, TaskId};
+use tg_service_async::{AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskStatusEvent};
 
 pub(crate) use executor::run_network_task;
 
@@ -272,6 +272,25 @@ impl fmt::Debug for NetworkTask {
   }
 }
 
+impl<E: From<NetworkEvent> + Send + 'static> AsyncJob<E> for NetworkTask {
+  fn run(
+    self: Box<Self>,
+    id: TaskId,
+    events: &Sender<E>,
+    cancellation: &TaskCancellation,
+  ) -> Result<(), String> {
+    run_network_task(id, *self, events, cancellation)
+  }
+
+  fn cancelled_before_start(&self, id: TaskId, events: &Sender<E>) {
+    emit_cancelled(id, self, events);
+  }
+
+  fn reports_own_cancellation(&self) -> bool {
+    true
+  }
+}
+
 #[derive(Clone)]
 struct NormalizedNetworkRequest {
   method: NetworkMethod,
@@ -297,18 +316,24 @@ impl NetworkService {
     }
   }
 
-  pub fn submit(
+  pub fn submit<E>(
     &mut self,
-    async_runtime: &AsyncRuntime,
+    async_runtime: &AsyncRuntime<E>,
     request: NetworkRequest,
-  ) -> Result<TaskId, NetworkSubmitError> {
+  ) -> Result<TaskId, NetworkSubmitError>
+  where
+    E: From<NetworkEvent> + From<TaskStatusEvent> + Send + 'static,
+  {
     let request = normalize_request(request, security::AddressPolicy::PublicOnly)?;
-    let task_id = async_runtime.submit(EngineTask::Network(NetworkTask { request }));
+    let task_id = async_runtime.submit(NetworkTask { request });
     self.active.insert(task_id, NetworkRequestStatus::Queued);
     Ok(task_id)
   }
 
-  pub fn cancel(&mut self, async_runtime: &AsyncRuntime, task_id: TaskId) -> bool {
+  pub fn cancel<E>(&mut self, async_runtime: &AsyncRuntime<E>, task_id: TaskId) -> bool
+  where
+    E: From<TaskStatusEvent> + Send + 'static,
+  {
     if !self.active.contains_key(&task_id) {
       return false;
     }
@@ -371,12 +396,19 @@ impl Default for NetworkService {
   }
 }
 
-pub(crate) fn emit_cancelled(task_id: TaskId, task: &NetworkTask, event_tx: &Sender<EngineEvent>) {
-  let _ = event_tx.send(EngineEvent::Network(NetworkEvent::Cancelled {
-    task_id,
-    method: task.request.method,
-    url: task.request.url.to_string(),
-  }));
+pub(crate) fn emit_cancelled<E: From<NetworkEvent>>(
+  task_id: TaskId,
+  task: &NetworkTask,
+  event_tx: &Sender<E>,
+) {
+  let _ = event_tx.send(
+    NetworkEvent::Cancelled {
+      task_id,
+      method: task.request.method,
+      url: task.request.url.to_string(),
+    }
+    .into(),
+  );
 }
 
 fn normalize_request(
@@ -473,7 +505,40 @@ mod tests {
   use std::{thread, time::Duration};
 
   use super::*;
-  use crate::host_engine::services::{SleepTask, TaskState};
+  use tg_service_async::TaskState;
+
+  #[derive(Debug)]
+  enum TestEvent {
+    Network(NetworkEvent),
+    Status,
+  }
+
+  impl From<NetworkEvent> for TestEvent {
+    fn from(event: NetworkEvent) -> Self {
+      Self::Network(event)
+    }
+  }
+
+  impl From<TaskStatusEvent> for TestEvent {
+    fn from(_: TaskStatusEvent) -> Self {
+      Self::Status
+    }
+  }
+
+  /// Keeps the only worker busy so the next task stays queued.
+  struct OccupyWorker(Duration);
+
+  impl AsyncJob<TestEvent> for OccupyWorker {
+    fn run(
+      self: Box<Self>,
+      _id: TaskId,
+      _events: &Sender<TestEvent>,
+      _cancellation: &TaskCancellation,
+    ) -> Result<(), String> {
+      thread::sleep(self.0);
+      Ok(())
+    }
+  }
 
   #[test]
   fn request_validation_rejects_unsupported_or_credentialed_urls() {
@@ -485,7 +550,7 @@ mod tests {
       assert!(
         NetworkService::new()
           .submit(
-            &AsyncRuntime::with_worker_count(1),
+            &AsyncRuntime::<TestEvent>::with_worker_count(1),
             NetworkRequest::get(url, NetworkResponseMode::Text),
           )
           .is_err()
@@ -593,17 +658,14 @@ mod tests {
 
   #[test]
   fn cancelling_a_queued_network_task_emits_cancelled_and_clears_state() {
-    let runtime = AsyncRuntime::with_worker_count(1);
-    runtime.submit(SleepTask {
-      duration: Duration::from_millis(50),
-      callback: None,
-    });
+    let runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+    runtime.submit(OccupyWorker(Duration::from_millis(50)));
     let request = normalize_request_for_test(NetworkRequest::get(
       "http://127.0.0.1/",
       NetworkResponseMode::Text,
     ))
     .unwrap();
-    let task_id = runtime.submit(EngineTask::Network(NetworkTask { request }));
+    let task_id = runtime.submit(NetworkTask { request });
     runtime.cancel_task(task_id);
 
     let mut cancelled = false;
@@ -611,7 +673,7 @@ mod tests {
       for event in runtime.poll_events() {
         if matches!(
           event,
-          EngineEvent::Network(NetworkEvent::Cancelled {
+          TestEvent::Network(NetworkEvent::Cancelled {
             task_id: actual,
             ..
           }) if actual == task_id

@@ -11,7 +11,7 @@ use super::{
   image::ImageEvent,
   input::{KeyEvent, SystemEvent},
   log::LogSource,
-  network::{NetworkEvent, NetworkTask},
+  network::NetworkEvent,
   package::{self, PackageAsyncEvent, PackageTask},
   recording::{self, RecordingAsyncEvent, RecordingTask},
   screenshot::{self, ScreenshotAsyncEvent, ScreenshotTask},
@@ -26,7 +26,6 @@ pub enum EngineTask {
   Screenshot(ScreenshotTask),
   Recording(RecordingTask),
   Video(VideoExportTask),
-  Network(NetworkTask),
 }
 
 #[derive(Clone, Debug)]
@@ -74,6 +73,12 @@ impl From<ImageEvent> for EngineEvent {
   }
 }
 
+impl From<NetworkEvent> for EngineEvent {
+  fn from(event: NetworkEvent) -> Self {
+    Self::Network(event)
+  }
+}
+
 impl From<TimeAsyncEvent> for EngineEvent {
   fn from(event: TimeAsyncEvent) -> Self {
     Self::Time(event)
@@ -95,21 +100,11 @@ impl AsyncJob<EngineEvent> for EngineTask {
     let temporary = temporary_target(self, &target, id);
     Some((target, temporary))
   }
-
-  fn cancelled_before_start(&self, id: TaskId, events: &Sender<EngineEvent>) {
-    if let EngineTask::Network(task) = self {
-      super::network::emit_cancelled(id, task, events);
-    }
-  }
-
-  fn reports_own_cancellation(&self) -> bool {
-    matches!(self, EngineTask::Network(_))
-  }
 }
 
 fn write_target(task: &EngineTask) -> Option<PathBuf> {
   match task {
-    EngineTask::Package(_) | EngineTask::Network(_) => None,
+    EngineTask::Package(_) => None,
     EngineTask::Export(task) => Some(task.output_dir.join(format!(
       "{}.{}",
       task.file_stem,
@@ -142,7 +137,6 @@ fn run_task(
     }
     EngineTask::Recording(task) => recording::run_recording_task(id, task, event_tx),
     EngineTask::Video(task) => video::run_video_task(id, task, event_tx, cancellation),
-    EngineTask::Network(task) => super::network::run_network_task(id, task, event_tx, cancellation),
   }
 }
 

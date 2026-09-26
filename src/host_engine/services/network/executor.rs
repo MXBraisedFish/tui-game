@@ -13,7 +13,7 @@ use reqwest::{
   redirect::Policy,
 };
 
-use crate::host_engine::services::{EngineEvent, TaskId, async_runtime::TaskCancellation};
+use tg_service_async::{TaskCancellation, TaskId};
 
 use super::{
   MAX_REDIRECTS, MAX_RESPONSE_BODY_BYTES, NetworkError, NetworkErrorCode, NetworkEvent,
@@ -25,10 +25,10 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
 const READ_BUFFER_BYTES: usize = 64 * 1024;
 
-pub(crate) fn run_network_task(
+pub(crate) fn run_network_task<E: From<NetworkEvent>>(
   task_id: TaskId,
   task: NetworkTask,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   cancellation: &TaskCancellation,
 ) -> Result<(), String> {
   let method = task.request.method;
@@ -37,19 +37,25 @@ pub(crate) fn run_network_task(
     super::emit_cancelled(task_id, &task, event_tx);
     return Err("network request cancelled".to_string());
   }
-  let _ = event_tx.send(EngineEvent::Network(NetworkEvent::Started {
-    task_id,
-    method,
-    url: original_url.clone(),
-  }));
+  let _ = event_tx.send(
+    NetworkEvent::Started {
+      task_id,
+      method,
+      url: original_url.clone(),
+    }
+    .into(),
+  );
 
   match execute(&task, cancellation) {
     Ok(response) => {
-      let _ = event_tx.send(EngineEvent::Network(NetworkEvent::Finished {
-        task_id,
-        method,
-        response,
-      }));
+      let _ = event_tx.send(
+        NetworkEvent::Finished {
+          task_id,
+          method,
+          response,
+        }
+        .into(),
+      );
       Ok(())
     }
     Err(error) if error.code == NetworkErrorCode::Cancelled => {
@@ -59,12 +65,15 @@ pub(crate) fn run_network_task(
     Err(error) => {
       let code = error.code;
       let stage = error.stage();
-      let _ = event_tx.send(EngineEvent::Network(NetworkEvent::Failed {
-        task_id,
-        method,
-        url: original_url,
-        error,
-      }));
+      let _ = event_tx.send(
+        NetworkEvent::Failed {
+          task_id,
+          method,
+          url: original_url,
+          error,
+        }
+        .into(),
+      );
       Err(format!(
         "network request failed during {stage} with {}",
         code.as_str()
@@ -662,23 +671,17 @@ mod tests {
       request: normalize_request_for_test(NetworkRequest::get(url, NetworkResponseMode::Text))
         .unwrap(),
     };
-    let (sender, receiver) = unbounded();
+    let (sender, receiver) = unbounded::<NetworkEvent>();
     run_network_task(TaskId(7), task, &sender, &TaskCancellation::new(TaskId(7))).unwrap();
-    let events = receiver
-      .try_iter()
-      .filter(|event| matches!(event, EngineEvent::Network(_)))
-      .collect::<Vec<_>>();
+    let events = receiver.try_iter().collect::<Vec<_>>();
     assert_eq!(events.len(), 2);
-    assert!(matches!(
-      events[0],
-      EngineEvent::Network(NetworkEvent::Started { .. })
-    ));
+    assert!(matches!(events[0], NetworkEvent::Started { .. }));
     assert!(matches!(
       events[1],
-      EngineEvent::Network(NetworkEvent::Finished {
+      NetworkEvent::Finished {
         response: NetworkResponse { status: 404, .. },
         ..
-      })
+      }
     ));
   }
 }
