@@ -1,3 +1,5 @@
+//! Screenshot service: rasterizes composed terminal frames to PNG/JSON and saves them as async jobs.
+
 use std::{
   collections::HashMap,
   env, fs,
@@ -12,11 +14,13 @@ use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use crate::host_engine::services::async_runtime::TaskCancellation;
-use crate::host_engine::services::{
-  CanvasCell, ComposedCell, ComposedFrame, LogService, LogSource, MEDIA_MANIFEST_VERSION,
-  RecordingPixelScale, StorageService, TaskId, TerminalColor, TextColor, TextStyle,
-};
+use tg_service_async::TaskCancellation;
+use tg_core_log::LogSource;
+use tg_core_style::{CanvasCell, ComposedCell, ComposedFrame, TerminalColor, TextColor, TextStyle};
+use tg_core_version::MEDIA_MANIFEST_VERSION;
+use tg_service_async::TaskId;
+use tg_service_log::LogService;
+use tg_service_storage::{RecordingPixelScale, StorageService};
 use tg_core_atomic_fs::{atomic_replace_with, atomic_write};
 
 // 导出按 1.5 倍基础像素密度直接栅格化，避免先低分辨率绘制再放大造成模糊。
@@ -76,9 +80,9 @@ pub enum ScreenshotAsyncEvent {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ScreenshotOperationFeedback {
-  pub(crate) copy_succeeded: Option<bool>,
-  pub(crate) save_task: Option<TaskId>,
+pub struct ScreenshotOperationFeedback {
+  pub copy_succeeded: Option<bool>,
+  pub save_task: Option<TaskId>,
 }
 
 pub struct ScreenshotService {
@@ -106,7 +110,7 @@ impl ScreenshotService {
     self.pending_font_preview.take()
   }
 
-  pub(crate) fn report_operation(
+  pub fn report_operation(
     &mut self,
     copy_succeeded: Option<bool>,
     save_task: Option<TaskId>,
@@ -117,7 +121,7 @@ impl ScreenshotService {
     });
   }
 
-  pub(crate) fn take_operation_feedback(&mut self) -> Option<ScreenshotOperationFeedback> {
+  pub fn take_operation_feedback(&mut self) -> Option<ScreenshotOperationFeedback> {
     self.pending_operation_feedback.take()
   }
 
@@ -583,18 +587,18 @@ fn send_progress<E: From<ScreenshotAsyncEvent>>(
   }));
 }
 
-pub(crate) struct TerminalFrameRasterizer {
+pub struct TerminalFrameRasterizer {
   fonts: FontSet,
 }
 
 impl TerminalFrameRasterizer {
-  pub(crate) fn load(preferred: &[String]) -> Result<Self, String> {
+  pub fn load(preferred: &[String]) -> Result<Self, String> {
     Ok(Self {
       fonts: FontSet::load(preferred)?,
     })
   }
 
-  pub(crate) fn dimensions(width: u16, height: u16, scale: RecordingPixelScale) -> (u32, u32) {
+  pub fn dimensions(width: u16, height: u16, scale: RecordingPixelScale) -> (u32, u32) {
     let metrics = RasterMetrics::for_scale(scale);
     (
       even_dimension((u32::from(width) * metrics.cell_width).max(1)),
@@ -602,7 +606,7 @@ impl TerminalFrameRasterizer {
     )
   }
 
-  pub(crate) fn render(
+  pub fn render(
     &self,
     frame: &ComposedFrame,
     rect: ScreenshotRect,
@@ -1308,7 +1312,7 @@ impl<E: From<ScreenshotAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::TaskId;
+  use tg_service_async::TaskId;
 
   #[test]
   fn font_preview_contains_representative_unicode_groups() {

@@ -1,3 +1,5 @@
+//! Video service: encodes recordings to MP4 (OpenH264 or ffmpeg) as async export jobs.
+
 use std::{
   collections::HashMap,
   fmt, fs,
@@ -19,12 +21,12 @@ use openh264::{
   formats::{RgbSliceU8, YUVBuffer},
 };
 
-use crate::host_engine::services::async_runtime::TaskCancellation;
-use crate::host_engine::services::{
-  FfmpegInstallation, FfmpegService, RecordingExportQuality, RecordingGpuAcceleration,
-  RecordingPlayback, RecordingProfile, ScreenshotRect, StorageService, TaskId,
-  load_recording_playback, screenshot::TerminalFrameRasterizer,
-};
+use tg_service_async::TaskCancellation;
+use tg_service_async::TaskId;
+use tg_service_ffmpeg::{FfmpegInstallation, FfmpegService};
+use tg_service_recording::{RecordingPlayback, load_recording_playback};
+use tg_service_screenshot::{ScreenshotRect, TerminalFrameRasterizer};
+use tg_service_storage::{RecordingExportQuality, RecordingGpuAcceleration, RecordingProfile, StorageService};
 
 #[derive(Clone, Debug)]
 pub struct VideoExportTask {
@@ -195,7 +197,7 @@ impl VideoService {
     result
   }
 
-  pub(crate) fn take_submission_feedback(&mut self) -> Option<bool> {
+  pub fn take_submission_feedback(&mut self) -> Option<bool> {
     self.pending_submission_feedback.take()
   }
 
@@ -1098,7 +1100,7 @@ impl<E: From<VideoAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E> fo
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::{RecordingGpuAcceleration, RecordingPixelScale};
+  use tg_service_storage::{RecordingGpuAcceleration, RecordingPixelScale};
   use openh264::formats::YUVSource;
   use std::{
     io::BufReader,
@@ -1216,7 +1218,7 @@ mod tests {
     let source_path = directory.join("recording.json");
     let output_path = directory.join("recording.mp4.tmp");
     let document = serde_json::json!({
-      "schema_version": crate::host_engine::services::MEDIA_MANIFEST_VERSION,
+      "schema_version": tg_core_version::MEDIA_MANIFEST_VERSION,
       "started_at": "2026-07-21T20:20:32.895Z",
       "finished_at": "2026-07-21T20:20:32.929Z",
       "frame_rate": 30,
@@ -1315,7 +1317,7 @@ mod tests {
     }
     wav.finalize().unwrap();
     let document = serde_json::json!({
-      "schema_version": crate::host_engine::services::MEDIA_MANIFEST_VERSION,
+      "schema_version": tg_core_version::MEDIA_MANIFEST_VERSION,
       "started_at": "2026-07-21T20:20:32.895Z",
       "finished_at": "2026-07-21T20:20:32.995Z",
       "frame_rate": 30,

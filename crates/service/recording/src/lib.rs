@@ -1,3 +1,5 @@
+//! Recording service: captures presented frames and audio events into recording documents and loads them for playback.
+
 use std::{
   fs,
   io::Read,
@@ -10,10 +12,11 @@ use chrono::{Local, SecondsFormat};
 use crossbeam_channel::Sender;
 use serde::{Deserialize, Serialize};
 
-use crate::host_engine::services::{
-  AudioAsyncEvent, AudioCaptureId, CanvasCell, ComposedCell, ComposedFrame, MEDIA_MANIFEST_VERSION,
-  StorageService, TaskId, TerminalColor, TextColor,
-};
+use tg_core_audio::{AudioAsyncEvent, AudioCaptureId};
+use tg_core_style::{CanvasCell, ComposedCell, ComposedFrame, TerminalColor, TextColor};
+use tg_core_version::MEDIA_MANIFEST_VERSION;
+use tg_service_async::TaskId;
+use tg_service_storage::StorageService;
 use tg_core_atomic_fs::atomic_write;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -480,7 +483,7 @@ impl RecordingService {
     true
   }
 
-  pub(crate) fn handle_audio_event<
+  pub fn handle_audio_event<
     E: From<RecordingAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
   >(
     &mut self,
@@ -545,7 +548,7 @@ impl RecordingService {
     self.finalizing_task = Some(task_id);
   }
 
-  pub(crate) fn capture_presented_frame(&mut self, frame: &ComposedFrame) {
+  pub fn capture_presented_frame(&mut self, frame: &ComposedFrame) {
     if self.state == RecordingState::Recording {
       let now = Instant::now();
       if let Some(session) = &mut self.session {
@@ -573,11 +576,11 @@ impl RecordingService {
     self.last_presented_frame = Some(frame.clone());
   }
 
-  pub(crate) fn capture_last_frame(&self) -> Option<ComposedFrame> {
+  pub fn capture_last_frame(&self) -> Option<ComposedFrame> {
     self.last_presented_frame.clone()
   }
 
-  pub(crate) fn handle_engine_event(&mut self, event: &RecordingAsyncEvent) {
+  pub fn handle_engine_event(&mut self, event: &RecordingAsyncEvent) {
     let task_id = match event {
       RecordingAsyncEvent::Saved { task_id, .. } | RecordingAsyncEvent::Failed { task_id, .. } => {
         *task_id
@@ -826,7 +829,7 @@ fn playback_cell(cell: PlaybackCell) -> Option<ComposedCell> {
   };
   Some(ComposedCell::Text(CanvasCell::styled(
     cell.text,
-    crate::host_engine::services::TextStyle {
+    tg_core_style::TextStyle {
       foreground,
       background,
       bold: cell.flags & 1 != 0,
@@ -1085,7 +1088,7 @@ impl<E: From<RecordingAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::{TextColor, TextStyle};
+  use tg_core_style::{TextColor, TextStyle};
   use std::time::{SystemTime, UNIX_EPOCH};
 
   fn frame(width: u16, height: u16, values: &[(u16, u16, &str)]) -> ComposedFrame {

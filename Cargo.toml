@@ -27,17 +27,18 @@ path = "src/main.rs"
 [dependencies]
 tg-core-arena = { path = "crates/core/arena" }
 tg-core-audio = { path = "crates/core/audio" }
-tg-core-atomic-fs = { path = "crates/core/atomic_fs" }
 tg-core-fault = { path = "crates/core/fault" }
-tg-core-geometry = { path = "crates/core/geometry" }
 tg-core-input = { path = "crates/core/input" }
-tg-core-log = { path = "crates/core/log" }
 tg-core-package-id = { path = "crates/core/package_id" }
 tg-core-sandbox-path = { path = "crates/core/sandbox_path" }
-tg-core-style = { path = "crates/core/style" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-package = { path = "crates/service/package" }
+tg-service-export = { path = "crates/service/export" }
+tg-service-video = { path = "crates/service/video" }
+tg-service-recording = { path = "crates/service/recording" }
+tg-service-screenshot = { path = "crates/service/screenshot" }
 tg-service-render-pipeline = { path = "crates/service/render_pipeline" }
 tg-service-render = { path = "crates/service/render" }
 tg-service-network = { path = "crates/service/network" }
@@ -65,14 +66,9 @@ crossterm = { workspace = true }
 mlua = { version = "0.12.0", features = ["lua54", "vendored"] }
 regex = "1.13.0"
 encoding_rs = "0.8.35"
-anyhow = "1.0.103"
-notify = "8"
 unicode-width = { workspace = true }
 unicode-segmentation = { workspace = true }
-once_cell = "1.19"
-serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
-serde_path_to_error = "0.1.20"
 serde_yaml = "0.9"
 toml = "1.1.2"
 csv = "1.3"
@@ -81,17 +77,8 @@ chrono = { workspace = true }
 rodio = { version = "0.22.2", default-features = false, features = ["playback", "flac", "mp3", "mp4", "vorbis", "wav"] }
 hound = "3.5"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
-mp4 = "0.14.0"
-openh264 = "0.9.7"
-fontdb = "0.23"
-fontdue = "0.9"
 base64 = "0.22"
-icy_sixel = "0.5"
 rdev = "0.5"
-palette = "0.7"
-zip = { version = "2.3", default-features = false, features = ["deflate"] }
-tar = "0.4"
-flate2 = "1.1"
 pulldown-cmark = "0.13.4"
 sysinfo = "0.38.3"
 

@@ -120,12 +120,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.104"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -363,18 +357,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 
 [[package]]
-name = "bitvec"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddcec3d12c579d40898fe0a9a358a803c23e9c52ca3c425707f81c9436211837"
-dependencies = [
- "funty",
- "radium",
- "tap",
- "wyz",
-]
-
-[[package]]
 name = "block"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -450,20 +432,6 @@ name = "bytemuck"
 version = "1.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797"
-dependencies = [
- "bytemuck_derive",
-]
-
-[[package]]
-name = "bytemuck_derive"
-version = "1.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc0e56a716f1e132ff6bf4bdac1c944a3fcdc1cae65f70a4a2a1ac3b401d2d1f"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.4",
-]
 
 [[package]]
 name = "byteorder"
@@ -1173,12 +1141,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "funty"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
-
-[[package]]
 name = "futures-channel"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1529,16 +1491,6 @@ dependencies = [
  "zerofrom",
  "zerotrie",
  "zerovec",
-]
-
-[[package]]
-name = "icy_sixel"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bfb5a63225620b59df34a235d1fb56ff7b766909c3212a8ff927511a22b181d"
-dependencies = [
- "quantette",
- "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -2090,7 +2042,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
- "libm",
 ]
 
 [[package]]
@@ -2299,15 +2250,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
-name = "ordered-float"
-version = "5.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c7c9e0d9b23589f26070720bac724174bfec1083e82f7854cdd0267518343c0"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "ordered-stream"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2324,8 +2266,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddeed8580d347d2abf3dcf06a5f0b3dc020258338526b277847cd4248a70fc64"
 dependencies = [
  "approx",
- "bytemuck",
- "libm",
  "palette_derive",
  "palette_math",
  "phf",
@@ -2348,9 +2288,6 @@ name = "palette_math"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e6eb142958d64335fb0e345c5b9ead2ecd6fc438c307e9d7d3c4fd428dbaf12"
-dependencies = [
- "libm",
-]
 
 [[package]]
 name = "parking"
@@ -2517,24 +2454,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
-name = "quantette"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba5d37e94c17b8870a5b936001d2845a6782a22ebdb1706c84294eca777f6729"
-dependencies = [
- "bitvec",
- "bytemuck",
- "libm",
- "num-traits",
- "ordered-float",
- "palette",
- "rand",
- "rand_xoshiro",
- "ref-cast",
- "wide",
-]
-
-[[package]]
 name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2622,12 +2541,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
-name = "radium"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
-
-[[package]]
 name = "rand"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2664,15 +2577,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_xoshiro"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "662effc7698e08ea324d3acccf8d9d7f7bf79b9785e270a174ea36e56900c91d"
-dependencies = [
- "rand_core",
-]
-
-[[package]]
 name = "rdev"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2695,26 +2599,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
  "bitflags 2.13.1",
-]
-
-[[package]]
-name = "ref-cast"
-version = "1.0.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e440fb4e4b4147295338efb76001ab9e4efc0e5839df2c47fc5ac2381d365c3"
-dependencies = [
- "ref-cast-impl",
-]
-
-[[package]]
-name = "ref-cast-impl"
-version = "1.0.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92ecd8964f8453721699a1ed72037b0db49ce2f5a5138486ee89bed6f67cdf3a"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.4",
 ]
 
 [[package]]
@@ -3407,12 +3291,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tap"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
-
-[[package]]
 name = "tar"
 version = "0.4.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3548,6 +3426,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-export"
+version = "2.0.0"
+dependencies = [
+ "crossbeam-channel",
+ "flate2",
+ "serde_json",
+ "tar",
+ "tg-core-atomic-fs",
+ "tg-core-log",
+ "tg-core-version",
+ "tg-service-async",
+ "tg-service-log",
+ "tg-service-storage",
+ "zip",
+]
+
+[[package]]
 name = "tg-service-ffmpeg"
 version = "2.0.0"
 
@@ -3631,6 +3526,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-package"
+version = "2.0.0"
+dependencies = [
+ "crossbeam-channel",
+ "notify",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "tg-core-audio",
+ "tg-core-input",
+ "tg-core-log",
+ "tg-core-package-id",
+ "tg-core-version",
+ "tg-service-async",
+ "tg-service-log",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "tg-service-popup"
 version = "2.0.0"
 dependencies = [
@@ -3643,6 +3558,22 @@ version = "2.0.0"
 dependencies = [
  "rand",
  "rand_chacha",
+]
+
+[[package]]
+name = "tg-service-recording"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+ "crossbeam-channel",
+ "serde",
+ "serde_json",
+ "tg-core-atomic-fs",
+ "tg-core-audio",
+ "tg-core-style",
+ "tg-core-version",
+ "tg-service-async",
+ "tg-service-storage",
 ]
 
 [[package]]
@@ -3675,6 +3606,28 @@ version = "2.0.0"
 dependencies = [
  "tg-core-input",
  "tg-core-style",
+]
+
+[[package]]
+name = "tg-service-screenshot"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+ "crossbeam-channel",
+ "fontdb",
+ "fontdue",
+ "image",
+ "serde",
+ "serde_json",
+ "tg-core-atomic-fs",
+ "tg-core-log",
+ "tg-core-style",
+ "tg-core-version",
+ "tg-service-async",
+ "tg-service-log",
+ "tg-service-storage",
+ "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]
@@ -3711,6 +3664,23 @@ version = "2.0.0"
 dependencies = [
  "crossbeam-channel",
  "tg-service-async",
+]
+
+[[package]]
+name = "tg-service-video"
+version = "2.0.0"
+dependencies = [
+ "crossbeam-channel",
+ "hound",
+ "mp4",
+ "openh264",
+ "serde_json",
+ "tg-core-version",
+ "tg-service-async",
+ "tg-service-ffmpeg",
+ "tg-service-recording",
+ "tg-service-screenshot",
+ "tg-service-storage",
 ]
 
 [[package]]
@@ -4076,46 +4046,29 @@ dependencies = [
 name = "tui-game"
 version = "2.0.0"
 dependencies = [
- "anyhow",
  "base64",
  "chrono",
  "crossbeam-channel",
  "crossterm",
  "csv",
  "encoding_rs",
- "flate2",
- "fontdb",
- "fontdue",
  "hound",
- "icy_sixel",
  "image",
  "mlua",
- "mp4",
- "notify",
- "once_cell",
- "openh264",
- "palette",
  "pulldown-cmark",
  "quick-xml",
  "rdev",
  "regex",
  "rodio",
- "serde",
  "serde_json",
- "serde_path_to_error",
  "serde_yaml",
  "sysinfo",
- "tar",
  "tg-core-arena",
- "tg-core-atomic-fs",
  "tg-core-audio",
  "tg-core-fault",
- "tg-core-geometry",
  "tg-core-input",
- "tg-core-log",
  "tg-core-package-id",
  "tg-core-sandbox-path",
- "tg-core-style",
  "tg-core-unicode",
  "tg-core-version",
  "tg-service-animation",
@@ -4123,6 +4076,7 @@ dependencies = [
  "tg-service-canvas",
  "tg-service-clipboard",
  "tg-service-code-highlight",
+ "tg-service-export",
  "tg-service-ffmpeg",
  "tg-service-file",
  "tg-service-host-object",
@@ -4132,19 +4086,22 @@ dependencies = [
  "tg-service-layout",
  "tg-service-log",
  "tg-service-network",
+ "tg-service-package",
  "tg-service-popup",
  "tg-service-random",
+ "tg-service-recording",
  "tg-service-render",
  "tg-service-render-pipeline",
  "tg-service-rich-text",
+ "tg-service-screenshot",
  "tg-service-storage",
  "tg-service-terminal",
  "tg-service-text-layout",
  "tg-service-time",
+ "tg-service-video",
  "toml",
  "unicode-segmentation",
  "unicode-width",
- "zip",
 ]
 
 [[package]]
@@ -4746,15 +4703,6 @@ name = "writeable"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
-
-[[package]]
-name = "wyz"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
-dependencies = [
- "tap",
-]
 
 [[package]]
 name = "x11"

@@ -1,0 +1,19 @@
+[package]
+name = "tg-service-video"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+mp4 = "0.14.0"
+openh264 = "0.9.7"
+tg-service-async = { path = "../async" }
+tg-service-ffmpeg = { path = "../ffmpeg" }
+tg-service-recording = { path = "../recording" }
+tg-service-screenshot = { path = "../screenshot" }
+tg-service-storage = { path = "../storage" }
+
+[dev-dependencies]
+hound = "3.5"
+serde_json = { version = "1.0.150", features = ["preserve_order"] }
+tg-core-version = { path = "../../core/version" }

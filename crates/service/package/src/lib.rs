@@ -1,3 +1,5 @@
+//! Package service: scans, validates and hot-reloads game/screensaver package manifests.
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
@@ -14,14 +16,13 @@ use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 
-pub use crate::host_engine::core::{PackageId, PackageSource, PackageType};
+pub use tg_core_package_id::{PackageId, PackageSource, PackageType};
 
-use crate::host_engine::services::{
-  async_runtime::{ManagedThreadId, TaskId},
-  input::canonical_key_token,
-  log::{HostLogMessage, LogService, LogSource},
-  version::{HOST_API_VERSION, PACKAGE_MANIFEST_VERSION},
-};
+use tg_core_input::canonical_key_token;
+use tg_core_log::{HostLogMessage, LogSource};
+use tg_core_version::{HOST_API_VERSION, PACKAGE_MANIFEST_VERSION};
+use tg_service_async::{ManagedThreadId, TaskId};
+use tg_service_log::LogService;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
@@ -537,14 +538,14 @@ impl PackageService {
     package: &PackageInfo,
     relative: &Path,
   ) -> Result<
-    crate::host_engine::services::ResolvedAudioFile,
-    crate::host_engine::services::AudioError,
+    tg_core_audio::ResolvedAudioFile,
+    tg_core_audio::AudioError,
   > {
     resolve_package_file(&package.path, Path::new("assets"), relative)
-      .map(crate::host_engine::services::ResolvedAudioFile::new)
+      .map(tg_core_audio::ResolvedAudioFile::new)
       .ok_or_else(|| {
-        crate::host_engine::services::AudioError::sanitized(
-          crate::host_engine::services::AudioErrorCode::InvalidPath,
+        tg_core_audio::AudioError::sanitized(
+          tg_core_audio::AudioErrorCode::InvalidPath,
         )
       })
   }
@@ -2656,7 +2657,8 @@ mod tests {
 
   #[test]
   fn checked_in_lua_test_packages_have_valid_complete_manifests() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_package");
+    // The checked-in test packages live at the workspace root, three levels above this crate.
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../test_package");
     let request = ScanRequest {
       root: root.clone(),
       language_code: "en_us".to_string(),
@@ -2695,14 +2697,14 @@ mod tests {
               .actions
               .iter()
               .map(
-                |(action, config)| crate::host_engine::services::ActionMapEntry {
+                |(action, config)| tg_core_input::ActionMapEntry {
                   action: action.clone(),
                   description: config.description.clone(),
                   keys: config.keys.clone(),
                 },
               )
               .collect::<Vec<_>>();
-            crate::host_engine::services::translate_action_map(&action_map)
+            tg_core_input::translate_action_map(&action_map)
               .unwrap_or_else(|error| panic!("{relative}/{dir_name}: {error:?}"));
           }
           PackageType::Screensaver => {

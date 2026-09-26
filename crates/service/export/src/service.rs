@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use crossbeam_channel::Sender;
 
-use crate::host_engine::services::version::{
-  HOST_API_VERSION, HOST_VERSION, PACKAGE_MANIFEST_VERSION,
-};
-use crate::host_engine::services::{LogService, StorageService, TaskId};
+use tg_core_version::{HOST_API_VERSION, HOST_VERSION, PACKAGE_MANIFEST_VERSION};
+use tg_service_async::TaskId;
+use tg_service_log::LogService;
+use tg_service_storage::StorageService;
 use tg_core_atomic_fs::atomic_replace_with;
 
 /// 导出文件格式
@@ -152,7 +152,7 @@ impl ExportService {
     let src_dir = scope.dir_path(storage);
     if !src_dir.is_dir() {
       log.warn_operation_failed(
-        crate::host_engine::services::LogSource::Storage,
+        tg_core_log::LogSource::Storage,
         "export_archive",
         src_dir.display().to_string(),
         "source directory does not exist",
@@ -176,8 +176,8 @@ impl ExportService {
     })?;
 
     log.info_message(
-      crate::host_engine::services::LogSource::Storage,
-      crate::host_engine::services::HostLogMessage::new(
+      tg_core_log::LogSource::Storage,
+      tg_core_log::HostLogMessage::new(
         "log_info.external.operation",
         "Host {operation} operation entered {state}.",
       )
@@ -188,11 +188,14 @@ impl ExportService {
     Ok(out_path)
   }
 
-  pub fn submit_export(
+  pub fn submit_export<E>(
     &self,
-    async_runtime: &crate::host_engine::services::AsyncRuntime,
+    async_runtime: &tg_service_async::AsyncRuntime<E>,
     task: ExportTask,
-  ) -> TaskId {
+  ) -> TaskId
+  where
+    E: From<ExportAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  {
     async_runtime.submit(task)
   }
 
@@ -344,7 +347,7 @@ pub(crate) fn run_export_task<E: From<ExportAsyncEvent>>(
   task_id: TaskId,
   task: ExportTask,
   event_tx: &Sender<E>,
-  cancellation: &crate::host_engine::services::async_runtime::TaskCancellation,
+  cancellation: &tg_service_async::TaskCancellation,
 ) -> Result<(), String> {
   match run_export_task_inner(task_id, task, event_tx, cancellation) {
     Ok(()) => Ok(()),
@@ -362,7 +365,7 @@ fn run_export_task_inner<E: From<ExportAsyncEvent>>(
   task_id: TaskId,
   task: ExportTask,
   event_tx: &Sender<E>,
-  cancellation: &crate::host_engine::services::async_runtime::TaskCancellation,
+  cancellation: &tg_service_async::TaskCancellation,
 ) -> Result<(), String> {
   let src_dir = task.scope.dir_path_from_root(&task.root_dir);
   if !src_dir.is_dir() {

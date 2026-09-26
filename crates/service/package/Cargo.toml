@@ -1,0 +1,20 @@
+[package]
+name = "tg-service-package"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+notify = "8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0.150", features = ["preserve_order"] }
+serde_path_to_error = "0.1.20"
+tg-core-audio = { path = "../../core/audio" }
+tg-core-input = { path = "../../core/input" }
+tg-core-log = { path = "../../core/log" }
+tg-core-package-id = { path = "../../core/package_id" }
+tg-core-version = { path = "../../core/version" }
+tg-service-async = { path = "../async" }
+tg-service-log = { path = "../log" }
+unicode-segmentation = { workspace = true }
+unicode-width = { workspace = true }
