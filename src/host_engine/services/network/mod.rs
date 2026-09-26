@@ -594,10 +594,10 @@ mod tests {
   #[test]
   fn cancelling_a_queued_network_task_emits_cancelled_and_clears_state() {
     let runtime = AsyncRuntime::with_worker_count(1);
-    runtime.submit(EngineTask::Sleep(SleepTask {
+    runtime.submit(SleepTask {
       duration: Duration::from_millis(50),
       callback: None,
-    }));
+    });
     let request = normalize_request_for_test(NetworkRequest::get(
       "http://127.0.0.1/",
       NetworkResponseMode::Text,

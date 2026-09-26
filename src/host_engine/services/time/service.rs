@@ -6,7 +6,41 @@ use super::objects::{
   TimeObjects, Timer, TimerEvent, TimerId, TimerMode, TimerOptions, TimerState,
 };
 
-use crate::host_engine::services::async_runtime::{AsyncRuntime, EngineTask, SleepTask, TaskId};
+use crossbeam_channel::Sender;
+use tg_service_async::{AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskStatusEvent};
+
+#[derive(Clone, Debug)]
+pub struct SleepTask {
+  pub duration: Duration,
+  pub callback: Option<TimeCallbackId>,
+}
+
+#[derive(Clone, Debug)]
+pub enum TimeAsyncEvent {
+  SleepFinished {
+    task_id: TaskId,
+    callback: Option<TimeCallbackId>,
+  },
+}
+
+impl<E: From<TimeAsyncEvent> + Send + 'static> AsyncJob<E> for SleepTask {
+  fn run(
+    self: Box<Self>,
+    id: TaskId,
+    events: &Sender<E>,
+    _cancellation: &TaskCancellation,
+  ) -> Result<(), String> {
+    std::thread::sleep(self.duration);
+    let _ = events.send(
+      TimeAsyncEvent::SleepFinished {
+        task_id: id,
+        callback: self.callback,
+      }
+      .into(),
+    );
+    Ok(())
+  }
+}
 
 pub struct TimeService;
 
@@ -21,13 +55,16 @@ impl TimeService {
     self.update_repeat_timers(pool, dt);
   }
 
-  pub fn sleep(
+  pub fn sleep<E>(
     &self,
-    async_runtime: &AsyncRuntime,
+    async_runtime: &AsyncRuntime<E>,
     duration: Duration,
     callback: Option<TimeCallbackId>,
-  ) -> TaskId {
-    async_runtime.submit(EngineTask::Sleep(SleepTask { duration, callback }))
+  ) -> TaskId
+  where
+    E: From<TimeAsyncEvent> + From<TaskStatusEvent> + Send + 'static,
+  {
+    async_runtime.submit(SleepTask { duration, callback })
   }
 
   fn update_standalone_timers(&self, pool: &mut TimeObjects, dt: Duration) {

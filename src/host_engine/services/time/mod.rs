@@ -6,4 +6,4 @@ pub use objects::{
   RepeatTimerOptions, TimeCallbackId, TimeCallbackRequest, TimeObjects, TimerEvent, TimerId,
   TimerMode, TimerOptions, TimerState,
 };
-pub use service::TimeService;
+pub use service::{SleepTask, TimeAsyncEvent, TimeService};

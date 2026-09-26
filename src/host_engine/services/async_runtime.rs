@@ -2,8 +2,6 @@ use std::{
   collections::HashMap,
   fs,
   path::{Path, PathBuf},
-  thread,
-  time::Duration,
 };
 
 use chardetng::{Iso2022JpDetection, Utf8Detection};
@@ -24,7 +22,7 @@ use super::{
   recording::{self, RecordingAsyncEvent, RecordingTask},
   screenshot::{self, ScreenshotAsyncEvent, ScreenshotTask},
   video::{self, VideoAsyncEvent, VideoExportTask},
-  time::TimeCallbackId,
+  time::TimeAsyncEvent,
 };
 
 #[derive(Clone, Debug)]
@@ -159,20 +157,6 @@ pub enum ImageEvent {
 }
 
 #[derive(Clone, Debug)]
-pub struct SleepTask {
-  pub duration: Duration,
-  pub callback: Option<TimeCallbackId>,
-}
-
-#[derive(Clone, Debug)]
-pub enum TimeAsyncEvent {
-  SleepFinished {
-    task_id: TaskId,
-    callback: Option<TimeCallbackId>,
-  },
-}
-
-#[derive(Clone, Debug)]
 pub enum EngineTask {
   Package(PackageTask),
   Export(ExportTask),
@@ -182,7 +166,6 @@ pub enum EngineTask {
   File(FileTask),
   Image(ImageTask),
   Network(NetworkTask),
-  Sleep(SleepTask),
 }
 
 #[derive(Clone, Debug)]
@@ -219,6 +202,12 @@ impl From<TaskStatusEvent> for EngineEvent {
   }
 }
 
+impl From<TimeAsyncEvent> for EngineEvent {
+  fn from(event: TimeAsyncEvent) -> Self {
+    Self::Time(event)
+  }
+}
+
 impl AsyncJob<EngineEvent> for EngineTask {
   fn run(
     self: Box<Self>,
@@ -250,8 +239,7 @@ fn write_target(task: &EngineTask) -> Option<PathBuf> {
   match task {
     EngineTask::Package(_)
     | EngineTask::Image(_)
-    | EngineTask::Network(_)
-    | EngineTask::Sleep(_) => None,
+    | EngineTask::Network(_) => None,
     EngineTask::Export(task) => Some(task.output_dir.join(format!(
       "{}.{}",
       task.file_stem,
@@ -306,14 +294,6 @@ fn run_task(
     EngineTask::File(task) => run_file_task(id, task, event_tx),
     EngineTask::Image(task) => run_image_task(id, task, event_tx),
     EngineTask::Network(task) => super::network::run_network_task(id, task, event_tx, cancellation),
-    EngineTask::Sleep(task) => {
-      thread::sleep(task.duration);
-      let _ = event_tx.send(EngineEvent::Time(TimeAsyncEvent::SleepFinished {
-        task_id: id,
-        callback: task.callback,
-      }));
-      Ok(())
-    }
   }
 }
 
@@ -1055,8 +1035,10 @@ fn run_image_task(
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::host_engine::services::time::SleepTask;
   use crossbeam_channel::unbounded;
   use std::sync::atomic::{AtomicU64, Ordering};
+  use std::thread;
   use std::time::Duration;
 
   static FILE_TEST_ID: AtomicU64 = AtomicU64::new(1);
@@ -1082,14 +1064,14 @@ mod tests {
   #[test]
   fn async_runtime_assigns_unique_task_ids() {
     let runtime = AsyncRuntime::with_worker_count(1);
-    let first = runtime.submit(EngineTask::Sleep(SleepTask {
+    let first = runtime.submit(SleepTask {
       duration: Duration::ZERO,
       callback: None,
-    }));
-    let second = runtime.submit(EngineTask::Sleep(SleepTask {
+    });
+    let second = runtime.submit(SleepTask {
       duration: Duration::ZERO,
       callback: None,
-    }));
+    });
 
     assert_ne!(first, second);
   }
@@ -1097,10 +1079,10 @@ mod tests {
   #[test]
   fn sleep_task_returns_time_event() {
     let runtime = AsyncRuntime::with_worker_count(1);
-    let task_id = runtime.submit(EngineTask::Sleep(SleepTask {
+    let task_id = runtime.submit(SleepTask {
       duration: Duration::from_millis(1),
       callback: None,
-    }));
+    });
 
     let mut found = false;
     for _ in 0..50 {
