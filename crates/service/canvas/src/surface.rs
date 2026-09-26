@@ -1,53 +1,55 @@
-//! 绘制面（切片与滚动盒子）的标识、滚动条样式与每帧描述。
+//! Identifiers, scrollbar styles and per-frame descriptions of drawing surfaces (slices and scroll
+//! boxes).
 //!
-//! 持有 UI 对象的一方（widget）每帧生成 [`SurfaceFrame`] 列表交给画布，画布不读取 UI 对象池。
+//! The owner of the UI objects (widget) builds a list of [`SurfaceFrame`]s every frame and hands it
+//! to the canvas; the canvas never reads the UI object pool.
 
 use tg_core_geometry::{Rect, Size};
 use tg_core_style::{TextColor, TextStyle};
 
-/// 切片唯一标识
+/// The unique identifier of a slice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SliceId(pub u64);
 
-/// 可滚动绘制面唯一标识。
+/// The unique identifier of a scrollable drawing surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ScrollBoxId(pub u64);
 
-/// 开发者可叠放绘制面的统一标识。
+/// The unified identifier of a stackable developer drawing surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SurfaceId {
   Slice(SliceId),
   ScrollBox(ScrollBoxId),
 }
 
-/// 滚动条放置侧。
+/// The side a scrollbar is placed on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScrollbarSide {
   Right,
 }
 
-/// 滚动条样式。
+/// The style of a scrollbar.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScrollbarStyle {
-  /// 垂直滚动条轨道字符。
+  /// Track character of the vertical scrollbar.
   pub track_char: char,
-  /// 垂直滚动条滑块字符。
+  /// Thumb character of the vertical scrollbar.
   pub thumb_char: char,
-  /// 垂直滚动条轨道样式。
+  /// Track style of the vertical scrollbar.
   pub track_style: TextStyle,
-  /// 垂直滚动条滑块样式。
+  /// Thumb style of the vertical scrollbar.
   pub thumb_style: TextStyle,
-  /// 水平滚动条轨道字符。
+  /// Track character of the horizontal scrollbar.
   pub h_track_char: char,
-  /// 水平滚动条滑块字符。
+  /// Thumb character of the horizontal scrollbar.
   pub h_thumb_char: char,
-  /// 水平滚动条轨道样式。
+  /// Track style of the horizontal scrollbar.
   pub h_track_style: TextStyle,
-  /// 水平滚动条滑块样式。
+  /// Thumb style of the horizontal scrollbar.
   pub h_thumb_style: TextStyle,
-  /// 滑块最小高度/宽度（默认 1）。
+  /// Minimum thumb height/width (default 1).
   pub minimum_thumb_height: u16,
-  /// 滚动条放置侧。
+  /// Side the scrollbar is placed on.
   pub side: ScrollbarSide,
 }
 
@@ -96,17 +98,18 @@ impl Default for ScrollbarStyle {
   }
 }
 
-/// ScrollBox 的完整区域解析结果。
+/// The fully resolved area layout of a scroll box.
 ///
-/// 所有滚动、裁剪、绘制与命中检测都必须使用该结果，禁止再次根据 options
-/// 推导滚动条可见性，避免不同阶段对同一格子的归属产生分歧。
+/// All scrolling, clipping, drawing and hit testing must use this result; never derive the
+/// scrollbar visibility from the options again, so that different stages cannot disagree about
+/// which area a cell belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ResolvedScrollBoxLayout {
-  /// `options.rect` 经 Developer Viewport 裁剪后的组件 viewport。
+  /// The component viewport: `options.rect` clipped to the developer viewport.
   pub viewport_rect: Rect,
-  /// 排除滚动条实际占用格子后的内容可视区域。
+  /// The visible content area, excluding the cells actually occupied by scrollbars.
   pub content_viewport_rect: Rect,
-  /// viewport 与外置滚动条共同占用的区域。
+  /// The area occupied by the viewport together with the external scrollbars.
   pub occupied_rect: Rect,
   pub vertical_track_rect: Option<Rect>,
   pub horizontal_track_rect: Option<Rect>,
@@ -116,7 +119,7 @@ pub struct ResolvedScrollBoxLayout {
   pub max_scroll_y: u16,
 }
 
-/// 切片在本帧的描述：已解析的位置与显示属性。
+/// The description of a slice in the current frame: its resolved position and display attributes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SliceFrame {
   pub id: SliceId,
@@ -126,7 +129,8 @@ pub struct SliceFrame {
   pub background: Option<TextColor>,
 }
 
-/// 滚动盒子在本帧的描述：已解析的区域布局、内容尺寸与滚动位置。
+/// The description of a scroll box in the current frame: its resolved area layout, content size
+/// and scroll position.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScrollBoxFrame {
   pub id: ScrollBoxId,
@@ -139,7 +143,8 @@ pub struct ScrollBoxFrame {
   pub scrollbar_style: ScrollbarStyle,
 }
 
-/// 一个绘制面在本帧的描述，按叠放顺序传给 [`CanvasService::prepare`](super::CanvasService::prepare)。
+/// The description of one drawing surface in the current frame, passed to
+/// [`CanvasService::prepare`](super::CanvasService::prepare) in stacking order.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SurfaceFrame {
   Slice(SliceFrame),

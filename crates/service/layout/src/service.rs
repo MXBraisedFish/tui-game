@@ -3,11 +3,18 @@ use super::{measure, position};
 use tg_service_text_layout::DrawTextParams;
 use tg_service_rich_text::RichTextParams;
 
-/// 布局服务，管理终端尺寸、视口和坐标计算
+/// The layout service, holding the terminal size and the developer viewport and resolving
+/// coordinates in them.
 pub struct LayoutService {
   physical: Size,
   viewport_request: Option<Rect>,
   viewport: Rect,
+}
+
+impl Default for LayoutService {
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl LayoutService {
@@ -90,12 +97,13 @@ impl LayoutService {
     self.resolve_viewport();
   }
 
+  #[cfg(test)]
   pub(crate) fn reset_developer_viewport(&mut self) {
     self.viewport_request = None;
     self.resolve_viewport();
   }
 
-  /// 在视口内根据水平锚点和内容宽度计算 X 坐标
+  /// Returns the X coordinate in the viewport for the horizontal anchor and content width.
   pub fn resolve_x(&self, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
     position::resolve_x(self.developer_size(), x_anchor, content_width, offset_x)
   }
@@ -104,7 +112,7 @@ impl LayoutService {
     self.resolve_x(x_anchor, content_width, offset_x)
   }
 
-  /// 在视口内根据垂直锚点和内容高度计算 Y 坐标
+  /// Returns the Y coordinate in the viewport for the vertical anchor and content height.
   pub fn resolve_y(&self, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
     position::resolve_y(self.developer_size(), y_anchor, content_height, offset_y)
   }
@@ -113,7 +121,7 @@ impl LayoutService {
     self.resolve_y(y_anchor, content_height, offset_y)
   }
 
-  /// 在视口内根据锚点和内容尺寸计算位置
+  /// Returns the position in the viewport for the anchors and content size.
   pub fn resolve_rect(
     &self,
     x_anchor: &str,
@@ -157,11 +165,8 @@ impl LayoutService {
     position::resolve_x(self.physical, x_anchor, content_width, offset_x)
   }
 
-  pub(crate) fn resolve_host_y(&self, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
-    position::resolve_y(self.physical, y_anchor, content_height, offset_y)
-  }
-
-  // 根据物理尺寸和开发者视口请求计算最终视口，并裁剪到物理边界内
+  // Resolves the final viewport from the physical size and the developer viewport request,
+  // clipped to the physical bounds.
   fn resolve_viewport(&mut self) {
     let requested = self.viewport_request.unwrap_or(Rect {
       x: 0,

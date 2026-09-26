@@ -527,7 +527,7 @@ mod tests {
     }
   }
 
-  /// Keeps the only worker busy so the next task stays queued.
+  /// A test job that keeps the only worker busy so the next task stays queued.
   struct OccupyWorker(Duration);
 
   impl AsyncJob<TestEvent> for OccupyWorker {

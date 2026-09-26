@@ -13,7 +13,7 @@ use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use tg_service_async::{AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskStatusEvent};
 
-/// 图片转换参数
+/// Parameters of an image conversion.
 #[derive(Clone, Debug)]
 pub struct ImageConvertParams {
   pub image_path: String,
@@ -89,13 +89,14 @@ impl<E: From<ImageEvent> + Send + 'static> AsyncJob<E> for ImageTask {
   }
 }
 
-/// 图片服务，将图片转换为终端半块字符画格式（支持内存 + 磁盘缓存）
+/// The image service, converting images into terminal half-block character art (with a memory and
+/// disk cache).
 pub struct ImageService {
   cache: HashMap<u64, String>,
   cache_dir: Option<PathBuf>,
 }
 
-/// 磁盘缓存条目格式。
+/// The format of a disk cache entry.
 #[derive(Serialize, Deserialize)]
 struct DiskCacheEntry {
   source_modified: u64,
@@ -103,7 +104,7 @@ struct DiskCacheEntry {
 }
 
 impl ImageService {
-  /// `cache_dir` 为 `None` 时不启用磁盘缓存。
+  /// Creates an image service. The disk cache is disabled when `cache_dir` is `None`.
   pub fn new(cache_dir: Option<PathBuf>) -> Self {
     Self {
       cache: HashMap::new(),
@@ -111,7 +112,12 @@ impl ImageService {
     }
   }
 
-  /// 将图片转换为终端字符画（含缓存支持）
+  /// Converts an image into terminal character art (with caching).
+  ///
+  /// # Errors
+  ///
+  /// Returns an error when the parameters are invalid, the image path cannot be resolved to an
+  /// existing png/jpg/jpeg file, the image cannot be opened, or the crop area is empty.
   pub fn convert(&mut self, params: ImageConvertParams) -> Result<String, String> {
     validate(&params)?;
 
@@ -119,11 +125,11 @@ impl ImageService {
     let hash = compute_hash(&resolved, &params);
 
     if params.cache {
-      // 1. 内存缓存。
+      // 1. Memory cache.
       if let Some(cached) = self.cache.get(&hash) {
         return Ok(cached.clone());
       }
-      // 2. 磁盘缓存。
+      // 2. Disk cache.
       if let Some(disk) = self.read_disk_cache(hash, &resolved) {
         self.cache.insert(hash, disk.clone());
         return Ok(disk);
@@ -156,7 +162,7 @@ impl ImageService {
     })
   }
 
-  // ─── 磁盘缓存辅助方法 ──────────────────────────────
+  // ─── Disk cache helpers ──────────────────────────────
 
   fn disk_cache_path(&self, hash: u64) -> Option<PathBuf> {
     self
@@ -173,7 +179,7 @@ impl ImageService {
     if entry.source_modified == current_mtime {
       Some(entry.rendered)
     } else {
-      // 过期则删除。
+      // Stale: delete it.
       let _ = fs::remove_file(&path);
       None
     }
@@ -202,13 +208,18 @@ impl ImageService {
   }
 }
 
-/// 获取源文件的修改时间（Unix 秒）。
+/// Returns the modification time of the source file (Unix seconds).
+///
+/// # Errors
+///
+/// Returns an error when the file metadata cannot be read or the modification time is before the
+/// Unix epoch.
 fn source_modified(path: &Path) -> io::Result<u64> {
   let meta = fs::metadata(path)?;
   let dur = meta
     .modified()?
     .duration_since(UNIX_EPOCH)
-    .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("mtime before epoch: {e:?}")))?;
+    .map_err(|e| io::Error::other(format!("mtime before epoch: {e:?}")))?;
   Ok(dur.as_secs())
 }
 
@@ -239,7 +250,7 @@ fn validate(p: &ImageConvertParams) -> Result<(), String> {
 
 const VALID_EXTS: &[&str] = &["png", "jpg", "jpeg"];
 
-// 解析图片路径，支持无后缀时自动查找 png/jpg/jpeg 文件
+// Resolves the image path; without an extension, looks for a matching png/jpg/jpeg file.
 fn resolve_path(raw: &str) -> Result<PathBuf, String> {
   let path = Path::new(raw);
 
@@ -271,7 +282,7 @@ fn resolve_path(raw: &str) -> Result<PathBuf, String> {
   ))
 }
 
-// 根据图片路径和转换参数计算缓存哈希值
+// Computes the cache hash from the image path and the conversion parameters.
 fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
   let mut h = DefaultHasher::new();
 
@@ -293,7 +304,7 @@ fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
   h.finish()
 }
 
-// 对图片执行裁剪、缩放并采样为半块字符画
+// Crops and scales the image, then samples it into half-block character art.
 fn process(img: &image::DynamicImage, p: &ImageConvertParams) -> Result<String, String> {
   let (src_w, src_h) = img.dimensions();
 
@@ -335,7 +346,8 @@ fn process(img: &image::DynamicImage, p: &ImageConvertParams) -> Result<String, 
   Ok(sample_halfblock(&resized, pw, ph))
 }
 
-// 将 RGBA 图像采样为终端半块字符 + 前景/背景色标签字符串
+// Samples an RGBA image into a string of terminal half-block characters with foreground/background
+// color tags.
 fn sample_halfblock(rgba: &image::RgbaImage, w: u32, h: u32) -> String {
   let char_rows = h / 2;
   let cap = (w as usize * char_rows as usize) * 18 + 2;
@@ -591,13 +603,13 @@ mod tests {
       ..Default::default()
     };
 
-    // 第一次调用：渲染并写入磁盘缓存。
+    // First call: renders and writes the disk cache.
     let r1 = {
       let mut svc = ImageService::new(Some(tmp.clone()));
       svc.convert(p.clone()).expect("first convert")
     };
 
-    // 第二次调用：新实例应从磁盘缓存读取。
+    // Second call: a new instance must read from the disk cache.
     let r2 = {
       let mut svc = ImageService::new(Some(tmp.clone()));
       svc.convert(p.clone()).expect("second convert (from disk)")
@@ -605,7 +617,7 @@ mod tests {
 
     assert_eq!(r1, r2, "disk-cached result must match");
 
-    // 清理。
+    // Clean up.
     let _ = fs::remove_dir_all(&tmp);
   }
 
@@ -627,7 +639,7 @@ mod tests {
     let mut svc = ImageService::new(Some(tmp.clone()));
     let _r1 = svc.convert(p.clone()).expect("first convert");
 
-    // 篡改磁盘缓存文件的 mtime 以制造过期。
+    // Tamper with the mtime recorded in the disk cache file to make the entry stale.
     let hash = {
       let resolved = resolve_path(&p.image_path).unwrap();
       compute_hash(&resolved, &p)
@@ -635,7 +647,7 @@ mod tests {
     let cache_file = tmp.join(format!("{hash}.json"));
     assert!(cache_file.exists(), "cache file should exist");
 
-    // 将 source_modified 改为 0，使其与源文件 mtime 不匹配。
+    // Set source_modified to 0 so it no longer matches the source file's mtime.
     let raw = fs::read_to_string(&cache_file).unwrap();
     let stale = raw.replace(
       &format!("\"source_modified\":{}", {
@@ -651,7 +663,7 @@ mod tests {
     );
     fs::write(&cache_file, stale).unwrap();
 
-    // 新实例读取时发现过期，应重新渲染。
+    // A new instance must detect the stale entry and render again.
     let mut svc2 = ImageService::new(Some(tmp.clone()));
     let r2 = svc2.convert(p).expect("stale cache should re-render");
     assert!(r2.starts_with("f%"));

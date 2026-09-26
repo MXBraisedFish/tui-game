@@ -376,11 +376,14 @@ const LUA_DIRECTORY_DEPTH_LIMIT: usize = 32;
 const LUA_I18N_NAMESPACE_LIMIT: usize = 256;
 const LUA_I18N_TOTAL_LIMIT: usize = 4 * 1024 * 1024;
 
+/// Texts of one language, keyed by namespace and then by text key.
+type I18nNamespaces = HashMap<String, HashMap<String, String>>;
+
 fn load_lua_i18n(
   assets_root: &Path,
   language_code: &str,
   callback_language_code: &str,
-) -> Result<(String, HashMap<String, HashMap<String, String>>), String> {
+) -> Result<(String, I18nNamespaces), String> {
   validate_lua_language_code(language_code)?;
   validate_lua_language_code(callback_language_code)?;
 
@@ -397,13 +400,13 @@ fn load_lua_i18n(
     (None, None) => return Err("no valid i18n language files were found".to_string()),
   };
 
-  if actual_language == language_code {
-    if let Some(fallback) = fallback {
-      for (namespace, values) in fallback {
-        let target = namespaces.entry(namespace).or_default();
-        for (key, value) in values {
-          target.entry(key).or_insert(value);
-        }
+  if actual_language == language_code
+    && let Some(fallback) = fallback
+  {
+    for (namespace, values) in fallback {
+      let target = namespaces.entry(namespace).or_default();
+      for (key, value) in values {
+        target.entry(key).or_insert(value);
       }
     }
   }
@@ -425,7 +428,7 @@ fn validate_lua_language_code(language_code: &str) -> Result<(), String> {
 fn load_lua_language(
   assets_root: &Path,
   language_code: &str,
-) -> Result<Option<HashMap<String, HashMap<String, String>>>, String> {
+) -> Result<Option<I18nNamespaces>, String> {
   let relative = SafeRelativePath::parse(&format!("language/{language_code}"))
     .map_err(|_| "invalid i18n language path".to_string())?;
   let directory = match resolve_sandbox_path(assets_root, &relative, SandboxPathKind::Directory) {

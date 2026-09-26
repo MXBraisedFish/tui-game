@@ -4,12 +4,18 @@ use super::{LanguageInfo, LanguageRegistryEntry};
 
 const HARD_CODED_MISSING_TEMPLATE: &str = "[Missing i18n Key: {value:missing_key}]";
 
-/// 国际化服务，管理多语言文本和语言注册表
+/// The internationalization service, holding the multilingual texts and the language registry.
 pub struct I18nService {
   current_language: String,
   current_language_info: Option<LanguageInfo>,
   language_registry: Vec<LanguageRegistryEntry>,
   runtime_texts: HashMap<String, HashMap<String, String>>,
+}
+
+impl Default for I18nService {
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl I18nService {
@@ -38,7 +44,7 @@ impl I18nService {
     self.runtime_texts.clear();
   }
 
-  /// 检查运行时文本是否为空
+  /// Returns whether no runtime texts are loaded.
   pub fn is_runtime_empty(&self) -> bool {
     self.runtime_texts.is_empty()
   }
@@ -62,7 +68,8 @@ impl I18nService {
     }
   }
 
-  /// 获取指定命名空间下的运行时翻译文本，未找到时返回本地化的缺失标记。
+  /// Returns the runtime translation of `key` in `namespace`, or the localized missing-key
+  /// marker when it is not found.
   pub fn get_runtime_text(&self, namespace: &str, key: &str) -> String {
     if let Some(text) = self
       .runtime_texts
@@ -112,7 +119,7 @@ impl I18nService {
     self.language_registry = registry;
   }
 
-  /// 检查指定语言代码是否在注册表中
+  /// Returns whether `language_code` is in the language registry.
   pub fn is_registered_language(&self, language_code: &str) -> bool {
     self
       .language_registry

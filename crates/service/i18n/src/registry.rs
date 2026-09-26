@@ -5,7 +5,7 @@ use serde::Deserialize;
 use tg_service_log::{LogService, LogSource};
 use tg_service_storage::StorageService;
 
-/// 语言注册表条目
+/// An entry of the language registry.
 #[derive(Clone, Debug, Deserialize)]
 pub struct LanguageRegistryEntry {
   pub code: String,
@@ -13,7 +13,9 @@ pub struct LanguageRegistryEntry {
   pub direction: String,
 }
 
-/// 从磁盘加载语言注册表
+/// Loads the language registry from disk.
+///
+/// Logs a warning and returns an empty list when the file cannot be read or parsed.
 pub fn load_language_registry(
   storage: &StorageService,
   log: &mut LogService,

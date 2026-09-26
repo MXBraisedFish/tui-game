@@ -28,17 +28,9 @@ pub enum TimerState {
   Stopped,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TimerOptions {
   pub emit_finished: bool,
-}
-
-impl Default for TimerOptions {
-  fn default() -> Self {
-    Self {
-      emit_finished: false,
-    }
-  }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -240,7 +232,7 @@ impl Timer {
   }
 }
 
-/// 一个运行时对象池中的全部计时器对象与待处理的时间回调请求
+/// All timer objects of one runtime object pool, plus the pending time callback requests.
 pub struct TimeObjects {
   pub(crate) timers: TimerObjects,
   pub(crate) delay_timers: DelayTimerObjects,

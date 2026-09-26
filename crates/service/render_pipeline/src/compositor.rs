@@ -5,15 +5,22 @@ use tg_core_unicode::graphemes;
 use tg_core_style::{CanvasCell, TextColor};
 use tg_service_canvas::CanvasService;
 
-/// 帧合成器：将基础层、切片层和宿主层按顺序叠加为一张合成帧。
+/// The frame compositor, stacking the base layer, the developer surfaces (slices and scroll boxes),
+/// the host layer and the top layer, in that order, into one composed frame.
 pub struct FrameCompositor;
+
+impl Default for FrameCompositor {
+  fn default() -> Self {
+    Self::new()
+  }
+}
 
 impl FrameCompositor {
   pub fn new() -> Self {
     Self
   }
 
-  /// 执行合成：按照分层顺序（底层 → 切片 → 宿主层）合并各层像素。
+  /// Composes the canvas layers in stacking order (base -> surfaces -> host -> top) into a frame.
   pub fn compose(&self, canvas: &CanvasService) -> ComposedFrame {
     let host = canvas.host_buffer();
     let mut frame = ComposedFrame::new(host.width(), host.height());
@@ -226,7 +233,7 @@ fn write_cell(frame: &mut ComposedFrame, x: u16, y: u16, source: &CanvasCell) {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use tg_core_style::{TerminalColor, TextColor, TextStyle};
+  use tg_core_style::TextStyle;
 
   #[test]
   fn compose_copies_text() {

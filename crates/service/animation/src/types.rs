@@ -509,7 +509,7 @@ pub enum AnimationRepeatCount {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AnimationRepeatOptions {
   pub mode: AnimationRepeatMode,
-  /// 总播放轮数；`Finite(1)` 表示只播放一次。
+  /// Total number of play cycles; `Finite(1)` plays only once.
   pub count: AnimationRepeatCount,
 }
 

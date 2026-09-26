@@ -4,7 +4,7 @@ use tg_service_rich_text::RichTextParams;
 use tg_service_text_layout as text_layout;
 use tg_service_rich_text::TextMode;
 
-/// 计算文本的渲染尺寸
+/// Returns the rendered size of `text`.
 pub fn get_text_size(text: &str, params: Option<&RichTextParams>) -> Size {
   let mut draw_params = DrawTextParams::new(
     0,
@@ -23,39 +23,37 @@ pub fn get_text_size(text: &str, params: Option<&RichTextParams>) -> Size {
   get_draw_text_size(&draw_params)
 }
 
-/// 计算文本的渲染宽度
+/// Returns the rendered width of `text`.
 pub fn get_text_width(text: &str, params: Option<&RichTextParams>) -> u16 {
   get_text_size(text, params).width
 }
 
-/// 计算文本的渲染高度
+/// Returns the rendered height of `text`.
 pub fn get_text_height(text: &str, params: Option<&RichTextParams>) -> u16 {
   get_text_size(text, params).height
 }
 
-/// 计算带排版参数的文本渲染尺寸
+/// Returns the rendered size of a text with layout parameters.
 pub fn get_draw_text_size(params: &DrawTextParams) -> Size {
   let params = params.host_formatted();
   let (width, height) = text_layout::measure_draw_text(params.as_ref());
   Size { width, height }
 }
 
-/// 计算带排版参数的文本渲染宽度
+/// Returns the rendered width of a text with layout parameters.
 pub fn get_draw_text_width(params: &DrawTextParams) -> u16 {
   get_draw_text_size(params).width
 }
 
-/// 计算带排版参数的文本渲染高度
+/// Returns the rendered height of a text with layout parameters.
 pub fn get_draw_text_height(params: &DrawTextParams) -> u16 {
   get_draw_text_size(params).height
 }
 
-/// 获取当前终端尺寸
+/// Returns the current terminal size.
 pub fn get_terminal_size() -> Size {
-  let (width, height) = crossterm::terminal::size().unwrap_or_else(|_e| {
-    // TODO: log warn when terminal size query fails — fallback to (95, 24)
-    (95, 24)
-  });
+  // TODO: log warn when terminal size query fails — fallback to (95, 24)
+  let (width, height) = crossterm::terminal::size().unwrap_or((95, 24));
   Size { width, height }
 }
 

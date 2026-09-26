@@ -1,24 +1,24 @@
 use super::types::{Position, Size};
 
-/// 水平对齐常量：左对齐
+/// Horizontal alignment: left.
 pub const ALIGN_LEFT: &str = "left";
 
-/// 水平对齐常量：居中
+/// Horizontal alignment: center.
 pub const ALIGN_CENTER: &str = "center";
 
-/// 水平对齐常量：右对齐
+/// Horizontal alignment: right.
 pub const ALIGN_RIGHT: &str = "right";
 
-/// 垂直对齐常量：顶部对齐
+/// Vertical alignment: top.
 pub const ALIGN_TOP: &str = "top";
 
-/// 垂直对齐常量：居中
+/// Vertical alignment: middle.
 pub const ALIGN_MIDDLE: &str = "middle";
 
-/// 垂直对齐常量：底部对齐
+/// Vertical alignment: bottom.
 pub const ALIGN_BOTTOM: &str = "bottom";
 
-/// 根据水平锚点和内容宽度计算 X 坐标
+/// Returns the X coordinate for the horizontal anchor and content width.
 pub fn resolve_x(size: Size, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
   let term_w = size.width;
   match x_anchor {
@@ -31,7 +31,7 @@ pub fn resolve_x(size: Size, x_anchor: &str, content_width: u16, offset_x: u16) 
   }
 }
 
-/// 根据垂直锚点和内容高度计算 Y 坐标
+/// Returns the Y coordinate for the vertical anchor and content height.
 pub fn resolve_y(size: Size, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
   let term_h = size.height;
   match y_anchor {
@@ -44,7 +44,7 @@ pub fn resolve_y(size: Size, y_anchor: &str, content_height: u16, offset_y: u16)
   }
 }
 
-/// 根据锚点和内容尺寸计算位置矩形
+/// Returns the position for the anchors and content size.
 pub fn resolve_rect(
   size: Size,
   x_anchor: &str,

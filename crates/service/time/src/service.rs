@@ -44,6 +44,12 @@ impl<E: From<TimeAsyncEvent> + Send + 'static> AsyncJob<E> for SleepTask {
 
 pub struct TimeService;
 
+impl Default for TimeService {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl TimeService {
   pub fn new() -> Self {
     Self
@@ -495,10 +501,9 @@ impl TimeService {
     if matches!(
       pool.timers.timers.get(&timer_id).map(|timer| timer.state),
       Some(TimerState::Finished | TimerState::Stopped)
-    ) {
-      if let Some(repeat) = pool.repeat_timers.timers.get_mut(&id) {
-        repeat.executed_count = 0;
-      }
+    ) && let Some(repeat) = pool.repeat_timers.timers.get_mut(&id)
+    {
+      repeat.executed_count = 0;
     }
     self.start_internal(pool, timer_id)
   }
@@ -708,12 +713,12 @@ impl TimeService {
 
     timer.elapsed = timer.elapsed.saturating_add(dt);
 
-    if let TimerMode::CountDown { duration } = timer.mode {
-      if timer.elapsed >= duration {
-        timer.elapsed = duration;
-        timer.state = TimerState::Finished;
-        return true;
-      }
+    if let TimerMode::CountDown { duration } = timer.mode
+      && timer.elapsed >= duration
+    {
+      timer.elapsed = duration;
+      timer.state = TimerState::Finished;
+      return true;
     }
 
     false

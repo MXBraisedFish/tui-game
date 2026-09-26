@@ -4,8 +4,15 @@ use super::AnimationObjects;
 
 use super::{AnimationError, AnimationTarget, AnimationValue, CellEffectId, EffectParameterId};
 
-/// 字符效果参数的宿主管理入口。实际逐格效果算法由渲染对象解释这些参数。
+/// The host-side entry point for managing character effect parameters. The per-cell effect
+/// algorithm itself is left to the render objects that interpret these parameters.
 pub struct CharacterEffectService;
+
+impl Default for CharacterEffectService {
+  fn default() -> Self {
+    Self::new()
+  }
+}
 
 impl CharacterEffectService {
   pub fn new() -> Self {

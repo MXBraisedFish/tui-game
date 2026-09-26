@@ -4,7 +4,11 @@ use tg_service_log::{LogService, LogSource};
 use tg_service_storage::StorageService;
 
 impl I18nService {
-  /// 将当前语言的日志标签与 log_info 消息模板应用到日志服务
+  /// Applies the current language's log labels and `log_info` message templates to the log service.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error when the pending log messages cannot be written to the log file.
   pub fn apply_log_translations(&self, log: &mut LogService) -> std::io::Result<()> {
     let missing_template = self.get_runtime_text("language_warning", "language_warning.missing");
     log.refresh_labels(
@@ -16,14 +20,16 @@ impl I18nService {
     )
   }
 
-  /// 刷新语言注册表
+  /// Reloads the language registry from disk.
   pub fn refresh_language_registry(&mut self, storage: &StorageService, log: &mut LogService) {
     let registry = load_language_registry(storage, log);
 
     self.set_language_registry(registry);
   }
 
-  /// 加载语言包信息
+  /// Loads the language package info of `language_code` from the registry.
+  ///
+  /// Returns `false` and clears the current language info when the language is not registered.
   pub fn load_language_package_info(
     &mut self,
     storage: &StorageService,
@@ -53,7 +59,7 @@ impl I18nService {
     false
   }
 
-  /// 检查语言包是否可用
+  /// Returns whether the language package of `language_code` is available.
   pub fn is_language_package_available(
     &self,
     storage: &StorageService,

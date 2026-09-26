@@ -1,4 +1,4 @@
-/// 当前语言信息，由 language_registry.json 派生。
+/// Information about the current language, derived from `language_registry.json`.
 #[derive(Clone, Debug)]
 pub struct LanguageInfo {
   pub code: String,

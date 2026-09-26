@@ -18,6 +18,12 @@ pub trait AnimationTargetRouter {
 
 pub struct AnimationService;
 
+impl Default for AnimationService {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl AnimationService {
   pub fn new() -> Self {
     Self
@@ -96,21 +102,20 @@ impl AnimationService {
       if !matches!(
         write.target,
         AnimationTarget::Value(_) | AnimationTarget::Effect(_)
-      ) {
-        if let Err(error) = router.apply(write) {
-          if matches!(error, AnimationError::TargetNotFound(_)) {
-            let cancelled = self.cancel(pool, AnimationHandle::new(write.animation_id))?;
-            for cleanup in &cancelled.writes {
-              if !matches!(
-                cleanup.target,
-                AnimationTarget::Value(_) | AnimationTarget::Effect(_)
-              ) {
-                let _ = router.apply(cleanup);
-              }
+      ) && let Err(error) = router.apply(write)
+      {
+        if matches!(error, AnimationError::TargetNotFound(_)) {
+          let cancelled = self.cancel(pool, AnimationHandle::new(write.animation_id))?;
+          for cleanup in &cancelled.writes {
+            if !matches!(
+              cleanup.target,
+              AnimationTarget::Value(_) | AnimationTarget::Effect(_)
+            ) {
+              let _ = router.apply(cleanup);
             }
           }
-          return Err(error);
         }
+        return Err(error);
       }
     }
     Ok(output)

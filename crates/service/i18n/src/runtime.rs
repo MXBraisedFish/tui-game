@@ -53,7 +53,10 @@ const RUNTIME_NAMESPACES: &[&str] = &[
 ];
 
 impl I18nService {
-  /// 加载运行时语言文本，含磁盘加载失败时的回退逻辑
+  /// Loads the runtime language texts of `language_code`.
+  ///
+  /// Falls back to the default language, then to the embedded en_us texts, when loading from
+  /// disk fails.
   pub fn load_runtime_language(
     &mut self,
     storage: &StorageService,
@@ -102,7 +105,7 @@ impl I18nService {
     self.set_current_language(fallback);
   }
 
-  /// 加载编译时嵌入的英文回退翻译
+  /// Loads the English fallback translations embedded at compile time.
   pub fn load_embedded_fallback(&mut self) {
     self.clear_runtime_texts();
     for namespace in RUNTIME_NAMESPACES {
@@ -166,9 +169,6 @@ impl I18nService {
       Err(_) => return None,
     };
 
-    match serde_json::from_str::<HashMap<String, String>>(&content) {
-      Ok(t) => Some(t),
-      Err(_) => None,
-    }
+    serde_json::from_str::<HashMap<String, String>>(&content).ok()
   }
 }

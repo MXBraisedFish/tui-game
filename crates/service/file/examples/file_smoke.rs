@@ -24,7 +24,13 @@ impl From<TaskStatusEvent> for Event {
   }
 }
 
+/// Waits up to five seconds for the next file event.
+///
 /// Only one task is in flight at a time, so the first file event belongs to it.
+///
+/// # Panics
+///
+/// Panics when no file event arrives within five seconds.
 fn next_file_event(runtime: &AsyncRuntime<Event>) -> FileEvent {
   let deadline = Instant::now() + Duration::from_secs(5);
   while Instant::now() < deadline {

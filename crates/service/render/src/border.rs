@@ -1,6 +1,6 @@
 use tg_core_style::{TextColor, TextStyle};
 
-/// 边框单个位置的字符与样式配置。
+/// The character and style configuration of a single border position.
 #[derive(Clone, Debug, Default)]
 pub struct BorderCharacter {
   pub char: Option<char>,
@@ -10,7 +10,7 @@ pub struct BorderCharacter {
 }
 
 impl BorderCharacter {
-  /// 将位置样式与默认样式合并，生成最终渲染用的 TextStyle。
+  /// Merges the position's style with the defaults into the final [`TextStyle`] used for rendering.
   pub fn resolve(
     &self,
     default_fg: Option<&TextColor>,
@@ -36,7 +36,7 @@ impl BorderCharacter {
   }
 }
 
-/// 自定义边框的八个方位字符与样式定义。
+/// The characters and styles of the eight positions of a custom border.
 #[derive(Clone, Debug, Default)]
 pub struct CustomBorder {
   pub left_top: BorderCharacter,
@@ -49,7 +49,9 @@ pub struct CustomBorder {
   pub left: BorderCharacter,
 }
 
-/// 预定义的边框样式枚举，支持无边框、单线、粗线、双线、圆角和自定义。
+/// A border style: none, single line, bold, double line, rounded corners, or custom.
+// reason: boxing the large `Custom` variant would change the public `BorderStyle::Custom` type.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum BorderStyle {
   None,
@@ -61,7 +63,7 @@ pub enum BorderStyle {
 }
 
 impl BorderStyle {
-  /// 将预定义样式展开为具体的 CustomBorder 描述（None 返回 None）。
+  /// Expands the style into a concrete [`CustomBorder`]; returns `None` for [`BorderStyle::None`].
   pub fn to_custom(&self) -> Option<CustomBorder> {
     match self {
       Self::None => None,

@@ -14,12 +14,19 @@ use super::{ComposedCell, ComposedFrame};
 use tg_core_style::{TerminalColor, TextColor, TextStyle};
 use tg_service_terminal::TerminalService;
 
-/// 帧呈现器：将 ComposedFrame 转换为 crossterm 指令并输出到终端，支持增量刷新。
+/// The frame presenter, turning a [`ComposedFrame`] into crossterm commands written to the
+/// terminal, with incremental redraws.
 pub struct FramePresenter {
   previous: Option<ComposedFrame>,
   force_full_redraw: bool,
 
   truecolor: bool,
+}
+
+impl Default for FramePresenter {
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl FramePresenter {
@@ -31,12 +38,17 @@ impl FramePresenter {
     }
   }
 
-  /// 标记下次呈现时需要全量重绘。
+  /// Requests a full redraw on the next present.
   pub fn request_render(&mut self) {
     self.force_full_redraw = true;
   }
 
-  /// 将帧输出到终端，仅重绘变化区域（除非要求全量重绘或尺寸变化）。
+  /// Writes the frame to the terminal, redrawing only the changed cells unless a full redraw was
+  /// requested or the frame size changed.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error when writing to or flushing the terminal fails.
   pub fn present(
     &mut self,
     frame: &ComposedFrame,
@@ -145,10 +157,10 @@ fn queue_text_run(
 ) -> io::Result<()> {
   let mut run_text = String::new();
   for x in start..end {
-    if let Some(ComposedCell::Text(cell)) = frame.get(x, y) {
-      if !cell.is_continuation() {
-        run_text.push_str(&cell.text);
-      }
+    if let Some(ComposedCell::Text(cell)) = frame.get(x, y)
+      && !cell.is_continuation()
+    {
+      run_text.push_str(&cell.text);
     }
   }
 
@@ -276,12 +288,12 @@ fn queue_style(stdout: &mut impl Write, style: &TextStyle, truecolor: bool) -> i
     )))?;
   }
 
-  if let Some(background) = &style.background {
-    if !matches!(background, TextColor::Transparent) {
-      stdout.queue(SetBackgroundColor(text_color_to_crossterm(
-        background, truecolor,
-      )))?;
-    }
+  if let Some(background) = &style.background
+    && !matches!(background, TextColor::Transparent)
+  {
+    stdout.queue(SetBackgroundColor(text_color_to_crossterm(
+      background, truecolor,
+    )))?;
   }
 
   if style.reverse {

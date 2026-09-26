@@ -12,7 +12,8 @@ use super::surface::{
   SurfaceFrame, SurfaceId,
 };
 
-/// 画布服务：管理基础层、宿主层和多切片缓冲区，协调文本绘制与区域查询。
+/// The canvas service, owning the base layer, the host layer and the per-surface buffers; it
+/// coordinates text drawing and area queries.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasService {
   base: CanvasBuffer,
@@ -26,7 +27,7 @@ pub struct CanvasService {
   force_full_redraw: bool,
 }
 
-/// 已预处理完成的切片：包含独立缓冲区、位置和可见性等元数据。
+/// A prepared slice: its own buffer plus metadata such as position and visibility.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreparedSlice {
   pub buffer: CanvasBuffer,
@@ -37,7 +38,7 @@ pub struct PreparedSlice {
   pub order: usize,
 }
 
-/// 已预处理完成的滚动盒子：包含虚拟内容缓冲区和可视窗口元数据。
+/// A prepared scroll box: its virtual content buffer plus viewport metadata.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreparedScrollBox {
   pub buffer: CanvasBuffer,
@@ -51,18 +52,22 @@ pub struct PreparedScrollBox {
   pub scrollbar_style: ScrollbarStyle,
 }
 
-/// 已预处理开发者 Surface 的只读引用。
+/// A read-only reference to a prepared developer surface.
 pub enum PreparedSurface<'a> {
   Slice(&'a PreparedSlice),
   ScrollBox(&'a PreparedScrollBox),
 }
 
+impl Default for CanvasService {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl CanvasService {
   pub fn new() -> Self {
-    let (width, height) = crossterm::terminal::size().unwrap_or_else(|_e| {
-      // TODO: log warn when terminal size query fails — fallback to (95, 24)
-      (95, 24)
-    });
+    // TODO: log warn when terminal size query fails — fallback to (95, 24)
+    let (width, height) = crossterm::terminal::size().unwrap_or((95, 24));
     Self {
       base: CanvasBuffer::new(width, height),
       host: CanvasBuffer::new(width, height),
@@ -96,7 +101,7 @@ impl CanvasService {
     }
   }
 
-  /// 开始新的一帧：调整宿主缓冲区尺寸，必要时标记全量重绘。
+  /// Starts a new frame: resizes the host buffers, requesting a full redraw when needed.
   pub fn begin_frame(&mut self, layout: &LayoutService) {
     let physical = layout.physical_size();
     if self.host.width() != physical.width || self.host.height() != physical.height {
@@ -110,7 +115,8 @@ impl CanvasService {
     }
   }
 
-  /// 按叠放顺序预处理本帧的全部绘制面缓冲区；`pool_id` 变化时丢弃上一对象池的缓冲区。
+  /// Prepares the buffers of all drawing surfaces of this frame in stacking order; when `pool_id`
+  /// changes, the buffers of the previous object pool are dropped.
   pub fn prepare(&mut self, pool_id: u64, surfaces: Vec<SurfaceFrame>, layout: &LayoutService) {
     self.viewport = layout.developer_viewport_rect();
     let size = layout.developer_size();
@@ -205,12 +211,12 @@ impl CanvasService {
     self.base.clear();
   }
 
-  /// 擦除基础层的矩形区域，使下层内容可以重新透出。
+  /// Erases a rectangle of the base layer so the content below shows through again.
   pub fn erase_rect(&mut self, x: i32, y: i32, width: u16, height: u16) {
     Self::erase_rect_from(&mut self.base, x, y, width, height);
   }
 
-  /// 擦除指定切片中的矩形区域。
+  /// Erases a rectangle in the given slice. Returns `false` when the slice is missing or hidden.
   pub fn erase_rect_on(&mut self, id: SliceId, x: i32, y: i32, width: u16, height: u16) -> bool {
     let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
       return false;
@@ -219,12 +225,13 @@ impl CanvasService {
     true
   }
 
-  /// 在基础层上绘制富文本（支持样式标签和排版参数）。
+  /// Draws rich text on the base layer (supports style tags and layout parameters).
   pub fn text(&mut self, params: &DrawTextParams) {
     self.text_at(i32::from(params.x), i32::from(params.y), params);
   }
 
-  /// 在基础层的有符号坐标上绘制富文本，画布外内容会被自动裁剪。
+  /// Draws rich text at signed coordinates on the base layer; content outside the canvas is
+  /// clipped.
   pub fn text_at(&mut self, x: i32, y: i32, params: &DrawTextParams) {
     let lines = text_layout::layout_text_lines(params);
     Self::draw_layout_lines(&mut self.base, x, y, params.line_align, &lines);
@@ -245,12 +252,13 @@ impl CanvasService {
     Self::draw_layout_lines(&mut self.base, x, y, params.line_align, &lines);
   }
 
-  /// 在指定切片的缓冲区上绘制富文本，返回是否成功（切片不可见时返回 false）。
+  /// Draws rich text into the buffer of the given slice. Returns whether it succeeded (`false`
+  /// when the slice is not visible).
   pub fn text_on(&mut self, id: SliceId, params: &DrawTextParams) -> bool {
     self.text_at_on(id, i32::from(params.x), i32::from(params.y), params)
   }
 
-  /// 在切片的有符号局部坐标上绘制文本。
+  /// Draws text at signed local coordinates of the slice.
   pub fn text_at_on(&mut self, id: SliceId, x: i32, y: i32, params: &DrawTextParams) -> bool {
     let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
       return false;
@@ -291,12 +299,12 @@ impl CanvasService {
     true
   }
 
-  /// 在指定滚动盒子的虚拟内容缓冲区上绘制富文本。
+  /// Draws rich text into the virtual content buffer of the given scroll box.
   pub fn text_in_scroll_box(&mut self, id: ScrollBoxId, params: &DrawTextParams) -> bool {
     self.text_at_in_scroll_box(id, i32::from(params.x), i32::from(params.y), params)
   }
 
-  /// 在滚动盒子虚拟内容区的有符号坐标上绘制文本。
+  /// Draws text at signed coordinates of the scroll box's virtual content area.
   pub fn text_at_in_scroll_box(
     &mut self,
     id: ScrollBoxId,
@@ -351,7 +359,7 @@ impl CanvasService {
     true
   }
 
-  /// 在宿主层上绘制富文本（用于覆盖层等）。
+  /// Draws rich text on the host layer (used by overlays and the like).
   pub fn host_text(&mut self, params: &DrawTextParams) {
     self.host_text_at(i32::from(params.x), i32::from(params.y), params);
   }
@@ -361,7 +369,7 @@ impl CanvasService {
     Self::draw_layout_lines(&mut self.host, x, y, params.line_align, &lines);
   }
 
-  /// 在宿主最高层上绘制富文本。
+  /// Draws rich text on the host's top layer.
   pub fn top_text(&mut self, params: &DrawTextParams) {
     self.top_text_at(i32::from(params.x), i32::from(params.y), params);
   }
@@ -390,7 +398,7 @@ impl CanvasService {
     Self::draw_layout_lines(&mut self.host, x, y, params.line_align, &lines);
   }
 
-  /// 在基础层上以指定样式绘制纯文本。
+  /// Draws plain text with the given style on the base layer.
   pub fn styled_text(
     &mut self,
     x: impl Into<i32>,
@@ -401,7 +409,8 @@ impl CanvasService {
     Self::styled_text_to(&mut self.base, x.into(), y.into(), text, style);
   }
 
-  /// 在指定切片的缓冲区上以指定样式绘制纯文本，返回是否成功。
+  /// Draws plain text with the given style into the buffer of the given slice. Returns whether it
+  /// succeeded.
   pub fn styled_text_on(
     &mut self,
     id: SliceId,
@@ -417,7 +426,8 @@ impl CanvasService {
     true
   }
 
-  /// 在指定滚动盒子的虚拟内容缓冲区上以指定样式绘制纯文本。
+  /// Draws plain text with the given style into the virtual content buffer of the given scroll
+  /// box.
   pub fn styled_text_in_scroll_box(
     &mut self,
     id: ScrollBoxId,
@@ -437,7 +447,7 @@ impl CanvasService {
     true
   }
 
-  /// 在宿主层上以指定样式绘制纯文本。
+  /// Draws plain text with the given style on the host layer.
   pub fn host_styled_text(
     &mut self,
     x: impl Into<i32>,
@@ -453,17 +463,6 @@ impl CanvasService {
     if let (Ok(x), Ok(y)) = (u16::try_from(x), u16::try_from(y)) {
       self.host.set(x, y, cell);
     }
-  }
-
-  /// 在宿主最高层上以指定样式绘制纯文本。
-  pub(crate) fn top_styled_text(
-    &mut self,
-    x: impl Into<i32>,
-    y: impl Into<i32>,
-    text: &str,
-    style: TextStyle,
-  ) {
-    Self::styled_text_to(self.top.buffer_mut(), x.into(), y.into(), text, style);
   }
 
   fn styled_text_to(buffer: &mut CanvasBuffer, x: i32, y: i32, text: &str, style: TextStyle) {
@@ -519,26 +518,26 @@ impl CanvasService {
     }
   }
 
-  /// 重置画布尺寸并标记需要全量重绘。
+  /// Resizes the canvas and requests a full redraw.
   pub fn resize(&mut self, width: u16, height: u16) {
     self.host.resize(width, height);
     let _ = self.top.resize_or_clear(width, height);
     self.force_full_redraw = true;
   }
 
-  /// 标记需要全量重绘（常用于样式或内容变更后）。
+  /// Requests a full redraw (typically after a style or content change).
   pub fn request_render(&mut self) {
     self.force_full_redraw = true;
   }
 
-  /// 取出并清除"需要全量重绘"标记，返回本次是否需要重绘。
+  /// Takes and clears the "full redraw requested" flag, returning whether a redraw is needed.
   pub fn take_render_requested(&mut self) -> bool {
     let requested = self.force_full_redraw;
     self.force_full_redraw = false;
     requested
   }
 
-  /// 获取基础层中指定坐标的字符单元。
+  /// Returns the cell of the base layer at the given coordinates.
   pub fn cell_at(&self, x: u16, y: u16) -> Option<&CanvasCell> {
     self.base.get(x, y)
   }
@@ -555,18 +554,7 @@ impl CanvasService {
     &self.base
   }
 
-  /// 按绘制顺序迭代所有预处理切片。
-  pub(crate) fn prepared_slices(&self) -> impl Iterator<Item = (SliceId, &PreparedSlice)> {
-    self
-      .surface_order
-      .iter()
-      .filter_map(|surface| match surface {
-        SurfaceId::Slice(id) => self.slices.get(id).map(|slice| (*id, slice)),
-        SurfaceId::ScrollBox(_) => None,
-      })
-  }
-
-  /// 按共享层级顺序迭代所有开发者 Surface。
+  /// Iterates over all prepared developer surfaces in their shared stacking order.
   pub fn prepared_surfaces(&self) -> impl Iterator<Item = PreparedSurface<'_>> {
     self
       .surface_order
@@ -581,7 +569,8 @@ impl CanvasService {
     self.viewport
   }
 
-  /// 获取指定切片在视口坐标系中的矩形区域（切片不可见时返回 None）。
+  /// Returns the rectangle of the given slice in viewport coordinates (`None` when the slice is
+  /// not visible).
   pub fn prepared_slice_rect(&self, id: SliceId) -> Option<Rect> {
     let slice = self.slices.get(&id)?;
     slice.visible.then_some(slice.rect)
@@ -618,7 +607,7 @@ impl CanvasService {
     })
   }
 
-  /// 查询预处理滚动盒子的内容区尺寸。
+  /// Returns the content size of the prepared scroll box.
   pub fn prepared_scroll_box_content_size(&self, id: ScrollBoxId) -> Option<Size> {
     self
       .scroll_boxes
@@ -627,7 +616,7 @@ impl CanvasService {
       .map(|sb| sb.content_size)
   }
 
-  /// 查询预处理滚动盒子的 viewport 尺寸。
+  /// Returns the viewport size of the prepared scroll box.
   pub fn prepared_scroll_box_viewport_size(&self, id: ScrollBoxId) -> Option<Size> {
     let sb = self.scroll_boxes.get(&id)?;
     sb.visible.then_some(Size {
@@ -636,13 +625,13 @@ impl CanvasService {
     })
   }
 
-  /// 查询预处理滚动盒子的滚动位置。
+  /// Returns the scroll position of the prepared scroll box.
   pub fn prepared_scroll_box_scroll_position(&self, id: ScrollBoxId) -> Option<(u16, u16)> {
     let sb = self.scroll_boxes.get(&id)?;
     sb.visible.then_some((sb.scroll_x, sb.scroll_y))
   }
 
-  /// 返回 Surface 层级顺序的只读切片。
+  /// Returns the surface stacking order as a read-only slice.
   pub fn surface_order(&self) -> &[SurfaceId] {
     &self.surface_order
   }
@@ -669,7 +658,8 @@ impl CanvasService {
       .and_then(|(id, _)| (id != ScrollBoxId(0)).then_some(id))
   }
 
-  /// 将物理坐标转换为视口内的相对坐标。
+  /// Converts physical coordinates into coordinates relative to the viewport; returns `None` when
+  /// the point is outside the viewport.
   pub fn viewport_point(&self, x: u16, y: u16) -> Option<(u16, u16)> {
     self
       .viewport
@@ -677,7 +667,7 @@ impl CanvasService {
       .then(|| (x - self.viewport.x, y - self.viewport.y))
   }
 
-  /// 计算基础层上矩形区域的命中检测结果。
+  /// Returns the hit-test result of a rectangle on the base layer.
   pub fn base_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
     surface_hit_rect(
       rect,
@@ -689,7 +679,7 @@ impl CanvasService {
     )
   }
 
-  /// 计算指定切片上矩形区域的命中检测结果。
+  /// Returns the hit-test result of a rectangle on the given slice.
   pub fn slice_hit_rect(
     &self,
     id: SliceId,
@@ -764,7 +754,7 @@ impl CanvasService {
     ))
   }
 
-  /// 计算宿主层上矩形区域的命中检测结果。
+  /// Returns the hit-test result of a rectangle on the host layer.
   pub fn host_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
     surface_hit_rect(
       rect,
@@ -840,7 +830,7 @@ impl CanvasService {
   }
 }
 
-// 计算矩形在指定表面上的裁剪命中区域。
+// Computes the clipped hit area of a rectangle on the given surface.
 fn surface_hit_rect(
   rect: Rect,
   ox: u16,
@@ -874,17 +864,14 @@ fn physical_rect(viewport: Rect, rect: Rect) -> Rect {
   }
 }
 
-// 解析背景色：当样式背景为 Transparent 时，继承已写入单元格的背景色。
+// Resolves the background color: a Transparent style background inherits the background of the
+// already written cell.
 fn resolve_background(mut style: TextStyle, buffer: &CanvasBuffer, x: u16, y: u16) -> TextStyle {
-  match &style.background {
-    Some(TextColor::Transparent) => {
-      if buffer.is_written(x, y)
-        && let Some(existing) = buffer.get(x, y)
-      {
-        style.background = existing.style.background.clone();
-      }
-    }
-    _ => {}
+  if matches!(style.background, Some(TextColor::Transparent))
+    && buffer.is_written(x, y)
+    && let Some(existing) = buffer.get(x, y)
+  {
+    style.background = existing.style.background.clone();
   }
   style
 }

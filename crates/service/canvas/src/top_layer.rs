@@ -1,6 +1,7 @@
 use super::buffer::CanvasBuffer;
 
-/// 宿主最高优先级绘制层。只用于全局短提示等必须压过所有 UI/Overlay 的内容。
+/// The host's highest-priority drawing layer. Only used for content that must cover all UI and
+/// overlays, such as short global notices.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TopLayer {
   buffer: CanvasBuffer,

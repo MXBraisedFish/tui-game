@@ -208,7 +208,8 @@ impl CharacterEffectPool {
   }
 }
 
-/// 一个运行时对象池中的全部动画对象：播放实例、动画值与字符特效
+/// All animation objects of one runtime object pool: playbacks, animated values and character
+/// effects.
 pub struct AnimationObjects {
   pub(crate) animations: AnimationPool,
   pub(crate) animation_values: AnimationValuePool,
@@ -224,7 +225,7 @@ impl AnimationObjects {
     }
   }
 
-  /// Number of live animation playbacks.
+  /// Returns the number of live animation playbacks.
   pub fn animation_count(&self) -> usize {
     self.animations.ids().len()
   }

@@ -14,20 +14,28 @@ enum Target {
   Top,
 }
 
-/// 渲染服务：提供文本、填充矩形和边框矩形等高层绘制操作。
+/// The render service, providing high-level drawing operations such as text, filled rectangles and
+/// bordered rectangles.
 pub struct RenderService;
+
+impl Default for RenderService {
+  fn default() -> Self {
+    Self::new()
+  }
+}
 
 impl RenderService {
   pub fn new() -> Self {
     Self
   }
 
-  /// 在基础层上绘制文本。
+  /// Draws text on the base layer.
   pub fn draw_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     self.draw_text_target(canvas, Target::Base, params);
   }
 
-  /// 在基础层的有符号坐标上绘制文本，超出画布的部分由 Canvas 裁剪。
+  /// Draws text at signed coordinates on the base layer; the canvas clips whatever falls outside
+  /// it.
   pub fn draw_text_at(
     &mut self,
     canvas: &mut CanvasService,
@@ -38,7 +46,8 @@ impl RenderService {
     self.draw_text_target_at(canvas, Target::Base, x, y, params);
   }
 
-  /// 在指定切片上绘制文本，返回是否绘制成功（切片不可见时返回 false）。
+  /// Draws text on the given slice. Returns whether it was drawn (`false` when the slice is not
+  /// visible).
   pub fn draw_text_on(
     &mut self,
     canvas: &mut CanvasService,
@@ -59,7 +68,7 @@ impl RenderService {
     canvas.text_at_on(slice, x, y, params)
   }
 
-  /// 在指定滚动盒子的虚拟内容区上绘制文本。
+  /// Draws text in the virtual content area of the given scroll box.
   pub fn draw_text_in_scroll_box(
     &mut self,
     canvas: &mut CanvasService,
@@ -80,41 +89,21 @@ impl RenderService {
     canvas.text_at_in_scroll_box(id, x, y, params)
   }
 
-  /// 在宿主层上绘制文本（用于顶层 UI 元素）。
+  /// Draws text on the host layer (used for top-level UI elements).
   pub fn draw_host_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     let params = params.host_formatted();
     self.draw_text_target(canvas, Target::Host, params.as_ref());
   }
 
-  pub(crate) fn draw_host_text_at(
-    &mut self,
-    canvas: &mut CanvasService,
-    x: i32,
-    y: i32,
-    params: &DrawTextParams,
-  ) {
-    let params = params.host_formatted();
-    self.draw_text_target_at(canvas, Target::Host, x, y, params.as_ref());
-  }
-
-  /// 在宿主最高层上绘制文本。
+  /// Draws text on the host's top layer.
   pub fn draw_top_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     let params = params.host_formatted();
     self.draw_text_target(canvas, Target::Top, params.as_ref());
   }
 
-  pub(crate) fn draw_top_text_at(
-    &mut self,
-    canvas: &mut CanvasService,
-    x: i32,
-    y: i32,
-    params: &DrawTextParams,
-  ) {
-    let params = params.host_formatted();
-    self.draw_text_target_at(canvas, Target::Top, x, y, params.as_ref());
-  }
-
-  /// 在基础层上绘制填充矩形。
+  /// Draws a filled rectangle on the base layer.
+  // reason: public API; grouping the parameters would change its signature.
+  #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect(
     &mut self,
     canvas: &mut CanvasService,
@@ -139,7 +128,7 @@ impl RenderService {
     );
   }
 
-  /// 在指定切片上绘制填充矩形，返回是否绘制成功。
+  /// Draws a filled rectangle on the given slice. Returns whether it was drawn.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect_on(
     &mut self,
@@ -170,7 +159,7 @@ impl RenderService {
     true
   }
 
-  /// 在指定滚动盒子的虚拟内容区上绘制填充矩形。
+  /// Draws a filled rectangle in the virtual content area of the given scroll box.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect_in_scroll_box(
     &mut self,
@@ -201,7 +190,7 @@ impl RenderService {
     true
   }
 
-  /// 在宿主层上绘制填充矩形。
+  /// Draws a filled rectangle on the host layer.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_host_filled_rect(
     &mut self,
@@ -217,32 +206,6 @@ impl RenderService {
     self.draw_filled_rect_target(
       canvas,
       Target::Host,
-      x.into(),
-      y.into(),
-      width,
-      height,
-      fill_char,
-      fill_fg,
-      fill_bg,
-    );
-  }
-
-  /// 在宿主最高层上绘制填充矩形。
-  #[allow(clippy::too_many_arguments)]
-  pub(crate) fn draw_top_filled_rect(
-    &mut self,
-    canvas: &mut CanvasService,
-    x: impl Into<i32>,
-    y: impl Into<i32>,
-    width: u16,
-    height: u16,
-    fill_char: Option<String>,
-    fill_fg: Option<TextColor>,
-    fill_bg: Option<TextColor>,
-  ) {
-    self.draw_filled_rect_target(
-      canvas,
-      Target::Top,
       x.into(),
       y.into(),
       width,
@@ -274,7 +237,7 @@ impl RenderService {
       _ => ' ',
     };
 
-    let fill_str: String = std::iter::repeat(ch).take(width as usize).collect();
+    let fill_str: String = std::iter::repeat_n(ch, width as usize).collect();
     for row in 0..height {
       self.draw_text_target_at(
         canvas,
@@ -291,7 +254,9 @@ impl RenderService {
     }
   }
 
-  /// 在基础层上绘制带样式的边框矩形。
+  /// Draws a styled bordered rectangle on the base layer.
+  // reason: public API; grouping the parameters would change its signature.
+  #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect(
     &mut self,
     canvas: &mut CanvasService,
@@ -320,7 +285,7 @@ impl RenderService {
     );
   }
 
-  /// 在指定切片上绘制带样式的边框矩形，返回是否绘制成功。
+  /// Draws a styled bordered rectangle on the given slice. Returns whether it was drawn.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect_on(
     &mut self,
@@ -355,7 +320,7 @@ impl RenderService {
     true
   }
 
-  /// 在指定滚动盒子的虚拟内容区上绘制边框矩形。
+  /// Draws a bordered rectangle in the virtual content area of the given scroll box.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect_in_scroll_box(
     &mut self,
@@ -390,7 +355,7 @@ impl RenderService {
     true
   }
 
-  /// 在宿主层上绘制带样式的边框矩形。
+  /// Draws a styled bordered rectangle on the host layer.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_host_border_rect(
     &mut self,
@@ -420,7 +385,7 @@ impl RenderService {
     );
   }
 
-  /// 在宿主最高层上绘制带样式的边框矩形。
+  /// Draws a styled bordered rectangle on the host's top layer.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_top_border_rect(
     &mut self,
@@ -498,7 +463,14 @@ impl RenderService {
     let l_ch = custom.left.char.unwrap_or(' ');
 
     self.draw_border_cell(canvas, target, x, y, lt_ch, &lt_s);
-    self.draw_border_span(canvas, target, x.saturating_add(1), y, t_ch, mid_w, &t_s);
+    self.draw_border_span(
+      canvas,
+      target,
+      x.saturating_add(1),
+      y,
+      std::iter::repeat_n(t_ch, mid_w as usize).collect(),
+      &t_s,
+    );
     self.draw_border_cell(
       canvas,
       target,
@@ -508,11 +480,7 @@ impl RenderService {
       &rt_s,
     );
 
-    let fill_text = fill_bg.as_ref().map(|_| {
-      std::iter::repeat(' ')
-        .take(mid_w as usize)
-        .collect::<String>()
-    });
+    let fill_text = fill_bg.as_ref().map(|_| " ".repeat(mid_w as usize));
     for row in 1..=mid_h {
       let cy = y.saturating_add(i32::from(row));
       self.draw_border_cell(canvas, target, x, cy, l_ch, &l_s);
@@ -546,8 +514,7 @@ impl RenderService {
       target,
       x.saturating_add(1),
       bot_y,
-      b_ch,
-      mid_w,
+      std::iter::repeat_n(b_ch, mid_w as usize).collect(),
       &b_s,
     );
     self.draw_border_cell(
@@ -597,11 +564,9 @@ impl RenderService {
     target: Target,
     x: i32,
     y: i32,
-    ch: char,
-    count: u16,
+    text: String,
     style: &TextStyle,
   ) {
-    let text: String = std::iter::repeat(ch).take(count as usize).collect();
     self.draw_text_target_at(
       canvas,
       target,
@@ -624,9 +589,9 @@ impl RenderService {
     );
   }
 
-  // ─── 统一 Surface 绘制 API ──────────────────────────
+  // ─── Unified surface drawing API ──────────────────────────
 
-  /// 在指定 Surface 上绘制文本。
+  /// Draws text on the given surface.
   pub fn draw_text_on_surface(
     &mut self,
     canvas: &mut CanvasService,
@@ -639,7 +604,7 @@ impl RenderService {
     }
   }
 
-  /// 在指定 Surface 的有符号局部坐标上绘制文本。
+  /// Draws text at signed local coordinates of the given surface.
   pub fn draw_text_at_on_surface(
     &mut self,
     canvas: &mut CanvasService,
@@ -654,7 +619,9 @@ impl RenderService {
     }
   }
 
-  /// 在指定 Surface 上绘制填充矩形。
+  /// Draws a filled rectangle on the given surface.
+  // reason: public API; grouping the parameters would change its signature.
+  #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect_on_surface(
     &mut self,
     canvas: &mut CanvasService,
@@ -678,7 +645,9 @@ impl RenderService {
     }
   }
 
-  /// 在指定 Surface 上绘制边框矩形。
+  /// Draws a bordered rectangle on the given surface.
+  // reason: public API; grouping the parameters would change its signature.
+  #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect_on_surface(
     &mut self,
     canvas: &mut CanvasService,
