@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-/// 键盘按键枚举
+/// Keyboard key.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Key {
   Esc,
@@ -92,7 +92,7 @@ pub enum Key {
   Unknown(u32),
 }
 
-/// 按键事件类型（按下 / 释放）
+/// Kind of key event (press or release).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyEventKind {
   Press,
@@ -105,7 +105,7 @@ pub struct KeyEvent {
   pub kind: KeyEventKind,
 }
 
-/// 原始按键事件（含可读显示文本）
+/// Raw key event, including its human-readable display text.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RawKeyEvent {
   pub key: Key,
@@ -113,7 +113,7 @@ pub struct RawKeyEvent {
   pub kind: KeyEventKind,
 }
 
-/// 按键状态（按下 / 按住 / 释放）
+/// Key state (pressed, held or released).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeyState {
   Pressed,
@@ -121,7 +121,7 @@ pub enum KeyState {
   Released,
 }
 
-/// 按键模式（单键或双键组合）
+/// Key pattern: a single key or a two-key combination.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeyPattern {
   Single(Key),
@@ -129,7 +129,7 @@ pub enum KeyPattern {
 }
 
 impl KeyPattern {
-  /// 将键位规范化排序，使组合键的匹配与按键顺序无关
+  /// Returns the pattern with its keys sorted, so combo matching does not depend on key order.
   pub fn normalized(self) -> Self {
     match self {
       KeyPattern::Single(key) => KeyPattern::Single(key),
@@ -165,20 +165,20 @@ impl KeyPattern {
   }
 }
 
-/// 按键绑定（按键模式到动作的映射）
+/// Binding from a key pattern to an action.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyBinding {
   pub pattern: KeyPattern,
   pub action: String,
 }
 
-/// 输入事件类型
+/// Type of input event.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputEventType {
   Keyboard,
 }
 
-/// 输入动作事件
+/// Input event that reports the state of a bound action.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InputActionEvent {
   pub event_type: InputEventType,

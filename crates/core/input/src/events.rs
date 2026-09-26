@@ -1,4 +1,4 @@
-/// 终端按键码
+/// Key code reported by the terminal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TerminalKeyCode {
   Char(char),
@@ -14,7 +14,7 @@ pub enum TerminalKeyCode {
   End,
 }
 
-/// 终端按键事件（含修饰键信息）
+/// Terminal key event, including the modifier state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TerminalKeyEvent {
   pub code: TerminalKeyCode,
@@ -33,7 +33,7 @@ pub struct FocusEvent {
   pub gained: bool,
 }
 
-/// 鼠标按键
+/// Mouse button.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MouseButton {
   Left,
@@ -41,7 +41,7 @@ pub enum MouseButton {
   Right,
 }
 
-/// 鼠标事件类型
+/// Kind of mouse event.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MouseEventKind {
   Press,
@@ -53,7 +53,7 @@ pub enum MouseEventKind {
   Scroll,
 }
 
-/// 滚轮方向
+/// Scroll wheel direction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScrollDirection {
   Up,
@@ -62,7 +62,7 @@ pub enum ScrollDirection {
   Right,
 }
 
-/// 鼠标事件
+/// Mouse event.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MouseEvent {
   pub kind: MouseEventKind,
@@ -72,7 +72,7 @@ pub struct MouseEvent {
   pub y: u16,
 }
 
-/// 系统事件（终端按键 / 鼠标 / 窗口大小 / 焦点）
+/// System event: terminal key, mouse, window resize or focus change.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SystemEvent {
   Resize(ResizeEvent),

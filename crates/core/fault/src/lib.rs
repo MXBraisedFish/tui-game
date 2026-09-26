@@ -1,3 +1,6 @@
+//! Host fault supervision: fault classification, panic capture into [`HostFault`] values and
+//! the crash log.
+
 use std::backtrace::Backtrace;
 use std::cell::{Cell, RefCell};
 use std::fmt;
@@ -80,9 +83,14 @@ pub struct CapturedPanic {
   pub backtrace: String,
 }
 
+// reason: the allows below silence a clippy false positive; every initializer is already a
+// `const { ... }` block.
 thread_local! {
+  #[allow(clippy::missing_const_for_thread_local)]
   static SUPERVISED: Cell<bool> = const { Cell::new(false) };
+  #[allow(clippy::missing_const_for_thread_local)]
   static CURRENT_DOMAIN: Cell<HostFaultDomain> = const { Cell::new(HostFaultDomain::Other) };
+  #[allow(clippy::missing_const_for_thread_local)]
   static CAPTURED_PANIC: RefCell<Option<CapturedPanic>> = const { RefCell::new(None) };
 }
 
@@ -108,6 +116,12 @@ pub fn capture_panic(report: CapturedPanic) {
 /// Runs one coarse host region under panic supervision. External/data errors
 /// should still be represented as normal Results inside the region; only a
 /// host panic crosses this boundary.
+///
+/// # Errors
+///
+/// Returns a [`HostFaultKind::Panic`] fault when `operation` panics. Its domain, detail,
+/// location and backtrace come from the report captured by the panic hook; without such a
+/// report the requested domain, the panic payload and a fresh backtrace are used instead.
 pub fn catch_host_fault<T>(
   phase: HostFaultPhase,
   domain: HostFaultDomain,

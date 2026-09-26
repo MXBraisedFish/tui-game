@@ -21,9 +21,9 @@ pub struct PopupRequest {
   pub color: TextColor,
   pub duration: Duration,
   pub dismiss_on: Vec<PopupDismissEvent>,
-  /// 当前弹窗是否允许被之后到来的弹窗替换。
+  /// Whether a popup that arrives later may replace this one.
   pub replaceable: bool,
-  /// 是否持续显示，直至调用方显式清理弹窗。
+  /// Whether the popup stays visible until the caller clears it explicitly.
   pub persistent: bool,
 }
 
@@ -39,7 +39,8 @@ struct ActivePopup {
   elapsed: Duration,
 }
 
-/// 统一管理短时状态弹窗的覆盖、超时和条件回收。
+/// Service that manages the replacement, timeout and conditional dismissal of short-lived status
+/// popups.
 pub struct PopupService {
   active: Option<ActivePopup>,
 }

@@ -3,17 +3,18 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::types::GraphemeInfo;
 
-/// 获取单个字符的终端列宽（0 表示组合字符或控制字符）。
+/// Returns the terminal column width of a single character (0 for combining or control
+/// characters).
 pub fn char_width(ch: char) -> usize {
   UnicodeWidthChar::width(ch).unwrap_or(0)
 }
 
-/// 获取字符串在终端中的显示宽度（按 Unicode 列宽计算）。
+/// Returns the terminal display width of a string, computed from Unicode column widths.
 pub fn display_width(text: &str) -> usize {
   UnicodeWidthStr::width(text)
 }
 
-/// 将字符串按字素边界拆分为 GraphemeInfo 列表。
+/// Splits a string at grapheme boundaries into a list of [`GraphemeInfo`].
 pub fn graphemes(text: &str) -> Vec<GraphemeInfo> {
   UnicodeSegmentation::graphemes(text, true)
     .map(|g| GraphemeInfo {

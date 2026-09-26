@@ -18,7 +18,7 @@ mod capabilities;
 
 pub use capabilities::TerminalCapabilities;
 
-/// 终端服务，管理原始模式和交替屏幕的进入与退出
+/// Terminal service that manages entering and leaving raw mode and the alternate screen.
 pub struct TerminalService {
   surface: Option<TerminalSurface>,
   capabilities: TerminalCapabilities,
@@ -30,7 +30,13 @@ struct TerminalSurface {
 }
 
 impl TerminalSurface {
-  // 初始化终端原始模式：启用 raw mode、交替屏幕、鼠标捕获、焦点事件，隐藏光标
+  /// Enters raw mode: enables raw mode, the alternate screen, mouse capture and focus events,
+  /// and hides the cursor.
+  ///
+  /// # Errors
+  ///
+  /// Returns the I/O error of the first terminal command that fails; a failure after raw mode
+  /// was enabled force-restores the terminal first.
   fn enter() -> io::Result<Self> {
     enable_raw_mode()?;
 
@@ -58,7 +64,8 @@ impl TerminalSurface {
     &mut self.stdout
   }
 
-  // 恢复终端到正常模式：显示光标、禁用交替屏幕、鼠标捕获和 raw mode
+  /// Restores the terminal to normal mode: shows the cursor and disables focus events, mouse
+  /// capture, the alternate screen and raw mode. Does nothing when already restored.
   fn restore(&mut self) {
     if !self.active {
       return;
@@ -114,7 +121,13 @@ impl TerminalService {
     }
   }
 
-  /// 进入终端原始模式（启用交替屏幕、鼠标捕获和焦点事件）
+  /// Enters terminal raw mode (enables the alternate screen, mouse capture and focus events).
+  ///
+  /// Does nothing when the terminal is already entered.
+  ///
+  /// # Errors
+  ///
+  /// Returns the I/O error of the first terminal command that fails.
   pub fn enter(&mut self) -> io::Result<()> {
     if self.surface.is_some() {
       return Ok(());
@@ -124,7 +137,7 @@ impl TerminalService {
     Ok(())
   }
 
-  /// 退出终端原始模式
+  /// Leaves terminal raw mode.
   pub fn exit(&mut self) {
     self.surface = None;
   }
@@ -137,7 +150,12 @@ impl TerminalService {
     self.surface.as_mut().map(|surface| surface.writer())
   }
 
-  /// 清屏并将光标归位到 (0, 0)
+  /// Clears the screen and moves the cursor to (0, 0). Does nothing when the terminal is not
+  /// entered.
+  ///
+  /// # Errors
+  ///
+  /// Returns the I/O error when queuing or flushing the terminal commands fails.
   pub fn clear_all_and_home(&mut self) -> io::Result<()> {
     use crossterm::QueueableCommand;
     use crossterm::cursor::MoveTo;
@@ -152,7 +170,7 @@ impl TerminalService {
     Ok(())
   }
 
-  /// 强制恢复终端设置（用于异常退出时的清理）
+  /// Forcibly restores the terminal settings (cleanup for abnormal exits).
   pub fn force_restore() {
     // TODO: log warning — static method has no access to LogService,
     // so I/O errors during forced terminal restore are silently discarded.
@@ -167,6 +185,12 @@ impl TerminalService {
     let _ = stdout.flush();
 
     let _ = io::stderr().flush();
+  }
+}
+
+impl Default for TerminalService {
+  fn default() -> Self {
+    Self::new()
   }
 }
 

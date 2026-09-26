@@ -12,8 +12,8 @@ use super::service::StorageService;
 use tg_core_package_id::PackageId;
 use tg_service_log::{HostLogMessage, LogService, LogSource};
 
-/// 终端配置文件：存储 Unicode 支持、颜色模式和鼠标支持的用户偏好。
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Terminal profile: the user's preferences for Unicode support, color mode and mouse support.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TerminalProfile {
   pub unicode: Option<bool>,
 
@@ -49,7 +49,8 @@ pub struct KeyBindingMapGroup {
   pub games: BTreeMap<String, ActionKeyMap>,
 }
 
-/// 按键映射持久化表。default 保存包或宿主的原始定义，user 保存实际生效的用户映射。
+/// Persisted key binding table: `default` keeps the original definitions of the packages or the
+/// host, `user` keeps the user mappings that are actually in effect.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct KeyBindingsProfile {
@@ -119,7 +120,7 @@ pub struct ScreenshotProfile {
   pub double_action: ScreenshotDoubleAction,
   pub auto_exit: bool,
 
-  /// 截屏导出时按顺序尝试的自定义字体路径或系统字体名称。
+  /// Custom font paths or system font names tried in order when screenshots are exported.
   pub fonts: Vec<String>,
 }
 
@@ -215,10 +216,11 @@ impl AutoRecordingMode {
   }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AutoSplitDuration {
   Off,
+  #[default]
   Minutes3,
   Minutes5,
   Minutes10,
@@ -241,12 +243,6 @@ impl AutoSplitDuration {
       Self::Minutes5 => Some(std::time::Duration::from_secs(5 * 60)),
       Self::Minutes10 => Some(std::time::Duration::from_secs(10 * 60)),
     }
-  }
-}
-
-impl Default for AutoSplitDuration {
-  fn default() -> Self {
-    Self::Minutes3
   }
 }
 
@@ -431,7 +427,7 @@ pub enum DisplayFpsLimit {
 }
 
 impl DisplayLogoMode {
-  /// Next value in the settings page cycling order.
+  /// Returns the next value in the settings page cycling order.
   pub fn next(self) -> Self {
     match self {
       Self::Order => Self::Random,
@@ -448,7 +444,7 @@ impl DisplayLogoMode {
 }
 
 impl DisplaySourceMode {
-  /// Next value in the settings page cycling order.
+  /// Returns the next value in the settings page cycling order.
   pub fn next(self) -> Self {
     match self {
       Self::All => Self::Mod,
@@ -460,7 +456,7 @@ impl DisplaySourceMode {
 }
 
 impl DisplayOrderMode {
-  /// Next value in the settings page cycling order.
+  /// Returns the next value in the settings page cycling order.
   pub fn next(self) -> Self {
     match self {
       Self::Random => Self::Order,
@@ -479,7 +475,7 @@ impl DisplayFpsLimit {
     }
   }
 
-  /// Next value in the settings page cycling order.
+  /// Returns the next value in the settings page cycling order.
   pub fn next(self) -> Self {
     match self {
       Self::Fps30 => Self::Fps60,
@@ -505,9 +501,10 @@ pub struct DisplaySettingsProfile {
   pub game_list_fps: DisplayFpsLimit,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SafeModeDefault {
+  #[default]
   On,
   OffPermanent,
 }
@@ -531,14 +528,15 @@ pub struct GamePackageState {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ScreensaverPackageState {
-  /// 包管理器总开关：关闭后不进入屏保列表。
+  /// Master switch of the package manager; a disabled package is left out of the screensaver
+  /// list.
   pub enabled: bool,
   pub debug: bool,
 
-  /// 屏保列表中的局内启用状态，与包总开关相互独立。
+  /// Enabled state inside the screensaver list, independent of the package master switch.
   pub playlist_enabled: bool,
 
-  /// 已启用屏保的显示顺序；未启用时不参与排序。
+  /// Display order of an enabled screensaver; disabled screensavers take no part in ordering.
   pub order: Option<u32>,
 }
 
@@ -580,12 +578,6 @@ impl Default for DisplaySettingsProfile {
   }
 }
 
-impl Default for SafeModeDefault {
-  fn default() -> Self {
-    Self::On
-  }
-}
-
 impl Default for PackageDefaultState {
   fn default() -> Self {
     Self {
@@ -596,35 +588,25 @@ impl Default for PackageDefaultState {
   }
 }
 
-impl Default for TerminalProfile {
-  fn default() -> Self {
-    Self {
-      unicode: None,
-      color: None,
-      mouse: None,
-    }
-  }
-}
-
 impl TerminalProfile {
-  /// 检查三项配置是否已全部填写完毕。
+  /// Returns whether all three settings are filled in (the color mode must be `truecolor` or
+  /// `256`).
   pub fn is_complete(&self) -> bool {
     self.unicode.is_some()
       && self
         .color
         .as_deref()
-        .map_or(false, |c| c == "truecolor" || c == "256")
+        .is_some_and(|c| c == "truecolor" || c == "256")
       && self.mouse.is_some()
   }
 }
 
 impl StorageService {
-  /// 读取保存的语言代码。
+  /// Reads the saved language code.
   pub fn read_language_code(&self, log: &mut LogService) -> Option<String> {
     let content = fs::read_to_string(self.profile_language_path())
-      .map_err(|error| {
-        log_profile_read_error(log, "language", &self.profile_language_path(), &error);
-        error
+      .inspect_err(|error| {
+        log_profile_read_error(log, "language", &self.profile_language_path(), error);
       })
       .ok()?;
     let code = content.trim();
@@ -635,7 +617,11 @@ impl StorageService {
     }
   }
 
-  /// 写入语言代码到配置文件。
+  /// Writes the language code to its profile file.
+  ///
+  /// # Errors
+  ///
+  /// Returns the I/O error when the file cannot be written.
   pub fn write_language_code(&self, language_code: &str) -> std::io::Result<()> {
     atomic_write(
       &self.profile_language_path(),
@@ -672,20 +658,19 @@ impl StorageService {
     let json = serde_json::to_string_pretty(profile).map_err(io::Error::other)?;
     let path = self.profile_key_bindings_path();
     let changed = changed_profile_fields(&path, &json);
-    atomic_write(&path, json.as_bytes(), true).map_err(|error| {
+    atomic_write(&path, json.as_bytes(), true).inspect_err(|error| {
       log.error_operation_failed(
         LogSource::Storage,
         "write_profile",
         "key_bindings",
         error.to_string(),
       );
-      error
     })?;
     log_profile_change(log, "key_bindings", changed);
     Ok(())
   }
 
-  /// 返回默认语言代码。
+  /// Returns the default language code.
   pub fn default_language_code(&self) -> &'static str {
     layout::DEFAULT_LANGUAGE_CODE
   }
@@ -724,47 +709,48 @@ impl StorageService {
     let path = self.profile_display_settings_path();
     let content = serde_json::to_string_pretty(profile).map_err(io::Error::other)?;
     let changed = changed_profile_fields(&path, &content);
-    atomic_write(&path, content.as_bytes(), true).map_err(|error| {
+    atomic_write(&path, content.as_bytes(), true).inspect_err(|error| {
       log.warn_operation_failed(
         LogSource::Storage,
         "write_profile",
         "display_settings",
         error.to_string(),
       );
-      error
     })?;
     self.display_settings = profile.clone();
     log_profile_change(log, "display_settings", changed);
     Ok(())
   }
 
-  /// 从文件读取终端配置。
+  /// Reads the terminal profile from its file.
   pub fn read_terminal_profile(&self, log: &mut LogService) -> Option<TerminalProfile> {
     let content = fs::read_to_string(self.profile_terminal_path())
-      .map_err(|error| {
-        log_profile_read_error(log, "terminal", &self.profile_terminal_path(), &error);
-        error
+      .inspect_err(|error| {
+        log_profile_read_error(log, "terminal", &self.profile_terminal_path(), error);
       })
       .ok()?;
     serde_json::from_str(&content)
-      .map_err(|error| {
+      .inspect_err(|error| {
         log.warn_operation_failed(
           LogSource::Storage,
           "parse_profile",
           "terminal",
           error.to_string(),
         );
-        error
       })
       .ok()
   }
 
-  /// 读取终端配置，缺失时返回默认值。
+  /// Reads the terminal profile, falling back to the default when it is missing or invalid.
   pub fn read_terminal_profile_or_default(&self, log: &mut LogService) -> TerminalProfile {
     self.read_terminal_profile(log).unwrap_or_default()
   }
 
-  /// 读取并修改终端配置后写回。
+  /// Reads the terminal profile, lets `f` modify it and writes it back.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error when the modified profile cannot be serialized or written.
   pub fn update_terminal_profile(
     &self,
     log: &mut LogService,
@@ -775,7 +761,12 @@ impl StorageService {
     self.write_terminal_profile(&profile, log)
   }
 
-  /// 将终端配置序列化后写入文件。
+  /// Serializes the terminal profile and writes it to its file.
+  ///
+  /// # Errors
+  ///
+  /// Returns an [`io::ErrorKind::InvalidData`] error when serialization fails and the I/O error
+  /// when the file cannot be written.
   pub fn write_terminal_profile(
     &self,
     profile: &TerminalProfile,
@@ -803,39 +794,42 @@ impl StorageService {
     Ok(())
   }
 
-  /// 清空已保存的终端能力检测结果，使下次启动重新进入能力检测流程。
+  /// Clears the saved terminal capability results so the next start runs capability detection
+  /// again.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error when the default profile cannot be written.
   pub fn reset_terminal_profile(&self, log: &mut LogService) -> std::io::Result<()> {
     self.write_terminal_profile(&TerminalProfile::default(), log)
   }
 
-  /// 检查终端配置文件是否已填写完整。
+  /// Returns whether the terminal profile file is completely filled in.
   pub fn is_terminal_profile_complete(&self, log: &mut LogService) -> bool {
     self
       .read_terminal_profile(log)
-      .map_or(false, |p| p.is_complete())
+      .is_some_and(|p| p.is_complete())
   }
 
   pub fn read_package_state(&self, log: &mut LogService) -> Option<PackageStateProfile> {
     let content = fs::read_to_string(self.profile_package_state_path())
-      .map_err(|error| {
+      .inspect_err(|error| {
         log_profile_read_error(
           log,
           "package_state",
           &self.profile_package_state_path(),
-          &error,
+          error,
         );
-        error
       })
       .ok()?;
     serde_json::from_str(&content)
-      .map_err(|error| {
+      .inspect_err(|error| {
         log.warn_operation_failed(
           LogSource::Storage,
           "parse_profile",
           "package_state",
           error.to_string(),
         );
-        error
       })
       .ok()
   }
@@ -913,40 +907,36 @@ impl StorageService {
 
   pub fn read_screenshot_profile(&self, log: &mut LogService) -> Option<ScreenshotProfile> {
     let content = fs::read_to_string(self.profile_screenshot_path())
-      .map_err(|error| {
-        log_profile_read_error(log, "screenshot", &self.profile_screenshot_path(), &error);
-        error
+      .inspect_err(|error| {
+        log_profile_read_error(log, "screenshot", &self.profile_screenshot_path(), error);
       })
       .ok()?;
     serde_json::from_str(&content)
-      .map_err(|error| {
+      .inspect_err(|error| {
         log.warn_operation_failed(
           LogSource::Storage,
           "parse_profile",
           "screenshot",
           error.to_string(),
         );
-        error
       })
       .ok()
   }
 
   pub fn read_recording_profile(&self, log: &mut LogService) -> Option<RecordingProfile> {
     let content = fs::read_to_string(self.profile_recording_path())
-      .map_err(|error| {
-        log_profile_read_error(log, "recording", &self.profile_recording_path(), &error);
-        error
+      .inspect_err(|error| {
+        log_profile_read_error(log, "recording", &self.profile_recording_path(), error);
       })
       .ok()?;
     let profile = serde_json::from_str::<RecordingProfile>(&content)
-      .map_err(|error| {
+      .inspect_err(|error| {
         log.warn_operation_failed(
           LogSource::Storage,
           "parse_profile",
           "recording",
           error.to_string(),
         );
-        error
       })
       .ok()?;
     if !profile.is_valid() {
@@ -1236,11 +1226,13 @@ mod tests {
   fn package_defaults_are_persisted_and_seed_new_package_states() {
     let storage = temp_storage("package_defaults");
     let mut log = LogService::new();
-    let mut profile = PackageStateProfile::default();
-    profile.defaults = PackageDefaultState {
-      enabled: false,
-      debug: true,
-      safe_mode: SafeModeDefault::OffPermanent,
+    let profile = PackageStateProfile {
+      defaults: PackageDefaultState {
+        enabled: false,
+        debug: true,
+        safe_mode: SafeModeDefault::OffPermanent,
+      },
+      ..Default::default()
     };
     storage.write_package_state(&profile, &mut log).unwrap();
 
@@ -1266,12 +1258,9 @@ mod tests {
 
     let profile = storage.read_package_state_or_default(&mut log);
     assert_eq!(profile.defaults.safe_mode, SafeModeDefault::OffPermanent);
-    assert_eq!(profile.games[&game_id.storage_key()].enabled, false);
-    assert_eq!(profile.games[&game_id.storage_key()].safe_mode, false);
-    assert_eq!(
-      profile.screensavers[&screensaver_id.storage_key()].enabled,
-      false
-    );
+    assert!(!profile.games[&game_id.storage_key()].enabled);
+    assert!(!profile.games[&game_id.storage_key()].safe_mode);
+    assert!(!profile.screensavers[&screensaver_id.storage_key()].enabled);
   }
 
   #[test]

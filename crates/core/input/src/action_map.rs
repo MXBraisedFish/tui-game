@@ -1,7 +1,7 @@
 use super::key_token::parse_key_token;
 use super::key::{KeyBinding, KeyPattern};
 
-/// 动作映射条目
+/// Action map entry: one action, its description and the key patterns bound to it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActionMapEntry {
   pub action: String,
@@ -9,7 +9,7 @@ pub struct ActionMapEntry {
   pub keys: Vec<Vec<String>>,
 }
 
-/// 动作映射翻译错误
+/// Error raised while translating an action map into key bindings.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ActionMapTranslateError {
   EmptyAction {
@@ -30,7 +30,16 @@ pub enum ActionMapTranslateError {
   },
 }
 
-/// 将动作映射条目翻译为按键绑定列表
+/// Translates action map entries into a list of key bindings.
+///
+/// Every pattern is normalized, so combo matching does not depend on key order.
+///
+/// # Errors
+///
+/// Returns [`ActionMapTranslateError::EmptyAction`] when an action name is blank,
+/// [`ActionMapTranslateError::EmptyKeyPattern`] when a key pattern has no keys,
+/// [`ActionMapTranslateError::TooManyKeys`] when a key pattern has more than two keys, and
+/// [`ActionMapTranslateError::UnknownKeyToken`] when a key token cannot be parsed.
 pub fn translate_action_map(
   entries: &[ActionMapEntry],
 ) -> Result<Vec<KeyBinding>, ActionMapTranslateError> {

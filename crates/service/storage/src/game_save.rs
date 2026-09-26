@@ -46,20 +46,11 @@ impl TryFrom<Value> for BestGameSave {
   }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct GameSaveProfile {
   pub continue_slot: Option<ContinueGameSave>,
   pub best: BTreeMap<String, BestGameSave>,
-}
-
-impl Default for GameSaveProfile {
-  fn default() -> Self {
-    Self {
-      continue_slot: None,
-      best: BTreeMap::new(),
-    }
-  }
 }
 
 impl StorageService {
@@ -132,6 +123,11 @@ impl StorageService {
   /// removed. Best records are removed only for installed packages that now
   /// explicitly disable score support; temporarily missing packages retain
   /// their records.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error when the changed profile cannot be serialized, exceeds the size limit or
+  /// cannot be written; nothing is written when no change is needed.
   pub fn reconcile_game_save_capabilities(
     &self,
     games: &[GameSaveCapabilities],
@@ -209,14 +205,13 @@ impl StorageService {
         "game save profile exceeds size limit",
       ));
     }
-    atomic_write(&self.profile_game_save_path(), &content, true).map_err(|error| {
+    atomic_write(&self.profile_game_save_path(), &content, true).inspect_err(|error| {
       log.error_operation_failed(
         LogSource::Storage,
         "write_profile",
         "game_save",
         error.to_string(),
       );
-      error
     })?;
     *self.game_save.borrow_mut() = profile;
     Ok(())

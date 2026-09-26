@@ -1,6 +1,9 @@
+//! Stable package identity: [`PackageId`] built from a [`PackageSource`], a [`PackageType`] and
+//! a validated mod id.
+
 use serde::{Deserialize, Serialize};
 
-/// 包来源（官方或模组）。
+/// Origin of a package (official or mod).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PackageSource {
@@ -8,7 +11,7 @@ pub enum PackageSource {
   Mod,
 }
 
-/// 包类型（游戏或屏保）。
+/// Kind of package (game or screensaver).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PackageType {
@@ -16,7 +19,8 @@ pub enum PackageType {
   Screensaver,
 }
 
-/// 宿主内部使用的稳定包身份。版本、标题和目录名不参与身份计算。
+/// Stable package identity used inside the host. The version, title and directory name are not
+/// part of the identity.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub struct PackageId {
   pub source: PackageSource,

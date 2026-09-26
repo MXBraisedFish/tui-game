@@ -5,7 +5,7 @@ use super::layout;
 use super::service::StorageService;
 use tg_service_log::{LogService, LogSource};
 
-/// 确保存储目录和默认文件存在，缺失时自动创建。
+/// Ensures the storage directories and default files exist, creating any that are missing.
 pub fn ensure_storage_layout(storage: &StorageService, log: &mut LogService) {
   ensure_required_directories(storage, log);
   ensure_default_files(storage, log);
@@ -49,17 +49,17 @@ fn ensure_default_files(storage: &StorageService, log: &mut LogService) {
         }
       }
     }
-    if let Some(parent) = path.parent() {
-      if let Err(error) = fs::create_dir_all(parent) {
-        log.error_operation_failed(
-          LogSource::Storage,
-          "create_default_parent",
-          parent.display().to_string(),
-          error.to_string(),
-        );
+    if let Some(parent) = path.parent()
+      && let Err(error) = fs::create_dir_all(parent)
+    {
+      log.error_operation_failed(
+        LogSource::Storage,
+        "create_default_parent",
+        parent.display().to_string(),
+        error.to_string(),
+      );
 
-        continue;
-      }
+      continue;
     }
     if let Err(error) = fs::write(&path, default_content) {
       log.error_operation_failed(

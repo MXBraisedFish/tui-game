@@ -1,6 +1,6 @@
 use super::LogPhase;
 
-/// 日志来源分类，标识产生日志的子系统。
+/// Log source category that identifies the subsystem producing an entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogSource {
   Engine,

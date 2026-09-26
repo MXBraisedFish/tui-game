@@ -76,20 +76,25 @@ pub enum TaskStatusEvent {
 
 /// A unit of work the executor can run on a worker thread.
 pub trait AsyncJob<E>: Send + 'static {
-  /// Runs the job; `Err` marks the task failed (unless it was cancelled meanwhile).
+  /// Runs the job.
+  ///
+  /// # Errors
+  ///
+  /// Returning `Err` marks the task failed (unless it was cancelled meanwhile).
   fn run(self: Box<Self>, id: TaskId, events: &Sender<E>, cancellation: &TaskCancellation)
   -> Result<(), String>;
 
-  /// File this job writes, registered with the write barrier before the job is queued.
-  /// Returns `(target, temporary)`.
+  /// Returns the file this job writes as `(target, temporary)`; it is registered with the write
+  /// barrier before the job is queued.
   fn write_target(&self, _id: TaskId) -> Option<(PathBuf, PathBuf)> {
     None
   }
 
-  /// Called instead of `run` when the task was cancelled before it started.
+  /// Handles a task that was cancelled before it started; called instead of [`run`](Self::run).
   fn cancelled_before_start(&self, _id: TaskId, _events: &Sender<E>) {}
 
-  /// Whether the job reports its own cancellation (then a cancelled `Ok` still counts as finished).
+  /// Returns whether the job reports its own cancellation (then a cancelled `Ok` still counts as
+  /// finished).
   fn reports_own_cancellation(&self) -> bool {
     false
   }
@@ -167,11 +172,11 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
 
   pub fn submit(&self, task: impl AsyncJob<E>) -> TaskId {
     let id = TaskId(self.next_task_id.fetch_add(1, Ordering::SeqCst));
-    if let Some((target, temporary)) = task.write_target(id) {
-      if !self.write_barrier.register(id, target, Some(temporary)) {
-        set_task_state(&self.task_states, id, TaskState::Cancelled);
-        return id;
-      }
+    if let Some((target, temporary)) = task.write_target(id)
+      && !self.write_barrier.register(id, target, Some(temporary))
+    {
+      set_task_state(&self.task_states, id, TaskState::Cancelled);
+      return id;
     }
     set_task_state(&self.task_states, id, TaskState::Pending);
     if self.task_tx.send(WorkerMessage::Run(id, Box::new(task))).is_err() {
@@ -195,7 +200,8 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
     states.get(&id).copied()
   }
 
-  /// 请求取消任务。尚未开始的任务不会执行；运行中的任务会在任务边界停止提交结果。
+  /// Requests cancellation of a task. A task that has not started yet will not run; a running
+  /// task stops submitting results at the task boundary.
   pub fn cancel_task(&self, id: TaskId) {
     self
       .cancelled_tasks
@@ -253,10 +259,10 @@ impl<E> AsyncRuntime<E> {
     };
 
     thread.stop.store(true, Ordering::SeqCst);
-    if thread.joinable {
-      if let Some(handle) = thread.handle.take() {
-        let _ = handle.join();
-      }
+    if thread.joinable
+      && let Some(handle) = thread.handle.take()
+    {
+      let _ = handle.join();
     }
     true
   }
@@ -266,9 +272,10 @@ impl<E> AsyncRuntime<E> {
       let _ = self.stop_managed_thread(id);
     }
   }
-  /// 停止任务执行器并等待所有工作线程结束。
+  /// Stops the task executor and waits for all worker threads to finish.
   ///
-  /// Shutdown 在销毁 Lua 与其它宿主服务前显式调用，Drop 仅作为异常路径兜底。
+  /// Shutdown calls this explicitly before Lua and the other host services are destroyed; `Drop`
+  /// is only a fallback for abnormal paths.
   pub fn shutdown(&mut self) {
     self.stop_all_managed_threads();
     for _ in &self.workers {

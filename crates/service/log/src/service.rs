@@ -12,7 +12,8 @@ use super::{
   format_log_entry, format_print_log_entry,
 };
 
-/// 日志服务：以环形队列存储最近 N 条日志，支持按级别写入与导出。
+/// Log service that keeps the most recent N entries in a ring queue, with leveled writing and
+/// export.
 pub struct LogService {
   queue: VecDeque<LogEntry>,
   next_sequence: u64,
@@ -87,7 +88,12 @@ impl LogService {
     }
   }
 
-  /// 设置包管理器的集中扫描日志。该文件与游戏/屏保运行日志相互独立。
+  /// Sets the package manager's central scan log, a file separate from the game/screensaver run
+  /// logs.
+  ///
+  /// # Errors
+  ///
+  /// Returns the I/O error when the parent directory of `path` cannot be created.
   pub fn set_package_scan_output_path(&mut self, path: PathBuf) -> io::Result<()> {
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent)?;
@@ -105,6 +111,10 @@ impl LogService {
   }
 
   /// Applies translated labels and `log_info` message templates, then enables file output.
+  ///
+  /// # Errors
+  ///
+  /// Returns the I/O error when the buffered entries cannot be appended to the log file.
   pub fn refresh_labels(
     &mut self,
     translate: impl Fn(&'static str) -> Option<String>,
@@ -118,6 +128,10 @@ impl LogService {
   }
 
   /// Enables file output with the embedded English labels when i18n is unavailable.
+  ///
+  /// # Errors
+  ///
+  /// Returns the I/O error when the buffered entries cannot be appended to the log file.
   pub fn activate_embedded_english(&mut self) -> io::Result<()> {
     self.materialize_pending_messages();
     self.write_enabled = true;
@@ -518,7 +532,7 @@ impl LogService {
     &self.queue
   }
 
-  /// 取出队列中所有日志并清空。
+  /// Takes all entries out of the queue, leaving it empty.
   pub fn drain(&mut self) -> Vec<LogEntry> {
     self.queue.drain(..).collect()
   }
@@ -526,7 +540,8 @@ impl LogService {
     self.queue.is_empty()
   }
 
-  /// 设置最大存储条数（至少为 1），超出时截断旧条目。
+  /// Sets the maximum number of stored entries (at least 1), dropping the oldest entries beyond
+  /// it.
   pub fn set_max_entries(&mut self, max_entries: usize) {
     self.max_entries = max_entries.max(1);
 
@@ -535,7 +550,7 @@ impl LogService {
     }
   }
 
-  /// 将当前所有日志输出到控制台（stdout）。
+  /// Writes all current entries to the console (stdout).
   pub fn flush_to_console(&self) {
     for entry in &self.queue {
       let line = format_log_entry(entry);
@@ -633,7 +648,8 @@ impl Default for LogService {
   }
 }
 
-// 获取当前 Unix 毫秒时间戳，失败时回退为 0。
+/// Returns the current Unix timestamp in milliseconds, falling back to 0 when the system clock
+/// is before the Unix epoch.
 fn now_ms() -> u128 {
   SystemTime::now()
     .duration_since(UNIX_EPOCH)

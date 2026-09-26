@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::{CapturedPanic, HostFault, capture_panic, current_fault_domain, is_supervised};
 
-/// 崩溃阶段枚举，用于在 panic 时标识当前所处的生命周期阶段
+/// Lifecycle phase that identifies where the host was when a panic happened.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CrashPhase {
   Boot = 0,
@@ -19,12 +19,12 @@ pub enum CrashPhase {
 static CRASH_PHASE: AtomicU8 = AtomicU8::new(CrashPhase::Boot as u8);
 static CRASH_RECORDED: AtomicBool = AtomicBool::new(false);
 
-/// 设置当前崩溃阶段的值
+/// Sets the current crash phase.
 pub fn set_crash_phase(phase: CrashPhase) {
   CRASH_PHASE.store(phase as u8, Ordering::SeqCst);
 }
 
-/// 读取当前崩溃阶段
+/// Returns the current crash phase.
 pub fn current_crash_phase() -> CrashPhase {
   match CRASH_PHASE.load(Ordering::SeqCst) {
     1 => CrashPhase::Init,
@@ -35,7 +35,13 @@ pub fn current_crash_phase() -> CrashPhase {
   }
 }
 
-/// 安装自定义 panic 钩子，在崩溃时通过 `restore_terminal` 恢复终端状态并打印当前阶段
+/// Installs the custom panic hook.
+///
+/// A supervised panic (inside [`catch_host_fault`](crate::catch_host_fault)) during the boot,
+/// init or runtime phase is only captured for the supervisor. Any other panic restores the
+/// terminal through `restore_terminal` and appends a crash record with the current phase to the
+/// crash log; when the record cannot be written, the phase and the panic are printed to stderr
+/// and the previous hook runs.
 pub fn install_panic_hook(restore_terminal: fn()) {
   CRASH_RECORDED.store(false, Ordering::SeqCst);
   let previous_hook = panic::take_hook();

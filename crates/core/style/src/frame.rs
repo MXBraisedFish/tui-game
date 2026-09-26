@@ -1,13 +1,13 @@
 use crate::CanvasCell;
 
-/// 合成后的单元：要么为空，要么包含一个已着色的 CanvasCell。
+/// Composed cell: either empty or holding a styled [`CanvasCell`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ComposedCell {
   Empty,
   Text(CanvasCell),
 }
 
-/// 合成后的帧缓冲区，用于最终输出到终端。
+/// Composed frame buffer that is finally written to the terminal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ComposedFrame {
   width: u16,
@@ -47,7 +47,7 @@ impl ComposedFrame {
     }
   }
 
-  /// 返回一个标准空白文本单元格，用于初始化帧。
+  /// Returns the standard blank text cell used to initialize frames.
   pub fn blank_text_cell() -> CanvasCell {
     CanvasCell::blank()
   }

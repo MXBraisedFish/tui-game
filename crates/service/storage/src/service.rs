@@ -11,7 +11,8 @@ use super::profile::DisplaySettingsProfile;
 use tg_core_audio::{AudioError, AudioErrorCode, ResolvedAudioFile};
 use tg_service_log::{LogService, LogSource};
 
-/// 存储服务：管理应用根目录，提供各子路径的构建方法，并在初始化时确保目录结构存在。
+/// Storage service that owns the application root directory, builds the paths below it and
+/// makes sure the directory layout exists when it is created.
 pub struct StorageService {
   root_dir: PathBuf,
   pub(super) display_settings: DisplaySettingsProfile,
@@ -85,7 +86,7 @@ impl StorageService {
     self.path(layout::DATA_PROFILES_DIR)
   }
 
-  /// 拼装根目录下的相对路径为完整路径。
+  /// Joins a path relative to the root directory into a full path.
   pub fn path(&self, relative_path: &str) -> PathBuf {
     self.root_dir.join(relative_path)
   }
@@ -126,7 +127,15 @@ impl StorageService {
     self.path(layout::ASSETS_LANGUAGE_DIR)
   }
 
-  /// Resolve a host audio asset under the deployed assets directory.
+  /// Resolves a host audio asset under the deployed assets directory.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`AudioErrorCode::InvalidPath`] when `relative` is empty, absolute or contains
+  /// anything but normal components, [`AudioErrorCode::NotFound`] when the application root,
+  /// the assets directory or the file cannot be canonicalized, and
+  /// [`AudioErrorCode::PermissionDenied`] when the file is not a regular file inside the assets
+  /// directory or the assets directory lies outside the application root.
   pub fn resolve_audio_asset(&self, relative: &Path) -> Result<ResolvedAudioFile, AudioError> {
     if relative.as_os_str().is_empty()
       || relative.is_absolute()
@@ -245,17 +254,18 @@ impl StorageService {
   }
 }
 
-// 自动探测应用根目录：依次尝试当前目录、可执行文件目录。
+/// Detects the application root directory: the current directory when it contains `assets` or
+/// `Cargo.toml`, otherwise the executable's directory, and `.` as the last resort.
 fn resolve_root_dir(log: &mut LogService) -> PathBuf {
-  if let Ok(current_dir) = std::env::current_dir() {
-    if current_dir.join("assets").exists() || current_dir.join("Cargo.toml").exists() {
-      return current_dir;
-    }
+  if let Ok(current_dir) = std::env::current_dir()
+    && (current_dir.join("assets").exists() || current_dir.join("Cargo.toml").exists())
+  {
+    return current_dir;
   }
-  if let Ok(exe_path) = std::env::current_exe() {
-    if let Some(exe_dir) = exe_path.parent() {
-      return exe_dir.to_path_buf();
-    }
+  if let Ok(exe_path) = std::env::current_exe()
+    && let Some(exe_dir) = exe_path.parent()
+  {
+    return exe_dir.to_path_buf();
   }
   log.warn_message(
     LogSource::Boot,

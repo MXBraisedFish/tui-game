@@ -9,37 +9,27 @@ use tg_service_rich_text::{
 };
 use unicode_linebreak::BreakOpportunity;
 
-/// 文本对齐方式
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Horizontal text alignment.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextAlign {
+  #[default]
   Left,
   Center,
   Right,
 }
 
-impl Default for TextAlign {
-  fn default() -> Self {
-    Self::Left
-  }
-}
-
-/// 文本换行模式
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Text wrapping mode.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextWrapMode {
   None,
 
   Auto,
 
+  #[default]
   Normal,
 }
 
-impl Default for TextWrapMode {
-  fn default() -> Self {
-    Self::Normal
-  }
-}
-
-/// 绘制文本的参数
+/// Parameters for drawing text.
 #[derive(Clone, Debug)]
 pub struct DrawTextParams {
   pub x: u16,
@@ -119,9 +109,12 @@ impl DrawTextParams {
     }
   }
 
-  /// 宿主 UI 传入富文本参数时已经明确要求格式化解析。
+  /// Returns the parameters with host formatting applied: when rich text parameters are set and
+  /// the mode is [`TextMode::Auto`], the text is parsed as rich text with any `f%` prefix removed.
   ///
-  /// Lua 绘制不会调用此方法，因此 Lua 的 `AUTO` 模式仍只识别带 `f%` 前缀的文本。
+  /// Host UIs that pass rich text parameters have explicitly asked for formatted parsing. Lua
+  /// drawing never calls this method, so Lua's `AUTO` mode still only recognizes text with the
+  /// `f%` prefix.
   pub fn host_formatted(&self) -> Cow<'_, Self> {
     if self.params.is_none() || self.text_mode != TextMode::Auto {
       return Cow::Borrowed(self);
@@ -164,7 +157,7 @@ enum TextToken {
   Newline,
 }
 
-// 将绘制文本参数转换为已排版好的文本行列表
+/// Lays out the text of the draw parameters into a list of text lines.
 pub fn layout_text_lines(params: &DrawTextParams) -> Vec<LayoutLine> {
   let default_style = params.to_text_style();
   let tokens = build_text_tokens(params, &default_style);
@@ -180,7 +173,7 @@ pub fn layout_rich_text_segments(
   layout_tokens(&tokens, params, &default_style)
 }
 
-// 测量绘制文本所需的尺寸（宽度 x 高度）
+/// Measures the size (width x height) needed to draw the text.
 pub fn measure_draw_text(params: &DrawTextParams) -> (u16, u16) {
   let lines = layout_text_lines(params);
   measure_lines(&lines)
@@ -210,7 +203,7 @@ fn measure_lines(lines: &[LayoutLine]) -> (u16, u16) {
   (width, height)
 }
 
-// 将富文本解析为字素 token 流，每个 token 携带样式信息
+/// Parses the rich text into a stream of grapheme tokens, each carrying its style.
 fn build_text_tokens(params: &DrawTextParams, style: &TextStyle) -> Vec<TextToken> {
   let rich_text =
     RichTextService::new().parse_mode(&params.text, params.params.as_ref(), params.text_mode);
@@ -238,7 +231,8 @@ fn build_segment_tokens(segments: &[RichTextSegment], style: &TextStyle) -> Vec<
   tokens
 }
 
-// 将 token 流按最大宽度/高度/换行模式排版为文本行
+/// Lays out the token stream into text lines according to the maximum width, the maximum
+/// height and the wrap mode.
 fn layout_tokens(
   tokens: &[TextToken],
   params: &DrawTextParams,
@@ -310,15 +304,15 @@ fn layout_tokens(
     lines.push(current);
   }
 
-  if overflow {
-    if let Some(line) = lines.last_mut() {
-      apply_overflow_marker(
-        line,
-        params.overflow_marker.as_deref(),
-        max_width,
-        overflow_style.as_ref().unwrap_or(default_style),
-      );
-    }
+  if overflow
+    && let Some(line) = lines.last_mut()
+  {
+    apply_overflow_marker(
+      line,
+      params.overflow_marker.as_deref(),
+      max_width,
+      overflow_style.as_ref().unwrap_or(default_style),
+    );
   }
 
   lines
@@ -635,6 +629,115 @@ fn is_upper_ascii(text: &str) -> bool {
   text.chars().all(|ch| ch.is_ascii_uppercase())
 }
 
+fn first_grapheme_style(tokens: &[TextToken]) -> Option<TextStyle> {
+  tokens.iter().find_map(|token| match token {
+    TextToken::Grapheme(item) => Some(item.style.clone()),
+    TextToken::Newline => None,
+  })
+}
+
+/// Appends the overflow marker (such as "...") to the line, dropping trailing graphemes when
+/// needed to make room.
+fn apply_overflow_marker(
+  line: &mut LayoutLine,
+  marker: Option<&str>,
+  max_width: Option<usize>,
+  style: &TextStyle,
+) {
+  let Some(marker) = marker else {
+    return;
+  };
+  if marker.is_empty() {
+    return;
+  }
+
+  let available = max_width.unwrap_or(usize::MAX);
+  if available == 0 {
+    line.items.clear();
+    line.width = 0;
+    return;
+  }
+
+  let mut marker_items = marker_graphemes(marker, available, style);
+  let marker_width: usize = marker_items.iter().map(|item| item.width).sum();
+  if marker_width == 0 && marker_items.is_empty() {
+    return;
+  }
+
+  while line.width.saturating_add(marker_width) > available {
+    let Some(removed) = line.items.pop() else {
+      break;
+    };
+    line.width = line.width.saturating_sub(removed.width);
+  }
+
+  if line.width.saturating_add(marker_width) > available {
+    let remaining = available.saturating_sub(line.width);
+    marker_items = marker_graphemes(marker, remaining, style);
+  }
+
+  for item in marker_items {
+    line.push(item);
+  }
+}
+
+/// Splits the overflow marker into graphemes whose total width stays within `max_width`.
+fn marker_graphemes(marker: &str, max_width: usize, style: &TextStyle) -> Vec<StyledGrapheme> {
+  let mut result = Vec::new();
+  let mut width = 0usize;
+  for g in graphemes(marker) {
+    if width + g.display_width > max_width {
+      break;
+    }
+    width += g.display_width;
+    result.push(StyledGrapheme {
+      text: g.text,
+      width: g.display_width,
+      style: style.clone(),
+    });
+  }
+  result
+}
+
+/// Merges the base style with the override style; non-default override values win.
+fn merge_style(base: &TextStyle, overrides: &TextStyle) -> TextStyle {
+  let mut merged = base.clone();
+
+  if overrides.foreground.is_some() {
+    merged.foreground = overrides.foreground.clone();
+  }
+  if overrides.background.is_some() {
+    merged.background = overrides.background.clone();
+  }
+
+  if overrides.bold {
+    merged.bold = true;
+  }
+  if overrides.italic {
+    merged.italic = true;
+  }
+  if overrides.underline {
+    merged.underline = true;
+  }
+  if overrides.strike {
+    merged.strike = true;
+  }
+  if overrides.blink {
+    merged.blink = true;
+  }
+  if overrides.reverse {
+    merged.reverse = true;
+  }
+  if overrides.hidden {
+    merged.hidden = true;
+  }
+  if overrides.dim {
+    merged.dim = true;
+  }
+
+  merged
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -931,112 +1034,4 @@ This action cannot be undone!";
       );
     }
   }
-}
-
-fn first_grapheme_style(tokens: &[TextToken]) -> Option<TextStyle> {
-  tokens.iter().find_map(|token| match token {
-    TextToken::Grapheme(item) => Some(item.style.clone()),
-    TextToken::Newline => None,
-  })
-}
-
-// 在行尾添加溢出标记（如 "..."），必要时裁剪字符以腾出空间
-fn apply_overflow_marker(
-  line: &mut LayoutLine,
-  marker: Option<&str>,
-  max_width: Option<usize>,
-  style: &TextStyle,
-) {
-  let Some(marker) = marker else {
-    return;
-  };
-  if marker.is_empty() {
-    return;
-  }
-
-  let available = max_width.unwrap_or(usize::MAX);
-  if available == 0 {
-    line.items.clear();
-    line.width = 0;
-    return;
-  }
-
-  let mut marker_items = marker_graphemes(marker, available, style);
-  let marker_width: usize = marker_items.iter().map(|item| item.width).sum();
-  if marker_width == 0 && marker_items.is_empty() {
-    return;
-  }
-
-  while line.width.saturating_add(marker_width) > available {
-    let Some(removed) = line.items.pop() else {
-      break;
-    };
-    line.width = line.width.saturating_sub(removed.width);
-  }
-
-  if line.width.saturating_add(marker_width) > available {
-    let remaining = available.saturating_sub(line.width);
-    marker_items = marker_graphemes(marker, remaining, style);
-  }
-
-  for item in marker_items {
-    line.push(item);
-  }
-}
-
-// 将溢出标记字符串按字素拆分，并限制总宽度
-fn marker_graphemes(marker: &str, max_width: usize, style: &TextStyle) -> Vec<StyledGrapheme> {
-  let mut result = Vec::new();
-  let mut width = 0usize;
-  for g in graphemes(marker) {
-    if width + g.display_width > max_width {
-      break;
-    }
-    width += g.display_width;
-    result.push(StyledGrapheme {
-      text: g.text,
-      width: g.display_width,
-      style: style.clone(),
-    });
-  }
-  result
-}
-
-// 合并基础样式和覆盖样式，覆盖样式的非默认值优先
-fn merge_style(base: &TextStyle, overrides: &TextStyle) -> TextStyle {
-  let mut merged = base.clone();
-
-  if overrides.foreground.is_some() {
-    merged.foreground = overrides.foreground.clone();
-  }
-  if overrides.background.is_some() {
-    merged.background = overrides.background.clone();
-  }
-
-  if overrides.bold {
-    merged.bold = true;
-  }
-  if overrides.italic {
-    merged.italic = true;
-  }
-  if overrides.underline {
-    merged.underline = true;
-  }
-  if overrides.strike {
-    merged.strike = true;
-  }
-  if overrides.blink {
-    merged.blink = true;
-  }
-  if overrides.reverse {
-    merged.reverse = true;
-  }
-  if overrides.hidden {
-    merged.hidden = true;
-  }
-  if overrides.dim {
-    merged.dim = true;
-  }
-
-  merged
 }

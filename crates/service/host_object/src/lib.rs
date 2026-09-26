@@ -120,6 +120,12 @@ impl HostObjectPool {
   }
 }
 
+impl Default for HostObjectPool {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

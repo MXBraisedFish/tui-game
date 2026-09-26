@@ -1,6 +1,6 @@
 //! Clipboard service: system clipboard text read/write.
 
-/// 剪贴板服务，提供系统剪贴板的读写能力
+/// Clipboard service that reads and writes the system clipboard.
 pub struct ClipboardService {
   clipboard: Option<arboard::Clipboard>,
   last_error: Option<String>,
@@ -19,7 +19,8 @@ impl ClipboardService {
     }
   }
 
-  /// 读取剪贴板中的文本内容
+  /// Reads the text content of the clipboard; returns `None` when the clipboard is unavailable or
+  /// cannot be read.
   pub fn read_text(&mut self) -> Option<String> {
     let clipboard = self.clipboard.as_mut()?;
     // TODO: add log warn when LogService is available
@@ -32,7 +33,7 @@ impl ClipboardService {
     }
   }
 
-  /// 向剪贴板写入文本
+  /// Writes text to the clipboard and returns whether it succeeded.
   pub fn write_text(&mut self, text: &str) -> bool {
     // TODO: add log warn when LogService is available
     match self.clipboard.as_mut() {
@@ -56,6 +57,12 @@ impl ClipboardService {
       clipboard: None,
       last_error: None,
     }
+  }
+}
+
+impl Default for ClipboardService {
+  fn default() -> Self {
+    Self::new()
   }
 }
 

@@ -100,32 +100,6 @@ impl Default for LogLabels {
   }
 }
 
-#[cfg(test)]
-mod tests {
-  use std::collections::HashMap;
-
-  use super::*;
-
-  #[test]
-  fn refresh_resets_missing_labels_to_defaults() {
-    let mut labels = LogLabels::new();
-    let translated = HashMap::from([
-        ("log.service.lua".to_string(), "脚本".to_string()),
-        ("log.service.game".to_string(), "游戏".to_string()),
-        ("log.service.screensaver".to_string(), "屏保".to_string()),
-        ("log.level.warn".to_string(), "警告".to_string()),
-      ]);
-    labels.refresh(|key| translated.get(key).cloned());
-    assert_eq!(labels.source(LogSource::Lua), "脚本");
-    assert_eq!(labels.source(LogSource::Game), "游戏");
-    assert_eq!(labels.source(LogSource::Screensaver), "屏保");
-    assert_eq!(labels.level(LogLevel::Warn), "警告");
-
-    labels.refresh(|_| None);
-    assert_eq!(labels.source(LogSource::Lua), "Lua");
-  }
-}
-
 pub fn log_label_keys() -> &'static [&'static str] {
   &[
     "log.phase.boot",
@@ -156,4 +130,30 @@ pub fn log_label_keys() -> &'static [&'static str] {
     "log.level.error",
     "log.level.fatal",
   ]
+}
+
+#[cfg(test)]
+mod tests {
+  use std::collections::HashMap;
+
+  use super::*;
+
+  #[test]
+  fn refresh_resets_missing_labels_to_defaults() {
+    let mut labels = LogLabels::new();
+    let translated = HashMap::from([
+        ("log.service.lua".to_string(), "脚本".to_string()),
+        ("log.service.game".to_string(), "游戏".to_string()),
+        ("log.service.screensaver".to_string(), "屏保".to_string()),
+        ("log.level.warn".to_string(), "警告".to_string()),
+      ]);
+    labels.refresh(|key| translated.get(key).cloned());
+    assert_eq!(labels.source(LogSource::Lua), "脚本");
+    assert_eq!(labels.source(LogSource::Game), "游戏");
+    assert_eq!(labels.source(LogSource::Screensaver), "屏保");
+    assert_eq!(labels.level(LogLevel::Warn), "警告");
+
+    labels.refresh(|_| None);
+    assert_eq!(labels.source(LogSource::Lua), "Lua");
+  }
 }

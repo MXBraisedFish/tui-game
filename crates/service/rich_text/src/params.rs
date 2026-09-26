@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use tg_core_input::ActionMapEntry;
 
-/// 富文本参数：包含占位变量值和按键动作映射，供解析时替换模板标记。
+/// Rich text parameters: placeholder values and key action maps that replace template markers
+/// while parsing.
 #[derive(Clone, Debug, Default)]
 pub struct RichTextParams {
   pub values: HashMap<String, String>,
@@ -13,14 +14,16 @@ pub struct RichTextParams {
 }
 
 impl RichTextParams {
-  /// 使用可自定义动作的当前映射与默认映射创建参数。
-  ///
-  /// 游戏按键和宿主全局按键应走这条路径；`{key:...}` 读取当前用户映射，
-  /// `{key_default:...}` 读取包或宿主提供的默认映射。
+  /// Creates parameters whose `{key:...}` and `{key_default:...}` placeholders both read the same
+  /// key action map.
   pub fn from_key_actions(key_actions: &HashMap<String, Vec<Vec<String>>>) -> Self {
     Self::from_key_action_maps(key_actions, key_actions)
   }
 
+  /// Creates parameters from the current and the default key action maps of customizable actions.
+  ///
+  /// Game keys and global host keys should take this path; `{key:...}` reads the current user
+  /// map and `{key_default:...}` reads the default map provided by the package or the host.
   pub fn from_key_action_maps(
     key_actions: &HashMap<String, Vec<Vec<String>>>,
     key_default_actions: &HashMap<String, Vec<Vec<String>>>,
@@ -32,10 +35,11 @@ impl RichTextParams {
     }
   }
 
-  /// 从不可自定义的 UI 动作表创建参数。
+  /// Creates parameters from a non-customizable UI action map.
   ///
-  /// UI 页面自己的操作键没有 user/default 之分，因此两个参数读取同一份映射。
-  /// 自动为每个 action 注册带前缀和不带前缀的键。
+  /// A UI page's own action keys have no user/default distinction, so both maps hold the same
+  /// entries. Every action is registered under its full name and, when it starts with `prefix`,
+  /// also under the name without the prefix.
   pub fn from_action_map(entries: &[ActionMapEntry], prefix: &str) -> Self {
     let mut key_actions = HashMap::new();
     for entry in entries {

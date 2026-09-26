@@ -7,9 +7,10 @@ use std::{
   process::{Command, Stdio},
 };
 
-/// 已验证可执行且完成编码器探测的 FFmpeg 快照。
+/// Snapshot of an FFmpeg executable that was verified to run and whose encoders were probed.
 ///
-/// 快照可安全传给异步导出任务；导出服务不负责搜索或探测 FFmpeg。
+/// The snapshot can be passed safely to asynchronous export tasks; the export service does not
+/// search for or probe FFmpeg itself.
 #[derive(Clone, Debug)]
 pub struct FfmpegInstallation {
   executable: PathBuf,
@@ -26,7 +27,7 @@ impl FfmpegInstallation {
   }
 }
 
-/// 跨平台 FFmpeg 发现与能力探测服务。
+/// Cross-platform service that discovers FFmpeg and probes its capabilities.
 pub struct FfmpegService {
   deployment_root: PathBuf,
   managed_directory: PathBuf,
@@ -44,7 +45,8 @@ impl FfmpegService {
     service
   }
 
-  /// 重新扫描所有受支持的位置并刷新编码器能力。
+  /// Rescans all supported locations, refreshes the encoder capabilities and returns whether
+  /// FFmpeg was found.
   pub fn refresh(&mut self) -> bool {
     self.installation = discover(
       &self.deployment_root,
@@ -57,7 +59,8 @@ impl FfmpegService {
     self.installation.is_some()
   }
 
-  /// FFmpeg 缺失时重新扫描，已经探测成功时不重复启动子进程。
+  /// Rescans only while FFmpeg is missing, so a successful probe never starts the child processes
+  /// again; returns whether FFmpeg is available.
   pub fn refresh_if_missing(&mut self) -> bool {
     self.installation.is_some() || self.refresh()
   }
@@ -179,7 +182,8 @@ fn build_candidates(
     push_unique(&mut candidates, candidate);
   }
 
-  // 最后保留一次由操作系统解析 PATH 的机会，兼容 shell/运行环境的特殊搜索规则。
+  // Finally, let the operating system resolve PATH once more, which covers special search rules
+  // of the shell or runtime environment.
   push_unique(&mut candidates, PathBuf::from(file_name));
   candidates
 }

@@ -3,7 +3,7 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use super::{LogEntry, LogLabels, LogPrintOptions, format_log_level};
 
-/// 将一条日志条目格式化为可读字符串（含序号、级别、来源、消息）。
+/// Formats a log entry as a readable string with its sequence number, level, source and message.
 pub fn format_log_entry(entry: &LogEntry) -> String {
   format!(
     "#{:04} [{}] [{:?}] {}",

@@ -1,6 +1,7 @@
 use crate::TextStyle;
 
-/// 画布上的单个字符单元，包含文本内容、样式和是否为宽字符延续标记。
+/// Single character cell of a canvas: its text, its style and whether it continues a wide
+/// character.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasCell {
   pub text: String,
@@ -9,7 +10,7 @@ pub struct CanvasCell {
 }
 
 impl CanvasCell {
-  /// 创建一个空白占位单元格。
+  /// Creates a blank placeholder cell.
   pub fn blank() -> Self {
     Self {
       text: " ".to_string(),
@@ -26,7 +27,7 @@ impl CanvasCell {
     }
   }
 
-  /// 创建一个带样式的字符单元格。
+  /// Creates a styled character cell.
   pub fn styled(text: impl Into<String>, style: TextStyle) -> Self {
     Self {
       text: text.into(),
@@ -35,7 +36,7 @@ impl CanvasCell {
     }
   }
 
-  /// 创建一个宽字符延续标记（不占独立列宽）。
+  /// Creates a wide-character continuation marker, which has no column width of its own.
   pub fn continuation() -> Self {
     Self {
       text: String::new(),

@@ -14,7 +14,8 @@ enum TagReadResult {
   Broken(String),
 }
 
-/// 解析富文本字符串，将 `<tag>` 标签转换为样式段、`{param}` 替换为实际值。
+/// Parses text in AUTO mode: text with the `f%` prefix is formatted (`<tag>` tags become styled
+/// segments and `{param}` placeholders are replaced with their values); other text stays plain.
 pub(super) fn parse_auto(text: &str, params: Option<&RichTextParams>) -> RichText {
   text.strip_prefix(RICH_TEXT_PREFIX).map_or_else(
     || plain_text(text),

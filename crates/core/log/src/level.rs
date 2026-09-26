@@ -1,4 +1,4 @@
-/// 日志严重级别，按升序排列（Trace 最低，Fatal 最高）。
+/// Log severity level, declared in ascending order (Trace is the lowest, Fatal the highest).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogLevel {
   Trace,
@@ -9,7 +9,7 @@ pub enum LogLevel {
   Fatal,
 }
 
-/// 将日志级别转为固定宽度的大写字符串标识。
+/// Returns the upper-case label of a log level (such as `"WARN"`).
 pub fn format_log_level(level: LogLevel) -> &'static str {
   match level {
     LogLevel::Trace => "TRACE",

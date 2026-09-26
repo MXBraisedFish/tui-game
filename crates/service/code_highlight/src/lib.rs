@@ -164,6 +164,12 @@ impl CodeHighlightService {
   }
 }
 
+impl Default for CodeHighlightService {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl Default for CodeHighlightTheme {
   fn default() -> Self {
     Self {

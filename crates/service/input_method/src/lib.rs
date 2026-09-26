@@ -226,14 +226,14 @@ impl InputMethodService {
       return true;
     };
 
-    if let Some(saved) = saved {
-      if let Err(err) = self.backend.set_input_method(&saved) {
-        self.saved_im = Some(saved);
-        self.saved_ime_state = saved_ime_state;
-        // TODO: add log warn when LogService is available
-        self.last_error = Some(format!("failed to restore input method: {err}"));
-        return false;
-      }
+    if let Some(saved) = saved
+      && let Err(err) = self.backend.set_input_method(&saved)
+    {
+      self.saved_im = Some(saved);
+      self.saved_ime_state = saved_ime_state;
+      // TODO: add log warn when LogService is available
+      self.last_error = Some(format!("failed to restore input method: {err}"));
+      return false;
     }
 
     if let Some(saved_ime_state) = saved_ime_state {
@@ -299,10 +299,10 @@ impl Default for InputMethodService {
 impl Drop for InputMethodService {
   fn drop(&mut self) {
     // TODO: add log warn when LogService is available
-    if !self.release_input_method() {
-      if let Some(ref err) = self.last_error {
-        eprintln!("[InputMethodService] drop restore failed: {err}");
-      }
+    if !self.release_input_method()
+      && let Some(ref err) = self.last_error
+    {
+      eprintln!("[InputMethodService] drop restore failed: {err}");
     }
   }
 }

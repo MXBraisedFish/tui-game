@@ -1,4 +1,4 @@
-/// 字素信息：包含文本片段和其终端显示宽度。
+/// Grapheme cluster with its text and terminal display width.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphemeInfo {
   pub text: String,

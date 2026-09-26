@@ -1,4 +1,4 @@
-/// 终端文本样式：包含前景色、背景色及各种文本修饰属性。
+/// Terminal text style: foreground and background colors plus text decoration flags.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TextStyle {
   pub foreground: Option<TextColor>,
@@ -13,7 +13,7 @@ pub struct TextStyle {
   pub dim: bool,
 }
 
-/// 文本颜色：终端色、RGB 真彩色或透明。
+/// Text color: a terminal color, an RGB true color or transparent.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TextColor {
   Terminal(TerminalColor),
@@ -23,7 +23,7 @@ pub enum TextColor {
   Transparent,
 }
 
-/// ANSI 16 色终端颜色枚举。
+/// One of the 16 ANSI terminal colors.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TerminalColor {
   Black,
@@ -45,7 +45,8 @@ pub enum TerminalColor {
 }
 
 impl TextStyle {
-  /// 按标签名启用一种文本修饰（如 "bold"、"italic" 等），返回是否识别成功。
+  /// Enables the text decoration named by `tag` (such as "bold" or "italic") and returns
+  /// whether the tag was recognized.
   pub fn enable_style(&mut self, tag: &str) -> bool {
     match tag {
       "bold" | "b" => self.bold = true,
@@ -61,7 +62,7 @@ impl TextStyle {
     true
   }
 
-  /// 按标签名禁用一个文本修饰，返回是否识别成功。
+  /// Disables the text decoration named by `tag` and returns whether the tag was recognized.
   pub fn disable_style(&mut self, tag: &str) -> bool {
     match tag {
       "bold" | "b" => self.bold = false,
@@ -85,7 +86,8 @@ impl TextStyle {
     self.foreground = None;
   }
 
-  /// 反转当前显式 RGB 前景色。终端命名色由终端主题决定，保持不变。
+  /// Inverts the explicit RGB foreground color. Named terminal colors depend on the terminal
+  /// theme and stay unchanged.
   pub fn reverse_foreground(&mut self) {
     if let Some(color) = self.foreground.as_mut() {
       color.reverse_rgb();
@@ -100,14 +102,15 @@ impl TextStyle {
     self.background = None;
   }
 
-  /// 反转当前显式 RGB 背景色。终端命名色由终端主题决定，保持不变。
+  /// Inverts the explicit RGB background color. Named terminal colors depend on the terminal
+  /// theme and stay unchanged.
   pub fn reverse_background(&mut self) {
     if let Some(color) = self.background.as_mut() {
       color.reverse_rgb();
     }
   }
 
-  /// 将样式重置为默认值。
+  /// Resets the style to its default value.
   pub fn reset(&mut self) {
     *self = Self::default();
   }

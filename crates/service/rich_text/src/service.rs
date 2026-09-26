@@ -1,20 +1,15 @@
 use super::{RichText, RichTextParams, parser};
 
-/// 文本解析模式。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Text parsing mode.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextMode {
+  #[default]
   Auto,
   Plain,
   Rich,
 }
 
-impl Default for TextMode {
-  fn default() -> Self {
-    Self::Auto
-  }
-}
-
-/// 富文本服务：提供解析和纯文本提取功能。
+/// Rich text service that parses rich text and extracts its visible plain text.
 pub struct RichTextService;
 
 impl RichTextService {
@@ -22,7 +17,9 @@ impl RichTextService {
     Self
   }
 
-  /// 解析富文本字符串，返回包含样式信息的分段列表。
+  /// Parses a rich text string into a list of styled segments.
+  ///
+  /// Uses [`TextMode::Auto`]: only text with the `f%` prefix is formatted; other text stays plain.
   pub fn parse(&self, text: &str, params: Option<&RichTextParams>) -> RichText {
     parser::parse_auto(text, params)
   }
@@ -40,13 +37,14 @@ impl RichTextService {
     }
   }
 
-  /// 解析富文本后仅提取可见文本内容（去除所有样式标签）。
+  /// Parses rich text and returns only its visible text (all style tags removed).
   pub fn visible_text(&self, text: &str, params: Option<&RichTextParams>) -> String {
     if params.is_none() && !text.starts_with("f%") {
       return text.to_string();
     }
 
-    // 宿主界面传入参数时已经明确要求格式化；Lua 的 AUTO 模式仍要求 `f%` 前缀。
+    // Host UIs that pass parameters have explicitly asked for formatting; Lua's AUTO mode still
+    // requires the `f%` prefix.
     let rich_text = if params.is_some() {
       parser::parse_rich(text.strip_prefix("f%").unwrap_or(text), params)
     } else {
@@ -57,6 +55,12 @@ impl RichTextService {
       result.push_str(&segment.text);
     }
     result
+  }
+}
+
+impl Default for RichTextService {
+  fn default() -> Self {
+    Self::new()
   }
 }
 

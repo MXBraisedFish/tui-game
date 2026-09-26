@@ -1,6 +1,7 @@
 use super::{TerminalColor, TextColor};
 
-/// 解析颜色字符串为 TextColor，支持终端色名、十六进制和 rgb() 格式。
+/// Parses a color string into a [`TextColor`]; terminal color names, hex (`#rrggbb`) and
+/// `rgb(r, g, b)` forms are supported.
 pub fn parse_text_color(value: &str) -> Option<TextColor> {
   let value = value.trim();
 
@@ -57,6 +58,21 @@ fn parse_hex_color(value: &str) -> Option<TextColor> {
   Some(TextColor::Rgb { r, g, b })
 }
 
+fn parse_rgb_color(value: &str) -> Option<TextColor> {
+  let inner = value.strip_prefix("rgb(")?.strip_suffix(')')?;
+  let parts: Vec<&str> = inner.split(',').map(|part| part.trim()).collect();
+
+  if parts.len() != 3 {
+    return None;
+  }
+
+  let r = parts[0].parse::<u8>().ok()?;
+  let g = parts[1].parse::<u8>().ok()?;
+  let b = parts[2].parse::<u8>().ok()?;
+
+  Some(TextColor::Rgb { r, g, b })
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -87,19 +103,4 @@ mod tests {
       );
     }
   }
-}
-
-fn parse_rgb_color(value: &str) -> Option<TextColor> {
-  let inner = value.strip_prefix("rgb(")?.strip_suffix(')')?;
-  let parts: Vec<&str> = inner.split(',').map(|part| part.trim()).collect();
-
-  if parts.len() != 3 {
-    return None;
-  }
-
-  let r = parts[0].parse::<u8>().ok()?;
-  let g = parts[1].parse::<u8>().ok()?;
-  let b = parts[2].parse::<u8>().ok()?;
-
-  Some(TextColor::Rgb { r, g, b })
 }

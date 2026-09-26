@@ -1,3 +1,5 @@
+//! Atomic file replacement through a temporary sibling file and a `.bak` backup of the original.
+
 use std::{
   fs::{self, OpenOptions},
   io::{self, Write},
@@ -65,7 +67,8 @@ pub fn atomic_replace_with(
   }
 }
 
-/// Temporary file the atomic writers fill before replacing `path` (`name.ext` -> `name.ext.tmp`).
+/// Returns the temporary file the atomic writers fill before replacing `path`
+/// (`name.ext` -> `name.ext.tmp`).
 pub fn temporary_path(path: &Path) -> PathBuf {
   let extension = path
     .extension()

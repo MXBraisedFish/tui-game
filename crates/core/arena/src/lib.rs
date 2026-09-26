@@ -62,6 +62,12 @@ impl<T> Arena<T> {
   }
 }
 
+impl<T> Default for Arena<T> {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::Arena;

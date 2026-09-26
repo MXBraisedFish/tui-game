@@ -1,4 +1,4 @@
-/// 终端能力描述（Unicode / 真彩色 / 鼠标支持）
+/// Terminal capability description (Unicode, true color and mouse support).
 #[derive(Clone, Debug)]
 pub struct TerminalCapabilities {
   pub unicode: bool,
@@ -7,7 +7,8 @@ pub struct TerminalCapabilities {
 }
 
 impl TerminalCapabilities {
-  /// 检测当前终端的能力
+  /// Returns the default capabilities: Unicode enabled, true color and mouse disabled. The
+  /// terminal itself is not probed.
   pub fn detect() -> Self {
     Self {
       unicode: true,

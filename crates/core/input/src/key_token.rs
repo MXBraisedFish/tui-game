@@ -1,6 +1,8 @@
 use super::key::Key;
 
-/// 将按键标记字符串（如 "shift", "a", "f1"）解析为 Key 枚举
+/// Parses a key token (such as "shift", "a" or "f1") into a [`Key`].
+///
+/// The token is trimmed and matched case-insensitively; unknown tokens yield `None`.
 pub fn parse_key_token(token: &str) -> Option<Key> {
   let token = token.trim().to_ascii_lowercase();
 
@@ -67,7 +69,7 @@ pub fn parse_key_token(token: &str) -> Option<Key> {
   }
 }
 
-/// 将任意可识别按键标记转换为输入系统的稳定持久化标记。
+/// Converts any recognized key token into the stable token the input system persists.
 pub fn canonical_key_token(token: &str) -> Option<String> {
   parse_key_token(token).map(key_token)
 }
@@ -139,7 +141,7 @@ fn parse_unknown_key(token: &str) -> Option<Key> {
   Some(Key::Unknown(code))
 }
 
-/// 将按键模式格式化为用户可读的显示文本（如 "[Shift + D]/[Ctrl + C]"）
+/// Formats key patterns as user-readable display text (such as "[Shift + D]/[Ctrl + C]").
 pub fn format_key_display(patterns: &[Vec<String>]) -> String {
   patterns
     .iter()
@@ -149,7 +151,7 @@ pub fn format_key_display(patterns: &[Vec<String>]) -> String {
         .filter_map(|token| parse_key_token(token))
         .collect();
 
-      keys.sort_by(|a, b| key_display_order(a).cmp(&key_display_order(b)));
+      keys.sort_by_key(key_display_order);
       let display: Vec<String> = keys.iter().map(|k| display_key_token(*k)).collect();
       if display.is_empty() {
         pattern.join(" + ")
@@ -162,7 +164,8 @@ pub fn format_key_display(patterns: &[Vec<String>]) -> String {
     .join("/")
 }
 
-// 按键显示排序权重：修饰键 < 字母 < 数字 < 小键盘 < 符号 < 其他
+/// Returns the display sort weight of a key: modifiers < letters < digits < numpad digits <
+/// symbols < numpad operators < other keys.
 fn key_display_order(key: &Key) -> u8 {
   match key {
     Key::LeftCtrl | Key::RightCtrl => 0,
@@ -224,7 +227,7 @@ fn key_display_order(key: &Key) -> u8 {
   }
 }
 
-/// 将 Key 枚举转换为可读的显示字符串
+/// Converts a [`Key`] into its human-readable display string.
 pub fn display_key_token(key: Key) -> String {
   match key {
     Key::Esc => "Esc".to_string(),
@@ -301,7 +304,7 @@ pub fn display_key_token(key: Key) -> String {
   }
 }
 
-/// 将按键转换为可持久化、可再次解析的标准标记。
+/// Converts a key into the canonical token that can be persisted and parsed again.
 pub fn key_token(key: Key) -> String {
   match key {
     Key::Esc => "esc".into(),

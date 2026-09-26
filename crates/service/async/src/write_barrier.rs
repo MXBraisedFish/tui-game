@@ -24,7 +24,8 @@ struct WriteBarrierState {
   failed: Vec<(PathBuf, String)>,
 }
 
-/// 统一追踪异步文件写入，供 Shutdown 建立停止提交与等待完成屏障。
+/// Shared tracker of asynchronous file writes that lets shutdown stop new submissions and wait
+/// for pending writes to complete.
 #[derive(Clone)]
 pub struct WriteBarrier {
   shared: Arc<(Mutex<WriteBarrierState>, Condvar)>,
