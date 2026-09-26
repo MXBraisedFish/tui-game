@@ -370,7 +370,7 @@ mod tests {
   use crossbeam_channel::unbounded;
 
   use super::*;
-  use crate::host_engine::services::network::{
+  use crate::{
     NetworkHeader, NetworkRequest, NetworkRequestBody, normalize_request_for_test,
   };
 

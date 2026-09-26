@@ -1,0 +1,10 @@
+[package]
+name = "tg-service-network"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "rustls", "gzip", "brotli", "deflate", "zstd"] }
+serde_json = { workspace = true }
+tg-service-async = { path = "../../service/async" }

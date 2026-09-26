@@ -38,6 +38,7 @@ tg-core-style = { path = "crates/core/style" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-network = { path = "crates/service/network" }
 tg-service-i18n = { path = "crates/service/i18n" }
 tg-service-layout = { path = "crates/service/layout" }
 tg-service-log = { path = "crates/service/log" }
@@ -75,7 +76,6 @@ toml = "1.1.2"
 csv = "1.3"
 quick-xml = "0.41.0"
 chrono = { workspace = true }
-reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "rustls", "gzip", "brotli", "deflate", "zstd"] }
 rodio = { version = "0.22.2", default-features = false, features = ["playback", "flac", "mp3", "mp4", "vorbis", "wav"] }
 hound = "3.5"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }

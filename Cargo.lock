@@ -3621,6 +3621,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-network"
+version = "2.0.0"
+dependencies = [
+ "crossbeam-channel",
+ "reqwest",
+ "serde_json",
+ "tg-service-async",
+]
+
+[[package]]
 name = "tg-service-popup"
 version = "2.0.0"
 dependencies = [
@@ -4065,7 +4075,6 @@ dependencies = [
  "quick-xml",
  "rdev",
  "regex",
- "reqwest",
  "rodio",
  "serde",
  "serde_json",
@@ -4098,6 +4107,7 @@ dependencies = [
  "tg-service-input-method",
  "tg-service-layout",
  "tg-service-log",
+ "tg-service-network",
  "tg-service-popup",
  "tg-service-random",
  "tg-service-rich-text",

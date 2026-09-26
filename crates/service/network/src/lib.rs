@@ -1,3 +1,5 @@
+//! Network service: validated HTTP(S) requests executed as async jobs, with SSRF-safe address checks and bounded status history.
+
 mod executor;
 mod security;
 
@@ -175,7 +177,7 @@ pub struct NetworkError {
 }
 
 impl NetworkError {
-  pub(crate) fn at(code: NetworkErrorCode, stage: &'static str) -> Self {
+  pub fn at(code: NetworkErrorCode, stage: &'static str) -> Self {
     Self {
       code,
       message: code.message().to_string(),

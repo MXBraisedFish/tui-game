@@ -11,7 +11,7 @@ mod input;
 use tg_service_layout as layout;
 use tg_service_log as log;
 mod lua;
-mod network;
+use tg_service_network as network;
 mod package;
 use tg_service_random as random;
 mod recording;
