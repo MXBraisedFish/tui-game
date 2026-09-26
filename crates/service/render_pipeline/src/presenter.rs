@@ -11,7 +11,8 @@ use once_cell::sync::Lazy;
 use palette::{IntoColor, Lab, Srgb, color_difference::Ciede2000};
 
 use super::{ComposedCell, ComposedFrame};
-use crate::host_engine::services::{TerminalColor, TerminalService, TextColor, TextStyle};
+use tg_core_style::{TerminalColor, TextColor, TextStyle};
+use tg_service_terminal::TerminalService;
 
 /// 帧呈现器：将 ComposedFrame 转换为 crossterm 指令并输出到终端，支持增量刷新。
 pub struct FramePresenter {
@@ -314,7 +315,7 @@ fn queue_style(stdout: &mut impl Write, style: &TextStyle, truecolor: bool) -> i
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::CanvasCell;
+  use tg_core_style::CanvasCell;
 
   #[test]
   fn previous_cell_returns_empty_for_missing_previous_frame() {

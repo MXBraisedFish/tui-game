@@ -1,8 +1,9 @@
 use super::BorderStyle;
-use crate::host_engine::services::unicode::char_width;
-use crate::host_engine::services::{
-  CanvasService, DrawTextParams, ScrollBoxId, SliceId, SurfaceId, TextColor, TextStyle,
-};
+use tg_core_unicode::char_width;
+use tg_core_style::{TextColor, TextStyle};
+use tg_service_canvas::CanvasService;
+use tg_service_text_layout::DrawTextParams;
+use tg_service_canvas::{ScrollBoxId, SliceId, SurfaceId};
 
 #[derive(Clone, Copy)]
 enum Target {
@@ -80,7 +81,7 @@ impl RenderService {
   }
 
   /// 在宿主层上绘制文本（用于顶层 UI 元素）。
-  pub(crate) fn draw_host_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
+  pub fn draw_host_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     let params = params.host_formatted();
     self.draw_text_target(canvas, Target::Host, params.as_ref());
   }
@@ -97,7 +98,7 @@ impl RenderService {
   }
 
   /// 在宿主最高层上绘制文本。
-  pub(crate) fn draw_top_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
+  pub fn draw_top_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     let params = params.host_formatted();
     self.draw_text_target(canvas, Target::Top, params.as_ref());
   }
@@ -202,7 +203,7 @@ impl RenderService {
 
   /// 在宿主层上绘制填充矩形。
   #[allow(clippy::too_many_arguments)]
-  pub(crate) fn draw_host_filled_rect(
+  pub fn draw_host_filled_rect(
     &mut self,
     canvas: &mut CanvasService,
     x: impl Into<i32>,
@@ -391,7 +392,7 @@ impl RenderService {
 
   /// 在宿主层上绘制带样式的边框矩形。
   #[allow(clippy::too_many_arguments)]
-  pub(crate) fn draw_host_border_rect(
+  pub fn draw_host_border_rect(
     &mut self,
     canvas: &mut CanvasService,
     x: impl Into<i32>,
@@ -421,7 +422,7 @@ impl RenderService {
 
   /// 在宿主最高层上绘制带样式的边框矩形。
   #[allow(clippy::too_many_arguments)]
-  pub(crate) fn draw_top_border_rect(
+  pub fn draw_top_border_rect(
     &mut self,
     canvas: &mut CanvasService,
     x: impl Into<i32>,

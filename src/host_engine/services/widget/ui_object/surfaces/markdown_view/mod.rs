@@ -7,7 +7,7 @@ pub use self::types::{
   MarkdownEvent, MarkdownRenderParams, MarkdownTheme, MarkdownViewId, MarkdownViewOptions,
 };
 use crate::host_engine::services::text_layout::{self, DrawTextParams, TextWrapMode};
-use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::UiObjectPool;
 use crate::host_engine::services::unicode::display_width;
 use crate::host_engine::services::{
   CanvasService, CodeHighlightService, MouseButton, MouseEvent, MouseEventKind, Rect,

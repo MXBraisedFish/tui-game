@@ -1,0 +1,10 @@
+[package]
+name = "tg-service-render"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tg-core-style = { path = "../../core/style" }
+tg-core-unicode = { path = "../../core/unicode" }
+tg-service-canvas = { path = "../canvas" }
+tg-service-text-layout = { path = "../text_layout" }

@@ -1,4 +1,4 @@
-use crate::host_engine::services::{TextColor, TextStyle};
+use tg_core_style::{TextColor, TextStyle};
 
 /// 边框单个位置的字符与样式配置。
 #[derive(Clone, Debug, Default)]
@@ -232,13 +232,13 @@ mod tests {
   fn resolve_uses_position_over_api() {
     let pos = BorderCharacter {
       fg: Some(TextColor::Terminal(
-        crate::host_engine::services::TerminalColor::Red,
+        tg_core_style::TerminalColor::Red,
       )),
       ..Default::default()
     };
     let style = pos.resolve(
       Some(&TextColor::Terminal(
-        crate::host_engine::services::TerminalColor::Blue,
+        tg_core_style::TerminalColor::Blue,
       )),
       None,
       None,
@@ -246,7 +246,7 @@ mod tests {
     assert_eq!(
       style.foreground,
       Some(TextColor::Terminal(
-        crate::host_engine::services::TerminalColor::Red
+        tg_core_style::TerminalColor::Red
       ))
     );
   }
@@ -256,7 +256,7 @@ mod tests {
     let pos = BorderCharacter::default();
     let style = pos.resolve(
       Some(&TextColor::Terminal(
-        crate::host_engine::services::TerminalColor::Green,
+        tg_core_style::TerminalColor::Green,
       )),
       None,
       None,
@@ -264,7 +264,7 @@ mod tests {
     assert_eq!(
       style.foreground,
       Some(TextColor::Terminal(
-        crate::host_engine::services::TerminalColor::Green
+        tg_core_style::TerminalColor::Green
       ))
     );
   }

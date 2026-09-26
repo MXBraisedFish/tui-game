@@ -10,7 +10,7 @@ pub use self::types::{
 };
 use super::surface::SurfaceId;
 pub(crate) use crate::host_engine::services::canvas::ResolvedScrollBoxLayout;
-use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::UiObjectPool;
 use crate::host_engine::services::unicode::char_width;
 use crate::host_engine::services::{
   CanvasService, LayoutService, MouseEvent, MouseEventKind, Rect, ScrollDirection, Size,

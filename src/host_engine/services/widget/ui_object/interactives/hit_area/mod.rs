@@ -4,7 +4,7 @@ mod types;
 pub(crate) use self::state::HitAreaObjects;
 use self::state::{HitAreaState, HitSnapshot, PressState};
 pub use self::types::{HitAreaEvent, HitAreaId, HitAreaOptions};
-use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::UiObjectPool;
 use crate::host_engine::services::{
   CanvasService, MouseButton, MouseEvent, MouseEventKind, Rect, SliceId, TextInputService,
 };

@@ -8,7 +8,7 @@ use super::types::{
   TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
   TextInputRenderParams, TextSurface,
 };
-use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::UiObjectPool;
 use crate::host_engine::services::{CanvasService, SliceId};
 
 const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);

@@ -4,3 +4,6 @@ pub(crate) mod scroll_box;
 pub(crate) mod slice;
 pub(crate) mod surface;
 pub(crate) mod table;
+
+#[cfg(test)]
+mod pipeline_tests;

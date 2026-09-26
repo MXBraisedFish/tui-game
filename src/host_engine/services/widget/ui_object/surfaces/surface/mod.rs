@@ -1,6 +1,6 @@
 use super::scroll_box::resolve_scroll_box_layout;
 use super::slice::resolve_rect;
-use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::UiObjectPool;
 use crate::host_engine::services::canvas::{ScrollBoxFrame, SliceFrame, SurfaceFrame};
 use crate::host_engine::services::{CanvasService, LayoutService, Size};
 

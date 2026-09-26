@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::UiObjectPool;
 use crate::host_engine::services::{LayoutService, Rect, Size, SurfaceId, TextColor};
 
 pub use crate::host_engine::services::canvas::SliceId;

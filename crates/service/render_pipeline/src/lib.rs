@@ -1,3 +1,5 @@
+//! Render pipeline: composes prepared canvas surfaces into a frame and presents it to the terminal.
+
 mod compositor;
 mod presenter;
 

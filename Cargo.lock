@@ -3646,6 +3646,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-render"
+version = "2.0.0"
+dependencies = [
+ "tg-core-style",
+ "tg-core-unicode",
+ "tg-service-canvas",
+ "tg-service-text-layout",
+]
+
+[[package]]
+name = "tg-service-render-pipeline"
+version = "2.0.0"
+dependencies = [
+ "crossterm",
+ "once_cell",
+ "palette",
+ "tg-core-style",
+ "tg-core-unicode",
+ "tg-service-canvas",
+ "tg-service-layout",
+ "tg-service-terminal",
+]
+
+[[package]]
 name = "tg-service-rich-text"
 version = "2.0.0"
 dependencies = [
@@ -4110,6 +4134,8 @@ dependencies = [
  "tg-service-network",
  "tg-service-popup",
  "tg-service-random",
+ "tg-service-render",
+ "tg-service-render-pipeline",
  "tg-service-rich-text",
  "tg-service-storage",
  "tg-service-terminal",

@@ -38,6 +38,8 @@ tg-core-style = { path = "crates/core/style" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-render-pipeline = { path = "crates/service/render_pipeline" }
+tg-service-render = { path = "crates/service/render" }
 tg-service-network = { path = "crates/service/network" }
 tg-service-i18n = { path = "crates/service/i18n" }
 tg-service-layout = { path = "crates/service/layout" }

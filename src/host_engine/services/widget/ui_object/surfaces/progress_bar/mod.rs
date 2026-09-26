@@ -6,7 +6,7 @@ use self::state::ProgressBarState;
 pub use self::types::{
   ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle,
 };
-use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::UiObjectPool;
 use crate::host_engine::services::unicode::char_width;
 use crate::host_engine::services::{CanvasService, Rect, SliceId, TextStyle};
 

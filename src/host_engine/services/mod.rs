@@ -15,14 +15,13 @@ use tg_service_network as network;
 mod package;
 use tg_service_random as random;
 mod recording;
-mod render;
-mod render_pipeline;
+use tg_service_render as render;
+use tg_service_render_pipeline as render_pipeline;
 mod screenshot;
 use tg_service_storage as storage;
 pub use tg_service_text_layout as text_layout;
 use tg_service_time as time;
-mod ui;
-mod unicode;
+use tg_core_unicode as unicode;
 use tg_core_version as version;
 mod video;
 pub(crate) mod widget;
@@ -105,8 +104,7 @@ pub use time::{
   DelayTimerEvent, RepeatTimerEvent, RepeatTimerId, SleepTask, TimeAsyncEvent, TimeService,
   TimerEvent, TimerId, TimerState,
 };
-pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
-pub use unicode::UnicodeService;
+pub use widget::{UiEvent, UiObjectPool, UiObjectPoolOwner};
 pub use version::{
   HOST_API_VERSION, HOST_VERSION, IMAGE_CACHE_FORMAT_VERSION, MEDIA_MANIFEST_VERSION,
 };
@@ -154,7 +152,6 @@ pub struct EngineServices {
   pub slice: SliceService,
   pub input: InputService,
   pub input_method: InputMethodService,
-  pub ui: UiService,
   pub game: GameService,
   pub image: ImageService,
   pub screensaver: ScreensaverService,
@@ -167,7 +164,6 @@ pub struct EngineServices {
   pub log: LogService,
   pub i18n: I18nService,
   pub rich_text: RichTextService,
-  pub unicode: UnicodeService,
   pub canvas: CanvasService,
   pub layout: LayoutService,
   pub compositor: FrameCompositor,
@@ -219,7 +215,6 @@ impl EngineServices {
       popup: PopupService::new(),
       input: InputService::new(),
       input_method: InputMethodService::new(),
-      ui: UiService::new(),
       game: GameService::new(),
       image: ImageService::new(Some(image_cache_dir)),
       screensaver: ScreensaverService::new(),
@@ -230,7 +225,6 @@ impl EngineServices {
       log,
       i18n: I18nService::new(),
       rich_text: RichTextService::new(),
-      unicode: UnicodeService::new(),
       canvas: CanvasService::new(),
       layout: LayoutService::new(),
       compositor: FrameCompositor::new(),

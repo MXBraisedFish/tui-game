@@ -5,7 +5,7 @@ pub(crate) use self::state::HyperlinkObjects;
 use self::state::{HyperlinkHit, HyperlinkState};
 pub use self::types::{HyperlinkEvent, HyperlinkId, HyperlinkOptions};
 use crate::host_engine::services::text_layout::{self, DrawTextParams, TextWrapMode};
-use crate::host_engine::services::ui::UiObjectPool;
+use crate::host_engine::services::UiObjectPool;
 use crate::host_engine::services::{
   CanvasService, MouseButton, MouseEvent, MouseEventKind, Rect, SliceId, TextInputService,
   TextStyle,
