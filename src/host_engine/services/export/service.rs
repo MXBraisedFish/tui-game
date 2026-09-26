@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 use crossbeam_channel::Sender;
 
-use tg_core_atomic_fs::atomic_replace_with;
 use crate::host_engine::services::version::{
   HOST_API_VERSION, HOST_VERSION, PACKAGE_MANIFEST_VERSION,
 };
-use crate::host_engine::services::{EngineEvent, LogService, StorageService, TaskId};
+use crate::host_engine::services::{LogService, StorageService, TaskId};
+use tg_core_atomic_fs::atomic_replace_with;
 
 /// 导出文件格式
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -193,7 +193,7 @@ impl ExportService {
     async_runtime: &crate::host_engine::services::AsyncRuntime,
     task: ExportTask,
   ) -> TaskId {
-    async_runtime.submit(crate::host_engine::services::EngineTask::Export(task))
+    async_runtime.submit(task)
   }
 
   fn export_entries<C, F>(
@@ -340,16 +340,16 @@ impl ExportService {
   }
 }
 
-pub(crate) fn run_export_task(
+pub(crate) fn run_export_task<E: From<ExportAsyncEvent>>(
   task_id: TaskId,
   task: ExportTask,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   cancellation: &crate::host_engine::services::async_runtime::TaskCancellation,
 ) -> Result<(), String> {
   match run_export_task_inner(task_id, task, event_tx, cancellation) {
     Ok(()) => Ok(()),
     Err(error) => {
-      let _ = event_tx.send(EngineEvent::Export(ExportAsyncEvent::Failed {
+      let _ = event_tx.send(E::from(ExportAsyncEvent::Failed {
         task_id,
         error: error.clone(),
       }));
@@ -358,10 +358,10 @@ pub(crate) fn run_export_task(
   }
 }
 
-fn run_export_task_inner(
+fn run_export_task_inner<E: From<ExportAsyncEvent>>(
   task_id: TaskId,
   task: ExportTask,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   cancellation: &crate::host_engine::services::async_runtime::TaskCancellation,
 ) -> Result<(), String> {
   let src_dir = task.scope.dir_path_from_root(&task.root_dir);
@@ -378,10 +378,7 @@ fn run_export_task_inner(
   let entries = collect_entries(base, &src_dir).map_err(|error| error.to_string())?;
   let total = entries.len();
 
-  let _ = event_tx.send(EngineEvent::Export(ExportAsyncEvent::Started {
-    task_id,
-    total,
-  }));
+  let _ = event_tx.send(E::from(ExportAsyncEvent::Started { task_id, total }));
 
   let service = ExportService::new();
   atomic_replace_with(&out_path, true, |temporary| {
@@ -391,7 +388,7 @@ fn run_export_task_inner(
       &entries,
       || cancellation.is_cancelled(),
       |packed| {
-        let _ = event_tx.send(EngineEvent::Export(ExportAsyncEvent::Progress {
+        let _ = event_tx.send(E::from(ExportAsyncEvent::Progress {
           task_id,
           packed,
           total,
@@ -401,7 +398,7 @@ fn run_export_task_inner(
   })
   .map_err(|error| error.to_string())?;
 
-  let _ = event_tx.send(EngineEvent::Export(ExportAsyncEvent::Finished {
+  let _ = event_tx.send(E::from(ExportAsyncEvent::Finished {
     task_id,
     path: out_path,
   }));
@@ -416,5 +413,24 @@ fn ensure_not_cancelled(cancelled: &mut impl FnMut() -> bool) -> io::Result<()> 
     ))
   } else {
     Ok(())
+  }
+}
+
+impl<E: From<ExportAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E> for ExportTask {
+  fn run(
+    self: Box<Self>,
+    id: tg_service_async::TaskId,
+    events: &crossbeam_channel::Sender<E>,
+    cancellation: &tg_service_async::TaskCancellation,
+  ) -> Result<(), String> {
+    run_export_task(id, *self, events, cancellation)
+  }
+
+  fn write_target(&self, _id: tg_service_async::TaskId) -> Option<(PathBuf, PathBuf)> {
+    let target = self
+      .output_dir
+      .join(format!("{}.{}", self.file_stem, self.format.extension()));
+    let temporary = tg_core_atomic_fs::temporary_path(&target);
+    Some((target, temporary))
   }
 }

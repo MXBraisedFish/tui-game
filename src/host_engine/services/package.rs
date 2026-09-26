@@ -8,6 +8,7 @@ use std::sync::{
 };
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
+use tg_service_async::AsyncRuntime;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -16,7 +17,7 @@ use serde::Deserialize;
 pub use crate::host_engine::core::{PackageId, PackageSource, PackageType};
 
 use crate::host_engine::services::{
-  async_runtime::{AsyncRuntime, EngineEvent, EngineTask, ManagedThreadId, TaskId},
+  async_runtime::{ManagedThreadId, TaskId},
   input::canonical_key_token,
   log::{HostLogMessage, LogService, LogSource},
   version::{HOST_API_VERSION, PACKAGE_MANIFEST_VERSION},
@@ -387,16 +388,24 @@ impl PackageService {
   }
 
   /// 请求后台重新扫描。热加载后续只需调用这个入口。
-  pub fn request_rescan(&self, async_runtime: &AsyncRuntime) -> bool {
+  pub fn request_rescan<
+    E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  >(
+    &self,
+    async_runtime: &AsyncRuntime<E>,
+  ) -> bool {
     let Some(request) = self.last_scan.clone() else {
       return false;
     };
-    async_runtime.submit(EngineTask::Package(PackageTask::Scan(request)));
+    async_runtime.submit(PackageTask::Scan(request));
     true
   }
 
   /// 启动 package.json 热更新监听。监听线程只产生事件；快照仍由主线程替换。
-  pub fn start_watcher(&mut self, async_runtime: &mut AsyncRuntime) -> bool {
+  pub fn start_watcher<E>(&mut self, async_runtime: &mut AsyncRuntime<E>) -> bool
+  where
+    E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  {
     if self.watcher_thread.is_some() {
       return false;
     }
@@ -417,9 +426,11 @@ impl PackageService {
   }
 
   /// 请求使用指定语言重新扫描。语言切换后调用。
-  pub fn request_rescan_for_language(
+  pub fn request_rescan_for_language<
+    E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  >(
     &mut self,
-    async_runtime: &AsyncRuntime,
+    async_runtime: &AsyncRuntime<E>,
     language_code: &str,
     missing_template: &str,
   ) -> bool {
@@ -429,7 +440,7 @@ impl PackageService {
     request.language_code = language_code.to_string();
     request.missing_template = missing_template.to_string();
     self.last_scan = Some(request.clone());
-    async_runtime.submit(EngineTask::Package(PackageTask::Scan(request)));
+    async_runtime.submit(PackageTask::Scan(request));
     true
   }
 
@@ -607,10 +618,10 @@ fn find_package(
     .cloned()
 }
 
-pub(crate) fn run_package_task(
+pub(crate) fn run_package_task<E: From<PackageAsyncEvent>>(
   task_id: TaskId,
   task: PackageTask,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
 ) -> Result<(), String> {
   match task {
     PackageTask::Scan(request) => {
@@ -630,7 +641,7 @@ pub(crate) fn run_package_task(
         send_package_event(event_tx, event);
       }
       let finished = scan_finished_event(&report);
-      let _ = event_tx.send(EngineEvent::Package(PackageAsyncEvent::SnapshotReady {
+      let _ = event_tx.send(E::from(PackageAsyncEvent::SnapshotReady {
         snapshot: report.snapshot,
         finished,
         watched_files: report.watched_files,
@@ -641,8 +652,8 @@ pub(crate) fn run_package_task(
   }
 }
 
-fn send_package_event(event_tx: &Sender<EngineEvent>, event: PackageEvent) {
-  let _ = event_tx.send(EngineEvent::Package(PackageAsyncEvent::Event(event)));
+fn send_package_event<E: From<PackageAsyncEvent>>(event_tx: &Sender<E>, event: PackageEvent) {
+  let _ = event_tx.send(E::from(PackageAsyncEvent::Event(event)));
 }
 
 fn scan_finished_event(report: &ScanReport) -> PackageEvent {
@@ -763,10 +774,10 @@ fn infer_field_path(reason: &str) -> String {
   }
 }
 
-fn run_package_watcher(
+fn run_package_watcher<E: From<PackageAsyncEvent> + Send + 'static>(
   request: ScanRequest,
   command_rx: Receiver<PackageWatcherCommand>,
-  event_tx: Sender<EngineEvent>,
+  event_tx: Sender<E>,
   stop: Arc<AtomicBool>,
 ) -> JoinHandle<()> {
   std::thread::spawn(move || {
@@ -880,9 +891,7 @@ fn run_package_watcher(
       if !pending.is_empty() && last_event_at.is_some_and(|time| time.elapsed() >= debounce) {
         let mut package_dirs = pending.drain().collect::<Vec<_>>();
         package_dirs.sort();
-        let _ = event_tx.send(EngineEvent::Package(PackageAsyncEvent::WatchChanged {
-          package_dirs,
-        }));
+        let _ = event_tx.send(E::from(PackageAsyncEvent::WatchChanged { package_dirs }));
         last_event_at = None;
       }
     }
@@ -905,12 +914,12 @@ fn watched_file_package_dirs(roots: &[PathBuf], files: Vec<PathBuf>) -> HashMap<
     .collect()
 }
 
-fn sync_package_watch_dirs<'a>(
+fn sync_package_watch_dirs<'a, E: From<PackageAsyncEvent>>(
   watcher: &mut RecommendedWatcher,
   watched_dirs: &mut HashSet<PathBuf>,
   roots: &[PathBuf],
   files: impl Iterator<Item = &'a PathBuf>,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
 ) {
   let mut next_dirs = roots.iter().cloned().collect::<HashSet<_>>();
   next_dirs.extend(roots.iter().flat_map(first_level_package_dirs));
@@ -944,11 +953,11 @@ fn first_level_package_dirs(root: &PathBuf) -> Vec<PathBuf> {
     .unwrap_or_default()
 }
 
-fn watch_package_dir(
+fn watch_package_dir<E: From<PackageAsyncEvent>>(
   watcher: &mut RecommendedWatcher,
   watched_dirs: &mut HashSet<PathBuf>,
   dir: &Path,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
 ) {
   let dir = dir.to_path_buf();
   if !watched_dirs.insert(dir.clone()) {
@@ -971,13 +980,13 @@ fn watch_package_dir(
   }
 }
 
-fn queue_package_watch_event(
+fn queue_package_watch_event<E: From<PackageAsyncEvent>>(
   watcher: &mut RecommendedWatcher,
   watched_dirs: &mut HashSet<PathBuf>,
   roots: &[PathBuf],
   watched_files: &HashMap<PathBuf, PathBuf>,
   event: Event,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   pending: &mut HashSet<PathBuf>,
 ) {
   if !matches!(
@@ -2425,12 +2434,42 @@ fn resolve_entry(pkg_dir: &Path, entry: &str) -> Result<String, String> {
   Ok(parts.join("/"))
 }
 
+impl<E: From<PackageAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E> for PackageTask {
+  fn run(
+    self: Box<Self>,
+    id: tg_service_async::TaskId,
+    events: &crossbeam_channel::Sender<E>,
+    cancellation: &tg_service_async::TaskCancellation,
+  ) -> Result<(), String> {
+    let _ = cancellation;
+    run_package_task(id, *self, events)
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use std::io;
 
   use super::*;
-  use crate::host_engine::services::async_runtime::{AsyncRuntime, EngineEvent};
+  use tg_service_async::{AsyncRuntime, TaskStatusEvent};
+
+  #[derive(Debug)]
+  enum TestEvent {
+    Package(PackageAsyncEvent),
+    Status,
+  }
+
+  impl From<PackageAsyncEvent> for TestEvent {
+    fn from(event: PackageAsyncEvent) -> Self {
+      Self::Package(event)
+    }
+  }
+
+  impl From<TaskStatusEvent> for TestEvent {
+    fn from(_: TaskStatusEvent) -> Self {
+      Self::Status
+    }
+  }
 
   const MISSING: &str = "[Missing i18n Key: {value:missing_key}]";
 
@@ -2461,7 +2500,7 @@ mod tests {
   }
 
   fn poll_async_package_events(
-    runtime: &AsyncRuntime,
+    runtime: &AsyncRuntime<TestEvent>,
     service: &mut PackageService,
     log: &mut LogService,
   ) -> Vec<PackageEvent> {
@@ -2469,7 +2508,7 @@ mod tests {
       .poll_events()
       .into_iter()
       .filter_map(|event| match event {
-        EngineEvent::Package(event) => Some(service.handle_async_event(event, log)),
+        TestEvent::Package(event) => Some(service.handle_async_event(event, log)),
         _ => None,
       })
       .collect()
@@ -2847,7 +2886,7 @@ mod tests {
 
     std::fs::remove_dir_all(root.join("data/mod/game/first")).unwrap();
     write_game(&root, "data/mod/game", "second", "Second");
-    let runtime = AsyncRuntime::with_worker_count(1);
+    let runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
     assert!(service.request_rescan(&runtime));
 
     for _ in 0..100 {
@@ -2875,7 +2914,7 @@ mod tests {
     let mut service = PackageService::new();
     let mut log = LogService::new();
     scan(&mut service, &root, &mut log, "en_us");
-    let runtime = AsyncRuntime::with_worker_count(1);
+    let runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
     assert!(service.request_rescan(&runtime));
 
     let mut events = Vec::new();

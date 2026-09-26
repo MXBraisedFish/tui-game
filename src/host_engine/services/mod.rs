@@ -33,7 +33,7 @@ pub use animation::{
   AnimationService, AnimationSource, AnimationTarget, AnimationValue, CharacterEffectService,
   TweenDefinition,
 };
-pub use async_runtime::{AsyncRuntime, EngineEvent, EngineTask, TaskId, TaskState};
+pub use async_runtime::{AsyncRuntime, EngineEvent, TaskId, TaskState};
 pub use audio::{
   AudioAsyncEvent, AudioCaptureId, AudioError, AudioErrorCode, AudioId, AudioObjectPool,
   AudioPoolId, AudioService, AudioSource, AudioState, ResolvedAudioFile,

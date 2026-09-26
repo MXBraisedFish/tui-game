@@ -4,17 +4,17 @@ use std::{
   path::{Path, PathBuf},
   time::{Duration, Instant},
 };
+use tg_service_async::AsyncRuntime;
 
 use chrono::{Local, SecondsFormat};
 use crossbeam_channel::Sender;
 use serde::{Deserialize, Serialize};
 
-use tg_core_atomic_fs::atomic_write;
 use crate::host_engine::services::{
-  AsyncRuntime, AudioAsyncEvent, AudioCaptureId, CanvasCell, ComposedCell, ComposedFrame,
-  EngineEvent, EngineTask, MEDIA_MANIFEST_VERSION, StorageService, TaskId, TerminalColor,
-  TextColor,
+  AudioAsyncEvent, AudioCaptureId, CanvasCell, ComposedCell, ComposedFrame, MEDIA_MANIFEST_VERSION,
+  StorageService, TaskId, TerminalColor, TextColor,
 };
+use tg_core_atomic_fs::atomic_write;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RecordingState {
@@ -421,7 +421,12 @@ impl RecordingService {
     true
   }
 
-  pub fn stop(&mut self, async_runtime: &AsyncRuntime) -> bool {
+  pub fn stop<
+    E: From<RecordingAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  >(
+    &mut self,
+    async_runtime: &AsyncRuntime<E>,
+  ) -> bool {
     if !matches!(
       self.state,
       RecordingState::Recording | RecordingState::Paused
@@ -475,10 +480,12 @@ impl RecordingService {
     true
   }
 
-  pub(crate) fn handle_audio_event(
+  pub(crate) fn handle_audio_event<
+    E: From<RecordingAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  >(
     &mut self,
     event: &AudioAsyncEvent,
-    async_runtime: &AsyncRuntime,
+    async_runtime: &AsyncRuntime<E>,
   ) {
     let capture_id = match event {
       AudioAsyncEvent::CaptureSaved { capture_id, .. }
@@ -522,17 +529,19 @@ impl RecordingService {
     self.submit_document(pending.document, pending.path, async_runtime);
   }
 
-  fn submit_document(
+  fn submit_document<
+    E: From<RecordingAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  >(
     &mut self,
     document: RecordingDocument,
     path: PathBuf,
-    async_runtime: &AsyncRuntime,
+    async_runtime: &AsyncRuntime<E>,
   ) {
     self.finalizing_audio_path = document
       .audio
       .as_ref()
       .map(|audio| path.with_file_name(&audio.file));
-    let task_id = async_runtime.submit(EngineTask::Recording(RecordingTask { document, path }));
+    let task_id = async_runtime.submit(RecordingTask { document, path });
     self.finalizing_task = Some(task_id);
   }
 
@@ -1024,10 +1033,10 @@ fn terminal_color_name(color: &TerminalColor) -> &'static str {
   }
 }
 
-pub fn run_recording_task(
+pub fn run_recording_task<E: From<RecordingAsyncEvent>>(
   task_id: TaskId,
   task: RecordingTask,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
 ) -> Result<(), String> {
   let result = (|| {
     let parent = task.path.parent().ok_or("recording path has no parent")?;
@@ -1037,19 +1046,39 @@ pub fn run_recording_task(
   })();
   match result {
     Ok(()) => {
-      let _ = event_tx.send(EngineEvent::Recording(RecordingAsyncEvent::Saved {
+      let _ = event_tx.send(E::from(RecordingAsyncEvent::Saved {
         task_id,
         path: task.path,
       }));
       Ok(())
     }
     Err(error) => {
-      let _ = event_tx.send(EngineEvent::Recording(RecordingAsyncEvent::Failed {
+      let _ = event_tx.send(E::from(RecordingAsyncEvent::Failed {
         task_id,
         error: error.clone(),
       }));
       Err(error)
     }
+  }
+}
+
+impl<E: From<RecordingAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E>
+  for RecordingTask
+{
+  fn run(
+    self: Box<Self>,
+    id: tg_service_async::TaskId,
+    events: &crossbeam_channel::Sender<E>,
+    cancellation: &tg_service_async::TaskCancellation,
+  ) -> Result<(), String> {
+    let _ = cancellation;
+    run_recording_task(id, *self, events)
+  }
+
+  fn write_target(&self, _id: tg_service_async::TaskId) -> Option<(PathBuf, PathBuf)> {
+    let target = self.path().to_path_buf();
+    let temporary = tg_core_atomic_fs::temporary_path(&target);
+    Some((target, temporary))
   }
 }
 

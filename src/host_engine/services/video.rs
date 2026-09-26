@@ -6,6 +6,7 @@ use std::{
   path::{Path, PathBuf},
   process::{Command, Stdio},
 };
+use tg_service_async::AsyncRuntime;
 
 use crossbeam_channel::Sender;
 use mp4::{AvcConfig, MediaConfig, Mp4Config, Mp4Sample, Mp4Writer, TrackConfig, TrackType};
@@ -20,9 +21,9 @@ use openh264::{
 
 use crate::host_engine::services::async_runtime::TaskCancellation;
 use crate::host_engine::services::{
-  AsyncRuntime, EngineEvent, EngineTask, FfmpegInstallation, FfmpegService, RecordingExportQuality,
-  RecordingGpuAcceleration, RecordingPlayback, RecordingProfile, ScreenshotRect, StorageService,
-  TaskId, load_recording_playback, screenshot::TerminalFrameRasterizer,
+  FfmpegInstallation, FfmpegService, RecordingExportQuality, RecordingGpuAcceleration,
+  RecordingPlayback, RecordingProfile, ScreenshotRect, StorageService, TaskId,
+  load_recording_playback, screenshot::TerminalFrameRasterizer,
 };
 
 #[derive(Clone, Debug)]
@@ -150,9 +151,11 @@ impl VideoService {
     }
   }
 
-  pub fn submit_recording_export(
+  pub fn submit_recording_export<
+    E: From<VideoAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  >(
     &mut self,
-    async_runtime: &AsyncRuntime,
+    async_runtime: &AsyncRuntime<E>,
     storage: &StorageService,
     ffmpeg: &FfmpegService,
     source_path: PathBuf,
@@ -173,13 +176,13 @@ impl VideoService {
         &source_path,
         self.output_paths.values(),
       );
-      let task_id = async_runtime.submit(EngineTask::Video(VideoExportTask {
+      let task_id = async_runtime.submit(VideoExportTask {
         source_path: source_path.clone(),
         output_path: output_path.clone(),
         ffmpeg: ffmpeg.installation().cloned(),
         fonts,
         profile,
-      }));
+      });
       self
         .active_exports
         .insert(task_id, VideoExportStatus::Queued);
@@ -289,13 +292,13 @@ impl Default for VideoService {
   }
 }
 
-pub(crate) fn run_video_task(
+pub(crate) fn run_video_task<E: From<VideoAsyncEvent>>(
   task_id: TaskId,
   task: VideoExportTask,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   cancellation: &TaskCancellation,
 ) -> Result<(), String> {
-  let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Preparing { task_id }));
+  let _ = event_tx.send(E::from(VideoAsyncEvent::Preparing { task_id }));
   let temporary_path = temporary_path(&task.output_path, task_id);
   let result = export_recording(task_id, &task, &temporary_path, event_tx, cancellation);
   match result {
@@ -321,7 +324,7 @@ pub(crate) fn run_video_task(
         send_failed(task_id, &task, export_error.clone(), event_tx);
         return Err(export_error.to_string());
       }
-      let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Saved {
+      let _ = event_tx.send(E::from(VideoAsyncEvent::Saved {
         task_id,
         source_path: task.source_path,
         mp4_path: task.output_path,
@@ -336,11 +339,11 @@ pub(crate) fn run_video_task(
   }
 }
 
-fn export_recording(
+fn export_recording<E: From<VideoAsyncEvent>>(
   task_id: TaskId,
   task: &VideoExportTask,
   temporary_path: &Path,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   cancellation: &TaskCancellation,
 ) -> Result<(), VideoExportError> {
   let playback = load_recording_playback(&task.source_path)
@@ -370,7 +373,7 @@ fn export_recording(
       width,
       height,
     ) {
-      let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Encoder {
+      let _ = event_tx.send(E::from(VideoAsyncEvent::Encoder {
         task_id,
         encoder: encoder.to_string(),
       }));
@@ -390,7 +393,7 @@ fn export_recording(
       }
     }
   }
-  let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Encoder {
+  let _ = event_tx.send(E::from(VideoAsyncEvent::Encoder {
     task_id,
     encoder: "openh264".to_string(),
   }));
@@ -405,11 +408,11 @@ fn export_recording(
   )
 }
 
-fn export_recording_openh264(
+fn export_recording_openh264<E: From<VideoAsyncEvent>>(
   task_id: TaskId,
   task: &VideoExportTask,
   temporary_path: &Path,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   playback: &RecordingPlayback,
   rasterizer: &TerminalFrameRasterizer,
   cancellation: &TaskCancellation,
@@ -517,7 +520,7 @@ fn export_recording_openh264(
     let percent = completed_frames.saturating_mul(100) / total_frames;
     if percent != last_progress_percent {
       last_progress_percent = percent;
-      let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Progress {
+      let _ = event_tx.send(E::from(VideoAsyncEvent::Progress {
         task_id,
         completed_frames,
         total_frames,
@@ -525,7 +528,7 @@ fn export_recording_openh264(
     }
   }
 
-  let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Finalizing { task_id }));
+  let _ = event_tx.send(E::from(VideoAsyncEvent::Finalizing { task_id }));
   writer
     .as_mut()
     .expect("at least one frame is always encoded")
@@ -535,11 +538,11 @@ fn export_recording_openh264(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn export_recording_ffmpeg(
+fn export_recording_ffmpeg<E: From<VideoAsyncEvent>>(
   task_id: TaskId,
   task: &VideoExportTask,
   temporary_path: &Path,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   ffmpeg: &Path,
   encoder: &'static str,
   playback: &RecordingPlayback,
@@ -703,7 +706,7 @@ fn export_recording_ffmpeg(
       ),
     ));
   }
-  let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Finalizing { task_id }));
+  let _ = event_tx.send(E::from(VideoAsyncEvent::Finalizing { task_id }));
   Ok(())
 }
 
@@ -835,19 +838,19 @@ fn ffmpeg_bitrate(
     .clamp(250_000, 80_000_000)
 }
 
-fn send_progress(
+fn send_progress<E: From<VideoAsyncEvent>>(
   task_id: TaskId,
   completed_frames: u64,
   total_frames: u64,
   last_progress_percent: &mut u64,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
 ) {
   let percent = completed_frames.saturating_mul(100) / total_frames;
   if percent == *last_progress_percent {
     return;
   }
   *last_progress_percent = percent;
-  let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Progress {
+  let _ = event_tx.send(E::from(VideoAsyncEvent::Progress {
     task_id,
     completed_frames,
     total_frames,
@@ -1058,19 +1061,38 @@ fn cleanup_temporary_file(path: &Path) {
   }
 }
 
-fn send_failed(
+fn send_failed<E: From<VideoAsyncEvent>>(
   task_id: TaskId,
   task: &VideoExportTask,
   error: VideoExportError,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
 ) {
-  let _ = event_tx.send(EngineEvent::Video(VideoAsyncEvent::Failed {
+  let _ = event_tx.send(E::from(VideoAsyncEvent::Failed {
     task_id,
     source_path: task.source_path.clone(),
     output_path: task.output_path.clone(),
     stage: error.stage,
     error: error.message,
   }));
+}
+
+impl<E: From<VideoAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E> for VideoExportTask {
+  fn run(
+    self: Box<Self>,
+    id: tg_service_async::TaskId,
+    events: &crossbeam_channel::Sender<E>,
+    cancellation: &tg_service_async::TaskCancellation,
+  ) -> Result<(), String> {
+    run_video_task(id, *self, events, cancellation)
+  }
+
+  /// Video exports write `<name>.mp4.task-<id>.part` so concurrent exports never share a file.
+  fn write_target(&self, id: tg_service_async::TaskId) -> Option<(PathBuf, PathBuf)> {
+    let temporary = self
+      .output_path
+      .with_extension(format!("mp4.task-{}.part", id.0));
+    Some((self.output_path.clone(), temporary))
+  }
 }
 
 #[cfg(test)]
@@ -1218,7 +1240,7 @@ mod tests {
         ..Default::default()
       },
     };
-    let (event_tx, _event_rx) = crossbeam_channel::unbounded();
+    let (event_tx, _event_rx) = crossbeam_channel::unbounded::<VideoAsyncEvent>();
 
     export_recording(
       TaskId(1),
@@ -1331,7 +1353,7 @@ mod tests {
         ..Default::default()
       },
     };
-    let (event_tx, _event_rx) = crossbeam_channel::unbounded();
+    let (event_tx, _event_rx) = crossbeam_channel::unbounded::<VideoAsyncEvent>();
 
     export_recording(
       TaskId(2),
@@ -1371,7 +1393,7 @@ mod tests {
         ..Default::default()
       },
     };
-    let (event_tx, _event_rx) = crossbeam_channel::unbounded();
+    let (event_tx, _event_rx) = crossbeam_channel::unbounded::<VideoAsyncEvent>();
 
     export_recording(
       TaskId(2),
@@ -1421,17 +1443,17 @@ mod tests {
     };
     let temporary = temporary_path(&output_path, task_id);
     fs::write(&temporary, b"stale").unwrap();
-    let (event_tx, event_rx) = crossbeam_channel::unbounded();
+    let (event_tx, event_rx) = crossbeam_channel::unbounded::<VideoAsyncEvent>();
 
     assert!(run_video_task(task_id, task, &event_tx, &TaskCancellation::new(task_id)).is_err());
     assert!(!temporary.exists());
     assert!(event_rx.try_iter().any(|event| matches!(
       event,
-      EngineEvent::Video(VideoAsyncEvent::Failed {
+      VideoAsyncEvent::Failed {
         task_id: TaskId(42),
         stage: VideoExportStage::Parse,
         ..
-      })
+      }
     )));
     fs::remove_dir_all(directory).unwrap();
   }

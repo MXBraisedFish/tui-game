@@ -1,32 +1,17 @@
-use std::path::PathBuf;
-
-use crossbeam_channel::Sender;
-use tg_core_atomic_fs::temporary_path;
-use tg_service_async::AsyncJob;
-
 use super::{
   audio::AudioAsyncEvent,
-  export::{self, ExportAsyncEvent, ExportTask},
+  export::ExportAsyncEvent,
   file::FileEvent,
   image::ImageEvent,
   input::{KeyEvent, SystemEvent},
   log::LogSource,
   network::NetworkEvent,
-  package::{self, PackageAsyncEvent, PackageTask},
-  recording::{self, RecordingAsyncEvent, RecordingTask},
-  screenshot::{self, ScreenshotAsyncEvent, ScreenshotTask},
+  package::PackageAsyncEvent,
+  recording::RecordingAsyncEvent,
+  screenshot::ScreenshotAsyncEvent,
   time::TimeAsyncEvent,
-  video::{self, VideoAsyncEvent, VideoExportTask},
+  video::VideoAsyncEvent,
 };
-
-#[derive(Clone, Debug)]
-pub enum EngineTask {
-  Package(PackageTask),
-  Export(ExportTask),
-  Screenshot(ScreenshotTask),
-  Recording(RecordingTask),
-  Video(VideoExportTask),
-}
 
 #[derive(Clone, Debug)]
 pub enum EngineEvent {
@@ -61,83 +46,30 @@ impl From<TaskStatusEvent> for EngineEvent {
   }
 }
 
-impl From<FileEvent> for EngineEvent {
-  fn from(event: FileEvent) -> Self {
-    Self::File(event)
-  }
+/// Wraps each service event type into its [`EngineEvent`] variant.
+macro_rules! engine_event_from {
+  ($($event:ty => $variant:ident),* $(,)?) => {
+    $(
+      impl From<$event> for EngineEvent {
+        fn from(event: $event) -> Self {
+          Self::$variant(event)
+        }
+      }
+    )*
+  };
 }
 
-impl From<ImageEvent> for EngineEvent {
-  fn from(event: ImageEvent) -> Self {
-    Self::Image(event)
-  }
-}
-
-impl From<NetworkEvent> for EngineEvent {
-  fn from(event: NetworkEvent) -> Self {
-    Self::Network(event)
-  }
-}
-
-impl From<TimeAsyncEvent> for EngineEvent {
-  fn from(event: TimeAsyncEvent) -> Self {
-    Self::Time(event)
-  }
-}
-
-impl AsyncJob<EngineEvent> for EngineTask {
-  fn run(
-    self: Box<Self>,
-    id: TaskId,
-    events: &Sender<EngineEvent>,
-    cancellation: &TaskCancellation,
-  ) -> Result<(), String> {
-    run_task(id, *self, events, cancellation)
-  }
-
-  fn write_target(&self, id: TaskId) -> Option<(PathBuf, PathBuf)> {
-    let target = write_target(self)?;
-    let temporary = temporary_target(self, &target, id);
-    Some((target, temporary))
-  }
-}
-
-fn write_target(task: &EngineTask) -> Option<PathBuf> {
-  match task {
-    EngineTask::Package(_) => None,
-    EngineTask::Export(task) => Some(task.output_dir.join(format!(
-      "{}.{}",
-      task.file_stem,
-      task.format.extension()
-    ))),
-    EngineTask::Screenshot(task) => Some(task.png_path.clone()),
-    EngineTask::Recording(task) => Some(task.path().to_path_buf()),
-    EngineTask::Video(task) => Some(task.output_path.clone()),
-  }
-}
-
-fn temporary_target(task: &EngineTask, target: &std::path::Path, task_id: TaskId) -> PathBuf {
-  if matches!(task, EngineTask::Video(_)) {
-    return target.with_extension(format!("mp4.task-{}.part", task_id.0));
-  }
-  temporary_path(target)
-}
-
-fn run_task(
-  id: TaskId,
-  task: EngineTask,
-  event_tx: &Sender<EngineEvent>,
-  cancellation: &TaskCancellation,
-) -> Result<(), String> {
-  match task {
-    EngineTask::Package(task) => package::run_package_task(id, task, event_tx),
-    EngineTask::Export(task) => export::run_export_task(id, task, event_tx, cancellation),
-    EngineTask::Screenshot(task) => {
-      screenshot::run_screenshot_task(id, task, event_tx, cancellation)
-    }
-    EngineTask::Recording(task) => recording::run_recording_task(id, task, event_tx),
-    EngineTask::Video(task) => video::run_video_task(id, task, event_tx, cancellation),
-  }
+engine_event_from! {
+  AudioAsyncEvent => Audio,
+  ExportAsyncEvent => Export,
+  FileEvent => File,
+  ImageEvent => Image,
+  NetworkEvent => Network,
+  PackageAsyncEvent => Package,
+  RecordingAsyncEvent => Recording,
+  ScreenshotAsyncEvent => Screenshot,
+  TimeAsyncEvent => Time,
+  VideoAsyncEvent => Video,
 }
 
 #[cfg(test)]
@@ -145,6 +77,7 @@ mod tests {
   use super::*;
   use crate::host_engine::services::file::FileTask;
   use crate::host_engine::services::time::SleepTask;
+  use std::path::PathBuf;
   use std::thread;
   use std::time::Duration;
 

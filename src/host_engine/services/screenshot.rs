@@ -13,12 +13,11 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::host_engine::services::async_runtime::TaskCancellation;
-use tg_core_atomic_fs::{atomic_replace_with, atomic_write};
 use crate::host_engine::services::{
-  CanvasCell, ComposedCell, ComposedFrame, EngineEvent, LogService, LogSource,
-  MEDIA_MANIFEST_VERSION, RecordingPixelScale, StorageService, TaskId, TerminalColor, TextColor,
-  TextStyle,
+  CanvasCell, ComposedCell, ComposedFrame, LogService, LogSource, MEDIA_MANIFEST_VERSION,
+  RecordingPixelScale, StorageService, TaskId, TerminalColor, TextColor, TextStyle,
 };
+use tg_core_atomic_fs::{atomic_replace_with, atomic_write};
 
 // 导出按 1.5 倍基础像素密度直接栅格化，避免先低分辨率绘制再放大造成模糊。
 const CELL_WIDTH: u32 = 18;
@@ -504,10 +503,10 @@ fn color_name(color: &TextColor) -> String {
   }
 }
 
-pub fn run_screenshot_task(
+pub fn run_screenshot_task<E: From<ScreenshotAsyncEvent>>(
   task_id: TaskId,
   task: ScreenshotTask,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   cancellation: &TaskCancellation,
 ) -> Result<(), String> {
   if cancellation.is_cancelled() {
@@ -523,14 +522,14 @@ pub fn run_screenshot_task(
     cancellation,
   ) {
     Ok(()) => {
-      let _ = event_tx.send(EngineEvent::Screenshot(ScreenshotAsyncEvent::Saved {
+      let _ = event_tx.send(E::from(ScreenshotAsyncEvent::Saved {
         task_id,
         png_path: task.png_path,
       }));
       Ok(())
     }
     Err(error) => {
-      let _ = event_tx.send(EngineEvent::Screenshot(ScreenshotAsyncEvent::Failed {
+      let _ = event_tx.send(E::from(ScreenshotAsyncEvent::Failed {
         task_id,
         error: error.clone(),
       }));
@@ -539,13 +538,13 @@ pub fn run_screenshot_task(
   }
 }
 
-fn save_png(
+fn save_png<E: From<ScreenshotAsyncEvent>>(
   task_id: TaskId,
   frame: &ComposedFrame,
   rect: ScreenshotRect,
   path: &PathBuf,
   preferred_fonts: &[String],
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &Sender<E>,
   cancellation: &TaskCancellation,
 ) -> Result<(), String> {
   fs::create_dir_all(path.parent().ok_or("PNG path has no parent directory")?)
@@ -571,13 +570,13 @@ fn save_png(
   .map_err(|error| error.to_string())
 }
 
-fn send_progress(
-  event_tx: &Sender<EngineEvent>,
+fn send_progress<E: From<ScreenshotAsyncEvent>>(
+  event_tx: &Sender<E>,
   task_id: TaskId,
   completed_rows: u16,
   total_rows: u16,
 ) {
-  let _ = event_tx.send(EngineEvent::Screenshot(ScreenshotAsyncEvent::Progress {
+  let _ = event_tx.send(E::from(ScreenshotAsyncEvent::Progress {
     task_id,
     completed_rows,
     total_rows,
@@ -1285,6 +1284,24 @@ fn terminal_rgb(color: &TerminalColor) -> (u8, u8, u8) {
     TerminalColor::BrightMagenta => (255, 85, 255),
     TerminalColor::BrightCyan => (85, 255, 255),
     TerminalColor::BrightWhite => (255, 255, 255),
+  }
+}
+
+impl<E: From<ScreenshotAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E>
+  for ScreenshotTask
+{
+  fn run(
+    self: Box<Self>,
+    id: tg_service_async::TaskId,
+    events: &crossbeam_channel::Sender<E>,
+    cancellation: &tg_service_async::TaskCancellation,
+  ) -> Result<(), String> {
+    run_screenshot_task(id, *self, events, cancellation)
+  }
+
+  fn write_target(&self, _id: tg_service_async::TaskId) -> Option<(PathBuf, PathBuf)> {
+    let temporary = tg_core_atomic_fs::temporary_path(&self.png_path);
+    Some((self.png_path.clone(), temporary))
   }
 }
 

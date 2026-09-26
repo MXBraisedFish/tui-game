@@ -24,7 +24,7 @@ use crate::host_engine::core::{
 };
 use crate::host_engine::services::{
   ActionKeyMap, ActionMapEntry, AutoRecordingMode, BorderStyle, DisplayLogoMode, DisplayOrderMode,
-  DrawTextParams, EngineServices, EngineTask, HostAreaKind, HostLogMessage, ImPolicy,
+  DrawTextParams, EngineServices, HostAreaKind, HostLogMessage, ImPolicy,
   InputActionEvent, KeyBindingsProfile, KeyState, LogLevel, LogPrintOptions, LogSource,
   LuaActionState, LuaEnqueueError, LuaErrorStage, LuaEventBroker, LuaEventData, LuaEventRoute,
   LuaHostCommand, LuaSessionDiagnostics, LuaSessionError, LuaSessionKind, LuaSessionToken,
@@ -3511,7 +3511,7 @@ pub(super) fn submit_screenshot_png(
   );
   let task_id = services
     .async_runtime
-    .submit(EngineTask::Screenshot(ScreenshotTask {
+    .submit(ScreenshotTask {
       frame,
       selection: rect,
       png_path,
@@ -3519,7 +3519,7 @@ pub(super) fn submit_screenshot_png(
         .storage
         .read_screenshot_profile_or_default(&mut services.log)
         .fonts,
-    }));
+    });
   if let Some(source_path) = source_path {
     services
       .screenshot
@@ -3547,12 +3547,12 @@ fn submit_font_preview_png(
   );
   let task_id = services
     .async_runtime
-    .submit(EngineTask::Screenshot(ScreenshotTask {
+    .submit(ScreenshotTask {
       frame,
       selection: rect,
       png_path,
       fonts,
-    }));
+    });
   if let Some(source_path) = source_path {
     services
       .screenshot
