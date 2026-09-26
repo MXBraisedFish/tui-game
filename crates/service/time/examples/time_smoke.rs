@@ -8,7 +8,8 @@ use tg_service_time::{TimeAsyncEvent, TimeObjects, TimeService};
 #[derive(Debug)]
 enum Event {
   Time(TimeAsyncEvent),
-  Status(TaskStatusEvent),
+  /// Executor status; this example only looks at time events.
+  Status,
 }
 
 impl From<TimeAsyncEvent> for Event {
@@ -18,8 +19,8 @@ impl From<TimeAsyncEvent> for Event {
 }
 
 impl From<TaskStatusEvent> for Event {
-  fn from(event: TaskStatusEvent) -> Self {
-    Self::Status(event)
+  fn from(_: TaskStatusEvent) -> Self {
+    Self::Status
   }
 }
 
