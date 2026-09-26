@@ -43,6 +43,7 @@ tg-service-log = { path = "crates/service/log" }
 tg-service-random = { path = "crates/service/random" }
 tg-service-storage = { path = "crates/service/storage" }
 tg-service-text-layout = { path = "crates/service/text_layout" }
+tg-service-time = { path = "crates/service/time" }
 tg-service-rich-text = { path = "crates/service/rich_text" }
 tg-service-code-highlight = { path = "crates/service/code_highlight" }
 tg-service-host-object = { path = "crates/service/host_object" }

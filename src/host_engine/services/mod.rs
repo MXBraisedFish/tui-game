@@ -20,7 +20,7 @@ mod render_pipeline;
 mod screenshot;
 use tg_service_storage as storage;
 pub use tg_service_text_layout as text_layout;
-mod time;
+use tg_service_time as time;
 mod ui;
 mod unicode;
 use tg_core_version as version;

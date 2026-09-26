@@ -1,0 +1,8 @@
+[package]
+name = "tg-service-time"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+tg-service-async = { path = "../async" }

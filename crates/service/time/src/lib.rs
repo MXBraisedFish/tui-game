@@ -1,3 +1,5 @@
+//! Time service: count-up/down, delay and repeat timers plus the async sleep job.
+
 mod objects;
 mod service;
 
