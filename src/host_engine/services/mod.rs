@@ -34,9 +34,7 @@ pub use animation::{
   AnimationService, AnimationSource, AnimationTarget, AnimationValue, CharacterEffectService,
   TweenDefinition,
 };
-pub use async_runtime::{
-  AsyncRuntime, EngineEvent, EngineTask, FileEvent, FileTask, ImageEvent, TaskId, TaskState,
-};
+pub use async_runtime::{AsyncRuntime, EngineEvent, EngineTask, ImageEvent, TaskId, TaskState};
 pub use audio::{
   AudioAsyncEvent, AudioCaptureId, AudioError, AudioErrorCode, AudioId, AudioObjectPool,
   AudioPoolId, AudioService, AudioSource, AudioState, ResolvedAudioFile,
@@ -47,7 +45,7 @@ pub use tg_service_code_highlight::{CodeHighlightService, CodeHighlightTheme};
 pub use event::EngineEventQueue;
 pub use export::{ExportAsyncEvent, ExportService, ExportTask};
 pub use tg_service_ffmpeg::{FfmpegInstallation, FfmpegService};
-pub use file::FileService;
+pub use file::{FileEvent, FileService, FileTask};
 pub use tg_service_host_object::{HostAreaKind, HostObjectPool};
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertParams, ImageService};

@@ -65,7 +65,8 @@ pub fn atomic_replace_with(
   }
 }
 
-fn temporary_path(path: &Path) -> PathBuf {
+/// Temporary file the atomic writers fill before replacing `path` (`name.ext` -> `name.ext.tmp`).
+pub fn temporary_path(path: &Path) -> PathBuf {
   let extension = path
     .extension()
     .and_then(|value| value.to_str())

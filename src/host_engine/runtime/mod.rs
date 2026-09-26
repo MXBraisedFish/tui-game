@@ -2200,7 +2200,7 @@ fn apply_lua_host_commands(
         let Some(token) = token else {
           continue;
         };
-        let task_id = services.async_runtime.submit(EngineTask::File(task));
+        let task_id = services.async_runtime.submit(task);
         if let Err(error) = router.register_task(
           task_id,
           token,
@@ -2234,7 +2234,7 @@ fn apply_lua_host_commands(
         let Some(token) = token else {
           continue;
         };
-        let task_id = services.async_runtime.submit(EngineTask::File(task));
+        let task_id = services.async_runtime.submit(task);
         if let Err(error) = router.register_task(
           task_id,
           token,
