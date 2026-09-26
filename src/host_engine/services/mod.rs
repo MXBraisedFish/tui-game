@@ -6,7 +6,7 @@ mod event;
 pub(crate) mod export;
 use tg_service_file as file;
 use tg_service_i18n as i18n;
-mod image;
+use tg_service_image as image;
 mod input;
 use tg_service_layout as layout;
 use tg_service_log as log;

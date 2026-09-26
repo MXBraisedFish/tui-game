@@ -1,3 +1,6 @@
+//! Image service: converts png/jpg images into half-block rich text (memory + disk cache),
+//! synchronously or as an async job.
+
 use std::collections::HashMap;
 use std::fs;
 use std::hash::{DefaultHasher, Hasher};

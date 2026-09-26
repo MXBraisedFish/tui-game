@@ -3582,6 +3582,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-image"
+version = "2.0.0"
+dependencies = [
+ "crossbeam-channel",
+ "image",
+ "serde",
+ "serde_json",
+ "tg-core-version",
+ "tg-service-async",
+]
+
+[[package]]
 name = "tg-service-input-method"
 version = "2.0.0"
 dependencies = [
@@ -4082,6 +4094,7 @@ dependencies = [
  "tg-service-file",
  "tg-service-host-object",
  "tg-service-i18n",
+ "tg-service-image",
  "tg-service-input-method",
  "tg-service-layout",
  "tg-service-log",
