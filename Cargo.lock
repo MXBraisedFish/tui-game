@@ -3552,6 +3552,19 @@ name = "tg-service-ffmpeg"
 version = "2.0.0"
 
 [[package]]
+name = "tg-service-file"
+version = "2.0.0"
+dependencies = [
+ "chardetng",
+ "crossbeam-channel",
+ "encoding_rs",
+ "serde_json",
+ "tg-core-atomic-fs",
+ "tg-core-sandbox-path",
+ "tg-service-async",
+]
+
+[[package]]
 name = "tg-service-host-object"
 version = "2.0.0"
 dependencies = [
@@ -4019,7 +4032,6 @@ version = "2.0.0"
 dependencies = [
  "anyhow",
  "base64",
- "chardetng",
  "chrono",
  "crossbeam-channel",
  "crossterm",
@@ -4067,6 +4079,7 @@ dependencies = [
  "tg-service-clipboard",
  "tg-service-code-highlight",
  "tg-service-ffmpeg",
+ "tg-service-file",
  "tg-service-host-object",
  "tg-service-i18n",
  "tg-service-input-method",

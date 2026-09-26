@@ -4,7 +4,7 @@ mod audio;
 use tg_service_canvas as canvas;
 mod event;
 pub(crate) mod export;
-mod file;
+use tg_service_file as file;
 use tg_service_i18n as i18n;
 mod image;
 mod input;

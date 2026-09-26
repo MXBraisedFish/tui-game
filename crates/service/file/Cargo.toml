@@ -1,0 +1,13 @@
+[package]
+name = "tg-service-file"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chardetng = "1.0.0"
+crossbeam-channel = "0.5"
+encoding_rs = "0.8.35"
+serde_json = { workspace = true }
+tg-core-atomic-fs = { path = "../../core/atomic_fs" }
+tg-core-sandbox-path = { path = "../../core/sandbox_path" }
+tg-service-async = { path = "../async" }

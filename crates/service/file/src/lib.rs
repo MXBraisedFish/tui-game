@@ -1,10 +1,13 @@
+//! File service: asynchronous file jobs (plain read/write plus the sandboxed Lua file and i18n
+//! operations) that report through the async executor.
+
 mod task;
 
 use std::path::PathBuf;
 
 use tg_service_async::{AsyncRuntime, TaskId, TaskStatusEvent};
 
-pub use task::{FileEvent, FileTask};
+pub use task::{FileEvent, FileListEntry, FileTask};
 
 pub struct FileService;
 
