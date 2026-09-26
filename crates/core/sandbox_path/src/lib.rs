@@ -1,10 +1,13 @@
+//! Sandbox path rules: parse script-supplied relative paths and resolve them inside a root
+//! without escaping it (no `..`, absolute paths, or symbolic-link escapes).
+
 use std::fmt;
 use std::path::{Path, PathBuf};
 
 const MAX_VIRTUAL_PATH_BYTES: usize = 8192;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SandboxPathKind {
+pub enum SandboxPathKind {
   Any,
   File,
   Directory,
@@ -14,13 +17,13 @@ pub(crate) enum SandboxPathKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct SafeRelativePath {
+pub struct SafeRelativePath {
   relative: PathBuf,
   virtual_path: String,
 }
 
 impl SafeRelativePath {
-  pub(crate) fn parse(input: &str) -> Result<Self, SandboxPathError> {
+  pub fn parse(input: &str) -> Result<Self, SandboxPathError> {
     if input.is_empty() {
       return Err(SandboxPathError::Empty);
     }
@@ -63,30 +66,30 @@ impl SafeRelativePath {
     })
   }
 
-  pub(crate) fn virtual_path(&self) -> &str {
+  pub fn virtual_path(&self) -> &str {
     &self.virtual_path
   }
 
-  pub(crate) fn is_root(&self) -> bool {
+  pub fn is_root(&self) -> bool {
     self.relative.as_os_str().is_empty()
   }
 
-  pub(crate) fn extension(&self) -> Option<&str> {
+  pub fn extension(&self) -> Option<&str> {
     self.relative.extension().and_then(|value| value.to_str())
   }
 
-  pub(crate) fn set_extension(&mut self, extension: &str) {
+  pub fn set_extension(&mut self, extension: &str) {
     self.relative.set_extension(extension);
     self.virtual_path = path_to_virtual(&self.relative);
   }
 
-  pub(crate) fn is_normalized(input: &str) -> bool {
+  pub fn is_normalized(input: &str) -> bool {
     Self::parse(input).is_ok_and(|path| path.virtual_path == input)
   }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SandboxPathError {
+pub enum SandboxPathError {
   Empty,
   TooLong,
   ContainsNul,
@@ -120,7 +123,7 @@ impl fmt::Display for SandboxPathError {
   }
 }
 
-pub(crate) fn resolve_sandbox_path(
+pub fn resolve_sandbox_path(
   root: &Path,
   relative: &SafeRelativePath,
   kind: SandboxPathKind,
@@ -194,7 +197,7 @@ fn resolve_removable_candidate(
   Ok(parent.join(name))
 }
 
-pub(crate) fn sandbox_path_exists(
+pub fn sandbox_path_exists(
   root: &Path,
   relative: &SafeRelativePath,
 ) -> Result<bool, SandboxPathError> {

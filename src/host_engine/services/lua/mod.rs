@@ -2,7 +2,7 @@ mod api;
 mod events;
 mod game;
 mod object_pool;
-pub(crate) mod path;
+pub(crate) use tg_core_sandbox_path as path;
 mod policy;
 mod screensaver;
 mod session;

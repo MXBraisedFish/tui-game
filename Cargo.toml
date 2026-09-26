@@ -33,6 +33,7 @@ tg-core-geometry = { path = "crates/core/geometry" }
 tg-core-input = { path = "crates/core/input" }
 tg-core-log = { path = "crates/core/log" }
 tg-core-package-id = { path = "crates/core/package_id" }
+tg-core-sandbox-path = { path = "crates/core/sandbox_path" }
 tg-core-style = { path = "crates/core/style" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }

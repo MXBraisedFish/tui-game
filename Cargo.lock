@@ -3473,6 +3473,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-core-sandbox-path"
+version = "2.0.0"
+
+[[package]]
 name = "tg-core-style"
 version = "2.0.0"
 
@@ -4053,6 +4057,7 @@ dependencies = [
  "tg-core-input",
  "tg-core-log",
  "tg-core-package-id",
+ "tg-core-sandbox-path",
  "tg-core-style",
  "tg-core-unicode",
  "tg-core-version",
