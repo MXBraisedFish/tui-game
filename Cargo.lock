@@ -3709,6 +3709,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-widget"
+version = "2.0.0"
+dependencies = [
+ "pulldown-cmark",
+ "tg-core-audio",
+ "tg-core-input",
+ "tg-core-style",
+ "tg-core-unicode",
+ "tg-service-animation",
+ "tg-service-audio",
+ "tg-service-canvas",
+ "tg-service-clipboard",
+ "tg-service-code-highlight",
+ "tg-service-layout",
+ "tg-service-random",
+ "tg-service-render-pipeline",
+ "tg-service-text-layout",
+ "tg-service-time",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4078,7 +4101,6 @@ dependencies = [
  "encoding_rs",
  "image",
  "mlua",
- "pulldown-cmark",
  "quick-xml",
  "regex",
  "serde_json",
@@ -4119,6 +4141,7 @@ dependencies = [
  "tg-service-text-layout",
  "tg-service-time",
  "tg-service-video",
+ "tg-service-widget",
  "toml",
  "unicode-segmentation",
  "unicode-width",

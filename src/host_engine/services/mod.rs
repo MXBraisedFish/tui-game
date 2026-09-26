@@ -24,7 +24,7 @@ use tg_service_time as time;
 use tg_core_unicode as unicode;
 use tg_core_version as version;
 use tg_service_video as video;
-pub(crate) mod widget;
+pub(crate) use tg_service_widget as widget;
 
 pub use animation::{
   AnimationBinding, AnimationClock, AnimationEasing, AnimationEvent, AnimationEventKind,

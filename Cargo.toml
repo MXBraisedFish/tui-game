@@ -31,6 +31,7 @@ tg-core-sandbox-path = { path = "crates/core/sandbox_path" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-widget = { path = "crates/service/widget" }
 tg-service-input = { path = "crates/service/input" }
 tg-service-audio = { path = "crates/service/audio" }
 tg-service-package = { path = "crates/service/package" }
@@ -74,7 +75,6 @@ quick-xml = "0.41.0"
 chrono = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 base64 = "0.22"
-pulldown-cmark = "0.13.4"
 sysinfo = "0.38.3"
 
 [dev-dependencies]

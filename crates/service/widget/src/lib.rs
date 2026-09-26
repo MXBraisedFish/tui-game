@@ -1,0 +1,35 @@
+//! Widget service: UI objects (slices, scroll boxes, tables, markdown views, progress bars, hit areas, hyperlinks, text inputs) and runtime object pools.
+
+pub(crate) mod runtime_object;
+pub(crate) mod ui_object;
+
+pub use runtime_object::{RuntimeObjectPool, RuntimeObjectPoolOwner};
+pub use ui_object::interactives::hit_area::{
+  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService,
+};
+pub use ui_object::interactives::hyperlink::{
+  HyperlinkEvent, HyperlinkId, HyperlinkOptions, HyperlinkService,
+};
+pub use ui_object::interactives::text_input::{
+  TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
+  TextInputRenderParams, TextInputService, VerticalAlign,
+};
+pub use ui_object::surfaces::markdown_view::{
+  MarkdownEvent, MarkdownRenderParams, MarkdownService, MarkdownTheme, MarkdownViewId,
+  MarkdownViewOptions,
+};
+pub use ui_object::surfaces::progress_bar::{
+  ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle,
+  ProgressBarService,
+};
+pub use ui_object::surfaces::scroll_box::{
+  Overflow, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout,
+  ScrollbarPolicy, ScrollbarSide, ScrollbarStyle, ScrollbarVisibility,
+};
+pub use ui_object::surfaces::slice::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
+pub use ui_object::surfaces::surface::SurfaceId;
+pub use ui_object::surfaces::table::{
+  TableAlign, TableBorderMode, TableBorderStyle, TableCell, TableColumn, TableDrawParams, TableId,
+  TableOptions, TableOverflow, TableRow, TableService, TableStyle,
+};
+pub use ui_object::{UiEvent, UiObjectPool, UiObjectPoolOwner};
