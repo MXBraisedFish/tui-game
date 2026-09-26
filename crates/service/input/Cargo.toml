@@ -1,0 +1,13 @@
+[package]
+name = "tg-service-input"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+crossterm = { workspace = true }
+rdev = "0.5"
+tg-core-input = { path = "../../core/input" }
+tg-core-log = { path = "../../core/log" }
+tg-service-async = { path = "../async" }
+tg-service-log = { path = "../log" }

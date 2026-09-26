@@ -17,8 +17,10 @@ use std::{
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
+mod event_sink;
 mod write_barrier;
 
+pub use event_sink::EventSink;
 pub use write_barrier::{WriteBarrier, WriteBarrierSnapshot};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

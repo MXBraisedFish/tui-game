@@ -1,0 +1,12 @@
+[package]
+name = "tg-service-audio"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+hound = "3.5"
+rodio = { version = "0.22.2", default-features = false, features = ["playback", "flac", "mp3", "mp4", "vorbis", "wav"] }
+tg-core-arena = { path = "../../core/arena" }
+tg-core-audio = { path = "../../core/audio" }
+tg-service-async = { path = "../async" }

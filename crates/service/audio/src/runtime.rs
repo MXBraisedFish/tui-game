@@ -20,7 +20,7 @@ use rodio::{
   source::Zero,
 };
 
-use crate::host_engine::services::EngineEvent;
+use tg_service_async::EventSink;
 
 use super::{
   AudioAsyncEvent, AudioCaptureId, AudioError, AudioErrorCode, AudioId, AudioPlaybackSnapshot,
@@ -273,7 +273,7 @@ pub(crate) struct AudioRuntime {
 }
 
 impl AudioRuntime {
-  pub(crate) fn new(event_tx: Sender<EngineEvent>) -> Self {
+  pub(crate) fn new(event_tx: EventSink<AudioAsyncEvent>) -> Self {
     let (command_tx, command_rx) = unbounded();
     let control_thread = thread::Builder::new()
       .name("audio-runtime".to_string())
@@ -315,7 +315,7 @@ impl Drop for AudioRuntime {
   }
 }
 
-fn run_audio_runtime(command_rx: Receiver<AudioCommand>, event_tx: Sender<EngineEvent>) {
+fn run_audio_runtime(command_rx: Receiver<AudioCommand>, event_tx: EventSink<AudioAsyncEvent>) {
   let (decode_tx, decode_rx) = bounded::<DecodeRequest>(8);
   let (decoded_tx, decoded_rx) = unbounded::<DecodeResult>();
   let (capture_tx, capture_rx) = unbounded::<CaptureWriterMessage>();
@@ -438,7 +438,7 @@ fn run_audio_runtime(command_rx: Receiver<AudioCommand>, event_tx: Sender<Engine
 #[allow(clippy::too_many_arguments)]
 fn handle_command(
   command: AudioCommand,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &EventSink<AudioAsyncEvent>,
   playback_mixer: Option<&Mixer>,
   output_config: Option<(u16, u32)>,
   capture_state: &Arc<CaptureTapState>,
@@ -676,7 +676,7 @@ fn handle_command(
 
 fn handle_decode_result(
   result: DecodeResult,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &EventSink<AudioAsyncEvent>,
   playback_mixer: Option<&Mixer>,
   instances: &mut HashMap<AudioId, RuntimeInstance>,
   cache: &mut HashMap<CacheKey, CacheEntry>,
@@ -743,7 +743,7 @@ fn handle_decode_result(
 }
 
 fn start_instance(
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &EventSink<AudioAsyncEvent>,
   playback_mixer: Option<&Mixer>,
   audio_id: AudioId,
   instance: &mut RuntimeInstance,
@@ -805,7 +805,7 @@ fn start_instance(
 }
 
 fn stop_instance(
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &EventSink<AudioAsyncEvent>,
   instances: &mut HashMap<AudioId, RuntimeInstance>,
   audio_id: AudioId,
   emit_event: bool,
@@ -832,7 +832,7 @@ fn stop_instance(
 }
 
 fn poll_players(
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &EventSink<AudioAsyncEvent>,
   playback_mixer: Option<&Mixer>,
   instances: &mut HashMap<AudioId, RuntimeInstance>,
 ) {
@@ -876,7 +876,7 @@ struct CaptureFile {
   samples_written: u64,
 }
 
-fn run_capture_writer(messages: Receiver<CaptureWriterMessage>, event_tx: Sender<EngineEvent>) {
+fn run_capture_writer(messages: Receiver<CaptureWriterMessage>, event_tx: EventSink<AudioAsyncEvent>) {
   let mut captures = HashMap::<AudioCaptureId, CaptureFile>::new();
   for message in messages {
     match message {
@@ -965,7 +965,7 @@ fn run_capture_writer(messages: Receiver<CaptureWriterMessage>, event_tx: Sender
 fn finish_capture(
   capture_id: AudioCaptureId,
   mut capture: CaptureFile,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &EventSink<AudioAsyncEvent>,
 ) {
   let result = (|| {
     capture
@@ -1008,7 +1008,7 @@ fn fail_capture(
   capture_id: AudioCaptureId,
   capture: CaptureFile,
   error: String,
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &EventSink<AudioAsyncEvent>,
 ) {
   let _ = fs::remove_file(&capture.temporary_path);
   send_event(
@@ -1156,7 +1156,7 @@ fn clear_unreferenced_cache(cache: &mut HashMap<CacheKey, CacheEntry>) {
 }
 
 fn send_object_error(
-  event_tx: &Sender<EngineEvent>,
+  event_tx: &EventSink<AudioAsyncEvent>,
   pool_id: AudioPoolId,
   audio_id: AudioId,
   error: AudioError,
@@ -1171,7 +1171,7 @@ fn send_object_error(
   );
 }
 
-fn report_backend_failure_once(event_tx: &Sender<EngineEvent>, already_reported: &AtomicBool) {
+fn report_backend_failure_once(event_tx: &EventSink<AudioAsyncEvent>, already_reported: &AtomicBool) {
   if already_reported.swap(true, Ordering::AcqRel) {
     return;
   }
@@ -1183,8 +1183,8 @@ fn report_backend_failure_once(event_tx: &Sender<EngineEvent>, already_reported:
   );
 }
 
-fn send_event(event_tx: &Sender<EngineEvent>, event: AudioAsyncEvent) {
-  let _ = event_tx.send(EngineEvent::Audio(event));
+fn send_event(event_tx: &EventSink<AudioAsyncEvent>, event: AudioAsyncEvent) {
+  event_tx.send(event);
 }
 
 #[cfg(test)]
@@ -1268,7 +1268,7 @@ mod tests {
     let path = temporary_path("wav");
     let temporary = capture_temporary_path(&path);
     let (message_tx, message_rx) = unbounded();
-    let (event_tx, event_rx) = unbounded();
+    let (event_tx, event_rx) = unbounded::<AudioAsyncEvent>();
     let capture_id = AudioCaptureId(7);
     message_tx
       .send(CaptureWriterMessage::Begin {
@@ -1290,7 +1290,7 @@ mod tests {
     message_tx.send(CaptureWriterMessage::Shutdown).unwrap();
     drop(message_tx);
 
-    run_capture_writer(message_rx, event_tx);
+    run_capture_writer(message_rx, EventSink::new(event_tx));
 
     assert!(path.is_file());
     assert!(!temporary.exists());
@@ -1300,12 +1300,12 @@ mod tests {
     assert_eq!(reader.len(), 4);
     assert!(matches!(
       event_rx.recv().unwrap(),
-      EngineEvent::Audio(AudioAsyncEvent::CaptureSaved {
+      AudioAsyncEvent::CaptureSaved {
         capture_id: AudioCaptureId(7),
         channels: 2,
         sample_rate: 8_000,
         ..
-      })
+      }
     ));
     fs::remove_file(path).unwrap();
   }
@@ -1343,15 +1343,16 @@ mod tests {
 
   #[test]
   fn backend_stream_errors_are_reported_once_through_engine_events() {
-    let (event_tx, event_rx) = unbounded();
+    let (event_tx, event_rx) = unbounded::<AudioAsyncEvent>();
     let already_reported = AtomicBool::new(false);
 
+    let event_tx = EventSink::new(event_tx);
     report_backend_failure_once(&event_tx, &already_reported);
     report_backend_failure_once(&event_tx, &already_reported);
 
     assert!(matches!(
       event_rx.recv().unwrap(),
-      EngineEvent::Audio(AudioAsyncEvent::BackendFailed { error })
+      AudioAsyncEvent::BackendFailed { error }
         if error.code == AudioErrorCode::BackendUnavailable
     ));
     assert!(event_rx.try_recv().is_err());

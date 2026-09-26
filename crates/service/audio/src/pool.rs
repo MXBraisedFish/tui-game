@@ -40,7 +40,7 @@ pub struct AudioObjectPool {
 }
 
 impl AudioObjectPool {
-  pub(crate) fn new(id: AudioPoolId) -> Self {
+  pub fn new(id: AudioPoolId) -> Self {
     Self {
       id,
       state: Arc::new(RwLock::new(AudioPoolState::new())),

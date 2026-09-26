@@ -1,3 +1,5 @@
+//! Input service: terminal and global key listeners, key state tracking and action-map translation.
+
 mod service;
 
 pub use tg_core_input::{ActionMapEntry, translate_action_map};
@@ -9,4 +11,4 @@ pub use tg_core_input::{canonical_key_token, format_key_display, key_token};
 pub use tg_core_input::{
   InputActionEvent, InputEventType, Key, KeyEvent, KeyEventKind, KeyState, RawKeyEvent,
 };
-pub use service::InputService;
+pub use service::{InputListenerError, InputService};

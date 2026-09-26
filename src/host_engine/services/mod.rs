@@ -1,13 +1,13 @@
 pub(crate) use tg_service_animation as animation;
 mod async_runtime;
-mod audio;
+use tg_service_audio as audio;
 use tg_service_canvas as canvas;
 mod event;
 pub(crate) use tg_service_export as export;
 use tg_service_file as file;
 use tg_service_i18n as i18n;
 use tg_service_image as image;
-mod input;
+use tg_service_input as input;
 use tg_service_layout as layout;
 use tg_service_log as log;
 mod lua;
@@ -182,7 +182,7 @@ impl EngineServices {
       storage.cache_dir_path().join("ffmpeg"),
     );
     let async_runtime = AsyncRuntime::new();
-    let audio = AudioService::new(async_runtime.event_sender());
+    let audio = AudioService::new(tg_service_async::EventSink::new(async_runtime.event_sender()));
 
     Self {
       async_runtime,

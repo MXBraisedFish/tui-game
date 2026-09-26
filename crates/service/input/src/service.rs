@@ -15,8 +15,9 @@ use crossterm::event::{
 };
 use rdev::{Event, EventType, Key as RdevKey, listen};
 
-use crate::host_engine::services::async_runtime::{AsyncRuntime, EngineEvent};
-use crate::host_engine::services::{LogService, LogSource};
+use tg_service_async::AsyncRuntime;
+use tg_core_log::LogSource;
+use tg_service_log::LogService;
 
 use tg_core_input::{
   FocusEvent, InputActionEvent, InputEventType, Key, KeyBinding, KeyEvent, KeyEventKind,
@@ -25,6 +26,10 @@ use tg_core_input::{
 };
 
 /// 输入服务，管理键盘/鼠标/系统事件的采集与动作分发
+/// A listener thread failure, reported to the application as an input log message.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InputListenerError(pub String);
+
 pub struct InputService {
   sender: Sender<KeyEvent>,
   receiver: Receiver<KeyEvent>,
@@ -85,7 +90,10 @@ impl InputService {
   }
 
   /// 启动全局键盘监听线程（仅首次调用生效）
-  pub fn start_key_listener(&self, async_runtime: &mut AsyncRuntime) {
+  pub fn start_key_listener<E>(&self, async_runtime: &mut AsyncRuntime<E>)
+  where
+    E: From<KeyEvent> + From<InputListenerError> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  {
     if self.key_listener_started.swap(true, Ordering::SeqCst) {
       return;
     }
@@ -96,7 +104,7 @@ impl InputService {
         let callback = move |event: Event| {
           if let Some(key_event) = key_event_from_rdev(event) {
             if sender_for_callback
-              .send(EngineEvent::InputKey(key_event))
+              .send(E::from(key_event))
               .is_err()
             {
               // Channel disconnected — likely during shutdown
@@ -104,17 +112,20 @@ impl InputService {
           }
         };
         if let Err(error) = listen(callback) {
-          let _ = sender.send(EngineEvent::Log {
-            source: LogSource::Input,
-            message: format!("Global key listener failed to start: {err:?}", err = error),
-          });
+          let _ = sender.send(E::from(InputListenerError(format!(
+            "Global key listener failed to start: {err:?}",
+            err = error
+          ))));
         }
       })
     });
   }
 
   /// 启动系统事件监听线程（终端按键/鼠标/窗口大小/焦点）
-  pub fn start_system_listener(&self, async_runtime: &mut AsyncRuntime) {
+  pub fn start_system_listener<E>(&self, async_runtime: &mut AsyncRuntime<E>)
+  where
+    E: From<SystemEvent> + From<InputListenerError> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+  {
     if self.system_listener_started.swap(true, Ordering::SeqCst) {
       return;
     }
@@ -126,10 +137,10 @@ impl InputService {
           let has_event = match ct_event::poll(poll_interval) {
             Ok(has) => has,
             Err(error) => {
-              let _ = sender.send(EngineEvent::Log {
-                source: LogSource::Input,
-                message: format!("Event poll error: {err}", err = error),
-              });
+              let _ = sender.send(E::from(InputListenerError(format!(
+                "Event poll error: {err}",
+                err = error
+              ))));
               false
             }
           };
@@ -138,14 +149,14 @@ impl InputService {
               match ct_event {
                 CtEvent::Key(key_event) => {
                   if let Some(event) = terminal_key_event_from_crossterm(key_event) {
-                    if sender.send(EngineEvent::System(event)).is_err() {
+                    if sender.send(E::from(event)).is_err() {
                       // Channel disconnected — likely during shutdown.
                     }
                   }
                 }
                 other_event => {
                   if let Some(sys_event) = system_event_from_crossterm(other_event) {
-                    if sender.send(EngineEvent::System(sys_event)).is_err() {
+                    if sender.send(E::from(sys_event)).is_err() {
                       // Channel disconnected — likely during shutdown.
                     }
                   }
@@ -210,7 +221,7 @@ impl InputService {
   ///
   /// Runtime 用它旁路观察必须同时送往 Lua 的焦点事件；该方法不应用事件状态，
   /// 也不把宿主 UI 的事件所有权转交给 Lua。
-  pub(crate) fn drain_system_event_observations(&mut self, limit: usize) -> Vec<SystemEvent> {
+  pub fn drain_system_event_observations(&mut self, limit: usize) -> Vec<SystemEvent> {
     while self.pending_system_events.len() < limit {
       let Ok(event) = self.system_receiver.try_recv() else {
         break;

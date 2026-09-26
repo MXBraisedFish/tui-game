@@ -1,3 +1,5 @@
+//! Audio service: playback pools, decoding and capture on a dedicated audio runtime thread, reporting through an event sink.
+
 mod pool;
 mod runtime;
 mod types;
@@ -11,7 +13,7 @@ use std::{
 
 use crossbeam_channel::Sender;
 
-use crate::host_engine::services::EngineEvent;
+use tg_service_async::EventSink;
 
 pub use pool::AudioObjectPool;
 pub use tg_core_audio::{
@@ -37,7 +39,7 @@ pub struct AudioService {
 }
 
 impl AudioService {
-  pub fn new(event_tx: Sender<EngineEvent>) -> Self {
+  pub fn new(event_tx: EventSink<AudioAsyncEvent>) -> Self {
     Self {
       runtime: AudioRuntime::new(event_tx),
       pools: HashMap::new(),
@@ -282,7 +284,7 @@ impl AudioService {
     Ok(removed)
   }
 
-  pub(crate) fn remove_owned(&mut self, audio_id: AudioId) -> Result<bool, AudioError> {
+  pub fn remove_owned(&mut self, audio_id: AudioId) -> Result<bool, AudioError> {
     let Some(pool) = self.pools.get(&audio_id.pool_id).and_then(Weak::upgrade) else {
       self.pools.remove(&audio_id.pool_id);
       return Ok(false);
@@ -829,8 +831,8 @@ mod tests {
   use super::*;
 
   fn service() -> AudioService {
-    let (events, _receiver) = unbounded();
-    AudioService::new(events)
+    let (events, _receiver) = unbounded::<AudioAsyncEvent>();
+    AudioService::new(EventSink::new(events))
   }
 
   fn unresolved_source(name: &str) -> AudioSource {

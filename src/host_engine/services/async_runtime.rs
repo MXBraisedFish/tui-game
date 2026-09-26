@@ -3,7 +3,7 @@ use super::{
   export::ExportAsyncEvent,
   file::FileEvent,
   image::ImageEvent,
-  input::{KeyEvent, SystemEvent},
+  input::{InputListenerError, KeyEvent, SystemEvent},
   log::LogSource,
   network::NetworkEvent,
   package::PackageAsyncEvent,
@@ -46,6 +46,21 @@ impl From<TaskStatusEvent> for EngineEvent {
   }
 }
 
+impl From<KeyEvent> for EngineEvent {
+  fn from(event: KeyEvent) -> Self {
+    Self::InputKey(event)
+  }
+}
+
+impl From<InputListenerError> for EngineEvent {
+  fn from(error: InputListenerError) -> Self {
+    Self::Log {
+      source: LogSource::Input,
+      message: error.0,
+    }
+  }
+}
+
 /// Wraps each service event type into its [`EngineEvent`] variant.
 macro_rules! engine_event_from {
   ($($event:ty => $variant:ident),* $(,)?) => {
@@ -68,6 +83,7 @@ engine_event_from! {
   PackageAsyncEvent => Package,
   RecordingAsyncEvent => Recording,
   ScreenshotAsyncEvent => Screenshot,
+  SystemEvent => System,
   TimeAsyncEvent => Time,
   VideoAsyncEvent => Video,
 }
