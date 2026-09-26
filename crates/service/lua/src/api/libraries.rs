@@ -13,11 +13,13 @@ use super::readonly;
 use super::{
   LuaApiContext, LuaCallPhase, LuaDrawCommand, LuaDrawTarget, LuaHostCommand, SharedApiState,
 };
-use crate::host_engine::services::lua::LuaSessionKind;
-use crate::host_engine::services::{
-  BorderCharacter, BorderStyle, CustomBorder, DrawTextParams, FileTask, LuaFileOperation,
-  TextAlign, TextColor, TextMode, TextWrapMode, parse_text_color,
-};
+use crate::LuaSessionKind;
+use tg_core_style::{TextColor, parse_text_color};
+use tg_service_file::FileTask;
+use crate::LuaFileOperation;
+use tg_service_render::{BorderCharacter, BorderStyle, CustomBorder};
+use tg_service_rich_text::TextMode;
+use tg_service_text_layout::{DrawTextParams, TextAlign, TextWrapMode};
 
 mod align;
 mod base;

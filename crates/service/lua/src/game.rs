@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use serde_json::Value as JsonValue;
 
-use crate::host_engine::services::{LogSessionId, PackageId, PackageSource, Size};
+use tg_core_package_id::{PackageId, PackageSource};
+use tg_service_layout::Size;
+use tg_service_log::LogSessionId;
 
 use super::{
   LuaDrawCommand, LuaEventDelivery, LuaExecutionStats, LuaHostCommand, LuaObjectPool, LuaSession,
@@ -247,12 +249,12 @@ mod tests {
   use std::sync::atomic::{AtomicU64, Ordering};
 
   use super::*;
-  use crate::host_engine::services::{PackageSource, PackageType};
+  use tg_core_package_id::{PackageSource, PackageType};
 
   fn test_package_id() -> PackageId {
     PackageId::new(PackageSource::Mod, PackageType::Game, "test.game").unwrap()
   }
-  use crate::host_engine::services::{LuaPolicy, LuaSessionKind, LuaSessionSpec};
+  use crate::{LuaPolicy, LuaSessionKind, LuaSessionSpec};
 
   static TEST_ID: AtomicU64 = AtomicU64::new(1);
 

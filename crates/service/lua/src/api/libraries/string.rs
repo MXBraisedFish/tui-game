@@ -218,7 +218,7 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
       } else {
         &text
       };
-      let output = crate::host_engine::services::RichTextService::new()
+      let output = tg_service_rich_text::RichTextService::new()
         .visible_text(&format!("f%{input}"), params.as_ref());
       ensure_output_size("string.rich_text_to_plain_text", &output)?;
       Ok(output)
@@ -1099,14 +1099,14 @@ fn format_value(value: &Value) -> mlua::Result<String> {
 pub(super) fn rich_text_params(
   value: Value,
   method: &str,
-) -> mlua::Result<Option<crate::host_engine::services::RichTextParams>> {
+) -> mlua::Result<Option<tg_service_rich_text::RichTextParams>> {
   if matches!(value, Value::Nil) {
     return Ok(None);
   }
   let Value::Table(table) = value else {
     return Err(args::invalid(method, "rich_params", "table or nil", &value));
   };
-  let mut output = crate::host_engine::services::RichTextParams::default();
+  let mut output = tg_service_rich_text::RichTextParams::default();
   for pair in table.pairs::<String, Value>() {
     let (key, value) = pair?;
     if key.len() > args::MAX_API_STRING_BYTES {

@@ -18,7 +18,7 @@ pub(super) fn measurement(lua: &Lua, state: SharedApiState) -> mlua::Result<Tabl
         };
         let table = measurement_text_parameters(method, values)?;
         let params = parse_draw_text_params(&table, method, &state.borrow().context, false)?;
-        let (width, height) = crate::host_engine::services::text_layout::measure_draw_text(&params);
+        let (width, height) = tg_service_text_layout::measure_draw_text(&params);
         match result {
           0 => {
             let size = lua.create_table()?;
@@ -235,7 +235,7 @@ pub(super) fn parse_draw_target(
   let pool = objects
     .as_ref()
     .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
-  if crate::host_engine::services::SliceService::new().exists(pool.ui(), id) {
+  if tg_service_widget::SliceService::new().exists(pool.ui(), id) {
     Ok(LuaDrawTarget::Slice(id))
   } else {
     Err(args::message(
@@ -249,7 +249,7 @@ pub(super) fn draw_target_size(
   state: &SharedApiState,
   method: &str,
   target: LuaDrawTarget,
-) -> mlua::Result<crate::host_engine::services::Size> {
+) -> mlua::Result<tg_service_layout::Size> {
   if target == LuaDrawTarget::Base {
     return Ok(state.borrow().context.base_size);
   }
@@ -266,10 +266,10 @@ pub(super) fn draw_target_size(
   let pool = objects
     .as_ref()
     .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
-  let rect = crate::host_engine::services::SliceService::new()
+  let rect = tg_service_widget::SliceService::new()
     .configured_rect(pool.ui(), id)
     .ok_or_else(|| args::message(method, "unknown or inaccessible slice layer"))?;
-  Ok(crate::host_engine::services::Size {
+  Ok(tg_service_layout::Size {
     width: slice::resolve_length(rect.width, base.width),
     height: slice::resolve_length(rect.height, base.height),
   })

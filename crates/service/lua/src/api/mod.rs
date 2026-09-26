@@ -13,10 +13,14 @@ use mlua::{Lua, Table};
 use super::LuaSessionKind;
 use super::object_pool::WeakLuaObjectPool;
 use super::{LuaI18nEvent, LuaI18nEventKind};
-use crate::host_engine::services::{
-  BorderStyle, DrawTextParams, FileTask, LuaFileOperation, RandomGeneratorId, Size, SliceId,
-  TextColor,
-};
+use tg_core_style::TextColor;
+use tg_service_file::FileTask;
+use tg_service_layout::Size;
+use crate::LuaFileOperation;
+use tg_service_random::RandomGeneratorId;
+use tg_service_render::BorderStyle;
+use tg_service_text_layout::DrawTextParams;
+use tg_service_widget::SliceId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaCallPhase {

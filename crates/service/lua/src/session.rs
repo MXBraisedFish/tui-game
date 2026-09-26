@@ -14,7 +14,8 @@ use mlua::{
 };
 use serde_json::{Map as JsonMap, Number as JsonNumber, Value as JsonValue};
 
-use crate::host_engine::services::{HOST_API_VERSION, Size};
+use tg_core_version::HOST_API_VERSION;
+use tg_service_layout::Size;
 
 use super::api::{
   self, LuaApiConfig, LuaApiContext, LuaCallPhase, LuaDrawCommand, LuaHostCommand, SharedApiState,
@@ -93,7 +94,7 @@ pub struct LuaSessionError {
   pub callback: Option<&'static str>,
   pub message: String,
   /// 会话完成注册前发生故障时，已成功产生且允许提交的诊断命令。
-  pub(crate) diagnostic_commands: Vec<LuaHostCommand>,
+  pub diagnostic_commands: Vec<LuaHostCommand>,
 }
 
 impl fmt::Display for LuaSessionError {
@@ -1559,7 +1560,8 @@ mod tests {
   use std::fs;
   use std::sync::atomic::{AtomicU64, Ordering};
 
-  use crate::host_engine::services::{LuaFileOperation, SliceId};
+  use crate::LuaFileOperation;
+  use tg_service_widget::SliceId;
 
   use super::super::LuaEventData;
   use super::*;
@@ -1643,7 +1645,7 @@ mod tests {
     let second_pool_id = second.with_objects(|objects| objects.ui().id()).unwrap();
     assert_ne!(first_pool_id, second_pool_id);
 
-    let time = crate::host_engine::services::TimeService::new();
+    let time = tg_service_time::TimeService::new();
     let timer = first
       .with_objects_mut(|objects| time.create_count_up(&mut objects.runtime_mut().time))
       .unwrap();
@@ -1651,7 +1653,7 @@ mod tests {
       first
         .with_objects(|objects| time.state(&objects.runtime().time, timer))
         .flatten(),
-      Some(crate::host_engine::services::TimerState::Idle)
+      Some(tg_service_time::TimerState::Idle)
     );
     assert_eq!(
       second
@@ -2470,13 +2472,13 @@ mod tests {
       session
         .with_objects(|objects| {
           assert_eq!(
-            crate::host_engine::services::RandomService::new()
+            tg_service_random::RandomService::new()
               .configured_ids(&objects.runtime().random_generators)
               .len(),
             1
           );
           assert_eq!(
-            crate::host_engine::services::SliceService::new()
+            tg_service_widget::SliceService::new()
               .ids(objects.ui())
               .len(),
             1
@@ -2494,13 +2496,13 @@ mod tests {
     second
       .with_objects(|objects| {
         assert_eq!(
-          crate::host_engine::services::RandomService::new()
+          tg_service_random::RandomService::new()
             .configured_ids(&objects.runtime().random_generators)
             .len(),
           1
         );
         assert_eq!(
-          crate::host_engine::services::SliceService::new()
+          tg_service_widget::SliceService::new()
             .ids(objects.ui())
             .len(),
           1
@@ -3843,7 +3845,7 @@ mod tests {
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
-        task: crate::host_engine::services::FileTask::LuaListDir { path, recursive: true, .. },
+        task: tg_service_file::FileTask::LuaListDir { path, recursive: true, .. },
         virtual_path,
         ..
       } if path == &expected_root && virtual_path == "."
@@ -3851,7 +3853,7 @@ mod tests {
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
-        task: crate::host_engine::services::FileTask::LuaReadText { path, .. },
+        task: tg_service_file::FileTask::LuaReadText { path, .. },
         virtual_path,
         ..
       } if path == &expected_root.join("input.txt") && virtual_path == "input.txt"
@@ -3859,7 +3861,7 @@ mod tests {
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
-        task: crate::host_engine::services::FileTask::LuaReadBytes { path },
+        task: tg_service_file::FileTask::LuaReadBytes { path },
         operation: LuaFileOperation::ReadBytes,
         virtual_path,
         event_tip: Some(event_tip),
@@ -3871,7 +3873,7 @@ mod tests {
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
-        task: crate::host_engine::services::FileTask::LuaWriteText { path, .. },
+        task: tg_service_file::FileTask::LuaWriteText { path, .. },
         virtual_path,
         ..
       } if path == &expected_root.join("output.txt") && virtual_path == "output.txt"
@@ -3879,7 +3881,7 @@ mod tests {
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
-        task: crate::host_engine::services::FileTask::LuaWriteBytes { path, bytes },
+        task: tg_service_file::FileTask::LuaWriteBytes { path, bytes },
         operation: LuaFileOperation::WriteBytes,
         virtual_path,
         event_tip: Some(event_tip),
@@ -3892,7 +3894,7 @@ mod tests {
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
-        task: crate::host_engine::services::FileTask::LuaCreateDir { path, .. },
+        task: tg_service_file::FileTask::LuaCreateDir { path, .. },
         operation: LuaFileOperation::CreateDir,
         virtual_path,
         event_tip: Some(event_tip),
@@ -3904,7 +3906,7 @@ mod tests {
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
-        task: crate::host_engine::services::FileTask::LuaRemove { path, recursive: false, .. },
+        task: tg_service_file::FileTask::LuaRemove { path, recursive: false, .. },
         operation: LuaFileOperation::Remove,
         virtual_path,
         event_tip: Some(event_tip),
@@ -3920,7 +3922,7 @@ mod tests {
   #[test]
   fn safe_mode_lab_exercises_debug_logging_and_file_write_permissions() {
     let package_root =
-      PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_package/game/safe_mode_lab");
+      PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..").join("test_package/game/safe_mode_lab");
     let entry_path = package_root.join("scripts/main.lua");
     let make_spec = || LuaSessionSpec {
       package_id: "test.safe_mode_lab".to_string(),
@@ -4635,7 +4637,7 @@ mod tests {
 
   #[test]
   fn test_package_entries_execute_the_basic_lifecycle() {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
     for (directory, session_kind) in [
       ("test_package/game", LuaSessionKind::Game),
       ("test_package/screensaver", LuaSessionKind::Screensaver),

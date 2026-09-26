@@ -5,6 +5,7 @@ use super::{
   image::ImageEvent,
   input::{InputListenerError, KeyEvent, SystemEvent},
   log::LogSource,
+  lua::LuaRoutableEvent,
   network::NetworkEvent,
   package::PackageAsyncEvent,
   recording::RecordingAsyncEvent,
@@ -58,6 +59,20 @@ impl From<InputListenerError> for EngineEvent {
       source: LogSource::Input,
       message: error.0,
     }
+  }
+}
+
+impl EngineEvent {
+  /// Returns the borrowed service event the Lua broker may route, if this is one.
+  pub fn lua_routable(&self) -> Option<LuaRoutableEvent<'_>> {
+    Some(match self {
+      Self::Audio(event) => LuaRoutableEvent::Audio(event),
+      Self::File(event) => LuaRoutableEvent::File(event),
+      Self::Image(event) => LuaRoutableEvent::Image(event),
+      Self::Network(event) => LuaRoutableEvent::Network(event),
+      Self::Time(event) => LuaRoutableEvent::Time(event),
+      _ => return None,
+    })
   }
 }
 

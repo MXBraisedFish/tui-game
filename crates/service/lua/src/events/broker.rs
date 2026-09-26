@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::host_engine::services::{
-  AudioAsyncEvent, AudioErrorCode, AudioId, EngineEvent, FileEvent, ImageEvent, NetworkError,
-  NetworkErrorCode, NetworkEvent, NetworkMethod, NetworkResponseBody, NetworkResponseMode, TaskId,
-  TimeAsyncEvent,
-};
+use tg_core_audio::{AudioAsyncEvent, AudioErrorCode, AudioId};
+use tg_service_async::TaskId;
+use tg_service_file::FileEvent;
+use tg_service_image::ImageEvent;
+use tg_service_network::{NetworkError, NetworkErrorCode, NetworkEvent, NetworkMethod, NetworkResponseBody, NetworkResponseMode};
+use tg_service_time::TimeAsyncEvent;
 
 use super::super::LuaSessionKind;
 use super::super::path::SafeRelativePath;
@@ -14,6 +15,24 @@ use super::{
   LuaImageOutcome, LuaNetworkBody, LuaNetworkEvent, LuaNetworkOutcome, LuaRuntimeEvent,
   LuaTimerEvent, LuaTimerEventKind, LuaTimerKind, sanitize_io_error, sanitize_network_error,
 };
+
+/// A borrowed asynchronous service event that the broker may route to the Lua session owning it.
+///
+/// The application layer builds it from its own event type, so the broker never depends on the
+/// application's aggregate event.
+#[derive(Clone, Copy, Debug)]
+pub enum LuaRoutableEvent<'a> {
+  /// Playback or capture state of an audio object.
+  Audio(&'a AudioAsyncEvent),
+  /// Completion of a file or i18n task.
+  File(&'a FileEvent),
+  /// Completion of an image conversion task.
+  Image(&'a ImageEvent),
+  /// Progress or completion of a network request.
+  Network(&'a NetworkEvent),
+  /// Completion of a sleep task.
+  Time(&'a TimeAsyncEvent),
+}
 
 pub const MAX_LUA_EVENTS_PER_FRAME: usize = 128;
 pub const MAX_LUA_PENDING_EVENTS: usize = 1_024;
@@ -397,12 +416,12 @@ impl LuaEventBroker {
   ///
   /// 包、导出、截图、录屏、视频、日志和通用 TaskFinished/TaskFailed
   /// 不会在这里产生 Lua 事件。
-  pub fn route_engine_event(
+  pub fn route_service_event(
     &mut self,
     frame: u64,
-    event: &EngineEvent,
+    event: LuaRoutableEvent<'_>,
   ) -> Result<Option<u64>, LuaEnqueueError> {
-    if let EngineEvent::Audio(event) = event {
+    if let LuaRoutableEvent::Audio(event) = event {
       if !event.has_valid_identity() {
         return Ok(None);
       }
@@ -620,9 +639,9 @@ fn valid_virtual_path(path: &str) -> bool {
   SafeRelativePath::is_normalized(path)
 }
 
-fn service_event_task_id(event: &EngineEvent) -> Option<TaskId> {
+fn service_event_task_id(event: LuaRoutableEvent<'_>) -> Option<TaskId> {
   match event {
-    EngineEvent::File(event) => Some(match event {
+    LuaRoutableEvent::File(event) => Some(match event {
       FileEvent::ReadTextFinished { task_id, .. }
       | FileEvent::WriteTextFinished { task_id, .. }
       | FileEvent::ReadBytesFinished { task_id, .. }
@@ -635,21 +654,24 @@ fn service_event_task_id(event: &EngineEvent) -> Option<TaskId> {
       | FileEvent::LuaI18nFinished { task_id, .. }
       | FileEvent::Failed { task_id, .. } => *task_id,
     }),
-    EngineEvent::Image(event) => Some(match event {
+    LuaRoutableEvent::Image(event) => Some(match event {
       ImageEvent::ConvertFinished { task_id, .. } | ImageEvent::Failed { task_id, .. } => *task_id,
     }),
-    EngineEvent::Network(event) => match event {
+    LuaRoutableEvent::Network(event) => match event {
       NetworkEvent::Started { .. } => None,
       NetworkEvent::Finished { task_id, .. }
       | NetworkEvent::Failed { task_id, .. }
       | NetworkEvent::Cancelled { task_id, .. } => Some(*task_id),
     },
-    EngineEvent::Time(TimeAsyncEvent::SleepFinished { task_id, .. }) => Some(*task_id),
+    LuaRoutableEvent::Time(TimeAsyncEvent::SleepFinished { task_id, .. }) => Some(*task_id),
     _ => None,
   }
 }
 
-fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Option<LuaEventData> {
+fn translate_task_event(
+  operation: &LuaTaskOperation,
+  event: LuaRoutableEvent<'_>,
+) -> Option<LuaEventData> {
   match (operation, event) {
     (
       LuaTaskOperation::I18n {
@@ -657,7 +679,7 @@ fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Op
         language_code: _,
         callback_language_code: _,
       },
-      EngineEvent::File(FileEvent::LuaI18nFinished {
+      LuaRoutableEvent::File(FileEvent::LuaI18nFinished {
         language_code: actual_language_code,
         callback_language_code: actual_callback_language_code,
         namespaces,
@@ -681,7 +703,7 @@ fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Op
         language_code,
         callback_language_code,
       },
-      EngineEvent::File(FileEvent::Failed { .. }),
+      LuaRoutableEvent::File(FileEvent::Failed { .. }),
     ) => Some(LuaEventData::I18n(LuaI18nEvent {
       kind: *kind,
       ok: false,
@@ -701,7 +723,7 @@ fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Op
         virtual_path,
         event_tip,
       },
-      EngineEvent::File(event),
+      LuaRoutableEvent::File(event),
     ) => {
       let outcome = match (kind, event) {
         (LuaFileOperation::ReadText, FileEvent::ReadTextFinished { text, .. }) => {
@@ -748,14 +770,14 @@ fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Op
     }
     (
       LuaTaskOperation::ImageConvert { request_id },
-      EngineEvent::Image(ImageEvent::ConvertFinished { output, .. }),
+      LuaRoutableEvent::Image(ImageEvent::ConvertFinished { output, .. }),
     ) => Some(LuaEventData::Image(LuaImageEvent {
       request_id: *request_id,
       outcome: LuaImageOutcome::Converted(output.clone()),
     })),
     (
       LuaTaskOperation::ImageConvert { request_id },
-      EngineEvent::Image(ImageEvent::Failed { error, .. }),
+      LuaRoutableEvent::Image(ImageEvent::Failed { error, .. }),
     ) => Some(LuaEventData::Image(LuaImageEvent {
       request_id: *request_id,
       outcome: LuaImageOutcome::Failed(sanitize_io_error(error)),
@@ -767,7 +789,7 @@ fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Op
         original_url,
         response_mode,
       },
-      EngineEvent::Network(NetworkEvent::Finished { response, .. }),
+      LuaRoutableEvent::Network(NetworkEvent::Finished { response, .. }),
     ) => Some(LuaEventData::Network(LuaNetworkEvent {
       request_id: *request_id,
       method: *method,
@@ -803,7 +825,7 @@ fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Op
         original_url,
         ..
       },
-      EngineEvent::Network(NetworkEvent::Failed { error, .. }),
+      LuaRoutableEvent::Network(NetworkEvent::Failed { error, .. }),
     ) => Some(LuaEventData::Network(LuaNetworkEvent {
       request_id: *request_id,
       method: *method,
@@ -817,7 +839,7 @@ fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Op
         original_url,
         ..
       },
-      EngineEvent::Network(NetworkEvent::Cancelled { .. }),
+      LuaRoutableEvent::Network(NetworkEvent::Cancelled { .. }),
     ) => Some(LuaEventData::Network(LuaNetworkEvent {
       request_id: *request_id,
       method: *method,
@@ -827,14 +849,15 @@ fn translate_task_event(operation: &LuaTaskOperation, event: &EngineEvent) -> Op
         "cancel",
       ))),
     })),
-    (LuaTaskOperation::Sleep { id }, EngineEvent::Time(TimeAsyncEvent::SleepFinished { .. })) => {
-      Some(LuaEventData::Timer(LuaTimerEvent {
-        id: *id,
-        timer_kind: LuaTimerKind::Sleep,
-        kind: LuaTimerEventKind::Finished,
-        executed_count: None,
-      }))
-    }
+    (
+      LuaTaskOperation::Sleep { id },
+      LuaRoutableEvent::Time(TimeAsyncEvent::SleepFinished { .. }),
+    ) => Some(LuaEventData::Timer(LuaTimerEvent {
+      id: *id,
+      timer_kind: LuaTimerKind::Sleep,
+      kind: LuaTimerEventKind::Finished,
+      executed_count: None,
+    })),
     _ => None,
   }
 }
@@ -844,9 +867,9 @@ mod tests {
   use std::path::PathBuf;
 
   use super::*;
-  use crate::host_engine::services::{
-    AudioError, AudioPoolId, KeyState, LuaActionState, LuaSessionKind, MouseEvent, MouseEventKind,
-  };
+  use tg_core_audio::{AudioError, AudioPoolId};
+  use tg_core_input::{KeyState, MouseEvent, MouseEventKind};
+  use crate::{LuaActionState, LuaSessionKind};
 
   fn token(kind: LuaSessionKind, generation: u64) -> LuaSessionToken {
     LuaSessionToken { kind, generation }
@@ -1124,9 +1147,9 @@ mod tests {
       )
       .unwrap();
     broker
-      .route_engine_event(
+      .route_service_event(
         7,
-        &EngineEvent::File(FileEvent::ReadTextFinished {
+        LuaRoutableEvent::File(&FileEvent::ReadTextFinished {
           task_id: TaskId(88),
           path: PathBuf::from(r"C:\private\story.txt"),
           text: "hello".to_string(),
@@ -1159,29 +1182,29 @@ mod tests {
         TaskId(89),
         4,
         LuaFileOperation::CreateDir,
-        EngineEvent::File(FileEvent::LuaCreateDirFinished {
+        FileEvent::LuaCreateDirFinished {
           task_id: TaskId(89),
           path: PathBuf::from(r"C:\private\created"),
-        }),
+        },
       ),
       (
         TaskId(90),
         5,
         LuaFileOperation::Remove,
-        EngineEvent::File(FileEvent::LuaRemoveFinished {
+        FileEvent::LuaRemoveFinished {
           task_id: TaskId(90),
           path: PathBuf::from(r"C:\private\removed"),
-        }),
+        },
       ),
       (
         TaskId(91),
         6,
         LuaFileOperation::Remove,
-        EngineEvent::File(FileEvent::Failed {
+        FileEvent::Failed {
           task_id: TaskId(91),
           path: PathBuf::from(r"C:\private\non-empty"),
           error: "directory is not empty".to_string(),
-        }),
+        },
       ),
     ] {
       let route = if request_id == 6 {
@@ -1202,7 +1225,9 @@ mod tests {
           route,
         )
         .unwrap();
-      broker.route_engine_event(8, &event).unwrap();
+      broker
+        .route_service_event(8, LuaRoutableEvent::File(&event))
+        .unwrap();
     }
 
     let events = broker.drain_frame(LuaSessionKind::Game);
@@ -1320,13 +1345,23 @@ mod tests {
         LuaEventRoute::Callback(callback),
       )
       .unwrap();
-    let finished = EngineEvent::Time(TimeAsyncEvent::SleepFinished {
+    let finished = TimeAsyncEvent::SleepFinished {
       task_id: TaskId(41),
       callback: None,
-    });
+    };
 
-    assert!(broker.route_engine_event(3, &finished).unwrap().is_some());
-    assert!(broker.route_engine_event(3, &finished).unwrap().is_none());
+    assert!(
+      broker
+        .route_service_event(3, LuaRoutableEvent::Time(&finished))
+        .unwrap()
+        .is_some()
+    );
+    assert!(
+      broker
+        .route_service_event(3, LuaRoutableEvent::Time(&finished))
+        .unwrap()
+        .is_none()
+    );
     let delivery = broker.drain_frame(LuaSessionKind::Game).pop().unwrap();
     assert_eq!(delivery.route, LuaEventRoute::Callback(callback));
     assert!(matches!(
@@ -1399,10 +1434,10 @@ mod tests {
         LuaEventRoute::Callback(callback),
       )
       .unwrap();
-    let finished = EngineEvent::Network(NetworkEvent::Finished {
+    let finished = NetworkEvent::Finished {
       task_id: TaskId(61),
       method: NetworkMethod::Get,
-      response: crate::host_engine::services::NetworkResponse {
+      response: tg_service_network::NetworkResponse {
         original_url: "https://example.com/8".to_string(),
         final_url: "https://example.com/final".to_string(),
         status: 404,
@@ -1412,10 +1447,20 @@ mod tests {
         )]),
         body: NetworkResponseBody::Text("missing".to_string()),
       },
-    });
+    };
 
-    assert!(broker.route_engine_event(3, &finished).unwrap().is_some());
-    assert!(broker.route_engine_event(3, &finished).unwrap().is_none());
+    assert!(
+      broker
+        .route_service_event(3, LuaRoutableEvent::Network(&finished))
+        .unwrap()
+        .is_some()
+    );
+    assert!(
+      broker
+        .route_service_event(3, LuaRoutableEvent::Network(&finished))
+        .unwrap()
+        .is_none()
+    );
     let delivery = broker.drain_frame(LuaSessionKind::Game).pop().unwrap();
     assert_eq!(delivery.route, LuaEventRoute::Callback(callback));
     assert!(matches!(
@@ -1455,9 +1500,9 @@ mod tests {
       .unwrap();
 
     broker
-      .route_engine_event(
+      .route_service_event(
         4,
-        &EngineEvent::Network(NetworkEvent::Failed {
+        LuaRoutableEvent::Network(&NetworkEvent::Failed {
           task_id: TaskId(71),
           method: NetworkMethod::Get,
           url: "https://example.com/1".to_string(),
@@ -1466,9 +1511,9 @@ mod tests {
       )
       .unwrap();
     broker
-      .route_engine_event(
+      .route_service_event(
         4,
-        &EngineEvent::Network(NetworkEvent::Cancelled {
+        LuaRoutableEvent::Network(&NetworkEvent::Cancelled {
           task_id: TaskId(72),
           method: NetworkMethod::Get,
           url: "https://example.com/2".to_string(),
@@ -1536,7 +1581,7 @@ mod tests {
       },
     ] {
       broker
-        .route_engine_event(10, &EngineEvent::Audio(event))
+        .route_service_event(10, LuaRoutableEvent::Audio(&event))
         .unwrap();
     }
 
@@ -1578,9 +1623,9 @@ mod tests {
       .register_audio(host_id, first, 5, LuaEventRoute::HandleEvent)
       .unwrap();
     broker
-      .route_engine_event(
+      .route_service_event(
         11,
-        &EngineEvent::Audio(AudioAsyncEvent::Failed {
+        LuaRoutableEvent::Audio(&AudioAsyncEvent::Failed {
           pool_id: host_id.pool_id,
           audio_id: host_id,
           error: AudioError::new(
@@ -1610,9 +1655,9 @@ mod tests {
     broker.synchronize_sessions(None, Some(second));
     assert_eq!(broker.take_orphaned_audio(), vec![host_id]);
     assert!(matches!(
-      broker.route_engine_event(
+      broker.route_service_event(
         12,
-        &EngineEvent::Audio(AudioAsyncEvent::Stopped {
+        LuaRoutableEvent::Audio(&AudioAsyncEvent::Stopped {
           pool_id: host_id.pool_id,
           audio_id: host_id,
         }),
@@ -1621,9 +1666,9 @@ mod tests {
     ));
     assert!(
       broker
-        .route_engine_event(
+        .route_service_event(
           12,
-          &EngineEvent::Audio(AudioAsyncEvent::BackendFailed {
+          LuaRoutableEvent::Audio(&AudioAsyncEvent::BackendFailed {
             error: AudioError::sanitized(AudioErrorCode::BackendUnavailable),
           }),
         )
@@ -1654,9 +1699,9 @@ mod tests {
     assert_eq!(broker.pending_len(LuaSessionKind::Game), 0);
     assert_eq!(broker.take_orphaned_tasks(), vec![TaskId(1)]);
     assert!(matches!(
-      broker.route_engine_event(
+      broker.route_service_event(
         2,
-        &EngineEvent::Image(ImageEvent::ConvertFinished {
+        LuaRoutableEvent::Image(&ImageEvent::ConvertFinished {
           task_id: TaskId(1),
           output: "old".to_string(),
         }),
@@ -1683,9 +1728,9 @@ mod tests {
       )
       .unwrap();
     broker
-      .route_engine_event(
+      .route_service_event(
         9,
-        &EngineEvent::File(FileEvent::LuaI18nFinished {
+        LuaRoutableEvent::File(&FileEvent::LuaI18nFinished {
           task_id: TaskId(41),
           language_code: "zh_cn".to_string(),
           callback_language_code: "en_us".to_string(),

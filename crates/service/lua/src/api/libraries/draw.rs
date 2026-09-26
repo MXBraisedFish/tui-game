@@ -189,7 +189,7 @@ fn optional_single_char(table: &Table, method: &str, name: &str) -> mlua::Result
       format!("{name} must contain one display cell"),
     ));
   };
-  if chars.next().is_some() || crate::host_engine::services::unicode::char_width(ch) != 1 {
+  if chars.next().is_some() || tg_core_unicode::char_width(ch) != 1 {
     return Err(args::message(
       method,
       format!("{name} must contain one display-cell character"),
@@ -216,7 +216,7 @@ fn parse_border(value: Value, method: &str) -> mlua::Result<BorderStyle> {
     let Some(ch) = chars.next() else {
       return Ok(BorderCharacter::default());
     };
-    if chars.next().is_some() || crate::host_engine::services::unicode::char_width(ch) != 1 {
+    if chars.next().is_some() || tg_core_unicode::char_width(ch) != 1 {
       return Err(args::message(
         method,
         "border characters must occupy one display cell",

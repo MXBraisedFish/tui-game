@@ -3,14 +3,12 @@ mod translate;
 
 use mlua::{Lua, Table};
 
-use crate::host_engine::services::{
-  MouseButton, MouseEvent, MouseEventKind, NetworkError, NetworkErrorCode, NetworkMethod,
-  ScrollDirection,
-};
+use tg_core_input::{MouseButton, MouseEvent, MouseEventKind, ScrollDirection};
+use tg_service_network::{NetworkError, NetworkErrorCode, NetworkMethod};
 
 pub use broker::{
   LuaEnqueueError, LuaEventBroker, LuaEventCallbackId, LuaEventDelivery, LuaEventRoute,
-  LuaSessionToken, LuaTaskOperation, MAX_LUA_EVENTS_PER_FRAME, MAX_LUA_FILE_TASKS_PER_SESSION,
+  LuaRoutableEvent, LuaSessionToken, LuaTaskOperation, MAX_LUA_EVENTS_PER_FRAME, MAX_LUA_FILE_TASKS_PER_SESSION,
   MAX_LUA_NETWORK_TASKS_PER_SESSION, MAX_LUA_PENDING_EVENTS,
 };
 pub use translate::{
@@ -26,12 +24,12 @@ pub enum LuaActionState {
   Released,
 }
 
-impl From<crate::host_engine::services::KeyState> for LuaActionState {
-  fn from(value: crate::host_engine::services::KeyState) -> Self {
+impl From<tg_core_input::KeyState> for LuaActionState {
+  fn from(value: tg_core_input::KeyState) -> Self {
     match value {
-      crate::host_engine::services::KeyState::Pressed => Self::Pressed,
-      crate::host_engine::services::KeyState::Held => Self::Held,
-      crate::host_engine::services::KeyState::Released => Self::Released,
+      tg_core_input::KeyState::Pressed => Self::Pressed,
+      tg_core_input::KeyState::Held => Self::Held,
+      tg_core_input::KeyState::Released => Self::Released,
     }
   }
 }

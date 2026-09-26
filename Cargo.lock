@@ -3541,6 +3541,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-service-lua"
+version = "2.0.0"
+dependencies = [
+ "base64",
+ "csv",
+ "encoding_rs",
+ "mlua",
+ "quick-xml",
+ "regex",
+ "serde_json",
+ "serde_yaml",
+ "tg-core-audio",
+ "tg-core-input",
+ "tg-core-package-id",
+ "tg-core-sandbox-path",
+ "tg-core-style",
+ "tg-core-unicode",
+ "tg-core-version",
+ "tg-service-animation",
+ "tg-service-async",
+ "tg-service-file",
+ "tg-service-image",
+ "tg-service-layout",
+ "tg-service-log",
+ "tg-service-network",
+ "tg-service-random",
+ "tg-service-render",
+ "tg-service-rich-text",
+ "tg-service-text-layout",
+ "tg-service-time",
+ "tg-service-widget",
+ "toml",
+]
+
+[[package]]
 name = "tg-service-network"
 version = "2.0.0"
 dependencies = [
@@ -4094,21 +4129,13 @@ dependencies = [
 name = "tui-game"
 version = "2.0.0"
 dependencies = [
- "base64",
  "chrono",
  "crossterm",
- "csv",
- "encoding_rs",
  "image",
- "mlua",
- "quick-xml",
- "regex",
  "serde_json",
- "serde_yaml",
  "sysinfo",
  "tg-core-fault",
  "tg-core-package-id",
- "tg-core-sandbox-path",
  "tg-core-unicode",
  "tg-core-version",
  "tg-service-animation",
@@ -4127,6 +4154,7 @@ dependencies = [
  "tg-service-input-method",
  "tg-service-layout",
  "tg-service-log",
+ "tg-service-lua",
  "tg-service-network",
  "tg-service-package",
  "tg-service-popup",
@@ -4142,7 +4170,6 @@ dependencies = [
  "tg-service-time",
  "tg-service-video",
  "tg-service-widget",
- "toml",
  "unicode-segmentation",
  "unicode-width",
 ]

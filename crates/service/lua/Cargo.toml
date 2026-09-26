@@ -1,0 +1,35 @@
+[package]
+name = "tg-service-lua"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+base64 = "0.22"
+csv = "1.3"
+encoding_rs = "0.8.35"
+mlua = { version = "0.12.0", features = ["lua54", "vendored"] }
+quick-xml = "0.41.0"
+regex = "1.13.0"
+serde_json = { version = "1.0.150", features = ["preserve_order"] }
+serde_yaml = "0.9"
+tg-core-audio = { path = "../../core/audio" }
+tg-core-input = { path = "../../core/input" }
+tg-core-package-id = { path = "../../core/package_id" }
+tg-core-sandbox-path = { path = "../../core/sandbox_path" }
+tg-core-style = { path = "../../core/style" }
+tg-core-unicode = { path = "../../core/unicode" }
+tg-core-version = { path = "../../core/version" }
+tg-service-animation = { path = "../animation" }
+tg-service-async = { path = "../async" }
+tg-service-file = { path = "../file" }
+tg-service-image = { path = "../image" }
+tg-service-layout = { path = "../layout" }
+tg-service-log = { path = "../log" }
+tg-service-network = { path = "../network" }
+tg-service-random = { path = "../random" }
+tg-service-render = { path = "../render" }
+tg-service-rich-text = { path = "../rich_text" }
+tg-service-text-layout = { path = "../text_layout" }
+tg-service-time = { path = "../time" }
+tg-service-widget = { path = "../widget" }
+toml = "1.1.2"

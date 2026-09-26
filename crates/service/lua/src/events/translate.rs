@@ -1,7 +1,6 @@
-use crate::host_engine::services::{
-  AnimationEvent, AnimationEventKind, DelayTimerEvent, HitAreaEvent, HyperlinkEvent, MarkdownEvent,
-  RepeatTimerEvent, ScrollBoxEvent, TextInputEvent, TimerEvent,
-};
+use tg_service_animation::{AnimationEvent, AnimationEventKind};
+use tg_service_time::{DelayTimerEvent, RepeatTimerEvent, TimerEvent};
+use tg_service_widget::{HitAreaEvent, HyperlinkEvent, MarkdownEvent, ScrollBoxEvent, TextInputEvent};
 
 use super::{
   LuaAnimationEvent, LuaAnimationEventKind, LuaEventData, LuaHitAreaEvent, LuaHyperlinkEvent,
@@ -146,20 +145,21 @@ pub fn translate_scroll_box_event(lua_id: u64, event: ScrollBoxEvent) -> LuaEven
   }
 }
 
-fn mouse_button(button: crate::host_engine::services::MouseButton) -> &'static str {
+fn mouse_button(button: tg_core_input::MouseButton) -> &'static str {
   match button {
-    crate::host_engine::services::MouseButton::Left => "left",
-    crate::host_engine::services::MouseButton::Middle => "middle",
-    crate::host_engine::services::MouseButton::Right => "right",
+    tg_core_input::MouseButton::Left => "left",
+    tg_core_input::MouseButton::Middle => "middle",
+    tg_core_input::MouseButton::Right => "right",
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::{
-    AnimationId, HitAreaId, MouseButton, RepeatTimerId, ScrollBoxId,
-  };
+  use tg_core_input::MouseButton;
+  use tg_service_animation::AnimationId;
+  use tg_service_time::RepeatTimerId;
+  use tg_service_widget::{HitAreaId, ScrollBoxId};
 
   #[test]
   fn translators_use_lua_local_ids_instead_of_host_ids() {

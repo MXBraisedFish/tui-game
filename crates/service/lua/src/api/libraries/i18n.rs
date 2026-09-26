@@ -1,5 +1,5 @@
 use super::*;
-use crate::host_engine::services::LuaI18nEventKind;
+use crate::LuaI18nEventKind;
 
 pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;

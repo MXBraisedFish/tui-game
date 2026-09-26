@@ -10,7 +10,7 @@ use tg_service_image as image;
 use tg_service_input as input;
 use tg_service_layout as layout;
 use tg_service_log as log;
-mod lua;
+use tg_service_lua as lua;
 use tg_service_network as network;
 use tg_service_package as package;
 use tg_service_random as random;
@@ -61,7 +61,8 @@ pub use log::{
 pub use lua::{
   GameService, LuaActionState, LuaApiConfig, LuaDrawCommand, LuaDrawTarget, LuaEnqueueError,
   LuaErrorStage, LuaEventBroker, LuaEventData, LuaEventRoute, LuaExecutionStats, LuaFileOperation,
-  LuaHostCommand, LuaI18nEventKind, LuaObjectPool, LuaPolicy, LuaService, LuaSessionDiagnostics,
+  LuaHostCommand, LuaI18nEventKind, LuaObjectPool, LuaPolicy, LuaRoutableEvent, LuaService,
+  LuaSessionDiagnostics,
   LuaSessionError, LuaSessionKind, LuaSessionSpec, LuaSessionToken, LuaTaskOperation,
   ScreensaverService,
 };

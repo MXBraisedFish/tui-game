@@ -4,10 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use mlua::{Lua, MultiValue, Table, Value};
 
 use super::*;
-use crate::host_engine::services::{
-  RandomConfiguration, RandomConfiguredRange, RandomGeneratedValue, RandomGeneratorId, RandomSeed,
-  RandomService,
-};
+use tg_service_random::{RandomConfiguration, RandomConfiguredRange, RandomGeneratedValue, RandomGeneratorId, RandomSeed, RandomService};
 
 const MAX_GENERATORS: usize = 4096;
 static AUTO_SEED_SEQUENCE: AtomicU64 = AtomicU64::new(1);
@@ -536,7 +533,7 @@ fn with_direct_generator<R>(
   method: &str,
   operation: impl FnOnce(
     &RandomService,
-    &mut crate::host_engine::services::RuntimeObjectPool,
+    &mut tg_service_widget::RuntimeObjectPool,
     RandomGeneratorId,
   ) -> mlua::Result<R>,
 ) -> mlua::Result<R> {
@@ -555,7 +552,7 @@ fn with_direct_generator<R>(
 fn with_pool<R>(
   state: &SharedApiState,
   method: &str,
-  operation: impl FnOnce(&crate::host_engine::services::LuaObjectPool) -> mlua::Result<R>,
+  operation: impl FnOnce(&crate::LuaObjectPool) -> mlua::Result<R>,
 ) -> mlua::Result<R> {
   let objects = state
     .borrow()
@@ -575,7 +572,7 @@ fn with_pool<R>(
 fn with_pool_mut<R>(
   state: &SharedApiState,
   method: &str,
-  operation: impl FnOnce(&mut crate::host_engine::services::LuaObjectPool) -> mlua::Result<R>,
+  operation: impl FnOnce(&mut crate::LuaObjectPool) -> mlua::Result<R>,
 ) -> mlua::Result<R> {
   let objects = state
     .borrow()

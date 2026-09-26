@@ -1,5 +1,5 @@
 use super::*;
-use crate::host_engine::services::lua::path::{
+use crate::path::{
   SafeRelativePath, SandboxPathKind, resolve_sandbox_path,
 };
 

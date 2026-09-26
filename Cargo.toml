@@ -27,10 +27,10 @@ path = "src/main.rs"
 [dependencies]
 tg-core-fault = { path = "crates/core/fault" }
 tg-core-package-id = { path = "crates/core/package_id" }
-tg-core-sandbox-path = { path = "crates/core/sandbox_path" }
 tg-core-unicode = { path = "crates/core/unicode" }
 tg-core-version = { path = "crates/core/version" }
 tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-lua = { path = "crates/service/lua" }
 tg-service-widget = { path = "crates/service/widget" }
 tg-service-input = { path = "crates/service/input" }
 tg-service-audio = { path = "crates/service/audio" }
@@ -62,19 +62,11 @@ tg-service-clipboard = { path = "crates/service/clipboard" }
 tg-service-file = { path = "crates/service/file" }
 tg-service-image = { path = "crates/service/image" }
 crossterm = { workspace = true }
-mlua = { version = "0.12.0", features = ["lua54", "vendored"] }
-regex = "1.13.0"
-encoding_rs = "0.8.35"
 unicode-width = { workspace = true }
 unicode-segmentation = { workspace = true }
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
-serde_yaml = "0.9"
-toml = "1.1.2"
-csv = "1.3"
-quick-xml = "0.41.0"
 chrono = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
-base64 = "0.22"
 sysinfo = "0.38.3"
 
 [dev-dependencies]

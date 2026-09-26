@@ -1,10 +1,10 @@
 use mlua::{Lua, MultiValue, Table, Value};
 
 use super::*;
-use crate::host_engine::services::{
-  LuaObjectPool, Size, SliceId, SliceLength, SliceOptions, SliceRect, SliceService, TerminalColor,
-  TextColor,
-};
+use tg_core_style::{TerminalColor, TextColor};
+use tg_service_layout::Size;
+use crate::LuaObjectPool;
+use tg_service_widget::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
 
 const MAX_SLICES: usize = 1024;
 

@@ -1,3 +1,5 @@
+//! Lua service: sandboxed Lua sessions for games and screensavers, the host API libraries, and the event broker that routes service events to scripts.
+
 mod api;
 mod events;
 mod game;
@@ -11,6 +13,7 @@ pub use api::{LuaApiConfig, LuaApiContext, LuaDrawCommand, LuaDrawTarget, LuaHos
 pub use events::{
   LuaActionState, LuaAnimationEvent, LuaAnimationEventKind, LuaAudioEvent, LuaAudioEventKind,
   LuaEnqueueError, LuaEventBroker, LuaEventCallbackId, LuaEventData, LuaEventDelivery,
+  LuaRoutableEvent,
   LuaEventError, LuaEventErrorCode, LuaEventRoute, LuaFileEntry, LuaFileEvent, LuaFileOperation,
   LuaFileOutcome, LuaHitAreaEvent, LuaHyperlinkEvent, LuaI18nEvent, LuaI18nEventKind,
   LuaImageEvent, LuaImageOutcome, LuaMarkdownEvent, LuaNetworkBody, LuaNetworkEvent,

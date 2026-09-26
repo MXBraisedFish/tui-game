@@ -1,9 +1,7 @@
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-use crate::host_engine::services::{
-  RuntimeObjectPool, RuntimeObjectPoolOwner, SliceService, UiObjectPool, UiObjectPoolOwner,
-};
+use tg_service_widget::{RuntimeObjectPool, RuntimeObjectPoolOwner, SliceService, UiObjectPool, UiObjectPoolOwner};
 
 pub(crate) type SharedLuaObjectPool = Rc<RefCell<Option<LuaObjectPool>>>;
 pub(crate) type WeakLuaObjectPool = Weak<RefCell<Option<LuaObjectPool>>>;
@@ -46,7 +44,7 @@ impl LuaObjectPool {
   }
 
   /// 开始新的宿主帧，清除仅对上一帧有效的 Lua UI 提交状态。
-  pub(crate) fn begin_frame(&mut self) {
+  pub fn begin_frame(&mut self) {
     SliceService::new().begin_frame(&mut self.ui);
   }
 }
