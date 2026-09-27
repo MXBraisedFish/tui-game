@@ -1,0 +1,9 @@
+[package]
+name = "tg-service-text-layout"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tg-core-unicode = { path = "../../core/unicode" }
+tg-service-rich-text = { path = "../rich_text" }
+unicode-linebreak = "0.1.5"

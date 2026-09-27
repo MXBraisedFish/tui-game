@@ -1,0 +1,16 @@
+[package]
+name = "tg-service-render-pipeline"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossterm = { workspace = true }
+once_cell = "1.19"
+palette = "0.7"
+tg-core-style = { path = "../../core/style" }
+tg-core-unicode = { path = "../../core/unicode" }
+tg-service-canvas = { path = "../canvas" }
+tg-service-terminal = { path = "../terminal" }
+
+[dev-dependencies]
+tg-service-layout = { path = "../layout" }

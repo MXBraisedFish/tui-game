@@ -1,0 +1,8 @@
+[package]
+name = "tg-core-unicode"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+unicode-segmentation = { workspace = true }
+unicode-width = { workspace = true }

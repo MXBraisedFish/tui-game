@@ -1,0 +1,6 @@
+[package]
+name = "tg-core-sandbox-path"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

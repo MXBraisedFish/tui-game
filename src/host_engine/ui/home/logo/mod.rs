@@ -111,25 +111,25 @@ impl<'a> LogoRandom<'a> {
   pub fn usize_inclusive(&mut self, min: usize, max: usize) -> usize {
     self
       .service
-      .int_range(self.pool, self.id, min as i64, max as i64 + 1)
+      .int_range(&mut self.pool.random_generators, self.id, min as i64, max as i64 + 1)
       .unwrap_or(min as i64) as usize
   }
 
   pub fn i32_inclusive(&mut self, min: i32, max: i32) -> i32 {
     self
       .service
-      .int_range(self.pool, self.id, min as i64, max as i64 + 1)
+      .int_range(&mut self.pool.random_generators, self.id, min as i64, max as i64 + 1)
       .unwrap_or(min as i64) as i32
   }
 
   pub fn f64(&mut self) -> f64 {
-    self.service.float_01(self.pool, self.id).unwrap_or(0.0)
+    self.service.float_01(&mut self.pool.random_generators, self.id).unwrap_or(0.0)
   }
 
   pub fn chance(&mut self, probability: f64) -> bool {
     self
       .service
-      .bool(self.pool, self.id, probability)
+      .bool(&mut self.pool.random_generators, self.id, probability)
       .unwrap_or(false)
   }
 
@@ -170,7 +170,7 @@ impl HomeLogo {
     pool: &mut RuntimeObjectPool,
   ) -> Self {
     let mut random_id = (configured_mode == DisplayLogoMode::Random)
-      .then(|| random.create(pool, RandomSeed::U64(seed)));
+      .then(|| random.create(&mut pool.random_generators, RandomSeed::U64(seed)));
     let mode = if configured_mode == DisplayLogoMode::Random {
       let mut rng = LogoRandom::new(random, pool, random_id.unwrap());
       DYNAMIC_MODES[rng.usize_inclusive(0, DYNAMIC_MODES.len() - 1)]
@@ -186,7 +186,7 @@ impl HomeLogo {
         | DisplayLogoMode::Char
     );
     if needs_random && random_id.is_none() {
-      random_id = Some(random.create(pool, RandomSeed::U64(seed)));
+      random_id = Some(random.create(&mut pool.random_generators, RandomSeed::U64(seed)));
     }
 
     let dynamic =
@@ -212,7 +212,7 @@ impl HomeLogo {
 
     if !needs_random {
       if let Some(id) = random_id.take() {
-        random.remove(pool, id);
+        random.remove(&mut pool.random_generators, id);
       }
     }
 
@@ -270,9 +270,9 @@ impl HomeLogo {
     let Some(handle) = self.animation else {
       return;
     };
-    animation.update(pool, AnimationClock::Ui, dt);
-    let time = animation.completed_cycles(pool, handle).unwrap_or(0) as f64
-      + animation.progress(pool, handle).unwrap_or(0.0);
+    animation.update(&mut pool.animation, AnimationClock::Ui, dt);
+    let time = animation.completed_cycles(&pool.animation, handle).unwrap_or(0) as f64
+      + animation.progress(&pool.animation, handle).unwrap_or(0.0);
     let mut rng = self.random.map(|id| LogoRandom::new(random, pool, id));
     match &mut self.dynamic {
       Some(DynamicLogo::Neon(logo)) => logo.advance(time),
@@ -290,10 +290,10 @@ fn create_clock(
   animation: &AnimationService,
   pool: &mut RuntimeObjectPool,
 ) -> Option<AnimationHandle> {
-  let value = animation.create_value(pool, AnimationValue::Float(0.0));
+  let value = animation.create_value(&mut pool.animation, AnimationValue::Float(0.0));
   animation
     .play(
-      pool,
+      &mut pool.animation,
       AnimationOwner::Host,
       AnimationSource::Tween(Arc::new(TweenDefinition {
         from: AnimationValue::Float(0.0),
@@ -407,8 +407,8 @@ mod tests {
       &mut classic_pool,
     );
     assert_eq!(classic.mode(), DisplayLogoMode::Classic);
-    assert!(classic_pool.animations.ids().is_empty());
-    assert!(classic_pool.random_generators.generators.is_empty());
+    assert!(classic_pool.animation.animation_count() == 0);
+    assert!(classic_pool.random_generators.is_empty());
 
     let mut neon_pool = RuntimeObjectPool::new();
     let neon = HomeLogo::new(
@@ -419,8 +419,8 @@ mod tests {
       &mut neon_pool,
     );
     assert_eq!(neon.mode(), DisplayLogoMode::Neon);
-    assert_eq!(neon_pool.animations.ids().len(), 1);
-    assert!(neon_pool.random_generators.generators.is_empty());
+    assert_eq!(neon_pool.animation.animation_count(), 1);
+    assert!(neon_pool.random_generators.is_empty());
 
     let mut error_pool = RuntimeObjectPool::new();
     let error = HomeLogo::new(
@@ -431,7 +431,7 @@ mod tests {
       &mut error_pool,
     );
     assert_eq!(error.mode(), DisplayLogoMode::Error);
-    assert_eq!(error_pool.animations.ids().len(), 1);
-    assert_eq!(error_pool.random_generators.generators.len(), 1);
+    assert_eq!(error_pool.animation.animation_count(), 1);
+    assert_eq!(error_pool.random_generators.len(), 1);
   }
 }

@@ -1,0 +1,1419 @@
+//! Screenshot service: rasterizes composed terminal frames to PNG/JSON and saves them as async jobs.
+
+use std::{
+  collections::HashMap,
+  env, fs,
+  path::{Path, PathBuf},
+};
+
+use chrono::Local;
+use crossbeam_channel::Sender;
+use image::{ImageBuffer, Rgba, RgbaImage};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+use tg_service_async::TaskCancellation;
+use tg_core_log::LogSource;
+use tg_core_style::{CanvasCell, ComposedCell, ComposedFrame, TerminalColor, TextColor, TextStyle};
+use tg_core_version::MEDIA_MANIFEST_VERSION;
+use tg_service_async::TaskId;
+use tg_service_log::LogService;
+use tg_service_storage::{RecordingPixelScale, StorageService};
+use tg_core_atomic_fs::{atomic_replace_with, atomic_write};
+
+// 导出按 1.5 倍基础像素密度直接栅格化，避免先低分辨率绘制再放大造成模糊。
+const CELL_WIDTH: u32 = 18;
+const CELL_HEIGHT: u32 = 36;
+const FONT_SIZE: f32 = 27.0;
+
+#[derive(Clone, Copy)]
+struct RasterMetrics {
+  cell_width: u32,
+  cell_height: u32,
+  font_size: f32,
+}
+
+impl RasterMetrics {
+  fn for_scale(scale: RecordingPixelScale) -> Self {
+    let (numerator, denominator) = scale.multiplier();
+    Self {
+      cell_width: (CELL_WIDTH * numerator / denominator).max(1),
+      cell_height: (CELL_HEIGHT * numerator / denominator).max(1),
+      font_size: FONT_SIZE * numerator as f32 / denominator as f32,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ScreenshotRect {
+  pub x: u16,
+  pub y: u16,
+  pub width: u16,
+  pub height: u16,
+}
+
+#[derive(Clone, Debug)]
+pub struct ScreenshotTask {
+  pub frame: ComposedFrame,
+  pub selection: ScreenshotRect,
+  pub png_path: PathBuf,
+  pub fonts: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ScreenshotAsyncEvent {
+  Progress {
+    task_id: TaskId,
+    completed_rows: u16,
+    total_rows: u16,
+  },
+  Saved {
+    task_id: TaskId,
+    png_path: PathBuf,
+  },
+  Failed {
+    task_id: TaskId,
+    error: String,
+  },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ScreenshotOperationFeedback {
+  pub copy_succeeded: Option<bool>,
+  pub save_task: Option<TaskId>,
+}
+
+pub struct ScreenshotService {
+  last_presented_frame: Option<ComposedFrame>,
+  pending_font_preview: Option<Vec<String>>,
+  pending_operation_feedback: Option<ScreenshotOperationFeedback>,
+  active_export_sources: HashMap<TaskId, Vec<PathBuf>>,
+}
+
+impl ScreenshotService {
+  pub fn new() -> Self {
+    Self {
+      last_presented_frame: None,
+      pending_font_preview: None,
+      pending_operation_feedback: None,
+      active_export_sources: HashMap::new(),
+    }
+  }
+
+  pub fn request_font_preview(&mut self, fonts: Vec<String>) {
+    self.pending_font_preview = Some(fonts);
+  }
+
+  pub fn take_font_preview_request(&mut self) -> Option<Vec<String>> {
+    self.pending_font_preview.take()
+  }
+
+  pub fn report_operation(
+    &mut self,
+    copy_succeeded: Option<bool>,
+    save_task: Option<TaskId>,
+  ) {
+    self.pending_operation_feedback = Some(ScreenshotOperationFeedback {
+      copy_succeeded,
+      save_task,
+    });
+  }
+
+  pub fn take_operation_feedback(&mut self) -> Option<ScreenshotOperationFeedback> {
+    self.pending_operation_feedback.take()
+  }
+
+  pub fn register_source_export(&mut self, task_id: TaskId, source_path: PathBuf) {
+    let sources = self.active_export_sources.entry(task_id).or_default();
+    if !sources.contains(&source_path) {
+      sources.push(source_path);
+    }
+  }
+
+  pub fn handle_engine_event(&mut self, event: &ScreenshotAsyncEvent) {
+    match event {
+      ScreenshotAsyncEvent::Saved { task_id, .. }
+      | ScreenshotAsyncEvent::Failed { task_id, .. } => {
+        self.active_export_sources.remove(task_id);
+      }
+      ScreenshotAsyncEvent::Progress { .. } => {}
+    }
+  }
+
+  pub fn is_source_exporting(&self, path: &Path) -> bool {
+    self
+      .active_export_sources
+      .values()
+      .flatten()
+      .any(|source| source == path)
+  }
+
+  pub fn font_preview_frame() -> ComposedFrame {
+    let lines = font_preview_lines();
+    let width = lines
+      .iter()
+      .map(|line| preview_line_width(line))
+      .max()
+      .unwrap_or(1)
+      .saturating_add(4)
+      .min(u16::MAX as usize) as u16;
+    let height = lines.len().saturating_add(4).min(u16::MAX as usize) as u16;
+    let mut frame = ComposedFrame::new(width, height);
+    for (index, line) in lines.iter().enumerate() {
+      write_preview_line(&mut frame, 2, index as u16 + 2, line);
+    }
+    frame
+  }
+
+  pub fn remember_presented_frame(&mut self, frame: ComposedFrame) {
+    self.last_presented_frame = Some(frame);
+  }
+
+  pub fn capture_last_frame(&self) -> Option<ComposedFrame> {
+    self.last_presented_frame.clone()
+  }
+
+  pub fn whole_frame_rect(frame: &ComposedFrame) -> Option<ScreenshotRect> {
+    (frame.width() > 0 && frame.height() > 0).then_some(ScreenshotRect {
+      x: 0,
+      y: 0,
+      width: frame.width(),
+      height: frame.height(),
+    })
+  }
+
+  pub fn normalize_selection(
+    frame: &ComposedFrame,
+    rect: ScreenshotRect,
+  ) -> Option<ScreenshotRect> {
+    if rect.width == 0 || rect.height == 0 || frame.width() == 0 || frame.height() == 0 {
+      return None;
+    }
+    let mut left = rect.x.min(frame.width().saturating_sub(1));
+    let mut top = rect.y.min(frame.height().saturating_sub(1));
+    let mut right = rect
+      .x
+      .saturating_add(rect.width.saturating_sub(1))
+      .min(frame.width().saturating_sub(1));
+    let mut bottom = rect
+      .y
+      .saturating_add(rect.height.saturating_sub(1))
+      .min(frame.height().saturating_sub(1));
+
+    if left > right {
+      std::mem::swap(&mut left, &mut right);
+    }
+    if top > bottom {
+      std::mem::swap(&mut top, &mut bottom);
+    }
+
+    for y in top..=bottom {
+      if is_continuation(frame, left, y) {
+        while left > 0 && is_continuation(frame, left, y) {
+          left -= 1;
+        }
+      }
+      let mut x = left;
+      while x <= right {
+        if let Some(ComposedCell::Text(cell)) = frame.get(x, y) {
+          if !cell.is_continuation() {
+            let w = cell.text.width().max(1) as u16;
+            right = right.max(x.saturating_add(w.saturating_sub(1)).min(frame.width() - 1));
+          }
+        }
+        x = x.saturating_add(1);
+      }
+    }
+
+    Some(ScreenshotRect {
+      x: left,
+      y: top,
+      width: right.saturating_sub(left).saturating_add(1),
+      height: bottom.saturating_sub(top).saturating_add(1),
+    })
+  }
+
+  pub fn plain_text(frame: &ComposedFrame, rect: ScreenshotRect) -> String {
+    let mut lines = Vec::new();
+    for y in rect.y..rect.y.saturating_add(rect.height) {
+      let mut line = String::new();
+      for x in rect.x..rect.x.saturating_add(rect.width) {
+        match frame.get(x, y) {
+          Some(ComposedCell::Text(cell)) if cell.is_continuation() => {}
+          Some(ComposedCell::Text(cell)) => line.push_str(&cell.text),
+          _ => line.push(' '),
+        }
+      }
+      lines.push(line.trim_end().to_string());
+    }
+    lines.join("\n")
+  }
+
+  pub fn rich_text(frame: &ComposedFrame, rect: ScreenshotRect) -> String {
+    let mut output = String::from("f%");
+    for y in rect.y..rect.y.saturating_add(rect.height) {
+      if y != rect.y {
+        output.push('\n');
+      }
+      for x in rect.x..rect.x.saturating_add(rect.width) {
+        match frame.get(x, y) {
+          Some(ComposedCell::Text(cell)) if cell.is_continuation() => {}
+          Some(ComposedCell::Text(cell)) => push_rich_cell(&mut output, cell),
+          _ => output.push(' '),
+        }
+      }
+    }
+    output
+  }
+
+  pub fn write_json(
+    &self,
+    storage: &StorageService,
+    frame: &ComposedFrame,
+    rect: ScreenshotRect,
+    png_path: Option<&PathBuf>,
+    log: &mut LogService,
+  ) -> Option<PathBuf> {
+    let timestamp = timestamp();
+    let path = storage
+      .screenshot_cache_dir_path()
+      .join(format!("{timestamp}.json"));
+    let document = json!({
+      "schema_version": MEDIA_MANIFEST_VERSION,
+      "timestamp": timestamp,
+      "frame": { "width": frame.width(), "height": frame.height() },
+      "selection": rect,
+      "plain_text": Self::plain_text(frame, rect),
+      "png_path": png_path.map(|p| p.to_string_lossy().to_string()),
+      "rich_text": rich_text_json(frame, rect),
+    });
+    if let Err(error) = fs::create_dir_all(storage.screenshot_cache_dir_path()).and_then(|_| {
+      atomic_write(
+        &path,
+        &serde_json::to_vec_pretty(&document).unwrap_or_default(),
+        true,
+      )
+    }) {
+      log.warn_operation_failed(
+        LogSource::Storage,
+        "write_screenshot_record",
+        path.display().to_string(),
+        error.to_string(),
+      );
+      return None;
+    }
+    Some(path)
+  }
+
+  pub fn next_png_path(storage: &StorageService) -> PathBuf {
+    storage
+      .screenshot_dir_path()
+      .join(format!("{}.png", timestamp()))
+  }
+}
+
+fn font_preview_lines() -> &'static [&'static str] {
+  &[
+    "ASCII: !\"#$%&'()*+,-./ 0123456789 :;<=>?@ ABC xyz [\\]^_` {|}~",
+    "Latin: ÀÁÂÃÄÅ Æ Ç ÈÉÊË ÌÍÎÏ Ñ ÒÓÔÕÖ Ø Œ ÙÚÛÜ Ý ß ẞ",
+    "Combining: e\u{301} a\u{308} n\u{303} A\u{30a}  ZWJ: 👩‍💻 👨‍👩‍👧‍👦",
+    "Zero width: AB A\u{200c}B A\u{200d}B AB  VS: ✈︎ ✈️",
+    "RTL: עברית العربية فارسی اردو  | controls: ABC العربية\u{202c}",
+    "",
+    "CJK: 中文繁體 日本語かなカナ 한글 漢字 〇々〆〄〓〈〉《》「」『』【】",
+    "Kana/Bopomofo: あいうえお アイウエオ ｱｲｳｴｵ ㄅㄆㄇㄈ ㆠㆡㆢ",
+    "Indic/SEA: हिन्दी বাংলা ਪੰਜਾਬੀ ગુજરાતી தமிழ் తెలుగు ಕನ್ನಡ മലയാളം ไทย ລາວ မြန်မာ",
+    "Greek/Cyrillic: ΑΒΓΔ αβγδ  Ελληνικά  АБВГ абвг Русский Українська",
+    "Semitic/African: אבגדה العربية ሀሁሂ ትግርኛ ꦗꦮ ꧋ ߒߞߏ",
+    "",
+    "Symbols: ←↑→↓ ↔↕ ⇐⇒ ∀∂∃∅∇∈∉∑√∞∧∨∩∪≈≠≤≥ ⌘⌥⌫⏎",
+    "Box: ─│┌┐└┘├┤┬┴┼ ═║╔╗╚╝╠╣╦╩╬ ╭╮╰╯ ┏┓┗┛┣┫┳┻╋",
+    "Blocks: ▀▁▂▃▄▅▆▇█ ▏▎▍▌▋▊▉ ░▒▓ ■□▪▫●○◆◇◢◣◤◥",
+    "Braille: ⠀⠁⠃⠇⠏⠟⠿⡿⣿  Music: ♩♪♫♬♭♮♯  Cards: ♠♥♦♣",
+    "Emoji: 😀🥹🫠🚀🌍🔥✨⚙️🧪🏳️‍🌈🇨🇳👍🏽  Keycap: 1️⃣ #️⃣ *️⃣",
+    "Historic/rare: 𓀀𓂀 𐀀 𐎀 𐤀 ᚠᚢᚦᚨᚱᚲ ⰀⰁ ⸘ ※ ⁂ ‽",
+    "",
+    "Full/Half width: ＡＢＣ１２３！ ａｂｃ ﾊﾝｶｸ ｡｢｣､･  Tab→\t←Tab",
+    "Space widths: [ ] [\u{a0}] [\u{2002}] [\u{2003}] [\u{2009}] [　] end",
+  ]
+}
+
+fn preview_line_width(line: &str) -> usize {
+  let mut column = 0;
+  for grapheme in line.graphemes(true) {
+    column += if grapheme == "\t" {
+      4 - column % 4
+    } else {
+      UnicodeWidthStr::width(grapheme)
+    };
+  }
+  column
+}
+
+fn write_preview_line(frame: &mut ComposedFrame, start_x: u16, y: u16, line: &str) {
+  let mut x = start_x as usize;
+  for grapheme in line.graphemes(true) {
+    if grapheme == "\t" {
+      x += 4 - (x - start_x as usize) % 4;
+      continue;
+    }
+    let width = UnicodeWidthStr::width(grapheme);
+    if width == 0 || x >= frame.width() as usize {
+      continue;
+    }
+    frame.set(x as u16, y, ComposedCell::Text(CanvasCell::new(grapheme)));
+    for offset in 1..width {
+      if x + offset < frame.width() as usize {
+        frame.set(
+          (x + offset) as u16,
+          y,
+          ComposedCell::Text(CanvasCell::continuation()),
+        );
+      }
+    }
+    x += width;
+  }
+}
+
+fn timestamp() -> String {
+  Local::now().format("%Y%m%d_%H%M%S_%3f").to_string()
+}
+
+fn is_continuation(frame: &ComposedFrame, x: u16, y: u16) -> bool {
+  matches!(frame.get(x, y), Some(ComposedCell::Text(cell)) if cell.is_continuation())
+}
+
+fn rich_text_json(frame: &ComposedFrame, rect: ScreenshotRect) -> Vec<Vec<serde_json::Value>> {
+  (rect.y..rect.y.saturating_add(rect.height))
+    .map(|y| {
+      (rect.x..rect.x.saturating_add(rect.width))
+        .filter_map(|x| match frame.get(x, y) {
+          Some(ComposedCell::Text(cell)) if !cell.is_continuation() => Some(json!({
+            "x": x - rect.x,
+            "text": cell.text,
+            "style": style_json(&cell.style),
+          })),
+          _ => None,
+        })
+        .collect()
+    })
+    .collect()
+}
+
+fn push_rich_cell(output: &mut String, cell: &CanvasCell) {
+  let tags = style_open_tags(&cell.style);
+  if tags.is_empty() {
+    output.push_str(&escape_rich_text(&cell.text));
+    return;
+  }
+  for tag in &tags {
+    output.push_str(tag);
+  }
+  output.push_str(&escape_rich_text(&cell.text));
+  output.push_str("<reset>");
+}
+
+fn style_open_tags(style: &TextStyle) -> Vec<String> {
+  let mut tags = Vec::new();
+  if let Some(color) = &style.foreground {
+    tags.push(format!("<fg:{}>", rich_color_name(color)));
+  }
+  if let Some(color) = &style.background
+    && !matches!(color, TextColor::Transparent)
+  {
+    tags.push(format!("<bg:{}>", rich_color_name(color)));
+  }
+  for (enabled, tag) in [
+    (style.bold, "b"),
+    (style.italic, "i"),
+    (style.underline, "u"),
+    (style.strike, "s"),
+    (style.blink, "l"),
+    (style.reverse, "r"),
+    (style.hidden, "h"),
+    (style.dim, "d"),
+  ] {
+    if enabled {
+      tags.push(format!("<{tag}>"));
+    }
+  }
+  tags
+}
+
+fn escape_rich_text(text: &str) -> String {
+  let mut output = String::new();
+  for ch in text.chars() {
+    if matches!(ch, '\\' | '<' | '{') {
+      output.push('\\');
+    }
+    output.push(ch);
+  }
+  output
+}
+
+fn rich_color_name(color: &TextColor) -> String {
+  match color {
+    TextColor::Terminal(color) => terminal_color_name(color).to_string(),
+    TextColor::Rgb { r, g, b } | TextColor::ForceRgb { r, g, b } => {
+      format!("#{r:02X}{g:02X}{b:02X}")
+    }
+    TextColor::Transparent => "transparent".to_string(),
+  }
+}
+
+fn terminal_color_name(color: &TerminalColor) -> &'static str {
+  match color {
+    TerminalColor::Black => "black",
+    TerminalColor::Red => "red",
+    TerminalColor::Green => "green",
+    TerminalColor::Yellow => "yellow",
+    TerminalColor::Blue => "blue",
+    TerminalColor::Magenta => "magenta",
+    TerminalColor::Cyan => "cyan",
+    TerminalColor::White => "white",
+    TerminalColor::BrightBlack => "bright_black",
+    TerminalColor::BrightRed => "bright_red",
+    TerminalColor::BrightGreen => "bright_green",
+    TerminalColor::BrightYellow => "bright_yellow",
+    TerminalColor::BrightBlue => "bright_blue",
+    TerminalColor::BrightMagenta => "bright_magenta",
+    TerminalColor::BrightCyan => "bright_cyan",
+    TerminalColor::BrightWhite => "bright_white",
+  }
+}
+
+fn style_json(style: &TextStyle) -> serde_json::Value {
+  json!({
+    "fg": style.foreground.as_ref().map(color_name),
+    "bg": style.background.as_ref().map(color_name),
+    "bold": style.bold,
+    "italic": style.italic,
+    "underline": style.underline,
+    "strike": style.strike,
+    "reverse": style.reverse,
+    "dim": style.dim,
+  })
+}
+
+fn color_name(color: &TextColor) -> String {
+  match color {
+    TextColor::Terminal(color) => format!("{color:?}").to_lowercase(),
+    TextColor::Rgb { r, g, b } | TextColor::ForceRgb { r, g, b } => {
+      format!("#{r:02X}{g:02X}{b:02X}")
+    }
+    TextColor::Transparent => "transparent".to_string(),
+  }
+}
+
+pub fn run_screenshot_task<E: From<ScreenshotAsyncEvent>>(
+  task_id: TaskId,
+  task: ScreenshotTask,
+  event_tx: &Sender<E>,
+  cancellation: &TaskCancellation,
+) -> Result<(), String> {
+  if cancellation.is_cancelled() {
+    return Err("screenshot export cancelled".to_string());
+  }
+  match save_png(
+    task_id,
+    &task.frame,
+    task.selection,
+    &task.png_path,
+    &task.fonts,
+    event_tx,
+    cancellation,
+  ) {
+    Ok(()) => {
+      let _ = event_tx.send(E::from(ScreenshotAsyncEvent::Saved {
+        task_id,
+        png_path: task.png_path,
+      }));
+      Ok(())
+    }
+    Err(error) => {
+      let _ = event_tx.send(E::from(ScreenshotAsyncEvent::Failed {
+        task_id,
+        error: error.clone(),
+      }));
+      Err(error)
+    }
+  }
+}
+
+fn save_png<E: From<ScreenshotAsyncEvent>>(
+  task_id: TaskId,
+  frame: &ComposedFrame,
+  rect: ScreenshotRect,
+  path: &PathBuf,
+  preferred_fonts: &[String],
+  event_tx: &Sender<E>,
+  cancellation: &TaskCancellation,
+) -> Result<(), String> {
+  fs::create_dir_all(path.parent().ok_or("PNG path has no parent directory")?)
+    .map_err(|error| error.to_string())?;
+  let rasterizer = TerminalFrameRasterizer::load(preferred_fonts)?;
+  let image = rasterizer.render(
+    frame,
+    rect,
+    RecordingPixelScale::Original,
+    |completed, total| {
+      send_progress(event_tx, task_id, completed, total);
+    },
+  );
+  if cancellation.is_cancelled() {
+    return Err("screenshot export cancelled".to_string());
+  }
+
+  atomic_replace_with(path, true, |temporary| {
+    image
+      .save_with_format(temporary, image::ImageFormat::Png)
+      .map_err(std::io::Error::other)
+  })
+  .map_err(|error| error.to_string())
+}
+
+fn send_progress<E: From<ScreenshotAsyncEvent>>(
+  event_tx: &Sender<E>,
+  task_id: TaskId,
+  completed_rows: u16,
+  total_rows: u16,
+) {
+  let _ = event_tx.send(E::from(ScreenshotAsyncEvent::Progress {
+    task_id,
+    completed_rows,
+    total_rows,
+  }));
+}
+
+pub struct TerminalFrameRasterizer {
+  fonts: FontSet,
+}
+
+impl TerminalFrameRasterizer {
+  pub fn load(preferred: &[String]) -> Result<Self, String> {
+    Ok(Self {
+      fonts: FontSet::load(preferred)?,
+    })
+  }
+
+  pub fn dimensions(width: u16, height: u16, scale: RecordingPixelScale) -> (u32, u32) {
+    let metrics = RasterMetrics::for_scale(scale);
+    (
+      even_dimension((u32::from(width) * metrics.cell_width).max(1)),
+      even_dimension((u32::from(height) * metrics.cell_height).max(1)),
+    )
+  }
+
+  pub fn render(
+    &self,
+    frame: &ComposedFrame,
+    rect: ScreenshotRect,
+    scale: RecordingPixelScale,
+    mut progress: impl FnMut(u16, u16),
+  ) -> RgbaImage {
+    // 字符、样式与颜色一直保留为结构化数据，直到确定最终导出尺寸后，
+    // 才按目标单元格和字号直接栅格化，避免先生成低分辨率位图再缩放。
+    let metrics = RasterMetrics::for_scale(scale);
+    let width = even_dimension(u32::from(rect.width) * metrics.cell_width);
+    let height = even_dimension(u32::from(rect.height) * metrics.cell_height);
+    let mut image = ImageBuffer::from_pixel(width.max(1), height.max(1), Rgba([0, 0, 0, 255]));
+
+    for y in 0..rect.height {
+      for x in 0..rect.width {
+        let Some(ComposedCell::Text(cell)) = frame.get(rect.x + x, rect.y + y) else {
+          continue;
+        };
+        let (fg, bg) = resolved_colors(&cell.style);
+        fill_rect(
+          &mut image,
+          u32::from(x) * metrics.cell_width,
+          u32::from(y) * metrics.cell_height,
+          metrics.cell_width,
+          metrics.cell_height,
+          bg,
+        );
+        if cell.style.underline {
+          draw_underline(&mut image, metrics, x, y, fg);
+        }
+      }
+      progress(y.saturating_add(1), rect.height.saturating_mul(2));
+    }
+
+    for y in 0..rect.height {
+      for x in 0..rect.width {
+        let Some(ComposedCell::Text(cell)) = frame.get(rect.x + x, rect.y + y) else {
+          continue;
+        };
+        if !cell.is_continuation() {
+          draw_cell_text(&mut image, &self.fonts, metrics, x, y, cell);
+        }
+      }
+      progress(
+        rect.height.saturating_add(y).saturating_add(1),
+        rect.height.saturating_mul(2),
+      );
+    }
+
+    image
+  }
+}
+
+fn even_dimension(value: u32) -> u32 {
+  value.saturating_add(value % 2)
+}
+
+struct CachedGlyph {
+  metrics: fontdue::Metrics,
+  bitmap: Vec<u8>,
+}
+
+struct FontSet {
+  fonts: Vec<fontdue::Font>,
+  font_for_char: std::cell::RefCell<std::collections::HashMap<char, Option<usize>>>,
+  glyph_cache:
+    std::cell::RefCell<std::collections::HashMap<(usize, u32, u32), std::rc::Rc<CachedGlyph>>>,
+}
+
+impl FontSet {
+  fn load(preferred: &[String]) -> Result<Self, String> {
+    let mut fonts = Vec::new();
+    let mut database = fontdb::Database::new();
+    database.load_system_fonts();
+
+    for value in preferred {
+      let path = Path::new(value);
+      if path.is_file() {
+        let _ = load_font_file(path, &mut fonts);
+      } else if let Some(id) = database.query(&fontdb::Query {
+        families: &[fontdb::Family::Name(value)],
+        ..fontdb::Query::default()
+      }) {
+        load_database_font(&database, id, &mut fonts);
+      }
+    }
+
+    for path in [
+      Path::new("assets/fonts/mnf.ttf"),
+      Path::new("assets/fonts/mmo.ttf"),
+      Path::new("assets/fonts/asmn.otf"),
+      Path::new("assets/fonts/nsscvf.ttf"),
+    ] {
+      if path.is_file() {
+        let _ = load_font_file(path, &mut fonts);
+      }
+    }
+
+    if let Some(paths) = env::var_os("TUI_CAPTURE_FONTS") {
+      for path in env::split_paths(&paths) {
+        let _ = load_font_file(&path, &mut fonts);
+      }
+    }
+
+    let mut ids = Vec::new();
+    const CANDIDATE_FAMILIES: &[&str] = &[
+      "Cascadia Mono",
+      "Cascadia Code",
+      "Consolas",
+      "JetBrains Mono",
+      "DejaVu Sans Mono",
+      "Sarasa Mono SC",
+      "Noto Sans Mono CJK SC",
+      "Noto Sans CJK SC",
+      "Microsoft YaHei",
+      "Microsoft YaHei UI",
+      "Yu Gothic",
+      "PingFang SC",
+      "Segoe UI Emoji",
+      "Apple Color Emoji",
+      "Noto Color Emoji",
+      "Noto Emoji",
+      "Symbola",
+    ];
+
+    for family_name in CANDIDATE_FAMILIES {
+      if let Some(id) = database.query(&fontdb::Query {
+        families: &[fontdb::Family::Name(family_name)],
+        ..fontdb::Query::default()
+      }) && !ids.contains(&id)
+      {
+        ids.push(id);
+      }
+    }
+    for family in [fontdb::Family::Monospace, fontdb::Family::SansSerif] {
+      if let Some(id) = database.query(&fontdb::Query {
+        families: &[family],
+        ..fontdb::Query::default()
+      }) && !ids.contains(&id)
+      {
+        ids.push(id);
+      }
+    }
+
+    for id in ids.into_iter().take(16) {
+      load_database_font(&database, id, &mut fonts);
+    }
+
+    if fonts.is_empty() {
+      return Err(
+        "No usable screenshot font found. Set TUI_CAPTURE_FONTS to TTF/OTF/TTC paths.".to_string(),
+      );
+    }
+
+    Ok(Self {
+      fonts,
+      font_for_char: std::cell::RefCell::new(std::collections::HashMap::new()),
+      glyph_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
+    })
+  }
+
+  fn glyph(&self, character: char, font_size: f32) -> Option<std::rc::Rc<CachedGlyph>> {
+    let font_index = self.font_index(character)?;
+    let key = (font_index, character as u32, font_size.to_bits());
+    if let Some(cached) = self.glyph_cache.borrow().get(&key) {
+      return Some(std::rc::Rc::clone(cached));
+    }
+    let (metrics, bitmap) = self.fonts[font_index].rasterize(character, font_size);
+    let cached = std::rc::Rc::new(CachedGlyph { metrics, bitmap });
+    self
+      .glyph_cache
+      .borrow_mut()
+      .insert(key, std::rc::Rc::clone(&cached));
+    Some(cached)
+  }
+
+  fn font_index(&self, character: char) -> Option<usize> {
+    let mut cache = self.font_for_char.borrow_mut();
+    if let Some(index) = cache.get(&character) {
+      return *index;
+    }
+    let index = self.fonts.iter().position(|font| font.has_glyph(character));
+    cache.insert(character, index);
+    index
+  }
+}
+
+fn load_database_font(database: &fontdb::Database, id: fontdb::ID, fonts: &mut Vec<fontdue::Font>) {
+  if let Some(result) = database.with_face_data(id, |data, face_index| {
+    fontdue::Font::from_bytes(
+      data.to_vec(),
+      fontdue::FontSettings {
+        collection_index: face_index,
+        ..fontdue::FontSettings::default()
+      },
+    )
+  }) && let Ok(font) = result
+  {
+    fonts.push(font);
+  }
+}
+
+fn load_font_file(path: &Path, fonts: &mut Vec<fontdue::Font>) -> Result<(), String> {
+  let bytes =
+    fs::read(path).map_err(|error| format!("Failed to read font {}: {error}", path.display()))?;
+  let font = fontdue::Font::from_bytes(bytes, fontdue::FontSettings::default())
+    .map_err(|error| format!("Failed to parse font {}: {error}", path.display()))?;
+  fonts.push(font);
+  Ok(())
+}
+
+fn draw_cell_text(
+  image: &mut RgbaImage,
+  fonts: &FontSet,
+  metrics: RasterMetrics,
+  x: u16,
+  y: u16,
+  cell: &CanvasCell,
+) {
+  if cell.style.hidden {
+    return;
+  }
+  let (fg, _bg) = resolved_colors(&cell.style);
+  let px = x as u32 * metrics.cell_width;
+  let py = y as u32 * metrics.cell_height;
+  let span_width = cell.text.width().max(1) as u32 * metrics.cell_width;
+  draw_grapheme(
+    image,
+    fonts,
+    metrics,
+    &cell.text,
+    px,
+    py,
+    span_width,
+    &cell.style,
+    fg,
+  );
+}
+
+fn draw_underline(
+  image: &mut RgbaImage,
+  metrics: RasterMetrics,
+  x: u16,
+  y: u16,
+  color: (u8, u8, u8),
+) {
+  let px = x as u32 * metrics.cell_width;
+  let py = y as u32 * metrics.cell_height + metrics.cell_height.saturating_sub(4);
+  for xx in px..px.saturating_add(metrics.cell_width).min(image.width()) {
+    composite_pixel(
+      image,
+      xx,
+      py.min(image.height().saturating_sub(1)),
+      color,
+      255,
+    );
+  }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_grapheme(
+  image: &mut RgbaImage,
+  fonts: &FontSet,
+  metrics: RasterMetrics,
+  grapheme: &str,
+  origin_x: u32,
+  origin_y: u32,
+  span_width: u32,
+  style: &TextStyle,
+  fg: (u8, u8, u8),
+) {
+  if let Some(character) = grapheme.chars().next()
+    && grapheme.chars().count() == 1
+    && draw_block_element(
+      image, metrics, character, origin_x, origin_y, span_width, fg,
+    )
+  {
+    return;
+  }
+  let visible_width_sum: usize = grapheme
+    .chars()
+    .map(|character| UnicodeWidthChar::width(character).unwrap_or(0))
+    .sum();
+  let complex_cluster = visible_width_sum > UnicodeWidthStr::width(grapheme);
+  let mut pen_x = origin_x;
+  let mut last_base_origin_x = origin_x as i32;
+  let clip_left = origin_x;
+  let clip_right = (origin_x + span_width).min(image.width());
+  let clip_top = origin_y;
+  let clip_bottom = (origin_y + metrics.cell_height).min(image.height());
+
+  for character in grapheme.chars() {
+    if character == '\u{200d}' || character == '\u{fe0f}' {
+      continue;
+    }
+    let char_width = UnicodeWidthChar::width(character).unwrap_or(0).min(2);
+    if complex_cluster && char_width > 0 && pen_x != origin_x {
+      break;
+    }
+
+    let font_size = if is_probably_emoji(character) {
+      metrics.font_size * 0.86
+    } else {
+      metrics.font_size
+    };
+    let Some(glyph) = fonts.glyph(character, font_size) else {
+      continue;
+    };
+    let glyph_metrics = &glyph.metrics;
+    let bitmap = &glyph.bitmap;
+    let allocated_width = if char_width == 0 {
+      span_width
+    } else {
+      (char_width as u32 * metrics.cell_width).min(span_width)
+    };
+    let glyph_origin_x = if char_width == 0 {
+      last_base_origin_x
+    } else {
+      let origin = pen_x as i32
+        + ((allocated_width as f32 - glyph_metrics.advance_width) / 2.0).round() as i32;
+      last_base_origin_x = origin;
+      origin
+    };
+
+    let destination_x = glyph_origin_x + glyph_metrics.xmin;
+    let baseline = origin_y as i32 + (metrics.cell_height as f32 * 0.78) as i32;
+    let top = baseline - glyph_metrics.height as i32 - glyph_metrics.ymin;
+    draw_glyph_bitmap(
+      image,
+      bitmap,
+      glyph_metrics.width,
+      glyph_metrics.height,
+      destination_x,
+      top,
+      clip_left,
+      clip_top,
+      clip_right,
+      clip_bottom,
+      fg,
+    );
+    if style.bold {
+      draw_glyph_bitmap(
+        image,
+        bitmap,
+        glyph_metrics.width,
+        glyph_metrics.height,
+        destination_x + 1,
+        top,
+        clip_left,
+        clip_top,
+        clip_right,
+        clip_bottom,
+        fg,
+      );
+    }
+
+    if char_width > 0 {
+      pen_x = pen_x.saturating_add(char_width as u32 * metrics.cell_width);
+    }
+  }
+
+  if let Some(character) = grapheme.chars().next()
+    && grapheme.chars().count() == 1
+    && let Some(connections) = box_connections(character)
+  {
+    draw_box_connections(
+      image,
+      metrics,
+      origin_x,
+      origin_y,
+      span_width,
+      fg,
+      connections,
+    );
+  }
+}
+
+fn draw_block_element(
+  image: &mut RgbaImage,
+  metrics: RasterMetrics,
+  character: char,
+  x: u32,
+  y: u32,
+  width: u32,
+  color: (u8, u8, u8),
+) -> bool {
+  let eighth_w = width.div_ceil(8);
+  let eighth_h = metrics.cell_height.div_ceil(8);
+  let rects: &[(u32, u32, u32, u32)] = match character {
+    '█' => &[(0, 0, 8, 8)],
+    '▀' => &[(0, 0, 8, 4)],
+    '▄' => &[(0, 4, 8, 4)],
+    '▌' => &[(0, 0, 4, 8)],
+    '▐' => &[(4, 0, 4, 8)],
+    '▁' => &[(0, 7, 8, 1)],
+    '▂' => &[(0, 6, 8, 2)],
+    '▃' => &[(0, 5, 8, 3)],
+    '▅' => &[(0, 3, 8, 5)],
+    '▆' => &[(0, 2, 8, 6)],
+    '▇' => &[(0, 1, 8, 7)],
+    '▉' => &[(0, 0, 7, 8)],
+    '▊' => &[(0, 0, 6, 8)],
+    '▋' => &[(0, 0, 5, 8)],
+    '▍' => &[(0, 0, 3, 8)],
+    '▎' => &[(0, 0, 2, 8)],
+    '▏' => &[(0, 0, 1, 8)],
+    '▔' => &[(0, 0, 8, 1)],
+    '▕' => &[(7, 0, 1, 8)],
+    '▖' => &[(0, 4, 4, 4)],
+    '▗' => &[(4, 4, 4, 4)],
+    '▘' => &[(0, 0, 4, 4)],
+    '▙' => &[(0, 0, 4, 8), (4, 4, 4, 4)],
+    '▚' => &[(0, 0, 4, 4), (4, 4, 4, 4)],
+    '▛' => &[(0, 0, 4, 8), (4, 0, 4, 4)],
+    '▜' => &[(0, 0, 8, 4), (4, 4, 4, 4)],
+    '▝' => &[(4, 0, 4, 4)],
+    '▞' => &[(4, 0, 4, 4), (0, 4, 4, 4)],
+    '▟' => &[(4, 0, 4, 8), (0, 4, 4, 4)],
+    _ => return false,
+  };
+  for &(rx, ry, rw, rh) in rects {
+    let left = x.saturating_add(rx * eighth_w).min(x + width);
+    let top = y.saturating_add(ry * eighth_h).min(y + metrics.cell_height);
+    let right = if rx + rw == 8 {
+      x + width
+    } else {
+      x.saturating_add((rx + rw) * eighth_w).min(x + width)
+    };
+    let bottom = if ry + rh == 8 {
+      y + metrics.cell_height
+    } else {
+      y.saturating_add((ry + rh) * eighth_h)
+        .min(y + metrics.cell_height)
+    };
+    fill_rect(
+      image,
+      left,
+      top,
+      right.saturating_sub(left),
+      bottom.saturating_sub(top),
+      color,
+    );
+  }
+  true
+}
+
+#[derive(Clone, Copy)]
+struct BoxConnections {
+  left: bool,
+  right: bool,
+  up: bool,
+  down: bool,
+}
+
+fn box_connections(character: char) -> Option<BoxConnections> {
+  let code = character as u32;
+  let directions = match code {
+    0x2500..=0x2501 | 0x2504..=0x2505 | 0x2508..=0x2509 | 0x254c..=0x254d | 0x257c | 0x257e => {
+      (true, true, false, false)
+    }
+    0x2502..=0x2503 | 0x2506..=0x2507 | 0x250a..=0x250b | 0x254e..=0x254f | 0x257d | 0x257f => {
+      (false, false, true, true)
+    }
+    0x250c..=0x250f | 0x256d => (false, true, false, true),
+    0x2510..=0x2513 | 0x256e => (true, false, false, true),
+    0x2514..=0x2517 | 0x2570 => (false, true, true, false),
+    0x2518..=0x251b | 0x256f => (true, false, true, false),
+    0x251c..=0x2523 => (false, true, true, true),
+    0x2524..=0x252b => (true, false, true, true),
+    0x252c..=0x2533 => (true, true, false, true),
+    0x2534..=0x253b => (true, true, true, false),
+    0x253c..=0x254b => (true, true, true, true),
+    0x2574 | 0x2578 => (true, false, false, false),
+    0x2575 | 0x2579 => (false, false, true, false),
+    0x2576 | 0x257a => (false, true, false, false),
+    0x2577 | 0x257b => (false, false, false, true),
+    _ => return None,
+  };
+  Some(BoxConnections {
+    left: directions.0,
+    right: directions.1,
+    up: directions.2,
+    down: directions.3,
+  })
+}
+
+fn draw_box_connections(
+  image: &mut RgbaImage,
+  metrics: RasterMetrics,
+  x: u32,
+  y: u32,
+  width: u32,
+  color: (u8, u8, u8),
+  connections: BoxConnections,
+) {
+  let center_x = x.saturating_add(width / 2);
+  let center_y = y.saturating_add(metrics.cell_height / 2);
+  let thickness = (metrics.cell_width / 9).max(1);
+  if connections.left {
+    fill_rect(image, x, center_y, width / 2 + 1, thickness, color);
+  }
+  if connections.right {
+    fill_rect(
+      image,
+      center_x,
+      center_y,
+      x.saturating_add(width).saturating_sub(center_x),
+      thickness,
+      color,
+    );
+  }
+  if connections.up {
+    fill_rect(
+      image,
+      center_x,
+      y,
+      thickness,
+      metrics.cell_height / 2 + 1,
+      color,
+    );
+  }
+  if connections.down {
+    fill_rect(
+      image,
+      center_x,
+      center_y,
+      thickness,
+      y.saturating_add(metrics.cell_height)
+        .saturating_sub(center_y),
+      color,
+    );
+  }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_glyph_bitmap(
+  image: &mut RgbaImage,
+  bitmap: &[u8],
+  bitmap_width: usize,
+  bitmap_height: usize,
+  destination_x: i32,
+  destination_y: i32,
+  clip_left: u32,
+  clip_top: u32,
+  clip_right: u32,
+  clip_bottom: u32,
+  color: (u8, u8, u8),
+) {
+  for source_y in 0..bitmap_height {
+    for source_x in 0..bitmap_width {
+      let coverage = bitmap[source_y * bitmap_width + source_x];
+      if coverage == 0 {
+        continue;
+      }
+      let x = destination_x + source_x as i32;
+      let y = destination_y + source_y as i32;
+      if x < 0 || y < 0 {
+        continue;
+      }
+      let x = x as u32;
+      let y = y as u32;
+      if x < clip_left
+        || x >= clip_right
+        || y < clip_top
+        || y >= clip_bottom
+        || x >= image.width()
+        || y >= image.height()
+      {
+        continue;
+      }
+      composite_pixel(image, x, y, color, coverage);
+    }
+  }
+}
+
+fn composite_pixel(image: &mut RgbaImage, x: u32, y: u32, color: (u8, u8, u8), coverage: u8) {
+  let destination = image.get_pixel(x, y).0;
+  let source_alpha = f32::from(coverage) / 255.0;
+  let destination_alpha = f32::from(destination[3]) / 255.0;
+  let output_alpha = source_alpha + destination_alpha * (1.0 - source_alpha);
+  if output_alpha <= f32::EPSILON {
+    image.put_pixel(x, y, Rgba([0, 0, 0, 0]));
+    return;
+  }
+
+  let blend_channel = |source: u8, destination: u8| -> u8 {
+    let source = f32::from(source) / 255.0;
+    let destination = f32::from(destination) / 255.0;
+    let output = (source * source_alpha + destination * destination_alpha * (1.0 - source_alpha))
+      / output_alpha;
+    (output.clamp(0.0, 1.0) * 255.0).round() as u8
+  };
+  image.put_pixel(
+    x,
+    y,
+    Rgba([
+      blend_channel(color.0, destination[0]),
+      blend_channel(color.1, destination[1]),
+      blend_channel(color.2, destination[2]),
+      (output_alpha.clamp(0.0, 1.0) * 255.0).round() as u8,
+    ]),
+  );
+}
+
+fn is_probably_emoji(character: char) -> bool {
+  matches!(
+    character as u32,
+    0x1F000..=0x1FAFF | 0x2600..=0x27BF | 0x2300..=0x23FF
+  )
+}
+
+fn fill_rect(
+  image: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
+  x: u32,
+  y: u32,
+  width: u32,
+  height: u32,
+  color: (u8, u8, u8),
+) {
+  let image_width = image.width();
+  let image_height = image.height();
+  let right = x.saturating_add(width).min(image_width);
+  let bottom = y.saturating_add(height).min(image_height);
+  if right <= x || bottom <= y {
+    return;
+  }
+  let pixel = [color.0, color.1, color.2, 255u8];
+  let mut samples = image.as_flat_samples_mut();
+  let raw = samples.as_mut_slice::<u8>();
+  for yy in y..bottom {
+    let row_start = (yy * image_width + x) as usize;
+    let row_end = (yy * image_width + right) as usize;
+    for chunk in raw[row_start * 4..row_end * 4].chunks_exact_mut(4) {
+      chunk.copy_from_slice(&pixel);
+    }
+  }
+}
+
+fn resolved_colors(style: &TextStyle) -> ((u8, u8, u8), (u8, u8, u8)) {
+  let mut fg = style
+    .foreground
+    .as_ref()
+    .map(color_rgb)
+    .unwrap_or((222, 214, 207));
+  let mut bg = style
+    .background
+    .as_ref()
+    .map(color_rgb)
+    .unwrap_or((0, 0, 0));
+  if style.reverse {
+    std::mem::swap(&mut fg, &mut bg);
+  }
+  (fg, bg)
+}
+
+fn color_rgb(color: &TextColor) -> (u8, u8, u8) {
+  match color {
+    TextColor::Rgb { r, g, b } | TextColor::ForceRgb { r, g, b } => (*r, *g, *b),
+    TextColor::Transparent => (0, 0, 0),
+    TextColor::Terminal(color) => terminal_rgb(color),
+  }
+}
+
+fn terminal_rgb(color: &TerminalColor) -> (u8, u8, u8) {
+  match color {
+    TerminalColor::Black => (0, 0, 0),
+    TerminalColor::Red => (170, 0, 0),
+    TerminalColor::Green => (0, 170, 0),
+    TerminalColor::Yellow => (170, 170, 0),
+    TerminalColor::Blue => (0, 0, 170),
+    TerminalColor::Magenta => (170, 0, 170),
+    TerminalColor::Cyan => (0, 170, 170),
+    TerminalColor::White => (222, 214, 207),
+    TerminalColor::BrightBlack => (85, 87, 83),
+    TerminalColor::BrightRed => (255, 85, 85),
+    TerminalColor::BrightGreen => (85, 255, 85),
+    TerminalColor::BrightYellow => (255, 255, 85),
+    TerminalColor::BrightBlue => (85, 85, 255),
+    TerminalColor::BrightMagenta => (255, 85, 255),
+    TerminalColor::BrightCyan => (85, 255, 255),
+    TerminalColor::BrightWhite => (255, 255, 255),
+  }
+}
+
+impl<E: From<ScreenshotAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E>
+  for ScreenshotTask
+{
+  fn run(
+    self: Box<Self>,
+    id: tg_service_async::TaskId,
+    events: &crossbeam_channel::Sender<E>,
+    cancellation: &tg_service_async::TaskCancellation,
+  ) -> Result<(), String> {
+    run_screenshot_task(id, *self, events, cancellation)
+  }
+
+  fn write_target(&self, _id: tg_service_async::TaskId) -> Option<(PathBuf, PathBuf)> {
+    let temporary = tg_core_atomic_fs::temporary_path(&self.png_path);
+    Some((self.png_path.clone(), temporary))
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use tg_service_async::TaskId;
+
+  #[test]
+  fn font_preview_contains_representative_unicode_groups() {
+    let frame = ScreenshotService::font_preview_frame();
+    let rect = ScreenshotService::whole_frame_rect(&frame).unwrap();
+    let text = ScreenshotService::plain_text(&frame, rect);
+    assert!(text.contains("中文繁體"));
+    assert!(text.contains("👩‍💻"));
+    assert!(text.contains("עברית"));
+    assert!(text.contains("▀▁▂▃▄"));
+    assert!(frame.width() > 60);
+    assert!(frame.height() > 20);
+  }
+
+  #[test]
+  fn font_preview_request_is_consumed_once() {
+    let mut service = ScreenshotService::new();
+    service.request_font_preview(vec!["test.ttf".to_string()]);
+    assert_eq!(
+      service.take_font_preview_request(),
+      Some(vec!["test.ttf".to_string()])
+    );
+    assert_eq!(service.take_font_preview_request(), None);
+  }
+
+  #[test]
+  fn operation_feedback_is_consumed_once() {
+    let mut service = ScreenshotService::new();
+    service.report_operation(Some(true), Some(TaskId(7)));
+
+    let feedback = service.take_operation_feedback().unwrap();
+    assert_eq!(feedback.copy_succeeded, Some(true));
+    assert_eq!(feedback.save_task, Some(TaskId(7)));
+    assert_eq!(service.take_operation_feedback(), None);
+  }
+
+  #[test]
+  fn source_export_lock_is_removed_on_terminal_event() {
+    let mut service = ScreenshotService::new();
+    let path = PathBuf::from("data/screenshot/cache/example.json");
+    service.register_source_export(TaskId(8), path.clone());
+    assert!(service.is_source_exporting(&path));
+    service.handle_engine_event(&ScreenshotAsyncEvent::Failed {
+      task_id: TaskId(8),
+      error: "test".to_string(),
+    });
+    assert!(!service.is_source_exporting(&path));
+  }
+
+  #[test]
+  fn full_block_fills_the_entire_export_cell_without_font_margins() {
+    let mut image = RgbaImage::new(CELL_WIDTH, CELL_HEIGHT);
+    assert!(draw_block_element(
+      &mut image,
+      RasterMetrics::for_scale(RecordingPixelScale::Original),
+      '█',
+      0,
+      0,
+      CELL_WIDTH,
+      (1, 2, 3)
+    ));
+    assert!(image.pixels().all(|pixel| pixel.0 == [1, 2, 3, 255]));
+  }
+
+  #[test]
+  fn export_density_is_one_and_a_half_times_the_previous_base_size() {
+    assert_eq!(
+      TerminalFrameRasterizer::dimensions(2, 1, RecordingPixelScale::Original),
+      (36, 36)
+    );
+  }
+
+  #[test]
+  fn screenshot_record_uses_the_shared_media_manifest_version() {
+    let root = std::env::temp_dir().join(format!(
+      "tg_screenshot_manifest_{}_{}",
+      std::process::id(),
+      timestamp()
+    ));
+    let storage = StorageService::from_root_for_test(root.clone());
+    let mut log = LogService::new();
+    let mut frame = ComposedFrame::new(1, 1);
+    frame.set(0, 0, ComposedCell::Text(CanvasCell::new("x")));
+    let path = ScreenshotService::new()
+      .write_json(
+        &storage,
+        &frame,
+        ScreenshotRect {
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+        },
+        None,
+        &mut log,
+      )
+      .unwrap();
+
+    let document: serde_json::Value =
+      serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    assert_eq!(document["schema_version"], MEDIA_MANIFEST_VERSION);
+    let _ = std::fs::remove_dir_all(root);
+  }
+}

@@ -1,41 +1,30 @@
-pub(crate) mod animation;
+pub(crate) use tg_service_animation as animation;
 mod async_runtime;
-mod audio;
-mod canvas;
-mod clipboard;
-mod code_highlight;
+use tg_service_audio as audio;
+use tg_service_canvas as canvas;
 mod event;
-pub(crate) mod export;
-mod ffmpeg;
-mod file;
-mod host_object;
-mod i18n;
-mod image;
-mod input;
-mod input_method;
-mod layout;
-mod log;
-mod lua;
-mod network;
-mod package;
-mod popup;
-mod random;
-mod recording;
-mod render;
-mod render_pipeline;
-mod rich_text;
-mod screenshot;
-mod storage;
-mod terminal;
-mod terminal_capabilities;
-pub mod text_layout;
-mod time;
-mod ui;
-mod unicode;
-mod version;
-mod video;
-pub(crate) mod widget;
-mod write_barrier;
+pub(crate) use tg_service_export as export;
+use tg_service_file as file;
+use tg_service_i18n as i18n;
+use tg_service_image as image;
+use tg_service_input as input;
+use tg_service_layout as layout;
+use tg_service_log as log;
+use tg_service_lua as lua;
+use tg_service_network as network;
+use tg_service_package as package;
+use tg_service_random as random;
+use tg_service_recording as recording;
+use tg_service_render as render;
+use tg_service_render_pipeline as render_pipeline;
+use tg_service_screenshot as screenshot;
+use tg_service_storage as storage;
+pub use tg_service_text_layout as text_layout;
+use tg_service_time as time;
+use tg_core_unicode as unicode;
+use tg_core_version as version;
+use tg_service_video as video;
+pub(crate) use tg_service_widget as widget;
 
 pub use animation::{
   AnimationBinding, AnimationClock, AnimationEasing, AnimationEvent, AnimationEventKind,
@@ -44,30 +33,27 @@ pub use animation::{
   AnimationService, AnimationSource, AnimationTarget, AnimationValue, CharacterEffectService,
   TweenDefinition,
 };
-pub use async_runtime::{
-  AsyncRuntime, EngineEvent, EngineTask, FileEvent, FileTask, ImageEvent, SleepTask, TaskId,
-  TaskState, TimeAsyncEvent,
-};
+pub use async_runtime::{AsyncRuntime, EngineEvent, TaskId, TaskState};
 pub use audio::{
   AudioAsyncEvent, AudioCaptureId, AudioError, AudioErrorCode, AudioId, AudioObjectPool,
   AudioPoolId, AudioService, AudioSource, AudioState, ResolvedAudioFile,
 };
 pub use canvas::{CanvasCell, CanvasService};
-pub use clipboard::ClipboardService;
-pub use code_highlight::{CodeHighlightService, CodeHighlightTheme};
+pub use tg_service_clipboard::ClipboardService;
+pub use tg_service_code_highlight::{CodeHighlightService, CodeHighlightTheme};
 pub use event::EngineEventQueue;
 pub use export::{ExportAsyncEvent, ExportService, ExportTask};
-pub use ffmpeg::{FfmpegInstallation, FfmpegService};
-pub use file::FileService;
-pub use host_object::{HostAreaKind, HostObjectPool};
+pub use tg_service_ffmpeg::{FfmpegInstallation, FfmpegService};
+pub use file::{FileEvent, FileService, FileTask};
+pub use tg_service_host_object::{HostAreaKind, HostObjectPool};
 pub use i18n::{I18nService, LanguageRegistryEntry};
-pub use image::{ImageConvertParams, ImageService};
+pub use image::{ImageConvertParams, ImageEvent, ImageService};
 pub use input::{
   ActionMapEntry, InputActionEvent, InputEventType, InputService, Key, KeyEvent, KeyEventKind,
   KeyState, MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, ScrollDirection, SystemEvent,
   TerminalKeyCode, TerminalKeyEvent, format_key_display, key_token, translate_action_map,
 };
-pub use input_method::{ImPolicy, InputMethodService};
+pub use tg_service_input_method::{ImPolicy, InputMethodService};
 pub use layout::{LayoutService, Rect, Size};
 pub use log::{
   HostLogMessage, LogLevel, LogPrintOptions, LogService, LogSessionId, LogSessionKind, LogSource,
@@ -75,7 +61,8 @@ pub use log::{
 pub use lua::{
   GameService, LuaActionState, LuaApiConfig, LuaDrawCommand, LuaDrawTarget, LuaEnqueueError,
   LuaErrorStage, LuaEventBroker, LuaEventData, LuaEventRoute, LuaExecutionStats, LuaFileOperation,
-  LuaHostCommand, LuaI18nEventKind, LuaObjectPool, LuaPolicy, LuaService, LuaSessionDiagnostics,
+  LuaHostCommand, LuaI18nEventKind, LuaObjectPool, LuaPolicy, LuaRoutableEvent, LuaService,
+  LuaSessionDiagnostics,
   LuaSessionError, LuaSessionKind, LuaSessionSpec, LuaSessionToken, LuaTaskOperation,
   ScreensaverService,
 };
@@ -87,16 +74,20 @@ pub use package::{
   PackageAsset, PackageEvent, PackageId, PackageInfo, PackageListEntry, PackageService,
   PackageSource, PackageType,
 };
-pub use popup::{PopupDismissEvent, PopupRequest, PopupService};
-pub use random::RandomService;
+pub use tg_service_popup::{PopupDismissEvent, PopupRequest, PopupService};
+pub use random::{
+  RandomConfiguration, RandomConfiguredRange, RandomGeneratedValue, RandomGeneratorId, RandomSeed,
+  RandomService,
+};
 pub use recording::{
   RecordingAsyncEvent, RecordingPlayback, RecordingService, RecordingState,
   load_recording_playback, load_recording_playback_metadata,
 };
 pub use render::{BorderCharacter, BorderStyle, CustomBorder, RenderService};
 pub use render_pipeline::{ComposedCell, ComposedFrame, FrameCompositor, FramePresenter};
-pub use rich_text::{
-  RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextStyle,
+use tg_service_rich_text as rich_text;
+pub use tg_service_rich_text::{
+  RichTextParams, RichTextSegment, RichTextService, TerminalColor, TextColor, TextMode, TextStyle,
   parse_text_color,
 };
 pub use screenshot::{ScreenshotAsyncEvent, ScreenshotRect, ScreenshotService, ScreenshotTask};
@@ -108,29 +99,29 @@ pub use storage::{
   RecordingPixelScale, RecordingPopupMode, RecordingProfile, SafeModeDefault,
   ScreensaverPackageState, ScreenshotDoubleAction, ScreenshotProfile, StorageService,
 };
-pub use terminal::TerminalService;
-pub use text_layout::{DrawTextParams, TextAlign, TextMode, TextWrapMode};
-pub use time::TimeService;
-pub use ui::{UiEvent, UiObjectPool, UiObjectPoolOwner, UiService};
-pub use unicode::UnicodeService;
+pub use tg_service_terminal::TerminalService;
+pub use tg_service_text_layout::{DrawTextParams, TextAlign, TextWrapMode};
+pub use time::{
+  DelayTimerEvent, RepeatTimerEvent, RepeatTimerId, SleepTask, TimeAsyncEvent, TimeService,
+  TimerEvent, TimerId, TimerState,
+};
+pub use widget::{UiEvent, UiObjectPool, UiObjectPoolOwner};
 pub use version::{
   HOST_API_VERSION, HOST_VERSION, IMAGE_CACHE_FORMAT_VERSION, MEDIA_MANIFEST_VERSION,
 };
 pub use video::{VideoAsyncEvent, VideoExportStage, VideoService};
 pub use widget::{
-  DelayTimerEvent, HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, HyperlinkEvent,
-  HyperlinkService, MarkdownEvent, MarkdownRenderParams, MarkdownService, MarkdownViewId,
-  MarkdownViewOptions, Overflow, ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions,
-  ProgressBarSegmentStyle, ProgressBarService, RandomConfiguration, RandomConfiguredRange,
-  RandomGeneratedValue, RandomGeneratorId, RandomSeed, RepeatTimerEvent, RepeatTimerId,
-  RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions,
-  ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarStyle, ScrollbarVisibility, SliceId,
-  SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId, TableBorderMode, TableColumn,
-  TableDrawParams, TableId, TableOptions, TableOverflow, TableRow, TableService, TableStyle,
-  TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
-  TextInputRenderParams, TextInputService, TimerEvent, TimerId, TimerState,
+  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, HyperlinkEvent, HyperlinkService,
+  MarkdownEvent, MarkdownRenderParams, MarkdownService, MarkdownViewId, MarkdownViewOptions,
+  Overflow, ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle,
+  ProgressBarService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId,
+  ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarStyle,
+  ScrollbarVisibility, SliceId, SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId,
+  TableBorderMode, TableColumn, TableDrawParams, TableId, TableOptions, TableOverflow, TableRow,
+  TableService, TableStyle, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode,
+  TextInputOptions, TextInputRenderParams, TextInputService,
 };
-pub use write_barrier::WriteBarrier;
+pub use tg_service_async::WriteBarrier;
 
 /// 引擎核心服务集合，持有所有子服务的实例
 pub struct EngineServices {
@@ -162,7 +153,6 @@ pub struct EngineServices {
   pub slice: SliceService,
   pub input: InputService,
   pub input_method: InputMethodService,
-  pub ui: UiService,
   pub game: GameService,
   pub image: ImageService,
   pub screensaver: ScreensaverService,
@@ -175,7 +165,6 @@ pub struct EngineServices {
   pub log: LogService,
   pub i18n: I18nService,
   pub rich_text: RichTextService,
-  pub unicode: UnicodeService,
   pub canvas: CanvasService,
   pub layout: LayoutService,
   pub compositor: FrameCompositor,
@@ -194,7 +183,7 @@ impl EngineServices {
       storage.cache_dir_path().join("ffmpeg"),
     );
     let async_runtime = AsyncRuntime::new();
-    let audio = AudioService::new(async_runtime.event_sender());
+    let audio = AudioService::new(tg_service_async::EventSink::new(async_runtime.event_sender()));
 
     Self {
       async_runtime,
@@ -227,7 +216,6 @@ impl EngineServices {
       popup: PopupService::new(),
       input: InputService::new(),
       input_method: InputMethodService::new(),
-      ui: UiService::new(),
       game: GameService::new(),
       image: ImageService::new(Some(image_cache_dir)),
       screensaver: ScreensaverService::new(),
@@ -238,7 +226,6 @@ impl EngineServices {
       log,
       i18n: I18nService::new(),
       rich_text: RichTextService::new(),
-      unicode: UnicodeService::new(),
       canvas: CanvasService::new(),
       layout: LayoutService::new(),
       compositor: FrameCompositor::new(),

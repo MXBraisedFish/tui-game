@@ -1,66 +1,74 @@
-[package]
-name = "tui-game"
+[workspace]
+members = [".", "crates/core/*", "crates/service/*"]
+resolver = "3"
+
+[workspace.package]
 version = "2.0.0"
 edition = "2024"
+
+[workspace.dependencies]
+chrono = { version = "0.4.45", default-features = true, features = ["clock"] }
+crossterm = "0.29.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0.150", features = ["preserve_order"] }
+unicode-segmentation = "1.13.3"
+unicode-width = "0.2.2"
+
+[package]
+name = "tui-game"
+version.workspace = true
+edition.workspace = true
 default-run = "tg"
 
 [[bin]]
 name = "tg"
 path = "src/main.rs"
 
-[build-dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.150"
-
 [dependencies]
-arboard = { version = "3.6.1", default-features = false }
-crossbeam-channel = "0.5"
-crossterm = "0.29.0"
-mlua = { version = "0.12.0", features = ["lua54", "vendored"] }
-regex = "1.13.0"
-encoding_rs = "0.8.35"
-chardetng = "1.0.0"
-anyhow = "1.0.103"
-notify = "8"
-unicode-width = "0.2.2"
-unicode-segmentation = "1.13.3"
-unicode-linebreak = "0.1.5"
-once_cell = "1.19"
-serde = { version = "1.0", features = ["derive"] }
+tg-core-fault = { path = "crates/core/fault" }
+tg-core-package-id = { path = "crates/core/package_id" }
+tg-core-unicode = { path = "crates/core/unicode" }
+tg-core-version = { path = "crates/core/version" }
+tg-service-terminal = { path = "crates/service/terminal" }
+tg-service-lua = { path = "crates/service/lua" }
+tg-service-widget = { path = "crates/service/widget" }
+tg-service-input = { path = "crates/service/input" }
+tg-service-audio = { path = "crates/service/audio" }
+tg-service-package = { path = "crates/service/package" }
+tg-service-export = { path = "crates/service/export" }
+tg-service-video = { path = "crates/service/video" }
+tg-service-recording = { path = "crates/service/recording" }
+tg-service-screenshot = { path = "crates/service/screenshot" }
+tg-service-render-pipeline = { path = "crates/service/render_pipeline" }
+tg-service-render = { path = "crates/service/render" }
+tg-service-network = { path = "crates/service/network" }
+tg-service-i18n = { path = "crates/service/i18n" }
+tg-service-layout = { path = "crates/service/layout" }
+tg-service-log = { path = "crates/service/log" }
+tg-service-random = { path = "crates/service/random" }
+tg-service-storage = { path = "crates/service/storage" }
+tg-service-text-layout = { path = "crates/service/text_layout" }
+tg-service-time = { path = "crates/service/time" }
+tg-service-rich-text = { path = "crates/service/rich_text" }
+tg-service-code-highlight = { path = "crates/service/code_highlight" }
+tg-service-host-object = { path = "crates/service/host_object" }
+tg-service-popup = { path = "crates/service/popup" }
+tg-service-input-method = { path = "crates/service/input_method" }
+tg-service-ffmpeg = { path = "crates/service/ffmpeg" }
+tg-service-animation = { path = "crates/service/animation" }
+tg-service-async = { path = "crates/service/async" }
+tg-service-canvas = { path = "crates/service/canvas" }
+tg-service-clipboard = { path = "crates/service/clipboard" }
+tg-service-file = { path = "crates/service/file" }
+tg-service-image = { path = "crates/service/image" }
+crossterm = { workspace = true }
+unicode-width = { workspace = true }
+unicode-segmentation = { workspace = true }
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
-serde_path_to_error = "0.1.20"
-serde_yaml = "0.9"
-toml = "1.1.2"
-csv = "1.3"
-quick-xml = "0.41.0"
-chrono = { version = "0.4.45", default-features = true, features = ["clock"] }
-rand = "0.10.2"
-rand_chacha = "0.10"
-reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "rustls", "gzip", "brotli", "deflate", "zstd"] }
-rodio = { version = "0.22.2", default-features = false, features = ["playback", "flac", "mp3", "mp4", "vorbis", "wav"] }
-hound = "3.5"
+chrono = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
-mp4 = "0.14.0"
-openh264 = "0.9.7"
-fontdb = "0.23"
-fontdue = "0.9"
-base64 = "0.22"
-icy_sixel = "0.5"
-rdev = "0.5"
-palette = "0.7"
-im-switch = "0.1"
-zip = { version = "2.3", default-features = false, features = ["deflate"] }
-tar = "0.4"
-flate2 = "1.1"
-pulldown-cmark = "0.13.4"
-tree-sitter = "0.26.10"
-tree-sitter-rust = "0.24.2"
-tree-sitter-python = "0.25.0"
-tree-sitter-javascript = "0.25.0"
-tree-sitter-typescript = "0.23.2"
-tree-sitter-json = "0.24.8"
-tree-sitter-toml = { package = "tree-sitter-toml-ng", version = "0.7.0" }
-tree-sitter-yaml = "0.7.2"
-tree-sitter-lua = "0.5.0"
-tree-sitter-bash = "0.25.1"
 sysinfo = "0.38.3"
+
+[dev-dependencies]
+tg-service-async = { path = "crates/service/async", features = ["test-support"] }
+tg-service-storage = { path = "crates/service/storage", features = ["test-support"] }

@@ -1,0 +1,7 @@
+[package]
+name = "tg-service-terminal"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossterm = { workspace = true }

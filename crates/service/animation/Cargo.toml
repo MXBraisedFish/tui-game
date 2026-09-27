@@ -1,0 +1,9 @@
+[package]
+name = "tg-service-animation"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tg-core-arena = { path = "../../core/arena" }
+tg-core-style = { path = "../../core/style" }
+unicode-width = { workspace = true }

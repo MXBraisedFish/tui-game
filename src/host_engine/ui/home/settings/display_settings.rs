@@ -472,16 +472,16 @@ impl DisplaySettingsUi {
 
   fn value_key(&self, index: usize) -> &'static str {
     match index {
-      0 => self.logo_mode.key(),
+      0 => logo_mode_key(self.logo_mode),
       1 if self.top_toolbar => "display_settings.tool.top_toolbar.on",
       1 => "display_settings.tool.top_toolbar.off",
       2 => "",
-      3 => self.screensaver_source.screensaver_key(),
-      4 => self.screensaver_order.key(),
-      5 => self.game_list_source.game_list_key(),
+      3 => screensaver_source_key(self.screensaver_source),
+      4 => screensaver_order_key(self.screensaver_order),
+      5 => game_list_source_key(self.game_list_source),
       6 if self.game_list_error => "display_settings.game_list.error.yes",
       6 => "display_settings.game_list.error.no",
-      _ => self.game_list_fps.key(),
+      _ => fps_limit_key(self.game_list_fps),
     }
   }
 
@@ -505,107 +505,51 @@ impl DisplaySettingsUi {
   }
 }
 
-impl DisplayLogoMode {
-  fn next(self) -> Self {
-    match self {
-      Self::Order => Self::Random,
-      Self::Random => Self::Classic,
-      Self::Classic => Self::Neon,
-      Self::Neon => Self::Wave,
-      Self::Wave => Self::Error,
-      Self::Error => Self::Glitch,
-      Self::Glitch => Self::Select,
-      Self::Select => Self::Char,
-      Self::Char => Self::Order,
-    }
-  }
-
-  fn key(self) -> &'static str {
-    match self {
-      Self::Order => "display_settings.logo.random.order",
-      Self::Random => "display_settings.logo.random.random",
-      Self::Classic => "display_settings.logo.random.classic",
-      Self::Neon => "display_settings.logo.random.only.neon",
-      Self::Wave => "display_settings.logo.random.only.wave",
-      Self::Error => "display_settings.logo.random.only.error",
-      Self::Glitch => "display_settings.logo.random.only.glitch",
-      Self::Select => "display_settings.logo.random.only.select",
-      Self::Char => "display_settings.logo.random.only.char",
-    }
+fn logo_mode_key(mode: DisplayLogoMode) -> &'static str {
+  match mode {
+    DisplayLogoMode::Order => "display_settings.logo.random.order",
+    DisplayLogoMode::Random => "display_settings.logo.random.random",
+    DisplayLogoMode::Classic => "display_settings.logo.random.classic",
+    DisplayLogoMode::Neon => "display_settings.logo.random.only.neon",
+    DisplayLogoMode::Wave => "display_settings.logo.random.only.wave",
+    DisplayLogoMode::Error => "display_settings.logo.random.only.error",
+    DisplayLogoMode::Glitch => "display_settings.logo.random.only.glitch",
+    DisplayLogoMode::Select => "display_settings.logo.random.only.select",
+    DisplayLogoMode::Char => "display_settings.logo.random.only.char",
   }
 }
 
-impl DisplaySourceMode {
-  fn next(self) -> Self {
-    match self {
-      Self::All => Self::Mod,
-      Self::Mod => Self::Official,
-      Self::Official => Self::No,
-      Self::No => Self::All,
-    }
-  }
-
-  fn screensaver_key(self) -> &'static str {
-    match self {
-      Self::All => "display_settings.screensaver.source.all",
-      Self::Mod => "display_settings.screensaver.source.mod",
-      Self::Official => "display_settings.screensaver.source.official",
-      Self::No => "display_settings.screensaver.source.no",
-    }
-  }
-
-  fn game_list_key(self) -> &'static str {
-    match self {
-      Self::All => "display_settings.game_list.source.all",
-      Self::Mod => "display_settings.game_list.source.mod",
-      Self::Official => "display_settings.game_list.source.official",
-      Self::No => "display_settings.game_list.source.no",
-    }
+fn screensaver_source_key(source: DisplaySourceMode) -> &'static str {
+  match source {
+    DisplaySourceMode::All => "display_settings.screensaver.source.all",
+    DisplaySourceMode::Mod => "display_settings.screensaver.source.mod",
+    DisplaySourceMode::Official => "display_settings.screensaver.source.official",
+    DisplaySourceMode::No => "display_settings.screensaver.source.no",
   }
 }
 
-impl DisplayOrderMode {
-  fn next(self) -> Self {
-    match self {
-      Self::Random => Self::Order,
-      Self::Order => Self::Random,
-    }
-  }
-
-  fn key(self) -> &'static str {
-    match self {
-      Self::Random => "display_settings.screensaver.random.random",
-      Self::Order => "display_settings.screensaver.random.order",
-    }
+fn game_list_source_key(source: DisplaySourceMode) -> &'static str {
+  match source {
+    DisplaySourceMode::All => "display_settings.game_list.source.all",
+    DisplaySourceMode::Mod => "display_settings.game_list.source.mod",
+    DisplaySourceMode::Official => "display_settings.game_list.source.official",
+    DisplaySourceMode::No => "display_settings.game_list.source.no",
   }
 }
 
-impl DisplayFpsLimit {
-  pub fn target_fps(self) -> Option<u16> {
-    match self {
-      Self::Fps30 => Some(30),
-      Self::Fps60 => Some(60),
-      Self::Fps120 => Some(120),
-      Self::Unlimited => None,
-    }
+fn screensaver_order_key(order: DisplayOrderMode) -> &'static str {
+  match order {
+    DisplayOrderMode::Random => "display_settings.screensaver.random.random",
+    DisplayOrderMode::Order => "display_settings.screensaver.random.order",
   }
+}
 
-  fn next(self) -> Self {
-    match self {
-      Self::Fps30 => Self::Fps60,
-      Self::Fps60 => Self::Fps120,
-      Self::Fps120 => Self::Unlimited,
-      Self::Unlimited => Self::Fps30,
-    }
-  }
-
-  fn key(self) -> &'static str {
-    match self {
-      Self::Fps30 => "display_settings.game_list.fps.30",
-      Self::Fps60 => "display_settings.game_list.fps.60",
-      Self::Fps120 => "display_settings.game_list.fps.120",
-      Self::Unlimited => "display_settings.game_list.fps.unlimited",
-    }
+fn fps_limit_key(limit: DisplayFpsLimit) -> &'static str {
+  match limit {
+    DisplayFpsLimit::Fps30 => "display_settings.game_list.fps.30",
+    DisplayFpsLimit::Fps60 => "display_settings.game_list.fps.60",
+    DisplayFpsLimit::Fps120 => "display_settings.game_list.fps.120",
+    DisplayFpsLimit::Unlimited => "display_settings.game_list.fps.unlimited",
   }
 }
 

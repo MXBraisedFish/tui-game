@@ -1,0 +1,20 @@
+[package]
+name = "tg-service-export"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+flate2 = "1.1"
+serde_json = { version = "1.0.150", features = ["preserve_order"] }
+tar = "0.4"
+tg-core-atomic-fs = { path = "../../core/atomic_fs" }
+tg-core-log = { path = "../../core/log" }
+tg-core-version = { path = "../../core/version" }
+tg-service-async = { path = "../async" }
+tg-service-log = { path = "../log" }
+tg-service-storage = { path = "../storage" }
+zip = { version = "2.3", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tg-service-storage = { path = "../storage", features = ["test-support"] }

@@ -1,0 +1,13 @@
+[package]
+name = "tg-service-canvas"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossterm = { workspace = true }
+tg-core-geometry = { path = "../../core/geometry" }
+tg-core-style = { path = "../../core/style" }
+tg-core-unicode = { path = "../../core/unicode" }
+tg-service-layout = { path = "../layout" }
+tg-service-rich-text = { path = "../rich_text" }
+tg-service-text-layout = { path = "../text_layout" }

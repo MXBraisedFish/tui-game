@@ -1,0 +1,7 @@
+[package]
+name = "tg-service-input-method"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+im-switch = "0.1"

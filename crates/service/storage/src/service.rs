@@ -1,0 +1,330 @@
+use std::{
+  cell::{Cell, RefCell},
+  io,
+  path::{Path, PathBuf},
+};
+
+use super::GameSaveProfile;
+use super::bootstrap::ensure_storage_layout;
+use super::layout;
+use super::profile::DisplaySettingsProfile;
+use tg_core_audio::{AudioError, AudioErrorCode, ResolvedAudioFile};
+use tg_service_log::{LogService, LogSource};
+
+/// Storage service that owns the application root directory, builds the paths below it and
+/// makes sure the directory layout exists when it is created.
+pub struct StorageService {
+  root_dir: PathBuf,
+  pub(super) display_settings: DisplaySettingsProfile,
+  pub(super) recording_profile_revision: Cell<u64>,
+  pub(super) game_save: RefCell<GameSaveProfile>,
+}
+
+impl StorageService {
+  pub fn new(log: &mut LogService) -> Self {
+    let root_dir = resolve_root_dir(log);
+
+    let mut service = Self {
+      root_dir,
+      display_settings: DisplaySettingsProfile::default(),
+      recording_profile_revision: Cell::new(0),
+      game_save: RefCell::new(GameSaveProfile::default()),
+    };
+
+    ensure_storage_layout(&service, log);
+    service.reload_display_settings_profile(log);
+    service.reload_game_save_profile(log);
+
+    service
+  }
+
+  pub fn root_dir(&self) -> &Path {
+    &self.root_dir
+  }
+
+  pub fn data_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_DIR)
+  }
+
+  pub fn cache_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_CACHE_DIR)
+  }
+
+  pub fn log_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_LOG_DIR)
+  }
+
+  pub fn screenshot_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_SCREENSHOT_DIR)
+  }
+
+  pub fn screenshot_cache_dir_path(&self) -> PathBuf {
+    self.path(layout::SCREENSHOT_CACHE_DIR)
+  }
+
+  pub fn recording_cache_dir_path(&self) -> PathBuf {
+    self.path(layout::RECORDING_CACHE_DIR)
+  }
+
+  pub fn recording_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_RECORDING_DIR)
+  }
+
+  pub fn tui_log_path(&self) -> PathBuf {
+    self.path(layout::TUI_LOG_FILE)
+  }
+
+  pub fn package_log_path(&self) -> PathBuf {
+    self.path(layout::PACKAGE_LOG_FILE)
+  }
+
+  pub fn mod_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_MOD_DIR)
+  }
+
+  pub fn profiles_dir_path(&self) -> PathBuf {
+    self.path(layout::DATA_PROFILES_DIR)
+  }
+
+  /// Joins a path relative to the root directory into a full path.
+  pub fn path(&self, relative_path: &str) -> PathBuf {
+    self.root_dir.join(relative_path)
+  }
+
+  pub fn profile_language_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_LANGUAGE_FILE)
+  }
+
+  pub fn profile_terminal_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_TERMINAL_FILE)
+  }
+
+  pub fn profile_package_state_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_PACKAGE_STATE_FILE)
+  }
+
+  pub fn profile_screenshot_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_SCREENSHOT_FILE)
+  }
+
+  pub fn profile_recording_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_RECORDING_FILE)
+  }
+
+  pub fn profile_display_settings_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_DISPLAY_SETTINGS_FILE)
+  }
+
+  pub fn profile_key_bindings_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_KEY_BINDINGS_FILE)
+  }
+
+  pub fn profile_game_save_path(&self) -> PathBuf {
+    self.path(layout::PROFILE_GAME_SAVE_FILE)
+  }
+
+  pub fn language_assets_root_path(&self) -> PathBuf {
+    self.path(layout::ASSETS_LANGUAGE_DIR)
+  }
+
+  /// Resolves a host audio asset under the deployed assets directory.
+  ///
+  /// # Errors
+  ///
+  /// Returns [`AudioErrorCode::InvalidPath`] when `relative` is empty, absolute or contains
+  /// anything but normal components, [`AudioErrorCode::NotFound`] when the application root,
+  /// the assets directory or the file cannot be canonicalized, and
+  /// [`AudioErrorCode::PermissionDenied`] when the file is not a regular file inside the assets
+  /// directory or the assets directory lies outside the application root.
+  pub fn resolve_audio_asset(&self, relative: &Path) -> Result<ResolvedAudioFile, AudioError> {
+    if relative.as_os_str().is_empty()
+      || relative.is_absolute()
+      || !relative
+        .components()
+        .all(|part| matches!(part, std::path::Component::Normal(_)))
+    {
+      return Err(AudioError::sanitized(AudioErrorCode::InvalidPath));
+    }
+    let root = self.root_dir.join("assets");
+    let canonical_deployment = self
+      .root_dir
+      .canonicalize()
+      .map_err(|_| AudioError::sanitized(AudioErrorCode::NotFound))?;
+    let canonical_root = root
+      .canonicalize()
+      .map_err(|_| AudioError::sanitized(AudioErrorCode::NotFound))?;
+    let candidate = root.join(relative);
+    let canonical_file = candidate
+      .canonicalize()
+      .map_err(|_| AudioError::sanitized(AudioErrorCode::NotFound))?;
+    if !canonical_root.is_dir()
+      || !canonical_root.starts_with(&canonical_deployment)
+      || !canonical_file.is_file()
+      || !canonical_file.starts_with(&canonical_root)
+    {
+      return Err(AudioError::sanitized(AudioErrorCode::PermissionDenied));
+    }
+    Ok(ResolvedAudioFile::new(canonical_file))
+  }
+
+  pub fn resolve_recording_audio(&self, path: &Path) -> Result<ResolvedAudioFile, AudioError> {
+    if !path.is_absolute() {
+      return Err(AudioError::sanitized(AudioErrorCode::InvalidPath));
+    }
+    let root = self.recording_cache_dir_path();
+    let canonical_root = root
+      .canonicalize()
+      .map_err(|_| AudioError::sanitized(AudioErrorCode::NotFound))?;
+    let canonical_file = path
+      .canonicalize()
+      .map_err(|_| AudioError::sanitized(AudioErrorCode::NotFound))?;
+    if !canonical_root.is_dir()
+      || !canonical_file.is_file()
+      || !canonical_file.starts_with(&canonical_root)
+    {
+      return Err(AudioError::sanitized(AudioErrorCode::PermissionDenied));
+    }
+    Ok(ResolvedAudioFile::new(canonical_file))
+  }
+
+  pub fn language_registry_path(&self) -> PathBuf {
+    self.path(layout::LANGUAGE_REGISTRY_FILE)
+  }
+
+  pub fn language_package_path(&self, language_code: &str) -> PathBuf {
+    self.language_assets_root_path().join(language_code)
+  }
+
+  pub fn language_runtime_path(&self, language_code: &str) -> PathBuf {
+    self.language_package_path(language_code).join("runtime")
+  }
+
+  pub fn language_runtime_namespace_path(&self, language_code: &str, namespace: &str) -> PathBuf {
+    self
+      .language_runtime_path(language_code)
+      .join(format!("{}.json", namespace))
+  }
+
+  pub fn clear_data(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.data_dir_path(), log)
+  }
+
+  pub fn clear_cache(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.cache_dir_path(), log)
+  }
+
+  pub fn clear_log(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.log_dir_path(), log)
+  }
+
+  pub fn clear_screenshot(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.screenshot_dir_path(), log)
+  }
+
+  pub fn clear_recording(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.recording_dir_path(), log)
+  }
+
+  pub fn clear_mod(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.mod_dir_path(), log)
+  }
+
+  pub fn clear_profiles(&self, log: &mut LogService) -> io::Result<()> {
+    self.remove_recreate(self.profiles_dir_path(), log)
+  }
+
+  fn remove_recreate(&self, path: PathBuf, log: &mut LogService) -> io::Result<()> {
+    if path.exists() {
+      std::fs::remove_dir_all(path)?;
+    }
+    ensure_storage_layout(self, log);
+    Ok(())
+  }
+}
+
+#[cfg(any(test, feature = "test-support"))]
+impl StorageService {
+  pub fn from_root_for_test(root_dir: PathBuf) -> Self {
+    Self {
+      root_dir,
+      display_settings: DisplaySettingsProfile::default(),
+      recording_profile_revision: Cell::new(0),
+      game_save: RefCell::new(GameSaveProfile::default()),
+    }
+  }
+}
+
+/// Detects the application root directory: the current directory when it contains `assets` or
+/// `Cargo.toml`, otherwise the executable's directory, and `.` as the last resort.
+fn resolve_root_dir(log: &mut LogService) -> PathBuf {
+  if let Ok(current_dir) = std::env::current_dir()
+    && (current_dir.join("assets").exists() || current_dir.join("Cargo.toml").exists())
+  {
+    return current_dir;
+  }
+  if let Ok(exe_path) = std::env::current_exe()
+    && let Some(exe_dir) = exe_path.parent()
+  {
+    return exe_dir.to_path_buf();
+  }
+  log.warn_message(
+    LogSource::Boot,
+    tg_service_log::HostLogMessage::new(
+      "log_info.fallback.activated",
+      "{domain} entered fallback mode: {reason}",
+    )
+    .param("domain", "storage_root")
+    .param(
+      "reason",
+      "application root could not be resolved; using '.'",
+    ),
+  );
+  PathBuf::from(".")
+}
+
+#[cfg(test)]
+mod tests {
+  use std::time::{SystemTime, UNIX_EPOCH};
+
+  use super::*;
+
+  #[test]
+  fn host_audio_assets_are_canonical_and_cannot_escape_assets() {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+      "tui-game-storage-audio-{}-{nonce}",
+      std::process::id()
+    ));
+    std::fs::create_dir_all(root.join("assets/audio")).unwrap();
+    std::fs::write(root.join("assets/audio/test.wav"), b"test").unwrap();
+    std::fs::write(root.join("outside.wav"), b"outside").unwrap();
+    let storage = StorageService::from_root_for_test(root.clone());
+
+    let resolved = storage
+      .resolve_audio_asset(Path::new("audio/test.wav"))
+      .unwrap();
+    assert_eq!(
+      resolved.path(),
+      root.join("assets/audio/test.wav").canonicalize().unwrap()
+    );
+    assert!(matches!(
+      storage.resolve_audio_asset(Path::new("../outside.wav")),
+      Err(AudioError {
+        code: AudioErrorCode::InvalidPath,
+        ..
+      })
+    ));
+    assert!(matches!(
+      storage.resolve_audio_asset(&root.join("outside.wav")),
+      Err(AudioError {
+        code: AudioErrorCode::InvalidPath,
+        ..
+      })
+    ));
+
+    std::fs::remove_dir_all(root).unwrap();
+  }
+}

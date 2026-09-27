@@ -1,0 +1,10 @@
+[package]
+name = "tg-service-log"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+tg-core-atomic-fs = { path = "../../core/atomic_fs" }
+tg-core-log = { path = "../../core/log" }
+tg-core-package-id = { path = "../../core/package_id" }

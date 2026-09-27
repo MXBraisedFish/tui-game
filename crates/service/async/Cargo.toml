@@ -1,0 +1,11 @@
+[package]
+name = "tg-service-async"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+
+[features]
+# Exposes `TaskCancellation::new/cancel` to other crates' tests.
+test-support = []

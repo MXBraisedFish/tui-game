@@ -14,11 +14,11 @@ use crate::host_engine::core::{
   CrashPhase, HostFaultDomain, HostFaultPhase, catch_host_fault, finalize_host_fault,
   install_panic_hook, set_crash_phase,
 };
-use crate::host_engine::services::{HostLogMessage, LogSource};
+use crate::host_engine::services::{HostLogMessage, LogSource, TerminalService};
 
 /// 启动并运行引擎主循环，依次执行引导、运行时、关闭三个阶段
 pub fn run() {
-  install_panic_hook();
+  install_panic_hook(TerminalService::force_restore);
 
   set_crash_phase(CrashPhase::Init);
   let boot_output = boot::prepare();

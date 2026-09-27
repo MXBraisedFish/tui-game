@@ -1,0 +1,6 @@
+[package]
+name = "tg-core-geometry"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

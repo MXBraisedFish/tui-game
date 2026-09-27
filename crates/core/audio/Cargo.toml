@@ -1,0 +1,6 @@
+[package]
+name = "tg-core-audio"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

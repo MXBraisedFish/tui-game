@@ -1,0 +1,12 @@
+[package]
+name = "tg-service-image"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crossbeam-channel = "0.5"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tg-core-version = { path = "../../core/version" }
+tg-service-async = { path = "../async" }

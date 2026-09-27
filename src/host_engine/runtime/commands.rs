@@ -1740,7 +1740,7 @@ fn start_language_loading(
   services
     .i18n
     .load_runtime_language(&services.storage, &mut services.log, code);
-  let _ = services.log.refresh_labels_from_i18n(&services.i18n);
+  let _ = services.i18n.apply_log_translations(&mut services.log);
   language_loading_ui.set_progress(&services.progress_bar, 0.5, 0.5);
   let package_language = services.i18n.current_language().to_string();
   let missing_template = services

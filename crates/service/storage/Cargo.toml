@@ -1,0 +1,16 @@
+[package]
+name = "tg-service-storage"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tg-core-atomic-fs = { path = "../../core/atomic_fs" }
+tg-core-audio = { path = "../../core/audio" }
+tg-core-package-id = { path = "../../core/package_id" }
+tg-service-log = { path = "../log" }
+
+[features]
+# Exposes `StorageService::from_root_for_test` to other crates' tests.
+test-support = []

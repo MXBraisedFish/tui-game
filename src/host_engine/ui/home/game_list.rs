@@ -501,7 +501,7 @@ impl GameListUi {
       info_content_height,
       layout,
     );
-    canvas.prepare(&self.objects, layout);
+    self.objects.prepare_canvas(canvas, layout);
 
     self.draw_right_panel(
       render,

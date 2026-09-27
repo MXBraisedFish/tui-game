@@ -1,0 +1,6 @@
+[package]
+name = "tg-core-log"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

@@ -1,0 +1,25 @@
+[package]
+name = "tg-service-widget"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+pulldown-cmark = "0.13.4"
+tg-core-audio = { path = "../../core/audio" }
+tg-core-input = { path = "../../core/input" }
+tg-core-style = { path = "../../core/style" }
+tg-core-unicode = { path = "../../core/unicode" }
+tg-service-animation = { path = "../animation" }
+tg-service-audio = { path = "../audio" }
+tg-service-canvas = { path = "../canvas" }
+tg-service-clipboard = { path = "../clipboard" }
+tg-service-code-highlight = { path = "../code_highlight" }
+tg-service-layout = { path = "../layout" }
+tg-service-random = { path = "../random" }
+tg-service-text-layout = { path = "../text_layout" }
+tg-service-time = { path = "../time" }
+unicode-segmentation = { workspace = true }
+unicode-width = { workspace = true }
+
+[dev-dependencies]
+tg-service-render-pipeline = { path = "../render_pipeline" }

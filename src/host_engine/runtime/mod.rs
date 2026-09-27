@@ -24,7 +24,7 @@ use crate::host_engine::core::{
 };
 use crate::host_engine::services::{
   ActionKeyMap, ActionMapEntry, AutoRecordingMode, BorderStyle, DisplayLogoMode, DisplayOrderMode,
-  DrawTextParams, EngineServices, EngineTask, HostAreaKind, HostLogMessage, ImPolicy,
+  DrawTextParams, EngineServices, HostAreaKind, HostLogMessage, ImPolicy,
   InputActionEvent, KeyBindingsProfile, KeyState, LogLevel, LogPrintOptions, LogSource,
   LuaActionState, LuaEnqueueError, LuaErrorStage, LuaEventBroker, LuaEventData, LuaEventRoute,
   LuaHostCommand, LuaSessionDiagnostics, LuaSessionError, LuaSessionKind, LuaSessionToken,
@@ -342,7 +342,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
   let mut screensaver_overlay_ui = ScreensaverOverlayUi::init();
   let mut top_toolbar = TopToolbarRuntime::new(&services.progress_bar);
   let screensaver_random = services.random.create(
-    &mut services.runtime_objects,
+    &mut services.runtime_objects.random_generators,
     RandomSeed::U64(
       SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -389,14 +389,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services.popup.update(frame_delta);
     services
       .time
-      .update(&mut services.runtime_objects, frame_delta);
+      .update(&mut services.runtime_objects.time, frame_delta);
     services.animation.update(
-      &mut services.runtime_objects,
+      &mut services.runtime_objects.animation,
       crate::host_engine::services::AnimationClock::Ui,
       frame_delta,
     );
     services.animation.update(
-      &mut services.runtime_objects,
+      &mut services.runtime_objects.animation,
       crate::host_engine::services::AnimationClock::Game,
       frame_delta,
     );
@@ -2010,14 +2010,14 @@ fn update_lua_object_pool(
   frame_delta: Duration,
 ) {
   objects.begin_frame();
-  time.update(objects.runtime_mut(), frame_delta);
+  time.update(&mut objects.runtime_mut().time, frame_delta);
   animation.update(
-    objects.runtime_mut(),
+    &mut objects.runtime_mut().animation,
     crate::host_engine::services::AnimationClock::Ui,
     frame_delta,
   );
   animation.update(
-    objects.runtime_mut(),
+    &mut objects.runtime_mut().animation,
     crate::host_engine::services::AnimationClock::Game,
     frame_delta,
   );
@@ -2200,7 +2200,7 @@ fn apply_lua_host_commands(
         let Some(token) = token else {
           continue;
         };
-        let task_id = services.async_runtime.submit(EngineTask::File(task));
+        let task_id = services.async_runtime.submit(task);
         if let Err(error) = router.register_task(
           task_id,
           token,
@@ -2234,7 +2234,7 @@ fn apply_lua_host_commands(
         let Some(token) = token else {
           continue;
         };
-        let task_id = services.async_runtime.submit(EngineTask::File(task));
+        let task_id = services.async_runtime.submit(task);
         if let Err(error) = router.register_task(
           task_id,
           token,
@@ -3245,7 +3245,7 @@ fn select_screensaver(
   let mut display = services.storage.display_settings_profile().clone();
   let index = match display.screensaver_order {
     DisplayOrderMode::Random => services.random.int_range(
-      &mut services.runtime_objects,
+      &mut services.runtime_objects.random_generators,
       random_id,
       0,
       entries.len() as i64,
@@ -3511,7 +3511,7 @@ pub(super) fn submit_screenshot_png(
   );
   let task_id = services
     .async_runtime
-    .submit(EngineTask::Screenshot(ScreenshotTask {
+    .submit(ScreenshotTask {
       frame,
       selection: rect,
       png_path,
@@ -3519,7 +3519,7 @@ pub(super) fn submit_screenshot_png(
         .storage
         .read_screenshot_profile_or_default(&mut services.log)
         .fonts,
-    }));
+    });
   if let Some(source_path) = source_path {
     services
       .screenshot
@@ -3547,12 +3547,12 @@ fn submit_font_preview_png(
   );
   let task_id = services
     .async_runtime
-    .submit(EngineTask::Screenshot(ScreenshotTask {
+    .submit(ScreenshotTask {
       frame,
       selection: rect,
       png_path,
       fonts,
-    }));
+    });
   if let Some(source_path) = source_path {
     services
       .screenshot

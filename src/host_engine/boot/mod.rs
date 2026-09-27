@@ -101,7 +101,7 @@ fn prepare_supervised(services: &mut EngineServices) -> Result<(), HostFault> {
     services
       .i18n
       .load_runtime_language(&services.storage, &mut services.log, &selected_language);
-    let _ = services.log.refresh_labels_from_i18n(&services.i18n);
+    let _ = services.i18n.apply_log_translations(&mut services.log);
   });
 
   let run_id = services.log.run_id().to_string();

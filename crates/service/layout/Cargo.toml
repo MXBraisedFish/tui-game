@@ -1,0 +1,10 @@
+[package]
+name = "tg-service-layout"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tg-core-geometry = { path = "../../core/geometry" }
+tg-service-rich-text = { path = "../rich_text" }
+tg-service-text-layout = { path = "../text_layout" }
+crossterm = { workspace = true }

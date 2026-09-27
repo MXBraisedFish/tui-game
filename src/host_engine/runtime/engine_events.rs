@@ -22,7 +22,10 @@ pub(super) fn drain_engine_events(
   let mut video_events = Vec::new();
 
   for event in services.engine_events.drain() {
-    if let Err(error) = lua_events.route_engine_event(frame, &event) {
+    let routed = event
+      .lua_routable()
+      .map(|routable| lua_events.route_service_event(frame, routable));
+    if let Some(Err(error)) = routed {
       match error {
         LuaEnqueueError::StaleTaskCompletion(_) | LuaEnqueueError::StaleAudioEvent(_) => {}
         error => services.log.warn_message(
