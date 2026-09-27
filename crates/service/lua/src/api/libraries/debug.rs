@@ -152,10 +152,8 @@ fn protected(lua: &Lua, extended: bool, state: SharedApiState) -> mlua::Result<F
           return Err(error);
         }
         let mut error_value = Value::String(lua.create_string(error.to_string())?);
-        if extended {
-          if let Value::Function(handler) = table.get::<Value>("error_callback")? {
-            error_value = handler.call(error_value)?;
-          }
+        if extended && let Value::Function(handler) = table.get::<Value>("error_callback")? {
+          error_value = handler.call(error_value)?;
         }
         let output = lua.create_table()?;
         output.raw_set("ok", false)?;

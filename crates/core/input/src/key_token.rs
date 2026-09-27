@@ -1,5 +1,28 @@
 use super::key::Key;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)] // Other target platform variants are constructed by platform-injected tests.
+enum KeyDisplayPlatform {
+  Windows,
+  MacOs,
+  Other,
+}
+
+fn current_key_display_platform() -> KeyDisplayPlatform {
+  #[cfg(target_os = "windows")]
+  {
+    KeyDisplayPlatform::Windows
+  }
+  #[cfg(target_os = "macos")]
+  {
+    KeyDisplayPlatform::MacOs
+  }
+  #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+  {
+    KeyDisplayPlatform::Other
+  }
+}
+
 /// Parses a key token (such as "shift", "a" or "f1") into a [`Key`].
 ///
 /// The token is trimmed and matched case-insensitively; unknown tokens yield `None`.
@@ -141,8 +164,15 @@ fn parse_unknown_key(token: &str) -> Option<Key> {
   Some(Key::Unknown(code))
 }
 
-/// Formats key patterns as user-readable display text (such as "[Shift + D]/[Ctrl + C]").
+/// Formats key patterns as user-readable display text (such as "[LShift + D]/[LCtrl + C]").
 pub fn format_key_display(patterns: &[Vec<String>]) -> String {
+  format_key_display_for_platform(patterns, current_key_display_platform())
+}
+
+fn format_key_display_for_platform(
+  patterns: &[Vec<String>],
+  platform: KeyDisplayPlatform,
+) -> String {
   patterns
     .iter()
     .map(|pattern| {
@@ -152,7 +182,10 @@ pub fn format_key_display(patterns: &[Vec<String>]) -> String {
         .collect();
 
       keys.sort_by_key(key_display_order);
-      let display: Vec<String> = keys.iter().map(|k| display_key_token(*k)).collect();
+      let display: Vec<String> = keys
+        .iter()
+        .map(|key| display_key_token_for_platform(*key, platform))
+        .collect();
       if display.is_empty() {
         pattern.join(" + ")
       } else {
@@ -229,6 +262,10 @@ fn key_display_order(key: &Key) -> u8 {
 
 /// Converts a [`Key`] into its human-readable display string.
 pub fn display_key_token(key: Key) -> String {
+  display_key_token_for_platform(key, current_key_display_platform())
+}
+
+fn display_key_token_for_platform(key: Key, platform: KeyDisplayPlatform) -> String {
   match key {
     Key::Esc => "Esc".to_string(),
     Key::Enter => "Enter".to_string(),
@@ -274,10 +311,24 @@ pub fn display_key_token(key: Key) -> String {
     Key::X => "x".to_uppercase().to_string(),
     Key::Y => "y".to_uppercase().to_string(),
     Key::Z => "z".to_uppercase().to_string(),
-    Key::LeftCtrl | Key::RightCtrl => "Ctrl".to_string(),
-    Key::LeftShift | Key::RightShift => "Shift".to_string(),
-    Key::LeftAlt | Key::RightAlt => "Alt".to_string(),
-    Key::LeftMeta | Key::RightMeta => "Meta".to_string(),
+    Key::LeftCtrl => "LCtrl".to_string(),
+    Key::RightCtrl => "RCtrl".to_string(),
+    Key::LeftShift => "LShift".to_string(),
+    Key::RightShift => "RShift".to_string(),
+    Key::LeftAlt => "LAlt".to_string(),
+    Key::RightAlt => "RAlt".to_string(),
+    Key::LeftMeta => match platform {
+      KeyDisplayPlatform::Windows => "LWin",
+      KeyDisplayPlatform::MacOs => "LCmd",
+      KeyDisplayPlatform::Other => "LMeta",
+    }
+    .to_string(),
+    Key::RightMeta => match platform {
+      KeyDisplayPlatform::Windows => "RWin",
+      KeyDisplayPlatform::MacOs => "RCmd",
+      KeyDisplayPlatform::Other => "RMeta",
+    }
+    .to_string(),
     Key::CapsLock => "Caps".to_string(),
     Key::NumLock => "Num".to_string(),
     Key::ScrollLock => "Scrl".to_string(),
@@ -390,8 +441,77 @@ mod tests {
   use super::*;
 
   #[test]
+  fn modifier_displays_distinguish_sides_and_follow_platform_names() {
+    let cases = [
+      (Key::LeftCtrl, "LCtrl", "LCtrl", "LCtrl"),
+      (Key::RightCtrl, "RCtrl", "RCtrl", "RCtrl"),
+      (Key::LeftShift, "LShift", "LShift", "LShift"),
+      (Key::RightShift, "RShift", "RShift", "RShift"),
+      (Key::LeftAlt, "LAlt", "LAlt", "LAlt"),
+      (Key::RightAlt, "RAlt", "RAlt", "RAlt"),
+      (Key::LeftMeta, "LWin", "LCmd", "LMeta"),
+      (Key::RightMeta, "RWin", "RCmd", "RMeta"),
+    ];
+
+    for (key, windows, macos, other) in cases {
+      assert_eq!(
+        display_key_token_for_platform(key, KeyDisplayPlatform::Windows),
+        windows
+      );
+      assert_eq!(
+        display_key_token_for_platform(key, KeyDisplayPlatform::MacOs),
+        macos
+      );
+      assert_eq!(
+        display_key_token_for_platform(key, KeyDisplayPlatform::Other),
+        other
+      );
+    }
+  }
+
+  #[test]
+  fn display_formatting_preserves_canonical_left_and_right_tokens() {
+    let keys = [
+      Key::LeftCtrl,
+      Key::RightCtrl,
+      Key::LeftShift,
+      Key::RightShift,
+      Key::LeftAlt,
+      Key::RightAlt,
+      Key::LeftMeta,
+      Key::RightMeta,
+    ];
+    for key in keys {
+      let token = key_token(key);
+      assert_eq!(parse_key_token(&token), Some(key));
+      assert_eq!(canonical_key_token(&token).as_deref(), Some(token.as_str()));
+    }
+    assert_eq!(canonical_key_token("ctrl").as_deref(), Some("left_ctrl"));
+    assert_eq!(canonical_key_token("meta").as_deref(), Some("left_meta"));
+
+    let patterns = vec![vec![
+      "right_meta".to_string(),
+      "left_shift".to_string(),
+      "left_ctrl".to_string(),
+      "x".to_string(),
+    ]];
+    assert_eq!(
+      format_key_display_for_platform(&patterns, KeyDisplayPlatform::Windows),
+      "[LCtrl + LShift + RWin + X]"
+    );
+    assert_eq!(
+      format_key_display_for_platform(&patterns, KeyDisplayPlatform::MacOs),
+      "[LCtrl + LShift + RCmd + X]"
+    );
+    assert_eq!(
+      format_key_display_for_platform(&patterns, KeyDisplayPlatform::Other),
+      "[LCtrl + LShift + RMeta + X]"
+    );
+  }
+
+  #[test]
   fn single_key() {
-    assert_eq!(format_key_display(&[vec!["shift".into()]]), "[Shift]");
+    assert_eq!(format_key_display(&[vec!["shift".into()]]), "[LShift]");
     assert_eq!(format_key_display(&[vec!["d".into()]]), "[D]");
     assert_eq!(format_key_display(&[vec!["enter".into()]]), "[Enter]");
   }
@@ -400,11 +520,11 @@ mod tests {
   fn combo_sorted_modifier_first() {
     assert_eq!(
       format_key_display(&[vec!["d".into(), "shift".into()]]),
-      "[Shift + D]"
+      "[LShift + D]"
     );
     assert_eq!(
       format_key_display(&[vec!["shift".into(), "d".into()]]),
-      "[Shift + D]"
+      "[LShift + D]"
     );
   }
 
@@ -412,7 +532,7 @@ mod tests {
   fn multi_pattern() {
     assert_eq!(
       format_key_display(&[vec!["d".into()], vec!["left".into(), "shift".into()]]),
-      "[D]/[Shift + ←]"
+      "[D]/[LShift + ←]"
     );
   }
 

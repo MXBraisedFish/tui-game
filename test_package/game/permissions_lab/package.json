@@ -1,0 +1,31 @@
+{
+  "mod_id": "test.permissions_lab",
+  "schema_version": 1,
+  "type": "game",
+  "version": "1.1.0",
+  "version_code": 2,
+  "api": { "min": 1, "max": 1 },
+  "entry": "main",
+  "display": {
+    "title": "Permissions Lab",
+    "description": "Exercises game-only package file access and per-package debug output.",
+    "author": "TUI GAME"
+  },
+  "runtime": { "min_width": 70, "min_height": 23 },
+  "game": {
+    "name": "f%<fg:bright_red>Permissions</fg> Lab",
+    "detail": "Game sessions can write only inside package assets. Debug output appears only when Debug is enabled.",
+    "mouse": false,
+    "truecolor": false,
+    "target_fps": 30,
+    "save": true,
+    "language": ["en_us"],
+    "score": { "enabled": true, "empty_text": "No probe run yet" },
+    "actions": {
+      "write_probe": { "description": "Write the package file probe", "keys": [["p"]] },
+      "read_probe": { "description": "Read the probe back", "keys": [["r"]] },
+      "list_probe": { "description": "List the state folder", "keys": [["l"]] },
+      "leave": { "description": "Return to game list", "keys": [["esc"]], "lock": true }
+    }
+  }
+}

@@ -5,7 +5,7 @@ use crate::host_engine::services::{
   UiObjectPoolOwner,
 };
 
-/// 窗口尺寸警告 UI：当终端窗口小于最低要求时显示提示信息。
+/// Warning page shown while the terminal window is smaller than the required size.
 pub struct WindowSizeWarningUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -13,7 +13,7 @@ pub struct WindowSizeWarningUi {
 }
 
 impl WindowSizeWarningUi {
-  /// 初始化窗口尺寸警告 UI。
+  /// Creates the window size warning UI.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     let area = hit_area.create(&mut objects, HitAreaOptions::default());
@@ -24,7 +24,7 @@ impl WindowSizeWarningUi {
     }
   }
 
-  /// 返回警告页面的按键映射定义。
+  /// Returns the action map (key bindings) of the warning page.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![ActionMapEntry {
       action: "window_size.exit".to_string(),
@@ -33,7 +33,7 @@ impl WindowSizeWarningUi {
     }]
   }
 
-  /// 处理 UI 事件。
+  /// Handles a UI event and returns the command it triggers, if any.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<WindowSizeWarningCommand> {
     match event {
       UiEvent::Action(event)
@@ -49,7 +49,7 @@ impl WindowSizeWarningUi {
     }
   }
 
-  /// 渲染窗口尺寸警告信息到宿主层。
+  /// Draws the window size warning onto the host layer.
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
@@ -111,7 +111,7 @@ impl RuntimeObjectPoolOwner for WindowSizeWarningUi {
   }
 }
 
-/// 窗口尺寸警告页面的布局信息。
+/// Screen layout of the window size warning page.
 pub(crate) struct WindowSizeWarningLayout {
   pub title_x: u16,
   pub title_y: u16,
@@ -125,13 +125,13 @@ pub(crate) struct WindowSizeWarningLayout {
   pub hint_y: u16,
 }
 
-/// 窗口尺寸警告页面的命令。
+/// Command emitted by the window size warning page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WindowSizeWarningCommand {
   Exit,
 }
 
-/// 计算窗口尺寸警告页面的布局信息。
+/// Computes the layout of the window size warning page, measuring the exit hint of `hint_key`.
 pub fn compute_positions(
   layout: &LayoutService,
   i18n: &I18nService,
@@ -139,8 +139,7 @@ pub fn compute_positions(
   required_height: u32,
   current_width: u16,
   current_height: u16,
-  is_host_mode: bool,
-  is_screensaver: bool,
+  hint_key: &str,
 ) -> WindowSizeWarningLayout {
   let title = i18n.get_runtime_text("window_size", "window_size.title");
   let tip = i18n.get_runtime_text("window_size", "window_size.tip");
@@ -173,13 +172,6 @@ pub fn compute_positions(
   let current_x = centered_x(layout, &current_line);
   let current_y = content_start_y + 2;
   let key_params = build_key_params();
-  let hint_key = if is_screensaver {
-    "window_size.action.exit.screensaver"
-  } else if is_host_mode {
-    "window_size.action.exit.host"
-  } else {
-    "window_size.action.exit.game"
-  };
   let hint = i18n.get_runtime_text("window_size", hint_key);
   let hint_w = layout.get_text_width(&hint, Some(&key_params));
   let hint_x = layout.resolve_host_x(LayoutService::ALIGN_CENTER, hint_w, 0);
@@ -211,22 +203,6 @@ fn draw_content(
   is_host_mode: bool,
   is_screensaver: bool,
 ) {
-  let positions = compute_positions(
-    layout,
-    i18n,
-    required_width,
-    required_height,
-    current_width,
-    current_height,
-    is_host_mode,
-    is_screensaver,
-  );
-  let key_params = build_key_params();
-
-  let title = i18n.get_runtime_text("window_size", "window_size.title");
-  let tip = i18n.get_runtime_text("window_size", "window_size.tip");
-  let required_prefix = i18n.get_runtime_text("window_size", "window_size.required");
-  let current_prefix = i18n.get_runtime_text("window_size", "window_size.current");
   let hint_key = if is_screensaver {
     "window_size.action.exit.screensaver"
   } else if is_host_mode {
@@ -234,6 +210,21 @@ fn draw_content(
   } else {
     "window_size.action.exit.game"
   };
+  let positions = compute_positions(
+    layout,
+    i18n,
+    required_width,
+    required_height,
+    current_width,
+    current_height,
+    hint_key,
+  );
+  let key_params = build_key_params();
+
+  let title = i18n.get_runtime_text("window_size", "window_size.title");
+  let tip = i18n.get_runtime_text("window_size", "window_size.tip");
+  let required_prefix = i18n.get_runtime_text("window_size", "window_size.required");
+  let current_prefix = i18n.get_runtime_text("window_size", "window_size.current");
   let hint = i18n.get_runtime_text("window_size", hint_key);
 
   let required_line = format!("{}{}×{}", required_prefix, required_width, required_height);

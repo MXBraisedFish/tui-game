@@ -15,7 +15,6 @@
   "game": {
     "name": "f%<fg:bright_green>Trail</fg> Runner",
     "detail": { "type": "i18n", "path": "display.json", "key": "detail", "callback": "Steer the runner, collect gems and never cross your own trail." },
-    "high_privilege": false,
     "mouse": false,
     "truecolor": false,
     "target_fps": 60,

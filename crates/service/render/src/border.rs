@@ -233,23 +233,17 @@ mod tests {
   #[test]
   fn resolve_uses_position_over_api() {
     let pos = BorderCharacter {
-      fg: Some(TextColor::Terminal(
-        tg_core_style::TerminalColor::Red,
-      )),
+      fg: Some(TextColor::Terminal(tg_core_style::TerminalColor::Red)),
       ..Default::default()
     };
     let style = pos.resolve(
-      Some(&TextColor::Terminal(
-        tg_core_style::TerminalColor::Blue,
-      )),
+      Some(&TextColor::Terminal(tg_core_style::TerminalColor::Blue)),
       None,
       None,
     );
     assert_eq!(
       style.foreground,
-      Some(TextColor::Terminal(
-        tg_core_style::TerminalColor::Red
-      ))
+      Some(TextColor::Terminal(tg_core_style::TerminalColor::Red))
     );
   }
 
@@ -257,17 +251,13 @@ mod tests {
   fn resolve_falls_back_to_api_when_position_none() {
     let pos = BorderCharacter::default();
     let style = pos.resolve(
-      Some(&TextColor::Terminal(
-        tg_core_style::TerminalColor::Green,
-      )),
+      Some(&TextColor::Terminal(tg_core_style::TerminalColor::Green)),
       None,
       None,
     );
     assert_eq!(
       style.foreground,
-      Some(TextColor::Terminal(
-        tg_core_style::TerminalColor::Green
-      ))
+      Some(TextColor::Terminal(tg_core_style::TerminalColor::Green))
     );
   }
 }

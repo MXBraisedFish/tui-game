@@ -13,10 +13,10 @@ use mlua::{Lua, Table};
 use super::LuaSessionKind;
 use super::object_pool::WeakLuaObjectPool;
 use super::{LuaI18nEvent, LuaI18nEventKind};
+use crate::LuaFileOperation;
 use tg_core_style::TextColor;
 use tg_service_file::FileTask;
 use tg_service_layout::Size;
-use crate::LuaFileOperation;
 use tg_service_random::RandomGeneratorId;
 use tg_service_render::BorderStyle;
 use tg_service_text_layout::DrawTextParams;
@@ -38,7 +38,6 @@ pub enum LuaCallPhase {
 #[derive(Clone, Debug)]
 pub struct LuaApiConfig {
   pub debug_enabled: bool,
-  pub safe_mode_enabled: bool,
   pub key_actions: HashMap<String, Vec<Vec<String>>>,
   pub key_default_actions: HashMap<String, Vec<Vec<String>>>,
   pub language_code: String,
@@ -49,7 +48,6 @@ impl Default for LuaApiConfig {
   fn default() -> Self {
     Self {
       debug_enabled: false,
-      safe_mode_enabled: true,
       key_actions: HashMap::new(),
       key_default_actions: HashMap::new(),
       language_code: "en_us".to_string(),
@@ -65,7 +63,6 @@ pub struct LuaApiContext {
   pub scripts_root: PathBuf,
   pub assets_root: PathBuf,
   pub debug_enabled: bool,
-  pub safe_mode_enabled: bool,
   pub base_size: Size,
   pub key_actions: HashMap<String, Vec<Vec<String>>>,
   pub key_default_actions: HashMap<String, Vec<Vec<String>>>,

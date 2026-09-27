@@ -26,7 +26,9 @@ use tg_service_async::TaskId;
 use tg_service_ffmpeg::{FfmpegInstallation, FfmpegService};
 use tg_service_recording::{RecordingPlayback, load_recording_playback};
 use tg_service_screenshot::{ScreenshotRect, TerminalFrameRasterizer};
-use tg_service_storage::{RecordingExportQuality, RecordingGpuAcceleration, RecordingProfile, StorageService};
+use tg_service_storage::{
+  RecordingExportQuality, RecordingGpuAcceleration, RecordingProfile, StorageService,
+};
 
 #[derive(Clone, Debug)]
 pub struct VideoExportTask {
@@ -34,6 +36,7 @@ pub struct VideoExportTask {
   pub output_path: PathBuf,
   pub ffmpeg: Option<FfmpegInstallation>,
   pub fonts: Vec<String>,
+  pub deployment_root: PathBuf,
   pub profile: RecordingProfile,
 }
 
@@ -183,6 +186,7 @@ impl VideoService {
         output_path: output_path.clone(),
         ffmpeg: ffmpeg.installation().cloned(),
         fonts,
+        deployment_root: storage.root_dir().to_path_buf(),
         profile,
       });
       self
@@ -360,7 +364,7 @@ fn export_recording<E: From<VideoAsyncEvent>>(
       "recording audio sidecar is missing",
     ));
   }
-  let rasterizer = TerminalFrameRasterizer::load(&task.fonts)
+  let rasterizer = TerminalFrameRasterizer::load(&task.fonts, &task.deployment_root)
     .map_err(|error| VideoExportError::new(VideoExportStage::Font, error))?;
   let (width, height) = TerminalFrameRasterizer::dimensions(
     metadata.max_width,
@@ -1100,12 +1104,12 @@ impl<E: From<VideoAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E> fo
 #[cfg(test)]
 mod tests {
   use super::*;
-  use tg_service_storage::{RecordingGpuAcceleration, RecordingPixelScale};
   use openh264::formats::YUVSource;
   use std::{
     io::BufReader,
     time::{Duration, SystemTime, UNIX_EPOCH},
   };
+  use tg_service_storage::{RecordingGpuAcceleration, RecordingPixelScale};
 
   fn test_directory(name: &str) -> PathBuf {
     let nonce = SystemTime::now()
@@ -1237,6 +1241,7 @@ mod tests {
       output_path: directory.join("recording.mp4"),
       ffmpeg: None,
       fonts: Vec::new(),
+      deployment_root: directory.clone(),
       profile: RecordingProfile {
         gpu_acceleration: RecordingGpuAcceleration::Off,
         ..Default::default()
@@ -1350,6 +1355,7 @@ mod tests {
       output_path: directory.join("recording.mp4"),
       ffmpeg: None,
       fonts: Vec::new(),
+      deployment_root: directory.clone(),
       profile: RecordingProfile {
         gpu_acceleration: RecordingGpuAcceleration::Auto,
         ..Default::default()
@@ -1390,6 +1396,7 @@ mod tests {
       output_path: directory.join("recording.mp4"),
       ffmpeg: ffmpeg.installation().cloned(),
       fonts: Vec::new(),
+      deployment_root: directory.clone(),
       profile: RecordingProfile {
         gpu_acceleration: RecordingGpuAcceleration::Off,
         ..Default::default()
@@ -1438,6 +1445,7 @@ mod tests {
       output_path: output_path.clone(),
       ffmpeg: None,
       fonts: Vec::new(),
+      deployment_root: directory.clone(),
       profile: RecordingProfile {
         gpu_acceleration: RecordingGpuAcceleration::Off,
         ..Default::default()

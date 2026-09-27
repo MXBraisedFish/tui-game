@@ -320,7 +320,14 @@ fn extremum(lua: &Lua, maximum: bool) -> mlua::Result<Function> {
       Value::Table(table) => table,
       value => return Err(args::invalid(method, "values", "table", &value)),
     };
-    let len = table.raw_len();
+    let declared_length = table.raw_get::<Value>("n")?;
+    let len = if matches!(declared_length, Value::Nil) {
+      table.raw_len()
+    } else {
+      let length = args::integer(declared_length, method, "values.n")?;
+      usize::try_from(length)
+        .map_err(|_| args::message(method, "values.n must be a non-negative integer"))?
+    };
     if len == 0 {
       return Err(args::message(method, "values must not be empty"));
     }

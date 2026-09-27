@@ -1,9 +1,9 @@
 use super::{ComposedCell, ComposedFrame};
+use tg_core_style::{CanvasCell, TextColor};
+use tg_core_unicode::graphemes;
+use tg_service_canvas::CanvasService;
 use tg_service_canvas::buffer::CanvasBuffer;
 use tg_service_canvas::{PreparedScrollBox, PreparedSurface};
-use tg_core_unicode::graphemes;
-use tg_core_style::{CanvasCell, TextColor};
-use tg_service_canvas::CanvasService;
 
 /// The frame compositor, stacking the base layer, the developer surfaces (slices and scroll boxes),
 /// the host layer and the top layer, in that order, into one composed frame.
@@ -247,5 +247,4 @@ mod tests {
       Some(ComposedCell::Text(cell)) if cell.text == "a"
     ));
   }
-
 }

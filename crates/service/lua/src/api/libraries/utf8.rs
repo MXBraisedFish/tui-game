@@ -91,30 +91,31 @@ pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
         ));
       }
       let start = args::optional_integer(&table, "utf8.char_position", "start", Some(1))?.unwrap();
-      let positions = text.char_indices().map(|(i, _)| i + 1).collect::<Vec<_>>();
-      let start = resolve_index(start, positions.len(), true);
+      let length = text.chars().count();
+      let start = resolve_index(start, length, true);
       let target = start.and_then(|start| {
         let value = start as i128 + index as i128 - 1;
-        (value >= 0 && value <= usize::MAX as i128).then_some(value as usize)
+        (value >= 0 && value < length as i128).then_some(value as usize)
       });
-      Ok(
-        target
-          .and_then(|i| positions.get(i).copied())
-          .map(|v| Value::Integer(v as i64))
-          .unwrap_or(Value::Nil),
-      )
+      let position =
+        target.and_then(|index| text.char_indices().nth(index).map(|(byte, _)| byte + 1));
+      Ok(position.map_or(Value::Nil, |position| Value::Integer(position as i64)))
     })?,
   )?;
   source.raw_set(
     "codepoints",
     lua.create_function(|lua, values: MultiValue| {
-      let text = args::string(
+      let text = args::lua_string(
         args::one("utf8.codepoints", "text", values)?,
         "utf8.codepoints",
         "text",
       )?;
       let byte_offset = std::rc::Rc::new(std::cell::Cell::new(0_usize));
       lua.create_function(move |lua, _: MultiValue| {
+        let text = text
+          .to_str()
+          .map_err(|_| args::message("utf8.codepoints", "text must be valid UTF-8"))?;
+        let text = text.as_ref();
         let offset = byte_offset.get();
         let Some(character) = text[offset..].chars().next() else {
           return Ok(Value::Nil);
@@ -131,21 +132,39 @@ pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
     "next",
     lua.create_function(|lua, values: MultiValue| {
       let table = args::named("utf8.next", values, &["text", "pos"])?;
-      let text = args::string(
+      let text = args::lua_string(
         args::required(&table, "utf8.next", "text")?,
         "utf8.next",
         "text",
       )?;
+      let text = text
+        .to_str()
+        .map_err(|_| args::message("utf8.next", "text must be valid UTF-8"))?;
+      let text = text.as_ref();
       let pos = args::optional_integer(&table, "utf8.next", "pos", None)?;
       if pos.is_some_and(|position| position < 1) {
         return Err(args::message("utf8.next", "pos must be at least 1"));
       }
-      let threshold = pos
-        .and_then(|position| usize::try_from(position).ok())
-        .unwrap_or_else(|| if pos.is_some() { usize::MAX } else { 0 });
-      let found = text
+      let start = match pos {
+        Some(position) => {
+          let Ok(position) = usize::try_from(position) else {
+            return Ok(Value::Nil);
+          };
+          if position > text.len() {
+            return Ok(Value::Nil);
+          }
+          let mut boundary = position;
+          while boundary < text.len() && !text.is_char_boundary(boundary) {
+            boundary += 1;
+          }
+          boundary
+        }
+        None => 0,
+      };
+      let found = text[start..]
         .char_indices()
-        .find(|(i, _)| pos.is_none() || *i + 1 > threshold);
+        .next()
+        .map(|(offset, character)| (start + offset, character));
       let Some((position, character)) = found else {
         return Ok(Value::Nil);
       };

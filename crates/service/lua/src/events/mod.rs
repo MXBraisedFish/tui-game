@@ -1,4 +1,5 @@
 mod broker;
+#[cfg(test)]
 mod translate;
 
 use mlua::{Lua, Table};
@@ -8,15 +9,9 @@ use tg_service_network::{NetworkError, NetworkErrorCode, NetworkMethod};
 
 pub use broker::{
   LuaEnqueueError, LuaEventBroker, LuaEventCallbackId, LuaEventDelivery, LuaEventRoute,
-  LuaRoutableEvent, LuaSessionToken, LuaTaskOperation, MAX_LUA_EVENTS_PER_FRAME, MAX_LUA_FILE_TASKS_PER_SESSION,
-  MAX_LUA_NETWORK_TASKS_PER_SESSION, MAX_LUA_PENDING_EVENTS,
+  LuaRoutableEvent, LuaSessionToken, LuaTaskOperation, MAX_LUA_EVENTS_PER_FRAME,
+  MAX_LUA_FILE_TASKS_PER_SESSION, MAX_LUA_NETWORK_TASKS_PER_SESSION, MAX_LUA_PENDING_EVENTS,
 };
-pub use translate::{
-  translate_animation_event, translate_delay_timer_event, translate_hit_area_event,
-  translate_hyperlink_event, translate_markdown_event, translate_repeat_timer_event,
-  translate_scroll_box_event, translate_text_input_event, translate_timer_event,
-};
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaActionState {
   Pressed,

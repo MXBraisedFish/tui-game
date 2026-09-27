@@ -1,20 +1,25 @@
 use std::fs;
 use std::io::ErrorKind;
+use std::{io, path::Path};
 
 use super::layout;
 use super::service::StorageService;
 use tg_service_log::{LogService, LogSource};
 
 /// Ensures the storage directories and default files exist, creating any that are missing.
-pub fn ensure_storage_layout(storage: &StorageService, log: &mut LogService) {
-  ensure_required_directories(storage, log);
-  ensure_default_files(storage, log);
+pub fn ensure_storage_layout(storage: &StorageService, log: &mut LogService) -> io::Result<()> {
+  ensure_required_directories(storage, log)?;
+  ensure_default_files(storage, log)
 }
 
-fn ensure_required_directories(storage: &StorageService, log: &mut LogService) {
+fn ensure_required_directories(storage: &StorageService, log: &mut LogService) -> io::Result<()> {
   for relative_dir in layout::REQUIRED_DIRECTORIES {
     let path = storage.path(relative_dir);
     if let Err(error) = fs::create_dir_all(&path) {
+      let detail = format!(
+        "create required storage directory {}: {error}",
+        path.display()
+      );
       log.fatal_message(
         LogSource::Boot,
         tg_service_log::HostLogMessage::new(
@@ -25,11 +30,13 @@ fn ensure_required_directories(storage: &StorageService, log: &mut LogService) {
         .param("target", path.display().to_string())
         .param("error", error.to_string()),
       );
+      return Err(io::Error::new(error.kind(), detail));
     }
   }
+  Ok(())
 }
 
-fn ensure_default_files(storage: &StorageService, log: &mut LogService) {
+fn ensure_default_files(storage: &StorageService, log: &mut LogService) -> io::Result<()> {
   for (relative_file, default_content) in layout::DEFAULT_FILES {
     let path = storage.path(relative_file);
     match fs::metadata(&path) {
@@ -46,6 +53,11 @@ fn ensure_default_files(storage: &StorageService, log: &mut LogService) {
             path.display().to_string(),
             error.to_string(),
           );
+          return Err(with_path_context(
+            "inspect default storage file",
+            &path,
+            error,
+          ));
         }
       }
     }
@@ -58,8 +70,11 @@ fn ensure_default_files(storage: &StorageService, log: &mut LogService) {
         parent.display().to_string(),
         error.to_string(),
       );
-
-      continue;
+      return Err(with_path_context(
+        "create default storage parent",
+        parent,
+        error,
+      ));
     }
     if let Err(error) = fs::write(&path, default_content) {
       log.error_operation_failed(
@@ -68,6 +83,19 @@ fn ensure_default_files(storage: &StorageService, log: &mut LogService) {
         path.display().to_string(),
         error.to_string(),
       );
+      return Err(with_path_context(
+        "create default storage file",
+        &path,
+        error,
+      ));
     }
   }
+  Ok(())
+}
+
+fn with_path_context(operation: &str, path: &Path, error: io::Error) -> io::Error {
+  io::Error::new(
+    error.kind(),
+    format!("{operation} {}: {error}", path.display()),
+  )
 }

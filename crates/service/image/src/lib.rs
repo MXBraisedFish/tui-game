@@ -2,14 +2,14 @@
 //! synchronously or as an async job.
 
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{self, File};
 use std::hash::{DefaultHasher, Hasher};
-use std::io;
+use std::io::{self, Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use crossbeam_channel::Sender;
-use image::GenericImageView;
+use image::{GenericImageView, ImageReader, Limits};
 use serde::{Deserialize, Serialize};
 use tg_service_async::{AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskStatusEvent};
 
@@ -17,8 +17,8 @@ use tg_service_async::{AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskSta
 #[derive(Clone, Debug)]
 pub struct ImageConvertParams {
   pub image_path: String,
-  pub output_width: u32,
-  pub output_height: u32,
+  pub output_width: Option<u32>,
+  pub output_height: Option<u32>,
   pub crop_x: i32,
   pub crop_y: i32,
   pub crop_width: Option<u32>,
@@ -32,8 +32,8 @@ impl Default for ImageConvertParams {
   fn default() -> Self {
     Self {
       image_path: String::new(),
-      output_width: 80,
-      output_height: 24,
+      output_width: Some(80),
+      output_height: Some(24),
       crop_x: 0,
       crop_y: 0,
       crop_width: None,
@@ -96,6 +96,14 @@ pub struct ImageService {
   cache_dir: Option<PathBuf>,
 }
 
+const MAX_SOURCE_FILE_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_SOURCE_PIXELS: u64 = 16_000_000;
+const MAX_SOURCE_DIMENSION: u32 = 16_384;
+const MAX_DECODE_ALLOCATION_BYTES: u64 = 80 * 1024 * 1024;
+const MAX_OUTPUT_DIMENSION: u32 = 2_048;
+const MAX_OUTPUT_CELLS: u64 = 16_384;
+const MAX_SCALED_PIXELS: u64 = 16_000_000;
+
 /// The format of a disk cache entry.
 #[derive(Serialize, Deserialize)]
 struct DiskCacheEntry {
@@ -122,7 +130,8 @@ impl ImageService {
     validate(&params)?;
 
     let resolved = resolve_path(&params.image_path)?;
-    let hash = compute_hash(&resolved, &params);
+    let source_bytes = read_source(&resolved)?;
+    let hash = compute_hash(&source_bytes, &params);
 
     if params.cache {
       // 1. Memory cache.
@@ -136,8 +145,7 @@ impl ImageService {
       }
     }
 
-    let img =
-      image::open(&resolved).map_err(|e| format!("无法打开图片 {}: {}", resolved.display(), e))?;
+    let img = decode_image(&source_bytes, &resolved)?;
 
     let result = process(&img, &params)?;
 
@@ -230,20 +238,95 @@ fn validate(p: &ImageConvertParams) -> Result<(), String> {
   if p.image_path.is_empty() {
     return Err("image_path 不能为空".into());
   }
-  if p.output_width == 0 {
+  if p.output_width == Some(0) {
     return Err("output_width 必须 > 0".into());
   }
-  if p.output_height == 0 {
+  if p.output_height == Some(0) {
     return Err("output_height 必须 > 0".into());
   }
-  if p.scale <= 0.0 {
+  if p.output_width.is_some_and(|width| width > MAX_OUTPUT_DIMENSION) {
+    return Err(format!("output_width 不得超过 {MAX_OUTPUT_DIMENSION}"));
+  }
+  if p.output_height.is_some_and(|height| height > MAX_OUTPUT_DIMENSION) {
+    return Err(format!("output_height 不得超过 {MAX_OUTPUT_DIMENSION}"));
+  }
+  if !p.scale.is_finite() || p.scale <= 0.0 {
     return Err("scale 必须 > 0".into());
+  }
+  if p.crop_x < 0 {
+    return Err("crop_x 不得小于 0".into());
+  }
+  if p.crop_y < 0 {
+    return Err("crop_y 不得小于 0".into());
   }
   if let Some(0) = p.crop_width {
     return Err("crop_width 必须 > 0".into());
   }
   if let Some(0) = p.crop_height {
     return Err("crop_height 必须 > 0".into());
+  }
+  Ok(())
+}
+
+fn read_source(path: &Path) -> Result<Vec<u8>, String> {
+  let file = File::open(path).map_err(|error| format!("无法读取图片 {}: {error}", path.display()))?;
+  let mut bytes = Vec::new();
+  file
+    .take(MAX_SOURCE_FILE_BYTES + 1)
+    .read_to_end(&mut bytes)
+    .map_err(|error| format!("读取图片 {} 失败: {error}", path.display()))?;
+  if bytes.len() as u64 > MAX_SOURCE_FILE_BYTES {
+    return Err(format!(
+      "图片文件 {} 超过 {} MiB 限制",
+      path.display(),
+      MAX_SOURCE_FILE_BYTES / (1024 * 1024)
+    ));
+  }
+  Ok(bytes)
+}
+
+fn decode_image(bytes: &[u8], path: &Path) -> Result<image::DynamicImage, String> {
+  let dimensions_reader = image_reader(bytes, path)?;
+  let (width, height) = dimensions_reader
+    .into_dimensions()
+    .map_err(|error| format!("读取图片尺寸 {} 失败: {error}", path.display()))?;
+  validate_source_dimensions(width, height, path)?;
+
+  let mut reader = image_reader(bytes, path)?;
+  reader.limits(Limits {
+    max_image_width: Some(MAX_SOURCE_DIMENSION),
+    max_image_height: Some(MAX_SOURCE_DIMENSION),
+    max_alloc: Some(MAX_DECODE_ALLOCATION_BYTES),
+  });
+  reader
+    .decode()
+    .map_err(|error| format!("无法解码图片 {}: {error}", path.display()))
+}
+
+fn image_reader<'a>(bytes: &'a [u8], path: &Path) -> Result<ImageReader<Cursor<&'a [u8]>>, String> {
+  ImageReader::new(Cursor::new(bytes))
+    .with_guessed_format()
+    .map_err(|error| format!("无法识别图片格式 {}: {error}", path.display()))
+}
+
+fn validate_source_dimensions(width: u32, height: u32, path: &Path) -> Result<(), String> {
+  if width == 0 || height == 0 {
+    return Err(format!("图片尺寸无效 {}: {width}×{height}", path.display()));
+  }
+  if width > MAX_SOURCE_DIMENSION || height > MAX_SOURCE_DIMENSION {
+    return Err(format!(
+      "图片尺寸 {} 超过单边 {} 像素限制: {width}×{height}",
+      path.display(),
+      MAX_SOURCE_DIMENSION
+    ));
+  }
+  let pixels = u64::from(width) * u64::from(height);
+  if pixels > MAX_SOURCE_PIXELS {
+    return Err(format!(
+      "图片像素数 {} 超过 {} 限制: {pixels}",
+      path.display(),
+      MAX_SOURCE_PIXELS
+    ));
   }
   Ok(())
 }
@@ -283,67 +366,136 @@ fn resolve_path(raw: &str) -> Result<PathBuf, String> {
 }
 
 // Computes the cache hash from the image path and the conversion parameters.
-fn compute_hash(resolved: &Path, p: &ImageConvertParams) -> u64 {
+fn compute_hash(source_bytes: &[u8], p: &ImageConvertParams) -> u64 {
   let mut h = DefaultHasher::new();
-
-  let input = format!(
-    "{}\x00{}\x00{}\x00{}\x00{}\x00{:?}\x00{:?}\x00{}\x00{:.6}\x00{}\x00{}",
-    resolved.display(),
-    p.output_width,
-    p.output_height,
-    p.crop_x,
-    p.crop_y,
-    p.crop_width,
-    p.crop_height,
-    p.square_crop,
-    p.scale,
-    p.cache,
-    tg_core_version::IMAGE_CACHE_FORMAT_VERSION,
-  );
-  h.write(input.as_bytes());
+  h.write(source_bytes);
+  hash_optional_u32(&mut h, p.output_width);
+  hash_optional_u32(&mut h, p.output_height);
+  h.write_i32(p.crop_x);
+  h.write_i32(p.crop_y);
+  hash_optional_u32(&mut h, p.crop_width);
+  hash_optional_u32(&mut h, p.crop_height);
+  h.write_u8(u8::from(p.square_crop));
+  h.write_u64(p.scale.to_bits());
+  h.write_u8(tg_core_version::IMAGE_CACHE_FORMAT_VERSION);
   h.finish()
+}
+
+fn hash_optional_u32(hasher: &mut impl Hasher, value: Option<u32>) {
+  match value {
+    Some(value) => {
+      hasher.write_u8(1);
+      hasher.write_u32(value);
+    }
+    None => hasher.write_u8(0),
+  }
 }
 
 // Crops and scales the image, then samples it into half-block character art.
 fn process(img: &image::DynamicImage, p: &ImageConvertParams) -> Result<String, String> {
   let (src_w, src_h) = img.dimensions();
-
-  let (cx, cy, cw, ch) = if p.square_crop {
-    let side = src_w.min(src_h);
-    ((src_w - side) / 2, (src_h - side) / 2, side, side)
-  } else {
-    let cx = p.crop_x.max(0) as u32;
-    let cy = p.crop_y.max(0) as u32;
-    let cw = p
-      .crop_width
-      .unwrap_or(src_w.saturating_sub(cx))
-      .min(src_w.saturating_sub(cx));
-    let ch = p
-      .crop_height
-      .unwrap_or(src_h.saturating_sub(cy))
-      .min(src_h.saturating_sub(cy));
-    (cx, cy, cw, ch)
-  };
-  if cw == 0 || ch == 0 {
-    return Err("裁剪区域为空".into());
-  }
+  let (cx, cy, cw, ch) = crop_area(src_w, src_h, p)?;
+  let (output_width, output_height) = output_dimensions(src_w, src_h, p)?;
+  let (scaled_width, scaled_height) = scaled_dimensions(cw, ch, p.scale)?;
 
   let rgba = img.to_rgba8();
   let cropped = image::imageops::crop_imm(&rgba, cx, cy, cw, ch).to_image();
 
   let scaled = if (p.scale - 1.0).abs() > f64::EPSILON {
-    let sw = ((cw as f64) * p.scale).round().max(1.0) as u32;
-    let sh = ((ch as f64) * p.scale).round().max(1.0) as u32;
-    image::imageops::resize(&cropped, sw, sh, image::imageops::FilterType::Lanczos3)
+    image::imageops::resize(
+      &cropped,
+      scaled_width,
+      scaled_height,
+      image::imageops::FilterType::Lanczos3,
+    )
   } else {
     cropped
   };
 
-  let pw = p.output_width;
-  let ph = p.output_height * 2;
+  let pw = output_width;
+  let ph = output_height
+    .checked_mul(2)
+    .ok_or_else(|| "output_height 超出支持范围".to_string())?;
   let resized = image::imageops::resize(&scaled, pw, ph, image::imageops::FilterType::Lanczos3);
 
   Ok(sample_halfblock(&resized, pw, ph))
+}
+
+fn crop_area(
+  source_width: u32,
+  source_height: u32,
+  params: &ImageConvertParams,
+) -> Result<(u32, u32, u32, u32), String> {
+  if params.square_crop {
+    let side = source_width.min(source_height);
+    return Ok(((source_width - side) / 2, (source_height - side) / 2, side, side));
+  }
+
+  let x = u32::try_from(params.crop_x).map_err(|_| "crop_x 不得小于 0".to_string())?;
+  let y = u32::try_from(params.crop_y).map_err(|_| "crop_y 不得小于 0".to_string())?;
+  if x >= source_width || y >= source_height {
+    return Err(format!(
+      "裁剪起点 ({x}, {y}) 超出图片范围 {source_width}×{source_height}"
+    ));
+  }
+
+  let width = params.crop_width.unwrap_or(source_width - x);
+  let height = params.crop_height.unwrap_or(source_height - y);
+  if x.checked_add(width).is_none_or(|right| right > source_width)
+    || y
+      .checked_add(height)
+      .is_none_or(|bottom| bottom > source_height)
+  {
+    return Err(format!(
+      "裁剪矩形 ({x}, {y}, {width}, {height}) 超出图片范围 {source_width}×{source_height}"
+    ));
+  }
+  if width == 0 || height == 0 {
+    return Err("裁剪区域为空".into());
+  }
+  Ok((x, y, width, height))
+}
+
+fn output_dimensions(
+  source_width: u32,
+  source_height: u32,
+  params: &ImageConvertParams,
+) -> Result<(u32, u32), String> {
+  let width = params.output_width.unwrap_or((source_width / 100).max(1));
+  let height = params.output_height.unwrap_or((source_height / 200).max(1));
+  if width == 0 || height == 0 {
+    return Err("输出宽高必须 > 0".into());
+  }
+  if width > MAX_OUTPUT_DIMENSION || height > MAX_OUTPUT_DIMENSION {
+    return Err(format!(
+      "输出尺寸不得超过单边 {MAX_OUTPUT_DIMENSION} 格: {width}×{height}"
+    ));
+  }
+  let cells = u64::from(width) * u64::from(height);
+  if cells > MAX_OUTPUT_CELLS {
+    return Err(format!(
+      "输出单元数 {cells} 超过 {MAX_OUTPUT_CELLS} 限制"
+    ));
+  }
+  Ok((width, height))
+}
+
+fn scaled_dimensions(width: u32, height: u32, scale: f64) -> Result<(u32, u32), String> {
+  let scaled_width = (f64::from(width) * scale).round().max(1.0);
+  let scaled_height = (f64::from(height) * scale).round().max(1.0);
+  if !scaled_width.is_finite()
+    || !scaled_height.is_finite()
+    || scaled_width > f64::from(MAX_SOURCE_DIMENSION)
+    || scaled_height > f64::from(MAX_SOURCE_DIMENSION)
+  {
+    return Err("缩放后的图片单边超过像素限制".into());
+  }
+  let scaled_width = scaled_width as u32;
+  let scaled_height = scaled_height as u32;
+  if u64::from(scaled_width) * u64::from(scaled_height) > MAX_SCALED_PIXELS {
+    return Err("缩放后的图片像素数超过限制".into());
+  }
+  Ok((scaled_width, scaled_height))
 }
 
 // Samples an RGBA image into a string of terminal half-block characters with foreground/background

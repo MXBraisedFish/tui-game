@@ -6,6 +6,8 @@ mod terminal_check;
 
 pub use boot_loading::{BootLoadingUi, BootProgress, BootStage};
 pub use exit::{ExitWarningCommand, ExitWarningMode, ExitWarningUi};
+pub(crate) use home::GameListRenderContext;
+pub(crate) use home::PackageListRenderContext;
 pub use home::{
   DisplaySettingsCommand, DisplaySettingsUi, GameKeyBindingsCommand, GameKeyBindingsUi,
   GameListCommand, GameListUi, GamePackageCommand, GamePackageUi, GlobalKeyBindingsCommand,
@@ -23,9 +25,8 @@ pub use home::{
 pub use overlay::{
   ClearWarningCommand, ClearWarningTarget, ClearWarningUi, CoverContinueCommand, CoverContinueUi,
   ExportFormat, ExportLoadingUi, ExportSettingsCommand, ExportSettingsUi, ExportType,
-  GameWarningCommand, GameWarningUi, LanguageLoadingUi, SafeModeWarningCommand, SafeModeWarningUi,
-  ScreensaverOverlayUi, ScreenshotCaptureCommand, ScreenshotCaptureUi, WindowSizeWarningCommand,
-  WindowSizeWarningUi,
+  GameWarningCommand, GameWarningUi, LanguageLoadingUi, ScreensaverOverlayUi,
+  ScreenshotCaptureCommand, ScreenshotCaptureUi, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 pub(crate) use terminal_check::TerminalCheckLayout;
 pub use terminal_check::{TerminalCheckCommand, TerminalCheckUi};

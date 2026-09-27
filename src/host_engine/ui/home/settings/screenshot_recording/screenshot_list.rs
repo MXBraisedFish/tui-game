@@ -24,8 +24,9 @@ impl MediaListSpec for ScreenshotListSpec {
       ("screenshot_list.scroll_up", "w"),
       ("screenshot_list.scroll_down", "s"),
       ("screenshot_list.scroll_left", "a"),
-      // D 在列表聚焦时删除，在信息栏聚焦时向右移动。输入服务会让
-      // 先注册的动作消费按键，因此必须由 del 统一接收后按面板分流。
+      // D deletes while the list is focused and scrolls right while the info panel is focused.
+      // The input service lets the action registered first consume the key, so `del` must
+      // receive it and dispatch it by the focused panel.
       ("screenshot_list.del", "d"),
       ("screenshot_list.scroll_right", "d"),
       ("screenshot_list.focus_up", "up"),

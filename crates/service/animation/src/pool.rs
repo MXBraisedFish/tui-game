@@ -4,8 +4,8 @@ use std::time::Duration;
 use super::{
   AnimationBinding, AnimationCallbackRequest, AnimationClock, AnimationEndMode, AnimationEvent,
   AnimationId, AnimationOwner, AnimationPlaybackOptions, AnimationRepeatOptions, AnimationSource,
-  AnimationTarget, AnimationValue, AnimationValueId, CellEffectId, EffectParameterId, PlaybackDirection,
-  PlaybackState,
+  AnimationTarget, AnimationValue, AnimationValueId, CellEffectId, EffectParameterId,
+  PlaybackDirection, PlaybackState,
 };
 
 pub(crate) use tg_core_arena::Arena;

@@ -16,12 +16,8 @@ pub(super) fn event(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           "event.clear_action"
         };
         let mut api = state.borrow_mut();
-        if api.context.session_kind != LuaSessionKind::Game || api.context.safe_mode_enabled {
-          ignore_once(
-            &mut api,
-            method,
-            "method requires a game with safe mode disabled",
-          );
+        if api.context.session_kind != LuaSessionKind::Game {
+          ignore_once(&mut api, method, "method requires a game session");
           return Ok(());
         }
         drop(api);

@@ -4,7 +4,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use mlua::{Lua, MultiValue, Table, Value};
 
 use super::*;
-use tg_service_random::{RandomConfiguration, RandomConfiguredRange, RandomGeneratedValue, RandomGeneratorId, RandomSeed, RandomService};
+use tg_service_random::{
+  RandomConfiguration, RandomConfiguredRange, RandomGeneratedValue, RandomGeneratorId, RandomSeed,
+  RandomService,
+};
 
 const MAX_GENERATORS: usize = 4096;
 static AUTO_SEED_SEQUENCE: AtomicU64 = AtomicU64::new(1);
@@ -83,10 +86,15 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       let configuration = configuration_from_create(&table, method)?;
       with_pool_mut(&create_state, method, |pool| {
         let service = RandomService::new();
-        if service.configured_ids(&pool.runtime().random_generators).len() >= MAX_GENERATORS {
+        if service
+          .configured_ids(&pool.runtime().random_generators)
+          .len()
+          >= MAX_GENERATORS
+        {
           return Err(args::message(method, "generator limit of 4096 was reached"));
         }
-        let id = service.create_configured(&mut pool.runtime_mut().random_generators, configuration);
+        let id =
+          service.create_configured(&mut pool.runtime_mut().random_generators, configuration);
         Ok(Value::String(lua.create_string(format_id(id))?))
       })
     })?,
@@ -128,7 +136,9 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         let service = RandomService::new();
         let ids = service.configured_ids(&pool.runtime().random_generators);
         for (index, id) in ids.iter().copied().enumerate() {
-          let configuration = service.configuration(&pool.runtime().random_generators, id).unwrap();
+          let configuration = service
+            .configuration(&pool.runtime().random_generators, id)
+            .unwrap();
           result.raw_set(index + 1, configuration_table(lua, id, configuration)?)?;
         }
         result.raw_set("n", ids.len())?;
@@ -144,7 +154,11 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       let method = "random.count";
       args::no_args(method, values)?;
       with_pool(&count_state, method, |pool| {
-        Ok(RandomService::new().configured_ids(&pool.runtime().random_generators).len())
+        Ok(
+          RandomService::new()
+            .configured_ids(&pool.runtime().random_generators)
+            .len(),
+        )
       })
     })?,
   )?;
@@ -162,11 +176,13 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         {
           return Err(args::message(method, "generator step is exhausted"));
         }
-        Ok(match service.generate_configured(&mut pool.runtime_mut().random_generators, id) {
-          Some(RandomGeneratedValue::Integer(value)) => Value::Integer(value),
-          Some(RandomGeneratedValue::Float(value)) => Value::Number(value),
-          None => Value::Nil,
-        })
+        Ok(
+          match service.generate_configured(&mut pool.runtime_mut().random_generators, id) {
+            Some(RandomGeneratedValue::Integer(value)) => Value::Integer(value),
+            Some(RandomGeneratedValue::Float(value)) => Value::Number(value),
+            None => Value::Nil,
+          },
+        )
       })
     })?,
   )
@@ -232,7 +248,8 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
       lua.create_function(move |lua, values: MultiValue| {
         let id = id_argument(values, method)?;
         with_pool(&state, method, |pool| {
-          let configuration = RandomService::new().configuration(&pool.runtime().random_generators, id);
+          let configuration =
+            RandomService::new().configuration(&pool.runtime().random_generators, id);
           Ok(match name {
             "get_type" => match configuration {
               Some(configuration) => {
@@ -292,7 +309,9 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
       let method = "random.get_info";
       let id = id_argument(values, method)?;
       with_pool(&state, method, |pool| {
-        let Some(configuration) = RandomService::new().configuration(&pool.runtime().random_generators, id) else {
+        let Some(configuration) =
+          RandomService::new().configuration(&pool.runtime().random_generators, id)
+        else {
           return Ok(Value::Nil);
         };
         Ok(Value::Table(configuration_table(lua, id, configuration)?))
@@ -540,8 +559,12 @@ fn with_direct_generator<R>(
   let existing = state.borrow().direct_random_id;
   with_pool_mut(state, method, |objects| {
     let service = RandomService::new();
-    let id = existing
-      .unwrap_or_else(|| service.create(&mut objects.runtime_mut().random_generators, RandomSeed::U64(auto_seed())));
+    let id = existing.unwrap_or_else(|| {
+      service.create(
+        &mut objects.runtime_mut().random_generators,
+        RandomSeed::U64(auto_seed()),
+      )
+    });
     if existing.is_none() {
       state.borrow_mut().direct_random_id = Some(id);
     }

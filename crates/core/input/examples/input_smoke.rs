@@ -1,6 +1,8 @@
 //! Minimal entry: translates an action map and round-trips a key token.
 
-use tg_core_input::{ActionMapEntry, Key, KeyPattern, key_token, parse_key_token, translate_action_map};
+use tg_core_input::{
+  ActionMapEntry, Key, KeyPattern, key_token, parse_key_token, translate_action_map,
+};
 
 fn main() {
   assert_eq!(parse_key_token(&key_token(Key::A)), Some(Key::A));

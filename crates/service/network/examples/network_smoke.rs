@@ -36,7 +36,9 @@ fn main() {
   assert_eq!(error.code, NetworkErrorCode::Unsupported);
 
   let loopback = NetworkRequest::get("http://127.0.0.1:9/", NetworkResponseMode::Text);
-  let task = network.submit(&runtime, loopback).expect("well-formed request");
+  let task = network
+    .submit(&runtime, loopback)
+    .expect("well-formed request");
   let deadline = Instant::now() + Duration::from_secs(5);
   while network.active_count() > 0 && Instant::now() < deadline {
     for event in runtime.poll_events() {

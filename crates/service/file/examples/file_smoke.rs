@@ -1,6 +1,9 @@
 //! Minimal entry: writes a text file through the async executor and reads it back.
 
-use std::time::{Duration, Instant};
+use std::{
+  path::PathBuf,
+  time::{Duration, Instant},
+};
 
 use tg_service_async::{AsyncRuntime, TaskStatusEvent};
 use tg_service_file::{FileEvent, FileService};
@@ -45,7 +48,8 @@ fn next_file_event(runtime: &AsyncRuntime<Event>) -> FileEvent {
 }
 
 fn main() {
-  let path = std::env::temp_dir().join(format!("tg_file_smoke_{}.txt", std::process::id()));
+  let root = create_temp_dir("tg_file_smoke");
+  let path = root.join("smoke.txt");
   let file = FileService::new();
   let runtime = AsyncRuntime::<Event>::with_worker_count(1);
 
@@ -64,6 +68,17 @@ fn main() {
     other => panic!("unexpected event after read: {other:?}"),
   }
 
-  let _ = std::fs::remove_file(&path);
+  std::fs::remove_dir_all(&root).expect("clean up temporary directory");
   println!("file ok: wrote and read back {}", path.display());
+}
+
+fn create_temp_dir(prefix: &str) -> PathBuf {
+  let nonce = std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_nanos();
+  let root = std::env::temp_dir().join(format!("{prefix}_{}_{nonce}", std::process::id()));
+  std::fs::create_dir(&root)
+    .unwrap_or_else(|error| panic!("create temporary directory {}: {error}", root.display()));
+  root
 }

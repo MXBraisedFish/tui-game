@@ -4,9 +4,8 @@ use std::{sync::Arc, time::Duration};
 
 use tg_service_animation::{
   AnimationBinding, AnimationClock, AnimationEasing, AnimationInterpolation, AnimationObjects,
-  AnimationOwner,
-  AnimationPlaybackOptions, AnimationProperty, AnimationService, AnimationSource, AnimationTarget,
-  AnimationValue, TweenDefinition,
+  AnimationOwner, AnimationPlaybackOptions, AnimationProperty, AnimationService, AnimationSource,
+  AnimationTarget, AnimationValue, TweenDefinition,
 };
 
 fn main() {
@@ -27,10 +26,19 @@ fn main() {
     initial_value: AnimationValue::Float(0.0),
   };
   service
-    .play(&mut objects, AnimationOwner::Host, tween, vec![binding], AnimationPlaybackOptions::default())
+    .play(
+      &mut objects,
+      AnimationOwner::Host,
+      tween,
+      vec![binding],
+      AnimationPlaybackOptions::default(),
+    )
     .expect("valid tween");
   service.update(&mut objects, AnimationClock::Ui, Duration::from_millis(500));
   let sampled = service.value(&objects, value).cloned();
   assert_eq!(sampled, Some(AnimationValue::Float(5.0)));
-  println!("animation ok: {sampled:?}, playbacks {}", objects.animation_count());
+  println!(
+    "animation ok: {sampled:?}, playbacks {}",
+    objects.animation_count()
+  );
 }

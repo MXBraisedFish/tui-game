@@ -1,20 +1,20 @@
+use std::io;
+use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
+use crate::host_engine::app::{BootOutput, EngineEvent, EngineServices, RuntimeWorld};
 use crate::host_engine::core::{
-  BootOutput, HostFault, HostFaultDomain, HostFaultPhase, RuntimeWorld, catch_host_fault,
-  with_fault_domain,
+  HostFault, HostFaultDomain, HostFaultPhase, catch_host_fault, with_fault_domain,
 };
-use crate::host_engine::services::{
-  EngineEvent, EngineServices, HOST_VERSION, HostLogMessage, LogSource, PackageEvent,
-};
+use crate::host_engine::services::{HOST_VERSION, HostLogMessage, LogSource, PackageEvent};
 use crate::host_engine::ui::{BootLoadingUi, BootProgress, BootStage};
 
 /// Prepares the engine and keeps ownership of partially initialized services
 /// when a supervised, post-terminal Boot fault occurs. This lets the caller
 /// show the normal exception page and perform an orderly shutdown.
-pub fn prepare() -> BootOutput {
-  let mut services = EngineServices::new();
+pub fn prepare(deployment_root: PathBuf) -> io::Result<BootOutput> {
+  let mut services = EngineServices::new(deployment_root)?;
   let world = RuntimeWorld::new();
 
   let result = catch_host_fault(HostFaultPhase::Boot, HostFaultDomain::Other, || {
@@ -39,16 +39,7 @@ pub fn prepare() -> BootOutput {
     )?;
     prepare_supervised(&mut services)
   });
-  let fault = match result {
-    Ok(Ok(())) => None,
-    Ok(Err(fault)) | Err(fault) => Some(fault),
-  };
-
-  BootOutput {
-    services,
-    world,
-    fault,
-  }
+  Ok(BootOutput::from_boot_result(services, world, result))
 }
 
 fn prepare_supervised(services: &mut EngineServices) -> Result<(), HostFault> {
@@ -192,7 +183,7 @@ fn wait_for_initial_package_scan(services: &mut EngineServices) -> Result<(), Ho
             _ => {}
           }
         }
-        EngineEvent::TaskFinished { .. } => {}
+        EngineEvent::TaskFinished => {}
         EngineEvent::TaskFailed { error, .. } => {
           return Err(HostFault::error(
             HostFaultPhase::Boot,

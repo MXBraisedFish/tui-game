@@ -92,7 +92,7 @@ local function advance()
     game.save_best()
     return
   end
-  table.insert { table = trail, value = { x = next_x, y = next_y } }
+  table.insert(trail, { x = next_x, y = next_y })
   if gem ~= nil and gem.x == next_x and gem.y == next_y then
     score = score + GEM_SCORE
     length = length + 2
@@ -102,7 +102,7 @@ local function advance()
     place_gem()
   end
   while #trail > length do
-    table.remove { table = trail, position = 1 }
+    table.remove(trail, 1)
   end
 end
 
@@ -173,10 +173,9 @@ function UpdateFrame(dt, alpha)
 end
 
 local function heading_name()
-  -- The host's pairs yields one { index, value } record per key.
-  for item in pairs(HEADINGS) do
-    if item.value == heading then
-      return item.index
+  for key, value in pairs(HEADINGS) do
+    if value == heading then
+      return key
     end
   end
   return "move_right"

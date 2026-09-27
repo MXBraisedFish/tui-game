@@ -1,7 +1,7 @@
 use super::types::{Position, Rect, Size};
 use super::{measure, position};
-use tg_service_text_layout::DrawTextParams;
 use tg_service_rich_text::RichTextParams;
+use tg_service_text_layout::DrawTextParams;
 
 /// The layout service, holding the terminal size and the developer viewport and resolving
 /// coordinates in them.
@@ -282,5 +282,4 @@ mod tests {
       )
     );
   }
-
 }

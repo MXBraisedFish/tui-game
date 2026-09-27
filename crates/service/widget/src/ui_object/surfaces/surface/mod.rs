@@ -1,8 +1,8 @@
 use super::scroll_box::resolve_scroll_box_layout;
 use super::slice::resolve_rect;
 use crate::UiObjectPool;
-use tg_service_canvas::{ScrollBoxFrame, SliceFrame, SurfaceFrame};
 use tg_service_canvas::CanvasService;
+use tg_service_canvas::{ScrollBoxFrame, SliceFrame, SurfaceFrame};
 use tg_service_layout::{LayoutService, Size};
 
 pub use tg_service_canvas::SurfaceId;
@@ -49,9 +49,12 @@ impl UiObjectPool {
 
 #[cfg(test)]
 mod tests {
+  use crate::{
+    Overflow, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility,
+    SliceLength, SliceOptions, SliceRect, SliceService, UiObjectPool,
+  };
   use tg_service_canvas::CanvasService;
   use tg_service_layout::{LayoutService, Rect, Size};
-  use crate::{Overflow, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, SliceLength, SliceOptions, SliceRect, SliceService, UiObjectPool};
 
   #[test]
   fn prepared_slice_queries_return_visible_prepared_size() {

@@ -306,7 +306,7 @@ mod tests {
     ka.insert("jump".to_string(), vec![vec!["shift".to_string()]]);
     let params = RichTextParams::from_key_actions(&ka);
     let rt = parse_auto("f%{key:jump}", Some(&params));
-    assert_eq!(rt.segments[0].text, "[Shift]");
+    assert_eq!(rt.segments[0].text, "[LShift]");
   }
 
   #[test]
@@ -316,6 +316,27 @@ mod tests {
     let params = RichTextParams::from_key_action_maps(&user, &defaults);
     let rt = parse_auto("f%{key:jump}/{key_default:jump}", Some(&params));
     assert_eq!(rt.segments[0].text, "[J]/[Space]");
+  }
+
+  #[test]
+  fn key_placeholders_use_the_shared_side_specific_modifier_display() {
+    let user = HashMap::from([(
+      "jump".to_string(),
+      vec![vec!["left_ctrl".into(), "j".into()]],
+    )]);
+    let defaults = HashMap::from([(
+      "jump".to_string(),
+      vec![vec!["right_shift".into(), "k".into()]],
+    )]);
+    let params = RichTextParams::from_key_action_maps(&user, &defaults);
+    let rendered = parse_auto("f%{key:jump}/{key_default:jump}", Some(&params));
+    let expected = format!(
+      "{}/{}",
+      format_key_display(&user["jump"]),
+      format_key_display(&defaults["jump"])
+    );
+
+    assert_eq!(rendered.segments[0].text, expected);
   }
 
   #[test]
@@ -347,7 +368,7 @@ mod tests {
     );
     let params = make_params(HashMap::new(), ka);
     let rt = parse_auto("f%{key:move}", Some(&params));
-    assert_eq!(rt.segments[0].text, "[D]/[Shift + ←]");
+    assert_eq!(rt.segments[0].text, "[D]/[LShift + ←]");
   }
 
   #[test]

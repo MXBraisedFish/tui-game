@@ -3,9 +3,9 @@ use std::time::Duration;
 
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
-  HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
-  UiObjectPoolOwner,
+  HitAreaService, I18nService, ImageService, KeyState, LayoutService, LogService, MouseButton,
+  PackageService, Rect, RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner,
+  ScrollBoxService, StorageService, TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub mod game;
@@ -15,7 +15,7 @@ const MODS_MENU_LEN: usize = 2;
 
 const MENU_KEYS: &[&str] = &["mods.game", "mods.screensaver"];
 
-/// 模组管理页面布局信息。
+/// Screen layout of the mods page.
 pub(crate) struct ModsLayout {
   title_x: u16,
   title_y: u16,
@@ -24,7 +24,35 @@ pub(crate) struct ModsLayout {
   hint_y: u16,
 }
 
-/// 模组管理 UI：提供游戏包和屏保包的管理入口。
+pub(crate) struct PackageListRenderContext<'a> {
+  pub(crate) render: &'a mut RenderService,
+  pub(crate) canvas: &'a mut CanvasService,
+  pub(crate) layout: &'a LayoutService,
+  pub(crate) i18n: &'a I18nService,
+  pub(crate) hit_area: &'a HitAreaService,
+  pub(crate) text_input: &'a TextInputService,
+  pub(crate) scroll_box: &'a ScrollBoxService,
+  pub(crate) package: &'a PackageService,
+  pub(crate) storage: &'a StorageService,
+  pub(crate) log: &'a mut LogService,
+  pub(crate) image: &'a mut ImageService,
+  pub(crate) mouse_supported: bool,
+  pub(crate) truecolor_supported: bool,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct PackageInfoRenderArea {
+  pub(crate) rect: Rect,
+  pub(crate) scroll_y: u16,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct PackageInfoTextPosition {
+  pub(crate) x: u16,
+  pub(crate) y: u16,
+}
+
+/// Mods page that leads to the game package and screensaver package managers.
 pub struct ModsUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -53,7 +81,7 @@ impl RuntimeObjectPoolOwner for ModsUi {
   }
 }
 
-/// 模组管理页面的命令。
+/// Command emitted by the mods page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModsCommand {
   OpenGame,
@@ -62,7 +90,7 @@ pub enum ModsCommand {
 }
 
 impl ModsUi {
-  /// 初始化模组管理页面 UI。
+  /// Creates the mods page UI.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -74,7 +102,7 @@ impl ModsUi {
     }
   }
 
-  /// 返回模组管理页面的按键映射定义。
+  /// Returns the action map (key bindings) of the mods page.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -110,7 +138,7 @@ impl ModsUi {
     ]
   }
 
-  /// 处理 UI 事件，返回导航或确认命令。
+  /// Handles a UI event and returns the navigation or confirm command it triggers, if any.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ModsCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -159,7 +187,7 @@ impl ModsUi {
     None
   }
 
-  /// 渲染模组管理页面到宿主层。
+  /// Draws the mods page onto the host layer.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -177,7 +205,8 @@ impl ModsUi {
     }
   }
 
-  /// 根据布局服务计算模组管理页面各元素的宿主坐标。
+  /// Computes the host coordinates of every element of the mods page from the
+  /// [`LayoutService`].
   pub fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> ModsLayout {
     let params = self.build_key_params();
     let viewport = layout.developer_viewport_rect();

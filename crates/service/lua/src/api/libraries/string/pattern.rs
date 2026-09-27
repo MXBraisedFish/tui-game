@@ -1,6 +1,8 @@
 use std::ops::Range;
 
 const MAX_PATTERN_STEPS: usize = 1_000_000;
+const MAX_PATTERN_OPS: usize = 512;
+pub const MAX_CAPTURE_GROUPS: usize = 32;
 
 #[derive(Clone, Debug)]
 pub enum LuaCapture {
@@ -15,10 +17,7 @@ pub struct LuaCaptures {
 }
 
 impl LuaCaptures {
-  pub fn len(&self) -> usize {
-    self.captures.len() + 1
-  }
-
+  #[cfg(test)]
   pub fn value(&self, index: usize) -> Option<LuaCapture> {
     if index == 0 {
       Some(LuaCapture::Text(self.full.clone()))
@@ -108,35 +107,33 @@ struct MatchState {
   starts: Vec<Option<usize>>,
 }
 
-struct Input<'a> {
-  text: &'a str,
-  chars: Vec<char>,
-  bytes: Vec<usize>,
+#[derive(Clone, Debug)]
+pub struct LuaPatternInput {
+  bytes: Vec<u32>,
 }
 
-impl<'a> Input<'a> {
-  fn new(text: &'a str) -> Self {
+impl LuaPatternInput {
+  pub fn new(text: &str) -> Self {
     let mut bytes = text
       .char_indices()
-      .map(|(index, _)| index)
+      .map(|(index, _)| index as u32)
       .collect::<Vec<_>>();
-    bytes.push(text.len());
-    Self {
-      text,
-      chars: text.chars().collect(),
-      bytes,
-    }
+    bytes.push(text.len() as u32);
+    Self { bytes }
+  }
+
+  fn len(&self) -> usize {
+    self.bytes.len() - 1
+  }
+
+  fn char_at(&self, text: &str, index: usize) -> Option<char> {
+    let start = *self.bytes.get(index)? as usize;
+    let end = *self.bytes.get(index + 1)? as usize;
+    text.get(start..end)?.chars().next()
   }
 
   fn byte_range(&self, range: Range<usize>) -> Range<usize> {
-    self.bytes[range.start]..self.bytes[range.end]
-  }
-
-  fn capture_text(&self, capture: &LuaCapture) -> Option<&'a str> {
-    let LuaCapture::Text(range) = capture else {
-      return None;
-    };
-    Some(&self.text[self.byte_range(range.clone())])
+    self.bytes[range.start] as usize..self.bytes[range.end] as usize
   }
 }
 
@@ -153,6 +150,9 @@ impl LuaPattern {
     if parser.index != chars.len() {
       return Err("unexpected ')' in pattern".to_string());
     }
+    if ops.len() > MAX_PATTERN_OPS {
+      return Err(format!("pattern exceeds {MAX_PATTERN_OPS} operations"));
+    }
     Ok(Self {
       ops,
       capture_count: parser.capture_count,
@@ -165,23 +165,34 @@ impl LuaPattern {
     self.captures_with_steps(text, start, &mut steps)
   }
 
-  pub fn captures_incremental(
-    &self,
-    text: &str,
-    start: usize,
-    steps: &mut usize,
-  ) -> Result<Option<LuaCaptures>, String> {
-    self.captures_with_steps(text, start, steps)
-  }
-
   fn captures_with_steps(
     &self,
     text: &str,
     start: usize,
     steps: &mut usize,
   ) -> Result<Option<LuaCaptures>, String> {
-    let input = Input::new(text);
-    let first = start.min(input.chars.len());
+    let input = LuaPatternInput::new(text);
+    self.captures_in_input(text, &input, start, steps)
+  }
+
+  pub fn captures_incremental_with_input(
+    &self,
+    text: &str,
+    input: &LuaPatternInput,
+    start: usize,
+    steps: &mut usize,
+  ) -> Result<Option<LuaCaptures>, String> {
+    self.captures_in_input(text, input, start, steps)
+  }
+
+  fn captures_in_input(
+    &self,
+    text: &str,
+    input: &LuaPatternInput,
+    start: usize,
+    steps: &mut usize,
+  ) -> Result<Option<LuaCaptures>, String> {
+    let first = start.min(input.len());
     let positions: Box<dyn Iterator<Item = usize>> = if self.anchored {
       if first == 0 {
         Box::new(std::iter::once(0))
@@ -189,14 +200,14 @@ impl LuaPattern {
         Box::new(std::iter::empty())
       }
     } else {
-      Box::new(first..=input.chars.len())
+      Box::new(first..=input.len())
     };
     for position in positions {
       let state = MatchState {
         captures: vec![None; self.capture_count],
         starts: vec![None; self.capture_count],
       };
-      if let Some((end, state)) = self.match_ops(&input, 0, position, state, steps)? {
+      if let Some((end, state)) = self.match_ops(text, input, 0, position, state, steps)? {
         let full = input.byte_range(position..end);
         let captures = state
           .captures
@@ -228,16 +239,15 @@ impl LuaPattern {
     text: &str,
     limit: usize,
   ) -> Result<Vec<LuaCaptures>, String> {
-    let char_bytes = text
-      .char_indices()
-      .map(|(index, _)| index)
-      .collect::<Vec<_>>();
+    let input = LuaPatternInput::new(text);
     let mut byte_start = 0;
     let mut output = Vec::new();
     let mut steps = 0;
     while byte_start <= text.len() && output.len() < limit {
-      let char_start = char_bytes.partition_point(|index| *index < byte_start);
-      let Some(captures) = self.captures_with_steps(text, char_start, &mut steps)? else {
+      let char_start = input
+        .bytes
+        .partition_point(|index| *index < byte_start as u32);
+      let Some(captures) = self.captures_in_input(text, &input, char_start, &mut steps)? else {
         break;
       };
       let next = if captures.full.end > captures.full.start {
@@ -258,7 +268,8 @@ impl LuaPattern {
 
   fn match_ops(
     &self,
-    input: &Input<'_>,
+    text: &str,
+    input: &LuaPatternInput,
     op_index: usize,
     position: usize,
     mut state: MatchState,
@@ -274,37 +285,36 @@ impl LuaPattern {
     match op {
       Op::CaptureStart(index) => {
         state.starts[*index] = Some(position);
-        self.match_ops(input, op_index + 1, position, state, steps)
+        self.match_ops(text, input, op_index + 1, position, state, steps)
       }
       Op::CaptureEnd(index) => {
         let Some(start) = state.starts[*index] else {
           return Ok(None);
         };
         state.captures[*index] = Some(LuaCapture::Text(start..position));
-        self.match_ops(input, op_index + 1, position, state, steps)
+        self.match_ops(text, input, op_index + 1, position, state, steps)
       }
       Op::CapturePosition(index) => {
         state.captures[*index] = Some(LuaCapture::Position(position));
-        self.match_ops(input, op_index + 1, position, state, steps)
+        self.match_ops(text, input, op_index + 1, position, state, steps)
       }
       Op::Frontier(set) => {
         let previous_matches = position
           .checked_sub(1)
-          .and_then(|index| input.chars.get(index))
-          .is_some_and(|value| set.matches(*value));
+          .and_then(|index| input.char_at(text, index))
+          .is_some_and(|value| set.matches(value));
         let current_matches = input
-          .chars
-          .get(position)
-          .is_some_and(|value| set.matches(*value));
+          .char_at(text, position)
+          .is_some_and(|value| set.matches(value));
         if !previous_matches && current_matches {
-          self.match_ops(input, op_index + 1, position, state, steps)
+          self.match_ops(text, input, op_index + 1, position, state, steps)
         } else {
           Ok(None)
         }
       }
       Op::End => {
-        if position == input.chars.len() {
-          self.match_ops(input, op_index + 1, position, state, steps)
+        if position == input.len() {
+          self.match_ops(text, input, op_index + 1, position, state, steps)
         } else {
           Ok(None)
         }
@@ -312,13 +322,13 @@ impl LuaPattern {
       Op::Atom(atom, quantifier) => {
         let mut positions = vec![position];
         let mut current = position;
-        while let Some(next) = atom.matches(input, current, &state, steps)? {
+        while let Some(next) = atom.matches(text, input, current, &state, steps)? {
           if next == current {
             break;
           }
           positions.push(next);
           current = next;
-          if positions.len() > input.chars.len() + 1 {
+          if positions.len() > input.len() + 1 {
             break;
           }
         }
@@ -331,7 +341,7 @@ impl LuaPattern {
         };
         for candidate in candidates {
           if let Some(result) =
-            self.match_ops(input, op_index + 1, candidate, state.clone(), steps)?
+            self.match_ops(text, input, op_index + 1, candidate, state.clone(), steps)?
           {
             return Ok(Some(result));
           }
@@ -345,7 +355,8 @@ impl LuaPattern {
 impl Atom {
   fn matches(
     &self,
-    input: &Input<'_>,
+    text: &str,
+    input: &LuaPatternInput,
     position: usize,
     state: &MatchState,
     steps: &mut usize,
@@ -354,7 +365,7 @@ impl Atom {
     if *steps > MAX_PATTERN_STEPS {
       return Err("pattern exceeded 1000000 matching steps".to_string());
     }
-    let value = input.chars.get(position).copied();
+    let value = input.char_at(text, position);
     Ok(match self {
       Self::Any => value.map(|_| position + 1),
       Self::Literal(expected) => (value == Some(*expected)).then_some(position + 1),
@@ -368,21 +379,20 @@ impl Atom {
         if value != Some(*open) {
           None
         } else if open == close {
-          input.chars[position + 1..]
-            .iter()
-            .position(|value| value == close)
-            .map(|offset| position + offset + 2)
+          (position + 1..input.len())
+            .find(|index| input.char_at(text, *index) == Some(*close))
+            .map(|index| index + 1)
         } else {
           let mut depth = 1_usize;
           let mut end = position + 1;
-          while let Some(value) = input.chars.get(end) {
+          while let Some(value) = input.char_at(text, end) {
             *steps += 1;
             if *steps > MAX_PATTERN_STEPS {
               return Err("pattern exceeded 1000000 matching steps".to_string());
             }
-            if value == open {
+            if value == *open {
               depth += 1;
-            } else if value == close {
+            } else if value == *close {
               depth -= 1;
               if depth == 0 {
                 break;
@@ -395,17 +405,21 @@ impl Atom {
       }
       Self::BackReference(index) => {
         let capture = state.captures.get(*index).and_then(Option::as_ref);
-        let Some(capture) = capture.and_then(|capture| input.capture_text(capture)) else {
+        let Some(LuaCapture::Text(capture)) = capture else {
           return Ok(None);
         };
-        let count = capture.chars().count();
+        let count = capture.end - capture.start;
         let end = position.saturating_add(count);
-        (end <= input.chars.len()
-          && input.chars[position..end]
-            .iter()
-            .copied()
-            .eq(capture.chars()))
-        .then_some(end)
+        if end > input.len() {
+          None
+        } else {
+          let capture_bytes = input.byte_range(capture.clone());
+          let matched_bytes = input.byte_range(position..end);
+          text[capture_bytes]
+            .chars()
+            .eq(text[matched_bytes].chars())
+            .then_some(end)
+        }
       }
     })
   }
@@ -608,8 +622,8 @@ impl Parser<'_> {
   }
 
   fn new_capture(&mut self) -> Result<usize, String> {
-    if self.capture_count >= 32 {
-      return Err("pattern exceeds 32 captures".to_string());
+    if self.capture_count >= MAX_CAPTURE_GROUPS {
+      return Err(format!("pattern exceeds {MAX_CAPTURE_GROUPS} captures"));
     }
     let value = self.capture_count;
     self.capture_count += 1;
@@ -675,6 +689,16 @@ mod tests {
     let position = LuaPattern::compile("()b").unwrap();
     let captures = position.captures("abc", 0).unwrap().unwrap();
     assert!(matches!(captures.value(1), Some(LuaCapture::Position(2))));
+  }
+
+  #[test]
+  fn patterns_with_excessive_operation_depth_are_rejected() {
+    let pattern = "a".repeat(MAX_PATTERN_OPS + 1);
+    assert!(
+      LuaPattern::compile(&pattern)
+        .unwrap_err()
+        .contains("operations")
+    );
   }
 
   #[test]

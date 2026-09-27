@@ -2,16 +2,17 @@ use std::{cmp::Ordering, time::Duration};
 
 use unicode_width::UnicodeWidthStr;
 
+use super::{PackageInfoRenderArea, PackageInfoTextPosition, PackageListRenderContext};
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
-  HitAreaOptions, HitAreaService, I18nService, ImageConvertParams, ImageService, KeyState,
-  LayoutService, LogService, MouseButton, Overflow, PackageAsset, PackageListEntry, PackageService,
-  Rect, RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
-  ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility,
-  StorageService, TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent,
-  TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle,
-  UiEvent, UiObjectPool, UiObjectPoolOwner,
+  HitAreaOptions, HitAreaService, I18nService, ImageConvertParams, KeyState, LayoutService,
+  LogService, MouseButton, Overflow, PackageAsset, PackageListEntry, Rect, RenderService,
+  RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxId,
+  ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, StorageService,
+  TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent, TextInputId,
+  TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent,
+  UiObjectPool, UiObjectPoolOwner,
 };
 
 /// 屏保包详情页面的命令。
@@ -468,104 +469,92 @@ impl ScreensaverPackageUi {
   }
 
   /// 渲染屏保包详情页面。
-  pub fn render(
-    &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    hit_area: &HitAreaService,
-    text_input: &TextInputService,
-    scroll_box: &ScrollBoxService,
-    package: &PackageService,
-    storage: &StorageService,
-    log: &mut LogService,
-    image: &mut ImageService,
-    truecolor_supported: bool,
-  ) {
-    self.sync_entries(package.mod_screensavers(), storage, log);
-    let positions = self.compute_positions(layout, i18n, text_input);
+  pub fn render(&mut self, context: &mut PackageListRenderContext<'_>) {
+    self.sync_entries(
+      context.package.mod_screensavers(),
+      context.storage,
+      context.log,
+    );
+    let positions = self.compute_positions(context.layout, context.i18n, context.text_input);
 
     self.sync_selection_for_per_page(positions.visible_items);
 
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.page_area,
-      layout.developer_viewport_rect(),
-      canvas,
+      context.layout.developer_viewport_rect(),
+      context.canvas,
     );
 
-    let viewport = layout.developer_viewport_rect();
+    let viewport = context.layout.developer_viewport_rect();
     let info_scroll_rect = Rect {
       x: positions.right_inner.x.saturating_sub(viewport.x),
       y: positions.right_inner.y.saturating_sub(viewport.y),
       width: positions.right_inner.width,
       height: positions.right_inner.height,
     };
-    scroll_box.set_rect(
+    context.scroll_box.set_rect(
       &mut self.objects,
       self.info_scroll,
       info_scroll_rect,
-      layout,
+      context.layout,
     );
-    let info_content_height = self.info_content_height(layout, positions.right_inner.width);
-    scroll_box.set_content_size(
+    let info_content_height = self.info_content_height(context.layout, positions.right_inner.width);
+    context.scroll_box.set_content_size(
       &mut self.objects,
       self.info_scroll,
       positions.right_inner.width.max(1),
       info_content_height,
-      layout,
+      context.layout,
     );
-    self.objects.prepare_canvas(canvas, layout);
+    self.objects.prepare_canvas(context.canvas, context.layout);
 
-    let info_scroll_y = scroll_box
+    let info_scroll_y = context
+      .scroll_box
       .scroll_y(&self.objects, self.info_scroll)
       .unwrap_or(0);
-    self.draw_right_panel(
-      render,
-      canvas,
-      layout,
-      i18n,
-      image,
-      truecolor_supported,
+    self.draw_right_panel(context, &positions, info_scroll_y);
+    self.draw_left_panel(context, &positions);
+    self.draw_action_hint(
+      context.render,
+      context.canvas,
+      context.i18n,
+      context.text_input,
       &positions,
-      info_scroll_y,
     );
-    self.draw_left_panel(render, canvas, layout, i18n, image, &positions, text_input);
-    self.draw_action_hint(render, canvas, i18n, text_input, &positions);
 
     if self.page > 1 {
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         self.flip_forward_area,
         positions.flip_forward_rect,
-        canvas,
+        context.canvas,
       );
     }
     if self.page < self.total_pages() {
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         self.flip_backward_area,
         positions.flip_backward_rect,
-        canvas,
+        context.canvas,
       );
     }
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.order_area,
       positions.order_rect,
-      canvas,
+      context.canvas,
     );
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.sort_area,
       positions.sort_rect,
-      canvas,
+      context.canvas,
     );
 
     let entries_len = self.page_entries().len();
     if self.needs_rebuild_areas || self.list_item_areas.len() != entries_len {
-      self.rebuild_list_areas(hit_area);
+      self.rebuild_list_areas(context.hit_area);
       self.needs_rebuild_areas = false;
     }
 
@@ -576,7 +565,7 @@ impl ScreensaverPackageUi {
       let item_y = positions
         .list_start_y
         .saturating_add(i as u16 * (positions.list_item_height + positions.list_item_gap));
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         *area_id,
         Rect {
@@ -585,7 +574,7 @@ impl ScreensaverPackageUi {
           width: positions.left_inner.width,
           height: positions.list_item_height,
         },
-        canvas,
+        context.canvas,
       );
     }
   }
@@ -754,16 +743,11 @@ impl ScreensaverPackageUi {
 
   fn draw_left_panel(
     &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    image: &mut ImageService,
+    context: &mut PackageListRenderContext<'_>,
     pos: &ScreensaverPackageLayout,
-    text_input: &TextInputService,
   ) {
-    render.draw_host_border_rect(
-      canvas,
+    context.render.draw_host_border_rect(
+      context.canvas,
       pos.left_rect.x,
       pos.left_rect.y,
       pos.left_rect.width,
@@ -775,18 +759,20 @@ impl ScreensaverPackageUi {
       None,
     );
     self.draw_panel_title(
-      render,
-      canvas,
+      context.render,
+      context.canvas,
       pos.left_rect,
-      &i18n.get_runtime_text("screensaver_pack", "screensaver_pack.list"),
+      &context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.list"),
     );
 
-    text_input.render_host(
+    context.text_input.render_host(
       &mut self.objects,
       self.search_input,
       &TextInputRenderParams {
         rect: pos.search_rect,
-        placeholder: i18n.get_runtime_text(
+        placeholder: context.i18n.get_runtime_text(
           "screensaver_pack",
           "screensaver_pack.list.search.placeholder",
         ),
@@ -799,9 +785,9 @@ impl ScreensaverPackageUi {
         placeholder_fg: Some(TextColor::Terminal(TerminalColor::BrightBlack)),
         ..Default::default()
       },
-      canvas,
+      context.canvas,
     );
-    self.draw_sort_separator(render, canvas, i18n, pos);
+    self.draw_sort_separator(context.render, context.canvas, context.i18n, pos);
 
     let entries = self.page_entries();
     for (i, entry) in entries.iter().enumerate() {
@@ -809,35 +795,22 @@ impl ScreensaverPackageUi {
         .list_start_y
         .saturating_add(i as u16 * (pos.list_item_height + pos.list_item_gap));
       if self.simple_list {
-        self.draw_entry_simple(
-          render,
-          canvas,
-          i18n,
-          pos,
-          entry,
-          y,
-          i == self.selected_index,
-        );
+        self.draw_entry_simple(context, pos, entry, y, i == self.selected_index);
       } else {
-        self.draw_entry_card(
-          render,
-          canvas,
-          layout,
-          image,
-          i18n,
-          pos,
-          entry,
-          y,
-          i == self.selected_index,
-        );
+        self.draw_entry_card(context, pos, entry, y, i == self.selected_index);
       }
     }
 
     if entries.is_empty() {
-      let text = i18n.get_runtime_text("screensaver_pack", "screensaver_pack.no.pack");
-      let width = layout.get_text_width(&text, None).min(pos.left_inner.width);
-      render.draw_host_text(
-        canvas,
+      let text = context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.no.pack");
+      let width = context
+        .layout
+        .get_text_width(&text, None)
+        .min(pos.left_inner.width);
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos
             .left_inner
@@ -854,22 +827,29 @@ impl ScreensaverPackageUi {
     }
 
     let total = self.total_pages_for(pos.visible_items).max(1);
-    if !text_input.is_focused(&self.objects, self.jump_input)
+    if !context
+      .text_input
+      .is_focused(&self.objects, self.jump_input)
       && self.jump_text != self.page.to_string()
     {
-      let _ = text_input.set_text(&mut self.objects, self.jump_input, self.page.to_string());
+      let _ =
+        context
+          .text_input
+          .set_text(&mut self.objects, self.jump_input, self.page.to_string());
       self.jump_text = self.page.to_string();
     }
     let key_params = RichTextParams::from_action_map(&Self::action_map(), "screensaver_pack.");
     if self.page > 1 {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos.flip_forward_rect.x,
           y: pos.flip_forward_rect.y,
           text: format!(
             "f%<fg:bright_black>{}</fg>",
-            i18n.get_runtime_text("screensaver_pack", "screensaver_pack.flip.forward")
+            context
+              .i18n
+              .get_runtime_text("screensaver_pack", "screensaver_pack.flip.forward")
           ),
           params: Some(key_params.clone()),
           max_width: Some(pos.flip_forward_rect.width),
@@ -878,14 +858,16 @@ impl ScreensaverPackageUi {
       );
     }
     if self.page < total {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos.flip_backward_rect.x,
           y: pos.flip_backward_rect.y,
           text: format!(
             "f%<fg:bright_black>{}</fg>",
-            i18n.get_runtime_text("screensaver_pack", "screensaver_pack.flip.backward")
+            context
+              .i18n
+              .get_runtime_text("screensaver_pack", "screensaver_pack.flip.backward")
           ),
           params: Some(key_params),
           max_width: Some(pos.flip_backward_rect.width),
@@ -894,8 +876,10 @@ impl ScreensaverPackageUi {
       );
     }
 
-    let jump_focused = text_input.is_focused(&self.objects, self.jump_input);
-    text_input.render_host(
+    let jump_focused = context
+      .text_input
+      .is_focused(&self.objects, self.jump_input);
+    context.text_input.render_host(
       &mut self.objects,
       self.jump_input,
       &TextInputRenderParams {
@@ -915,10 +899,10 @@ impl ScreensaverPackageUi {
         text_align: TextAlign::Right,
         ..Default::default()
       },
-      canvas,
+      context.canvas,
     );
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: pos.page_separator_x,
         y: pos.page_y,
@@ -926,8 +910,8 @@ impl ScreensaverPackageUi {
         ..Default::default()
       },
     );
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: pos.total_page_x,
         y: pos.page_y,
@@ -939,11 +923,7 @@ impl ScreensaverPackageUi {
 
   fn draw_entry_card(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    image: &mut ImageService,
-    i18n: &I18nService,
+    context: &mut PackageListRenderContext<'_>,
     pos: &ScreensaverPackageLayout,
     entry: &PackageListEntry,
     y: u16,
@@ -960,8 +940,8 @@ impl ScreensaverPackageUi {
       .max(1);
 
     for row in 0..4 {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: marker_x,
           y: y.saturating_add(row),
@@ -975,8 +955,8 @@ impl ScreensaverPackageUi {
       );
     }
 
-    render.draw_host_filled_rect(
-      canvas,
+    context.render.draw_host_filled_rect(
+      context.canvas,
       image_x,
       y,
       8,
@@ -990,16 +970,7 @@ impl ScreensaverPackageUi {
       }),
     );
     let package_params = Self::package_rich_params(entry);
-    self.draw_icon_asset(
-      render,
-      canvas,
-      layout,
-      image,
-      &entry.icon,
-      image_x,
-      y,
-      &package_params,
-    );
+    self.draw_icon_asset(context, &entry.icon, image_x, y, &package_params);
 
     let status_key = if entry.enabled {
       "screensaver_pack.list.status.on"
@@ -1010,7 +981,9 @@ impl ScreensaverPackageUi {
       if entry.debug {
         format!(
           "f%[<fg:bright_magenta>{}</fg>]{}",
-          i18n.get_runtime_text("screensaver_pack", "screensaver_pack.list.debug"),
+          context
+            .i18n
+            .get_runtime_text("screensaver_pack", "screensaver_pack.list.debug"),
           entry.title
         )
       } else {
@@ -1018,28 +991,36 @@ impl ScreensaverPackageUi {
       },
       format!(
         "f%<fg:bright_yellow>{}</fg>{}",
-        i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.author"),
+        context
+          .i18n
+          .get_runtime_text("screensaver_pack", "screensaver_pack.info.author"),
         entry.author
       ),
       format!(
         "f%<fg:bright_yellow>{}</fg>{}",
-        i18n.get_runtime_text("screensaver_pack", "screensaver_pack.list.version"),
+        context
+          .i18n
+          .get_runtime_text("screensaver_pack", "screensaver_pack.list.version"),
         entry.version
       ),
       format!(
         "f%<fg:bright_yellow>{}</fg>{}{}</fg>",
-        i18n.get_runtime_text("screensaver_pack", "screensaver_pack.list.status"),
+        context
+          .i18n
+          .get_runtime_text("screensaver_pack", "screensaver_pack.list.status"),
         if status_key == "screensaver_pack.list.status.on" {
           "<fg:bright_green>"
         } else {
           "<fg:bright_red>"
         },
-        i18n.get_runtime_text("screensaver_pack", status_key)
+        context
+          .i18n
+          .get_runtime_text("screensaver_pack", status_key)
       ),
     ];
     for (row, text) in lines.into_iter().enumerate() {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: text_x,
           y: y.saturating_add(row as u16),
@@ -1056,9 +1037,7 @@ impl ScreensaverPackageUi {
 
   fn draw_entry_simple(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    i18n: &I18nService,
+    context: &mut PackageListRenderContext<'_>,
     pos: &ScreensaverPackageLayout,
     entry: &PackageListEntry,
     y: u16,
@@ -1072,7 +1051,9 @@ impl ScreensaverPackageUi {
     } else {
       "screensaver_pack.list.status.off"
     };
-    let status = i18n.get_runtime_text("screensaver_pack", status_key);
+    let status = context
+      .i18n
+      .get_runtime_text("screensaver_pack", status_key);
     let right_width = status.width().saturating_add(2).min(u16::MAX as usize) as u16;
     let right_x = pos
       .left_inner
@@ -1080,8 +1061,8 @@ impl ScreensaverPackageUi {
       .saturating_add(pos.left_inner.width.saturating_sub(right_width));
     let text_width = right_x.saturating_sub(text_x).max(1);
 
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: marker_x,
         y,
@@ -1097,14 +1078,16 @@ impl ScreensaverPackageUi {
     let title = if entry.debug {
       format!(
         "f%[<fg:bright_magenta>{}</fg>]{}",
-        i18n.get_runtime_text("screensaver_pack", "screensaver_pack.list.debug"),
+        context
+          .i18n
+          .get_runtime_text("screensaver_pack", "screensaver_pack.list.debug"),
         entry.title
       )
     } else {
       entry.title.clone()
     };
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: text_x,
         y,
@@ -1122,8 +1105,8 @@ impl ScreensaverPackageUi {
     } else {
       "bright_red"
     };
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: right_x,
         y,
@@ -1136,17 +1119,14 @@ impl ScreensaverPackageUi {
 
   fn draw_icon_asset(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    image: &mut ImageService,
+    context: &mut PackageListRenderContext<'_>,
     asset: &PackageAsset,
     x: u16,
     y: u16,
     params: &RichTextParams,
   ) {
-    if let PackageAsset::Image { path } = asset {
-      if let Ok(text) = image.convert(ImageConvertParams {
+    if let PackageAsset::Image { path } = asset
+      && let Ok(text) = context.image.convert(ImageConvertParams {
         image_path: path.clone(),
         output_width: 8,
         output_height: 4,
@@ -1154,21 +1134,21 @@ impl ScreensaverPackageUi {
         scale: 1.0,
         cache: true,
         ..Default::default()
-      }) {
-        render.draw_host_text(
-          canvas,
-          &DrawTextParams {
-            x,
-            y,
-            text,
-            wrap_mode: TextWrapMode::Auto,
-            max_width: Some(8),
-            max_height: Some(4),
-            ..Default::default()
-          },
-        );
-        return;
-      }
+      })
+    {
+      context.render.draw_host_text(
+        context.canvas,
+        &DrawTextParams {
+          x,
+          y,
+          text,
+          wrap_mode: TextWrapMode::Auto,
+          max_width: Some(8),
+          max_height: Some(4),
+          ..Default::default()
+        },
+      );
+      return;
     }
 
     let fallback = PackageAsset::default_icon();
@@ -1181,12 +1161,12 @@ impl ScreensaverPackageUi {
     };
     for (row, line) in lines.iter().take(4).enumerate() {
       if line.trim_start().starts_with("f%") {
-        render.draw_host_text(
-          canvas,
+        context.render.draw_host_text(
+          context.canvas,
           &DrawTextParams {
             x,
             y: y.saturating_add(row as u16),
-            text: Self::fit_asset_rich_line(line, false, 8, layout, Some(params)),
+            text: Self::fit_asset_rich_line(line, false, 8, context.layout, Some(params)),
             params: Some(params.clone()),
             wrap_mode: TextWrapMode::None,
             max_width: Some(8),
@@ -1195,24 +1175,24 @@ impl ScreensaverPackageUi {
           },
         );
       } else {
-        canvas.host_styled_text(x, y.saturating_add(row as u16), line, TextStyle::default());
+        context.canvas.host_styled_text(
+          x,
+          y.saturating_add(row as u16),
+          line,
+          TextStyle::default(),
+        );
       }
     }
   }
 
   fn draw_right_panel(
     &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    image: &mut ImageService,
-    truecolor_supported: bool,
+    context: &mut PackageListRenderContext<'_>,
     pos: &ScreensaverPackageLayout,
     scroll_y: u16,
   ) {
-    render.draw_host_border_rect(
-      canvas,
+    context.render.draw_host_border_rect(
+      context.canvas,
       pos.right_rect.x,
       pos.right_rect.y,
       pos.right_rect.width,
@@ -1224,20 +1204,25 @@ impl ScreensaverPackageUi {
       None,
     );
     self.draw_panel_title(
-      render,
-      canvas,
+      context.render,
+      context.canvas,
       pos.right_rect,
-      &i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info"),
+      &context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.info"),
     );
 
     let page_entries = self.page_entries();
     let Some(entry) = page_entries.get(self.selected_index) else {
-      let text = i18n.get_runtime_text("screensaver_pack", "screensaver_pack.no.info");
-      let width = layout
+      let text = context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.no.info");
+      let width = context
+        .layout
         .get_text_width(&text, None)
         .min(pos.right_inner.width);
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos
             .right_inner
@@ -1255,116 +1240,81 @@ impl ScreensaverPackageUi {
       return;
     };
 
-    self.draw_info_content(
-      render,
-      canvas,
-      i18n,
-      image,
-      layout,
-      entry,
-      pos.right_inner,
-      scroll_y,
-      truecolor_supported,
-    );
+    self.draw_info_content(context, entry, pos.right_inner, scroll_y);
   }
 
   fn draw_info_content(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    i18n: &I18nService,
-    image: &mut ImageService,
-    layout: &LayoutService,
+    context: &mut PackageListRenderContext<'_>,
     entry: &PackageListEntry,
     rect: Rect,
     scroll_y: u16,
-    truecolor_supported: bool,
   ) {
     let package_params = Self::package_rich_params(entry);
+    let info_area = PackageInfoRenderArea { rect, scroll_y };
     let mut y = 0;
-    self.draw_info_banner(
-      render,
-      canvas,
-      image,
-      layout,
-      &entry.banner,
-      &package_params,
-      rect,
-      scroll_y,
-      y,
-    );
+    self.draw_info_banner(context, &entry.banner, &package_params, info_area, y);
     y += 15;
-    self.draw_info_center_text(
-      render,
-      canvas,
-      layout,
-      rect,
-      scroll_y,
-      y,
-      &entry.title,
-      Some(&package_params),
-    );
+    self.draw_info_center_text(context, info_area, y, &entry.title, Some(&package_params));
     y += 2;
 
     self.draw_info_subtitle(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n,
       "screensaver_pack",
       "screensaver_pack.info.subtitle.base",
     );
     y += 1;
     self.draw_info_pair(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.pack_name"),
+      context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.info.pack_name"),
       &entry.mod_id,
     );
     y += 1;
     self.draw_info_pair_rich_value(
-      render,
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.author"),
+      context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.info.author"),
       &entry.author,
       &package_params,
     );
     y += 1;
     self.draw_info_pair_rich_value(
-      render,
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.version"),
+      context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.info.version"),
       &entry.version,
       &package_params,
     );
     y += 2;
 
     self.draw_info_subtitle(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n,
       "screensaver_pack",
       "screensaver_pack.info.subtitle.config",
     );
     y += 1;
     self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.status"),
-      i18n.get_runtime_text(
+      context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.info.status"),
+      context.i18n.get_runtime_text(
         "screensaver_pack",
         if entry.enabled {
           "screensaver_pack.info.status.on"
@@ -1380,12 +1330,13 @@ impl ScreensaverPackageUi {
     );
     y += 1;
     self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.debug"),
-      i18n.get_runtime_text(
+      context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.info.debug"),
+      context.i18n.get_runtime_text(
         "screensaver_pack",
         if entry.debug {
           "screensaver_pack.info.debug.on"
@@ -1402,7 +1353,7 @@ impl ScreensaverPackageUi {
     y += 1;
     let (truecolor_key, truecolor_color) = if !entry.truecolor_required {
       ("screensaver_pack.info.truecolor.off", Self::hint_style())
-    } else if truecolor_supported {
+    } else if context.truecolor_supported {
       (
         "screensaver_pack.info.truecolor.on.support",
         Self::style(TerminalColor::BrightGreen),
@@ -1414,28 +1365,29 @@ impl ScreensaverPackageUi {
       )
     };
     self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("screensaver_pack", "screensaver_pack.info.truecolor"),
-      i18n.get_runtime_text("screensaver_pack", truecolor_key),
+      context
+        .i18n
+        .get_runtime_text("screensaver_pack", "screensaver_pack.info.truecolor"),
+      context
+        .i18n
+        .get_runtime_text("screensaver_pack", truecolor_key),
       truecolor_color,
     );
     y += 2;
 
     self.draw_info_subtitle(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n,
       "screensaver_pack",
       "screensaver_pack.info.subtitle.description",
     );
     y += 1;
-    let _ = render.draw_text_in_scroll_box(
-      canvas,
+    let _ = context.render.draw_text_in_scroll_box(
+      context.canvas,
       self.info_scroll,
       &DrawTextParams {
         x: 0,
@@ -1451,22 +1403,18 @@ impl ScreensaverPackageUi {
 
   fn draw_info_banner(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    image: &mut ImageService,
-    layout: &LayoutService,
+    context: &mut PackageListRenderContext<'_>,
     asset: &PackageAsset,
     params: &RichTextParams,
-    rect: Rect,
-    scroll_y: u16,
+    area: PackageInfoRenderArea,
     y: u16,
   ) {
     const BANNER_WIDTH: u16 = 60;
     const BANNER_HEIGHT: u16 = 14;
 
-    let x = rect.width.saturating_sub(BANNER_WIDTH) / 2;
-    if let PackageAsset::Image { path } = asset {
-      if let Ok(text) = image.convert(ImageConvertParams {
+    let x = area.rect.width.saturating_sub(BANNER_WIDTH) / 2;
+    if let PackageAsset::Image { path } = asset
+      && let Ok(text) = context.image.convert(ImageConvertParams {
         image_path: path.clone(),
         output_width: BANNER_WIDTH as u32,
         output_height: BANNER_HEIGHT as u32,
@@ -1474,23 +1422,23 @@ impl ScreensaverPackageUi {
         scale: 1.0,
         cache: true,
         ..Default::default()
-      }) {
-        let is_rich = text.starts_with("f%");
-        for (row, line) in text.lines().take(BANNER_HEIGHT as usize).enumerate() {
-          self.draw_info_rich_text(
-            render,
-            canvas,
-            rect,
-            scroll_y,
+      })
+    {
+      let is_rich = text.starts_with("f%");
+      for (row, line) in text.lines().take(BANNER_HEIGHT as usize).enumerate() {
+        self.draw_info_rich_text(
+          context,
+          area,
+          PackageInfoTextPosition {
             x,
-            y.saturating_add(row as u16),
-            Self::fit_asset_rich_line(line, is_rich, BANNER_WIDTH, layout, Some(params)),
-            Some(BANNER_WIDTH),
-            Some(params),
-          );
-        }
-        return;
+            y: y.saturating_add(row as u16),
+          },
+          Self::fit_asset_rich_line(line, is_rich, BANNER_WIDTH, context.layout, Some(params)),
+          Some(BANNER_WIDTH),
+          Some(params),
+        );
       }
+      return;
     }
 
     let fallback = PackageAsset::default_banner();
@@ -1503,13 +1451,13 @@ impl ScreensaverPackageUi {
     };
     for (row, line) in lines.iter().take(BANNER_HEIGHT as usize).enumerate() {
       self.draw_info_rich_text(
-        render,
-        canvas,
-        rect,
-        scroll_y,
-        x,
-        y.saturating_add(row as u16),
-        Self::fit_asset_rich_line(line, false, BANNER_WIDTH, layout, Some(params)),
+        context,
+        area,
+        PackageInfoTextPosition {
+          x,
+          y: y.saturating_add(row as u16),
+        },
+        Self::fit_asset_rich_line(line, false, BANNER_WIDTH, context.layout, Some(params)),
         Some(BANNER_WIDTH),
         Some(params),
       );
@@ -1548,49 +1496,43 @@ impl ScreensaverPackageUi {
 
   fn draw_info_subtitle(
     &self,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
-    i18n: &I18nService,
     namespace: &str,
     key: &str,
   ) {
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      0,
-      y,
-      &i18n.get_runtime_text(namespace, key),
+      context,
+      area,
+      PackageInfoTextPosition { x: 0, y },
+      &context.i18n.get_runtime_text(namespace, key),
       Self::style(TerminalColor::BrightYellow),
     );
   }
 
   fn draw_info_pair(
     &self,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
     label: String,
     value: &str,
   ) {
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      0,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x: 0, y },
       &label,
       Self::style(TerminalColor::BrightBlue),
     );
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      label.width().min(u16::MAX as usize) as u16,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition {
+        x: label.width().min(u16::MAX as usize) as u16,
+        y,
+      },
       value,
       TextStyle::default(),
     );
@@ -1598,10 +1540,8 @@ impl ScreensaverPackageUi {
 
   fn draw_info_pair_rich_value(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
     label: String,
     value: &str,
@@ -1609,52 +1549,45 @@ impl ScreensaverPackageUi {
   ) {
     let x = label.width().min(u16::MAX as usize) as u16;
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      0,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x: 0, y },
       &label,
       Self::style(TerminalColor::BrightBlue),
     );
     self.draw_info_rich_text(
-      render,
-      canvas,
-      rect,
-      scroll_y,
-      x,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x, y },
       value.to_string(),
-      Some(rect.width.saturating_sub(x)),
+      Some(area.rect.width.saturating_sub(x)),
       Some(params),
     );
   }
 
   fn draw_info_status(
     &self,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
     label: String,
     value: String,
     value_style: TextStyle,
   ) {
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      0,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x: 0, y },
       &label,
       Self::style(TerminalColor::BrightBlue),
     );
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      label.width().min(u16::MAX as usize) as u16,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition {
+        x: label.width().min(u16::MAX as usize) as u16,
+        y,
+      },
       &value,
       value_style,
     );
@@ -1662,78 +1595,66 @@ impl ScreensaverPackageUi {
 
   fn draw_info_center_text(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
     text: &str,
     params: Option<&RichTextParams>,
   ) {
-    let width = layout.get_text_width(text, params);
-    let x = rect.width.saturating_sub(width.min(rect.width)) / 2;
+    let width = context.layout.get_text_width(text, params);
+    let x = area.rect.width.saturating_sub(width.min(area.rect.width)) / 2;
     self.draw_info_rich_text(
-      render,
-      canvas,
-      rect,
-      scroll_y,
-      x,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x, y },
       text.to_string(),
-      Some(rect.width.saturating_sub(x)),
+      Some(area.rect.width.saturating_sub(x)),
       params,
     );
   }
 
   fn draw_info_text(
     &self,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
-    x: u16,
-    y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
+    position: PackageInfoTextPosition,
     text: &str,
     style: TextStyle,
   ) {
-    let Some(screen_y) = y.checked_sub(scroll_y) else {
+    let Some(screen_y) = position.y.checked_sub(area.scroll_y) else {
       return;
     };
-    if screen_y >= rect.height || x >= rect.width {
+    if screen_y >= area.rect.height || position.x >= area.rect.width {
       return;
     }
-    canvas.host_styled_text(
-      rect.x.saturating_add(x),
-      rect.y.saturating_add(screen_y),
+    context.canvas.host_styled_text(
+      area.rect.x.saturating_add(position.x),
+      area.rect.y.saturating_add(screen_y),
       text,
       style,
     );
   }
 
-  #[allow(clippy::too_many_arguments)]
   fn draw_info_rich_text(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
-    x: u16,
-    y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
+    position: PackageInfoTextPosition,
     text: String,
     max_width: Option<u16>,
     params: Option<&RichTextParams>,
   ) {
-    let Some(screen_y) = y.checked_sub(scroll_y) else {
+    let Some(screen_y) = position.y.checked_sub(area.scroll_y) else {
       return;
     };
-    if screen_y >= rect.height || x >= rect.width {
+    if screen_y >= area.rect.height || position.x >= area.rect.width {
       return;
     }
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
-        x: rect.x.saturating_add(x),
-        y: rect.y.saturating_add(screen_y),
+        x: area.rect.x.saturating_add(position.x),
+        y: area.rect.y.saturating_add(screen_y),
         text,
         params: params.cloned(),
         wrap_mode: TextWrapMode::None,

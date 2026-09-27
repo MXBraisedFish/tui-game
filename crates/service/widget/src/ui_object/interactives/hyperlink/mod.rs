@@ -4,14 +4,15 @@ mod types;
 pub(crate) use self::state::HyperlinkObjects;
 use self::state::{HyperlinkHit, HyperlinkState};
 pub use self::types::{HyperlinkEvent, HyperlinkId, HyperlinkOptions};
-use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
 use crate::UiObjectPool;
+use crate::{SliceId, TextInputService};
 use tg_core_input::{MouseButton, MouseEvent, MouseEventKind};
 use tg_core_style::TextStyle;
 use tg_service_canvas::CanvasService;
 use tg_service_layout::Rect;
-use crate::{SliceId, TextInputService};
+use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
 
+#[derive(Default)]
 pub struct HyperlinkService;
 
 impl HyperlinkService {
@@ -141,37 +142,6 @@ impl HyperlinkService {
           height: 1,
         },
       ),
-    )
-  }
-
-  pub(crate) fn render_host(
-    &self,
-    pool: &mut UiObjectPool,
-    id: HyperlinkId,
-    x: u16,
-    y: u16,
-    canvas: &mut CanvasService,
-  ) -> bool {
-    let Some((text, style)) = pool
-      .hyperlinks
-      .links
-      .get(&id)
-      .map(|state| (state.options.text.clone(), state.options.style.clone()))
-    else {
-      return false;
-    };
-    let params = draw_params(x, y, text, style);
-    canvas.host_text(&params);
-    let width = text_width(&params);
-    self.render_resolved(
-      pool,
-      id,
-      canvas.host_hit_rect(Rect {
-        x,
-        y,
-        width,
-        height: 1,
-      }),
     )
   }
 
@@ -329,12 +299,10 @@ mod tests {
 
     assert_eq!(
       pool.pop_event(),
-      Some(crate::UiEvent::Hyperlink(
-        HyperlinkEvent::Clicked {
-          id,
-          link: "https://example.com".to_string(),
-        },
-      )),
+      Some(crate::UiEvent::Hyperlink(HyperlinkEvent::Clicked {
+        id,
+        link: "https://example.com".to_string(),
+      },)),
     );
   }
 

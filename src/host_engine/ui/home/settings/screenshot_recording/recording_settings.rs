@@ -9,7 +9,7 @@ use crate::host_engine::services::{
   TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
-use super::fonts_settings::{FontsSettingsCommand, FontsSettingsUi};
+use super::fonts_settings::{FontsSettingsCommand, FontsSettingsRenderContext, FontsSettingsUi};
 
 const NS: &str = "recording_settings";
 const MENU_LEN: usize = 9;
@@ -263,13 +263,15 @@ impl RecordingSettingsUi {
     if self.fonts_open {
       return self.fonts.render(
         &mut self.objects,
-        render,
-        canvas,
-        layout,
-        i18n,
-        hit_area,
-        text_input,
-        scroll_box,
+        &mut FontsSettingsRenderContext {
+          render,
+          canvas,
+          layout,
+          i18n,
+          hit_area,
+          text_input,
+          scroll_box,
+        },
       );
     }
     let viewport = layout.developer_viewport_rect();

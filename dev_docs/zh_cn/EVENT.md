@@ -295,7 +295,7 @@ error = {
 | `path` | `string` | 相对于安全文件根目录的虚拟文件路径。 |
 | `file_type` | `string` | 不含点号的扩展名，例如 `rs`。 |
 
-`write_text`、`write_bytes`、`create_dir` 和 `remove` 成功时只携带 `ok = true`，不携带正文。`text`、`bytes`、`entries` 互斥。屏保只允许收到自身只读文件请求的结果；创建目录与删除操作仅允许关闭安全模式的游戏发起。
+`write_text`、`write_bytes`、`create_dir` 和 `remove` 成功时只携带 `ok = true`，不携带正文。`text`、`bytes`、`entries` 互斥。屏保只允许收到自身只读文件请求的结果；创建目录与删除操作仅允许游戏会话发起，并仍受包内 `assets/` 路径限制。
 
 创建目录成功事件示例：
 

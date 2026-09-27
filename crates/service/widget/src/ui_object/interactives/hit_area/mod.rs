@@ -5,12 +5,13 @@ pub(crate) use self::state::HitAreaObjects;
 use self::state::{HitAreaState, HitSnapshot, PressState};
 pub use self::types::{HitAreaEvent, HitAreaId, HitAreaOptions};
 use crate::UiObjectPool;
+use crate::{SliceId, TextInputService};
 use tg_core_input::{MouseButton, MouseEvent, MouseEventKind};
 use tg_service_canvas::CanvasService;
 use tg_service_layout::Rect;
-use crate::{SliceId, TextInputService};
 
 /// 点击区域服务，管理鼠标交互区域
+#[derive(Default)]
 pub struct HitAreaService;
 
 impl HitAreaService {
@@ -303,9 +304,12 @@ fn event_point(pool: &UiObjectPool, id: HitAreaId, x: u16, y: u16) -> (u16, u16)
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::{
+    SliceLength, SliceOptions, SliceRect, SliceService, TextInputEvent, TextInputMode,
+    TextInputOptions, TextInputRenderParams, UiEvent,
+  };
   use tg_service_canvas::CanvasService;
   use tg_service_layout::LayoutService;
-  use crate::{SliceLength, SliceOptions, SliceRect, SliceService, TextInputEvent, TextInputMode, TextInputOptions, TextInputRenderParams, UiEvent};
 
   fn mouse(kind: MouseEventKind, button: Option<MouseButton>, x: u16, y: u16) -> MouseEvent {
     MouseEvent {

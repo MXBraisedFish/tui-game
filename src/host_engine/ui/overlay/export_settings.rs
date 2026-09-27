@@ -13,7 +13,7 @@ const NS: &str = "export_settings";
 
 const HINT_GRAY: &str = "rgb(85,87,83)";
 
-/// 导出文件格式
+/// Archive format of an export.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExportFormat {
   Zip,
@@ -48,7 +48,7 @@ impl ExportFormat {
   }
 }
 
-/// 导出范围类型
+/// Data scope of an export.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExportType {
   Cache,
@@ -88,7 +88,7 @@ impl ExportType {
   }
 }
 
-/// 聚焦目标
+/// Setting that currently has the focus.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ExportSettingsFocus {
   Name,
@@ -127,14 +127,15 @@ pub struct ExportSettingsUi {
   type_area: HitAreaId,
   format: ExportFormat,
   export_type: Option<ExportType>,
-  /// 是否有输入框正在活跃
+  /// Whether one of the text inputs is being edited.
   input_active: bool,
-  /// TextInput 文字缓存，Changed 事件时同步
+  /// Cached texts of the name and path inputs, updated on every [`TextInputEvent::Changed`].
   name_text: String,
   path_text: String,
-  /// 程序根目录，用于 {root} 解析
+  /// Program root directory, used to resolve `{root}`.
   root_dir: std::path::PathBuf,
-  /// 当前校验状态，render 时更新，供 ConfirmExport 检查
+  /// Current validation state, updated on render and checked before
+  /// [`ExportSettingsCommand::ConfirmExport`] is emitted.
   name_valid: bool,
   path_valid: bool,
 }
@@ -241,7 +242,7 @@ impl ExportSettingsUi {
     let path_id = self.path_input_id;
 
     match event {
-      // ── TextInput 组件事件 ──────────────────────────────
+      // ── TextInput events ────────────────────────────────
       UiEvent::TextInput(TextInputEvent::Pressed { id }) if *id == name_id => {
         self.focus = ExportSettingsFocus::Name;
         Some(ExportSettingsCommand::FocusInput)
@@ -354,7 +355,7 @@ impl ExportSettingsUi {
   }
 
   pub fn focus_input(&mut self, text_input: &mut crate::host_engine::services::TextInputService) {
-    // 保存旧值，供 CancelInput 恢复
+    // Refresh the text caches from the inputs; `cancel_input` writes the caches back.
     self.name_text = text_input
       .get_text(&self.objects, self.name_input_id)
       .unwrap_or("")
@@ -380,7 +381,10 @@ impl ExportSettingsUi {
     let _ = text_input.blur(&mut self.objects);
   }
 
-  /// Esc：退出输入并恢复旧值
+  /// Leaves text input (Esc) and writes the cached texts back into both inputs.
+  ///
+  /// The caches follow every [`TextInputEvent::Changed`], so the text typed so far is kept rather
+  /// than the text from before editing.
   pub fn cancel_input(&mut self, text_input: &mut crate::host_engine::services::TextInputService) {
     let restore_name = self.name_text.clone();
     let restore_path = self.path_text.clone();
@@ -598,7 +602,7 @@ impl ExportSettingsUi {
     let name_hint_w = layout.get_text_width(&name_hint_raw, Some(&params));
     let path_hint_w = layout.get_text_width(&path_hint_raw, Some(&params));
 
-    // Type line: "❯ 格式选择 [ZIP]"
+    // Type line, e.g. "❯ Format [ZIP]"
     let type_line_plain = format!("❯ {} [{}]", type_label, format_label);
     let type_line_w = layout.get_text_width(&type_line_plain, Some(&params));
 

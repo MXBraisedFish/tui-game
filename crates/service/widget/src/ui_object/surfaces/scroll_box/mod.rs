@@ -9,14 +9,15 @@ pub use self::types::{
   ScrollbarSide, ScrollbarStyle, ScrollbarVisibility,
 };
 use super::surface::SurfaceId;
-pub(crate) use tg_service_canvas::ResolvedScrollBoxLayout;
 use crate::UiObjectPool;
-use tg_core_unicode::char_width;
 use tg_core_input::{MouseEvent, MouseEventKind, ScrollDirection};
+use tg_core_unicode::char_width;
 use tg_service_canvas::CanvasService;
+pub(crate) use tg_service_canvas::ResolvedScrollBoxLayout;
 use tg_service_layout::{LayoutService, Rect, Size};
 
 /// 可滚动绘制面服务。
+#[derive(Default)]
 pub struct ScrollBoxService;
 
 impl ScrollBoxService {
@@ -1051,6 +1052,7 @@ pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size
 }
 
 /// 垂直滚动条是否应显示。
+#[cfg(test)]
 pub(crate) fn shows_vertical_scrollbar(state: &ScrollBoxState, viewport: Size) -> bool {
   resolve_scroll_box_layout(state, viewport)
     .vertical_track_rect
@@ -1058,6 +1060,7 @@ pub(crate) fn shows_vertical_scrollbar(state: &ScrollBoxState, viewport: Size) -
 }
 
 /// 水平滚动条是否应显示。
+#[cfg(test)]
 pub(crate) fn shows_horizontal_scrollbar(state: &ScrollBoxState, viewport: Size) -> bool {
   resolve_scroll_box_layout(state, viewport)
     .horizontal_track_rect
@@ -1119,9 +1122,9 @@ fn find_scroll_box_for_interaction(
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::{SliceOptions, SliceService};
   use tg_core_input::{MouseButton, ScrollDirection};
   use tg_service_canvas::CanvasService;
-  use crate::{SliceOptions, SliceService};
 
   #[test]
   fn create_rejects_zero_wheel_step_and_allows_horizontal_overflow() {

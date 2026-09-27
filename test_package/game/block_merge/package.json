@@ -15,7 +15,6 @@
   "game": {
     "name": "f%<fg:bright_magenta>Block</fg> Merge",
     "detail": "Slide the board to merge equal blocks. Each move spawns a new block from a seeded generator; the board can be continued later.",
-    "high_privilege": false,
     "mouse": false,
     "truecolor": false,
     "target_fps": 60,

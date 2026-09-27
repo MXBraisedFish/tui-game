@@ -24,12 +24,9 @@ local cells = {}
 -- Sorts a copy of the palette from dark to bright and precomputes the shade strings.
 local function build_shades()
   local stops = table.deepcopy(PALETTE)
-  table.sort {
-    table = stops,
-    comparator = function(left, right)
-      return left.r + left.g + left.b < right.r + right.g + right.b
-    end,
-  }
+  table.sort(stops, function(left, right)
+    return left.r + left.g + left.b < right.r + right.g + right.b
+  end)
   shades = {}
   for shade = 0, SHADES - 1 do
     local scaled = shade / (SHADES - 1) * (#stops - 1)
@@ -105,6 +102,6 @@ function Render()
       bg = shades[shade],
     }
   end
-  local caption = table.concat { table = { "pulse", "grid", tostring(#cells) .. " cells" }, sep = " / " }
+  local caption = table.concat({ "pulse", "grid", tostring(#cells) .. " cells" }, " / ")
   draw.text { x = 1, y = height - 1, text = caption, fg = color.GRAY }
 end

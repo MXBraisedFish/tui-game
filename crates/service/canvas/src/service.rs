@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+use super::surface::{
+  ResolvedScrollBoxLayout, ScrollBoxFrame, ScrollBoxId, ScrollbarStyle, SliceFrame, SliceId,
+  SurfaceFrame, SurfaceId,
+};
 use super::{CanvasCell, buffer::CanvasBuffer, top_layer::TopLayer};
 use tg_core_geometry::{Rect, Size};
 use tg_core_style::{TextColor, TextStyle};
@@ -7,10 +11,6 @@ use tg_core_unicode::graphemes;
 use tg_service_layout::LayoutService;
 use tg_service_rich_text::RichTextSegment;
 use tg_service_text_layout::{self as text_layout, DrawTextParams, LayoutLine, TextAlign};
-use super::surface::{
-  ResolvedScrollBoxLayout, ScrollBoxFrame, ScrollBoxId, ScrollbarStyle, SliceFrame, SliceId,
-  SurfaceFrame, SurfaceId,
-};
 
 /// The canvas service, owning the base layer, the host layer and the per-surface buffers; it
 /// coordinates text drawing and area queries.
@@ -150,14 +150,17 @@ impl CanvasService {
 
   fn prepare_slice(&mut self, order: usize, frame: SliceFrame) {
     let rect = frame.rect;
-    let prepared = self.slices.entry(frame.id).or_insert_with(|| PreparedSlice {
-      buffer: CanvasBuffer::new(rect.width, rect.height),
-      rect,
-      visible: frame.visible,
-      opaque: frame.opaque,
-      background: frame.background.clone(),
-      order,
-    });
+    let prepared = self
+      .slices
+      .entry(frame.id)
+      .or_insert_with(|| PreparedSlice {
+        buffer: CanvasBuffer::new(rect.width, rect.height),
+        rect,
+        visible: frame.visible,
+        opaque: frame.opaque,
+        background: frame.background.clone(),
+        order,
+      });
     if prepared.buffer.width() != rect.width || prepared.buffer.height() != rect.height {
       prepared.buffer.resize(rect.width, rect.height);
       self.force_full_redraw = true;
@@ -379,11 +382,7 @@ impl CanvasService {
     Self::draw_layout_lines(self.top.buffer_mut(), x, y, params.line_align, &lines);
   }
 
-  pub fn host_rich_text_segments(
-    &mut self,
-    segments: &[RichTextSegment],
-    params: &DrawTextParams,
-  ) {
+  pub fn host_rich_text_segments(&mut self, segments: &[RichTextSegment], params: &DrawTextParams) {
     self.host_rich_text_segments_at(i32::from(params.x), i32::from(params.y), segments, params);
   }
 
@@ -680,11 +679,7 @@ impl CanvasService {
   }
 
   /// Returns the hit-test result of a rectangle on the given slice.
-  pub fn slice_hit_rect(
-    &self,
-    id: SliceId,
-    rect: Rect,
-  ) -> Option<(Rect, (u16, u16), usize)> {
+  pub fn slice_hit_rect(&self, id: SliceId, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
     let slice = self.slices.get(&id).filter(|slice| slice.visible)?;
     surface_hit_rect(
       rect,
@@ -879,9 +874,9 @@ fn resolve_background(mut style: TextStyle, buffer: &CanvasBuffer, x: u16, y: u1
 #[cfg(test)]
 mod tests {
   use super::*;
+  use std::collections::HashMap;
   use tg_service_rich_text::{RichTextParams, TerminalColor, TextMode};
   use tg_service_text_layout::TextWrapMode;
-  use std::collections::HashMap;
 
   /// Writes `height` rows of `ch` from (x, y) the way the render service fills a rectangle.
   fn fill_rect(

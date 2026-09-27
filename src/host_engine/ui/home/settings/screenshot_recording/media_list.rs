@@ -1394,6 +1394,9 @@ impl<S: MediaListSpec> MediaListUi<S> {
     })
   }
 
+  // reason: the runtime calls this signature from outside ui/ (as `ScreenshotListUi` and
+  // `RecordingListUi`), so it cannot be changed here.
+  #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -1429,7 +1432,8 @@ impl<S: MediaListSpec> MediaListUi<S> {
       canvas,
     );
     self.draw_sort_bar(render, canvas, i18n, hit_area, &pos);
-    self.draw_entries(render, canvas, layout, i18n, hit_area, scroll_box, &pos);
+    self.draw_entries(render, canvas, layout, i18n, hit_area, &pos);
+    self.register_entry_areas(canvas, layout, hit_area, scroll_box, &pos);
     self.draw_info(render, canvas, i18n, &pos);
     self.draw_hints(render, canvas, layout, i18n, text_input, &pos);
     if self.renaming.is_some() {
@@ -1568,12 +1572,16 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let visible_width = effective_viewport.width;
     let visible_height = effective_viewport.height;
     self.media_offset = (
-      (media_width <= visible_width)
-        .then(|| visible_width.saturating_sub(media_width) / 2)
-        .unwrap_or(0),
-      (media_height <= visible_height)
-        .then(|| visible_height.saturating_sub(media_height) / 2)
-        .unwrap_or(0),
+      if media_width <= visible_width {
+        visible_width.saturating_sub(media_width) / 2
+      } else {
+        0
+      },
+      if media_height <= visible_height {
+        visible_height.saturating_sub(media_height) / 2
+      } else {
+        0
+      },
     );
     let _ = service.set_content_size(
       &mut self.objects,
@@ -1823,7 +1831,6 @@ impl<S: MediaListSpec> MediaListUi<S> {
     layout: &LayoutService,
     i18n: &I18nService,
     hit_area: &HitAreaService,
-    scroll_box: &ScrollBoxService,
     pos: &MediaListLayout,
   ) {
     let entries: Vec<_> = self.filtered_entries().into_iter().cloned().collect();
@@ -1873,13 +1880,26 @@ impl<S: MediaListSpec> MediaListUi<S> {
         },
       );
     }
+  }
+
+  /// Registers the hit areas of the list rows scrolled into view.
+  ///
+  /// Uses the item areas that [`Self::draw_entries`] sized to the filtered entry count.
+  fn register_entry_areas(
+    &mut self,
+    canvas: &mut CanvasService,
+    layout: &LayoutService,
+    hit_area: &HitAreaService,
+    scroll_box: &ScrollBoxService,
+    pos: &MediaListLayout,
+  ) {
     let top = scroll_box
       .scroll_y(&self.objects, self.list_scroll)
       .unwrap_or(0) as usize;
     let height = scroll_box
       .visible_content_height(&self.objects, self.list_scroll, layout)
       .unwrap_or(0) as usize;
-    for index in top..entries.len().min(top.saturating_add(height)) {
+    for index in top..self.item_areas.len().min(top.saturating_add(height)) {
       hit_area.render_host(
         &mut self.objects,
         self.item_areas[index],
@@ -2618,7 +2638,9 @@ pub fn actions(entries: &[(&str, &str)]) -> Vec<ActionMapEntry> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::host_engine::services::{InputActionEvent, InputEventType};
+  use crate::host_engine::services::{
+    InputActionEvent, InputEventType, MouseEvent, MouseEventKind,
+  };
 
   struct TestSpec;
 
@@ -2705,6 +2727,99 @@ mod tests {
     });
     ui.active = ActivePanel::Info;
     ui
+  }
+
+  #[test]
+  fn filtered_rows_keep_visible_hit_areas_after_count_and_scroll_changes() {
+    let hit_area = HitAreaService::new();
+    let mut text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let mut ui = MediaListUi::<TestSpec>::init(&hit_area, &text_input, &scroll_box);
+    for name in [
+      "match-d", "other", "match-b", "match-a", "match-c", "unused",
+    ] {
+      ui.entries.push(MediaEntry {
+        name: name.to_string(),
+        path: PathBuf::from(name),
+        modified: SystemTime::UNIX_EPOCH,
+        duration_us: 0,
+        info: None,
+        preview: None,
+        recording: None,
+        valid: Some(true),
+      });
+    }
+
+    let mut layout = LayoutService::new();
+    layout.resize_physical(40, 10);
+    let pos = MediaListLayout {
+      left: Rect {
+        x: 1,
+        y: 1,
+        width: 16,
+        height: 5,
+      },
+      right: Rect::default(),
+      search: Rect::default(),
+      sort_y: 2,
+      list: Rect {
+        x: 2,
+        y: 4,
+        width: 14,
+        height: 2,
+      },
+      hint_y: 9,
+      hint_lines: Vec::new(),
+    };
+    let mut canvas = CanvasService::new();
+    let mut render = RenderService::new();
+    let i18n = I18nService::new();
+
+    ui.prepare_scroll_box(&scroll_box, &layout, &pos);
+    canvas.begin_frame(&layout);
+    ui.objects.prepare_canvas(&mut canvas, &layout);
+    ui.draw_entries(&mut render, &mut canvas, &layout, &i18n, &hit_area, &pos);
+    assert_eq!(ui.item_areas.len(), 6);
+    let removed_area = ui.item_areas[5];
+
+    ui.search = "match".to_string();
+    ui.prepare_scroll_box(&scroll_box, &layout, &pos);
+    ui.objects.begin_render();
+    canvas.begin_frame(&layout);
+    ui.objects.prepare_canvas(&mut canvas, &layout);
+    ui.draw_entries(&mut render, &mut canvas, &layout, &i18n, &hit_area, &pos);
+    assert_eq!(ui.item_areas.len(), 4);
+    assert!(!hit_area.exists(&ui.objects, removed_area));
+
+    assert!(scroll_box.scroll_to_bottom(&mut ui.objects, ui.list_scroll, &layout));
+    assert_eq!(scroll_box.scroll_y(&ui.objects, ui.list_scroll), Some(2));
+    ui.objects.begin_render();
+    ui.register_entry_areas(&mut canvas, &layout, &hit_area, &scroll_box, &pos);
+
+    let click = |kind, y| MouseEvent {
+      kind,
+      button: Some(MouseButton::Left),
+      scroll: None,
+      x: pos.list.x + 1,
+      y,
+    };
+    assert!(hit_area.route_mouse_event(
+      &mut ui.objects,
+      &mut text_input,
+      &canvas,
+      click(MouseEventKind::Press, pos.list.y + 1),
+    ));
+    assert!(hit_area.route_mouse_event(
+      &mut ui.objects,
+      &mut text_input,
+      &canvas,
+      click(MouseEventKind::Release, pos.list.y + 1),
+    ));
+    while let Some(event) = ui.objects.pop_event() {
+      ui.handle_event(&event);
+    }
+
+    assert_eq!(ui.selected, 3);
   }
 
   fn test_recording_playback() -> (PathBuf, Arc<RecordingPlayback>) {

@@ -158,7 +158,7 @@ let params = RichTextParams::from_action_map(&action_map_entries, "export_settin
 
 按键模式使用 `format_key_display()` 生成：
 - `[W]` — 单键
-- `[Ctrl + S]` — 组合键
+- `[LCtrl + S]` — 左 Ctrl 组合键；右侧修饰键使用相应的 `R` 前缀
 - `[W]/[↑]` — 多方案
 
 ### 4.3 缺失参数

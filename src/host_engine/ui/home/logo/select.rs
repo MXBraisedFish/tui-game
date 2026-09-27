@@ -100,18 +100,19 @@ impl SelectLogo {
         }
       }
     }
-    for x in 1..width - 1 {
-      rows[0][x] = styled('▪', DOT, false, true);
-      rows[source.len() - 1][x] = styled('▪', DOT, false, true);
+    for y in [0, source.len() - 1] {
+      for cell in rows[y].iter_mut().take(width - 1).skip(1) {
+        *cell = styled('▪', DOT, false, true);
+      }
     }
     for row in rows.iter_mut().take(source.len() - 1).skip(1) {
       row[0] = styled('▪', DOT, false, true);
       row[width - 1] = styled('▪', DOT, false, true);
     }
     let middle = source.len() / 2;
-    for x in 1..width - 1 {
-      if rows[middle][x].ch == ' ' {
-        rows[middle][x] = styled('▪', DOT, false, true);
+    for cell in rows[middle].iter_mut().take(width - 1).skip(1) {
+      if cell.ch == ' ' {
+        *cell = styled('▪', DOT, false, true);
       }
     }
     for y in (0..source.len()).step_by(5) {
@@ -176,9 +177,9 @@ impl SelectLogo {
         let ay1 = y.saturating_sub(2);
         let ax2 = x + frame_width + 1;
         let ay2 = y + frame_height + 1;
-        ax1 <= frame.x + frame.width - 1
+        ax1 < frame.x + frame.width
           && ax2 >= frame.x
-          && ay1 <= frame.y + frame.height - 1
+          && ay1 < frame.y + frame.height
           && ay2 >= frame.y
       });
       if !overlaps {

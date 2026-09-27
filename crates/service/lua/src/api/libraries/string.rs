@@ -2,7 +2,7 @@ use super::*;
 
 mod pattern;
 
-use pattern::{LuaCapture, LuaCaptures, LuaPattern};
+use pattern::{LuaCapture, LuaCaptures, LuaPattern, LuaPatternInput, MAX_CAPTURE_GROUPS};
 
 pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
@@ -103,11 +103,17 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
       if size > args::MAX_API_STRING_BYTES {
         return Err(args::message("string.rep", "output exceeds 1 MiB"));
       }
-      Ok(
-        std::iter::repeat_n(text, times)
-          .collect::<Vec<_>>()
-          .join(&sep),
-      )
+      if size == 0 {
+        return Ok(String::new());
+      }
+      let mut output = String::with_capacity(size);
+      for index in 0..times {
+        if index > 0 {
+          output.push_str(&sep);
+        }
+        output.push_str(&text);
+      }
+      Ok(output)
     })?,
   )?;
   source.raw_set("find", string_find(lua, false)?)?;
@@ -247,6 +253,10 @@ pub(super) fn text_parameter(parameters: &Table, method: &str) -> mlua::Result<S
   args::string(args::required(parameters, method, "text")?, method, "text")
 }
 
+fn lua_text_parameter(parameters: &Table, method: &str) -> mlua::Result<mlua::LuaString> {
+  args::lua_string(args::required(parameters, method, "text")?, method, "text")
+}
+
 enum CompiledPattern {
   Lua(LuaPattern),
   Regex(Regex),
@@ -302,15 +312,15 @@ impl CompiledPattern {
       Self::Lua(pattern) => pattern
         .captures(text, text[..offset].chars().count())
         .map(|capture| capture.map(Into::into)),
-      Self::Regex(pattern) => Ok(pattern.captures(&text[offset..]).map(|captures| {
+      Self::Regex(pattern) => Ok(pattern.captures_at(text, offset).map(|captures| {
         let full = captures.get(0).unwrap();
         PatternCaptures {
-          full: offset + full.start()..offset + full.end(),
+          full: full.start()..full.end(),
           captures: (1..captures.len())
             .map(|index| {
-              captures.get(index).map(|capture| {
-                PatternCapture::Text(offset + capture.start()..offset + capture.end())
-              })
+              captures
+                .get(index)
+                .map(|capture| PatternCapture::Text(capture.start()..capture.end()))
             })
             .collect(),
         }
@@ -349,13 +359,15 @@ impl CompiledPattern {
     &self,
     text: &str,
     byte_start: usize,
+    char_start: usize,
+    lua_input: Option<&LuaPatternInput>,
     lua_pattern_steps: &mut usize,
   ) -> Result<Option<PatternCaptures>, String> {
     match self {
       Self::Lua(pattern) => {
-        let char_start = text[..byte_start].chars().count();
+        let input = lua_input.ok_or_else(|| "Lua pattern input is unavailable".to_string())?;
         pattern
-          .captures_incremental(text, char_start, lua_pattern_steps)
+          .captures_incremental_with_input(text, input, char_start, lua_pattern_steps)
           .map(|captures| captures.map(Into::into))
       }
       Self::Regex(pattern) => Ok(pattern.captures_at(text, byte_start).map(|captures| {
@@ -428,19 +440,35 @@ fn pattern_parameter(
     method,
     "pattern",
   )?;
-  if pattern.len() > 8 * 1024 {
-    return Err(args::message(method, "pattern exceeds 8 KiB"));
-  }
+  compile_pattern(&pattern, method, regex)
+}
+
+fn compile_pattern(pattern: &str, method: &str, regex: bool) -> mlua::Result<CompiledPattern> {
+  validate_pattern_size(pattern, method)?;
   if regex {
-    RegexBuilder::new(&pattern)
+    let pattern = RegexBuilder::new(pattern)
       .size_limit(1024 * 1024)
       .build()
-      .map(CompiledPattern::Regex)
-      .map_err(|error| args::message(method, format!("invalid pattern: {error}")))
+      .map_err(|error| args::message(method, format!("invalid pattern: {error}")))?;
+    if pattern.captures_len() > MAX_CAPTURE_GROUPS + 1 {
+      return Err(args::message(
+        method,
+        format!("pattern exceeds {MAX_CAPTURE_GROUPS} captures"),
+      ));
+    }
+    Ok(CompiledPattern::Regex(pattern))
   } else {
-    LuaPattern::compile(&pattern)
+    LuaPattern::compile(pattern)
       .map(CompiledPattern::Lua)
       .map_err(|message| args::message(method, format!("invalid pattern: {message}")))
+  }
+}
+
+fn validate_pattern_size(pattern: &str, method: &str) -> mlua::Result<()> {
+  if pattern.len() > 8 * 1024 {
+    Err(args::message(method, "pattern exceeds 8 KiB"))
+  } else {
+    Ok(())
   }
 }
 
@@ -482,28 +510,31 @@ fn string_find(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
     };
     let parameters = args::named(method, values, allowed)?;
     let text = text_parameter(&parameters, method)?;
+    let pattern = args::string(
+      args::required(&parameters, method, "pattern")?,
+      method,
+      "pattern",
+    )?;
     let init = args::optional_integer(&parameters, method, "init", Some(1))?.unwrap();
+    let plain = !regex_mode && args::optional_bool(&parameters, method, "plain", false)?;
+    if !plain {
+      validate_pattern_size(&pattern, method)?;
+    }
     let Some(offset) = search_start(&text, init) else {
       return Ok(Value::Nil);
     };
-    let plain = !regex_mode && args::optional_bool(&parameters, method, "plain", false)?;
     if plain {
-      let needle = args::string(
-        args::required(&parameters, method, "pattern")?,
-        method,
-        "pattern",
-      )?;
-      let Some(found) = text[offset..].find(&needle) else {
+      let Some(found) = text[offset..].find(&pattern) else {
         return Ok(Value::Nil);
       };
       let start = offset + found;
-      let finish = start + needle.len();
+      let finish = start + pattern.len();
       let captures = lua.create_table()?;
       captures.raw_set(1, &text[start..finish])?;
       captures.raw_set("n", 1)?;
       return find_result(lua, &text, start, finish, captures).map(Value::Table);
     }
-    let pattern = pattern_parameter(&parameters, method, regex_mode)?;
+    let pattern = compile_pattern(&pattern, method, regex_mode)?;
     let Some(captures) = pattern
       .captures(&text, offset)
       .map_err(|message| args::message(method, message))?
@@ -526,11 +557,17 @@ fn string_match(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
     };
     let parameters = args::named(method, values, &["text", "pattern", "init"])?;
     let text = text_parameter(&parameters, method)?;
+    let pattern = args::string(
+      args::required(&parameters, method, "pattern")?,
+      method,
+      "pattern",
+    )?;
     let init = args::optional_integer(&parameters, method, "init", Some(1))?.unwrap();
+    validate_pattern_size(&pattern, method)?;
     let Some(offset) = search_start(&text, init) else {
       return Ok(Value::Nil);
     };
-    let pattern = pattern_parameter(&parameters, method, regex_mode)?;
+    let pattern = compile_pattern(&pattern, method, regex_mode)?;
     let Some(captures) = pattern
       .captures(&text, offset)
       .map_err(|message| args::message(method, message))?
@@ -549,7 +586,7 @@ fn string_gmatch(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
       "string.gmatch"
     };
     let parameters = args::named(method, values, &["text", "pattern"])?;
-    let text = text_parameter(&parameters, method)?;
+    let text = lua_text_parameter(&parameters, method)?;
     let pattern = pattern_parameter(&parameters, method, regex_mode)?;
     let state = std::rc::Rc::new(std::cell::RefCell::new(GmatchState::default()));
     lua.create_function(move |lua, _: MultiValue| {
@@ -557,25 +594,66 @@ fn string_gmatch(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
       if state.exhausted {
         return Ok(Value::Nil);
       }
-      let Some(captures) = pattern
-        .next_captures(&text, state.byte_start, &mut state.lua_pattern_steps)
-        .map_err(|message| args::message(method, message))?
-      else {
-        state.exhausted = true;
-        return Ok(Value::Nil);
+      let text = text
+        .to_str()
+        .map_err(|_| args::message(method, "text must be valid UTF-8"))?;
+      let text = text.as_ref();
+      if matches!(&pattern, CompiledPattern::Lua(_)) && state.lua_pattern_input.is_none() {
+        state.lua_pattern_input = Some(LuaPatternInput::new(text));
+      }
+      let captures_result = {
+        let GmatchState {
+          byte_start,
+          char_start,
+          lua_pattern_input,
+          lua_pattern_steps,
+          ..
+        } = &mut *state;
+        pattern.next_captures(
+          text,
+          *byte_start,
+          *char_start,
+          lua_pattern_input.as_ref(),
+          lua_pattern_steps,
+        )
+      };
+      let captures = match captures_result {
+        Ok(Some(captures)) => captures,
+        Ok(None) => {
+          state.exhausted = true;
+          state.lua_pattern_input = None;
+          return Ok(Value::Nil);
+        }
+        Err(message) => {
+          state.exhausted = true;
+          state.lua_pattern_input = None;
+          return Err(args::message(method, message));
+        }
       };
       if state.matches >= 10_000 {
+        state.exhausted = true;
+        state.lua_pattern_input = None;
         return Err(args::message(method, "result exceeds 10000 items"));
       }
-      let bytes = capture_output_bytes(method, &captures)?;
+      let bytes = match capture_output_bytes(method, &captures) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+          state.exhausted = true;
+          state.lua_pattern_input = None;
+          return Err(error);
+        }
+      };
       state.output_bytes = state
         .output_bytes
         .checked_add(bytes)
         .ok_or_else(|| args::message(method, "result size overflow"))?;
       if state.output_bytes > args::MAX_API_STRING_BYTES {
+        state.exhausted = true;
+        state.lua_pattern_input = None;
         return Err(args::message(method, "result exceeds 1 MiB"));
       }
       state.matches += 1;
+      let previous_byte_start = state.byte_start;
       if captures.full.end > captures.full.start {
         state.byte_start = captures.full.end;
       } else if captures.full.end < text.len() {
@@ -587,7 +665,11 @@ fn string_gmatch(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
       } else {
         state.exhausted = true;
       }
-      capture_values_table(lua, method, &text, &captures).map(Value::Table)
+      state.char_start += text[previous_byte_start..state.byte_start].chars().count();
+      if state.exhausted {
+        state.lua_pattern_input = None;
+      }
+      capture_values_table(lua, method, text, &captures).map(Value::Table)
     })
   })
 }
@@ -595,6 +677,8 @@ fn string_gmatch(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
 #[derive(Default)]
 struct GmatchState {
   byte_start: usize,
+  char_start: usize,
+  lua_pattern_input: Option<LuaPatternInput>,
   matches: usize,
   output_bytes: usize,
   lua_pattern_steps: usize,
@@ -882,7 +966,7 @@ fn safe_format(format_string: &str, values: &[Value]) -> mlua::Result<String> {
             "format '%q' does not accept flags, width, or precision",
           ));
         }
-        (format!("{:?}", format_value(value)?), false)
+        (format_quoted(&format_value(value)?), false)
       }
       'd' | 'i' => {
         let value = args::integer(value.clone(), "string.format", "values")?;
@@ -903,13 +987,13 @@ fn safe_format(format_string: &str, values: &[Value]) -> mlua::Result<String> {
       'f' | 'e' | 'E' | 'g' | 'G' => {
         let value = args::number(value.clone(), "string.format", "values")?;
         let precision = spec.precision.unwrap_or(6).min(32);
-        let mut value = match kind {
-          'f' => format!("{value:.precision$}"),
-          'e' => format!("{value:.precision$e}"),
-          'E' => format!("{value:.precision$E}"),
-          'g' | 'G' => format!("{value:.precision$}"),
-          _ => unreachable!(),
+        let value = match kind {
+          'f' => format_fixed(value, precision, spec.alternate),
+          'e' | 'E' => format_scientific(value, precision, kind == 'E', spec.alternate),
+          'g' | 'G' => format_general(value, precision.max(1), kind == 'G', spec.alternate),
+          _ => unreachable!("numeric format branch only handles float conversions"),
         };
+        let mut value = value;
         if !value.starts_with('-') {
           if spec.plus {
             value.insert(0, '+');
@@ -941,6 +1025,7 @@ fn safe_format(format_string: &str, values: &[Value]) -> mlua::Result<String> {
       return Err(args::message("string.format", "output exceeds 1 MiB"));
     }
   }
+  ensure_output_size("string.format", &output)?;
   Ok(output)
 }
 
@@ -975,7 +1060,7 @@ impl FormatSpec {
     output.width = parse_format_number(chars)?;
     if chars.peek() == Some(&'.') {
       chars.next();
-      output.precision = Some(parse_format_number(chars)?.unwrap_or(0).min(32));
+      output.precision = Some(parse_format_number(chars)?.unwrap_or(0));
     }
     if output
       .width
@@ -1017,7 +1102,8 @@ where
 
 fn format_signed_integer(value: i64, spec: &FormatSpec) -> String {
   let negative = value < 0;
-  let digits = padded_integer_digits(value.unsigned_abs(), spec.precision, 10, false);
+  let precision = spec.precision.map(|precision| precision.min(32));
+  let digits = padded_integer_digits(value.unsigned_abs(), precision, 10, false);
   let sign = if negative {
     "-"
   } else if spec.plus {
@@ -1031,7 +1117,8 @@ fn format_signed_integer(value: i64, spec: &FormatSpec) -> String {
 }
 
 fn format_unsigned_integer(value: u64, radix: u32, uppercase: bool, spec: &FormatSpec) -> String {
-  let digits = padded_integer_digits(value, spec.precision, radix, uppercase);
+  let precision = spec.precision.map(|precision| precision.min(32));
+  let digits = padded_integer_digits(value, precision, radix, uppercase);
   let prefix = if spec.alternate {
     match (radix, uppercase) {
       (8, _) if !digits.starts_with('0') => "0",
@@ -1043,6 +1130,137 @@ fn format_unsigned_integer(value: u64, radix: u32, uppercase: bool, spec: &Forma
     ""
   };
   format!("{prefix}{digits}")
+}
+
+fn format_fixed(value: f64, precision: usize, alternate: bool) -> String {
+  if !value.is_finite() {
+    return format_special_float(value, false);
+  }
+  let mut output = format!("{value:.precision$}");
+  if alternate && !output.contains('.') {
+    output.push('.');
+  }
+  output
+}
+
+fn format_quoted(value: &str) -> String {
+  let bytes = value.as_bytes();
+  let mut output = String::with_capacity(value.len() + 2);
+  output.push('"');
+  let mut copied_until = 0;
+
+  for (index, character) in value.char_indices() {
+    let escape = match character {
+      '"' => Some("\\\"".to_string()),
+      '\\' => Some("\\\\".to_string()),
+      '\n' => Some("\\\n".to_string()),
+      character if character.is_ascii_control() => {
+        let code = character as u8;
+        let followed_by_digit = bytes.get(index + 1).is_some_and(u8::is_ascii_digit);
+        Some(if followed_by_digit {
+          format!("\\{code:03}")
+        } else {
+          format!("\\{code}")
+        })
+      }
+      _ => None,
+    };
+    if let Some(escape) = escape {
+      output.push_str(&value[copied_until..index]);
+      output.push_str(&escape);
+      copied_until = index + character.len_utf8();
+    }
+  }
+
+  output.push_str(&value[copied_until..]);
+  output.push('"');
+  output
+}
+
+fn format_scientific(value: f64, precision: usize, uppercase: bool, alternate: bool) -> String {
+  if !value.is_finite() {
+    return format_special_float(value, uppercase);
+  }
+  let output = format!("{:.*e}", precision, value);
+  let (mantissa, exponent) = output.split_once('e').unwrap();
+  let exponent = exponent.parse::<i32>().unwrap();
+  let mantissa = ensure_decimal_point(mantissa.to_string(), alternate);
+  format!(
+    "{mantissa}{}{:+03}",
+    if uppercase { 'E' } else { 'e' },
+    exponent
+  )
+}
+
+fn format_general(value: f64, precision: usize, uppercase: bool, alternate: bool) -> String {
+  if !value.is_finite() {
+    return format_special_float(value, uppercase);
+  }
+
+  let scientific = format!("{:.*e}", precision.saturating_sub(1), value.abs());
+  let (mantissa, exponent) = scientific.split_once('e').unwrap();
+  let exponent = exponent.parse::<i32>().unwrap();
+  let use_scientific = exponent < -4 || exponent >= precision as i32;
+  let mut output = if use_scientific {
+    let mantissa = ensure_decimal_point(mantissa.to_string(), alternate);
+    format!(
+      "{mantissa}{}{:+03}",
+      if uppercase { 'E' } else { 'e' },
+      exponent
+    )
+  } else {
+    let decimals = (precision as i32 - exponent - 1).max(0) as usize;
+    format!("{:.*}", decimals, value.abs())
+  };
+
+  if !alternate {
+    trim_general_fraction(&mut output);
+  } else if !output.contains('.') {
+    output.push('.');
+  }
+  if value.is_sign_negative() {
+    output.insert(0, '-');
+  }
+  output
+}
+
+fn format_special_float(value: f64, uppercase: bool) -> String {
+  let word = if value.is_nan() {
+    if uppercase { "NAN" } else { "nan" }
+  } else if uppercase {
+    "INF"
+  } else {
+    "inf"
+  };
+  if value.is_sign_negative() && !value.is_nan() {
+    format!("-{word}")
+  } else {
+    word.to_string()
+  }
+}
+
+fn ensure_decimal_point(mut value: String, alternate: bool) -> String {
+  if alternate && !value.contains('.') {
+    value.push('.');
+  }
+  value
+}
+
+fn trim_general_fraction(value: &mut String) {
+  let exponent_start = value.find(['e', 'E']).unwrap_or(value.len());
+  let Some(decimal_point) = value[..exponent_start].find('.') else {
+    return;
+  };
+  let mut end = exponent_start;
+  while end > decimal_point + 1 && value.as_bytes()[end - 1] == b'0' {
+    end -= 1;
+  }
+  if end == decimal_point + 1 {
+    end -= 1;
+  }
+  if end < exponent_start {
+    value.replace_range(end..exponent_start, "");
+  }
 }
 
 fn padded_integer_digits(

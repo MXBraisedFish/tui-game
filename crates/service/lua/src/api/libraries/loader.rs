@@ -1,7 +1,5 @@
 use super::*;
-use crate::path::{
-  SafeRelativePath, SandboxPathKind, resolve_sandbox_path,
-};
+use crate::path::{SafeRelativePath, SandboxPathKind, resolve_sandbox_path};
 
 const MAX_MODULE_SOURCE_BYTES: usize = 1024 * 1024;
 const MAX_MODULE_CHAIN_SOURCE_BYTES: usize = 4 * 1024 * 1024;

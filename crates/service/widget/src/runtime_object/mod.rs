@@ -1,6 +1,6 @@
+use tg_service_animation::AnimationObjects;
 use tg_service_random::RandomGeneratorObjects;
 use tg_service_time::TimeObjects;
-use tg_service_animation::AnimationObjects;
 
 /// 运行时对象池，存储非 UI 组件的宿主托管对象
 pub struct RuntimeObjectPool {
@@ -16,6 +16,12 @@ impl RuntimeObjectPool {
       random_generators: RandomGeneratorObjects::new(),
       animation: AnimationObjects::new(),
     }
+  }
+}
+
+impl Default for RuntimeObjectPool {
+  fn default() -> Self {
+    Self::new()
   }
 }
 

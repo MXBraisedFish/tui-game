@@ -5,10 +5,16 @@ use tg_service_clipboard::ClipboardService;
 
 fn main() {
   let mut clipboard = ClipboardService::new();
-  let previous = clipboard.read_text();
+  let Some(previous) = clipboard.read_text() else {
+    println!("clipboard ok: no restorable text clipboard");
+    return;
+  };
   if clipboard.write_text("tg clipboard smoke") {
     let read_back = clipboard.read_text();
-    clipboard.write_text(previous.as_deref().unwrap_or(""));
+    assert!(
+      clipboard.write_text(&previous),
+      "restore previous clipboard text"
+    );
     assert_eq!(read_back.as_deref(), Some("tg clipboard smoke"));
     println!("clipboard ok: round trip");
   } else {

@@ -1,29 +1,20 @@
 # Security Details
 
-Safe Mode is designed to improve the security of third-party scripts during execution.
+Lua scripts run with a restricted set of project APIs. Their access depends on the session type and the package's Debug setting.
 
-When Safe Mode is enabled, access to certain high-risk APIs is restricted to reduce the possibility of scripts affecting local data or the system environment.
+## Game sessions
 
-Disabling Safe Mode does not grant scripts full system access. All scripts continue to run inside the runtime sandbox and remain subject to the restrictions imposed by the application environment. Safe Mode serves as an additional security layer that further limits access to sensitive capabilities.
+- File APIs operate inside the current package's `assets/` directory. They cannot address arbitrary host paths or another package's files.
+- `event.skip_action` and `event.clear_action` are available only to game sessions.
+- Game control APIs are not exposed to screensaver sessions.
 
-If you trust the current script or mod, you may disable Safe Mode to unlock its full functionality.
+## Screensaver sessions
 
-# Capabilities Restricted by Safe Mode
+- Screensavers can read their own package assets. File writes, directory creation, deletion, and game action controls are unavailable.
+- User input events are filtered by the host before delivery.
 
-## File Write APIs
+## Debug output
 
-Restricts scripts from creating, modifying, or deleting local files.
+The package Debug setting enables `debug.print`, `debug.info`, `debug.warn`, `debug.error`, and slow-callback warnings. Assertion and protected-call helpers remain available when Debug is off.
 
-[API list to be added]
-
-## System APIs
-
-Restricts access to certain system functions and interactions with the host environment.
-
-[API list to be added]
-
-## Network APIs
-
-Restricts scripts from initiating network requests or accessing external resources.
-
-[API list to be added]
+Lua scripts do not receive the native `io`, `os`, or `package` libraries. The host enforces per-session memory and execution limits and keeps terminal control in the host application.

@@ -28,6 +28,14 @@ pub enum GameSessionState {
   Faulted,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct GameStartOptions {
+  pub target_fps: u32,
+  pub min_size: Size,
+  pub save_game_enabled: bool,
+  pub save_best_enabled: bool,
+}
+
 /// 唯一游戏 Session 的宿主生命周期。
 pub struct GameService {
   session: Option<LuaSession>,
@@ -60,19 +68,16 @@ impl GameService {
     &mut self,
     session: LuaSession,
     package: PackageId,
-    target_fps: u32,
-    min_size: Size,
-    save_game_enabled: bool,
-    save_best_enabled: bool,
+    options: GameStartOptions,
     log_session: Option<LogSessionId>,
   ) -> Option<LogSessionId> {
     let previous_log = self.stop();
     self.generation = self.generation.wrapping_add(1).max(1);
     self.package = Some(package);
-    self.target_fps = Some(target_fps);
-    self.min_size = min_size;
-    self.save_game_enabled = save_game_enabled;
-    self.save_best_enabled = save_best_enabled;
+    self.target_fps = Some(options.target_fps);
+    self.min_size = options.min_size;
+    self.save_game_enabled = options.save_game_enabled;
+    self.save_best_enabled = options.save_best_enabled;
     self.accumulator = Duration::ZERO;
     self.session = Some(session);
     self.log_session = log_session;
@@ -313,13 +318,15 @@ mod tests {
     service.start(
       test_session(),
       test_package_id(),
-      120,
-      Size {
-        width: 40,
-        height: 12,
+      GameStartOptions {
+        target_fps: 120,
+        min_size: Size {
+          width: 40,
+          height: 12,
+        },
+        save_game_enabled: true,
+        save_best_enabled: false,
       },
-      true,
-      false,
       None,
     );
 
@@ -343,13 +350,15 @@ mod tests {
     service.start(
       test_session(),
       test_package_id(),
-      60,
-      Size {
-        width: 40,
-        height: 12,
+      GameStartOptions {
+        target_fps: 60,
+        min_size: Size {
+          width: 40,
+          height: 12,
+        },
+        save_game_enabled: true,
+        save_best_enabled: false,
       },
-      true,
-      false,
       None,
     );
     let first = service.session_token().unwrap();
@@ -361,13 +370,15 @@ mod tests {
     service.start(
       test_session(),
       test_package_id(),
-      60,
-      Size {
-        width: 40,
-        height: 12,
+      GameStartOptions {
+        target_fps: 60,
+        min_size: Size {
+          width: 40,
+          height: 12,
+        },
+        save_game_enabled: true,
+        save_best_enabled: false,
       },
-      true,
-      false,
       None,
     );
     let second = service.session_token().unwrap();

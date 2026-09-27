@@ -222,11 +222,11 @@ impl ScreenshotCaptureUi {
           }
         }
         MouseEventKind::Release if mouse.button == Some(MouseButton::Left) => {
-          if self.drag_anchor.is_some() {
-            if let Some(pos) = local {
-              self.drag_cursor = Some(pos);
-              self.selection = self.selection_from_drag();
-            }
+          if self.drag_anchor.is_some()
+            && let Some(pos) = local
+          {
+            self.drag_cursor = Some(pos);
+            self.selection = self.selection_from_drag();
           }
           self.drag_anchor = None;
           self.drag_cursor = None;
@@ -393,7 +393,7 @@ impl ScreenshotCaptureUi {
           Some(ComposedCell::Text(cell)) => cell.clone(),
           _ => CanvasCell::blank(),
         };
-        if selection.map_or(false, |r| contains(r, x, y)) {
+        if selection.is_some_and(|r| contains(r, x, y)) {
           cell.style.reverse = !cell.style.reverse;
         }
         canvas.host_cell(tx, ty, cell);

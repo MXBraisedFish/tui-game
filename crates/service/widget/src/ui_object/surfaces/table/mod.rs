@@ -9,11 +9,12 @@ pub use self::types::{
   TableAlign, TableBorderMode, TableBorderStyle, TableCell, TableColumn, TableDrawParams, TableId,
   TableOptions, TableOverflow, TableRow, TableStyle,
 };
-use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
+use crate::SliceId;
 use crate::UiObjectPool;
 use tg_service_canvas::CanvasService;
-use crate::SliceId;
+use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
 
+#[derive(Default)]
 pub struct TableService;
 
 #[derive(Clone, Copy)]
@@ -21,6 +22,12 @@ enum TableTarget {
   Base,
   Slice(SliceId),
   Host,
+}
+
+#[derive(Clone, Copy)]
+struct TablePosition {
+  x: u16,
+  y: u16,
 }
 
 impl TableService {
@@ -139,8 +146,7 @@ impl TableService {
       self.draw_full_border_line(
         canvas,
         target,
-        params.x,
-        y,
+        TablePosition { x: params.x, y },
         &columns,
         &options.style,
         BorderLine::Top,
@@ -152,8 +158,7 @@ impl TableService {
       let header_height = self.draw_row(
         canvas,
         target,
-        params.x,
-        y,
+        TablePosition { x: params.x, y },
         &columns,
         &options
           .columns
@@ -179,8 +184,7 @@ impl TableService {
           self.draw_full_border_line(
             canvas,
             target,
-            params.x,
-            y,
+            TablePosition { x: params.x, y },
             &columns,
             &options.style,
             BorderLine::Middle,
@@ -215,8 +219,7 @@ impl TableService {
         let row_height = self.draw_row(
           canvas,
           target,
-          params.x,
-          y,
+          TablePosition { x: params.x, y },
           &columns,
           &row.cells,
           &options.style,
@@ -229,8 +232,10 @@ impl TableService {
       self.draw_full_border_line(
         canvas,
         target,
-        params.x,
-        bottom.saturating_sub(1),
+        TablePosition {
+          x: params.x,
+          y: bottom.saturating_sub(1),
+        },
         &columns,
         &options.style,
         BorderLine::Bottom,
@@ -244,12 +249,12 @@ impl TableService {
     &self,
     canvas: &mut CanvasService,
     target: TableTarget,
-    x: u16,
-    y: u16,
+    position: TablePosition,
     columns: &[EffectiveColumn],
     cells: &[TableCell],
     style: &TableStyle,
   ) -> u16 {
+    let TablePosition { x, y } = position;
     let row_height = row_height(columns, cells);
     let mut cursor = x;
     if style.border_mode == TableBorderMode::Full {
@@ -269,7 +274,14 @@ impl TableService {
         .get(index)
         .map(|cell| cell.text.as_str())
         .unwrap_or("");
-      self.draw_cell(canvas, target, cursor, y, row_height, column, text);
+      self.draw_cell(
+        canvas,
+        target,
+        TablePosition { x: cursor, y },
+        row_height,
+        column,
+        text,
+      );
       cursor = cursor.saturating_add(column.width);
 
       if style.border_mode == TableBorderMode::Full {
@@ -291,12 +303,12 @@ impl TableService {
     &self,
     canvas: &mut CanvasService,
     target: TableTarget,
-    x: u16,
-    y: u16,
+    position: TablePosition,
     height: u16,
     column: &EffectiveColumn,
     text: &str,
   ) {
+    let TablePosition { x, y } = position;
     if column.width == 0 {
       return;
     }
@@ -376,12 +388,12 @@ impl TableService {
     &self,
     canvas: &mut CanvasService,
     target: TableTarget,
-    x: u16,
-    y: u16,
+    position: TablePosition,
     columns: &[EffectiveColumn],
     style: &TableStyle,
     line_kind: BorderLine,
   ) {
+    let TablePosition { x, y } = position;
     let chars = border_chars(style);
     let (left, sep, right, h) = match line_kind {
       BorderLine::Top => (
@@ -597,9 +609,11 @@ fn natural_column_width(
   index: usize,
   show_header: bool,
 ) -> u16 {
-  let header = show_header
-    .then(|| visible_width(&column.title))
-    .unwrap_or(0);
+  let header = if show_header {
+    visible_width(&column.title)
+  } else {
+    0
+  };
   let body = rows
     .iter()
     .filter_map(|row| row.cells.get(index))

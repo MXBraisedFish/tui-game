@@ -70,7 +70,6 @@ game_package/
     "name": "Example Game",
     "detail": "Game description shown in the game list.",
 
-    "high_privilege": false,
     "mouse": false,
     "truecolor": false,
     "target_fps": 60,
@@ -210,7 +209,6 @@ i18n 的查询顺序固定为：用户当前语言 → `en_us` → `callback`。
 | --- | --- | --- | --- |
 | `name` | package-text | 是 | 游戏名称，解析后不可为空。 |
 | `detail` | package-text | 是 | 游戏详情。 |
-| `high_privilege` | boolean | 否 | 默认 `false`；表示完整体验可能需要关闭安全模式，仅作为提示。 |
 | `mouse` | boolean | 否 | 默认 `false`；表示游戏需要鼠标，仅作为提示。 |
 | `truecolor` | boolean | 否 | 默认 `false`；表示游戏需要真彩色，仅作为提示。 |
 | `target_fps` | integer | 否 | 默认 `60`；只接受 `30`、`60`、`120`。 |

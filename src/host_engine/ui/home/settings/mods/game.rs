@@ -1,17 +1,18 @@
-use std::{cmp::Ordering, collections::HashSet, time::Duration};
+use std::{cmp::Ordering, time::Duration};
 
 use unicode_width::UnicodeWidthStr;
 
+use super::{PackageInfoRenderArea, PackageInfoTextPosition, PackageListRenderContext};
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
-  HitAreaOptions, HitAreaService, I18nService, ImageConvertParams, ImageService, KeyState,
-  LayoutService, LogService, MouseButton, Overflow, PackageAsset, PackageId, PackageListEntry,
-  PackageService, Rect, RenderService, RichTextParams, RichTextService, RuntimeObjectPool,
-  RuntimeObjectPoolOwner, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy,
-  ScrollbarVisibility, StorageService, TerminalColor, TextAlign, TextColor, TextInputCursorShape,
-  TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
-  TextInputService, TextStyle, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  HitAreaOptions, HitAreaService, I18nService, ImageConvertParams, KeyState, LayoutService,
+  LogService, MouseButton, Overflow, PackageAsset, PackageListEntry, Rect, RenderService,
+  RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxId,
+  ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, StorageService,
+  TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent, TextInputId,
+  TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle, UiEvent,
+  UiObjectPool, UiObjectPoolOwner,
 };
 
 /// 游戏包详情页面的命令。
@@ -27,7 +28,6 @@ pub enum GamePackageCommand {
   SubmitJump(String),
   ToggleEnabled,
   ToggleDebug,
-  RequestToggleSafeMode,
 }
 
 /// 游戏包详情页面布局信息。
@@ -62,7 +62,6 @@ enum GameSortField {
   Author,
   Status,
   Debug,
-  SafeMode,
 }
 
 impl GameSortField {
@@ -71,8 +70,7 @@ impl GameSortField {
       Self::Title => Self::Author,
       Self::Author => Self::Status,
       Self::Status => Self::Debug,
-      Self::Debug => Self::SafeMode,
-      Self::SafeMode => Self::Title,
+      Self::Debug => Self::Title,
     }
   }
 
@@ -82,21 +80,7 @@ impl GameSortField {
       Self::Author => "game_pack.list.sort.author",
       Self::Status => "game_pack.list.sort.status",
       Self::Debug => "game_pack.list.sort.debug",
-      Self::SafeMode => "game_pack.list.sort.safe_mode",
     }
-  }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SafeModeStatus {
-  On,
-  OffTemporary,
-  OffPermanent,
-}
-
-impl SafeModeStatus {
-  fn enabled(self) -> bool {
-    self == Self::On
   }
 }
 
@@ -126,7 +110,6 @@ pub struct GamePackageUi {
   search_text: String,
   jump_text: String,
   simple_list: bool,
-  temporary_safe_mode_disabled: HashSet<PackageId>,
   needs_rebuild_areas: bool,
 }
 
@@ -223,7 +206,6 @@ impl GamePackageUi {
       search_text: String::new(),
       jump_text: "1".to_string(),
       simple_list: false,
-      temporary_safe_mode_disabled: HashSet::new(),
       needs_rebuild_areas: true,
     }
   }
@@ -295,11 +277,6 @@ impl GamePackageUi {
         action: "game_pack.sort".to_string(),
         description: "Toggle sort".to_string(),
         keys: vec![vec!["x".to_string()]],
-      },
-      ActionMapEntry {
-        action: "game_pack.safe_mode".to_string(),
-        description: "Toggle safe mode".to_string(),
-        keys: vec![vec!["b".to_string()]],
       },
       ActionMapEntry {
         action: "game_pack.jump".to_string(),
@@ -415,7 +392,6 @@ impl GamePackageUi {
           self.toggle_list_style();
           None
         }
-        "game_pack.safe_mode" => Some(GamePackageCommand::RequestToggleSafeMode),
         "game_pack.confirm" => Some(GamePackageCommand::ToggleEnabled),
         "game_pack.debug" => Some(GamePackageCommand::ToggleDebug),
         "game_pack.list.back" => Some(GamePackageCommand::Back),
@@ -456,33 +432,6 @@ impl GamePackageUi {
     let _ = text_input.blur(&mut self.objects);
   }
 
-  pub fn selected_safe_mode(&self) -> Option<bool> {
-    self
-      .selected_safe_mode_status()
-      .map(SafeModeStatus::enabled)
-  }
-
-  fn selected_safe_mode_status(&self) -> Option<SafeModeStatus> {
-    self
-      .page_entries()
-      .get(self.selected_index)
-      .map(|entry| self.safe_mode_status(entry))
-  }
-
-  pub fn selected_mod_id(&self) -> Option<String> {
-    self
-      .page_entries()
-      .get(self.selected_index)
-      .map(|entry| entry.mod_id.clone())
-  }
-
-  pub fn selected_package_id(&self) -> Option<crate::host_engine::services::PackageId> {
-    self
-      .page_entries()
-      .get(self.selected_index)
-      .map(|entry| entry.id.clone())
-  }
-
   pub fn toggle_selected_enabled(&mut self, storage: &StorageService, log: &mut LogService) {
     let Some((mod_id, package_id, enabled)) =
       self.selected_entry_state(|entry| (entry.mod_id.clone(), entry.id.clone(), !entry.enabled))
@@ -503,42 +452,6 @@ impl GamePackageUi {
     let _ = storage.update_game_package_state(&package_id, log, |state| state.debug = debug);
   }
 
-  pub fn enable_selected_safe_mode(&mut self, storage: &StorageService, log: &mut LogService) {
-    let Some((mod_id, package_id)) =
-      self.selected_entry_state(|entry| (entry.mod_id.clone(), entry.id.clone()))
-    else {
-      return;
-    };
-    self.update_entry(&mod_id, |entry| entry.safe_mode = true);
-    let _ = storage.update_game_package_state(&package_id, log, |state| state.safe_mode = true);
-  }
-
-  pub fn disable_selected_safe_mode_temporary(&mut self) {
-    let Some(mod_id) = self.selected_mod_id() else {
-      return;
-    };
-    for item in &mut self.entries {
-      if item.mod_id == mod_id {
-        item.safe_mode = false;
-      }
-    }
-    self.needs_rebuild_areas = true;
-  }
-
-  pub fn disable_selected_safe_mode_permanent(
-    &mut self,
-    storage: &StorageService,
-    log: &mut LogService,
-  ) {
-    let Some((mod_id, package_id)) =
-      self.selected_entry_state(|entry| (entry.mod_id.clone(), entry.id.clone()))
-    else {
-      return;
-    };
-    self.update_entry(&mod_id, |entry| entry.safe_mode = false);
-    let _ = storage.update_game_package_state(&package_id, log, |state| state.safe_mode = false);
-  }
-
   pub fn scroll_info(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, lines: i32) {
     let _ = scroll_box.scroll_by(&mut self.objects, self.info_scroll, 0, lines, layout);
   }
@@ -549,112 +462,88 @@ impl GamePackageUi {
   }
 
   /// 渲染游戏包详情页面。
-  pub fn render(
-    &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    hit_area: &HitAreaService,
-    text_input: &TextInputService,
-    scroll_box: &ScrollBoxService,
-    package: &PackageService,
-    storage: &StorageService,
-    log: &mut LogService,
-    temporary_safe_mode_disabled: &HashSet<PackageId>,
-    image: &mut ImageService,
-    mouse_supported: bool,
-    truecolor_supported: bool,
-  ) {
-    self.sync_entries(
-      package.mod_games(),
-      storage,
-      log,
-      temporary_safe_mode_disabled,
-    );
-    let positions = self.compute_positions(layout, i18n, text_input);
+  pub fn render(&mut self, context: &mut PackageListRenderContext<'_>) {
+    self.sync_entries(context.package.mod_games(), context.storage, context.log);
+    let positions = self.compute_positions(context.layout, context.i18n, context.text_input);
 
     self.sync_selection_for_per_page(positions.visible_items);
 
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.page_area,
-      layout.developer_viewport_rect(),
-      canvas,
+      context.layout.developer_viewport_rect(),
+      context.canvas,
     );
 
-    let viewport = layout.developer_viewport_rect();
+    let viewport = context.layout.developer_viewport_rect();
     let info_scroll_rect = Rect {
       x: positions.right_inner.x.saturating_sub(viewport.x),
       y: positions.right_inner.y.saturating_sub(viewport.y),
       width: positions.right_inner.width,
       height: positions.right_inner.height,
     };
-    scroll_box.set_rect(
+    context.scroll_box.set_rect(
       &mut self.objects,
       self.info_scroll,
       info_scroll_rect,
-      layout,
+      context.layout,
     );
-    let info_content_height = self.info_content_height(layout, positions.right_inner.width);
-    scroll_box.set_content_size(
+    let info_content_height = self.info_content_height(context.layout, positions.right_inner.width);
+    context.scroll_box.set_content_size(
       &mut self.objects,
       self.info_scroll,
       positions.right_inner.width.max(1),
       info_content_height,
-      layout,
+      context.layout,
     );
-    self.objects.prepare_canvas(canvas, layout);
+    self.objects.prepare_canvas(context.canvas, context.layout);
 
-    let info_scroll_y = scroll_box
+    let info_scroll_y = context
+      .scroll_box
       .scroll_y(&self.objects, self.info_scroll)
       .unwrap_or(0);
-    self.draw_right_panel(
-      render,
-      canvas,
-      layout,
-      i18n,
-      image,
-      mouse_supported,
-      truecolor_supported,
+    self.draw_right_panel(context, &positions, info_scroll_y);
+    self.draw_left_panel(context, &positions);
+    self.draw_action_hint(
+      context.render,
+      context.canvas,
+      context.i18n,
+      context.text_input,
       &positions,
-      info_scroll_y,
     );
-    self.draw_left_panel(render, canvas, layout, i18n, image, &positions, text_input);
-    self.draw_action_hint(render, canvas, i18n, text_input, &positions);
 
     if self.page > 1 {
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         self.flip_forward_area,
         positions.flip_forward_rect,
-        canvas,
+        context.canvas,
       );
     }
     if self.page < self.total_pages() {
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         self.flip_backward_area,
         positions.flip_backward_rect,
-        canvas,
+        context.canvas,
       );
     }
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.order_area,
       positions.order_rect,
-      canvas,
+      context.canvas,
     );
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.sort_area,
       positions.sort_rect,
-      canvas,
+      context.canvas,
     );
 
     let entries_len = self.page_entries().len();
     if self.needs_rebuild_areas || self.list_item_areas.len() != entries_len {
-      self.rebuild_list_areas(hit_area);
+      self.rebuild_list_areas(context.hit_area);
       self.needs_rebuild_areas = false;
     }
 
@@ -665,7 +554,7 @@ impl GamePackageUi {
       let item_y = positions
         .list_start_y
         .saturating_add(i as u16 * (positions.list_item_height + positions.list_item_gap));
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         *area_id,
         Rect {
@@ -674,7 +563,7 @@ impl GamePackageUi {
           width: positions.left_inner.width,
           height: positions.list_item_height,
         },
-        canvas,
+        context.canvas,
       );
     }
   }
@@ -843,16 +732,11 @@ impl GamePackageUi {
 
   fn draw_left_panel(
     &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    image: &mut ImageService,
+    context: &mut PackageListRenderContext<'_>,
     pos: &GamePackageLayout,
-    text_input: &TextInputService,
   ) {
-    render.draw_host_border_rect(
-      canvas,
+    context.render.draw_host_border_rect(
+      context.canvas,
       pos.left_rect.x,
       pos.left_rect.y,
       pos.left_rect.width,
@@ -864,18 +748,20 @@ impl GamePackageUi {
       None,
     );
     self.draw_panel_title(
-      render,
-      canvas,
+      context.render,
+      context.canvas,
       pos.left_rect,
-      &i18n.get_runtime_text("game_pack", "game_pack.list"),
+      &context.i18n.get_runtime_text("game_pack", "game_pack.list"),
     );
 
-    text_input.render_host(
+    context.text_input.render_host(
       &mut self.objects,
       self.search_input,
       &TextInputRenderParams {
         rect: pos.search_rect,
-        placeholder: i18n.get_runtime_text("game_pack", "game_pack.list.search.placeholder"),
+        placeholder: context
+          .i18n
+          .get_runtime_text("game_pack", "game_pack.list.search.placeholder"),
         fg: Some(TextColor::Terminal(TerminalColor::BrightWhite)),
         bg: Some(TextColor::Rgb {
           r: 24,
@@ -885,9 +771,9 @@ impl GamePackageUi {
         placeholder_fg: Some(TextColor::Terminal(TerminalColor::BrightBlack)),
         ..Default::default()
       },
-      canvas,
+      context.canvas,
     );
-    self.draw_sort_separator(render, canvas, i18n, pos);
+    self.draw_sort_separator(context.render, context.canvas, context.i18n, pos);
 
     let entries = self.page_entries();
     for (i, entry) in entries.iter().enumerate() {
@@ -895,35 +781,22 @@ impl GamePackageUi {
         .list_start_y
         .saturating_add(i as u16 * (pos.list_item_height + pos.list_item_gap));
       if self.simple_list {
-        self.draw_entry_simple(
-          render,
-          canvas,
-          i18n,
-          pos,
-          entry,
-          y,
-          i == self.selected_index,
-        );
+        self.draw_entry_simple(context, pos, entry, y, i == self.selected_index);
       } else {
-        self.draw_entry_card(
-          render,
-          canvas,
-          layout,
-          image,
-          i18n,
-          pos,
-          entry,
-          y,
-          i == self.selected_index,
-        );
+        self.draw_entry_card(context, pos, entry, y, i == self.selected_index);
       }
     }
 
     if entries.is_empty() {
-      let text = i18n.get_runtime_text("game_pack", "game_pack.no.pack");
-      let width = layout.get_text_width(&text, None).min(pos.left_inner.width);
-      render.draw_host_text(
-        canvas,
+      let text = context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.no.pack");
+      let width = context
+        .layout
+        .get_text_width(&text, None)
+        .min(pos.left_inner.width);
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos
             .left_inner
@@ -940,22 +813,29 @@ impl GamePackageUi {
     }
 
     let total = self.total_pages_for(pos.visible_items).max(1);
-    if !text_input.is_focused(&self.objects, self.jump_input)
+    if !context
+      .text_input
+      .is_focused(&self.objects, self.jump_input)
       && self.jump_text != self.page.to_string()
     {
-      let _ = text_input.set_text(&mut self.objects, self.jump_input, self.page.to_string());
+      let _ =
+        context
+          .text_input
+          .set_text(&mut self.objects, self.jump_input, self.page.to_string());
       self.jump_text = self.page.to_string();
     }
     let key_params = RichTextParams::from_action_map(&Self::action_map(), "game_pack.");
     if self.page > 1 {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos.flip_forward_rect.x,
           y: pos.flip_forward_rect.y,
           text: format!(
             "f%<fg:bright_black>{}</fg>",
-            i18n.get_runtime_text("game_pack", "game_pack.flip.forward")
+            context
+              .i18n
+              .get_runtime_text("game_pack", "game_pack.flip.forward")
           ),
           params: Some(key_params.clone()),
           max_width: Some(pos.flip_forward_rect.width),
@@ -964,14 +844,16 @@ impl GamePackageUi {
       );
     }
     if self.page < total {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos.flip_backward_rect.x,
           y: pos.flip_backward_rect.y,
           text: format!(
             "f%<fg:bright_black>{}</fg>",
-            i18n.get_runtime_text("game_pack", "game_pack.flip.backward")
+            context
+              .i18n
+              .get_runtime_text("game_pack", "game_pack.flip.backward")
           ),
           params: Some(key_params),
           max_width: Some(pos.flip_backward_rect.width),
@@ -980,8 +862,10 @@ impl GamePackageUi {
       );
     }
 
-    let jump_focused = text_input.is_focused(&self.objects, self.jump_input);
-    text_input.render_host(
+    let jump_focused = context
+      .text_input
+      .is_focused(&self.objects, self.jump_input);
+    context.text_input.render_host(
       &mut self.objects,
       self.jump_input,
       &TextInputRenderParams {
@@ -1001,10 +885,10 @@ impl GamePackageUi {
         text_align: TextAlign::Right,
         ..Default::default()
       },
-      canvas,
+      context.canvas,
     );
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: pos.page_separator_x,
         y: pos.page_y,
@@ -1012,8 +896,8 @@ impl GamePackageUi {
         ..Default::default()
       },
     );
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: pos.total_page_x,
         y: pos.page_y,
@@ -1025,11 +909,7 @@ impl GamePackageUi {
 
   fn draw_entry_card(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    image: &mut ImageService,
-    i18n: &I18nService,
+    context: &mut PackageListRenderContext<'_>,
     pos: &GamePackageLayout,
     entry: &PackageListEntry,
     y: u16,
@@ -1038,15 +918,15 @@ impl GamePackageUi {
     let marker_x = pos.left_inner.x;
     let image_x = marker_x.saturating_add(1);
     let text_x = image_x.saturating_add(9);
-    let safe_x = pos
+    let right_edge_x = pos
       .left_inner
       .x
       .saturating_add(pos.left_inner.width.saturating_sub(1));
-    let text_width = safe_x.saturating_sub(text_x).max(1);
+    let text_width = right_edge_x.saturating_sub(text_x).max(1);
 
     for row in 0..4 {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: marker_x,
           y: y.saturating_add(row),
@@ -1060,8 +940,8 @@ impl GamePackageUi {
       );
     }
 
-    render.draw_host_filled_rect(
-      canvas,
+    context.render.draw_host_filled_rect(
+      context.canvas,
       image_x,
       y,
       8,
@@ -1075,16 +955,7 @@ impl GamePackageUi {
       }),
     );
     let package_params = Self::package_rich_params(entry);
-    self.draw_icon_asset(
-      render,
-      canvas,
-      layout,
-      image,
-      &entry.icon,
-      image_x,
-      y,
-      &package_params,
-    );
+    self.draw_icon_asset(context, &entry.icon, image_x, y, &package_params);
 
     let status_key = if entry.enabled {
       "game_pack.list.status.on"
@@ -1095,7 +966,9 @@ impl GamePackageUi {
       if entry.debug {
         format!(
           "f%[<fg:bright_magenta>{}</fg>]{}",
-          i18n.get_runtime_text("game_pack", "game_pack.list.debug"),
+          context
+            .i18n
+            .get_runtime_text("game_pack", "game_pack.list.debug"),
           entry.title
         )
       } else {
@@ -1103,28 +976,34 @@ impl GamePackageUi {
       },
       format!(
         "f%<fg:bright_yellow>{}</fg>{}",
-        i18n.get_runtime_text("game_pack", "game_pack.info.author"),
+        context
+          .i18n
+          .get_runtime_text("game_pack", "game_pack.info.author"),
         entry.author
       ),
       format!(
         "f%<fg:bright_yellow>{}</fg>{}",
-        i18n.get_runtime_text("game_pack", "game_pack.list.version"),
+        context
+          .i18n
+          .get_runtime_text("game_pack", "game_pack.list.version"),
         entry.version
       ),
       format!(
         "f%<fg:bright_yellow>{}</fg>{}{}</fg>",
-        i18n.get_runtime_text("game_pack", "game_pack.list.status"),
+        context
+          .i18n
+          .get_runtime_text("game_pack", "game_pack.list.status"),
         if status_key == "game_pack.list.status.on" {
           "<fg:bright_green>"
         } else {
           "<fg:bright_red>"
         },
-        i18n.get_runtime_text("game_pack", status_key)
+        context.i18n.get_runtime_text("game_pack", status_key)
       ),
     ];
     for (row, text) in lines.into_iter().enumerate() {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: text_x,
           y: y.saturating_add(row as u16),
@@ -1137,27 +1016,11 @@ impl GamePackageUi {
         },
       );
     }
-
-    if !entry.safe_mode {
-      for row in 0..4 {
-        render.draw_host_text(
-          canvas,
-          &DrawTextParams {
-            x: safe_x,
-            y: y.saturating_add(row),
-            text: "f%<fg:red>█</fg>".to_string(),
-            ..Default::default()
-          },
-        );
-      }
-    }
   }
 
   fn draw_entry_simple(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    i18n: &I18nService,
+    context: &mut PackageListRenderContext<'_>,
     pos: &GamePackageLayout,
     entry: &PackageListEntry,
     y: u16,
@@ -1171,16 +1034,16 @@ impl GamePackageUi {
     } else {
       "game_pack.list.status.off"
     };
-    let status = i18n.get_runtime_text("game_pack", status_key);
-    let right_width = status.width().saturating_add(3).min(u16::MAX as usize) as u16;
+    let status = context.i18n.get_runtime_text("game_pack", status_key);
+    let right_width = status.width().saturating_add(2).min(u16::MAX as usize) as u16;
     let right_x = pos
       .left_inner
       .x
       .saturating_add(pos.left_inner.width.saturating_sub(right_width));
     let text_width = right_x.saturating_sub(text_x).max(1);
 
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: marker_x,
         y,
@@ -1196,14 +1059,16 @@ impl GamePackageUi {
     let title = if entry.debug {
       format!(
         "f%[<fg:bright_magenta>{}</fg>]{}",
-        i18n.get_runtime_text("game_pack", "game_pack.list.debug"),
+        context
+          .i18n
+          .get_runtime_text("game_pack", "game_pack.list.debug"),
         entry.title
       )
     } else {
       entry.title.clone()
     };
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: text_x,
         y,
@@ -1221,17 +1086,12 @@ impl GamePackageUi {
     } else {
       "bright_red"
     };
-    let safe_mark = if entry.safe_mode {
-      " "
-    } else {
-      "<fg:red>█</fg>"
-    };
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: right_x,
         y,
-        text: format!("f%[<fg:{}>{}</fg>]{}", status_color, status, safe_mark),
+        text: format!("f%[<fg:{}>{}</fg>]", status_color, status),
         max_width: Some(right_width),
         ..Default::default()
       },
@@ -1240,17 +1100,14 @@ impl GamePackageUi {
 
   fn draw_icon_asset(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    image: &mut ImageService,
+    context: &mut PackageListRenderContext<'_>,
     asset: &PackageAsset,
     x: u16,
     y: u16,
     params: &RichTextParams,
   ) {
-    if let PackageAsset::Image { path } = asset {
-      if let Ok(text) = image.convert(ImageConvertParams {
+    if let PackageAsset::Image { path } = asset
+      && let Ok(text) = context.image.convert(ImageConvertParams {
         image_path: path.clone(),
         output_width: 8,
         output_height: 4,
@@ -1258,21 +1115,21 @@ impl GamePackageUi {
         scale: 1.0,
         cache: true,
         ..Default::default()
-      }) {
-        render.draw_host_text(
-          canvas,
-          &DrawTextParams {
-            x,
-            y,
-            text,
-            wrap_mode: TextWrapMode::Auto,
-            max_width: Some(8),
-            max_height: Some(4),
-            ..Default::default()
-          },
-        );
-        return;
-      }
+      })
+    {
+      context.render.draw_host_text(
+        context.canvas,
+        &DrawTextParams {
+          x,
+          y,
+          text,
+          wrap_mode: TextWrapMode::Auto,
+          max_width: Some(8),
+          max_height: Some(4),
+          ..Default::default()
+        },
+      );
+      return;
     }
 
     let fallback = PackageAsset::default_icon();
@@ -1285,12 +1142,12 @@ impl GamePackageUi {
     };
     for (row, line) in lines.iter().take(4).enumerate() {
       if line.trim_start().starts_with("f%") {
-        render.draw_host_text(
-          canvas,
+        context.render.draw_host_text(
+          context.canvas,
           &DrawTextParams {
             x,
             y: y.saturating_add(row as u16),
-            text: Self::fit_asset_rich_line(line, false, 8, layout, Some(params)),
+            text: Self::fit_asset_rich_line(line, false, 8, context.layout, Some(params)),
             params: Some(params.clone()),
             wrap_mode: TextWrapMode::None,
             max_width: Some(8),
@@ -1299,25 +1156,24 @@ impl GamePackageUi {
           },
         );
       } else {
-        canvas.host_styled_text(x, y.saturating_add(row as u16), line, TextStyle::default());
+        context.canvas.host_styled_text(
+          x,
+          y.saturating_add(row as u16),
+          line,
+          TextStyle::default(),
+        );
       }
     }
   }
 
   fn draw_right_panel(
     &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    image: &mut ImageService,
-    mouse_supported: bool,
-    truecolor_supported: bool,
+    context: &mut PackageListRenderContext<'_>,
     pos: &GamePackageLayout,
     scroll_y: u16,
   ) {
-    render.draw_host_border_rect(
-      canvas,
+    context.render.draw_host_border_rect(
+      context.canvas,
       pos.right_rect.x,
       pos.right_rect.y,
       pos.right_rect.width,
@@ -1329,20 +1185,23 @@ impl GamePackageUi {
       None,
     );
     self.draw_panel_title(
-      render,
-      canvas,
+      context.render,
+      context.canvas,
       pos.right_rect,
-      &i18n.get_runtime_text("game_pack", "game_pack.info"),
+      &context.i18n.get_runtime_text("game_pack", "game_pack.info"),
     );
 
     let page_entries = self.page_entries();
     let Some(entry) = page_entries.get(self.selected_index) else {
-      let text = i18n.get_runtime_text("game_pack", "game_pack.no.info");
-      let width = layout
+      let text = context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.no.info");
+      let width = context
+        .layout
         .get_text_width(&text, None)
         .min(pos.right_inner.width);
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos
             .right_inner
@@ -1360,119 +1219,81 @@ impl GamePackageUi {
       return;
     };
 
-    self.draw_info_content(
-      render,
-      canvas,
-      i18n,
-      image,
-      layout,
-      entry,
-      pos.right_inner,
-      scroll_y,
-      mouse_supported,
-      truecolor_supported,
-    );
+    self.draw_info_content(context, entry, pos.right_inner, scroll_y);
   }
 
   fn draw_info_content(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    i18n: &I18nService,
-    image: &mut ImageService,
-    layout: &LayoutService,
+    context: &mut PackageListRenderContext<'_>,
     entry: &PackageListEntry,
     rect: Rect,
     scroll_y: u16,
-    mouse_supported: bool,
-    truecolor_supported: bool,
   ) {
     let package_params = Self::package_rich_params(entry);
+    let info_area = PackageInfoRenderArea { rect, scroll_y };
     let mut y = 0;
-    self.draw_info_banner(
-      render,
-      canvas,
-      image,
-      layout,
-      &entry.banner,
-      &package_params,
-      rect,
-      scroll_y,
-      y,
-    );
+    self.draw_info_banner(context, &entry.banner, &package_params, info_area, y);
     y += 15;
-    self.draw_info_center_text(
-      render,
-      canvas,
-      layout,
-      rect,
-      scroll_y,
-      y,
-      &entry.title,
-      Some(&package_params),
-    );
+    self.draw_info_center_text(context, info_area, y, &entry.title, Some(&package_params));
     y += 2;
 
     self.draw_info_subtitle(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n,
       "game_pack",
       "game_pack.info.subtitle.base",
     );
     y += 1;
     self.draw_info_pair(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.pack_name"),
+      context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.info.pack_name"),
       &entry.mod_id,
     );
     y += 1;
     self.draw_info_pair_rich_value(
-      render,
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.author"),
+      context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.info.author"),
       &entry.author,
       &package_params,
     );
     y += 1;
     self.draw_info_pair_rich_value(
-      render,
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.version"),
+      context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.info.version"),
       &entry.version,
       &package_params,
     );
     y += 2;
 
     self.draw_info_subtitle(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n,
       "game_pack",
       "game_pack.info.subtitle.config",
     );
     y += 1;
-    let safe_mode_status = self.safe_mode_status(entry);
     self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.status"),
-      i18n.get_runtime_text(
+      context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.info.status"),
+      context.i18n.get_runtime_text(
         "game_pack",
         if entry.enabled {
           "game_pack.info.status.on"
@@ -1488,12 +1309,13 @@ impl GamePackageUi {
     );
     y += 1;
     self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.debug"),
-      i18n.get_runtime_text(
+      context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.info.debug"),
+      context.i18n.get_runtime_text(
         "game_pack",
         if entry.debug {
           "game_pack.info.debug.on"
@@ -1510,7 +1332,7 @@ impl GamePackageUi {
     y += 1;
     let (mouse_key, mouse_color) = if !entry.mouse_required {
       ("game_pack.info.mouse.off", Self::hint_style())
-    } else if mouse_supported {
+    } else if context.mouse_supported {
       (
         "game_pack.info.mouse.on.support",
         Self::style(TerminalColor::BrightGreen),
@@ -1522,18 +1344,19 @@ impl GamePackageUi {
       )
     };
     self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.mouse"),
-      i18n.get_runtime_text("game_pack", mouse_key),
+      context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.info.mouse"),
+      context.i18n.get_runtime_text("game_pack", mouse_key),
       mouse_color,
     );
     y += 1;
     let (truecolor_key, truecolor_color) = if !entry.truecolor_required {
       ("game_pack.info.truecolor.off", Self::hint_style())
-    } else if truecolor_supported {
+    } else if context.truecolor_supported {
       (
         "game_pack.info.truecolor.on.support",
         Self::style(TerminalColor::BrightGreen),
@@ -1545,47 +1368,28 @@ impl GamePackageUi {
       )
     };
     self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.truecolor"),
-      i18n.get_runtime_text("game_pack", truecolor_key),
+      context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.info.truecolor"),
+      context.i18n.get_runtime_text("game_pack", truecolor_key),
       truecolor_color,
-    );
-    y += 1;
-    self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
-      y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.high_privilege"),
-      i18n.get_runtime_text(
-        "game_pack",
-        if entry.high_privilege_required {
-          "game_pack.info.high_privilege.on"
-        } else {
-          "game_pack.info.high_privilege.off"
-        },
-      ),
-      if entry.high_privilege_required {
-        Self::style(TerminalColor::BrightRed)
-      } else {
-        Self::hint_style()
-      },
     );
     y += 1;
     let language_supported = entry
       .supported_languages
       .iter()
-      .any(|language| language.eq_ignore_ascii_case(i18n.current_language_code()));
+      .any(|language| language.eq_ignore_ascii_case(context.i18n.current_language_code()));
     self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.language"),
-      i18n.get_runtime_text(
+      context
+        .i18n
+        .get_runtime_text("game_pack", "game_pack.info.language"),
+      context.i18n.get_runtime_text(
         "game_pack",
         if language_supported {
           "game_pack.info.language.support"
@@ -1600,40 +1404,18 @@ impl GamePackageUi {
       },
     );
     y += 1;
-    self.draw_info_status(
-      canvas,
-      rect,
-      scroll_y,
-      y,
-      i18n.get_runtime_text("game_pack", "game_pack.info.safe_mode"),
-      i18n.get_runtime_text(
-        "game_pack",
-        match safe_mode_status {
-          SafeModeStatus::On => "game_pack.info.safe_mode.on",
-          SafeModeStatus::OffTemporary => "game_pack.info.safe_mode.off.temporary",
-          SafeModeStatus::OffPermanent => "game_pack.info.safe_mode.off.permanent",
-        },
-      ),
-      if safe_mode_status.enabled() {
-        Self::hint_style()
-      } else {
-        Self::style(TerminalColor::BrightRed)
-      },
-    );
-    y += 2;
+    y += 1;
 
     self.draw_info_subtitle(
-      canvas,
-      rect,
-      scroll_y,
+      context,
+      info_area,
       y,
-      i18n,
       "game_pack",
       "game_pack.info.subtitle.description",
     );
     y += 1;
-    let _ = render.draw_text_in_scroll_box(
-      canvas,
+    let _ = context.render.draw_text_in_scroll_box(
+      context.canvas,
       self.info_scroll,
       &DrawTextParams {
         x: 0,
@@ -1649,22 +1431,18 @@ impl GamePackageUi {
 
   fn draw_info_banner(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    image: &mut ImageService,
-    layout: &LayoutService,
+    context: &mut PackageListRenderContext<'_>,
     asset: &PackageAsset,
     params: &RichTextParams,
-    rect: Rect,
-    scroll_y: u16,
+    area: PackageInfoRenderArea,
     y: u16,
   ) {
     const BANNER_WIDTH: u16 = 60;
     const BANNER_HEIGHT: u16 = 14;
 
-    let x = rect.width.saturating_sub(BANNER_WIDTH) / 2;
-    if let PackageAsset::Image { path } = asset {
-      if let Ok(text) = image.convert(ImageConvertParams {
+    let x = area.rect.width.saturating_sub(BANNER_WIDTH) / 2;
+    if let PackageAsset::Image { path } = asset
+      && let Ok(text) = context.image.convert(ImageConvertParams {
         image_path: path.clone(),
         output_width: BANNER_WIDTH as u32,
         output_height: BANNER_HEIGHT as u32,
@@ -1672,23 +1450,23 @@ impl GamePackageUi {
         scale: 1.0,
         cache: true,
         ..Default::default()
-      }) {
-        let is_rich = text.starts_with("f%");
-        for (row, line) in text.lines().take(BANNER_HEIGHT as usize).enumerate() {
-          self.draw_info_rich_text(
-            render,
-            canvas,
-            rect,
-            scroll_y,
+      })
+    {
+      let is_rich = text.starts_with("f%");
+      for (row, line) in text.lines().take(BANNER_HEIGHT as usize).enumerate() {
+        self.draw_info_rich_text(
+          context,
+          area,
+          PackageInfoTextPosition {
             x,
-            y.saturating_add(row as u16),
-            Self::fit_asset_rich_line(line, is_rich, BANNER_WIDTH, layout, Some(params)),
-            Some(BANNER_WIDTH),
-            Some(params),
-          );
-        }
-        return;
+            y: y.saturating_add(row as u16),
+          },
+          Self::fit_asset_rich_line(line, is_rich, BANNER_WIDTH, context.layout, Some(params)),
+          Some(BANNER_WIDTH),
+          Some(params),
+        );
       }
+      return;
     }
 
     let fallback = PackageAsset::default_banner();
@@ -1701,13 +1479,13 @@ impl GamePackageUi {
     };
     for (row, line) in lines.iter().take(BANNER_HEIGHT as usize).enumerate() {
       self.draw_info_rich_text(
-        render,
-        canvas,
-        rect,
-        scroll_y,
-        x,
-        y.saturating_add(row as u16),
-        Self::fit_asset_rich_line(line, false, BANNER_WIDTH, layout, Some(params)),
+        context,
+        area,
+        PackageInfoTextPosition {
+          x,
+          y: y.saturating_add(row as u16),
+        },
+        Self::fit_asset_rich_line(line, false, BANNER_WIDTH, context.layout, Some(params)),
         Some(BANNER_WIDTH),
         Some(params),
       );
@@ -1746,49 +1524,43 @@ impl GamePackageUi {
 
   fn draw_info_subtitle(
     &self,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
-    i18n: &I18nService,
     namespace: &str,
     key: &str,
   ) {
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      0,
-      y,
-      &i18n.get_runtime_text(namespace, key),
+      context,
+      area,
+      PackageInfoTextPosition { x: 0, y },
+      &context.i18n.get_runtime_text(namespace, key),
       Self::style(TerminalColor::BrightYellow),
     );
   }
 
   fn draw_info_pair(
     &self,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
     label: String,
     value: &str,
   ) {
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      0,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x: 0, y },
       &label,
       Self::style(TerminalColor::BrightBlue),
     );
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      label.width().min(u16::MAX as usize) as u16,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition {
+        x: label.width().min(u16::MAX as usize) as u16,
+        y,
+      },
       value,
       TextStyle::default(),
     );
@@ -1796,10 +1568,8 @@ impl GamePackageUi {
 
   fn draw_info_pair_rich_value(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
     label: String,
     value: &str,
@@ -1807,52 +1577,45 @@ impl GamePackageUi {
   ) {
     let x = label.width().min(u16::MAX as usize) as u16;
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      0,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x: 0, y },
       &label,
       Self::style(TerminalColor::BrightBlue),
     );
     self.draw_info_rich_text(
-      render,
-      canvas,
-      rect,
-      scroll_y,
-      x,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x, y },
       value.to_string(),
-      Some(rect.width.saturating_sub(x)),
+      Some(area.rect.width.saturating_sub(x)),
       Some(params),
     );
   }
 
   fn draw_info_status(
     &self,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
     label: String,
     value: String,
     value_style: TextStyle,
   ) {
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      0,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x: 0, y },
       &label,
       Self::style(TerminalColor::BrightBlue),
     );
     self.draw_info_text(
-      canvas,
-      rect,
-      scroll_y,
-      label.width().min(u16::MAX as usize) as u16,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition {
+        x: label.width().min(u16::MAX as usize) as u16,
+        y,
+      },
       &value,
       value_style,
     );
@@ -1860,78 +1623,66 @@ impl GamePackageUi {
 
   fn draw_info_center_text(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    rect: Rect,
-    scroll_y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
     y: u16,
     text: &str,
     params: Option<&RichTextParams>,
   ) {
-    let width = layout.get_text_width(text, params);
-    let x = rect.width.saturating_sub(width.min(rect.width)) / 2;
+    let width = context.layout.get_text_width(text, params);
+    let x = area.rect.width.saturating_sub(width.min(area.rect.width)) / 2;
     self.draw_info_rich_text(
-      render,
-      canvas,
-      rect,
-      scroll_y,
-      x,
-      y,
+      context,
+      area,
+      PackageInfoTextPosition { x, y },
       text.to_string(),
-      Some(rect.width.saturating_sub(x)),
+      Some(area.rect.width.saturating_sub(x)),
       params,
     );
   }
 
   fn draw_info_text(
     &self,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
-    x: u16,
-    y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
+    position: PackageInfoTextPosition,
     text: &str,
     style: TextStyle,
   ) {
-    let Some(screen_y) = y.checked_sub(scroll_y) else {
+    let Some(screen_y) = position.y.checked_sub(area.scroll_y) else {
       return;
     };
-    if screen_y >= rect.height || x >= rect.width {
+    if screen_y >= area.rect.height || position.x >= area.rect.width {
       return;
     }
-    canvas.host_styled_text(
-      rect.x.saturating_add(x),
-      rect.y.saturating_add(screen_y),
+    context.canvas.host_styled_text(
+      area.rect.x.saturating_add(position.x),
+      area.rect.y.saturating_add(screen_y),
       text,
       style,
     );
   }
 
-  #[allow(clippy::too_many_arguments)]
   fn draw_info_rich_text(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    rect: Rect,
-    scroll_y: u16,
-    x: u16,
-    y: u16,
+    context: &mut PackageListRenderContext<'_>,
+    area: PackageInfoRenderArea,
+    position: PackageInfoTextPosition,
     text: String,
     max_width: Option<u16>,
     params: Option<&RichTextParams>,
   ) {
-    let Some(screen_y) = y.checked_sub(scroll_y) else {
+    let Some(screen_y) = position.y.checked_sub(area.scroll_y) else {
       return;
     };
-    if screen_y >= rect.height || x >= rect.width {
+    if screen_y >= area.rect.height || position.x >= area.rect.width {
       return;
     }
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
-        x: rect.x.saturating_add(x),
-        y: rect.y.saturating_add(screen_y),
+        x: area.rect.x.saturating_add(position.x),
+        y: area.rect.y.saturating_add(screen_y),
         text,
         params: params.cloned(),
         wrap_mode: TextWrapMode::None,
@@ -2227,17 +1978,6 @@ impl GamePackageUi {
       GameSortField::Author => Self::package_visible_text(entry, &entry.author),
       GameSortField::Status => format!("{}", entry.enabled),
       GameSortField::Debug => format!("{}", entry.debug),
-      GameSortField::SafeMode => format!("{}", entry.safe_mode),
-    }
-  }
-
-  fn safe_mode_status(&self, entry: &PackageListEntry) -> SafeModeStatus {
-    if entry.safe_mode {
-      SafeModeStatus::On
-    } else if self.temporary_safe_mode_disabled.contains(&entry.id) {
-      SafeModeStatus::OffTemporary
-    } else {
-      SafeModeStatus::OffPermanent
     }
   }
 
@@ -2246,25 +1986,15 @@ impl GamePackageUi {
     mut entries: Vec<PackageListEntry>,
     storage: &StorageService,
     log: &mut LogService,
-    temporary_safe_mode_disabled: &HashSet<PackageId>,
   ) {
-    self.temporary_safe_mode_disabled = temporary_safe_mode_disabled.clone();
     let profile = storage.read_package_state_or_default(log);
     for entry in &mut entries {
       if let Some(state) = profile.game(&entry.id) {
         entry.enabled = state.enabled;
         entry.debug = state.debug;
-        entry.safe_mode = state.safe_mode;
       } else {
         entry.enabled = profile.defaults.enabled;
         entry.debug = profile.defaults.debug;
-        entry.safe_mode = matches!(
-          profile.defaults.safe_mode,
-          crate::host_engine::services::SafeModeDefault::On
-        );
-      }
-      if temporary_safe_mode_disabled.contains(&entry.id) {
-        entry.safe_mode = false;
       }
     }
     let selected = self.selected_entry_id();
@@ -2359,11 +2089,6 @@ impl GamePackageUi {
         "game_pack.action.jump.confirm",
       ]
     } else {
-      let safe_key = if self.selected_safe_mode().unwrap_or(true) {
-        "game_pack.action.safe_mode.off"
-      } else {
-        "game_pack.action.safe_mode.on"
-      };
       let debug_key = if self
         .page_entries()
         .get(self.selected_index)
@@ -2379,7 +2104,6 @@ impl GamePackageUi {
         "game_pack.action.scroll",
         "game_pack.action.confirm",
         "game_pack.action.list.back",
-        safe_key,
         debug_key,
         "game_pack.action.list.detail2simple",
         "game_pack.action.list.search",

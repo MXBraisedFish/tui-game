@@ -22,17 +22,12 @@ pub enum TableBorderMode {
   Full,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TableBorderStyle {
+  #[default]
   Single,
   Double,
   DoubleOuterSingleInner,
-}
-
-impl Default for TableBorderStyle {
-  fn default() -> Self {
-    Self::Single
-  }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

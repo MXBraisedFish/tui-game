@@ -194,7 +194,10 @@ mod tests {
   fn combo_patterns_are_order_independent_and_consume_both_keys() {
     let combo = KeyPattern::Combo(Key::Z, Key::A);
     assert_eq!(combo.normalized(), KeyPattern::Combo(Key::A, Key::Z));
-    assert_eq!(combo.normalized(), KeyPattern::Combo(Key::A, Key::Z).normalized());
+    assert_eq!(
+      combo.normalized(),
+      KeyPattern::Combo(Key::A, Key::Z).normalized()
+    );
 
     let mut consumed = HashSet::new();
     assert!(!combo.has_consumed_key(&consumed));

@@ -6,13 +6,14 @@ use self::state::ProgressBarState;
 pub use self::types::{
   ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle,
 };
+use crate::SliceId;
 use crate::UiObjectPool;
-use tg_core_unicode::char_width;
 use tg_core_style::TextStyle;
+use tg_core_unicode::char_width;
 use tg_service_canvas::CanvasService;
 use tg_service_layout::Rect;
-use crate::SliceId;
 
+#[derive(Default)]
 pub struct ProgressBarService;
 
 impl ProgressBarService {
@@ -381,9 +382,7 @@ mod tests {
       segments
         .iter()
         .filter(|(_, _, style)| style.foreground
-          == Some(TextColor::Terminal(
-            tg_core_style::TerminalColor::Green
-          )))
+          == Some(TextColor::Terminal(tg_core_style::TerminalColor::Green)))
         .count(),
       6
     );

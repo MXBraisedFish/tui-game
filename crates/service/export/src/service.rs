@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 use crossbeam_channel::Sender;
 
+use tg_core_atomic_fs::atomic_replace_with;
 use tg_core_version::{HOST_API_VERSION, HOST_VERSION, PACKAGE_MANIFEST_VERSION};
 use tg_service_async::TaskId;
 use tg_service_log::LogService;
 use tg_service_storage::StorageService;
-use tg_core_atomic_fs::atomic_replace_with;
 
 /// 导出文件格式
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -132,6 +132,7 @@ fn collect_recursive(base: &Path, current: &Path, out: &mut Vec<Entry>) -> io::R
 }
 
 /// 导出服务：将指定目录打包为 ZIP / TAR / TAR.GZ，附带 manifest.json。
+#[derive(Default)]
 pub struct ExportService;
 
 impl ExportService {

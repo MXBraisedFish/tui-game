@@ -12,7 +12,7 @@ pub use profile::{
   DisplayOrderMode, DisplaySettingsProfile, DisplaySourceMode, GamePackageState,
   KeyBindingsProfile, PackageDefaultState, PackageStateProfile, RecordingExportFrameRate,
   RecordingExportQuality, RecordingFrameRate, RecordingGpuAcceleration, RecordingPixelScale,
-  RecordingPopupMode, RecordingProfile, SafeModeDefault, ScreensaverPackageState,
-  ScreenshotDoubleAction, ScreenshotProfile,
+  RecordingPopupMode, RecordingProfile, ScreensaverPackageState, ScreenshotDoubleAction,
+  ScreenshotProfile,
 };
 pub use service::StorageService;

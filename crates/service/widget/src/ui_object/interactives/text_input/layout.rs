@@ -116,14 +116,12 @@ impl VisualLayout {
 }
 
 pub(super) fn move_vertical(state: &mut TextInputState, width: usize, delta: isize, extend: bool) {
-  if !extend {
-    if let Some(range) = state.buffer.selection() {
-      state
-        .buffer
-        .move_to(if delta < 0 { range.start } else { range.end }, false);
-      state.visual_line = None;
-      return;
-    }
+  if !extend && let Some(range) = state.buffer.selection() {
+    state
+      .buffer
+      .move_to(if delta < 0 { range.start } else { range.end }, false);
+    state.visual_line = None;
+    return;
   }
   if state.mode == TextInputMode::SingleLine {
     return;

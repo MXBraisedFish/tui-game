@@ -69,7 +69,10 @@ mod tests {
     let mut frame = ComposedFrame::new(3, 2);
     assert_eq!(frame.get(2, 1), Some(&ComposedCell::Empty));
     frame.set(2, 1, ComposedCell::Text(CanvasCell::new("x")));
-    assert_eq!(frame.get(2, 1), Some(&ComposedCell::Text(CanvasCell::new("x"))));
+    assert_eq!(
+      frame.get(2, 1),
+      Some(&ComposedCell::Text(CanvasCell::new("x")))
+    );
     frame.set(3, 0, ComposedCell::Text(CanvasCell::new("y")));
     assert_eq!(frame.get(3, 0), None);
     assert_eq!(frame.get(0, 2), None);

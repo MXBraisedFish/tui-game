@@ -3,6 +3,9 @@ mod media_list;
 pub mod recording_list;
 pub mod recording_settings;
 pub mod screenshot_list;
+// reason: fixing this means renaming or removing a `pub` module, which this refactor pass must
+// not do.
+#[allow(clippy::module_inception)]
 pub mod screenshot_recording;
 pub mod screenshot_settings;
 

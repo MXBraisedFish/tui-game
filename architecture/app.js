@@ -2,11 +2,11 @@
   'use strict';
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const ALL = window.ARCH_DATA || {};
+  const currentData = window.ARCH_DATA?.current;
   const LAYER_COLOR = {
-    main_loop: '#f5a524', ui: '#a78bfa', service: '#2dd4bf', core: '#fb7185',
+    main_loop: '#f2c078', ui: '#b6a1ef', service: '#79e2c5', core: '#84b8fa',
   };
-  const LAYER_NAME = { main_loop: '主循环', ui: '界面', service: '服务', core: '核' };
+  const LAYER_NAME = { main_loop: '主程序 / 应用', ui: '界面', service: '服务', core: '核' };
   const GROUP_COLOR = {
     常量: '#facc15', 接口: '#fb923c', 类型: '#60a5fa', 函数: '#4ade80', 方法: '#94a3b8', 其他: '#94a3b8',
   };
@@ -19,7 +19,7 @@
   const SEVERITY_COLOR = { high: '#ef4444', medium: '#f59e0b', low: '#64748b' };
 
   let data = null;
-  const state = { view: 'flow', graphMode: 'overview', focus: null, badOnly: false };
+  const state = { view: 'graph', graphMode: 'overview', focus: null, badOnly: false };
   const panel = document.getElementById('panel');
 
   // ---------- small helpers ----------
@@ -93,7 +93,8 @@
 
   function lastSegments(id) {
     const parts = id.split('/');
-    if (parts.length <= 2) return id;
+    if (/^tg_(core|service)_/.test(parts.at(-1))) return parts.at(-1).replace(/^tg_(core|service)_/, '');
+    if (parts.length <= 2) return parts.at(-1);
     return parts.slice(-2).join('/');
   }
 
@@ -159,13 +160,15 @@
       const box = this.root.getBBox();
       const rect = this.svg.getBoundingClientRect();
       if (!box.width || !box.height || !rect.width) return;
-      const scale = Math.min(maxScale, (rect.width - padding * 2) / box.width, (rect.height - padding * 2) / box.height);
+      const toolbar = this.svg.parentElement.querySelector('.toolbar');
+      const top = Math.max(padding, (toolbar?.offsetHeight || 0) + 30);
+      const legend = this.svg.parentElement.querySelector('.legend');
+      const bottom = Math.max(padding, (legend?.offsetHeight || 0) + 30);
+      const height = Math.max(1, rect.height - top - bottom);
+      const scale = Math.min(maxScale, (rect.width - padding * 2) / box.width, height / box.height);
       this.k = Math.max(0.05, scale);
       this.x = (rect.width - box.width * this.k) / 2 - box.x * this.k;
-      this.y = padding - box.y * this.k;
-      if (box.height * this.k < rect.height - padding * 2) {
-        this.y = (rect.height - box.height * this.k) / 2 - box.y * this.k;
-      }
+      this.y = top + (height - box.height * this.k) / 2 - box.y * this.k;
       this.apply();
     }
 
@@ -173,7 +176,8 @@
       const rect = this.svg.getBoundingClientRect();
       this.k = scale;
       this.x = rect.width / 2 - x * scale;
-      this.y = 40 - y * scale;
+      const toolbar = this.svg.parentElement.querySelector('.toolbar');
+      this.y = (toolbar?.offsetHeight || 0) + 30 - y * scale;
       this.apply();
     }
 
@@ -196,6 +200,13 @@
   // new top-left position; `onClick` fires when the pointer barely moved.
   function makeDraggable(group, zoom, getPosition, onMove, onClick) {
     group.classList.add('draggable');
+    if (onClick) {
+      group.setAttribute('tabindex', '0');
+      group.setAttribute('role', 'button');
+      group.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onClick(); }
+      });
+    }
     group.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
       const start = zoom.toLocal(event.clientX, event.clientY);
@@ -229,9 +240,10 @@
 
   // ---------- panel ----------
 
-  function setPanel(html) {
+  function setPanel(html, reveal = true) {
+    if (reveal) setInspector(true);
     panel.innerHTML = html;
-    panel.scrollTop = 0;
+    document.getElementById('inspector').scrollTop = 0;
     panel.querySelectorAll('[data-unit]').forEach((node) => {
       node.addEventListener('click', () => focusUnit(node.dataset.unit));
     });
@@ -282,22 +294,23 @@
       tree: `<h2>模块树</h2>
         <p>按源码的 <span class="ref">mod</span> 声明展开的完整模块树，颜色表示所属层级。</p>
         <p class="muted">点击圆点展开或收起，点击名称查看模块概述与依赖。数字为该模块文件的行数。</p>`,
-      graph: `<h2>依赖节点图</h2>
-        <p><b>总览</b>：每张卡片是一个模块，连线表示依赖（从使用方指向被使用方）。鼠标悬停高亮相关连线，红色表示违反分层规则。</p>
-        <p><b>点击模块</b>进入三层视图：左侧是依赖的模块，中间是当前模块，右侧是它实现的常量、接口、类型、函数和方法，每条都附一句说明。</p>
+      graph: `<h2>阅读依赖关系</h2>
+        <p><b>总览</b>：每张卡片是一个工作区 crate，连线表示依赖（从使用方指向被使用方）。鼠标悬停高亮相关连线，红色表示违反分层规则。</p>
+        <p><b>点击模块</b>进入三层视图：左侧是依赖的模块，中间是当前模块，右侧是它实现的常量、接口、类型、函数和方法，有文档注释的条目附带说明。</p>
         <p class="muted">卡片可拖动；拖动空白处平移，滚轮缩放。</p>`,
-      findings: `<h2>审计发现</h2>
-        <p>上半部分是根据依赖数据自动检查出的架构问题；下半部分是通读代码时记录的安全、正确性、架构和质量问题。</p>`,
+      findings: `<h2>架构检查范围</h2>
+        <p>自动检查工作区依赖的分层规则与服务环路。检查结果不等同于完整的代码审计或测试结论。</p>
+        <p class="muted">人工审计记录为空时，仅表示当前数据没有附带记录。</p>`,
     };
-    setPanel(hints[state.view] + statsHtml());
+    setPanel(hints[state.view] + statsHtml(), false);
   }
 
   function statsHtml() {
     const stats = data.stats;
-    return `<h3>快照：${escapeHtml(data.snapshot)}（生成于 ${escapeHtml(data.generatedAt)}）</h3>
+    return `<h3>当前源码统计</h3>
       <ul class="muted">
         <li>${stats.files} 个源文件，${stats.lines} 行</li>
-        <li>${stats.units} 个模块，${stats.edges} 条模块间依赖</li>
+        <li>${stats.units} 个 crate，${stats.edges} 条 crate 间依赖</li>
         <li>${stats.items} 个条目，其中 ${stats.described} 个有说明</li>
         <li>${data.checks.length} 条自动检查结果，${stats.findings} 条审计发现</li>
       </ul>`;
@@ -311,11 +324,11 @@
   addArrowMarker(flowSvg, 'arrow-fault', '#ef4444');
   addArrowMarker(flowSvg, 'arrow-loop', '#2dd4bf');
 
-  const FLOW = { colWidth: 400, nodeWidth: 320, nodeHeight: 50, rowHeight: 72 };
+  const FLOW = { colWidth: 400, nodeWidth: 320, nodeHeight: 50, rowHeight: 96 };
   const FLOW_STYLE = {
-    start: { fill: '#3a2a26', stroke: '#ff6d5a' },
-    end: { fill: '#3a2a26', stroke: '#ff6d5a' },
-    process: { fill: '#262833', stroke: '#4a4e66' },
+    start: { fill: '#1a302e', stroke: '#79e2c5' },
+    end: { fill: '#1a302e', stroke: '#79e2c5' },
+    process: { fill: '#1b2531', stroke: '#42556b' },
     decision: { fill: '#302a1c', stroke: '#f5a524' },
     io: { fill: '#1f2a33', stroke: '#60a5fa' },
     async: { fill: '#1c2e2c', stroke: '#2dd4bf', dash: '5 4' },
@@ -366,6 +379,11 @@
     const a = flowBox(source);
     const b = flowBox(target);
     const lane = 26;
+    if (source.id === target.id) {
+      const x = a.x + a.w + lane;
+      return { d: `M ${a.x + a.w} ${a.cy} H ${x} V ${a.y + a.h + 14} H ${a.cx} V ${a.y + a.h}`,
+        lx: x + 6, ly: a.cy + 6, anchor: 'start' };
+    }
     if (edge.kind === 'loop' || (source.col === target.col && target.row < source.row)) {
       const x = a.x - lane - 8;
       return { d: `M ${a.x} ${a.cy} H ${x} V ${b.cy} H ${b.x}`, lx: x - 6, ly: (a.cy + b.cy) / 2, anchor: 'end' };
@@ -395,6 +413,10 @@
     if (target.row > source.row) {
       const toRight = target.col > source.col;
       const tx = toRight ? b.x : b.x + b.w;
+      if (source.col === 0 && flowNodesBetween(nodes, source.col, source.row, target.row)) {
+        const x = a.x - lane;
+        return { d: `M ${a.x} ${a.cy} H ${x} V ${b.cy} H ${tx}`, lx: x - 6, ly: a.cy - 6, anchor: 'end' };
+      }
       if (source.col === 0 || source.col === 2) {
         return { d: `M ${a.cx} ${a.y + a.h} V ${b.cy} H ${tx}`, lx: a.cx + 8, ly: a.y + a.h + 14, anchor: 'start' };
       }
@@ -415,12 +437,12 @@
     const edgeLayer = svgEl('g', {}, root);
     const nodeLayer = svgEl('g', {}, root);
 
-    flow.groups.forEach((group, index) => {
-      const pad = 22 + (group.id === 'g_frame' ? 0 : 14);
+    flow.groups.forEach((group) => {
+      const pad = 20;
       const x = group.col[0] * FLOW.colWidth - pad;
-      const y = group.row[0] * FLOW.rowHeight - pad - 22;
+      const y = group.row[0] * FLOW.rowHeight - 32;
       const w = (group.col[1] - group.col[0]) * FLOW.colWidth + FLOW.nodeWidth + pad * 2;
-      const h = (group.row[1] - group.row[0]) * FLOW.rowHeight + FLOW.nodeHeight + pad * 2 + 22;
+      const h = (group.row[1] - group.row[0]) * FLOW.rowHeight + FLOW.nodeHeight + 44;
       const box = svgEl('rect', { x, y, width: w, height: h, rx: 12, class: 'group-box' }, groupLayer);
       if (group.id === 'g_frame') {
         box.setAttribute('stroke', '#2dd4bf');
@@ -429,7 +451,6 @@
       const title = svgText(groupLayer, x + 14, y + 22, group.title, { class: 'group-title' });
       title.style.cursor = 'pointer';
       title.addEventListener('click', () => setPanel(`<h2>${escapeHtml(group.title)}</h2><p class="ref">${escapeHtml(group.ref)}</p>`));
-      void index;
     });
 
     flow.edges.forEach((edge) => {
@@ -471,9 +492,10 @@
     });
 
     document.getElementById('flow-legend').innerHTML = Object.entries(FLOW_TYPE_NAME)
+      .filter(([type]) => nodes.some((node) => node.type === type))
       .map(([type, name]) => `<span><i style="background:${FLOW_STYLE[type].stroke}"></i>${name}</span>`).join('')
       + '<span><i style="background:#ef4444"></i>红线：故障路径</span><span><i style="background:#2dd4bf"></i>青线：循环 / 跳出</span>';
-    requestAnimationFrame(() => flowZoom.focusTop(FLOW.colWidth * 1.5, -60, 0.85));
+    requestAnimationFrame(() => flowZoom.fit(40, 1));
   }
 
   // ---------- module tree ----------
@@ -548,6 +570,7 @@
 
     draw(treeRoot);
     document.getElementById('tree-legend').innerHTML = Object.entries(LAYER_NAME)
+      .filter(([layer]) => data.units.some((unit) => unit.layer === layer))
       .map(([layer, name]) => `<span><i style="background:${LAYER_COLOR[layer]}"></i>${name}</span>`).join('')
       + '<span>实心圆点：已收起，可展开</span>';
     if (keepView) {
@@ -590,14 +613,15 @@
     const columns = [
       { layer: 'main_loop', perColumn: 14 },
       { layer: 'ui', perColumn: 16 },
-      { layer: 'service', perColumn: 21 },
-      { layer: 'core', perColumn: 14 },
+      { layer: 'service', perColumn: 11 },
+      { layer: 'core', perColumn: 12 },
     ];
     let columnX = 0;
     const headers = [];
     columns.forEach((column) => {
       const units = data.units.filter((unit) => unit.layer === column.layer).sort((a, b) => a.id.localeCompare(b.id));
-      const columnCount = Math.max(1, Math.ceil(units.length / column.perColumn));
+      if (!units.length) return;
+      const columnCount = Math.ceil(units.length / column.perColumn);
       headers.push({ layer: column.layer, x: columnX, w: columnCount * 270 - 50, count: units.length });
       units.forEach((unit, index) => {
         const col = Math.floor(index / column.perColumn);
@@ -686,8 +710,9 @@
     });
 
     document.getElementById('graph-legend').innerHTML = Object.entries(LAYER_NAME)
+      .filter(([layer]) => data.units.some((unit) => unit.layer === layer))
       .map(([layer, name]) => `<span><i style="background:${LAYER_COLOR[layer]}"></i>${name}</span>`).join('')
-      + '<span><i style="background:#ef4444"></i>违规依赖（核的依赖、服务间双向依赖）</span><span>连线从使用方右侧指向被依赖方左侧</span>';
+      + '<span><i style="background:#ef4444"></i>违规依赖 / 服务环路</span><span>连线从使用方右侧指向被依赖方左侧</span>';
     requestAnimationFrame(() => graphZoom.fit(40, 0.9));
     defaultPanel();
   }
@@ -883,6 +908,7 @@
 
   function focusUnit(unitId) {
     if (!unitById(unitId)) return;
+    setInspector(true);
     state.focus = unitId;
     state.graphMode = 'focus';
     switchView('graph');
@@ -903,12 +929,13 @@
     });
 
     container.innerHTML = `
-      <h2>概览</h2>
+      <h2>依赖结构检查</h2>
+      <p class="scope-note">自动检查覆盖已提取的 crate 间分层依赖与服务环路，不覆盖全部业务行为。人工审计记录为空不代表没有代码缺陷。</p>
       <div class="cards">
         <div class="card"><div class="num">${layerChecks.length}</div><div class="lbl">分层违规依赖</div></div>
         <div class="card"><div class="num">${cycleChecks.length}</div><div class="lbl">服务循环依赖分量</div></div>
-        ${['high', 'medium', 'low'].map((severity) => `<div class="card"><div class="num" style="color:${SEVERITY_COLOR[severity]}">${bySeverity[severity] || 0}</div><div class="lbl">${SEVERITY_NAME[severity]}风险发现</div></div>`).join('')}
-        ${Object.entries(CATEGORY_NAME).map(([category, name]) => `<div class="card"><div class="num">${byCategory[category] || 0}</div><div class="lbl">${name}</div></div>`).join('')}
+        ${(findings.length ? ['high', 'medium', 'low'] : []).map((severity) => `<div class="card"><div class="num" style="color:${SEVERITY_COLOR[severity]}">${bySeverity[severity] || 0}</div><div class="lbl">${SEVERITY_NAME[severity]}风险发现</div></div>`).join('')}
+        ${(findings.length ? Object.entries(CATEGORY_NAME) : []).map(([category, name]) => `<div class="card"><div class="num">${byCategory[category] || 0}</div><div class="lbl">${name}</div></div>`).join('')}
       </div>
 
       <h2>自动检查：分层违规</h2>
@@ -927,7 +954,7 @@
         <div class="muted">直接双向依赖的模块对（${check.mutual.length}）：${check.mutual.map(([a, b]) => `${escapeHtml(a)} ⇄ ${escapeHtml(b)}`).join('；') || '无（通过更长的环路形成循环）'}</div>
       </div>`).join('') || '<p class="muted">无</p>'}
 
-      <h2>通读代码的审计发现（${findings.length}）</h2>
+      <h2>附带的人工审计记录（${findings.length}）</h2>
       <div class="filters">
         <select id="f-severity"><option value="">全部风险等级</option>${['high', 'medium', 'low'].map((severity) => `<option value="${severity}">${SEVERITY_NAME[severity]}</option>`).join('')}</select>
         <select id="f-category"><option value="">全部类别</option>${Object.entries(CATEGORY_NAME).map(([category, name]) => `<option value="${category}">${name}</option>`).join('')}</select>
@@ -952,7 +979,7 @@
         <td>${badge(SEVERITY_NAME[finding.severity] || finding.severity, SEVERITY_COLOR[finding.severity] || '#64748b')}</td>
         <td>${escapeHtml(CATEGORY_NAME[finding.category] || finding.category)}</td>
         <td><b>${escapeHtml(finding.title)}</b><div class="detail">${escapeHtml(finding.detail)}</div></td>
-        <td class="ref">${escapeHtml(finding.file)}:${finding.line}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">没有匹配的发现</td></tr>';
+        <td class="ref">${escapeHtml(finding.file)}:${finding.line}</td></tr>`).join('') || `<tr><td colspan="4" class="muted">${findings.length ? '没有匹配的发现' : '当前数据未附人工审计记录'}</td></tr>`;
     }
 
     [severity, category].forEach((control) => control.addEventListener('change', refresh));
@@ -969,7 +996,18 @@
 
   function switchView(view) {
     state.view = view;
-    document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.view === view));
+    const intros = {
+      graph: ['依赖总览', '从主程序到服务与核，探索模块之间的连接。'],
+      flow: ['生命周期', '沿着启动、运行与退出，追踪引擎的执行路径。'],
+      tree: ['模块树', '从工作区 crate 展开到 Rust 模块与源码位置。'],
+      findings: ['架构检查', '查看依赖分层、服务环路与附带的审计记录。'],
+    };
+    document.getElementById('view-title').textContent = intros[view][0];
+    document.getElementById('view-description').textContent = intros[view][1];
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.view === view);
+      tab.setAttribute('aria-pressed', String(tab.dataset.view === view));
+    });
     document.querySelectorAll('.view').forEach((section) => section.classList.toggle('active', section.id === `view-${view}`));
     if (view === 'graph') {
       renderGraph();
@@ -985,26 +1023,35 @@
     defaultPanel();
   }
 
-  function loadSnapshot(name) {
-    data = ALL[name];
-    overviewPositions = null;
+  function loadCurrent() {
+    data = currentData;
     treeRoot = data.tree;
     prepareTree(treeRoot, 0);
-    Object.keys(rendered).forEach((key) => delete rendered[key]);
     const stats = data.stats;
     document.getElementById('stats').innerHTML = [
-      `<span class="chip"><b>${stats.files}</b> 文件</span>`,
-      `<span class="chip"><b>${stats.lines.toLocaleString()}</b> 行</span>`,
-      `<span class="chip"><b>${stats.units}</b> 模块</span>`,
-      `<span class="chip"><b>${stats.edges}</b> 依赖</span>`,
-      `<span class="chip"><b>${stats.items}</b> 条目</span>`,
-    ].join('');
-    if (state.focus && !unitById(state.focus)) {
-      state.focus = null;
-      state.graphMode = 'overview';
-    }
+      [stats.units, '工作区 crate'], [stats.edges, '依赖关系'],
+      [stats.files, '源码文件'], [stats.items, '代码条目'],
+    ].map(([value, label], index) => `<div class="metric ${index === 3 ? 'metric-extra' : ''}"><b>${value.toLocaleString()}</b><span>${label}</span></div>`).join('');
+    document.getElementById('generated-at').textContent = `数据生成于 ${data.generatedAt}`;
     switchView(state.view);
   }
+
+  function setInspector(open) {
+    document.getElementById('workspace').classList.toggle('panel-hidden', !open);
+    const toggle = document.getElementById('panel-toggle');
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.textContent = open ? '收起详情' : '展开详情';
+  }
+
+  document.getElementById('panel-toggle').addEventListener('click', () => {
+    setInspector(document.getElementById('workspace').classList.contains('panel-hidden'));
+  });
+  const canvasResize = new ResizeObserver(() => {
+    if (state.view === 'graph' && rendered.graph && state.graphMode === 'overview') graphZoom.fit(40, .9);
+    if (state.view === 'flow' && rendered.flow) flowZoom.fit(40, 1);
+    if (state.view === 'tree' && rendered.tree) treeZoom.fit(40, 1);
+  });
+  document.querySelectorAll('.canvas-wrap').forEach((canvas) => canvasResize.observe(canvas));
 
   document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
     if (tab.dataset.view === 'graph' && state.view === 'graph') state.graphMode = 'overview';
@@ -1030,6 +1077,7 @@
     if (action === 'bad-only') {
       state.badOnly = !state.badOnly;
       button.classList.toggle('on', state.badOnly);
+      button.setAttribute('aria-pressed', String(state.badOnly));
       if (state.graphMode === 'overview') renderOverview();
     }
   }));
@@ -1041,7 +1089,7 @@
     if (!text) { searchResults.style.display = 'none'; return; }
     const matches = data.units.filter((unit) => unit.id.toLowerCase().includes(text)
       || (unit.summary || '').toLowerCase().includes(text)).slice(0, 30);
-    searchResults.innerHTML = matches.map((unit) => `<div data-id="${escapeHtml(unit.id)}">${badge(LAYER_NAME[unit.layer], LAYER_COLOR[unit.layer])} <span class="mono">${escapeHtml(unit.id)}</span></div>`).join('')
+    searchResults.innerHTML = matches.map((unit) => `<button type="button" data-id="${escapeHtml(unit.id)}">${badge(LAYER_NAME[unit.layer], LAYER_COLOR[unit.layer])} <span class="mono">${escapeHtml(unit.id)}</span></button>`).join('')
       || '<div class="muted">无匹配</div>';
     searchResults.style.display = 'block';
     searchResults.querySelectorAll('[data-id]').forEach((row) => row.addEventListener('click', () => {
@@ -1050,17 +1098,23 @@
       focusUnit(row.dataset.id);
     }));
   });
-  searchInput.addEventListener('blur', () => setTimeout(() => { searchResults.style.display = 'none'; }, 200));
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') searchResults.style.display = 'none';
+    if (searchResults.style.display !== 'none' && (event.key === 'Enter' || event.key === 'ArrowDown')) {
+      const first = searchResults.querySelector('[data-id]');
+      if (first) { event.preventDefault(); event.key === 'Enter' ? first.click() : first.focus(); }
+    }
+  });
+  searchResults.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { searchResults.style.display = 'none'; searchInput.focus(); }
+  });
+  searchInput.parentElement.addEventListener('focusout', (event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) searchResults.style.display = 'none';
+  });
 
-  const snapshotSelect = document.getElementById('snapshot');
-  const snapshotNames = Object.keys(ALL);
-  const SNAPSHOT_NAME = { before: '重构前', after: '重构后' };
-  snapshotSelect.innerHTML = snapshotNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(SNAPSHOT_NAME[name] || name)}</option>`).join('');
-  snapshotSelect.addEventListener('change', () => loadSnapshot(snapshotSelect.value));
-  if (!snapshotNames.length) {
-    document.body.innerHTML = '<p style="padding:40px">未找到数据文件 data/*.js。</p>';
+  if (!currentData) {
+    document.body.innerHTML = '<p style="padding:40px">未找到当前架构数据。请运行 python architecture/build_current.py 后刷新页面。</p>';
     return;
   }
-  loadSnapshot(snapshotNames[snapshotNames.length - 1]);
-  snapshotSelect.value = snapshotNames[snapshotNames.length - 1];
+  loadCurrent();
 })();

@@ -4,7 +4,9 @@ mod logo;
 mod settings;
 
 pub use about::{InputDemoCommand, InputDemoUi};
+pub(crate) use game_list::GameListRenderContext;
 pub use game_list::{GameListCommand, GameListUi};
+pub(crate) use settings::PackageListRenderContext;
 pub use settings::display_settings::{DisplaySettingsCommand, DisplaySettingsUi};
 pub use settings::key_bindings::{
   GameKeyBindingsCommand, GameKeyBindingsUi, GlobalKeyBindingsCommand, GlobalKeyBindingsUi,
@@ -83,7 +85,8 @@ fn style_logo(lines: &[&str]) -> String {
   result
 }
 
-/// 首页布局信息：Logo、菜单项、版本号和操作提示的坐标与区域。
+/// Screen layout of the home page: positions and areas of the logo, menu items, version label and
+/// action hint.
 pub(crate) struct HomeLayout {
   logo_x: u16,
   logo_y: u16,
@@ -96,7 +99,7 @@ pub(crate) struct HomeLayout {
   action_hint_y: u16,
 }
 
-/// 首页 UI：包含 Logo 展示、菜单导航和操作提示。
+/// Home page with the logo, menu navigation and action hints.
 pub struct HomeUi {
   selected_index: usize,
   continue_game_name: Option<String>,
@@ -126,7 +129,7 @@ impl RuntimeObjectPoolOwner for HomeUi {
   }
 }
 
-/// 首页发出的命令。
+/// Command emitted by the home page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HomeUiCommand {
   StartGame,
@@ -141,7 +144,7 @@ impl HomeUi {
     logo::dynamic_mode_for_cursor(cursor)
   }
 
-  /// 初始化首页 UI，创建命中检测区域。
+  /// Creates the home page UI and its menu hit areas.
   pub fn init(
     hit_area: &HitAreaService,
     animation: &AnimationService,
@@ -168,7 +171,7 @@ impl HomeUi {
     }
   }
 
-  /// 返回首页的按键映射定义。
+  /// Returns the action map (key bindings) of the home page.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -214,7 +217,7 @@ impl HomeUi {
     ]
   }
 
-  /// 处理 UI 事件，返回用户选中项对应的命令。
+  /// Handles a UI event and returns the command of the menu item the user selected, if any.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<HomeUiCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -287,7 +290,7 @@ impl HomeUi {
     None
   }
 
-  /// 渲染首页内容到宿主层。
+  /// Draws the home page onto the host layer.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -383,7 +386,8 @@ impl HomeUi {
     RichTextParams::from_action_map(&Self::action_map(), "home.")
   }
 
-  /// 根据布局服务计算首页各元素的宿主坐标。
+  /// Computes the host coordinates of every element of the home page from the
+  /// [`LayoutService`].
   pub(crate) fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> HomeLayout {
     let params = self.build_key_params();
     let viewport = layout.developer_viewport_rect();

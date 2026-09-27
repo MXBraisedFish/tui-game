@@ -156,7 +156,7 @@ impl CoverContinueUi {
       &DrawTextParams {
         x: start_x,
         y: start_y,
-        text: start.clone(),
+        text: start,
         params: Some(params.clone()),
         ..Default::default()
       },
@@ -166,8 +166,8 @@ impl CoverContinueUi {
       &DrawTextParams {
         x: back_x,
         y: back_y,
-        text: back.clone(),
-        params: Some(params.clone()),
+        text: back,
+        params: Some(params),
         ..Default::default()
       },
     );
@@ -175,35 +175,22 @@ impl CoverContinueUi {
     self.register_area(
       hit_area,
       canvas,
-      layout,
       self.start_area,
       start_x,
       start_y,
-      &start,
-      &params,
+      start_width,
     );
-    self.register_area(
-      hit_area,
-      canvas,
-      layout,
-      self.back_area,
-      back_x,
-      back_y,
-      &back,
-      &params,
-    );
+    self.register_area(hit_area, canvas, self.back_area, back_x, back_y, back_width);
   }
 
   fn register_area(
     &mut self,
     hit_area: &HitAreaService,
     canvas: &mut CanvasService,
-    layout: &LayoutService,
     id: HitAreaId,
     x: u16,
     y: u16,
-    text: &str,
-    params: &RichTextParams,
+    width: u16,
   ) {
     hit_area.render_host(
       &mut self.objects,
@@ -211,7 +198,7 @@ impl CoverContinueUi {
       Rect {
         x,
         y,
-        width: layout.get_text_width(text, Some(params)).max(1),
+        width: width.max(1),
         height: 1,
       },
       canvas,

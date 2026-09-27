@@ -149,12 +149,26 @@ mod tests {
   #[test]
   fn reversing_only_changes_explicit_rgb_colors() {
     let mut style = TextStyle::default();
-    style.set_foreground(TextColor::Rgb { r: 0, g: 100, b: 255 });
+    style.set_foreground(TextColor::Rgb {
+      r: 0,
+      g: 100,
+      b: 255,
+    });
     style.set_background(TextColor::Terminal(TerminalColor::Red));
     style.reverse_foreground();
     style.reverse_background();
-    assert_eq!(style.foreground, Some(TextColor::Rgb { r: 255, g: 155, b: 0 }));
-    assert_eq!(style.background, Some(TextColor::Terminal(TerminalColor::Red)));
+    assert_eq!(
+      style.foreground,
+      Some(TextColor::Rgb {
+        r: 255,
+        g: 155,
+        b: 0
+      })
+    );
+    assert_eq!(
+      style.background,
+      Some(TextColor::Terminal(TerminalColor::Red))
+    );
     style.clear_foreground();
     assert_eq!(style.foreground, None);
   }

@@ -39,7 +39,7 @@ const RAINBOW: &[(u8, u8, u8)] = &[
   (128, 0, 255),
 ];
 
-/// 终端检测页面的布局信息。
+/// Screen layout of the terminal check page.
 pub(crate) struct TerminalCheckLayout {
   title_x: u16,
   title_y: u16,
@@ -53,7 +53,8 @@ pub(crate) struct TerminalCheckLayout {
   hint_y: u16,
 }
 
-/// 终端能力检测 UI：分步检测 Unicode 支持、真彩色支持和鼠标支持。
+/// Terminal capability check page that asks, step by step, about Unicode, true color and mouse
+/// support.
 pub struct TerminalCheckUi {
   step: usize,
 
@@ -82,7 +83,7 @@ impl RuntimeObjectPoolOwner for TerminalCheckUi {
   }
 }
 
-/// 终端检测页面的命令。
+/// Command emitted by the terminal check page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TerminalCheckCommand {
   Next,
@@ -93,7 +94,7 @@ pub enum TerminalCheckCommand {
 }
 
 impl TerminalCheckUi {
-  /// 初始化终端检测 UI。
+  /// Creates the terminal check UI.
   pub fn init() -> Self {
     Self {
       step: STEP_UNICODE,
@@ -112,7 +113,7 @@ impl TerminalCheckUi {
     };
   }
 
-  /// 返回终端检测页面的按键映射定义。
+  /// Returns the action map (key bindings) of the terminal check page.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -138,7 +139,7 @@ impl TerminalCheckUi {
     ]
   }
 
-  /// 处理键盘事件。
+  /// Handles a keyboard action event and returns the command it triggers, if any.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<TerminalCheckCommand> {
     let UiEvent::Action(event) = event else {
       return None;
@@ -173,7 +174,8 @@ impl TerminalCheckUi {
     }
   }
 
-  /// 处理鼠标事件（移动、点击、右键返回）。
+  /// Handles a mouse event: moving over an option selects it, a left click on an option confirms
+  /// the current selection and a right click returns [`TerminalCheckCommand::Exit`].
   pub fn handle_mouse_event(
     &mut self,
     event: &MouseEvent,
@@ -190,10 +192,10 @@ impl TerminalCheckUi {
         if event.button == Some(MouseButton::Right) {
           return Some(TerminalCheckCommand::Exit);
         }
-        if event.button == Some(MouseButton::Left) {
-          if Self::hit_test(positions, event.x, event.y).is_some() {
-            return self.confirm_current();
-          }
+        if event.button == Some(MouseButton::Left)
+          && Self::hit_test(positions, event.x, event.y).is_some()
+        {
+          return self.confirm_current();
         }
         None
       }
@@ -206,7 +208,7 @@ impl TerminalCheckUi {
     None
   }
 
-  /// 根据当前步骤渲染对应内容。
+  /// Draws the content of the current check step.
   pub fn render(
     &self,
     render: &mut RenderService,
@@ -222,7 +224,7 @@ impl TerminalCheckUi {
     }
   }
 
-  /// 根据当前步骤计算布局信息。
+  /// Computes the layout of the current check step.
   pub fn compute_positions(
     &self,
     layout: &LayoutService,
@@ -363,16 +365,16 @@ impl TerminalCheckUi {
     let option_texts: Vec<String> = (0..UNICODE_OPTIONS)
       .map(|i| self.option_display_name(&option_names, i))
       .collect();
-    for i in 0..UNICODE_OPTIONS {
+    for (i, option_text) in option_texts.iter().enumerate() {
       let text = if i == self.selected_index {
         let fg = if self.is_exit_option(i) {
           "bright_red"
         } else {
           "bright_cyan"
         };
-        format!("f%<fg:{}>{}</fg>", fg, option_texts[i])
+        format!("f%<fg:{}>{}</fg>", fg, option_text)
       } else {
-        option_texts[i].clone()
+        option_text.clone()
       };
       render.draw_host_text(
         canvas,
@@ -543,16 +545,16 @@ impl TerminalCheckUi {
     let option_texts: Vec<String> = (0..COLOR_OPTIONS)
       .map(|i| self.option_display_name(&option_names, i))
       .collect();
-    for i in 0..COLOR_OPTIONS {
+    for (i, option_text) in option_texts.iter().enumerate() {
       let text = if i == self.selected_index {
         let fg = if self.is_exit_option(i) {
           "bright_red"
         } else {
           "bright_cyan"
         };
-        format!("f%<fg:{}>{}</fg>", fg, option_texts[i])
+        format!("f%<fg:{}>{}</fg>", fg, option_text)
       } else {
-        option_texts[i].clone()
+        option_text.clone()
       };
       render.draw_host_text(
         canvas,
@@ -850,13 +852,13 @@ impl TerminalCheckUi {
     }
   }
 
-  /// 进入下一个检测步骤。
+  /// Advances to the next check step.
   pub fn advance_step(&mut self) {
     self.step += 1;
     self.apply_detection();
   }
 
-  /// 将当前步骤的检测结果持久化到终端配置文件。
+  /// Saves the answer of the current check step to the terminal profile.
   pub fn persist_current_step(&self, storage: &mut StorageService, log: &mut LogService) {
     match self.step {
       STEP_UNICODE => {

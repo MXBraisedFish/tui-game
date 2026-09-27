@@ -111,19 +111,32 @@ impl<'a> LogoRandom<'a> {
   pub fn usize_inclusive(&mut self, min: usize, max: usize) -> usize {
     self
       .service
-      .int_range(&mut self.pool.random_generators, self.id, min as i64, max as i64 + 1)
+      .int_range(
+        &mut self.pool.random_generators,
+        self.id,
+        min as i64,
+        max as i64 + 1,
+      )
       .unwrap_or(min as i64) as usize
   }
 
   pub fn i32_inclusive(&mut self, min: i32, max: i32) -> i32 {
     self
       .service
-      .int_range(&mut self.pool.random_generators, self.id, min as i64, max as i64 + 1)
+      .int_range(
+        &mut self.pool.random_generators,
+        self.id,
+        min as i64,
+        max as i64 + 1,
+      )
       .unwrap_or(min as i64) as i32
   }
 
   pub fn f64(&mut self) -> f64 {
-    self.service.float_01(&mut self.pool.random_generators, self.id).unwrap_or(0.0)
+    self
+      .service
+      .float_01(&mut self.pool.random_generators, self.id)
+      .unwrap_or(0.0)
   }
 
   pub fn chance(&mut self, probability: f64) -> bool {
@@ -210,10 +223,8 @@ impl HomeLogo {
         _ => None,
       };
 
-    if !needs_random {
-      if let Some(id) = random_id.take() {
-        random.remove(&mut pool.random_generators, id);
-      }
+    if !needs_random && let Some(id) = random_id.take() {
+      random.remove(&mut pool.random_generators, id);
     }
 
     let animation_handle = dynamic.as_ref().and_then(|_| create_clock(animation, pool));
@@ -271,7 +282,9 @@ impl HomeLogo {
       return;
     };
     animation.update(&mut pool.animation, AnimationClock::Ui, dt);
-    let time = animation.completed_cycles(&pool.animation, handle).unwrap_or(0) as f64
+    let time = animation
+      .completed_cycles(&pool.animation, handle)
+      .unwrap_or(0) as f64
       + animation.progress(&pool.animation, handle).unwrap_or(0.0);
     let mut rng = self.random.map(|id| LogoRandom::new(random, pool, id));
     match &mut self.dynamic {

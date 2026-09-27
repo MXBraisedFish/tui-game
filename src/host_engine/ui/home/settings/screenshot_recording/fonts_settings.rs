@@ -9,6 +9,16 @@ use crate::host_engine::services::{
 
 const NS: &str = "fonts_settings";
 
+pub(crate) struct FontsSettingsRenderContext<'a> {
+  pub(crate) render: &'a mut RenderService,
+  pub(crate) canvas: &'a mut CanvasService,
+  pub(crate) layout: &'a LayoutService,
+  pub(crate) i18n: &'a I18nService,
+  pub(crate) hit_area: &'a HitAreaService,
+  pub(crate) text_input: &'a TextInputService,
+  pub(crate) scroll_box: &'a ScrollBoxService,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FontsSettingsCommand {
   Back(Vec<String>),
@@ -308,30 +318,24 @@ impl FontsSettingsUi {
   pub fn render(
     &mut self,
     objects: &mut UiObjectPool,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    hit_area: &HitAreaService,
-    text_input: &TextInputService,
-    scroll_box: &ScrollBoxService,
+    context: &mut FontsSettingsRenderContext<'_>,
   ) -> Option<(u16, u16)> {
-    let viewport = layout.developer_viewport_rect();
-    let title = i18n.get_runtime_text(NS, "fonts_settings.title");
-    render.draw_host_text(
-      canvas,
+    let viewport = context.layout.developer_viewport_rect();
+    let title = context.i18n.get_runtime_text(NS, "fonts_settings.title");
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: viewport.x
           + viewport
             .width
-            .saturating_sub(layout.get_text_width(&title, None))
+            .saturating_sub(context.layout.get_text_width(&title, None))
             / 2,
         y: viewport.y,
         text: format!("f%<fg:bright_magenta><b>{title}</b></fg>"),
         ..Default::default()
       },
     );
-    let hint_lines = self.hint_lines(i18n, viewport.width);
+    let hint_lines = self.hint_lines(context.i18n, viewport.width);
     let hint_height = hint_lines.len().max(1) as u16;
     let frame = Rect {
       x: viewport.x,
@@ -339,8 +343,8 @@ impl FontsSettingsUi {
       width: viewport.width,
       height: viewport.height.saturating_sub(1 + hint_height),
     };
-    render.draw_host_border_rect(
-      canvas,
+    context.render.draw_host_border_rect(
+      context.canvas,
       frame.x,
       frame.y,
       frame.width,
@@ -353,11 +357,15 @@ impl FontsSettingsUi {
     );
 
     if self.fonts.is_empty() {
-      let no = i18n.get_runtime_text(NS, "fonts_settings.no");
-      render.draw_host_text(
-        canvas,
+      let no = context.i18n.get_runtime_text(NS, "fonts_settings.no");
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
-          x: frame.x + frame.width.saturating_sub(layout.get_text_width(&no, None)) / 2,
+          x: frame.x
+            + frame
+              .width
+              .saturating_sub(context.layout.get_text_width(&no, None))
+              / 2,
           y: frame.y + frame.height / 2,
           text: format!("f%<fg:rgb(85,87,83)>{no}</fg>"),
           ..Default::default()
@@ -366,8 +374,8 @@ impl FontsSettingsUi {
     } else {
       for (index, font) in self.fonts.iter().enumerate() {
         let number = format!("{:>4}", index + 1);
-        render.draw_text_in_scroll_box(
-          canvas,
+        context.render.draw_text_in_scroll_box(
+          context.canvas,
           self.scroll,
           &DrawTextParams {
             x: 0,
@@ -382,8 +390,8 @@ impl FontsSettingsUi {
           } else {
             "bright_cyan"
           };
-          render.draw_text_in_scroll_box(
-            canvas,
+          context.render.draw_text_in_scroll_box(
+            context.canvas,
             self.scroll,
             &DrawTextParams {
               x: 4,
@@ -393,8 +401,8 @@ impl FontsSettingsUi {
             },
           );
         }
-        render.draw_text_in_scroll_box(
-          canvas,
+        context.render.draw_text_in_scroll_box(
+          context.canvas,
           self.scroll,
           &DrawTextParams {
             x: 6,
@@ -414,13 +422,13 @@ impl FontsSettingsUi {
       .y
       .saturating_add(viewport.height.saturating_sub(hint_height));
     for (index, hint) in hint_lines.iter().enumerate() {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: viewport.x
             + viewport
               .width
-              .saturating_sub(layout.get_text_width(hint, Some(&params)))
+              .saturating_sub(context.layout.get_text_width(hint, Some(&params)))
               / 2,
           y: hint_y.saturating_add(index as u16),
           text: format!(
@@ -433,12 +441,24 @@ impl FontsSettingsUi {
       );
     }
 
-    self.register_hit_areas(objects, hit_area, scroll_box, canvas, viewport, frame);
+    self.register_hit_areas(
+      objects,
+      context.hit_area,
+      context.scroll_box,
+      context.canvas,
+      viewport,
+      frame,
+    );
 
-    if self.edit_mode.is_none() {
-      return None;
-    }
-    self.render_add_dialog(objects, render, canvas, layout, i18n, text_input)
+    self.edit_mode?;
+    self.render_add_dialog(
+      objects,
+      context.render,
+      context.canvas,
+      context.layout,
+      context.i18n,
+      context.text_input,
+    )
   }
 
   fn render_add_dialog(

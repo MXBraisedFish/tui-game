@@ -30,7 +30,7 @@ local function line_indices(direction, line)
     else
       row, column = board.SIZE + 1 - step, line
     end
-    table.insert { table = indices, value = index_of(row, column) }
+    table.insert(indices, index_of(row, column))
   end
   return indices
 end
@@ -38,10 +38,9 @@ end
 -- Packs the non-empty values towards the front and merges equal neighbours once.
 local function merge_line(values)
   local packed = {}
-  -- The host's ipairs yields one { index, value } record per element.
-  for item in ipairs(values) do
-    if item.value ~= 0 then
-      table.insert { table = packed, value = item.value }
+  for _, value in ipairs(values) do
+    if value ~= 0 then
+      table.insert(packed, value)
     end
   end
 
@@ -57,10 +56,10 @@ local function merge_line(values)
     else
       position = position + 1
     end
-    table.insert { table = merged, value = value }
+    table.insert(merged, value)
   end
   while #merged < board.SIZE do
-    table.insert { table = merged, value = 0 }
+    table.insert(merged, 0)
   end
   return merged, gained
 end
@@ -92,7 +91,7 @@ function board.empty_cells(cells)
   local empty = {}
   for index = 1, #cells do
     if cells[index] == 0 then
-      table.insert { table = empty, value = index }
+      table.insert(empty, index)
     end
   end
   return empty

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use mlua::{MultiValue, Table, Value};
+use mlua::{LuaString, MultiValue, Table, Value};
 
 pub const MAX_API_STRING_BYTES: usize = 1024 * 1024;
 pub const MAX_API_TABLE_ENTRIES: usize = 16_384;
@@ -144,21 +144,28 @@ pub fn required(table: &Table, method: &str, name: &str) -> mlua::Result<Value> 
 }
 
 pub fn string(value: Value, method: &str, name: &str) -> mlua::Result<String> {
+  Ok(lua_string(value, method, name)?.to_str()?.to_string())
+}
+
+pub fn lua_string(value: Value, method: &str, name: &str) -> mlua::Result<LuaString> {
   let Value::String(value) = value else {
     return Err(invalid(method, name, "UTF-8 string", &value));
   };
-  let value = value.to_str().map_err(|_| {
-    invalid(
-      method,
-      name,
-      "valid UTF-8 string",
-      &Value::String(value.clone()),
-    )
-  })?;
-  if value.len() > MAX_API_STRING_BYTES {
+  let length = value
+    .to_str()
+    .map_err(|_| {
+      invalid(
+        method,
+        name,
+        "valid UTF-8 string",
+        &Value::String(value.clone()),
+      )
+    })?
+    .len();
+  if length > MAX_API_STRING_BYTES {
     return Err(message(method, format!("parameter '{name}' exceeds 1 MiB")));
   }
-  Ok(value.to_string())
+  Ok(value)
 }
 
 /// Converts a free-form Lua value into user-facing text using the same stable

@@ -3,283 +3,129 @@ use super::*;
 use std::collections::{HashMap, HashSet};
 
 pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
-  let source = lua.create_table()?;
-  source.raw_set(
-    "concat",
-    lua.create_function(|_, values: MultiValue| {
-      let parameters = args::named("table.concat", values, &["table", "sep", "start", "finish"])?;
-      let input = mutable_or_readonly_table(
-        args::required(&parameters, "table.concat", "table")?,
-        "table.concat",
-        "table",
-      )?;
-      let separator = args::optional_string(&parameters, "table.concat", "sep", Some(""))?.unwrap();
-      let start = args::optional_integer(&parameters, "table.concat", "start", Some(1))?.unwrap();
-      let finish = args::optional_integer(
-        &parameters,
-        "table.concat",
-        "finish",
-        Some(input.raw_len() as i64),
-      )?
-      .unwrap();
-      if start < 1 {
-        return Err(args::message("table.concat", "start must be at least 1"));
-      }
-      if finish < start {
-        return Ok(String::new());
-      }
-      checked_entry_count("table.concat", start, finish, args::MAX_API_TABLE_ENTRIES)?;
-      let mut parts = Vec::new();
-      let mut output_len = 0_usize;
-      for index in start..=finish {
-        let value = input.raw_get::<Value>(index)?;
-        let text = match value {
-          Value::String(value) => value.to_str()?.to_string(),
-          Value::Integer(value) => value.to_string(),
-          Value::Number(value) => value.to_string(),
-          value => {
-            return Err(args::invalid(
-              "table.concat",
-              "table",
-              "array containing only strings or numbers",
-              &value,
-            ));
-          }
-        };
-        output_len = output_len
-          .checked_add(text.len())
-          .and_then(|size| size.checked_add(if parts.is_empty() { 0 } else { separator.len() }))
-          .ok_or_else(|| args::message("table.concat", "output size overflow"))?;
-        if output_len > args::MAX_API_STRING_BYTES {
-          return Err(args::message("table.concat", "output exceeds 1 MiB"));
-        }
-        parts.push(text);
-      }
-      Ok(parts.join(&separator))
-    })?,
-  )?;
+  let source = lua.globals().get::<Table>("table")?;
+  let length = lua
+    .load("function(value) return #value end")
+    .eval::<Function>()?;
+
+  let concat = source.get::<Function>("concat")?;
+  source.raw_set("concat", bounded_concat(lua, concat, length.clone())?)?;
+  let insert = source.get::<Function>("insert")?;
+  let insert_length = length.clone();
   source.raw_set(
     "insert",
-    lua.create_function(|_, values: MultiValue| {
-      let parameters = args::named("table.insert", values, &["table", "position", "value"])?;
-      let input = writable_table(
-        args::required(&parameters, "table.insert", "table")?,
-        "table.insert",
-        "table",
-      )?;
-      let len = input.raw_len();
-      if len >= args::MAX_API_TABLE_ENTRIES {
-        return Err(args::message(
-          "table.insert",
-          "array cannot exceed 16384 entries",
-        ));
-      }
-      let position = args::optional_integer(
-        &parameters,
-        "table.insert",
-        "position",
-        Some(len as i64 + 1),
-      )?
-      .unwrap();
-      if position < 1 || position > len as i64 + 1 {
-        return Err(args::message("table.insert", "position is out of range"));
-      }
-      let value = args::required(&parameters, "table.insert", "value")?;
-      for index in (position as usize..=len).rev() {
-        input.raw_set(index + 1, input.raw_get::<Value>(index)?)?;
-      }
-      input.raw_set(position, value)
-    })?,
-  )?;
-  source.raw_set(
-    "move",
-    lua.create_function(|_, values: MultiValue| {
-      let parameters = args::named(
-        "table.move",
-        values,
-        &["source", "start", "finish", "target_index", "target"],
-      )?;
-      let source = mutable_or_readonly_table(
-        args::required(&parameters, "table.move", "source")?,
-        "table.move",
-        "source",
-      )?;
-      let target = match parameters.get::<Value>("target")? {
-        Value::Nil => writable_table(parameters.get::<Value>("source")?, "table.move", "source")?,
-        value => writable_table(value, "table.move", "target")?,
-      };
-      let start = args::integer(
-        args::required(&parameters, "table.move", "start")?,
-        "table.move",
-        "start",
-      )?;
-      let finish = args::integer(
-        args::required(&parameters, "table.move", "finish")?,
-        "table.move",
-        "finish",
-      )?;
-      let target_index = args::integer(
-        args::required(&parameters, "table.move", "target_index")?,
-        "table.move",
-        "target_index",
-      )?;
-      if finish >= start {
-        let count = checked_entry_count("table.move", start, finish, args::MAX_API_TABLE_ENTRIES)?;
-        checked_offset("table.move", start, count)?;
-        checked_offset("table.move", target_index, count)?;
-        let copied = (0..count)
-          .map(|offset| {
-            let index = start
-              .checked_add(offset as i64)
-              .ok_or_else(|| args::message("table.move", "source index overflow"))?;
-            source.raw_get::<Value>(index)
-          })
-          .collect::<mlua::Result<Vec<_>>>()?;
-        for (offset, value) in copied.into_iter().enumerate() {
-          let index = target_index
-            .checked_add(offset as i64)
-            .ok_or_else(|| args::message("table.move", "target index overflow"))?;
-          target.raw_set(index, value)?;
-        }
-      }
-      Ok(target)
-    })?,
-  )?;
-  source.raw_set(
-    "pack",
-    lua.create_function(|lua, values: MultiValue| {
-      let value = args::one("table.pack", "values", values)?;
-      let values = args::array_values(value, "table.pack", "values")?;
-      let output = lua.create_table()?;
-      for (index, value) in values.iter().cloned().enumerate() {
-        output.raw_set(index + 1, value)?;
-      }
-      output.raw_set("n", values.len())?;
-      Ok(output)
-    })?,
-  )?;
-  source.raw_set(
-    "remove",
-    lua.create_function(|_, values: MultiValue| {
-      let parameters = args::named("table.remove", values, &["table", "position"])?;
-      let input = writable_table(
-        args::required(&parameters, "table.remove", "table")?,
-        "table.remove",
-        "table",
-      )?;
-      let len = input.raw_len();
-      if len > args::MAX_API_TABLE_ENTRIES {
-        return Err(args::message("table.remove", "array exceeds 16384 entries"));
-      }
-      if len == 0 {
-        return Ok(Value::Nil);
-      }
-      let position =
-        args::optional_integer(&parameters, "table.remove", "position", Some(len as i64))?.unwrap();
-      if position < 1 || position > len as i64 {
-        return Err(args::message("table.remove", "position is out of range"));
-      }
-      let removed = input.raw_get::<Value>(position)?;
-      for index in position as usize..len {
-        input.raw_set(index, input.raw_get::<Value>(index + 1)?)?;
-      }
-      input.raw_set(len, Value::Nil)?;
-      Ok(removed)
-    })?,
-  )?;
-  source.raw_set(
-    "sort",
-    lua.create_function(|_, values: MultiValue| {
-      let parameters = args::named("table.sort", values, &["table", "comparator"])?;
-      let input = writable_table(
-        args::required(&parameters, "table.sort", "table")?,
-        "table.sort",
-        "table",
-      )?;
-      let len = input.raw_len();
-      if len > 4096 {
-        return Err(args::message("table.sort", "array exceeds 4096 items"));
-      }
-      let comparator = match parameters.get::<Value>("comparator")? {
-        Value::Nil => None,
-        Value::Function(function) => Some(function),
-        value => {
-          return Err(args::invalid(
-            "table.sort",
-            "comparator",
-            "function or nil",
-            &value,
+    bounded_standard_function(lua, insert, move |arguments| {
+      reject_readonly_table(arguments, 0, "table.insert")?;
+      if let Some(table) = table_argument_at(arguments, 0) {
+        let length = checked_table_length(&insert_length, &table, "table.insert")?;
+        if length >= args::MAX_API_TABLE_ENTRIES as i64 {
+          return Err(args::message(
+            "table.insert",
+            "array cannot exceed 16384 entries",
           ));
         }
-      };
-      let mut items = (1..=len)
-        .map(|index| input.raw_get::<Value>(index))
-        .collect::<mlua::Result<Vec<_>>>()?;
-      let mut comparison_error = None;
-      items.sort_by(|left, right| {
-        if comparison_error.is_some() {
-          return Ordering::Equal;
-        }
-        let result = if let Some(comparator) = &comparator {
-          comparator.call::<bool>((left.clone(), right.clone()))
-        } else {
-          default_less(left, right)
-        };
-        match result {
-          Ok(true) => Ordering::Less,
-          Ok(false) => match if let Some(comparator) = &comparator {
-            comparator.call::<bool>((right.clone(), left.clone()))
-          } else {
-            default_less(right, left)
-          } {
-            Ok(true) => Ordering::Greater,
-            Ok(false) => Ordering::Equal,
-            Err(error) => {
-              comparison_error = Some(error);
-              Ordering::Equal
-            }
-          },
-          Err(error) => {
-            comparison_error = Some(error);
-            Ordering::Equal
-          }
-        }
-      });
-      if let Some(error) = comparison_error {
-        return Err(error);
-      }
-      for (index, value) in items.into_iter().enumerate() {
-        input.raw_set(index + 1, value)?;
       }
       Ok(())
     })?,
   )?;
+  let move_table = source.get::<Function>("move")?;
+  source.raw_set(
+    "move",
+    bounded_standard_function(lua, move_table, |arguments| {
+      let source_table = table_argument_at(arguments, 0);
+      let target_value = arguments.get(4).cloned().unwrap_or(Value::Nil);
+      let target_table = match target_value {
+        Value::Nil => source_table.clone(),
+        Value::Table(table) => Some(table),
+        _ => None,
+      };
+      if let Some(target) = target_table
+        && readonly::is_proxy(&target)?
+      {
+        return Err(readonly_write_error());
+      }
+      if let (Some(start), Some(finish)) = (
+        integer_argument(arguments, 1),
+        integer_argument(arguments, 2),
+      ) {
+        reject_large_span("table.move", start, finish, args::MAX_API_TABLE_ENTRIES)?;
+      }
+      Ok(())
+    })?,
+  )?;
+  let pack = source.get::<Function>("pack")?;
+  source.raw_set(
+    "pack",
+    bounded_standard_function(lua, pack, |arguments| {
+      if arguments.len() > args::MAX_API_TABLE_ENTRIES {
+        return Err(args::message(
+          "table.pack",
+          "arguments exceed 16384 entries",
+        ));
+      }
+      Ok(())
+    })?,
+  )?;
+  let remove = source.get::<Function>("remove")?;
+  let remove_length = length.clone();
+  source.raw_set(
+    "remove",
+    bounded_standard_function(lua, remove, move |arguments| {
+      reject_readonly_table(arguments, 0, "table.remove")?;
+      if let Some(table) = table_argument_at(arguments, 0) {
+        let length = checked_table_length(&remove_length, &table, "table.remove")?;
+        if length > args::MAX_API_TABLE_ENTRIES as i64 {
+          return Err(args::message("table.remove", "array exceeds 16384 entries"));
+        }
+      }
+      Ok(())
+    })?,
+  )?;
+  let sort = source.get::<Function>("sort")?;
+  let sort_length = length.clone();
+  source.raw_set(
+    "sort",
+    bounded_standard_function(lua, sort, move |arguments| {
+      reject_readonly_table(arguments, 0, "table.sort")?;
+      if let Some(table) = table_argument_at(arguments, 0) {
+        let length = checked_table_length(&sort_length, &table, "table.sort")?;
+        if length > 4096 {
+          return Err(args::message("table.sort", "array exceeds 4096 items"));
+        }
+      }
+      Ok(())
+    })?,
+  )?;
+  let unpack = source.get::<Function>("unpack")?;
   source.raw_set(
     "unpack",
-    lua.create_function(|_, values: MultiValue| {
-      let table = args::named("table.unpack", values, &["table", "start", "finish"])?;
-      let value = args::required(&table, "table.unpack", "table")?;
-      let Value::Table(input) = value else {
-        return Err(args::invalid("table.unpack", "table", "table", &value));
-      };
-      let input = readonly::backing(&input)?;
-      let start = args::optional_integer(&table, "table.unpack", "start", Some(1))?.unwrap();
-      let finish = args::optional_integer(
-        &table,
-        "table.unpack",
-        "finish",
-        Some(input.raw_len() as i64),
-      )?
-      .unwrap();
-      if start < 1 || finish < start {
-        return Ok(MultiValue::new());
+    bounded_standard_function(lua, unpack, move |arguments| {
+      if let Some(table) = table_argument_at(arguments, 0) {
+        let start = match optional_integer_argument(arguments, 1) {
+          Some(start) => start,
+          None
+            if arguments
+              .get(1)
+              .is_none_or(|value| matches!(value, Value::Nil)) =>
+          {
+            1
+          }
+          None => return Ok(()),
+        };
+        let finish = match optional_integer_argument(arguments, 2) {
+          Some(finish) => finish,
+          None
+            if arguments
+              .get(2)
+              .is_none_or(|value| matches!(value, Value::Nil)) =>
+          {
+            checked_table_length(&length, &table, "table.unpack")?
+          }
+          None => return Ok(()),
+        };
+        reject_large_span("table.unpack", start, finish, args::MAX_API_TABLE_ENTRIES)?;
       }
-      checked_entry_count("table.unpack", start, finish, args::MAX_API_TABLE_ENTRIES)?;
-      let mut output = Vec::new();
-      for index in start..=finish {
-        output.push(input.raw_get(index)?)
-      }
-      Ok(MultiValue::from_vec(output))
+      Ok(())
     })?,
   )?;
   source.raw_set(
@@ -375,6 +221,125 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
   readonly::proxy(lua, source)
 }
 
+fn bounded_standard_function<F>(lua: &Lua, function: Function, check: F) -> mlua::Result<Function>
+where
+  F: Fn(&MultiValue) -> mlua::Result<()> + 'static,
+{
+  lua.create_function(move |_, arguments: MultiValue| {
+    check(&arguments)?;
+    function.call::<MultiValue>(arguments)
+  })
+}
+
+fn bounded_concat(lua: &Lua, function: Function, length: Function) -> mlua::Result<Function> {
+  lua.create_function(move |_, arguments: MultiValue| {
+    if let Some(table) = table_argument_at(&arguments, 0) {
+      let start = match optional_integer_argument(&arguments, 2) {
+        Some(start) => start,
+        None
+          if arguments
+            .get(2)
+            .is_none_or(|value| matches!(value, Value::Nil)) =>
+        {
+          1
+        }
+        None => return function.call::<MultiValue>(arguments),
+      };
+      let finish = match optional_integer_argument(&arguments, 3) {
+        Some(finish) => finish,
+        None
+          if arguments
+            .get(3)
+            .is_none_or(|value| matches!(value, Value::Nil)) =>
+        {
+          checked_table_length(&length, &table, "table.concat")?
+        }
+        None => return function.call::<MultiValue>(arguments),
+      };
+      reject_large_span("table.concat", start, finish, args::MAX_API_TABLE_ENTRIES)?;
+    }
+    let results = function.call::<MultiValue>(arguments)?;
+    if let Some(Value::String(value)) = results.front()
+      && value.as_bytes().len() > args::MAX_API_STRING_BYTES
+    {
+      return Err(args::message("table.concat", "output exceeds 1 MiB"));
+    }
+    Ok(results)
+  })
+}
+
+fn table_argument_at(arguments: &MultiValue, index: usize) -> Option<Table> {
+  match arguments.get(index) {
+    Some(Value::Table(table)) => Some(table.clone()),
+    _ => None,
+  }
+}
+
+fn checked_table_length(length: &Function, table: &Table, method: &str) -> mlua::Result<i64> {
+  let value = length.call::<Value>(table.clone())?;
+  args::integer(value, method, "table length")
+}
+
+fn optional_integer_argument(arguments: &MultiValue, index: usize) -> Option<i64> {
+  let value = arguments.get(index)?.clone();
+  if matches!(value, Value::Nil) {
+    return None;
+  }
+  integer_argument(arguments, index)
+}
+
+fn integer_argument(arguments: &MultiValue, index: usize) -> Option<i64> {
+  match arguments.get(index)? {
+    Value::Integer(value) => Some(*value),
+    Value::Number(value) if value.is_finite() && value.fract() == 0.0 => {
+      if *value < i64::MIN as f64 || *value >= 9_223_372_036_854_775_808.0 {
+        None
+      } else {
+        Some(*value as i64)
+      }
+    }
+    Value::String(value) => {
+      let text = value.to_str().ok()?;
+      match super::base::parse_number(text.as_ref())? {
+        Value::Integer(value) => Some(value),
+        Value::Number(value)
+          if value.is_finite()
+            && value.fract() == 0.0
+            && value >= i64::MIN as f64
+            && value < 9_223_372_036_854_775_808.0 =>
+        {
+          Some(value as i64)
+        }
+        _ => None,
+      }
+    }
+    _ => None,
+  }
+}
+
+fn reject_large_span(method: &str, start: i64, finish: i64, limit: usize) -> mlua::Result<()> {
+  if finish >= start && (finish as i128 - start as i128 + 1) > limit as i128 {
+    return Err(args::message(
+      method,
+      format!("range exceeds {limit} entries"),
+    ));
+  }
+  Ok(())
+}
+
+fn reject_readonly_table(arguments: &MultiValue, index: usize, method: &str) -> mlua::Result<()> {
+  if let Some(table) = table_argument_at(arguments, index)
+    && readonly::is_proxy(&table)?
+  {
+    return Err(args::message(method, "parameter 'table' is read-only"));
+  }
+  Ok(())
+}
+
+fn readonly_write_error() -> mlua::Error {
+  mlua::Error::RuntimeError("attempt to modify a read-only TUI GAME API table".to_string())
+}
+
 struct TableShape {
   array_indexes: Vec<i64>,
   hash_count: usize,
@@ -427,27 +392,6 @@ fn inspect_table_shape(method: &str, input: &Table) -> mlua::Result<TableShape> 
     array_indexes,
     hash_count,
   })
-}
-
-fn checked_entry_count(method: &str, start: i64, finish: i64, limit: usize) -> mlua::Result<usize> {
-  let count = (finish as i128) - (start as i128) + 1;
-  let count = usize::try_from(count).map_err(|_| args::message(method, "range is too large"))?;
-  if count > limit {
-    return Err(args::message(
-      method,
-      format!("range exceeds {limit} entries"),
-    ));
-  }
-  Ok(count)
-}
-
-fn checked_offset(method: &str, start: i64, count: usize) -> mlua::Result<()> {
-  if count > 0 {
-    start
-      .checked_add((count - 1) as i64)
-      .ok_or_else(|| args::message(method, "index overflow"))?;
-  }
-  Ok(())
 }
 
 fn deep_copy_table(
@@ -709,18 +653,4 @@ fn writable_table(value: Value, method: &str, name: &str) -> mlua::Result<Table>
     ));
   }
   Ok(table)
-}
-
-fn default_less(left: &Value, right: &Value) -> mlua::Result<bool> {
-  match (left, right) {
-    (Value::Integer(left), Value::Integer(right)) => Ok(left < right),
-    (Value::Integer(left), Value::Number(right)) => Ok((*left as f64) < *right),
-    (Value::Number(left), Value::Integer(right)) => Ok(*left < *right as f64),
-    (Value::Number(left), Value::Number(right)) => Ok(left < right),
-    (Value::String(left), Value::String(right)) => Ok(left.as_bytes() < right.as_bytes()),
-    _ => Err(args::message(
-      "table.sort",
-      "values are not mutually comparable numbers or strings",
-    )),
-  }
 }

@@ -164,6 +164,7 @@ struct LuaRegisteredCallback {
 
 pub struct LuaSession {
   callbacks: LuaCallbacks,
+  #[cfg(test)]
   environment: RegistryKey,
   lua: Lua,
   policy: LuaPolicy,
@@ -176,6 +177,7 @@ pub struct LuaSession {
   last_stats: LuaExecutionStats,
   objects: SharedLuaObjectPool,
   event_callbacks: HashMap<LuaEventCallbackId, LuaRegisteredCallback>,
+  #[cfg(test)]
   next_event_callback_id: u64,
   api_state: SharedApiState,
   slow_callback_warnings: HashMap<&'static str, SlowCallbackWarning>,
@@ -197,7 +199,7 @@ impl LuaSession {
     validate_continue_data(&spec, &policy)?;
     validate_best_data(&spec, &policy)?;
     let source = read_source(&spec, &policy)?;
-    let lua = Lua::new_with(StdLib::NONE, LuaOptions::default())
+    let lua = Lua::new_with(StdLib::TABLE, LuaOptions::default())
       .map_err(|error| session_error(&spec, LuaErrorStage::CreateVm, None, error))?;
     lua
       .set_memory_limit(policy.memory_limit_bytes)
@@ -226,8 +228,6 @@ impl LuaSession {
         scripts_root,
         assets_root,
         debug_enabled: api_config.debug_enabled,
-        safe_mode_enabled: spec.session_kind == LuaSessionKind::Screensaver
-          || api_config.safe_mode_enabled,
         base_size: spec.base_size,
         key_actions: api_config.key_actions,
         key_default_actions: api_config.key_default_actions,
@@ -255,12 +255,14 @@ impl LuaSession {
     .map_err(|failure| execution_error(&spec, LuaErrorStage::ExecuteEntry, None, failure))?;
 
     let callbacks = discover_callbacks(&lua, &environment, &spec)?;
+    #[cfg(test)]
     let environment_key = lua
       .create_registry_value(environment)
       .map_err(|error| session_error(&spec, LuaErrorStage::BuildSandbox, None, error))?;
 
     let mut session = Self {
       callbacks,
+      #[cfg(test)]
       environment: environment_key,
       lua,
       policy,
@@ -273,6 +275,7 @@ impl LuaSession {
       last_stats: LuaExecutionStats::default(),
       objects,
       event_callbacks: HashMap::new(),
+      #[cfg(test)]
       next_event_callback_id: 1,
       api_state,
       slow_callback_warnings: HashMap::new(),
@@ -321,14 +324,11 @@ impl LuaSession {
   pub fn configure_api(
     &mut self,
     debug_enabled: bool,
-    safe_mode_enabled: bool,
     key_actions: HashMap<String, Vec<Vec<String>>>,
     key_default_actions: HashMap<String, Vec<Vec<String>>>,
   ) {
     let mut state = self.api_state.borrow_mut();
     state.context.debug_enabled = debug_enabled;
-    state.context.safe_mode_enabled =
-      self.session_kind == LuaSessionKind::Screensaver || safe_mode_enabled;
     state.context.key_actions = key_actions;
     state.context.key_default_actions = key_default_actions;
   }
@@ -379,6 +379,7 @@ impl LuaSession {
     }
   }
 
+  #[cfg(test)]
   pub(crate) fn register_event_callback(
     &mut self,
     function: Function,
@@ -1612,6 +1613,518 @@ mod tests {
   }
 
   #[test]
+  fn lua_compatibility_baseline_runs_the_same_sample_on_lua_54() {
+    let sample = valid_script(
+      r##"
+        local sequence = { 7, 11 }
+        local ipairs_iterator, ipairs_state, ipairs_control = ipairs(sequence)
+        local ipairs_first, ipairs_second = ipairs_iterator(ipairs_state, ipairs_control)
+        local pairs_iterator, pairs_state, pairs_control = pairs(sequence)
+        local pairs_first, pairs_second = pairs_iterator(pairs_state, pairs_control)
+
+        compatibility = {
+          ipairs_state_is_input = ipairs_state == sequence,
+          ipairs_first = ipairs_first,
+          ipairs_second = ipairs_second,
+          ipairs_second_is_nil = ipairs_second == nil,
+          pairs_state_is_input = pairs_state == sequence,
+          pairs_second_is_nil = pairs_second == nil,
+        }
+      "##,
+    );
+
+    let baseline = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).unwrap();
+    baseline.load(&sample).exec().unwrap();
+    let baseline_version = baseline.globals().get::<String>("_VERSION").unwrap();
+    let baseline_result = baseline.globals().get::<Value>("compatibility").unwrap();
+
+    let session =
+      LuaSession::load(spec(&sample, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let host_version = session.lua.globals().get::<String>("_VERSION").unwrap();
+    let host_result = session.environment_value("compatibility");
+
+    assert_eq!(baseline_version, host_version);
+    assert!(
+      host_version.contains("5.4"),
+      "unexpected Lua version: {host_version}"
+    );
+    assert_eq!(
+      lua_to_json(baseline_result, 0, 32, &mut HashSet::new()).unwrap(),
+      serde_json::json!({
+        "ipairs_state_is_input": true,
+        "ipairs_first": 1,
+        "ipairs_second": 7,
+        "ipairs_second_is_nil": false,
+        "pairs_state_is_input": true,
+        "pairs_second_is_nil": false,
+      })
+    );
+    assert_eq!(
+      lua_to_json(host_result, 0, 32, &mut HashSet::new()).unwrap(),
+      serde_json::json!({
+        "ipairs_state_is_input": true,
+        "ipairs_first": 1,
+        "ipairs_second": 7,
+        "ipairs_second_is_nil": false,
+        "pairs_state_is_input": true,
+        "pairs_second_is_nil": false,
+      })
+    );
+  }
+
+  #[test]
+  fn standard_base_functions_follow_lua54_table_and_vararg_semantics() {
+    let source = valid_script(
+      r##"
+        function Init(ctx)
+          local sequence = { "first", "second", table = "ordinary field", value = 9 }
+          local ipairs_iterator, ipairs_state, ipairs_control = ipairs(sequence)
+          local first_key, first_value = ipairs_iterator(ipairs_state, ipairs_control)
+          local second_key, second_value = ipairs_iterator(ipairs_state, first_key)
+          local end_key = ipairs_iterator(ipairs_state, second_key)
+
+          local copied = {}
+          for key, value in pairs(sequence) do copied[key] = value end
+
+          local named = { table = "ordinary field" }
+          local named_key, named_value = next(named)
+          local named_pairs = {}
+          for key, value in pairs(named) do named_pairs[key] = value end
+
+          local count = select("#", "first", nil, "third")
+          local second, third = select(2, "first", nil, "third")
+          local negative = select(-1, "first", nil, "third")
+          local cyclic = { "cycle is valid" }
+          cyclic.self = cyclic
+          local cycle_iterator, cycle_state, cycle_control = ipairs(cyclic)
+          local cycle_key, cycle_value = cycle_iterator(cycle_state, cycle_control)
+
+          local custom = setmetatable({ left = 1, right = 2 }, {
+            __pairs = function(subject)
+              local position = 0
+              return function(state, previous)
+                position = position + 1
+                if position == 1 then return "right", state.right end
+                if position == 2 then return "left", state.left end
+              end, subject, "start"
+            end,
+          })
+          local custom_iterator, custom_state, custom_control = pairs(custom)
+          local custom_key, custom_value = custom_iterator(custom_state, custom_control)
+
+          local record = { index = 1, value = "record" }
+          local text = tostring({ value = "ordinary field" })
+          local table_text = string.find{ text = text, pattern = "^table: 0x" } ~= nil
+          debug.assert{
+            value = ipairs_state == sequence and ipairs_control == 0
+              and first_key == 1 and first_value == "first"
+              and second_key == 2 and second_value == "second" and end_key == nil
+              and copied["table"] == "ordinary field" and copied.value == 9
+              and named_key == "table" and named_value == "ordinary field"
+              and named_pairs.table == "ordinary field"
+              and count == 3 and second == nil and third == "third" and negative == "third"
+              and cycle_state == cyclic and cycle_key == 1 and cycle_value == "cycle is valid"
+              and custom_state.left == 1 and custom_control == "start"
+              and custom_key == "right" and custom_value == 2
+              and type(record) == "table" and rawlen({ value = 1 }) == 0
+              and rawequal(record, record) and table_text,
+          }
+        end
+      "##,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn base_library_matches_native_lua54_on_plain_table_operations() {
+    let source = valid_script(
+      r##"
+        local sequence = { "first", "second" }
+        local ipairs_iterator, ipairs_state, ipairs_control = ipairs(sequence)
+        local first_index, first_value = ipairs_iterator(ipairs_state, ipairs_control)
+        local second_index, second_value = ipairs_iterator(ipairs_state, first_index)
+        local pair_table = { table = "ordinary field" }
+        local raw_target = setmetatable({}, { __index = { fallback = "inherited" } })
+        local raw_write_result = rawset(raw_target, "value", 8)
+        local next_key, next_value = next(pair_table)
+        local pairs_iterator, pairs_state, pairs_control = pairs(pair_table)
+        local pairs_key, pairs_value = pairs_iterator(pairs_state, pairs_control)
+        local count = select("#", "first", nil, pair_table, nil)
+        local selected, selected_tail = select(3, "first", nil, pair_table, nil)
+        local negative = select(-1, "first", nil, "last")
+        local meta = { __index = { fallback = 7 }, __metatable = "locked" }
+        local protected = setmetatable({}, meta)
+        local custom = setmetatable({ value = 4 }, {
+          __pairs = function(subject)
+            return next, subject, nil
+          end,
+        })
+        local custom_iterator, custom_state, custom_control = pairs(custom)
+        local custom_key, custom_value = custom_iterator(custom_state, custom_control)
+
+        compatibility_base = {
+          ipairs_state_is_input = ipairs_state == sequence,
+          ipairs_control = ipairs_control,
+          ipairs_first_index = first_index,
+          ipairs_first_value = first_value,
+          ipairs_second_index = second_index,
+          ipairs_second_value = second_value,
+          next_key = next_key,
+          next_value = next_value,
+          pairs_state_is_input = pairs_state == pair_table,
+          pairs_key = pairs_key,
+          pairs_value = pairs_value,
+          select_count = count,
+          select_preserved_table = selected == pair_table,
+          select_preserved_trailing_nil = selected_tail == nil,
+          select_negative = negative,
+          rawget_skips_index = rawget(raw_target, "fallback") == nil
+            and raw_target.fallback == "inherited",
+          rawset_returns_table = raw_write_result == raw_target,
+          rawset_uses_raw_slot = rawget(raw_target, "value") == 8,
+          rawset_handles_named_table_field = rawset(pair_table, "table", "updated") == pair_table
+            and rawget(pair_table, "table") == "updated",
+          rawset_nil_removes_slot = rawset(pair_table, "table", nil) == pair_table
+            and rawget(pair_table, "table") == nil,
+          type_of_named_table = type({ index = 1, value = 2 }),
+          type_of_float = type(1.5),
+          tonumber_decimal = tonumber("12.5"),
+          tonumber_base = tonumber("ff", 16),
+          tonumber_hex_float = tonumber("0x1p2"),
+          tonumber_invalid_hex_exponent = tonumber("0x1pfoo") == nil,
+          tostring_integer = tostring(12),
+          tostring_string = tostring("text"),
+          rawlen_named_table = rawlen({ value = 1 }),
+          rawequal_numeric = rawequal(1, 1.0),
+          protected_marker = getmetatable(protected),
+          protected_index = protected.fallback,
+          custom_state_is_input = custom_state == custom,
+          custom_key = custom_key,
+          custom_value = custom_value,
+          setmetatable_nil_removes_metatable = (function()
+            local removable = setmetatable({}, { __index = { fallback = 7 } })
+            local result = setmetatable(removable, nil)
+            return result == removable and getmetatable(removable) == nil
+              and removable.fallback == nil
+          end)(),
+          number_metatable = getmetatable(1),
+        }
+      "##,
+    );
+    let baseline = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).unwrap();
+    baseline.load(&source).exec().unwrap();
+    let baseline_result = baseline
+      .globals()
+      .get::<Value>("compatibility_base")
+      .unwrap();
+
+    let session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let host_result = session.environment_value("compatibility_base");
+
+    assert_eq!(
+      lua_to_json(baseline_result, 0, 32, &mut HashSet::new()).unwrap(),
+      lua_to_json(host_result, 0, 32, &mut HashSet::new()).unwrap()
+    );
+  }
+
+  #[test]
+  fn table_standard_library_matches_native_lua54_behavior() {
+    let source = valid_script(
+      r##"
+        local sequence = { "a", "c" }
+        table.insert(sequence, 2, "b")
+        table.insert(sequence, "d")
+        local removed = table.remove(sequence, 2)
+
+        local moved = { 1, 2, 3, 4 }
+        local move_result = table.move(moved, 1, 3, 2)
+        local target = {}
+        local target_result = table.move(moved, 2, 3, 1, target)
+
+        local packed = table.pack("first", nil, "last", nil)
+        local first, second, third, fourth = table.unpack(packed, 1, packed.n)
+        local virtual = setmetatable({ [1] = "left" }, {
+          __index = function(_, index)
+            if index == 2 then return "right" end
+          end,
+          __len = function() return 2 end,
+        })
+        local values = {
+          { name = "beta" },
+          { name = "alpha" },
+        }
+        setmetatable(values[1], { __lt = function(left, right) return left.name < right.name end })
+        setmetatable(values[2], { __lt = function(left, right) return left.name < right.name end })
+        table.sort(values)
+
+        compatibility_table = {
+          concat = table.concat({ 1, "二", 3 }, "|", 1, 3),
+          concat_uses_index_and_length = table.concat(virtual, ","),
+          insert_remove = table.concat(sequence, "") .. ":" .. removed,
+          move_returns_source = move_result == moved,
+          move_overlap = table.concat(moved, ","),
+          move_returns_target = target_result == target,
+          move_target = table.concat(target, ","),
+          packed_count = packed.n,
+          packed_nil_positions = first == "first" and second == nil
+            and third == "last" and fourth == nil,
+          sort_uses_less_metamethod = values[1].name == "alpha"
+            and values[2].name == "beta",
+        }
+      "##,
+    );
+    let baseline = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).unwrap();
+    baseline.load(&source).exec().unwrap();
+    let baseline_result = baseline
+      .globals()
+      .get::<Value>("compatibility_table")
+      .unwrap();
+
+    let session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let host_result = session.environment_value("compatibility_table");
+
+    assert_eq!(
+      lua_to_json(baseline_result, 0, 32, &mut HashSet::new()).unwrap(),
+      lua_to_json(host_result, 0, 32, &mut HashSet::new()).unwrap()
+    );
+  }
+
+  #[test]
+  fn lua54_string_baseline_records_byte_indices_and_native_returns() {
+    let baseline = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).unwrap();
+    let result = baseline
+      .load(
+        r#"
+          local find_start, find_finish, find_capture = string.find("A你B", "(你)")
+          local match_first, match_second = string.match("id=7", "(%a+)=(%d+)")
+          local iterator = string.gmatch("a1 b2", "(%a)(%d)")
+          local first_letter, first_digit = iterator()
+          local second_letter, second_digit = iterator()
+          local replaced, replacement_count = string.gsub("a1 b2", "(%a)(%d)", "%2%1")
+          local plain_start, plain_finish = string.find("x.y", ".", 1, true)
+          local reversed = string.reverse("你ab")
+          local byte_one, byte_two, byte_three, byte_four, byte_five = string.byte(reversed, 1, 5)
+
+          native_string = {
+            sub = string.sub("A你B", 2, 4),
+            find_start = find_start,
+            find_finish = find_finish,
+            find_capture = find_capture,
+            match_first = match_first,
+            match_second = match_second,
+            first_letter = first_letter,
+            first_digit = first_digit,
+            second_letter = second_letter,
+            second_digit = second_digit,
+            replaced = replaced,
+            replacement_count = replacement_count,
+            plain_start = plain_start,
+            plain_finish = plain_finish,
+            lowered_unicode = string.lower("ÄBC"),
+            reversed_bytes = { byte_one, byte_two, byte_three, byte_four, byte_five },
+          }
+
+          native_format = {
+            formatted = string.format("%s:%04d", "v", 7),
+            general_scientific = string.format("%.3g", 12345),
+            general_fixed = string.format("%.3g", 12.5),
+            general_small = string.format("%.3g", 0.0000125),
+            general_rounds_to_scientific = string.format("%.3g", 999.9),
+            general_rounds_to_fixed = string.format("%.3g", 0.00009999),
+            general_alternate = string.format("%#.3g", 12.0),
+            scientific = string.format("%.2e", 12.5),
+            scientific_upper = string.format("%.2E", 12.5),
+            fixed_infinity = string.format("%f", 1 / 0),
+            fixed_nan = string.format("%f", 0 / 0),
+            fixed_negative_nan = string.format("%f", -(0 / 0)),
+            fixed_negative_infinity = string.format("%+f", -1 / 0),
+            quoted_nul = string.format("%q", "a\0b"),
+            quoted_control = string.format("%q", "\1"),
+            quoted_control_digit = string.format("%q", "\1" .. "2"),
+            quoted_newline = string.format("%q", "a\nb"),
+            quoted_tab = string.format("%q", "\t"),
+            quoted_carriage_return = string.format("%q", "\r"),
+            quoted_backspace = string.format("%q", "\b"),
+            quoted_zero_digit = string.format("%q", "\0" .. "2"),
+            quoted_quote = string.format("%q", "\""),
+            quoted_backslash = string.format("%q", "\\"),
+            unicode_character = string.format("%c", 0x4f60),
+          }
+        "#,
+      )
+      .exec()
+      .and_then(|()| baseline.globals().get::<Value>("native_string"))
+      .unwrap();
+    let format_result = baseline.globals().get::<Value>("native_format").unwrap();
+
+    assert_eq!(
+      lua_to_json(result, 0, 32, &mut HashSet::new()).unwrap(),
+      serde_json::json!({
+        "sub": "你",
+        "find_start": 2,
+        "find_finish": 4,
+        "find_capture": "你",
+        "match_first": "id",
+        "match_second": "7",
+        "first_letter": "a",
+        "first_digit": "1",
+        "second_letter": "b",
+        "second_digit": "2",
+        "replaced": "1a 2b",
+        "replacement_count": 2,
+        "plain_start": 2,
+        "plain_finish": 2,
+        "lowered_unicode": "Äbc",
+        "reversed_bytes": [98, 97, 160, 189, 228],
+      })
+    );
+
+    assert_eq!(
+      lua_to_json(format_result, 0, 32, &mut HashSet::new()).unwrap(),
+      serde_json::json!({
+        "formatted": "v:0007",
+        "general_scientific": "1.23e+04",
+        "general_fixed": "12.5",
+        "general_small": "1.25e-05",
+        "general_rounds_to_scientific": "1e+03",
+        "general_rounds_to_fixed": "0.0001",
+        "general_alternate": "12.0",
+        "scientific": "1.25e+01",
+        "scientific_upper": "1.25E+01",
+        "fixed_infinity": "inf",
+        "fixed_nan": "nan",
+        "fixed_negative_nan": "nan",
+        "fixed_negative_infinity": "-inf",
+        "quoted_nul": "\"a\\0b\"",
+        "quoted_control": "\"\\1\"",
+        "quoted_control_digit": "\"\\0012\"",
+        "quoted_newline": "\"a\\\nb\"",
+        "quoted_tab": "\"\\9\"",
+        "quoted_carriage_return": "\"\\13\"",
+        "quoted_backspace": "\"\\8\"",
+        "quoted_zero_digit": "\"\\0002\"",
+        "quoted_quote": "\"\\\"\"",
+        "quoted_backslash": "\"\\\\\"",
+        "unicode_character": "`",
+      })
+    );
+  }
+
+  #[test]
+  fn lua54_math_utf8_baseline_records_native_returns_and_byte_offsets() {
+    let baseline = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).unwrap();
+    let result = baseline
+      .load(
+        r#"
+          local integer_part, fractional_part = math.modf(-3.25)
+          local mantissa, exponent = math.frexp(12.8)
+          local codepoint_one, codepoint_two, codepoint_three = utf8.codepoint("A你B", 1, 5)
+          local iterator, state, control = utf8.codes("A你B")
+          local first_position, first_codepoint = iterator(state, control)
+          control = first_position
+          local second_position, second_codepoint = iterator(state, control)
+          control = second_position
+          local third_position, third_codepoint = iterator(state, control)
+
+          native_math_utf8 = {
+            floor_negative = math.floor(-3.1),
+            ceil_negative = math.ceil(-3.1),
+            fmod_negative = math.fmod(-7, 3),
+            min_multiple = math.min(4, -2, 7),
+            max_multiple = math.max(4, -2, 7),
+            modf_integer = integer_part,
+            modf_fraction = fractional_part,
+            frexp_mantissa = mantissa,
+            frexp_exponent = exponent,
+            tointeger_exact = math.tointeger(3.0),
+            tointeger_fractional_is_nil = math.tointeger(3.25) == nil,
+            type_integer = math.type(3),
+            type_float = math.type(3.0),
+            unsigned_wrap_comparison = not math.ult(-1, 1),
+            utf8_char = utf8.char(65, 20320),
+            utf8_len = utf8.len("A你B"),
+            utf8_range_len = utf8.len("A你B", 2, 4),
+            utf8_codepoint_one = codepoint_one,
+            utf8_codepoint_two = codepoint_two,
+            utf8_codepoint_three = codepoint_three,
+            utf8_first_position = first_position,
+            utf8_first_codepoint = first_codepoint,
+            utf8_second_position = second_position,
+            utf8_second_codepoint = second_codepoint,
+            utf8_third_position = third_position,
+            utf8_third_codepoint = third_codepoint,
+            utf8_offset = utf8.offset("A你B", 2, 1),
+          }
+        "#,
+      )
+      .exec()
+      .and_then(|()| baseline.globals().get::<Value>("native_math_utf8"))
+      .unwrap();
+
+    assert_eq!(
+      lua_to_json(result, 0, 32, &mut HashSet::new()).unwrap(),
+      serde_json::json!({
+        "floor_negative": -4,
+        "ceil_negative": -3,
+        "fmod_negative": -1,
+        "min_multiple": -2,
+        "max_multiple": 7,
+        "modf_integer": -3,
+        "modf_fraction": -0.25,
+        "frexp_mantissa": 0.8,
+        "frexp_exponent": 4,
+        "tointeger_exact": 3,
+        "tointeger_fractional_is_nil": true,
+        "type_integer": "integer",
+        "type_float": "float",
+        "unsigned_wrap_comparison": true,
+        "utf8_char": "A你",
+        "utf8_len": 3,
+        "utf8_range_len": 1,
+        "utf8_codepoint_one": 65,
+        "utf8_codepoint_two": 20320,
+        "utf8_codepoint_three": 66,
+        "utf8_first_position": 1,
+        "utf8_first_codepoint": 65,
+        "utf8_second_position": 2,
+        "utf8_second_codepoint": 20320,
+        "utf8_third_position": 5,
+        "utf8_third_codepoint": 66,
+        "utf8_offset": 2,
+      })
+    );
+  }
+
+  #[test]
+  fn string_primitive_metatable_stays_isolated_from_native_string_methods() {
+    let baseline = Lua::new_with(StdLib::ALL_SAFE, LuaOptions::default()).unwrap();
+    let native_string_methods = baseline
+      .load(
+        r#"
+          local metatable = getmetatable("text")
+          return metatable ~= nil and type(metatable.__index.sub) == "function"
+        "#,
+      )
+      .eval::<bool>()
+      .unwrap();
+    assert!(native_string_methods);
+
+    let source = valid_script(
+      r#"
+        string_metatable_compatibility = getmetatable("text") == nil
+      "#,
+    );
+    let session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    assert_eq!(
+      session.environment_value("string_metatable_compatibility"),
+      Value::Boolean(true)
+    );
+  }
+
+  #[test]
   fn creates_isolated_game_and_screensaver_vms() {
     let mut first = LuaSession::load(
       spec(
@@ -1774,6 +2287,8 @@ mod tests {
       "type",
       "setmetatable",
       "getmetatable",
+      "rawget",
+      "rawset",
     ] {
       assert_ne!(session.environment_value(name), Value::Nil, "{name}");
     }
@@ -1789,8 +2304,6 @@ mod tests {
       "loadstring",
       "dofile",
       "require",
-      "rawget",
-      "rawset",
       "os",
       "io",
       "package",
@@ -1807,19 +2320,33 @@ mod tests {
         function Init(ctx)
           local ok = debug.pcall{ func = function() math.PI = 0 end }
           debug.assert{ value = not ok.ok, message = "math must be read-only" }
-          local iterator = pairs(math)
-          local item = iterator()
-          debug.assert{ value = type{ value = item } == "table" }
-          debug.assert{ value = item.index ~= nil and item.value ~= nil }
+          local iterator, state, control = pairs(math)
+          local first_key, first_value = iterator(state, control)
+          debug.assert{
+            value = type(first_key) == "string" and first_value ~= nil
+              and state ~= math and next(state) == nil,
+          }
           local count = 0
-          for pair in pairs(math) do
-            debug.assert{ value = pair.index ~= nil and pair.value ~= nil }
+          for key, value in pairs(math) do
+            debug.assert{ value = type(key) == "string" and value ~= nil }
             count = count + 1
           end
           debug.assert{ value = count > 0 }
-          local first = next{ table = math, index = nil }
-          debug.assert{ value = first.index ~= nil and first.value ~= nil }
-          debug.assert{ value = math.PI > 3, message = "iterator leaked backing table" }
+          local next_key, next_value = next(math)
+          debug.assert{ value = type(next_key) == "string" and next_value ~= nil }
+          local raw_write = debug.pcall{ func = function() rawset(math, "PI", 0) end }
+          local raw_base_write = debug.pcall{
+            func = function() base.rawset(base, "ipairs", nil) end,
+          }
+          debug.assert{
+            value = rawlen(math) == 0 and rawget(math, "PI") == nil and math.PI > 3
+              and #char.ASCII_LETTER > 0 and table.concat(char.ASCII_LETTER) ~= ""
+              and not debug.pcall{
+                func = function() table.insert(char.ASCII_LETTER, "!") end,
+              }.ok
+              and not raw_write.ok and not raw_base_write.ok,
+            message = "raw access exposed or modified a read-only API backing table",
+          }
         end
       "#,
     );
@@ -1827,7 +2354,7 @@ mod tests {
   }
 
   #[test]
-  fn base_metatable_api_uses_named_parameters_and_preserves_protection() {
+  fn base_metatable_api_uses_lua54_positional_parameters_and_preserves_protection() {
     let source = valid_script(
       r#"
         function Init(ctx)
@@ -1837,36 +2364,33 @@ mod tests {
 
           local target = {}
           local metatable = { __index = { fallback = 7 } }
-          local result = setmetatable{ table = target, metatable = metatable }
+          local result = setmetatable(target, metatable)
           debug.assert{
             value = result == target and target.fallback == 7
               and getmetatable(target) == metatable
-              and base.getmetatable{ table = target } == metatable,
+              and base.getmetatable(target) == metatable,
           }
 
-          local removed = base.setmetatable{ table = target, metatable = nil }
+          local removed = setmetatable(target, nil)
           debug.assert{
             value = removed == target and getmetatable(target) == nil
               and target.fallback == nil,
           }
 
           local protected = {}
-          setmetatable{
-            table = protected,
-            metatable = { __metatable = "locked" },
-          }
+          setmetatable(protected, { __metatable = "locked" })
           debug.assert{
             value = getmetatable(protected) == "locked"
               and fails(function()
-                setmetatable{ table = protected, metatable = {} }
+                setmetatable(protected, {})
               end),
           }
 
           debug.assert{
             value = getmetatable(base) == false
-              and fails(function() setmetatable{ table = base, metatable = {} } end)
-              and fails(function() setmetatable{ table = target, metatable = false } end)
-              and fails(function() getmetatable(1) end),
+              and fails(function() setmetatable(base, {}) end)
+              and fails(function() setmetatable(target, false) end)
+              and getmetatable(1) == nil,
           }
         end
       "#,
@@ -1897,9 +2421,9 @@ mod tests {
             __lt = function(left, right) return left.raw < right.raw end,
             __tostring = function(value) return "value:" .. value.raw end,
           }
-          local left = setmetatable{ table = { raw = 2 }, metatable = metatable }
-          local same = setmetatable{ table = { raw = 2 }, metatable = metatable }
-          local greater = setmetatable{ table = { raw = 3 }, metatable = metatable }
+          local left = setmetatable({ raw = 2 }, metatable)
+          local same = setmetatable({ raw = 2 }, metatable)
+          local greater = setmetatable({ raw = 3 }, metatable)
           left.created = 9
           debug.assert{
             value = left.missing == 7 and writes.created == 9 and #left == 12
@@ -1908,9 +2432,7 @@ mod tests {
           }
 
           local custom = { left = 1, right = 2 }
-          setmetatable{
-            table = custom,
-            metatable = {
+          setmetatable(custom, {
               __pairs = function(subject)
                 local keys = { "right", "left" }
                 local position = 0
@@ -1920,42 +2442,35 @@ mod tests {
                   if key ~= nil then return key, state[key] end
                 end, subject, nil
               end,
-            },
-          }
-          local iterator = pairs(custom)
-          local first = iterator()
-          local second = iterator()
+            })
+          local iterator, state, control = pairs(custom)
+          local first_key, first_value = iterator(state, control)
+          local second_key, second_value = iterator(state, first_key)
           debug.assert{
-            value = first.index == "right" and first.value == 2
-              and second.index == "left" and second.value == 1
-              and iterator() == nil,
+            value = state == custom and first_key == "right" and first_value == 2
+              and second_key == "left" and second_value == 1
+              and iterator(state, second_key) == nil,
           }
 
-          local virtual = setmetatable{
-            table = { [1] = "a" },
-            metatable = {
+          local virtual = setmetatable({ [1] = "a" }, {
               __index = function(_, index)
                 if index == 2 then return "b" end
               end,
-            },
-          }
-          local array_iterator = ipairs(virtual)
-          local array_first = array_iterator()
-          local array_second = array_iterator()
+            })
+          local array_iterator, array_state, array_index = ipairs(virtual)
+          local array_first, array_first_value = array_iterator(array_state, array_index)
+          local array_second, array_second_value = array_iterator(array_state, array_first)
           debug.assert{
-            value = array_first.index == 1 and array_first.value == "a"
-              and array_second.index == 2 and array_second.value == "b"
-              and array_iterator() == nil,
+            value = array_state == virtual and array_index == 0
+              and array_first == 1 and array_first_value == "a"
+              and array_second == 2 and array_second_value == "b"
+              and array_iterator(array_state, array_second) == nil,
           }
 
-          local invalid = setmetatable{
-            table = {}, metatable = { __tostring = true },
-          }
+          local invalid = setmetatable({}, { __tostring = true })
           debug.assert{ value = fails(function() tostring(invalid) end) }
 
-          local named = setmetatable{
-            table = {}, metatable = { __name = "Type" },
-          }
+          local named = setmetatable({}, { __name = "Type" })
           debug.assert{
             value = string.find{
               text = tostring(named), pattern = "^Type: 0x",
@@ -1980,9 +2495,9 @@ mod tests {
             end,
           }
           do
-            local normal <close> = setmetatable{ table = {}, metatable = metatable }
+            local normal <close> = setmetatable({}, metatable)
           end
-          local failed <close> = setmetatable{ table = {}, metatable = metatable }
+          local failed <close> = setmetatable({}, metatable)
           debug.assert{ value = false }
         end
       "#,
@@ -2012,6 +2527,102 @@ mod tests {
   }
 
   #[test]
+  fn lua_gc_preserves_weak_tables_and_runs_finalizers() {
+    let source = valid_script("");
+    let session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let environment: Table = session.lua.registry_value(&session.environment).unwrap();
+    environment.set("finalized", 0).unwrap();
+    session
+      .lua
+      .load(
+        r#"
+          weak_values = setmetatable({}, { __mode = "v" })
+          do
+            local value = {}
+            weak_values[1] = value
+          end
+          do
+            local value = setmetatable({}, {
+              __gc = function() finalized = finalized + 1 end,
+            })
+          end
+        "#,
+      )
+      .set_environment(environment.clone())
+      .exec()
+      .unwrap();
+
+    session.lua.gc_collect().unwrap();
+    session.lua.gc_collect().unwrap();
+
+    let weak_values: Table = environment.get("weak_values").unwrap();
+    assert!(matches!(
+      weak_values.raw_get::<Value>(1).unwrap(),
+      Value::Nil
+    ));
+    assert_eq!(environment.get::<i64>("finalized").unwrap(), 1);
+  }
+
+  #[test]
+  fn stop_releases_registered_callbacks_before_collecting() {
+    let source = valid_script("");
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let environment: Table = session.lua.registry_value(&session.environment).unwrap();
+    environment.set("finalized", 0).unwrap();
+    let callback = session
+      .lua
+      .load(
+        r#"
+          return (function()
+            local marker = setmetatable({}, {
+              __gc = function() finalized = finalized + 1 end,
+            })
+            return function() return marker end
+          end)()
+        "#,
+      )
+      .set_environment(environment.clone())
+      .eval::<Function>()
+      .unwrap();
+    session
+      .register_event_callback(callback, LuaCallbackLifetime::UntilTerminal)
+      .unwrap();
+
+    session.stop();
+
+    assert_eq!(session.state(), LuaSessionState::Stopped);
+    assert_eq!(environment.get::<i64>("finalized").unwrap(), 1);
+  }
+
+  #[test]
+  fn instruction_limit_still_closes_pending_variables() {
+    let source = valid_script(
+      r#"
+        function Update(dt)
+          local closing <close> = setmetatable({}, {
+            __close = function() close_called = true end,
+          })
+          while true do end
+        end
+      "#,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+
+    let error = session.update().unwrap_err();
+
+    assert_eq!(error.stage, LuaErrorStage::ExecutionLimit);
+    assert!(
+      session
+        .environment_value("close_called")
+        .as_boolean()
+        .unwrap_or(false)
+    );
+  }
+
+  #[test]
   fn align_resolve_rect_returns_a_named_coordinate_table() {
     let source = valid_script(
       r#"
@@ -2034,7 +2645,7 @@ mod tests {
             horizontal_align = align.RIGHT,
             vertical_align = align.BOTTOM,
           }
-          debug.assert{ value = type{ value = top_left } == "table" }
+          debug.assert{ value = type(top_left) == "table" }
           debug.assert{ value = top_left.x == 0 and top_left.y == 0 }
           debug.assert{ value = center.x == 55 and center.y == 17 }
           debug.assert{ value = bottom_right.x == 110 and bottom_right.y == 34 }
@@ -2085,7 +2696,7 @@ mod tests {
           local size, extra = measurement.get_text_size{
             text = "Hello\n世界",
           }
-          debug.assert{ value = type{ value = size } == "table" }
+          debug.assert{ value = type(size) == "table" }
           debug.assert{ value = size.width == 5 and size.height == 2 }
           debug.assert{ value = extra == nil }
           debug.assert{
@@ -2677,13 +3288,13 @@ mod tests {
         function Update(dt)
           local x = 0
           local y = 0
-          for item in ipairs(char.ASCII_LETTER) do
+          for _, item in ipairs(char.ASCII_LETTER) do
             x = x + 2
             if x % 20 == 0 then
               x = 2
               y = y + 1
             end
-            draw.text{ x = x, y = y, text = item.value }
+            draw.text{ x = x, y = y, text = item }
           end
         end
       "#,
@@ -3022,19 +3633,20 @@ mod tests {
             cursor.child = {}
             cursor = cursor.child
           end
-          local depth_ok = debug.pcall{ func = function() base.type(value) end }
+          local depth_ok = debug.pcall{ func = function() return type(value) end }
           local cyclic = {}
           cyclic.self = cyclic
-          local cycle_ok = debug.pcall{ func = function() base.type(cyclic) end }
+          local cycle_ok = debug.pcall{ func = function() return type(cyclic) end }
           local unknown_ok = debug.pcall{
             func = function()
               measurement.get_text_width{ text = "value", unknown = true }
             end,
           }
-          local packed = table.pack{ values = { [1] = "first", n = 3 } }
+          local packed = table.pack("first", nil, nil)
           debug.assert{
-            value = not sqrt_ok.ok and not pow_ok.ok and not depth_ok.ok and not cycle_ok.ok
-              and not unknown_ok.ok
+            value = not sqrt_ok.ok and not pow_ok.ok and depth_ok.ok
+              and depth_ok.values[1] == "table" and cycle_ok.ok
+              and cycle_ok.values[1] == "table" and not unknown_ok.ok
               and packed.n == 3 and packed[1] == "first" and packed[3] == nil,
           }
         end
@@ -3067,6 +3679,9 @@ mod tests {
           debug.assert{ value = string.sub{ text = "甲乙丙", start = -2, finish = -1 } == "乙丙" }
           debug.assert{ value = string.sub{ text = "甲乙丙", start = -99, finish = 99 } == "甲乙丙" }
           debug.assert{ value = string.rep{ text = "A", times = 3, sep = ":" } == "A:A:A" }
+          debug.assert{
+            value = string.rep{ text = "", times = 9223372036854775807 } == "",
+          }
 
           local found = string.find{ text = "你ab你", pattern = "(a)(b)" }
           debug.assert{
@@ -3081,6 +3696,13 @@ mod tests {
           }
           debug.assert{ value = string.find{ text = "abc", pattern = "a", init = 0 }.start == 1 }
           debug.assert{ value = string.find{ text = "abc", pattern = "a", init = 99 } == nil }
+          debug.assert{
+            value = fails(function() string.find{ text = "abc", init = 99 } end)
+              and fails(function() string.match{ text = "abc", init = 99 } end)
+              and fails(function()
+                string.find{ text = "abc", pattern = "a", init = 99, plain = "yes" }
+              end),
+          }
           local no_capture = string.find{ text = "abc", pattern = "b" }
           debug.assert{
             value = no_capture.captures.n == 1 and no_capture.captures[1] == "b",
@@ -3098,10 +3720,16 @@ mod tests {
           local iterator = string.gmatch{ text = "a1 b2", pattern = "(%a)(%d)" }
           local first = iterator()
           local second = iterator()
+          local unicode_iterator = string.gmatch{ text = "甲乙丙", pattern = "." }
+          local unicode_first = unicode_iterator()
+          local unicode_second = unicode_iterator()
+          local unicode_third = unicode_iterator()
           debug.assert{
             value = first.n == 2 and first[1] == "a" and first[2] == "1"
               and second.n == 2 and second[1] == "b" and second[2] == "2"
-              and iterator() == nil,
+              and iterator() == nil and unicode_first[1] == "甲"
+              and unicode_second[1] == "乙" and unicode_third[1] == "丙"
+              and unicode_iterator() == nil,
           }
           local iterated = ""
           for item in string.gmatch{ text = "a1 b2", pattern = "(%a)(%d)" } do
@@ -3158,6 +3786,16 @@ mod tests {
           }
           debug.assert{ value = regex_replaced.result == "1a 2b" and regex_replaced.count == 2 }
           debug.assert{ value = string.regex_test{ text = "abc", pattern = "^a" } }
+          debug.assert{
+            value = string.regex_find{ text = "ba", pattern = "^a", init = 2 } == nil
+              and string.regex_match{ text = "ba", pattern = "^a", init = 2 } == nil,
+          }
+          local many_regex_captures = string.rep{ text = "()", times = 33 }
+          debug.assert{
+            value = fails(function()
+              string.regex_match{ text = "a", pattern = many_regex_captures .. "a" }
+            end),
+          }
           debug.assert{ value = string.regex_escape("[a-z]") == "\\[a\\-z\\]" }
           local regex_parts = string.regex_split{ text = "a, b;c", pattern = "[,;]\\s*" }
           debug.assert{ value = #regex_parts == 3 and regex_parts[2] == "b" }
@@ -3185,12 +3823,63 @@ mod tests {
             } == "a   |+2|0xff|1.25|%",
           }
           debug.assert{
+            value = string.format{ format_string = "%.3g", values = { 12345 } } == "1.23e+04"
+              and string.format{ format_string = "%.3g", values = { 12.5 } } == "12.5"
+              and string.format{ format_string = "%.3g", values = { 0.0000125 } } == "1.25e-05"
+              and string.format{ format_string = "%.3g", values = { 999.9 } } == "1e+03"
+              and string.format{ format_string = "%.3g", values = { 0.00009999 } } == "0.0001"
+              and string.format{ format_string = "%#.3g", values = { 12.0 } } == "12.0"
+              and string.format{ format_string = "%.2e", values = { 12.5 } } == "1.25e+01"
+              and string.format{ format_string = "%.2E", values = { 12.5 } } == "1.25E+01",
+          }
+          debug.assert{
+            value = string.format{ format_string = "%.100s", values = { "甲乙丙" } } == "甲乙丙"
+              and string.format{ format_string = "%.2s", values = { "甲乙丙" } } == "甲乙"
+              and string.format{ format_string = "%5s", values = { "甲" } } == "    甲",
+          }
+          debug.assert{
+            value = string.format{ format_string = "%q", values = { "a\0b" } } == "\"a\\0b\""
+              and string.format{ format_string = "%q", values = { "\0" .. "2" } }
+                == "\"\\0002\""
+              and string.format{ format_string = "%q", values = { "\1" .. "2" } }
+                == "\"\\0012\""
+              and string.format{ format_string = "%q", values = { "a\nb" } }
+                == "\"a\\\nb\""
+              and string.format{ format_string = "%q", values = { "\t\b\r" } }
+                == "\"\\9\\8\\13\""
+              and string.format{ format_string = "%q", values = { "\"\\" } }
+                == "\"\\\"\\\\\""
+              and string.format{ format_string = "%c", values = { 0x4f60 } } == "你",
+          }
+          local fixed_infinity = string.format{ format_string = "%f", values = { 1 / 0 } }
+          debug.assert{ value = fixed_infinity == "inf", message = "fixed infinity: " .. fixed_infinity }
+          local fixed_nan = string.format{ format_string = "%f", values = { 0 / 0 } }
+          debug.assert{ value = fixed_nan == "nan", message = "fixed NaN: " .. fixed_nan }
+          local fixed_negative_nan = string.format{ format_string = "%f", values = { -(0 / 0) } }
+          debug.assert{
+            value = fixed_negative_nan == "nan",
+            message = "fixed negative NaN: " .. fixed_negative_nan,
+          }
+          local fixed_negative_infinity = string.format{ format_string = "%+f", values = { -1 / 0 } }
+          debug.assert{
+            value = fixed_negative_infinity == "-inf",
+            message = "fixed negative infinity: " .. fixed_negative_infinity,
+          }
+          debug.assert{
             value = string.format{ format_string = "plain", values = {} } == "plain",
           }
           debug.assert{
             value = not debug.pcall{
               func = function() string.format{ format_string = "plain" } end,
             }.ok,
+          }
+          debug.assert{
+            value = fails(function()
+              string.format{
+                format_string = "%1048576sX",
+                values = { "x" },
+              }
+            end),
           }
         end
       "#,
@@ -3215,63 +3904,59 @@ mod tests {
             return not debug.pcall{ func = func }.ok
           end
 
-          local joined = table.concat{
-            table = { 1, "二", 3 }, sep = "|", start = 1, finish = 3,
-          }
+          local joined = table.concat({ 1, "二", 3 }, "|", 1, 3)
           debug.assert{ value = joined == "1|二|3" }
           debug.assert{
             value = fails(function()
-              table.concat{ table = { 1, 2 }, separator = "," }
+              table.concat({ 1, true }, ",")
             end),
           }
 
           local inserted = { "a", "c" }
-          table.insert{ table = inserted, position = 2, value = "b" }
-          table.insert{ table = inserted, value = "d" }
+          table.insert(inserted, 2, "b")
+          table.insert(inserted, "d")
           debug.assert{
             value = inserted[1] == "a" and inserted[2] == "b"
               and inserted[3] == "c" and inserted[4] == "d",
           }
-          local removed = table.remove{ table = inserted, position = 2 }
+          local removed = table.remove(inserted, 2)
           debug.assert{
             value = removed == "b" and #inserted == 3 and inserted[2] == "c",
           }
 
           local moved = { 1, 2, 3, 4 }
-          local moved_result = table.move{
-            source = moved, start = 1, finish = 3, target_index = 2,
-          }
+          local moved_result = table.move(moved, 1, 3, 2)
           debug.assert{
             value = moved_result == moved and moved[1] == 1 and moved[2] == 1
               and moved[3] == 2 and moved[4] == 3,
           }
           local target = {}
           debug.assert{
-            value = table.move{
-              source = moved, start = 2, finish = 3, target_index = 1, target = target,
-            } == target and target[1] == 1 and target[2] == 2,
+            value = table.move(moved, 2, 3, 1, target) == target
+              and target[1] == 1 and target[2] == 2,
           }
           debug.assert{
             value = fails(function()
-              table.move{
-                source = {}, start = 0, finish = 1, target_index = 9223372036854775807,
-              }
+              table.move({}, 0, 1, 9223372036854775807)
             end),
           }
+          debug.assert{
+            value = fails(function() table.move({}, 1, 16385, 1) end)
+              and fails(function() table.concat({}, ",", 1, 16385) end)
+              and fails(function() table.unpack({}, 1, 16385) end),
+          }
 
-          local packed = table.pack{ values = { [1] = "a", [3] = "c", n = 3 } }
+          local packed = table.pack("a", nil, "c")
           debug.assert{
             value = packed.n == 3 and packed[1] == "a"
               and packed[2] == nil and packed[3] == "c",
           }
-          local directly_packed = table.pack{ "x", nil, "z", n = 3 }
+          local directly_packed = table.pack("x", nil, "z")
           debug.assert{
             value = directly_packed.n == 3 and directly_packed[1] == "x"
               and directly_packed[2] == nil and directly_packed[3] == "z",
           }
-          local first, second, third = table.unpack{
-            table = packed, start = 1, finish = packed.n,
-          }
+          local first, second, third = table.unpack(packed, 1, packed.n)
           debug.assert{ value = first == "a" and second == nil and third == "c" }
 
           local sparse = {
@@ -3309,13 +3994,13 @@ mod tests {
           }
 
           local sortable = { 3, 1, 2 }
-          table.sort{ table = sortable }
+          table.sort(sortable)
           debug.assert{ value = sortable[1] == 1 and sortable[2] == 2 and sortable[3] == 3 }
-          table.sort{
-            table = sortable,
-            comparator = function(left, right) return left > right end,
-          }
+          table.sort(sortable, function(left, right) return left > right end)
           debug.assert{ value = sortable[1] == 3 and sortable[2] == 2 and sortable[3] == 1 }
+          local oversized = {}
+          for index = 1, 4097 do oversized[index] = index end
+          debug.assert{ value = fails(function() table.sort(oversized) end) }
 
           local child = { value = 7 }
           local original = { child = child, alias = child, callback = function() end }
@@ -3425,6 +4110,7 @@ mod tests {
             value = from_start.position == 1 and from_start.codepoint == 65
               and after_first.position == 2 and after_first.codepoint == 20320
               and after_second.position == 5 and after_second.codepoint == 66
+              and utf8.next{ text = "A你B", pos = 3 }.position == 5
               and utf8.next{ text = "A你B", pos = 5 } == nil,
           }
           debug.assert{
@@ -3515,6 +4201,7 @@ mod tests {
 
           debug.assert{ value = math.max{ 1, 5, 3 } == 5 }
           debug.assert{ value = math.min{ values = { 1, -2, 3 } } == -2 }
+          debug.assert{ value = math.max{ values = table.pack(4, -2, 7) } == 7 }
           local parts = math.modf(3.14)
           debug.assert{
             value = parts.integer_part == 3
@@ -3551,6 +4238,8 @@ mod tests {
           debug.assert{ value = fails(function() math.asin(2) end) }
           debug.assert{ value = fails(function() math.max{} end) }
           debug.assert{ value = fails(function() math.max{ values = { [1] = 1, [3] = 3, n = 3 } } end) }
+          debug.assert{ value = fails(function() math.max{ values = { 1, 2, n = 1 } } end) }
+          debug.assert{ value = fails(function() math.max{ values = { 1, n = "2" } } end) }
           debug.assert{ value = fails(function() math.modf(1e20) end) }
           debug.assert{ value = fails(function() math.approx_equal{ left = math.INFINITE, right = 1 } end) }
           debug.assert{ value = fails(function() math.approx_equal{ left = 1, right = 1, epsilon = -1 } end) }
@@ -3693,7 +4382,6 @@ mod tests {
       LuaPolicy::default(),
       LuaApiConfig {
         debug_enabled: true,
-        safe_mode_enabled: false,
         key_actions: HashMap::new(),
         key_default_actions: HashMap::new(),
         ..LuaApiConfig::default()
@@ -3716,7 +4404,7 @@ mod tests {
   }
 
   #[test]
-  fn event_action_controls_require_an_unrestricted_game_session() {
+  fn event_action_controls_require_a_game_session() {
     let source = valid_script(
       r#"
         function Init(ctx)
@@ -3725,20 +4413,17 @@ mod tests {
         end
       "#,
     );
-    let load = |session_kind, safe_mode_enabled| {
+    let load = |session_kind| {
       let mut session = LuaSession::load_with_api(
         spec(&source, session_kind),
         LuaPolicy::default(),
-        LuaApiConfig {
-          safe_mode_enabled,
-          ..LuaApiConfig::default()
-        },
+        LuaApiConfig::default(),
       )
       .unwrap();
       session.take_host_commands()
     };
 
-    let permitted = load(LuaSessionKind::Game, false);
+    let permitted = load(LuaSessionKind::Game);
     assert!(
       permitted
         .iter()
@@ -3750,11 +4435,7 @@ mod tests {
         .any(|command| matches!(command, LuaHostCommand::ClearActions))
     );
 
-    for commands in [
-      load(LuaSessionKind::Game, true),
-      load(LuaSessionKind::Screensaver, false),
-      load(LuaSessionKind::Screensaver, true),
-    ] {
+    for commands in [load(LuaSessionKind::Screensaver)] {
       assert!(!commands.iter().any(|command| matches!(
         command,
         LuaHostCommand::SkipActions | LuaHostCommand::ClearActions
@@ -3833,10 +4514,7 @@ mod tests {
         save_best_enabled: false,
       },
       LuaPolicy::default(),
-      LuaApiConfig {
-        safe_mode_enabled: false,
-        ..LuaApiConfig::default()
-      },
+      LuaApiConfig::default(),
     )
     .unwrap();
 
@@ -3920,12 +4598,13 @@ mod tests {
   }
 
   #[test]
-  fn safe_mode_lab_exercises_debug_logging_and_file_write_permissions() {
-    let package_root =
-      PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..").join("test_package/game/safe_mode_lab");
+  fn game_file_access_and_debug_logging_are_independently_gated() {
+    let package_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .join("../../..")
+      .join("test_package/game/permissions_lab");
     let entry_path = package_root.join("scripts/main.lua");
     let make_spec = || LuaSessionSpec {
-      package_id: "test.safe_mode_lab".to_string(),
+      package_id: "test.permissions_lab".to_string(),
       session_kind: LuaSessionKind::Game,
       entry_path: entry_path.clone(),
       fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
@@ -3947,22 +4626,23 @@ mod tests {
       },
     };
 
-    let mut restricted =
+    let mut game_without_debug =
       LuaSession::load_with_api(make_spec(), LuaPolicy::default(), LuaApiConfig::default())
         .unwrap();
-    restricted.handle_event(&action).unwrap();
-    let restricted_commands = restricted.take_host_commands();
-    assert!(restricted_commands.iter().any(|command| matches!(
+    game_without_debug.handle_event(&action).unwrap();
+    let game_commands = game_without_debug.take_host_commands();
+    assert!(game_commands.iter().any(|command| matches!(
       command,
-      LuaHostCommand::Ignored {
-        method: "file.write",
+      LuaHostCommand::FileRequest {
+        operation: LuaFileOperation::WriteText,
+        virtual_path,
         ..
-      }
+      } if virtual_path == "state/probe.log"
     )));
     assert!(
-      !restricted_commands
+      !game_commands
         .iter()
-        .any(|command| matches!(command, LuaHostCommand::FileRequest { .. }))
+        .any(|command| matches!(command, LuaHostCommand::Print { .. }))
     );
 
     let mut permitted = LuaSession::load_with_api(
@@ -3970,7 +4650,6 @@ mod tests {
       LuaPolicy::default(),
       LuaApiConfig {
         debug_enabled: true,
-        safe_mode_enabled: false,
         ..LuaApiConfig::default()
       },
     )
@@ -3998,10 +4677,17 @@ mod tests {
       r#"
         private_state = "main-only"
         function Init(ctx)
+          debug.assert{
+            value = _ENV ~= nil and _G == nil and rawget(_ENV, "_G") == nil
+              and rawget(_ENV, "base") == base and rawget(_ENV, "rawget") == rawget
+              and load == nil and rawget(_ENV, "package") == nil
+              and debug.getregistry == nil,
+          }
           local first, first_gap, first_tail = loader.require("cached")
           local second, second_gap, second_tail = loader.require{ path = "./cached.lua" }
           debug.assert{
-            value = first == second and first.count == 1 and first.leaked == "main-only",
+            value = first == second and first.count == 1 and first.leaked == "main-only"
+              and first.sandboxed and first.global_hidden,
           }
           debug.assert{
             value = first_gap == nil and second_gap == nil and first_tail == 3 and second_tail == 3,
@@ -4052,7 +4738,7 @@ mod tests {
     let scripts_root = session_spec.entry_path.parent().unwrap();
     fs::write(
       scripts_root.join("cached.lua"),
-      "required_count = (required_count or 0) + 1\nreturn { count = required_count, leaked = private_state }, nil, 3",
+      "required_count = (required_count or 0) + 1\nreturn { count = required_count, leaked = private_state, sandboxed = _ENV ~= nil and _G == nil and debug.getregistry == nil, global_hidden = load == nil and package == nil }, nil, 3",
     )
     .unwrap();
     fs::write(
@@ -4363,13 +5049,13 @@ mod tests {
         function Render()
           local x = 0
           local y = 0
-          for item in ipairs(char.ASCII) do
+          for _, item in ipairs(char.ASCII) do
             x = x + 1
             if x > 20 then
               x = 1
               y = y + 1
             end
-            draw.text{ x = x, y = y, text = item.value }
+            draw.text{ x = x, y = y, text = item }
           end
         end
       "#,
@@ -4810,7 +5496,14 @@ mod tests {
   #[test]
   fn memory_limit_faults_only_the_current_session() {
     let source = valid_script(
-      "function Update(dt) local value = string.rep{ text = 'x', times = 1024 * 1024 } end",
+      r#"
+        function Update(dt)
+          debug.pcall{ func = function()
+            local values = {}
+            while true do values[#values + 1] = {} end
+          end }
+        end
+      "#,
     );
     let mut session =
       LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
@@ -4821,5 +5514,12 @@ mod tests {
     let error = session.update().unwrap_err();
     assert_eq!(error.stage, LuaErrorStage::MemoryLimit);
     assert_eq!(session.state(), LuaSessionState::Faulted);
+
+    let mut healthy_session = LuaSession::load(
+      spec(&valid_script(""), LuaSessionKind::Game),
+      LuaPolicy::default(),
+    )
+    .unwrap();
+    healthy_session.update().unwrap();
   }
 }

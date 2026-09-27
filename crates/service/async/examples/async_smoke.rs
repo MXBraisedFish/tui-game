@@ -42,7 +42,13 @@ fn main() {
     events.extend(runtime.poll_events());
     std::thread::sleep(Duration::from_millis(5));
   }
-  assert_eq!(events, [Event::Answer(42), Event::Status(TaskStatusEvent::Finished { id })]);
+  assert_eq!(
+    events,
+    [
+      Event::Answer(42),
+      Event::Status(TaskStatusEvent::Finished { id })
+    ]
+  );
   assert_eq!(runtime.task_state(id), Some(TaskState::Finished));
   println!("async ok: {events:?}");
 }

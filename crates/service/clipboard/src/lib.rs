@@ -75,6 +75,9 @@ mod tests {
     let mut clipboard = ClipboardService::unavailable();
     assert_eq!(clipboard.read_text(), None);
     assert!(!clipboard.write_text("text"));
-    assert_eq!(clipboard.last_error.as_deref(), Some("Clipboard not available"));
+    assert_eq!(
+      clipboard.last_error.as_deref(),
+      Some("Clipboard not available")
+    );
   }
 }

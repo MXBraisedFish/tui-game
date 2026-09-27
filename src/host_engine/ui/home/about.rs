@@ -40,7 +40,7 @@ const PLAYER_BORDER: TextColor = TextColor::Rgb {
   b: 215,
 };
 
-/// About 页临时音频播放器，用于验证宿主音频服务。
+/// Temporary audio player on the About page, used to verify the host audio service.
 pub struct InputDemoUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,

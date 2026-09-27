@@ -44,10 +44,10 @@ impl TextInputService {
           }
         }
         'x' => {
-          if let Some(text) = state.buffer.selected_text().map(str::to_string) {
-            if clipboard.write_text(&text) {
-              changed = state.buffer.delete_selection();
-            }
+          if let Some(text) = state.buffer.selected_text().map(str::to_string)
+            && clipboard.write_text(&text)
+          {
+            changed = state.buffer.delete_selection();
           }
         }
         'v' => {

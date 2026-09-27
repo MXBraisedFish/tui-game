@@ -11,8 +11,6 @@ use std::{
   time::Duration,
 };
 
-use crossbeam_channel::Sender;
-
 use tg_service_async::EventSink;
 
 pub use pool::AudioObjectPool;

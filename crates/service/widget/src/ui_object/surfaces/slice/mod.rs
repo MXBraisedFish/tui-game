@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use crate::SurfaceId;
 use crate::UiObjectPool;
 use tg_core_style::TextColor;
 use tg_service_layout::{LayoutService, Rect, Size};
-use crate::SurfaceId;
 
 pub use tg_service_canvas::SliceId;
 
@@ -77,6 +77,7 @@ impl SliceObjects {
 }
 
 /// 切片服务，管理视口子区域的分割与层级排序
+#[derive(Default)]
 pub struct SliceService;
 
 impl SliceService {
@@ -204,12 +205,7 @@ impl SliceService {
   }
 
   /// 将切片设置为必须逐帧显式提交后才可见。
-  pub fn set_frame_scoped(
-    &self,
-    pool: &mut UiObjectPool,
-    id: SliceId,
-    frame_scoped: bool,
-  ) -> bool {
+  pub fn set_frame_scoped(&self, pool: &mut UiObjectPool, id: SliceId, frame_scoped: bool) -> bool {
     let Some(state) = pool.slices.slices.get_mut(&id) else {
       return false;
     };
@@ -591,9 +587,7 @@ mod tests {
       .create(
         &mut pool,
         SliceOptions {
-          background: Some(TextColor::Terminal(
-            tg_core_style::TerminalColor::Blue,
-          )),
+          background: Some(TextColor::Terminal(tg_core_style::TerminalColor::Blue)),
           ..Default::default()
         },
       )

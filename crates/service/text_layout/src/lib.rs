@@ -304,9 +304,7 @@ fn layout_tokens(
     lines.push(current);
   }
 
-  if overflow
-    && let Some(line) = lines.last_mut()
-  {
+  if overflow && let Some(line) = lines.last_mut() {
     apply_overflow_marker(
       line,
       params.overflow_marker.as_deref(),

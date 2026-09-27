@@ -1529,9 +1529,9 @@ impl GameKeyBindingsUi {
           render.draw_filled_rect_in_scroll_box(
             canvas,
             self.right_scroll,
-            columns[slot + 1].0.saturating_add(3),
+            columns[slot + 1].0.saturating_add(1),
             y,
-            columns[slot + 1].1.saturating_sub(6),
+            columns[slot + 1].1.saturating_sub(2),
             1,
             Some(" ".into()),
             None,
@@ -2103,8 +2103,8 @@ fn draw_scroll_centered(
   fg: TextColor,
   bg: Option<TextColor>,
 ) {
-  let inner_x = column.0.saturating_add(3);
-  let inner_w = column.1.saturating_sub(6);
+  let inner_x = column.0.saturating_add(1);
+  let inner_w = column.1.saturating_sub(2);
   let text_w = layout.get_text_width(text, None).min(inner_w);
   render.draw_text_in_scroll_box(
     canvas,
@@ -2293,7 +2293,7 @@ mod tests {
       rows: vec![GameBindingRow {
         action: "jump".into(),
         description: "Jump".into(),
-        keys: vec![vec!["space".into()]],
+        keys: vec![vec!["left_ctrl".into(), "x".into()]],
         locked: false,
         priority: 0,
       }],
@@ -2302,12 +2302,12 @@ mod tests {
     ui.selected_action = Some("jump".into());
 
     let mut layout = LayoutService::new();
-    layout.resize_physical(120, 40);
+    layout.resize_physical(80, 30);
     layout.set_developer_viewport(Rect {
       x: 0,
       y: 0,
-      width: 120,
-      height: 40,
+      width: 80,
+      height: 30,
     });
     let i18n = I18nService::new();
     ui.prepare_surfaces(&layout, &i18n, &text_input, &scroll_box);
@@ -2335,6 +2335,9 @@ mod tests {
 
     assert!(rendered.contains("Sample Game"));
     assert!(rendered.contains("Jump"));
+    assert!(rendered.contains(&format_key_display(&[
+      vec!["left_ctrl".into(), "x".into(),]
+    ])));
   }
 
   #[test]
@@ -2345,11 +2348,11 @@ mod tests {
     let mut ui = GameKeyBindingsUi::init(&hit_area, &text_input, &scroll_box);
     ui.profile.default.games.insert(
       "sample".into(),
-      BTreeMap::from([("jump".into(), vec![vec!["space".into()]])]),
+      BTreeMap::from([("jump".into(), vec![vec!["right_shift".into(), "k".into()]])]),
     );
     ui.profile.user.games.insert(
       "sample".into(),
-      BTreeMap::from([("jump".into(), vec![vec!["j".into()]])]),
+      BTreeMap::from([("jump".into(), vec![vec!["left_ctrl".into(), "j".into()]])]),
     );
     let game = GameBindingEntry {
       id: "sample".into(),
@@ -2359,11 +2362,18 @@ mod tests {
     let row = GameBindingRow {
       action: "jump".into(),
       description: "f%{key:jump}/{key_default:jump} Jump".into(),
-      keys: vec![vec!["j".into()]],
+      keys: vec![vec!["left_ctrl".into(), "j".into()]],
       locked: false,
       priority: 0,
     };
 
-    assert_eq!(ui.visible_description(&game, &row), "[J]/[Space] Jump");
+    assert_eq!(
+      ui.visible_description(&game, &row),
+      format!(
+        "{}/{} Jump",
+        format_key_display(&[vec!["left_ctrl".into(), "j".into()]]),
+        format_key_display(&[vec!["right_shift".into(), "k".into()]])
+      )
+    );
   }
 }

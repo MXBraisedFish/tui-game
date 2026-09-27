@@ -3,23 +3,21 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Rect, RenderService,
-  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, SafeModeDefault, UiEvent,
-  UiObjectPool, UiObjectPoolOwner,
+  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiEvent, UiObjectPool,
+  UiObjectPoolOwner,
 };
 
 const NS: &str = "security_settings";
-const MENU_LEN: usize = 8;
-const ROW_LEN: usize = 8;
-const DEFAULT_START: usize = 5;
+const MENU_LEN: usize = 6;
+const ROW_LEN: usize = 6;
+const DEFAULT_START: usize = 4;
 const LABEL_KEYS: [&str; ROW_LEN] = [
   "security_settings.security_details",
   "security_settings.reset_terminal",
   "security_settings.mod.reset.status",
   "security_settings.mod.reset.debug",
-  "security_settings.mod.reset.safe_mode",
   "security_settings.mod.default.status",
   "security_settings.mod.default.debug",
-  "security_settings.mod.default.safe_mode",
 ];
 pub struct SecuritySettingsUi {
   selected_index: usize,
@@ -29,7 +27,6 @@ pub struct SecuritySettingsUi {
   menu_areas: [HitAreaId; MENU_LEN],
   default_enabled: bool,
   default_debug: bool,
-  default_safe_mode: SafeModeDefault,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,10 +36,8 @@ pub enum SecuritySettingsCommand {
   ResetTerminal,
   ResetStatus,
   ResetDebug,
-  ResetSafeMode,
   SetDefaultStatus(bool),
   SetDefaultDebug(bool),
-  SetDefaultSafeMode(SafeModeDefault),
 }
 
 impl UiObjectPoolOwner for SecuritySettingsUi {
@@ -72,7 +67,6 @@ impl SecuritySettingsUi {
       menu_areas: std::array::from_fn(|_| hit_area.create(&mut objects, HitAreaOptions::default())),
       default_enabled: true,
       default_debug: false,
-      default_safe_mode: SafeModeDefault::On,
       objects,
       runtime_objects: RuntimeObjectPool::new(),
     }
@@ -109,24 +103,14 @@ impl SecuritySettingsUi {
         "Focus package debug reset",
       ),
       action(
-        "security_settings.focus_reset_safe_mode",
-        "5",
-        "Focus package safe mode reset",
-      ),
-      action(
         "security_settings.focus_default_status",
-        "6",
+        "5",
         "Focus default package status",
       ),
       action(
         "security_settings.focus_default_debug",
-        "7",
+        "6",
         "Focus default package debug",
-      ),
-      action(
-        "security_settings.focus_default_safe_mode",
-        "8",
-        "Focus default package safe mode",
       ),
     ]
   }
@@ -164,10 +148,8 @@ impl SecuritySettingsUi {
         "security_settings.focus_reset_terminal" => self.focus(1),
         "security_settings.focus_reset_status" => self.focus(2),
         "security_settings.focus_reset_debug" => self.focus(3),
-        "security_settings.focus_reset_safe_mode" => self.focus(4),
-        "security_settings.focus_default_status" => self.focus(5),
-        "security_settings.focus_default_debug" => self.focus(6),
-        "security_settings.focus_default_safe_mode" => self.focus(7),
+        "security_settings.focus_default_status" => self.focus(4),
+        "security_settings.focus_default_debug" => self.focus(5),
         _ => None,
       },
       _ => None,
@@ -181,10 +163,9 @@ impl SecuritySettingsUi {
     None
   }
 
-  pub fn set_defaults(&mut self, enabled: bool, debug: bool, safe_mode: SafeModeDefault) {
+  pub fn set_defaults(&mut self, enabled: bool, debug: bool) {
     self.default_enabled = enabled;
     self.default_debug = debug;
-    self.default_safe_mode = safe_mode;
   }
 
   pub fn render(
@@ -284,13 +265,8 @@ impl SecuritySettingsUi {
       1 => SecuritySettingsCommand::ResetTerminal,
       2 => SecuritySettingsCommand::ResetStatus,
       3 => SecuritySettingsCommand::ResetDebug,
-      4 => SecuritySettingsCommand::ResetSafeMode,
-      5 => SecuritySettingsCommand::SetDefaultStatus(!self.default_enabled),
-      6 => SecuritySettingsCommand::SetDefaultDebug(!self.default_debug),
-      _ => SecuritySettingsCommand::SetDefaultSafeMode(match self.default_safe_mode {
-        SafeModeDefault::On => SafeModeDefault::OffPermanent,
-        SafeModeDefault::OffPermanent => SafeModeDefault::On,
-      }),
+      4 => SecuritySettingsCommand::SetDefaultStatus(!self.default_enabled),
+      _ => SecuritySettingsCommand::SetDefaultDebug(!self.default_debug),
     })
   }
 
@@ -356,14 +332,10 @@ impl SecuritySettingsUi {
 
   fn value_key(&self, index: usize) -> Option<&'static str> {
     match index {
-      5 if self.default_enabled => Some("security_settings.reset.status.on"),
-      5 => Some("security_settings.reset.status.off"),
-      6 if self.default_debug => Some("security_settings.reset.debug.on"),
-      6 => Some("security_settings.reset.debug.off"),
-      7 => Some(match self.default_safe_mode {
-        SafeModeDefault::On => "security_settings.reset.safe_mode.on",
-        SafeModeDefault::OffPermanent => "security_settings.reset.safe_mode.off",
-      }),
+      4 if self.default_enabled => Some("security_settings.reset.status.on"),
+      4 => Some("security_settings.reset.status.off"),
+      5 if self.default_debug => Some("security_settings.reset.debug.on"),
+      5 => Some("security_settings.reset.debug.off"),
       _ => None,
     }
   }
@@ -387,10 +359,9 @@ impl SecuritySettingsUi {
 fn value_color(key: &str) -> &'static str {
   match key {
     "security_settings.reset.status.off" => "bright_red",
-    "security_settings.reset.status.on" | "security_settings.reset.safe_mode.on" => "bright_green",
+    "security_settings.reset.status.on" => "bright_green",
     "security_settings.reset.debug.on" => "bright_magenta",
     "security_settings.reset.debug.off" => "rgb(85,87,83)",
-    "security_settings.reset.safe_mode.off" => "bright_red",
     _ => "white",
   }
 }
@@ -410,22 +381,15 @@ mod tests {
   #[test]
   fn default_options_are_focusable_and_emit_switch_commands() {
     let mut ui = SecuritySettingsUi::init(&HitAreaService::new());
-    ui.selected_index = 5;
+    ui.selected_index = 4;
     assert_eq!(
       ui.confirm_selected(),
       Some(SecuritySettingsCommand::SetDefaultStatus(false))
     );
-    ui.selected_index = 6;
+    ui.selected_index = 5;
     assert_eq!(
       ui.confirm_selected(),
       Some(SecuritySettingsCommand::SetDefaultDebug(true))
-    );
-    ui.selected_index = 7;
-    assert_eq!(
-      ui.confirm_selected(),
-      Some(SecuritySettingsCommand::SetDefaultSafeMode(
-        SafeModeDefault::OffPermanent
-      ))
     );
   }
 }

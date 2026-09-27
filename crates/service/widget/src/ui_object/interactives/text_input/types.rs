@@ -1,8 +1,8 @@
 pub use tg_service_text_layout::TextAlign;
 
+use crate::SliceId;
 use tg_core_style::{TextColor, TextStyle};
 use tg_service_layout::Rect;
-use crate::SliceId;
 
 /// 文本输入组件的唯一标识符。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

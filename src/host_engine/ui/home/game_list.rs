@@ -1,13 +1,13 @@
-use std::{cmp::Ordering, collections::HashSet, time::Duration};
+use std::{cmp::Ordering, time::Duration};
 
 use unicode_width::UnicodeWidthStr;
 
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DisplaySourceMode, DrawTextParams, HitAreaEvent,
-  HitAreaId, HitAreaOptions, HitAreaService, I18nService, ImageService, KeyState, LayoutService,
-  LogService, MouseButton, Overflow, PackageId, PackageListEntry, PackageService, PackageSource,
-  Rect, RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
+  HitAreaId, HitAreaOptions, HitAreaService, I18nService, KeyState, LayoutService, LogService,
+  MouseButton, Overflow, PackageId, PackageListEntry, PackageService, PackageSource, Rect,
+  RenderService, RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner,
   ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility,
   StorageService, TerminalColor, TextAlign, TextColor, TextInputCursorShape, TextInputEvent,
   TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams, TextInputService, TextStyle,
@@ -52,6 +52,21 @@ pub(crate) struct GameListLayout {
   pub total_page_x: u16,
   pub hint_x: u16,
   pub hint_y: u16,
+}
+
+pub(crate) struct GameListRenderContext<'a> {
+  pub(crate) render: &'a mut RenderService,
+  pub(crate) canvas: &'a mut CanvasService,
+  pub(crate) layout: &'a LayoutService,
+  pub(crate) i18n: &'a I18nService,
+  pub(crate) hit_area: &'a HitAreaService,
+  pub(crate) text_input: &'a TextInputService,
+  pub(crate) scroll_box: &'a ScrollBoxService,
+  pub(crate) package: &'a PackageService,
+  pub(crate) storage: &'a StorageService,
+  pub(crate) log: &'a mut LogService,
+  pub(crate) mouse_supported: bool,
+  pub(crate) truecolor_supported: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,7 +122,6 @@ pub struct GameListUi {
   simple_list: bool,
   source_mode: DisplaySourceMode,
   show_warnings: bool,
-  temporary_safe_mode_disabled: HashSet<PackageId>,
   needs_rebuild_areas: bool,
 }
 
@@ -206,7 +220,6 @@ impl GameListUi {
       simple_list: false,
       source_mode: DisplaySourceMode::All,
       show_warnings: true,
-      temporary_safe_mode_disabled: HashSet::new(),
       needs_rebuild_areas: true,
     }
   }
@@ -439,115 +452,91 @@ impl GameListUi {
   }
 
   /// 渲染游戏列表页面。
-  pub fn render(
-    &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    hit_area: &HitAreaService,
-    text_input: &TextInputService,
-    scroll_box: &ScrollBoxService,
-    package: &PackageService,
-    storage: &StorageService,
-    log: &mut LogService,
-    temporary_safe_mode_disabled: &HashSet<PackageId>,
-    image: &mut ImageService,
-    mouse_supported: bool,
-    truecolor_supported: bool,
-  ) {
-    self.sync_display_settings(storage);
-    self.sync_entries(
-      package.game_list(),
-      storage,
-      log,
-      temporary_safe_mode_disabled,
-    );
-    let positions = self.compute_positions(layout, i18n, text_input);
+  pub fn render(&mut self, context: &mut GameListRenderContext<'_>) {
+    self.sync_display_settings(context.storage);
+    self.sync_entries(context.package.game_list(), context.storage, context.log);
+    let positions = self.compute_positions(context.layout, context.i18n, context.text_input);
 
     self.sync_selection_for_per_page(positions.visible_items);
 
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.page_area,
-      layout.developer_viewport_rect(),
-      canvas,
+      context.layout.developer_viewport_rect(),
+      context.canvas,
     );
 
-    let viewport = layout.developer_viewport_rect();
+    let viewport = context.layout.developer_viewport_rect();
     let info_scroll_rect = Rect {
       x: positions.right_inner.x.saturating_sub(viewport.x),
       y: positions.right_inner.y.saturating_sub(viewport.y),
       width: positions.right_inner.width,
       height: positions.right_inner.height,
     };
-    scroll_box.set_rect(
+    context.scroll_box.set_rect(
       &mut self.objects,
       self.info_scroll,
       info_scroll_rect,
-      layout,
+      context.layout,
     );
     let info_content_height = self.info_content_height(
-      layout,
-      i18n,
+      context.layout,
+      context.i18n,
       positions.right_inner.width,
-      mouse_supported,
-      truecolor_supported,
+      context.mouse_supported,
+      context.truecolor_supported,
     );
-    scroll_box.set_content_size(
+    context.scroll_box.set_content_size(
       &mut self.objects,
       self.info_scroll,
       positions.right_inner.width.max(1),
       info_content_height,
-      layout,
+      context.layout,
     );
-    self.objects.prepare_canvas(canvas, layout);
+    self.objects.prepare_canvas(context.canvas, context.layout);
 
-    self.draw_right_panel(
-      render,
-      canvas,
-      layout,
-      i18n,
-      image,
-      mouse_supported,
-      truecolor_supported,
+    self.draw_right_panel(context, &positions);
+    self.draw_left_panel(context, &positions);
+    self.draw_action_hint(
+      context.render,
+      context.canvas,
+      context.i18n,
+      context.text_input,
       &positions,
     );
-    self.draw_left_panel(render, canvas, layout, i18n, image, &positions, text_input);
-    self.draw_action_hint(render, canvas, i18n, text_input, &positions);
 
     if self.page > 1 {
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         self.flip_forward_area,
         positions.flip_forward_rect,
-        canvas,
+        context.canvas,
       );
     }
     if self.page < self.total_pages() {
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         self.flip_backward_area,
         positions.flip_backward_rect,
-        canvas,
+        context.canvas,
       );
     }
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.order_area,
       positions.order_rect,
-      canvas,
+      context.canvas,
     );
-    hit_area.render_host(
+    context.hit_area.render_host(
       &mut self.objects,
       self.sort_area,
       positions.sort_rect,
-      canvas,
+      context.canvas,
     );
 
     let entries_len = self.page_entries().len();
     if self.needs_rebuild_areas || self.list_item_areas.len() != entries_len {
-      self.rebuild_list_areas(hit_area);
+      self.rebuild_list_areas(context.hit_area);
       self.needs_rebuild_areas = false;
     }
 
@@ -558,7 +547,7 @@ impl GameListUi {
       let item_y = positions
         .list_start_y
         .saturating_add(i as u16 * (positions.list_item_height + positions.list_item_gap));
-      hit_area.render_host(
+      context.hit_area.render_host(
         &mut self.objects,
         *area_id,
         Rect {
@@ -567,7 +556,7 @@ impl GameListUi {
           width: positions.left_inner.width,
           height: positions.list_item_height,
         },
-        canvas,
+        context.canvas,
       );
     }
   }
@@ -724,18 +713,9 @@ impl GameListUi {
 
   // ─── 绘制 ──────────────────────────────────────────────
 
-  fn draw_left_panel(
-    &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    _image: &mut ImageService,
-    pos: &GameListLayout,
-    text_input: &TextInputService,
-  ) {
-    render.draw_host_border_rect(
-      canvas,
+  fn draw_left_panel(&mut self, context: &mut GameListRenderContext<'_>, pos: &GameListLayout) {
+    context.render.draw_host_border_rect(
+      context.canvas,
       pos.left_rect.x,
       pos.left_rect.y,
       pos.left_rect.width,
@@ -747,18 +727,20 @@ impl GameListUi {
       None,
     );
     self.draw_panel_title(
-      render,
-      canvas,
+      context.render,
+      context.canvas,
       pos.left_rect,
-      &i18n.get_runtime_text("game_list", "game_list.list"),
+      &context.i18n.get_runtime_text("game_list", "game_list.list"),
     );
 
-    text_input.render_host(
+    context.text_input.render_host(
       &mut self.objects,
       self.search_input,
       &TextInputRenderParams {
         rect: pos.search_rect,
-        placeholder: i18n.get_runtime_text("game_list", "game_list.list.search.placeholder"),
+        placeholder: context
+          .i18n
+          .get_runtime_text("game_list", "game_list.list.search.placeholder"),
         fg: Some(TextColor::Terminal(TerminalColor::BrightWhite)),
         bg: Some(TextColor::Rgb {
           r: 24,
@@ -768,32 +750,28 @@ impl GameListUi {
         placeholder_fg: Some(TextColor::Terminal(TerminalColor::BrightBlack)),
         ..Default::default()
       },
-      canvas,
+      context.canvas,
     );
-    self.draw_sort_separator(render, canvas, i18n, pos);
+    self.draw_sort_separator(context.render, context.canvas, context.i18n, pos);
 
     let entries = self.page_entries();
     for (i, entry) in entries.iter().enumerate() {
       let y = pos
         .list_start_y
         .saturating_add(i as u16 * (pos.list_item_height + pos.list_item_gap));
-      self.draw_entry_row(
-        render,
-        canvas,
-        layout,
-        i18n,
-        pos,
-        entry,
-        y,
-        i == self.selected_index,
-      );
+      self.draw_entry_row(context, pos, entry, y, i == self.selected_index);
     }
 
     if entries.is_empty() {
-      let text = i18n.get_runtime_text("game_list", "game_list.no.pack");
-      let width = layout.get_text_width(&text, None).min(pos.left_inner.width);
-      render.draw_host_text(
-        canvas,
+      let text = context
+        .i18n
+        .get_runtime_text("game_list", "game_list.no.pack");
+      let width = context
+        .layout
+        .get_text_width(&text, None)
+        .min(pos.left_inner.width);
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos
             .left_inner
@@ -810,22 +788,29 @@ impl GameListUi {
     }
 
     let total = self.total_pages_for(pos.visible_items).max(1);
-    if !text_input.is_focused(&self.objects, self.jump_input)
+    if !context
+      .text_input
+      .is_focused(&self.objects, self.jump_input)
       && self.jump_text != self.page.to_string()
     {
-      let _ = text_input.set_text(&mut self.objects, self.jump_input, self.page.to_string());
+      let _ =
+        context
+          .text_input
+          .set_text(&mut self.objects, self.jump_input, self.page.to_string());
       self.jump_text = self.page.to_string();
     }
     let key_params = RichTextParams::from_action_map(&Self::action_map(), "game_list.");
     if self.page > 1 {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos.flip_forward_rect.x,
           y: pos.flip_forward_rect.y,
           text: format!(
             "f%<fg:bright_black>{}</fg>",
-            i18n.get_runtime_text("game_list", "game_list.flip.forward")
+            context
+              .i18n
+              .get_runtime_text("game_list", "game_list.flip.forward")
           ),
           params: Some(key_params.clone()),
           max_width: Some(pos.flip_forward_rect.width),
@@ -834,14 +819,16 @@ impl GameListUi {
       );
     }
     if self.page < total {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: pos.flip_backward_rect.x,
           y: pos.flip_backward_rect.y,
           text: format!(
             "f%<fg:bright_black>{}</fg>",
-            i18n.get_runtime_text("game_list", "game_list.flip.backward")
+            context
+              .i18n
+              .get_runtime_text("game_list", "game_list.flip.backward")
           ),
           params: Some(key_params),
           max_width: Some(pos.flip_backward_rect.width),
@@ -850,8 +837,10 @@ impl GameListUi {
       );
     }
 
-    let jump_focused = text_input.is_focused(&self.objects, self.jump_input);
-    text_input.render_host(
+    let jump_focused = context
+      .text_input
+      .is_focused(&self.objects, self.jump_input);
+    context.text_input.render_host(
       &mut self.objects,
       self.jump_input,
       &TextInputRenderParams {
@@ -871,10 +860,10 @@ impl GameListUi {
         text_align: TextAlign::Right,
         ..Default::default()
       },
-      canvas,
+      context.canvas,
     );
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: pos.page_separator_x,
         y: pos.page_y,
@@ -882,8 +871,8 @@ impl GameListUi {
         ..Default::default()
       },
     );
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: pos.total_page_x,
         y: pos.page_y,
@@ -895,10 +884,7 @@ impl GameListUi {
 
   fn draw_entry_row(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
+    context: &mut GameListRenderContext<'_>,
     pos: &GameListLayout,
     entry: &PackageListEntry,
     y: u16,
@@ -910,7 +896,7 @@ impl GameListUi {
       PackageSource::Official => "game_list.list.source.official",
       PackageSource::Mod => "game_list.list.source.mod",
     };
-    let source = i18n.get_runtime_text("game_list", source_key);
+    let source = context.i18n.get_runtime_text("game_list", source_key);
     let source_color = match entry.source {
       PackageSource::Official => "bright_magenta",
       PackageSource::Mod => "bright_yellow",
@@ -920,7 +906,8 @@ impl GameListUi {
     } else {
       String::new()
     };
-    let source_width = layout
+    let source_width = context
+      .layout
       .get_text_width(&source_text, None)
       .min(pos.left_inner.width);
     let source_x = pos
@@ -931,8 +918,8 @@ impl GameListUi {
     let title_x = marker_x.saturating_add(1);
     let title_width = source_x.saturating_sub(title_x).max(1);
 
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: marker_x,
         y,
@@ -947,8 +934,8 @@ impl GameListUi {
       },
     );
 
-    render.draw_host_text(
-      canvas,
+    context.render.draw_host_text(
+      context.canvas,
       &DrawTextParams {
         x: title_x,
         y,
@@ -961,8 +948,8 @@ impl GameListUi {
       },
     );
     if show_source {
-      render.draw_host_text(
-        canvas,
+      context.render.draw_host_text(
+        context.canvas,
         &DrawTextParams {
           x: source_x,
           y,
@@ -975,19 +962,9 @@ impl GameListUi {
     }
   }
 
-  fn draw_right_panel(
-    &mut self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    _image: &mut ImageService,
-    mouse_supported: bool,
-    truecolor_supported: bool,
-    pos: &GameListLayout,
-  ) {
-    render.draw_host_border_rect(
-      canvas,
+  fn draw_right_panel(&mut self, context: &mut GameListRenderContext<'_>, pos: &GameListLayout) {
+    context.render.draw_host_border_rect(
+      context.canvas,
       pos.right_rect.x,
       pos.right_rect.y,
       pos.right_rect.width,
@@ -999,10 +976,10 @@ impl GameListUi {
       None,
     );
     self.draw_panel_title(
-      render,
-      canvas,
+      context.render,
+      context.canvas,
       pos.right_rect,
-      &i18n.get_runtime_text("game_list", "game_list.info"),
+      &context.i18n.get_runtime_text("game_list", "game_list.info"),
     );
 
     let Some(entry) = self.selected_entry() else {
@@ -1014,74 +991,68 @@ impl GameListUi {
     let mut y = 0;
 
     self.draw_info_value(
-      render,
-      canvas,
+      context.render,
+      context.canvas,
       width,
       &mut y,
       Self::game_display_name(&entry),
       &params,
     );
-    self.draw_info_separator(canvas, width, &mut y);
+    self.draw_info_separator(context.canvas, width, &mut y);
     self.draw_info_pair(
-      render,
-      canvas,
-      layout,
+      context,
       width,
       &mut y,
-      &i18n.get_runtime_text("game_list", "game_list.info.author"),
+      &context
+        .i18n
+        .get_runtime_text("game_list", "game_list.info.author"),
       &entry.author,
       &params,
     );
     self.draw_info_pair(
-      render,
-      canvas,
-      layout,
+      context,
       width,
       &mut y,
-      &i18n.get_runtime_text("game_list", "game_list.info.version"),
+      &context
+        .i18n
+        .get_runtime_text("game_list", "game_list.info.version"),
       &entry.version,
       &params,
     );
     self.draw_info_pair(
-      render,
-      canvas,
-      layout,
+      context,
       width,
       &mut y,
-      &i18n.get_runtime_text("game_list", "game_list.info.pack_title"),
+      &context
+        .i18n
+        .get_runtime_text("game_list", "game_list.info.pack_title"),
       &entry.title,
       &params,
     );
-    self.draw_info_separator(canvas, width, &mut y);
+    self.draw_info_separator(context.canvas, width, &mut y);
 
-    let warnings = self.info_warnings(i18n, &entry, mouse_supported, truecolor_supported);
+    let warnings = self.info_warnings(
+      context.i18n,
+      &entry,
+      context.mouse_supported,
+      context.truecolor_supported,
+    );
     if !warnings.is_empty() {
       for warning in warnings {
-        self.draw_info_warning(render, canvas, width, &mut y, warning);
+        self.draw_info_warning(context.render, context.canvas, width, &mut y, warning);
       }
-      self.draw_info_separator(canvas, width, &mut y);
+      self.draw_info_separator(context.canvas, width, &mut y);
     }
 
     if entry.score_enabled {
-      let score = self.info_score_text(i18n, &entry);
-      self.draw_info_wrapped(
-        render,
-        canvas,
-        layout,
-        width,
-        &mut y,
-        score,
-        Some(&params),
-        None,
-      );
-      self.draw_info_separator(canvas, width, &mut y);
+      let score = self.info_score_text(context.i18n, &entry);
+      self.draw_info_wrapped(context, width, &mut y, score, Some(&params), None);
+      self.draw_info_separator(context.canvas, width, &mut y);
     }
 
-    self.draw_info_description_label(canvas, &mut y, i18n);
+    self.draw_info_description_label(context.canvas, &mut y, context.i18n);
     self.draw_info_wrapped(
-      render,
-      canvas,
-      layout,
+      context,
       width,
       &mut y,
       entry.game_detail.clone(),
@@ -1347,9 +1318,6 @@ impl GameListUi {
     if entry.truecolor_required && !truecolor_supported {
       warnings.push(i18n.get_runtime_text("game_list", "game_list.info.true_color.error"));
     }
-    if entry.high_privilege_required && entry.safe_mode {
-      warnings.push(i18n.get_runtime_text("game_list", "game_list.info.high_privilege.error"));
-    }
     if !entry
       .supported_languages
       .iter()
@@ -1411,9 +1379,7 @@ impl GameListUi {
 
   fn draw_info_pair(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
+    context: &mut GameListRenderContext<'_>,
     width: u16,
     y: &mut u16,
     label: &str,
@@ -1421,9 +1387,9 @@ impl GameListUi {
     params: &RichTextParams,
   ) {
     let label_text = format!("f%<fg:bright_blue>{}</fg>", label);
-    let label_width = layout.get_text_width(&label_text, None).min(width);
-    render.draw_text_in_scroll_box(
-      canvas,
+    let label_width = context.layout.get_text_width(&label_text, None).min(width);
+    context.render.draw_text_in_scroll_box(
+      context.canvas,
       self.info_scroll,
       &DrawTextParams {
         y: *y,
@@ -1434,8 +1400,8 @@ impl GameListUi {
       },
     );
     if label_width < width {
-      render.draw_text_in_scroll_box(
-        canvas,
+      context.render.draw_text_in_scroll_box(
+        context.canvas,
         self.info_scroll,
         &DrawTextParams {
           x: label_width,
@@ -1504,9 +1470,7 @@ impl GameListUi {
 
   fn draw_info_wrapped(
     &self,
-    render: &mut RenderService,
-    canvas: &mut CanvasService,
-    layout: &LayoutService,
+    context: &mut GameListRenderContext<'_>,
     width: u16,
     y: &mut u16,
     text: String,
@@ -1522,8 +1486,16 @@ impl GameListUi {
       max_width: Some(width),
       ..Default::default()
     };
-    render.draw_text_in_scroll_box(canvas, self.info_scroll, &draw_params);
-    *y = (*y).saturating_add(layout.get_draw_text_size(&draw_params).height.max(1));
+    context
+      .render
+      .draw_text_in_scroll_box(context.canvas, self.info_scroll, &draw_params);
+    *y = (*y).saturating_add(
+      context
+        .layout
+        .get_draw_text_size(&draw_params)
+        .height
+        .max(1),
+    );
   }
 
   fn handle_hover(&mut self, id: HitAreaId) {
@@ -1635,25 +1607,15 @@ impl GameListUi {
     mut entries: Vec<PackageListEntry>,
     storage: &StorageService,
     log: &mut LogService,
-    temporary_safe_mode_disabled: &HashSet<PackageId>,
   ) {
-    self.temporary_safe_mode_disabled = temporary_safe_mode_disabled.clone();
     let profile = storage.read_package_state_or_default(log);
     for entry in &mut entries {
       if let Some(state) = profile.game(&entry.id) {
         entry.enabled = state.enabled;
         entry.debug = state.debug;
-        entry.safe_mode = state.safe_mode;
       } else {
         entry.enabled = profile.defaults.enabled;
         entry.debug = profile.defaults.debug;
-        entry.safe_mode = matches!(
-          profile.defaults.safe_mode,
-          crate::host_engine::services::SafeModeDefault::On
-        );
-      }
-      if temporary_safe_mode_disabled.contains(&entry.id) {
-        entry.safe_mode = false;
       }
       entry.best_string = storage
         .best_game_save(&entry.id)

@@ -13,10 +13,10 @@ use super::readonly;
 use super::{
   LuaApiContext, LuaCallPhase, LuaDrawCommand, LuaDrawTarget, LuaHostCommand, SharedApiState,
 };
+use crate::LuaFileOperation;
 use crate::LuaSessionKind;
 use tg_core_style::{TextColor, parse_text_color};
 use tg_service_file::FileTask;
-use crate::LuaFileOperation;
 use tg_service_render::{BorderCharacter, BorderStyle, CustomBorder};
 use tg_service_rich_text::TextMode;
 use tg_service_text_layout::{DrawTextParams, TextAlign, TextWrapMode};
@@ -60,6 +60,8 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
     "next",
     "select",
     "rawequal",
+    "rawget",
+    "rawset",
     "rawlen",
     "tonumber",
     "tostring",
@@ -93,10 +95,6 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
 
 fn function_value(function: Function) -> Value {
   Value::Function(function)
-}
-
-fn string_value(lua: &Lua, value: &str) -> mlua::Result<Value> {
-  Ok(Value::String(lua.create_string(value)?))
 }
 
 fn ignore_once(state: &mut super::LuaApiState, method: &'static str, reason: &'static str) {

@@ -1,7 +1,5 @@
 use super::*;
-use crate::path::{
-  SafeRelativePath, SandboxPathKind, resolve_sandbox_path, sandbox_path_exists,
-};
+use crate::path::{SafeRelativePath, SandboxPathKind, resolve_sandbox_path, sandbox_path_exists};
 
 pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
@@ -296,14 +294,10 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
 
 pub(super) fn file_permission(state: &SharedApiState, method: &'static str) -> bool {
   let mut state = state.borrow_mut();
-  if state.context.session_kind == LuaSessionKind::Game && !state.context.safe_mode_enabled {
+  if state.context.session_kind == LuaSessionKind::Game {
     true
   } else {
-    ignore_once(
-      &mut state,
-      method,
-      "method requires a game with safe mode disabled",
-    );
+    ignore_once(&mut state, method, "method requires a game session");
     false
   }
 }

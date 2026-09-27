@@ -9,7 +9,7 @@ use super::bootstrap::ensure_storage_layout;
 use super::layout;
 use super::profile::DisplaySettingsProfile;
 use tg_core_audio::{AudioError, AudioErrorCode, ResolvedAudioFile};
-use tg_service_log::{LogService, LogSource};
+use tg_service_log::LogService;
 
 /// Storage service that owns the application root directory, builds the paths below it and
 /// makes sure the directory layout exists when it is created.
@@ -21,9 +21,19 @@ pub struct StorageService {
 }
 
 impl StorageService {
-  pub fn new(log: &mut LogService) -> Self {
-    let root_dir = resolve_root_dir(log);
-
+  /// Creates storage for the supplied deployment root and initializes its on-disk layout.
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if `root_dir` is not absolute or if the required storage layout cannot be
+  /// created and written.
+  pub fn new(root_dir: PathBuf, log: &mut LogService) -> io::Result<Self> {
+    if !root_dir.is_absolute() {
+      return Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!("deployment root must be absolute: {}", root_dir.display()),
+      ));
+    }
     let mut service = Self {
       root_dir,
       display_settings: DisplaySettingsProfile::default(),
@@ -31,11 +41,12 @@ impl StorageService {
       game_save: RefCell::new(GameSaveProfile::default()),
     };
 
-    ensure_storage_layout(&service, log);
+    ensure_storage_layout(&service, log)?;
+    verify_storage_writable(&service)?;
     service.reload_display_settings_profile(log);
     service.reload_game_save_profile(log);
 
-    service
+    Ok(service)
   }
 
   pub fn root_dir(&self) -> &Path {
@@ -237,9 +248,40 @@ impl StorageService {
     if path.exists() {
       std::fs::remove_dir_all(path)?;
     }
-    ensure_storage_layout(self, log);
+    ensure_storage_layout(self, log)?;
     Ok(())
   }
+}
+
+fn verify_storage_writable(storage: &StorageService) -> io::Result<()> {
+  let directory = storage.cache_dir_path();
+  let nonce = std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_nanos();
+  let probe = directory.join(format!(
+    ".tui-game-write-check-{}-{nonce}",
+    std::process::id()
+  ));
+  std::fs::OpenOptions::new()
+    .write(true)
+    .create_new(true)
+    .open(&probe)
+    .map_err(|error| {
+      io::Error::new(
+        error.kind(),
+        format!(
+          "deployment storage is not writable at {}: {error}",
+          probe.display()
+        ),
+      )
+    })?;
+  std::fs::remove_file(&probe).map_err(|error| {
+    io::Error::new(
+      error.kind(),
+      format!("remove storage write check {}: {error}", probe.display()),
+    )
+  })
 }
 
 #[cfg(any(test, feature = "test-support"))]
@@ -252,34 +294,6 @@ impl StorageService {
       game_save: RefCell::new(GameSaveProfile::default()),
     }
   }
-}
-
-/// Detects the application root directory: the current directory when it contains `assets` or
-/// `Cargo.toml`, otherwise the executable's directory, and `.` as the last resort.
-fn resolve_root_dir(log: &mut LogService) -> PathBuf {
-  if let Ok(current_dir) = std::env::current_dir()
-    && (current_dir.join("assets").exists() || current_dir.join("Cargo.toml").exists())
-  {
-    return current_dir;
-  }
-  if let Ok(exe_path) = std::env::current_exe()
-    && let Some(exe_dir) = exe_path.parent()
-  {
-    return exe_dir.to_path_buf();
-  }
-  log.warn_message(
-    LogSource::Boot,
-    tg_service_log::HostLogMessage::new(
-      "log_info.fallback.activated",
-      "{domain} entered fallback mode: {reason}",
-    )
-    .param("domain", "storage_root")
-    .param(
-      "reason",
-      "application root could not be resolved; using '.'",
-    ),
-  );
-  PathBuf::from(".")
 }
 
 #[cfg(test)]
@@ -324,6 +338,58 @@ mod tests {
         ..
       })
     ));
+
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn production_constructor_uses_only_the_explicit_deployment_root() {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+      "tui-game-storage-explicit-root-{}-{nonce}",
+      std::process::id()
+    ));
+    std::fs::create_dir_all(root.join("assets")).unwrap();
+    std::fs::write(root.join("Cargo.toml"), "fake deployment marker").unwrap();
+
+    let mut log = LogService::new();
+    let storage = StorageService::new(root.clone(), &mut log).unwrap();
+
+    assert_eq!(storage.root_dir(), root);
+    assert!(storage.data_dir_path().is_dir());
+    assert!(storage.tui_log_path().starts_with(&root));
+
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn production_constructor_reports_an_unusable_root() {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+      "tui-game-storage-unusable-root-{}-{nonce}",
+      std::process::id()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("data"), "blocks required storage directory").unwrap();
+
+    let mut log = LogService::new();
+    let result = StorageService::new(root.clone(), &mut log);
+
+    assert!(
+      result.is_err(),
+      "an unusable storage root must fail startup"
+    );
+    let error = match result {
+      Ok(_) => panic!("an unusable storage root unexpectedly initialized"),
+      Err(error) => error,
+    };
+    assert!(error.to_string().contains("data"));
 
     std::fs::remove_dir_all(root).unwrap();
   }

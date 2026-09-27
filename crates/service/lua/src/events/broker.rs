@@ -4,7 +4,10 @@ use tg_core_audio::{AudioAsyncEvent, AudioErrorCode, AudioId};
 use tg_service_async::TaskId;
 use tg_service_file::FileEvent;
 use tg_service_image::ImageEvent;
-use tg_service_network::{NetworkError, NetworkErrorCode, NetworkEvent, NetworkMethod, NetworkResponseBody, NetworkResponseMode};
+use tg_service_network::{
+  NetworkError, NetworkErrorCode, NetworkEvent, NetworkMethod, NetworkResponseBody,
+  NetworkResponseMode,
+};
 use tg_service_time::TimeAsyncEvent;
 
 use super::super::LuaSessionKind;
@@ -867,9 +870,9 @@ mod tests {
   use std::path::PathBuf;
 
   use super::*;
+  use crate::{LuaActionState, LuaSessionKind};
   use tg_core_audio::{AudioError, AudioPoolId};
   use tg_core_input::{KeyState, MouseEvent, MouseEventKind};
-  use crate::{LuaActionState, LuaSessionKind};
 
   fn token(kind: LuaSessionKind, generation: u64) -> LuaSessionToken {
     LuaSessionToken { kind, generation }
