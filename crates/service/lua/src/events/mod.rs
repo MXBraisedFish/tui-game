@@ -10,7 +10,8 @@ use tg_service_network::{NetworkError, NetworkErrorCode, NetworkMethod};
 pub use broker::{
   LuaEnqueueError, LuaEventBroker, LuaEventCallbackId, LuaEventDelivery, LuaEventRoute,
   LuaRoutableEvent, LuaSessionToken, LuaTaskOperation, MAX_LUA_EVENTS_PER_FRAME,
-  MAX_LUA_FILE_TASKS_PER_SESSION, MAX_LUA_NETWORK_TASKS_PER_SESSION, MAX_LUA_PENDING_EVENTS,
+  MAX_LUA_FILE_TASKS_PER_SESSION, MAX_LUA_IMAGE_TASKS_PER_SESSION,
+  MAX_LUA_NETWORK_TASKS_PER_SESSION, MAX_LUA_PENDING_EVENTS,
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaActionState {

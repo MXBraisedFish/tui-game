@@ -36,7 +36,7 @@ pub use canvas::{CanvasCell, CanvasService};
 pub use export::{ExportAsyncEvent, ExportService, ExportTask};
 pub use file::FileEvent;
 pub use i18n::{I18nService, LanguageRegistryEntry};
-pub use image::{ImageConvertParams, ImageEvent, ImageService};
+pub use image::{ImageConvertMode, ImageConvertParams, ImageEvent, ImageService};
 pub use input::{
   ActionMapEntry, InputActionEvent, InputListenerError, InputService, Key, KeyEvent, KeyEventKind,
   KeyState, MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, SystemEvent, TerminalKeyCode,

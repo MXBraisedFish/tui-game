@@ -42,8 +42,8 @@
 | `crop_x/y/width/height` | 像素单位 | 用户确认负偏移或矩形越界报错；省略 width/height 时从偏移位置取剩余区域；显式 0 仍报错 |
 | `scale` | 默认 1.0 | 规范化后参与缓存键；非正数及非有限值拒绝 |
 | `cache` | 默认 true | false 不查/不写磁盘或内存缓存 |
-| 转换模式 | 现有只描述 half-block | B6 增 `half_block` / `mix_block`，缺省 half-block；缓存键包含 mode/version |
-| 透明背景 | 当前转换忽略 alpha | 用户确认新增可选 RGB 字符串背景色（`#rrggbb` / `rgb(r,g,b)`，可传 `color.hex/rgb` 返回值），默认黑色；先将 RGBA 合成为该背景上的 RGB，再进行两种模式转换，背景值纳入缓存键；拒绝主题命名色以保证确定性 |
+| 转换模式 | 现有只描述 half-block | 用户确认增加 `half_block` / `mix_block`，缺省 half-block；缓存键包含 mode/version。mix 对宿主支持的 29 个几何块 mask（U+2580–U+258F、U+2590、U+2594–U+259F，含当前 `▅` 基线）逐格计算前景/背景均值与平方 RGB 误差，按最小误差并以码点顺序打破平局 |
+| 透明背景 | 当前转换忽略 alpha | 用户确认新增可选 RGB 字符串背景色（仅 `#rrggbb` / `rgb(r,g,b)`，可传 `color.hex/rgb` 返回值），默认黑色；按每个 8-bit 通道 `(src*a + bg*(255-a) + 127)/255` 混合，先合成再缩放；背景值纳入缓存键；拒绝主题命名色以保证确定性 |
 | 返回与事件 ID | 页面只写事件返回 | 用户确认 `image.load` 立即返回 Session 内 request id，完成/失败事件回传同一 id |
 | 事件 `output` | `EVENT.md` 示例写虚拟标识/路径，但 Rust 当前输出为富文本 | 用户确认保留可直接绘制的富文本字符串；修正文档示例和字段说明 |
 

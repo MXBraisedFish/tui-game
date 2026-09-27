@@ -12,10 +12,11 @@ use mlua::{Lua, Table};
 
 use super::LuaSessionKind;
 use super::object_pool::WeakLuaObjectPool;
-use super::{LuaI18nEvent, LuaI18nEventKind};
+use super::{LuaI18nEvent, LuaI18nEventKind, LuaImageEvent};
 use crate::LuaFileOperation;
 use tg_core_style::TextColor;
 use tg_service_file::FileTask;
+use tg_service_image::ImageConvertParams;
 use tg_service_layout::Size;
 use tg_service_random::RandomGeneratorId;
 use tg_service_render::BorderStyle;
@@ -149,6 +150,10 @@ pub enum LuaHostCommand {
     language_code: String,
     callback_language_code: String,
   },
+  ImageRequest {
+    request_id: u64,
+    params: ImageConvertParams,
+  },
   Draw(LuaDrawCommand),
 }
 
@@ -163,6 +168,8 @@ pub(crate) struct LuaApiState {
   pub loader_stack: Vec<PathBuf>,
   pub loader_source_bytes: usize,
   pub next_file_request_id: u64,
+  pub next_image_request_id: u64,
+  pub pending_image_request_ids: HashSet<u64>,
   pub i18n: LuaI18nState,
   pub direct_random_id: Option<RandomGeneratorId>,
   pub ignored_methods: HashSet<&'static str>,
@@ -199,6 +206,8 @@ pub(crate) fn build_environment(
     loader_stack: Vec::new(),
     loader_source_bytes: 0,
     next_file_request_id: 1,
+    next_image_request_id: 1,
+    pending_image_request_ids: HashSet::new(),
     i18n: LuaI18nState::default(),
     direct_random_id: None,
     ignored_methods: HashSet::new(),
@@ -226,4 +235,11 @@ pub(crate) fn apply_i18n_event(state: &SharedApiState, event: &LuaI18nEvent) {
   } else if event.kind == LuaI18nEventKind::Created {
     state.i18n.created = false;
   }
+}
+
+pub(crate) fn apply_image_event(state: &SharedApiState, event: &LuaImageEvent) {
+  state
+    .borrow_mut()
+    .pending_image_request_ids
+    .remove(&event.request_id);
 }

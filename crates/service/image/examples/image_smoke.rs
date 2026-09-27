@@ -38,8 +38,8 @@ fn main() {
 
   let params = ImageConvertParams {
     image_path: path.to_string_lossy().into(),
-    output_width: 8,
-    output_height: 4,
+    output_width: Some(8),
+    output_height: Some(4),
     cache: false,
     ..Default::default()
   };

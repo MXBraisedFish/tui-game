@@ -18,8 +18,8 @@ pub use events::{
   LuaImageEvent, LuaImageOutcome, LuaMarkdownEvent, LuaNetworkBody, LuaNetworkEvent,
   LuaNetworkOutcome, LuaRoutableEvent, LuaRuntimeEvent, LuaScrollBoxEvent, LuaSessionToken,
   LuaTaskOperation, LuaTextInputEvent, LuaTimerEvent, LuaTimerEventKind, LuaTimerKind,
-  MAX_LUA_EVENTS_PER_FRAME, MAX_LUA_FILE_TASKS_PER_SESSION, MAX_LUA_NETWORK_TASKS_PER_SESSION,
-  MAX_LUA_PENDING_EVENTS,
+  MAX_LUA_EVENTS_PER_FRAME, MAX_LUA_FILE_TASKS_PER_SESSION, MAX_LUA_IMAGE_TASKS_PER_SESSION,
+  MAX_LUA_NETWORK_TASKS_PER_SESSION, MAX_LUA_PENDING_EVENTS,
 };
 pub use game::{GameService, GameStartOptions, LuaSessionDiagnostics};
 pub use object_pool::LuaObjectPool;

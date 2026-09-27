@@ -1,11 +1,13 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
-  HitAreaService, I18nService, ImageService, KeyState, LayoutService, LogService, MouseButton,
-  PackageService, Rect, RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner,
-  ScrollBoxService, StorageService, TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
+  HitAreaService, I18nService, ImageConvertMode, ImageConvertParams, ImageService, KeyState,
+  LayoutService, LogService, MouseButton, PackageService, Rect, RenderService, RichTextParams,
+  RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxService, StorageService, TextInputService,
+  UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub mod game;
@@ -38,6 +40,79 @@ pub(crate) struct PackageListRenderContext<'a> {
   pub(crate) image: &'a mut ImageService,
   pub(crate) mouse_supported: bool,
   pub(crate) truecolor_supported: bool,
+}
+
+const MAX_PACKAGE_IMAGE_CACHE_ENTRIES: usize = 64;
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct PackageImageCacheKey {
+  image_path: String,
+  mode: ImageConvertMode,
+  background: [u8; 3],
+  output_width: Option<u32>,
+  output_height: Option<u32>,
+  crop_x: i32,
+  crop_y: i32,
+  crop_width: Option<u32>,
+  crop_height: Option<u32>,
+  square_crop: bool,
+  scale_bits: u64,
+}
+
+impl PackageImageCacheKey {
+  fn from_params(params: &ImageConvertParams) -> Self {
+    Self {
+      image_path: params.image_path.clone(),
+      mode: params.mode,
+      background: params.background,
+      output_width: params.output_width,
+      output_height: params.output_height,
+      crop_x: params.crop_x,
+      crop_y: params.crop_y,
+      crop_width: params.crop_width,
+      crop_height: params.crop_height,
+      square_crop: params.square_crop,
+      scale_bits: params.scale.to_bits(),
+    }
+  }
+}
+
+/// Keeps package images out of the synchronous conversion path on later UI frames.
+#[derive(Default)]
+pub(crate) struct PackageImageCache {
+  snapshot_revision: Option<u64>,
+  rendered: HashMap<PackageImageCacheKey, Option<Arc<str>>>,
+  insertion_order: VecDeque<PackageImageCacheKey>,
+}
+
+impl PackageImageCache {
+  fn get_or_convert(
+    &mut self,
+    snapshot_revision: u64,
+    image_service: &mut ImageService,
+    params: ImageConvertParams,
+  ) -> Option<Arc<str>> {
+    if self.snapshot_revision != Some(snapshot_revision) {
+      self.rendered.clear();
+      self.insertion_order.clear();
+      self.snapshot_revision = Some(snapshot_revision);
+    }
+
+    let key = PackageImageCacheKey::from_params(&params);
+    if let Some(cached) = self.rendered.get(&key) {
+      return cached.clone();
+    }
+
+    let rendered = image_service.convert(params).ok().map(Arc::<str>::from);
+    if self.rendered.len() == MAX_PACKAGE_IMAGE_CACHE_ENTRIES
+      && let Some(oldest) = self.insertion_order.pop_front()
+    {
+      self.rendered.remove(&oldest);
+    }
+    self.insertion_order.push_back(key.clone());
+    self.rendered.insert(key, rendered.clone());
+    rendered
+  }
 }
 
 #[derive(Clone, Copy)]
@@ -370,5 +445,90 @@ impl ModsUi {
         ..Default::default()
       },
     );
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use image::{Rgb, RgbImage};
+  use std::time::{SystemTime, UNIX_EPOCH};
+
+  fn temp_dir(label: &str) -> std::path::PathBuf {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .expect("system clock should be after Unix epoch")
+      .as_nanos();
+    std::env::temp_dir().join(format!("tui-game-{label}-{}-{nonce}", std::process::id()))
+  }
+
+  fn write_solid_png(path: &std::path::Path, color: Rgb<u8>) {
+    RgbImage::from_pixel(8, 8, color)
+      .save(path)
+      .expect("test image should be saved");
+  }
+
+  fn params(image_path: &std::path::Path) -> ImageConvertParams {
+    ImageConvertParams {
+      image_path: image_path.to_string_lossy().into_owned(),
+      output_width: Some(2),
+      output_height: Some(2),
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn package_image_cache_reuses_until_snapshot_changes() {
+    let dir = temp_dir("package-image-cache");
+    std::fs::create_dir_all(&dir).expect("test directory should be created");
+    let image_path = dir.join("icon.png");
+    write_solid_png(&image_path, Rgb([255, 0, 0]));
+
+    let mut cache = PackageImageCache::default();
+    let mut image_service = ImageService::new(None);
+    let original = cache
+      .get_or_convert(1, &mut image_service, params(&image_path))
+      .expect("first conversion should succeed");
+
+    write_solid_png(&image_path, Rgb([0, 0, 255]));
+    let same_revision = cache
+      .get_or_convert(1, &mut image_service, params(&image_path))
+      .expect("cached conversion should remain available");
+    assert_eq!(same_revision, original);
+
+    let refreshed = cache
+      .get_or_convert(2, &mut image_service, params(&image_path))
+      .expect("conversion after snapshot update should succeed");
+    assert_ne!(refreshed, original);
+
+    std::fs::remove_dir_all(dir).expect("test directory should be removed");
+  }
+
+  #[test]
+  fn package_image_cache_retries_missing_asset_after_snapshot_changes() {
+    let dir = temp_dir("package-missing-image");
+    std::fs::create_dir_all(&dir).expect("test directory should be created");
+    let image_path = dir.join("icon.png");
+    let mut cache = PackageImageCache::default();
+    let mut image_service = ImageService::new(None);
+
+    assert!(
+      cache
+        .get_or_convert(1, &mut image_service, params(&image_path))
+        .is_none()
+    );
+    write_solid_png(&image_path, Rgb([80, 120, 160]));
+    assert!(
+      cache
+        .get_or_convert(1, &mut image_service, params(&image_path))
+        .is_none()
+    );
+    assert!(
+      cache
+        .get_or_convert(2, &mut image_service, params(&image_path))
+        .is_some()
+    );
+
+    std::fs::remove_dir_all(dir).expect("test directory should be removed");
   }
 }

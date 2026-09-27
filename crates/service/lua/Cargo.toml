@@ -33,3 +33,6 @@ tg-service-text-layout = { path = "../text_layout" }
 tg-service-time = { path = "../time" }
 tg-service-widget = { path = "../widget" }
 toml = "1.1.2"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }

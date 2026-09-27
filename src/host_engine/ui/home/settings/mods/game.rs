@@ -2,7 +2,9 @@ use std::{cmp::Ordering, time::Duration};
 
 use unicode_width::UnicodeWidthStr;
 
-use super::{PackageInfoRenderArea, PackageInfoTextPosition, PackageListRenderContext};
+use super::{
+  PackageImageCache, PackageInfoRenderArea, PackageInfoTextPosition, PackageListRenderContext,
+};
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
@@ -111,6 +113,7 @@ pub struct GamePackageUi {
   jump_text: String,
   simple_list: bool,
   needs_rebuild_areas: bool,
+  image_cache: PackageImageCache,
 }
 
 impl UiObjectPoolOwner for GamePackageUi {
@@ -207,6 +210,7 @@ impl GamePackageUi {
       jump_text: "1".to_string(),
       simple_list: false,
       needs_rebuild_areas: true,
+      image_cache: PackageImageCache::default(),
     }
   }
 
@@ -908,7 +912,7 @@ impl GamePackageUi {
   }
 
   fn draw_entry_card(
-    &self,
+    &mut self,
     context: &mut PackageListRenderContext<'_>,
     pos: &GamePackageLayout,
     entry: &PackageListEntry,
@@ -1099,7 +1103,7 @@ impl GamePackageUi {
   }
 
   fn draw_icon_asset(
-    &self,
+    &mut self,
     context: &mut PackageListRenderContext<'_>,
     asset: &PackageAsset,
     x: u16,
@@ -1107,22 +1111,26 @@ impl GamePackageUi {
     params: &RichTextParams,
   ) {
     if let PackageAsset::Image { path } = asset
-      && let Ok(text) = context.image.convert(ImageConvertParams {
-        image_path: path.clone(),
-        output_width: 8,
-        output_height: 4,
-        square_crop: true,
-        scale: 1.0,
-        cache: true,
-        ..Default::default()
-      })
+      && let Some(text) = self.image_cache.get_or_convert(
+        context.package.snapshot_revision(),
+        context.image,
+        ImageConvertParams {
+          image_path: path.clone(),
+          output_width: Some(8),
+          output_height: Some(4),
+          square_crop: true,
+          scale: 1.0,
+          cache: true,
+          ..Default::default()
+        },
+      )
     {
       context.render.draw_host_text(
         context.canvas,
         &DrawTextParams {
           x,
           y,
-          text,
+          text: text.to_string(),
           wrap_mode: TextWrapMode::Auto,
           max_width: Some(8),
           max_height: Some(4),
@@ -1223,7 +1231,7 @@ impl GamePackageUi {
   }
 
   fn draw_info_content(
-    &self,
+    &mut self,
     context: &mut PackageListRenderContext<'_>,
     entry: &PackageListEntry,
     rect: Rect,
@@ -1430,7 +1438,7 @@ impl GamePackageUi {
   }
 
   fn draw_info_banner(
-    &self,
+    &mut self,
     context: &mut PackageListRenderContext<'_>,
     asset: &PackageAsset,
     params: &RichTextParams,
@@ -1442,15 +1450,19 @@ impl GamePackageUi {
 
     let x = area.rect.width.saturating_sub(BANNER_WIDTH) / 2;
     if let PackageAsset::Image { path } = asset
-      && let Ok(text) = context.image.convert(ImageConvertParams {
-        image_path: path.clone(),
-        output_width: BANNER_WIDTH as u32,
-        output_height: BANNER_HEIGHT as u32,
-        square_crop: false,
-        scale: 1.0,
-        cache: true,
-        ..Default::default()
-      })
+      && let Some(text) = self.image_cache.get_or_convert(
+        context.package.snapshot_revision(),
+        context.image,
+        ImageConvertParams {
+          image_path: path.clone(),
+          output_width: Some(BANNER_WIDTH as u32),
+          output_height: Some(BANNER_HEIGHT as u32),
+          square_crop: false,
+          scale: 1.0,
+          cache: true,
+          ..Default::default()
+        },
+      )
     {
       let is_rich = text.starts_with("f%");
       for (row, line) in text.lines().take(BANNER_HEIGHT as usize).enumerate() {

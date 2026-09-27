@@ -268,7 +268,7 @@ Lua 循环 table 本身合法；序列化或宿主消息不支持循环是另一
 
 ### B6 — half_block / mix_block 与图片缓存
 
-入口：`crates/service/image/src/lib.rs`。当前 `compute_hash` 基于路径/参数，内存缓存可直接返回；仅靠磁盘 mtime 校验不足。
+入口：`crates/service/image/src/lib.rs`。B6 开始时 `compute_hash` 依赖不稳定的默认哈希和秒级 mtime；本阶段逐项修正源快照、参数、缓存版本与转换模式。
 
 先研究 `temp/` 中已有上游库与当前实现，记录候选算法/字符集、采样、颜色量化、宽高比及许可证。half_block 沿用并修正必要问题；mix_block 使用有确定匹配规则的 Unicode 方块，不实现无界搜索或新字体系统。
 
@@ -292,15 +292,15 @@ Lua 循环 table 本身合法；序列化或宿主消息不支持循环是另一
 
 | 子任务 | 具体改动 | 验证 |
 |---|---|---|
-| B6.1 参数与源读取 | ImageConvertParams 加转换模式；scale 检查 is_finite（目前仅 <=0，NaN 可漏过）；尺寸/解码像素预算与裁剪乘法检查；一次读 bytes 同时用于解码/摘要 | NaN/Inf、0/极大、奇数尺寸、坏格式、越界 crop |
-| B6.2 缓存 | compute_hash 目前 scale 格式化只保留 6 位小数，内存无 mtime 校验，磁盘 mtime 只有秒；改内容摘要+精确规范参数+版本，IMAGE_CACHE_FORMAT_VERSION 从2升级；复用 atomic_fs 写入 | 同路径同秒换图、六位小数后 scale 差异、损坏/旧缓存、原子失败、cache=false |
+| B6.1 参数与源读取 | 区分显式/自动尺寸；scale 检查 is_finite；加入尺寸、解码像素预算与严格裁剪检查；同一份受限 bytes 用于后续摘要/解码 | NaN/Inf、0/极大、奇数尺寸、坏格式、越界 crop |
+| B6.2 缓存 | 使用稳定 BLAKE3 内容摘要、带类型标记的精确输出参数、缓存格式版本；IMAGE_CACHE_FORMAT_VERSION 从 2 升为 3；复用 atomic_fs 原子写入 | 同路径同长度/mtime 换图、六位小数后 scale 差异、损坏/旧缓存、写失败、cache=false |
 | B6.3 转换 | half 保持基线；mix 有限 glyph/mask 与色差匹配；定义透明像素混合背景并计入 cache key，尺寸始终以 cell 为单位 | 纯色/透明/边缘；误差不劣于候选中的 half；确定性与预算 |
 | B6.4 宿主 UI | game.rs/screensaver.rs 的四个 icon/banner ImageConvertParams 调用同步模式；避免每帧重复读大图片，利用页面/资源修订缓存，内容热更新必须失效 | 连续帧无重复重转换，换内容刷新，缺资源正常提示 |
-| B6.5 Lua 请求 | 当前 install 没 image，LuaHostCommand 没 ImageRequest；补 library→host command→app submit/register_task→ImageEvent→broker→HandleEvent，复用 session token/generation，勿在 mlua 回调里直接阻塞解码 | 真正 Lua 脚本 image 请求→结果→draw；坏路径/取消/退出/晚到事件 |
+| B6.5 Lua 请求 | 注册 `image.load{...}`，把安全解析后的请求异步提交 ImageService，按 Session token/generation 经 broker 投递 request id 与可绘制富文本；每 Session 限制 4 个待完成请求；任务检查协作取消，缓存写失败可忽略 | Lua 脚本请求→事件→draw；路径隔离/参数校验/请求配额；取消/退出/晚到结果 |
 
-B6.5 接口先在 B0 对照 image.md 裁决：文档 path/block_width/block_height 的默认值可能对小图算出 0，Rust 默认却为80×24；异步返回目前文档只有事件。不得直接选其中一个且不记录。推荐明确有效最小尺寸和事件关联字段；是否同步返回 task id 跟 Q6 一致。
+B6.5 API 选择已由用户在 B0 裁决并实现：缺省尺寸按文档比例且最小 1×1，异步立即返回 request id、终态事件回传同 ID；输出富文本直接供 `draw.text` 使用。参数仍使用项目命名表格式，错误结果沿用安全化事件表。
 
-服务目前 resolve_path 可读任意宿主路径；Lua 新入口必须先经 session.assets_root + sandbox_path，既限制显式扩展也限制自动补后缀查找；缓存文件名不得由 Lua 任意指定。ImageTask 目前忽略 cancellation，磁盘缓存写也不进入写屏障：新公开异步链路须决定可取消阶段，接入已有原子写/写屏障或明确缓存失败可丢弃的关闭语义，不修改共享执行器的事件规则。
+Lua 图片入口对显式扩展与自动补后缀的每个候选都先通过 `session.assets_root + sandbox_path`，只向服务传递已解析路径；缓存文件名始终由 BLAKE3 摘要生成。ImageTask 在读入、解码、合成、缩放、采样行与缓存写前后检查取消。磁盘缓存是原子写入的可丢弃数据，写失败不影响转换；既有 AsyncRuntime 负责 join worker，不增加共享写屏障规则。
 
 测试 ID：IMG-PARAM/CACHE/MODE/UI/LUA/CANCEL/SANDBOX。此块只新增 image 已请求链路，不顺便补 audio/http/widget 所有尚未注册接口。
 
@@ -474,13 +474,13 @@ cargo test --workspace --locked recording_with_audio_exports_as_h264_aac_mp4 -- 
 | 工作包 | 当前状态 | 下一步 / 必要决定 |
 |---|---|---|
 | A0–A3 | 已验收 | 用户本轮确认接受；不重跑 A 全套 |
-| B0 契约 | 首版契约清单、裁决表、B6 image 草案及 B4 CLI 候选已归档；未决项保留为对应工作包的前置问题 | Q2a/Q3/Q6/Q7 与 image 参数在对应实现前确认 |
+| B0 契约 | 首版契约清单、裁决表、B6 image 草案及 B4 CLI 候选已归档；未决项保留为对应工作包的前置问题 | Q2a/Q3/Q6/Q7 留待对应工作包实现前确认；B6 image 行为已全部裁决 |
 | B1 路径 | 自动实现与回归完成；Windows workspace build/test/strict Clippy/fmt 通过 | 留待 B 最终验收的跨平台与真实终端运行；继续 B2 |
 | B2 Lua | 已完成；B2.1–B2.5 覆盖标准库、错误预算、GC/终结器、关闭与宿主生命周期 | 不重开；按最终全量回归复核 |
 | B3 安全模式 | 已完成 | 权限矩阵与 profile 兼容回归见 `dev_docs/refactor/B3_PERMISSIONS.md` |
-| B5 左右键 | 实现完成（Windows自动回归通过） | Linux/macOS 实际系统监听与构建留待最终跨平台验证；进入 B6 |
-| B6 图片 | 进行中（契约已确认，B6.1 实施中） | 已确认默认尺寸/裁剪/透明背景/request id/event output；逐块完成服务参数与缓存→转换模式→宿主 UI→Lua 全链路 |
-| B4 清单 | 待 B5/B6 后执行 | schema2、新格式完全升级；Q2a/Q3 |
+| B5 左右键 | 实现完成（Windows自动回归通过） | Linux/macOS 实际系统监听与构建留待最终跨平台验证；B6 已关闭 |
+| B6 图片 | 已完成（B6.1–B6.5） | 默认尺寸/裁剪/透明背景/request id/event output 已确认；受限读取、BLAKE3 缓存、half/mix、RGB 混色、包热更新和 Lua 异步链路均有回归 |
+| B4 清单 | 待继续（B6 后按用户要求临时暂停） | 用户完成人工处理后从 B4 schema2 与新格式迁移继续；先确认 Q2a/Q3 |
 | B7 栅格化 | 待执行 | Q7 基准终端字体；先固定样本 |
 | B8 渲染 | 待执行 | 先可测输出和基线，再一项项优化 |
 | B9 IME | 待执行 | Q7 目标环境，动态预输入实机验证 |
@@ -490,7 +490,7 @@ cargo test --workspace --locked recording_with_audio_exports_as_h264_aac_mp4 -- 
 
 ### 2026-09-27 B0/B1 执行记录
 
-- B0 首版成果：`dev_docs/zh_cn/LUA_COMPATIBILITY.md`、`dev_docs/zh_cn/LUA_API_MIGRATION.md`、`dev_docs/refactor/B0_CONTRACTS.md`。确认的 Q1/Q2/Q4 已记录；Q2a/Q3/Q6/Q7 和 image 参数仍只在对应实现前提问，不据候选草案视作批准。Q5 后由用户确认并记录在 Q5 决策表与 B5 执行记录中。
+- B0 首版成果：`dev_docs/zh_cn/LUA_COMPATIBILITY.md`、`dev_docs/zh_cn/LUA_API_MIGRATION.md`、`dev_docs/refactor/B0_CONTRACTS.md`。确认的 Q1/Q2/Q4 已记录；Q2a/Q3/Q6/Q7 仍只在对应实现前提问，不据候选草案视作批准。Q5 后由用户确认并记录在 Q5 决策表与 B5 执行记录中；B6 image 行为已于本轮全部确认。
 - B1.1–B1.4：完成部署根解析与显式 Storage 构造、崩溃日志路径注入、截图/视频字体根传递、smoke 示例路径修复和 CWD 审计。回归覆盖普通/伪项目/中文空格调用目录、根目录初始化失败、子进程崩溃日志、显式字体失效回退、相对路径按部署根解析、全来源失败列出路径，以及 EngineServices 只在部署根创建数据。
 - 验证（Windows）：`cargo fmt --all -- --check`、`cargo build --workspace --all-targets --locked`、`cargo test --workspace --locked`、`cargo clippy --workspace --all-targets --locked -- -D warnings` 均退出 0；`storage_smoke` 与 `ffmpeg_smoke` 已运行通过。Clippy 首次发现 `save_png` 参数过多，改为接收 `ScreenshotTask` 后复查通过。
 - 边界：外部 CWD 回归在复制的测试可执行文件中验证生产根解析和服务装配，没有启动交互 TUI；根不可用由 `data` 被普通文件阻塞模拟，没有验证 Windows ACL 只读或其他 OS。截图与视频复用同一 rasterizer/font loader 和尺寸 helper；本块未做真实编码视频与 PNG 像素逐点比对。Linux/macOS 留待最终验收。
@@ -572,6 +572,51 @@ cargo test --workspace --locked recording_with_audio_exports_as_h264_aac_mp4 -- 
 
 - 开始基点：承接 B5 工作区；检查确认 `crates/service/image/src/lib.rs` 尚无本轮修改。当前 image service 用路径与六位小数参数的 `DefaultHasher` 缓存、秒级 mtime 校验和非原子写；`ImageTask` 尚不检查取消。Lua 已有 image event 类型与 broker 路由，但 `image` library/host command 尚未注册。
 - 可复用基础：`tg-core-atomic-fs::atomic_write` 已提供 sibling temp + replace；image service 尚无稳定内容摘要依赖。现有 `TextColor::Transparent` 可经 compositor/presenter 表达透明样式，但 rich-text 字符串颜色解析不接受 `transparent`。
-- B6.4 调查：`EngineServices` 已长期持有以 `data/cache/images` 初始化的 `ImageService`，game/screensaver 详情页每帧同步调用四处 icon/banner 转换；因此内容摘要后可由既有内存缓存避免重复 decode/resize，热更新通过源字节摘要失效，不需要再添加页面级重复缓存。
+- B6.4 调查：`EngineServices` 长期持有 `ImageService`，game/screensaver 详情页每帧同步调用四处 icon/banner 转换。ImageService 的内容摘要缓存避免重复 decode/resize，但仍需逐帧读源文件以计算摘要；PackageService 已把图片资产纳入 watched files，变化后通过 rescan 发布快照。因此宿主 UI 以包快照 revision 缓存渲染字符串，避免重复读文件，快照替换时统一失效。
 - 用户于 2026-09-27 关闭了全部 image API 契约问题：Lua 缺省尺寸按源图宽/100、高/200取整且最小 1×1；负裁剪偏移和越界矩形报错、缺省尺寸取剩余区域；新增可选 RGB 字符串背景（`#rrggbb` / `rgb(r,g,b)`），默认黑色并纳入缓存键；异步 `image.load` 立即返回 request id，完成事件携带同一 ID；event `output` 保留可直接绘制的富文本字符串。命名终端色不作为混色输入，以保证确定性。已同步至 `dev_docs/refactor/B0_CONTRACTS.md`，不再复问。
 - 清理遵循既有验收记录：本阶段未删除或重试删除任何临时目录；保留 architecture、生成工具及 `temp/image-converter-reference/`。
+
+### 2026-09-27 B6.1 参数与源读取
+
+- `ImageConvertParams` 用 `Option<u32>` 表示显式/自动输出宽高；Rust 默认仍是 80×24，Lua 缺省值按原图宽/100、高/200向下取整且最小为 1。固定上限为单边 2,048 格、总计 16,384 格；缩放后单边不超 16,384 像素、工作像素不超 16,000,000。
+- `scale` 拒绝 NaN/±Inf/非正数；裁剪拒绝负偏移、零宽高、原点越界和矩形溢出。未指定宽或高时各自延伸到源图对应边界；square crop 保留既有居中行为。源文件单次读入受限 32 MiB；先从同一内存快照探测并核验源尺寸（单边 16,384、总像素 16,000,000、decoder allocation 80 MiB），再用该快照命中缓存摘要或解码。
+- 本块先用内部临时摘要验证单快照路径；已由 B6.2 换为稳定 BLAKE3，并删除旧 mtime 依赖。背景色契约格式已确认：Lua 只收 `#rrggbb` / `rgb(r,g,b)` 精确 RGB 字符串，默认黑色，不接受依赖终端主题的颜色名。
+- 修改文件：`crates/service/image/src/lib.rs`，image smoke 示例，以及 game/screensaver 四处 `ImageConvertParams` 调用点。新增 7 项参数/边界用例，现服务测试共 24/24。
+- 验证（Windows）：`cargo test -p tg-service-image -p tui-game --locked`（24 + 105 通过，0 失败、0 忽略）；`cargo clippy -p tg-service-image --all-targets --locked -- -D warnings`、`cargo fmt --all -- --check` 与 `git diff --check` 均退出 0。
+- B6.2 已完成，详见下方执行记录；保留 `cache=false` 完全旁路缓存。
+
+### 2026-09-27 B6.2 内容摘要与原子缓存
+
+- `compute_cache_key` 现在使用锁定版本 `blake3 = 1.8.7`；摘要含域标记、缓存格式版本、源字节长度与同一读取快照的完整内容，以及所有影响输出的类型化参数。`scale` 使用 `to_bits()`，小数精度不再被格式化截断；路径和 cache 开关不影响图像结果，因此不进入 key。
+- `IMAGE_CACHE_FORMAT_VERSION` 从 2 升为 3。磁盘文件名为 `v3-<64位小写摘要>.json`，记录格式版本；读取限制为 2 MiB，坏 JSON、超限文件或版本不符作为 miss 并重新生成。移除 source mtime 检查，内存与磁盘缓存都以同一内容摘要命中。
+- 使用 `tg_core_atomic_fs::atomic_write` 写缓存。由于 atomic_fs 的 sibling 临时文件名固定，各独立 ImageService 的并发写由进程级 mutex 串行；缓存是可丢弃数据，目录创建/原子写失败不影响转换成功。`cache=false` 不读取或写入内存/磁盘缓存，也不创建缓存目录。
+- 新增缓存回归：同路径、相同 PNG 字节长度且恢复到相同 mtime 后替换图像内容；逐项改变输出宽高、裁剪参数、square crop 和六位小数之后的 scale；损坏/旧版本缓存恢复、cache=false、缓存写失败、并发写一致性。image service 测试 28/28 通过。
+- 验证（Windows）：`cargo test -p tg-service-image -p tui-game --locked`（28 + 105 通过）；随后 `cargo test -p tg-service-image --locked`（28 通过）、`cargo clippy -p tg-service-image --all-targets --locked -- -D warnings`、`cargo fmt --all -- --check`、`git diff --check` 均通过，0 失败、0 忽略。
+- B6.2 代码块关闭，进入 B6.3：加入 half/mix 模式和已确认的精确 RGB 背景混色，并把模式/背景并入缓存 key。
+
+### 2026-09-27 B6.3 转换模式与透明像素
+
+- 新增 `ImageConvertMode::{HalfBlock, MixBlock}`；Rust 默认 `HalfBlock`，不改变全不透明图片的既有 `▅` 输出。`ImageConvertParams.background` 是 RGB 三通道，缺省 `[0,0,0]`。
+- 对源 RGBA 在裁剪/缩放前先逐通道执行已确认的 `(src*a + bg*(255-a) + 127)/255`，再把 alpha 设为 255，避免透明 RGB 随缩放渗色。背景与模式已纳入 BLAKE3 key；格式版本保持 3，旧 key 自然 miss。
+- `MixBlock` 将每个字符格采样为 8×16 个像素（归一化 8×8 mask，每个垂直子格平均两行），枚举宿主栅格器已支持的 29 个几何字形；U+2591–U+2593 阴影字符不作为覆盖 mask。按码点固定顺序，在每个 mask 上计算前/背景 RGB 均值（四舍五入）及总平方 RGB 误差，严格更小时才替换候选；`▅` 旧形状保留作质量基线。
+- `logo-art` 仅作为 MIT 算法参考：其 renderer 输出 ANSI，不直接复用到宿主富文本；候选 glyph 几何逐项对齐 `draw_block_element` 的本地矩形定义。新增验证涵盖 29 个 mask 唯一且排序、全色平局、象限精确匹配、任意样本误差不高于 `▅`、alpha 0/128/255 的混色、半块默认及 mix 透明背景输出。
+- 验证（Windows）：`cargo test -p tg-service-image -p tui-game --locked`（32 + 105 通过）；`cargo clippy -p tg-service-image --all-targets --locked -- -D warnings`、`cargo fmt --all -- --check`、`git diff --check` 通过，0 失败、0 忽略。
+- B6.3 代码块关闭，进入 B6.4：核查四处 UI 图像调用的帧间读盘/转换行为与资源热更新失效路径。
+
+### 2026-09-27 B6.4 宿主包资源图像缓存
+
+- game 与 screensaver 包详情页各加入一个最多 64 项 FIFO `PackageImageCache`，四处 icon/banner 转换按图像路径和全部输出参数缓存富文本结果；缓存错误也在当前快照内记住，使损坏/缺失资源继续使用既有默认图案，不会每帧重试。
+- `PackageService::snapshot_revision()` 随每次发布的新快照递增。资产文件已在扫描结果 watched files 中；文件变化触发重扫，UI 读取新 revision 后清空缓存、重新转换。缓存容量有界，页面实例销毁即释放。
+- 新增回归覆盖同快照内连续帧复用（替换同路径文件仍不重复读取）和 revision 变化后重新转换，以及缺失资源在新 revision 出现后重试。包服务的重扫测试同时检查快照 revision 前进。
+- 验证（Windows）：`cargo test -p tg-service-package -p tui-game --locked`（34 + 107 通过）；`cargo clippy -p tg-service-package --all-targets --locked -- -D warnings` 与 `cargo clippy -p tui-game --all-targets --locked -- -D warnings` 通过；`cargo fmt --all -- --check`、`git diff --check` 退出 0。0 失败、0 忽略。
+- B6.4 代码块关闭，进入 B6.5：实现隔离的 Lua `image` 库和异步宿主请求闭环。
+
+### 2026-09-27 B6.5 Lua 图片异步请求闭环
+
+- 注册只读 `image.load{...}`，保留项目命名参数表协议，校验类型、正数尺寸、非负裁剪偏移、有限正 scale、模式及精确 RGB 字符串。背景仅接受 `#rrggbb` / `rgb(r,g,b)`，默认黑色。Lua `image.load` 自动/显式扩展路径都通过 assets sandbox；测试覆盖父级路径、非法扩展和在系统允许建链时对显式/自动扩展符号链接越界的拒绝。
+- 每个 Session 独立递增 request id，API 和事件派发层共同维护最多 4 个待完成请求；完成/失败事件投递前释放配额。宿主命令经 `ImageService::convert_async` 提交，broker 绑定当前 Session token/generation，事件仍按既有 HandleEvent 路由；Lua 收到的成功 `output` 保留 `f%...` 富文本，可直接交给 `draw.text`。
+- ImageTask 在读取前后、解码前后、alpha 合成/缩放/采样行及缓存写前后检查协作取消；被取消的任务不发图片完成/失败事件。图片缓存为 BLAKE3 命名的原子、可丢弃数据，写失败不影响输出；没有增加 AsyncRuntime 共享事件或写屏障规则。
+- 修正文档：`image.md` 补齐尺寸最小值、剩余区域裁剪、背景/模式/缓存/4 项并发上限和 request id 示例；`EVENT.md` 改为实际富文本输出并说明 ID 关联。
+- Lua 端到端回归运行真实 PNG：脚本请求→ImageService 异步转换→broker 事件→`HandleEvent` 调用 `draw.text`；同时覆盖配额拒绝/完成后释放、参数传递、坏路径和无效颜色。image task 取消测试、broker 取消后晚到事件与图像请求上限测试均通过。
+- 最终验证（Windows）：`cargo test -p tg-service-image -p tg-service-lua -p tg-service-package -p tui-game --locked`（image 33、Lua 109、package 34、宿主 107 全部通过，0 失败、0 忽略）；`cargo clippy -p tg-service-image -p tg-service-lua -p tg-service-package -p tui-game --all-targets --locked -- -D warnings`、`cargo fmt --all -- --check` 与 `git diff --check` 全部退出 0。符号链接回归按操作系统能力条件执行；没有做 B7 的实机截图检查。
+- B6.1–B6.5 全部关闭。按用户要求，本轮在 B6 后临时停下；人工处理完成前不开始 B4。恢复后下一步为 B4 schema2 与新格式迁移，并在对应实现前确认 Q2a/Q3。

@@ -338,7 +338,7 @@ error = {
     request_id = 5,
     kind = "convert",
     ok = true,
-    output = "converted-image-id",
+    output = "f%<bg:#000000><fg:#ffffff>▅",
   },
 }
 ```
@@ -348,8 +348,10 @@ error = {
 | `request_id` | `integer` | 始终 | Session 内请求 ID。 |
 | `kind` | `string` | 始终 | 固定为 `convert`。 |
 | `ok` | `boolean` | 始终 | 转换是否成功。 |
-| `output` | `string \| nil` | `ok == true` | 转换结果的虚拟标识或路径。 |
+| `output` | `string \| nil` | `ok == true` | 可直接传给 `draw.text{ text = event.data.output }` 的富文本字符串。 |
 | `error` | `table \| nil` | `ok == false` | 通用错误表。 |
+
+`request_id` 与 `image.load{...}` 立即返回的 Session 内请求 ID 一致，可用于关联并发转换结果。富文本输出以 `f%` 开头，包含终端颜色标签与方块字形。
 
 ### 5.4 `network`
 

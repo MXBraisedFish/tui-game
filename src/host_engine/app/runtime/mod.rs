@@ -2111,6 +2111,32 @@ fn apply_lua_host_commands(
           );
         }
       }
+      LuaHostCommand::ImageRequest { request_id, params } => {
+        let token = match kind {
+          LuaSessionKind::Game => services.game.session_token(),
+          LuaSessionKind::Screensaver => services.screensaver.session_token(),
+        };
+        let Some(token) = token else {
+          continue;
+        };
+        let task_id = services
+          .image
+          .convert_async(&services.async_runtime, params);
+        if let Err(error) = router.register_task(
+          task_id,
+          token,
+          LuaTaskOperation::ImageConvert { request_id },
+          LuaEventRoute::HandleEvent,
+        ) {
+          services.async_runtime.cancel_task(task_id);
+          log_lua_session_message(
+            services,
+            kind,
+            "warn",
+            format!("Lua image request rejected: {error:?}"),
+          );
+        }
+      }
       LuaHostCommand::ExitGame if kind == LuaSessionKind::Game => {
         if let Some(id) = services.game.stop() {
           services.log.close_session(id);

@@ -373,6 +373,9 @@ impl LuaSession {
     if let super::LuaEventData::I18n(event) = &delivery.event.data {
       api::apply_i18n_event(&self.api_state, event);
     }
+    if let super::LuaEventData::Image(event) = &delivery.event.data {
+      api::apply_image_event(&self.api_state, event);
+    }
     match delivery.route {
       LuaEventRoute::HandleEvent => self.handle_event(&delivery.event),
       LuaEventRoute::Callback(callback) => self.invoke_event_callback(callback, &delivery.event),
@@ -1562,12 +1565,32 @@ mod tests {
   use std::sync::atomic::{AtomicU64, Ordering};
 
   use crate::LuaFileOperation;
+  use crate::{LuaEventBroker, LuaSessionToken, LuaTaskOperation};
+  use tg_service_async::{AsyncRuntime, TaskStatusEvent};
+  use tg_service_image::{ImageEvent, ImageService};
   use tg_service_widget::SliceId;
 
   use super::super::LuaEventData;
   use super::*;
 
   static TEST_ID: AtomicU64 = AtomicU64::new(1);
+
+  enum ImageRuntimeEvent {
+    Image(ImageEvent),
+    TaskStatus(TaskStatusEvent),
+  }
+
+  impl From<ImageEvent> for ImageRuntimeEvent {
+    fn from(event: ImageEvent) -> Self {
+      Self::Image(event)
+    }
+  }
+
+  impl From<TaskStatusEvent> for ImageRuntimeEvent {
+    fn from(event: TaskStatusEvent) -> Self {
+      Self::TaskStatus(event)
+    }
+  }
 
   fn script_path(source: &str) -> PathBuf {
     let id = TEST_ID.fetch_add(1, Ordering::Relaxed);
@@ -2246,6 +2269,177 @@ mod tests {
       session.environment_value("missing"),
       Value::String(session.lua.create_string("[缺少：menu.missing]").unwrap())
     );
+  }
+
+  #[test]
+  fn image_load_returns_request_id_routes_rich_text_and_rejects_unsafe_arguments() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          image_request_id = image.load{
+            path = "./sample",
+            block_width = 2,
+            block_height = 1,
+            crop_x = 1,
+            crop_y = 2,
+            crop_width = 3,
+            crop_height = 4,
+            scale = 0.75,
+            cache = false,
+            mode = "mix_block",
+            background = color.rgb{ r = 12, g = 34, b = 56 },
+          }
+          local traversal = debug.pcall{
+            func = function() image.load{ path = "../outside.png" } end,
+          }
+          local unsupported = debug.pcall{
+            func = function() image.load{ path = "sample.gif" } end,
+          }
+          local negative_crop = debug.pcall{
+            func = function() image.load{ path = "sample.png", crop_x = -1 } end,
+          }
+          local named_color = debug.pcall{
+            func = function() image.load{ path = "sample.png", background = "red" } end,
+          }
+          local invalid_mode = debug.pcall{
+            func = function() image.load{ path = "sample.png", mode = "native" } end,
+          }
+          for _ = 1, 3 do image.load{ path = "sample" } end
+          local over_limit = debug.pcall{
+            func = function() image.load{ path = "sample" } end,
+          }
+          debug.assert{ value = image_request_id == 1 }
+          debug.assert{ value = not traversal.ok }
+          debug.assert{ value = not unsupported.ok }
+          debug.assert{ value = not negative_crop.ok }
+          debug.assert{ value = not named_color.ok }
+          debug.assert{ value = not invalid_mode.ok }
+          debug.assert{ value = not over_limit.ok }
+        end
+        function HandleEvent(event)
+          if event.type == "image" and event.data.request_id == image_request_id and event.data.ok then
+            draw.text{ x = 2, y = 3, text = event.data.output }
+            image_after_completion = image.load{ path = "sample" }
+          end
+        end
+      "#,
+    );
+    let mut spec = spec(&source, LuaSessionKind::Game);
+    let package_dir = spec.entry_path.parent().unwrap().to_path_buf();
+    let scripts_dir = package_dir.join("scripts");
+    fs::create_dir_all(&scripts_dir).unwrap();
+    spec.entry_path = scripts_dir.join("main.lua");
+    fs::write(&spec.entry_path, &source).unwrap();
+    let assets_dir = package_dir.join("assets");
+    fs::create_dir_all(&assets_dir).unwrap();
+    image::RgbImage::from_pixel(8, 8, image::Rgb([220, 100, 30]))
+      .save(assets_dir.join("sample.png"))
+      .unwrap();
+
+    let mut session = LuaSession::load(spec, LuaPolicy::default()).unwrap();
+    assert_eq!(
+      session.environment_value("image_request_id"),
+      Value::Integer(1)
+    );
+    let commands = session.take_host_commands();
+    assert_eq!(
+      commands
+        .iter()
+        .filter(|command| matches!(command, LuaHostCommand::ImageRequest { .. }))
+        .count(),
+      crate::MAX_LUA_IMAGE_TASKS_PER_SESSION
+    );
+    let image_request = commands.iter().find_map(|command| match command {
+      LuaHostCommand::ImageRequest { request_id, params } => Some((*request_id, params)),
+      _ => None,
+    });
+    let (request_id, params) = image_request.expect("Lua request should reach the host");
+    assert_eq!(request_id, 1);
+    assert_eq!(
+      PathBuf::from(&params.image_path),
+      assets_dir.join("sample.png").canonicalize().unwrap()
+    );
+    assert_eq!(params.output_width, Some(2));
+    assert_eq!(params.output_height, Some(1));
+    assert_eq!((params.crop_x, params.crop_y), (1, 2));
+    assert_eq!((params.crop_width, params.crop_height), (Some(3), Some(4)));
+    assert_eq!(params.scale, 0.75);
+    assert!(!params.cache);
+    assert_eq!(params.mode, tg_service_image::ImageConvertMode::MixBlock);
+    assert_eq!(params.background, [12, 34, 56]);
+
+    let runtime = AsyncRuntime::<ImageRuntimeEvent>::with_worker_count(1);
+    let image_service = ImageService::new(None);
+    let task_id = image_service.convert_async(&runtime, params.clone());
+    let token = LuaSessionToken {
+      kind: LuaSessionKind::Game,
+      generation: 1,
+    };
+    let mut broker = LuaEventBroker::new();
+    broker.synchronize_sessions(Some(token), None);
+    broker
+      .register_task(
+        task_id,
+        token,
+        LuaTaskOperation::ImageConvert { request_id },
+        LuaEventRoute::HandleEvent,
+      )
+      .unwrap();
+
+    let started = std::time::Instant::now();
+    let mut task_finished = false;
+    while started.elapsed() < Duration::from_secs(5) {
+      for event in runtime.poll_events() {
+        match event {
+          ImageRuntimeEvent::Image(event) => {
+            broker
+              .route_service_event(1, crate::LuaRoutableEvent::Image(&event))
+              .unwrap();
+          }
+          ImageRuntimeEvent::TaskStatus(TaskStatusEvent::Finished { id }) if id == task_id => {
+            task_finished = true;
+          }
+          ImageRuntimeEvent::TaskStatus(_) => {}
+        }
+      }
+      if task_finished {
+        break;
+      }
+      std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(task_finished, "async image conversion should finish");
+    let mut deliveries = broker.drain_frame(LuaSessionKind::Game);
+    assert_eq!(deliveries.len(), 1);
+    let delivery = deliveries.pop().unwrap();
+    let crate::LuaEventData::Image(crate::LuaImageEvent {
+      request_id: event_request_id,
+      outcome: crate::LuaImageOutcome::Converted(output),
+    }) = &delivery.event.data
+    else {
+      panic!("expected converted image output");
+    };
+    assert_eq!(*event_request_id, request_id);
+    assert!(output.starts_with("f%"));
+    let output = output.clone();
+    session.dispatch_event(&delivery).unwrap();
+    let draw_commands = session.take_draw_commands();
+    assert!(draw_commands.iter().any(|command| matches!(
+      command,
+      LuaDrawCommand::Text { x: 2, y: 3, params, .. } if params.text == output
+    )));
+    assert_eq!(
+      session.environment_value("image_after_completion"),
+      Value::Integer(5)
+    );
+    assert!(
+      session
+        .take_host_commands()
+        .iter()
+        .any(|command| matches!(command, LuaHostCommand::ImageRequest { request_id: 5, .. }))
+    );
+
+    session.stop();
+    fs::remove_dir_all(package_dir).unwrap();
   }
 
   #[test]

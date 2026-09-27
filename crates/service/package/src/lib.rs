@@ -326,6 +326,7 @@ struct ScanReport {
 #[derive(Default)]
 pub struct PackageService {
   snapshot: PackageSnapshot,
+  snapshot_revision: u64,
   user_game_key_actions: BTreeMap<String, BTreeMap<String, Vec<Vec<String>>>>,
   last_scan: Option<ScanRequest>,
   watcher_thread: Option<ManagedThreadId>,
@@ -370,7 +371,7 @@ impl PackageService {
       total_candidates,
     );
     let finished = scan_finished_event(&report);
-    self.snapshot = report.snapshot;
+    self.publish_snapshot(report.snapshot);
     for event in scan_events
       .into_iter()
       .chain(report.events)
@@ -459,7 +460,7 @@ impl PackageService {
         finished,
         watched_files,
       } => {
-        self.snapshot = snapshot;
+        self.publish_snapshot(snapshot);
         if let Some(tx) = &self.watcher_tx {
           let _ = tx.send(PackageWatcherCommand::SetFiles(watched_files));
         }
@@ -471,6 +472,11 @@ impl PackageService {
 
   pub fn games(&self) -> Vec<PackageInfo> {
     self.snapshot.games.clone()
+  }
+
+  /// Revision of the currently published package/resource snapshot.
+  pub fn snapshot_revision(&self) -> u64 {
+    self.snapshot_revision
   }
 
   pub fn screensavers(&self) -> Vec<PackageInfo> {
@@ -592,6 +598,11 @@ impl PackageService {
         .collect();
     }
     entry
+  }
+
+  fn publish_snapshot(&mut self, snapshot: PackageSnapshot) {
+    self.snapshot = snapshot;
+    self.snapshot_revision = self.snapshot_revision.wrapping_add(1);
   }
 }
 
@@ -2882,6 +2893,8 @@ mod tests {
     let mut log = LogService::new();
     scan(&mut service, &root, &mut log, "en_us");
     assert_eq!(service.mod_games()[0].mod_id, "first");
+    let first_revision = service.snapshot_revision();
+    assert!(first_revision > 0);
 
     std::fs::remove_dir_all(root.join("data/mod/game/first")).unwrap();
     write_game(&root, "data/mod/game", "second", "Second");
@@ -2896,6 +2909,7 @@ mod tests {
         .map(|entry| entry.mod_id.as_str())
         == Some("second")
       {
+        assert!(service.snapshot_revision() > first_revision);
         let _ = std::fs::remove_dir_all(root);
         return;
       }
