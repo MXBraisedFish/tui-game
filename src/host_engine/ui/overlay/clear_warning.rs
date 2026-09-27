@@ -161,11 +161,13 @@ impl ClearWarningUi {
       i18n.get_runtime_text(NS, "clear_warning.no")
     );
     let yes_text = self.yes_text(i18n);
+    let no_width = layout.get_text_width(&no_text, Some(&params));
+    let yes_width = layout.get_text_width(&yes_text, Some(&params));
     let block_w = [
       desc_size.width.max(1),
       layout.get_text_width(&path_text, Some(&params)).min(max_w),
-      layout.get_text_width(&no_text, Some(&params)),
-      layout.get_text_width(&yes_text, Some(&params)),
+      no_width,
+      yes_width,
     ]
     .into_iter()
     .max()
@@ -193,34 +195,16 @@ impl ClearWarningUi {
     let path_y = start_y.saturating_add(desc_h);
     let no_y = path_y.saturating_add(2);
     let yes_y = no_y.saturating_add(1);
-    self.draw_line(
+    Self::draw_line(
       render, canvas, content_x, path_y, &path_text, block_w, &params,
     );
-    self.draw_line(render, canvas, content_x, no_y, &no_text, block_w, &params);
-    self.draw_line(
+    Self::draw_line(render, canvas, content_x, no_y, &no_text, block_w, &params);
+    Self::draw_line(
       render, canvas, content_x, yes_y, &yes_text, block_w, &params,
     );
 
-    self.register_area(
-      hit_area,
-      canvas,
-      layout,
-      self.no_area,
-      content_x,
-      no_y,
-      &no_text,
-      &params,
-    );
-    self.register_area(
-      hit_area,
-      canvas,
-      layout,
-      self.yes_area,
-      content_x,
-      yes_y,
-      &yes_text,
-      &params,
-    );
+    self.register_area(hit_area, canvas, self.no_area, content_x, no_y, no_width);
+    self.register_area(hit_area, canvas, self.yes_area, content_x, yes_y, yes_width);
   }
 
   fn yes_text(&self, i18n: &I18nService) -> String {
@@ -240,7 +224,6 @@ impl ClearWarningUi {
   }
 
   fn draw_line(
-    &self,
     render: &mut RenderService,
     canvas: &mut CanvasService,
     x: u16,
@@ -266,12 +249,10 @@ impl ClearWarningUi {
     &mut self,
     hit_area: &HitAreaService,
     canvas: &CanvasService,
-    layout: &LayoutService,
     id: HitAreaId,
     x: u16,
     y: u16,
-    text: &str,
-    params: &RichTextParams,
+    width: u16,
   ) {
     hit_area.render_host(
       &mut self.objects,
@@ -279,7 +260,7 @@ impl ClearWarningUi {
       Rect {
         x,
         y,
-        width: layout.get_text_width(text, Some(params)).max(1),
+        width: width.max(1),
         height: 1,
       },
       canvas,

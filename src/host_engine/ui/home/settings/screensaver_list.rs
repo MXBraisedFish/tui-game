@@ -384,6 +384,8 @@ impl ScreensaverListUi {
     }
   }
 
+  // reason: the runtime calls this signature from outside ui/, so it cannot be changed here.
+  #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -402,6 +404,8 @@ impl ScreensaverListUi {
     self.register_hit_areas(hit_area, scroll_box, canvas, &pos);
   }
 
+  // reason: the runtime calls this signature from outside ui/, so it cannot be changed here.
+  #[allow(clippy::too_many_arguments)]
   pub(crate) fn prepare_surfaces(
     &mut self,
     layout: &LayoutService,
@@ -442,10 +446,9 @@ impl ScreensaverListUi {
     });
     for entry in &mut self.entries {
       let state = profile.screensaver(&entry.id);
-      // 此页面中的 enabled 表示局内屏保列表状态，不是包管理器总开关。
-      entry.enabled = state.map_or(true, |state| {
-        state.playlist_enabled || state.order.is_some()
-      });
+      // On this page `enabled` means "in the in-game screensaver list", not the package
+      // manager's master switch.
+      entry.enabled = state.is_none_or(|state| state.playlist_enabled || state.order.is_some());
       entry.debug = state.map_or(profile.defaults.debug, |state| state.debug);
     }
     let left_ids: Vec<_> = self
@@ -1339,10 +1342,8 @@ mod tests {
       path: PathBuf::new(),
       enabled,
       debug: false,
-      safe_mode: true,
       mouse_required: false,
       truecolor_required: false,
-      high_privilege_required: false,
       supported_languages: Vec::new(),
       score_enabled: false,
       score_empty_text: String::new(),

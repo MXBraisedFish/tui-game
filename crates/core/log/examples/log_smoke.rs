@@ -7,5 +7,9 @@ fn main() {
   assert_eq!(message.render(None), "loaded 3 packages");
   assert_eq!(message.render(Some("{count} ok")), "3 ok");
   assert_eq!(LogSource::Boot.phase(), LogPhase::Boot);
-  println!("log ok: [{}] {}", format_log_level(LogLevel::Info), message.render(None));
+  println!(
+    "log ok: [{}] {}",
+    format_log_level(LogLevel::Info),
+    message.render(None)
+  );
 }

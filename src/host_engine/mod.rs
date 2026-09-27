@@ -1,3 +1,5 @@
+pub mod app;
+
 pub mod boot;
 
 pub mod runtime;
@@ -10,6 +12,9 @@ pub mod services;
 
 pub mod ui;
 
+use std::io;
+
+use crate::host_engine::app::EngineServices;
 use crate::host_engine::core::{
   CrashPhase, HostFaultDomain, HostFaultPhase, catch_host_fault, finalize_host_fault,
   install_panic_hook, set_crash_phase,
@@ -17,18 +22,20 @@ use crate::host_engine::core::{
 use crate::host_engine::services::{HostLogMessage, LogSource, TerminalService};
 
 /// 启动并运行引擎主循环，依次执行引导、运行时、关闭三个阶段
-pub fn run() {
-  install_panic_hook(TerminalService::force_restore);
+pub fn run() -> io::Result<()> {
+  let deployment_root = crate::host_engine::app::current_deployment_root()?;
+  let crash_log_path = deployment_root.join("data/log/tui_crash.log");
+  install_panic_hook(TerminalService::force_restore, crash_log_path.clone());
 
   set_crash_phase(CrashPhase::Init);
-  let boot_output = boot::prepare();
+  let boot_output = boot::prepare(deployment_root)?;
 
   let mut services = boot_output.services;
   let mut world = boot_output.world;
 
   if let Some(fault) = boot_output.fault {
     let run_id = services.log.run_id().to_string();
-    let _ = finalize_host_fault(&run_id, &fault);
+    let _ = finalize_host_fault(&run_id, &fault, &crash_log_path);
     services.log.error_message(
       LogSource::Crash,
       HostLogMessage::new(
@@ -43,7 +50,7 @@ pub fn run() {
     set_crash_phase(CrashPhase::Shutdown);
     log_lifecycle(&mut services, "shutdown");
     shutdown::close(&mut services, world, exit_state);
-    return;
+    return Ok(());
   }
 
   set_crash_phase(CrashPhase::Runtime);
@@ -54,7 +61,7 @@ pub fn run() {
     Ok(exit_state) => exit_state,
     Err(fault) => {
       let run_id = services.log.run_id().to_string();
-      let _ = finalize_host_fault(&run_id, &fault);
+      let _ = finalize_host_fault(&run_id, &fault, &crash_log_path);
       services.log.error_message(
         LogSource::Crash,
         HostLogMessage::new(
@@ -70,9 +77,10 @@ pub fn run() {
   set_crash_phase(CrashPhase::Shutdown);
   log_lifecycle(&mut services, "shutdown");
   shutdown::close(&mut services, world, exit_state);
+  Ok(())
 }
 
-fn log_lifecycle(services: &mut services::EngineServices, phase: &'static str) {
+fn log_lifecycle(services: &mut EngineServices, phase: &'static str) {
   services.log.info_message(
     LogSource::Engine,
     HostLogMessage::new(

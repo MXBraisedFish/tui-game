@@ -1,9 +1,17 @@
-//! Minimal entry: searches for ffmpeg next to the working directory and reports what it found.
+//! Minimal entry: searches deployment, managed-cache and system locations for ffmpeg.
+
+use std::path::PathBuf;
 
 use tg_service_ffmpeg::FfmpegService;
 
 fn main() {
-  let mut ffmpeg = FfmpegService::new(".", "data/cache/ffmpeg");
+  let executable = std::env::current_exe().expect("current executable");
+  let root = executable
+    .parent()
+    .expect("executable parent")
+    .to_path_buf();
+  let managed_directory = root.join(PathBuf::from("data/cache/ffmpeg"));
+  let mut ffmpeg = FfmpegService::new(root, managed_directory);
   let found = ffmpeg.refresh();
   assert_eq!(found, ffmpeg.installation().is_some());
   match ffmpeg.installation() {

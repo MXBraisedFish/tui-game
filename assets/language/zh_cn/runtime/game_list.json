@@ -28,7 +28,6 @@
   "game_list.info.pack_title": "包标题：",
   "game_list.info.mouse.error": "该游戏可能需要鼠标支持才能获得完整体验",
   "game_list.info.true_color.error": "该游戏可能需要真彩支持才能获得完整体验",
-  "game_list.info.high_privilege.error": "该游戏可能需要关闭安全模式才能获得完整体验",
   "game_list.info.language.error": "该游戏可能不支持当前所选语言",
   "game_list.info.description": "游戏玩法：",
   "game_list.list.sort.title": "游戏名",

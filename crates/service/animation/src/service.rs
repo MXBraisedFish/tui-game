@@ -283,11 +283,7 @@ impl AnimationService {
     Ok(output)
   }
 
-  pub fn clear_owner(
-    &self,
-    pool: &mut AnimationObjects,
-    owner: AnimationOwner,
-  ) -> AnimationUpdate {
+  pub fn clear_owner(&self, pool: &mut AnimationObjects, owner: AnimationOwner) -> AnimationUpdate {
     let mut output = AnimationUpdate::default();
     for id in pool.animations.ids_owned_by(owner) {
       if let Ok(removed) = self.remove(pool, AnimationHandle::new(id)) {

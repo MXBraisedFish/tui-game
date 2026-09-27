@@ -161,4 +161,29 @@ mod tests {
     barrier.stop_new_writes();
     assert!(!barrier.register(TaskId(1), PathBuf::from("x"), None));
   }
+
+  #[test]
+  fn wait_does_not_finish_until_an_active_write_finishes() {
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    let barrier = WriteBarrier::new();
+    assert!(barrier.register(TaskId(1), PathBuf::from("save.json"), None));
+    barrier.start(TaskId(1));
+
+    let waiting_barrier = barrier.clone();
+    let (started_tx, started_rx) = mpsc::channel();
+    let (finished_tx, finished_rx) = mpsc::channel();
+    let waiter = std::thread::spawn(move || {
+      started_tx.send(()).unwrap();
+      waiting_barrier.wait();
+      finished_tx.send(()).unwrap();
+    });
+
+    started_rx.recv().unwrap();
+    assert!(finished_rx.recv_timeout(Duration::from_millis(20)).is_err());
+    barrier.finish(TaskId(1));
+    finished_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+    waiter.join().unwrap();
+  }
 }

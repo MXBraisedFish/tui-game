@@ -1,5 +1,5 @@
-use crate::host_engine::core::{ExitState, RuntimeWorld, set_crash_phase};
-use crate::host_engine::services::EngineServices;
+use crate::host_engine::app::{EngineServices, RuntimeWorld};
+use crate::host_engine::core::{ExitState, set_crash_phase};
 
 use super::services::{HostLogMessage, LogSource};
 

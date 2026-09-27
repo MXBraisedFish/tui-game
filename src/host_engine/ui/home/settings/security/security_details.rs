@@ -108,6 +108,8 @@ impl SecurityDetailsUi {
     let _ = scroll_box.scroll_by(&mut self.objects, self.scroll_box, 0, amount, layout);
   }
 
+  // reason: the runtime calls this signature from outside ui/, so it cannot be changed here.
+  #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
     render: &mut RenderService,

@@ -14,4 +14,6 @@ pub use key::{
   InputActionEvent, InputEventType, Key, KeyBinding, KeyEvent, KeyEventKind, KeyPattern, KeyState,
   RawKeyEvent,
 };
-pub use key_token::{canonical_key_token, display_key_token, format_key_display, key_token, parse_key_token};
+pub use key_token::{
+  canonical_key_token, display_key_token, format_key_display, key_token, parse_key_token,
+};

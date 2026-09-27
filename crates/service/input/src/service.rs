@@ -15,8 +15,8 @@ use crossterm::event::{
 };
 use rdev::{Event, EventType, Key as RdevKey, listen};
 
-use tg_service_async::AsyncRuntime;
 use tg_core_log::LogSource;
+use tg_service_async::AsyncRuntime;
 use tg_service_log::LogService;
 
 use tg_core_input::{
@@ -92,7 +92,11 @@ impl InputService {
   /// 启动全局键盘监听线程（仅首次调用生效）
   pub fn start_key_listener<E>(&self, async_runtime: &mut AsyncRuntime<E>)
   where
-    E: From<KeyEvent> + From<InputListenerError> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+    E: From<KeyEvent>
+      + From<InputListenerError>
+      + From<tg_service_async::TaskStatusEvent>
+      + Send
+      + 'static,
   {
     if self.key_listener_started.swap(true, Ordering::SeqCst) {
       return;
@@ -102,13 +106,10 @@ impl InputService {
       thread::spawn(move || {
         let sender_for_callback = sender.clone();
         let callback = move |event: Event| {
-          if let Some(key_event) = key_event_from_rdev(event) {
-            if sender_for_callback
-              .send(E::from(key_event))
-              .is_err()
-            {
-              // Channel disconnected — likely during shutdown
-            }
+          if let Some(key_event) = key_event_from_rdev(event)
+            && sender_for_callback.send(E::from(key_event)).is_err()
+          {
+            // Channel disconnected — likely during shutdown
           }
         };
         if let Err(error) = listen(callback) {
@@ -124,7 +125,11 @@ impl InputService {
   /// 启动系统事件监听线程（终端按键/鼠标/窗口大小/焦点）
   pub fn start_system_listener<E>(&self, async_runtime: &mut AsyncRuntime<E>)
   where
-    E: From<SystemEvent> + From<InputListenerError> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
+    E: From<SystemEvent>
+      + From<InputListenerError>
+      + From<tg_service_async::TaskStatusEvent>
+      + Send
+      + 'static,
   {
     if self.system_listener_started.swap(true, Ordering::SeqCst) {
       return;
@@ -148,17 +153,17 @@ impl InputService {
             if let Ok(ct_event) = ct_event::read() {
               match ct_event {
                 CtEvent::Key(key_event) => {
-                  if let Some(event) = terminal_key_event_from_crossterm(key_event) {
-                    if sender.send(E::from(event)).is_err() {
-                      // Channel disconnected — likely during shutdown.
-                    }
+                  if let Some(event) = terminal_key_event_from_crossterm(key_event)
+                    && sender.send(E::from(event)).is_err()
+                  {
+                    // Channel disconnected — likely during shutdown.
                   }
                 }
                 other_event => {
-                  if let Some(sys_event) = system_event_from_crossterm(other_event) {
-                    if sender.send(E::from(sys_event)).is_err() {
-                      // Channel disconnected — likely during shutdown.
-                    }
+                  if let Some(sys_event) = system_event_from_crossterm(other_event)
+                    && sender.send(E::from(sys_event)).is_err()
+                  {
+                    // Channel disconnected — likely during shutdown.
                   }
                 }
               }
@@ -248,20 +253,21 @@ impl InputService {
       let Some(event) = self.pop_system_event() else {
         break;
       };
-      if let SystemEvent::Mouse(me) = &event {
-        if let Some(button) = me.button {
-          match me.kind {
-            MouseEventKind::Press | MouseEventKind::Drag => {
-              active_buttons.insert(button);
-            }
-            _ => {}
+      if let SystemEvent::Mouse(me) = &event
+        && let Some(button) = me.button
+      {
+        match me.kind {
+          MouseEventKind::Press | MouseEventKind::Drag => {
+            active_buttons.insert(button);
           }
+          _ => {}
         }
       }
-      if self.focused && self.raw_mouse_capture_enabled {
-        if let SystemEvent::Mouse(mouse) = &event {
-          self.raw_mouse_events.push_back(*mouse);
-        }
+      if self.focused
+        && self.raw_mouse_capture_enabled
+        && let SystemEvent::Mouse(mouse) = &event
+      {
+        self.raw_mouse_events.push_back(*mouse);
       }
       self.apply_system_event(&event);
       events.push(event);
@@ -271,20 +277,20 @@ impl InputService {
       if events.len() >= limit {
         break;
       }
-      if !active_buttons.contains(button) {
-        if let Some((x, y)) = self.mouse_position {
-          let hold = MouseEvent {
-            kind: MouseEventKind::Hold,
-            button: Some(*button),
-            scroll: None,
-            x,
-            y,
-          };
-          if self.focused && self.raw_mouse_capture_enabled {
-            self.raw_mouse_events.push_back(hold);
-          }
-          events.push(SystemEvent::Mouse(hold));
+      if !active_buttons.contains(button)
+        && let Some((x, y)) = self.mouse_position
+      {
+        let hold = MouseEvent {
+          kind: MouseEventKind::Hold,
+          button: Some(*button),
+          scroll: None,
+          x,
+          y,
+        };
+        if self.focused && self.raw_mouse_capture_enabled {
+          self.raw_mouse_events.push_back(hold);
         }
+        events.push(SystemEvent::Mouse(hold));
       }
     }
 
@@ -570,7 +576,7 @@ impl InputService {
     for binding in bindings {
       let pattern = binding.pattern.normalized();
 
-      if pattern.has_consumed_key(&consumed_keys) {
+      if pattern.has_consumed_key(consumed_keys) {
         continue;
       }
 
@@ -641,6 +647,12 @@ impl InputService {
         }
       }
     }
+  }
+}
+
+impl Default for InputService {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
@@ -886,6 +898,7 @@ fn mouse_button_from_crossterm(button: crossterm::event::MouseButton) -> MouseBu
 #[cfg(test)]
 mod tests {
   use super::*;
+  use tg_core_input::{ActionMapEntry, translate_action_map};
 
   fn key(code: CtKeyCode) -> CtKeyEvent {
     CtKeyEvent::new(code, CtKeyModifiers::NONE)
@@ -934,6 +947,30 @@ mod tests {
     );
     assert_eq!(input.collect_action_events()[0].action, "test.a");
     assert_eq!(input.collect_action_events()[0].state, KeyState::Pressed);
+  }
+
+  #[test]
+  fn raw_key_capture_uses_the_shared_modifier_display() {
+    let mut input = InputService::new();
+    input.enable_raw_key_capture();
+    for key in [Key::LeftCtrl, Key::RightCtrl] {
+      input
+        .sender
+        .send(KeyEvent {
+          key,
+          kind: KeyEventKind::Press,
+        })
+        .unwrap();
+    }
+    input.poll();
+
+    let events = input.take_raw_key_events();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].key, Key::LeftCtrl);
+    assert_eq!(events[0].display, display_key_token(Key::LeftCtrl));
+    assert_eq!(events[1].key, Key::RightCtrl);
+    assert_eq!(events[1].display, display_key_token(Key::RightCtrl));
+    assert_ne!(events[0].display, events[1].display);
   }
 
   #[test]
@@ -995,6 +1032,158 @@ mod tests {
       kind: KeyEventKind::Release,
     });
     assert_eq!(input.collect_action_events()[0].state, KeyState::Released);
+  }
+
+  #[test]
+  fn left_and_right_modifier_bindings_route_independently() {
+    let bindings = translate_action_map(&[
+      ActionMapEntry {
+        action: "left_modifier".into(),
+        description: String::new(),
+        keys: vec![vec!["left_ctrl".into()]],
+      },
+      ActionMapEntry {
+        action: "right_modifier".into(),
+        description: String::new(),
+        keys: vec![vec!["right_ctrl".into()]],
+      },
+    ])
+    .unwrap();
+    let mut input = InputService::new();
+    input.load_key_bindings(bindings);
+
+    input
+      .sender
+      .send(KeyEvent {
+        key: Key::LeftCtrl,
+        kind: KeyEventKind::Press,
+      })
+      .unwrap();
+    input.poll();
+    assert_eq!(
+      input.collect_action_events(),
+      vec![InputActionEvent {
+        event_type: InputEventType::Keyboard,
+        action: "left_modifier".into(),
+        state: KeyState::Pressed,
+      }]
+    );
+
+    input.begin_frame();
+    input
+      .sender
+      .send(KeyEvent {
+        key: Key::RightCtrl,
+        kind: KeyEventKind::Press,
+      })
+      .unwrap();
+    input.poll();
+    assert_eq!(
+      input.collect_action_events(),
+      vec![
+        InputActionEvent {
+          event_type: InputEventType::Keyboard,
+          action: "left_modifier".into(),
+          state: KeyState::Held,
+        },
+        InputActionEvent {
+          event_type: InputEventType::Keyboard,
+          action: "right_modifier".into(),
+          state: KeyState::Pressed,
+        },
+      ]
+    );
+
+    input.begin_frame();
+    input
+      .sender
+      .send(KeyEvent {
+        key: Key::LeftCtrl,
+        kind: KeyEventKind::Release,
+      })
+      .unwrap();
+    input.poll();
+    assert_eq!(
+      input.collect_action_events(),
+      vec![
+        InputActionEvent {
+          event_type: InputEventType::Keyboard,
+          action: "left_modifier".into(),
+          state: KeyState::Released,
+        },
+        InputActionEvent {
+          event_type: InputEventType::Keyboard,
+          action: "right_modifier".into(),
+          state: KeyState::Held,
+        },
+      ]
+    );
+  }
+
+  #[test]
+  fn rdev_modifier_events_keep_the_reported_side() {
+    let cases = [
+      (RdevKey::ControlLeft, Key::LeftCtrl),
+      (RdevKey::ControlRight, Key::RightCtrl),
+      (RdevKey::ShiftLeft, Key::LeftShift),
+      (RdevKey::ShiftRight, Key::RightShift),
+      (RdevKey::Alt, Key::LeftAlt),
+      (RdevKey::AltGr, Key::RightAlt),
+      (RdevKey::MetaLeft, Key::LeftMeta),
+      (RdevKey::MetaRight, Key::RightMeta),
+    ];
+    for (source, expected) in cases {
+      assert_eq!(key_from_rdev(source), Some(expected));
+    }
+  }
+
+  #[test]
+  fn left_and_right_modifier_combinations_route_to_distinct_actions() {
+    fn send(input: &mut InputService, key: Key, kind: KeyEventKind) {
+      input.sender.send(KeyEvent { key, kind }).unwrap();
+      input.poll();
+    }
+
+    let bindings = translate_action_map(&[
+      ActionMapEntry {
+        action: "left_combo".into(),
+        description: String::new(),
+        keys: vec![vec!["left_ctrl".into(), "x".into()]],
+      },
+      ActionMapEntry {
+        action: "right_combo".into(),
+        description: String::new(),
+        keys: vec![vec!["right_ctrl".into(), "x".into()]],
+      },
+    ])
+    .unwrap();
+    let mut input = InputService::new();
+    input.load_key_bindings(bindings);
+
+    send(&mut input, Key::LeftCtrl, KeyEventKind::Press);
+    assert!(input.collect_action_events().is_empty());
+    input.begin_frame();
+    send(&mut input, Key::X, KeyEventKind::Press);
+    let events = input.collect_action_events();
+    assert_eq!(events[0].action, "left_combo");
+    assert_eq!(events[0].state, KeyState::Pressed);
+    input.begin_frame();
+    send(&mut input, Key::X, KeyEventKind::Release);
+    let events = input.collect_action_events();
+    assert_eq!(events[0].action, "left_combo");
+    assert_eq!(events[0].state, KeyState::Released);
+    input.begin_frame();
+    send(&mut input, Key::LeftCtrl, KeyEventKind::Release);
+    assert!(input.collect_action_events().is_empty());
+
+    input.begin_frame();
+    send(&mut input, Key::RightCtrl, KeyEventKind::Press);
+    assert!(input.collect_action_events().is_empty());
+    input.begin_frame();
+    send(&mut input, Key::X, KeyEventKind::Press);
+    let events = input.collect_action_events();
+    assert_eq!(events[0].action, "right_combo");
+    assert_eq!(events[0].state, KeyState::Pressed);
   }
 
   #[test]

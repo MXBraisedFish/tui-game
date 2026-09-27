@@ -13,7 +13,11 @@ pub fn proxy(lua: &Lua, source: Table) -> mlua::Result<Table> {
       ))
     })?,
   )?;
-  metatable.set("__len", source.raw_len())?;
+  let length_source = source.clone();
+  metatable.set(
+    "__len",
+    lua.create_function(move |_, _table: Value| Ok(length_source.raw_len()))?,
+  )?;
   let pairs_source = source.clone();
   metatable.set(
     "__pairs",

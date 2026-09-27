@@ -404,11 +404,7 @@ impl TimeService {
     self.reset_internal(pool, timer_id)
   }
 
-  pub fn delay_timer_state(
-    &self,
-    pool: &TimeObjects,
-    id: DelayTimerId,
-  ) -> Option<TimerState> {
+  pub fn delay_timer_state(&self, pool: &TimeObjects, id: DelayTimerId) -> Option<TimerState> {
     Some(
       pool
         .timers
@@ -418,11 +414,7 @@ impl TimeService {
     )
   }
 
-  pub fn delay_timer_elapsed(
-    &self,
-    pool: &TimeObjects,
-    id: DelayTimerId,
-  ) -> Option<Duration> {
+  pub fn delay_timer_elapsed(&self, pool: &TimeObjects, id: DelayTimerId) -> Option<Duration> {
     Some(
       pool
         .timers
@@ -432,11 +424,7 @@ impl TimeService {
     )
   }
 
-  pub fn delay_timer_remaining(
-    &self,
-    pool: &TimeObjects,
-    id: DelayTimerId,
-  ) -> Option<Duration> {
+  pub fn delay_timer_remaining(&self, pool: &TimeObjects, id: DelayTimerId) -> Option<Duration> {
     pool
       .timers
       .timers
@@ -543,11 +531,7 @@ impl TimeService {
     self.reset_internal(pool, timer_id)
   }
 
-  pub fn repeat_timer_state(
-    &self,
-    pool: &TimeObjects,
-    id: RepeatTimerId,
-  ) -> Option<TimerState> {
+  pub fn repeat_timer_state(&self, pool: &TimeObjects, id: RepeatTimerId) -> Option<TimerState> {
     Some(
       pool
         .timers
@@ -557,11 +541,7 @@ impl TimeService {
     )
   }
 
-  pub fn repeat_timer_elapsed(
-    &self,
-    pool: &TimeObjects,
-    id: RepeatTimerId,
-  ) -> Option<Duration> {
+  pub fn repeat_timer_elapsed(&self, pool: &TimeObjects, id: RepeatTimerId) -> Option<Duration> {
     Some(
       pool
         .timers
@@ -571,11 +551,7 @@ impl TimeService {
     )
   }
 
-  pub fn repeat_timer_remaining(
-    &self,
-    pool: &TimeObjects,
-    id: RepeatTimerId,
-  ) -> Option<Duration> {
+  pub fn repeat_timer_remaining(&self, pool: &TimeObjects, id: RepeatTimerId) -> Option<Duration> {
     pool
       .timers
       .timers
@@ -591,11 +567,7 @@ impl TimeService {
       .progress()
   }
 
-  pub fn repeat_timer_executed_count(
-    &self,
-    pool: &TimeObjects,
-    id: RepeatTimerId,
-  ) -> Option<u32> {
+  pub fn repeat_timer_executed_count(&self, pool: &TimeObjects, id: RepeatTimerId) -> Option<u32> {
     Some(pool.repeat_timers.timers.get(&id)?.executed_count)
   }
 
@@ -607,30 +579,18 @@ impl TimeService {
     pool.take_repeat_timer_events(id)
   }
 
-  pub fn take_time_callback_requests(
-    &self,
-    pool: &mut TimeObjects,
-  ) -> Vec<TimeCallbackRequest> {
+  pub fn take_time_callback_requests(&self, pool: &mut TimeObjects) -> Vec<TimeCallbackRequest> {
     pool.take_time_callback_requests()
   }
 
-  fn create(
-    &self,
-    pool: &mut TimeObjects,
-    mode: TimerMode,
-    options: TimerOptions,
-  ) -> TimerId {
+  fn create(&self, pool: &mut TimeObjects, mode: TimerMode, options: TimerOptions) -> TimerId {
     let id = TimerId(pool.timers.next_id);
     pool.timers.next_id += 1;
     pool.timers.timers.insert(id, Timer::new(mode, options));
     id
   }
 
-  fn create_internal_count_down(
-    &self,
-    pool: &mut TimeObjects,
-    duration: Duration,
-  ) -> TimerId {
+  fn create_internal_count_down(&self, pool: &mut TimeObjects, duration: Duration) -> TimerId {
     let id = self.create(
       pool,
       TimerMode::CountDown { duration },

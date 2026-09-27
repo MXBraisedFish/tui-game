@@ -21,7 +21,6 @@
     "target_fps": 30,
     "mouse": false,
     "truecolor": false,
-    "high_privilege": false,
     "save": false,
     "language": ["en_us"],
     "actions": {}

@@ -1065,4 +1065,29 @@ mod tests {
     assert!(ui.handle_raw_key_events(&mut input, Duration::from_millis(1)));
     assert_eq!(ui.rows[0].keys, vec![vec!["a".to_string()]]);
   }
+
+  #[test]
+  fn modifier_display_fits_global_binding_columns_at_eighty_cells() {
+    let hit_area = HitAreaService::new();
+    let mut ui = GlobalKeyBindingsUi::init(&hit_area);
+    let pattern = vec!["right_shift".to_string(), "q".to_string()];
+    ui.load(
+      vec![ActionMapEntry {
+        action: "host.quit".into(),
+        description: "Quit".into(),
+        keys: vec![pattern.clone()],
+      }],
+      KeyBindingsProfile::default(),
+    );
+
+    let mut layout = LayoutService::new();
+    layout.resize_physical(80, 30);
+    let table_width = ui.table_width(&layout, 80);
+    let inner_width = table_width.saturating_sub(2);
+    let key_column_width = inner_width.saturating_mul(30) / 100;
+    let available_text_width = key_column_width.saturating_sub(6);
+    let display = format_key_display(&[pattern]);
+
+    assert!(available_text_width >= layout.get_text_width(&display, None));
+  }
 }

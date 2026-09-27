@@ -17,7 +17,10 @@ fn main() {
     persistent: false,
   }));
   let view = popups.view().expect("popup is visible");
-  assert!(!popups.dismiss(PopupDismissEvent::UiInput), "too early to dismiss");
+  assert!(
+    !popups.dismiss(PopupDismissEvent::UiInput),
+    "too early to dismiss"
+  );
   popups.update(Duration::from_secs(1));
   assert!(popups.dismiss(PopupDismissEvent::UiInput));
   assert!(popups.view().is_none());

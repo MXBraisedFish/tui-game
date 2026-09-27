@@ -4,7 +4,10 @@ use tg_core_audio::{AudioAsyncEvent, AudioErrorCode, AudioId};
 use tg_service_async::TaskId;
 use tg_service_file::FileEvent;
 use tg_service_image::ImageEvent;
-use tg_service_network::{NetworkError, NetworkErrorCode, NetworkEvent, NetworkMethod, NetworkResponseBody, NetworkResponseMode};
+use tg_service_network::{
+  NetworkError, NetworkErrorCode, NetworkEvent, NetworkMethod, NetworkResponseBody,
+  NetworkResponseMode,
+};
 use tg_service_time::TimeAsyncEvent;
 
 use super::super::LuaSessionKind;
@@ -38,6 +41,7 @@ pub const MAX_LUA_EVENTS_PER_FRAME: usize = 128;
 pub const MAX_LUA_PENDING_EVENTS: usize = 1_024;
 pub const MAX_LUA_NETWORK_TASKS_PER_SESSION: usize = 4;
 pub const MAX_LUA_FILE_TASKS_PER_SESSION: usize = 8;
+pub const MAX_LUA_IMAGE_TASKS_PER_SESSION: usize = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct LuaSessionToken {
@@ -114,6 +118,7 @@ pub enum LuaEnqueueError {
   AudioAlreadyRegistered(AudioId),
   NetworkTaskLimit(LuaSessionToken),
   FileTaskLimit(LuaSessionToken),
+  ImageTaskLimit(LuaSessionToken),
   InvalidVirtualPath,
   StaleTaskCompletion(TaskId),
   StaleAudioEvent(AudioId),
@@ -346,6 +351,18 @@ impl LuaEventBroker {
         >= MAX_LUA_FILE_TASKS_PER_SESSION
     {
       return Err(LuaEnqueueError::FileTaskLimit(token));
+    }
+    if matches!(operation, LuaTaskOperation::ImageConvert { .. })
+      && self
+        .tasks
+        .values()
+        .filter(|task| {
+          task.token == token && matches!(task.operation, LuaTaskOperation::ImageConvert { .. })
+        })
+        .count()
+        >= MAX_LUA_IMAGE_TASKS_PER_SESSION
+    {
+      return Err(LuaEnqueueError::ImageTaskLimit(token));
     }
     if self.tasks.contains_key(&task_id) {
       return Err(LuaEnqueueError::TaskAlreadyRegistered(task_id));
@@ -867,9 +884,9 @@ mod tests {
   use std::path::PathBuf;
 
   use super::*;
+  use crate::{LuaActionState, LuaSessionKind};
   use tg_core_audio::{AudioError, AudioPoolId};
   use tg_core_input::{KeyState, MouseEvent, MouseEventKind};
-  use crate::{LuaActionState, LuaSessionKind};
 
   fn token(kind: LuaSessionKind, generation: u64) -> LuaSessionToken {
     LuaSessionToken { kind, generation }
@@ -1708,6 +1725,61 @@ mod tests {
       ),
       Err(LuaEnqueueError::StaleTaskCompletion(TaskId(1)))
     ));
+  }
+
+  #[test]
+  fn image_task_limit_is_per_session_and_released_on_completion() {
+    let game = token(LuaSessionKind::Game, 1);
+    let saver = token(LuaSessionKind::Screensaver, 1);
+    let mut broker = LuaEventBroker::new();
+    broker.synchronize_sessions(Some(game), Some(saver));
+    for index in 0..MAX_LUA_IMAGE_TASKS_PER_SESSION {
+      broker
+        .register_task(
+          TaskId(index as u64 + 1),
+          game,
+          LuaTaskOperation::ImageConvert {
+            request_id: index as u64 + 1,
+          },
+          LuaEventRoute::HandleEvent,
+        )
+        .unwrap();
+    }
+    assert!(matches!(
+      broker.register_task(
+        TaskId(99),
+        game,
+        LuaTaskOperation::ImageConvert { request_id: 99 },
+        LuaEventRoute::HandleEvent,
+      ),
+      Err(LuaEnqueueError::ImageTaskLimit(actual)) if actual == game
+    ));
+
+    broker
+      .register_task(
+        TaskId(99),
+        saver,
+        LuaTaskOperation::ImageConvert { request_id: 99 },
+        LuaEventRoute::HandleEvent,
+      )
+      .expect("the image limit is isolated per session");
+    broker
+      .route_service_event(
+        2,
+        LuaRoutableEvent::Image(&ImageEvent::ConvertFinished {
+          task_id: TaskId(1),
+          output: "f%image".to_string(),
+        }),
+      )
+      .unwrap();
+    broker
+      .register_task(
+        TaskId(100),
+        game,
+        LuaTaskOperation::ImageConvert { request_id: 100 },
+        LuaEventRoute::HandleEvent,
+      )
+      .expect("completed tasks release their slot");
   }
 
   #[test]

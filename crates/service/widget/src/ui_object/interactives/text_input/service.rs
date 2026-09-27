@@ -8,9 +8,9 @@ use super::types::{
   TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
   TextInputRenderParams, TextSurface,
 };
+use crate::SliceId;
 use crate::UiObjectPool;
 use tg_service_canvas::CanvasService;
-use crate::SliceId;
 
 const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 
@@ -309,6 +309,13 @@ impl TextInputService {
     }
   }
   fn cursor_blink_visible(&self) -> bool {
-    (self.cursor_blink_started.elapsed().as_millis() / CURSOR_BLINK_INTERVAL.as_millis()) % 2 == 0
+    (self.cursor_blink_started.elapsed().as_millis() / CURSOR_BLINK_INTERVAL.as_millis())
+      .is_multiple_of(2)
+  }
+}
+
+impl Default for TextInputService {
+  fn default() -> Self {
+    Self::new()
   }
 }

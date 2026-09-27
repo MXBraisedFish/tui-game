@@ -28,7 +28,6 @@
   "game_list.info.pack_title": "Title:",
   "game_list.info.mouse.error": "This game may require mouse support for the full experience",
   "game_list.info.true_color.error": "This game may require truecolor support for the full experience",
-  "game_list.info.high_privilege.error": "This game may require disabling safe mode for the full experience",
   "game_list.info.language.error": "This game may not support the selected language",
   "game_list.info.description": "Gameplay:",
   "game_list.list.sort.title": "Game",

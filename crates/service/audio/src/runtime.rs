@@ -876,7 +876,10 @@ struct CaptureFile {
   samples_written: u64,
 }
 
-fn run_capture_writer(messages: Receiver<CaptureWriterMessage>, event_tx: EventSink<AudioAsyncEvent>) {
+fn run_capture_writer(
+  messages: Receiver<CaptureWriterMessage>,
+  event_tx: EventSink<AudioAsyncEvent>,
+) {
   let mut captures = HashMap::<AudioCaptureId, CaptureFile>::new();
   for message in messages {
     match message {
@@ -1171,7 +1174,10 @@ fn send_object_error(
   );
 }
 
-fn report_backend_failure_once(event_tx: &EventSink<AudioAsyncEvent>, already_reported: &AtomicBool) {
+fn report_backend_failure_once(
+  event_tx: &EventSink<AudioAsyncEvent>,
+  already_reported: &AtomicBool,
+) {
   if already_reported.swap(true, Ordering::AcqRel) {
     return;
   }

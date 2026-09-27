@@ -17,6 +17,8 @@ pub mod security;
 pub mod storage_management;
 pub mod toolbar_custom;
 
+pub(crate) use mods::PackageListRenderContext;
+
 use key_bindings::KeyBindingsUi;
 use screenshot_recording::ScreenshotRecordingUi;
 
@@ -33,7 +35,7 @@ const MENU_KEYS: &[&str] = &[
   "settings.screenshot_recording",
 ];
 
-/// 设置页面布局信息。
+/// Screen layout of the settings page.
 pub(crate) struct SettingsLayout {
   title_x: u16,
   title_y: u16,
@@ -42,7 +44,7 @@ pub(crate) struct SettingsLayout {
   action_hint_y: u16,
 }
 
-/// 设置页面 UI：包含菜单导航和操作提示。
+/// Settings page with menu navigation and action hints.
 pub struct SettingsUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -73,7 +75,7 @@ impl RuntimeObjectPoolOwner for SettingsUi {
   }
 }
 
-/// 设置页面的命令。
+/// Command emitted by the settings page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsUiCommand {
   Back,
@@ -88,7 +90,7 @@ pub enum SettingsUiCommand {
 }
 
 impl SettingsUi {
-  /// 初始化设置页面 UI。
+  /// Creates the settings page UI.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -114,7 +116,7 @@ impl SettingsUi {
     &mut self.key_bindings
   }
 
-  /// 返回设置页面的按键映射定义。
+  /// Returns the action map (key bindings) of the settings page.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -180,7 +182,7 @@ impl SettingsUi {
     ]
   }
 
-  /// 处理 UI 事件，返回导航或确认命令。
+  /// Handles a UI event and returns the navigation or confirm command it triggers, if any.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<SettingsUiCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -274,7 +276,7 @@ impl SettingsUi {
     None
   }
 
-  /// 渲染设置页面到宿主层。
+  /// Draws the settings page onto the host layer.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -292,7 +294,8 @@ impl SettingsUi {
     }
   }
 
-  /// 根据布局服务计算设置页面各元素的宿主坐标。
+  /// Computes the host coordinates of every element of the settings page from the
+  /// [`LayoutService`].
   pub fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> SettingsLayout {
     let params = self.build_key_params();
     let viewport = layout.developer_viewport_rect();

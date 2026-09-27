@@ -45,10 +45,6 @@ impl TextBuffer {
     changed
   }
 
-  pub fn clear(&mut self) -> bool {
-    self.set_text(String::new())
-  }
-
   pub fn cursor(&self) -> usize {
     self.cursor
   }
@@ -159,14 +155,6 @@ impl TextBuffer {
     true
   }
 
-  pub fn move_left(&mut self) -> bool {
-    self.move_left_select(false, false)
-  }
-
-  pub fn move_right(&mut self) -> bool {
-    self.move_right_select(false, false)
-  }
-
   /// 向左移动一个字素或一个单词，可选扩展选区。
   pub fn move_left_select(&mut self, extend: bool, word: bool) -> bool {
     if !extend && self.selection().is_some() {
@@ -199,14 +187,6 @@ impl TextBuffer {
     target.is_some_and(|target| self.move_to(target, extend))
   }
 
-  pub fn move_home(&mut self) -> bool {
-    self.move_to(0, false)
-  }
-
-  pub fn move_end(&mut self) -> bool {
-    self.move_to(self.text.len(), false)
-  }
-
   /// 移动光标到指定位置（自动对齐边界），可选扩展选区。
   pub fn move_to(&mut self, cursor: usize, extend: bool) -> bool {
     let changed = self.set_cursor(cursor, extend);
@@ -220,10 +200,6 @@ impl TextBuffer {
 
   pub fn set_preferred_column(&mut self, column: Option<usize>) {
     self.preferred_column = column;
-  }
-
-  pub fn grapheme_count(&self) -> usize {
-    self.text.graphemes(true).count()
   }
 
   fn boundaries(&self) -> Vec<usize> {

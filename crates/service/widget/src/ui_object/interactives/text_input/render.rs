@@ -100,17 +100,19 @@ pub(super) fn render_single_line(
     x += glyph.width;
   }
   let cursor_x = cursor_x_full.saturating_sub(start_x);
-  if active && cursor_glyph.is_none() && cursor_visible {
-    if let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default()) {
-      draw_styled(
-        canvas,
-        surface,
-        params.rect.x + offset_x + cursor_x as u16,
-        y,
-        marker,
-        input_cursor_style(params),
-      );
-    }
+  if active
+    && cursor_glyph.is_none()
+    && cursor_visible
+    && let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default())
+  {
+    draw_styled(
+      canvas,
+      surface,
+      params.rect.x + offset_x + cursor_x as u16,
+      y,
+      marker,
+      input_cursor_style(params),
+    );
   }
   state.hit = Some(HitSnapshot {
     rect: params.rect,
@@ -210,19 +212,18 @@ pub(super) fn render_multi_line(
       .iter()
       .any(|glyph| glyph.start == state.buffer.cursor())
     && cursor_visible
+    && let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default())
   {
-    if let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default()) {
-      let line_w = line_widths.get(cursor_line).copied().unwrap_or(0) as u16;
-      let offset_x = align_offset(params.text_align, params.rect.width, line_w);
-      draw_styled(
-        canvas,
-        surface,
-        params.rect.x + offset_x + cursor_x as u16,
-        params.rect.y + (cursor_line - first_line) as u16,
-        marker,
-        input_cursor_style(params),
-      );
-    }
+    let line_w = line_widths.get(cursor_line).copied().unwrap_or(0) as u16;
+    let offset_x = align_offset(params.text_align, params.rect.width, line_w);
+    draw_styled(
+      canvas,
+      surface,
+      params.rect.x + offset_x + cursor_x as u16,
+      params.rect.y + (cursor_line - first_line) as u16,
+      marker,
+      input_cursor_style(params),
+    );
   }
   state.hit = Some(HitSnapshot {
     rect: params.rect,

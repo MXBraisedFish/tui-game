@@ -4,9 +4,6 @@ pub(crate) mod surfaces;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use tg_core_input::InputActionEvent;
-use tg_core_audio::AudioPoolId;
-use tg_service_audio::AudioObjectPool;
 use interactives::hit_area::{HitAreaEvent, HitAreaId, HitAreaObjects};
 use interactives::hyperlink::{HyperlinkEvent, HyperlinkId, HyperlinkObjects};
 use interactives::text_input::{TextInputEvent, TextInputObjects};
@@ -16,6 +13,9 @@ use surfaces::scroll_box::{ScrollBoxEvent, ScrollBoxObjects};
 use surfaces::slice::SliceObjects;
 use surfaces::surface::SurfaceId;
 use surfaces::table::TableObjects;
+use tg_core_audio::AudioPoolId;
+use tg_core_input::InputActionEvent;
+use tg_service_audio::AudioObjectPool;
 
 static NEXT_POOL_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -53,7 +53,6 @@ pub(crate) enum UiComponentEvent {
   Hyperlink(HyperlinkEvent),
   Markdown(MarkdownEvent),
   TextInput(TextInputEvent),
-  ScrollBox(ScrollBoxEvent),
 }
 
 impl UiComponentEvent {
@@ -68,21 +67,21 @@ impl UiComponentEvent {
         | HitAreaEvent::Click { id, .. }
         | HitAreaEvent::Drag { id, .. } => *id,
       }),
-      Self::Hyperlink(_) | Self::Markdown(_) | Self::TextInput(_) | Self::ScrollBox(_) => None,
+      Self::Hyperlink(_) | Self::Markdown(_) | Self::TextInput(_) => None,
     }
   }
 
   pub(crate) fn hyperlink_id(&self) -> Option<HyperlinkId> {
     match self {
       Self::Hyperlink(HyperlinkEvent::Clicked { id, .. }) => Some(*id),
-      Self::HitArea(_) | Self::Markdown(_) | Self::TextInput(_) | Self::ScrollBox(_) => None,
+      Self::HitArea(_) | Self::Markdown(_) | Self::TextInput(_) => None,
     }
   }
 
   pub(crate) fn markdown_id(&self) -> Option<MarkdownViewId> {
     match self {
       Self::Markdown(MarkdownEvent::LinkClicked { id, .. }) => Some(*id),
-      Self::HitArea(_) | Self::Hyperlink(_) | Self::TextInput(_) | Self::ScrollBox(_) => None,
+      Self::HitArea(_) | Self::Hyperlink(_) | Self::TextInput(_) => None,
     }
   }
 
@@ -97,7 +96,7 @@ impl UiComponentEvent {
         | TextInputEvent::Pressed { id }
         | TextInputEvent::PressedOutside { id } => *id,
       }),
-      Self::HitArea(_) | Self::Hyperlink(_) | Self::Markdown(_) | Self::ScrollBox(_) => None,
+      Self::HitArea(_) | Self::Hyperlink(_) | Self::Markdown(_) => None,
     }
   }
 }
@@ -151,10 +150,6 @@ impl UiObjectPool {
     self.events.push_back(UiComponentEvent::HitArea(event));
   }
 
-  pub(crate) fn push_scroll_event(&mut self, event: ScrollBoxEvent) {
-    self.events.push_back(UiComponentEvent::ScrollBox(event));
-  }
-
   pub(crate) fn push_hyperlink_event(&mut self, event: HyperlinkEvent) {
     self.events.push_back(UiComponentEvent::Hyperlink(event));
   }
@@ -173,7 +168,6 @@ impl UiObjectPool {
       UiComponentEvent::Hyperlink(event) => UiEvent::Hyperlink(event),
       UiComponentEvent::Markdown(event) => UiEvent::Markdown(event),
       UiComponentEvent::TextInput(event) => UiEvent::TextInput(event),
-      UiComponentEvent::ScrollBox(event) => UiEvent::ScrollBox(event),
     })
   }
 
@@ -214,6 +208,12 @@ impl UiObjectPool {
       .surfaces
       .insert(target_index + usize::from(above), surface);
     true
+  }
+}
+
+impl Default for UiObjectPool {
+  fn default() -> Self {
+    Self::new()
   }
 }
 

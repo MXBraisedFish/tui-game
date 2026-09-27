@@ -4,11 +4,11 @@ use std::{
   path::Path,
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::IgnoredAny};
 
-use tg_core_atomic_fs::atomic_write;
 use super::layout;
 use super::service::StorageService;
+use tg_core_atomic_fs::atomic_write;
 use tg_core_package_id::PackageId;
 use tg_service_log::{HostLogMessage, LogService, LogSource};
 
@@ -501,28 +501,54 @@ pub struct DisplaySettingsProfile {
   pub game_list_fps: DisplayFpsLimit,
 }
 
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum SafeModeDefault {
-  #[default]
-  On,
-  OffPermanent,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "PackageDefaultStateProfile", deny_unknown_fields)]
 pub struct PackageDefaultState {
   pub enabled: bool,
   pub debug: bool,
-  pub safe_mode: SafeModeDefault,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PackageDefaultStateProfile {
+  enabled: bool,
+  debug: bool,
+  #[serde(default, rename = "safe_mode")]
+  _safe_mode: Option<IgnoredAny>,
+}
+
+impl From<PackageDefaultStateProfile> for PackageDefaultState {
+  fn from(profile: PackageDefaultStateProfile) -> Self {
+    Self {
+      enabled: profile.enabled,
+      debug: profile.debug,
+    }
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "GamePackageStateProfile", deny_unknown_fields)]
 pub struct GamePackageState {
   pub enabled: bool,
   pub debug: bool,
-  pub safe_mode: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GamePackageStateProfile {
+  enabled: bool,
+  debug: bool,
+  #[serde(default, rename = "safe_mode")]
+  _safe_mode: Option<IgnoredAny>,
+}
+
+impl From<GamePackageStateProfile> for GamePackageState {
+  fn from(profile: GamePackageStateProfile) -> Self {
+    Self {
+      enabled: profile.enabled,
+      debug: profile.debug,
+    }
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -545,7 +571,6 @@ impl Default for GamePackageState {
     Self {
       enabled: true,
       debug: false,
-      safe_mode: true,
     }
   }
 }
@@ -583,7 +608,6 @@ impl Default for PackageDefaultState {
     Self {
       enabled: true,
       debug: false,
-      safe_mode: SafeModeDefault::On,
     }
   }
 }
@@ -876,7 +900,6 @@ impl StorageService {
     let initial = GamePackageState {
       enabled: defaults.enabled,
       debug: defaults.debug,
-      safe_mode: defaults.safe_mode == SafeModeDefault::On,
     };
     f(profile
       .games
@@ -1108,7 +1131,10 @@ mod tests {
     }
     assert_eq!(fps, DisplayFpsLimit::Fps30);
     assert_eq!(targets, [Some(30), Some(60), Some(120), None]);
-    assert_eq!(DisplayOrderMode::Random.next().next(), DisplayOrderMode::Random);
+    assert_eq!(
+      DisplayOrderMode::Random.next().next(),
+      DisplayOrderMode::Random
+    );
     assert_eq!(DisplaySourceMode::No.next(), DisplaySourceMode::All);
     assert_eq!(DisplayLogoMode::Char.next(), DisplayLogoMode::Order);
   }
@@ -1181,7 +1207,6 @@ mod tests {
       .update_game_package_state(&game_id, &mut log, |state| {
         state.enabled = false;
         state.debug = true;
-        state.safe_mode = false;
       })
       .unwrap();
     storage
@@ -1197,7 +1222,6 @@ mod tests {
       Some(&GamePackageState {
         enabled: false,
         debug: true,
-        safe_mode: false,
       })
     );
     assert_eq!(
@@ -1230,7 +1254,6 @@ mod tests {
       defaults: PackageDefaultState {
         enabled: false,
         debug: true,
-        safe_mode: SafeModeDefault::OffPermanent,
       },
       ..Default::default()
     };
@@ -1257,9 +1280,7 @@ mod tests {
       .unwrap();
 
     let profile = storage.read_package_state_or_default(&mut log);
-    assert_eq!(profile.defaults.safe_mode, SafeModeDefault::OffPermanent);
     assert!(!profile.games[&game_id.storage_key()].enabled);
-    assert!(!profile.games[&game_id.storage_key()].safe_mode);
     assert!(!profile.screensavers[&screensaver_id.storage_key()].enabled);
   }
 
@@ -1271,8 +1292,181 @@ mod tests {
   }
 
   #[test]
-  fn removed_safe_mode_value_is_rejected() {
-    assert!(serde_json::from_str::<SafeModeDefault>(r#""off_temporary""#).is_err());
+  fn legacy_safe_mode_fields_are_ignored_without_losing_package_settings() {
+    let profile: PackageStateProfile = serde_json::from_str(
+      r#"
+        {
+          "defaults": { "enabled": false, "debug": true, "safe_mode": "off_permanent" },
+          "games": {
+            "game:test.game": { "enabled": false, "debug": true, "safe_mode": false }
+          },
+          "screensavers": {
+            "screensaver:test.screen": {
+              "enabled": true,
+              "debug": false,
+              "playlist_enabled": false,
+              "order": 7
+            }
+          }
+        }
+      "#,
+    )
+    .unwrap();
+
+    assert_eq!(
+      profile.defaults,
+      PackageDefaultState {
+        enabled: false,
+        debug: true,
+      }
+    );
+    assert_eq!(
+      profile.games["game:test.game"],
+      GamePackageState {
+        enabled: false,
+        debug: true,
+      }
+    );
+    assert_eq!(
+      profile.screensavers["screensaver:test.screen"],
+      ScreensaverPackageState {
+        enabled: true,
+        debug: false,
+        playlist_enabled: false,
+        order: Some(7),
+      }
+    );
+
+    let serialized = serde_json::to_value(profile).unwrap();
+    assert!(serialized["defaults"].get("safe_mode").is_none());
+    assert!(
+      serialized["games"]["game:test.game"]
+        .get("safe_mode")
+        .is_none()
+    );
+  }
+
+  #[test]
+  fn legacy_safe_mode_profile_update_preserves_other_user_data() {
+    let root = std::env::temp_dir().join(format!(
+      "tg_storage_legacy_safe_mode_user_data_{}",
+      std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("data/profiles")).unwrap();
+
+    let mut log = LogService::new();
+    let storage = StorageService::from_root_for_test(root.clone());
+    let game_id = PackageId::new(
+      tg_core_package_id::PackageSource::Official,
+      tg_core_package_id::PackageType::Game,
+      "legacy_game",
+    )
+    .unwrap();
+    let screen_id = PackageId::new(
+      tg_core_package_id::PackageSource::Official,
+      tg_core_package_id::PackageType::Screensaver,
+      "legacy_screen",
+    )
+    .unwrap();
+
+    storage.write_language_code("zh_cn").unwrap();
+
+    let mut key_bindings = KeyBindingsProfile::default();
+    key_bindings
+      .default
+      .global
+      .insert("confirm".into(), vec![vec!["enter".into()]]);
+    key_bindings
+      .user
+      .global
+      .insert("confirm".into(), vec![vec!["space".into()]]);
+    storage
+      .write_key_bindings_profile(&key_bindings, &mut log)
+      .unwrap();
+
+    storage
+      .write_continue_game_save(&game_id, serde_json::json!({"level": 8}), &mut log)
+      .unwrap();
+    storage
+      .write_best_game_save(
+        &game_id,
+        crate::BestGameSave {
+          best_string: "420".into(),
+          data: serde_json::json!({"best_string": "420", "score": 420}),
+        },
+        &mut log,
+      )
+      .unwrap();
+
+    fs::write(
+      storage.profile_package_state_path(),
+      format!(
+        r#"{{
+          "defaults": {{"enabled": false, "debug": true, "safe_mode": "off_permanent"}},
+          "games": {{"{}": {{"enabled": false, "debug": true, "safe_mode": false}}}},
+          "screensavers": {{"{}": {{"enabled": true, "debug": false, "playlist_enabled": false, "order": 7}}}}
+        }}"#,
+        game_id.storage_key(),
+        screen_id.storage_key(),
+      ),
+    )
+    .unwrap();
+    drop(storage);
+
+    let storage = StorageService::new(root.clone(), &mut log).unwrap();
+    assert_eq!(
+      storage.read_language_code(&mut log).as_deref(),
+      Some("zh_cn")
+    );
+    assert_eq!(storage.read_key_bindings_profile(&mut log), key_bindings);
+    assert_eq!(
+      storage.continue_game_save().unwrap().data,
+      serde_json::json!({"level": 8})
+    );
+    assert_eq!(
+      storage.best_game_save(&game_id).unwrap().data,
+      serde_json::json!({"best_string": "420", "score": 420})
+    );
+
+    storage
+      .update_game_package_state(&game_id, &mut log, |state| state.debug = false)
+      .unwrap();
+    let package_state = storage.read_package_state_or_default(&mut log);
+    assert_eq!(
+      package_state.defaults,
+      PackageDefaultState {
+        enabled: false,
+        debug: true,
+      }
+    );
+    assert_eq!(
+      package_state.games[&game_id.storage_key()],
+      GamePackageState {
+        enabled: false,
+        debug: false,
+      }
+    );
+    assert_eq!(
+      package_state.screensavers[&screen_id.storage_key()],
+      ScreensaverPackageState {
+        enabled: true,
+        debug: false,
+        playlist_enabled: false,
+        order: Some(7),
+      }
+    );
+    let rewritten_profile: Value =
+      serde_json::from_str(&fs::read_to_string(storage.profile_package_state_path()).unwrap())
+        .unwrap();
+    assert!(rewritten_profile["defaults"].get("safe_mode").is_none());
+    assert!(
+      rewritten_profile["games"][game_id.storage_key()]
+        .get("safe_mode")
+        .is_none()
+    );
+
+    fs::remove_dir_all(root).unwrap();
   }
 
   #[test]
@@ -1299,6 +1493,54 @@ mod tests {
     assert_eq!(profile.user.global["one"], vec![vec!["b".to_string()]]);
     assert!(profile.user.global["two"].is_empty());
     assert_eq!(profile.default.global, global);
+  }
+
+  #[test]
+  fn key_binding_modifier_tokens_survive_profile_reload() {
+    let root =
+      std::env::temp_dir().join(format!("tg_storage_modifier_tokens_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("data/profiles")).unwrap();
+    let mut log = LogService::new();
+    let storage = StorageService::from_root_for_test(root.clone());
+
+    let mut profile = KeyBindingsProfile::default();
+    profile.default.global.insert(
+      "host.quit".into(),
+      vec![vec!["left_ctrl".into(), "q".into()]],
+    );
+    profile.user.global.insert(
+      "host.quit".into(),
+      vec![
+        vec!["left_ctrl".into(), "q".into()],
+        vec!["right_ctrl".into(), "q".into()],
+      ],
+    );
+    profile
+      .user
+      .global
+      .insert("legacy.alias".into(), vec![vec!["ctrl".into(), "x".into()]]);
+    storage
+      .write_key_bindings_profile(&profile, &mut log)
+      .unwrap();
+    drop(storage);
+
+    let storage = StorageService::new(root.clone(), &mut log).unwrap();
+    let loaded = storage.read_key_bindings_profile(&mut log);
+    assert_eq!(loaded, profile);
+    assert_eq!(
+      loaded.user.global["host.quit"],
+      vec![
+        vec!["left_ctrl".to_string(), "q".to_string()],
+        vec!["right_ctrl".to_string(), "q".to_string()],
+      ]
+    );
+    assert_eq!(
+      loaded.user.global["legacy.alias"],
+      vec![vec!["ctrl".to_string(), "x".to_string()]]
+    );
+
+    fs::remove_dir_all(root).unwrap();
   }
 
   #[test]

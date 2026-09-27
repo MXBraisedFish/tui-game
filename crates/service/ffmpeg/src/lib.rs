@@ -52,7 +52,6 @@ impl FfmpegService {
       &self.deployment_root,
       &self.managed_directory,
       std::env::current_exe().ok().as_deref(),
-      std::env::current_dir().ok().as_deref(),
       std::env::var_os("PATH").as_deref(),
       Platform::current(),
     );
@@ -74,7 +73,6 @@ fn discover(
   deployment_root: &Path,
   managed_directory: &Path,
   current_executable: Option<&Path>,
-  current_directory: Option<&Path>,
   path: Option<&OsStr>,
   platform: Platform,
 ) -> Option<FfmpegInstallation> {
@@ -82,7 +80,6 @@ fn discover(
     deployment_root,
     managed_directory,
     current_executable,
-    current_directory,
     path,
     platform,
   )
@@ -141,7 +138,6 @@ fn build_candidates(
   deployment_root: &Path,
   managed_directory: &Path,
   current_executable: Option<&Path>,
-  current_directory: Option<&Path>,
   path: Option<&OsStr>,
   platform: Platform,
 ) -> Vec<PathBuf> {
@@ -167,10 +163,6 @@ fn build_candidates(
   push_unique(&mut candidates, deployment_root.join(file_name));
   push_unique(&mut candidates, deployment_root.join("bin").join(file_name));
   push_unique(&mut candidates, managed_directory.join(file_name));
-
-  if let Some(current_directory) = current_directory {
-    push_unique(&mut candidates, current_directory.join(file_name));
-  }
 
   if let Some(path) = path {
     for directory in std::env::split_paths(path) {
@@ -290,14 +282,13 @@ mod tests {
   }
 
   #[test]
-  fn candidates_cover_bundle_root_cache_current_directory_and_path() {
+  fn candidates_cover_bundle_root_cache_and_path_without_working_directory() {
     let separator = if cfg!(windows) { ";" } else { ":" };
     let path = OsString::from(format!("path-a{separator}path-b"));
     let candidates = build_candidates(
       Path::new("deployment"),
       Path::new("cache/ffmpeg"),
       Some(Path::new("application/bin/tg")),
-      Some(Path::new("working")),
       Some(&path),
       Platform::Linux,
     );
@@ -306,7 +297,6 @@ mod tests {
       PathBuf::from("application/bin/ffmpeg"),
       PathBuf::from("deployment/ffmpeg"),
       PathBuf::from("cache/ffmpeg/ffmpeg"),
-      PathBuf::from("working/ffmpeg"),
       PathBuf::from("path-a/ffmpeg"),
       PathBuf::from("path-b/ffmpeg"),
     ] {
@@ -324,7 +314,6 @@ mod tests {
       Path::new("deployment"),
       Path::new("cache"),
       Some(Path::new("TuiGame.app/Contents/MacOS/tg")),
-      None,
       None,
       Platform::MacOs,
     );

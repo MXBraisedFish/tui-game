@@ -16,7 +16,10 @@ impl I18nService {
         let value = self.get_runtime_text("log", key);
         (value != missing_template.replace("{value:missing_key}", key)).then_some(value)
       },
-      self.runtime_namespace("log_info").cloned().unwrap_or_default(),
+      self
+        .runtime_namespace("log_info")
+        .cloned()
+        .unwrap_or_default(),
     )
   }
 

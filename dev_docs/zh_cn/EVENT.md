@@ -295,7 +295,7 @@ error = {
 | `path` | `string` | 相对于安全文件根目录的虚拟文件路径。 |
 | `file_type` | `string` | 不含点号的扩展名，例如 `rs`。 |
 
-`write_text`、`write_bytes`、`create_dir` 和 `remove` 成功时只携带 `ok = true`，不携带正文。`text`、`bytes`、`entries` 互斥。屏保只允许收到自身只读文件请求的结果；创建目录与删除操作仅允许关闭安全模式的游戏发起。
+`write_text`、`write_bytes`、`create_dir` 和 `remove` 成功时只携带 `ok = true`，不携带正文。`text`、`bytes`、`entries` 互斥。屏保只允许收到自身只读文件请求的结果；创建目录与删除操作仅允许游戏会话发起，并仍受包内 `assets/` 路径限制。
 
 创建目录成功事件示例：
 
@@ -338,7 +338,7 @@ error = {
     request_id = 5,
     kind = "convert",
     ok = true,
-    output = "converted-image-id",
+    output = "f%<bg:#000000><fg:#ffffff>▅",
   },
 }
 ```
@@ -348,8 +348,10 @@ error = {
 | `request_id` | `integer` | 始终 | Session 内请求 ID。 |
 | `kind` | `string` | 始终 | 固定为 `convert`。 |
 | `ok` | `boolean` | 始终 | 转换是否成功。 |
-| `output` | `string \| nil` | `ok == true` | 转换结果的虚拟标识或路径。 |
+| `output` | `string \| nil` | `ok == true` | 可直接传给 `draw.text{ text = event.data.output }` 的富文本字符串。 |
 | `error` | `table \| nil` | `ok == false` | 通用错误表。 |
+
+`request_id` 与 `image.load{...}` 立即返回的 Session 内请求 ID 一致，可用于关联并发转换结果。富文本输出以 `f%` 开头，包含终端颜色标签与方块字形。
 
 ### 5.4 `network`
 

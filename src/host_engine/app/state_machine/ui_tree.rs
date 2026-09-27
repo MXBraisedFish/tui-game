@@ -1,0 +1,301 @@
+/// UI 树状态，以栈形式管理界面节点的导航路径
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UiTreeState {
+  pub path: Vec<UiNodeState>,
+}
+
+/// UI 节点状态，包含节点类型及其逻辑与渲染状态
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UiNodeState {
+  pub kind: UiNodeKind,
+  pub logic: UiNodeLogicState,
+  pub render: UiNodeRenderState,
+}
+
+/// UI 节点类型枚举
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UiNodeKind {
+  Home,
+  Settings,
+  KeyBindings,
+  GlobalKeyBindings,
+  GameKeyBindings,
+  DisplaySettings,
+  ToolbarCustom,
+  ScreensaverList,
+  ScreenshotRecording,
+  ScreenshotSettings,
+  RecordingSettings,
+  ScreenshotList,
+  RecordingList,
+  SecuritySettings,
+  SecurityDetails,
+  LanguageSelect,
+  StorageManagement,
+  StorageManagementClear,
+  StorageManagementExport,
+  StorageManagementView,
+  Mods,
+  TerminalCheck,
+  GameList,
+  GamePackage,
+  ScreensaverPackage,
+  InputDemo,
+  ExitWarning,
+}
+
+/// UI 节点逻辑状态
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UiNodeLogicState;
+
+/// UI 节点渲染状态
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UiNodeRenderState;
+
+impl UiNodeState {
+  pub fn home() -> Self {
+    Self {
+      kind: UiNodeKind::Home,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn settings() -> Self {
+    Self {
+      kind: UiNodeKind::Settings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn key_bindings() -> Self {
+    Self {
+      kind: UiNodeKind::KeyBindings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn global_key_bindings() -> Self {
+    Self {
+      kind: UiNodeKind::GlobalKeyBindings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn game_key_bindings() -> Self {
+    Self {
+      kind: UiNodeKind::GameKeyBindings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn display_settings() -> Self {
+    Self {
+      kind: UiNodeKind::DisplaySettings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn toolbar_custom() -> Self {
+    Self {
+      kind: UiNodeKind::ToolbarCustom,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screensaver_list() -> Self {
+    Self {
+      kind: UiNodeKind::ScreensaverList,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screenshot_recording() -> Self {
+    Self {
+      kind: UiNodeKind::ScreenshotRecording,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screenshot_settings() -> Self {
+    Self {
+      kind: UiNodeKind::ScreenshotSettings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn recording_settings() -> Self {
+    Self {
+      kind: UiNodeKind::RecordingSettings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screenshot_list() -> Self {
+    Self {
+      kind: UiNodeKind::ScreenshotList,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn recording_list() -> Self {
+    Self {
+      kind: UiNodeKind::RecordingList,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn security_settings() -> Self {
+    Self {
+      kind: UiNodeKind::SecuritySettings,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn security_details() -> Self {
+    Self {
+      kind: UiNodeKind::SecurityDetails,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn mods() -> Self {
+    Self {
+      kind: UiNodeKind::Mods,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn terminal_check() -> Self {
+    Self {
+      kind: UiNodeKind::TerminalCheck,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn game_list() -> Self {
+    Self {
+      kind: UiNodeKind::GameList,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn language_select() -> Self {
+    Self {
+      kind: UiNodeKind::LanguageSelect,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn storage_management() -> Self {
+    Self {
+      kind: UiNodeKind::StorageManagement,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn storage_management_clear() -> Self {
+    Self {
+      kind: UiNodeKind::StorageManagementClear,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn storage_management_export() -> Self {
+    Self {
+      kind: UiNodeKind::StorageManagementExport,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn storage_management_view() -> Self {
+    Self {
+      kind: UiNodeKind::StorageManagementView,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn game_package() -> Self {
+    Self {
+      kind: UiNodeKind::GamePackage,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn screensaver_package() -> Self {
+    Self {
+      kind: UiNodeKind::ScreensaverPackage,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn input_demo() -> Self {
+    Self {
+      kind: UiNodeKind::InputDemo,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+
+  pub fn exit_warning() -> Self {
+    Self {
+      kind: UiNodeKind::ExitWarning,
+      logic: UiNodeLogicState,
+      render: UiNodeRenderState,
+    }
+  }
+}
+
+impl UiTreeState {
+  pub fn new() -> Self {
+    Self {
+      path: vec![UiNodeState::home()],
+    }
+  }
+
+  pub fn path(&self) -> &[UiNodeState] {
+    &self.path
+  }
+
+  pub fn current(&self) -> Option<&UiNodeState> {
+    self.path.last()
+  }
+
+  /// 进入一个 UI 节点，将其压入导航栈
+  pub fn enter(&mut self, node: UiNodeState) {
+    self.path.push(node);
+  }
+
+  /// 返回上一层 UI 节点，仅在栈深度大于 1 时执行
+  pub fn back(&mut self) -> Option<UiNodeState> {
+    if self.path.len() <= 1 {
+      return None;
+    }
+
+    self.path.pop()
+  }
+}

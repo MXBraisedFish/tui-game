@@ -545,8 +545,8 @@ end
 | `右 Shift`            | `right_shift` | `RShift` |
 | `左 Alt`              | `left_alt`    | `LAlt`   |
 | `右 Alt`              | `right_alt`   | `RAlt`   |
-| `左 Meta` (Win / Cmd) | `left_meta`   | `LMeta`  |
-| `右 Meta` (Win / Cmd) | `right_meta`  | `RMeta`  |
+| `左 Meta` (Win / Cmd) | `left_meta`   | Linux `LMeta` / macOS `LCmd` / Windows `LWin` |
+| `右 Meta` (Win / Cmd) | `right_meta`  | Linux `RMeta` / macOS `RCmd` / Windows `RWin` |
 
 ### 锁定键
 | 物理按键         | 传递值          | 展示表    |

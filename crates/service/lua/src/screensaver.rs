@@ -177,12 +177,13 @@ mod tests {
   use std::path::PathBuf;
 
   use super::*;
-  use tg_core_package_id::{PackageSource, PackageType};
   use crate::{LuaPolicy, LuaSessionSpec};
+  use tg_core_package_id::{PackageSource, PackageType};
 
   #[test]
   fn checked_in_screensaver_runs_and_releases_its_object_pool() {
-    let entry_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
+    let entry_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .join("../../..")
       .join("test_package/screensaver/layer_waves/scripts/main.lua");
     let session = LuaSession::load(
       LuaSessionSpec {

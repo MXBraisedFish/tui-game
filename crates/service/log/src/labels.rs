@@ -142,11 +142,11 @@ mod tests {
   fn refresh_resets_missing_labels_to_defaults() {
     let mut labels = LogLabels::new();
     let translated = HashMap::from([
-        ("log.service.lua".to_string(), "脚本".to_string()),
-        ("log.service.game".to_string(), "游戏".to_string()),
-        ("log.service.screensaver".to_string(), "屏保".to_string()),
-        ("log.level.warn".to_string(), "警告".to_string()),
-      ]);
+      ("log.service.lua".to_string(), "脚本".to_string()),
+      ("log.service.game".to_string(), "游戏".to_string()),
+      ("log.service.screensaver".to_string(), "屏保".to_string()),
+      ("log.level.warn".to_string(), "警告".to_string()),
+    ]);
     labels.refresh(|key| translated.get(key).cloned());
     assert_eq!(labels.source(LogSource::Lua), "脚本");
     assert_eq!(labels.source(LogSource::Game), "游戏");

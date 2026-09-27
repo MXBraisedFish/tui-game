@@ -1,7 +1,9 @@
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-use tg_service_widget::{RuntimeObjectPool, RuntimeObjectPoolOwner, SliceService, UiObjectPool, UiObjectPoolOwner};
+use tg_service_widget::{
+  RuntimeObjectPool, RuntimeObjectPoolOwner, SliceService, UiObjectPool, UiObjectPoolOwner,
+};
 
 pub(crate) type SharedLuaObjectPool = Rc<RefCell<Option<LuaObjectPool>>>;
 pub(crate) type WeakLuaObjectPool = Weak<RefCell<Option<LuaObjectPool>>>;

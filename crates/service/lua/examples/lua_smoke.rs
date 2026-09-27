@@ -6,8 +6,8 @@ use tg_service_layout::Size;
 use tg_service_lua::{LuaService, LuaSessionKind, LuaSessionSpec};
 
 fn main() {
-  let package_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-    .join("../../../test_package/screensaver/layer_waves");
+  let package_root =
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../test_package/screensaver/layer_waves");
   let session = LuaService::new()
     .create_session(LuaSessionSpec {
       package_id: "layer_waves".to_string(),

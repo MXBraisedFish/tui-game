@@ -1,10 +1,13 @@
 //! Frame composition of widget-created slices and scroll boxes (widget + canvas + render pipeline).
 
+use crate::{
+  Overflow, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, SliceLength,
+  SliceOptions, SliceRect, SliceService, SurfaceId, UiObjectPool,
+};
 use tg_core_style::{ComposedCell, ComposedFrame, TerminalColor, TextColor, TextStyle};
 use tg_service_canvas::CanvasService;
 use tg_service_layout::LayoutService;
 use tg_service_render_pipeline::FrameCompositor;
-use crate::{Overflow, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, SliceLength, SliceOptions, SliceRect, SliceService, SurfaceId, UiObjectPool};
 
 fn text(frame: &ComposedFrame, x: u16, y: u16) -> &str {
   match frame.get(x, y).unwrap() {

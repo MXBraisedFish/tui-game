@@ -13,7 +13,7 @@ pub const PACKAGE_MANIFEST_VERSION: u32 = 1;
 pub const MEDIA_MANIFEST_VERSION: u32 = 1;
 
 /// Format version of the image character-art cache.
-pub const IMAGE_CACHE_FORMAT_VERSION: u8 = 2;
+pub const IMAGE_CACHE_FORMAT_VERSION: u8 = 3;
 
 #[cfg(test)]
 mod tests {
@@ -25,6 +25,6 @@ mod tests {
     assert_eq!(HOST_API_VERSION, 1);
     assert_eq!(PACKAGE_MANIFEST_VERSION, 1);
     assert_eq!(MEDIA_MANIFEST_VERSION, 1);
-    assert_eq!(IMAGE_CACHE_FORMAT_VERSION, 2);
+    assert_eq!(IMAGE_CACHE_FORMAT_VERSION, 3);
   }
 }

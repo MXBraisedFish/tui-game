@@ -370,9 +370,7 @@ mod tests {
   use crossbeam_channel::unbounded;
 
   use super::*;
-  use crate::{
-    NetworkHeader, NetworkRequest, NetworkRequestBody, normalize_request_for_test,
-  };
+  use crate::{NetworkHeader, NetworkRequest, NetworkRequestBody, normalize_request_for_test};
 
   fn serve_once(response: &'static [u8]) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();

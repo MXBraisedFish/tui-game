@@ -1,6 +1,9 @@
 //! Minimal entry: renders a generated PNG to half-block text, synchronously and as an async job.
 
-use std::time::{Duration, Instant};
+use std::{
+  path::PathBuf,
+  time::{Duration, Instant},
+};
 
 use tg_service_async::{AsyncRuntime, TaskStatusEvent};
 use tg_service_image::{ImageConvertParams, ImageEvent, ImageService};
@@ -25,7 +28,8 @@ impl From<TaskStatusEvent> for Event {
 }
 
 fn main() {
-  let path = std::env::temp_dir().join(format!("tg_image_smoke_{}.png", std::process::id()));
+  let root = create_temp_dir("tg_image_smoke");
+  let path = root.join("smoke.png");
   let mut pixels = image::RgbImage::new(8, 8);
   for (x, y, pixel) in pixels.enumerate_pixels_mut() {
     *pixel = image::Rgb([(x * 32) as u8, (y * 32) as u8, 128]);
@@ -34,8 +38,8 @@ fn main() {
 
   let params = ImageConvertParams {
     image_path: path.to_string_lossy().into(),
-    output_width: 8,
-    output_height: 4,
+    output_width: Some(8),
+    output_height: Some(4),
     cache: false,
     ..Default::default()
   };
@@ -68,6 +72,17 @@ fn main() {
     "async job renders the same text"
   );
 
-  let _ = std::fs::remove_file(&path);
+  std::fs::remove_dir_all(&root).expect("clean up temporary directory");
   println!("image ok: {} bytes of half-block text", rendered.len());
+}
+
+fn create_temp_dir(prefix: &str) -> PathBuf {
+  let nonce = std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_nanos();
+  let root = std::env::temp_dir().join(format!("{prefix}_{}_{nonce}", std::process::id()));
+  std::fs::create_dir(&root)
+    .unwrap_or_else(|error| panic!("create temporary directory {}: {error}", root.display()));
+  root
 }

@@ -15,17 +15,28 @@ fn main() {
     1,
     vec![SurfaceFrame::Slice(SliceFrame {
       id: slice,
-      rect: Rect { x: 2, y: 1, width: 4, height: 2 },
+      rect: Rect {
+        x: 2,
+        y: 1,
+        width: 4,
+        height: 2,
+      },
       visible: true,
       opaque: false,
       background: None,
     })],
     &layout,
   );
-  let text = DrawTextParams { text: "hello".to_string(), ..Default::default() };
+  let text = DrawTextParams {
+    text: "hello".to_string(),
+    ..Default::default()
+  };
   assert!(canvas.text_at_on(slice, 0, 0, &text));
   canvas.text_at(0, 0, &text);
-  assert_eq!(canvas.cell_at(1, 0).map(|cell| cell.text.as_str()), Some("e"));
+  assert_eq!(
+    canvas.cell_at(1, 0).map(|cell| cell.text.as_str()),
+    Some("e")
+  );
   assert_eq!(canvas.prepared_slice_width(slice), Some(4));
   println!("canvas ok: slice {:?}", canvas.prepared_slice_rect(slice));
 }

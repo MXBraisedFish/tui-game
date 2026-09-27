@@ -30,7 +30,10 @@ fn main() {
   let timer = time.create_count_up(&mut objects);
   assert!(time.start(&mut objects, timer));
   time.update(&mut objects, Duration::from_millis(250));
-  assert_eq!(time.elapsed(&objects, timer), Some(Duration::from_millis(250)));
+  assert_eq!(
+    time.elapsed(&objects, timer),
+    Some(Duration::from_millis(250))
+  );
 
   let runtime = AsyncRuntime::<Event>::with_worker_count(1);
   let task = time.sleep(&runtime, Duration::from_millis(10), None);

@@ -19,7 +19,7 @@ const MIN_CELL_WIDTH: u16 = 14;
 
 const MAX_NAME_LEN: u16 = 20;
 
-/// 语言选择页面布局信息。
+/// Screen layout of the language selection page.
 pub(crate) struct LanguageSelectLayout {
   title_x: u16,
   title_y: u16,
@@ -35,7 +35,8 @@ pub(crate) struct LanguageSelectLayout {
   hint_y: u16,
 }
 
-/// 语言选择 UI：以网格形式展示可用的语言包，支持翻页和键盘/鼠标导航。
+/// Language selection page that shows the available language packs as a paged grid, navigable
+/// by keyboard and mouse.
 pub struct LanguageSelectUi {
   selected_index: usize,
   page: usize,
@@ -74,7 +75,7 @@ impl RuntimeObjectPoolOwner for LanguageSelectUi {
   }
 }
 
-/// 语言选择页面的命令。
+/// Command emitted by the language selection page.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LanguageSelectCommand {
   Confirm(String),
@@ -84,7 +85,8 @@ pub enum LanguageSelectCommand {
 }
 
 impl LanguageSelectUi {
-  /// 初始化语言选择页面：加载语言注册表、预加载运行时文本缓存。
+  /// Creates the language selection page from `registry`, sorted by name, and preloads the
+  /// runtime language texts of every registered language.
   pub fn init(
     mut registry: Vec<LanguageRegistryEntry>,
     storage: &StorageService,
@@ -152,11 +154,11 @@ impl LanguageSelectUi {
     let mut cache = HashMap::new();
     for entry in registry {
       let path = storage.language_runtime_namespace_path(&entry.code, "language");
-      if let Ok(content) = std::fs::read_to_string(&path) {
-        if let Ok(texts) = serde_json::from_str::<HashMap<String, String>>(&content) {
-          cache.insert(entry.code.clone(), texts);
-          continue;
-        }
+      if let Ok(content) = std::fs::read_to_string(&path)
+        && let Ok(texts) = serde_json::from_str::<HashMap<String, String>>(&content)
+      {
+        cache.insert(entry.code.clone(), texts);
+        continue;
       }
       log.warn_operation_failed(
         LogSource::I18n,
@@ -195,7 +197,7 @@ impl LanguageSelectUi {
       .clamp(1, pages);
   }
 
-  /// 返回语言选择页面的按键映射定义。
+  /// Returns the action map (key bindings) of the language selection page.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
@@ -241,7 +243,7 @@ impl LanguageSelectUi {
     ]
   }
 
-  /// 处理 UI 事件，返回语言确认或返回命令。
+  /// Handles a UI event and returns the confirm or back command it triggers, if any.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<LanguageSelectCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -367,7 +369,7 @@ impl LanguageSelectUi {
     None
   }
 
-  /// 渲染语言选择页面到宿主层。
+  /// Draws the language selection page onto the host layer.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -396,7 +398,8 @@ impl LanguageSelectUi {
     }
   }
 
-  /// 根据布局服务计算语言选择页面各元素的宿主坐标。
+  /// Computes the host coordinates of every element of the language selection page from the
+  /// [`LayoutService`].
   pub fn compute_positions(&self, layout: &LayoutService) -> LanguageSelectLayout {
     let viewport = layout.developer_viewport_rect();
     let size = layout.developer_size();
@@ -587,11 +590,9 @@ impl LanguageSelectUi {
         self.page += 1;
         self.selected_index = (self.page - 1) * per_page;
       }
-    } else {
-      if self.page > 1 {
-        self.page -= 1;
-        self.selected_index = (self.page - 1) * per_page;
-      }
+    } else if self.page > 1 {
+      self.page -= 1;
+      self.selected_index = (self.page - 1) * per_page;
     }
     None
   }

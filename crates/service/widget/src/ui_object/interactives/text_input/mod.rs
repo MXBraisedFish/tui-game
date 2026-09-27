@@ -9,6 +9,6 @@ mod types;
 pub use service::TextInputService;
 pub(crate) use state::TextInputObjects;
 pub use types::{
-  TextAlign, TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
+  TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
   TextInputRenderParams, VerticalAlign,
 };

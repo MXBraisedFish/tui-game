@@ -13,7 +13,7 @@
 | `concat`      | 拼接数组表中的元素                             | [concat](#concat)           |
 | `insert`      | 在指定位置插入一个元素，并将后续元素后移       | [insert](#insert)           |
 | `move`        | 将表中的指定范围元素复制并覆盖到目标索引       | [move](#move)               |
-| `pack`        | 将数组表打包为新的表，并记录原始数组表元素数量 | [pack](#pack)               |
+| `pack`        | 将变参打包为新的表，并记录参数个数             | [pack](#pack)               |
 | `unpack`      | 展开数组表                                     | [unpack](#unpack)           |
 | `remove`      | 删除指定位置的一个元素，并将后续元素前移       | [remove](#remove)           |
 | `sort`        | 排序数组表                                     | [sort](#sort)               |
@@ -33,18 +33,17 @@
 ### 调用
 
 ```lua
--- 表参数
-table.concat{}
+table.concat(list [, sep [, i [, j]]])
 ```
 
 ### 参数
 
-| 参数名   | 类型    | 必填 | 默认值     | 说明               |
-| -------- | ------- | ---- | ---------- | ------------------ |
-| `table`  | table   | 是   | -          | 源数组表           |
-| `sep`    | string  | 否   | `""`       | 相邻元素间的分隔符 |
-| `start`  | integer | 否   | `1`        | 起始索引           |
-| `finish` | integer | 否   | 数组表长度 | 结束索引           |
+| 位置 | 名称 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| 1 | `list` | table | 必填 | 源数组表 |
+| 2 | `sep` | string | `""` | 相邻元素间的分隔符 |
+| 3 | `i` | integer | `1` | 起始索引 |
+| 4 | `j` | integer | `#list` | 结束索引 |
 
 ### 返回
 
@@ -58,10 +57,10 @@ table.concat{}
 
 ```lua
 local t1 = { "apple", "banana", "grape" }
-debug.print { message = table.concat { table = t1 } }
+debug.print { message = table.concat(t1) }
 
 local t2 = { "a", "b", "c" }
-debug.print { message = table.concat { table = t2, sep = " | " } }
+debug.print { message = table.concat(t2, " | ") }
 ```
 
 输出：
@@ -80,17 +79,15 @@ a | b | c
 ### 调用
 
 ```lua
--- 表参数
-table.insert{}
+table.insert(list, [pos,] value)
 ```
 
 ### 参数
 
-| 参数名     | 类型    | 必填 | 默认值    | 说明       |
-| ---------- | ------- | ---- | --------- | ---------- |
-| `table`    | table   | 是   | -         | 目标表     |
-| `value`    | any     | 是   | -         | 要插入的值 |
-| `position` | integer | 否   | 末尾 `+1` | 插入位置   |
+| 位置 | 名称 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| 1 | `list` | table | 必填 | 目标表 |
+| 2 | `pos` / `value` | integer / any | 末尾 `+1` 或必填 | 两参数形式把第二个参数作为值；三参数形式先给插入位置，再给值 |
 
 ### 返回
 
@@ -100,11 +97,11 @@ table.insert{}
 
 ```lua
 local t1 = { "x", "y" }
-table.insert { table = t1, value = "z" }
+table.insert(t1, "z")
 debug.print { message = table.pretty(t1) .. "\n" }
 
 local t2 = { "a", "c" }
-table.insert { table = t2, value = "b", position = 2 }
+table.insert(t2, 2, "b")
 debug.print { message = table.pretty(t2) }
 ```
 
@@ -133,19 +130,18 @@ debug.print { message = table.pretty(t2) }
 ### 调用
 
 ```lua
--- 表参数
-table.move{}
+table.move(a1, f, e, t [, a2])
 ```
 
 ### 参数
 
-| 参数名         | 类型    | 必填 | 默认值   | 说明         |
-| -------------- | ------- | ---- | -------- | ------------ |
-| `source`       | table   | 是   | -        | 源数组表     |
-| `start`        | integer | 是   | -        | 起始索引     |
-| `finish`       | integer | 是   | -        | 结束索引     |
-| `target_index` | integer | 是   | -        | 目标起始索引 |
-| `target`       | table   | 否   | 源数组表 | 目标表       |
+| 位置 | 名称 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| 1 | `a1` | table | 必填 | 源表 |
+| 2 | `f` | integer | 必填 | 起始索引 |
+| 3 | `e` | integer | 必填 | 结束索引 |
+| 4 | `t` | integer | 必填 | 目标起始索引 |
+| 5 | `a2` | table | `a1` | 目标表 |
 
 ### 返回
 
@@ -159,13 +155,13 @@ table.move{}
 
 ```lua
 local t1 = { "a", "b", "c", "d" }
-local t_m1 = table.move { source = t1, start = 2, finish = 3, target_index = 4 }
+local t_m1 = table.move(t1, 2, 3, 4)
 debug.print { message = table.pretty(t1) }
 debug.print { message = t1 }
-debug.print { message = t_m1 .. "\n" }
+debug.print { message = table.pretty(t_m1) .. "\n" }
 
 local t2 = { 1, 2, 3, 4, 5 }
-table.move { source = t2, start = 1, finish = 2, target_index = 4 }
+table.move(t2, 1, 2, 4)
 debug.print { message = table.pretty(t2) }
 ```
 
@@ -194,26 +190,23 @@ table: 0x19be6539b30
 ### 额外补充
 
 - 该 API 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
-- 返回值的是被修改后的源数组表地址，而非拷贝后的表。
+- 返回值是目标表 `a2`；未给 `a2` 时是源表 `a1`。
 
 ---
 
 ## `pack`
 
-将数组表打包为新的表，并记录原始数组表元素数量。
+将所有变参打包为新的表，并记录变参数量。
 
 ### 调用
 
 ```lua
--- 单参数
-table.pack()
+table.pack(...)
 ```
 
 ### 参数
 
-| 参数名   | 类型  | 必填 | 默认值 | 说明     |
-| -------- | ----- | ---- | ------ | -------- |
-| `values` | table | 是   | -      | 源数组表 |
+接收零个或多个任意值；`nil` 位置由返回表的 `n` 字段保留。
 
 ### 返回
 
@@ -226,10 +219,10 @@ table.pack()
 ### 示例
 
 ```lua
-local packed1 = table.pack { "a", "b", "c" }
+local packed1 = table.pack("a", "b", "c")
 debug.print { message = table.pretty(packed1) .. "\n" }
 
-local packed2 = table.pack { 1, nil, 3 }
+local packed2 = table.pack(1, nil, 3)
 debug.print { message = table.pretty(packed2) }
 ```
 
@@ -261,31 +254,30 @@ debug.print { message = table.pretty(packed2) }
   ...
   [x] = ...,
   n = x
-} -- 共有 x+1 个元素，所有返回值连续排序，最后 n 为返回值个数
+} -- n 是变参数量；nil 槽位不存储，但 n 保留尾部 nil
 ```
 
-- `nil` 值不会被显式存储，但表结构中的 `n` 字段为源数组表中包含 `nil` 值的长度。
+- `nil` 值不会被显式存储，但 `n` 保留所有参数位置，包括末尾的 `nil`。
 
 ---
 
 ## `unpack`
 
-展开数组表。
+将数组表元素作为多个返回值展开。
 
 ### 调用
 
 ```lua
--- 表参数
-table.unpack{}
+table.unpack(list [, i [, j]])
 ```
 
 ### 参数
 
-| 参数名   | 类型    | 必填 | 默认值     | 说明     |
-| -------- | ------- | ---- | ---------- | -------- |
-| `table`  | table   | 是   | -          | 源数组表 |
-| `start`  | integer | 否   | `1`        | 起始索引 |
-| `finish` | integer | 否   | 数组表长度 | 结束索引 |
+| 位置 | 名称 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| 1 | `list` | table | 必填 | 源数组表 |
+| 2 | `i` | integer | `1` | 起始索引 |
+| 3 | `j` | integer | `#list` | 结束索引 |
 
 ### 返回
 
@@ -299,11 +291,11 @@ table.unpack{}
 
 ```lua
 local t1 = { "a", "b", "c" }
-local a1, b1, c1 = table.unpack { table = t1 }
+local a1, b1, c1 = table.unpack(t1)
 debug.print { message = a1 .. " " .. b1 .. " " .. c1 }
 
 local t2 = { 10, 20, 30, 40 }
-local a2, b2 = table.unpack { table = t2, start = 2 }
+local a2, b2 = table.unpack(t2, 2)
 debug.print { message = a2 .. " " .. b2 }
 ```
 
@@ -327,16 +319,15 @@ a b c
 ### 调用
 
 ```lua
--- 表参数
-table.remove{}
+table.remove(list [, pos])
 ```
 
 ### 参数
 
-| 参数名     | 类型    | 必填 | 默认值     | 说明     |
-| ---------- | ------- | ---- | ---------- | -------- |
-| `table`    | table   | 是   | -          | 目标表   |
-| `position` | integer | 否   | 数组表长度 | 删除位置 |
+| 位置 | 名称 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| 1 | `list` | table | 必填 | 目标表 |
+| 2 | `pos` | integer | `#list` | 删除位置 |
 
 ### 返回
 
@@ -348,11 +339,11 @@ table.remove{}
 
 ```lua
 local t1 = { "a", "b", "c", "d" }
-local removed1 = table.remove { table = t1 }
+local removed1 = table.remove(t1)
 debug.print { message = removed1 .. " " .. table.pretty(t1) .. "\n" }
 
 local t2 = { 10, 20, 30, 40 }
-local removed2 = table.remove { table = t2, position = 2 }
+local removed2 = table.remove(t2, 2)
 debug.print { message = removed2 .. " " .. table.pretty(t2) }
 ```
 
@@ -383,16 +374,15 @@ d
 ### 调用
 
 ```lua
--- 表参数
-table.sort{}
+table.sort(list [, comp])
 ```
 
 ### 参数
 
-| 参数名       | 类型     | 必填 | 默认值 | 说明       |
-| ------------ | -------- | ---- | ------ | ---------- |
-| `table`      | table    | 是   | -      | 目标数组表 |
-| `comparator` | function / nil | 否   | `nil`  | 比较函数   |
+| 位置 | 名称 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| 1 | `list` | table | 必填 | 目标数组表 |
+| 2 | `comp` | function / nil | `nil` | 比较函数 |
 
 ### 返回
 
@@ -402,29 +392,23 @@ table.sort{}
 
 ```lua
 local t1 = { 3, 1, 4, 2 }
-table.sort { table = t1 }
+table.sort(t1)
 debug.print { message = table.pretty(t1) .. "\n" }
 
 local t2 = { "banana", "apple", "grape", "cherry" }
-table.sort { table = t2 }
+table.sort(t2)
 debug.print { message = table.pretty(t2) .. "\n" }
 
 local t3 = { 5, 2, 8, 1 }
-table.sort {
-  table = t3,
-  comparator = function(left, right)
-    return left > right
-  end
-  }
+table.sort(t3, function(left, right)
+  return left > right
+end)
 debug.print { message = table.pretty(t3) .. "\n" }
 
 local t4 = { "abc", "a", "abcdef", "ab" }
-table.sort {
-  table = t4,
-  comparator = function(left, right)
-    return #left < #right
-  end
-}
+table.sort(t4, function(left, right)
+  return #left < #right
+end)
 debug.print { message = table.pretty(t4) }
 ```
 

@@ -2,43 +2,81 @@ use super::*;
 
 pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
   let ipairs = lua.create_function(|lua, args: MultiValue| {
-    let value = args::one("base.ipairs", "table", args)?;
+    let value = positional_argument(&args, 0, "base.ipairs", "table")?;
     let Value::Table(table) = value else {
       return Err(args::invalid("base.ipairs", "table", "table", &value));
     };
-    record_iterator(lua, readonly::backing(&table)?, true)
+    let iterator = lua.create_function(|_, args: MultiValue| {
+      let state = positional_argument(&args, 0, "base.ipairs iterator", "state")?;
+      let index = positional_argument(&args, 1, "base.ipairs iterator", "index")?;
+      let Value::Table(state) = state else {
+        return Err(args::invalid(
+          "base.ipairs iterator",
+          "state",
+          "table",
+          &state,
+        ));
+      };
+      let index = args::integer(index, "base.ipairs iterator", "index")?;
+      let next = index
+        .checked_add(1)
+        .ok_or_else(|| args::message("base.ipairs iterator", "index overflow"))?;
+      let value = state.get::<Value>(next)?;
+      if matches!(value, Value::Nil) {
+        Ok(MultiValue::from_vec(vec![Value::Nil]))
+      } else {
+        Ok(MultiValue::from_vec(vec![Value::Integer(next), value]))
+      }
+    })?;
+    Ok(MultiValue::from_vec(vec![
+      Value::Function(iterator),
+      Value::Table(table),
+      Value::Integer(0),
+    ]))
   })?;
-  let pairs = lua.create_function(|lua, args: MultiValue| {
-    let value = args::one("base.pairs", "table", args)?;
+  let next = lua.create_function(|_, args: MultiValue| {
+    let value = positional_argument(&args, 0, "base.next", "table")?;
+    let Value::Table(table) = value else {
+      return Err(args::invalid("base.next", "table", "table", &value));
+    };
+    let index = args.get(1).cloned().unwrap_or(Value::Nil);
+    next_pair(&table, index)
+  })?;
+  let next_for_pairs = next.clone();
+  let pairs = lua.create_function(move |_, args: MultiValue| {
+    let value = positional_argument(&args, 0, "base.pairs", "table")?;
     let Value::Table(table) = value else {
       return Err(args::invalid("base.pairs", "table", "table", &value));
     };
-    pairs_iterator(lua, table)
-  })?;
-  let next = lua.create_function(|lua, args: MultiValue| {
-    let table = args::named("base.next", args, &["table", "index"])?;
-    let value = args::required(&table, "base.next", "table")?;
-    let Value::Table(source) = value else {
-      return Err(args::invalid("base.next", "table", "table", &value));
-    };
-    let source = readonly::backing(&source)?;
-    let index = table.get::<Value>("index")?;
-    let mut found = matches!(index, Value::Nil);
-    for pair in source.pairs::<Value, Value>() {
-      let (key, value) = pair?;
-      if found {
-        return iteration_record(lua, key, value).map(Value::Table);
+    if let Some(metatable) = table.metatable() {
+      let metamethod = metatable.raw_get::<Value>("__pairs")?;
+      if let Value::Function(metamethod) = metamethod {
+        let results = metamethod.call::<MultiValue>(table)?;
+        let mut values = results.into_iter();
+        return Ok(MultiValue::from_vec(vec![
+          values.next().unwrap_or(Value::Nil),
+          values.next().unwrap_or(Value::Nil),
+          values.next().unwrap_or(Value::Nil),
+        ]));
       }
-      if raw_equal(&key, &index) {
-        found = true;
+      if !matches!(metamethod, Value::Nil) {
+        return Err(args::invalid(
+          "base.pairs",
+          "__pairs",
+          "function",
+          &metamethod,
+        ));
       }
     }
-    Ok(Value::Nil)
+    Ok(MultiValue::from_vec(vec![
+      Value::Function(next_for_pairs.clone()),
+      Value::Table(table),
+      Value::Nil,
+    ]))
   })?;
   let select = lua.create_function(|_, args: MultiValue| {
-    let table = args::named("base.select", args, &["index", "values"])?;
-    let index = args::required(&table, "base.select", "index")?;
-    let values = args::values(&table, "base.select")?;
+    let index = positional_argument(&args, 0, "base.select", "index")?;
+    let values = args.into_iter().skip(1).collect::<Vec<_>>();
     if let Value::String(index) = &index
       && index.to_str()?.as_ref() == "#"
     {
@@ -60,17 +98,38 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
     ))
   })?;
   let rawequal = lua.create_function(|_, args: MultiValue| {
-    let table = args::named("base.rawequal", args, &["left", "right"])?;
-    Ok(raw_equal(
-      &table.get::<Value>("left")?,
-      &table.get::<Value>("right")?,
-    ))
+    let left = args.front().cloned().unwrap_or(Value::Nil);
+    let right = args.get(1).cloned().unwrap_or(Value::Nil);
+    Ok(raw_equal(&left, &right))
+  })?;
+  let rawget = lua.create_function(|_, args: MultiValue| {
+    let value = positional_argument(&args, 0, "base.rawget", "table")?;
+    let Value::Table(table) = value else {
+      return Err(args::invalid("base.rawget", "table", "table", &value));
+    };
+    let key = positional_argument(&args, 1, "base.rawget", "key")?;
+    table.raw_get::<Value>(key)
+  })?;
+  let rawset = lua.create_function(|_, args: MultiValue| {
+    let value = positional_argument(&args, 0, "base.rawset", "table")?;
+    let Value::Table(table) = value else {
+      return Err(args::invalid("base.rawset", "table", "table", &value));
+    };
+    if readonly::is_proxy(&table)? {
+      return Err(mlua::Error::RuntimeError(
+        "attempt to modify a read-only TUI GAME API table".to_string(),
+      ));
+    }
+    let key = positional_argument(&args, 1, "base.rawset", "key")?;
+    let value = args.get(2).cloned().unwrap_or(Value::Nil);
+    table.raw_set(key, value)?;
+    Ok(table)
   })?;
   let rawlen = lua.create_function(|_, args: MultiValue| {
-    let value = args::one("base.rawlen", "value", args)?;
+    let value = positional_argument(&args, 0, "base.rawlen", "value")?;
     match value {
       Value::String(value) => Ok(value.as_bytes().len() as i64),
-      Value::Table(table) => Ok(readonly::backing(&table)?.raw_len() as i64),
+      Value::Table(table) => Ok(table.raw_len() as i64),
       value => Err(args::invalid(
         "base.rawlen",
         "value",
@@ -80,9 +139,13 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
     }
   })?;
   let tonumber = lua.create_function(|_, args: MultiValue| {
-    let table = args::named("base.tonumber", args, &["value", "base"])?;
-    let value = args::required(&table, "base.tonumber", "value")?;
-    let base = args::optional_integer(&table, "base.tonumber", "base", None)?;
+    let value = positional_argument(&args, 0, "base.tonumber", "value")?;
+    let base = args.get(1).cloned().unwrap_or(Value::Nil);
+    let base = if matches!(base, Value::Nil) {
+      None
+    } else {
+      Some(args::integer(base, "base.tonumber", "base")?)
+    };
     match (value, base) {
       (Value::Integer(value), None) => Ok(Value::Integer(value)),
       (Value::Number(value), None) => Ok(Value::Number(value)),
@@ -98,17 +161,21 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
             .unwrap_or(Value::Nil),
         )
       }
-      (value, Some(_)) => Err(args::invalid(
+      (value, Some(_)) if !matches!(value, Value::String(_)) => Err(args::invalid(
         "base.tonumber",
-        "base",
-        "integer 2..36",
+        "value",
+        "string when a base is provided",
         &value,
+      )),
+      (_, Some(_)) => Err(args::message(
+        "base.tonumber",
+        "base must be in the range 2..36",
       )),
       _ => Ok(Value::Nil),
     }
   })?;
   let tostring = lua.create_function(|lua, args: MultiValue| {
-    let value = args::one("base.tostring", "value", args)?;
+    let value = positional_argument(&args, 0, "base.tostring", "value")?;
     if let Value::Table(table) = &value
       && let Some(metatable) = table.metatable()
     {
@@ -138,7 +205,7 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
     lua.create_string(text)
   })?;
   let type_fn = lua.create_function(|lua, args: MultiValue| {
-    let value = args::one("base.type", "value", args)?;
+    let value = positional_argument(&args, 0, "base.type", "value")?;
     let type_name = match value {
       Value::Integer(_) | Value::Number(_) => "number",
       _ => args::type_name(&value),
@@ -146,8 +213,7 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
     lua.create_string(type_name)
   })?;
   let setmetatable = lua.create_function(|_, args: MultiValue| {
-    let parameters = args::named("base.setmetatable", args, &["table", "metatable"])?;
-    let target = parameters.get::<Value>("table")?;
+    let target = positional_argument(&args, 0, "base.setmetatable", "table")?;
     let Value::Table(target) = target else {
       return Err(args::invalid(
         "base.setmetatable",
@@ -165,9 +231,9 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
         ));
       }
     }
-    let metatable = match parameters.get::<Value>("metatable")? {
-      Value::Nil => None,
+    let metatable = match positional_argument(&args, 1, "base.setmetatable", "metatable")? {
       Value::Table(metatable) => Some(metatable),
+      Value::Nil => None,
       value => {
         return Err(args::invalid(
           "base.setmetatable",
@@ -181,9 +247,9 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
     Ok(target)
   })?;
   let getmetatable = lua.create_function(|_, args: MultiValue| {
-    let value = args::one("base.getmetatable", "table", args)?;
+    let value = positional_argument(&args, 0, "base.getmetatable", "value")?;
     let Value::Table(target) = value else {
-      return Err(args::invalid("base.getmetatable", "table", "table", &value));
+      return Ok(Value::Nil);
     };
     let Some(metatable) = target.metatable() else {
       return Ok(Value::Nil);
@@ -203,6 +269,8 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
       ("next", function_value(next)),
       ("select", function_value(select)),
       ("rawequal", function_value(rawequal)),
+      ("rawget", function_value(rawget)),
+      ("rawset", function_value(rawset)),
       ("rawlen", function_value(rawlen)),
       ("tonumber", function_value(tonumber)),
       ("tostring", function_value(tostring)),
@@ -213,84 +281,34 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
   )
 }
 
-fn record_iterator(lua: &Lua, table: Table, array_only: bool) -> mlua::Result<Function> {
-  if array_only {
-    let index = std::rc::Rc::new(std::cell::Cell::new(0_i64));
-    lua.create_function(move |lua, _: MultiValue| {
-      let next = index.get().saturating_add(1);
-      let value = table.get::<Value>(next)?;
-      if matches!(value, Value::Nil) {
-        Ok(Value::Nil)
-      } else {
-        index.set(next);
-        iteration_record(lua, Value::Integer(next), value).map(Value::Table)
-      }
-    })
-  } else {
-    let values = table
-      .pairs::<Value, Value>()
-      .collect::<mlua::Result<Vec<_>>>()?;
-    let index = std::rc::Rc::new(std::cell::Cell::new(0_usize));
-    lua.create_function(move |lua, _: MultiValue| {
-      let current = index.get();
-      let Some((key, value)) = values.get(current).cloned() else {
-        return Ok(Value::Nil);
-      };
-      index.set(current + 1);
-      iteration_record(lua, key, value).map(Value::Table)
-    })
-  }
+fn positional_argument(
+  arguments: &MultiValue,
+  index: usize,
+  method: &str,
+  name: &str,
+) -> mlua::Result<Value> {
+  arguments
+    .get(index)
+    .cloned()
+    .ok_or_else(|| args::invalid(method, name, "value", &Value::Nil))
 }
 
-fn pairs_iterator(lua: &Lua, table: Table) -> mlua::Result<Function> {
-  if readonly::is_proxy(&table)? {
-    return record_iterator(lua, readonly::backing(&table)?, false);
-  }
-  if let Some(metatable) = table.metatable() {
-    let metamethod = metatable.raw_get::<Value>("__pairs")?;
-    if !matches!(metamethod, Value::Nil) {
-      let Value::Function(metamethod) = metamethod else {
-        return Err(args::invalid(
-          "base.pairs",
-          "__pairs",
-          "function",
-          &metamethod,
-        ));
-      };
-      let mut results = metamethod.call::<MultiValue>(table)?;
-      let iterator = results.pop_front().unwrap_or(Value::Nil);
-      let Value::Function(iterator) = iterator else {
-        return Err(args::invalid(
-          "base.pairs",
-          "__pairs iterator",
-          "function",
-          &iterator,
-        ));
-      };
-      let state = results.pop_front().unwrap_or(Value::Nil);
-      let initial = results.pop_front().unwrap_or(Value::Nil);
-      let control = std::rc::Rc::new(std::cell::RefCell::new(initial));
-      return lua.create_function(move |lua, _: MultiValue| {
-        let current = control.borrow().clone();
-        let mut values = iterator.call::<MultiValue>((state.clone(), current))?;
-        let index = values.pop_front().unwrap_or(Value::Nil);
-        if matches!(index, Value::Nil) {
-          return Ok(Value::Nil);
-        }
-        let value = values.pop_front().unwrap_or(Value::Nil);
-        *control.borrow_mut() = index.clone();
-        iteration_record(lua, index, value).map(Value::Table)
-      });
+fn next_pair(table: &Table, index: Value) -> mlua::Result<MultiValue> {
+  let source = readonly::backing(table)?;
+  let mut found = matches!(index, Value::Nil);
+  for pair in source.pairs::<Value, Value>() {
+    let (key, value) = pair?;
+    if found {
+      return Ok(MultiValue::from_vec(vec![key, value]));
+    }
+    if raw_equal(&key, &index) {
+      found = true;
     }
   }
-  record_iterator(lua, table, false)
-}
-
-fn iteration_record(lua: &Lua, index: Value, value: Value) -> mlua::Result<Table> {
-  let result = lua.create_table()?;
-  result.set("index", index)?;
-  result.set("value", value)?;
-  Ok(result)
+  if !matches!(index, Value::Nil) && !found {
+    return Err(args::message("base.next", "invalid key to 'next'"));
+  }
+  Ok(MultiValue::from_vec(vec![Value::Nil]))
 }
 
 fn raw_equal(left: &Value, right: &Value) -> bool {
@@ -311,11 +329,73 @@ fn raw_equal(left: &Value, right: &Value) -> bool {
   }
 }
 
-fn parse_number(text: &str) -> Option<Value> {
+pub(super) fn parse_number(text: &str) -> Option<Value> {
   let text = text.trim();
   if let Ok(value) = text.parse::<i64>() {
     Some(Value::Integer(value))
   } else {
-    text.parse::<f64>().ok().map(Value::Number)
+    text
+      .parse::<f64>()
+      .ok()
+      .or_else(|| parse_hex_number(text))
+      .map(Value::Number)
   }
+}
+
+fn parse_hex_number(text: &str) -> Option<f64> {
+  let (negative, unsigned) = match text.as_bytes().first()? {
+    b'-' => (true, &text[1..]),
+    b'+' => (false, &text[1..]),
+    _ => (false, text),
+  };
+  let unsigned = unsigned
+    .strip_prefix("0x")
+    .or_else(|| unsigned.strip_prefix("0X"))?;
+  let (mantissa, exponent) = match unsigned.find(['p', 'P']) {
+    Some(position) => {
+      if unsigned[position + 1..].contains(['p', 'P']) {
+        return None;
+      }
+      let exponent = &unsigned[position + 1..];
+      if exponent.is_empty() || exponent == "+" || exponent == "-" {
+        return None;
+      }
+      let exponent_digits = exponent
+        .strip_prefix('+')
+        .or_else(|| exponent.strip_prefix('-'))
+        .unwrap_or(exponent);
+      if !exponent_digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+      }
+      let exponent = exponent.parse::<i32>().unwrap_or_else(|_| {
+        if exponent.starts_with('-') {
+          i32::MIN
+        } else {
+          i32::MAX
+        }
+      });
+      (&unsigned[..position], exponent)
+    }
+    None => (unsigned, 0),
+  };
+  let (integer, fraction) = match mantissa.split_once('.') {
+    Some((integer, fraction)) if !fraction.contains('.') => (integer, fraction),
+    Some(_) => return None,
+    None => (mantissa, ""),
+  };
+  if integer.is_empty() && fraction.is_empty() {
+    return None;
+  }
+
+  let mut value = 0.0;
+  for digit in integer.chars() {
+    value = value * 16.0 + f64::from(digit.to_digit(16)?);
+  }
+  let mut place = 1.0 / 16.0;
+  for digit in fraction.chars() {
+    value += f64::from(digit.to_digit(16)?) * place;
+    place /= 16.0;
+  }
+  value *= 2_f64.powi(exponent);
+  Some(if negative { -value } else { value })
 }

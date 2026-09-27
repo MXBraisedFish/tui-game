@@ -12,12 +12,12 @@ use chrono::{Local, SecondsFormat};
 use crossbeam_channel::Sender;
 use serde::{Deserialize, Serialize};
 
+use tg_core_atomic_fs::atomic_write;
 use tg_core_audio::{AudioAsyncEvent, AudioCaptureId};
 use tg_core_style::{CanvasCell, ComposedCell, ComposedFrame, TerminalColor, TextColor};
 use tg_core_version::MEDIA_MANIFEST_VERSION;
 use tg_service_async::TaskId;
 use tg_service_storage::StorageService;
-use tg_core_atomic_fs::atomic_write;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RecordingState {
@@ -1088,8 +1088,8 @@ impl<E: From<RecordingAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E
 #[cfg(test)]
 mod tests {
   use super::*;
-  use tg_core_style::{TextColor, TextStyle};
   use std::time::{SystemTime, UNIX_EPOCH};
+  use tg_core_style::{TextColor, TextStyle};
 
   fn frame(width: u16, height: u16, values: &[(u16, u16, &str)]) -> ComposedFrame {
     let mut frame = ComposedFrame::new(width, height);

@@ -1,34 +1,11 @@
 use tg_service_animation::{AnimationEvent, AnimationEventKind};
-use tg_service_time::{DelayTimerEvent, RepeatTimerEvent, TimerEvent};
-use tg_service_widget::{HitAreaEvent, HyperlinkEvent, MarkdownEvent, ScrollBoxEvent, TextInputEvent};
+use tg_service_time::RepeatTimerEvent;
+use tg_service_widget::{HitAreaEvent, ScrollBoxEvent};
 
 use super::{
-  LuaAnimationEvent, LuaAnimationEventKind, LuaEventData, LuaHitAreaEvent, LuaHyperlinkEvent,
-  LuaMarkdownEvent, LuaScrollBoxEvent, LuaTextInputEvent, LuaTimerEvent, LuaTimerEventKind,
-  LuaTimerKind,
+  LuaAnimationEvent, LuaAnimationEventKind, LuaEventData, LuaHitAreaEvent, LuaScrollBoxEvent,
+  LuaTimerEvent, LuaTimerEventKind, LuaTimerKind,
 };
-
-pub fn translate_timer_event(lua_id: u64, event: TimerEvent) -> LuaEventData {
-  match event {
-    TimerEvent::Finished { .. } => LuaEventData::Timer(LuaTimerEvent {
-      id: lua_id,
-      timer_kind: LuaTimerKind::Timer,
-      kind: LuaTimerEventKind::Finished,
-      executed_count: None,
-    }),
-  }
-}
-
-pub fn translate_delay_timer_event(lua_id: u64, event: DelayTimerEvent) -> LuaEventData {
-  match event {
-    DelayTimerEvent::Finished { .. } => LuaEventData::Timer(LuaTimerEvent {
-      id: lua_id,
-      timer_kind: LuaTimerKind::Delay,
-      kind: LuaTimerEventKind::Finished,
-      executed_count: None,
-    }),
-  }
-}
 
 pub fn translate_repeat_timer_event(lua_id: u64, event: RepeatTimerEvent) -> LuaEventData {
   match event {
@@ -98,42 +75,6 @@ pub fn translate_hit_area_event(lua_id: u64, event: &HitAreaEvent) -> LuaEventDa
     button,
     dx,
     dy,
-  })
-}
-
-pub fn translate_hyperlink_event(lua_id: u64, event: &HyperlinkEvent) -> LuaEventData {
-  match event {
-    HyperlinkEvent::Clicked { link, .. } => LuaEventData::Hyperlink(LuaHyperlinkEvent {
-      id: lua_id,
-      link: link.clone(),
-    }),
-  }
-}
-
-pub fn translate_markdown_event(lua_id: u64, event: &MarkdownEvent) -> LuaEventData {
-  match event {
-    MarkdownEvent::LinkClicked { href, text, .. } => LuaEventData::Markdown(LuaMarkdownEvent {
-      id: lua_id,
-      href: href.clone(),
-      text: text.clone(),
-    }),
-  }
-}
-
-pub fn translate_text_input_event(lua_id: u64, event: &TextInputEvent) -> LuaEventData {
-  let (kind, value) = match event {
-    TextInputEvent::Focused { .. } => ("focused", None),
-    TextInputEvent::Blurred { .. } => ("blurred", None),
-    TextInputEvent::Changed { value, .. } => ("changed", Some(value.clone())),
-    TextInputEvent::Submit { value, .. } => ("submit", Some(value.clone())),
-    TextInputEvent::Cancel { value, .. } => ("cancel", Some(value.clone())),
-    TextInputEvent::Pressed { .. } => ("pressed", None),
-    TextInputEvent::PressedOutside { .. } => ("pressed_outside", None),
-  };
-  LuaEventData::TextInput(LuaTextInputEvent {
-    id: lua_id,
-    kind,
-    value,
   })
 }
 

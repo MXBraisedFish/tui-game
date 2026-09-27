@@ -1,9 +1,9 @@
 use super::BorderStyle;
-use tg_core_unicode::char_width;
 use tg_core_style::{TextColor, TextStyle};
+use tg_core_unicode::char_width;
 use tg_service_canvas::CanvasService;
-use tg_service_text_layout::DrawTextParams;
 use tg_service_canvas::{ScrollBoxId, SliceId, SurfaceId};
+use tg_service_text_layout::DrawTextParams;
 
 #[derive(Clone, Copy)]
 enum Target {

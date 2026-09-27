@@ -14,14 +14,14 @@ use serde_json::json;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use tg_service_async::TaskCancellation;
+use tg_core_atomic_fs::{atomic_replace_with, atomic_write};
 use tg_core_log::LogSource;
 use tg_core_style::{CanvasCell, ComposedCell, ComposedFrame, TerminalColor, TextColor, TextStyle};
 use tg_core_version::MEDIA_MANIFEST_VERSION;
+use tg_service_async::TaskCancellation;
 use tg_service_async::TaskId;
 use tg_service_log::LogService;
 use tg_service_storage::{RecordingPixelScale, StorageService};
-use tg_core_atomic_fs::{atomic_replace_with, atomic_write};
 
 // 导出按 1.5 倍基础像素密度直接栅格化，避免先低分辨率绘制再放大造成模糊。
 const CELL_WIDTH: u32 = 18;
@@ -60,6 +60,7 @@ pub struct ScreenshotTask {
   pub selection: ScreenshotRect,
   pub png_path: PathBuf,
   pub fonts: Vec<String>,
+  pub deployment_root: PathBuf,
 }
 
 #[derive(Clone, Debug)]
@@ -85,6 +86,7 @@ pub struct ScreenshotOperationFeedback {
   pub save_task: Option<TaskId>,
 }
 
+#[derive(Default)]
 pub struct ScreenshotService {
   last_presented_frame: Option<ComposedFrame>,
   pending_font_preview: Option<Vec<String>>,
@@ -94,12 +96,7 @@ pub struct ScreenshotService {
 
 impl ScreenshotService {
   pub fn new() -> Self {
-    Self {
-      last_presented_frame: None,
-      pending_font_preview: None,
-      pending_operation_feedback: None,
-      active_export_sources: HashMap::new(),
-    }
+    Self::default()
   }
 
   pub fn request_font_preview(&mut self, fonts: Vec<String>) {
@@ -110,11 +107,7 @@ impl ScreenshotService {
     self.pending_font_preview.take()
   }
 
-  pub fn report_operation(
-    &mut self,
-    copy_succeeded: Option<bool>,
-    save_task: Option<TaskId>,
-  ) {
+  pub fn report_operation(&mut self, copy_succeeded: Option<bool>, save_task: Option<TaskId>) {
     self.pending_operation_feedback = Some(ScreenshotOperationFeedback {
       copy_succeeded,
       save_task,
@@ -217,11 +210,11 @@ impl ScreenshotService {
       }
       let mut x = left;
       while x <= right {
-        if let Some(ComposedCell::Text(cell)) = frame.get(x, y) {
-          if !cell.is_continuation() {
-            let w = cell.text.width().max(1) as u16;
-            right = right.max(x.saturating_add(w.saturating_sub(1)).min(frame.width() - 1));
-          }
+        if let Some(ComposedCell::Text(cell)) = frame.get(x, y)
+          && !cell.is_continuation()
+        {
+          let w = cell.text.width().max(1) as u16;
+          right = right.max(x.saturating_add(w.saturating_sub(1)).min(frame.width() - 1));
         }
         x = x.saturating_add(1);
       }
@@ -516,15 +509,7 @@ pub fn run_screenshot_task<E: From<ScreenshotAsyncEvent>>(
   if cancellation.is_cancelled() {
     return Err("screenshot export cancelled".to_string());
   }
-  match save_png(
-    task_id,
-    &task.frame,
-    task.selection,
-    &task.png_path,
-    &task.fonts,
-    event_tx,
-    cancellation,
-  ) {
+  match save_png(task_id, &task, event_tx, cancellation) {
     Ok(()) => {
       let _ = event_tx.send(E::from(ScreenshotAsyncEvent::Saved {
         task_id,
@@ -544,19 +529,21 @@ pub fn run_screenshot_task<E: From<ScreenshotAsyncEvent>>(
 
 fn save_png<E: From<ScreenshotAsyncEvent>>(
   task_id: TaskId,
-  frame: &ComposedFrame,
-  rect: ScreenshotRect,
-  path: &PathBuf,
-  preferred_fonts: &[String],
+  task: &ScreenshotTask,
   event_tx: &Sender<E>,
   cancellation: &TaskCancellation,
 ) -> Result<(), String> {
-  fs::create_dir_all(path.parent().ok_or("PNG path has no parent directory")?)
-    .map_err(|error| error.to_string())?;
-  let rasterizer = TerminalFrameRasterizer::load(preferred_fonts)?;
+  fs::create_dir_all(
+    task
+      .png_path
+      .parent()
+      .ok_or("PNG path has no parent directory")?,
+  )
+  .map_err(|error| error.to_string())?;
+  let rasterizer = TerminalFrameRasterizer::load(&task.fonts, &task.deployment_root)?;
   let image = rasterizer.render(
-    frame,
-    rect,
+    &task.frame,
+    task.selection,
     RecordingPixelScale::Original,
     |completed, total| {
       send_progress(event_tx, task_id, completed, total);
@@ -566,7 +553,7 @@ fn save_png<E: From<ScreenshotAsyncEvent>>(
     return Err("screenshot export cancelled".to_string());
   }
 
-  atomic_replace_with(path, true, |temporary| {
+  atomic_replace_with(&task.png_path, true, |temporary| {
     image
       .save_with_format(temporary, image::ImageFormat::Png)
       .map_err(std::io::Error::other)
@@ -592,9 +579,9 @@ pub struct TerminalFrameRasterizer {
 }
 
 impl TerminalFrameRasterizer {
-  pub fn load(preferred: &[String]) -> Result<Self, String> {
+  pub fn load(preferred: &[String], deployment_root: &Path) -> Result<Self, String> {
     Ok(Self {
-      fonts: FontSet::load(preferred)?,
+      fonts: FontSet::load(preferred, deployment_root)?,
     })
   }
 
@@ -677,37 +664,55 @@ struct FontSet {
 }
 
 impl FontSet {
-  fn load(preferred: &[String]) -> Result<Self, String> {
-    let mut fonts = Vec::new();
+  fn load(preferred: &[String], deployment_root: &Path) -> Result<Self, String> {
     let mut database = fontdb::Database::new();
     database.load_system_fonts();
+    let extra_font_paths = env::var_os("TUI_CAPTURE_FONTS")
+      .map(|paths| env::split_paths(&paths).collect::<Vec<_>>())
+      .unwrap_or_default();
+    Self::load_with_sources(preferred, deployment_root, &extra_font_paths, database)
+  }
 
+  fn load_with_sources(
+    preferred: &[String],
+    deployment_root: &Path,
+    extra_font_paths: &[PathBuf],
+    database: fontdb::Database,
+  ) -> Result<Self, String> {
+    let mut fonts = Vec::new();
+    let mut attempted = Vec::new();
     for value in preferred {
-      let path = Path::new(value);
+      let path = resolve_font_path(Path::new(value), deployment_root);
       if path.is_file() {
-        let _ = load_font_file(path, &mut fonts);
+        attempted.push(path.display().to_string());
+        if let Err(error) = load_font_file(&path, &mut fonts) {
+          attempted.push(error);
+        }
       } else if let Some(id) = database.query(&fontdb::Query {
         families: &[fontdb::Family::Name(value)],
         ..fontdb::Query::default()
       }) {
         load_database_font(&database, id, &mut fonts);
+      } else {
+        attempted.push(format!("font family '{value}' was not found"));
       }
     }
 
-    for path in [
-      Path::new("assets/fonts/mnf.ttf"),
-      Path::new("assets/fonts/mmo.ttf"),
-      Path::new("assets/fonts/asmn.otf"),
-      Path::new("assets/fonts/nsscvf.ttf"),
-    ] {
+    for path in extra_font_paths {
+      let path = resolve_font_path(path, deployment_root);
+      attempted.push(path.display().to_string());
+      if let Err(error) = load_font_file(&path, &mut fonts) {
+        attempted.push(error);
+      }
+    }
+
+    for path in bundled_font_paths(deployment_root) {
       if path.is_file() {
-        let _ = load_font_file(path, &mut fonts);
-      }
-    }
-
-    if let Some(paths) = env::var_os("TUI_CAPTURE_FONTS") {
-      for path in env::split_paths(&paths) {
-        let _ = load_font_file(&path, &mut fonts);
+        if let Err(error) = load_font_file(&path, &mut fonts) {
+          attempted.push(error);
+        }
+      } else {
+        attempted.push(format!("bundled font is missing: {}", path.display()));
       }
     }
 
@@ -756,9 +761,14 @@ impl FontSet {
     }
 
     if fonts.is_empty() {
-      return Err(
-        "No usable screenshot font found. Set TUI_CAPTURE_FONTS to TTF/OTF/TTC paths.".to_string(),
-      );
+      let attempts = if attempted.is_empty() {
+        "no preferred, bundled, or system fonts were available".to_string()
+      } else {
+        attempted.join("; ")
+      };
+      return Err(format!(
+        "No usable screenshot font found after preferred, bundled, and system fallbacks; attempted: {attempts}"
+      ));
     }
 
     Ok(Self {
@@ -794,10 +804,27 @@ impl FontSet {
   }
 }
 
+fn resolve_font_path(path: &Path, deployment_root: &Path) -> PathBuf {
+  if path.is_absolute() {
+    path.to_path_buf()
+  } else {
+    deployment_root.join(path)
+  }
+}
+
+fn bundled_font_paths(deployment_root: &Path) -> [PathBuf; 4] {
+  [
+    deployment_root.join("assets/fonts/mnf.ttf"),
+    deployment_root.join("assets/fonts/mmo.ttf"),
+    deployment_root.join("assets/fonts/asmn.otf"),
+    deployment_root.join("assets/fonts/nsscvf.ttf"),
+  ]
+}
+
 fn load_database_font(database: &fontdb::Database, id: fontdb::ID, fonts: &mut Vec<fontdue::Font>) {
   if let Some(result) = database.with_face_data(id, |data, face_index| {
     fontdue::Font::from_bytes(
-      data.to_vec(),
+      data,
       fontdue::FontSettings {
         collection_index: face_index,
         ..fontdue::FontSettings::default()
@@ -1325,6 +1352,66 @@ mod tests {
     assert!(text.contains("▀▁▂▃▄"));
     assert!(frame.width() > 60);
     assert!(frame.height() > 20);
+  }
+
+  #[test]
+  fn invalid_preferred_font_falls_back_to_a_bundled_font_under_the_deployment_root() {
+    let root = std::env::temp_dir().join(format!(
+      "tui-font-root-{}-{}",
+      std::process::id(),
+      timestamp()
+    ));
+    let fonts_dir = root.join("assets/fonts");
+    std::fs::create_dir_all(&fonts_dir).unwrap();
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts/mnf.ttf");
+    std::fs::copy(&fixture, fonts_dir.join("mnf.ttf")).unwrap();
+    let invalid_font = root.join("custom-invalid.ttf");
+    std::fs::write(&invalid_font, b"not a font").unwrap();
+    let preferred = vec![invalid_font.to_string_lossy().into_owned()];
+
+    let fonts =
+      FontSet::load_with_sources(&preferred, &root, &[], fontdb::Database::new()).unwrap();
+
+    assert!(!fonts.fonts.is_empty());
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn relative_preferred_font_path_is_resolved_from_the_deployment_root() {
+    let root = std::env::temp_dir().join(format!(
+      "tui-font-relative-{}-{}",
+      std::process::id(),
+      timestamp()
+    ));
+    let fonts_dir = root.join("assets/fonts");
+    std::fs::create_dir_all(&fonts_dir).unwrap();
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts/mnf.ttf");
+    std::fs::copy(&fixture, fonts_dir.join("custom.ttf")).unwrap();
+    let preferred = vec!["assets/fonts/custom.ttf".to_string()];
+
+    let fonts =
+      FontSet::load_with_sources(&preferred, &root, &[], fontdb::Database::new()).unwrap();
+
+    assert!(!fonts.fonts.is_empty());
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn font_failure_reports_attempted_deployment_font_paths() {
+    let root = std::env::temp_dir().join(format!(
+      "tui-font-missing-{}-{}",
+      std::process::id(),
+      timestamp()
+    ));
+    std::fs::create_dir_all(root.join("assets/fonts")).unwrap();
+
+    let error = match FontSet::load_with_sources(&[], &root, &[], fontdb::Database::new()) {
+      Ok(_) => panic!("font loading succeeded without any available source"),
+      Err(error) => error,
+    };
+
+    assert!(error.contains(&root.join("assets/fonts/mnf.ttf").display().to_string()));
+    std::fs::remove_dir_all(root).unwrap();
   }
 
   #[test]

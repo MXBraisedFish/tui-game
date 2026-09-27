@@ -12,7 +12,11 @@ impl RandomService {
     Self
   }
 
-  pub fn create(&self, generators: &mut RandomGeneratorObjects, seed: RandomSeed) -> RandomGeneratorId {
+  pub fn create(
+    &self,
+    generators: &mut RandomGeneratorObjects,
+    seed: RandomSeed,
+  ) -> RandomGeneratorId {
     generators.create(RandomGenerator::new(seed))
   }
 
@@ -157,19 +161,31 @@ impl RandomService {
     true
   }
 
-  pub fn next_u32(&self, generators: &mut RandomGeneratorObjects, id: RandomGeneratorId) -> Option<u32> {
+  pub fn next_u32(
+    &self,
+    generators: &mut RandomGeneratorObjects,
+    id: RandomGeneratorId,
+  ) -> Option<u32> {
     let generator = generators.generators.get_mut(&id)?;
     generator.draw_count += 1;
     Some(generator.rng.next_u32())
   }
 
-  pub fn next_u64(&self, generators: &mut RandomGeneratorObjects, id: RandomGeneratorId) -> Option<u64> {
+  pub fn next_u64(
+    &self,
+    generators: &mut RandomGeneratorObjects,
+    id: RandomGeneratorId,
+  ) -> Option<u64> {
     let generator = generators.generators.get_mut(&id)?;
     generator.draw_count += 1;
     Some(generator.rng.next_u64())
   }
 
-  pub fn float_01(&self, generators: &mut RandomGeneratorObjects, id: RandomGeneratorId) -> Option<f64> {
+  pub fn float_01(
+    &self,
+    generators: &mut RandomGeneratorObjects,
+    id: RandomGeneratorId,
+  ) -> Option<f64> {
     let generator = generators.generators.get_mut(&id)?;
     generator.draw_count += 1;
     Some(next_f64(&mut generator.rng))
@@ -226,8 +242,7 @@ impl RandomService {
     generators: &mut RandomGeneratorObjects,
     snapshot: RandomSnapshot,
   ) -> RandomGeneratorId {
-    generators
-      .create(RandomGenerator::from_snapshot(&snapshot))
+    generators.create(RandomGenerator::from_snapshot(&snapshot))
   }
 }
 

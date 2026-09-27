@@ -14,15 +14,26 @@ fn restore_terminal() {
 }
 
 fn main() {
-  install_panic_hook(restore_terminal);
+  install_panic_hook(
+    restore_terminal,
+    std::env::temp_dir()
+      .join("tg-fault-smoke")
+      .join("data/log/tui_crash.log"),
+  );
   set_crash_phase(CrashPhase::Runtime);
   let fault = catch_host_fault(HostFaultPhase::Runtime, HostFaultDomain::Other, || -> () {
     panic!("smoke panic")
   })
   .expect_err("panic must be converted into a fault");
   assert!(fault.to_string().contains("smoke panic"));
-  assert!(fault.location.is_some(), "supervised panic is captured by the hook");
-  assert!(!TERMINAL_RESTORED.load(Ordering::SeqCst), "supervised panic keeps the terminal");
+  assert!(
+    fault.location.is_some(),
+    "supervised panic is captured by the hook"
+  );
+  assert!(
+    !TERMINAL_RESTORED.load(Ordering::SeqCst),
+    "supervised panic keeps the terminal"
+  );
   let value = catch_host_fault(HostFaultPhase::Runtime, HostFaultDomain::Other, || 7).unwrap();
   assert_eq!(value, 7);
   println!("fault ok: {fault}");

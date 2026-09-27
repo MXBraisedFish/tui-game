@@ -1,5 +1,5 @@
-use super::key_token::parse_key_token;
 use super::key::{KeyBinding, KeyPattern};
+use super::key_token::parse_key_token;
 
 /// Action map entry: one action, its description and the key patterns bound to it.
 #[derive(Clone, Debug, PartialEq, Eq)]

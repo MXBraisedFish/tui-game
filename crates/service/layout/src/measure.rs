@@ -1,8 +1,8 @@
 use super::types::Size;
-use tg_service_text_layout::DrawTextParams;
 use tg_service_rich_text::RichTextParams;
-use tg_service_text_layout as text_layout;
 use tg_service_rich_text::TextMode;
+use tg_service_text_layout as text_layout;
+use tg_service_text_layout::DrawTextParams;
 
 /// Returns the rendered size of `text`.
 pub fn get_text_size(text: &str, params: Option<&RichTextParams>) -> Size {

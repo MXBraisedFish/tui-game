@@ -85,10 +85,8 @@ pub struct PackageListEntry {
   pub path: PathBuf,
   pub enabled: bool,
   pub debug: bool,
-  pub safe_mode: bool,
   pub mouse_required: bool,
   pub truecolor_required: bool,
-  pub high_privilege_required: bool,
   pub supported_languages: Vec<String>,
   pub score_enabled: bool,
   pub score_empty_text: String,
@@ -137,7 +135,6 @@ pub struct PackageRuntime {
 pub struct GameConfig {
   pub name: String,
   pub detail: String,
-  pub high_privilege: bool,
   pub mouse: bool,
   pub truecolor: bool,
   pub target_fps: u32,
@@ -172,20 +169,20 @@ pub struct ScreensaverConfig {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct PackageSnapshot {
+pub struct PackageSnapshot {
   games: Vec<PackageInfo>,
   screensavers: Vec<PackageInfo>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ScanRequest {
+struct ScanRequest {
   root: PathBuf,
   language_code: String,
   missing_template: String,
 }
 
 #[derive(Clone, Debug)]
-pub enum PackageTask {
+pub(crate) enum PackageTask {
   Scan(ScanRequest),
 }
 
@@ -326,8 +323,10 @@ struct ScanReport {
 }
 
 /// 包管理服务，负责扫描和加载游戏/屏保包。
+#[derive(Default)]
 pub struct PackageService {
   snapshot: PackageSnapshot,
+  snapshot_revision: u64,
   user_game_key_actions: BTreeMap<String, BTreeMap<String, Vec<Vec<String>>>>,
   last_scan: Option<ScanRequest>,
   watcher_thread: Option<ManagedThreadId>,
@@ -340,13 +339,7 @@ enum PackageWatcherCommand {
 
 impl PackageService {
   pub fn new() -> Self {
-    Self {
-      snapshot: PackageSnapshot::default(),
-      user_game_key_actions: BTreeMap::new(),
-      last_scan: None,
-      watcher_thread: None,
-      watcher_tx: None,
-    }
+    Self::default()
   }
 
   pub fn configure_scan(&mut self, root_dir: &Path, language_code: &str, missing_template: &str) {
@@ -378,7 +371,7 @@ impl PackageService {
       total_candidates,
     );
     let finished = scan_finished_event(&report);
-    self.snapshot = report.snapshot;
+    self.publish_snapshot(report.snapshot);
     for event in scan_events
       .into_iter()
       .chain(report.events)
@@ -467,7 +460,7 @@ impl PackageService {
         finished,
         watched_files,
       } => {
-        self.snapshot = snapshot;
+        self.publish_snapshot(snapshot);
         if let Some(tx) = &self.watcher_tx {
           let _ = tx.send(PackageWatcherCommand::SetFiles(watched_files));
         }
@@ -479,6 +472,11 @@ impl PackageService {
 
   pub fn games(&self) -> Vec<PackageInfo> {
     self.snapshot.games.clone()
+  }
+
+  /// Revision of the currently published package/resource snapshot.
+  pub fn snapshot_revision(&self) -> u64 {
+    self.snapshot_revision
   }
 
   pub fn screensavers(&self) -> Vec<PackageInfo> {
@@ -537,16 +535,11 @@ impl PackageService {
     &self,
     package: &PackageInfo,
     relative: &Path,
-  ) -> Result<
-    tg_core_audio::ResolvedAudioFile,
-    tg_core_audio::AudioError,
-  > {
+  ) -> Result<tg_core_audio::ResolvedAudioFile, tg_core_audio::AudioError> {
     resolve_package_file(&package.path, Path::new("assets"), relative)
       .map(tg_core_audio::ResolvedAudioFile::new)
       .ok_or_else(|| {
-        tg_core_audio::AudioError::sanitized(
-          tg_core_audio::AudioErrorCode::InvalidPath,
-        )
+        tg_core_audio::AudioError::sanitized(tg_core_audio::AudioErrorCode::InvalidPath)
       })
   }
 
@@ -605,6 +598,11 @@ impl PackageService {
         .collect();
     }
     entry
+  }
+
+  fn publish_snapshot(&mut self, snapshot: PackageSnapshot) {
+    self.snapshot = snapshot;
+    self.snapshot_revision = self.snapshot_revision.wrapping_add(1);
   }
 }
 
@@ -1076,7 +1074,6 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
       .screensaver
       .as_ref()
       .is_some_and(|screensaver| screensaver.truecolor);
-  let high_privilege_required = info.game.as_ref().is_some_and(|game| game.high_privilege);
   let supported_languages = info
     .game
     .as_ref()
@@ -1145,10 +1142,8 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     path: info.path,
     enabled: true,
     debug: false,
-    safe_mode: true,
     mouse_required,
     truecolor_required,
-    high_privilege_required,
     supported_languages,
     score_enabled,
     score_empty_text,
@@ -1179,9 +1174,11 @@ fn scan_all_packages(
     emit_event,
     total,
     &mut scanned,
-    "scripts/game",
-    PackageType::Game,
-    PackageSource::Official,
+    ScanTarget {
+      relative: "scripts/game",
+      expected_type: PackageType::Game,
+      source: PackageSource::Official,
+    },
   );
   scan_dir(
     &mut report,
@@ -1189,9 +1186,11 @@ fn scan_all_packages(
     emit_event,
     total,
     &mut scanned,
-    "scripts/screensaver",
-    PackageType::Screensaver,
-    PackageSource::Official,
+    ScanTarget {
+      relative: "scripts/screensaver",
+      expected_type: PackageType::Screensaver,
+      source: PackageSource::Official,
+    },
   );
   scan_dir(
     &mut report,
@@ -1199,9 +1198,11 @@ fn scan_all_packages(
     emit_event,
     total,
     &mut scanned,
-    "data/mod/game",
-    PackageType::Game,
-    PackageSource::Mod,
+    ScanTarget {
+      relative: "data/mod/game",
+      expected_type: PackageType::Game,
+      source: PackageSource::Mod,
+    },
   );
   scan_dir(
     &mut report,
@@ -1209,25 +1210,36 @@ fn scan_all_packages(
     emit_event,
     total,
     &mut scanned,
-    "data/mod/screensaver",
-    PackageType::Screensaver,
-    PackageSource::Mod,
+    ScanTarget {
+      relative: "data/mod/screensaver",
+      expected_type: PackageType::Screensaver,
+      source: PackageSource::Mod,
+    },
   );
 
   report
 }
 
 // 递归扫描指定目录下的所有包并加载
+struct ScanTarget {
+  relative: &'static str,
+  expected_type: PackageType,
+  source: PackageSource,
+}
+
 fn scan_dir(
   report: &mut ScanReport,
   request: &ScanRequest,
   emit_event: &mut impl FnMut(PackageEvent),
   total: usize,
   scanned: &mut usize,
-  relative: &str,
-  expected_type: PackageType,
-  source: PackageSource,
+  target: ScanTarget,
 ) {
+  let ScanTarget {
+    relative,
+    expected_type,
+    source,
+  } = target;
   let dir = request.root.join(relative);
   let Some((canonical_root, canonical_dir)) = canonical_scan_root(&request.root, &dir) else {
     return;
@@ -1598,7 +1610,6 @@ fn read_package(
       Some(GameConfig {
         name,
         detail,
-        high_privilege: g.high_privilege.unwrap_or(false),
         mouse: g.mouse.unwrap_or(false),
         truecolor: g.truecolor.unwrap_or(false),
         target_fps,
@@ -1958,7 +1969,6 @@ struct RawRuntime {
 struct RawGameConfig {
   name: RawPackageText,
   detail: RawPackageText,
-  high_privilege: Option<bool>,
   mouse: Option<bool>,
   truecolor: Option<bool>,
   target_fps: Option<u32>,
@@ -2427,10 +2437,10 @@ fn resolve_entry(pkg_dir: &Path, entry: &str) -> Result<String, String> {
   if parts.is_empty() {
     return Err("Entry is empty".to_string());
   }
-  if let Some(last) = parts.last_mut() {
-    if !last.ends_with(".lua") {
-      last.push_str(".lua");
-    }
+  if let Some(last) = parts.last_mut()
+    && !last.ends_with(".lua")
+  {
+    last.push_str(".lua");
   }
   Ok(parts.join("/"))
 }
@@ -2456,13 +2466,13 @@ mod tests {
 
   #[derive(Debug)]
   enum TestEvent {
-    Package(PackageAsyncEvent),
+    Package(Box<PackageAsyncEvent>),
     Status,
   }
 
   impl From<PackageAsyncEvent> for TestEvent {
     fn from(event: PackageAsyncEvent) -> Self {
-      Self::Package(event)
+      Self::Package(Box::new(event))
     }
   }
 
@@ -2509,7 +2519,7 @@ mod tests {
       .poll_events()
       .into_iter()
       .filter_map(|event| match event {
-        TestEvent::Package(event) => Some(service.handle_async_event(event, log)),
+        TestEvent::Package(event) => Some(service.handle_async_event(*event, log)),
         _ => None,
       })
       .collect()
@@ -2696,13 +2706,11 @@ mod tests {
             let action_map = game
               .actions
               .iter()
-              .map(
-                |(action, config)| tg_core_input::ActionMapEntry {
-                  action: action.clone(),
-                  description: config.description.clone(),
-                  keys: config.keys.clone(),
-                },
-              )
+              .map(|(action, config)| tg_core_input::ActionMapEntry {
+                action: action.clone(),
+                description: config.description.clone(),
+                keys: config.keys.clone(),
+              })
               .collect::<Vec<_>>();
             tg_core_input::translate_action_map(&action_map)
               .unwrap_or_else(|error| panic!("{relative}/{dir_name}: {error:?}"));
@@ -2885,6 +2893,8 @@ mod tests {
     let mut log = LogService::new();
     scan(&mut service, &root, &mut log, "en_us");
     assert_eq!(service.mod_games()[0].mod_id, "first");
+    let first_revision = service.snapshot_revision();
+    assert!(first_revision > 0);
 
     std::fs::remove_dir_all(root.join("data/mod/game/first")).unwrap();
     write_game(&root, "data/mod/game", "second", "Second");
@@ -2899,6 +2909,7 @@ mod tests {
         .map(|entry| entry.mod_id.as_str())
         == Some("second")
       {
+        assert!(service.snapshot_revision() > first_revision);
         let _ = std::fs::remove_dir_all(root);
         return;
       }
@@ -3352,14 +3363,13 @@ mod tests {
   }
 
   #[test]
-  fn game_high_privilege_and_truecolor_flags_reach_list_entry() {
-    let root = temp_root("game_privilege_truecolor");
+  fn game_truecolor_flag_reaches_list_entry() {
+    let root = temp_root("game_truecolor");
     write_game(&root, "data/mod/game", "flag_game", "Flag Game");
     let package_json = root.join("data/mod/game/flag_game/package.json");
-    let content = std::fs::read_to_string(&package_json).unwrap().replace(
-      r#""target_fps":60"#,
-      r#""target_fps":60,"high_privilege":true,"truecolor":true"#,
-    );
+    let content = std::fs::read_to_string(&package_json)
+      .unwrap()
+      .replace(r#""target_fps":60"#, r#""target_fps":60,"truecolor":true"#);
     std::fs::write(package_json, content).unwrap();
 
     let mut service = PackageService::new();
@@ -3367,9 +3377,32 @@ mod tests {
     scan(&mut service, &root, &mut log, "en_us");
 
     let entry = service.mod_games().remove(0);
-    assert!(entry.high_privilege_required);
     assert!(entry.truecolor_required);
 
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn removed_high_privilege_game_field_is_rejected() {
+    let root = temp_root("removed_high_privilege_field");
+    write_game(
+      &root,
+      "data/mod/game",
+      "removed_field_game",
+      "Removed Field Game",
+    );
+    let package_json = root.join("data/mod/game/removed_field_game/package.json");
+    let content = std::fs::read_to_string(&package_json).unwrap().replace(
+      r#""target_fps":60"#,
+      r#""target_fps":60,"high_privilege":true"#,
+    );
+    std::fs::write(package_json, content).unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+
+    assert!(service.mod_games().is_empty());
     let _ = std::fs::remove_dir_all(root);
   }
 

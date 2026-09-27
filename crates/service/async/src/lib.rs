@@ -81,8 +81,12 @@ pub trait AsyncJob<E>: Send + 'static {
   /// # Errors
   ///
   /// Returning `Err` marks the task failed (unless it was cancelled meanwhile).
-  fn run(self: Box<Self>, id: TaskId, events: &Sender<E>, cancellation: &TaskCancellation)
-  -> Result<(), String>;
+  fn run(
+    self: Box<Self>,
+    id: TaskId,
+    events: &Sender<E>,
+    cancellation: &TaskCancellation,
+  ) -> Result<(), String>;
 
   /// Returns the file this job writes as `(target, temporary)`; it is registered with the write
   /// barrier before the job is queued.
@@ -179,11 +183,17 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
       return id;
     }
     set_task_state(&self.task_states, id, TaskState::Pending);
-    if self.task_tx.send(WorkerMessage::Run(id, Box::new(task))).is_err() {
+    if self
+      .task_tx
+      .send(WorkerMessage::Run(id, Box::new(task)))
+      .is_err()
+    {
       let error = "asynchronous worker queue is closed".to_string();
       set_task_state(&self.task_states, id, TaskState::Failed);
       self.write_barrier.fail(id, error.clone());
-      let _ = self.event_tx.send(TaskStatusEvent::Failed { id, error }.into());
+      let _ = self
+        .event_tx
+        .send(TaskStatusEvent::Failed { id, error }.into());
     }
     id
   }
@@ -249,7 +259,6 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
 
     id
   }
-
 }
 
 impl<E> AsyncRuntime<E> {

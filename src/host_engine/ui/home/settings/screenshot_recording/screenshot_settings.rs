@@ -7,7 +7,7 @@ use crate::host_engine::services::{
   ScreenshotProfile, ScrollBoxService, TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
-use super::fonts_settings::{FontsSettingsCommand, FontsSettingsUi};
+use super::fonts_settings::{FontsSettingsCommand, FontsSettingsRenderContext, FontsSettingsUi};
 
 const NS: &str = "screenshot_settings";
 const MENU_LEN: usize = 4;
@@ -222,6 +222,8 @@ impl ScreenshotSettingsUi {
     }
   }
 
+  // reason: the runtime calls this signature from outside ui/, so it cannot be changed here.
+  #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -235,13 +237,15 @@ impl ScreenshotSettingsUi {
     if self.fonts_open {
       return self.fonts.render(
         &mut self.objects,
-        render,
-        canvas,
-        layout,
-        i18n,
-        hit_area,
-        text_input,
-        scroll_box,
+        &mut FontsSettingsRenderContext {
+          render,
+          canvas,
+          layout,
+          i18n,
+          hit_area,
+          text_input,
+          scroll_box,
+        },
       );
     }
     let viewport = layout.developer_viewport_rect();

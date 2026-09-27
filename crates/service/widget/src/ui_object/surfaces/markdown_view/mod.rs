@@ -6,18 +6,19 @@ use self::state::{MarkdownLinkHit, MarkdownViewState};
 pub use self::types::{
   MarkdownEvent, MarkdownRenderParams, MarkdownTheme, MarkdownViewId, MarkdownViewOptions,
 };
-use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
 use crate::UiObjectPool;
-use tg_core_unicode::display_width;
+use crate::{ScrollBoxId, SliceId};
+use pulldown_cmark::{Alignment, CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use tg_core_input::{MouseButton, MouseEvent, MouseEventKind};
 use tg_core_style::{RichTextSegment, TextColor, TextStyle};
+use tg_core_unicode::display_width;
 use tg_service_canvas::CanvasService;
 use tg_service_code_highlight::CodeHighlightService;
 use tg_service_layout::{Rect, Size};
 use tg_service_text_layout::TextAlign;
-use crate::{ScrollBoxId, SliceId};
-use pulldown_cmark::{Alignment, CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
 
+#[derive(Default)]
 pub struct MarkdownService;
 
 #[derive(Clone, Copy)]
@@ -25,7 +26,6 @@ enum MarkdownTarget {
   Base,
   Slice(SliceId),
   ScrollBox(ScrollBoxId),
-  Host,
 }
 
 #[derive(Clone, Debug)]
@@ -224,24 +224,6 @@ impl MarkdownService {
     )
   }
 
-  pub(crate) fn render_host(
-    &self,
-    pool: &mut UiObjectPool,
-    id: MarkdownViewId,
-    params: MarkdownRenderParams,
-    canvas: &mut CanvasService,
-    code_highlight: &CodeHighlightService,
-  ) -> bool {
-    self.render_to(
-      pool,
-      id,
-      params,
-      MarkdownTarget::Host,
-      canvas,
-      code_highlight,
-    )
-  }
-
   fn render_to(
     &self,
     pool: &mut UiObjectPool,
@@ -271,22 +253,19 @@ impl MarkdownService {
     let bottom = params
       .max_height
       .map(|height| params.y.saturating_add(height));
+    let mut context = MarkdownDrawContext {
+      pool,
+      id,
+      options: &options,
+      target,
+      canvas,
+      code_highlight,
+    };
     for block in blocks {
       if bottom.is_some_and(|bottom| y >= bottom) {
         break;
       }
-      y = draw_block(
-        pool,
-        id,
-        &block,
-        &options,
-        params.x,
-        y,
-        params.width,
-        target,
-        canvas,
-        code_highlight,
-      );
+      y = draw_block(&mut context, &block, params.x, y, params.width);
     }
     true
   }
@@ -551,65 +530,65 @@ fn parse_markdown(
   blocks
 }
 
-fn draw_block(
-  pool: &mut UiObjectPool,
+struct MarkdownDrawContext<'a> {
+  pool: &'a mut UiObjectPool,
   id: MarkdownViewId,
+  options: &'a MarkdownViewOptions,
+  target: MarkdownTarget,
+  canvas: &'a mut CanvasService,
+  code_highlight: &'a CodeHighlightService,
+}
+
+fn draw_block(
+  context: &mut MarkdownDrawContext<'_>,
   block: &MdBlock,
-  options: &MarkdownViewOptions,
   x: u16,
   y: u16,
   width: u16,
-  target: MarkdownTarget,
-  canvas: &mut CanvasService,
-  code_highlight: &CodeHighlightService,
 ) -> u16 {
   match block {
     MdBlock::Text { segments, links } => {
       let params = text_params(x, y, width, None);
-      draw_segments(canvas, target, segments, &params);
-      register_links(pool, id, links, x, y, target, canvas);
+      draw_segments(context.canvas, context.target, segments, &params);
+      register_links(
+        context.pool,
+        context.id,
+        links,
+        x,
+        y,
+        context.target,
+        context.canvas,
+      );
       y.saturating_add(measure_segments(segments, &params).height)
     }
-    MdBlock::Code { language, code } => draw_code_block(
-      canvas,
-      target,
-      x,
-      y,
-      width,
-      language.as_deref(),
-      code,
-      options,
-      code_highlight,
-    ),
+    MdBlock::Code { language, code } => {
+      draw_code_block(context, x, y, width, language.as_deref(), code)
+    }
     MdBlock::Rule => {
       draw_plain(
-        canvas,
-        target,
+        context.canvas,
+        context.target,
         x,
         y,
         &"─".repeat(width as usize),
-        options.theme.horizontal_rule.clone(),
+        context.options.theme.horizontal_rule.clone(),
       );
       y.saturating_add(1)
     }
-    MdBlock::Table { rows, aligns } => {
-      draw_table(canvas, target, x, y, width, rows, aligns, &options.theme)
-    }
+    MdBlock::Table { rows, aligns } => draw_table(context, x, y, width, rows, aligns),
     MdBlock::Blank => y.saturating_add(1),
   }
 }
 
 fn draw_code_block(
-  canvas: &mut CanvasService,
-  target: MarkdownTarget,
+  context: &mut MarkdownDrawContext<'_>,
   x: u16,
   y: u16,
   width: u16,
   language: Option<&str>,
   code: &str,
-  options: &MarkdownViewOptions,
-  code_highlight: &CodeHighlightService,
 ) -> u16 {
+  let options = context.options;
   let lines = code.trim_end_matches('\n').split('\n').collect::<Vec<_>>();
   let max_line = lines
     .iter()
@@ -619,8 +598,8 @@ fn draw_code_block(
   let inner_width = max_line.saturating_add(2).clamp(20, width.max(1));
   let right = inner_width.saturating_sub(1);
   draw_plain(
-    canvas,
-    target,
+    context.canvas,
+    context.target,
     x,
     y,
     &format!("┌{}┐", "─".repeat(right as usize)),
@@ -628,35 +607,40 @@ fn draw_code_block(
   );
   if let Some(language) = language.filter(|language| !language.is_empty()) {
     draw_plain(
-      canvas,
-      target,
+      context.canvas,
+      context.target,
       x.saturating_add(2),
       y,
       language,
       options.theme.code_border.clone(),
     );
   }
-  let code_language = language.and_then(|language| code_highlight.language_from_name(language));
+  let code_language =
+    language.and_then(|language| context.code_highlight.language_from_name(language));
   let mut row = y.saturating_add(1);
   for line in lines {
     draw_plain(
-      canvas,
-      target,
+      context.canvas,
+      context.target,
       x,
       row,
       "│",
       options.theme.code_border.clone(),
     );
     draw_plain(
-      canvas,
-      target,
+      context.canvas,
+      context.target,
       x.saturating_add(inner_width),
       row,
       "│",
       options.theme.code_border.clone(),
     );
     let segments = code_language
-      .map(|language| code_highlight.highlight_segments(line, language, &options.code_theme))
+      .map(|language| {
+        context
+          .code_highlight
+          .highlight_segments(line, language, &options.code_theme)
+      })
       .unwrap_or_else(|| {
         vec![RichTextSegment {
           text: line.to_string(),
@@ -664,8 +648,8 @@ fn draw_code_block(
         }]
       });
     draw_segments(
-      canvas,
-      target,
+      context.canvas,
+      context.target,
       &segments,
       &DrawTextParams {
         x: x.saturating_add(1),
@@ -678,8 +662,8 @@ fn draw_code_block(
     row = row.saturating_add(1);
   }
   draw_plain(
-    canvas,
-    target,
+    context.canvas,
+    context.target,
     x,
     row,
     &format!("└{}┘", "─".repeat(right as usize)),
@@ -689,15 +673,14 @@ fn draw_code_block(
 }
 
 fn draw_table(
-  canvas: &mut CanvasService,
-  target: MarkdownTarget,
+  context: &mut MarkdownDrawContext<'_>,
   x: u16,
   y: u16,
   width: u16,
   rows: &[Vec<String>],
   aligns: &[TextAlign],
-  theme: &MarkdownTheme,
 ) -> u16 {
+  let theme = &context.options.theme;
   if rows.is_empty() || width < 3 {
     return y;
   }
@@ -705,8 +688,8 @@ fn draw_table(
   let cell_widths = markdown_table_widths(rows, width, columns);
   let mut row_y = y;
   draw_plain(
-    canvas,
-    target,
+    context.canvas,
+    context.target,
     x,
     row_y,
     &table_border(&cell_widths, '┌', '┬', '┐'),
@@ -722,8 +705,8 @@ fn draw_table(
     let row_height = markdown_table_row_height(row, &cell_widths).max(1);
     for line in 0..row_height {
       draw_plain(
-        canvas,
-        target,
+        context.canvas,
+        context.target,
         x,
         row_y.saturating_add(line),
         "│",
@@ -731,11 +714,11 @@ fn draw_table(
       );
     }
     let mut cell_x = x.saturating_add(1);
-    for col in 0..columns {
+    for (col, cell_width) in cell_widths.iter().enumerate().take(columns) {
       let text = row.get(col).map(String::as_str).unwrap_or("");
       draw_segments(
-        canvas,
-        target,
+        context.canvas,
+        context.target,
         &[RichTextSegment {
           text: text.to_string(),
           style: row_style.clone(),
@@ -743,7 +726,7 @@ fn draw_table(
         &DrawTextParams {
           x: cell_x,
           y: row_y,
-          max_width: Some(cell_widths[col]),
+          max_width: Some(*cell_width),
           max_height: Some(row_height),
           wrap_mode: TextWrapMode::Auto,
           non_truncate_word_wrap: true,
@@ -751,11 +734,11 @@ fn draw_table(
           ..Default::default()
         },
       );
-      cell_x = cell_x.saturating_add(cell_widths[col]);
+      cell_x = cell_x.saturating_add(*cell_width);
       for line in 0..row_height {
         draw_plain(
-          canvas,
-          target,
+          context.canvas,
+          context.target,
           cell_x,
           row_y.saturating_add(line),
           "│",
@@ -770,7 +753,14 @@ fn draw_table(
     } else {
       table_border(&cell_widths, '├', '┼', '┤')
     };
-    draw_plain(canvas, target, x, row_y, &sep, theme.table_border.clone());
+    draw_plain(
+      context.canvas,
+      context.target,
+      x,
+      row_y,
+      &sep,
+      theme.table_border.clone(),
+    );
     row_y = row_y.saturating_add(1);
   }
   row_y
@@ -834,7 +824,6 @@ fn register_links(
       MarkdownTarget::Base => canvas.base_hit_rect(rect),
       MarkdownTarget::Slice(slice) => canvas.slice_hit_rect(slice, rect),
       MarkdownTarget::ScrollBox(scroll_box) => canvas.scroll_box_hit_rect(scroll_box, rect),
-      MarkdownTarget::Host => canvas.host_hit_rect(rect),
     };
     let Some((rect, _, surface_rank)) = resolved else {
       continue;
@@ -891,10 +880,6 @@ fn draw_segments(
     MarkdownTarget::ScrollBox(scroll_box) => {
       canvas.rich_text_segments_in_scroll_box(scroll_box, segments, params)
     }
-    MarkdownTarget::Host => {
-      canvas.host_rich_text_segments(segments, params);
-      true
-    }
   }
 }
 
@@ -914,10 +899,6 @@ fn draw_plain(
     MarkdownTarget::Slice(slice) => canvas.styled_text_on(slice, x, y, text, style),
     MarkdownTarget::ScrollBox(scroll_box) => {
       canvas.styled_text_in_scroll_box(scroll_box, x, y, text, style)
-    }
-    MarkdownTarget::Host => {
-      canvas.host_styled_text(x, y, text, style);
-      true
     }
   }
 }
