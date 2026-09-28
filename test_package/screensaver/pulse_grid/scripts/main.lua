@@ -23,7 +23,7 @@ local cells = {}
 
 -- Sorts a copy of the palette from dark to bright and precomputes the shade strings.
 local function build_shades()
-  local stops = table.deepcopy(PALETTE)
+  local stops = table.deepcopy{ table = PALETTE }
   table.sort(stops, function(left, right)
     return left.r + left.g + left.b < right.r + right.g + right.b
   end)

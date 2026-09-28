@@ -9,7 +9,10 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "ini_encode",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.ini_encode";
-      let data = value::lua_to_json(args::one(method, "t", values)?, method)?;
+      let data = value::lua_to_json(
+        super::value_argument(values, method, "value", false)?,
+        method,
+      )?;
       let serde_json::Value::Object(entries) = data else {
         return Err(args::message(method, "INI root must be an object table"));
       };
@@ -119,7 +122,7 @@ fn validate_name(value: &str, method: &str) -> mlua::Result<()> {
 
 fn scalar(value: serde_json::Value, method: &str) -> mlua::Result<String> {
   match value {
-    serde_json::Value::Null => Ok(String::new()),
+    serde_json::Value::Null => Err(args::message(method, "INI does not support null values")),
     serde_json::Value::Bool(value) => Ok(value.to_string()),
     serde_json::Value::Number(value) => Ok(value.to_string()),
     serde_json::Value::String(value) if !value.contains(['\n', '\r']) => Ok(value),

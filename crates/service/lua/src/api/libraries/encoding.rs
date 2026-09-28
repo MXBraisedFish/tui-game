@@ -130,7 +130,8 @@ fn install_hex(lua: &Lua, source: &Table) -> mlua::Result<()> {
 }
 
 fn bytes_argument(values: MultiValue, method: &str) -> mlua::Result<Vec<u8>> {
-  let value = args::one(method, "s", values)?;
+  let table = args::named(method, values, &["s"])?;
+  let value = args::required(&table, method, "s")?;
   let Value::String(value) = value else {
     return Err(args::invalid(method, "s", "string", &value));
   };

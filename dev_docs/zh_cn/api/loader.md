@@ -27,8 +27,8 @@
 ### 调用
 
 ```lua
--- 单参数
-loader.require()
+-- 命名参数表
+loader.require{ path = "helper.lua" }
 ```
 
 ### 参数
@@ -43,7 +43,7 @@ loader.require()
 
 | 类型     | 说明       |
 | -------- | ---------- |
-| `any...` | 模块返回值 |
+| `any...` | 模块返回值（保留模块定义的多返回值与 nil 位置） |
 
 ### 示例
 
@@ -53,8 +53,8 @@ scripts/
 - helper.lua
 
 -- main.lua
-local helper1 = loader.require("helper.lua")
-local helper2 = loader.require("helper.lua")
+local helper1 = loader.require{ path = "helper.lua" }
+local helper2 = loader.require{ path = "helper.lua" }
 
 helper1.print()
 
@@ -91,8 +91,8 @@ true
 ### 调用
 
 ```lua
--- 单参数
-loader.dofile()
+-- 命名参数表
+loader.dofile{ path = "helper.lua" }
 ```
 
 ### 参数
@@ -107,7 +107,7 @@ loader.dofile()
 
 | 类型     | 说明       |
 | -------- | ---------- |
-| `any...` | 模块返回值 |
+| `any...` | 模块返回值（保留模块定义的多返回值与 nil 位置） |
 
 ### 示例
 
@@ -117,8 +117,8 @@ scripts/
 - helper.lua
 
 -- main.lua
-local helper1 = loader.dofile("helper.lua")
-local helper2 = loader.dofile("helper.lua")
+local helper1 = loader.dofile{ path = "helper.lua" }
+local helper2 = loader.dofile{ path = "helper.lua" }
 
 helper1.print()
 
@@ -155,8 +155,8 @@ false
 ### 调用
 
 ```lua
--- 单参数
-loader.loadfile()
+-- 命名参数表
+loader.loadfile{ path = "helper.lua" }
 ```
 
 ### 参数
@@ -181,8 +181,8 @@ scripts/
 - helper.lua
 
 -- main.lua
-local func1 = loader.loadfile("helper.lua")
-local func2 = loader.loadfile("helper.lua")
+local func1 = loader.loadfile{ path = "helper.lua" }
+local func2 = loader.loadfile{ path = "helper.lua" }
 
 debug.print { message = tostring(func1 == func2) }
 

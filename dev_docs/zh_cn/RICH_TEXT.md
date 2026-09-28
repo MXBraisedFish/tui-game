@@ -1,4 +1,6 @@
-# 富文本指令
+# 富文本指令（旧版语法，已废弃）
+
+> 本文后续的 `{tc:...}`、`{ts:...}` 等花括号指令不属于当前解析器语法。当前格式使用 `f%` 前缀、`<fg:...>` / `<bg:...>` / `<b>` 等标签；请以[当前富文本参考](RICH_TEXT_zh_cn.md)为准。本页保留旧内容供迁移时查阅。
 
 # 文档信息
 
@@ -22,73 +24,9 @@
 
 # 适用范围
 
-**扩展宿主语言**
+包清单中的普通文本和 i18n 回退文本会经过富文本解析。schema 2 中支持的配置文本字段与文件位置见[游戏包 schema 2](PACKAAGE_GAME.md)和[屏保包 schema 2](PACKAAGE_SCREENSAVER.md)，包括 `version`、展示字段、游戏名称/详情、最佳成绩空文本、动作说明和屏保名称。图像及文本资源路径不是富文本字段。
 
-> 直接写入即可，由宿主处理
-
-根据已有的文件字段对照填写（极少，若文本不带富文本写法均为普通渲染）
-
-**游戏包配置文件 `game.json` 以下字段：**
-
->  直接写入即可，由宿主处理
-
-`package_name`
-`introduction`
-`author`
-`game_name`
-`description`
-`detail`
-`version`
-`icon`
-`banner`
-
-**游戏包配置文件 `package.json` 以下字段：**
-
->  直接写入即可，由宿主处理
-
-`best_none` - 直接写入即可，由宿主处理
-
-屏保包配置文件 `package.json` 以下字段：**
-
->  直接写入即可，由宿主处理
-
-`package_name`
-`screensaver_name`
-`author`
-`version`
-`introduction`
-`icon`
-`banner`
-
-**老板包配置文件 `package.json` 以下字段：**
-
->  直接写入即可，由宿主处理
-
-`package_name`
-`boss_name`
-`author`
-`version`
-`introduction`
-`icon`
-`banner`
-
-**游戏包自定义语言：**
-
->  使用特殊 API 处理
-
-`任意字段`
-
-**屏保包自定义语言：**
-
->  使用特殊 API 处理
-
-`任意字段`
-
-**游戏包自定义语言：**
-
->  使用特殊 API 处理
-
-`任意字段`
+游戏脚本使用 `i18n` API 读取的自定义语言字符串不会自动按配置字段处理；Lua API 返回并交给绘制接口的字符串按各 API 契约解析。`best_string` 等 Lua 参数是否解析富文本，以对应 API 文档为准。
 
 **API 传递值 `best_string` 字符串：**
 

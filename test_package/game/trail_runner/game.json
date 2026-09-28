@@ -1,0 +1,28 @@
+{
+  "name": "f%<fg:bright_green>Trail</fg> Runner",
+  "detail": {
+    "type": "i18n",
+    "key": "detail",
+    "callback": "Steer the runner, collect gems and never cross your own trail."
+  },
+  "mouse": false,
+  "truecolor": false,
+  "target_fps": 60,
+  "language": [
+    "en_us",
+    "zh_cn"
+  ],
+  "command": "trail_runner",
+  "entry": "main",
+  "min_width": 60,
+  "min_height": 20,
+  "save_game": true,
+  "best_score": {
+    "empty_text": {
+      "type": "i18n",
+      "key": "empty_score",
+      "callback": "No trail record yet"
+    },
+    "enable": true
+  }
+}

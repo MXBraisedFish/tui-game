@@ -1,11 +1,19 @@
 use std::collections::{BTreeMap, HashSet};
 
-use mlua::{Lua, Table, Value};
+use mlua::{Lua, Table, UserData, Value};
 
 use super::super::{args, readonly};
 
 const MAX_DEPTH: usize = 32;
 const MAX_NODES: usize = 16_384;
+
+pub(super) struct NullSentinel;
+
+impl UserData for NullSentinel {}
+
+pub(super) fn is_null_sentinel(value: &Value) -> bool {
+  matches!(value, Value::UserData(value) if value.is::<NullSentinel>())
+}
 
 pub(super) fn lua_to_json(value: Value, method: &str) -> mlua::Result<serde_json::Value> {
   let mut seen = HashSet::new();
@@ -41,6 +49,7 @@ fn encode(
         .map_err(|_| args::message(method, "text formats require valid UTF-8 strings"))?
         .to_string(),
     )),
+    Value::UserData(value) if value.is::<NullSentinel>() => Ok(serde_json::Value::Null),
     Value::Table(table) => encode_table(table, method, depth, nodes, seen),
     value => Err(args::message(
       method,
@@ -123,11 +132,13 @@ pub(super) fn json_to_lua(
   lua: &Lua,
   value: &serde_json::Value,
   method: &str,
+  null: &Value,
 ) -> mlua::Result<Value> {
   fn decode(
     lua: &Lua,
     value: &serde_json::Value,
     method: &str,
+    null: &Value,
     depth: usize,
     nodes: &mut usize,
   ) -> mlua::Result<Value> {
@@ -136,7 +147,7 @@ pub(super) fn json_to_lua(
       return Err(args::message(method, "decoded value exceeds safety limits"));
     }
     match value {
-      serde_json::Value::Null => Ok(Value::Nil),
+      serde_json::Value::Null => Ok(null.clone()),
       serde_json::Value::Bool(value) => Ok(Value::Boolean(*value)),
       serde_json::Value::Number(value) => {
         if let Some(value) = value.as_i64() {
@@ -153,24 +164,31 @@ pub(super) fn json_to_lua(
       serde_json::Value::Array(values) => {
         let table = lua.create_table_with_capacity(values.len(), 0)?;
         for (index, value) in values.iter().enumerate() {
-          table.raw_set(index + 1, decode(lua, value, method, depth + 1, nodes)?)?;
+          table.raw_set(
+            index + 1,
+            decode(lua, value, method, null, depth + 1, nodes)?,
+          )?;
         }
         Ok(Value::Table(table))
       }
       serde_json::Value::Object(values) => {
         let table = lua.create_table_with_capacity(0, values.len())?;
         for (key, value) in values {
-          table.raw_set(key.as_str(), decode(lua, value, method, depth + 1, nodes)?)?;
+          table.raw_set(
+            key.as_str(),
+            decode(lua, value, method, null, depth + 1, nodes)?,
+          )?;
         }
         Ok(Value::Table(table))
       }
     }
   }
-  decode(lua, value, method, 0, &mut 0)
+  decode(lua, value, method, null, 0, &mut 0)
 }
 
 pub(super) fn text_argument(values: mlua::MultiValue, method: &str) -> mlua::Result<String> {
-  let value = args::one(method, "s", values)?;
+  let table = args::named(method, values, &["s"])?;
+  let value = args::required(&table, method, "s")?;
   args::string(value, method, "s")
 }
 

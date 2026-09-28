@@ -1,0 +1,8 @@
+{
+  "name": "Star Drift",
+  "truecolor": false,
+  "command": "star_drift",
+  "entry": "main",
+  "min_width": 40,
+  "min_height": 12
+}

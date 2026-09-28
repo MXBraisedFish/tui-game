@@ -1,0 +1,19 @@
+{
+  "name": "f%<fg:bright_red>Permissions</fg> Lab",
+  "detail": "Game sessions can write only inside package assets. Debug output appears only when Debug is enabled.",
+  "mouse": false,
+  "truecolor": false,
+  "target_fps": 30,
+  "language": [
+    "en_us"
+  ],
+  "command": "permissions_lab",
+  "entry": "main",
+  "min_width": 70,
+  "min_height": 23,
+  "save_game": true,
+  "best_score": {
+    "empty_text": "No probe run yet",
+    "enable": true
+  }
+}

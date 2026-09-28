@@ -67,7 +67,7 @@ end
 
 ```lua
 function Init(ctx)
-  debug.print { message = serialization.json_encode(ctx) }
+  debug.print { message = serialization.json_encode{ value = ctx } }
   -- 初始化逻辑
 end
 ```
@@ -132,7 +132,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "action" then
-    debug.print { message = serialization.json_encode(event) }
+    debug.print { message = serialization.json_encode{ value = event } }
     -- 事件处理逻辑
   end
 end
@@ -187,7 +187,7 @@ end
 
 ```lua
 function Update(dt)
-  debug.print { message = serialization.json_encode(dt) }
+  debug.print { message = serialization.json_encode{ value = dt } }
   -- 物理帧更新逻辑
 end
 ```
@@ -304,7 +304,7 @@ end
 保存游戏数据，供玩家"继续游戏"后传递初始化数据。
 
 > 仅游戏脚本可用。
-> 仅 `package.json` 中 `game.save` 为 `true` 时可用，且必须实现。
+> 仅 `game.json` 中 `save_game` 为 `true` 时可用，且必须实现。
 > 通过 `game.save_game` 调用。
 
 ### 调用
@@ -336,7 +336,7 @@ end
 
 ```lua
 function Init(ctx)
-  debug.print { message = serialization.json_encode(ctx) }
+  debug.print { message = serialization.json_encode{ value = ctx } }
   -- 初始化逻辑
 end
 
@@ -372,7 +372,7 @@ end
 保存最佳记录数据，用于游戏列表展示，并在后续包含在传递的初始化数据中。
 
 > 仅游戏脚本可用。
-> 仅 `package.json` 中 `game.best.enabled` 为 `true` 时可用，且必须实现。
+> 仅 `game.json` 中 `best_score.enable` 为 `true` 时可用，且必须实现。
 > 通过 `game.save_best` 调用。
 
 ### 调用
@@ -407,7 +407,7 @@ end
 
 ```lua
 function Init(ctx)
-  debug.print { message = serialization.json_encode(ctx) }
+  debug.print { message = serialization.json_encode{ value = ctx } }
   -- 初始化逻辑
 end
 

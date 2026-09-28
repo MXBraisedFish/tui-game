@@ -4,6 +4,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{
   PackageImageCache, PackageInfoRenderArea, PackageInfoTextPosition, PackageListRenderContext,
+  package_image_convert_mode,
 };
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
@@ -466,7 +467,7 @@ impl GamePackageUi {
   }
 
   /// 渲染游戏包详情页面。
-  pub fn render(&mut self, context: &mut PackageListRenderContext<'_>) {
+  pub fn render(&mut self, context: &mut PackageListRenderContext<'_>) -> Option<(u16, u16)> {
     self.sync_entries(context.package.mod_games(), context.storage, context.log);
     let positions = self.compute_positions(context.layout, context.i18n, context.text_input);
 
@@ -507,7 +508,7 @@ impl GamePackageUi {
       .scroll_y(&self.objects, self.info_scroll)
       .unwrap_or(0);
     self.draw_right_panel(context, &positions, info_scroll_y);
-    self.draw_left_panel(context, &positions);
+    let input_cursor = self.draw_left_panel(context, &positions);
     self.draw_action_hint(
       context.render,
       context.canvas,
@@ -570,6 +571,8 @@ impl GamePackageUi {
         context.canvas,
       );
     }
+
+    input_cursor
   }
 
   // ─── 布局计算 ──────────────────────────────────────────
@@ -738,7 +741,7 @@ impl GamePackageUi {
     &mut self,
     context: &mut PackageListRenderContext<'_>,
     pos: &GamePackageLayout,
-  ) {
+  ) -> Option<(u16, u16)> {
     context.render.draw_host_border_rect(
       context.canvas,
       pos.left_rect.x,
@@ -758,7 +761,7 @@ impl GamePackageUi {
       &context.i18n.get_runtime_text("game_pack", "game_pack.list"),
     );
 
-    context.text_input.render_host(
+    let search_cursor = context.text_input.render_host(
       &mut self.objects,
       self.search_input,
       &TextInputRenderParams {
@@ -869,7 +872,7 @@ impl GamePackageUi {
     let jump_focused = context
       .text_input
       .is_focused(&self.objects, self.jump_input);
-    context.text_input.render_host(
+    let jump_cursor = context.text_input.render_host(
       &mut self.objects,
       self.jump_input,
       &TextInputRenderParams {
@@ -909,6 +912,7 @@ impl GamePackageUi {
         ..Default::default()
       },
     );
+    search_cursor.or(jump_cursor)
   }
 
   fn draw_entry_card(
@@ -1110,12 +1114,13 @@ impl GamePackageUi {
     y: u16,
     params: &RichTextParams,
   ) {
-    if let PackageAsset::Image { path } = asset
+    if let PackageAsset::Image { path, mode } = asset
       && let Some(text) = self.image_cache.get_or_convert(
         context.package.snapshot_revision(),
         context.image,
         ImageConvertParams {
           image_path: path.clone(),
+          mode: package_image_convert_mode(*mode),
           output_width: Some(8),
           output_height: Some(4),
           square_crop: true,
@@ -1449,12 +1454,13 @@ impl GamePackageUi {
     const BANNER_HEIGHT: u16 = 14;
 
     let x = area.rect.width.saturating_sub(BANNER_WIDTH) / 2;
-    if let PackageAsset::Image { path } = asset
+    if let PackageAsset::Image { path, mode } = asset
       && let Some(text) = self.image_cache.get_or_convert(
         context.package.snapshot_revision(),
         context.image,
         ImageConvertParams {
           image_path: path.clone(),
+          mode: package_image_convert_mode(*mode),
           output_width: Some(BANNER_WIDTH as u32),
           output_height: Some(BANNER_HEIGHT as u32),
           square_crop: false,

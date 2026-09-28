@@ -319,3 +319,142 @@ impl Default for TextInputService {
     Self::new()
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use tg_service_layout::{LayoutService, Rect};
+
+  fn test_canvas() -> (CanvasService, LayoutService) {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(80, 24);
+    layout.set_developer_viewport(Rect {
+      x: 4,
+      y: 3,
+      width: 40,
+      height: 12,
+    });
+
+    let mut canvas = CanvasService::new();
+    canvas.resize(80, 24);
+    (canvas, layout)
+  }
+
+  #[test]
+  fn base_cursor_uses_the_clipped_viewport_origin_and_wide_cell_width() {
+    let (mut canvas, layout) = test_canvas();
+    let mut pool = UiObjectPool::new();
+    pool.prepare_canvas(&mut canvas, &layout);
+    let mut service = TextInputService::new();
+    let input = service.create(
+      &mut pool,
+      TextInputOptions {
+        initial_text: "A界".to_string(),
+        ..Default::default()
+      },
+    );
+    assert!(service.focus(&mut pool, input));
+
+    let cursor = service.render(
+      &mut pool,
+      input,
+      &TextInputRenderParams {
+        rect: Rect {
+          x: 2,
+          y: 1,
+          width: 10,
+          height: 1,
+        },
+        cursor_blink: false,
+        ..Default::default()
+      },
+      &mut canvas,
+    );
+
+    assert_eq!(cursor, Some((9, 4)));
+  }
+
+  #[test]
+  fn multiline_cursor_tracks_the_visible_scrolled_line() {
+    let (mut canvas, layout) = test_canvas();
+    let mut pool = UiObjectPool::new();
+    pool.prepare_canvas(&mut canvas, &layout);
+    let mut service = TextInputService::new();
+    let input = service.create(
+      &mut pool,
+      TextInputOptions {
+        initial_text: "a\nb\nc".to_string(),
+        mode: TextInputMode::MultiLine,
+        ..Default::default()
+      },
+    );
+    assert!(service.focus(&mut pool, input));
+
+    let cursor = service.render(
+      &mut pool,
+      input,
+      &TextInputRenderParams {
+        rect: Rect {
+          x: 3,
+          y: 4,
+          width: 5,
+          height: 2,
+        },
+        cursor_blink: false,
+        ..Default::default()
+      },
+      &mut canvas,
+    );
+
+    assert_eq!(cursor, Some((8, 8)));
+  }
+
+  #[test]
+  fn host_cursor_stays_in_physical_coordinates_and_zero_rect_hides_it() {
+    let (mut canvas, layout) = test_canvas();
+    let mut pool = UiObjectPool::new();
+    pool.prepare_canvas(&mut canvas, &layout);
+    let mut service = TextInputService::new();
+    let input = service.create(
+      &mut pool,
+      TextInputOptions {
+        initial_text: "xy".to_string(),
+        ..Default::default()
+      },
+    );
+    assert!(service.focus(&mut pool, input));
+
+    let host_cursor = service.render_host(
+      &mut pool,
+      input,
+      &TextInputRenderParams {
+        rect: Rect {
+          x: 6,
+          y: 2,
+          width: 8,
+          height: 1,
+        },
+        cursor_blink: false,
+        ..Default::default()
+      },
+      &mut canvas,
+    );
+    let hidden_cursor = service.render_host(
+      &mut pool,
+      input,
+      &TextInputRenderParams {
+        rect: Rect {
+          x: 6,
+          y: 2,
+          width: 0,
+          height: 1,
+        },
+        ..Default::default()
+      },
+      &mut canvas,
+    );
+
+    assert_eq!(host_cursor, Some((8, 2)));
+    assert_eq!(hidden_cursor, None);
+  }
+}

@@ -89,7 +89,7 @@ local function advance()
   local bounds = field()
   if next_x < bounds.left or next_x > bounds.right or next_y < bounds.top or next_y > bounds.bottom or occupies_trail(next_x, next_y) then
     crashed = true
-    game.save_best()
+    game.save_best{}
     return
   end
   table.insert(trail, { x = next_x, y = next_y })
@@ -148,7 +148,7 @@ function HandleEvent(event)
   elseif event.type == "action" and event.data.state == "pressed" then
     local action = event.data.action
     if action == "leave" then
-      game.exit_game()
+      game.exit_game{}
     elseif action == "pause" then
       paused = not paused
     elseif HEADINGS[action] ~= nil then
@@ -221,7 +221,7 @@ function Render()
   draw.text { x = 2, y = height - 2, text = message, fg = message_color, max_width = width - 4, max_height = 1 }
   local language_line = string.format {
     format_string = "Language %s, title length %d",
-    values = { i18n.get_language_code(), utf8.len(title) },
+    values = { i18n.get_language_code{}, utf8.len(title) },
   }
   draw.text { x = 2, y = height - 1, text = language_line, fg = color.GRAY, max_width = width - 4, max_height = 1 }
 end

@@ -462,10 +462,8 @@ impl ExportSettingsUi {
     i18n: &I18nService,
     hit_area: &HitAreaService,
     text_input: &crate::host_engine::services::TextInputService,
-  ) {
-    let Some(_export_type) = self.export_type else {
-      return;
-    };
+  ) -> Option<(u16, u16)> {
+    self.export_type?;
 
     let size = layout.physical_size();
     let params = Self::key_params();
@@ -705,7 +703,7 @@ impl ExportSettingsUi {
     );
 
     // Row 2: text input widget (handles text + placeholder + cursor)
-    text_input.render_host(
+    let name_cursor = text_input.render_host(
       &mut self.objects,
       self.name_input_id,
       &TextInputRenderParams {
@@ -774,7 +772,7 @@ impl ExportSettingsUi {
       },
     );
 
-    text_input.render_host(
+    let path_cursor = text_input.render_host(
       &mut self.objects,
       self.path_input_id,
       &TextInputRenderParams {
@@ -887,6 +885,7 @@ impl ExportSettingsUi {
         ..Default::default()
       },
     );
+    name_cursor.or(path_cursor)
   }
 
   fn bottom_hint(&self, i18n: &I18nService) -> String {

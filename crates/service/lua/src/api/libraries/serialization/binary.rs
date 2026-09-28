@@ -101,7 +101,8 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "binary_packsize",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.binary_packsize";
-      let format = args::string(args::one(method, "fmt", values)?, method, "fmt")?;
+      let table = args::named(method, values, &["fmt"])?;
+      let format = args::string(args::required(&table, method, "fmt")?, method, "fmt")?;
       let mut size = 0_usize;
       for operation in parse_format(&format, method)? {
         size = aligned_offset(size, operation)?;

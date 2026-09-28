@@ -3,6 +3,7 @@
 ## 基本库说明
 
 `file` 提供异步文件操作。
+所有 API 使用单个命名参数表。异步读写、目录枚举和目录/文件操作在任务提交后立即返回整数 request id；对应终态事件的 `data.request_id` 回传同一值。因会话权限被门控而未提交的操作返回 `nil`，不会产生完成事件。
 
 ---
 
@@ -1088,7 +1089,7 @@ file.read{}
 
 ### 返回
 
-事件返回，请查看⌊[事件结构](../EVENT.md)⌉文档⌊file⌉部分。
+调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
@@ -1096,11 +1097,11 @@ file.read{}
 assets/
 - file.txt
 
-file.read { path = "file.txt" }
+local request_id = file.read { path = "file.txt" }
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode(event) }
+    debug.print { message = serialization.json_encode{ value = event } }
   end
 end
 ```
@@ -1127,7 +1128,7 @@ end
 ### 额外补充
 
 - 参数 `byte` 为 false 时按文本读取，参数 `encoding` 与 参数 `end_of_line` **生效**。
-- 参数 `byte` 为 false 时按二进制读取，参数 `encoding` 与 参数 `end_of_line` **忽略**。
+- 参数 `byte` 为 true 时按二进制读取，参数 `encoding` 与 参数 `end_of_line` **忽略**。
 
 ---
 
@@ -1158,7 +1159,7 @@ file.write{}
 
 ### 返回
 
-事件返回，请查看⌊[事件结构](../EVENT.md)⌉文档⌊file⌉部分。
+调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
@@ -1166,11 +1167,11 @@ file.write{}
 assets/
 - file.txt
 
-file.write { path = "file.txt", text = "Hello Tui Game", event_tip = "Get!" }
+local request_id = file.write { path = "file.txt", text = "Hello Tui Game", event_tip = "Get!" }
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode(event) }
+    debug.print { message = serialization.json_encode{ value = event } }
   end
 end
 ```
@@ -1197,7 +1198,7 @@ end
 ### 额外补充
 
 - 参数 `byte` 为 false 时按文本读取，参数 `encoding` 与 参数 `end_of_line` **生效**。
-- 参数 `byte` 为 false 时按二进制读取，参数 `encoding` 与 参数 `end_of_line` **忽略**。
+- 参数 `byte` 为 true 时按二进制写入，参数 `encoding` 与 参数 `end_of_line` **忽略**。
 - 该 API 会自动创建未创建的**文件**。
 - 该 API 不会自动补全未创建的**目录**，目录不存在会抛出错误。
 
@@ -1228,7 +1229,7 @@ file.list_dir{}
 
 ### 返回
 
-事件返回，请查看⌊[事件结构](../EVENT.md)⌉文档⌊file⌉部分。
+调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
@@ -1252,7 +1253,7 @@ file.list_dir { path = "js/", file_type = "json", event_tip = "Only Json" }
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode(event) }
+    debug.print { message = serialization.json_encode{ value = event } }
   end
 end
 ```
@@ -1367,7 +1368,7 @@ file.create_dir{}
 
 ### 返回
 
-事件返回，请查看⌊[事件结构](../EVENT.md)⌉文档⌊file⌉部分。
+调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
@@ -1379,7 +1380,7 @@ file.create_dir { path = "test1/test2" }
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode(event) }
+    debug.print { message = serialization.json_encode{ value = event } }
   end
 end
 ```
@@ -1432,8 +1433,8 @@ assets/
 ### 调用
 
 ```lua
--- 单参数
-file.exists()
+-- 命名参数表
+file.exists{ path = "." }
 ```
 
 ### 参数
@@ -1456,8 +1457,8 @@ file.exists()
 assets/
 - test/
 
-debug.print { message = tostring(file.exists("test")) }
-debug.print { message = tostring(file.exists("none")) }
+debug.print { message = tostring(file.exists{ path = "test" }) }
+debug.print { message = tostring(file.exists{ path = "none" }) }
 ```
 
 输出：
@@ -1493,7 +1494,7 @@ file.remove{}
 
 ### 返回
 
-事件返回，请查看⌊[事件结构](../EVENT.md)⌉文档⌊file⌉部分。
+调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
@@ -1508,7 +1509,7 @@ file.remove { path = "test", recursive = false }
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode(event) }
+    debug.print { message = serialization.json_encode{ value = event } }
   end
 end
 ```

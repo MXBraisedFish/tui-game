@@ -1,0 +1,19 @@
+{
+  "name": "B8.5 Flicker Review",
+  "detail": "Compare static output, local changes, smooth full-screen redraws and an optional 2 Hz high-contrast pulse.",
+  "mouse": false,
+  "truecolor": true,
+  "target_fps": 120,
+  "language": [
+    "en_us",
+    "zh_cn"
+  ],
+  "command": "b8_flicker_lab",
+  "entry": "main",
+  "min_width": 0,
+  "min_height": 0,
+  "save_game": false,
+  "best_score": {
+    "enable": false
+  }
+}

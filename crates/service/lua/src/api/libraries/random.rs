@@ -117,7 +117,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "clear",
     lua.create_function(move |_, values: MultiValue| {
       let method = "random.clear";
-      args::no_args(method, values)?;
+      args::empty_named(method, values)?;
       with_pool_mut(&clear_state, method, |pool| {
         RandomService::new().clear_configured(&mut pool.runtime_mut().random_generators);
         Ok(true)
@@ -130,7 +130,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "list",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "random.list";
-      args::no_args(method, values)?;
+      args::empty_named(method, values)?;
       with_pool(&list_state, method, |pool| {
         let result = lua.create_table()?;
         let service = RandomService::new();
@@ -152,7 +152,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "count",
     lua.create_function(move |_, values: MultiValue| {
       let method = "random.count";
-      args::no_args(method, values)?;
+      args::empty_named(method, values)?;
       with_pool(&count_state, method, |pool| {
         Ok(
           RandomService::new()
@@ -523,7 +523,8 @@ fn non_negative_step(value: i64, method: &str) -> mlua::Result<u64> {
 }
 
 fn id_argument(values: MultiValue, method: &str) -> mlua::Result<RandomGeneratorId> {
-  let id = args::string(args::one(method, "id", values)?, method, "id")?;
+  let table = args::named(method, values, &["id"])?;
+  let id = args::string(args::required(&table, method, "id")?, method, "id")?;
   parse_id(id).ok_or_else(|| args::message(method, "invalid generator ID"))
 }
 

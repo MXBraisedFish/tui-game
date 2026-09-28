@@ -366,7 +366,7 @@ fn export_recording<E: From<VideoAsyncEvent>>(
   }
   let rasterizer = TerminalFrameRasterizer::load(&task.fonts, &task.deployment_root)
     .map_err(|error| VideoExportError::new(VideoExportStage::Font, error))?;
-  let (width, height) = TerminalFrameRasterizer::dimensions(
+  let (width, height) = rasterizer.dimensions(
     metadata.max_width,
     metadata.max_height,
     task.profile.pixel_scale,
@@ -426,7 +426,7 @@ fn export_recording_openh264<E: From<VideoAsyncEvent>>(
   let metadata = playback.metadata();
   let frame_rate = task.profile.export_frame_rate.resolve(metadata.frame_rate);
   let total_frames = sampled_frame_count(metadata.duration_us, frame_rate);
-  let (pixel_width, pixel_height) = TerminalFrameRasterizer::dimensions(
+  let (pixel_width, pixel_height) = rasterizer.dimensions(
     metadata.max_width,
     metadata.max_height,
     task.profile.pixel_scale,
@@ -558,7 +558,7 @@ fn export_recording_ffmpeg<E: From<VideoAsyncEvent>>(
   let metadata = playback.metadata();
   let frame_rate = task.profile.export_frame_rate.resolve(metadata.frame_rate);
   let total_frames = sampled_frame_count(metadata.duration_us, frame_rate);
-  let (width, height) = TerminalFrameRasterizer::dimensions(
+  let (width, height) = rasterizer.dimensions(
     metadata.max_width,
     metadata.max_height,
     task.profile.pixel_scale,
@@ -1205,12 +1205,14 @@ mod tests {
 
   #[test]
   fn pixel_scale_dimensions_are_even() {
+    let deployment_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let rasterizer = TerminalFrameRasterizer::load(&[], &deployment_root).unwrap();
     for scale in [
       RecordingPixelScale::Half,
       RecordingPixelScale::Original,
       RecordingPixelScale::Double,
     ] {
-      let (width, height) = TerminalFrameRasterizer::dimensions(3, 5, scale);
+      let (width, height) = rasterizer.dimensions(3, 5, scale);
       assert_eq!(width % 2, 0);
       assert_eq!(height % 2, 0);
     }
@@ -1236,12 +1238,13 @@ mod tests {
       "events": [{ "time_us": 33_333, "size": [2, 1], "changes": [[0, 1, [1]]] }]
     });
     fs::write(&source_path, serde_json::to_vec(&document).unwrap()).unwrap();
+    let deployment_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let task = VideoExportTask {
       source_path,
       output_path: directory.join("recording.mp4"),
       ffmpeg: None,
-      fonts: Vec::new(),
-      deployment_root: directory.clone(),
+      fonts: vec!["assets/fonts/mmo.ttf".to_string()],
+      deployment_root,
       profile: RecordingProfile {
         gpu_acceleration: RecordingGpuAcceleration::Off,
         ..Default::default()
@@ -1263,7 +1266,7 @@ mod tests {
       mp4::Mp4Reader::read_header(BufReader::new(File::open(&output_path).unwrap()), size).unwrap();
     let track = reader.tracks().get(&1).unwrap();
     assert_eq!(track.media_type().unwrap(), mp4::MediaType::H264);
-    assert_eq!((track.width(), track.height()), (36, 36));
+    assert_eq!((track.width(), track.height()), (30, 36));
     assert_eq!(track.timescale(), 30);
     assert_eq!(track.sample_count(), 2);
     assert_eq!(track.duration(), Duration::from_micros(66_666));
@@ -1294,7 +1297,7 @@ mod tests {
         offset += length;
       }
       if let Some(frame) = decoder.decode(&annex_b).unwrap() {
-        assert_eq!(frame.dimensions(), (36, 36));
+        assert_eq!(frame.dimensions(), (30, 36));
         decoded += 1;
       }
     }

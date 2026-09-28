@@ -17,14 +17,18 @@
 | B6 图片 API（2026-09-27） | 图像默认尺寸、crop、透明背景、异步关联与 event output 曾存在实现/文档差异 | Lua 缺省尺寸按文档比例计算并最小为 1×1；负 crop 或越界报错、省略尺寸取剩余区域；增加 RGB 字符串背景色，默认黑色并混色/入 cache key；`image.load` 返回 request id、终态事件回传同一 id；事件 output 保留富文本字符串，可直接绘制 |
 | 生命周期与分层 | 保留现有 boot/shutdown 编排；runtime 业务及宿主状态/服务组合归 app | 不再为目录纯度重复迁移 |
 
-## 需在对应实现前裁决
+## B 阶段契约与待裁决项
 
-| ID / 对应工作包 | 当前证据与未定行为 | 候选方案（未获批准） | 是否阻塞 |
+| ID / 对应工作包 | 当前证据与待定范围 | 已确认决定 / 候选方案 | 状态 |
 |---|---|---|---|
-| Q2a / B4.2 | 清单 `mod_id` 新规则只许字母/数字/下划线；`PackageId` 同时读取旧 profile，仓库 fixtures 目前有 `test.xxx` | 清单严格收紧，profile 身份反序列化保持兼容；测试 fixture 可显式改名；不自动重命名用户 ID | 阻塞 ID 收紧与旧 profile 回归设计，不阻塞 B1–B3 |
-| Q3 键位 / B4.4 | `normalize_action_keys` 允许顶层 `[]` 表示未绑定，拒绝内层 `[]`，每层最多两个元素并规范化 token | 复用现有校验；重复 token、相同主/备用绑定和跨动作冲突需明确报错、去重还是允许 | 阻塞相关 keys 契约，不阻塞 B1 |
-| Q3 CLI / B4.7 | 当前 `src/main.rs` 不解析命令行，package/game config 也无 command 消费者 | 启动参数只解析为单一 command；扫描结束后按唯一匹配包走现有 game/screensaver 启动路径；未知、重复、宿主保留参数报错，不调用 shell | 冲突/优先级规则待确认；禁止在 B4 前悄悄定行为 |
-| Q6 / B10 | `color.rgb`、`draw.text`、`file.read` 分属纯值、多可选项和异步事件；参数、返回及旧名期限并不统一 | 参考 [LUA_API_MIGRATION.md](../zh_cn/LUA_API_MIGRATION.md) 候选形状，先确认逐 API 的输入/结果/错误和兼容期 | 阻塞批量扩展 API 改名，不阻塞 B1–B9 的独立功能 |
+| Q2a / B4.2（已确认） | 新清单和 `PackageId` 仅允许 ASCII 字母/数字/下划线；旧 profile 可能包含点号或连字符 ID | 不兼容或迁移旧 ID；仓库 fixtures 直接改为新规则。旧 profile 中出现非法 ID 时严格拒绝，不加兼容层 | 已解除身份契约阻塞 |
+| Q3 键位 / B4.4（已确认） | `normalize_action_keys` 允许顶层 `[]` 表示未绑定，拒绝内层 `[]`，每层最多两个元素并规范化 token | 规范化后组合内重复键、同动作重复绑定（含主/备用相同）、跨动作完全相同绑定均报错；保留其它合法组合 | 已解除键位契约阻塞 |
+| Q3 CLI / 后续任务（已延期） | 当前 `src/main.rs` 不解析命令行，package command 尚无 CLI 消费者 | 用户决定本轮不添加 CLI 启动命令，作为后续独立任务；B4 不实现 CLI 解析、命令匹配或启动分发 | 不属于本轮 B4 |
+| B4 `command` 字段（已确认保留） | game 新字段与 screensaver 既有字段供后续 CLI 使用 | schema 2 保留两类 command 字段；本轮只读取并校验配置，不实现 CLI 消费者 | 已解除 schema 阻塞 |
+| B4 package 字段（已确认） | `package` 用于 IDE 插件识别 TUI GAME 开发包并启用补全 | 可选字符串，标记值为 `"tui game"`；宿主只解析并保留字段约束，不改变运行权限或启动行为 | 已解除 header 阻塞 |
+| B4 坏包热更新（已确认） | 多文件编辑/重建期间可能产生暂时无效候选 | 当前扫描无效的包暂时下架；修复后重扫重新出现，运行中会话按既有生命周期继续 | 已解除坏包发布策略阻塞 |
+| B4 官方清单夹具（已确认） | 三个 `scripts/game/official_*` 清单没有对应 Lua `scripts/` | 移入显式负例测试夹具，不创建空入口或伪造官方上线包 | 已解除 fixture 归属阻塞 |
+| Q6 / B10 | 当前扩展混用位置值、数组/命名参数表、标量/复合返回和异步事件；string/math/utf8 与 image 已有单独确认的项目契约 | 用户确认宿主扩展统一采用一个命名参数表、简单结果返回标量、复合结果返回具名表、异步调用立即返回 request id 并由终态事件回传；B2/B6 保持既定契约；无旧 API alias。`serialization.NULL` 保留 JSON/YAML null；CSV/INI/TOML/XML 遇到哨兵时报错 | B10.2 已迁移 encoding、serialization、自定义 table、random、draw/measurement/slice；继续 file/i18n/image 异步 API |
 | Q7 / B7、B9 | “与终端一致”未给参考终端、字体、字号、行距、缩放和 IME 名称 | 同一基准配置比较几何/颜色/样式；跨终端逐像素一致不作为承诺 | 阻塞像素与 IME 的实机验收基准，不阻塞 B1 |
 
 ## B0 交付索引

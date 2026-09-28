@@ -34,6 +34,7 @@ impl<'de> Deserialize<'de> for PackageId {
     D: serde::Deserializer<'de>,
   {
     #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
     struct Wire {
       source: PackageSource,
       package_type: PackageType,
@@ -66,6 +67,28 @@ impl PackageId {
       self.package_type.as_str(),
       self.mod_id
     )
+  }
+
+  /// Parses the canonical key used by package-scoped profile data.
+  pub fn from_storage_key(value: &str) -> Result<Self, String> {
+    let mut parts = value.split('/');
+    let source = match parts.next() {
+      Some("official") => PackageSource::Official,
+      Some("mod") => PackageSource::Mod,
+      _ => return Err("package key has an invalid source".to_string()),
+    };
+    let package_type = match parts.next() {
+      Some("game") => PackageType::Game,
+      Some("screensaver") => PackageType::Screensaver,
+      _ => return Err("package key has an invalid type".to_string()),
+    };
+    let Some(mod_id) = parts.next() else {
+      return Err("package key has no mod_id".to_string());
+    };
+    if parts.next().is_some() {
+      return Err("package key has extra path components".to_string());
+    }
+    Self::new(source, package_type, mod_id)
   }
 }
 
@@ -102,9 +125,9 @@ fn validate_mod_id(mod_id: &str) -> Result<(), String> {
   }
   if !mod_id
     .bytes()
-    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
   {
-    return Err("mod_id may only contain ASCII letters, digits, '.', '_' and '-'".to_string());
+    return Err("mod_id may only contain ASCII letters, digits and '_'".to_string());
   }
   Ok(())
 }
@@ -122,7 +145,7 @@ mod tests {
 
   #[test]
   fn unsafe_mod_ids_are_rejected() {
-    for bad in ["", "../escape", "a/b", r"a\b"] {
+    for bad in ["", "../escape", "a/b", r"a\b", "old.id", "old-id", "中"] {
       assert!(
         PackageId::new(PackageSource::Official, PackageType::Screensaver, bad).is_err(),
         "{bad:?}"
@@ -142,5 +165,25 @@ mod tests {
       )
       .is_err()
     );
+    for mod_id in ["old.id", "old-id"] {
+      let json = format!(r#"{{"source":"mod","package_type":"game","mod_id":"{mod_id}"}}"#);
+      assert!(serde_json::from_str::<PackageId>(&json).is_err());
+    }
+  }
+
+  #[test]
+  fn storage_key_parser_requires_canonical_type_and_mod_id() {
+    let id = PackageId::from_storage_key("official/screensaver/sky_line").unwrap();
+    assert_eq!(id.storage_key(), "official/screensaver/sky_line");
+    for invalid in [
+      "official/game/old.id",
+      "mod/game/old-id",
+      "game/demo",
+      "mod/unknown/demo",
+      "mod/game/demo/extra",
+      "mod/game/",
+    ] {
+      assert!(PackageId::from_storage_key(invalid).is_err(), "{invalid}");
+    }
   }
 }

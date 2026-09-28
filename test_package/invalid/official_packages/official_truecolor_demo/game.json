@@ -1,0 +1,15 @@
+{
+  "name": "f%<fg:#8FC7FF>Truecolor</fg> Official Demo",
+  "detail": "Official source package with truecolor requirement.",
+  "target_fps": 120,
+  "mouse": true,
+  "truecolor": true,
+  "language": [
+    "en_us"
+  ],
+  "command": "official_truecolor_demo",
+  "entry": "official_truecolor_demo",
+  "min_width": 0,
+  "min_height": 0,
+  "save_game": false
+}

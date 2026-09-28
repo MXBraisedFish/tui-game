@@ -211,7 +211,7 @@ pub(super) fn route_render(
     export_settings_ui
       .objects()
       .prepare_canvas(&mut services.canvas, &services.layout);
-    export_settings_ui.render(
+    let input_cursor = export_settings_ui.render(
       &mut services.render,
       &mut services.canvas,
       &services.layout,
@@ -219,7 +219,7 @@ pub(super) fn route_render(
       &services.hit_area,
       &services.text_input,
     );
-    return None;
+    return input_cursor;
   }
 
   let show_top_toolbar = services.storage.display_settings_profile().top_toolbar;
@@ -376,7 +376,7 @@ pub(super) fn route_render(
       );
     }
     Some(UiNodeKind::GameKeyBindings) => {
-      settings_ui.key_bindings_mut().game_mut().render(
+      input_cursor = settings_ui.key_bindings_mut().game_mut().render(
         &mut services.render,
         &mut services.canvas,
         &services.layout,
@@ -405,7 +405,7 @@ pub(super) fn route_render(
       );
     }
     Some(UiNodeKind::ScreensaverList) => {
-      screensaver_list_ui.render(
+      input_cursor = screensaver_list_ui.render(
         &mut services.render,
         &mut services.canvas,
         &services.layout,
@@ -561,7 +561,7 @@ pub(super) fn route_render(
     }
     Some(UiNodeKind::GameList) => {
       let capabilities = services.terminal.capabilities();
-      game_list_ui.render(&mut GameListRenderContext {
+      input_cursor = game_list_ui.render(&mut GameListRenderContext {
         render: &mut services.render,
         canvas: &mut services.canvas,
         layout: &services.layout,
@@ -578,7 +578,7 @@ pub(super) fn route_render(
     }
     Some(UiNodeKind::GamePackage) => {
       let capabilities = services.terminal.capabilities();
-      game_package_ui.render(&mut PackageListRenderContext {
+      input_cursor = game_package_ui.render(&mut PackageListRenderContext {
         render: &mut services.render,
         canvas: &mut services.canvas,
         layout: &services.layout,
@@ -596,7 +596,7 @@ pub(super) fn route_render(
     }
     Some(UiNodeKind::ScreensaverPackage) => {
       let capabilities = services.terminal.capabilities();
-      screensaver_package_ui.render(&mut PackageListRenderContext {
+      input_cursor = screensaver_package_ui.render(&mut PackageListRenderContext {
         render: &mut services.render,
         canvas: &mut services.canvas,
         layout: &services.layout,

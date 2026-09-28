@@ -29,8 +29,8 @@
 ### 调用
 
 ```lua
--- 单参数
-event.skip_action()
+-- 空命名参数表
+event.skip_action{}
 ```
 
 ### 参数
@@ -44,7 +44,7 @@ event.skip_action()
 ### 示例
 
 ```lua
-event.skip_action()
+event.skip_action{}
 ```
 
 ### 额外补充
@@ -63,8 +63,8 @@ event.skip_action()
 ### 调用
 
 ```lua
--- 单参数
-event.clear_action()
+-- 空命名参数表
+event.clear_action{}
 ```
 
 ### 参数
@@ -78,7 +78,7 @@ event.clear_action()
 ### 示例
 
 ```lua
-event.clear_action()
+event.clear_action{}
 ```
 
 ### 额外补充

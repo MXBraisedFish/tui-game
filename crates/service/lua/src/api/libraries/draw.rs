@@ -119,7 +119,7 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   source.raw_set(
     "render",
     lua.create_function(move |_, values: MultiValue| {
-      args::no_args("draw.render", values)?;
+      args::empty_named("draw.render", values)?;
       let mut state = state2.borrow_mut();
       if state.phase == LuaCallPhase::Render {
         return Err(args::message(

@@ -1607,7 +1607,7 @@ mod tests {
 
   fn spec(source: &str, kind: LuaSessionKind) -> LuaSessionSpec {
     LuaSessionSpec {
-      package_id: "test.package".to_string(),
+      package_id: "test_package".to_string(),
       session_kind: kind,
       entry_path: script_path(source),
       fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
@@ -2207,14 +2207,26 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          system_language = i18n.get_language_code()
-          i18n.create{}
-          i18n.create{ language_code = "ignored" }
+          system_language = i18n.get_language_code{}
+          create_request_id = i18n.create{}
+          duplicate_create_result = i18n.create{ language_code = "ignored" }
+          local positional_language_call = debug.pcall{
+            func = function() i18n.get_language_code() end,
+          }
+          debug.assert{ value = not positional_language_call.ok }
         end
         function HandleEvent(event)
-          if event.type == "i18n" and event.data.ok then
-            translated = i18n.get_value{ namespace = "menu", key = "title" }
-            missing = i18n.get_value{ namespace = "menu", key = "missing" }
+          if event.type == "i18n" then
+            if event.data.kind == "created" then
+              created_event_request_id = event.data.request_id
+              if event.data.ok then
+                translated = i18n.get_value{ namespace = "menu", key = "title" }
+                missing = i18n.get_value{ namespace = "menu", key = "missing" }
+                reload_request_id = i18n.reload{}
+              end
+            elseif event.data.kind == "reloaded" then
+              reload_completed_request_id = event.data.request_id
+            end
           end
         end
       "#,
@@ -2233,6 +2245,14 @@ mod tests {
       session.environment_value("system_language"),
       Value::String(session.lua.create_string("zh_cn").unwrap())
     );
+    assert_eq!(
+      session.environment_value("create_request_id"),
+      Value::Integer(1)
+    );
+    assert_eq!(
+      session.environment_value("duplicate_create_result"),
+      Value::Nil
+    );
     let commands = session.take_host_commands();
     assert_eq!(
       commands
@@ -2241,12 +2261,21 @@ mod tests {
         .count(),
       1
     );
+    let request_id = commands
+      .iter()
+      .find_map(|command| match command {
+        LuaHostCommand::I18nRequest { request_id, .. } => Some(*request_id),
+        _ => None,
+      })
+      .expect("i18n create should enqueue a request");
+    assert_eq!(request_id, 1);
 
     let delivery = LuaEventDelivery {
       event: LuaRuntimeEvent {
         sequence: 1,
         frame: 1,
         data: LuaEventData::I18n(super::super::LuaI18nEvent {
+          request_id,
           kind: super::super::LuaI18nEventKind::Created,
           ok: true,
           message: "i18n instance created".to_string(),
@@ -2268,6 +2297,46 @@ mod tests {
     assert_eq!(
       session.environment_value("missing"),
       Value::String(session.lua.create_string("[缺少：menu.missing]").unwrap())
+    );
+    assert_eq!(
+      session.environment_value("created_event_request_id"),
+      Value::Integer(request_id as i64)
+    );
+    assert_eq!(
+      session.environment_value("reload_request_id"),
+      Value::Integer(2)
+    );
+
+    let reload_commands = session.take_host_commands();
+    assert!(reload_commands.iter().any(|command| matches!(
+      command,
+      LuaHostCommand::I18nRequest {
+        request_id: 2,
+        kind: super::super::LuaI18nEventKind::Reloaded,
+        ..
+      }
+    )));
+    session
+      .dispatch_event(&LuaEventDelivery {
+        event: LuaRuntimeEvent {
+          sequence: 2,
+          frame: 2,
+          data: LuaEventData::I18n(super::super::LuaI18nEvent {
+            request_id: 2,
+            kind: super::super::LuaI18nEventKind::Reloaded,
+            ok: true,
+            message: "i18n instance reloaded".to_string(),
+            language_code: "zh_cn".to_string(),
+            callback_language_code: "en_us".to_string(),
+            namespaces: None,
+          }),
+        },
+        route: LuaEventRoute::HandleEvent,
+      })
+      .unwrap();
+    assert_eq!(
+      session.environment_value("reload_completed_request_id"),
+      Value::Integer(2)
     );
   }
 
@@ -3051,22 +3120,28 @@ mod tests {
             max = 10,
             seed = 2468,
           }
-          debug.assert{ value = random.generate(first) == random.generate(second) }
-          debug.assert{ value = random.generate(first) == random.generate(second) }
+          debug.assert{
+            value = random.generate{ id = first } == random.generate{ id = second },
+          }
+          debug.assert{
+            value = random.generate{ id = first } == random.generate{ id = second },
+          }
 
           slice_id = slice.create{ width = 20, height = 20, layer = 3 }
           slice.draw{ id = slice_id, x = -4, y = 2 }
-          local info = slice.get_info(slice_id)
+          local info = slice.get_info{ id = slice_id }
           debug.assert{
             value = info.width == 20 and info.height == 20 and info.layer == 1,
           }
 
           local json = serialization.json_encode{
-            title = "TUI GAME",
-            enabled = true,
-            values = { 1, 2, 3 },
+            value = {
+              title = "TUI GAME",
+              enabled = true,
+              values = { 1, 2, 3 },
+            },
           }
-          local decoded = serialization.json_decode(json)
+          local decoded = serialization.json_decode{ s = json }
           debug.assert{
             value = decoded.title == "TUI GAME" and decoded.enabled
               and decoded.values[3] == 3,
@@ -3087,22 +3162,38 @@ mod tests {
           }
 
           local xml = serialization.xml_encode{
-            root = {
-              _attr = { version = "1.0" },
-              child = { "Hello", _attr = { id = 1 } },
+            value = {
+              root = {
+                _attr = { version = "1.0" },
+                child = { "Hello", _attr = { id = 1 } },
+              },
             },
           }
-          local xml_data = serialization.xml_decode(xml)
+          local xml_data = serialization.xml_decode{ s = xml }
           debug.assert{
             value = xml_data.root._attr.version == "1.0"
               and xml_data.root.child._attr.id == "1"
               and xml_data.root.child._text == "Hello",
           }
 
-          local encoded = encoding.base64_encode("TUI GAME")
-          debug.assert{ value = encoding.base64_decode(encoded) == "TUI GAME" }
-          debug.assert{ value = encoding.url_decode(encoding.url_encode("a b/中")) == "a b/中" }
-          debug.assert{ value = encoding.hex_decode(encoding.hex_encode("abc")) == "abc" }
+          local encoded = encoding.base64_encode{ s = "TUI GAME" }
+          debug.assert{ value = encoding.base64_decode{ s = encoded } == "TUI GAME" }
+          local url = encoding.url_encode{ s = "a b/中" }
+          debug.assert{ value = encoding.url_decode{ s = url } == "a b/中" }
+          local hex = encoding.hex_encode{ s = "abc" }
+          debug.assert{ value = encoding.hex_decode{ s = hex } == "abc" }
+
+          local bytes = "\\0\\255binary"
+          debug.assert{
+            value = encoding.base64_decode{
+              s = encoding.base64_encode{ s = bytes },
+            } == bytes,
+          }
+          debug.assert{
+            value = encoding.hex_decode{
+              s = encoding.hex_encode{ s = bytes },
+            } == bytes,
+          }
         end
 
         function Render()
@@ -3140,6 +3231,10 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
+          local function fails(func)
+            return not debug.pcall{ func = func }.ok
+          end
+
           local direct_int = random.randint{}
           local direct_float = random.randfloat{}
           debug.assert{
@@ -3148,14 +3243,20 @@ mod tests {
           debug.assert{ value = direct_float >= 0 and direct_float <= 1 }
 
           local generator = random.create{}
-          local initial = random.get_info(generator)
+          local initial = random.get_info{ id = generator }
           debug.assert{
             value = initial.type == random.INT
               and initial.min == -2147483648
               and initial.max == 2147483647
               and initial.step == 0,
           }
-          debug.assert{ value = random.count() == 1 and random.list().n == 1 }
+          debug.assert{ value = random.count{} == 1 and random.list{}.n == 1 }
+          debug.assert{
+            value = fails(function() random.generate(generator) end)
+              and fails(function() random.count() end)
+              and fails(function() slice.exists("base") end)
+              and fails(function() slice.count() end),
+          }
           debug.assert{
             value = random.set{
               id = generator,
@@ -3166,17 +3267,18 @@ mod tests {
               step = 5,
             },
           }
-          local range = random.get_range(generator)
+          local range = random.get_range{ id = generator }
           debug.assert{
-            value = random.get_type(generator) == random.FLOAT
+            value = random.get_type{ id = generator } == random.FLOAT
               and range.min == -2.5
               and range.max == 3.5
-              and random.get_seed(generator) == 42
-              and random.get_step(generator) == 5,
+              and random.get_seed{ id = generator } == 42
+              and random.get_step{ id = generator } == 5,
           }
-          local value = random.generate(generator)
+          local value = random.generate{ id = generator }
           debug.assert{
-            value = value >= -2.5 and value <= 3.5 and random.get_step(generator) == 6,
+            value = value >= -2.5 and value <= 3.5
+              and random.get_step{ id = generator } == 6,
           }
           debug.assert{ value = random.set_type{ id = generator } }
           debug.assert{ value = random.set_seed{ id = generator } }
@@ -3185,8 +3287,8 @@ mod tests {
           }
           debug.assert{ value = not missing_step.ok }
 
-          debug.assert{ value = slice.exists("base") }
-          local base = slice.get_info("base")
+          debug.assert{ value = slice.exists{ id = "base" } }
+          local base = slice.get_info{ id = "base" }
           debug.assert{
             value = base.width == ctx.base.width
               and base.height == ctx.base.height
@@ -3195,7 +3297,7 @@ mod tests {
           }
           local first = slice.create{ width = 10, height = 4, bg = color.BLUE }
           local inserted = slice.create{ width = 3, height = 2, layer = 1 }
-          local slices = slice.list()
+          local slices = slice.list{}
           debug.assert{
             value = slices.n == 2
               and slices[1].id == inserted
@@ -3206,17 +3308,17 @@ mod tests {
           }
           debug.assert{ value = slice.set{ id = first } }
           debug.assert{ value = slice.set{ id = first, bg = color.RED } }
-          debug.assert{ value = slice.get_background(first) == color.RED }
+          debug.assert{ value = slice.get_background{ id = first } == color.RED }
           debug.assert{
             value = slice.set_background{ id = first, bg = color.TRANSPARENT },
           }
           debug.assert{
-            value = slice.get_background(first) == color.TRANSPARENT,
+            value = slice.get_background{ id = first } == color.TRANSPARENT,
           }
           debug.assert{ value = slice.set_background{ id = first, bg = color.NONE } }
-          debug.assert{ value = slice.get_background(first) == color.NONE }
+          debug.assert{ value = slice.get_background{ id = first } == color.NONE }
           debug.assert{ value = slice.set_background{ id = first } }
-          debug.assert{ value = slice.get_background(first) == color.NONE }
+          debug.assert{ value = slice.get_background{ id = first } == color.NONE }
           debug.assert{
             value = not slice.set_background{ id = "base", bg = color.BLUE },
           }
@@ -3231,24 +3333,24 @@ mod tests {
           debug.assert{ value = not invalid_background.ok }
           debug.assert{
             value = slice.set_size{ id = first, width = 12 }
-              and slice.get_width(first) == 12
-              and slice.get_height(first) == 4,
+              and slice.get_width{ id = first } == 12
+              and slice.get_height{ id = first } == 4,
           }
           debug.assert{ value = slice.set_layer{ id = first, layer = 999 } }
-          debug.assert{ value = slice.get_layer(first) == 2 }
-          debug.assert{ value = slice.delete(inserted) }
-          debug.assert{ value = slice.get_layer(first) == 1 }
+          debug.assert{ value = slice.get_layer{ id = first } == 2 }
+          debug.assert{ value = slice.delete{ id = inserted } }
+          debug.assert{ value = slice.get_layer{ id = first } == 1 }
           debug.assert{
             value = slice["50P"] == nil
               and slice.list_by_layer == nil
               and random.set_params == nil,
           }
           debug.assert{
-            value = slice.clear()
-              and slice.count() == 0
-              and slice.list().n == 0,
+            value = slice.clear{}
+              and slice.count{} == 0
+              and slice.list{}.n == 0,
           }
-          debug.assert{ value = random.clear() and random.count() == 0 }
+          debug.assert{ value = random.clear{} and random.count{} == 0 }
         end
       "#,
     );
@@ -3324,30 +3426,47 @@ mod tests {
           local cyclic = {}
           cyclic.self = cyclic
           local cyclic_ok = debug.pcall{
-            func = function() serialization.json_encode(cyclic) end,
+            func = function() serialization.json_encode{ value = cyclic } end,
           }
           local sparse_ok = debug.pcall{
-            func = function() serialization.json_encode{ [1] = "a", [3] = "c" } end,
+            func = function()
+              serialization.json_encode{ value = { [1] = "a", [3] = "c" } }
+            end,
           }
           local entity_ok = debug.pcall{
             func = function()
-              serialization.xml_decode(
-                "<!DOCTYPE root [<!ENTITY secret 'hidden'>]><root>&secret;</root>"
-              )
+              serialization.xml_decode{
+                s = "<!DOCTYPE root [<!ENTITY secret 'hidden'>]><root>&secret;</root>",
+              }
             end,
           }
           local mismatched_xml_ok = debug.pcall{
             func = function()
-              serialization.xml_decode("<root><child></root>")
+              serialization.xml_decode{ s = "<root><child></root>" }
             end,
           }
           local mixed_xml_ok = debug.pcall{
             func = function()
-              serialization.xml_decode("<root><child/>text</root>")
+              serialization.xml_decode{ s = "<root><child/>text</root>" }
             end,
           }
-          local hex_ok = debug.pcall{
-            func = function() encoding.hex_decode("0xz1") end,
+          local positional_encoding_ok = debug.pcall{
+            func = function() encoding.hex_decode("00") end,
+          }
+          local missing_encoding_arg_ok = debug.pcall{
+            func = function() encoding.hex_decode{} end,
+          }
+          local invalid_hex_ok = debug.pcall{
+            func = function() encoding.hex_decode{ s = "0xz1" } end,
+          }
+          local positional_serialization_ok = debug.pcall{
+            func = function() serialization.json_encode({}) end,
+          }
+          local missing_serialization_arg_ok = debug.pcall{
+            func = function() serialization.json_decode{} end,
+          }
+          local positional_packsize_ok = debug.pcall{
+            func = function() serialization.binary_packsize("<I4") end,
           }
           debug.assert{
             value = not cyclic_ok.ok
@@ -3355,7 +3474,114 @@ mod tests {
               and not entity_ok.ok
               and not mismatched_xml_ok.ok
               and not mixed_xml_ok.ok
-              and not hex_ok.ok,
+              and not positional_encoding_ok.ok
+              and not missing_encoding_arg_ok.ok
+              and not invalid_hex_ok.ok
+              and not positional_serialization_ok.ok
+              and not missing_serialization_arg_ok.ok
+              and not positional_packsize_ok.ok,
+          }
+        end
+      "#,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn serialization_json_top_level_null_empty_and_numeric_edges_are_stable() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          local encoded_nil = serialization.json_encode(nil)
+          local decoded_null = serialization.json_decode{ s = "null" }
+          local empty_table = serialization.json_encode{ value = {} }
+          local max_integer = serialization.json_decode{ s = "9223372036854775807" }
+          local above_i64 = serialization.json_decode{ s = "9223372036854775808" }
+          local nested = serialization.json_decode{
+            s = '{"object":{"nil":null},"array":[1,null,3]}',
+          }
+          local nested_json = serialization.json_encode{ value = nested }
+          local nested_round_trip = serialization.json_decode{ s = nested_json }
+          local yaml = serialization.yaml_encode{
+            value = { object = { null = serialization.NULL } },
+          }
+          local yaml_value = serialization.yaml_decode{ s = yaml }
+          local mutation_ok = debug.pcall{
+            func = function() serialization.NULL.field = true end,
+          }
+          local infinity_ok = debug.pcall{
+            func = function() serialization.json_encode{ value = 1 / 0 } end,
+          }
+          local nan_ok = debug.pcall{
+            func = function() serialization.json_encode{ value = 0 / 0 } end,
+          }
+
+          debug.assert{
+            value = encoded_nil == "null"
+              and decoded_null == serialization.NULL
+              and empty_table == "{}",
+            message = "top-level JSON null and empty table contract failed",
+          }
+          debug.assert{
+            value = max_integer == math.MAX_INTEGER
+              and math.type(max_integer) == "integer"
+              and math.type(above_i64) == "float",
+            message = "JSON integer boundary contract failed",
+          }
+          debug.assert{
+            value = nested.object["nil"] == serialization.NULL
+              and #nested.array == 3
+              and nested.array[1] == 1
+              and nested.array[2] == serialization.NULL
+              and nested.array[3] == 3
+              and nested_round_trip.object["nil"] == serialization.NULL
+              and #nested_round_trip.array == 3
+              and nested_round_trip.array[1] == 1
+              and nested_round_trip.array[2] == serialization.NULL
+              and nested_round_trip.array[3] == 3,
+            message = "nested JSON null round-trip contract failed",
+          }
+          debug.assert{
+            value = yaml_value.object.null == serialization.NULL,
+            message = "YAML null round-trip contract failed",
+          }
+          debug.assert{
+            value = not mutation_ok.ok and not infinity_ok.ok and not nan_ok.ok,
+            message = "NULL immutability or non-finite number rejection failed",
+          }
+        end
+      "#,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn serialization_null_is_preserved_or_rejected_by_format_contract() {
+    let source = valid_script(
+      r#"
+        function Init(ctx)
+          local csv_ok = debug.pcall{
+            func = function()
+              serialization.csv_encode{ rows = { { "value", serialization.NULL } } }
+            end,
+          }
+          local ini_ok = debug.pcall{
+            func = function()
+              serialization.ini_encode{ value = { entry = serialization.NULL } }
+            end,
+          }
+          local toml_ok = debug.pcall{
+            func = function()
+              serialization.toml_encode{ value = { entry = serialization.NULL } }
+            end,
+          }
+          local xml_ok = debug.pcall{
+            func = function()
+              serialization.xml_encode{ value = { root = { child = serialization.NULL } } }
+            end,
+          }
+          debug.assert{
+            value = not csv_ok.ok and not ini_ok.ok and not toml_ok.ok and not xml_ok.ok,
           }
         end
       "#,
@@ -3379,7 +3605,7 @@ mod tests {
           local csv = serialization.csv_encode{
             rows = { { "name", "score" }, { "player", 9 } },
           }
-          local csv_value = serialization.csv_decode(csv)
+          local csv_value = serialization.csv_decode{ s = csv }
           debug.assert{
             value = csv_value[2][1] == "player" and csv_value[2][2] == "9",
           }
@@ -3387,21 +3613,21 @@ mod tests {
           local yaml = serialization.yaml_encode{
             value = { name = "TUI", enabled = true },
           }
-          local yaml_value = serialization.yaml_decode(yaml)
+          local yaml_value = serialization.yaml_decode{ s = yaml }
           debug.assert{ value = yaml_value.name == "TUI" and yaml_value.enabled }
 
           local toml = serialization.toml_encode{
             value = { name = "TUI", version = 1 },
           }
-          local toml_value = serialization.toml_decode(toml)
+          local toml_value = serialization.toml_decode{ s = toml }
           debug.assert{
             value = toml_value.name == "TUI" and toml_value.version == 1,
           }
 
           local ini = serialization.ini_encode{
-            server = { host = "127.0.0.1", port = 8080 },
+            value = { server = { host = "127.0.0.1", port = 8080 } },
           }
-          local ini_value = serialization.ini_decode(ini)
+          local ini_value = serialization.ini_decode{ s = ini }
           debug.assert{
             value = ini_value.server.host == "127.0.0.1"
               and ini_value.server.port == "8080",
@@ -3428,7 +3654,7 @@ mod tests {
               and unpacked_second.values[2] == "ok",
           }
           debug.assert{
-            value = serialization.binary_packsize("<I2c2x") == 5,
+            value = serialization.binary_packsize{ fmt = "<I2c2x" } == 5,
           }
         end
       "#,
@@ -3442,13 +3668,15 @@ mod tests {
       r#"
         function Init(ctx)
           draw.fill_rect{ x = 2, y = 1, width = 10, height = 4, bg = color.BLUE }
-          draw.render()
+          draw.render{}
+          local missing_table = debug.pcall{ func = function() draw.render() end }
+          debug.assert{ value = not missing_table.ok }
         end
         function Update(dt)
           draw.erase_rect{ x = 3, y = 2, width = 8, height = 2 }
         end
         function Render()
-          local ok = debug.pcall{ func = function() draw.render() end }
+          local ok = debug.pcall{ func = function() draw.render{} end }
           debug.assert{ value = not ok.ok }
           draw.text{ x = 1, y = 1, text = "render" }
         end
@@ -3639,7 +3867,7 @@ mod tests {
             value = measurement.get_text_width{ text = 12345 } == 5,
           }
           debug.print{ message = 100, title = false }
-          debug.info(true)
+          debug.info{ message = true }
         end
 
         function Render()
@@ -3714,9 +3942,17 @@ mod tests {
             time = true,
             type_head = true,
           }
-          debug.info("info")
+          local positional_info = debug.pcall{
+            func = function() debug.info("positional") end,
+          }
+          debug.assert{ value = not positional_info.ok }
+          local positional_skip = debug.pcall{
+            func = function() event.skip_action() end,
+          }
+          debug.assert{ value = not positional_skip.ok }
+          debug.info{ message = "info" }
           debug.warn{ message = "warn" }
-          debug.error("error")
+          debug.error{ message = "error" }
         end
       "#,
     );
@@ -4156,13 +4392,13 @@ mod tests {
           local sparse = {
             [1] = "a", [3] = "c", [0] = "zero", [-1] = "negative", name = "value",
           }
-          local count = table.count(sparse)
+          local count = table.count{ table = sparse }
           local array_count = table.count_array{ table = sparse }
           debug.assert{
             value = count.n == 5 and not count.contiguous
               and array_count.n == 2 and not array_count.contiguous
               and array_count.indexes[1] == 1 and array_count.indexes[2] == 3
-              and table.count_hash(sparse) == 3,
+              and table.count_hash{ table = sparse } == 3,
           }
           local compacted = table.compact{ table = sparse }
           debug.assert{
@@ -4170,21 +4406,25 @@ mod tests {
               and sparse[3] == nil and sparse[0] == "zero"
               and sparse[-1] == "negative" and sparse.name == "value",
           }
-          local compacted_count = table.count(sparse)
-          local compacted_array_count = table.count_array(sparse)
+          local compacted_count = table.count{ table = sparse }
+          local compacted_array_count = table.count_array{ table = sparse }
           debug.assert{
             value = compacted_count.n == 5 and compacted_count.contiguous
               and compacted_array_count.n == 2 and compacted_array_count.contiguous
               and compacted_array_count.indexes[1] == 1
               and compacted_array_count.indexes[2] == 2,
           }
-          local empty_count = table.count_array{}
+          local empty_count = table.count_array{ table = {} }
           debug.assert{
             value = empty_count.n == 0 and empty_count.contiguous
               and #empty_count.indexes == 0,
           }
           debug.assert{
-            value = fails(function() table.compact(char.ASCII_LETTER) end),
+            value = fails(function() table.compact{ table = char.ASCII_LETTER } end),
+          }
+          debug.assert{
+            value = fails(function() table.compact(sparse) end)
+              and fails(function() table.pretty({}) end),
           }
 
           local sortable = { 3, 1, 2 }
@@ -4198,7 +4438,7 @@ mod tests {
 
           local child = { value = 7 }
           local original = { child = child, alias = child, callback = function() end }
-          local copied = table.deepcopy(original)
+          local copied = table.deepcopy{ table = original }
           debug.assert{
             value = copied ~= original and copied.child ~= child
               and copied.child == copied.alias and copied.child.value == 7
@@ -4207,7 +4447,7 @@ mod tests {
           copied.child.value = 9
           debug.assert{ value = original.child.value == 7 }
 
-          local visual = table.pretty({ 1, 3, "a", n = 3 })
+          local visual = table.pretty{ table = { 1, 3, "a", n = 3 } }
           debug.assert{ value = visual == "{[1] = 1, [2] = 3, [3] = \"a\", n = 3}" }
           local nested = table.pretty{
             table = { text = "a\nb", enabled = true, callback = function() end },
@@ -4451,25 +4691,29 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          local result = debug.pcall{ func = function() game.exit_game() end }
+          local result = debug.pcall{ func = function() game.exit_game{} end }
           debug.assert{ value = not result.ok }
         end
         function SaveGame()
-          local save = debug.pcall{ func = function() game.save_game() end }
-          local exit = debug.pcall{ func = function() game.exit_game() end }
+          local save = debug.pcall{ func = function() game.save_game{} end }
+          local exit = debug.pcall{ func = function() game.exit_game{} end }
           debug.assert{ value = not save.ok and not exit.ok }
-          game.save_best()
+          game.save_best{}
           return { saved = true }
         end
         function SaveBest()
-          local save = debug.pcall{ func = function() game.save_best() end }
-          local exit = debug.pcall{ func = function() game.exit_game() end }
+          local save = debug.pcall{ func = function() game.save_best{} end }
+          local exit = debug.pcall{ func = function() game.exit_game{} end }
           debug.assert{ value = not save.ok and not exit.ok }
-          game.save_game()
+          game.save_game{}
           return { best_string = "best" }
         end
         function Update(dt)
-          game.exit_game()
+          local positional_exit = debug.pcall{
+            func = function() game.exit_game() end,
+          }
+          debug.assert{ value = not positional_exit.ok }
+          game.exit_game{}
         end
       "#,
     );
@@ -4525,13 +4769,13 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          game.exit_game("ignored")
-          event.clear_action("ignored")
-          file.write("ignored")
-          file.list_dir("ignored")
-          file.create_dir("ignored")
-          file.remove("ignored")
-          debug.info({ invalid = true })
+          game.exit_game{ unexpected = true }
+          event.clear_action{ unexpected = true }
+          file.write{ unexpected = true }
+          file.list_dir{ unexpected = true }
+          file.create_dir{ unexpected = true }
+          file.remove{ unexpected = true }
+          debug.info{ invalid = true }
         end
       "#,
     );
@@ -4564,10 +4808,10 @@ mod tests {
   fn api_configuration_is_active_during_entry_and_init() {
     let source = valid_script(
       r#"
-        debug.info("entry")
+          debug.info{ message = "entry" }
         function Init(ctx)
-          debug.info("init")
-          event.clear_action()
+          debug.info{ message = "init" }
+          event.clear_action{}
         end
       "#,
     );
@@ -4602,8 +4846,8 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          event.skip_action()
-          event.clear_action()
+          event.skip_action{}
+          event.clear_action{}
         end
       "#,
     );
@@ -4665,21 +4909,34 @@ mod tests {
           function Init(ctx)
             debug.assert{ value = file.read_byte == nil }
             debug.assert{ value = file.write_byte == nil }
-            debug.assert{ value = file.exists(".") }
+            debug.assert{ value = file.exists{ path = "." } }
             debug.assert{ value = file.exists{ path = "./input.txt" } }
-            debug.assert{ value = not file.exists("./missing.txt") }
-            file.list_dir{ path = ".", recursive = true }
-            file.read{ path = "./input.txt" }
-            file.read{ path = "./input.bin", byte = true, event_tip = "read-binary" }
-            file.write{ path = "./output.txt", text = "output" }
-            file.write{
+            debug.assert{ value = not file.exists{ path = "./missing.txt" } }
+            list_request_id = file.list_dir{ path = ".", recursive = true }
+            read_text_request_id = file.read{ path = "./input.txt" }
+            read_bytes_request_id = file.read{
+              path = "./input.bin", byte = true, event_tip = "read-binary",
+            }
+            write_text_request_id = file.write{ path = "./output.txt", text = "output" }
+            write_bytes_request_id = file.write{
               path = "./output.bin",
               text = "a\0\255b",
               byte = true,
               event_tip = "write-binary",
             }
-            file.create_dir{ path = "./created/nested/leaf", event_tip = "created" }
-            file.remove{ path = "./input.txt", event_tip = "removed" }
+            create_dir_request_id = file.create_dir{
+              path = "./created/nested/leaf", event_tip = "created",
+            }
+            remove_request_id = file.remove{ path = "./input.txt", event_tip = "removed" }
+            debug.assert{
+              value = type(list_request_id) == "number"
+                and type(read_text_request_id) == "number"
+                and type(read_bytes_request_id) == "number"
+                and type(write_text_request_id) == "number"
+                and type(write_bytes_request_id) == "number"
+                and type(create_dir_request_id) == "number"
+                and type(remove_request_id) == "number",
+            }
             local empty = debug.pcall{
               func = function() file.list_dir{ path = "" } end,
             }
@@ -4688,13 +4945,19 @@ mod tests {
             }
             debug.assert{ value = not empty.ok and not traversal.ok }
           end
+
+          function HandleEvent(event)
+            if event.type == "file" and event.data.ok then
+              completed_request_id = event.data.request_id
+            end
+          end
         "#,
       ),
     )
     .unwrap();
     let mut session = LuaSession::load_with_api(
       LuaSessionSpec {
-        package_id: "test.assets_root".to_string(),
+        package_id: "test_assets_root".to_string(),
         session_kind: LuaSessionKind::Game,
         entry_path,
         fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
@@ -4714,6 +4977,13 @@ mod tests {
 
     let expected_root = assets_root.canonicalize().unwrap();
     let requests = session.take_host_commands();
+    let lua_request_id = |name| {
+      let Value::Integer(value) = session.environment_value(name) else {
+        panic!("{name} should return a Lua integer request id");
+      };
+      value as u64
+    };
+    let read_text_request_id = lua_request_id("read_text_request_id");
     assert!(requests.iter().any(|command| matches!(
       command,
       LuaHostCommand::FileRequest {
@@ -4727,8 +4997,12 @@ mod tests {
       LuaHostCommand::FileRequest {
         task: tg_service_file::FileTask::LuaReadText { path, .. },
         virtual_path,
+        request_id,
+        operation: LuaFileOperation::ReadText,
         ..
-      } if path == &expected_root.join("input.txt") && virtual_path == "input.txt"
+      } if path == &expected_root.join("input.txt")
+        && virtual_path == "input.txt"
+        && *request_id == read_text_request_id
     )));
     assert!(requests.iter().any(|command| matches!(
       command,
@@ -4788,6 +5062,27 @@ mod tests {
         && event_tip == "removed"
     )));
 
+    session
+      .dispatch_event(&LuaEventDelivery {
+        event: LuaRuntimeEvent {
+          sequence: 1,
+          frame: 1,
+          data: LuaEventData::File(super::super::LuaFileEvent {
+            request_id: read_text_request_id,
+            kind: LuaFileOperation::ReadText,
+            path: "input.txt".to_string(),
+            tip: None,
+            outcome: super::super::LuaFileOutcome::Text("input".to_string()),
+          }),
+        },
+        route: LuaEventRoute::HandleEvent,
+      })
+      .unwrap();
+    assert_eq!(
+      session.environment_value("completed_request_id"),
+      Value::Integer(read_text_request_id as i64)
+    );
+
     fs::remove_dir_all(package_root).unwrap();
   }
 
@@ -4798,7 +5093,7 @@ mod tests {
       .join("test_package/game/permissions_lab");
     let entry_path = package_root.join("scripts/main.lua");
     let make_spec = || LuaSessionSpec {
-      package_id: "test.permissions_lab".to_string(),
+      package_id: "test_permissions_lab".to_string(),
       session_kind: LuaSessionKind::Game,
       entry_path: entry_path.clone(),
       fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
@@ -4877,7 +5172,11 @@ mod tests {
               and load == nil and rawget(_ENV, "package") == nil
               and debug.getregistry == nil,
           }
-          local first, first_gap, first_tail = loader.require("cached")
+          local positional_require = debug.pcall{
+            func = function() loader.require("cached") end,
+          }
+          debug.assert{ value = not positional_require.ok }
+          local first, first_gap, first_tail = loader.require{ path = "cached" }
           local second, second_gap, second_tail = loader.require{ path = "./cached.lua" }
           debug.assert{
             value = first == second and first.count == 1 and first.leaked == "main-only"
@@ -4887,14 +5186,14 @@ mod tests {
             value = first_gap == nil and second_gap == nil and first_tail == 3 and second_tail == 3,
           }
 
-          local fresh_first = loader.dofile("fresh")
+          local fresh_first = loader.dofile{ path = "fresh" }
           local fresh_second = loader.dofile{ path = "./fresh.lua" }
           debug.assert{
             value = fresh_first ~= fresh_second
               and fresh_first.count == 1 and fresh_second.count == 2,
           }
 
-          local compiled_first = loader.loadfile("compiled")
+          local compiled_first = loader.loadfile{ path = "compiled" }
           local compiled_second = loader.loadfile{ path = "compiled.lua" }
           debug.assert{
             value = type(compiled_first) == "function"
@@ -4910,16 +5209,16 @@ mod tests {
           }
 
           local traversal_ok = debug.pcall{
-            func = function() loader.require("../outside") end,
+            func = function() loader.require{ path = "../outside" } end,
           }
           local extension_ok = debug.pcall{
-            func = function() loader.dofile("module.txt") end,
+            func = function() loader.dofile{ path = "module.txt" } end,
           }
           local bytecode_ok = debug.pcall{
-            func = function() loader.loadfile("bytecode.lua") end,
+            func = function() loader.loadfile{ path = "bytecode.lua" } end,
           }
           local cycle_ok = debug.pcall{
-            func = function() loader.require("cycle") end,
+            func = function() loader.require{ path = "cycle" } end,
           }
           debug.assert{
             value = not traversal_ok.ok and not extension_ok.ok and not bytecode_ok.ok
@@ -4949,7 +5248,7 @@ mod tests {
     fs::write(scripts_root.join("bytecode.lua"), [0x1b, b'L', b'u', b'a']).unwrap();
     fs::write(
       scripts_root.join("cycle.lua"),
-      "return loader.require('cycle')",
+      "return loader.require{ path = 'cycle' }",
     )
     .unwrap();
 
@@ -5337,7 +5636,7 @@ mod tests {
       save["calls"],
       serde_json::json!(["Init", "HandleEvent", "Update", "UpdateFrame", "Render"])
     );
-    assert_eq!(save["package_id"], "test.package");
+    assert_eq!(save["package_id"], "test_package");
     assert_eq!(save["package_type"], "game");
     assert_eq!(save["base_width"], 120);
     assert_eq!(save["base_height"], 40);
@@ -5518,9 +5817,9 @@ mod tests {
   #[test]
   fn test_package_entries_execute_the_basic_lifecycle() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
-    for (directory, session_kind) in [
-      ("test_package/game", LuaSessionKind::Game),
-      ("test_package/screensaver", LuaSessionKind::Screensaver),
+    for (directory, session_kind, expected_package_count) in [
+      ("test_package/game", LuaSessionKind::Game, 4),
+      ("test_package/screensaver", LuaSessionKind::Screensaver, 3),
     ] {
       let package_root = manifest_dir.join(directory);
       let mut package_count = 0;
@@ -5586,8 +5885,8 @@ mod tests {
       }
 
       assert_eq!(
-        package_count, 3,
-        "expected three test packages in {directory}"
+        package_count, expected_package_count,
+        "unexpected test package count in {directory}"
       );
     }
   }
@@ -5606,7 +5905,7 @@ mod tests {
     fs::write(&path, [0xff, 0xfe, 0xfd]).unwrap();
     let invalid_utf8 = match LuaSession::load(
       LuaSessionSpec {
-        package_id: "invalid.utf8".to_string(),
+        package_id: "invalid_utf8".to_string(),
         session_kind: LuaSessionKind::Game,
         entry_path: path,
         fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
@@ -5643,7 +5942,7 @@ mod tests {
     fs::rename(path, &text_path).unwrap();
     let non_lua = match LuaSession::load(
       LuaSessionSpec {
-        package_id: "invalid.extension".to_string(),
+        package_id: "invalid_extension".to_string(),
         session_kind: LuaSessionKind::Game,
         entry_path: text_path,
         fixed_delta: Duration::from_secs_f64(1.0 / 60.0),

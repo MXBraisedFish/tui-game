@@ -3,28 +3,30 @@ mod ini;
 mod value;
 mod xml;
 
-use mlua::{Lua, MultiValue, Table};
+use mlua::{Lua, MultiValue, Table, Value};
 
 use super::*;
 
 pub(super) fn serialization(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.create_table()?;
-  install_json(lua, &source)?;
+  let null = Value::UserData(lua.create_userdata(value::NullSentinel)?);
+  source.raw_set("NULL", null.clone())?;
+  install_json(lua, &source, null.clone())?;
   install_csv(lua, &source)?;
-  install_yaml(lua, &source)?;
-  install_toml(lua, &source)?;
+  install_yaml(lua, &source, null.clone())?;
+  install_toml(lua, &source, null)?;
   ini::install(lua, &source)?;
   xml::install(lua, &source)?;
   binary::install(lua, &source)?;
   readonly::proxy(lua, source)
 }
 
-fn install_json(lua: &Lua, source: &Table) -> mlua::Result<()> {
+fn install_json(lua: &Lua, source: &Table, null: Value) -> mlua::Result<()> {
   source.raw_set(
     "json_encode",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.json_encode";
-      let value = args::one(method, "value", values)?;
+      let value = value_argument(values, method, "value", true)?;
       let value = value::lua_to_json(value, method)?;
       value::bounded_text(
         method,
@@ -34,12 +36,12 @@ fn install_json(lua: &Lua, source: &Table) -> mlua::Result<()> {
   )?;
   source.raw_set(
     "json_decode",
-    lua.create_function(|lua, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "serialization.json_decode";
       let text = value::text_argument(values, method)?;
       let decoded: serde_json::Value =
         serde_json::from_str(&text).map_err(|_| args::message(method, "invalid JSON data"))?;
-      value::json_to_lua(lua, &decoded, method)
+      value::json_to_lua(lua, &decoded, method, &null)
     })?,
   )
 }
@@ -49,7 +51,7 @@ fn install_csv(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "csv_encode",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.csv_encode";
-      let data = value::lua_to_json(args::one(method, "rows", values)?, method)?;
+      let data = value::lua_to_json(value_argument(values, method, "rows", false)?, method)?;
       let serde_json::Value::Array(rows) = data else {
         return Err(args::message(method, "expected a two-dimensional array"));
       };
@@ -99,12 +101,12 @@ fn install_csv(lua: &Lua, source: &Table) -> mlua::Result<()> {
   )
 }
 
-fn install_yaml(lua: &Lua, source: &Table) -> mlua::Result<()> {
+fn install_yaml(lua: &Lua, source: &Table, null: Value) -> mlua::Result<()> {
   source.raw_set(
     "yaml_encode",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.yaml_encode";
-      let data = value::lua_to_json(args::one(method, "value", values)?, method)?;
+      let data = value::lua_to_json(value_argument(values, method, "value", false)?, method)?;
       let text =
         serde_yaml::to_string(&data).map_err(|_| args::message(method, "YAML encoding failed"))?;
       value::bounded_text(method, text)
@@ -112,7 +114,7 @@ fn install_yaml(lua: &Lua, source: &Table) -> mlua::Result<()> {
   )?;
   source.raw_set(
     "yaml_decode",
-    lua.create_function(|lua, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "serialization.yaml_decode";
       let text = value::text_argument(values, method)?;
       let yaml: serde_yaml::Value =
@@ -120,17 +122,20 @@ fn install_yaml(lua: &Lua, source: &Table) -> mlua::Result<()> {
       reject_yaml_tags(&yaml, method)?;
       let data =
         serde_json::to_value(yaml).map_err(|_| args::message(method, "unsupported YAML value"))?;
-      value::json_to_lua(lua, &data, method)
+      value::json_to_lua(lua, &data, method, &null)
     })?,
   )
 }
 
-fn install_toml(lua: &Lua, source: &Table) -> mlua::Result<()> {
+fn install_toml(lua: &Lua, source: &Table, null: Value) -> mlua::Result<()> {
   source.raw_set(
     "toml_encode",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.toml_encode";
-      let data = value::lua_to_json(args::one(method, "value", values)?, method)?;
+      let data = value::lua_to_json(value_argument(values, method, "value", false)?, method)?;
+      if contains_null(&data) {
+        return Err(args::message(method, "TOML does not support null values"));
+      }
       if !data.is_object() {
         return Err(args::message(method, "TOML root must be an object table"));
       }
@@ -141,25 +146,47 @@ fn install_toml(lua: &Lua, source: &Table) -> mlua::Result<()> {
   )?;
   source.raw_set(
     "toml_decode",
-    lua.create_function(|lua, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "serialization.toml_decode";
       let text = value::text_argument(values, method)?;
       let data: toml::Value =
         toml::from_str(&text).map_err(|_| args::message(method, "invalid TOML data"))?;
       let json =
         serde_json::to_value(data).map_err(|_| args::message(method, "unsupported TOML value"))?;
-      value::json_to_lua(lua, &json, method)
+      value::json_to_lua(lua, &json, method, &null)
     })?,
   )
 }
 
 fn scalar_text(value: serde_json::Value, method: &str) -> mlua::Result<String> {
   match value {
-    serde_json::Value::Null => Ok(String::new()),
+    serde_json::Value::Null => Err(args::message(method, "CSV does not support null values")),
     serde_json::Value::Bool(value) => Ok(value.to_string()),
     serde_json::Value::Number(value) => Ok(value.to_string()),
     serde_json::Value::String(value) => Ok(value),
     _ => Err(args::message(method, "CSV cells must be scalar values")),
+  }
+}
+
+fn value_argument(
+  values: MultiValue,
+  method: &str,
+  name: &str,
+  allow_top_level_nil: bool,
+) -> mlua::Result<Value> {
+  if allow_top_level_nil && values.len() == 1 && matches!(values.front(), Some(Value::Nil)) {
+    return Ok(Value::Nil);
+  }
+  let table = args::named(method, values, &[name])?;
+  args::required(&table, method, name)
+}
+
+fn contains_null(value: &serde_json::Value) -> bool {
+  match value {
+    serde_json::Value::Null => true,
+    serde_json::Value::Array(values) => values.iter().any(contains_null),
+    serde_json::Value::Object(values) => values.values().any(contains_null),
+    _ => false,
   }
 }
 

@@ -1,0 +1,13 @@
+{
+  "title": {
+    "type": "i18n",
+    "key": "title",
+    "callback": "Trail Runner"
+  },
+  "description": {
+    "type": "i18n",
+    "key": "description",
+    "callback": "Steer a growing trail and collect gems."
+  },
+  "author": "TUI GAME"
+}

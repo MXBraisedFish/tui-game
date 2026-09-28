@@ -1,0 +1,8 @@
+{
+  "title": "Block Merge",
+  "description": "A 4x4 sliding merge puzzle that exercises loader, random, table, align and serialization APIs.",
+  "author": {
+    "type": "text",
+    "text": "TUI GAME"
+  }
+}

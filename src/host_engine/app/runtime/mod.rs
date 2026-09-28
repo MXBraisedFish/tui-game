@@ -61,6 +61,42 @@ use std::{
 const SCREENSHOT_DOUBLE_ACTION_WINDOW: Duration = Duration::from_millis(300);
 const HOST_KEY_CHORD_WINDOW: Duration = Duration::from_millis(100);
 
+fn effective_game_target_fps(
+  player_limit: Option<u16>,
+  package_target: Option<u32>,
+) -> Option<u16> {
+  let package_limit = package_target.and_then(|fps| u16::try_from(fps).ok());
+  match (player_limit, package_limit) {
+    (Some(player), Some(package)) => Some(player.min(package)),
+    (Some(player), None) => Some(player),
+    (None, Some(package)) => Some(package),
+    (None, None) => None,
+  }
+}
+
+#[cfg(test)]
+mod game_fps_tests {
+  use super::effective_game_target_fps;
+
+  #[test]
+  fn game_frame_limit_uses_the_lower_player_or_package_limit() {
+    for (player, package, expected) in [
+      (Some(30), Some(120), Some(30)),
+      (Some(120), Some(30), Some(30)),
+      (Some(120), None, Some(120)),
+      (None, Some(60), Some(60)),
+      (None, Some(120), Some(120)),
+      (None, None, None),
+    ] {
+      assert_eq!(
+        effective_game_target_fps(player, package),
+        expected,
+        "player={player:?}, package={package:?}"
+      );
+    }
+  }
+}
+
 #[derive(Default)]
 pub(super) struct LanguageLoadingRuntime {
   active: bool,
@@ -763,6 +799,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
           game_warning_seconds_left(game_warning_elapsed),
         )
       };
+    let input_cursor = cursor_when_terminal_focused(input_cursor, services.input.is_focused());
     draw_popup(services);
     let text_force_redraw = services.canvas.take_render_requested();
     let composed = services.compositor.compose(&services.canvas);
@@ -788,19 +825,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       update_auto_recording(services, &mut auto_recording);
     }
 
-    scheduler.set_target_fps(
+    scheduler.set_target_fps(effective_game_target_fps(
       services
-        .game
-        .target_fps()
-        .and_then(|fps| u16::try_from(fps).ok())
-        .or_else(|| {
-          services
-            .storage
-            .display_settings_profile()
-            .game_list_fps
-            .target_fps()
-        }),
-    );
+        .storage
+        .display_settings_profile()
+        .game_list_fps
+        .target_fps(),
+      services.game.target_fps(),
+    ));
     scheduler.wait_for_next_frame();
   }
 
@@ -963,6 +995,13 @@ fn sync_input_method_policy(services: &mut EngineServices) {
     ImPolicy::ForceAscii
   };
   let _ = services.input_method.set_policy(policy);
+}
+
+fn cursor_when_terminal_focused(
+  cursor: Option<(u16, u16)>,
+  terminal_focused: bool,
+) -> Option<(u16, u16)> {
+  if terminal_focused { cursor } else { None }
 }
 
 fn update_exit_preparation(
@@ -2079,6 +2118,7 @@ fn apply_lua_host_commands(
         }
       }
       LuaHostCommand::I18nRequest {
+        request_id,
         task,
         kind: event_kind,
         language_code,
@@ -2096,6 +2136,7 @@ fn apply_lua_host_commands(
           task_id,
           token,
           LuaTaskOperation::I18n {
+            request_id,
             kind: event_kind,
             language_code,
             callback_language_code,
@@ -3454,8 +3495,9 @@ mod tests {
   use std::time::Duration;
 
   use super::{
-    AutoRecordingRuntime, format_lua_fault_message, has_pressed_action, queue_lua_system_event,
-    replace_lua_resize_size, sequential_screensaver_index,
+    AutoRecordingRuntime, cursor_when_terminal_focused, format_lua_fault_message,
+    has_pressed_action, queue_lua_system_event, replace_lua_resize_size,
+    sequential_screensaver_index,
   };
   use crate::host_engine::services::{
     AutoRecordingMode, InputActionEvent, InputEventType, KeyState, LuaErrorStage, LuaEventBroker,
@@ -3465,9 +3507,19 @@ mod tests {
   };
 
   #[test]
+  fn terminal_focus_gates_final_input_cursor() {
+    assert_eq!(
+      cursor_when_terminal_focused(Some((4, 7)), true),
+      Some((4, 7))
+    );
+    assert_eq!(cursor_when_terminal_focused(Some((4, 7)), false), None);
+    assert_eq!(cursor_when_terminal_focused(None, true), None);
+  }
+
+  #[test]
   fn lua_fault_log_does_not_append_stale_successful_callback_stats() {
     let error = LuaSessionError {
-      package_id: "test.package".to_string(),
+      package_id: "test_package".to_string(),
       session_kind: LuaSessionKind::Game,
       stage: LuaErrorStage::ExecutionLimit,
       callback: Some("Render"),

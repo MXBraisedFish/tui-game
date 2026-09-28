@@ -1,0 +1,8 @@
+{
+  "name": "Layer Waves",
+  "truecolor": false,
+  "command": "layer_waves",
+  "entry": "main",
+  "min_width": 60,
+  "min_height": 20
+}

@@ -26,14 +26,17 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
 
       let mut api = create_state.borrow_mut();
       if api.i18n.created || api.i18n.loading {
-        return Ok(());
+        return Ok(Value::Nil);
       }
       api.i18n.created = true;
       api.i18n.loading = true;
+      let request_id = api.next_i18n_request_id;
+      api.next_i18n_request_id = api.next_i18n_request_id.wrapping_add(1).max(1);
       let assets_root = api.context.assets_root.clone();
       push_host_command(
         &mut api,
         LuaHostCommand::I18nRequest {
+          request_id,
           task: FileTask::LuaLoadI18n {
             assets_root,
             language_code: language_code.clone(),
@@ -44,7 +47,7 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           callback_language_code,
         },
       );
-      Ok(())
+      Ok(Value::Integer(request_id as i64))
     })?,
   )?;
 
@@ -89,7 +92,7 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   source.raw_set(
     "get_language_code",
     lua.create_function(move |_, values: MultiValue| {
-      args::no_args("i18n.get_language_code", values)?;
+      args::empty_named("i18n.get_language_code", values)?;
       Ok(language_state.borrow().context.language_code.clone())
     })?,
   )?;
@@ -119,13 +122,16 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         return Err(args::message(method, "i18n instance has not been created"));
       }
       if api.i18n.loading {
-        return Ok(());
+        return Ok(Value::Nil);
       }
       api.i18n.loading = true;
+      let request_id = api.next_i18n_request_id;
+      api.next_i18n_request_id = api.next_i18n_request_id.wrapping_add(1).max(1);
       let assets_root = api.context.assets_root.clone();
       push_host_command(
         &mut api,
         LuaHostCommand::I18nRequest {
+          request_id,
           task: FileTask::LuaLoadI18n {
             assets_root,
             language_code: language_code.clone(),
@@ -136,7 +142,7 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           callback_language_code,
         },
       );
-      Ok(())
+      Ok(Value::Integer(request_id as i64))
     })?,
   )?;
 

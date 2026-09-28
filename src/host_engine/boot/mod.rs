@@ -167,9 +167,12 @@ fn wait_for_initial_package_scan(services: &mut EngineServices) -> Result<(), Ho
     for event in services.async_runtime.poll_events() {
       match event {
         EngineEvent::Package(event) => {
-          let event = services
+          let Some(event) = services
             .package
-            .handle_async_event(event, &mut services.log);
+            .handle_async_event(event, &mut services.log)
+          else {
+            continue;
+          };
           match event {
             PackageEvent::ScanStarted { total: value } => total = value,
             PackageEvent::ScanProgress {

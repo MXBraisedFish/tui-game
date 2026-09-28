@@ -80,8 +80,8 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           LuaFileOperation::ReadText,
         )
       };
-      enqueue_file_request(&read_state, task, operation, virtual_path, event_tip);
-      Ok(())
+      let request_id = enqueue_file_request(&read_state, task, operation, virtual_path, event_tip);
+      Ok(Value::Integer(request_id as i64))
     })?,
   )?;
   let write_state = state.clone();
@@ -90,7 +90,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     lua.create_function(move |_, values: MultiValue| {
       let method = "file.write";
       if !file_permission(&write_state, method) {
-        return Ok(());
+        return Ok(Value::Nil);
       }
       let table = args::named(
         method,
@@ -138,8 +138,8 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           LuaFileOperation::WriteText,
         )
       };
-      enqueue_file_request(&write_state, task, operation, virtual_path, event_tip);
-      Ok(())
+      let request_id = enqueue_file_request(&write_state, task, operation, virtual_path, event_tip);
+      Ok(Value::Integer(request_id as i64))
     })?,
   )?;
   let create_dir_state = state.clone();
@@ -148,7 +148,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     lua.create_function(move |_, values: MultiValue| {
       let method = "file.create_dir";
       if !file_permission(&create_dir_state, method) {
-        return Ok(());
+        return Ok(Value::Nil);
       }
       let table = args::named(method, values, &["path", "event_tip"])?;
       let relative_path = file_path(&table, method)?;
@@ -161,7 +161,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         SandboxPathKind::WritableDirectory,
         method,
       )?;
-      enqueue_file_request(
+      let request_id = enqueue_file_request(
         &create_dir_state,
         FileTask::LuaCreateDir {
           root: assets_root,
@@ -172,7 +172,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(())
+      Ok(Value::Integer(request_id as i64))
     })?,
   )?;
   let exists_state = state.clone();
@@ -180,7 +180,8 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "exists",
     lua.create_function(move |_, values: MultiValue| {
       let method = "file.exists";
-      let value = args::one(method, "path", values)?;
+      let table = args::named(method, values, &["path"])?;
+      let value = args::required(&table, method, "path")?;
       let path = args::string(value, method, "path")?;
       let relative_path = parse_file_path(&path, method)?;
       sandbox_path_exists(&exists_state.borrow().context.assets_root, &relative_path)
@@ -193,7 +194,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     lua.create_function(move |_, values: MultiValue| {
       let method = "file.remove";
       if !file_permission(&remove_state, method) {
-        return Ok(());
+        return Ok(Value::Nil);
       }
       let table = args::named(method, values, &["path", "recursive", "event_tip"])?;
       let relative_path = file_path(&table, method)?;
@@ -213,7 +214,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         SandboxPathKind::Removable,
         method,
       )?;
-      enqueue_file_request(
+      let request_id = enqueue_file_request(
         &remove_state,
         FileTask::LuaRemove {
           root: assets_root,
@@ -225,7 +226,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(())
+      Ok(Value::Integer(request_id as i64))
     })?,
   )?;
   let list_state = state.clone();
@@ -234,7 +235,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     lua.create_function(move |_, values: MultiValue| {
       let method = "file.list_dir";
       if !file_permission(&list_state, method) {
-        return Ok(());
+        return Ok(Value::Nil);
       }
       let table = args::named(
         method,
@@ -275,7 +276,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         SandboxPathKind::Directory,
         method,
       )?;
-      enqueue_file_request(
+      let request_id = enqueue_file_request(
         &list_state,
         FileTask::LuaListDir {
           path,
@@ -286,7 +287,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(())
+      Ok(Value::Integer(request_id as i64))
     })?,
   )?;
   readonly::proxy(lua, source)
@@ -385,7 +386,7 @@ fn enqueue_file_request(
   operation: LuaFileOperation,
   virtual_path: String,
   event_tip: Option<String>,
-) {
+) -> u64 {
   let mut state = state.borrow_mut();
   let request_id = state.next_file_request_id;
   state.next_file_request_id = state.next_file_request_id.wrapping_add(1).max(1);
@@ -399,4 +400,5 @@ fn enqueue_file_request(
       event_tip,
     },
   );
+  request_id
 }

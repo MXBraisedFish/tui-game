@@ -1,6 +1,8 @@
 # Lua 事件协议
 
-本文档描述 Rust 宿主当前能够投递给游戏或屏保 Lua Session 的全部事件。事件只用于宿主向脚本通知状态变化；原始终端按键、宿主 UI 事件、内部任务 ID、绝对路径和内部错误信息不会暴露给 Lua。
+本文档包含已实现事件和未来事件 schema。当前生产可投递范围是 `action`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期，以及 `file`、`i18n`、`image` 异步终态；它们通过 `HandleEvent(event)` 交付。独立 callback 注册、`timer`、`animation`、`audio`、`network` 和 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源，不能当作现有脚本能力使用。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准，生产链路证据见 [B10_EVENT_AUDIT.md](../refactor/B10_EVENT_AUDIT.md)。
+
+事件只用于宿主向脚本通知状态变化；原始终端按键、宿主 UI 事件、内部任务 ID、绝对路径和内部错误信息不会暴露给 Lua。
 
 ## 1. 通用结构
 
@@ -29,9 +31,8 @@
 
 ### 1.1 投递方式
 
-- 没有为对象或异步请求注册回调时，事件交给 `HandleEvent(event)`。
-- 注册了回调时，完整事件信封只交给该回调，不再重复交给 `HandleEvent`。
-- 回调在 Runtime 主线程执行，并使用与 `HandleEvent` 相同的时间和指令预算。
+- 当前所有生产事件都交给 `HandleEvent(event)`。独立 callback 形式只属于未来 schema，没有可供 Lua 包使用的注册 API。
+- 若未来增加独立 callback，事件路由及其 Runtime 线程、预算和是否同时投递给 `HandleEvent` 的规则需随 API 一起定义。
 - 事件处理期间产生的新事件追加至队尾，最早在下一宿主帧投递，不会递归调用 Lua。
 - 每个游戏和屏保 Session 各有独立队列；单帧最多处理 128 条，待处理上限为 1024 条。
 - 队列溢出只会使对应 Session 故障，不应导致宿主崩溃或影响另一个 Session。
@@ -396,6 +397,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 {
   type = "i18n",
   data = {
+    request_id = 4,
     kind = "created",
     ok = true,
     message = "i18n instance created",
@@ -407,6 +409,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
+| `request_id` | `integer` | 始终 | 与成功入队的 `i18n.create{}` 或 `i18n.reload{}` 返回的会话内请求 ID 相同。 |
 | `kind` | `string` | 始终 | `created` 表示 `create` 请求结束，`reloaded` 表示 `reload` 请求结束。 |
 | `ok` | `boolean` | 始终 | 本次语言加载是否成功。 |
 | `message` | `string` | 始终 | 已净化的加载结果说明，不包含绝对路径、系统错误或宿主任务 ID。 |

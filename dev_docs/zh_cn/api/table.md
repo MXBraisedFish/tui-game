@@ -4,6 +4,8 @@
 
 `table` 提供表操作。
 
+Lua 5.4 标准方法（如 `table.insert`、`table.unpack`）保持原生 Lua 调用方式。项目扩展 `deepcopy`、`pretty`、`count`、`count_array`、`count_hash`、`compact` 使用 `{ table = ... }` 命名参数表。
+
 ## 目录
 
 ### 方法
@@ -98,11 +100,11 @@ table.insert(list, [pos,] value)
 ```lua
 local t1 = { "x", "y" }
 table.insert(t1, "z")
-debug.print { message = table.pretty(t1) .. "\n" }
+debug.print { message = table.pretty{ table = t1 } .. "\n" }
 
 local t2 = { "a", "c" }
 table.insert(t2, 2, "b")
-debug.print { message = table.pretty(t2) }
+debug.print { message = table.pretty{ table = t2 } }
 ```
 
 输出：
@@ -156,13 +158,13 @@ table.move(a1, f, e, t [, a2])
 ```lua
 local t1 = { "a", "b", "c", "d" }
 local t_m1 = table.move(t1, 2, 3, 4)
-debug.print { message = table.pretty(t1) }
+debug.print { message = table.pretty{ table = t1 } }
 debug.print { message = t1 }
-debug.print { message = table.pretty(t_m1) .. "\n" }
+debug.print { message = table.pretty{ table = t_m1 } .. "\n" }
 
 local t2 = { 1, 2, 3, 4, 5 }
 table.move(t2, 1, 2, 4)
-debug.print { message = table.pretty(t2) }
+debug.print { message = table.pretty{ table = t2 } }
 ```
 
 输出：
@@ -220,10 +222,10 @@ table.pack(...)
 
 ```lua
 local packed1 = table.pack("a", "b", "c")
-debug.print { message = table.pretty(packed1) .. "\n" }
+debug.print { message = table.pretty{ table = packed1 } .. "\n" }
 
 local packed2 = table.pack(1, nil, 3)
-debug.print { message = table.pretty(packed2) }
+debug.print { message = table.pretty{ table = packed2 } }
 ```
 
 输出：
@@ -340,11 +342,11 @@ table.remove(list [, pos])
 ```lua
 local t1 = { "a", "b", "c", "d" }
 local removed1 = table.remove(t1)
-debug.print { message = removed1 .. " " .. table.pretty(t1) .. "\n" }
+debug.print { message = removed1 .. " " .. table.pretty{ table = t1 } .. "\n" }
 
 local t2 = { 10, 20, 30, 40 }
 local removed2 = table.remove(t2, 2)
-debug.print { message = removed2 .. " " .. table.pretty(t2) }
+debug.print { message = removed2 .. " " .. table.pretty{ table = t2 } }
 ```
 
 输出：
@@ -393,23 +395,23 @@ table.sort(list [, comp])
 ```lua
 local t1 = { 3, 1, 4, 2 }
 table.sort(t1)
-debug.print { message = table.pretty(t1) .. "\n" }
+debug.print { message = table.pretty{ table = t1 } .. "\n" }
 
 local t2 = { "banana", "apple", "grape", "cherry" }
 table.sort(t2)
-debug.print { message = table.pretty(t2) .. "\n" }
+debug.print { message = table.pretty{ table = t2 } .. "\n" }
 
 local t3 = { 5, 2, 8, 1 }
 table.sort(t3, function(left, right)
   return left > right
 end)
-debug.print { message = table.pretty(t3) .. "\n" }
+debug.print { message = table.pretty{ table = t3 } .. "\n" }
 
 local t4 = { "abc", "a", "abcdef", "ab" }
 table.sort(t4, function(left, right)
   return #left < #right
 end)
-debug.print { message = table.pretty(t4) }
+debug.print { message = table.pretty{ table = t4 } }
 ```
 
 输出：
@@ -467,7 +469,7 @@ end
 
 ```lua
 -- 单参数
-table.deepcopy()
+table.deepcopy{ table = {} }
 ```
 
 ### 参数
@@ -488,7 +490,7 @@ table.deepcopy()
 
 ```lua
 local t = { 1, 2, 3 }
-local t_copy = table.deepcopy(t)
+local t_copy = table.deepcopy{ table = t }
 
 debug.print { message = tostring(t) }
 debug.print { message = tostring(t_copy) }
@@ -511,7 +513,7 @@ table: 0x24076b6a190
 
 ```lua
 -- 单参数
-table.pretty()
+table.pretty{ table = {} }
 ```
 
 ### 参数
@@ -532,7 +534,7 @@ table.pretty()
 
 ```lua
 local t = { "apple", "banana", "grape" }
-debug.print { message = table.pretty(t) }
+debug.print { message = table.pretty{ table = t } }
 ```
 
 输出：
@@ -555,7 +557,7 @@ debug.print { message = table.pretty(t) }
 
 ```lua
 -- 单参数
-table.count()
+table.count{ table = {} }
 ```
 
 ### 参数
@@ -577,7 +579,7 @@ table.count()
 
 ```lua
 local t = { [1] = "a", [3] = "c", name = "Tui Game" }
-local result = table.count(t)
+local result = table.count{ table = t }
 
 debug.print { message = result.n }
 debug.print { message = result.contiguous }
@@ -605,7 +607,7 @@ false
 
 ```lua
 -- 单参数
-table.count_array()
+table.count_array{ table = {} }
 ```
 
 ### 参数
@@ -632,7 +634,7 @@ local result = table.count_array { table = t }
 
 debug.print { message = result.n }
 debug.print { message = result.contiguous }
-debug.print { message = table.pretty(result.indexes) }
+debug.print { message = table.pretty{ table = result.indexes } }
 ```
 
 输出：
@@ -660,7 +662,7 @@ false
 
 ```lua
 -- 单参数
-table.count_hash()
+table.count_hash{ table = {} }
 ```
 
 ### 参数
@@ -681,7 +683,7 @@ table.count_hash()
 
 ```lua
 local t = { [1] = "a", [3] = "c", name = "Tui Game", [0] = "zero" }
-local result = table.count_hash(t)
+local result = table.count_hash{ table = t }
 
 debug.print { message = result }
 ```
@@ -702,7 +704,7 @@ debug.print { message = result }
 
 ```lua
 -- 单参数
-table.compact()
+table.compact{ table = {} }
 ```
 
 ### 参数
@@ -726,7 +728,7 @@ local t = { [1] = "a", [3] = "c", [8] = "h", name = "Tui Game" }
 local result = table.compact { table = t }
 
 debug.print { message = tostring(result == t) }
-debug.print { message = table.pretty(t) }
+debug.print { message = table.pretty{ table = t } }
 ```
 
 输出：

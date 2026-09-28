@@ -145,6 +145,7 @@ pub enum LuaHostCommand {
     event_tip: Option<String>,
   },
   I18nRequest {
+    request_id: u64,
     task: FileTask,
     kind: LuaI18nEventKind,
     language_code: String,
@@ -168,6 +169,7 @@ pub(crate) struct LuaApiState {
   pub loader_stack: Vec<PathBuf>,
   pub loader_source_bytes: usize,
   pub next_file_request_id: u64,
+  pub next_i18n_request_id: u64,
   pub next_image_request_id: u64,
   pub pending_image_request_ids: HashSet<u64>,
   pub i18n: LuaI18nState,
@@ -206,6 +208,7 @@ pub(crate) fn build_environment(
     loader_stack: Vec::new(),
     loader_source_bytes: 0,
     next_file_request_id: 1,
+    next_i18n_request_id: 1,
     next_image_request_id: 1,
     pending_image_request_ids: HashSet::new(),
     i18n: LuaI18nState::default(),

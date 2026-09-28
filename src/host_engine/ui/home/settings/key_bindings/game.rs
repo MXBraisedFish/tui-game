@@ -691,10 +691,10 @@ impl GameKeyBindingsUi {
     hit_area: &HitAreaService,
     text_input: &TextInputService,
     scroll_box: &ScrollBoxService,
-  ) {
+  ) -> Option<(u16, u16)> {
     let pos = self.compute_layout(layout, i18n, text_input);
     self.draw_frames(render, canvas, layout, i18n, &pos);
-    self.draw_search(canvas, i18n, text_input, &pos);
+    let input_cursor = self.draw_search(canvas, i18n, text_input, &pos);
     self.draw_games(render, canvas, layout, i18n, &pos);
     self.draw_key_rows(render, canvas, layout, i18n, &pos);
     self.draw_hints(render, canvas, layout, &pos);
@@ -702,6 +702,7 @@ impl GameKeyBindingsUi {
     if self.show_color_doc {
       self.draw_color_doc(render, canvas, layout, i18n, &pos);
     }
+    input_cursor
   }
 
   fn activate_slot(&mut self, requested_slot: usize) -> Option<GameKeyBindingsCommand> {
@@ -1331,7 +1332,7 @@ impl GameKeyBindingsUi {
     i18n: &I18nService,
     text_input: &TextInputService,
     pos: &GameKeyBindingsLayout,
-  ) {
+  ) -> Option<(u16, u16)> {
     text_input.render_host(
       &mut self.objects,
       self.search_input,
@@ -1351,7 +1352,7 @@ impl GameKeyBindingsUi {
         ..Default::default()
       },
       canvas,
-    );
+    )
   }
 
   fn draw_games(

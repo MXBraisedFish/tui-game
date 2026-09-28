@@ -724,19 +724,19 @@ mod tests {
     let game_id = PackageId::new(
       tg_core_package_id::PackageSource::Mod,
       tg_core_package_id::PackageType::Game,
-      "sample.game",
+      "sample_game",
     )
     .unwrap();
     let screensaver_id = PackageId::new(
       tg_core_package_id::PackageSource::Official,
       tg_core_package_id::PackageType::Screensaver,
-      "sample.screensaver",
+      "sample_screensaver",
     )
     .unwrap();
     let official_game_id = PackageId::new(
       tg_core_package_id::PackageSource::Official,
       tg_core_package_id::PackageType::Game,
-      "sample.game",
+      "sample_game",
     )
     .unwrap();
     let game = log.open_session(LogSessionKind::Game, &game_id).unwrap();

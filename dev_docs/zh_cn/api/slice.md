@@ -3,6 +3,7 @@
 ## 基本库说明
 
 `slice` 提供图层切片对象管理。
+所有方法使用单个命名参数表；对象操作通过 `id` 字段指定切片，无参数方法传入空表 `{}`。
 
 ---
 
@@ -65,7 +66,7 @@ slice.create{}
 ```lua
 function Init(ctx)
   s = slice.create { width = 20, height = 10, bg = color.YELLOW }
-  debug.print { message = table.pretty(slice.get_info(s)) }
+  debug.print { message = table.pretty{ table = slice.get_info{ id = s } } }
 end
 
 function Render()
@@ -104,7 +105,7 @@ end
 
 ```lua
 -- 单参数
-slice.delete()
+slice.delete{ id = "slice_001" }
 ```
 
 ### 参数
@@ -127,9 +128,9 @@ slice.delete()
 local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 debug.print { message = s }
 
-debug.print { message = slice.delete(s) }
+debug.print { message = slice.delete{ id = s } }
 
-debug.print { message = table.pretty(slice.list()) }
+debug.print { message = table.pretty{ table = slice.list{} } }
 ```
 
 输出：
@@ -152,7 +153,7 @@ true
 
 ```lua
 -- 单参数
-slice.clear()
+slice.clear{}
 ```
 
 ### 参数
@@ -175,9 +176,9 @@ slice.create { width = 30, height = 8, bg = color.RED }
 slice.create { width = 40, height = 6, bg = color.GREEN }
 slice.create { width = 50, height = 4, bg = color.BLUE }
 
-debug.print { message = slice.clear() }
+debug.print { message = slice.clear{} }
 
-debug.print { message = table.pretty(slice.list()) }
+debug.print { message = table.pretty{ table = slice.list{} } }
 ```
 
 输出：
@@ -199,7 +200,7 @@ true
 
 ```lua
 -- 单参数
-slice.list()
+slice.list{}
 ```
 
 ### 参数
@@ -220,7 +221,7 @@ slice.list()
 local s1 = slice.create { width = 20, height = 10, bg = color.YELLOW }
 local s2 = slice.create { width = 30, height = 8, bg = color.RED }
 
-debug.print { message = table.pretty(slice.list()) }
+debug.print { message = table.pretty{ table = slice.list{} } }
 ```
 
 输出：
@@ -276,7 +277,7 @@ debug.print { message = table.pretty(slice.list()) }
 
 ```lua
 -- 单参数
-slice.count()
+slice.count{}
 ```
 
 ### 参数
@@ -297,7 +298,7 @@ slice.count()
 slice.create { width = 20, height = 10, bg = color.YELLOW }
 slice.create { width = 30, height = 8, bg = color.RED }
 
-debug.print { message = slice.count() }
+debug.print { message = slice.count{} }
 ```
 
 输出：
@@ -390,7 +391,7 @@ local s2 = slice.create { width = 30, height = 8, bg = color.RED }
 
 debug.print { message = slice.set { id = s1, width = 25, height = 5, bg = color.BLUE } }
 
-debug.print { message = table.pretty(slice.get_info(s1)) }
+debug.print { message = table.pretty{ table = slice.get_info{ id = s1 } } }
 ```
 
 输出：
@@ -446,7 +447,7 @@ local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
 debug.print { message = slice.set_size { id = s, width = 30, height = 6 } }
 
-debug.print { message = table.pretty(slice.get_info(s)) }
+debug.print { message = table.pretty{ table = slice.get_info{ id = s } } }
 ```
 
 输出：
@@ -501,7 +502,7 @@ local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
 debug.print { message = slice.set_width { id = s, width = 30 } }
 
-debug.print { message = slice.get_width(s) }
+debug.print { message = slice.get_width{ id = s } }
 ```
 
 输出：
@@ -550,7 +551,7 @@ local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
 debug.print { message = slice.set_height { id = s, height = 6 } }
 
-debug.print { message = slice.get_height(s) }
+debug.print { message = slice.get_height{ id = s } }
 ```
 
 输出：
@@ -601,7 +602,7 @@ function Init(ctx)
 
   debug.print { message = slice.set_layer { id = s1, layer = 2 } }
 
-  debug.print { message = table.pretty(slice.list()) }
+  debug.print { message = table.pretty{ table = slice.list{} } }
 end
 
 function Render()
@@ -675,7 +676,7 @@ function Init(ctx)
 
   debug.print { message = slice.set_background { id = s, bg = color.RED } }
 
-  debug.print { message = slice.get_background(s) }
+  debug.print { message = slice.get_background{ id = s } }
 end
 
 function Render()
@@ -706,7 +707,7 @@ red
 
 ```lua
 -- 单参数
-slice.get_size()
+slice.get_size{ id = "slice_001" }
 ```
 
 ### 参数
@@ -729,7 +730,7 @@ slice.get_size()
 ```lua
 local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
-debug.print { message = table.pretty(slice.get_size(s)) }
+debug.print { message = table.pretty{ table = slice.get_size{ id = s } } }
 ```
 
 输出：
@@ -751,7 +752,7 @@ debug.print { message = table.pretty(slice.get_size(s)) }
 
 ```lua
 -- 单参数
-slice.get_width()
+slice.get_width{ id = "slice_001" }
 ```
 
 ### 参数
@@ -773,7 +774,7 @@ slice.get_width()
 ```lua
 local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
-debug.print { message = slice.get_width(s) }
+debug.print { message = slice.get_width{ id = s } }
 ```
 
 输出：
@@ -792,7 +793,7 @@ debug.print { message = slice.get_width(s) }
 
 ```lua
 -- 单参数
-slice.get_height()
+slice.get_height{ id = "slice_001" }
 ```
 
 ### 参数
@@ -814,7 +815,7 @@ slice.get_height()
 ```lua
 local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
-debug.print { message = slice.get_height(s) }
+debug.print { message = slice.get_height{ id = s } }
 ```
 
 输出：
@@ -833,7 +834,7 @@ debug.print { message = slice.get_height(s) }
 
 ```lua
 -- 单参数
-slice.get_layer()
+slice.get_layer{ id = "slice_001" }
 ```
 
 ### 参数
@@ -855,7 +856,7 @@ slice.get_layer()
 ```lua
 local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
-debug.print { message = slice.get_layer(s) }
+debug.print { message = slice.get_layer{ id = s } }
 ```
 
 输出：
@@ -878,7 +879,7 @@ debug.print { message = slice.get_layer(s) }
 
 ```lua
 -- 单参数
-slice.get_background()
+slice.get_background{ id = "slice_001" }
 ```
 
 ### 参数
@@ -900,7 +901,7 @@ slice.get_background()
 ```lua
 local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
-debug.print { message = slice.get_background(s) }
+debug.print { message = slice.get_background{ id = s } }
 ```
 
 输出：
@@ -923,7 +924,7 @@ yellow
 
 ```lua
 -- 单参数
-slice.get_info()
+slice.get_info{ id = "slice_001" }
 ```
 
 ### 参数
@@ -949,7 +950,7 @@ slice.get_info()
 ```lua
 local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
 
-debug.print { message = table.pretty(slice.get_info(s)) }
+debug.print { message = table.pretty{ table = slice.get_info{ id = s } } }
 ```
 
 输出：
@@ -974,7 +975,7 @@ debug.print { message = table.pretty(slice.get_info(s)) }
 
 ```lua
 -- 单参数
-slice.exists()
+slice.exists{ id = "slice_001" }
 ```
 
 ### 参数
@@ -995,10 +996,10 @@ slice.exists()
 
 ```lua
 local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
-debug.print { message = slice.exists(s) }
+debug.print { message = slice.exists{ id = s } }
 
-slice.delete(s)
-debug.print { message = slice.exists(s) }
+slice.delete{ id = s }
+debug.print { message = slice.exists{ id = s } }
 ```
 
 输出：

@@ -1,0 +1,5 @@
+{
+  "title": "Layer Waves",
+  "description": "Two stacked slice layers with drifting waves; exercises the Lua-owned slice object pool.",
+  "author": "TUI GAME"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "f%<fg:bright_green>Official</fg> Arcade",
+  "detail": "Official source package used to test game list source label.",
+  "target_fps": 60,
+  "mouse": false,
+  "truecolor": false,
+  "language": [
+    "en_us"
+  ],
+  "command": "official_arcade",
+  "entry": "official_arcade",
+  "min_width": 0,
+  "min_height": 0,
+  "save_game": false
+}

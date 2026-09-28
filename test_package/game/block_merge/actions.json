@@ -1,0 +1,63 @@
+{
+  "move_up": {
+    "description": "Slide up",
+    "keys": [
+      [
+        "w"
+      ],
+      [
+        "up"
+      ]
+    ]
+  },
+  "move_down": {
+    "description": "Slide down",
+    "keys": [
+      [
+        "s"
+      ],
+      [
+        "down"
+      ]
+    ]
+  },
+  "move_left": {
+    "description": "Slide left",
+    "keys": [
+      [
+        "a"
+      ],
+      [
+        "left"
+      ]
+    ]
+  },
+  "move_right": {
+    "description": "Slide right",
+    "keys": [
+      [
+        "d"
+      ],
+      [
+        "right"
+      ]
+    ]
+  },
+  "restart": {
+    "description": "Start a new board",
+    "keys": [
+      [
+        "r"
+      ]
+    ]
+  },
+  "leave": {
+    "description": "Return to game list",
+    "keys": [
+      [
+        "esc"
+      ]
+    ],
+    "lock": true
+  }
+}

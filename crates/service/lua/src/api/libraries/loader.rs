@@ -162,7 +162,8 @@ fn read_module(
   method: &str,
   values: MultiValue,
 ) -> mlua::Result<LoadedModule> {
-  let value = args::one(method, "path", values)?;
+  let table = args::named(method, values, &["path"])?;
+  let value = args::required(&table, method, "path")?;
   let virtual_path = args::string(value, method, "path")?;
   if virtual_path.is_empty() || virtual_path.len() > 8192 || virtual_path.contains('\0') {
     return Err(args::message(method, "invalid module path"));

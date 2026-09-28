@@ -3,6 +3,7 @@
 ## 基本库说明
 
 `encoding` 提供字符串与二进制数据的编码转换。
+所有方法均使用单个命名参数表，输入字段名为 `s`。
 
 ---
 
@@ -31,7 +32,7 @@
 
 ```lua
 -- 单参数
-encoding.base64_encode()
+encoding.base64_encode{ s = "Hello Tui Game" }
 ```
 
 ### 参数
@@ -51,7 +52,7 @@ encoding.base64_encode()
 ### 示例
 
 ```lua
-debug.print { message = encoding.base64_encode("Hello Tui Game") }
+debug.print { message = encoding.base64_encode{ s = "Hello Tui Game" } }
 ```
 
 输出
@@ -70,7 +71,7 @@ SGVsbG8gVHVpIEdhbWU=
 
 ```lua
 -- 单参数
-encoding.base64_decode()
+encoding.base64_decode{ s = "SGVsbG8gVHVpIEdhbWU=" }
 ```
 
 ### 参数
@@ -90,7 +91,7 @@ encoding.base64_decode()
 ### 示例
 
 ```lua
-debug.print { message = encoding.base64_decode("SGVsbG8gVHVpIEdhbWU=") }
+debug.print { message = encoding.base64_decode{ s = "SGVsbG8gVHVpIEdhbWU=" } }
 ```
 
 输出：
@@ -109,7 +110,7 @@ Hello Tui Game
 
 ```lua
 -- 单参数
-encoding.url_encode()
+encoding.url_encode{ s = "exe=Hello Tui Game" }
 ```
 
 ### 参数
@@ -129,7 +130,7 @@ encoding.url_encode()
 ### 示例
 
 ```lua
-debug.print { message = encoding.url_encode("exe=Hello Tui Game") }
+debug.print { message = encoding.url_encode{ s = "exe=Hello Tui Game" } }
 ```
 
 输出：
@@ -152,7 +153,7 @@ exe%3DHello%20Tui%20Game
 
 ```lua
 -- 单参数
-encoding.url_decode()
+encoding.url_decode{ s = "exe%3DHello%20Tui%20Game" }
 ```
 
 ### 参数
@@ -172,7 +173,7 @@ encoding.url_decode()
 ### 示例
 
 ```lua
-debug.print { message = encoding.url_decode("exe%3DHello%20Tui%20Game") }
+debug.print { message = encoding.url_decode{ s = "exe%3DHello%20Tui%20Game" } }
 ```
 
 输出：
@@ -195,7 +196,7 @@ exe=Hello Tui Game
 
 ```lua
 -- 单参数
-encoding.hex_encode()
+encoding.hex_encode{ s = "Hello Tui Game" }
 ```
 
 ### 参数
@@ -215,7 +216,7 @@ encoding.hex_encode()
 ### 示例
 
 ```lua
-debug.print { message = encoding.hex_encode("Hello Tui Game") }
+debug.print { message = encoding.hex_encode{ s = "Hello Tui Game" } }
 ```
 
 输出：
@@ -234,7 +235,7 @@ debug.print { message = encoding.hex_encode("Hello Tui Game") }
 
 ```lua
 -- 单参数
-encoding.hex_decode()
+encoding.hex_decode{ s = "48656c6c6f205475692047616d65" }
 ```
 
 ### 参数
@@ -254,7 +255,7 @@ encoding.hex_decode()
 ### 示例
 
 ```lua
-debug.print { message = encoding.hex_decode("48656c6c6f205475692047616d65") }
+debug.print { message = encoding.hex_decode{ s = "48656c6c6f205475692047616d65" } }
 ```
 
 输出：

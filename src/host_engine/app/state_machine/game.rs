@@ -7,7 +7,7 @@ pub struct GameState {
   pub package: PackageId,
   pub min_width: u32,
   pub min_height: u32,
-  pub target_fps: u32,
+  pub target_fps: Option<u32>,
   pub return_host: Box<HostState>,
 }
 
@@ -16,7 +16,7 @@ impl GameState {
     package: PackageId,
     min_width: u32,
     min_height: u32,
-    target_fps: u32,
+    target_fps: Option<u32>,
     return_host: HostState,
   ) -> Self {
     Self {

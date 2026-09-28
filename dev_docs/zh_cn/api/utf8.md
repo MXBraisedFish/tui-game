@@ -309,11 +309,11 @@ utf8.char_to_codepoint{}
 ```lua
 local s1 = "Hello"
 local r1 = utf8.char_to_codepoint { text = s1 }
-debug.print { message = table.pretty(r1) }
+debug.print { message = table.pretty{ table = r1 } }
 
 local s2 = "你好世界"
 local r2 = utf8.char_to_codepoint { text = s2, start = 2, finish = 3 }
-debug.print { message = table.pretty(r2) }
+debug.print { message = table.pretty{ table = r2 } }
 
 ```
 
@@ -373,11 +373,11 @@ utf8.char_to_ascii{}
 ```lua
 local s1 = "ABC"
 local r1 = utf8.char_to_ascii { text = s1 }
-debug.print { message = table.pretty(r1) }
+debug.print { message = table.pretty{ table = r1 } }
 
 local s2 = "A中B"
 local r2 = utf8.char_to_ascii { text = s2, start = 1, finish = 2 }
-debug.print { message = table.pretty(r2) }
+debug.print { message = table.pretty{ table = r2 } }
 ```
 
 输出：

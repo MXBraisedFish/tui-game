@@ -1,20 +1,11 @@
 {
-  "mod_id": "test.layer_waves",
-  "schema_version": 1,
+  "mod_id": "test_layer_waves",
+  "schema_version": 2,
   "type": "screensaver",
   "version": "1.1.0",
   "version_code": 2,
-  "api": { "min": 1, "max": 1 },
-  "entry": "main",
-  "display": {
-    "title": "Layer Waves",
-    "description": "Two stacked slice layers with drifting waves; exercises the Lua-owned slice object pool.",
-    "author": "TUI GAME"
-  },
-  "runtime": { "min_width": 60, "min_height": 20 },
-  "screensaver": {
-    "name": "Layer Waves",
-    "truecolor": false,
-    "command": "layer_waves"
+  "api": {
+    "min": 1,
+    "max": 1
   }
 }

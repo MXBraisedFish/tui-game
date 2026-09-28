@@ -1,0 +1,31 @@
+{
+  "scene_reference": {
+    "description": "Show a static reference screen",
+    "keys": [["1"]]
+  },
+  "scene_local": {
+    "description": "Show a small moving marker",
+    "keys": [["2"]]
+  },
+  "scene_full": {
+    "description": "Show smooth full-screen redraw",
+    "keys": [["3"]]
+  },
+  "scene_pulse": {
+    "description": "Show optional low-frequency pulse",
+    "keys": [["4"]]
+  },
+  "scene_next": {
+    "description": "Select the next scene",
+    "keys": [["n"]]
+  },
+  "pause": {
+    "description": "Pause or resume animation",
+    "keys": [["space"]]
+  },
+  "leave": {
+    "description": "Return to game list",
+    "keys": [["esc"]],
+    "lock": true
+  }
+}

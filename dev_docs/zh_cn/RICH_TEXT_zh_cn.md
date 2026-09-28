@@ -1,8 +1,10 @@
 # 富文本系统参考手册
 
+当前生产解析器使用本文所述的 `f%` 前缀和尖括号标签。旧版 `RICH_TEXT.md` 中的花括号 `tc` / `ts` 指令不受支持。
+
 ## 解析入口
 
-所有富文本解析始于 `src/host_engine/services/rich_text/parser.rs` 中的 `parse` 函数，通过 `RichTextService::parse(text, params)` 对外暴露。`DrawTextParams.text` 字段会被文本渲染管线自动解析——你只需传入带有正确前缀和标签的字符串即可。
+解析实现位于 `crates/service/rich_text/src/parser.rs` 和 `service.rs`。`RichTextService::parse(text, params)` 使用 `Auto` 模式；`DrawTextParams.text` 由渲染管线按指定的 `TextMode` 解析。Lua `draw.text` 默认使用 `AUTO` 模式。
 
 ---
 
@@ -17,8 +19,9 @@
 // 富文本——标签和参数会被解析
 "f%<fg:red>Hello</fg> World"
 
-// 即使传入了 params，标签解析仍然需要 f% 前缀。
-// 但：如果传入了 params 且无 f% 前缀，{param} 替换仍然生效。
+// RichTextService::parse / TextMode::Auto 只有在 f% 前缀存在时才解析标签和参数。
+// TextMode::Rich 会无条件解析；宿主 visible_text 在传入 params 时也会解析不带前缀的占位符。
+// Lua draw.text 的 AUTO 模式始终需要 f% 才解析标签和参数。
 ```
 
 ---
@@ -36,7 +39,7 @@
 "f%<fg:rgb(85,87,83)>自定义灰色</fg>"
 ```
 
-关闭：`</fg>` — 清除前景色，恢复终端默认。
+关闭：`</fg>` — 清除前景色，恢复终端默认。关闭标签不会恢复更早的前景色。
 
 ### 2.2 背景色：`<bg:颜色>`
 
@@ -45,7 +48,7 @@
 "f%<bg:rgb(30,30,30)>深色背景</bg>"
 ```
 
-关闭：`</bg>` — 清除背景色。
+关闭：`</bg>` — 清除背景色。关闭标签不会恢复更早的背景色。
 
 ### 2.3 文本样式
 
@@ -77,10 +80,10 @@
 
 ### 2.5 嵌套
 
-标签可嵌套——内层覆盖外层：
+多个样式可同时生效。再次设置同一属性会覆盖旧值；关闭标签只清除对应属性，不使用栈恢复外层值：
 
 ```rust
-"f%<fg:white>白色 <fg:red>红色</fg> 白色</fg>"
+"f%<fg:white>白色 <fg:red>红色</fg> 默认前景色"
 "f%<b>粗体 <i>粗斜体</i> 粗体</b>"
 ```
 
@@ -130,17 +133,20 @@ TextColor::ForceRgb { r: 85, g: 87, b: 83 }
 
 ## 4. 参数替换：`{...}`
 
-参数从 `RichTextParams` 中解析，需要 `f%` 前缀（或 `params` 为 `Some`）。
+参数从 `RichTextParams` 中解析。`Auto` 模式（包括 Lua `draw.text` 默认模式）要求字符串有 `f%` 前缀；`Rich` 模式不要求前缀。宿主 `visible_text` 在传入参数对象时会解析未带前缀的占位符，这一例外不适用于 Lua `draw.text` 的 `AUTO` 模式。
 
-### 4.1 值参数：`{value:名称}` 或 `{名称}`
+### 4.1 值参数：`{value:名称}`
 
 ```rust
 let mut values = HashMap::new();
 values.insert("type".to_string(), "cache".to_string());
-let params = RichTextParams { values, key_actions: HashMap::new() };
+let params = RichTextParams {
+    values,
+    key_actions: HashMap::new(),
+    key_default_actions: HashMap::new(),
+};
 
 "f%正在导出 {value:type} 数据"  // → "正在导出 cache 数据"
-"f%正在导出 {type} 数据"        // → 同上（裸名称默认 = value）
 ```
 
 ### 4.2 按键显示参数：`{key:动作名}`
@@ -161,16 +167,20 @@ let params = RichTextParams::from_action_map(&action_map_entries, "export_settin
 - `[LCtrl + S]` — 左 Ctrl 组合键；右侧修饰键使用相应的 `R` 前缀
 - `[W]/[↑]` — 多方案
 
-### 4.3 缺失参数
+### 4.3 默认按键：`{key_default:动作名}`
 
-如果 `{value:...}` 或 `{key:...}` 无法解析，原始文本会原样保留在输出中：
+从 `key_default_actions` 读取默认按键。可用 `RichTextParams::from_key_action_maps(current, defaults)` 分别传入当前和默认按键映射；`from_key_actions` 与 `from_action_map` 会让两种占位符使用同一份映射。
+
+### 4.4 缺失参数
+
+如果 `{value:...}`、`{key:...}` 或 `{key_default:...}` 无法解析，原始文本会原样保留在输出中：
 
 ```rust
 "{key:unknown_action}"  // 保持为原文
 "{value:missing}"       // 保持为原文
 ```
 
-### 4.4 参数中的转义
+### 4.5 参数中的转义
 
 用 `\` 转义 `{`、`}`、`<`、`>`、`\`：
 
@@ -184,8 +194,9 @@ let params = RichTextParams::from_action_map(&action_map_entries, "export_settin
 
 ```rust
 pub struct RichTextParams {
-    pub values: HashMap<String, String>,              // 值映射
-    pub key_actions: HashMap<String, Vec<Vec<String>>>, // 按键动作映射
+    pub values: HashMap<String, String>,
+    pub key_actions: HashMap<String, Vec<Vec<String>>>,
+    pub key_default_actions: HashMap<String, Vec<Vec<String>>>,
 }
 ```
 
@@ -243,7 +254,7 @@ let plain: String = rt.visible_text("f%<fg:red>你好</fg>", Some(&params));
 // plain = "你好"
 ```
 
-`visible_text()` 对纯文本（无 `f%` 前缀、无 params）会**短路返回**——直接返回原始字符串不做解析。
+`visible_text()` 对纯文本（无 `f%` 前缀、无 params）会**短路返回**——直接返回原始字符串不做解析。传入 `params` 时宿主会解析占位符，即使没有 `f%`；这与 `parse()` 的 Auto 模式及 Lua `draw.text` 的默认模式不同。
 
 ---
 
@@ -314,7 +325,7 @@ let hint = format!(
 let mut params = RichTextParams::from_action_map(&Self::action_map(), "my_ui.");
 params.values.insert("target".to_string(), "缓存".to_string());
 
-"f%清除 {target}：按 {key:confirm}"
+"f%清除 {value:target}：按 {key:confirm}"
 // → "清除 缓存：按 [Enter]"
 ```
 
@@ -379,10 +390,10 @@ pub enum TextColor {
 
 ## 10. 关键规则
 
-1. **`f%` 前缀必不可少**——没有它，`<标签>` 会被当作普通文字渲染。
+1. **Auto 模式下 `f%` 前缀必不可少**——没有它，标签和占位符会被当作普通文字；`Rich` 模式及宿主传参数的 `visible_text` 是文中说明的例外。
 2. **每个文本字符串只有一个 `f%`**——放在最外层 `format!()` 调用上。嵌入的片段**不应**带有自己的 `f%`。
 3. **未闭合标签**（如 `<b` 没有 `>`）会被当作普通文字渲染——平和降级，不会 panic。
 4. **未知颜色名**在 `<fg:X>` / `<bg:X>` 中会导致整个标签被当作普通文字渲染。
-5. **缺失参数**`{name}` 会在输出中保留原文 `{name}`——安全回退。
+5. **缺失参数**（例如 `{value:name}`）会在输出中保留原文——安全回退；裸 `{name}` 不是有效占位符。
 6. **转义规则**：`\<` → `<`，`\{` → `{`，`\}` → `}`，`\>` → `>`，`\\` → `\`。
-7. **嵌套规则**：内层标签对相同属性（如前/背景色）覆盖外层。
+7. **覆盖规则**：再次设置前/背景色会覆盖旧值；`</fg>` / `</bg>` 清除对应属性，不恢复被覆盖值。

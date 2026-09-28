@@ -73,6 +73,7 @@ pub enum LuaTaskOperation {
     event_tip: Option<String>,
   },
   I18n {
+    request_id: u64,
     kind: LuaI18nEventKind,
     language_code: String,
     callback_language_code: String,
@@ -692,6 +693,7 @@ fn translate_task_event(
   match (operation, event) {
     (
       LuaTaskOperation::I18n {
+        request_id,
         kind,
         language_code: _,
         callback_language_code: _,
@@ -703,6 +705,7 @@ fn translate_task_event(
         ..
       }),
     ) => Some(LuaEventData::I18n(LuaI18nEvent {
+      request_id: *request_id,
       kind: *kind,
       ok: true,
       message: match kind {
@@ -716,12 +719,14 @@ fn translate_task_event(
     })),
     (
       LuaTaskOperation::I18n {
+        request_id,
         kind,
         language_code,
         callback_language_code,
       },
       LuaRoutableEvent::File(FileEvent::Failed { .. }),
     ) => Some(LuaEventData::I18n(LuaI18nEvent {
+      request_id: *request_id,
       kind: *kind,
       ok: false,
       message: match kind {
@@ -1792,6 +1797,7 @@ mod tests {
         TaskId(41),
         game,
         LuaTaskOperation::I18n {
+          request_id: 57,
           kind: LuaI18nEventKind::Created,
           language_code: "zh_cn".to_string(),
           callback_language_code: "en_us".to_string(),
@@ -1820,6 +1826,7 @@ mod tests {
       panic!("expected i18n event");
     };
     assert!(event.ok);
+    assert_eq!(event.request_id, 57);
     assert_eq!(event.kind, LuaI18nEventKind::Created);
     assert_eq!(event.language_code, "zh_cn");
     assert_eq!(event.namespaces.as_ref().unwrap()["menu"]["title"], "标题");

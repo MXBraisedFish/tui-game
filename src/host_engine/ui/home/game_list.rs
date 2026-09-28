@@ -452,7 +452,7 @@ impl GameListUi {
   }
 
   /// 渲染游戏列表页面。
-  pub fn render(&mut self, context: &mut GameListRenderContext<'_>) {
+  pub fn render(&mut self, context: &mut GameListRenderContext<'_>) -> Option<(u16, u16)> {
     self.sync_display_settings(context.storage);
     self.sync_entries(context.package.game_list(), context.storage, context.log);
     let positions = self.compute_positions(context.layout, context.i18n, context.text_input);
@@ -496,7 +496,7 @@ impl GameListUi {
     self.objects.prepare_canvas(context.canvas, context.layout);
 
     self.draw_right_panel(context, &positions);
-    self.draw_left_panel(context, &positions);
+    let input_cursor = self.draw_left_panel(context, &positions);
     self.draw_action_hint(
       context.render,
       context.canvas,
@@ -559,6 +559,8 @@ impl GameListUi {
         context.canvas,
       );
     }
+
+    input_cursor
   }
 
   // ─── 布局计算 ──────────────────────────────────────────
@@ -713,7 +715,11 @@ impl GameListUi {
 
   // ─── 绘制 ──────────────────────────────────────────────
 
-  fn draw_left_panel(&mut self, context: &mut GameListRenderContext<'_>, pos: &GameListLayout) {
+  fn draw_left_panel(
+    &mut self,
+    context: &mut GameListRenderContext<'_>,
+    pos: &GameListLayout,
+  ) -> Option<(u16, u16)> {
     context.render.draw_host_border_rect(
       context.canvas,
       pos.left_rect.x,
@@ -733,7 +739,7 @@ impl GameListUi {
       &context.i18n.get_runtime_text("game_list", "game_list.list"),
     );
 
-    context.text_input.render_host(
+    let search_cursor = context.text_input.render_host(
       &mut self.objects,
       self.search_input,
       &TextInputRenderParams {
@@ -840,7 +846,7 @@ impl GameListUi {
     let jump_focused = context
       .text_input
       .is_focused(&self.objects, self.jump_input);
-    context.text_input.render_host(
+    let jump_cursor = context.text_input.render_host(
       &mut self.objects,
       self.jump_input,
       &TextInputRenderParams {
@@ -880,6 +886,7 @@ impl GameListUi {
         ..Default::default()
       },
     );
+    search_cursor.or(jump_cursor)
   }
 
   fn draw_entry_row(

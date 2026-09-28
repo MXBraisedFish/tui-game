@@ -1,0 +1,63 @@
+{
+  "move_up": {
+    "description": "Steer up",
+    "keys": [
+      [
+        "w"
+      ],
+      [
+        "up"
+      ]
+    ]
+  },
+  "move_down": {
+    "description": "Steer down",
+    "keys": [
+      [
+        "s"
+      ],
+      [
+        "down"
+      ]
+    ]
+  },
+  "move_left": {
+    "description": "Steer left",
+    "keys": [
+      [
+        "a"
+      ],
+      [
+        "left"
+      ]
+    ]
+  },
+  "move_right": {
+    "description": "Steer right",
+    "keys": [
+      [
+        "d"
+      ],
+      [
+        "right"
+      ]
+    ]
+  },
+  "pause": {
+    "description": "Pause or resume",
+    "keys": [
+      [
+        "space"
+      ]
+    ]
+  },
+  "leave": {
+    "description": "Return to game list",
+    "keys": [
+      [
+        "esc"
+      ]
+    ],
+    "lock": true
+  }
+}

@@ -50,7 +50,26 @@ impl TryFrom<Value> for BestGameSave {
 #[serde(deny_unknown_fields)]
 pub struct GameSaveProfile {
   pub continue_slot: Option<ContinueGameSave>,
+  #[serde(deserialize_with = "deserialize_best_saves")]
   pub best: BTreeMap<String, BestGameSave>,
+}
+
+fn deserialize_best_saves<'de, D>(
+  deserializer: D,
+) -> Result<BTreeMap<String, BestGameSave>, D::Error>
+where
+  D: serde::Deserializer<'de>,
+{
+  let best = BTreeMap::<String, BestGameSave>::deserialize(deserializer)?;
+  for key in best.keys() {
+    let package_id = PackageId::from_storage_key(key).map_err(serde::de::Error::custom)?;
+    if package_id.package_type != tg_core_package_id::PackageType::Game {
+      return Err(serde::de::Error::custom(format!(
+        "best save key {key:?} must refer to a game"
+      )));
+    }
+  }
+  Ok(best)
 }
 
 impl StorageService {
@@ -224,6 +243,25 @@ mod tests {
   use tg_core_package_id::{PackageSource, PackageType};
 
   #[test]
+  fn game_save_profile_rejects_legacy_package_ids() {
+    for key in ["mod/game/old.id", "official/game/old-id"] {
+      let profile = format!(
+        r#"{{"continue_slot":null,"best":{{"{key}":{{"best_string":"1","data":{{"best_string":"1"}}}}}}}}"#
+      );
+      assert!(
+        serde_json::from_str::<GameSaveProfile>(&profile).is_err(),
+        "{key}"
+      );
+    }
+
+    let old_continue = r#"{
+      "continue_slot":{"package":{"source":"mod","package_type":"game","mod_id":"old.id"},"data":{}},
+      "best":{}
+    }"#;
+    assert!(serde_json::from_str::<GameSaveProfile>(old_continue).is_err());
+  }
+
+  #[test]
   fn continue_slot_is_shared_and_best_records_are_per_game() {
     let root = std::env::temp_dir().join(format!("tui-game-save-profile-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -233,23 +271,23 @@ mod tests {
 
     storage
       .write_continue_game_save(
-        &PackageId::new(PackageSource::Official, PackageType::Game, "game.a").unwrap(),
+        &PackageId::new(PackageSource::Official, PackageType::Game, "game_a").unwrap(),
         serde_json::json!({"level": 1}),
         &mut log,
       )
       .unwrap();
     storage
       .write_continue_game_save(
-        &PackageId::new(PackageSource::Mod, PackageType::Game, "game.b").unwrap(),
+        &PackageId::new(PackageSource::Mod, PackageType::Game, "game_b").unwrap(),
         serde_json::json!({"level": 2}),
         &mut log,
       )
       .unwrap();
     let slot = storage.continue_game_save().unwrap();
     assert_eq!(slot.package.source, PackageSource::Mod);
-    assert_eq!(slot.package.mod_id, "game.b");
+    assert_eq!(slot.package.mod_id, "game_b");
 
-    let official = PackageId::new(PackageSource::Official, PackageType::Game, "game.a").unwrap();
+    let official = PackageId::new(PackageSource::Official, PackageType::Game, "game_a").unwrap();
     storage
       .write_best_game_save(
         &official,
@@ -264,7 +302,7 @@ mod tests {
       storage.best_game_save(&official).unwrap().best_string,
       "100"
     );
-    let mod_package = PackageId::new(PackageSource::Mod, PackageType::Game, "game.a").unwrap();
+    let mod_package = PackageId::new(PackageSource::Mod, PackageType::Game, "game_a").unwrap();
     assert!(storage.best_game_save(&mod_package).is_none());
 
     storage.clear_continue_game_save(&mut log).unwrap();
@@ -287,7 +325,7 @@ mod tests {
     fs::create_dir_all(root.join("data/profiles")).unwrap();
     let storage = StorageService::from_root_for_test(root.clone());
     let mut log = LogService::new();
-    let id = PackageId::new(PackageSource::Mod, PackageType::Game, "game.changed").unwrap();
+    let id = PackageId::new(PackageSource::Mod, PackageType::Game, "game_changed").unwrap();
 
     storage
       .write_continue_game_save(&id, serde_json::json!({"level": 1}), &mut log)

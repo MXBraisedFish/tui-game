@@ -195,10 +195,7 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
   source.raw_set(
     "deepcopy",
     lua.create_function(|lua, values: MultiValue| {
-      let value = args::one("table.deepcopy", "table", values)?;
-      let Value::Table(input) = value else {
-        return Err(args::invalid("table.deepcopy", "table", "table", &value));
-      };
+      let input = table_argument("table.deepcopy", values, false)?;
       let mut copied = HashMap::new();
       let mut entries = 0_usize;
       deep_copy_table(lua, &input, 0, &mut entries, &mut copied)
@@ -207,10 +204,7 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
   source.raw_set(
     "pretty",
     lua.create_function(|_, values: MultiValue| {
-      let value = args::one("table.pretty", "table", values)?;
-      let Value::Table(input) = value else {
-        return Err(args::invalid("table.pretty", "table", "table", &value));
-      };
+      let input = table_argument("table.pretty", values, false)?;
       let mut writer = PrettyWriter::default();
       let mut entries = 0_usize;
       let mut active = HashSet::new();
@@ -361,7 +355,8 @@ impl TableShape {
 }
 
 fn table_argument(method: &str, values: MultiValue, writable: bool) -> mlua::Result<Table> {
-  let value = args::one(method, "table", values)?;
+  let parameters = args::named(method, values, &["table"])?;
+  let value = args::required(&parameters, method, "table")?;
   if writable {
     writable_table(value, method, "table")
   } else {

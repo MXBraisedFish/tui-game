@@ -288,8 +288,8 @@ Print A Log
 ### 调用
 
 ```lua
--- 单参数
-debug.info()
+-- 命名参数表
+debug.info{ message = "..." }
 ```
 
 ### 参数
@@ -305,7 +305,7 @@ debug.info()
 ### 示例
 
 ```lua
-debug.info("This is a INFO")
+debug.info{ message = "This is a INFO" }
 ```
 
 输出
@@ -325,8 +325,8 @@ debug.info("This is a INFO")
 ### 调用
 
 ```lua
--- 单参数
-debug.warn()
+-- 命名参数表
+debug.warn{ message = "..." }
 ```
 
 ### 参数
@@ -342,7 +342,7 @@ debug.warn()
 ### 示例
 
 ```lua
-debug.warn("This is a WARN")
+debug.warn{ message = "This is a WARN" }
 ```
 
 输出
@@ -362,8 +362,8 @@ debug.warn("This is a WARN")
 ### 调用
 
 ```lua
--- 单参数
-debug.error()
+-- 命名参数表
+debug.error{ message = "..." }
 ```
 
 ### 参数
@@ -379,7 +379,7 @@ debug.error()
 ### 示例
 
 ```lua
-debug.error("This is a ERROR")
+debug.error{ message = "This is a ERROR" }
 ```
 
 输出
@@ -499,7 +499,7 @@ local result2 = debug.pcall {
 }
 
 if not result2.ok then
-  debug.error(result2.error)
+  debug.error{ message = result2.error }
 end
 ```
 
@@ -597,7 +597,7 @@ local result2 = debug.xpcall {
 }
 
 if not result2.ok then
-  debug.error(result2.error)
+  debug.error{ message = result2.error }
 end
 ```
 

@@ -1,6 +1,6 @@
 # Lua 兼容性与当前注册面
 
-更新时间：2026-09-27。本文先记录 `crates/service/lua/src/api/libraries.rs::install` 实际装入的 Lua 环境，供 B2 对照 Lua 5.4；它是代码清单，不表示所有行为已经符合标准 Lua。
+更新时间：2026-09-28。本文记录 `crates/service/lua/src/api/libraries.rs::install` 实际装入的 Lua 环境；标准能力按 B2 对照 Lua 5.4，项目扩展按各 API 的已确认契约执行。
 
 ## 环境边界
 
@@ -36,7 +36,7 @@
 | `measurement` | `get_text_size`, `get_text_width`, `get_text_height` |
 | `random` | 常量 `INT`, `FLOAT`；函数 `randint`, `randfloat`, `create`, `delete`, `clear`, `list`, `count`, `generate`, `set`, `set_type`, `set_range`, `set_seed`, `set_step`, `get_type`, `get_seed`, `get_step`, `exists`, `get_range`, `get_info` |
 | `slice` | `create`, `delete`, `clear`, `set`, `set_size`, `set_width`, `set_height`, `set_background`, `set_layer`, `draw`, `exists`, `get_size`, `get_width`, `get_height`, `get_layer`, `get_background`, `get_info`, `list`, `count` |
-| `serialization` | `json_encode/decode`, `csv_encode/decode`, `yaml_encode/decode`, `toml_encode/decode`, `ini_encode/decode`, `xml_encode/decode`, `binary_encode/decode` |
+| `serialization` | `json_encode/decode`, `csv_encode/decode`, `yaml_encode/decode`, `toml_encode/decode`, `ini_encode/decode`, `xml_encode/decode`, `binary_pack`, `binary_unpack`, `binary_packsize` |
 | `encoding` | `base64_encode`, `base64_decode`, `url_encode`, `url_decode`, `hex_encode`, `hex_decode` |
 | `draw` | `text`, `fill_rect`, `stroke_rect`, `erase_rect`, `render` |
 | `debug` | `VERSION`, `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `print`, `info`, `warn`, `error`, `assert`, `pcall`, `xpcall` |
@@ -50,7 +50,7 @@
 
 ### 尚未注册
 
-`image` 当前没有安装；B6 计划增加其异步请求链路。`audio`、`animation`、`http`、`timer`、`effect`、`widget`、`ime`、`keyboard` 也未由 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
+`image` 已由 B6 注册 `image.load`，使用 request id 关联异步 `HandleEvent` 终态。`audio`、`animation`、`http`、`timer`、`effect`、`widget`、`ime`、`keyboard` 未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
 
 ## B2 对照约定
 

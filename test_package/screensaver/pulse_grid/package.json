@@ -1,20 +1,11 @@
 {
-  "mod_id": "test.pulse_grid",
-  "schema_version": 1,
+  "mod_id": "test_pulse_grid",
+  "schema_version": 2,
   "type": "screensaver",
   "version": "1.1.0",
   "version_code": 2,
-  "api": { "min": 1, "max": 1 },
-  "entry": "main",
-  "display": {
-    "title": "Pulse Grid",
-    "description": "A grid of cells pulsing outward from the centre; exercises color, math and table helpers.",
-    "author": "TUI GAME"
-  },
-  "runtime": { "min_width": 40, "min_height": 16 },
-  "screensaver": {
-    "name": "f%<fg:bright_cyan>Pulse</fg> Grid",
-    "truecolor": true,
-    "command": "pulse_grid"
+  "api": {
+    "min": 1,
+    "max": 1
   }
 }

@@ -18,9 +18,9 @@
 
 Game 和 Screensaver 都不接收原生 `io`、`os`、`package`、完整 Lua `debug` 库或终端/shell 控制权。会话类型与 Debug 是独立维度；删除旧安全开关没有扩大这些能力。
 
-## profile 兼容
+## profile 数据规则调整
 
-包设置 profile 中旧 `defaults.safe_mode` 与 game state `safe_mode` 字段仅在反序列化边界忽略。有效 `enabled`、`debug`、screensaver `playlist_enabled`/`order` 继续加载；下次写 package state 时不再序列化安全字段。语言、键位、继续存档和最高分仍保存在各自 profile 文件，旧字段迁移不清空它们。
+本文件记录 B3 验收时的旧 profile 兼容行为。用户在 B4.2 明确要求严格拒绝旧 profile、不做迁移；该决定覆盖下方 B3 当时的兼容测试结论。当前 package state 不再接受 safe_mode 字段或点号/连字符包 ID；key bindings 和 game save 也拒绝旧包 ID。任一对应 profile 解析失败时，读取方沿用原有坏档处理，记录警告并使用默认数据，不改写旧文件。
 
 ## 覆盖与验证
 
@@ -29,7 +29,7 @@ Game 和 Screensaver 都不接收原生 `io`、`os`、`package`、完整 Lua `de
 | Game 文件写入可用，Screensaver 文件变更拒绝；路径沙箱仍有效 | `game_file_access_and_debug_logging_are_independently_gated`、`restricted_calls_are_ignored_before_parameter_validation`、`file_apis_share_current_directory_and_parent_traversal_rules`、`task_registration_rejects_unsafe_virtual_paths_and_screensaver_writes` |
 | Game-only `event`/`game` 方法与 callback 限制 | `event_action_controls_require_a_game_session`、`game_commands_enforce_callback_reentrancy_boundaries` |
 | Debug 输出开关不影响断言和受控保护调用 | `debug_print_constants_and_convenience_methods_use_the_standard_options`、`debug_assert_accepts_nil_and_reports_an_assertion_failure`、`protected_calls_return_named_result_tables` |
-| 旧 package state 迁移并保留各存储位置用户数据 | `legacy_safe_mode_fields_are_ignored_without_losing_package_settings`、`legacy_safe_mode_profile_update_preserves_other_user_data` |
+| profile 包 ID 和已删除字段严格拒绝 | B4.2：`package_state_rejects_legacy_package_ids_and_removed_fields`、`key_bindings_profile_rejects_legacy_package_ids`、`game_save_profile_rejects_legacy_package_ids` |
 | 旧包字段明确拒绝，迁移后的权限夹具可加载并执行 | `removed_high_privilege_game_field_is_rejected`、`checked_in_lua_test_packages_have_valid_complete_manifests`、`test_package_entries_execute_the_basic_lifecycle`；夹具 `test_package/game/permissions_lab/` |
 | 宿主设置与路由删除安全模式入口；会话关闭与对象/任务生命周期仍有效 | `cargo test -p tui-game --locked` 的 security settings、overlay、boot/runtime/session 与 task routing 测试 |
 

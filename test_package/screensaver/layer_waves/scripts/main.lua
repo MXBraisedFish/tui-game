@@ -60,8 +60,8 @@ end
 function Render()
   draw.fill_rect { x = 0, y = 0, width = width, height = height, char = " ", bg = color.BLACK }
 
-  local back_size = slice.get_size(back_panel)
-  local front_size = slice.get_size(front_panel)
+  local back_size = slice.get_size{ id = back_panel }
+  local front_size = slice.get_size{ id = front_panel }
   local drift_x = math.floor(math.cos(phase * 0.5) * 4)
   local drift_y = math.floor(math.sin(phase * 0.7) * 2)
 
@@ -78,5 +78,5 @@ function Render()
 
   draw_waves(back_panel, back_size.width, back_size.height, 1.5, color.BRIGHT_CYAN)
   draw_waves(front_panel, front_size.width, front_size.height, 2.5, color.WHITE)
-  draw.text { x = 1, y = height - 1, text = slice.count() .. " slices", fg = color.GRAY }
+  draw.text { x = 1, y = height - 1, text = slice.count{} .. " slices", fg = color.GRAY }
 end

@@ -31,8 +31,8 @@ local function scatter()
     for _ = 1, count do
       stars[#stars + 1] = {
         layer = layer_index,
-        x = random.generate(column_rng),
-        y = random.generate(row_rng),
+        x = random.generate{ id = column_rng },
+        y = random.generate{ id = row_rng },
       }
     end
   end
@@ -61,7 +61,7 @@ function Update(dt)
     star.x = star.x - LAYERS[star.layer].speed * dt
     if star.x < 0 then
       star.x = star.x + width
-      star.y = random.generate(row_rng)
+      star.y = random.generate{ id = row_rng }
     end
   end
 end
@@ -76,7 +76,7 @@ function Render()
     local layer = LAYERS[star.layer]
     draw.text { x = star.x // 1, y = star.y, text = layer.glyph, fg = layer.fg }
   end
-  local info = random.get_info(row_rng)
+  local info = random.get_info{ id = row_rng }
   local footer = string.upper("star drift") .. "  seed " .. info.seed .. "  draws " .. info.step
   draw.text { x = 1, y = height - 1, text = footer, fg = color.GRAY, max_width = width - 2, max_height = 1 }
 end

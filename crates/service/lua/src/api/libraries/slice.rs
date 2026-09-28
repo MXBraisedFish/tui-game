@@ -79,7 +79,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "clear",
     lua.create_function(move |_, values: MultiValue| {
       let method = "slice.clear";
-      args::no_args(method, values)?;
+      args::empty_named(method, values)?;
       with_pool_mut(&state, method, |objects| {
         let service = SliceService::new();
         for id in service.ids(objects.ui()) {
@@ -235,7 +235,7 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
     "list",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.list";
-      args::no_args(method, values)?;
+      args::empty_named(method, values)?;
       let size = list_state.borrow().context.base_size;
       with_pool(&list_state, method, |objects| {
         let service = SliceService::new();
@@ -254,7 +254,7 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
     "count",
     lua.create_function(move |_, values: MultiValue| {
       let method = "slice.count";
-      args::no_args(method, values)?;
+      args::empty_named(method, values)?;
       with_pool(&state, method, |objects| {
         Ok(SliceService::new().ids(objects.ui()).len())
       })
@@ -401,7 +401,8 @@ pub(super) fn resolve_length(length: SliceLength, total: u16) -> u16 {
 }
 
 fn id_argument(values: MultiValue, method: &str) -> mlua::Result<SliceHandle> {
-  let value = args::string(args::one(method, "id", values)?, method, "id")?;
+  let table = args::named(method, values, &["id"])?;
+  let value = args::string(args::required(&table, method, "id")?, method, "id")?;
   parse_handle(&value, method, "id")
 }
 

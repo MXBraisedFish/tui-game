@@ -4,7 +4,7 @@ use std::{
   path::Path,
 };
 
-use serde::{Deserialize, Serialize, de::IgnoredAny};
+use serde::{Deserialize, Serialize};
 
 use super::layout;
 use super::service::StorageService;
@@ -22,12 +22,56 @@ pub struct TerminalProfile {
   pub mouse: Option<bool>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
 pub struct PackageStateProfile {
   pub defaults: PackageDefaultState,
   pub games: HashMap<String, GamePackageState>,
   pub screensavers: HashMap<String, ScreensaverPackageState>,
+}
+
+impl<'de> Deserialize<'de> for PackageStateProfile {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: serde::Deserializer<'de>,
+  {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Wire {
+      defaults: PackageDefaultState,
+      games: HashMap<String, GamePackageState>,
+      screensavers: HashMap<String, ScreensaverPackageState>,
+    }
+
+    let profile = Wire::deserialize(deserializer)?;
+    validate_profile_package_keys(profile.games.keys(), tg_core_package_id::PackageType::Game)
+      .map_err(serde::de::Error::custom)?;
+    validate_profile_package_keys(
+      profile.screensavers.keys(),
+      tg_core_package_id::PackageType::Screensaver,
+    )
+    .map_err(serde::de::Error::custom)?;
+    Ok(Self {
+      defaults: profile.defaults,
+      games: profile.games,
+      screensavers: profile.screensavers,
+    })
+  }
+}
+
+fn validate_profile_package_keys<'a>(
+  keys: impl Iterator<Item = &'a String>,
+  expected_type: tg_core_package_id::PackageType,
+) -> Result<(), String> {
+  for key in keys {
+    let package_id = PackageId::from_storage_key(key)
+      .map_err(|error| format!("invalid package profile key {key:?}: {error}"))?;
+    if package_id.package_type != expected_type {
+      return Err(format!(
+        "package profile key {key:?} must refer to a {expected_type:?}"
+      ));
+    }
+  }
+  Ok(())
 }
 
 impl PackageStateProfile {
@@ -42,11 +86,32 @@ impl PackageStateProfile {
 
 pub type ActionKeyMap = BTreeMap<String, Vec<Vec<String>>>;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
 pub struct KeyBindingMapGroup {
   pub global: ActionKeyMap,
   pub games: BTreeMap<String, ActionKeyMap>,
+}
+
+impl<'de> Deserialize<'de> for KeyBindingMapGroup {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: serde::Deserializer<'de>,
+  {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Wire {
+      global: ActionKeyMap,
+      games: BTreeMap<String, ActionKeyMap>,
+    }
+
+    let group = Wire::deserialize(deserializer)?;
+    validate_profile_package_keys(group.games.keys(), tg_core_package_id::PackageType::Game)
+      .map_err(serde::de::Error::custom)?;
+    Ok(Self {
+      global: group.global,
+      games: group.games,
+    })
+  }
 }
 
 /// Persisted key binding table: `default` keeps the original definitions of the packages or the
@@ -502,53 +567,17 @@ pub struct DisplaySettingsProfile {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(from = "PackageDefaultStateProfile", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct PackageDefaultState {
   pub enabled: bool,
   pub debug: bool,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PackageDefaultStateProfile {
-  enabled: bool,
-  debug: bool,
-  #[serde(default, rename = "safe_mode")]
-  _safe_mode: Option<IgnoredAny>,
-}
-
-impl From<PackageDefaultStateProfile> for PackageDefaultState {
-  fn from(profile: PackageDefaultStateProfile) -> Self {
-    Self {
-      enabled: profile.enabled,
-      debug: profile.debug,
-    }
-  }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(from = "GamePackageStateProfile", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct GamePackageState {
   pub enabled: bool,
   pub debug: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct GamePackageStateProfile {
-  enabled: bool,
-  debug: bool,
-  #[serde(default, rename = "safe_mode")]
-  _safe_mode: Option<IgnoredAny>,
-}
-
-impl From<GamePackageStateProfile> for GamePackageState {
-  fn from(profile: GamePackageStateProfile) -> Self {
-    Self {
-      enabled: profile.enabled,
-      debug: profile.debug,
-    }
-  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -1292,64 +1321,31 @@ mod tests {
   }
 
   #[test]
-  fn legacy_safe_mode_fields_are_ignored_without_losing_package_settings() {
-    let profile: PackageStateProfile = serde_json::from_str(
-      r#"
-        {
-          "defaults": { "enabled": false, "debug": true, "safe_mode": "off_permanent" },
-          "games": {
-            "game:test.game": { "enabled": false, "debug": true, "safe_mode": false }
-          },
-          "screensavers": {
-            "screensaver:test.screen": {
-              "enabled": true,
-              "debug": false,
-              "playlist_enabled": false,
-              "order": 7
-            }
-          }
-        }
-      "#,
-    )
-    .unwrap();
+  fn package_state_rejects_legacy_package_ids_and_removed_fields() {
+    for key in ["official/game/old.id", "mod/screensaver/old-id"] {
+      let json = if key.contains("screensaver") {
+        format!(
+          r#"{{"defaults":{{"enabled":true,"debug":false}},"games":{{}},"screensavers":{{"{key}":{{"enabled":true,"debug":false,"playlist_enabled":true,"order":null}}}}}}"#
+        )
+      } else {
+        format!(
+          r#"{{"defaults":{{"enabled":true,"debug":false}},"games":{{"{key}":{{"enabled":true,"debug":false}}}},"screensavers":{{}}}}"#
+        )
+      };
+      assert!(
+        serde_json::from_str::<PackageStateProfile>(&json).is_err(),
+        "{key}"
+      );
+    }
 
-    assert_eq!(
-      profile.defaults,
-      PackageDefaultState {
-        enabled: false,
-        debug: true,
-      }
-    );
-    assert_eq!(
-      profile.games["game:test.game"],
-      GamePackageState {
-        enabled: false,
-        debug: true,
-      }
-    );
-    assert_eq!(
-      profile.screensavers["screensaver:test.screen"],
-      ScreensaverPackageState {
-        enabled: true,
-        debug: false,
-        playlist_enabled: false,
-        order: Some(7),
-      }
-    );
-
-    let serialized = serde_json::to_value(profile).unwrap();
-    assert!(serialized["defaults"].get("safe_mode").is_none());
-    assert!(
-      serialized["games"]["game:test.game"]
-        .get("safe_mode")
-        .is_none()
-    );
+    let old_field = r#"{"defaults":{"enabled":true,"debug":false,"safe_mode":false},"games":{},"screensavers":{}}"#;
+    assert!(serde_json::from_str::<PackageStateProfile>(old_field).is_err());
   }
 
   #[test]
-  fn legacy_safe_mode_profile_update_preserves_other_user_data() {
+  fn package_state_profile_update_preserves_other_user_data() {
     let root = std::env::temp_dir().join(format!(
-      "tg_storage_legacy_safe_mode_user_data_{}",
+      "tg_storage_package_state_user_data_{}",
       std::process::id()
     ));
     let _ = fs::remove_dir_all(&root);
@@ -1403,8 +1399,8 @@ mod tests {
       storage.profile_package_state_path(),
       format!(
         r#"{{
-          "defaults": {{"enabled": false, "debug": true, "safe_mode": "off_permanent"}},
-          "games": {{"{}": {{"enabled": false, "debug": true, "safe_mode": false}}}},
+          "defaults": {{"enabled": false, "debug": true}},
+          "games": {{"{}": {{"enabled": false, "debug": true}}}},
           "screensavers": {{"{}": {{"enabled": true, "debug": false, "playlist_enabled": false, "order": 7}}}}
         }}"#,
         game_id.storage_key(),
@@ -1459,12 +1455,7 @@ mod tests {
     let rewritten_profile: Value =
       serde_json::from_str(&fs::read_to_string(storage.profile_package_state_path()).unwrap())
         .unwrap();
-    assert!(rewritten_profile["defaults"].get("safe_mode").is_none());
-    assert!(
-      rewritten_profile["games"][game_id.storage_key()]
-        .get("safe_mode")
-        .is_none()
-    );
+    assert_eq!(rewritten_profile["defaults"]["debug"], true);
 
     fs::remove_dir_all(root).unwrap();
   }
@@ -1493,6 +1484,15 @@ mod tests {
     assert_eq!(profile.user.global["one"], vec![vec!["b".to_string()]]);
     assert!(profile.user.global["two"].is_empty());
     assert_eq!(profile.default.global, global);
+  }
+
+  #[test]
+  fn key_bindings_profile_rejects_legacy_package_ids() {
+    let profile = r#"{
+      "default":{"global":{},"games":{"mod/game/old.id":{}}},
+      "user":{"global":{},"games":{"mod/game/old-id":{}}}
+    }"#;
+    assert!(serde_json::from_str::<KeyBindingsProfile>(profile).is_err());
   }
 
   #[test]
@@ -1549,13 +1549,13 @@ mod tests {
     let mut game_actions = ActionKeyMap::new();
     game_actions.insert("jump".into(), vec![vec!["space".into()]]);
     let mut games = BTreeMap::new();
-    games.insert("game.one".into(), game_actions.clone());
+    games.insert("mod/game/game_one".into(), game_actions.clone());
     profile.synchronize(ActionKeyMap::new(), games);
-    assert_eq!(profile.user.games["game.one"], game_actions);
+    assert_eq!(profile.user.games["mod/game/game_one"], game_actions);
 
     profile.synchronize(ActionKeyMap::new(), BTreeMap::new());
-    assert_eq!(profile.default.games["game.one"], game_actions);
-    assert_eq!(profile.user.games["game.one"], game_actions);
+    assert_eq!(profile.default.games["mod/game/game_one"], game_actions);
+    assert_eq!(profile.user.games["mod/game/game_one"], game_actions);
   }
 
   #[test]
@@ -1565,16 +1565,16 @@ mod tests {
     original.insert("jump".into(), vec![vec!["space".into()]]);
     original.insert("removed".into(), vec![vec!["r".into()]]);
     let mut games = BTreeMap::new();
-    games.insert("game.one".into(), original);
+    games.insert("mod/game/game_one".into(), original);
     profile.synchronize(ActionKeyMap::new(), games);
 
     let mut current = ActionKeyMap::new();
     current.insert("jump".into(), vec![vec!["space".into()]]);
     let mut games = BTreeMap::new();
-    games.insert("game.one".into(), current);
+    games.insert("mod/game/game_one".into(), current);
     profile.synchronize(ActionKeyMap::new(), games);
 
-    assert!(!profile.user.games["game.one"].contains_key("removed"));
+    assert!(!profile.user.games["mod/game/game_one"].contains_key("removed"));
   }
 
   #[test]

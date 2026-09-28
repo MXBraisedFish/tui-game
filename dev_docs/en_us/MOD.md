@@ -55,19 +55,13 @@
 一个合规的模组必须遵循以下目录结构，否则宿主将无法识别和加载该模组。
 
 ```text
-<namespace>/               -- 模组命名空间/根目录
-├─ package.json            -- 模组包信息（名称、作者、版本等）
-├─ game.json               -- 模组游戏信息（配置、入口、权限等）
-├─ scripts/                -- 脚本目录
-│  ├─ main.lua             -- 脚本入口文件
-│  └─ function/            -- 辅助脚本目录
-│     └─ *.lua             -- 辅助脚本
-└─ assets/                 -- 资源目录
-   ├─ lang/                -- 语言资源目录
-   │  ├─ en_us.json        -- 英语（美国）
-   │  ├─ zh_cn.json        -- 简体中文
-   │  └─ *.json            -- 其它语言文件
-   └─ *                    -- 其它资源（图片、字体、音频等）
+<package>/
+├─ package.json
+├─ display.json
+├─ game.json or screensaver.json
+├─ actions.json             # optional for games
+├─ scripts/main.lua
+└─ assets/language/<code>/package.json
 ```
 
 > 注：`package.json`、`game.json` 的具体字段含义请参考后续章节。
@@ -76,139 +70,17 @@
 
 # 模组配置文件
 
-## 目录结构<font style="opacity:0;">1</font>
+The host uses the schema 2 split-file package format. The old single-file examples below have been retired. See the current [game package schema](../zh_cn/PACKAAGE_GAME.md) and [screensaver package schema](../zh_cn/PACKAAGE_SCREENSAVER.md).
 
 ```text
-<namespace>/               -- 模组命名空间/根目录
-├─ package.json            -- 模组包信息（名称、作者、版本等）
-└─ game.json               -- 模组游戏信息（配置、入口、权限等）
+<package>/
+├─ package.json
+├─ display.json
+├─ game.json or screensaver.json
+├─ actions.json             # optional for games
+├─ scripts/main.lua
+└─ assets/language/<code>/package.json
 ```
-
-## 命名空间
-
-- 模组根目录为 `<namespace>/`，`<namespace>` 即为该模组的命名空间。
-- 命名空间在全局必须唯一，宿主将优先加载首个遇到的同名命名空间模组。
-- 命名空间仅允许包含以下字符：小写字母 `a-z`、大写字母 `A-Z`、数字 `0-9`、下划线 `_`。
-
-## `package.json`
-
-> 注：
-> - `key` 表示语言键，需配合语言文件使用。
-> - `image` 表示图片路径，相对于 `assets/` 目录。
-
-该文件用于声明模组的基本信息，格式如下：
-
-```json
-{
-  "package": string,                -- 包名
-  "introduction": string | key,     -- 包简介
-  "author": string | key,           -- 作者信息
-  "name": string | key,             -- 游戏显示名称
-  "description": string | key,      -- 游戏简短描述
-  "detail": string | key,           -- 游戏详细描述
-  "icon": Array | string | image,   -- 图标
-  "banner": Array | string | image  -- 横幅
-}
-```
-
-**字段说明**
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `package` | <font color="#92cddc">string</font> | 包名，用于区分不同模组，全局唯一。仅允许字符串。 |
-| `introduction` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> | 包简介，在模组列表中展示，由开发者编写。可填写字符串或语言键。 |
-| `author` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> | 作者名称。可填写字符串或语言键。 |
-| `name` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> | 游戏显示名称，在游戏列表中展示。可填写字符串或语言键。 |
-| `description` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> | 游戏简短描述，建议一句话概括玩法或目标。可填写字符串或语言键。 |
-| `detail` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> | 游戏详细描述，建议包含：游戏目标、核心机制、操作方式、特殊警告（如与原版差异）等。可填写字符串或语言键。 |
-| `icon` | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 图标，在模组列表中展示。具体要求见 其它-[头图与图标](#图标和头图) |
-| `banner` | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 横幅，在模组详情页展示。具体要求见 其它-[头图与图标](#图标和头图) |
-
-## `game.json`
-
-> 注：
-> - `key` 表示语言键。
-> - `path` 表示脚本路径，相对于 `scripts/` 目录。
-
-该文件用于声明游戏的核心配置，格式如下：
-
-```json
-{
-  "api": Array | int,                -- 支持的 API 版本范围
-  "entry": path,                     -- 入口脚本路径
-  "save": boolean,                   -- 是否支持存档
-  "best_none": string | key | null,  -- 最佳记录占位文本（null 表示禁用）
-  "min_width": int,                  -- 最小终端宽度（字符行数）
-  "min_height": int,                 -- 最小终端高度（字符列数）
-  "write": boolean,                  -- 是否请求直写权限
-  "actions": object,                 -- 按键动作映射表
-  "runtime": {
-    "target_fps": int                -- 目标帧率
-  }
-}
-```
-
-**字段说明**
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `api` | <font color="#92cddc">Array</font> \| <font color="#92cddc">int</font> | 支持的 API 版本。数组格式 `[min, max]` 表示支持从 `min` 到 `max` 的版本（含端点）；整数表示仅支持该单一版本。若版本不符合宿主要求，模组将不被加载并抛出异常。 |
-| `entry` | <font color="#92cddc">path</font> | 入口脚本路径，相对于 `scripts/` 目录。若路径错误，模组将不被加载并抛出异常。 |
-| `save` | <font color="#92cddc">boolean</font> | 是否支持存档。`true` 表示需要实现声明式 API `save_game(state)`；`false` 则忽略相关调用。 |
-| `best_none` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> \| <font color="#92cddc">null</font> | 无最佳记录时显示的文本。若不为 `null`，需实现声明式 API `save_best_score(state)`；若为 `null`，表示不启用最佳记录功能，相关调用被忽略。 |
-| `min_width` | <font color="#92cddc">int</font> | 游戏所需的最小终端宽度（字符列数）。终端尺寸不足时会显示提示。值≦0为无限制。 |
-| `min_height` | <font color="#92cddc">int</font> | 游戏所需的最小终端高度（字符行数）。终端尺寸不足时会显示提示。值≦0为无限制。 |
-| `write` | <font color="#92cddc">boolean</font> | 是否请求直写权限。`true` 表示模组需要文件写入权限，加载时会向用户申请；`false` 表示不需要权限，所有直写请求将被宿主忽略。<font color="red">直写操作为高风险操作，请最大程度避免使用！</font> |
-| `actions` | <font color="#92cddc">object</font> | 按键动作映射表，格式见下方「注册表格式」。宿主会将物理按键映射为语义化动作。 |
-| `runtime` | <font color="#92cddc">object</font> | 运行时设置。 |
-| `runtime.target_fps` | <font color="#92cddc">int</font> | 目标帧率，支持 `30`、`60`、`120`。其它值将被忽略并回退为 `60`。实际帧率受机器性能影响，该值为上限。 |
-
-## 注册表格式
-
-> 注：
-> - `#` 表示自定义或可变内容。
-> - `[]` 表示字段可重复或扩展。
-> - `<>` 表示类型约束。
-> - `key` 表示按键映射名，具体按键映射见 附录-[物理按键语义映射表](#物理按键语义映射表)。
-
-```json
-"actions": {
-  [#action]: key | Array<key>
-}
-```
-
-**示例**：
-
-```json
-"actions": {
-  "jump": "space",
-  "move": ["up", "down", "left", "right"]
-}
-```
-
-> 每个动作可绑定单个按键或多个按键（数组形式）。宿主会将按键事件转换为动作事件，通过 `handle_event` 传递给脚本（事件类型 `action`）。
-
-## UID
-
-UID 是宿主为每个模组生成的唯一标识码，用于区分不同模组。
-
-**构成格式**：`mod_game_{编码}`
-
-**编码生成规则**：
-
-1. 将模组的 `命名空间`、`包名（package）`、`作者（author）` 按顺序拼接成一个字符串。
-2. 对该字符串进行哈希运算，然后使用 Base64 编码。
-3. 取编码结果的前 16 位字符作为最终编码。
-
-> 上述过程可用以下伪代码表示：
-> ```
-> encoding = base64(hash(namespace + package + author)).substring(0, 16)
-> uid = "mod_game_" + encoding
-> ```
-
-**稳定性**：只要 `命名空间`、`包名`、`作者` 三者保持不变，生成的 UID 就不会改变。这确保了模组在不同环境中的一致性识别。
-
----
 
 # 模组脚本规范
 

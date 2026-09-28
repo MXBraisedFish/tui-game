@@ -21,7 +21,7 @@ pub(super) fn event(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           return Ok(());
         }
         drop(api);
-        args::no_args(method, values)?;
+        args::empty_named(method, values)?;
         push_host_command(&mut state.borrow_mut(), command.clone());
         Ok(())
       })?,

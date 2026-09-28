@@ -54,8 +54,8 @@ pub use lua::{
 };
 pub use network::{NetworkEvent, NetworkService};
 pub use package::{
-  PackageAsset, PackageAsyncEvent, PackageEvent, PackageId, PackageInfo, PackageListEntry,
-  PackageService, PackageSource,
+  PackageAsset, PackageAsyncEvent, PackageEvent, PackageId, PackageImageMode, PackageInfo,
+  PackageListEntry, PackageService, PackageSource,
 };
 pub use random::{RandomGeneratorId, RandomSeed, RandomService};
 pub use recording::{

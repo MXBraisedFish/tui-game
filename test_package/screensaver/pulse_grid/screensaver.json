@@ -1,0 +1,8 @@
+{
+  "name": "f%<fg:bright_cyan>Pulse</fg> Grid",
+  "truecolor": true,
+  "command": "pulse_grid",
+  "entry": "main",
+  "min_width": 40,
+  "min_height": 16
+}

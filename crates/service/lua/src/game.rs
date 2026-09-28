@@ -30,7 +30,7 @@ pub enum GameSessionState {
 
 #[derive(Clone, Copy, Debug)]
 pub struct GameStartOptions {
-  pub target_fps: u32,
+  pub target_fps: Option<u32>,
   pub min_size: Size,
   pub save_game_enabled: bool,
   pub save_best_enabled: bool,
@@ -74,7 +74,7 @@ impl GameService {
     let previous_log = self.stop();
     self.generation = self.generation.wrapping_add(1).max(1);
     self.package = Some(package);
-    self.target_fps = Some(options.target_fps);
+    self.target_fps = options.target_fps;
     self.min_size = options.min_size;
     self.save_game_enabled = options.save_game_enabled;
     self.save_best_enabled = options.save_best_enabled;
@@ -257,7 +257,7 @@ mod tests {
   use tg_core_package_id::{PackageSource, PackageType};
 
   fn test_package_id() -> PackageId {
-    PackageId::new(PackageSource::Mod, PackageType::Game, "test.game").unwrap()
+    PackageId::new(PackageSource::Mod, PackageType::Game, "test_game").unwrap()
   }
   use crate::{LuaPolicy, LuaSessionKind, LuaSessionSpec};
 
@@ -287,7 +287,7 @@ mod tests {
     .unwrap();
     LuaSession::load(
       LuaSessionSpec {
-        package_id: "test.game.service".to_string(),
+        package_id: "test_game_service".to_string(),
         session_kind: LuaSessionKind::Game,
         entry_path,
         fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
@@ -313,13 +313,36 @@ mod tests {
   }
 
   #[test]
+  fn package_target_fps_remains_optional_for_the_host_scheduler() {
+    let mut service = GameService::new();
+    service.start(
+      test_session(),
+      test_package_id(),
+      GameStartOptions {
+        target_fps: None,
+        min_size: Size {
+          width: 40,
+          height: 12,
+        },
+        save_game_enabled: false,
+        save_best_enabled: false,
+      },
+      None,
+    );
+
+    assert_eq!(service.target_fps(), None);
+    service.stop();
+    assert_eq!(service.target_fps(), None);
+  }
+
+  #[test]
   fn fixed_update_clamps_delta_and_catches_up_at_most_eight_times() {
     let mut service = GameService::new();
     service.start(
       test_session(),
       test_package_id(),
       GameStartOptions {
-        target_fps: 120,
+        target_fps: Some(120),
         min_size: Size {
           width: 40,
           height: 12,
@@ -351,7 +374,7 @@ mod tests {
       test_session(),
       test_package_id(),
       GameStartOptions {
-        target_fps: 60,
+        target_fps: Some(60),
         min_size: Size {
           width: 40,
           height: 12,
@@ -371,7 +394,7 @@ mod tests {
       test_session(),
       test_package_id(),
       GameStartOptions {
-        target_fps: 60,
+        target_fps: Some(60),
         min_size: Size {
           width: 40,
           height: 12,

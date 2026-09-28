@@ -4,7 +4,7 @@
 
 ## 入口与生命周期
 
-`package.json` 的 `entry` 相对于包内 `scripts/` 目录，省略 `.lua` 后缀时由宿主补齐。入口必须是 UTF-8 文本，最大 1 MiB，规范路径不得逃出 `scripts/`。
+游戏包的 `game.json` 或屏保包的 `screensaver.json` 中，`entry` 相对于包内 `scripts/` 目录；省略 `.lua` 后缀时由宿主补齐。入口必须是 UTF-8 文本，最大 1 MiB，规范路径不得逃出 `scripts/`。
 
 游戏和屏保均必须实现：
 
@@ -29,7 +29,7 @@ function SaveBest() return nil end
 
 ```lua
 ctx = {
-  package_id = "example.game",
+  package_id = "example_game",
   package_type = "game", -- 或 "screensaver"
   base = { width = 120, height = 40 },
   start_mode = "new", -- 或 "continue"

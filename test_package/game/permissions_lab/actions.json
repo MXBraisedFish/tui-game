@@ -1,0 +1,35 @@
+{
+  "write_probe": {
+    "description": "Write the package file probe",
+    "keys": [
+      [
+        "p"
+      ]
+    ]
+  },
+  "read_probe": {
+    "description": "Read the probe back",
+    "keys": [
+      [
+        "r"
+      ]
+    ]
+  },
+  "list_probe": {
+    "description": "List the state folder",
+    "keys": [
+      [
+        "l"
+      ]
+    ]
+  },
+  "leave": {
+    "description": "Return to game list",
+    "keys": [
+      [
+        "esc"
+      ]
+    ],
+    "lock": true
+  }
+}

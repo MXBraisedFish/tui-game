@@ -22,7 +22,7 @@ pub(super) fn game(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           return Ok(());
         }
         drop(api);
-        args::no_args(method, values)?;
+        args::empty_named(method, values)?;
         let mut api = state.borrow_mut();
         let invalid_state = match command {
           LuaHostCommand::ExitGame => match api.phase {

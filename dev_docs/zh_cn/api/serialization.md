@@ -1,8 +1,12 @@
 # serialization 库
 
+所有方法使用单个命名参数表。JSON/YAML 的 null 使用只读 `serialization.NULL` 哨兵保留；CSV、INI、TOML、XML 不接受该哨兵。
+
 ## 基本库说明
 
 `serialization` 提供多格式序列化与反序列化。
+
+JSON/YAML 共用转换层限制：最多 32 层、16,384 个值节点、编码输出最多 1 MiB；拒绝非有限数字、非 UTF-8 字符串/键、循环表、稀疏数组、非正整数数组键，以及同一表混用数组索引和字符串键。`json_decode` 与 `yaml_decode` 将格式中的 null 解码为只读 userdata `serialization.NULL`；编码时该哨兵还原为 JSON/YAML null，可安全放在对象字段和数组位置。顶层 `json_encode(nil)` 仍输出 `null`；其它编码 API 使用命名参数表。CSV、INI、TOML、XML 无法按已定义契约保留 null，遇到哨兵时报错；空字符串仍按各自格式正常处理。Lua 空表没有数组/对象标记，通过 JSON/YAML 转换时表示为空对象 `{}`。具体调用错误会指出被拒绝的值或限制。
 
 ---
 
@@ -39,8 +43,8 @@
 ### 调用
 
 ```lua
--- 单参数
-serialization.json_encode()
+-- 命名参数表；顶层 nil 可直接传入以编码 JSON null
+serialization.json_encode{ value = {} }
 ```
 
 ### 参数
@@ -61,7 +65,7 @@ serialization.json_encode()
 
 ```lua
 local data = { name = "TUI", version = 1, features = { "draw", "event" } }
-local json = serialization.json_encode(data)
+local json = serialization.json_encode{ value = data }
 debug.print { message = json }
 ```
 
@@ -73,7 +77,8 @@ debug.print { message = json }
 
 ### 额外补充
 
-- 参数 `value` 必须可序列化。
+- 参数 `value` 必须可序列化；使用 `serialization.NULL` 表示对象字段或数组位置中的 JSON null。
+- 只有顶层 Lua `nil` 使用特例调用 `serialization.json_encode(nil)`；普通值统一通过 `{ value = ... }` 传递。
 
 ---
 
@@ -85,7 +90,7 @@ debug.print { message = json }
 
 ```lua
 -- 单参数
-serialization.json_decode()
+serialization.json_decode{ s = "{}" }
 ```
 
 ### 参数
@@ -106,7 +111,7 @@ serialization.json_decode()
 
 ```lua
 local json = '{"name":"TUI","version":1}'
-local data = serialization.json_decode(json)
+local data = serialization.json_decode{ s = json }
 debug.print { message = data.name .. ", v" .. tostring(data.version) }
 ```
 
@@ -118,7 +123,7 @@ TUI, v1
 
 ### 额外补充
 
-- 参数 `s` 必须可反序列化。
+- 参数 `s` 必须可反序列化；JSON null 解码为 `serialization.NULL`，包含该哨兵的值可以原样重新编码。
 
 ---
 
@@ -130,7 +135,7 @@ TUI, v1
 
 ```lua
 -- 单参数
-serialization.csv_encode()
+serialization.csv_encode{ rows = {} }
 ```
 
 ### 参数
@@ -155,7 +160,7 @@ local data = {
     { "Alice", 95 },
     { "Bob", 87 }
 }
-local csv = serialization.csv_encode(data)
+local csv = serialization.csv_encode{ rows = data }
 debug.print { message = csv }
 ```
 
@@ -169,7 +174,7 @@ Bob,87
 
 ### 额外补充
 
-- 参数 `rows` 必须可序列化。
+- 参数 `rows` 必须可序列化；CSV 不支持 `serialization.NULL`，空字段解码为普通空字符串。
 
 ---
 
@@ -181,7 +186,7 @@ Bob,87
 
 ```lua
 -- 单参数
-serialization.csv_decode()
+serialization.csv_decode{ s = "" }
 ```
 
 ### 参数
@@ -202,7 +207,7 @@ serialization.csv_decode()
 
 ```lua
 local csv = "Name,Score\nAlice,95\nBob,87"
-local data = serialization.csv_decode(csv)
+local data = serialization.csv_decode{ s = csv }
 debug.print { message = data[2][1] .. ": " .. tostring(data[2][2]) }
 ```
 
@@ -226,7 +231,7 @@ Alice: 95
 
 ```lua
 -- 单参数
-serialization.yaml_encode()
+serialization.yaml_encode{ value = {} }
 ```
 
 ### 参数
@@ -247,7 +252,7 @@ serialization.yaml_encode()
 
 ```lua
 local data = { name = "TUI", version = 1 }
-local yaml = serialization.yaml_encode(data)
+local yaml = serialization.yaml_encode{ value = data }
 debug.print { message = yaml }
 ```
 
@@ -260,7 +265,7 @@ version: 1
 
 ### 额外补充
 
-- 参数 `value` 必须可序列化。
+- 参数 `value` 必须可序列化；`serialization.NULL` 编码为 YAML null。
 
 ---
 
@@ -272,7 +277,7 @@ version: 1
 
 ```lua
 -- 单参数
-serialization.yaml_decode()
+serialization.yaml_decode{ s = "{}" }
 ```
 
 ### 参数
@@ -293,7 +298,7 @@ serialization.yaml_decode()
 
 ```lua
 local yaml = "name: TUI\nversion: 1"
-local data = serialization.yaml_decode(yaml)
+local data = serialization.yaml_decode{ s = yaml }
 debug.print { message = data.name }
 ```
 
@@ -305,7 +310,7 @@ TUI
 
 ### 额外补充
 
-- 参数 `s` 必须可反序列化。
+- 参数 `s` 必须可反序列化；YAML null 解码为 `serialization.NULL`。
 
 ---
 
@@ -317,7 +322,7 @@ TUI
 
 ```lua
 -- 单参数
-serialization.toml_encode()
+serialization.toml_encode{ value = {} }
 ```
 
 ### 参数
@@ -338,7 +343,7 @@ serialization.toml_encode()
 
 ```lua
 local data = { name = "TUI", version = 1 }
-local toml = serialization.toml_encode(data)
+local toml = serialization.toml_encode{ value = data }
 debug.print { message = toml }
 ```
 
@@ -351,7 +356,7 @@ version = 1
 
 ### 额外补充
 
-- 参数 `value` 必须可序列化。
+- 参数 `value` 必须可序列化；TOML 不支持 null，包含 `serialization.NULL` 时返回错误。
 
 ---
 
@@ -363,7 +368,7 @@ version = 1
 
 ```lua
 -- 单参数
-serialization.toml_decode()
+serialization.toml_decode{ s = "" }
 ```
 
 ### 参数
@@ -384,7 +389,7 @@ serialization.toml_decode()
 
 ```lua
 local toml = 'name = "TUI"\nversion = 1'
-local data = serialization.toml_decode(toml)
+local data = serialization.toml_decode{ s = toml }
 debug.print { message = data.name }
 ```
 
@@ -408,14 +413,14 @@ TUI
 
 ```lua
 -- 单参数
-serialization.ini_encode(t)
+serialization.ini_encode{ value = t }
 ```
 
 ### 参数
 
 | 参数名 | 类型  | 必填 | 默认值 | 说明            |
 | ------ | ----- | ---- | ------ | --------------- |
-| `t`    | table | 是   | -      | 要编码的 Lua 表 |
+| `value` | table | 是   | -      | 要编码的 Lua 表 |
 
 ### 返回
 
@@ -432,7 +437,7 @@ local data = {
   server = { host = "127.0.0.1", port = 8080 },
   logging = { level = "debug" }
 }
-local ini = serialization.ini_encode(data)
+local ini = serialization.ini_encode{ value = data }
 debug.print { message = ini }
 ```
 
@@ -449,7 +454,7 @@ level = debug
 
 ### 额外补充
 
-- 参数 `t` 必须可序列化。
+- 参数 `value` 必须可序列化；INI 不支持 `serialization.NULL`。
 
 ---
 
@@ -461,7 +466,7 @@ level = debug
 
 ```lua
 -- 单参数
-serialization.ini_decode()
+serialization.ini_decode{ s = "" }
 ```
 
 ### 参数
@@ -482,7 +487,7 @@ serialization.ini_decode()
 
 ```lua
 local ini = "[server]\nhost = 127.0.0.1\nport = 8080"
-local data = serialization.ini_decode(ini)
+local data = serialization.ini_decode{ s = ini }
 debug.print { message = data.server.host }
 ```
 
@@ -506,7 +511,7 @@ debug.print { message = data.server.host }
 
 ```lua
 -- 单参数
-serialization.xml_encode()
+serialization.xml_encode{ value = {} }
 ```
 
 ### 参数
@@ -532,7 +537,7 @@ local data = {
     child = { "Hello", _attr = { id = 1 } }
   }
 }
-local xml = serialization.xml_encode(data)
+local xml = serialization.xml_encode{ value = data }
 debug.print { message = xml }
 ```
 
@@ -544,7 +549,7 @@ debug.print { message = xml }
 
 ### 额外补充
 
-- 参数 `value` 必须可序列化。
+- 参数 `value` 必须可序列化；XML 不支持 `serialization.NULL`。
 
 ---
 
@@ -556,7 +561,7 @@ debug.print { message = xml }
 
 ```lua
 -- 单参数
-serialization.xml_decode()
+serialization.xml_decode{ s = "<root/>" }
 ```
 
 ### 参数
@@ -577,7 +582,7 @@ serialization.xml_decode()
 
 ```lua
 local xml = '<root version="1.0"><child id="1">Hello</child></root>'
-local data = serialization.xml_decode(xml)
+local data = serialization.xml_decode{ s = xml }
 debug.print { message = data.root.child._text }
 ```
 
@@ -695,7 +700,7 @@ debug.print { message = tostring(result.values[1]) .. ", " .. tostring(result.va
 
 ```lua
 -- 单参数
-serialization.binary_packsize()
+serialization.binary_packsize{ fmt = "<I4 I4" }
 ```
 
 ### 参数
@@ -715,7 +720,7 @@ serialization.binary_packsize()
 ### 示例
 
 ```lua
-local size = serialization.binary_packsize("<I4 I4")
+local size = serialization.binary_packsize{ fmt = "<I4 I4" }
 debug.print { message = tostring(size) }
 ```
 

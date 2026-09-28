@@ -251,6 +251,7 @@ impl LuaI18nEventKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaI18nEvent {
+  pub request_id: u64,
   pub kind: LuaI18nEventKind,
   pub ok: bool,
   pub message: String,
@@ -600,6 +601,7 @@ impl LuaEventData {
         }
       }
       Self::I18n(event) => {
+        data.set("request_id", event.request_id)?;
         data.set("kind", event.kind.as_str())?;
         data.set("ok", event.ok)?;
         data.set("message", event.message.as_str())?;

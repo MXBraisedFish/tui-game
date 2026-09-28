@@ -73,98 +73,28 @@
 一个合规的屏保包必须遵循以下目录结构，缺少部分内容宿主将无法识别和加载该 屏保包。
 
 ```text
-<namespace>/               -- 屏保包命名空间/根目录
-├─ package.json            -- 屏保包信息（名称、作者、版本、入口等）
-├─ scripts/                -- 脚本目录
-│  ├─ main.lua             -- 脚本入口文件
-│  └─ function/            -- 辅助脚本目录
-│     └─ *.lua             -- 辅助脚本
-└─ assets/                 -- 资源目录
-   ├─ lang/                -- 语言资源目录
-   │  ├─ en_us.json        -- 英语（美国）
-   │  ├─ zh_cn.json        -- 简体中文
-   │  └─ *.json            -- 其它语言文件
-   └─ *                    -- 其它资源
+screensaver_package/
+├─ package.json
+├─ display.json
+├─ screensaver.json
+├─ scripts/main.lua
+└─ assets/language/<code>/package.json
 ```
 
 ---
 
 # 屏保包配置文件
 
-## 目录结构<font style="opacity:0;">1</font>
+当前宿主使用 schema 2 分文件格式。完整字段、默认值、i18n 和资源规则见[屏保包 schema 2](PACKAAGE_SCREENSAVER.md)。旧版单文件示例不再是有效包格式。
 
 ```text
-<namespace>/               -- 屏保包命名空间/根目录
-└─ package.json            -- 屏保包信息
+screensaver_package/
+├─ package.json
+├─ display.json
+├─ screensaver.json
+├─ scripts/main.lua
+└─ assets/language/<code>/package.json
 ```
-
-## 命名空间
-
-- 屏保包根目录为 `<namespace>/`，`<namespace>` 即为该 屏保包的命名空间。
-- 命名空间在全局必须唯一，宿主将优先加载首个遇到的同名命名空间 屏保包。
-- 命名空间仅允许包含以下字符：小写字母 `a-z`、大写字母 `A-Z`、数字 `0-9`、下划线 `_`。
-
-## `package.json`
-
-> 注：
-> 
-> - `key` 表示语言键，需配合语言文件使用。
-> - `image` 表示图片路径，相对于 `assets/` 目录。
-
-该文件用于声明 屏保包的基本信息，格式如下：
-
-```json
-{
-  "api": int | Array,               -- 支持的 API 版本范围
-  "entry": path,                    -- 入口脚本路径
-  "package": string,                -- 包名
-  "package_name": string | key,     -- 屏保包显示名称
-  "screensaver_name": string | key,       -- 屏保界面显示名称
-  "author": string | key,           -- 作者
-  "version": string,                -- 包版本号
-  "introduction": string | key,     -- 屏保包简介
-  "icon": Array | string | image,   -- 图标
-  "banner": Array | string | image  -- 横幅
-}
-```
-
-**字段说明**
-
-| 字段             | 类型                                                                                                              | 说明                                                                      |
-| -------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `api`          | <font color="#92cddc">Array</font> \| <font color="#92cddc">int</font>                                          | 支持的 API 版本。数组格式 $[min, max]$ 表示支持从 `min` 到 `max` 的版本（含端点）；整数表示仅支持该单一版本。 |
-| `entry`        | <font color="#92cddc">path</font>                                                                               | 入口脚本路径，相对于 `scripts/` 目录。                                               |
-| `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同屏保包，包内全局唯一。仅允许字符串。                                             |
-| `package_name` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 屏保包显示名称，在屏保包列表展示的包名。可填写字符串或语言键。                                         |
-| `screensaver_name`   | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | Screensaver 界面展示名称，在屏保包设置列表中展示。可填写字符串或语言键。                                    |
-| `author`       | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 作者名称。可填写字符串或语言键。                                                        |
-| `version`      | <font color="#92cddc">string</font>                                                                             | 屏保包版本号，由作者自行定义。推荐格式：主版本号.次版本号。仅允许字符串。                                   |
-| `introduction` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 屏保包简介，在屏保包列表中展示。可填写字符串或语言键。                                             |
-| `icon`         | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 图标，在屏保包列表中展示。具体要求见『其它-[头图与图标](#图标和头图)』。                                 |
-| `banner`       | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 横幅，在屏保包详情页展示。具体要求见『其它-[头图与图标](#图标和头图)』。                                 |
-
-## UID
-
-UID 是宿主为每个包生成的唯一标识码，用于内部区分不同包，是最终的识别 ID。
-
-**构成格式**：`screensaver_{编码}`
-
-**编码生成规则**：
-
-1. 将 屏保包的 `来源（source）`、`命名空间（namespace）`、`包名（package）`、`Screensaver 界面显示名称（screensaver_name）`、`作者（author）`、`入口（entry）` 按特定格式拼接成一个字符串。
-2. 对该字符串进行特定运算编码。
-
-上述过程可用以下伪代码表示：
-```python
-encoding = function(source + namespace + package + screensaver_name + author + entry)
-uid = "screensaver_" + encoding
-```
-
-**稳定性**：只要 `来源`、`命名空间`、`包名`、`Screensaver 名`、`作者`、`入口` 保持不变，生成的 UID 就不会改变。
-
-**符号**：由`0-9` `a-z` `A-Z`组成。
-
----
 
 # 屏保包脚本规范
 
@@ -181,7 +111,7 @@ uid = "screensaver_" + encoding
 ## 规范要求
 
 1. 所有脚本文件必须放在 `scripts/` 目录下，且仅支持 `.lua` 扩展名。
-2. 入口脚本建议直接放在 `scripts/` 目录下，由 `package.json` 中的 `entry` 字段指定，可自定义。
+2. 入口脚本建议直接放在 `scripts/` 目录下，由 `screensaver.json` 中的 `entry` 字段指定，可自定义。
 3. 辅助脚本必须放在 `scripts/function/` 目录下，用于组织可复用的模块化代码。
 
 ## 沙箱限制（禁用 API）
@@ -282,7 +212,7 @@ end
 {
   "screensaver.title": "DVD",
   "screensaver.collision": "碰撞次数：{times}",                  -- 提供score替换内容
-  "screensaver.exit": "{tc:green}按 {key:exit} 键返回{tc:clear}" -- 使用可以解析富文本的相关 API
+  "screensaver.exit": "f%<fg:green>按 {key:exit} 键返回</fg>" -- 使用可以解析富文本的相关 API
 }
 ```
 
@@ -390,7 +320,7 @@ end
 
 示意图如下：
 
-![绘制坐标](./image/axis.png)
+![绘制坐标](../en_us/image/axis.png)
 
 ---
 
@@ -410,7 +340,7 @@ end
 ```
 
 **样图**
-![默认图标](./image/mod_icon.png)
+![默认图标](../en_us/image/mod_icon.png)
 
 ## 默认头图
 
@@ -429,4 +359,4 @@ end
 ```
 
 **样图**
-![默认头图](./image/screensaver_banner.png)
+![默认头图](../en_us/image/screensaver_banner.png)

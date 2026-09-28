@@ -3,6 +3,7 @@
 ## 基本库说明
 
 `draw` 提供终端画布绘制指令。
+绘制方法使用命名参数表；`draw.render{}` 是无参数的显式重绘请求。
 
 ---
 
@@ -296,7 +297,7 @@ draw.erase_rect {
 
 ```lua
 -- 单参数
-draw.render()
+draw.render{}
 ```
 
 ### 返回
@@ -311,7 +312,7 @@ function HandleEvent(event)
 	message = "Hello TUI GAME"
 
 	-- 请求重新绘制
-	draw.render()
+	draw.render{}
 end
 
 function Render()

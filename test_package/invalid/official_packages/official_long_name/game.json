@@ -1,0 +1,15 @@
+{
+  "name": "f%<fg:bright_magenta>Official</fg> <fg:bright_yellow>Very Very Long Game Name For Overflow Test</fg>",
+  "detail": "This official package tests one-line clipping before the source label.",
+  "target_fps": 30,
+  "mouse": false,
+  "truecolor": false,
+  "language": [
+    "en_us"
+  ],
+  "command": "official_long_name",
+  "entry": "official_long_name",
+  "min_width": 0,
+  "min_height": 0,
+  "save_game": false
+}

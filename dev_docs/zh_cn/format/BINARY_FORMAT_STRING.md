@@ -74,8 +74,8 @@ debug.print { message = tostring(#big) }
 ### 示例
 
 ```lua
-size1 = serialization.binary_packsize("c1 i4")
-size2 = serialization.binary_packsize("!4 c1 i4")
+size1 = serialization.binary_packsize{ fmt = "c1 i4" }
+size2 = serialization.binary_packsize{ fmt = "!4 c1 i4" }
 
 debug.print { message = tostring(size1) }
 debug.print { message = tostring(size2) }
@@ -131,11 +131,11 @@ debug.print { message = tostring(#bytes2) }
 ### 示例
 
 ```lua
-size1 = serialization.binary_packsize("b B")
-size2 = serialization.binary_packsize("h H")
-size3 = serialization.binary_packsize("i I")
-size4 = serialization.binary_packsize("l L")
-size5 = serialization.binary_packsize("j J")
+size1 = serialization.binary_packsize{ fmt = "b B" }
+size2 = serialization.binary_packsize{ fmt = "h H" }
+size3 = serialization.binary_packsize{ fmt = "i I" }
+size4 = serialization.binary_packsize{ fmt = "l L" }
+size5 = serialization.binary_packsize{ fmt = "j J" }
 
 debug.print { message = tostring(size1) }
 debug.print { message = tostring(size2) }
@@ -177,7 +177,7 @@ debug.print { message = tostring(size5) }
 ### 示例
 
 ```lua
-size = serialization.binary_packsize("i1 I2 i4")
+size = serialization.binary_packsize{ fmt = "i1 I2 i4" }
 
 debug.print { message = tostring(size) }
 ```
@@ -212,9 +212,9 @@ debug.print { message = tostring(size) }
 ### 示例
 
 ```lua
-size1 = serialization.binary_packsize("f")
-size2 = serialization.binary_packsize("d")
-size3 = serialization.binary_packsize("n")
+size1 = serialization.binary_packsize{ fmt = "f" }
+size2 = serialization.binary_packsize{ fmt = "d" }
+size3 = serialization.binary_packsize{ fmt = "n" }
 
 debug.print { message = tostring(size1) }
 debug.print { message = tostring(size2) }

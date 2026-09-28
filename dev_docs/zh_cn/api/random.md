@@ -3,6 +3,7 @@
 ## 基本库说明
 
 `random` 提供可控且安全的随机数生成。
+所有方法均接收一个命名参数表；无参数方法使用空表 `{}`，生成器操作通过 `id` 字段传入对象 ID。
 
 ---
 
@@ -217,14 +218,14 @@ random.create{}
 ```lua
 local r1 = random.create {}
 debug.print { message = r1 }
-debug.print { message = random.generate(r1) }
+debug.print { message = random.generate{ id = r1 } }
 
 local r2 = random.create { type = random.INT, min = 1, max = 30, seed = 520 }
 debug.print { message = r2 }
-debug.print { message = random.generate(r2) }
+debug.print { message = random.generate{ id = r2 } }
 
 
-debug.print { message = table.pretty(random.list()) }
+debug.print { message = table.pretty{ table = random.list{} } }
 ```
 
 输出：
@@ -271,7 +272,7 @@ rng_002
 
 ```lua
 -- 单参数
-random.delete()
+random.delete{ id = "rng_001" }
 ```
 
 ### 参数
@@ -293,12 +294,12 @@ random.delete()
 ```lua
 local r = random.create {}
 debug.print { message = r }
-debug.print { message = random.generate(r) }
+debug.print { message = random.generate{ id = r } }
 
-debug.print { message = random.delete(r) }
+debug.print { message = random.delete{ id = r } }
 
 
-debug.print { message = table.pretty(random.list()) }
+debug.print { message = table.pretty{ table = random.list{} } }
 ```
 
 输出：
@@ -322,7 +323,7 @@ true
 
 ```lua
 -- 单参数
-random.clear()
+random.clear{}
 ```
 
 ### 参数
@@ -345,9 +346,9 @@ random.create {}
 random.create {}
 random.create {}
 
-debug.print { message = random.clear() }
+debug.print { message = random.clear{} }
 
-debug.print { message = table.pretty(random.list()) }
+debug.print { message = table.pretty{ table = random.list{} } }
 ```
 
 输出：
@@ -369,7 +370,7 @@ true
 
 ```lua
 -- 单参数
-random.list()
+random.list{}
 ```
 
 ### 参数
@@ -390,7 +391,7 @@ random.list()
 random.create {}
 random.create {}
 
-debug.print { message = table.pretty(random.list()) }
+debug.print { message = table.pretty{ table = random.list{} } }
 ```
 
 输出：
@@ -446,7 +447,7 @@ debug.print { message = table.pretty(random.list()) }
 
 ```lua
 -- 单参数
-random.count()
+random.count{}
 ```
 
 ### 参数
@@ -470,7 +471,7 @@ random.create {}
 random.create {}
 random.create {}
 
-debug.print { message = random.count() }
+debug.print { message = random.count{} }
 ```
 
 输出：
@@ -489,7 +490,7 @@ debug.print { message = random.count() }
 
 ```lua
 -- 单参数
-random.generate()
+random.generate{ id = "rng_001" }
 ```
 
 ### 参数
@@ -511,11 +512,11 @@ random.generate()
 ```lua
 local r = random.create { min = -5, max = 30 }
 
-debug.print { message = random.generate(r) }
-debug.print { message = random.generate(r) }
-debug.print { message = random.generate(r) }
-debug.print { message = random.generate(r) }
-debug.print { message = random.generate(r) }
+debug.print { message = random.generate{ id = r } }
+debug.print { message = random.generate{ id = r } }
+debug.print { message = random.generate{ id = r } }
+debug.print { message = random.generate{ id = r } }
+debug.print { message = random.generate{ id = r } }
 ```
 
 输出：
@@ -565,11 +566,11 @@ random.set{}
 ```lua
 local r = random.create {}
 
-debug.print { message = table.pretty(random.get_info(r)) }
+debug.print { message = table.pretty{ table = random.get_info{ id = r } } }
 
 random.set { id = r,  type = random.FLOAT, min = 3.2, max = 5.8, seed = 123456 }
 
-debug.print { message = table.pretty(random.get_info(r)) }
+debug.print { message = table.pretty{ table = random.get_info{ id = r } } }
 ```
 
 输出：
@@ -672,11 +673,11 @@ random.set_range{}
 ```lua
 local r = random.create { min = 10, max = 20 }
 
-debug.print { message = table.pretty(random.get_range(r)) }
+debug.print { message = table.pretty{ table = random.get_range{ id = r } } }
 
 random.set_range { id = r, min = 5, max = 7 }
 
-debug.print { message = table.pretty(random.get_range(r)) }
+debug.print { message = table.pretty{ table = random.get_range{ id = r } } }
 ```
 
 输出;
@@ -729,11 +730,11 @@ random.set_seed{}
 ```lua
 local r = random.create {}
 
-debug.print { message = random.get_info(r).seed }
+debug.print { message = random.get_info{ id = r }.seed }
 
 random.set_seed { id = r,  seed = 1314 }
 
-debug.print { message = random.get_info(r).seed }
+debug.print { message = random.get_info{ id = r }.seed }
 ```
 
 输出;
@@ -776,11 +777,11 @@ random.set_step{}
 ```lua
 local r = random.create {}
 
-debug.print { message = random.get_info(r).step }
+debug.print { message = random.get_info{ id = r }.step }
 
 random.set_step { id = r,  step = 30 }
 
-debug.print { message = random.get_info(r).step }
+debug.print { message = random.get_info{ id = r }.step }
 ```
 
 输出;
@@ -800,7 +801,7 @@ debug.print { message = random.get_info(r).step }
 
 ```lua
 -- 单参数
-random.get_type()
+random.get_type{ id = "rng_001" }
 ```
 
 ### 参数
@@ -821,7 +822,7 @@ random.get_type()
 
 ```lua
 local r = random.create { type = random.INT }
-debug.print { message = random.get_type(r) }
+debug.print { message = random.get_type{ id = r } }
 ```
 
 输出;
@@ -840,7 +841,7 @@ int
 
 ```lua
 -- 单参数
-random.get_range()
+random.get_range{ id = "rng_001" }
 ```
 
 ### 参数
@@ -862,7 +863,7 @@ random.get_range()
 
 ```lua
 local r = random.create { min = 10, max = 20 }
-debug.print { message = table.pretty(random.get_range(r)) }
+debug.print { message = table.pretty{ table = random.get_range{ id = r } } }
 ```
 
 输出;
@@ -884,7 +885,7 @@ debug.print { message = table.pretty(random.get_range(r)) }
 
 ```lua
 -- 单参数
-random.get_seed()
+random.get_seed{ id = "rng_001" }
 ```
 
 ### 参数
@@ -905,7 +906,7 @@ random.get_seed()
 
 ```lua
 local r = random.create { seed = 2233 }
-debug.print { message = random.get_seed(r) }
+debug.print { message = random.get_seed{ id = r } }
 ```
 
 输出;
@@ -924,7 +925,7 @@ debug.print { message = random.get_seed(r) }
 
 ```lua
 -- 单参数
-random.get_step()
+random.get_step{ id = "rng_001" }
 ```
 
 ### 参数
@@ -943,7 +944,7 @@ random.get_step()
 
 ```lua
 local r = random.create { step = 50 }
-debug.print { message = random.get_step(r) }
+debug.print { message = random.get_step{ id = r } }
 ```
 
 输出;
@@ -962,7 +963,7 @@ debug.print { message = random.get_step(r) }
 
 ```lua
 -- 单参数
-random.get_info()
+random.get_info{ id = "rng_001" }
 ```
 
 ### 参数
@@ -988,7 +989,7 @@ random.get_info()
 
 ```lua
 local r = random.create {}
-debug.print { message = table.pretty(random.get_info(r)) }
+debug.print { message = table.pretty{ table = random.get_info{ id = r } } }
 ```
 
 输出;
@@ -1014,7 +1015,7 @@ debug.print { message = table.pretty(random.get_info(r)) }
 
 ```lua
 -- 单参数
-random.exists()
+random.exists{ id = "rng_001" }
 ```
 
 ### 参数
@@ -1033,10 +1034,10 @@ random.exists()
 
 ```lua
 local r = random.create {}
-debug.print { message = random.exists(r) }
+debug.print { message = random.exists{ id = r } }
 
-random.delete(r)
-debug.print { message = random.exists(r) }
+random.delete{ id = r }
+debug.print { message = random.exists{ id = r } }
 ```
 
 输出;

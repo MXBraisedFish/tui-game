@@ -395,13 +395,14 @@ impl ScreensaverListUi {
     hit_area: &HitAreaService,
     text_input: &TextInputService,
     scroll_box: &ScrollBoxService,
-  ) {
+  ) -> Option<(u16, u16)> {
     let pos = self.compute_layout(layout, i18n, text_input);
     self.draw_frame(render, canvas, i18n, &pos);
-    self.draw_search(text_input, canvas, i18n, &pos);
+    let input_cursor = self.draw_search(text_input, canvas, i18n, &pos);
     self.draw_lists(render, canvas, layout, i18n, &pos);
     self.draw_hints(render, canvas, layout, i18n, text_input, &pos);
     self.register_hit_areas(hit_area, scroll_box, canvas, &pos);
+    input_cursor
   }
 
   // reason: the runtime calls this signature from outside ui/, so it cannot be changed here.
@@ -898,7 +899,7 @@ impl ScreensaverListUi {
     canvas: &mut CanvasService,
     i18n: &I18nService,
     pos: &ScreensaverListLayout,
-  ) {
+  ) -> Option<(u16, u16)> {
     text_input.render_host(
       &mut self.objects,
       self.search_input,
@@ -916,7 +917,7 @@ impl ScreensaverListUi {
         ..Default::default()
       },
       canvas,
-    );
+    )
   }
 
   fn draw_lists(

@@ -5,9 +5,9 @@ use std::time::Duration;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, ImageConvertMode, ImageConvertParams, ImageService, KeyState,
-  LayoutService, LogService, MouseButton, PackageService, Rect, RenderService, RichTextParams,
-  RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxService, StorageService, TextInputService,
-  UiEvent, UiObjectPool, UiObjectPoolOwner,
+  LayoutService, LogService, MouseButton, PackageImageMode, PackageService, Rect, RenderService,
+  RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxService, StorageService,
+  TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
 pub mod game;
@@ -43,6 +43,13 @@ pub(crate) struct PackageListRenderContext<'a> {
 }
 
 const MAX_PACKAGE_IMAGE_CACHE_ENTRIES: usize = 64;
+
+fn package_image_convert_mode(mode: PackageImageMode) -> ImageConvertMode {
+  match mode {
+    PackageImageMode::HalfBlock => ImageConvertMode::HalfBlock,
+    PackageImageMode::MixBlock => ImageConvertMode::MixBlock,
+  }
+}
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct PackageImageCacheKey {
@@ -501,6 +508,35 @@ mod tests {
       .expect("conversion after snapshot update should succeed");
     assert_ne!(refreshed, original);
 
+    std::fs::remove_dir_all(dir).expect("test directory should be removed");
+  }
+
+  #[test]
+  fn package_image_cache_keeps_half_and_mix_block_outputs_separate() {
+    let dir = temp_dir("package-image-modes");
+    std::fs::create_dir_all(&dir).expect("test directory should be created");
+    let image_path = dir.join("icon.png");
+    write_solid_png(&image_path, Rgb([100, 140, 180]));
+
+    let mut cache = PackageImageCache::default();
+    let mut image_service = ImageService::new(None);
+    let half_block = cache
+      .get_or_convert(1, &mut image_service, params(&image_path))
+      .expect("half-block conversion should succeed");
+    let mix_block = cache
+      .get_or_convert(
+        1,
+        &mut image_service,
+        ImageConvertParams {
+          mode: package_image_convert_mode(PackageImageMode::MixBlock),
+          ..params(&image_path)
+        },
+      )
+      .expect("mix-block conversion should succeed");
+
+    assert_ne!(half_block, mix_block);
+    assert!(half_block.contains('▅'));
+    assert!(mix_block.contains('▀'));
     std::fs::remove_dir_all(dir).expect("test directory should be removed");
   }
 

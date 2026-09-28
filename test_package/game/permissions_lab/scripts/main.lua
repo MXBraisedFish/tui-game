@@ -24,12 +24,12 @@ end
 local function handle_file_event(data)
   if not data.ok then
     push_log("File " .. data.kind .. " failed: " .. data.error.code)
-    debug.warn("file " .. data.kind .. " failed: " .. data.error.message)
+    debug.warn{ message = "file " .. data.kind .. " failed: " .. data.error.message }
     return
   end
   if data.kind == "write_text" then
     push_log("Wrote " .. data.path .. " (tip: " .. tostring(data.tip) .. ")")
-    debug.info("probe written to " .. data.path)
+    debug.info{ message = "probe written to " .. data.path }
   elseif data.kind == "read_text" then
     push_log("Read back: " .. first_line(data.text))
   elseif data.kind == "list_dir" then
@@ -44,13 +44,13 @@ end
 local function self_check()
   local decoded = debug.pcall {
     func = function()
-      return serialization.json_decode("{\"probes\": 1}")
+      return serialization.json_decode{ s = "{\"probes\": 1}" }
     end,
   }
   debug.assert { value = decoded.ok and decoded.values[1].probes == 1, message = "json round trip failed" }
   local broken = debug.pcall {
     func = function()
-      return serialization.json_decode("{broken")
+      return serialization.json_decode{ s = "{broken" }
     end,
   }
   debug.assert { value = not broken.ok, message = "invalid JSON was accepted" }
@@ -66,9 +66,9 @@ function Init(ctx)
     best_probes = ctx.best_data.probes or 0
   end
   self_check()
-  debug.info("Permissions Lab initialized")
+  debug.info{ message = "Permissions Lab initialized" }
   push_log("P writes inside package assets, R reads it back, L lists state/.")
-  if file.exists(PROBE_PATH) then
+  if file.exists{ path = PROBE_PATH } then
     push_log("A probe file from an earlier run exists.")
   end
 end
@@ -91,7 +91,7 @@ function HandleEvent(event)
       }
       push_log("Requested write #" .. probes .. " inside package assets.")
     elseif action == "read_probe" then
-      if file.exists(PROBE_PATH) then
+      if file.exists{ path = PROBE_PATH } then
         file.read { path = PROBE_PATH, encoding = file.UTF_8, event_tip = "probe_read" }
         push_log("Requested a read of " .. PROBE_PATH .. ".")
       else
@@ -101,7 +101,7 @@ function HandleEvent(event)
       file.list_dir { path = "state", event_tip = "state_listed" }
       push_log("Requested a listing of state/.")
     elseif action == "leave" then
-      game.exit_game()
+      game.exit_game{}
     end
   elseif event.type == "file" then
     handle_file_event(event.data)

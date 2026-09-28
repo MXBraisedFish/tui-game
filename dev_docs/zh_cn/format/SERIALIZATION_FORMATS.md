@@ -31,14 +31,12 @@
 ## 通用规则
 
 - 所有序列化操作最后返回的均为字符串类型，只有被写入到对应的文件当中才会被解析。
-- 所有文件类型中的空值（例如 `null`，`~` 等），转换后的 `nil` 不会被 Lua 值解释器保留；反之 `nil` 并不会被转换为对应的空值，而是留空。
+- 统一通过单个命名参数表调用 `serialization` API。JSON/YAML 的 null 解码为只读 `serialization.NULL`，编码时还原为 null；CSV、INI、TOML、XML 遇到该哨兵时报错，避免把 null 静默变成空字符串。Lua 表不能保存 `nil` 字段，因此需要显式空值时使用哨兵。
 
   **示例**
 
   ```lua
-  {
-    is_null = nil -- JSON 为 {}
-  }
+  { is_null = serialization.NULL } -- JSON 为 {"is_null":null}
   ```
 
 ---
@@ -72,10 +70,10 @@ data = any...
 
 > 该部分值的映射不可逆
 
-| Lua   | 方向 | JSON   |
-| ----- | :--: | ------ |
-| `nil` | $→$  | 空字段 |
-| `nil` | $←$  | `null` |
+| Lua                  | 方向 | JSON   |
+| -------------------- | :--: | ------ |
+| 顶层 `nil`           | $→$  | `null` |
+| `serialization.NULL` | $↔$  | `null` |
 
 ### 示例
 
@@ -90,7 +88,7 @@ data = {
   values = { 1, 2, 3 }
 }
 
-json = serialization.json_encode(data)
+json = serialization.json_encode{ value = data }
 debug.print { message = json }
 ```
 
@@ -104,7 +102,7 @@ debug.print { message = json }
 
 ```lua
 json = '{"name":"TUI GAME","values":[1,2,3]}'
-data = serialization.json_decode(json)
+data = serialization.json_decode{ s = json }
 debug.print { message = tostring(data.name) }  -- TUI GAME
 ```
 
@@ -135,11 +133,11 @@ TUI GAME
 }
 ```
 
-> `nil` 被当做可显式的 `null`
+> 在对象或数组中显式保留 `null` 时使用 `serialization.NULL`
 
 ```lua
 {
-  is_null = nil -- JSON 为 {}
+  is_null = serialization.NULL -- JSON 为 {"is_null":null}
 }
 ```
 
@@ -193,7 +191,7 @@ data = {
   window = { width = 120, height = 40 }
 }
 
-toml = serialization.toml_encode(data)
+toml = serialization.toml_encode{ value = data }
 debug.print { message = toml }
 ```
 
@@ -211,7 +209,7 @@ height = 40
 
 ```lua
 toml = 'title = "TUI GAME"\n[window]\nwidth = 120'
-data = serialization.toml_decode(toml)
+data = serialization.toml_decode{ s = toml }
 debug.print { message = tostring(data.window.width) }
 ```
 
@@ -279,11 +277,10 @@ data = {
 
 > 该部分值的映射不可逆
 
-| Lua      | 方向 | YAML         |
-| -------- | :--: | ------------ |
-| `string` | $←$  | `date`       |
-| `nil`    | $→$  | 空字段       |
-| `nil`    | $←$  | `null` / `~` |
+| Lua                  | 方向 | YAML         |
+| -------------------- | :--: | ------------ |
+| `string`             | $←$  | `date`       |
+| `serialization.NULL` | $↔$  | `null` / `~` |
 
 ### 示例
 
@@ -298,7 +295,7 @@ data = {
   tags = { "tui", "lua" }
 }
 
-yaml = serialization.yaml_encode(data)
+yaml = serialization.yaml_encode{ value = data }
 debug.print { message = yaml }
 ```
 
@@ -316,7 +313,7 @@ tags:
 
 ```lua
 yaml = "name: TUI GAME\ntags:\n- tui\n- lua"
-data = serialization.yaml_decode(yaml)
+data = serialization.yaml_decode{ s = yaml }
 debug.print { message = tostring(data.tags[1]) }
 ```
 
@@ -340,11 +337,11 @@ name: !person TUI # 反序列化不支持自定义标签
 1: one
 ```
 
-> `nil` 被当做可显式的 `null`
+> 在 YAML 中显式保留 `null` 时使用 `serialization.NULL`
 
 ```lua
 {
-  is_null = nil -- YAML 为空文件
+  is_null = serialization.NULL -- YAML 输出 null
 }
 ```
 
@@ -397,7 +394,7 @@ rows = {
   { "Bob", 30, true }
 }
 
-csv = serialization.csv_encode(rows)
+csv = serialization.csv_encode{ rows = rows }
 debug.print { message = csv }
 ```
 
@@ -413,7 +410,7 @@ Bob,30,true
 
 ```lua
 csv = "name,age,work\nAlice,12,false\nBob,30,true"
-rows = serialization.csv_decode(csv)
+rows = serialization.csv_decode{ s = csv }
 debug.print { message = tostring(rows[2][1]) }
 debug.print { message = tostring(type(rows[2][2])) }
 ```
@@ -500,8 +497,9 @@ XML 结构：
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
-| `nil`     | $→$  | 单标签   |
 | `string`  | $←$  | 单标签   |
+
+XML 不支持 `serialization.NULL`；遇到哨兵会报错。空字符串映射为空标签文本，不等同于 null。
 
 ### 属性
 
@@ -522,7 +520,7 @@ data = {
   }
 }
 
-xml = serialization.xml_encode(data)
+xml = serialization.xml_encode{ value = data }
 debug.print { message = xml }
 ```
 
@@ -553,10 +551,10 @@ data2 = {
   root = "Hello"
 }
 
-xml1 = serialization.xml_encode(data1)
+xml1 = serialization.xml_encode{ value = data1 }
 debug.print { message = xml1 }
 
-xml2 = serialization.xml_encode(data2)
+xml2 = serialization.xml_encode{ value = data2 }
 debug.print { message = xml2 }
 ```
 
@@ -636,7 +634,7 @@ data = {
   }
 }
 
-xml = serialization.xml_encode(data)
+xml = serialization.xml_encode{ value = data }
 debug.print { message = xml }
 ```
 
@@ -657,7 +655,7 @@ debug.print { message = xml }
 
 ```lua
 xml = '<root version="1.0"><item>A</item><item>B</item></root>'
-data = serialization.xml_decode(xml)
+data = serialization.xml_decode{ s = xml }
 debug.print { message = tostring(data.root.item[1].name) }
 ```
 
@@ -730,7 +728,8 @@ data = {
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
-| `nil`     | $→$  | 空字段   |
+
+INI 不支持 `serialization.NULL`；遇到哨兵会报错。空字符串仍按空值文本写入。
 
 ### 示例
 
@@ -745,7 +744,7 @@ data = {
   }
 }
 
-ini = serialization.ini_encode(data)
+ini = serialization.ini_encode{ value = data }
 debug.print { message = ini }
 ```
 
@@ -763,7 +762,7 @@ port = 8080
 
 ```lua
 ini = "[server]\nhost=127.0.0.1\nport=8080"
-data = serialization.ini_decode(ini)
+data = serialization.ini_decode{ s = ini }
 debug.print { message = data.server.host }
 ```
 
@@ -851,7 +850,7 @@ debug.print { message = result.values[1] .. ", " .. result.values[2] }
 查询大小：
 
 ```lua
-size = serialization.binary_packsize("<I4 I4")
+size = serialization.binary_packsize{ fmt = "<I4 I4" }
 debug.print { message = tostring(size) }
 ```
 

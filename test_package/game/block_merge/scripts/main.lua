@@ -2,7 +2,7 @@
 -- Exercises loader, random generators, table, string.format, align, measurement,
 -- serialization and the save callbacks.
 
-local board = loader.require("board")
+local board = loader.require{ path = "board" }
 
 local CELL_WIDTH = 7
 local CELL_HEIGHT = 3
@@ -42,7 +42,7 @@ local highlight_index = nil
 local highlight_left = 0
 
 local function create_generators(new_seed, position_step, value_step)
-  random.clear()
+  random.clear{}
   seed = new_seed
   position_rng = random.create {
     type = random.INT,
@@ -66,8 +66,8 @@ local function spawn_tile()
     return
   end
   random.set_range { id = position_rng, min = 1, max = #empty }
-  local index = empty[random.generate(position_rng)]
-  if random.generate(value_rng) < 0.9 then
+  local index = empty[random.generate{ id = position_rng }]
+  if random.generate{ id = value_rng } < 0.9 then
     cells[index] = 2
   else
     cells[index] = 4
@@ -88,7 +88,7 @@ local function new_game(new_seed)
 end
 
 local function restore(saved)
-  cells = serialization.json_decode(saved.board)
+  cells = serialization.json_decode{ s = saved.board }
   score = saved.score or 0
   moves = saved.moves or 0
   game_over = not board.can_move(cells)
@@ -117,7 +117,7 @@ local function apply_move(direction)
   else
     game_over = true
     status = "No moves left. Press R to start a new board."
-    game.save_best()
+    game.save_best{}
   end
 end
 
@@ -172,9 +172,9 @@ function HandleEvent(event)
   elseif event.type == "action" and event.data.state == "pressed" then
     local action = event.data.action
     if action == "leave" then
-      game.exit_game()
+      game.exit_game{}
     elseif action == "restart" then
-      game.save_best()
+      game.save_best{}
       new_game(random.randint { min = 1, max = 2147483646 })
     elseif DIRECTIONS[action] ~= nil then
       apply_move(DIRECTIONS[action])
@@ -225,12 +225,12 @@ end
 
 function SaveGame()
   return {
-    board = serialization.json_encode(cells),
+    board = serialization.json_encode{ value = cells },
     score = score,
     moves = moves,
     seed = seed,
-    position_step = random.get_step(position_rng),
-    value_step = random.get_step(value_rng),
+    position_step = random.get_step{ id = position_rng },
+    value_step = random.get_step{ id = value_rng },
   }
 end
 

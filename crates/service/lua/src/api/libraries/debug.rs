@@ -67,8 +67,12 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
             type_head,
           );
         } else {
-          let message =
-            args::dynamic_text(args::one(method, "message", values)?, method, "message")?;
+          let table = args::named(method, values, &["message"])?;
+          let message = args::dynamic_text(
+            args::required(&table, method, "message")?,
+            method,
+            "message",
+          )?;
           enqueue_debug_print(
             &mut state.borrow_mut(),
             message,

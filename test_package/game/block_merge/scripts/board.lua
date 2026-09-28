@@ -1,4 +1,4 @@
--- Pure board logic for Block Merge. Loaded through loader.require("board").
+-- Pure board logic for Block Merge. Loaded through loader.require{ path = "board" }.
 
 local board = {}
 

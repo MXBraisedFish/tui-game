@@ -2,6 +2,8 @@
 
 本文档说明游戏和屏保 Lua Session 使用的生命周期回调，包括各回调的职责、调用时机、参数格式、返回值和运行限制。
 
+当前只有入口生命周期回调（包括 `HandleEvent`）由生产 Runtime 调用。独立的服务/object callback 路由和 lifetime 目前是 Lua 服务内部测试设施，没有面向脚本的注册 API；所有当前生产事件都进入 `HandleEvent`。服务/库是否已注册见 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md)，事件 source 审计见 [B10_EVENT_AUDIT.md](../refactor/B10_EVENT_AUDIT.md)。
+
 ## 1. 回调总览
 
 入口脚本在加载完成后，宿主会从脚本环境中查找以下回调：
@@ -20,8 +22,8 @@
 
 对于游戏：
 
-- `package.json` 中 `game.save = true` 时，`SaveGame` 为必需回调。
-- `package.json` 中 `game.score.enabled = true` 时，`SaveBest` 为必需回调。
+- `game.json` 中 `save_game = true` 时，`SaveGame` 为必需回调。
+- `game.json` 中 `best_score.enable = true` 时，`SaveBest` 为必需回调。
 - 对应功能未开启时，保存回调可以省略；即使定义，宿主也不会通过该功能调用它。
 
 屏保不使用 `SaveGame` 和 `SaveBest`。屏保脚本即使声明这两个函数，宿主也不会将其注册为屏保生命周期回调。
@@ -75,7 +77,7 @@ end
 
 ```lua
 {
-  package_id = "example.game",
+  package_id = "example_game",
   package_type = "game",
   base = {
     width = 120,
@@ -112,7 +114,7 @@ Lua API 不公开物理终端宽高。脚本只能查询当前 Session 的 Base 
 
 ### 限制
 
-- `game.exit_game()` 不允许在 `Init` 中调用。
+- `game.exit_game{}` 不允许在 `Init` 中调用。
 - 异步 API 可以在 `Init` 中提交请求，但结果只能在 Session 进入正常 Runtime 后通过事件接收。
 - 绘制 API 可以使用，但绘制命令仍由宿主在回调结束后统一处理。
 
@@ -152,7 +154,7 @@ end
 - Runtime 每帧在 `Update` 之前投递事件。
 - 单个 Session 每个宿主帧最多处理 128 个事件，剩余事件保留到后续帧。
 - 没有事件时，本帧不会调用 `HandleEvent`。
-- 异步 API 或对象显式注册了独立回调时，完整事件只交给该回调，不再重复进入 `HandleEvent`。
+- 当前生产 API 没有独立回调注册能力；未来若增加该能力，需在对应 API 文档中说明事件是否仍进入 `HandleEvent`。
 
 ### 参数
 
@@ -189,7 +191,7 @@ end
 - 游戏可以接收允许的动作、鼠标、系统、服务和对象事件。
 - 屏保不接收键盘、动作、鼠标及交互组件事件。
 - 覆盖屏接管输入时，游戏不会收到动作、鼠标和交互组件事件。
-- `event.skip_action()` 和 `event.clear_action()` 只影响游戏脚本动作事件，不影响宿主全局动作和系统事件，并且要求关闭安全模式。
+- `event.skip_action{}` 和 `event.clear_action{}` 只影响游戏脚本动作事件，不影响宿主全局动作和系统事件。
 
 ### 示例
 
@@ -326,7 +328,7 @@ Base 画布的初始宽高来自 `Init(ctx)` 的 `ctx.base.width` 和 `ctx.base.
 
 - `draw.text` 等普通绘制 API 并非只能在 `Render` 中调用；它们可在任意生命周期回调中向当前 Session 的虚拟画布命令缓冲提交绘制。
 - 宿主在 Lua 回调结束后统一消费并拼合绘制命令。建议主要在 `Render` 中组织绘制，以便代码职责清晰。
-- `draw.render()` 只请求宿主重绘，不会立即递归调用 `Render`；它不允许在 `Render` 回调内使用。
+- `draw.render{}` 只请求宿主重绘，不会立即递归调用 `Render`；它不允许在 `Render` 回调内使用。
 - 坐标允许为负数，超出画布的部分由宿主裁剪。
 - 每个 Session 每帧最多提交 4096 条绘制命令。
 - 每个 Session 每帧绘制文本累计最多 1 MiB。
@@ -371,13 +373,11 @@ end
 
 ### 启用条件
 
-仅游戏使用。`package.json` 必须包含：
+仅游戏使用。`game.json` 必须包含：
 
 ```json
 {
-  "game": {
-    "save": true
-  }
+  "save_game": true
 }
 ```
 
@@ -385,8 +385,8 @@ end
 
 ### 调用时机
 
-- 脚本调用 `game.save_game()` 后，由宿主在当前 Lua 回调返回后调用。
-- 退出游戏或关闭宿主不会自动调用；开发者如需保留继续游戏数据，必须在退出前显式调用 `game.save_game()`。
+- 脚本调用 `game.save_game{}` 后，由宿主在当前 Lua 回调返回后调用。
+- 退出游戏或关闭宿主不会自动调用；开发者如需保留继续游戏数据，必须在退出前显式调用 `game.save_game{}`。
 - Session 已经故障时不会自动保存故障状态。
 
 该存储只用于宿主的单个“继续游戏”槽位。所有游戏共用该槽位，后保存的游戏会覆盖之前的继续游戏数据。游戏自己的长期、多槽位存档应在获得权限后使用文件 API。
@@ -423,8 +423,8 @@ end
 
 ### 限制
 
-- `game.save_game()` 不允许在 `SaveGame` 内再次调用，避免递归保存。
-- `game.exit_game()` 不允许在 `SaveGame` 内调用。
+- `game.save_game{}` 不允许在 `SaveGame` 内再次调用，避免递归保存。
+- `game.exit_game{}` 不允许在 `SaveGame` 内调用。
 - 返回值不合法时不会写入继续游戏槽位，并会作为当前游戏的 Lua Session 错误抛出；宿主继续运行。
 
 ## 9. `SaveBest`
@@ -444,14 +444,12 @@ end
 
 ### 启用条件
 
-仅游戏使用。`package.json` 必须启用记录：
+仅游戏使用。`game.json` 必须启用记录：
 
 ```json
 {
-  "game": {
-    "score": {
-      "enabled": true
-    }
+  "best_score": {
+    "enable": true
   }
 }
 ```
@@ -460,8 +458,8 @@ end
 
 ### 调用时机
 
-- 脚本调用 `game.save_best()` 后，由宿主在当前 Lua 回调返回后调用。
-- 退出游戏或关闭宿主不会自动调用；开发者如需更新最佳记录，必须在退出前显式调用 `game.save_best()`。
+- 脚本调用 `game.save_best{}` 后，由宿主在当前 Lua 回调返回后调用。
+- 退出游戏或关闭宿主不会自动调用；开发者如需更新最佳记录，必须在退出前显式调用 `game.save_best{}`。
 - Session 已经故障时不会自动保存故障状态。
 
 ### 参数
@@ -488,8 +486,8 @@ end
 
 ### 限制
 
-- `game.save_best()` 不允许在 `SaveBest` 内再次调用，避免递归保存。
-- `game.exit_game()` 不允许在 `SaveBest` 内调用。
+- `game.save_best{}` 不允许在 `SaveBest` 内再次调用，避免递归保存。
+- `game.exit_game{}` 不允许在 `SaveBest` 内调用。
 - 返回值不合法时不会写入最佳记录，并会作为当前游戏的 Lua Session 错误抛出；宿主继续运行。
 
 ## 10. 公共执行限制
@@ -500,7 +498,6 @@ end
 | ------------- | ---------: | ---------: | -----------: |
 | `Init`        |      50 ms |     100 ms |    1,000,000 |
 | `HandleEvent` |      20 ms |      75 ms |      200,000 |
-| 独立事件回调  |      20 ms |      75 ms |      200,000 |
 | `Update`      |      20 ms |      75 ms |      200,000 |
 | `UpdateFrame` |      20 ms |      75 ms |      200,000 |
 | `Render`      |      20 ms |      75 ms |      200,000 |
@@ -524,9 +521,9 @@ end
 ### 10.3 一般约束
 
 - 所有生命周期回调都在 Runtime 主线程串行执行，不会并发调用同一 Session。
-- 不要在回调中阻塞等待异步服务结果；请求结果会在后续帧通过事件或独立回调返回。
+- 不要在回调中阻塞等待异步服务结果；当前生产请求结果会在后续帧通过 `HandleEvent` 返回。
 - 原始终端按键、宿主内部任务 ID、绝对路径和宿主 UI 对象不会传给脚本。
-- Session 停止后，宿主会清理其事件、对象、异步任务所有权和注册回调；旧 Session 的迟到结果不会进入新 Session。
+- Session 停止后，宿主会清理其事件、对象和异步任务所有权；旧 Session 的迟到结果不会进入新 Session。
 
 ## 11. 最小模板
 

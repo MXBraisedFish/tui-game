@@ -44,9 +44,12 @@ pub(super) fn drain_engine_events(
       EngineEvent::InputKey(event) => services.input.queue_key_event(event, &mut services.log),
       EngineEvent::System(event) => services.input.queue_system_event(event, &mut services.log),
       EngineEvent::Package(event) => {
-        let event = services
+        let Some(event) = services
           .package
-          .handle_async_event(event, &mut services.log);
+          .handle_async_event(event, &mut services.log)
+        else {
+          continue;
+        };
         if matches!(event, PackageEvent::ScanFinished { .. }) {
           synchronize_key_bindings_profile(services);
           reconcile_game_save_profile(services);

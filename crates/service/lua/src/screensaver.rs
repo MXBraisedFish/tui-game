@@ -187,7 +187,7 @@ mod tests {
       .join("test_package/screensaver/layer_waves/scripts/main.lua");
     let session = LuaSession::load(
       LuaSessionSpec {
-        package_id: "test.layer_waves".to_string(),
+        package_id: "test_layer_waves".to_string(),
         session_kind: LuaSessionKind::Screensaver,
         entry_path,
         fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
@@ -210,7 +210,7 @@ mod tests {
       PackageId::new(
         PackageSource::Official,
         PackageType::Screensaver,
-        "test.layer_waves",
+        "test_layer_waves",
       )
       .unwrap(),
       None,

@@ -33,17 +33,8 @@ pub fn message(method: &str, text: impl Into<String>) -> mlua::Error {
   mlua::Error::RuntimeError(format!("{method}: {}", text.into()))
 }
 
-pub fn no_args(method: &str, args: MultiValue) -> mlua::Result<()> {
-  if args.is_empty() {
-    return Ok(());
-  }
-  if args.len() == 1
-    && let Some(Value::Table(table)) = args.front()
-    && table.is_empty()
-  {
-    return Ok(());
-  }
-  Err(message(method, "expected no parameters"))
+pub fn empty_named(method: &str, args: MultiValue) -> mlua::Result<()> {
+  named(method, args, &[]).map(|_| ())
 }
 
 pub fn one(method: &str, parameter: &str, args: MultiValue) -> mlua::Result<Value> {
