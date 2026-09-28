@@ -1,0 +1,48 @@
+{
+  "settings_sha256": "770c92172441544f038b405f680eb5fb9c7cddb7fd568098c50ba971536400b4",
+  "profile": {
+    "backgroundImage": null,
+    "colorScheme": "Tango Dark",
+    "commandline": "%SystemRoot%\\System32\\cmd.exe",
+    "cursorColor": "#EEEEEC",
+    "cursorShape": "underscore",
+    "font": {
+      "face": "Maple Mono NF CN",
+      "weight": "semi-bold"
+    },
+    "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
+    "hidden": false,
+    "intenseTextStyle": "bright",
+    "name": "命令提示符"
+  },
+  "defaults": {
+    "colorScheme": "Tango Dark",
+    "font": {
+      "cellHeight": "1.5",
+      "weight": "semi-bold"
+    }
+  },
+  "font_points": 12,
+  "dpi_from_prior_baseline": 144,
+  "font_px_initial": 24,
+  "cell_metrics": "measured using 80 alternating background cells, not glyph ink",
+  "scheme": "Tango Dark",
+  "scheme_source": "https://github.com/microsoft/terminal/blob/main/src/cascadia/TerminalSettingsModel/defaults.json",
+  "user_decision": "2026-09-28: use current terminal settings without modifying them",
+  "upstream_geometry_source": "https://github.com/microsoft/terminal/blob/main/src/renderer/atlas/AtlasEngine.api.cpp",
+  "upstream_note": "main revision is implementation reference, not claimed to match installed binary exactly",
+  "measured_cell_pixels": {
+    "width": 15,
+    "height": 36
+  },
+  "measured_window_dpi": 144,
+  "directwrite_match": {
+    "weight": 700,
+    "simulation_flags": 1,
+    "meaning": "DWRITE_FONT_SIMULATIONS_BOLD"
+  },
+  "fontdb_match": {
+    "weight": 400,
+    "postscript_name": "MapleMono-NF-CN-Regular"
+  }
+}

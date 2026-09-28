@@ -1,0 +1,20 @@
+[package]
+name = "terminal-raster"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+image.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+fontdb.workspace = true
+fontdue.workspace = true
+harfrust.workspace = true
+unicode-segmentation.workspace = true
+unicode-width.workspace = true
+crossterm.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true
+windows-numerics.workspace = true

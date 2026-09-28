@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>终端导出实验对照</title>
+<style>
+body{margin:24px;background:#141820;color:#e1e7ef;font:15px/1.6 system-ui}h1{font-size:24px}p{color:#aebccd}button,select,input{font:inherit}select{padding:6px;background:#242e3a;color:inherit}label{margin-right:20px}a{color:#8edcc7}.stage{position:relative;width:max-content;margin-top:18px;border:1px solid #4b596a}.stage img{display:block;max-width:none}.stage #candidate{position:absolute;inset:0;opacity:.5}.viewport{max-width:100%;overflow:auto}small{color:#9caec1}
+</style>
+<h1>同一测试帧：终端截图与合成 PNG</h1>
+<p>保持原始像素尺寸，不做缩放对齐。拖动透明度，检查边缘是否移动、重影；先看 ASCII／CJK，再看复杂文字与方块。</p>
+<label>合成后端 <select id="backend">
+<option value="native-cluster-gray">DirectWrite · 簇间距校准 · 灰度</option>
+<option value="native-cell-gray">DirectWrite · 逐字格 · 灰度</option>
+<option value="native-cell-cleartype">DirectWrite · 逐字格 · ClearType</option>
+<option value="native-run-gray">DirectWrite · 自然行布局</option>
+<option value="software-fit">fontdue + HarfRust · 整行间距缩放</option>
+<option value="software-natural">fontdue + HarfRust · 自然字距</option>
+</select></label>
+<label>终端 ← <input id="blend" type="range" min="0" max="100" value="50" aria-label="合成图透明度"> → 合成 <span id="percent">50%</span></label>
+<p><a href="window.png">完整窗口截图</a> · <a href="calibration.json">字格实测</a> · <a id="metrics" href="comparison/native-cluster-gray/comparison.json">逐行误差</a> · <a id="diff" href="comparison/native-cluster-gray/difference.png">差异热图</a></p>
+<small>软件对照仅使用主字体，不能当作 dev 完整渲染器。原生簇模式仍不是 Windows Terminal 的 Atlas 引擎；复杂脚本、双向文字、emoji、几何字符单独观察。</small>
+<div class="viewport"><div class="stage"><img src="reference.png" alt="校准后的终端原图"><img id="candidate" src="measured/native-cluster-gray.png" alt="合成对照"></div></div>
+<script>
+const backend=document.querySelector('#backend'),blend=document.querySelector('#blend'),candidate=document.querySelector('#candidate');
+backend.addEventListener('change',()=>{candidate.src=`measured/${backend.value}.png`;document.querySelector('#metrics').href=`comparison/${backend.value}/comparison.json`;document.querySelector('#diff').href=`comparison/${backend.value}/difference.png`;});
+blend.addEventListener('input',()=>{candidate.style.opacity=blend.value/100;document.querySelector('#percent').textContent=`${blend.value}%`;});
+</script>
+</html>

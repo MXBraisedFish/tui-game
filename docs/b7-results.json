@@ -1,0 +1,1059 @@
+{
+  "date": "2026-09-28",
+  "calibration": {
+    "crop": {
+      "x": 23,
+      "y": 73,
+      "width": 1200,
+      "height": 720
+    },
+    "cell_width": 15,
+    "cell_height": 36,
+    "method": "80 exact alternating magenta/cyan background cells + vertical blue/yellow ruler",
+    "baseline": "not measured; retained from input profile, calibrate independently",
+    "input": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\window.png"
+  },
+  "profile": {
+    "family": "Maple Mono NF CN",
+    "weight": 600,
+    "font_px": 24.0,
+    "cell_width": 15,
+    "cell_height": 36,
+    "baseline": 27.0,
+    "foreground": [
+      211,
+      215,
+      207
+    ],
+    "background": [
+      0,
+      0,
+      0
+    ],
+    "palette": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        204,
+        0,
+        0
+      ],
+      [
+        78,
+        154,
+        6
+      ],
+      [
+        196,
+        160,
+        0
+      ],
+      [
+        52,
+        101,
+        164
+      ],
+      [
+        117,
+        80,
+        123
+      ],
+      [
+        6,
+        152,
+        154
+      ],
+      [
+        211,
+        215,
+        207
+      ],
+      [
+        85,
+        87,
+        83
+      ],
+      [
+        239,
+        41,
+        41
+      ],
+      [
+        138,
+        226,
+        52
+      ],
+      [
+        252,
+        233,
+        79
+      ],
+      [
+        114,
+        159,
+        207
+      ],
+      [
+        173,
+        127,
+        168
+      ],
+      [
+        52,
+        226,
+        226
+      ],
+      [
+        238,
+        238,
+        236
+      ]
+    ],
+    "bold_is_bright": true
+  },
+  "comparisons": {
+    "native-cell-cleartype": {
+      "reference": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\reference.png",
+      "candidate": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\measured\\native-cell-cleartype.png",
+      "width": 1200,
+      "height": 720,
+      "alignment": "none; same cell crop required",
+      "rows": [
+        {
+          "row": 0,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 21060,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 1,
+          "rgb_mae": 4.248634259259259,
+          "changed_fraction_gt16": 0.14460648148148147,
+          "active_pixels": 10129,
+          "active_rgb_mae": 18.12034751703031
+        },
+        {
+          "row": 2,
+          "rgb_mae": 4.267006172839507,
+          "changed_fraction_gt16": 0.13898148148148148,
+          "active_pixels": 9310,
+          "active_rgb_mae": 19.79964196204798
+        },
+        {
+          "row": 3,
+          "rgb_mae": 3.7949305555555557,
+          "changed_fraction_gt16": 0.10203703703703704,
+          "active_pixels": 7221,
+          "active_rgb_mae": 22.70336518487744
+        },
+        {
+          "row": 4,
+          "rgb_mae": 4.970979938271605,
+          "changed_fraction_gt16": 0.07449074074074075,
+          "active_pixels": 4516,
+          "active_rgb_mae": 47.55233244759374
+        },
+        {
+          "row": 5,
+          "rgb_mae": 4.789166666666667,
+          "changed_fraction_gt16": 0.05592592592592593,
+          "active_pixels": 3285,
+          "active_rgb_mae": 62.98082191780822
+        },
+        {
+          "row": 6,
+          "rgb_mae": 14.643518518518519,
+          "changed_fraction_gt16": 0.11905092592592592,
+          "active_pixels": 7056,
+          "active_rgb_mae": 89.65419501133786
+        },
+        {
+          "row": 7,
+          "rgb_mae": 7.445200617283951,
+          "changed_fraction_gt16": 0.07594907407407407,
+          "active_pixels": 3663,
+          "active_rgb_mae": 87.8058058058058
+        },
+        {
+          "row": 8,
+          "rgb_mae": 3.9955015432098766,
+          "changed_fraction_gt16": 0.046550925925925926,
+          "active_pixels": 4206,
+          "active_rgb_mae": 41.03796164209859
+        },
+        {
+          "row": 9,
+          "rgb_mae": 1.7298225308641975,
+          "changed_fraction_gt16": 0.026990740740740742,
+          "active_pixels": 1966,
+          "active_rgb_mae": 38.01034248897931
+        },
+        {
+          "row": 10,
+          "rgb_mae": 4.122191358024692,
+          "changed_fraction_gt16": 0.047453703703703706,
+          "active_pixels": 4226,
+          "active_rgb_mae": 42.13882315822685
+        },
+        {
+          "row": 11,
+          "rgb_mae": 9.13091049382716,
+          "changed_fraction_gt16": 0.099375,
+          "active_pixels": 9852,
+          "active_rgb_mae": 40.03809717147111
+        },
+        {
+          "row": 12,
+          "rgb_mae": 1.319868827160494,
+          "changed_fraction_gt16": 0.04384259259259259,
+          "active_pixels": 3137,
+          "active_rgb_mae": 18.176070555732654
+        },
+        {
+          "row": 13,
+          "rgb_mae": 1.2867515432098766,
+          "changed_fraction_gt16": 0.03895833333333333,
+          "active_pixels": 2805,
+          "active_rgb_mae": 19.817349970291147
+        },
+        {
+          "row": 14,
+          "rgb_mae": 1.2590895061728395,
+          "changed_fraction_gt16": 0.04125,
+          "active_pixels": 3007,
+          "active_rgb_mae": 18.088681964305508
+        },
+        {
+          "row": 15,
+          "rgb_mae": 4.9936342592592595,
+          "changed_fraction_gt16": 0.05462962962962963,
+          "active_pixels": 12640,
+          "active_rgb_mae": 17.066851265822784
+        },
+        {
+          "row": 16,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 32400,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 17,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 34560,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 18,
+          "rgb_mae": 3.5175617283950618,
+          "changed_fraction_gt16": 0.11851851851851852,
+          "active_pixels": 8201,
+          "active_rgb_mae": 18.52928504653904
+        },
+        {
+          "row": 19,
+          "rgb_mae": 2.245054012345679,
+          "changed_fraction_gt16": 0.07675925925925926,
+          "active_pixels": 5436,
+          "active_rgb_mae": 17.84148883983321
+        }
+      ],
+      "interpretation": "lower is closer; no pass threshold claims visual equivalence; inspect text rows separately from background/palette"
+    },
+    "native-cell-gray": {
+      "reference": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\reference.png",
+      "candidate": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\measured\\native-cell-gray.png",
+      "width": 1200,
+      "height": 720,
+      "alignment": "none; same cell crop required",
+      "rows": [
+        {
+          "row": 0,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 21060,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 1,
+          "rgb_mae": 0.08391975308641976,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 8504,
+          "active_rgb_mae": 0.42630918783317656
+        },
+        {
+          "row": 2,
+          "rgb_mae": 0.07858796296296296,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 7864,
+          "active_rgb_mae": 0.43171414038657174
+        },
+        {
+          "row": 3,
+          "rgb_mae": 1.2618055555555556,
+          "changed_fraction_gt16": 0.01337962962962963,
+          "active_pixels": 6490,
+          "active_rgb_mae": 8.399075500770415
+        },
+        {
+          "row": 4,
+          "rgb_mae": 3.507037037037037,
+          "changed_fraction_gt16": 0.023078703703703702,
+          "active_pixels": 3942,
+          "active_rgb_mae": 38.43328259766616
+        },
+        {
+          "row": 5,
+          "rgb_mae": 3.966921296296296,
+          "changed_fraction_gt16": 0.025,
+          "active_pixels": 2870,
+          "active_rgb_mae": 59.71114982578397
+        },
+        {
+          "row": 6,
+          "rgb_mae": 13.874467592592593,
+          "changed_fraction_gt16": 0.08592592592592592,
+          "active_pixels": 6524,
+          "active_rgb_mae": 91.87262415695892
+        },
+        {
+          "row": 7,
+          "rgb_mae": 7.050015432098766,
+          "changed_fraction_gt16": 0.06259259259259259,
+          "active_pixels": 3451,
+          "active_rgb_mae": 88.25287356321839
+        },
+        {
+          "row": 8,
+          "rgb_mae": 4.073348765432098,
+          "changed_fraction_gt16": 0.03509259259259259,
+          "active_pixels": 4051,
+          "active_rgb_mae": 43.438327984859704
+        },
+        {
+          "row": 9,
+          "rgb_mae": 1.2949074074074074,
+          "changed_fraction_gt16": 0.01,
+          "active_pixels": 1739,
+          "active_rgb_mae": 32.167912593444505
+        },
+        {
+          "row": 10,
+          "rgb_mae": 4.215131172839506,
+          "changed_fraction_gt16": 0.03601851851851852,
+          "active_pixels": 4071,
+          "active_rgb_mae": 44.729468599033815
+        },
+        {
+          "row": 11,
+          "rgb_mae": 7.778433641975309,
+          "changed_fraction_gt16": 0.05243055555555556,
+          "active_pixels": 9109,
+          "active_rgb_mae": 36.88970615142533
+        },
+        {
+          "row": 12,
+          "rgb_mae": 0.027438271604938273,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 2716,
+          "active_rgb_mae": 0.436426116838488
+        },
+        {
+          "row": 13,
+          "rgb_mae": 0.030216049382716048,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 2385,
+          "active_rgb_mae": 0.547309573724668
+        },
+        {
+          "row": 14,
+          "rgb_mae": 0.08150462962962964,
+          "changed_fraction_gt16": 0.00034722222222222224,
+          "active_pixels": 2645,
+          "active_rgb_mae": 1.3311909262759924
+        },
+        {
+          "row": 15,
+          "rgb_mae": 3.6792824074074075,
+          "changed_fraction_gt16": 0.017361111111111112,
+          "active_pixels": 12308,
+          "active_rgb_mae": 12.913958401039974
+        },
+        {
+          "row": 16,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 32400,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 17,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 34560,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 18,
+          "rgb_mae": 0.069375,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 6936,
+          "active_rgb_mae": 0.4320934256055363
+        },
+        {
+          "row": 19,
+          "rgb_mae": 0.04619598765432099,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 4587,
+          "active_rgb_mae": 0.4350701257176077
+        }
+      ],
+      "interpretation": "lower is closer; no pass threshold claims visual equivalence; inspect text rows separately from background/palette"
+    },
+    "native-cluster-gray": {
+      "reference": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\reference.png",
+      "candidate": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\measured\\native-cluster-gray.png",
+      "width": 1200,
+      "height": 720,
+      "alignment": "none; same cell crop required",
+      "rows": [
+        {
+          "row": 0,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 21060,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 1,
+          "rgb_mae": 0.08391975308641976,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 8504,
+          "active_rgb_mae": 0.42630918783317656
+        },
+        {
+          "row": 2,
+          "rgb_mae": 0.07858796296296296,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 7864,
+          "active_rgb_mae": 0.43171414038657174
+        },
+        {
+          "row": 3,
+          "rgb_mae": 1.2618055555555556,
+          "changed_fraction_gt16": 0.01337962962962963,
+          "active_pixels": 6490,
+          "active_rgb_mae": 8.399075500770415
+        },
+        {
+          "row": 4,
+          "rgb_mae": 0.044328703703703703,
+          "changed_fraction_gt16": 0.0002314814814814815,
+          "active_pixels": 3769,
+          "active_rgb_mae": 0.5080923321836031
+        },
+        {
+          "row": 5,
+          "rgb_mae": 7.767322530864197,
+          "changed_fraction_gt16": 0.0487037037037037,
+          "active_pixels": 3219,
+          "active_rgb_mae": 104.23992958475718
+        },
+        {
+          "row": 6,
+          "rgb_mae": 13.874467592592593,
+          "changed_fraction_gt16": 0.08592592592592592,
+          "active_pixels": 6524,
+          "active_rgb_mae": 91.87262415695892
+        },
+        {
+          "row": 7,
+          "rgb_mae": 7.091466049382716,
+          "changed_fraction_gt16": 0.06275462962962963,
+          "active_pixels": 3458,
+          "active_rgb_mae": 88.59205706574127
+        },
+        {
+          "row": 8,
+          "rgb_mae": 4.091342592592593,
+          "changed_fraction_gt16": 0.03509259259259259,
+          "active_pixels": 4051,
+          "active_rgb_mae": 43.630214761787215
+        },
+        {
+          "row": 9,
+          "rgb_mae": 1.2949074074074074,
+          "changed_fraction_gt16": 0.01,
+          "active_pixels": 1739,
+          "active_rgb_mae": 32.167912593444505
+        },
+        {
+          "row": 10,
+          "rgb_mae": 4.233125,
+          "changed_fraction_gt16": 0.03601851851851852,
+          "active_pixels": 4071,
+          "active_rgb_mae": 44.920412675018426
+        },
+        {
+          "row": 11,
+          "rgb_mae": 7.778078703703704,
+          "changed_fraction_gt16": 0.05243055555555556,
+          "active_pixels": 9109,
+          "active_rgb_mae": 36.88802283455923
+        },
+        {
+          "row": 12,
+          "rgb_mae": 0.027438271604938273,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 2716,
+          "active_rgb_mae": 0.436426116838488
+        },
+        {
+          "row": 13,
+          "rgb_mae": 0.030216049382716048,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 2385,
+          "active_rgb_mae": 0.547309573724668
+        },
+        {
+          "row": 14,
+          "rgb_mae": 0.08150462962962964,
+          "changed_fraction_gt16": 0.00034722222222222224,
+          "active_pixels": 2645,
+          "active_rgb_mae": 1.3311909262759924
+        },
+        {
+          "row": 15,
+          "rgb_mae": 3.6792824074074075,
+          "changed_fraction_gt16": 0.017361111111111112,
+          "active_pixels": 12308,
+          "active_rgb_mae": 12.913958401039974
+        },
+        {
+          "row": 16,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 32400,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 17,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 34560,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 18,
+          "rgb_mae": 0.069375,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 6936,
+          "active_rgb_mae": 0.4320934256055363
+        },
+        {
+          "row": 19,
+          "rgb_mae": 0.04619598765432099,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 4587,
+          "active_rgb_mae": 0.4350701257176077
+        }
+      ],
+      "interpretation": "lower is closer; no pass threshold claims visual equivalence; inspect text rows separately from background/palette"
+    },
+    "native-run-gray": {
+      "reference": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\reference.png",
+      "candidate": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\measured\\native-run-gray.png",
+      "width": 1200,
+      "height": 720,
+      "alignment": "none; same cell crop required",
+      "rows": [
+        {
+          "row": 0,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 21060,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 1,
+          "rgb_mae": 37.950563271604935,
+          "changed_fraction_gt16": 0.2564814814814815,
+          "active_pixels": 12930,
+          "active_rgb_mae": 126.79538540861047
+        },
+        {
+          "row": 2,
+          "rgb_mae": 29.04576388888889,
+          "changed_fraction_gt16": 0.2098611111111111,
+          "active_pixels": 11141,
+          "active_rgb_mae": 112.62696346827035
+        },
+        {
+          "row": 3,
+          "rgb_mae": 30.105385802469137,
+          "changed_fraction_gt16": 0.19578703703703704,
+          "active_pixels": 9841,
+          "active_rgb_mae": 132.15655590556514
+        },
+        {
+          "row": 4,
+          "rgb_mae": 16.42516975308642,
+          "changed_fraction_gt16": 0.1074537037037037,
+          "active_pixels": 5796,
+          "active_rgb_mae": 122.42362548884287
+        },
+        {
+          "row": 5,
+          "rgb_mae": 12.381481481481481,
+          "changed_fraction_gt16": 0.07717592592592593,
+          "active_pixels": 3854,
+          "active_rgb_mae": 138.78567721847432
+        },
+        {
+          "row": 6,
+          "rgb_mae": 20.66081790123457,
+          "changed_fraction_gt16": 0.12761574074074075,
+          "active_pixels": 7286,
+          "active_rgb_mae": 122.5016927440754
+        },
+        {
+          "row": 7,
+          "rgb_mae": 8.312484567901235,
+          "changed_fraction_gt16": 0.07282407407407407,
+          "active_pixels": 3720,
+          "active_rgb_mae": 96.5320788530466
+        },
+        {
+          "row": 8,
+          "rgb_mae": 7.945123456790124,
+          "changed_fraction_gt16": 0.05513888888888889,
+          "active_pixels": 4444,
+          "active_rgb_mae": 77.23432343234323
+        },
+        {
+          "row": 9,
+          "rgb_mae": 10.391396604938272,
+          "changed_fraction_gt16": 0.05611111111111111,
+          "active_pixels": 2791,
+          "active_rgb_mae": 160.84139495999045
+        },
+        {
+          "row": 10,
+          "rgb_mae": 8.116990740740741,
+          "changed_fraction_gt16": 0.056226851851851854,
+          "active_pixels": 4469,
+          "active_rgb_mae": 78.46363839785187
+        },
+        {
+          "row": 11,
+          "rgb_mae": 21.629621913580248,
+          "changed_fraction_gt16": 0.12618055555555555,
+          "active_pixels": 10661,
+          "active_rgb_mae": 87.64653096957758
+        },
+        {
+          "row": 12,
+          "rgb_mae": 9.446026234567901,
+          "changed_fraction_gt16": 0.06826388888888889,
+          "active_pixels": 3793,
+          "active_rgb_mae": 107.58458564021443
+        },
+        {
+          "row": 13,
+          "rgb_mae": 9.488479938271604,
+          "changed_fraction_gt16": 0.059814814814814814,
+          "active_pixels": 3377,
+          "active_rgb_mae": 121.38061395716119
+        },
+        {
+          "row": 14,
+          "rgb_mae": 8.844537037037037,
+          "changed_fraction_gt16": 0.06453703703703703,
+          "active_pixels": 3646,
+          "active_rgb_mae": 104.7953922106418
+        },
+        {
+          "row": 15,
+          "rgb_mae": 11.133510802469136,
+          "changed_fraction_gt16": 0.07458333333333333,
+          "active_pixels": 12962,
+          "active_rgb_mae": 37.10597644396441
+        },
+        {
+          "row": 16,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 32400,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 17,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 34560,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 18,
+          "rgb_mae": 32.88594135802469,
+          "changed_fraction_gt16": 0.2175462962962963,
+          "active_pixels": 10812,
+          "active_rgb_mae": 131.39776791219631
+        },
+        {
+          "row": 19,
+          "rgb_mae": 22.24079475308642,
+          "changed_fraction_gt16": 0.1452314814814815,
+          "active_pixels": 7146,
+          "active_rgb_mae": 134.45316727306653
+        }
+      ],
+      "interpretation": "lower is closer; no pass threshold claims visual equivalence; inspect text rows separately from background/palette"
+    },
+    "software-fit": {
+      "reference": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\reference.png",
+      "candidate": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\measured\\software-fit.png",
+      "width": 1200,
+      "height": 720,
+      "alignment": "none; same cell crop required",
+      "rows": [
+        {
+          "row": 0,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 21060,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 1,
+          "rgb_mae": 8.487592592592593,
+          "changed_fraction_gt16": 0.11120370370370371,
+          "active_pixels": 8774,
+          "active_rgb_mae": 41.78983359927057
+        },
+        {
+          "row": 2,
+          "rgb_mae": 7.712986111111111,
+          "changed_fraction_gt16": 0.10789351851851851,
+          "active_pixels": 8066,
+          "active_rgb_mae": 41.30932308455244
+        },
+        {
+          "row": 3,
+          "rgb_mae": 31.969791666666666,
+          "changed_fraction_gt16": 0.21384259259259258,
+          "active_pixels": 10152,
+          "active_rgb_mae": 136.04166666666666
+        },
+        {
+          "row": 4,
+          "rgb_mae": 3.9543595679012347,
+          "changed_fraction_gt16": 0.05032407407407408,
+          "active_pixels": 3888,
+          "active_rgb_mae": 43.93732853223594
+        },
+        {
+          "row": 5,
+          "rgb_mae": 14.965408950617284,
+          "changed_fraction_gt16": 0.09835648148148148,
+          "active_pixels": 4892,
+          "active_rgb_mae": 132.15569637503407
+        },
+        {
+          "row": 6,
+          "rgb_mae": 23.230200617283952,
+          "changed_fraction_gt16": 0.1520601851851852,
+          "active_pixels": 7771,
+          "active_rgb_mae": 129.13970745935745
+        },
+        {
+          "row": 7,
+          "rgb_mae": 11.935146604938272,
+          "changed_fraction_gt16": 0.09048611111111111,
+          "active_pixels": 4082,
+          "active_rgb_mae": 126.31022374652947
+        },
+        {
+          "row": 8,
+          "rgb_mae": 4.839637345679012,
+          "changed_fraction_gt16": 0.04636574074074074,
+          "active_pixels": 3864,
+          "active_rgb_mae": 54.107746721877156
+        },
+        {
+          "row": 9,
+          "rgb_mae": 2.0525925925925925,
+          "changed_fraction_gt16": 0.019375,
+          "active_pixels": 1680,
+          "active_rgb_mae": 52.78095238095238
+        },
+        {
+          "row": 10,
+          "rgb_mae": 4.95070987654321,
+          "changed_fraction_gt16": 0.04729166666666667,
+          "active_pixels": 3882,
+          "active_rgb_mae": 55.092907436029535
+        },
+        {
+          "row": 11,
+          "rgb_mae": 10.544645061728396,
+          "changed_fraction_gt16": 0.07592592592592592,
+          "active_pixels": 9001,
+          "active_rgb_mae": 50.60867311039514
+        },
+        {
+          "row": 12,
+          "rgb_mae": 2.752854938271605,
+          "changed_fraction_gt16": 0.036180555555555556,
+          "active_pixels": 2810,
+          "active_rgb_mae": 42.3214709371293
+        },
+        {
+          "row": 13,
+          "rgb_mae": 2.9385879629629628,
+          "changed_fraction_gt16": 0.032546296296296295,
+          "active_pixels": 2467,
+          "active_rgb_mae": 51.45804620997163
+        },
+        {
+          "row": 14,
+          "rgb_mae": 10.213711419753086,
+          "changed_fraction_gt16": 0.07231481481481482,
+          "active_pixels": 3704,
+          "active_rgb_mae": 119.12320014398848
+        },
+        {
+          "row": 15,
+          "rgb_mae": 5.362793209876544,
+          "changed_fraction_gt16": 0.04576388888888889,
+          "active_pixels": 12764,
+          "active_rgb_mae": 18.150475295100804
+        },
+        {
+          "row": 16,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 32400,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 17,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 34560,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 18,
+          "rgb_mae": 7.058680555555555,
+          "changed_fraction_gt16": 0.09094907407407407,
+          "active_pixels": 7190,
+          "active_rgb_mae": 42.41098748261474
+        },
+        {
+          "row": 19,
+          "rgb_mae": 4.67804012345679,
+          "changed_fraction_gt16": 0.061134259259259256,
+          "active_pixels": 4756,
+          "active_rgb_mae": 42.49186991869919
+        }
+      ],
+      "interpretation": "lower is closer; no pass threshold claims visual equivalence; inspect text rows separately from background/palette"
+    },
+    "software-natural": {
+      "reference": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\reference.png",
+      "candidate": "E:\\Code\\tg-test\\b7-render-lab\\verified-run\\measured\\software-natural.png",
+      "width": 1200,
+      "height": 720,
+      "alignment": "none; same cell crop required",
+      "rows": [
+        {
+          "row": 0,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 21060,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 1,
+          "rgb_mae": 38.9687037037037,
+          "changed_fraction_gt16": 0.2670138888888889,
+          "active_pixels": 12949,
+          "active_rgb_mae": 130.00602363116843
+        },
+        {
+          "row": 2,
+          "rgb_mae": 31.944158950617282,
+          "changed_fraction_gt16": 0.22652777777777777,
+          "active_pixels": 11162,
+          "active_rgb_mae": 123.6326524517709
+        },
+        {
+          "row": 3,
+          "rgb_mae": 32.468155864197534,
+          "changed_fraction_gt16": 0.21666666666666667,
+          "active_pixels": 10262,
+          "active_rgb_mae": 136.68138114727475
+        },
+        {
+          "row": 4,
+          "rgb_mae": 19.82837191358025,
+          "changed_fraction_gt16": 0.13171296296296298,
+          "active_pixels": 6251,
+          "active_rgb_mae": 137.03178158161361
+        },
+        {
+          "row": 5,
+          "rgb_mae": 15.404220679012345,
+          "changed_fraction_gt16": 0.1000925925925926,
+          "active_pixels": 4943,
+          "active_rgb_mae": 134.62721693978017
+        },
+        {
+          "row": 6,
+          "rgb_mae": 23.595092592592593,
+          "changed_fraction_gt16": 0.15358796296296295,
+          "active_pixels": 7837,
+          "active_rgb_mae": 130.06354472374633
+        },
+        {
+          "row": 7,
+          "rgb_mae": 12.783726851851851,
+          "changed_fraction_gt16": 0.09298611111111112,
+          "active_pixels": 4252,
+          "active_rgb_mae": 129.88170272812795
+        },
+        {
+          "row": 8,
+          "rgb_mae": 10.375717592592592,
+          "changed_fraction_gt16": 0.07219907407407407,
+          "active_pixels": 4483,
+          "active_rgb_mae": 99.98460852107964
+        },
+        {
+          "row": 9,
+          "rgb_mae": 10.393688271604939,
+          "changed_fraction_gt16": 0.05856481481481481,
+          "active_pixels": 2677,
+          "active_rgb_mae": 167.7278047565683
+        },
+        {
+          "row": 10,
+          "rgb_mae": 10.552006172839507,
+          "changed_fraction_gt16": 0.07298611111111111,
+          "active_pixels": 4509,
+          "active_rgb_mae": 101.09706512900125
+        },
+        {
+          "row": 11,
+          "rgb_mae": 29.989760802469135,
+          "changed_fraction_gt16": 0.16960648148148147,
+          "active_pixels": 11150,
+          "active_rgb_mae": 116.19351270553064
+        },
+        {
+          "row": 12,
+          "rgb_mae": 11.833765432098765,
+          "changed_fraction_gt16": 0.08125,
+          "active_pixels": 4066,
+          "active_rgb_mae": 125.73011969175275
+        },
+        {
+          "row": 13,
+          "rgb_mae": 12.254313271604937,
+          "changed_fraction_gt16": 0.07305555555555555,
+          "active_pixels": 3626,
+          "active_rgb_mae": 145.99733406876263
+        },
+        {
+          "row": 14,
+          "rgb_mae": 13.278881172839506,
+          "changed_fraction_gt16": 0.08775462962962963,
+          "active_pixels": 4203,
+          "active_rgb_mae": 136.48528828614482
+        },
+        {
+          "row": 15,
+          "rgb_mae": 13.391913580246914,
+          "changed_fraction_gt16": 0.08756944444444445,
+          "active_pixels": 13267,
+          "active_rgb_mae": 43.60674354915706
+        },
+        {
+          "row": 16,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 32400,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 17,
+          "rgb_mae": 0.0,
+          "changed_fraction_gt16": 0.0,
+          "active_pixels": 34560,
+          "active_rgb_mae": 0.0
+        },
+        {
+          "row": 18,
+          "rgb_mae": 33.45402006172839,
+          "changed_fraction_gt16": 0.2256712962962963,
+          "active_pixels": 10876,
+          "active_rgb_mae": 132.8809917861959
+        },
+        {
+          "row": 19,
+          "rgb_mae": 21.541219135802468,
+          "changed_fraction_gt16": 0.14673611111111112,
+          "active_pixels": 7145,
+          "active_rgb_mae": 130.24222066713318
+        }
+      ],
+      "interpretation": "lower is closer; no pass threshold claims visual equivalence; inspect text rows separately from background/palette"
+    }
+  },
+  "software_font": {
+    "families": [
+      "Maple Mono NF CN"
+    ],
+    "weight": 400,
+    "postscript_name": "MapleMono-NF-CN-Regular",
+    "source": "File(\"C:\\\\Users\\\\123\\\\AppData\\\\Local\\\\Microsoft\\\\Windows\\\\Fonts\\\\MapleMono-NF-CN-Regular.ttf\")",
+    "face_index": 0,
+    "fallback": "disabled for controlled software experiment"
+  },
+  "native_font": {
+    "backend": "DirectWrite + Direct2D WIC software target",
+    "layout_mode": "cluster",
+    "cleartype": false,
+    "primary_family": "Maple Mono NF CN",
+    "weight": 700,
+    "simulations": 1,
+    "ascent": 24.479999542236328,
+    "descent": 7.200000286102295,
+    "line_gap": 0.0,
+    "limitations": [
+      "system fallback differs from strict software probe",
+      "cell mode isolates graphemes and loses cross-cluster joining",
+      "run mode preserves shaping but not terminal cell advances",
+      "monochrome emoji; native color layers disabled",
+      "not the terminal Atlas renderer"
+    ]
+  },
+  "font_file_sha256": "8b4f149beaead3eac78ffb84adf31513ebf06fe6dbc6e181ccd9debad3c70f1a",
+  "evidence_sha256": {
+    "reference.png": "e1ccbb2b0f0c14d8b48c836bd140f15d360683766fbb64d43996603b44fcdb43",
+    "native-cluster-gray.png": "b86ab50116d12d6bd5ea29620f563ef688cc75481e9d2a7d3510445069fc5c08",
+    "software-fit.png": "cb7a3b1b82fbe3b3d8cb569b55a43b95829f68d62b890bd20083d962eabe863d"
+  },
+  "method_notes": [
+    "Software probe is isolated primary-font baseline, NOT full dev rasterizer.",
+    "No scaling or registration applied to comparisons.",
+    "AA MAE measured on active-pixel union per row, not whole image.",
+    "All six comparisons share exact same terminal capture, font size, grid and palette."
+  ]
+}
