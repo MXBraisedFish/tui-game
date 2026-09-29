@@ -39,8 +39,8 @@ fn install_direct(
   };
   source.raw_set(
     name,
-    lua.create_function(move |_lua, values: MultiValue| {
-      let table = args::named(method, values, &["min", "max"])?;
+    lua.create_function(move |lua, values: MultiValue| {
+      let table = positional_table(lua, method, values, &[], &["min", "max"])?;
       if integer {
         let min = args::optional_integer(&table, method, "min", Some(i32::MIN.into()))?.unwrap();
         let max = args::optional_integer(&table, method, "max", Some(i32::MAX.into()))?.unwrap();
@@ -82,7 +82,13 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "create",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "random.create";
-      let table = args::named(method, values, &["type", "min", "max", "seed", "step"])?;
+      let table = positional_table(
+        lua,
+        method,
+        values,
+        &[],
+        &["type", "min", "max", "seed", "step"],
+      )?;
       let configuration = configuration_from_create(&table, method)?;
       with_pool_mut(&create_state, method, |pool| {
         let service = RandomService::new();
@@ -117,7 +123,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "clear",
     lua.create_function(move |_, values: MultiValue| {
       let method = "random.clear";
-      args::empty_named(method, values)?;
+      args::no_args(method, values)?;
       with_pool_mut(&clear_state, method, |pool| {
         RandomService::new().clear_configured(&mut pool.runtime_mut().random_generators);
         Ok(true)
@@ -130,7 +136,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "list",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "random.list";
-      args::empty_named(method, values)?;
+      args::no_args(method, values)?;
       with_pool(&list_state, method, |pool| {
         let result = lua.create_table()?;
         let service = RandomService::new();
@@ -152,7 +158,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "count",
     lua.create_function(move |_, values: MultiValue| {
       let method = "random.count";
-      args::empty_named(method, values)?;
+      args::no_args(method, values)?;
       with_pool(&count_state, method, |pool| {
         Ok(
           RandomService::new()
@@ -189,13 +195,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
 }
 
 fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Result<()> {
-  for (name, allowed) in [
-    ("set", &["id", "type", "min", "max", "seed", "step"][..]),
-    ("set_type", &["id", "type"][..]),
-    ("set_range", &["id", "min", "max"][..]),
-    ("set_seed", &["id", "seed"][..]),
-    ("set_step", &["id", "step"][..]),
-  ] {
+  for name in ["set", "set_type", "set_range", "set_seed", "set_step"] {
     let method: &'static str = match name {
       "set" => "random.set",
       "set_type" => "random.set_type",
@@ -206,8 +206,15 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     let state = state.clone();
     source.raw_set(
       name,
-      lua.create_function(move |_lua, values: MultiValue| {
-        let table = args::named(method, values, allowed)?;
+      lua.create_function(move |lua, values: MultiValue| {
+        let (required, options): (&[&str], &[&str]) = match name {
+          "set" => (&["id"], &["type", "min", "max", "seed", "step"]),
+          "set_type" => (&["id", "type"], &[]),
+          "set_range" => (&["id", "min", "max"], &[]),
+          "set_seed" => (&["id", "seed"], &[]),
+          _ => (&["id", "step"], &[]),
+        };
+        let table = positional_table(lua, method, values, required, options)?;
         if name == "set_range" {
           args::required(&table, method, "min")?;
           args::required(&table, method, "max")?;
@@ -274,7 +281,7 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
   let range_state = state.clone();
   source.raw_set(
     "get_range",
-    lua.create_function(move |lua, values: MultiValue| {
+    lua.create_function(move |_, values: MultiValue| {
       let method = "random.get_range";
       let id = id_argument(values, method)?;
       with_pool(&range_state, method, |pool| {
@@ -282,22 +289,18 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
           Some(RandomConfiguration {
             range: RandomConfiguredRange::Integer { min, max },
             ..
-          }) => {
-            let result = lua.create_table()?;
-            result.raw_set("min", min)?;
-            result.raw_set("max", max)?;
-            Ok(Value::Table(result))
-          }
+          }) => Ok(MultiValue::from_vec(vec![
+            Value::Integer(min),
+            Value::Integer(max),
+          ])),
           Some(RandomConfiguration {
             range: RandomConfiguredRange::Float { min, max },
             ..
-          }) => {
-            let result = lua.create_table()?;
-            result.raw_set("min", min)?;
-            result.raw_set("max", max)?;
-            Ok(Value::Table(result))
-          }
-          None => Ok(Value::Nil),
+          }) => Ok(MultiValue::from_vec(vec![
+            Value::Number(min),
+            Value::Number(max),
+          ])),
+          None => Ok(MultiValue::from_vec(vec![Value::Nil])),
         }
       })
     })?,
@@ -523,8 +526,7 @@ fn non_negative_step(value: i64, method: &str) -> mlua::Result<u64> {
 }
 
 fn id_argument(values: MultiValue, method: &str) -> mlua::Result<RandomGeneratorId> {
-  let table = args::named(method, values, &["id"])?;
-  let id = args::string(args::required(&table, method, "id")?, method, "id")?;
+  let id = args::string(args::one(method, "id", values)?, method, "id")?;
   parse_id(id).ok_or_else(|| args::message(method, "invalid generator ID"))
 }
 

@@ -1,17 +1,14 @@
 # file 库
 
-## 基本库说明
-
-`file` 提供异步文件操作。
-所有 API 使用单个命名参数表。异步读写、目录枚举和目录/文件操作在任务提交后立即返回整数 request id；对应终态事件的 `data.request_id` 回传同一值。因会话权限被门控而未提交的操作返回 `nil`，不会产生完成事件。
+`file` 提供 `assets/` 目录中的异步文件操作。
 
 ---
 
-## 目录
+# 目录
 
-### 常量
+## 常量
 
-| 常量名           | 说明                                  | 索引                              |
+| 常量           | 说明                                  | 定位                              |
 | ---------------- | ------------------------------------- | --------------------------------- |
 | `AUTO`           | 自动检测模式                          | [AUTO](#AUTO)                     |
 | `ALL`            | 全部统一模式                          | [ALL](#ALL)                       |
@@ -46,7 +43,6 @@
 | `ISO_8859_7`     | ISO-8859-7 编码（希腊）               | [ISO_8859_7](#ISO_8859_7)         |
 | `ISO_8859_8`     | ISO-8859-8 编码（希伯来）             | [ISO_8859_8](#ISO_8859_8)         |
 | `ISO_8859_8_I`   | ISO-8859-8-I 编码（希伯来，逻辑顺序） | [ISO_8859_8_I](#ISO_8859_8_I)     |
-| `ISO_8859_9`     | ISO-8859-9 编码（土耳其）             | [ISO_8859_9](#ISO_8859_9)         |
 | `ISO_8859_10`    | ISO-8859-10 编码（北欧）              | [ISO_8859_10](#ISO_8859_10)       |
 | `ISO_8859_11`    | ISO-8859-11 编码（泰文）              | [ISO_8859_11](#ISO_8859_11)       |
 | `ISO_8859_13`    | ISO-8859-13 编码（波罗的海）          | [ISO_8859_13](#ISO_8859_13)       |
@@ -59,9 +55,9 @@
 | `MACINTOSH`      | Macintosh 编码（西欧）                | [MACINTOSH](#MACINTOSH)           |
 | `X_MAC_CYRILLIC` | x-mac-cyrillic 编码（西里尔）         | [X_MAC_CYRILLIC](#X_MAC_CYRILLIC) |
 
-### 方法
+## 方法
 
-| 方法名       | 说明                                          | 索引                      |
+| 方法       | 说明                                          | 定位                      |
 | ------------ | --------------------------------------------- | ------------------------- |
 | `read`       | 异步读取 `assets/` 目录下的文本文件           | [read](#read)             |
 | `write`      | 异步写入文本文件到 `assets/` 目录             | [write](#write)           |
@@ -72,13 +68,13 @@
 
 ---
 
-## 常量
+# 常量
 
 ## `AUTO`
 
 自动检测模式。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 - 参数 `end_of_line`
@@ -92,8 +88,20 @@ file.AUTO
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.AUTO, end_of_line = file.AUTO }
+file.read("file.txt", {encoding = file.AUTO, end_of_line = file.AUTO})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"auto"
+```
+
 
 ---
 
@@ -101,7 +109,7 @@ file.read { path = "file.txt", encoding = file.AUTO, end_of_line = file.AUTO }
 
 全部统一模式。
 
-**可用于**
+### 可用于
 
 - 参数 `file_type`
 
@@ -114,8 +122,20 @@ file.ALL
 ### 示例
 
 ```lua
-file.list_dir { path = "dir/", file_type = file.ALL }
+file.list_dir("dir/", {file_type = file.ALL})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"all"
+```
+
 
 ---
 
@@ -123,7 +143,7 @@ file.list_dir { path = "dir/", file_type = file.ALL }
 
 回车换行符。
 
-**可用于**
+### 可用于
 
 - 参数 `end_of_line`
 
@@ -136,8 +156,20 @@ file.CR
 ### 示例
 
 ```lua
-file.read { path = "file.txt", end_of_line = file.CR }
+file.read("file.txt", {end_of_line = file.CR})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"cr"
+```
+
 
 ---
 
@@ -145,7 +177,7 @@ file.read { path = "file.txt", end_of_line = file.CR }
 
 换行符。
 
-**可用于**
+### 可用于
 
 - 参数 `end_of_line`
 
@@ -158,8 +190,20 @@ file.LF
 ### 示例
 
 ```lua
-file.read { path = "file.txt", end_of_line = file.LF }
+file.read("file.txt", {end_of_line = file.LF})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"lf"
+```
+
 
 ---
 
@@ -167,7 +211,7 @@ file.read { path = "file.txt", end_of_line = file.LF }
 
 回车换行符组合。
 
-**可用于**
+### 可用于
 
 - 参数 `end_of_line`
 
@@ -180,8 +224,20 @@ file.CRLF
 ### 示例
 
 ```lua
-file.read { path = "file.txt", end_of_line = file.CRLF }
+file.read("file.txt", {end_of_line = file.CRLF})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"crlf"
+```
+
 
 ---
 
@@ -189,7 +245,7 @@ file.read { path = "file.txt", end_of_line = file.CRLF }
 
 UTF-8 编码。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -202,8 +258,20 @@ file.UTF_8
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.UTF_8 }
+file.read("file.txt", {encoding = file.UTF_8})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"utf-8"
+```
+
 
 ---
 
@@ -211,7 +279,7 @@ file.read { path = "file.txt", encoding = file.UTF_8 }
 
 UTF-16 小端编码。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -224,8 +292,20 @@ file.UTF_16LE
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.UTF_16LE }
+file.read("file.txt", {encoding = file.UTF_16LE})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"utf-16le"
+```
+
 
 ---
 
@@ -233,7 +313,7 @@ file.read { path = "file.txt", encoding = file.UTF_16LE }
 
 UTF-16 大端编码。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -245,16 +325,26 @@ file.UTF_16BE
 
 ### 示例
 
-````lua
-file.read { path = "file.txt", encoding = file.UTF_16BE }
+```lua
+file.read("file.txt", {encoding = file.UTF_16BE})
+```
 
----
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"utf-16be"
+```
 
 ## `GBK`
 
 GBK 编码（简体中文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -262,13 +352,25 @@ GBK 编码（简体中文）。
 
 ```lua
 file.GBK
-````
+```
 
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.GBK }
+file.read("file.txt", {encoding = file.GBK})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"gbk"
+```
+
 
 ---
 
@@ -276,7 +378,7 @@ file.read { path = "file.txt", encoding = file.GBK }
 
 GB18030 编码（简体中文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -289,8 +391,20 @@ file.GB18030
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.GB18030 }
+file.read("file.txt", {encoding = file.GB18030})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"gb18030"
+```
+
 
 ---
 
@@ -298,7 +412,7 @@ file.read { path = "file.txt", encoding = file.GB18030 }
 
 BIG5 编码（繁体中文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -311,8 +425,20 @@ file.BIG5
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.BIG5 }
+file.read("file.txt", {encoding = file.BIG5})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"big5"
+```
+
 
 ---
 
@@ -320,7 +446,7 @@ file.read { path = "file.txt", encoding = file.BIG5 }
 
 Shift JIS 编码（日文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -333,8 +459,20 @@ file.SHIFT_JIS
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.SHIFT_JIS }
+file.read("file.txt", {encoding = file.SHIFT_JIS})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"shift_jis"
+```
+
 
 ---
 
@@ -342,7 +480,7 @@ file.read { path = "file.txt", encoding = file.SHIFT_JIS }
 
 EUC-JP 编码（日文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -355,8 +493,20 @@ file.EUC_JP
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.EUC_JP }
+file.read("file.txt", {encoding = file.EUC_JP})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"euc-jp"
+```
+
 
 ---
 
@@ -364,7 +514,7 @@ file.read { path = "file.txt", encoding = file.EUC_JP }
 
 ISO-2022-JP 编码（日文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -377,8 +527,20 @@ file.ISO_2022_JP
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_2022_JP }
+file.read("file.txt", {encoding = file.ISO_2022_JP})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-2022-jp"
+```
+
 
 ---
 
@@ -386,7 +548,7 @@ file.read { path = "file.txt", encoding = file.ISO_2022_JP }
 
 EUC-KR 编码（韩文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -399,8 +561,20 @@ file.EUC_KR
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.EUC_KR }
+file.read("file.txt", {encoding = file.EUC_KR})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"euc-kr"
+```
+
 
 ---
 
@@ -408,7 +582,7 @@ file.read { path = "file.txt", encoding = file.EUC_KR }
 
 Windows-874 编码（泰文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -421,8 +595,20 @@ file.WINDOWS_874
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_874 }
+file.read("file.txt", {encoding = file.WINDOWS_874})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-874"
+```
+
 
 ---
 
@@ -430,7 +616,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_874 }
 
 Windows-1250 编码（中欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -443,8 +629,20 @@ file.WINDOWS_1250
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1250 }
+file.read("file.txt", {encoding = file.WINDOWS_1250})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1250"
+```
+
 
 ---
 
@@ -452,7 +650,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1250 }
 
 Windows-1251 编码（西里尔）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -465,8 +663,20 @@ file.WINDOWS_1251
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1251 }
+file.read("file.txt", {encoding = file.WINDOWS_1251})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1251"
+```
+
 
 ---
 
@@ -474,7 +684,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1251 }
 
 Windows-1252 编码（西欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -487,8 +697,20 @@ file.WINDOWS_1252
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1252 }
+file.read("file.txt", {encoding = file.WINDOWS_1252})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1252"
+```
+
 
 ---
 
@@ -496,7 +718,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1252 }
 
 Windows-1253 编码（希腊）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -509,8 +731,20 @@ file.WINDOWS_1253
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1253 }
+file.read("file.txt", {encoding = file.WINDOWS_1253})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1253"
+```
+
 
 ---
 
@@ -518,7 +752,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1253 }
 
 Windows-1254 编码（土耳其）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -531,8 +765,20 @@ file.WINDOWS_1254
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1254 }
+file.read("file.txt", {encoding = file.WINDOWS_1254})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1254"
+```
+
 
 ---
 
@@ -540,7 +786,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1254 }
 
 Windows-1255 编码（希伯来）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -553,8 +799,20 @@ file.WINDOWS_1255
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1255 }
+file.read("file.txt", {encoding = file.WINDOWS_1255})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1255"
+```
+
 
 ---
 
@@ -562,7 +820,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1255 }
 
 Windows-1256 编码（阿拉伯）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -575,8 +833,20 @@ file.WINDOWS_1256
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1256 }
+file.read("file.txt", {encoding = file.WINDOWS_1256})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1256"
+```
+
 
 ---
 
@@ -584,7 +854,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1256 }
 
 Windows-1257 编码（波罗的海）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -597,8 +867,20 @@ file.WINDOWS_1257
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1257 }
+file.read("file.txt", {encoding = file.WINDOWS_1257})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1257"
+```
+
 
 ---
 
@@ -606,7 +888,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1257 }
 
 Windows-1258 编码（越南）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -619,8 +901,20 @@ file.WINDOWS_1258
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.WINDOWS_1258 }
+file.read("file.txt", {encoding = file.WINDOWS_1258})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"windows-1258"
+```
+
 
 ---
 
@@ -628,7 +922,7 @@ file.read { path = "file.txt", encoding = file.WINDOWS_1258 }
 
 ISO-8859-2 编码（中欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -641,8 +935,20 @@ file.ISO_8859_2
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_2 }
+file.read("file.txt", {encoding = file.ISO_8859_2})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-2"
+```
+
 
 ---
 
@@ -650,7 +956,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_2 }
 
 ISO-8859-3 编码（南欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -663,8 +969,20 @@ file.ISO_8859_3
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_3 }
+file.read("file.txt", {encoding = file.ISO_8859_3})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-3"
+```
+
 
 ---
 
@@ -672,7 +990,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_3 }
 
 ISO-8859-4 编码（北欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -685,8 +1003,20 @@ file.ISO_8859_4
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_4 }
+file.read("file.txt", {encoding = file.ISO_8859_4})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-4"
+```
+
 
 ---
 
@@ -694,7 +1024,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_4 }
 
 ISO-8859-5 编码（西里尔）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -707,8 +1037,20 @@ file.ISO_8859_5
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_5 }
+file.read("file.txt", {encoding = file.ISO_8859_5})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-5"
+```
+
 
 ---
 
@@ -716,7 +1058,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_5 }
 
 ISO-8859-6 编码（阿拉伯）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -729,8 +1071,20 @@ file.ISO_8859_6
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_6 }
+file.read("file.txt", {encoding = file.ISO_8859_6})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-6"
+```
+
 
 ---
 
@@ -738,7 +1092,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_6 }
 
 ISO-8859-7 编码（希腊）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -751,8 +1105,20 @@ file.ISO_8859_7
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_7 }
+file.read("file.txt", {encoding = file.ISO_8859_7})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-7"
+```
+
 
 ---
 
@@ -760,7 +1126,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_7 }
 
 ISO-8859-8 编码（希伯来）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -773,8 +1139,20 @@ file.ISO_8859_8
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_8 }
+file.read("file.txt", {encoding = file.ISO_8859_8})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-8"
+```
+
 
 ---
 
@@ -782,7 +1160,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_8 }
 
 ISO-8859-8-I 编码（希伯来，逻辑顺序）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -795,30 +1173,20 @@ file.ISO_8859_8_I
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_8_I }
+file.read("file.txt", {encoding = file.ISO_8859_8_I})
 ```
 
----
-
-## `ISO_8859_9`
-
-ISO-8859-9 编码（土耳其）。
-
-**可用于**
-
-- 参数 `encoding`
-
-### 调用
+**输出：**
 
 ```lua
-file.ISO_8859_9
 ```
 
-### 示例
+### 等值
 
-```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_9 }
+```text
+"iso-8859-8-i"
 ```
+
 
 ---
 
@@ -826,7 +1194,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_9 }
 
 ISO-8859-10 编码（北欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -839,8 +1207,20 @@ file.ISO_8859_10
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_10 }
+file.read("file.txt", {encoding = file.ISO_8859_10})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-10"
+```
+
 
 ---
 
@@ -848,7 +1228,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_10 }
 
 ISO-8859-11 编码（泰文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -861,8 +1241,20 @@ file.ISO_8859_11
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_11 }
+file.read("file.txt", {encoding = file.ISO_8859_11})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-11"
+```
+
 
 ---
 
@@ -870,7 +1262,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_11 }
 
 ISO-8859-13 编码（波罗的海）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -883,8 +1275,20 @@ file.ISO_8859_13
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_13 }
+file.read("file.txt", {encoding = file.ISO_8859_13})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-13"
+```
+
 
 ---
 
@@ -892,7 +1296,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_13 }
 
 ISO-8859-14 编码（凯尔特）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -905,8 +1309,20 @@ file.ISO_8859_14
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_14 }
+file.read("file.txt", {encoding = file.ISO_8859_14})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-14"
+```
+
 
 ---
 
@@ -914,7 +1330,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_14 }
 
 ISO-8859-15 编码（西欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -927,8 +1343,20 @@ file.ISO_8859_15
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_15 }
+file.read("file.txt", {encoding = file.ISO_8859_15})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-15"
+```
+
 
 ---
 
@@ -936,7 +1364,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_15 }
 
 ISO-8859-16 编码（东南欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -949,8 +1377,20 @@ file.ISO_8859_16
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.ISO_8859_16 }
+file.read("file.txt", {encoding = file.ISO_8859_16})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"iso-8859-16"
+```
+
 
 ---
 
@@ -958,7 +1398,7 @@ file.read { path = "file.txt", encoding = file.ISO_8859_16 }
 
 KOI8-R 编码（俄文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -971,8 +1411,20 @@ file.KOI8_R
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.KOI8_R }
+file.read("file.txt", {encoding = file.KOI8_R})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"koi8-r"
+```
+
 
 ---
 
@@ -980,7 +1432,7 @@ file.read { path = "file.txt", encoding = file.KOI8_R }
 
 KOI8-U 编码（乌克兰）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -993,8 +1445,20 @@ file.KOI8_U
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.KOI8_U }
+file.read("file.txt", {encoding = file.KOI8_U})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"koi8-u"
+```
+
 
 ---
 
@@ -1002,7 +1466,7 @@ file.read { path = "file.txt", encoding = file.KOI8_U }
 
 IBM866 编码（俄文）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -1015,8 +1479,20 @@ file.IBM866
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.IBM866 }
+file.read("file.txt", {encoding = file.IBM866})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"ibm866"
+```
+
 
 ---
 
@@ -1024,7 +1500,7 @@ file.read { path = "file.txt", encoding = file.IBM866 }
 
 Macintosh 编码（西欧）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -1037,8 +1513,20 @@ file.MACINTOSH
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.MACINTOSH }
+file.read("file.txt", {encoding = file.MACINTOSH})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"macintosh"
+```
+
 
 ---
 
@@ -1046,7 +1534,7 @@ file.read { path = "file.txt", encoding = file.MACINTOSH }
 
 x-mac-cyrillic 编码（西里尔）。
 
-**可用于**
+### 可用于
 
 - 参数 `encoding`
 
@@ -1059,12 +1547,24 @@ file.X_MAC_CYRILLIC
 ### 示例
 
 ```lua
-file.read { path = "file.txt", encoding = file.X_MAC_CYRILLIC }
+file.read("file.txt", {encoding = file.X_MAC_CYRILLIC})
 ```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"x-mac-cyrillic"
+```
+
 
 ---
 
-## 方法
+# 方法
 
 ## `read`
 
@@ -1073,59 +1573,49 @@ file.read { path = "file.txt", encoding = file.X_MAC_CYRILLIC }
 ### 调用
 
 ```lua
--- 表参数
-file.read{}
+file.read
 ```
 
-### 参数
+## 参数
 
-| 参数名        | 类型         | 必填 | 默认值        | 说明                      |
-| ------------- | ------------ | ---- | ------------- | ------------------------- |
-| `path`        | string       | 是   | -             | 相对 `assets/` 的文件路径 |
-| `encoding`    | const-file   | 否   | `file.AUTO`   | 文本编码                  |
-| `end_of_line` | const-file   | 否   | `file.AUTO` | 换行符规范                |
-| `byte`        | boolean      | 否   | `false`       | 二进制模式                |
-| `event_tip`   | string / nil | 否   | `nil`         | 自定义事件标记            |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `assets/` 的文件路径 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `encoding` | const-file | 默认：`file.AUTO`；文本编码 |
+| `end_of_line` | const-file | 默认：`file.AUTO`；换行符规范 |
+| `byte` | boolean | 默认：`false`；二进制模式 |
+| `event_tip` | string / nil | 默认：`nil`；自定义事件标记 |
+## 返回值
 
 调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
 ```lua
-assets/
-- file.txt
+-- Fixture: assets/file.txt contains "Hello Tui Game".
 
-local request_id = file.read { path = "file.txt" }
+local request_id = file.read("file.txt")
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode{ value = event } }
+    debug.print(serialization.json_encode(event))
   end
 end
 ```
 
-输出：
+**输出：**
 
-> X 为占位符
-
-```json
-{
-  "type": "file",
-  "frame": X,
-  "sequence": X,
-  "data": {
-    "request_id": X,
-    "path": "file.txt",
-    "ok": true,
-    "kind": "read_text",
-    "text": "Hello Tui Game"
-  }
-}
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `byte` 为 false 时按文本读取，参数 `encoding` 与 参数 `end_of_line` **生效**。
 - 参数 `byte` 为 true 时按二进制读取，参数 `encoding` 与 参数 `end_of_line` **忽略**。
@@ -1136,71 +1626,65 @@ end
 
 异步写入文本文件到 `assets/` 目录。
 
-> 仅游戏会话可调用；路径仍限制在当前包的 `assets/` 根目录内。
-> 仅游戏脚本可用。
+
+### 限制
+
+- 仅游戏脚本可用。
 
 ### 调用
 
 ```lua
--- 表参数
-file.write{}
+file.write
 ```
 
-### 参数
+## 参数
 
-| 参数名        | 类型         | 必填 | 默认值      | 说明                      |
-| ------------- | ------------ | ---- | ----------- | ------------------------- |
-| `path`        | string       | 是   | -           | 相对 `assets/` 的文件路径 |
-| `text`        | string       | 是   | -           | 要写入的文本              |
-| `encoding`    | const-file   | 否   | `file.AUTO` | 文本编码                  |
-| `end_of_line` | const-file   | 否   | `file.AUTO` | 换行符规范                |
-| `byte`        | boolean      | 否   | `false`     | 二进制模式                |
-| `event_tip`   | string / nil | 否   | `nil`       | 事件提示文本              |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `assets/` 的文件路径 |
+| `text` | string | 要写入的文本 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `encoding` | const-file | 默认：`file.AUTO`；文本编码 |
+| `end_of_line` | const-file | 默认：`file.AUTO`；换行符规范 |
+| `byte` | boolean | 默认：`false`；二进制模式 |
+| `event_tip` | string / nil | 默认：`nil`；事件提示文本 |
+## 返回值
 
 调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
 ```lua
-assets/
-- file.txt
+-- Fixture: assets/file.txt exists.
 
-local request_id = file.write { path = "file.txt", text = "Hello Tui Game", event_tip = "Get!" }
+local request_id = file.write("file.txt", "Hello Tui Game", {event_tip = "Get!"})
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode{ value = event } }
+    debug.print(serialization.json_encode(event))
   end
 end
 ```
 
-输出：
+**输出：**
 
-> X 为占位符
-
-```json
-{
-  "type": "file",
-  "frame": X,
-  "sequence": X,
-  "data": {
-    "request_id": X,
-    "path": "file.txt",
-    "ok": true,
-    "kind": "write_text",
-    "tip": "Get!"
-  }
-}
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `byte` 为 false 时按文本读取，参数 `encoding` 与 参数 `end_of_line` **生效**。
 - 参数 `byte` 为 true 时按二进制写入，参数 `encoding` 与 参数 `end_of_line` **忽略**。
 - 该 API 会自动创建未创建的**文件**。
 - 该 API 不会自动补全未创建的**目录**，目录不存在会抛出错误。
+
+- 路径必须位于当前包的 `assets/` 根目录内，不接受越出该目录的路径。
 
 ---
 
@@ -1208,140 +1692,65 @@ end
 
 异步枚举 `assets/` 目录下的条目。
 
-> 仅游戏会话可调用；路径仍限制在当前包的 `assets/` 根目录内。
-> 仅游戏脚本可用。
+
+### 限制
+
+- 仅游戏脚本可用。
 
 ### 调用
 
 ```lua
--- 表参数
-file.list_dir{}
+file.list_dir
 ```
 
-### 参数
+## 参数
 
-| 参数名      | 类型                | 必填 | 默认值     | 说明                      |
-| ----------- | ------------------- | ---- | ---------- | ------------------------- |
-| `path`      | string              | 是   | -          | 相对 `assets/` 目录路径 |
-| `recursive` | boolean             | 否   | `false`    | 是否递归子目录枚举        |
-| `file_type` | string / const-file | 否   | `file.ALL` | 仅匹配指定扩展名          |
-| `event_tip` | string / nil        | 否   | `nil`      | 事件提示文本              |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `assets/` 目录路径 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `recursive` | boolean | 默认：`false`；是否递归子目录枚举 |
+| `file_type` | string / const-file | 默认：`file.ALL`；仅匹配指定扩展名 |
+| `event_tip` | string / nil | 默认：`nil`；事件提示文本 |
+## 返回值
 
 调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
 ```lua
-assets/
-+ c/
-| + main.c
-| - game.c
-+ js/
-| + data.json
-| - main.js
-+ rust/
-| + src/
-| | - main.rs
-| - Cargo.toml
-- file.txt
+-- Fixture:
+-- assets/
+-- + c/ (game.c, main.c)
+-- + js/ (data.json, main.js)
+-- + rust/ (src/main.rs, Cargo.toml)
+-- - file.txt
 
-file.list_dir { path = ".", recursive = true }
-file.list_dir { path = "rust/" }
-file.list_dir { path = "js/", file_type = "json", event_tip = "Only Json" }
+file.list_dir(".", {recursive = true})
+file.list_dir("rust/")
+file.list_dir("js/", {file_type = "json", event_tip = "Only Json"})
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode{ value = event } }
+    debug.print(serialization.json_encode(event))
   end
 end
 ```
 
-输出：
+**输出：**
 
-> X 为占位符
-
-```json
-{
-  "type": "file",
-  "sequence": X,
-  "frame": X,
-  "data": {
-    "request_id": X,
-    "ok": true,
-    "kind": "list_dir",
-    "path": ".",
-    "entries": [
-      {
-        "path": "c/game.c",
-        "file_type": "c"
-      },
-      {
-        "path": "c/main.c",
-        "file_type": "c"
-      },
-      {
-        "path": "file.txt",
-        "file_type": "txt"
-      },
-      {
-        "path": "js/data.json",
-        "file_type": "json"
-      },
-      {
-        "path": "js/main.js",
-        "file_type": "js"
-      },
-      {
-        "path": "rust/Cargo.toml",
-        "file_type": "toml"
-      },
-      {
-        "path": "rust/src/main.rs",
-        "file_type": "rs"
-      }
-    ],
-  }
-}
-
-{
-  "type": "file",
-  "frame": X,
-  "sequence": X,
-  "data": {
-    "request_id": X,
-    "ok": true,
-    "kind": "list_dir",
-    "path": "rust/",
-    "entries": [
-      {
-        "path": "Cargo.toml",
-        "file_type": "toml"
-      }
-    ],
-  }
-}
-
-{
-  "type": "file",
-  "frame": X,
-  "sequence": X,
-  "data": {
-    "request_id": X,
-    "ok": true,
-    "tip": "Only Json",
-    "kind": "list_dir",
-    "path": "js/",
-    "entries": [
-      {
-        "path": "data.json",
-        "file_type": "json"
-      }
-    ],
-  }
-}
+```lua
 ```
+
+### 额外说明
+
+- 路径必须位于当前包的 `assets/` 根目录内，不接受越出该目录的路径。
 
 ---
 
@@ -1349,80 +1758,59 @@ end
 
 异步创建指定目录到 `assets/` 目录。
 
-> 仅游戏会话可调用；路径仍限制在当前包的 `assets/` 根目录内。
-> 仅游戏脚本可用。
+
+### 限制
+
+- 仅游戏脚本可用。
 
 ### 调用
 
 ```lua
--- 表参数
-file.create_dir{}
+file.create_dir
 ```
 
-### 参数
+## 参数
 
-| 参数名      | 类型         | 必填 | 默认值 | 说明                      |
-| ----------- | ------------ | ---- | ------ | ------------------------- |
-| `path`      | string       | 是   | -      | 相对 `assets/` 目录路径 |
-| `event_tip` | string / nil | 否   | `nil`  | 事件提示文本              |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `assets/` 目录路径 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `event_tip` | string / nil | 默认：`nil`；事件提示文本 |
+## 返回值
 
 调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
 ```lua
-assets/
+-- Fixture: start with an empty assets/ directory.
 
-file.create_dir { path = "file" }
-file.create_dir { path = "test1/test2" }
+file.create_dir("file")
+file.create_dir("test1/test2")
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode{ value = event } }
+    debug.print(serialization.json_encode(event))
   end
 end
 ```
 
-输出：
+**输出：**
 
-> X 为占位符
-
-```json
-assets/
-+ file/
-- test1/
-  - test2/
-
-{
-  "type": "file",
-  "frame": X,
-  "sequence": X,
-  "data": {
-    "request_id": X,
-    "ok": true,
-    "kind": "create_dir",
-    "path": "file"
-  },
-}
-
-{
-  "type": "file",
-  "frame": X,
-  "sequence": X,
-  "data": {
-    "request_id": X,
-    "ok": true,
-    "kind": "create_dir",
-    "path": "test1/test2"
-  },
-}
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 该 API **支持**链式创建目录。
+
+- 路径必须位于当前包的 `assets/` 根目录内，不接受越出该目录的路径。
 
 ---
 
@@ -1433,17 +1821,17 @@ assets/
 ### 调用
 
 ```lua
--- 命名参数表
-file.exists{ path = "." }
+file.exists
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明                      |
-| ------ | ------ | ---- | ------ | ------------------------- |
-| `path` | string | 是   | -      | 相对 `assets/` 目录路径 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `assets/` 目录路径 |
+## 返回值
 
 直接返回一个值。
 
@@ -1454,104 +1842,77 @@ file.exists{ path = "." }
 ### 示例
 
 ```lua
-assets/
-- test/
+-- Fixture: assets/test/ exists.
 
-debug.print { message = tostring(file.exists{ path = "test" }) }
-debug.print { message = tostring(file.exists{ path = "none" }) }
+debug.print(tostring(file.exists("test")))
+debug.print(tostring(file.exists("none")))
 ```
 
-输出：
+**输出：**
 
-```test
-true
-false
+```lua
 ```
+
 
 ---
-
 ## `remove`
 
 异步删除 `assets/` 目录下指定文件或目录。
 
-> 仅游戏会话可调用；路径仍限制在当前包的 `assets/` 根目录内。
-> 仅游戏脚本可用。
+
+### 限制
+
+- 仅游戏脚本可用。
 
 ### 调用
 
 ```lua
--- 表参数
-file.remove{}
+file.remove
 ```
 
-### 参数
+## 参数
 
-| 参数名      | 类型         | 必填 | 默认值  | 说明                      |
-| ----------- | ------------ | ---- | ------- | ------------------------- |
-| `path`      | string       | 是   | -       | 相对 `assets/` 目录路径 |
-| `recursive` | boolean      | 否   | `false` | 是否删除非空目录          |
-| `event_tip` | string / nil | 否   | `nil`   | 事件提示文本              |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `assets/` 目录路径 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `recursive` | boolean | 默认：`false`；是否删除非空目录 |
+| `event_tip` | string / nil | 默认：`nil`；事件提示文本 |
+## 返回值
 
 调用立即返回整数 request id；任务完成或失败时，[`file` 终态事件](../EVENT.md) 的 `data.request_id` 回传同一值。
 
 ### 示例
 
 ```lua
-assets/
-+ test/
-| - test.txt
-- file.txt
+-- Fixture:
+-- assets/
+-- + test/test.txt
+-- - file.txt
 
-file.remove { path = "file.txt" }
-file.remove { path = "test", recursive = false }
+file.remove("file.txt")
+file.remove("test", {recursive = false})
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = serialization.json_encode{ value = event } }
+    debug.print(serialization.json_encode(event))
   end
 end
 ```
 
-输出：
+**输出：**
 
-> X 为占位符
-
-```json
-assets/
-+ test/
-  - test.txt
-
-{
-  "type": "file",
-  "frame": X,
-  "sequence": X,
-  "data": {
-    "request_id": X,
-    "ok": true,
-    "kind": "remove",
-    "path": "file.txt"
-  },
-}
-
-{
-  "type": "file",
-  "frame": X,
-  "sequence": X,
-  "data": {
-    "request_id": X,
-    "ok": false,
-    "kind": "remove",
-    "path": "test",
-    "error": {
-      "code": "io",
-      "message": "I/O operation failed"
-    },
-  }
-}
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 该 API 一次仅删除**单个**文件或目录，无法链式删除。
+
+- 路径必须位于当前包的 `assets/` 根目录内，不接受越出该目录的路径。

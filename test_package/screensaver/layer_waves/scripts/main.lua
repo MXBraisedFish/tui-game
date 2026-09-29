@@ -11,24 +11,24 @@ local front_panel = nil
 
 local function panel_sizes()
   local back = {
-    width = math.max { values = { 8, width * 3 // 4 } },
-    height = math.max { values = { 4, height // 2 } },
+    width = math.max({ 8, width * 3 // 4 }),
+    height = math.max({ 4, height // 2 }),
   }
   local front = {
-    width = math.max { values = { 6, width // 2 } },
-    height = math.max { values = { 3, height // 3 } },
+    width = math.max({ 6, width // 2 }),
+    height = math.max({ 3, height // 3 }),
   }
   return back, front
 end
 
 local function draw_waves(panel, panel_width, panel_height, speed, fg)
-  draw.fill_rect { x = 0, y = 0, width = panel_width, height = panel_height, char = " ", slice_layer = panel }
-  draw.stroke_rect { x = 0, y = 0, width = panel_width, height = panel_height, fg = fg, border_char = char.ROUNDED_LINE, slice_layer = panel }
+  draw.fill_rect(0, 0, panel_width, panel_height, { char = " ", slice_layer = panel })
+  draw.stroke_rect(0, 0, panel_width, panel_height, { fg = fg, border_char = char.ROUNDED_LINE, slice_layer = panel })
   for row = 1, panel_height - 2 do
     local wave = math.sin(phase * speed + row * 0.6)
     local x = math.floor((wave + 1) * (panel_width - 4) / 2) + 1
     local glyph = WAVE_GLYPHS[(row % #WAVE_GLYPHS) + 1]
-    draw.text { x = x, y = row, text = glyph .. glyph, fg = fg, slice_layer = panel }
+    draw.text(x, row, glyph .. glyph, { fg = fg, slice_layer = panel })
   end
 end
 
@@ -36,8 +36,8 @@ function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
   local back, front = panel_sizes()
-  back_panel = slice.create { width = back.width, height = back.height, bg = color.BLUE, layer = 5 }
-  front_panel = slice.create { width = front.width, height = front.height, bg = color.MAGENTA, layer = 10 }
+  back_panel = slice.create(back.width, back.height, { bg = color.BLUE, layer = 5 })
+  front_panel = slice.create(front.width, front.height, { bg = color.MAGENTA, layer = 10 })
 end
 
 function HandleEvent(event)
@@ -45,8 +45,8 @@ function HandleEvent(event)
     width = event.data.width
     height = event.data.height
     local back, front = panel_sizes()
-    slice.set_size { id = back_panel, width = back.width, height = back.height }
-    slice.set_size { id = front_panel, width = front.width, height = front.height }
+    slice.set_size(back_panel, back.width, back.height)
+    slice.set_size(front_panel, front.width, front.height)
   end
 end
 
@@ -58,25 +58,17 @@ function UpdateFrame(dt, alpha)
 end
 
 function Render()
-  draw.fill_rect { x = 0, y = 0, width = width, height = height, char = " ", bg = color.BLACK }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
 
-  local back_size = slice.get_size{ id = back_panel }
-  local front_size = slice.get_size{ id = front_panel }
+  local back_width, back_height = slice.get_size(back_panel)
+  local front_width, front_height = slice.get_size(front_panel)
   local drift_x = math.floor(math.cos(phase * 0.5) * 4)
   local drift_y = math.floor(math.sin(phase * 0.7) * 2)
 
-  slice.draw {
-    id = back_panel,
-    x = (width - back_size.width) // 2 + drift_x,
-    y = (height - back_size.height) // 2,
-  }
-  slice.draw {
-    id = front_panel,
-    x = (width - front_size.width) // 2 - drift_x,
-    y = (height - front_size.height) // 2 + drift_y,
-  }
+  slice.draw(back_panel, (width - back_width) // 2 + drift_x, (height - back_height) // 2)
+  slice.draw(front_panel, (width - front_width) // 2 - drift_x, (height - front_height) // 2 + drift_y)
 
-  draw_waves(back_panel, back_size.width, back_size.height, 1.5, color.BRIGHT_CYAN)
-  draw_waves(front_panel, front_size.width, front_size.height, 2.5, color.WHITE)
-  draw.text { x = 1, y = height - 1, text = slice.count{} .. " slices", fg = color.GRAY }
+  draw_waves(back_panel, back_width, back_height, 1.5, color.BRIGHT_CYAN)
+  draw_waves(front_panel, front_width, front_height, 2.5, color.WHITE)
+  draw.text(1, height - 1, slice.count() .. " slices", { fg = color.GRAY })
 end

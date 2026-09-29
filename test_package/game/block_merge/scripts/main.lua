@@ -2,7 +2,7 @@
 -- Exercises loader, random generators, table, string.format, align, measurement,
 -- serialization and the save callbacks.
 
-local board = loader.require{ path = "board" }
+local board = loader.require("board")
 
 local CELL_WIDTH = 7
 local CELL_HEIGHT = 3
@@ -42,22 +42,10 @@ local highlight_index = nil
 local highlight_left = 0
 
 local function create_generators(new_seed, position_step, value_step)
-  random.clear{}
+  random.clear()
   seed = new_seed
-  position_rng = random.create {
-    type = random.INT,
-    min = 1,
-    max = board.SIZE * board.SIZE,
-    seed = seed,
-    step = position_step,
-  }
-  value_rng = random.create {
-    type = random.FLOAT,
-    min = 0,
-    max = 1,
-    seed = seed + 1,
-    step = value_step,
-  }
+  position_rng = random.create({ type = random.INT, min = 1, max = board.SIZE * board.SIZE, seed = seed, step = position_step })
+  value_rng = random.create({ type = random.FLOAT, min = 0, max = 1, seed = seed + 1, step = value_step })
 end
 
 local function spawn_tile()
@@ -65,9 +53,9 @@ local function spawn_tile()
   if #empty == 0 then
     return
   end
-  random.set_range { id = position_rng, min = 1, max = #empty }
-  local index = empty[random.generate{ id = position_rng }]
-  if random.generate{ id = value_rng } < 0.9 then
+  random.set_range(position_rng, 1, #empty)
+  local index = empty[random.generate(position_rng)]
+  if random.generate(value_rng) < 0.9 then
     cells[index] = 2
   else
     cells[index] = 4
@@ -88,7 +76,7 @@ local function new_game(new_seed)
 end
 
 local function restore(saved)
-  cells = serialization.json_decode{ s = saved.board }
+  cells = serialization.json_decode(saved.board)
   score = saved.score or 0
   moves = saved.moves or 0
   game_over = not board.can_move(cells)
@@ -113,11 +101,11 @@ local function apply_move(direction)
   end
   spawn_tile()
   if board.can_move(cells) then
-    status = string.format { format_string = "Slid %s and gained %d points.", values = { direction, gained } }
+    status = string.format("Slid %s and gained %d points.", direction, gained)
   else
     game_over = true
     status = "No moves left. Press R to start a new board."
-    game.save_best{}
+    game.save_best()
   end
 end
 
@@ -135,18 +123,10 @@ local function draw_board(origin_x, origin_y)
       local value = cells[index]
       local x = origin_x + 1 + (column - 1) * CELL_WIDTH
       local y = origin_y + 1 + (row - 1) * CELL_HEIGHT
-      draw.fill_rect { x = x, y = y, width = CELL_WIDTH - 1, height = CELL_HEIGHT - 1, char = " ", bg = tile_color(value) }
+      draw.fill_rect(x, y, CELL_WIDTH - 1, CELL_HEIGHT - 1, { char = " ", bg = tile_color(value) })
       if value > 0 then
         local label = tostring(value)
-        draw.text {
-          x = x + (CELL_WIDTH - 1 - utf8.len(label)) // 2,
-          y = y,
-          text = label,
-          fg = color.BLACK,
-          bg = tile_color(value),
-          bold = true,
-          reverse = index == highlight_index and highlight_left > 0,
-        }
+        draw.text(x + (CELL_WIDTH - 1 - utf8.len(label)) // 2, y, label, { fg = color.BLACK, bg = tile_color(value), bold = true, reverse = index == highlight_index and highlight_left > 0 })
       end
     end
   end
@@ -161,7 +141,7 @@ function Init(ctx)
   if ctx.start_mode == "continue" and ctx.continue_data ~= nil then
     restore(ctx.continue_data)
   else
-    new_game(random.randint { min = 1, max = 2147483646 })
+    new_game(random.randint({ min = 1, max = 2147483646 }))
   end
 end
 
@@ -172,10 +152,10 @@ function HandleEvent(event)
   elseif event.type == "action" and event.data.state == "pressed" then
     local action = event.data.action
     if action == "leave" then
-      game.exit_game{}
+      game.exit_game()
     elseif action == "restart" then
-      game.save_best{}
-      new_game(random.randint { min = 1, max = 2147483646 })
+      game.save_best()
+      new_game(random.randint({ min = 1, max = 2147483646 }))
     elseif DIRECTIONS[action] ~= nil then
       apply_move(DIRECTIONS[action])
     end
@@ -184,7 +164,7 @@ end
 
 function Update(dt)
   if highlight_left > 0 then
-    highlight_left = math.max { values = { 0, highlight_left - dt } }
+    highlight_left = math.max({ 0, highlight_left - dt })
   end
 end
 
@@ -192,45 +172,35 @@ function UpdateFrame(dt, alpha)
 end
 
 function Render()
-  draw.fill_rect { x = 0, y = 0, width = width, height = height, char = " ", bg = color.BLACK }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
 
   local title = "f%<fg:bright_magenta>Block</fg> Merge"
-  local title_width = measurement.get_text_width { text = title }
-  draw.text { x = align.resolve_x { width = title_width, horizontal_align = align.HORIZONTAL_CENTER }, y = 1, text = title, bold = true }
-  draw.text {
-    x = 2,
-    y = 3,
-    text = string.format { format_string = "Score %d   Best %d   Moves %d", values = { score, best_score, moves } },
-    fg = color.BRIGHT_YELLOW,
-  }
+  local title_width = measurement.get_text_width(title)
+  draw.text(align.resolve_x(title_width, align.HORIZONTAL_CENTER), 1, title, { bold = true })
+  draw.text(2, 3, string.format("Score %d   Best %d   Moves %d", score, best_score, moves), { fg = color.BRIGHT_YELLOW })
 
   local board_width = board.SIZE * CELL_WIDTH + 1
   local board_height = board.SIZE * CELL_HEIGHT + 1
-  local origin = align.resolve_rect {
-    width = board_width,
-    height = board_height,
-    horizontal_align = align.HORIZONTAL_CENTER,
-    vertical_align = align.TOP,
-    offset_y = 5,
-  }
-  draw.stroke_rect { x = origin.x, y = origin.y, width = board_width, height = board_height, fg = color.BRIGHT_GRAY, border_char = char.ROUNDED_LINE }
-  draw_board(origin.x, origin.y)
+  local origin_x, origin_y = align.resolve_rect(
+    board_width, board_height, align.HORIZONTAL_CENTER, align.TOP, { offset_y = 5 })
+  draw.stroke_rect(origin_x, origin_y, board_width, board_height, { fg = color.BRIGHT_GRAY, border_char = char.ROUNDED_LINE })
+  draw_board(origin_x, origin_y)
 
   local status_color = color.GRAY
   if game_over then
     status_color = color.BRIGHT_RED
   end
-  draw.text { x = 2, y = height - 2, text = status, fg = status_color, max_width = width - 4, max_height = 1 }
+  draw.text(2, height - 2, status, { fg = status_color, max_width = width - 4, max_height = 1 })
 end
 
 function SaveGame()
   return {
-    board = serialization.json_encode{ value = cells },
+    board = serialization.json_encode(cells),
     score = score,
     moves = moves,
     seed = seed,
-    position_step = random.get_step{ id = position_rng },
-    value_step = random.get_step{ id = value_rng },
+    position_step = random.get_step(position_rng),
+    value_step = random.get_step(value_rng),
   }
 end
 

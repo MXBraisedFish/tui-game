@@ -8,13 +8,14 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let load_state = state;
   source.raw_set(
     "load",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "image.load";
-      let table = args::named(
+      let parameters = args::positional(
+        lua,
         method,
         values,
+        &["path"],
         &[
-          "path",
           "block_width",
           "block_height",
           "crop_x",
@@ -27,7 +28,8 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           "background",
         ],
       )?;
-      let relative = image_path(&table, method)?;
+      let table = parameters.options();
+      let relative = image_path(&parameters, method)?;
       let assets_root = load_state.borrow().context.assets_root.clone();
       let resolved = resolve_image_path(&assets_root, &relative)
         .map_err(|error| args::message(method, format!("invalid image path: {error}")))?;
@@ -102,8 +104,8 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   readonly::proxy(lua, source)
 }
 
-fn image_path(table: &Table, method: &str) -> mlua::Result<SafeRelativePath> {
-  let path = args::string(args::required(table, method, "path")?, method, "path")?;
+fn image_path(parameters: &args::PositionalArgs, method: &str) -> mlua::Result<SafeRelativePath> {
+  let path = args::string(parameters.required(0, method, "path")?, method, "path")?;
   SafeRelativePath::parse(&path)
     .map_err(|error| args::message(method, format!("unsafe asset path: {error}")))
 }

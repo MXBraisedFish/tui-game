@@ -554,7 +554,7 @@ hello.sayAny("tui game")   -- 日志输出 "tui game"
 
 ```json
 {
-  "package": "example",
+  "package": "tui game",
   "introduction": "example.introduction",
   "author": "TUI GAME",
   "name": "example.name",

@@ -1,6 +1,6 @@
 # Lua 兼容性与当前注册面
 
-更新时间：2026-09-28。本文记录 `crates/service/lua/src/api/libraries.rs::install` 实际装入的 Lua 环境；标准能力按 B2 对照 Lua 5.4，项目扩展按各 API 的已确认契约执行。
+更新时间：2026-09-29。本文记录 `crates/service/lua/src/api/libraries.rs::install` 实际装入的 Lua 环境；标准能力按 Lua 5.4 协议，项目扩展按各 API 页面说明执行。
 
 ## 环境边界
 
@@ -18,7 +18,7 @@
 | `string` | 常量 `AUTO`, `PLAIN_TEXT`, `RICH_TEXT`；函数 `lower`, `upper`, `reverse`, `regex_escape`, `split`, `sub`, `rep`, `find`, `match`, `gmatch`, `gsub`, `regex_find`, `regex_match`, `regex_gmatch`, `regex_gsub`, `regex_test`, `regex_split`, `format`, `rich_text_to_plain_text` |
 | `utf8` | `len`, `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints`, `byte_position`, `codepoint`, `next`, `position` |
 
-`base` 的迭代器、表长、模式和类型行为由 Lua 5.4 同版本用例审计；项目扩展的参数/结果形状按已确认契约保留。标准 `table.*` 使用 Lua 5.4 实现并由宿主包装限制操作量；只读 API 表不能通过 rawset、insert、remove、sort 或 move 被修改。错误、预算、GC、终结器、`<close>` 和会话结束行为的证据见兼容基线记录。
+`base` 的迭代器、表长、模式和类型行为由 Lua 5.4 同版本用例审计；项目扩展的参数/结果形状按对应 API 文档说明。标准 `table.*` 使用 Lua 5.4 实现并由宿主包装限制操作量；只读 API 表不能通过 rawset、insert、remove、sort 或 move 被修改。错误、预算、GC、终结器、`<close>` 和会话结束行为由 Lua 宿主回归覆盖。
 
 ### 宿主扩展
 
@@ -46,7 +46,7 @@
 | `loader` | `require`, `dofile`, `loadfile` |
 | `file` | `read`, `write`, `create_dir`, `exists`, `remove`, `list_dir`；另有编码与换行常量，详见 `api/file.md` |
 
-`char` 的数组内容、`random` / `slice` 的对象字段及各函数详细形状以后续代码审计为准。上述扩展名来自当前注册实现；除 B0 契约草案明确标记外，不从文档占位页推导 API。
+`char` 的数组内容、`random` / `slice` 的对象字段及各函数详细形状以后续代码审计为准。上述扩展名来自当前注册实现，不从文档占位页推导 API。
 
 ### 尚未注册
 
@@ -58,7 +58,7 @@
 - 对标准库按 Lua 5.4 同版本行为作为主对照。Lua 5.5 只记录版本差异，不作为本项目目标。
 - `io`、`os`、`package`、原生 `debug` 等能力不自动开放；任何权限变化需单独说明沙箱边界与测试。
 - 用户已确认字符串原生元表保持隔离：`getmetatable("x")` 在宿主环境返回 nil；不能借 `("x"):sub(...)` 绕过受控的项目 `string.*` API。
-- 用户已确认 B2.4 string 与 math/utf8 保留项目既有参数和结果协议；Lua 5.4 基线仅用于核对计算行为、安全限制与错误边界，不把这些项目 API 转成原生位置参数/多返回。
-- 本清单记录 API 面和总体边界；逐项行为、差异裁决及测试证据见 [B2_LUA_BASELINE.md](../refactor/B2_LUA_BASELINE.md)。
-- B2.1–B2.5 同版本对照、宿主限制和错误/关闭回归均已完成；Lua 服务包 106 项测试通过。项目特有行为和有意保留的协议差异按 API 文档执行。
-- string/pattern 保留项目命名参数和结果表；Lua 字符串元表保持隔离。Unicode 位置/格式语义与 pattern、输出上限列在 [string API](api/string.md)。
+- 项目扩展按必填参数顺序使用位置参数；方法声明了选项时，选项放在末尾表中。原生 Lua 5.4 接口仍保留其原生参数协议。
+- 宿主自定义的多个相关结果按 Lua 多返回值传递；捕获列表、解码对象、配置列表等本来就是数据的结果仍保留为 Lua 表。
+- 用户已确认字符串元表保持隔离；`getmetatable("x")` 不暴露原生字符串方法。受控的项目 `string.*` 接口仍遵循项目自己的位置参数和返回形状。
+- Lua 5.4 基线用于核对标准接口行为、安全边界和错误路径；项目扩展的签名、返回顺序与限制见对应 API 页面及 [Lua API 调用约定](LUA_API_MIGRATION.md)。

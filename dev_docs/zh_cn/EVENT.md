@@ -1,6 +1,6 @@
 # Lua 事件协议
 
-本文档包含已实现事件和未来事件 schema。当前生产可投递范围是 `action`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期，以及 `file`、`i18n`、`image` 异步终态；它们通过 `HandleEvent(event)` 交付。独立 callback 注册、`timer`、`animation`、`audio`、`network` 和 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源，不能当作现有脚本能力使用。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准，生产链路证据见 [B10_EVENT_AUDIT.md](../refactor/B10_EVENT_AUDIT.md)。
+本文档包含已实现事件和未来事件 schema。当前生产可投递范围是 `action`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期，以及 `file`、`i18n`、`image` 异步终态；它们通过 `HandleEvent(event)` 交付。独立 callback 注册、`timer`、`animation`、`audio`、`network` 和 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源，不能当作现有脚本能力使用。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准。
 
 事件只用于宿主向脚本通知状态变化；原始终端按键、宿主 UI 事件、内部任务 ID、绝对路径和内部错误信息不会暴露给 Lua。
 
@@ -9,7 +9,7 @@
 所有事件都使用同一个信封：
 
 ```lua
-{
+local event = {
   type = "action",
   sequence = 42,
   frame = 1800,
@@ -349,10 +349,10 @@ error = {
 | `request_id` | `integer` | 始终 | Session 内请求 ID。 |
 | `kind` | `string` | 始终 | 固定为 `convert`。 |
 | `ok` | `boolean` | 始终 | 转换是否成功。 |
-| `output` | `string \| nil` | `ok == true` | 可直接传给 `draw.text{ text = event.data.output }` 的富文本字符串。 |
+| `output` | `string \| nil` | `ok == true` | 可直接传给 `draw.text(x, y, event.data.output)` 的富文本字符串。 |
 | `error` | `table \| nil` | `ok == false` | 通用错误表。 |
 
-`request_id` 与 `image.load{...}` 立即返回的 Session 内请求 ID 一致，可用于关联并发转换结果。富文本输出以 `f%` 开头，包含终端颜色标签与方块字形。
+`request_id` 与 `image.load(path, options)` 立即返回的 Session 内请求 ID 一致，可用于关联并发转换结果。富文本输出以 `f%` 开头，包含终端颜色标签与方块字形。
 
 ### 5.4 `network`
 
@@ -391,7 +391,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 ### 5.5 `i18n`
 
-调用 `i18n.create{}` 或 `i18n.reload{}` 后，在包语言文件异步加载结束时发送。该事件只投递给发起请求的游戏或屏保 Session。事件进入 `HandleEvent` 前，宿主已经提交成功加载的语言数据，因此可在处理该事件时立即调用 `i18n.get_value{}`。
+调用 `i18n.create(options)` 或 `i18n.reload(options)` 后，在包语言文件异步加载结束时发送。该事件只投递给发起请求的游戏或屏保 Session。事件进入 `HandleEvent` 前，宿主已经提交成功加载的语言数据，因此可在处理该事件时立即调用 `i18n.get_value(namespace, key)`。
 
 ```lua
 {
@@ -409,7 +409,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `request_id` | `integer` | 始终 | 与成功入队的 `i18n.create{}` 或 `i18n.reload{}` 返回的会话内请求 ID 相同。 |
+| `request_id` | `integer` | 始终 | 与成功入队的 `i18n.create(options)` 或 `i18n.reload(options)` 返回的会话内请求 ID 相同。 |
 | `kind` | `string` | 始终 | `created` 表示 `create` 请求结束，`reloaded` 表示 `reload` 请求结束。 |
 | `ok` | `boolean` | 始终 | 本次语言加载是否成功。 |
 | `message` | `string` | 始终 | 已净化的加载结果说明，不包含绝对路径、系统错误或宿主任务 ID。 |
@@ -419,7 +419,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 - 包语言文件只从 `assets/language/<language_code>/*.json` 读取，不递归扫描子目录。
 - 每个命名空间 JSON 必须是单层对象，并且所有值都必须是字符串。
 - 主语言成功加载后，缺失的命名空间和键由备用语言补齐；已有主语言值不会被覆盖。
-- 两种语言都没有某个键时，`i18n.get_value{}` 使用宿主当前语言的 `language_warning.missing` 文本生成最终缺失提示。
+- 两种语言都没有某个键时，`i18n.get_value(namespace, key)` 使用宿主当前语言的 `language_warning.missing` 文本生成最终缺失提示。
 - 加载失败不会把内部文件路径或解析细节暴露给事件。`reload` 失败时继续保留上一次成功加载的数据。
 
 ## 6. 音频事件

@@ -473,8 +473,10 @@ fn export_recording_openh264<E: From<VideoAsyncEvent>>(
           height: metadata.max_height,
         },
         task.profile.pixel_scale,
-        |_, _| {},
+        |_, _| !cancellation.is_cancelled(),
       );
+      let image =
+        image.map_err(|error| VideoExportError::new(VideoExportStage::Rasterize, error))?;
       let rgb = rgba_to_rgb(image.into_raw());
       previous_frame = Some(frame.clone());
       previous_rgb = Some(rgb);
@@ -666,8 +668,17 @@ fn export_recording_ffmpeg<E: From<VideoAsyncEvent>>(
           height: metadata.max_height,
         },
         task.profile.pixel_scale,
-        |_, _| {},
+        |_, _| !cancellation.is_cancelled(),
       );
+      let image = match image {
+        Ok(image) => image,
+        Err(error) => {
+          drop(stdin);
+          let _ = child.kill();
+          let _ = child.wait();
+          return Err(VideoExportError::new(VideoExportStage::Rasterize, error));
+        }
+      };
       previous_frame = Some(frame.clone());
       previous_rgb = Some(rgba_to_rgb(image.into_raw()));
     }
@@ -1302,6 +1313,141 @@ mod tests {
       }
     }
     assert_eq!(decoded, 2);
+    drop(reader);
+    fs::remove_dir_all(directory).unwrap();
+  }
+
+  #[test]
+  fn preview_styles_and_colors_survive_video_export() {
+    use tg_core_style::{ComposedCell, TextColor};
+    use tg_service_screenshot::ScreenshotService;
+    let directory = test_directory("preview");
+    let source_path = directory.join("preview.json");
+    let frame = ScreenshotService::font_preview_frame();
+    let color = |value: &TextColor| match value {
+      TextColor::Rgb { r, g, b } | TextColor::ForceRgb { r, g, b } => {
+        serde_json::json!({"type":"rgb","value":[r,g,b]})
+      }
+      TextColor::Terminal(color) => {
+        serde_json::json!({"type":"terminal","value":format!("{color:?}").replace("Bright", "bright_").to_lowercase()})
+      }
+      TextColor::Transparent => serde_json::json!({"type":"transparent"}),
+    };
+    let mut palette = vec![
+      serde_json::json!({"text":" ","foreground":null,"background":null,"flags":0,"continuation":false}),
+    ];
+    let mut rows = Vec::new();
+    for y in 0..frame.height() {
+      let mut row = Vec::new();
+      for x in 0..frame.width() {
+        let index = match frame.get(x, y).unwrap() {
+          ComposedCell::Empty => 0,
+          ComposedCell::Text(cell) => {
+            let style = &cell.style;
+            let flags = u16::from(style.bold)
+              | u16::from(style.italic) << 1
+              | u16::from(style.underline) << 2
+              | u16::from(style.strike) << 3
+              | u16::from(style.blink) << 4
+              | u16::from(style.reverse) << 5
+              | u16::from(style.hidden) << 6
+              | u16::from(style.dim) << 7;
+            palette.push(serde_json::json!({"text":cell.text,"foreground":style.foreground.as_ref().map(color),
+              "background":style.background.as_ref().map(color),"flags":flags,"continuation":cell.is_continuation()}));
+            palette.len() - 1
+          }
+        };
+        row.push((1, index));
+      }
+      rows.push(row);
+    }
+    fs::write(&source_path, serde_json::to_vec(&serde_json::json!({
+      "schema_version":tg_core_version::MEDIA_MANIFEST_VERSION,"started_at":"2026-09-29T00:00:00Z","finished_at":"2026-09-29T00:00:01Z",
+      "frame_rate":30,"canvas":{"max_width":frame.width(),"max_height":frame.height()},
+      "duration_us":{"active":1_000_000,"paused":0,"wall":1_000_000},"palette":palette,
+      "initial":{"width":frame.width(),"height":frame.height(),"rows":rows},"events":[]
+    })).unwrap()).unwrap();
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let rasterizer = TerminalFrameRasterizer::load(&[], &root).unwrap();
+    let rect = ScreenshotService::whole_frame_rect(&frame).unwrap();
+    let expected = rasterizer
+      .render(&frame, rect, RecordingPixelScale::Original, |_, _| true)
+      .unwrap();
+    let playback = load_recording_playback(&source_path).unwrap();
+    let restored = rasterizer
+      .render(
+        &playback.initial_frame(),
+        rect,
+        RecordingPixelScale::Original,
+        |_, _| true,
+      )
+      .unwrap();
+    assert_eq!(
+      expected, restored,
+      "video input must retain preview styles and colors"
+    );
+    let task = VideoExportTask {
+      source_path,
+      output_path: directory.join("preview.mp4"),
+      ffmpeg: None,
+      fonts: Vec::new(),
+      deployment_root: root,
+      profile: RecordingProfile {
+        gpu_acceleration: RecordingGpuAcceleration::Off,
+        ..Default::default()
+      },
+    };
+    let (tx, _) = crossbeam_channel::unbounded::<VideoAsyncEvent>();
+    export_recording(
+      TaskId(9),
+      &task,
+      &task.output_path,
+      &tx,
+      &TaskCancellation::new(TaskId(9)),
+    )
+    .unwrap();
+    let size = fs::metadata(&task.output_path).unwrap().len();
+    let mut reader =
+      mp4::Mp4Reader::read_header(BufReader::new(File::open(&task.output_path).unwrap()), size)
+        .unwrap();
+    let track = reader.tracks().get(&1).unwrap();
+    assert_eq!(
+      (u32::from(track.width()), u32::from(track.height())),
+      expected.dimensions()
+    );
+    assert_eq!(track.sample_count(), 30);
+    let avcc = &track.trak.mdia.minf.stbl.stsd.avc1.as_ref().unwrap().avcc;
+    let mut header = Vec::new();
+    for entry in [
+      &avcc.sequence_parameter_sets[0].bytes,
+      &avcc.picture_parameter_sets[0].bytes,
+    ] {
+      header.extend_from_slice(&[0, 0, 0, 1]);
+      header.extend_from_slice(entry);
+    }
+    let mut decoder = openh264::decoder::Decoder::new().unwrap();
+    let mut decoded = 0;
+    for id in 1..=30 {
+      let sample = reader.read_sample(1, id).unwrap().unwrap();
+      let mut bytes = if id == 1 { header.clone() } else { Vec::new() };
+      let mut offset = 0;
+      while offset < sample.bytes.len() {
+        let count =
+          u32::from_be_bytes(sample.bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        offset += 4;
+        bytes.extend_from_slice(&[0, 0, 0, 1]);
+        bytes.extend_from_slice(&sample.bytes[offset..offset + count]);
+        offset += count;
+      }
+      if let Some(image) = decoder.decode(&bytes).unwrap() {
+        assert_eq!(
+          image.dimensions(),
+          (expected.width() as usize, expected.height() as usize)
+        );
+        decoded += 1;
+      }
+    }
+    assert_eq!(decoded, 30);
     drop(reader);
     fs::remove_dir_all(directory).unwrap();
   }

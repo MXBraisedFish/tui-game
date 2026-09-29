@@ -92,5 +92,5 @@ local is_equal = rawequal {left = 1, right = 2} -- 返回 false
 
 **示例**：
 ```lua
-draw.text {x = 1, y = 2, text = "Hello Tui Game"} -- 在 base 切片坐标 (1, 2) 作为起始位置绘制字符串 "Hello Tui Game"
+draw.text(1, 2, "Hello Tui Game") -- 在 base 切片坐标 (1, 2) 作为起始位置绘制字符串 "Hello Tui Game"
 ```

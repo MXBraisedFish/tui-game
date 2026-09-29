@@ -1737,9 +1737,8 @@ mod tests {
 
           local record = { index = 1, value = "record" }
           local text = tostring({ value = "ordinary field" })
-          local table_text = string.find{ text = text, pattern = "^table: 0x" } ~= nil
-          debug.assert{
-            value = ipairs_state == sequence and ipairs_control == 0
+          local table_text = string.find(text, "^table: 0x") ~= nil
+          debug.assert(ipairs_state == sequence and ipairs_control == 0
               and first_key == 1 and first_value == "first"
               and second_key == 2 and second_value == "second" and end_key == nil
               and copied["table"] == "ordinary field" and copied.value == 9
@@ -1750,8 +1749,7 @@ mod tests {
               and custom_state.left == 1 and custom_control == "start"
               and custom_key == "right" and custom_value == 2
               and type(record) == "table" and rawlen({ value = 1 }) == 0
-              and rawequal(record, record) and table_text,
-          }
+              and rawequal(record, record) and table_text)
         end
       "##,
     );
@@ -2207,22 +2205,20 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          system_language = i18n.get_language_code{}
-          create_request_id = i18n.create{}
-          duplicate_create_result = i18n.create{ language_code = "ignored" }
-          local positional_language_call = debug.pcall{
-            func = function() i18n.get_language_code() end,
-          }
-          debug.assert{ value = not positional_language_call.ok }
+          system_language = i18n.get_language_code()
+          create_request_id = i18n.create()
+          duplicate_create_result = i18n.create({ language_code = "ignored" })
+          local extra_language_argument = debug.pcall(function() i18n.get_language_code("extra") end)
+          debug.assert(not extra_language_argument)
         end
         function HandleEvent(event)
           if event.type == "i18n" then
             if event.data.kind == "created" then
               created_event_request_id = event.data.request_id
               if event.data.ok then
-                translated = i18n.get_value{ namespace = "menu", key = "title" }
-                missing = i18n.get_value{ namespace = "menu", key = "missing" }
-                reload_request_id = i18n.reload{}
+                translated = i18n.get_value("menu", "title")
+                missing = i18n.get_value("menu", "missing")
+                reload_request_id = i18n.reload()
               end
             elseif event.data.kind == "reloaded" then
               reload_completed_request_id = event.data.request_id
@@ -2345,8 +2341,7 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          image_request_id = image.load{
-            path = "./sample",
+          image_request_id = image.load("./sample", {
             block_width = 2,
             block_height = 1,
             crop_x = 1,
@@ -2356,39 +2351,35 @@ mod tests {
             scale = 0.75,
             cache = false,
             mode = "mix_block",
-            background = color.rgb{ r = 12, g = 34, b = 56 },
-          }
-          local traversal = debug.pcall{
-            func = function() image.load{ path = "../outside.png" } end,
-          }
-          local unsupported = debug.pcall{
-            func = function() image.load{ path = "sample.gif" } end,
-          }
-          local negative_crop = debug.pcall{
-            func = function() image.load{ path = "sample.png", crop_x = -1 } end,
-          }
-          local named_color = debug.pcall{
-            func = function() image.load{ path = "sample.png", background = "red" } end,
-          }
-          local invalid_mode = debug.pcall{
-            func = function() image.load{ path = "sample.png", mode = "native" } end,
-          }
-          for _ = 1, 3 do image.load{ path = "sample" } end
-          local over_limit = debug.pcall{
-            func = function() image.load{ path = "sample" } end,
-          }
-          debug.assert{ value = image_request_id == 1 }
-          debug.assert{ value = not traversal.ok }
-          debug.assert{ value = not unsupported.ok }
-          debug.assert{ value = not negative_crop.ok }
-          debug.assert{ value = not named_color.ok }
-          debug.assert{ value = not invalid_mode.ok }
-          debug.assert{ value = not over_limit.ok }
+            background = color.rgb(12, 34, 56),
+          })
+          debug.assert(color.rgb(12, 34, 56) == "rgb(12,34,56)")
+          debug.assert(color.hex(12, 34, 56) == '#0c2238')
+          local named_color_args = debug.pcall(function() color.rgb{ r = 12, g = 34, b = 56 } end)
+          local extra_color_arg = debug.pcall(function() color.rgb(12, 34, 56, {}) end)
+          local bad_color_channel = debug.pcall(function() color.rgb(12, 34, 256) end)
+          local traversal = debug.pcall(function() image.load("../outside.png") end)
+          local unsupported = debug.pcall(function() image.load("sample.gif") end)
+          local negative_crop = debug.pcall(function() image.load("sample.png", { crop_x = -1 }) end)
+          local named_color = debug.pcall(function() image.load("sample.png", { background = "red" }) end)
+          local invalid_mode = debug.pcall(function() image.load("sample.png", { mode = "native" }) end)
+          for _ = 1, 3 do image.load("sample") end
+          local over_limit = debug.pcall(function() image.load("sample") end)
+          debug.assert(image_request_id == 1)
+          debug.assert(not named_color_args)
+          debug.assert(not extra_color_arg)
+          debug.assert(not bad_color_channel)
+          debug.assert(not traversal)
+          debug.assert(not unsupported)
+          debug.assert(not negative_crop)
+          debug.assert(not named_color)
+          debug.assert(not invalid_mode)
+          debug.assert(not over_limit)
         end
         function HandleEvent(event)
           if event.type == "image" and event.data.request_id == image_request_id and event.data.ok then
-            draw.text{ x = 2, y = 3, text = event.data.output }
-            image_after_completion = image.load{ path = "sample" }
+            draw.text(2, 3, event.data.output)
+            image_after_completion = image.load("sample")
           end
         end
       "#,
@@ -2581,35 +2572,26 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          local ok = debug.pcall{ func = function() math.PI = 0 end }
-          debug.assert{ value = not ok.ok, message = "math must be read-only" }
+          local ok = debug.pcall(function() math.PI = 0 end)
+          debug.assert(not ok, { message = "math must be read-only" })
           local iterator, state, control = pairs(math)
           local first_key, first_value = iterator(state, control)
-          debug.assert{
-            value = type(first_key) == "string" and first_value ~= nil
-              and state ~= math and next(state) == nil,
-          }
+          debug.assert(type(first_key) == "string" and first_value ~= nil
+              and state ~= math and next(state) == nil)
           local count = 0
           for key, value in pairs(math) do
-            debug.assert{ value = type(key) == "string" and value ~= nil }
+            debug.assert(type(key) == "string" and value ~= nil)
             count = count + 1
           end
-          debug.assert{ value = count > 0 }
+          debug.assert(count > 0)
           local next_key, next_value = next(math)
-          debug.assert{ value = type(next_key) == "string" and next_value ~= nil }
-          local raw_write = debug.pcall{ func = function() rawset(math, "PI", 0) end }
-          local raw_base_write = debug.pcall{
-            func = function() base.rawset(base, "ipairs", nil) end,
-          }
-          debug.assert{
-            value = rawlen(math) == 0 and rawget(math, "PI") == nil and math.PI > 3
+          debug.assert(type(next_key) == "string" and next_value ~= nil)
+          local raw_write = debug.pcall(function() rawset(math, "PI", 0) end)
+          local raw_base_write = debug.pcall(function() base.rawset(base, "ipairs", nil) end)
+          debug.assert(rawlen(math) == 0 and rawget(math, "PI") == nil and math.PI > 3
               and #char.ASCII_LETTER > 0 and table.concat(char.ASCII_LETTER) ~= ""
-              and not debug.pcall{
-                func = function() table.insert(char.ASCII_LETTER, "!") end,
-              }.ok
-              and not raw_write.ok and not raw_base_write.ok,
-            message = "raw access exposed or modified a read-only API backing table",
-          }
+              and not select(1, debug.pcall(function() table.insert(char.ASCII_LETTER, "!") end))
+              and not raw_write and not raw_base_write, { message = "raw access exposed or modified a read-only API backing table" })
         end
       "#,
     );
@@ -2622,39 +2604,31 @@ mod tests {
       r#"
         function Init(ctx)
           local function fails(func)
-            return not debug.pcall{ func = func }.ok
+            return not select(1, debug.pcall(func))
           end
 
           local target = {}
           local metatable = { __index = { fallback = 7 } }
           local result = setmetatable(target, metatable)
-          debug.assert{
-            value = result == target and target.fallback == 7
+          debug.assert(result == target and target.fallback == 7
               and getmetatable(target) == metatable
-              and base.getmetatable(target) == metatable,
-          }
+              and base.getmetatable(target) == metatable)
 
           local removed = setmetatable(target, nil)
-          debug.assert{
-            value = removed == target and getmetatable(target) == nil
-              and target.fallback == nil,
-          }
+          debug.assert(removed == target and getmetatable(target) == nil
+              and target.fallback == nil)
 
           local protected = {}
           setmetatable(protected, { __metatable = "locked" })
-          debug.assert{
-            value = getmetatable(protected) == "locked"
+          debug.assert(getmetatable(protected) == "locked"
               and fails(function()
                 setmetatable(protected, {})
-              end),
-          }
+              end))
 
-          debug.assert{
-            value = getmetatable(base) == false
+          debug.assert(getmetatable(base) == false
               and fails(function() setmetatable(base, {}) end)
               and fails(function() setmetatable(target, false) end)
-              and getmetatable(1) == nil,
-          }
+              and getmetatable(1) == nil)
         end
       "#,
     );
@@ -2667,7 +2641,7 @@ mod tests {
       r#"
         function Init(ctx)
           local function fails(func)
-            return not debug.pcall{ func = func }.ok
+            return not select(1, debug.pcall(func))
           end
 
           local writes = {}
@@ -2688,11 +2662,9 @@ mod tests {
           local same = setmetatable({ raw = 2 }, metatable)
           local greater = setmetatable({ raw = 3 }, metatable)
           left.created = 9
-          debug.assert{
-            value = left.missing == 7 and writes.created == 9 and #left == 12
+          debug.assert(left.missing == 7 and writes.created == 9 and #left == 12
               and left(4) == 8 and left + greater == 5 and left .. greater == "23"
-              and left == same and left < greater and tostring(left) == "value:2",
-          }
+              and left == same and left < greater and tostring(left) == "value:2")
 
           local custom = { left = 1, right = 2 }
           setmetatable(custom, {
@@ -2709,11 +2681,9 @@ mod tests {
           local iterator, state, control = pairs(custom)
           local first_key, first_value = iterator(state, control)
           local second_key, second_value = iterator(state, first_key)
-          debug.assert{
-            value = state == custom and first_key == "right" and first_value == 2
+          debug.assert(state == custom and first_key == "right" and first_value == 2
               and second_key == "left" and second_value == 1
-              and iterator(state, second_key) == nil,
-          }
+              and iterator(state, second_key) == nil)
 
           local virtual = setmetatable({ [1] = "a" }, {
               __index = function(_, index)
@@ -2723,22 +2693,16 @@ mod tests {
           local array_iterator, array_state, array_index = ipairs(virtual)
           local array_first, array_first_value = array_iterator(array_state, array_index)
           local array_second, array_second_value = array_iterator(array_state, array_first)
-          debug.assert{
-            value = array_state == virtual and array_index == 0
+          debug.assert(array_state == virtual and array_index == 0
               and array_first == 1 and array_first_value == "a"
               and array_second == 2 and array_second_value == "b"
-              and array_iterator(array_state, array_second) == nil,
-          }
+              and array_iterator(array_state, array_second) == nil)
 
           local invalid = setmetatable({}, { __tostring = true })
-          debug.assert{ value = fails(function() tostring(invalid) end) }
+          debug.assert(fails(function() tostring(invalid) end))
 
           local named = setmetatable({}, { __name = "Type" })
-          debug.assert{
-            value = string.find{
-              text = tostring(named), pattern = "^Type: 0x",
-            } ~= nil,
-          }
+          debug.assert(string.find(tostring(named), "^Type: 0x") ~= nil)
         end
       "#,
     );
@@ -2752,16 +2716,14 @@ mod tests {
         function UpdateFrame(dt, alpha)
           local metatable = {
             __close = function(_, error_value)
-              debug.print{
-                message = error_value == nil and "closed normally" or "closed with error",
-              }
+              debug.print(error_value == nil and "closed normally" or "closed with error")
             end,
           }
           do
             local normal <close> = setmetatable({}, metatable)
           end
           local failed <close> = setmetatable({}, metatable)
-          debug.assert{ value = false }
+          debug.assert(false)
         end
       "#,
     );
@@ -2886,33 +2848,23 @@ mod tests {
   }
 
   #[test]
-  fn align_resolve_rect_returns_a_named_coordinate_table() {
+  fn align_resolve_rect_returns_two_position_values() {
     let source = valid_script(
       r#"
         function Init(ctx)
-          local top_left, extra = align.resolve_rect{
-            width = 10,
-            height = 4,
-            horizontal_align = align.LEFT,
-            vertical_align = align.TOP,
-          }
-          local center = align.resolve_rect{
-            width = 10,
-            height = 4,
-            horizontal_align = align.CENTER,
-            vertical_align = align.CENTER,
-          }
-          local bottom_right = align.resolve_rect{
-            width = 10,
-            height = 4,
-            horizontal_align = align.RIGHT,
-            vertical_align = align.BOTTOM,
-          }
-          debug.assert{ value = type(top_left) == "table" }
-          debug.assert{ value = top_left.x == 0 and top_left.y == 0 }
-          debug.assert{ value = center.x == 55 and center.y == 17 }
-          debug.assert{ value = bottom_right.x == 110 and bottom_right.y == 34 }
-          debug.assert{ value = extra == nil }
+          local function fails(func)
+            return not select(1, debug.pcall(func))
+          end
+          local top_x, top_y = align.resolve_rect(10, 4, align.LEFT, align.TOP)
+          local center_x, center_y = align.resolve_rect(10, 4, align.CENTER, align.CENTER)
+          local right_x, bottom_y = align.resolve_rect(10, 4, align.RIGHT, align.BOTTOM)
+          debug.assert(top_x == 0 and top_y == 0)
+          debug.assert(center_x == 55 and center_y == 17)
+          debug.assert(right_x == 110 and bottom_y == 34)
+          debug.assert(select('#', align.resolve_rect(10, 4, align.LEFT, align.TOP)) == 2)
+          debug.assert(align.resolve_x(10, align.RIGHT, { offset_x = -2 }) == 108)
+          debug.assert(align.resolve_y(4, align.BOTTOM, { relative_y = 20 }) == 16)
+          debug.assert(fails(function() align.resolve_rect(10, 4, align.LEFT, align.TOP, { typo = 1 }) end))
         end
       "#,
     );
@@ -2930,21 +2882,12 @@ mod tests {
       r#"
         function Init(ctx)
           local text = "f%<fg:green>Test"
-          local plain = measurement.get_text_width{
-            text = text,
-            text_mode = string.PLAIN_TEXT,
-          }
-          local rich = measurement.get_text_width{
-            text = text,
-            text_mode = string.RICH_TEXT,
-          }
-          local auto = measurement.get_text_width{
-            text = text,
-            text_mode = string.AUTO,
-          }
-          debug.assert{ value = plain == 16, message = "plain mode must preserve all syntax" }
-          debug.assert{ value = rich == 6, message = "rich mode must preserve the f% prefix" }
-          debug.assert{ value = auto == 4, message = "auto mode must consume the f% prefix" }
+          local plain = measurement.get_text_width(text, { text_mode = string.PLAIN_TEXT })
+          local rich = measurement.get_text_width(text, { text_mode = string.RICH_TEXT })
+          local auto = measurement.get_text_width(text, { text_mode = string.AUTO })
+          debug.assert(plain == 16, { message = "plain mode must preserve all syntax" })
+          debug.assert(rich == 6, { message = "rich mode must preserve the f% prefix" })
+          debug.assert(auto == 4, { message = "auto mode must consume the f% prefix" })
         end
       "#,
     );
@@ -2956,39 +2899,15 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          local size, extra = measurement.get_text_size{
-            text = "Hello\n世界",
-          }
-          debug.assert{ value = type(size) == "table" }
-          debug.assert{ value = size.width == 5 and size.height == 2 }
-          debug.assert{ value = extra == nil }
-          debug.assert{
-            value = measurement.get_text_width{
-              text = "abcdef",
-              max_width = 3,
-              auto_wrap = true,
-              word_wrap = false,
-            } == 3,
-          }
-          debug.assert{
-            value = measurement.get_text_height{
-              text = "abcdef",
-              max_width = 3,
-              max_height = 1,
-              overflow_marker = "..",
-              auto_wrap = true,
-              word_wrap = false,
-            } == 1,
-          }
-          local rich = measurement.get_text_size{
-            text = "f%{value:name}",
-            rich_params = { name = "终端" },
-            text_mode = string.AUTO,
-            horizontal_align = align.RIGHT,
-          }
-          debug.assert{ value = rich.width == 4 and rich.height == 1 }
-          local empty = measurement.get_text_size{ text = "" }
-          debug.assert{ value = empty.width == 0 and empty.height == 0 }
+          local width, height = measurement.get_text_size("Hello\n世界")
+          debug.assert(width == 5 and height == 2)
+          debug.assert(select('#', measurement.get_text_size("Hello\n世界")) == 2)
+          debug.assert(measurement.get_text_width("abcdef", { max_width = 3, auto_wrap = true, word_wrap = false }) == 3)
+          debug.assert(measurement.get_text_height("abcdef", { max_width = 3, max_height = 1, overflow_marker = "..", auto_wrap = true, word_wrap = false }) == 1)
+          local rich_width, rich_height = measurement.get_text_size("f%{value:name}", { rich_params = { name = "终端" }, text_mode = string.AUTO, horizontal_align = align.RIGHT })
+          debug.assert(rich_width == 4 and rich_height == 1)
+          local empty_width, empty_height = measurement.get_text_size("")
+          debug.assert(empty_width == 0 and empty_height == 0)
         end
       "#,
     );
@@ -3001,42 +2920,42 @@ mod tests {
       r#"
         function Init(ctx)
           local function fails(func)
-            return not debug.pcall{ func = func }.ok
+            return not select(1, debug.pcall(func))
           end
 
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", x = 0 }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", bold = true }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", fg = color.RED }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", slice_layer = "base" }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", max_width = 0 }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", max_height = 65536 }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", max_width = 1.5 }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", auto_wrap = "true" }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", horizontal_align = "bottom" }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{ text = "text", text_mode = "unknown" }
-          end) }
-          debug.assert{ value = fails(function()
-            measurement.get_text_width{}
-          end) }
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { x = 0 })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { bold = true })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { fg = color.RED })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { slice_layer = "base" })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { max_width = 0 })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { max_height = 65536 })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { max_width = 1.5 })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { auto_wrap = "true" })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { horizontal_align = "bottom" })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width("text", { text_mode = "unknown" })
+          end))
+          debug.assert(fails(function()
+            measurement.get_text_width(nil)
+          end))
         end
       "#,
     );
@@ -3048,23 +2967,14 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          debug.assert{
-            value = measurement.get_text_width{ text = "f%{key:jump}" } == 3,
-          }
-          debug.assert{
-            value = measurement.get_text_width{ text = "f%{key_default:jump}" } == 4,
-          }
+          debug.assert(measurement.get_text_width("f%{key:jump}") == 3)
+          debug.assert(measurement.get_text_width("f%{key_default:jump}") == 4)
         end
         function Render()
-          draw.text{ x = 1, y = 1, text = "ordinary" }
-          draw.text{ x = 1, y = 2, text = "f%{key:jump}" }
-          draw.text{ x = 1, y = 3, text = "f%{key_default:jump}" }
-          draw.text{
-            x = 1,
-            y = 4,
-            text = "f%{value:name}",
-            rich_params = { name = "TUI" },
-          }
+          draw.text(1, 1, "ordinary")
+          draw.text(1, 2, "f%{key:jump}")
+          draw.text(1, 3, "f%{key_default:jump}")
+          draw.text(1, 4, "f%{value:name}", { rich_params = { name = "TUI" } })
         end
       "#,
     );
@@ -3108,103 +3018,56 @@ mod tests {
         local slice_id
 
         function Init(ctx)
-          local first = random.create{
-            type = random.INT,
-            min = -10,
-            max = 10,
-            seed = 2468,
-          }
-          local second = random.create{
-            type = random.INT,
-            min = -10,
-            max = 10,
-            seed = 2468,
-          }
-          debug.assert{
-            value = random.generate{ id = first } == random.generate{ id = second },
-          }
-          debug.assert{
-            value = random.generate{ id = first } == random.generate{ id = second },
-          }
+          local first = random.create({ type = random.INT, min = -10, max = 10, seed = 2468 })
+          local second = random.create({ type = random.INT, min = -10, max = 10, seed = 2468 })
+          debug.assert(random.generate(first) == random.generate(second))
+          debug.assert(random.generate(first) == random.generate(second))
 
-          slice_id = slice.create{ width = 20, height = 20, layer = 3 }
-          slice.draw{ id = slice_id, x = -4, y = 2 }
-          local info = slice.get_info{ id = slice_id }
-          debug.assert{
-            value = info.width == 20 and info.height == 20 and info.layer == 1,
-          }
+          slice_id = slice.create(20, 20, { layer = 3 })
+          slice.draw(slice_id, -4, 2)
+          local info = slice.get_info(slice_id)
+          debug.assert(info.width == 20 and info.height == 20 and info.layer == 1)
 
-          local json = serialization.json_encode{
-            value = {
+          local json = serialization.json_encode({
               title = "TUI GAME",
               enabled = true,
               values = { 1, 2, 3 },
-            },
-          }
-          local decoded = serialization.json_decode{ s = json }
-          debug.assert{
-            value = decoded.title == "TUI GAME" and decoded.enabled
-              and decoded.values[3] == 3,
-          }
+            })
+          local decoded = serialization.json_decode(json)
+          debug.assert(decoded.title == "TUI GAME" and decoded.enabled
+              and decoded.values[3] == 3)
 
-          local packed = serialization.binary_pack{
-            fmt = "<i2c3",
-            values = { 513, "abc" },
-          }
-          local unpacked = serialization.binary_unpack{
-            fmt = "<i2c3",
-            data = packed,
-          }
-          debug.assert{
-            value = unpacked.values[1] == 513
-              and unpacked.values[2] == "abc"
-              and unpacked.next_pos == 6,
-          }
+          local packed = serialization.binary_pack("<i2c3", 513, "abc")
+          local unpacked_values, unpacked_next = serialization.binary_unpack("<i2c3", packed)
+          debug.assert(unpacked_values[1] == 513
+              and unpacked_values[2] == "abc"
+              and unpacked_next == 6)
 
-          local xml = serialization.xml_encode{
-            value = {
+          local xml = serialization.xml_encode({
               root = {
                 _attr = { version = "1.0" },
                 child = { "Hello", _attr = { id = 1 } },
               },
-            },
-          }
-          local xml_data = serialization.xml_decode{ s = xml }
-          debug.assert{
-            value = xml_data.root._attr.version == "1.0"
+            })
+          local xml_data = serialization.xml_decode(xml)
+          debug.assert(xml_data.root._attr.version == "1.0"
               and xml_data.root.child._attr.id == "1"
-              and xml_data.root.child._text == "Hello",
-          }
+              and xml_data.root.child._text == "Hello")
 
-          local encoded = encoding.base64_encode{ s = "TUI GAME" }
-          debug.assert{ value = encoding.base64_decode{ s = encoded } == "TUI GAME" }
-          local url = encoding.url_encode{ s = "a b/中" }
-          debug.assert{ value = encoding.url_decode{ s = url } == "a b/中" }
-          local hex = encoding.hex_encode{ s = "abc" }
-          debug.assert{ value = encoding.hex_decode{ s = hex } == "abc" }
+          local encoded = encoding.base64_encode("TUI GAME")
+          debug.assert(encoding.base64_decode(encoded) == "TUI GAME")
+          local url = encoding.url_encode("a b/中")
+          debug.assert(encoding.url_decode(url) == "a b/中")
+          local hex = encoding.hex_encode("abc")
+          debug.assert(encoding.hex_decode(hex) == "abc")
 
           local bytes = "\\0\\255binary"
-          debug.assert{
-            value = encoding.base64_decode{
-              s = encoding.base64_encode{ s = bytes },
-            } == bytes,
-          }
-          debug.assert{
-            value = encoding.hex_decode{
-              s = encoding.hex_encode{ s = bytes },
-            } == bytes,
-          }
+          debug.assert(encoding.base64_decode(encoding.base64_encode(bytes)) == bytes)
+          debug.assert(encoding.hex_decode(encoding.hex_encode(bytes)) == bytes)
         end
 
         function Render()
-          draw.fill_rect{
-            x = -2,
-            y = 1,
-            width = 5,
-            height = 2,
-            char = "#",
-            slice_layer = slice_id,
-          }
+          draw.fill_rect(-2, 1, 5, 2, { char = "#", slice_layer = slice_id })
         end
       "##,
     );
@@ -3232,125 +3095,97 @@ mod tests {
       r#"
         function Init(ctx)
           local function fails(func)
-            return not debug.pcall{ func = func }.ok
+            return not select(1, debug.pcall(func))
           end
 
-          local direct_int = random.randint{}
-          local direct_float = random.randfloat{}
-          debug.assert{
-            value = direct_int >= -2147483648 and direct_int <= 2147483647,
-          }
-          debug.assert{ value = direct_float >= 0 and direct_float <= 1 }
+          local direct_int = random.randint()
+          local direct_float = random.randfloat()
+          debug.assert(direct_int >= -2147483648 and direct_int <= 2147483647)
+          debug.assert(direct_float >= 0 and direct_float <= 1)
 
-          local generator = random.create{}
-          local initial = random.get_info{ id = generator }
-          debug.assert{
-            value = initial.type == random.INT
+          local generator = random.create()
+          local initial = random.get_info(generator)
+          debug.assert(initial.type == random.INT
               and initial.min == -2147483648
               and initial.max == 2147483647
-              and initial.step == 0,
-          }
-          debug.assert{ value = random.count{} == 1 and random.list{}.n == 1 }
-          debug.assert{
-            value = fails(function() random.generate(generator) end)
-              and fails(function() random.count() end)
-              and fails(function() slice.exists("base") end)
-              and fails(function() slice.count() end),
-          }
-          debug.assert{
-            value = random.set{
-              id = generator,
-              type = random.FLOAT,
-              min = -2.5,
-              max = 3.5,
-              seed = 42,
-              step = 5,
-            },
-          }
-          local range = random.get_range{ id = generator }
-          debug.assert{
-            value = random.get_type{ id = generator } == random.FLOAT
-              and range.min == -2.5
-              and range.max == 3.5
-              and random.get_seed{ id = generator } == 42
-              and random.get_step{ id = generator } == 5,
-          }
-          local value = random.generate{ id = generator }
-          debug.assert{
-            value = value >= -2.5 and value <= 3.5
-              and random.get_step{ id = generator } == 6,
-          }
-          debug.assert{ value = random.set_type{ id = generator } }
-          debug.assert{ value = random.set_seed{ id = generator } }
-          local missing_step = debug.pcall{
-            func = function() random.set_step{ id = generator } end,
-          }
-          debug.assert{ value = not missing_step.ok }
+              and initial.step == 0)
+          debug.assert(random.count() == 1 and random.list().n == 1)
+          debug.assert(fails(function() random.generate() end)
+              and fails(function() random.count(true) end)
+              and fails(function() slice.exists() end)
+              and fails(function() slice.count(true) end))
+          debug.assert(random.set(generator, { type = random.FLOAT, min = -2.5, max = 3.5, seed = 42, step = 5 }))
+          local range_min, range_max = random.get_range(generator)
+          debug.assert(random.get_type(generator) == random.FLOAT
+              and range_min == -2.5
+              and range_max == 3.5
+              and select('#', random.get_range(generator)) == 2
+              and random.get_range("rng_999") == nil
+              and select('#', random.get_range("rng_999")) == 1
+              and random.get_seed(generator) == 42
+              and random.get_step(generator) == 5)
+          local value = random.generate(generator)
+          debug.assert(value >= -2.5 and value <= 3.5
+              and random.get_step(generator) == 6)
+          debug.assert(random.set_type(generator, random.FLOAT))
+          debug.assert(random.set_seed(generator, 42))
+          debug.assert(fails(function() random.set_type(generator) end))
+          debug.assert(fails(function() random.set_seed(generator) end))
+          local missing_step = debug.pcall(function() random.set_step(generator, nil) end)
+          debug.assert(not missing_step)
 
-          debug.assert{ value = slice.exists{ id = "base" } }
-          local base = slice.get_info{ id = "base" }
-          debug.assert{
-            value = base.width == ctx.base.width
+          debug.assert(slice.exists("base"))
+          local base = slice.get_info("base")
+          debug.assert(base.width == ctx.base.width
               and base.height == ctx.base.height
               and base.layer == 0
-              and base.bg == color.TRANSPARENT,
-          }
-          local first = slice.create{ width = 10, height = 4, bg = color.BLUE }
-          local inserted = slice.create{ width = 3, height = 2, layer = 1 }
-          local slices = slice.list{}
-          debug.assert{
-            value = slices.n == 2
+              and base.bg == color.TRANSPARENT)
+          local first = slice.create(10, 4, { bg = color.BLUE })
+          local inserted = slice.create(3, 2, { layer = 1 })
+          local first_width, first_height = slice.get_size(first)
+          debug.assert(first_width == 10 and first_height == 4
+              and select('#', slice.get_size(first)) == 2
+              and slice.get_size("slice_999") == nil
+              and select('#', slice.get_size("slice_999")) == 1)
+          debug.assert(fails(function() random.create({ typo = true }) end)
+              and fails(function() slice.create(2, 2, { typo = true }) end))
+          local slices = slice.list()
+          debug.assert(slices.n == 2
               and slices[1].id == inserted
               and slices[1].layer == 1
               and slices[2].id == first
               and slices[2].layer == 2
-              and slices[2].bg == color.BLUE,
-          }
-          debug.assert{ value = slice.set{ id = first } }
-          debug.assert{ value = slice.set{ id = first, bg = color.RED } }
-          debug.assert{ value = slice.get_background{ id = first } == color.RED }
-          debug.assert{
-            value = slice.set_background{ id = first, bg = color.TRANSPARENT },
-          }
-          debug.assert{
-            value = slice.get_background{ id = first } == color.TRANSPARENT,
-          }
-          debug.assert{ value = slice.set_background{ id = first, bg = color.NONE } }
-          debug.assert{ value = slice.get_background{ id = first } == color.NONE }
-          debug.assert{ value = slice.set_background{ id = first } }
-          debug.assert{ value = slice.get_background{ id = first } == color.NONE }
-          debug.assert{
-            value = not slice.set_background{ id = "base", bg = color.BLUE },
-          }
-          debug.assert{
-            value = not slice.set_background{ id = "slice_999", bg = color.BLUE },
-          }
-          local invalid_background = debug.pcall{
-            func = function()
-              slice.set_background{ id = first, bg = "not-a-color" }
-            end,
-          }
-          debug.assert{ value = not invalid_background.ok }
-          debug.assert{
-            value = slice.set_size{ id = first, width = 12 }
-              and slice.get_width{ id = first } == 12
-              and slice.get_height{ id = first } == 4,
-          }
-          debug.assert{ value = slice.set_layer{ id = first, layer = 999 } }
-          debug.assert{ value = slice.get_layer{ id = first } == 2 }
-          debug.assert{ value = slice.delete{ id = inserted } }
-          debug.assert{ value = slice.get_layer{ id = first } == 1 }
-          debug.assert{
-            value = slice["50P"] == nil
+              and slices[2].bg == color.BLUE)
+          debug.assert(slice.set(first))
+          debug.assert(slice.set(first, { bg = color.RED }))
+          debug.assert(slice.get_background(first) == color.RED)
+          debug.assert(slice.set_background(first, color.TRANSPARENT))
+          debug.assert(slice.get_background(first) == color.TRANSPARENT)
+          debug.assert(slice.set_background(first, color.NONE))
+          debug.assert(slice.get_background(first) == color.NONE)
+          debug.assert(fails(function() slice.set_background(first) end))
+          debug.assert(slice.get_background(first) == color.NONE)
+          debug.assert(not slice.set_background("base", color.BLUE))
+          debug.assert(not slice.set_background("slice_999", color.BLUE))
+          local invalid_background = debug.pcall(function()
+              slice.set_background(first, "not-a-color")
+            end)
+          debug.assert(not invalid_background)
+          debug.assert(slice.set_size(first, 12, 4)
+              and slice.get_width(first) == 12
+              and slice.get_height(first) == 4)
+          debug.assert(fails(function() slice.set_size(first, 12) end))
+          debug.assert(slice.set_layer(first, 999))
+          debug.assert(slice.get_layer(first) == 2)
+          debug.assert(slice.delete(inserted))
+          debug.assert(slice.get_layer(first) == 1)
+          debug.assert(slice["50P"] == nil
               and slice.list_by_layer == nil
-              and random.set_params == nil,
-          }
-          debug.assert{
-            value = slice.clear{}
-              and slice.count{} == 0
-              and slice.list{}.n == 0,
-          }
-          debug.assert{ value = random.clear{} and random.count{} == 0 }
+              and random.set_params == nil)
+          debug.assert(slice.clear()
+              and slice.count() == 0
+              and slice.list().n == 0)
+          debug.assert(random.clear() and random.count() == 0)
         end
       "#,
     );
@@ -3362,8 +3197,8 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          generator = random.create{ seed = 7 }
-          layer = slice.create{ width = 2, height = 2 }
+          generator = random.create({ seed = 7 })
+          layer = slice.create(2, 2)
         end
       "#,
     );
@@ -3425,62 +3260,38 @@ mod tests {
         function Init(ctx)
           local cyclic = {}
           cyclic.self = cyclic
-          local cyclic_ok = debug.pcall{
-            func = function() serialization.json_encode{ value = cyclic } end,
-          }
-          local sparse_ok = debug.pcall{
-            func = function()
-              serialization.json_encode{ value = { [1] = "a", [3] = "c" } }
-            end,
-          }
-          local entity_ok = debug.pcall{
-            func = function()
-              serialization.xml_decode{
-                s = "<!DOCTYPE root [<!ENTITY secret 'hidden'>]><root>&secret;</root>",
-              }
-            end,
-          }
-          local mismatched_xml_ok = debug.pcall{
-            func = function()
-              serialization.xml_decode{ s = "<root><child></root>" }
-            end,
-          }
-          local mixed_xml_ok = debug.pcall{
-            func = function()
-              serialization.xml_decode{ s = "<root><child/>text</root>" }
-            end,
-          }
-          local positional_encoding_ok = debug.pcall{
-            func = function() encoding.hex_decode("00") end,
-          }
-          local missing_encoding_arg_ok = debug.pcall{
-            func = function() encoding.hex_decode{} end,
-          }
-          local invalid_hex_ok = debug.pcall{
-            func = function() encoding.hex_decode{ s = "0xz1" } end,
-          }
-          local positional_serialization_ok = debug.pcall{
-            func = function() serialization.json_encode({}) end,
-          }
-          local missing_serialization_arg_ok = debug.pcall{
-            func = function() serialization.json_decode{} end,
-          }
-          local positional_packsize_ok = debug.pcall{
-            func = function() serialization.binary_packsize("<I4") end,
-          }
-          debug.assert{
-            value = not cyclic_ok.ok
-              and not sparse_ok.ok
-              and not entity_ok.ok
-              and not mismatched_xml_ok.ok
-              and not mixed_xml_ok.ok
-              and not positional_encoding_ok.ok
-              and not missing_encoding_arg_ok.ok
-              and not invalid_hex_ok.ok
-              and not positional_serialization_ok.ok
-              and not missing_serialization_arg_ok.ok
-              and not positional_packsize_ok.ok,
-          }
+          local cyclic_ok = debug.pcall(function() serialization.json_encode(cyclic) end)
+          local sparse_ok = debug.pcall(function()
+              serialization.json_encode({ [1] = "a", [3] = "c" })
+            end)
+          local entity_ok = debug.pcall(function()
+              serialization.xml_decode("<!DOCTYPE root [<!ENTITY secret 'hidden'>]><root>&secret;</root>")
+            end)
+          local mismatched_xml_ok = debug.pcall(function()
+              serialization.xml_decode("<root><child></root>")
+            end)
+          local mixed_xml_ok = debug.pcall(function()
+              serialization.xml_decode("<root><child/>text</root>")
+            end)
+          local positional_encoding_ok = debug.pcall(function() return encoding.hex_decode("00") end)
+          local missing_encoding_arg_ok = debug.pcall(function() encoding.hex_decode() end)
+          local wrong_encoding_type_ok = debug.pcall(function() encoding.hex_decode(123) end)
+          local invalid_hex_ok = debug.pcall(function() encoding.hex_decode("0xz1") end)
+          local positional_serialization_ok = debug.pcall(function() return serialization.json_encode({}) end)
+          local missing_serialization_arg_ok = debug.pcall(function() serialization.json_decode() end)
+          local positional_packsize_ok = debug.pcall(function() serialization.binary_packsize("<I4") end)
+          debug.assert(not cyclic_ok
+              and not sparse_ok
+              and not entity_ok
+              and not mismatched_xml_ok
+              and not mixed_xml_ok
+              and positional_encoding_ok
+              and not missing_encoding_arg_ok
+              and not wrong_encoding_type_ok
+              and not invalid_hex_ok
+              and positional_serialization_ok
+              and not missing_serialization_arg_ok
+              and positional_packsize_ok)
         end
       "#,
     );
@@ -3493,43 +3304,26 @@ mod tests {
       r#"
         function Init(ctx)
           local encoded_nil = serialization.json_encode(nil)
-          local decoded_null = serialization.json_decode{ s = "null" }
-          local empty_table = serialization.json_encode{ value = {} }
-          local max_integer = serialization.json_decode{ s = "9223372036854775807" }
-          local above_i64 = serialization.json_decode{ s = "9223372036854775808" }
-          local nested = serialization.json_decode{
-            s = '{"object":{"nil":null},"array":[1,null,3]}',
-          }
-          local nested_json = serialization.json_encode{ value = nested }
-          local nested_round_trip = serialization.json_decode{ s = nested_json }
-          local yaml = serialization.yaml_encode{
-            value = { object = { null = serialization.NULL } },
-          }
-          local yaml_value = serialization.yaml_decode{ s = yaml }
-          local mutation_ok = debug.pcall{
-            func = function() serialization.NULL.field = true end,
-          }
-          local infinity_ok = debug.pcall{
-            func = function() serialization.json_encode{ value = 1 / 0 } end,
-          }
-          local nan_ok = debug.pcall{
-            func = function() serialization.json_encode{ value = 0 / 0 } end,
-          }
+          local decoded_null = serialization.json_decode("null")
+          local empty_table = serialization.json_encode({})
+          local max_integer = serialization.json_decode("9223372036854775807")
+          local above_i64 = serialization.json_decode("9223372036854775808")
+          local nested = serialization.json_decode('{"object":{"nil":null},"array":[1,null,3]}')
+          local nested_json = serialization.json_encode(nested)
+          local nested_round_trip = serialization.json_decode(nested_json)
+          local yaml = serialization.yaml_encode({ object = { null = serialization.NULL } })
+          local yaml_value = serialization.yaml_decode(yaml)
+          local mutation_ok = debug.pcall(function() serialization.NULL.field = true end)
+          local infinity_ok = debug.pcall(function() serialization.json_encode(1 / 0) end)
+          local nan_ok = debug.pcall(function() serialization.json_encode(0 / 0) end)
 
-          debug.assert{
-            value = encoded_nil == "null"
+          debug.assert(encoded_nil == "null"
               and decoded_null == serialization.NULL
-              and empty_table == "{}",
-            message = "top-level JSON null and empty table contract failed",
-          }
-          debug.assert{
-            value = max_integer == math.MAX_INTEGER
+              and empty_table == "{}", { message = "top-level JSON null and empty table contract failed" })
+          debug.assert(max_integer == math.MAX_INTEGER
               and math.type(max_integer) == "integer"
-              and math.type(above_i64) == "float",
-            message = "JSON integer boundary contract failed",
-          }
-          debug.assert{
-            value = nested.object["nil"] == serialization.NULL
+              and math.type(above_i64) == "float", { message = "JSON integer boundary contract failed" })
+          debug.assert(nested.object["nil"] == serialization.NULL
               and #nested.array == 3
               and nested.array[1] == 1
               and nested.array[2] == serialization.NULL
@@ -3538,17 +3332,9 @@ mod tests {
               and #nested_round_trip.array == 3
               and nested_round_trip.array[1] == 1
               and nested_round_trip.array[2] == serialization.NULL
-              and nested_round_trip.array[3] == 3,
-            message = "nested JSON null round-trip contract failed",
-          }
-          debug.assert{
-            value = yaml_value.object.null == serialization.NULL,
-            message = "YAML null round-trip contract failed",
-          }
-          debug.assert{
-            value = not mutation_ok.ok and not infinity_ok.ok and not nan_ok.ok,
-            message = "NULL immutability or non-finite number rejection failed",
-          }
+              and nested_round_trip.array[3] == 3, { message = "nested JSON null round-trip contract failed" })
+          debug.assert(yaml_value.object.null == serialization.NULL, { message = "YAML null round-trip contract failed" })
+          debug.assert(not mutation_ok and not infinity_ok and not nan_ok, { message = "NULL immutability or non-finite number rejection failed" })
         end
       "#,
     );
@@ -3560,29 +3346,19 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          local csv_ok = debug.pcall{
-            func = function()
-              serialization.csv_encode{ rows = { { "value", serialization.NULL } } }
-            end,
-          }
-          local ini_ok = debug.pcall{
-            func = function()
-              serialization.ini_encode{ value = { entry = serialization.NULL } }
-            end,
-          }
-          local toml_ok = debug.pcall{
-            func = function()
-              serialization.toml_encode{ value = { entry = serialization.NULL } }
-            end,
-          }
-          local xml_ok = debug.pcall{
-            func = function()
-              serialization.xml_encode{ value = { root = { child = serialization.NULL } } }
-            end,
-          }
-          debug.assert{
-            value = not csv_ok.ok and not ini_ok.ok and not toml_ok.ok and not xml_ok.ok,
-          }
+          local csv_ok = debug.pcall(function()
+              serialization.csv_encode({ { "value", serialization.NULL } })
+            end)
+          local ini_ok = debug.pcall(function()
+              serialization.ini_encode({ entry = serialization.NULL })
+            end)
+          local toml_ok = debug.pcall(function()
+              serialization.toml_encode({ entry = serialization.NULL })
+            end)
+          local xml_ok = debug.pcall(function()
+              serialization.xml_encode({ root = { child = serialization.NULL } })
+            end)
+          debug.assert(not csv_ok and not ini_ok and not toml_ok and not xml_ok)
         end
       "#,
     );
@@ -3594,68 +3370,36 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          local json = serialization.json_encode{
-            value = { name = "TUI", enabled = true, values = { 1, 2 } },
-          }
-          local json_value = serialization.json_decode{ s = json }
-          debug.assert{
-            value = json_value.name == "TUI" and json_value.values[2] == 2,
-          }
+          local json = serialization.json_encode({ name = "TUI", enabled = true, values = { 1, 2 } })
+          local json_value = serialization.json_decode(json)
+          debug.assert(json_value.name == "TUI" and json_value.values[2] == 2)
 
-          local csv = serialization.csv_encode{
-            rows = { { "name", "score" }, { "player", 9 } },
-          }
-          local csv_value = serialization.csv_decode{ s = csv }
-          debug.assert{
-            value = csv_value[2][1] == "player" and csv_value[2][2] == "9",
-          }
+          local csv = serialization.csv_encode({ { "name", "score" }, { "player", 9 } })
+          local csv_value = serialization.csv_decode(csv)
+          debug.assert(csv_value[2][1] == "player" and csv_value[2][2] == "9")
 
-          local yaml = serialization.yaml_encode{
-            value = { name = "TUI", enabled = true },
-          }
-          local yaml_value = serialization.yaml_decode{ s = yaml }
-          debug.assert{ value = yaml_value.name == "TUI" and yaml_value.enabled }
+          local yaml = serialization.yaml_encode({ name = "TUI", enabled = true })
+          local yaml_value = serialization.yaml_decode(yaml)
+          debug.assert(yaml_value.name == "TUI" and yaml_value.enabled)
 
-          local toml = serialization.toml_encode{
-            value = { name = "TUI", version = 1 },
-          }
-          local toml_value = serialization.toml_decode{ s = toml }
-          debug.assert{
-            value = toml_value.name == "TUI" and toml_value.version == 1,
-          }
+          local toml = serialization.toml_encode({ name = "TUI", version = 1 })
+          local toml_value = serialization.toml_decode(toml)
+          debug.assert(toml_value.name == "TUI" and toml_value.version == 1)
 
-          local ini = serialization.ini_encode{
-            value = { server = { host = "127.0.0.1", port = 8080 } },
-          }
-          local ini_value = serialization.ini_decode{ s = ini }
-          debug.assert{
-            value = ini_value.server.host == "127.0.0.1"
-              and ini_value.server.port == "8080",
-          }
+          local ini = serialization.ini_encode({ server = { host = "127.0.0.1", port = 8080 } })
+          local ini_value = serialization.ini_decode(ini)
+          debug.assert(ini_value.server.host == "127.0.0.1"
+              and ini_value.server.port == "8080")
 
-          local first = serialization.binary_pack{
-            fmt = "<I2z",
-            values = { 513, "ok" },
-          }
+          local first = serialization.binary_pack("<I2z", 513, "ok")
           local all = first .. first
-          local unpacked_first = serialization.binary_unpack{
-            fmt = "<I2z",
-            data = all,
-          }
-          local unpacked_second = serialization.binary_unpack{
-            fmt = "<I2z",
-            data = all,
-            pos = unpacked_first.next_pos,
-          }
-          debug.assert{
-            value = unpacked_first.values[1] == 513
-              and unpacked_first.values[2] == "ok"
-              and unpacked_second.values[1] == 513
-              and unpacked_second.values[2] == "ok",
-          }
-          debug.assert{
-            value = serialization.binary_packsize{ fmt = "<I2c2x" } == 5,
-          }
+          local unpacked_first, next_pos = serialization.binary_unpack("<I2z", all)
+          local unpacked_second = serialization.binary_unpack("<I2z", all, { pos = next_pos })
+          debug.assert(unpacked_first[1] == 513
+              and unpacked_first[2] == "ok"
+              and unpacked_second[1] == 513
+              and unpacked_second[2] == "ok")
+          debug.assert(serialization.binary_packsize("<I2c2x") == 5)
         end
       "#,
     );
@@ -3667,18 +3411,23 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          draw.fill_rect{ x = 2, y = 1, width = 10, height = 4, bg = color.BLUE }
-          draw.render{}
-          local missing_table = debug.pcall{ func = function() draw.render() end }
-          debug.assert{ value = not missing_table.ok }
+          draw.fill_rect(2, 1, 10, 4, { bg = color.BLUE })
+          draw.render()
+          local no_arguments = debug.pcall(function() draw.render() end)
+          local extra_argument = debug.pcall(function() draw.render(true) end)
+          local missing_text = debug.pcall(function() draw.text(1, 1) end)
+          local unknown_draw_option = debug.pcall(function() draw.text(1, 1, "x", { boid = true }) end)
+          local unknown_rect_option = debug.pcall(function() draw.fill_rect(2, 1, 10, 4, { color = color.BLUE }) end)
+          debug.assert(no_arguments and not extra_argument
+              and not missing_text and not unknown_draw_option and not unknown_rect_option)
         end
         function Update(dt)
-          draw.erase_rect{ x = 3, y = 2, width = 8, height = 2 }
+          draw.erase_rect(3, 2, 8, 2)
         end
         function Render()
-          local ok = debug.pcall{ func = function() draw.render{} end }
-          debug.assert{ value = not ok.ok }
-          draw.text{ x = 1, y = 1, text = "render" }
+          local ok = debug.pcall(function() draw.render() end)
+          debug.assert(not ok)
+          draw.text(1, 1, "render")
         end
       "#,
     );
@@ -3716,7 +3465,7 @@ mod tests {
               x = 2
               y = y + 1
             end
-            draw.text{ x = x, y = y, text = item }
+            draw.text(x, y, item)
           end
         end
       "#,
@@ -3737,7 +3486,7 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          debug.print{ message = "plain" }
+          debug.print("plain")
         end
       "#,
     );
@@ -3767,7 +3516,7 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          debug.assert{ value = nil, message = "nil assertion" }
+          debug.assert(nil, { message = "nil assertion" })
         end
       "#,
     );
@@ -3787,7 +3536,7 @@ mod tests {
     let default_source = valid_script(
       r#"
         function Init(ctx)
-          debug.assert{}
+          debug.assert(nil)
         end
       "#,
     );
@@ -3806,8 +3555,8 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          debug.print{ message = "before init fault" }
-          debug.assert{ value = false }
+          debug.print("before init fault")
+          debug.assert(false)
         end
       "#,
     );
@@ -3834,8 +3583,8 @@ mod tests {
     let source = valid_script(
       r#"
         function Update(dt)
-          debug.print{ message = 1 }
-          debug.print{ missing_message }
+          debug.print(1)
+          debug.print()
         end
       "#,
     );
@@ -3863,20 +3612,13 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          debug.assert{
-            value = measurement.get_text_width{ text = 12345 } == 5,
-          }
-          debug.print{ message = 100, title = false }
-          debug.info{ message = true }
+          debug.assert(measurement.get_text_width(12345) == 5)
+          debug.print(100, { title = false })
+          debug.info(true)
         end
 
         function Render()
-          draw.text{
-            x = 1,
-            y = 1,
-            text = 200,
-            overflow_marker = 9,
-          }
+          draw.text(1, 1, 200, { overflow_marker = 9 })
         end
       "#,
     );
@@ -3926,33 +3668,21 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          debug.assert{
-            value = debug.VERSION == "Lua 5.4 / TUI GAME API 1"
+          debug.assert(debug.VERSION == "Lua 5.4 / TUI GAME API 1"
               and debug.TRACE == "trace"
               and debug.DEBUG == "debug"
               and debug.INFO == "info"
               and debug.WARN == "warn"
               and debug.ERROR == "error"
-              and debug.FATAL == "fatal",
-          }
-          debug.print{
-            message = "custom",
-            title = "Title",
-            level = debug.WARN,
-            time = true,
-            type_head = true,
-          }
-          local positional_info = debug.pcall{
-            func = function() debug.info("positional") end,
-          }
-          debug.assert{ value = not positional_info.ok }
-          local positional_skip = debug.pcall{
-            func = function() event.skip_action() end,
-          }
-          debug.assert{ value = not positional_skip.ok }
-          debug.info{ message = "info" }
-          debug.warn{ message = "warn" }
-          debug.error{ message = "error" }
+              and debug.FATAL == "fatal")
+          debug.assert(debug.assert("value") == "value")
+          debug.print("custom", { title = "Title", level = debug.WARN, time = true, type_head = true })
+          debug.info("positional")
+          local extra_skip_argument = debug.pcall(function() event.skip_action("extra") end)
+          debug.assert(not extra_skip_argument)
+          debug.info("info")
+          debug.warn("warn")
+          debug.error("error")
         end
       "#,
     );
@@ -3976,9 +3706,12 @@ mod tests {
         type_head: true,
       } if message == "custom" && title == "Title" && level == "warn"
     )));
-    for (expected_message, expected_level) in
-      [("info", "info"), ("warn", "warn"), ("error", "error")]
-    {
+    for (expected_message, expected_level) in [
+      ("positional", "info"),
+      ("info", "info"),
+      ("warn", "warn"),
+      ("error", "error"),
+    ] {
       assert!(commands.iter().any(|command| matches!(
         command,
         LuaHostCommand::Print {
@@ -3993,59 +3726,62 @@ mod tests {
   }
 
   #[test]
-  fn protected_calls_return_named_result_tables() {
+  fn protected_calls_follow_lua_multiple_return_semantics() {
     let source = valid_script(
-      r#"
+      r##"
         function Init(ctx)
-          local success = debug.pcall{
-            func = function(left, right)
-              return left + right, nil, "tail"
-            end,
-            values = { 2, 3 },
-          }
-          debug.assert{
-            value = success.ok
-              and type(success.values) == "table"
-              and success.values.n == 3
-              and success.values[1] == 5
-              and success.values[2] == nil
-              and success.values[3] == "tail"
-              and success.error == nil,
-          }
+          local function pack(...)
+            return { n = select("#", ...), ... }
+          end
+          local returned = pack(debug.pcall(function()
+            return "first", nil, "third", nil
+          end))
+          debug.assert(returned[1] and returned.n == 5
+              and returned[2] == "first" and returned[3] == nil
+              and returned[4] == "third" and returned[5] == nil)
 
-          local failure = debug.pcall{
-            func = function()
-              debug.assert{ value = false, message = "failed" }
-            end,
-          }
-          debug.assert{
-            value = not failure.ok
-              and type(failure.error) == "string"
-              and failure.values == nil,
-          }
+          local received_count, received_second, received_third
+          local called = debug.pcall(function(...)
+            received_count = select("#", ...)
+            received_second = select(2, ...)
+            received_third = select(3, ...)
+          end, "first", nil, "third")
+          debug.assert(called and received_count == 3
+              and received_second == nil and received_third == "third")
 
-          local obsolete_message = debug.pcall{
-            func = function()
-              debug.pcall{ func = function() end, message = "removed" }
-            end,
-          }
-          debug.assert{
-            value = not obsolete_message.ok and type(obsolete_message.error) == "string",
-          }
+          local failed, failure = debug.pcall(function()
+            debug.assert(false, { message = "failed" })
+          end)
+          debug.assert(not failed and type(failure) == "string")
 
-          local handled = debug.xpcall{
-            func = function()
-              debug.assert{ value = false, message = "failed" }
-            end,
-            error_callback = function(message)
-              return "handled"
-            end,
-          }
-          debug.assert{
-            value = not handled.ok and handled.error == "handled",
-          }
+          local table_ok, table_result = debug.pcall(function(value)
+            return value
+          end, { message = "vararg table" })
+          debug.assert(table_ok and table_result.message == "vararg table")
+
+          local missing_function, missing_function_error = debug.pcall(function()
+            debug.pcall()
+          end)
+          debug.assert(not missing_function and type(missing_function_error) == "string")
+
+          local invalid_handler, invalid_handler_error = debug.pcall(function()
+            debug.xpcall(function() return true end, true)
+          end)
+          debug.assert(not invalid_handler and type(invalid_handler_error) == "string")
+
+          local unknown_assertion_option = debug.pcall(function()
+            debug.assert(true, { typo = true })
+          end)
+          debug.assert(not unknown_assertion_option)
+
+          local handled, handled_error = debug.xpcall(function()
+            debug.assert(false, { message = "failed" })
+          end, function(message)
+            return "handled"
+          end)
+          debug.assert(not handled and handled_error == "handled")
         end
-      "#,
+      "##,
     );
     LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
   }
@@ -4055,30 +3791,26 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          local sqrt_ok = debug.pcall{ func = function() math.sqrt(-1) end }
-          local pow_ok = debug.pcall{ func = function() math.pow{ x = -1, y = 0.5 } end }
+          local sqrt_ok = debug.pcall(function() math.sqrt(-1) end)
+          local pow_ok = debug.pcall(function() math.pow(-1, 0.5) end)
           local value = {}
           local cursor = value
           for index = 1, 33 do
             cursor.child = {}
             cursor = cursor.child
           end
-          local depth_ok = debug.pcall{ func = function() return type(value) end }
+          local depth_ok, depth_ok_value1 = debug.pcall(function() return type(value) end)
           local cyclic = {}
           cyclic.self = cyclic
-          local cycle_ok = debug.pcall{ func = function() return type(cyclic) end }
-          local unknown_ok = debug.pcall{
-            func = function()
-              measurement.get_text_width{ text = "value", unknown = true }
-            end,
-          }
+          local cycle_ok, cycle_ok_value1 = debug.pcall(function() return type(cyclic) end)
+          local unknown_ok = debug.pcall(function()
+              measurement.get_text_width("value", { unknown = true })
+            end)
           local packed = table.pack("first", nil, nil)
-          debug.assert{
-            value = not sqrt_ok.ok and not pow_ok.ok and depth_ok.ok
-              and depth_ok.values[1] == "table" and cycle_ok.ok
-              and cycle_ok.values[1] == "table" and not unknown_ok.ok
-              and packed.n == 3 and packed[1] == "first" and packed[3] == nil,
-          }
+          debug.assert(not sqrt_ok and not pow_ok and depth_ok
+              and depth_ok_value1 == "table" and cycle_ok
+              and cycle_ok_value1 == "table" and not unknown_ok
+              and packed.n == 3 and packed[1] == "first" and packed[3] == nil)
         end
       "#,
     );
@@ -4091,226 +3823,155 @@ mod tests {
       r#"
         function Init(ctx)
           local function fails(func)
-            return not debug.pcall{ func = func }.ok
+            return not select(1, debug.pcall(func))
           end
 
-          debug.assert{ value = string.lower("ÄBC") == "äbc" }
-          debug.assert{ value = string.upper{ text = "äbc" } == "ÄBC" }
-          debug.assert{ value = string.reverse("你ab") == "ba你" }
+          debug.assert(string.lower("ÄBC") == "äbc")
+          debug.assert(string.upper("äbc") == "ÄBC")
+          debug.assert(string.reverse("你ab") == "ba你")
 
-          local parts = string.split{ text = "a<>你<>", sep = "<>" }
-          debug.assert{
-            value = #parts == 3 and parts[1] == "a" and parts[2] == "你" and parts[3] == "",
-          }
-          debug.assert{ value = fails(function() string.split{ text = "abc", sep = "" } end) }
-          debug.assert{ value = fails(function() string.split{ text = "abc", char = "b" } end) }
+          local parts = string.split("a<>你<>", "<>")
+          debug.assert(#parts == 3 and parts[1] == "a" and parts[2] == "你" and parts[3] == "")
+          debug.assert(fails(function() string.split("abc", "") end))
+          debug.assert(fails(function() string.split("abc", "b", { typo = true }) end))
 
-          debug.assert{ value = string.sub{ text = "甲乙丙", start = 2 } == "乙丙" }
-          debug.assert{ value = string.sub{ text = "甲乙丙", start = -2, finish = -1 } == "乙丙" }
-          debug.assert{ value = string.sub{ text = "甲乙丙", start = -99, finish = 99 } == "甲乙丙" }
-          debug.assert{ value = string.rep{ text = "A", times = 3, sep = ":" } == "A:A:A" }
-          debug.assert{
-            value = string.rep{ text = "", times = 9223372036854775807 } == "",
-          }
+          debug.assert(string.sub("甲乙丙", 2) == "乙丙")
+          debug.assert(string.sub("甲乙丙", -2, { finish = -1 }) == "乙丙")
+          debug.assert(string.sub("甲乙丙", -99, { finish = 99 }) == "甲乙丙")
+          debug.assert(string.rep("A", 3, { sep = ":" }) == "A:A:A")
+          debug.assert(string.rep("", 9223372036854775807) == "")
 
-          local found = string.find{ text = "你ab你", pattern = "(a)(b)" }
-          debug.assert{
-            value = found.start == 2 and found.finish == 3
-              and found.captures.n == 2
-              and found.captures[1] == "a" and found.captures[2] == "b",
-          }
-          local plain = string.find{ text = "a.b", pattern = ".", plain = true }
-          debug.assert{
-            value = plain.start == 2 and plain.finish == 2
-              and plain.captures.n == 1 and plain.captures[1] == ".",
-          }
-          debug.assert{ value = string.find{ text = "abc", pattern = "a", init = 0 }.start == 1 }
-          debug.assert{ value = string.find{ text = "abc", pattern = "a", init = 99 } == nil }
-          debug.assert{
-            value = fails(function() string.find{ text = "abc", init = 99 } end)
-              and fails(function() string.match{ text = "abc", init = 99 } end)
-              and fails(function()
-                string.find{ text = "abc", pattern = "a", init = 99, plain = "yes" }
-              end),
-          }
-          local no_capture = string.find{ text = "abc", pattern = "b" }
-          debug.assert{
-            value = no_capture.captures.n == 1 and no_capture.captures[1] == "b",
-          }
+          local first, last, found = string.find("你ab你", "(a)(b)")
+          debug.assert(first == 2 and last == 3
+              and found.n == 2 and found[1] == "a" and found[2] == "b")
+          local plain_start, plain_finish, plain = string.find("a.b", ".", { plain = true })
+          debug.assert(plain_start == 2 and plain_finish == 2
+              and plain.n == 1 and plain[1] == ".")
+          local init_start = string.find("abc", "a", { init = 0 })
+          debug.assert(init_start == 1)
+          debug.assert(string.find("abc", "a", { init = 99 }) == nil)
+          debug.assert(fails(function() string.find("abc") end)
+              and fails(function() string.match("abc", "a", { init = "bad" }) end)
+              and fails(function() string.find("abc", "a", { init = 99, plain = "yes" }) end)
+              and fails(function() string.find("abc", "a", { typo = true }) end))
+          debug.assert(select('#', string.find("abc", "z")) == 1)
+          local _, _, no_capture = string.find("abc", "b")
+          debug.assert(no_capture.n == 1 and no_capture[1] == "b")
 
-          local matched = string.match{ text = "x=42", pattern = "(%a+)=(%d+)" }
-          debug.assert{
-            value = matched.n == 2 and matched[1] == "x" and matched[2] == "42",
-          }
-          local whole = string.match{ text = "x=42", pattern = "%d+" }
-          debug.assert{ value = whole.n == 1 and whole[1] == "42" }
-          local position = string.match{ text = "abc", pattern = "()b" }
-          debug.assert{ value = position.n == 1 and position[1] == 2 }
+          local matched = string.match("x=42", "(%a+)=(%d+)")
+          debug.assert(matched.n == 2 and matched[1] == "x" and matched[2] == "42")
+          local whole = string.match("x=42", "%d+")
+          debug.assert(whole.n == 1 and whole[1] == "42")
+          local position = string.match("abc", "()b")
+          debug.assert(position.n == 1 and position[1] == 2)
 
-          local iterator = string.gmatch{ text = "a1 b2", pattern = "(%a)(%d)" }
+          local iterator = string.gmatch("a1 b2", "(%a)(%d)")
           local first = iterator()
           local second = iterator()
-          local unicode_iterator = string.gmatch{ text = "甲乙丙", pattern = "." }
+          local unicode_iterator = string.gmatch("甲乙丙", ".")
           local unicode_first = unicode_iterator()
           local unicode_second = unicode_iterator()
           local unicode_third = unicode_iterator()
-          debug.assert{
-            value = first.n == 2 and first[1] == "a" and first[2] == "1"
+          debug.assert(first.n == 2 and first[1] == "a" and first[2] == "1"
               and second.n == 2 and second[1] == "b" and second[2] == "2"
               and iterator() == nil and unicode_first[1] == "甲"
               and unicode_second[1] == "乙" and unicode_third[1] == "丙"
-              and unicode_iterator() == nil,
-          }
+              and unicode_iterator() == nil)
           local iterated = ""
-          for item in string.gmatch{ text = "a1 b2", pattern = "(%a)(%d)" } do
+          for item in string.gmatch("a1 b2", "(%a)(%d)") do
             iterated = iterated .. item[1] .. item[2]
           end
-          debug.assert{ value = iterated == "a1b2" }
-          local many = string.rep{ text = "x", times = 10001 }
-          local lazy_pattern = string.gmatch{ text = many, pattern = "." }
-          debug.assert{ value = lazy_pattern()[1] == "x" }
+          debug.assert(iterated == "a1b2")
+          local many = string.rep("x", 10001)
+          local lazy_pattern = string.gmatch(many, ".")
+          debug.assert(lazy_pattern()[1] == "x")
 
-          local replaced = string.gsub{ text = "ab", pattern = "(%a)", repl = "%1%1" }
-          debug.assert{ value = replaced.result == "aabb" and replaced.count == 2 }
-          local unchanged = string.gsub{ text = "ab", pattern = ".", repl = "x", limit = 0 }
-          debug.assert{ value = unchanged.result == "ab" and unchanged.count == 0 }
-          local table_replaced = string.gsub{
-            text = "ab", pattern = ".", repl = { a = "A" },
-          }
-          debug.assert{ value = table_replaced.result == "Ab" and table_replaced.count == 2 }
-          local function_replaced = string.gsub{
-            text = "a1", pattern = ".", repl = function(value)
+          local replaced, replace_count = string.gsub("ab", "(%a)", "%1%1")
+          debug.assert(replaced == "aabb" and replace_count == 2)
+          local unchanged, unchanged_count = string.gsub("ab", ".", "x", { limit = 0 })
+          debug.assert(unchanged == "ab" and unchanged_count == 0)
+          debug.assert(select('#', string.gsub("ab", "z", "x")) == 2)
+          local table_replaced, table_count = string.gsub("ab", ".", { a = "A" })
+          debug.assert(table_replaced == "Ab" and table_count == 2)
+          local function_replaced, function_count = string.gsub("a1", ".", function(value)
               if value == "a" then return 9 end
               return false
-            end,
-          }
-          debug.assert{ value = function_replaced.result == "91" and function_replaced.count == 2 }
-          debug.assert{
-            value = fails(function()
-              string.gsub{ text = "ab", pattern = ".", repl = "x", limit = -2 }
-            end),
-          }
-          debug.assert{
-            value = fails(function()
-              string.gsub{ text = "a", pattern = ".", repl = function() return true end }
-            end),
-          }
+            end)
+          debug.assert(function_replaced == "91" and function_count == 2)
+          debug.assert(fails(function() string.gsub("ab", ".", "x", { limit = -2 }) end))
+          debug.assert(fails(function() string.gsub("a", ".", function() return true end) end))
 
-          local regex_found = string.regex_find{ text = "你ab你", pattern = "(a)(b)" }
-          debug.assert{
-            value = regex_found.start == 2 and regex_found.finish == 3
-              and regex_found.captures.n == 2
-              and regex_found.captures[1] == "a" and regex_found.captures[2] == "b",
-          }
-          local regex_match = string.regex_match{ text = "x=42", pattern = "([a-z]+)=([0-9]+)" }
-          debug.assert{ value = regex_match[1] == "x" and regex_match[2] == "42" }
+          local regex_start, regex_finish, regex_found = string.regex_find("你ab你", "(a)(b)")
+          debug.assert(regex_start == 2 and regex_finish == 3
+              and regex_found.n == 2 and regex_found[1] == "a" and regex_found[2] == "b")
+          local regex_match = string.regex_match("x=42", "([a-z]+)=([0-9]+)")
+          debug.assert(regex_match[1] == "x" and regex_match[2] == "42")
           local regex_iterated = ""
-          for item in string.regex_gmatch{ text = "a1 b2", pattern = "([a-z])([0-9])" } do
+          for item in string.regex_gmatch("a1 b2", "([a-z])([0-9])") do
             regex_iterated = regex_iterated .. item[1] .. item[2]
           end
-          debug.assert{ value = regex_iterated == "a1b2" }
-          local lazy_regex = string.regex_gmatch{ text = many, pattern = "." }
-          debug.assert{ value = lazy_regex()[1] == "x" }
-          local regex_replaced = string.regex_gsub{
-            text = "a1 b2", pattern = "([a-z])([0-9])", repl = "$2$1", limit = -1,
-          }
-          debug.assert{ value = regex_replaced.result == "1a 2b" and regex_replaced.count == 2 }
-          debug.assert{ value = string.regex_test{ text = "abc", pattern = "^a" } }
-          debug.assert{
-            value = string.regex_find{ text = "ba", pattern = "^a", init = 2 } == nil
-              and string.regex_match{ text = "ba", pattern = "^a", init = 2 } == nil,
-          }
-          local many_regex_captures = string.rep{ text = "()", times = 33 }
-          debug.assert{
-            value = fails(function()
-              string.regex_match{ text = "a", pattern = many_regex_captures .. "a" }
-            end),
-          }
-          debug.assert{ value = string.regex_escape("[a-z]") == "\\[a\\-z\\]" }
-          local regex_parts = string.regex_split{ text = "a, b;c", pattern = "[,;]\\s*" }
-          debug.assert{ value = #regex_parts == 3 and regex_parts[2] == "b" }
+          debug.assert(regex_iterated == "a1b2")
+          local lazy_regex = string.regex_gmatch(many, ".")
+          debug.assert(lazy_regex()[1] == "x")
+          local regex_replaced, regex_count = string.regex_gsub(
+            "a1 b2", "([a-z])([0-9])", "$2$1", { limit = -1 })
+          debug.assert(regex_replaced == "1a 2b" and regex_count == 2)
+          debug.assert(string.regex_test("abc", "^a"))
+          debug.assert(string.regex_find("ba", "^a", { init = 2 }) == nil
+              and string.regex_match("ba", "^a", { init = 2 }) == nil)
+          local many_regex_captures = string.rep("()", 33)
+          debug.assert(fails(function()
+              string.regex_match("a", many_regex_captures .. "a")
+            end))
+          debug.assert(string.regex_escape("[a-z]") == "\\[a\\-z\\]")
+          local regex_parts = string.regex_split("a, b;c", "[,;]\\s*")
+          debug.assert(#regex_parts == 3 and regex_parts[2] == "b")
 
-          debug.assert{
-            value = string.rich_text_to_plain_text{
-              text = "f%<fg:red>A</fg>{value:tail}", rich_params = { tail = "B" },
-            } == "AB",
-          }
-          debug.assert{
-            value = string.rich_text_to_plain_text{ text = "f%{key:jump}" } == "[Space]",
-          }
-          debug.assert{
-            value = string.rich_text_to_plain_text{
-              text = "f%{key:jump}", key_params = false,
-            } == "{key:jump}",
-          }
-          debug.assert{
-            value = string.format{ format_string = "%s:%04d", values = { "v", 7 } } == "v:0007",
-          }
-          debug.assert{
-            value = string.format{
-              format_string = "%-4s|%+d|%#x|%.2f|%%",
-              values = { "a", 2, 255, 1.25 },
-            } == "a   |+2|0xff|1.25|%",
-          }
-          debug.assert{
-            value = string.format{ format_string = "%.3g", values = { 12345 } } == "1.23e+04"
-              and string.format{ format_string = "%.3g", values = { 12.5 } } == "12.5"
-              and string.format{ format_string = "%.3g", values = { 0.0000125 } } == "1.25e-05"
-              and string.format{ format_string = "%.3g", values = { 999.9 } } == "1e+03"
-              and string.format{ format_string = "%.3g", values = { 0.00009999 } } == "0.0001"
-              and string.format{ format_string = "%#.3g", values = { 12.0 } } == "12.0"
-              and string.format{ format_string = "%.2e", values = { 12.5 } } == "1.25e+01"
-              and string.format{ format_string = "%.2E", values = { 12.5 } } == "1.25E+01",
-          }
-          debug.assert{
-            value = string.format{ format_string = "%.100s", values = { "甲乙丙" } } == "甲乙丙"
-              and string.format{ format_string = "%.2s", values = { "甲乙丙" } } == "甲乙"
-              and string.format{ format_string = "%5s", values = { "甲" } } == "    甲",
-          }
-          debug.assert{
-            value = string.format{ format_string = "%q", values = { "a\0b" } } == "\"a\\0b\""
-              and string.format{ format_string = "%q", values = { "\0" .. "2" } }
+          debug.assert(string.rich_text_to_plain_text("f%<fg:red>A</fg>{value:tail}",
+              { rich_params = { tail = "B" } }) == "AB")
+          debug.assert(string.rich_text_to_plain_text("f%{key:jump}") == "[Space]")
+          debug.assert(string.rich_text_to_plain_text("f%{key:jump}", { key_params = false }) == "{key:jump}")
+          debug.assert(string.format("%s:%04d", "v", 7) == "v:0007")
+          local format_payload = { value = "data" }
+          debug.assert(string.format("%s", format_payload) == tostring(format_payload))
+          debug.assert(string.format("%-4s|%+d|%#x|%.2f|%%", "a", 2, 255, 1.25)
+            == "a   |+2|0xff|1.25|%")
+          debug.assert(string.format("%.3g", 12345) == "1.23e+04"
+              and string.format("%.3g", 12.5) == "12.5"
+              and string.format("%.3g", 0.0000125) == "1.25e-05"
+              and string.format("%.3g", 999.9) == "1e+03"
+              and string.format("%.3g", 0.00009999) == "0.0001"
+              and string.format("%#.3g", 12.0) == "12.0"
+              and string.format("%.2e", 12.5) == "1.25e+01"
+              and string.format("%.2E", 12.5) == "1.25E+01")
+          debug.assert(string.format("%.100s", "甲乙丙") == "甲乙丙"
+              and string.format("%.2s", "甲乙丙") == "甲乙"
+              and string.format("%5s", "甲") == "    甲")
+          debug.assert(string.format("%q", "a\0b") == "\"a\\0b\""
+              and string.format("%q", "\0" .. "2")
                 == "\"\\0002\""
-              and string.format{ format_string = "%q", values = { "\1" .. "2" } }
+              and string.format("%q", "\1" .. "2")
                 == "\"\\0012\""
-              and string.format{ format_string = "%q", values = { "a\nb" } }
+              and string.format("%q", "a\nb")
                 == "\"a\\\nb\""
-              and string.format{ format_string = "%q", values = { "\t\b\r" } }
+              and string.format("%q", "\t\b\r")
                 == "\"\\9\\8\\13\""
-              and string.format{ format_string = "%q", values = { "\"\\" } }
+              and string.format("%q", "\"\\")
                 == "\"\\\"\\\\\""
-              and string.format{ format_string = "%c", values = { 0x4f60 } } == "你",
-          }
-          local fixed_infinity = string.format{ format_string = "%f", values = { 1 / 0 } }
-          debug.assert{ value = fixed_infinity == "inf", message = "fixed infinity: " .. fixed_infinity }
-          local fixed_nan = string.format{ format_string = "%f", values = { 0 / 0 } }
-          debug.assert{ value = fixed_nan == "nan", message = "fixed NaN: " .. fixed_nan }
-          local fixed_negative_nan = string.format{ format_string = "%f", values = { -(0 / 0) } }
-          debug.assert{
-            value = fixed_negative_nan == "nan",
-            message = "fixed negative NaN: " .. fixed_negative_nan,
-          }
-          local fixed_negative_infinity = string.format{ format_string = "%+f", values = { -1 / 0 } }
-          debug.assert{
-            value = fixed_negative_infinity == "-inf",
-            message = "fixed negative infinity: " .. fixed_negative_infinity,
-          }
-          debug.assert{
-            value = string.format{ format_string = "plain", values = {} } == "plain",
-          }
-          debug.assert{
-            value = not debug.pcall{
-              func = function() string.format{ format_string = "plain" } end,
-            }.ok,
-          }
-          debug.assert{
-            value = fails(function()
-              string.format{
-                format_string = "%1048576sX",
-                values = { "x" },
-              }
-            end),
-          }
+              and string.format("%c", 0x4f60) == "你")
+          local fixed_infinity = string.format("%f", 1 / 0)
+          debug.assert(fixed_infinity == "inf", { message = "fixed infinity: " .. fixed_infinity })
+          local fixed_nan = string.format("%f", 0 / 0)
+          debug.assert(fixed_nan == "nan", { message = "fixed NaN: " .. fixed_nan })
+          local fixed_negative_nan = string.format("%f", -(0 / 0))
+          debug.assert(fixed_negative_nan == "nan", { message = "fixed negative NaN: " .. fixed_negative_nan })
+          local fixed_negative_infinity = string.format("%+f", -1 / 0)
+          debug.assert(fixed_negative_infinity == "-inf", { message = "fixed negative infinity: " .. fixed_negative_infinity })
+          debug.assert(string.format("plain") == "plain")
+          debug.assert(not select(1, debug.pcall(function() string.format() end)))
+          debug.assert(fails(function()
+              string.format("%1048576sX", "x")
+            end))
         end
       "#,
     );
@@ -4331,132 +3992,101 @@ mod tests {
       r#"
         function Init(ctx)
           local function fails(func)
-            return not debug.pcall{ func = func }.ok
+            return not select(1, debug.pcall(func))
           end
 
           local joined = table.concat({ 1, "二", 3 }, "|", 1, 3)
-          debug.assert{ value = joined == "1|二|3" }
-          debug.assert{
-            value = fails(function()
+          debug.assert(joined == "1|二|3")
+          debug.assert(fails(function()
               table.concat({ 1, true }, ",")
-            end),
-          }
+            end))
 
           local inserted = { "a", "c" }
           table.insert(inserted, 2, "b")
           table.insert(inserted, "d")
-          debug.assert{
-            value = inserted[1] == "a" and inserted[2] == "b"
-              and inserted[3] == "c" and inserted[4] == "d",
-          }
+          debug.assert(inserted[1] == "a" and inserted[2] == "b"
+              and inserted[3] == "c" and inserted[4] == "d")
           local removed = table.remove(inserted, 2)
-          debug.assert{
-            value = removed == "b" and #inserted == 3 and inserted[2] == "c",
-          }
+          debug.assert(removed == "b" and #inserted == 3 and inserted[2] == "c")
 
           local moved = { 1, 2, 3, 4 }
           local moved_result = table.move(moved, 1, 3, 2)
-          debug.assert{
-            value = moved_result == moved and moved[1] == 1 and moved[2] == 1
-              and moved[3] == 2 and moved[4] == 3,
-          }
+          debug.assert(moved_result == moved and moved[1] == 1 and moved[2] == 1
+              and moved[3] == 2 and moved[4] == 3)
           local target = {}
-          debug.assert{
-            value = table.move(moved, 2, 3, 1, target) == target
-              and target[1] == 1 and target[2] == 2,
-          }
-          debug.assert{
-            value = fails(function()
+          debug.assert(table.move(moved, 2, 3, 1, target) == target
+              and target[1] == 1 and target[2] == 2)
+          debug.assert(fails(function()
               table.move({}, 0, 1, 9223372036854775807)
-            end),
-          }
-          debug.assert{
-            value = fails(function() table.move({}, 1, 16385, 1) end)
+            end))
+          debug.assert(fails(function() table.move({}, 1, 16385, 1) end)
               and fails(function() table.concat({}, ",", 1, 16385) end)
-              and fails(function() table.unpack({}, 1, 16385) end),
-          }
+              and fails(function() table.unpack({}, 1, 16385) end))
 
           local packed = table.pack("a", nil, "c")
-          debug.assert{
-            value = packed.n == 3 and packed[1] == "a"
-              and packed[2] == nil and packed[3] == "c",
-          }
+          debug.assert(packed.n == 3 and packed[1] == "a"
+              and packed[2] == nil and packed[3] == "c")
           local directly_packed = table.pack("x", nil, "z")
-          debug.assert{
-            value = directly_packed.n == 3 and directly_packed[1] == "x"
-              and directly_packed[2] == nil and directly_packed[3] == "z",
-          }
+          debug.assert(directly_packed.n == 3 and directly_packed[1] == "x"
+              and directly_packed[2] == nil and directly_packed[3] == "z")
           local first, second, third = table.unpack(packed, 1, packed.n)
-          debug.assert{ value = first == "a" and second == nil and third == "c" }
+          debug.assert(first == "a" and second == nil and third == "c")
 
           local sparse = {
             [1] = "a", [3] = "c", [0] = "zero", [-1] = "negative", name = "value",
           }
-          local count = table.count{ table = sparse }
-          local array_count = table.count_array{ table = sparse }
-          debug.assert{
-            value = count.n == 5 and not count.contiguous
-              and array_count.n == 2 and not array_count.contiguous
-              and array_count.indexes[1] == 1 and array_count.indexes[2] == 3
-              and table.count_hash{ table = sparse } == 3,
-          }
-          local compacted = table.compact{ table = sparse }
-          debug.assert{
-            value = compacted == sparse and sparse[1] == "a" and sparse[2] == "c"
+          local count, contiguous = table.count(sparse)
+          local array_count, array_contiguous, array_indexes = table.count_array(sparse)
+          debug.assert(count == 5 and not contiguous
+              and array_count == 2 and not array_contiguous
+              and array_indexes[1] == 1 and array_indexes[2] == 3
+              and table.count_hash(sparse) == 3)
+          local compacted = table.compact(sparse)
+          debug.assert(compacted == sparse and sparse[1] == "a" and sparse[2] == "c"
               and sparse[3] == nil and sparse[0] == "zero"
-              and sparse[-1] == "negative" and sparse.name == "value",
-          }
-          local compacted_count = table.count{ table = sparse }
-          local compacted_array_count = table.count_array{ table = sparse }
-          debug.assert{
-            value = compacted_count.n == 5 and compacted_count.contiguous
-              and compacted_array_count.n == 2 and compacted_array_count.contiguous
-              and compacted_array_count.indexes[1] == 1
-              and compacted_array_count.indexes[2] == 2,
-          }
-          local empty_count = table.count_array{ table = {} }
-          debug.assert{
-            value = empty_count.n == 0 and empty_count.contiguous
-              and #empty_count.indexes == 0,
-          }
-          debug.assert{
-            value = fails(function() table.compact{ table = char.ASCII_LETTER } end),
-          }
-          debug.assert{
-            value = fails(function() table.compact(sparse) end)
-              and fails(function() table.pretty({}) end),
-          }
+              and sparse[-1] == "negative" and sparse.name == "value")
+          local compacted_count, compacted_contiguous = table.count(sparse)
+          local compacted_array_count, compacted_array_contiguous, compacted_indexes = table.count_array(sparse)
+          debug.assert(compacted_count == 5 and compacted_contiguous
+              and compacted_array_count == 2 and compacted_array_contiguous
+              and compacted_indexes[1] == 1 and compacted_indexes[2] == 2)
+          local empty_count, empty_contiguous, empty_indexes = table.count_array({})
+          debug.assert(empty_count == 0 and empty_contiguous and #empty_indexes == 0)
+          local keyed_payload = { table = "data" }
+          local keyed_count, keyed_contiguous = table.count(keyed_payload)
+          debug.assert(keyed_count == 1 and keyed_contiguous)
+          debug.assert(fails(function() table.compact(char.ASCII_LETTER) end))
+          debug.assert(table.pretty({}) == "{}"
+              and fails(function() table.pretty("not a table") end))
 
           local sortable = { 3, 1, 2 }
           table.sort(sortable)
-          debug.assert{ value = sortable[1] == 1 and sortable[2] == 2 and sortable[3] == 3 }
+          debug.assert(sortable[1] == 1 and sortable[2] == 2 and sortable[3] == 3)
           table.sort(sortable, function(left, right) return left > right end)
-          debug.assert{ value = sortable[1] == 3 and sortable[2] == 2 and sortable[3] == 1 }
+          debug.assert(sortable[1] == 3 and sortable[2] == 2 and sortable[3] == 1)
           local oversized = {}
           for index = 1, 4097 do oversized[index] = index end
-          debug.assert{ value = fails(function() table.sort(oversized) end) }
+          debug.assert(fails(function() table.sort(oversized) end))
 
           local child = { value = 7 }
           local original = { child = child, alias = child, callback = function() end }
-          local copied = table.deepcopy{ table = original }
-          debug.assert{
-            value = copied ~= original and copied.child ~= child
+          local copied = table.deepcopy(original)
+          debug.assert(copied ~= original and copied.child ~= child
               and copied.child == copied.alias and copied.child.value == 7
-              and copied.callback == original.callback,
-          }
+              and copied.callback == original.callback)
           copied.child.value = 9
-          debug.assert{ value = original.child.value == 7 }
+          debug.assert(original.child.value == 7)
+          local cyclic = {}
+          cyclic.self = cyclic
+          local cyclic_copy = table.deepcopy(cyclic)
+          debug.assert(cyclic_copy ~= cyclic and cyclic_copy.self == cyclic_copy)
 
-          local visual = table.pretty{ table = { 1, 3, "a", n = 3 } }
-          debug.assert{ value = visual == "{[1] = 1, [2] = 3, [3] = \"a\", n = 3}" }
-          local nested = table.pretty{
-            table = { text = "a\nb", enabled = true, callback = function() end },
-          }
-          debug.assert{
-            value = string.find{ text = nested, pattern = "callback", plain = true } ~= nil
-              and string.find{ text = nested, pattern = "<function:", plain = true } ~= nil
-              and string.find{ text = nested, pattern = "\\n", plain = true } ~= nil,
-          }
+          local visual = table.pretty({ 1, 3, "a", n = 3 })
+          debug.assert(visual == "{[1] = 1, [2] = 3, [3] = \"a\", n = 3}")
+          local nested = table.pretty({ text = "a\nb", enabled = true, callback = function() end })
+          debug.assert(string.find(nested, "callback", { plain = true }) ~= nil
+              and string.find(nested, "<function:", { plain = true }) ~= nil
+              and string.find(nested, "\\n", { plain = true }) ~= nil)
         end
       "#,
     );
@@ -4469,87 +4099,65 @@ mod tests {
       r#"
         function Init(ctx)
           local function fails(func)
-            return not debug.pcall{ func = func }.ok
+            return not select(1, debug.pcall(func))
           end
 
-          debug.assert{ value = utf8.len("A你B") == 3 }
-          debug.assert{ value = utf8.byte_len{ text = "A你B" } == 5 }
-          debug.assert{ value = utf8.is_ascii("ABC") and not utf8.is_ascii("A你") }
+          debug.assert(utf8.len("A你B") == 3)
+          debug.assert(utf8.byte_len("A你B") == 5)
+          debug.assert(utf8.is_ascii("ABC") and not utf8.is_ascii("A你"))
 
-          debug.assert{ value = utf8.codepoint_to_char{ 65, 20320 } == "A你" }
-          debug.assert{
-            value = utf8.codepoint_to_char{ values = { 65, 66 } } == "AB",
-          }
-          debug.assert{ value = utf8.ascii_to_char{ 65, 66, 67 } == "ABC" }
-          debug.assert{
-            value = fails(function() utf8.ascii_to_char{ 128 } end)
-              and fails(function() utf8.codepoint_to_char{ 55296 } end),
-          }
+          debug.assert(utf8.codepoint_to_char{ 65, 20320 } == "A你")
+          debug.assert(utf8.codepoint_to_char({ 65, 66 }) == "AB")
+          debug.assert(utf8.ascii_to_char{ 65, 66, 67 } == "ABC")
+          debug.assert(fails(function() utf8.ascii_to_char{ 128 } end)
+              and fails(function() utf8.codepoint_to_char{ 55296 } end))
 
-          local codepoints = utf8.char_to_codepoint{ text = "A你B" }
-          debug.assert{
-            value = codepoints.n == 3 and codepoints[1] == 65
-              and codepoints[2] == 20320 and codepoints[3] == 66,
-          }
-          local ascii = utf8.char_to_ascii{ text = "A你B", start = 1, finish = 3 }
-          debug.assert{
-            value = ascii.n == 3 and ascii[1] == 65
-              and ascii[2] == nil and ascii[3] == 66,
-          }
-          local one_ascii = utf8.char_to_ascii{ text = "ABC", start = 2 }
-          debug.assert{
-            value = one_ascii.n == 2 and one_ascii[1] == 66 and one_ascii[2] == 67,
-          }
-          debug.assert{
-            value = utf8.char_to_ascii{ text = "" }.n == 0
-              and utf8.char_to_codepoint{ text = "" }.n == 0,
-          }
-          local reversed_range = utf8.char_to_codepoint{
-            text = "ABC", start = 3, finish = 1,
-          }
-          debug.assert{ value = reversed_range.n == 0 }
+          local codepoints = utf8.char_to_codepoint("A你B")
+          debug.assert(codepoints.n == 3 and codepoints[1] == 65
+              and codepoints[2] == 20320 and codepoints[3] == 66)
+          local ascii = utf8.char_to_ascii("A你B", { start = 1, finish = 3 })
+          debug.assert(ascii.n == 3 and ascii[1] == 65
+              and ascii[2] == nil and ascii[3] == 66)
+          local one_ascii = utf8.char_to_ascii("ABC", { start = 2 })
+          debug.assert(one_ascii.n == 2 and one_ascii[1] == 66 and one_ascii[2] == 67)
+          debug.assert(utf8.char_to_ascii("").n == 0
+              and utf8.char_to_codepoint("").n == 0)
+          local reversed_range = utf8.char_to_codepoint("ABC", { start = 3, finish = 1 })
+          debug.assert(reversed_range.n == 0)
 
-          debug.assert{
-            value = utf8.char_position{ text = "A你B", index = 2 } == 2
-              and utf8.char_position{ text = "A你B", start = 2, index = 2 } == 5
-              and utf8.char_position{ text = "A你B", index = 9 } == nil,
-          }
-          debug.assert{
-            value = fails(function()
-              utf8.char_position{ text = "ABC", index = 0 }
-            end),
-          }
+          debug.assert(utf8.char_position("A你B", 2) == 2
+              and utf8.char_position("A你B", 2, { start = 2 }) == 5
+              and utf8.char_position("A你B", 9) == nil)
+          debug.assert(fails(function()
+              utf8.char_position("ABC", 0)
+            end))
 
           local iterator = utf8.codepoints("A你B")
-          local first = iterator()
-          local second = iterator()
-          local third = iterator()
-          debug.assert{
-            value = first.byte_position == 1 and first.codepoint == 65
-              and second.byte_position == 2 and second.codepoint == 20320
-              and third.byte_position == 5 and third.codepoint == 66
-              and iterator() == nil,
-          }
+          local first_position, first_codepoint = iterator()
+          local second_position, second_codepoint = iterator()
+          local third_position, third_codepoint = iterator()
+          debug.assert(first_position == 1 and first_codepoint == 65
+              and second_position == 2 and second_codepoint == 20320
+              and third_position == 5 and third_codepoint == 66
+              and select('#', iterator()) == 1 and iterator() == nil)
           local total = 0
-          for item in utf8.codepoints(string.rep{ text = "x", times = 20000 }) do
+          for byte_position, codepoint in utf8.codepoints(string.rep("x", 20000)) do
             total = total + 1
+            if total == 1 then debug.assert(byte_position == 1 and codepoint == 120) end
             if total == 2 then break end
           end
-          debug.assert{ value = total == 2 }
+          debug.assert(total == 2)
 
-          local from_start = utf8.next{ text = "A你B" }
-          local after_first = utf8.next{ text = "A你B", pos = 1 }
-          local after_second = utf8.next{ text = "A你B", pos = 2 }
-          debug.assert{
-            value = from_start.position == 1 and from_start.codepoint == 65
-              and after_first.position == 2 and after_first.codepoint == 20320
-              and after_second.position == 5 and after_second.codepoint == 66
-              and utf8.next{ text = "A你B", pos = 3 }.position == 5
-              and utf8.next{ text = "A你B", pos = 5 } == nil,
-          }
-          debug.assert{
-            value = fails(function() utf8.next{ text = "ABC", pos = 0 } end),
-          }
+          local from_start_position, from_start_codepoint = utf8.next("A你B")
+          local after_first_position, after_first_codepoint = utf8.next("A你B", { pos = 1 })
+          local after_second_position, after_second_codepoint = utf8.next("A你B", { pos = 2 })
+          debug.assert(from_start_position == 1 and from_start_codepoint == 65
+              and after_first_position == 2 and after_first_codepoint == 20320
+              and after_second_position == 5 and after_second_codepoint == 66
+              and utf8.next("A你B", { pos = 3 }) == 5
+              and utf8.next("A你B", { pos = 5 }) == nil
+              and select('#', utf8.next("A你B")) == 2)
+          debug.assert(fails(function() utf8.next("ABC", { pos = 0 }) end))
         end
       "#,
     );
@@ -4565,121 +4173,120 @@ mod tests {
             return math.abs(left - right) < tolerance
           end
           local function fails(func)
-            return not debug.pcall{ func = func }.ok
+            return not select(1, debug.pcall(func))
           end
 
-          debug.assert{ value = math.type(math.PI) == "float" }
-          debug.assert{ value = math.type(math.E) == "float" }
-          debug.assert{ value = math.POSITIVE_INFINITE == math.INFINITE }
-          debug.assert{ value = math.POSITIVE_INFINITE > math.MAX_INTEGER }
-          debug.assert{ value = math.NEGATIVE_INFINITE < math.MIN_INTEGER }
-          debug.assert{ value = math.type(math.MAX_INTEGER) == "integer" }
-          debug.assert{ value = math.type(math.MIN_INTEGER) == "integer" }
-          debug.assert{ value = math.type{ value = 1.5 } == "float" }
-          debug.assert{ value = math.type{} == nil }
-          debug.assert{ value = near(math.DEG * math.PI, 180.0, 0.000000000001) }
-          debug.assert{ value = near(math.RAD * 180.0, math.PI, 0.000000000001) }
+          debug.assert(math.type(math.PI) == "float")
+          debug.assert(math.type(math.E) == "float")
+          debug.assert(math.POSITIVE_INFINITE == math.INFINITE)
+          debug.assert(math.POSITIVE_INFINITE > math.MAX_INTEGER)
+          debug.assert(math.NEGATIVE_INFINITE < math.MIN_INTEGER)
+          debug.assert(math.type(math.MAX_INTEGER) == "integer")
+          debug.assert(math.type(math.MIN_INTEGER) == "integer")
+          debug.assert(math.type(1.5) == "float")
+          debug.assert(fails(function() math.type() end))
+          debug.assert(near(math.DEG * math.PI, 180.0, 0.000000000001))
+          debug.assert(near(math.RAD * 180.0, math.PI, 0.000000000001))
 
-          debug.assert{ value = type(math.lg) == "function" }
-          debug.assert{ value = type(math.ln) == "function" }
-          debug.assert{ value = type(math.type) == "function" }
-          debug.assert{ value = math.log10 == nil and math.number_type == nil }
-          debug.assert{ value = type(1) == "number" and type(1.5) == "number" }
+          debug.assert(type(math.lg) == "function")
+          debug.assert(type(math.ln) == "function")
+          debug.assert(type(math.type) == "function")
+          debug.assert(math.log10 == nil and math.number_type == nil)
+          debug.assert(type(1) == "number" and type(1.5) == "number")
 
-          debug.assert{ value = math.abs(-5) == 5 and math.type(math.abs(-5)) == "float" }
-          debug.assert{ value = math.ceil(3.1) == 4 and math.type(math.ceil(3.1)) == "integer" }
-          debug.assert{ value = math.floor(-3.1) == -4 and math.type(math.floor(-3.1)) == "integer" }
-          debug.assert{ value = math.round(3.5) == 4 and math.round(-3.5) == -4 }
-          debug.assert{ value = math.round_to{ value = 3.14159, digits = 2 } == 3.14 }
-          debug.assert{ value = math.round_to{ value = 12345, digits = -2 } == 12300 }
-          debug.assert{ value = math.round_to{ value = 1e308, digits = 1 } == 1e308 }
+          debug.assert(math.abs(-5) == 5 and math.type(math.abs(-5)) == "float")
+          debug.assert(math.ceil(3.1) == 4 and math.type(math.ceil(3.1)) == "integer")
+          debug.assert(math.floor(-3.1) == -4 and math.type(math.floor(-3.1)) == "integer")
+          debug.assert(math.round(3.5) == 4 and math.round(-3.5) == -4)
+          debug.assert(math.round_to(3.14159, 2) == 3.14)
+          debug.assert(math.round_to(12345, -2) == 12300)
+          debug.assert(math.round_to(1e308, 1) == 1e308)
 
-          debug.assert{ value = math.fmod{ x = 7, y = 3 } == 1 }
-          debug.assert{ value = math.fmod{ x = -7, y = 3 } == -1 }
-          debug.assert{ value = math.fmod{ x = math.MIN_INTEGER, y = -1 } == 0 }
-          debug.assert{ value = math.type(math.fmod{ x = 7, y = 3 }) == "integer" }
-          debug.assert{ value = math.pow{ x = 2, y = 3 } == 8 }
-          debug.assert{ value = near(math.exp(1), math.E, 0.000000000001) }
-          debug.assert{ value = math.log{ value = 8, base = 2 } == 3 }
-          debug.assert{ value = math.lg(100) == 2 }
-          debug.assert{ value = near(math.ln(math.E), 1, 0.000000000001) }
-          debug.assert{ value = math.sqrt(9) == 3 }
-          debug.assert{ value = math.ldexp{ x = 3, exp = 2 } == 12 }
-          debug.assert{ value = math.ldexp{ x = 0, exp = math.MAX_INTEGER } == 0 }
-          debug.assert{ value = math.ldexp{ x = 1, exp = math.MIN_INTEGER } == 0 }
+          debug.assert(math.fmod(7, 3) == 1)
+          debug.assert(math.fmod(-7, 3) == -1)
+          debug.assert(math.fmod(math.MIN_INTEGER, -1) == 0)
+          debug.assert(math.type(math.fmod(7, 3)) == "integer")
+          debug.assert(math.pow(2, 3) == 8)
+          debug.assert(near(math.exp(1), math.E, 0.000000000001))
+          debug.assert(math.log(8, 2) == 3)
+          debug.assert(math.lg(100) == 2)
+          debug.assert(near(math.ln(math.E), 1, 0.000000000001))
+          debug.assert(math.sqrt(9) == 3)
+          debug.assert(math.ldexp(3, 2) == 12)
+          debug.assert(math.ldexp(0, math.MAX_INTEGER) == 0)
+          debug.assert(math.ldexp(1, math.MIN_INTEGER) == 0)
 
-          local split = math.frexp(12.8)
-          debug.assert{
-            value = near(split.mantissa, 0.8, 0.000000000001)
-              and split.exponent == 4
-              and math.type(split.exponent) == "integer",
-          }
-          local largest = math.frexp(1.7976931348623157e308)
-          debug.assert{
-            value = largest.mantissa >= 0.5 and largest.mantissa < 1.0
-              and largest.exponent == 1024,
-          }
+          local mantissa, exponent = math.frexp(12.8)
+          debug.assert(near(mantissa, 0.8, 0.000000000001)
+              and exponent == 4
+              and math.type(exponent) == "integer"
+              and select('#', math.frexp(12.8)) == 2)
+          local largest_mantissa, largest_exponent = math.frexp(1.7976931348623157e308)
+          debug.assert(largest_mantissa >= 0.5 and largest_mantissa < 1.0
+              and largest_exponent == 1024)
 
-          debug.assert{ value = near(math.sin(math.PI / 2), 1, 0.000000000001) }
-          debug.assert{ value = near(math.cos(0), 1, 0.000000000001) }
-          debug.assert{ value = near(math.tan(0), 0, 0.000000000001) }
-          debug.assert{ value = near(math.asin(1), math.PI / 2, 0.000000000001) }
-          debug.assert{ value = near(math.acos(1), 0, 0.000000000001) }
-          debug.assert{ value = near(math.atan(1), math.PI / 4, 0.000000000001) }
-          debug.assert{ value = near(math.atan2{ y = 1, x = 1 }, math.PI / 4, 0.000000000001) }
-          debug.assert{ value = near(math.deg(math.PI), 180, 0.000000000001) }
-          debug.assert{ value = near(math.rad(180), math.PI, 0.000000000001) }
-          debug.assert{ value = math.normalize_angle(450) == 90 }
-          debug.assert{ value = math.normalize_angle(-90) == 270 }
-          debug.assert{ value = math.type(math.normalize_angle(0)) == "float" }
+          debug.assert(near(math.sin(math.PI / 2), 1, 0.000000000001))
+          debug.assert(near(math.cos(0), 1, 0.000000000001))
+          debug.assert(near(math.tan(0), 0, 0.000000000001))
+          debug.assert(near(math.asin(1), math.PI / 2, 0.000000000001))
+          debug.assert(near(math.acos(1), 0, 0.000000000001))
+          debug.assert(near(math.atan(1), math.PI / 4, 0.000000000001))
+          debug.assert(near(math.atan2(1, 1), math.PI / 4, 0.000000000001))
+          debug.assert(near(math.deg(math.PI), 180, 0.000000000001))
+          debug.assert(near(math.rad(180), math.PI, 0.000000000001))
+          debug.assert(math.normalize_angle(450) == 90)
+          debug.assert(math.normalize_angle(-90) == 270)
+          debug.assert(math.type(math.normalize_angle(0)) == "float")
 
-          debug.assert{ value = math.max{ 1, 5, 3 } == 5 }
-          debug.assert{ value = math.min{ values = { 1, -2, 3 } } == -2 }
-          debug.assert{ value = math.max{ values = table.pack(4, -2, 7) } == 7 }
-          local parts = math.modf(3.14)
-          debug.assert{
-            value = parts.integer_part == 3
-              and math.type(parts.integer_part) == "integer"
-              and near(parts.fractional_part, 0.14, 0.000000000001),
-          }
-          debug.assert{ value = math.tointeger(3.0) == 3 }
-          debug.assert{ value = math.tointeger(3.14) == nil }
-          debug.assert{ value = math.tointeger(9223372036854775808.0) == nil }
-          debug.assert{ value = math.type("3") == nil }
-          debug.assert{ value = math.ult{ left = -1, right = 0 } == false }
-          debug.assert{ value = math.approx_equal{ left = 0.1 + 0.2, right = 0.3 } }
-          debug.assert{ value = math.approx_equal{ left = 1.0, right = 1.005, epsilon = 0.01 } }
-          debug.assert{ value = not math.approx_equal{ left = 1.0, right = 1.01, epsilon = 0.001 } }
-          debug.assert{ value = math.approx_equal{ left = -0.0, right = 0.0, epsilon = 0.0 } }
-          debug.assert{ value = near(math.percent{ value = 5, total = 16 }, 0.3125, 0.000000000001) }
-          debug.assert{ value = near(math.percent{ value = 5, total = 16, as_percent = true }, 31.25, 0.000000000001) }
+          debug.assert(math.max({ 1, 5, 3 }) == 5)
+          debug.assert(math.min({ 1, -2, 3 }) == -2)
+          debug.assert(math.max(table.pack(4, -2, 7)) == 7)
+          local integer_part, fractional_part = math.modf(3.14)
+          debug.assert(integer_part == 3
+              and math.type(integer_part) == "integer"
+              and near(fractional_part, 0.14, 0.000000000001)
+              and select('#', math.modf(3.14)) == 2)
+          debug.assert(math.tointeger(3.0) == 3)
+          debug.assert(math.tointeger(3.14) == nil)
+          debug.assert(math.tointeger(9223372036854775808.0) == nil)
+          debug.assert(math.type("3") == nil)
+          debug.assert(math.ult(-1, 0) == false)
+          debug.assert(math.approx_equal(0.1 + 0.2, 0.3))
+          debug.assert(math.approx_equal(1.0, 1.005, { epsilon = 0.01 }))
+          debug.assert(not math.approx_equal(1.0, 1.01, { epsilon = 0.001 }))
+          debug.assert(math.approx_equal(-0.0, 0.0, { epsilon = 0.0 }))
+          debug.assert(near(math.percent(5, 16), 0.3125, 0.000000000001))
+          debug.assert(math.percent(5, 16, {}) == 0.3125)
+          debug.assert(near(math.percent(5, 16, { as_percent = true }), 31.25, 0.000000000001))
 
-          debug.assert{ value = math.factorial(0) == 1 }
-          debug.assert{ value = math.type(math.factorial{ n = 5 }) == "float" }
-          debug.assert{ value = math.factorial(170) > 7e306 }
-          debug.assert{ value = math.combination{ n = 5, k = 2 } == 10 }
-          debug.assert{ value = math.type(math.combination{ n = 5, k = 2 }) == "integer" }
+          debug.assert(math.factorial(0) == 1)
+          debug.assert(math.type(math.factorial(5)) == "float")
+          debug.assert(math.factorial(170) > 7e306)
+          debug.assert(math.combination(5, 2) == 10)
+          debug.assert(math.type(math.combination(5, 2)) == "integer")
 
-          debug.assert{ value = fails(function() math.abs(math.INFINITE) end) }
-          debug.assert{ value = fails(function() math.ceil(1e20) end) }
-          debug.assert{ value = fails(function() math.round_to{ value = 1, digits = 309 } end) }
-          debug.assert{ value = fails(function() math.fmod{ x = 1, y = 0 } end) }
-          debug.assert{ value = fails(function() math.fmod{ x = 9223372036854775808.0, y = 1 } end) }
-          debug.assert{ value = fails(function() math.pow{ left = 2, right = 3 } end) }
-          debug.assert{ value = fails(function() math.ldexp{ x = 1, exp = math.MAX_INTEGER } end) }
-          debug.assert{ value = fails(function() math.log{ value = 2 } end) }
-          debug.assert{ value = fails(function() math.sqrt(-1) end) }
-          debug.assert{ value = fails(function() math.asin(2) end) }
-          debug.assert{ value = fails(function() math.max{} end) }
-          debug.assert{ value = fails(function() math.max{ values = { [1] = 1, [3] = 3, n = 3 } } end) }
-          debug.assert{ value = fails(function() math.max{ values = { 1, 2, n = 1 } } end) }
-          debug.assert{ value = fails(function() math.max{ values = { 1, n = "2" } } end) }
-          debug.assert{ value = fails(function() math.modf(1e20) end) }
-          debug.assert{ value = fails(function() math.approx_equal{ left = math.INFINITE, right = 1 } end) }
-          debug.assert{ value = fails(function() math.approx_equal{ left = 1, right = 1, epsilon = -1 } end) }
-          debug.assert{ value = fails(function() math.approx_equal{ left = 1, right = 1, extra = true } end) }
-          debug.assert{ value = fails(function() math.factorial(171) end) }
-          debug.assert{ value = fails(function() math.combination{ n = 67, k = 33 } end) }
+          debug.assert(fails(function() math.abs(math.INFINITE) end))
+          debug.assert(fails(function() math.ceil(1e20) end))
+          debug.assert(fails(function() math.round_to(1, 309) end))
+          debug.assert(fails(function() math.fmod(1, 0) end))
+          debug.assert(fails(function() math.fmod(9223372036854775808.0, 1) end))
+          debug.assert(fails(function() math.fmod{ x = 1, y = 2 } end))
+          debug.assert(fails(function() math.pow(-1, 0.5) end))
+          debug.assert(fails(function() math.ldexp(1, math.MAX_INTEGER) end))
+          debug.assert(fails(function() math.log(2) end))
+          debug.assert(fails(function() math.sqrt(-1) end))
+          debug.assert(fails(function() math.asin(2) end))
+          debug.assert(fails(function() math.max{} end))
+          debug.assert(fails(function() math.max({ [1] = 1, [3] = 3, n = 3 }) end))
+          debug.assert(fails(function() math.max({ 1, 2, n = 1 }) end))
+          debug.assert(fails(function() math.max({ 1, n = "2" }) end))
+          debug.assert(fails(function() math.modf(1e20) end))
+          debug.assert(fails(function() math.approx_equal(math.INFINITE, 1) end))
+          debug.assert(fails(function() math.approx_equal(1, 1, { epsilon = -1 }) end))
+          debug.assert(fails(function() math.approx_equal(1, 1, { extra = true }) end))
+          debug.assert(fails(function() math.approx_equal(1, 1, true) end))
+          debug.assert(fails(function() math.factorial(171) end))
+          debug.assert(fails(function() math.combination(67, 33) end))
         end
       "#,
     );
@@ -4691,29 +4298,27 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          local result = debug.pcall{ func = function() game.exit_game{} end }
-          debug.assert{ value = not result.ok }
+          local result = debug.pcall(function() game.exit_game() end)
+          debug.assert(not result)
         end
         function SaveGame()
-          local save = debug.pcall{ func = function() game.save_game{} end }
-          local exit = debug.pcall{ func = function() game.exit_game{} end }
-          debug.assert{ value = not save.ok and not exit.ok }
-          game.save_best{}
+          local save = debug.pcall(function() game.save_game() end)
+          local exit = debug.pcall(function() game.exit_game() end)
+          debug.assert(not save and not exit)
+          game.save_best()
           return { saved = true }
         end
         function SaveBest()
-          local save = debug.pcall{ func = function() game.save_best{} end }
-          local exit = debug.pcall{ func = function() game.exit_game{} end }
-          debug.assert{ value = not save.ok and not exit.ok }
-          game.save_game{}
+          local save = debug.pcall(function() game.save_best() end)
+          local exit = debug.pcall(function() game.exit_game() end)
+          debug.assert(not save and not exit)
+          game.save_game()
           return { best_string = "best" }
         end
         function Update(dt)
-          local positional_exit = debug.pcall{
-            func = function() game.exit_game() end,
-          }
-          debug.assert{ value = not positional_exit.ok }
-          game.exit_game{}
+          local extra_argument = debug.pcall(function() game.exit_game("extra") end)
+          debug.assert(not extra_argument)
+          game.exit_game()
         end
       "#,
     );
@@ -4769,13 +4374,13 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          game.exit_game{ unexpected = true }
-          event.clear_action{ unexpected = true }
-          file.write{ unexpected = true }
-          file.list_dir{ unexpected = true }
-          file.create_dir{ unexpected = true }
-          file.remove{ unexpected = true }
-          debug.info{ invalid = true }
+          game.exit_game("ignored")
+          event.clear_action("ignored")
+          file.write()
+          file.list_dir()
+          file.create_dir()
+          file.remove()
+          debug.info("ignored")
         end
       "#,
     );
@@ -4808,10 +4413,10 @@ mod tests {
   fn api_configuration_is_active_during_entry_and_init() {
     let source = valid_script(
       r#"
-          debug.info{ message = "entry" }
+          debug.info("entry")
         function Init(ctx)
-          debug.info{ message = "init" }
-          event.clear_action{}
+          debug.info("init")
+          event.clear_action()
         end
       "#,
     );
@@ -4846,8 +4451,8 @@ mod tests {
     let source = valid_script(
       r#"
         function Init(ctx)
-          event.skip_action{}
-          event.clear_action{}
+          event.skip_action()
+          event.clear_action()
         end
       "#,
     );
@@ -4907,43 +4512,33 @@ mod tests {
       valid_script(
         r#"
           function Init(ctx)
-            debug.assert{ value = file.read_byte == nil }
-            debug.assert{ value = file.write_byte == nil }
-            debug.assert{ value = file.exists{ path = "." } }
-            debug.assert{ value = file.exists{ path = "./input.txt" } }
-            debug.assert{ value = not file.exists{ path = "./missing.txt" } }
-            list_request_id = file.list_dir{ path = ".", recursive = true }
-            read_text_request_id = file.read{ path = "./input.txt" }
-            read_bytes_request_id = file.read{
-              path = "./input.bin", byte = true, event_tip = "read-binary",
-            }
-            write_text_request_id = file.write{ path = "./output.txt", text = "output" }
-            write_bytes_request_id = file.write{
-              path = "./output.bin",
-              text = "a\0\255b",
+            debug.assert(file.read_byte == nil)
+            debug.assert(file.write_byte == nil)
+            debug.assert(file.exists("."))
+            debug.assert(file.exists("./input.txt"))
+            debug.assert(not file.exists("./missing.txt"))
+            list_request_id = file.list_dir(".", { recursive = true })
+            read_text_request_id = file.read("./input.txt")
+            read_bytes_request_id = file.read("./input.bin", {
+              byte = true, event_tip = "read-binary",
+            })
+            write_text_request_id = file.write("./output.txt", "output")
+            write_bytes_request_id = file.write("./output.bin", "a\0\255b", {
               byte = true,
               event_tip = "write-binary",
-            }
-            create_dir_request_id = file.create_dir{
-              path = "./created/nested/leaf", event_tip = "created",
-            }
-            remove_request_id = file.remove{ path = "./input.txt", event_tip = "removed" }
-            debug.assert{
-              value = type(list_request_id) == "number"
+            })
+            create_dir_request_id = file.create_dir("./created/nested/leaf", { event_tip = "created" })
+            remove_request_id = file.remove("./input.txt", { event_tip = "removed" })
+            debug.assert(type(list_request_id) == "number"
                 and type(read_text_request_id) == "number"
                 and type(read_bytes_request_id) == "number"
                 and type(write_text_request_id) == "number"
                 and type(write_bytes_request_id) == "number"
                 and type(create_dir_request_id) == "number"
-                and type(remove_request_id) == "number",
-            }
-            local empty = debug.pcall{
-              func = function() file.list_dir{ path = "" } end,
-            }
-            local traversal = debug.pcall{
-              func = function() file.list_dir{ path = "./folder/../" } end,
-            }
-            debug.assert{ value = not empty.ok and not traversal.ok }
+                and type(remove_request_id) == "number")
+            local empty = debug.pcall(function() file.list_dir("") end)
+            local traversal = debug.pcall(function() file.list_dir("./folder/../") end)
+            debug.assert(not empty and not traversal)
           end
 
           function HandleEvent(event)
@@ -5166,64 +4761,40 @@ mod tests {
       r#"
         private_state = "main-only"
         function Init(ctx)
-          debug.assert{
-            value = _ENV ~= nil and _G == nil and rawget(_ENV, "_G") == nil
+          debug.assert(_ENV ~= nil and _G == nil and rawget(_ENV, "_G") == nil
               and rawget(_ENV, "base") == base and rawget(_ENV, "rawget") == rawget
               and load == nil and rawget(_ENV, "package") == nil
-              and debug.getregistry == nil,
-          }
-          local positional_require = debug.pcall{
-            func = function() loader.require("cached") end,
-          }
-          debug.assert{ value = not positional_require.ok }
-          local first, first_gap, first_tail = loader.require{ path = "cached" }
-          local second, second_gap, second_tail = loader.require{ path = "./cached.lua" }
-          debug.assert{
-            value = first == second and first.count == 1 and first.leaked == "main-only"
-              and first.sandboxed and first.global_hidden,
-          }
-          debug.assert{
-            value = first_gap == nil and second_gap == nil and first_tail == 3 and second_tail == 3,
-          }
+              and debug.getregistry == nil)
+          local extra_require_argument = debug.pcall(function() loader.require("cached", "extra") end)
+          debug.assert(not extra_require_argument)
+          local first, first_gap, first_tail = loader.require("cached")
+          local second, second_gap, second_tail = loader.require("./cached.lua")
+          debug.assert(first == second and first.count == 1 and first.leaked == "main-only"
+              and first.sandboxed and first.global_hidden)
+          debug.assert(first_gap == nil and second_gap == nil and first_tail == 3 and second_tail == 3)
 
-          local fresh_first = loader.dofile{ path = "fresh" }
-          local fresh_second = loader.dofile{ path = "./fresh.lua" }
-          debug.assert{
-            value = fresh_first ~= fresh_second
-              and fresh_first.count == 1 and fresh_second.count == 2,
-          }
+          local fresh_first = loader.dofile("fresh")
+          local fresh_second = loader.dofile("./fresh.lua")
+          debug.assert(fresh_first ~= fresh_second
+              and fresh_first.count == 1 and fresh_second.count == 2)
 
-          local compiled_first = loader.loadfile{ path = "compiled" }
-          local compiled_second = loader.loadfile{ path = "compiled.lua" }
-          debug.assert{
-            value = type(compiled_first) == "function"
+          local compiled_first = loader.loadfile("compiled")
+          local compiled_second = loader.loadfile("compiled.lua")
+          debug.assert(type(compiled_first) == "function"
               and type(compiled_second) == "function"
               and compiled_first ~= compiled_second
-              and compiled_count == nil,
-          }
+              and compiled_count == nil)
           local compiled_result_first = compiled_first()
           local compiled_result_second = compiled_second()
-          debug.assert{
-            value = compiled_result_first ~= compiled_result_second
-              and compiled_result_first.count == 1 and compiled_result_second.count == 2,
-          }
+          debug.assert(compiled_result_first ~= compiled_result_second
+              and compiled_result_first.count == 1 and compiled_result_second.count == 2)
 
-          local traversal_ok = debug.pcall{
-            func = function() loader.require{ path = "../outside" } end,
-          }
-          local extension_ok = debug.pcall{
-            func = function() loader.dofile{ path = "module.txt" } end,
-          }
-          local bytecode_ok = debug.pcall{
-            func = function() loader.loadfile{ path = "bytecode.lua" } end,
-          }
-          local cycle_ok = debug.pcall{
-            func = function() loader.require{ path = "cycle" } end,
-          }
-          debug.assert{
-            value = not traversal_ok.ok and not extension_ok.ok and not bytecode_ok.ok
-              and not cycle_ok.ok,
-          }
+          local traversal_ok = debug.pcall(function() loader.require("../outside") end)
+          local extension_ok = debug.pcall(function() loader.dofile("module.txt") end)
+          local bytecode_ok = debug.pcall(function() loader.loadfile("bytecode.lua") end)
+          local cycle_ok = debug.pcall(function() loader.require("cycle") end)
+          debug.assert(not traversal_ok and not extension_ok and not bytecode_ok
+              and not cycle_ok)
         end
       "#,
     );
@@ -5248,7 +4819,7 @@ mod tests {
     fs::write(scripts_root.join("bytecode.lua"), [0x1b, b'L', b'u', b'a']).unwrap();
     fs::write(
       scripts_root.join("cycle.lua"),
-      "return loader.require{ path = 'cycle' }",
+      "return loader.require('cycle')",
     )
     .unwrap();
 
@@ -5411,9 +4982,8 @@ mod tests {
 
   #[test]
   fn instruction_budget_cannot_be_hidden_by_pcall() {
-    let source = valid_script(
-      "function Update(dt) debug.pcall{ func = function() while true do end end } end",
-    );
+    let source =
+      valid_script("function Update(dt) debug.pcall(function() while true do end end) end");
     let mut session =
       LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
     let error = session.update().unwrap_err();
@@ -5548,7 +5118,7 @@ mod tests {
               x = 1
               y = y + 1
             end
-            draw.text{ x = x, y = y, text = item }
+            draw.text(x, y, item)
           end
         end
       "#,
@@ -5991,10 +5561,10 @@ mod tests {
     let source = valid_script(
       r#"
         function Update(dt)
-          debug.pcall{ func = function()
+          debug.pcall(function()
             local values = {}
             while true do values[#values + 1] = {} end
-          end }
+          end)
         end
       "#,
     );
@@ -6014,5 +5584,96 @@ mod tests {
     )
     .unwrap();
     healthy_session.update().unwrap();
+  }
+
+  #[test]
+  fn migrated_documentation_lua_examples_parse() {
+    fn collect_markdown_files(directory: &Path, files: &mut Vec<PathBuf>) {
+      for entry in fs::read_dir(directory).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+          collect_markdown_files(&path, files);
+        } else if path.extension().is_some_and(|extension| extension == "md") {
+          files.push(path);
+        }
+      }
+    }
+
+    let docs_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../dev_docs/zh_cn");
+    let mut markdown_files = Vec::new();
+    collect_markdown_files(&docs_root.join("api"), &mut markdown_files);
+    let mut format_files = Vec::new();
+    collect_markdown_files(&docs_root.join("format"), &mut format_files);
+    format_files.retain(|path| !path.file_name().is_some_and(|name| name == "EVENT.md"));
+    markdown_files.extend(format_files);
+    markdown_files.extend(
+      [
+        "API.md",
+        "CALLBACK.md",
+        "EVENT.md",
+        "LUA_API_MIGRATION.md",
+        "LUA_COMPATIBILITY.md",
+      ]
+      .into_iter()
+      .map(|name| docs_root.join(name)),
+    );
+    markdown_files.push(docs_root.join("education/I18N.md"));
+
+    let lua = Lua::new();
+    let mut example_count = 0;
+    for path in markdown_files {
+      let markdown = fs::read_to_string(&path).unwrap();
+      let mut in_lua_fence = false;
+      let mut compile_example = true;
+      let mut in_call_section = false;
+      let mut in_output_section = false;
+      let mut example = String::new();
+      let mut fence_line = 0;
+
+      for (line_index, line) in markdown.lines().enumerate() {
+        if line.trim_start().starts_with('#') {
+          in_call_section = line.trim() == "### 调用";
+          in_output_section = false;
+        }
+        if line.trim() == "输出：" || line.trim().starts_with("**输出") {
+          in_output_section = true;
+        }
+        if line.trim() == "```lua" && !in_lua_fence {
+          in_lua_fence = true;
+          compile_example = !in_call_section && !in_output_section;
+          fence_line = line_index + 1;
+          example.clear();
+        } else if line.trim() == "```" && in_lua_fence {
+          if compile_example {
+            example_count += 1;
+            let chunk = if example.trim_start().starts_with('{') {
+              format!("return {example}")
+            } else {
+              example.clone()
+            };
+            lua.load(&chunk).into_function().unwrap_or_else(|error| {
+              panic!(
+                "invalid Lua example in {} starting at line {}: {error}",
+                path.display(),
+                fence_line
+              )
+            });
+          }
+          in_lua_fence = false;
+        } else if in_lua_fence {
+          example.push_str(line);
+          example.push('\n');
+        }
+      }
+
+      assert!(
+        !in_lua_fence,
+        "unclosed Lua example in {} starting at line {}",
+        path.display(),
+        fence_line
+      );
+    }
+
+    assert!(example_count > 0, "no API documentation Lua examples found");
   }
 }

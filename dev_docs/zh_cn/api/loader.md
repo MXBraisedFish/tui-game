@@ -1,213 +1,140 @@
 # loader 库
 
-## 基本库说明
-
-`loader` 提供脚本加载额外的 Lua 模块。
+`loader` 用来从包内 `scripts/` 目录加载并执行 Lua 模块。
 
 ---
 
-## 目录
-
-### 方法
-
-| 方法名     | 说明                                         | 索引                  |
-| ---------- | -------------------------------------------- | --------------------- |
-| `require`  | 加载并执行模块，返回模块结果，并缓存加载结果 | [require](#require)   |
-| `dofile`   | 加载并执行模块，返回模块结果，不缓存加载结果 | [dofile](#dofile)     |
-| `loadfile` | 加载并编译模块，返回编译后的函数，不执行模块 | [loadfile](#loadfile) |
-
----
+# 目录
 
 ## 方法
 
+| 方法 | 说明 | 定位 |
+| --- | --- | --- |
+| `require` | 加载并缓存模块 | [require](#require) |
+| `dofile` | 加载并执行模块，不缓存本次结果 | [dofile](#dofile) |
+| `loadfile` | 编译模块并返回可调用函数 | [loadfile](#loadfile) |
+
+---
+
+# 方法
+
 ## `require`
 
-加载并执行模块，返回模块结果，并缓存加载结果。
+加载并执行模块。首次调用会执行文件，之后从当前脚本环境的模块缓存中返回结果。
 
 ### 调用
 
 ```lua
--- 命名参数表
-loader.require{ path = "helper.lua" }
+loader.require
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明                     |
-| ------ | ------ | ---- | ------ | ------------------------ |
-| `path` | string | 是   | -      | 相对 `scripts/` 目录路径 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `scripts/` 的 Lua 文件路径。 |
 
-自定义返回值。
+## 返回值
 
-| 类型     | 说明       |
-| -------- | ---------- |
-| `any...` | 模块返回值（保留模块定义的多返回值与 nil 位置） |
+透传模块返回的原始 Lua 多返回值，包括其中的 nil。
 
 ### 示例
 
 ```lua
-scripts/
-+ main.lua
-- helper.lua
-
--- main.lua
-local helper1 = loader.require{ path = "helper.lua" }
-local helper2 = loader.require{ path = "helper.lua" }
-
-helper1.print()
-
-debug.print { message = tostring(helper1 == helper2) }
-
--- helper.lua
-local M = {}
-
-function M.print()
-  debug.print { message = "Helper Function" }
-end
-
-return M
+-- scripts/value.lua 返回两个值：return "ready", nil
+local status, optional = loader.require("value.lua")
+debug.print(status)
 ```
 
-输出：
+**输出：**
 
-```text
-Helper Function
-true
+```lua
 ```
 
-## 额外补充
+### 额外说明
 
-- 模块必须为 `lua` 文件。
-- 该 API 调用后的返回值共享全局环境缓存，每次调用不会重新执行。
+- 模块文件必须是 Lua 文件。
+- 模块缓存仅在当前脚本环境内共享。
 
 ---
 
 ## `dofile`
 
-加载并执行模块，返回模块结果，不缓存加载结果。
+加载并执行模块文件，每次调用都会重新执行。
 
 ### 调用
 
 ```lua
--- 命名参数表
-loader.dofile{ path = "helper.lua" }
+loader.dofile
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明                     |
-| ------ | ------ | ---- | ------ | ------------------------ |
-| `path` | string | 是   | -      | 相对 `scripts/` 目录路径 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `scripts/` 的 Lua 文件路径。 |
 
-自定义返回值。
+## 返回值
 
-| 类型     | 说明       |
-| -------- | ---------- |
-| `any...` | 模块返回值（保留模块定义的多返回值与 nil 位置） |
+透传模块返回的原始 Lua 多返回值，包括其中的 nil。
 
 ### 示例
 
 ```lua
-scripts/
-+ main.lua
-- helper.lua
-
--- main.lua
-local helper1 = loader.dofile{ path = "helper.lua" }
-local helper2 = loader.dofile{ path = "helper.lua" }
-
-helper1.print()
-
-debug.print { message = tostring(helper1 == helper2) }
-
--- helper.lua
-local M = {}
-
-function M.print()
-  debug.print { message = "Helper Function" }
-end
-
-return M
+local status, optional = loader.dofile("value.lua")
+debug.print(status)
 ```
 
-输出：
+**输出：**
 
-```text
-Helper Function
-false
+```lua
 ```
-
-## 额外补充
-
-- 模块必须为 `lua` 文件。
-- 该 API 调用后的返回值不缓存，每次调用都会重新执行。
 
 ---
 
 ## `loadfile`
 
-加载并编译模块，返回编译后的函数，不执行模块。
+读取并编译模块文件，但不会立即执行它。
 
 ### 调用
 
 ```lua
--- 命名参数表
-loader.loadfile{ path = "helper.lua" }
+loader.loadfile
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明                     |
-| ------ | ------ | ---- | ------ | ------------------------ |
-| `path` | string | 是   | -      | 相对 `scripts/` 目录路径 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `path` | string | 相对 `scripts/` 的 Lua 文件路径。 |
 
-直接返回一个值。
+## 返回值
 
-| 类型       | 说明             |
-| ---------- | ---------------- |
-| `function` | 模块编译后的函数 |
+返回可调用的函数。调用该函数时会执行已加载文件，并透传文件的原始多返回值和 nil。
+
+| 类型 | 说明 |
+| --- | --- |
+| function | 已编译的 Lua 模块函数。 |
 
 ### 示例
 
 ```lua
-scripts/
-+ main.lua
-- helper.lua
-
--- main.lua
-local func1 = loader.loadfile{ path = "helper.lua" }
-local func2 = loader.loadfile{ path = "helper.lua" }
-
-debug.print { message = tostring(func1 == func2) }
-
-local helper = func1()
-
-helper.print()
-
--- helper.lua
-local M = {}
-
-function M.print()
-  debug.print { message = "Helper Function" }
-end
-
-return M
+local module = loader.loadfile("value.lua")
+local status, optional = module()
+debug.print(status)
 ```
 
-输出：
+**输出：**
 
-```text
-false
-Helper Function
+```lua
 ```
 
-## 额外补充
+### 额外说明
 
-- 模块必须为 `lua` 文件。
-- 该 API 调用后的编译值不缓存，每次调用都会重新编译。
+- `require`、`dofile` 和 `loadfile` 的路径必须指向包内 `scripts/`，不能通过绝对路径或路径穿越读取包外文件。

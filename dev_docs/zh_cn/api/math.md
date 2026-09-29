@@ -1,25 +1,14 @@
 # math 库
 
-## 基本库说明
-
-`math` 提供数学运算与数学常量。
-
-> 在使用数学计算时请时刻关注浮点数精度问题，可能会导致意外的 bug。
-
-### 调用与数值限制
-
-- 本项目保留文档中的命名参数和数组参数；`frexp`、`modf` 返回字段表，数值比较等 API 按页面所示返回标量。
-- 运行期数值参数和计算结果必须为有限数；无穷常量只用于比较，不能传入受限运算。
-- `min/max` 接受最多 16,384 项的稠密数组；可带 `n` 长度字段，但它必须与数组项一致且不能有空洞。`factorial` 的 `n` 范围是 `0..=170`；组合数超出整数范围时报错。
-- `fmod` 按本项目契约接收整数并返回整数余数；它不接受浮点余数参数。
+`math` 提供数学常量和计算方法。浮点数计算可能产生精度误差。
 
 ---
 
-## 目录
+# 目录
 
-### 常量
+## 常量
 
-| 常量名                           | 说明              | 索引                                      |
+| 常量                             | 说明              | 定位                                      |
 | -------------------------------- | ----------------- | ----------------------------------------- |
 | `PI`                             | 圆周率 π          | [PI](#PI)                                 |
 | `E`                              | 自然常数 e        | [E](#E)                                   |
@@ -30,9 +19,9 @@
 | `MAX_INTEGER`                    | 最大整数 `2^63-1` | [MAX_INTEGER](#MAX_INTEGER)               |
 | `MIN_INTEGER`                    | 最小整数 `-2^63`  | [MIN_INTEGER](#MIN_INTEGER)               |
 
-### 方法
+## 方法
 
-| 方法名            | 说明                             | 索引                                |
+| 方法              | 说明                             | 定位                                |
 | ----------------- | -------------------------------- | ----------------------------------- |
 | `abs`             | 计算绝对值                       | [abs](#abs)                         |
 | `ceil`            | 向上取整                         | [ceil](#ceil)                       |
@@ -62,7 +51,7 @@
 | `min`             | 返回一组数中的最小值             | [min](#min)                         |
 | `modf`            | 分离数值的整数部分与小数部分     | [modf](#modf)                       |
 | `tointeger`       | 将数值精确转换为整数             | [tointeger](#tointeger)             |
-| `type`            | 返回数值的类型名                 | [type](#type)                        |
+| `type`            | 返回数值的类型名                 | [type](#type)                       |
 | `ult`             | 以无符号整数比较两个整数         | [ult](#ult)                         |
 | `approx_equal`    | 以指定误差比较两个数字是否相等   | [approx_equal](#approx_equal)       |
 | `percent`         | 计算百分比 $\frac{value}{total}$ | [percent](#percent)                 |
@@ -71,13 +60,13 @@
 
 ---
 
-## 常量
+# 常量
 
 ## `PI`
 
 圆周率 π。
 
-**可用于**
+### 可用于
 
 - 任意
 
@@ -90,10 +79,16 @@ math.PI
 ### 示例
 
 ```lua
-debug.print { message = tostring(math.PI) }
+debug.print(tostring(math.PI))
 ```
 
-输出：
+**输出：**
+
+```lua
+
+```
+
+### 等值
 
 ```text
 3.141592653589793
@@ -105,7 +100,7 @@ debug.print { message = tostring(math.PI) }
 
 自然常数 e。
 
-**可用于**
+### 可用于
 
 - 数学比较。
 
@@ -118,10 +113,16 @@ math.E
 ### 示例
 
 ```lua
-debug.print { message = tostring(math.E) }
+debug.print(tostring(math.E))
 ```
 
-输出：
+**输出：**
+
+```lua
+
+```
+
+### 等值
 
 ```text
 2.718281828459045
@@ -133,7 +134,7 @@ debug.print { message = tostring(math.E) }
 
 正无穷。
 
-**可用于**
+### 可用于
 
 - 数学比较。
 
@@ -146,16 +147,22 @@ math.POSITIVE_INFINITE
 ### 示例
 
 ```lua
-debug.print { message = tostring(math.POSITIVE_INFINITE > math.MAX_INTEGER) }
+debug.print(tostring(math.POSITIVE_INFINITE > math.MAX_INTEGER))
 ```
 
-输出：
+**输出：**
+
+```lua
+
+```
+
+### 等值
 
 ```text
-true
++∞
 ```
 
-### 额外补充
+### 额外说明
 
 - 该值永远大于任何数。
 - 不可用于计算。
@@ -166,7 +173,7 @@ true
 
 负无穷。
 
-**可用于**
+### 可用于
 
 - 任意
 
@@ -179,16 +186,22 @@ math.NEGATIVE_INFINITE
 ### 示例
 
 ```lua
-debug.print { message = tostring(math.NEGATIVE_INFINITE < math.MIN_INTEGER) }
+debug.print(tostring(math.NEGATIVE_INFINITE < math.MIN_INTEGER))
 ```
 
-输出：
+**输出：**
+
+```lua
+
+```
+
+### 等值
 
 ```text
-true
+-∞
 ```
 
-### 额外补充
+### 额外说明
 
 - 该值永远小于任何数。
 - 不可用于计算。
@@ -199,7 +212,7 @@ true
 
 弧度转角度系数，`180 / π`。
 
-**可用于**
+### 可用于
 
 - 任意
 
@@ -212,10 +225,16 @@ math.DEG
 ### 示例
 
 ```lua
-debug.print { message = tostring(math.DEG) }
+debug.print(tostring(math.DEG))
 ```
 
-输出：
+**输出：**
+
+```lua
+
+```
+
+### 等值
 
 ```text
 57.29577951308232
@@ -227,7 +246,7 @@ debug.print { message = tostring(math.DEG) }
 
 角度转弧度系数，`π / 180`。
 
-**可用于**
+### 可用于
 
 - 任意
 
@@ -240,10 +259,16 @@ math.RAD
 ### 示例
 
 ```lua
-debug.print { message = tostring(math.RAD) }
+debug.print(tostring(math.RAD))
 ```
 
-输出：
+**输出：**
+
+```lua
+
+```
+
+### 等值
 
 ```text
 0.017453292519943295
@@ -255,7 +280,7 @@ debug.print { message = tostring(math.RAD) }
 
 最大可表示的整数 `2^63-1`。
 
-**可用于**
+### 可用于
 
 - 任意
 
@@ -268,10 +293,16 @@ math.MAX_INTEGER
 ### 示例
 
 ```lua
-debug.print { message = tostring(math.MAX_INTEGER) }
+debug.print(tostring(math.MAX_INTEGER))
 ```
 
-输出：
+**输出：**
+
+```lua
+
+```
+
+### 等值
 
 ```text
 9223372036854775807
@@ -283,7 +314,7 @@ debug.print { message = tostring(math.MAX_INTEGER) }
 
 最小可表示的整数 `-2^63`。
 
-**可用于**
+### 可用于
 
 - 任意
 
@@ -296,10 +327,16 @@ math.MIN_INTEGER
 ### 示例
 
 ```lua
-debug.print { message = tostring(math.MIN_INTEGER) }
+debug.print(tostring(math.MIN_INTEGER))
 ```
 
-输出：
+**输出：**
+
+```lua
+
+```
+
+### 等值
 
 ```text
 -9223372036854775808
@@ -307,7 +344,7 @@ debug.print { message = tostring(math.MIN_INTEGER) }
 
 ---
 
-## 方法
+# 方法
 
 ## `abs`
 
@@ -316,36 +353,41 @@ debug.print { message = tostring(math.MIN_INTEGER) }
 ### 调用
 
 ```lua
--- 单参数
-math.abs()
+math.abs
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明             |
-| ------- | ------ | ---- | ------ | ---------------- |
-| `value` | float | 是   | -      | 要取绝对值的数值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明             |
+| ------- | ----- | ---------------- |
+| `value` | float | 要取绝对值的数值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 绝对值 |
 
 ### 示例
 
 ```lua
 local n = math.abs(-5.20)
-debug.print { message = tostring(n) }
+debug.print(tostring(n))
 ```
 
-输出：
+**输出：**
 
-```text
-5.2
+```lua
+
 ```
+
+### 额外说明
+
+运行时数值参数和计算结果必须是有限数；无穷常量只可用于比较，不能传入受限运算。
 
 ---
 
@@ -356,17 +398,18 @@ debug.print { message = tostring(n) }
 ### 调用
 
 ```lua
--- 单参数
-math.ceil()
+math.ceil
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明         |
-| ------- | ------ | ---- | ------ | ------------ |
-| `value` | float | 是   | -      | 要取整的数值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明         |
+| ------- | ----- | ------------ |
+| `value` | float | 要取整的数值 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -378,13 +421,13 @@ math.ceil()
 
 ```lua
 local n = math.ceil(3.14)
-debug.print { message = tostring(n) }
+debug.print(tostring(n))
 ```
 
-输出：
+**输出：**
 
-```text
-4
+```lua
+
 ```
 
 ---
@@ -396,17 +439,18 @@ debug.print { message = tostring(n) }
 ### 调用
 
 ```lua
--- 单参数
-math.floor()
+math.floor
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明         |
-| ------- | ------ | ---- | ------ | ------------ |
-| `value` | float | 是   | -      | 要取整的数值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明         |
+| ------- | ----- | ------------ |
+| `value` | float | 要取整的数值 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -418,13 +462,13 @@ math.floor()
 
 ```lua
 local n = math.floor(3.14)
-debug.print { message = tostring(n) }
+debug.print(tostring(n))
 ```
 
-输出：
+**输出：**
 
-```text
-3
+```lua
+
 ```
 
 ---
@@ -436,17 +480,18 @@ debug.print { message = tostring(n) }
 ### 调用
 
 ```lua
--- 单参数
-math.round()
+math.round
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明         |
-| ------- | ------ | ---- | ------ | ------------ |
-| `value` | float | 是   | -      | 要取整的数值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明         |
+| ------- | ----- | ------------ |
+| `value` | float | 要取整的数值 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -459,13 +504,13 @@ math.round()
 ```lua
 local n1 = math.round(3.5)
 local n2 = math.round(-3.5)
-debug.print { message = tostring(n1) .. ", " .. tostring(n2) }
+debug.print(tostring(n1) .. ", " .. tostring(n2))
 ```
 
-输出：
+**输出：**
 
-```text
-4, -4
+```lua
+
 ```
 
 ---
@@ -477,40 +522,41 @@ debug.print { message = tostring(n1) .. ", " .. tostring(n2) }
 ### 调用
 
 ```lua
--- 表参数
-math.round_to{}
+math.round_to
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型    | 必填 | 默认值 | 说明         |
-| -------- | ------- | ---- | ------ | ------------ |
-| `value`  | float  | 是   | -      | 要取整的数值 |
-| `digits` | integer | 是   | -      | 小数位数     |
+### 必填参数
 
-### 返回
+| 参数名   | 类型    | 说明         |
+| -------- | ------- | ------------ |
+| `value`  | float   | 要取整的数值 |
+| `digits` | integer | 小数位数     |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明               |
-| ------ | ------------------ |
+| 类型  | 说明               |
+| ----- | ------------------ |
 | float | 保留指定位数的结果 |
 
 ### 示例
 
 ```lua
-local r1 = math.round_to { value = 3.14159, digits = 2 }
-local r2 = math.round_to { value = 12345, digits = -2 }
-debug.print { message = tostring(r1) .. ", " .. tostring(r2) }
+local r1 = math.round_to(3.14159, 2)
+local r2 = math.round_to(12345, -2)
+debug.print(tostring(r1) .. ", " .. tostring(r2))
 ```
 
-输出：
+**输出：**
 
-```text
-3.14, 12300
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `digits` 范围为 $[-308, 308]$。
 
@@ -523,18 +569,19 @@ debug.print { message = tostring(r1) .. ", " .. tostring(r2) }
 ### 调用
 
 ```lua
--- 表参数
-math.fmod{}
+math.fmod
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值 | 说明   |
-| ------ | ------- | ---- | ------ | ------ |
-| `x`    | integer | 是   | -      | 被除数 |
-| `y`    | integer | 是   | -      | 除数   |
+### 必填参数
 
-### 返回
+| 参数名 | 类型    | 说明   |
+| ------ | ------- | ------ |
+| `x`    | integer | 被除数 |
+| `y`    | integer | 除数   |
+
+## 返回值
 
 直接返回一个值。
 
@@ -546,16 +593,16 @@ math.fmod{}
 
 ```lua
 local r = math.fmod(7, 3)
-debug.print { message = tostring(r) }
+debug.print(tostring(r))
 ```
 
-输出：
+**输出：**
 
-```text
-1
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 结果符号与被除数一致。
 
@@ -568,36 +615,37 @@ debug.print { message = tostring(r) }
 ### 调用
 
 ```lua
--- 表参数
-math.pow{}
+math.pow
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明 |
-| ------ | ------ | ---- | ------ | ---- |
-| `x`    | float | 是   | -      | 底数 |
-| `y`    | float | 是   | -      | 指数 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型  | 说明 |
+| ------ | ----- | ---- |
+| `x`    | float | 底数 |
+| `y`    | float | 指数 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明       |
-| ------ | ---------- |
+| 类型  | 说明       |
+| ----- | ---------- |
 | float | 幂运算结果 |
 
 ### 示例
 
 ```lua
 local p = math.pow(2, 10)
-debug.print { message = tostring(p) }
+debug.print(tostring(p))
 ```
 
-输出：
+**输出：**
 
-```text
-1024
+```lua
+
 ```
 
 ---
@@ -609,35 +657,36 @@ debug.print { message = tostring(p) }
 ### 调用
 
 ```lua
--- 单参数
-math.exp()
+math.exp
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 指数值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 指数值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明                 |
-| ------ | -------------------- |
+| 类型  | 说明                 |
+| ----- | -------------------- |
 | float | $e^{value}$ 的计算值 |
 
 ### 示例
 
 ```lua
 local e2 = math.exp(2)
-debug.print { message = tostring(e2) }
+debug.print(tostring(e2))
 ```
 
-输出：
+**输出：**
 
-```text
-7.38905609893065
+```lua
+
 ```
 
 ---
@@ -649,36 +698,37 @@ debug.print { message = tostring(e2) }
 ### 调用
 
 ```lua
--- 表参数
-math.log{}
+math.log
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明 |
-| ------- | ------ | ---- | ------ | ---- |
-| `value` | float | 是   | -      | 真数 |
-| `base`  | float | 是   | -      | 底数 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明 |
+| ------- | ----- | ---- |
+| `value` | float | 真数 |
+| `base`  | float | 底数 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 对数值 |
 
 ### 示例
 
 ```lua
-local log = math.log { value = 8, base = 2 }
-debug.print { message = tostring(log) }
+local log = math.log(8, 2)
+debug.print(tostring(log))
 ```
 
-输出：
+**输出：**
 
-```text
-3
+```lua
+
 ```
 
 ---
@@ -690,35 +740,36 @@ debug.print { message = tostring(log) }
 ### 调用
 
 ```lua
--- 单参数
-math.lg()
+math.lg
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明 |
-| ------- | ------ | ---- | ------ | ---- |
-| `value` | float | 是   | -      | 真数 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明 |
+| ------- | ----- | ---- |
+| `value` | float | 真数 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明       |
-| ------ | ---------- |
+| 类型  | 说明       |
+| ----- | ---------- |
 | float | 常用对数值 |
 
 ### 示例
 
 ```lua
 local lg = math.lg(100)
-debug.print { message = tostring(lg) }
+debug.print(tostring(lg))
 ```
 
-输出：
+**输出：**
 
-```text
-2
+```lua
+
 ```
 
 ---
@@ -730,35 +781,36 @@ debug.print { message = tostring(lg) }
 ### 调用
 
 ```lua
--- 单参数
-math.ln()
+math.ln
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明 |
-| ------- | ------ | ---- | ------ | ---- |
-| `value` | float | 是   | -      | 真数 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明 |
+| ------- | ----- | ---- |
+| `value` | float | 真数 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明       |
-| ------ | ---------- |
+| 类型  | 说明       |
+| ----- | ---------- |
 | float | 常用对数值 |
 
 ### 示例
 
 ```lua
 local ln = math.ln(math.E)
-debug.print { message = tostring(ln) }
+debug.print(tostring(ln))
 ```
 
-输出：
+**输出：**
 
-```text
-1
+```lua
+
 ```
 
 ---
@@ -770,35 +822,36 @@ debug.print { message = tostring(ln) }
 ### 调用
 
 ```lua
--- 单参数
-math.sqrt()
+math.sqrt
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明     |
-| ------- | ------ | ---- | ------ | -------- |
-| `value` | float | 是   | -      | 被开方数 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明     |
+| ------- | ----- | -------- |
+| `value` | float | 被开方数 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明     |
-| ------ | -------- |
+| 类型  | 说明     |
+| ----- | -------- |
 | float | 平方根值 |
 
 ### 示例
 
 ```lua
 local r = math.sqrt(16)
-debug.print { message = tostring(r) }
+debug.print(tostring(r))
 ```
 
-输出：
+**输出：**
 
-```text
-4
+```lua
+
 ```
 
 ---
@@ -810,36 +863,37 @@ debug.print { message = tostring(r) }
 ### 调用
 
 ```lua
--- 表参数
-math.ldexp{}
+math.ldexp
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值 | 说明 |
-| ------ | ------- | ---- | ------ | ---- |
-| `x`    | float  | 是   | -      | 尾数 |
-| `exp`  | integer | 是   | -      | 指数 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型    | 说明 |
+| ------ | ------- | ---- |
+| `x`    | float   | 尾数 |
+| `exp`  | integer | 指数 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明     |
-| ------ | -------- |
+| 类型  | 说明     |
+| ----- | -------- |
 | float | 计算结果 |
 
 ### 示例
 
 ```lua
-local v = math.ldexp{ x = 3, exp = 2 }
-debug.print { message = tostring(v) }
+local v = math.ldexp(3, 2)
+debug.print(tostring(v))
 ```
 
-输出：
+**输出：**
 
-```text
-12
+```lua
+
 ```
 
 ---
@@ -851,41 +905,42 @@ debug.print { message = tostring(v) }
 ### 调用
 
 ```lua
--- 单参数
-math.frexp()
+math.frexp
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明         |
-| ------- | ------ | ---- | ------ | ------------ |
-| `value` | float | 是   | -      | 要分解的数值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明         |
+| ------- | ----- | ------------ |
+| `value` | float | 要分解的数值 |
 
-返回一个对象表。
+## 返回值
 
-| 字段       | 类型    | 说明 |
-| ---------- | ------- | ---- |
-| `mantissa` | float  | 尾数 |
-| `exponent` | integer | 指数 |
+返回两个值，依次为尾数和二进制指数。
+
+| 值名       | 类型    | 说明   |
+| ---------- | ------- | ------ |
+| `mantissa` | float   | 尾数。 |
+| `exponent` | integer | 指数。 |
 
 ### 示例
 
 ```lua
-local f = math.frexp(12.8)
-debug.print { message = tostring(f.mantissa) .. ", " .. tostring(f.exponent) }
+local mantissa, exponent = math.frexp(12.8)
+debug.print(tostring(mantissa) .. ", " .. tostring(exponent))
 ```
 
-输出：
+**输出：**
 
-```text
-0.8, 4
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
-- 参数 `value`、字段 `mantissa`和字段 `exponent` 满足公式 $value = mantissa \times 2^{exponent}$，为 API `math.ldexp` 的逆运算。
+- 参数 `value`、返回值 `mantissa` 和 `exponent` 满足公式 $value = mantissa \times 2^{exponent}$；`math.ldexp` 可进行逆运算。
 
 ---
 
@@ -896,35 +951,36 @@ debug.print { message = tostring(f.mantissa) .. ", " .. tostring(f.exponent) }
 ### 调用
 
 ```lua
--- 单参数
-math.sin()
+math.sin
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 弧度值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 弧度值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 正弦值 |
 
 ### 示例
 
 ```lua
 local s = math.sin(math.PI / 2)
-debug.print { message = tostring(s) }
+debug.print(tostring(s))
 ```
 
-输出：
+**输出：**
 
-```text
-1
+```lua
+
 ```
 
 ---
@@ -936,35 +992,36 @@ debug.print { message = tostring(s) }
 ### 调用
 
 ```lua
--- 单参数
-math.cos()
+math.cos
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 弧度值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 弧度值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 余弦值 |
 
 ### 示例
 
 ```lua
 local c = math.cos(math.PI)
-debug.print { message = tostring(c) }
+debug.print(tostring(c))
 ```
 
-输出：
+**输出：**
 
-```text
--1
+```lua
+
 ```
 
 ---
@@ -976,35 +1033,36 @@ debug.print { message = tostring(c) }
 ### 调用
 
 ```lua
--- 单参数
-math.tan()
+math.tan
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 弧度值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 弧度值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 正切值 |
 
 ### 示例
 
 ```lua
 local t = math.tan(math.PI / 4) -- 可能会有浮点数精度问题
-debug.print { message = tostring(t) }
+debug.print(tostring(t))
 ```
 
-输出：
+**输出：**
 
-```text
-0.9999999999999999
+```lua
+
 ```
 
 ---
@@ -1016,38 +1074,39 @@ debug.print { message = tostring(t) }
 ### 调用
 
 ```lua
--- 单参数
-math.asin()
+math.asin
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 正弦值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 正弦值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 弧度值 |
 
 ### 示例
 
 ```lua
 local r = math.asin(0.5)
-debug.print { message = tostring(r) }
+debug.print(tostring(r))
 ```
 
-输出：
+**输出：**
 
-```text
-0.5235987755982989
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `value` 范围为 $[-1, 1]$
 
@@ -1060,38 +1119,39 @@ debug.print { message = tostring(r) }
 ### 调用
 
 ```lua
--- 单参数
-math.acos(value)
+math.acos
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 余弦值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 余弦值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 弧度值 |
 
 ### 示例
 
 ```lua
 local r = math.acos(0.5)
-debug.print { message = tostring(r) }
+debug.print(tostring(r))
 ```
 
-输出：
+**输出：**
 
-```text
-1.0471975511965979
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `value` 范围为 $[-1, 1]$
 
@@ -1104,35 +1164,36 @@ debug.print { message = tostring(r) }
 ### 调用
 
 ```lua
--- 单参数
-math.atan()
+math.atan
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 正切值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 正切值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 弧度值 |
 
 ### 示例
 
 ```lua
 local r = math.atan(1)
-debug.print { message = tostring(r) }
+debug.print(tostring(r))
 ```
 
-输出：
+**输出：**
 
-```text
-0.7853981633974483
+```lua
+
 ```
 
 ---
@@ -1144,36 +1205,37 @@ debug.print { message = tostring(r) }
 ### 调用
 
 ```lua
--- 表参数
-math.atan2{}
+math.atan2
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明   |
-| ------ | ------ | ---- | ------ | ------ |
-| `y`    | float | 是   | -      | 纵坐标 |
-| `x`    | float | 是   | -      | 横坐标 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型  | 说明   |
+| ------ | ----- | ------ |
+| `y`    | float | 纵坐标 |
+| `x`    | float | 横坐标 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 弧度值 |
 
 ### 示例
 
 ```lua
 local a = math.atan2(1, 1)
-debug.print { message = tostring(a) }
+debug.print(tostring(a))
 ```
 
-输出：
+**输出：**
 
-```text
-0.7853981633974483
+```lua
+
 ```
 
 ---
@@ -1185,35 +1247,36 @@ debug.print { message = tostring(a) }
 ### 调用
 
 ```lua
--- 单参数
-math.deg()
+math.deg
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 弧度值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 弧度值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 角度值 |
 
 ### 示例
 
 ```lua
 local d = math.deg(math.PI)
-debug.print { message = tostring(d) }
+debug.print(tostring(d))
 ```
 
-输出：
+**输出：**
 
-```text
-180
+```lua
+
 ```
 
 ---
@@ -1225,35 +1288,36 @@ debug.print { message = tostring(d) }
 ### 调用
 
 ```lua
--- 单参数
-math.rad()
+math.rad
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明   |
-| ------- | ------ | ---- | ------ | ------ |
-| `value` | float | 是   | -      | 角度值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明   |
+| ------- | ----- | ------ |
+| `value` | float | 角度值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 弧度值 |
 
 ### 示例
 
 ```lua
 local r = math.rad(180)
-debug.print { message = tostring(r) }
+debug.print(tostring(r))
 ```
 
-输出：
+**输出：**
 
-```text
-3.141592653589793
+```lua
+
 ```
 
 ---
@@ -1265,22 +1329,23 @@ debug.print { message = tostring(r) }
 ### 调用
 
 ```lua
--- 单参数
-math.normalize_angle()
+math.normalize_angle
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型    | 必填 | 默认值 | 说明   |
-| ------- | ------- | ---- | ------ | ------ |
-| `value` | integer | 是   | -      | 角度值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型    | 说明   |
+| ------- | ------- | ------ |
+| `value` | integer | 角度值 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明           |
-| ------ | -------------- |
+| 类型  | 说明           |
+| ----- | -------------- |
 | float | 归一化后的角度 |
 
 ### 示例
@@ -1288,13 +1353,13 @@ math.normalize_angle()
 ```lua
 local a1 = math.normalize_angle(450)
 local a2 = math.normalize_angle(-90)
-debug.print { message = tostring(a1) .. ", " .. tostring(a2) }
+debug.print(tostring(a1) .. ", " .. tostring(a2))
 ```
 
-输出：
+**输出：**
 
-```text
-90, 270
+```lua
+
 ```
 
 ---
@@ -1306,36 +1371,41 @@ debug.print { message = tostring(a1) .. ", " .. tostring(a2) }
 ### 调用
 
 ```lua
--- 单参数
-math.max()
+math.max
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型  | 必填 | 默认值 | 说明     |
-| -------- | ----- | ---- | ------ | -------- |
-| `values` | table | 是   | -      | 数值数组表 |
+### 必填参数
 
-### 返回
+| 参数名   | 类型  | 说明       |
+| -------- | ----- | ---------- |
+| `values` | table | 数值数组表 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 最大值 |
 
 ### 示例
 
 ```lua
 local m = math.max({ 1, 5, 3, 9, 2 })
-debug.print { message = tostring(m) }
+debug.print(tostring(m))
 ```
 
-输出：
+**输出：**
 
-```text
-9
+```lua
+
 ```
+
+### 额外说明
+
+只接受最多 16,384 项的稠密数值数组。可提供 `n` 字段表示长度，但其值必须与数组项一致，数组中不能有空洞。
 
 ---
 
@@ -1346,36 +1416,41 @@ debug.print { message = tostring(m) }
 ### 调用
 
 ```lua
--- 表参数
-math.min{}
+math.min
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型  | 必填 | 默认值 | 说明     |
-| -------- | ----- | ---- | ------ | -------- |
-| `values` | table | 是   | -      | 数值数组表 |
+### 必填参数
 
-### 返回
+| 参数名   | 类型  | 说明       |
+| -------- | ----- | ---------- |
+| `values` | table | 数值数组表 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明   |
-| ------ | ------ |
+| 类型  | 说明   |
+| ----- | ------ |
 | float | 最小值 |
 
 ### 示例
 
 ```lua
 local m = math.min({ 1, 5, 3, 9, 2 })
-debug.print { message = tostring(m) }
+debug.print(tostring(m))
 ```
 
-输出：
+**输出：**
 
-```text
-1
+```lua
+
 ```
+
+### 额外说明
+
+只接受最多 16,384 项的稠密数值数组。可提供 `n` 字段表示长度，但其值必须与数组项一致，数组中不能有空洞。
 
 ---
 
@@ -1386,36 +1461,37 @@ debug.print { message = tostring(m) }
 ### 调用
 
 ```lua
--- 单参数
-math.modf()
+math.modf
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型    | 必填 | 默认值 | 说明         |
-| ------- | ------- | ---- | ------ | ------------ |
-| `value` | integer | 是   | -      | 要分解的数值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型    | 说明         |
+| ------- | ------- | ------------ |
+| `value` | integer | 要分解的数值 |
 
-返回一个对象表。
+## 返回值
 
-| 字段              | 类型    | 说明     |
-| ----------------- | ------- | -------- |
-| `integer_part`    | integer | 整数部分 |
-| `fractional_part` | float  | 小数部分 |
+返回两个值，依次为整数部分和小数部分。
+
+| 值名              | 类型    | 说明       |
+| ----------------- | ------- | ---------- |
+| `integer_part`    | integer | 整数部分。 |
+| `fractional_part` | float   | 小数部分。 |
 
 ### 示例
 
 ```lua
-local n = math.modf(2.5)
-debug.print { message = tostring(n.integer_part) .. ", " .. tostring(n.fractional_part) }
+local integer_part, fractional_part = math.modf(2.5)
+debug.print(tostring(integer_part) .. ", " .. tostring(fractional_part))
 ```
 
-输出：
+**输出：**
 
-```text
-2, 0.5
+```lua
+
 ```
 
 ---
@@ -1427,17 +1503,18 @@ debug.print { message = tostring(n.integer_part) .. ", " .. tostring(n.fractiona
 ### 调用
 
 ```lua
--- 单参数
-math.tointeger(value)
+math.tointeger
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型   | 必填 | 默认值 | 说明         |
-| ------- | ------ | ---- | ------ | ------------ |
-| `value` | float | 是   | -      | 要转换的数值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明         |
+| ------- | ----- | ------------ |
+| `value` | float | 要转换的数值 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -1450,16 +1527,16 @@ math.tointeger(value)
 ```lua
 local i1 = math.tointeger(3.0)
 local i2 = math.tointeger(3.14)
-debug.print { message = tostring(i1) .. ", " .. tostring(i2) }
+debug.print(tostring(i1) .. ", " .. tostring(i2))
 ```
 
-输出：
+**输出：**
 
-```text
-3, nil
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 若转换失败时返回 `nil`。
 
@@ -1472,17 +1549,18 @@ debug.print { message = tostring(i1) .. ", " .. tostring(i2) }
 ### 调用
 
 ```lua
--- 单参数
-math.type()
+math.type
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型 | 必填 | 默认值 | 说明                         |
-| ------- | ---- | ---- | ------ | ---------------------------- |
-| `value` | any  | 是   | -      | 要判断的值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型 | 说明       |
+| ------- | ---- | ---------- |
+| `value` | any  | 要判断的值 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -1496,16 +1574,16 @@ math.type()
 local t1 = math.type(3)
 local t2 = math.type(3.14)
 local t3 = math.type("3")
-debug.print { message = tostring(t1) .. ", " .. tostring(t2) .. ", " .. tostring(t3) }
+debug.print(tostring(t1) .. ", " .. tostring(t2) .. ", " .. tostring(t3))
 ```
 
-输出：
+**输出：**
 
-```text
-integer, float, nil
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 若参数传递不为数值时返回 `nil`。
 
@@ -1518,18 +1596,19 @@ integer, float, nil
 ### 调用
 
 ```lua
--- 表参数
-math.ult{}
+math.ult
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型    | 必填 | 默认值 | 说明       |
-| ------- | ------- | ---- | ------ | ---------- |
-| `left`  | integer | 是   | -      | 左侧操作数 |
-| `right` | integer | 是   | -      | 右侧操作数 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型    | 说明       |
+| ------- | ------- | ---------- |
+| `left`  | integer | 左侧操作数 |
+| `right` | integer | 右侧操作数 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -1540,18 +1619,18 @@ math.ult{}
 ### 示例
 
 ```lua
-local b1 = math.ult { left = -1, right = 1 }  -- -1 二进制码在无符号整数为 2^64-1
-local b2 = math.ult { left = 1, right = -1 }
-debug.print { message = tostring(b1) .. ", " .. tostring(b2) }
+local b1 = math.ult(-1, 1)  -- -1 二进制码在无符号整数为 2^64-1
+local b2 = math.ult(1, -1)
+debug.print(tostring(b1) .. ", " .. tostring(b2))
 ```
 
-输出：
+**输出：**
 
-```text
-false, true
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 该 API 等价于两个无符号数使用操作符 `<`。
 - 负数会直接以二进制码进行比较，而非取绝对值。
@@ -1565,19 +1644,25 @@ false, true
 ### 调用
 
 ```lua
--- 表参数
-math.approx_equal{}
+math.approx_equal
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型    | 必填 | 默认值  | 说明       |
-| --------- | ------- | ---- | ------- | ---------- |
-| `left`    | float   | 是   | -       | 左侧操作数 |
-| `right`   | float   | 是   | -       | 右侧操作数 |
-| `epsilon` | float  | 否   | `1e-10` | 误差范围   |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明       |
+| ------- | ----- | ---------- |
+| `left`  | float | 左侧操作数 |
+| `right` | float | 右侧操作数 |
+
+### 选填参数
+
+| 参数名    | 类型  | 说明                    |
+| --------- | ----- | ----------------------- |
+| `epsilon` | float | 默认：`1e-10`；误差范围 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -1588,18 +1673,17 @@ math.approx_equal{}
 ### 示例
 
 ```lua
-local ae1 = math.approx_equal { left = 0.1 + 0.2, right = 0.3 }
-local ae2 = math.approx_equal { left = 1000000.0, right = 1000000.0000001, epsilon = 1e-10 }
+local ae1 = math.approx_equal(0.1 + 0.2, 0.3)
+local ae2 = math.approx_equal(1000000.0, 1000000.0000001, {epsilon = 1e-10})
 
-debug.print { message = tostring(ae1) }
-debug.print { message = tostring(ae2) }
+debug.print(tostring(ae1))
+debug.print(tostring(ae2))
 ```
 
-输出：
+**输出：**
 
-```text
-true
-false
+```lua
+
 ```
 
 ---
@@ -1611,41 +1695,46 @@ false
 ### 调用
 
 ```lua
--- 表参数
-math.percent{}
+math.percent
 ```
 
-### 参数
+## 参数
 
-| 参数名       | 类型    | 必填 | 默认值  | 说明       |
-| ------------ | ------- | ---- | ------- | ---------- |
-| `value`      | float  | 是   | -       | 分子       |
-| `total`      | float  | 是   | -       | 分母       |
-| `as_percent` | boolean | 否   | `false` | 百分比输出 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明 |
+| ------- | ----- | ---- |
+| `value` | float | 分子 |
+| `total` | float | 分母 |
+
+### 选填参数
+
+| 参数名       | 类型    | 说明                      |
+| ------------ | ------- | ------------------------- |
+| `as_percent` | boolean | 默认：`false`；百分比输出 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明       |
-| ------ | ---------- |
+| 类型  | 说明       |
+| ----- | ---------- |
 | float | 百分比数值 |
 
 ### 示例
 
 ```lua
-local p1 = math.percent { value = 25, total = 80 }
-debug.print { message = tostring(p1) }
+local p1 = math.percent(25, 80)
+debug.print(tostring(p1))
 
-local p2 = math.percent { value = 25, total = 80, as_percent = true }
-debug.print { message = tostring(p2) }
+local p2 = math.percent(25, 80, {as_percent = true})
+debug.print(tostring(p2))
 ```
 
-输出：
+**输出：**
 
-```text
-0.3125
-31.25
+```lua
+
 ```
 
 ---
@@ -1657,38 +1746,39 @@ debug.print { message = tostring(p2) }
 ### 调用
 
 ```lua
--- 单参数
-math.factorial(n)
+math.factorial
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值 | 说明   |
-| ------ | ------- | ---- | ------ | ------ |
-| `n`    | integer | 是   | -      | 阶乘数 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型    | 说明   |
+| ------ | ------- | ------ |
+| `n`    | integer | 阶乘数 |
+
+## 返回值
 
 直接返回一个值。
 
-| 类型   | 说明     |
-| ------ | -------- |
+| 类型  | 说明     |
+| ----- | -------- |
 | float | 阶乘结果 |
 
 ### 示例
 
 ```lua
 local f = math.factorial(5)
-debug.print { message = tostring(f) }
+debug.print(tostring(f))
 ```
 
-输出：
+**输出：**
 
-```text
-120
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `n` 范围为 $[0, 170]$。
 
@@ -1701,18 +1791,19 @@ debug.print { message = tostring(f) }
 ### 调用
 
 ```lua
--- 表参数
-math.combination{}
+math.combination
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值 | 说明   |
-| ------ | ------- | ---- | ------ | ------ |
-| `n`    | integer | 是   | -      | 总数   |
-| `k`    | integer | 是   | -      | 选取数 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型    | 说明   |
+| ------ | ------- | ------ |
+| `n`    | integer | 总数   |
+| `k`    | integer | 选取数 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -1723,16 +1814,18 @@ math.combination{}
 ### 示例
 
 ```lua
-local c = math.combination { n = 5, k = 2 }
-debug.print { message = tostring(c) }
+local c = math.combination(5, 2)
+debug.print(tostring(c))
 ```
 
-输出：
+**输出：**
 
-```text
-10
+```lua
+
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `k` 范围为 $[0, n]$。
+
+参数 `k` 必须在 `0..=n` 范围内；组合数超出整数范围时会报错。

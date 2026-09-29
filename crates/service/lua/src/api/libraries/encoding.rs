@@ -15,7 +15,7 @@ fn install_base64(lua: &Lua, source: &Table) -> mlua::Result<()> {
   source.raw_set(
     "base64_encode",
     lua.create_function(|lua, values: MultiValue| {
-      let bytes = bytes_argument(values, "encoding.base64_encode")?;
+      let bytes = bytes_argument(lua, values, "encoding.base64_encode")?;
       let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
       Ok(Value::String(lua.create_string(encoded)?))
     })?,
@@ -24,7 +24,7 @@ fn install_base64(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "base64_decode",
     lua.create_function(|lua, values: MultiValue| {
       let method = "encoding.base64_decode";
-      let bytes = bytes_argument(values, method)?;
+      let bytes = bytes_argument(lua, values, method)?;
       if bytes.len() > encoded_input_limit() {
         return Err(args::message(
           method,
@@ -44,7 +44,7 @@ fn install_url(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "url_encode",
     lua.create_function(|lua, values: MultiValue| {
       let method = "encoding.url_encode";
-      let bytes = bytes_argument(values, method)?;
+      let bytes = bytes_argument(lua, values, method)?;
       let mut output = Vec::with_capacity(bytes.len().saturating_mul(3));
       const HEX: &[u8; 16] = b"0123456789ABCDEF";
       for byte in bytes {
@@ -64,7 +64,7 @@ fn install_url(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "url_decode",
     lua.create_function(|lua, values: MultiValue| {
       let method = "encoding.url_decode";
-      let bytes = bytes_argument(values, method)?;
+      let bytes = bytes_argument(lua, values, method)?;
       let mut output = Vec::with_capacity(bytes.len());
       let mut index = 0;
       while index < bytes.len() {
@@ -93,7 +93,7 @@ fn install_hex(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "hex_encode",
     lua.create_function(|lua, values: MultiValue| {
       let method = "encoding.hex_encode";
-      let bytes = bytes_argument(values, method)?;
+      let bytes = bytes_argument(lua, values, method)?;
       if bytes.len() > args::MAX_API_STRING_BYTES / 2 {
         return Err(args::message(method, "encoded output exceeds 1 MiB"));
       }
@@ -109,7 +109,7 @@ fn install_hex(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "hex_decode",
     lua.create_function(|lua, values: MultiValue| {
       let method = "encoding.hex_decode";
-      let bytes = bytes_argument(values, method)?;
+      let bytes = bytes_argument(lua, values, method)?;
       if bytes.len() % 2 != 0 {
         return Err(args::message(
           method,
@@ -129,9 +129,9 @@ fn install_hex(lua: &Lua, source: &Table) -> mlua::Result<()> {
   )
 }
 
-fn bytes_argument(values: MultiValue, method: &str) -> mlua::Result<Vec<u8>> {
-  let table = args::named(method, values, &["s"])?;
-  let value = args::required(&table, method, "s")?;
+fn bytes_argument(lua: &Lua, values: MultiValue, method: &str) -> mlua::Result<Vec<u8>> {
+  let parsed = args::positional(lua, method, values, &["s"], &[])?;
+  let value = parsed.required(0, method, "s")?;
   let Value::String(value) = value else {
     return Err(args::invalid(method, "s", "string", &value));
   };

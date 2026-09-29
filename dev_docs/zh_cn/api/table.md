@@ -1,20 +1,18 @@
 # table 库
 
-## 基本库说明
+`table` 提供表的拼接、插入、排序、复制和统计等操作。
 
-`table` 提供表操作。
+---
 
-Lua 5.4 标准方法（如 `table.insert`、`table.unpack`）保持原生 Lua 调用方式。项目扩展 `deepcopy`、`pretty`、`count`、`count_array`、`count_hash`、`compact` 使用 `{ table = ... }` 命名参数表。
+# 目录
 
-## 目录
+## 方法
 
-### 方法
-
-| 方法名        | 说明                                           | 索引                        |
+| 方法        | 说明                                           | 定位                        |
 | ------------- | ---------------------------------------------- | --------------------------- |
 | `concat`      | 拼接数组表中的元素                             | [concat](#concat)           |
 | `insert`      | 在指定位置插入一个元素，并将后续元素后移       | [insert](#insert)           |
-| `move`        | 将表中的指定范围元素复制并覆盖到目标索引       | [move](#move)               |
+| `move`        | 将表中的指定范围元素复制并覆盖到目标定位       | [move](#move)               |
 | `pack`        | 将变参打包为新的表，并记录参数个数             | [pack](#pack)               |
 | `unpack`      | 展开数组表                                     | [unpack](#unpack)           |
 | `remove`      | 删除指定位置的一个元素，并将后续元素前移       | [remove](#remove)           |
@@ -26,7 +24,9 @@ Lua 5.4 标准方法（如 `table.insert`、`table.unpack`）保持原生 Lua �
 | `count_hash`  | 查询表中真实的哈希键数量                       | [count_hash](#count_hash)   |
 | `compact`     | 将数组部分前压为从 1 开始的连续排列            | [compact](#compact)         |
 
-## 方法
+---
+
+# 方法
 
 ## `concat`
 
@@ -35,19 +35,25 @@ Lua 5.4 标准方法（如 `table.insert`、`table.unpack`）保持原生 Lua �
 ### 调用
 
 ```lua
-table.concat(list [, sep [, i [, j]]])
+table.concat
 ```
 
-### 参数
+## 参数
 
-| 位置 | 名称 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| 1 | `list` | table | 必填 | 源数组表 |
-| 2 | `sep` | string | `""` | 相邻元素间的分隔符 |
-| 3 | `i` | integer | `1` | 起始索引 |
-| 4 | `j` | integer | `#list` | 结束索引 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `list` | table | 源数组表 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `sep` | string | 默认：`""`；相邻元素间的分隔符 |
+| `i` | integer | 默认：`1`；起始定位 |
+| `j` | integer | 默认：`#list`；结束定位 |
+## 返回值
 
 直接返回一个值。
 
@@ -59,17 +65,15 @@ table.concat(list [, sep [, i [, j]]])
 
 ```lua
 local t1 = { "apple", "banana", "grape" }
-debug.print { message = table.concat(t1) }
+debug.print(table.concat(t1))
 
 local t2 = { "a", "b", "c" }
-debug.print { message = table.concat(t2, " | ") }
+debug.print(table.concat(t2, " | "))
 ```
 
-输出：
+**输出：**
 
-```text
-applebananagrape
-a | b | c
+```lua
 ```
 
 ---
@@ -81,17 +85,25 @@ a | b | c
 ### 调用
 
 ```lua
-table.insert(list, [pos,] value)
+table.insert
 ```
 
-### 参数
+## 参数
 
-| 位置 | 名称 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| 1 | `list` | table | 必填 | 目标表 |
-| 2 | `pos` / `value` | integer / any | 末尾 `+1` 或必填 | 两参数形式把第二个参数作为值；三参数形式先给插入位置，再给值 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `list` | table | 目标表。 |
+| `value` | any | 要插入的值；追加形式为 `table.insert(list, value)`。 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `pos` | integer | 插入位置；使用时调用 `table.insert(list, pos, value)`。 |
+
+## 返回值
 
 无。
 
@@ -100,27 +112,16 @@ table.insert(list, [pos,] value)
 ```lua
 local t1 = { "x", "y" }
 table.insert(t1, "z")
-debug.print { message = table.pretty{ table = t1 } .. "\n" }
+debug.print(table.pretty(t1) .. "\n")
 
 local t2 = { "a", "c" }
 table.insert(t2, 2, "b")
-debug.print { message = table.pretty{ table = t2 } }
+debug.print(table.pretty(t2))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  [1] = "x",
-  [2] = "y",
-  [3] = "z"
-}
-
-{
-  [1] = "a",
-  [2] = "b",
-  [3] = "c"
-}
 ```
 
 ---
@@ -132,20 +133,27 @@ debug.print { message = table.pretty{ table = t2 } }
 ### 调用
 
 ```lua
-table.move(a1, f, e, t [, a2])
+table.move
 ```
 
-### 参数
+## 参数
 
-| 位置 | 名称 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| 1 | `a1` | table | 必填 | 源表 |
-| 2 | `f` | integer | 必填 | 起始索引 |
-| 3 | `e` | integer | 必填 | 结束索引 |
-| 4 | `t` | integer | 必填 | 目标起始索引 |
-| 5 | `a2` | table | `a1` | 目标表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `src` | table | 源表。 |
+| `first` | integer | 要复制范围的起始索引。 |
+| `last` | integer | 要复制范围的结束索引。 |
+| `target_start` | integer | 目标表中的起始索引。 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `target` | table | 接收复制内容的表；默认使用 `src`。 |
+
+## 返回值
 
 返回一个数组表。
 
@@ -158,38 +166,21 @@ table.move(a1, f, e, t [, a2])
 ```lua
 local t1 = { "a", "b", "c", "d" }
 local t_m1 = table.move(t1, 2, 3, 4)
-debug.print { message = table.pretty{ table = t1 } }
-debug.print { message = t1 }
-debug.print { message = table.pretty{ table = t_m1 } .. "\n" }
+debug.print(table.pretty(t1))
+debug.print(t1)
+debug.print(table.pretty(t_m1) .. "\n")
 
 local t2 = { 1, 2, 3, 4, 5 }
 table.move(t2, 1, 2, 4)
-debug.print { message = table.pretty{ table = t2 } }
+debug.print(table.pretty(t2))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  [1] = "a",
-  [2] = "b",
-  [3] = "c",
-  [4] = "b",
-  [5] = "c"
-}
-table: 0x19be6539b30
-table: 0x19be6539b30
-
-{
-  [1] = 1,
-  [2] = 2,
-  [3] = 3,
-  [4] = 1,
-  [5] = 2
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 该 API 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
 - 返回值是目标表 `a2`；未给 `a2` 时是源表 `a1`。
@@ -203,14 +194,17 @@ table: 0x19be6539b30
 ### 调用
 
 ```lua
-table.pack(...)
+table.pack
 ```
 
-### 参数
+## 参数
 
-接收零个或多个任意值；`nil` 位置由返回表的 `n` 字段保留。
+### 选填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `...` | any... | 传给函数的参数，可包含表和 nil。 |
+## 返回值
 
 返回一个数组表。
 
@@ -222,41 +216,27 @@ table.pack(...)
 
 ```lua
 local packed1 = table.pack("a", "b", "c")
-debug.print { message = table.pretty{ table = packed1 } .. "\n" }
+debug.print(table.pretty(packed1) .. "\n")
 
 local packed2 = table.pack(1, nil, 3)
-debug.print { message = table.pretty{ table = packed2 } }
+debug.print(table.pretty(packed2))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  [1] = "a",
-  [2] = "b",
-  [3] = "c",
-  n = 3
-}
-
-{
-  [1] = 1,
-  [3] = 3,
-  n = 3
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 返回值数组表结构如下：
 
 ```lua
-{
-  [1] = ...,
-  [2] = ...,
-  ...
-  [x] = ...,
-  n = x
-} -- n 是变参数量；nil 槽位不存储，但 n 保留尾部 nil
+local packed = {
+  [1] = 1,
+  [3] = 3,
+  n = 3,
+}
 ```
 
 - `nil` 值不会被显式存储，但 `n` 保留所有参数位置，包括末尾的 `nil`。
@@ -270,18 +250,24 @@ debug.print { message = table.pretty{ table = packed2 } }
 ### 调用
 
 ```lua
-table.unpack(list [, i [, j]])
+table.unpack
 ```
 
-### 参数
+## 参数
 
-| 位置 | 名称 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| 1 | `list` | table | 必填 | 源数组表 |
-| 2 | `i` | integer | `1` | 起始索引 |
-| 3 | `j` | integer | `#list` | 结束索引 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `list` | table | 源数组表 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `i` | integer | 默认：`1`；起始索引 |
+| `j` | integer | 默认：`#list`；结束索引 |
+## 返回值
 
 返回多个值。
 
@@ -294,21 +280,19 @@ table.unpack(list [, i [, j]])
 ```lua
 local t1 = { "a", "b", "c" }
 local a1, b1, c1 = table.unpack(t1)
-debug.print { message = a1 .. " " .. b1 .. " " .. c1 }
+debug.print(a1 .. " " .. b1 .. " " .. c1)
 
 local t2 = { 10, 20, 30, 40 }
 local a2, b2 = table.unpack(t2, 2)
-debug.print { message = a2 .. " " .. b2 }
+debug.print(a2 .. " " .. b2)
 ```
 
-输出：
+**输出：**
 
-```text
-a b c
-20 30
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 该 API 返回多参数而非表。
 
@@ -321,17 +305,23 @@ a b c
 ### 调用
 
 ```lua
-table.remove(list [, pos])
+table.remove
 ```
 
-### 参数
+## 参数
 
-| 位置 | 名称 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| 1 | `list` | table | 必填 | 目标表 |
-| 2 | `pos` | integer | `#list` | 删除位置 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `list` | table | 目标表 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `pos` | integer | 默认：`#list`；删除位置 |
+## 返回值
 
 | 类型 | 说明         |
 | ---- | ------------ |
@@ -342,29 +332,16 @@ table.remove(list [, pos])
 ```lua
 local t1 = { "a", "b", "c", "d" }
 local removed1 = table.remove(t1)
-debug.print { message = removed1 .. " " .. table.pretty{ table = t1 } .. "\n" }
+debug.print(removed1 .. " " .. table.pretty(t1) .. "\n")
 
 local t2 = { 10, 20, 30, 40 }
 local removed2 = table.remove(t2, 2)
-debug.print { message = removed2 .. " " .. table.pretty{ table = t2 } }
+debug.print(removed2 .. " " .. table.pretty(t2))
 ```
 
-输出：
+**输出：**
 
 ```lua
-d
-{
-  [1] = "a",
-  [2] = "b",
-  [3] = "c"
-}
-
-20
-{
-  [1] = 10,
-  [2] = 30,
-  [3] = 40
-}
 ```
 
 ---
@@ -376,17 +353,23 @@ d
 ### 调用
 
 ```lua
-table.sort(list [, comp])
+table.sort
 ```
 
-### 参数
+## 参数
 
-| 位置 | 名称 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| 1 | `list` | table | 必填 | 目标数组表 |
-| 2 | `comp` | function / nil | `nil` | 比较函数 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `list` | table | 目标数组表 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `comp` | function / nil | 默认：`nil`；比较函数 |
+## 返回值
 
 无。
 
@@ -395,65 +378,37 @@ table.sort(list [, comp])
 ```lua
 local t1 = { 3, 1, 4, 2 }
 table.sort(t1)
-debug.print { message = table.pretty{ table = t1 } .. "\n" }
+debug.print(table.pretty(t1) .. "\n")
 
 local t2 = { "banana", "apple", "grape", "cherry" }
 table.sort(t2)
-debug.print { message = table.pretty{ table = t2 } .. "\n" }
+debug.print(table.pretty(t2) .. "\n")
 
 local t3 = { 5, 2, 8, 1 }
 table.sort(t3, function(left, right)
   return left > right
 end)
-debug.print { message = table.pretty{ table = t3 } .. "\n" }
+debug.print(table.pretty(t3) .. "\n")
 
 local t4 = { "abc", "a", "abcdef", "ab" }
 table.sort(t4, function(left, right)
   return #left < #right
 end)
-debug.print { message = table.pretty{ table = t4 } }
+debug.print(table.pretty(t4))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  [1] = 1,
-  [2] = 2,
-  [3] = 3,
-  [4] = 4
-}
-
-{
-  [1] = "apple",
-  [2] = "banana",
-  [3] = "cherry",
-  [4] = "grape"
-}
-
-{
-  [1] = 8,
-  [2] = 5,
-  [3] = 2,
-  [4] = 1
-}
-
-{
-  [1] = "a",
-  [2] = "ab",
-  [3] = "abc",
-  [4] = "abcdef"
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `comparator` 函数结构如下：
 
 ```lua
-function(left, right)
-  -- 比较处理逻辑
-  return boolean
+local function comparator(left, right)
+  return left < right
 end
 ```
 
@@ -468,17 +423,17 @@ end
 ### 调用
 
 ```lua
--- 单参数
-table.deepcopy{ table = {} }
+table.deepcopy
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型  | 必填 | 默认值 | 说明   |
-| ------- | ----- | ---- | ------ | ------ |
-| `table` | table | 是   | -      | 目标表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `table` | table | 目标表 |
+## 返回值
 
 返回一个混合表。
 
@@ -490,17 +445,15 @@ table.deepcopy{ table = {} }
 
 ```lua
 local t = { 1, 2, 3 }
-local t_copy = table.deepcopy{ table = t }
+local t_copy = table.deepcopy(t)
 
-debug.print { message = tostring(t) }
-debug.print { message = tostring(t_copy) }
+debug.print(tostring(t))
+debug.print(tostring(t_copy))
 ```
 
-输出：
+**输出：**
 
-```text
-table: 0x24076b69b50  -- 两个表地址不同，非引用。
-table: 0x24076b6a190
+```lua
 ```
 
 ---
@@ -512,17 +465,17 @@ table: 0x24076b6a190
 ### 调用
 
 ```lua
--- 单参数
-table.pretty{ table = {} }
+table.pretty
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型  | 必填 | 默认值 | 说明   |
-| ------- | ----- | ---- | ------ | ------ |
-| `table` | table | 是   | -      | 目标表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `table` | table | 目标表 |
+## 返回值
 
 直接返回一个值。
 
@@ -534,17 +487,12 @@ table.pretty{ table = {} }
 
 ```lua
 local t = { "apple", "banana", "grape" }
-debug.print { message = table.pretty{ table = t } }
+debug.print(table.pretty(t))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  [1] = "apple",
-  [2] = "banana",
-  [3] = "grape"
-}
 ```
 
 ---
@@ -556,43 +504,41 @@ debug.print { message = table.pretty{ table = t } }
 ### 调用
 
 ```lua
--- 单参数
-table.count{ table = {} }
+table.count
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型  | 必填 | 默认值 | 说明   |
-| ------- | ----- | ---- | ------ | ------ |
-| `table` | table | 是   | -      | 目标表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `table` | table | 目标表 |
+## 返回值
 
-返回一个对象表。
+返回两个值，依次为表中元素总数和数组部分是否连续。
 
-| 字段         | 类型    | 说明                              |
-| ------------ | ------- | --------------------------------- |
-| `n`          | integer | 表中真实存在的全部元素数量        |
-| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列 |
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `count` | integer | 表中真实存在的元素数量。 |
+| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列。 |
 
 ### 示例
 
 ```lua
 local t = { [1] = "a", [3] = "c", name = "Tui Game" }
-local result = table.count{ table = t }
+local count, contiguous = table.count(t)
 
-debug.print { message = result.n }
-debug.print { message = result.contiguous }
+debug.print(count)
+debug.print(contiguous)
 ```
 
-输出：
+**输出：**
 
-```text
-3
-false
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 空数组的返回值 `contiguous` 为 `true`。
 - 值为 `nil` 的键在 Lua 表中表示该键不存在，因此不会计数。
@@ -606,49 +552,43 @@ false
 ### 调用
 
 ```lua
--- 单参数
-table.count_array{ table = {} }
+table.count_array
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型  | 必填 | 默认值 | 说明   |
-| ------- | ----- | ---- | ------ | ------ |
-| `table` | table | 是   | -      | 目标表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `table` | table | 目标表 |
+## 返回值
 
-返回一个对象表。
+返回三个值，依次为数组元素数量、数组部分是否连续和有效下标表。
 
-| 字段         | 类型    | 说明                              |
-| ------------ | ------- | --------------------------------- |
-| `n`          | integer | 真实存在的数组元素数量            |
-| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列 |
-| `indexes`    | table   | 所有有效数组下标组成的升序数组表  |
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `count` | integer | 真实存在的数组元素数量。 |
+| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列。 |
+| `indexes` | table | 所有有效数组下标组成的升序数组表。 |
 
 ### 示例
 
 ```lua
 local t = { [1] = "a", [3] = "c", name = "Tui Game" }
-local result = table.count_array { table = t }
+local count, contiguous, indexes = table.count_array(t)
 
-debug.print { message = result.n }
-debug.print { message = result.contiguous }
-debug.print { message = table.pretty{ table = result.indexes } }
+debug.print(count)
+debug.print(contiguous)
+debug.print(table.pretty(indexes))
 ```
 
-输出：
+**输出：**
 
 ```lua
-2
-false
-{
-  [1] = 1, 
-  [2] = 3
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - `indexes` 按下标从小到大排序。
 
@@ -661,17 +601,17 @@ false
 ### 调用
 
 ```lua
--- 单参数
-table.count_hash{ table = {} }
+table.count_hash
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型  | 必填 | 默认值 | 说明   |
-| ------- | ----- | ---- | ------ | ------ |
-| `table` | table | 是   | -      | 目标表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `table` | table | 目标表 |
+## 返回值
 
 直接返回一个值。
 
@@ -683,15 +623,14 @@ table.count_hash{ table = {} }
 
 ```lua
 local t = { [1] = "a", [3] = "c", name = "Tui Game", [0] = "zero" }
-local result = table.count_hash{ table = t }
+local result = table.count_hash(t)
 
-debug.print { message = result }
+debug.print(result)
 ```
 
-输出：
+**输出：**
 
-```text
-2
+```lua
 ```
 
 ---
@@ -703,17 +642,17 @@ debug.print { message = result }
 ### 调用
 
 ```lua
--- 单参数
-table.compact{ table = {} }
+table.compact
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型  | 必填 | 默认值 | 说明       |
-| ------- | ----- | ---- | ------ | ---------- |
-| `table` | table | 是   | -      | 要压实的表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `table` | table | 要压实的表 |
+## 返回值
 
 直接返回一个值。
 
@@ -725,25 +664,18 @@ table.compact{ table = {} }
 
 ```lua
 local t = { [1] = "a", [3] = "c", [8] = "h", name = "Tui Game" }
-local result = table.compact { table = t }
+local result = table.compact(t)
 
-debug.print { message = tostring(result == t) }
-debug.print { message = table.pretty{ table = t } }
+debug.print(tostring(result == t))
+debug.print(table.pretty(t))
 ```
 
-输出：
+**输出：**
 
 ```lua
-true
-{
-  [1] = "a", 
-  [2] = "c", 
-  [3] = "h", 
-  name = "Tui Game"
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 数组元素按照压实前的下标升序排列，元素之间的相对顺序不会改变。
 - 哈希项不会被删除或移动。

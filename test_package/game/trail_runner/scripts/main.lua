@@ -36,7 +36,7 @@ local blink_time = 0
 
 local function label(key)
   if labels_ready then
-    return i18n.get_value { namespace = "ui", key = key }
+    return i18n.get_value("ui", key)
   end
   return FALLBACK_TEXT[key]
 end
@@ -59,8 +59,8 @@ end
 local function place_gem()
   local bounds = field()
   for _ = 1, 64 do
-    local x = random.randint { min = bounds.left, max = bounds.right }
-    local y = random.randint { min = bounds.top, max = bounds.bottom }
+    local x = random.randint({ min = bounds.left, max = bounds.right })
+    local y = random.randint({ min = bounds.top, max = bounds.bottom })
     if not occupies_trail(x, y) then
       gem = { x = x, y = y }
       return
@@ -89,7 +89,7 @@ local function advance()
   local bounds = field()
   if next_x < bounds.left or next_x > bounds.right or next_y < bounds.top or next_y > bounds.bottom or occupies_trail(next_x, next_y) then
     crashed = true
-    game.save_best{}
+    game.save_best()
     return
   end
   table.insert(trail, { x = next_x, y = next_y })
@@ -122,7 +122,7 @@ end
 function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
-  i18n.create {}
+  i18n.create()
   if ctx.best_data ~= nil then
     best_score = ctx.best_data.score or 0
   end
@@ -148,7 +148,7 @@ function HandleEvent(event)
   elseif event.type == "action" and event.data.state == "pressed" then
     local action = event.data.action
     if action == "leave" then
-      game.exit_game{}
+      game.exit_game()
     elseif action == "pause" then
       paused = not paused
     elseif HEADINGS[action] ~= nil then
@@ -182,16 +182,16 @@ local function heading_name()
 end
 
 function Render()
-  draw.fill_rect { x = 0, y = 0, width = width, height = height, char = " ", bg = color.BLACK }
-  draw.stroke_rect { x = 0, y = 2, width = width, height = height - 5, fg = color.GREEN, border_char = char.ROUNDED_LINE }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
+  draw.stroke_rect(0, 2, width, height - 5, { fg = color.GREEN, border_char = char.ROUNDED_LINE })
 
   local title = label("title")
-  draw.text { x = 2, y = 0, text = "f%<fg:bright_green>" .. title .. "</fg>", bold = true }
-  local summary = string.format {
-    format_string = "%s %d   %s %d   %s %d",
-    values = { label("score"), score, label("best"), best_score, label("length"), #trail },
-  }
-  draw.text { x = width - 2 - measurement.get_text_width { text = summary }, y = 0, text = summary, fg = color.BRIGHT_YELLOW }
+  draw.text(2, 0, "f%<fg:bright_green>" .. title .. "</fg>", { bold = true })
+  local summary = string.format(
+    "%s %d   %s %d   %s %d",
+    label("score"), score, label("best"), best_score, label("length"), #trail
+  )
+  draw.text(width - 2 - measurement.get_text_width(summary), 0, summary, { fg = color.BRIGHT_YELLOW })
 
   for index = 1, #trail do
     local point = trail[index]
@@ -203,10 +203,10 @@ function Render()
     elseif index <= #trail - 6 then
       fg = color.GRAY
     end
-    draw.text { x = point.x, y = point.y, text = glyph, fg = fg }
+    draw.text(point.x, point.y, glyph, { fg = fg })
   end
   if gem ~= nil and blink_time < 0.7 then
-    draw.text { x = gem.x, y = gem.y, text = "*", fg = color.BRIGHT_CYAN, bold = true }
+    draw.text(gem.x, gem.y, "*", { fg = color.BRIGHT_CYAN, bold = true })
   end
 
   local message = label("help")
@@ -218,12 +218,9 @@ function Render()
     message = "f%" .. label("paused") .. " ({key:pause})"
     message_color = color.BRIGHT_YELLOW
   end
-  draw.text { x = 2, y = height - 2, text = message, fg = message_color, max_width = width - 4, max_height = 1 }
-  local language_line = string.format {
-    format_string = "Language %s, title length %d",
-    values = { i18n.get_language_code{}, utf8.len(title) },
-  }
-  draw.text { x = 2, y = height - 1, text = language_line, fg = color.GRAY, max_width = width - 4, max_height = 1 }
+  draw.text(2, height - 2, message, { fg = message_color, max_width = width - 4, max_height = 1 })
+  local language_line = string.format("Language %s, title length %d", i18n.get_language_code(), utf8.len(title))
+  draw.text(2, height - 1, language_line, { fg = color.GRAY, max_width = width - 4, max_height = 1 })
 end
 
 function SaveGame()

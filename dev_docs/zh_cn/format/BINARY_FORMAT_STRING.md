@@ -37,18 +37,12 @@ Lua 二进制格式字符串是二进制数据包操作的核心参数，用于�
 ### 示例
 
 ```lua
-little = serialization.binary_pack {
-  fmt = "<I4",
-  values = { 0x12345678 }
-}
+little = serialization.binary_pack("<I4", table.unpack({ 0x12345678 }))
 
-big = serialization.binary_pack {
-  fmt = ">I4",
-  values = { 0x12345678 }
-}
+big = serialization.binary_pack(">I4", table.unpack({ 0x12345678 }))
 
-debug.print { message = tostring(#little) }
-debug.print { message = tostring(#big) }
+debug.print(tostring(#little))
+debug.print(tostring(#big))
 ```
 
 输出：
@@ -74,23 +68,17 @@ debug.print { message = tostring(#big) }
 ### 示例
 
 ```lua
-size1 = serialization.binary_packsize{ fmt = "c1 i4" }
-size2 = serialization.binary_packsize{ fmt = "!4 c1 i4" }
+size1 = serialization.binary_packsize("c1 i4")
+size2 = serialization.binary_packsize("!4 c1 i4")
 
-debug.print { message = tostring(size1) }
-debug.print { message = tostring(size2) }
+debug.print(tostring(size1))
+debug.print(tostring(size2))
 
-bytes1 = serialization.binary_pack {
-  fmt = "c1 Xi4 i4",
-  values = { "A", 100 }
-}
-bytes2 = serialization.binary_pack {
-  fmt = "!4 c1 Xi4 i4", -- Xop 需要 !n 开头
-  values = { "A", 100 }
-}
+bytes1 = serialization.binary_pack("c1 Xi4 i4", table.unpack({ "A", 100 }))
+bytes2 = serialization.binary_pack("!4 c1 Xi4 i4", "A", 100)
 
-debug.print { message = tostring(#bytes1) }
-debug.print { message = tostring(#bytes2) }
+debug.print(tostring(#bytes1))
+debug.print(tostring(#bytes2))
 ```
 
 输出：
@@ -131,17 +119,17 @@ debug.print { message = tostring(#bytes2) }
 ### 示例
 
 ```lua
-size1 = serialization.binary_packsize{ fmt = "b B" }
-size2 = serialization.binary_packsize{ fmt = "h H" }
-size3 = serialization.binary_packsize{ fmt = "i I" }
-size4 = serialization.binary_packsize{ fmt = "l L" }
-size5 = serialization.binary_packsize{ fmt = "j J" }
+size1 = serialization.binary_packsize("b B")
+size2 = serialization.binary_packsize("h H")
+size3 = serialization.binary_packsize("i I")
+size4 = serialization.binary_packsize("l L")
+size5 = serialization.binary_packsize("j J")
 
-debug.print { message = tostring(size1) }
-debug.print { message = tostring(size2) }
-debug.print { message = tostring(size3) }
-debug.print { message = tostring(size4) }
-debug.print { message = tostring(size5) }
+debug.print(tostring(size1))
+debug.print(tostring(size2))
+debug.print(tostring(size3))
+debug.print(tostring(size4))
+debug.print(tostring(size5))
 ```
 
 输出：
@@ -177,9 +165,9 @@ debug.print { message = tostring(size5) }
 ### 示例
 
 ```lua
-size = serialization.binary_packsize{ fmt = "i1 I2 i4" }
+size = serialization.binary_packsize("i1 I2 i4")
 
-debug.print { message = tostring(size) }
+debug.print(tostring(size))
 ```
 
 输出：
@@ -212,13 +200,13 @@ debug.print { message = tostring(size) }
 ### 示例
 
 ```lua
-size1 = serialization.binary_packsize{ fmt = "f" }
-size2 = serialization.binary_packsize{ fmt = "d" }
-size3 = serialization.binary_packsize{ fmt = "n" }
+size1 = serialization.binary_packsize("f")
+size2 = serialization.binary_packsize("d")
+size3 = serialization.binary_packsize("n")
 
-debug.print { message = tostring(size1) }
-debug.print { message = tostring(size2) }
-debug.print { message = tostring(size3) }
+debug.print(tostring(size1))
+debug.print(tostring(size2))
+debug.print(tostring(size3))
 ```
 
 输出：
@@ -252,26 +240,17 @@ debug.print { message = tostring(size3) }
 ### 示例
 
 ```lua
-bytes1 = serialization.binary_pack {
-  fmt = "c5 c4 c4",
-  values = { "Hello", "Tui", "Game" }
-}
+bytes1 = serialization.binary_pack("c5 c4 c4", table.unpack({ "Hello", "Tui", "Game" }))
 
-debug.print { message = tostring(#bytes1) }
+debug.print(tostring(#bytes1))
 
-bytes2 = serialization.binary_pack {
-  fmt = "z",
-  values = { "Hello" }
-}
+bytes2 = serialization.binary_pack("z", table.unpack({ "Hello" }))
 
-debug.print { message = tostring(#bytes2) }
+debug.print(tostring(#bytes2))
 
-bytes3 = serialization.binary_pack {
-  fmt = "s4",
-  values = { "Hello" }
-}
+bytes3 = serialization.binary_pack("s4", table.unpack({ "Hello" }))
 
-debug.print { message = tostring(#bytes3) }
+debug.print(tostring(#bytes3))
 ```
 
 输出：
@@ -304,15 +283,12 @@ debug.print { message = tostring(#bytes3) }
 ### 示例
 
 ```lua
-bytes = serialization.binary_pack {
-  fmt = "<I2 x I2",
-  values = {
+bytes = serialization.binary_pack("<I2 x I2", table.unpack({
     100,
     200
-  }
-}
+  }))
 
-debug.print { message = tostring(#bytes) }
+debug.print(tostring(#bytes))
 ```
 
 输出：

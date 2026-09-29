@@ -72,15 +72,21 @@ pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
   )?;
   source.raw_set(
     "char_position",
-    lua.create_function(|_, values: MultiValue| {
-      let table = args::named("utf8.char_position", values, &["text", "index", "start"])?;
+    lua.create_function(|lua, values: MultiValue| {
+      let parameters = args::positional(
+        lua,
+        "utf8.char_position",
+        values,
+        &["text", "index"],
+        &["start"],
+      )?;
       let text = args::string(
-        args::required(&table, "utf8.char_position", "text")?,
+        parameters.required(0, "utf8.char_position", "text")?,
         "utf8.char_position",
         "text",
       )?;
       let index = args::integer(
-        args::required(&table, "utf8.char_position", "index")?,
+        parameters.required(1, "utf8.char_position", "index")?,
         "utf8.char_position",
         "index",
       )?;
@@ -90,7 +96,9 @@ pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
           "index must be at least 1",
         ));
       }
-      let start = args::optional_integer(&table, "utf8.char_position", "start", Some(1))?.unwrap();
+      let start =
+        args::optional_integer(parameters.options(), "utf8.char_position", "start", Some(1))?
+          .unwrap();
       let length = text.chars().count();
       let start = resolve_index(start, length, true);
       let target = start.and_then(|start| {
@@ -111,29 +119,29 @@ pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
         "text",
       )?;
       let byte_offset = std::rc::Rc::new(std::cell::Cell::new(0_usize));
-      lua.create_function(move |lua, _: MultiValue| {
+      lua.create_function(move |_, _: MultiValue| {
         let text = text
           .to_str()
           .map_err(|_| args::message("utf8.codepoints", "text must be valid UTF-8"))?;
         let text = text.as_ref();
         let offset = byte_offset.get();
         let Some(character) = text[offset..].chars().next() else {
-          return Ok(Value::Nil);
+          return Ok(MultiValue::from_vec(vec![Value::Nil]));
         };
         byte_offset.set(offset + character.len_utf8());
-        let item = lua.create_table()?;
-        item.raw_set("byte_position", offset + 1)?;
-        item.raw_set("codepoint", character as u32)?;
-        Ok(Value::Table(item))
+        Ok(MultiValue::from_vec(vec![
+          Value::Integer((offset + 1) as i64),
+          Value::Integer(character as u32 as i64),
+        ]))
       })
     })?,
   )?;
   source.raw_set(
     "next",
     lua.create_function(|lua, values: MultiValue| {
-      let table = args::named("utf8.next", values, &["text", "pos"])?;
+      let parameters = args::positional(lua, "utf8.next", values, &["text"], &["pos"])?;
       let text = args::lua_string(
-        args::required(&table, "utf8.next", "text")?,
+        parameters.required(0, "utf8.next", "text")?,
         "utf8.next",
         "text",
       )?;
@@ -141,17 +149,17 @@ pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
         .to_str()
         .map_err(|_| args::message("utf8.next", "text must be valid UTF-8"))?;
       let text = text.as_ref();
-      let pos = args::optional_integer(&table, "utf8.next", "pos", None)?;
+      let pos = args::optional_integer(parameters.options(), "utf8.next", "pos", None)?;
       if pos.is_some_and(|position| position < 1) {
         return Err(args::message("utf8.next", "pos must be at least 1"));
       }
       let start = match pos {
         Some(position) => {
           let Ok(position) = usize::try_from(position) else {
-            return Ok(Value::Nil);
+            return Ok(MultiValue::from_vec(vec![Value::Nil]));
           };
           if position > text.len() {
-            return Ok(Value::Nil);
+            return Ok(MultiValue::from_vec(vec![Value::Nil]));
           }
           let mut boundary = position;
           while boundary < text.len() && !text.is_char_boundary(boundary) {
@@ -166,12 +174,12 @@ pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
         .next()
         .map(|(offset, character)| (start + offset, character));
       let Some((position, character)) = found else {
-        return Ok(Value::Nil);
+        return Ok(MultiValue::from_vec(vec![Value::Nil]));
       };
-      let item = lua.create_table()?;
-      item.raw_set("position", position + 1)?;
-      item.raw_set("codepoint", character as u32)?;
-      Ok(Value::Table(item))
+      Ok(MultiValue::from_vec(vec![
+        Value::Integer((position + 1) as i64),
+        Value::Integer(character as u32 as i64),
+      ]))
     })?,
   )?;
   readonly::proxy(lua, source)
@@ -209,12 +217,13 @@ pub(super) fn utf8_codes(lua: &Lua, values: MultiValue, ascii_only: bool) -> mlu
   } else {
     "utf8.char_to_codepoint"
   };
-  let table = args::named(method, values, &["text", "start", "finish"])?;
-  let text = args::string(args::required(&table, method, "text")?, method, "text")?;
+  let parameters = args::positional(lua, method, values, &["text"], &["start", "finish"])?;
+  let text = args::string(parameters.required(0, method, "text")?, method, "text")?;
+  let options = parameters.options();
   let chars = text.chars().collect::<Vec<_>>();
-  let start = args::optional_integer(&table, method, "start", Some(1))?.unwrap();
+  let start = args::optional_integer(options, method, "start", Some(1))?.unwrap();
   let default_finish = chars.len() as i64;
-  let finish = args::optional_integer(&table, method, "finish", Some(default_finish))?.unwrap();
+  let finish = args::optional_integer(options, method, "finish", Some(default_finish))?.unwrap();
   let output = lua.create_table()?;
   let Some(start) = resolve_index(start, chars.len(), false) else {
     output.raw_set("n", 0)?;

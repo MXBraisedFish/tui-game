@@ -29,11 +29,16 @@ pub(super) fn color(lua: &Lua) -> mlua::Result<Table> {
   for (name, hex) in [("rgb", false), ("hex", true)] {
     source.raw_set(
       name,
-      lua.create_function(move |_, values: MultiValue| {
+      lua.create_function(move |lua, values: MultiValue| {
         let method = if hex { "color.hex" } else { "color.rgb" };
-        let table = args::named(method, values, &["r", "g", "b"])?;
+        let parsed = args::positional(lua, method, values, &["r", "g", "b"], &[])?;
         let channel = |n| -> mlua::Result<u8> {
-          let v = args::integer(args::required(&table, method, n)?, method, n)?;
+          let index = match n {
+            "r" => 0,
+            "g" => 1,
+            _ => 2,
+          };
+          let v = args::integer(parsed.required(index, method, n)?, method, n)?;
           u8::try_from(v).map_err(|_| args::message(method, format!("{n} must be in 0..=255")))
         };
         let (r, g, b) = (channel("r")?, channel("g")?, channel("b")?);

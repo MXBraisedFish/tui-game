@@ -16,18 +16,16 @@ pub(super) fn measurement(lua: &Lua, state: SharedApiState) -> mlua::Result<Tabl
           1 => "measurement.get_text_width",
           _ => "measurement.get_text_height",
         };
-        let table = measurement_text_parameters(method, values)?;
+        let table = measurement_text_parameters(lua, method, values)?;
         let params = parse_draw_text_params(&table, method, &state.borrow().context, false)?;
         let (width, height) = tg_service_text_layout::measure_draw_text(&params);
         match result {
-          0 => {
-            let size = lua.create_table()?;
-            size.raw_set("width", width)?;
-            size.raw_set("height", height)?;
-            Ok(Value::Table(size))
-          }
-          1 => Ok(Value::Integer(width as i64)),
-          _ => Ok(Value::Integer(height as i64)),
+          0 => Ok(MultiValue::from_vec(vec![
+            Value::Integer(width as i64),
+            Value::Integer(height as i64),
+          ])),
+          1 => Ok(MultiValue::from_vec(vec![Value::Integer(width as i64)])),
+          _ => Ok(MultiValue::from_vec(vec![Value::Integer(height as i64)])),
         }
       })?,
     )?;
@@ -35,14 +33,17 @@ pub(super) fn measurement(lua: &Lua, state: SharedApiState) -> mlua::Result<Tabl
   readonly::proxy(lua, source)
 }
 
-pub(super) fn draw_text_parameters(method: &str, values: MultiValue) -> mlua::Result<Table> {
-  args::named(
+pub(super) fn draw_text_parameters(
+  lua: &Lua,
+  method: &str,
+  values: MultiValue,
+) -> mlua::Result<Table> {
+  positional_table(
+    lua,
     method,
     values,
+    &["x", "y", "text"],
     &[
-      "x",
-      "y",
-      "text",
       "fg",
       "bg",
       "horizontal_align",
@@ -66,12 +67,32 @@ pub(super) fn draw_text_parameters(method: &str, values: MultiValue) -> mlua::Re
   )
 }
 
-fn measurement_text_parameters(method: &str, values: MultiValue) -> mlua::Result<Table> {
-  args::named(
+pub(super) fn positional_table(
+  lua: &Lua,
+  method: &str,
+  values: MultiValue,
+  required_names: &[&str],
+  option_fields: &[&str],
+) -> mlua::Result<Table> {
+  let parsed = args::positional(lua, method, values, required_names, option_fields)?;
+  let table = lua.create_table()?;
+  for (index, name) in required_names.iter().enumerate() {
+    table.raw_set(*name, parsed.required(index, method, name)?)?;
+  }
+  for pair in parsed.options().clone().pairs::<String, Value>() {
+    let (name, value) = pair?;
+    table.raw_set(name, value)?;
+  }
+  Ok(table)
+}
+
+fn measurement_text_parameters(lua: &Lua, method: &str, values: MultiValue) -> mlua::Result<Table> {
+  positional_table(
+    lua,
     method,
     values,
+    &["text"],
     &[
-      "text",
       "horizontal_align",
       "auto_wrap",
       "word_wrap",

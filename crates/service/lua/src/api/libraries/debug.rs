@@ -22,7 +22,7 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     let state = state.clone();
     source.raw_set(
       name,
-      lua.create_function(move |_, values: MultiValue| {
+      lua.create_function(move |lua, values: MultiValue| {
         let method = match name {
           "print" => "debug.print",
           "info" => "debug.info",
@@ -34,13 +34,16 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           return Ok(());
         }
         if name == "print" {
-          let table = args::named(
+          let parameters = args::positional(
+            lua,
             method,
             values,
-            &["message", "title", "level", "time", "type_head"],
+            &["message"],
+            &["title", "level", "time", "type_head"],
           )?;
+          let table = parameters.options();
           let message = args::dynamic_text(
-            args::required(&table, method, "message")?,
+            parameters.required(0, method, "message")?,
             method,
             "message",
           )?;
@@ -67,9 +70,9 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
             type_head,
           );
         } else {
-          let table = args::named(method, values, &["message"])?;
+          let parameters = args::positional(lua, method, values, &["message"], &[])?;
           let message = args::dynamic_text(
-            args::required(&table, method, "message")?,
+            parameters.required(0, method, "message")?,
             method,
             "message",
           )?;
@@ -88,15 +91,18 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   }
   source.raw_set(
     "assert",
-    lua.create_function(|_, values: MultiValue| {
-      let table = args::named("debug.assert", values, &["value", "message"])?;
-      // Lua 的 nil 无法作为表字段保留下来，因此省略 value 与显式传入 nil
-      // 都应进入断言失败分支，而不是被通用必填参数校验拦截。
-      let value = table.get::<Value>("value")?;
+    lua.create_function(|lua, values: MultiValue| {
+      let parameters = args::positional(lua, "debug.assert", values, &["value"], &["message"])?;
+      // nil is a valid asserted value; omission still fails required-position parsing.
+      let value = parameters.get(0);
       if matches!(value, Value::Nil | Value::Boolean(false)) {
-        let message =
-          args::optional_dynamic_text(&table, "debug.assert", "message", Some("assertion failed"))?
-            .unwrap();
+        let message = args::optional_dynamic_text(
+          parameters.options(),
+          "debug.assert",
+          "message",
+          Some("assertion failed"),
+        )?
+        .unwrap();
         Err(mlua::Error::RuntimeError(message))
       } else {
         Ok(value)
@@ -115,21 +121,26 @@ fn protected(lua: &Lua, extended: bool, state: SharedApiState) -> mlua::Result<F
     } else {
       "debug.pcall"
     };
-    let allowed = if extended {
-      &["func", "error_callback", "values"][..]
+    let required = if extended {
+      &["func", "error_callback"][..]
     } else {
-      &["func", "values"][..]
+      &["func"][..]
     };
-    let table = args::named(method, values, allowed)?;
-    let value = args::required(&table, method, "func")?;
+    let values = args::variadic(method, values, required)?;
+    let value = values[0].clone();
     let Value::Function(function) = value else {
       return Err(args::invalid(method, "func", "function", &value));
     };
-    let call_values = if matches!(table.get::<Value>("values")?, Value::Nil) {
-      Vec::new()
+    let error_callback = if extended {
+      let value = values[1].clone();
+      let Value::Function(function) = value else {
+        return Err(args::invalid(method, "error_callback", "function", &value));
+      };
+      Some(function)
     } else {
-      args::values(&table, method)?
+      None
     };
+    let call_values = values.into_iter().skip(required.len()).collect::<Vec<_>>();
     match function.call::<MultiValue>(MultiValue::from_vec(call_values)) {
       Ok(result) => {
         if state.borrow().fatal_budget_exceeded || state.borrow().fatal_api_error {
@@ -137,16 +148,10 @@ fn protected(lua: &Lua, extended: bool, state: SharedApiState) -> mlua::Result<F
             "fatal Lua API resource limit exceeded".to_string(),
           ));
         }
-        let output = lua.create_table()?;
-        output.raw_set("ok", true)?;
-        let packed = lua.create_table()?;
-        let count = result.len();
-        for (index, value) in result.into_iter().enumerate() {
-          packed.raw_set(index + 1, value)?;
-        }
-        packed.raw_set("n", count)?;
-        output.raw_set("values", packed)?;
-        Ok(output)
+        let mut output = Vec::with_capacity(result.len() + 1);
+        output.push(Value::Boolean(true));
+        output.extend(result);
+        Ok(MultiValue::from_vec(output))
       }
       Err(error) => {
         if state.borrow().fatal_budget_exceeded
@@ -156,13 +161,13 @@ fn protected(lua: &Lua, extended: bool, state: SharedApiState) -> mlua::Result<F
           return Err(error);
         }
         let mut error_value = Value::String(lua.create_string(error.to_string())?);
-        if extended && let Value::Function(handler) = table.get::<Value>("error_callback")? {
+        if let Some(handler) = error_callback {
           error_value = handler.call(error_value)?;
         }
-        let output = lua.create_table()?;
-        output.raw_set("ok", false)?;
-        output.raw_set("error", error_value)?;
-        Ok(output)
+        Ok(MultiValue::from_vec(vec![
+          Value::Boolean(false),
+          error_value,
+        ]))
       }
     }
   })

@@ -14,24 +14,15 @@ local elapsed = 0
 local frame_index = 0
 
 local function fit_size(new_width, new_height)
-  width = math.max { values = { 1, new_width } }
-  height = math.max { values = { 1, new_height } }
+  width = math.max({ 1, new_width })
+  height = math.max({ 1, new_height })
 end
 
 local function draw_line(y, text, fg, bg, bold)
   if y < 0 or y >= height then
     return
   end
-  draw.text {
-    x = 1,
-    y = y,
-    text = text,
-    fg = fg,
-    bg = bg,
-    bold = bold or false,
-    max_width = math.max { values = { 1, width - 2 } },
-    max_height = 1,
-  }
+  draw.text(1, y, text, { fg = fg, bg = bg, bold = bold or false, max_width = math.max({ 1, width - 2 }), max_height = 1 })
 end
 
 local function mode_title()
@@ -51,14 +42,7 @@ local function draw_header(fg)
 end
 
 local function draw_reference()
-  draw.fill_rect {
-    x = 0,
-    y = 0,
-    width = width,
-    height = height,
-    char = " ",
-    bg = color.BLACK,
-  }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
   draw_header(color.BRIGHT_CYAN)
   draw_line(4, "Static screen: watch for unintended flicker or stale cells.", color.WHITE)
   draw_line(6, "ASCII: !\"#$%&'()*+,-./ 0123456789  ABC xyz", color.BRIGHT_GREEN)
@@ -68,58 +52,31 @@ local function draw_reference()
 end
 
 local function draw_local_update()
-  draw.fill_rect {
-    x = 0,
-    y = 0,
-    width = width,
-    height = height,
-    char = " ",
-    bg = color.BLACK,
-  }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
   draw_header(color.BRIGHT_CYAN)
   draw_line(4, "Only the marker below moves; the rest of the frame stays unchanged.", color.WHITE)
   draw_line(7, "Local change:", color.GRAY)
 
-  local travel = math.max { values = { 1, width - 8 } }
-  local marker_y = math.min { values = { height - 4, 9 } }
-  marker_y = math.max { values = { 0, marker_y } }
+  local travel = math.max({ 1, width - 8 })
+  local marker_y = math.min({ height - 4, 9 })
+  marker_y = math.max({ 0, marker_y })
   local marker_x = 3 + (frame_index // 4) % travel
-  draw.text {
-    x = marker_x,
-    y = marker_y,
-    text = "#",
-    fg = color.BRIGHT_YELLOW,
-    bold = true,
-  }
+  draw.text(marker_x, marker_y, "#", { fg = color.BRIGHT_YELLOW, bold = true })
   draw_line(height - 2, "Observe whether the small update causes visible flashes elsewhere.", color.GRAY)
 end
 
 local function draw_full_refresh()
-  draw.fill_rect {
-    x = 0,
-    y = 0,
-    width = width,
-    height = height,
-    char = " ",
-    bg = color.BLACK,
-  }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
 
   local stripe_width = 6
   for x = 0, width - 1, stripe_width do
     local sweep = (x * 3 + frame_index * 2) % 160
-    local bg = color.rgb {
-      r = 20 + sweep,
-      g = 28 + (sweep * 3) % 180,
-      b = 50 + (sweep * 5) % 200,
-    }
-    draw.fill_rect {
-      x = x,
-      y = 2,
-      width = math.min { values = { stripe_width, width - x } },
-      height = math.max { values = { 1, height - 4 } },
-      char = " ",
-      bg = bg,
-    }
+    local bg = color.rgb(
+      20 + sweep,
+      28 + (sweep * 3) % 180,
+      50 + (sweep * 5) % 200
+    )
+    draw.fill_rect(x, 2, math.min({ stripe_width, width - x }), math.max({ 1, height - 4 }), { char = " ", bg = bg })
   end
 
   draw_header(color.WHITE)
@@ -131,14 +88,7 @@ local function draw_pulse()
   local light_phase = math.floor(elapsed / 0.25) % 2 == 0
   local bg = light_phase and color.WHITE or color.BLACK
   local fg = light_phase and color.BLACK or color.WHITE
-  draw.fill_rect {
-    x = 0,
-    y = 0,
-    width = width,
-    height = height,
-    char = " ",
-    bg = bg,
-  }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = bg })
   draw_header(fg)
   draw_line(7, "2 Hz high-contrast pulse (opt-in scene)", fg, bg, true)
   draw_line(9, "Press 1, 2 or 3 to return to the render scenes.", fg, bg)
@@ -181,7 +131,7 @@ function HandleEvent(event)
     elseif action == "pause" then
       paused = not paused
     elseif action == "leave" then
-      game.exit_game {}
+      game.exit_game()
     end
   end
 end

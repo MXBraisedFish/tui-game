@@ -1,24 +1,21 @@
 # random 库
 
-## 基本库说明
-
-`random` 提供可控且安全的随机数生成。
-所有方法均接收一个命名参数表；无参数方法使用空表 `{}`，生成器操作通过 `id` 字段传入对象 ID。
+`random` 提供随机数生成和随机数生成器管理。
 
 ---
 
-## 目录
+# 目录
 
-### 常量
+## 常量
 
-| 常量名  | 说明                   | 索引            |
-| ------- | ---------------------- | --------------- |
-| `INT`   | 整数类型随机数生成器   | [INT](#INT)     |
+| 常量 | 说明 | 定位 |
+| --- | --- | --- |
+| `INT` | 整数类型随机数生成器 | [INT](#INT) |
 | `FLOAT` | 浮点数类型随机数生成器 | [FLOAT](#FLOAT) |
 
-### 方法
+## 方法
 
-| 方法名      | 说明                         | 索引                    |
+| 方法      | 说明                         | 定位                    |
 | ----------- | ---------------------------- | ----------------------- |
 | `randint`   | 随机生成指定区间的整数       | [randint](#randint)     |
 | `randfloat` | 随机生成指定区间的浮点数     | [randfloat](#randfloat) |
@@ -42,13 +39,13 @@
 
 ---
 
-## 常量
+# 常量
 
 ## `INT`
 
 整数类型随机数生成器。
 
-**可用于**
+### 可用于
 
 - 参数 `type`
 
@@ -60,13 +57,29 @@ random.INT
 
 ### 示例
 
+```lua
+local generator = random.create({type = random.INT})
+local value = random.generate(generator)
+```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"int"
+```
+
 ---
 
 ## `FLOAT`
 
 浮点数类型随机数生成器。
 
-**可用于**
+### 可用于
 
 - 参数 `type`
 
@@ -78,9 +91,26 @@ random.FLOAT
 
 ### 示例
 
+```lua
+local generator = random.create({type = random.FLOAT})
+local value = random.generate(generator)
+```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+"float"
+```
+
 ---
 
-## 方法
+# 方法
+
 
 ## `randint`
 
@@ -89,18 +119,18 @@ random.FLOAT
 ### 调用
 
 ```lua
--- 表参数
-random.randint{}
+random.randint
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值        | 说明           |
-| ------ | ------- | ---- | ------------- | -------------- |
-| `min`  | integer | 否   | `-2147483648` | 区间下界（含） |
-| `max`  | integer | 否   | `2147483647`  | 区间上界（含） |
+### 选填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `min` | integer | 默认：`-2147483648`；区间下界（含） |
+| `max` | integer | 默认：`2147483647`；区间上界（含） |
+## 返回值
 
 | 类型    | 说明             |
 | ------- | ---------------- |
@@ -109,25 +139,22 @@ random.randint{}
 ### 示例
 
 ```lua
-local r1 = random.randint {}
-debug.print { message = r1 }
+local r1 = random.randint()
+debug.print(r1)
 
-local r2 = random.randint { min = 1, max = 10 }
-debug.print { message = r2 }
+local r2 = random.randint({min = 1, max = 10})
+debug.print(r2)
 
-local r3 = random.randint { min = -20, max = -8 }
-debug.print { message = r3 }
+local r3 = random.randint({min = -20, max = -8})
+debug.print(r3)
 ```
 
-输出：
+**输出：**
 
-```text
-1812592315
-7
--9
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
 - 直接生成无法控制相关参数。
@@ -141,18 +168,18 @@ debug.print { message = r3 }
 ### 调用
 
 ```lua
--- 表参数
-random.randfloat{}
+random.randfloat
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型             | 必填 | 默认值 | 说明           |
-| ------ | ---------------- | ---- | ------ | -------------- |
-| `min`  | integer / float | 否   | `0`    | 区间下界（含） |
-| `max`  | integer / float | 否   | `1`    | 区间上界（含） |
+### 选填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `min` | integer / float | 默认：`0`；区间下界（含） |
+| `max` | integer / float | 默认：`1`；区间上界（含） |
+## 返回值
 
 | 类型   | 说明               |
 | ------ | ------------------ |
@@ -161,25 +188,22 @@ random.randfloat{}
 ### 示例
 
 ```lua
-local r1 = random.randfloat {}
-debug.print { message = r1 }
+local r1 = random.randfloat()
+debug.print(r1)
 
-local r2 = random.randfloat { min = 1, max = 10 }
-debug.print { message = r2 }
+local r2 = random.randfloat({min = 1, max = 10})
+debug.print(r2)
 
-local r3 = random.randfloat { min = -20, max = -8 }
-debug.print { message = r3 }
+local r3 = random.randfloat({min = -20, max = -8})
+debug.print(r3)
 ```
 
-输出：
+**输出：**
 
-```text
-0.7669397909242387
-7.324927707931401
--13.663908207215046
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
 - 直接生成无法控制相关参数。
@@ -193,21 +217,21 @@ debug.print { message = r3 }
 ### 调用
 
 ```lua
--- 表参数
-random.create{}
+random.create
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型             | 必填 | 默认值         | 说明           |
-| ------ | ---------------- | ---- | -------------- | -------------- |
-| `min`  | float / integer | 否   | 跟随生成器类型 | 区间下界（含） |
-| `max`  | float / integer | 否   | 跟随生成器类型 | 区间上界（含） |
-| `type` | const-random     | 否   | `random.INT`   | 生成器类型     |
-| `seed` | integer          | 否   | 系统随机生成   | 随机种子       |
-| `step` | integer          | 否   | `0`            | 初始步进数     |
+### 选填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `min` | float / integer | 默认：跟随生成器类型；区间下界（含） |
+| `max` | float / integer | 默认：跟随生成器类型；区间上界（含） |
+| `type` | const-random | 默认：`random.INT`；生成器类型 |
+| `seed` | integer | 默认：系统随机生成；随机种子 |
+| `step` | integer | 默认：`0`；初始步进数 |
+## 返回值
 
 | 类型   | 说明      |
 | ------ | --------- |
@@ -216,47 +240,24 @@ random.create{}
 ### 示例
 
 ```lua
-local r1 = random.create {}
-debug.print { message = r1 }
-debug.print { message = random.generate{ id = r1 } }
+local r1 = random.create()
+debug.print(r1)
+debug.print(random.generate(r1))
 
-local r2 = random.create { type = random.INT, min = 1, max = 30, seed = 520 }
-debug.print { message = r2 }
-debug.print { message = random.generate{ id = r2 } }
+local r2 = random.create({type = random.INT, min = 1, max = 30, seed = 520})
+debug.print(r2)
+debug.print(random.generate(r2))
 
 
-debug.print { message = table.pretty{ table = random.list{} } }
+debug.print(table.pretty(random.list()))
 ```
 
-输出：
+**输出：**
 
 ```lua
-rng_001
-1277268617
-rng_002
-14
-{
-  [1] = {
-    id = "rng_001",
-    max = 2147483647,
-    min = -2147483648,
-    seed = 1789000067301558980,
-    step = 1,
-    type = "int"
-  },
-  [2] = {
-    id = "rng_002",
-    max = 30,
-    min = 1,
-    seed = 520,
-    step = 1,
-    type = "int"
-  },
-  n = 2
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
 - 参数 `type` 为 `random.INT` 时，参数 `min` 默认值为 `-2147483648`，参数 `max` 默认值为 `2147483647`。
@@ -271,17 +272,17 @@ rng_002
 ### 调用
 
 ```lua
--- 单参数
-random.delete{ id = "rng_001" }
+random.delete
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明      |
-| ------ | ------ | ---- | ------ | --------- |
-| `id`   | string | 是   | -      | 生成器 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -292,25 +293,19 @@ random.delete{ id = "rng_001" }
 ### 示例
 
 ```lua
-local r = random.create {}
-debug.print { message = r }
-debug.print { message = random.generate{ id = r } }
+local r = random.create()
+debug.print(r)
+debug.print(random.generate(r))
 
-debug.print { message = random.delete{ id = r } }
+debug.print(random.delete(r))
 
 
-debug.print { message = table.pretty{ table = random.list{} } }
+debug.print(table.pretty(random.list()))
 ```
 
-输出：
+**输出：**
 
 ```lua
-rng_001
-553823262
-true
-{
-  n = 0
-}
 ```
 
 ---
@@ -322,15 +317,10 @@ true
 ### 调用
 
 ```lua
--- 单参数
-random.clear{}
+random.clear
 ```
 
-### 参数
-
-无。
-
-### 返回
+## 返回值
 
 直接返回一个值。
 
@@ -341,23 +331,19 @@ random.clear{}
 ### 示例
 
 ```lua
-random.create {}
-random.create {}
-random.create {}
-random.create {}
+random.create()
+random.create()
+random.create()
+random.create()
 
-debug.print { message = random.clear{} }
+debug.print(random.clear())
 
-debug.print { message = table.pretty{ table = random.list{} } }
+debug.print(table.pretty(random.list()))
 ```
 
-输出：
+**输出：**
 
 ```lua
-true
-{
-  n = 0
-}
 ```
 
 ---
@@ -369,15 +355,10 @@ true
 ### 调用
 
 ```lua
--- 单参数
-random.list{}
+random.list
 ```
 
-### 参数
-
-无。
-
-### 返回
+## 返回值
 
 返回一个混合表。
 
@@ -388,53 +369,33 @@ random.list{}
 ### 示例
 
 ```lua
-random.create {}
-random.create {}
+random.create()
+random.create()
 
-debug.print { message = table.pretty{ table = random.list{} } }
+debug.print(table.pretty(random.list()))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  [1] = {
-    id = "rng_001",
-    max = 2147483647,
-    min = -2147483648,
-    seed = 1789001961255729648,
-    step = 0,
-    type = "int"
-  },
-  [2] = {
-    id = "rng_002",
-    max = 2147483647,
-    min = -2147483648,
-    seed = 1789001959106153348,
-    step = 0,
-    type = "int"
-  },
-  n = 2
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 返回值混合表结构如下：
 
 ```lua
-{
+local generators = {
   {
-    id = ...,   -- string
-    type = ..., -- string
-    min = ...,  -- float / integer
-    max = ...,  -- float / integer
-    seed = ..., -- integer,
-    step = ..., -- integer
+    id = "example", -- string
+    type = "integer", -- string
+    min = 1, -- float / integer
+    max = 10, -- float / integer
+    seed = 42, -- integer,
+    step = 1, -- integer
   },
-  ...
-  n = x,        -- integer
-} -- 共有 x+1 个元素，所有返回值连续排序，最后 n 为返回值个数
+  n = 1, -- integer; the number of generators
+}
 ```
 
 ---
@@ -446,15 +407,10 @@ debug.print { message = table.pretty{ table = random.list{} } }
 ### 调用
 
 ```lua
--- 单参数
-random.count{}
+random.count
 ```
 
-### 参数
-
-无。
-
-### 返回
+## 返回值
 
 直接返回一个值。
 
@@ -465,19 +421,18 @@ random.count{}
 ### 示例
 
 ```lua
-random.create {}
-random.create {}
-random.create {}
-random.create {}
-random.create {}
+random.create()
+random.create()
+random.create()
+random.create()
+random.create()
 
-debug.print { message = random.count{} }
+debug.print(random.count())
 ```
 
-输出：
+**输出：**
 
 ```lua
-5
 ```
 
 ---
@@ -489,17 +444,17 @@ debug.print { message = random.count{} }
 ### 调用
 
 ```lua
--- 单参数
-random.generate{ id = "rng_001" }
+random.generate
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明      |
-| ------ | ------ | ---- | ------ | --------- |
-| `id`   | string | 是   | -      | 生成器 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -510,23 +465,18 @@ random.generate{ id = "rng_001" }
 ### 示例
 
 ```lua
-local r = random.create { min = -5, max = 30 }
+local r = random.create({min = -5, max = 30})
 
-debug.print { message = random.generate{ id = r } }
-debug.print { message = random.generate{ id = r } }
-debug.print { message = random.generate{ id = r } }
-debug.print { message = random.generate{ id = r } }
-debug.print { message = random.generate{ id = r } }
+debug.print(random.generate(r))
+debug.print(random.generate(r))
+debug.print(random.generate(r))
+debug.print(random.generate(r))
+debug.print(random.generate(r))
 ```
 
-输出：
+**输出：**
 
-```text
-12
-18
-7
-12
-6
+```lua
 ```
 
 ---
@@ -538,22 +488,27 @@ debug.print { message = random.generate{ id = r } }
 ### 调用
 
 ```lua
--- 表参数
-random.set{}
+random.set
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型             | 必填 | 默认值   | 说明           |
-| ------ | ---------------- | ---- | -------- | -------------- |
-| `id`   | string           | 是   | -        | 生成器 ID      |
-| `type` | const-random     | 否   | 保持原值 | 生成器类型     |
-| `min`  | float / integer | 否   | 保持原值 | 区间下界（含） |
-| `max`  | float / integer | 否   | 保持原值 | 区间上界（含） |
-| `seed` | integer          | 否   | 保持原值 | 随机种子       |
-| `step` | integer          | 否   | 保持原值 | 步进数         |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | const-random | 默认：保持原值；生成器类型 |
+| `min` | float / integer | 默认：保持原值；区间下界（含） |
+| `max` | float / integer | 默认：保持原值；区间上界（含） |
+| `seed` | integer | 默认：保持原值；随机种子 |
+| `step` | integer | 默认：保持原值；步进数 |
+## 返回值
 
 直接返回一个值。
 
@@ -564,37 +519,21 @@ random.set{}
 ### 示例
 
 ```lua
-local r = random.create {}
+local r = random.create()
 
-debug.print { message = table.pretty{ table = random.get_info{ id = r } } }
+debug.print(table.pretty(random.get_info(r)))
 
-random.set { id = r,  type = random.FLOAT, min = 3.2, max = 5.8, seed = 123456 }
+random.set(r, {type = random.FLOAT, min = 3.2, max = 5.8, seed = 123456})
 
-debug.print { message = table.pretty{ table = random.get_info{ id = r } } }
+debug.print(table.pretty(random.get_info(r)))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  id = "rng_001", 
-  max = 2147483647, 
-  min = -2147483648, 
-  seed = 1789002380334941420, 
-  step = 0, 
-  type = "int"
-}
-{
-  id = "rng_001", 
-  max = 5.8, 
-  min = 3.2, 
-  seed = 123456, 
-  step = 0, 
-  type = "float"
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
 
@@ -607,18 +546,18 @@ debug.print { message = table.pretty{ table = random.get_info{ id = r } } }
 ### 调用
 
 ```lua
--- 表参数
-random.set_type{}
+random.set_type
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型         | 必填 | 默认值   | 说明       |
-| ------ | ------------ | ---- | -------- | ---------- |
-| `id`   | string       | 是   | -        | 生成器 ID  |
-| `type` | const-random | 否   | 保持原值 | 生成器类型 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+| `type` | const-random | 默认：保持原值；生成器类型 |
+## 返回值
 
 直接返回一个值。
 
@@ -629,14 +568,14 @@ random.set_type{}
 ### 示例
 
 ```lua
-
+local r = random.create({type = random.INT})
+random.set_type(r, random.FLOAT)
+debug.print(random.get_type(r))
 ```
 
-输出;
+**输出：**
 
-```text
-int
-float
+```lua
 ```
 
 ---
@@ -648,19 +587,19 @@ float
 ### 调用
 
 ```lua
--- 表参数
-random.set_range{}
+random.set_range
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型             | 必填 | 默认值   | 说明           |
-| ------ | ---------------- | ---- | -------- | -------------- |
-| `id`   | string           | 是   | -        | 生成器 ID      |
-| `min`  | float / integer | 是   | 保持原值 | 区间下界（含） |
-| `max`  | float / integer | 是   | 保持原值 | 区间上界（含） |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+| `min` | float / integer | 默认：保持原值；区间下界（含） |
+| `max` | float / integer | 默认：保持原值；区间上界（含） |
+## 返回值
 
 直接返回一个值。
 
@@ -671,29 +610,21 @@ random.set_range{}
 ### 示例
 
 ```lua
-local r = random.create { min = 10, max = 20 }
+local r = random.create({min = 10, max = 20})
 
-debug.print { message = table.pretty{ table = random.get_range{ id = r } } }
+debug.print(table.pretty(random.get_range(r)))
 
-random.set_range { id = r, min = 5, max = 7 }
+random.set_range(r, 5, 7)
 
-debug.print { message = table.pretty{ table = random.get_range{ id = r } } }
+debug.print(table.pretty(random.get_range(r)))
 ```
 
-输出;
+**输出：**
 
 ```lua
-{
-  max = 20, 
-  min = 10
-}
-{
-  max = 7, 
-  min = 5
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
 
@@ -706,18 +637,18 @@ debug.print { message = table.pretty{ table = random.get_range{ id = r } } }
 ### 调用
 
 ```lua
--- 表参数
-random.set_seed{}
+random.set_seed
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值   | 说明      |
-| ------ | ------- | ---- | -------- | --------- |
-| `id`   | string  | 是   | -        | 生成器 ID |
-| `seed` | integer | 否   | 保持原值 | 随机种子  |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+| `seed` | integer | 默认：保持原值；随机种子 |
+## 返回值
 
 直接返回一个值。
 
@@ -728,20 +659,18 @@ random.set_seed{}
 ### 示例
 
 ```lua
-local r = random.create {}
+local r = random.create()
 
-debug.print { message = random.get_info{ id = r }.seed }
+debug.print(random.get_info(r).seed)
 
-random.set_seed { id = r,  seed = 1314 }
+random.set_seed(r, 1314)
 
-debug.print { message = random.get_info{ id = r }.seed }
+debug.print(random.get_info(r).seed)
 ```
 
-输出;
+**输出：**
 
-```text
-1789004668875999436
-1314
+```lua
 ```
 
 ---
@@ -753,18 +682,18 @@ debug.print { message = random.get_info{ id = r }.seed }
 ### 调用
 
 ```lua
--- 表参数
-random.set_step{}
+random.set_step
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值   | 说明      |
-| ------ | ------- | ---- | -------- | --------- |
-| `id`   | string  | 是   | -        | 生成器 ID |
-| `step` | integer | 是   | 保持原值 | 步进数    |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+| `step` | integer | 默认：保持原值；步进数 |
+## 返回值
 
 直接返回一个值。
 
@@ -775,20 +704,18 @@ random.set_step{}
 ### 示例
 
 ```lua
-local r = random.create {}
+local r = random.create()
 
-debug.print { message = random.get_info{ id = r }.step }
+debug.print(random.get_info(r).step)
 
-random.set_step { id = r,  step = 30 }
+random.set_step(r, 30)
 
-debug.print { message = random.get_info{ id = r }.step }
+debug.print(random.get_info(r).step)
 ```
 
-输出;
+**输出：**
 
-```text
-0
-30
+```lua
 ```
 
 ---
@@ -800,17 +727,17 @@ debug.print { message = random.get_info{ id = r }.step }
 ### 调用
 
 ```lua
--- 单参数
-random.get_type{ id = "rng_001" }
+random.get_type
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明      |
-| ------ | ------ | ---- | ------ | --------- |
-| `id`   | string | 是   | -      | 生成器 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -821,14 +748,13 @@ random.get_type{ id = "rng_001" }
 ### 示例
 
 ```lua
-local r = random.create { type = random.INT }
-debug.print { message = random.get_type{ id = r } }
+local r = random.create({type = random.INT})
+debug.print(random.get_type(r))
 ```
 
-输出;
+**输出：**
 
-```text
-int
+```lua
 ```
 
 ---
@@ -840,39 +766,36 @@ int
 ### 调用
 
 ```lua
--- 单参数
-random.get_range{ id = "rng_001" }
+random.get_range
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明      |
-| ------ | ------ | ---- | ------ | --------- |
-| `id`   | string | 是   | -      | 生成器 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+## 返回值
 
-返回一个对象表。
+找到生成器时返回两个值，依次为区间下界和上界；找不到时返回一个 nil。
 
-| 字段  | 类型             | 说明     |
-| ----- | ---------------- | -------- |
-| `min` | float / integer | 区间下界 |
-| `max` | float / integer | 区间上界 |
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `min` | float / integer | 区间下界。 |
+| `max` | float / integer | 区间上界。 |
 
 ### 示例
 
 ```lua
-local r = random.create { min = 10, max = 20 }
-debug.print { message = table.pretty{ table = random.get_range{ id = r } } }
+local r = random.create({min = 10, max = 20})
+local min_value, max_value = random.get_range(r)
+debug.print(tostring(min_value) .. ", " .. tostring(max_value))
 ```
 
-输出;
+**输出：**
 
 ```lua
-{
-  max = 20, 
-  min = 10
-}
 ```
 
 ---
@@ -884,17 +807,17 @@ debug.print { message = table.pretty{ table = random.get_range{ id = r } } }
 ### 调用
 
 ```lua
--- 单参数
-random.get_seed{ id = "rng_001" }
+random.get_seed
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明      |
-| ------ | ------ | ---- | ------ | --------- |
-| `id`   | string | 是   | -      | 生成器 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -905,14 +828,13 @@ random.get_seed{ id = "rng_001" }
 ### 示例
 
 ```lua
-local r = random.create { seed = 2233 }
-debug.print { message = random.get_seed{ id = r } }
+local r = random.create({seed = 2233})
+debug.print(random.get_seed(r))
 ```
 
-输出;
+**输出：**
 
-```text
-2233
+```lua
 ```
 
 ---
@@ -924,17 +846,17 @@ debug.print { message = random.get_seed{ id = r } }
 ### 调用
 
 ```lua
--- 单参数
-random.get_step{ id = "rng_001" }
+random.get_step
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明      |
-| ------ | ------ | ---- | ------ | --------- |
-| `id`   | string | 是   | -      | 生成器 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+## 返回值
 
 | 类型    | 说明       |
 | ------- | ---------- |
@@ -943,14 +865,13 @@ random.get_step{ id = "rng_001" }
 ### 示例
 
 ```lua
-local r = random.create { step = 50 }
-debug.print { message = random.get_step{ id = r } }
+local r = random.create({step = 50})
+debug.print(random.get_step(r))
 ```
 
-输出;
+**输出：**
 
-```text
-50
+```lua
 ```
 
 ---
@@ -962,17 +883,17 @@ debug.print { message = random.get_step{ id = r } }
 ### 调用
 
 ```lua
--- 单参数
-random.get_info{ id = "rng_001" }
+random.get_info
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明      |
-| ------ | ------ | ---- | ------ | --------- |
-| `id`   | string | 是   | -      | 生成器 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+## 返回值
 
 返回一个对象表。
 
@@ -988,21 +909,13 @@ random.get_info{ id = "rng_001" }
 ### 示例
 
 ```lua
-local r = random.create {}
-debug.print { message = table.pretty{ table = random.get_info{ id = r } } }
+local r = random.create()
+debug.print(table.pretty(random.get_info(r)))
 ```
 
-输出;
+**输出：**
 
 ```lua
-{
-  id = "rng_001", 
-  max = 2147483647, 
-  min = -2147483648, 
-  seed = 1789005094764332964, 
-  step = 0, 
-  type = "int"
-}
 ```
 
 ---
@@ -1014,17 +927,17 @@ debug.print { message = table.pretty{ table = random.get_info{ id = r } } }
 ### 调用
 
 ```lua
--- 单参数
-random.exists{ id = "rng_001" }
+random.exists
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明      |
-| ------ | ------ | ---- | ------ | --------- |
-| `id`   | string | 是   | -      | 生成器 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 生成器 ID |
+## 返回值
 
 | 类型    | 说明     |
 | ------- | -------- |
@@ -1033,16 +946,14 @@ random.exists{ id = "rng_001" }
 ### 示例
 
 ```lua
-local r = random.create {}
-debug.print { message = random.exists{ id = r } }
+local r = random.create()
+debug.print(random.exists(r))
 
-random.delete{ id = r }
-debug.print { message = random.exists{ id = r } }
+random.delete(r)
+debug.print(random.exists(r))
 ```
 
-输出;
+**输出：**
 
-```text
-true
-false
+```lua
 ```

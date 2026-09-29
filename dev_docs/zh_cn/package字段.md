@@ -4,4 +4,3 @@
 
 - [游戏包 schema 2](PACKAAGE_GAME.md)
 - [屏保包 schema 2](PACKAAGE_SCREENSAVER.md)
-- [B 阶段契约记录](../refactor/B0_CONTRACTS.md)

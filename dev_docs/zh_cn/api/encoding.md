@@ -1,270 +1,260 @@
 # encoding 库
 
-## 基本库说明
-
-`encoding` 提供字符串与二进制数据的编码转换。
-所有方法均使用单个命名参数表，输入字段名为 `s`。
+`encoding` 用来转换文本编码格式，得到 Base64、URL 百分号编码或十六进制字符串，也可以把这些格式还原为原始字符串。
 
 ---
 
-## 目录
-
-### 方法
-
-| 方法名          | 说明                                      | 索引                            |
-| --------------- | ----------------------------------------- | ------------------------------- |
-| `base64_encode` | 将字符串数据编码为 Base64 字符串          | [base64_encode](#base64_encode) |
-| `base64_decode` | 将 Base64 字符串解码为原始字符串          | [base64_decode](#base64_decode) |
-| `url_encode`    | 将字符串编码为 URL 安全格式（百分号编码） | [url_encode](#url_encode)       |
-| `url_decode`    | 将 URL 编码字符串解码为原始字符串         | [url_decode](#url_decode)       |
-| `hex_encode`    | 将字符串编码为十六进制字符串              | [hex_encode](#hex_encode)       |
-| `hex_decode`    | 将十六进制字符串解码为原始字符串          | [hex_decode](#hex_decode)       |
-
----
+# 目录
 
 ## 方法
 
+| 方法 | 说明 | 定位 |
+| --- | --- | --- |
+| `base64_encode` | 将字符串编码为 Base64 | [base64_encode](#base64_encode) |
+| `base64_decode` | 将 Base64 解码为字符串 | [base64_decode](#base64_decode) |
+| `url_encode` | 对字符串进行 URL 百分号编码 | [url_encode](#url_encode) |
+| `url_decode` | 解码 URL 百分号编码字符串 | [url_decode](#url_decode) |
+| `hex_encode` | 将字符串编码为十六进制 | [hex_encode](#hex_encode) |
+| `hex_decode` | 将十六进制解码为字符串 | [hex_decode](#hex_decode) |
+
+---
+
+# 方法
+
 ## `base64_encode`
 
-将字符串数据编码为 Base64 字符串。
+将字符串编码为 Base64 字符串。
 
 ### 调用
 
 ```lua
--- 单参数
-encoding.base64_encode{ s = "Hello Tui Game" }
+encoding.base64_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明         |
-| ------ | ------ | ---- | ------ | ------------ |
-| `s`    | string | 是   | -      | 要编码的数据 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `s` | string | 要编码的字符串。 |
 
-直接返回一个值。
+## 返回值
 
-| 类型   | 说明          |
-| ------ | ------------- |
-| string | Base64 字符串 |
+返回一个 Base64 字符串。
+
+| 类型 | 说明 |
+| --- | --- |
+| string | 编码结果。 |
 
 ### 示例
 
 ```lua
-debug.print { message = encoding.base64_encode{ s = "Hello Tui Game" } }
+local encoded = encoding.base64_encode("Hello Tui Game")
+debug.print(encoded)
 ```
 
-输出
+**输出：**
 
-```text
-SGVsbG8gVHVpIEdhbWU=
+```lua
 ```
 
 ---
 
 ## `base64_decode`
 
-将 Base64 字符串解码为原始字符串。
+将 Base64 字符串解码为原始字符串。输入不是有效 Base64 时会报错。
 
 ### 调用
 
 ```lua
--- 单参数
-encoding.base64_decode{ s = "SGVsbG8gVHVpIEdhbWU=" }
+encoding.base64_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明          |
-| ------ | ------ | ---- | ------ | ------------- |
-| `s`    | string | 是   | -      | Base64 字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `s` | string | 要解码的 Base64 字符串。 |
 
-直接返回一个值。
+## 返回值
 
-| 类型   | 说明             |
-| ------ | ---------------- |
-| string | 解码后的原始数据 |
+返回解码后的原始字符串。
+
+| 类型 | 说明 |
+| --- | --- |
+| string | 解码结果。 |
 
 ### 示例
 
 ```lua
-debug.print { message = encoding.base64_decode{ s = "SGVsbG8gVHVpIEdhbWU=" } }
+local decoded = encoding.base64_decode("SGVsbG8gVHVpIEdhbWU=")
+debug.print(decoded)
 ```
 
-输出：
+**输出：**
 
-```text
-Hello Tui Game
+```lua
 ```
 
 ---
 
 ## `url_encode`
 
-将字符串编码为 URL 安全格式（百分号编码）。
+将字符串中的非 URL 安全字节转换为百分号编码。
 
 ### 调用
 
 ```lua
--- 单参数
-encoding.url_encode{ s = "exe=Hello Tui Game" }
+encoding.url_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明           |
-| ------ | ------ | ---- | ------ | -------------- |
-| `s`    | string | 是   | -      | 要编码的字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `s` | string | 要编码的字符串。 |
 
-直接返回一个值。
+## 返回值
 
-| 类型   | 说明           |
-| ------ | -------------- |
-| string | 百分号编码结果 |
+返回百分号编码后的字符串。
+
+| 类型 | 说明 |
+| --- | --- |
+| string | 编码结果。 |
 
 ### 示例
 
 ```lua
-debug.print { message = encoding.url_encode{ s = "exe=Hello Tui Game" } }
+local encoded = encoding.url_encode("name=Hello Tui Game")
+debug.print(encoded)
 ```
 
-输出：
+**输出：**
 
-```text
-exe%3DHello%20Tui%20Game
+```lua
 ```
-
-### 额外补充
-
-- 该 API 为严格的百分号编码
 
 ---
 
 ## `url_decode`
 
-将 URL 编码字符串解码为原始字符串。
+将 URL 百分号编码字符串还原为原始字符串。格式无效时会报错。
 
 ### 调用
 
 ```lua
--- 单参数
-encoding.url_decode{ s = "exe%3DHello%20Tui%20Game" }
+encoding.url_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明               |
-| ------ | ------ | ---- | ------ | ------------------ |
-| `s`    | string | 是   | -      | 百分号编码的字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `s` | string | 要解码的百分号编码字符串。 |
 
-直接返回一个值。
+## 返回值
 
-| 类型   | 说明               |
-| ------ | ------------------ |
-| string | 解码后的原始字符串 |
+返回解码后的字符串。
+
+| 类型 | 说明 |
+| --- | --- |
+| string | 解码结果。 |
 
 ### 示例
 
 ```lua
-debug.print { message = encoding.url_decode{ s = "exe%3DHello%20Tui%20Game" } }
+local decoded = encoding.url_decode("name%3DHello%20Tui%20Game")
+debug.print(decoded)
 ```
 
-输出：
+**输出：**
 
-```text
-exe=Hello Tui Game
+```lua
 ```
-
-### 额外补充
-
-- 该 API 为严格的百分号解码，所有不满足的格式均会拒绝解码并抛出错误
 
 ---
 
 ## `hex_encode`
 
-将字符串编码为十六进制字符串。
+将字符串的每个字节编码为两位十六进制数。
 
 ### 调用
 
 ```lua
--- 单参数
-encoding.hex_encode{ s = "Hello Tui Game" }
+encoding.hex_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明         |
-| ------ | ------ | ---- | ------ | ------------ |
-| `s`    | string | 是   | -      | 要编码的数据 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `s` | string | 要编码的字符串。 |
 
-直接返回一个值。
+## 返回值
 
-| 类型   | 说明           |
-| ------ | -------------- |
-| string | 十六进制字符串 |
+返回小写十六进制字符串。
+
+| 类型 | 说明 |
+| --- | --- |
+| string | 编码结果。 |
 
 ### 示例
 
 ```lua
-debug.print { message = encoding.hex_encode{ s = "Hello Tui Game" } }
+local encoded = encoding.hex_encode("Hello")
+debug.print(encoded)
 ```
 
-输出：
+**输出：**
 
-```text
-48656c6c6f205475692047616d65
+```lua
 ```
 
 ---
 
 ## `hex_decode`
 
-将十六进制字符串解码为原始字符串。
+将偶数长度的十六进制字符串解码为原始字节。输入含非十六进制字符或长度为奇数时会报错。
 
 ### 调用
 
 ```lua
--- 单参数
-encoding.hex_decode{ s = "48656c6c6f205475692047616d65" }
+encoding.hex_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明           |
-| ------ | ------ | ---- | ------ | -------------- |
-| `s`    | string | 是   | -      | 十六进制字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `s` | string | 要解码的十六进制字符串。 |
 
-直接返回一个值。
+## 返回值
 
-| 类型   | 说明             |
-| ------ | ---------------- |
-| string | 解码后的原始数据 |
+返回解码后的原始字符串。
+
+| 类型 | 说明 |
+| --- | --- |
+| string | 解码结果。 |
 
 ### 示例
 
 ```lua
-debug.print { message = encoding.hex_decode{ s = "48656c6c6f205475692047616d65" } }
+local decoded = encoding.hex_decode("48656c6c6f")
+debug.print(decoded)
 ```
 
-输出：
+**输出：**
 
-```text
-Hello Tui Game
+```lua
 ```
-
-### 额外补充
-
-- 参数 `s` 接受大小写十六进制字符。
-- 参数 `s` 输入长度必须为偶数。

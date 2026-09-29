@@ -78,12 +78,12 @@ Lua 模式是 Lua 语言内置的轻量级匹配语法，相较于正则表达�
 
 ```lua
 s1 = "abc123"
-r1 = string.find { text = s1, pattern = "%d+" }
-debug.print { message = r1.start .. " " .. r1.finish }
+local start1, finish1, captures1 = string.find(s1, "%d+")
+debug.print(start1 .. " " .. finish1)
 
 s2 = "abc"
-r2 = string.find { text = s2, pattern = "%d*" }
-debug.print { message = r2.start .. " " .. r2.finish }
+local start2, finish2, captures2 = string.find(s2, "%d*")
+debug.print(start2 .. " " .. finish2)
 ```
 
 输出：
@@ -107,12 +107,12 @@ debug.print { message = r2.start .. " " .. r2.finish }
 
 ```lua
 s1 = "100% complete"
-r1 = string.find { text = s1, pattern = "%%" }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.find(s1, "%%")
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "file.txt"
-r2 = string.find { text = s2, pattern = "%." }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.find(s2, "%.")
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 ```
 
 输出：
@@ -137,20 +137,20 @@ debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
 
 ```lua
 s1 = "abc123def"
-r1 = string.find { text = s1, pattern = "%d+" }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.find(s1, "%d+")
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "abc"
-r2 = string.find { text = s2, pattern = "%d*" }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.find(s2, "%d*")
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 
 s3 = "a<b>c<d>e"
-r3 = string.find { text = s3, pattern = "<.->" }
-debug.print { message = r3.start .. " " .. r3.finish .. " " .. r3.captures[1] }
+local start3, finish3, captures3 = string.find(s3, "<.->")
+debug.print(start3 .. " " .. finish3 .. " " .. captures3[1])
 
 s4 = "color"
-r4 = string.find { text = s4, pattern = "colou?r" }
-debug.print { message = r4.start .. " " .. r4.finish .. " " .. r4.captures[1] }
+local start4, finish4, captures4 = string.find(s4, "colou?r")
+debug.print(start4 .. " " .. finish4 .. " " .. captures4[1])
 ```
 
 输出：
@@ -200,12 +200,12 @@ debug.print { message = r4.start .. " " .. r4.finish .. " " .. r4.captures[1] }
 
 ```lua
 s1 = "abc123"
-r1 = string.find { text = s1, pattern = "%d+" }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.find(s1, "%d+")
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "123abc"
-r2 = string.find { text = s2, pattern = "%D+" }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.find(s2, "%D+")
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 ```
 
 输出：
@@ -231,16 +231,16 @@ debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
 
 ```lua
 s1 = "abc123"
-r1 = string.find { text = s1, pattern = "[abc]+" }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.find(s1, "[abc]+")
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "hello123"
-r2 = string.find { text = s2, pattern = "[a-z]+" }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.find(s2, "[a-z]+")
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 
 s3 = "abc123"
-r3 = string.find { text = s3, pattern = "[^a-z]+" }
-debug.print { message = r3.start .. " " .. r3.finish .. " " .. r3.captures[1] }
+local start3, finish3, captures3 = string.find(s3, "[^a-z]+")
+debug.print(start3 .. " " .. finish3 .. " " .. captures3[1])
 ```
 
 输出：
@@ -270,20 +270,20 @@ debug.print { message = r3.start .. " " .. r3.finish .. " " .. r3.captures[1] }
 
 ```lua
 s1 = "Name: Alice"
-r1 = string.find { text = s1, pattern = "Name: (%w+)" }
-debug.print { message = r1.captures[1] .. " " .. r1.captures.n }
+local start1, finish1, captures1 = string.find(s1, "Name: (%w+)")
+debug.print(captures1[1] .. " " .. captures1.n)
 
 s2 = "Alice, 30"
-r2 = string.find { text = s2, pattern = "(%w+), (%d+)" }
-debug.print { message = r2.captures[1] .. " " .. r2.captures[2] .. " " .. r2.captures.n }
+local start2, finish2, captures2 = string.find(s2, "(%w+), (%d+)")
+debug.print(captures2[1] .. " " .. captures2[2] .. " " .. captures2.n)
 
 s3 = "Today is 2024-12-25"
-r3 = string.find { text = s3, pattern = "(%d+)-(%d+)-(%d+)" }
-debug.print { message = r3.captures[1] .. " " .. r3.captures[2] .. " " .. r3.captures[3] .. " " .. r3.captures.n }
+local start3, finish3, captures3 = string.find(s3, "(%d+)-(%d+)-(%d+)")
+debug.print(captures3[1] .. " " .. captures3[2] .. " " .. captures3[3] .. " " .. captures3.n)
 
 s4 = "hello"
-r4 = string.find { text = s4, pattern = "()hello()" }
-debug.print { message = r4.captures[1] .. " " .. r4.captures[2] .. " " .. r4.captures.n }
+local start4, finish4, captures4 = string.find(s4, "()hello()")
+debug.print(captures4[1] .. " " .. captures4[2] .. " " .. captures4.n)
 ```
 
 输出：
@@ -313,12 +313,12 @@ Alice 30 2
 
 ```lua
 s1 = "hello world"
-r1 = string.find { text = s1, pattern = "^hello" }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.find(s1, "^hello")
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "hello world"
-r2 = string.find { text = s2, pattern = "world$" }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.find(s2, "world$")
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 ```
 
 输出：
@@ -342,12 +342,12 @@ debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
 
 ```lua
 s1 = "a(b(c)d)e"
-r1 = string.find { text = s1, pattern = "%b()" }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.find(s1, "%b()")
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "x[1,2,[3,4]]y"
-r2 = string.find { text = s2, pattern = "%b[]" }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.find(s2, "%b[]")
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 ```
 
 输出：
@@ -375,12 +375,12 @@ debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
 
 ```lua
 s1 = "hello world"
-r1 = string.gsub { text = s1, pattern = "%a+", repl = "[%0]" }
-debug.print { message = r1.result .. " " .. r1.count }
+local result1, count1 = string.gsub(s1, "%a+", "[%0]")
+debug.print(result1 .. " " .. count1)
 
 s2 = "2024-12-25"
-r2 = string.gsub { text = s2, pattern = "(%d+)-(%d+)-(%d+)", repl = "%1/%2/%3" }
-debug.print { message = r2.result .. " " .. r2.count }
+local result2, count2 = string.gsub(s2, "(%d+)-(%d+)-(%d+)", "%1/%2/%3")
+debug.print(result2 .. " " .. count2)
 ```
 
 ```text
@@ -410,10 +410,10 @@ debug.print { message = r2.result .. " " .. r2.count }
 
 ```lua
 str1 = [[string \d \" \[]]
-debug.print { message = str1 }
+debug.print(str1)
 
 str2 = [=[string [[]] string]=]
-debug.print { message = str2 }
+debug.print(str2)
 ```
 
 输出：
@@ -452,12 +452,12 @@ string [[]] string
 
 ```lua
 s1 = "a.b"
-r1 = string.regex_find { text = s1, pattern = [[\.]] }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.regex_find(s1, [[\.]])
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "abc"
-r2 = string.regex_find { text = s2, pattern = [[.]] }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.regex_find(s2, [[.]])
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 ```
 
 输出：
@@ -481,12 +481,12 @@ debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
 
 ```lua
 s1 = "a.b"
-r1 = string.regex_find { text = s1, pattern = [[\.]] }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.regex_find(s1, [[\.]])
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "a+b"
-r2 = string.regex_find { text = s2, pattern = [[\+]] }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.regex_find(s2, [[\+]])
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 ```
 
 输出：
@@ -521,16 +521,16 @@ debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
 
 ```lua
 s1 = "hello\nworld"
-r1 = string.regex_find { text = s1, pattern = [[\n]] }
-debug.print { message = r1.start .. " " .. r1.finish .. " " .. r1.captures[1] }
+local start1, finish1, captures1 = string.regex_find(s1, [[\n]])
+debug.print(start1 .. " " .. finish1 .. " " .. captures1[1])
 
 s2 = "ABC"
-r2 = string.regex_find { text = s2, pattern = [[\x41]] }
-debug.print { message = r2.start .. " " .. r2.finish .. " " .. r2.captures[1] }
+local start2, finish2, captures2 = string.regex_find(s2, [[\x41]])
+debug.print(start2 .. " " .. finish2 .. " " .. captures2[1])
 
 s3 = "😀"
-r3 = string.regex_find { text = s3, pattern = [[\u{1F600}]] }
-debug.print { message = r3.start .. " " .. r3.finish .. " " .. r3.captures[1] }
+local start3, finish3, captures3 = string.regex_find(s3, [[\u{1F600}]])
+debug.print(start3 .. " " .. finish3 .. " " .. captures3[1])
 ```
 
 输出：
@@ -565,16 +565,16 @@ debug.print { message = r3.start .. " " .. r3.finish .. " " .. r3.captures[1] }
 
 ```lua
 s1 = "aaab"
-r1 = string.regex_find { text = s1, pattern = [[a+]] }
-debug.print { message = r1.start .. " " .. r1.finish }
+local start1, finish1, captures1 = string.regex_find(s1, [[a+]])
+debug.print(start1 .. " " .. finish1)
 
 s2 = "aaabc"
-r2 = string.regex_find { text = s2, pattern = [[a{2,3}]] }
-debug.print { message = r2.start .. " " .. r2.finish }
+local start2, finish2, captures2 = string.regex_find(s2, [[a{2,3}]])
+debug.print(start2 .. " " .. finish2)
 
 s3 = "aaab"
-r3 = string.regex_find { text = s3, pattern = [[a*?]] }
-debug.print { message = r3.start .. " " .. r3.finish }
+local start3, finish3, captures3 = string.regex_find(s3, [[a*?]])
+debug.print(start3 .. " " .. finish3)
 ```
 
 输出：
@@ -608,16 +608,16 @@ debug.print { message = r3.start .. " " .. r3.finish }
 
 ```lua
 s1 = "abc123"
-r1 = string.regex_find { text = s1, pattern = [[\d+]] }
-debug.print { message = r1.start .. " " .. r1.finish }
+local start1, finish1, captures1 = string.regex_find(s1, [[\d+]])
+debug.print(start1 .. " " .. finish1)
 
 s2 = "a b"
-r2 = string.regex_find { text = s2, pattern = [[\s]] }
-debug.print { message = r2.start .. " " .. r2.finish }
+local start2, finish2, captures2 = string.regex_find(s2, [[\s]])
+debug.print(start2 .. " " .. finish2)
 
 s3 = "hello!"
-r3 = string.regex_find { text = s3, pattern = [[\W]] }
-debug.print { message = r3.start .. " " .. r3.finish }
+local start3, finish3, captures3 = string.regex_find(s3, [[\W]])
+debug.print(start3 .. " " .. finish3)
 ```
 
 输出：
@@ -655,20 +655,20 @@ debug.print { message = r3.start .. " " .. r3.finish }
 
 ```lua
 s1 = "abc123"
-r1 = string.regex_find { text = s1, pattern = [=[[[:digit:]]+]=] }
-debug.print { message = r1.start .. " " .. r1.finish }
+local start1, finish1, captures1 = string.regex_find(s1, [=[[[:digit:]]+]=])
+debug.print(start1 .. " " .. finish1)
 
 s2 = "123abc"
-r2 = string.regex_find { text = s2, pattern = [=[[[:alpha:]]+]=] }
-debug.print { message = r2.start .. " " .. r2.finish }
+local start2, finish2, captures2 = string.regex_find(s2, [=[[[:alpha:]]+]=])
+debug.print(start2 .. " " .. finish2)
 
 s3 = "a b"
-r3 = string.regex_find { text = s3, pattern = [=[[[:space:]]]=] }
-debug.print { message = r3.start .. " " .. r3.finish }
+local start3, finish3, captures3 = string.regex_find(s3, [=[[[:space:]]]=])
+debug.print(start3 .. " " .. finish3)
 
 s4 = "hello!"
-r4 = string.regex_find { text = s4, pattern = [=[[[:punct:]]]=] }
-debug.print { message = r4.start .. " " .. r4.finish }
+local start4, finish4, captures4 = string.regex_find(s4, [=[[[:punct:]]]=])
+debug.print(start4 .. " " .. finish4)
 ```
 
 输出：
@@ -699,24 +699,24 @@ debug.print { message = r4.start .. " " .. r4.finish }
 
 ```lua
 s1 = "defabc"
-r1 = string.regex_find { text = s1, pattern = [=[[abc]+]=] }
-debug.print { message = r1.start .. " " .. r1.finish }
+local start1, finish1, captures1 = string.regex_find(s1, [=[[abc]+]=])
+debug.print(start1 .. " " .. finish1)
 
 s3 = "abc123"
-r3 = string.regex_find { text = s3, pattern = [=[[^0-9]+]=] }
-debug.print { message = r3.start .. " " .. r3.finish }
+local start3, finish3, captures3 = string.regex_find(s3, [=[[^0-9]+]=])
+debug.print(start3 .. " " .. finish3)
 
 s4 = "abcdef"
-r4 = string.regex_find { text = s4, pattern = [=[[a-z&&[def]]+]=] }
-debug.print { message = r4.start .. " " .. r4.finish }
+local start4, finish4, captures4 = string.regex_find(s4, [=[[a-z&&[def]]+]=])
+debug.print(start4 .. " " .. finish4)
 
 s5 = "123456"
-r5 = string.regex_find { text = s5, pattern = [=[[0-9--4]+]=] }
-debug.print { message = r5.start .. " " .. r5.finish }
+local start5, finish5, captures5 = string.regex_find(s5, [=[[0-9--4]+]=])
+debug.print(start5 .. " " .. finish5)
 
 s6 = "abgh"
-r6 = string.regex_find { text = s6, pattern = [=[[a-g~~b-h]+]=] }
-debug.print { message = r6.start .. " " .. r6.finish }
+local start6, finish6, captures6 = string.regex_find(s6, [=[[a-g~~b-h]+]=])
+debug.print(start6 .. " " .. finish6)
 ```
 
 输出：
@@ -750,20 +750,20 @@ debug.print { message = r6.start .. " " .. r6.finish }
 
 ```lua
 s1 = "abc123"
-r1 = string.regex_find { text = s1, pattern = [[\p{N}+]] }
-debug.print { message = r1.start .. " " .. r1.finish }
+local start1, finish1, captures1 = string.regex_find(s1, [[\p{N}+]])
+debug.print(start1 .. " " .. finish1)
 
 s2 = "Hello"
-r2 = string.regex_find { text = s2, pattern = [[\p{Lu}]] }
-debug.print { message = r2.start .. " " .. r2.finish }
+local start2, finish2, captures2 = string.regex_find(s2, [[\p{Lu}]])
+debug.print(start2 .. " " .. finish2)
 
 s3 = "αβγ123"
-r3 = string.regex_find { text = s3, pattern = [[\p{Greek}+]] }
-debug.print { message = r3.start .. " " .. r3.finish }
+local start3, finish3, captures3 = string.regex_find(s3, [[\p{Greek}+]])
+debug.print(start3 .. " " .. finish3)
 
 s4 = "abc123!@#"
-r4 = string.regex_find { text = s4, pattern = [[\P{L}+]] }
-debug.print { message = r4.start .. " " .. r4.finish }
+local start4, finish4, captures4 = string.regex_find(s4, [[\P{L}+]])
+debug.print(start4 .. " " .. finish4)
 ```
 
 输出：
@@ -795,20 +795,20 @@ debug.print { message = r4.start .. " " .. r4.finish }
 
 ```lua
 s1 = "Name: Alice"
-r1 = string.regex_find { text = s1, pattern = [[Name: (\w+)]] }
-debug.print { message = r1.captures[1] .. " " .. r1.captures.n }
+local start1, finish1, captures1 = string.regex_find(s1, [[Name: (\w+)]])
+debug.print(captures1[1] .. " " .. captures1.n)
 
 s2 = "2024-12-25"
-r2 = string.regex_find { text = s2, pattern = [[(\d+)-(\d+)-(\d+)]] }
-debug.print { message = r2.captures[1] .. " " .. r2.captures[2] .. " " .. r2.captures[3] .. " " .. r2.captures.n }
+local start2, finish2, captures2 = string.regex_find(s2, [[(\d+)-(\d+)-(\d+)]])
+debug.print(captures2[1] .. " " .. captures2[2] .. " " .. captures2[3] .. " " .. captures2.n)
 
 s3 = "abc123"
-r3 = string.regex_find { text = s3, pattern = [[(?:abc)(\d+)]] }
-debug.print { message = r3.captures[1] .. " " .. r3.captures.n }
+local start3, finish3, captures3 = string.regex_find(s3, [[(?:abc)(\d+)]])
+debug.print(captures3[1] .. " " .. captures3.n)
 
 s4 = "Name: Alice"
-r4 = string.regex_find { text = s4, pattern = [[Name: (?P<user>\w+)]] }
-debug.print { message = r4.captures[1] .. " " .. r4.captures.n }
+local start4, finish4, captures4 = string.regex_find(s4, [[Name: (?P<user>\w+)]])
+debug.print(captures4[1] .. " " .. captures4.n)
 ```
 
 输出：
@@ -847,12 +847,12 @@ Alice 1
 
 ```lua
 s1 = "hello world"
-r1 = string.regex_find { text = s1, pattern = [[^hello]] }
-debug.print { message = r1.start .. " " .. r1.finish }
+local start1, finish1, captures1 = string.regex_find(s1, [[^hello]])
+debug.print(start1 .. " " .. finish1)
 
 s2 = "hello world"
-r2 = string.regex_find { text = s2, pattern = [[world$]] }
-debug.print { message = r2.start .. " " .. r2.finish }
+local start2, finish2, captures2 = string.regex_find(s2, [[world$]])
+debug.print(start2 .. " " .. finish2)
 ```
 
 输出：
@@ -878,12 +878,12 @@ debug.print { message = r2.start .. " " .. r2.finish }
 
 ```lua
 s1 = "Hello"
-r1 = string.regex_find { text = s1, pattern = [[(?i)hELLo]] }
-debug.print { message = r1.start .. " " .. r1.finish }
+local start1, finish1, captures1 = string.regex_find(s1, [[(?i)hELLo]])
+debug.print(start1 .. " " .. finish1)
 
 s2 = "Hello"
-t2 = string.regex_test { text = s2, pattern = [[(?-i)hELLo]] }
-debug.print { message = tostring(t2) }
+t2 = string.regex_test(s2, [[(?-i)hELLo]])
+debug.print(tostring(t2))
 ```
 
 输出：
@@ -913,12 +913,12 @@ false
 
 ```lua
 s1 = "hello world"
-g1 = string.regex_gsub { text = s1, pattern = [[\w+]], repl = "[$0]" }
-debug.print { message = g1.result .. " " .. g1.count }
+local result1, count1 = string.regex_gsub(s1, [[\w+]], "[$0]")
+debug.print(result1 .. " " .. count1)
 
 s2 = "2024-12-25"
-g2 = string.regex_gsub { text = s2, pattern = [[(\d+)-(\d+)-(\d+)]], repl = "$1/$2/$3" }
-debug.print { message = g2.result .. " " .. g2.count }
+local result2, count2 = string.regex_gsub(s2, [[(\d+)-(\d+)-(\d+)]], "$1/$2/$3")
+debug.print(result2 .. " " .. count2)
 ```
 
 ```text

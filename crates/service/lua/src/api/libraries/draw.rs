@@ -5,9 +5,9 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let text_state = state.clone();
   source.raw_set(
     "text",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.text";
-      let table = draw_text_parameters(method, values)?;
+      let table = draw_text_parameters(lua, method, values)?;
       let target = parse_draw_target(&table, method, &text_state)?;
       let params = {
         let state = text_state.borrow();
@@ -30,21 +30,14 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let fill_state = state.clone();
   source.raw_set(
     "fill_rect",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.fill_rect";
-      let table = args::named(
+      let table = positional_table(
+        lua,
         method,
         values,
-        &[
-          "x",
-          "y",
-          "width",
-          "height",
-          "char",
-          "fg",
-          "bg",
-          "slice_layer",
-        ],
+        &["x", "y", "width", "height"],
+        &["char", "fg", "bg", "slice_layer"],
       )?;
       let target = parse_draw_target(&table, method, &fill_state)?;
       let fill_char = optional_single_char(&table, method, "char")?;
@@ -64,21 +57,14 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let stroke_state = state.clone();
   source.raw_set(
     "stroke_rect",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.stroke_rect";
-      let table = args::named(
+      let table = positional_table(
+        lua,
         method,
         values,
-        &[
-          "x",
-          "y",
-          "width",
-          "height",
-          "fg",
-          "bg",
-          "border_char",
-          "slice_layer",
-        ],
+        &["x", "y", "width", "height"],
+        &["fg", "bg", "border_char", "slice_layer"],
       )?;
       let target = parse_draw_target(&table, method, &stroke_state)?;
       let command = LuaDrawCommand::StrokeRect {
@@ -97,12 +83,14 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let erase_state = state.clone();
   source.raw_set(
     "erase_rect",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.erase_rect";
-      let table = args::named(
+      let table = positional_table(
+        lua,
         method,
         values,
-        &["x", "y", "width", "height", "slice_layer"],
+        &["x", "y", "width", "height"],
+        &["slice_layer"],
       )?;
       let target = parse_draw_target(&table, method, &erase_state)?;
       let command = LuaDrawCommand::EraseRect {
@@ -119,7 +107,7 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   source.raw_set(
     "render",
     lua.create_function(move |_, values: MultiValue| {
-      args::empty_named("draw.render", values)?;
+      args::no_args("draw.render", values)?;
       let mut state = state2.borrow_mut();
       if state.phase == LuaCallPhase::Render {
         return Err(args::message(

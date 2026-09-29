@@ -187,9 +187,8 @@ pub(super) fn json_to_lua(
 }
 
 pub(super) fn text_argument(values: mlua::MultiValue, method: &str) -> mlua::Result<String> {
-  let table = args::named(method, values, &["s"])?;
-  let value = args::required(&table, method, "s")?;
-  args::string(value, method, "s")
+  let value = args::one(method, "text", values)?;
+  args::string(value, method, "text")
 }
 
 pub(super) fn bounded_text(method: &str, value: String) -> mlua::Result<String> {

@@ -46,7 +46,7 @@ mod utf8;
 
 use measurement::{
   draw_target_size, draw_text_parameters, parse_color, parse_draw_target, parse_draw_text_params,
-  positive_u16,
+  positional_table, positive_u16,
 };
 use string::rich_text_params;
 

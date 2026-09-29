@@ -174,11 +174,11 @@ fn value_argument(
   name: &str,
   allow_top_level_nil: bool,
 ) -> mlua::Result<Value> {
-  if allow_top_level_nil && values.len() == 1 && matches!(values.front(), Some(Value::Nil)) {
-    return Ok(Value::Nil);
+  let value = args::one(method, name, values)?;
+  if matches!(value, Value::Nil) && !allow_top_level_nil {
+    return Err(args::invalid(method, name, "non-nil value", &value));
   }
-  let table = args::named(method, values, &[name])?;
-  args::required(&table, method, name)
+  Ok(value)
 }
 
 fn contains_null(value: &serde_json::Value) -> bool {

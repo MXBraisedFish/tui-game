@@ -199,6 +199,7 @@ end
 
 function Player:say()
   print("I am " .. self.name)
+end
 
 player1 = Player.new("Alice", 100)
 player2 = Player.new("Peter", 30)

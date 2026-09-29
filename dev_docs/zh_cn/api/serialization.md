@@ -1,20 +1,20 @@
 # serialization 库
 
-所有方法使用单个命名参数表。JSON/YAML 的 null 使用只读 `serialization.NULL` 哨兵保留；CSV、INI、TOML、XML 不接受该哨兵。
-
-## 基本库说明
-
-`serialization` 提供多格式序列化与反序列化。
-
-JSON/YAML 共用转换层限制：最多 32 层、16,384 个值节点、编码输出最多 1 MiB；拒绝非有限数字、非 UTF-8 字符串/键、循环表、稀疏数组、非正整数数组键，以及同一表混用数组索引和字符串键。`json_decode` 与 `yaml_decode` 将格式中的 null 解码为只读 userdata `serialization.NULL`；编码时该哨兵还原为 JSON/YAML null，可安全放在对象字段和数组位置。顶层 `json_encode(nil)` 仍输出 `null`；其它编码 API 使用命名参数表。CSV、INI、TOML、XML 无法按已定义契约保留 null，遇到哨兵时报错；空字符串仍按各自格式正常处理。Lua 空表没有数组/对象标记，通过 JSON/YAML 转换时表示为空对象 `{}`。具体调用错误会指出被拒绝的值或限制。
+`serialization` 提供多种格式的数据编码和解码。
 
 ---
 
-## 目录
+# 目录
 
-### 方法
+## 常量
 
-| 方法名            | 说明                           | 索引                                |
+| 常量 | 说明 | 定位 |
+| --- | --- | --- |
+| `NULL` | 表示 JSON/YAML 中的 null 值 | [NULL](#NULL) |
+
+## 方法
+
+| 方法            | 说明                           | 定位                                |
 | ----------------- | ------------------------------ | ----------------------------------- |
 | `json_encode`     | 将 Lua 值编码为 JSON 字符串    | [json_encode](#json_encode)         |
 | `json_decode`     | 将 JSON 字符串解码为 Lua 值    | [json_decode](#json_decode)         |
@@ -34,7 +34,48 @@ JSON/YAML 共用转换层限制：最多 32 层、16,384 个值节点、编码�
 
 ---
 
-## 方法
+# 常量
+
+## `NULL`
+
+用来表示 JSON/YAML 中的 `null`，并与 Lua 的 `nil` 区分开。
+
+### 调用
+
+```lua
+serialization.NULL
+```
+
+### 可用于
+
+- JSON/YAML 编码参数中的对象字段或数组元素
+
+### 示例
+
+```lua
+local encoded = serialization.json_encode({value = serialization.NULL})
+local decoded = serialization.json_decode(encoded)
+local encoded_again = serialization.json_encode(decoded)
+```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```json
+null
+```
+
+### 额外说明
+
+- JSON/YAML 编码与解码都保留此值；CSV、INI、TOML、XML 遇到此值会报错。
+
+---
+
+# 方法
 
 ## `json_encode`
 
@@ -43,17 +84,17 @@ JSON/YAML 共用转换层限制：最多 32 层、16,384 个值节点、编码�
 ### 调用
 
 ```lua
--- 命名参数表；顶层 nil 可直接传入以编码 JSON null
-serialization.json_encode{ value = {} }
+serialization.json_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型 | 必填 | 默认值 | 说明            |
-| ------- | ---- | ---- | ------ | --------------- |
-| `value` | any  | 是   | -      | 要编码的 Lua 值 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `value` | any | 要编码的 Lua 值 |
+## 返回值
 
 直接返回一个值。
 
@@ -65,20 +106,21 @@ serialization.json_encode{ value = {} }
 
 ```lua
 local data = { name = "TUI", version = 1, features = { "draw", "event" } }
-local json = serialization.json_encode{ value = data }
-debug.print { message = json }
+local json = serialization.json_encode(data)
+debug.print(json)
 ```
 
-输出：
+**输出：**
 
-```json
-{"features":["draw","event"],"name":"TUI","version":1}
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `value` 必须可序列化；使用 `serialization.NULL` 表示对象字段或数组位置中的 JSON null。
-- 只有顶层 Lua `nil` 使用特例调用 `serialization.json_encode(nil)`；普通值统一通过 `{ value = ... }` 传递。
+- `value` 直接作为位置参数传入；`serialization.NULL` 用于保留嵌套的 JSON null。
+- JSON/YAML 编码和解码共用以下数据限制：嵌套最多 32 层、最多 16,384 个值节点，编码结果最多 1 MiB；拒绝非有限数字、无效 UTF-8、循环表、稀疏数组、非正整数数组键，以及同一表混用数组索引和字符串键。
+- 空 Lua 表编码为 JSON/YAML 对象 `{}`；顶层 `json_encode(nil)` 编码为 `null`。发生错误时会说明被拒绝的值或限制。
 
 ---
 
@@ -89,17 +131,17 @@ debug.print { message = json }
 ### 调用
 
 ```lua
--- 单参数
-serialization.json_decode{ s = "{}" }
+serialization.json_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `s`    | string | 是   | -      | JSON 字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | JSON 字符串 |
+## 返回值
 
 直接返回一个值。
 
@@ -111,17 +153,16 @@ serialization.json_decode{ s = "{}" }
 
 ```lua
 local json = '{"name":"TUI","version":1}'
-local data = serialization.json_decode{ s = json }
-debug.print { message = data.name .. ", v" .. tostring(data.version) }
+local data = serialization.json_decode(json)
+debug.print(data.name .. ", v" .. tostring(data.version))
 ```
 
-输出：
+**输出：**
 
-```text
-TUI, v1
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `s` 必须可反序列化；JSON null 解码为 `serialization.NULL`，包含该哨兵的值可以原样重新编码。
 
@@ -134,17 +175,17 @@ TUI, v1
 ### 调用
 
 ```lua
--- 单参数
-serialization.csv_encode{ rows = {} }
+serialization.csv_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型  | 必填 | 默认值 | 说明     |
-| ------ | ----- | ---- | ------ | -------- |
-| `rows` | table | 是   | -      | 二维数组表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `rows` | table | 二维数组表 |
+## 返回值
 
 直接返回一个值。
 
@@ -160,19 +201,16 @@ local data = {
     { "Alice", 95 },
     { "Bob", 87 }
 }
-local csv = serialization.csv_encode{ rows = data }
-debug.print { message = csv }
+local csv = serialization.csv_encode(data)
+debug.print(csv)
 ```
 
-输出：
+**输出：**
 
-```csv
-Name,Score
-Alice,95
-Bob,87
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `rows` 必须可序列化；CSV 不支持 `serialization.NULL`，空字段解码为普通空字符串。
 
@@ -185,17 +223,17 @@ Bob,87
 ### 调用
 
 ```lua
--- 单参数
-serialization.csv_decode{ s = "" }
+serialization.csv_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `s`    | string | 是   | -      | CSV 字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | CSV 字符串 |
+## 返回值
 
 返回一个数组表。
 
@@ -207,17 +245,16 @@ serialization.csv_decode{ s = "" }
 
 ```lua
 local csv = "Name,Score\nAlice,95\nBob,87"
-local data = serialization.csv_decode{ s = csv }
-debug.print { message = data[2][1] .. ": " .. tostring(data[2][2]) }
+local data = serialization.csv_decode(csv)
+debug.print(data[2][1] .. ": " .. tostring(data[2][2]))
 ```
 
-输出：
+**输出：**
 
-```text
-Alice: 95
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `s` 必须可反序列化。
 
@@ -230,17 +267,17 @@ Alice: 95
 ### 调用
 
 ```lua
--- 单参数
-serialization.yaml_encode{ value = {} }
+serialization.yaml_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型             | 必填 | 默认值 | 说明            |
-| ------- | ---------------- | ---- | ------ | --------------- |
-| `value` | table / 基本类型 | 是   | -      | 要编码的 Lua 值 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `value` | table / 基本类型 | 要编码的 Lua 值 |
+## 返回值
 
 直接返回一个值。
 
@@ -252,18 +289,16 @@ serialization.yaml_encode{ value = {} }
 
 ```lua
 local data = { name = "TUI", version = 1 }
-local yaml = serialization.yaml_encode{ value = data }
-debug.print { message = yaml }
+local yaml = serialization.yaml_encode(data)
+debug.print(yaml)
 ```
 
-输出：
+**输出：**
 
-```text
-name: TUI
-version: 1
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `value` 必须可序列化；`serialization.NULL` 编码为 YAML null。
 
@@ -276,17 +311,17 @@ version: 1
 ### 调用
 
 ```lua
--- 单参数
-serialization.yaml_decode{ s = "{}" }
+serialization.yaml_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `s`    | string | 是   | -      | YAML 字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | YAML 字符串 |
+## 返回值
 
 直接返回一个值。
 
@@ -298,17 +333,16 @@ serialization.yaml_decode{ s = "{}" }
 
 ```lua
 local yaml = "name: TUI\nversion: 1"
-local data = serialization.yaml_decode{ s = yaml }
-debug.print { message = data.name }
+local data = serialization.yaml_decode(yaml)
+debug.print(data.name)
 ```
 
-输出：
+**输出：**
 
-```text
-TUI
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `s` 必须可反序列化；YAML null 解码为 `serialization.NULL`。
 
@@ -321,17 +355,17 @@ TUI
 ### 调用
 
 ```lua
--- 单参数
-serialization.toml_encode{ value = {} }
+serialization.toml_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型 | 必填 | 默认值 | 说明            |
-| ------- | ---- | ---- | ------ | --------------- |
-| `value` | any  | 是   | -      | 要编码的 Lua 值 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `value` | any | 要编码的 Lua 值 |
+## 返回值
 
 直接返回一个值。
 
@@ -343,18 +377,16 @@ serialization.toml_encode{ value = {} }
 
 ```lua
 local data = { name = "TUI", version = 1 }
-local toml = serialization.toml_encode{ value = data }
-debug.print { message = toml }
+local toml = serialization.toml_encode(data)
+debug.print(toml)
 ```
 
-输出：
+**输出：**
 
-```text
-name = "TUI"
-version = 1
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `value` 必须可序列化；TOML 不支持 null，包含 `serialization.NULL` 时返回错误。
 
@@ -367,17 +399,17 @@ version = 1
 ### 调用
 
 ```lua
--- 单参数
-serialization.toml_decode{ s = "" }
+serialization.toml_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `s`    | string | 是   | -      | TOML 字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | TOML 字符串 |
+## 返回值
 
 直接返回一个值。
 
@@ -389,17 +421,16 @@ serialization.toml_decode{ s = "" }
 
 ```lua
 local toml = 'name = "TUI"\nversion = 1'
-local data = serialization.toml_decode{ s = toml }
-debug.print { message = data.name }
+local data = serialization.toml_decode(toml)
+debug.print(data.name)
 ```
 
-输出：
+**输出：**
 
-```text
-TUI
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `s` 必须可反序列化。
 
@@ -412,17 +443,17 @@ TUI
 ### 调用
 
 ```lua
--- 单参数
-serialization.ini_encode{ value = t }
+serialization.ini_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型  | 必填 | 默认值 | 说明            |
-| ------ | ----- | ---- | ------ | --------------- |
-| `value` | table | 是   | -      | 要编码的 Lua 表 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `value` | table | 要编码的 Lua 表 |
+## 返回值
 
 直接返回一个值。
 
@@ -437,22 +468,16 @@ local data = {
   server = { host = "127.0.0.1", port = 8080 },
   logging = { level = "debug" }
 }
-local ini = serialization.ini_encode{ value = data }
-debug.print { message = ini }
+local ini = serialization.ini_encode(data)
+debug.print(ini)
 ```
 
-输出：
+**输出：**
 
-```text
-[server]
-host = 127.0.0.1
-port = 8080
-
-[logging]
-level = debug
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `value` 必须可序列化；INI 不支持 `serialization.NULL`。
 
@@ -465,17 +490,17 @@ level = debug
 ### 调用
 
 ```lua
--- 单参数
-serialization.ini_decode{ s = "" }
+serialization.ini_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `s`    | string | 是   | -      | INI 字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | INI 字符串 |
+## 返回值
 
 返回一个对象表。
 
@@ -487,17 +512,16 @@ serialization.ini_decode{ s = "" }
 
 ```lua
 local ini = "[server]\nhost = 127.0.0.1\nport = 8080"
-local data = serialization.ini_decode{ s = ini }
-debug.print { message = data.server.host }
+local data = serialization.ini_decode(ini)
+debug.print(data.server.host)
 ```
 
-输出：
+**输出：**
 
-```text
-127.0.0.1
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `s` 必须可反序列化。
 
@@ -510,17 +534,17 @@ debug.print { message = data.server.host }
 ### 调用
 
 ```lua
--- 单参数
-serialization.xml_encode{ value = {} }
+serialization.xml_encode
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型  | 必填 | 默认值 | 说明            |
-| ------- | ----- | ---- | ------ | --------------- |
-| `value` | table | 是   | -      | 要编码的 Lua 值 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `value` | table | 要编码的 Lua 值 |
+## 返回值
 
 直接返回一个值。
 
@@ -537,17 +561,16 @@ local data = {
     child = { "Hello", _attr = { id = 1 } }
   }
 }
-local xml = serialization.xml_encode{ value = data }
-debug.print { message = xml }
+local xml = serialization.xml_encode(data)
+debug.print(xml)
 ```
 
-输出：
+**输出：**
 
-```text
-<root version="1.0"><child id="1">Hello</child></root>
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `value` 必须可序列化；XML 不支持 `serialization.NULL`。
 
@@ -560,17 +583,17 @@ debug.print { message = xml }
 ### 调用
 
 ```lua
--- 单参数
-serialization.xml_decode{ s = "<root/>" }
+serialization.xml_decode
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `s`    | string | 是   | -      | XML 字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | XML 字符串 |
+## 返回值
 
 返回一个对象表。
 
@@ -582,17 +605,16 @@ serialization.xml_decode{ s = "<root/>" }
 
 ```lua
 local xml = '<root version="1.0"><child id="1">Hello</child></root>'
-local data = serialization.xml_decode{ s = xml }
-debug.print { message = data.root.child._text }
+local data = serialization.xml_decode(xml)
+debug.print(data.root.child._text)
 ```
 
-输出：
+**输出：**
 
-```text
-Hello
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `s` 必须可反序列化。
 
@@ -605,18 +627,23 @@ Hello
 ### 调用
 
 ```lua
--- 表参数
-serialization.binary_pack{}
+serialization.binary_pack
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型   | 必填 | 默认值 | 说明       |
-| -------- | ------ | ---- | ------ | ---------- |
-| `fmt`    | string | 是   | -      | 打包格式串 |
-| `values` | table  | 是   | -      | 数据数组表   |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `fmt` | string | 打包格式串 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `...` | any... | 传给函数的参数，可包含表和 nil。 |
+## 返回值
 
 直接返回一个值。
 
@@ -627,17 +654,13 @@ serialization.binary_pack{}
 ### 示例
 
 ```lua
-local bytes = serialization.binary_pack {
-  fmt = "<I4 I4",
-  values = { 100, 200 }
-}
-debug.print { message = "packed " .. tostring(#bytes) .. " bytes" }
+local bytes = serialization.binary_pack("<I4 I4", table.unpack({ 100, 200 }))
+debug.print("packed " .. tostring(#bytes) .. " bytes")
 ```
 
-输出：
+**输出：**
 
-```text
-packed 8 bytes
+```lua
 ```
 
 ---
@@ -649,45 +672,43 @@ packed 8 bytes
 ### 调用
 
 ```lua
--- 表参数
-serialization.binary_unpack{}
+serialization.binary_unpack
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值 | 说明                         |
-| ------ | ------- | ---- | ------ | ---------------------------- |
-| `fmt`  | string  | 是   | -      | 解包格式串                   |
-| `data` | binary  | 是   | -      | 二进制数据，可包含任意字节   |
-| `pos`  | integer | 否   | `1`    | 基起始字节位置             |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `fmt` | string | 解包格式串 |
+| `data` | binary | 二进制数据，可包含任意字节 |
 
-返回一个对象表。
+### 选填参数
 
-| 字段       | 类型    | 说明                         |
-| ---------- | ------- | ---------------------------- |
-| `values`   | table   | 解出的数据表               |
-| `next_pos` | integer | 下一次解包的一基起始字节位置 |
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `pos` | integer | 默认：`1`；基起始字节位置 |
+## 返回值
+
+返回两个值：解出的数据数组表和下一次解包的一基字节位置。
+
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `values` | table | 按格式顺序解出的数据数组表。 |
+| `next_pos` | integer | 下一次解包的一基起始字节位置。 |
 
 ### 示例
 
 ```lua
-local bytes = serialization.binary_pack {
-  fmt = "<I4 I4",
-  values = { 100, 200 }
-}
-local result = serialization.binary_unpack {
-  fmt = "<I4 I4",
-  data = bytes
-}
-debug.print { message = tostring(result.values[1]) .. ", " .. tostring(result.values[2]) }
+local bytes = serialization.binary_pack("<I4 I4", table.unpack({ 100, 200 }))
+local values, next_pos = serialization.binary_unpack("<I4 I4", bytes)
+debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. next_pos)
 ```
 
-输出：
+**输出：**
 
-```text
-100, 200
+```lua
 ```
 
 ---
@@ -699,17 +720,17 @@ debug.print { message = tostring(result.values[1]) .. ", " .. tostring(result.va
 ### 调用
 
 ```lua
--- 单参数
-serialization.binary_packsize{ fmt = "<I4 I4" }
+serialization.binary_packsize
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `fmt`  | string | 是   | -      | 打包格式串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `fmt` | string | 打包格式串 |
+## 返回值
 
 直接返回一个值。
 
@@ -720,12 +741,11 @@ serialization.binary_packsize{ fmt = "<I4 I4" }
 ### 示例
 
 ```lua
-local size = serialization.binary_packsize{ fmt = "<I4 I4" }
-debug.print { message = tostring(size) }
+local size = serialization.binary_packsize("<I4 I4")
+debug.print(tostring(size))
 ```
 
-输出：
+**输出：**
 
-```text
-8
+```lua
 ```

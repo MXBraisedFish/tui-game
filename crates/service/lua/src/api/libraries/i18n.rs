@@ -7,9 +7,16 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let create_state = state.clone();
   source.raw_set(
     "create",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "i18n.create";
-      let table = args::named(method, values, &["language_code", "callback_language_code"])?;
+      let parameters = args::positional(
+        lua,
+        method,
+        values,
+        &[],
+        &["language_code", "callback_language_code"],
+      )?;
+      let table = parameters.options();
       let system_language = create_state.borrow().context.language_code.clone();
       let language_code = args::optional_string(
         &table,
@@ -54,15 +61,15 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let value_state = state.clone();
   source.raw_set(
     "get_value",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "i18n.get_value";
-      let table = args::named(method, values, &["namespace", "key"])?;
+      let parameters = args::positional(lua, method, values, &["namespace", "key"], &[])?;
       let namespace = args::string(
-        args::required(&table, method, "namespace")?,
+        parameters.required(0, method, "namespace")?,
         method,
         "namespace",
       )?;
-      let key = args::string(args::required(&table, method, "key")?, method, "key")?;
+      let key = args::string(parameters.required(1, method, "key")?, method, "key")?;
       validate_lookup_name(method, "namespace", &namespace)?;
       validate_lookup_name(method, "key", &key)?;
       let api = value_state.borrow();
@@ -92,7 +99,7 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   source.raw_set(
     "get_language_code",
     lua.create_function(move |_, values: MultiValue| {
-      args::empty_named("i18n.get_language_code", values)?;
+      args::no_args("i18n.get_language_code", values)?;
       Ok(language_state.borrow().context.language_code.clone())
     })?,
   )?;
@@ -100,9 +107,16 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let reload_state = state;
   source.raw_set(
     "reload",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "i18n.reload";
-      let table = args::named(method, values, &["language_code", "callback_language_code"])?;
+      let parameters = args::positional(
+        lua,
+        method,
+        values,
+        &[],
+        &["language_code", "callback_language_code"],
+      )?;
+      let table = parameters.options();
       let system_language = reload_state.borrow().context.language_code.clone();
       let language_code = args::optional_string(
         &table,

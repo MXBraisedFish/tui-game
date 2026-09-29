@@ -1,15 +1,14 @@
 # slice 库
 
-## 基本库说明
-
-`slice` 提供图层切片对象管理。
-所有方法使用单个命名参数表；对象操作通过 `id` 字段指定切片，无参数方法传入空表 `{}`。
+`slice` 用于创建和管理图层切片对象。
 
 ---
 
-## 目录
+# 目录
 
-| 方法名           | 说明                     | 索引                              |
+## 方法
+
+| 方法           | 说明                     | 定位                              |
 | ---------------- | ------------------------ | --------------------------------- |
 | `create`         | 创建一个图层切片对象     | [create](#create)                 |
 | `delete`         | 删除指定图层切片         | [delete](#delete)                 |
@@ -33,6 +32,8 @@
 
 ---
 
+# 方法
+
 ## `create`
 
 创建一个图层切片对象。
@@ -40,20 +41,25 @@
 ### 调用
 
 ```lua
--- 表参数
-slice.create{}
+slice.create
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型                 | 必填 | 默认值       | 说明         |
-| -------- | -------------------- | ---- | ------------ | ------------ |
-| `width`  | integer              | 是   | -            | 图层切片宽度 |
-| `height` | integer              | 是   | -            | 图层切片高度 |
-| `bg`     | string / const-color | 否   | `color.NONE` | 图层切片背景 |
-| `layer`  | integer              | 否   | 自动向上递增 | 图层层级     |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `width` | integer | 图层切片宽度 |
+| `height` | integer | 图层切片高度 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `bg` | string / const-color | 默认：`color.NONE`；图层切片背景 |
+| `layer` | integer | 默认：自动向上递增；图层层级 |
+## 返回值
 
 直接返回一个值。
 
@@ -65,30 +71,21 @@ slice.create{}
 
 ```lua
 function Init(ctx)
-  s = slice.create { width = 20, height = 10, bg = color.YELLOW }
-  debug.print { message = table.pretty{ table = slice.get_info{ id = s } } }
+  s = slice.create(20, 10, {bg = color.YELLOW})
+  debug.print(table.pretty(slice.get_info(s)))
 end
 
 function Render()
-  slice.draw { id = s, x = 5, y = 2 }
+  slice.draw(s, 5, 2)
 end
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  id = "slice_001",
-  bg = "yellow",
-  height = 10,
-  width = 20,
-  layer = 1
-}
 ```
 
-![slice.create示例](../image/slice_create_example.png)
-
-### 额外补充
+### 额外说明
 
 - 图层层级之间不允许空洞图层，参数 `layer` 超过最大层级时自动修正为置顶。
 - 插入层级会自动将后面的图层切片层级向上递增。
@@ -104,17 +101,17 @@ end
 ### 调用
 
 ```lua
--- 单参数
-slice.delete{ id = "slice_001" }
+slice.delete
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明            |
-| ------ | ------ | ---- | ------ | --------------- |
-| `id`   | string | 是   | -      | 图层切片对象 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片对象 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -125,22 +122,17 @@ slice.delete{ id = "slice_001" }
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
-debug.print { message = s }
+local s = slice.create(20, 10, {bg = color.YELLOW})
+debug.print(s)
 
-debug.print { message = slice.delete{ id = s } }
+debug.print(slice.delete(s))
 
-debug.print { message = table.pretty{ table = slice.list{} } }
+debug.print(table.pretty(slice.list()))
 ```
 
-输出：
+**输出：**
 
 ```lua
-slice_001
-true
-{
-  n = 0
-}
 ```
 
 ---
@@ -152,15 +144,10 @@ true
 ### 调用
 
 ```lua
--- 单参数
-slice.clear{}
+slice.clear
 ```
 
-### 参数
-
-无。
-
-### 返回
+## 返回值
 
 直接返回一个值。
 
@@ -171,23 +158,19 @@ slice.clear{}
 ### 示例
 
 ```lua
-slice.create { width = 20, height = 10, bg = color.YELLOW }
-slice.create { width = 30, height = 8, bg = color.RED }
-slice.create { width = 40, height = 6, bg = color.GREEN }
-slice.create { width = 50, height = 4, bg = color.BLUE }
+slice.create(20, 10, {bg = color.YELLOW})
+slice.create(30, 8, {bg = color.RED})
+slice.create(40, 6, {bg = color.GREEN})
+slice.create(50, 4, {bg = color.BLUE})
 
-debug.print { message = slice.clear{} }
+debug.print(slice.clear())
 
-debug.print { message = table.pretty{ table = slice.list{} } }
+debug.print(table.pretty(slice.list()))
 ```
 
-输出：
+**输出：**
 
 ```lua
-true
-{
-  n = 0
-}
 ```
 
 ---
@@ -199,15 +182,10 @@ true
 ### 调用
 
 ```lua
--- 单参数
-slice.list{}
+slice.list
 ```
 
-### 参数
-
-无。
-
-### 返回
+## 返回值
 
 返回一个混合表。
 
@@ -218,50 +196,32 @@ slice.list{}
 ### 示例
 
 ```lua
-local s1 = slice.create { width = 20, height = 10, bg = color.YELLOW }
-local s2 = slice.create { width = 30, height = 8, bg = color.RED }
+local s1 = slice.create(20, 10, {bg = color.YELLOW})
+local s2 = slice.create(30, 8, {bg = color.RED})
 
-debug.print { message = table.pretty{ table = slice.list{} } }
+debug.print(table.pretty(slice.list()))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  {
-    id = "slice_001",
-    width = 20,
-    height = 10,
-    layer = 1,
-    bg = "yellow"
-  },
-  {
-    id = "slice_002",
-    width = 30,
-    height = 8,
-    layer = 2,
-    bg = "red"
-  },
-  n = 2
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - 返回值混合表结构如下：
 
 ```lua
-{
+local layers = {
   {
-    id = ...,     -- string
-    width = ...,  -- integer
-    height = ..., -- integer
-    layer = ...,  -- integer
-    bg = ... ,    -- string
+    id = "background", -- string
+    width = 80, -- integer
+    height = 24, -- integer
+    layer = 1, -- integer
+    bg = "#000000", -- string
   },
-  ...
-  n = x,      -- integer
-} -- 共有 x+1 个元素，所有返回值连续排序，最后 n 为返回值个数
+  n = 1, -- integer; the number of layers
+}
 ```
 
 - 返回值数组表按照图层切片层级依次排序。
@@ -276,15 +236,10 @@ debug.print { message = table.pretty{ table = slice.list{} } }
 ### 调用
 
 ```lua
--- 单参数
-slice.count{}
+slice.count
 ```
 
-### 参数
-
-无。
-
-### 返回
+## 返回值
 
 直接返回一个值。
 
@@ -295,16 +250,15 @@ slice.count{}
 ### 示例
 
 ```lua
-slice.create { width = 20, height = 10, bg = color.YELLOW }
-slice.create { width = 30, height = 8, bg = color.RED }
+slice.create(20, 10, {bg = color.YELLOW})
+slice.create(30, 8, {bg = color.RED})
 
-debug.print { message = slice.count{} }
+debug.print(slice.count())
 ```
 
-输出：
+**输出：**
 
-```text
-2
+```lua
 ```
 
 ---
@@ -316,19 +270,19 @@ debug.print { message = slice.count{} }
 ### 调用
 
 ```lua
--- 表参数
-slice.draw{}
+slice.draw
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型    | 必填 | 默认值 | 说明                        |
-| ------ | ------- | ---- | ------ | --------------------------- |
-| `id`   | string  | 是   | -      | 图层切片 ID                 |
-| `x`    | integer | 是   | -      | 图层切片左上角位置的 x 坐标 |
-| `y`    | integer | 是   | -      | 图层切片左上角位置的 y 坐标 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+| `x` | integer | 图层切片左上角位置的 x 坐标 |
+| `y` | integer | 图层切片左上角位置的 y 坐标 |
+## 返回值
 
 无。
 
@@ -336,19 +290,20 @@ slice.draw{}
 
 ```lua
 function Init(ctx)
-  s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+  s = slice.create(20, 10, {bg = color.YELLOW})
 end
 
 function Render()
-  slice.draw { id = s, x = 5, y = 2 }
+  slice.draw(s, 5, 2)
 end
 ```
 
-输出：
+**输出：**
 
-![slice.create示例](../image/slice_create_example.png)
+```lua
+```
 
-### 额外补充
+### 额外说明
 
 - `slice.draw` 的提交仅对当前帧有效。需要持续显示的图层切片应当每帧调用一次。
 
@@ -361,21 +316,26 @@ end
 ### 调用
 
 ```lua
--- 表参数
-slice.set{}
+slice.set
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型                 | 必填 | 默认值   | 说明         |
-| -------- | -------------------- | ---- | -------- | ------------ |
-| `id`     | string               | 是   | -        | 图层切片 ID  |
-| `width`  | integer              | 否   | 保持原值 | 图层切片宽度 |
-| `height` | integer              | 否   | 保持原值 | 图层切片高度 |
-| `bg`     | string / const-color | 否   | 保持原值 | 图层切片背景 |
-| `layer`  | integer              | 否   | 保持原值 | 图层层级     |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `width` | integer | 默认：保持原值；图层切片宽度 |
+| `height` | integer | 默认：保持原值；图层切片高度 |
+| `bg` | string / const-color | 默认：保持原值；图层切片背景 |
+| `layer` | integer | 默认：保持原值；图层层级 |
+## 返回值
 
 直接返回一个值。
 
@@ -386,28 +346,20 @@ slice.set{}
 ### 示例
 
 ```lua
-local s1 = slice.create { width = 20, height = 10, bg = color.YELLOW }
-local s2 = slice.create { width = 30, height = 8, bg = color.RED }
+local s1 = slice.create(20, 10, {bg = color.YELLOW})
+local s2 = slice.create(30, 8, {bg = color.RED})
 
-debug.print { message = slice.set { id = s1, width = 25, height = 5, bg = color.BLUE } }
+debug.print(slice.set(s1, {width = 25, height = 5, bg = color.BLUE}))
 
-debug.print { message = table.pretty{ table = slice.get_info{ id = s1 } } }
+debug.print(table.pretty(slice.get_info(s1)))
 ```
 
-输出：
+**输出：**
 
 ```lua
-true
-{
-  id = "slice_001",
-  bg = "blue",
-  height = 5,
-  width = 25,
-  layer = 1
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -420,19 +372,19 @@ true
 ### 调用
 
 ```lua
--- 表参数
-slice.set_size{}
+slice.set_size
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型    | 必填 | 默认值   | 说明         |
-| -------- | ------- | ---- | -------- | ------------ |
-| `id`     | string  | 是   | -        | 图层切片 ID  |
-| `width`  | integer | 否   | 保持原值 | 图层切片宽度 |
-| `height` | integer | 否   | 保持原值 | 图层切片高度 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+| `width` | integer | 默认：保持原值；图层切片宽度 |
+| `height` | integer | 默认：保持原值；图层切片高度 |
+## 返回值
 
 直接返回一个值。
 
@@ -443,27 +395,19 @@ slice.set_size{}
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create(20, 10, {bg = color.YELLOW})
 
-debug.print { message = slice.set_size { id = s, width = 30, height = 6 } }
+debug.print(slice.set_size(s, 30, 6))
 
-debug.print { message = table.pretty{ table = slice.get_info{ id = s } } }
+debug.print(table.pretty(slice.get_info(s)))
 ```
 
-输出：
+**输出：**
 
 ```lua
-true
-{
-  id = "slice_001",
-  bg = "yellow",
-  height = 6,
-  width = 30,
-  layer = 1
-}
 ```
 
-### 额外补充
+### 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -476,18 +420,18 @@ true
 ### 调用
 
 ```lua
--- 表参数
-slice.set_width{}
+slice.set_width
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型    | 必填 | 默认值   | 说明         |
-| ------- | ------- | ---- | -------- | ------------ |
-| `id`    | string  | 是   | -        | 图层切片 ID  |
-| `width` | integer | 否   | 保持原值 | 图层切片宽度 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+| `width` | integer | 默认：保持原值；图层切片宽度 |
+## 返回值
 
 直接返回一个值。
 
@@ -498,21 +442,19 @@ slice.set_width{}
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create(20, 10, {bg = color.YELLOW})
 
-debug.print { message = slice.set_width { id = s, width = 30 } }
+debug.print(slice.set_width(s, 30))
 
-debug.print { message = slice.get_width{ id = s } }
+debug.print(slice.get_width(s))
 ```
 
-输出：
+**输出：**
 
-```text
-true
-30
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -525,18 +467,18 @@ true
 ### 调用
 
 ```lua
--- 表参数
-slice.set_height{}
+slice.set_height
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型    | 必填 | 默认值   | 说明         |
-| -------- | ------- | ---- | -------- | ------------ |
-| `id`     | string  | 是   | -        | 图层切片 ID  |
-| `height` | integer | 否   | 保持原值 | 图层切片高度 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+| `height` | integer | 默认：保持原值；图层切片高度 |
+## 返回值
 
 直接返回一个值。
 
@@ -547,21 +489,19 @@ slice.set_height{}
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create(20, 10, {bg = color.YELLOW})
 
-debug.print { message = slice.set_height { id = s, height = 6 } }
+debug.print(slice.set_height(s, 6))
 
-debug.print { message = slice.get_height{ id = s } }
+debug.print(slice.get_height(s))
 ```
 
-输出：
+**输出：**
 
-```text
-true
-6
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -574,18 +514,18 @@ true
 ### 调用
 
 ```lua
--- 表参数
-slice.set_layer{}
+slice.set_layer
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型    | 必填 | 默认值   | 说明        |
-| ------- | ------- | ---- | -------- | ----------- |
-| `id`    | string  | 是   | -        | 图层切片 ID |
-| `layer` | integer | 否   | 保持原值 | 图层层级    |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+| `layer` | integer | 默认：保持原值；图层层级 |
+## 返回值
 
 直接返回一个值。
 
@@ -597,46 +537,26 @@ slice.set_layer{}
 
 ```lua
 function Init(ctx)
-  s1 = slice.create { width = 20, height = 10, bg = color.YELLOW }
-  s2 = slice.create { width = 30, height = 8, bg = color.RED }
+  s1 = slice.create(20, 10, {bg = color.YELLOW})
+  s2 = slice.create(30, 8, {bg = color.RED})
 
-  debug.print { message = slice.set_layer { id = s1, layer = 2 } }
+  debug.print(slice.set_layer(s1, 2))
 
-  debug.print { message = table.pretty{ table = slice.list{} } }
+  debug.print(table.pretty(slice.list()))
 end
 
 function Render()
-  slice.draw { id = s1, x = 0, y = 0 } -- 绘制顺序不影响图层顺序
-  slice.draw { id = s2, x = 0, y = 0 }
+  slice.draw(s1, 0, 0) -- 绘制顺序不影响图层顺序
+  slice.draw(s2, 0, 0)
 end
 ```
 
-输出：
+**输出：**
 
 ```lua
-true
-{
-  {
-    id = "slice_002",
-    width = 30,
-    height = 8,
-    layer = 1,
-    bg = "red"
-  },
-  {
-    id = "slice_001",
-    width = 20,
-    height = 10,
-    layer = 2,
-    bg = "yellow"
-  },
-  n = 2
-}
 ```
 
-![slice.set_layer示例](../image/slice_set_layer_example.png)
-
-### 额外补充
+### 额外说明
 
 - 图层层级之间不允许空洞图层，参数 `layer` 超过最大层级时自动修正为置顶。
 - 插入层级会自动将后面的图层切片层级向上递增。
@@ -651,18 +571,18 @@ true
 ### 调用
 
 ```lua
--- 表参数
-slice.set_background{}
+slice.set_background
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型                 | 必填 | 默认值   | 说明         |
-| ------ | -------------------- | ---- | -------- | ------------ |
-| `id`   | string               | 是   | -        | 图层切片 ID  |
-| `bg`   | string / const-color | 否   | 保持原值 | 图层切片背景 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+| `bg` | string / const-color | 默认：保持原值；图层切片背景 |
+## 返回值
 
 | 类型    | 说明         |
 | ------- | ------------ |
@@ -672,28 +592,24 @@ slice.set_background{}
 
 ```lua
 function Init(ctx)
-  s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+  s = slice.create(20, 10, {bg = color.YELLOW})
 
-  debug.print { message = slice.set_background { id = s, bg = color.RED } }
+  debug.print(slice.set_background(s, color.RED))
 
-  debug.print { message = slice.get_background{ id = s } }
+  debug.print(slice.get_background(s))
 end
 
 function Render()
-  slice.draw { id = s, x = 0, y = 0 }
+  slice.draw(s, 0, 0)
 end
 ```
 
-输出：
+**输出：**
 
-```text
-true
-red
+```lua
 ```
 
-![slice.set_background示例](../image/slice_set_background_example.png)
-
-### 额外补充
+### 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -706,40 +622,36 @@ red
 ### 调用
 
 ```lua
--- 单参数
-slice.get_size{ id = "slice_001" }
+slice.get_size
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `id`   | string | 是   | -      | 图层切片 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+## 返回值
 
-返回一个对象表。
+返回两个值，依次为图层切片宽度和高度；切片不存在时返回一个 nil。
 
-| 字段     | 类型    | 说明         |
-| -------- | ------- | ------------ |
-| `width`  | integer | 图层切片宽度 |
-| `height` | integer | 图层切片高度 |
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `width` | integer | 图层切片宽度。 |
+| `height` | integer | 图层切片高度。 |
 
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
-
-debug.print { message = table.pretty{ table = slice.get_size{ id = s } } }
+local s = slice.create(20, 10, {bg = color.YELLOW})
+local width, height = slice.get_size(s)
+debug.print(tostring(width) .. ", " .. tostring(height))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  width = 20,
-  height = 10
-}
 ```
 
 ---
@@ -751,17 +663,17 @@ debug.print { message = table.pretty{ table = slice.get_size{ id = s } } }
 ### 调用
 
 ```lua
--- 单参数
-slice.get_width{ id = "slice_001" }
+slice.get_width
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `id`   | string | 是   | -      | 图层切片 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -772,15 +684,14 @@ slice.get_width{ id = "slice_001" }
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create(20, 10, {bg = color.YELLOW})
 
-debug.print { message = slice.get_width{ id = s } }
+debug.print(slice.get_width(s))
 ```
 
-输出：
+**输出：**
 
-```text
-20
+```lua
 ```
 
 ---
@@ -792,17 +703,17 @@ debug.print { message = slice.get_width{ id = s } }
 ### 调用
 
 ```lua
--- 单参数
-slice.get_height{ id = "slice_001" }
+slice.get_height
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `id`   | string | 是   | -      | 图层切片 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -813,15 +724,14 @@ slice.get_height{ id = "slice_001" }
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create(20, 10, {bg = color.YELLOW})
 
-debug.print { message = slice.get_height{ id = s } }
+debug.print(slice.get_height(s))
 ```
 
-输出：
+**输出：**
 
-```text
-10
+```lua
 ```
 
 ---
@@ -833,17 +743,17 @@ debug.print { message = slice.get_height{ id = s } }
 ### 调用
 
 ```lua
--- 单参数
-slice.get_layer{ id = "slice_001" }
+slice.get_layer
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `id`   | string | 是   | -      | 图层切片 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -854,18 +764,17 @@ slice.get_layer{ id = "slice_001" }
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create(20, 10, {bg = color.YELLOW})
 
-debug.print { message = slice.get_layer{ id = s } }
+debug.print(slice.get_layer(s))
 ```
 
-输出：
+**输出：**
 
-```text
-1
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - `"base"` 图层层级为 `0`。
 
@@ -878,17 +787,17 @@ debug.print { message = slice.get_layer{ id = s } }
 ### 调用
 
 ```lua
--- 单参数
-slice.get_background{ id = "slice_001" }
+slice.get_background
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `id`   | string | 是   | -      | 图层切片 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -899,18 +808,17 @@ slice.get_background{ id = "slice_001" }
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create(20, 10, {bg = color.YELLOW})
 
-debug.print { message = slice.get_background{ id = s } }
+debug.print(slice.get_background(s))
 ```
 
-输出：
+**输出：**
 
-```text
-yellow
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - `"base"` 图层背景颜色为 `color.TRANSPARENT`。
 
@@ -923,17 +831,17 @@ yellow
 ### 调用
 
 ```lua
--- 单参数
-slice.get_info{ id = "slice_001" }
+slice.get_info
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `id`   | string | 是   | -      | 图层切片 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+## 返回值
 
 返回一个对象表。
 
@@ -948,21 +856,14 @@ slice.get_info{ id = "slice_001" }
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
+local s = slice.create(20, 10, {bg = color.YELLOW})
 
-debug.print { message = table.pretty{ table = slice.get_info{ id = s } } }
+debug.print(table.pretty(slice.get_info(s)))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{
-  id = "slice_001",
-  bg = "yellow",
-  height = 10,
-  width = 20,
-  layer = 1
-}
 ```
 
 ---
@@ -974,17 +875,17 @@ debug.print { message = table.pretty{ table = slice.get_info{ id = s } } }
 ### 调用
 
 ```lua
--- 单参数
-slice.exists{ id = "slice_001" }
+slice.exists
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明        |
-| ------ | ------ | ---- | ------ | ----------- |
-| `id`   | string | 是   | -      | 图层切片 ID |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 图层切片 ID |
+## 返回值
 
 直接返回一个值。
 
@@ -995,16 +896,14 @@ slice.exists{ id = "slice_001" }
 ### 示例
 
 ```lua
-local s = slice.create { width = 20, height = 10, bg = color.YELLOW }
-debug.print { message = slice.exists{ id = s } }
+local s = slice.create(20, 10, {bg = color.YELLOW})
+debug.print(slice.exists(s))
 
-slice.delete{ id = s }
-debug.print { message = slice.exists{ id = s } }
+slice.delete(s)
+debug.print(slice.exists(s))
 ```
 
-输出：
+**输出：**
 
-```text
-true
-false
+```lua
 ```

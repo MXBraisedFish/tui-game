@@ -1,124 +1,126 @@
 # game 库
 
-## 基本库说明
-
-`game` 提供游戏脚本生命周期控制回调。
+`game` 提供退出游戏、保存继续游戏数据和保存最佳记录的命令。
 
 ---
 
-## 目录
-
-### 方法
-
-| 方法名 | 说明 | 索引 |
-| ----- | ---- | ---- |
-| `exit_game` | 请求结束当前游戏脚本运行 | [exit_game](#exit_game) |
-| `save_game` | 请求执行一次 `SaveGame` 回调，将游戏数据保存在"继续游戏"槽位 | [save_game](#save_game) |
-| `save_best` | 请求执行一次 `SaveBest` 回调，在游戏列表展示本游戏最佳记录记录 | [save_best](#save_best) |
-
----
+# 目录
 
 ## 方法
 
+| 方法 | 说明 | 定位 |
+| --- | --- | --- |
+| `exit_game` | 请求结束当前游戏 | [exit_game](#exit_game) |
+| `save_game` | 请求保存继续游戏数据 | [save_game](#save_game) |
+| `save_best` | 请求保存最佳记录 | [save_best](#save_best) |
+
+---
+
+# 方法
+
 ## `exit_game`
 
-请求结束当前游戏脚本运行。
+请求结束当前游戏。此命令不会自动保存游戏数据或最佳记录。
 
-> 仅游戏脚本可用。
+### 限制
+
+- 仅游戏脚本可用
 
 ### 调用
 
 ```lua
--- 空命名参数表
-game.exit_game{}
+game.exit_game
 ```
 
-### 参数
+## 返回值
 
-无。
-
-### 返回
-
-无。
+无返回值。
 
 ### 示例
 
 ```lua
-game.exit_game{}
+game.exit_game()
 ```
 
-### 额外补充
+**输出：**
 
-- 调用该 API 不会自动调用 `SaveGame` 或 `SaveBest`。
-- 如需保存继续游戏数据或最佳记录，应在退出前分别显式调用 `game.save_game{}` 或 `game.save_best{}`。
-- 同一回调中先请求保存、再请求退出时，宿主会按照调用顺序先完成保存，再结束游戏。
-- **不可**在 `Init`, `SaveGame`, `SaveBest` 回调中调用。
+```lua
+```
+
+### 额外说明
+
+- 需要保存时，应先调用 `game.save_game()` 或 `game.save_best()`，再请求退出。
+- 不可在 `Init`、`SaveGame` 或 `SaveBest` 回调中调用。
 
 ---
 
 ## `save_game`
 
-请求执行一次 `SaveGame` 回调, 将游戏数据保存在 `继续游戏` 槽位。
+请求执行一次 `SaveGame` 回调，将游戏数据保存到继续游戏槽位。
 
-> 仅游戏脚本可用。
-> 仅当 `game.json` 中 `save_game` 字段为 true 时可用。
+### 限制
+
+- 仅游戏脚本可用
 
 ### 调用
 
 ```lua
--- 空命名参数表
-game.save_game{}
+game.save_game
 ```
 
-### 参数
+## 返回值
 
-无。
-
-### 返回
-
-无。
+无返回值。
 
 ### 示例
 
 ```lua
-game.save_game{}
+game.save_game()
 ```
 
-### 额外补充
+**输出：**
 
-- 保存的数据会在玩家使用 `继续游戏` 进入时，传递给 `Init` 回调。
-- **不可**在 `SaveGame` 回调中调用。
+```lua
+```
+
+### 额外说明
+
+- 包清单需启用 `save_game`。
+- 保存的数据会在玩家继续游戏时传给 `Init` 回调。
+- 不可在 `SaveGame` 回调中调用。
 
 ---
 
 ## `save_best`
 
-请求执行一次 `SaveBest` 回调, 在游戏列表展示本游戏最佳记录记录。
+请求执行一次 `SaveBest` 回调，将最佳记录提供给游戏列表展示。
 
-> 仅游戏脚本可用。
-> 仅当 `game.json` 中 `best_score.enable` 字段为 true 时可用。
+### 限制
+
+- 仅游戏脚本可用
 
 ### 调用
 
 ```lua
--- 空命名参数表
-game.save_best{}
+game.save_best
 ```
 
-### 参数
+## 返回值
 
-无。
-
-### 返回
-
-无。
+无返回值。
 
 ### 示例
 
 ```lua
-game.save_best{}
+game.save_best()
 ```
 
-### 额外补充
+**输出：**
 
-- **不可**在 `SaveBest` 回调中调用。
+```lua
+```
+
+### 额外说明
+
+- 包清单需启用 `best_score.enable`。
+- 不可在 `SaveBest` 回调中调用。

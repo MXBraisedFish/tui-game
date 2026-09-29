@@ -33,9 +33,8 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "binary_pack",
     lua.create_function(|lua, values: MultiValue| {
       let method = "serialization.binary_pack";
-      let table = args::named(method, values, &["fmt", "values"])?;
-      let format = args::string(args::required(&table, method, "fmt")?, method, "fmt")?;
-      let values = args::values(&table, method)?;
+      let values = args::variadic(method, values, &["fmt"])?;
+      let format = args::string(values[0].clone(), method, "fmt")?;
       let operations = parse_format(&format, method)?;
       let mut output = Vec::new();
       let mut value_index = 0;
@@ -43,7 +42,7 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
         apply_alignment(&mut output, operation)?;
         pack_operation(
           operation,
-          values.get(value_index).cloned(),
+          values.get(value_index + 1).cloned(),
           &mut output,
           &mut value_index,
           method,
@@ -52,7 +51,7 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
           return Err(args::message(method, "packed output exceeds 1 MiB"));
         }
       }
-      if value_index != values.len() {
+      if value_index + 1 != values.len() {
         return Err(args::message(method, "too many values for format string"));
       }
       Ok(Value::String(lua.create_string(output)?))
@@ -63,16 +62,16 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "binary_unpack",
     lua.create_function(|lua, values: MultiValue| {
       let method = "serialization.binary_unpack";
-      let table = args::named(method, values, &["fmt", "data", "pos"])?;
-      let format = args::string(args::required(&table, method, "fmt")?, method, "fmt")?;
-      let data_value = args::required(&table, method, "data")?;
+      let parameters = args::positional(lua, method, values, &["fmt", "data"], &["pos"])?;
+      let format = args::string(parameters.get(0), method, "fmt")?;
+      let data_value = parameters.get(1);
       let Value::String(data) = data_value else {
         return Err(args::invalid(method, "data", "string", &data_value));
       };
       if data.as_bytes().len() > args::MAX_API_STRING_BYTES {
         return Err(args::message(method, "input exceeds 1 MiB"));
       }
-      let pos = args::optional_integer(&table, method, "pos", Some(1))?.unwrap();
+      let pos = args::optional_integer(parameters.options(), method, "pos", Some(1))?.unwrap();
       let mut offset = usize::try_from(pos.saturating_sub(1))
         .map_err(|_| args::message(method, "pos must be at least 1"))?;
       if pos < 1 || offset > data.as_bytes().len() {
@@ -90,10 +89,10 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
           result_index += 1;
         }
       }
-      let result = lua.create_table()?;
-      result.raw_set("values", results)?;
-      result.raw_set("next_pos", offset + 1)?;
-      Ok(result)
+      Ok(MultiValue::from_vec(vec![
+        Value::Table(results),
+        Value::Integer((offset + 1) as i64),
+      ]))
     })?,
   )?;
 
@@ -101,8 +100,7 @@ pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
     "binary_packsize",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.binary_packsize";
-      let table = args::named(method, values, &["fmt"])?;
-      let format = args::string(args::required(&table, method, "fmt")?, method, "fmt")?;
+      let format = args::string(args::one(method, "fmt", values)?, method, "fmt")?;
       let mut size = 0_usize;
       for operation in parse_format(&format, method)? {
         size = aligned_offset(size, operation)?;

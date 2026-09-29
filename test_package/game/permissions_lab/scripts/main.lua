@@ -17,19 +17,19 @@ local function push_log(line)
 end
 
 local function first_line(text)
-  local lines = string.split { text = text, sep = "\n" }
+  local lines = string.split(text, "\n")
   return lines[1] or ""
 end
 
 local function handle_file_event(data)
   if not data.ok then
     push_log("File " .. data.kind .. " failed: " .. data.error.code)
-    debug.warn{ message = "file " .. data.kind .. " failed: " .. data.error.message }
+    debug.warn("file " .. data.kind .. " failed: " .. data.error.message)
     return
   end
   if data.kind == "write_text" then
     push_log("Wrote " .. data.path .. " (tip: " .. tostring(data.tip) .. ")")
-    debug.info{ message = "probe written to " .. data.path }
+    debug.info("probe written to " .. data.path)
   elseif data.kind == "read_text" then
     push_log("Read back: " .. first_line(data.text))
   elseif data.kind == "list_dir" then
@@ -42,18 +42,14 @@ local function handle_file_event(data)
 end
 
 local function self_check()
-  local decoded = debug.pcall {
-    func = function()
-      return serialization.json_decode{ s = "{\"probes\": 1}" }
-    end,
-  }
-  debug.assert { value = decoded.ok and decoded.values[1].probes == 1, message = "json round trip failed" }
-  local broken = debug.pcall {
-    func = function()
-      return serialization.json_decode{ s = "{broken" }
-    end,
-  }
-  debug.assert { value = not broken.ok, message = "invalid JSON was accepted" }
+  local decoded, decoded_value1 = debug.pcall(function()
+      return serialization.json_decode("{\"probes\": 1}")
+    end)
+  debug.assert(decoded and decoded_value1.probes == 1, { message = "json round trip failed" })
+  local broken = debug.pcall(function()
+      return serialization.json_decode("{broken")
+    end)
+  debug.assert(not broken, { message = "invalid JSON was accepted" })
 end
 
 function Init(ctx)
@@ -66,9 +62,9 @@ function Init(ctx)
     best_probes = ctx.best_data.probes or 0
   end
   self_check()
-  debug.info{ message = "Permissions Lab initialized" }
+  debug.info("Permissions Lab initialized")
   push_log("P writes inside package assets, R reads it back, L lists state/.")
-  if file.exists{ path = PROBE_PATH } then
+  if file.exists(PROBE_PATH) then
     push_log("A probe file from an earlier run exists.")
   end
 end
@@ -81,27 +77,25 @@ function HandleEvent(event)
     local action = event.data.action
     if action == "write_probe" then
       probes = probes + 1
-      debug.print { message = "write probe #" .. probes, title = "permissions_lab", level = debug.INFO, time = true }
-      file.write {
-        path = PROBE_PATH,
-        text = "probe=" .. probes .. "\n",
+      debug.print("write probe #" .. probes, { title = "permissions_lab", level = debug.INFO, time = true })
+      file.write(PROBE_PATH, "probe=" .. probes .. "\n", {
         encoding = file.UTF_8,
         end_of_line = file.LF,
         event_tip = "probe_written",
-      }
+      })
       push_log("Requested write #" .. probes .. " inside package assets.")
     elseif action == "read_probe" then
-      if file.exists{ path = PROBE_PATH } then
-        file.read { path = PROBE_PATH, encoding = file.UTF_8, event_tip = "probe_read" }
+      if file.exists(PROBE_PATH) then
+        file.read(PROBE_PATH, { encoding = file.UTF_8, event_tip = "probe_read" })
         push_log("Requested a read of " .. PROBE_PATH .. ".")
       else
         push_log("Nothing to read yet; write a probe first.")
       end
     elseif action == "list_probe" then
-      file.list_dir { path = "state", event_tip = "state_listed" }
+      file.list_dir("state", { event_tip = "state_listed" })
       push_log("Requested a listing of state/.")
     elseif action == "leave" then
-      game.exit_game{}
+      game.exit_game()
     end
   elseif event.type == "file" then
     handle_file_event(event.data)
@@ -115,14 +109,14 @@ function UpdateFrame(dt, alpha)
 end
 
 function Render()
-  draw.fill_rect { x = 0, y = 0, width = width, height = height, char = " ", bg = color.BLACK }
-  draw.stroke_rect { x = 0, y = 0, width = width, height = height, fg = color.BRIGHT_RED, border_char = char.DOUBLE_LINE }
-  draw.text { x = 2, y = 1, text = "Permissions Lab", fg = color.BRIGHT_RED, bold = true }
-  draw.text { x = 2, y = 3, text = "Probes requested: " .. probes .. "   Best: " .. best_probes, fg = color.BRIGHT_YELLOW }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
+  draw.stroke_rect(0, 0, width, height, { fg = color.BRIGHT_RED, border_char = char.DOUBLE_LINE })
+  draw.text(2, 1, "Permissions Lab", { fg = color.BRIGHT_RED, bold = true })
+  draw.text(2, 3, "Probes requested: " .. probes .. "   Best: " .. best_probes, { fg = color.BRIGHT_YELLOW })
   for line_number = 1, #log_lines do
-    draw.text { x = 2, y = 4 + line_number, text = log_lines[line_number], fg = color.BRIGHT_GRAY, max_width = width - 4, max_height = 1 }
+    draw.text(2, 4 + line_number, log_lines[line_number], { fg = color.BRIGHT_GRAY, max_width = width - 4, max_height = 1 })
   end
-  draw.text { x = 2, y = height - 2, text = "P write  R read  L list  Esc leave", fg = color.GRAY }
+  draw.text(2, height - 2, "P write  R read  L list  Esc leave", { fg = color.GRAY })
 end
 
 function SaveGame()

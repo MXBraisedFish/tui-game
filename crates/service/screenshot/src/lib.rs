@@ -33,6 +33,7 @@ use tg_service_storage::{RecordingPixelScale, StorageService};
 const REFERENCE_FONT_SIZE: f32 = 24.0;
 const REFERENCE_LINE_HEIGHT: f32 = 31.68;
 const REFERENCE_CELL_HEIGHT: u32 = 36;
+const REFERENCE_CELL_WIDTH: f32 = 15.0;
 const REFERENCE_CELL_LEADING: f32 = REFERENCE_CELL_HEIGHT as f32 - REFERENCE_LINE_HEIGHT;
 
 #[derive(Clone, Copy)]
@@ -69,7 +70,7 @@ impl RasterMetrics {
     }
 
     Ok(Self {
-      cell_width,
+      cell_width: REFERENCE_CELL_WIDTH,
       cell_height: REFERENCE_CELL_HEIGHT,
       font_size,
       baseline: line_metrics.ascent + REFERENCE_CELL_LEADING / 2.0,
@@ -212,11 +213,12 @@ impl ScreenshotService {
       .unwrap_or(1)
       .saturating_add(4)
       .min(u16::MAX as usize) as u16;
-    let height = lines.len().saturating_add(4).min(u16::MAX as usize) as u16;
+    let height = lines.len().saturating_add(8).min(u16::MAX as usize) as u16;
     let mut frame = ComposedFrame::new(width, height);
     for (index, line) in lines.iter().enumerate() {
       write_preview_line(&mut frame, 2, index as u16 + 2, line);
     }
+    write_preview_references(&mut frame, lines.len() as u16 + 3);
     frame
   }
 
@@ -430,6 +432,145 @@ fn write_preview_line(frame: &mut ComposedFrame, start_x: u16, y: u16, line: &st
   }
 }
 
+fn write_preview_references(frame: &mut ComposedFrame, y: u16) {
+  write_preview_line(frame, 2, y, "Style: ");
+  let mut x = 9;
+  for (label, style) in [
+    ("Plain", TextStyle::default()),
+    (
+      "Bold",
+      TextStyle {
+        bold: true,
+        foreground: Some(TextColor::Terminal(TerminalColor::Blue)),
+        ..Default::default()
+      },
+    ),
+    (
+      "Italic",
+      TextStyle {
+        italic: true,
+        ..Default::default()
+      },
+    ),
+    (
+      "Under",
+      TextStyle {
+        underline: true,
+        ..Default::default()
+      },
+    ),
+    (
+      "Strike",
+      TextStyle {
+        strike: true,
+        ..Default::default()
+      },
+    ),
+    (
+      "Dim",
+      TextStyle {
+        dim: true,
+        ..Default::default()
+      },
+    ),
+    (
+      "Reverse",
+      TextStyle {
+        reverse: true,
+        ..Default::default()
+      },
+    ),
+    (
+      "Blink",
+      TextStyle {
+        blink: true,
+        ..Default::default()
+      },
+    ),
+    (
+      "[Hide]",
+      TextStyle {
+        hidden: true,
+        ..Default::default()
+      },
+    ),
+  ] {
+    for character in label.chars() {
+      frame.set(
+        x,
+        y,
+        ComposedCell::Text(CanvasCell::styled(character.to_string(), style.clone())),
+      );
+      x += 1;
+    }
+    x += 1;
+  }
+  use TerminalColor::*;
+  let colors = [
+    Black,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    White,
+    BrightBlack,
+    BrightRed,
+    BrightGreen,
+    BrightYellow,
+    BrightBlue,
+    BrightMagenta,
+    BrightCyan,
+    BrightWhite,
+  ];
+  write_preview_line(frame, 2, y + 1, "16 ANSI:");
+  write_preview_line(frame, 2, y + 2, "RGB:    ");
+  let start = 11;
+  let width = frame.width() - start - 2;
+  for offset in 0..width {
+    let color = colors[usize::from(offset) * colors.len() / usize::from(width)].clone();
+    frame.set(
+      start + offset,
+      y + 1,
+      ComposedCell::Text(CanvasCell::styled(
+        " ",
+        TextStyle {
+          background: Some(TextColor::Terminal(color)),
+          ..Default::default()
+        },
+      )),
+    );
+    // Six linear RGB segments: red -> yellow -> green -> cyan -> blue -> magenta -> red.
+    let phase = u32::from(offset) * 6 * 255 / u32::from(width - 1);
+    let step = (phase % 255) as u8;
+    let (r, g, b) = match phase / 255 {
+      0 => (255, step, 0),
+      1 => (255 - step, 255, 0),
+      2 => (0, 255, step),
+      3 => (0, 255 - step, 255),
+      4 => (step, 0, 255),
+      _ => (255, 0, 255 - step),
+    };
+    let (r, g, b) = if offset == width - 1 {
+      (255, 0, 0)
+    } else {
+      (r, g, b)
+    };
+    frame.set(
+      start + offset,
+      y + 2,
+      ComposedCell::Text(CanvasCell::styled(
+        " ",
+        TextStyle {
+          background: Some(TextColor::ForceRgb { r, g, b }),
+          ..Default::default()
+        },
+      )),
+    );
+  }
+}
+
 fn timestamp() -> String {
   Local::now().format("%Y%m%d_%H%M%S_%3f").to_string()
 }
@@ -607,8 +748,9 @@ fn save_png<E: From<ScreenshotAsyncEvent>>(
     RecordingPixelScale::Original,
     |completed, total| {
       send_progress(event_tx, task_id, completed, total);
+      !cancellation.is_cancelled()
     },
-  );
+  )?;
   if cancellation.is_cancelled() {
     return Err("screenshot export cancelled".to_string());
   }
@@ -659,14 +801,37 @@ impl TerminalFrameRasterizer {
     frame: &ComposedFrame,
     rect: ScreenshotRect,
     scale: RecordingPixelScale,
-    mut progress: impl FnMut(u16, u16),
-  ) -> RgbaImage {
+    mut progress: impl FnMut(u16, u16) -> bool,
+  ) -> Result<RgbaImage, String> {
     // 字符、样式与颜色一直保留为结构化数据，直到确定最终导出尺寸后，
     // 才按目标单元格和字号直接栅格化，避免先生成低分辨率位图再缩放。
     let metrics = self.metrics.for_scale(scale);
     let width = metrics.image_width(rect.width);
     let height = metrics.image_height(rect.height);
-    let mut image = ImageBuffer::from_pixel(width.max(1), height.max(1), Rgba([0, 0, 0, 255]));
+    if rect.width == 0
+      || rect.height == 0
+      || u32::from(rect.x) + u32::from(rect.width) > u32::from(u16::MAX)
+      || u32::from(rect.y) + u32::from(rect.height) > u32::from(u16::MAX)
+    {
+      return Err("invalid screenshot rectangle".into());
+    }
+    let bytes = u64::from(width) * u64::from(height) * 4;
+    if bytes > 256 * 1024 * 1024 {
+      return Err("export image exceeds 256 MiB pixel limit".into());
+    }
+    if !progress(0, rect.height) {
+      return Err("frame rasterization cancelled".into());
+    }
+    let mut pixels = Vec::new();
+    pixels
+      .try_reserve_exact(bytes as usize)
+      .map_err(|error| format!("cannot allocate export image: {error}"))?;
+    pixels.resize(bytes as usize, 0);
+    for pixel in pixels.chunks_exact_mut(4) {
+      pixel[3] = 255;
+    }
+    let mut image =
+      ImageBuffer::from_raw(width, height, pixels).ok_or("invalid export image dimensions")?;
 
     for y in 0..rect.height {
       let spans = shape_row(frame, rect, y, &self.fonts);
@@ -682,8 +847,18 @@ impl TerminalFrameRasterizer {
           metrics.cell_height,
           bg,
         );
-        if span.style.underline {
+        if span.style.underline && !span.style.hidden {
           draw_underline_span(&mut image, metrics, cell_x, y, span.cell_width, fg);
+        }
+        if span.style.strike && !span.style.hidden {
+          fill_rect(
+            &mut image,
+            metrics.cell_x(cell_x),
+            u32::from(y) * metrics.cell_height + (metrics.baseline * 0.65).round() as u32,
+            span_width,
+            metrics.scale.round().max(1.0) as u32,
+            fg,
+          );
         }
         cell_x = cell_x.saturating_add(span.cell_width);
       }
@@ -693,13 +868,11 @@ impl TerminalFrameRasterizer {
         draw_shaped_span(&mut image, &self.fonts, metrics, cell_x, y, span);
         cell_x = cell_x.saturating_add(span.cell_width);
       }
-      progress(
-        y.saturating_add(1).saturating_mul(2),
-        rect.height.saturating_mul(2),
-      );
+      if !progress(y + 1, rect.height) {
+        return Err("frame rasterization cancelled".into());
+      }
     }
-
-    image
+    Ok(image)
   }
 }
 
@@ -713,7 +886,7 @@ struct CachedGlyph {
 }
 
 struct LoadedFont {
-  raster: fontdue::Font,
+  raster: std::cell::OnceCell<Option<fontdue::Font>>,
   source: FontSource,
   face_index: u32,
   shaper_data: std::cell::RefCell<Option<ShaperData>>,
@@ -727,6 +900,7 @@ enum FontSource {
 #[derive(Debug)]
 struct ShapedGlyph {
   glyph_id: u16,
+  cluster: u32,
   x_advance: f32,
   x_offset: f32,
   y_offset: f32,
@@ -735,6 +909,7 @@ struct ShapedGlyph {
 struct FontSet {
   fonts: Vec<LoadedFont>,
   database: fontdb::Database,
+  selection_cache: std::cell::RefCell<HashMap<String, usize>>,
   glyph_cache:
     std::cell::RefCell<std::collections::HashMap<(usize, u16, u32), std::rc::Rc<CachedGlyph>>>,
 }
@@ -812,20 +987,28 @@ impl FontSet {
       }
     }
 
-    for path in bundled_font_paths(deployment_root) {
-      if path.is_file() {
-        if !loaded_font_files.insert(path.clone()) {
-          continue;
-        }
-        if let Err(error) = load_font_file(&path, &mut fonts) {
-          attempted.push(error);
-        }
-      } else {
-        attempted.push(format!("bundled font is missing: {}", path.display()));
+    let bundled_path = bundled_font_path(deployment_root);
+    if bundled_path.is_file() {
+      if loaded_font_files.insert(bundled_path.clone())
+        && let Err(error) = load_font_file(&bundled_path, &mut fonts)
+      {
+        attempted.push(error);
       }
+    } else {
+      attempted.push(format!(
+        "bundled font is missing: {}",
+        bundled_path.display()
+      ));
     }
 
     let mut ids = Vec::new();
+    if let Some(id) = database.query(&fontdb::Query {
+      families: &[fontdb::Family::Monospace],
+      ..fontdb::Query::default()
+    }) && !ids.contains(&id)
+    {
+      ids.push(id);
+    }
     for family_name in SYSTEM_FONT_FALLBACK_FAMILIES {
       if let Some(id) = database.query(&fontdb::Query {
         families: &[fontdb::Family::Name(family_name)],
@@ -835,17 +1018,28 @@ impl FontSet {
         ids.push(id);
       }
     }
-    for family in [fontdb::Family::Monospace, fontdb::Family::SansSerif] {
-      if let Some(id) = database.query(&fontdb::Query {
-        families: &[family],
-        ..fontdb::Query::default()
-      }) && !ids.contains(&id)
-      {
-        ids.push(id);
-      }
+    if let Some(id) = database.query(&fontdb::Query {
+      families: &[fontdb::Family::SansSerif],
+      ..fontdb::Query::default()
+    }) && !ids.contains(&id)
+    {
+      ids.push(id);
     }
 
-    for id in ids.into_iter().take(16) {
+    // The preferred system families are only a priority list, not a coverage whitelist.
+    let mut remaining = database.faces().collect::<Vec<_>>();
+    remaining.sort_by_key(|face| {
+      (
+        face.style != fontdb::Style::Normal,
+        face.weight.0.abs_diff(400),
+      )
+    });
+    for face in remaining {
+      if !ids.contains(&face.id) {
+        ids.push(face.id);
+      }
+    }
+    for id in ids {
       load_database_font(&database, id, &mut fonts);
     }
 
@@ -863,6 +1057,7 @@ impl FontSet {
     Ok(Self {
       fonts,
       database,
+      selection_cache: std::cell::RefCell::new(HashMap::new()),
       glyph_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
     })
   }
@@ -871,7 +1066,7 @@ impl FontSet {
     self
       .fonts
       .first()
-      .map(|font| &font.raster)
+      .and_then(|font| font.raster(&self.database))
       .ok_or_else(|| "No usable primary screenshot font was loaded".to_string())
   }
 
@@ -888,7 +1083,7 @@ impl FontSet {
     let (metrics, bitmap) = self
       .fonts
       .get(font_index)?
-      .raster
+      .raster(&self.database)?
       .rasterize_indexed(glyph_id, font_size);
     let cached = std::rc::Rc::new(CachedGlyph { metrics, bitmap });
     self
@@ -907,35 +1102,34 @@ impl FontSet {
       return (!self.fonts.is_empty()).then_some(0);
     }
 
-    if let Some(primary) = self.fonts.first()
-      && characters
-        .iter()
-        .all(|character| font_has_character(&primary.raster, *character))
-    {
-      return Some(0);
+    if let Some(index) = self.selection_cache.borrow().get(grapheme) {
+      return Some(*index);
     }
-
-    self
-      .fonts
-      .iter()
-      .position(|font| {
-        characters
-          .iter()
-          .all(|character| font_has_character(&font.raster, *character))
-      })
-      .or_else(|| {
+    let mut best = None;
+    let mut best_count = 0;
+    for (index, font) in self.fonts.iter().enumerate() {
+      let count = font.coverage(&self.database, &characters);
+      if count == characters.len() && font.raster(&self.database).is_some() {
         self
-          .fonts
-          .iter()
-          .enumerate()
-          .max_by_key(|(_, font)| {
-            characters
-              .iter()
-              .filter(|character| font_has_character(&font.raster, **character))
-              .count()
-          })
-          .map(|(index, _)| index)
-      })
+          .selection_cache
+          .borrow_mut()
+          .insert(grapheme.to_string(), index);
+        return Some(index);
+      }
+      if count > best_count {
+        best = Some(index);
+        best_count = count;
+      }
+    }
+    // No complete face exists. Keep the best partial cluster, otherwise primary .notdef.
+    let index = best
+      .filter(|index| self.fonts[*index].raster(&self.database).is_some())
+      .unwrap_or(0);
+    self
+      .selection_cache
+      .borrow_mut()
+      .insert(grapheme.to_string(), index);
+    Some(index)
   }
 
   fn shape_text(
@@ -965,6 +1159,7 @@ impl FontSet {
         .map(|(info, position)| {
           Some(ShapedGlyph {
             glyph_id: u16::try_from(info.glyph_id).ok()?,
+            cluster: info.cluster,
             x_advance: position.x_advance as f32 / 64.0,
             x_offset: position.x_offset as f32 / 64.0,
             y_offset: position.y_offset as f32 / 64.0,
@@ -982,6 +1177,7 @@ impl FontSet {
   }
 }
 
+#[cfg(test)]
 fn font_has_character(font: &fontdue::Font, character: char) -> bool {
   font.lookup_glyph_index(character) != 0
 }
@@ -994,35 +1190,75 @@ fn resolve_font_path(path: &Path, deployment_root: &Path) -> PathBuf {
   }
 }
 
-fn bundled_font_paths(deployment_root: &Path) -> [PathBuf; 4] {
-  [
-    deployment_root.join("assets/fonts/mmo.ttf"),
-    deployment_root.join("assets/fonts/mnf.ttf"),
-    deployment_root.join("assets/fonts/asmn.otf"),
-    deployment_root.join("assets/fonts/nsscvf.ttf"),
-  ]
+fn bundled_font_path(deployment_root: &Path) -> PathBuf {
+  deployment_root.join("assets/fonts/mmo.ttf")
+}
+
+impl LoadedFont {
+  fn raster(&self, database: &fontdb::Database) -> Option<&fontdue::Font> {
+    self
+      .raster
+      .get_or_init(|| match &self.source {
+        FontSource::Owned(bytes) => fontdue::Font::from_bytes(
+          bytes.as_slice(),
+          fontdue::FontSettings {
+            collection_index: self.face_index,
+            ..Default::default()
+          },
+        )
+        .ok(),
+        FontSource::Database(id) => database
+          .with_face_data(*id, |bytes, face_index| {
+            fontdue::Font::from_bytes(
+              bytes,
+              fontdue::FontSettings {
+                collection_index: face_index,
+                ..Default::default()
+              },
+            )
+            .ok()
+          })
+          .flatten(),
+      })
+      .as_ref()
+  }
+
+  fn coverage(&self, database: &fontdb::Database, characters: &[char]) -> usize {
+    let count = |bytes: &[u8], index| {
+      ttf_parser::Face::parse(bytes, index)
+        .map(|face| {
+          characters
+            .iter()
+            .filter(|character| {
+              face
+                .glyph_index(**character)
+                .is_some_and(|glyph| glyph.0 != 0)
+            })
+            .count()
+        })
+        .unwrap_or(0)
+    };
+    match &self.source {
+      FontSource::Owned(bytes) => count(bytes, self.face_index),
+      FontSource::Database(id) => database.with_face_data(*id, count).unwrap_or(0),
+    }
+  }
 }
 
 fn load_database_font(database: &fontdb::Database, id: fontdb::ID, fonts: &mut Vec<LoadedFont>) {
-  if let Some(Ok(font)) =
-    database.with_face_data(id, |data, face_index| -> Result<LoadedFont, String> {
-      let raster = fontdue::Font::from_bytes(
-        data,
-        fontdue::FontSettings {
-          collection_index: face_index,
-          ..fontdue::FontSettings::default()
-        },
-      )
-      .map_err(|error| error.to_string())?;
-      Ok(LoadedFont {
-        raster,
-        source: FontSource::Database(id),
-        face_index,
-        shaper_data: std::cell::RefCell::new(None),
-      })
-    })
+  if fonts
+    .iter()
+    .any(|font| matches!(font.source, FontSource::Database(existing) if existing == id))
   {
-    fonts.push(font);
+    return;
+  }
+  if let Some(face) = database.face(id) {
+    fonts.push(LoadedFont {
+      raster: std::cell::OnceCell::new(),
+      source: FontSource::Database(id),
+      face_index: face.index,
+      shaper_data: std::cell::RefCell::new(None),
+    });
   }
 }
 
@@ -1045,7 +1281,7 @@ fn load_font_bytes(bytes: Vec<u8>, face_index: u32) -> Result<LoadedFont, String
   )
   .map_err(|error| error.to_string())?;
   Ok(LoadedFont {
-    raster,
+    raster: std::cell::OnceCell::from(Some(raster)),
     source: FontSource::Owned(bytes),
     face_index,
     shaper_data: std::cell::RefCell::new(None),
@@ -1087,7 +1323,21 @@ fn shape_row(
     };
     let (text, style) = match composed {
       ComposedCell::Empty => (" ".to_string(), TextStyle::default()),
-      ComposedCell::Text(cell) if cell.is_continuation() => continue,
+      ComposedCell::Text(cell) if cell.is_continuation() => {
+        if x > 0 {
+          continue;
+        }
+        // A crop starting inside a wide cell still occupies its first column.
+        let mut start = rect.x;
+        while start > 0 && is_continuation(frame, start, rect.y + y) {
+          start -= 1;
+        }
+        let style = match frame.get(start, rect.y + y) {
+          Some(ComposedCell::Text(lead)) => lead.style.clone(),
+          _ => TextStyle::default(),
+        };
+        (" ".to_string(), style)
+      }
       ComposedCell::Text(cell) => {
         let text = if cell.text.is_empty() {
           " ".to_string()
@@ -1101,7 +1351,7 @@ fn shape_row(
     source.push_str(&text);
     let cell_width = UnicodeWidthStr::width(text.as_str())
       .max(1)
-      .min(u32::MAX as usize) as u32;
+      .min(usize::from(rect.width - x)) as u32;
     let script = text
       .chars()
       .map(|character| character.script())
@@ -1151,6 +1401,7 @@ fn shape_row(
     let key_font = first.font_index;
     let key_emoji = first.emoji;
     let key_style = first.style.clone();
+    let key_geometry = is_geometry(&first.text);
     let mut end = cursor + 1;
     while end < visual_order.len() {
       let cell = &cells[visual_order[end]];
@@ -1159,6 +1410,7 @@ fn shape_row(
         || cell.font_index != key_font
         || cell.emoji != key_emoji
         || cell.style != key_style
+        || is_geometry(&cell.text) != key_geometry
       {
         break;
       }
@@ -1214,6 +1466,84 @@ impl RowTextCell {
   }
 }
 
+fn is_geometry(text: &str) -> bool {
+  !text.is_empty() && text.chars().all(|c| matches!(c, '\u{2500}'..='\u{259f}'))
+}
+
+// HarfRust clusters are UTF-8 byte offsets, in visual glyph order (descending for RTL).
+// Allocate terminal columns per cluster without stretching marks or every glyph advance.
+fn cluster_positions(
+  glyphs: &[ShapedGlyph],
+  span: &ShapedTextSpan,
+  metrics: RasterMetrics,
+  origin: u32,
+) -> Vec<f32> {
+  let mut clusters: Vec<u32> = glyphs.iter().map(|glyph| glyph.cluster).collect();
+  clusters.sort_unstable();
+  clusters.dedup();
+  let mut widths = vec![0u32; clusters.len()];
+  let mut cells: Vec<_> = span.visual_cells.iter().collect();
+  if span.direction == ShapeDirection::RightToLeft {
+    cells.reverse();
+  }
+  let mut byte_offset = 0;
+  for cell in cells {
+    let index = clusters
+      .partition_point(|offset| *offset as usize <= byte_offset)
+      .saturating_sub(1);
+    widths[index] += cell.cell_width;
+    byte_offset += cell.text.len();
+  }
+  let mut positions = Vec::with_capacity(glyphs.len());
+  let mut start = 0;
+  let mut column = origin;
+  while start < glyphs.len() {
+    let cluster = glyphs[start].cluster;
+    let mut end = start + 1;
+    // Joining scripts keep continuous advances inside a word; spare column space
+    // belongs outside the word, not between connected letters.
+    let joining = joining_cluster(&span.text, cluster);
+    while end < glyphs.len()
+      && (glyphs[end].cluster == cluster
+        || (joining && joining_cluster(&span.text, glyphs[end].cluster)))
+    {
+      end += 1;
+    }
+    let mut width = 0;
+    let mut previous = None;
+    for glyph in &glyphs[start..end] {
+      if previous != Some(glyph.cluster) {
+        width += widths[clusters
+          .binary_search(&glyph.cluster)
+          .expect("known shaping cluster")];
+        previous = Some(glyph.cluster);
+      }
+    }
+    let natural: f32 = glyphs[start..end].iter().map(|glyph| glyph.x_advance).sum();
+    let allocated = metrics.cell_span_width(column, width) as f32;
+    let mut pen = metrics.cell_x(column) as f32 + (allocated - natural).max(0.0) / 2.0;
+    for glyph in &glyphs[start..end] {
+      positions.push(pen);
+      pen += glyph.x_advance;
+    }
+    column += width;
+    start = end;
+  }
+  positions
+}
+
+fn joining_cluster(text: &str, offset: u32) -> bool {
+  text
+    .get(offset as usize..)
+    .and_then(|text| text.chars().next())
+    .is_some_and(|character| {
+      matches!(
+        character.script(),
+        Script::Arabic | Script::Syriac | Script::Mongolian
+      )
+    })
+}
+
 fn draw_shaped_span(
   image: &mut RgbaImage,
   fonts: &FontSet,
@@ -1223,6 +1553,10 @@ fn draw_shaped_span(
   span: &ShapedTextSpan,
 ) {
   if span.style.hidden {
+    return;
+  }
+  if is_geometry(&span.text) {
+    draw_fallback_span(image, fonts, metrics, origin_cell_x, y, span);
     return;
   }
   let Some(font_index) = span.font_index else {
@@ -1243,24 +1577,16 @@ fn draw_shaped_span(
   let clip_right = origin_x.saturating_add(span_width).min(image.width());
   let baseline = u32::from(y) * metrics.cell_height + metrics.baseline.round() as u32;
   let (fg, _) = resolved_colors(&span.style);
-  let natural_advance: f32 = glyphs.iter().map(|glyph| glyph.x_advance).sum();
-  let horizontal_scale = if natural_advance > 0.0 {
-    span_width as f32 / natural_advance
-  } else {
-    1.0
-  };
-  let mut pen_x = origin_x as f32;
+  let positions = cluster_positions(&glyphs, span, metrics, origin_cell_x);
   let clip_top = u32::from(y) * metrics.cell_height;
   let clip_bottom = clip_top
     .saturating_add(metrics.cell_height)
     .min(image.height());
-  for glyph in glyphs {
+  for (glyph, pen_x) in glyphs.iter().zip(positions) {
     let Some(rasterized) = fonts.glyph_by_index(font_index, glyph.glyph_id, font_size) else {
-      pen_x += glyph.x_advance * horizontal_scale;
       continue;
     };
-    let destination_x =
-      (pen_x + glyph.x_offset * horizontal_scale).round() as i32 + rasterized.metrics.xmin;
+    let destination_x = (pen_x + glyph.x_offset).round() as i32 + rasterized.metrics.xmin;
     let glyph_baseline = baseline as f32 - glyph.y_offset;
     let destination_y =
       glyph_baseline.round() as i32 - rasterized.metrics.height as i32 - rasterized.metrics.ymin;
@@ -1276,23 +1602,8 @@ fn draw_shaped_span(
       clip_right,
       clip_bottom,
       fg,
+      span.style.italic,
     );
-    if span.style.bold {
-      draw_glyph_bitmap(
-        image,
-        &rasterized.bitmap,
-        rasterized.metrics.width,
-        rasterized.metrics.height,
-        destination_x + 1,
-        destination_y,
-        origin_x,
-        clip_top,
-        clip_right,
-        clip_bottom,
-        fg,
-      );
-    }
-    pen_x += glyph.x_advance * horizontal_scale;
   }
 }
 
@@ -1377,6 +1688,20 @@ fn draw_grapheme(
   {
     return;
   }
+  if grapheme.chars().count() == 1
+    && let Some(connections) = grapheme.chars().next().and_then(box_connections)
+  {
+    draw_box_connections(
+      image,
+      metrics,
+      origin_x,
+      origin_y,
+      span_width,
+      fg,
+      connections,
+    );
+    return;
+  }
   let visible_width_sum: usize = grapheme
     .chars()
     .map(|character| UnicodeWidthChar::width(character).unwrap_or(0))
@@ -1415,7 +1740,10 @@ fn draw_grapheme(
     let Some(font_index) = font_index else {
       continue;
     };
-    let glyph_id = fonts.fonts[font_index].raster.lookup_glyph_index(character);
+    let glyph_id = fonts.fonts[font_index]
+      .raster(&fonts.database)
+      .map(|font| font.lookup_glyph_index(character))
+      .unwrap_or(0);
     let Some(glyph) = fonts.glyph_by_index(font_index, glyph_id, font_size) else {
       continue;
     };
@@ -1463,42 +1791,13 @@ fn draw_grapheme(
       clip_right,
       clip_bottom,
       fg,
+      style.italic,
     );
-    if style.bold {
-      draw_glyph_bitmap(
-        image,
-        bitmap,
-        glyph_metrics.width,
-        glyph_metrics.height,
-        destination_x + 1,
-        top,
-        clip_left,
-        clip_top,
-        clip_right,
-        clip_bottom,
-        fg,
-      );
-    }
 
     if char_width > 0 && !complex_cluster {
       pen_cell_x = pen_cell_x.saturating_add(char_width as u32);
       pen_x = metrics.cell_x(pen_cell_x);
     }
-  }
-
-  if let Some(character) = grapheme.chars().next()
-    && grapheme.chars().count() == 1
-    && let Some(connections) = box_connections(character)
-  {
-    draw_box_connections(
-      image,
-      metrics,
-      origin_x,
-      origin_y,
-      span_width,
-      fg,
-      connections,
-    );
   }
 }
 
@@ -1511,8 +1810,6 @@ fn draw_block_element(
   height: u32,
   color: (u8, u8, u8),
 ) -> bool {
-  let eighth_w = width.div_ceil(8);
-  let eighth_h = height.div_ceil(8);
   let rects: &[(u32, u32, u32, u32)] = match character {
     '█' => &[(0, 0, 8, 8)],
     '▀' => &[(0, 0, 8, 4)],
@@ -1546,17 +1843,17 @@ fn draw_block_element(
     _ => return false,
   };
   for &(rx, ry, rw, rh) in rects {
-    let left = x.saturating_add(rx * eighth_w).min(x + width);
-    let top = y.saturating_add(ry * eighth_h).min(y + height);
+    let left = x.saturating_add(rx * width / 8).min(x + width);
+    let top = y.saturating_add(ry * height / 8).min(y + height);
     let right = if rx + rw == 8 {
       x + width
     } else {
-      x.saturating_add((rx + rw) * eighth_w).min(x + width)
+      x.saturating_add((rx + rw) * width / 8).min(x + width)
     };
     let bottom = if ry + rh == 8 {
       y + height
     } else {
-      y.saturating_add((ry + rh) * eighth_h).min(y + height)
+      y.saturating_add((ry + rh) * height / 8).min(y + height)
     };
     fill_rect(
       image,
@@ -1671,6 +1968,7 @@ fn draw_glyph_bitmap(
   clip_right: u32,
   clip_bottom: u32,
   color: (u8, u8, u8),
+  italic: bool,
 ) {
   for source_y in 0..bitmap_height {
     for source_x in 0..bitmap_width {
@@ -1678,7 +1976,12 @@ fn draw_glyph_bitmap(
       if coverage == 0 {
         continue;
       }
-      let x = destination_x + source_x as i32;
+      let slant = if italic {
+        ((bitmap_height - 1 - source_y) as f32 * 0.2).round() as i32
+      } else {
+        0
+      };
+      let x = destination_x + source_x as i32 + slant;
       let y = destination_y + source_y as i32;
       if x < 0 || y < 0 {
         continue;
@@ -1769,17 +2072,21 @@ fn fill_rect(
   }
 }
 
+// Stable export palette: Tango Dark. Transparent means terminal default, not PNG alpha.
 fn resolved_colors(style: &TextStyle) -> ((u8, u8, u8), (u8, u8, u8)) {
-  let mut fg = style
-    .foreground
-    .as_ref()
-    .map(color_rgb)
-    .unwrap_or((222, 214, 207));
+  let mut fg = match style.foreground.as_ref() {
+    None | Some(TextColor::Transparent) => (211, 215, 207),
+    Some(TextColor::Terminal(color)) if style.bold => terminal_rgb_bright(color),
+    Some(color) => color_rgb(color),
+  };
   let mut bg = style
     .background
     .as_ref()
     .map(color_rgb)
     .unwrap_or((0, 0, 0));
+  if style.dim {
+    fg = (fg.0 / 2, fg.1 / 2, fg.2 / 2);
+  }
   if style.reverse {
     std::mem::swap(&mut fg, &mut bg);
   }
@@ -1794,24 +2101,39 @@ fn color_rgb(color: &TextColor) -> (u8, u8, u8) {
   }
 }
 
+fn terminal_rgb_bright(color: &TerminalColor) -> (u8, u8, u8) {
+  use TerminalColor::*;
+  terminal_rgb(&match color {
+    Black => BrightBlack,
+    Red => BrightRed,
+    Green => BrightGreen,
+    Yellow => BrightYellow,
+    Blue => BrightBlue,
+    Magenta => BrightMagenta,
+    Cyan => BrightCyan,
+    White => BrightWhite,
+    color => color.clone(),
+  })
+}
+
 fn terminal_rgb(color: &TerminalColor) -> (u8, u8, u8) {
   match color {
     TerminalColor::Black => (0, 0, 0),
-    TerminalColor::Red => (170, 0, 0),
-    TerminalColor::Green => (0, 170, 0),
-    TerminalColor::Yellow => (170, 170, 0),
-    TerminalColor::Blue => (0, 0, 170),
-    TerminalColor::Magenta => (170, 0, 170),
-    TerminalColor::Cyan => (0, 170, 170),
-    TerminalColor::White => (222, 214, 207),
+    TerminalColor::Red => (204, 0, 0),
+    TerminalColor::Green => (78, 154, 6),
+    TerminalColor::Yellow => (196, 160, 0),
+    TerminalColor::Blue => (52, 101, 164),
+    TerminalColor::Magenta => (117, 80, 123),
+    TerminalColor::Cyan => (6, 152, 154),
+    TerminalColor::White => (211, 215, 207),
     TerminalColor::BrightBlack => (85, 87, 83),
-    TerminalColor::BrightRed => (255, 85, 85),
-    TerminalColor::BrightGreen => (85, 255, 85),
-    TerminalColor::BrightYellow => (255, 255, 85),
-    TerminalColor::BrightBlue => (85, 85, 255),
-    TerminalColor::BrightMagenta => (255, 85, 255),
-    TerminalColor::BrightCyan => (85, 255, 255),
-    TerminalColor::BrightWhite => (255, 255, 255),
+    TerminalColor::BrightRed => (239, 41, 41),
+    TerminalColor::BrightGreen => (138, 226, 52),
+    TerminalColor::BrightYellow => (252, 233, 79),
+    TerminalColor::BrightBlue => (114, 159, 207),
+    TerminalColor::BrightMagenta => (173, 127, 168),
+    TerminalColor::BrightCyan => (52, 226, 226),
+    TerminalColor::BrightWhite => (238, 238, 236),
   }
 }
 
@@ -1852,6 +2174,31 @@ mod tests {
   }
 
   #[test]
+  fn no_preferred_font_uses_bundled_maple_under_the_deployment_root() {
+    let root = std::env::temp_dir().join(format!(
+      "tui-font-default-{}-{}",
+      std::process::id(),
+      timestamp()
+    ));
+    let fonts_dir = root.join("assets/fonts");
+    std::fs::create_dir_all(&fonts_dir).unwrap();
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts/mmo.ttf");
+    std::fs::copy(&fixture, fonts_dir.join("mmo.ttf")).unwrap();
+
+    let fonts = FontSet::load_with_sources(&[], &root, &[], fontdb::Database::new()).unwrap();
+
+    assert!(
+      fonts
+        .primary_font()
+        .unwrap()
+        .name()
+        .unwrap()
+        .starts_with("Maple Mono NF CN")
+    );
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
   fn invalid_preferred_font_falls_back_to_a_bundled_font_under_the_deployment_root() {
     let root = std::env::temp_dir().join(format!(
       "tui-font-root-{}-{}",
@@ -1860,8 +2207,8 @@ mod tests {
     ));
     let fonts_dir = root.join("assets/fonts");
     std::fs::create_dir_all(&fonts_dir).unwrap();
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts/mnf.ttf");
-    std::fs::copy(&fixture, fonts_dir.join("mnf.ttf")).unwrap();
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts/mmo.ttf");
+    std::fs::copy(&fixture, fonts_dir.join("mmo.ttf")).unwrap();
     let invalid_font = root.join("custom-invalid.ttf");
     std::fs::write(&invalid_font, b"not a font").unwrap();
     let preferred = vec![invalid_font.to_string_lossy().into_owned()];
@@ -1869,7 +2216,14 @@ mod tests {
     let fonts =
       FontSet::load_with_sources(&preferred, &root, &[], fontdb::Database::new()).unwrap();
 
-    assert!(!fonts.fonts.is_empty());
+    assert!(
+      fonts
+        .primary_font()
+        .unwrap()
+        .name()
+        .unwrap()
+        .starts_with("Maple Mono NF CN")
+    );
     std::fs::remove_dir_all(root).unwrap();
   }
 
@@ -1882,7 +2236,7 @@ mod tests {
     ));
     let fonts_dir = root.join("assets/fonts");
     std::fs::create_dir_all(&fonts_dir).unwrap();
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts/mnf.ttf");
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts/mmo.ttf");
     std::fs::copy(&fixture, fonts_dir.join("custom.ttf")).unwrap();
     let preferred = vec!["assets/fonts/custom.ttf".to_string()];
 
@@ -1907,7 +2261,7 @@ mod tests {
       Err(error) => error,
     };
 
-    assert!(error.contains(&root.join("assets/fonts/mnf.ttf").display().to_string()));
+    assert!(error.contains(&root.join("assets/fonts/mmo.ttf").display().to_string()));
     std::fs::remove_dir_all(root).unwrap();
   }
 
@@ -1965,15 +2319,15 @@ mod tests {
   }
 
   #[test]
-  fn raster_metrics_follow_the_primary_font_advance_and_terminal_line_height() {
+  fn raster_metrics_use_fixed_terminal_columns_and_font_baseline() {
     let rasterizer = maple_rasterizer();
-    assert!((rasterizer.metrics.cell_width - 14.4).abs() < 0.01);
+    assert!((rasterizer.metrics.cell_width - 15.0).abs() < 0.01);
     assert_eq!(rasterizer.metrics.cell_height, 36);
     assert!((rasterizer.metrics.font_size - 24.0).abs() < 0.01);
     assert!((rasterizer.metrics.baseline - 26.64).abs() < 0.01);
     assert_eq!(
       rasterizer.dimensions(73, 25, RecordingPixelScale::Original),
-      (1052, 900)
+      (1096, 900)
     );
   }
 
@@ -1983,20 +2337,23 @@ mod tests {
     let metrics = rasterizer.metrics;
     let mut frame = ComposedFrame::new(1, 1);
     frame.set(0, 0, ComposedCell::Text(CanvasCell::new("M")));
-    let image = rasterizer.render(
-      &frame,
-      ScreenshotRect {
-        x: 0,
-        y: 0,
-        width: 1,
-        height: 1,
-      },
-      RecordingPixelScale::Original,
-      |_, _| {},
-    );
+    let image = rasterizer
+      .render(
+        &frame,
+        ScreenshotRect {
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+        },
+        RecordingPixelScale::Original,
+        |_, _| true,
+      )
+      .unwrap();
     let font_index = rasterizer.fonts.font_index_for_grapheme("M").unwrap();
     let glyph_id = rasterizer.fonts.fonts[font_index]
-      .raster
+      .raster(&rasterizer.fonts.database)
+      .unwrap()
       .lookup_glyph_index('M');
     let glyph = rasterizer
       .fonts
@@ -2037,7 +2394,7 @@ mod tests {
       return;
     };
     let font_index = fonts.font_index_for_grapheme(word).unwrap();
-    let font = &fonts.fonts[font_index].raster;
+    let font = fonts.fonts[font_index].raster(&fonts.database).unwrap();
     let nominal_rtl = word
       .chars()
       .rev()
@@ -2058,6 +2415,23 @@ mod tests {
 
     assert_ne!(shaped_ids, nominal_rtl);
     assert!(shaped.iter().all(|glyph| glyph.x_advance >= 0.0));
+    let mut frame = ComposedFrame::new(4, 1);
+    write_preview_line(&mut frame, 0, 0, word);
+    let spans = shape_row(
+      &frame,
+      ScreenshotService::whole_frame_rect(&frame).unwrap(),
+      0,
+      &fonts,
+    );
+    let metrics = RasterMetrics::for_font(fonts.primary_font().unwrap()).unwrap();
+    assert_eq!(spans.len(), 1);
+    let positions = cluster_positions(&shaped, &spans[0], metrics, 0);
+    for index in 1..positions.len() {
+      assert!(
+        (positions[index] - positions[index - 1] - shaped[index - 1].x_advance).abs() < 0.001,
+        "column padding must not separate joined Arabic letters"
+      );
+    }
   }
 
   #[test]
@@ -2078,7 +2452,8 @@ mod tests {
     assert_ne!(
       shaped[0].glyph_id,
       rasterizer.fonts.fonts[font_index]
-        .raster
+        .raster(&rasterizer.fonts.database)
+        .unwrap()
         .lookup_glyph_index('e')
     );
   }
@@ -2129,7 +2504,9 @@ mod tests {
   #[test]
   fn font_coverage_does_not_treat_notdef_as_a_supported_character() {
     let rasterizer = maple_rasterizer();
-    let font = &rasterizer.fonts.fonts[0].raster;
+    let font = rasterizer.fonts.fonts[0]
+      .raster(&rasterizer.fonts.database)
+      .unwrap();
     assert!(font_has_character(font, 'M'));
     assert!(!font_has_character(font, '😀'));
   }
@@ -2142,7 +2519,7 @@ mod tests {
       return;
     };
     let font_index = fonts.font_index_for_grapheme(sequence).unwrap();
-    let font = &fonts.fonts[font_index].raster;
+    let font = fonts.fonts[font_index].raster(&fonts.database).unwrap();
     let nominal = sequence
       .chars()
       .map(|character| font.lookup_glyph_index(character))
@@ -2181,11 +2558,12 @@ mod tests {
         text
           .chars()
           .filter(|character| !is_shaping_ignorable(*character))
-          .all(|character| font_has_character(&font.raster, character))
+          .all(|character| font_has_character(font.raster(&database).unwrap(), character))
       }) {
         return Some(FontSet {
           fonts,
           database,
+          selection_cache: std::cell::RefCell::new(HashMap::new()),
           glyph_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
         });
       }
@@ -2234,10 +2612,10 @@ mod tests {
   fn fractional_cell_advance_uses_stable_rounded_boundaries() {
     let metrics = maple_rasterizer().metrics;
     assert_eq!(metrics.cell_x(0), 0);
-    assert_eq!(metrics.cell_x(1), 14);
-    assert_eq!(metrics.cell_x(2), 29);
-    assert_eq!(metrics.cell_x(3), 43);
-    assert_eq!(metrics.cell_x(5), 72);
+    assert_eq!(metrics.cell_x(1), 15);
+    assert_eq!(metrics.cell_x(2), 30);
+    assert_eq!(metrics.cell_x(3), 45);
+    assert_eq!(metrics.cell_x(5), 75);
   }
 
   #[test]
@@ -2259,15 +2637,15 @@ mod tests {
     let rasterizer = maple_rasterizer();
     assert_eq!(
       rasterizer.dimensions(3, 5, RecordingPixelScale::Half),
-      (22, 90)
+      (24, 90)
     );
     assert_eq!(
       rasterizer.dimensions(3, 5, RecordingPixelScale::Original),
-      (44, 180)
+      (46, 180)
     );
     assert_eq!(
       rasterizer.dimensions(3, 5, RecordingPixelScale::Double),
-      (86, 360)
+      (90, 360)
     );
   }
 
@@ -2275,12 +2653,375 @@ mod tests {
     bundled_rasterizer(&["assets/fonts/mmo.ttf".to_string()])
   }
 
+  #[test]
+  fn system_fallback_searches_all_faces_before_returning_notdef() {
+    let fonts = FontSet::load(&[], &test_deployment_root()).unwrap();
+    assert!(
+      fonts
+        .fonts
+        .iter()
+        .skip(1)
+        .all(|font| font.raster.get().is_none()),
+      "system fallback faces should only rasterize on demand"
+    );
+    for sample in [
+      "한", "글", "ไ", "ท", "ย", "မြ", "ሀ", "ꦗ", "ߒ", "𓀀", "𐀀", "𐎀", "ᚠ", "Ⰰ",
+    ] {
+      let characters = sample
+        .chars()
+        .filter(|c| !is_shaping_ignorable(*c))
+        .collect::<Vec<_>>();
+      let available = fonts.fonts.iter().any(|font| {
+        font.coverage(&fonts.database, &characters) == characters.len()
+          && font.raster(&fonts.database).is_some()
+      });
+      let index = fonts.font_index_for_grapheme(sample).unwrap();
+      if available {
+        assert_eq!(
+          fonts.fonts[index].coverage(&fonts.database, &characters),
+          characters.len(),
+          "missed installed fallback for {sample}"
+        );
+        assert!(
+          fonts
+            .shape_text(index, sample, ShapeDirection::LeftToRight, 24.0)
+            .unwrap()
+            .iter()
+            .all(|glyph| glyph.glyph_id != 0),
+          "fallback shapes .notdef for {sample}"
+        );
+      } else {
+        eprintln!("No installed face covers {sample:?}");
+      }
+      assert_eq!(fonts.font_index_for_grapheme(sample), Some(index));
+    }
+    assert_eq!(fonts.font_index_for_grapheme("\u{10ffff}"), Some(0));
+  }
+
+  #[test]
+  fn clusters_keep_marks_and_ligatures_without_long_row_drift() {
+    let rasterizer = maple_rasterizer();
+    let mut frame = ComposedFrame::new(160, 1);
+    write_preview_line(&mut frame, 0, 0, &"a\u{301}->中".repeat(30));
+    let rect = ScreenshotService::whole_frame_rect(&frame).unwrap();
+    let spans = shape_row(&frame, rect, 0, &rasterizer.fonts);
+    let mut column = 0;
+    for span in spans {
+      let glyphs = rasterizer
+        .fonts
+        .shape_text(span.font_index.unwrap(), &span.text, span.direction, 24.0)
+        .unwrap();
+      let positions = cluster_positions(&glyphs, &span, rasterizer.metrics, column);
+      assert_eq!(positions.len(), glyphs.len());
+      for (glyph, position) in glyphs.iter().zip(&positions) {
+        assert!(*position >= rasterizer.metrics.cell_x(column) as f32);
+        assert!(glyph.cluster < span.text.len() as u32);
+      }
+      column += span.cell_width;
+    }
+    assert_eq!(column, 160);
+    assert_eq!(rasterizer.metrics.cell_x(column), 2400);
+    // Deliberately unequal natural advances must not scale every character by a run ratio.
+    let mut frame = ComposedFrame::new(3, 1);
+    write_preview_line(&mut frame, 0, 0, "abc");
+    let span = shape_row(
+      &frame,
+      ScreenshotService::whole_frame_rect(&frame).unwrap(),
+      0,
+      &rasterizer.fonts,
+    )
+    .remove(0);
+    let glyphs = [5.0, 25.0, 10.0]
+      .into_iter()
+      .enumerate()
+      .map(|(cluster, x_advance)| ShapedGlyph {
+        glyph_id: 1,
+        cluster: cluster as u32,
+        x_advance,
+        x_offset: 0.0,
+        y_offset: 0.0,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(
+      cluster_positions(&glyphs, &span, rasterizer.metrics, 0),
+      [5.0, 15.0, 32.5]
+    );
+  }
+
+  #[test]
+  fn cropped_wide_continuation_does_not_shift_following_cells() {
+    let rasterizer = maple_rasterizer();
+    let mut frame = ComposedFrame::new(4, 1);
+    write_preview_line(&mut frame, 0, 0, "中AB");
+    let spans = shape_row(
+      &frame,
+      ScreenshotRect {
+        x: 1,
+        y: 0,
+        width: 3,
+        height: 1,
+      },
+      0,
+      &rasterizer.fonts,
+    );
+    assert_eq!(
+      spans
+        .iter()
+        .map(|span| span.text.as_str())
+        .collect::<String>(),
+      " AB"
+    );
+    assert_eq!(spans.iter().map(|span| span.cell_width).sum::<u32>(), 3);
+  }
+
+  #[test]
+  fn export_colors_reset_brighten_and_preserve_truecolor() {
+    let mut style = TextStyle {
+      foreground: Some(TextColor::Transparent),
+      ..TextStyle::default()
+    };
+    assert_eq!(resolved_colors(&style), ((211, 215, 207), (0, 0, 0)));
+    style.foreground = Some(TextColor::Terminal(TerminalColor::Red));
+    style.bold = true;
+    assert_eq!(resolved_colors(&style).0, (239, 41, 41));
+    style.foreground = Some(TextColor::Rgb {
+      r: 10,
+      g: 20,
+      b: 30,
+    });
+    assert_eq!(resolved_colors(&style).0, (10, 20, 30));
+    style.dim = true;
+    style.reverse = true;
+    assert_eq!(resolved_colors(&style), ((0, 0, 0), (5, 10, 15)));
+  }
+
+  #[test]
+  fn actual_frame_geometry_and_png_round_trip_share_pixels() {
+    let rasterizer = maple_rasterizer();
+    let mut frame = ComposedFrame::new(2, 1);
+    frame.set(
+      0,
+      0,
+      ComposedCell::Text(CanvasCell::styled(
+        "█",
+        TextStyle {
+          foreground: Some(TextColor::Rgb { r: 7, g: 19, b: 31 }),
+          ..TextStyle::default()
+        },
+      )),
+    );
+    frame.set(1, 0, ComposedCell::Text(CanvasCell::new("▐")));
+    let image = rasterizer
+      .render(
+        &frame,
+        ScreenshotService::whole_frame_rect(&frame).unwrap(),
+        RecordingPixelScale::Original,
+        |_, _| true,
+      )
+      .unwrap();
+    for y in 0..36 {
+      for x in 0..15 {
+        assert_eq!(image.get_pixel(x, y).0, [7, 19, 31, 255]);
+      }
+    }
+    // Odd cell width: the right half starts at floor(width / 2), never at 8 * ceil(width / 8).
+    assert_eq!(image.get_pixel(21, 10).0, [0, 0, 0, 255]);
+    assert_eq!(image.get_pixel(22, 10).0, [211, 215, 207, 255]);
+    let mut png = std::io::Cursor::new(Vec::new());
+    image.write_to(&mut png, image::ImageFormat::Png).unwrap();
+    assert_eq!(
+      image::load_from_memory(png.get_ref()).unwrap().to_rgba8(),
+      image
+    );
+  }
+
+  #[test]
+  fn rendering_rejects_empty_oversized_and_cancelled_work() {
+    let rasterizer = maple_rasterizer();
+    let frame = ComposedFrame::new(2, 2);
+    for (width, height) in [(0, 1), (u16::MAX, u16::MAX)] {
+      assert!(
+        rasterizer
+          .render(
+            &frame,
+            ScreenshotRect {
+              x: 0,
+              y: 0,
+              width,
+              height
+            },
+            RecordingPixelScale::Double,
+            |_, _| true
+          )
+          .is_err()
+      );
+    }
+    let mut rows = Vec::new();
+    let result = rasterizer.render(
+      &frame,
+      ScreenshotService::whole_frame_rect(&frame).unwrap(),
+      RecordingPixelScale::Original,
+      |row, _| {
+        rows.push(row);
+        row == 0
+      },
+    );
+    assert!(result.unwrap_err().contains("cancelled"));
+    assert_eq!(rows, [0, 1]);
+  }
+
+  #[test]
+  fn styles_and_repeated_frames_keep_pixels_and_glyph_cache_stable() {
+    let rasterizer = maple_rasterizer();
+    let mut frame = ComposedFrame::new(3, 1);
+    let rect = ScreenshotService::whole_frame_rect(&frame).unwrap();
+    frame.set(0, 0, ComposedCell::Text(CanvasCell::new("M")));
+    let plain = rasterizer
+      .render(&frame, rect, RecordingPixelScale::Original, |_, _| true)
+      .unwrap();
+    for style in [
+      TextStyle {
+        italic: true,
+        ..TextStyle::default()
+      },
+      TextStyle {
+        strike: true,
+        ..TextStyle::default()
+      },
+      TextStyle {
+        dim: true,
+        ..TextStyle::default()
+      },
+    ] {
+      frame.set(0, 0, ComposedCell::Text(CanvasCell::styled("M", style)));
+      assert_ne!(
+        rasterizer
+          .render(&frame, rect, RecordingPixelScale::Original, |_, _| true)
+          .unwrap(),
+        plain
+      );
+    }
+    frame.set(
+      0,
+      0,
+      ComposedCell::Text(CanvasCell::styled(
+        "M",
+        TextStyle {
+          hidden: true,
+          underline: true,
+          strike: true,
+          ..TextStyle::default()
+        },
+      )),
+    );
+    assert!(
+      rasterizer
+        .render(&frame, rect, RecordingPixelScale::Original, |_, _| true)
+        .unwrap()
+        .pixels()
+        .all(|pixel| pixel.0 == [0, 0, 0, 255])
+    );
+    frame.set(
+      0,
+      0,
+      ComposedCell::Text(CanvasCell::styled(
+        "M",
+        TextStyle {
+          blink: true,
+          ..TextStyle::default()
+        },
+      )),
+    );
+    let entries = rasterizer.fonts.glyph_cache.borrow().len();
+    for _ in 0..120 {
+      assert_eq!(
+        rasterizer
+          .render(&frame, rect, RecordingPixelScale::Original, |_, _| true)
+          .unwrap(),
+        plain
+      );
+    }
+    assert_eq!(rasterizer.fonts.glyph_cache.borrow().len(), entries);
+  }
+
+  #[test]
+  fn screenshot_job_saves_pixels_and_reports_bad_output_without_partial_files() {
+    let nonce = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let directory = std::env::temp_dir().join(format!("tg-png-{}-{nonce}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    let mut frame = ComposedFrame::new(2, 1);
+    frame.set(
+      0,
+      0,
+      ComposedCell::Text(CanvasCell::styled(
+        "█",
+        TextStyle {
+          foreground: Some(TextColor::Rgb {
+            r: 11,
+            g: 22,
+            b: 33,
+          }),
+          ..TextStyle::default()
+        },
+      )),
+    );
+    let mut task = ScreenshotTask {
+      selection: ScreenshotService::whole_frame_rect(&frame).unwrap(),
+      frame,
+      png_path: directory.join("frame.png"),
+      fonts: Vec::new(),
+      deployment_root: test_deployment_root(),
+    };
+    let (tx, rx) = crossbeam_channel::unbounded::<ScreenshotAsyncEvent>();
+    run_screenshot_task(
+      TaskId(1),
+      task.clone(),
+      &tx,
+      &TaskCancellation::new(TaskId(1)),
+    )
+    .unwrap();
+    let image = image::open(&task.png_path).unwrap().to_rgba8();
+    assert_eq!(image.dimensions(), (30, 36));
+    assert_eq!(image.get_pixel(0, 0).0, [11, 22, 33, 255]);
+    assert!(
+      rx.try_iter()
+        .any(|event| matches!(event, ScreenshotAsyncEvent::Saved { .. }))
+    );
+    let blocker = directory.join("blocked");
+    fs::write(&blocker, "keep").unwrap();
+    task.png_path = blocker.join("frame.png");
+    assert!(
+      run_screenshot_task(
+        TaskId(2),
+        task.clone(),
+        &tx,
+        &TaskCancellation::new(TaskId(2))
+      )
+      .is_err()
+    );
+    assert!(
+      rx.try_iter()
+        .any(|event| matches!(event, ScreenshotAsyncEvent::Failed { .. }))
+    );
+    assert_eq!(fs::read_to_string(blocker).unwrap(), "keep");
+    let cancellation = TaskCancellation::new(TaskId(3));
+    cancellation.cancel();
+    task.png_path = directory.join("cancelled.png");
+    assert!(run_screenshot_task(TaskId(3), task.clone(), &tx, &cancellation).is_err());
+    assert!(!task.png_path.exists());
+    assert_eq!(fs::read_dir(&directory).unwrap().count(), 2);
+    fs::remove_dir_all(directory).unwrap();
+  }
+
   fn bundled_rasterizer(preferred: &[String]) -> TerminalFrameRasterizer {
     let deployment_root = test_deployment_root();
     let font_path = preferred
       .first()
       .map(PathBuf::from)
-      .unwrap_or_else(|| bundled_font_paths(&deployment_root)[0].clone());
+      .unwrap_or_else(|| bundled_font_path(&deployment_root));
     let mut loaded_fonts = Vec::new();
     load_font_file(
       &resolve_font_path(&font_path, &deployment_root),
@@ -2290,6 +3031,7 @@ mod tests {
     let fonts = FontSet {
       fonts: loaded_fonts,
       database: fontdb::Database::new(),
+      selection_cache: std::cell::RefCell::new(HashMap::new()),
       glyph_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
     };
     let metrics = RasterMetrics::for_font(fonts.primary_font().unwrap()).unwrap();

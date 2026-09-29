@@ -81,19 +81,21 @@
 - 错误码包含以下固定值：
 
 ```lua
-"invalid_request"
-"permission_denied"
-"not_found"
-"too_large"
-"invalid_utf8"
-"cancelled"
-"timeout"
-"io"
-"network"
-"unsupported"
-"decode"
-"backend_unavailable"
-"internal"
+local error_codes = {
+  "invalid_request",
+  "permission_denied",
+  "not_found",
+  "too_large",
+  "invalid_utf8",
+  "cancelled",
+  "timeout",
+  "io",
+  "network",
+  "unsupported",
+  "decode",
+  "backend_unavailable",
+  "internal",
+}
 ```
 
 ---
@@ -132,7 +134,7 @@
 ```lua
 function HandleEvent(event)
   if event.type == "action" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -220,7 +222,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "key" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -308,7 +310,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "mouse" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -398,7 +400,7 @@ Base 画布尺寸变化事件。
 ```lua
 function HandleEvent(event)
   if event.type == "resize" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -456,7 +458,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "focus" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -511,7 +513,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "overlay_started" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -565,7 +567,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "overlay_stopped" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -625,7 +627,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "timer" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -708,7 +710,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "animation" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -793,7 +795,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -909,7 +911,7 @@ end
 | `request_id` | integer      | 当前会话内的请求 ID                          |
 | `kind`       | string       | 图片操作类型                                 |
 | `ok`         | boolean      | 转换是否成功                                 |
-| `output`     | string / nil | 转换成功时出现，表示可直接交给 `draw.text{ text = output }` 的终端富文本 |
+| `output`     | string / nil | 转换成功时出现，表示可直接交给 `draw.text(x, y, output)` 的终端富文本 |
 | `error`      | table / nil  | 转换失败时出现，包含通用错误码和错误说明     |
 
 ### 发送条件
@@ -921,7 +923,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "image" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -999,7 +1001,7 @@ GET 或 POST 请求产生最终结果时，发送给登记该请求的游戏、�
 ```lua
 function HandleEvent(event)
   if event.type == "network" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1067,7 +1069,7 @@ end
 
 | 字段                     | 类型    | 说明                                                             |
 | ------------------------ | ------- | ---------------------------------------------------------------- |
-| `request_id`             | integer | 与 `i18n.create{}` 或 `i18n.reload{}` 返回的会话内请求 ID 相同   |
+| `request_id`             | integer | 与 `i18n.create(options)` 或 `i18n.reload(options)` 返回的会话内请求 ID 相同   |
 | `kind`                   | string  | 语言加载事件类型                                                 |
 | `ok`                     | boolean | 本次语言加载是否成功                                             |
 | `message`                | string  | 经过净化的加载结果说明                                           |
@@ -1076,14 +1078,14 @@ end
 
 ### 发送条件
 
-调用 `i18n.create {}` 或 `i18n.reload {}` 并成功入队后，包语言文件异步加载结束时，发送给发起请求的游戏、屏保会话；`data.request_id` 与调用立即返回的 ID 相同。
+调用 `i18n.create(options)` 或 `i18n.reload(options)` 并成功入队后，包语言文件异步加载结束时，发送给发起请求的游戏、屏保会话；`data.request_id` 与调用立即返回的 ID 相同。
 
 ### 示例
 
 ```lua
 function HandleEvent(event)
   if event.type == "i18n" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1118,10 +1120,10 @@ end
 "reloaded" -- reload 请求结束
 ```
 
-- 事件进入 `HandleEvent` 前，宿主已经提交成功加载的语言数据，可立即调用 `i18n.get_value {}` 获取文本。
+- 事件进入 `HandleEvent` 前，宿主已经提交成功加载的语言数据，可立即调用 `i18n.get_value(namespace, key)` 获取文本。
 - 包语言文件从 `assets/language/<language_code>/*.json` 读取，不递归扫描子目录；每个命名空间 JSON 必须是单层对象，所有值必须是字符串。
 - 主语言缺少的命名空间和键由备用语言补齐，已有主语言值不会被覆盖。
-- 两种语言都没有某个键时，`i18n.get_value {}` 使用宿主当前语言的 `language_warning.missing` 文本生成缺失提示。
+- 两种语言都没有某个键时，`i18n.get_value(namespace, key)` 使用宿主当前语言的 `language_warning.missing` 文本生成缺失提示。
 - `message` 不包含绝对路径、系统错误或宿主任务 ID。
 - `reload` 失败时保留上一次成功加载的数据。
 
@@ -1163,7 +1165,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "audio" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1248,7 +1250,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "hit_area" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1327,7 +1329,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "hyperlink" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1391,7 +1393,7 @@ Markdown 文本中的链接点击事件。
 ```lua
 function HandleEvent(event)
   if event.type == "markdown" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1454,7 +1456,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "text_input" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1529,7 +1531,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "scroll_box" then
-    debug.print { message = table.pretty{ table = event } }
+    debug.print(table.pretty(event))
   end
 end
 ```

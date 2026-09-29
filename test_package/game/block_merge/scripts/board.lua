@@ -1,4 +1,4 @@
--- Pure board logic for Block Merge. Loaded through loader.require{ path = "board" }.
+-- Pure board logic for Block Merge. Loaded through loader.require("board").
 
 local board = {}
 
@@ -116,7 +116,7 @@ function board.can_move(cells)
 end
 
 function board.max_tile(cells)
-  return math.floor(math.max { values = cells })
+  return math.floor(math.max(cells))
 end
 
 return board

@@ -1,20 +1,14 @@
 # utf8 库
 
-## 基本库说明
+`utf8` 提供 UTF-8 字符串长度、转换和遍历方法。
 
-`utf8` 提供 UTF-8 字符串处理。
+---
 
-### 调用与资源限制
+# 目录
 
-- 本项目保留命名参数、数组参数、字段结果表和惰性记录迭代器；Lua 5.4 的位置参数/多返回形状不替换这些接口。
-- 字符串最多 1 MiB；码点/ASCII 数组最多 16,384 项。字符串索引相关字段会明确标为 Unicode 标量位置或一基 UTF-8 字节位置。
-- 输入字符串先校验为有效 UTF-8；生成码点字符串受 1 MiB 输出上限约束。`codepoints` 和 `next` 按需返回单项记录，不预先构造全部结果。
+## 方法
 
-## 目录
-
-### 方法
-
-| 方法名              | 说明                                                                 | 索引                                    |
+| 方法                | 说明                                                                 | 定位                                    |
 | ------------------- | -------------------------------------------------------------------- | --------------------------------------- |
 | `len`               | 返回字符串包含的 Unicode 标量数量                                    | [len](#len)                             |
 | `byte_len`          | 返回字符串经过 UTF-8 编码后的字节数                                  | [byte_len](#byte_len)                   |
@@ -29,7 +23,7 @@
 
 ---
 
-## 方法
+# 方法
 
 ## `len`
 
@@ -38,17 +32,18 @@
 ### 调用
 
 ```lua
--- 单参数
-utf8.len()
+utf8.len
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `text` | string | 目标字符串 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -60,26 +55,26 @@ utf8.len()
 
 ```lua
 local s1 = "Hello"
-debug.print { message = utf8.len(s1) }
+debug.print(utf8.len(s1))
 
 local s2 = "你好世界"
-debug.print { message = utf8.len(s2) }
+debug.print(utf8.len(s2))
 
 local s3 = "😊👍"
-debug.print { message = utf8.len(s3) }
+debug.print(utf8.len(s3))
 
 local s4 = "A😊B中"
-debug.print { message = utf8.len(s4) }
+debug.print(utf8.len(s4))
 ```
 
-输出：
+**输出：**
 
-```text
-5
-4
-2
-4
+```lua
 ```
+
+### 额外说明
+
+字符串输入最多为 1 MiB；字符和 ASCII 数组最多为 16,384 项；由数组生成的字符串最多为 1 MiB。接口参数会注明索引按 Unicode 标量位置还是一基 UTF-8 字节位置解释。输入文本必须是有效 UTF-8。
 
 ---
 
@@ -90,17 +85,18 @@ debug.print { message = utf8.len(s4) }
 ### 调用
 
 ```lua
--- 单参数
-utf8.byte_len()
+utf8.byte_len
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `text` | string | 目标字符串 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -112,29 +108,25 @@ utf8.byte_len()
 
 ```lua
 local s1 = "Hello"
-debug.print { message = utf8.byte_len(s1) }
+debug.print(utf8.byte_len(s1))
 
 local s2 = "你好"
-debug.print { message = utf8.byte_len(s2) }
+debug.print(utf8.byte_len(s2))
 
 local s3 = "😊👍"
-debug.print { message = utf8.byte_len(s3) }
+debug.print(utf8.byte_len(s3))
 
 local s4 = "A😊B中"
-debug.print { message = utf8.byte_len(s4) }
+debug.print(utf8.byte_len(s4))
 
 ```
 
-输出：
+**输出：**
 
-```text
-5
-6
-8
-9
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 字节数为 UTF-8 字节数。
 
@@ -147,17 +139,18 @@ debug.print { message = utf8.byte_len(s4) }
 ### 调用
 
 ```lua
--- 单参数
-utf8.is_ascii()
+utf8.is_ascii
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `text` | string | 目标字符串 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -169,17 +162,15 @@ utf8.is_ascii()
 
 ```lua
 local s1 = "Hello"
-debug.print { message = utf8.is_ascii(s1) }
+debug.print(utf8.is_ascii(s1))
 
 local s2 = "😊"
-debug.print { message = utf8.is_ascii(s2) }
+debug.print(utf8.is_ascii(s2))
 ```
 
-输出：
+**输出：**
 
-```text
-true
-false
+```lua
 ```
 
 ---
@@ -191,17 +182,18 @@ false
 ### 调用
 
 ```lua
--- 单参数
-utf8.codepoint_to_char()
+utf8.codepoint_to_char
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型  | 必填 | 默认值 | 说明       |
-| -------- | ----- | ---- | ------ | ---------- |
-| `values` | table | 是   | -      | 码点数组表 |
+### 必填参数
 
-### 返回
+| 参数名   | 类型  | 说明       |
+| -------- | ----- | ---------- |
+| `values` | table | 码点数组表 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -213,17 +205,15 @@ utf8.codepoint_to_char()
 
 ```lua
 local t1 = { 72, 101, 108, 108, 111 }
-debug.print { message = utf8.codepoint_to_char(t1) }
+debug.print(utf8.codepoint_to_char(t1))
 
 local t2 = { 20320, 22909, 19990, 30028 }
-debug.print { message = utf8.codepoint_to_char(t2) }
+debug.print(utf8.codepoint_to_char(t2))
 ```
 
-输出：
+**输出：**
 
-```text
-Hello
-你好世界
+```lua
 ```
 
 ---
@@ -235,17 +225,18 @@ Hello
 ### 调用
 
 ```lua
--- 单参数
-utf8.ascii_to_char()
+utf8.ascii_to_char
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型  | 必填 | 默认值 | 说明         |
-| -------- | ----- | ---- | ------ | ------------ |
-| `values` | table | 是   | -      | ASCII 码数组 |
+### 必填参数
 
-### 返回
+| 参数名   | 类型  | 说明         |
+| -------- | ----- | ------------ |
+| `values` | table | ASCII 码数组 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -257,21 +248,18 @@ utf8.ascii_to_char()
 
 ```lua
 local t1 = { 65, 66, 67 }
-debug.print { message = utf8.ascii_to_char(t1) }
+debug.print(utf8.ascii_to_char(t1))
 
 local t2 = { 72, 105, 10, 84, 104, 101, 114, 101 }
-debug.print { message = utf8.ascii_to_char(t2) }
+debug.print(utf8.ascii_to_char(t2))
 ```
 
-输出：
+**输出：**
 
-```text
-ABC
-Hi
-There
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - ASCII 码范围为 $[0..127]$。
 
@@ -284,19 +272,25 @@ There
 ### 调用
 
 ```lua
--- 表参数
-utf8.char_to_codepoint{}
+utf8.char_to_codepoint
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型    | 必填 | 默认值           | 说明                  |
-| -------- | ------- | ---- | ---------------- | --------------------- |
-| `text`   | string  | 是   | -                | 目标字符串            |
-| `start`  | integer | 否   | `1`              | 起始 Unicode 标量位置 |
-| `finish` | integer | 否   | Unicode 标量数量 | 结束 Unicode 标量位置 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `text` | string | 目标字符串 |
+
+### 选填参数
+
+| 参数名   | 类型    | 说明                                          |
+| -------- | ------- | --------------------------------------------- |
+| `start`  | integer | 默认：`1`；起始 Unicode 标量位置              |
+| `finish` | integer | 默认：Unicode 标量数量；结束 Unicode 标量位置 |
+
+## 返回值
 
 返回一个数组表。
 
@@ -308,35 +302,30 @@ utf8.char_to_codepoint{}
 
 ```lua
 local s1 = "Hello"
-local r1 = utf8.char_to_codepoint { text = s1 }
-debug.print { message = table.pretty{ table = r1 } }
+local r1 = utf8.char_to_codepoint(s1)
+debug.print(table.pretty(r1))
 
 local s2 = "你好世界"
-local r2 = utf8.char_to_codepoint { text = s2, start = 2, finish = 3 }
-debug.print { message = table.pretty{ table = r2 } }
+local r2 = utf8.char_to_codepoint(s2, {start = 2, finish = 3})
+debug.print(table.pretty(r2))
 
 ```
 
-输出：
+**输出：**
 
 ```lua
-{ [1] = 72, [2] = 101, [3] = 108, [4] = 108, [5] = 111, n = 5 }
-
-{ [1] = 22909, [2] = 19990, n = 2 }
 ```
 
-### 额外补充
+### 额外说明
 
 - 返回值表结构如下：
 
 ```lua
-{
-  [1] = ...,
-  [2] = ...,
-  ...
-  [x] = ...,
-  n = x
-} -- 共有 x+1 个元素，所有返回值连续排序，最后 n 为返回值个数
+local values = {
+  [1] = 65,
+  [2] = 20320,
+  n = 2,
+}
 ```
 
 ---
@@ -348,19 +337,25 @@ debug.print { message = table.pretty{ table = r2 } }
 ### 调用
 
 ```lua
--- 表参数
-utf8.char_to_ascii{}
+utf8.char_to_ascii
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型    | 必填 | 默认值           | 说明                  |
-| -------- | ------- | ---- | ---------------- | --------------------- |
-| `text`   | string  | 是   | -                | 目标字符串            |
-| `start`  | integer | 否   | `1`              | 起始 Unicode 标量位置 |
-| `finish` | integer | 否   | Unicode 标量数量 | 结束 Unicode 标量位置 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `text` | string | 目标字符串 |
+
+### 选填参数
+
+| 参数名   | 类型    | 说明                                          |
+| -------- | ------- | --------------------------------------------- |
+| `start`  | integer | 默认：`1`；起始 Unicode 标量位置              |
+| `finish` | integer | 默认：Unicode 标量数量；结束 Unicode 标量位置 |
+
+## 返回值
 
 返回一个数组表。
 
@@ -372,35 +367,31 @@ utf8.char_to_ascii{}
 
 ```lua
 local s1 = "ABC"
-local r1 = utf8.char_to_ascii { text = s1 }
-debug.print { message = table.pretty{ table = r1 } }
+local r1 = utf8.char_to_ascii(s1)
+debug.print(table.pretty(r1))
 
 local s2 = "A中B"
-local r2 = utf8.char_to_ascii { text = s2, start = 1, finish = 2 }
-debug.print { message = table.pretty{ table = r2 } }
+local r2 = utf8.char_to_ascii(s2, {start = 1, finish = 2})
+debug.print(table.pretty(r2))
 ```
 
-输出：
+**输出：**
 
 ```lua
-{ [1] = 65, [2] = 66, [3] = 67, n = 3 }
-{ [1] = 65, n = 2 }
 ```
 
-### 额外补充
+### 额外说明
 
 - 若 Unicode 标量不属于 ASCII 范围，对应结果位置标记为 `nil`。
 
 - 返回值表结构如下：
 
 ```lua
-{
-  [1] = ...,
-  [2] = ...,
-  ...
-  [x] = ...,
-  n = x
-} -- 共有 x+1 个元素，所有返回值连续排序，最后 n 为返回值个数
+local values = {
+  [1] = 65,
+  [2] = 20320,
+  n = 2,
+}
 ```
 
 ---
@@ -412,19 +403,25 @@ debug.print { message = table.pretty{ table = r2 } }
 ### 调用
 
 ```lua
--- 表参数
-utf8.char_position{}
+utf8.char_position
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型    | 必填 | 默认值 | 说明                                   |
-| ------- | ------- | ---- | ------ | -------------------------------------- |
-| `text`  | string  | 是   | -      | 目标字符串                             |
-| `index` | integer | 是   | -      | 从 `start` 开始计算的 Unicode 标量序号 |
-| `start` | integer | 否   | `1`    | 起始 Unicode 标量位置                  |
+### 必填参数
 
-### 返回
+| 参数名  | 类型    | 说明                                   |
+| ------- | ------- | -------------------------------------- |
+| `text`  | string  | 目标字符串                             |
+| `index` | integer | 从 `start` 开始计算的 Unicode 标量序号 |
+
+### 选填参数
+
+| 参数名  | 类型    | 说明                             |
+| ------- | ------- | -------------------------------- |
+| `start` | integer | 默认：`1`；起始 Unicode 标量位置 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -436,17 +433,15 @@ utf8.char_position{}
 
 ```lua
 local s1 = "Hello"
-debug.print { message = utf8.char_position { text = s1, index = 1 } }
+debug.print(utf8.char_position(s1, 1))
 
 local s2 = "你好世界"
-debug.print { message = utf8.char_position { text = s2, index = 3 } }
+debug.print(utf8.char_position(s2, 3))
 ```
 
-输出：
+**输出：**
 
-```text
-1
-7
+```lua
 ```
 
 ---
@@ -458,17 +453,18 @@ debug.print { message = utf8.char_position { text = s2, index = 3 } }
 ### 调用
 
 ```lua
--- 单参数
-utf8.codepoints()
+utf8.codepoints
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `text` | string | 目标字符串 |
+
+## 返回值
 
 直接返回一个值。
 
@@ -476,39 +472,37 @@ utf8.codepoints()
 | -------- | -------- |
 | function | 迭代函数 |
 
-**迭代器函数**，返回一个对象表。
+迭代器每次返回两个值：当前 Unicode 标量的一基 UTF-8 字节位置和码点。
 
-| 字段          | 类型    | 说明                                   |
-| ------------- | ------- | -------------------------------------- |
-| `byte_position` | integer | 当前 Unicode 标量的一基 UTF-8 字节位置 |
-| `codepoint`     | integer | 当前 Unicode 标量对应的码点            |
+| 值名            | 类型    | 说明                                     |
+| --------------- | ------- | ---------------------------------------- |
+| `byte_position` | integer | 当前 Unicode 标量的一基 UTF-8 字节位置。 |
+| `codepoint`     | integer | 当前 Unicode 标量对应的码点。            |
 
 ### 示例
 
 ```lua
 local s1 = "ABC"
-for item in utf8.codepoints(s1) do
-  debug.print { message = item.byte_position .. " " .. item.codepoint }
+for byte_position, codepoint in utf8.codepoints(s1) do
+  debug.print(byte_position .. " " .. codepoint)
 end
 
-debug.print { message = "" }
+debug.print("")
 
 local s2 = "你好"
-for item in utf8.codepoints(s2) do
-  debug.print { message = item.byte_position .. " " .. item.codepoint }
+for byte_position, codepoint in utf8.codepoints(s2) do
+  debug.print(byte_position .. " " .. codepoint)
 end
 ```
 
-输出：
+**输出：**
 
-```text
-1 65
-2 66
-3 67
-
-1 20320
-4 22909
+```lua
 ```
+
+### 额外说明
+
+每次迭代按需返回当前位置和码点，不会预先创建包含全部字符的数组。
 
 ---
 
@@ -519,55 +513,44 @@ end
 ### 调用
 
 ```lua
--- 表参数
-utf8.next{}
+utf8.next
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型          | 必填 | 默认值 | 说明                                                                  |
-| ------ | ------------- | ---- | ------ | --------------------------------------------------------------------- |
-| `text` | string        | 是   | -      | 目标字符串                                                            |
-| `pos`  | integer / nil | 否   | `nil`  | 当前一基 UTF-8 字节位置；省略或传入 `nil` 时从第一个 Unicode 标量开始 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `text` | string | 目标字符串 |
 
-**找到下一个元素时**，返回一个对象表。
+### 选填参数
 
-| 返回值名    | 类型    | 说明                                     |
-| ----------- | ------- | ---------------------------------------- |
-| `codepoint` | integer | 下一个 Unicode 标量对应的码点            |
-| `position`  | integer | 下一个 Unicode 标量的一基 UTF-8 字节位置 |
+| 参数名 | 类型          | 说明                                                                               |
+| ------ | ------------- | ---------------------------------------------------------------------------------- |
+| `pos`  | integer / nil | 默认：`nil`；当前一基 UTF-8 字节位置；省略或传入 `nil` 时从第一个 Unicode 标量开始 |
 
-**没有后续元素时**，直接返回一个值。
+## 返回值
 
-| 类型 | 说明       |
-| ---- | ---------- |
-| nil  | 无后续元素 |
+找到下一个元素时返回两个值：一基 UTF-8 字节位置和码点。没有后续元素时返回一个 nil。
+
+| 值名            | 类型    | 说明                                       |
+| --------------- | ------- | ------------------------------------------ |
+| `byte_position` | integer | 下一个 Unicode 标量的一基 UTF-8 字节位置。 |
+| `codepoint`     | integer | 下一个 Unicode 标量对应的码点。            |
 
 ### 示例
 
 ```lua
 local s = "A😊B中"
-local pos = nil
-
-while true do
-  local item = utf8.next { text = s, pos = pos }
-  
-  if item == nil then
-    break
-  end
-  
-  debug.print { message = item.position .. " " .. item.codepoint }
-  pos = item.position
+local byte_position, codepoint = utf8.next(s)
+while byte_position ~= nil do
+  debug.print(byte_position .. " " .. codepoint)
+  byte_position, codepoint = utf8.next(s, {pos = byte_position})
 end
 ```
 
-输出：
+**输出：**
 
-```text
-1 65
-2 128522
-6 66
-7 20013
+```lua
 ```

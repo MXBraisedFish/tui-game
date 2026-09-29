@@ -3379,20 +3379,39 @@ mod tests {
       language_code: "en_us".to_string(),
       missing_template: MISSING.to_string(),
     };
+    let required_fixtures = [
+      (
+        PackageType::Game,
+        &[
+          "block_merge",
+          "permissions_lab",
+          "trail_runner",
+          "b8_flicker_lab",
+        ][..],
+      ),
+      (
+        PackageType::Screensaver,
+        &["layer_waves", "pulse_grid", "star_drift"][..],
+      ),
+    ];
+    let mut package_ids = HashSet::new();
 
     for (relative, expected_type) in [
       ("game", PackageType::Game),
       ("screensaver", PackageType::Screensaver),
     ] {
       let category = root.join(relative);
-      let mut count = 0;
+      let mut fixture_ids = HashSet::new();
       for entry in std::fs::read_dir(&category).unwrap() {
         let entry = entry.unwrap();
         if !entry.file_type().unwrap().is_dir() {
           continue;
         }
-        count += 1;
         let dir_name = entry.file_name().to_string_lossy().into_owned();
+        assert!(
+          fixture_ids.insert(dir_name.clone()),
+          "duplicate {relative} fixture identity {dir_name}"
+        );
         let package = read_package(
           &entry.path(),
           &dir_name,
@@ -3401,9 +3420,16 @@ mod tests {
           &request,
         )
         .unwrap_or_else(|error| panic!("{relative}/{dir_name}: {}", error.reason));
-        assert!(package.runtime.min_width > 0);
-        assert!(package.runtime.min_height > 0);
-        assert!(entry.path().join("scripts/main.lua").is_file());
+        assert!(
+          package_ids.insert(package.id.clone()),
+          "duplicate package identity in checked-in fixtures: {:?}",
+          package.id
+        );
+        assert!(
+          package.path.join("scripts").join(&package.entry).is_file(),
+          "{relative}/{dir_name} entry {} does not exist",
+          package.entry
+        );
         match expected_type {
           PackageType::Game => {
             let game = package.game.expect("game configuration");
@@ -3425,8 +3451,103 @@ mod tests {
           }
         }
       }
-      assert_eq!(count, 3, "expected three {relative} test packages");
+      let required = required_fixtures
+        .iter()
+        .find(|(package_type, _)| package_type == &expected_type)
+        .map(|(_, fixtures)| *fixtures)
+        .expect("required fixture list for package type");
+      for fixture_id in required {
+        assert!(
+          fixture_ids.contains(*fixture_id),
+          "required {relative} fixture {fixture_id} is missing"
+        );
+      }
     }
+  }
+
+  #[test]
+  fn package_dimensions_allow_zero_and_scans_allow_additional_valid_games() {
+    let root = temp_root("package_dimensions");
+    write_game(&root, "data/mod/game", "default_size", "Default Size");
+    write_game(&root, "data/mod/game", "zero_size", "Zero Size");
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+
+    let default_package = read_package(
+      &root.join("data/mod/game/default_size"),
+      "default_size",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap();
+    assert_eq!(default_package.runtime.min_width, 0);
+    assert_eq!(default_package.runtime.min_height, 0);
+
+    let zero_size_dir = root.join("data/mod/game/zero_size");
+    let game_path = zero_size_dir.join("game.json");
+    let mut game: serde_json::Value =
+      serde_json::from_slice(&std::fs::read(&game_path).unwrap()).unwrap();
+    game["min_width"] = serde_json::json!(0);
+    game["min_height"] = serde_json::json!(0);
+    std::fs::write(&game_path, serde_json::to_vec(&game).unwrap()).unwrap();
+    let zero_package = read_package(
+      &zero_size_dir,
+      "zero_size",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap();
+    assert_eq!(zero_package.runtime.min_width, 0);
+    assert_eq!(zero_package.runtime.min_height, 0);
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+    assert_eq!(service.game_list().len(), 2);
+
+    write_game(&root, "data/mod/game", "added_game", "Added Game");
+    scan(&mut service, &root, &mut log, "en_us");
+    let scanned_ids = service
+      .game_list()
+      .into_iter()
+      .map(|package| package.mod_id)
+      .collect::<HashSet<_>>();
+    assert_eq!(scanned_ids.len(), 3);
+    assert!(scanned_ids.contains("added_game"));
+
+    game["min_width"] = serde_json::json!(-1);
+    std::fs::write(&game_path, serde_json::to_vec(&game).unwrap()).unwrap();
+    assert!(
+      read_package(
+        &zero_size_dir,
+        "zero_size",
+        &PackageType::Game,
+        &PackageSource::Mod,
+        &request,
+      )
+      .is_err()
+    );
+
+    game["min_width"] = serde_json::json!("wide");
+    std::fs::write(&game_path, serde_json::to_vec(&game).unwrap()).unwrap();
+    assert!(
+      read_package(
+        &zero_size_dir,
+        "zero_size",
+        &PackageType::Game,
+        &PackageSource::Mod,
+        &request,
+      )
+      .is_err()
+    );
+
+    let _ = std::fs::remove_dir_all(root);
   }
 
   #[test]

@@ -53,14 +53,17 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let read_state = state.clone();
   source.raw_set(
     "read",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.read";
-      let table = args::named(
+      let parameters = args::positional(
+        lua,
         method,
         values,
-        &["path", "encoding", "end_of_line", "byte", "event_tip"],
+        &["path"],
+        &["encoding", "end_of_line", "byte", "event_tip"],
       )?;
-      let relative_path = file_path(&table, method)?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
       let byte = file_byte_mode(&table, method)?;
       let event_tip = file_tip(&table, method)?;
@@ -87,24 +90,20 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let write_state = state.clone();
   source.raw_set(
     "write",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.write";
       if !file_permission(&write_state, method) {
         return Ok(Value::Nil);
       }
-      let table = args::named(
+      let parameters = args::positional(
+        lua,
         method,
         values,
-        &[
-          "path",
-          "text",
-          "encoding",
-          "end_of_line",
-          "byte",
-          "event_tip",
-        ],
+        &["path", "text"],
+        &["encoding", "end_of_line", "byte", "event_tip"],
       )?;
-      let relative_path = file_path(&table, method)?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
       let byte = file_byte_mode(&table, method)?;
       let event_tip = file_tip(&table, method)?;
@@ -114,7 +113,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         SandboxPathKind::WritableFile,
         method,
       )?;
-      let content = args::required(&table, method, "text")?;
+      let content = parameters.required(1, method, "text")?;
       let (task, operation) = if byte {
         let bytes = file_bytes(content, method)?;
         (
@@ -145,13 +144,14 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let create_dir_state = state.clone();
   source.raw_set(
     "create_dir",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.create_dir";
       if !file_permission(&create_dir_state, method) {
         return Ok(Value::Nil);
       }
-      let table = args::named(method, values, &["path", "event_tip"])?;
-      let relative_path = file_path(&table, method)?;
+      let parameters = args::positional(lua, method, values, &["path"], &["event_tip"])?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
       let event_tip = file_tip(&table, method)?;
       let assets_root = create_dir_state.borrow().context.assets_root.clone();
@@ -178,10 +178,10 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let exists_state = state.clone();
   source.raw_set(
     "exists",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.exists";
-      let table = args::named(method, values, &["path"])?;
-      let value = args::required(&table, method, "path")?;
+      let parameters = args::positional(lua, method, values, &["path"], &[])?;
+      let value = parameters.required(0, method, "path")?;
       let path = args::string(value, method, "path")?;
       let relative_path = parse_file_path(&path, method)?;
       sandbox_path_exists(&exists_state.borrow().context.assets_root, &relative_path)
@@ -191,13 +191,15 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let remove_state = state.clone();
   source.raw_set(
     "remove",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.remove";
       if !file_permission(&remove_state, method) {
         return Ok(Value::Nil);
       }
-      let table = args::named(method, values, &["path", "recursive", "event_tip"])?;
-      let relative_path = file_path(&table, method)?;
+      let parameters =
+        args::positional(lua, method, values, &["path"], &["recursive", "event_tip"])?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       if relative_path.is_root() {
         return Err(args::message(method, "cannot remove the assets root"));
       }
@@ -232,17 +234,20 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let list_state = state.clone();
   source.raw_set(
     "list_dir",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.list_dir";
       if !file_permission(&list_state, method) {
         return Ok(Value::Nil);
       }
-      let table = args::named(
+      let parameters = args::positional(
+        lua,
         method,
         values,
-        &["path", "recursive", "file_type", "event_tip"],
+        &["path"],
+        &["recursive", "file_type", "event_tip"],
       )?;
-      let relative_path = file_path(&table, method)?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
       let recursive = match table.get::<Value>("recursive")? {
         Value::Nil => false,
@@ -303,8 +308,11 @@ pub(super) fn file_permission(state: &SharedApiState, method: &'static str) -> b
   }
 }
 
-pub(super) fn file_path(table: &Table, method: &str) -> mlua::Result<SafeRelativePath> {
-  let path = args::string(args::required(table, method, "path")?, method, "path")?;
+pub(super) fn file_path(
+  parameters: &args::PositionalArgs,
+  method: &str,
+) -> mlua::Result<SafeRelativePath> {
+  let path = args::string(parameters.required(0, method, "path")?, method, "path")?;
   parse_file_path(&path, method)
 }
 

@@ -23,7 +23,7 @@ local cells = {}
 
 -- Sorts a copy of the palette from dark to bright and precomputes the shade strings.
 local function build_shades()
-  local stops = table.deepcopy{ table = PALETTE }
+  local stops = table.deepcopy(PALETTE)
   table.sort(stops, function(left, right)
     return left.r + left.g + left.b < right.r + right.g + right.b
   end)
@@ -31,15 +31,15 @@ local function build_shades()
   for shade = 0, SHADES - 1 do
     local scaled = shade / (SHADES - 1) * (#stops - 1)
     local lower = math.floor(scaled) + 1
-    local upper = math.min { values = { lower + 1, #stops } }
+    local upper = math.min({ lower + 1, #stops })
     local mix = scaled - (lower - 1)
     local from = stops[lower]
     local to = stops[upper]
-    shades[shade + 1] = color.rgb {
-      r = math.round(from.r + (to.r - from.r) * mix),
-      g = math.round(from.g + (to.g - from.g) * mix),
-      b = math.round(from.b + (to.b - from.b) * mix),
-    }
+    shades[shade + 1] = color.rgb(
+      math.round(from.r + (to.r - from.r) * mix),
+      math.round(from.g + (to.g - from.g) * mix),
+      math.round(from.b + (to.b - from.b) * mix)
+    )
   end
 end
 
@@ -88,20 +88,13 @@ function UpdateFrame(dt, alpha)
 end
 
 function Render()
-  draw.fill_rect { x = 0, y = 0, width = width, height = height, char = " ", bg = color.hex { r = 8, g = 10, b = 20 } }
+  draw.fill_rect(0, 0, width, height, { char = " ", bg = color.hex(8, 10, 20) })
   for index = 1, #cells do
     local cell = cells[index]
     local intensity = (math.sin(cell.distance - shown_phase) + 1) / 2
     local shade = (intensity * (SHADES - 1)) // 1 + 1
-    draw.fill_rect {
-      x = cell.x,
-      y = cell.y,
-      width = CELL_WIDTH - 1,
-      height = CELL_HEIGHT - 1,
-      char = " ",
-      bg = shades[shade],
-    }
+    draw.fill_rect(cell.x, cell.y, CELL_WIDTH - 1, CELL_HEIGHT - 1, { char = " ", bg = shades[shade] })
   end
   local caption = table.concat({ "pulse", "grid", tostring(#cells) .. " cells" }, " / ")
-  draw.text { x = 1, y = height - 1, text = caption, fg = color.GRAY }
+  draw.text(1, height - 1, caption, { fg = color.GRAY })
 end

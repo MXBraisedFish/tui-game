@@ -130,13 +130,13 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
   )?;
   source.raw_set(
     "count",
-    lua.create_function(|lua, values: MultiValue| {
+    lua.create_function(|_, values: MultiValue| {
       let input = table_argument("table.count", values, false)?;
       let shape = inspect_table_shape("table.count", &input)?;
-      let output = lua.create_table()?;
-      output.raw_set("n", shape.total_count())?;
-      output.raw_set("contiguous", shape.is_contiguous())?;
-      Ok(output)
+      Ok(MultiValue::from_vec(vec![
+        Value::Integer(shape.total_count() as i64),
+        Value::Boolean(shape.is_contiguous()),
+      ]))
     })?,
   )?;
   source.raw_set(
@@ -148,11 +148,11 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
       for (position, index) in shape.array_indexes.iter().copied().enumerate() {
         indexes.raw_set(position + 1, index)?;
       }
-      let output = lua.create_table()?;
-      output.raw_set("n", shape.array_indexes.len())?;
-      output.raw_set("contiguous", shape.is_contiguous())?;
-      output.raw_set("indexes", indexes)?;
-      Ok(output)
+      Ok(MultiValue::from_vec(vec![
+        Value::Integer(shape.array_indexes.len() as i64),
+        Value::Boolean(shape.is_contiguous()),
+        Value::Table(indexes),
+      ]))
     })?,
   )?;
   source.raw_set(
@@ -355,8 +355,7 @@ impl TableShape {
 }
 
 fn table_argument(method: &str, values: MultiValue, writable: bool) -> mlua::Result<Table> {
-  let parameters = args::named(method, values, &["table"])?;
-  let value = args::required(&parameters, method, "table")?;
+  let value = args::one(method, "table", values)?;
   if writable {
     writable_table(value, method, "table")
   } else {

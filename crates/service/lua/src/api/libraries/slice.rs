@@ -28,7 +28,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "create",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.create";
-      let table = args::named(method, values, &["width", "height", "bg", "layer"])?;
+      let table = positional_table(lua, method, values, &["width", "height"], &["bg", "layer"])?;
       let width = length(args::required(&table, method, "width")?, method, "width")?;
       let height = length(args::required(&table, method, "height")?, method, "height")?;
       let background = parse_color(table.get::<Value>("bg")?, method, "bg", true)?;
@@ -79,7 +79,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "clear",
     lua.create_function(move |_, values: MultiValue| {
       let method = "slice.clear";
-      args::empty_named(method, values)?;
+      args::no_args(method, values)?;
       with_pool_mut(&state, method, |objects| {
         let service = SliceService::new();
         for id in service.ids(objects.ui()) {
@@ -92,18 +92,18 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
 }
 
 fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Result<()> {
-  for (name, fields) in [
-    ("set", &["id", "width", "height", "bg", "layer"][..]),
-    ("set_size", &["id", "width", "height"][..]),
-    ("set_width", &["id", "width"][..]),
-    ("set_height", &["id", "height"][..]),
-    ("set_background", &["id", "bg"][..]),
-    ("set_layer", &["id", "layer"][..]),
+  for name in [
+    "set",
+    "set_size",
+    "set_width",
+    "set_height",
+    "set_background",
+    "set_layer",
   ] {
     let state = state.clone();
     source.raw_set(
       name,
-      lua.create_function(move |_, values: MultiValue| {
+      lua.create_function(move |lua, values: MultiValue| {
         let method: &'static str = match name {
           "set" => "slice.set",
           "set_size" => "slice.set_size",
@@ -112,7 +112,15 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
           "set_background" => "slice.set_background",
           _ => "slice.set_layer",
         };
-        let table = args::named(method, values, fields)?;
+        let (required, options): (&[&str], &[&str]) = match name {
+          "set" => (&["id"], &["width", "height", "bg", "layer"]),
+          "set_size" => (&["id", "width", "height"], &[]),
+          "set_width" => (&["id", "width"], &[]),
+          "set_height" => (&["id", "height"], &[]),
+          "set_background" => (&["id", "bg"], &[]),
+          _ => (&["id", "layer"], &[]),
+        };
+        let table = positional_table(lua, method, values, required, options)?;
         let handle = table_id(&table, method)?;
         let width = optional_length(&table, method, "width")?;
         let height = optional_length(&table, method, "height")?;
@@ -154,9 +162,9 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
 
   source.raw_set(
     "draw",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.draw";
-      let table = args::named(method, values, &["id", "x", "y"])?;
+      let table = positional_table(lua, method, values, &["id", "x", "y"], &[])?;
       let SliceHandle::Object(id) = table_id(&table, method)? else {
         return Err(args::message(method, "base layer cannot be positioned"));
       };
@@ -215,7 +223,19 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
           _ => "slice.get_background",
         };
         let handle = id_argument(values, method)?;
-        query_value(lua, &state, method, handle, name)
+        let result = query_value(lua, &state, method, handle, name)?;
+        if name == "get_size" {
+          match result {
+            Value::Table(size) => Ok(MultiValue::from_vec(vec![
+              Value::Integer(size.get::<i64>("width")?),
+              Value::Integer(size.get::<i64>("height")?),
+            ])),
+            Value::Nil => Ok(MultiValue::from_vec(vec![Value::Nil])),
+            value => Err(args::invalid(method, "result", "size table or nil", &value)),
+          }
+        } else {
+          Ok(MultiValue::from_vec(vec![result]))
+        }
       })?,
     )?;
   }
@@ -235,7 +255,7 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
     "list",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.list";
-      args::empty_named(method, values)?;
+      args::no_args(method, values)?;
       let size = list_state.borrow().context.base_size;
       with_pool(&list_state, method, |objects| {
         let service = SliceService::new();
@@ -254,7 +274,7 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
     "count",
     lua.create_function(move |_, values: MultiValue| {
       let method = "slice.count";
-      args::empty_named(method, values)?;
+      args::no_args(method, values)?;
       with_pool(&state, method, |objects| {
         Ok(SliceService::new().ids(objects.ui()).len())
       })
@@ -401,8 +421,7 @@ pub(super) fn resolve_length(length: SliceLength, total: u16) -> u16 {
 }
 
 fn id_argument(values: MultiValue, method: &str) -> mlua::Result<SliceHandle> {
-  let table = args::named(method, values, &["id"])?;
-  let value = args::string(args::required(&table, method, "id")?, method, "id")?;
+  let value = args::string(args::one(method, "id", values)?, method, "id")?;
   parse_handle(&value, method, "id")
 }
 

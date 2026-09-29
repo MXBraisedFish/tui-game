@@ -1,30 +1,22 @@
 # string 库
 
-## 基本库说明
+`string` 提供字符串处理。Lua 字符串值没有额外的原生方法，请使用此库公开的 `string.*` 接口。
 
-`string` 提供字符串处理。
+---
 
-### 调用与资源限制
+# 目录
 
-- 本项目 API 使用文档中的命名参数表和结果表；Lua 字符串值不开放原生 string 元表方法。
-- 字符串输入与单个输出最多 1 MiB；模式最多 8 KiB，最多 32 个捕获组。
-- Lua 模式最多 512 个操作和 1,000,000 个累计匹配步骤；正则构建受 1 MiB 大小限制。遍历、替换、分割最多 10,000 项。
-- 一次性操作超限时返回带 API 名称的错误；`gmatch` 迭代器触限时返回错误，先前已取出的匹配不会撤回。
-- 位置、反转和大小写按 Unicode 字符处理；Lua pattern 的字母/大小写/单词/空白类使用 Unicode 属性，数字/十六进制/标点类仍按 ASCII 判断。
+## 常量
 
-## 目录
-
-### 常量
-
-| 常量名       | 说明                 | 索引                      |
+| 常量       | 说明                 | 定位                      |
 | ------------ | -------------------- | ------------------------- |
 | `AUTO`       | 自动检查文本类型     | [AUTO](#AUTO)             |
 | `PLAIN_TEXT` | 强制按普通文本解析   | [PLAIN_TEXT](#PLAIN_TEXT) |
 | `RICH_TEXT`  | 强制按富文本语法解析 | [RICH_TEXT](#RICH_TEXT)   |
 
-### 方法
+## 方法
 
-| 方法名                    | 说明                                             | 索引                                                |
+| 方法                    | 说明                                             | 定位                                                |
 | ------------------------- | ------------------------------------------------ | --------------------------------------------------- |
 | `lower`                   | 将字符串全部转为小写                             | [lower](#lower)                                     |
 | `upper`                   | 将字符串全部转为大写                             | [upper](#upper)                                     |
@@ -48,13 +40,13 @@
 
 ---
 
-## 常量
+# 常量
 
 ## `AUTO`
 
 自动检查文本类型。
 
-**可用于**
+### 可用于
 
 - 参数 `text_mode`
 
@@ -70,19 +62,24 @@ string.AUTO
 local p_str = "Hello Tui Game"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width { text = p_str, text_mode = string.AUTO }
-local len2 = measurement.get_text_width { text = r_str, text_mode = string.AUTO }
+local len1 = measurement.get_text_width(p_str, {text_mode = string.AUTO})
+local len2 = measurement.get_text_width(r_str, {text_mode = string.AUTO})
 
-debug.print { message = tostring(len1) }
-debug.print { message = tostring(len2) }
+debug.print(tostring(len1))
+debug.print(tostring(len2))
 ```
 
-输出：
+**输出：**
+
+```lua
+```
+
+### 等值
 
 ```text
-14
-14
+"auto"
 ```
+
 
 ---
 
@@ -90,7 +87,7 @@ debug.print { message = tostring(len2) }
 
 强制按普通文本解析；头部声明 `f%`，富文本标签会被强制保留。
 
-**可用于**
+### 可用于
 
 - 参数 `text_mode`
 
@@ -106,19 +103,24 @@ string.PLAIN_TEXT
 local p_str = "Hello Tui Game"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width { text = p_str, text_mode = string.PLAIN_TEXT }
-local len2 = measurement.get_text_width { text = r_str, text_mode = string.PLAIN_TEXT }
+local len1 = measurement.get_text_width(p_str, {text_mode = string.PLAIN_TEXT})
+local len2 = measurement.get_text_width(r_str, {text_mode = string.PLAIN_TEXT})
 
-debug.print { message = tostring(len1) }
-debug.print { message = tostring(len2) }
+debug.print(tostring(len1))
+debug.print(tostring(len2))
 ```
 
-输出：
+**输出：**
+
+```lua
+```
+
+### 等值
 
 ```text
-14
-40
+"plain_text"
 ```
+
 
 ---
 
@@ -126,7 +128,7 @@ debug.print { message = tostring(len2) }
 
 强制按富文本语法解析；头部声明 `f%` 会被强制保留。
 
-**可用于**
+### 可用于
 
 - 文本参数 `text_mode`
 
@@ -142,23 +144,28 @@ string.RICH_TEXT
 local nh_r_str = "<fg:red>Hello<fg:yellow> Tui Game</fg>"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width { text = nh_r_str, text_mode = string.RICH_TEXT }
-local len2 = measurement.get_text_width { text = r_str, text_mode = string.RICH_TEXT }
+local len1 = measurement.get_text_width(nh_r_str, {text_mode = string.RICH_TEXT})
+local len2 = measurement.get_text_width(r_str, {text_mode = string.RICH_TEXT})
 
-debug.print { message = tostring(len1) }
-debug.print { message = tostring(len2) }
+debug.print(tostring(len1))
+debug.print(tostring(len2))
 ```
 
-输出：
+**输出：**
+
+```lua
+```
+
+### 等值
 
 ```text
-14
-16
+"rich_text"
 ```
+
 
 ---
 
-## 方法
+# 方法
 
 ## `lower`
 
@@ -167,17 +174,17 @@ debug.print { message = tostring(len2) }
 ### 调用
 
 ```lua
--- 单参数
-string.lower()
+string.lower
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+## 返回值
 
 | 类型   | 说明     |
 | ------ | -------- |
@@ -189,16 +196,17 @@ string.lower()
 local u_str = "HELLO TUI GAME"
 local str = string.lower(u_str)
 
-debug.print { message = str }
+debug.print(str)
 ```
 
-输出：
+**输出：**
 
-直接返回一个值。
-
-```text
-hello tui game
+```lua
 ```
+
+### 额外说明
+
+本库的字符串输入和单次输出最多为 1 MiB；模式最多为 8 KiB，捕获组最多 32 个。Lua 模式最多执行 512 个操作和 1,000,000 次累计匹配步骤；正则表达式构建最多使用 1 MiB。适用时，遍历、替换和分割最多产生 10,000 项。一次性操作超限会返回带接口名称的错误；`gmatch` 类迭代器触限时返回错误，已经取出的结果不会撤回。字符位置、反转和大小写按 Unicode 字符处理；Lua 模式中的字母、大小写、单词和空白类别使用 Unicode 属性，数字、十六进制和标点类别仍按 ASCII 判断。
 
 ---
 
@@ -209,17 +217,17 @@ hello tui game
 ### 调用
 
 ```lua
--- 单参数
-string.upper()
+string.upper
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+## 返回值
 
 直接返回一个值。
 
@@ -233,13 +241,12 @@ string.upper()
 local l_str = "hello tui game"
 local str = string.upper(l_str)
 
-debug.print { message = str }
+debug.print(str)
 ```
 
-输出：
+**输出：**
 
-```text
-HELLO TUI GAME
+```lua
 ```
 
 ---
@@ -251,17 +258,17 @@ HELLO TUI GAME
 ### 调用
 
 ```lua
--- 单参数
-string.reverse()
+string.reverse
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+## 返回值
 
 | 类型   | 说明     |
 | ------ | -------- |
@@ -273,13 +280,12 @@ string.reverse()
 local r_str = "emaG iuT olleH"
 local str = string.reverse(r_str)
 
-debug.print { message = str }
+debug.print(str)
 ```
 
-输出：
+**输出：**
 
-```text
-Hello Tui Game
+```lua
 ```
 
 ---
@@ -291,18 +297,18 @@ Hello Tui Game
 ### 调用
 
 ```lua
--- 表参数
-string.split{}
+string.split
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
-| `sep`  | string | 是   | -      | 分割字符   |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `sep` | string | 分割字符 |
+## 返回值
 
 返回一个数组表。
 
@@ -313,19 +319,16 @@ string.split{}
 ### 示例
 
 ```lua
-local parts = string.split { text = "apple,banana,grape", sep = "," }
+local parts = string.split("apple,banana,grape", ",")
 
 for i in ipairs(parts) do
-  debug.print { message = i.value }
+  debug.print(i.value)
 end
 ```
 
-输出：
+**输出：**
 
-```text
-apple
-banana
-grape
+```lua
 ```
 
 ---
@@ -337,19 +340,24 @@ grape
 ### 调用
 
 ```lua
--- 表参数
-string.sub{}
+string.sub
 ```
 
-### 参数
+## 参数
 
-| 参数名   | 类型    | 必填 | 默认值         | 说明         |
-| -------- | ------- | ---- | -------------- | ------------ |
-| `text`   | string  | 是   | -              | 目标字符串   |
-| `start`  | integer | 是   | -              | 起始字符位置 |
-| `finish` | integer | 否   | 目标字符串长度 | 结束字符位置 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `start` | integer | 起始字符位置 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `finish` | integer | 默认：目标字符串长度；结束字符位置 |
+## 返回值
 
 直接返回一个值。
 
@@ -361,15 +369,14 @@ string.sub{}
 
 ```lua
 local sub_str = "Hello Tui Game"
-local str = string.sub { text = sub_str, start = 1, finish = 5 }
+local str = string.sub(sub_str, 1, {finish = 5})
 
-debug.print { message = str }
+debug.print(str)
 ```
 
-输出：
+**输出：**
 
-```text
-Hello
+```lua
 ```
 
 ---
@@ -381,19 +388,24 @@ Hello
 ### 调用
 
 ```lua
--- 表参数
-string.rep{}
+string.rep
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型    | 必填 | 默认值 | 说明               |
-| ------- | ------- | ---- | ------ | ------------------ |
-| `text`  | string  | 是   | -      | 要重复的字符串     |
-| `times` | integer | 是   | -      | 重复次数           |
-| `sep`   | string  | 否   | `""`   | 相邻副本间的分隔符 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 要重复的字符串 |
+| `times` | integer | 重复次数 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `sep` | string | 默认：`""`；相邻副本间的分隔符 |
+## 返回值
 
 直接返回一个值。
 
@@ -405,15 +417,14 @@ string.rep{}
 
 ```lua
 local rep_str = "ABC"
-local str = string.rep { text = rep_str, times = 3, sep = " | " }
+local str = string.rep(rep_str, 3, {sep = " | "})
 
-debug.print { message = str }
+debug.print(str)
 ```
 
-输出：
+**输出：**
 
-```text
-ABC | ABC | ABC
+```lua
 ```
 
 ---
@@ -425,79 +436,66 @@ ABC | ABC | ABC
 ### 调用
 
 ```lua
--- 表参数
-string.find{}
+string.find
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型    | 必填 | 默认值  | 说明               |
-| --------- | ------- | ---- | ------- | ------------------ |
-| `text`    | string  | 是   | -       | 目标字符串         |
-| `pattern` | string  | 是   | -       | 模式字符串         |
-| `init`    | integer | 否   | `1`     | 起始搜索位置       |
-| `plain`   | boolean | 否   | `false` | 是否按普通文本查找 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 模式字符串 |
 
-若**查找成功**，返回一个对象表。
+### 选填参数
 
-| 字段       | 类型    | 说明                   |
-| ---------- | ------- | ---------------------- |
-| `start`    | integer | 匹配起点               |
-| `finish`   | integer | 匹配终点               |
-| `captures` | table   | 匹配到的字符串或捕获组 |
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `init` | integer | 默认：`1`；起始搜索位置 |
+| `plain` | boolean | 默认：`false`；是否按普通文本查找 |
+## 返回值
 
-若**查找失败**，直接返回一个值。
+查找成功时返回三个值：匹配起点、匹配终点和捕获数组表。查找失败时返回一个 nil。
 
-| 类型 | 说明     |
-| ---- | -------- |
-| nil  | 查找失败 |
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `start` | integer | 匹配起点。 |
+| `finish` | integer | 匹配终点。 |
+| `captures` | table | 匹配到的字符串或捕获组数组表。 |
 
 ### 示例
 
 ```lua
-local result1 = string.find { text = "Hello Tui Game", pattern = "Tui" }
-debug.print { message = tostring(result1.start) }
-debug.print { message = tostring(result1.finish) }
-debug.print { message = result1.captures[1] }
-debug.print { message = tostring(result1.captures.n) .. "\n" }
+local start1, finish1, captures1 = string.find("Hello Tui Game", "Tui")
+debug.print(tostring(start1))
+debug.print(tostring(finish1))
+debug.print(captures1[1])
+debug.print(tostring(captures1.n) .. "\n")
 
-local result2 = string.find { text = "Name: Alice, Age: 30", pattern = "Name: (%w+), Age: (%d+)" }
-debug.print { message = tostring(result2.start) }
-debug.print { message = tostring(result2.finish) }
-debug.print { message = result2.captures[1] }
-debug.print { message = tostring(result2.captures[2]) }
-debug.print { message = tostring(result2.captures.n) }
+local start2, finish2, captures2 = string.find("Name: Alice, Age: 30", "Name: (%w+), Age: (%d+)")
+debug.print(tostring(start2))
+debug.print(tostring(finish2))
+debug.print(captures2[1])
+debug.print(tostring(captures2[2]))
+debug.print(tostring(captures2.n))
 ```
 
-输出：
+**输出：**
 
-```text
-7
-9
-Tui
-1
-
-1
-20
-Alice
-30
-2
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 返回值 `captures` 表结构如下：
 
 ```lua
-{
-  [1] = ..., -- string
-  [2] = ...,
-  ...
-  [x] = ..., -- string
-  n = x      -- integer
-} -- 共有 x+1 个元素，所有捕获结果连续排序，最后 n 为捕获结果数量
+local captures = {
+  [1] = "Alice", -- string
+  [2] = "30", -- string
+  n = 2, -- integer; the number of captures
+}
 ```
 
 - 匹配结果为零长字符时，返回值中的 $finish = start - 1$
@@ -511,19 +509,24 @@ Alice
 ### 调用
 
 ```lua
--- 表参数
-string.match{}
+string.match
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型    | 必填 | 默认值 | 说明         |
-| --------- | ------- | ---- | ------ | ------------ |
-| `text`    | string  | 是   | -      | 目标字符串   |
-| `pattern` | string  | 是   | -      | 模式字符串   |
-| `init`    | integer | 否   | `1`    | 起始搜索位置 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 模式字符串 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `init` | integer | 默认：`1`；起始搜索位置 |
+## 返回值
 
 若**查找成功**，返回一个混合表。
 
@@ -540,39 +543,31 @@ string.match{}
 ### 示例
 
 ```lua
-local match1 = string.match { text = "Hello 123", pattern = "%d+" }
-debug.print { message = match1[1] }
-debug.print { message = tostring(match1.n) .. "\n" }
+local match1 = string.match("Hello 123", "%d+")
+debug.print(match1[1])
+debug.print(tostring(match1.n) .. "\n")
 
-local match2 = string.match { text = "Product: Apple, Price: 5.99", pattern = "Product: (%w+), Price: ([%d.]+)" }
-debug.print { message = match2[1] }
-debug.print { message = match2[2] }
-debug.print { message = tostring(match2.n) }
+local match2 = string.match("Product: Apple, Price: 5.99", "Product: (%w+), Price: ([%d.]+)")
+debug.print(match2[1])
+debug.print(match2[2])
+debug.print(tostring(match2.n))
 ```
 
-输出：
+**输出：**
 
-```text
-123
-1
-
-Apple
-5.99
-2
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 返回值混合表结构如下：
 
 ```lua
-{
-  [1] = ..., -- string
-  [2] = ...,
-  ...
-  [x] = ..., -- string
-  n = x      -- integer
-} -- 共有 x+1 个元素，所有捕获结果连续排序，最后 n 为捕获结果数量
+local captures = {
+  [1] = "Alice",
+  [2] = "30",
+  n = 2,
+}
 ```
 
 ---
@@ -584,18 +579,18 @@ Apple
 ### 调用
 
 ```lua
--- 表参数
-string.gmatch{}
+string.gmatch
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型   | 必填 | 默认值 | 说明       |
-| --------- | ------ | ---- | ------ | ---------- |
-| `text`    | string | 是   | -      | 目标字符串 |
-| `pattern` | string | 是   | -      | 模式字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 模式字符串 |
+## 返回值
 
 直接返回一个值。
 
@@ -613,45 +608,36 @@ string.gmatch{}
 ### 示例
 
 ```lua
-local iter1 = string.gmatch { text = "a1 b2 c3", pattern = "%w+" }
+local iter1 = string.gmatch("a1 b2 c3", "%w+")
 
 for m in iter1 do
-  debug.print { message = m[1] .. " " .. m.n }
+  debug.print(m[1] .. " " .. m.n)
 end
 
-debug.print { message = "" }
+debug.print("")
 
-local iter2 = string.gmatch { text = "A-1 B-2 C-3", pattern = "(%w+)-(%d+)" }
+local iter2 = string.gmatch("A-1 B-2 C-3", "(%w+)-(%d+)")
 
 for caps in iter2 do
-  debug.print { message = caps[1] .. " " .. caps[2] .. " " .. caps.n }
+  debug.print(caps[1] .. " " .. caps[2] .. " " .. caps.n)
 end
 ```
 
-输出：
+**输出：**
 
-```text
-a1 1
-b2 1
-c3 1
-
-A 1 2
-B 2 2
-C 3 2
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 迭代器返回值元素混合表结构：
 
 ```lua
-{
-  [1] = ..., -- string
-  [2] = ...,
-  ...
-  [x] = ..., -- string
-  n = x      -- integer
-} -- 共有 x+1 个元素，所有捕获结果连续排序，最后 n 为捕获结果数量
+local captures = {
+  [1] = "Alice",
+  [2] = "30",
+  n = 2,
+}
 ```
 
 ---
@@ -663,61 +649,55 @@ C 3 2
 ### 调用
 
 ```lua
--- 表参数
-string.gsub{}
+string.gsub
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型                      | 必填 | 默认值 | 说明         |
-| --------- | ------------------------- | ---- | ------ | ------------ |
-| `text`    | string                    | 是   | -      | 目标字符串   |
-| `pattern` | string                    | 是   | -      | 模式字符串   |
-| `repl`    | string / table / function | 是   | -      | 替换内容     |
-| `limit`   | integer                   | 否   | `-1`   | 最大替换次数 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 模式字符串 |
+| `repl` | string / table / function | 替换内容 |
 
-返回一个对象表。
+### 选填参数
 
-| 字段     | 类型    | 说明         |
-| -------- | ------- | ------------ |
-| `result` | string  | 替换结果     |
-| `count`  | integer | 实际替换次数 |
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `limit` | integer | 默认：`-1`；最大替换次数 |
+## 返回值
+
+返回两个值，依次为替换后的字符串和实际替换次数。
+
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `result` | string | 替换结果。 |
+| `count` | integer | 实际替换次数。 |
 
 ### 示例
 
 ```lua
-local r1 = string.gsub { text = "one two three", pattern = "%a+", repl = "X" }
-debug.print { message = r1.result .. " " .. r1.count .. "\n" }
+local result1, count1 = string.gsub("one two three", "%a+", "X")
+debug.print(result1 .. " " .. count1 .. "\n")
 
-local r2 = string.gsub { text = "2023-2024-2025", pattern = "(%d+)", repl = "[$1]", limit = 2 }
-debug.print { message = r2.result .. " " .. r2.count .. "\n" }
+local result2, count2 = string.gsub("2023-2024-2025", "(%d+)", "[$1]", {limit = 2})
+debug.print(result2 .. " " .. count2 .. "\n")
 
-local r3 = string.gsub { text = "apple banana apple", pattern = "(%w+)", repl = { apple = "fruit", banana = "berry" } }
-debug.print { message = r3.result .. " " .. r3.count .. "\n" }
+local result3, count3 = string.gsub("apple banana apple", "(%w+)", { apple = "fruit", banana = "berry" })
+debug.print(result3 .. " " .. count3 .. "\n")
 
-local r4 = string.gsub {
-  text = "a1 b2 c3",
-  pattern = "(%w)(%d)",
-  repl = function(letter, num) return letter .. string.rep { text = "x", times = tonumber { value = num } } end
-}
-debug.print { message = r4.result .. " " .. r4.count }
+local result4, count4 = string.gsub("a1 b2 c3", "(%w)(%d)", function(letter, num) return letter .. string.rep("x", tonumber(num)) end)
+debug.print(result4 .. " " .. count4)
 ```
 
-输出：
+**输出：**
 
-```text
-X X X 3
-
-[$1]-[$1]-2025 2
-
-fruit berry fruit 3
-
-ax bxx cxxx 3
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 参数 `limit` 为 -1 时代表不限次数。
 
@@ -730,17 +710,17 @@ ax bxx cxxx 3
 ### 调用
 
 ```lua
--- 单参数
-string.regex_escape()
+string.regex_escape
 ```
 
-### 参数
+## 参数
 
-| 参数名 | 类型   | 必填 | 默认值 | 说明       |
-| ------ | ------ | ---- | ------ | ---------- |
-| `text` | string | 是   | -      | 目标字符串 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+## 返回值
 
 直接返回一个值。
 
@@ -752,17 +732,15 @@ string.regex_escape()
 
 ```lua
 local e1 = string.regex_escape("hello")
-debug.print { message = e1 }
+debug.print(e1)
 
 local e2 = string.regex_escape("a+b*c?")
-debug.print { message = e2 }
+debug.print(e2)
 ```
 
-输出：
+**输出：**
 
-```text
-hello
-a\+b\*c\?
+```lua
 ```
 
 ---
@@ -774,78 +752,65 @@ a\+b\*c\?
 ### 调用
 
 ```lua
--- 表参数
-string.regex_find{}
+string.regex_find
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型    | 必填 | 默认值 | 说明         |
-| --------- | ------- | ---- | ------ | ------------ |
-| `text`    | string  | 是   | -      | 目标字符串   |
-| `pattern` | string  | 是   | -      | 正则表达式   |
-| `init`    | integer | 否   | `1`    | 起始搜索位置 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 正则表达式 |
 
-若**查找成功**，返回一个对象表。
+### 选填参数
 
-| 字段       | 类型    | 说明                   |
-| ---------- | ------- | ---------------------- |
-| `start`    | integer | 匹配起点               |
-| `finish`   | integer | 匹配终点               |
-| `captures` | table   | 匹配到的字符串或捕获组 |
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `init` | integer | 默认：`1`；起始搜索位置 |
+## 返回值
 
-若**查找失败**，直接返回一个值。
+查找成功时返回三个值：匹配起点、匹配终点和捕获数组表。查找失败时返回一个 nil。
 
-| 类型 | 说明     |
-| ---- | -------- |
-| nil  | 查找失败 |
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `start` | integer | 匹配起点。 |
+| `finish` | integer | 匹配终点。 |
+| `captures` | table | 匹配到的字符串或捕获组数组表。 |
 
 ### 示例
 
 ```lua
-local f1 = string.regex_find { text = "Hello 123", pattern = [[\d+]] }
-debug.print { message = tostring(f1.start) }
-debug.print { message = tostring(f1.finish) }
-debug.print { message = f1.captures[1] }
-debug.print { message = tostring(f1.captures.n) .. "\n" }
+local start1, finish1, captures1 = string.regex_find("Hello 123", [[\d+]])
+debug.print(tostring(start1))
+debug.print(tostring(finish1))
+debug.print(captures1[1])
+debug.print(tostring(captures1.n) .. "\n")
 
-local f2 = string.regex_find { text = "Name: Alice, Age: 30", pattern = [[Name: (\w+), Age: (\d+)]] }
-debug.print { message = tostring(f2.start) }
-debug.print { message = tostring(f2.finish) }
-debug.print { message = f2.captures[1] }
-debug.print { message = f2.captures[2] }
-debug.print { message = tostring(f2.captures.n) }
+local start2, finish2, captures2 = string.regex_find("Name: Alice, Age: 30", [[Name: (\w+), Age: (\d+)]])
+debug.print(tostring(start2))
+debug.print(tostring(finish2))
+debug.print(captures2[1])
+debug.print(captures2[2])
+debug.print(tostring(captures2.n))
 ```
 
-输出：
+**输出：**
 
-```text
-7
-9
-123
-1
-
-1
-20
-Alice
-30
-2
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 返回值 `captures` 表结构如下：
 
 ```lua
-{
-  [1] = ..., -- string
-  [2] = ...,
-  ...
-  [x] = ..., -- string
-  n = x      -- integer
-} -- 共有 x+1 个元素，所有捕获结果连续排序，最后 n 为捕获结果数量
+local captures = {
+  [1] = "Alice",
+  [2] = "30",
+  n = 2,
+}
 ```
 
 - 匹配结果为零长字符时，返回值中的 $finish = start - 1$，且字段 `caputers.n` 为 0。
@@ -859,19 +824,24 @@ Alice
 ### 调用
 
 ```lua
--- 表参数
-string.regex_match{}
+string.regex_match
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型    | 必填 | 默认值 | 说明         |
-| --------- | ------- | ---- | ------ | ------------ |
-| `text`    | string  | 是   | -      | 目标字符串   |
-| `pattern` | string  | 是   | -      | 正则表达式   |
-| `init`    | integer | 否   | `1`    | 起始搜索位置 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 正则表达式 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `init` | integer | 默认：`1`；起始搜索位置 |
+## 返回值
 
 若**查找成功**，返回一个混合表。
 
@@ -888,28 +858,31 @@ string.regex_match{}
 ### 示例
 
 ```lua
-local m1 = string.regex_match { text = "Hello 123", pattern = [[\d+]] }
-debug.print { message = m1[1] }
-debug.print { message = tostring(m1.n) .. "\n" }
+local m1 = string.regex_match("Hello 123", [[\d+]])
+debug.print(m1[1])
+debug.print(tostring(m1.n) .. "\n")
 
-local m2 = string.regex_match { text = "Name: Alice, Age: 30", pattern = [[Name: (\w+), Age: (\d+)]] }
-debug.print { message = m2[1] }
-debug.print { message = m2[2] }
-debug.print { message = tostring(m2.n) }
+local m2 = string.regex_match("Name: Alice, Age: 30", [[Name: (\w+), Age: (\d+)]])
+debug.print(m2[1])
+debug.print(m2[2])
+debug.print(tostring(m2.n))
 ```
 
-### 额外补充
+**输出：**
+
+```lua
+```
+
+### 额外说明
 
 - 返回值混合表结构如下：
 
 ```lua
-{
-  [1] = ..., -- string
-  [2] = ...,
-  ...
-  [x] = ..., -- string
-  n = x      -- integer
-} -- 共有 x+1 个元素，所有捕获结果连续排序，最后 n 为捕获结果数量
+local captures = {
+  [1] = "Alice",
+  [2] = "30",
+  n = 2,
+}
 ```
 
 ---
@@ -921,18 +894,18 @@ debug.print { message = tostring(m2.n) }
 ### 调用
 
 ```lua
--- 表参数
-string.regex_gmatch{}
+string.regex_gmatch
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型   | 必填 | 默认值 | 说明       |
-| --------- | ------ | ---- | ------ | ---------- |
-| `text`    | string | 是   | -      | 目标字符串 |
-| `pattern` | string | 是   | -      | 正则表达式 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 正则表达式 |
+## 返回值
 
 直接返回一个值。
 
@@ -950,44 +923,35 @@ string.regex_gmatch{}
 ### 示例
 
 ```lua
-local iter1 = string.regex_gmatch { text = "a1 b2 c3", pattern = [[\w+]] }
+local iter1 = string.regex_gmatch("a1 b2 c3", [[\w+]])
 
 for m in iter1 do
-  debug.print { message = m[1] .. " " .. m.n }
+  debug.print(m[1] .. " " .. m.n)
 end
 
-debug.print { message = "" }
+debug.print("")
 
-local iter2 = string.regex_gmatch { text = "A-1 B-2 C-3", pattern = [[(\w+)-(\d+)]] }
+local iter2 = string.regex_gmatch("A-1 B-2 C-3", [[(\w+)-(\d+)]])
 for caps in iter2 do
-  debug.print { message = caps[1] .. " " .. caps[2] .. " " .. caps.n }
+  debug.print(caps[1] .. " " .. caps[2] .. " " .. caps.n)
 end
 ```
 
-输出：
+**输出：**
 
-```text
-a1 1
-b2 1
-c3 1
-
-A 1 2
-B 2 2
-C 3 2
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 迭代器返回值元素混合表结构：
 
 ```lua
-{
-  [1] = ..., -- string
-  [2] = ...,
-  ...
-  [x] = ..., -- string
-  n = x      -- integer
-} -- 共有 x+1 个元素，所有捕获结果连续排序，最后 n 为捕获结果数量
+local captures = {
+  [1] = "Alice",
+  [2] = "30",
+  n = 2,
+}
 ```
 
 ---
@@ -999,63 +963,54 @@ C 3 2
 ### 调用
 
 ```lua
--- 表参数
-string.regex_gsub{}
+string.regex_gsub
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型                      | 必填 | 默认值 | 说明         |
-| --------- | ------------------------- | ---- | ------ | ------------ |
-| `text`    | string                    | 是   | -      | 目标字符串   |
-| `pattern` | string                    | 是   | -      | 正则表达式   |
-| `repl`    | string / table / function | 是   | -      | 替换内容     |
-| `limit`   | integer                   | 否   | `-1`   | 最大替换次数 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 正则表达式 |
+| `repl` | string / table / function | 替换内容 |
 
-返回一个对象表。
+### 选填参数
 
-| 字段     | 类型    | 说明         |
-| -------- | ------- | ------------ |
-| `result` | string  | 替换结果     |
-| `count`  | integer | 实际替换次数 |
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `limit` | integer | 默认：`-1`；最大替换次数 |
+## 返回值
+
+返回两个值，依次为替换后的字符串和实际替换次数。
+
+| 值名 | 类型 | 说明 |
+| --- | --- | --- |
+| `result` | string | 替换结果。 |
+| `count` | integer | 实际替换次数。 |
 
 ### 示例
 
 ```lua
-local g1 = string.regex_gsub { text = "one two three", pattern = [[\w+]], repl = "X" }
-debug.print { message = g1.result .. " " .. g1.count .. "\n" }
+local result1, count1 = string.regex_gsub("one two three", [[\w+]], "X")
+debug.print(result1 .. " " .. count1 .. "\n")
 
-local g2 = string.regex_gsub { text = "2023-2024-2025", pattern = [[(\d+)]], repl = "[$1]", limit = 2 }
-debug.print { message = g2.result .. " " .. g2.count .. "\n" }
+local result2, count2 = string.regex_gsub("2023-2024-2025", [[(\d+)]], "[$1]", {limit = 2})
+debug.print(result2 .. " " .. count2 .. "\n")
 
-local g3 = string.regex_gsub { text = "apple banana apple", pattern = [[(\w+)]], repl = { apple = "fruit", banana = "berry" } }
-debug.print { message = g3.result .. " " .. g3.count .. "\n" }
+local result3, count3 = string.regex_gsub("apple banana apple", [[(\w+)]], { apple = "fruit", banana = "berry" })
+debug.print(result3 .. " " .. count3 .. "\n")
 
-local g4 = string.regex_gsub {
-  text = "a1 b2 c3",
-  pattern = [[(\w)(\d)]],
-  repl = function(letter, num)
-    return letter .. string.rep {
-      text = "x",
-      times = tonumber { value = num }
-    }
-  end
-}
-debug.print { message = g4.result .. " " .. g4.count }
+local result4, count4 = string.regex_gsub("a1 b2 c3", [[(\w)(\d)]], function(letter, num)
+    return letter .. string.rep("x", tonumber(num))
+  end)
+debug.print(result4 .. " " .. count4)
 ```
 
-输出：
+**输出：**
 
-```text
-X X X 3
-
-[2023]-[2024]-2025 2
-
-fruit berry fruit 3
-
-ax bxx cxxx 3
+```lua
 ```
 
 ---
@@ -1067,18 +1022,18 @@ ax bxx cxxx 3
 ### 调用
 
 ```lua
--- 表参数
-string.regex_test{}
+string.regex_test
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型   | 必填 | 默认值 | 说明       |
-| --------- | ------ | ---- | ------ | ---------- |
-| `text`    | string | 是   | -      | 目标字符串 |
-| `pattern` | string | 是   | -      | 正则表达式 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 正则表达式 |
+## 返回值
 
 直接返回一个值。
 
@@ -1089,18 +1044,16 @@ string.regex_test{}
 ### 示例
 
 ```lua
-local t1 = string.regex_test { text = "abc123", pattern = [[\d+]] }
-debug.print { message = tostring(t1) }
+local t1 = string.regex_test("abc123", [[\d+]])
+debug.print(tostring(t1))
 
-local t2 = string.regex_test { text = "hello", pattern = [[\d+]] }
-debug.print { message = tostring(t2) }
+local t2 = string.regex_test("hello", [[\d+]])
+debug.print(tostring(t2))
 ```
 
-输出：
+**输出：**
 
-```text
-true
-false
+```lua
 ```
 
 ---
@@ -1112,18 +1065,18 @@ false
 ### 调用
 
 ```lua
--- 表参数
-string.regex_split{}
+string.regex_split
 ```
 
-### 参数
+## 参数
 
-| 参数名    | 类型   | 必填 | 默认值 | 说明       |
-| --------- | ------ | ---- | ------ | ---------- |
-| `text`    | string | 是   | -      | 目标字符串 |
-| `pattern` | string | 是   | -      | 正则表达式 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 目标字符串 |
+| `pattern` | string | 正则表达式 |
+## 返回值
 
 返回一个数组表。
 
@@ -1134,29 +1087,22 @@ string.regex_split{}
 ### 示例
 
 ```lua
-local parts1 = string.regex_split { text = "a b c", pattern = [[\s+]] }
-debug.print { message = parts1[1] }
-debug.print { message = parts1[2] }
-debug.print { message = parts1[3] }
+local parts1 = string.regex_split("a b c", [[\s+]])
+debug.print(parts1[1])
+debug.print(parts1[2])
+debug.print(parts1[3])
 
-debug.print { message = "" }
+debug.print("")
 
-local parts2 = string.regex_split { text = "one, two;three", pattern = [[\s*[,;]\s*]] }
-debug.print { message = parts2[1] }
-debug.print { message = parts2[2] }
-debug.print { message = parts2[3] }
+local parts2 = string.regex_split("one, two;three", [[\s*[,;]\s*]])
+debug.print(parts2[1])
+debug.print(parts2[2])
+debug.print(parts2[3])
 ```
 
-输出：
+**输出：**
 
-```text
-a
-b
-c
-
-one
-two
-three
+```lua
 ```
 
 ---
@@ -1168,20 +1114,23 @@ three
 ### 调用
 
 ```lua
--- 表参数
-string.format{}
+string.format
 ```
 
-### 参数
+## 参数
 
-| 参数名          | 类型   | 必填 | 默认值 | 说明                           |
-| --------------- | ------ | ---- | ------ | ------------------------------ |
-| `format_string` | string | 是   | -      | 格式串                         |
-| `values`        | table  | 是   | -      | 按格式项顺序排列的参数值数组表 |
+### 必填参数
 
-支持 `%s`、`%q`、`%c`、`%d`、`%i`、`%u`、`%o`、`%x`、`%X`、`%f`、`%e`、`%E`、`%g`、`%G` 和 `%%`。可使用 `- +`、空格、`#`、`0` 标志、宽度和精度；`%q` 不接受修饰符。浮点和整数精度最多 32，宽度与最终输出最多 1 MiB。宽度及 `%s` 精度按 Unicode 字符计数；`%c` 接受 Unicode 码点。
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `format_string` | string | 格式串 |
 
-### 返回
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `...` | any... | 传给函数的参数，可包含表和 nil。 |
+## 返回值
 
 直接返回一个值。
 
@@ -1192,26 +1141,22 @@ string.format{}
 ### 示例
 
 ```lua
-local f1 = string.format { format_string = "Hello %s!", values = { "World" } }
-debug.print { message = f1 }
+local f1 = string.format("Hello %s!", table.unpack({ "World" }))
+debug.print(f1)
 
-local f2 = string.format { format_string = "%s is %d years old.", values = { "Alice", 30 } }
-debug.print { message = f2 }
+local f2 = string.format("%s is %d years old.", table.unpack({ "Alice", 30 }))
+debug.print(f2)
 
-local f3 = string.format { format_string = "Pi ≈ %.2f", values = { math.PI } }
-debug.print { message = f3 }
+local f3 = string.format("Pi ≈ %.2f", table.unpack({ math.PI }))
+debug.print(f3)
 
-local f4 = string.format { format_string = "Hello, Tui Game!", values = {} }
-debug.print { message = f4 }
+local f4 = string.format("Hello, Tui Game!", table.unpack({}))
+debug.print(f4)
 ```
 
-输出：
+**输出：**
 
-```text
-Hello World!
-Alice is 30 years old.
-Pi ≈ 3.14
-Hello, Tui Game!
+```lua
 ```
 
 ---
@@ -1223,20 +1168,25 @@ Hello, Tui Game!
 ### 调用
 
 ```lua
--- 表参数
-string.rich_text_to_plain_text{}
+string.rich_text_to_plain_text
 ```
 
-### 参数
+## 参数
 
-| 参数名         | 类型    | 必填 | 默认值 | 说明             |
-| -------------- | ------- | ---- | ------ | ---------------- |
-| `text`         | string  | 是   | -      | 富文本字符串     |
-| `rich_params`  | table   | 否   | `nil`  | 富文本参数表     |
-| `key_params`   | boolean | 否   | `true` | 是否解析按键参数 |
-| `strip_header` | boolean | 否   | `true` | 是否剥离 `f%` 头 |
+### 必填参数
 
-### 返回
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `text` | string | 富文本字符串 |
+
+### 选填参数
+
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `rich_params` | table | 默认：`nil`；富文本参数表 |
+| `key_params` | boolean | 默认：`true`；是否解析按键参数 |
+| `strip_header` | boolean | 默认：`true`；是否剥离 `f%` 头 |
+## 返回值
 
 | 返回值名 | 类型   | 说明             |
 | -------- | ------ | ---------------- |
@@ -1245,28 +1195,24 @@ string.rich_text_to_plain_text{}
 ### 示例
 
 ```lua
-local plain1 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello</fg>" }
-debug.print { message = plain1 }
+local plain1 = string.rich_text_to_plain_text("f%<fg:red>Hello</fg>")
+debug.print(plain1)
 
-local plain2 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello {value:name}</fg>", rich_params = { name = "World" } }
-debug.print { message = plain2 }
+local plain2 = string.rich_text_to_plain_text("f%<fg:red>Hello {value:name}</fg>", {rich_params = { name = "World" }})
+debug.print(plain2)
 
-local plain3 = string.rich_text_to_plain_text { text = "f%<fg:red>{key:exit}</fg>", key_params = false }
-debug.print { message = plain3 }
+local plain3 = string.rich_text_to_plain_text("f%<fg:red>{key:exit}</fg>", {key_params = false})
+debug.print(plain3)
 
-local plain4 = string.rich_text_to_plain_text { text = "f%<fg:red>Hello</fg>", strip_header = false }
-debug.print { message = plain4 }
+local plain4 = string.rich_text_to_plain_text("f%<fg:red>Hello</fg>", {strip_header = false})
+debug.print(plain4)
 ```
 
-输出：
+**输出：**
 
-```text
-Hello
-Hello World
-{key:exit}
-f%Hello
+```lua
 ```
 
-### 额外补充
+### 额外说明
 
 - 该 API 返回的普通文本会去掉所有的富文本标签，并按需解析相关参数标签（未被解析的参数标签会保留）。

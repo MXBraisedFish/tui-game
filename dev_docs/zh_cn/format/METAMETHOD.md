@@ -62,7 +62,7 @@ local base = { x = 10 }
 
 local obj1 = setmetatable { table = {}, metatable = { __index = base } }
 
-debug.print { message = obj1.x }
+debug.print(obj1.x)
 
 local obj2 = setmetatable { table = {}, metatable = {
   __index = function(table, key)
@@ -70,7 +70,7 @@ local obj2 = setmetatable { table = {}, metatable = {
   end
 } }
 
-debug.print { message = obj2.y }
+debug.print(obj2.y)
 ```
 
 输出：
@@ -103,11 +103,11 @@ local base = {}
 local obj1 = setmetatable { table = {}, metatable = { __newindex = base } }
 
 obj1.a = 1
-debug.print { message = base.a }
+debug.print(base.a)
 
 local obj2 = setmetatable { table = {}, metatable = {
   __newindex = function(table, key, value)
-    debug.print { message = "Don't have '" .. key .. "'" }
+    debug.print("Don't have '" .. key .. "'")
   end
 } }
 
@@ -144,7 +144,7 @@ local add = setmetatable { table = {},  metatable = {
   end
 } }
 
-debug.print { message = add(3, 4)}
+debug.print(add(3, 4))
 ```
 
 输出：
@@ -179,7 +179,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x + y }
+debug.print(x + y)
 ```
 
 输出：
@@ -219,7 +219,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x - y }
+debug.print(x - y)
 ```
 
 输出：
@@ -259,7 +259,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x * y }
+debug.print(x * y)
 ```
 
 输出：
@@ -299,7 +299,7 @@ local mt = {
 local x = setmetatable { table = { v = 10 }, metatable = mt }
 local y = { v = 4 }
 
-debug.print { message = x / y }
+debug.print(x / y)
 ```
 
 输出：
@@ -339,7 +339,7 @@ local mt = {
 local x = setmetatable { table = { v = 10 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x % y }
+debug.print(x % y)
 ```
 
 输出：
@@ -379,7 +379,7 @@ local mt = {
 local x = setmetatable { table = { v = 2 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x ^ y }
+debug.print(x ^ y)
 ```
 
 输出：
@@ -419,7 +419,7 @@ local mt = {
 local x = setmetatable { table = { v = 10 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x // y }
+debug.print(x // y)
 ```
 
 输出：
@@ -459,7 +459,7 @@ local mt = {
 local x = setmetatable { table = { v = 6 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x & y }
+debug.print(x & y)
 ```
 
 输出：
@@ -499,7 +499,7 @@ local mt = {
 local x = setmetatable { table = { v = 6 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x | y }
+debug.print(x | y)
 ```
 
 输出：
@@ -539,7 +539,7 @@ local mt = {
 local x = setmetatable { table = { v = 6 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x ~ y }
+debug.print(x ~ y)
 ```
 
 输出：
@@ -579,7 +579,7 @@ local mt = {
 local x = setmetatable { table = { v = 3 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x << y }
+debug.print(x << y)
 ```
 
 输出：
@@ -619,7 +619,7 @@ local mt = {
 local x = setmetatable { table = { v = 12 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x >> y }
+debug.print(x >> y)
 ```
 
 输出：
@@ -658,7 +658,7 @@ local mt = {
 
 local x = setmetatable { table = { v = 5 }, metatable = mt }
 
-debug.print { message = -x }
+debug.print(-x)
 ```
 
 输出：
@@ -692,7 +692,7 @@ local mt = {
 
 local x = setmetatable { table = { v = 0 }, metatable = mt }
 
-debug.print { message = ~x }
+debug.print(~x)
 ```
 
 输出：
@@ -726,7 +726,7 @@ local mt = {
 
 local x = setmetatable { table = { n = 42 }, metatable = mt }
 
-debug.print { message = #x }
+debug.print(#x)
 ```
 
 输出：
@@ -761,7 +761,7 @@ local mt = {
 local x = setmetatable { table = { v = "a" }, metatable = mt }
 local y = { v = "b" }
 
-debug.print { message = x .. y }
+debug.print(x .. y)
 ```
 
 输出：
@@ -801,7 +801,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 1 }
 
-debug.print { message = x == y }
+debug.print(x == y)
 ```
 
 输出：
@@ -842,7 +842,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x < y }
+debug.print(x < y)
 ```
 
 输出：
@@ -883,7 +883,7 @@ local mt = {
 local x = setmetatable { table = { v = 2 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x <= y }
+debug.print(x <= y)
 ```
 
 输出：
@@ -917,7 +917,7 @@ true
 ```lua
 local mt = {
   __gc = function(obj)
-    debug.print { message = "collected" }
+    debug.print("collected")
   end
 }
 
@@ -952,9 +952,9 @@ collected
 local mt = {
   __close = function(obj, err)
     if err == nil then
-      debug.print { message = "closed" }
+      debug.print("closed")
     else
-      debug.print { message = "error!!!" }
+      debug.print("error!!!")
     end
   end
 }
@@ -965,7 +965,7 @@ end
 
 do
   local y <close> = setmetatable { table = {}, metatable = mt }
-  debug.assert { value = false }
+  debug.assert(false)
 end
 ```
 
@@ -1004,7 +1004,7 @@ function Update(dt)
     t["name"] = {}
     i = 1
   elseif i == 1 then
-    debug.print { message = type(t["name"]) }
+    debug.print(type(t["name"]))
     i = 2
   end
 end
@@ -1035,7 +1035,7 @@ nil
 
 ```lua
 local t = setmetatable { table = {}, metatable = { __metatable = "locked" } }
-debug.print { message = getmetatable(t) }
+debug.print(getmetatable(t))
 ```
 
 输出：
@@ -1062,7 +1062,7 @@ locked
 
 ```lua
 local t = setmetatable { table = {}, metatable = { __name = "Type" } }
-debug.print { message = tostring(t) }
+debug.print(tostring(t))
 ```
 
 输出：
