@@ -1,13 +1,21 @@
 # test branch
 
-This branch is used for **unstable experiments with new features**. Most test features are experimented with and archived separately on this branch.
+This branch is used for **unstable experiments with new features**. Most test features will be experimented with and archived separately on this branch.
 
 ## Notes
 
-- Experimental code may be rewritten, reverted, or discarded at any time.
+- Experimental code may be rewritten, rolled back, or discarded at any time.
 - Experimental code is not guaranteed to run stably. Some content may be abandoned after only an initial attempt, but will still be archived.
-- There is no guarantee that any experimental code will eventually be merged into the actual project once it stabilizes.
+- All experimental code is not guaranteed to be merged into the actual project even after it becomes stable.
 - The code on this branch is not part of the actual project code.
+
+## Experimental Branch Environment and Development Requirements
+
+1. All experimental projects on this branch share the same Rust project environment.
+2. The Rust project environment configuration on this branch should remain consistent with the development branch at all times.
+3. Experimental projects should remain independent of one another.
+4. All Rust experimental projects should be placed in the `experiments/` directory, with subdirectories used to keep experimental projects isolated.
+5. Experimental mappings in other languages should be placed in the `other/[code_language]/` directory. The remaining environment requirements, experimental isolation, and other such requirements are consistent with the four points above.
 
 ---
 
@@ -22,35 +30,10 @@ This branch is used for **unstable experiments with new features**. Most test fe
 - 所有实验性代码并不保证在稳定后一定会并入实际工程当中。
 - 该分支代码不属于实际工程代码的一部分。
 
-## 统一 Rust 实验环境
+## 实验分支环境与开发要求
 
-本分支保留独立历史，整个活动开发区使用一个 Cargo workspace：
-
-```text
-Cargo.toml / Cargo.lock / rust-toolchain.toml
-experiments/
-  terminal-raster/   终端自截图合成：字体、字格、颜色与系统后端对照
-  image-compare/     背景标尺校准、固定尺寸裁剪、逐行误差与热图
-profiles/           可复用的实验参数，不携带系统字体文件
-tools/xtask/        dev 依赖与编译器版本审计
-docs/               基线、实测结论与小型证据文件
-archive/logo_animation/  原有 Python logo 实验原样归档
-```
-
-Rust 编译器锁定为 dev 当前使用的 1.93.0，edition 2024 / resolver 3。外部依赖版本集中在根 manifest，按 dev 实际 Cargo.lock 精确锁定；子项目仅继承 workspace。根唯一 lock 固定传递依赖，禁止子项目各自升级。未来 dev 升级后须显式同步基线再验证。
-
-```powershell
-cargo run -p xtask --locked                           # 对照归档基线
-cargo run -p xtask --locked -- --dev E:\Code\tui-game # 只读检查当前 dev 锁文件
-cargo test --workspace --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo fmt --all -- --check
-```
-
-开始渲染实验：
-
-```powershell
-./experiments/terminal-raster/run.ps1 -OutputDirectory E:\Code\tg-test\b7-render-lab\my-run -DevWorktree E:\Code\tui-game
-```
-
-运行后打开输出目录 `index.html`，按原始像素叠加比较终端与合成图。详细使用见 [终端实验说明](experiments/terminal-raster/README.md)，结论和后续工作见 [B7 实测报告](docs/B7_REPORT.md)。Windows 原生后端和窗口捕获仅在 Windows 使用；软件探针和图像比较为可移植 Rust 代码，本轮尚未在 Linux/macOS 验证。
+1. 该分支所有实验项目共用同一个 Rust 项目环境。
+2. 该分支 Rust 项目环境配置应当与开发分支时刻保持一致。
+3. 实验项目之间应保持相互独立。
+4. Rust 实验项目应全部放在 `experiments/` 目录且用子级目录保持实验项目隔离。
+5. 其他语言映射实验应当放在 `other/[code_language]/` 目录下，其余环境要求、实验隔离等与上述四条内容一致。
