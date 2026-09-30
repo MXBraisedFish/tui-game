@@ -1,11 +1,11 @@
 {
   "boot_loading.title": "TUI GAME is starting",
-  "boot_loading.stage.storage": "Storage and logs",
-  "boot_loading.stage.terminal": "Terminal and display",
-  "boot_loading.stage.language": "Language resources",
-  "boot_loading.stage.services": "Core services",
-  "boot_loading.stage.packages": "Games and screensavers",
-  "boot_loading.stage.listeners": "Input and hot reload listeners",
-  "boot_loading.stage.runtime": "Runtime and UI",
+  "boot_loading.stage.storage": "Reading storage and loading logs",
+  "boot_loading.stage.terminal": "Starting terminal renderer",
+  "boot_loading.stage.language": "Loading language packs",
+  "boot_loading.stage.services": "Starting core services",
+  "boot_loading.stage.packages": "Preparing mod packages",
+  "boot_loading.stage.listeners": "Registering event listeners",
+  "boot_loading.stage.runtime": "Starting engine environment",
   "boot_loading.stage.ready": "Ready"
 }

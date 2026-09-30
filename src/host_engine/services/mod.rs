@@ -75,7 +75,6 @@ pub use storage::{
 };
 pub use tg_service_async::TaskId;
 pub use tg_service_clipboard::ClipboardService;
-pub use tg_service_code_highlight::CodeHighlightService;
 pub use tg_service_ffmpeg::FfmpegService;
 pub use tg_service_host_object::{HostAreaKind, HostObjectPool};
 pub use tg_service_input_method::{ImPolicy, InputMethodService};
@@ -89,8 +88,7 @@ pub use time::{TimeAsyncEvent, TimeService, TimerId};
 pub use version::{HOST_VERSION, MEDIA_MANIFEST_VERSION};
 pub use video::{VideoAsyncEvent, VideoExportStage, VideoService};
 pub use widget::{
-  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, HyperlinkService, MarkdownRenderParams,
-  MarkdownService, MarkdownViewId, MarkdownViewOptions, Overflow, ProgressBarFillOrigin,
+  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, Overflow, ProgressBarFillOrigin,
   ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService,
   RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions,
   ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, TableBorderMode,

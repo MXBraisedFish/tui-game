@@ -1,7 +1,6 @@
 {
   "security_settings.title": "Security Settings",
   "security_settings.reset_terminal": "Reset Terminal Capability Detection",
-  "security_settings.security_details": "Security Details",
   "security_settings.mod.reset.status": "Reset All Mod Statuses",
   "security_settings.mod.reset.debug": "Reset All Mod Debug Settings",
   "security_settings.mod.default.status": "Default Mod Status",
@@ -13,7 +12,7 @@
   "security_settings.reset.success": "Reset Successful",
   "security_settings.reset.fail": "Reset Failed",
   "security_settings.reset.terminal.success": ", Restart & Detect Again",
-  "security_settings.action.focus": "{key:security_settings.focus_security_details}/{key:security_settings.focus_reset_terminal}/{key:security_settings.focus_reset_status}/{key:security_settings.focus_reset_debug}/{key:security_settings.focus_default_status}/{key:security_settings.focus_default_debug} Focus",
+  "security_settings.action.focus": "{key:security_settings.focus_reset_terminal}/{key:security_settings.focus_reset_status}/{key:security_settings.focus_reset_debug}/{key:security_settings.focus_default_status}/{key:security_settings.focus_default_debug} Focus",
   "security_settings.action.select": "{key:security_settings.focus_up}/{key:security_settings.focus_down} Select",
   "security_settings.action.switch": "{key:security_settings.confirm} Switch",
   "security_settings.action.confirm": "{key:security_settings.confirm} Confirm",

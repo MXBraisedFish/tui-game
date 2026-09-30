@@ -50,7 +50,6 @@ tg-service-storage = { path = "crates/service/storage" }
 tg-service-text-layout = { path = "crates/service/text_layout" }
 tg-service-time = { path = "crates/service/time" }
 tg-service-rich-text = { path = "crates/service/rich_text" }
-tg-service-code-highlight = { path = "crates/service/code_highlight" }
 tg-service-host-object = { path = "crates/service/host_object" }
 tg-service-popup = { path = "crates/service/popup" }
 tg-service-input-method = { path = "crates/service/input_method" }

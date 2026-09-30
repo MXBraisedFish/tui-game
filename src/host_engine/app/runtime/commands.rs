@@ -369,7 +369,7 @@ pub(super) fn apply_input_demo_command(
 pub(super) fn apply_settings_command(
   command: SettingsUiCommand,
   settings_ui: &mut SettingsUi,
-  security_uis: &mut SecurityUis,
+  security_settings_ui: &mut SecuritySettingsUi,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
@@ -391,9 +391,7 @@ pub(super) fn apply_settings_command(
         .storage
         .read_package_state_or_default(&mut services.log)
         .defaults;
-      security_uis
-        .settings
-        .set_defaults(defaults.enabled, defaults.debug);
+      security_settings_ui.set_defaults(defaults.enabled, defaults.debug);
       world.state.enter_ui_node(UiNodeState::security_settings())
     }
     SettingsUiCommand::OpenDisplaySettings => {
@@ -1049,18 +1047,15 @@ pub(super) fn apply_screensaver_list_command(
 
 pub(super) fn apply_security_settings_command(
   command: SecuritySettingsCommand,
-  security_uis: &mut SecurityUis,
+  security_settings_ui: &mut SecuritySettingsUi,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
   match command {
     SecuritySettingsCommand::Back => {
       world.state.pop_ui_node();
-      clear_exiting_pool(security_uis.settings.objects_mut(), services);
-      security_uis.settings = SecuritySettingsUi::init(&services.hit_area);
-    }
-    SecuritySettingsCommand::OpenDetails => {
-      world.state.enter_ui_node(UiNodeState::security_details());
+      clear_exiting_pool(security_settings_ui.objects_mut(), services);
+      *security_settings_ui = SecuritySettingsUi::init(&services.hit_area);
     }
     SecuritySettingsCommand::ResetTerminal => {
       let success = services
@@ -1109,12 +1104,12 @@ pub(super) fn apply_security_settings_command(
       show_security_reset_popup(services, success, false);
     }
     SecuritySettingsCommand::SetDefaultStatus(enabled) => {
-      update_package_defaults(security_uis, services, |defaults| {
+      update_package_defaults(security_settings_ui, services, |defaults| {
         defaults.enabled = enabled;
       });
     }
     SecuritySettingsCommand::SetDefaultDebug(debug) => {
-      update_package_defaults(security_uis, services, |defaults| {
+      update_package_defaults(security_settings_ui, services, |defaults| {
         defaults.debug = debug;
       });
     }
@@ -1122,7 +1117,7 @@ pub(super) fn apply_security_settings_command(
 }
 
 fn update_package_defaults(
-  security_uis: &mut SecurityUis,
+  security_settings_ui: &mut SecuritySettingsUi,
   services: &mut EngineServices,
   update: impl FnOnce(&mut crate::host_engine::services::PackageDefaultState),
 ) {
@@ -1135,9 +1130,7 @@ fn update_package_defaults(
     .write_package_state(&profile, &mut services.log)
     .is_ok()
   {
-    security_uis
-      .settings
-      .set_defaults(profile.defaults.enabled, profile.defaults.debug);
+    security_settings_ui.set_defaults(profile.defaults.enabled, profile.defaults.debug);
   } else {
     show_security_reset_popup(services, false, false);
   }
@@ -1178,33 +1171,6 @@ fn show_security_reset_popup(services: &mut EngineServices, success: bool, termi
     replaceable: true,
     persistent: false,
   });
-}
-
-pub(super) fn apply_security_details_command(
-  command: SecurityDetailsCommand,
-  security_uis: &mut SecurityUis,
-  services: &mut EngineServices,
-  world: &mut RuntimeWorld,
-) {
-  match command {
-    SecurityDetailsCommand::Back => {
-      world.state.pop_ui_node();
-      clear_exiting_pool(security_uis.details.objects_mut(), services);
-      security_uis.details = SecurityDetailsUi::init(
-        &services.hit_area,
-        &services.scroll_box,
-        &services.markdown,
-        &services.storage,
-        &services.i18n,
-      );
-    }
-    SecurityDetailsCommand::Scroll(amount) => {
-      security_uis
-        .details
-        .scroll(amount, &services.scroll_box, &services.layout);
-      services.canvas.request_render();
-    }
-  }
 }
 
 pub(super) fn apply_storage_management_command(

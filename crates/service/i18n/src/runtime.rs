@@ -34,7 +34,6 @@ const RUNTIME_NAMESPACES: &[&str] = &[
   "log_info",
   "export_settings",
   "security_settings",
-  "security_details",
   "game_pack",
   "game_list",
   "screensaver_list",

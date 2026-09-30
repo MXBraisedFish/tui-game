@@ -165,6 +165,10 @@ end
 ```lua
 ```
 
+### 额外说明
+
+- 选填参数直接按位置传入，不使用末尾选项表。
+
 ---
 
 ## `select`
@@ -206,6 +210,10 @@ local first, second = select(2, "a", "b", "c")
 
 ```lua
 ```
+
+### 额外说明
+
+- 选填参数直接按位置传入，不使用末尾选项表。
 
 ---
 
@@ -292,7 +300,7 @@ debug.print(tostring(value))
 
 ## `rawset`
 
-直接设置表中的键值，不调用 `__newindex` 元方法。宿主只读 API 表不能修改。
+直接设置表中的键值，不调用 `__newindex` 元方法。
 
 ### 调用
 
@@ -415,6 +423,10 @@ local hexadecimal = tonumber("2A", 16)
 
 ```lua
 ```
+
+### 额外说明
+
+- 选填参数直接按位置传入，不使用末尾选项表。
 
 ---
 
@@ -539,7 +551,7 @@ debug.print(tostring(values.answer))
 
 ## `getmetatable`
 
-获取表的元表。若元表设置了 `__metatable`，返回该保护值。Lua 字符串的元表保持隔离，查询字符串返回 nil。
+获取表的元表，或获取它设置的保护值。
 
 ### 调用
 
@@ -577,5 +589,7 @@ debug.print(type(meta))
 
 ### 额外说明
 
+- 参数不是表（例如字符串）时，返回 `nil`。
+
 - `ipairs`、`pairs`、`next`、`select`、`rawequal`、`rawget`、`rawset`、`rawlen`、`tonumber`、`tostring`、`type`、`setmetatable` 和 `getmetatable` 同时作为 Lua 全局函数提供。
-- 只读 API 表不能通过 `rawset` 修改。
+- `rawset` 只用于修改脚本自己的表。

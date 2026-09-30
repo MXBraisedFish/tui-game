@@ -157,7 +157,12 @@ impl TextInputService {
       hit.origin = origin;
       hit.surface_rank = surface_rank;
     }
-    result.map(|(x, y)| (origin.0.saturating_add(x), origin.1.saturating_add(y)))
+    result.and_then(|(x, y)| {
+      Some((
+        u16::try_from(origin.0.saturating_add(i32::from(x))).ok()?,
+        u16::try_from(origin.1.saturating_add(i32::from(y))).ok()?,
+      ))
+    })
   }
 
   /// 聚焦指定文本输入组件，若之前有点击暂存则移动光标到该位置。

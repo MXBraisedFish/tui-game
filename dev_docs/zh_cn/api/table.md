@@ -53,6 +53,7 @@ table.concat
 | `sep` | string | 默认：`""`；相邻元素间的分隔符 |
 | `i` | integer | 默认：`1`；起始定位 |
 | `j` | integer | 默认：`#list`；结束定位 |
+
 ## 返回值
 
 直接返回一个值。
@@ -75,6 +76,10 @@ debug.print(table.concat(t2, " | "))
 
 ```lua
 ```
+
+### 额外说明
+
+- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
 
 ---
 
@@ -123,6 +128,10 @@ debug.print(table.pretty(t2))
 
 ```lua
 ```
+
+### 额外说明
+
+- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
 
 ---
 
@@ -182,8 +191,10 @@ debug.print(table.pretty(t2))
 
 ### 额外说明
 
+- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+
 - 该 API 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
-- 返回值是目标表 `a2`；未给 `a2` 时是源表 `a1`。
+- 返回值是目标表 `target`；未给 `target` 时是源表 `src`。
 
 ---
 
@@ -204,6 +215,7 @@ table.pack
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `...` | any... | 传给函数的参数，可包含表和 nil。 |
+
 ## 返回值
 
 返回一个数组表。
@@ -228,6 +240,8 @@ debug.print(table.pretty(packed2))
 ```
 
 ### 额外说明
+
+- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
 
 - 返回值数组表结构如下：
 
@@ -267,6 +281,7 @@ table.unpack
 | --- | --- | --- |
 | `i` | integer | 默认：`1`；起始索引 |
 | `j` | integer | 默认：`#list`；结束索引 |
+
 ## 返回值
 
 返回多个值。
@@ -293,6 +308,8 @@ debug.print(a2 .. " " .. b2)
 ```
 
 ### 额外说明
+
+- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
 
 - 该 API 返回多参数而非表。
 
@@ -321,6 +338,7 @@ table.remove
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `pos` | integer | 默认：`#list`；删除位置 |
+
 ## 返回值
 
 | 类型 | 说明         |
@@ -343,6 +361,10 @@ debug.print(removed2 .. " " .. table.pretty(t2))
 
 ```lua
 ```
+
+### 额外说明
+
+- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
 
 ---
 
@@ -369,6 +391,7 @@ table.sort
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `comp` | function / nil | 默认：`nil`；比较函数 |
+
 ## 返回值
 
 无。
@@ -404,7 +427,9 @@ debug.print(table.pretty(t4))
 
 ### 额外说明
 
-- 参数 `comparator` 函数结构如下：
+- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+
+- 参数 `comp` 函数结构如下：
 
 ```lua
 local function comparator(left, right)
@@ -412,7 +437,7 @@ local function comparator(left, right)
 end
 ```
 
-- 参数 `comparator` 函数返回值为 `true` 时，表示 `left` 排在 `right` 之前；返回值为 `false` 时，表示 `left` 排在 `right` 之后。
+- 参数 `comp` 函数返回值为 `true` 时，表示 `left` 排在 `right` 之前；返回值为 `false` 时，表示不要求 `left` 排在 `right` 前面（也可能两者相等）。
 
 ---
 
@@ -433,6 +458,7 @@ table.deepcopy
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `table` | table | 目标表 |
+
 ## 返回值
 
 返回一个混合表。
@@ -475,6 +501,7 @@ table.pretty
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `table` | table | 目标表 |
+
 ## 返回值
 
 直接返回一个值。
@@ -514,6 +541,7 @@ table.count
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `table` | table | 目标表 |
+
 ## 返回值
 
 返回两个值，依次为表中元素总数和数组部分是否连续。
@@ -562,6 +590,7 @@ table.count_array
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `table` | table | 目标表 |
+
 ## 返回值
 
 返回三个值，依次为数组元素数量、数组部分是否连续和有效下标表。
@@ -611,6 +640,7 @@ table.count_hash
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `table` | table | 目标表 |
+
 ## 返回值
 
 直接返回一个值。
@@ -652,6 +682,7 @@ table.compact
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `table` | table | 要压实的表 |
+
 ## 返回值
 
 直接返回一个值。

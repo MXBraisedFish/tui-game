@@ -10,16 +10,16 @@
 
 | 常量            | 说明                       | 定位                                |
 | ----------------- | -------------------------- | ----------------------------------- |
-| `LINE`            | 单线边框字符表             | [LINE](#LINE)                       |
-| `BOLD_LINE`       | 粗线边框字符表             | [BOLD_LINE](#BOLD_LINE)             |
-| `DOUBLE_LINE`     | 双线边框字符表             | [DOUBLE_LINE](#DOUBLE_LINE)         |
-| `ROUNDED_LINE`    | 圆角线边框字符表           | [ROUNDED_LINE](#ROUNDED_LINE)       |
-| `ASCII_NUMBER`    | `"0"`~`"9"` 字符数组表       | [ASCII_NUMBER](#ASCII_NUMBER)       |
-| `ASCII_LOWERCASE` | `"a"`~`"z"` 字符数组表       | [ASCII_LOWERCASE](#ASCII_LOWERCASE) |
-| `ASCII_UPPERCASE` | `"A"`~`"Z"` 字符数组表       | [ASCII_UPPERCASE](#ASCII_UPPERCASE) |
-| `ASCII_LETTER`    | 大小写字母字符数组表         | [ASCII_LETTER](#ASCII_LETTER)       |
-| `ASCII_CHARACTER` | ASCII 符号字符数组表         | [ASCII_CHARACTER](#ASCII_CHARACTER) |
-| `ASCII`           | 数字+字母+符号全量字符数组表 | [ASCII](#ASCII)                     |
+| `LINE`            | 单线边框字符表             | [LINE](#line)                       |
+| `BOLD_LINE`       | 粗线边框字符表             | [BOLD_LINE](#bold_line)             |
+| `DOUBLE_LINE`     | 双线边框字符表             | [DOUBLE_LINE](#double_line)         |
+| `ROUNDED_LINE`    | 圆角线边框字符表           | [ROUNDED_LINE](#rounded_line)       |
+| `ASCII_NUMBER`    | `"0"`~`"9"` 字符数组表       | [ASCII_NUMBER](#ascii_number)       |
+| `ASCII_LOWERCASE` | `"a"`~`"z"` 字符数组表       | [ASCII_LOWERCASE](#ascii_lowercase) |
+| `ASCII_UPPERCASE` | `"A"`~`"Z"` 字符数组表       | [ASCII_UPPERCASE](#ascii_uppercase) |
+| `ASCII_LETTER`    | 大小写字母字符数组表         | [ASCII_LETTER](#ascii_letter)       |
+| `ASCII_CHARACTER` | ASCII 符号字符数组表         | [ASCII_CHARACTER](#ascii_character) |
+| `ASCII`           | 数字+字母+符号全量字符数组表 | [ASCII](#ascii)                     |
 
 ---
 
@@ -29,15 +29,15 @@
 
 单线边框字符表。
 
-### 可用于
-
-- 参数 `border_char`
-
 ### 调用
 
 ```lua
 char.LINE
 ```
+
+### 可用于
+
+- 参数 `border_char`
 
 ### 示例
 
@@ -76,15 +76,15 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.LINE})
 
 粗线边框字符表。
 
-### 可用于
-
-- 参数 `border_char`
-
 ### 调用
 
 ```lua
 char.BOLD_LINE
 ```
+
+### 可用于
+
+- 参数 `border_char`
 
 ### 示例
 
@@ -123,15 +123,15 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.BOLD_LINE})
 
 双线边框字符表。
 
-### 可用于
-
-- 参数 `border_char`
-
 ### 调用
 
 ```lua
 char.DOUBLE_LINE
 ```
+
+### 可用于
+
+- 参数 `border_char`
 
 ### 示例
 
@@ -170,15 +170,15 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.DOUBLE_LINE})
 
 圆角线边框字符表。
 
-### 可用于
-
-- 参数 `border_char`
-
 ### 调用
 
 ```lua
 char.ROUNDED_LINE
 ```
+
+### 可用于
+
+- 参数 `border_char`
 
 ### 示例
 
@@ -217,15 +217,15 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.ROUNDED_LINE})
 
 数字字符数组表。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 char.ASCII_NUMBER
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -260,7 +260,6 @@ end
 }
 ```
 
-
 ### 额外说明
 
 - 所有数字均为**字符串**类型，而非数字。
@@ -271,15 +270,15 @@ end
 
 小写字母字符数组表。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 char.ASCII_LOWERCASE
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -340,15 +339,15 @@ end
 
 大写字母字符数组表。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 char.ASCII_UPPERCASE
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -409,15 +408,15 @@ end
 
 全部大小写字母字符数组表。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 char.ASCII_LETTER
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -504,15 +503,15 @@ end
 
 ASCII 符号字符数组表。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 char.ASCII_CHARACTER
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -570,15 +569,15 @@ draw.text(0, 0, table.concat(char.ASCII_CHARACTER))
 
 全量可打印 ASCII 字符数组表。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 char.ASCII
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 

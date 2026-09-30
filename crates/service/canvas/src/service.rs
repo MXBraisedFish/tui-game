@@ -32,6 +32,8 @@ pub struct CanvasService {
 pub struct PreparedSlice {
   pub buffer: CanvasBuffer,
   pub rect: Rect,
+  pub source_x: u16,
+  pub source_y: u16,
   pub visible: bool,
   pub opaque: bool,
   pub background: Option<TextColor>,
@@ -156,6 +158,8 @@ impl CanvasService {
       .or_insert_with(|| PreparedSlice {
         buffer: CanvasBuffer::new(rect.width, rect.height),
         rect,
+        source_x: frame.source_x,
+        source_y: frame.source_y,
         visible: frame.visible,
         opaque: frame.opaque,
         background: frame.background.clone(),
@@ -168,6 +172,8 @@ impl CanvasService {
       prepared.buffer.clear();
     }
     prepared.rect = rect;
+    prepared.source_x = frame.source_x;
+    prepared.source_y = frame.source_y;
     prepared.visible = frame.visible;
     prepared.opaque = frame.opaque;
     prepared.background = frame.background;
@@ -224,7 +230,13 @@ impl CanvasService {
     let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
       return false;
     };
-    Self::erase_rect_from(&mut slice.buffer, x, y, width, height);
+    Self::erase_rect_from(
+      &mut slice.buffer,
+      x.saturating_sub(i32::from(slice.source_x)),
+      y.saturating_sub(i32::from(slice.source_y)),
+      width,
+      height,
+    );
     true
   }
 
@@ -267,7 +279,13 @@ impl CanvasService {
       return false;
     };
     let lines = text_layout::layout_text_lines(params);
-    Self::draw_layout_lines(&mut slice.buffer, x, y, params.line_align, &lines);
+    Self::draw_layout_lines(
+      &mut slice.buffer,
+      x.saturating_sub(i32::from(slice.source_x)),
+      y.saturating_sub(i32::from(slice.source_y)),
+      params.line_align,
+      &lines,
+    );
     true
   }
 
@@ -298,7 +316,13 @@ impl CanvasService {
       return false;
     };
     let lines = text_layout::layout_rich_text_segments(segments, params);
-    Self::draw_layout_lines(&mut slice.buffer, x, y, params.line_align, &lines);
+    Self::draw_layout_lines(
+      &mut slice.buffer,
+      x.saturating_sub(i32::from(slice.source_x)),
+      y.saturating_sub(i32::from(slice.source_y)),
+      params.line_align,
+      &lines,
+    );
     true
   }
 
@@ -421,7 +445,13 @@ impl CanvasService {
     let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
       return false;
     };
-    Self::styled_text_to(&mut slice.buffer, x.into(), y.into(), text, style);
+    Self::styled_text_to(
+      &mut slice.buffer,
+      x.into().saturating_sub(i32::from(slice.source_x)),
+      y.into().saturating_sub(i32::from(slice.source_y)),
+      text,
+      style,
+    );
     true
   }
 
@@ -667,11 +697,11 @@ impl CanvasService {
   }
 
   /// Returns the hit-test result of a rectangle on the base layer.
-  pub fn base_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
+  pub fn base_hit_rect(&self, rect: Rect) -> Option<(Rect, (i32, i32), usize)> {
     surface_hit_rect(
       rect,
-      self.viewport.x,
-      self.viewport.y,
+      i32::from(self.viewport.x),
+      i32::from(self.viewport.y),
       self.base.width(),
       self.base.height(),
       0,
@@ -679,23 +709,25 @@ impl CanvasService {
   }
 
   /// Returns the hit-test result of a rectangle on the given slice.
-  pub fn slice_hit_rect(&self, id: SliceId, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
+  pub fn slice_hit_rect(&self, id: SliceId, rect: Rect) -> Option<(Rect, (i32, i32), usize)> {
     let slice = self.slices.get(&id).filter(|slice| slice.visible)?;
-    surface_hit_rect(
-      rect,
-      self.viewport.x.saturating_add(slice.rect.x),
-      self.viewport.y.saturating_add(slice.rect.y),
-      slice.buffer.width(),
-      slice.buffer.height(),
-      slice.order + 1,
-    )
+    let visible_local = clipped_slice_local_rect(slice, rect)?;
+    let origin_x = i32::from(self.viewport.x) + i32::from(slice.rect.x) - i32::from(slice.source_x);
+    let origin_y = i32::from(self.viewport.y) + i32::from(slice.rect.y) - i32::from(slice.source_y);
+    let visible = Rect {
+      x: u16::try_from(origin_x.saturating_add(i32::from(visible_local.x))).ok()?,
+      y: u16::try_from(origin_y.saturating_add(i32::from(visible_local.y))).ok()?,
+      width: visible_local.width,
+      height: visible_local.height,
+    };
+    Some((visible, (origin_x, origin_y), slice.order + 1))
   }
 
   pub fn scroll_box_hit_rect(
     &self,
     id: ScrollBoxId,
     rect: Rect,
-  ) -> Option<(Rect, (u16, u16), usize)> {
+  ) -> Option<(Rect, (i32, i32), usize)> {
     let scroll_box = self
       .scroll_boxes
       .get(&id)
@@ -736,21 +768,15 @@ impl CanvasService {
     Some((
       visible,
       (
-        self
-          .viewport
-          .x
-          .saturating_add(scroll_box.layout.content_viewport_rect.x),
-        self
-          .viewport
-          .y
-          .saturating_add(scroll_box.layout.content_viewport_rect.y),
+        i32::from(self.viewport.x) + i32::from(scroll_box.layout.content_viewport_rect.x),
+        i32::from(self.viewport.y) + i32::from(scroll_box.layout.content_viewport_rect.y),
       ),
       scroll_box.order + 1,
     ))
   }
 
   /// Returns the hit-test result of a rectangle on the host layer.
-  pub fn host_hit_rect(&self, rect: Rect) -> Option<(Rect, (u16, u16), usize)> {
+  pub fn host_hit_rect(&self, rect: Rect) -> Option<(Rect, (i32, i32), usize)> {
     surface_hit_rect(
       rect,
       0,
@@ -828,26 +854,46 @@ impl CanvasService {
 // Computes the clipped hit area of a rectangle on the given surface.
 fn surface_hit_rect(
   rect: Rect,
-  ox: u16,
-  oy: u16,
+  ox: i32,
+  oy: i32,
   width: u16,
   height: u16,
   rank: usize,
-) -> Option<(Rect, (u16, u16), usize)> {
+) -> Option<(Rect, (i32, i32), usize)> {
   let x = rect.x.min(width);
   let y = rect.y.min(height);
   let width = rect.width.min(width.saturating_sub(x));
   let height = rect.height.min(height.saturating_sub(y));
   (width > 0 && height > 0).then_some((
     Rect {
-      x: ox.saturating_add(x),
-      y: oy.saturating_add(y),
+      x: u16::try_from(ox.saturating_add(i32::from(x))).ok()?,
+      y: u16::try_from(oy.saturating_add(i32::from(y))).ok()?,
       width,
       height,
     },
     (ox, oy),
     rank,
   ))
+}
+
+fn clipped_slice_local_rect(slice: &PreparedSlice, rect: Rect) -> Option<Rect> {
+  let x1 = i32::from(rect.x).max(i32::from(slice.source_x));
+  let y1 = i32::from(rect.y).max(i32::from(slice.source_y));
+  let x2 = i32::from(rect.x)
+    .saturating_add(i32::from(rect.width))
+    .min(i32::from(slice.source_x).saturating_add(i32::from(slice.buffer.width())));
+  let y2 = i32::from(rect.y)
+    .saturating_add(i32::from(rect.height))
+    .min(i32::from(slice.source_y).saturating_add(i32::from(slice.buffer.height())));
+  if x2 <= x1 || y2 <= y1 {
+    return None;
+  }
+  Some(Rect {
+    x: x1 as u16,
+    y: y1 as u16,
+    width: (x2 - x1) as u16,
+    height: (y2 - y1) as u16,
+  })
 }
 
 fn physical_rect(viewport: Rect, rect: Rect) -> Rect {
@@ -1067,6 +1113,8 @@ mod tests {
             width: 4,
             height: 2,
           },
+          source_x: 0,
+          source_y: 0,
           visible: true,
           opaque: false,
           background: None,
@@ -1114,6 +1162,79 @@ mod tests {
       canvas.scroll_boxes[&scroll_box].buffer.row_text(0),
       "bcd ",
       "scroll-box content coordinates must clip"
+    );
+  }
+
+  #[test]
+  fn partially_offscreen_slice_preserves_source_coordinates_for_draw_and_hits() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(12, 6);
+    let slice = SliceId(1);
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(
+      1,
+      vec![SurfaceFrame::Slice(SliceFrame {
+        id: slice,
+        rect: Rect {
+          x: 0,
+          y: 0,
+          width: 6,
+          height: 2,
+        },
+        source_x: 4,
+        source_y: 1,
+        visible: true,
+        opaque: false,
+        background: None,
+      })],
+      &layout,
+    );
+
+    assert!(canvas.text_at_on(
+      slice,
+      0,
+      1,
+      &DrawTextParams {
+        text: "abcdefghij".to_string(),
+        ..Default::default()
+      }
+    ));
+    assert_eq!(canvas.slices[&slice].buffer.row_text(0), "efghij");
+    assert_eq!(
+      canvas.slice_hit_rect(
+        slice,
+        Rect {
+          x: 0,
+          y: 1,
+          width: 4,
+          height: 1,
+        }
+      ),
+      None,
+      "hit regions fully outside the visible source range must be discarded"
+    );
+    assert_eq!(
+      canvas.slice_hit_rect(
+        slice,
+        Rect {
+          x: 3,
+          y: 1,
+          width: 5,
+          height: 1,
+        }
+      ),
+      Some((
+        Rect {
+          x: 0,
+          y: 0,
+          width: 4,
+          height: 1,
+        },
+        (-4, -1),
+        1,
+      )),
+      "visible hit area coordinates must follow the same crop as slice drawing"
     );
   }
 

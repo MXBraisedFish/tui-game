@@ -10,9 +10,9 @@
 
 | 常量       | 说明                 | 定位                      |
 | ------------ | -------------------- | ------------------------- |
-| `AUTO`       | 自动检查文本类型     | [AUTO](#AUTO)             |
-| `PLAIN_TEXT` | 强制按普通文本解析   | [PLAIN_TEXT](#PLAIN_TEXT) |
-| `RICH_TEXT`  | 强制按富文本语法解析 | [RICH_TEXT](#RICH_TEXT)   |
+| `AUTO`       | 自动检查文本类型     | [AUTO](#auto)             |
+| `PLAIN_TEXT` | 强制按普通文本解析   | [PLAIN_TEXT](#plain_text) |
+| `RICH_TEXT`  | 强制按富文本语法解析 | [RICH_TEXT](#rich_text)   |
 
 ## 方法
 
@@ -46,15 +46,15 @@
 
 自动检查文本类型。
 
-### 可用于
-
-- 参数 `text_mode`
-
 ### 调用
 
 ```lua
 string.AUTO
 ```
+
+### 可用于
+
+- 参数 `text_mode`
 
 ### 示例
 
@@ -80,22 +80,21 @@ debug.print(tostring(len2))
 "auto"
 ```
 
-
 ---
 
 ## `PLAIN_TEXT`
 
 强制按普通文本解析；头部声明 `f%`，富文本标签会被强制保留。
 
-### 可用于
-
-- 参数 `text_mode`
-
 ### 调用
 
 ```lua
 string.PLAIN_TEXT
 ```
+
+### 可用于
+
+- 参数 `text_mode`
 
 ### 示例
 
@@ -121,22 +120,21 @@ debug.print(tostring(len2))
 "plain_text"
 ```
 
-
 ---
 
 ## `RICH_TEXT`
 
 强制按富文本语法解析；头部声明 `f%` 会被强制保留。
 
-### 可用于
-
-- 文本参数 `text_mode`
-
 ### 调用
 
 ```lua
 string.RICH_TEXT
 ```
+
+### 可用于
+
+- 文本参数 `text_mode`
 
 ### 示例
 
@@ -162,7 +160,6 @@ debug.print(tostring(len2))
 "rich_text"
 ```
 
-
 ---
 
 # 方法
@@ -184,6 +181,7 @@ string.lower
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
+
 ## 返回值
 
 | 类型   | 说明     |
@@ -227,6 +225,7 @@ string.upper
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
+
 ## 返回值
 
 直接返回一个值。
@@ -268,6 +267,7 @@ string.reverse
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
+
 ## 返回值
 
 | 类型   | 说明     |
@@ -308,6 +308,7 @@ string.split
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
 | `sep` | string | 分割字符 |
+
 ## 返回值
 
 返回一个数组表。
@@ -321,8 +322,8 @@ string.split
 ```lua
 local parts = string.split("apple,banana,grape", ",")
 
-for i in ipairs(parts) do
-  debug.print(i.value)
+for _, value in ipairs(parts) do
+  debug.print(value)
 end
 ```
 
@@ -357,6 +358,7 @@ string.sub
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `finish` | integer | 默认：目标字符串长度；结束字符位置 |
+
 ## 返回值
 
 直接返回一个值。
@@ -405,6 +407,7 @@ string.rep
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `sep` | string | 默认：`""`；相邻副本间的分隔符 |
+
 ## 返回值
 
 直接返回一个值。
@@ -454,6 +457,7 @@ string.find
 | --- | --- | --- |
 | `init` | integer | 默认：`1`；起始搜索位置 |
 | `plain` | boolean | 默认：`false`；是否按普通文本查找 |
+
 ## 返回值
 
 查找成功时返回三个值：匹配起点、匹配终点和捕获数组表。查找失败时返回一个 nil。
@@ -487,6 +491,8 @@ debug.print(tostring(captures2.n))
 ```
 
 ### 额外说明
+
+- 这是项目的字符串接口：`init`、`plain` 放在末尾选项表中；起止位置按从 1 开始的 Unicode 字符计数。第三个返回值始终是捕获表，不把捕获组展开为更多返回值。
 
 - 返回值 `captures` 表结构如下：
 
@@ -526,6 +532,7 @@ string.match
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `init` | integer | 默认：`1`；起始搜索位置 |
+
 ## 返回值
 
 若**查找成功**，返回一个混合表。
@@ -590,6 +597,7 @@ string.gmatch
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
 | `pattern` | string | 模式字符串 |
+
 ## 返回值
 
 直接返回一个值。
@@ -602,7 +610,7 @@ string.gmatch
 
 | 字段      | 类型      | 说明         |
 | --------- | --------- | ------------ |
-| [integer] | string... | 捕获结果     |
+| [integer] | string / integer / nil | 捕获结果     |
 | `n`       | integer   | 捕获结果数量 |
 
 ### 示例
@@ -629,6 +637,8 @@ end
 ```
 
 ### 额外说明
+
+- 每次迭代只返回一个捕获表；使用 `for captures in string.gmatch(text, pattern) do ... end` 读取。没有捕获组时，表的第 1 项是完整匹配；位置捕获 `()` 的值为整数。
 
 - 迭代器返回值元素混合表结构：
 
@@ -667,6 +677,7 @@ string.gsub
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `limit` | integer | 默认：`-1`；最大替换次数 |
+
 ## 返回值
 
 返回两个值，依次为替换后的字符串和实际替换次数。
@@ -720,6 +731,7 @@ string.regex_escape
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
+
 ## 返回值
 
 直接返回一个值。
@@ -769,6 +781,7 @@ string.regex_find
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `init` | integer | 默认：`1`；起始搜索位置 |
+
 ## 返回值
 
 查找成功时返回三个值：匹配起点、匹配终点和捕获数组表。查找失败时返回一个 nil。
@@ -813,7 +826,7 @@ local captures = {
 }
 ```
 
-- 匹配结果为零长字符时，返回值中的 $finish = start - 1$，且字段 `caputers.n` 为 0。
+- 匹配结果为零长字符时，返回值中的 $finish = start - 1$；`captures.n` 表示捕获数量，没有捕获组时为 1，保存完整匹配（可以是空字符串）。
 
 ---
 
@@ -841,6 +854,7 @@ string.regex_match
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `init` | integer | 默认：`1`；起始搜索位置 |
+
 ## 返回值
 
 若**查找成功**，返回一个混合表。
@@ -905,6 +919,7 @@ string.regex_gmatch
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
 | `pattern` | string | 正则表达式 |
+
 ## 返回值
 
 直接返回一个值。
@@ -917,7 +932,7 @@ string.regex_gmatch
 
 | 字段      | 类型      | 说明         |
 | --------- | --------- | ------------ |
-| [integer] | string... | 捕获结果     |
+| [integer] | string / nil | 捕获结果     |
 | `n`       | integer   | 捕获结果数量 |
 
 ### 示例
@@ -981,6 +996,7 @@ string.regex_gsub
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `limit` | integer | 默认：`-1`；最大替换次数 |
+
 ## 返回值
 
 返回两个值，依次为替换后的字符串和实际替换次数。
@@ -1033,13 +1049,14 @@ string.regex_test
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
 | `pattern` | string | 正则表达式 |
+
 ## 返回值
 
 直接返回一个值。
 
-| 返回值名  | 类型    | 说明         |
-| --------- | ------- | ------------ |
-| `matched` | boolean | 是否存在匹配 |
+| 类型 | 说明 |
+| --- | --- |
+| boolean | 是否存在匹配 |
 
 ### 示例
 
@@ -1076,6 +1093,7 @@ string.regex_split
 | --- | --- | --- |
 | `text` | string | 目标字符串 |
 | `pattern` | string | 正则表达式 |
+
 ## 返回值
 
 返回一个数组表。
@@ -1129,7 +1147,8 @@ string.format
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `...` | any... | 传给函数的参数，可包含表和 nil。 |
+| `...` | any... | 按格式串依次传入的值；类型必须匹配对应占位符。 |
+
 ## 返回值
 
 直接返回一个值。
@@ -1186,11 +1205,14 @@ string.rich_text_to_plain_text
 | `rich_params` | table | 默认：`nil`；富文本参数表 |
 | `key_params` | boolean | 默认：`true`；是否解析按键参数 |
 | `strip_header` | boolean | 默认：`true`；是否剥离 `f%` 头 |
+
 ## 返回值
 
-| 返回值名 | 类型   | 说明             |
-| -------- | ------ | ---------------- |
-| `text`   | string | 转换后的普通文本 |
+返回一个字符串。
+
+| 类型 | 说明 |
+| --- | --- |
+| string | 转换后的普通文本 |
 
 ### 示例
 

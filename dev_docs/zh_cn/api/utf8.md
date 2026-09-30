@@ -389,7 +389,7 @@ debug.print(table.pretty(r2))
 ```lua
 local values = {
   [1] = 65,
-  [2] = 20320,
+  [2] = nil, -- 非 ASCII 字符的位置留空
   n = 2,
 }
 ```
@@ -413,21 +413,21 @@ utf8.char_position
 | 参数名  | 类型    | 说明                                   |
 | ------- | ------- | -------------------------------------- |
 | `text`  | string  | 目标字符串                             |
-| `index` | integer | 从 `start` 开始计算的 Unicode 标量序号 |
+| `index` | integer / nil | 从 `start` 开始计算的 Unicode 标量序号 |
 
 ### 选填参数
 
 | 参数名  | 类型    | 说明                             |
 | ------- | ------- | -------------------------------- |
-| `start` | integer | 默认：`1`；起始 Unicode 标量位置 |
+| `start` | integer / nil | 默认：`1`；起始 Unicode 标量位置 |
 
 ## 返回值
 
-直接返回一个值。
+找到字符时返回一个字节位置，超出范围时返回 `nil`。
 
 | 类型    | 说明                                   |
 | ------- | -------------------------------------- |
-| integer | 目标 Unicode 标量的一基 UTF-8 字节位置 |
+| integer / nil | 目标 Unicode 标量的一基 UTF-8 字节位置 |
 
 ### 示例
 
@@ -502,7 +502,7 @@ end
 
 ### 额外说明
 
-每次迭代按需返回当前位置和码点，不会预先创建包含全部字符的数组。
+使用 `for byte_position, codepoint in utf8.codepoints(text) do ... end` 遍历；结束时返回 `nil`。
 
 ---
 

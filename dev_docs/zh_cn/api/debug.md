@@ -10,13 +10,13 @@
 
 | 常量 | 说明 | 定位 |
 | --- | --- | --- |
-| `VERSION` | Lua 与 TUI GAME API 版本字符串 | [VERSION](#VERSION) |
-| `TRACE` | 追踪日志等级 | [TRACE](#TRACE) |
-| `DEBUG` | 调试日志等级 | [DEBUG](#DEBUG) |
-| `INFO` | 信息日志等级 | [INFO](#INFO) |
-| `WARN` | 警告日志等级 | [WARN](#WARN) |
-| `ERROR` | 错误日志等级 | [ERROR](#ERROR) |
-| `FATAL` | 致命日志等级 | [FATAL](#FATAL) |
+| `VERSION` | Lua 与 TUI GAME API 版本字符串 | [VERSION](#version) |
+| `TRACE` | 追踪日志等级 | [TRACE](#trace) |
+| `DEBUG` | 调试日志等级 | [DEBUG](#debug) |
+| `INFO` | 信息日志等级 | [INFO](#info) |
+| `WARN` | 警告日志等级 | [WARN](#warn) |
+| `ERROR` | 错误日志等级 | [ERROR](#error) |
+| `FATAL` | 致命日志等级 | [FATAL](#fatal) |
 
 ## 方法
 
@@ -62,7 +62,7 @@ debug.print(debug.VERSION)
 ### 等值
 
 ```text
-Lua 5.4 / TUI GAME API 1
+"Lua 5.4 / TUI GAME API 1"
 ```
 
 ---
@@ -95,7 +95,7 @@ debug.print("trace message", {level = debug.TRACE})
 ### 等值
 
 ```text
-trace
+"trace"
 ```
 
 ---
@@ -128,7 +128,7 @@ debug.print("debug message", {level = debug.DEBUG})
 ### 等值
 
 ```text
-debug
+"debug"
 ```
 
 ---
@@ -161,7 +161,7 @@ debug.print("info message", {level = debug.INFO})
 ### 等值
 
 ```text
-info
+"info"
 ```
 
 ---
@@ -194,7 +194,7 @@ debug.print("warning message", {level = debug.WARN})
 ### 等值
 
 ```text
-warn
+"warn"
 ```
 
 ---
@@ -227,7 +227,7 @@ debug.print("error message", {level = debug.ERROR})
 ### 等值
 
 ```text
-error
+"error"
 ```
 
 ---
@@ -260,7 +260,7 @@ debug.print("fatal message", {level = debug.FATAL})
 ### 等值
 
 ```text
-fatal
+"fatal"
 ```
 
 ---

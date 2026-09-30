@@ -19,14 +19,14 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let table = parameters.options();
       let system_language = create_state.borrow().context.language_code.clone();
       let language_code = args::optional_string(
-        &table,
+        table,
         method,
         "language_code",
         Some(system_language.as_str()),
       )?
       .expect("language_code has a default");
       let callback_language_code =
-        args::optional_string(&table, method, "callback_language_code", Some("en_us"))?
+        args::optional_string(table, method, "callback_language_code", Some("en_us"))?
           .expect("callback_language_code has a default");
       validate_language_code(method, "language_code", &language_code)?;
       validate_language_code(method, "callback_language_code", &callback_language_code)?;
@@ -119,14 +119,14 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let table = parameters.options();
       let system_language = reload_state.borrow().context.language_code.clone();
       let language_code = args::optional_string(
-        &table,
+        table,
         method,
         "language_code",
         Some(system_language.as_str()),
       )?
       .expect("language_code has a default");
       let callback_language_code =
-        args::optional_string(&table, method, "callback_language_code", Some("en_us"))?
+        args::optional_string(table, method, "callback_language_code", Some("en_us"))?
           .expect("callback_language_code has a default");
       validate_language_code(method, "language_code", &language_code)?;
       validate_language_code(method, "callback_language_code", &callback_language_code)?;

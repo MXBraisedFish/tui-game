@@ -4217,7 +4217,6 @@ dependencies = [
  "tg-service-audio",
  "tg-service-canvas",
  "tg-service-clipboard",
- "tg-service-code-highlight",
  "tg-service-export",
  "tg-service-ffmpeg",
  "tg-service-file",

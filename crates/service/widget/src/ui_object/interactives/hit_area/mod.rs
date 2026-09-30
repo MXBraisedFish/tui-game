@@ -114,7 +114,7 @@ impl HitAreaService {
     &self,
     pool: &mut UiObjectPool,
     id: HitAreaId,
-    resolved: Option<(Rect, (u16, u16), usize)>,
+    resolved: Option<(Rect, (i32, i32), usize)>,
   ) -> bool {
     if !pool.hit_areas.areas.contains_key(&id) {
       return false;
@@ -294,8 +294,12 @@ fn event_point(pool: &UiObjectPool, id: HitAreaId, x: u16, y: u16) -> (u16, u16)
     .hit
     .map(|hit| {
       (
-        x.saturating_sub(hit.origin.0),
-        y.saturating_sub(hit.origin.1),
+        i32::from(x)
+          .saturating_sub(hit.origin.0)
+          .clamp(0, i32::from(u16::MAX)) as u16,
+        i32::from(y)
+          .saturating_sub(hit.origin.1)
+          .clamp(0, i32::from(u16::MAX)) as u16,
       )
     })
     .unwrap_or((x, y))
@@ -476,6 +480,53 @@ mod tests {
       service.local_pointer_position(&pool, slice_area),
       Some((0, 0))
     );
+  }
+
+  #[test]
+  fn negative_slice_hit_uses_the_original_slice_coordinates() {
+    let service = HitAreaService::new();
+    let slices = SliceService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(12, 6);
+    let slice = slices
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: SliceRect {
+            x: 0,
+            y: 0,
+            width: SliceLength::Fixed(10),
+            height: SliceLength::Fixed(2),
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    assert!(slices.draw(&mut pool, slice, -4, 1));
+    let area = service.create(&mut pool, HitAreaOptions::default());
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    pool.prepare_canvas(&mut canvas, &layout);
+    service.render_on(&mut pool, area, slice, rect(0, 0, 10, 2), &canvas);
+
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      &canvas,
+      mouse(MouseEventKind::Move, None, 0, 1),
+    );
+
+    assert_eq!(
+      events(&mut pool),
+      vec![UiEvent::HitArea(HitAreaEvent::HoverEnter {
+        id: area,
+        x: 4,
+        y: 0,
+      })]
+    );
+    assert_eq!(service.local_pointer_position(&pool, area), Some((0, 0)));
   }
 
   #[test]

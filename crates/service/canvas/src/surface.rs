@@ -124,6 +124,9 @@ pub struct ResolvedScrollBoxLayout {
 pub struct SliceFrame {
   pub id: SliceId,
   pub rect: Rect,
+  /// Source position inside the configured slice that maps to `rect`'s top-left cell.
+  pub source_x: u16,
+  pub source_y: u16,
   pub visible: bool,
   pub opaque: bool,
   pub background: Option<TextColor>,

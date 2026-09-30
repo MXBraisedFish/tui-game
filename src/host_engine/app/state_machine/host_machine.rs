@@ -146,7 +146,7 @@ impl HostMachineState {
   }
 
   /// 压入一个窗口尺寸过小的警告覆盖层
-  pub fn push_window_size_overlay(&mut self, min_w: u32, min_h: u32) {
+  pub fn push_window_size_overlay(&mut self, min_w: u64, min_h: u64) {
     if let Some(runtime) = self.runtime_mut() {
       runtime.overlays_mut().push(OverlayState {
         kind: OverlayKind::WindowSizeWarning,
@@ -256,8 +256,8 @@ impl HostMachineState {
         kind: OverlayKind::Screensaver,
         logic: super::OverlayLogicState,
         render: super::OverlayRenderState {
-          required_width: min_width,
-          required_height: min_height,
+          required_width: u64::from(min_width),
+          required_height: u64::from(min_height),
         },
       });
     }
@@ -311,5 +311,35 @@ mod tests {
     assert!(state.is_shutdown());
     state.enter_stopped();
     assert!(state.is_stopped());
+  }
+
+  #[test]
+  fn overlay_navigation_preserves_the_underlying_ui_path() {
+    let mut state = HostMachineState::new();
+    state.enter_runtime();
+    state.enter_ui_node(UiNodeState::settings());
+    let path_before = state.current_ui_path_kinds();
+
+    state.push_language_loading_overlay();
+    state.push_clear_warning_overlay();
+    assert_eq!(
+      state.current_overlay_kind(),
+      Some(OverlayKind::ClearWarning)
+    );
+    assert_eq!(state.current_ui_path_kinds(), path_before);
+
+    assert_eq!(
+      state.pop_overlay().map(|overlay| overlay.kind),
+      Some(OverlayKind::ClearWarning)
+    );
+    assert_eq!(
+      state.current_overlay_kind(),
+      Some(OverlayKind::LanguageLoading)
+    );
+    assert_eq!(state.current_ui_path_kinds(), path_before);
+
+    state.remove_overlay_kind(OverlayKind::LanguageLoading);
+    assert_eq!(state.current_overlay_kind(), None);
+    assert_eq!(state.current_ui_path_kinds(), path_before);
   }
 }

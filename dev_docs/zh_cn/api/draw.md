@@ -49,8 +49,8 @@ draw.text
 | `horizontal_align` | const-align | 默认：`align.LEFT`；多行文本的水平对齐方式 |
 | `auto_wrap` | boolean | 默认：`true`；是否自动换行 |
 | `word_wrap` | boolean | 默认：`true`；是否按完整单词换行 |
-| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度 |
-| `max_height` | integer / nil | 默认：`nil`；最大绘制高度 |
+| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度；提供时范围为 1～65535 |
+| `max_height` | integer / nil | 默认：`nil`；最大绘制高度；提供时范围为 1～65535 |
 | `overflow_marker` | string | 默认：`"..."`；文本溢出时使用的省略标记 |
 | `text_mode` | const-string | 默认：`string.AUTO`；文本解析模式 |
 | `rich_params` | table / nil | 默认：`nil`；富文本参数 |
@@ -63,6 +63,7 @@ draw.text
 | `hidden` | boolean | 默认：`false`；隐藏 |
 | `dim` | boolean | 默认：`false`；暗淡 |
 | `slice_layer` | string | 默认：`"base"`；绘制目标切片图层 |
+
 ## 返回值
 
 无。
@@ -81,6 +82,8 @@ draw.text(2, 2, "Hello TUI GAME", {fg = color.WHITE, italic = true})
 ```
 
 ### 额外说明
+
+- 坐标从 0 开始，单位为终端字符格；超出目标切片的内容会裁剪。需要持续显示的内容放在 `Render` 回调中绘制。
 
 - 参数 `bg` 和参数 `fg` 均支持形如 rgb(r,g,b) 或 \#rrggbb 的颜色代码，字符串类型，无空格
 
@@ -104,8 +107,8 @@ draw.fill_rect
 | --- | --- | --- |
 | `x` | integer | 矩形左上角的 x 坐标 |
 | `y` | integer | 矩形左上角的 y 坐标 |
-| `width` | integer | 矩形宽度 |
-| `height` | integer | 矩形高度 |
+| `width` | integer | 矩形宽度，范围 1～65535 |
+| `height` | integer | 矩形高度，范围 1～65535 |
 
 ### 选填参数
 
@@ -115,6 +118,7 @@ draw.fill_rect
 | `fg` | string / const-color | 默认：`color.NONE`；前景色 |
 | `bg` | string / const-color | 默认：`color.NONE`；背景色 |
 | `slice_layer` | string | 默认：`"base"`；绘制目标切片图层 |
+
 ## 返回值
 
 无。
@@ -157,8 +161,8 @@ draw.stroke_rect
 | --- | --- | --- |
 | `x` | integer | 矩形左上角的 x 坐标 |
 | `y` | integer | 矩形左上角的 y 坐标 |
-| `width` | integer | 矩形宽度 |
-| `height` | integer | 矩形高度 |
+| `width` | integer | 矩形宽度，范围 1～65535 |
+| `height` | integer | 矩形高度，范围 1～65535 |
 
 ### 选填参数
 
@@ -168,6 +172,7 @@ draw.stroke_rect
 | `bg` | string / const-color | 默认：`color.NONE`；边框背景色 |
 | `border_char` | const-char / table | 默认：`char.LINE`；边框字符 |
 | `slice_layer` | string | 默认：`"base"`；绘制目标切片图层 |
+
 ## 返回值
 
 无。
@@ -234,14 +239,15 @@ draw.erase_rect
 | --- | --- | --- |
 | `x` | integer | 矩形左上角的 x 坐标 |
 | `y` | integer | 矩形左上角的 y 坐标 |
-| `width` | integer | 矩形宽度 |
-| `height` | integer | 矩形高度 |
+| `width` | integer | 矩形宽度，范围 1～65535 |
+| `height` | integer | 矩形高度，范围 1～65535 |
 
 ### 选填参数
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `slice_layer` | string | 默认：`"base"`；绘制目标切片图层 |
+
 ## 返回值
 
 无。

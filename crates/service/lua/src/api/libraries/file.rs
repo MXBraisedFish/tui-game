@@ -65,8 +65,8 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let table = parameters.options();
       let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
-      let byte = file_byte_mode(&table, method)?;
-      let event_tip = file_tip(&table, method)?;
+      let byte = file_byte_mode(table, method)?;
+      let event_tip = file_tip(table, method)?;
       let path = resolve_file_path(
         &read_state.borrow().context.assets_root,
         &relative_path,
@@ -76,8 +76,8 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let (task, operation) = if byte {
         (FileTask::LuaReadBytes { path }, LuaFileOperation::ReadBytes)
       } else {
-        validate_file_eol(&table, method)?;
-        let encoding = file_encoding(&table, method)?;
+        validate_file_eol(table, method)?;
+        let encoding = file_encoding(table, method)?;
         (
           FileTask::LuaReadText { path, encoding },
           LuaFileOperation::ReadText,
@@ -105,8 +105,8 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let table = parameters.options();
       let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
-      let byte = file_byte_mode(&table, method)?;
-      let event_tip = file_tip(&table, method)?;
+      let byte = file_byte_mode(table, method)?;
+      let event_tip = file_tip(table, method)?;
       let path = resolve_file_path(
         &write_state.borrow().context.assets_root,
         &relative_path,
@@ -125,8 +125,8 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         if text.contains('\0') {
           return Err(args::message(method, "text must contain no NUL"));
         }
-        let encoding = file_encoding(&table, method)?;
-        let end_of_line = validate_file_eol(&table, method)?;
+        let encoding = file_encoding(table, method)?;
+        let end_of_line = validate_file_eol(table, method)?;
         (
           FileTask::LuaWriteText {
             path,
@@ -153,7 +153,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let table = parameters.options();
       let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
-      let event_tip = file_tip(&table, method)?;
+      let event_tip = file_tip(table, method)?;
       let assets_root = create_dir_state.borrow().context.assets_root.clone();
       let path = resolve_file_path(
         &assets_root,
@@ -208,7 +208,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         value => args::boolean(value, method, "recursive")?,
       };
       let virtual_path = relative_path.virtual_path().to_string();
-      let event_tip = file_tip(&table, method)?;
+      let event_tip = file_tip(table, method)?;
       let assets_root = remove_state.borrow().context.assets_root.clone();
       let path = resolve_file_path(
         &assets_root,
@@ -274,7 +274,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           }
         }
       };
-      let event_tip = file_tip(&table, method)?;
+      let event_tip = file_tip(table, method)?;
       let path = resolve_file_path(
         &list_state.borrow().context.assets_root,
         &relative_path,

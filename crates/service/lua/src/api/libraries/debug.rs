@@ -47,10 +47,10 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
             method,
             "message",
           )?;
-          let title = args::optional_dynamic_text(&table, method, "title", None)?;
-          let time = args::optional_bool(&table, method, "time", false)?;
-          let type_head = args::optional_bool(&table, method, "type_head", false)?;
-          let level = args::optional_string(&table, method, "level", None)?;
+          let title = args::optional_dynamic_text(table, method, "title", None)?;
+          let time = args::optional_bool(table, method, "time", false)?;
+          let type_head = args::optional_bool(table, method, "type_head", false)?;
+          let level = args::optional_string(table, method, "level", None)?;
           let level = level
             .map(|level| level.to_ascii_lowercase())
             .map(|level| match level.as_str() {

@@ -9,7 +9,7 @@ use super::types::{HitAreaId, HitAreaOptions};
 pub(crate) struct HitSnapshot {
   pub rect: Rect,
   pub order: u64,
-  pub origin: (u16, u16),
+  pub origin: (i32, i32),
   pub surface_rank: usize,
 }
 

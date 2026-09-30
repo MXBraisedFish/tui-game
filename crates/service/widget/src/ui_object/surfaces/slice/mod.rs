@@ -338,7 +338,10 @@ impl SliceService {
 
 // 根据布局将切片相对坐标解析为绝对像素坐标
 pub(crate) fn resolve_rect(rect: SliceRect, layout: &LayoutService) -> Rect {
-  let viewport = layout.developer_size();
+  resolve_rect_with_source(rect, layout.developer_size()).0
+}
+
+pub(crate) fn resolve_rect_with_source(rect: SliceRect, viewport: Size) -> (Rect, u16, u16) {
   let resolve = |length: SliceLength, total: u16, offset: i32| match length {
     SliceLength::Fixed(value) => i64::from(value),
     SliceLength::Auto => (i64::from(total) - i64::from(offset.max(0))).max(0),
@@ -352,24 +355,29 @@ pub(crate) fn resolve_rect(rect: SliceRect, layout: &LayoutService) -> Rect {
     (
       visible_start as u16,
       visible_end.saturating_sub(visible_start) as u16,
+      visible_start.saturating_sub(start).clamp(0, length.max(0)) as u16,
     )
   };
-  let (x, width) = clip_axis(
+  let (x, width, source_x) = clip_axis(
     rect.x,
     resolve(rect.width, viewport.width, rect.x),
     viewport.width,
   );
-  let (y, height) = clip_axis(
+  let (y, height, source_y) = clip_axis(
     rect.y,
     resolve(rect.height, viewport.height, rect.y),
     viewport.height,
   );
-  Rect {
-    x,
-    y,
-    width,
-    height,
-  }
+  (
+    Rect {
+      x,
+      y,
+      width,
+      height,
+    },
+    source_x,
+    source_y,
+  )
 }
 
 fn valid_rect(rect: SliceRect) -> bool {
@@ -627,6 +635,22 @@ mod tests {
         width: 6,
         height: 8,
       })
+    );
+    assert_eq!(
+      resolve_rect_with_source(
+        rect(-4, -2, SliceLength::Fixed(10), SliceLength::Auto),
+        layout.developer_size(),
+      ),
+      (
+        Rect {
+          x: 0,
+          y: 0,
+          width: 6,
+          height: 8,
+        },
+        4,
+        2,
+      )
     );
 
     let outside = service

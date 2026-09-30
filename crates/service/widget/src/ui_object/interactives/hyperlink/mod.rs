@@ -149,7 +149,7 @@ impl HyperlinkService {
     &self,
     pool: &mut UiObjectPool,
     id: HyperlinkId,
-    resolved: Option<(Rect, (u16, u16), usize)>,
+    resolved: Option<(Rect, (i32, i32), usize)>,
   ) -> bool {
     if !pool.hyperlinks.links.contains_key(&id) {
       return false;

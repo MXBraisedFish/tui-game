@@ -46,12 +46,11 @@ use crate::host_engine::ui::{
   ScreensaverListUi, ScreensaverOverlayUi, ScreensaverPackageCommand, ScreensaverPackageUi,
   ScreenshotCaptureCommand, ScreenshotCaptureUi, ScreenshotListCommand, ScreenshotListUi,
   ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
-  ScreenshotSettingsUi, SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand,
-  SecuritySettingsUi, SettingsUi, SettingsUiCommand, StorageManagementClearCommand,
-  StorageManagementClearUi, StorageManagementCommand, StorageManagementExportCommand,
-  StorageManagementExportUi, StorageManagementUi, StorageManagementViewCommand,
-  StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
-  ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
+  ScreenshotSettingsUi, SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
+  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
+  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
+  StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
+  TerminalCheckUi, ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 use std::{
   collections::HashMap,
@@ -232,17 +231,12 @@ struct InputModePolicy {
   raw_key_capture: bool,
 }
 
-pub(super) struct SecurityUis {
-  settings: SecuritySettingsUi,
-  details: SecurityDetailsUi,
-}
-
 struct RuntimeUiContext<'a> {
   home_ui: &'a mut HomeUi,
   settings_ui: &'a mut SettingsUi,
   display_settings_ui: &'a mut DisplaySettingsUi,
   screensaver_list_ui: &'a mut ScreensaverListUi,
-  security_uis: &'a mut SecurityUis,
+  security_settings_ui: &'a mut SecuritySettingsUi,
   storage_management_ui: &'a mut StorageManagementUi,
   storage_management_clear_ui: &'a mut StorageManagementClearUi,
   storage_management_export_ui: &'a mut StorageManagementExportUi,
@@ -281,7 +275,7 @@ struct RuntimePageContext<'a> {
   settings_ui: &'a mut SettingsUi,
   display_settings_ui: &'a mut DisplaySettingsUi,
   screensaver_list_ui: &'a mut ScreensaverListUi,
-  security_uis: &'a mut SecurityUis,
+  security_settings_ui: &'a mut SecuritySettingsUi,
   storage_management_ui: &'a mut StorageManagementUi,
   storage_management_clear_ui: &'a mut StorageManagementClearUi,
   storage_management_export_ui: &'a mut StorageManagementExportUi,
@@ -310,7 +304,7 @@ impl RuntimePageContext<'_> {
       settings_ui: &mut *self.settings_ui,
       display_settings_ui: &mut *self.display_settings_ui,
       screensaver_list_ui: &mut *self.screensaver_list_ui,
-      security_uis: &mut *self.security_uis,
+      security_settings_ui: &mut *self.security_settings_ui,
       storage_management_ui: &mut *self.storage_management_ui,
       storage_management_clear_ui: &mut *self.storage_management_clear_ui,
       storage_management_export_ui: &mut *self.storage_management_export_ui,
@@ -341,7 +335,7 @@ impl RuntimeUiContext<'_> {
       settings_ui: &mut *self.settings_ui,
       display_settings_ui: &mut *self.display_settings_ui,
       screensaver_list_ui: &mut *self.screensaver_list_ui,
-      security_uis: &mut *self.security_uis,
+      security_settings_ui: &mut *self.security_settings_ui,
       storage_management_ui: &mut *self.storage_management_ui,
       storage_management_clear_ui: &mut *self.storage_management_clear_ui,
       storage_management_export_ui: &mut *self.storage_management_export_ui,
@@ -449,16 +443,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     &services.text_input,
     &services.scroll_box,
   );
-  let mut security_uis = SecurityUis {
-    settings: SecuritySettingsUi::init(&services.hit_area),
-    details: SecurityDetailsUi::init(
-      &services.hit_area,
-      &services.scroll_box,
-      &services.markdown,
-      &services.storage,
-      &services.i18n,
-    ),
-  };
+  let mut security_settings_ui = SecuritySettingsUi::init(&services.hit_area);
   let mut storage_management_ui = StorageManagementUi::init(&services.hit_area);
   let mut storage_management_clear_ui = StorageManagementClearUi::init(&services.hit_area);
   let mut storage_management_export_ui = StorageManagementExportUi::init(&services.hit_area);
@@ -537,7 +522,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         settings_ui: &mut settings_ui,
         display_settings_ui: &mut display_settings_ui,
         screensaver_list_ui: &mut screensaver_list_ui,
-        security_uis: &mut security_uis,
+        security_settings_ui: &mut security_settings_ui,
         storage_management_ui: &mut storage_management_ui,
         storage_management_clear_ui: &mut storage_management_clear_ui,
         storage_management_export_ui: &mut storage_management_export_ui,

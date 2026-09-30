@@ -43,11 +43,12 @@ measurement.get_text_size
 | `horizontal_align` | const-align | 默认：`align.LEFT`；多行文本的水平对齐方式 |
 | `auto_wrap` | boolean | 默认：`true`；是否自动换行 |
 | `word_wrap` | boolean | 默认：`true`；是否按完整单词换行 |
-| `max_height` | integer / nil | 默认：`nil`；最大绘制高度 |
-| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度 |
+| `max_height` | integer / nil | 默认：`nil`；最大绘制高度；提供时范围为 1～65535 |
+| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度；提供时范围为 1～65535 |
 | `overflow_marker` | string | 默认：`"..."`；文本溢出时使用的省略标记 |
 | `rich_params` | table / nil | 默认：`nil`；富文本参数 |
 | `text_mode` | const-string | 默认：`string.AUTO`；文本解析模式 |
+
 ## 返回值
 
 返回两个值，依次为文本显示宽度和高度。
@@ -96,11 +97,12 @@ measurement.get_text_width
 | `horizontal_align` | const-align | 默认：`align.LEFT`；多行文本的水平对齐方式 |
 | `auto_wrap` | boolean | 默认：`true`；是否自动换行 |
 | `word_wrap` | boolean | 默认：`true`；是否按完整单词换行 |
-| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度 |
-| `max_height` | integer / nil | 默认：`nil`；最大绘制高度 |
+| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度；提供时范围为 1～65535 |
+| `max_height` | integer / nil | 默认：`nil`；最大绘制高度；提供时范围为 1～65535 |
 | `overflow_marker` | string | 默认：`"..."`；文本溢出时使用的省略标记 |
 | `text_mode` | const-string | 默认：`string.AUTO`；文本解析模式 |
 | `rich_params` | table / nil | 默认：`nil`；富文本参数 |
+
 ## 返回值
 
 直接返回一个值。
@@ -148,11 +150,12 @@ measurement.get_text_height
 | `horizontal_align` | const-align | 默认：`align.LEFT`；多行文本的水平对齐方式 |
 | `auto_wrap` | boolean | 默认：`true`；是否自动换行 |
 | `word_wrap` | boolean | 默认：`true`；是否按完整单词换行 |
-| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度 |
-| `max_height` | integer / nil | 默认：`nil`；最大绘制高度 |
+| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度；提供时范围为 1～65535 |
+| `max_height` | integer / nil | 默认：`nil`；最大绘制高度；提供时范围为 1～65535 |
 | `overflow_marker` | string | 默认：`"..."`；文本溢出时使用的省略标记 |
 | `text_mode` | const-string | 默认：`string.AUTO`；文本解析模式 |
 | `rich_params` | table / nil | 默认：`nil`；富文本参数 |
+
 ## 返回值
 
 直接返回一个值。

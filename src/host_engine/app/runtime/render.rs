@@ -13,7 +13,7 @@ pub(super) fn route_render(
     settings_ui,
     display_settings_ui,
     screensaver_list_ui,
-    security_uis,
+    security_settings_ui,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -109,7 +109,7 @@ pub(super) fn route_render(
           .ui()
           .prepare_canvas(&mut services.canvas, &services.layout);
       });
-      apply_lua_draw_commands(services, commands);
+      apply_lua_draw_commands(&mut services.render, &mut services.canvas, commands);
     } else {
       screensaver_overlay_ui.objects_mut().begin_render();
       screensaver_overlay_ui
@@ -234,7 +234,7 @@ pub(super) fn route_render(
         .ui()
         .prepare_canvas(&mut services.canvas, &services.layout);
     });
-    apply_lua_draw_commands(services, commands);
+    apply_lua_draw_commands(&mut services.render, &mut services.canvas, commands);
   }
 
   if world.state.current_ui_kind() == Some(UiNodeKind::ScreensaverList) {
@@ -303,7 +303,7 @@ pub(super) fn route_render(
       settings_ui,
       display_settings_ui,
       screensaver_list_ui,
-      security_uis,
+      security_settings_ui,
       storage_management_ui,
       storage_management_clear_ui,
       storage_management_export_ui,
@@ -481,24 +481,12 @@ pub(super) fn route_render(
         );
     }
     Some(UiNodeKind::SecuritySettings) => {
-      security_uis.settings.render(
+      security_settings_ui.render(
         &mut services.render,
         &mut services.canvas,
         &services.layout,
         &services.i18n,
         &services.hit_area,
-      );
-    }
-    Some(UiNodeKind::SecurityDetails) => {
-      security_uis.details.render(
-        &mut services.render,
-        &mut services.canvas,
-        &services.layout,
-        &services.i18n,
-        &services.hit_area,
-        &services.scroll_box,
-        &services.markdown,
-        &services.code_highlight,
       );
     }
     Some(UiNodeKind::StorageManagement) => {
@@ -676,7 +664,8 @@ pub(super) fn route_render(
 }
 
 fn apply_lua_draw_commands(
-  services: &mut EngineServices,
+  render: &mut crate::host_engine::services::RenderService,
+  canvas: &mut crate::host_engine::services::CanvasService,
   commands: Vec<crate::host_engine::services::LuaDrawCommand>,
 ) {
   use crate::host_engine::services::{LuaDrawCommand, LuaDrawTarget};
@@ -688,13 +677,9 @@ fn apply_lua_draw_commands(
         y,
         params,
       } => match target {
-        LuaDrawTarget::Base => services
-          .render
-          .draw_text_at(&mut services.canvas, x, y, &params),
+        LuaDrawTarget::Base => render.draw_text_at(canvas, x, y, &params),
         LuaDrawTarget::Slice(id) => {
-          services
-            .render
-            .draw_text_at_on(&mut services.canvas, id, x, y, &params);
+          render.draw_text_at_on(canvas, id, x, y, &params);
         }
       },
       LuaDrawCommand::FillRect {
@@ -707,28 +692,11 @@ fn apply_lua_draw_commands(
         fg,
         bg,
       } => match target {
-        LuaDrawTarget::Base => services.render.draw_filled_rect(
-          &mut services.canvas,
-          x,
-          y,
-          width,
-          height,
-          fill_char,
-          fg,
-          bg,
-        ),
+        LuaDrawTarget::Base => {
+          render.draw_filled_rect(canvas, x, y, width, height, fill_char, fg, bg)
+        }
         LuaDrawTarget::Slice(id) => {
-          services.render.draw_filled_rect_on(
-            &mut services.canvas,
-            id,
-            x,
-            y,
-            width,
-            height,
-            fill_char,
-            fg,
-            bg,
-          );
+          render.draw_filled_rect_on(canvas, id, x, y, width, height, fill_char, fg, bg);
         }
       },
       LuaDrawCommand::StrokeRect {
@@ -741,32 +709,11 @@ fn apply_lua_draw_commands(
         fg,
         bg,
       } => match target {
-        LuaDrawTarget::Base => services.render.draw_border_rect(
-          &mut services.canvas,
-          x,
-          y,
-          width,
-          height,
-          &border,
-          fg,
-          bg,
-          None,
-          None,
-        ),
+        LuaDrawTarget::Base => {
+          render.draw_border_rect(canvas, x, y, width, height, &border, fg, bg, None, None)
+        }
         LuaDrawTarget::Slice(id) => {
-          services.render.draw_border_rect_on(
-            &mut services.canvas,
-            id,
-            x,
-            y,
-            width,
-            height,
-            &border,
-            fg,
-            bg,
-            None,
-            None,
-          );
+          render.draw_border_rect_on(canvas, id, x, y, width, height, &border, fg, bg, None, None);
         }
       },
       LuaDrawCommand::EraseRect {
@@ -776,11 +723,122 @@ fn apply_lua_draw_commands(
         width,
         height,
       } => match target {
-        LuaDrawTarget::Base => services.canvas.erase_rect(x, y, width, height),
+        LuaDrawTarget::Base => canvas.erase_rect(x, y, width, height),
         LuaDrawTarget::Slice(id) => {
-          services.canvas.erase_rect_on(id, x, y, width, height);
+          canvas.erase_rect_on(id, x, y, width, height);
         }
       },
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::host_engine::services::{
+    CanvasService, ComposedCell, FrameCompositor, LayoutService, RenderService, Size,
+  };
+  use std::time::{Duration, SystemTime, UNIX_EPOCH};
+  use tg_service_lua::{LuaPolicy, LuaService, LuaSessionKind, LuaSessionSpec};
+
+  fn row_text(frame: &crate::host_engine::services::ComposedFrame, y: u16) -> String {
+    (0..6)
+      .map(|x| match frame.get(x, y).unwrap() {
+        ComposedCell::Text(cell) => cell.text.as_str(),
+        ComposedCell::Empty => " ",
+      })
+      .collect()
+  }
+
+  #[test]
+  fn lua_slice_draws_are_clipped_in_game_and_screensaver_frames() {
+    let suffix = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let directory = std::env::temp_dir().join(format!(
+      "tg_slice_composition_{}_{}",
+      std::process::id(),
+      suffix
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let entry_path = directory.join("main.lua");
+    std::fs::write(
+      &entry_path,
+      r#"
+        function Init(ctx)
+          layer = slice.create(10, 5)
+        end
+        function HandleEvent(event) end
+        function Update(dt) end
+        function UpdateFrame(dt, alpha) end
+        function Render()
+          slice.draw(layer, -4, 1)
+          draw.text(0, 0, "abcdefghij", { slice_layer = layer })
+          draw.fill_rect(0, 1, 10, 1, { char = "F", slice_layer = layer })
+          draw.stroke_rect(0, 2, 10, 3, {
+            border_char = {
+              left_top = "A", top = "T", right_top = "C",
+              left = "L", right = "R",
+              left_bottom = "D", bottom = "B", right_bottom = "E",
+            },
+            slice_layer = layer,
+          })
+          draw.erase_rect(4, 0, 1, 1, { slice_layer = layer })
+          draw.text(8, 1, "BASE")
+        end
+      "#,
+    )
+    .unwrap();
+
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session = LuaService::with_policy(LuaPolicy::default())
+        .create_session(LuaSessionSpec {
+          package_id: format!("slice_test_{}", kind.as_str()),
+          session_kind: kind,
+          entry_path: entry_path.clone(),
+          fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
+          base_size: Size {
+            width: 12,
+            height: 6,
+          },
+          continue_data: None,
+          best_data: None,
+          save_game_enabled: false,
+          save_best_enabled: false,
+        })
+        .unwrap();
+      session
+        .with_objects_mut(|objects| objects.begin_frame())
+        .unwrap();
+      session.render().unwrap();
+      let commands = session.take_draw_commands();
+
+      let mut layout = LayoutService::new();
+      layout.resize_physical(12, 6);
+      let mut canvas = CanvasService::new();
+      canvas.begin_frame(&layout);
+      session
+        .with_objects(|objects| objects.ui().prepare_canvas(&mut canvas, &layout))
+        .unwrap();
+      apply_lua_draw_commands(&mut RenderService::new(), &mut canvas, commands);
+      let frame = FrameCompositor::new().compose(&canvas);
+
+      assert_eq!((frame.width(), frame.height()), (12, 6));
+      assert_eq!(row_text(&frame, 1), " fghij");
+      assert_eq!(row_text(&frame, 2), "FFFFFF");
+      assert_eq!(row_text(&frame, 3), "TTTTTC");
+      assert_eq!(row_text(&frame, 4), "     R");
+      assert_eq!(row_text(&frame, 5), "BBBBBE");
+      let base_tail = (8..12)
+        .map(|x| match frame.get(x, 1).unwrap() {
+          ComposedCell::Text(cell) => cell.text.as_str(),
+          ComposedCell::Empty => " ",
+        })
+        .collect::<String>();
+      assert_eq!(base_tail, "BASE");
+    }
+
+    std::fs::remove_dir_all(directory).unwrap();
   }
 }

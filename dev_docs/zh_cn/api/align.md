@@ -10,14 +10,14 @@
 
 | 常量              | 说明         | 定位                                    |
 | ------------------- | ------------ | --------------------------------------- |
-| `AUTO`              | 自动对齐模式 | [AUTO](#AUTO)                           |
-| `LEFT`              | 左对齐模式   | [LEFT](#LEFT)                           |
-| `HORIZONTAL_CENTER` | 水平居中模式 | [HORIZONTAL_CENTER](#HORIZONTAL_CENTER) |
-| `RIGHT`             | 右对齐模式   | [RIGHT](#RIGHT)                         |
-| `TOP`               | 顶部对齐模式 | [TOP](#TOP)                             |
-| `VERTICAL_CENTER`   | 垂直居中模式 | [VERTICAL_CENTER](#VERTICAL_CENTER)     |
-| `BOTTOM`            | 底部对齐模式 | [BOTTOM](#BOTTOM)                       |
-| `CENTER`            | 双向居中模式 | [CENTER](#CENTER)                       |
+| `AUTO`              | 自动对齐模式 | [AUTO](#auto)                           |
+| `LEFT`              | 左对齐模式   | [LEFT](#left)                           |
+| `HORIZONTAL_CENTER` | 水平居中模式 | [HORIZONTAL_CENTER](#horizontal_center) |
+| `RIGHT`             | 右对齐模式   | [RIGHT](#right)                         |
+| `TOP`               | 顶部对齐模式 | [TOP](#top)                             |
+| `VERTICAL_CENTER`   | 垂直居中模式 | [VERTICAL_CENTER](#vertical_center)     |
+| `BOTTOM`            | 底部对齐模式 | [BOTTOM](#bottom)                       |
+| `CENTER`            | 双向居中模式 | [CENTER](#center)                       |
 
 ## 方法
 
@@ -35,16 +35,16 @@
 
 自动对齐模式。
 
-### 可用于
-
-- 参数 `horizontal_align`
-- 参数 `vertical_align`
-
 ### 调用
 
 ```lua
 align.AUTO
 ```
+
+### 可用于
+
+- 参数 `horizontal_align`
+- 参数 `vertical_align`
 
 ### 示例
 
@@ -64,12 +64,11 @@ draw.text(x, y, "AUTO", {fg = color.BRIGHT_RED})
 "auto"
 ```
 
-
 ### 额外说明
 
 - `align` API 中用于水平对齐时等价于 `align.HORIZONTAL_CENTER`。
 - `align` API 中用于垂直对齐时等价于 `align.VERTICAL_CENTER`。
-- `draw` 和 `measurement` API 中用于垂直对齐时等价于 `align.LEFT`。
+- `draw` 和 `measurement` API 中用于水平对齐时等价于 `align.LEFT`。
 
 ---
 
@@ -77,15 +76,15 @@ draw.text(x, y, "AUTO", {fg = color.BRIGHT_RED})
 
 左对齐模式。
 
-### 可用于
-
-- 参数 `horizontal_align`
-
 ### 调用
 
 ```lua
 align.LEFT
 ```
+
+### 可用于
+
+- 参数 `horizontal_align`
 
 ### 示例
 
@@ -105,22 +104,21 @@ draw.text(x, 3, "LEFT", {fg = color.BRIGHT_RED})
 "left"
 ```
 
-
 ---
 
 ## `HORIZONTAL_CENTER`
 
 水平居中模式。
 
-### 可用于
-
-- 参数 `horizontal_align`
-
 ### 调用
 
 ```lua
 align.HORIZONTAL_CENTER
 ```
+
+### 可用于
+
+- 参数 `horizontal_align`
 
 ### 示例
 
@@ -140,22 +138,21 @@ draw.text(x, 3, "H_CENTER", {fg = color.BRIGHT_RED})
 "horizontal_center"
 ```
 
-
 ---
 
 ## `RIGHT`
 
 右对齐模式。
 
-### 可用于
-
-- 参数 `horizontal_align`
-
 ### 调用
 
 ```lua
 align.RIGHT
 ```
+
+### 可用于
+
+- 参数 `horizontal_align`
 
 ### 示例
 
@@ -175,22 +172,21 @@ draw.text(x, 3, "RIGHT", {fg = color.BRIGHT_RED})
 "right"
 ```
 
-
 ---
 
 ## `TOP`
 
 顶部对齐模式。
 
-### 可用于
-
-- 参数 `vertical_align`
-
 ### 调用
 
 ```lua
 align.TOP
 ```
+
+### 可用于
+
+- 参数 `vertical_align`
 
 ### 示例
 
@@ -210,22 +206,21 @@ draw.text(4, y, "TOP", {fg = color.BRIGHT_RED, max_width = 1})
 "top"
 ```
 
-
 ---
 
 ## `VERTICAL_CENTER`
 
 垂直居中模式。
 
-### 可用于
-
-- 参数 `vertical_align`
-
 ### 调用
 
 ```lua
 align.VERTICAL_CENTER
 ```
+
+### 可用于
+
+- 参数 `vertical_align`
 
 ### 示例
 
@@ -245,22 +240,21 @@ draw.text(4, y, "V|CENTER", {fg = color.BRIGHT_RED, max_width = 1})
 "vertical_center"
 ```
 
-
 ---
 
 ## `BOTTOM`
 
 底部对齐模式。
 
-### 可用于
-
-- 参数 `vertical_align`
-
 ### 调用
 
 ```lua
 align.BOTTOM
 ```
+
+### 可用于
+
+- 参数 `vertical_align`
 
 ### 示例
 
@@ -280,23 +274,22 @@ draw.text(4, y, "BOTTOM", {fg = color.BRIGHT_RED, max_width = 1})
 "bottom"
 ```
 
-
 ---
 
 ## `CENTER`
 
 双向居中模式。
 
-### 可用于
-
-- 参数 `horizontal_align`
-- 参数 `vertical_align`
-
 ### 调用
 
 ```lua
 align.CENTER
 ```
+
+### 可用于
+
+- 参数 `horizontal_align`
+- 参数 `vertical_align`
 
 ### 示例
 
@@ -315,7 +308,6 @@ draw.text(x, y, "CENTER", {fg = color.BRIGHT_RED})
 ```text
 "center"
 ```
-
 
 ### 额外说明
 
@@ -342,7 +334,7 @@ align.resolve_x
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `width` | integer | 文本宽度 |
+| `width` | integer | 文本宽度，范围 1～65535 |
 | `horizontal_align` | const-align | 水平对齐方式 |
 
 ### 选填参数
@@ -352,6 +344,7 @@ align.resolve_x
 | `offset_x` | integer | 默认：`0`；锚点上的水平偏移 |
 | `relative_x` | integer / nil | 默认：`nil`；自定义水平锚点 |
 | `slice_layer` | string | 默认：`"base"`；目标切片图层 |
+
 ## 返回值
 
 直接返回一个值。
@@ -396,7 +389,7 @@ align.resolve_y
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `height` | integer | 文本高度 |
+| `height` | integer | 文本高度，范围 1～65535 |
 | `vertical_align` | const-align | 垂直对齐方式 |
 
 ### 选填参数
@@ -406,6 +399,7 @@ align.resolve_y
 | `offset_y` | integer | 默认：`0`；锚点上的垂直偏移 |
 | `relative_y` | integer / nil | 默认：`nil`；自定义垂直锚点 |
 | `slice_layer` | string | 默认：`"base"`；目标切片图层 |
+
 ## 返回值
 
 直接返回一个值。
@@ -450,8 +444,8 @@ align.resolve_rect
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `width` | integer | 文本宽度 |
-| `height` | integer | 文本高度 |
+| `width` | integer | 文本宽度，范围 1～65535 |
+| `height` | integer | 文本高度，范围 1～65535 |
 | `horizontal_align` | const-align | 水平对齐方式 |
 | `vertical_align` | const-align | 垂直对齐方式 |
 
@@ -464,6 +458,7 @@ align.resolve_rect
 | `relative_x` | integer / nil | 默认：`nil`；自定义水平锚点 |
 | `relative_y` | integer / nil | 默认：`nil`；自定义垂直锚点 |
 | `slice_layer` | string | 默认：`"base"`；目标切片图层 |
+
 ## 返回值
 
 返回两个值，依次为 x 坐标和 y 坐标。

@@ -21,6 +21,8 @@ fn main() {
         width: 4,
         height: 2,
       },
+      source_x: 0,
+      source_y: 0,
       visible: true,
       opaque: false,
       background: None,

@@ -3418,8 +3418,12 @@ mod tests {
           local missing_text = debug.pcall(function() draw.text(1, 1) end)
           local unknown_draw_option = debug.pcall(function() draw.text(1, 1, "x", { boid = true }) end)
           local unknown_rect_option = debug.pcall(function() draw.fill_rect(2, 1, 10, 4, { color = color.BLUE }) end)
+          local unknown_slice = debug.pcall(function()
+              draw.text(1, 1, "x", { slice_layer = "slice_999" })
+            end)
           debug.assert(no_arguments and not extra_argument
-              and not missing_text and not unknown_draw_option and not unknown_rect_option)
+              and not missing_text and not unknown_draw_option and not unknown_rect_option
+              and not unknown_slice)
         end
         function Update(dt)
           draw.erase_rect(3, 2, 8, 2)
@@ -5604,7 +5608,7 @@ mod tests {
     collect_markdown_files(&docs_root.join("api"), &mut markdown_files);
     let mut format_files = Vec::new();
     collect_markdown_files(&docs_root.join("format"), &mut format_files);
-    format_files.retain(|path| !path.file_name().is_some_and(|name| name == "EVENT.md"));
+    format_files.retain(|path| path.file_name().is_none_or(|name| name != "EVENT.md"));
     markdown_files.extend(format_files);
     markdown_files.extend(
       [

@@ -28,12 +28,13 @@ local id = file.read("notes.txt", {encoding = file.UTF_8})
 ```lua
 local start_pos, end_pos, captures = string.find("item-42", "(%a+)%-(%d+)")
 local width, height = measurement.get_text_size("Hello")
+local bytes = serialization.binary_pack("<I2", 42)
 local values, next_pos = serialization.binary_unpack("<I2", bytes)
 ```
 
 ## 异步方法
 
-`file`、`i18n` 和 `image` 的操作在成功入队后立即返回 request id，不会同步等待任务完成。终态事件在 `data.request_id` 中携带同一个 id。权限门控或请求去重导致任务未入队时，方法按各自契约返回 nil，且不产生该请求的完成事件。`image.load` 的完成事件还会在 `output` 中返回可供 `draw.text` 使用的富文本字符串。
+`file` 的异步操作、`i18n.create/reload` 和 `image.load`在成功入队后立即返回 request id，不会同步等待任务完成。终态事件在 `data.request_id` 中携带同一个 id。权限门控或请求去重导致任务未入队时，方法按各自契约返回 nil，且不产生该请求的完成事件。`image.load` 的完成事件还会在 `data.output` 中返回可供 `draw.text` 使用的富文本字符串。
 
 ## 序列化空值
 

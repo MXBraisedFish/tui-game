@@ -9,7 +9,7 @@ use super::types::{TextInputId, TextInputMode};
 #[derive(Clone, Copy)]
 pub(super) struct HitSnapshot {
   pub rect: Rect,
-  pub origin: (u16, u16),
+  pub origin: (i32, i32),
   pub surface_rank: usize,
   pub width: usize,
   pub first_line: usize,

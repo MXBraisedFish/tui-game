@@ -23,9 +23,7 @@ pub use settings::screenshot_recording::{
   ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
   ScreenshotSettingsUi,
 };
-pub use settings::security::{
-  SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi,
-};
+pub use settings::security::{SecuritySettingsCommand, SecuritySettingsUi};
 pub use settings::storage_management::{
   StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
   StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,

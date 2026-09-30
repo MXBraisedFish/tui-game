@@ -85,6 +85,7 @@ loader.dofile
 ### 示例
 
 ```lua
+-- 准备 scripts/value.lua，内容为：return "ready", nil
 local status, optional = loader.dofile("value.lua")
 debug.print(status)
 ```
@@ -125,6 +126,7 @@ loader.loadfile
 ### 示例
 
 ```lua
+-- 准备 scripts/value.lua，内容为：return "ready", nil
 local module = loader.loadfile("value.lua")
 local status, optional = module()
 debug.print(status)

@@ -10,7 +10,7 @@
 
 | 常量 | 说明 | 定位 |
 | --- | --- | --- |
-| `NULL` | 表示 JSON/YAML 中的 null 值 | [NULL](#NULL) |
+| `NULL` | 表示 JSON/YAML 中的 null 值 | [NULL](#null) |
 
 ## 方法
 
@@ -94,6 +94,7 @@ serialization.json_encode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `value` | any | 要编码的 Lua 值 |
+
 ## 返回值
 
 直接返回一个值。
@@ -141,6 +142,7 @@ serialization.json_decode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | JSON 字符串 |
+
 ## 返回值
 
 直接返回一个值。
@@ -164,7 +166,7 @@ debug.print(data.name .. ", v" .. tostring(data.version))
 
 ### 额外说明
 
-- 参数 `s` 必须可反序列化；JSON null 解码为 `serialization.NULL`，包含该哨兵的值可以原样重新编码。
+- 参数 `text` 必须是有效文本；JSON null 解码为 `serialization.NULL`，包含该哨兵的值可以原样重新编码。
 
 ---
 
@@ -185,6 +187,7 @@ serialization.csv_encode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `rows` | table | 二维数组表 |
+
 ## 返回值
 
 直接返回一个值。
@@ -233,6 +236,7 @@ serialization.csv_decode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | CSV 字符串 |
+
 ## 返回值
 
 返回一个数组表。
@@ -256,7 +260,7 @@ debug.print(data[2][1] .. ": " .. tostring(data[2][2]))
 
 ### 额外说明
 
-- 参数 `s` 必须可反序列化。
+- 参数 `text` 必须是对应格式的有效文本。
 
 ---
 
@@ -277,6 +281,7 @@ serialization.yaml_encode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `value` | table / 基本类型 | 要编码的 Lua 值 |
+
 ## 返回值
 
 直接返回一个值。
@@ -321,6 +326,7 @@ serialization.yaml_decode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | YAML 字符串 |
+
 ## 返回值
 
 直接返回一个值。
@@ -344,7 +350,7 @@ debug.print(data.name)
 
 ### 额外说明
 
-- 参数 `s` 必须可反序列化；YAML null 解码为 `serialization.NULL`。
+- 参数 `text` 必须是有效文本；YAML null 解码为 `serialization.NULL`。
 
 ---
 
@@ -365,6 +371,7 @@ serialization.toml_encode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `value` | any | 要编码的 Lua 值 |
+
 ## 返回值
 
 直接返回一个值。
@@ -409,6 +416,7 @@ serialization.toml_decode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | TOML 字符串 |
+
 ## 返回值
 
 直接返回一个值。
@@ -432,7 +440,7 @@ debug.print(data.name)
 
 ### 额外说明
 
-- 参数 `s` 必须可反序列化。
+- 参数 `text` 必须是对应格式的有效文本。
 
 ---
 
@@ -453,6 +461,7 @@ serialization.ini_encode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `value` | table | 要编码的 Lua 表 |
+
 ## 返回值
 
 直接返回一个值。
@@ -500,6 +509,7 @@ serialization.ini_decode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | INI 字符串 |
+
 ## 返回值
 
 返回一个对象表。
@@ -523,7 +533,7 @@ debug.print(data.server.host)
 
 ### 额外说明
 
-- 参数 `s` 必须可反序列化。
+- 参数 `text` 必须是对应格式的有效文本。
 
 ---
 
@@ -544,6 +554,7 @@ serialization.xml_encode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `value` | table | 要编码的 Lua 值 |
+
 ## 返回值
 
 直接返回一个值。
@@ -572,6 +583,8 @@ debug.print(xml)
 
 ### 额外说明
 
+- 最外层表必须只有一个根元素。元素的 `_attr` 表表示属性，`_text` 表示文本；同名子元素可用数组表示。不能在同一元素中混合文本与子元素。
+
 - 参数 `value` 必须可序列化；XML 不支持 `serialization.NULL`。
 
 ---
@@ -593,6 +606,7 @@ serialization.xml_decode
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `text` | string | XML 字符串 |
+
 ## 返回值
 
 返回一个对象表。
@@ -616,7 +630,9 @@ debug.print(data.root.child._text)
 
 ### 额外说明
 
-- 参数 `s` 必须可反序列化。
+- 属性在 `_attr` 中，文本在 `_text` 中；重复子元素组成数组。不支持 DTD、实体声明及文本与子元素混排。
+
+- 参数 `text` 必须是对应格式的有效文本。
 
 ---
 
@@ -642,14 +658,15 @@ serialization.binary_pack
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `...` | any... | 传给函数的参数，可包含表和 nil。 |
+| `...` | integer / number / string... | 按格式串顺序传入数值或字节字符串；数量与类型必须匹配，不接受表或 nil。 |
+
 ## 返回值
 
 直接返回一个值。
 
 | 类型   | 说明                 |
 | ------ | -------------------- |
-| binary | 打包后的二进制字符串 |
+| string | 打包后的二进制字符串 |
 
 ### 示例
 
@@ -682,13 +699,14 @@ serialization.binary_unpack
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `fmt` | string | 解包格式串 |
-| `data` | binary | 二进制数据，可包含任意字节 |
+| `data` | string | 二进制数据，可包含任意字节 |
 
 ### 选填参数
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `pos` | integer | 默认：`1`；基起始字节位置 |
+| `pos` | integer | 默认：`1`；从 1 开始的起始字节位置 |
+
 ## 返回值
 
 返回两个值：解出的数据数组表和下一次解包的一基字节位置。
@@ -730,6 +748,7 @@ serialization.binary_packsize
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `fmt` | string | 打包格式串 |
+
 ## 返回值
 
 直接返回一个值。

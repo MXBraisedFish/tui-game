@@ -1,26 +1,26 @@
 # lifecycle 库
 
-`lifecycle` 说明脚本可实现的生命周期回调；宿主会在对应阶段调用这些函数。
+在脚本中定义这些函数，就能在初始化、处理输入、更新画面和保存数据时执行自己的逻辑。
 
 ---
 
 # 目录
 
-## 回调
+## 方法
 
-| 回调        | 说明                                           | 定位                        |
+| 方法        | 说明                                           | 定位                        |
 | ------------- | ---------------------------------------------- | --------------------------- |
-| `Init`        | 初始化游戏或屏保                               | [Init](#Init)               |
-| `HandleEvent` | 事件处理                                       | [HandleEvent](#HandleEvent) |
-| `Update`      | 物理帧更新，固定步长调用                       | [Update](#Update)           |
-| `UpdateFrame` | 帧更新，随着系统帧调用                         | [UpdateFrame](#UpdateFrame) |
-| `Render`      | 绘制当前画面                                   | [Render](#Render)           |
-| `SaveGame`    | 保存游戏数据，供玩家"继续游戏"后传递初始化数据 | [SaveGame](#SaveGame)       |
-| `SaveBest`    | 保存最佳记录数据，用于游戏列表展示             | [SaveBest](#SaveBest)       |
+| `Init`        | 初始化游戏或屏保                               | [Init](#init)               |
+| `HandleEvent` | 事件处理                                       | [HandleEvent](#handleevent) |
+| `Update`      | 物理帧更新，固定步长调用                       | [Update](#update)           |
+| `UpdateFrame` | 帧更新，随着系统帧调用                         | [UpdateFrame](#updateframe) |
+| `Render`      | 绘制当前画面                                   | [Render](#render)           |
+| `SaveGame`    | 保存游戏数据，供玩家"继续游戏"后传递初始化数据 | [SaveGame](#savegame)       |
+| `SaveBest`    | 保存最佳记录数据，用于游戏列表展示             | [SaveBest](#savebest)       |
 
 ---
 
-# 回调
+# 方法
 
 ## `Init`
 
@@ -29,33 +29,16 @@
 ### 调用
 
 ```lua
-function Init(ctx)
-end
+Init
 ```
 
 ## 参数
 
-`ctx` 为初始化上下文表。
+### 必填参数
 
-| 字段            | 类型    | 说明                 |
-| --------------- | ------- | -------------------- |
-| `package_id`    | string  | 模组包 ID            |
-| `package_type`  | string  | 模组包类型           |
-| `base`          | table   | 基础切片图层状态信息 |
-| `base.width`    | integer | 基础切片图层宽度     |
-| `base.height`   | integer | 基础切片图层高度     |
-| `api_version`   | integer | API 版本             |
-| `start_mode`    | string  | 游戏启动模式         |
-| `continue_data` | any     | 继续游戏数据         |
-| `best_data`     | table   | 最佳记录数据         |
-
-### 额外说明
-
-- 字段 `package_type` 为 "game" 或 "screensaver"。
-- 字段 `api_version` 当前为 1。
-- 字段 `start_mode` 为 "new" 或 "continue"。
-- 字段 `continue_data` 仅在玩家"继续游戏"时提供，其内容来自此前 `SaveGame` 保存的数据。
-- 字段 `best_data` 的内容来自此前 `SaveBest` 保存的数据。
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `ctx` | table | 初始化信息。 |
 
 ## 返回值
 
@@ -75,6 +58,29 @@ end
 ```lua
 ```
 
+### 额外说明
+
+`ctx` 为初始化上下文表。
+
+| 字段            | 类型    | 说明                 |
+| --------------- | ------- | -------------------- |
+| `package_id`    | string  | 模组包 ID            |
+| `package_type`  | string  | 模组包类型           |
+| `base`          | table   | 基础切片图层状态信息 |
+| `base.width`    | integer | 基础切片图层宽度     |
+| `base.height`   | integer | 基础切片图层高度     |
+| `api_version`   | integer | API 版本             |
+| `start_mode`    | string  | 游戏启动模式         |
+| `continue_data` | any     | 继续游戏数据         |
+| `best_data`     | table   | 最佳记录数据         |
+
+
+- 字段 `package_type` 为 "game" 或 "screensaver"。
+- 字段 `api_version` 当前为 1。
+- 字段 `start_mode` 为 "new" 或 "continue"。
+- 字段 `continue_data` 仅在玩家"继续游戏"时提供，其内容来自此前 `SaveGame` 保存的数据。
+- 字段 `best_data` 的内容来自此前 `SaveBest` 保存的数据。
+
 ---
 
 ## `HandleEvent`
@@ -84,26 +90,16 @@ end
 ### 调用
 
 ```lua
-function HandleEvent(event)
-end
+HandleEvent
 ```
 
 ## 参数
 
-`event` 为事件上下文表。
+### 必填参数
 
-| 字段       | 类型    | 说明         |
-| ---------- | ------- | ------------ |
-| `type`     | string  | 事件类型     |
-| `sequence` | integer | 事件全局序号 |
-| `frame`    | integer | 系统帧序号   |
-| `data`     | table   | 事件数据     |
-
-### 额外说明
-
-- 字段 `sequence` 事件全局序号，部分事件会被系统全局处理，脚本收到的序号不保证连续。
-- 字段 `frame` 为运行时系统帧序号，不代表该脚本自身处理事件的次数。
-- 字段 `type` 和字段 `data` 的具体结构查看⌞[事件结构](../EVENT.md)⌝。
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `event` | table | 本次收到的事件。 |
 
 ## 返回值
 
@@ -125,6 +121,22 @@ end
 ```lua
 ```
 
+### 额外说明
+
+`event` 为事件上下文表。
+
+| 字段       | 类型    | 说明         |
+| ---------- | ------- | ------------ |
+| `type`     | string  | 事件类型     |
+| `sequence` | integer | 事件全局序号 |
+| `frame`    | integer | 系统帧序号   |
+| `data`     | table   | 事件数据     |
+
+
+- 字段 `sequence` 事件全局序号，部分事件会被系统全局处理，脚本收到的序号不保证连续。
+- 字段 `frame` 为运行时系统帧序号，不代表该脚本自身处理事件的次数。
+- 字段 `type` 和字段 `data` 的具体结构查看⌞[事件结构](../EVENT.md)⌝。
+
 ---
 
 ## `Update`
@@ -134,22 +146,16 @@ end
 ### 调用
 
 ```lua
-function Update(dt)
-end
+Update
 ```
 
 ## 参数
 
-`dt` 为物理帧时间差，单位 `秒`。
+### 必填参数
 
-| 类型   | 说明         |
-| ------ | ------------ |
-| float | 物理帧时间差 |
-
-### 额外说明
-
-- 物理帧更新间隔固定为 1/60 秒。
-- 系统会根据实际帧间隔来计算 `Update` 调用次数，每帧最多调用 8 次。
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `dt` | number | 固定更新的时间间隔，单位为秒。 |
 
 ## 返回值
 
@@ -169,6 +175,18 @@ end
 ```lua
 ```
 
+### 额外说明
+
+`dt` 为物理帧时间差，单位 `秒`。
+
+| 类型   | 说明         |
+| ------ | ------------ |
+| float | 物理帧时间差 |
+
+
+- 物理帧更新间隔固定为 1/60 秒。
+- 系统会根据实际帧间隔来计算 `Update` 调用次数，每帧最多调用 8 次。
+
 ---
 
 ## `UpdateFrame`
@@ -178,27 +196,17 @@ end
 ### 调用
 
 ```lua
-function UpdateFrame(dt, alpha)
-end
+UpdateFrame
 ```
 
 ## 参数
 
-`dt` 为帧更新时间差，单位 `秒`。
+### 必填参数
 
-| 类型   | 说明         |
-| ------ | ------------ |
-| float | 物理帧时间差 |
-
-`alpha` 表示当前显示帧在最近两次固定 `Update` 状态之间的插值比例，范围为 `0` 到 `1`。
-
-| 类型   | 说明     |
-| ------ | -------- |
-| float | 差值比例 |
-
-### 额外说明
-
-- 帧更新随系统帧调用，实际调用频率受游戏帧率设置、系统帧设置和玩家设备性能影响。
+| 参数名 | 类型 | 说明 |
+| --- | --- | --- |
+| `dt` | number | 本次画面更新的时间间隔，单位为秒。 |
+| `alpha` | number | 用于插值的比例，范围为 0～1。 |
 
 ## 返回值
 
@@ -220,6 +228,19 @@ end
 ```lua
 ```
 
+### 额外说明
+
+`dt` 为画面更新时间差，单位为秒。
+
+`alpha` 表示当前显示帧在最近两次固定 `Update` 状态之间的插值比例，范围为 `0` 到 `1`。
+
+| 类型   | 说明     |
+| ------ | -------- |
+| float | 插值比例 |
+
+
+- 帧更新随系统帧调用，实际调用频率受游戏帧率设置、系统帧设置和玩家设备性能影响。
+
 ---
 
 ## `Render`
@@ -229,8 +250,7 @@ end
 ### 调用
 
 ```lua
-function Render()
-end
+Render
 ```
 
 ## 参数
@@ -267,9 +287,7 @@ end
 ### 调用
 
 ```lua
-function SaveGame()
-  return value
-end
+SaveGame
 ```
 
 ## 参数
@@ -283,11 +301,6 @@ end
 | 类型 | 说明     |
 | ---- | -------- |
 | any  | 游戏数据 |
-
-### 额外说明
-
-- 仅当 `game.json` 中 `save_game` 为 `true` 时可用，且必须实现。通过 `game.save_game` 读取。
-- 返回值必须可序列化，且只能返回一个值。
 
 ### 示例
 
@@ -309,6 +322,11 @@ end
 ```lua
 ```
 
+### 额外说明
+
+- 仅当 `game.json` 中 `save_game` 为 `true` 时可用，且必须实现。通过 `game.save_game` 读取。
+- 返回值必须可序列化，且只能返回一个值。
+
 ---
 
 ## `SaveBest`
@@ -322,12 +340,7 @@ end
 ### 调用
 
 ```lua
-function SaveBest()
-  return {
-    best_string = string,
-    any...
-  }
-end
+SaveBest
 ```
 
 ## 参数
@@ -341,12 +354,6 @@ end
 | 类型  | 说明         |
 | ----- | ------------ |
 | table | 最佳记录数据 |
-
-### 额外说明
-
-- 返回值表必须包含 `best_string` 字段，类型为 `string`，用于游戏列表展示。
-- 仅当 `game.json` 中 `best_score.enable` 为 `true` 时可用，且必须实现。通过 `game.save_best` 读取。
-- 返回值必须可序列化。
 
 ### 示例
 
@@ -370,3 +377,9 @@ end
 
 ```lua
 ```
+
+### 额外说明
+
+- 返回值表必须包含 `best_string` 字段，类型为 `string`，用于游戏列表展示。
+- 仅当 `game.json` 中 `best_score.enable` 为 `true` 时可用，且必须实现。通过 `game.save_best` 读取。
+- 返回值必须可序列化。

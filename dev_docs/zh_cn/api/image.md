@@ -18,7 +18,7 @@
 
 ## `load`
 
-异步读取 Session 包 `assets/` 目录中的 PNG、JPG 或 JPEG 图片并转换为终端字符画。路径必须位于该目录内；省略扩展名时依次查找 `png`、`jpg`、`jpeg`。
+读取包内图片，并转换为可以绘制的终端字符画。
 
 ### 调用
 
@@ -46,12 +46,12 @@ image.load
 | `crop_height` | integer | 像素裁剪高度；省略时取从 `crop_y` 到图片底部的剩余区域。 |
 | `scale` | number | 裁剪区域的缩放比例；默认 `1.0`，必须是有限正数。 |
 | `cache` | boolean | 是否读写图像缓存；默认 `true`。 |
-| `mode` | string | 转换模式；默认 `"half_block"`，也可用 `"mix_block"` 匹配宿主支持的方块字形。 |
+| `mode` | string | 转换模式；默认 `"half_block"`，也可用 `"mix_block"` 使用更多方块字形。 |
 | `background` | string | RGBA 透明像素的混合背景；默认 `"#000000"`。只接受精确 RGB 字符串 `"#rrggbb"` 或 `"rgb(r,g,b)"`，也可传 `color.hex`、`color.rgb` 的返回值。 |
 
 ## 返回值
 
-立即返回当前 Session 内的整数 request id。完成或失败事件会在 `data.request_id` 中回传相同 ID；成功事件的 `data.output` 是可传给 `draw.text` 的富文本字符串。
+立即返回当前脚本运行期间的整数 request id。完成或失败事件会在 `data.request_id` 中回传相同 ID；成功事件的 `data.output` 是可传给 `draw.text` 的富文本字符串。
 
 | 类型 | 说明 |
 | --- | --- |
@@ -60,6 +60,7 @@ image.load
 ### 示例
 
 ```lua
+local image_text = nil
 local image_request_id = image.load("ui/title", {
   block_width = 40,
   block_height = 10,
@@ -71,7 +72,14 @@ function HandleEvent(event)
   if event.type == "image"
     and event.data.request_id == image_request_id
     and event.data.ok then
-    draw.text(2, 2, event.data.output)
+    image_text = event.data.output
+    draw.render()
+  end
+end
+
+function Render()
+  if image_text then
+    draw.text(2, 2, image_text)
   end
 end
 ```
@@ -83,8 +91,10 @@ end
 
 ### 额外说明
 
-- 每个 Session 同时最多有 4 个待完成的图片请求；事件交付后释放名额。
+- 示例需要包内 `assets/ui/title.png`（或 `.jpg`、`.jpeg`）。路径不能越出 `assets/`；省略扩展名时按上述顺序查找。
+
+- 每个脚本 同时最多有 4 个待完成的图片请求；事件交付后释放名额。
 - 输出单边最多 2,048 格、总计最多 16,384 格；源文件最多 32 MiB，源图最多 16,000,000 像素。
 - `crop_x`、`crop_y`、`crop_width` 和 `crop_height` 使用像素单位。负偏移、空区域或越界尺寸会使请求失败；省略裁剪尺寸时取剩余区域。
-- `background` 按每个 8-bit RGB 通道 `(src*a + bg*(255-a) + 127)/255` 混合后再缩放，并纳入缓存键。
+- 透明像素先与 `background` 指定的颜色混合，再转换成字符画；背景色不同会得到不同结果。
 - 事件结构见⌞[事件文档](../EVENT.md)⌝。

@@ -8,55 +8,57 @@
 
 ## 常量
 
-| 常量                             | 说明              | 定位                                      |
-| -------------------------------- | ----------------- | ----------------------------------------- |
-| `PI`                             | 圆周率 π          | [PI](#PI)                                 |
-| `E`                              | 自然常数 e        | [E](#E)                                   |
-| `POSITIVE_INFINITE` / `INFINITE` | 正无穷            | [POSITIVE_INFINITE / INFINITE](#INFINITE) |
-| `NEGATIVE_INFINITE`              | 负无穷            | [NEGATIVE_INFINITE](#NEGATIVE_INFINITE)   |
-| `DEG`                            | 弧度转角度系数    | [DEG](#DEG)                               |
-| `RAD`                            | 角度转弧度系数    | [RAD](#RAD)                               |
-| `MAX_INTEGER`                    | 最大整数 `2^63-1` | [MAX_INTEGER](#MAX_INTEGER)               |
-| `MIN_INTEGER`                    | 最小整数 `-2^63`  | [MIN_INTEGER](#MIN_INTEGER)               |
+| 常量 | 说明 | 定位 |
+| --- | --- | --- |
+| `POSITIVE_INFINITE` | 正无穷 | [POSITIVE_INFINITE](#positive_infinite) |
+| `PI` | 圆周率 π | [PI](#pi) |
+| `E` | 自然常数 e | [E](#e) |
+| `NEGATIVE_INFINITE` | 负无穷 | [NEGATIVE_INFINITE](#negative_infinite) |
+| `DEG` | 弧度转角度系数 | [DEG](#deg) |
+| `RAD` | 角度转弧度系数 | [RAD](#rad) |
+| `MAX_INTEGER` | 最大整数 `2^63-1` | [MAX_INTEGER](#max_integer) |
+| `MIN_INTEGER` | 最小整数 `-2^63` | [MIN_INTEGER](#min_integer) |
+| `INFINITE` | 正无穷，POSITIVE_INFINITE 的别名 | [INFINITE](#infinite) |
 
 ## 方法
 
-| 方法              | 说明                             | 定位                                |
-| ----------------- | -------------------------------- | ----------------------------------- |
-| `abs`             | 计算绝对值                       | [abs](#abs)                         |
-| `ceil`            | 向上取整                         | [ceil](#ceil)                       |
-| `floor`           | 向下取整                         | [floor](#floor)                     |
-| `round`           | 四舍五入到最近的整数             | [round](#round)                     |
-| `round_to`        | 按指定位数四舍五入               | [round_to](#round_to)               |
-| `fmod`            | 计算取模（余数）                 | [fmod](#fmod)                       |
-| `pow`             | 计算幂运算 $x^y$                 | [pow](#pow)                         |
-| `exp`             | 计算 $e^{value}$                 | [exp](#exp)                         |
-| `log`             | 计算指定底数的对数               | [log](#log)                         |
-| `lg`              | 计算以 10 为底的对数             | [lg](#lg)                           |
-| `ln`              | 计算以 e 为底的对数              | [ln](#ln)                           |
-| `sqrt`            | 计算平方根                       | [sqrt](#sqrt)                       |
-| `ldexp`           | 计算 $x \times 2^{exp}$          | [ldexp](#ldexp)                     |
-| `frexp`           | 将数值分解为尾数与二进制指数     | [frexp](#frexp)                     |
-| `sin`             | 计算正弦（弧度制）               | [sin](#sin)                         |
-| `cos`             | 计算余弦（弧度制）               | [cos](#cos)                         |
-| `tan`             | 计算正切（弧度制）               | [tan](#tan)                         |
-| `asin`            | 计算反正弦（弧度制）             | [asin](#asin)                       |
-| `acos`            | 计算反余弦（弧度制）             | [acos](#acos)                       |
-| `atan`            | 计算反正切（弧度制）             | [atan](#atan)                       |
-| `atan2`           | 计算反正切（弧度制）             | [atan2](#atan2)                     |
-| `deg`             | 将弧度转换为角度                 | [deg](#deg)                         |
-| `rad`             | 将角度转换为弧度                 | [rad](#rad)                         |
-| `normalize_angle` | 将角度归一化到 `[0, 360)` 区间   | [normalize_angle](#normalize_angle) |
-| `max`             | 返回一组数中的最大值             | [max](#max)                         |
-| `min`             | 返回一组数中的最小值             | [min](#min)                         |
-| `modf`            | 分离数值的整数部分与小数部分     | [modf](#modf)                       |
-| `tointeger`       | 将数值精确转换为整数             | [tointeger](#tointeger)             |
-| `type`            | 返回数值的类型名                 | [type](#type)                       |
-| `ult`             | 以无符号整数比较两个整数         | [ult](#ult)                         |
-| `approx_equal`    | 以指定误差比较两个数字是否相等   | [approx_equal](#approx_equal)       |
-| `percent`         | 计算百分比 $\frac{value}{total}$ | [percent](#percent)                 |
-| `factorial`       | 计算阶乘 $n!$                    | [factorial](#factorial)             |
-| `combination`     | 计算组合数 $C^n_k$               | [combination](#combination)         |
+| 方法 | 说明 | 定位 |
+| --- | --- | --- |
+| `abs` | 计算绝对值 | [abs](#abs) |
+| `ceil` | 向上取整 | [ceil](#ceil) |
+| `floor` | 向下取整 | [floor](#floor) |
+| `round` | 四舍五入到最近的整数 | [round](#round) |
+| `round_to` | 按指定位数四舍五入 | [round_to](#round_to) |
+| `fmod` | 计算取模（余数） | [fmod](#fmod) |
+| `pow` | 计算幂运算 $x^y$ | [pow](#pow) |
+| `exp` | 计算 $e^{value}$ | [exp](#exp) |
+| `log` | 计算指定底数的对数 | [log](#log) |
+| `lg` | 计算以 10 为底的对数 | [lg](#lg) |
+| `ln` | 计算以 e 为底的对数 | [ln](#ln) |
+| `sqrt` | 计算平方根 | [sqrt](#sqrt) |
+| `ldexp` | 计算 $x \times 2^{exp}$ | [ldexp](#ldexp) |
+| `frexp` | 将数值分解为尾数与二进制指数 | [frexp](#frexp) |
+| `sin` | 计算正弦（弧度制） | [sin](#sin) |
+| `cos` | 计算余弦（弧度制） | [cos](#cos) |
+| `tan` | 计算正切（弧度制） | [tan](#tan) |
+| `asin` | 计算反正弦（弧度制） | [asin](#asin) |
+| `acos` | 计算反余弦（弧度制） | [acos](#acos) |
+| `atan` | 计算反正切（弧度制） | [atan](#atan) |
+| `atan2` | 计算反正切（弧度制） | [atan2](#atan2) |
+| `deg` | 将弧度转换为角度 | [deg](#deg) |
+| `rad` | 将角度转换为弧度 | [rad](#rad) |
+| `normalize_angle` | 将角度归一化到 `[0, 360)` 区间 | [normalize_angle](#normalize_angle) |
+| `max` | 返回一组数中的最大值 | [max](#max) |
+| `min` | 返回一组数中的最小值 | [min](#min) |
+| `modf` | 分离数值的整数部分与小数部分 | [modf](#modf) |
+| `tointeger` | 将数值精确转换为整数 | [tointeger](#tointeger) |
+| `type` | 返回数值的类型名 | [type](#type) |
+| `ult` | 以无符号整数比较两个整数 | [ult](#ult) |
+| `approx_equal` | 以指定误差比较两个数字是否相等 | [approx_equal](#approx_equal) |
+| `percent` | 计算百分比 $\frac{value}{total}$ | [percent](#percent) |
+| `factorial` | 计算阶乘 $n!$ | [factorial](#factorial) |
+| `combination` | 计算组合数 $C^n_k$ | [combination](#combination) |
+
 
 ---
 
@@ -66,15 +68,15 @@
 
 圆周率 π。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 math.PI
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -100,15 +102,15 @@ debug.print(tostring(math.PI))
 
 自然常数 e。
 
-### 可用于
-
-- 数学比较。
-
 ### 调用
 
 ```lua
 math.E
 ```
+
+### 可用于
+
+- 数学比较。
 
 ### 示例
 
@@ -130,19 +132,19 @@ debug.print(tostring(math.E))
 
 ---
 
-## `POSITIVE_INFINITE` / `INFINITE` {#INFINITE}
+## `POSITIVE_INFINITE`
 
 正无穷。
-
-### 可用于
-
-- 数学比较。
 
 ### 调用
 
 ```lua
 math.POSITIVE_INFINITE
 ```
+
+### 可用于
+
+- 数学比较。
 
 ### 示例
 
@@ -159,12 +161,12 @@ debug.print(tostring(math.POSITIVE_INFINITE > math.MAX_INTEGER))
 ### 等值
 
 ```text
-+∞
+1 / 0
 ```
 
 ### 额外说明
 
-- 该值永远大于任何数。
+- 该值大于所有有限数。
 - 不可用于计算。
 
 ---
@@ -173,15 +175,15 @@ debug.print(tostring(math.POSITIVE_INFINITE > math.MAX_INTEGER))
 
 负无穷。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 math.NEGATIVE_INFINITE
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -198,12 +200,12 @@ debug.print(tostring(math.NEGATIVE_INFINITE < math.MIN_INTEGER))
 ### 等值
 
 ```text
--∞
+-1 / 0
 ```
 
 ### 额外说明
 
-- 该值永远小于任何数。
+- 该值小于所有有限数。
 - 不可用于计算。
 
 ---
@@ -212,15 +214,15 @@ debug.print(tostring(math.NEGATIVE_INFINITE < math.MIN_INTEGER))
 
 弧度转角度系数，`180 / π`。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 math.DEG
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -246,15 +248,15 @@ debug.print(tostring(math.DEG))
 
 角度转弧度系数，`π / 180`。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 math.RAD
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -280,15 +282,15 @@ debug.print(tostring(math.RAD))
 
 最大可表示的整数 `2^63-1`。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 math.MAX_INTEGER
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -314,15 +316,15 @@ debug.print(tostring(math.MAX_INTEGER))
 
 最小可表示的整数 `-2^63`。
 
-### 可用于
-
-- 任意
-
 ### 调用
 
 ```lua
 math.MIN_INTEGER
 ```
+
+### 可用于
+
+- 任意
 
 ### 示例
 
@@ -341,6 +343,43 @@ debug.print(tostring(math.MIN_INTEGER))
 ```text
 -9223372036854775808
 ```
+
+---
+
+## `INFINITE`
+
+正无穷，POSITIVE_INFINITE 的别名。
+
+### 调用
+
+```lua
+math.INFINITE
+```
+
+### 可用于
+
+- 任意
+
+### 示例
+
+```lua
+debug.print(math.INFINITE == math.POSITIVE_INFINITE)
+```
+
+**输出：**
+
+```lua
+```
+
+### 等值
+
+```text
+math.POSITIVE_INFINITE
+```
+
+### 额外说明
+
+- 与 `math.POSITIVE_INFINITE` 的值相同。
 
 ---
 
@@ -604,6 +643,8 @@ debug.print(tostring(r))
 
 ### 额外说明
 
+- `x`、`y` 必须是整数，`y` 不能为 0；本接口不接受带小数的余数运算。
+
 - 结果符号与被除数一致。
 
 ---
@@ -730,6 +771,10 @@ debug.print(tostring(log))
 ```lua
 
 ```
+
+### 额外说明
+
+- `value` 必须大于 0；`base` 必须大于 0 且不等于 1，不能省略。
 
 ---
 
@@ -1470,7 +1515,7 @@ math.modf
 
 | 参数名  | 类型    | 说明         |
 | ------- | ------- | ------------ |
-| `value` | integer | 要分解的数值 |
+| `value` | number | 要分解的数值 |
 
 ## 返回值
 
@@ -1736,6 +1781,10 @@ debug.print(tostring(p2))
 ```lua
 
 ```
+
+### 额外说明
+
+- `total` 不能为 0。默认返回 `value / total`；`as_percent = true` 时再乘以 100。
 
 ---
 

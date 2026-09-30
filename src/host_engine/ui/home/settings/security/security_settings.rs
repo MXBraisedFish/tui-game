@@ -8,11 +8,10 @@ use crate::host_engine::services::{
 };
 
 const NS: &str = "security_settings";
-const MENU_LEN: usize = 6;
-const ROW_LEN: usize = 6;
-const DEFAULT_START: usize = 4;
+const MENU_LEN: usize = 5;
+const ROW_LEN: usize = 5;
+const DEFAULT_START: usize = 3;
 const LABEL_KEYS: [&str; ROW_LEN] = [
-  "security_settings.security_details",
   "security_settings.reset_terminal",
   "security_settings.mod.reset.status",
   "security_settings.mod.reset.debug",
@@ -32,7 +31,6 @@ pub struct SecuritySettingsUi {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SecuritySettingsCommand {
   Back,
-  OpenDetails,
   ResetTerminal,
   ResetStatus,
   ResetDebug,
@@ -83,33 +81,28 @@ impl SecuritySettingsUi {
       ),
       action("security_settings.back", "esc", "Back to settings"),
       action(
-        "security_settings.focus_security_details",
-        "1",
-        "Focus security details",
-      ),
-      action(
         "security_settings.focus_reset_terminal",
-        "2",
+        "1",
         "Focus terminal capability reset",
       ),
       action(
         "security_settings.focus_reset_status",
-        "3",
+        "2",
         "Focus package status reset",
       ),
       action(
         "security_settings.focus_reset_debug",
-        "4",
+        "3",
         "Focus package debug reset",
       ),
       action(
         "security_settings.focus_default_status",
-        "5",
+        "4",
         "Focus default package status",
       ),
       action(
         "security_settings.focus_default_debug",
-        "6",
+        "5",
         "Focus default package debug",
       ),
     ]
@@ -144,12 +137,11 @@ impl SecuritySettingsUi {
         }
         "security_settings.confirm" => self.confirm_selected(),
         "security_settings.back" => Some(SecuritySettingsCommand::Back),
-        "security_settings.focus_security_details" => self.focus(0),
-        "security_settings.focus_reset_terminal" => self.focus(1),
-        "security_settings.focus_reset_status" => self.focus(2),
-        "security_settings.focus_reset_debug" => self.focus(3),
-        "security_settings.focus_default_status" => self.focus(4),
-        "security_settings.focus_default_debug" => self.focus(5),
+        "security_settings.focus_reset_terminal" => self.focus(0),
+        "security_settings.focus_reset_status" => self.focus(1),
+        "security_settings.focus_reset_debug" => self.focus(2),
+        "security_settings.focus_default_status" => self.focus(3),
+        "security_settings.focus_default_debug" => self.focus(4),
         _ => None,
       },
       _ => None,
@@ -261,11 +253,10 @@ impl SecuritySettingsUi {
 
   fn confirm_selected(&self) -> Option<SecuritySettingsCommand> {
     Some(match self.selected_index {
-      0 => SecuritySettingsCommand::OpenDetails,
-      1 => SecuritySettingsCommand::ResetTerminal,
-      2 => SecuritySettingsCommand::ResetStatus,
-      3 => SecuritySettingsCommand::ResetDebug,
-      4 => SecuritySettingsCommand::SetDefaultStatus(!self.default_enabled),
+      0 => SecuritySettingsCommand::ResetTerminal,
+      1 => SecuritySettingsCommand::ResetStatus,
+      2 => SecuritySettingsCommand::ResetDebug,
+      3 => SecuritySettingsCommand::SetDefaultStatus(!self.default_enabled),
       _ => SecuritySettingsCommand::SetDefaultDebug(!self.default_debug),
     })
   }
@@ -332,10 +323,10 @@ impl SecuritySettingsUi {
 
   fn value_key(&self, index: usize) -> Option<&'static str> {
     match index {
-      4 if self.default_enabled => Some("security_settings.reset.status.on"),
-      4 => Some("security_settings.reset.status.off"),
-      5 if self.default_debug => Some("security_settings.reset.debug.on"),
-      5 => Some("security_settings.reset.debug.off"),
+      3 if self.default_enabled => Some("security_settings.reset.status.on"),
+      3 => Some("security_settings.reset.status.off"),
+      4 if self.default_debug => Some("security_settings.reset.debug.on"),
+      4 => Some("security_settings.reset.debug.off"),
       _ => None,
     }
   }
@@ -379,14 +370,33 @@ mod tests {
   use super::*;
 
   #[test]
+  fn menu_contains_only_security_settings_actions() {
+    assert_eq!(LABEL_KEYS.len(), MENU_LEN);
+
+    let mut ui = SecuritySettingsUi::init(&HitAreaService::new());
+    let expected = [
+      SecuritySettingsCommand::ResetTerminal,
+      SecuritySettingsCommand::ResetStatus,
+      SecuritySettingsCommand::ResetDebug,
+      SecuritySettingsCommand::SetDefaultStatus(false),
+      SecuritySettingsCommand::SetDefaultDebug(true),
+    ];
+
+    for (index, command) in expected.into_iter().enumerate() {
+      ui.selected_index = index;
+      assert_eq!(ui.confirm_selected(), Some(command));
+    }
+  }
+
+  #[test]
   fn default_options_are_focusable_and_emit_switch_commands() {
     let mut ui = SecuritySettingsUi::init(&HitAreaService::new());
-    ui.selected_index = 4;
+    ui.selected_index = 3;
     assert_eq!(
       ui.confirm_selected(),
       Some(SecuritySettingsCommand::SetDefaultStatus(false))
     );
-    ui.selected_index = 5;
+    ui.selected_index = 4;
     assert_eq!(
       ui.confirm_selected(),
       Some(SecuritySettingsCommand::SetDefaultDebug(true))

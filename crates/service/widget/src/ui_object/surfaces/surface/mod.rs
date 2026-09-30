@@ -1,5 +1,5 @@
 use super::scroll_box::resolve_scroll_box_layout;
-use super::slice::resolve_rect;
+use super::slice::resolve_rect_with_source;
 use crate::UiObjectPool;
 use tg_service_canvas::CanvasService;
 use tg_service_canvas::{ScrollBoxFrame, SliceFrame, SurfaceFrame};
@@ -16,9 +16,13 @@ impl UiObjectPool {
       .filter_map(|surface| match *surface {
         SurfaceId::Slice(id) => {
           let state = self.slices.slices.get(&id)?;
+          let (rect, source_x, source_y) =
+            resolve_rect_with_source(state.rect, layout.developer_size());
           Some(SurfaceFrame::Slice(SliceFrame {
             id,
-            rect: resolve_rect(state.rect, layout),
+            rect,
+            source_x,
+            source_y,
             visible: state.visible && (!state.frame_scoped || state.drawn_this_frame),
             opaque: state.opaque,
             background: state.background.clone(),

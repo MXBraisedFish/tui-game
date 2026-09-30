@@ -41,8 +41,8 @@ pub struct OverlayLogicState;
 /// 覆盖层渲染状态，包含该覆盖层所需的最小窗口尺寸
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverlayRenderState {
-  pub required_width: u32,
-  pub required_height: u32,
+  pub required_width: u64,
+  pub required_height: u64,
 }
 
 impl OverlayStackState {
@@ -54,11 +54,8 @@ impl OverlayStackState {
   }
 
   pub fn top(&self) -> Option<&OverlayState> {
-    self.stack.last()
-  }
-
-  pub fn top_mut(&mut self) -> Option<&mut OverlayState> {
-    self.stack.last_mut()
+    let index = self.current_index()?;
+    self.stack.get(index)
   }
 
   fn current_index(&self) -> Option<usize> {
@@ -76,20 +73,20 @@ impl OverlayStackState {
       .map(|(index, _)| index)
   }
 
-  /// 压入一个覆盖层到栈顶
+  /// 主动显示一个覆盖层。同类型覆盖层保持单实例，并成为同层最新项。
   pub fn push(&mut self, overlay: OverlayState) {
     let was_empty = self.stack.is_empty();
     self.stack.retain(|item| item.kind != overlay.kind);
     self.stack.push(overlay);
-    self.stack.sort_by_key(|item| item.kind.priority());
     if was_empty {
       self.transitions.push(OverlayStackTransition::Started);
     }
   }
 
-  /// 弹出栈顶覆盖层
+  /// 关闭当前显示的覆盖层。
   pub fn pop(&mut self) -> Option<OverlayState> {
-    let overlay = self.stack.pop()?;
+    let index = self.current_index()?;
+    let overlay = self.stack.remove(index);
     if self.stack.is_empty() {
       self.transitions.push(OverlayStackTransition::Stopped);
     }
@@ -97,7 +94,7 @@ impl OverlayStackState {
   }
 
   pub fn current_kind(&self) -> Option<OverlayKind> {
-    self.current_index().map(|index| self.stack[index].kind)
+    self.top().map(|overlay| overlay.kind)
   }
 
   pub fn remove_kind(&mut self, kind: OverlayKind) -> Option<OverlayState> {
@@ -113,21 +110,37 @@ impl OverlayStackState {
     self.stack.iter().find(|overlay| overlay.kind == kind)
   }
 
+  pub fn get_mut(&mut self, kind: OverlayKind) -> Option<&mut OverlayState> {
+    self.stack.iter_mut().find(|overlay| overlay.kind == kind)
+  }
+
   pub fn drain_transitions(&mut self) -> Vec<OverlayStackTransition> {
     std::mem::take(&mut self.transitions)
   }
 }
 
 impl OverlayKind {
+  pub fn is_program_overlay(self) -> bool {
+    matches!(
+      self,
+      OverlayKind::CoverContinue
+        | OverlayKind::ClearWarning
+        | OverlayKind::ExportLoading
+        | OverlayKind::ExportSettings
+        | OverlayKind::GameWarning
+        | OverlayKind::LanguageLoading
+    )
+  }
+
   fn priority(self) -> u8 {
     match self {
       OverlayKind::CoverContinue => 20,
       OverlayKind::ClearWarning => 20,
       OverlayKind::ExportLoading => 20,
       OverlayKind::ExportSettings => 20,
+      OverlayKind::GameWarning => 20,
       OverlayKind::LanguageLoading => 20,
       OverlayKind::Screensaver => 25,
-      OverlayKind::GameWarning => 27,
       OverlayKind::WindowSizeWarning => 30,
       OverlayKind::ScreenshotCapture => 40,
     }
@@ -186,13 +199,103 @@ mod tests {
   }
 
   #[test]
-  fn game_warning_is_between_screensaver_and_window_size_warning() {
+  fn fixed_overlay_priority_does_not_depend_on_insertion_order() {
+    let mut stack = OverlayStackState::new();
+    stack.push(overlay(OverlayKind::ScreenshotCapture));
+    stack.push(overlay(OverlayKind::WindowSizeWarning));
+    stack.push(overlay(OverlayKind::Screensaver));
+    stack.push(overlay(OverlayKind::GameWarning));
+
+    assert_eq!(stack.current_kind(), Some(OverlayKind::ScreenshotCapture));
+    assert_eq!(stack.top().map(|item| item.kind), stack.current_kind());
+
+    assert_eq!(
+      stack.pop().map(|item| item.kind),
+      Some(OverlayKind::ScreenshotCapture)
+    );
+    assert_eq!(stack.current_kind(), Some(OverlayKind::WindowSizeWarning));
+    assert_eq!(
+      stack.pop().map(|item| item.kind),
+      Some(OverlayKind::WindowSizeWarning)
+    );
+    assert_eq!(stack.current_kind(), Some(OverlayKind::Screensaver));
+    assert_eq!(
+      stack.pop().map(|item| item.kind),
+      Some(OverlayKind::Screensaver)
+    );
+    assert_eq!(stack.current_kind(), Some(OverlayKind::GameWarning));
+  }
+
+  #[test]
+  fn game_warning_is_an_ordinary_overlay_below_screensaver() {
     let mut stack = OverlayStackState::new();
     stack.push(overlay(OverlayKind::Screensaver));
     stack.push(overlay(OverlayKind::GameWarning));
-    assert_eq!(stack.current_kind(), Some(OverlayKind::GameWarning));
-    stack.push(overlay(OverlayKind::WindowSizeWarning));
-    assert_eq!(stack.current_kind(), Some(OverlayKind::WindowSizeWarning));
+
+    assert_eq!(stack.current_kind(), Some(OverlayKind::Screensaver));
+  }
+
+  #[test]
+  fn every_ordinary_overlay_shares_the_same_priority() {
+    let ordinary = [
+      OverlayKind::CoverContinue,
+      OverlayKind::ClearWarning,
+      OverlayKind::ExportLoading,
+      OverlayKind::ExportSettings,
+      OverlayKind::GameWarning,
+      OverlayKind::LanguageLoading,
+    ];
+
+    for earlier in ordinary {
+      assert!(earlier.is_program_overlay());
+      for later in ordinary {
+        if earlier == later {
+          continue;
+        }
+        let mut stack = OverlayStackState::new();
+        stack.push(overlay(earlier));
+        stack.push(overlay(later));
+        assert_eq!(stack.current_kind(), Some(later));
+      }
+    }
+    assert!(!OverlayKind::Screensaver.is_program_overlay());
+    assert!(!OverlayKind::WindowSizeWarning.is_program_overlay());
+    assert!(!OverlayKind::ScreenshotCapture.is_program_overlay());
+  }
+
+  #[test]
+  fn refreshing_overlay_state_does_not_change_active_order() {
+    let mut stack = OverlayStackState::new();
+    stack.push(overlay(OverlayKind::LanguageLoading));
+    stack.push(overlay(OverlayKind::ClearWarning));
+
+    stack
+      .get_mut(OverlayKind::LanguageLoading)
+      .unwrap()
+      .render
+      .required_width = 123;
+
+    assert_eq!(stack.current_kind(), Some(OverlayKind::ClearWarning));
+    assert_eq!(stack.top().map(|item| item.kind), stack.current_kind());
+    assert_eq!(
+      stack
+        .get(OverlayKind::LanguageLoading)
+        .unwrap()
+        .render
+        .required_width,
+      123
+    );
+  }
+
+  #[test]
+  fn actively_showing_same_overlay_moves_it_to_latest_position_in_its_layer() {
+    let mut stack = OverlayStackState::new();
+    stack.push(overlay(OverlayKind::LanguageLoading));
+    stack.push(overlay(OverlayKind::ClearWarning));
+    stack.push(overlay(OverlayKind::LanguageLoading));
+
+    assert_eq!(stack.stack.len(), 2);
+    assert_eq!(stack.current_kind(), Some(OverlayKind::LanguageLoading));
   }
 
   #[test]

@@ -1,7 +1,7 @@
 {
   "window_size.title": "Terminal Too Small",
-  "window_size.current": "Current Size: ",
-  "window_size.required": "Required Size: ",
+  "window_size.current": "Current terminal: ",
+  "window_size.required": "Terminal needs at least: ",
   "window_size.tip": "Resize your terminal to the required size.",
   "window_size.action.exit.host": "{key:window_size.exit} Quit",
   "window_size.action.exit.game": "{key:window_size.exit} Back to Game List",

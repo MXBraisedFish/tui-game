@@ -34,12 +34,12 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let resolved = resolve_image_path(&assets_root, &relative)
         .map_err(|error| args::message(method, format!("invalid image path: {error}")))?;
 
-      let output_width = optional_positive_u32(&table, method, "block_width")?;
-      let output_height = optional_positive_u32(&table, method, "block_height")?;
-      let crop_x = optional_crop_offset(&table, method, "crop_x")?;
-      let crop_y = optional_crop_offset(&table, method, "crop_y")?;
-      let crop_width = optional_positive_u32(&table, method, "crop_width")?;
-      let crop_height = optional_positive_u32(&table, method, "crop_height")?;
+      let output_width = optional_positive_u32(table, method, "block_width")?;
+      let output_height = optional_positive_u32(table, method, "block_height")?;
+      let crop_x = optional_crop_offset(table, method, "crop_x")?;
+      let crop_y = optional_crop_offset(table, method, "crop_y")?;
+      let crop_width = optional_positive_u32(table, method, "crop_width")?;
+      let crop_height = optional_positive_u32(table, method, "crop_height")?;
       let scale = match table.get::<Value>("scale")? {
         Value::Nil => 1.0,
         value => args::number(value, method, "scale")?,
@@ -50,8 +50,8 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           "scale must be a finite positive number",
         ));
       }
-      let cache = args::optional_bool(&table, method, "cache", true)?;
-      let mode = match args::optional_string(&table, method, "mode", Some("half_block"))?
+      let cache = args::optional_bool(table, method, "cache", true)?;
+      let mode = match args::optional_string(table, method, "mode", Some("half_block"))?
         .expect("mode has a default")
         .as_str()
       {
@@ -64,7 +64,7 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           ));
         }
       };
-      let background = parse_background_color(&table, method)?;
+      let background = parse_background_color(table, method)?;
 
       let mut api = load_state.borrow_mut();
       if api.pending_image_request_ids.len() >= MAX_LUA_IMAGE_TASKS_PER_SESSION {

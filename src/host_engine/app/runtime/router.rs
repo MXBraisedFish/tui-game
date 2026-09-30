@@ -14,7 +14,7 @@ pub(super) fn current_objects_mut<'a>(
   settings_ui: &'a mut SettingsUi,
   display_settings_ui: &'a mut DisplaySettingsUi,
   screensaver_list_ui: &'a mut ScreensaverListUi,
-  security_uis: &'a mut SecurityUis,
+  security_settings_ui: &'a mut SecuritySettingsUi,
   storage_management_ui: &'a mut StorageManagementUi,
   storage_management_clear_ui: &'a mut StorageManagementClearUi,
   storage_management_export_ui: &'a mut StorageManagementExportUi,
@@ -67,8 +67,7 @@ pub(super) fn current_objects_mut<'a>(
         .recording_list_mut()
         .objects_mut(),
     ),
-    Some(UiNodeKind::SecuritySettings) => Some(security_uis.settings.objects_mut()),
-    Some(UiNodeKind::SecurityDetails) => Some(security_uis.details.objects_mut()),
+    Some(UiNodeKind::SecuritySettings) => Some(security_settings_ui.objects_mut()),
     Some(UiNodeKind::StorageManagement) => Some(storage_management_ui.objects_mut()),
     Some(UiNodeKind::StorageManagementClear) => Some(storage_management_clear_ui.objects_mut()),
     Some(UiNodeKind::StorageManagementExport) => Some(storage_management_export_ui.objects_mut()),
@@ -94,7 +93,7 @@ pub(super) fn deactivate_hidden_pools(
     settings_ui,
     display_settings_ui,
     screensaver_list_ui,
-    security_uis,
+    security_settings_ui,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -185,11 +184,7 @@ pub(super) fn deactivate_hidden_pools(
   );
   deactivate(
     UiNodeKind::SecuritySettings,
-    security_uis.settings.objects_mut(),
-  );
-  deactivate(
-    UiNodeKind::SecurityDetails,
-    security_uis.details.objects_mut(),
+    security_settings_ui.objects_mut(),
   );
   deactivate(
     UiNodeKind::StorageManagement,
@@ -271,7 +266,7 @@ pub(super) fn route_text_input_events(
           context.settings_ui,
           context.display_settings_ui,
           context.screensaver_list_ui,
-          context.security_uis,
+          context.security_settings_ui,
           context.storage_management_ui,
           context.storage_management_clear_ui,
           context.storage_management_export_ui,
@@ -299,7 +294,7 @@ pub(super) fn route_text_input_events(
           context.settings_ui,
           context.display_settings_ui,
           context.screensaver_list_ui,
-          context.security_uis,
+          context.security_settings_ui,
           context.storage_management_ui,
           context.storage_management_clear_ui,
           context.storage_management_export_ui,
@@ -398,7 +393,7 @@ pub(super) fn route_input_events(
           context.settings_ui,
           context.display_settings_ui,
           context.screensaver_list_ui,
-          context.security_uis,
+          context.security_settings_ui,
           context.storage_management_ui,
           context.storage_management_clear_ui,
           context.storage_management_export_ui,
@@ -433,7 +428,7 @@ pub(super) fn route_update(
     settings_ui,
     display_settings_ui,
     screensaver_list_ui,
-    security_uis,
+    security_settings_ui,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -531,9 +526,8 @@ pub(super) fn route_update(
         &services.storage,
       ),
     Some(UiNodeKind::SecuritySettings) => {
-      security_uis.settings.update(world.clock.delta_time());
+      security_settings_ui.update(world.clock.delta_time());
     }
-    Some(UiNodeKind::SecurityDetails) => {}
     Some(UiNodeKind::StorageManagement) => {
       let _ = storage_management_ui.update(world.clock.delta_time());
     }
@@ -722,7 +716,7 @@ fn route_component_mouse(
     context.settings_ui,
     context.display_settings_ui,
     context.screensaver_list_ui,
-    context.security_uis,
+    context.security_settings_ui,
     context.storage_management_ui,
     context.storage_management_clear_ui,
     context.storage_management_export_ui,
@@ -742,18 +736,6 @@ fn route_component_mouse(
     .route_mouse_event(pool, &services.canvas, &services.layout, event)
   {
     services.canvas.request_render();
-    return true;
-  }
-  if services
-    .markdown
-    .route_mouse_event(pool, &services.text_input, event)
-  {
-    return true;
-  }
-  if services
-    .hyperlink
-    .route_mouse_event(pool, &services.text_input, event)
-  {
     return true;
   }
   services
@@ -784,7 +766,7 @@ fn route_component_events(
       context.settings_ui,
       context.display_settings_ui,
       context.screensaver_list_ui,
-      context.security_uis,
+      context.security_settings_ui,
       context.storage_management_ui,
       context.storage_management_clear_ui,
       context.storage_management_export_ui,
@@ -817,7 +799,7 @@ fn route_input_event(
     settings_ui,
     display_settings_ui,
     screensaver_list_ui,
-    security_uis,
+    security_settings_ui,
     storage_management_ui,
     storage_management_clear_ui,
     storage_management_export_ui,
@@ -859,7 +841,7 @@ fn route_input_event(
     }
     Some(UiNodeKind::Settings) => {
       if let Some(command) = settings_ui.handle_event(event) {
-        apply_settings_command(command, settings_ui, security_uis, services, world);
+        apply_settings_command(command, settings_ui, security_settings_ui, services, world);
       }
     }
     Some(UiNodeKind::KeyBindings) => {
@@ -942,13 +924,8 @@ fn route_input_event(
       }
     }
     Some(UiNodeKind::SecuritySettings) => {
-      if let Some(command) = security_uis.settings.handle_event(event) {
-        apply_security_settings_command(command, security_uis, services, world);
-      }
-    }
-    Some(UiNodeKind::SecurityDetails) => {
-      if let Some(command) = security_uis.details.handle_event(event) {
-        apply_security_details_command(command, security_uis, services, world);
+      if let Some(command) = security_settings_ui.handle_event(event) {
+        apply_security_settings_command(command, security_settings_ui, services, world);
       }
     }
     Some(UiNodeKind::StorageManagement) => {
