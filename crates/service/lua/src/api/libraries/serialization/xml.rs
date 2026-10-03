@@ -1,3 +1,5 @@
+//! XML document parsing and serialization exposed to Lua.
+
 use std::collections::{BTreeMap, HashSet};
 
 use mlua::{Lua, MultiValue, Table, Value};
@@ -17,6 +19,12 @@ struct Node {
   children: Vec<Node>,
 }
 
+/// Build and register the Lua xml API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
   source.raw_set(
     "xml_encode",

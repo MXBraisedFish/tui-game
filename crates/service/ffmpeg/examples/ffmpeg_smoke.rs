@@ -1,4 +1,4 @@
-//! Minimal entry: searches deployment, managed-cache and system locations for ffmpeg.
+//! Independent FFmpeg smoke entry exercising the public API and checking its results.
 
 use std::path::PathBuf;
 

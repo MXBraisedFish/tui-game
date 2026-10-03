@@ -1,4 +1,4 @@
-//! Minimal entry: builds an audio event and validates its identity and error formatting.
+//! Independent audio smoke entry exercising the public API and checking its results.
 
 use tg_core_audio::{AudioAsyncEvent, AudioError, AudioErrorCode, AudioId, AudioPoolId};
 

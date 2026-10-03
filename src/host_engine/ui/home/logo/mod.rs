@@ -1,3 +1,5 @@
+//! Logo logo animation state and terminal-cell presentation.
+
 mod character;
 mod error;
 mod glitch;
@@ -20,6 +22,7 @@ use self::{
   select::SelectLogo, wave::WaveLogo,
 };
 
+/// The dynamic template used by this module.
 pub(super) const DYNAMIC_TEMPLATE: [&str; 5] = [
   "   ████████  ██    ██  ██     ██████    █████   ███    ███  ███████   ",
   "      ██     ██    ██  ██    ██        ██   ██  ████  ████  ██        ",
@@ -28,6 +31,7 @@ pub(super) const DYNAMIC_TEMPLATE: [&str; 5] = [
   "      ██      ██████   ██     ██████   ██   ██  ██      ██  ███████   ",
 ];
 
+/// The padded template used by this module.
 pub(super) const PADDED_TEMPLATE: [&str; 7] = [
   "                                                                      ",
   DYNAMIC_TEMPLATE[0],
@@ -38,6 +42,7 @@ pub(super) const PADDED_TEMPLATE: [&str; 7] = [
   "                                                                      ",
 ];
 
+/// The select template used by this module.
 pub(super) const SELECT_TEMPLATE: [&str; 7] = [
   "▟                                                                    ▙",
   DYNAMIC_TEMPLATE[0],
@@ -48,6 +53,7 @@ pub(super) const SELECT_TEMPLATE: [&str; 7] = [
   "▜                                                                    ▛",
 ];
 
+/// The glitch template used by this module.
 pub(super) const GLITCH_TEMPLATE: [&str; 5] = [
   "  ██████████ ████  ████ ████     ████████   ███████  █████  █████ █████████  ",
   "     ████    ████  ████ ████    ████       ████ ████ ████████████ ████       ",
@@ -65,22 +71,45 @@ const DYNAMIC_MODES: [DisplayLogoMode; 6] = [
   DisplayLogoMode::Char,
 ];
 
+/// Color overrides and decoration flags for a logo-animation character.
+///
+/// # Fields
+///
+/// * `fg` - The foreground color override, or `None` to inherit the default.
+/// * `bg` - The background color override, or `None` to inherit the default.
+/// * `bold` - Whether the bold text style is enabled.
+/// * `dim` - Whether the dim text style is enabled.
+/// * `reverse` - Whether the reverse text style is enabled.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct CellStyle {
+  /// The foreground color override, or `None` to inherit the default.
   pub fg: Option<(u8, u8, u8)>,
+  /// The background color override, or `None` to inherit the default.
   pub bg: Option<(u8, u8, u8)>,
+  /// Whether the bold text style is enabled.
   pub bold: bool,
+  /// Whether the dim text style is enabled.
   pub dim: bool,
+  /// Whether the reverse text style is enabled.
   pub reverse: bool,
 }
 
+/// A single character and its logo-animation style.
+///
+/// # Fields
+///
+/// * `ch` - The ch.
+/// * `style` - The text style applied to the rendered content.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct LogoCell {
+  /// The ch.
   pub ch: char,
+  /// The text style applied to the rendered content.
   pub style: CellStyle,
 }
 
 impl LogoCell {
+  /// Create a default-style cell containing the supplied character.
   pub fn plain(ch: char) -> Self {
     Self {
       ch,
@@ -88,11 +117,13 @@ impl LogoCell {
     }
   }
 
+  /// Create a text cell carrying the supplied terminal style.
   pub fn styled(ch: char, style: CellStyle) -> Self {
     Self { ch, style }
   }
 }
 
+/// Access to the random stream used by home-page logo effects.
 pub(super) struct LogoRandom<'a> {
   service: &'a RandomService,
   pool: &'a mut RuntimeObjectPool,
@@ -108,6 +139,7 @@ impl<'a> LogoRandom<'a> {
     Self { service, pool, id }
   }
 
+  /// Sample an unsigned integer from the inclusive logo-animation range.
   pub fn usize_inclusive(&mut self, min: usize, max: usize) -> usize {
     self
       .service
@@ -120,6 +152,7 @@ impl<'a> LogoRandom<'a> {
       .unwrap_or(min as i64) as usize
   }
 
+  /// Sample a signed integer from the inclusive logo-animation range.
   pub fn i32_inclusive(&mut self, min: i32, max: i32) -> i32 {
     self
       .service
@@ -132,6 +165,7 @@ impl<'a> LogoRandom<'a> {
       .unwrap_or(min as i64) as i32
   }
 
+  /// Return the current f64.
   pub fn f64(&mut self) -> f64 {
     self
       .service
@@ -139,6 +173,7 @@ impl<'a> LogoRandom<'a> {
       .unwrap_or(0.0)
   }
 
+  /// Sample whether the logo-animation random trial succeeds.
   pub fn chance(&mut self, probability: f64) -> bool {
     self
       .service
@@ -146,10 +181,12 @@ impl<'a> LogoRandom<'a> {
       .unwrap_or(false)
   }
 
+  /// Choose an element from a nonempty logo-animation value list.
   pub fn choose<T: Copy>(&mut self, values: &[T]) -> T {
     values[self.usize_inclusive(0, values.len() - 1)]
   }
 
+  /// Shuffle the supplied logo-animation values in place.
   pub fn shuffle<T>(&mut self, values: &mut [T]) {
     for i in (1..values.len()).rev() {
       let j = self.usize_inclusive(0, i);
@@ -167,6 +204,7 @@ enum DynamicLogo {
   Character(CharacterLogo),
 }
 
+/// The selected classic or dynamic home-page logo.
 pub(super) struct HomeLogo {
   mode: DisplayLogoMode,
   animation: Option<AnimationHandle>,
@@ -175,6 +213,16 @@ pub(super) struct HomeLogo {
 }
 
 impl HomeLogo {
+  /// Create a home logo initialized from `configured_mode`, `seed`, `animation`, `random`,
+  /// `pool`.
+  ///
+  /// # Arguments
+  ///
+  /// * `configured_mode` - The configured mode.
+  /// * `seed` - The seed initializing the random stream.
+  /// * `animation` - The animation.
+  /// * `random` - The random.
+  /// * `pool` - The object pool that owns the component.
   pub fn new(
     configured_mode: DisplayLogoMode,
     seed: u64,
@@ -236,10 +284,12 @@ impl HomeLogo {
     }
   }
 
+  /// Return the current mode.
   pub fn mode(&self) -> DisplayLogoMode {
     self.mode
   }
 
+  /// Return the multiline template selected by the current logo mode.
   pub fn template_text(&self, classic: &[&str]) -> String {
     let lines: &[&str] = match self.dynamic {
       Some(DynamicLogo::Wave(_) | DynamicLogo::Character(_)) => &PADDED_TEMPLATE,
@@ -251,6 +301,7 @@ impl HomeLogo {
     lines.join("\n")
   }
 
+  /// Render the selected dynamic logo, using the classic callback when no dynamic mode is active.
   pub fn render_text(&self, classic: impl FnOnce() -> String) -> String {
     match &self.dynamic {
       Some(DynamicLogo::Neon(logo)) => logo.render(),
@@ -263,6 +314,7 @@ impl HomeLogo {
     }
   }
 
+  /// Adjust the logo's row origin for modes that extend above the normal template.
   pub fn render_y(&self, layout_y: u16) -> u16 {
     if matches!(self.dynamic, Some(DynamicLogo::Error(_))) {
       layout_y.saturating_sub(1)
@@ -271,6 +323,14 @@ impl HomeLogo {
     }
   }
 
+  /// Advance the logo view's transient state for this host frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `dt` - The elapsed duration applied to this update.
+  /// * `animation` - The animation.
+  /// * `random` - The random.
+  /// * `pool` - The object pool that owns the component.
   pub fn update(
     &mut self,
     dt: Duration,
@@ -332,6 +392,7 @@ fn create_clock(
     .ok()
 }
 
+/// Encode logo rows as tagged rich text, grouping adjacent cells with the same style.
 pub(super) fn cells_to_rich_text(rows: &[Vec<LogoCell>]) -> String {
   let mut output = String::from("f%");
   for (row_index, row) in rows.iter().enumerate() {
@@ -378,6 +439,7 @@ fn push_style_start(output: &mut String, style: CellStyle) {
   }
 }
 
+/// Sample three color channels for a logo-animation color.
 pub(super) fn random_rgb(rng: &mut LogoRandom<'_>) -> (u8, u8, u8) {
   (
     rng.usize_inclusive(0, 255) as u8,
@@ -386,6 +448,7 @@ pub(super) fn random_rgb(rng: &mut LogoRandom<'_>) -> (u8, u8, u8) {
   )
 }
 
+/// Select a dynamic logo mode by wrapping the cursor through the mode list.
 pub(super) fn dynamic_mode_for_cursor(cursor: u64) -> DisplayLogoMode {
   DYNAMIC_MODES[cursor as usize % DYNAMIC_MODES.len()]
 }

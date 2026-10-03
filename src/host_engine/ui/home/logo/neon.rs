@@ -1,3 +1,5 @@
+//! Neon logo animation state and terminal-cell presentation.
+
 use super::{CellStyle, DYNAMIC_TEMPLATE, LogoCell, cells_to_rich_text};
 
 const FRAME_SECONDS: f64 = 0.05;
@@ -5,12 +7,14 @@ const PERIOD: f64 = 22.0;
 const DIAGONAL: f64 = 1.8;
 const SPEED: f64 = -0.5;
 
+/// The neon logo representation used by this module.
 pub(super) struct NeonLogo {
   offset: f64,
   rendered_steps: u64,
 }
 
 impl NeonLogo {
+  /// Create a neon logo with its initial state.
   pub fn new() -> Self {
     Self {
       offset: 0.0,
@@ -18,6 +22,7 @@ impl NeonLogo {
     }
   }
 
+  /// Advance the selected logo animation by its timer step.
   pub fn advance(&mut self, seconds: f64) {
     let target = (seconds / FRAME_SECONDS).floor() as u64;
     if target > self.rendered_steps {
@@ -27,6 +32,7 @@ impl NeonLogo {
     }
   }
 
+  /// Draw the neon view and register interaction regions in its assigned surfaces.
   pub fn render(&self) -> String {
     let rows = DYNAMIC_TEMPLATE
       .iter()

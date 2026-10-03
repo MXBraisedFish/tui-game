@@ -1,5 +1,13 @@
+//! Lua color library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Build and register the Lua color API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn color(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, value) in [

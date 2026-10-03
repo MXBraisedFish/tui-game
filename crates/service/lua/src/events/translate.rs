@@ -1,3 +1,5 @@
+//! Translation of service events into the Lua session event model.
+
 use tg_service_animation::{AnimationEvent, AnimationEventKind};
 use tg_service_time::RepeatTimerEvent;
 use tg_service_widget::{HitAreaEvent, ScrollBoxEvent};
@@ -7,6 +9,7 @@ use super::{
   LuaTimerEvent, LuaTimerEventKind, LuaTimerKind,
 };
 
+/// Convert a repeating-timer outcome into its session-local script event.
 pub fn translate_repeat_timer_event(lua_id: u64, event: RepeatTimerEvent) -> LuaEventData {
   match event {
     RepeatTimerEvent::Tick { executed_count, .. } => LuaEventData::Timer(LuaTimerEvent {
@@ -14,16 +17,23 @@ pub fn translate_repeat_timer_event(lua_id: u64, event: RepeatTimerEvent) -> Lua
       timer_kind: LuaTimerKind::Repeat,
       kind: LuaTimerEventKind::Tick,
       executed_count: Some(executed_count),
+      object_id: None,
+      tip: None,
+      revision: None,
     }),
     RepeatTimerEvent::Finished { executed_count, .. } => LuaEventData::Timer(LuaTimerEvent {
       id: lua_id,
       timer_kind: LuaTimerKind::Repeat,
       kind: LuaTimerEventKind::Finished,
       executed_count: Some(executed_count),
+      object_id: None,
+      tip: None,
+      revision: None,
     }),
   }
 }
 
+/// Convert an animation outcome into its session-local script event.
 pub fn translate_animation_event(lua_id: u64, event: &AnimationEvent) -> LuaEventData {
   let kind = match &event.kind {
     AnimationEventKind::Started => LuaAnimationEventKind::Started,
@@ -37,6 +47,7 @@ pub fn translate_animation_event(lua_id: u64, event: &AnimationEvent) -> LuaEven
   LuaEventData::Animation(LuaAnimationEvent { id: lua_id, kind })
 }
 
+/// Convert a pointer-region outcome into its script-visible hit-area event.
 pub fn translate_hit_area_event(lua_id: u64, event: &HitAreaEvent) -> LuaEventData {
   let (kind, x, y, button, dx, dy) = match event {
     HitAreaEvent::HoverEnter { x, y, .. } => ("hover_enter", *x, *y, None, None, None),
@@ -78,6 +89,7 @@ pub fn translate_hit_area_event(lua_id: u64, event: &HitAreaEvent) -> LuaEventDa
   })
 }
 
+/// Convert a scroll-position change into its script-visible scroll-box event.
 pub fn translate_scroll_box_event(lua_id: u64, event: ScrollBoxEvent) -> LuaEventData {
   match event {
     ScrollBoxEvent::Scrolled { x, y, .. } => {
@@ -116,6 +128,9 @@ mod tests {
       LuaEventData::Timer(LuaTimerEvent {
         id: 91,
         executed_count: Some(3),
+        object_id: None,
+        tip: None,
+        revision: None,
         ..
       })
     ));

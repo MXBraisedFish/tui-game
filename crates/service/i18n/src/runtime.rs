@@ -1,3 +1,5 @@
+//! Runtime support for the i18n service.
+
 use std::collections::{HashMap, HashSet};
 use std::fs;
 
@@ -51,10 +53,13 @@ const RUNTIME_NAMESPACES: &[&str] = &[
 ];
 
 impl I18nService {
-  /// Loads the runtime language texts of `language_code`.
+  /// Load the selected language's runtime namespaces and apply fallback text where needed.
   ///
-  /// Falls back to the default language, then to the embedded en_us texts, when loading from
-  /// disk fails.
+  /// # Arguments
+  ///
+  /// * `storage` - The deployment-relative storage service.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `language_code` - The registered language code.
   pub fn load_runtime_language(
     &mut self,
     storage: &StorageService,
@@ -103,7 +108,7 @@ impl I18nService {
     self.set_current_language(fallback);
   }
 
-  /// Loads the English fallback translations embedded at compile time.
+  /// Populate runtime namespaces from the compiled English translation set.
   pub fn load_embedded_fallback(&mut self) {
     self.clear_runtime_texts();
     for namespace in RUNTIME_NAMESPACES {

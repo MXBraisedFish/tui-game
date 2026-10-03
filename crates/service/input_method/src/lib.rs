@@ -1,4 +1,21 @@
-//! Input method service: detects an ASCII input method and optionally forces it while a game runs.
+//! Platform input-method restrictions reconciled with the current host policy.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_input_method::{ImPolicy, InputMethodService};
+//!
+//! fn main() {
+//!   let service = InputMethodService::new();
+//!   assert_eq!(service.policy(), ImPolicy::Free);
+//!   assert!(!service.is_input_method_restricted());
+//!   println!(
+//!     "input_method ok: ascii={:?} error={:?}",
+//!     service.ascii_input_method(),
+//!     service.last_error()
+//!   );
+//! }
+//! ```
 
 use std::env;
 use std::time::Duration;
@@ -6,9 +23,12 @@ use std::time::Duration;
 const ASCII_IM_ENV: &str = "IM_GUARD_ASCII_IM";
 const RECONCILE_INTERVAL: Duration = Duration::from_millis(750);
 
+/// The host policy governing when platform input methods must be restricted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImPolicy {
+  /// The free setting for im policy.
   Free,
+  /// The force ascii setting for im policy.
   ForceAscii,
 }
 
@@ -54,6 +74,7 @@ impl InputMethodBackend for SystemInputMethodBackend {
   }
 }
 
+/// The public entry point for input method operations.
 pub struct InputMethodService {
   backend: Box<dyn InputMethodBackend>,
   ascii_im: Option<String>,
@@ -66,6 +87,7 @@ pub struct InputMethodService {
 }
 
 impl InputMethodService {
+  /// Create an input method service with its initial state.
   pub fn new() -> Self {
     Self::from_backend(Box::new(SystemInputMethodBackend), read_ascii_im_override())
   }
@@ -94,6 +116,7 @@ impl InputMethodService {
     }
   }
 
+  /// Update the policy used by this input method service.
   pub fn set_policy(&mut self, policy: ImPolicy) -> bool {
     self.policy = policy;
     match policy {
@@ -102,24 +125,29 @@ impl InputMethodService {
     }
   }
 
+  /// Return the current policy.
   pub fn policy(&self) -> ImPolicy {
     self.policy
   }
 
+  /// Acquire an input-method restriction and reconcile the platform input mode.
   pub fn restrict_input_method(&mut self) -> bool {
     self.policy = ImPolicy::ForceAscii;
     self.restrict()
   }
 
+  /// Release an input-method restriction and restore the allowed input mode.
   pub fn release_input_method(&mut self) -> bool {
     self.policy = ImPolicy::Free;
     self.release()
   }
 
+  /// Report whether this input method service is input method restricted.
   pub fn is_input_method_restricted(&self) -> bool {
     self.active
   }
 
+  /// Advance input method state using the supplied frame timing.
   pub fn update(&mut self, dt: Duration) {
     if self.policy != ImPolicy::ForceAscii || !self.active {
       self.reconcile_elapsed = Duration::ZERO;
@@ -133,13 +161,13 @@ impl InputMethodService {
     }
   }
 
+  /// Apply the current input-method policy immediately.
   pub fn reconcile_now(&mut self) -> bool {
     if !self.active {
       return true;
     }
 
     let Some(ascii_im) = self.ascii_im.clone() else {
-      // TODO: add log warn when LogService is available
       self.last_error = Some("ASCII input method is unavailable".to_string());
       return false;
     };
@@ -148,7 +176,6 @@ impl InputMethodService {
       Ok(current) if current == ascii_im => true,
       Ok(_) => self.set_ascii_input_method(&ascii_im),
       Err(err) => {
-        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to get current input method: {err}"));
         false
       }
@@ -163,10 +190,12 @@ impl InputMethodService {
     }
   }
 
+  /// Return the ASCII input method discovered for the current platform.
   pub fn ascii_input_method(&self) -> Option<&str> {
     self.ascii_im.as_deref()
   }
 
+  /// Return the current last error.
   pub fn last_error(&self) -> Option<&str> {
     self.last_error.as_deref()
   }
@@ -177,7 +206,6 @@ impl InputMethodService {
     }
 
     let Some(ascii_im) = self.ascii_im.clone() else {
-      // TODO: add log warn when LogService is available
       self.last_error = Some("ASCII input method is unavailable".to_string());
       return false;
     };
@@ -185,7 +213,6 @@ impl InputMethodService {
     let current = match self.backend.get_input_method() {
       Ok(current) => current,
       Err(err) => {
-        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to get current input method: {err}"));
         return false;
       }
@@ -231,7 +258,7 @@ impl InputMethodService {
     {
       self.saved_im = Some(saved);
       self.saved_ime_state = saved_ime_state;
-      // TODO: add log warn when LogService is available
+
       self.last_error = Some(format!("failed to restore input method: {err}"));
       return false;
     }
@@ -239,7 +266,7 @@ impl InputMethodService {
     if let Some(saved_ime_state) = saved_ime_state {
       if let Err(err) = self.backend.set_ime_state(saved_ime_state) {
         self.saved_ime_state = Some(saved_ime_state);
-        // TODO: add log warn when LogService is available
+
         self.last_error = Some(format!("failed to restore IME state: {err}"));
         false
       } else {
@@ -263,7 +290,6 @@ impl InputMethodService {
         true
       }
       Err(err) => {
-        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to switch to ASCII input method: {err}"));
         false
       }
@@ -275,14 +301,12 @@ impl InputMethodService {
       Ok(Some(true)) => match self.backend.set_ime_state(false) {
         Ok(()) => true,
         Err(err) => {
-          // TODO: add log warn when LogService is available
           self.last_error = Some(format!("failed to close IME: {err}"));
           false
         }
       },
       Ok(Some(false)) | Ok(None) => true,
       Err(err) => {
-        // TODO: add log warn when LogService is available
         self.last_error = Some(format!("failed to get IME state: {err}"));
         false
       }
@@ -298,7 +322,6 @@ impl Default for InputMethodService {
 
 impl Drop for InputMethodService {
   fn drop(&mut self) {
-    // TODO: add log warn when LogService is available
     if !self.release_input_method()
       && let Some(ref err) = self.last_error
     {

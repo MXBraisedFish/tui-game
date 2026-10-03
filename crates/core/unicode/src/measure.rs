@@ -1,20 +1,21 @@
+//! Visible text measurements that account for terminal column widths.
+
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::types::GraphemeInfo;
 
-/// Returns the terminal column width of a single character (0 for combining or control
-/// characters).
+/// Return the terminal column width of one Unicode scalar value.
 pub fn char_width(ch: char) -> usize {
   UnicodeWidthChar::width(ch).unwrap_or(0)
 }
 
-/// Returns the terminal display width of a string, computed from Unicode column widths.
+/// Return the terminal column width of the supplied text.
 pub fn display_width(text: &str) -> usize {
   UnicodeWidthStr::width(text)
 }
 
-/// Splits a string at grapheme boundaries into a list of [`GraphemeInfo`].
+/// Split text into graphemes and retain each grapheme's text and terminal column width.
 pub fn graphemes(text: &str) -> Vec<GraphemeInfo> {
   UnicodeSegmentation::graphemes(text, true)
     .map(|g| GraphemeInfo {

@@ -1,6 +1,14 @@
+//! Lua file library bindings with validated arguments and session-owned host access.
+
 use super::*;
 use crate::path::{SafeRelativePath, SandboxPathKind, resolve_sandbox_path, sandbox_path_exists};
 
+/// Build and register the Lua file API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, value) in [
@@ -298,6 +306,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   readonly::proxy(lua, source)
 }
 
+/// Report whether the current session may perform the requested file operation.
 pub(super) fn file_permission(state: &SharedApiState, method: &'static str) -> bool {
   let mut state = state.borrow_mut();
   if state.context.session_kind == LuaSessionKind::Game {
@@ -308,6 +317,12 @@ pub(super) fn file_permission(state: &SharedApiState, method: &'static str) -> b
   }
 }
 
+/// Validate a script-supplied relative path within the session's file sandbox.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the supplied path is invalid, escapes its safe root, or is
+/// not permitted for this request.
 pub(super) fn file_path(
   parameters: &args::PositionalArgs,
   method: &str,
@@ -321,6 +336,11 @@ fn parse_file_path(path: &str, method: &str) -> mlua::Result<SafeRelativePath> {
     .map_err(|error| args::message(method, format!("unsafe asset path: {error}")))
 }
 
+/// Resolve the requested text encoding to one of the supported encoding names.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the encoding is not one of the supported text encodings.
 pub(super) fn file_encoding(table: &Table, method: &str) -> mlua::Result<String> {
   let encoding = match table.get::<Value>("encoding")? {
     Value::Nil => "auto".to_string(),
@@ -364,6 +384,11 @@ fn file_bytes(value: Value, method: &str) -> mlua::Result<Vec<u8>> {
   Ok(value.as_bytes().to_vec())
 }
 
+/// Read an optional bounded event-tip string for the file completion payload.
+///
+/// # Errors
+///
+/// Return a Lua argument error when a supplied event-tip value is not valid bounded text.
 pub(super) fn file_tip(table: &Table, method: &str) -> mlua::Result<Option<String>> {
   match table.get::<Value>("event_tip")? {
     Value::Nil => Ok(None),

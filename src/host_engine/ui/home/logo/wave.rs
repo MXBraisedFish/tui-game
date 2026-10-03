@@ -1,3 +1,5 @@
+//! Wave logo animation state and terminal-cell presentation.
+
 use super::{CellStyle, LogoCell, PADDED_TEMPLATE, cells_to_rich_text};
 
 const FRAME_SECONDS: f64 = 0.10;
@@ -10,19 +12,23 @@ const COLORS: [(u8, u8, u8); 5] = [
   (200, 230, 255),
 ];
 
+/// The wave logo representation used by this module.
 pub(super) struct WaveLogo {
   tick: u64,
 }
 
 impl WaveLogo {
+  /// Create a wave logo with its initial state.
   pub fn new() -> Self {
     Self { tick: 1 }
   }
 
+  /// Advance the selected logo animation by its timer step.
   pub fn advance(&mut self, seconds: f64) {
     self.tick = 1 + (seconds / FRAME_SECONDS).floor() as u64;
   }
 
+  /// Draw the wave view and register interaction regions in its assigned surfaces.
   pub fn render(&self) -> String {
     let width = PADDED_TEMPLATE
       .iter()

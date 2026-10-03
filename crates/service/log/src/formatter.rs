@@ -1,9 +1,11 @@
+//! Formatting of log records for files and terminal output.
+
 use chrono::{DateTime, Local};
 use std::time::{Duration, UNIX_EPOCH};
 
 use super::{LogEntry, LogLabels, LogPrintOptions, format_log_level};
 
-/// Formats a log entry as a readable string with its sequence number, level, source and message.
+/// Format a log record using the supplied localized labels.
 pub fn format_log_entry(entry: &LogEntry) -> String {
   format!(
     "#{:04} [{}] [{:?}] {}",
@@ -14,6 +16,7 @@ pub fn format_log_entry(entry: &LogEntry) -> String {
   )
 }
 
+/// Format a log record for persistent file output.
 pub fn format_file_log_entry(entry: &LogEntry, labels: &LogLabels) -> String {
   format!(
     "[{}][{}][{}][{}] {}\n",
@@ -25,6 +28,13 @@ pub fn format_file_log_entry(entry: &LogEntry, labels: &LogLabels) -> String {
   )
 }
 
+/// Format a script print record with its requested header options.
+///
+/// # Arguments
+///
+/// * `entry` - The entry.
+/// * `labels` - The labels.
+/// * `options` - The validated options for the operation.
 pub fn format_print_log_entry(
   entry: &LogEntry,
   labels: &LogLabels,

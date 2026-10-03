@@ -1,15 +1,30 @@
-//! Clipboard service: system clipboard text read/write.
+//! Text clipboard access with an unavailable-backend fallback.
+//!
+//! System availability and clipboard contents vary. Read text only when the returned value is
+//! `Some`; `None` also covers unavailable backends and non-text clipboard contents.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_clipboard::ClipboardService;
+//!
+//! let mut clipboard = ClipboardService::new();
+//! if let Some(text) = clipboard.read_text() {
+//!     let _character_count = text.chars().count();
+//! }
+//! ```
 
-/// Clipboard service that reads and writes the system clipboard.
+/// The public entry point for clipboard operations.
 pub struct ClipboardService {
   clipboard: Option<arboard::Clipboard>,
   last_error: Option<String>,
 }
 
 impl ClipboardService {
+  /// Open the system clipboard, retaining an unavailable backend if initialization fails.
   pub fn new() -> Self {
     let clipboard = arboard::Clipboard::new().ok();
-    // TODO: add log warn when LogService is available
+
     let last_error = clipboard
       .is_none()
       .then(|| "Failed to open system clipboard".to_string());
@@ -19,11 +34,10 @@ impl ClipboardService {
     }
   }
 
-  /// Reads the text content of the clipboard; returns `None` when the clipboard is unavailable or
-  /// cannot be read.
+  /// Return system clipboard text, or `None` when the backend or text contents are unavailable.
   pub fn read_text(&mut self) -> Option<String> {
     let clipboard = self.clipboard.as_mut()?;
-    // TODO: add log warn when LogService is available
+
     match clipboard.get_text() {
       Ok(text) => Some(text),
       Err(_) => {
@@ -33,9 +47,8 @@ impl ClipboardService {
     }
   }
 
-  /// Writes text to the clipboard and returns whether it succeeded.
+  /// Replace system clipboard text and return whether the backend accepted the write.
   pub fn write_text(&mut self, text: &str) -> bool {
-    // TODO: add log warn when LogService is available
     match self.clipboard.as_mut() {
       Some(clipboard) => match clipboard.set_text(text) {
         Ok(()) => true,
@@ -51,6 +64,7 @@ impl ClipboardService {
     }
   }
 
+  /// Create a clipboard service without an active platform backend.
   #[cfg(test)]
   pub(crate) fn unavailable() -> Self {
     Self {

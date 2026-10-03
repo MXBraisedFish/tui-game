@@ -1,6 +1,4 @@
--- Block Merge: a 4x4 sliding merge puzzle.
--- Exercises loader, random generators, table, string.format, align, measurement,
--- serialization and the save callbacks.
+-- Block merge package callbacks and terminal-cell drawing.
 
 local board = loader.require("board")
 
@@ -41,6 +39,7 @@ local status = ""
 local highlight_index = nil
 local highlight_left = 0
 
+-- Create deterministic position and tile-value generators at the requested saved steps.
 local function create_generators(new_seed, position_step, value_step)
   random.clear()
   seed = new_seed
@@ -48,6 +47,7 @@ local function create_generators(new_seed, position_step, value_step)
   value_rng = random.create({ type = random.FLOAT, min = 0, max = 1, seed = seed + 1, step = value_step })
 end
 
+-- Place a randomly selected tile in an empty board cell when one is available.
 local function spawn_tile()
   local empty = board.empty_cells(cells)
   if #empty == 0 then
@@ -64,6 +64,7 @@ local function spawn_tile()
   highlight_left = HIGHLIGHT_SECONDS
 end
 
+-- Reset the board, score, and random streams using the requested seed.
 local function new_game(new_seed)
   cells = board.new()
   score = 0
@@ -75,6 +76,7 @@ local function new_game(new_seed)
   status = "Slide with WASD or the arrow keys. R restarts, Esc leaves."
 end
 
+-- Restore validated saved board and generator state when the save data is usable.
 local function restore(saved)
   cells = serialization.json_decode(saved.board)
   score = saved.score or 0
@@ -84,6 +86,7 @@ local function restore(saved)
   status = "Welcome back. Continue sliding."
 end
 
+-- Apply a board move and spawn a tile only after a successful move.
 local function apply_move(direction)
   if game_over then
     status = "No moves left. Press R to start a new board."
@@ -109,6 +112,7 @@ local function apply_move(direction)
   end
 end
 
+-- Choose the foreground color for the displayed tile value.
 local function tile_color(value)
   if value == 0 then
     return color.GRAY
@@ -116,6 +120,7 @@ local function tile_color(value)
   return TILE_COLORS[value] or color.BRIGHT_BLUE
 end
 
+-- Draw the board at the requested terminal-cell origin.
 local function draw_board(origin_x, origin_y)
   for row = 1, board.SIZE do
     for column = 1, board.SIZE do
@@ -132,6 +137,7 @@ local function draw_board(origin_x, origin_y)
   end
 end
 
+-- Initialize package state from the supplied base dimensions and startup data.
 function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
@@ -145,6 +151,7 @@ function Init(ctx)
   end
 end
 
+-- Apply the resize, action, or completion events handled by this package.
 function HandleEvent(event)
   if event.type == "resize" then
     width = event.data.width
@@ -162,15 +169,18 @@ function HandleEvent(event)
   end
 end
 
+-- Advance package simulation using the fixed-update delta in seconds.
 function Update(dt)
   if highlight_left > 0 then
     highlight_left = math.max({ 0, highlight_left - dt })
   end
 end
 
+-- Keep this optional callback empty; this package needs no work in this phase.
 function UpdateFrame(dt, alpha)
 end
 
+-- Draw the current package state in terminal-cell coordinates.
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
 
@@ -193,6 +203,7 @@ function Render()
   draw.text(2, height - 2, status, { fg = status_color, max_width = width - 4, max_height = 1 })
 end
 
+-- Return the structured state needed to continue this game.
 function SaveGame()
   return {
     board = serialization.json_encode(cells),
@@ -204,6 +215,7 @@ function SaveGame()
   }
 end
 
+-- Return the best-result data and its display text for host score persistence.
 function SaveBest()
   if score > best_score then
     best_score = score

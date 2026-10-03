@@ -1,14 +1,16 @@
+//! Language availability checks and updates to translated log labels.
+
 use super::{I18nService, LanguageInfo, load_language_registry};
 
 use tg_service_log::{LogService, LogSource};
 use tg_service_storage::StorageService;
 
 impl I18nService {
-  /// Applies the current language's log labels and `log_info` message templates to the log service.
+  /// Refresh the log service's localized labels from the current language.
   ///
   /// # Errors
   ///
-  /// Returns an error when the pending log messages cannot be written to the log file.
+  /// Propagate the log service's error if translated label data cannot be applied.
   pub fn apply_log_translations(&self, log: &mut LogService) -> std::io::Result<()> {
     let missing_template = self.get_runtime_text("language_warning", "language_warning.missing");
     log.refresh_labels(
@@ -23,16 +25,20 @@ impl I18nService {
     )
   }
 
-  /// Reloads the language registry from disk.
+  /// Reload the deployed language registry into the translation service.
   pub fn refresh_language_registry(&mut self, storage: &StorageService, log: &mut LogService) {
     let registry = load_language_registry(storage, log);
 
     self.set_language_registry(registry);
   }
 
-  /// Loads the language package info of `language_code` from the registry.
+  /// Load the display metadata for a registered language package.
   ///
-  /// Returns `false` and clears the current language info when the language is not registered.
+  /// # Arguments
+  ///
+  /// * `storage` - The deployment-relative storage service.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `language_code` - The registered language code.
   pub fn load_language_package_info(
     &mut self,
     storage: &StorageService,
@@ -62,7 +68,13 @@ impl I18nService {
     false
   }
 
-  /// Returns whether the language package of `language_code` is available.
+  /// Check whether a registered language package has its required deployed resources.
+  ///
+  /// # Arguments
+  ///
+  /// * `storage` - The deployment-relative storage service.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `language_code` - The registered language code.
   pub fn is_language_package_available(
     &self,
     storage: &StorageService,

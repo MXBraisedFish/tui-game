@@ -1,21 +1,38 @@
-//! Sandbox path rules: parse script-supplied relative paths and resolve them inside a root
-//! without escaping it (no `..`, absolute paths, or symbolic-link escapes).
+//! Portable relative paths and filesystem resolution constrained to a safe root.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_sandbox_path::SafeRelativePath;
+//!
+//! let path = SafeRelativePath::parse("./assets/icon.png").expect("safe relative path");
+//! assert_eq!(path.virtual_path(), "assets/icon.png");
+//! assert!(SafeRelativePath::parse("../outside").is_err());
+//! ```
 
 use std::fmt;
 use std::path::{Path, PathBuf};
 
 const MAX_VIRTUAL_PATH_BYTES: usize = 8192;
 
+/// The required target kind and creation/removal rules for safe-root resolution.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SandboxPathKind {
+  /// The any setting for sandbox path kind.
   Any,
+  /// The file setting for sandbox path kind.
   File,
+  /// The directory setting for sandbox path kind.
   Directory,
+  /// The writable file setting for sandbox path kind.
   WritableFile,
+  /// The writable directory setting for sandbox path kind.
   WritableDirectory,
+  /// The removable setting for sandbox path kind.
   Removable,
 }
 
+/// A normalized portable path that excludes absolute roots and parent traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SafeRelativePath {
   relative: PathBuf,
@@ -23,6 +40,13 @@ pub struct SafeRelativePath {
 }
 
 impl SafeRelativePath {
+  /// Validate a portable relative path and normalize separators and redundant current-directory
+  /// segments.
+  ///
+  /// # Errors
+  ///
+  /// Return `Empty`, `TooLong`, `ContainsNul`, `Absolute`, `ParentTraversal`, or `InvalidSegment`
+  /// for the corresponding invalid portable path.
   pub fn parse(input: &str) -> Result<Self, SandboxPathError> {
     if input.is_empty() {
       return Err(SandboxPathError::Empty);
@@ -66,41 +90,59 @@ impl SafeRelativePath {
     })
   }
 
+  /// Return the normalized portable path using forward slashes.
   pub fn virtual_path(&self) -> &str {
     &self.virtual_path
   }
 
+  /// Report whether the normalized relative path denotes the safe root itself.
   pub fn is_root(&self) -> bool {
     self.relative.as_os_str().is_empty()
   }
 
+  /// Return the current extension.
   pub fn extension(&self) -> Option<&str> {
     self.relative.extension().and_then(|value| value.to_str())
   }
 
+  /// Update the extension used by this safe relative path.
   pub fn set_extension(&mut self, extension: &str) {
     self.relative.set_extension(extension);
     self.virtual_path = path_to_virtual(&self.relative);
   }
 
+  /// Report whether a path is already valid and in its canonical portable spelling.
   pub fn is_normalized(input: &str) -> bool {
     Self::parse(input).is_ok_and(|path| path.virtual_path == input)
   }
 }
 
+/// Failures reported by sandbox path operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SandboxPathError {
+  /// The empty failure condition.
   Empty,
+  /// The too long failure condition.
   TooLong,
+  /// The contains nul failure condition.
   ContainsNul,
+  /// The absolute failure condition.
   Absolute,
+  /// The parent traversal failure condition.
   ParentTraversal,
+  /// The invalid segment failure condition.
   InvalidSegment,
+  /// The root unavailable failure condition.
   RootUnavailable,
+  /// The not found failure condition.
   NotFound,
+  /// The parent unavailable failure condition.
   ParentUnavailable,
+  /// The escapes root failure condition.
   EscapesRoot,
+  /// The not file failure condition.
   NotFile,
+  /// The not directory failure condition.
   NotDirectory,
 }
 
@@ -123,6 +165,20 @@ impl fmt::Display for SandboxPathError {
   }
 }
 
+/// Resolve a validated relative path under the canonical root and enforce the requested path
+/// kind.
+///
+/// # Arguments
+///
+/// * `root` - The filesystem root that bounds path resolution.
+/// * `relative` - The validated path relative to the safe root.
+/// * `kind` - The requested event, object, or path kind.
+///
+/// # Errors
+///
+/// Return `RootUnavailable`, `NotFound`, or `ParentUnavailable` when required paths cannot be
+/// resolved; return `EscapesRoot` for escapes and `NotFile` or `NotDirectory` for a mismatched
+/// target kind.
 pub fn resolve_sandbox_path(
   root: &Path,
   relative: &SafeRelativePath,
@@ -197,6 +253,12 @@ fn resolve_removable_candidate(
   Ok(parent.join(name))
 }
 
+/// Check for a path under the safe root without treating a missing target as an error.
+///
+/// # Errors
+///
+/// Return a sandbox error for an unavailable root, an escaping path, or an unresolved parent. A
+/// safely missing target returns `Ok(false)`.
 pub fn sandbox_path_exists(
   root: &Path,
   relative: &SafeRelativePath,

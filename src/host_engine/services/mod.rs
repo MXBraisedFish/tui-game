@@ -1,3 +1,5 @@
+//! Host import boundary re-exporting service crates without owning their implementations.
+
 use tg_core_version as version;
 pub(crate) use tg_service_animation as animation;
 use tg_service_audio as audio;
@@ -38,9 +40,9 @@ pub use file::FileEvent;
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertMode, ImageConvertParams, ImageEvent, ImageService};
 pub use input::{
-  ActionMapEntry, InputActionEvent, InputListenerError, InputService, Key, KeyEvent, KeyEventKind,
-  KeyState, MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, SystemEvent, TerminalKeyCode,
-  format_key_display, key_token, translate_action_map,
+  ActionMapEntry, InputActionEvent, InputListenerError, InputNotification, InputService, Key,
+  KeyEvent, KeyEventKind, KeyState, MouseButton, MouseEvent, MouseEventKind, RawKeyEvent,
+  SystemEvent, TerminalKeyCode, format_key_display, key_token, translate_action_map,
 };
 pub use layout::{LayoutService, Rect, Size};
 pub use log::{

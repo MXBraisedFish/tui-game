@@ -1,3 +1,5 @@
+//! Terminal frame diffs and flushing of the currently composed frame.
+
 use std::io::{self, Write};
 
 use crossterm::{
@@ -14,8 +16,7 @@ use super::{ComposedCell, ComposedFrame};
 use tg_core_style::{TerminalColor, TextColor, TextStyle};
 use tg_service_terminal::TerminalService;
 
-/// The frame presenter, turning a [`ComposedFrame`] into crossterm commands written to the
-/// terminal, with incremental redraws.
+/// The frame presenter representation used by this module.
 pub struct FramePresenter {
   previous: Option<ComposedFrame>,
   force_full_redraw: bool,
@@ -29,6 +30,7 @@ impl Default for FramePresenter {
 }
 
 impl FramePresenter {
+  /// Create a frame presenter with its initial state.
   pub fn new() -> Self {
     Self {
       previous: None,
@@ -37,17 +39,23 @@ impl FramePresenter {
     }
   }
 
-  /// Requests a full redraw on the next present.
+  /// Mark the current drawing state as needing presentation.
   pub fn request_render(&mut self) {
     self.force_full_redraw = true;
   }
 
-  /// Writes the frame to the terminal, redrawing only the changed cells unless a full redraw was
-  /// requested or the frame size changed.
+  /// Write the composed frame's changed cells to the active terminal and flush the output.
+  ///
+  /// # Arguments
+  ///
+  /// * `frame` - The composed terminal-cell frame.
+  /// * `terminal` - The terminal service that owns output and terminal mode.
+  /// * `text_force_redraw` - The text force redraw.
+  /// * `final_cursor` - The final cursor.
   ///
   /// # Errors
   ///
-  /// Returns an error when writing to or flushing the terminal fails.
+  /// Propagate terminal I/O errors from cursor movement, style changes, cell output, or flushing.
   pub fn present(
     &mut self,
     frame: &ComposedFrame,
@@ -58,7 +66,8 @@ impl FramePresenter {
     let truecolor = terminal.capabilities().truecolor;
 
     let Some(writer) = terminal.writer_mut() else {
-      // TODO: log warn when terminal writer is missing (headless mode)
+      // Without a terminal writer, retain the composed state but skip physical output.
+
       return Ok(());
     };
 
@@ -946,7 +955,11 @@ mod tests {
     let mut exit = FileTime::default();
     let mut kernel = FileTime::default();
     let mut user = FileTime::default();
+    // SAFETY: The no-argument Win32 call returns the current process pseudo-handle without
+    // transferring ownership.
     let process = unsafe { GetCurrentProcess() };
+    // SAFETY: The current-process handle is valid, and all four pointers refer to distinct
+    // writable repr(C) FILETIME values for the duration of the call.
     let succeeded =
       unsafe { GetProcessTimes(process, &mut creation, &mut exit, &mut kernel, &mut user) };
     if succeeded == 0 {

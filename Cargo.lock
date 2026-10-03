@@ -3393,6 +3393,13 @@ name = "tg-core-audio"
 version = "2.0.0"
 
 [[package]]
+name = "tg-core-date"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+]
+
+[[package]]
 name = "tg-core-fault"
 version = "2.0.0"
 
@@ -3622,6 +3629,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tg-core-audio",
+ "tg-core-date",
  "tg-core-input",
  "tg-core-package-id",
  "tg-core-sandbox-path",
@@ -3632,9 +3640,11 @@ dependencies = [
  "tg-service-async",
  "tg-service-file",
  "tg-service-image",
+ "tg-service-input",
  "tg-service-layout",
  "tg-service-log",
  "tg-service-network",
+ "tg-service-package",
  "tg-service-random",
  "tg-service-render",
  "tg-service-rich-text",
@@ -3773,6 +3783,7 @@ dependencies = [
  "tg-core-audio",
  "tg-core-package-id",
  "tg-service-log",
+ "tg-service-package",
 ]
 
 [[package]]

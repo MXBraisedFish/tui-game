@@ -1,3 +1,5 @@
+//! One Lua VM and its loading, callback execution, coroutine cleanup, and owned objects.
+
 use std::cell::Cell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
@@ -26,13 +28,17 @@ use super::policy::{LuaBudgetKind, LuaExecutionBudget, LuaPolicy};
 
 const REQUIRED_CALLBACKS: &[&str] = &["Init", "HandleEvent", "Update", "UpdateFrame", "Render"];
 
+/// The game or screensaver role of an isolated Lua VM.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum LuaSessionKind {
+  /// The game setting for Lua session kind.
   Game,
+  /// The screensaver setting for Lua session kind.
   Screensaver,
 }
 
 impl LuaSessionKind {
+  /// Return the stable string key for this Lua session kind.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::Game => "game",
@@ -47,53 +53,111 @@ impl fmt::Display for LuaSessionKind {
   }
 }
 
+/// The loaded, running, stopped, or faulted state of a Lua VM.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaSessionState {
+  /// The operation is loading.
   Loading,
+  /// The operation is running.
   Running,
+  /// The operation is faulted.
   Faulted,
+  /// The operation is stopped.
   Stopped,
 }
 
+/// The script loading or callback stage that produced a session failure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaErrorStage {
+  /// The validate policy failure condition.
   ValidatePolicy,
+  /// The read source failure condition.
   ReadSource,
+  /// The create vm failure condition.
   CreateVm,
+  /// The build sandbox failure condition.
   BuildSandbox,
+  /// The execute entry failure condition.
   ExecuteEntry,
+  /// The discover callbacks failure condition.
   DiscoverCallbacks,
+  /// The callback failure condition.
   Callback,
+  /// The execution limit failure condition.
   ExecutionLimit,
+  /// The memory limit failure condition.
   MemoryLimit,
+  /// The continue data validation failure condition.
   ContinueDataValidation,
+  /// The best data validation failure condition.
   BestDataValidation,
+  /// The save validation failure condition.
   SaveValidation,
+  /// The event callback failure condition.
   EventCallback,
+  /// The event queue failure condition.
   EventQueue,
 }
 
+/// Package entry, callback names, and initial data defining a new Lua session.
+///
+/// # Fields
+///
+/// * `package_id` - The stable source, type, and name of the package.
+/// * `session_kind` - The session kind.
+/// * `entry_path` - The filesystem path for entry.
+/// * `fixed_delta` - The fixed delta.
+/// * `base_size` - The base size.
+/// * `continue_data` - The continue data.
+/// * `best_data` - The best data.
+/// * `save_game_enabled` - The save game enabled.
+/// * `save_best_enabled` - The save best enabled.
 #[derive(Clone, Debug)]
 pub struct LuaSessionSpec {
+  /// The stable source, type, and name of the package.
   pub package_id: String,
+  /// The session kind.
   pub session_kind: LuaSessionKind,
+  /// The filesystem path for entry.
   pub entry_path: PathBuf,
+  /// The fixed delta.
   pub fixed_delta: Duration,
+  /// The base size.
   pub base_size: Size,
+  /// The continue data.
   pub continue_data: Option<JsonValue>,
+  /// The best data.
   pub best_data: Option<JsonValue>,
+  /// The save game enabled.
   pub save_game_enabled: bool,
+  /// The save best enabled.
   pub save_best_enabled: bool,
 }
 
+/// Failures reported by Lua session operations.
+///
+/// # Fields
+///
+/// * `package_id` - The stable source, type, and name of the package.
+/// * `session_kind` - The session kind.
+/// * `stage` - The Lua error stage carried by this Lua session error.
+/// * `callback` - The callback.
+/// * `message` - The diagnostic or display message.
+/// * `diagnostic_commands` - The ordered diagnostic commands retained by this owner.
 #[derive(Clone, Debug)]
 pub struct LuaSessionError {
+  /// The stable source, type, and name of the package.
   pub package_id: String,
+  /// The session kind.
   pub session_kind: LuaSessionKind,
+  /// The Lua error stage carried by this Lua session error.
   pub stage: LuaErrorStage,
+  /// The callback.
   pub callback: Option<&'static str>,
+  /// The diagnostic or display message.
   pub message: String,
-  /// 会话完成注册前发生故障时，已成功产生且允许提交的诊断命令。
+
+  /// The ordered diagnostic commands retained by this owner.
   pub diagnostic_commands: Vec<LuaHostCommand>,
 }
 
@@ -113,16 +177,29 @@ impl fmt::Display for LuaSessionError {
 
 impl std::error::Error for LuaSessionError {}
 
+/// Execution time and instruction counters retained from supervised Lua callbacks.
+///
+/// # Fields
+///
+/// * `instructions` - The instructions.
+/// * `elapsed` - The elapsed represented as a duration.
+/// * `memory_bytes` - The memory measured in bytes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LuaExecutionStats {
+  /// The instructions.
   pub instructions: u64,
+  /// The elapsed represented as a duration.
   pub elapsed: Duration,
+  /// The memory measured in bytes.
   pub memory_bytes: usize,
 }
 
+/// The time, instruction, memory, or command limit reported by session supervision.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaExecutionLimitKind {
+  /// The time setting for Lua execution limit kind.
   Time,
+  /// The instructions setting for Lua execution limit kind.
   Instructions,
 }
 
@@ -151,9 +228,12 @@ struct LuaCallbacks {
   save_best: Option<RegistryKey>,
 }
 
+/// The one-shot or persistent lifetime of a registered session callback.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaCallbackLifetime {
+  /// The once setting for Lua callback lifetime.
   Once,
+  /// The until terminal setting for Lua callback lifetime.
   UntilTerminal,
 }
 
@@ -162,6 +242,7 @@ struct LuaRegisteredCallback {
   lifetime: LuaCallbackLifetime,
 }
 
+/// One isolated Lua VM with bounded callbacks and its own host-managed objects.
 pub struct LuaSession {
   callbacks: LuaCallbacks,
   #[cfg(test)]
@@ -184,10 +265,28 @@ pub struct LuaSession {
 }
 
 impl LuaSession {
+  /// Read and initialize the package entry in a new isolated Lua VM.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub(super) fn load(spec: LuaSessionSpec, policy: LuaPolicy) -> Result<Self, LuaSessionError> {
     Self::load_with_api(spec, policy, LuaApiConfig::default())
   }
 
+  /// Load the package entry into an isolated session and install the supplied host API.
+  ///
+  /// # Arguments
+  ///
+  /// * `spec` - The spec.
+  /// * `policy` - The policy.
+  /// * `api_config` - The api config.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for an invalid policy or entry, failed Lua initialization, script
+  /// load errors, or failed initialization callbacks.
   pub(super) fn load_with_api(
     spec: LuaSessionSpec,
     policy: LuaPolicy,
@@ -296,31 +395,44 @@ impl LuaSession {
     Ok(session)
   }
 
+  /// Return the current package id.
   pub fn package_id(&self) -> &str {
     &self.package_id
   }
 
+  /// Return the current session kind.
   pub fn session_kind(&self) -> LuaSessionKind {
     self.session_kind
   }
 
+  /// Return the state for the addressed object.
   pub fn state(&self) -> LuaSessionState {
     self.state
   }
 
+  /// Return the current entry path.
   pub fn entry_path(&self) -> &std::path::Path {
     &self.entry_path
   }
 
+  /// Return the current base size.
   pub fn base_size(&self) -> Size {
     self.base_size
   }
 
+  /// Update the base dimensions exposed to subsequent script drawing callbacks.
   pub fn set_base_size(&mut self, size: Size) {
     self.base_size = size;
     self.api_state.borrow_mut().context.base_size = size;
   }
 
+  /// Attach the host API configuration used by subsequent session callbacks.
+  ///
+  /// # Arguments
+  ///
+  /// * `debug_enabled` - The debug enabled.
+  /// * `key_actions` - The action labels used to format key hints.
+  /// * `key_default_actions` - The key default actions.
   pub fn configure_api(
     &mut self,
     debug_enabled: bool,
@@ -333,23 +445,28 @@ impl LuaSession {
     state.context.key_default_actions = key_default_actions;
   }
 
+  /// Return the execution statistics retained from the most recent callback.
   pub fn last_stats(&self) -> LuaExecutionStats {
     self.last_stats
   }
 
+  /// Return the Lua VM's currently reported memory usage in bytes.
   pub fn memory_used(&self) -> usize {
     self.lua.used_memory()
   }
 
+  /// Report whether the session owns a host object pool.
   pub fn has_objects(&self) -> bool {
     self.objects.borrow().is_some()
   }
 
+  /// Read the session-owned object pool through the supplied callback when it exists.
   pub fn with_objects<R>(&self, operation: impl FnOnce(&super::LuaObjectPool) -> R) -> Option<R> {
     let objects = self.objects.borrow();
     Some(operation(objects.as_ref()?))
   }
 
+  /// Mutate the session-owned object pool through the supplied callback when it exists.
   pub fn with_objects_mut<R>(
     &self,
     operation: impl FnOnce(&mut super::LuaObjectPool) -> R,
@@ -358,6 +475,12 @@ impl LuaSession {
     Some(operation(objects.as_mut()?))
   }
 
+  /// Invoke the script HandleEvent callback under the session execution budget.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn handle_event(&mut self, event: &LuaRuntimeEvent) -> Result<(), LuaSessionError> {
     let event = match self.event_table(event, LuaErrorStage::Callback, "HandleEvent") {
       Ok(event) => event,
@@ -369,7 +492,56 @@ impl LuaSession {
     self.invoke_hot(Callback::HandleEvent, event, LuaBudgetKind::HandleEvent)
   }
 
+  /// Deliver one owned event to its callback or HandleEvent under the session budget.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn dispatch_event(&mut self, delivery: &LuaEventDelivery) -> Result<(), LuaSessionError> {
+    if self.session_kind != LuaSessionKind::Game
+      && matches!(
+        delivery.event.data,
+        super::LuaEventData::Action { .. } | super::LuaEventData::Key { .. }
+      )
+    {
+      return Ok(());
+    }
+    if matches!(
+      delivery.event.data,
+      super::LuaEventData::Action { .. } | super::LuaEventData::Key { .. }
+    ) && delivery.route != LuaEventRoute::InputRelease
+    {
+      let mut api = self.api_state.borrow_mut();
+      if let LuaEventRoute::Input { generation } = delivery.route
+        && generation != api.input.generation(&delivery.event.data)
+      {
+        return Ok(());
+      }
+      if !api.input.accept(&delivery.event.data) {
+        return Ok(());
+      }
+    }
+    if let super::LuaEventData::Timer(event) = &delivery.event.data
+      && let Some(revision) = event.revision
+    {
+      let callback = self
+        .with_objects(|objects| {
+          let id = tg_service_time::ScheduledTimerId(event.id);
+          let info = tg_service_time::TimeService::new()
+            .scheduled_timer_info(&objects.runtime().time, id)?;
+          if info.revision != revision {
+            return None;
+          }
+          Some(objects.timers.get(&id)?.callback.clone())
+        })
+        .flatten();
+      return match callback {
+        None => Ok(()),
+        Some(None) => self.handle_event(&delivery.event),
+        Some(Some(function)) => self.invoke_event_function(function, &delivery.event),
+      };
+    }
     if let super::LuaEventData::I18n(event) = &delivery.event.data {
       api::apply_i18n_event(&self.api_state, event);
     }
@@ -377,11 +549,47 @@ impl LuaSession {
       api::apply_image_event(&self.api_state, event);
     }
     match delivery.route {
-      LuaEventRoute::HandleEvent => self.handle_event(&delivery.event),
+      LuaEventRoute::HandleEvent | LuaEventRoute::Input { .. } | LuaEventRoute::InputRelease => {
+        self.handle_event(&delivery.event)
+      }
       LuaEventRoute::Callback(callback) => self.invoke_event_callback(callback, &delivery.event),
     }
   }
 
+  /// Return the active subscription generation, or `None` when this input is not accepted.
+  ///
+  /// Check this before enqueueing so callbacks cannot retroactively enable a previously
+  /// rejected press and disabled subscriptions do not consume the session queue budget.
+  pub fn input_generation(&self, data: &super::LuaEventData) -> Option<u64> {
+    if self.session_kind != LuaSessionKind::Game || self.state != LuaSessionState::Running {
+      return None;
+    }
+    let api = self.api_state.borrow();
+    let enabled = match data {
+      super::LuaEventData::Action { .. } => api.input.actions,
+      super::LuaEventData::Key { .. } => api.input.keys,
+      _ => false,
+    };
+    enabled.then(|| api.input.generation(data))
+  }
+
+  /// Close delivered input without changing subscriptions and return balanced releases.
+  pub fn close_input(&mut self, actions: bool, keys: bool) -> Vec<super::LuaEventData> {
+    self.api_state.borrow_mut().input.close(actions, keys);
+    self.take_input_releases()
+  }
+
+  /// Drain releases created by a subscription change after the callback returns.
+  pub fn take_input_releases(&mut self) -> Vec<super::LuaEventData> {
+    self.api_state.borrow_mut().input.take_releases()
+  }
+
+  /// Associate a callback with a session-local event or request identifier.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error when the callback cannot be registered under the session policy or VM
+  /// state.
   #[cfg(test)]
   pub(crate) fn register_event_callback(
     &mut self,
@@ -400,6 +608,7 @@ impl LuaSession {
     Ok(id)
   }
 
+  /// Remove a session-local event callback and report whether it existed.
   pub(crate) fn unregister_event_callback(&mut self, id: LuaEventCallbackId) -> bool {
     let Some(callback) = self.event_callbacks.remove(&id) else {
       return false;
@@ -407,6 +616,12 @@ impl LuaSession {
     self.lua.remove_registry_value(callback.key).is_ok()
   }
 
+  /// Invoke the script fixed-update callback under its configured execution budget.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn update(&mut self) -> Result<(), LuaSessionError> {
     self.invoke_hot(
       Callback::Update,
@@ -415,6 +630,12 @@ impl LuaSession {
     )
   }
 
+  /// Invoke the script's frame-update callback under its configured execution budget.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for an invalid callback state, a Lua callback failure, or an exceeded
+  /// execution budget.
   pub fn update_frame(&mut self, real_delta: Duration, alpha: f64) -> Result<(), LuaSessionError> {
     self.invoke_hot(
       Callback::UpdateFrame,
@@ -423,10 +644,17 @@ impl LuaSession {
     )
   }
 
+  /// Invoke the script Render callback and collect bounded draw commands for the frame.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn render(&mut self) -> Result<(), LuaSessionError> {
     self.invoke_hot(Callback::Render, (), LuaBudgetKind::Render)
   }
 
+  /// Drain host commands produced by the session callbacks.
   pub fn take_host_commands(&mut self) -> Vec<LuaHostCommand> {
     let mut state = self.api_state.borrow_mut();
     let mut host = Vec::new();
@@ -457,6 +685,7 @@ impl LuaSession {
       .collect()
   }
 
+  /// Drain the structured drawing commands produced for the current frame.
   pub fn take_draw_commands(&mut self) -> Vec<LuaDrawCommand> {
     let mut state = self.api_state.borrow_mut();
     let mut draw = Vec::new();
@@ -473,19 +702,33 @@ impl LuaSession {
     draw
   }
 
+  /// Invoke the game-save callback and return its validated serializable result.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for a failing save callback or a result that violates the supported
+  /// save-data contract.
   pub fn save_game(&mut self) -> Result<Option<JsonValue>, LuaSessionError> {
     self.invoke_save(Callback::SaveGame)
   }
 
+  /// Invoke the best-score callback and return its validated score result.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for a failing score callback or a score that violates the supported
+  /// result contract.
   pub fn save_best(&mut self) -> Result<Option<JsonValue>, LuaSessionError> {
     self.invoke_save(Callback::SaveBest)
   }
 
+  /// Stop the Lua session state addressed by this operation.
   pub fn stop(&mut self) {
     if self.state == LuaSessionState::Stopped {
       return;
     }
     self.state = LuaSessionState::Stopped;
+    self.api_state.borrow_mut().input = crate::input::LuaInputState::default();
     for (_, callback) in self.event_callbacks.drain() {
       let _ = self.lua.remove_registry_value(callback.key);
     }
@@ -589,6 +832,24 @@ impl LuaSession {
       .lua
       .registry_value::<Function>(&registered.key)
       .map_err(|error| self.error(LuaErrorStage::EventCallback, Some("EventCallback"), error))?;
+    if remove_after {
+      self.unregister_event_callback(callback_id);
+    }
+    self.invoke_event_function(function, event)
+  }
+
+  fn invoke_event_function(
+    &mut self,
+    function: Function,
+    event: &LuaRuntimeEvent,
+  ) -> Result<(), LuaSessionError> {
+    if self.state != LuaSessionState::Running {
+      return Err(self.error(
+        LuaErrorStage::EventCallback,
+        Some("EventCallback"),
+        format!("session is {:?}", self.state),
+      ));
+    }
     let event_table = match self.event_table(event, LuaErrorStage::EventCallback, "EventCallback") {
       Ok(event) => event,
       Err(error) => {
@@ -597,6 +858,7 @@ impl LuaSession {
       }
     };
     let budget = self.policy.budget(LuaBudgetKind::HandleEvent);
+    self.api_state.borrow_mut().phase = LuaCallPhase::Event;
     let outcome = run_with_budget(
       &self.lua,
       function,
@@ -605,9 +867,7 @@ impl LuaSession {
       self.policy.hook_interval,
       &self.api_state,
     );
-    if remove_after {
-      self.unregister_event_callback(callback_id);
-    }
+    self.api_state.borrow_mut().phase = LuaCallPhase::Idle;
     match outcome {
       Ok((_, stats)) => {
         self.last_stats = LuaExecutionStats {
@@ -653,6 +913,7 @@ impl LuaSession {
 
   fn mark_faulted(&mut self) {
     self.state = LuaSessionState::Faulted;
+    self.api_state.borrow_mut().input = crate::input::LuaInputState::default();
     self.objects.take();
   }
 
@@ -765,7 +1026,7 @@ impl LuaSession {
       return Err(self.error(
         LuaErrorStage::SaveValidation,
         Some(callback.name()),
-        "callback must return a serializable table containing string field 'best_string'",
+        "callback must return a serializable table containing field 'best_string'",
       ));
     }
     let mut seen = HashSet::new();
@@ -790,17 +1051,13 @@ impl LuaSession {
       ));
     }
     if callback == Callback::SaveBest {
-      let best_string = json
-        .as_object()
-        .and_then(|value| value.get("best_string"))
-        .and_then(JsonValue::as_str);
-      if best_string.is_none() {
-        return Err(self.error(
+      tg_service_package::validate_best_save(&json).map_err(|message| {
+        self.error(
           LuaErrorStage::SaveValidation,
           Some(callback.name()),
-          "callback must return a table containing string field 'best_string'",
-        ));
-      }
+          message,
+        )
+      })?;
     }
     Ok(Some(json))
   }
@@ -1273,12 +1530,12 @@ where
 
   let result = thread.resume::<MultiValue>(args);
   if result.is_err() {
-    // lua_resume 不会自行展开一个无恢复点的失败协程。Lua 5.4 的 reset
-    // 会关闭待关闭变量，并把原始错误作为 __close 的第二个参数传入。
-    // Hook 此时仍然安装，关闭元方法继续受当前回调预算约束。
+    // Reset the failed Lua 5.4 coroutine to unwind to-be-closed values and pass the original
+    // error to __close. The active hook keeps cleanup within the callback budget.
+
     if let Ok(noop) = lua.create_function(|_, _: MultiValue| Ok(MultiValue::new())) {
-      // Lua 5.4 在清理一个失败线程时会再次返回该线程原本的错误；这里
-      // 只需要它完成栈展开，面向调用者仍保留 resume 取得的原始错误。
+      // Reset may repeat the coroutine failure; preserve the original resume error after cleanup.
+
       let _ = thread.reset(noop);
     }
   }
@@ -2275,6 +2532,7 @@ mod tests {
           kind: super::super::LuaI18nEventKind::Created,
           ok: true,
           message: "i18n instance created".to_string(),
+          warning: None,
           language_code: "zh_cn".to_string(),
           callback_language_code: "en_us".to_string(),
           namespaces: Some(HashMap::from([(
@@ -2322,6 +2580,7 @@ mod tests {
             kind: super::super::LuaI18nEventKind::Reloaded,
             ok: true,
             message: "i18n instance reloaded".to_string(),
+            warning: None,
             language_code: "zh_cn".to_string(),
             callback_language_code: "en_us".to_string(),
             namespaces: None,
@@ -2334,6 +2593,64 @@ mod tests {
       session.environment_value("reload_completed_request_id"),
       Value::Integer(2)
     );
+  }
+
+  #[test]
+  fn i18n_custom_callback_is_literal_strict_and_only_used_for_missing_keys() {
+    let source = valid_script(
+      r#"
+      function Init(ctx)
+        debug.assert(i18n.get_value("menu", "absent", {callback = "备用文字"}) == "备用文字")
+        debug.assert(i18n.get_value("menu", "absent", {callback = ""}) == "")
+        debug.assert(i18n.get_value("menu", "absent", {callback = "{value:missing_key}"}) == "{value:missing_key}")
+        debug.assert(i18n.get_value("menu", "absent", {callback = nil}) == "[Missing i18n Key: menu.absent]")
+        request_id = i18n.create({language_code = "zh_cn", callback_language_code = "en_us"})
+      end
+      function HandleEvent(event)
+        debug.assert(event.data.ok and event.data.warning == "primary language 'zh_cn' has no language resources")
+        debug.assert(event.data.language_code == "zh_cn")
+        debug.assert(i18n.get_value("menu", "title", {callback = "备用文字"}) == "Title")
+        debug.assert(i18n.get_value("menu", "empty", {callback = "备用文字"}) == "")
+        debug.assert(i18n.get_value("menu", "missing", {callback = "备用文字"}) == "备用文字")
+        for _, f in ipairs({
+          function() i18n.get_value("menu", "title", {callback = 1}) end,
+          function() i18n.get_value("menu", "title", {callback = false}) end,
+          function() i18n.get_value("menu", "title", {callback = function() end}) end,
+          function() i18n.get_value("menu", "title", {fallback = "wrong key"}) end,
+          function() i18n.get_value("menu", "title", "wrong position") end,
+          function() i18n.get_value("menu", "title", setmetatable({}, {})) end
+        }) do debug.assert(not select(1, debug.pcall(f))) end
+      end
+    "#,
+    );
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session = LuaSession::load(spec(&source, kind), LuaPolicy::default()).unwrap();
+      session
+        .dispatch_event(&LuaEventDelivery {
+          event: LuaRuntimeEvent {
+            sequence: 1,
+            frame: 1,
+            data: LuaEventData::I18n(super::super::LuaI18nEvent {
+              request_id: 1,
+              kind: super::super::LuaI18nEventKind::Created,
+              ok: true,
+              message: "i18n instance created".into(),
+              warning: Some("primary language 'zh_cn' has no language resources".into()),
+              language_code: "zh_cn".into(),
+              callback_language_code: "en_us".into(),
+              namespaces: Some(HashMap::from([(
+                "menu".into(),
+                HashMap::from([
+                  ("title".into(), "Title".into()),
+                  ("empty".into(), "".into()),
+                ]),
+              )])),
+            }),
+          },
+          route: LuaEventRoute::HandleEvent,
+        })
+        .unwrap();
+    }
   }
 
   #[test]
@@ -2518,6 +2835,8 @@ mod tests {
       "align",
       "char",
       "color",
+      "date",
+      "timer",
       "measurement",
       "draw",
       "debug",
@@ -2564,6 +2883,35 @@ mod tests {
       "coroutine",
     ] {
       assert_eq!(session.environment_value(name), Value::Nil, "{name}");
+    }
+  }
+
+  #[test]
+  fn date_library_is_available_in_game_and_screensaver_lifecycles() {
+    let source = valid_script(
+      r#"
+        local function check_date()
+          local t = date.timestamp_to_date(-1, {timezone = date.UTC})
+          debug.assert(t.year == 1969 and t.millisecond == 999)
+          debug.assert(date.date_to_timestamp(t.year, t.month, t.day, t.hour, t.minute, t.second, t.millisecond, {timezone = date.UTC}) == -1)
+          debug.assert(date.timestamp_diff(-500, 1000) == 1500)
+          debug.assert(date.timestamp_diff(1000, 1000) == 0)
+          debug.assert(type(date.now()) == "number")
+          debug.assert(type(date.now({time_type = date.DATE})) == "table")
+          debug.assert(not select(1, debug.pcall(function() date.UTC = "invalid" end)))
+          debug.assert(not select(1, debug.pcall(function() rawset(date, "UTC", "invalid") end)))
+          debug.assert(not select(1, debug.pcall(function() date.now({unknown = true}) end)))
+        end
+        check_date()
+        function Init(ctx) check_date() end
+        function Update(dt) check_date() end
+        function Render() check_date() end
+      "#,
+    );
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session = LuaSession::load(spec(&source, kind), LuaPolicy::default()).unwrap();
+      session.update().unwrap();
+      session.render().unwrap();
     }
   }
 
@@ -2915,6 +3263,53 @@ mod tests {
   }
 
   #[test]
+  fn multiline_measurement_and_centered_drawing_share_the_text_block() {
+    let source = valid_script(
+      r#"
+        function Render()
+          local text = i18n.get_value("ui", "switch_mod.action", {
+            callback = "f%{key:normal_mode}\n<fg:bright_green>Normal Mode</fg>\n{key:challenge_mode}\n<fg:bright_red>Chllenge Mode</fg>"
+          })
+          for _, alignment in ipairs({ align.CENTER, align.RIGHT }) do
+            local options = { horizontal_align = alignment, max_width = 20 }
+            local w, h = measurement.get_text_size(text, options)
+            debug.assert(w == 13 and h == 4)
+            local x, y = align.resolve_rect(w, h, align.CENTER, align.CENTER)
+            debug.assert(x == 54 and y == 18)
+            draw.text(x, y, text, options)
+          end
+        end
+      "#,
+    );
+    let mut session = LuaSession::load_with_api(
+      spec(&source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+      LuaApiConfig {
+        key_actions: HashMap::from([
+          ("normal_mode".to_string(), vec![vec!["1".to_string()]]),
+          ("challenge_mode".to_string(), vec![vec!["2".to_string()]]),
+        ]),
+        ..LuaApiConfig::default()
+      },
+    )
+    .unwrap();
+    session.render().unwrap();
+    let commands = session.take_draw_commands();
+    assert_eq!(commands.len(), 2);
+    for (command, alignment) in commands.iter().zip([
+      tg_service_text_layout::TextAlign::Center,
+      tg_service_text_layout::TextAlign::Right,
+    ]) {
+      let LuaDrawCommand::Text { x, y, params, .. } = command else {
+        panic!("expected a text drawing command");
+      };
+      assert_eq!((*x, *y), (54, 18));
+      assert_eq!(params.line_align, alignment);
+      assert_eq!(tg_service_text_layout::measure_draw_text(params), (13, 4));
+    }
+  }
+
+  #[test]
   fn measurement_api_rejects_position_style_target_and_invalid_layout_parameters() {
     let source = valid_script(
       r#"
@@ -3188,6 +3583,303 @@ mod tests {
           debug.assert(random.clear() and random.count() == 0)
         end
       "#,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  fn advance_test_timers(session: &mut LuaSession, delta: Duration) -> Result<(), LuaSessionError> {
+    let events = session
+      .with_objects_mut(|objects| {
+        tg_service_time::TimeService::new().update(&mut objects.runtime_mut().time, delta);
+        objects.take_timer_events()
+      })
+      .unwrap_or_default();
+    for (index, data) in events.into_iter().enumerate() {
+      session.dispatch_event(&LuaEventDelivery {
+        route: LuaEventRoute::HandleEvent,
+        event: LuaRuntimeEvent {
+          sequence: index as u64 + 1,
+          frame: 1,
+          data,
+        },
+      })?;
+    }
+    Ok(())
+  }
+
+  #[test]
+  fn timer_protocol_queries_and_atomic_changes_match_the_current_contract() {
+    let source = valid_script(
+      r##"
+      function Init(ctx)
+        local function fails(f) return not select(1, debug.pcall(f)) end
+        local id = timer.create(0.25, {delay = 0.1, interval = -0.05, loop = true, ["repeat"] = 2, tip = "cycle"})
+        debug.assert(type(id) == "string" and timer.count() == 1 and timer.exists(id))
+        local info = timer.get_info(id)
+        debug.assert(info.duration == 0.25 and info.delay == 0.1 and info.interval == -0.05)
+        debug.assert(info.loop and info["repeat"] == 2 and info.tip == "cycle" and info.state == "idle")
+        debug.assert(info.executed_count == 0 and info.elapsed == 0)
+        debug.assert(timer.list().n == 1 and timer.list()[1].id == id)
+        debug.assert(select("#", timer.create(1)) == 1)
+        debug.assert(timer.start(id) and not timer.start(id))
+        debug.assert(fails(function() timer.set(id, {delay = -1}) end))
+        debug.assert(timer.get_info(id).state == "running" and timer.get_info(id).delay == 0.1)
+        debug.assert(timer.set(id, {duration = 0.5, ["repeat"] = false, tip = false, callback = false}))
+        info = timer.get_info(id)
+        debug.assert(info.state == "idle" and info.duration == 0.5 and info["repeat"] == nil and info.tip == nil)
+        debug.assert(timer.get_info("timer_999") == nil and not timer.exists("timer_999"))
+        for _, method in ipairs({"start", "pause", "reset", "restart", "delete"}) do
+          debug.assert(not timer[method]("timer_999"))
+          debug.assert(fails(function() timer[method](id, {}) end))
+        end
+        debug.assert(not timer.set("timer_999", {}))
+        for _, method in ipairs({"get_duration", "get_delay", "get_loop", "get_interval", "get_callback", "get_tip", "get_state",
+          "set_duration", "set_delay", "set_loop", "set_interval", "set_callback", "set_tip"}) do
+          debug.assert(timer[method] == nil)
+        end
+        for _, f in ipairs({
+          function() timer.create({duration = 1}) end,
+          function() timer.create(-1) end,
+          function() timer.create(0/0) end,
+          function() timer.create(1/0) end,
+          function() timer.create(1, {duration = 2}) end,
+          function() timer.create(1, {unknown = true}) end,
+          function() timer.create(1, {delay = -1}) end,
+          function() timer.create(1, {delay = 0.1, interval = -0.2}) end,
+          function() timer.create(1, {interval = 1/0}) end,
+          function() timer.create(1, {loop = "true"}) end,
+          function() timer.create(1, {["repeat"] = 0}) end,
+          function() timer.create(1, {["repeat"] = 4294967296}) end,
+          function() timer.create(1, {callback = 42}) end,
+          function() timer.create(1, {tip = {}}) end,
+          function() timer.create(1, setmetatable({}, {})) end,
+          function() timer.set(id, {id = id}) end,
+          function() timer.set(id, {wat = true}) end,
+          function() timer.count(1) end,
+          function() timer.get_info("invalid") end,
+          function() timer.create = false end
+        }) do debug.assert(fails(f)) end
+        debug.assert(timer.pause(id) == false and timer.restart(id) and timer.pause(id))
+        debug.assert(timer.start(id) and timer.reset(id))
+        debug.assert(timer.delete(id) and not timer.delete(id))
+        debug.assert(timer.clear() and timer.clear() and timer.count() == 0)
+        local first = timer.create(1)
+        timer.clear()
+        debug.assert(first ~= timer.create(1))
+      end
+    "##,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
+  fn timer_callbacks_and_handle_event_use_the_same_envelope_without_double_delivery() {
+    let source = valid_script(
+      r##"
+      function Init(ctx)
+        callback_count, handled = 0, 0
+        repeating = timer.create(0.1, {delay = 0.2, interval = -0.15, loop = true, ["repeat"] = 2,
+          tip = "hello", callback = function(event)
+            debug.assert(event.type == "timer" and event.data.id == repeating and event.data.tip == "hello")
+            debug.assert(event.data.executed_count == callback_count + 1)
+            callback_count = callback_count + 1
+            debug.assert(event.data.kind == (callback_count == 2 and "finished" or "tick"))
+          end})
+        single = timer.create(0)
+        timer.start(repeating)
+        timer.start(single)
+      end
+      function HandleEvent(event)
+        debug.assert(event.type == "timer" and event.data.id == single and event.data.kind == "finished")
+        handled = handled + 1
+      end
+    "##,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    advance_test_timers(&mut session, Duration::from_millis(299)).unwrap();
+    assert_eq!(
+      session.environment_value("callback_count"),
+      Value::Integer(0)
+    );
+    assert_eq!(session.environment_value("handled"), Value::Integer(1));
+    advance_test_timers(&mut session, Duration::from_millis(1)).unwrap();
+    advance_test_timers(&mut session, Duration::from_millis(149)).unwrap();
+    assert_eq!(
+      session.environment_value("callback_count"),
+      Value::Integer(1)
+    );
+    advance_test_timers(&mut session, Duration::from_millis(1)).unwrap();
+    assert_eq!(
+      session.environment_value("callback_count"),
+      Value::Integer(2)
+    );
+    advance_test_timers(&mut session, Duration::from_secs(10)).unwrap();
+    assert_eq!(
+      session.environment_value("callback_count"),
+      Value::Integer(2)
+    );
+    assert_eq!(session.environment_value("handled"), Value::Integer(1));
+  }
+
+  #[test]
+  fn timer_callbacks_can_mutate_objects_and_invalidate_queued_events() {
+    let source = valid_script(
+      r##"
+      function Init(ctx)
+        calls, stale, created = 0, 0, 0
+        first = timer.create(0, {loop = true, callback = function(event)
+          calls = calls + 1
+          timer.reset(second)
+          debug.assert(timer.delete(first))
+          local id = timer.create(0, {callback = function(e) created = created + 1 end})
+          timer.start(id)
+        end})
+        second = timer.create(0, {callback = function(event) stale = stale + 1 end})
+        timer.start(first)
+        timer.start(second)
+      end
+    "##,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    advance_test_timers(&mut session, Duration::ZERO).unwrap();
+    assert_eq!(session.environment_value("calls"), Value::Integer(1));
+    assert_eq!(session.environment_value("stale"), Value::Integer(0));
+    assert_eq!(session.environment_value("created"), Value::Integer(0));
+    advance_test_timers(&mut session, Duration::ZERO).unwrap();
+    assert_eq!(session.environment_value("created"), Value::Integer(1));
+  }
+
+  #[test]
+  fn timer_undelivered_events_are_discarded_after_reset_set_pause_delete_or_clear() {
+    for operation in ["reset", "set", "pause", "delete", "clear", "restart"] {
+      let mutation = match operation {
+        "set" => "timer.set(id, {duration = 1})".to_string(),
+        "clear" => "timer.clear()".to_string(),
+        _ => format!("timer.{operation}(id)"),
+      };
+      let source = valid_script(&format!(
+        r##"
+        function Init(ctx)
+          calls = 0
+          id = timer.create(0, {{loop = true, callback = function(e) calls = calls + 1 end}})
+          timer.start(id)
+        end
+        function Update(dt) {mutation} end
+      "##
+      ));
+      let mut session =
+        LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+      let data = session
+        .with_objects_mut(|objects| {
+          tg_service_time::TimeService::new()
+            .update(&mut objects.runtime_mut().time, Duration::ZERO);
+          objects.take_timer_events().remove(0)
+        })
+        .unwrap();
+      session.update().unwrap();
+      session
+        .dispatch_event(&LuaEventDelivery {
+          route: LuaEventRoute::HandleEvent,
+          event: LuaRuntimeEvent {
+            sequence: 1,
+            frame: 1,
+            data,
+          },
+        })
+        .unwrap();
+      assert_eq!(
+        session.environment_value("calls"),
+        Value::Integer(0),
+        "{operation}"
+      );
+    }
+  }
+
+  #[test]
+  fn timer_callbacks_cannot_escape_the_execution_budget_and_release_their_pool() {
+    let source = valid_script(
+      r##"
+      function Init(ctx)
+        local id = timer.create(0, {callback = function(event)
+          debug.pcall(function() while true do end end)
+        end})
+        timer.start(id)
+      end
+    "##,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let error = advance_test_timers(&mut session, Duration::ZERO).unwrap_err();
+    assert_eq!(error.stage, LuaErrorStage::ExecutionLimit);
+    assert_eq!(session.state(), LuaSessionState::Faulted);
+    assert!(!session.has_objects());
+  }
+
+  #[test]
+  fn timer_objects_are_session_local_and_stop_releases_callbacks() {
+    let source = valid_script(
+      r##"
+      function Init(ctx)
+        calls = 0
+        id = timer.create(0, {callback = function(e) calls = calls + 1 end})
+        timer.start(id)
+      end
+    "##,
+    );
+    let mut game =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let mut saver = LuaSession::load(
+      spec(&source, LuaSessionKind::Screensaver),
+      LuaPolicy::default(),
+    )
+    .unwrap();
+    advance_test_timers(&mut game, Duration::ZERO).unwrap();
+    assert_eq!(game.environment_value("calls"), Value::Integer(1));
+    assert_eq!(saver.environment_value("calls"), Value::Integer(0));
+    game.stop();
+    assert!(!game.has_objects());
+    advance_test_timers(&mut saver, Duration::ZERO).unwrap();
+    assert_eq!(saver.environment_value("calls"), Value::Integer(1));
+  }
+
+  #[test]
+  fn timer_creation_is_bounded_and_callbacks_are_released_when_cleared() {
+    let source = valid_script(
+      r##"
+      function Init(ctx)
+        retained = setmetatable({}, {__mode = "v"})
+        local f = function(event) end
+        retained[1] = f
+        id = timer.create(1, {callback = f})
+      end
+      function Update(dt) timer.clear() end
+    "##,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    session.lua.gc_collect().unwrap();
+    let retained = match session.environment_value("retained") {
+      Value::Table(table) => table,
+      _ => panic!("weak table"),
+    };
+    assert!(matches!(
+      retained.get::<Value>(1).unwrap(),
+      Value::Function(_)
+    ));
+    session.update().unwrap();
+    session.lua.gc_collect().unwrap();
+    assert_eq!(retained.get::<Value>(1).unwrap(), Value::Nil);
+    let source = valid_script(
+      r##"
+      function Init(ctx)
+        for i = 1, 1024 do timer.create(1) end
+        debug.assert(timer.count() == 1024)
+        debug.assert(not select(1, debug.pcall(function() timer.create(1) end)))
+        debug.assert(timer.count() == 1024)
+      end
+    "##,
     );
     LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
   }
@@ -4934,6 +5626,248 @@ mod tests {
   }
 
   #[test]
+  fn ime_defaults_strict_arguments_and_screen_scope_are_enforced() {
+    let source = valid_script(
+      r#"
+      function Init(ctx)
+        debug.assert(ime.receive_action_event() == false)
+        debug.assert(ime.reject_action_event() == true)
+        debug.assert(ime.reject_action_event() == false)
+        debug.assert(ime.receive_action_event() == true)
+        debug.assert(ime.reject_key_event() == false)
+        debug.assert(ime.receive_key_event() == true)
+        debug.assert(ime.receive_key_event() == false)
+        debug.assert(ime.reject_key_event() == true)
+        for _, fn in pairs(ime) do
+          debug.assert(not select(1,debug.pcall(function() fn({}) end)))
+        end
+        debug.assert(not select(1,debug.pcall(function() ime.receive_key_event = true end)))
+      end
+    "#,
+    );
+    assert!(LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).is_ok());
+    let source = valid_script(
+      r#"
+      function Init(ctx)
+        debug.assert(ime.receive_action_event() == false)
+        debug.assert(ime.reject_action_event() == false)
+        debug.assert(ime.receive_key_event() == false)
+        debug.assert(ime.reject_key_event() == false)
+      end
+    "#,
+    );
+    assert!(
+      LuaSession::load(
+        spec(&source, LuaSessionKind::Screensaver),
+        LuaPolicy::default()
+      )
+      .is_ok()
+    );
+  }
+
+  #[test]
+  fn disabled_subscriptions_do_not_queue_old_presses_or_inherit_held_input_on_enable() {
+    use crate::{LuaActionState as State, LuaEventData as Data, LuaRuntimeEvent};
+    let source = valid_script(
+      r#"
+      local keys=0
+      function HandleEvent(e)
+        if e.type == "resize" then ime.receive_key_event() end
+        if e.type == "key" then keys=keys+1 end
+      end
+      function SaveGame() return {keys=keys} end
+    "#,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let key = |state| Data::Key {
+      key: "esc".into(),
+      state,
+    };
+    assert!(session.input_generation(&key(State::Pressed)).is_none());
+    assert!(
+      session
+        .input_generation(&Data::Action {
+          action: "pause".into(),
+          state: State::Pressed
+        })
+        .is_some()
+    );
+    session
+      .dispatch_event(&LuaEventDelivery {
+        event: LuaRuntimeEvent {
+          sequence: 1,
+          frame: 1,
+          data: Data::Resize {
+            width: 80,
+            height: 24,
+          },
+        },
+        route: LuaEventRoute::HandleEvent,
+      })
+      .unwrap();
+    let generation = session.input_generation(&key(State::Pressed)).unwrap();
+    for (i, state) in [State::Held, State::Released, State::Pressed]
+      .into_iter()
+      .enumerate()
+    {
+      session
+        .dispatch_event(&LuaEventDelivery {
+          event: LuaRuntimeEvent {
+            sequence: 2 + i as u64,
+            frame: 2,
+            data: key(state),
+          },
+          route: LuaEventRoute::Input { generation },
+        })
+        .unwrap();
+    }
+    assert_eq!(session.save_game().unwrap().unwrap()["keys"], 1);
+  }
+
+  #[test]
+  fn rejecting_input_closes_delivered_states_and_invalidates_old_queue_generations() {
+    use crate::{LuaActionState as State, LuaEventData as Data, LuaRuntimeEvent};
+    let source = valid_script(
+      r#"
+      local seen = ""
+      function Init(ctx) ime.receive_key_event() end
+      function HandleEvent(e)
+        seen = seen .. e.type .. "/" .. (e.data.action or e.data.key) .. "/" .. e.data.state .. ";"
+        if e.type == "action" and e.data.state == "pressed" then
+          ime.reject_action_event()
+          ime.receive_action_event()
+        end
+      end
+      function SaveGame() return {seen=seen} end
+    "#,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let action = |action: &str, state| Data::Action {
+      action: action.into(),
+      state,
+    };
+    let key = |state| Data::Key {
+      key: "a".into(),
+      state,
+    };
+    let generation = session
+      .input_generation(&action("pause", State::Pressed))
+      .unwrap();
+    let mut sequence = 0;
+    let mut send = |session: &mut LuaSession, data, route| {
+      sequence += 1;
+      session
+        .dispatch_event(&LuaEventDelivery {
+          event: LuaRuntimeEvent {
+            sequence,
+            frame: 1,
+            data,
+          },
+          route,
+        })
+        .unwrap();
+    };
+    send(
+      &mut session,
+      action("pause", State::Pressed),
+      LuaEventRoute::Input { generation },
+    );
+    send(
+      &mut session,
+      action("exit", State::Pressed),
+      LuaEventRoute::Input { generation },
+    );
+    let releases = session.take_input_releases();
+    assert_eq!(releases, [action("pause", State::Released)]);
+    send(
+      &mut session,
+      releases[0].clone(),
+      LuaEventRoute::InputRelease,
+    );
+    send(
+      &mut session,
+      key(State::Pressed),
+      LuaEventRoute::Input { generation: 0 },
+    );
+    let releases = session.close_input(true, true);
+    assert_eq!(releases, [key(State::Released)]);
+    send(
+      &mut session,
+      releases[0].clone(),
+      LuaEventRoute::InputRelease,
+    );
+    let generation = session.input_generation(&key(State::Held)).unwrap();
+    send(
+      &mut session,
+      key(State::Held),
+      LuaEventRoute::Input { generation },
+    );
+    send(
+      &mut session,
+      key(State::Released),
+      LuaEventRoute::Input { generation },
+    );
+    assert!(session.close_input(true, true).is_empty());
+    assert_eq!(
+      session.save_game().unwrap().unwrap()["seen"],
+      "action/pause/pressed;action/pause/released;key/a/pressed;key/a/released;"
+    );
+  }
+
+  #[test]
+  fn save_best_accepts_package_text_and_validates_all_substitutions() {
+    let source = valid_script(
+      r#"
+      function SaveBest()
+        return {
+          best_string = {type="i18n", key="score", callback="f%Best: {value:score}"},
+          value = {score="42", rank={type="i18n", key="rank", callback="Gold"}},
+          score = 42
+        }
+      end
+    "#,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let data = session.save_best().unwrap().unwrap();
+    assert_eq!(data["best_string"]["key"], "score");
+    assert_eq!(data["value"]["rank"]["callback"], "Gold");
+    assert_eq!(data["score"], 42);
+    let mut next = spec(&source, LuaSessionKind::Game);
+    next.best_data = Some(data.clone());
+    let mut restored = LuaSession::load(next, LuaPolicy::default()).unwrap();
+    assert_eq!(restored.save_best().unwrap(), Some(data));
+
+    for body in [
+      "{best_string='---', value={}}",
+      "{best_string={type='text', text='42'}}",
+    ] {
+      let source = valid_script(&format!("function SaveBest() return {body} end"));
+      let mut session =
+        LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+      assert!(session.save_best().is_ok());
+    }
+    for body in [
+      "{best_string={type='i18n', key='score'}}",
+      "{best_string={type='i18n', key='', callback='x'}}",
+      "{best_string={type='i18n', key='score', callback='x', path='../x'}}",
+      "{best_string='x', value=42}",
+      "{best_string='x', value={'x'}}",
+      "{best_string='x', value={score=42}}",
+      "{best_string='x', value={score={type='i18n', key='score'}}}",
+    ] {
+      let source = valid_script(&format!("function SaveBest() return {body} end"));
+      let mut session =
+        LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+      let error = session.save_best().unwrap_err();
+      assert_eq!(error.stage, LuaErrorStage::SaveValidation, "{body}");
+      assert_eq!(session.state(), LuaSessionState::Faulted);
+    }
+  }
+
+  #[test]
   fn enabled_save_callbacks_are_required_and_best_needs_best_string() {
     let source = valid_script("");
     let mut game_save_spec = spec(&source, LuaSessionKind::Game);
@@ -5291,7 +6225,8 @@ mod tests {
 
     session.dispatch_event(&delivery).unwrap();
     assert!(session.event_callbacks.is_empty());
-    // 一次性回调已回收；重复完成事件不能转投 HandleEvent。
+    // A completed one-shot callback must not redirect a duplicate completion to HandleEvent.
+
     session.dispatch_event(&delivery).unwrap();
 
     assert_eq!(session.environment_value("handle_count"), Value::Integer(0));

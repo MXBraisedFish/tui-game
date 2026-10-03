@@ -1,4 +1,4 @@
-//! Minimal entry: logs a host message with translated labels and reads it back from memory.
+//! Independent log smoke entry exercising the public API and checking its results.
 
 use std::collections::HashMap;
 

@@ -1,4 +1,14 @@
-//! Package service: scans, validates and hot-reloads game/screensaver package manifests.
+//! Schema-2 package discovery, validated launch snapshots, and background rescans.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_package::PackageService;
+//!
+//! let packages = PackageService::new();
+//! assert_eq!(packages.total_count(), 0);
+//! assert!(packages.game_list().is_empty());
+//! ```
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
@@ -31,156 +41,341 @@ const MAX_PACKAGE_MANIFEST_BYTES: usize = 1024 * 1024;
 const MAX_PACKAGE_TEXT_BYTES: usize = 1024 * 1024;
 const MAX_PACKAGE_I18N_BYTES: usize = 1024 * 1024;
 
-/// 包文本字段：普通字符串直接使用，对象形式明确声明纯文本或包内 i18n。
+/// Literal package text or an explicitly declared package translation reference.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PackageText {
+  /// The literal setting for package text.
   Literal(String),
+  /// The i18n setting for package text.
   I18n {
+    /// The filesystem path to read, write, or resolve.
     path: String,
+    /// The lookup key.
     key: String,
+    /// The callback.
     callback: String,
   },
 }
 
-/// 包完整信息
+/// A validated package snapshot including display data, requirements, and launch configuration.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `source` - The package source carried by this package info.
+/// * `dir_name` - The dir name.
+/// * `mod_id` - The validated package name within its source and type.
+/// * `package_type` - Whether the package is a game or screensaver.
+/// * `version` - The version.
+/// * `version_code` - The version code.
+/// * `api_min` - The api min.
+/// * `api_max` - The api max.
+/// * `entry` - The entry.
+/// * `display` - The display.
+/// * `runtime` - The runtime.
+/// * `game` - The game.
+/// * `screensaver` - The screensaver.
+/// * `path` - The filesystem path to read, write, or resolve.
 #[derive(Clone, Debug)]
 pub struct PackageInfo {
+  /// The identifier of the owned object.
   pub id: PackageId,
+  /// The package source carried by this package info.
   pub source: PackageSource,
+  /// The dir name.
   pub dir_name: String,
+  /// The validated package name within its source and type.
   pub mod_id: String,
+  /// Whether the package is a game or screensaver.
   pub package_type: PackageType,
+  /// The version.
   pub version: String,
+  /// The version code.
   pub version_code: u32,
+  /// The api min.
   pub api_min: u32,
+  /// The api max.
   pub api_max: u32,
+  /// The entry.
   pub entry: String,
+  /// The display.
   pub display: PackageDisplay,
+  /// The runtime.
   pub runtime: PackageRuntime,
+  /// The game.
   pub game: Option<GameConfig>,
+  /// The screensaver.
   pub screensaver: Option<ScreensaverConfig>,
+  /// The filesystem path to read, write, or resolve.
   pub path: PathBuf,
   watched_files: Vec<PathBuf>,
 }
 
-/// 面向 UI 列表的轻量包条目快照。
+/// A lightweight package snapshot for UI lists.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `mod_id` - The validated package name within its source and type.
+/// * `source` - The package source carried by this package list entry.
+/// * `package_type` - Whether the package is a game or screensaver.
+/// * `key_actions` - The key actions indexed by their declared keys.
+/// * `key_default_actions` - The key default actions indexed by their declared keys.
+/// * `title` - The title.
+/// * `game_name` - The game name.
+/// * `screensaver_name` - The screensaver name.
+/// * `game_detail` - The game detail.
+/// * `description` - The description.
+/// * `author` - The author.
+/// * `version` - The version.
+/// * `icon` - The icon.
+/// * `icon_path` - The filesystem path for icon.
+/// * `banner` - The banner.
+/// * `path` - The filesystem path to read, write, or resolve.
+/// * `enabled` - Whether the feature is enabled.
+/// * `debug` - The debug.
+/// * `mouse_required` - The mouse required.
+/// * `truecolor_required` - The truecolor required.
+/// * `supported_languages` - The ordered supported languages retained by this owner.
+/// * `score_enabled` - The score enabled.
+/// * `score_empty_text` - The score empty text.
+/// * `best_string` - The localized best-score template.
+/// * `best_values` - Literal substitutions for the best-score display.
+/// * `min_width` - The min width in terminal columns.
+/// * `min_height` - The min height in terminal rows.
+/// * `screensaver_command` - The screensaver command.
 #[derive(Clone, Debug)]
 pub struct PackageListEntry {
+  /// The identifier of the owned object.
   pub id: PackageId,
+  /// The validated package name within its source and type.
   pub mod_id: String,
+  /// The package source carried by this package list entry.
   pub source: PackageSource,
+  /// Whether the package is a game or screensaver.
   pub package_type: PackageType,
+  /// The key actions indexed by their declared keys.
   pub key_actions: HashMap<String, Vec<Vec<String>>>,
+  /// The key default actions indexed by their declared keys.
   pub key_default_actions: HashMap<String, Vec<Vec<String>>>,
+  /// The title.
   pub title: String,
+  /// The game name.
   pub game_name: String,
+  /// The screensaver name.
   pub screensaver_name: String,
+  /// The game detail.
   pub game_detail: String,
+  /// The description.
   pub description: String,
+  /// The author.
   pub author: String,
+  /// The version.
   pub version: String,
+  /// The icon.
   pub icon: PackageAsset,
+  /// The filesystem path for icon.
   pub icon_path: Option<String>,
+  /// The banner.
   pub banner: PackageAsset,
+  /// The filesystem path to read, write, or resolve.
   pub path: PathBuf,
+  /// Whether the feature is enabled.
   pub enabled: bool,
+  /// The debug.
   pub debug: bool,
+  /// The mouse required.
   pub mouse_required: bool,
+  /// The truecolor required.
   pub truecolor_required: bool,
+  /// The ordered supported languages retained by this owner.
   pub supported_languages: Vec<String>,
+  /// The score enabled.
   pub score_enabled: bool,
+  /// The score empty text.
   pub score_empty_text: String,
+  /// The best string.
   pub best_string: Option<String>,
+  /// Localized literal substitutions for the best-score display only.
+  pub best_values: HashMap<String, String>,
+  /// The min width in terminal columns.
   pub min_width: u32,
+  /// The min height in terminal rows.
   pub min_height: u32,
+  /// The screensaver command.
   pub screensaver_command: String,
 }
 
-/// 包显示信息
+/// The visible package labels, icon, banner, and display asset declarations.
+///
+/// # Fields
+///
+/// * `title` - The title.
+/// * `description` - The description.
+/// * `author` - The author.
+/// * `icon` - The icon.
+/// * `banner` - The banner.
 #[derive(Clone, Debug)]
 pub struct PackageDisplay {
+  /// The title.
   pub title: String,
+  /// The description.
   pub description: String,
+  /// The author.
   pub author: String,
+  /// The icon.
   pub icon: PackageAsset,
+  /// The banner.
   pub banner: PackageAsset,
 }
 
-/// 包展示资源。
+/// A package display resource and its validated rendering configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PackageAsset {
+  /// The image setting for package asset.
   Image {
+    /// The filesystem path to read, write, or resolve.
     path: String,
+    /// The package image mode carried by this package asset.
     mode: PackageImageMode,
   },
+  /// The text setting for package asset.
   Text {
+    /// The filesystem path to read, write, or resolve.
     path: String,
+    /// The ordered lines retained by this owner.
     lines: Vec<String>,
   },
 }
 
+/// The image sampling mode declared by a package display asset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PackageImageMode {
+  /// The half block setting for package image mode.
   HalfBlock,
+  /// The mix block setting for package image mode.
   MixBlock,
 }
 
 impl PackageAsset {
+  /// Create the default package-icon asset settings.
   pub fn default_icon() -> Self {
     default_icon_asset()
   }
 
+  /// Create the default package-banner asset settings.
   pub fn default_banner() -> Self {
     default_banner_asset()
   }
 }
 
-/// 包运行时要求
+/// The package-declared terminal size and execution requirements.
+///
+/// # Fields
+///
+/// * `min_width` - The minimum developer-area width in columns; zero imposes no minimum.
+/// * `min_height` - The minimum developer-area height in rows; zero imposes no minimum.
 #[derive(Clone, Debug)]
 pub struct PackageRuntime {
+  /// The minimum developer-area width in columns; zero imposes no minimum.
   pub min_width: u32,
+  /// The minimum developer-area height in rows; zero imposes no minimum.
   pub min_height: u32,
 }
 
-/// 游戏配置
+/// The game's script callbacks, save capabilities, and score configuration.
+///
+/// # Fields
+///
+/// * `name` - The name used to identify the object or field.
+/// * `detail` - The diagnostic detail attached to the fault.
+/// * `command` - The command.
+/// * `mouse` - Whether this package requires terminal pointer support.
+/// * `truecolor` - The truecolor.
+/// * `target_fps` - The requested frame rate, or no explicit limit.
+/// * `save` - The save.
+/// * `supported_languages` - The ordered supported languages retained by this owner.
+/// * `score` - The score.
+/// * `actions` - The actions indexed by their declared keys.
+/// * `action_order` - The ordered action order retained by this owner.
 #[derive(Clone, Debug)]
 pub struct GameConfig {
+  /// The name used to identify the object or field.
   pub name: String,
+  /// The diagnostic detail attached to the fault.
   pub detail: String,
+  /// The command.
   pub command: String,
+  /// Whether this package requires terminal pointer support.
   pub mouse: bool,
+  /// The truecolor.
   pub truecolor: bool,
+  /// The requested frame rate, or no explicit limit.
   pub target_fps: Option<u32>,
+  /// The save.
   pub save: bool,
+  /// The ordered supported languages retained by this owner.
   pub supported_languages: Vec<String>,
+  /// The score.
   pub score: Option<ScoreConfig>,
+  /// The actions indexed by their declared keys.
   pub actions: HashMap<String, ActionConfig>,
+  /// The ordered action order retained by this owner.
   pub action_order: Vec<String>,
 }
 
-/// 分数配置
+/// The enabled best-score behavior and comparison ordering.
+///
+/// # Fields
+///
+/// * `enabled` - Whether the feature is enabled.
+/// * `empty_text` - The empty text.
 #[derive(Clone, Debug)]
 pub struct ScoreConfig {
+  /// Whether the feature is enabled.
   pub enabled: bool,
+  /// The empty text.
   pub empty_text: String,
 }
 
-/// 动作绑定配置
+/// One package action with its label and default shortcut patterns.
+///
+/// # Fields
+///
+/// * `description` - The description.
+/// * `keys` - The ordered keys retained by this owner.
+/// * `lock` - The lock.
+/// * `priority` - The nonnegative dispatch priority; larger values are dispatched first.
 #[derive(Clone, Debug)]
 pub struct ActionConfig {
+  /// The description.
   pub description: String,
+  /// The ordered keys retained by this owner.
   pub keys: Vec<Vec<String>>,
+  /// The lock.
   pub lock: bool,
+  /// The nonnegative dispatch priority; larger values are dispatched first.
+  pub priority: u64,
 }
 
-/// 屏保配置
+/// The screensaver's script and runtime configuration.
+///
+/// # Fields
+///
+/// * `name` - The name used to identify the object or field.
+/// * `truecolor` - The truecolor.
+/// * `command` - The command.
 #[derive(Clone, Debug)]
 pub struct ScreensaverConfig {
+  /// The name used to identify the object or field.
   pub name: String,
+  /// The truecolor.
   pub truecolor: bool,
+  /// The command.
   pub command: String,
 }
 
+/// Validated package metadata retained for discovery and launch.
 #[derive(Clone, Debug, Default)]
 pub struct PackageSnapshot {
   games: Vec<PackageInfo>,
@@ -195,71 +390,126 @@ struct ScanRequest {
   missing_template: String,
 }
 
+/// The inputs of an asynchronous package operation.
 #[derive(Clone, Debug)]
 pub(crate) enum PackageTask {
+  /// The scan setting for package task.
   Scan(ScanRequest),
 }
 
+/// A package async event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum PackageAsyncEvent {
+  /// A event notification delivered to the owning consumer.
   Event(PackageEvent),
+  /// A scan event notification delivered to the owning consumer.
   ScanEvent {
+    /// The sequence.
     sequence: u64,
+    /// The event to apply or route.
     event: PackageEvent,
   },
+  /// A watch changed notification delivered to the owning consumer.
   WatchChanged {
+    /// The ordered package dirs retained by this owner.
     package_dirs: Vec<PathBuf>,
   },
+  /// A snapshot ready notification delivered to the owning consumer.
   SnapshotReady {
+    /// The sequence.
     sequence: u64,
+    /// The snapshot.
     snapshot: PackageSnapshot,
+    /// The finished.
     finished: PackageEvent,
+    /// The ordered watched files retained by this owner.
     watched_files: Vec<PathBuf>,
   },
 }
 
+/// A package event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum PackageEvent {
+  /// A info notification delivered to the owning consumer.
   Info(HostLogMessage),
+  /// A warn notification delivered to the owning consumer.
   Warn(HostLogMessage),
+  /// A package warn notification delivered to the owning consumer.
   PackageWarn {
+    /// The stable source, type, and name of the package.
     package_id: PackageId,
+    /// The diagnostic or display message.
     message: HostLogMessage,
   },
+  /// A diagnostic notification delivered to the owning consumer.
   Diagnostic {
+    /// The stable source, type, and name of the package.
     package_id: Option<PackageId>,
+    /// The diagnostic.
     diagnostic: PackageDiagnostic,
   },
+  /// A loaded notification delivered to the owning consumer.
   Loaded {
+    /// The stable source, type, and name of the package.
     package_id: PackageId,
+    /// The filesystem path for relative package.
     relative_package_path: String,
   },
+  /// A scan started notification delivered to the owning consumer.
   ScanStarted {
+    /// The total.
     total: usize,
   },
+  /// A scan progress notification delivered to the owning consumer.
   ScanProgress {
+    /// The scanned.
     scanned: usize,
+    /// The total.
     total: usize,
   },
+  /// A watch changed notification delivered to the owning consumer.
   WatchChanged {
+    /// The folders.
     folders: usize,
   },
+  /// A scan finished notification delivered to the owning consumer.
   ScanFinished {
+    /// The total.
     total: usize,
+    /// The games.
     games: usize,
+    /// The screensavers.
     screensavers: usize,
+    /// The errors.
     errors: u32,
+    /// The duplicates.
     duplicates: u32,
   },
 }
 
+/// The package diagnostic representation used by this module.
+///
+/// # Fields
+///
+/// * `code` - The stable error or language code.
+/// * `relative_package_path` - The filesystem path for relative package.
+/// * `field_path` - The filesystem path for field.
+/// * `line` - The line.
+/// * `column` - The column.
+/// * `reason` - The reason.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackageDiagnostic {
+  /// The stable error or language code.
   pub code: String,
+  /// The filesystem path for relative package.
   pub relative_package_path: String,
+  /// The filesystem path for field.
   pub field_path: String,
+  /// The line.
   pub line: Option<usize>,
+  /// The column.
   pub column: Option<usize>,
+  /// The reason.
   pub reason: String,
 }
 
@@ -394,7 +644,7 @@ struct ScanReport {
   watched_files: Vec<PathBuf>,
 }
 
-/// 包管理服务，负责扫描和加载游戏/屏保包。
+/// The public entry point for package operations.
 #[derive(Default)]
 pub struct PackageService {
   snapshot: PackageSnapshot,
@@ -411,10 +661,66 @@ enum PackageWatcherCommand {
 }
 
 impl PackageService {
+  /// Create a package service with its initial state.
   pub fn new() -> Self {
     Self::default()
   }
 
+  /// Resolve a saved best-score template and its literal substitutions for the current language.
+  ///
+  /// References use the package's `assets/language/<code>/package/best_string.json` file,
+  /// followed by English and the declared callback. Preserve the original save for language changes.
+  ///
+  /// # Errors
+  ///
+  /// Return an error if the template or any named substitution is not valid package text.
+  pub fn resolve_best_save(
+    &self,
+    package_dir: &Path,
+    data: &serde_json::Value,
+  ) -> Result<(String, HashMap<String, String>), String> {
+    validate_best_save(data)?;
+    let language = self
+      .last_scan
+      .as_ref()
+      .map_or("en_us", |scan| scan.language_code.as_str());
+    let mut resources = HashMap::new();
+    let mut resolve = |value: &serde_json::Value, field: &str| -> Result<String, String> {
+      let value = parse_best_text(value, field)?;
+      match value {
+        RawPackageText::Literal(text) => Ok(text),
+        RawPackageText::Object(value) if value.text_type == "text" => Ok(value.text.unwrap()),
+        RawPackageText::Object(value) => {
+          let key = value.key.unwrap();
+          let translated = [language, "en_us"].into_iter().find_map(|code| {
+            resources
+              .entry(code)
+              .or_insert_with(|| load_package_i18n_values(package_dir, code, "best_string.json"))
+              .as_ref()
+              .and_then(|values| values.get(&key))
+              .cloned()
+          });
+          Ok(translated.unwrap_or_else(|| value.callback.unwrap()))
+        }
+      }
+    };
+    let text = resolve(&data["best_string"], "best_string")?;
+    let mut values = HashMap::new();
+    if let Some(params) = data.get("value").and_then(serde_json::Value::as_object) {
+      for (key, value) in params {
+        values.insert(key.clone(), resolve(value, &format!("value.{key}"))?);
+      }
+    }
+    Ok((text, values))
+  }
+
+  /// Configure package scan language and profile-derived package visibility.
+  ///
+  /// # Arguments
+  ///
+  /// * `root_dir` - The deployment root containing assets, data, and scripts.
+  /// * `language_code` - The registered language code.
+  /// * `missing_template` - The missing template.
   pub fn configure_scan(&mut self, root_dir: &Path, language_code: &str, missing_template: &str) {
     self.last_scan = Some(ScanRequest {
       sequence: self.scan_sequence,
@@ -424,7 +730,14 @@ impl PackageService {
     });
   }
 
-  /// 扫描所有目录下的包（官方和模组的游戏与屏保），启动期同步等待完成。
+  /// Scan game and screensaver roots and wait for the initial validated package snapshot.
+  ///
+  /// # Arguments
+  ///
+  /// * `root_dir` - The deployment root containing assets, data, and scripts.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `language_code` - The registered language code.
+  /// * `missing_template` - The missing template.
   pub fn scan_all(
     &mut self,
     root_dir: &Path,
@@ -455,7 +768,7 @@ impl PackageService {
     }
   }
 
-  /// 请求后台重新扫描。热加载后续只需调用这个入口。
+  /// Queue a background package rescan without blocking the host frame.
   pub fn request_rescan<
     E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
   >(
@@ -469,7 +782,8 @@ impl PackageService {
     true
   }
 
-  /// 启动 package.json 热更新监听。监听线程只产生事件；快照仍由主线程替换。
+  /// Start the manifest watcher that requests rescans without mutating snapshots off the host
+  /// thread.
   pub fn start_watcher<E>(&mut self, async_runtime: &mut AsyncRuntime<E>) -> bool
   where
     E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
@@ -493,7 +807,13 @@ impl PackageService {
     true
   }
 
-  /// 请求使用指定语言重新扫描。语言切换后调用。
+  /// Queue a package rescan using the selected translation language.
+  ///
+  /// # Arguments
+  ///
+  /// * `async_runtime` - The shared background-task executor.
+  /// * `language_code` - The registered language code.
+  /// * `missing_template` - The missing template.
   pub fn request_rescan_for_language<
     E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
   >(
@@ -522,6 +842,7 @@ impl PackageService {
     Some(request)
   }
 
+  /// Publish a matching completed package snapshot or retain the scan failure diagnostic.
   pub fn handle_async_event(
     &mut self,
     event: PackageAsyncEvent,
@@ -565,29 +886,32 @@ impl PackageService {
     }
   }
 
+  /// Return the current games.
   pub fn games(&self) -> Vec<PackageInfo> {
     self.snapshot.games.clone()
   }
 
-  /// Revision of the currently published package/resource snapshot.
+  /// Return the revision of the currently published package snapshot.
   pub fn snapshot_revision(&self) -> u64 {
     self.snapshot_revision
   }
 
+  /// Return the current screensavers.
   pub fn screensavers(&self) -> Vec<PackageInfo> {
     self.snapshot.screensavers.clone()
   }
 
-  /// 按来源和包 ID 精确查找游戏，避免官方包与模组同名时选错。
+  /// Find a game by its complete source/type/name identity.
   pub fn find_game(&self, source: &PackageSource, mod_id: &str) -> Option<PackageInfo> {
     find_package(&self.snapshot.games, source, mod_id)
   }
 
-  /// 按来源和包 ID 精确查找屏保。
+  /// Find a screensaver by its complete source/type/name identity.
   pub fn find_screensaver(&self, source: &PackageSource, mod_id: &str) -> Option<PackageInfo> {
     find_package(&self.snapshot.screensavers, source, mod_id)
   }
 
+  /// Find a package by its complete stable identity.
   pub fn find_by_id(&self, package_id: &PackageId) -> Option<PackageInfo> {
     let packages = match package_id.package_type {
       PackageType::Game => &self.snapshot.games,
@@ -599,12 +923,22 @@ impl PackageService {
       .cloned()
   }
 
-  /// 启动前重新验证扫描快照，并重新解析入口以抵御热更新或损坏数据。
+  /// Revalidate a scanned package and resolve its current entry immediately before launching it.
+  ///
+  /// # Errors
+  ///
+  /// Return an error when the package files no longer satisfy the schema or its entry cannot be
+  /// resolved safely.
   pub fn validate_for_launch(&self, package: &PackageInfo) -> Result<PathBuf, String> {
     validate_loaded_package(package)?;
     resolve_package_entry_path(package)
   }
 
+  /// Validate the game's action declarations and effective user bindings.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid action names, patterns, key tokens, or effective user bindings.
   pub fn validate_game_action_map(
     &self,
     actions: &HashMap<String, Vec<Vec<String>>>,
@@ -617,15 +951,26 @@ impl PackageService {
         ));
       }
     }
-    validate_action_key_conflicts(actions)
+    Ok(())
   }
 
-  /// 解析包的实际 Lua 入口，并确保规范路径仍位于 scripts/ 内。
+  /// Resolve the existing Lua entry while enforcing containment within the package scripts
+  /// directory.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for an invalid entry, missing script, non-file target, or a canonical path
+  /// outside `scripts/`.
   pub fn resolve_entry_path(&self, package: &PackageInfo) -> Result<PathBuf, String> {
     resolve_package_entry_path(package)
   }
 
-  /// Resolve a package audio asset without permitting access outside its assets directory.
+  /// Resolve a playable audio asset while enforcing its permitted asset root.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for an invalid relative asset path, an escaping path, a missing file, or an
+  /// unsupported audio source.
   pub fn resolve_audio_asset(
     &self,
     package: &PackageInfo,
@@ -638,6 +983,7 @@ impl PackageService {
       })
   }
 
+  /// Return the current mod games.
   pub fn mod_games(&self) -> Vec<PackageListEntry> {
     self
       .games()
@@ -647,6 +993,7 @@ impl PackageService {
       .collect()
   }
 
+  /// Return the current game list.
   pub fn game_list(&self) -> Vec<PackageListEntry> {
     self
       .games()
@@ -655,6 +1002,7 @@ impl PackageService {
       .collect()
   }
 
+  /// Return the current mod screensavers.
   pub fn mod_screensavers(&self) -> Vec<PackageListEntry> {
     self
       .screensavers()
@@ -664,7 +1012,7 @@ impl PackageService {
       .collect()
   }
 
-  /// 返回全部官方与模组屏保的轻量 UI 快照。
+  /// Return the current screensaver list.
   pub fn screensaver_list(&self) -> Vec<PackageListEntry> {
     self
       .screensavers()
@@ -673,10 +1021,12 @@ impl PackageService {
       .collect()
   }
 
+  /// Return the current total count.
   pub fn total_count(&self) -> usize {
     self.snapshot.games.len() + self.snapshot.screensavers.len()
   }
 
+  /// Update the user game key actions used by this package service.
   pub fn set_user_game_key_actions(
     &mut self,
     actions: BTreeMap<String, BTreeMap<String, Vec<Vec<String>>>>,
@@ -725,6 +1075,18 @@ fn find_package(
     .cloned()
 }
 
+/// Execute a package scan or metadata task and emit its completion through the shared event sink.
+///
+/// # Arguments
+///
+/// * `task_id` - The identifier of the asynchronous task.
+/// * `task` - The task.
+/// * `event_tx` - The event tx.
+///
+/// # Errors
+///
+/// Return an error for cancelled scans, unavailable package roots, invalid package metadata, or
+/// task-specific validation failures.
 pub(crate) fn run_package_task<E: From<PackageAsyncEvent>>(
   task_id: TaskId,
   task: PackageTask,
@@ -1040,10 +1402,24 @@ fn sync_package_watch_dirs<'a, E: From<PackageAsyncEvent>>(
 ) {
   let mut next_dirs = roots.iter().cloned().collect::<HashSet<_>>();
   next_dirs.extend(roots.iter().flat_map(first_level_package_dirs));
-  next_dirs.extend(files.filter_map(|file| file.parent().map(Path::to_path_buf)));
+  // Watch each ancestor so missing resource directories can be created or rebuilt later.
+  for file in files {
+    let Some(package_dir) = watched_file_package_dir(roots, file) else {
+      continue;
+    };
+    let mut parent = file.parent();
+    while let Some(dir) = parent {
+      next_dirs.insert(dir.to_path_buf());
+      if dir == package_dir {
+        break;
+      }
+      parent = dir.parent();
+    }
+  }
 
   for dir in watched_dirs
-    .difference(&next_dirs)
+    .iter()
+    .filter(|dir| !next_dirs.contains(*dir) || !dir.is_dir())
     .cloned()
     .collect::<Vec<_>>()
   {
@@ -1052,7 +1428,7 @@ fn sync_package_watch_dirs<'a, E: From<PackageAsyncEvent>>(
   }
 
   for dir in next_dirs {
-    if dir.exists() {
+    if dir.is_dir() {
       watch_package_dir(watcher, watched_dirs, &dir, event_tx);
     }
   }
@@ -1113,18 +1489,41 @@ fn queue_package_watch_event<E: From<PackageAsyncEvent>>(
     return;
   }
 
+  let mut refresh_dirs = false;
   for path in event.paths {
+    if matches!(
+      event.kind,
+      EventKind::Remove(_) | EventKind::Modify(notify::event::ModifyKind::Name(_))
+    ) {
+      // A replacement directory needs a new OS watch even when the path already exists.
+      for dir in watched_dirs
+        .iter()
+        .filter(|dir| dir.starts_with(&path))
+        .cloned()
+        .collect::<Vec<_>>()
+      {
+        let _ = watcher.unwatch(&dir);
+        watched_dirs.remove(&dir);
+      }
+    }
     if let Some(package_dir) = watched_package_dir(roots, &path) {
       if package_dir.exists() {
         watch_package_dir(watcher, watched_dirs, &package_dir, event_tx);
       }
       pending.insert(package_dir);
-      continue;
+      refresh_dirs = true;
     }
 
-    if let Some(package_dir) = watched_files.get(&path) {
-      pending.insert(package_dir.clone());
+    // Directory events also affect tracked files beneath that directory.
+    for (file, package_dir) in watched_files {
+      if file.starts_with(&path) {
+        pending.insert(package_dir.clone());
+        refresh_dirs = true;
+      }
     }
+  }
+  if refresh_dirs {
+    sync_package_watch_dirs(watcher, watched_dirs, roots, watched_files.keys(), event_tx);
   }
 }
 
@@ -1276,6 +1675,7 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     score_enabled,
     score_empty_text,
     best_string: None,
+    best_values: HashMap::new(),
     min_width: info.runtime.min_width,
     min_height: info.runtime.min_height,
     screensaver_command,
@@ -1348,7 +1748,6 @@ fn scan_all_packages(
   report
 }
 
-// 递归扫描指定目录下的所有包并加载
 struct ScanTarget {
   relative: &'static str,
   expected_type: PackageType,
@@ -1489,7 +1888,6 @@ fn count_child_dirs(dir: &Path) -> usize {
     .unwrap_or(0)
 }
 
-// Read, validate and combine the schema 2 package files into one snapshot.
 fn read_package(
   dir: &Path,
   dir_name: &str,
@@ -1500,6 +1898,15 @@ fn read_package(
   let raw =
     read_package_config_file::<RawPackageHeader>(dir, "package.json", MAX_PACKAGE_MANIFEST_BYTES)?;
   let mut watched_files = vec![dir.join("package.json")];
+  if *expected_type == PackageType::Game {
+    push_package_i18n_watch_path(
+      dir,
+      &request.language_code,
+      "best_string.json",
+      &mut watched_files,
+    );
+    push_package_i18n_watch_path(dir, "en_us", "best_string.json", &mut watched_files);
+  }
   let mut manifest_errors = Vec::new();
 
   PackageReadError::push_if(
@@ -1629,15 +2036,21 @@ fn read_package(
         },
         None,
         Some(screen),
-        BTreeMap::new(),
+        RawActions::default(),
       )
     }
   };
   let entry = resolve_entry(dir, &raw_entry)
     .map_err(|reason| PackageReadError::at("entry", reason).in_file(config_file_for(pkg_type)))?;
 
-  let version = resolve_package_text(dir, &raw.version, request, &mut watched_files, "version")
-    .map_err(PackageReadError::semantic)?;
+  let version = resolve_config_text(
+    dir,
+    &raw.version,
+    request,
+    &mut watched_files,
+    "version",
+    "package.json",
+  )?;
   if version.trim().is_empty() {
     return Err(PackageReadError::at("version", "version is empty"));
   }
@@ -1738,15 +2151,11 @@ fn read_package(
             description,
             keys,
             lock: action.lock,
+            priority: action.priority,
           },
         );
       }
-      let action_keys = actions
-        .iter()
-        .map(|(name, config)| (name.clone(), config.keys.clone()))
-        .collect();
-      validate_action_key_conflicts(&action_keys)
-        .map_err(|reason| PackageReadError::at("$", reason).in_file("actions.json"))?;
+
       let score = g
         .best_score
         .map(|score| {
@@ -1890,8 +2299,15 @@ fn resolve_config_text(
   field: &str,
   source_file: &'static str,
 ) -> Result<String, PackageReadError> {
-  resolve_package_text(package_dir, value, request, watched_files, field)
-    .map_err(|reason| PackageReadError::semantic(reason).in_file(source_file))
+  resolve_package_text(
+    package_dir,
+    value,
+    request,
+    watched_files,
+    field,
+    source_file,
+  )
+  .map_err(|reason| PackageReadError::semantic(reason).in_file(source_file))
 }
 
 fn normalize_action_keys(action: &str, keys: Vec<Vec<String>>) -> Result<Vec<Vec<String>>, String> {
@@ -1942,29 +2358,6 @@ fn normalize_action_keys(action: &str, keys: Vec<Vec<String>>) -> Result<Vec<Vec
     normalized_patterns.push(normalized);
   }
   Ok(normalized_patterns)
-}
-
-fn validate_action_key_conflicts(
-  actions: &HashMap<String, Vec<Vec<String>>>,
-) -> Result<(), String> {
-  let mut action_names = actions.keys().collect::<Vec<_>>();
-  action_names.sort_unstable();
-  let mut bindings = BTreeMap::<Vec<String>, &str>::new();
-
-  for action in action_names {
-    let keys = actions.get(action).expect("action name came from map");
-    for pattern in keys {
-      let mut identity = pattern.clone();
-      identity.sort_unstable();
-      if let Some(previous_action) = bindings.get(&identity) {
-        return Err(format!(
-          "game actions '{previous_action}' and '{action}' share the same key binding"
-        ));
-      }
-      bindings.insert(identity, action.as_str());
-    }
-  }
-  Ok(())
 }
 
 fn read_manifest_package_id(dir: &Path, source: PackageSource) -> Option<PackageId> {
@@ -2022,12 +2415,6 @@ fn validate_loaded_package(package: &PackageInfo) -> Result<(), String> {
           ));
         }
       }
-      let action_keys = game
-        .actions
-        .iter()
-        .map(|(action, config)| (action.clone(), config.keys.clone()))
-        .collect();
-      validate_action_key_conflicts(&action_keys)?;
     }
     PackageType::Screensaver => {
       let screensaver = package
@@ -2147,6 +2534,84 @@ struct RawApiRange {
   max: u32,
 }
 
+/// Validate the presentation fields in a best-score save without reading language resources.
+///
+/// The optional `value` object contains named literal or package-text substitutions.
+/// Other save fields belong to the game and are left untouched.
+///
+/// # Errors
+///
+/// Return an error for a missing template, malformed text reference, or non-object substitutions.
+///
+/// # Examples
+///
+/// ```rust
+/// use tg_service_package::validate_best_save;
+/// let data = serde_json::json!({
+///   "best_string": {"type": "i18n", "key": "score", "callback": "f%Best: {value:score}"},
+///   "value": {"score": "42"}
+/// });
+/// assert!(validate_best_save(&data).is_ok());
+/// assert!(validate_best_save(&serde_json::json!({"best_string": 42})).is_err());
+/// ```
+pub fn validate_best_save(data: &serde_json::Value) -> Result<(), String> {
+  let object = data
+    .as_object()
+    .ok_or("best save must be an object table")?;
+  let text = object
+    .get("best_string")
+    .ok_or("best save must contain field 'best_string'")?;
+  parse_best_text(text, "best_string")?;
+  if let Some(value) = object.get("value") {
+    let values = value
+      .as_object()
+      .ok_or("best save field 'value' must be an object table")?;
+    for (key, value) in values {
+      if key.trim().is_empty() {
+        return Err("best save substitution names must not be empty".into());
+      }
+      parse_best_text(value, &format!("value.{key}"))?;
+    }
+  }
+  Ok(())
+}
+
+fn parse_best_text(value: &serde_json::Value, field: &str) -> Result<RawPackageText, String> {
+  let text: RawPackageText = serde_json::from_value(value.clone())
+    .map_err(|error| format!("{field} must be a string or package text object: {error}"))?;
+  validate_package_text(&text, field)?;
+  Ok(text)
+}
+
+fn validate_package_text(value: &RawPackageText, field: &str) -> Result<(), String> {
+  match value {
+    RawPackageText::Literal(_) => Ok(()),
+    RawPackageText::Object(value) if value.text_type == "text" => {
+      value
+        .text
+        .as_ref()
+        .ok_or_else(|| format!("{field}.text is required when type is 'text'"))?;
+      Ok(())
+    }
+    RawPackageText::Object(value) if value.text_type == "i18n" => {
+      value
+        .key
+        .as_deref()
+        .filter(|key| !key.trim().is_empty())
+        .ok_or_else(|| format!("{field}.key is required when type is 'i18n'"))?;
+      value
+        .callback
+        .as_ref()
+        .ok_or_else(|| format!("{field}.callback is required when type is 'i18n'"))?;
+      Ok(())
+    }
+    RawPackageText::Object(value) => Err(format!(
+      "{field}.type must be 'text' or 'i18n', got '{}'",
+      value.text_type
+    )),
+  }
+}
+
 #[derive(Clone, Deserialize)]
 #[serde(untagged)]
 enum RawPackageText {
@@ -2219,6 +2684,8 @@ struct RawActionConfig {
   keys: Vec<Vec<String>>,
   #[serde(default)]
   lock: bool,
+  #[serde(default)]
+  priority: u64,
 }
 
 #[derive(Deserialize)]
@@ -2234,7 +2701,45 @@ struct RawScreensaverConfig {
   command: String,
 }
 
-type RawActions = BTreeMap<String, RawActionConfig>;
+#[derive(Default)]
+struct RawActions(Vec<(String, RawActionConfig)>);
+
+impl<'de> serde::Deserialize<'de> for RawActions {
+  fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    struct OrderedActions;
+    impl<'de> serde::de::Visitor<'de> for OrderedActions {
+      type Value = RawActions;
+      fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an ordered action object")
+      }
+      fn visit_map<A: serde::de::MapAccess<'de>>(
+        self,
+        mut map: A,
+      ) -> Result<Self::Value, A::Error> {
+        let mut names = HashSet::new();
+        let mut actions = Vec::new();
+        while let Some(name) = map.next_key::<String>()? {
+          if !names.insert(name.clone()) {
+            return Err(serde::de::Error::custom(format!(
+              "duplicate action name '{name}'"
+            )));
+          }
+          actions.push((name, map.next_value::<RawActionConfig>()?));
+        }
+        Ok(RawActions(actions))
+      }
+    }
+    deserializer.deserialize_map(OrderedActions)
+  }
+}
+
+impl IntoIterator for RawActions {
+  type Item = (String, RawActionConfig);
+  type IntoIter = std::vec::IntoIter<Self::Item>;
+  fn into_iter(self) -> Self::IntoIter {
+    self.0.into_iter()
+  }
+}
 
 fn parse_package_type(s: &str) -> Result<PackageType, String> {
   match s {
@@ -2317,6 +2822,7 @@ fn parse_package_asset(
   Ok(Some(asset))
 }
 
+/// Return the built-in package icon as terminal text lines.
 pub(crate) fn default_icon_lines() -> Vec<String> {
   normalize_asset_lines(
     ["████████", "██ ██ ██", "   ██   ", "  ████  "],
@@ -2624,35 +3130,19 @@ fn resolve_package_text(
   request: &ScanRequest,
   watched_files: &mut Vec<PathBuf>,
   field: &str,
+  source_file: &str,
 ) -> Result<String, String> {
+  validate_package_text(value, field)?;
   match value {
     RawPackageText::Literal(text) => Ok(text.clone()),
-    RawPackageText::Object(value) if value.text_type == "text" => value
-      .text
-      .clone()
-      .ok_or_else(|| format!("{field}.text is required when type is 'text'")),
-    RawPackageText::Object(value) if value.text_type == "i18n" => {
-      let key = value
-        .key
-        .as_deref()
-        .filter(|key| !key.trim().is_empty())
-        .ok_or_else(|| format!("{field}.key is required when type is 'i18n'"))?;
-      let callback = value
-        .callback
-        .as_deref()
-        .ok_or_else(|| format!("{field}.callback is required when type is 'i18n'"))?;
-      Ok(resolve_package_i18n(
-        pkg_dir,
-        "package.json",
-        key,
-        callback,
-        request,
-        watched_files,
-      ))
-    }
-    RawPackageText::Object(value) => Err(format!(
-      "{field}.type must be 'text' or 'i18n', got '{}'",
-      value.text_type
+    RawPackageText::Object(value) if value.text_type == "text" => Ok(value.text.clone().unwrap()),
+    RawPackageText::Object(value) => Ok(resolve_package_i18n(
+      pkg_dir,
+      source_file,
+      value.key.as_deref().unwrap(),
+      value.callback.as_deref().unwrap(),
+      request,
+      watched_files,
     )),
   }
 }
@@ -2683,6 +3173,7 @@ fn push_package_i18n_watch_path(
       pkg_dir
         .join("assets/language")
         .join(language_code)
+        .join("package")
         .join(path),
     );
   }
@@ -2694,18 +3185,26 @@ fn load_package_i18n_value(
   relative_path: &str,
   key: &str,
 ) -> Option<String> {
+  load_package_i18n_values(pkg_dir, language_code, relative_path)?
+    .get(key)
+    .cloned()
+}
+
+fn load_package_i18n_values(
+  pkg_dir: &Path,
+  language_code: &str,
+  relative_path: &str,
+) -> Option<HashMap<String, String>> {
   if !safe_path_segment(language_code) {
     return None;
   }
   let relative = Path::new("language")
     .join(language_code)
+    .join("package")
     .join(relative_path);
   let path = resolve_package_file(pkg_dir, Path::new("assets"), &relative)?;
   let content = read_utf8_file_limited(&path, MAX_PACKAGE_I18N_BYTES).ok()?;
-  serde_json::from_str::<HashMap<String, String>>(&content)
-    .ok()?
-    .get(key)
-    .cloned()
+  serde_json::from_str(&content).ok()
 }
 
 fn normalize_language_codes(values: &[String]) -> Result<Vec<String>, String> {
@@ -2730,7 +3229,9 @@ fn normalize_language_codes(values: &[String]) -> Result<Vec<String>, String> {
   Ok(normalized)
 }
 
-// 规范化包入口脚本路径。扫描阶段只验证路径语义，不验证脚本文件是否存在。
+// Scan-time normalization checks portable entry semantics; launch-time resolution checks the
+// actual file.
+
 fn resolve_entry(pkg_dir: &Path, entry: &str) -> Result<String, String> {
   let _ = pkg_dir;
   let trimmed = entry.trim();
@@ -2862,7 +3363,9 @@ mod tests {
           rescan_requested = true;
         }
         if rescan_requested && matches!(event, PackageEvent::ScanFinished { .. }) {
-          // Let the watcher apply the snapshot's SetFiles command before the next mutation.
+          // Wait for the watcher to accept the snapshot file set before mutating the fixture
+          // again.
+
           std::thread::sleep(Duration::from_millis(150));
           return event;
         }
@@ -3302,7 +3805,67 @@ mod tests {
   }
 
   #[test]
-  fn identical_key_patterns_cannot_target_multiple_actions() {
+  fn action_priority_preserves_declaration_order_and_reports_invalid_fields() {
+    let root = temp_root("action_priority");
+    write_game(&root, "data/mod/game", "priority_game", "Priority");
+    let dir = root.join("data/mod/game/priority_game");
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".into(),
+      missing_template: MISSING.into(),
+    };
+    let read = || {
+      read_package(
+        &dir,
+        "priority_game",
+        &PackageType::Game,
+        &PackageSource::Mod,
+        &request,
+      )
+    };
+    std::fs::write(
+      dir.join("actions.json"),
+      r#"{
+      "z_first":{"description":"first","keys":[["esc"]]},
+      "a_second":{"description":"second","keys":[["esc"]],"priority":0},
+      "huge":{"description":"huge","keys":[],"priority":18446744073709551615}
+    }"#,
+    )
+    .unwrap();
+    let game = read().unwrap().game.unwrap();
+    assert_eq!(game.action_order, ["z_first", "a_second", "huge"]);
+    assert_eq!(game.actions["z_first"].priority, 0);
+    assert_eq!(game.actions["huge"].priority, u64::MAX);
+    for value in [
+      "-1",
+      "1.5",
+      "1.0",
+      r#""10""#,
+      "true",
+      "null",
+      "18446744073709551616",
+    ] {
+      std::fs::write(
+        dir.join("actions.json"),
+        format!(r#"{{"a":{{"description":"a","keys":[],"priority":{value}}}}}"#),
+      )
+      .unwrap();
+      let error = read().unwrap_err();
+      assert!(error.field_path.contains("priority"), "{value}: {error:?}");
+      assert_eq!(error.source_file, PackageSourceFile::Actions);
+    }
+    std::fs::write(
+      dir.join("actions.json"),
+      r#"{"a":{"description":"a","keys":[]},"a":{"description":"a","keys":[]}}"#,
+    )
+    .unwrap();
+    assert!(read().unwrap_err().reason.contains("duplicate action name"));
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn identical_key_patterns_can_target_multiple_actions() {
     let actions = HashMap::from([
       (
         "move_left".to_string(),
@@ -3314,13 +3877,18 @@ mod tests {
       ),
     ]);
 
-    assert!(validate_action_key_conflicts(&actions).is_err());
     assert!(
-      validate_action_key_conflicts(&HashMap::from([
-        ("move_left".to_string(), vec![vec!["a".to_string()]]),
-        ("move_right".to_string(), vec![vec!["d".to_string()]]),
-      ]))
-      .is_ok()
+      PackageService::new()
+        .validate_game_action_map(&actions)
+        .is_ok()
+    );
+    assert!(
+      PackageService::new()
+        .validate_game_action_map(&HashMap::from([
+          ("move_left".to_string(), vec![vec!["a".to_string()]]),
+          ("move_right".to_string(), vec![vec!["d".to_string()]]),
+        ]))
+        .is_ok()
     );
   }
 
@@ -3371,7 +3939,8 @@ mod tests {
 
   #[test]
   fn checked_in_lua_test_packages_have_valid_complete_manifests() {
-    // The checked-in test packages live at the workspace root, three levels above this crate.
+    // Repository package fixtures are reached from the workspace root, not the deployment root.
+
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../test_package");
     let request = ScanRequest {
       sequence: 0,
@@ -3441,6 +4010,7 @@ mod tests {
                 action: action.clone(),
                 description: config.description.clone(),
                 keys: config.keys.clone(),
+                priority: 0,
               })
               .collect::<Vec<_>>();
             tg_core_input::translate_action_map(&action_map)
@@ -3731,7 +4301,7 @@ mod tests {
     let path = if file.is_empty() {
       language_root.with_extension("json")
     } else {
-      language_root.join(file)
+      language_root.join("package").join(file)
     };
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, json).unwrap();
@@ -3849,7 +4419,7 @@ mod tests {
       "data/mod/game",
       "watch_recovery",
       "en_us",
-      "package.json",
+      "display.json",
       r#"{"watch.title":"Before"}"#,
     );
     let display_json = r#"{"title":{"type":"i18n","key":"watch.title","callback":"Callback"},"description":"Description","author":"Tester","icon":{"type":"text","path":"ui/icon.txt"}}"#;
@@ -3918,7 +4488,7 @@ mod tests {
       "data/mod/game",
       "watch_recovery",
       "en_us",
-      "package.json",
+      "display.json",
       r#"{"watch.title":"After"}"#,
     );
     assert!(matches!(
@@ -3929,6 +4499,106 @@ mod tests {
 
     drop(runtime);
     let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn package_watcher_recovers_missing_and_rebuilt_language_directories() {
+    let root = temp_root("watch_language_directories");
+    write_game(&root, "data/mod/game", "language_watch", "Initial");
+    let dir = root.join("data/mod/game/language_watch");
+    std::fs::write(
+      dir.join("display.json"),
+      r#"{"title":{"type":"i18n","key":"title","callback":"Callback"},"description":"Description","author":"Tester"}"#,
+    )
+    .unwrap();
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "zh_cn");
+    assert_eq!(service.games()[0].display.title, "Callback");
+    let mut runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+    assert!(service.start_watcher(&mut runtime));
+    std::thread::sleep(Duration::from_millis(150));
+
+    let english_path = dir.join("assets/language/en_us/package/display.json");
+    std::fs::create_dir_all(english_path.parent().unwrap()).unwrap();
+    std::fs::write(&english_path, r#"{"title":"English"}"#).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "missing ancestor creation",
+    );
+    assert_eq!(service.games()[0].display.title, "English");
+
+    let language_dir = dir.join("assets/language/zh_cn");
+    std::fs::create_dir(&language_dir).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "language directory creation",
+    );
+    let translations = language_dir.join("package");
+    std::fs::create_dir(&translations).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation directory creation",
+    );
+    let title_path = translations.join("display.json");
+    std::fs::write(&title_path, r#"{"title":"Current"}"#).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation file creation",
+    );
+    assert_eq!(service.games()[0].display.title, "Current");
+
+    std::fs::remove_file(&title_path).unwrap();
+    wait_for_watcher_scan(&runtime, &mut service, &mut log, "translation file removal");
+    assert_eq!(service.games()[0].display.title, "English");
+    std::fs::remove_dir(&translations).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation directory removal",
+    );
+    std::fs::create_dir(&translations).unwrap();
+    std::fs::write(&title_path, r#"{"title":"Rebuilt"}"#).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation directory rebuild",
+    );
+    assert_eq!(service.games()[0].display.title, "Rebuilt");
+
+    let replacement = translations.join("replacement.tmp");
+    std::fs::write(&replacement, r#"{"title":"Replaced"}"#).unwrap();
+    std::fs::rename(&replacement, &title_path).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation file replacement",
+    );
+    assert_eq!(service.games()[0].display.title, "Replaced");
+
+    let old_dir = language_dir.join("old_package");
+    std::fs::rename(&translations, &old_dir).unwrap();
+    std::fs::create_dir(&translations).unwrap();
+    std::fs::write(&title_path, r#"{"title":"New directory"}"#).unwrap();
+    wait_for_watcher_scan(&runtime, &mut service, &mut log, "directory replacement");
+    assert_eq!(service.games()[0].display.title, "New directory");
+    std::fs::write(&title_path, r#"{"title":"Still watched"}"#).unwrap();
+    wait_for_watcher_scan(&runtime, &mut service, &mut log, "rebuilt directory update");
+    assert_eq!(service.games()[0].display.title, "Still watched");
+
+    drop(runtime);
+    std::fs::remove_dir_all(root).unwrap();
   }
 
   #[test]
@@ -4190,7 +4860,7 @@ mod tests {
         "mod_id":"i18n_game",
         "schema_version":2,
         "type":"game",
-        "version":{"type":"i18n","key":"version","callback":"1.0.0"},
+        "version":{"type":"i18n","key":"shared","callback":"1.0.0"},
         "version_code":1,
         "api":{"min":1,"max":1}
       }"#,
@@ -4199,7 +4869,7 @@ mod tests {
     std::fs::write(
       dir.join("display.json"),
       r#"{
-        "title":{"type":"i18n","key":"title","callback":"Title"},
+        "title":{"type":"i18n","key":"shared","callback":"Title"},
         "description":{"type":"i18n","key":"description","callback":"Description"},
         "author":{"type":"i18n","key":"author","callback":"Author"}
       }"#,
@@ -4208,7 +4878,7 @@ mod tests {
     std::fs::write(
       dir.join("game.json"),
       r#"{
-        "name":{"type":"i18n","key":"game.name","callback":"Game"},
+        "name":{"type":"i18n","key":"shared","callback":"Game"},
         "detail":{"type":"i18n","key":"detail","callback":"Detail"},
         "command":"i18n_game","entry":"ui/init","min_width":1,"min_height":1,
         "target_fps":60,"language":["zh_cn"],
@@ -4218,7 +4888,7 @@ mod tests {
     .unwrap();
     std::fs::write(
       dir.join("actions.json"),
-      r#"{"move_up":{"description":{"type":"i18n","key":"move.up","callback":"Move"},"keys":[["w"]]}}"#,
+      r#"{"move_up":{"description":{"type":"i18n","key":"shared","callback":"Move"},"keys":[["w"]]}}"#,
     )
     .unwrap();
     std::fs::create_dir_all(root.join("data/mod/game/i18n_game/scripts/ui")).unwrap();
@@ -4227,14 +4897,21 @@ mod tests {
       "-- test",
     )
     .unwrap();
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_game",
-      "zh_cn",
-      "package.json",
-      r#"{"version":"版本一","title":"中文标题","description":"多级简介","author":"作者","game.name":"游戏名","detail":"游戏详情","best_score.empty":"无记录","move.up":"上移"}"#,
-    );
+    // Reuse one key across files to verify that each manifest has its own namespace.
+    for (file, json) in [
+      ("package.json", r#"{"shared":"版本一"}"#),
+      (
+        "display.json",
+        r#"{"shared":"中文标题","description":"多级简介","author":"作者"}"#,
+      ),
+      (
+        "game.json",
+        r#"{"shared":"游戏名","detail":"游戏详情","best_score.empty":"无记录"}"#,
+      ),
+      ("actions.json", r#"{"shared":"上移"}"#),
+    ] {
+      write_package_language(&root, "data/mod/game", "i18n_game", "zh_cn", file, json);
+    }
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
@@ -4285,7 +4962,7 @@ mod tests {
       "data/mod/game",
       "fallback_game",
       "en_us",
-      "package.json",
+      "display.json",
       r#"{"title":"English Title"}"#,
     );
     std::fs::write(
@@ -4301,6 +4978,32 @@ mod tests {
     let game = service.games().remove(0);
     assert_eq!(game.display.title, "English Title");
     assert_eq!(game.display.author, "Fallback Author");
+
+    let dir = root.join("data/mod/game/fallback_game");
+    std::fs::create_dir_all(dir.join("assets/language/zh_cn/package")).unwrap();
+    std::fs::write(
+      dir.join("assets/language/zh_cn/package.json"),
+      r#"{"title":"Legacy title"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("assets/language/zh_cn/package/game.json"),
+      r#"{"title":"Wrong manifest title"}"#,
+    )
+    .unwrap();
+    let title_path = dir.join("assets/language/zh_cn/package/display.json");
+    for invalid in ["{", r#"{"title":12}"#, r#"{"other":"Missing title"}"#] {
+      std::fs::write(&title_path, invalid).unwrap();
+      scan(&mut service, &root, &mut log, "zh_cn");
+      assert_eq!(service.games()[0].display.title, "English Title");
+    }
+    std::fs::write(&title_path, r#"{"title":"Current title"}"#).unwrap();
+    scan(&mut service, &root, &mut log, "zh_cn");
+    assert_eq!(service.games()[0].display.title, "Current title");
+    std::fs::remove_file(title_path).unwrap();
+    std::fs::remove_file(dir.join("assets/language/en_us/package/display.json")).unwrap();
+    scan(&mut service, &root, &mut log, "zh_cn");
+    assert_eq!(service.games()[0].display.title, "Fallback Title");
 
     let _ = std::fs::remove_dir_all(root);
   }
@@ -4320,7 +5023,7 @@ mod tests {
       "data/mod/screensaver",
       "screen_i18n",
       "zh_cn",
-      "package.json",
+      "screensaver.json",
       r#"{"name":"屏保名"}"#,
     );
 
@@ -4509,7 +5212,7 @@ mod tests {
       "data/mod/screensaver",
       "flag_screen",
       "zh_cn",
-      "package.json",
+      "screensaver.json",
       r#"{"screen.name":"旗标屏保"}"#,
     );
 
@@ -4733,7 +5436,7 @@ mod tests {
       package_dir.join("package.json"),
       package_dir.join("assets/ui/icon.txt"),
       package_dir.join("assets/language/zh_cn.json"),
-      root.join("beta/assets/language/zh_cn/display.json"),
+      root.join("beta/assets/language/zh_cn/package/display.json"),
       root.join("package.json"),
     ];
 
@@ -4748,10 +5451,118 @@ mod tests {
       Some(&package_dir)
     );
     assert_eq!(
-      watched.get(&root.join("beta/assets/language/zh_cn/display.json")),
+      watched.get(&root.join("beta/assets/language/zh_cn/package/display.json")),
       Some(&root.join("beta"))
     );
     assert!(!watched.contains_key(&root.join("package.json")));
+  }
+
+  #[test]
+  fn best_save_uses_its_own_resource_and_language_fallback() {
+    let root = temp_root("best_save_text");
+    write_game(&root, "data/mod/game", "best_text", "Game");
+    let dir = root.join("data/mod/game/best_text");
+    for (language, file, content) in [
+      (
+        "zh_cn",
+        "best_string.json",
+        r#"{"score":"f%最佳：{value:score} {value:rank}","rank":"金牌"}"#,
+      ),
+      (
+        "en_us",
+        "best_string.json",
+        r#"{"score":"f%Best: {value:score} {value:rank}","only_en":"English"}"#,
+      ),
+      ("zh_cn", "package.json", r#"{"missing":"Wrong resource"}"#),
+    ] {
+      write_package_language(&root, "data/mod/game", "best_text", language, file, content);
+    }
+    let data = serde_json::json!({
+      "best_string":{"type":"i18n","key":"score","callback":"f%Fallback: {value:score}"},
+      "value":{
+        "score":"42",
+        "rank":{"type":"i18n","key":"rank","callback":"Gold"},
+        "english":{"type":"i18n","key":"only_en","callback":"callback"},
+        "missing":{"type":"i18n","key":"missing","callback":"fallback"},
+        "literal":{"type":"text","text":"{value:score}<b>literal"}
+      }
+    });
+    let mut service = PackageService::new();
+    service.configure_scan(&root, "zh_cn", MISSING);
+    let (text, values) = service.resolve_best_save(&dir, &data).unwrap();
+    assert_eq!(text, "f%最佳：{value:score} {value:rank}");
+    assert_eq!(values["rank"], "金牌");
+    assert_eq!(values["english"], "English");
+    assert_eq!(values["missing"], "fallback");
+    assert_eq!(values["literal"], "{value:score}<b>literal");
+    service.configure_scan(&root, "en_us", MISSING);
+    let (text, values) = service.resolve_best_save(&dir, &data).unwrap();
+    assert_eq!(text, "f%Best: {value:score} {value:rank}");
+    assert_eq!(values["rank"], "Gold");
+    assert_eq!(
+      service
+        .resolve_best_save(&dir, &serde_json::json!({"best_string":"---"}))
+        .unwrap(),
+      ("---".into(), HashMap::new())
+    );
+    std::fs::write(
+      dir.join("assets/language/en_us/package/best_string.json"),
+      "{",
+    )
+    .unwrap();
+    let (text, _) = service.resolve_best_save(&dir, &data).unwrap();
+    assert_eq!(text, "f%Fallback: {value:score}");
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn best_save_language_resource_is_watched_before_the_first_save() {
+    let root = temp_root("best_save_watch");
+    write_game(&root, "data/mod/game", "best_watch", "Game");
+    let dir = root.join("data/mod/game/best_watch");
+    let data =
+      serde_json::json!({"best_string":{"type":"i18n","key":"score","callback":"Missing"}});
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "zh_cn");
+    assert_eq!(service.resolve_best_save(&dir, &data).unwrap().0, "Missing");
+    let mut runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+    assert!(service.start_watcher(&mut runtime));
+    std::thread::sleep(Duration::from_millis(150));
+    let mut revision = service.snapshot_revision();
+    for content in [r#"{"score":"Created"}"#, r#"{"score":"Updated"}"#] {
+      write_package_language(
+        &root,
+        "data/mod/game",
+        "best_watch",
+        "zh_cn",
+        "best_string.json",
+        content,
+      );
+      wait_for_watcher_scan(
+        &runtime,
+        &mut service,
+        &mut log,
+        "best score language resource",
+      );
+      assert!(service.snapshot_revision() > revision);
+      revision = service.snapshot_revision();
+      let expected = serde_json::from_str::<serde_json::Value>(content).unwrap();
+      assert_eq!(
+        service.resolve_best_save(&dir, &data).unwrap().0,
+        expected["score"].as_str().unwrap()
+      );
+    }
+    std::fs::remove_file(dir.join("assets/language/zh_cn/package/best_string.json")).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "best score language resource removal",
+    );
+    assert_eq!(service.resolve_best_save(&dir, &data).unwrap().0, "Missing");
+    drop(runtime);
+    std::fs::remove_dir_all(root).unwrap();
   }
 
   #[test]
@@ -4766,7 +5577,7 @@ mod tests {
       "data/mod/game",
       "watch_game",
       "zh_cn",
-      "package.json",
+      "display.json",
       r#"{"title":"监听标题"}"#,
     );
     let package_json = dir.join("package.json");
@@ -4790,9 +5601,11 @@ mod tests {
     assert!(files.contains(&dir.join("display.json")));
     assert!(files.contains(&dir.join("game.json")));
     assert!(files.contains(&dir.join("actions.json")));
+    assert!(files.contains(&dir.join("assets/language/zh_cn/package/best_string.json")));
+    assert!(files.contains(&dir.join("assets/language/en_us/package/best_string.json")));
     assert!(files.contains(&dir.join("assets/ui/icon.txt")));
-    assert!(files.contains(&dir.join("assets/language/zh_cn/package.json")));
-    assert!(files.contains(&dir.join("assets/language/en_us/package.json")));
+    assert!(files.contains(&dir.join("assets/language/zh_cn/package/display.json")));
+    assert!(files.contains(&dir.join("assets/language/en_us/package/display.json")));
 
     let _ = std::fs::remove_dir_all(root);
   }

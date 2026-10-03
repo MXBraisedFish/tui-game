@@ -1,3 +1,5 @@
+//! Construction and registration of the supported Lua API libraries.
+
 use std::cmp::Ordering;
 use std::f64::consts::{E, PI};
 use std::fs;
@@ -26,6 +28,7 @@ mod base;
 #[path = "libraries/char.rs"]
 mod chars;
 mod color;
+mod date;
 mod debug;
 mod draw;
 mod encoding;
@@ -34,6 +37,7 @@ mod file;
 mod game;
 mod i18n;
 mod image;
+mod ime;
 mod loader;
 mod math;
 mod measurement;
@@ -42,6 +46,7 @@ mod serialization;
 mod slice;
 mod string;
 mod table;
+mod timer;
 mod utf8;
 
 use measurement::{
@@ -52,6 +57,18 @@ use string::rich_text_params;
 
 const MAX_HOST_COMMANDS_PER_CALLBACK: usize = 4096;
 
+/// Build and register the Lua libraries API in the supplied VM and host context.
+///
+/// # Arguments
+///
+/// * `lua` - The Lua VM in which values and callbacks are created.
+/// * `environment` - The environment.
+/// * `state` - The state.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::Result<()> {
   let base = base::base(lua)?;
   environment.set("base", base.clone())?;
@@ -77,11 +94,13 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   environment.set("table", table::table_lib(lua)?)?;
   environment.set("string", string::string_lib(lua, state.clone())?)?;
   environment.set("color", color::color(lua)?)?;
+  environment.set("date", date::date(lua)?)?;
   environment.set("char", chars::char_lib(lua)?)?;
   environment.set("align", align::align(lua, state.clone())?)?;
   environment.set("measurement", measurement::measurement(lua, state.clone())?)?;
   environment.set("random", random::random(lua, state.clone())?)?;
   environment.set("slice", slice::slice(lua, state.clone())?)?;
+  environment.set("timer", timer::timer(lua, state.clone())?)?;
   environment.set("serialization", serialization::serialization(lua)?)?;
   environment.set("encoding", encoding::encoding(lua)?)?;
   environment.set("draw", draw::draw(lua, state.clone())?)?;
@@ -89,6 +108,7 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   environment.set("game", game::game(lua, state.clone())?)?;
   environment.set("i18n", i18n::i18n(lua, state.clone())?)?;
   environment.set("image", image::image(lua, state.clone())?)?;
+  environment.set("ime", ime::ime(lua, state.clone())?)?;
   environment.set("event", event::event(lua, state.clone())?)?;
   environment.set("loader", loader::loader(lua, environment, state.clone())?)?;
   environment.set("file", file::file(lua, state)?)?;
@@ -163,4 +183,44 @@ fn truncate(mut value: String, max: usize) -> String {
     value.truncate(max);
   }
   value
+}
+
+fn with_pool<R>(
+  state: &SharedApiState,
+  method: &str,
+  operation: impl FnOnce(&crate::LuaObjectPool) -> mlua::Result<R>,
+) -> mlua::Result<R> {
+  let objects = state
+    .borrow()
+    .objects
+    .upgrade()
+    .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
+  let objects = objects
+    .try_borrow()
+    .map_err(|_| args::message(method, "session object pool is busy"))?;
+  operation(
+    objects
+      .as_ref()
+      .ok_or_else(|| args::message(method, "session object pool is unavailable"))?,
+  )
+}
+
+fn with_pool_mut<R>(
+  state: &SharedApiState,
+  method: &str,
+  operation: impl FnOnce(&mut crate::LuaObjectPool) -> mlua::Result<R>,
+) -> mlua::Result<R> {
+  let objects = state
+    .borrow()
+    .objects
+    .upgrade()
+    .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
+  let mut objects = objects
+    .try_borrow_mut()
+    .map_err(|_| args::message(method, "session object pool is busy"))?;
+  operation(
+    objects
+      .as_mut()
+      .ok_or_else(|| args::message(method, "session object pool is unavailable"))?,
+  )
 }

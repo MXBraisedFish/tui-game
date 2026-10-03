@@ -1,55 +1,90 @@
-//! Identifiers, scrollbar styles and per-frame descriptions of drawing surfaces (slices and scroll
-//! boxes).
-//!
-//! The owner of the UI objects (widget) builds a list of [`SurfaceFrame`]s every frame and hands it
-//! to the canvas; the canvas never reads the UI object pool.
+//! Prepared drawing surfaces and their identities in a composed frame.
 
 use tg_core_geometry::{Rect, Size};
 use tg_core_style::{TextColor, TextStyle};
 
-/// The unique identifier of a slice.
+/// The identity of slice within its owning pool or session.
+///
+/// # Fields
+///
+/// * `0` - The wrapped u64 value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct SliceId(pub u64);
+pub struct SliceId(
+  /// The wrapped u64 value.
+  pub u64,
+);
 
-/// The unique identifier of a scrollable drawing surface.
+/// The identity of scroll box within its owning pool or session.
+///
+/// # Fields
+///
+/// * `0` - The wrapped u64 value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ScrollBoxId(pub u64);
+pub struct ScrollBoxId(
+  /// The wrapped u64 value.
+  pub u64,
+);
 
-/// The unified identifier of a stackable developer drawing surface.
+/// The identity of a slice or scroll-box surface in a composed frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SurfaceId {
+  /// The slice setting for surface id.
   Slice(SliceId),
+  /// The scroll box setting for surface id.
   ScrollBox(ScrollBoxId),
 }
 
-/// The side a scrollbar is placed on.
+/// The side of a viewport on which a scrollbar is drawn.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScrollbarSide {
+  /// The right setting for scrollbar side.
   Right,
 }
 
-/// The style of a scrollbar.
+/// Characters and colors used to draw scrollbar tracks and thumbs.
+///
+/// # Fields
+///
+/// * `track_char` - The track char.
+/// * `thumb_char` - The thumb char.
+/// * `track_style` - The track style.
+/// * `thumb_style` - The thumb style.
+/// * `h_track_char` - The h track char.
+/// * `h_thumb_char` - The h thumb char.
+/// * `h_track_style` - The h track style.
+/// * `h_thumb_style` - The h thumb style.
+/// * `minimum_thumb_height` - The minimum thumb height in terminal rows.
+/// * `side` - The side.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScrollbarStyle {
-  /// Track character of the vertical scrollbar.
+  /// The track char.
   pub track_char: char,
-  /// Thumb character of the vertical scrollbar.
+
+  /// The thumb char.
   pub thumb_char: char,
-  /// Track style of the vertical scrollbar.
+
+  /// The track style.
   pub track_style: TextStyle,
-  /// Thumb style of the vertical scrollbar.
+
+  /// The thumb style.
   pub thumb_style: TextStyle,
-  /// Track character of the horizontal scrollbar.
+
+  /// The h track char.
   pub h_track_char: char,
-  /// Thumb character of the horizontal scrollbar.
+
+  /// The h thumb char.
   pub h_thumb_char: char,
-  /// Track style of the horizontal scrollbar.
+
+  /// The h track style.
   pub h_track_style: TextStyle,
-  /// Thumb style of the horizontal scrollbar.
+
+  /// The h thumb style.
   pub h_thumb_style: TextStyle,
-  /// Minimum thumb height/width (default 1).
+
+  /// The minimum thumb height in terminal rows.
   pub minimum_thumb_height: u16,
-  /// Side the scrollbar is placed on.
+
+  /// The side.
   pub side: ScrollbarSide,
 }
 
@@ -98,63 +133,116 @@ impl Default for ScrollbarStyle {
   }
 }
 
-/// The fully resolved area layout of a scroll box.
+/// Content bounds and scrollbar occupancy resolved against the visible viewport.
 ///
-/// All scrolling, clipping, drawing and hit testing must use this result; never derive the
-/// scrollbar visibility from the options again, so that different stages cannot disagree about
-/// which area a cell belongs to.
+/// # Fields
+///
+/// * `viewport_rect` - The viewport rect.
+/// * `content_viewport_rect` - The content viewport rect.
+/// * `occupied_rect` - The occupied rect.
+/// * `vertical_track_rect` - The vertical track rect.
+/// * `horizontal_track_rect` - The horizontal track rect.
+/// * `vertical_thumb_rect` - The vertical thumb rect.
+/// * `horizontal_thumb_rect` - The horizontal thumb rect.
+/// * `max_scroll_x` - The max scroll x.
+/// * `max_scroll_y` - The max scroll y.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ResolvedScrollBoxLayout {
-  /// The component viewport: `options.rect` clipped to the developer viewport.
+  /// The viewport rect.
   pub viewport_rect: Rect,
-  /// The visible content area, excluding the cells actually occupied by scrollbars.
+
+  /// The content viewport rect.
   pub content_viewport_rect: Rect,
-  /// The area occupied by the viewport together with the external scrollbars.
+
+  /// The occupied rect.
   pub occupied_rect: Rect,
+  /// The vertical track rect.
   pub vertical_track_rect: Option<Rect>,
+  /// The horizontal track rect.
   pub horizontal_track_rect: Option<Rect>,
+  /// The vertical thumb rect.
   pub vertical_thumb_rect: Option<Rect>,
+  /// The horizontal thumb rect.
   pub horizontal_thumb_rect: Option<Rect>,
+  /// The max scroll x.
   pub max_scroll_x: u16,
+  /// The max scroll y.
   pub max_scroll_y: u16,
 }
 
-/// The description of a slice in the current frame: its resolved position and display attributes.
+/// The slice geometry and drawing data submitted for one composition pass.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `rect` - The rectangular region in terminal cells.
+/// * `source_x` - The source x.
+/// * `source_y` - The source y.
+/// * `visible` - Whether this surface participates in composition.
+/// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `background` - The background color override, or `None` to inherit the default.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SliceFrame {
+  /// The identifier of the owned object.
   pub id: SliceId,
+  /// The rectangular region in terminal cells.
   pub rect: Rect,
-  /// Source position inside the configured slice that maps to `rect`'s top-left cell.
+
+  /// The source x.
   pub source_x: u16,
+  /// The source y.
   pub source_y: u16,
+  /// Whether this surface participates in composition.
   pub visible: bool,
+  /// Whether empty cells cover lower surfaces.
   pub opaque: bool,
+  /// The background color override, or `None` to inherit the default.
   pub background: Option<TextColor>,
 }
 
-/// The description of a scroll box in the current frame: its resolved area layout, content size
-/// and scroll position.
+/// The scroll box geometry and drawing data submitted for one composition pass.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `layout` - The service resolving terminal sizes and positions.
+/// * `content_size` - The content size.
+/// * `scroll_x` - The content offset from the viewport origin in terminal columns.
+/// * `scroll_y` - The content offset from the viewport origin in terminal rows.
+/// * `visible` - Whether this surface participates in composition.
+/// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `scrollbar_style` - The scrollbar style.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScrollBoxFrame {
+  /// The identifier of the owned object.
   pub id: ScrollBoxId,
+  /// The service resolving terminal sizes and positions.
   pub layout: ResolvedScrollBoxLayout,
+  /// The content size.
   pub content_size: Size,
+  /// The content offset from the viewport origin in terminal columns.
   pub scroll_x: u16,
+  /// The content offset from the viewport origin in terminal rows.
   pub scroll_y: u16,
+  /// Whether this surface participates in composition.
   pub visible: bool,
+  /// Whether empty cells cover lower surfaces.
   pub opaque: bool,
+  /// The scrollbar style.
   pub scrollbar_style: ScrollbarStyle,
 }
 
-/// The description of one drawing surface in the current frame, passed to
-/// [`CanvasService::prepare`](super::CanvasService::prepare) in stacking order.
+/// The surface geometry and drawing data submitted for one composition pass.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SurfaceFrame {
+  /// The slice setting for surface frame.
   Slice(SliceFrame),
+  /// The scroll box setting for surface frame.
   ScrollBox(ScrollBoxFrame),
 }
 
 impl SurfaceFrame {
+  /// Return the current id.
   pub fn id(&self) -> SurfaceId {
     match self {
       Self::Slice(frame) => SurfaceId::Slice(frame.id),

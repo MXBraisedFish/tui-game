@@ -1,3 +1,5 @@
+//! Screensaver page state, user commands, and terminal-cell presentation.
+
 use std::{cmp::Ordering, time::Duration};
 
 use unicode_width::UnicodeWidthStr;
@@ -18,44 +20,101 @@ use crate::host_engine::services::{
   UiObjectPool, UiObjectPoolOwner,
 };
 
-/// 屏保包详情页面的命令。
+/// An application request produced by screensaver package interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScreensaverPackageCommand {
+  /// A request to back.
   Back,
+  /// A request to focus search.
   FocusSearch,
+  /// A request to blur search.
   BlurSearch,
+  /// A request to focus jump.
   FocusJump,
+  /// A request to blur jump.
   BlurJump,
+  /// The scroll info up setting for screensaver package command.
   ScrollInfoUp,
+  /// The scroll info down setting for screensaver package command.
   ScrollInfoDown,
+  /// The submit jump setting for screensaver package command.
   SubmitJump(String),
+  /// A request to toggle enabled.
   ToggleEnabled,
+  /// A request to toggle debug.
   ToggleDebug,
 }
 
-/// 屏保包详情页面布局信息。
+/// Resolved geometry and positions used to display screensaver package.
+///
+/// # Fields
+///
+/// * `left_rect` - The left rect.
+/// * `left_inner` - The left inner.
+/// * `right_rect` - The right rect.
+/// * `right_inner` - The right inner.
+/// * `search_rect` - The search rect.
+/// * `sort_bar_y` - The sort bar y.
+/// * `order_rect` - The order rect.
+/// * `sort_rect` - The sort rect.
+/// * `list_area_y` - The list area y.
+/// * `list_area_height` - The list area height in terminal rows.
+/// * `list_start_y` - The list start y.
+/// * `list_item_height` - The list item height in terminal rows.
+/// * `list_item_gap` - The list item gap.
+/// * `visible_items` - The visible items.
+/// * `page_y` - The page y.
+/// * `flip_forward_rect` - The flip forward rect.
+/// * `flip_backward_rect` - The flip backward rect.
+/// * `jump_rect` - The jump rect.
+/// * `page_separator_x` - The page separator x.
+/// * `total_page_x` - The total page x.
+/// * `hint_x` - The hint x.
+/// * `hint_y` - The hint y.
 pub(crate) struct ScreensaverPackageLayout {
+  /// The left rect.
   pub left_rect: Rect,
+  /// The left inner.
   pub left_inner: Rect,
+  /// The right rect.
   pub right_rect: Rect,
+  /// The right inner.
   pub right_inner: Rect,
+  /// The search rect.
   pub search_rect: Rect,
+  /// The sort bar y.
   pub sort_bar_y: u16,
+  /// The order rect.
   pub order_rect: Rect,
+  /// The sort rect.
   pub sort_rect: Rect,
+  /// The list area y.
   pub list_area_y: u16,
+  /// The list area height in terminal rows.
   pub list_area_height: u16,
+  /// The list start y.
   pub list_start_y: u16,
+  /// The list item height in terminal rows.
   pub list_item_height: u16,
+  /// The list item gap.
   pub list_item_gap: u16,
+  /// The visible items.
   pub visible_items: usize,
+  /// The page y.
   pub page_y: u16,
+  /// The flip forward rect.
   pub flip_forward_rect: Rect,
+  /// The flip backward rect.
   pub flip_backward_rect: Rect,
+  /// The jump rect.
   pub jump_rect: Rect,
+  /// The page separator x.
   pub page_separator_x: u16,
+  /// The total page x.
   pub total_page_x: u16,
+  /// The hint x.
   pub hint_x: u16,
+  /// The hint y.
   pub hint_y: u16,
 }
 
@@ -87,11 +146,7 @@ impl ScreensaverSortField {
   }
 }
 
-/// 屏保包详情 UI：左右 33/67 分栏布局。
-///
-/// 左侧：搜索框 + 列表（翻页） + 翻页指示器，包裹在双线边框内。
-/// 右侧：滚动信息盒，包裹在双线边框内。
-/// 底部：操作提示栏。
+/// The state and owned widgets of the screensaver package view.
 pub struct ScreensaverPackageUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -138,7 +193,17 @@ impl RuntimeObjectPoolOwner for ScreensaverPackageUi {
 }
 
 impl ScreensaverPackageUi {
-  /// 初始化屏保包详情 UI。
+  /// Create the screensaver view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `failed to create screensaver info scroll box`.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -215,83 +280,97 @@ impl ScreensaverPackageUi {
     }
   }
 
-  /// 返回按键映射定义。
+  /// Return the shortcuts currently enabled by the screensaver view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "screensaver_pack.flip_forward".to_string(),
         description: "Previous list page".to_string(),
         keys: vec![vec!["q".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.flip_backward".to_string(),
         description: "Next list page".to_string(),
         keys: vec![vec!["e".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.scroll_up".to_string(),
         description: "Scroll info up".to_string(),
         keys: vec![vec!["w".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.scroll_down".to_string(),
         description: "Scroll info down".to_string(),
         keys: vec![vec!["s".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.focus_up".to_string(),
         description: "Focus previous item".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.focus_down".to_string(),
         description: "Focus next item".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.confirm".to_string(),
         description: "Toggle selection".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.list.back".to_string(),
         description: "Go back to mods menu".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.debug".to_string(),
         description: "Toggle debug mode".to_string(),
         keys: vec![vec!["n".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.list".to_string(),
         description: "Toggle list style".to_string(),
         keys: vec![vec!["l".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.search".to_string(),
         description: "Search".to_string(),
         keys: vec![vec!["c".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.order".to_string(),
         description: "Toggle order".to_string(),
         keys: vec![vec!["z".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.sort".to_string(),
         description: "Toggle sort".to_string(),
         keys: vec![vec!["x".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "screensaver_pack.jump".to_string(),
         description: "Jump to page".to_string(),
         keys: vec![vec!["j".to_string()]],
+        priority: 0,
       },
     ]
   }
 
-  /// 处理 UI 事件，返回导航命令。
+  /// Interpret a screensaver UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ScreensaverPackageCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -406,26 +485,31 @@ impl ScreensaverPackageUi {
     }
   }
 
+  /// Focus the list's search input and switch interaction to text editing.
   pub fn focus_search(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.focus(&mut self.objects, self.search_input);
   }
 
+  /// Release search-input focus and return interaction to list navigation.
   pub fn blur_search(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Focus the page-number input for a direct list jump.
   pub fn focus_jump(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.set_text(&mut self.objects, self.jump_input, self.page.to_string());
     self.jump_text = self.page.to_string();
     let _ = text_input.focus(&mut self.objects, self.jump_input);
   }
 
+  /// Release page-number input focus.
   pub fn blur_jump(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.set_text(&mut self.objects, self.jump_input, self.page.to_string());
     self.jump_text = self.page.to_string();
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Validate the entered page number and move the list to that page.
   pub fn submit_jump(&mut self, text_input: &mut TextInputService, value: String) {
     if let Ok(page) = value.trim().parse::<usize>() {
       self.page = page.clamp(1, self.total_pages());
@@ -437,6 +521,7 @@ impl ScreensaverPackageUi {
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Toggle the selected package's enabled state and persist the package profile.
   pub fn toggle_selected_enabled(&mut self, storage: &StorageService, log: &mut LogService) {
     let Some((mod_id, package_id, enabled)) =
       self.selected_entry_state(|entry| (entry.mod_id.clone(), entry.id.clone(), !entry.enabled))
@@ -447,13 +532,16 @@ impl ScreensaverPackageUi {
     let _ = storage.update_screensaver_package_state(&package_id, log, |state| {
       state.enabled = enabled;
       if enabled {
-        // 包总开关重新打开时只恢复可见性，不自动加入局内屏保列表。
+        // Re-enabling a package restores visibility but does not add it to the in-game
+        // screensaver rotation.
+
         state.playlist_enabled = false;
         state.order = None;
       }
     });
   }
 
+  /// Toggle the selected package's debug state and persist the package profile.
   pub fn toggle_selected_debug(&mut self, storage: &StorageService, log: &mut LogService) {
     let Some((mod_id, package_id, debug)) =
       self.selected_entry_state(|entry| (entry.mod_id.clone(), entry.id.clone(), !entry.debug))
@@ -464,16 +552,24 @@ impl ScreensaverPackageUi {
     let _ = storage.update_screensaver_package_state(&package_id, log, |state| state.debug = debug);
   }
 
+  /// Scroll the selected entry's detail viewport by the requested row delta.
+  ///
+  /// # Arguments
+  ///
+  /// * `scroll_box` - The scroll box.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `lines` - The lines.
   pub fn scroll_info(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, lines: i32) {
     let _ = scroll_box.scroll_by(&mut self.objects, self.info_scroll, 0, lines, layout);
   }
 
+  /// Advance the screensaver view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<ScreensaverPackageCommand> {
     let _ = dt;
     None
   }
 
-  /// 渲染屏保包详情页面。
+  /// Draw the screensaver view and register interaction regions in its assigned surfaces.
   pub fn render(&mut self, context: &mut PackageListRenderContext<'_>) -> Option<(u16, u16)> {
     self.sync_entries(
       context.package.mod_screensavers(),
@@ -586,8 +682,13 @@ impl ScreensaverPackageUi {
     input_cursor
   }
 
-  // ─── 布局计算 ──────────────────────────────────────────
-
+  /// Resolve the screensaver view's terminal-cell layout from its available dimensions.
+  ///
+  /// # Arguments
+  ///
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `text_input` - The text input.
   pub fn compute_positions(
     &self,
     layout: &LayoutService,
@@ -745,8 +846,6 @@ impl ScreensaverPackageUi {
       hint_y,
     }
   }
-
-  // ─── 绘制 ──────────────────────────────────────────────
 
   fn draw_left_panel(
     &mut self,
@@ -1788,8 +1887,6 @@ impl ScreensaverPackageUi {
       );
     }
   }
-
-  // ─── 辅助方法 ──────────────────────────────────────────
 
   fn package_rich_params(entry: &PackageListEntry) -> RichTextParams {
     RichTextParams::from_key_action_maps(&entry.key_actions, &entry.key_default_actions)

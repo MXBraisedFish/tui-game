@@ -1,3 +1,5 @@
+//! Boot loading page state, user commands, and terminal-cell presentation.
+
 use crate::host_engine::services::{
   CanvasService, DrawTextParams, I18nService, LayoutService, RenderService, TextColor, TextMode,
 };
@@ -18,19 +20,29 @@ const ACTIVE_COLOR: TextColor = TextColor::Rgb {
   b: 190,
 };
 
+/// The startup stage displayed in the boot progress screen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BootStage {
+  /// The storage stage of the operation.
   Storage,
+  /// The terminal stage of the operation.
   Terminal,
+  /// The language stage of the operation.
   Language,
+  /// The services stage of the operation.
   Services,
+  /// The packages stage of the operation.
   Packages,
+  /// The listeners stage of the operation.
   Listeners,
+  /// The runtime stage of the operation.
   Runtime,
+  /// The ready stage of the operation.
   Ready,
 }
 
 impl BootStage {
+  /// The all used by this module.
   pub const ALL: [Self; 8] = [
     Self::Storage,
     Self::Terminal,
@@ -76,14 +88,25 @@ impl BootStage {
   }
 }
 
+/// The current startup stage and its completed fraction.
+///
+/// # Fields
+///
+/// * `stage` - The boot stage carried by this boot progress.
+/// * `stage_progress` - The stage progress.
+/// * `ready` - The ready.
 #[derive(Clone, Copy, Debug)]
 pub struct BootProgress {
+  /// The boot stage carried by this boot progress.
   pub stage: BootStage,
+  /// The stage progress.
   pub stage_progress: f32,
+  /// The ready.
   pub ready: bool,
 }
 
 impl BootProgress {
+  /// Create a boot-progress snapshot for the requested stage.
   pub fn at(stage: BootStage) -> Self {
     Self {
       stage,
@@ -92,6 +115,7 @@ impl BootProgress {
     }
   }
 
+  /// Update boot progress with the package currently being scanned.
   pub fn package(scanned: usize, total: usize) -> Self {
     Self {
       stage: BootStage::Packages,
@@ -104,6 +128,7 @@ impl BootProgress {
     }
   }
 
+  /// Return the current ready.
   pub fn ready() -> Self {
     Self {
       stage: BootStage::Ready,
@@ -122,9 +147,19 @@ impl BootProgress {
   }
 }
 
+/// The state and owned widgets of the boot loading view.
 pub struct BootLoadingUi;
 
 impl BootLoadingUi {
+  /// Draw the boot loading view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `progress` - The progress.
   pub fn render(
     render: &mut RenderService,
     canvas: &mut CanvasService,

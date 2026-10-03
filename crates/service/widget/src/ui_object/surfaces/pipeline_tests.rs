@@ -1,4 +1,4 @@
-//! Frame composition of widget-created slices and scroll boxes (widget + canvas + render pipeline).
+//! Regression checks for widget behavior and relevant failure paths.
 
 use crate::{
   Overflow, ScrollBoxOptions, ScrollBoxService, ScrollbarPolicy, ScrollbarVisibility, SliceLength,

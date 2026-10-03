@@ -1,5 +1,4 @@
-//! Minimal entry: shows a popup, dismisses it with a matching event after the minimum
-//! display delay and checks it is gone.
+//! Independent popup smoke entry exercising the public API and checking its results.
 
 use std::time::Duration;
 

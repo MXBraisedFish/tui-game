@@ -1,5 +1,13 @@
+//! Lua event library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Build and register the Lua event API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn event(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, command) in [

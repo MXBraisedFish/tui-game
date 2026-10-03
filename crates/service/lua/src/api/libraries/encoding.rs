@@ -1,8 +1,16 @@
+//! Lua encoding library bindings with validated arguments and session-owned host access.
+
 use base64::Engine;
 use mlua::{Lua, MultiValue, Table, Value};
 
 use super::*;
 
+/// Build and register the Lua encoding API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn encoding(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   install_base64(lua, &source)?;

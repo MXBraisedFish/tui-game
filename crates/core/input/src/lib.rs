@@ -1,4 +1,14 @@
-//! Input data model: keys, key patterns/bindings, action maps, key tokens and terminal system events.
+//! Keyboard and mouse events, action bindings, and portable key tokens.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_input::{canonical_key_token, parse_key_token};
+//!
+//! assert!(parse_key_token("a").is_some());
+//! assert_eq!(canonical_key_token(" A "), Some("a".to_string()));
+//! assert!(parse_key_token("unknown-key").is_none());
+//! ```
 
 mod action_map;
 mod events;

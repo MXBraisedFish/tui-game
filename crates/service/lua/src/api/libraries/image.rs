@@ -1,8 +1,20 @@
+//! Lua image library bindings with validated arguments and session-owned host access.
+
 use super::*;
 use crate::MAX_LUA_IMAGE_TASKS_PER_SESSION;
 use crate::path::{SafeRelativePath, SandboxPathError, SandboxPathKind, resolve_sandbox_path};
 use tg_service_image::{ImageConvertMode, ImageConvertParams};
 
+/// Build and register the Lua image API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
+///
+/// # Panics
+///
+/// Panic if an internal invariant is violated: `mode has a default`.
 pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   let load_state = state;

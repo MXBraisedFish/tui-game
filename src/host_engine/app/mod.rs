@@ -1,4 +1,4 @@
-//! Application-owned state, event routing and service composition.
+//! Application-owned state, service composition, event routing, and business orchestration.
 
 mod async_runtime;
 mod boot_output;

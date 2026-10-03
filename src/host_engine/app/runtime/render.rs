@@ -1,7 +1,18 @@
+//! Visible page and overlay rendering according to application composition order.
+
 use super::*;
 use super::{host_viewport::apply_host_viewport, router::current_objects_mut};
 use crate::host_engine::services::UiObjectPoolOwner;
 
+/// Draw the active page and visible overlays in composition order, returning any requested
+/// terminal cursor.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `context` - The state and services needed for the operation.
+/// * `game_warning_seconds_left` - The game warning seconds left.
 pub(super) fn route_render(
   services: &mut EngineServices,
   world: &RuntimeWorld,

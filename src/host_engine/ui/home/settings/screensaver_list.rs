@@ -1,3 +1,5 @@
+//! Screensaver list page state, user commands, and terminal-cell presentation.
+
 use std::{cmp::Ordering, time::Duration};
 
 use unicode_width::UnicodeWidthStr;
@@ -47,16 +49,25 @@ impl SortField {
   }
 }
 
+/// An application request produced by screensaver list interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScreensaverListCommand {
+  /// A request to back.
   Back,
+  /// A request to focus search.
   FocusSearch,
+  /// A request to blur search.
   BlurSearch,
+  /// A request to set enabled.
   SetEnabled {
+    /// The stable source, type, and name of the package.
     package_id: PackageId,
+    /// Whether the feature is enabled.
     enabled: bool,
   },
+  /// A request to save order.
   SaveOrder(Vec<PackageId>),
+  /// The scroll setting for screensaver list command.
   Scroll(i32),
 }
 
@@ -73,6 +84,7 @@ struct ScreensaverListLayout {
   hint_lines: Vec<String>,
 }
 
+/// The state and owned widgets of the screensaver list view.
 pub struct ScreensaverListUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -121,6 +133,17 @@ impl RuntimeObjectPoolOwner for ScreensaverListUi {
 }
 
 impl ScreensaverListUi {
+  /// Create the screensaver list view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `failed to create screensaver list scroll box`.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -186,6 +209,7 @@ impl ScreensaverListUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the screensaver list view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     [
       ("screensaver_list.focus_up.move_up", "up"),
@@ -205,10 +229,12 @@ impl ScreensaverListUi {
       action: action.to_string(),
       description: action.to_string(),
       keys: vec![vec![key.to_string()]],
+      priority: 0,
     })
     .collect()
   }
 
+  /// Interpret a screensaver list UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ScreensaverListCommand> {
     match event {
       UiEvent::TextInput(TextInputEvent::Pressed { id }) if *id == self.search_input => {
@@ -338,19 +364,29 @@ impl ScreensaverListUi {
     }
   }
 
+  /// Advance the screensaver list view's transient state for this host frame.
   pub fn update(&mut self, _dt: Duration) -> Option<ScreensaverListCommand> {
     None
   }
 
+  /// Focus the list's search input and switch interaction to text editing.
   pub fn focus_search(&mut self, text_input: &mut TextInputService) {
     self.active = ActiveList::Disabled;
     let _ = text_input.focus(&mut self.objects, self.search_input);
   }
 
+  /// Release search-input focus and return interaction to list navigation.
   pub fn blur_search(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Scroll the active list panel and keep its selection within the visible rows.
+  ///
+  /// # Arguments
+  ///
+  /// * `scroll_box` - The scroll box.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `dy` - The dy.
   pub fn scroll_active(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, dy: i32) {
     let id = match self.active {
       ActiveList::Disabled => self.left_scroll,
@@ -384,7 +420,17 @@ impl ScreensaverListUi {
     }
   }
 
-  // reason: the runtime calls this signature from outside ui/, so it cannot be changed here.
+  /// Draw the screensaver list view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
@@ -405,7 +451,17 @@ impl ScreensaverListUi {
     input_cursor
   }
 
-  // reason: the runtime calls this signature from outside ui/, so it cannot be changed here.
+  /// Resolve and submit the screensaver list view's drawing surfaces for this frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  /// * `package` - The validated package snapshot.
+  /// * `storage` - The deployment-relative storage service.
+  /// * `log` - The service receiving diagnostic records.
   #[allow(clippy::too_many_arguments)]
   pub(crate) fn prepare_surfaces(
     &mut self,
@@ -447,8 +503,9 @@ impl ScreensaverListUi {
     });
     for entry in &mut self.entries {
       let state = profile.screensaver(&entry.id);
-      // On this page `enabled` means "in the in-game screensaver list", not the package
-      // manager's master switch.
+      // This page edits in-game screensaver rotation membership, independently of the package
+      // master switch.
+
       entry.enabled = state.is_none_or(|state| state.playlist_enabled || state.order.is_some());
       entry.debug = state.map_or(profile.defaults.debug, |state| state.debug);
     }
@@ -619,6 +676,7 @@ impl ScreensaverListUi {
     }
   }
 
+  /// Drain and return the queued order command.
   pub fn take_order_command(&self) -> ScreensaverListCommand {
     ScreensaverListCommand::SaveOrder(
       self
@@ -1349,6 +1407,7 @@ mod tests {
       score_enabled: false,
       score_empty_text: String::new(),
       best_string: None,
+      best_values: std::collections::HashMap::new(),
       min_width: 0,
       min_height: 0,
       screensaver_command: String::new(),

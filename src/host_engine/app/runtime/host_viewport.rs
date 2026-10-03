@@ -1,8 +1,12 @@
+//! Physical terminal requirements and developer/base viewport synchronization.
+
 use super::*;
 use crate::host_engine::services::{HostObjectPool, LayoutService, Rect, Size};
 
+/// The program default min size used by this module.
 pub(super) const PROGRAM_DEFAULT_MIN_SIZE: (u32, u32) = (95, 24);
 
+/// Refresh physical host areas and apply the remaining developer viewport to the layout service.
 pub(super) fn apply_host_viewport(services: &mut EngineServices, top_toolbar: bool) {
   refresh_host_areas(
     &mut services.host_objects,
@@ -57,6 +61,7 @@ fn refresh_host_areas(host_objects: &mut HostObjectPool, physical: Size, top_too
   );
 }
 
+/// Return the terminal size remaining after reserving host toolbar space, saturating at zero.
 pub(super) fn developer_size(physical: Size, top_toolbar: bool) -> Size {
   let reserved = reserved_size(top_toolbar);
   Size {
@@ -65,6 +70,8 @@ pub(super) fn developer_size(physical: Size, top_toolbar: bool) -> Size {
   }
 }
 
+/// Add reserved host space to a base requirement to obtain the required physical terminal
+/// dimensions.
 pub(super) fn required_physical_size(required_base: (u64, u64), top_toolbar: bool) -> (u64, u64) {
   let reserved = reserved_size(top_toolbar);
   (

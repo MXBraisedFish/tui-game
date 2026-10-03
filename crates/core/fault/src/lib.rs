@@ -1,5 +1,13 @@
-//! Host fault supervision: fault classification, panic capture into [`HostFault`] values and
-//! the crash log.
+//! Panic supervision, fault classification, terminal restoration, and crash records.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_fault::{HostFaultDomain, HostFaultPhase, catch_host_fault};
+//!
+//! let result = catch_host_fault(HostFaultPhase::Runtime, HostFaultDomain::Other, || 42);
+//! assert_eq!(result.expect("successful operation"), 42);
+//! ```
 
 use std::backtrace::Backtrace;
 use std::cell::{Cell, RefCell};
@@ -10,47 +18,91 @@ mod crash;
 
 pub use crash::{CrashPhase, finalize_host_fault, install_panic_hook, set_crash_phase};
 
+/// The supervised host phase in which a fault occurred.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostFaultPhase {
+  /// The boot stage of the operation.
   Boot,
+  /// The runtime stage of the operation.
   Runtime,
+  /// The shutdown stage of the operation.
   Shutdown,
 }
 
+/// The subsystem responsible for a supervised fault.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostFaultDomain {
+  /// The storage setting for host fault domain.
   Storage,
+  /// The terminal setting for host fault domain.
   Terminal,
+  /// The i18n setting for host fault domain.
   I18n,
+  /// The package setting for host fault domain.
   Package,
+  /// The input setting for host fault domain.
   Input,
+  /// The audio setting for host fault domain.
   Audio,
+  /// The network setting for host fault domain.
   Network,
+  /// The lua setting for host fault domain.
   Lua,
+  /// The ui setting for host fault domain.
   Ui,
+  /// The render setting for host fault domain.
   Render,
+  /// The async setting for host fault domain.
   Async,
+  /// The other setting for host fault domain.
   Other,
 }
 
+/// The classification of a returned failure or captured panic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostFaultKind {
+  /// The error failure condition.
   Error,
+  /// The panic failure condition.
   Panic,
+  /// The invariant failure condition.
   Invariant,
 }
 
+/// A classified host failure with phase, domain, diagnostic detail, and captured panic context.
+///
+/// # Fields
+///
+/// * `phase` - The host fault phase carried by this host fault.
+/// * `domain` - The subsystem used to classify a fault.
+/// * `kind` - The host fault kind carried by this host fault.
+/// * `detail` - The diagnostic detail attached to the fault.
+/// * `location` - The location.
+/// * `backtrace` - The backtrace.
 #[derive(Clone, Debug)]
 pub struct HostFault {
+  /// The host fault phase carried by this host fault.
   pub phase: HostFaultPhase,
+  /// The subsystem used to classify a fault.
   pub domain: HostFaultDomain,
+  /// The host fault kind carried by this host fault.
   pub kind: HostFaultKind,
+  /// The diagnostic detail attached to the fault.
   pub detail: String,
+  /// The location.
   pub location: Option<String>,
+  /// The backtrace.
   pub backtrace: String,
 }
 
 impl HostFault {
+  /// Create a non-panic host fault with the supplied phase, domain, and diagnostic detail.
+  ///
+  /// # Arguments
+  ///
+  /// * `phase` - The lifecycle phase used to classify the operation.
+  /// * `domain` - The subsystem used to classify a fault.
+  /// * `detail` - The diagnostic detail attached to the fault.
   pub fn error(phase: HostFaultPhase, domain: HostFaultDomain, detail: impl Into<String>) -> Self {
     Self {
       phase,
@@ -75,16 +127,28 @@ impl fmt::Display for HostFault {
 
 impl std::error::Error for HostFault {}
 
+/// A panic payload, source location, and backtrace retained by the panic hook.
+///
+/// # Fields
+///
+/// * `domain` - The subsystem used to classify a fault.
+/// * `detail` - The diagnostic detail attached to the fault.
+/// * `location` - The location.
+/// * `backtrace` - The backtrace.
 #[derive(Clone, Debug)]
 pub struct CapturedPanic {
+  /// The subsystem used to classify a fault.
   pub domain: HostFaultDomain,
+  /// The diagnostic detail attached to the fault.
   pub detail: String,
+  /// The location.
   pub location: Option<String>,
+  /// The backtrace.
   pub backtrace: String,
 }
 
-// reason: the allows below silence a clippy false positive; every initializer is already a
-// `const { ... }` block.
+// Keep the lint override local: these thread-local initializers already use const blocks.
+
 thread_local! {
   #[allow(clippy::missing_const_for_thread_local)]
   static SUPERVISED: Cell<bool> = const { Cell::new(false) };
@@ -94,14 +158,17 @@ thread_local! {
   static CAPTURED_PANIC: RefCell<Option<CapturedPanic>> = const { RefCell::new(None) };
 }
 
+/// Report whether the current thread is inside a host fault boundary.
 pub fn is_supervised() -> bool {
   SUPERVISED.get()
 }
 
+/// Return the fault domain assigned to the current thread.
 pub fn current_fault_domain() -> HostFaultDomain {
   CURRENT_DOMAIN.get()
 }
 
+/// Run an operation with a temporary fault domain and restore the previous domain afterward.
 pub fn with_fault_domain<T>(domain: HostFaultDomain, operation: impl FnOnce() -> T) -> T {
   let previous = CURRENT_DOMAIN.replace(domain);
   let result = operation();
@@ -109,19 +176,23 @@ pub fn with_fault_domain<T>(domain: HostFaultDomain, operation: impl FnOnce() ->
   result
 }
 
+/// Store the current supervised panic report for the enclosing fault boundary.
 pub fn capture_panic(report: CapturedPanic) {
   CAPTURED_PANIC.with_borrow_mut(|slot| *slot = Some(report));
 }
 
-/// Runs one coarse host region under panic supervision. External/data errors
-/// should still be represented as normal Results inside the region; only a
-/// host panic crosses this boundary.
+/// Run an operation under panic supervision and return its value or a classified host fault.
+///
+/// # Arguments
+///
+/// * `phase` - The lifecycle phase used to classify the operation.
+/// * `domain` - The subsystem used to classify a fault.
+/// * `operation` - The operation to execute within the boundary.
 ///
 /// # Errors
 ///
-/// Returns a [`HostFaultKind::Panic`] fault when `operation` panics. Its domain, detail,
-/// location and backtrace come from the report captured by the panic hook; without such a
-/// report the requested domain, the panic payload and a fresh backtrace are used instead.
+/// Return a panic-classified host fault when the operation panics; ordinary errors returned by
+/// the operation remain part of its successful return value.
 pub fn catch_host_fault<T>(
   phase: HostFaultPhase,
   domain: HostFaultDomain,
@@ -156,6 +227,7 @@ pub fn catch_host_fault<T>(
   }
 }
 
+/// Extract a string panic payload, using a stable fallback for other payload types.
 pub(crate) fn panic_payload(payload: &Box<dyn std::any::Any + Send>) -> String {
   if let Some(message) = payload.downcast_ref::<&str>() {
     (*message).to_string()

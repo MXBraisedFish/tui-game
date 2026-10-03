@@ -1,3 +1,5 @@
+//! Host scheduling helpers and re-exported independent fault and package-identity cores.
+
 pub mod clock;
 pub mod exit_state;
 pub use tg_core_fault as fault;

@@ -1,3 +1,5 @@
+//! Lua mod library bindings with validated arguments and session-owned host access.
+
 mod binary;
 mod ini;
 mod value;
@@ -7,6 +9,12 @@ use mlua::{Lua, MultiValue, Table, Value};
 
 use super::*;
 
+/// Build and register the Lua serialization API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn serialization(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   let null = Value::UserData(lua.create_userdata(value::NullSentinel)?);

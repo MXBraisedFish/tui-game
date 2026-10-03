@@ -1,3 +1,5 @@
+//! Recording settings page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -25,6 +27,7 @@ const LABEL_KEYS: [&str; MENU_LEN] = [
   "recording_settings.video_gpu",
 ];
 
+/// The state and owned widgets of the recording settings view.
 pub struct RecordingSettingsUi {
   selected_index: usize,
   profile: RecordingProfile,
@@ -37,17 +40,28 @@ pub struct RecordingSettingsUi {
   fonts: FontsSettingsUi,
 }
 
+/// An application request produced by recording settings interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecordingSettingsCommand {
+  /// A request to back.
   Back,
+  /// The changed setting for recording settings command.
   Changed(RecordingProfile),
+  /// The changed fonts setting for recording settings command.
   ChangedFonts(Vec<String>),
+  /// A request to export font preview.
   ExportFontPreview(Vec<String>),
+  /// A request to open fonts.
   OpenFonts,
+  /// A request to start add font.
   StartAddFont,
+  /// A request to start modify font.
   StartModifyFont,
+  /// The finish font edit setting for recording settings command.
   FinishFontEdit(String),
+  /// A request to cancel font edit.
   CancelFontEdit,
+  /// The scroll fonts setting for recording settings command.
   ScrollFonts(i32),
 }
 
@@ -72,6 +86,15 @@ impl RuntimeObjectPoolOwner for RecordingSettingsUi {
 }
 
 impl RecordingSettingsUi {
+  /// Create the recording settings view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  /// * `profile` - The user profile being read or updated.
+  /// * `shared_fonts` - The shared fonts.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -94,6 +117,7 @@ impl RecordingSettingsUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the recording settings view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     let mut actions = vec![
       action("recording_settings.focus_up", "up", "Focus previous option"),
@@ -146,6 +170,7 @@ impl RecordingSettingsUi {
     actions
   }
 
+  /// Interpret a recording settings UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<RecordingSettingsCommand> {
     if self.fonts_open {
       return self.fonts.handle_event(event).map(|command| match command {
@@ -207,29 +232,42 @@ impl RecordingSettingsUi {
     }
   }
 
+  /// Advance the recording settings view's transient state for this host frame.
   pub fn update(&mut self, _dt: Duration) {}
 
+  /// Open the font-preference editor with a copy of the current shared preferences.
   pub fn open_fonts(&mut self) {
     self.fonts_open = true;
     self.fonts.enter(self.shared_fonts.clone());
   }
 
+  /// Begin appending a font preference through the owned editor.
   pub fn start_add_font(&mut self, text_input: &mut TextInputService) {
     self.fonts.start_add(&mut self.objects, text_input);
   }
 
+  /// Begin modifying the selected font preference through the owned editor.
   pub fn start_modify_font(&mut self, text_input: &mut TextInputService) {
     self.fonts.start_modify(&mut self.objects, text_input);
   }
 
+  /// Apply the entered font preference through the owned editor.
   pub fn finish_font_edit(&mut self, text_input: &mut TextInputService, value: String) {
     self.fonts.finish_edit(&mut self.objects, text_input, value);
   }
 
+  /// Discard the pending preference edit and release editor focus.
   pub fn cancel_font_edit(&mut self, text_input: &mut TextInputService) {
     self.fonts.cancel_edit(&mut self.objects, text_input);
   }
 
+  /// Resolve and submit the recording settings view's drawing surfaces for this frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `scroll_box` - The scroll box.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
   pub fn prepare_surfaces(
     &mut self,
     scroll_box: &ScrollBoxService,
@@ -243,12 +281,30 @@ impl RecordingSettingsUi {
     }
   }
 
+  /// Scroll font preferences while the font editor is open.
+  ///
+  /// # Arguments
+  ///
+  /// * `scroll_box` - The scroll box.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `dy` - The dy.
   pub fn scroll_fonts(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, dy: i32) {
     if self.fonts_open {
       self.fonts.scroll(&mut self.objects, scroll_box, layout, dy);
     }
   }
 
+  /// Draw the recording settings view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
@@ -508,6 +564,7 @@ fn action(name: &str, key: &str, description: &str) -> ActionMapEntry {
     action: name.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }
 

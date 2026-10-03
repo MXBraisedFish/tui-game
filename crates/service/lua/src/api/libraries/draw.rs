@@ -1,5 +1,13 @@
+//! Lua draw library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Submit the component's configured drawing state to the current canvas frame.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   let text_state = state.clone();

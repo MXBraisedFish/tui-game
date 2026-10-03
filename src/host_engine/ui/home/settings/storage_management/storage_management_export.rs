@@ -1,3 +1,5 @@
+//! Storage management export page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -20,6 +22,7 @@ const MENU_KEYS: &[&str] = &[
   "storage_management_export.export.data",
 ];
 
+/// The state and owned widgets of the storage management export view.
 pub struct StorageManagementExportUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -28,6 +31,7 @@ pub struct StorageManagementExportUi {
   menu_areas: [HitAreaId; MENU_LEN],
 }
 
+/// Resolved geometry and positions used to display storage management export.
 pub(crate) struct StorageManagementExportLayout {
   title_x: u16,
   title_y: u16,
@@ -36,15 +40,24 @@ pub(crate) struct StorageManagementExportLayout {
   hint_y: u16,
 }
 
+/// An application request produced by storage management export interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StorageManagementExportCommand {
+  /// A request to back.
   Back,
+  /// A request to export cache.
   ExportCache,
+  /// A request to export log.
   ExportLog,
+  /// A request to export mod.
   ExportMod,
+  /// A request to export profile.
   ExportProfile,
+  /// A request to export screenshot.
   ExportScreenshot,
+  /// A request to export recording.
   ExportRecording,
+  /// A request to export data.
   ExportData,
 }
 
@@ -69,6 +82,7 @@ impl RuntimeObjectPoolOwner for StorageManagementExportUi {
 }
 
 impl StorageManagementExportUi {
+  /// Create the storage management export view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -80,66 +94,79 @@ impl StorageManagementExportUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the storage management export view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "storage_management_export.focus_up".to_string(),
         description: "Focus previous export option".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.focus_down".to_string(),
         description: "Focus next export option".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.confirm".to_string(),
         description: "Confirm selected export option".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.back".to_string(),
         description: "Back to storage management".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.focus_cache".to_string(),
         description: "Focus export cache".to_string(),
         keys: vec![vec!["1".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.focus_log".to_string(),
         description: "Focus export log".to_string(),
         keys: vec![vec!["2".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.focus_mod".to_string(),
         description: "Focus export mod".to_string(),
         keys: vec![vec!["3".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.focus_profile".to_string(),
         description: "Focus export profile".to_string(),
         keys: vec![vec!["4".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.focus_screenshot".to_string(),
         description: "Focus export screenshot".to_string(),
         keys: vec![vec!["5".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.focus_recording".to_string(),
         description: "Focus export recording".to_string(),
         keys: vec![vec!["6".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_export.focus_data".to_string(),
         description: "Focus export data".to_string(),
         keys: vec![vec!["7".to_string()]],
+        priority: 0,
       },
     ]
   }
 
+  /// Interpret a storage management export UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<StorageManagementExportCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -203,11 +230,22 @@ impl StorageManagementExportUi {
     }
   }
 
+  /// Advance the storage management export view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<StorageManagementExportCommand> {
     let _ = dt;
     None
   }
 
+  /// Draw the storage management export view and register interaction regions in its assigned
+  /// surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,

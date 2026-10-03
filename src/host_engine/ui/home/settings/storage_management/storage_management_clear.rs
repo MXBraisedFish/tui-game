@@ -1,3 +1,5 @@
+//! Storage management clear page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -20,6 +22,7 @@ const MENU_KEYS: &[&str] = &[
   "storage_management.clear.data",
 ];
 
+/// The state and owned widgets of the storage management clear view.
 pub struct StorageManagementClearUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -28,6 +31,7 @@ pub struct StorageManagementClearUi {
   menu_areas: [HitAreaId; MENU_LEN],
 }
 
+/// Resolved geometry and positions used to display storage management clear.
 pub(crate) struct StorageManagementClearLayout {
   title_x: u16,
   title_y: u16,
@@ -36,15 +40,24 @@ pub(crate) struct StorageManagementClearLayout {
   hint_y: u16,
 }
 
+/// An application request produced by storage management clear interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StorageManagementClearCommand {
+  /// A request to back.
   Back,
+  /// A request to clear cache.
   ClearCache,
+  /// A request to clear log.
   ClearLog,
+  /// A request to clear mod.
   ClearMod,
+  /// A request to clear profile.
   ClearProfile,
+  /// A request to clear screenshot.
   ClearScreenshot,
+  /// A request to clear recording.
   ClearRecording,
+  /// A request to clear data.
   ClearData,
 }
 
@@ -69,6 +82,7 @@ impl RuntimeObjectPoolOwner for StorageManagementClearUi {
 }
 
 impl StorageManagementClearUi {
+  /// Create the storage management clear view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -80,66 +94,79 @@ impl StorageManagementClearUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the storage management clear view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "storage_management_clear.focus_up".to_string(),
         description: "Focus previous clear option".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.focus_down".to_string(),
         description: "Focus next clear option".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.confirm".to_string(),
         description: "Confirm selected clear option".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.back".to_string(),
         description: "Back to storage management".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.focus_cache".to_string(),
         description: "Focus clear cache".to_string(),
         keys: vec![vec!["1".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.focus_log".to_string(),
         description: "Focus clear log".to_string(),
         keys: vec![vec!["2".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.focus_mod".to_string(),
         description: "Focus clear mod".to_string(),
         keys: vec![vec!["3".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.focus_profile".to_string(),
         description: "Focus clear profile".to_string(),
         keys: vec![vec!["4".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.focus_screenshot".to_string(),
         description: "Focus clear screenshot".to_string(),
         keys: vec![vec!["5".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.focus_recording".to_string(),
         description: "Focus clear recording".to_string(),
         keys: vec![vec!["6".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_clear.focus_data".to_string(),
         description: "Focus clear data".to_string(),
         keys: vec![vec!["7".to_string()]],
+        priority: 0,
       },
     ]
   }
 
+  /// Interpret a storage management clear UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<StorageManagementClearCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -203,11 +230,22 @@ impl StorageManagementClearUi {
     }
   }
 
+  /// Advance the storage management clear view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<StorageManagementClearCommand> {
     let _ = dt;
     None
   }
 
+  /// Draw the storage management clear view and register interaction regions in its assigned
+  /// surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,

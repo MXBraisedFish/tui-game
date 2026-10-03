@@ -1,3 +1,5 @@
+//! Composition of clipped base, host, widget, and top-layer cells.
+
 use super::{ComposedCell, ComposedFrame};
 use tg_core_style::{CanvasCell, TextColor};
 use tg_core_unicode::graphemes;
@@ -5,8 +7,7 @@ use tg_service_canvas::CanvasService;
 use tg_service_canvas::buffer::CanvasBuffer;
 use tg_service_canvas::{PreparedScrollBox, PreparedSurface};
 
-/// The frame compositor, stacking the base layer, the developer surfaces (slices and scroll boxes),
-/// the host layer and the top layer, in that order, into one composed frame.
+/// The frame compositor representation used by this module.
 pub struct FrameCompositor;
 
 impl Default for FrameCompositor {
@@ -16,11 +17,12 @@ impl Default for FrameCompositor {
 }
 
 impl FrameCompositor {
+  /// Create a frame compositor with its initial state.
   pub fn new() -> Self {
     Self
   }
 
-  /// Composes the canvas layers in stacking order (base -> surfaces -> host -> top) into a frame.
+  /// Combine prepared drawing surfaces into the frame presented to the physical terminal.
   pub fn compose(&self, canvas: &CanvasService) -> ComposedFrame {
     let host = canvas.host_buffer();
     let mut frame = ComposedFrame::new(host.width(), host.height());

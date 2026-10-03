@@ -1,6 +1,4 @@
--- Pulse Grid: rings of colour pulse outward from the centre of a cell grid.
--- Exercises color.rgb/hex, math trigonometry, table.deepcopy/sort/concat and
--- interpolation between fixed updates through UpdateFrame's alpha.
+-- Pulse grid package callbacks and terminal-cell drawing.
 
 local CELL_WIDTH = 6
 local CELL_HEIGHT = 3
@@ -21,7 +19,7 @@ local shown_phase = 0
 local shades = {}
 local cells = {}
 
--- Sorts a copy of the palette from dark to bright and precomputes the shade strings.
+-- Construct the color sequence used by the pulsing grid.
 local function build_shades()
   local stops = table.deepcopy(PALETTE)
   table.sort(stops, function(left, right)
@@ -43,7 +41,7 @@ local function build_shades()
   end
 end
 
--- Caches every cell position with its distance from the grid centre.
+-- Rebuild grid-cell placement for the current screen dimensions.
 local function layout_cells()
   cells = {}
   local columns = width // CELL_WIDTH
@@ -63,6 +61,7 @@ local function layout_cells()
   end
 end
 
+-- Initialize package state from the supplied base dimensions and startup data.
 function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
@@ -70,6 +69,7 @@ function Init(ctx)
   layout_cells()
 end
 
+-- Apply the resize, action, or completion events handled by this package.
 function HandleEvent(event)
   if event.type == "resize" then
     width = event.data.width
@@ -78,15 +78,18 @@ function HandleEvent(event)
   end
 end
 
+-- Advance package simulation using the fixed-update delta in seconds.
 function Update(dt)
   previous_phase = phase
   phase = phase + dt * PULSE_SPEED
 end
 
+-- Apply per-frame state using elapsed seconds and the fixed-step interpolation fraction.
 function UpdateFrame(dt, alpha)
   shown_phase = previous_phase + (phase - previous_phase) * alpha
 end
 
+-- Draw the current package state in terminal-cell coordinates.
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.hex(8, 10, 20) })
   for index = 1, #cells do

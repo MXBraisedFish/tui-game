@@ -1,5 +1,9 @@
+//! Overlay priority, transition tracking, and terminal-size warning state.
+
 use super::*;
 
+/// Maintain the size warning against physical terminal requirements for the currently visible
+/// surface.
 pub(super) fn manage_window_size_overlay(services: &EngineServices, world: &mut RuntimeWorld) {
   if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture) {
     let _ = world
@@ -109,6 +113,7 @@ fn program_default_min_size() -> (u64, u64) {
   (u64::from(width), u64::from(height))
 }
 
+/// Apply the window size view command to application state and its services.
 pub(super) fn apply_window_size_command(cmd: WindowSizeWarningCommand, world: &mut RuntimeWorld) {
   match cmd {
     WindowSizeWarningCommand::Exit => {

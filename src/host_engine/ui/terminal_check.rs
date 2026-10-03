@@ -1,3 +1,5 @@
+//! Terminal check page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -39,7 +41,7 @@ const RAINBOW: &[(u8, u8, u8)] = &[
   (128, 0, 255),
 ];
 
-/// Screen layout of the terminal check page.
+/// Resolved geometry and positions used to display terminal check.
 pub(crate) struct TerminalCheckLayout {
   title_x: u16,
   title_y: u16,
@@ -53,8 +55,7 @@ pub(crate) struct TerminalCheckLayout {
   hint_y: u16,
 }
 
-/// Terminal capability check page that asks, step by step, about Unicode, true color and mouse
-/// support.
+/// The state and owned widgets of the terminal check view.
 pub struct TerminalCheckUi {
   step: usize,
 
@@ -83,18 +84,24 @@ impl RuntimeObjectPoolOwner for TerminalCheckUi {
   }
 }
 
-/// Command emitted by the terminal check page.
+/// An application request produced by terminal check interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TerminalCheckCommand {
+  /// The next setting for terminal check command.
   Next,
 
+  /// The exit setting for terminal check command.
   Exit,
 
-  Done { mouse: bool },
+  /// The done setting for terminal check command.
+  Done {
+    /// Whether terminal pointer input is supported; `None` keeps the detected setting.
+    mouse: bool,
+  },
 }
 
 impl TerminalCheckUi {
-  /// Creates the terminal check UI.
+  /// Create the terminal check view and allocate its owned UI objects.
   pub fn init() -> Self {
     Self {
       step: STEP_UNICODE,
@@ -113,33 +120,37 @@ impl TerminalCheckUi {
     };
   }
 
-  /// Returns the action map (key bindings) of the terminal check page.
+  /// Return the shortcuts currently enabled by the terminal check view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "terminal.focus_up".to_string(),
         description: "Focus previous option".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "terminal.focus_down".to_string(),
         description: "Focus next option".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "terminal.confirm".to_string(),
         description: "Confirm selection".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "terminal.exit".to_string(),
         description: "Exit program".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
     ]
   }
 
-  /// Handles a keyboard action event and returns the command it triggers, if any.
+  /// Interpret a terminal check UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<TerminalCheckCommand> {
     let UiEvent::Action(event) = event else {
       return None;
@@ -174,8 +185,8 @@ impl TerminalCheckUi {
     }
   }
 
-  /// Handles a mouse event: moving over an option selects it, a left click on an option confirms
-  /// the current selection and a right click returns [`TerminalCheckCommand::Exit`].
+  /// Update the terminal-check selection or return a confirmation/exit command for a pointer
+  /// event.
   pub fn handle_mouse_event(
     &mut self,
     event: &MouseEvent,
@@ -203,12 +214,20 @@ impl TerminalCheckUi {
     }
   }
 
+  /// Advance the terminal check view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<TerminalCheckCommand> {
     let _ = dt;
     None
   }
 
-  /// Draws the content of the current check step.
+  /// Draw the terminal check view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
   pub fn render(
     &self,
     render: &mut RenderService,
@@ -224,7 +243,7 @@ impl TerminalCheckUi {
     }
   }
 
-  /// Computes the layout of the current check step.
+  /// Resolve the terminal check view's terminal-cell layout from its available dimensions.
   pub fn compute_positions(
     &self,
     layout: &LayoutService,
@@ -852,13 +871,13 @@ impl TerminalCheckUi {
     }
   }
 
-  /// Advances to the next check step.
+  /// Advance terminal capability checking and apply detection for the next step.
   pub fn advance_step(&mut self) {
     self.step += 1;
     self.apply_detection();
   }
 
-  /// Saves the answer of the current check step to the terminal profile.
+  /// Persist the user-selected Unicode or color capability for the current checking step.
   pub fn persist_current_step(&self, storage: &mut StorageService, log: &mut LogService) {
     match self.step {
       STEP_UNICODE => {

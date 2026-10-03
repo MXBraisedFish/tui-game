@@ -1,4 +1,4 @@
-//! Minimal entry: accepts a normal relative path and rejects an escaping one.
+//! Independent sandbox path smoke entry exercising the public API and checking its results.
 
 use tg_core_sandbox_path::SafeRelativePath;
 

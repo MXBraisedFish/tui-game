@@ -1,3 +1,5 @@
+//! Completion routing, profile reconciliation, and context-aware failure logging.
+
 use super::*;
 use crate::host_engine::app::EngineEvent;
 use crate::host_engine::services::{
@@ -5,13 +7,32 @@ use crate::host_engine::services::{
   VideoAsyncEvent,
 };
 
+/// The runtime engine events representation used by this module.
+///
+/// # Fields
+///
+/// * `package` - The ordered package retained by this owner.
+/// * `export` - The ordered export retained by this owner.
+/// * `screenshot` - The ordered screenshot retained by this owner.
+/// * `video` - The ordered video retained by this owner.
 pub(super) struct RuntimeEngineEvents {
+  /// The ordered package retained by this owner.
   pub package: Vec<PackageEvent>,
+  /// The ordered export retained by this owner.
   pub export: Vec<ExportAsyncEvent>,
+  /// The ordered screenshot retained by this owner.
   pub screenshot: Vec<ScreenshotAsyncEvent>,
+  /// The ordered video retained by this owner.
   pub video: Vec<VideoAsyncEvent>,
 }
 
+/// Drain and return the queued engine events.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `lua_events` - The Lua events.
+/// * `frame` - The composed terminal-cell frame.
 pub(super) fn drain_engine_events(
   services: &mut EngineServices,
   lua_events: &mut LuaEventBroker,
@@ -224,7 +245,8 @@ pub(super) fn drain_engine_events(
       | EngineEvent::Image(_)
       | EngineEvent::Time(_)
       | EngineEvent::TaskFinished => {}
-      // 具体服务已经产生带业务上下文的终态事件；通用失败事件不重复写日志。
+      // Service-specific completion already includes business context; do not log the generic
+      // failure again.
       EngineEvent::TaskFailed { .. } => {}
       EngineEvent::Log { source, message } => {
         services
@@ -242,6 +264,7 @@ pub(super) fn drain_engine_events(
   }
 }
 
+/// Reconcile stored continue/best results with the scanned games' declared save capabilities.
 pub(super) fn reconcile_game_save_profile(services: &mut EngineServices) {
   let games = services
     .package

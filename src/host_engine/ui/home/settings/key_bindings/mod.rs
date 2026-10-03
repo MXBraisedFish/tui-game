@@ -1,3 +1,5 @@
+//! Key bindings page state, user commands, and terminal-cell presentation.
+
 mod game;
 mod global;
 
@@ -17,13 +19,18 @@ use crate::host_engine::services::{
 const MENU_LEN: usize = 2;
 const MENU_KEYS: [&str; MENU_LEN] = ["key_bindings.global", "key_bindings.game"];
 
+/// An application request produced by key bindings interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyBindingsCommand {
+  /// A request to back.
   Back,
+  /// A request to open global.
   OpenGlobal,
+  /// A request to open game.
   OpenGame,
 }
 
+/// The state and owned widgets of the key bindings view.
 pub struct KeyBindingsUi {
   selected: usize,
   objects: UiObjectPool,
@@ -55,6 +62,13 @@ impl RuntimeObjectPoolOwner for KeyBindingsUi {
 }
 
 impl KeyBindingsUi {
+  /// Create the key bindings view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -72,14 +86,17 @@ impl KeyBindingsUi {
     }
   }
 
+  /// Return mutable access to the owned global.
   pub fn global_mut(&mut self) -> &mut GlobalKeyBindingsUi {
     &mut self.global
   }
 
+  /// Return mutable access to the owned game.
   pub fn game_mut(&mut self) -> &mut GameKeyBindingsUi {
     &mut self.game
   }
 
+  /// Return the shortcuts currently enabled by the key bindings view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       action("key_bindings.focus_up", "up", "Focus previous option"),
@@ -91,6 +108,7 @@ impl KeyBindingsUi {
     ]
   }
 
+  /// Interpret a key bindings UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<KeyBindingsCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -144,8 +162,18 @@ impl KeyBindingsUi {
     })
   }
 
+  /// Advance the key bindings view's transient state for this host frame.
   pub fn update(&mut self, _dt: Duration) {}
 
+  /// Draw the key bindings view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -281,5 +309,6 @@ fn action(name: &str, key: &str, description: &str) -> ActionMapEntry {
     action: name.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }

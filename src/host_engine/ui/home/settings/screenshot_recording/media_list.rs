@@ -1,3 +1,5 @@
+//! Media list page state, user commands, and terminal-cell presentation.
+
 use std::{
   fs, io,
   marker::PhantomData,
@@ -80,41 +82,70 @@ fn playback_time_text(time_us: u64) -> String {
   format!("{}:{:02}", seconds / 60, seconds % 60)
 }
 
+/// An application request produced by media list interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MediaListCommand {
+  /// A request to back.
   Back,
+  /// A request to focus search.
   FocusSearch,
+  /// A request to blur search.
   BlurSearch,
+  /// A request to select list.
   SelectList(i32),
+  /// The scroll list setting for media list command.
   ScrollList(i32),
+  /// The scroll info setting for media list command.
   ScrollInfo {
+    /// The dx.
     dx: i32,
+    /// The dy.
     dy: i32,
   },
+  /// The begin rename setting for media list command.
   BeginRename,
+  /// A request to cancel rename.
   CancelRename,
+  /// The commit rename setting for media list command.
   CommitRename {
+    /// The old name.
     old_name: String,
+    /// The new name.
     new_name: String,
   },
+  /// A request to copy screenshot.
   CopyScreenshot {
+    /// The composed terminal-cell frame.
     frame: ComposedFrame,
+    /// The rectangular region in terminal cells.
     rect: ScreenshotRect,
+    /// The rich.
     rich: bool,
   },
+  /// A request to save screenshot.
   SaveScreenshot {
+    /// The filesystem path for source.
     source_path: PathBuf,
+    /// The composed terminal-cell frame.
     frame: ComposedFrame,
+    /// The rectangular region in terminal cells.
     rect: ScreenshotRect,
+    /// The copy.
     copy: bool,
   },
+  /// A request to export recording.
   ExportRecording {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// The request delete setting for media list command.
   RequestDelete {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// A request to confirm delete.
   ConfirmDelete {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
 }
@@ -312,6 +343,7 @@ impl RecordingPlayer {
   }
 }
 
+/// Selected screenshot cells and metadata prepared for the media-list preview.
 #[derive(Clone, Debug)]
 pub(crate) struct ScreenshotPreview {
   width: u16,
@@ -342,6 +374,7 @@ impl ScreenshotPreview {
   }
 }
 
+/// Read supported structured screenshot metadata and reconstruct its selected terminal cells.
 pub(super) fn load_screenshot_preview(path: &Path) -> Option<ScreenshotPreview> {
   let document: Value = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
   if document.get("schema_version")?.as_u64()?
@@ -462,18 +495,26 @@ struct PreviewCell {
   style: TextStyle,
 }
 
+/// Failures reported by media rename operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MediaRenameError {
+  /// The invalid failure condition.
   Invalid,
+  /// The duplicate failure condition.
   Duplicate,
 }
 
+/// The media list notice representation used by this module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MediaListNotice {
+  /// The rename error setting for media list notice.
   RenameError {
+    /// The namespace.
     namespace: &'static str,
+    /// The error.
     error: MediaRenameError,
   },
+  /// The clear rename error setting for media list notice.
   ClearRenameError,
 }
 
@@ -520,17 +561,23 @@ fn media_info_header_layout(
   }
 }
 
+/// The contract for accessing or implementing media list spec.
 pub trait MediaListSpec: Send + Sync + 'static {
   const NS: &'static str;
   const SUPPORTS_DURATION: bool;
+  /// Return the shortcuts currently enabled by the media list view.
   fn action_map() -> Vec<ActionMapEntry>;
+  /// Return the current left hint keys.
   fn left_hint_keys() -> &'static [&'static str];
+  /// Return the current right hint keys.
   fn right_hint_keys() -> &'static [&'static str];
+  /// Load an optional structured screenshot preview; recording list specifications return `None`.
   fn load_preview(_path: &Path) -> Option<ScreenshotPreview> {
     None
   }
 }
 
+/// The state and owned widgets of the media list view.
 pub struct MediaListUi<S: MediaListSpec> {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -587,6 +634,19 @@ impl<S: MediaListSpec> RuntimeObjectPoolOwner for MediaListUi<S> {
 }
 
 impl<S: MediaListSpec> MediaListUi<S> {
+  /// Create the media list view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `failed to create media list scroll box`;
+  /// `failed to create media info scroll box`; `failed to create recording playback progress
+  /// bar`.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -687,6 +747,12 @@ impl<S: MediaListSpec> MediaListUi<S> {
     }
   }
 
+  /// Start an asynchronous scan of the requested media directory.
+  ///
+  /// # Errors
+  ///
+  /// This entry point currently returns `Ok(())`; asynchronous scan failures are handled by the
+  /// media-list completion path.
   pub fn reload(&mut self, directory: &Path) -> io::Result<()> {
     self.directory = Some(directory.to_path_buf());
     self.start_scan();
@@ -803,6 +869,13 @@ impl<S: MediaListSpec> MediaListUi<S> {
     self.load_rx = Some(rx);
   }
 
+  /// Reset media search, selection, editing, playback, and scrolling when the page is entered.
+  ///
+  /// # Arguments
+  ///
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn reset_for_entry(
     &mut self,
     text_input: &mut TextInputService,
@@ -829,20 +902,24 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let _ = scroll_box.scroll_to(&mut self.objects, self.info_scroll, 0, 0, layout);
   }
 
+  /// Return the shortcuts currently enabled by the media list view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     S::action_map()
   }
 
+  /// Focus the list's search input and switch interaction to text editing.
   pub fn focus_search(&mut self, text_input: &mut TextInputService) {
     self.active = ActivePanel::List;
     self.pause_player();
     let _ = text_input.focus(&mut self.objects, self.search_input);
   }
 
+  /// Release search-input focus and return interaction to list navigation.
   pub fn blur_search(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Populate and focus the rename input for the selected media item.
   pub fn begin_rename(&mut self, text_input: &mut TextInputService) {
     let Some(name) = self
       .filtered_entries()
@@ -857,12 +934,27 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let _ = text_input.focus(&mut self.objects, self.rename_input);
   }
 
+  /// Discard the rename interaction and clear its pending error notice.
   pub fn cancel_rename(&mut self, text_input: &mut TextInputService) {
     self.renaming = None;
     self.pending_notice = Some(MediaListNotice::ClearRenameError);
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Rename the structured media file and update the visible entry after successful filesystem
+  /// replacement.
+  ///
+  /// # Arguments
+  ///
+  /// * `directory` - The directory.
+  /// * `old_name` - The old name.
+  /// * `new_name` - The new name.
+  /// * `text_input` - The text input.
+  ///
+  /// # Errors
+  ///
+  /// Return `AlreadyExists` if the new name belongs to an existing file; propagate filesystem
+  /// rename failures.
   pub fn commit_rename(
     &mut self,
     directory: &Path,
@@ -897,6 +989,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
     Ok(())
   }
 
+  /// Queue an invalid-name notice after the rename operation fails.
   pub fn rename_io_failed(&mut self) {
     self.pending_notice = Some(MediaListNotice::RenameError {
       namespace: S::NS,
@@ -904,19 +997,27 @@ impl<S: MediaListSpec> MediaListUi<S> {
     });
   }
 
+  /// Drain and return the queued notice.
   pub fn take_notice(&mut self) -> Option<MediaListNotice> {
     self.pending_notice.take()
   }
 
+  /// Retain the deletion target and pause playback until confirmation.
   pub fn begin_delete(&mut self, path: PathBuf) {
     self.pending_delete = Some(path);
     self.pause_player();
   }
 
+  /// Discard the pending media deletion target.
   pub fn cancel_delete(&mut self) {
     self.pending_delete = None;
   }
 
+  /// Remove the media source, attempt companion audio cleanup, and update the retained list.
+  ///
+  /// # Errors
+  ///
+  /// Propagate failure to remove the primary media file; companion audio cleanup is best effort.
   pub fn finish_delete(&mut self, path: &Path) -> io::Result<()> {
     let audio_path = S::SUPPORTS_DURATION
       .then(|| load_recording_playback_metadata(path))
@@ -940,6 +1041,13 @@ impl<S: MediaListSpec> MediaListUi<S> {
     Ok(())
   }
 
+  /// Scroll the media list and clamp selection to its visible rows.
+  ///
+  /// # Arguments
+  ///
+  /// * `service` - The service.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `dy` - The dy.
   pub fn scroll_list(&mut self, service: &ScrollBoxService, layout: &LayoutService, dy: i32) {
     if dy == 0 || self.filtered_entries().is_empty() {
       return;
@@ -951,6 +1059,13 @@ impl<S: MediaListSpec> MediaListUi<S> {
       .unwrap_or(self.last_list_scroll_y);
   }
 
+  /// Move media selection, discard stale playback, and reveal the new selection.
+  ///
+  /// # Arguments
+  ///
+  /// * `service` - The service.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `dy` - The dy.
   pub fn select_list(&mut self, service: &ScrollBoxService, layout: &LayoutService, dy: i32) {
     let previous = self.selected;
     self.move_selection(dy as isize);
@@ -964,6 +1079,14 @@ impl<S: MediaListSpec> MediaListUi<S> {
       .unwrap_or(self.last_list_scroll_y);
   }
 
+  /// Scroll the selected entry's detail viewport by the requested row delta.
+  ///
+  /// # Arguments
+  ///
+  /// * `service` - The service.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `dx` - The dx.
+  /// * `dy` - The dy.
   pub fn scroll_info(
     &mut self,
     service: &ScrollBoxService,
@@ -974,6 +1097,15 @@ impl<S: MediaListSpec> MediaListUi<S> {
     let _ = service.scroll_by(&mut self.objects, self.info_scroll, dx, dy, layout);
   }
 
+  /// Advance the media list view's transient state for this host frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `dt` - The elapsed duration applied to this update.
+  /// * `service` - The service.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `audio` - The audio.
+  /// * `storage` - The deployment-relative storage service.
   pub fn update(
     &mut self,
     dt: Duration,
@@ -1148,6 +1280,14 @@ impl<S: MediaListSpec> MediaListUi<S> {
     }
   }
 
+  /// Resolve and submit the media list view's drawing surfaces for this frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   pub fn prepare_surfaces(
     &mut self,
     layout: &LayoutService,
@@ -1159,6 +1299,7 @@ impl<S: MediaListSpec> MediaListUi<S> {
     self.prepare_scroll_box(scroll_box, layout, &pos);
   }
 
+  /// Interpret a media list UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<MediaListCommand> {
     if let Some(path) = self.pending_delete.clone() {
       let UiEvent::Action(event) = event else {
@@ -1394,8 +1535,17 @@ impl<S: MediaListSpec> MediaListUi<S> {
     })
   }
 
-  // reason: the runtime calls this signature from outside ui/ (as `ScreenshotListUi` and
-  // `RecordingListUi`), so it cannot be changed here.
+  /// Draw the media list view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
@@ -1882,9 +2032,6 @@ impl<S: MediaListSpec> MediaListUi<S> {
     }
   }
 
-  /// Registers the hit areas of the list rows scrolled into view.
-  ///
-  /// Uses the item areas that [`Self::draw_entries`] sized to the filtered entry count.
   fn register_entry_areas(
     &mut self,
     canvas: &mut CanvasService,
@@ -2625,9 +2772,11 @@ fn action(name: &str, key: &str) -> ActionMapEntry {
     action: name.to_string(),
     description: name.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }
 
+/// Build action declarations from shortcut name/key pairs.
 pub fn actions(entries: &[(&str, &str)]) -> Vec<ActionMapEntry> {
   entries
     .iter()

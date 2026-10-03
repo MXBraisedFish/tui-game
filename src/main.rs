@@ -1,3 +1,5 @@
+//! Executable entry point reporting startup failures and selecting the process exit status.
+
 mod host_engine;
 
 fn main() {

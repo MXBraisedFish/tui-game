@@ -1,3 +1,5 @@
+//! Storage management view page state, user commands, and terminal-cell presentation.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -44,6 +46,7 @@ struct StorageRow {
   bytes: u64,
 }
 
+/// The state and owned widgets of the storage management view view.
 pub struct StorageManagementViewUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -56,6 +59,7 @@ pub struct StorageManagementViewUi {
   scroll_elapsed: Duration,
 }
 
+/// Resolved geometry and positions used to display storage management view.
 pub(crate) struct StorageManagementViewLayout {
   title_x: u16,
   title_y: u16,
@@ -69,10 +73,14 @@ pub(crate) struct StorageManagementViewLayout {
   hint_y: u16,
 }
 
+/// An application request produced by storage management view interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StorageManagementViewCommand {
+  /// A request to back.
   Back,
+  /// A request to copy all.
   CopyAll(String),
+  /// A request to copy path.
   CopyPath(String),
 }
 
@@ -97,6 +105,11 @@ impl RuntimeObjectPoolOwner for StorageManagementViewUi {
 }
 
 impl StorageManagementViewUi {
+  /// Create the storage management view view and allocate its owned UI objects.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `storage management table options are valid`.
   pub fn init(hit_area: &HitAreaService, table: &TableService) -> Self {
     let mut objects = UiObjectPool::new();
     let table_id = table
@@ -115,17 +128,20 @@ impl StorageManagementViewUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the storage management view view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "storage_management_view.back".to_string(),
         description: "Back to storage management".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management_view.copy".to_string(),
         description: "Copy all storage paths".to_string(),
         keys: vec![vec!["ctrl".to_string(), "c".to_string()]],
+        priority: 0,
       },
     ]
   }
@@ -180,6 +196,7 @@ impl StorageManagementViewUi {
     ]
   }
 
+  /// Interpret a storage management view UI event and return the requested application command.
   pub fn handle_event(
     &mut self,
     event: &UiEvent,
@@ -212,6 +229,13 @@ impl StorageManagementViewUi {
     }
   }
 
+  /// Advance the storage management view view's transient state for this host frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `dt` - The elapsed duration applied to this update.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
   pub fn update(&mut self, dt: Duration, layout: &LayoutService, i18n: &I18nService) {
     self.scroll_elapsed += dt;
     if self.scroll_elapsed < SCROLL_STEP || self.rows.is_empty() {
@@ -235,7 +259,18 @@ impl StorageManagementViewUi {
     }
   }
 
-  // reason: the runtime calls this signature from outside ui/, so it cannot be changed here.
+  /// Draw the storage management view view and register interaction regions in its assigned
+  /// surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `storage` - The deployment-relative storage service.
+  /// * `hit_area` - The hit area.
+  /// * `table` - The Lua table to inspect or convert.
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,

@@ -13,10 +13,10 @@
   "key_bindings_global.action.reset.only": "{key:key_bindings_global.reset.only} Reset Current Action",
   "key_bindings_global.action.reset.all": "{key:key_bindings_global.reset.all} Reset All Key Bindings",
   "key_bindings_global.action.any": "[Any Key] Press to Bind (press all keys together for key combinations)",
-  "key_bindings_global.color_doc.yellow": "Yellow - Conflicts with one or more game key bindings (Global takes priority)",
-  "key_bindings_global.color_doc.red": "Red - Conflicts within Global key bindings",
+  "key_bindings_global.color_doc.yellow": "Yellow - shares bindings with games; saving is allowed",
   "key_bindings_global.color_doc.gray": "Gray - This key binding cannot be modified",
-  "key_bindings_global.color_doc.composite": "Yellow/Red + Gray - Conflicting and cannot be modified",
-  "key_bindings_global.color_doc.priority": "Color Priority: Red > Yellow",
-  "key_bindings_global.conflict": "Global key bindings contain conflicts and cannot be saved."
+  "key_bindings_global.color_doc.composite": "Yellow + Gray - shared and locked binding",
+  "key_bindings_global.color_doc.priority": "P: package priority; list previews first binding, runtime ranks actual matches",
+  "key_bindings_global.invalid": "Invalid binding: check key names, empty or oversized combinations, repeated keys and duplicate bindings within the same action.",
+  "key_bindings_global.color_doc.shared": "Yellow - shared by actions in this scope; saving is allowed"
 }

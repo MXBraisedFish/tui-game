@@ -1,18 +1,27 @@
-//! Version constants of the host and of the formats it reads and writes.
+//! Host and persisted-format version constants used to check compatibility.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_version::{HOST_VERSION, PACKAGE_MANIFEST_VERSION};
+//!
+//! assert!(!HOST_VERSION.is_empty());
+//! assert_eq!(PACKAGE_MANIFEST_VERSION, 2);
+//! ```
 
-/// Host version, taken from the Cargo package version.
+/// The host package version embedded by Cargo.
 pub const HOST_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Package API version supported by this host.
+/// The currently supported host API version.
 pub const HOST_API_VERSION: u32 = 1;
 
-/// `package.json` manifest version supported by this host.
+/// The supported package manifest schema version.
 pub const PACKAGE_MANIFEST_VERSION: u32 = 2;
 
-/// Screenshot/recording manifest version this host writes and reads.
+/// The supported persisted-media manifest version.
 pub const MEDIA_MANIFEST_VERSION: u32 = 1;
 
-/// Format version of the image character-art cache.
+/// The current disposable image cache format version.
 pub const IMAGE_CACHE_FORMAT_VERSION: u8 = 3;
 
 #[cfg(test)]

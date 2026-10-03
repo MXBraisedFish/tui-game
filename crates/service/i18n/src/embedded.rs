@@ -1,10 +1,10 @@
+//! Compiled English strings used when deployed translations are unavailable.
+
 use std::collections::HashMap;
 
 include!(concat!(env!("OUT_DIR"), "/embedded_en_us.rs"));
 
-/// Fills `map` with the en_us translations of namespace `ns` embedded at compile time.
-///
-/// Returns `false` when no embedded namespace has that name.
+/// Fill missing runtime translation keys from the compiled English namespace.
 pub fn fill_embedded_namespace(ns: &str, map: &mut HashMap<String, String>) -> bool {
   fill_namespace(ns, map)
 }

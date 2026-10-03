@@ -1,3 +1,5 @@
+//! Frame-scoped rectangular surfaces with ordered composition and clipping.
+
 use mlua::{Lua, MultiValue, Table, Value};
 
 use super::*;
@@ -14,6 +16,12 @@ enum SliceHandle {
   Object(SliceId),
 }
 
+/// Build and register the Lua slice API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn slice(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   install_lifecycle(lua, &source, state.clone())?;
@@ -54,7 +62,9 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
             },
           )
           .ok_or_else(|| args::message(method, "invalid slice dimensions"))?;
-        // Lua 切片是逐帧提交的资源；创建只保留配置，不使其自动出现在画布上。
+        // Creation stores slice configuration; only a submission for this frame makes it
+        // drawable.
+
         service.set_frame_scoped(objects.ui_mut(), id, true);
         Ok(Value::String(lua.create_string(format_id(id))?))
       })
@@ -412,6 +422,7 @@ fn optional_background(table: &Table, method: &str) -> mlua::Result<Option<Optio
   }
 }
 
+/// Resolve a Lua slice length against the available terminal-cell dimension.
 pub(super) fn resolve_length(length: SliceLength, total: u16) -> u16 {
   match length {
     SliceLength::Fixed(value) => value,
@@ -437,6 +448,17 @@ fn parse_handle(value: &str, method: &str, name: &str) -> mlua::Result<SliceHand
   parse_id(value, method, name).map(SliceHandle::Object)
 }
 
+/// Validate a Lua object identifier before looking it up in the session pool.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the identifier is not a supported non-negative integer.
 pub(super) fn parse_id(value: &str, method: &str, name: &str) -> mlua::Result<SliceId> {
   let raw = value
     .strip_prefix("slice_")

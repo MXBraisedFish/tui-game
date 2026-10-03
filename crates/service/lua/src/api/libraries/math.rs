@@ -1,7 +1,15 @@
+//! Lua math library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
 const MAX_I64_EXCLUSIVE: f64 = 9_223_372_036_854_775_808.0;
 
+/// Build and register the Lua math API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn math(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   install_constants(&source)?;

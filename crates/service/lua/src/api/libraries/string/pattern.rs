@@ -1,22 +1,37 @@
+//! Lua-pattern matching with bounded captures and backtracking work.
+
 use std::ops::Range;
 
 const MAX_PATTERN_STEPS: usize = 1_000_000;
 const MAX_PATTERN_OPS: usize = 512;
+/// The max capture groups used by this module.
 pub const MAX_CAPTURE_GROUPS: usize = 32;
 
+/// A substring or byte-position capture produced by a Lua pattern.
 #[derive(Clone, Debug)]
 pub enum LuaCapture {
+  /// The text setting for Lua capture.
   Text(Range<usize>),
+  /// The position setting for Lua capture.
   Position(usize),
 }
 
+/// The complete match span and its ordered Lua-pattern captures.
+///
+/// # Fields
+///
+/// * `full` - The full.
+/// * `captures` - The ordered captures retained by this owner.
 #[derive(Clone, Debug)]
 pub struct LuaCaptures {
+  /// The full.
   pub full: Range<usize>,
+  /// The ordered captures retained by this owner.
   pub captures: Vec<Option<LuaCapture>>,
 }
 
 impl LuaCaptures {
+  /// Return the value for the addressed object when it is available.
   #[cfg(test)]
   pub fn value(&self, index: usize) -> Option<LuaCapture> {
     if index == 0 {
@@ -27,6 +42,7 @@ impl LuaCaptures {
   }
 }
 
+/// A compiled, bounded Lua-pattern matcher.
 #[derive(Clone, Debug)]
 pub struct LuaPattern {
   ops: Vec<Op>,
@@ -107,12 +123,14 @@ struct MatchState {
   starts: Vec<Option<usize>>,
 }
 
+/// Byte input with cached character boundaries used by pattern matching.
 #[derive(Clone, Debug)]
 pub struct LuaPatternInput {
   bytes: Vec<u32>,
 }
 
 impl LuaPatternInput {
+  /// Create a Lua pattern input initialized from `text`.
   pub fn new(text: &str) -> Self {
     let mut bytes = text
       .char_indices()
@@ -138,6 +156,12 @@ impl LuaPatternInput {
 }
 
 impl LuaPattern {
+  /// Compile a bounded Lua pattern, rejecting malformed pattern and capture syntax.
+  ///
+  /// # Errors
+  ///
+  /// Return a pattern error for malformed Lua-pattern syntax, invalid captures, or matching work
+  /// that exceeds its safety limits.
   pub fn compile(pattern: &str) -> Result<Self, String> {
     let chars = pattern.chars().collect::<Vec<_>>();
     let mut parser = Parser {
@@ -160,6 +184,12 @@ impl LuaPattern {
     })
   }
 
+  /// Find a pattern match and return its span and captured values.
+  ///
+  /// # Errors
+  ///
+  /// Return a pattern error for malformed Lua-pattern syntax, invalid captures, or matching work
+  /// that exceeds its safety limits.
   pub fn captures(&self, text: &str, start: usize) -> Result<Option<LuaCaptures>, String> {
     let mut steps = 0;
     self.captures_with_steps(text, start, &mut steps)
@@ -175,6 +205,20 @@ impl LuaPattern {
     self.captures_in_input(text, &input, start, steps)
   }
 
+  /// Continue matching from a byte position using cached input boundaries and a shared work
+  /// budget.
+  ///
+  /// # Arguments
+  ///
+  /// * `text` - The text to process or display.
+  /// * `input` - The input value to validate or transform.
+  /// * `start` - The start.
+  /// * `steps` - The steps.
+  ///
+  /// # Errors
+  ///
+  /// Return a pattern error for malformed Lua-pattern syntax, invalid captures, or matching work
+  /// that exceeds its safety limits.
   pub fn captures_incremental_with_input(
     &self,
     text: &str,
@@ -225,6 +269,12 @@ impl LuaPattern {
     Ok(None)
   }
 
+  /// Collect successive pattern matches without repeatedly restarting at the same empty match.
+  ///
+  /// # Errors
+  ///
+  /// Return a pattern error for malformed Lua-pattern syntax, invalid captures, or matching work
+  /// that exceeds its safety limits.
   pub fn captures_iter(&self, text: &str) -> Result<Vec<LuaCaptures>, String> {
     let output = self.captures_iter_limited(text, 10_001)?;
     if output.len() > 10_000 {
@@ -234,6 +284,12 @@ impl LuaPattern {
     }
   }
 
+  /// Collect pattern matches while enforcing the requested capture limit.
+  ///
+  /// # Errors
+  ///
+  /// Return a pattern error for malformed Lua-pattern syntax, invalid captures, or matching work
+  /// that exceeds its safety limits.
   pub fn captures_iter_limited(
     &self,
     text: &str,

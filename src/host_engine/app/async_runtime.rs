@@ -1,31 +1,57 @@
+//! Application completion-event aggregation and conversion into service-owned Lua routing inputs.
+
 use crate::host_engine::services::{
   AudioAsyncEvent, ExportAsyncEvent, FileEvent, ImageEvent, InputListenerError, KeyEvent,
   LogSource, LuaRoutableEvent, NetworkEvent, PackageAsyncEvent, RecordingAsyncEvent,
   ScreenshotAsyncEvent, SystemEvent, TimeAsyncEvent, VideoAsyncEvent,
 };
 
+/// A engine event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum EngineEvent {
+  /// A input key notification delivered to the owning consumer.
   InputKey(KeyEvent),
+  /// A system notification delivered to the owning consumer.
   System(SystemEvent),
+  /// A package notification delivered to the owning consumer.
   Package(PackageAsyncEvent),
+  /// A export notification delivered to the owning consumer.
   Export(ExportAsyncEvent),
+  /// A screenshot notification delivered to the owning consumer.
   Screenshot(ScreenshotAsyncEvent),
+  /// A recording notification delivered to the owning consumer.
   Recording(RecordingAsyncEvent),
+  /// A video notification delivered to the owning consumer.
   Video(VideoAsyncEvent),
+  /// A file notification delivered to the owning consumer.
   File(FileEvent),
+  /// A image notification delivered to the owning consumer.
   Image(ImageEvent),
+  /// A network notification delivered to the owning consumer.
   Network(NetworkEvent),
+  /// A audio notification delivered to the owning consumer.
   Audio(AudioAsyncEvent),
+  /// A time notification delivered to the owning consumer.
   Time(TimeAsyncEvent),
+  /// A task finished notification delivered to the owning consumer.
   TaskFinished,
-  TaskFailed { error: String },
-  Log { source: LogSource, message: String },
+  /// A task failed notification delivered to the owning consumer.
+  TaskFailed {
+    /// The error.
+    error: String,
+  },
+  /// A log notification delivered to the owning consumer.
+  Log {
+    /// The log source carried by this engine event.
+    source: LogSource,
+    /// The diagnostic or display message.
+    message: String,
+  },
 }
 
 pub use tg_service_async::TaskStatusEvent;
 
-/// 宿主的异步执行器，事件类型为 [`EngineEvent`]。
+/// The shared type used for async runtime.
 pub type AsyncRuntime = tg_service_async::AsyncRuntime<EngineEvent>;
 
 impl From<TaskStatusEvent> for EngineEvent {
@@ -53,7 +79,7 @@ impl From<InputListenerError> for EngineEvent {
 }
 
 impl EngineEvent {
-  /// Returns the borrowed service event the Lua broker may route, if this is one.
+  /// Return the current Lua routable.
   pub fn lua_routable(&self) -> Option<LuaRoutableEvent<'_>> {
     Some(match self {
       Self::Audio(event) => LuaRoutableEvent::Audio(event),
@@ -66,7 +92,6 @@ impl EngineEvent {
   }
 }
 
-/// Wraps each service event type into its [`EngineEvent`] variant.
 macro_rules! engine_event_from {
   ($($event:ty => $variant:ident),* $(,)?) => {
     $(

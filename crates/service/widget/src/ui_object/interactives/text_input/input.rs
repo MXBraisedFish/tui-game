@@ -1,3 +1,5 @@
+//! Input support for the widget service.
+
 use std::time::{Duration, Instant};
 
 use super::layout::{VisualLayout, cursor_from_point, move_line_edge, move_vertical};
@@ -12,7 +14,13 @@ use tg_service_clipboard::ClipboardService;
 const DRAG_SCROLL_INTERVAL: Duration = Duration::from_millis(100);
 
 impl TextInputService {
-  /// 将终端按键事件路由到当前聚焦的输入组件，执行编辑操作。
+  /// Apply a terminal key event to the focused text input and queue any resulting edit event.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `clipboard` - The clipboard.
+  /// * `key` - The lookup key.
   pub fn route_terminal_key(
     &mut self,
     pool: &mut UiObjectPool,
@@ -105,7 +113,7 @@ impl TextInputService {
     }
   }
 
-  /// 将鼠标事件路由到对应输入组件，处理点击聚焦和拖拽选区。
+  /// Route a pointer event through the component's current hit regions and focus state.
   pub(crate) fn route_mouse_event(&mut self, pool: &mut UiObjectPool, event: MouseEvent) -> bool {
     if event.button != Some(MouseButton::Left) && event.kind != MouseEventKind::Hold {
       if event.kind == MouseEventKind::Release {

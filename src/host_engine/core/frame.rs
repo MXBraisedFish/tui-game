@@ -1,7 +1,9 @@
+//! Frame scheduling and optional target-frame-rate pacing.
+
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// 帧调度器，按目标帧率控制每帧的时长，提供帧间休眠
+/// Optional frame-rate pacing and frame deadline tracking.
 pub struct FrameScheduler {
   current_frame: u64,
   frame_start: Instant,
@@ -9,6 +11,7 @@ pub struct FrameScheduler {
 }
 
 impl FrameScheduler {
+  /// Create a frame scheduler initialized from `target_fps`.
   pub fn new(target_fps: u16) -> Self {
     let target_fps = target_fps.max(1);
     let target_frame_duration = Duration::from_secs_f64(1.0 / target_fps as f64);
@@ -20,14 +23,15 @@ impl FrameScheduler {
     }
   }
 
-  /// 开始新一帧，返回自调度开始以来的累计帧号
+  /// Prepare per-frame state and discard submissions or observations belonging to the previous
+  /// frame.
   pub fn begin_frame(&mut self) -> u64 {
     self.current_frame = self.current_frame.saturating_add(1);
     self.frame_start = Instant::now();
     self.current_frame
   }
 
-  /// 等待直到当前帧的目标时长用完，控制帧率上限
+  /// Wait for the configured frame deadline when frame-rate limiting is enabled.
   pub fn wait_for_next_frame(&self) {
     let Some(target_frame_duration) = self.target_frame_duration else {
       return;
@@ -41,6 +45,7 @@ impl FrameScheduler {
     thread::sleep(target_frame_duration - elapsed);
   }
 
+  /// Update the target fps used by this frame scheduler.
   pub fn set_target_fps(&mut self, target_fps: Option<u16>) {
     self.target_frame_duration =
       target_fps.map(|fps| Duration::from_secs_f64(1.0 / fps.max(1) as f64));

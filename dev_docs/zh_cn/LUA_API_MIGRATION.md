@@ -1,6 +1,6 @@
 # Lua API 调用约定
 
-更新时间：2026-09-29。本文说明当前注册的 Lua API 调用和返回规则。各方法的字段、默认值、单位及权限限制以对应 API 页面为准。
+更新时间：2026-10-02。本文说明当前注册的 Lua API 调用和返回规则。各方法的字段、默认值、单位及权限限制以对应 API 页面为准。
 
 ## 调用参数
 
@@ -45,3 +45,7 @@ JSON 和 YAML 使用 `serialization.NULL` 表示并保留嵌套 null。CSV、INI
 - [API 总览](API.md)
 - [Lua 兼容性与注册面](LUA_COMPATIBILITY.md)
 - [file](api/file.md)、[i18n](api/i18n.md)、[image](api/image.md)、[serialization](api/serialization.md)
+
+## 多行文本对齐
+
+`draw.text` 的 `align.CENTER` 和 `align.RIGHT` 以换行、裁剪和省略处理后的最长显示行作为对齐宽度，不再跟随第一行。坐标始终表示文本块左上角。测量和绘制使用相同选项时，可以直接使用 `align.resolve_rect(width, height, ...)` 返回的坐标；旧脚本若为第一行额外减去半宽或右对齐偏移，应移除这部分补偿。`max_width` 仍是宽度上限，单行及左对齐行为不变。

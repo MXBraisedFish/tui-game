@@ -1,3 +1,5 @@
+//! Host lifecycle coordinator handing application state and services through boot, runtime, and shutdown.
+
 pub mod app;
 
 pub mod boot;
@@ -21,7 +23,12 @@ use crate::host_engine::core::{
 };
 use crate::host_engine::services::{HostLogMessage, LogSource, TerminalService};
 
-/// 启动并运行引擎主循环，依次执行引导、运行时、关闭三个阶段
+/// Coordinate boot, application runtime, and shutdown with supervised fault handling.
+///
+/// # Errors
+///
+/// Propagate boot preparation errors before the runtime and normal shutdown phases can be
+/// entered.
 pub fn run() -> io::Result<()> {
   let deployment_root = crate::host_engine::app::current_deployment_root()?;
   let crash_log_path = deployment_root.join("data/log/tui_crash.log");

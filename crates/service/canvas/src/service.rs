@@ -1,3 +1,5 @@
+//! Service support for the canvas service.
+
 use std::collections::HashMap;
 
 use super::surface::{
@@ -12,8 +14,7 @@ use tg_service_layout::LayoutService;
 use tg_service_rich_text::RichTextSegment;
 use tg_service_text_layout::{self as text_layout, DrawTextParams, LayoutLine, TextAlign};
 
-/// The canvas service, owning the base layer, the host layer and the per-surface buffers; it
-/// coordinates text drawing and area queries.
+/// The public entry point for canvas operations.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasService {
   base: CanvasBuffer,
@@ -27,36 +28,78 @@ pub struct CanvasService {
   force_full_redraw: bool,
 }
 
-/// A prepared slice: its own buffer plus metadata such as position and visibility.
+/// The prepared slice representation used by this module.
+///
+/// # Fields
+///
+/// * `buffer` - The buffer.
+/// * `rect` - The rectangular region in terminal cells.
+/// * `source_x` - The source x.
+/// * `source_y` - The source y.
+/// * `visible` - Whether this surface participates in composition.
+/// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `background` - The background color override, or `None` to inherit the default.
+/// * `order` - The order.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreparedSlice {
+  /// The buffer.
   pub buffer: CanvasBuffer,
+  /// The rectangular region in terminal cells.
   pub rect: Rect,
+  /// The source x.
   pub source_x: u16,
+  /// The source y.
   pub source_y: u16,
+  /// Whether this surface participates in composition.
   pub visible: bool,
+  /// Whether empty cells cover lower surfaces.
   pub opaque: bool,
+  /// The background color override, or `None` to inherit the default.
   pub background: Option<TextColor>,
+  /// The order.
   pub order: usize,
 }
 
-/// A prepared scroll box: its virtual content buffer plus viewport metadata.
+/// The prepared scroll box representation used by this module.
+///
+/// # Fields
+///
+/// * `buffer` - The buffer.
+/// * `layout` - The service resolving terminal sizes and positions.
+/// * `content_size` - The content size.
+/// * `scroll_x` - The content offset from the viewport origin in terminal columns.
+/// * `scroll_y` - The content offset from the viewport origin in terminal rows.
+/// * `visible` - Whether this surface participates in composition.
+/// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `order` - The order.
+/// * `scrollbar_style` - The scrollbar style.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreparedScrollBox {
+  /// The buffer.
   pub buffer: CanvasBuffer,
+  /// The service resolving terminal sizes and positions.
   pub layout: ResolvedScrollBoxLayout,
+  /// The content size.
   pub content_size: Size,
+  /// The content offset from the viewport origin in terminal columns.
   pub scroll_x: u16,
+  /// The content offset from the viewport origin in terminal rows.
   pub scroll_y: u16,
+  /// Whether this surface participates in composition.
   pub visible: bool,
+  /// Whether empty cells cover lower surfaces.
   pub opaque: bool,
+  /// The order.
   pub order: usize,
+  /// The scrollbar style.
   pub scrollbar_style: ScrollbarStyle,
 }
 
-/// A read-only reference to a prepared developer surface.
+/// The prepared surface representation used by this module.
 pub enum PreparedSurface<'a> {
+  /// The slice setting for prepared surface.
   Slice(&'a PreparedSlice),
+  /// The scroll box setting for prepared surface.
   ScrollBox(&'a PreparedScrollBox),
 }
 
@@ -67,8 +110,10 @@ impl Default for CanvasService {
 }
 
 impl CanvasService {
+  /// Create a canvas service with its initial state.
   pub fn new() -> Self {
-    // TODO: log warn when terminal size query fails — fallback to (95, 24)
+    // Use the established canvas fallback when querying physical terminal dimensions fails.
+
     let (width, height) = crossterm::terminal::size().unwrap_or((95, 24));
     Self {
       base: CanvasBuffer::new(width, height),
@@ -88,14 +133,17 @@ impl CanvasService {
     }
   }
 
+  /// Return the current base width.
   pub fn base_width(&self) -> u16 {
     self.base.width()
   }
 
+  /// Return the current base height.
   pub fn base_height(&self) -> u16 {
     self.base.height()
   }
 
+  /// Return the current base size.
   pub fn base_size(&self) -> Size {
     Size {
       width: self.base.width(),
@@ -103,7 +151,8 @@ impl CanvasService {
     }
   }
 
-  /// Starts a new frame: resizes the host buffers, requesting a full redraw when needed.
+  /// Prepare per-frame state and discard submissions or observations belonging to the previous
+  /// frame.
   pub fn begin_frame(&mut self, layout: &LayoutService) {
     let physical = layout.physical_size();
     if self.host.width() != physical.width || self.host.height() != physical.height {
@@ -117,8 +166,13 @@ impl CanvasService {
     }
   }
 
-  /// Prepares the buffers of all drawing surfaces of this frame in stacking order; when `pool_id`
-  /// changes, the buffers of the previous object pool are dropped.
+  /// Resolve the submitted surfaces and their composition order for the current frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool_id` - The identity of the owning pool.
+  /// * `surfaces` - The surfaces.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn prepare(&mut self, pool_id: u64, surfaces: Vec<SurfaceFrame>, layout: &LayoutService) {
     self.viewport = layout.developer_viewport_rect();
     let size = layout.developer_size();
@@ -216,16 +270,32 @@ impl CanvasService {
     prepared.scrollbar_style = frame.scrollbar_style;
   }
 
+  /// Discard the previously retained canvas contents.
   pub fn clear(&mut self) {
     self.base.clear();
   }
 
-  /// Erases a rectangle of the base layer so the content below shows through again.
+  /// Remove written cell contributions from the requested base-canvas rectangle.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
   pub fn erase_rect(&mut self, x: i32, y: i32, width: u16, height: u16) {
     Self::erase_rect_from(&mut self.base, x, y, width, height);
   }
 
-  /// Erases a rectangle in the given slice. Returns `false` when the slice is missing or hidden.
+  /// Remove written cell contributions from a rectangle on the identified slice.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
   pub fn erase_rect_on(&mut self, id: SliceId, x: i32, y: i32, width: u16, height: u16) -> bool {
     let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
       return false;
@@ -240,22 +310,36 @@ impl CanvasService {
     true
   }
 
-  /// Draws rich text on the base layer (supports style tags and layout parameters).
+  /// Return the text for the addressed object.
   pub fn text(&mut self, params: &DrawTextParams) {
     self.text_at(i32::from(params.x), i32::from(params.y), params);
   }
 
-  /// Draws rich text at signed coordinates on the base layer; content outside the canvas is
-  /// clipped.
+  /// Write styled text to the base buffer with grapheme-width and surface clipping rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn text_at(&mut self, x: i32, y: i32, params: &DrawTextParams) {
     let lines = text_layout::layout_text_lines(params);
     Self::draw_layout_lines(&mut self.base, x, y, params.line_align, &lines);
   }
 
+  /// Write styled text to the base buffer with grapheme-width and surface clipping rules.
   pub fn rich_text_segments(&mut self, segments: &[RichTextSegment], params: &DrawTextParams) {
     self.rich_text_segments_at(i32::from(params.x), i32::from(params.y), segments, params);
   }
 
+  /// Write styled text to the base buffer with grapheme-width and surface clipping rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `segments` - The styled text segments in display order.
+  /// * `params` - The formatting or rendering parameters.
   pub fn rich_text_segments_at(
     &mut self,
     x: i32,
@@ -267,13 +351,21 @@ impl CanvasService {
     Self::draw_layout_lines(&mut self.base, x, y, params.line_align, &lines);
   }
 
-  /// Draws rich text into the buffer of the given slice. Returns whether it succeeded (`false`
-  /// when the slice is not visible).
+  /// Write styled text to the specified slice buffer with grapheme-width and surface clipping
+  /// rules.
   pub fn text_on(&mut self, id: SliceId, params: &DrawTextParams) -> bool {
     self.text_at_on(id, i32::from(params.x), i32::from(params.y), params)
   }
 
-  /// Draws text at signed local coordinates of the slice.
+  /// Write styled text to the specified slice buffer with grapheme-width and surface clipping
+  /// rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn text_at_on(&mut self, id: SliceId, x: i32, y: i32, params: &DrawTextParams) -> bool {
     let Some(slice) = self.slices.get_mut(&id).filter(|slice| slice.visible) else {
       return false;
@@ -289,6 +381,14 @@ impl CanvasService {
     true
   }
 
+  /// Write styled text to the specified slice buffer with grapheme-width and surface clipping
+  /// rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `segments` - The styled text segments in display order.
+  /// * `params` - The formatting or rendering parameters.
   pub fn rich_text_segments_on(
     &mut self,
     id: SliceId,
@@ -304,6 +404,16 @@ impl CanvasService {
     )
   }
 
+  /// Write styled text to the specified slice buffer with grapheme-width and surface clipping
+  /// rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `segments` - The styled text segments in display order.
+  /// * `params` - The formatting or rendering parameters.
   pub fn rich_text_segments_at_on(
     &mut self,
     id: SliceId,
@@ -326,12 +436,21 @@ impl CanvasService {
     true
   }
 
-  /// Draws rich text into the virtual content buffer of the given scroll box.
+  /// Write styled text to the scroll-box content buffer with grapheme-width and surface clipping
+  /// rules.
   pub fn text_in_scroll_box(&mut self, id: ScrollBoxId, params: &DrawTextParams) -> bool {
     self.text_at_in_scroll_box(id, i32::from(params.x), i32::from(params.y), params)
   }
 
-  /// Draws text at signed coordinates of the scroll box's virtual content area.
+  /// Write styled text to the scroll-box content buffer with grapheme-width and surface clipping
+  /// rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn text_at_in_scroll_box(
     &mut self,
     id: ScrollBoxId,
@@ -351,6 +470,14 @@ impl CanvasService {
     true
   }
 
+  /// Write styled text to the scroll-box content buffer with grapheme-width and surface clipping
+  /// rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `segments` - The styled text segments in display order.
+  /// * `params` - The formatting or rendering parameters.
   pub fn rich_text_segments_in_scroll_box(
     &mut self,
     id: ScrollBoxId,
@@ -366,6 +493,16 @@ impl CanvasService {
     )
   }
 
+  /// Write styled text to the scroll-box content buffer with grapheme-width and surface clipping
+  /// rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `segments` - The styled text segments in display order.
+  /// * `params` - The formatting or rendering parameters.
   pub fn rich_text_segments_at_in_scroll_box(
     &mut self,
     id: ScrollBoxId,
@@ -386,30 +523,53 @@ impl CanvasService {
     true
   }
 
-  /// Draws rich text on the host layer (used by overlays and the like).
+  /// Write styled text to the host buffer with grapheme-width and surface clipping rules.
   pub fn host_text(&mut self, params: &DrawTextParams) {
     self.host_text_at(i32::from(params.x), i32::from(params.y), params);
   }
 
+  /// Write styled text to the host buffer with grapheme-width and surface clipping rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn host_text_at(&mut self, x: i32, y: i32, params: &DrawTextParams) {
     let lines = text_layout::layout_text_lines(params);
     Self::draw_layout_lines(&mut self.host, x, y, params.line_align, &lines);
   }
 
-  /// Draws rich text on the host's top layer.
+  /// Write styled text to the top buffer with grapheme-width and surface clipping rules.
   pub fn top_text(&mut self, params: &DrawTextParams) {
     self.top_text_at(i32::from(params.x), i32::from(params.y), params);
   }
 
+  /// Write styled text to the top buffer with grapheme-width and surface clipping rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn top_text_at(&mut self, x: i32, y: i32, params: &DrawTextParams) {
     let lines = text_layout::layout_text_lines(params);
     Self::draw_layout_lines(self.top.buffer_mut(), x, y, params.line_align, &lines);
   }
 
+  /// Write styled text to the host buffer with grapheme-width and surface clipping rules.
   pub fn host_rich_text_segments(&mut self, segments: &[RichTextSegment], params: &DrawTextParams) {
     self.host_rich_text_segments_at(i32::from(params.x), i32::from(params.y), segments, params);
   }
 
+  /// Write styled text to the host buffer with grapheme-width and surface clipping rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `segments` - The styled text segments in display order.
+  /// * `params` - The formatting or rendering parameters.
   pub(crate) fn host_rich_text_segments_at(
     &mut self,
     x: i32,
@@ -421,7 +581,14 @@ impl CanvasService {
     Self::draw_layout_lines(&mut self.host, x, y, params.line_align, &lines);
   }
 
-  /// Draws plain text with the given style on the base layer.
+  /// Write styled text to the base buffer with grapheme-width and surface clipping rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `text` - The text to process or display.
+  /// * `style` - The text style applied to the rendered content.
   pub fn styled_text(
     &mut self,
     x: impl Into<i32>,
@@ -432,8 +599,16 @@ impl CanvasService {
     Self::styled_text_to(&mut self.base, x.into(), y.into(), text, style);
   }
 
-  /// Draws plain text with the given style into the buffer of the given slice. Returns whether it
-  /// succeeded.
+  /// Write styled text to the specified slice buffer with grapheme-width and surface clipping
+  /// rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `text` - The text to process or display.
+  /// * `style` - The text style applied to the rendered content.
   pub fn styled_text_on(
     &mut self,
     id: SliceId,
@@ -455,8 +630,16 @@ impl CanvasService {
     true
   }
 
-  /// Draws plain text with the given style into the virtual content buffer of the given scroll
-  /// box.
+  /// Write styled text to the scroll-box content buffer with grapheme-width and surface clipping
+  /// rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `text` - The text to process or display.
+  /// * `style` - The text style applied to the rendered content.
   pub fn styled_text_in_scroll_box(
     &mut self,
     id: ScrollBoxId,
@@ -476,7 +659,14 @@ impl CanvasService {
     true
   }
 
-  /// Draws plain text with the given style on the host layer.
+  /// Write styled text to the host buffer with grapheme-width and surface clipping rules.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `text` - The text to process or display.
+  /// * `style` - The text style applied to the rendered content.
   pub fn host_styled_text(
     &mut self,
     x: impl Into<i32>,
@@ -487,6 +677,13 @@ impl CanvasService {
     Self::styled_text_to(&mut self.host, x.into(), y.into(), text, style);
   }
 
+  /// Write one styled cell into the physical host buffer within its clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `cell` - The styled terminal cell to write.
   pub fn host_cell(&mut self, x: impl Into<i32>, y: impl Into<i32>, cell: CanvasCell) {
     let (x, y) = (x.into(), y.into());
     if let (Ok(x), Ok(y)) = (u16::try_from(x), u16::try_from(y)) {
@@ -547,43 +744,46 @@ impl CanvasService {
     }
   }
 
-  /// Resizes the canvas and requests a full redraw.
+  /// Resize the base terminal-cell buffer and invalidate its previous contents.
   pub fn resize(&mut self, width: u16, height: u16) {
     self.host.resize(width, height);
     let _ = self.top.resize_or_clear(width, height);
     self.force_full_redraw = true;
   }
 
-  /// Requests a full redraw (typically after a style or content change).
+  /// Mark the current drawing state as needing presentation.
   pub fn request_render(&mut self) {
     self.force_full_redraw = true;
   }
 
-  /// Takes and clears the "full redraw requested" flag, returning whether a redraw is needed.
+  /// Return and clear the pending render request flag.
   pub fn take_render_requested(&mut self) -> bool {
     let requested = self.force_full_redraw;
     self.force_full_redraw = false;
     requested
   }
 
-  /// Returns the cell of the base layer at the given coordinates.
+  /// Return the base-canvas cell at the supplied coordinates when it is in bounds.
   pub fn cell_at(&self, x: u16, y: u16) -> Option<&CanvasCell> {
     self.base.get(x, y)
   }
 
+  /// Return the current host buffer.
   pub fn host_buffer(&self) -> &CanvasBuffer {
     &self.host
   }
 
+  /// Return the current top buffer.
   pub fn top_buffer(&self) -> &CanvasBuffer {
     self.top.buffer()
   }
 
+  /// Return the current base buffer.
   pub fn base_buffer(&self) -> &CanvasBuffer {
     &self.base
   }
 
-  /// Iterates over all prepared developer surfaces in their shared stacking order.
+  /// Return the surfaces resolved for the current frame.
   pub fn prepared_surfaces(&self) -> impl Iterator<Item = PreparedSurface<'_>> {
     self
       .surface_order
@@ -594,17 +794,18 @@ impl CanvasService {
       })
   }
 
+  /// Return the current viewport.
   pub fn viewport(&self) -> Rect {
     self.viewport
   }
 
-  /// Returns the rectangle of the given slice in viewport coordinates (`None` when the slice is
-  /// not visible).
+  /// Return the slice rect for the addressed object when it is available.
   pub fn prepared_slice_rect(&self, id: SliceId) -> Option<Rect> {
     let slice = self.slices.get(&id)?;
     slice.visible.then_some(slice.rect)
   }
 
+  /// Return the slice size for the addressed object when it is available.
   pub fn prepared_slice_size(&self, id: SliceId) -> Option<Size> {
     let rect = self.prepared_slice_rect(id)?;
     Some(Size {
@@ -613,14 +814,17 @@ impl CanvasService {
     })
   }
 
+  /// Return the slice width in terminal columns for the addressed object when it is available.
   pub fn prepared_slice_width(&self, id: SliceId) -> Option<u16> {
     Some(self.prepared_slice_size(id)?.width)
   }
 
+  /// Return the slice height in terminal rows for the addressed object when it is available.
   pub fn prepared_slice_height(&self, id: SliceId) -> Option<u16> {
     Some(self.prepared_slice_size(id)?.height)
   }
 
+  /// Return the scroll box rect for the addressed object when it is available.
   pub fn prepared_scroll_box_rect(&self, id: ScrollBoxId) -> Option<Rect> {
     let scroll_box = self.scroll_boxes.get(&id)?;
     scroll_box
@@ -628,6 +832,7 @@ impl CanvasService {
       .then_some(scroll_box.layout.viewport_rect)
   }
 
+  /// Return the scroll box size for the addressed object when it is available.
   pub fn prepared_scroll_box_size(&self, id: ScrollBoxId) -> Option<Size> {
     let rect = self.prepared_scroll_box_rect(id)?;
     Some(Size {
@@ -636,7 +841,7 @@ impl CanvasService {
     })
   }
 
-  /// Returns the content size of the prepared scroll box.
+  /// Return the scroll box content size for the addressed object when it is available.
   pub fn prepared_scroll_box_content_size(&self, id: ScrollBoxId) -> Option<Size> {
     self
       .scroll_boxes
@@ -645,7 +850,7 @@ impl CanvasService {
       .map(|sb| sb.content_size)
   }
 
-  /// Returns the viewport size of the prepared scroll box.
+  /// Return the scroll box viewport size for the addressed object when it is available.
   pub fn prepared_scroll_box_viewport_size(&self, id: ScrollBoxId) -> Option<Size> {
     let sb = self.scroll_boxes.get(&id)?;
     sb.visible.then_some(Size {
@@ -654,17 +859,18 @@ impl CanvasService {
     })
   }
 
-  /// Returns the scroll position of the prepared scroll box.
+  /// Return the scroll box scroll position for the addressed object when it is available.
   pub fn prepared_scroll_box_scroll_position(&self, id: ScrollBoxId) -> Option<(u16, u16)> {
     let sb = self.scroll_boxes.get(&id)?;
     sb.visible.then_some((sb.scroll_x, sb.scroll_y))
   }
 
-  /// Returns the surface stacking order as a read-only slice.
+  /// Return the composition order assigned to the specified surface.
   pub fn surface_order(&self) -> &[SurfaceId] {
     &self.surface_order
   }
 
+  /// Return the highest visible scroll box containing the pointer location.
   pub fn top_scroll_box_at(&self, x: u16, y: u16) -> Option<ScrollBoxId> {
     self
       .surface_order
@@ -687,8 +893,7 @@ impl CanvasService {
       .and_then(|(id, _)| (id != ScrollBoxId(0)).then_some(id))
   }
 
-  /// Converts physical coordinates into coordinates relative to the viewport; returns `None` when
-  /// the point is outside the viewport.
+  /// Convert a physical terminal point into developer-viewport coordinates when it is visible.
   pub fn viewport_point(&self, x: u16, y: u16) -> Option<(u16, u16)> {
     self
       .viewport
@@ -696,7 +901,7 @@ impl CanvasService {
       .then(|| (x - self.viewport.x, y - self.viewport.y))
   }
 
-  /// Returns the hit-test result of a rectangle on the base layer.
+  /// Resolve and clip a hit rectangle against the base drawing surface.
   pub fn base_hit_rect(&self, rect: Rect) -> Option<(Rect, (i32, i32), usize)> {
     surface_hit_rect(
       rect,
@@ -708,7 +913,7 @@ impl CanvasService {
     )
   }
 
-  /// Returns the hit-test result of a rectangle on the given slice.
+  /// Resolve and clip a hit rectangle against the identified slice.
   pub fn slice_hit_rect(&self, id: SliceId, rect: Rect) -> Option<(Rect, (i32, i32), usize)> {
     let slice = self.slices.get(&id).filter(|slice| slice.visible)?;
     let visible_local = clipped_slice_local_rect(slice, rect)?;
@@ -723,6 +928,7 @@ impl CanvasService {
     Some((visible, (origin_x, origin_y), slice.order + 1))
   }
 
+  /// Resolve and clip a hit rectangle against the identified scroll-box content viewport.
   pub fn scroll_box_hit_rect(
     &self,
     id: ScrollBoxId,
@@ -775,7 +981,7 @@ impl CanvasService {
     ))
   }
 
-  /// Returns the hit-test result of a rectangle on the host layer.
+  /// Resolve and clip a hit rectangle against the physical host surface.
   pub fn host_hit_rect(&self, rect: Rect) -> Option<(Rect, (i32, i32), usize)> {
     surface_hit_rect(
       rect,
@@ -794,15 +1000,15 @@ impl CanvasService {
     align: TextAlign,
     lines: &[LayoutLine],
   ) {
-    let base_width = lines.first().map(|line| line.width).unwrap_or(0);
+    let block_width = lines.iter().map(|line| line.width).max().unwrap_or(0);
+    let block_width = i32::try_from(block_width).unwrap_or(i32::MAX);
 
     for (line_index, line) in lines.iter().enumerate() {
-      let base_width = i32::try_from(base_width).unwrap_or(i32::MAX);
       let line_width = i32::try_from(line.width).unwrap_or(i32::MAX);
       let offset = match align {
         TextAlign::Left => 0,
-        TextAlign::Center => base_width.saturating_sub(line_width) / 2,
-        TextAlign::Right => base_width.saturating_sub(line_width),
+        TextAlign::Center => block_width.saturating_sub(line_width) / 2,
+        TextAlign::Right => block_width.saturating_sub(line_width),
       };
       let mut cursor_x = x.saturating_add(offset);
       let cursor_y = y.saturating_add(i32::try_from(line_index).unwrap_or(i32::MAX));
@@ -851,7 +1057,6 @@ impl CanvasService {
   }
 }
 
-// Computes the clipped hit area of a rectangle on the given surface.
 fn surface_hit_rect(
   rect: Rect,
   ox: i32,
@@ -905,8 +1110,8 @@ fn physical_rect(viewport: Rect, rect: Rect) -> Rect {
   }
 }
 
-// Resolves the background color: a Transparent style background inherits the background of the
-// already written cell.
+// A transparent background inherits the cell already written beneath this text.
+
 fn resolve_background(mut style: TextStyle, buffer: &CanvasBuffer, x: u16, y: u16) -> TextStyle {
   if matches!(style.background, Some(TextColor::Transparent))
     && buffer.is_written(x, y)
@@ -924,7 +1129,6 @@ mod tests {
   use tg_service_rich_text::{RichTextParams, TerminalColor, TextMode};
   use tg_service_text_layout::TextWrapMode;
 
-  /// Writes `height` rows of `ch` from (x, y) the way the render service fills a rectangle.
   fn fill_rect(
     canvas: &mut CanvasService,
     x: i32,
@@ -1163,6 +1367,25 @@ mod tests {
       "bcd ",
       "scroll-box content coordinates must clip"
     );
+
+    let aligned = DrawTextParams {
+      text: "ab\nabcdef".to_string(),
+      line_align: TextAlign::Center,
+      ..Default::default()
+    };
+    canvas.slices.get_mut(&slice).unwrap().buffer.clear();
+    canvas
+      .scroll_boxes
+      .get_mut(&scroll_box)
+      .unwrap()
+      .buffer
+      .clear();
+    assert!(canvas.text_at_on(slice, -1, 0, &aligned));
+    assert!(canvas.text_at_in_scroll_box(scroll_box, -1, 0, &aligned));
+    assert_eq!(canvas.slices[&slice].buffer.row_text(0), " ab ");
+    assert_eq!(canvas.slices[&slice].buffer.row_text(1), "bcde");
+    assert_eq!(canvas.scroll_boxes[&scroll_box].buffer.row_text(0), " ab ");
+    assert_eq!(canvas.scroll_boxes[&scroll_box].buffer.row_text(1), "bcde");
   }
 
   #[test]
@@ -1322,7 +1545,7 @@ mod tests {
   }
 
   #[test]
-  fn multiline_alignment_is_relative_to_first_line() {
+  fn multiline_alignment_uses_the_longest_line() {
     let mut canvas = CanvasService::new();
     canvas.text(&DrawTextParams {
       x: 0,
@@ -1337,24 +1560,80 @@ mod tests {
   }
 
   #[test]
-  fn multiline_alignment_allows_lines_wider_than_the_first_line() {
-    for (align, expected_x) in [
+  fn multiline_alignment_keeps_the_longest_line_at_the_block_origin() {
+    for (align, first_x) in [
       (TextAlign::Left, 5),
-      (TextAlign::Center, 4),
-      (TextAlign::Right, 2),
+      (TextAlign::Center, 6),
+      (TextAlign::Right, 8),
     ] {
       let mut canvas = CanvasService::new();
-      canvas.text(&DrawTextParams {
+      let params = DrawTextParams {
         x: 5,
-        y: 0,
-        text: "Test\nabcdefg".to_string(),
+        y: 1,
+        text: "Test\nabcdefg\nx".to_string(),
         line_align: align,
+        max_width: Some(20),
         ..Default::default()
-      });
+      };
+      assert_eq!(text_layout::measure_draw_text(&params), (7, 3));
+      canvas.text(&params);
 
-      assert_eq!(canvas.base.get(expected_x, 1).unwrap().text, "a");
-      assert_eq!(canvas.base.get(5, 0).unwrap().text, "T");
+      assert_eq!(canvas.base.get(first_x, 1).unwrap().text, "T");
+      assert_eq!(canvas.base.get(5, 2).unwrap().text, "a");
+      assert_eq!(canvas.base.get(11, 2).unwrap().text, "g");
+      for row in 1..4 {
+        assert!((0..5).all(|x| !canvas.base.is_written(x, row)));
+        assert!((12..canvas.base_width()).all(|x| !canvas.base.is_written(x, row)));
+      }
     }
+  }
+
+  #[test]
+  fn rich_multiline_alignment_uses_resolved_terminal_cell_widths() {
+    for (align, first_x) in [(TextAlign::Center, 4), (TextAlign::Right, 6)] {
+      let mut canvas = CanvasService::new();
+      let params = DrawTextParams {
+        x: 2,
+        y: 0,
+        text: "f%<fg:green>界</fg>\n{value:label}\na".to_string(),
+        params: Some(RichTextParams {
+          values: HashMap::from([("label".to_string(), "abcdef".to_string())]),
+          ..Default::default()
+        }),
+        line_align: align,
+        max_width: Some(20),
+        ..Default::default()
+      };
+      assert_eq!(text_layout::measure_draw_text(&params), (6, 3));
+      canvas.text(&params);
+      assert_eq!(canvas.base.get(first_x, 0).unwrap().text, "界");
+      assert!(canvas.base.get(first_x + 1, 0).unwrap().is_continuation());
+      assert_eq!(canvas.base.get(2, 1).unwrap().text, "a");
+      assert_eq!(
+        canvas.base.get(first_x, 0).unwrap().style.foreground,
+        Some(TextColor::Terminal(TerminalColor::Green))
+      );
+    }
+  }
+
+  #[test]
+  fn alignment_uses_visible_wrapped_lines_after_height_clipping() {
+    let mut canvas = CanvasService::new();
+    let params = DrawTextParams {
+      text: "ab\ncdefghij\nabcdefghijkl".to_string(),
+      non_truncate_word_wrap: false,
+      line_align: TextAlign::Center,
+      wrap_mode: TextWrapMode::Auto,
+      max_width: Some(5),
+      max_height: Some(3),
+      overflow_marker: None,
+      ..Default::default()
+    };
+    assert_eq!(text_layout::measure_draw_text(&params), (5, 3));
+    canvas.text(&params);
+    assert_eq!(raw_row_prefix(&canvas, 0, 5), " ab  ");
+    assert_eq!(raw_row_prefix(&canvas, 1, 5), "cdefg");
+    assert_eq!(raw_row_prefix(&canvas, 2, 5), " hij ");
   }
 
   #[test]

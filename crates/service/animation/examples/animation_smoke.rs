@@ -1,4 +1,4 @@
-//! Minimal entry: plays a linear float tween on a standalone value and samples it halfway.
+//! Independent animation smoke entry exercising the public API and checking its results.
 
 use std::{sync::Arc, time::Duration};
 

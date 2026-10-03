@@ -1,4 +1,4 @@
-//! Minimal entry: extracts plain text from the built-in font preview frame.
+//! Independent screenshot smoke entry exercising the public API and checking its results.
 
 use tg_service_screenshot::{ScreenshotService, TerminalFrameRasterizer};
 use tg_service_storage::RecordingPixelScale;
@@ -12,7 +12,8 @@ fn main() {
     "screenshot ok: {} lines of plain text",
     text.lines().count()
   );
-  // Optional output path makes the same production renderer available for visual checks.
+  // An optional destination writes the same rasterized fixture used by production exports.
+
   if let Some(output) = std::env::args_os().nth(1) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let start = std::time::Instant::now();

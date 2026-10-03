@@ -1,5 +1,13 @@
+//! Lua debug library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Build and register the Lua debug API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   source.raw_set("VERSION", "Lua 5.4 / TUI GAME API 1")?;
@@ -93,7 +101,8 @@ pub(super) fn debug(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "assert",
     lua.create_function(|lua, values: MultiValue| {
       let parameters = args::positional(lua, "debug.assert", values, &["value"], &["message"])?;
-      // nil is a valid asserted value; omission still fails required-position parsing.
+      // Explicit nil can be asserted; an omitted required position is still an argument error.
+
       let value = parameters.get(0);
       if matches!(value, Value::Nil | Value::Boolean(false)) {
         let message = args::optional_dynamic_text(

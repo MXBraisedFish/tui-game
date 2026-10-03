@@ -1,3 +1,5 @@
+//! Render support for the widget service.
+
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
@@ -18,6 +20,17 @@ fn align_offset(align: TextAlign, container: u16, content: u16) -> u16 {
   }
 }
 
+/// Draw a single-line input with its scroll offset, selection, and visible cursor.
+///
+/// # Arguments
+///
+/// * `state` - The state.
+/// * `active` - The active.
+/// * `cursor_visible` - The cursor visible.
+/// * `params` - The formatting or rendering parameters.
+/// * `canvas` - The clipped canvas used for drawing.
+/// * `surface` - The destination drawing surface and its clipping bounds.
+/// * `order` - The order.
 pub(super) fn render_single_line(
   state: &mut TextInputState,
   active: bool,
@@ -126,6 +139,17 @@ pub(super) fn render_single_line(
   active.then_some((params.rect.x + offset_x + cursor_x as u16, y))
 }
 
+/// Draw a multi-line input with wrapped lines, selection, alignment, and visible cursor.
+///
+/// # Arguments
+///
+/// * `state` - The state.
+/// * `active` - The active.
+/// * `cursor_visible` - The cursor visible.
+/// * `params` - The formatting or rendering parameters.
+/// * `canvas` - The clipped canvas used for drawing.
+/// * `surface` - The destination drawing surface and its clipping bounds.
+/// * `order` - The order.
 pub(super) fn render_multi_line(
   state: &mut TextInputState,
   active: bool,
@@ -168,7 +192,6 @@ pub(super) fn render_multi_line(
     0
   };
 
-  // 预计算每行的最大宽度（用于水平对齐）
   let mut line_widths: Vec<usize> = Vec::new();
   for glyph in &layout.glyphs {
     let line_end = glyph.x + glyph.width;
@@ -251,6 +274,13 @@ fn cursor_marker(shape: TextInputCursorShape) -> Option<&'static str> {
   }
 }
 
+/// Fill the clipped input rectangle using its resolved background style.
+///
+/// # Arguments
+///
+/// * `canvas` - The clipped canvas used for drawing.
+/// * `surface` - The destination drawing surface and its clipping bounds.
+/// * `params` - The formatting or rendering parameters.
 pub(super) fn fill_input_background(
   canvas: &mut CanvasService,
   surface: TextSurface,

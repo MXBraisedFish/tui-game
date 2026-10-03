@@ -1,4 +1,4 @@
-//! Minimal entry: runs one job on a worker thread and collects its event and completion status.
+//! Independent async smoke entry exercising the public API and checking its results.
 
 use std::time::{Duration, Instant};
 

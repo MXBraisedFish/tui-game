@@ -1,9 +1,17 @@
+//! Lua string library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
 mod pattern;
 
 use pattern::{LuaCapture, LuaCaptures, LuaPattern, LuaPatternInput, MAX_CAPTURE_GROUPS};
 
+/// Build and register the Lua string API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, value) in [
@@ -1311,6 +1319,12 @@ fn format_value(value: &Value) -> mlua::Result<String> {
   args::dynamic_text(value.clone(), "string.format", "values")
 }
 
+/// Convert Lua formatting values into explicit rich-text parameters.
+///
+/// # Errors
+///
+/// Return a Lua argument error when formatting values cannot be converted into supported
+/// substitutions.
 pub(super) fn rich_text_params(
   value: Value,
   method: &str,

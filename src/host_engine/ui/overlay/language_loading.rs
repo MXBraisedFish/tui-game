@@ -1,3 +1,5 @@
+//! Language loading overlay state, owned interactions, and clipped terminal presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -7,6 +9,7 @@ use crate::host_engine::services::{
   TimerId, UiObjectPool, UiObjectPoolOwner,
 };
 
+/// The state and owned widgets of the language loading view.
 pub struct LanguageLoadingUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -15,6 +18,11 @@ pub struct LanguageLoadingUi {
 }
 
 impl LanguageLoadingUi {
+  /// Create the language loading view and allocate its owned UI objects.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `valid language loading progress bar options`.
   pub fn init(progress_bar: &ProgressBarService, time: &TimeService) -> Self {
     let mut objects = UiObjectPool::new();
     let mut runtime_objects = RuntimeObjectPool::new();
@@ -31,19 +39,38 @@ impl LanguageLoadingUi {
     }
   }
 
+  /// Reset and start the loading-indicator animation timer.
   pub fn restart_animation(&mut self, time: &TimeService) {
     let _ = time.reset(&mut self.runtime_objects.time, self.animation_timer);
     let _ = time.start(&mut self.runtime_objects.time, self.animation_timer);
   }
 
+  /// Advance the language loading view's transient state for this host frame.
   pub fn update(&mut self, time: &TimeService, dt: Duration) {
     time.update(&mut self.runtime_objects.time, dt);
   }
 
+  /// Update the progress used by this language loading ui.
+  ///
+  /// # Arguments
+  ///
+  /// * `progress_bar` - The progress bar.
+  /// * `completed` - The completed.
+  /// * `preview` - The preview.
   pub fn set_progress(&mut self, progress_bar: &ProgressBarService, completed: f32, preview: f32) {
     let _ = progress_bar.set_progress(&mut self.objects, self.bar, completed, preview);
   }
 
+  /// Draw the language loading view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `progress_bar` - The progress bar.
+  /// * `time` - The time.
   pub fn render(
     &mut self,
     render: &mut RenderService,

@@ -1,3 +1,5 @@
+//! Creation of the deployment storage layout needed by runtime services.
+
 use std::fs;
 use std::io::ErrorKind;
 use std::{io, path::Path};
@@ -6,7 +8,12 @@ use super::layout;
 use super::service::StorageService;
 use tg_service_log::{LogService, LogSource};
 
-/// Ensures the storage directories and default files exist, creating any that are missing.
+/// Create the deployment data directories and initialize required profile files.
+///
+/// # Errors
+///
+/// Return an I/O error when required deployment directories or initial profile files cannot be
+/// created.
 pub fn ensure_storage_layout(storage: &StorageService, log: &mut LogService) -> io::Result<()> {
   ensure_required_directories(storage, log)?;
   ensure_default_files(storage, log)

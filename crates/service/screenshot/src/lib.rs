@@ -1,4 +1,15 @@
-//! Screenshot service: rasterizes composed terminal frames to PNG/JSON and saves them as async jobs.
+//! Structured frame capture and shared text rasterization for image and video export.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_screenshot::ScreenshotService;
+//!
+//! let frame = ScreenshotService::font_preview_frame();
+//! let rect = ScreenshotService::whole_frame_rect(&frame).expect("nonempty frame");
+//! let text = ScreenshotService::plain_text(&frame, rect);
+//! assert!(text.contains("CJK:"));
+//! ```
 
 use std::{
   collections::{HashMap, HashSet},
@@ -29,7 +40,8 @@ use tg_service_async::TaskId;
 use tg_service_log::LogService;
 use tg_service_storage::{RecordingPixelScale, StorageService};
 
-// Reference profile: Maple Mono NF CN at 12 pt / 144 DPI, measured in Windows Terminal.
+// Default cell metrics come from the measured Maple Mono NF CN reference at 12 pt and 144 DPI.
+
 const REFERENCE_FONT_SIZE: f32 = 24.0;
 const REFERENCE_LINE_HEIGHT: f32 = 31.68;
 const REFERENCE_CELL_HEIGHT: u32 = 36;
@@ -46,6 +58,13 @@ struct RasterMetrics {
 }
 
 impl RasterMetrics {
+  /// Derive export font size and baseline from valid primary-font line metrics while retaining
+  /// the reference terminal cell geometry.
+  ///
+  /// # Errors
+  ///
+  /// Return an error if horizontal line metrics are missing/invalid or the primary face has no
+  /// positive finite monospace advance.
   fn for_font(font: &fontdue::Font) -> Result<Self, String> {
     let font_name = font.name().unwrap_or("unknown font");
     let line_metrics = font
@@ -78,6 +97,8 @@ impl RasterMetrics {
     })
   }
 
+  /// Scale the cell geometry, font size, and baseline together for final-resolution
+  /// rasterization.
   fn for_scale(self, scale: RecordingPixelScale) -> Self {
     let (numerator, denominator) = scale.multiplier();
     let multiplier = numerator as f32 / denominator as f32;
@@ -107,46 +128,92 @@ impl RasterMetrics {
   }
 }
 
+/// A capture selection in terminal-cell coordinates.
+///
+/// # Fields
+///
+/// * `x` - The horizontal coordinate in terminal cells.
+/// * `y` - The vertical coordinate in terminal cells.
+/// * `width` - The width in terminal columns.
+/// * `height` - The height in terminal rows.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScreenshotRect {
+  /// The horizontal coordinate in terminal cells.
   pub x: u16,
+  /// The vertical coordinate in terminal cells.
   pub y: u16,
+  /// The width in terminal columns.
   pub width: u16,
+  /// The height in terminal rows.
   pub height: u16,
 }
 
+/// The inputs of an asynchronous screenshot operation.
+///
+/// # Fields
+///
+/// * `frame` - The composed terminal-cell frame.
+/// * `selection` - The currently selected text or frame region.
+/// * `png_path` - The filesystem path for png.
+/// * `fonts` - The ordered fonts retained by this owner.
+/// * `deployment_root` - The deployment root.
 #[derive(Clone, Debug)]
 pub struct ScreenshotTask {
+  /// The composed terminal-cell frame.
   pub frame: ComposedFrame,
+  /// The currently selected text or frame region.
   pub selection: ScreenshotRect,
+  /// The filesystem path for png.
   pub png_path: PathBuf,
+  /// The ordered fonts retained by this owner.
   pub fonts: Vec<String>,
+  /// The deployment root.
   pub deployment_root: PathBuf,
 }
 
+/// A screenshot async event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum ScreenshotAsyncEvent {
+  /// A progress notification delivered to the owning consumer.
   Progress {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The completed rows.
     completed_rows: u16,
+    /// The total rows.
     total_rows: u16,
   },
+  /// A saved notification delivered to the owning consumer.
   Saved {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path for png.
     png_path: PathBuf,
   },
+  /// A failed notification delivered to the owning consumer.
   Failed {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The error.
     error: String,
   },
 }
 
+/// The screenshot operation feedback representation used by this module.
+///
+/// # Fields
+///
+/// * `copy_succeeded` - The copy succeeded.
+/// * `save_task` - The save task.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ScreenshotOperationFeedback {
+  /// The copy succeeded.
   pub copy_succeeded: Option<bool>,
+  /// The save task.
   pub save_task: Option<TaskId>,
 }
 
+/// The public entry point for screenshot operations.
 #[derive(Default)]
 pub struct ScreenshotService {
   last_presented_frame: Option<ComposedFrame>,
@@ -156,18 +223,22 @@ pub struct ScreenshotService {
 }
 
 impl ScreenshotService {
+  /// Create a screenshot service with its initial state.
   pub fn new() -> Self {
     Self::default()
   }
 
+  /// Queue a preview-frame request using the configured export font settings.
   pub fn request_font_preview(&mut self, fonts: Vec<String>) {
     self.pending_font_preview = Some(fonts);
   }
 
+  /// Take and clear the pending export-font preview request.
   pub fn take_font_preview_request(&mut self) -> Option<Vec<String>> {
     self.pending_font_preview.take()
   }
 
+  /// Queue screenshot operation feedback for the host UI.
   pub fn report_operation(&mut self, copy_succeeded: Option<bool>, save_task: Option<TaskId>) {
     self.pending_operation_feedback = Some(ScreenshotOperationFeedback {
       copy_succeeded,
@@ -175,10 +246,12 @@ impl ScreenshotService {
     });
   }
 
+  /// Drain pending screenshot operation feedback.
   pub fn take_operation_feedback(&mut self) -> Option<ScreenshotOperationFeedback> {
     self.pending_operation_feedback.take()
   }
 
+  /// Track an export task by the screenshot or recording source it reads.
   pub fn register_source_export(&mut self, task_id: TaskId, source_path: PathBuf) {
     let sources = self.active_export_sources.entry(task_id).or_default();
     if !sources.contains(&source_path) {
@@ -186,6 +259,7 @@ impl ScreenshotService {
     }
   }
 
+  /// Apply a matching asynchronous completion event to screenshot state.
   pub fn handle_engine_event(&mut self, event: &ScreenshotAsyncEvent) {
     match event {
       ScreenshotAsyncEvent::Saved { task_id, .. }
@@ -196,6 +270,7 @@ impl ScreenshotService {
     }
   }
 
+  /// Report whether the source is currently used by an active export.
   pub fn is_source_exporting(&self, path: &Path) -> bool {
     self
       .active_export_sources
@@ -204,6 +279,7 @@ impl ScreenshotService {
       .any(|source| source == path)
   }
 
+  /// Build the shared font, style, ANSI-color, and continuous-spectrum preview frame.
   pub fn font_preview_frame() -> ComposedFrame {
     let lines = font_preview_lines();
     let width = lines
@@ -222,14 +298,17 @@ impl ScreenshotService {
     frame
   }
 
+  /// Retain the latest fully composed frame for capture and recording.
   pub fn remember_presented_frame(&mut self, frame: ComposedFrame) {
     self.last_presented_frame = Some(frame);
   }
 
+  /// Capture the most recently presented frame using the requested scope or selection.
   pub fn capture_last_frame(&self) -> Option<ComposedFrame> {
     self.last_presented_frame.clone()
   }
 
+  /// Return the rectangle covering the retained physical terminal frame.
   pub fn whole_frame_rect(frame: &ComposedFrame) -> Option<ScreenshotRect> {
     (frame.width() > 0 && frame.height() > 0).then_some(ScreenshotRect {
       x: 0,
@@ -239,6 +318,7 @@ impl ScreenshotService {
     })
   }
 
+  /// Clamp a capture selection to the retained frame bounds.
   pub fn normalize_selection(
     frame: &ComposedFrame,
     rect: ScreenshotRect,
@@ -290,6 +370,7 @@ impl ScreenshotService {
     })
   }
 
+  /// Convert captured cells to plain text while skipping wide-cell continuation markers.
   pub fn plain_text(frame: &ComposedFrame, rect: ScreenshotRect) -> String {
     let mut lines = Vec::new();
     for y in rect.y..rect.y.saturating_add(rect.height) {
@@ -306,6 +387,7 @@ impl ScreenshotService {
     lines.join("\n")
   }
 
+  /// Convert captured styled cells to tagged text while preserving their colors and styles.
   pub fn rich_text(frame: &ComposedFrame, rect: ScreenshotRect) -> String {
     let mut output = String::from("f%");
     for y in rect.y..rect.y.saturating_add(rect.height) {
@@ -323,6 +405,15 @@ impl ScreenshotService {
     output
   }
 
+  /// Persist the captured structured frame in the screenshot data format.
+  ///
+  /// # Arguments
+  ///
+  /// * `storage` - The deployment-relative storage service.
+  /// * `frame` - The composed terminal-cell frame.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `png_path` - The filesystem path for png.
+  /// * `log` - The service receiving diagnostic records.
   pub fn write_json(
     &self,
     storage: &StorageService,
@@ -362,6 +453,7 @@ impl ScreenshotService {
     Some(path)
   }
 
+  /// Choose the next available PNG output path under the screenshot directory.
   pub fn next_png_path(storage: &StorageService) -> PathBuf {
     storage
       .screenshot_dir_path()
@@ -541,7 +633,9 @@ fn write_preview_references(frame: &mut ComposedFrame, y: u16) {
         },
       )),
     );
-    // Six linear RGB segments: red -> yellow -> green -> cyan -> blue -> magenta -> red.
+    // Interpolate six RGB edges to form a continuous red-yellow-green-cyan-blue-magenta-red
+    // spectrum.
+
     let phase = u32::from(offset) * 6 * 255 / u32::from(width - 1);
     let step = (phase % 255) as u8;
     let (r, g, b) = match phase / 255 {
@@ -701,6 +795,19 @@ fn color_name(color: &TextColor) -> String {
   }
 }
 
+/// Render and write the captured structured frame as a PNG using the shared rasterizer.
+///
+/// # Arguments
+///
+/// * `task_id` - The identifier of the asynchronous task.
+/// * `task` - The task.
+/// * `event_tx` - The event tx.
+/// * `cancellation` - The cancellation token for the operation.
+///
+/// # Errors
+///
+/// Return an error for cancellation, invalid capture or raster dimensions, font loading failures,
+/// or PNG output failures.
 pub fn run_screenshot_task<E: From<ScreenshotAsyncEvent>>(
   task_id: TaskId,
   task: ScreenshotTask,
@@ -776,18 +883,32 @@ fn send_progress<E: From<ScreenshotAsyncEvent>>(
   }));
 }
 
+/// A reusable font set, metrics, and glyph cache shared by PNG and video rendering.
 pub struct TerminalFrameRasterizer {
   fonts: FontSet,
   metrics: RasterMetrics,
 }
 
 impl TerminalFrameRasterizer {
+  /// Load ordered preferred, extra, bundled, and system font sources for capture rendering.
+  ///
+  /// # Errors
+  ///
+  /// Return an error when no usable primary font is available or its line metrics and monospace
+  /// advance are invalid.
   pub fn load(preferred: &[String], deployment_root: &Path) -> Result<Self, String> {
     let fonts = FontSet::load(preferred, deployment_root)?;
     let metrics = RasterMetrics::for_font(fonts.primary_font()?)?;
     Ok(Self { fonts, metrics })
   }
 
+  /// Return the rasterized pixel dimensions for the frame and export settings.
+  ///
+  /// # Arguments
+  ///
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `scale` - The scale.
   pub fn dimensions(&self, width: u16, height: u16, scale: RecordingPixelScale) -> (u32, u32) {
     let metrics = self.metrics.for_scale(scale);
     (
@@ -796,6 +917,20 @@ impl TerminalFrameRasterizer {
     )
   }
 
+  /// Rasterize a structured frame selection directly into final-size opaque RGBA pixels.
+  ///
+  /// # Arguments
+  ///
+  /// * `frame` - The composed terminal-cell frame.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `scale` - The scale.
+  /// * `progress` - The callback used to progress.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for an empty or overflowing selection, output exceeding 256 MiB of RGBA
+  /// pixels, allocation failures, invalid image dimensions, or cancellation requested by the
+  /// progress callback.
   pub fn render(
     &self,
     frame: &ComposedFrame,
@@ -803,8 +938,9 @@ impl TerminalFrameRasterizer {
     scale: RecordingPixelScale,
     mut progress: impl FnMut(u16, u16) -> bool,
   ) -> Result<RgbaImage, String> {
-    // 字符、样式与颜色一直保留为结构化数据，直到确定最终导出尺寸后，
-    // 才按目标单元格和字号直接栅格化，避免先生成低分辨率位图再缩放。
+    // Keep text, color, and style structured until output dimensions are resolved; rasterize at
+    // the final cell size instead of scaling a low-resolution bitmap.
+
     let metrics = self.metrics.for_scale(scale);
     let width = metrics.image_width(rect.width);
     let height = metrics.image_height(rect.height);
@@ -939,6 +1075,11 @@ const SYSTEM_FONT_FALLBACK_FAMILIES: &[&str] = &[
 ];
 
 impl FontSet {
+  /// Load ordered preferred, extra, bundled, and system font sources for capture rendering.
+  ///
+  /// # Errors
+  ///
+  /// Return an error listing attempted sources when no usable font can be loaded.
   fn load(preferred: &[String], deployment_root: &Path) -> Result<Self, String> {
     let mut database = fontdb::Database::new();
     database.load_system_fonts();
@@ -948,6 +1089,19 @@ impl FontSet {
     Self::load_with_sources(preferred, deployment_root, &extra_font_paths, database)
   }
 
+  /// Assemble the ordered fallback set, retaining all usable system faces for missing-character
+  /// coverage.
+  ///
+  /// # Arguments
+  ///
+  /// * `preferred` - User font paths or family names in preference order.
+  /// * `deployment_root` - The root used to resolve relative font paths and bundled assets.
+  /// * `extra_font_paths` - Additional font files searched before the bundled default.
+  /// * `database` - Discovered system faces used after explicit and bundled font sources.
+  ///
+  /// # Errors
+  ///
+  /// Return an error listing attempted sources when no usable font can be loaded.
   fn load_with_sources(
     preferred: &[String],
     deployment_root: &Path,
@@ -1026,7 +1180,9 @@ impl FontSet {
       ids.push(id);
     }
 
-    // The preferred system families are only a priority list, not a coverage whitelist.
+    // Preferred system families affect search order only; other faces remain eligible for missing
+    // glyphs.
+
     let mut remaining = database.faces().collect::<Vec<_>>();
     remaining.sort_by_key(|face| {
       (
@@ -1062,6 +1218,11 @@ impl FontSet {
     })
   }
 
+  /// Return the first loaded face usable by the rasterizer.
+  ///
+  /// # Errors
+  ///
+  /// Return an error if the first retained face cannot be rasterized.
   fn primary_font(&self) -> Result<&fontdue::Font, String> {
     self
       .fonts
@@ -1093,6 +1254,8 @@ impl FontSet {
     Some(cached)
   }
 
+  /// Choose one face for a whole grapheme, preferring full coverage and otherwise the best
+  /// partial face before notdef.
   fn font_index_for_grapheme(&self, grapheme: &str) -> Option<usize> {
     let characters = grapheme
       .chars()
@@ -1121,7 +1284,9 @@ impl FontSet {
         best_count = count;
       }
     }
-    // No complete face exists. Keep the best partial cluster, otherwise primary .notdef.
+    // When no face covers the complete cluster, prefer partial coverage before using the primary
+    // missing-glyph box.
+
     let index = best
       .filter(|index| self.fonts[*index].raster(&self.database).is_some())
       .unwrap_or(0);
@@ -1132,6 +1297,15 @@ impl FontSet {
     Some(index)
   }
 
+  /// Shape a directional text span into glyphs, cluster byte offsets, advances, and mark
+  /// positions.
+  ///
+  /// # Arguments
+  ///
+  /// * `font_index` - The font index.
+  /// * `text` - The text to process or display.
+  /// * `direction` - The direction.
+  /// * `font_size` - The font size.
   fn shape_text(
     &self,
     font_index: usize,
@@ -1309,6 +1483,15 @@ struct ShapedTextSpan {
   emoji: bool,
 }
 
+/// Resolve frame cells into styled, directional shaping spans while preserving wide-cell crop
+/// occupancy.
+///
+/// # Arguments
+///
+/// * `frame` - The composed terminal-cell frame.
+/// * `rect` - The rectangular region in terminal cells.
+/// * `y` - The vertical coordinate in terminal cells.
+/// * `fonts` - The fonts.
 fn shape_row(
   frame: &ComposedFrame,
   rect: ScreenshotRect,
@@ -1327,7 +1510,9 @@ fn shape_row(
         if x > 0 {
           continue;
         }
-        // A crop starting inside a wide cell still occupies its first column.
+        // Preserve the first occupied crop column even when its source is a wide-cell
+        // continuation.
+
         let mut start = rect.x;
         while start > 0 && is_continuation(frame, start, rect.y + y) {
           start -= 1;
@@ -1470,8 +1655,22 @@ fn is_geometry(text: &str) -> bool {
   !text.is_empty() && text.chars().all(|c| matches!(c, '\u{2500}'..='\u{259f}'))
 }
 
-// HarfRust clusters are UTF-8 byte offsets, in visual glyph order (descending for RTL).
-// Allocate terminal columns per cluster without stretching marks or every glyph advance.
+// Shaping clusters are UTF-8 byte offsets ordered visually, reversed for RTL. Assign terminal
+// columns per cluster without scaling every glyph or separating combining marks.
+
+/// Center each cluster or connected word inside its allocated terminal columns without stretching
+/// individual glyph advances.
+///
+/// # Arguments
+///
+/// * `glyphs` - The glyphs.
+/// * `span` - The span.
+/// * `metrics` - The metrics.
+/// * `origin` - The origin.
+///
+/// # Panics
+///
+/// Panic if an internal invariant is violated: `known shaping cluster`.
 fn cluster_positions(
   glyphs: &[ShapedGlyph],
   span: &ShapedTextSpan,
@@ -1500,8 +1699,9 @@ fn cluster_positions(
   while start < glyphs.len() {
     let cluster = glyphs[start].cluster;
     let mut end = start + 1;
-    // Joining scripts keep continuous advances inside a word; spare column space
-    // belongs outside the word, not between connected letters.
+    // Place spare column space outside connected words so joining-script advances stay
+    // continuous.
+
     let joining = joining_cluster(&span.text, cluster);
     while end < glyphs.len()
       && (glyphs[end].cluster == cluster
@@ -1544,6 +1744,17 @@ fn joining_cluster(text: &str, offset: u32) -> bool {
     })
 }
 
+/// Rasterize shaped glyphs within the span and row bounds, using cell fallback for geometric or
+/// unavailable text.
+///
+/// # Arguments
+///
+/// * `image` - The image.
+/// * `fonts` - The fonts.
+/// * `metrics` - The metrics.
+/// * `origin_cell_x` - The origin cell x.
+/// * `y` - The vertical coordinate in terminal cells.
+/// * `span` - The span.
 fn draw_shaped_span(
   image: &mut RgbaImage,
   fonts: &FontSet,
@@ -1607,6 +1818,16 @@ fn draw_shaped_span(
   }
 }
 
+/// Draw individual visual cells when a span has no usable shaped glyph sequence.
+///
+/// # Arguments
+///
+/// * `image` - The image.
+/// * `fonts` - The fonts.
+/// * `metrics` - The metrics.
+/// * `origin_cell_x` - The origin cell x.
+/// * `y` - The vertical coordinate in terminal cells.
+/// * `span` - The span.
 fn draw_fallback_span(
   image: &mut RgbaImage,
   fonts: &FontSet,
@@ -1801,6 +2022,17 @@ fn draw_grapheme(
   }
 }
 
+/// Draw supported block characters as pixel geometry, returning false for unsupported characters.
+///
+/// # Arguments
+///
+/// * `image` - The image.
+/// * `character` - The character.
+/// * `x` - The x measured in output-image pixels.
+/// * `y` - The y measured in output-image pixels.
+/// * `width` - The width measured in output-image pixels.
+/// * `height` - The height measured in output-image pixels.
+/// * `color` - The color assigned to the target property.
 fn draw_block_element(
   image: &mut RgbaImage,
   character: char,
@@ -1907,6 +2139,18 @@ fn box_connections(character: char) -> Option<BoxConnections> {
   })
 }
 
+/// Draw connected box edges using the current cell geometry so neighboring cells meet at their
+/// boundaries.
+///
+/// # Arguments
+///
+/// * `image` - The image.
+/// * `metrics` - The metrics.
+/// * `x` - The x measured in output-image pixels.
+/// * `y` - The y measured in output-image pixels.
+/// * `width` - The width measured in output-image pixels.
+/// * `color` - The color assigned to the target property.
+/// * `connections` - The connections.
 fn draw_box_connections(
   image: &mut RgbaImage,
   metrics: RasterMetrics,
@@ -1955,6 +2199,23 @@ fn draw_box_connections(
   }
 }
 
+/// Blend grayscale glyph coverage into the image within explicit clipping bounds, applying the
+/// optional italic shear.
+///
+/// # Arguments
+///
+/// * `image` - The image.
+/// * `bitmap` - The bitmap.
+/// * `bitmap_width` - The bitmap width measured in output-image pixels.
+/// * `bitmap_height` - The bitmap height measured in output-image pixels.
+/// * `destination_x` - The destination x measured in output-image pixels.
+/// * `destination_y` - The destination y measured in output-image pixels.
+/// * `clip_left` - The clip left measured in output-image pixels.
+/// * `clip_top` - The clip top measured in output-image pixels.
+/// * `clip_right` - The clip right measured in output-image pixels.
+/// * `clip_bottom` - The clip bottom measured in output-image pixels.
+/// * `color` - The color assigned to the target property.
+/// * `italic` - The italic.
 #[allow(clippy::too_many_arguments)]
 fn draw_glyph_bitmap(
   image: &mut RgbaImage,
@@ -2072,7 +2333,11 @@ fn fill_rect(
   }
 }
 
-// Stable export palette: Tango Dark. Transparent means terminal default, not PNG alpha.
+// Use the stable Tango Dark export palette; transparent cells resolve to terminal defaults, not
+// PNG alpha.
+
+/// Resolve default, reverse, dim, and bright-text styling into opaque export
+/// foreground/background colors.
 fn resolved_colors(style: &TextStyle) -> ((u8, u8, u8), (u8, u8, u8)) {
   let mut fg = match style.foreground.as_ref() {
     None | Some(TextColor::Transparent) => (211, 215, 207),
@@ -2093,6 +2358,7 @@ fn resolved_colors(style: &TextStyle) -> ((u8, u8, u8), (u8, u8, u8)) {
   (fg, bg)
 }
 
+/// Resolve a terminal palette or explicit RGB color to its export RGB value.
 fn color_rgb(color: &TextColor) -> (u8, u8, u8) {
   match color {
     TextColor::Rgb { r, g, b } | TextColor::ForceRgb { r, g, b } => (*r, *g, *b),
@@ -2721,7 +2987,8 @@ mod tests {
     }
     assert_eq!(column, 160);
     assert_eq!(rasterizer.metrics.cell_x(column), 2400);
-    // Deliberately unequal natural advances must not scale every character by a run ratio.
+    // Unequal natural glyph advances must retain per-cluster terminal positioning.
+
     let mut frame = ComposedFrame::new(3, 1);
     write_preview_line(&mut frame, 0, 0, "abc");
     let span = shape_row(
@@ -2824,7 +3091,9 @@ mod tests {
         assert_eq!(image.get_pixel(x, y).0, [7, 19, 31, 255]);
       }
     }
-    // Odd cell width: the right half starts at floor(width / 2), never at 8 * ceil(width / 8).
+    // For odd cell widths, split the right half at floor(width / 2) so the geometric fill stays
+    // contiguous.
+
     assert_eq!(image.get_pixel(21, 10).0, [0, 0, 0, 255]);
     assert_eq!(image.get_pixel(22, 10).0, [211, 215, 207, 255]);
     let mut png = std::io::Cursor::new(Vec::new());

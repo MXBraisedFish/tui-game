@@ -1,3 +1,5 @@
+//! Crash-phase tracking, supervised panic capture, and best-effort crash-log persistence.
+
 use std::backtrace::Backtrace;
 use std::io::Write;
 use std::panic;
@@ -7,25 +9,30 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::{CapturedPanic, HostFault, capture_panic, current_fault_domain, is_supervised};
 
-/// Lifecycle phase that identifies where the host was when a panic happened.
+/// The host lifecycle phase recorded when a panic occurs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CrashPhase {
+  /// The boot stage of the operation.
   Boot = 0,
+  /// The init stage of the operation.
   Init = 1,
+  /// The runtime stage of the operation.
   Runtime = 2,
+  /// The shutdown stage of the operation.
   Shutdown = 3,
+  /// The operation is stopped.
   Stopped = 4,
 }
 
 static CRASH_PHASE: AtomicU8 = AtomicU8::new(CrashPhase::Boot as u8);
 static CRASH_RECORDED: AtomicBool = AtomicBool::new(false);
 
-/// Sets the current crash phase.
+/// Record the lifecycle phase used by subsequent panic reports.
 pub fn set_crash_phase(phase: CrashPhase) {
   CRASH_PHASE.store(phase as u8, Ordering::SeqCst);
 }
 
-/// Returns the current crash phase.
+/// Return the most recently recorded crash phase.
 pub fn current_crash_phase() -> CrashPhase {
   match CRASH_PHASE.load(Ordering::SeqCst) {
     1 => CrashPhase::Init,
@@ -36,13 +43,8 @@ pub fn current_crash_phase() -> CrashPhase {
   }
 }
 
-/// Installs the custom panic hook.
-///
-/// A supervised panic (inside [`catch_host_fault`](crate::catch_host_fault)) during the boot,
-/// init or runtime phase is only captured for the supervisor. Any other panic restores the
-/// terminal through `restore_terminal` and appends a crash record with the current phase to the
-/// crash log; when the record cannot be written, the phase and the panic are printed to stderr
-/// and the previous hook runs.
+/// Install panic reporting that captures supervised faults and restores the terminal for other
+/// panics.
 pub fn install_panic_hook(restore_terminal: fn(), crash_log_path: PathBuf) {
   CRASH_RECORDED.store(false, Ordering::SeqCst);
   let previous_hook = panic::take_hook();
@@ -91,8 +93,13 @@ pub fn install_panic_hook(restore_terminal: fn(), crash_log_path: PathBuf) {
   }))
 }
 
-/// Writes one complete supervised fault record. Terminal restoration is left
-/// to the normal shutdown path so the exception screen remains visible.
+/// Append a supervised fault record and report whether the record was written.
+///
+/// # Arguments
+///
+/// * `run_id` - The identifier of the current host run.
+/// * `fault` - The fault.
+/// * `crash_log_path` - The destination path for crash records.
 pub fn finalize_host_fault(run_id: &str, fault: &HostFault, crash_log_path: &Path) -> bool {
   append_crash_record(
     crash_log_path,

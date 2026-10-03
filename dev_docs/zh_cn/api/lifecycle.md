@@ -367,7 +367,8 @@ function SaveBest()
   -- 保存前的数据处理
   local coin = 10
   return {
-    best_string = "Coin" .. coin,
+    best_string = { type = "i18n", key = "coin", callback = "f%Coin: {value:coin}" },
+    value = { coin = tostring(coin) },
     coin = coin
   }
 end
@@ -380,6 +381,10 @@ end
 
 ### 额外说明
 
-- 返回值表必须包含 `best_string` 字段，类型为 `string`，用于游戏列表展示。
+- 返回值表必须包含 `best_string`，可以是字符串，也可以是 `{ type = "text", text = "..." }` 或 `{ type = "i18n", key = "...", callback = "..." }` 文本表；i18n 的 `key` 和 `callback` 必填，`key` 不能为空，不能添加未知字段。
+- 可选的 `value` 是名称到文本的对象表，每个值同样可以是字符串或文本表。例如 `value = { coin = tostring(coin) }` 对应 `f%Coin: {value:coin}`；数值需先转成字符串，不能传数组。
+- 所有 i18n 文本都查找当前包的 `assets/language/<语言代码>/package/best_string.json`，依次使用当前语言、`en_us`、各文本表的 `callback`。
+- 使用占位符或样式时，展示文本、翻译或回退文本需带 `f%` 前缀；替换值按原样插入，未提供的参数保留原占位符。
+- 原始文本表与参数一起保存并通过 `ctx.best_data` 传回。切换语言、热加载语言文件后，游戏列表重新显示对应文本；纯字符串旧存档仍可读取。
 - 仅当 `game.json` 中 `best_score.enable` 为 `true` 时可用，且必须实现。通过 `game.save_best` 读取。
 - 返回值必须可序列化。

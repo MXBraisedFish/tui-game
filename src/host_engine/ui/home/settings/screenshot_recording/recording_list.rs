@@ -1,10 +1,15 @@
+//! Recording list page state, user commands, and terminal-cell presentation.
+
 use crate::host_engine::services::ActionMapEntry;
 
 use super::media_list::{MediaListCommand, MediaListSpec, MediaListUi, actions};
 
+/// The shared type used for recording list command.
 pub type RecordingListCommand = MediaListCommand;
+/// The shared type used for recording list ui.
 pub type RecordingListUi = MediaListUi<RecordingListSpec>;
 
+/// The recording list spec representation used by this module.
 pub struct RecordingListSpec;
 
 impl MediaListSpec for RecordingListSpec {

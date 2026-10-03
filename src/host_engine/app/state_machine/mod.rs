@@ -1,3 +1,5 @@
+//! Application lifecycle state, page navigation, and ordered overlay ownership.
+
 mod game;
 mod host;
 mod host_machine;

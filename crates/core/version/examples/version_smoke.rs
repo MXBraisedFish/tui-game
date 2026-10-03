@@ -1,4 +1,4 @@
-//! Minimal entry: prints the host and API versions.
+//! Independent version smoke entry exercising the public API and checking its results.
 
 fn main() {
   assert!(!tg_core_version::HOST_VERSION.is_empty());

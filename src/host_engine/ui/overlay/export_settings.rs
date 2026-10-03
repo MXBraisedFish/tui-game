@@ -1,3 +1,5 @@
+//! Export settings overlay state, owned interactions, and clipped terminal presentation.
+
 use std::path::Path;
 
 use crate::host_engine::services::text_layout::TextWrapMode;
@@ -13,11 +15,14 @@ const NS: &str = "export_settings";
 
 const HINT_GRAY: &str = "rgb(85,87,83)";
 
-/// Archive format of an export.
+/// The archive format used for a directory export.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExportFormat {
+  /// The zip setting for export format.
   Zip,
+  /// The tar setting for export format.
   Tar,
+  /// The tar gz setting for export format.
   TarGz,
 }
 
@@ -48,15 +53,22 @@ impl ExportFormat {
   }
 }
 
-/// Data scope of an export.
+/// The selected content category in the archive export settings view.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExportType {
+  /// The cache setting for export type.
   Cache,
+  /// The log setting for export type.
   Log,
+  /// The mod setting for export type.
   Mod,
+  /// The profile setting for export type.
   Profile,
+  /// The screenshot setting for export type.
   Screenshot,
+  /// The recording setting for export type.
   Recording,
+  /// The data setting for export type.
   Data,
 }
 
@@ -88,7 +100,6 @@ impl ExportType {
   }
 }
 
-/// Setting that currently has the focus.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ExportSettingsFocus {
   Name,
@@ -114,6 +125,7 @@ impl ExportSettingsFocus {
   }
 }
 
+/// The state and owned widgets of the export settings view.
 pub struct ExportSettingsUi {
   objects: UiObjectPool,
   #[allow(dead_code)]
@@ -127,20 +139,20 @@ pub struct ExportSettingsUi {
   type_area: HitAreaId,
   format: ExportFormat,
   export_type: Option<ExportType>,
-  /// Whether one of the text inputs is being edited.
+
   input_active: bool,
-  /// Cached texts of the name and path inputs, updated on every [`TextInputEvent::Changed`].
+
   name_text: String,
   path_text: String,
-  /// Program root directory, used to resolve `{root}`.
+
   root_dir: std::path::PathBuf,
-  /// Current validation state, updated on render and checked before
-  /// [`ExportSettingsCommand::ConfirmExport`] is emitted.
+
   name_valid: bool,
   path_valid: bool,
 }
 
 impl ExportSettingsUi {
+  /// Create the export settings view and allocate its owned UI objects.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &crate::host_engine::services::TextInputService,
@@ -185,51 +197,61 @@ impl ExportSettingsUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the export settings view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "export_settings.focus_up".to_string(),
         description: "Focus previous setting".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "export_settings.focus_down".to_string(),
         description: "Focus next setting".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "export_settings.focus_name".to_string(),
         description: "Focus name input".to_string(),
         keys: vec![vec!["1".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "export_settings.focus_path".to_string(),
         description: "Focus path input".to_string(),
         keys: vec![vec!["2".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "export_settings.focus_type".to_string(),
         description: "Focus format selector".to_string(),
         keys: vec![vec!["3".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "export_settings.confirm".to_string(),
         description: "Confirm / enter input / submit".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "export_settings.back".to_string(),
         description: "Back / exit input".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "export_settings.confirm_export".to_string(),
         description: "Confirm export".to_string(),
         keys: vec![vec!["ctrl".to_string(), "s".to_string()]],
+        priority: 0,
       },
     ]
   }
 
+  /// Start the export settings ui state addressed by this operation.
   pub fn start(&mut self, export_type: ExportType, root_dir: std::path::PathBuf) {
     self.export_type = Some(export_type);
     self.focus = ExportSettingsFocus::Name;
@@ -237,12 +259,12 @@ impl ExportSettingsUi {
     self.root_dir = root_dir;
   }
 
+  /// Interpret a export settings UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ExportSettingsCommand> {
     let name_id = self.name_input_id;
     let path_id = self.path_input_id;
 
     match event {
-      // ── TextInput events ────────────────────────────────
       UiEvent::TextInput(TextInputEvent::Pressed { id }) if *id == name_id => {
         self.focus = ExportSettingsFocus::Name;
         Some(ExportSettingsCommand::FocusInput)
@@ -264,7 +286,7 @@ impl ExportSettingsUi {
         self.path_text = value.clone();
         None
       }
-      // ── HitArea ─────────────────────────────────────────
+
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) if !self.input_active => {
         if *id == self.name_area {
           self.focus = ExportSettingsFocus::Name;
@@ -308,7 +330,7 @@ impl ExportSettingsUi {
           Some(ExportSettingsCommand::Cancel)
         }
       }
-      // ── Action ──────────────────────────────────────────
+
       UiEvent::Action(event) if event.state == KeyState::Pressed && !self.input_active => {
         match event.action.as_str() {
           "export_settings.focus_up" => {
@@ -354,8 +376,11 @@ impl ExportSettingsUi {
     }
   }
 
+  /// Cache existing export fields and focus the field selected for editing.
   pub fn focus_input(&mut self, text_input: &mut crate::host_engine::services::TextInputService) {
-    // Refresh the text caches from the inputs; `cancel_input` writes the caches back.
+    // Cache the current editor values so cancel can restore them without losing the selected
+    // defaults.
+
     self.name_text = text_input
       .get_text(&self.objects, self.name_input_id)
       .unwrap_or("")
@@ -376,15 +401,13 @@ impl ExportSettingsUi {
     }
   }
 
+  /// End export-field editing and release text-input focus.
   pub fn blur_input(&mut self, text_input: &mut crate::host_engine::services::TextInputService) {
     self.input_active = false;
     let _ = text_input.blur(&mut self.objects);
   }
 
-  /// Leaves text input (Esc) and writes the cached texts back into both inputs.
-  ///
-  /// The caches follow every [`TextInputEvent::Changed`], so the text typed so far is kept rather
-  /// than the text from before editing.
+  /// Restore cached export fields and release text-input focus.
   pub fn cancel_input(&mut self, text_input: &mut crate::host_engine::services::TextInputService) {
     let restore_name = self.name_text.clone();
     let restore_path = self.path_text.clone();
@@ -396,14 +419,17 @@ impl ExportSettingsUi {
     self.path_text = restore_path;
   }
 
+  /// Return the current name text.
   pub fn name_text(&self) -> &str {
     &self.name_text
   }
 
+  /// Return the current path text.
   pub fn path_text(&self) -> &str {
     &self.path_text
   }
 
+  /// Return the current resolved name.
   pub fn resolved_name(&self) -> String {
     let trimmed = self.name_text.trim();
     if trimmed.is_empty() {
@@ -417,6 +443,7 @@ impl ExportSettingsUi {
     }
   }
 
+  /// Return the current resolved path.
   pub fn resolved_path(&self) -> String {
     let trimmed = self.path_text.trim();
     if trimmed.is_empty() {
@@ -426,11 +453,13 @@ impl ExportSettingsUi {
     }
   }
 
+  /// Return the current format.
   #[allow(dead_code)]
   pub fn format(&self) -> ExportFormat {
     self.format
   }
 
+  /// Return the current export scope.
   pub fn export_scope(&self) -> Option<ExportType> {
     self.export_type
   }
@@ -454,6 +483,16 @@ impl ExportSettingsUi {
     path.exists() && path.is_dir()
   }
 
+  /// Draw the export settings view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -468,7 +507,6 @@ impl ExportSettingsUi {
     let size = layout.physical_size();
     let params = Self::key_params();
 
-    // ── Title ──────────────────────────────────────────────
     let title = i18n.get_runtime_text(NS, "export_settings.title");
     let title_w = layout.get_text_width(&title, None);
     render.draw_host_text(
@@ -481,13 +519,11 @@ impl ExportSettingsUi {
       },
     );
 
-    // ── Content layout — dynamic centering ──────────────────
     let name_label = i18n.get_runtime_text(NS, "export_settings.set.name");
     let path_label = i18n.get_runtime_text(NS, "export_settings.set.path");
     let type_label = i18n.get_runtime_text(NS, "export_settings.set.type");
     let format_label = i18n.get_runtime_text(NS, self.format.i18n_key());
 
-    // Resolved defaults for validation
     let _export_type = self.export_type.unwrap_or(ExportType::Data);
     let type_str = _export_type.dynamic_type_text(i18n);
     let now = chrono::Local::now();
@@ -502,11 +538,9 @@ impl ExportSettingsUi {
       .get_runtime_text(NS, "export_settings.set.path.default")
       .replace("{root}", &root_str);
 
-    // Raw hints
     let name_hint_raw = i18n.get_runtime_text(NS, "export_settings.set.name.tip");
     let path_hint_raw = i18n.get_runtime_text(NS, "export_settings.set.path.tip");
 
-    // Validation
     let name_to_validate = {
       let raw = self.name_text();
       if raw.trim().is_empty() {
@@ -548,7 +582,6 @@ impl ExportSettingsUi {
       "bright_red"
     };
 
-    // Indicators
     let ind_on = "<fg:bright_cyan>❯</fg>";
     let ind_off = " ";
     let name_ind = if self.focus == ExportSettingsFocus::Name {
@@ -567,7 +600,6 @@ impl ExportSettingsUi {
       ind_off
     };
 
-    // Border color
     let name_border_fg: Option<crate::host_engine::services::TextColor> =
       if self.focus == ExportSettingsFocus::Name && self.input_active {
         Some(crate::host_engine::services::TextColor::Terminal(
@@ -588,10 +620,9 @@ impl ExportSettingsUi {
     let name_placeholder = i18n.get_runtime_text(NS, "export_settings.set.name.default");
     let path_placeholder = i18n.get_runtime_text(NS, "export_settings.set.path.default");
 
-    // ── Measure content widths ──────────────────────────────
     let name_label_w = layout.get_text_width(&name_label, None);
     let name_valid_w = layout.get_text_width(&name_valid_label, Some(&params));
-    let name_line_w = name_label_w + 1 + name_valid_w; // label + space + status
+    let name_line_w = name_label_w + 1 + name_valid_w;
 
     let path_label_w = layout.get_text_width(&path_label, None);
     let path_valid_w = layout.get_text_width(&path_valid_label, Some(&params));
@@ -600,18 +631,15 @@ impl ExportSettingsUi {
     let name_hint_w = layout.get_text_width(&name_hint_raw, Some(&params));
     let path_hint_w = layout.get_text_width(&path_hint_raw, Some(&params));
 
-    // Type line, e.g. "❯ Format [ZIP]"
     let type_line_plain = format!("❯ {} [{}]", type_label, format_label);
     let type_line_w = layout.get_text_width(&type_line_plain, Some(&params));
 
-    // Border dimensions (capped at 52, min 6)
     let max_avail = size.width.saturating_sub(32).max(14);
     let border_w = (52u16).min(max_avail.saturating_sub(2)).max(6);
     let inner_w = border_w.saturating_sub(2);
     const BORDER_H: u16 = 3;
-    let indented_border_w = 2 + border_w; // ❯ + space + border
+    let indented_border_w = 2 + border_w;
 
-    // Section widths = max of (label_line, indented_border, hint_indented)
     let name_section_w = [name_line_w, indented_border_w, 2 + name_hint_w]
       .into_iter()
       .max()
@@ -620,7 +648,7 @@ impl ExportSettingsUi {
       .into_iter()
       .max()
       .unwrap_or(1);
-    let type_section_w = type_line_w + 2; // ❯ indicator offset
+    let type_section_w = type_line_w + 2;
     let block_w = [name_section_w, path_section_w, type_section_w]
       .into_iter()
       .max()
@@ -630,20 +658,13 @@ impl ExportSettingsUi {
     let content_x = size.width.saturating_sub(block_w) / 2;
     let border_x = content_x + 2;
 
-    // ── Vertical centering ──────────────────────────────────
     const SECTION_H: u16 = 5;
-    let total_rows = SECTION_H + 1 + SECTION_H + 1 + 1u16; // name + gap + path + gap + type = 13
-    let start_y = (size
-      .height
-      .saturating_sub(1 /* hint */ + 1)
-      .saturating_sub(total_rows)
-      / 2)
-      .max(3u16);
+    let total_rows = SECTION_H + 1 + SECTION_H + 1 + 1u16;
+    let start_y = (size.height.saturating_sub(1 + 1).saturating_sub(total_rows) / 2).max(3u16);
     let name_y = start_y;
     let path_y = name_y + SECTION_H + 1;
     let type_y = path_y + SECTION_H + 1;
 
-    // Input rects
     let name_input_rect = Rect {
       x: border_x + 1,
       y: name_y + 2,
@@ -660,8 +681,6 @@ impl ExportSettingsUi {
     let name_focused = text_input.is_focused(&self.objects, self.name_input_id);
     let path_focused = text_input.is_focused(&self.objects, self.path_input_id);
 
-    // ── Name section ────────────────────────────────────────
-    // Row 0: label + validation
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -677,7 +696,6 @@ impl ExportSettingsUi {
       },
     );
 
-    // Rows 1-3: border box
     render.draw_host_border_rect(
       canvas,
       border_x,
@@ -691,7 +709,6 @@ impl ExportSettingsUi {
       None,
     );
 
-    // Row 2: ❯ indicator
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -702,7 +719,6 @@ impl ExportSettingsUi {
       },
     );
 
-    // Row 2: text input widget (handles text + placeholder + cursor)
     let name_cursor = text_input.render_host(
       &mut self.objects,
       self.name_input_id,
@@ -719,7 +735,6 @@ impl ExportSettingsUi {
       canvas,
     );
 
-    // Row 4: raw hint
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -733,7 +748,6 @@ impl ExportSettingsUi {
       },
     );
 
-    // ── Path section ───────────────────────────────────────
     render.draw_host_text(
       canvas,
       &DrawTextParams {
@@ -801,7 +815,6 @@ impl ExportSettingsUi {
       },
     );
 
-    // ── Type section (no border) ────────────────────────────
     let type_color = if self.focus == ExportSettingsFocus::Type {
       "bright_cyan"
     } else {
@@ -822,7 +835,6 @@ impl ExportSettingsUi {
       },
     );
 
-    // Hit areas — content-width, skip when text input active
     if !self.input_active {
       hit_area.render_host(
         &mut self.objects,
@@ -870,7 +882,6 @@ impl ExportSettingsUi {
       );
     }
 
-    // ── Bottom hint ─────────────────────────────────────────
     let hint = self.bottom_hint(i18n);
     let hint_w = layout.get_text_width(&hint, Some(&params));
     let hint_x = size.width.saturating_sub(hint_w) / 2;
@@ -944,11 +955,17 @@ impl RuntimeObjectPoolOwner for ExportSettingsUi {
   }
 }
 
+/// An application request produced by export settings interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExportSettingsCommand {
+  /// A request to cancel.
   Cancel,
+  /// A request to focus input.
   FocusInput,
+  /// A request to blur input.
   BlurInput,
+  /// A request to cancel input.
   CancelInput,
+  /// A request to confirm export.
   ConfirmExport,
 }

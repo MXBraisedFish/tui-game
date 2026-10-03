@@ -1,6 +1,6 @@
 # Lua 兼容性与当前注册面
 
-更新时间：2026-09-29。本文说明脚本能使用哪些接口，以及与标准 Lua 调用方式的区别。
+更新时间：2026-10-02。本文说明脚本能使用哪些接口，以及与标准 Lua 调用方式的区别。
 
 ## 环境边界
 
@@ -35,10 +35,13 @@
 | `align` | 常量 `AUTO`, `LEFT`, `HORIZONTAL_CENTER`, `RIGHT`, `TOP`, `VERTICAL_CENTER`, `BOTTOM`, `CENTER`；函数 `resolve_x`, `resolve_y`, `resolve_rect` |
 | `measurement` | `get_text_size`, `get_text_width`, `get_text_height` |
 | `random` | 常量 `INT`, `FLOAT`；函数 `randint`, `randfloat`, `create`, `delete`, `clear`, `list`, `count`, `generate`, `set`, `set_type`, `set_range`, `set_seed`, `set_step`, `get_type`, `get_seed`, `get_step`, `exists`, `get_range`, `get_info` |
+| `ime` | `receive_action_event`、`reject_action_event`、`receive_key_event`、`reject_key_event`；游戏 action 默认开启、key 默认关闭，开关独立；屏保返回 false；详见 [ime](api/ime.md) |
+| `timer` | `create`, `list`, `count`, `delete`, `clear`, `exists`, `set`, `get_info`, `start`, `pause`, `reset`, `restart` |
 | `slice` | `create`, `delete`, `clear`, `set`, `set_size`, `set_width`, `set_height`, `set_background`, `set_layer`, `draw`, `exists`, `get_size`, `get_width`, `get_height`, `get_layer`, `get_background`, `get_info`, `list`, `count` |
 | `serialization` | 常量 `NULL`；`json_encode/decode`, `csv_encode/decode`, `yaml_encode/decode`, `toml_encode/decode`, `ini_encode/decode`, `xml_encode/decode`, `binary_pack`, `binary_unpack`, `binary_packsize` |
 | `encoding` | `base64_encode`, `base64_decode`, `url_encode`, `url_decode`, `hex_encode`, `hex_decode` |
 | `draw` | `text`, `fill_rect`, `stroke_rect`, `erase_rect`, `render` |
+| `date` | 常量 `LOCAL`、`UTC`、`UTC_MINUS_1`～`UTC_MINUS_12`、`UTC_PLUS_1`～`UTC_PLUS_14`、`TIMESTAMP`、`DATE`；方法 `now`、`date_to_timestamp`、`timestamp_to_date`、`timestamp_diff`，必填参数按顺序传入，选填参数使用末尾严格选项表；详见 [date](api/date.md) |
 | `debug` | `VERSION`, `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `print`, `info`, `warn`, `error`, `assert`, `pcall`, `xpcall` |
 | `game` | `exit_game`, `save_game`, `save_best` |
 | `i18n` | `create`, `get_value`, `get_language_code`, `reload` |
@@ -51,9 +54,13 @@
 
 ### 尚未开放
 
-`image.load` 已开放，通过请求编号关联异步结果。`audio`、`animation`、`http`、`timer`、`effect`、`widget`、`ime`、`keyboard` 未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
+`image.load` 已开放，通过请求编号关联异步结果。`audio`、`animation`、`http`、`effect`、`widget`、`keyboard` 未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
 
 ## 调用差异
+
+- `timer` 使用秒作为计时单位；必填参数按顺序传入，选填参数放在末尾严格表里，例如 `timer.create(1, {loop = true})`。参数与状态的查询、修改只提供 `get_info` 和 `set`。
+
+- `date` 必填参数按顺序传入，选填参数用末尾严格表显式填写，例如 `date.timestamp_to_date(0, {timezone = date.UTC})`。时间戳单位为毫秒，时区默认本机时区；时区和返回格式使用该库常量。
 
 - 使用 Lua 5.4，不把 Lua 5.5 新增能力视为已提供。
 - `base` 方法也能直接使用全局名称，例如 `pairs(t)`。`debug.pcall` 和 `debug.xpcall` 使用变参；全局 `pcall`、`xpcall`、`assert`、`print` 不开放。
@@ -63,3 +70,5 @@
 - `utf8` 仅提供上表列出的名字，没有 `utf8.codepoint`、`utf8.byte_position` 或 `utf8.position` 别名。
 - 使用 `string.sub(text, start, options)` 等库函数；不支持借助字符串冒号方法调用原生接口。
 - 相关多个结果按顺序返回；捕获列表、解码对象和配置列表等数据本身仍为表。查看⌞[Lua API 调用约定](LUA_API_MIGRATION.md)⌝。
+
+按键兼容性：动作允许共享绑定，宿主层优先，各层 priority 降序、实际命中组合键优先、注册顺序优先。held 改为 pressed 后下一宿主帧只发送一次，持续移动请保存状态并在 Update 中处理。失焦、覆盖屏和拒收补发已交付输入的 released；event 队列控制不影响 key 或收尾释放。schema 2 和已有改键存档保持有效。

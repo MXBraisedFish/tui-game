@@ -1,57 +1,149 @@
+//! Assembly of application service instances from a deployment root.
+
 use super::{AsyncRuntime, EngineEventQueue};
 use crate::host_engine::services::*;
 use std::io;
 use std::path::{Path, PathBuf};
 
-/// Owns the host services assembled for one application run.
+/// Application service instances assembled under one deployment root.
+///
+/// # Fields
+///
+/// * `async_runtime` - The async runtime instance used by this owner.
+/// * `engine_events` - The engine events.
+/// * `audio` - The audio service instance used by this owner.
+/// * `network` - The network service instance used by this owner.
+/// * `random` - The random service instance used by this owner.
+/// * `animation` - The animation service instance used by this owner.
+/// * `screenshot` - The screenshot service instance used by this owner.
+/// * `recording` - The recording service instance used by this owner.
+/// * `ffmpeg` - The FFmpeg service instance used by this owner.
+/// * `video` - The video service instance used by this owner.
+/// * `package` - The package service instance used by this owner.
+/// * `popup` - The popup service instance used by this owner.
+/// * `clipboard` - The clipboard service instance used by this owner.
+/// * `runtime_objects` - The runtime objects.
+/// * `time` - The time service instance used by this owner.
+/// * `host_objects` - The host objects.
+/// * `hit_area` - The hit area service instance used by this owner.
+/// * `scroll_box` - The scroll box service instance used by this owner.
+/// * `progress_bar` - The progress bar service instance used by this owner.
+/// * `table` - The table service instance used by this owner.
+/// * `input` - The input service instance used by this owner.
+/// * `input_method` - The input method service instance used by this owner.
+/// * `game` - The game service instance used by this owner.
+/// * `image` - The image service instance used by this owner.
+/// * `screensaver` - The screensaver service instance used by this owner.
+/// * `storage` - The storage service instance used by this owner.
+/// * `export` - The export service instance used by this owner.
+/// * `lua` - The Lua service instance used by this owner.
+/// * `render` - The render service instance used by this owner.
+/// * `terminal` - The terminal service instance used by this owner.
+/// * `text_input` - The text input service instance used by this owner.
+/// * `log` - The log service instance used by this owner.
+/// * `i18n` - The i18n service instance used by this owner.
+/// * `rich_text` - The rich text service instance used by this owner.
+/// * `canvas` - The canvas service instance used by this owner.
+/// * `layout` - The layout service instance used by this owner.
+/// * `compositor` - The compositor.
+/// * `presenter` - The presenter.
 pub struct EngineServices {
+  /// The async runtime instance used by this owner.
   pub async_runtime: AsyncRuntime,
+  /// The engine events.
   pub engine_events: EngineEventQueue,
+  /// The audio service instance used by this owner.
   pub audio: AudioService,
+  /// The network service instance used by this owner.
   pub network: NetworkService,
+  /// The random service instance used by this owner.
   pub random: RandomService,
+  /// The animation service instance used by this owner.
   pub animation: AnimationService,
+  /// The screenshot service instance used by this owner.
   pub screenshot: ScreenshotService,
+  /// The recording service instance used by this owner.
   pub recording: RecordingService,
+  /// The FFmpeg service instance used by this owner.
   pub ffmpeg: FfmpegService,
+  /// The video service instance used by this owner.
   pub video: VideoService,
+  /// The package service instance used by this owner.
   pub package: PackageService,
+  /// The popup service instance used by this owner.
   pub popup: PopupService,
+  /// The clipboard service instance used by this owner.
   pub clipboard: ClipboardService,
+  /// The runtime objects.
   pub runtime_objects: RuntimeObjectPool,
+  /// The time service instance used by this owner.
   pub time: TimeService,
+  /// The host objects.
   pub host_objects: HostObjectPool,
+  /// The hit area service instance used by this owner.
   pub hit_area: HitAreaService,
+  /// The scroll box service instance used by this owner.
   pub scroll_box: ScrollBoxService,
+  /// The progress bar service instance used by this owner.
   pub progress_bar: ProgressBarService,
+  /// The table service instance used by this owner.
   pub table: TableService,
+  /// The input service instance used by this owner.
   pub input: InputService,
+  /// The input method service instance used by this owner.
   pub input_method: InputMethodService,
+  /// The game service instance used by this owner.
   pub game: GameService,
+  /// The image service instance used by this owner.
   pub image: ImageService,
+  /// The screensaver service instance used by this owner.
   pub screensaver: ScreensaverService,
+  /// The storage service instance used by this owner.
   pub storage: StorageService,
+  /// The export service instance used by this owner.
   pub export: ExportService,
+  /// The Lua service instance used by this owner.
   pub lua: LuaService,
+  /// The render service instance used by this owner.
   pub render: RenderService,
+  /// The terminal service instance used by this owner.
   pub terminal: TerminalService,
+  /// The text input service instance used by this owner.
   pub text_input: TextInputService,
+  /// The log service instance used by this owner.
   pub log: LogService,
+  /// The i18n service instance used by this owner.
   pub i18n: I18nService,
+  /// The rich text service instance used by this owner.
   pub rich_text: RichTextService,
+  /// The canvas service instance used by this owner.
   pub canvas: CanvasService,
+  /// The layout service instance used by this owner.
   pub layout: LayoutService,
+  /// The compositor.
   pub compositor: FrameCompositor,
+  /// The presenter.
   pub presenter: FramePresenter,
 }
 
 impl EngineServices {
+  /// Create an engine services initialized from `deployment_root`.
+  ///
+  /// # Errors
+  ///
+  /// Propagate essential service initialization or deployment storage errors.
   pub fn new(deployment_root: PathBuf) -> io::Result<Self> {
     let mut log = LogService::new();
     let storage = StorageService::new(deployment_root, &mut log)?;
     Self::assemble(storage, log)
   }
 
+  /// Construct application services against an explicitly supplied test deployment root.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `test deployment root must accept the package
+  /// log path`.
   #[cfg(test)]
   pub(super) fn for_test(root_dir: std::path::PathBuf) -> Self {
     let log = LogService::new();
@@ -121,7 +213,11 @@ impl EngineServices {
   }
 }
 
-/// Resolves the production root as the parent directory of the executable path.
+/// Resolve the deployment directory from the executable's parent path.
+///
+/// # Errors
+///
+/// Return an error when the executable path has no usable parent deployment directory.
 pub fn deployment_root_from_executable(executable: &Path) -> io::Result<PathBuf> {
   if !executable.is_absolute() {
     return Err(io::Error::new(
@@ -144,7 +240,11 @@ pub fn deployment_root_from_executable(executable: &Path) -> io::Result<PathBuf>
     })
 }
 
-/// Resolves the current process's production root without consulting its working directory.
+/// Return the current deployment root.
+///
+/// # Errors
+///
+/// Propagate executable-path lookup or deployment-root resolution errors.
 pub fn current_deployment_root() -> io::Result<PathBuf> {
   let executable = std::env::current_exe().map_err(|error| {
     io::Error::new(error.kind(), format!("resolve current executable: {error}"))

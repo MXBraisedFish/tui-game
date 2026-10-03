@@ -1,29 +1,35 @@
+//! Params support for the rich text service.
+
 use std::collections::HashMap;
 
 use tg_core_input::ActionMapEntry;
 
-/// Rich text parameters: placeholder values and key action maps that replace template markers
-/// while parsing.
+/// Configuration values controlling rich text behavior.
+///
+/// # Fields
+///
+/// * `values` - The values indexed by their declared keys.
+/// * `key_actions` - The key actions indexed by their declared keys.
+/// * `key_default_actions` - The key default actions indexed by their declared keys.
 #[derive(Clone, Debug, Default)]
 pub struct RichTextParams {
+  /// The values indexed by their declared keys.
   pub values: HashMap<String, String>,
 
+  /// The key actions indexed by their declared keys.
   pub key_actions: HashMap<String, Vec<Vec<String>>>,
 
+  /// The key default actions indexed by their declared keys.
   pub key_default_actions: HashMap<String, Vec<Vec<String>>>,
 }
 
 impl RichTextParams {
-  /// Creates parameters whose `{key:...}` and `{key_default:...}` placeholders both read the same
-  /// key action map.
+  /// Create text-format substitutions from named actions and their displayed shortcuts.
   pub fn from_key_actions(key_actions: &HashMap<String, Vec<Vec<String>>>) -> Self {
     Self::from_key_action_maps(key_actions, key_actions)
   }
 
-  /// Creates parameters from the current and the default key action maps of customizable actions.
-  ///
-  /// Game keys and global host keys should take this path; `{key:...}` reads the current user
-  /// map and `{key_default:...}` reads the default map provided by the package or the host.
+  /// Merge action maps into the shortcut substitutions used by formatted text.
   pub fn from_key_action_maps(
     key_actions: &HashMap<String, Vec<Vec<String>>>,
     key_default_actions: &HashMap<String, Vec<Vec<String>>>,
@@ -35,11 +41,7 @@ impl RichTextParams {
     }
   }
 
-  /// Creates parameters from a non-customizable UI action map.
-  ///
-  /// A UI page's own action keys have no user/default distinction, so both maps hold the same
-  /// entries. Every action is registered under its full name and, when it starts with `prefix`,
-  /// also under the name without the prefix.
+  /// Build shortcut substitutions from one action map.
   pub fn from_action_map(entries: &[ActionMapEntry], prefix: &str) -> Self {
     let mut key_actions = HashMap::new();
     for entry in entries {

@@ -123,4 +123,5 @@ game.save_best()
 ### 额外说明
 
 - 包清单需启用 `best_score.enable`。
+- `SaveBest` 返回的 `best_string` 和 `value` 参数支持字符串或包清单文本表。翻译使用包内 `assets/language/<语言代码>/package/best_string.json`；完整写法见[回调参考](../CALLBACK.md#9-savebest)。
 - 不可在 `SaveBest` 回调中调用。

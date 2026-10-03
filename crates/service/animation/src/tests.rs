@@ -1,3 +1,5 @@
+//! Regression checks for animation behavior and relevant failure paths.
+
 use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
 use super::*;

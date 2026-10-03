@@ -1,3 +1,5 @@
+//! Overlay overlay state, owned interactions, and clipped terminal presentation.
+
 mod clear_warning;
 mod cover_continue;
 mod export_loading;

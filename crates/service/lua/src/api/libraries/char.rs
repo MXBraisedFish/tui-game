@@ -1,5 +1,18 @@
+//! Lua char library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Build and register the Lua char API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
+///
+/// # Panics
+///
+/// Panic if the Lua VM cannot allocate the strings used to construct the constant character
+/// tables.
 pub(super) fn char_lib(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, chars) in [

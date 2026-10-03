@@ -1,4 +1,4 @@
-//! Minimal entry: loads a checked-in screensaver script into a sandboxed Lua session.
+//! Independent lua smoke entry exercising the public API and checking its results.
 
 use std::{path::PathBuf, time::Duration};
 

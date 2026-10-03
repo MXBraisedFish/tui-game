@@ -79,7 +79,7 @@ game_package/
 ├─ game.json
 ├─ actions.json             # 可选
 ├─ scripts/main.lua
-└─ assets/language/<code>/package.json
+└─ assets/language/<code>/package/<配置文件名>.json
 ```
 
 ---
@@ -95,7 +95,7 @@ game_package/
 ├─ game.json
 ├─ actions.json             # 可选
 ├─ scripts/main.lua
-└─ assets/language/<code>/package.json
+└─ assets/language/<code>/package/<配置文件名>.json
 ```
 
 # 游戏包脚本规范

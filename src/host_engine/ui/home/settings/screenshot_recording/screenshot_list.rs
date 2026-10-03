@@ -1,3 +1,5 @@
+//! Screenshot list page state, user commands, and terminal-cell presentation.
+
 use std::path::Path;
 
 use crate::host_engine::services::ActionMapEntry;
@@ -6,9 +8,12 @@ use super::media_list::{
   MediaListCommand, MediaListSpec, MediaListUi, ScreenshotPreview, actions, load_screenshot_preview,
 };
 
+/// The shared type used for screenshot list command.
 pub type ScreenshotListCommand = MediaListCommand;
+/// The shared type used for screenshot list ui.
 pub type ScreenshotListUi = MediaListUi<ScreenshotListSpec>;
 
+/// The screenshot list spec representation used by this module.
 pub struct ScreenshotListSpec;
 
 impl MediaListSpec for ScreenshotListSpec {
@@ -24,9 +29,8 @@ impl MediaListSpec for ScreenshotListSpec {
       ("screenshot_list.scroll_up", "w"),
       ("screenshot_list.scroll_down", "s"),
       ("screenshot_list.scroll_left", "a"),
-      // D deletes while the list is focused and scrolls right while the info panel is focused.
-      // The input service lets the action registered first consume the key, so `del` must
-      // receive it and dispatch it by the focused panel.
+      // Register D deletion first, then interpret it by panel focus; otherwise key consumption
+      // hides right-scroll behavior.
       ("screenshot_list.del", "d"),
       ("screenshot_list.scroll_right", "d"),
       ("screenshot_list.focus_up", "up"),

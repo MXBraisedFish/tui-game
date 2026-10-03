@@ -1,4 +1,15 @@
-//! FFmpeg service: locates an ffmpeg executable and probes its encoders.
+//! FFmpeg discovery and encoder capability checks for video export.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use std::path::PathBuf;
+//! use tg_service_ffmpeg::FfmpegService;
+//!
+//! let mut ffmpeg = FfmpegService::new(PathBuf::from("."), PathBuf::from("data/cache/ffmpeg"));
+//! let found = ffmpeg.refresh();
+//! assert_eq!(found, ffmpeg.installation().is_some());
+//! ```
 
 use std::{
   collections::HashSet,
@@ -7,10 +18,7 @@ use std::{
   process::{Command, Stdio},
 };
 
-/// Snapshot of an FFmpeg executable that was verified to run and whose encoders were probed.
-///
-/// The snapshot can be passed safely to asynchronous export tasks; the export service does not
-/// search for or probe FFmpeg itself.
+/// A discovered FFmpeg executable and its advertised encoder names.
 #[derive(Clone, Debug)]
 pub struct FfmpegInstallation {
   executable: PathBuf,
@@ -18,16 +26,18 @@ pub struct FfmpegInstallation {
 }
 
 impl FfmpegInstallation {
+  /// Return the current executable.
   pub fn executable(&self) -> &Path {
     &self.executable
   }
 
+  /// Report whether the discovered FFmpeg installation advertises the specified encoder.
   pub fn supports_encoder(&self, encoder: &str) -> bool {
     self.encoders.contains(encoder)
   }
 }
 
-/// Cross-platform service that discovers FFmpeg and probes its capabilities.
+/// The public entry point for FFmpeg operations.
 pub struct FfmpegService {
   deployment_root: PathBuf,
   managed_directory: PathBuf,
@@ -35,6 +45,7 @@ pub struct FfmpegService {
 }
 
 impl FfmpegService {
+  /// Create the FFmpeg service and immediately search deployment, managed, and system locations.
   pub fn new(deployment_root: impl Into<PathBuf>, managed_directory: impl Into<PathBuf>) -> Self {
     let mut service = Self {
       deployment_root: deployment_root.into(),
@@ -45,8 +56,7 @@ impl FfmpegService {
     service
   }
 
-  /// Rescans all supported locations, refreshes the encoder capabilities and returns whether
-  /// FFmpeg was found.
+  /// Repeat executable and encoder discovery, replacing the cached result and returning success.
   pub fn refresh(&mut self) -> bool {
     self.installation = discover(
       &self.deployment_root,
@@ -58,12 +68,12 @@ impl FfmpegService {
     self.installation.is_some()
   }
 
-  /// Rescans only while FFmpeg is missing, so a successful probe never starts the child processes
-  /// again; returns whether FFmpeg is available.
+  /// Repeat FFmpeg discovery only when no usable installation is cached.
   pub fn refresh_if_missing(&mut self) -> bool {
     self.installation.is_some() || self.refresh()
   }
 
+  /// Return the cached FFmpeg installation and its advertised encoders, if available.
   pub fn installation(&self) -> Option<&FfmpegInstallation> {
     self.installation.as_ref()
   }
@@ -174,8 +184,8 @@ fn build_candidates(
     push_unique(&mut candidates, candidate);
   }
 
-  // Finally, let the operating system resolve PATH once more, which covers special search rules
-  // of the shell or runtime environment.
+  // Delegate the last lookup to the operating system to retain its executable search rules.
+
   push_unique(&mut candidates, PathBuf::from(file_name));
   candidates
 }

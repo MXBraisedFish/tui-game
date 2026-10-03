@@ -1,4 +1,4 @@
-//! Minimal entry: detects the ASCII input method without switching anything.
+//! Independent input method smoke entry exercising the public API and checking its results.
 
 use tg_service_input_method::{ImPolicy, InputMethodService};
 

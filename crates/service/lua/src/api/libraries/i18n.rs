@@ -1,6 +1,19 @@
+//! Lua i18n library bindings with validated arguments and session-owned host access.
+
 use super::*;
 use crate::LuaI18nEventKind;
 
+/// Build and register the Lua i18n API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
+///
+/// # Panics
+///
+/// Panic if an internal invariant is violated: `language_code has a default`;
+/// `callback_language_code has a default`.
 pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
 
@@ -63,7 +76,8 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "get_value",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "i18n.get_value";
-      let parameters = args::positional(lua, method, values, &["namespace", "key"], &[])?;
+      let parameters = args::positional(lua, method, values, &["namespace", "key"], &["callback"])?;
+      let callback = args::optional_string(parameters.options(), method, "callback", None)?;
       let namespace = args::string(
         parameters.required(0, method, "namespace")?,
         method,
@@ -80,6 +94,9 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         .and_then(|values| values.get(&key))
       {
         return Ok(value.clone());
+      }
+      if let Some(callback) = callback {
+        return Ok(callback);
       }
       let missing_key = if key.starts_with(&format!("{namespace}.")) {
         key

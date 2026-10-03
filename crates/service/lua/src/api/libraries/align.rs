@@ -1,5 +1,13 @@
+//! Lua align library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Set the table column alignment and return the updated column configuration.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, value) in [

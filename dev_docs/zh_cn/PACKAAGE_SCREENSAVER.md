@@ -11,8 +11,8 @@ screensaver_package/
 ├── screensaver.json      # 屏保运行配置与入口
 ├── scripts/main.lua
 └── assets/language/
-    ├── en_us/package.json
-    └── zh_cn/package.json
+    ├── en_us/package/  # package.json, display.json, screensaver.json
+    └── zh_cn/package/  # package.json, display.json, screensaver.json
 ```
 
 官方包位于 `scripts/screensaver/<包目录>/`，模组包位于 `data/mod/screensaver/<包目录>/`。包相对路径不得使用绝对路径、`..`、反斜杠或越界符号链接。
@@ -47,7 +47,7 @@ screensaver_package/
 
 `title`、`description`、`author` 必填。`icon` 和 `banner` 可省略，省略时使用宿主默认资源。图片支持 PNG/JPG/JPEG，`block` 可选 `half_block`（默认）或 `mix_block`；文本资源只能是 UTF-8 `.txt`，并按图标 `8×4`、横幅 `60×14` 单元格规范化。文本资源忽略 `block`。
 
-文本值既可直接写字符串，也可写 `{ "type": "text", "text": "..." }`。i18n 文本格式为 `{ "type": "i18n", "key": "title", "callback": "Example Screensaver" }`；不接受 `path`。宿主依次从 `assets/language/<当前语言>/package.json`、`assets/language/en_us/package.json` 读取扁平的字符串键值对象；都未找到时使用 `callback`。语言包示例：`{ "title": "示例屏保" }`。
+文本值既可直接写字符串，也可写 `{ "type": "text", "text": "..." }`。i18n 文本格式为 `{ "type": "i18n", "key": "title", "callback": "Example Screensaver" }`；不接受 `path`。每个清单文件读取自己的同名翻译文件：`display.json` 对应 `assets/language/<当前语言>/package/display.json`，其他文件同理。宿主先查当前语言，再查 `en_us` 下的同名文件，都未找到时使用 `callback`；不读取旧路径 `assets/language/<语言>/package.json`。翻译文件是扁平的字符串键值对象。语言包示例：`{ "title": "示例屏保" }`。
 
 ## `screensaver.json`
 
@@ -65,3 +65,13 @@ screensaver_package/
 `name`、`entry`、`command` 必填。`command` 本轮只解析并校验，CLI 启动命令留待后续任务。入口相对于 `scripts/`，可省略 `.lua`；尺寸省略时为 0（不限制）；`truecolor` 默认 `false`。屏保没有动作映射配置。
 
 错误诊断会指出对应配置文件和字段。坏包本次从列表下架，修复后可重新出现；已运行会话按既有生命周期继续。
+
+所有支持 i18n 的字段如下；不在表内的字段不接受 i18n 对象：
+
+| 清单文件 | 字段 | 翻译文件（相对包目录） |
+| --- | --- | --- |
+| `package.json` | `version` | `assets/language/<语言>/package/package.json` |
+| `display.json` | `title`、`description`、`author` | `assets/language/<语言>/package/display.json` |
+| `screensaver.json` | `name` | `assets/language/<语言>/package/screensaver.json` |
+
+热加载跟踪当前语言和 `en_us` 的翻译文件及其父目录。修改、删除、替换文件或补建、重建目录后都会重新扫描包；脚本使用的同级 `ui.json` 等语言文件保持原有位置。

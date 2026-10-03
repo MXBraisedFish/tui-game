@@ -1,4 +1,4 @@
-//! Minimal entry: writes a text file through the async executor and reads it back.
+//! Independent file smoke entry exercising the public API and checking its results.
 
 use std::{
   path::PathBuf,
@@ -6,12 +6,12 @@ use std::{
 };
 
 use tg_service_async::{AsyncRuntime, TaskStatusEvent};
-use tg_service_file::{FileEvent, FileService};
+use tg_service_file::{FileEvent, FileService, FileTask};
 
 #[derive(Debug)]
 enum Event {
   File(FileEvent),
-  /// Executor status; this example only looks at file events.
+
   Status,
 }
 
@@ -27,13 +27,6 @@ impl From<TaskStatusEvent> for Event {
   }
 }
 
-/// Waits up to five seconds for the next file event.
-///
-/// Only one task is in flight at a time, so the first file event belongs to it.
-///
-/// # Panics
-///
-/// Panics when no file event arrives within five seconds.
 fn next_file_event(runtime: &AsyncRuntime<Event>) -> FileEvent {
   let deadline = Instant::now() + Duration::from_secs(5);
   while Instant::now() < deadline {
@@ -66,6 +59,31 @@ fn main() {
       assert_eq!(text, "hello");
     }
     other => panic!("unexpected event after read: {other:?}"),
+  }
+
+  let request = runtime.submit(FileTask::LuaLoadI18n {
+    assets_root: root.clone(),
+    language_code: "zh_cn".into(),
+    callback_language_code: "en_us".into(),
+  });
+  match next_file_event(&runtime) {
+    FileEvent::LuaI18nFinished {
+      task_id,
+      language_code,
+      namespaces,
+      warning,
+      ..
+    } => {
+      assert_eq!(task_id, request);
+      assert_eq!(language_code, "zh_cn");
+      assert!(namespaces.is_empty());
+      let warning = warning.expect("missing-language warning");
+      assert!(
+        warning.contains("primary language 'zh_cn'")
+          && warning.contains("fallback language 'en_us'")
+      );
+    }
+    other => panic!("missing translations unexpectedly failed: {other:?}"),
   }
 
   std::fs::remove_dir_all(&root).expect("clean up temporary directory");

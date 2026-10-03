@@ -1,4 +1,4 @@
-//! Minimal entry: rejects an unsupported URL, then runs one request whose loopback target is refused.
+//! Independent network smoke entry exercising the public API and checking its results.
 
 use std::time::{Duration, Instant};
 
@@ -11,7 +11,7 @@ use tg_service_network::{
 #[derive(Debug)]
 enum Event {
   Network(NetworkEvent),
-  /// Executor status; this example only looks at network events.
+
   Status,
 }
 

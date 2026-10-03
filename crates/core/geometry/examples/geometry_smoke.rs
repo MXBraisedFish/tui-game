@@ -1,4 +1,4 @@
-//! Minimal entry: hit-tests one point against a rectangle.
+//! Independent geometry smoke entry exercising the public API and checking its results.
 
 use tg_core_geometry::{Rect, Size};
 

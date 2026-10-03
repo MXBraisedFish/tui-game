@@ -1,3 +1,5 @@
+//! Settings page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -35,7 +37,7 @@ const MENU_KEYS: &[&str] = &[
   "settings.screenshot_recording",
 ];
 
-/// Screen layout of the settings page.
+/// Resolved geometry and positions used to display settings.
 pub(crate) struct SettingsLayout {
   title_x: u16,
   title_y: u16,
@@ -44,7 +46,7 @@ pub(crate) struct SettingsLayout {
   action_hint_y: u16,
 }
 
-/// Settings page with menu navigation and action hints.
+/// The state and owned widgets of the settings view.
 pub struct SettingsUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -75,22 +77,37 @@ impl RuntimeObjectPoolOwner for SettingsUi {
   }
 }
 
-/// Command emitted by the settings page.
+/// An application request produced by settings UI interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsUiCommand {
+  /// A request to back.
   Back,
+  /// A request to open language select.
   OpenLanguageSelect,
+  /// A request to open key bindings.
   OpenKeyBindings,
+  /// A request to open mods.
   OpenMods,
+  /// A request to open storage management.
   OpenStorageManagement,
+  /// A request to open security settings.
   OpenSecuritySettings,
+  /// A request to open display settings.
   OpenDisplaySettings,
+  /// A request to open screensaver list.
   OpenScreensaverList,
+  /// A request to open screenshot recording.
   OpenScreenshotRecording,
 }
 
 impl SettingsUi {
-  /// Creates the settings page UI.
+  /// Create the settings view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -108,81 +125,95 @@ impl SettingsUi {
     }
   }
 
+  /// Return mutable access to the owned screenshot recording.
   pub fn screenshot_recording_mut(&mut self) -> &mut ScreenshotRecordingUi {
     &mut self.screenshot_recording
   }
 
+  /// Return mutable access to the owned key bindings.
   pub fn key_bindings_mut(&mut self) -> &mut KeyBindingsUi {
     &mut self.key_bindings
   }
 
-  /// Returns the action map (key bindings) of the settings page.
+  /// Return the shortcuts currently enabled by the settings view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "settings.focus_up".to_string(),
         description: "Focus previous option".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_down".to_string(),
         description: "Focus next option".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.confirm".to_string(),
         description: "Confirm selected option".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.back".to_string(),
         description: "Go back to home".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_language".to_string(),
         description: "Focus language option".to_string(),
         keys: vec![vec!["1".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_key_bindings".to_string(),
         description: "Focus key bindings option".to_string(),
         keys: vec![vec!["2".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_mod".to_string(),
         description: "Focus mod option".to_string(),
         keys: vec![vec!["3".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_storage_management".to_string(),
         description: "Focus storage management option".to_string(),
         keys: vec![vec!["4".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_security_settings".to_string(),
         description: "Focus security settings option".to_string(),
         keys: vec![vec!["5".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_display_settings".to_string(),
         description: "Focus display settings option".to_string(),
         keys: vec![vec!["6".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_screensaver_list".to_string(),
         description: "Focus screensaver list option".to_string(),
         keys: vec![vec!["7".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "settings.focus_screenshot_recording".to_string(),
         description: "Focus screenshot and recording option".to_string(),
         keys: vec![vec!["8".to_string()]],
+        priority: 0,
       },
     ]
   }
 
-  /// Handles a UI event and returns the navigation or confirm command it triggers, if any.
+  /// Interpret a settings UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<SettingsUiCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -271,12 +302,21 @@ impl SettingsUi {
     }
   }
 
+  /// Advance the settings view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<SettingsUiCommand> {
     let _ = dt;
     None
   }
 
-  /// Draws the settings page onto the host layer.
+  /// Draw the settings view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -294,8 +334,7 @@ impl SettingsUi {
     }
   }
 
-  /// Computes the host coordinates of every element of the settings page from the
-  /// [`LayoutService`].
+  /// Resolve the settings view's terminal-cell layout from its available dimensions.
   pub fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> SettingsLayout {
     let params = self.build_key_params();
     let viewport = layout.developer_viewport_rect();

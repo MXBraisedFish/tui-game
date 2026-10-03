@@ -1,4 +1,4 @@
-//! Minimal entry: seeded generators are reproducible and snapshots restore the stream.
+//! Independent random smoke entry exercising the public API and checking its results.
 
 use tg_service_random::{RandomGeneratorObjects, RandomSeed, RandomService};
 

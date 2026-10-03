@@ -1,21 +1,28 @@
+//! Selection between the program page tree and the active game runtime.
+
 use super::{GameState, HostState};
 
-/// 主宿主状态，区分当前运行的是 Host 界面还是 Game 游戏
+/// The currently active program-page or game-runtime branch.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MainHostState {
+  /// The operation is host.
   Host(HostState),
+  /// The operation is game.
   Game(GameState),
 }
 
 impl MainHostState {
+  /// Report whether this main host state is host.
   pub fn is_host(&self) -> bool {
     matches!(self, MainHostState::Host(_))
   }
 
+  /// Report whether this main host state is game.
   pub fn is_game(&self) -> bool {
     matches!(self, MainHostState::Game(_))
   }
 
+  /// Return the current host.
   pub fn host(&self) -> Option<&HostState> {
     match self {
       MainHostState::Host(host) => Some(host),
@@ -23,6 +30,7 @@ impl MainHostState {
     }
   }
 
+  /// Return mutable access to the owned host.
   pub fn host_mut(&mut self) -> Option<&mut HostState> {
     match self {
       MainHostState::Host(host) => Some(host),
@@ -30,6 +38,7 @@ impl MainHostState {
     }
   }
 
+  /// Return the current game.
   pub fn game(&self) -> Option<&GameState> {
     match self {
       MainHostState::Game(game) => Some(game),

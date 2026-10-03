@@ -1,3 +1,5 @@
+//! Exit warning page state, user commands, and terminal-cell presentation.
+
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
@@ -9,20 +11,32 @@ use crate::host_engine::services::{
 
 const NS: &str = "exit_warning";
 
+/// The normal or pending-write form of the exit confirmation view.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExitWarningMode {
+  /// The export warning setting for exit warning mode.
   ExportWarning,
+  /// The waiting for exports setting for exit warning mode.
   WaitingForExports,
-  Exception { seconds_left: u8 },
+  /// The exception setting for exit warning mode.
+  Exception {
+    /// The seconds left.
+    seconds_left: u8,
+  },
 }
 
+/// An application request produced by exit warning interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExitWarningCommand {
+  /// The wait for exports setting for exit warning command.
   WaitForExports,
+  /// A request to back.
   Back,
+  /// The exit now setting for exit warning command.
   ExitNow,
 }
 
+/// The state and owned widgets of the exit warning view.
 pub struct ExitWarningUi {
   objects: UiObjectPool,
   image_bar: ProgressBarId,
@@ -34,6 +48,12 @@ pub struct ExitWarningUi {
 }
 
 impl ExitWarningUi {
+  /// Create the exit warning view and allocate its owned UI objects.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `exit image progress style must be valid`; `exit
+  /// video progress style must be valid`.
   pub fn init(progress_bar: &ProgressBarService, hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     let options = progress_options();
@@ -57,6 +77,7 @@ impl ExitWarningUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the exit warning view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       action("exit_warning.tip_export_auto_exit", "Wait for exports", "1"),
@@ -65,6 +86,7 @@ impl ExitWarningUi {
     ]
   }
 
+  /// Return the current waiting action map.
   pub fn waiting_action_map() -> Vec<ActionMapEntry> {
     vec![
       action("exit_warning.tip_export_back", "Back", "1"),
@@ -72,6 +94,7 @@ impl ExitWarningUi {
     ]
   }
 
+  /// Interpret a exit warning UI event and return the requested application command.
   pub fn handle_event(&self, mode: ExitWarningMode, event: &UiEvent) -> Option<ExitWarningCommand> {
     match event {
       UiEvent::Action(event) if event.state == KeyState::Pressed => {
@@ -108,6 +131,19 @@ impl ExitWarningUi {
     }
   }
 
+  /// Draw the exit warning view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `progress_bar` - The progress bar.
+  /// * `hit_area` - The hit area.
+  /// * `mode` - The mode.
+  /// * `image` - The image.
+  /// * `video` - The video.
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
@@ -622,6 +658,7 @@ fn action(action: &str, description: &str, key: &str) -> ActionMapEntry {
     action: action.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }
 

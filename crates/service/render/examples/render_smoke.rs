@@ -1,4 +1,4 @@
-//! Minimal entry: draws a line border and a text label onto the base canvas layer.
+//! Independent render smoke entry exercising the public API and checking its results.
 
 use tg_service_canvas::CanvasService;
 use tg_service_render::{BorderStyle, RenderService};

@@ -1,5 +1,13 @@
+//! Lua UTF-8 library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Build and register the Lua UTF-8 API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   source.raw_set(
@@ -185,6 +193,17 @@ pub(super) fn utf8(lua: &Lua) -> mlua::Result<Table> {
   readonly::proxy(lua, source)
 }
 
+/// Validate the single required text argument for a UTF-8 operation.
+///
+/// # Arguments
+///
+/// * `lua` - The Lua VM in which values and callbacks are created.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `operation` - The operation to execute within the boundary.
+///
+/// # Errors
+///
+/// Return a Lua argument error when there is not exactly one valid text argument.
 pub(super) fn single_text(
   lua: &Lua,
   method: &'static str,
@@ -195,6 +214,13 @@ pub(super) fn single_text(
     Ok(operation(&text))
   })
 }
+/// Convert a Lua-style relative byte index into a bounded string position.
+///
+/// # Arguments
+///
+/// * `index` - The slot or sequence index.
+/// * `len` - The len.
+/// * `allow_end` - The allow end.
 pub(super) fn resolve_index(index: i64, len: usize, allow_end: bool) -> Option<usize> {
   if len == 0 && !allow_end {
     return None;
@@ -211,6 +237,17 @@ pub(super) fn resolve_index(index: i64, len: usize, allow_end: bool) -> Option<u
   };
   (value >= 0 && (value as usize) <= max).then_some(value as usize)
 }
+/// Create the Lua UTF-8 codepoint iterator for the supplied text.
+///
+/// # Arguments
+///
+/// * `lua` - The Lua VM in which values and callbacks are created.
+/// * `values` - The input values in their supplied order.
+/// * `ascii_only` - The ascii only.
+///
+/// # Errors
+///
+/// Return a Lua error when the text is invalid UTF-8 or iterator construction fails.
 pub(super) fn utf8_codes(lua: &Lua, values: MultiValue, ascii_only: bool) -> mlua::Result<Table> {
   let method = if ascii_only {
     "utf8.char_to_ascii"

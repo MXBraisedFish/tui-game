@@ -1,3 +1,5 @@
+//! Screensaver-session lifecycle and frame callbacks isolated from the game session.
+
 use std::time::Duration;
 
 use tg_core_package_id::PackageId;
@@ -12,7 +14,7 @@ use super::{
 const MAX_REAL_DELTA: Duration = Duration::from_millis(250);
 const MAX_FIXED_UPDATES_PER_FRAME: usize = 8;
 
-/// 唯一屏保 Session 的宿主生命周期。全终端显示层仍由 Runtime Overlay 管理。
+/// The lifecycle owner of one screensaver session independent of game-session state.
 pub struct ScreensaverService {
   session: Option<LuaSession>,
   package: Option<PackageId>,
@@ -22,6 +24,7 @@ pub struct ScreensaverService {
 }
 
 impl ScreensaverService {
+  /// Create a screensaver service with its initial state.
   pub fn new() -> Self {
     Self {
       session: None,
@@ -32,6 +35,13 @@ impl ScreensaverService {
     }
   }
 
+  /// Start the screensaver state addressed by this operation.
+  ///
+  /// # Arguments
+  ///
+  /// * `session` - The Lua session receiving the operation.
+  /// * `package` - The validated package snapshot.
+  /// * `log_session` - The log session.
   pub fn start(
     &mut self,
     session: LuaSession,
@@ -47,6 +57,7 @@ impl ScreensaverService {
     previous_log
   }
 
+  /// Stop the screensaver state addressed by this operation.
   pub fn stop(&mut self) -> Option<LogSessionId> {
     if let Some(mut session) = self.session.take() {
       session.stop();
@@ -56,14 +67,17 @@ impl ScreensaverService {
     self.log_session.take()
   }
 
+  /// Return the current log session.
   pub fn log_session(&self) -> Option<LogSessionId> {
     self.log_session
   }
 
+  /// Report whether this screensaver service is active.
   pub fn is_active(&self) -> bool {
     self.session.is_some()
   }
 
+  /// Report whether this screensaver service is faulted.
   pub fn is_faulted(&self) -> bool {
     self
       .session
@@ -71,26 +85,32 @@ impl ScreensaverService {
       .is_some_and(|session| session.state() == LuaSessionState::Faulted)
   }
 
+  /// Return the current package id.
   pub fn package_id(&self) -> Option<&str> {
     self.package.as_ref().map(|package| package.mod_id.as_str())
   }
 
+  /// Return the current package.
   pub fn package(&self) -> Option<&PackageId> {
     self.package.as_ref()
   }
 
+  /// Report whether the session owns a host object pool.
   pub fn has_objects(&self) -> bool {
     self.session.as_ref().is_some_and(LuaSession::has_objects)
   }
 
+  /// Read the session-owned object pool through the supplied callback when it exists.
   pub fn with_objects<R>(&self, operation: impl FnOnce(&LuaObjectPool) -> R) -> Option<R> {
     self.session.as_ref()?.with_objects(operation)
   }
 
+  /// Mutate the session-owned object pool through the supplied callback when it exists.
   pub fn with_objects_mut<R>(&self, operation: impl FnOnce(&mut LuaObjectPool) -> R) -> Option<R> {
     self.session.as_ref()?.with_objects_mut(operation)
   }
 
+  /// Return the current session token.
   pub fn session_token(&self) -> Option<LuaSessionToken> {
     self.session.as_ref().map(|_| LuaSessionToken {
       kind: LuaSessionKind::Screensaver,
@@ -98,6 +118,7 @@ impl ScreensaverService {
     })
   }
 
+  /// Return the current diagnostics.
   pub fn diagnostics(&self) -> Option<LuaSessionDiagnostics> {
     self.session.as_ref().map(|session| LuaSessionDiagnostics {
       entry_path: session.entry_path().to_path_buf(),
@@ -106,12 +127,19 @@ impl ScreensaverService {
     })
   }
 
+  /// Update the base dimensions exposed to subsequent script drawing callbacks.
   pub fn set_base_size(&mut self, size: Size) {
     if let Some(session) = self.session.as_mut() {
       session.set_base_size(size);
     }
   }
 
+  /// Deliver one owned event to its callback or HandleEvent under the session budget.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn dispatch_event(&mut self, delivery: &LuaEventDelivery) -> Result<(), LuaSessionError> {
     let Some(session) = self.session.as_mut() else {
       return Ok(());
@@ -119,6 +147,12 @@ impl ScreensaverService {
     session.dispatch_event(delivery)
   }
 
+  /// Execute fixed 60 Hz updates and one frame update, returning the fixed-update count.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn advance(&mut self, real_delta: Duration) -> Result<usize, LuaSessionError> {
     let Some(session) = self.session.as_mut() else {
       return Ok(0);
@@ -142,6 +176,12 @@ impl ScreensaverService {
     Ok(updates)
   }
 
+  /// Invoke the script Render callback and collect bounded draw commands for the frame.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn render(&mut self) -> Result<(), LuaSessionError> {
     let Some(session) = self.session.as_mut() else {
       return Ok(());
@@ -149,6 +189,7 @@ impl ScreensaverService {
     session.render()
   }
 
+  /// Drain host commands produced by the session callbacks.
   pub fn take_host_commands(&mut self) -> Vec<LuaHostCommand> {
     self
       .session
@@ -157,6 +198,7 @@ impl ScreensaverService {
       .unwrap_or_default()
   }
 
+  /// Drain the structured drawing commands produced for the current frame.
   pub fn take_draw_commands(&mut self) -> Vec<LuaDrawCommand> {
     self
       .session

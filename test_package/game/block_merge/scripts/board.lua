@@ -1,13 +1,15 @@
--- Pure board logic for Block Merge. Loaded through loader.require("board").
+-- Block merge package callbacks and terminal-cell drawing.
 
 local board = {}
 
 board.SIZE = 4
 
+-- Convert one-based row and column coordinates to a flat board index.
 local function index_of(row, column)
   return (row - 1) * board.SIZE + column
 end
 
+-- Create a four-by-four board containing only empty tiles.
 function board.new()
   local cells = {}
   for index = 1, board.SIZE * board.SIZE do
@@ -16,7 +18,7 @@ function board.new()
   return cells
 end
 
--- Returns the cell indices of one line, ordered from the edge the tiles slide towards.
+-- Return board indices in traversal order for one directional move.
 local function line_indices(direction, line)
   local indices = {}
   for step = 1, board.SIZE do
@@ -35,7 +37,7 @@ local function line_indices(direction, line)
   return indices
 end
 
--- Packs the non-empty values towards the front and merges equal neighbours once.
+-- Pack nonempty tiles, merge equal neighbors once, and return the line and gained score.
 local function merge_line(values)
   local packed = {}
   for _, value in ipairs(values) do
@@ -64,7 +66,7 @@ local function merge_line(values)
   return merged, gained
 end
 
--- Slides every line in one direction. Returns whether any tile moved and the points gained.
+-- Apply a directional move in place and return whether tiles moved and the gained score.
 function board.slide(cells, direction)
   local moved = false
   local gained = 0
@@ -87,6 +89,7 @@ function board.slide(cells, direction)
   return moved, gained
 end
 
+-- Return the indices of all empty tiles.
 function board.empty_cells(cells)
   local empty = {}
   for index = 1, #cells do
@@ -97,6 +100,7 @@ function board.empty_cells(cells)
   return empty
 end
 
+-- Report whether the board has an empty tile or equal adjacent tiles.
 function board.can_move(cells)
   if #board.empty_cells(cells) > 0 then
     return true
@@ -115,6 +119,7 @@ function board.can_move(cells)
   return false
 end
 
+-- Return the largest tile value as an integer.
 function board.max_tile(cells)
   return math.floor(math.max(cells))
 end

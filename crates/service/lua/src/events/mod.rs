@@ -1,3 +1,5 @@
+//! Script-visible event payloads and ownership-aware delivery.
+
 mod broker;
 #[cfg(test)]
 mod translate;
@@ -13,10 +15,14 @@ pub use broker::{
   MAX_LUA_FILE_TASKS_PER_SESSION, MAX_LUA_IMAGE_TASKS_PER_SESSION,
   MAX_LUA_NETWORK_TASKS_PER_SESSION, MAX_LUA_PENDING_EVENTS,
 };
+/// The retained state of Lua action.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaActionState {
+  /// A transition into the pressed state.
   Pressed,
+  /// The operation is held.
   Held,
+  /// A transition out of the pressed state.
   Released,
 }
 
@@ -31,6 +37,7 @@ impl From<tg_core_input::KeyState> for LuaActionState {
 }
 
 impl LuaActionState {
+  /// Return the stable string key for this Lua action state.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::Pressed => "pressed",
@@ -40,11 +47,16 @@ impl LuaActionState {
   }
 }
 
+/// The Lua timer kind representation used by this module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaTimerKind {
+  /// The timer setting for Lua timer kind.
   Timer,
+  /// The delay setting for Lua timer kind.
   Delay,
+  /// The repeat setting for Lua timer kind.
   Repeat,
+  /// The sleep setting for Lua timer kind.
   Sleep,
 }
 
@@ -59,9 +71,12 @@ impl LuaTimerKind {
   }
 }
 
+/// The Lua timer event kind representation used by this module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaTimerEventKind {
+  /// A tick notification delivered to the owning consumer.
   Tick,
+  /// The operation is finished.
   Finished,
 }
 
@@ -74,20 +89,53 @@ impl LuaTimerEventKind {
   }
 }
 
+/// A Lua timer event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `timer_kind` - The timer kind.
+/// * `kind` - The Lua timer event kind carried by this Lua timer event.
+/// * `executed_count` - The executed count.
+/// * `object_id` - The script timer handle, when available.
+/// * `tip` - The custom text attached to the event.
+/// * `revision` - The internal revision rejecting stale deliveries.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaTimerEvent {
+  /// The identifier of the owned object.
   pub id: u64,
+  /// The timer kind.
   pub timer_kind: LuaTimerKind,
+  /// The Lua timer event kind carried by this Lua timer event.
   pub kind: LuaTimerEventKind,
+  /// The executed count.
   pub executed_count: Option<u32>,
+  /// The script object handle, when the event comes from the timer library.
+  pub object_id: Option<String>,
+  /// The custom text supplied when creating or configuring the timer.
+  pub tip: Option<String>,
+  /// The internal schedule revision used to discard invalidated deliveries.
+  pub revision: Option<u64>,
 }
 
+/// The Lua animation event kind representation used by this module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LuaAnimationEventKind {
+  /// A started notification delivered to the owning consumer.
   Started,
-  Marker { name: String },
-  Loop { completed: u32 },
+  /// A marker notification delivered to the owning consumer.
+  Marker {
+    /// The name used to identify the object or field.
+    name: String,
+  },
+  /// A loop notification delivered to the owning consumer.
+  Loop {
+    /// The completed.
+    completed: u32,
+  },
+  /// The operation is finished.
   Finished,
+  /// A cancelled notification delivered to the owning consumer.
   Cancelled,
 }
 
@@ -103,24 +151,41 @@ impl LuaAnimationEventKind {
   }
 }
 
+/// A Lua animation event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `kind` - The Lua animation event kind carried by this Lua animation event.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaAnimationEvent {
+  /// The identifier of the owned object.
   pub id: u64,
+  /// The Lua animation event kind carried by this Lua animation event.
   pub kind: LuaAnimationEventKind,
 }
 
+/// The Lua file operation representation used by this module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaFileOperation {
+  /// The read text setting for Lua file operation.
   ReadText,
+  /// The read bytes setting for Lua file operation.
   ReadBytes,
+  /// The write text setting for Lua file operation.
   WriteText,
+  /// The write bytes setting for Lua file operation.
   WriteBytes,
+  /// The list dir setting for Lua file operation.
   ListDir,
+  /// The create dir setting for Lua file operation.
   CreateDir,
+  /// The remove setting for Lua file operation.
   Remove,
 }
 
 impl LuaFileOperation {
+  /// Return the stable string key for this Lua file operation.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::ReadText => "read_text",
@@ -133,6 +198,7 @@ impl LuaFileOperation {
     }
   }
 
+  /// Report whether this Lua file operation is write.
   pub fn is_write(self) -> bool {
     matches!(
       self,
@@ -141,24 +207,39 @@ impl LuaFileOperation {
   }
 }
 
+/// Failures reported by Lua event operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaEventErrorCode {
+  /// The invalid request failure condition.
   InvalidRequest,
+  /// The permission denied failure condition.
   PermissionDenied,
+  /// The not found failure condition.
   NotFound,
+  /// The too large failure condition.
   TooLarge,
+  /// The invalid UTF-8 failure condition.
   InvalidUtf8,
+  /// The cancelled failure condition.
   Cancelled,
+  /// The timeout failure condition.
   Timeout,
+  /// The io failure condition.
   Io,
+  /// The network failure condition.
   Network,
+  /// The unsupported failure condition.
   Unsupported,
+  /// The decode failure condition.
   Decode,
+  /// The backend unavailable failure condition.
   BackendUnavailable,
+  /// The internal failure condition.
   Internal,
 }
 
 impl LuaEventErrorCode {
+  /// Return the stable string key for this Lua event error code.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::InvalidRequest => "invalid_request",
@@ -178,13 +259,23 @@ impl LuaEventErrorCode {
   }
 }
 
+/// Failures reported by Lua event operations.
+///
+/// # Fields
+///
+/// * `code` - The stable error or language code.
+/// * `message` - The diagnostic or display message.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaEventError {
+  /// The stable error or language code.
   pub code: LuaEventErrorCode,
+  /// The diagnostic or display message.
   pub message: String,
 }
 
 impl LuaEventError {
+  /// Create a stable public error message from its code without exposing internal diagnostic
+  /// detail.
   pub fn sanitized(code: LuaEventErrorCode) -> Self {
     Self {
       code,
@@ -208,39 +299,73 @@ impl LuaEventError {
   }
 }
 
+/// The Lua file outcome representation used by this module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LuaFileOutcome {
+  /// The text setting for Lua file outcome.
   Text(String),
+  /// The bytes setting for Lua file outcome.
   Bytes(Vec<u8>),
+  /// The written setting for Lua file outcome.
   Written,
+  /// The directory created setting for Lua file outcome.
   DirectoryCreated,
+  /// The removed setting for Lua file outcome.
   Removed,
+  /// The entries setting for Lua file outcome.
   Entries(Vec<LuaFileEntry>),
+  /// The failed setting for Lua file outcome.
   Failed(LuaEventError),
 }
 
+/// The Lua file entry representation used by this module.
+///
+/// # Fields
+///
+/// * `path` - The filesystem path to read, write, or resolve.
+/// * `file_type` - The file type.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaFileEntry {
+  /// The filesystem path to read, write, or resolve.
   pub path: String,
+  /// The file type.
   pub file_type: String,
 }
 
+/// A Lua file event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `request_id` - The identifier of the request.
+/// * `kind` - The Lua file operation carried by this Lua file event.
+/// * `path` - The filesystem path to read, write, or resolve.
+/// * `tip` - The tip.
+/// * `outcome` - The outcome.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaFileEvent {
+  /// The identifier of the request.
   pub request_id: u64,
+  /// The Lua file operation carried by this Lua file event.
   pub kind: LuaFileOperation,
+  /// The filesystem path to read, write, or resolve.
   pub path: String,
+  /// The tip.
   pub tip: Option<String>,
+  /// The outcome.
   pub outcome: LuaFileOutcome,
 }
 
+/// The Lua i18n event kind representation used by this module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaI18nEventKind {
+  /// A created notification delivered to the owning consumer.
   Created,
+  /// A reloaded notification delivered to the owning consumer.
   Reloaded,
 }
 
 impl LuaI18nEventKind {
+  /// Return the stable string key for this Lua i18n event kind.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::Created => "created",
@@ -249,105 +374,224 @@ impl LuaI18nEventKind {
   }
 }
 
+/// A Lua i18n event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `request_id` - The identifier of the request.
+/// * `kind` - The Lua i18n event kind carried by this Lua i18n event.
+/// * `ok` - The ok.
+/// * `message` - The diagnostic or display message.
+/// * `language_code` - The registered language code.
+/// * `callback_language_code` - The callback language code.
+/// * `warning` - Missing-language warnings accompanying successful loading.
+/// * `namespaces` - The namespaces.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaI18nEvent {
+  /// The identifier of the request.
   pub request_id: u64,
+  /// The Lua i18n event kind carried by this Lua i18n event.
   pub kind: LuaI18nEventKind,
+  /// The ok.
   pub ok: bool,
+  /// The diagnostic or display message.
   pub message: String,
+  /// Missing primary or fallback resources, or `None` when no warning was reported.
+  pub warning: Option<String>,
+  /// The registered language code.
   pub language_code: String,
+  /// The callback language code.
   pub callback_language_code: String,
+  /// The namespaces.
   pub(crate) namespaces:
     Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
 }
 
+/// The Lua image outcome representation used by this module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LuaImageOutcome {
+  /// The converted setting for Lua image outcome.
   Converted(String),
+  /// The failed setting for Lua image outcome.
   Failed(LuaEventError),
 }
 
+/// A Lua image event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `request_id` - The identifier of the request.
+/// * `outcome` - The outcome.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaImageEvent {
+  /// The identifier of the request.
   pub request_id: u64,
+  /// The outcome.
   pub outcome: LuaImageOutcome,
 }
 
+/// The Lua network outcome representation used by this module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LuaNetworkOutcome {
+  /// The response setting for Lua network outcome.
   Response {
+    /// The final url.
     final_url: String,
+    /// The status.
     status: u16,
+    /// The headers.
     headers: std::collections::BTreeMap<String, String>,
+    /// The body.
     body: LuaNetworkBody,
   },
+  /// The failed setting for Lua network outcome.
   Failed(LuaEventError),
 }
 
+/// The Lua network body representation used by this module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LuaNetworkBody {
+  /// The text setting for Lua network body.
   Text(String),
+  /// The bytes setting for Lua network body.
   Bytes(Vec<u8>),
 }
 
+/// A Lua network event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `request_id` - The identifier of the request.
+/// * `method` - The method.
+/// * `url` - The url.
+/// * `outcome` - The outcome.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaNetworkEvent {
+  /// The identifier of the request.
   pub request_id: u64,
+  /// The method.
   pub method: NetworkMethod,
+  /// The url.
   pub url: String,
+  /// The outcome.
   pub outcome: LuaNetworkOutcome,
 }
 
+/// A Lua hit area event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `kind` - The &'static str carried by this Lua hit area event.
+/// * `x` - The horizontal coordinate in terminal cells.
+/// * `y` - The vertical coordinate in terminal cells.
+/// * `button` - The mouse button to query.
+/// * `dx` - The dx.
+/// * `dy` - The dy.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaHitAreaEvent {
+  /// The identifier of the owned object.
   pub id: u64,
+  /// The &'static str carried by this Lua hit area event.
   pub kind: &'static str,
+  /// The horizontal coordinate in terminal cells.
   pub x: u16,
+  /// The vertical coordinate in terminal cells.
   pub y: u16,
+  /// The mouse button to query.
   pub button: Option<&'static str>,
+  /// The dx.
   pub dx: Option<i32>,
+  /// The dy.
   pub dy: Option<i32>,
 }
 
+/// A Lua hyperlink event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `link` - The link.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaHyperlinkEvent {
+  /// The identifier of the owned object.
   pub id: u64,
+  /// The link.
   pub link: String,
 }
 
+/// A Lua markdown event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `href` - The href.
+/// * `text` - The text to process or display.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaMarkdownEvent {
+  /// The identifier of the owned object.
   pub id: u64,
+  /// The href.
   pub href: String,
+  /// The text to process or display.
   pub text: String,
 }
 
+/// A Lua text input event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `kind` - The &'static str carried by this Lua text input event.
+/// * `value` - The value to store or convert.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaTextInputEvent {
+  /// The identifier of the owned object.
   pub id: u64,
+  /// The &'static str carried by this Lua text input event.
   pub kind: &'static str,
+  /// The value to store or convert.
   pub value: Option<String>,
 }
 
+/// A Lua scroll box event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `x` - The horizontal coordinate in terminal cells.
+/// * `y` - The vertical coordinate in terminal cells.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaScrollBoxEvent {
+  /// The identifier of the owned object.
   pub id: u64,
+  /// The horizontal coordinate in terminal cells.
   pub x: u16,
+  /// The vertical coordinate in terminal cells.
   pub y: u16,
 }
 
+/// The Lua audio event kind representation used by this module.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaAudioEventKind {
+  /// A ready notification delivered to the owning consumer.
   Ready,
+  /// A started notification delivered to the owning consumer.
   Started,
+  /// The operation is paused.
   Paused,
+  /// A resumed notification delivered to the owning consumer.
   Resumed,
+  /// The operation is stopped.
   Stopped,
+  /// The operation is finished.
   Finished,
+  /// A failed notification delivered to the owning consumer.
   Failed,
 }
 
 impl LuaAudioEventKind {
+  /// Return the stable string key for this Lua audio event kind.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::Ready => "ready",
@@ -361,55 +605,107 @@ impl LuaAudioEventKind {
   }
 }
 
+/// A Lua audio event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `kind` - The Lua audio event kind carried by this Lua audio event.
+/// * `duration_ms` - The duration measured in milliseconds.
+/// * `position_ms` - The position measured in milliseconds.
+/// * `error` - The error.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaAudioEvent {
+  /// The identifier of the owned object.
   pub id: u64,
+  /// The Lua audio event kind carried by this Lua audio event.
   pub kind: LuaAudioEventKind,
+  /// The duration measured in milliseconds.
   pub duration_ms: Option<u64>,
+  /// The position measured in milliseconds.
   pub position_ms: Option<u64>,
+  /// The error.
   pub error: Option<LuaEventError>,
 }
 
+/// The Lua event data representation used by this module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LuaEventData {
+  /// The action setting for Lua event data.
   Action {
+    /// The action.
     action: String,
+    /// The Lua action state carried by this Lua event data.
     state: LuaActionState,
   },
+  /// A physical keyboard state transition using the canonical key token.
+  Key {
+    /// The portable key name, including left/right modifier distinctions.
+    key: String,
+    /// The transition into pressed, held, or released.
+    state: LuaActionState,
+  },
+  /// The mouse setting for Lua event data.
   Mouse {
+    /// The &'static str carried by this Lua event data.
     kind: &'static str,
+    /// The mouse button to query.
     button: Option<&'static str>,
+    /// The scroll.
     scroll: Option<&'static str>,
+    /// The horizontal coordinate in terminal cells.
     x: u16,
+    /// The vertical coordinate in terminal cells.
     y: u16,
   },
+  /// The resize setting for Lua event data.
   Resize {
+    /// The width in terminal columns.
     width: u16,
+    /// The height in terminal rows.
     height: u16,
   },
+  /// The focus setting for Lua event data.
   Focus {
+    /// Whether terminal focus was gained rather than lost.
     gained: bool,
   },
+  /// The overlay started setting for Lua event data.
   OverlayStarted,
+  /// The overlay stopped setting for Lua event data.
   OverlayStopped,
+  /// The timer setting for Lua event data.
   Timer(LuaTimerEvent),
+  /// The animation setting for Lua event data.
   Animation(LuaAnimationEvent),
+  /// The file setting for Lua event data.
   File(LuaFileEvent),
+  /// The i18n setting for Lua event data.
   I18n(LuaI18nEvent),
+  /// The image setting for Lua event data.
   Image(LuaImageEvent),
+  /// The network setting for Lua event data.
   Network(LuaNetworkEvent),
+  /// The audio setting for Lua event data.
   Audio(LuaAudioEvent),
+  /// The hit area setting for Lua event data.
   HitArea(LuaHitAreaEvent),
+  /// The hyperlink setting for Lua event data.
   Hyperlink(LuaHyperlinkEvent),
+  /// The markdown setting for Lua event data.
   Markdown(LuaMarkdownEvent),
+  /// The text input setting for Lua event data.
   TextInput(LuaTextInputEvent),
+  /// The scroll box setting for Lua event data.
   ScrollBox(LuaScrollBoxEvent),
 }
 
 impl LuaEventData {
+  /// Return the current event type.
   pub fn event_type(&self) -> &'static str {
     match self {
       Self::Action { .. } => "action",
+      Self::Key { .. } => "key",
       Self::Mouse { .. } => "mouse",
       Self::Resize { .. } => "resize",
       Self::Focus { .. } => "focus",
@@ -430,6 +726,7 @@ impl LuaEventData {
     }
   }
 
+  /// Convert a terminal pointer event into a script-visible mouse event payload.
   pub fn mouse(event: MouseEvent) -> Self {
     Self::Mouse {
       kind: match event.kind {
@@ -447,6 +744,7 @@ impl LuaEventData {
     }
   }
 
+  /// Report whether this event completes its one-shot operation or terminates its timer/animation callback.
   pub fn callback_is_terminal(&self) -> bool {
     match self {
       Self::Timer(event) => event.kind == LuaTimerEventKind::Finished,
@@ -463,6 +761,7 @@ impl LuaEventData {
     matches!(
       self,
       Self::Action { .. }
+        | Self::Key { .. }
         | Self::Mouse { .. }
         | Self::HitArea(_)
         | Self::Hyperlink(_)
@@ -472,6 +771,7 @@ impl LuaEventData {
     )
   }
 
+  /// Report whether the addressed object is coalescible with.
   pub(super) fn is_coalescible_with(&self, newer: &Self) -> bool {
     match (self, newer) {
       (Self::Resize { .. }, Self::Resize { .. }) => true,
@@ -499,11 +799,13 @@ impl LuaEventData {
     }
   }
 
+  /// Report whether this event category may be delivered to the specified session kind.
   pub(super) fn allowed_for(&self, kind: super::LuaSessionKind) -> bool {
     match kind {
       super::LuaSessionKind::Game => true,
       super::LuaSessionKind::Screensaver => match self {
         Self::Action { .. }
+        | Self::Key { .. }
         | Self::Mouse { .. }
         | Self::OverlayStarted
         | Self::OverlayStopped
@@ -525,11 +827,21 @@ impl LuaEventData {
     }
   }
 
+  /// Build the script-visible event table without exposing host task identifiers or session
+  /// generations.
+  ///
+  /// # Errors
+  ///
+  /// Propagate Lua allocation or field-conversion errors while constructing the event payload.
   pub(super) fn to_lua_table(&self, lua: &Lua) -> mlua::Result<Table> {
     let data = lua.create_table()?;
     match self {
       Self::Action { action, state } => {
         data.set("action", action.as_str())?;
+        data.set("state", state.as_str())?;
+      }
+      Self::Key { key, state } => {
+        data.set("key", key.as_str())?;
         data.set("state", state.as_str())?;
       }
       Self::Mouse {
@@ -552,10 +864,15 @@ impl LuaEventData {
       Self::Focus { gained } => data.set("gained", *gained)?,
       Self::OverlayStarted | Self::OverlayStopped => {}
       Self::Timer(event) => {
-        data.set("id", event.id)?;
+        if let Some(id) = &event.object_id {
+          data.set("id", id.as_str())?;
+        } else {
+          data.set("id", event.id)?;
+        }
         data.set("timer_kind", event.timer_kind.as_str())?;
         data.set("kind", event.kind.as_str())?;
         data.set("executed_count", event.executed_count)?;
+        data.set("tip", event.tip.as_deref())?;
       }
       Self::Animation(event) => {
         data.set("id", event.id)?;
@@ -605,6 +922,7 @@ impl LuaEventData {
         data.set("kind", event.kind.as_str())?;
         data.set("ok", event.ok)?;
         data.set("message", event.message.as_str())?;
+        data.set("warning", event.warning.as_deref())?;
         data.set("language_code", event.language_code.as_str())?;
         data.set(
           "callback_language_code",
@@ -702,10 +1020,20 @@ impl LuaEventData {
   }
 }
 
+/// A Lua runtime event payload queued for its owning consumer.
+///
+/// # Fields
+///
+/// * `sequence` - The sequence.
+/// * `frame` - The composed terminal-cell frame.
+/// * `data` - The data.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaRuntimeEvent {
+  /// The sequence.
   pub sequence: u64,
+  /// The composed terminal-cell frame.
   pub frame: u64,
+  /// The data.
   pub data: LuaEventData,
 }
 
@@ -716,6 +1044,7 @@ fn error_table(lua: &Lua, error: &LuaEventError) -> mlua::Result<Table> {
   Ok(table)
 }
 
+/// Map filesystem failures to script-visible errors without revealing host paths.
 pub(super) fn sanitize_io_error(message: &str) -> LuaEventError {
   let lower = message.to_ascii_lowercase();
   let code = if lower.contains("not found") || lower.contains("cannot find") {
@@ -744,6 +1073,7 @@ pub(super) fn sanitize_io_error(message: &str) -> LuaEventError {
   LuaEventError::sanitized(code)
 }
 
+/// Map network failures to script-visible errors without leaking destination details.
 pub(super) fn sanitize_network_error(error: &NetworkError) -> LuaEventError {
   let code = match error.code {
     NetworkErrorCode::InvalidRequest => LuaEventErrorCode::InvalidRequest,
@@ -972,6 +1302,9 @@ mod tests {
           timer_kind: LuaTimerKind::Repeat,
           kind: LuaTimerEventKind::Tick,
           executed_count: Some(2),
+          object_id: None,
+          tip: None,
+          revision: None,
         }),
         "timer",
       ),
@@ -1095,6 +1428,9 @@ mod tests {
       timer_kind: LuaTimerKind::Timer,
       kind: LuaTimerEventKind::Finished,
       executed_count: None,
+      object_id: None,
+      tip: None,
+      revision: None,
     })
     .to_lua_table(&lua)
     .unwrap();

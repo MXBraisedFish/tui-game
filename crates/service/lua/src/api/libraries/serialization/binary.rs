@@ -1,3 +1,5 @@
+//! Byte and numeric packing through the Lua serialization library.
+
 use mlua::{Lua, MultiValue, Table, Value};
 
 use super::args;
@@ -28,6 +30,12 @@ struct Op {
   max_align: usize,
 }
 
+/// Build and register the Lua binary API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
   source.raw_set(
     "binary_pack",

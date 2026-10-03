@@ -1,4 +1,64 @@
-//! Network service: validated HTTP(S) requests executed as async jobs, with SSRF-safe address checks and bounded status history.
+//! Validated asynchronous HTTP requests, cancellation, response limits, and safe diagnostics.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use std::time::{Duration, Instant};
+//!
+//! use tg_service_async::{AsyncRuntime, TaskStatusEvent};
+//! use tg_service_network::{
+//!   NetworkErrorCode, NetworkEvent, NetworkRequest, NetworkRequestStatus, NetworkResponseMode,
+//!   NetworkService,
+//! };
+//!
+//! #[derive(Debug)]
+//! enum Event {
+//!   Network(NetworkEvent),
+//!     Status,
+//! }
+//!
+//! impl From<NetworkEvent> for Event {
+//!   fn from(event: NetworkEvent) -> Self {
+//!     Self::Network(event)
+//!   }
+//! }
+//!
+//! impl From<TaskStatusEvent> for Event {
+//!   fn from(_: TaskStatusEvent) -> Self {
+//!     Self::Status
+//!   }
+//! }
+//!
+//! fn main() {
+//!   let runtime = AsyncRuntime::<Event>::with_worker_count(1);
+//!   let mut network = NetworkService::new();
+//!
+//!   let unsupported = NetworkRequest::get("ftp://example.com/", NetworkResponseMode::Text);
+//!   let error = network.submit(&runtime, unsupported).unwrap_err();
+//!   assert_eq!(error.code, NetworkErrorCode::Unsupported);
+//!
+//!   let loopback = NetworkRequest::get("http://127.0.0.1:9/", NetworkResponseMode::Text);
+//!   let task = network
+//!     .submit(&runtime, loopback)
+//!     .expect("well-formed request");
+//!   let deadline = Instant::now() + Duration::from_secs(5);
+//!   while network.active_count() > 0 && Instant::now() < deadline {
+//!     for event in runtime.poll_events() {
+//!       if let Event::Network(event) = event {
+//!         network.handle_engine_event(&event);
+//!       }
+//!     }
+//!     std::thread::sleep(Duration::from_millis(5));
+//!   }
+//!   assert_eq!(
+//!     network.status(task),
+//!     Some(&NetworkRequestStatus::Failed {
+//!       code: NetworkErrorCode::PermissionDenied
+//!     })
+//!   );
+//!   println!("network ok: loopback request {task:?} refused");
+//! }
+//! ```
 
 mod executor;
 mod security;
@@ -19,20 +79,30 @@ use tg_service_async::{AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskSta
 pub(crate) use executor::run_network_task;
 
 const TERMINAL_STATUS_LIMIT: usize = 256;
+/// The max request body bytes used by this module.
 pub(crate) const MAX_REQUEST_BODY_BYTES: usize = 1024 * 1024;
+/// The max response body bytes used by this module.
 pub(crate) const MAX_RESPONSE_BODY_BYTES: usize = 4 * 1024 * 1024;
+/// The max url bytes used by this module.
 pub(crate) const MAX_URL_BYTES: usize = 8192;
+/// The max request headers used by this module.
 pub(crate) const MAX_REQUEST_HEADERS: usize = 64;
+/// The max request header bytes used by this module.
 pub(crate) const MAX_REQUEST_HEADER_BYTES: usize = 32 * 1024;
+/// The max redirects used by this module.
 pub(crate) const MAX_REDIRECTS: usize = 5;
 
+/// The HTTP method allowed by the script request API.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NetworkMethod {
+  /// The get setting for network method.
   Get,
+  /// The post setting for network method.
   Post,
 }
 
 impl NetworkMethod {
+  /// Return the stable string key for this network method.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::Get => "get",
@@ -41,17 +111,25 @@ impl NetworkMethod {
   }
 }
 
+/// The text, binary, or structured representation requested for an HTTP response.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NetworkResponseMode {
+  /// The text setting for network response mode.
   Text,
+  /// The bytes setting for network response mode.
   Bytes,
 }
 
+/// The optional request payload sent to an HTTP destination.
 #[derive(Clone, Debug, PartialEq)]
 pub enum NetworkRequestBody {
+  /// The empty setting for network request body.
   Empty,
+  /// The text setting for network request body.
   Text(String),
+  /// The bytes setting for network request body.
   Bytes(Vec<u8>),
+  /// The json setting for network request body.
   Json(serde_json::Value),
 }
 
@@ -61,13 +139,22 @@ impl NetworkRequestBody {
   }
 }
 
+/// One validated HTTP header name and value.
+///
+/// # Fields
+///
+/// * `name` - The name used to identify the object or field.
+/// * `value` - The value to store or convert.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NetworkHeader {
+  /// The name used to identify the object or field.
   pub name: String,
+  /// The value to store or convert.
   pub value: String,
 }
 
 impl NetworkHeader {
+  /// Create a network header initialized from `name`, `value`.
   pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
     Self {
       name: name.into(),
@@ -76,16 +163,31 @@ impl NetworkHeader {
   }
 }
 
+/// The HTTP method, destination, payload, response mode, and limits of a queued request.
+///
+/// # Fields
+///
+/// * `method` - The method.
+/// * `url` - The url.
+/// * `headers` - The ordered headers retained by this owner.
+/// * `body` - The body.
+/// * `response_mode` - The response mode.
 #[derive(Clone, Debug, PartialEq)]
 pub struct NetworkRequest {
+  /// The method.
   pub method: NetworkMethod,
+  /// The url.
   pub url: String,
+  /// The ordered headers retained by this owner.
   pub headers: Vec<NetworkHeader>,
+  /// The body.
   pub body: NetworkRequestBody,
+  /// The response mode.
   pub response_mode: NetworkResponseMode,
 }
 
 impl NetworkRequest {
+  /// Create a GET request with the supplied URL and response representation.
   pub fn get(url: impl Into<String>, response_mode: NetworkResponseMode) -> Self {
     Self {
       method: NetworkMethod::Get,
@@ -96,6 +198,13 @@ impl NetworkRequest {
     }
   }
 
+  /// Create a POST request with the supplied URL, response mode, and body.
+  ///
+  /// # Arguments
+  ///
+  /// * `url` - The url.
+  /// * `body` - The body.
+  /// * `response_mode` - The response mode.
   pub fn post(
     url: impl Into<String>,
     body: NetworkRequestBody,
@@ -111,35 +220,63 @@ impl NetworkRequest {
   }
 }
 
+/// The validated response payload exposed to the request owner.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NetworkResponseBody {
+  /// The text setting for network response body.
   Text(String),
+  /// The bytes setting for network response body.
   Bytes(Vec<u8>),
 }
 
+/// The status, headers, and bounded payload received from an HTTP destination.
+///
+/// # Fields
+///
+/// * `original_url` - The original url.
+/// * `final_url` - The final url.
+/// * `status` - The status.
+/// * `headers` - The headers indexed by their declared keys.
+/// * `body` - The body.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NetworkResponse {
+  /// The original url.
   pub original_url: String,
+  /// The final url.
   pub final_url: String,
+  /// The status.
   pub status: u16,
+  /// The headers indexed by their declared keys.
   pub headers: BTreeMap<String, String>,
+  /// The body.
   pub body: NetworkResponseBody,
 }
 
+/// Failures reported by network operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NetworkErrorCode {
+  /// The invalid request failure condition.
   InvalidRequest,
+  /// The permission denied failure condition.
   PermissionDenied,
+  /// The too large failure condition.
   TooLarge,
+  /// The invalid UTF-8 failure condition.
   InvalidUtf8,
+  /// The cancelled failure condition.
   Cancelled,
+  /// The timeout failure condition.
   Timeout,
+  /// The network failure condition.
   Network,
+  /// The unsupported failure condition.
   Unsupported,
+  /// The internal failure condition.
   Internal,
 }
 
 impl NetworkErrorCode {
+  /// Return the stable string key for this network error code.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::InvalidRequest => "invalid_request",
@@ -169,14 +306,23 @@ impl NetworkErrorCode {
   }
 }
 
+/// Failures reported by network operations.
+///
+/// # Fields
+///
+/// * `code` - The stable error or language code.
+/// * `message` - The diagnostic or display message.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NetworkError {
+  /// The stable error or language code.
   pub code: NetworkErrorCode,
+  /// The diagnostic or display message.
   pub message: String,
   stage: &'static str,
 }
 
 impl NetworkError {
+  /// Create a sanitized network error with the supplied code and request stage.
   pub fn at(code: NetworkErrorCode, stage: &'static str) -> Self {
     Self {
       code,
@@ -185,14 +331,23 @@ impl NetworkError {
     }
   }
 
+  /// Return the current stage.
   pub(crate) fn stage(&self) -> &'static str {
     self.stage
   }
 }
 
+/// Failures reported by network submit operations.
+///
+/// # Fields
+///
+/// * `code` - The stable error or language code.
+/// * `message` - The diagnostic or display message.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NetworkSubmitError {
+  /// The stable error or language code.
   pub code: NetworkErrorCode,
+  /// The diagnostic or display message.
   pub message: String,
 }
 
@@ -213,32 +368,51 @@ impl fmt::Display for NetworkSubmitError {
 
 impl std::error::Error for NetworkSubmitError {}
 
+/// A network event payload queued for its owning consumer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NetworkEvent {
+  /// A started notification delivered to the owning consumer.
   Started {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The method.
     method: NetworkMethod,
+    /// The url.
     url: String,
   },
+  /// The operation is finished.
   Finished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The method.
     method: NetworkMethod,
+    /// The response.
     response: NetworkResponse,
   },
+  /// A failed notification delivered to the owning consumer.
   Failed {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The method.
     method: NetworkMethod,
+    /// The url.
     url: String,
+    /// The error.
     error: NetworkError,
   },
+  /// A cancelled notification delivered to the owning consumer.
   Cancelled {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The method.
     method: NetworkMethod,
+    /// The url.
     url: String,
   },
 }
 
 impl NetworkEvent {
+  /// Return the current task id.
   pub fn task_id(&self) -> TaskId {
     match self {
       Self::Started { task_id, .. }
@@ -249,15 +423,28 @@ impl NetworkEvent {
   }
 }
 
+/// The current stage or terminal outcome of an owned HTTP request.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NetworkRequestStatus {
+  /// The operation is queued.
   Queued,
+  /// The operation is running.
   Running,
-  Completed { status: u16 },
-  Failed { code: NetworkErrorCode },
+  /// The operation is completed.
+  Completed {
+    /// The status.
+    status: u16,
+  },
+  /// The operation is failed.
+  Failed {
+    /// The stable error or language code.
+    code: NetworkErrorCode,
+  },
+  /// The operation is cancelled.
   Cancelled,
 }
 
+/// The inputs of an asynchronous network operation.
 #[derive(Clone)]
 pub struct NetworkTask {
   request: NormalizedNetworkRequest,
@@ -303,6 +490,7 @@ struct NormalizedNetworkRequest {
   address_policy: security::AddressPolicy,
 }
 
+/// The public entry point for network operations.
 pub struct NetworkService {
   active: HashMap<TaskId, NetworkRequestStatus>,
   terminal: HashMap<TaskId, NetworkRequestStatus>,
@@ -310,6 +498,7 @@ pub struct NetworkService {
 }
 
 impl NetworkService {
+  /// Create a network service with its initial state.
   pub fn new() -> Self {
     Self {
       active: HashMap::new(),
@@ -318,6 +507,13 @@ impl NetworkService {
     }
   }
 
+  /// Queue the background operation and return its task identifier for state queries and
+  /// completion routing.
+  ///
+  /// # Errors
+  ///
+  /// Return a submission error for an unsupported URL, invalid headers/body/response settings, or
+  /// request data exceeding the validation limits.
   pub fn submit<E>(
     &mut self,
     async_runtime: &AsyncRuntime<E>,
@@ -332,6 +528,7 @@ impl NetworkService {
     Ok(task_id)
   }
 
+  /// Cancel the network state addressed by this operation.
   pub fn cancel<E>(&mut self, async_runtime: &AsyncRuntime<E>, task_id: TaskId) -> bool
   where
     E: From<TaskStatusEvent> + Send + 'static,
@@ -343,6 +540,7 @@ impl NetworkService {
     true
   }
 
+  /// Return the status for the addressed object when it is available.
   pub fn status(&self, task_id: TaskId) -> Option<&NetworkRequestStatus> {
     self
       .active
@@ -350,10 +548,12 @@ impl NetworkService {
       .or_else(|| self.terminal.get(&task_id))
   }
 
+  /// Return the current active count.
   pub fn active_count(&self) -> usize {
     self.active.len()
   }
 
+  /// Apply a matching asynchronous completion event to network state.
   pub fn handle_engine_event(&mut self, event: &NetworkEvent) {
     let task_id = event.task_id();
     if !self.active.contains_key(&task_id) {
@@ -398,6 +598,13 @@ impl Default for NetworkService {
   }
 }
 
+/// Queue the terminal cancellation outcome for an owned network request.
+///
+/// # Arguments
+///
+/// * `task_id` - The identifier of the asynchronous task.
+/// * `task` - The task.
+/// * `event_tx` - The event tx.
 pub(crate) fn emit_cancelled<E: From<NetworkEvent>>(
   task_id: TaskId,
   task: &NetworkTask,
@@ -527,7 +734,6 @@ mod tests {
     }
   }
 
-  /// A test job that keeps the only worker busy so the next task stays queued.
   struct OccupyWorker(Duration);
 
   impl AsyncJob<TestEvent> for OccupyWorker {

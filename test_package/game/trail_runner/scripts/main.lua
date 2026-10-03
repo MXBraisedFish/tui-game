@@ -1,6 +1,4 @@
--- Trail Runner: steer a runner that leaves a growing trail and collect gems.
--- Exercises i18n (package language files), rich text with key placeholders,
--- utf8, measurement, the direct random API and continue/best data.
+-- Trail runner package callbacks and terminal-cell drawing.
 
 local STEP_SECONDS = 0.12
 local GEM_SCORE = 10
@@ -34,6 +32,7 @@ local paused = false
 local crashed = false
 local blink_time = 0
 
+-- Resolve a package text label through the active language.
 local function label(key)
   if labels_ready then
     return i18n.get_value("ui", key)
@@ -41,11 +40,12 @@ local function label(key)
   return FALLBACK_TEXT[key]
 end
 
--- The playfield is the inside of the border drawn by Render.
+-- Return the playable region inside the current terminal dimensions.
 local function field()
   return { left = 1, top = 3, right = width - 2, bottom = height - 5 }
 end
 
+-- Report whether the trail already occupies the requested cell.
 local function occupies_trail(x, y)
   for index = 1, #trail do
     local point = trail[index]
@@ -56,6 +56,7 @@ local function occupies_trail(x, y)
   return false
 end
 
+-- Choose an unoccupied trail-field cell for the next collectible.
 local function place_gem()
   local bounds = field()
   for _ = 1, 64 do
@@ -69,6 +70,7 @@ local function place_gem()
   gem = nil
 end
 
+-- Reset trail movement, score, and collectible placement for a new run.
 local function reset_run()
   local bounds = field()
   local start_y = (bounds.top + bounds.bottom) // 2
@@ -82,6 +84,7 @@ local function reset_run()
   place_gem()
 end
 
+-- Advance trail movement and apply collision or collectible outcomes.
 local function advance()
   local head = trail[#trail]
   local next_x = head.x + heading.x
@@ -106,6 +109,7 @@ local function advance()
   end
 end
 
+-- Change trail direction for the requested action without reversing into the trail.
 local function steer(action)
   local next_heading = HEADINGS[action]
   if crashed then
@@ -113,12 +117,13 @@ local function steer(action)
     heading = next_heading
     return
   end
-  -- A runner cannot reverse straight into its own trail.
+
   if next_heading.x ~= -heading.x or next_heading.y ~= -heading.y then
     heading = next_heading
   end
 end
 
+-- Initialize package state from the supplied base dimensions and startup data.
 function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
@@ -138,6 +143,7 @@ function Init(ctx)
   end
 end
 
+-- Apply the resize, action, or completion events handled by this package.
 function HandleEvent(event)
   if event.type == "resize" then
     width = event.data.width
@@ -157,6 +163,7 @@ function HandleEvent(event)
   end
 end
 
+-- Advance package simulation using the fixed-update delta in seconds.
 function Update(dt)
   if paused or crashed then
     return
@@ -168,10 +175,12 @@ function Update(dt)
   end
 end
 
+-- Apply per-frame state using elapsed seconds and the fixed-step interpolation fraction.
 function UpdateFrame(dt, alpha)
   blink_time = (blink_time + dt) % 1
 end
 
+-- Return the visible label for the current trail direction.
 local function heading_name()
   for key, value in pairs(HEADINGS) do
     if value == heading then
@@ -181,6 +190,7 @@ local function heading_name()
   return "move_right"
 end
 
+-- Draw the current package state in terminal-cell coordinates.
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
   draw.stroke_rect(0, 2, width, height - 5, { fg = color.GREEN, border_char = char.ROUNDED_LINE })
@@ -223,6 +233,7 @@ function Render()
   draw.text(2, height - 1, language_line, { fg = color.GRAY, max_width = width - 4, max_height = 1 })
 end
 
+-- Return the structured state needed to continue this game.
 function SaveGame()
   return {
     trail = trail,
@@ -232,6 +243,7 @@ function SaveGame()
   }
 end
 
+-- Return the best-result data and its display text for host score persistence.
 function SaveBest()
   if score > best_score then
     best_score = score

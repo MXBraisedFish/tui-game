@@ -1,3 +1,5 @@
+//! About page state, user commands, and terminal-cell presentation.
+
 use std::{path::Path, time::Duration};
 
 use crate::host_engine::services::{
@@ -40,7 +42,7 @@ const PLAYER_BORDER: TextColor = TextColor::Rgb {
   b: 215,
 };
 
-/// Temporary audio player on the About page, used to verify the host audio service.
+/// The state and owned widgets of the input demo view.
 pub struct InputDemoUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -76,18 +78,31 @@ impl RuntimeObjectPoolOwner for InputDemoUi {
   }
 }
 
+/// An application request produced by input demo interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputDemoCommand {
+  /// A request to back.
   Back,
+  /// A request to toggle playback.
   TogglePlayback,
+  /// A request to stop.
   Stop,
+  /// The restart setting for input demo command.
   Restart,
+  /// The volume down setting for input demo command.
   VolumeDown,
+  /// The volume up setting for input demo command.
   VolumeUp,
+  /// A request to toggle loop.
   ToggleLoop,
 }
 
 impl InputDemoUi {
+  /// Create the about view and allocate its owned UI objects.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `audio test progress bar options must be valid`.
   pub fn init(hit_area: &HitAreaService, progress_bar: &ProgressBarService) -> Self {
     let mut objects = UiObjectPool::new();
     let progress = progress_bar
@@ -118,46 +133,55 @@ impl InputDemoUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the about view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "input_demo.back".into(),
         description: "Back to home".into(),
         keys: vec![vec!["esc".into()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "input_demo.toggle".into(),
         description: "Play or pause test audio".into(),
         keys: vec![vec!["space".into()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "input_demo.stop".into(),
         description: "Stop test audio".into(),
         keys: vec![vec!["s".into()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "input_demo.restart".into(),
         description: "Restart test audio".into(),
         keys: vec![vec!["r".into()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "input_demo.volume_down".into(),
         description: "Decrease test audio volume".into(),
         keys: vec![vec!["left".into()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "input_demo.volume_up".into(),
         description: "Increase test audio volume".into(),
         keys: vec![vec!["right".into()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "input_demo.loop".into(),
         description: "Toggle test audio loop".into(),
         keys: vec![vec!["l".into()]],
+        priority: 0,
       },
     ]
   }
 
+  /// Interpret a about UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<InputDemoCommand> {
     match event {
       UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
@@ -179,6 +203,13 @@ impl InputDemoUi {
     }
   }
 
+  /// Advance the about view's transient state for this host frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `audio` - The audio.
+  /// * `storage` - The deployment-relative storage service.
+  /// * `progress_bar` - The progress bar.
   pub fn update(
     &mut self,
     audio: &mut AudioService,
@@ -214,6 +245,7 @@ impl InputDemoUi {
     changed
   }
 
+  /// Toggle the about-page audio between playback and pause.
   pub fn toggle_playback(&mut self, audio: &mut AudioService) {
     let Some(audio_id) = self.audio_id else {
       return;
@@ -226,6 +258,7 @@ impl InputDemoUi {
     self.set_operation_result(result);
   }
 
+  /// Stop the input demo ui state addressed by this operation.
   pub fn stop(&mut self, audio: &mut AudioService) {
     let Some(audio_id) = self.audio_id else {
       return;
@@ -234,6 +267,7 @@ impl InputDemoUi {
     self.set_operation_result(result);
   }
 
+  /// Restart the input demo ui state addressed by this operation.
   pub fn restart(&mut self, audio: &mut AudioService) {
     let Some(audio_id) = self.audio_id else {
       return;
@@ -242,6 +276,7 @@ impl InputDemoUi {
     self.set_operation_result(result);
   }
 
+  /// Adjust about-page playback volume within its allowed range.
   pub fn adjust_volume(&mut self, audio: &mut AudioService, delta: f32) {
     let Some(audio_id) = self.audio_id else {
       return;
@@ -257,6 +292,7 @@ impl InputDemoUi {
     }
   }
 
+  /// Toggle repeated playback of the about-page audio.
   pub fn toggle_loop(&mut self, audio: &mut AudioService) {
     let Some(audio_id) = self.audio_id else {
       return;
@@ -272,6 +308,7 @@ impl InputDemoUi {
     }
   }
 
+  /// Stop about-page playback when navigation leaves the view.
   pub fn leave(&mut self, audio: &mut AudioService) {
     if let Some(audio_id) = self.audio_id.take() {
       let _ = audio.stop(self.objects.audio_mut(), audio_id);
@@ -282,6 +319,15 @@ impl InputDemoUi {
     self.position = Duration::ZERO;
   }
 
+  /// Draw the about view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `hit_area` - The hit area.
+  /// * `progress_bar` - The progress bar.
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,

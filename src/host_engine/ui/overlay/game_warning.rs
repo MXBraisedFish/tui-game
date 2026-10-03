@@ -1,3 +1,5 @@
+//! Game warning overlay state, owned interactions, and clipped terminal presentation.
+
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, I18nService, KeyState, LayoutService,
   RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, TerminalColor,
@@ -6,6 +8,7 @@ use crate::host_engine::services::{
 
 const NS: &str = "game_warning";
 
+/// The state and owned widgets of the game warning view.
 pub struct GameWarningUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -13,6 +16,7 @@ pub struct GameWarningUi {
 }
 
 impl GameWarningUi {
+  /// Create the game warning view and allocate its owned UI objects.
   pub fn init() -> Self {
     Self {
       objects: UiObjectPool::new(),
@@ -21,14 +25,17 @@ impl GameWarningUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the game warning view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![ActionMapEntry {
       action: "game_warning.back".to_string(),
       description: "Return to game list".to_string(),
       keys: vec![vec!["esc".to_string()]],
+      priority: 0,
     }]
   }
 
+  /// Interpret a game warning UI event and return the requested application command.
   pub fn handle_event(&self, event: &UiEvent) -> Option<GameWarningCommand> {
     match event {
       UiEvent::Action(event)
@@ -40,6 +47,15 @@ impl GameWarningUi {
     }
   }
 
+  /// Draw the game warning view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `seconds_left` - The seconds left.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -120,8 +136,10 @@ fn draw_centered(
   );
 }
 
+/// An application request produced by game warning interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameWarningCommand {
+  /// A request to back.
   Back,
 }
 

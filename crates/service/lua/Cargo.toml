@@ -13,6 +13,7 @@ regex = "1.13.0"
 serde_json = { version = "1.0.150", features = ["preserve_order"] }
 serde_yaml = "0.9"
 tg-core-audio = { path = "../../core/audio" }
+tg-core-date = { path = "../../core/date" }
 tg-core-input = { path = "../../core/input" }
 tg-core-package-id = { path = "../../core/package_id" }
 tg-core-sandbox-path = { path = "../../core/sandbox_path" }
@@ -26,6 +27,7 @@ tg-service-image = { path = "../image" }
 tg-service-layout = { path = "../layout" }
 tg-service-log = { path = "../log" }
 tg-service-network = { path = "../network" }
+tg-service-package = { path = "../package" }
 tg-service-random = { path = "../random" }
 tg-service-render = { path = "../render" }
 tg-service-rich-text = { path = "../rich_text" }
@@ -36,3 +38,4 @@ toml = "1.1.2"
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
+tg-service-input = { path = "../input" }

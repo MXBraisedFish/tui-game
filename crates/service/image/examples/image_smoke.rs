@@ -1,4 +1,4 @@
-//! Minimal entry: renders a generated PNG to half-block text, synchronously and as an async job.
+//! Independent image smoke entry exercising the public API and checking its results.
 
 use std::{
   path::PathBuf,
@@ -11,7 +11,7 @@ use tg_service_image::{ImageConvertParams, ImageEvent, ImageService};
 #[derive(Debug)]
 enum Event {
   Image(ImageEvent),
-  /// Executor status; this example only looks at image events.
+
   Status,
 }
 

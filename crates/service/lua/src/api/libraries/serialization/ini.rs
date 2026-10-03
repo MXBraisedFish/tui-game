@@ -1,9 +1,17 @@
+//! INI document parsing and serialization exposed to Lua.
+
 use std::collections::BTreeMap;
 
 use mlua::{Lua, MultiValue, Table};
 
 use super::{args, value};
 
+/// Build and register the Lua ini API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
   source.raw_set(
     "ini_encode",

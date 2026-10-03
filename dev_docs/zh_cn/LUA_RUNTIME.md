@@ -58,13 +58,14 @@ ctx = {
 
 支持的类型：
 
+- `key`：`data.key` 和 `data.state`，用 ime.receive_key_event() 开启；默认关闭。
 - `action`：`data.action` 和 `data.state`（`pressed`、`held`、`released`）。
 - `mouse`：`data.kind`、`button`、`scroll`、`x`、`y`。
 - `resize`：`data.width`、`height`。
 - `focus`：`data.gained`。
 - `screensaver_started`、`screensaver_stopped`：空 `data`。
 
-Lua 不会收到原始终端按键；动作名来自游戏包当前生效的用户按键映射。宿主全局按键始终优先。
+Lua 可通过 ime 开启规范化 key 状态事件；不接收原始终端对象或输入法提交文字。动作名来自当前用户映射，全部命中动作依次发送。宿主层优先，各层 priority 降序、实际命中组合键优先，再按声明顺序。held 只在 pressed 后下一宿主帧发送一次，持续移动在 Update 中使用脚本保存的按住状态。
 
 Runtime 每帧最多向 Lua 分发 128 个事件，剩余事件保留到下一帧，且不会在回调中递归分发新事件。
 

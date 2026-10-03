@@ -1,3 +1,5 @@
+//! Clear warning overlay state, owned interactions, and clipped terminal presentation.
+
 use std::{path::PathBuf, time::Duration};
 
 use crate::host_engine::services::text_layout::TextWrapMode;
@@ -11,18 +13,27 @@ use crate::host_engine::services::{
 const CONFIRM_DELAY: Duration = Duration::from_secs(3);
 const NS: &str = "clear_warning";
 
+/// The storage category requiring destructive-operation confirmation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClearWarningTarget {
+  /// The cache setting for clear warning target.
   Cache,
+  /// The log setting for clear warning target.
   Log,
+  /// The mod setting for clear warning target.
   Mod,
+  /// The profile setting for clear warning target.
   Profile,
+  /// The screenshot setting for clear warning target.
   Screenshot,
+  /// The recording setting for clear warning target.
   Recording,
+  /// The data setting for clear warning target.
   Data,
 }
 
 impl ClearWarningTarget {
+  /// Return the current description key.
   pub fn description_key(self) -> &'static str {
     match self {
       Self::Cache => "clear_warning.description.cache",
@@ -36,6 +47,7 @@ impl ClearWarningTarget {
   }
 }
 
+/// The state and owned widgets of the clear warning view.
 pub struct ClearWarningUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -47,6 +59,7 @@ pub struct ClearWarningUi {
 }
 
 impl ClearWarningUi {
+  /// Create the clear warning view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -60,35 +73,42 @@ impl ClearWarningUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the clear warning view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "clear_warning.yes.temporary".to_string(),
         description: "Confirm clear data".to_string(),
         keys: vec![vec!["1".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "clear_warning.no".to_string(),
         description: "Cancel clear data".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
     ]
   }
 
+  /// Start the clear warning ui state addressed by this operation.
   pub fn start(&mut self, target: ClearWarningTarget, path: PathBuf) {
     self.target = Some(target);
     self.path = path;
     self.elapsed = Duration::ZERO;
   }
 
+  /// Return the current target.
   pub fn target(&self) -> Option<ClearWarningTarget> {
     self.target
   }
 
+  /// Advance the clear warning view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) {
     self.elapsed = self.elapsed.saturating_add(dt);
   }
 
+  /// Consume raw key transitions for the active capture or confirmation interaction.
   pub fn handle_raw_key_events(&self, input: &mut InputService) -> Option<ClearWarningCommand> {
     for event in input.take_raw_key_events() {
       if event.kind != KeyEventKind::Press {
@@ -103,6 +123,7 @@ impl ClearWarningUi {
     None
   }
 
+  /// Interpret a clear warning UI event and return the requested application command.
   pub fn handle_event(&self, event: &UiEvent) -> Option<ClearWarningCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::Click {
@@ -119,6 +140,15 @@ impl ClearWarningUi {
     }
   }
 
+  /// Draw the clear warning view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -296,9 +326,12 @@ impl RuntimeObjectPoolOwner for ClearWarningUi {
   }
 }
 
+/// An application request produced by clear warning interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClearWarningCommand {
+  /// A request to cancel.
   Cancel,
+  /// A request to confirm.
   Confirm,
 }
 

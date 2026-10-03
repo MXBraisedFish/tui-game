@@ -1,3 +1,5 @@
+//! Column sizing, overflow handling, alignment, and table drawing.
+
 mod state;
 mod types;
 
@@ -14,6 +16,7 @@ use crate::UiObjectPool;
 use tg_service_canvas::CanvasService;
 use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
 
+/// The public entry point for table operations.
 #[derive(Default)]
 pub struct TableService;
 
@@ -31,10 +34,12 @@ struct TablePosition {
 }
 
 impl TableService {
+  /// Create a table service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Create an owned table object and return its identity.
   pub fn create(&self, pool: &mut UiObjectPool, options: TableOptions) -> Option<TableId> {
     validate_options(&options).then(|| {
       let id = TableId(pool.tables.next_id);
@@ -44,14 +49,23 @@ impl TableService {
     })
   }
 
+  /// Remove the identified widget object and release its owned state.
   pub fn remove(&self, pool: &mut UiObjectPool, id: TableId) -> bool {
     pool.tables.tables.remove(&id).is_some()
   }
 
+  /// Report whether the identified widget object is still present.
   pub fn exists(&self, pool: &UiObjectPool, id: TableId) -> bool {
     pool.tables.tables.contains_key(&id)
   }
 
+  /// Update the columns used by this table service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `columns` - The columns.
   pub fn set_columns(
     &self,
     pool: &mut UiObjectPool,
@@ -72,6 +86,13 @@ impl TableService {
     true
   }
 
+  /// Update the style used by this table service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `style` - The text style applied to the rendered content.
   pub fn set_style(&self, pool: &mut UiObjectPool, id: TableId, style: TableStyle) -> bool {
     let Some(state) = pool.tables.tables.get_mut(&id) else {
       return false;
@@ -80,10 +101,18 @@ impl TableService {
     true
   }
 
+  /// Return the options for the addressed object when it is available.
   pub fn options<'a>(&self, pool: &'a UiObjectPool, id: TableId) -> Option<&'a TableOptions> {
     Some(&pool.tables.tables.get(&id)?.options)
   }
 
+  /// Submit the component's configured drawing state to the current canvas frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw(
     &self,
     pool: &UiObjectPool,
@@ -93,6 +122,14 @@ impl TableService {
     self.draw_to(pool, canvas, TableTarget::Base, params)
   }
 
+  /// Draw the configured table onto the identified clipped slice.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `slice` - The slice.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_on(
     &self,
     pool: &UiObjectPool,
@@ -103,6 +140,13 @@ impl TableService {
     self.draw_to(pool, canvas, TableTarget::Slice(slice), params)
   }
 
+  /// Draw the configured table in physical host coordinates.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_host(
     &self,
     pool: &UiObjectPool,

@@ -1,8 +1,11 @@
+//! Screensaver overlay state, owned interactions, and clipped terminal presentation.
+
 use crate::host_engine::services::{
   CanvasService, DrawTextParams, I18nService, LayoutService, PackageListEntry, RenderService,
   RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, UiObjectPool, UiObjectPoolOwner,
 };
 
+/// The state and owned widgets of the screensaver overlay view.
 pub struct ScreensaverOverlayUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -11,6 +14,7 @@ pub struct ScreensaverOverlayUi {
 }
 
 impl ScreensaverOverlayUi {
+  /// Create the screensaver view and allocate its owned UI objects.
   pub fn init() -> Self {
     Self {
       objects: UiObjectPool::new(),
@@ -20,12 +24,21 @@ impl ScreensaverOverlayUi {
     }
   }
 
+  /// Start the screensaver overlay ui state addressed by this operation.
   pub fn start(&mut self, entry: &PackageListEntry) {
     self.name = entry.screensaver_name.clone();
     self.params =
       RichTextParams::from_key_action_maps(&entry.key_actions, &entry.key_default_actions);
   }
 
+  /// Draw the screensaver view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `_i18n` - The service resolving localized text.
   pub fn render(
     &mut self,
     render: &mut RenderService,

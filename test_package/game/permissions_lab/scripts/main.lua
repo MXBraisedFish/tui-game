@@ -1,4 +1,4 @@
--- Permissions Lab: exercises game-only package file access and per-package debug output.
+-- Permissions lab package callbacks and terminal-cell drawing.
 
 local PROBE_PATH = "state/probe.log"
 local MAX_LOG_LINES = 10
@@ -9,6 +9,7 @@ local probes = 0
 local best_probes = 0
 local log_lines = {}
 
+-- Append a visible diagnostic and discard the oldest entries beyond the display limit.
 local function push_log(line)
   table.insert(log_lines, line)
   while #log_lines > MAX_LOG_LINES do
@@ -16,11 +17,13 @@ local function push_log(line)
   end
 end
 
+-- Return the first line of text, or an empty string when no line is present.
 local function first_line(text)
   local lines = string.split(text, "\n")
   return lines[1] or ""
 end
 
+-- Display file-request outcomes and report failures through the debug library.
 local function handle_file_event(data)
   if not data.ok then
     push_log("File " .. data.kind .. " failed: " .. data.error.code)
@@ -41,6 +44,7 @@ local function handle_file_event(data)
   end
 end
 
+-- Assert successful JSON decoding and rejection of malformed JSON.
 local function self_check()
   local decoded, decoded_value1 = debug.pcall(function()
       return serialization.json_decode("{\"probes\": 1}")
@@ -52,6 +56,7 @@ local function self_check()
   debug.assert(not broken, { message = "invalid JSON was accepted" })
 end
 
+-- Initialize package state from the supplied base dimensions and startup data.
 function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
@@ -69,6 +74,7 @@ function Init(ctx)
   end
 end
 
+-- Apply the resize, action, or completion events handled by this package.
 function HandleEvent(event)
   if event.type == "resize" then
     width = event.data.width
@@ -102,12 +108,15 @@ function HandleEvent(event)
   end
 end
 
+-- Keep this optional callback empty; this package needs no work in this phase.
 function Update(dt)
 end
 
+-- Keep this optional callback empty; this package needs no work in this phase.
 function UpdateFrame(dt, alpha)
 end
 
+-- Draw the current package state in terminal-cell coordinates.
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
   draw.stroke_rect(0, 0, width, height, { fg = color.BRIGHT_RED, border_char = char.DOUBLE_LINE })
@@ -119,10 +128,12 @@ function Render()
   draw.text(2, height - 2, "P write  R read  L list  Esc leave", { fg = color.GRAY })
 end
 
+-- Return the structured state needed to continue this game.
 function SaveGame()
   return { probes = probes }
 end
 
+-- Return the best-result data and its display text for host score persistence.
 function SaveBest()
   if probes > best_probes then
     best_probes = probes

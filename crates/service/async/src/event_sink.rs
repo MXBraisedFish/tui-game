@@ -1,28 +1,27 @@
+//! Completion-event delivery without depending on the application loop.
+
 use std::sync::Arc;
 
 use crossbeam_channel::Sender;
 
-/// A cloneable handle that delivers one service's events into the application's event channel.
-///
-/// Services that keep a long-lived sender (for example on background threads) hold an
-/// `EventSink<TheirEvent>` instead of a `Sender<AppEvent>`, so they never name the application's
-/// aggregate event type.
+/// A service-neutral sender for asynchronous completion events.
 pub struct EventSink<T> {
   send: Arc<dyn Fn(T) + Send + Sync>,
 }
 
 impl<T: 'static> EventSink<T> {
-  /// Wraps an application channel whose event type can be built from `T`.
+  /// Create an event sink initialized from `sender`.
   pub fn new<E: From<T> + Send + 'static>(sender: Sender<E>) -> Self {
     Self {
       send: Arc::new(move |event| {
-        // A closed channel means the application is shutting down; the event is dropped.
+        // A disconnected receiver no longer consumes completion events; discard the send result.
+
         let _ = sender.send(E::from(event));
       }),
     }
   }
 
-  /// Sends one event; silently dropped when the application channel is closed.
+  /// Send the supplied event or command to the owning runtime channel.
   pub fn send(&self, event: T) {
     (self.send)(event);
   }

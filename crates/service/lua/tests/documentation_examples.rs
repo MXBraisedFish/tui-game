@@ -1,4 +1,5 @@
-//! Check documented API members, constants and examples in real package sessions.
+//! Regression checks for documented Lua library members and independently executed API examples.
+
 use std::{fs, path::PathBuf, time::Duration};
 
 use tg_service_layout::Size;
@@ -21,7 +22,9 @@ fn api_examples_execute_with_fixture_assets() {
   fs::create_dir(fixture.0.join("assets")).unwrap();
   let entry = fixture.0.join("scripts/main.lua");
   let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../dev_docs/zh_cn/api");
-  // Assets only: asynchronous requests are queued here, not executed by a host loop.
+  // These fixtures enqueue asynchronous requests; no application loop executes their side
+  // effects.
+
   fs::write(fixture.0.join("assets/file.txt"), "Hello Tui Game").unwrap();
   for directory in ["dir", "test", "c", "js", "rust/src", "ui"] {
     fs::create_dir_all(fixture.0.join("assets").join(directory)).unwrap();
@@ -46,6 +49,8 @@ fn api_examples_execute_with_fixture_assets() {
     "base",
     "char",
     "color",
+    "date",
+    "timer",
     "debug",
     "draw",
     "encoding",
@@ -54,6 +59,7 @@ fn api_examples_execute_with_fixture_assets() {
     "game",
     "i18n",
     "image",
+    "ime",
     "lifecycle",
     "loader",
     "math",
@@ -109,7 +115,9 @@ fn run_snippet(
   entry: &std::path::Path,
   source: &str,
 ) -> Result<(), tg_service_lua::LuaSessionError> {
-  // Each excerpt is independent. Definitions in it replace these required callbacks.
+  // Run each excerpt independently and let its own callback definitions replace the fixture
+  // callbacks.
+
   let script = format!(
     "function Init(ctx) end\nfunction HandleEvent(event) end\nfunction Update(dt) end\nfunction UpdateFrame(dt, alpha) end\nfunction Render() end\n{source}"
   );
@@ -159,6 +167,8 @@ fn documented_members_match_registered_libraries() {
     "base",
     "char",
     "color",
+    "date",
+    "timer",
     "debug",
     "draw",
     "encoding",
@@ -167,6 +177,7 @@ fn documented_members_match_registered_libraries() {
     "game",
     "i18n",
     "image",
+    "ime",
     "loader",
     "math",
     "measurement",
@@ -208,7 +219,8 @@ fn documented_members_match_registered_libraries() {
       end
     "#,
     );
-    // Split first, so adjacent constant entries are not consumed as regex delimiters.
+    // Separate entries before matching so a delimiter cannot consume the following constant.
+
     for block in markdown.split("\n## `").skip(1) {
       let name = block.split('`').next().unwrap();
       if let Some(value) = value_pattern.captures(block) {

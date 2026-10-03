@@ -1,5 +1,13 @@
+//! Game-session lifecycle, frame callbacks, host commands, and optional save support.
+
 use super::*;
 
+/// Build and register the Lua game API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn game(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, command) in [

@@ -1,3 +1,5 @@
+//! Runtime support for the audio service.
+
 use std::{
   collections::HashMap,
   fs::{self, File},
@@ -33,66 +35,111 @@ const MAX_CACHE_BYTES: usize = 512 * 1024 * 1024;
 const PLAYBACK_POLL_INTERVAL: Duration = Duration::from_millis(20);
 const CAPTURE_CHUNK_SAMPLES: usize = 2048;
 
+/// An application request produced by audio interactions.
 #[derive(Clone)]
 pub(crate) enum AudioCommand {
+  /// A playback-runtime command to load.
   Load {
+    /// The identity of the owning pool.
     pool_id: AudioPoolId,
+    /// The playback object identifier.
     audio_id: AudioId,
+    /// The audio source carried by this audio command.
     source: AudioSource,
+    /// The requested volume multiplier.
     volume: f32,
+    /// The looped.
     looped: bool,
+    /// The snapshot.
     snapshot: Arc<AudioPlaybackSnapshot>,
   },
+  /// A playback-runtime command to remove.
   Remove {
+    /// The playback object identifier.
     audio_id: AudioId,
   },
+  /// A playback-runtime command to play.
   Play {
+    /// The playback object identifier.
     audio_id: AudioId,
+    /// The paused.
     paused: bool,
   },
+  /// A playback-runtime command to pause.
   Pause {
+    /// The playback object identifier.
     audio_id: AudioId,
   },
+  /// A playback-runtime command to resume.
   Resume {
+    /// The playback object identifier.
     audio_id: AudioId,
   },
+  /// A playback-runtime command to stop.
   Stop {
+    /// The playback object identifier.
     audio_id: AudioId,
   },
+  /// A playback-runtime command to restart.
   Restart {
+    /// The playback object identifier.
     audio_id: AudioId,
+    /// The paused.
     paused: bool,
   },
+  /// A playback-runtime command to set volume.
   SetVolume {
+    /// The playback object identifier.
     audio_id: AudioId,
+    /// The requested volume multiplier.
     volume: f32,
   },
+  /// A playback-runtime command to set loop.
   SetLoop {
+    /// The playback object identifier.
     audio_id: AudioId,
+    /// The looped.
     looped: bool,
   },
+  /// A playback-runtime command to seek.
   Seek {
+    /// The playback object identifier.
     audio_id: AudioId,
+    /// The position represented as a duration.
     position: Duration,
   },
+  /// A playback-runtime command to start capture.
   StartCapture {
+    /// The audio-capture identifier.
     capture_id: AudioCaptureId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// A playback-runtime command to pause capture.
   PauseCapture {
+    /// The audio-capture identifier.
     capture_id: AudioCaptureId,
   },
+  /// A playback-runtime command to resume capture.
   ResumeCapture {
+    /// The audio-capture identifier.
     capture_id: AudioCaptureId,
   },
+  /// A playback-runtime command to stop capture.
   StopCapture {
+    /// The audio-capture identifier.
     capture_id: AudioCaptureId,
   },
+  /// A playback-runtime command to stop all.
   StopAll,
+  /// A playback-runtime command to release pool.
   ReleasePool {
+    /// The identity of the owning pool.
     pool_id: AudioPoolId,
   },
+  /// A playback-runtime command to clear cache.
   ClearCache,
+  /// A playback-runtime command to shutdown.
   Shutdown,
 }
 
@@ -267,12 +314,14 @@ struct DecodeResult {
   result: Result<DecodedAudio, AudioError>,
 }
 
+/// The audio runtime representation used by this module.
 pub(crate) struct AudioRuntime {
   command_tx: Sender<AudioCommand>,
   control_thread: Option<JoinHandle<()>>,
 }
 
 impl AudioRuntime {
+  /// Create an audio runtime initialized from `event_tx`.
   pub(crate) fn new(event_tx: EventSink<AudioAsyncEvent>) -> Self {
     let (command_tx, command_rx) = unbounded();
     let control_thread = thread::Builder::new()
@@ -285,10 +334,16 @@ impl AudioRuntime {
     }
   }
 
+  /// Return the current command sender.
   pub(crate) fn command_sender(&self) -> Sender<AudioCommand> {
     self.command_tx.clone()
   }
 
+  /// Send the supplied event or command to the owning runtime channel.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the audio command channel is disconnected.
   pub(crate) fn send(&self, command: AudioCommand) -> Result<(), AudioError> {
     self
       .command_tx
@@ -296,6 +351,7 @@ impl AudioRuntime {
       .map_err(|_| AudioError::sanitized(AudioErrorCode::RuntimeClosed))
   }
 
+  /// Stop audio work and release its owned runtime resources.
   pub(crate) fn shutdown(&mut self) {
     let _ = self.command_tx.send(AudioCommand::Shutdown);
     if let Some(thread) = self.control_thread.take() {
@@ -1204,7 +1260,6 @@ mod tests {
   use super::*;
 
   fn temporary_path(extension: &str) -> PathBuf {
-    // Parallel tests can read the same clock tick on Windows; the counter keeps names unique.
     static NEXT_FILE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let nonce = SystemTime::now()
       .duration_since(UNIX_EPOCH)

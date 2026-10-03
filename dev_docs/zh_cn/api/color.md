@@ -8,28 +8,28 @@
 
 ## 常量
 
-| 常量 | 说明 | 定位 |
-| --- | --- | --- |
-| `GRAY` | 灰色 | [GRAY](#gray) |
-| `BRIGHT_GRAY` | 亮灰色 | [BRIGHT_GRAY](#bright_gray) |
-| `BLACK` | 黑色 | [BLACK](#black) |
-| `RED` | 红色 | [RED](#red) |
-| `GREEN` | 绿色 | [GREEN](#green) |
-| `YELLOW` | 黄色 | [YELLOW](#yellow) |
-| `BLUE` | 蓝色 | [BLUE](#blue) |
-| `MAGENTA` | 品红 | [MAGENTA](#magenta) |
-| `CYAN` | 青色 | [CYAN](#cyan) |
-| `BRIGHT_RED` | 亮红 | [BRIGHT_RED](#bright_red) |
-| `BRIGHT_GREEN` | 亮绿 | [BRIGHT_GREEN](#bright_green) |
-| `BRIGHT_YELLOW` | 亮黄 | [BRIGHT_YELLOW](#bright_yellow) |
-| `BRIGHT_BLUE` | 亮蓝 | [BRIGHT_BLUE](#bright_blue) |
-| `BRIGHT_MAGENTA` | 亮品红 | [BRIGHT_MAGENTA](#bright_magenta) |
-| `BRIGHT_CYAN` | 亮青 | [BRIGHT_CYAN](#bright_cyan) |
-| `WHITE` | 白色 | [WHITE](#white) |
-| `NONE` | 默认颜色 | [NONE](#none) |
-| `TRANSPARENT` | 透明背景 | [TRANSPARENT](#transparent) |
-| `GREY` | 灰色，GRAY 的另一种拼写 | [GREY](#grey) |
-| `BRIGHT_GREY` | 亮灰色，BRIGHT_GRAY 的另一种拼写 | [BRIGHT_GREY](#bright_grey) |
+| 常量               | 说明                     | 定位                                |
+| ---------------- | ---------------------- | --------------------------------- |
+| `GRAY`           | 灰色                     | [GRAY](#gray)                     |
+| `BRIGHT_GRAY`    | 亮灰色                    | [BRIGHT_GRAY](#bright_gray)       |
+| `BLACK`          | 黑色                     | [BLACK](#black)                   |
+| `RED`            | 红色                     | [RED](#red)                       |
+| `GREEN`          | 绿色                     | [GREEN](#green)                   |
+| `YELLOW`         | 黄色                     | [YELLOW](#yellow)                 |
+| `BLUE`           | 蓝色                     | [BLUE](#blue)                     |
+| `MAGENTA`        | 品红                     | [MAGENTA](#magenta)               |
+| `CYAN`           | 青色                     | [CYAN](#cyan)                     |
+| `BRIGHT_RED`     | 亮红                     | [BRIGHT_RED](#bright_red)         |
+| `BRIGHT_GREEN`   | 亮绿                     | [BRIGHT_GREEN](#bright_green)     |
+| `BRIGHT_YELLOW`  | 亮黄                     | [BRIGHT_YELLOW](#bright_yellow)   |
+| `BRIGHT_BLUE`    | 亮蓝                     | [BRIGHT_BLUE](#bright_blue)       |
+| `BRIGHT_MAGENTA` | 亮品红                    | [BRIGHT_MAGENTA](#bright_magenta) |
+| `BRIGHT_CYAN`    | 亮青                     | [BRIGHT_CYAN](#bright_cyan)       |
+| `WHITE`          | 白色                     | [WHITE](#white)                   |
+| `NONE`           | 默认颜色                   | [NONE](#none)                     |
+| `TRANSPARENT`    | 透明背景                   | [TRANSPARENT](#transparent)       |
+| `GREY`           | 灰色，GRAY 的另一种拼写         | [GREY](#grey)                     |
+| `BRIGHT_GREY`    | 亮灰色，BRIGHT_GRAY 的另一种拼写 | [BRIGHT_GREY](#bright_grey)       |
 
 ## 方法
 

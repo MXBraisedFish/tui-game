@@ -8,17 +8,17 @@
 
 ## 常量
 
-| 常量 | 说明 | 定位 |
-| --- | --- | --- |
-| `POSITIVE_INFINITE` | 正无穷 | [POSITIVE_INFINITE](#positive_infinite) |
-| `PI` | 圆周率 π | [PI](#pi) |
-| `E` | 自然常数 e | [E](#e) |
-| `NEGATIVE_INFINITE` | 负无穷 | [NEGATIVE_INFINITE](#negative_infinite) |
-| `DEG` | 弧度转角度系数 | [DEG](#deg) |
-| `RAD` | 角度转弧度系数 | [RAD](#rad) |
-| `MAX_INTEGER` | 最大整数 `2^63-1` | [MAX_INTEGER](#max_integer) |
-| `MIN_INTEGER` | 最小整数 `-2^63` | [MIN_INTEGER](#min_integer) |
-| `INFINITE` | 正无穷，POSITIVE_INFINITE 的别名 | [INFINITE](#infinite) |
+| 常量                  | 说明                        | 定位                                      |
+| ------------------- | ------------------------- | --------------------------------------- |
+| `POSITIVE_INFINITE` | 正无穷                       | [POSITIVE_INFINITE](#positive_infinite) |
+| `PI`                | 圆周率 π                     | [PI](#pi)                               |
+| `E`                 | 自然常数 e                    | [E](#e)                                 |
+| `NEGATIVE_INFINITE` | 负无穷                       | [NEGATIVE_INFINITE](#negative_infinite) |
+| `DEG`               | 弧度转角度系数                   | [DEG](#deg)                             |
+| `RAD`               | 角度转弧度系数                   | [RAD](#rad)                             |
+| `MAX_INTEGER`       | 最大整数 `2^63-1`             | [MAX_INTEGER](#max_integer)             |
+| `MIN_INTEGER`       | 最小整数 `-2^63`              | [MIN_INTEGER](#min_integer)             |
+| `INFINITE`          | 正无穷，POSITIVE_INFINITE 的别名 | [INFINITE](#infinite)                   |
 
 ## 方法
 

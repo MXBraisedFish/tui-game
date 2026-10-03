@@ -1,4 +1,4 @@
-//! Minimal entry: clips a developer viewport to the physical size and centers content in it.
+//! Independent layout smoke entry exercising the public API and checking its results.
 
 use tg_core_geometry::Rect;
 use tg_service_layout::LayoutService;

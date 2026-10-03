@@ -1,7 +1,15 @@
+//! Column sizing, overflow handling, alignment, and table drawing.
+
 use super::*;
 
 use std::collections::{HashMap, HashSet};
 
+/// Build and register the Lua table API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.globals().get::<Table>("table")?;
   let length = lua

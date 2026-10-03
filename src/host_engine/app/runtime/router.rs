@@ -1,9 +1,32 @@
+//! Input, update, focus, and pointer ownership across visible application surfaces.
+
 use super::*;
 use crate::host_engine::services::{
   HitAreaEvent, KeyState, MouseEvent, SystemEvent, TerminalKeyCode, UiEvent, UiObjectPool,
   UiObjectPoolOwner,
 };
 
+/// Return the owned UI object pool of the currently selected program page.
+///
+/// # Arguments
+///
+/// * `world` - The application-owned runtime state.
+/// * `home_ui` - The home ui.
+/// * `settings_ui` - The settings ui.
+/// * `display_settings_ui` - The display settings ui.
+/// * `screensaver_list_ui` - The screensaver list ui.
+/// * `security_settings_ui` - The security settings ui.
+/// * `storage_management_ui` - The storage management ui.
+/// * `storage_management_clear_ui` - The storage management clear ui.
+/// * `storage_management_export_ui` - The storage management export ui.
+/// * `storage_management_view_ui` - The storage management view ui.
+/// * `language_select_ui` - The language select ui.
+/// * `terminal_check_ui` - The terminal check ui.
+/// * `mods_ui` - The mods ui.
+/// * `game_list_ui` - The game list ui.
+/// * `game_package_ui` - The game package ui.
+/// * `screensaver_package_ui` - The screensaver package ui.
+/// * `input_demo_ui` - The input demo ui.
 #[expect(
   clippy::too_many_arguments,
   reason = "The active page pool is selected from mutually exclusive UI states."
@@ -83,6 +106,13 @@ pub(super) fn current_objects_mut<'a>(
   }
 }
 
+/// Deactivate hidden view pools so their focused inputs cannot receive this frame's events.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `context` - The state and services needed for the operation.
 pub(super) fn deactivate_hidden_pools(
   services: &mut EngineServices,
   world: &RuntimeWorld,
@@ -252,6 +282,13 @@ pub(super) fn deactivate_hidden_pools(
   }
 }
 
+/// Deliver terminal text-editing events to the current page's owned input pool.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `context` - The state and services needed for the operation.
 pub(super) fn route_text_input_events(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
@@ -316,6 +353,13 @@ pub(super) fn route_text_input_events(
   }
 }
 
+/// Deliver actions and pointer events to the active overlay or uncovered page.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `context` - The state and services needed for the operation.
 pub(super) fn route_input_events(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
@@ -346,6 +390,10 @@ pub(super) fn route_input_events(
     return;
   }
 
+  let input_owner = (
+    world.state.current_ui_kind(),
+    world.state.current_overlay_kind(),
+  );
   while let Some(event) = services.input.next_action_event() {
     if handle_host_key_action(event.action.as_str(), event.state, world) {
       if world.is_stopped() {
@@ -361,8 +409,15 @@ pub(super) fn route_input_events(
     );
     route_component_events(services, world, &mut context.reborrow());
 
-    if world.is_stopped() {
-      break;
+    if world.is_stopped()
+      || input_owner
+        != (
+          world.state.current_ui_kind(),
+          world.state.current_overlay_kind(),
+        )
+    {
+      services.input.clear();
+      return;
     }
   }
 
@@ -412,12 +467,26 @@ pub(super) fn route_input_events(
       }
       _ => {}
     }
-    if world.is_stopped() {
+    if world.is_stopped()
+      || input_owner
+        != (
+          world.state.current_ui_kind(),
+          world.state.current_overlay_kind(),
+        )
+    {
+      services.input.clear();
       break;
     }
   }
 }
 
+/// Advance visible page and overlay state and apply resulting application transitions.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `context` - The state and services needed for the operation.
 pub(super) fn route_update(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
@@ -1008,6 +1077,13 @@ fn route_input_event(
   }
 }
 
+/// Apply a host shortcut to recording, screenshot, toolbar, or application navigation state.
+///
+/// # Arguments
+///
+/// * `action` - The action.
+/// * `state` - The state.
+/// * `world` - The application-owned runtime state.
 pub(super) fn handle_host_key_action(
   action: &str,
   state: KeyState,
@@ -1044,6 +1120,15 @@ fn route_terminal_check_mouse_event(
   }
 }
 
+/// Dispatch export-settings interactions and apply confirmed or cancelled export commands.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `export_settings_ui` - The export settings ui.
+/// * `export_loading_ui` - The export loading ui.
+/// * `export_loading` - The export loading.
 pub(super) fn route_export_settings_overlay_events(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
@@ -1073,7 +1158,9 @@ pub(super) fn route_export_settings_overlay_events(
       break;
     }
   }
-  // 若 action 刚激活了 text_input，跳过 Enter 的 TerminalKey 避免瞬间 Submit
+  // Do not deliver the same Enter to an input just focused by its action; that would submit
+  // immediately.
+
   let just_activated = !was_active && services.text_input.is_active();
   for sys_event in services.input.drain_system_events() {
     match sys_event {
@@ -1087,7 +1174,8 @@ pub(super) fn route_export_settings_overlay_events(
       }
       SystemEvent::TerminalKey(key) => {
         if just_activated && key.code == TerminalKeyCode::Enter {
-          continue; // 跳过触发 FocusInput 的 Enter，避免立刻 Submit
+          continue; // Skip the Enter that focused the input instead of submitting the newly activated
+          // editor.
         }
         services.text_input.route_terminal_key(
           export_settings_ui.objects_mut(),
@@ -1121,8 +1209,15 @@ pub(super) fn route_export_settings_overlay_events(
   }
 }
 
-/// ExportSettings overlay 输入中路由——只走 system events，不 dispatch action，
-/// 避免 Enter 被 action map 拦截而打断 IME 组字。
+/// Deliver terminal editing events to the export-settings overlay input pool.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `export_settings_ui` - The export settings ui.
+/// * `export_loading_ui` - The export loading ui.
+/// * `export_loading` - The export loading.
 pub(super) fn route_export_settings_text_input_events(
   services: &mut EngineServices,
   world: &mut RuntimeWorld,

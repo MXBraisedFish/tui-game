@@ -1,3 +1,5 @@
+//! Lua random library bindings with validated arguments and session-owned host access.
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -12,6 +14,12 @@ use tg_service_random::{
 const MAX_GENERATORS: usize = 4096;
 static AUTO_SEED_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
+/// Build and register the Lua random API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn random(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   source.raw_set("INT", "int")?;
@@ -573,44 +581,4 @@ fn with_direct_generator<R>(
     }
     operation(&service, objects.runtime_mut(), id)
   })
-}
-
-fn with_pool<R>(
-  state: &SharedApiState,
-  method: &str,
-  operation: impl FnOnce(&crate::LuaObjectPool) -> mlua::Result<R>,
-) -> mlua::Result<R> {
-  let objects = state
-    .borrow()
-    .objects
-    .upgrade()
-    .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
-  let objects = objects
-    .try_borrow()
-    .map_err(|_| args::message(method, "session object pool is busy"))?;
-  operation(
-    objects
-      .as_ref()
-      .ok_or_else(|| args::message(method, "session object pool is unavailable"))?,
-  )
-}
-
-fn with_pool_mut<R>(
-  state: &SharedApiState,
-  method: &str,
-  operation: impl FnOnce(&mut crate::LuaObjectPool) -> mlua::Result<R>,
-) -> mlua::Result<R> {
-  let objects = state
-    .borrow()
-    .objects
-    .upgrade()
-    .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
-  let mut objects = objects
-    .try_borrow_mut()
-    .map_err(|_| args::message(method, "session object pool is busy"))?;
-  operation(
-    objects
-      .as_mut()
-      .ok_or_else(|| args::message(method, "session object pool is unavailable"))?,
-  )
 }

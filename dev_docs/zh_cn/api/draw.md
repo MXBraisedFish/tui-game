@@ -36,8 +36,8 @@ draw.text
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `x` | integer | 文本起始位置的 x 坐标 |
-| `y` | integer | 文本起始位置的 y 坐标 |
+| `x` | integer | 文本块左上角的 x 坐标 |
+| `y` | integer | 文本块左上角的 y 坐标 |
 | `text` | string | 要绘制的文本 |
 
 ### 选填参数
@@ -46,7 +46,7 @@ draw.text
 | --- | --- | --- |
 | `fg` | string / const-color | 默认：`color.NONE`；前景色 |
 | `bg` | string / const-color | 默认：`color.NONE`；背景色 |
-| `horizontal_align` | const-align | 默认：`align.LEFT`；多行文本的水平对齐方式 |
+| `horizontal_align` | const-align | 默认：`align.LEFT`；各行相对于最长显示行的水平对齐方式 |
 | `auto_wrap` | boolean | 默认：`true`；是否自动换行 |
 | `word_wrap` | boolean | 默认：`true`；是否按完整单词换行 |
 | `max_width` | integer / nil | 默认：`nil`；最大绘制宽度；提供时范围为 1～65535 |
@@ -74,6 +74,12 @@ draw.text
 draw.text(2, 1, "Hello TUI GAME", {fg = color.BRIGHT_RED})
 
 draw.text(2, 2, "Hello TUI GAME", {fg = color.WHITE, italic = true})
+
+local text = "f%<fg:bright_green>Normal Mode</fg>\n<fg:bright_red>Challenge Mode</fg>"
+local options = {horizontal_align = align.CENTER, max_width = 20}
+local width, height = measurement.get_text_size(text, options)
+local x, y = align.resolve_rect(width, height, align.CENTER, align.CENTER)
+draw.text(x, y, text, options)
 ```
 
 **输出：**
@@ -84,6 +90,9 @@ draw.text(2, 2, "Hello TUI GAME", {fg = color.WHITE, italic = true})
 ### 额外说明
 
 - 坐标从 0 开始，单位为终端字符格；超出目标切片的内容会裁剪。需要持续显示的内容放在 `Render` 回调中绘制。
+
+- 多行文本以换行和省略处理后最长的显示行为宽度：`align.CENTER` 将短行放在这段宽度的中间，`align.RIGHT` 将短行靠右。`x`、`y` 始终是文本块左上角，单行不会额外偏移；居中遇到半格时向左取整。
+- `max_width` 只限制换行和裁剪，不会补齐空白来扩大文本块。使用相同选项测量后，将返回的宽、高交给 `align.resolve_rect`，再直接绘制即可。
 
 - 参数 `bg` 和参数 `fg` 均支持形如 rgb(r,g,b) 或 \#rrggbb 的颜色代码，字符串类型，无空格
 

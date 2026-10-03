@@ -1,51 +1,88 @@
-/// 覆盖层栈状态，以栈形式管理多个覆盖层
+//! Overlay priority, transition tracking, and terminal-size warning state.
+
+/// Overlay entries and transitions ordered by fixed category priority and display recency.
+///
+/// # Fields
+///
+/// * `stack` - The ordered stack retained by this owner.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverlayStackState {
+  /// The ordered stack retained by this owner.
   pub stack: Vec<OverlayState>,
   transitions: Vec<OverlayStackTransition>,
 }
 
-/// 覆盖屏栈从空到非空、或从非空回到空时产生的生命周期变化。
+/// A transition between an empty overlay stack and one containing visible overlays.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayStackTransition {
+  /// The first overlay has appeared above the active page.
   Started,
+  /// The last overlay has been removed, uncovering the active page.
   Stopped,
 }
 
-/// 覆盖层状态，包含类型及其逻辑与渲染状态
+/// The retained state of overlay.
+///
+/// # Fields
+///
+/// * `kind` - The overlay kind carried by this overlay state.
+/// * `logic` - Retained overlay interaction state.
+/// * `render` - The overlay rendering snapshot, including physical terminal requirements.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverlayState {
+  /// The overlay kind carried by this overlay state.
   pub kind: OverlayKind,
+  /// Retained overlay interaction state.
   pub logic: OverlayLogicState,
+  /// The overlay rendering snapshot, including physical terminal requirements.
   pub render: OverlayRenderState,
 }
 
-/// 覆盖层类型枚举
+/// The overlay category used to resolve priority and input ownership.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayKind {
+  /// The confirmation shown before continuing a covered game.
   CoverContinue,
+  /// The confirmation shown before clearing stored data.
   ClearWarning,
+  /// The progress display for an active archive export.
   ExportLoading,
+  /// The settings shown before submitting an archive export.
   ExportSettings,
+  /// The warning shown before entering a game.
   GameWarning,
+  /// The progress display while language and package resources reload.
   LanguageLoading,
+  /// The capture selection displayed above every other overlay.
   ScreenshotCapture,
+  /// The screensaver displayed above ordinary overlays and below size/capture warnings.
   Screensaver,
+  /// The physical terminal-size warning displayed below screenshot capture.
   WindowSizeWarning,
 }
 
-/// 覆盖层逻辑状态
+/// The retained interaction state of a particular host overlay.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverlayLogicState;
 
-/// 覆盖层渲染状态，包含该覆盖层所需的最小窗口尺寸
+/// The overlay rendering snapshot selected for the current frame.
+///
+/// # Fields
+///
+/// * `required_width` - The required physical terminal width in columns including host
+/// reservations.
+/// * `required_height` - The required physical terminal height in rows including host
+/// reservations.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverlayRenderState {
+  /// The required physical terminal width in columns including host reservations.
   pub required_width: u64,
+  /// The required physical terminal height in rows including host reservations.
   pub required_height: u64,
 }
 
 impl OverlayStackState {
+  /// Create an overlay stack state with its initial state.
   pub fn new() -> Self {
     Self {
       stack: Vec::new(),
@@ -53,6 +90,7 @@ impl OverlayStackState {
     }
   }
 
+  /// Return the highest-priority overlay, preferring the last shown entry for equal priorities.
   pub fn top(&self) -> Option<&OverlayState> {
     let index = self.current_index()?;
     self.stack.get(index)
@@ -73,7 +111,7 @@ impl OverlayStackState {
       .map(|(index, _)| index)
   }
 
-  /// 主动显示一个覆盖层。同类型覆盖层保持单实例，并成为同层最新项。
+  /// Show or replace an overlay and report stack activation when it was previously empty.
   pub fn push(&mut self, overlay: OverlayState) {
     let was_empty = self.stack.is_empty();
     self.stack.retain(|item| item.kind != overlay.kind);
@@ -83,7 +121,7 @@ impl OverlayStackState {
     }
   }
 
-  /// 关闭当前显示的覆盖层。
+  /// Remove and return the highest-priority overlay, reporting deactivation if the stack empties.
   pub fn pop(&mut self) -> Option<OverlayState> {
     let index = self.current_index()?;
     let overlay = self.stack.remove(index);
@@ -93,10 +131,12 @@ impl OverlayStackState {
     Some(overlay)
   }
 
+  /// Return the category of the overlay currently owning interaction.
   pub fn current_kind(&self) -> Option<OverlayKind> {
     self.top().map(|overlay| overlay.kind)
   }
 
+  /// Remove the requested overlay, reporting deactivation when the last entry disappears.
   pub fn remove_kind(&mut self, kind: OverlayKind) -> Option<OverlayState> {
     let index = self.stack.iter().position(|overlay| overlay.kind == kind)?;
     let overlay = self.stack.remove(index);
@@ -106,20 +146,24 @@ impl OverlayStackState {
     Some(overlay)
   }
 
+  /// Return access to the requested overlay stack state value when it exists.
   pub fn get(&self, kind: OverlayKind) -> Option<&OverlayState> {
     self.stack.iter().find(|overlay| overlay.kind == kind)
   }
 
+  /// Return mutable access to the requested overlay stack state value when it exists.
   pub fn get_mut(&mut self, kind: OverlayKind) -> Option<&mut OverlayState> {
     self.stack.iter_mut().find(|overlay| overlay.kind == kind)
   }
 
+  /// Drain and return the queued transitions.
   pub fn drain_transitions(&mut self) -> Vec<OverlayStackTransition> {
     std::mem::take(&mut self.transitions)
   }
 }
 
 impl OverlayKind {
+  /// Report whether this overlay kind is program overlay.
   pub fn is_program_overlay(self) -> bool {
     matches!(
       self,

@@ -1,3 +1,5 @@
+//! Screenshot recording page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -18,6 +20,7 @@ const MENU_KEYS: [&str; MENU_LEN] = [
   "screenshot_recording.recording_list",
 ];
 
+/// The state and owned widgets of the screenshot recording view.
 pub struct ScreenshotRecordingUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -30,12 +33,18 @@ pub struct ScreenshotRecordingUi {
   recording_list: RecordingListUi,
 }
 
+/// An application request produced by screenshot recording interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScreenshotRecordingCommand {
+  /// A request to back.
   Back,
+  /// A request to open screenshot settings.
   OpenScreenshotSettings,
+  /// A request to open recording settings.
   OpenRecordingSettings,
+  /// A request to open screenshot list.
   OpenScreenshotList,
+  /// A request to open recording list.
   OpenRecordingList,
 }
 
@@ -60,6 +69,13 @@ impl RuntimeObjectPoolOwner for ScreenshotRecordingUi {
 }
 
 impl ScreenshotRecordingUi {
+  /// Create the screenshot recording view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -90,6 +106,7 @@ impl ScreenshotRecordingUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the screenshot recording view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       action(
@@ -131,6 +148,7 @@ impl ScreenshotRecordingUi {
     ]
   }
 
+  /// Interpret a screenshot recording UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ScreenshotRecordingCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -170,26 +188,41 @@ impl ScreenshotRecordingUi {
     }
   }
 
+  /// Advance the screenshot recording view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) {
     let _ = dt;
   }
 
+  /// Return mutable access to the owned screenshot settings.
   pub fn screenshot_settings_mut(&mut self) -> &mut ScreenshotSettingsUi {
     &mut self.screenshot_settings
   }
 
+  /// Return mutable access to the owned recording settings.
   pub fn recording_settings_mut(&mut self) -> &mut RecordingSettingsUi {
     &mut self.recording_settings
   }
 
+  /// Return mutable access to the owned screenshot list.
   pub fn screenshot_list_mut(&mut self) -> &mut ScreenshotListUi {
     &mut self.screenshot_list
   }
 
+  /// Return mutable access to the owned recording list.
   pub fn recording_list_mut(&mut self) -> &mut RecordingListUi {
     &mut self.recording_list
   }
 
+  /// Draw the screenshot recording view and register interaction regions in its assigned
+  /// surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -306,5 +339,6 @@ fn action(name: &str, key: &str, description: &str) -> ActionMapEntry {
     action: name.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }

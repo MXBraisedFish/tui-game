@@ -1,3 +1,5 @@
+//! Display settings page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use super::toolbar_custom::ToolbarCustomUi;
@@ -22,6 +24,7 @@ const LABEL_KEYS: [&str; MENU_LEN] = [
   "display_settings.game_list.fps",
 ];
 
+/// The state and owned widgets of the display settings view.
 pub struct DisplaySettingsUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -41,10 +44,14 @@ pub struct DisplaySettingsUi {
   custom: ToolbarCustomUi,
 }
 
+/// An application request produced by display settings interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DisplaySettingsCommand {
+  /// A request to back.
   Back,
+  /// A request to open toolbar custom.
   OpenToolbarCustom,
+  /// The changed setting for display settings command.
   Changed(DisplaySettingsProfile),
 }
 
@@ -69,6 +76,13 @@ impl RuntimeObjectPoolOwner for DisplaySettingsUi {
 }
 
 impl DisplaySettingsUi {
+  /// Create the display settings view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `profile` - The user profile being read or updated.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -96,6 +110,7 @@ impl DisplaySettingsUi {
     }
   }
 
+  /// Update the top toolbar used by this display settings ui.
   pub fn set_top_toolbar(&mut self, enabled: bool) {
     self.top_toolbar = enabled;
     if !enabled && self.selected_index == 2 {
@@ -103,6 +118,7 @@ impl DisplaySettingsUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the display settings view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       action("display_settings.focus_up", "up", "Focus previous option"),
@@ -152,6 +168,7 @@ impl DisplaySettingsUi {
     ]
   }
 
+  /// Interpret a display settings UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<DisplaySettingsCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -236,11 +253,21 @@ impl DisplaySettingsUi {
     }
   }
 
+  /// Advance the display settings view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<DisplaySettingsCommand> {
     let _ = dt;
     None
   }
 
+  /// Draw the display settings view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -372,14 +399,17 @@ impl DisplaySettingsUi {
     }
   }
 
+  /// Return mutable access to the owned custom.
   pub fn custom_mut(&mut self) -> &mut ToolbarCustomUi {
     &mut self.custom
   }
 
+  /// Return the current custom text.
   pub fn custom_text(&self) -> &str {
     &self.top_toolbar_custom_text
   }
 
+  /// Update the custom text used by this display settings ui.
   pub fn set_custom_text(&mut self, text: String) {
     self.top_toolbar_custom_text = text;
   }
@@ -568,5 +598,6 @@ fn action(name: &str, key: &str, description: &str) -> ActionMapEntry {
     action: name.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }

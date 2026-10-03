@@ -1,3 +1,5 @@
+//! Language page state, user commands, and terminal-cell presentation.
+
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -19,7 +21,7 @@ const MIN_CELL_WIDTH: u16 = 14;
 
 const MAX_NAME_LEN: u16 = 20;
 
-/// Screen layout of the language selection page.
+/// Resolved geometry and positions used to display language select.
 pub(crate) struct LanguageSelectLayout {
   title_x: u16,
   title_y: u16,
@@ -35,8 +37,7 @@ pub(crate) struct LanguageSelectLayout {
   hint_y: u16,
 }
 
-/// Language selection page that shows the available language packs as a paged grid, navigable
-/// by keyboard and mouse.
+/// The state and owned widgets of the language select view.
 pub struct LanguageSelectUi {
   selected_index: usize,
   page: usize,
@@ -75,18 +76,28 @@ impl RuntimeObjectPoolOwner for LanguageSelectUi {
   }
 }
 
-/// Command emitted by the language selection page.
+/// An application request produced by language select interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LanguageSelectCommand {
+  /// A request to confirm.
   Confirm(String),
+  /// A request to confirm and apply.
   ConfirmAndApply(String),
+  /// A request to back.
   Back,
+  /// The exit setting for language select command.
   Exit,
 }
 
 impl LanguageSelectUi {
-  /// Creates the language selection page from `registry`, sorted by name, and preloads the
-  /// runtime language texts of every registered language.
+  /// Create the language view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `registry` - The registry.
+  /// * `storage` - The deployment-relative storage service.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `hit_area` - The hit area.
   pub fn init(
     mut registry: Vec<LanguageRegistryEntry>,
     storage: &StorageService,
@@ -142,6 +153,7 @@ impl LanguageSelectUi {
     }
   }
 
+  /// Report whether this language select ui is first selection.
   pub fn is_first_selection(&self) -> bool {
     self.first_selection
   }
@@ -197,53 +209,61 @@ impl LanguageSelectUi {
       .clamp(1, pages);
   }
 
-  /// Returns the action map (key bindings) of the language selection page.
+  /// Return the shortcuts currently enabled by the language view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "language_select.focus_up".to_string(),
         description: "Focus up".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "language_select.focus_down".to_string(),
         description: "Focus down".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "language_select.focus_left".to_string(),
         description: "Focus left".to_string(),
         keys: vec![vec!["left".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "language_select.focus_right".to_string(),
         description: "Focus right".to_string(),
         keys: vec![vec!["right".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "language_select.flip_forward".to_string(),
         description: "Previous page".to_string(),
         keys: vec![vec!["q".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "language_select.flip_backward".to_string(),
         description: "Next page".to_string(),
         keys: vec![vec!["e".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "language_select.confirm".to_string(),
         description: "Confirm language".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "language_select.back".to_string(),
         description: "Go back".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
     ]
   }
 
-  /// Handles a UI event and returns the confirm or back command it triggers, if any.
+  /// Interpret a language UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<LanguageSelectCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -364,12 +384,21 @@ impl LanguageSelectUi {
     })
   }
 
+  /// Advance the language view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<LanguageSelectCommand> {
     let _ = dt;
     None
   }
 
-  /// Draws the language selection page onto the host layer.
+  /// Draw the language view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `_i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -398,8 +427,7 @@ impl LanguageSelectUi {
     }
   }
 
-  /// Computes the host coordinates of every element of the language selection page from the
-  /// [`LayoutService`].
+  /// Resolve the language view's terminal-cell layout from its available dimensions.
   pub fn compute_positions(&self, layout: &LayoutService) -> LanguageSelectLayout {
     let viewport = layout.developer_viewport_rect();
     let size = layout.developer_size();

@@ -1,4 +1,4 @@
-//! Minimal entry: creates an audio type in a pool, sets its volume and removes it again.
+//! Independent audio smoke entry exercising the public API and checking its results.
 
 use crossbeam_channel::unbounded;
 use tg_core_audio::{AudioAsyncEvent, AudioPoolId};

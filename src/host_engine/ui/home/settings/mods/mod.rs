@@ -1,3 +1,5 @@
+//! Mods page state, user commands, and terminal-cell presentation.
+
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,7 +19,7 @@ const MODS_MENU_LEN: usize = 2;
 
 const MENU_KEYS: &[&str] = &["mods.game", "mods.screensaver"];
 
-/// Screen layout of the mods page.
+/// Resolved geometry and positions used to display mods.
 pub(crate) struct ModsLayout {
   title_x: u16,
   title_y: u16,
@@ -26,19 +28,49 @@ pub(crate) struct ModsLayout {
   hint_y: u16,
 }
 
+/// The services and view state needed to draw package list.
+///
+/// # Fields
+///
+/// * `render` - The &'a mut render service instance used by this owner.
+/// * `canvas` - The &'a mut canvas service instance used by this owner.
+/// * `layout` - The &'a layout service instance used by this owner.
+/// * `i18n` - The &'a i18n service instance used by this owner.
+/// * `hit_area` - The &'a hit area service instance used by this owner.
+/// * `text_input` - The &'a text input service instance used by this owner.
+/// * `scroll_box` - The &'a scroll box service instance used by this owner.
+/// * `package` - The &'a package service instance used by this owner.
+/// * `storage` - The &'a storage service instance used by this owner.
+/// * `log` - The &'a mut log service instance used by this owner.
+/// * `image` - The &'a mut image service instance used by this owner.
+/// * `mouse_supported` - The mouse supported.
+/// * `truecolor_supported` - The truecolor supported.
 pub(crate) struct PackageListRenderContext<'a> {
+  /// The &'a mut render service instance used by this owner.
   pub(crate) render: &'a mut RenderService,
+  /// The &'a mut canvas service instance used by this owner.
   pub(crate) canvas: &'a mut CanvasService,
+  /// The &'a layout service instance used by this owner.
   pub(crate) layout: &'a LayoutService,
+  /// The &'a i18n service instance used by this owner.
   pub(crate) i18n: &'a I18nService,
+  /// The &'a hit area service instance used by this owner.
   pub(crate) hit_area: &'a HitAreaService,
+  /// The &'a text input service instance used by this owner.
   pub(crate) text_input: &'a TextInputService,
+  /// The &'a scroll box service instance used by this owner.
   pub(crate) scroll_box: &'a ScrollBoxService,
+  /// The &'a package service instance used by this owner.
   pub(crate) package: &'a PackageService,
+  /// The &'a storage service instance used by this owner.
   pub(crate) storage: &'a StorageService,
+  /// The &'a mut log service instance used by this owner.
   pub(crate) log: &'a mut LogService,
+  /// The &'a mut image service instance used by this owner.
   pub(crate) image: &'a mut ImageService,
+  /// The mouse supported.
   pub(crate) mouse_supported: bool,
+  /// The truecolor supported.
   pub(crate) truecolor_supported: bool,
 }
 
@@ -84,7 +116,7 @@ impl PackageImageCacheKey {
   }
 }
 
-/// Keeps package images out of the synchronous conversion path on later UI frames.
+/// The package image cache representation used by this module.
 #[derive(Default)]
 pub(crate) struct PackageImageCache {
   snapshot_revision: Option<u64>,
@@ -122,19 +154,35 @@ impl PackageImageCache {
   }
 }
 
+/// The package info render area representation used by this module.
+///
+/// # Fields
+///
+/// * `rect` - The rectangular region in terminal cells.
+/// * `scroll_y` - The content offset from the viewport origin in terminal rows.
 #[derive(Clone, Copy)]
 pub(crate) struct PackageInfoRenderArea {
+  /// The rectangular region in terminal cells.
   pub(crate) rect: Rect,
+  /// The content offset from the viewport origin in terminal rows.
   pub(crate) scroll_y: u16,
 }
 
+/// The package info text position representation used by this module.
+///
+/// # Fields
+///
+/// * `x` - The horizontal coordinate in terminal cells.
+/// * `y` - The vertical coordinate in terminal cells.
 #[derive(Clone, Copy)]
 pub(crate) struct PackageInfoTextPosition {
+  /// The horizontal coordinate in terminal cells.
   pub(crate) x: u16,
+  /// The vertical coordinate in terminal cells.
   pub(crate) y: u16,
 }
 
-/// Mods page that leads to the game package and screensaver package managers.
+/// The state and owned widgets of the mods view.
 pub struct ModsUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -163,16 +211,19 @@ impl RuntimeObjectPoolOwner for ModsUi {
   }
 }
 
-/// Command emitted by the mods page.
+/// An application request produced by mods interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModsCommand {
+  /// A request to open game.
   OpenGame,
+  /// A request to open screensaver.
   OpenScreensaver,
+  /// A request to back.
   Back,
 }
 
 impl ModsUi {
-  /// Creates the mods page UI.
+  /// Create the mods view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -184,43 +235,49 @@ impl ModsUi {
     }
   }
 
-  /// Returns the action map (key bindings) of the mods page.
+  /// Return the shortcuts currently enabled by the mods view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "mods.focus_game".to_string(),
         description: "Focus game pack option".to_string(),
         keys: vec![vec!["1".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "mods.focus_screensaver".to_string(),
         description: "Focus screensaver pack option".to_string(),
         keys: vec![vec!["2".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "mods.focus_up".to_string(),
         description: "Focus previous option".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "mods.focus_down".to_string(),
         description: "Focus next option".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "mods.confirm".to_string(),
         description: "Confirm selected option".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "mods.back".to_string(),
         description: "Go back to settings".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
     ]
   }
 
-  /// Handles a UI event and returns the navigation or confirm command it triggers, if any.
+  /// Interpret a mods UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ModsCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -264,12 +321,21 @@ impl ModsUi {
     }
   }
 
+  /// Advance the mods view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<ModsCommand> {
     let _ = dt;
     None
   }
 
-  /// Draws the mods page onto the host layer.
+  /// Draw the mods view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -287,8 +353,7 @@ impl ModsUi {
     }
   }
 
-  /// Computes the host coordinates of every element of the mods page from the
-  /// [`LayoutService`].
+  /// Resolve the mods view's terminal-cell layout from its available dimensions.
   pub fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> ModsLayout {
     let params = self.build_key_params();
     let viewport = layout.developer_viewport_rect();

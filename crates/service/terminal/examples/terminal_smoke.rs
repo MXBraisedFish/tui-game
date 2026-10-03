@@ -1,4 +1,4 @@
-//! Minimal entry: applies a capability profile without entering raw mode.
+//! Independent terminal smoke entry exercising the public API and checking its results.
 
 use tg_service_terminal::TerminalService;
 

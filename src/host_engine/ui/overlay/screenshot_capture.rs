@@ -1,3 +1,5 @@
+//! Screenshot capture overlay state, owned interactions, and clipped terminal presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::text_layout::TextWrapMode;
@@ -11,12 +13,18 @@ use crate::host_engine::services::{
 const DOUBLE_SCREENSHOT_ACTION_WINDOW: Duration = Duration::from_millis(300);
 const DOUBLE_MOUSE_CLICK_WINDOW: Duration = Duration::from_millis(300);
 
+/// An application request produced by screenshot capture interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScreenshotCaptureCommand {
+  /// The exit setting for screenshot capture command.
   Exit,
+  /// A request to copy.
   Copy,
+  /// A request to copy rich text.
   CopyRichText,
+  /// A request to save png.
   SavePng,
+  /// The all setting for screenshot capture command.
   All,
 }
 
@@ -28,6 +36,7 @@ struct MenuState {
   height: u16,
 }
 
+/// The state and owned widgets of the screenshot capture view.
 pub struct ScreenshotCaptureUi {
   frame: Option<ComposedFrame>,
   selection: Option<ScreenshotRect>,
@@ -45,6 +54,7 @@ pub struct ScreenshotCaptureUi {
 }
 
 impl ScreenshotCaptureUi {
+  /// Create the screenshot capture view and allocate its owned UI objects.
   pub fn init() -> Self {
     Self {
       frame: None,
@@ -63,10 +73,12 @@ impl ScreenshotCaptureUi {
     }
   }
 
+  /// Update the host key params used by this screenshot capture ui.
   pub fn set_host_key_params(&mut self, params: RichTextParams) {
     self.host_key_params = params;
   }
 
+  /// Return the shortcuts currently enabled by the screenshot capture view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       entry("screenshot.copy", "Copy screenshot", "c"),
@@ -80,6 +92,13 @@ impl ScreenshotCaptureUi {
     ]
   }
 
+  /// Start the screenshot capture ui state addressed by this operation.
+  ///
+  /// # Arguments
+  ///
+  /// * `frame` - The composed terminal-cell frame.
+  /// * `show_guide` - The show guide.
+  /// * `auto_exit` - The auto exit.
   pub fn start(&mut self, frame: ComposedFrame, show_guide: bool, auto_exit: bool) {
     self.frame = Some(frame);
     self.selection = None;
@@ -95,6 +114,7 @@ impl ScreenshotCaptureUi {
     self.auto_exit = auto_exit;
   }
 
+  /// Finish the screenshot capture ui state addressed by this operation.
   pub fn finish(&mut self) {
     self.frame = None;
     self.selection = None;
@@ -106,26 +126,32 @@ impl ScreenshotCaptureUi {
     self.user_touched = false;
   }
 
+  /// Report whether completing a capture operation should close screenshot mode automatically.
   pub fn auto_exit(&self) -> bool {
     self.auto_exit
   }
 
+  /// Advance the screenshot capture view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) {
     self.opened_elapsed = self.opened_elapsed.saturating_add(dt);
   }
 
+  /// Report whether the untouched selection is still inside the repeated-shortcut action window.
   pub fn can_run_double_action(&self) -> bool {
     !self.user_touched && self.opened_elapsed <= DOUBLE_SCREENSHOT_ACTION_WINDOW
   }
 
+  /// Report whether this screenshot capture ui is guide visible.
   pub fn is_guide_visible(&self) -> bool {
     self.guide_visible
   }
 
+  /// Report whether the visible guide has passed the one-second dismissal delay.
   pub fn can_dismiss_guide_by_screenshot_action(&self) -> bool {
     self.guide_visible && self.opened_elapsed >= Duration::from_millis(1000)
   }
 
+  /// Close and persist dismissal of the screenshot guide when it is visible.
   pub fn dismiss_guide(&mut self, storage: &StorageService, log: &mut LogService) {
     if self.guide_visible {
       self.close_guide(storage, log);
@@ -133,18 +159,31 @@ impl ScreenshotCaptureUi {
     }
   }
 
+  /// Return and clear the pending request to dismiss the capture-mode notification.
   pub fn take_mode_toast_dismiss_requested(&mut self) -> bool {
     let requested = self.mode_toast_dismiss_requested;
     self.mode_toast_dismiss_requested = false;
     requested
   }
 
+  /// Return and clear the pending request to dismiss the capture-operation notification.
   pub fn take_operation_toast_dismiss_requested(&mut self) -> bool {
     let requested = self.operation_toast_dismiss_requested;
     self.operation_toast_dismiss_requested = false;
     requested
   }
 
+  /// Consume screenshot-mode events, updating selection or returning the requested capture
+  /// command.
+  ///
+  /// # Arguments
+  ///
+  /// * `input` - The input value to validate or transform.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `storage` - The deployment-relative storage service.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `actions` - The actions.
   pub fn handle_input(
     &mut self,
     input: &mut InputService,
@@ -243,12 +282,14 @@ impl ScreenshotCaptureUi {
     None
   }
 
+  /// Return the current current selection.
   pub fn current_selection(&self) -> Option<(ComposedFrame, ScreenshotRect)> {
     let frame = self.frame.clone()?;
     let rect = ScreenshotService::normalize_selection(&frame, self.selection?)?;
     Some((frame, rect))
   }
 
+  /// Clear the selection retained by this screenshot capture ui.
   pub fn clear_selection(&mut self) {
     self.selection = None;
     self.drag_anchor = None;
@@ -256,6 +297,14 @@ impl ScreenshotCaptureUi {
     self.menu = None;
   }
 
+  /// Draw the screenshot capture view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
   pub fn render(
     &self,
     render: &mut RenderService,
@@ -313,6 +362,7 @@ impl ScreenshotCaptureUi {
     self.menu = None;
   }
 
+  /// Select all terminal cells in the captured frame.
   pub fn select_whole_frame(&mut self) {
     self.select_all();
   }
@@ -492,6 +542,7 @@ fn entry(action: &str, description: &str, key: &str) -> ActionMapEntry {
     action: action.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }
 

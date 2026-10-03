@@ -78,7 +78,7 @@ screensaver_package/
 ├─ display.json
 ├─ screensaver.json
 ├─ scripts/main.lua
-└─ assets/language/<code>/package.json
+└─ assets/language/<code>/package/<配置文件名>.json
 ```
 
 ---
@@ -93,7 +93,7 @@ screensaver_package/
 ├─ display.json
 ├─ screensaver.json
 ├─ scripts/main.lua
-└─ assets/language/<code>/package.json
+└─ assets/language/<code>/package/<配置文件名>.json
 ```
 
 # 屏保包脚本规范

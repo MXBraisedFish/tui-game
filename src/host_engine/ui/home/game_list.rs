@@ -1,4 +1,6 @@
-use std::{cmp::Ordering, time::Duration};
+//! Game list page state, user commands, and terminal-cell presentation.
+
+use std::{cmp::Ordering, collections::HashMap, path::PathBuf, time::Duration};
 
 use unicode_width::UnicodeWidthStr;
 
@@ -14,58 +16,145 @@ use crate::host_engine::services::{
   UiEvent, UiObjectPool, UiObjectPoolOwner,
 };
 
-/// 游戏列表页面的命令。
+/// An application request produced by game list interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GameListCommand {
+  /// A request to back.
   Back,
+  /// A request to focus search.
   FocusSearch,
+  /// A request to blur search.
   BlurSearch,
+  /// A request to focus jump.
   FocusJump,
+  /// A request to blur jump.
   BlurJump,
+  /// The scroll info up setting for game list command.
   ScrollInfoUp,
+  /// The scroll info down setting for game list command.
   ScrollInfoDown,
+  /// The submit jump setting for game list command.
   SubmitJump(String),
-  Confirm { package_id: PackageId },
+  /// A request to confirm.
+  Confirm {
+    /// The stable source, type, and name of the package.
+    package_id: PackageId,
+  },
 }
 
-/// 游戏列表页面布局信息。
+/// Resolved geometry and positions used to display game list.
+///
+/// # Fields
+///
+/// * `left_rect` - The left rect.
+/// * `left_inner` - The left inner.
+/// * `right_rect` - The right rect.
+/// * `right_inner` - The right inner.
+/// * `search_rect` - The search rect.
+/// * `sort_bar_y` - The sort bar y.
+/// * `order_rect` - The order rect.
+/// * `sort_rect` - The sort rect.
+/// * `list_area_y` - The list area y.
+/// * `list_area_height` - The list area height in terminal rows.
+/// * `list_start_y` - The list start y.
+/// * `list_item_height` - The list item height in terminal rows.
+/// * `list_item_gap` - The list item gap.
+/// * `visible_items` - The visible items.
+/// * `page_y` - The page y.
+/// * `flip_forward_rect` - The flip forward rect.
+/// * `flip_backward_rect` - The flip backward rect.
+/// * `jump_rect` - The jump rect.
+/// * `page_separator_x` - The page separator x.
+/// * `total_page_x` - The total page x.
+/// * `hint_x` - The hint x.
+/// * `hint_y` - The hint y.
 pub(crate) struct GameListLayout {
+  /// The left rect.
   pub left_rect: Rect,
+  /// The left inner.
   pub left_inner: Rect,
+  /// The right rect.
   pub right_rect: Rect,
+  /// The right inner.
   pub right_inner: Rect,
+  /// The search rect.
   pub search_rect: Rect,
+  /// The sort bar y.
   pub sort_bar_y: u16,
+  /// The order rect.
   pub order_rect: Rect,
+  /// The sort rect.
   pub sort_rect: Rect,
+  /// The list area y.
   pub list_area_y: u16,
+  /// The list area height in terminal rows.
   pub list_area_height: u16,
+  /// The list start y.
   pub list_start_y: u16,
+  /// The list item height in terminal rows.
   pub list_item_height: u16,
+  /// The list item gap.
   pub list_item_gap: u16,
+  /// The visible items.
   pub visible_items: usize,
+  /// The page y.
   pub page_y: u16,
+  /// The flip forward rect.
   pub flip_forward_rect: Rect,
+  /// The flip backward rect.
   pub flip_backward_rect: Rect,
+  /// The jump rect.
   pub jump_rect: Rect,
+  /// The page separator x.
   pub page_separator_x: u16,
+  /// The total page x.
   pub total_page_x: u16,
+  /// The hint x.
   pub hint_x: u16,
+  /// The hint y.
   pub hint_y: u16,
 }
 
+/// The services and view state needed to draw game list.
+///
+/// # Fields
+///
+/// * `render` - The &'a mut render service instance used by this owner.
+/// * `canvas` - The &'a mut canvas service instance used by this owner.
+/// * `layout` - The &'a layout service instance used by this owner.
+/// * `i18n` - The &'a i18n service instance used by this owner.
+/// * `hit_area` - The &'a hit area service instance used by this owner.
+/// * `text_input` - The &'a text input service instance used by this owner.
+/// * `scroll_box` - The &'a scroll box service instance used by this owner.
+/// * `package` - The &'a package service instance used by this owner.
+/// * `storage` - The &'a storage service instance used by this owner.
+/// * `log` - The &'a mut log service instance used by this owner.
+/// * `mouse_supported` - The mouse supported.
+/// * `truecolor_supported` - The truecolor supported.
 pub(crate) struct GameListRenderContext<'a> {
+  /// The &'a mut render service instance used by this owner.
   pub(crate) render: &'a mut RenderService,
+  /// The &'a mut canvas service instance used by this owner.
   pub(crate) canvas: &'a mut CanvasService,
+  /// The &'a layout service instance used by this owner.
   pub(crate) layout: &'a LayoutService,
+  /// The &'a i18n service instance used by this owner.
   pub(crate) i18n: &'a I18nService,
+  /// The &'a hit area service instance used by this owner.
   pub(crate) hit_area: &'a HitAreaService,
+  /// The &'a text input service instance used by this owner.
   pub(crate) text_input: &'a TextInputService,
+  /// The &'a scroll box service instance used by this owner.
   pub(crate) scroll_box: &'a ScrollBoxService,
+  /// The &'a package service instance used by this owner.
   pub(crate) package: &'a PackageService,
+  /// The &'a storage service instance used by this owner.
   pub(crate) storage: &'a StorageService,
+  /// The &'a mut log service instance used by this owner.
   pub(crate) log: &'a mut LogService,
+  /// The mouse supported.
   pub(crate) mouse_supported: bool,
+  /// The truecolor supported.
   pub(crate) truecolor_supported: bool,
 }
 
@@ -94,11 +183,16 @@ impl GameListSortField {
   }
 }
 
-/// 游戏列表 UI：左右 33/67 分栏布局。
-///
-/// 左侧：搜索框 + 列表（翻页） + 翻页指示器，包裹在双线边框内。
-/// 右侧：滚动信息盒，包裹在双线边框内。
-/// 底部：操作提示栏。
+// Keep localized scores until their save or package-resource revision changes.
+struct BestScoreDisplay {
+  data: serde_json::Value,
+  path: PathBuf,
+  revision: u64,
+  text: String,
+  values: HashMap<String, String>,
+}
+
+/// The state and owned widgets of the game list view.
 pub struct GameListUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -117,6 +211,7 @@ pub struct GameListUi {
   ascending: bool,
   sort_field: GameListSortField,
   entries: Vec<PackageListEntry>,
+  best_display_cache: HashMap<PackageId, BestScoreDisplay>,
   search_text: String,
   jump_text: String,
   simple_list: bool,
@@ -146,7 +241,17 @@ impl RuntimeObjectPoolOwner for GameListUi {
 }
 
 impl GameListUi {
-  /// 初始化游戏列表 UI。
+  /// Create the game list view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `failed to create game info scroll box`.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -215,6 +320,7 @@ impl GameListUi {
       ascending: true,
       sort_field: GameListSortField::Title,
       entries: Vec::new(),
+      best_display_cache: HashMap::new(),
       search_text: String::new(),
       jump_text: "1".to_string(),
       simple_list: false,
@@ -224,78 +330,91 @@ impl GameListUi {
     }
   }
 
-  /// 返回按键映射定义。
+  /// Return the shortcuts currently enabled by the game list view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "game_list.flip_forward".to_string(),
         description: "Previous list page".to_string(),
         keys: vec![vec!["q".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.flip_backward".to_string(),
         description: "Next list page".to_string(),
         keys: vec![vec!["e".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.scroll_up".to_string(),
         description: "Scroll info up".to_string(),
         keys: vec![vec!["w".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.scroll_down".to_string(),
         description: "Scroll info down".to_string(),
         keys: vec![vec!["s".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.focus_up".to_string(),
         description: "Focus previous item".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.focus_down".to_string(),
         description: "Focus next item".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.confirm".to_string(),
         description: "Toggle selection".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.list.back".to_string(),
         description: "Go back to mods menu".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.list".to_string(),
         description: "Toggle list style".to_string(),
         keys: vec![vec!["l".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.search".to_string(),
         description: "Search".to_string(),
         keys: vec![vec!["c".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.order".to_string(),
         description: "Toggle order".to_string(),
         keys: vec![vec!["z".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.sort".to_string(),
         description: "Toggle sort".to_string(),
         keys: vec![vec!["x".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "game_list.jump".to_string(),
         description: "Jump to page".to_string(),
         keys: vec![vec!["j".to_string()]],
+        priority: 0,
       },
     ]
   }
 
-  /// 处理 UI 事件，返回导航命令。
+  /// Interpret a game list UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<GameListCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -411,26 +530,31 @@ impl GameListUi {
     }
   }
 
+  /// Focus the list's search input and switch interaction to text editing.
   pub fn focus_search(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.focus(&mut self.objects, self.search_input);
   }
 
+  /// Release search-input focus and return interaction to list navigation.
   pub fn blur_search(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Focus the page-number input for a direct list jump.
   pub fn focus_jump(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.set_text(&mut self.objects, self.jump_input, self.page.to_string());
     self.jump_text = self.page.to_string();
     let _ = text_input.focus(&mut self.objects, self.jump_input);
   }
 
+  /// Release page-number input focus.
   pub fn blur_jump(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.set_text(&mut self.objects, self.jump_input, self.page.to_string());
     self.jump_text = self.page.to_string();
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Validate the entered page number and move the list to that page.
   pub fn submit_jump(&mut self, text_input: &mut TextInputService, value: String) {
     if let Ok(page) = value.trim().parse::<usize>() {
       self.page = page.clamp(1, self.total_pages());
@@ -442,19 +566,32 @@ impl GameListUi {
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Scroll the selected entry's detail viewport by the requested row delta.
+  ///
+  /// # Arguments
+  ///
+  /// * `scroll_box` - The scroll box.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `lines` - The lines.
   pub fn scroll_info(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, lines: i32) {
     let _ = scroll_box.scroll_by(&mut self.objects, self.info_scroll, 0, lines, layout);
   }
 
+  /// Advance the game list view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<GameListCommand> {
     let _ = dt;
     None
   }
 
-  /// 渲染游戏列表页面。
+  /// Draw the game list view and register interaction regions in its assigned surfaces.
   pub fn render(&mut self, context: &mut GameListRenderContext<'_>) -> Option<(u16, u16)> {
     self.sync_display_settings(context.storage);
-    self.sync_entries(context.package.game_list(), context.storage, context.log);
+    self.sync_entries(
+      context.package.game_list(),
+      context.package,
+      context.storage,
+      context.log,
+    );
     let positions = self.compute_positions(context.layout, context.i18n, context.text_input);
 
     self.sync_selection_for_per_page(positions.visible_items);
@@ -563,8 +700,13 @@ impl GameListUi {
     input_cursor
   }
 
-  // ─── 布局计算 ──────────────────────────────────────────
-
+  /// Resolve the game list view's terminal-cell layout from its available dimensions.
+  ///
+  /// # Arguments
+  ///
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `text_input` - The text input.
   pub fn compute_positions(
     &self,
     layout: &LayoutService,
@@ -712,8 +854,6 @@ impl GameListUi {
       hint_y,
     }
   }
-
-  // ─── 绘制 ──────────────────────────────────────────────
 
   fn draw_left_panel(
     &mut self,
@@ -1053,7 +1193,8 @@ impl GameListUi {
 
     if entry.score_enabled {
       let score = self.info_score_text(context.i18n, &entry);
-      self.draw_info_wrapped(context, width, &mut y, score, Some(&params), None);
+      let score_params = Self::best_rich_params(&entry);
+      self.draw_info_wrapped(context, width, &mut y, score, Some(&score_params), None);
       self.draw_info_separator(context.canvas, width, &mut y);
     }
 
@@ -1156,10 +1297,14 @@ impl GameListUi {
     }
   }
 
-  // ─── 辅助方法 ──────────────────────────────────────────
-
   fn package_rich_params(entry: &PackageListEntry) -> RichTextParams {
     RichTextParams::from_key_action_maps(&entry.key_actions, &entry.key_default_actions)
+  }
+
+  fn best_rich_params(entry: &PackageListEntry) -> RichTextParams {
+    let mut params = Self::package_rich_params(entry);
+    params.values = entry.best_values.clone();
+    params
   }
 
   fn package_visible_text(entry: &PackageListEntry, text: &str) -> String {
@@ -1274,7 +1419,7 @@ impl GameListUi {
         width,
         self.info_score_text(i18n, &entry),
         TextWrapMode::Auto,
-        Some(&params),
+        Some(&Self::best_rich_params(&entry)),
       ) + 1;
     }
     height += 1;
@@ -1612,6 +1757,7 @@ impl GameListUi {
   fn sync_entries(
     &mut self,
     mut entries: Vec<PackageListEntry>,
+    package: &PackageService,
     storage: &StorageService,
     log: &mut LogService,
   ) {
@@ -1624,10 +1770,40 @@ impl GameListUi {
         entry.enabled = profile.defaults.enabled;
         entry.debug = profile.defaults.debug;
       }
-      entry.best_string = storage
-        .best_game_save(&entry.id)
-        .map(|best| best.best_string);
+      let Some(best) = storage.best_game_save(&entry.id) else {
+        self.best_display_cache.remove(&entry.id);
+        continue;
+      };
+      let revision = package.snapshot_revision();
+      let cache_valid = self
+        .best_display_cache
+        .get(&entry.id)
+        .is_some_and(|cached| {
+          cached.data == best.data && cached.path == entry.path && cached.revision == revision
+        });
+      if !cache_valid {
+        self.best_display_cache.remove(&entry.id);
+        if let Ok((text, values)) = package.resolve_best_save(&entry.path, &best.data) {
+          self.best_display_cache.insert(
+            entry.id.clone(),
+            BestScoreDisplay {
+              data: best.data,
+              path: entry.path.clone(),
+              revision,
+              text,
+              values,
+            },
+          );
+        }
+      }
+      if let Some(cached) = self.best_display_cache.get(&entry.id) {
+        entry.best_string = Some(cached.text.clone());
+        entry.best_values = cached.values.clone();
+      }
     }
+    self
+      .best_display_cache
+      .retain(|id, _| entries.iter().any(|entry| &entry.id == id));
     let selected = self.selected_entry_key();
     if self
       .entries
@@ -1740,5 +1916,116 @@ impl GameListUi {
       current_width += item_w;
     }
     lines
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::host_engine::services::BestGameSave;
+
+  #[test]
+  fn best_score_ui_resolves_values_and_invalidates_cached_language_resources() {
+    let nonce = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root = std::env::temp_dir().join(format!("tg-best-ui-{}-{nonce}", std::process::id()));
+    let dir = root.join("data/mod/game/score_ui");
+    for (relative, content) in [
+      (
+        "package.json",
+        r#"{"mod_id":"score_ui","schema_version":2,"type":"game","version":"1.0","version_code":1,"api":{"min":1,"max":1}}"#,
+      ),
+      (
+        "display.json",
+        r#"{"title":"Game","description":"Description","author":"Author"}"#,
+      ),
+      (
+        "game.json",
+        r#"{"name":"Game","detail":"f%Detail {value:score}","command":"score_ui","entry":"main","language":["zh_cn","en_us"],"best_score":{"enable":true}}"#,
+      ),
+      ("scripts/main.lua", "function Render() end"),
+      (
+        "assets/language/zh_cn/package/best_string.json",
+        r#"{"score":"f%最佳：{value:score} {value:rank}","rank":"金牌"}"#,
+      ),
+      (
+        "assets/language/en_us/package/best_string.json",
+        r#"{"score":"f%Best: {value:score} {value:rank}","rank":"Gold"}"#,
+      ),
+    ] {
+      let path = dir.join(relative);
+      std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+      std::fs::write(path, content).unwrap();
+    }
+    std::fs::create_dir_all(root.join("data/profiles")).unwrap();
+    let storage = StorageService::from_root_for_test(root.clone());
+    let mut log = LogService::new();
+    let mut package = PackageService::new();
+    package.scan_all(&root, &mut log, "zh_cn", "missing: {key}");
+    let id = package.game_list()[0].id.clone();
+    let mut data = serde_json::json!({
+      "best_string":{"type":"i18n","key":"score","callback":"f%Best: {value:score}"},
+      "value":{"score":"42","rank":{"type":"i18n","key":"rank","callback":"Gold"}},
+      "score":42
+    });
+    storage
+      .write_best_game_save(&id, BestGameSave::try_from(data.clone()).unwrap(), &mut log)
+      .unwrap();
+    let mut ui = GameListUi::init(
+      &HitAreaService::new(),
+      &TextInputService::new(),
+      &ScrollBoxService::new(),
+    );
+    let visible_score = |ui: &GameListUi| {
+      let entry = &ui.entries[0];
+      RichTextService::new().visible_text(
+        entry.best_string.as_ref().unwrap(),
+        Some(&GameListUi::best_rich_params(entry)),
+      )
+    };
+    ui.sync_entries(package.game_list(), &package, &storage, &mut log);
+    assert_eq!(visible_score(&ui), "最佳：42 金牌");
+    assert_eq!(
+      GameListUi::package_visible_text(&ui.entries[0], &ui.entries[0].game_detail),
+      "Detail {value:score}"
+    );
+
+    let zh_path = dir.join("assets/language/zh_cn/package/best_string.json");
+    std::fs::write(
+      &zh_path,
+      r#"{"score":"f%新纪录：{value:score}","rank":"金牌"}"#,
+    )
+    .unwrap();
+    ui.sync_entries(package.game_list(), &package, &storage, &mut log);
+    assert_eq!(visible_score(&ui), "最佳：42 金牌");
+    package.scan_all(&root, &mut log, "zh_cn", "missing: {key}");
+    ui.sync_entries(package.game_list(), &package, &storage, &mut log);
+    assert_eq!(visible_score(&ui), "新纪录：42");
+    package.scan_all(&root, &mut log, "en_us", "missing: {key}");
+    ui.sync_entries(package.game_list(), &package, &storage, &mut log);
+    assert_eq!(visible_score(&ui), "Best: 42 Gold");
+
+    data["value"]["score"] = serde_json::Value::String("{value:rank}<b>literal".into());
+    storage
+      .write_best_game_save(&id, BestGameSave::try_from(data).unwrap(), &mut log)
+      .unwrap();
+    ui.sync_entries(package.game_list(), &package, &storage, &mut log);
+    assert_eq!(visible_score(&ui), "Best: {value:rank}<b>literal Gold");
+    storage
+      .write_best_game_save(
+        &id,
+        BestGameSave::try_from(serde_json::json!({"best_string":"Legacy 42"})).unwrap(),
+        &mut log,
+      )
+      .unwrap();
+    ui.sync_entries(package.game_list(), &package, &storage, &mut log);
+    assert_eq!(visible_score(&ui), "Legacy 42");
+    assert!(ui.entries[0].best_values.is_empty());
+    assert_eq!(ui.best_display_cache.len(), 1);
+    ui.sync_entries(Vec::new(), &package, &storage, &mut log);
+    assert!(ui.best_display_cache.is_empty());
+    std::fs::remove_dir_all(root).unwrap();
   }
 }

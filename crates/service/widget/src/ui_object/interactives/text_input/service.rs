@@ -1,3 +1,5 @@
+//! Service support for the widget service.
+
 use std::ops::Range;
 use std::time::{Duration, Instant};
 
@@ -14,14 +16,24 @@ use tg_service_canvas::CanvasService;
 
 const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 
-/// 文本输入服务：管理输入焦点、光标、选区、键盘和鼠标路由及渲染。
+/// The public entry point for text input operations.
+///
+/// # Fields
+///
+/// * `active` - The active.
+/// * `drag` - The drag.
+/// * `cursor_blink_started` - The cursor blink started.
 pub struct TextInputService {
+  /// The active.
   pub(super) active: TextInputActive,
+  /// The drag.
   pub(super) drag: Option<DragSelection>,
+  /// The cursor blink started.
   pub(super) cursor_blink_started: Instant,
 }
 
 impl TextInputService {
+  /// Create a text input service with its initial state.
   pub fn new() -> Self {
     Self {
       active: TextInputActive::Inactive,
@@ -30,7 +42,7 @@ impl TextInputService {
     }
   }
 
-  /// 在对象池中创建一个新的文本输入组件。
+  /// Create an owned text input object and return its identity.
   pub fn create(&self, pool: &mut UiObjectPool, options: TextInputOptions) -> TextInputId {
     let objects = &mut pool.text_inputs;
     let id = TextInputId(objects.next_input_id);
@@ -49,7 +61,7 @@ impl TextInputService {
     id
   }
 
-  /// 移除文本输入组件（已聚焦时不允许移除）。
+  /// Remove the identified widget object and release its owned state.
   pub fn remove(&mut self, pool: &mut UiObjectPool, id: TextInputId) -> bool {
     if self.is_focused(pool, id) {
       return false;
@@ -63,7 +75,14 @@ impl TextInputService {
     removed
   }
 
-  /// 渲染文本输入组件到基础层，返回光标物理坐标。
+  /// Render the text input service into its requested terminal-cell surface.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `params` - The formatting or rendering parameters.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render(
     &self,
     pool: &mut UiObjectPool,
@@ -74,7 +93,15 @@ impl TextInputService {
     self.render_target(pool, id, params, canvas, TextSurface::Base)
   }
 
-  /// 渲染文本输入组件到指定切片，返回光标物理坐标。
+  /// Render the component into the identified clipped slice and update its interaction geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `slice` - The slice.
+  /// * `params` - The formatting or rendering parameters.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render_on(
     &self,
     pool: &mut UiObjectPool,
@@ -86,7 +113,14 @@ impl TextInputService {
     self.render_target(pool, id, params, canvas, TextSurface::Slice(slice))
   }
 
-  /// 渲染文本输入组件到宿主层。
+  /// Render the component into the physical host surface and update its interaction geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `params` - The formatting or rendering parameters.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render_host(
     &self,
     pool: &mut UiObjectPool,
@@ -165,7 +199,8 @@ impl TextInputService {
     })
   }
 
-  /// 聚焦指定文本输入组件，若之前有点击暂存则移动光标到该位置。
+  /// Focus the requested input and apply a previously queued pointer cursor position when
+  /// present.
   pub fn focus(&mut self, pool: &mut UiObjectPool, id: TextInputId) -> bool {
     if self.active != TextInputActive::Inactive || !self.exists(pool, id) {
       return false;
@@ -184,7 +219,7 @@ impl TextInputService {
     true
   }
 
-  /// 取消当前焦点。
+  /// Release the focused text input and clear its active interaction state.
   pub fn blur(&mut self, pool: &mut UiObjectPool) -> bool {
     let TextInputActive::Focused(active) = self.active else {
       return false;
@@ -200,10 +235,12 @@ impl TextInputService {
     true
   }
 
+  /// Report whether this text input service is active.
   pub fn is_active(&self) -> bool {
     self.active != TextInputActive::Inactive
   }
 
+  /// Report whether the addressed object is focused.
   pub fn is_focused(&self, pool: &UiObjectPool, id: TextInputId) -> bool {
     self.active
       == TextInputActive::Focused(ActiveTextInput {
@@ -212,10 +249,12 @@ impl TextInputService {
       })
   }
 
+  /// Report whether the identified widget object is still present.
   pub fn exists(&self, pool: &UiObjectPool, id: TextInputId) -> bool {
     pool.text_inputs.inputs.contains_key(&id)
   }
 
+  /// Return the current text of the identified input when the object is still live.
   pub fn get_text<'a>(&self, pool: &'a UiObjectPool, id: TextInputId) -> Option<&'a str> {
     pool
       .text_inputs
@@ -224,6 +263,7 @@ impl TextInputService {
       .map(|state| state.buffer.text())
   }
 
+  /// Return the cursor for the addressed object when it is available.
   pub fn cursor(&self, pool: &UiObjectPool, id: TextInputId) -> Option<usize> {
     pool
       .text_inputs
@@ -232,6 +272,7 @@ impl TextInputService {
       .map(|state| state.buffer.cursor())
   }
 
+  /// Return the selection for the addressed object when it is available.
   pub fn selection(&self, pool: &UiObjectPool, id: TextInputId) -> Option<Range<usize>> {
     pool
       .text_inputs
@@ -240,7 +281,13 @@ impl TextInputService {
       .and_then(|state| state.buffer.selection())
   }
 
-  /// 设置输入框文本内容，触发 Changed 事件。
+  /// Update the text used by this text input service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `text` - The text to process or display.
   pub fn set_text(
     &self,
     pool: &mut UiObjectPool,
@@ -259,11 +306,19 @@ impl TextInputService {
     true
   }
 
+  /// Replace the identified input text with an empty string and queue its change event when
+  /// needed.
   pub fn clear(&self, pool: &mut UiObjectPool, id: TextInputId) -> bool {
     self.set_text(pool, id, String::new())
   }
 
-  /// 查找鼠标坐标下可命中的输入组件，返回（层级, 渲染顺序）用于排序。
+  /// Return the layer and drawing order of the top input hit at the supplied pointer position.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
   pub(crate) fn mouse_hit_order(
     &self,
     pool: &UiObjectPool,
@@ -284,7 +339,7 @@ impl TextInputService {
       .max()
   }
 
-  /// 向当前聚焦的输入组件发送"外部按下"事件。
+  /// Queue an outside-press event for the currently focused input.
   pub(crate) fn push_pressed_outside(&self, pool: &mut UiObjectPool) {
     let TextInputActive::Focused(active) = self.active else {
       return;
@@ -302,7 +357,7 @@ impl TextInputService {
     }
   }
 
-  /// 反激活指定对象池的命中区域和拖拽选区。
+  /// Clear hit regions and drag state for a UI pool that is no longer interactive.
   pub fn deactivate_pool(&mut self, pool: &mut UiObjectPool) {
     pool.text_inputs.clear_hits();
     if self

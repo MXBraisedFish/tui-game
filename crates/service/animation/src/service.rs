@@ -1,3 +1,5 @@
+//! Service support for the animation service.
+
 use std::time::Duration;
 
 use super::AnimationObjects;
@@ -12,10 +14,18 @@ use super::{
   AnimationWrite, AnimationWriteOperation, EffectParameterId, PlaybackDirection, PlaybackState,
 };
 
+/// The contract for writing sampled properties to application-owned targets.
 pub trait AnimationTargetRouter {
+  /// Apply a sampled animation property write to its resolved target.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the target is unavailable or cannot accept the requested
+  /// property write.
   fn apply(&mut self, write: &AnimationWrite) -> Result<(), AnimationError>;
 }
 
+/// The public entry point for animation operations.
 pub struct AnimationService;
 
 impl Default for AnimationService {
@@ -25,10 +35,29 @@ impl Default for AnimationService {
 }
 
 impl AnimationService {
+  /// Create an animation service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Validate and allocate an owned animation playback, starting it when auto-play is enabled.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `owner` - The owner whose resources are being addressed.
+  /// * `source` - The source value or package origin.
+  /// * `bindings` - The bindings.
+  /// * `options` - The validated options for the operation.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error for invalid tracks or targets, incompatible property values, or
+  /// invalid playback settings.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `new playback must exist`.
   pub fn play(
     &self,
     pool: &mut AnimationObjects,
@@ -53,6 +82,13 @@ impl AnimationService {
     Ok(AnimationHandle::new(id))
   }
 
+  /// Advance animation state using the supplied frame timing.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `clock` - The clock.
+  /// * `dt` - The elapsed duration applied to this update.
   pub fn update(
     &self,
     pool: &mut AnimationObjects,
@@ -90,6 +126,18 @@ impl AnimationService {
     output
   }
 
+  /// Advance animations and apply their sampled property values to the supplied target writer.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `clock` - The clock.
+  /// * `dt` - The elapsed duration applied to this update.
+  /// * `router` - The router.
+  ///
+  /// # Errors
+  ///
+  /// Propagate a target-write error when a sampled animation property cannot be applied.
   pub fn update_and_apply(
     &self,
     pool: &mut AnimationObjects,
@@ -121,6 +169,12 @@ impl AnimationService {
     Ok(output)
   }
 
+  /// Start the animation state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the identifier is stale or the requested state transition is
+  /// invalid.
   pub fn start(
     &self,
     pool: &mut AnimationObjects,
@@ -143,6 +197,12 @@ impl AnimationService {
     Ok(())
   }
 
+  /// Pause the animation state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the identifier is stale or the requested state transition is
+  /// invalid.
   pub fn pause(
     &self,
     pool: &mut AnimationObjects,
@@ -162,6 +222,12 @@ impl AnimationService {
     Ok(())
   }
 
+  /// Resume the animation state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the identifier is stale or the requested state transition is
+  /// invalid.
   pub fn resume(
     &self,
     pool: &mut AnimationObjects,
@@ -181,6 +247,12 @@ impl AnimationService {
     Ok(())
   }
 
+  /// Cancel the animation state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the identifier is stale or the requested state transition is
+  /// invalid.
   pub fn cancel(
     &self,
     pool: &mut AnimationObjects,
@@ -212,6 +284,12 @@ impl AnimationService {
     Ok(output)
   }
 
+  /// Finish the animation state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the identifier is stale or the requested state transition is
+  /// invalid.
   pub fn finish(
     &self,
     pool: &mut AnimationObjects,
@@ -235,6 +313,12 @@ impl AnimationService {
     Ok(output)
   }
 
+  /// Reset the animation state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the identifier is stale or the requested state transition is
+  /// invalid.
   pub fn reset(
     &self,
     pool: &mut AnimationObjects,
@@ -270,6 +354,12 @@ impl AnimationService {
     Ok(output)
   }
 
+  /// Remove the identified animation object and release its owned state.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the identifier is stale or the requested state transition is
+  /// invalid.
   pub fn remove(
     &self,
     pool: &mut AnimationObjects,
@@ -283,6 +373,7 @@ impl AnimationService {
     Ok(output)
   }
 
+  /// Remove animation resources associated with the specified owner.
   pub fn clear_owner(&self, pool: &mut AnimationObjects, owner: AnimationOwner) -> AnimationUpdate {
     let mut output = AnimationUpdate::default();
     for id in pool.animations.ids_owned_by(owner) {
@@ -294,14 +385,17 @@ impl AnimationService {
     output
   }
 
+  /// Return the state for the addressed object when it is available.
   pub fn state(&self, pool: &AnimationObjects, handle: AnimationHandle) -> Option<PlaybackState> {
     Some(pool.animations.get(handle.id())?.state)
   }
 
+  /// Return the elapsed for the addressed object when it is available.
   pub fn elapsed(&self, pool: &AnimationObjects, handle: AnimationHandle) -> Option<Duration> {
     Some(pool.animations.get(handle.id())?.elapsed)
   }
 
+  /// Return the progress for the addressed object when it is available.
   pub fn progress(&self, pool: &AnimationObjects, handle: AnimationHandle) -> Option<f64> {
     let playback = pool.animations.get(handle.id())?;
     Some(
@@ -309,10 +403,18 @@ impl AnimationService {
     )
   }
 
+  /// Return the completed cycles for the addressed object when it is available.
   pub fn completed_cycles(&self, pool: &AnimationObjects, handle: AnimationHandle) -> Option<u32> {
     Some(pool.animations.get(handle.id())?.completed_cycles)
   }
 
+  /// Update the speed used by this animation service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `handle` - The handle.
+  /// * `speed` - The playback or animation speed multiplier.
   pub fn set_speed(
     &self,
     pool: &mut AnimationObjects,
@@ -329,6 +431,7 @@ impl AnimationService {
     true
   }
 
+  /// Drain and return the queued events.
   pub fn take_events(
     &self,
     pool: &mut AnimationObjects,
@@ -347,6 +450,7 @@ impl AnimationService {
     events
   }
 
+  /// Drain callback requests queued during the most recent animation updates.
   pub fn take_callback_requests(
     &self,
     pool: &mut AnimationObjects,
@@ -354,6 +458,7 @@ impl AnimationService {
     pool.animations.callback_requests.drain(..).collect()
   }
 
+  /// Allocate an independently owned animation value in the supplied object pool.
   pub fn create_value(
     &self,
     pool: &mut AnimationObjects,
@@ -362,6 +467,7 @@ impl AnimationService {
     pool.animation_values.insert(value)
   }
 
+  /// Remove an animation value and the playbacks targeting it.
   pub fn remove_value(&self, pool: &mut AnimationObjects, id: AnimationValueId) -> bool {
     let removed = pool.animation_values.remove(id).is_some();
     if removed {
@@ -370,6 +476,7 @@ impl AnimationService {
     removed
   }
 
+  /// Return the value for the addressed object when it is available.
   pub fn value<'a>(
     &self,
     pool: &'a AnimationObjects,
@@ -378,6 +485,18 @@ impl AnimationService {
     Some(pool.animation_values.get(id)?.resolved())
   }
 
+  /// Update the value used by this animation service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `value` - The value to store or convert.
+  ///
+  /// # Errors
+  ///
+  /// Return an animation error when the value identifier is stale or the new value has an
+  /// incompatible kind.
   pub fn set_value(
     &self,
     pool: &mut AnimationObjects,

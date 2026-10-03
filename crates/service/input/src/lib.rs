@@ -1,8 +1,34 @@
-//! Input service: terminal and global key listeners, key state tracking and action-map translation.
+//! Keyboard and terminal event collection, frame state, and ordered action dispatch.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_input::{Key, KeyEvent, KeyEventKind};
+//! use tg_service_input::InputService;
+//! use tg_service_log::LogService;
+//!
+//! fn main() {
+//!   let mut input = InputService::new();
+//!   let mut log = LogService::new();
+//!
+//!   input.queue_key_event(
+//!     KeyEvent {
+//!       key: Key::A,
+//!       kind: KeyEventKind::Press,
+//!     },
+//!     &mut log,
+//!   );
+//!   input.poll();
+//!
+//!   assert!(input.is_down(Key::A));
+//!   assert!(input.was_pressed(Key::A));
+//!   println!("input ok: key A pressed");
+//! }
+//! ```
 
 mod service;
 
-pub use service::{InputListenerError, InputService};
+pub use service::{InputListenerError, InputNotification, InputService};
 pub use tg_core_input::{ActionMapEntry, translate_action_map};
 pub use tg_core_input::{
   InputActionEvent, InputEventType, Key, KeyEvent, KeyEventKind, KeyState, RawKeyEvent,

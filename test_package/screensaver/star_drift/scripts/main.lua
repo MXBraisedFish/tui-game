@@ -1,6 +1,4 @@
--- Star Drift: three parallax layers of stars drift from right to left.
--- Exercises seeded random generators (create/set_range/generate/get_info),
--- string helpers and fractional movement between fixed updates.
+-- Star drift package callbacks and terminal-cell drawing.
 
 local SEED = 20260924
 local MAX_STARS = 90
@@ -16,11 +14,12 @@ local stars = {}
 local column_rng = nil
 local row_rng = nil
 
--- Keeps the star count small so Init and resize stay far below the callback budgets.
+-- Return the star count selected for the current screen size.
 local function total_stars()
   return math.min({ MAX_STARS, width * height // 40 })
 end
 
+-- Create the star positions and speeds for the current screen dimensions.
 local function scatter()
   stars = {}
   random.set_range(column_rng, 0, width - 1)
@@ -38,15 +37,17 @@ local function scatter()
   end
 end
 
+-- Initialize package state from the supplied base dimensions and startup data.
 function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
-  -- Columns are floats because stars move by fractional steps; rows stay on whole lines.
+
   column_rng = random.create({ type = random.FLOAT, seed = SEED })
   row_rng = random.create({ type = random.INT, seed = SEED + 1 })
   scatter()
 end
 
+-- Apply the resize, action, or completion events handled by this package.
 function HandleEvent(event)
   if event.type == "resize" then
     width = event.data.width
@@ -55,6 +56,7 @@ function HandleEvent(event)
   end
 end
 
+-- Advance package simulation using the fixed-update delta in seconds.
 function Update(dt)
   for index = 1, #stars do
     local star = stars[index]
@@ -66,9 +68,11 @@ function Update(dt)
   end
 end
 
+-- Keep this optional callback empty; this package needs no work in this phase.
 function UpdateFrame(dt, alpha)
 end
 
+-- Draw the current package state in terminal-cell coordinates.
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
   for index = 1, #stars do

@@ -1,3 +1,5 @@
+//! Destination and header validation before network requests reach the executor.
+
 use std::{
   io,
   net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs},
@@ -7,18 +9,35 @@ use reqwest::Url;
 
 use super::{NetworkError, NetworkErrorCode};
 
+/// The destination-address restrictions applied before connecting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum AddressPolicy {
+  /// The public only setting for address policy.
   PublicOnly,
+  /// The allow loopback for tests setting for address policy.
   #[cfg(test)]
   AllowLoopbackForTests,
 }
 
+/// A validated HTTP destination and its permitted resolved addresses.
+///
+/// # Fields
+///
+/// * `host` - The host state machine or host-owned state.
+/// * `addresses` - The ordered addresses retained by this owner.
 pub(super) struct ResolvedDestination {
+  /// The host state machine or host-owned state.
   pub host: String,
+  /// The ordered addresses retained by this owner.
   pub addresses: Vec<SocketAddr>,
 }
 
+/// Validate a request URL and resolve only destinations permitted by the network policy.
+///
+/// # Errors
+///
+/// Return a network error for unsupported URL forms, failed name resolution, or addresses
+/// rejected by the destination policy.
 pub(super) fn resolve_destination(
   url: &Url,
   policy: AddressPolicy,
@@ -104,6 +123,7 @@ fn ipv6_is_public(address: Ipv6Addr) -> bool {
     || segments[0] == 0x2002)
 }
 
+/// Report whether a request header is controlled by the client or prohibited by policy.
 pub(super) fn is_forbidden_request_header(name: &str) -> bool {
   matches!(
     name,
@@ -121,6 +141,7 @@ pub(super) fn is_forbidden_request_header(name: &str) -> bool {
     || name.starts_with("x-forwarded-")
 }
 
+/// Report whether a response header may be exposed to scripts.
 pub(super) fn is_safe_response_header(name: &str) -> bool {
   matches!(
     name,
@@ -141,6 +162,7 @@ pub(super) fn is_safe_response_header(name: &str) -> bool {
   )
 }
 
+/// Return a diagnostic URL with sensitive request components removed.
 pub(super) fn redacted_url(url: &Url) -> String {
   let mut redacted = url.clone();
   redacted.set_query(None);

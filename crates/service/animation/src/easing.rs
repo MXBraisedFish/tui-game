@@ -1,5 +1,8 @@
+//! Normalized timing curves used to interpolate animation tracks.
+
 use super::AnimationEasing;
 
+/// Evaluate the easing curve at the supplied normalized progress.
 pub(crate) fn sample(easing: AnimationEasing, t: f64) -> f64 {
   let t = t.clamp(0.0, 1.0);
   match easing {

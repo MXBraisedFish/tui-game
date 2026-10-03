@@ -1,4 +1,4 @@
-//! Minimal entry: parses a tagged string into styled segments.
+//! Independent rich text smoke entry exercising the public API and checking its results.
 
 use tg_service_rich_text::{RichTextService, TextMode};
 

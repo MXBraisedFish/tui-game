@@ -6,7 +6,7 @@
 
 这些事件遵循统一的结构，即事件协议。本文档详细说明各类事件的结构、发送条件和使用示例。
 
-本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；独立 callback、timer、animation、audio、network 和 widget 事件不能仅凭本页结构示例视为已经实现。
+本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；timer 已开放，支持指定 callback；animation、audio、network 和 widget 事件不能仅凭本页结构示例视为已经实现。
 
 ---
 
@@ -127,7 +127,7 @@ local error_codes = {
 
 ### 发送条件
 
-玩家按下、持续按住或松开按键，且输入命中游戏包的动作映射时，发送给游戏会话。宿主先处理全局按键，剩余输入才转换为动作事件；覆盖屏接管交互期间不发送。
+玩家按下、持续按住或松开按键，且输入命中游戏包的动作映射时，发送给游戏会话。宿主先执行全局快捷键行为，全部命中动作按优先级派发；默认接收，可用 ime.reject_action_event 关闭。覆盖屏期间不发送普通动作，但已交付活动输入的收尾 released 仍会交付。
 
 ### 示例
 
@@ -184,11 +184,13 @@ end
 
 ```lua
 "pressed"  -- 当前帧按下按键
-"held"     -- 当前帧持续按住按键
+"held"     -- pressed 后下一宿主帧仍有效时发送一次，不逐帧重复
 "released" -- 当前帧松开按键
 ```
 
-- 覆盖屏出现后，尚未投递的交互事件会被清理，避免宿主输入继续传递给游戏。
+- 优先级规则：宿主层优先，各层 priority 降序，同值按实际命中组合键优先，再按注册顺序。游戏以 actions.json 声明顺序注册，所有命中动作均发送。备选绑定按任意一个有效合并，最后一个结束才释放。
+- 同帧快速点按保留 pressed/released；自动重复按下被过滤。失焦、首个覆盖屏接管、拒收或映射更新会作废未交付普通输入，已交付活动输入补发一次 released。恢复等待旧键松开后的新按下。
+- 持续移动请在 HandleEvent 中保存按住状态，在 Update 中处理，不依赖 held 逐帧发送。
 
 ---
 
@@ -215,7 +217,7 @@ end
 
 ### 发送条件
 
-玩家按下、持续按住或松开按键后发送。
+游戏调用 ime.receive_key_event() 后接收规范化原始键状态变化，默认关闭；屏保不接收。每次键变化先发送 key，再发送对应有序 action。
 
 ### 示例
 
@@ -272,9 +274,11 @@ end
 
 ```lua
 "pressed"  -- 当前帧按下按键
-"held"     -- 当前帧持续按住按键
+"held"     -- pressed 后下一宿主帧仍有效时发送一次，不逐帧重复
 "released" -- 当前帧松开按键
 ```
+
+- key 保留左右修饰键、数字小键盘和未知键表示，不表示输入法文字。可以观察宿主快捷键但不能阻止宿主，仍受焦点和覆盖屏归属限制；对应 reject 和失焦会为已交付活动键收尾一次。
 
 ---
 
@@ -482,7 +486,7 @@ end
 ### 额外补充
 
 - 字段 `gained` 为 `true` 时表示获得焦点，为 `false` 时表示失去焦点。
-- 失去焦点不会额外生成所有动作的 `released` 事件。游戏应在 `gained == false` 时清理自行保存的输入状态。
+- 失去焦点时，实际已交付且尚未释放的 action 和 key 会先补发一次 released，再发送 focus(false)；未交付 pressed 不产生孤立 released。
 - 焦点事件不会合并。
 
 ---
@@ -595,7 +599,7 @@ end
 
 ## `timer`
 
-计时器触发或结束事件。
+计时器到时后的通知。
 
 ### 结构
 
@@ -603,28 +607,35 @@ end
 {
   type = "timer",
   data = {
-    id = ...,              -- integer
-    timer_kind = ...,      -- string
+    id = ...,              -- string
+    timer_kind = "timer",  -- string
     kind = ...,            -- string
-    executed_count = ...,  -- integer / nil
+    executed_count = ...,  -- integer
+    tip = ...,             -- string / nil
   },
 }
 ```
 
-| 字段             | 类型          | 说明                                         |
-| ---------------- | ------------- | -------------------------------------------- |
-| `id`             | integer       | 当前会话内的计时器 ID                        |
-| `timer_kind`     | string        | 计时器类型                                   |
-| `kind`           | string        | 计时器事件类型                               |
-| `executed_count` | integer / nil | 重复计时器事件中出现，表示已经完成的触发次数 |
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 与 timer.create 返回的 ID 相同 |
+| `timer_kind` | string | 当前为 timer |
+| `kind` | string | 非末次触发为 tick，末次为 finished |
+| `executed_count` | integer | 已触发的次数，从 1 开始 |
+| `tip` | string / nil | 创建或修改时填写的自定义文字 |
 
 ### 发送条件
 
-计时器触发、计时结束或休眠请求完成时，发送给创建该计时器或请求的游戏、屏保会话。
+计时到期时，发送给创建计时器的游戏或屏保脚本。
 
 ### 示例
 
 ```lua
+function Init(ctx)
+  local id = timer.create(1, {tip = "到时间了"})
+  timer.start(id)
+end
+
 function HandleEvent(event)
   if event.type == "timer" then
     debug.print(table.pretty(event))
@@ -634,45 +645,17 @@ end
 
 输出：
 
-> X 为占位符
-
 ```lua
-{
-  type = "timer",
-  frame = X,
-  sequence = X,
-  data =
-  {
-    id = 1,
-    timer_kind = "repeat",
-    kind = "tick",
-    executed_count = 3,
-  },
-}
 ```
 
 ### 额外补充
 
-- 字段 `timer_kind` 包含以下固定值：
-
-```lua
-"timer"  -- 计时器
-"delay"  -- 延迟计时器
-"repeat" -- 重复计时器
-"sleep"  -- 休眠请求
-```
-
-- 字段 `kind` 包含以下固定值：
-
-```lua
-"tick"     -- 重复计时器触发一次
-"finished" -- 计时或休眠结束
-```
-
-- `timer`、`delay`、`sleep` 只产生一次 `finished` 事件。
-- `repeat` 每次触发时产生 `tick`，结束时产生 `finished`；这两种事件都会携带 `executed_count`。
-- 一次性计时器的终态回调在投递后回收，重复计时器的回调保留至结束或取消。
-- 计时器事件不会合并。
+- 当前 timer 库的每次触发只产生一次事件：非末次为 tick，末次为 finished；无限循环只产生 tick。
+- 提供 callback 时只调用它，否则交给 HandleEvent；结束后保留对象和回调，便于重启。
+- 每个计时器每帧最多触发一次；投递上限为每帧 128 条，待处理上限 1024 条。
+- 暂停、重置、重启、修改、删除或清空计时器会让尚未投递的旧事件失效。
+- delay、repeat、sleep 为预留类型，没有对应的脚本 API。
+- 查看⌞[计时器事件](../EVENT.md#41-timer)⌝与⌞[timer 库](../api/timer.md)⌝。
 
 ---
 
@@ -1060,6 +1043,7 @@ end
     request_id = ...,              -- integer
     kind = ...,                    -- string
     ok = ...,                      -- boolean
+    warning = ...,                 -- string / nil
     message = ...,                 -- string
     language_code = ...,           -- string
     callback_language_code = ...,  -- string
@@ -1073,7 +1057,8 @@ end
 | `kind`                   | string  | 语言加载事件类型                                                 |
 | `ok`                     | boolean | 本次语言加载是否成功                                             |
 | `message`                | string  | 经过净化的加载结果说明                                           |
-| `language_code`          | string  | 成功时为实际加载的主语言或备用语言代码，失败时为请求的主语言代码 |
+| `warning` | string / nil | 首选语言或回退语言缺少目录、JSON 时的提示；无警告时为 nil |
+| `language_code`          | string  | 请求指定的首选语言代码，缺失时也不切换为回退代码 |
 | `callback_language_code` | string  | 本次请求使用的备用语言代码                                       |
 
 ### 发送条件
@@ -1123,7 +1108,9 @@ end
 - 事件进入 `HandleEvent` 前，宿主已经提交成功加载的语言数据，可立即调用 `i18n.get_value(namespace, key)` 获取文本。
 - 包语言文件从 `assets/language/<language_code>/*.json` 读取，不递归扫描子目录；每个命名空间 JSON 必须是单层对象，所有值必须是字符串。
 - 主语言缺少的命名空间和键由备用语言补齐，已有主语言值不会被覆盖。
-- 两种语言都没有某个键时，`i18n.get_value(namespace, key)` 使用宿主当前语言的 `language_warning.missing` 文本生成缺失提示。
+- 缺少语言目录或 JSON 时使用空语言，ok 仍为 true；warning 会指出缺少首选语言或回退语言及其代码。无警告时为 nil。
+- 两种语言都没有某个键时，get_value 的末尾选项 callback 指定最终返回文字；省略时使用程序的缺失键提示。
+- 重载成功时替换旧资源，即使新资源为空；真正的加载错误才返回 ok 为 false 并保留旧资源。
 - `message` 不包含绝对路径、系统错误或宿主任务 ID。
 - `reload` 失败时保留上一次成功加载的数据。
 

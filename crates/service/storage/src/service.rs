@@ -1,3 +1,5 @@
+//! Service support for the storage service.
+
 use std::{
   cell::{Cell, RefCell},
   io,
@@ -11,22 +13,30 @@ use super::profile::DisplaySettingsProfile;
 use tg_core_audio::{AudioError, AudioErrorCode, ResolvedAudioFile};
 use tg_service_log::LogService;
 
-/// Storage service that owns the application root directory, builds the paths below it and
-/// makes sure the directory layout exists when it is created.
+/// The public entry point for storage operations.
+///
+/// # Fields
+///
+/// * `display_settings` - The display settings.
+/// * `recording_profile_revision` - The recording profile revision.
+/// * `game_save` - The game save.
 pub struct StorageService {
   root_dir: PathBuf,
+  /// The display settings.
   pub(super) display_settings: DisplaySettingsProfile,
+  /// The recording profile revision.
   pub(super) recording_profile_revision: Cell<u64>,
+  /// The game save.
   pub(super) game_save: RefCell<GameSaveProfile>,
 }
 
 impl StorageService {
-  /// Creates storage for the supplied deployment root and initializes its on-disk layout.
+  /// Create a storage service initialized from `root_dir`, `log`.
   ///
   /// # Errors
   ///
-  /// Returns an error if `root_dir` is not absolute or if the required storage layout cannot be
-  /// created and written.
+  /// Return an error when deployment-relative storage directories or initial profiles cannot be
+  /// created.
   pub fn new(root_dir: PathBuf, log: &mut LogService) -> io::Result<Self> {
     if !root_dir.is_absolute() {
       return Err(io::Error::new(
@@ -49,104 +59,122 @@ impl StorageService {
     Ok(service)
   }
 
+  /// Return the current root dir.
   pub fn root_dir(&self) -> &Path {
     &self.root_dir
   }
 
+  /// Return the current data dir path.
   pub fn data_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_DIR)
   }
 
+  /// Return the current cache dir path.
   pub fn cache_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_CACHE_DIR)
   }
 
+  /// Return the current log dir path.
   pub fn log_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_LOG_DIR)
   }
 
+  /// Return the current screenshot dir path.
   pub fn screenshot_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_SCREENSHOT_DIR)
   }
 
+  /// Return the current screenshot cache dir path.
   pub fn screenshot_cache_dir_path(&self) -> PathBuf {
     self.path(layout::SCREENSHOT_CACHE_DIR)
   }
 
+  /// Return the current recording cache dir path.
   pub fn recording_cache_dir_path(&self) -> PathBuf {
     self.path(layout::RECORDING_CACHE_DIR)
   }
 
+  /// Return the current recording dir path.
   pub fn recording_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_RECORDING_DIR)
   }
 
+  /// Return the current tUI log path.
   pub fn tui_log_path(&self) -> PathBuf {
     self.path(layout::TUI_LOG_FILE)
   }
 
+  /// Resolve the log file path for the validated package identity.
   pub fn package_log_path(&self) -> PathBuf {
     self.path(layout::PACKAGE_LOG_FILE)
   }
 
+  /// Return the current mod dir path.
   pub fn mod_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_MOD_DIR)
   }
 
+  /// Return the current profiles dir path.
   pub fn profiles_dir_path(&self) -> PathBuf {
     self.path(layout::DATA_PROFILES_DIR)
   }
 
-  /// Joins a path relative to the root directory into a full path.
+  /// Resolve a deployment-relative path under the storage root.
   pub fn path(&self, relative_path: &str) -> PathBuf {
     self.root_dir.join(relative_path)
   }
 
+  /// Return the current profile language path.
   pub fn profile_language_path(&self) -> PathBuf {
     self.path(layout::PROFILE_LANGUAGE_FILE)
   }
 
+  /// Return the current profile terminal path.
   pub fn profile_terminal_path(&self) -> PathBuf {
     self.path(layout::PROFILE_TERMINAL_FILE)
   }
 
+  /// Return the current profile package state path.
   pub fn profile_package_state_path(&self) -> PathBuf {
     self.path(layout::PROFILE_PACKAGE_STATE_FILE)
   }
 
+  /// Return the current profile screenshot path.
   pub fn profile_screenshot_path(&self) -> PathBuf {
     self.path(layout::PROFILE_SCREENSHOT_FILE)
   }
 
+  /// Return the current profile recording path.
   pub fn profile_recording_path(&self) -> PathBuf {
     self.path(layout::PROFILE_RECORDING_FILE)
   }
 
+  /// Return the current profile display settings path.
   pub fn profile_display_settings_path(&self) -> PathBuf {
     self.path(layout::PROFILE_DISPLAY_SETTINGS_FILE)
   }
 
+  /// Return the current profile key bindings path.
   pub fn profile_key_bindings_path(&self) -> PathBuf {
     self.path(layout::PROFILE_KEY_BINDINGS_FILE)
   }
 
+  /// Return the current profile game save path.
   pub fn profile_game_save_path(&self) -> PathBuf {
     self.path(layout::PROFILE_GAME_SAVE_FILE)
   }
 
+  /// Return the current language assets root path.
   pub fn language_assets_root_path(&self) -> PathBuf {
     self.path(layout::ASSETS_LANGUAGE_DIR)
   }
 
-  /// Resolves a host audio asset under the deployed assets directory.
+  /// Resolve a playable audio asset while enforcing its permitted asset root.
   ///
   /// # Errors
   ///
-  /// Returns [`AudioErrorCode::InvalidPath`] when `relative` is empty, absolute or contains
-  /// anything but normal components, [`AudioErrorCode::NotFound`] when the application root,
-  /// the assets directory or the file cannot be canonicalized, and
-  /// [`AudioErrorCode::PermissionDenied`] when the file is not a regular file inside the assets
-  /// directory or the assets directory lies outside the application root.
+  /// Return an error for an invalid relative asset path, an escaping path, a missing file, or an
+  /// unsupported audio source.
   pub fn resolve_audio_asset(&self, relative: &Path) -> Result<ResolvedAudioFile, AudioError> {
     if relative.as_os_str().is_empty()
       || relative.is_absolute()
@@ -178,6 +206,12 @@ impl StorageService {
     Ok(ResolvedAudioFile::new(canonical_file))
   }
 
+  /// Resolve a recording audio file while enforcing the recording storage root.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid or escaping recording paths, unavailable audio files, or
+  /// mismatched target kinds.
   pub fn resolve_recording_audio(&self, path: &Path) -> Result<ResolvedAudioFile, AudioError> {
     if !path.is_absolute() {
       return Err(AudioError::sanitized(AudioErrorCode::InvalidPath));
@@ -198,48 +232,94 @@ impl StorageService {
     Ok(ResolvedAudioFile::new(canonical_file))
   }
 
+  /// Return the current language registry path.
   pub fn language_registry_path(&self) -> PathBuf {
     self.path(layout::LANGUAGE_REGISTRY_FILE)
   }
 
+  /// Return the deployed metadata path for the selected language package.
   pub fn language_package_path(&self, language_code: &str) -> PathBuf {
     self.language_assets_root_path().join(language_code)
   }
 
+  /// Return the deployed runtime-translation directory for the selected language.
   pub fn language_runtime_path(&self, language_code: &str) -> PathBuf {
     self.language_package_path(language_code).join("runtime")
   }
 
+  /// Return the JSON path for a deployed runtime namespace in the selected language.
   pub fn language_runtime_namespace_path(&self, language_code: &str, namespace: &str) -> PathBuf {
     self
       .language_runtime_path(language_code)
       .join(format!("{}.json", namespace))
   }
 
+  /// Clear the data retained by this storage service.
+  ///
+  /// # Errors
+  ///
+  /// Propagate filesystem errors while removing the selected storage entries and recreating their
+  /// required directories.
   pub fn clear_data(&self, log: &mut LogService) -> io::Result<()> {
     self.remove_recreate(self.data_dir_path(), log)
   }
 
+  /// Clear the cache retained by this storage service.
+  ///
+  /// # Errors
+  ///
+  /// Propagate filesystem errors while removing the selected storage entries and recreating their
+  /// required directories.
   pub fn clear_cache(&self, log: &mut LogService) -> io::Result<()> {
     self.remove_recreate(self.cache_dir_path(), log)
   }
 
+  /// Clear the log retained by this storage service.
+  ///
+  /// # Errors
+  ///
+  /// Propagate filesystem errors while removing the selected storage entries and recreating their
+  /// required directories.
   pub fn clear_log(&self, log: &mut LogService) -> io::Result<()> {
     self.remove_recreate(self.log_dir_path(), log)
   }
 
+  /// Clear the screenshot retained by this storage service.
+  ///
+  /// # Errors
+  ///
+  /// Propagate filesystem errors while removing the selected storage entries and recreating their
+  /// required directories.
   pub fn clear_screenshot(&self, log: &mut LogService) -> io::Result<()> {
     self.remove_recreate(self.screenshot_dir_path(), log)
   }
 
+  /// Clear the recording retained by this storage service.
+  ///
+  /// # Errors
+  ///
+  /// Propagate filesystem errors while removing the selected storage entries and recreating their
+  /// required directories.
   pub fn clear_recording(&self, log: &mut LogService) -> io::Result<()> {
     self.remove_recreate(self.recording_dir_path(), log)
   }
 
+  /// Clear the mod retained by this storage service.
+  ///
+  /// # Errors
+  ///
+  /// Propagate filesystem errors while removing the selected storage entries and recreating their
+  /// required directories.
   pub fn clear_mod(&self, log: &mut LogService) -> io::Result<()> {
     self.remove_recreate(self.mod_dir_path(), log)
   }
 
+  /// Clear the profiles retained by this storage service.
+  ///
+  /// # Errors
+  ///
+  /// Propagate filesystem errors while removing the selected storage entries and recreating their
+  /// required directories.
   pub fn clear_profiles(&self, log: &mut LogService) -> io::Result<()> {
     self.remove_recreate(self.profiles_dir_path(), log)
   }
@@ -286,6 +366,7 @@ fn verify_storage_writable(storage: &StorageService) -> io::Result<()> {
 
 #[cfg(any(test, feature = "test-support"))]
 impl StorageService {
+  /// Create storage paths under an explicitly supplied test deployment root.
   pub fn from_root_for_test(root_dir: PathBuf) -> Self {
     Self {
       root_dir,

@@ -1,5 +1,13 @@
+//! Lua base library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Build and register the Lua base API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
   let ipairs = lua.create_function(|lua, args: MultiValue| {
     let value = positional_argument(&args, 0, "base.ipairs", "table")?;
@@ -329,6 +337,8 @@ fn raw_equal(left: &Value, right: &Value) -> bool {
   }
 }
 
+/// Parse a Lua-compatible numeric spelling and return its integer or floating-point
+/// representation.
 pub(super) fn parse_number(text: &str) -> Option<Value> {
   let text = text.trim();
   if let Ok(value) = text.parse::<i64>() {

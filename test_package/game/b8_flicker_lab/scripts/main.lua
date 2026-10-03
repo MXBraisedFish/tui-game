@@ -1,4 +1,4 @@
--- B8.5 visual review scenes for the terminal renderer.
+-- B8 flicker lab package callbacks and terminal-cell drawing.
 
 local MODE_REFERENCE = "reference"
 local MODE_LOCAL = "local"
@@ -13,11 +13,13 @@ local paused = false
 local elapsed = 0
 local frame_index = 0
 
+-- Update retained drawing dimensions after a resize.
 local function fit_size(new_width, new_height)
   width = math.max({ 1, new_width })
   height = math.max({ 1, new_height })
 end
 
+-- Draw a fixture line with explicit foreground, background, and weight settings.
 local function draw_line(y, text, fg, bg, bold)
   if y < 0 or y >= height then
     return
@@ -25,6 +27,7 @@ local function draw_line(y, text, fg, bg, bold)
   draw.text(1, y, text, { fg = fg, bg = bg, bold = bold or false, max_width = math.max({ 1, width - 2 }), max_height = 1 })
 end
 
+-- Return the visible title of the selected flicker-test mode.
 local function mode_title()
   if mode == MODE_REFERENCE then
     return "STATIC REFERENCE"
@@ -36,11 +39,13 @@ local function mode_title()
   return "OPTIONAL LOW-FREQUENCY PULSE — 2 Hz"
 end
 
+-- Draw fixture instructions and timing counters using the requested color.
 local function draw_header(fg)
   draw_line(0, "B8.5  |  " .. mode_title(), fg, nil, true)
   draw_line(1, "Keys: 1 static  2 local  3 full motion  4 pulse  N next  Space pause  Esc back", fg)
 end
 
+-- Draw the stable reference pattern for comparison.
 local function draw_reference()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
   draw_header(color.BRIGHT_CYAN)
@@ -51,6 +56,7 @@ local function draw_reference()
   draw_line(height - 2, "Select another scene with 1–4 or N. Escape returns to the game list.", color.GRAY)
 end
 
+-- Draw a pattern whose changing region remains limited to a local area.
 local function draw_local_update()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
   draw_header(color.BRIGHT_CYAN)
@@ -65,6 +71,7 @@ local function draw_local_update()
   draw_line(height - 2, "Observe whether the small update causes visible flashes elsewhere.", color.GRAY)
 end
 
+-- Draw the full-frame refresh fixture.
 local function draw_full_refresh()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
 
@@ -84,6 +91,7 @@ local function draw_full_refresh()
   draw_line(height - 2, "This is the main continuous-redraw scene; change the player FPS limit to compare.", color.WHITE)
 end
 
+-- Draw the alternating pulse fixture.
 local function draw_pulse()
   local light_phase = math.floor(elapsed / 0.25) % 2 == 0
   local bg = light_phase and color.WHITE or color.BLACK
@@ -95,10 +103,12 @@ local function draw_pulse()
   draw_line(height - 2, "N returns to the reference scene after the other modes.", fg, bg)
 end
 
+-- Select a flicker-test mode and reset its retained drawing state.
 local function set_mode(new_mode)
   mode = new_mode
 end
 
+-- Cycle through the flicker-test modes.
 local function next_mode()
   for index = 1, #MODE_ORDER do
     if MODE_ORDER[index] == mode then
@@ -109,10 +119,12 @@ local function next_mode()
   set_mode(MODE_REFERENCE)
 end
 
+-- Initialize package state from the supplied base dimensions and startup data.
 function Init(ctx)
   fit_size(ctx.base.width, ctx.base.height)
 end
 
+-- Apply the resize, action, or completion events handled by this package.
 function HandleEvent(event)
   if event.type == "resize" then
     fit_size(event.data.width, event.data.height)
@@ -136,18 +148,21 @@ function HandleEvent(event)
   end
 end
 
+-- Advance package simulation using the fixed-update delta in seconds.
 function Update(dt)
   if not paused then
     elapsed = elapsed + dt
   end
 end
 
+-- Apply per-frame state using elapsed seconds and the fixed-step interpolation fraction.
 function UpdateFrame(_dt, _alpha)
   if not paused then
     frame_index = frame_index + 1
   end
 end
 
+-- Draw the current package state in terminal-cell coordinates.
 function Render()
   if mode == MODE_REFERENCE then
     draw_reference()
@@ -160,10 +175,12 @@ function Render()
   end
 end
 
+-- Return the structured state needed to continue this game.
 function SaveGame()
   return {}
 end
 
+-- Return the best-result data and its display text for host score persistence.
 function SaveBest()
   return { best_string = "" }
 end

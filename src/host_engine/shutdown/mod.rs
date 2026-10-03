@@ -1,9 +1,17 @@
+//! Shutdown-phase ordering of pending writes, script stops, service release, and terminal restoration.
+
 use crate::host_engine::app::{EngineServices, RuntimeWorld};
 use crate::host_engine::core::{ExitState, set_crash_phase};
 
 use super::services::{HostLogMessage, LogSource};
 
-/// 执行引擎关闭流程：记录日志并退出终端
+/// Stop script sessions, wait for pending writes, release services, and restore terminal state.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `_exit_state` - The exit state.
 pub fn close(services: &mut EngineServices, mut world: RuntimeWorld, _exit_state: ExitState) {
   let write_barrier = services.async_runtime.write_barrier();
   write_barrier.stop_new_writes();

@@ -1,15 +1,13 @@
+//! Required positional arguments and strict trailing option-table validation.
+
 use mlua::{Lua, LuaString, MultiValue, Table, Value};
 
+/// The max api string bytes used by this module.
 pub const MAX_API_STRING_BYTES: usize = 1024 * 1024;
+/// The max api table entries used by this module.
 pub const MAX_API_TABLE_ENTRIES: usize = 16_384;
 
-/// The parsed positional values and a sanitized optional-parameter table.
-///
-/// Positional values stay separate from options so a data table in a required
-/// slot is never mistaken for an options table, and explicit nil arguments
-/// remain distinguishable from omitted arguments through [`Self::was_supplied`].
-/// Positional payloads and nested option values are left to their API's own
-/// validation so generic parsing does not reinterpret user data structures.
+/// Required Lua positional values kept separate from a validated trailing options table.
 #[derive(Debug)]
 pub struct PositionalArgs {
   values: Vec<Value>,
@@ -17,10 +15,22 @@ pub struct PositionalArgs {
 }
 
 impl PositionalArgs {
+  /// Return the value at a zero-based argument index, or Lua nil for an absent position.
   pub fn get(&self, index: usize) -> Value {
     self.values.get(index).cloned().unwrap_or(Value::Nil)
   }
 
+  /// Read a required non-nil Lua argument or option field.
+  ///
+  /// # Arguments
+  ///
+  /// * `index` - The slot or sequence index.
+  /// * `method` - The script-visible method name included in argument errors.
+  /// * `name` - The name used to identify the object or field.
+  ///
+  /// # Errors
+  ///
+  /// Return a Lua argument error when the required position is absent or contains nil.
   pub fn required(&self, index: usize, method: &str, name: &str) -> mlua::Result<Value> {
     if !self.was_supplied(index) {
       return Err(message(
@@ -39,21 +49,31 @@ impl PositionalArgs {
     }
   }
 
+  /// Report whether the argument position was present, including an explicitly supplied `nil`.
   pub fn was_supplied(&self, index: usize) -> bool {
     index < self.values.len()
   }
 
+  /// Return the validated trailing options table, including an empty table when it was omitted.
   pub fn options(&self) -> &Table {
     &self.options
   }
 }
 
-/// Parses a fixed positional prefix followed by at most one strict options
-/// table. If `option_fields` is empty, no extra arguments are accepted.
+/// Parse required positional arguments and a strict trailing options table.
 ///
-/// A final nil is accepted as an omitted options table only when the method
-/// declares option fields. Nil values inside an options table are naturally
-/// absent in Lua and therefore use the method's normal defaults.
+/// # Arguments
+///
+/// * `lua` - The Lua VM in which values and callbacks are created.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `arguments` - The supplied Lua arguments, preserving explicit nil positions.
+/// * `required_names` - Required positional parameter names in their call order.
+/// * `option_fields` - The complete list of accepted trailing option keys.
+///
+/// # Errors
+///
+/// Return a Lua argument error for missing/extra positions, a non-table trailing option value, a
+/// metatable, unknown fields, or an options table exceeding its field limit.
 pub fn positional(
   lua: &Lua,
   method: &str,
@@ -115,9 +135,18 @@ pub fn positional(
   })
 }
 
-/// Validates a required prefix while preserving every following value as a
-/// method argument. Use this for project variadic methods that do not declare
-/// an options table.
+/// Retain the Lua-native variadic argument protocol without a host options-table
+/// reinterpretation.
+///
+/// # Arguments
+///
+/// * `method` - The script-visible method name included in argument errors.
+/// * `arguments` - The supplied Lua arguments, preserving explicit nil positions.
+/// * `required_names` - Required positional parameter names in their call order.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the required positional prefix is incomplete.
 pub fn variadic(
   method: &str,
   arguments: MultiValue,
@@ -163,6 +192,7 @@ fn copy_options(
   Ok(())
 }
 
+/// Return the stable type label used in Lua argument diagnostics.
 pub fn type_name(value: &Value) -> &'static str {
   match value {
     Value::Nil => "nil",
@@ -180,6 +210,15 @@ pub fn type_name(value: &Value) -> &'static str {
   }
 }
 
+/// Create a method-qualified Lua error containing the parameter name and expected and actual
+/// types.
+///
+/// # Arguments
+///
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+/// * `expected` - The expected.
+/// * `value` - The value to store or convert.
 pub fn invalid(method: &str, name: &str, expected: &str, value: &Value) -> mlua::Error {
   mlua::Error::RuntimeError(format!(
     "{method}: invalid parameter '{name}': expected {expected}, got {}",
@@ -187,10 +226,16 @@ pub fn invalid(method: &str, name: &str, expected: &str, value: &Value) -> mlua:
   ))
 }
 
+/// Create a method-qualified Lua runtime error from the supplied diagnostic text.
 pub fn message(method: &str, text: impl Into<String>) -> mlua::Error {
   mlua::Error::RuntimeError(format!("{method}: {}", text.into()))
 }
 
+/// Reject supplied values when the Lua API expects no arguments.
+///
+/// # Errors
+///
+/// Return a Lua argument error when any positional argument was supplied.
 pub fn no_args(method: &str, arguments: MultiValue) -> mlua::Result<()> {
   if arguments.is_empty() {
     Ok(())
@@ -202,6 +247,17 @@ pub fn no_args(method: &str, arguments: MultiValue) -> mlua::Result<()> {
   }
 }
 
+/// Validate that exactly one positional Lua argument was supplied.
+///
+/// # Arguments
+///
+/// * `method` - The script-visible method name included in argument errors.
+/// * `parameter` - The parameter.
+/// * `args` - The supplied Lua arguments.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the supplied positional argument count is not exactly one.
 pub fn one(method: &str, parameter: &str, args: MultiValue) -> mlua::Result<Value> {
   if args.len() != 1 {
     return Err(message(
@@ -213,6 +269,17 @@ pub fn one(method: &str, parameter: &str, args: MultiValue) -> mlua::Result<Valu
   Ok(value)
 }
 
+/// Read a required non-nil Lua argument or option field.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the required position is absent or contains nil.
 pub fn required(table: &Table, method: &str, name: &str) -> mlua::Result<Value> {
   let value = table.get::<Value>(name)?;
   if matches!(value, Value::Nil) {
@@ -222,10 +289,32 @@ pub fn required(table: &Table, method: &str, name: &str) -> mlua::Result<Value> 
   }
 }
 
+/// Validate bounded UTF-8 Lua text and return it as an owned Rust string.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error for a non-string value, invalid UTF-8, or text longer than 1 MiB.
 pub fn string(value: Value, method: &str, name: &str) -> mlua::Result<String> {
   Ok(lua_string(value, method, name)?.to_str()?.to_string())
 }
 
+/// Validate and retain the bounded UTF-8 Lua string value.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error for a non-string value, invalid UTF-8, or text longer than 1 MiB.
 pub fn lua_string(value: Value, method: &str, name: &str) -> mlua::Result<LuaString> {
   let Value::String(value) = value else {
     return Err(invalid(method, name, "UTF-8 string", &value));
@@ -247,12 +336,18 @@ pub fn lua_string(value: Value, method: &str, name: &str) -> mlua::Result<LuaStr
   Ok(value)
 }
 
-/// Converts a free-form Lua value into user-facing text using the same stable
-/// representation exposed by `base.tostring`.
+/// Validate a Lua value accepted by the host's dynamic-text formatting rules.
 ///
-/// This is intentionally separate from [`string`]: identifiers, paths,
-/// constants, encodings and protocol strings must continue to require an
-/// actual UTF-8 Lua string.
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error for invalid UTF-8 or converted text longer than 1 MiB; propagate
+/// option-table access errors when applicable.
 pub fn dynamic_text(value: Value, method: &str, name: &str) -> mlua::Result<String> {
   let text = match value {
     Value::Nil => "nil".to_string(),
@@ -282,6 +377,18 @@ pub fn dynamic_text(value: Value, method: &str, name: &str) -> mlua::Result<Stri
   Ok(text)
 }
 
+/// Accept an integer or exactly integral finite number within the signed 64-bit range.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error for a non-integral or non-finite value, or a value outside the
+/// signed 64-bit range; propagate option-table access errors when applicable.
 pub fn integer(value: Value, method: &str, name: &str) -> mlua::Result<i64> {
   match value {
     Value::Integer(value) => Ok(value),
@@ -296,6 +403,17 @@ pub fn integer(value: Value, method: &str, name: &str) -> mlua::Result<i64> {
   }
 }
 
+/// Read an integer or floating-point Lua number as `f64`.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the value is neither an integer nor a floating-point number.
 pub fn number(value: Value, method: &str, name: &str) -> mlua::Result<f64> {
   match value {
     Value::Integer(value) => Ok(value as f64),
@@ -304,6 +422,18 @@ pub fn number(value: Value, method: &str, name: &str) -> mlua::Result<f64> {
   }
 }
 
+/// Read an actual Lua boolean without truthiness coercion.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error for a supplied non-boolean value; propagate option-table access
+/// errors when applicable.
 pub fn boolean(value: Value, method: &str, name: &str) -> mlua::Result<bool> {
   let Value::Boolean(value) = value else {
     return Err(invalid(method, name, "boolean", &value));
@@ -311,6 +441,19 @@ pub fn boolean(value: Value, method: &str, name: &str) -> mlua::Result<bool> {
   Ok(value)
 }
 
+/// Read bounded Lua array positions, using an explicit `n` length when supplied and retaining nil
+/// holes.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error for a non-table value, an invalid explicit `n` length, or a length
+/// exceeding 16384 entries; propagate table-access errors.
 pub fn array_values(value: Value, method: &str, name: &str) -> mlua::Result<Vec<Value>> {
   let Value::Table(values) = value else {
     return Err(invalid(method, name, "array table", &value));
@@ -328,6 +471,19 @@ pub fn array_values(value: Value, method: &str, name: &str) -> mlua::Result<Vec<
   (1..=length).map(|index| values.raw_get(index)).collect()
 }
 
+/// Read an optional integral field, returning the supplied default when it is nil.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+/// * `default` - The default.
+///
+/// # Errors
+///
+/// Return a Lua argument error for a non-integral or non-finite value, or a value outside the
+/// signed 64-bit range; propagate option-table access errors when applicable.
 pub fn optional_integer(
   table: &Table,
   method: &str,
@@ -342,6 +498,19 @@ pub fn optional_integer(
   }
 }
 
+/// Read an optional bounded UTF-8 string field, returning its default when it is nil.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+/// * `default` - The default.
+///
+/// # Errors
+///
+/// Return a Lua argument error for a supplied non-string value, invalid UTF-8, or text longer
+/// than 1 MiB; propagate table-access errors.
 pub fn optional_string(
   table: &Table,
   method: &str,
@@ -356,6 +525,19 @@ pub fn optional_string(
   }
 }
 
+/// Read an optional dynamic-text field while retaining its default when absent.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+/// * `default` - The default.
+///
+/// # Errors
+///
+/// Return a Lua argument error for invalid UTF-8 or converted text longer than 1 MiB; propagate
+/// option-table access errors when applicable.
 pub fn optional_dynamic_text(
   table: &Table,
   method: &str,
@@ -370,6 +552,19 @@ pub fn optional_dynamic_text(
   }
 }
 
+/// Read an optional boolean field, returning its default when it is nil.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+/// * `default` - The default.
+///
+/// # Errors
+///
+/// Return a Lua argument error for a supplied non-boolean value; propagate option-table access
+/// errors when applicable.
 pub fn optional_bool(table: &Table, method: &str, name: &str, default: bool) -> mlua::Result<bool> {
   let value = table.get::<Value>(name)?;
   if matches!(value, Value::Nil) {

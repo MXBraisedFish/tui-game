@@ -1,3 +1,5 @@
+//! Security settings page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -18,6 +20,7 @@ const LABEL_KEYS: [&str; ROW_LEN] = [
   "security_settings.mod.default.status",
   "security_settings.mod.default.debug",
 ];
+/// The state and owned widgets of the security settings view.
 pub struct SecuritySettingsUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -28,13 +31,20 @@ pub struct SecuritySettingsUi {
   default_debug: bool,
 }
 
+/// An application request produced by security settings interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SecuritySettingsCommand {
+  /// A request to back.
   Back,
+  /// The reset terminal setting for security settings command.
   ResetTerminal,
+  /// The reset status setting for security settings command.
   ResetStatus,
+  /// The reset debug setting for security settings command.
   ResetDebug,
+  /// A request to set default status.
   SetDefaultStatus(bool),
+  /// A request to set default debug.
   SetDefaultDebug(bool),
 }
 
@@ -57,6 +67,7 @@ impl RuntimeObjectPoolOwner for SecuritySettingsUi {
 }
 
 impl SecuritySettingsUi {
+  /// Create the security settings view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -70,6 +81,7 @@ impl SecuritySettingsUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the security settings view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       action("security_settings.focus_up", "up", "Focus previous option"),
@@ -108,6 +120,7 @@ impl SecuritySettingsUi {
     ]
   }
 
+  /// Interpret a security settings UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<SecuritySettingsCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -148,6 +161,7 @@ impl SecuritySettingsUi {
     }
   }
 
+  /// Advance the security settings view's transient state for this host frame.
   pub fn update(&mut self, _dt: Duration) {}
 
   fn focus(&mut self, index: usize) -> Option<SecuritySettingsCommand> {
@@ -155,11 +169,21 @@ impl SecuritySettingsUi {
     None
   }
 
+  /// Update the defaults used by this security settings ui.
   pub fn set_defaults(&mut self, enabled: bool, debug: bool) {
     self.default_enabled = enabled;
     self.default_debug = debug;
   }
 
+  /// Draw the security settings view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -362,6 +386,7 @@ fn action(name: &str, key: &str, description: &str) -> ActionMapEntry {
     action: name.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }
 

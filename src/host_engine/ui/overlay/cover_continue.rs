@@ -1,3 +1,5 @@
+//! Cover continue overlay state, owned interactions, and clipped terminal presentation.
+
 use crate::host_engine::services::text_layout::TextWrapMode;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
@@ -8,12 +10,16 @@ use crate::host_engine::services::{
 
 const NS: &str = "cover_continue";
 
+/// An application request produced by cover continue interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CoverContinueCommand {
+  /// A request to start.
   Start,
+  /// A request to back.
   Back,
 }
 
+/// The state and owned widgets of the cover continue view.
 pub struct CoverContinueUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
@@ -23,6 +29,7 @@ pub struct CoverContinueUi {
 }
 
 impl CoverContinueUi {
+  /// Create the cover continue view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -34,29 +41,35 @@ impl CoverContinueUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the cover continue view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "cover_continue.start".to_string(),
         description: "Start a new game and overwrite the continue slot".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "cover_continue.back".to_string(),
         description: "Return to the game list".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
     ]
   }
 
+  /// Start the cover continue ui state addressed by this operation.
   pub fn start(&mut self, continue_game: String) {
     self.continue_game = continue_game;
   }
 
+  /// Reset the cover continue ui state addressed by this operation.
   pub fn reset(&mut self) {
     self.continue_game.clear();
   }
 
+  /// Interpret a cover continue UI event and return the requested application command.
   pub fn handle_event(&self, event: &UiEvent) -> Option<CoverContinueCommand> {
     match event {
       UiEvent::Action(event) if event.state == KeyState::Pressed => match event.action.as_str() {
@@ -78,6 +91,15 @@ impl CoverContinueUi {
     }
   }
 
+  /// Draw the cover continue view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,

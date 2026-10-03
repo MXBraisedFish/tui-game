@@ -1,4 +1,15 @@
-//! Video service: encodes recordings to MP4 (OpenH264 or ffmpeg) as async export jobs.
+//! Recording export through the shared rasterizer with encoder fallback and cancellation.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_async::TaskId;
+//! use tg_service_video::VideoService;
+//!
+//! let video = VideoService::new();
+//! assert_eq!(video.active_export_count(), 0);
+//! assert!(video.status(TaskId(1)).is_none());
+//! ```
 
 use std::{
   collections::HashMap,
@@ -30,71 +41,133 @@ use tg_service_storage::{
   RecordingExportQuality, RecordingGpuAcceleration, RecordingProfile, StorageService,
 };
 
+/// The inputs of an asynchronous video export operation.
+///
+/// # Fields
+///
+/// * `source_path` - The filesystem path for source.
+/// * `output_path` - The filesystem path for output.
+/// * `ffmpeg` - The FFmpeg.
+/// * `fonts` - The ordered fonts retained by this owner.
+/// * `deployment_root` - The deployment root.
+/// * `profile` - The recording profile carried by this video export task.
 #[derive(Clone, Debug)]
 pub struct VideoExportTask {
+  /// The filesystem path for source.
   pub source_path: PathBuf,
+  /// The filesystem path for output.
   pub output_path: PathBuf,
+  /// The FFmpeg.
   pub ffmpeg: Option<FfmpegInstallation>,
+  /// The ordered fonts retained by this owner.
   pub fonts: Vec<String>,
+  /// The deployment root.
   pub deployment_root: PathBuf,
+  /// The recording profile carried by this video export task.
   pub profile: RecordingProfile,
 }
 
+/// The video export progress representation used by this module.
+///
+/// # Fields
+///
+/// * `completed_frames` - The completed frames.
+/// * `total_frames` - The total frames.
+/// * `ratio` - The ratio.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VideoExportProgress {
+  /// The completed frames.
   pub completed_frames: u64,
+  /// The total frames.
   pub total_frames: u64,
+  /// The ratio.
   pub ratio: f32,
 }
 
+/// The pending, active, completed, cancelled, or failed state of a video export.
 #[derive(Clone, Debug, PartialEq)]
 pub enum VideoExportStatus {
+  /// The operation is queued.
   Queued,
+  /// The operation is preparing.
   Preparing,
+  /// The operation is encoding.
   Encoding(VideoExportProgress),
+  /// The operation is finalizing.
   Finalizing,
+  /// The operation is failed.
   Failed(String),
 }
 
+/// A video async event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum VideoAsyncEvent {
+  /// A preparing notification delivered to the owning consumer.
   Preparing {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
   },
+  /// A encoder notification delivered to the owning consumer.
   Encoder {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The encoder.
     encoder: String,
   },
+  /// A progress notification delivered to the owning consumer.
   Progress {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The completed frames.
     completed_frames: u64,
+    /// The total frames.
     total_frames: u64,
   },
+  /// A finalizing notification delivered to the owning consumer.
   Finalizing {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
   },
+  /// A saved notification delivered to the owning consumer.
   Saved {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path for source.
     source_path: PathBuf,
+    /// The filesystem path for mp4.
     mp4_path: PathBuf,
   },
+  /// A failed notification delivered to the owning consumer.
   Failed {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path for source.
     source_path: PathBuf,
+    /// The filesystem path for output.
     output_path: PathBuf,
+    /// The video export stage carried by this video async event.
     stage: VideoExportStage,
+    /// The error.
     error: String,
   },
 }
 
+/// The currently active preparation, rendering, encoding, or finalization stage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VideoExportStage {
+  /// The parse stage of the operation.
   Parse,
+  /// The audio stage of the operation.
   Audio,
+  /// The font stage of the operation.
   Font,
+  /// The rasterize stage of the operation.
   Rasterize,
+  /// The encode stage of the operation.
   Encode,
+  /// The mux stage of the operation.
   Mux,
+  /// The disk stage of the operation.
   Disk,
 }
 
@@ -112,9 +185,17 @@ impl fmt::Display for VideoExportStage {
   }
 }
 
+/// Failures reported by video export operations.
+///
+/// # Fields
+///
+/// * `stage` - The video export stage carried by this video export error.
+/// * `message` - The diagnostic or display message.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VideoExportError {
+  /// The video export stage carried by this video export error.
   pub stage: VideoExportStage,
+  /// The diagnostic or display message.
   pub message: String,
 }
 
@@ -135,6 +216,7 @@ impl fmt::Display for VideoExportError {
 
 impl std::error::Error for VideoExportError {}
 
+/// The public entry point for video operations.
 pub struct VideoService {
   active_exports: HashMap<TaskId, VideoExportStatus>,
   output_paths: HashMap<TaskId, PathBuf>,
@@ -145,6 +227,7 @@ pub struct VideoService {
 }
 
 impl VideoService {
+  /// Create a video service with its initial state.
   pub fn new() -> Self {
     Self {
       active_exports: HashMap::new(),
@@ -156,6 +239,21 @@ impl VideoService {
     }
   }
 
+  /// Validate and queue a recording-to-video export, returning its task identifier.
+  ///
+  /// # Arguments
+  ///
+  /// * `async_runtime` - The shared background-task executor.
+  /// * `storage` - The deployment-relative storage service.
+  /// * `ffmpeg` - The FFmpeg.
+  /// * `source_path` - The filesystem path for source.
+  /// * `fonts` - The fonts.
+  /// * `profile` - The user profile being read or updated.
+  ///
+  /// # Errors
+  ///
+  /// Return a parse-stage error when the source is not a file or a disk-stage error when the
+  /// recording output directory cannot be created.
   pub fn submit_recording_export<
     E: From<VideoAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
   >(
@@ -201,10 +299,12 @@ impl VideoService {
     result
   }
 
+  /// Drain feedback about video export submission failures or accepted requests.
   pub fn take_submission_feedback(&mut self) -> Option<bool> {
     self.pending_submission_feedback.take()
   }
 
+  /// Apply a matching asynchronous completion event to video state.
   pub fn handle_engine_event(&mut self, event: &VideoAsyncEvent) {
     match event {
       VideoAsyncEvent::Preparing { task_id } => {
@@ -250,6 +350,7 @@ impl VideoService {
     }
   }
 
+  /// Return the status for the addressed object when it is available.
   pub fn status(&self, task_id: TaskId) -> Option<&VideoExportStatus> {
     self.active_exports.get(&task_id).or_else(|| {
       self
@@ -260,6 +361,7 @@ impl VideoService {
     })
   }
 
+  /// Return the progress for the addressed object when it is available.
   pub fn progress(&self, task_id: TaskId) -> Option<VideoExportProgress> {
     match self.status(task_id) {
       Some(VideoExportStatus::Encoding(progress)) => Some(*progress),
@@ -272,18 +374,22 @@ impl VideoService {
     }
   }
 
+  /// Return the number of video exports that have not reached a terminal state.
   pub fn active_export_count(&self) -> usize {
     self.active_exports.len()
   }
 
+  /// Return the task identifiers of active video exports.
   pub fn active_task_ids(&self) -> Vec<TaskId> {
     self.export_order.clone()
   }
 
+  /// Report whether the source is currently used by an active export.
   pub fn is_source_exporting(&self, path: &Path) -> bool {
     self.source_paths.values().any(|source| source == path)
   }
 
+  /// Return the progress of the first active video export for host status display.
   pub fn first_active_progress(&self) -> Option<VideoExportProgress> {
     self
       .export_order
@@ -298,6 +404,20 @@ impl Default for VideoService {
   }
 }
 
+/// Replay a recording through the shared rasterizer and encode it with cancellation-aware backend
+/// fallback.
+///
+/// # Arguments
+///
+/// * `task_id` - The identifier of the asynchronous task.
+/// * `task` - The task.
+/// * `event_tx` - The event tx.
+/// * `cancellation` - The cancellation token for the operation.
+///
+/// # Errors
+///
+/// Return an error for cancellation, invalid recording data or dimensions, rasterization
+/// failures, unavailable encoders, or failed video/audio output.
 pub(crate) fn run_video_task<E: From<VideoAsyncEvent>>(
   task_id: TaskId,
   task: VideoExportTask,
@@ -752,10 +872,14 @@ fn ffmpeg_encoders(
     .collect()
 }
 
-/// 用一帧黑屏真实启动一次 FFmpeg，过滤掉"列出来但打不开"的编码器。
+/// Probe candidate FFmpeg encoders with a minimal frame before selecting an export backend.
 ///
-/// 硬件编码器可能编译进 FFmpeg 但缺少驱动/设备，直接正式导出会让每次尝试
-/// 白白跑完整条流水线后才失败。这里先用最小输入探测一次，只保留可用的候选。
+/// # Arguments
+///
+/// * `ffmpeg` - The FFmpeg.
+/// * `candidates` - The candidates.
+/// * `width` - The width in terminal columns.
+/// * `height` - The height in terminal rows.
 fn usable_encoders(
   ffmpeg: &FfmpegInstallation,
   candidates: Vec<&'static str>,
@@ -984,12 +1108,11 @@ fn encoder_config(profile: &RecordingProfile, frame_rate: u16) -> EncoderConfig 
     RecordingExportQuality::High => (Complexity::High, QpRange::new(12, 28)),
   };
   EncoderConfig::new()
-    // OpenH264 2.6 declares SCREEN_CONTENT_NON_REAL_TIME but rejects it in
-    // ParamValidationExt; screen-content real-time is the supported screen path.
+    // Use the screen-content mode accepted by OpenH264 validation, even though its enum also
+    // names a non-real-time mode.
     .usage_type(UsageType::ScreenContentRealTime)
-    // RC_OFF keeps every timeline frame and lets the configured QP range control
-    // visual quality. OpenH264 otherwise emits an initialization warning when
-    // Quality RC is paired with frame skipping disabled.
+    // Disable rate control to retain every timeline frame; the configured QP interval controls
+    // quality.
     .rate_control_mode(RateControlMode::Off)
     .max_frame_rate(FrameRate::from_hz(f32::from(frame_rate)))
     .complexity(complexity)
@@ -1103,7 +1226,6 @@ impl<E: From<VideoAsyncEvent> + Send + 'static> tg_service_async::AsyncJob<E> fo
     run_video_task(id, *self, events, cancellation)
   }
 
-  /// Video exports write `<name>.mp4.task-<id>.part` so concurrent exports never share a file.
   fn write_target(&self, id: tg_service_async::TaskId) -> Option<(PathBuf, PathBuf)> {
     let temporary = self
       .output_path

@@ -1,4 +1,4 @@
-//! Minimal entry: inserts, removes and reuses one arena slot.
+//! Independent arena smoke entry exercising the public API and checking its results.
 
 use tg_core_arena::Arena;
 

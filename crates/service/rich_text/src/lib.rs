@@ -1,4 +1,22 @@
-//! Rich text service: parses tagged/plain text (colors, styles, key placeholders) into styled segments.
+//! Plain and tagged text parsing with explicit formatting parameters.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_rich_text::{RichTextService, TextMode};
+//!
+//! fn main() {
+//!   let service = RichTextService::new();
+//!   let rich = service.parse_mode("plain <b>bold</b>", None, TextMode::Rich);
+//!   let bold = rich
+//!     .segments
+//!     .iter()
+//!     .find(|segment| segment.text == "bold")
+//!     .expect("bold segment");
+//!   assert!(bold.style.bold);
+//!   println!("rich_text ok: {} segments", rich.segments.len());
+//! }
+//! ```
 
 mod params;
 mod parser;

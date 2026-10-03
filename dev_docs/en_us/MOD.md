@@ -61,7 +61,7 @@
 ├─ game.json or screensaver.json
 ├─ actions.json             # optional for games
 ├─ scripts/main.lua
-└─ assets/language/<code>/package.json
+└─ assets/language/<code>/package/<配置文件名>.json
 ```
 
 > 注：`package.json`、`game.json` 的具体字段含义请参考后续章节。
@@ -79,7 +79,7 @@ The host uses the schema 2 split-file package format. The old single-file exampl
 ├─ game.json or screensaver.json
 ├─ actions.json             # optional for games
 ├─ scripts/main.lua
-└─ assets/language/<code>/package.json
+└─ assets/language/<code>/package/<配置文件名>.json
 ```
 
 # 模组脚本规范

@@ -3,7 +3,7 @@
 | 项目         | 内容                       |
 | ---------- | ------------------------ |
 | **API 版本** | 1                        |
-| **最后更新日期** | 2026-09-29                    |
+| **最后更新日期** | 2026-10-02                    |
 | **更新作者**   | MXFish                   |
 | **文档作用**   | 本文档展示所有 API 的基本使用标准和总索引。 |
 
@@ -38,6 +38,8 @@ Lua 基础语法保持不变，但脚本运行环境不会直接提供完整的�
 | `align`         | 辅助计算布局坐标      | [ALIGN](./api/align.md)                | 方法 / 常量 |
 | `char`          | 常用的字符表        | [CHAR](./api/char.md)                  | 常量      |
 | `color`         | 颜色控制          | [COLOR](./api/color.md)                | 方法 / 常量 |
+| `timer` | 计时与循环提醒 | [TIMER](./api/timer.md) | 方法 |
+| `date` | 获取时间及日期与时间戳转换 | [DATE](./api/date.md) | 方法 / 常量 |
 | `debug`         | 用于脚本信息调试与错误捕获 | [DEBUG](./api/debug.md)                | 方法 / 常量 |
 | `encoding`      | 提供基础的编码与解码转换  | [ENCODING](./api/encoding.md)          | 方法      |
 | `event`         | 事件队列控制        | [EVENT](./api/event.md)                | 方法      |
@@ -98,6 +100,7 @@ draw.text(1, 2, "Hello Tui Game", {fg = color.WHITE}) -- 在 base 切片坐标 (
 
 ### 参数与结果的补充约定
 
+
 - `base`、`debug.pcall`、`debug.xpcall` 以及 `table.concat/insert/move/pack/remove/sort/unpack` 保留位置参数或变参协议，选填参数也直接按位置传递。`table.insert(list, pos, value)` 的插入位置位于值之前。
 - 当前 `string`、`math`、`utf8` 是项目提供的接口；不能仅凭与 Lua 标准函数同名，就套用标准签名。比如 `string.find(text, pattern, {init = 2})` 返回起点、终点和捕获表。
 - 多个结果按顺序接收，如 `local width, height = measurement.get_text_size("文字")`。结果本身是数据表时仍返回表，未找到对象时的 `nil` 等分支见对应方法。
@@ -105,4 +108,6 @@ draw.text(1, 2, "Hello Tui Game", {fg = color.WHITE}) -- 在 base 切片坐标 (
 - 文档中的 `integer`、`float` 是 `number` 的两种形式；`const-color` 等表示该库提供的常量，并非额外的 Lua 类型。二进制数据使用 Lua 字符串保存。
 - 示例是单个功能片段。完整脚本还需定义 `Init`、`HandleEvent`、`Update`、`UpdateFrame`、`Render`；显示 `debug.print` 等输出需要开启调试模式。示例下的“输出”留空，供人工实测填写。
 - 文件、图片及语言加载需要包内资源；异步方法返回请求编号，实际结果在 `HandleEvent` 中接收，不能把请求编号当作读取结果。
-- `audio`、`animation`、`http`、`timer`、`effect`、`widget`、`ime` 和 `keyboard` 当前未开放，相关占位页不代表可调用。查看⌞[调用约定](LUA_API_MIGRATION.md)⌝与⌞[可用接口](LUA_COMPATIBILITY.md)⌝。
+- `audio`、`animation`、`http`、`effect`、`widget` 和 `keyboard` 当前未开放，相关占位页不代表可调用。查看⌞[调用约定](LUA_API_MIGRATION.md)⌝与⌞[可用接口](LUA_COMPATIBILITY.md)⌝。
+
+动作与原始键接收由 [ime 库](api/ime.md) 分别控制。游戏默认接收动作，不接收原始键；held 只发送一次，持续移动在 Update 中使用保存的按住状态。

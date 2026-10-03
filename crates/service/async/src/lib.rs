@@ -1,9 +1,61 @@
-//! Async task executor: worker threads, task ids/states, cooperative cancellation, the write
-//! barrier for asynchronous file writes, and managed listener threads.
+//! Background task execution, cancellation, completion events, and shutdown write tracking.
 //!
-//! The executor is generic over the application's event type `E`; tasks implement [`AsyncJob`]
-//! and report through a `Sender<E>`. Completion/failure of a task is reported as
-//! [`TaskStatusEvent`], so `E` must implement `From<TaskStatusEvent>`.
+//! # Examples
+//!
+//! ```rust
+//! use std::time::{Duration, Instant};
+//!
+//! use crossbeam_channel::Sender;
+//! use tg_service_async::{
+//!   AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskState, TaskStatusEvent,
+//! };
+//!
+//! #[derive(Debug, PartialEq)]
+//! enum Event {
+//!   Answer(u32),
+//!   Status(TaskStatusEvent),
+//! }
+//!
+//! impl From<TaskStatusEvent> for Event {
+//!   fn from(event: TaskStatusEvent) -> Self {
+//!     Self::Status(event)
+//!   }
+//! }
+//!
+//! struct Answer;
+//!
+//! impl AsyncJob<Event> for Answer {
+//!   fn run(
+//!     self: Box<Self>,
+//!     _id: TaskId,
+//!     events: &Sender<Event>,
+//!     _cancellation: &TaskCancellation,
+//!   ) -> Result<(), String> {
+//!     let _ = events.send(Event::Answer(42));
+//!     Ok(())
+//!   }
+//! }
+//!
+//! fn main() {
+//!   let runtime = AsyncRuntime::<Event>::with_worker_count(1);
+//!   let id = runtime.submit(Answer);
+//!   let deadline = Instant::now() + Duration::from_secs(5);
+//!   let mut events = Vec::new();
+//!   while events.len() < 2 && Instant::now() < deadline {
+//!     events.extend(runtime.poll_events());
+//!     std::thread::sleep(Duration::from_millis(5));
+//!   }
+//!   assert_eq!(
+//!     events,
+//!     [
+//!       Event::Answer(42),
+//!       Event::Status(TaskStatusEvent::Finished { id })
+//!     ]
+//!   );
+//!   assert_eq!(runtime.task_state(id), Some(TaskState::Finished));
+//!   println!("async ok: {events:?}");
+//! }
+//! ```
 
 use std::{
   collections::{HashMap, HashSet},
@@ -23,12 +75,29 @@ mod write_barrier;
 pub use event_sink::EventSink;
 pub use write_barrier::{WriteBarrier, WriteBarrierSnapshot};
 
+/// The identity of task within its owning pool or session.
+///
+/// # Fields
+///
+/// * `0` - The wrapped u64 value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct TaskId(pub u64);
+pub struct TaskId(
+  /// The wrapped u64 value.
+  pub u64,
+);
 
+/// The identity of managed thread within its owning pool or session.
+///
+/// # Fields
+///
+/// * `0` - The wrapped u64 value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ManagedThreadId(pub u64);
+pub struct ManagedThreadId(
+  /// The wrapped u64 value.
+  pub u64,
+);
 
+/// A clonable cancellation signal checked by background work.
 #[derive(Clone)]
 pub struct TaskCancellation {
   task_id: TaskId,
@@ -36,6 +105,7 @@ pub struct TaskCancellation {
 }
 
 impl TaskCancellation {
+  /// Create a task cancellation initialized from `task_id`.
   #[cfg(any(test, feature = "test-support"))]
   pub fn new(task_id: TaskId) -> Self {
     Self {
@@ -44,10 +114,12 @@ impl TaskCancellation {
     }
   }
 
+  /// Report whether cancellation has been requested for this operation.
   pub fn is_cancelled(&self) -> bool {
     is_cancelled(&self.cancelled, self.task_id)
   }
 
+  /// Cancel the task cancellation state addressed by this operation.
   #[cfg(any(test, feature = "test-support"))]
   pub fn cancel(&self) {
     self
@@ -58,29 +130,53 @@ impl TaskCancellation {
   }
 }
 
+/// The queued, running, completed, failed, or cancelled state of an asynchronous task.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TaskState {
+  /// The operation is pending.
   Pending,
+  /// The operation is running.
   Running,
+  /// The operation is finished.
   Finished,
+  /// The operation is failed.
   Failed,
+  /// The operation is cancelled.
   Cancelled,
 }
 
-/// Completion or failure of a task, reported by the executor itself.
+/// A task status event payload queued for its owning consumer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TaskStatusEvent {
-  Finished { id: TaskId },
-  Failed { id: TaskId, error: String },
+  /// The operation is finished.
+  Finished {
+    /// The identifier of the owned object.
+    id: TaskId,
+  },
+  /// A failed notification delivered to the owning consumer.
+  Failed {
+    /// The identifier of the owned object.
+    id: TaskId,
+    /// The error.
+    error: String,
+  },
 }
 
-/// A unit of work the executor can run on a worker thread.
+/// A background operation receiving task identity, cancellation, and completion delivery.
 pub trait AsyncJob<E>: Send + 'static {
-  /// Runs the job.
+  /// Execute this job with its task identity, cancellation signal, and completion sender.
+  ///
+  /// # Arguments
+  ///
+  /// * `self` - The self.
+  /// * `id` - The identifier of the owned object.
+  /// * `events` - The events in delivery order.
+  /// * `cancellation` - The cancellation token for the operation.
   ///
   /// # Errors
   ///
-  /// Returning `Err` marks the task failed (unless it was cancelled meanwhile).
+  /// Return a job-specific diagnostic when execution fails. The implementation must check
+  /// cancellation and report its service-specific completion events.
   fn run(
     self: Box<Self>,
     id: TaskId,
@@ -88,17 +184,16 @@ pub trait AsyncJob<E>: Send + 'static {
     cancellation: &TaskCancellation,
   ) -> Result<(), String>;
 
-  /// Returns the file this job writes as `(target, temporary)`; it is registered with the write
-  /// barrier before the job is queued.
+  /// Declare the final and temporary paths tracked by shutdown, or `None` for a job without a
+  /// write.
   fn write_target(&self, _id: TaskId) -> Option<(PathBuf, PathBuf)> {
     None
   }
 
-  /// Handles a task that was cancelled before it started; called instead of [`run`](Self::run).
+  /// Report service-specific cancellation for a queued job that never began execution.
   fn cancelled_before_start(&self, _id: TaskId, _events: &Sender<E>) {}
 
-  /// Returns whether the job reports its own cancellation (then a cancelled `Ok` still counts as
-  /// finished).
+  /// Report whether this job emits its own service-specific cancellation event.
   fn reports_own_cancellation(&self) -> bool {
     false
   }
@@ -115,6 +210,7 @@ struct ManagedThread {
   handle: Option<JoinHandle<()>>,
 }
 
+/// The async runtime representation used by this module.
 pub struct AsyncRuntime<E> {
   task_tx: Sender<WorkerMessage<E>>,
   event_tx: Sender<E>,
@@ -129,10 +225,22 @@ pub struct AsyncRuntime<E> {
 }
 
 impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
+  /// Create the asynchronous executor with four worker threads.
+  ///
+  /// # Panics
+  ///
+  /// Panic if the operating system cannot create a worker thread.
   pub fn new() -> Self {
     Self::with_worker_count(4)
   }
 
+  /// Create the asynchronous executor with the requested worker count.
+  ///
+  /// A zero count still starts one worker.
+  ///
+  /// # Panics
+  ///
+  /// Panic if the operating system cannot create a worker thread.
   pub fn with_worker_count(worker_count: usize) -> Self {
     let (task_tx, task_rx) = unbounded();
     let (event_tx, event_rx) = unbounded();
@@ -147,8 +255,7 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
       let task_states = task_states.clone();
       let cancelled_tasks = cancelled_tasks.clone();
       let write_barrier = write_barrier.clone();
-      // Note: thread::spawn failure (e.g. OOM) is a process-level abort in std;
-      // no recoverable error to log here.
+
       workers.push(thread::spawn(move || {
         worker_loop(
           task_rx,
@@ -174,6 +281,8 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
     }
   }
 
+  /// Queue the background operation and return its task identifier for state queries and
+  /// completion routing.
   pub fn submit(&self, task: impl AsyncJob<E>) -> TaskId {
     let id = TaskId(self.next_task_id.fetch_add(1, Ordering::SeqCst));
     if let Some((target, temporary)) = task.write_target(id)
@@ -198,20 +307,22 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
     id
   }
 
+  /// Return the shared tracker used to await outstanding writes during shutdown.
   pub fn write_barrier(&self) -> WriteBarrier {
     self.write_barrier.clone()
   }
 
+  /// Return the last recorded lifecycle state of the asynchronous task.
   pub fn task_state(&self, id: TaskId) -> Option<TaskState> {
     let states = self.task_states.lock().unwrap_or_else(|poison| {
-      // Mutex poisoned — a previous task panicked. Recover the guard.
+      // Recover the queue after a task panic so unrelated tasks can still be received.
+
       poison.into_inner()
     });
     states.get(&id).copied()
   }
 
-  /// Requests cancellation of a task. A task that has not started yet will not run; a running
-  /// task stops submitting results at the task boundary.
+  /// Request cancellation of the identified asynchronous task.
   pub fn cancel_task(&self, id: TaskId) {
     self
       .cancelled_tasks
@@ -223,20 +334,24 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
     }
   }
 
+  /// Request cancellation for each supplied asynchronous task identifier.
   pub fn cancel_tasks(&self, ids: impl IntoIterator<Item = TaskId>) {
     for id in ids {
       self.cancel_task(id);
     }
   }
 
+  /// Drain the completion events currently available from background workers.
   pub fn poll_events(&self) -> Vec<E> {
     self.event_rx.try_iter().collect()
   }
 
+  /// Return a sender connected to the executor's completion-event queue.
   pub fn event_sender(&self) -> Sender<E> {
     self.event_tx.clone()
   }
 
+  /// Start a listener thread whose stop signal and join handle are owned by the executor.
   pub fn spawn_managed_listener<F>(&mut self, joinable: bool, start: F) -> ManagedThreadId
   where
     F: FnOnce(Sender<E>, Arc<AtomicBool>) -> JoinHandle<()> + Send + 'static,
@@ -262,6 +377,7 @@ impl<E: From<TaskStatusEvent> + Send + 'static> AsyncRuntime<E> {
 }
 
 impl<E> AsyncRuntime<E> {
+  /// Signal one managed listener to stop and join its thread.
   pub fn stop_managed_thread(&mut self, id: ManagedThreadId) -> bool {
     let Some(mut thread) = self.managed_threads.remove(&id) else {
       return false;
@@ -275,16 +391,15 @@ impl<E> AsyncRuntime<E> {
     }
     true
   }
+  /// Signal and join every managed listener thread.
   pub fn stop_all_managed_threads(&mut self) {
     let ids = self.managed_threads.keys().copied().collect::<Vec<_>>();
     for id in ids {
       let _ = self.stop_managed_thread(id);
     }
   }
-  /// Stops the task executor and waits for all worker threads to finish.
-  ///
-  /// Shutdown calls this explicitly before Lua and the other host services are destroyed; `Drop`
-  /// is only a fallback for abnormal paths.
+
+  /// Stop async work and release its owned runtime resources.
   pub fn shutdown(&mut self) {
     self.stop_all_managed_threads();
     for _ in &self.workers {
@@ -384,7 +499,8 @@ fn set_task_state(
   state: TaskState,
 ) {
   let mut states = task_states.lock().unwrap_or_else(|poison| {
-    // Mutex poisoned — a previous task panicked. Recover the guard.
+    // A poisoned queue must not prevent shutdown from collecting its remaining work.
+
     poison.into_inner()
   });
   states.insert(id, state);

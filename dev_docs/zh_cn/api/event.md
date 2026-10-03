@@ -19,7 +19,7 @@
 
 ## `skip_action`
 
-跳过本帧剩余的输入动作。
+将本帧剩余的普通动作留到后续帧处理。
 
 ### 限制
 
@@ -48,7 +48,8 @@ event.skip_action()
 
 ### 额外说明
 
-- 全局事件不会被清空。
+- 将普通 action 的 pressed、held、released 按原顺序一起延期，不影响 key、鼠标、系统事件或其他事件。
+- 已交付活动动作的 released，以及失焦、覆盖屏或拒收产生的收尾 released，仍会交付。
 
 ---
 
@@ -83,4 +84,5 @@ event.clear_action()
 
 ### 额外说明
 
-- 全局事件不会被清空。
+- 只处理普通 action 的 pressed 和 held，不影响 key、鼠标、系统事件或其他事件。
+- 已交付活动动作的 released，以及失焦、覆盖屏或拒收产生的收尾 released，仍会交付。

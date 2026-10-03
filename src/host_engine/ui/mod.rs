@@ -1,3 +1,5 @@
+//! Ui page state, user commands, and terminal-cell presentation.
+
 mod boot_loading;
 mod exit;
 mod home;

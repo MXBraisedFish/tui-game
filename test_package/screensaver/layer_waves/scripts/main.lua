@@ -1,5 +1,4 @@
--- Layer Waves: two stacked slices drift over the base layer.
--- Exercises slice creation, resizing, per-frame placement and drawing into slice layers.
+-- Layer waves package callbacks and terminal-cell drawing.
 
 local WAVE_GLYPHS = { "~", "-", "~", "=" }
 
@@ -9,6 +8,7 @@ local phase = 0
 local back_panel = nil
 local front_panel = nil
 
+-- Return the dimensions of the overlapping background and foreground wave panels.
 local function panel_sizes()
   local back = {
     width = math.max({ 8, width * 3 // 4 }),
@@ -21,6 +21,7 @@ local function panel_sizes()
   return back, front
 end
 
+-- Fill and outline one slice, then draw its animated wave positions.
 local function draw_waves(panel, panel_width, panel_height, speed, fg)
   draw.fill_rect(0, 0, panel_width, panel_height, { char = " ", slice_layer = panel })
   draw.stroke_rect(0, 0, panel_width, panel_height, { fg = fg, border_char = char.ROUNDED_LINE, slice_layer = panel })
@@ -32,6 +33,7 @@ local function draw_waves(panel, panel_width, panel_height, speed, fg)
   end
 end
 
+-- Initialize package state from the supplied base dimensions and startup data.
 function Init(ctx)
   width = ctx.base.width
   height = ctx.base.height
@@ -40,6 +42,7 @@ function Init(ctx)
   front_panel = slice.create(front.width, front.height, { bg = color.MAGENTA, layer = 10 })
 end
 
+-- Apply the resize, action, or completion events handled by this package.
 function HandleEvent(event)
   if event.type == "resize" then
     width = event.data.width
@@ -50,13 +53,16 @@ function HandleEvent(event)
   end
 end
 
+-- Advance package simulation using the fixed-update delta in seconds.
 function Update(dt)
   phase = phase + dt
 end
 
+-- Keep this optional callback empty; this package needs no work in this phase.
 function UpdateFrame(dt, alpha)
 end
 
+-- Draw the current package state in terminal-cell coordinates.
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
 

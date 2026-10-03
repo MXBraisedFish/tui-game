@@ -1,30 +1,51 @@
-//! Stable package identity: [`PackageId`] built from a [`PackageSource`], a [`PackageType`] and
-//! a validated mod id.
+//! Validated package identities and stable keys for package-scoped data.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_package_id::{PackageId, PackageSource, PackageType};
+//!
+//! let id = PackageId::new(PackageSource::Mod, PackageType::Game, "example").expect("valid name");
+//! assert_eq!(id.storage_key(), "mod/game/example");
+//! assert_eq!(PackageId::from_storage_key(&id.storage_key()).expect("valid key"), id);
+//! ```
 
 use serde::{Deserialize, Serialize};
 
-/// Origin of a package (official or mod).
+/// The official or mod origin of a package.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PackageSource {
+  /// Content originating from official.
   Official,
+  /// Content originating from mod.
   Mod,
 }
 
-/// Kind of package (game or screensaver).
+/// The game or screensaver category of a package.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PackageType {
+  /// A Lua game package.
   Game,
+  /// A Lua screensaver package.
   Screensaver,
 }
 
-/// Stable package identity used inside the host. The version, title and directory name are not
-/// part of the identity.
+/// A validated package identity independent of its title, version, and directory spelling.
+///
+/// # Fields
+///
+/// * `source` - The package source carried by this package id.
+/// * `package_type` - Whether the package is a game or screensaver.
+/// * `mod_id` - The validated package name within its source and type.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub struct PackageId {
+  /// The package source carried by this package id.
   pub source: PackageSource,
+  /// Whether the package is a game or screensaver.
   pub package_type: PackageType,
+  /// The validated package name within its source and type.
   pub mod_id: String,
 }
 
@@ -46,6 +67,18 @@ impl<'de> Deserialize<'de> for PackageId {
 }
 
 impl PackageId {
+  /// Validate a package name and combine it with the source and package type.
+  ///
+  /// # Arguments
+  ///
+  /// * `source` - The source value or package origin.
+  /// * `package_type` - Whether the package is a game or screensaver.
+  /// * `mod_id` - The validated package name within its source and type.
+  ///
+  /// # Errors
+  ///
+  /// Return an error when the package name is empty, exceeds 128 bytes, or contains characters
+  /// other than ASCII letters, digits, and underscores.
   pub fn new(
     source: PackageSource,
     package_type: PackageType,
@@ -60,6 +93,7 @@ impl PackageId {
     })
   }
 
+  /// Return the canonical source/type/name key used for package-scoped persistence.
   pub fn storage_key(&self) -> String {
     format!(
       "{}/{}/{}",
@@ -69,7 +103,11 @@ impl PackageId {
     )
   }
 
-  /// Parses the canonical key used by package-scoped profile data.
+  /// Parse a canonical package storage key into its source, type, and validated name.
+  ///
+  /// # Errors
+  ///
+  /// Return an error when the key has invalid source/type components or an invalid package name.
   pub fn from_storage_key(value: &str) -> Result<Self, String> {
     let mut parts = value.split('/');
     let source = match parts.next() {
@@ -99,6 +137,7 @@ impl std::fmt::Display for PackageId {
 }
 
 impl PackageSource {
+  /// Return the stable string key for this package source.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::Official => "official",
@@ -108,6 +147,7 @@ impl PackageSource {
 }
 
 impl PackageType {
+  /// Return the stable string key for this package type.
   pub fn as_str(self) -> &'static str {
     match self {
       Self::Game => "game",
