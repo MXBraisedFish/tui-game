@@ -55,8 +55,7 @@ draw.text(x, y, "AUTO", {fg = color.BRIGHT_RED})
 
 **输出：**
 
-```lua
-```
+![align_AUTO_example](../image/align_AUTO_example.png)
 
 ### 等值
 
@@ -95,8 +94,7 @@ draw.text(x, 3, "LEFT", {fg = color.BRIGHT_RED})
 
 **输出：**
 
-```lua
-```
+![align_LEFT_example](../image/align_LEFT_example.png)
 
 ### 等值
 
@@ -129,8 +127,7 @@ draw.text(x, 3, "H_CENTER", {fg = color.BRIGHT_RED})
 
 **输出：**
 
-```lua
-```
+![align_HORIZONTAL_CENTER_example](../image/align_HORIZONTAL_CENTER_example.png)
 
 ### 等值
 
@@ -140,7 +137,7 @@ draw.text(x, 3, "H_CENTER", {fg = color.BRIGHT_RED})
 
 ### 额外说明
 
-- 用于 `draw.text` 时，各行在最长显示行的宽度内居中；传入坐标仍是文本块左上角。
+- 用于 `draw.text` 时，各行在最长显示行的宽度内居中。
 
 ---
 
@@ -167,8 +164,7 @@ draw.text(x, 3, "RIGHT", {fg = color.BRIGHT_RED})
 
 **输出：**
 
-```lua
-```
+![align_RIGHT_example](../image/align_RIGHT_example.png)
 
 ### 等值
 
@@ -178,7 +174,7 @@ draw.text(x, 3, "RIGHT", {fg = color.BRIGHT_RED})
 
 ### 额外说明
 
-- 用于 `draw.text` 时，各行向最长显示行的右边缘对齐；传入坐标仍是文本块左上角，不是右边缘。
+- 用于 `draw.text` 时，各行向最长显示行的右边缘对齐。
 
 ---
 
@@ -205,8 +201,7 @@ draw.text(4, y, "TOP", {fg = color.BRIGHT_RED, max_width = 1})
 
 **输出：**
 
-```lua
-```
+![align_TOP_example](../image/align_TOP_example.png)
 
 ### 等值
 
@@ -239,8 +234,7 @@ draw.text(4, y, "V|CENTER", {fg = color.BRIGHT_RED, max_width = 1})
 
 **输出：**
 
-```lua
-```
+![align_VERTICAL_CENTER_example](../image/align_VERTICAL_CENTER_example.png)
 
 ### 等值
 
@@ -273,8 +267,7 @@ draw.text(4, y, "BOTTOM", {fg = color.BRIGHT_RED, max_width = 1})
 
 **输出：**
 
-```lua
-```
+![align_BOTTOM_example](../image/align_BOTTOM_example.png)
 
 ### 等值
 
@@ -308,8 +301,7 @@ draw.text(x, y, "CENTER", {fg = color.BRIGHT_RED})
 
 **输出：**
 
-```lua
-```
+![align_CENTER_example](../image/align_CENTER_example.png)
 
 ### 等值
 
@@ -320,8 +312,8 @@ draw.text(x, y, "CENTER", {fg = color.BRIGHT_RED})
 ### 额外说明
 
 - 水平对齐时等价于 `align.HORIZONTAL_CENTER`。
-- 用于 `draw.text` 时，各行在最长显示行的宽度内居中。文本块位置由传入的 `x`、`y` 决定；若要将整个文本块居中，先测量，再调用 `align.resolve_rect`。
 - 垂直对齐时等价于 `align.VERTICAL_CENTER`。
+- 用于 `draw.text` 时，各行在最长显示行的宽度内居中。
 
 ---
 
@@ -343,20 +335,20 @@ align.resolve_x
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `width` | integer | 文本宽度，范围 1～65535 |
+| `width` | integer | 文本宽度 |
 | `horizontal_align` | const-align | 水平对齐方式 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `offset_x` | integer | 默认：`0`；锚点上的水平偏移 |
-| `relative_x` | integer / nil | 默认：`nil`；自定义水平锚点 |
-| `slice_layer` | string | 默认：`"base"`；目标切片图层 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `offset_x` | integer | `0` | 锚点上的水平偏移 |
+| `relative_x` | integer / nil | `nil` | 自定义水平锚点 |
+| `slice_layer` | string | `"base"` | 目标切片图层 |
 
 ## 返回值
 
-直接返回一个值。
+返回一个值。
 
 | 类型    | 说明             |
 | ------- | ---------------- |
@@ -377,8 +369,7 @@ draw.text(x3, 4, "Game", {fg = color.BRIGHT_GREEN})
 
 **输出：**
 
-```lua
-```
+![align_resolve_x_example](../image/align_resolve_x_example.png)
 
 ---
 
@@ -398,20 +389,20 @@ align.resolve_y
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `height` | integer | 文本高度，范围 1～65535 |
+| `height` | integer | 文本高度 |
 | `vertical_align` | const-align | 垂直对齐方式 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `offset_y` | integer | 默认：`0`；锚点上的垂直偏移 |
-| `relative_y` | integer / nil | 默认：`nil`；自定义垂直锚点 |
-| `slice_layer` | string | 默认：`"base"`；目标切片图层 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `offset_y` | integer | `0` | 锚点上的垂直偏移 |
+| `relative_y` | integer / nil | `nil` | 自定义垂直锚点 |
+| `slice_layer` | string | `"base"` | 目标切片图层 |
 
 ## 返回值
 
-直接返回一个值。
+返回一个值。
 
 | 类型    | 说明             |
 | ------- | ---------------- |
@@ -432,8 +423,7 @@ draw.text(5, y3, "Game", {fg = color.BRIGHT_GREEN, max_width = 1})
 
 **输出：**
 
-```lua
-```
+![align_resolve_y_example](../image/align_resolve_y_example.png)
 
 ---
 
@@ -453,29 +443,29 @@ align.resolve_rect
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `width` | integer | 文本宽度，范围 1～65535 |
-| `height` | integer | 文本高度，范围 1～65535 |
+| `width` | integer | 文本宽度 |
+| `height` | integer | 文本高度 |
 | `horizontal_align` | const-align | 水平对齐方式 |
 | `vertical_align` | const-align | 垂直对齐方式 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `offset_x` | integer | 默认：`0`；锚点上的水平偏移 |
-| `offset_y` | integer | 默认：`0`；锚点上的垂直偏移 |
-| `relative_x` | integer / nil | 默认：`nil`；自定义水平锚点 |
-| `relative_y` | integer / nil | 默认：`nil`；自定义垂直锚点 |
-| `slice_layer` | string | 默认：`"base"`；目标切片图层 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `offset_x` | integer | `0` | 锚点上的水平偏移 |
+| `offset_y` | integer | `0` | 锚点上的垂直偏移 |
+| `relative_x` | integer / nil | `nil` | 自定义水平锚点 |
+| `relative_y` | integer / nil | `nil` | 自定义垂直锚点 |
+| `slice_layer` | string | `"base"` | 目标切片图层 |
 
 ## 返回值
 
-返回两个值，依次为 x 坐标和 y 坐标。
+返回两个值。
 
 | 值名 | 类型 | 说明 |
 | --- | --- | --- |
-| `x` | integer | 绘制起始水平坐标。 |
-| `y` | integer | 绘制起始垂直坐标。 |
+| `x` | integer | 绘制起始水平坐标 |
+| `y` | integer | 绘制起始垂直坐标 |
 
 ### 示例
 
@@ -489,5 +479,4 @@ draw.fill_rect(x2, y2, 10, 4, {bg = color.BRIGHT_GREEN})
 
 **输出：**
 
-```lua
-```
+![align_resolve_rect_example](../image/align_resolve_rect_example.png)

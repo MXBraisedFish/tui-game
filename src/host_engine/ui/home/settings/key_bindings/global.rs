@@ -27,6 +27,7 @@ const LIGHT_GRAY: TextColor = TextColor::Rgb {
 const CYAN: TextColor = TextColor::Terminal(TerminalColor::BrightCyan);
 const MAGENTA: TextColor = TextColor::Terminal(TerminalColor::BrightMagenta);
 const YELLOW: TextColor = TextColor::Terminal(TerminalColor::BrightYellow);
+const RED: TextColor = TextColor::Terminal(TerminalColor::BrightRed);
 const BLUE: TextColor = TextColor::Terminal(TerminalColor::Blue);
 const WHITE: TextColor = TextColor::Terminal(TerminalColor::BrightWhite);
 const BLACK: TextColor = TextColor::Terminal(TerminalColor::Black);
@@ -578,7 +579,7 @@ impl GlobalKeyBindingsUi {
       let y = table.y.saturating_add(3 + index as u16);
       let row = &self.rows[index];
       let conflict_color = if shared_actions.contains(row.action.as_str()) {
-        Some(YELLOW.clone())
+        Some(RED.clone())
       } else if row
         .keys
         .iter()
@@ -792,7 +793,11 @@ impl GlobalKeyBindingsUi {
       let line_y = y.saturating_add(1 + index as u16 + u16::from(index == 5));
       match index {
         0 | 1 => {
-          let color = YELLOW.clone();
+          let color = if index == 0 {
+            YELLOW.clone()
+          } else {
+            RED.clone()
+          };
           for fill_x in [
             x.saturating_add(1),
             x.saturating_add(2),

@@ -22,9 +22,9 @@ local cells = {}
 -- Construct the color sequence used by the pulsing grid.
 local function build_shades()
   local stops = table.deepcopy(PALETTE)
-  table.sort(stops, function(left, right)
+  table.sort(stops, { comp = function(left, right)
     return left.r + left.g + left.b < right.r + right.g + right.b
-  end)
+  end })
   shades = {}
   for shade = 0, SHADES - 1 do
     local scaled = shade / (SHADES - 1) * (#stops - 1)
@@ -98,6 +98,6 @@ function Render()
     local shade = (intensity * (SHADES - 1)) // 1 + 1
     draw.fill_rect(cell.x, cell.y, CELL_WIDTH - 1, CELL_HEIGHT - 1, { char = " ", bg = shades[shade] })
   end
-  local caption = table.concat({ "pulse", "grid", tostring(#cells) .. " cells" }, " / ")
+  local caption = table.concat({ "pulse", "grid", tostring(#cells) .. " cells" }, { sep = " / " })
   draw.text(1, height - 1, caption, { fg = color.GRAY })
 end

@@ -9,9 +9,9 @@
   "key_bindings_game.action.back": "{key:key_bindings_game.back} Back & Save",
   "key_bindings_game.action.color_doc.in": "{key:key_bindings_game.color_doc} Show Color Guide",
   "key_bindings_game.action.color_doc.out": "{key:key_bindings_game.color_doc} Hide Color Guide",
-  "key_bindings_game.color_doc.yellow": "Yellow - shares bindings with host; saving is allowed",
+  "key_bindings_game.color_doc.yellow": "Yellow - shares bindings with the program",
   "key_bindings_game.color_doc.gray": "Gray - This key binding cannot be modified",
-  "key_bindings_game.color_doc.composite": "Yellow + Gray - shared and locked binding",
+  "key_bindings_game.color_doc.composite": "Yellow/Red + Gray - shared and locked binding",
   "key_bindings_game.color_doc.priority": "P: package priority; list previews first binding, runtime ranks actual matches",
   "key_bindings_game.list": "List",
   "key_bindings_game.key": "Key Bindings",
@@ -37,5 +37,5 @@
   "key_bindings_game.key.order.descending": "Des↓",
   "key_bindings_game.list.search.placeholder": "🔍 Search",
   "key_bindings_game.invalid": "Invalid binding: check key names, empty or oversized combinations, repeated keys and duplicate bindings within the same action.",
-  "key_bindings_game.color_doc.shared": "Yellow - shared by actions in this scope; saving is allowed"
+  "key_bindings_game.color_doc.shared": "Red - shared by actions in this game"
 }

@@ -1508,12 +1508,12 @@ file.read
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `encoding` | const-file | 默认：`file.AUTO`；文本编码 |
-| `end_of_line` | const-file | 默认：`file.AUTO`；换行符规范 |
-| `byte` | boolean | 默认：`false`；二进制模式 |
-| `event_tip` | string / nil | 默认：`nil`；自定义事件标记 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `encoding` | const-file | `file.AUTO` | 文本编码 |
+| `end_of_line` | const-file | `file.AUTO` | 换行符规范 |
+| `byte` | boolean | `false` | 二进制模式 |
+| `event_tip` | string / nil | `nil` | 自定义事件标记 |
 
 ## 返回值
 
@@ -1521,7 +1521,7 @@ file.read
 
 | 类型 | 说明 |
 | --- | --- |
-| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号。 |
+| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
 
 ### 示例
 
@@ -1576,12 +1576,12 @@ file.write
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `encoding` | const-file | 默认：`file.AUTO`；文本编码 |
-| `end_of_line` | const-file | 默认：`file.AUTO`；换行符规范 |
-| `byte` | boolean | 默认：`false`；二进制模式 |
-| `event_tip` | string / nil | 默认：`nil`；事件提示文本 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `encoding` | const-file | `file.AUTO` | 文本编码 |
+| `end_of_line` | const-file | `file.AUTO` | 换行符规范 |
+| `byte` | boolean | `false` | 二进制模式 |
+| `event_tip` | string / nil | `nil` | 事件提示文本 |
 
 ## 返回值
 
@@ -1589,7 +1589,7 @@ file.write
 
 | 类型 | 说明 |
 | --- | --- |
-| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号。 |
+| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
 
 屏保脚本调用时返回 `nil`，不提交任务，也不产生该请求的结果事件。
 
@@ -1648,11 +1648,11 @@ file.list_dir
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `recursive` | boolean | 默认：`false`；是否递归子目录枚举 |
-| `file_type` | string / const-file | 默认：`file.ALL`；仅匹配指定扩展名 |
-| `event_tip` | string / nil | 默认：`nil`；事件提示文本 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `recursive` | boolean | `false` | 是否递归子目录枚举 |
+| `file_type` | string / const-file | `file.ALL` | 仅匹配指定扩展名 |
+| `event_tip` | string / nil | `nil` | 事件提示文本 |
 
 ## 返回值
 
@@ -1660,7 +1660,7 @@ file.list_dir
 
 | 类型 | 说明 |
 | --- | --- |
-| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号。 |
+| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
 
 屏保脚本调用时返回 `nil`，不提交任务，也不产生该请求的结果事件。
 
@@ -1721,9 +1721,9 @@ file.create_dir
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `event_tip` | string / nil | 默认：`nil`；事件提示文本 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `event_tip` | string / nil | `nil` | 事件提示文本 |
 
 ## 返回值
 
@@ -1731,7 +1731,7 @@ file.create_dir
 
 | 类型 | 说明 |
 | --- | --- |
-| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号。 |
+| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
 
 屏保脚本调用时返回 `nil`，不提交任务，也不产生该请求的结果事件。
 
@@ -1784,7 +1784,7 @@ file.exists
 
 ## 返回值
 
-直接返回一个值。
+返回一个值。
 
 | 类型    | 说明               |
 | ------- | ------------------ |
@@ -1829,10 +1829,10 @@ file.remove
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `recursive` | boolean | 默认：`false`；是否删除非空目录 |
-| `event_tip` | string / nil | 默认：`nil`；事件提示文本 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `recursive` | boolean | `false` | 是否删除非空目录 |
+| `event_tip` | string / nil | `nil` | 事件提示文本 |
 
 ## 返回值
 
@@ -1840,7 +1840,7 @@ file.remove
 
 | 类型 | 说明 |
 | --- | --- |
-| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号。 |
+| integer | 请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
 
 屏保脚本调用时返回 `nil`，不提交任务，也不产生该请求的结果事件。
 

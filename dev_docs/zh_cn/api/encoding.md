@@ -37,7 +37,7 @@ encoding.base64_encode
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `s` | string | 要编码的字符串。 |
+| `s` | string | 要编码的字符串 |
 
 ## 返回值
 
@@ -45,7 +45,7 @@ encoding.base64_encode
 
 | 类型 | 说明 |
 | --- | --- |
-| string | 编码结果。 |
+| string | 编码结果 |
 
 ### 示例
 
@@ -77,7 +77,7 @@ encoding.base64_decode
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `s` | string | 要解码的 Base64 字符串。 |
+| `s` | string | 要解码的 Base64 字符串 |
 
 ## 返回值
 
@@ -85,7 +85,7 @@ encoding.base64_decode
 
 | 类型 | 说明 |
 | --- | --- |
-| string | 解码结果。 |
+| string | 解码结果 |
 
 ### 示例
 
@@ -117,7 +117,7 @@ encoding.url_encode
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `s` | string | 要编码的字符串。 |
+| `s` | string | 要编码的字符串 |
 
 ## 返回值
 
@@ -125,7 +125,7 @@ encoding.url_encode
 
 | 类型 | 说明 |
 | --- | --- |
-| string | 编码结果。 |
+| string | 编码结果 |
 
 ### 示例
 
@@ -157,7 +157,7 @@ encoding.url_decode
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `s` | string | 要解码的百分号编码字符串。 |
+| `s` | string | 要解码的百分号编码字符串 |
 
 ## 返回值
 
@@ -165,7 +165,7 @@ encoding.url_decode
 
 | 类型 | 说明 |
 | --- | --- |
-| string | 解码结果。 |
+| string | 解码结果 |
 
 ### 示例
 
@@ -197,7 +197,7 @@ encoding.hex_encode
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `s` | string | 要编码的字符串。 |
+| `s` | string | 要编码的字符串 |
 
 ## 返回值
 
@@ -205,7 +205,7 @@ encoding.hex_encode
 
 | 类型 | 说明 |
 | --- | --- |
-| string | 编码结果。 |
+| string | 编码结果 |
 
 ### 示例
 
@@ -237,7 +237,7 @@ encoding.hex_decode
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `s` | string | 要解码的十六进制字符串。 |
+| `s` | string | 要解码的十六进制字符串 |
 
 ## 返回值
 
@@ -245,7 +245,7 @@ encoding.hex_decode
 
 | 类型 | 说明 |
 | --- | --- |
-| string | 解码结果。 |
+| string | 解码结果 |
 
 ### 示例
 

@@ -9,9 +9,9 @@
   "key_bindings_game.action.back": "{key:key_bindings_game.back} 返回并保存",
   "key_bindings_game.action.color_doc.in": "{key:key_bindings_game.color_doc} 查看颜色说明",
   "key_bindings_game.action.color_doc.out": "{key:key_bindings_game.color_doc} 关闭颜色说明",
-  "key_bindings_game.color_doc.yellow": "黄色-与宿主共享绑定，允许保存",
+  "key_bindings_game.color_doc.yellow": "黄色 - 与程序共享绑定",
   "key_bindings_game.color_doc.gray": "灰色 - 该按键不可修改",
-  "key_bindings_game.color_doc.composite": "黄色 + 灰色 - 共享按键且不可修改",
+  "key_bindings_game.color_doc.composite": "黄色/红色 + 灰色 - 共享按键且不可修改",
   "key_bindings_game.color_doc.priority": "P为包优先级；列表按首个绑定预览，实际按当前命中排序",
   "key_bindings_game.list": "列表",
   "key_bindings_game.key": "按键",
@@ -37,5 +37,5 @@
   "key_bindings_game.key.order.descending": "倒序↑",
   "key_bindings_game.list.search.placeholder": "🔍 搜索",
   "key_bindings_game.invalid": "绑定不合法：请检查键名、空或超长组合、组合内重复键，以及同一动作的重复绑定。",
-  "key_bindings_game.color_doc.shared": "黄色-游戏内多个动作共享绑定，允许保存"
+  "key_bindings_game.color_doc.shared": "红色 - 游戏内多个动作共享绑定"
 }

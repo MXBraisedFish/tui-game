@@ -101,7 +101,8 @@ draw.text(1, 2, "Hello Tui Game", {fg = color.WHITE}) -- 在 base 切片坐标 (
 ### 参数与结果的补充约定
 
 
-- `base`、`debug.pcall`、`debug.xpcall` 以及 `table.concat/insert/move/pack/remove/sort/unpack` 保留位置参数或变参协议，选填参数也直接按位置传递。`table.insert(list, pos, value)` 的插入位置位于值之前。
+- 所有公开 API 的选填参数统一放在末尾严格选项表中，例如 `tonumber("ff", {base = 16})`、`table.insert(list, value, {pos = 2})`；旧的位置选填参数写法不再接受。
+- `select`、`table.pack`、`string.format`、`serialization.binary_pack`、`debug.pcall` 和 `debug.xpcall` 接收变参；这些值是业务数据，表和 nil 都按原样传递。
 - 当前 `string`、`math`、`utf8` 是项目提供的接口；不能仅凭与 Lua 标准函数同名，就套用标准签名。比如 `string.find(text, pattern, {init = 2})` 返回起点、终点和捕获表。
 - 多个结果按顺序接收，如 `local width, height = measurement.get_text_size("文字")`。结果本身是数据表时仍返回表，未找到对象时的 `nil` 等分支见对应方法。
 - 绘制坐标从 `0` 开始，单位是终端字符格；Lua 数组索引从 `1` 开始。字符位置与字节位置按各方法说明区分。

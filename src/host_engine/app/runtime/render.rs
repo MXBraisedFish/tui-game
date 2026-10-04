@@ -573,6 +573,7 @@ pub(super) fn route_render(
         log: &mut services.log,
         mouse_supported: capabilities.mouse,
         truecolor_supported: capabilities.truecolor,
+        top_toolbar: services.storage.display_settings_profile().top_toolbar,
       });
     }
     Some(UiNodeKind::GamePackage) => {

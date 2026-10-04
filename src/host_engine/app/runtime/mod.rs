@@ -9,6 +9,8 @@ mod render;
 mod router;
 mod toolbar;
 
+pub(crate) use host_viewport::required_physical_size;
+
 use action_map::*;
 use commands::*;
 use engine_events::{drain_engine_events, reconcile_game_save_profile};
@@ -151,6 +153,31 @@ struct PendingScreenshotHotkey {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PendingHostHotkey {
   elapsed: Duration,
+}
+
+/// The specific host commands captured by one physical key change.
+struct HostChordFlags {
+  recording_pause: bool,
+  toolbar_switch: bool,
+}
+
+impl HostChordFlags {
+  /// Capture the specific recording and toolbar commands before handling their base actions.
+  fn new(events: &[InputActionEvent]) -> Self {
+    Self {
+      recording_pause: has_pressed_action(events, HOST_KEY_RECORDING_PAUSE),
+      toolbar_switch: has_pressed_action(events, HOST_KEY_TOP_TOOLBAR_SWITCH),
+    }
+  }
+
+  /// Allow an action unless a specific command from the same key change replaces it.
+  fn allows(&self, action: &str) -> bool {
+    match action {
+      HOST_KEY_RECORDING => !self.recording_pause,
+      HOST_KEY_TOP_TOOLBAR => !self.toolbar_switch,
+      _ => true,
+    }
+  }
 }
 
 struct AutoRecordingRuntime {
@@ -1699,54 +1726,47 @@ fn route_frame_input(
     world.state.current_overlay_kind(),
   );
   let mut ordinary_input_valid = true;
-  for event in services
-    .input
-    .notifications()
-    .iter()
-    .filter_map(|notification| match notification {
-      InputNotification::Action {
-        event,
-        system: true,
-      } => Some(event.clone()),
-      _ => None,
-    })
-    .collect::<Vec<_>>()
-  {
-    let events = std::slice::from_ref(&event);
-    let _ = handle_screenshot_hotkey(
-      services,
-      world,
-      screenshot_capture_ui,
-      pending_screenshot_saves,
-      pending_screenshot_hotkey,
-      events,
-    );
-    let _ = handle_host_chord_input(
-      services,
-      world,
-      display_settings_ui,
-      pending_recording_hotkey,
-      pending_screensaver_hotkey,
-      pending_toolbar_hotkey,
-      events,
-    );
-    let _ = handle_host_key_action(&event.action, event.state, world);
-    if world.state.is_shutdown() {
-      services.input.clear();
-      context
-        .lua_events
-        .clear_pending_interactive(LuaSessionKind::Game);
-      return;
-    }
-    if owner
-      != (
-        world.state.current_ui_kind(),
-        world.state.current_overlay_kind(),
-      )
-    {
-      // Host matches remain valid; the old page/game must not receive the rest of this batch.
-      ordinary_input_valid = false;
-      services.input.clear();
+  for batch in host_action_batches(services.input.notifications()) {
+    let chord_flags = HostChordFlags::new(&batch);
+    for event in batch {
+      let events = std::slice::from_ref(&event);
+      let _ = handle_screenshot_hotkey(
+        services,
+        world,
+        screenshot_capture_ui,
+        pending_screenshot_saves,
+        pending_screenshot_hotkey,
+        events,
+      );
+      if chord_flags.allows(&event.action) {
+        let _ = handle_host_chord_input(
+          services,
+          world,
+          display_settings_ui,
+          pending_recording_hotkey,
+          pending_screensaver_hotkey,
+          pending_toolbar_hotkey,
+          events,
+        );
+      }
+      let _ = handle_host_key_action(&event.action, event.state, world);
+      if world.state.is_shutdown() {
+        services.input.clear();
+        context
+          .lua_events
+          .clear_pending_interactive(LuaSessionKind::Game);
+        return;
+      }
+      if owner
+        != (
+          world.state.current_ui_kind(),
+          world.state.current_overlay_kind(),
+        )
+      {
+        // Host matches remain valid; the old page/game must not receive the rest of this batch.
+        ordinary_input_valid = false;
+        services.input.clear();
+      }
     }
   }
 
@@ -3070,6 +3090,30 @@ fn handle_host_chord_input(
   false
 }
 
+/// Group host matches by physical key or focus change without altering the input journal.
+fn host_action_batches(notifications: &[InputNotification]) -> Vec<Vec<InputActionEvent>> {
+  let mut batches = Vec::new();
+  let mut actions = Vec::new();
+  for notification in notifications {
+    match notification {
+      InputNotification::Key { .. } | InputNotification::Focus { .. } => {
+        if !actions.is_empty() {
+          batches.push(std::mem::take(&mut actions));
+        }
+      }
+      InputNotification::Action {
+        event,
+        system: true,
+      } => actions.push(event.clone()),
+      InputNotification::Action { system: false, .. } => {}
+    }
+  }
+  if !actions.is_empty() {
+    batches.push(actions);
+  }
+  batches
+}
+
 fn has_pressed_action(events: &[InputActionEvent], action: &str) -> bool {
   events
     .iter()
@@ -3851,6 +3895,193 @@ mod tests {
     }];
     assert!(has_pressed_action(&events, "host_key.screenshot"));
     assert!(!has_pressed_action(&events, "host_key.recording"));
+  }
+
+  #[test]
+  fn host_chord_flags_keep_specific_commands_exclusive_and_preserve_game_matches() {
+    use super::action_map::{
+      HOST_KEY_RECORDING, HOST_KEY_RECORDING_PAUSE, HOST_KEY_SCREENSHOT, HOST_KEY_TOP_TOOLBAR,
+      HOST_KEY_TOP_TOOLBAR_SWITCH,
+    };
+    use super::{HostChordFlags, host_action_batches};
+    use crate::host_engine::services::{
+      ActionMapEntry, InputNotification, InputService, Key, KeyEvent, KeyEventKind, LogService,
+      translate_action_map,
+    };
+
+    for (key, token, base_action, specific_action) in [
+      (
+        Key::Fn(2),
+        "f2",
+        HOST_KEY_RECORDING,
+        HOST_KEY_RECORDING_PAUSE,
+      ),
+      (
+        Key::Fn(5),
+        "f5",
+        HOST_KEY_TOP_TOOLBAR,
+        HOST_KEY_TOP_TOOLBAR_SWITCH,
+      ),
+    ] {
+      for base_priority in [0, 10] {
+        let mut input = InputService::new();
+        let mut log = LogService::new();
+        input.load_system_key_bindings(
+          translate_action_map(&[
+            ActionMapEntry {
+              action: base_action.into(),
+              description: String::new(),
+              keys: vec![vec![token.into()]],
+              priority: base_priority,
+            },
+            ActionMapEntry {
+              action: specific_action.into(),
+              description: String::new(),
+              keys: vec![vec!["q".into(), token.into()]],
+              priority: 0,
+            },
+          ])
+          .unwrap(),
+        );
+        input.load_key_bindings(
+          translate_action_map(&[ActionMapEntry {
+            action: "game_action".into(),
+            description: String::new(),
+            keys: vec![vec![token.into()]],
+            priority: 100,
+          }])
+          .unwrap(),
+        );
+        input.begin_frame();
+        for key in [Key::Q, key] {
+          input.queue_key_event(
+            KeyEvent {
+              key,
+              kind: KeyEventKind::Press,
+            },
+            &mut log,
+          );
+        }
+        input.poll();
+        let batches = host_action_batches(input.notifications());
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].len(), 2);
+        let flags = HostChordFlags::new(&batches[0]);
+        assert!(flags.allows(HOST_KEY_SCREENSHOT));
+        let accepted = batches[0]
+          .iter()
+          .filter(|event| flags.allows(&event.action))
+          .map(|event| event.action.as_str())
+          .collect::<Vec<_>>();
+        assert_eq!(accepted, [specific_action]);
+        assert!(
+          input
+            .notifications()
+            .iter()
+            .any(|notification| matches!(notification,
+              InputNotification::Action { event, system: false }
+                if event.action == "game_action" && event.state == KeyState::Pressed
+            ))
+        );
+
+        input.begin_frame();
+        input.queue_key_event(
+          KeyEvent {
+            key,
+            kind: KeyEventKind::Press,
+          },
+          &mut log,
+        );
+        input.poll();
+        assert!(
+          !host_action_batches(input.notifications())
+            .iter()
+            .flatten()
+            .any(|event| event.state == KeyState::Pressed)
+        );
+        input.begin_frame();
+        input.queue_key_event(
+          KeyEvent {
+            key: Key::Q,
+            kind: KeyEventKind::Release,
+          },
+          &mut log,
+        );
+        input.queue_key_event(
+          KeyEvent {
+            key,
+            kind: KeyEventKind::Release,
+          },
+          &mut log,
+        );
+        input.poll();
+        let released = host_action_batches(input.notifications())
+          .into_iter()
+          .flatten()
+          .filter(|event| event.state == KeyState::Released)
+          .map(|event| event.action)
+          .collect::<Vec<_>>();
+        assert_eq!(released, [specific_action, base_action]);
+      }
+    }
+  }
+
+  #[test]
+  fn host_chord_flags_reset_between_physical_changes_within_one_frame() {
+    use super::action_map::{HOST_KEY_RECORDING, HOST_KEY_RECORDING_PAUSE};
+    use super::{HostChordFlags, host_action_batches};
+    use crate::host_engine::services::{
+      ActionMapEntry, InputService, Key, KeyEvent, KeyEventKind, LogService, translate_action_map,
+    };
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    input.load_system_key_bindings(
+      translate_action_map(&[
+        ActionMapEntry {
+          action: HOST_KEY_RECORDING.into(),
+          description: String::new(),
+          keys: vec![vec!["f2".into()]],
+          priority: 0,
+        },
+        ActionMapEntry {
+          action: HOST_KEY_RECORDING_PAUSE.into(),
+          description: String::new(),
+          keys: vec![vec!["q".into(), "f2".into()]],
+          priority: 0,
+        },
+      ])
+      .unwrap(),
+    );
+    input.begin_frame();
+    for (key, kind) in [
+      (Key::Q, KeyEventKind::Press),
+      (Key::Fn(2), KeyEventKind::Press),
+      (Key::Fn(2), KeyEventKind::Release),
+      (Key::Q, KeyEventKind::Release),
+      (Key::Fn(2), KeyEventKind::Press),
+      (Key::Q, KeyEventKind::Press),
+    ] {
+      input.queue_key_event(KeyEvent { key, kind }, &mut log);
+    }
+    input.poll();
+    let accepted = host_action_batches(input.notifications())
+      .into_iter()
+      .flat_map(|batch| {
+        let flags = HostChordFlags::new(&batch);
+        batch
+          .into_iter()
+          .filter(move |event| event.state == KeyState::Pressed && flags.allows(&event.action))
+      })
+      .map(|event| event.action)
+      .collect::<Vec<_>>();
+    assert_eq!(
+      accepted,
+      [
+        HOST_KEY_RECORDING_PAUSE,
+        HOST_KEY_RECORDING,
+        HOST_KEY_RECORDING_PAUSE
+      ]
+    );
   }
 
   #[test]

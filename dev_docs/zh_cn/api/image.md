@@ -32,22 +32,22 @@ image.load
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `path` | string | 相对 `assets/` 的路径；不接受绝对路径、父级路径或越出包目录的符号链接。扩展名可省略。 |
+| `path` | string | 相对 `assets/` 的路径；不接受绝对路径、父级路径或越出包目录的符号链接扩展名可省略 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `block_width` | integer | 输出字符格宽度；默认 `max(floor(图片宽度 / 100), 1)`，必须大于 0。 |
-| `block_height` | integer | 输出字符格高度；默认 `max(floor(图片高度 / 200), 1)`，必须大于 0。 |
-| `crop_x` | integer | 像素裁剪起点 x；默认 `0`。 |
-| `crop_y` | integer | 像素裁剪起点 y；默认 `0`。 |
-| `crop_width` | integer | 像素裁剪宽度；省略时取从 `crop_x` 到图片右侧的剩余区域。 |
-| `crop_height` | integer | 像素裁剪高度；省略时取从 `crop_y` 到图片底部的剩余区域。 |
-| `scale` | number | 裁剪区域的缩放比例；默认 `1.0`，必须是有限正数。 |
-| `cache` | boolean | 是否读写图像缓存；默认 `true`。 |
-| `mode` | string | 转换模式；默认 `"half_block"`，也可用 `"mix_block"` 使用更多方块字形。 |
-| `background` | string | RGBA 透明像素的混合背景；默认 `"#000000"`。只接受精确 RGB 字符串 `"#rrggbb"` 或 `"rgb(r,g,b)"`，也可传 `color.hex`、`color.rgb` 的返回值。 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `block_width` | integer | `max(floor(图片宽度 / 100), 1)` | 输出字符格宽度；必须大于 0 |
+| `block_height` | integer | `max(floor(图片高度 / 200), 1)` | 输出字符格高度；必须大于 0 |
+| `crop_x` | integer | `0` | 像素裁剪起点 x |
+| `crop_y` | integer | `0` | 像素裁剪起点 y |
+| `crop_width` | integer | 从 `crop_x` 到图片右侧的剩余区域 | 像素裁剪宽度 |
+| `crop_height` | integer | 从 `crop_y` 到图片底部的剩余区域 | 像素裁剪高度 |
+| `scale` | number | `1.0` | 裁剪区域的缩放比例；必须是有限正数 |
+| `cache` | boolean | `true` | 是否读写图像缓存 |
+| `mode` | string | `"half_block"` | 转换模式；也可用 `"mix_block"` 使用更多方块字形 |
+| `background` | string | `"#000000"` | RGBA 透明像素的混合背景只接受精确 RGB 字符串 `"#rrggbb"` 或 `"rgb(r,g,b)"`，也可传 `color.hex`、`color.rgb` 的返回值 |
 
 ## 返回值
 
@@ -55,7 +55,7 @@ image.load
 
 | 类型 | 说明 |
 | --- | --- |
-| integer | 已入队图片请求的 ID。 |
+| integer | 已入队图片请求的 ID |
 
 ### 示例
 

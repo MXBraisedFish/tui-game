@@ -39,7 +39,7 @@ ime.receive_action_event
 
 | 类型 | 说明 |
 | --- | --- |
-| boolean | 接收状态发生改变时为 true；已经处于目标状态时为 false。 |
+| boolean | 接收状态发生改变时为 true；已经处于目标状态时为 false |
 
 ### 示例
 
@@ -85,7 +85,7 @@ ime.reject_action_event
 
 | 类型 | 说明 |
 | --- | --- |
-| boolean | 接收状态发生改变时为 true；已经处于目标状态时为 false。 |
+| boolean | 接收状态发生改变时为 true；已经处于目标状态时为 false |
 
 ### 示例
 
@@ -130,7 +130,7 @@ ime.receive_key_event
 
 | 类型 | 说明 |
 | --- | --- |
-| boolean | 接收状态发生改变时为 true；已经处于目标状态时为 false。 |
+| boolean | 接收状态发生改变时为 true；已经处于目标状态时为 false |
 
 ### 示例
 
@@ -175,7 +175,7 @@ ime.reject_key_event
 
 | 类型 | 说明 |
 | --- | --- |
-| boolean | 接收状态发生改变时为 true；已经处于目标状态时为 false。 |
+| boolean | 接收状态发生改变时为 true；已经处于目标状态时为 false |
 
 ### 示例
 

@@ -13,7 +13,7 @@ local log_lines = {}
 local function push_log(line)
   table.insert(log_lines, line)
   while #log_lines > MAX_LOG_LINES do
-    table.remove(log_lines, 1)
+    table.remove(log_lines, { pos = 1 })
   end
 end
 
@@ -40,7 +40,7 @@ local function handle_file_event(data)
     for _, entry in ipairs(data.entries) do
       table.insert(names, entry.path .. " [" .. entry.file_type .. "]")
     end
-    push_log("state/ contains: " .. table.concat(names, ", "))
+    push_log("state/ contains: " .. table.concat(names, { sep = ", " }))
   end
 end
 

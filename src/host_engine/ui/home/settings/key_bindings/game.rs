@@ -36,6 +36,7 @@ const LIGHT_GRAY: TextColor = TextColor::Rgb {
 const CYAN: TextColor = TextColor::Terminal(TerminalColor::BrightCyan);
 const MAGENTA: TextColor = TextColor::Terminal(TerminalColor::BrightMagenta);
 const YELLOW: TextColor = TextColor::Terminal(TerminalColor::BrightYellow);
+const RED: TextColor = TextColor::Terminal(TerminalColor::BrightRed);
 const BLUE: TextColor = TextColor::Terminal(TerminalColor::Blue);
 const WHITE: TextColor = TextColor::Terminal(TerminalColor::BrightWhite);
 const BLACK: TextColor = TextColor::Terminal(TerminalColor::Black);
@@ -1458,7 +1459,7 @@ impl GameKeyBindingsUi {
         );
       }
       let marker = match self.game_conflict_level(game) {
-        ConflictLevel::Internal => Some(YELLOW.clone()),
+        ConflictLevel::Internal => Some(RED.clone()),
         ConflictLevel::Global => Some(YELLOW.clone()),
         ConflictLevel::None => None,
       };
@@ -1535,7 +1536,7 @@ impl GameKeyBindingsUi {
       }
       let conflict = self.row_conflict_level(game, row);
       let conflict_color = match conflict {
-        ConflictLevel::Internal => Some(YELLOW.clone()),
+        ConflictLevel::Internal => Some(RED.clone()),
         ConflictLevel::Global => Some(YELLOW.clone()),
         ConflictLevel::None => None,
       };
@@ -1768,7 +1769,11 @@ impl GameKeyBindingsUi {
       let line_y = y.saturating_add(1 + index as u16 + u16::from(index == 5));
       match index {
         0 | 1 => {
-          let color = YELLOW.clone();
+          let color = if index == 0 {
+            YELLOW.clone()
+          } else {
+            RED.clone()
+          };
           for fill_x in [
             x.saturating_add(1),
             x.saturating_add(2),

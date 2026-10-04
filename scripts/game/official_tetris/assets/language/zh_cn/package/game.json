@@ -1,0 +1,5 @@
+{
+  "game.name": "俄罗斯方块",
+  "game.empty_text": "f%<fg:bright_green>普通模式</fg>\n分数: ---\n<fg:bright_red>挑战模式</fg>\n分数: ---\n等级: ---\n阶段: ---",
+  "game.detail": "f%经典俄罗斯方块，控制方块下落，消除行数，获得分数。\n游戏分为<fg:bright_green>普通模式</fg>和<fg:bright_red>挑战模式</fg>。\n\n<fg:bright_green>普通模式</fg>：\n无特殊规则，尽可能达成最高分数吧！\n\n<fg:bright_red>挑战模式</fg>：\n参考 NES 版本实现，随着等级上升，方块下落速度会变的更快，但同时获得分数也会更高。\n冲击自己的极限吧！"
+}

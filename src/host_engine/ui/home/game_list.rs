@@ -131,6 +131,7 @@ pub(crate) struct GameListLayout {
 /// * `log` - The &'a mut log service instance used by this owner.
 /// * `mouse_supported` - The mouse supported.
 /// * `truecolor_supported` - The truecolor supported.
+/// * `top_toolbar` - Whether game startup reserves two terminal rows for the toolbar.
 pub(crate) struct GameListRenderContext<'a> {
   /// The &'a mut render service instance used by this owner.
   pub(crate) render: &'a mut RenderService,
@@ -156,6 +157,8 @@ pub(crate) struct GameListRenderContext<'a> {
   pub(crate) mouse_supported: bool,
   /// The truecolor supported.
   pub(crate) truecolor_supported: bool,
+  /// Whether game startup reserves two terminal rows for the toolbar.
+  pub(crate) top_toolbar: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -616,13 +619,7 @@ impl GameListUi {
       info_scroll_rect,
       context.layout,
     );
-    let info_content_height = self.info_content_height(
-      context.layout,
-      context.i18n,
-      positions.right_inner.width,
-      context.mouse_supported,
-      context.truecolor_supported,
-    );
+    let info_content_height = self.info_content_height(context, positions.right_inner.width);
     context.scroll_box.set_content_size(
       &mut self.objects,
       self.info_scroll,
@@ -1178,12 +1175,7 @@ impl GameListUi {
     );
     self.draw_info_separator(context.canvas, width, &mut y);
 
-    let warnings = self.info_warnings(
-      context.i18n,
-      &entry,
-      context.mouse_supported,
-      context.truecolor_supported,
-    );
+    let warnings = self.info_warnings(context, &entry);
     if !warnings.is_empty() {
       for warning in warnings {
         self.draw_info_warning(context.render, context.canvas, width, &mut y, warning);
@@ -1394,14 +1386,9 @@ impl GameListUi {
     self.apply_global_selection(index);
   }
 
-  fn info_content_height(
-    &self,
-    layout: &LayoutService,
-    i18n: &I18nService,
-    width: u16,
-    mouse_supported: bool,
-    truecolor_supported: bool,
-  ) -> u16 {
+  fn info_content_height(&self, context: &GameListRenderContext<'_>, width: u16) -> u16 {
+    let layout = context.layout;
+    let i18n = context.i18n;
     let Some(entry) = self.selected_entry() else {
       return 1;
     };
@@ -1409,7 +1396,7 @@ impl GameListUi {
     let width = width.max(1);
     let params = Self::package_rich_params(&entry);
     let mut height = 6;
-    let warnings = self.info_warnings(i18n, &entry, mouse_supported, truecolor_supported);
+    let warnings = self.info_warnings(context, &entry);
     if !warnings.is_empty() {
       height += warnings.len() as u16 + 1;
     }
@@ -1453,21 +1440,21 @@ impl GameListUi {
       .max(1)
   }
 
+  /// Return enabled game warnings using physical terminal dimensions and startup reservations.
   fn info_warnings(
     &self,
-    i18n: &I18nService,
+    context: &GameListRenderContext<'_>,
     entry: &PackageListEntry,
-    mouse_supported: bool,
-    truecolor_supported: bool,
   ) -> Vec<String> {
+    let i18n = context.i18n;
     if !self.show_warnings {
       return Vec::new();
     }
     let mut warnings = Vec::new();
-    if entry.mouse_required && !mouse_supported {
+    if entry.mouse_required && !context.mouse_supported {
       warnings.push(i18n.get_runtime_text("game_list", "game_list.info.mouse.error"));
     }
-    if entry.truecolor_required && !truecolor_supported {
+    if entry.truecolor_required && !context.truecolor_supported {
       warnings.push(i18n.get_runtime_text("game_list", "game_list.info.true_color.error"));
     }
     if !entry
@@ -1476,6 +1463,21 @@ impl GameListUi {
       .any(|language| language.eq_ignore_ascii_case(i18n.current_language_code()))
     {
       warnings.push(i18n.get_runtime_text("game_list", "game_list.info.language.error"));
+    }
+    let physical = context.layout.physical_size();
+    let required = crate::host_engine::app::required_physical_size(
+      (u64::from(entry.min_width), u64::from(entry.min_height)),
+      context.top_toolbar,
+    );
+    if (entry.min_width > 0 && u64::from(physical.width) < required.0)
+      || (entry.min_height > 0 && u64::from(physical.height) < required.1)
+    {
+      warnings.push(
+        i18n
+          .get_runtime_text("game_list", "game_list.info.size.error")
+          .replace("{value:w}", &required.0.to_string())
+          .replace("{value:h}", &required.1.to_string()),
+      );
     }
     warnings
   }
@@ -1923,6 +1925,137 @@ impl GameListUi {
 mod tests {
   use super::*;
   use crate::host_engine::services::BestGameSave;
+
+  #[test]
+  fn size_warnings_use_physical_dimensions_and_track_scroll_content_height() {
+    use crate::host_engine::services::{PackageAsset, PackageType};
+
+    let hit_area = HitAreaService::new();
+    let text_input = TextInputService::new();
+    let scroll_box = ScrollBoxService::new();
+    let mut ui = GameListUi::init(&hit_area, &text_input, &scroll_box);
+    let mut layout = LayoutService::new();
+    let mut render = RenderService::new();
+    let mut canvas = CanvasService::new();
+    let mut i18n = I18nService::new();
+    let package = PackageService::new();
+    let storage = StorageService::from_root_for_test(std::env::temp_dir());
+    let mut log = LogService::new();
+    let asset = PackageAsset::Text {
+      path: String::new(),
+      lines: Vec::new(),
+    };
+    let mut entry = PackageListEntry {
+      id: PackageId::new(PackageSource::Official, PackageType::Game, "size_test").unwrap(),
+      mod_id: "size_test".into(),
+      source: PackageSource::Official,
+      package_type: PackageType::Game,
+      key_actions: HashMap::new(),
+      key_default_actions: HashMap::new(),
+      title: "Game".into(),
+      game_name: "Game".into(),
+      screensaver_name: String::new(),
+      game_detail: "Details".into(),
+      description: String::new(),
+      author: String::new(),
+      version: String::new(),
+      icon: asset.clone(),
+      icon_path: None,
+      banner: asset,
+      path: PathBuf::new(),
+      enabled: true,
+      debug: false,
+      mouse_required: false,
+      truecolor_required: false,
+      supported_languages: vec!["zh_cn".into(), "en_us".into()],
+      score_enabled: false,
+      score_empty_text: String::new(),
+      best_string: None,
+      best_values: HashMap::new(),
+      min_width: 120,
+      min_height: 40,
+      screensaver_command: String::new(),
+    };
+    for (language, translations) in [
+      (
+        "zh_cn",
+        include_str!(concat!(
+          env!("CARGO_MANIFEST_DIR"),
+          "/assets/language/zh_cn/runtime/game_list.json"
+        )),
+      ),
+      (
+        "en_us",
+        include_str!(concat!(
+          env!("CARGO_MANIFEST_DIR"),
+          "/assets/language/en_us/runtime/game_list.json"
+        )),
+      ),
+    ] {
+      i18n.set_current_language(language);
+      i18n.insert_runtime_namespace(
+        "game_list",
+        serde_json::from_str::<HashMap<String, String>>(translations).unwrap(),
+      );
+      for (width, height, top_toolbar, minimum, expected) in [
+        (119, 42, true, (120, 40), Some((120u64, 42u64))),
+        (120, 41, true, (120, 40), Some((120, 42))),
+        (120, 42, true, (120, 40), None),
+        (120, 40, false, (120, 40), None),
+        (120, 39, false, (120, 40), Some((120, 40))),
+        (120, 65535, true, (120, 65535), Some((120, 65537))),
+        (
+          120,
+          40,
+          false,
+          (u32::MAX, 40),
+          Some((u64::from(u32::MAX), 40)),
+        ),
+        (0, 0, true, (0, 0), None),
+      ] {
+        layout.resize_physical(width, height);
+        layout.set_developer_viewport(Rect {
+          x: 0,
+          y: 0,
+          width: 20,
+          height: 5,
+        });
+        entry.min_width = minimum.0;
+        entry.min_height = minimum.1;
+        ui.entries = vec![entry.clone()];
+        let context = GameListRenderContext {
+          render: &mut render,
+          canvas: &mut canvas,
+          layout: &layout,
+          i18n: &i18n,
+          hit_area: &hit_area,
+          text_input: &text_input,
+          scroll_box: &scroll_box,
+          package: &package,
+          storage: &storage,
+          log: &mut log,
+          mouse_supported: true,
+          truecolor_supported: true,
+          top_toolbar,
+        };
+        let warnings = ui.info_warnings(&context, &entry);
+        let expected_text = expected.map(|(w, h)| match language {
+          "zh_cn" => format!("该游戏需要至少 {w}x{h} 的终端尺寸才可以运行"),
+          _ => format!("This game requires a terminal size of at least {w}x{h} to run"),
+        });
+        assert_eq!(warnings, expected_text.into_iter().collect::<Vec<_>>());
+        let visible_height = ui.info_content_height(&context, 80);
+        ui.show_warnings = false;
+        assert!(ui.info_warnings(&context, &entry).is_empty());
+        let hidden_height = ui.info_content_height(&context, 80);
+        ui.show_warnings = true;
+        assert_eq!(
+          visible_height - hidden_height,
+          if expected.is_some() { 2 } else { 0 }
+        );
+      }
+    }
+  }
 
   #[test]
   fn best_score_ui_resolves_values_and_invalidates_cached_language_resources() {

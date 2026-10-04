@@ -1,0 +1,5 @@
+{
+  "display.title": "俄罗斯方块",
+  "display.description": "来自 Tui Game 的游戏包。\n由 Tui Game 官方制作。\n该游戏包实现了一个接近 NES 版本的俄罗斯方块，有普通模式和挑战模式，尽可能消除行来获得更高分数吧！",
+  "display.author": "Tui Game 官方"
+}

@@ -1,6 +1,6 @@
 # Lua 兼容性与当前注册面
 
-更新时间：2026-10-02。本文说明脚本能使用哪些接口，以及与标准 Lua 调用方式的区别。
+更新时间：2026-10-04。本文说明脚本能使用哪些接口，以及与标准 Lua 调用方式的区别。
 
 ## 环境边界
 
@@ -8,13 +8,13 @@
 
 ### 基础接口
 
-下表列出当前可用的基础接口。`base`、受保护调用与标准 `table` 方法保留位置参数或变参；`math`、`string`、`utf8` 的项目接口以各自文档为准，不保证与同名标准函数有相同的签名和结果。
+下表列出当前可用的基础接口。所有公开 API 的选填参数统一放在末尾严格选项表中，变参作为业务数据依次传递；`math`、`string`、`utf8` 的项目接口以各自文档为准，不保证与同名标准函数有相同的签名和结果。
 
 | 位置 | 当前安装项 |
 |---|---|
 | 全局及 `base` | `ipairs`, `pairs`, `next`, `select`, `rawequal`, `rawget`, `rawset`, `rawlen`, `tonumber`, `tostring`, `type`, `setmetatable`, `getmetatable` |
 | `math` | 函数：`abs`, `ceil`, `floor`, `round`, `round_to`, `fmod`, `pow`, `exp`, `log`, `lg`, `ln`, `sqrt`, `ldexp`, `frexp`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `deg`, `rad`, `normalize_angle`, `max`, `min`, `modf`, `tointeger`, `type`, `ult`, `approx_equal`, `percent`, `factorial`, `combination`；常量：`PI`, `E`, `POSITIVE_INFINITE`, `INFINITE`, `NEGATIVE_INFINITE`, `DEG`, `RAD`, `MAX_INTEGER`, `MIN_INTEGER` |
-| `table` | 原生 Lua 5.4：`concat`, `insert`, `move`, `pack`, `remove`, `sort`, `unpack`（由宿主包装保留操作上限）；项目扩展：`count`, `count_array`, `count_hash`, `compact`, `deepcopy`, `pretty` |
+| `table` | Lua 5.4 表操作：`concat`, `insert`, `move`, `pack`, `remove`, `sort`, `unpack`（选填参数使用末尾严格选项表，并保留操作上限）；项目扩展：`count`, `count_array`, `count_hash`, `compact`, `deepcopy`, `pretty` |
 | `string` | 常量 `AUTO`, `PLAIN_TEXT`, `RICH_TEXT`；函数 `lower`, `upper`, `reverse`, `regex_escape`, `split`, `sub`, `rep`, `find`, `match`, `gmatch`, `gsub`, `regex_find`, `regex_match`, `regex_gmatch`, `regex_gsub`, `regex_test`, `regex_split`, `format`, `rich_text_to_plain_text` |
 | `utf8` | `len`, `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints`, `next` |
 
@@ -64,7 +64,9 @@
 
 - 使用 Lua 5.4，不把 Lua 5.5 新增能力视为已提供。
 - `base` 方法也能直接使用全局名称，例如 `pairs(t)`。`debug.pcall` 和 `debug.xpcall` 使用变参；全局 `pcall`、`xpcall`、`assert`、`print` 不开放。
-- `table.concat/insert/move/pack/remove/sort/unpack` 使用标准位置参数；其余项目接口有选填参数时使用末尾严格选项表。
+- 所有选填参数使用末尾严格选项表，例如 `next(t, {key = previous_key})`、`tonumber("ff", {base = 16})`、`table.concat(t, {sep = ","})`；旧的位置选填参数写法不再接受。
+- `table.insert(list, value, {pos = 2})` 先传入要插入的值；`pairs`、`ipairs` 的内部迭代协议保持不变，遍历表使用 `pairs(t)`。
+- `select`、`table.pack`、格式化与受保护调用的变参属于业务数据，仍依次传入，表和 nil 原样保留。
 - `string.find` 返回起点、终点、捕获表；`string.match` 和 `string.gmatch` 返回捕获表。字符位置按 Unicode 字符计数，不能直接套用标准 Lua 的字节位置和捕获多返回值写法。
 - `math.max/min` 接收一个数值数组，`math.log` 要求显式给出底数，`math.fmod` 只接受整数。其余限制查看各方法说明。
 - `utf8` 仅提供上表列出的名字，没有 `utf8.codepoint`、`utf8.byte_position` 或 `utf8.position` 别名。

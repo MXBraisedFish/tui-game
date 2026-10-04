@@ -48,15 +48,15 @@ table.concat
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `sep` | string | 默认：`""`；相邻元素间的分隔符 |
-| `i` | integer | 默认：`1`；起始定位 |
-| `j` | integer | 默认：`#list`；结束定位 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `sep` | string | `""` | 相邻元素间的分隔符 |
+| `i` | integer | `1` | 起始定位 |
+| `j` | integer | `#list` | 结束定位 |
 
 ## 返回值
 
-直接返回一个值。
+返回一个值。
 
 | 类型   | 说明     |
 | ------ | -------- |
@@ -69,7 +69,7 @@ local t1 = { "apple", "banana", "grape" }
 debug.print(table.concat(t1))
 
 local t2 = { "a", "b", "c" }
-debug.print(table.concat(t2, " | "))
+debug.print(table.concat(t2, { sep = " | " }))
 ```
 
 **输出：**
@@ -79,7 +79,7 @@ debug.print(table.concat(t2, " | "))
 
 ### 额外说明
 
-- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
 
 ---
 
@@ -99,14 +99,14 @@ table.insert
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `list` | table | 目标表。 |
-| `value` | any | 要插入的值；追加形式为 `table.insert(list, value)`。 |
+| `list` | table | 目标表 |
+| `value` | any | 要插入的值；追加形式为 `table.insert(list, value)` |
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `pos` | integer | 插入位置；使用时调用 `table.insert(list, pos, value)`。 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `pos` | integer | `#list + 1` | 插入位置 |
 
 ## 返回值
 
@@ -120,7 +120,7 @@ table.insert(t1, "z")
 debug.print(table.pretty(t1) .. "\n")
 
 local t2 = { "a", "c" }
-table.insert(t2, 2, "b")
+table.insert(t2, "b", { pos = 2 })
 debug.print(table.pretty(t2))
 ```
 
@@ -131,7 +131,7 @@ debug.print(table.pretty(t2))
 
 ### 额外说明
 
-- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
 
 ---
 
@@ -151,16 +151,16 @@ table.move
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `src` | table | 源表。 |
-| `first` | integer | 要复制范围的起始索引。 |
-| `last` | integer | 要复制范围的结束索引。 |
-| `target_start` | integer | 目标表中的起始索引。 |
+| `src` | table | 源表 |
+| `first` | integer | 要复制范围的起始索引 |
+| `last` | integer | 要复制范围的结束索引 |
+| `target_start` | integer | 目标表中的起始索引 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `target` | table | 接收复制内容的表；默认使用 `src`。 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `target` | table | `src` | 接收复制内容的表 |
 
 ## 返回值
 
@@ -191,7 +191,7 @@ debug.print(table.pretty(t2))
 
 ### 额外说明
 
-- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
 
 - 该 API 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
 - 返回值是目标表 `target`；未给 `target` 时是源表 `src`。
@@ -207,14 +207,6 @@ debug.print(table.pretty(t2))
 ```lua
 table.pack
 ```
-
-## 参数
-
-### 选填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `...` | any... | 传给函数的参数，可包含表和 nil。 |
 
 ## 返回值
 
@@ -241,7 +233,7 @@ debug.print(table.pretty(packed2))
 
 ### 额外说明
 
-- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+- 要保存的值依次传入，表和 nil 都会原样保留；没有值时使用 `table.pack()`。
 
 - 返回值数组表结构如下：
 
@@ -277,10 +269,10 @@ table.unpack
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `i` | integer | 默认：`1`；起始索引 |
-| `j` | integer | 默认：`#list`；结束索引 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `i` | integer | `1` | 起始索引 |
+| `j` | integer | `#list` | 结束索引 |
 
 ## 返回值
 
@@ -298,7 +290,7 @@ local a1, b1, c1 = table.unpack(t1)
 debug.print(a1 .. " " .. b1 .. " " .. c1)
 
 local t2 = { 10, 20, 30, 40 }
-local a2, b2 = table.unpack(t2, 2)
+local a2, b2 = table.unpack(t2, { i = 2 })
 debug.print(a2 .. " " .. b2)
 ```
 
@@ -309,7 +301,7 @@ debug.print(a2 .. " " .. b2)
 
 ### 额外说明
 
-- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
 
 - 该 API 返回多参数而非表。
 
@@ -335,9 +327,9 @@ table.remove
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `pos` | integer | 默认：`#list`；删除位置 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `pos` | integer | `#list` | 删除位置 |
 
 ## 返回值
 
@@ -353,7 +345,7 @@ local removed1 = table.remove(t1)
 debug.print(removed1 .. " " .. table.pretty(t1) .. "\n")
 
 local t2 = { 10, 20, 30, 40 }
-local removed2 = table.remove(t2, 2)
+local removed2 = table.remove(t2, { pos = 2 })
 debug.print(removed2 .. " " .. table.pretty(t2))
 ```
 
@@ -364,7 +356,7 @@ debug.print(removed2 .. " " .. table.pretty(t2))
 
 ### 额外说明
 
-- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
 
 ---
 
@@ -388,9 +380,9 @@ table.sort
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `comp` | function / nil | 默认：`nil`；比较函数 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `comp` | function / nil | `nil` | 比较函数 |
 
 ## 返回值
 
@@ -408,15 +400,15 @@ table.sort(t2)
 debug.print(table.pretty(t2) .. "\n")
 
 local t3 = { 5, 2, 8, 1 }
-table.sort(t3, function(left, right)
+table.sort(t3, { comp = function(left, right)
   return left > right
-end)
+end })
 debug.print(table.pretty(t3) .. "\n")
 
 local t4 = { "abc", "a", "abcdef", "ab" }
-table.sort(t4, function(left, right)
+table.sort(t4, { comp = function(left, right)
   return #left < #right
-end)
+end })
 debug.print(table.pretty(t4))
 ```
 
@@ -427,7 +419,7 @@ debug.print(table.pretty(t4))
 
 ### 额外说明
 
-- 使用 Lua 5.4 的位置参数/变参调用方式，选填参数不放入选项表。查看⌞[Lua 5.4 表操作](https://www.lua.org/manual/5.4/manual.html#6.6)⌝。
+- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
 
 - 参数 `comp` 函数结构如下：
 
@@ -504,7 +496,7 @@ table.pretty
 
 ## 返回值
 
-直接返回一个值。
+返回一个值。
 
 | 类型   | 说明           |
 | ------ | -------------- |
@@ -548,8 +540,8 @@ table.count
 
 | 值名 | 类型 | 说明 |
 | --- | --- | --- |
-| `count` | integer | 表中真实存在的元素数量。 |
-| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列。 |
+| `count` | integer | 表中真实存在的元素数量 |
+| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列 |
 
 ### 示例
 
@@ -597,9 +589,9 @@ table.count_array
 
 | 值名 | 类型 | 说明 |
 | --- | --- | --- |
-| `count` | integer | 真实存在的数组元素数量。 |
-| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列。 |
-| `indexes` | table | 所有有效数组下标组成的升序数组表。 |
+| `count` | integer | 真实存在的数组元素数量 |
+| `contiguous` | boolean | 数组部分是否从下标 1 开始连续排列 |
+| `indexes` | table | 所有有效数组下标组成的升序数组表 |
 
 ### 示例
 
@@ -643,7 +635,7 @@ table.count_hash
 
 ## 返回值
 
-直接返回一个值。
+返回一个值。
 
 | 类型    | 说明                 |
 | ------- | -------------------- |
@@ -685,7 +677,7 @@ table.compact
 
 ## 返回值
 
-直接返回一个值。
+返回一个值。
 
 | 类型  | 说明                         |
 | ----- | ---------------------------- |

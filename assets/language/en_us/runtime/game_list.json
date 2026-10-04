@@ -38,5 +38,6 @@
   "game_list.list.search.placeholder": "🔍 Search",
   "game_list.list.source.official": "Official",
   "game_list.list.source.mod": "Mod",
-  "game_list.info.high_score.no": "No High Score"
+  "game_list.info.high_score.no": "No High Score",
+  "game_list.info.size.error": "This game requires a terminal size of at least {value:w}x{value:h} to run"
 }

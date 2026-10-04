@@ -2096,8 +2096,13 @@ mod tests {
       .get::<Value>("compatibility_base")
       .unwrap();
 
-    let session =
-      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let host_source = source.replace(r#"tonumber("ff", 16)"#, r#"tonumber("ff", { base = 16 })"#);
+
+    let session = LuaSession::load(
+      spec(&host_source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+    )
+    .unwrap();
     let host_result = session.environment_value("compatibility_base");
 
     assert_eq!(
@@ -2107,7 +2112,7 @@ mod tests {
   }
 
   #[test]
-  fn table_standard_library_matches_native_lua54_behavior() {
+  fn table_named_options_preserve_native_lua54_behavior() {
     let source = valid_script(
       r##"
         local sequence = { "a", "c" }
@@ -2159,8 +2164,49 @@ mod tests {
       .get::<Value>("compatibility_table")
       .unwrap();
 
-    let session =
-      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let host_source = source
+      .replace(
+        r#"table.insert(sequence, 2, "b")"#,
+        r#"table.insert(sequence, "b", { pos = 2 })"#,
+      )
+      .replace(
+        r#"table.remove(sequence, 2)"#,
+        r#"table.remove(sequence, { pos = 2 })"#,
+      )
+      .replace(
+        r#"table.move(moved, 2, 3, 1, target)"#,
+        r#"table.move(moved, 2, 3, 1, { target = target })"#,
+      )
+      .replace(
+        r#"table.unpack(packed, 1, packed.n)"#,
+        r#"table.unpack(packed, { i = 1, j = packed.n })"#,
+      )
+      .replace(
+        r#"table.concat({ 1, "二", 3 }, "|", 1, 3)"#,
+        r#"table.concat({ 1, "二", 3 }, { sep = "|", i = 1, j = 3 })"#,
+      )
+      .replace(
+        r#"table.concat(virtual, ",")"#,
+        r#"table.concat(virtual, { sep = "," })"#,
+      )
+      .replace(
+        r#"table.concat(sequence, "")"#,
+        r#"table.concat(sequence, { sep = "" })"#,
+      )
+      .replace(
+        r#"table.concat(moved, ",")"#,
+        r#"table.concat(moved, { sep = "," })"#,
+      )
+      .replace(
+        r#"table.concat(target, ",")"#,
+        r#"table.concat(target, { sep = "," })"#,
+      );
+
+    let session = LuaSession::load(
+      spec(&host_source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+    )
+    .unwrap();
     let host_result = session.environment_value("compatibility_table");
 
     assert_eq!(
@@ -4683,6 +4729,103 @@ mod tests {
   }
 
   #[test]
+  fn named_options_preserve_table_payloads_iteration_and_strict_validation() {
+    let source = valid_script(
+      r##"
+        function Init(ctx)
+          local function fails(func)
+            return not select(1, debug.pcall(func))
+          end
+          debug.assert(tonumber("ff", { base = 16 }) == 255
+              and base.tonumber("11", { base = 2 }) == 3
+              and tonumber("12.5", {}) == 12.5
+              and tonumber("0x1p2") == 4
+              and tonumber("bad") == nil)
+          local key_table = {}
+          local values = { [key_table] = 1, other = 2 }
+          local visited = 0
+          local key, value = next(values)
+          while key ~= nil do
+            visited = visited + 1
+            key, value = base.next(values, { key = key })
+          end
+          debug.assert(visited == 2 and next({}, {}) == nil)
+          visited = 0
+          for key, value in pairs(values) do visited = visited + value end
+          debug.assert(visited == 3)
+          local custom = setmetatable({}, { __pairs = function()
+            local complete = false
+            return function()
+              if not complete then complete = true; return "custom", 7 end
+            end, nil, nil
+          end })
+          for key, value in pairs(custom) do
+            debug.assert(key == "custom" and value == 7)
+          end
+
+          local payload = { pos = "this is data" }
+          local list = {}
+          table.insert(list, payload)
+          table.insert(list, false, { pos = 1 })
+          debug.assert(list[1] == false and list[2] == payload)
+          debug.assert(table.remove(list, { pos = 1 }) == false)
+          table.insert(list, nil, { pos = 1 })
+          debug.assert(list[1] == nil and list[2] == payload)
+          local target = {}
+          debug.assert(table.move(list, 1, 2, 1, { target = target }) == target
+              and target[1] == nil and target[2] == payload)
+          local packed = table.pack("a", nil, "c")
+          local a, b, c = table.unpack(packed, { j = packed.n })
+          debug.assert(a == "a" and b == nil and c == "c"
+              and select("#", table.unpack(packed, { j = packed.n })) == 3)
+          debug.assert(table.concat({"a", "b", "c"}, { sep = "-", i = 2 }) == "b-c"
+              and table.concat({"a", "b"}, {}) == "ab"
+              and table.concat({"a", "b"}, nil) == "ab")
+          local sorted = { 1, 3, 2 }
+          table.sort(sorted, { comp = function(left, right) return left > right end })
+          debug.assert(sorted[1] == 3 and sorted[3] == 1)
+          table.sort(sorted, {})
+          debug.assert(sorted[1] == 1 and sorted[3] == 3)
+
+          local calls = {
+            function(options) return tonumber("ff", options) end,
+            function(options) return next(values, options) end,
+            function(options) return table.concat({"a"}, options) end,
+            function(options) return table.insert({}, payload, options) end,
+            function(options) return table.move({}, 1, 0, 1, options) end,
+            function(options) return table.remove({}, options) end,
+            function(options) return table.sort({}, options) end,
+            function(options) return table.unpack({}, options) end,
+          }
+          for _, call in ipairs(calls) do
+            debug.assert(fails(function() call({ typo = 1 }) end))
+            debug.assert(fails(function() call({ [1] = 1 }) end))
+            debug.assert(fails(function() call(setmetatable({}, {})) end))
+            debug.assert(fails(function() call(1) end))
+          end
+          debug.assert(fails(function() tonumber("ff", 16) end)
+              and fails(function() tonumber("ff", { base = "16" }) end)
+              and fails(function() tonumber("ff", { base = 1 }) end)
+              and fails(function() next(values, "other") end)
+              and fails(function() table.insert({}, 1, payload) end)
+              and fails(function() table.concat({}, { sep = false }) end)
+              and fails(function() table.remove({}, { pos = 1.5 }) end)
+              and fails(function() table.move({}, 1, 0, 1, { target = false }) end)
+              and fails(function() table.sort({}, { comp = false }) end)
+              and fails(function() table.unpack({}, { j = "2" }) end)
+              and fails(function() table.concat({}, {}, {}) end))
+          local ok, received, missing = debug.pcall(function(value, hole)
+            return value, hole
+          end, payload, nil)
+          debug.assert(ok and received == payload and missing == nil
+              and select("#", payload, nil) == 2)
+        end
+      "##,
+    );
+    LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+  }
+
+  #[test]
   fn table_api_matches_documented_operations_and_pretty_output() {
     let source = valid_script(
       r#"
@@ -4691,18 +4834,18 @@ mod tests {
             return not select(1, debug.pcall(func))
           end
 
-          local joined = table.concat({ 1, "二", 3 }, "|", 1, 3)
+          local joined = table.concat({ 1, "二", 3 }, { sep = "|", i = 1, j = 3 })
           debug.assert(joined == "1|二|3")
           debug.assert(fails(function()
-              table.concat({ 1, true }, ",")
+              table.concat({ 1, true }, { sep = "," })
             end))
 
           local inserted = { "a", "c" }
-          table.insert(inserted, 2, "b")
+          table.insert(inserted, "b", { pos = 2 })
           table.insert(inserted, "d")
           debug.assert(inserted[1] == "a" and inserted[2] == "b"
               and inserted[3] == "c" and inserted[4] == "d")
-          local removed = table.remove(inserted, 2)
+          local removed = table.remove(inserted, { pos = 2 })
           debug.assert(removed == "b" and #inserted == 3 and inserted[2] == "c")
 
           local moved = { 1, 2, 3, 4 }
@@ -4710,14 +4853,14 @@ mod tests {
           debug.assert(moved_result == moved and moved[1] == 1 and moved[2] == 1
               and moved[3] == 2 and moved[4] == 3)
           local target = {}
-          debug.assert(table.move(moved, 2, 3, 1, target) == target
+          debug.assert(table.move(moved, 2, 3, 1, { target = target }) == target
               and target[1] == 1 and target[2] == 2)
           debug.assert(fails(function()
               table.move({}, 0, 1, 9223372036854775807)
             end))
           debug.assert(fails(function() table.move({}, 1, 16385, 1) end)
-              and fails(function() table.concat({}, ",", 1, 16385) end)
-              and fails(function() table.unpack({}, 1, 16385) end))
+              and fails(function() table.concat({}, { sep = ",", i = 1, j = 16385 }) end)
+              and fails(function() table.unpack({}, { i = 1, j = 16385 }) end))
 
           local packed = table.pack("a", nil, "c")
           debug.assert(packed.n == 3 and packed[1] == "a"
@@ -4725,7 +4868,7 @@ mod tests {
           local directly_packed = table.pack("x", nil, "z")
           debug.assert(directly_packed.n == 3 and directly_packed[1] == "x"
               and directly_packed[2] == nil and directly_packed[3] == "z")
-          local first, second, third = table.unpack(packed, 1, packed.n)
+          local first, second, third = table.unpack(packed, { i = 1, j = packed.n })
           debug.assert(first == "a" and second == nil and third == "c")
 
           local sparse = {
@@ -4758,7 +4901,7 @@ mod tests {
           local sortable = { 3, 1, 2 }
           table.sort(sortable)
           debug.assert(sortable[1] == 1 and sortable[2] == 2 and sortable[3] == 3)
-          table.sort(sortable, function(left, right) return left > right end)
+          table.sort(sortable, { comp = function(left, right) return left > right end })
           debug.assert(sortable[1] == 3 and sortable[2] == 2 and sortable[3] == 1)
           local oversized = {}
           for index = 1, 4097 do oversized[index] = index end

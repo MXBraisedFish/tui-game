@@ -10,18 +10,18 @@
 
 | 方法         | 说明              | 定位                    |
 | ---------- | --------------- | --------------------- |
-| `create`   | 创建一个计时器。        | [create](#create)     |
-| `list`     | 查看所有计时器的信息。     | [list](#list)         |
-| `count`    | 查看计时器总数。        | [count](#count)       |
-| `delete`   | 删除一个计时器。        | [delete](#delete)     |
-| `clear`    | 删除所有计时器。        | [clear](#clear)       |
-| `exists`   | 检查一个计时器是否还在。    | [exists](#exists)     |
-| `set`      | 修改一个计时器的参数。     | [set](#set)           |
-| `get_info` | 查看一个计时器的参数和状态。  | [get_info](#get_info) |
-| `start`    | 开始或继续计时。        | [start](#start)       |
-| `pause`    | 暂停计时，保留已经走过的时间。 | [pause](#pause)       |
-| `reset`    | 清零计时进度，回到未启动状态。 | [reset](#reset)       |
-| `restart`  | 清零计时进度，然后重新开始。  | [restart](#restart)   |
+| `create`   | 创建一个计时器        | [create](#create)     |
+| `list`     | 查看所有计时器的信息     | [list](#list)         |
+| `count`    | 查看计时器总数        | [count](#count)       |
+| `delete`   | 删除一个计时器        | [delete](#delete)     |
+| `clear`    | 删除所有计时器        | [clear](#clear)       |
+| `exists`   | 检查一个计时器是否还在    | [exists](#exists)     |
+| `set`      | 修改一个计时器的参数     | [set](#set)           |
+| `get_info` | 查看一个计时器的参数和状态  | [get_info](#get_info) |
+| `start`    | 开始或继续计时        | [start](#start)       |
+| `pause`    | 暂停计时，保留已经走过的时间 | [pause](#pause)       |
+| `reset`    | 清零计时进度，回到未启动状态 | [reset](#reset)       |
+| `restart`  | 清零计时进度，然后重新开始  | [restart](#restart)   |
 
 ---
 
@@ -47,14 +47,14 @@ timer.create
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `delay` | number | 默认：`0`；首次启动前的等待时间；每轮之间也会加上它，单位为秒 |
-| `loop` | boolean | 默认：`false`；是否循环 |
-| `interval` | number | 默认：`0`；每轮之间额外等待的时间，允许负数，单位为秒 |
-| `repeat` | integer / false | 默认：`nil`；循环时的总触发次数；false 表示不限次数 |
-| `callback` | function / false | 默认：`nil`；接收事件的函数；false 表示清空 |
-| `tip` | string / false | 默认：`nil`；随事件返回的自定义文字；false 表示清空 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `delay` | number | `0` | 首次启动前的等待时间；每轮之间也会加上它，单位为秒 |
+| `loop` | boolean | `false` | 是否循环 |
+| `interval` | number | `0` | 每轮之间额外等待的时间，允许负数，单位为秒 |
+| `repeat` | integer / false | `nil` | 循环时的总触发次数；false 表示不限次数 |
+| `callback` | function / false | `nil` | 接收事件的函数；false 表示清空 |
+| `tip` | string / false | `nil` | 随事件返回的自定义文字；false 表示清空 |
 
 ## 返回值
 
@@ -332,15 +332,15 @@ timer.set
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `duration` | number | 默认：`保持原值`；每次计时的时长，单位为秒 |
-| `delay` | number | 默认：`保持原值`；首次启动前的等待时间；每轮之间也会加上它，单位为秒 |
-| `loop` | boolean | 默认：`保持原值`；是否循环 |
-| `interval` | number | 默认：`保持原值`；每轮之间额外等待的时间，允许负数，单位为秒 |
-| `repeat` | integer / false | 默认：`保持原值`；循环时的总触发次数；false 表示不限次数 |
-| `callback` | function / false | 默认：`保持原值`；接收事件的函数；false 表示清空 |
-| `tip` | string / false | 默认：`保持原值`；随事件返回的自定义文字；false 表示清空 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `duration` | number | `保持原值` | 每次计时的时长，单位为秒 |
+| `delay` | number | `保持原值` | 首次启动前的等待时间；每轮之间也会加上它，单位为秒 |
+| `loop` | boolean | `保持原值` | 是否循环 |
+| `interval` | number | `保持原值` | 每轮之间额外等待的时间，允许负数，单位为秒 |
+| `repeat` | integer / false | `保持原值` | 循环时的总触发次数；false 表示不限次数 |
+| `callback` | function / false | `保持原值` | 接收事件的函数；false 表示清空 |
+| `tip` | string / false | `保持原值` | 随事件返回的自定义文字；false 表示清空 |
 
 ## 返回值
 

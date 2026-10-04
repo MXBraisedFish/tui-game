@@ -1,20 +1,24 @@
 # Lua API 调用约定
 
-更新时间：2026-10-02。本文说明当前注册的 Lua API 调用和返回规则。各方法的字段、默认值、单位及权限限制以对应 API 页面为准。
+更新时间：2026-10-04。本文说明当前注册的 Lua API 调用和返回规则。各方法的字段、默认值、单位及权限限制以对应 API 页面为准。
 
 ## 调用参数
 
-- Lua 5.4 原生接口保持原生参数协议，包括迭代器、`pcall`、`select` 和原生 `table.*`。
-- 项目 API 按必填参数的顺序直接传参。方法声明了选项时，可在末尾传一个选项表；不需要选项时可省略。
+- 所有公开 API 的选填参数统一使用末尾严格选项表，包括 `base.next`、`base.tonumber` 和 `table` 方法；旧的位置选填参数写法不再接受。
+- `pairs`、`ipairs` 返回的迭代函数按 Lua 循环协议工作；`select`、`table.pack` 等变参传递的是业务数据，不是命名选项。
+- 所有 API 按必填参数的顺序直接传参。方法声明了选项时，可在末尾传一个选项表；不需要选项时可省略。
 - 没有选项的方法不接受额外参数。无参方法使用空括号调用。
 - 选项表只接受文档列出的字段。未知字段、非字符串键、字段类型错误和多余位置参数会报错。
-- 真实业务数据表仍按位置参数传递，不会被当作选项表解析。`string.format`、`serialization.binary_pack`、`debug.pcall` 和 `debug.xpcall` 的变参原样传递，变参中的表和 nil 都会保留。
+- 真实业务数据表仍按位置参数传递，不会被当作选项表解析。`select`、`table.pack`、`string.format`、`serialization.binary_pack`、`debug.pcall` 和 `debug.xpcall` 的变参原样传递，变参中的表和 nil 都会保留。
 
 ```lua
 draw.text(2, 3, "Hello", {fg = color.WHITE, bold = true})
 local encoded = encoding.base64_encode("Hello")
 local rows = serialization.csv_encode({{"name", "score"}, {"Ada", 10}})
 local id = file.read("notes.txt", {encoding = file.UTF_8})
+local number = tonumber("ff", {base = 16})
+table.insert(rows, {"Grace", 20}, {pos = 1})
+local text = table.concat({"a", "b"}, {sep = ","})
 ```
 
 ## 返回值

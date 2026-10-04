@@ -136,6 +136,26 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
       Ok(())
     })?,
   )?;
+  let option_methods: [(&str, &str, &[&str], &[&str]); 6] = [
+    ("concat", "table.concat", &["list"], &["sep", "i", "j"]),
+    ("insert", "table.insert", &["list", "value"], &["pos"]),
+    (
+      "move",
+      "table.move",
+      &["src", "first", "last", "target_start"],
+      &["target"],
+    ),
+    ("remove", "table.remove", &["list"], &["pos"]),
+    ("sort", "table.sort", &["list"], &["comp"]),
+    ("unpack", "table.unpack", &["list"], &["i", "j"]),
+  ];
+  for (name, method, required_names, option_fields) in option_methods {
+    let function = source.get::<Function>(name)?;
+    source.raw_set(
+      name,
+      standard_options(lua, function, method, required_names, option_fields)?,
+    )?;
+  }
   source.raw_set(
     "count",
     lua.create_function(|_, values: MultiValue| {
@@ -221,6 +241,58 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
     })?,
   )?;
   readonly::proxy(lua, source)
+}
+
+/// Translate strict named options into the bounded Lua table operation's positional arguments.
+///
+/// # Arguments
+///
+/// * `lua` - The VM that owns the function and argument tables.
+/// * `function` - The native operation with its existing resource limits.
+/// * `method` - The public method name used in errors.
+/// * `required_names` - The required arguments in public call order.
+/// * `option_fields` - The named options in native call order.
+///
+/// # Errors
+///
+/// Return an error for invalid arguments or options, or if the bounded native operation fails.
+fn standard_options(
+  lua: &Lua,
+  function: Function,
+  method: &'static str,
+  required_names: &'static [&'static str],
+  option_fields: &'static [&'static str],
+) -> mlua::Result<Function> {
+  lua.create_function(move |lua, values: MultiValue| {
+    let parsed = args::positional(lua, method, values, required_names, option_fields)?;
+    let mut arguments = (0..required_names.len())
+      .map(|index| parsed.get(index))
+      .collect::<Vec<_>>();
+    for field in option_fields {
+      let value = parsed.options().raw_get::<Value>(*field)?;
+      let value = if matches!(value, Value::Nil) {
+        value
+      } else {
+        match *field {
+          "i" | "j" | "pos" => Value::Integer(args::integer(value, method, field)?),
+          "sep" => Value::String(args::lua_string(value, method, field)?),
+          "comp" if matches!(value, Value::Function(_)) => value,
+          "target" if matches!(value, Value::Table(_)) => value,
+          "comp" => return Err(args::invalid(method, field, "function", &value)),
+          "target" => return Err(args::invalid(method, field, "table", &value)),
+          _ => unreachable!("registered table option has no validator"),
+        }
+      };
+      if method == "table.insert" {
+        if !matches!(value, Value::Nil) {
+          arguments.insert(1, value);
+        }
+      } else {
+        arguments.push(value);
+      }
+    }
+    function.call::<MultiValue>(MultiValue::from_vec(arguments))
+  })
 }
 
 fn bounded_standard_function<F>(lua: &Lua, function: Function, check: F) -> mlua::Result<Function>

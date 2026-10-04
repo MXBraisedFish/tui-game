@@ -11,7 +11,7 @@ mod world;
 pub use async_runtime::{AsyncRuntime, EngineEvent};
 pub use boot_output::BootOutput;
 pub use event_queue::EngineEventQueue;
-pub(crate) use runtime::{run, run_exception};
+pub(crate) use runtime::{required_physical_size, run, run_exception};
 pub use services::EngineServices;
 pub(crate) use services::current_deployment_root;
 pub use state_machine::{

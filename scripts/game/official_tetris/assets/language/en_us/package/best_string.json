@@ -1,0 +1,11 @@
+{
+  "best_string.stage.classic": "Classic",
+  "best_string.stage.challenge": "Challenge",
+  "best_string.stage.crash": "Crash Point",
+  "best_string.stage.darkness": "Darkness",
+  "best_string.stage.dawn": "Dawn",
+  "best_string.stage.dusk": "Dusk",
+  "best_string.stage.green_corridor": "Green Corridor",
+  "best_string.stage.rebirth": "Rebirth",
+  "best_string.string": "f%<fg:bright_green>Normal Mode</fg>\nScore: {value:normal_score}\n<fg:bright_red>Challenge Mode</fg>\nScore: {value:challenge_score}\nLevel: {value:level}\nStage: {value:stage}{value:stage_cycle}"
+}

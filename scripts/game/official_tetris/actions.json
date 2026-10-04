@@ -1,0 +1,184 @@
+{
+  "exit": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.exit",
+      "callback": "Exit Game"
+    },
+    "keys": [
+      [
+        "esc"
+      ]
+    ],
+    "lock": false
+  },
+  "rotate_clockwise": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.rotate_clockwise",
+      "callback": "Rotate Clockwise"
+    },
+    "keys": [
+      [
+        "a"
+      ]
+    ],
+    "lock": false
+  },
+  "rotate_counterclockwise": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.rotate_counterclockwise",
+      "callback": "Rotate Counterclockwise"
+    },
+    "keys": [
+      [
+        "d"
+      ]
+    ],
+    "lock": false
+  },
+  "move_left": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.move_left",
+      "callback": "Move Left"
+    },
+    "keys": [
+      [
+        "left"
+      ]
+    ],
+    "lock": false
+  },
+  "move_right": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.move_right",
+      "callback": "Move Right"
+    },
+    "keys": [
+      [
+        "right"
+      ]
+    ],
+    "lock": false
+  },
+  "soft_drop": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.soft_drop",
+      "callback": "Soft Drop"
+    },
+    "keys": [
+      [
+        "down"
+      ]
+    ],
+    "lock": false
+  },
+  "hard_drop": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.hard_drop",
+      "callback": "Hard Drop"
+    },
+    "keys": [
+      [
+        "space"
+      ]
+    ],
+    "lock": false
+  },
+  "start-resume": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.start",
+      "callback": "Start / Resume"
+    },
+    "keys": [
+      [
+        "enter"
+      ]
+    ],
+    "lock": false
+  },
+  "restart": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.restart",
+      "callback": "Restart"
+    },
+    "keys": [
+      [
+        "r"
+      ]
+    ],
+    "lock": false
+  },
+  "pause": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.pause",
+      "callback": "Pause"
+    },
+    "keys": [
+      [
+        "w"
+      ]
+    ],
+    "lock": false
+  },
+  "switch_mode": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.switch_mode",
+      "callback": "Switch Mode"
+    },
+    "keys": [
+      [
+        "f"
+      ]
+    ],
+    "lock": false
+  },
+  "normal_mode": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.normal_mode",
+      "callback": "Normal Mode"
+    },
+    "keys": [
+      [
+        "1"
+      ]
+    ],
+    "lock": false
+  },
+  "challenge_mode": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.challenge_mode",
+      "callback": "Challenge Mode"
+    },
+    "keys": [
+      [
+        "2"
+      ]
+    ],
+    "lock": false
+  },
+  "landing_preview": {
+    "description": {
+      "type": "i18n",
+      "key": "actions.landing_preview",
+      "callback": "Landing Preview"
+    },
+    "keys": [
+      [
+        "g"
+      ]
+    ],
+    "lock": false
+  }
+}

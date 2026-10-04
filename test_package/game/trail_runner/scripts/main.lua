@@ -105,7 +105,7 @@ local function advance()
     place_gem()
   end
   while #trail > length do
-    table.remove(trail, 1)
+    table.remove(trail, { pos = 1 })
   end
 end
 

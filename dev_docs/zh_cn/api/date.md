@@ -10,36 +10,36 @@
 
 | 常量 | 说明 | 定位 |
 | --- | --- | --- |
-| `LOCAL` | 使用程序运行时的本机时区。 | [LOCAL](#local) |
-| `UTC` | 使用 UTC 时间，不加时差。 | [UTC](#utc) |
-| `UTC_MINUS_12` | 使用在 UTC 时间上减去 12 小时的固定时区。 | [UTC_MINUS_12](#utc_minus_12) |
-| `UTC_MINUS_11` | 使用在 UTC 时间上减去 11 小时的固定时区。 | [UTC_MINUS_11](#utc_minus_11) |
-| `UTC_MINUS_10` | 使用在 UTC 时间上减去 10 小时的固定时区。 | [UTC_MINUS_10](#utc_minus_10) |
-| `UTC_MINUS_9` | 使用在 UTC 时间上减去 9 小时的固定时区。 | [UTC_MINUS_9](#utc_minus_9) |
-| `UTC_MINUS_8` | 使用在 UTC 时间上减去 8 小时的固定时区。 | [UTC_MINUS_8](#utc_minus_8) |
-| `UTC_MINUS_7` | 使用在 UTC 时间上减去 7 小时的固定时区。 | [UTC_MINUS_7](#utc_minus_7) |
-| `UTC_MINUS_6` | 使用在 UTC 时间上减去 6 小时的固定时区。 | [UTC_MINUS_6](#utc_minus_6) |
-| `UTC_MINUS_5` | 使用在 UTC 时间上减去 5 小时的固定时区。 | [UTC_MINUS_5](#utc_minus_5) |
-| `UTC_MINUS_4` | 使用在 UTC 时间上减去 4 小时的固定时区。 | [UTC_MINUS_4](#utc_minus_4) |
-| `UTC_MINUS_3` | 使用在 UTC 时间上减去 3 小时的固定时区。 | [UTC_MINUS_3](#utc_minus_3) |
-| `UTC_MINUS_2` | 使用在 UTC 时间上减去 2 小时的固定时区。 | [UTC_MINUS_2](#utc_minus_2) |
-| `UTC_MINUS_1` | 使用在 UTC 时间上减去 1 小时的固定时区。 | [UTC_MINUS_1](#utc_minus_1) |
-| `UTC_PLUS_1` | 使用在 UTC 时间上加上 1 小时的固定时区。 | [UTC_PLUS_1](#utc_plus_1) |
-| `UTC_PLUS_2` | 使用在 UTC 时间上加上 2 小时的固定时区。 | [UTC_PLUS_2](#utc_plus_2) |
-| `UTC_PLUS_3` | 使用在 UTC 时间上加上 3 小时的固定时区。 | [UTC_PLUS_3](#utc_plus_3) |
-| `UTC_PLUS_4` | 使用在 UTC 时间上加上 4 小时的固定时区。 | [UTC_PLUS_4](#utc_plus_4) |
-| `UTC_PLUS_5` | 使用在 UTC 时间上加上 5 小时的固定时区。 | [UTC_PLUS_5](#utc_plus_5) |
-| `UTC_PLUS_6` | 使用在 UTC 时间上加上 6 小时的固定时区。 | [UTC_PLUS_6](#utc_plus_6) |
-| `UTC_PLUS_7` | 使用在 UTC 时间上加上 7 小时的固定时区。 | [UTC_PLUS_7](#utc_plus_7) |
-| `UTC_PLUS_8` | 使用在 UTC 时间上加上 8 小时的固定时区。 | [UTC_PLUS_8](#utc_plus_8) |
-| `UTC_PLUS_9` | 使用在 UTC 时间上加上 9 小时的固定时区。 | [UTC_PLUS_9](#utc_plus_9) |
-| `UTC_PLUS_10` | 使用在 UTC 时间上加上 10 小时的固定时区。 | [UTC_PLUS_10](#utc_plus_10) |
-| `UTC_PLUS_11` | 使用在 UTC 时间上加上 11 小时的固定时区。 | [UTC_PLUS_11](#utc_plus_11) |
-| `UTC_PLUS_12` | 使用在 UTC 时间上加上 12 小时的固定时区。 | [UTC_PLUS_12](#utc_plus_12) |
-| `UTC_PLUS_13` | 使用在 UTC 时间上加上 13 小时的固定时区。 | [UTC_PLUS_13](#utc_plus_13) |
-| `UTC_PLUS_14` | 使用在 UTC 时间上加上 14 小时的固定时区。 | [UTC_PLUS_14](#utc_plus_14) |
-| `TIMESTAMP` | 让 now 返回一个毫秒时间戳。 | [TIMESTAMP](#timestamp) |
-| `DATE` | 让 now 返回包含年月日和时间的表。 | [DATE](#date) |
+| `LOCAL` | 使用程序运行时的本机时区 | [LOCAL](#local) |
+| `UTC` | 使用 UTC 时间，不加时差 | [UTC](#utc) |
+| `UTC_MINUS_12` | 使用在 UTC 时间上减去 12 小时的固定时区 | [UTC_MINUS_12](#utc_minus_12) |
+| `UTC_MINUS_11` | 使用在 UTC 时间上减去 11 小时的固定时区 | [UTC_MINUS_11](#utc_minus_11) |
+| `UTC_MINUS_10` | 使用在 UTC 时间上减去 10 小时的固定时区 | [UTC_MINUS_10](#utc_minus_10) |
+| `UTC_MINUS_9` | 使用在 UTC 时间上减去 9 小时的固定时区 | [UTC_MINUS_9](#utc_minus_9) |
+| `UTC_MINUS_8` | 使用在 UTC 时间上减去 8 小时的固定时区 | [UTC_MINUS_8](#utc_minus_8) |
+| `UTC_MINUS_7` | 使用在 UTC 时间上减去 7 小时的固定时区 | [UTC_MINUS_7](#utc_minus_7) |
+| `UTC_MINUS_6` | 使用在 UTC 时间上减去 6 小时的固定时区 | [UTC_MINUS_6](#utc_minus_6) |
+| `UTC_MINUS_5` | 使用在 UTC 时间上减去 5 小时的固定时区 | [UTC_MINUS_5](#utc_minus_5) |
+| `UTC_MINUS_4` | 使用在 UTC 时间上减去 4 小时的固定时区 | [UTC_MINUS_4](#utc_minus_4) |
+| `UTC_MINUS_3` | 使用在 UTC 时间上减去 3 小时的固定时区 | [UTC_MINUS_3](#utc_minus_3) |
+| `UTC_MINUS_2` | 使用在 UTC 时间上减去 2 小时的固定时区 | [UTC_MINUS_2](#utc_minus_2) |
+| `UTC_MINUS_1` | 使用在 UTC 时间上减去 1 小时的固定时区 | [UTC_MINUS_1](#utc_minus_1) |
+| `UTC_PLUS_1` | 使用在 UTC 时间上加上 1 小时的固定时区 | [UTC_PLUS_1](#utc_plus_1) |
+| `UTC_PLUS_2` | 使用在 UTC 时间上加上 2 小时的固定时区 | [UTC_PLUS_2](#utc_plus_2) |
+| `UTC_PLUS_3` | 使用在 UTC 时间上加上 3 小时的固定时区 | [UTC_PLUS_3](#utc_plus_3) |
+| `UTC_PLUS_4` | 使用在 UTC 时间上加上 4 小时的固定时区 | [UTC_PLUS_4](#utc_plus_4) |
+| `UTC_PLUS_5` | 使用在 UTC 时间上加上 5 小时的固定时区 | [UTC_PLUS_5](#utc_plus_5) |
+| `UTC_PLUS_6` | 使用在 UTC 时间上加上 6 小时的固定时区 | [UTC_PLUS_6](#utc_plus_6) |
+| `UTC_PLUS_7` | 使用在 UTC 时间上加上 7 小时的固定时区 | [UTC_PLUS_7](#utc_plus_7) |
+| `UTC_PLUS_8` | 使用在 UTC 时间上加上 8 小时的固定时区 | [UTC_PLUS_8](#utc_plus_8) |
+| `UTC_PLUS_9` | 使用在 UTC 时间上加上 9 小时的固定时区 | [UTC_PLUS_9](#utc_plus_9) |
+| `UTC_PLUS_10` | 使用在 UTC 时间上加上 10 小时的固定时区 | [UTC_PLUS_10](#utc_plus_10) |
+| `UTC_PLUS_11` | 使用在 UTC 时间上加上 11 小时的固定时区 | [UTC_PLUS_11](#utc_plus_11) |
+| `UTC_PLUS_12` | 使用在 UTC 时间上加上 12 小时的固定时区 | [UTC_PLUS_12](#utc_plus_12) |
+| `UTC_PLUS_13` | 使用在 UTC 时间上加上 13 小时的固定时区 | [UTC_PLUS_13](#utc_plus_13) |
+| `UTC_PLUS_14` | 使用在 UTC 时间上加上 14 小时的固定时区 | [UTC_PLUS_14](#utc_plus_14) |
+| `TIMESTAMP` | 让 now 返回一个毫秒时间戳 | [TIMESTAMP](#timestamp) |
+| `DATE` | 让 now 返回包含年月日和时间的表 | [DATE](#date) |
 
 ## 方法
 
@@ -1228,10 +1228,10 @@ date.now
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `timezone` | const-date | 时区，默认 `date.LOCAL` |
-| `time_type` | const-date | 返回内容，默认 `date.TIMESTAMP` |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `timezone` | const-date | `date.LOCAL` | 时区 |
+| `time_type` | const-date | `date.TIMESTAMP` | 返回内容 |
 
 ## 返回值
 
@@ -1301,9 +1301,9 @@ date.date_to_timestamp
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `timezone` | const-date | 输入日期所属的时区，默认 `date.LOCAL` |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `timezone` | const-date | `date.LOCAL` | 输入日期所属的时区 |
 
 ## 返回值
 
@@ -1359,9 +1359,9 @@ date.timestamp_to_date
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `timezone` | const-date | 输出日期的时区，默认 `date.LOCAL` |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `timezone` | const-date | `date.LOCAL` | 输出日期的时区 |
 
 ## 返回值
 

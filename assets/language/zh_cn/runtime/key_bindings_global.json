@@ -13,10 +13,10 @@
   "key_bindings_global.action.reset.only": "{key:key_bindings_global.reset.only} 重置当前动作按键",
   "key_bindings_global.action.reset.all": "{key:key_bindings_global.reset.all} 重置全部按键",
   "key_bindings_global.action.any": "[任意按键] 绑定（组合键需同时按下）",
-  "key_bindings_global.color_doc.yellow": "黄色-与游戏共享绑定，允许保存",
+  "key_bindings_global.color_doc.yellow": "黄色 - 与游戏共享绑定",
   "key_bindings_global.color_doc.gray": "灰色 - 该按键不可修改",
-  "key_bindings_global.color_doc.composite": "黄色 + 灰色 - 共享按键且不可修改",
+  "key_bindings_global.color_doc.composite": "黄色/红色 + 灰色 - 共享按键且不可修改",
   "key_bindings_global.color_doc.priority": "P为包优先级；列表按首个绑定预览，实际按当前命中排序",
   "key_bindings_global.invalid": "绑定不合法：请检查键名、空或超长组合、组合内重复键，以及同一动作的重复绑定。",
-  "key_bindings_global.color_doc.shared": "黄色-宿主内多个动作共享绑定，允许保存"
+  "key_bindings_global.color_doc.shared": "红色 - 程序内多个动作共享绑定"
 }

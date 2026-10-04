@@ -72,7 +72,7 @@ pub(super) fn developer_size(physical: Size, top_toolbar: bool) -> Size {
 
 /// Add reserved host space to a base requirement to obtain the required physical terminal
 /// dimensions.
-pub(super) fn required_physical_size(required_base: (u64, u64), top_toolbar: bool) -> (u64, u64) {
+pub(crate) fn required_physical_size(required_base: (u64, u64), top_toolbar: bool) -> (u64, u64) {
   let reserved = reserved_size(top_toolbar);
   (
     required_base.0 + u64::from(reserved.width),

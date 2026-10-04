@@ -42,27 +42,27 @@ draw.text
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `fg` | string / const-color | 默认：`color.NONE`；前景色 |
-| `bg` | string / const-color | 默认：`color.NONE`；背景色 |
-| `horizontal_align` | const-align | 默认：`align.LEFT`；各行相对于最长显示行的水平对齐方式 |
-| `auto_wrap` | boolean | 默认：`true`；是否自动换行 |
-| `word_wrap` | boolean | 默认：`true`；是否按完整单词换行 |
-| `max_width` | integer / nil | 默认：`nil`；最大绘制宽度；提供时范围为 1～65535 |
-| `max_height` | integer / nil | 默认：`nil`；最大绘制高度；提供时范围为 1～65535 |
-| `overflow_marker` | string | 默认：`"..."`；文本溢出时使用的省略标记 |
-| `text_mode` | const-string | 默认：`string.AUTO`；文本解析模式 |
-| `rich_params` | table / nil | 默认：`nil`；富文本参数 |
-| `bold` | boolean | 默认：`false`；粗体 |
-| `italic` | boolean | 默认：`false`；斜体 |
-| `underline` | boolean | 默认：`false`；下划线 |
-| `strike` | boolean | 默认：`false`；删除线 |
-| `blink` | boolean | 默认：`false`；闪烁 |
-| `reverse` | boolean | 默认：`false`；反显 |
-| `hidden` | boolean | 默认：`false`；隐藏 |
-| `dim` | boolean | 默认：`false`；暗淡 |
-| `slice_layer` | string | 默认：`"base"`；绘制目标切片图层 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `fg` | string / const-color | `color.NONE` | 前景色 |
+| `bg` | string / const-color | `color.NONE` | 背景色 |
+| `horizontal_align` | const-align | `align.LEFT` | 各行相对于最长显示行的水平对齐方式 |
+| `auto_wrap` | boolean | `true` | 是否自动换行 |
+| `word_wrap` | boolean | `true` | 是否按完整单词换行 |
+| `max_width` | integer / nil | `nil` | 最大绘制宽度；提供时范围为 1～65535 |
+| `max_height` | integer / nil | `nil` | 最大绘制高度；提供时范围为 1～65535 |
+| `overflow_marker` | string | `"..."` | 文本溢出时使用的省略标记 |
+| `text_mode` | const-string | `string.AUTO` | 文本解析模式 |
+| `rich_params` | table / nil | `nil` | 富文本参数 |
+| `bold` | boolean | `false` | 粗体 |
+| `italic` | boolean | `false` | 斜体 |
+| `underline` | boolean | `false` | 下划线 |
+| `strike` | boolean | `false` | 删除线 |
+| `blink` | boolean | `false` | 闪烁 |
+| `reverse` | boolean | `false` | 反显 |
+| `hidden` | boolean | `false` | 隐藏 |
+| `dim` | boolean | `false` | 暗淡 |
+| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
 
 ## 返回值
 
@@ -121,12 +121,12 @@ draw.fill_rect
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `char` | string / nil | 默认：`nil`；填充字符 |
-| `fg` | string / const-color | 默认：`color.NONE`；前景色 |
-| `bg` | string / const-color | 默认：`color.NONE`；背景色 |
-| `slice_layer` | string | 默认：`"base"`；绘制目标切片图层 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `char` | string / nil | `nil` | 填充字符 |
+| `fg` | string / const-color | `color.NONE` | 前景色 |
+| `bg` | string / const-color | `color.NONE` | 背景色 |
+| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
 
 ## 返回值
 
@@ -175,12 +175,12 @@ draw.stroke_rect
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `fg` | string / const-color | 默认：`color.NONE`；边框前景色 |
-| `bg` | string / const-color | 默认：`color.NONE`；边框背景色 |
-| `border_char` | const-char / table | 默认：`char.LINE`；边框字符 |
-| `slice_layer` | string | 默认：`"base"`；绘制目标切片图层 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `fg` | string / const-color | `color.NONE` | 边框前景色 |
+| `bg` | string / const-color | `color.NONE` | 边框背景色 |
+| `border_char` | const-char / table | `char.LINE` | 边框字符 |
+| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
 
 ## 返回值
 
@@ -253,9 +253,9 @@ draw.erase_rect
 
 ### 选填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `slice_layer` | string | 默认：`"base"`；绘制目标切片图层 |
+| 参数名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
 
 ## 返回值
 

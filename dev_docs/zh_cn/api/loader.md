@@ -34,7 +34,7 @@ loader.require
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `path` | string | 相对 `scripts/` 的 Lua 文件路径。 |
+| `path` | string | 相对 `scripts/` 的 Lua 文件路径 |
 
 ## 返回值
 
@@ -76,7 +76,7 @@ loader.dofile
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `path` | string | 相对 `scripts/` 的 Lua 文件路径。 |
+| `path` | string | 相对 `scripts/` 的 Lua 文件路径 |
 
 ## 返回值
 
@@ -113,7 +113,7 @@ loader.loadfile
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `path` | string | 相对 `scripts/` 的 Lua 文件路径。 |
+| `path` | string | 相对 `scripts/` 的 Lua 文件路径 |
 
 ## 返回值
 
@@ -121,7 +121,7 @@ loader.loadfile
 
 | 类型 | 说明 |
 | --- | --- |
-| function | 已编译的 Lua 模块函数。 |
+| function | 已编译的 Lua 模块函数 |
 
 ### 示例
 
