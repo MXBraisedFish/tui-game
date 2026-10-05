@@ -8,57 +8,56 @@
 
 ## 常量
 
-| 常量                  | 说明                        | 定位                                      |
-| ------------------- | ------------------------- | --------------------------------------- |
-| `POSITIVE_INFINITE` | 正无穷                       | [POSITIVE_INFINITE](#positive_infinite) |
-| `PI`                | 圆周率 π                     | [PI](#pi)                               |
-| `E`                 | 自然常数 e                    | [E](#e)                                 |
-| `NEGATIVE_INFINITE` | 负无穷                       | [NEGATIVE_INFINITE](#negative_infinite) |
-| `DEG`               | 弧度转角度系数                   | [DEG](#deg)                             |
-| `RAD`               | 角度转弧度系数                   | [RAD](#rad)                             |
-| `MAX_INTEGER`       | 最大整数 `2^63-1`             | [MAX_INTEGER](#max_integer)             |
-| `MIN_INTEGER`       | 最小整数 `-2^63`              | [MIN_INTEGER](#min_integer)             |
+| 常量                | 说明                             | 定位                                    |
+| ------------------- | -------------------------------- | --------------------------------------- |
+| `POSITIVE_INFINITE` | 正无穷                           | [POSITIVE_INFINITE](#positive_infinite) |
+| `PI`                | 圆周率 π                         | [PI](#pi)                               |
+| `E`                 | 自然常数 e                       | [E](#e)                                 |
+| `NEGATIVE_INFINITE` | 负无穷                           | [NEGATIVE_INFINITE](#negative_infinite) |
+| `DEG`               | 弧度转角度系数，`180 / π`        | [DEG](#deg)                             |
+| `RAD`               | 角度转弧度系数，`π / 180`        | [RAD](#rad)                             |
+| `MAX_INTEGER`       | 最大可表示的整数 `2^63-1`        | [MAX_INTEGER](#max_integer)             |
+| `MIN_INTEGER`       | 最小可表示的整数 `-2^63`         | [MIN_INTEGER](#min_integer)             |
 | `INFINITE`          | 正无穷，POSITIVE_INFINITE 的别名 | [INFINITE](#infinite)                   |
 
 ## 方法
 
-| 方法 | 说明 | 定位 |
-| --- | --- | --- |
-| `abs` | 计算绝对值 | [abs](#abs) |
-| `ceil` | 向上取整 | [ceil](#ceil) |
-| `floor` | 向下取整 | [floor](#floor) |
-| `round` | 四舍五入到最近的整数 | [round](#round) |
-| `round_to` | 按指定位数四舍五入 | [round_to](#round_to) |
-| `fmod` | 计算取模（余数） | [fmod](#fmod) |
-| `pow` | 计算幂运算 $x^y$ | [pow](#pow) |
-| `exp` | 计算 $e^{value}$ | [exp](#exp) |
-| `log` | 计算指定底数的对数 | [log](#log) |
-| `lg` | 计算以 10 为底的对数 | [lg](#lg) |
-| `ln` | 计算以 e 为底的对数 | [ln](#ln) |
-| `sqrt` | 计算平方根 | [sqrt](#sqrt) |
-| `ldexp` | 计算 $x \times 2^{exp}$ | [ldexp](#ldexp) |
-| `frexp` | 将数值分解为尾数与二进制指数 | [frexp](#frexp) |
-| `sin` | 计算正弦（弧度制） | [sin](#sin) |
-| `cos` | 计算余弦（弧度制） | [cos](#cos) |
-| `tan` | 计算正切（弧度制） | [tan](#tan) |
-| `asin` | 计算反正弦（弧度制） | [asin](#asin) |
-| `acos` | 计算反余弦（弧度制） | [acos](#acos) |
-| `atan` | 计算反正切（弧度制） | [atan](#atan) |
-| `atan2` | 计算反正切（弧度制） | [atan2](#atan2) |
-| `deg` | 将弧度转换为角度 | [deg](#deg) |
-| `rad` | 将角度转换为弧度 | [rad](#rad) |
-| `normalize_angle` | 将角度归一化到 `[0, 360)` 区间 | [normalize_angle](#normalize_angle) |
-| `max` | 返回一组数中的最大值 | [max](#max) |
-| `min` | 返回一组数中的最小值 | [min](#min) |
-| `modf` | 分离数值的整数部分与小数部分 | [modf](#modf) |
-| `tointeger` | 将数值精确转换为整数 | [tointeger](#tointeger) |
-| `type` | 返回数值的类型名 | [type](#type) |
-| `ult` | 以无符号整数比较两个整数 | [ult](#ult) |
-| `approx_equal` | 以指定误差比较两个数字是否相等 | [approx_equal](#approx_equal) |
-| `percent` | 计算百分比 $\frac{value}{total}$ | [percent](#percent) |
-| `factorial` | 计算阶乘 $n!$ | [factorial](#factorial) |
-| `combination` | 计算组合数 $C^n_k$ | [combination](#combination) |
-
+| 方法              | 说明                            | 定位                                |
+| ----------------- | ------------------------------- | ----------------------------------- |
+| `abs`             | 计算绝对值                      | [abs](#abs)                         |
+| `ceil`            | 向上取整                        | [ceil](#ceil)                       |
+| `floor`           | 向下取整                        | [floor](#floor)                     |
+| `round`           | 四舍五入到最近的整数            | [round](#round)                     |
+| `round_to`        | 按指定位数四舍五入              | [round_to](#round_to)               |
+| `fmod`            | 计算取模（余数）                | [fmod](#fmod)                       |
+| `pow`             | 计算幂运算 $x^y$                | [pow](#pow)                         |
+| `exp`             | 计算 $e^{value}$                | [exp](#exp)                         |
+| `log`             | 计算指定底数的对数              | [log](#log)                         |
+| `lg`              | 计算以 10 为底的对数            | [lg](#lg)                           |
+| `ln`              | 计算以 e 为底的对数             | [ln](#ln)                           |
+| `sqrt`            | 计算平方根                      | [sqrt](#sqrt)                       |
+| `ldexp`           | 计算 $x \times 2^{exp}$         | [ldexp](#ldexp)                     |
+| `frexp`           | 将数值分解为尾数与二进制指数    | [frexp](#frexp)                     |
+| `sin`             | 计算正弦（弧度制）              | [sin](#sin)                         |
+| `cos`             | 计算余弦（弧度制）              | [cos](#cos)                         |
+| `tan`             | 计算正切（弧度制）              | [tan](#tan)                         |
+| `asin`            | 计算反正弦（弧度制）            | [asin](#asin)                       |
+| `acos`            | 计算反余弦（弧度制）            | [acos](#acos)                       |
+| `atan`            | 计算反正切（弧度制）            | [atan](#atan)                       |
+| `atan2`           | 计算 `y`/`x` 的反正切（弧度制） | [atan2](#atan2)                     |
+| `deg`             | 将弧度转换为角度                | [deg](#deg)                         |
+| `rad`             | 将角度转换为弧度                | [rad](#rad)                         |
+| `normalize_angle` | 将角度归一化到 `[0, 360)` 区间  | [normalize_angle](#normalize_angle) |
+| `max`             | 返回一组数中的最大值            | [max](#max)                         |
+| `min`             | 返回一组数中的最小值            | [min](#min)                         |
+| `modf`            | 分离数值的整数部分与小数部分    | [modf](#modf)                       |
+| `tointeger`       | 将数值精确转换为整数            | [tointeger](#tointeger)             |
+| `type`            | 返回数值的类型名                | [type](#type)                       |
+| `ult`             | 以无符号整数比较两个整数        | [ult](#ult)                         |
+| `approx_equal`    | 以指定误差比较两个数字是否相等  | [approx_equal](#approx_equal)       |
+| `percent`         | 计算 $value / total$            | [percent](#percent)                 |
+| `factorial`       | 计算阶乘 $n!$                   | [factorial](#factorial)             |
+| `combination`     | 计算组合数 $C^n_k$              | [combination](#combination)         |
 
 ---
 
@@ -76,7 +75,7 @@ math.PI
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
@@ -110,7 +109,7 @@ math.E
 
 ### 可用于
 
-- 数学比较。
+- 任意。
 
 ### 示例
 
@@ -161,10 +160,12 @@ debug.print(tostring(math.POSITIVE_INFINITE > math.MAX_INTEGER))
 ### 等值
 
 ```text
-1 / 0
+inf
 ```
 
-### 额外说明
+等价表达式为 `1 / 0`。
+
+## 额外说明
 
 - 该值大于所有有限数。
 - 不可用于计算。
@@ -183,7 +184,7 @@ math.NEGATIVE_INFINITE
 
 ### 可用于
 
-- 任意
+- 数学比较。
 
 ### 示例
 
@@ -200,10 +201,12 @@ debug.print(tostring(math.NEGATIVE_INFINITE < math.MIN_INTEGER))
 ### 等值
 
 ```text
--1 / 0
+-inf
 ```
 
-### 额外说明
+等价表达式为 `-1 / 0`。
+
+## 额外说明
 
 - 该值小于所有有限数。
 - 不可用于计算。
@@ -222,7 +225,7 @@ math.DEG
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
@@ -256,7 +259,7 @@ math.RAD
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
@@ -290,7 +293,7 @@ math.MAX_INTEGER
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
@@ -324,7 +327,7 @@ math.MIN_INTEGER
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
@@ -358,7 +361,7 @@ math.INFINITE
 
 ### 可用于
 
-- 任意
+- 数学比较。
 
 ### 示例
 
@@ -376,10 +379,6 @@ debug.print(math.INFINITE == math.POSITIVE_INFINITE)
 ```text
 math.POSITIVE_INFINITE
 ```
-
-### 额外说明
-
-- 与 `math.POSITIVE_INFINITE` 的值相同。
 
 ---
 
@@ -424,9 +423,9 @@ debug.print(tostring(n))
 
 ```
 
-### 额外说明
+## 额外说明
 
-运行时数值参数和计算结果必须是有限数；无穷常量只可用于比较，不能传入受限运算。
+- 运行时数值参数和计算结果必须是有限数；无穷常量只可用于比较，不能传入受限运算。
 
 ---
 
@@ -469,6 +468,10 @@ debug.print(tostring(n))
 
 ```
 
+## 额外说明
+
+- 结果超出整数范围时会报错。
+
 ---
 
 ## `floor`
@@ -509,6 +512,10 @@ debug.print(tostring(n))
 ```lua
 
 ```
+
+## 额外说明
+
+- 结果超出整数范围时会报错。
 
 ---
 
@@ -551,6 +558,10 @@ debug.print(tostring(n1) .. ", " .. tostring(n2))
 ```lua
 
 ```
+
+## 额外说明
+
+- 结果超出整数范围时会报错。
 
 ---
 
@@ -595,7 +606,7 @@ debug.print(tostring(r1) .. ", " .. tostring(r2))
 
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `digits` 范围为 $[-308, 308]$。
 
@@ -641,10 +652,9 @@ debug.print(tostring(r))
 
 ```
 
-### 额外说明
+## 额外说明
 
 - `x`、`y` 必须是整数，`y` 不能为 0；本接口不接受带小数的余数运算。
-
 - 结果符号与被除数一致。
 
 ---
@@ -772,7 +782,7 @@ debug.print(tostring(log))
 
 ```
 
-### 额外说明
+## 额外说明
 
 - `value` 必须大于 0；`base` 必须大于 0 且不等于 1，不能省略。
 
@@ -817,6 +827,10 @@ debug.print(tostring(lg))
 
 ```
 
+## 额外说明
+
+- 参数 `value` 必须大于 0。
+
 ---
 
 ## `ln`
@@ -843,7 +857,7 @@ math.ln
 
 | 类型  | 说明       |
 | ----- | ---------- |
-| float | 常用对数值 |
+| float | 自然对数值 |
 
 ### 示例
 
@@ -857,6 +871,10 @@ debug.print(tostring(ln))
 ```lua
 
 ```
+
+## 额外说明
+
+- 参数 `value` 必须大于 0。
 
 ---
 
@@ -898,6 +916,10 @@ debug.print(tostring(r))
 ```lua
 
 ```
+
+## 额外说明
+
+- 参数 `value` 不能为负数。
 
 ---
 
@@ -965,8 +987,8 @@ math.frexp
 
 返回两个值，依次为尾数和二进制指数。
 
-| 值名       | 类型    | 说明   |
-| ---------- | ------- | ------ |
+| 值名       | 类型    | 说明 |
+| ---------- | ------- | ---- |
 | `mantissa` | float   | 尾数 |
 | `exponent` | integer | 指数 |
 
@@ -983,7 +1005,7 @@ debug.print(tostring(mantissa) .. ", " .. tostring(exponent))
 
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `value`、返回值 `mantissa` 和 `exponent` 满足公式 $value = mantissa \times 2^{exponent}$；`math.ldexp` 可进行逆运算。
 
@@ -1151,9 +1173,9 @@ debug.print(tostring(r))
 
 ```
 
-### 额外说明
+## 额外说明
 
-- 参数 `value` 范围为 $[-1, 1]$
+- 参数 `value` 范围为 $[-1, 1]$。
 
 ---
 
@@ -1196,9 +1218,9 @@ debug.print(tostring(r))
 
 ```
 
-### 额外说明
+## 额外说明
 
-- 参数 `value` 范围为 $[-1, 1]$
+- 参数 `value` 范围为 $[-1, 1]$。
 
 ---
 
@@ -1245,7 +1267,7 @@ debug.print(tostring(r))
 
 ## `atan2`
 
-计算反正切（弧度制）。
+计算 `y`/`x` 的反正切（弧度制）。
 
 ### 调用
 
@@ -1448,9 +1470,9 @@ debug.print(tostring(m))
 
 ```
 
-### 额外说明
+## 额外说明
 
-只接受最多 16,384 项的稠密数值数组。可提供 `n` 字段表示长度，但其值必须与数组项一致，数组中不能有空洞。
+- 只接受最多 16,384 项的稠密数值数组；可提供 `n` 字段表示长度，但其值必须与数组项一致，数组中不能有空洞。
 
 ---
 
@@ -1493,9 +1515,9 @@ debug.print(tostring(m))
 
 ```
 
-### 额外说明
+## 额外说明
 
-只接受最多 16,384 项的稠密数值数组。可提供 `n` 字段表示长度，但其值必须与数组项一致，数组中不能有空洞。
+- 只接受最多 16,384 项的稠密数值数组；可提供 `n` 字段表示长度，但其值必须与数组项一致，数组中不能有空洞。
 
 ---
 
@@ -1513,16 +1535,16 @@ math.modf
 
 ### 必填参数
 
-| 参数名  | 类型    | 说明         |
-| ------- | ------- | ------------ |
-| `value` | number | 要分解的数值 |
+| 参数名  | 类型  | 说明         |
+| ------- | ----- | ------------ |
+| `value` | float | 要分解的数值 |
 
 ## 返回值
 
 返回两个值，依次为整数部分和小数部分。
 
-| 值名              | 类型    | 说明       |
-| ----------------- | ------- | ---------- |
+| 值名              | 类型    | 说明     |
+| ----------------- | ------- | -------- |
 | `integer_part`    | integer | 整数部分 |
 | `fractional_part` | float   | 小数部分 |
 
@@ -1555,17 +1577,17 @@ math.tointeger
 
 ### 必填参数
 
-| 参数名  | 类型  | 说明         |
-| ------- | ----- | ------------ |
-| `value` | float | 要转换的数值 |
+| 参数名  | 类型 | 说明         |
+| ------- | ---- | ------------ |
+| `value` | any  | 要转换的数值 |
 
 ## 返回值
 
 返回一个值。
 
-| 类型          | 说明             |
-| ------------- | ---------------- |
-| integer / nil | 精确转换后的整数 |
+| 类型            | 说明             |
+| --------------- | ---------------- |
+| integer / `nil` | 精确转换后的整数 |
 
 ### 示例
 
@@ -1581,9 +1603,9 @@ debug.print(tostring(i1) .. ", " .. tostring(i2))
 
 ```
 
-### 额外说明
+## 额外说明
 
-- 若转换失败时返回 `nil`。
+- 转换失败时返回 `nil`。
 
 ---
 
@@ -1609,9 +1631,9 @@ math.type
 
 返回一个值。
 
-| 类型         | 说明     |
-| ------------ | -------- |
-| string / nil | 数值类型 |
+| 类型           | 说明     |
+| -------------- | -------- |
+| string / `nil` | 数值类型 |
 
 ### 示例
 
@@ -1628,9 +1650,9 @@ debug.print(tostring(t1) .. ", " .. tostring(t2) .. ", " .. tostring(t3))
 
 ```
 
-### 额外说明
+## 额外说明
 
-- 若参数传递不为数值时返回 `nil`。
+- 若传入的不是数值，返回 `nil`。
 
 ---
 
@@ -1664,7 +1686,7 @@ math.ult
 ### 示例
 
 ```lua
-local b1 = math.ult(-1, 1)  -- -1 二进制码在无符号整数为 2^64-1
+local b1 = math.ult(-1, 1)  -- -1 的无符号二进制码为 2^64-1
 local b2 = math.ult(1, -1)
 debug.print(tostring(b1) .. ", " .. tostring(b2))
 ```
@@ -1675,9 +1697,8 @@ debug.print(tostring(b1) .. ", " .. tostring(b2))
 
 ```
 
-### 额外说明
+## 额外说明
 
-- 该 API 等价于两个无符号数使用操作符 `<`。
 - 负数会直接以二进制码进行比较，而非取绝对值。
 
 ---
@@ -1703,8 +1724,8 @@ math.approx_equal
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --------- | ----- | --- | ----------------------- |
+| 参数名    | 类型  | 默认值  | 说明     |
+| --------- | ----- | ------- | -------- |
 | `epsilon` | float | `1e-10` | 误差范围 |
 
 ## 返回值
@@ -1731,11 +1752,15 @@ debug.print(tostring(ae2))
 
 ```
 
+## 额外说明
+
+- `epsilon` 不能为负数。
+
 ---
 
 ## `percent`
 
-计算百分比 $\frac{value}{total}$。
+计算 $value / total$。
 
 ### 调用
 
@@ -1754,17 +1779,17 @@ math.percent
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| ------------ | ------- | --- | ------------------------- |
+| 参数名       | 类型    | 默认值  | 说明       |
+| ------------ | ------- | ------- | ---------- |
 | `as_percent` | boolean | `false` | 百分比输出 |
 
 ## 返回值
 
 返回一个值。
 
-| 类型  | 说明       |
-| ----- | ---------- |
-| float | 百分比数值 |
+| 类型  | 说明                                     |
+| ----- | ---------------------------------------- |
+| float | 比例；`as_percent = true` 时为百分比数值 |
 
 ### 示例
 
@@ -1782,7 +1807,7 @@ debug.print(tostring(p2))
 
 ```
 
-### 额外说明
+## 额外说明
 
 - `total` 不能为 0。默认返回 `value / total`；`as_percent = true` 时再乘以 100。
 
@@ -1827,7 +1852,7 @@ debug.print(tostring(f))
 
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `n` 范围为 $[0, 170]$。
 
@@ -1873,8 +1898,6 @@ debug.print(tostring(c))
 
 ```
 
-### 额外说明
+## 额外说明
 
-- 参数 `k` 范围为 $[0, n]$。
-
-参数 `k` 必须在 `0..=n` 范围内；组合数超出整数范围时会报错。
+- 参数 `k` 范围为 $[0, n]$，`n` 不能为负数；组合数超出整数范围时会报错。

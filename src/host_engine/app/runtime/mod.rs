@@ -1648,7 +1648,7 @@ fn route_frame_input(
       }),
       InputNotification::Focus { gained } => {
         if !gained {
-          let releases = services.game.close_input(true, true);
+          let releases = services.game.focus_lost_input();
           queue_game_input_releases(services, context.lua_events, *frame, releases);
           context
             .lua_events
@@ -2170,7 +2170,7 @@ fn queue_lua_overlay_transitions(
   for transition in world.state.take_overlay_transitions() {
     let data = match transition {
       OverlayStackTransition::Started => {
-        let releases = services.game.close_input(true, true);
+        let releases = services.game.focus_lost_input();
         queue_game_input_releases(services, router, frame, releases);
         // Discard undelivered script input when an overlay acquires interaction ownership.
 

@@ -100,9 +100,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "write",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "file.write";
-      if !file_permission(&write_state, method) {
-        return Ok(Value::Nil);
-      }
+      require_game(&write_state.borrow(), method)?;
       let parameters = args::positional(
         lua,
         method,
@@ -154,9 +152,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "create_dir",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "file.create_dir";
-      if !file_permission(&create_dir_state, method) {
-        return Ok(Value::Nil);
-      }
+      require_game(&create_dir_state.borrow(), method)?;
       let parameters = args::positional(lua, method, values, &["path"], &["event_tip"])?;
       let table = parameters.options();
       let relative_path = file_path(&parameters, method)?;
@@ -201,9 +197,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "remove",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "file.remove";
-      if !file_permission(&remove_state, method) {
-        return Ok(Value::Nil);
-      }
+      require_game(&remove_state.borrow(), method)?;
       let parameters =
         args::positional(lua, method, values, &["path"], &["recursive", "event_tip"])?;
       let table = parameters.options();
@@ -244,9 +238,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "list_dir",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "file.list_dir";
-      if !file_permission(&list_state, method) {
-        return Ok(Value::Nil);
-      }
+      require_game(&list_state.borrow(), method)?;
       let parameters = args::positional(
         lua,
         method,
@@ -304,17 +296,6 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     })?,
   )?;
   readonly::proxy(lua, source)
-}
-
-/// Report whether the current session may perform the requested file operation.
-pub(super) fn file_permission(state: &SharedApiState, method: &'static str) -> bool {
-  let mut state = state.borrow_mut();
-  if state.context.session_kind == LuaSessionKind::Game {
-    true
-  } else {
-    ignore_once(&mut state, method, "method requires a game session");
-    false
-  }
 }
 
 /// Validate a script-supplied relative path within the session's file sandbox.

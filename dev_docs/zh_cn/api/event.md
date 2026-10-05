@@ -8,10 +8,12 @@
 
 ## 方法
 
-| 方法 | 说明 | 定位 |
-| --- | --- | --- |
-| `skip_action` | 跳过本帧动作队列 | [skip_action](#skip_action) |
-| `clear_action` | 清除当前积压动作 | [clear_action](#clear_action) |
+| 方法           | 说明                               | 定位                          |
+| -------------- | ---------------------------------- | ----------------------------- |
+| `skip_action`  | 将本帧剩余的普通动作留到后续帧处理 | [skip_action](#skip_action)   |
+| `clear_action` | 清除当前等待处理的输入动作         | [clear_action](#clear_action) |
+| `enable_focus_release` | 启用游戏失焦时的释放事件补发 | [enable_focus_release](#enable_focus_release) |
+| `disable_focus_release` | 关闭游戏失焦时的释放事件补发 | [disable_focus_release](#disable_focus_release) |
 
 ---
 
@@ -23,7 +25,7 @@
 
 ### 限制
 
-- 仅游戏脚本可用
+- 仅游戏脚本可用。
 
 ### 调用
 
@@ -41,15 +43,9 @@ event.skip_action
 event.skip_action()
 ```
 
-**输出：**
+## 额外说明
 
-```lua
-```
-
-### 额外说明
-
-- 将普通 action 的 pressed、held、released 按原顺序一起延期，不影响 key、鼠标、系统事件或其他事件。
-- 已交付活动动作的 released，以及失焦、覆盖屏或拒收产生的收尾 released，仍会交付。
+- 仅跳过用户输入的 `action` 事件。
 
 ---
 
@@ -59,7 +55,7 @@ event.skip_action()
 
 ### 限制
 
-- 仅游戏脚本可用
+- 仅游戏脚本可用。
 
 ### 调用
 
@@ -77,12 +73,80 @@ event.clear_action
 event.clear_action()
 ```
 
+## 额外说明
+
+- 仅清楚用户输入的 `action` 事件。
+
+---
+
+## `enable_focus_release`
+
+启用游戏失焦时的释放事件补发，包括终端失焦和覆盖屏接管。
+
+### 限制
+
+- 仅游戏脚本可用。
+
+### 调用
+
+```lua
+event.enable_focus_release
+```
+
+## 返回值
+
+返回一个值。
+
+| 类型 | 说明 |
+| --- | --- |
+| boolean | 设置是否成功 |
+
+### 示例
+
+```lua
+local success = event.enable_focus_release()
+debug.print(success)
+```
+
 **输出：**
 
 ```lua
+true
 ```
 
-### 额外说明
+---
 
-- 只处理普通 action 的 pressed 和 held，不影响 key、鼠标、系统事件或其他事件。
-- 已交付活动动作的 released，以及失焦、覆盖屏或拒收产生的收尾 released，仍会交付。
+## `disable_focus_release`
+
+关闭游戏失焦时的释放事件补发，包括终端失焦和覆盖屏接管。
+
+### 限制
+
+- 仅游戏脚本可用。
+
+### 调用
+
+```lua
+event.disable_focus_release
+```
+
+## 返回值
+
+返回一个值。
+
+| 类型 | 说明 |
+| --- | --- |
+| boolean | 设置是否成功 |
+
+### 示例
+
+```lua
+local success = event.disable_focus_release()
+debug.print(success)
+```
+
+**输出：**
+
+```lua
+true
+```

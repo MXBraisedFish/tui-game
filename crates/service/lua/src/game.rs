@@ -248,6 +248,14 @@ impl GameService {
       .map_or_else(Vec::new, |session| session.close_input(actions, keys))
   }
 
+  /// Forget game input on terminal focus loss or overlay takeover under its session policy.
+  pub fn focus_lost_input(&mut self) -> Vec<crate::LuaEventData> {
+    self
+      .session
+      .as_mut()
+      .map_or_else(Vec::new, LuaSession::focus_lost_input)
+  }
+
   /// Drain closing releases created by a script subscription change.
   pub fn take_input_releases(&mut self) -> Vec<crate::LuaEventData> {
     self

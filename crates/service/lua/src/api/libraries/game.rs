@@ -24,12 +24,7 @@ pub(super) fn game(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           LuaHostCommand::SaveGame => "game.save_game",
           _ => "game.save_best",
         };
-        let mut api = state.borrow_mut();
-        if api.context.session_kind != LuaSessionKind::Game {
-          ignore_once(&mut api, method, "game API is unavailable to screensavers");
-          return Ok(());
-        }
-        drop(api);
+        require_game(&state.borrow(), method)?;
         args::no_args(method, values)?;
         let mut api = state.borrow_mut();
         let invalid_state = match command {

@@ -23,15 +23,30 @@ pub(super) fn event(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         } else {
           "event.clear_action"
         };
-        let mut api = state.borrow_mut();
-        if api.context.session_kind != LuaSessionKind::Game {
-          ignore_once(&mut api, method, "method requires a game session");
-          return Ok(());
-        }
-        drop(api);
+        require_game(&state.borrow(), method)?;
         args::no_args(method, values)?;
         push_host_command(&mut state.borrow_mut(), command.clone());
         Ok(())
+      })?,
+    )?;
+  }
+  for (name, enabled) in [
+    ("enable_focus_release", true),
+    ("disable_focus_release", false),
+  ] {
+    let state = state.clone();
+    source.raw_set(
+      name,
+      lua.create_function(move |_, values: MultiValue| {
+        let method = if enabled {
+          "event.enable_focus_release"
+        } else {
+          "event.disable_focus_release"
+        };
+        require_game(&state.borrow(), method)?;
+        args::no_args(method, values)?;
+        state.borrow_mut().input.focus_release = enabled;
+        Ok(true)
       })?,
     )?;
   }

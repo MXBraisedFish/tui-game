@@ -138,10 +138,10 @@ fn install_hex(lua: &Lua, source: &Table) -> mlua::Result<()> {
 }
 
 fn bytes_argument(lua: &Lua, values: MultiValue, method: &str) -> mlua::Result<Vec<u8>> {
-  let parsed = args::positional(lua, method, values, &["s"], &[])?;
-  let value = parsed.required(0, method, "s")?;
+  let parsed = args::positional(lua, method, values, &["sting"], &[])?;
+  let value = parsed.required(0, method, "sting")?;
   let Value::String(value) = value else {
-    return Err(args::invalid(method, "s", "string", &value));
+    return Err(args::invalid(method, "sting", "string", &value));
   };
   if value.as_bytes().len() > args::MAX_API_STRING_BYTES {
     return Err(args::message(method, "input exceeds 1 MiB"));

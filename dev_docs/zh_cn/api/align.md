@@ -8,7 +8,7 @@
 
 ## 常量
 
-| 常量              | 说明         | 定位                                    |
+| 常量                | 说明         | 定位                                    |
 | ------------------- | ------------ | --------------------------------------- |
 | `AUTO`              | 自动对齐模式 | [AUTO](#auto)                           |
 | `LEFT`              | 左对齐模式   | [LEFT](#left)                           |
@@ -21,10 +21,10 @@
 
 ## 方法
 
-| 方法             | 说明                                                | 定位                            |
-| -------------- | ------------------------------------------------- | ----------------------------- |
-| `resolve_x`    | 根据元素宽度与水平对齐方式，计算文本左边缘的 x 坐标                       | [resolve_x](#resolve_x)       |
-| `resolve_y`    | 根据元素高度与垂直对齐方式，计算文本上边缘的 y 坐标                       | [resolve_y](#resolve_y)       |
+| 方法           | 说明                                                                                         | 定位                          |
+| -------------- | -------------------------------------------------------------------------------------------- | ----------------------------- |
+| `resolve_x`    | 根据元素宽度与水平对齐方式，计算文本左边缘的 x 坐标                                          | [resolve_x](#resolve_x)       |
+| `resolve_y`    | 根据元素高度与垂直对齐方式，计算文本上边缘的 y 坐标                                          | [resolve_y](#resolve_y)       |
 | `resolve_rect` | 根据元素宽度与高度、水平对齐方式和垂直对齐方式，计算文本左边缘的 x 坐标、文本上边缘的 y 坐标 | [resolve_rect](#resolve_rect) |
 
 ---
@@ -63,7 +63,7 @@ draw.text(x, y, "AUTO", {fg = color.BRIGHT_RED})
 "auto"
 ```
 
-### 额外说明
+## 额外说明
 
 - `align` API 中用于水平对齐时等价于 `align.HORIZONTAL_CENTER`。
 - `align` API 中用于垂直对齐时等价于 `align.VERTICAL_CENTER`。
@@ -135,7 +135,7 @@ draw.text(x, 3, "H_CENTER", {fg = color.BRIGHT_RED})
 "horizontal_center"
 ```
 
-### 额外说明
+## 额外说明
 
 - 用于 `draw.text` 时，各行在最长显示行的宽度内居中。
 
@@ -172,7 +172,7 @@ draw.text(x, 3, "RIGHT", {fg = color.BRIGHT_RED})
 "right"
 ```
 
-### 额外说明
+## 额外说明
 
 - 用于 `draw.text` 时，各行向最长显示行的右边缘对齐。
 
@@ -309,7 +309,7 @@ draw.text(x, y, "CENTER", {fg = color.BRIGHT_RED})
 "center"
 ```
 
-### 额外说明
+## 额外说明
 
 - 水平对齐时等价于 `align.HORIZONTAL_CENTER`。
 - 垂直对齐时等价于 `align.VERTICAL_CENTER`。

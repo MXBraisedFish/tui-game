@@ -72,26 +72,9 @@ pub(super) fn date(lua: &Lua) -> mlua::Result<Table> {
         ],
         &["timezone"],
       )?;
-      let integer =
-        |index, name| args::integer(parsed.required(index, method, name)?, method, name);
-      let unsigned = |index, name| {
-        u32::try_from(integer(index, name)?).map_err(|_| {
-          args::message(
-            method,
-            format!("{name} must be a non-negative 32-bit integer"),
-          )
-        })
-      };
-      let date = DateFields {
-        year: i32::try_from(integer(0, "year")?)
-          .map_err(|_| args::message(method, "year must be a signed 32-bit integer"))?,
-        month: unsigned(1, "month")?,
-        day: unsigned(2, "day")?,
-        hour: unsigned(3, "hour")?,
-        minute: unsigned(4, "minute")?,
-        second: unsigned(5, "second")?,
-        millisecond: unsigned(6, "millisecond")?,
-      };
+      let date = parse_date_fields(method, "", |index, name| {
+        parsed.required(index, method, name)
+      })?;
       date_to_timestamp(date, parse_timezone(parsed.options(), method)?)
         .map_err(|error| args::message(method, error.to_string()))
     })?,
@@ -119,23 +102,102 @@ pub(super) fn date(lua: &Lua) -> mlua::Result<Table> {
         lua,
         method,
         values,
-        &["left_timestamp", "right_timestamp"],
-        &[],
+        &["early_timestamp", "later_timestamp"],
+        &["timezone"],
       )?;
-      let left = args::integer(
-        parsed.required(0, method, "left_timestamp")?,
+      let timezone = parse_timezone(parsed.options(), method)?;
+      let early = parse_timestamp_or_date(
+        parsed.required(0, method, "early_timestamp")?,
+        timezone,
         method,
-        "left_timestamp",
+        "early_timestamp",
       )?;
-      let right = args::integer(
-        parsed.required(1, method, "right_timestamp")?,
+      let later = parse_timestamp_or_date(
+        parsed.required(1, method, "later_timestamp")?,
+        timezone,
         method,
-        "right_timestamp",
+        "later_timestamp",
       )?;
-      timestamp_diff(left, right).map_err(|error| args::message(method, error.to_string()))
+      timestamp_diff(early, later).map_err(|error| args::message(method, error.to_string()))
     })?,
   )?;
   readonly::proxy(lua, source)
+}
+
+/// Read seven integral calendar fields from positional arguments or a date table.
+///
+/// # Arguments
+///
+/// * `method` - The public method name included in errors.
+/// * `prefix` - The parent date argument name, or an empty string for positional fields.
+/// * `read` - The reader for a field's position and name.
+///
+/// # Errors
+///
+/// Return an argument error for missing, non-integral, or out-of-range calendar fields.
+fn parse_date_fields(
+  method: &str,
+  prefix: &str,
+  read: impl Fn(usize, &str) -> mlua::Result<Value>,
+) -> mlua::Result<DateFields> {
+  let field_name = |name: &str| {
+    if prefix.is_empty() {
+      name.to_string()
+    } else {
+      format!("{prefix}.{name}")
+    }
+  };
+  let integer = |index, name| args::integer(read(index, name)?, method, &field_name(name));
+  let unsigned = |index, name| {
+    u32::try_from(integer(index, name)?).map_err(|_| {
+      args::message(
+        method,
+        format!("{} must be a non-negative 32-bit integer", field_name(name)),
+      )
+    })
+  };
+  Ok(DateFields {
+    year: i32::try_from(integer(0, "year")?).map_err(|_| {
+      args::message(
+        method,
+        format!("{} must be a signed 32-bit integer", field_name("year")),
+      )
+    })?,
+    month: unsigned(1, "month")?,
+    day: unsigned(2, "day")?,
+    hour: unsigned(3, "hour")?,
+    minute: unsigned(4, "minute")?,
+    second: unsigned(5, "second")?,
+    millisecond: unsigned(6, "millisecond")?,
+  })
+}
+
+/// Resolve an integer timestamp or a seven-field date into Unix milliseconds.
+///
+/// # Arguments
+///
+/// * `value` - The timestamp or date supplied by the script.
+/// * `timezone` - The time zone used only for a calendar date.
+/// * `method` - The public method name included in errors.
+/// * `name` - The early or later argument name included in errors.
+///
+/// # Errors
+///
+/// Return an argument error for invalid timestamps or fields, or a conversion error for an
+/// invalid, unsupported, ambiguous, or unavailable calendar date.
+fn parse_timestamp_or_date(
+  value: Value,
+  timezone: DateTimeZone,
+  method: &str,
+  name: &str,
+) -> mlua::Result<i64> {
+  if let Value::Table(table) = value {
+    let date = parse_date_fields(method, name, |_, field| table.raw_get(field))?;
+    date_to_timestamp(date, timezone)
+      .map_err(|error| args::message(method, format!("{name}: {error}")))
+  } else {
+    args::integer(value, method, name)
+  }
 }
 
 fn parse_timezone(options: &Table, method: &str) -> mlua::Result<DateTimeZone> {
@@ -209,17 +271,102 @@ mod tests {
       end
       fails(function() date.timestamp_diff(2, 1) end, 'greater than')
       fails(function() date.timestamp_diff(math.mininteger, math.maxinteger) end, 'range')
-      fails(function() date.timestamp_diff() end, 'left_timestamp')
-      fails(function() date.timestamp_diff(0) end, 'right_timestamp')
-      fails(function() date.timestamp_diff(nil, 1) end, 'left_timestamp')
-      fails(function() date.timestamp_diff(0, nil) end, 'right_timestamp')
-      fails(function() date.timestamp_diff('0', 1) end, 'left_timestamp')
-      fails(function() date.timestamp_diff(0, 1.5) end, 'right_timestamp')
-      fails(function() date.timestamp_diff(0, math.huge) end, 'right_timestamp')
-      fails(function() date.timestamp_diff(0, 1, {}) end, 'expected 2')
-      fails(function() date.timestamp_diff(0, 1, nil) end, 'expected 2')
-      fails(function() date.timestamp_diff({left_timestamp = 0, right_timestamp = 1}) end, 'right_timestamp')
-      fails(function() date.timestamp_diff({}, 1) end, 'left_timestamp')
+      fails(function() date.timestamp_diff() end, 'early_timestamp')
+      fails(function() date.timestamp_diff(0) end, 'later_timestamp')
+      fails(function() date.timestamp_diff(nil, 1) end, 'early_timestamp')
+      fails(function() date.timestamp_diff(0, nil) end, 'later_timestamp')
+      fails(function() date.timestamp_diff('0', 1) end, 'early_timestamp')
+      fails(function() date.timestamp_diff(0, 1.5) end, 'later_timestamp')
+      fails(function() date.timestamp_diff(0, math.huge) end, 'later_timestamp')
+      assert(date.timestamp_diff(0, 1, {}) == 1)
+      assert(date.timestamp_diff(0, 1, nil) == 1)
+      fails(function() date.timestamp_diff({early_timestamp = 0, later_timestamp = 1}) end, 'later_timestamp')
+      fails(function() date.timestamp_diff({}, 1) end, 'early_timestamp')
+    "#).exec().unwrap();
+  }
+
+  #[test]
+  fn timestamp_diff_accepts_calendar_dates_mixed_operands_and_shared_timezones() {
+    vm().load(r#"
+      for hours = -12, 14 do
+        local timezone = date.UTC
+        if hours < 0 then timezone = date['UTC_MINUS_' .. -hours] end
+        if hours > 0 then timezone = date['UTC_PLUS_' .. hours] end
+        for _, timestamp in ipairs({-1001, -1, 0, 123, 1700000000123}) do
+          local early = date.timestamp_to_date(timestamp, {timezone = timezone})
+          local later = date.timestamp_to_date(timestamp + 1500, {timezone = timezone})
+          assert(date.timestamp_diff(early, later, {timezone = timezone}) == 1500)
+          assert(date.timestamp_diff(early, timestamp + 1500, {timezone = timezone}) == 1500)
+          assert(date.timestamp_diff(timestamp, later, {timezone = timezone}) == 1500)
+          assert(date.timestamp_diff(early, timestamp, {timezone = timezone}) == 0)
+          assert(date.timestamp_diff(timestamp, early, {timezone = timezone}) == 0)
+          assert(select('#', date.timestamp_diff(early, later, {timezone = timezone})) == 1)
+          assert(date.timestamp_diff(timestamp, timestamp + 1500, {timezone = timezone}) == 1500)
+          assert(early.millisecond == date.timestamp_to_date(timestamp, {timezone = timezone}).millisecond)
+        end
+      end
+      local early = date.timestamp_to_date(1700000000123)
+      local later = date.timestamp_to_date(1700000000124)
+      assert(date.timestamp_diff(early, later) == 1)
+      assert(date.timestamp_diff(early, later, {}) == 1)
+      assert(date.timestamp_diff(early, later, nil) == 1)
+      assert(date.timestamp_diff(early, 1700000000124) == 1)
+      assert(date.timestamp_diff(1700000000123, later) == 1)
+      local utc_early = date.timestamp_to_date(0, {timezone = date.UTC})
+      local utc_later = date.timestamp_to_date(1, {timezone = date.UTC})
+      local east = date.timestamp_to_date(0, {timezone = date.UTC_PLUS_8})
+      assert(date.timestamp_diff(utc_early, utc_later, {timezone = date.UTC}) == 1)
+      assert(date.timestamp_diff(utc_early, east, {timezone = date.UTC}) == 8 * 3600000)
+      local leap = {year = 2000, month = 2, day = 29, hour = 23, minute = 59, second = 59, millisecond = 999}
+      local next_day = {year = 2000, month = 3, day = 1, hour = 0, minute = 0, second = 0, millisecond = 0}
+      assert(date.timestamp_diff(leap, next_day, {timezone = date.UTC}) == 1)
+      local current = date.now({time_type = date.DATE})
+      assert(date.timestamp_diff(current, current) == 0)
+    "#).exec().unwrap();
+  }
+
+  #[test]
+  fn timestamp_diff_rejects_bad_date_fields_order_and_options_with_argument_context() {
+    vm().load(r#"
+      local function fails(fn, expected)
+        local ok, message = pcall(fn)
+        assert(not ok and tostring(message):find(expected, 1, true), tostring(message))
+      end
+      local early = date.timestamp_to_date(0, {timezone = date.UTC})
+      local later = date.timestamp_to_date(1, {timezone = date.UTC})
+      for _, field in ipairs({'year', 'month', 'day', 'hour', 'minute', 'second', 'millisecond'}) do
+        local saved = early[field]
+        for _, invalid in ipairs({'1', false, 1.5, math.huge}) do
+          early[field] = invalid
+          fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'early_timestamp.' .. field)
+          fails(function() date.timestamp_diff(0, early, {timezone = date.UTC}) end, 'later_timestamp.' .. field)
+        end
+        early[field] = nil
+        fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'early_timestamp.' .. field)
+        early[field] = saved
+      end
+      for _, case in ipairs({
+        {'year', math.maxinteger}, {'year', 2147483647}, {'month', 0}, {'month', 13},
+        {'day', 0}, {'day', 32}, {'hour', 24}, {'minute', 60}, {'second', 60},
+        {'millisecond', -1}, {'millisecond', 1000}, {'day', 4294967296}
+      }) do
+        local field, saved = case[1], early[case[1]]
+        early[field] = case[2]
+        fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'early_timestamp')
+        early[field] = saved
+      end
+      early.year = 1900; early.month = 2; early.day = 29
+      fails(function() date.timestamp_diff(early, 1, {timezone = date.UTC}) end, 'invalid calendar')
+      fails(function() date.timestamp_diff(later, 0, {timezone = date.UTC}) end, 'later_timestamp must')
+      fails(function() date.timestamp_diff(1, date.timestamp_to_date(0, {timezone = date.UTC}), {timezone = date.UTC}) end, 'later_timestamp must')
+      fails(function() date.timestamp_diff(0, 1, {unknown = true}) end, 'unknown option')
+      fails(function() date.timestamp_diff(0, 1, {[1] = date.UTC}) end, 'option names')
+      fails(function() date.timestamp_diff(0, 1, setmetatable({}, {})) end, 'metatable')
+      fails(function() date.timestamp_diff(0, 1, {timezone = false}) end, 'timezone')
+      fails(function() date.timestamp_diff(0, 1, {timezone = 'utc+15'}) end, 'timezone')
+      fails(function() date.timestamp_diff(0, 1, date.UTC) end, 'table or nil')
+      fails(function() date.timestamp_diff(0, 1, {}, {}) end, 'arguments')
+      fails(function() date.timestamp_diff(false, 1) end, 'early_timestamp')
     "#).exec().unwrap();
   }
 

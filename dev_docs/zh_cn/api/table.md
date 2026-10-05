@@ -8,21 +8,21 @@
 
 ## 方法
 
-| 方法        | 说明                                           | 定位                        |
-| ------------- | ---------------------------------------------- | --------------------------- |
-| `concat`      | 拼接数组表中的元素                             | [concat](#concat)           |
-| `insert`      | 在指定位置插入一个元素，并将后续元素后移       | [insert](#insert)           |
-| `move`        | 将表中的指定范围元素复制并覆盖到目标定位       | [move](#move)               |
-| `pack`        | 将变参打包为新的表，并记录参数个数             | [pack](#pack)               |
-| `unpack`      | 展开数组表                                     | [unpack](#unpack)           |
-| `remove`      | 删除指定位置的一个元素，并将后续元素前移       | [remove](#remove)           |
-| `sort`        | 排序数组表                                     | [sort](#sort)               |
-| `deepcopy`    | 深拷贝表                                       | [deepcopy](#deepcopy)       |
-| `pretty`      | 将表转换为有可读性的字符串                     | [pretty](#pretty)           |
-| `count`       | 查询表中真实的元素数量                         | [count](#count)             |
-| `count_array` | 查询表中真实的数组元素数量及下标               | [count_array](#count_array) |
-| `count_hash`  | 查询表中真实的哈希键数量                       | [count_hash](#count_hash)   |
-| `compact`     | 将数组部分前压为从 1 开始的连续排列            | [compact](#compact)         |
+| 方法          | 说明                                                            | 定位                        |
+| ------------- | --------------------------------------------------------------- | --------------------------- |
+| `concat`      | 拼接数组表中的元素                                              | [concat](#concat)           |
+| `insert`      | 在指定位置插入一个元素，并将后续元素后移                        | [insert](#insert)           |
+| `move`        | 将数组表中的指定范围元素复制并覆盖到目标索引                    | [move](#move)               |
+| `pack`        | 将所有变参打包为新的表，并记录变参数量                          | [pack](#pack)               |
+| `unpack`      | 将数组表元素作为多个返回值展开                                  | [unpack](#unpack)           |
+| `remove`      | 删除指定位置的一个元素，并将后续元素前移                        | [remove](#remove)           |
+| `sort`        | 排序数组表                                                      | [sort](#sort)               |
+| `deepcopy`    | 深拷贝表                                                        | [deepcopy](#deepcopy)       |
+| `pretty`      | 将表转换为有可读性的字符串                                      | [pretty](#pretty)           |
+| `count`       | 查询表中真实存在的元素数量                                      | [count](#count)             |
+| `count_array` | 查询表中真实存在的数组元素数量                                  | [count_array](#count_array) |
+| `count_hash`  | 查询表中真实存在的哈希项数量                                    | [count_hash](#count_hash)   |
+| `compact`     | 压实目标表的数组部分，将所有数组元素前压至从下标 1 开始连续排列 | [compact](#compact)         |
 
 ---
 
@@ -51,8 +51,8 @@ table.concat
 | 参数名 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `sep` | string | `""` | 相邻元素间的分隔符 |
-| `i` | integer | `1` | 起始定位 |
-| `j` | integer | `#list` | 结束定位 |
+| `i` | integer | `1` | 起始索引 |
+| `j` | integer | `#list` | 结束索引 |
 
 ## 返回值
 
@@ -77,9 +77,10 @@ debug.print(table.concat(t2, { sep = " | " }))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
+- `concat`、`insert`、`move`、`unpack`、`remove`、`sort` 的必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
+- `table` 库和其它库的 API 表本身只读；`insert`、`remove`、`sort`、`move`、`compact` 不能以只读 API 表作为写入目标，`count`、`count_array`、`count_hash`、`pretty`、`deepcopy` 则可以传入。
 
 ---
 
@@ -110,7 +111,7 @@ table.insert
 
 ## 返回值
 
-无。
+无返回值。
 
 ### 示例
 
@@ -128,10 +129,6 @@ debug.print(table.pretty(t2))
 
 ```lua
 ```
-
-### 额外说明
-
-- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
 
 ---
 
@@ -164,7 +161,7 @@ table.move
 
 ## 返回值
 
-返回一个数组表。
+返回目标表 `target`。
 
 | 类型  | 说明   |
 | ----- | ------ |
@@ -176,7 +173,7 @@ table.move
 local t1 = { "a", "b", "c", "d" }
 local t_m1 = table.move(t1, 2, 3, 4)
 debug.print(table.pretty(t1))
-debug.print(t1)
+debug.print(tostring(t_m1 == t1))
 debug.print(table.pretty(t_m1) .. "\n")
 
 local t2 = { 1, 2, 3, 4, 5 }
@@ -189,12 +186,10 @@ debug.print(table.pretty(t2))
 ```lua
 ```
 
-### 额外说明
-
-- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
+## 额外说明
 
 - 该 API 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
-- 返回值是目标表 `target`；未给 `target` 时是源表 `src`。
+- 未给 `target` 时，返回源表 `src`。
 
 ---
 
@@ -210,11 +205,11 @@ table.pack
 
 ## 返回值
 
-返回一个数组表。
+返回一个混合表。
 
-| 类型  | 说明   |
-| ----- | ------ |
-| table | 数组表 |
+| 类型  | 说明       |
+| ----- | ---------- |
+| table | 打包结果表 |
 
 ### 示例
 
@@ -231,11 +226,11 @@ debug.print(table.pretty(packed2))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 要保存的值依次传入，表和 nil 都会原样保留；没有值时使用 `table.pack()`。
+- 要保存的值依次传入，嵌套表按引用保留（不深拷贝）；没有值时使用 `table.pack()`。
 
-- 返回值数组表结构如下：
+- 返回值混合表结构如下：
 
 ```lua
 local packed = {
@@ -299,9 +294,7 @@ debug.print(a2 .. " " .. b2)
 ```lua
 ```
 
-### 额外说明
-
-- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
+## 额外说明
 
 - 该 API 返回多参数而非表。
 
@@ -333,6 +326,8 @@ table.remove
 
 ## 返回值
 
+返回一个值。
+
 | 类型 | 说明         |
 | ---- | ------------ |
 | any  | 被删除的元素 |
@@ -353,10 +348,6 @@ debug.print(removed2 .. " " .. table.pretty(t2))
 
 ```lua
 ```
-
-### 额外说明
-
-- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
 
 ---
 
@@ -382,11 +373,11 @@ table.sort
 
 | 参数名 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `comp` | function / nil | `nil` | 比较函数 |
+| `comp` | function | `nil` | 比较函数 |
 
 ## 返回值
 
-无。
+无返回值。
 
 ### 示例
 
@@ -417,18 +408,9 @@ debug.print(table.pretty(t4))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
-
-- 参数 `comp` 函数结构如下：
-
-```lua
-local function comparator(left, right)
-  return left < right
-end
-```
-
+- 目标数组表最多 4096 个元素，超出会报错。
 - 参数 `comp` 函数返回值为 `true` 时，表示 `left` 排在 `right` 之前；返回值为 `false` 时，表示不要求 `left` 排在 `right` 前面（也可能两者相等）。
 
 ---
@@ -462,11 +444,12 @@ table.deepcopy
 ### 示例
 
 ```lua
-local t = { 1, 2, 3 }
+local t = { 1, 2, 3, child = { value = 7 } }
 local t_copy = table.deepcopy(t)
+t_copy.child.value = 9
 
-debug.print(tostring(t))
-debug.print(tostring(t_copy))
+debug.print(tostring(t_copy ~= t))
+debug.print(t.child.value)
 ```
 
 **输出：**
@@ -558,9 +541,10 @@ debug.print(contiguous)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 空数组的返回值 `contiguous` 为 `true`。
+- 数组部分为空时（包括空表和只有哈希项的表），`contiguous` 为 `true`。
+- 下标为 0 或负整数的项按哈希项计数，不计入数组元素数量。
 - 值为 `nil` 的键在 Lua 表中表示该键不存在，因此不会计数。
 
 ---
@@ -609,7 +593,7 @@ debug.print(table.pretty(indexes))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - `indexes` 按下标从小到大排序。
 
@@ -679,9 +663,9 @@ table.compact
 
 返回一个值。
 
-| 类型  | 说明                         |
-| ----- | ---------------------------- |
-| table | 压实后的原始表 |
+| 类型  | 说明         |
+| ----- | ------------ |
+| table | 压实后的原表 |
 
 ### 示例
 
@@ -698,7 +682,7 @@ debug.print(table.pretty(t))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 数组元素按照压实前的下标升序排列，元素之间的相对顺序不会改变。
 - 哈希项不会被删除或移动。

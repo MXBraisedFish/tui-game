@@ -43,7 +43,7 @@ fn main() {
     r#"
     local seen = {}
     function Init(ctx)
-      debug.assert(not ime.receive_action_event())
+      debug.assert(ime.receive_action_event())
       debug.assert(ime.receive_key_event())
     end
     function HandleEvent(e)
@@ -51,6 +51,12 @@ fn main() {
         seen[#seen+1] = e.type .. ":" .. (e.data.action or e.data.key) .. ":" .. e.data.state
       elseif e.type == "focus" then
         seen[#seen+1] = "focus:" .. tostring(e.data.gained)
+      elseif e.type == "overlay_started" or e.type == "overlay_stopped" then
+        seen[#seen+1] = e.type
+      elseif e.type == "resize" then
+        local fn = e.data.width == 1 and event.disable_focus_release or event.enable_focus_release
+        debug.assert(fn())
+        debug.assert(fn())
       end
     end
     function SaveGame() return {seen = seen} end
@@ -176,12 +182,189 @@ fn main() {
   );
   route(&input, &mut session, &mut broker, token, 4);
   // An undelivered press must not create an orphan release at an overlay boundary.
-  assert!(session.close_input(true, true).is_empty());
+  assert!(session.focus_lost_input().is_empty());
   broker.clear_pending_interactive(LuaSessionKind::Game);
   deliver(&mut session, &mut broker);
   assert!(session.close_input(true, true).is_empty());
+  broker
+    .push_system(
+      5,
+      LuaEventData::Resize {
+        width: 1,
+        height: 24,
+      },
+    )
+    .unwrap();
+  deliver(&mut session, &mut broker);
+  input.begin_frame();
+  input.queue_key_event(
+    KeyEvent {
+      key: Key::Space,
+      kind: KeyEventKind::Release,
+    },
+    &mut log,
+  );
+  input.queue_key_event(
+    KeyEvent {
+      key: Key::Esc,
+      kind: KeyEventKind::Press,
+    },
+    &mut log,
+  );
+  input.poll();
+  route(&input, &mut session, &mut broker, token, 5);
+  deliver(&mut session, &mut broker);
+  let before_focus = session.save_game().unwrap().unwrap()["seen"]
+    .as_array()
+    .unwrap()
+    .len();
+  input.begin_frame();
+  input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+  input.poll();
+  route(&input, &mut session, &mut broker, token, 6);
+  deliver(&mut session, &mut broker);
+  let saved = session.save_game().unwrap().unwrap();
+  assert_eq!(
+    &saved["seen"].as_array().unwrap()[before_focus..],
+    &[serde_json::json!("focus:false")]
+  );
+  input.begin_frame();
+  input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+  input.poll();
+  assert!(input.notifications().is_empty());
+  input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+  input.queue_key_event(
+    KeyEvent {
+      key: Key::Esc,
+      kind: KeyEventKind::Press,
+    },
+    &mut log,
+  );
+  input.poll();
+  assert_eq!(
+    input.notifications(),
+    [InputNotification::Focus { gained: true }]
+  );
+  route(&input, &mut session, &mut broker, token, 7);
+  deliver(&mut session, &mut broker);
+  broker
+    .push_system(
+      8,
+      LuaEventData::Resize {
+        width: 80,
+        height: 24,
+      },
+    )
+    .unwrap();
+  deliver(&mut session, &mut broker);
+  input.begin_frame();
+  input.queue_key_event(
+    KeyEvent {
+      key: Key::Esc,
+      kind: KeyEventKind::Release,
+    },
+    &mut log,
+  );
+  input.queue_key_event(
+    KeyEvent {
+      key: Key::Esc,
+      kind: KeyEventKind::Press,
+    },
+    &mut log,
+  );
+  input.poll();
+  route(&input, &mut session, &mut broker, token, 8);
+  deliver(&mut session, &mut broker);
+  let before_focus = session.save_game().unwrap().unwrap()["seen"]
+    .as_array()
+    .unwrap()
+    .len();
+  input.begin_frame();
+  input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+  input.poll();
+  route(&input, &mut session, &mut broker, token, 9);
+  deliver(&mut session, &mut broker);
+  let saved = session.save_game().unwrap().unwrap();
+  assert_eq!(
+    &saved["seen"].as_array().unwrap()[before_focus..],
+    &[
+      serde_json::json!("key:esc:released"),
+      serde_json::json!("action:exit:released"),
+      serde_json::json!("focus:false"),
+    ]
+  );
+  for (index, enabled) in [true, false].into_iter().enumerate() {
+    let frame = 10 + index as u64 * 3;
+    broker
+      .push_system(
+        frame,
+        LuaEventData::Resize {
+          width: if enabled { 80 } else { 1 },
+          height: 24,
+        },
+      )
+      .unwrap();
+    deliver(&mut session, &mut broker);
+    input.begin_frame();
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::Esc,
+        kind: KeyEventKind::Release,
+      },
+      &mut log,
+    );
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::Esc,
+        kind: KeyEventKind::Press,
+      },
+      &mut log,
+    );
+    input.poll();
+    route(&input, &mut session, &mut broker, token, frame);
+    deliver(&mut session, &mut broker);
+    let before_overlay = session.save_game().unwrap().unwrap()["seen"]
+      .as_array()
+      .unwrap()
+      .len();
+    for data in session.focus_lost_input() {
+      broker
+        .push_owned(token, frame + 1, data, LuaEventRoute::InputRelease)
+        .unwrap();
+    }
+    broker.clear_pending_interactive(LuaSessionKind::Game);
+    broker
+      .push_system(frame + 1, LuaEventData::OverlayStarted)
+      .unwrap();
+    assert!(session.focus_lost_input().is_empty());
+    deliver(&mut session, &mut broker);
+    let saved = session.save_game().unwrap().unwrap();
+    let expected = if enabled {
+      vec![
+        serde_json::json!("key:esc:released"),
+        serde_json::json!("action:exit:released"),
+        serde_json::json!("overlay_started"),
+      ]
+    } else {
+      vec![serde_json::json!("overlay_started")]
+    };
+    assert_eq!(
+      &saved["seen"].as_array().unwrap()[before_overlay..],
+      expected.as_slice()
+    );
+    input.begin_frame();
+    input.poll();
+    broker
+      .push_system(frame + 2, LuaEventData::OverlayStopped)
+      .unwrap();
+    deliver(&mut session, &mut broker);
+    input.begin_frame();
+    input.poll();
+    assert!(input.notifications().is_empty());
+  }
   println!(
-    "Lua input ok: shared Esc, priority, host observation, held once, focus and queued-input cleanup"
+    "Lua input ok: shared bindings, idempotent subscriptions, optional focus and overlay releases, fresh input after recovery"
   );
 }
 
@@ -217,7 +400,7 @@ fn route(
       InputNotification::Action { system: true, .. } => continue,
       InputNotification::Focus { gained } => {
         if !gained {
-          for data in session.close_input(true, true) {
+          for data in session.focus_lost_input() {
             broker
               .push_owned(token, frame, data, LuaEventRoute::InputRelease)
               .unwrap();

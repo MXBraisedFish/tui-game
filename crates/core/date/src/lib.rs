@@ -77,7 +77,7 @@ pub enum DateError {
   AmbiguousLocalTime,
   /// The local wall-clock time is skipped during a forward clock change or cannot be resolved.
   UnavailableLocalTime,
-  /// The right timestamp is less than the left timestamp.
+  /// The later timestamp is less than the early timestamp.
   InvalidTimestampOrder,
   /// The timestamp difference cannot fit in a signed 64-bit millisecond count.
   DifferenceOverflow,
@@ -94,7 +94,7 @@ impl fmt::Display for DateError {
         "local date does not exist or local time-zone data is unavailable"
       }
       Self::InvalidTimestampOrder => {
-        "right_timestamp must be greater than or equal to left_timestamp"
+        "later_timestamp must be greater than or equal to early_timestamp"
       }
       Self::DifferenceOverflow => {
         "timestamp difference exceeds the signed 64-bit millisecond range"
@@ -115,13 +115,13 @@ pub fn now_timestamp() -> i64 {
 
 /// Return the non-negative difference between two Unix millisecond timestamps.
 ///
-/// Require `right_timestamp >= left_timestamp`; equal timestamps return zero. Subtraction does not depend on
-/// time zones and accepts negative timestamps without converting them to calendar dates.
+/// Require `later_timestamp >= early_timestamp`; equal timestamps return zero. Subtraction does
+/// not depend on time zones and accepts negative timestamps without converting them to calendar dates.
 ///
 /// # Errors
 ///
-/// Return [`DateError::InvalidTimestampOrder`] when the right timestamp is less than
-/// to the left timestamp, or [`DateError::DifferenceOverflow`] when the difference exceeds
+/// Return [`DateError::InvalidTimestampOrder`] when the later timestamp is less than
+/// the early timestamp, or [`DateError::DifferenceOverflow`] when the difference exceeds
 /// the signed 64-bit range.
 ///
 /// # Examples
@@ -133,12 +133,12 @@ pub fn now_timestamp() -> i64 {
 /// assert_eq!(timestamp_diff(1000, 1000)?, 0);
 /// # Ok::<(), tg_core_date::DateError>(())
 /// ```
-pub fn timestamp_diff(left_timestamp: i64, right_timestamp: i64) -> Result<i64, DateError> {
-  if right_timestamp < left_timestamp {
+pub fn timestamp_diff(early_timestamp: i64, later_timestamp: i64) -> Result<i64, DateError> {
+  if later_timestamp < early_timestamp {
     return Err(DateError::InvalidTimestampOrder);
   }
-  right_timestamp
-    .checked_sub(left_timestamp)
+  later_timestamp
+    .checked_sub(early_timestamp)
     .ok_or(DateError::DifferenceOverflow)
 }
 

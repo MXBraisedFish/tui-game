@@ -25,19 +25,16 @@ pub(super) fn ime(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           "receive_key_event" => "ime.receive_key_event",
           _ => "ime.reject_key_event",
         };
+        require_game(&state.borrow(), method)?;
         args::no_args(method, values)?;
         let mut api = state.borrow_mut();
-        if api.context.session_kind != LuaSessionKind::Game {
-          ignore_once(&mut api, method, "method requires a game session");
-          return Ok(false);
-        }
         let current = if actions {
           api.input.actions
         } else {
           api.input.keys
         };
         if current == enabled {
-          return Ok(false);
+          return Ok(true);
         }
         if actions {
           api.input.actions = enabled;

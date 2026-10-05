@@ -8,7 +8,7 @@
 
 ## 方法
 
-| 方法        | 说明                       | 定位                        |
+| 方法          | 说明                       | 定位                        |
 | ------------- | -------------------------- | --------------------------- |
 | `text`        | 在指定位置绘制文本         | [text](#text)               |
 | `fill_rect`   | 填充一个矩形区域           | [fill_rect](#fill_rect)     |
@@ -34,67 +34,54 @@ draw.text
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `x` | integer | 文本块左上角的 x 坐标 |
-| `y` | integer | 文本块左上角的 y 坐标 |
-| `text` | string | 要绘制的文本 |
+| 参数名 | 类型    | 说明                  |
+| ------ | ------- | --------------------- |
+| `x`    | integer | 文本块左上角的 x 坐标 |
+| `y`    | integer | 文本块左上角的 y 坐标 |
+| `text` | string  | 要绘制的文本          |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `fg` | string / const-color | `color.NONE` | 前景色 |
-| `bg` | string / const-color | `color.NONE` | 背景色 |
-| `horizontal_align` | const-align | `align.LEFT` | 各行相对于最长显示行的水平对齐方式 |
-| `auto_wrap` | boolean | `true` | 是否自动换行 |
-| `word_wrap` | boolean | `true` | 是否按完整单词换行 |
-| `max_width` | integer / nil | `nil` | 最大绘制宽度；提供时范围为 1～65535 |
-| `max_height` | integer / nil | `nil` | 最大绘制高度；提供时范围为 1～65535 |
-| `overflow_marker` | string | `"..."` | 文本溢出时使用的省略标记 |
-| `text_mode` | const-string | `string.AUTO` | 文本解析模式 |
-| `rich_params` | table / nil | `nil` | 富文本参数 |
-| `bold` | boolean | `false` | 粗体 |
-| `italic` | boolean | `false` | 斜体 |
-| `underline` | boolean | `false` | 下划线 |
-| `strike` | boolean | `false` | 删除线 |
-| `blink` | boolean | `false` | 闪烁 |
-| `reverse` | boolean | `false` | 反显 |
-| `hidden` | boolean | `false` | 隐藏 |
-| `dim` | boolean | `false` | 暗淡 |
-| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
+| 参数名             | 类型                 | 默认值        | 说明                                |
+| ------------------ | -------------------- | ------------- | ----------------------------------- |
+| `fg`               | string / const-color | `color.NONE`  | 前景色                              |
+| `bg`               | string / const-color | `color.NONE`  | 背景色                              |
+| `horizontal_align` | const-align          | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式  |
+| `auto_wrap`        | boolean              | `true`        | 是否自动换行                        |
+| `word_wrap`        | boolean              | `true`        | 是否按完整单词换行                  |
+| `max_width`        | integer / nil        | `nil`         | 最大绘制宽度 |
+| `max_height`       | integer / nil        | `nil`         | 最大绘制高度 |
+| `overflow_marker`  | string               | `"..."`       | 文本溢出时使用的省略标记            |
+| `text_mode`        | const-string         | `string.AUTO` | 文本解析模式                        |
+| `rich_params`      | table / nil          | `nil`         | 富文本参数                          |
+| `bold`             | boolean              | `false`       | 粗体                                |
+| `italic`           | boolean              | `false`       | 斜体                                |
+| `underline`        | boolean              | `false`       | 下划线                              |
+| `strike`           | boolean              | `false`       | 删除线                              |
+| `blink`            | boolean              | `false`       | 闪烁                                |
+| `reverse`          | boolean              | `false`       | 反显                                |
+| `hidden`           | boolean              | `false`       | 隐藏                                |
+| `dim`              | boolean              | `false`       | 暗淡                                |
+| `slice_layer`      | string               | `"base"`      | 绘制目标切片图层                    |
 
 ## 返回值
 
-无。
+无返回值。
 
 ### 示例
 
 ```lua
 draw.text(2, 1, "Hello TUI GAME", {fg = color.BRIGHT_RED})
-
 draw.text(2, 2, "Hello TUI GAME", {fg = color.WHITE, italic = true})
-
-local text = "f%<fg:bright_green>Normal Mode</fg>\n<fg:bright_red>Challenge Mode</fg>"
-local options = {horizontal_align = align.CENTER, max_width = 20}
-local width, height = measurement.get_text_size(text, options)
-local x, y = align.resolve_rect(width, height, align.CENTER, align.CENTER)
-draw.text(x, y, text, options)
 ```
 
 **输出：**
 
-```lua
-```
+![draw_text_example](../image/draw_text_example.png)
 
-### 额外说明
+## 额外说明
 
-- 坐标从 0 开始，单位为终端字符格；超出目标切片的内容会裁剪。需要持续显示的内容放在 `Render` 回调中绘制。
-
-- 多行文本以换行和省略处理后最长的显示行为宽度：`align.CENTER` 将短行放在这段宽度的中间，`align.RIGHT` 将短行靠右。`x`、`y` 始终是文本块左上角，单行不会额外偏移；居中遇到半格时向左取整。
-- `max_width` 只限制换行和裁剪，不会补齐空白来扩大文本块。使用相同选项测量后，将返回的宽、高交给 `align.resolve_rect`，再直接绘制即可。
-
-- 参数 `bg` 和参数 `fg` 均支持形如 rgb(r,g,b) 或 \#rrggbb 的颜色代码，字符串类型，无空格
+- 坐标原点为 $(0,0)$。
 
 ---
 
@@ -112,25 +99,25 @@ draw.fill_rect
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `x` | integer | 矩形左上角的 x 坐标 |
-| `y` | integer | 矩形左上角的 y 坐标 |
-| `width` | integer | 矩形宽度，范围 1～65535 |
-| `height` | integer | 矩形高度，范围 1～65535 |
+| 参数名   | 类型    | 说明                    |
+| -------- | ------- | ----------------------- |
+| `x`      | integer | 矩形左上角的 x 坐标     |
+| `y`      | integer | 矩形左上角的 y 坐标     |
+| `width`  | integer | 矩形宽度 |
+| `height` | integer | 矩形高度 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `char` | string / nil | `nil` | 填充字符 |
-| `fg` | string / const-color | `color.NONE` | 前景色 |
-| `bg` | string / const-color | `color.NONE` | 背景色 |
-| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
+| 参数名        | 类型                 | 默认值       | 说明             |
+| ------------- | -------------------- | ------------ | ---------------- |
+| `char`        | string / nil         | `nil`        | 填充字符         |
+| `fg`          | string / const-color | `color.NONE` | 前景色           |
+| `bg`          | string / const-color | `color.NONE` | 背景色           |
+| `slice_layer` | string               | `"base"`     | 绘制目标切片图层 |
 
 ## 返回值
 
-无。
+无返回值。
 
 ### 示例
 
@@ -142,13 +129,12 @@ draw.fill_rect(13, 1, 10, 4, {char = "-", fg = color.GREEN})
 
 **输出：**
 
-```lua
-```
+![draw_fill_rect_example](../image/draw_fill_rect_example.png)
 
-### 额外说明
+## 额外说明
 
-- 参数 `char` 必须为宽度为 **1** 的字符。
-- 参数 `bg` 和参数 `fg` 均支持形如 rgb(r,g,b) 或 \#rrggbb 的颜色代码，字符串类型，无空格
+- 选填参数 `char` 填写时必须为宽度为 **1** 的字符。
+- 坐标原点为 $(0,0)$。
 
 ---
 
@@ -166,25 +152,25 @@ draw.stroke_rect
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `x` | integer | 矩形左上角的 x 坐标 |
-| `y` | integer | 矩形左上角的 y 坐标 |
-| `width` | integer | 矩形宽度，范围 1～65535 |
-| `height` | integer | 矩形高度，范围 1～65535 |
+| 参数名   | 类型    | 说明                    |
+| -------- | ------- | ----------------------- |
+| `x`      | integer | 矩形左上角的 x 坐标     |
+| `y`      | integer | 矩形左上角的 y 坐标     |
+| `width`  | integer | 矩形宽度 |
+| `height` | integer | 矩形高度 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `fg` | string / const-color | `color.NONE` | 边框前景色 |
-| `bg` | string / const-color | `color.NONE` | 边框背景色 |
-| `border_char` | const-char / table | `char.LINE` | 边框字符 |
-| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
+| 参数名        | 类型                 | 默认值       | 说明             |
+| ------------- | -------------------- | ------------ | ---------------- |
+| `fg`          | string / const-color | `color.NONE` | 边框前景色       |
+| `bg`          | string / const-color | `color.NONE` | 边框背景色       |
+| `border_char` | const-char / table   | `char.LINE`  | 边框字符         |
+| `slice_layer` | string               | `"base"`     | 绘制目标切片图层 |
 
 ## 返回值
 
-无。
+无返回值。
 
 ### 示例
 
@@ -205,28 +191,27 @@ draw.stroke_rect(15, 1, 12, 5, {fg = color.YELLOW, border_char = {
 
 **输出：**
 
-```lua
-```
+![draw_stroke_rect_example](../image/draw_stroke_rect_example.png)
 
-### 额外说明
+## 额外说明
 
 - 参数 `border_char` 表结构：
 
 ```lua
 local border_char = {
-  top = "─", -- string / const-char
-  left_top = "┌", -- string / const-char
-  left = "│", -- string / const-char
-  left_bottom = "└", -- string / const-char
-  bottom = "─", -- string / const-char
+  top = "─",          -- string / const-char
+  left_top = "┌",     -- string / const-char
+  left = "│",         -- string / const-char
+  left_bottom = "└",  -- string / const-char
+  bottom = "─",       -- string / const-char
   right_bottom = "┘", -- string / const-char
-  right = "│", -- string / const-char
-  right_top = "┐", -- string / const-char
+  right = "│",        -- string / const-char
+  right_top = "┐",    -- string / const-char
 }
 ```
 
-- 参数 `border_char` 每个字段必须为宽度为 **1** 的字符。
-- 参数 `bg` 和参数 `fg` 均支持形如 rgb(r,g,b) 或 \#rrggbb 的颜色代码，字符串类型，无空格
+- 选填参数 `border_char` 填写时每个字段必须为宽度为 **1** 的字符。
+- 坐标原点为 $(0,0)$。
 
 ---
 
@@ -244,22 +229,22 @@ draw.erase_rect
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `x` | integer | 矩形左上角的 x 坐标 |
-| `y` | integer | 矩形左上角的 y 坐标 |
-| `width` | integer | 矩形宽度，范围 1～65535 |
-| `height` | integer | 矩形高度，范围 1～65535 |
+| 参数名   | 类型    | 说明                    |
+| -------- | ------- | ----------------------- |
+| `x`      | integer | 矩形左上角的 x 坐标     |
+| `y`      | integer | 矩形左上角的 y 坐标     |
+| `width`  | integer | 矩形宽度 |
+| `height` | integer | 矩形高度 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
+| 参数名        | 类型   | 默认值   | 说明             |
+| ------------- | ------ | -------- | ---------------- |
 | `slice_layer` | string | `"base"` | 绘制目标切片图层 |
 
 ## 返回值
 
-无。
+无返回值。
 
 ### 示例
 
@@ -271,8 +256,7 @@ draw.erase_rect(3, 2, 8, 2)
 
 **输出：**
 
-```lua
-```
+![draw_erase_rect_example](../image/draw_erase_rect_example.png)
 
 ---
 
@@ -288,16 +272,12 @@ draw.render
 
 ## 返回值
 
-无。
+无返回值。
 
 ### 示例
 
 ```lua
 function HandleEvent(event)
-	-- 更新需要显示的内容
-	message = "Hello TUI GAME"
-
-	-- 请求重新绘制
 	draw.render()
 end
 
@@ -305,12 +285,6 @@ function Render()
 	-- 绘制逻辑
 end
 ```
-
-**输出：**
-
-```lua
-```
-
-### 额外说明
+## 额外说明
 
 - **不可**在 `Render` 回调中调用。

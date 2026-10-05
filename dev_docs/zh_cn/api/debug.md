@@ -8,27 +8,27 @@
 
 ## 常量
 
-| 常量 | 说明 | 定位 |
-| --- | --- | --- |
-| `VERSION` | Lua 与 TUI GAME API 版本字符串 | [VERSION](#version) |
-| `TRACE` | 追踪日志等级 | [TRACE](#trace) |
-| `DEBUG` | 调试日志等级 | [DEBUG](#debug) |
-| `INFO` | 信息日志等级 | [INFO](#info) |
-| `WARN` | 警告日志等级 | [WARN](#warn) |
-| `ERROR` | 错误日志等级 | [ERROR](#error) |
-| `FATAL` | 致命日志等级 | [FATAL](#fatal) |
+| 常量      | 说明                                 | 定位                |
+| --------- | ------------------------------------ | ------------------- |
+| `VERSION` | 返回运行时和 TUI GAME API 的版本标识 | [VERSION](#version) |
+| `TRACE`   | 追踪日志等级字符串                   | [TRACE](#trace)     |
+| `DEBUG`   | 调试日志等级字符串                   | [DEBUG](#debug)     |
+| `INFO`    | 信息日志等级字符串                   | [INFO](#info)       |
+| `WARN`    | 警告日志等级字符串                   | [WARN](#warn)       |
+| `ERROR`   | 错误日志等级字符串                   | [ERROR](#error)     |
+| `FATAL`   | 致命日志等级字符串                   | [FATAL](#fatal)     |
 
 ## 方法
 
-| 方法 | 说明 | 定位 |
-| --- | --- | --- |
-| `print` | 输出可设置等级和标题的日志 | [print](#print) |
-| `info` | 输出信息日志 | [info](#info) |
-| `warn` | 输出警告日志 | [warn](#warn) |
-| `error` | 输出错误日志 | [error](#error) |
-| `assert` | 检查值是否为真值 | [assert](#assert) |
-| `pcall` | 受保护地调用函数并返回多个结果 | [pcall](#pcall) |
-| `xpcall` | 受保护调用并处理错误值 | [xpcall](#xpcall) |
+| 方法     | 说明                                       | 定位              |
+| -------- | ------------------------------------------ | ----------------- |
+| `print`  | 向调试日志输出一条消息                     | [print](#print)   |
+| `info`   | 向调试日志输出一条信息                     | [info](#info)     |
+| `warn`   | 向调试日志输出一条警告                     | [warn](#warn)     |
+| `error`  | 向调试日志输出一条错误                     | [error](#error)   |
+| `assert` | 断言值                                     | [assert](#assert) |
+| `pcall`  | 受保护地调用函数                           | [pcall](#pcall)   |
+| `xpcall` | 受保护地调用函数，出现错误执行回调函数处理 | [xpcall](#xpcall) |
 
 ---
 
@@ -46,7 +46,7 @@ debug.VERSION
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
@@ -57,6 +57,7 @@ debug.print(debug.VERSION)
 **输出：**
 
 ```lua
+Lua 5.4 / TUI GAME API 1
 ```
 
 ### 等值
@@ -79,7 +80,7 @@ debug.TRACE
 
 ### 可用于
 
-- `debug.print` 的选填参数 `level`
+- 参数 `level`
 
 ### 示例
 
@@ -90,6 +91,7 @@ debug.print("trace message", {level = debug.TRACE})
 **输出：**
 
 ```lua
+[跟踪] trace message
 ```
 
 ### 等值
@@ -112,7 +114,7 @@ debug.DEBUG
 
 ### 可用于
 
-- `debug.print` 的选填参数 `level`
+- 参数 `level`
 
 ### 示例
 
@@ -123,6 +125,7 @@ debug.print("debug message", {level = debug.DEBUG})
 **输出：**
 
 ```lua
+[调试] debug message
 ```
 
 ### 等值
@@ -145,7 +148,7 @@ debug.INFO
 
 ### 可用于
 
-- `debug.print` 的选填参数 `level`
+- 参数 `level`
 
 ### 示例
 
@@ -156,6 +159,7 @@ debug.print("info message", {level = debug.INFO})
 **输出：**
 
 ```lua
+[信息] info message
 ```
 
 ### 等值
@@ -178,7 +182,7 @@ debug.WARN
 
 ### 可用于
 
-- `debug.print` 的选填参数 `level`
+- 参数 `level`
 
 ### 示例
 
@@ -189,6 +193,7 @@ debug.print("warning message", {level = debug.WARN})
 **输出：**
 
 ```lua
+[警告] warning message
 ```
 
 ### 等值
@@ -211,7 +216,7 @@ debug.ERROR
 
 ### 可用于
 
-- `debug.print` 的选填参数 `level`
+- 参数 `level`
 
 ### 示例
 
@@ -222,6 +227,7 @@ debug.print("error message", {level = debug.ERROR})
 **输出：**
 
 ```lua
+[错误] error message
 ```
 
 ### 等值
@@ -244,7 +250,7 @@ debug.FATAL
 
 ### 可用于
 
-- `debug.print` 的选填参数 `level`
+- 参数 `level`
 
 ### 示例
 
@@ -255,6 +261,7 @@ debug.print("fatal message", {level = debug.FATAL})
 **输出：**
 
 ```lua
+[致命] fatal message
 ```
 
 ### 等值
@@ -269,11 +276,11 @@ debug.print("fatal message", {level = debug.FATAL})
 
 ## `print`
 
-向调试日志输出一条消息。该方法需要启用调试模式。
+向调试日志输出一条消息。
 
 ### 限制
 
-- 需开启调试模式
+- 需开启调试模式。
 
 ### 调用
 
@@ -285,18 +292,18 @@ debug.print
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `message` | any | 要输出的内容，会转换为文本 |
+| 参数名    | 类型 | 说明     |
+| --------- | ---- | -------- |
+| `message` | any  | 输出信息 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `title` | string / nil | `nil` | 日志标题 |
-| `level` | string / nil | `nil` | `trace`、`debug`、`info`、`warn`、`error` 或 `fatal` |
-| `time` | boolean | `false` | 是否显示时间 |
-| `type_head` | boolean | `false` | 是否显示会话类型 |
+| 参数名      | 类型         | 默认值  | 说明             |
+| ----------- | ------------ | ------- | ---------------- |
+| `title`     | string / nil | `nil`   | 日志标题         |
+| `level`     | const-debug  | `nil`   | 日志等级         |
+| `time`      | boolean      | `false` | 是否显示时间     |
+| `type_head` | boolean      | `false` | 是否显示会话类型 |
 
 ## 返回值
 
@@ -313,17 +320,24 @@ debug.print("A titled message", {title = "Game", time = true, type_head = true})
 **输出：**
 
 ```lua
+A message
+[警告] A warning
+[游戏][2026-10-05 00:54:12.209][Game] A titled message
 ```
+
+## 额外补充
+
+- 必填参数 `message` 不可为 `nil`。
 
 ---
 
 ## `info`
 
-向调试日志输出一条信息。该方法需要启用调试模式。
+向调试日志输出一条信息。
 
 ### 限制
 
-- 需开启调试模式
+- 需开启调试模式。
 
 ### 调用
 
@@ -335,9 +349,9 @@ debug.info
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `message` | any | 要输出的内容，会转换为文本 |
+| 参数名    | 类型 | 说明     |
+| --------- | ---- | -------- |
+| `message` | any  | 输出信息 |
 
 ## 返回值
 
@@ -352,17 +366,22 @@ debug.info("Saved")
 **输出：**
 
 ```lua
+[游戏][2026-10-05 01:03:05.690][信息] Saved
 ```
+
+## 额外补充
+
+- 必填参数 `message` 不可为 `nil`。
 
 ---
 
 ## `warn`
 
-向调试日志输出一条警告。该方法需要启用调试模式。
+向调试日志输出一条警告。
 
 ### 限制
 
-- 需开启调试模式
+- 需开启调试模式。
 
 ### 调用
 
@@ -374,9 +393,9 @@ debug.warn
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `message` | any | 要输出的内容，会转换为文本 |
+| 参数名    | 类型 | 说明     |
+| --------- | ---- | -------- |
+| `message` | any  | 输出信息 |
 
 ## 返回值
 
@@ -391,17 +410,22 @@ debug.warn("Low health")
 **输出：**
 
 ```lua
+[游戏][2026-10-05 01:03:25.573][警告] Low health
 ```
+
+## 额外补充
+
+- 必填参数 `message` 不可为 `nil`。
 
 ---
 
 ## `error`
 
-向调试日志输出一条错误。该方法需要启用调试模式。
+向调试日志输出一条错误。
 
 ### 限制
 
-- 需开启调试模式
+- 需开启调试模式。
 
 ### 调用
 
@@ -413,9 +437,9 @@ debug.error
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `message` | any | 要输出的内容，会转换为文本 |
+| 参数名    | 类型 | 说明     |
+| --------- | ---- | -------- |
+| `message` | any  | 输出信息 |
 
 ## 返回值
 
@@ -430,13 +454,18 @@ debug.error("Could not load save")
 **输出：**
 
 ```lua
+[游戏][2026-10-05 01:03:41.814][错误] Could not load save
 ```
+
+## 额外补充
+
+- 必填参数 `message` 不可为 `nil`。
 
 ---
 
 ## `assert`
 
-若值为 `nil` 或 `false`，抛出错误；否则返回传入的原值。可用它检查游戏条件。
+断言值。
 
 ### 调用
 
@@ -448,36 +477,47 @@ debug.assert
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `value` | any | 要检查的值；显式传入 `nil` 会触发断言错误 |
+| 参数名  | 类型 | 说明     |
+| ------- | ---- | -------- |
+| `value` | any  | 断言的值 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `message` | any | `"assertion failed"` | 断言失败时显示的消息 |
+| 参数名    | 类型 | 默认值               | 说明                 |
+| --------- | ---- | -------------------- | -------------------- |
+| `message` | any  | `"assertion failed"` | 断言失败时输出的信息 |
 
 ## 返回值
 
-断言成功时返回原始 `value`；值为 `nil` 或 `false` 时抛出错误。
+**断言成功时**，返回一个值。
+
+| 类型 | 说明         |
+| ---- | ------------ |
+| any  | 断言成功的值 |
+
+**断言失败时**，抛出异常。
 
 ### 示例
 
 ```lua
-local score = debug.assert(10, {message = "score is required"})
+local score = debug.assert(nil, {message = "score is required"})
 ```
 
 **输出：**
 
 ```lua
+[脚本终止运行，抛出错误信息]
 ```
+
+## 额外补充
+
+- 选填参数 `message` 不可为 `nil`。
 
 ---
 
 ## `pcall`
 
-受保护地调用函数。调用结果以 Lua 多返回值形式返回，成功标记后保留函数的返回值和 nil 位置。
+受保护地调用函数。
 
 ### 调用
 
@@ -489,41 +529,61 @@ debug.pcall
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `func` | function | 要调用的函数 |
+| 参数名 | 类型     | 说明             |
+| ------ | -------- | ---------------- |
+| `func` | function | 要调用的函数     |
+| `...`  | any...   | 传递给函数的变参 |
 
 ## 返回值
 
-函数成功时返回 `true` 和函数的全部返回值；失败时返回 `false` 和错误值。致命资源错误会继续向外传播。
+**函数成功时**，返回任意数量值。
 
-| 值名 | 类型 | 说明 |
-| --- | --- | --- |
-| `ok` | boolean | 调用是否成功 |
-| `...` | any... | 成功时为函数返回值；失败时只有错误值 |
+| 值名  | 类型    | 说明                        |
+| ----- | ------- | --------------------------- |
+| `ok`  | boolean | 调用是否成功（必为 `true`） |
+| `...` | any...  | 函数返回值                  |
+
+**函数失败时**，返回两个值。
+
+| 值名    | 类型    | 说明                         |
+| ------- | ------- | ---------------------------- |
+| `ok`    | boolean | 调用是否成功（必为 `false`） |
+| `error` | string  | 错误信息                     |
 
 ### 示例
 
 ```lua
+local ok, error = debug.pcall(function(a, b)
+  return a + b
+end, 10, "3")
+
+debug.print(ok)
+debug.print(error)
+
 local ok, sum, label = debug.pcall(function(a, b)
-  return a + b, "sum", nil
-end, 10, 20)
+  return a + b, "sum"
+end, 10, "3")
+
+debug.print(ok)
+debug.print(sum)
+debug.print(label)
 ```
 
 **输出：**
 
 ```lua
+false
+[打印错误信息，脚本继续运行]
+true
+13
+sum
 ```
-
-### 额外说明
-
-- `func` 后依次传入要交给它的值；这些值是调用数据，表和 nil 都会原样保留，不作为选项表解析。
 
 ---
 
 ## `xpcall`
 
-受保护地调用函数；发生普通 Lua 错误时，先将错误传给处理函数，再返回处理后的错误值。
+受保护地调用函数，出现错误执行回调函数处理。
 
 ### 调用
 
@@ -535,19 +595,27 @@ debug.xpcall
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `func` | function | 要调用的函数 |
-| `error_callback` | function | 处理错误值的函数 |
+| 参数名           | 类型     | 说明                 |
+| ---------------- | -------- | -------------------- |
+| `func`           | function | 要调用的函数         |
+| `error_callback` | function | 处理错误值的函数     |
+| `...`            | any...   | 传递给调用函数的变参 |
 
 ## 返回值
 
-函数成功时返回 `true` 和函数的全部返回值；失败时返回 `false` 和错误处理函数的结果。致命资源错误不会被捕获。
+**函数成功时**，返回任意数量值。
 
-| 值名 | 类型 | 说明 |
-| --- | --- | --- |
-| `ok` | boolean | 调用是否成功 |
-| `...` | any... | 成功时为函数返回值；失败时为错误处理函数的结果 |
+| 值名  | 类型    | 说明                        |
+| ----- | ------- | --------------------------- |
+| `ok`  | boolean | 调用是否成功（必为 `true`） |
+| `...` | any...  | 调用函数返回值              |
+
+**函数失败时**，返回两个值。
+
+| 值名    | 类型    | 说明                         |
+| ------- | ------- | ---------------------------- |
+| `ok`    | boolean | 调用是否成功（必为 `false`） |
+| `error` | any     | 处理函数返回值               |
 
 ### 示例
 
@@ -557,13 +625,32 @@ local ok, value = debug.xpcall(function(text)
 end, function(err)
   return "failed: " .. tostring(err)
 end, "hello")
+
+debug.print(ok)
+debug.print(value)
+
+local ok, error, code = debug.xpcall(function(text)
+  return string.upper(text)
+end, function(err)
+  return "failed: " .. tostring(err), 123
+end, nil)
+
+debug.print(ok)
+debug.print(error)
+debug.print(type(code))
 ```
 
 **输出：**
 
 ```lua
+true
+HELLO
+false
+[打印处理后的错误信息，脚本继续运行]
+nil
 ```
 
-### 额外说明
+## 额外说明
 
-- `error_callback` 后依次传入要交给 `func` 的值；这些值是调用数据，表和 nil 都会原样保留，不作为选项表解析。
+- 必填参数 `error_callback` 回调函数接收一个值，为错误信息。
+- 必填参数 `error_callback` 回调函数返回值仅保留第一个。

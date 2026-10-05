@@ -8,11 +8,11 @@
 
 ## 方法
 
-| 方法 | 说明 | 定位 |
-| --- | --- | --- |
-| `exit_game` | 请求结束当前游戏 | [exit_game](#exit_game) |
-| `save_game` | 请求保存继续游戏数据 | [save_game](#save_game) |
-| `save_best` | 请求保存最佳记录 | [save_best](#save_best) |
+| 方法        | 说明                                                       | 定位                    |
+| ----------- | ---------------------------------------------------------- | ----------------------- |
+| `exit_game` | 请求结束当前游戏；此命令不会自动保存游戏数据或最佳记录     | [exit_game](#exit_game) |
+| `save_game` | 请求执行一次 `SaveGame` 回调，将游戏数据保存到继续游戏槽位 | [save_game](#save_game) |
+| `save_best` | 请求执行一次 `SaveBest` 回调，将最佳记录提供给游戏列表展示 | [save_best](#save_best) |
 
 ---
 
@@ -20,11 +20,11 @@
 
 ## `exit_game`
 
-请求结束当前游戏。此命令不会自动保存游戏数据或最佳记录。
+请求结束当前游戏；此命令不会自动保存游戏数据或最佳记录。
 
 ### 限制
 
-- 仅游戏脚本可用
+- 仅游戏脚本可用。
 
 ### 调用
 
@@ -47,8 +47,9 @@ game.exit_game()
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
+- 无参数；游戏脚本中传入任何参数都会报错。
 - 需要保存时，应先调用 `game.save_game()` 或 `game.save_best()`，再请求退出。
 - 不可在 `Init`、`SaveGame` 或 `SaveBest` 回调中调用。
 
@@ -60,7 +61,7 @@ game.exit_game()
 
 ### 限制
 
-- 仅游戏脚本可用
+- 仅游戏脚本可用。
 
 ### 调用
 
@@ -83,8 +84,9 @@ game.save_game()
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
+- 无参数；游戏脚本中传入任何参数都会报错。
 - 包清单需启用 `save_game`。
 - 保存的数据会在玩家继续游戏时传给 `Init` 回调。
 - 不可在 `SaveGame` 回调中调用。
@@ -97,7 +99,7 @@ game.save_game()
 
 ### 限制
 
-- 仅游戏脚本可用
+- 仅游戏脚本可用。
 
 ### 调用
 
@@ -120,8 +122,9 @@ game.save_best()
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
+- 无参数；游戏脚本中传入任何参数都会报错。
 - 包清单需启用 `best_score.enable`。
-- `SaveBest` 返回的 `best_string` 和 `value` 参数支持字符串或包清单文本表。翻译使用包内 `assets/language/<语言代码>/package/best_string.json`；完整写法见[回调参考](../CALLBACK.md#9-savebest)。
+- `SaveBest` 返回的 `best_string` 支持字符串或包清单文本表，`value` 是名称到字符串或包清单文本表的对象表。翻译使用包内 `assets/language/<语言代码>/package/best_string.json`；完整写法见[回调参考](../CALLBACK.md#9-savebest)。
 - 不可在 `SaveBest` 回调中调用。

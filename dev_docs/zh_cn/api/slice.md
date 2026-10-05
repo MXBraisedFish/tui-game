@@ -8,7 +8,7 @@
 
 ## 方法
 
-| 方法           | 说明                     | 定位                              |
+| 方法             | 说明                     | 定位                              |
 | ---------------- | ------------------------ | --------------------------------- |
 | `create`         | 创建一个图层切片对象     | [create](#create)                 |
 | `delete`         | 删除指定图层切片         | [delete](#delete)                 |
@@ -16,7 +16,7 @@
 | `list`           | 获取所有图层切片信息     | [list](#list)                     |
 | `count`          | 返回当前图层切片的总数   | [count](#count)                   |
 | `draw`           | 绘制图层切片             | [draw](#draw)                     |
-| `set`            | 修改生成器的参数         | [set](#set)                       |
+| `set`            | 修改图层切片的参数       | [set](#set)                       |
 | `set_size`       | 修改图层切片的宽度和高度 | [set_size](#set_size)             |
 | `set_width`      | 修改图层切片的宽度       | [set_width](#set_width)           |
 | `set_height`     | 修改图层切片的高度       | [set_height](#set_height)         |
@@ -38,6 +38,10 @@
 
 创建一个图层切片对象。
 
+### 限制
+
+最多可同时存在 1024 个图层切片；超出后 `slice.create` 会报错。
+
 ### 调用
 
 ```lua
@@ -58,7 +62,7 @@ slice.create
 | 参数名 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `bg` | string / const-color | `color.NONE` | 图层切片背景 |
-| `layer` | integer | 自动向上递增 | 图层层级 |
+| `layer` | integer | 自动向上递增 | 图层层级；正整数，小于 1 会报错 |
 
 ## 返回值
 
@@ -86,13 +90,12 @@ end
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 图层层级之间不允许空洞图层，参数 `layer` 超过最大层级时自动修正为置顶。
 - 插入层级会自动将后面的图层切片层级向上递增。
 - 创建只保存图层切片对象及其配置，不会自动将其绘制到画布。
-- 图层切片仅在当前帧显式调用 `slice.draw` 后参与该帧合成；下一帧需要再次调用。
-- `slice.draw` 的位置可以为负数；超出当前 base 的部分会裁剪，仍按切片原局部坐标绘制，命中坐标也保持该局部坐标系。
+- 图层切片 ID 的格式为 `slice_` 加正整数，例如 `slice_001`。
 
 ---
 
@@ -112,7 +115,7 @@ slice.delete
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | string | 图层切片对象 ID |
+| `id` | string | 图层切片 ID |
 
 ## 返回值
 
@@ -138,6 +141,10 @@ debug.print(table.pretty(slice.list()))
 ```lua
 ```
 
+## 额外说明
+
+- `"base"` 图层不可删除，传入 `"base"` 时返回 `false`。
+
 ---
 
 ## `clear`
@@ -156,7 +163,7 @@ slice.clear
 
 | 类型    | 说明         |
 | ------- | ------------ |
-| boolean | 是否删除成功 |
+| boolean | 恒为 `true`  |
 
 ### 示例
 
@@ -210,20 +217,20 @@ debug.print(table.pretty(slice.list()))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 返回值混合表结构如下：
 
 ```lua
-local layers = {
+local slices = {
   {
-    id = "slice_1", -- 示例 ID；以 slice.create 的返回值为准
-    width = 80, -- integer
-    height = 24, -- integer
+    id = "slice_001", -- 示例 ID；以 slice.create 的返回值为准
+    width = 20, -- integer
+    height = 10, -- integer
     layer = 1, -- integer
-    bg = "#000000", -- string
+    bg = "yellow", -- string
   },
-  n = 1, -- integer; the number of layers
+  n = 1, -- integer，切片数量
 }
 ```
 
@@ -288,7 +295,7 @@ slice.draw
 
 ## 返回值
 
-无。
+无返回值。
 
 ### 示例
 
@@ -307,15 +314,16 @@ end
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - `slice.draw` 的提交仅对当前帧有效。需要持续显示的图层切片应当每帧调用一次。
+- `slice.draw` 的位置可以为负数；超出当前 base 的部分会裁剪，绘制仍按切片的局部坐标进行。
 
 ---
 
 ## `set`
 
-修改生成器的参数。
+修改图层切片的参数。
 
 ### 调用
 
@@ -338,7 +346,7 @@ slice.set
 | `width` | integer | 保持原值 | 图层切片宽度，范围 1～65535 |
 | `height` | integer | 保持原值 | 图层切片高度，范围 1～65535 |
 | `bg` | string / const-color | 保持原值 | 图层切片背景 |
-| `layer` | integer | 保持原值 | 图层层级 |
+| `layer` | integer | 保持原值 | 图层层级；正整数，小于 1 会报错 |
 
 ## 返回值
 
@@ -364,7 +372,7 @@ debug.print(table.pretty(slice.get_info(s1)))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -413,7 +421,7 @@ debug.print(table.pretty(slice.get_info(s)))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -461,7 +469,7 @@ debug.print(slice.get_width(s))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -509,7 +517,7 @@ debug.print(slice.get_height(s))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -532,7 +540,7 @@ slice.set_layer
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | string | 图层切片 ID |
-| `layer` | integer | 图层层级 |
+| `layer` | integer | 图层层级；正整数，小于 1 会报错 |
 
 ## 返回值
 
@@ -565,7 +573,7 @@ end
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 图层层级之间不允许空洞图层，参数 `layer` 超过最大层级时自动修正为置顶。
 - 插入层级会自动将后面的图层切片层级向上递增。
@@ -594,6 +602,8 @@ slice.set_background
 
 ## 返回值
 
+返回一个值。
+
 | 类型    | 说明         |
 | ------- | ------------ |
 | boolean | 是否修改成功 |
@@ -619,7 +629,7 @@ end
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - `"base"` 图层不可修改。
 
@@ -645,7 +655,7 @@ slice.get_size
 
 ## 返回值
 
-返回两个值，依次为图层切片宽度和高度；切片不存在时返回一个 nil。
+**切片存在时**，返回两个值，依次为图层切片宽度和高度；**切片不存在时**，返回一个 `nil`。
 
 | 值名 | 类型 | 说明 |
 | --- | --- | --- |
@@ -687,7 +697,7 @@ slice.get_width
 
 ## 返回值
 
-对象不存在时返回 `nil`；对象存在时返回以下结果。
+**对象不存在时**，返回 `nil`；**对象存在时**，返回以下结果。
 
 返回一个值。
 
@@ -708,7 +718,7 @@ debug.print(slice.get_width(s))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 请先判断查询结果是否为 `nil`，再读取字段或参与计算。
 
@@ -734,7 +744,7 @@ slice.get_height
 
 ## 返回值
 
-对象不存在时返回 `nil`；对象存在时返回以下结果。
+**对象不存在时**，返回 `nil`；**对象存在时**，返回以下结果。
 
 返回一个值。
 
@@ -755,7 +765,7 @@ debug.print(slice.get_height(s))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 请先判断查询结果是否为 `nil`，再读取字段或参与计算。
 
@@ -781,7 +791,7 @@ slice.get_layer
 
 ## 返回值
 
-对象不存在时返回 `nil`；对象存在时返回以下结果。
+**对象不存在时**，返回 `nil`；**对象存在时**，返回以下结果。
 
 返回一个值。
 
@@ -802,7 +812,7 @@ debug.print(slice.get_layer(s))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 请先判断查询结果是否为 `nil`，再读取字段或参与计算。
 
@@ -830,7 +840,7 @@ slice.get_background
 
 ## 返回值
 
-对象不存在时返回 `nil`；对象存在时返回以下结果。
+**对象不存在时**，返回 `nil`；**对象存在时**，返回以下结果。
 
 返回一个值。
 
@@ -851,7 +861,7 @@ debug.print(slice.get_background(s))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 请先判断查询结果是否为 `nil`，再读取字段或参与计算。
 
@@ -878,11 +888,12 @@ slice.get_info
 | `id` | string | 图层切片 ID |
 
 ## 返回值
-对象存在时返回一个表；不存在时返回 `nil`。
+
+**对象存在时**，返回一个表；**不存在时**，返回 `nil`。
 
 | 类型 | 说明 |
 | --- | --- |
-| table / nil | 切片信息，或对象不存在 |
+| table / `nil` | 切片信息 |
 
 ### 示例
 
@@ -897,7 +908,7 @@ debug.print(table.pretty(slice.get_info(s)))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 返回表包含以下字段：
 
@@ -910,6 +921,7 @@ debug.print(table.pretty(slice.get_info(s)))
 | `layer`  | integer | 图层层级     |
 
 - 请先判断查询结果是否为 `nil`，再读取字段或参与计算。
+- 传入 `"base"` 时返回 base 图层的信息表，其中 `id` 为 `"base"`、`layer` 为 `0`、`bg` 为 `color.TRANSPARENT`，`width` 和 `height` 为 base 图层的尺寸。
 
 ---
 
@@ -953,3 +965,7 @@ debug.print(slice.exists(s))
 
 ```lua
 ```
+
+## 额外说明
+
+- `"base"` 图层始终存在，传入 `"base"` 时返回 `true`。

@@ -8,18 +8,18 @@
 
 ## 常量
 
-| 常量            | 说明                       | 定位                                |
-| ----------------- | -------------------------- | ----------------------------------- |
-| `LINE`            | 单线边框字符表             | [LINE](#line)                       |
-| `BOLD_LINE`       | 粗线边框字符表             | [BOLD_LINE](#bold_line)             |
-| `DOUBLE_LINE`     | 双线边框字符表             | [DOUBLE_LINE](#double_line)         |
-| `ROUNDED_LINE`    | 圆角线边框字符表           | [ROUNDED_LINE](#rounded_line)       |
-| `ASCII_NUMBER`    | `"0"`~`"9"` 字符数组表       | [ASCII_NUMBER](#ascii_number)       |
-| `ASCII_LOWERCASE` | `"a"`~`"z"` 字符数组表       | [ASCII_LOWERCASE](#ascii_lowercase) |
-| `ASCII_UPPERCASE` | `"A"`~`"Z"` 字符数组表       | [ASCII_UPPERCASE](#ascii_uppercase) |
-| `ASCII_LETTER`    | 大小写字母字符数组表         | [ASCII_LETTER](#ascii_letter)       |
-| `ASCII_CHARACTER` | ASCII 符号字符数组表         | [ASCII_CHARACTER](#ascii_character) |
-| `ASCII`           | 数字+字母+符号全量字符数组表 | [ASCII](#ascii)                     |
+| 常量              | 说明                        | 定位                                |
+| ----------------- | --------------------------- | ----------------------------------- |
+| `LINE`            | 单线边框字符表              | [LINE](#line)                       |
+| `BOLD_LINE`       | 粗线边框字符表              | [BOLD_LINE](#bold_line)             |
+| `DOUBLE_LINE`     | 双线边框字符表              | [DOUBLE_LINE](#double_line)         |
+| `ROUNDED_LINE`    | 圆角线边框字符表            | [ROUNDED_LINE](#rounded_line)       |
+| `ASCII_NUMBER`    | 数字字符数组表              | [ASCII_NUMBER](#ascii_number)       |
+| `ASCII_LOWERCASE` | 小写字母字符数组表          | [ASCII_LOWERCASE](#ascii_lowercase) |
+| `ASCII_UPPERCASE` | 大写字母字符数组表          | [ASCII_UPPERCASE](#ascii_uppercase) |
+| `ASCII_LETTER`    | 全部大小写字母字符数组表    | [ASCII_LETTER](#ascii_letter)       |
+| `ASCII_CHARACTER` | ASCII 符号字符数组表        | [ASCII_CHARACTER](#ascii_character) |
+| `ASCII`           | 全量可打印 ASCII 字符数组表 | [ASCII](#ascii)                     |
 
 ---
 
@@ -47,8 +47,7 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.LINE})
 
 **输出：**
 
-```lua
-```
+![char_LINE_example](../image/char_LINE_example.png)
 
 ### 等值
 
@@ -94,8 +93,7 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.BOLD_LINE})
 
 **输出：**
 
-```lua
-```
+![char_BOLD_LINE_example](../image/char_BOLD_LINE_example.png)
 
 ### 等值
 
@@ -141,8 +139,7 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.DOUBLE_LINE})
 
 **输出：**
 
-```lua
-```
+![char_DOUBLE_LINE_example](../image/char_DOUBLE_LINE_example.png)
 
 ### 等值
 
@@ -188,8 +185,7 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.ROUNDED_LINE})
 
 **输出：**
 
-```lua
-```
+![char_ROUNDED_LINE_example](../image/char_ROUNDED_LINE_example.png)
 
 ### 等值
 
@@ -225,14 +221,14 @@ char.ASCII_NUMBER
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
 ```lua
 local x, y = 0, 0
 
-for _, item in ipairs(char.ASCII_NUMBER) do
+for i, item in ipairs(char.ASCII_NUMBER) do
   x = x + 2
   draw.text(x, y, item)
 end
@@ -240,8 +236,7 @@ end
 
 **输出：**
 
-```lua
-```
+![char_ASCII_NUMBER_example](../image/char_ASCII_NUMBER_example.png)
 
 ### 等值
 
@@ -260,7 +255,7 @@ end
 }
 ```
 
-### 额外说明
+## 额外说明
 
 - 所有数字均为**字符串**类型，而非数字。
 
@@ -278,14 +273,14 @@ char.ASCII_LOWERCASE
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
 ```lua
 local x, y = 0, 0
 
-for _, item in ipairs(char.ASCII_LOWERCASE) do
+for i, item in ipairs(char.ASCII_LOWERCASE) do
   x = x + 2
   if x >= 20 then
     x = 2
@@ -297,8 +292,7 @@ end
 
 **输出：**
 
-```lua
-```
+![char_ASCII_LOWERCASE_example](../image/char_ASCII_LOWERCASE_example.png)
 
 ### 等值
 
@@ -347,14 +341,14 @@ char.ASCII_UPPERCASE
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
 ```lua
 local x, y = 0, 0
 
-for _, item in ipairs(char.ASCII_UPPERCASE) do
+for i, item in ipairs(char.ASCII_UPPERCASE) do
   x = x + 2
   if x >= 20 then
     x = 2
@@ -366,8 +360,7 @@ end
 
 **输出：**
 
-```lua
-```
+![char_ASCII_UPPERCASE_example](../image/char_ASCII_UPPERCASE_example.png)
 
 ### 等值
 
@@ -416,14 +409,14 @@ char.ASCII_LETTER
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
 ```lua
 local x, y = 0, 0
 
-for _, item in ipairs(char.ASCII_LETTER) do
+for i, item in ipairs(char.ASCII_LETTER) do
   x = x + 2
   if x >= 20 then
     x = 2
@@ -435,8 +428,7 @@ end
 
 **输出：**
 
-```lua
-```
+![char_ASCII_LETTER_example](../image/char_ASCII_LETTER_example.png)
 
 ### 等值
 
@@ -511,18 +503,26 @@ char.ASCII_CHARACTER
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
 ```lua
-draw.text(0, 0, table.concat(char.ASCII_CHARACTER))
+local x, y = 0, 0
+
+for i, item in ipairs(char.ASCII_CHARACTER) do
+  x = x + 2
+  if x >= 20 then
+    x = 2
+    y = y + 1
+  end
+  draw.text(x, y, item)
+end
 ```
 
 **输出：**
 
-```lua
-```
+![char_ASCII_CHARACTER_example](../image/char_ASCII_CHARACTER_example.png)
 
 ### 等值
 
@@ -577,18 +577,26 @@ char.ASCII
 
 ### 可用于
 
-- 任意
+- 任意。
 
 ### 示例
 
 ```lua
-draw.text(0, 0, table.concat(char.ASCII))
+local x, y = 0, 0
+
+for i, item in ipairs(char.ASCII) do
+  x = x + 2
+  if x >= 20 then
+    x = 2
+    y = y + 1
+  end
+  draw.text(x, y, item)
+end
 ```
 
 **输出：**
 
-```lua
-```
+![char_ASCII_example](../image/char_ASCII_example.png)
 
 ### 等值
 

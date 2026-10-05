@@ -8,29 +8,29 @@
 
 ## 常量
 
-| 常量 | 说明 | 定位 |
-| --- | --- | --- |
-| `NULL` | 表示 JSON/YAML 中的 null 值 | [NULL](#null) |
+| 常量   | 说明                                                     | 定位          |
+| ------ | -------------------------------------------------------- | ------------- |
+| `NULL` | 用来表示 JSON/YAML 中的 `null`，并与 Lua 的 `nil` 区分开 | [NULL](#null) |
 
 ## 方法
 
-| 方法            | 说明                           | 定位                                |
-| ----------------- | ------------------------------ | ----------------------------------- |
-| `json_encode`     | 将 Lua 值编码为 JSON 字符串    | [json_encode](#json_encode)         |
-| `json_decode`     | 将 JSON 字符串解码为 Lua 值    | [json_decode](#json_decode)         |
+| 方法              | 说明                             | 定位                                |
+| ----------------- | -------------------------------- | ----------------------------------- |
+| `json_encode`     | 将 Lua 值编码为 JSON 字符串      | [json_encode](#json_encode)         |
+| `json_decode`     | 将 JSON 字符串解码为 Lua 值      | [json_decode](#json_decode)         |
 | `csv_encode`      | 将二维数组表编码为 CSV 字符串    | [csv_encode](#csv_encode)           |
 | `csv_decode`      | 将 CSV 字符串解码为二维数组表    | [csv_decode](#csv_decode)           |
-| `yaml_encode`     | 将 Lua 值编码为 YAML 字符串    | [yaml_encode](#yaml_encode)         |
-| `yaml_decode`     | 将 YAML 字符串解码为 Lua 值    | [yaml_decode](#yaml_decode)         |
-| `toml_encode`     | 将 Lua 值编码为 TOML 字符串    | [toml_encode](#toml_encode)         |
-| `toml_decode`     | 将 TOML 字符串解码为 Lua 值    | [toml_decode](#toml_decode)         |
-| `ini_encode`      | 将 Lua 表编码为 INI 字符串     | [ini_encode](#ini_encode)           |
-| `ini_decode`      | 将 INI 字符串解码为 Lua 表     | [ini_decode](#ini_decode)           |
-| `xml_encode`      | 将 Lua 值编码为 XML 字符串     | [xml_encode](#xml_encode)           |
-| `xml_decode`      | 将 XML 字符串解码为 Lua 值     | [xml_decode](#xml_decode)           |
-| `binary_pack`     | 按格式串打包数据为二进制字符串 | [binary_pack](#binary_pack)         |
-| `binary_unpack`   | 按格式串从二进制字符串解包数据 | [binary_unpack](#binary_unpack)     |
-| `binary_packsize` | 返回按格式打包所需的总字节数   | [binary_packsize](#binary_packsize) |
+| `yaml_encode`     | 将 Lua 值编码为 YAML 字符串      | [yaml_encode](#yaml_encode)         |
+| `yaml_decode`     | 将 YAML 字符串解码为 Lua 值      | [yaml_decode](#yaml_decode)         |
+| `toml_encode`     | 将 Lua 值编码为 TOML 字符串      | [toml_encode](#toml_encode)         |
+| `toml_decode`     | 将 TOML 字符串解码为 Lua 值      | [toml_decode](#toml_decode)         |
+| `ini_encode`      | 将 Lua 表编码为 INI 字符串       | [ini_encode](#ini_encode)           |
+| `ini_decode`      | 将 INI 字符串解码为 Lua 表       | [ini_decode](#ini_decode)           |
+| `xml_encode`      | 将 Lua 值编码为 XML 字符串       | [xml_encode](#xml_encode)           |
+| `xml_decode`      | 将 XML 字符串解码为 Lua 值       | [xml_decode](#xml_decode)           |
+| `binary_pack`     | 按格式串将数据打包为二进制字符串 | [binary_pack](#binary_pack)         |
+| `binary_unpack`   | 按格式串从二进制字符串中解包数据 | [binary_unpack](#binary_unpack)     |
+| `binary_packsize` | 返回按格式串打包所需的总字节数   | [binary_packsize](#binary_packsize) |
 
 ---
 
@@ -65,11 +65,9 @@ local encoded_again = serialization.json_encode(decoded)
 
 ### 等值
 
-```json
-null
-```
+无字面值；编码时翻译为 JSON/YAML 的 `null`。
 
-### 额外说明
+## 额外说明
 
 - JSON/YAML 编码与解码都保留此值；CSV、INI、TOML、XML 遇到此值会报错。
 
@@ -116,11 +114,10 @@ debug.print(json)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `value` 必须可序列化；使用 `serialization.NULL` 表示对象字段或数组位置中的 JSON null。
-- `value` 直接作为位置参数传入；`serialization.NULL` 用于保留嵌套的 JSON null。
-- JSON/YAML 编码和解码共用以下数据限制：嵌套最多 32 层、最多 16,384 个值节点，编码结果最多 1 MiB；拒绝非有限数字、无效 UTF-8、循环表、稀疏数组、非正整数数组键，以及同一表混用数组索引和字符串键。
+- JSON/YAML 编码和解码共用以下数据限制：编码最多 32 层、解码最多 33 层，最多 16,384 个值节点，编码结果最多 1 MiB；拒绝非有限数字、无效 UTF-8、循环表、稀疏数组、非正整数数组键，以及同一表混用数组索引和字符串键。
 - 空 Lua 表编码为 JSON/YAML 对象 `{}`；顶层 `json_encode(nil)` 编码为 `null`。发生错误时会说明被拒绝的值或限制。
 
 ---
@@ -164,7 +161,7 @@ debug.print(data.name .. ", v" .. tostring(data.version))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `text` 必须是有效文本；JSON null 解码为 `serialization.NULL`，包含该哨兵的值可以原样重新编码。
 
@@ -213,9 +210,9 @@ debug.print(csv)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 参数 `rows` 必须可序列化；CSV 不支持 `serialization.NULL`，空字段解码为普通空字符串。
+- 参数 `rows` 必须是二维数组表，单元格只能是标量；CSV 不支持 `serialization.NULL`。
 
 ---
 
@@ -258,9 +255,9 @@ debug.print(data[2][1] .. ": " .. tostring(data[2][2]))
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 参数 `text` 必须是对应格式的有效文本。
+- CSV 的每个字段都解码为字符串，空字段为普通空字符串。
 
 ---
 
@@ -303,7 +300,7 @@ debug.print(yaml)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `value` 必须可序列化；`serialization.NULL` 编码为 YAML null。
 
@@ -348,7 +345,7 @@ debug.print(data.name)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `text` 必须是有效文本；YAML null 解码为 `serialization.NULL`。
 
@@ -368,9 +365,9 @@ serialization.toml_encode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `value` | any | 要编码的 Lua 值 |
+| 参数名  | 类型  | 说明            |
+| ------- | ----- | --------------- |
+| `value` | table | 要编码的 Lua 表 |
 
 ## 返回值
 
@@ -393,9 +390,10 @@ debug.print(toml)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `value` 必须可序列化；TOML 不支持 null，包含 `serialization.NULL` 时返回错误。
+- TOML 的根必须是对象表，数组或标量根会报错。
 
 ---
 
@@ -438,9 +436,9 @@ debug.print(data.name)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 参数 `text` 必须是对应格式的有效文本。
+- TOML 文档的根总是对象表，解码结果总是表，且不会包含 `serialization.NULL`。
 
 ---
 
@@ -486,9 +484,11 @@ debug.print(ini)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 参数 `value` 必须可序列化；INI 不支持 `serialization.NULL`。
+- 参数 `value` 必须是对象表；只支持一层节，节内值必须是标量。
+- 键名与节名不能为空，也不能含 `[`、`]`、`=`、`;`、`#` 或换行；值不能含换行。
 
 ---
 
@@ -531,9 +531,9 @@ debug.print(data.server.host)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 参数 `text` 必须是对应格式的有效文本。
+- INI 的值都解码为字符串；节解码为嵌套表，节外的键直接放在根表中。
 
 ---
 
@@ -551,9 +551,9 @@ serialization.xml_encode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `value` | table | 要编码的 Lua 值 |
+| 参数名  | 类型  | 说明            |
+| ------- | ----- | --------------- |
+| `value` | table | 要编码的 Lua 表 |
 
 ## 返回值
 
@@ -581,7 +581,7 @@ debug.print(xml)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
 - 最外层表必须只有一个根元素。元素的 `_attr` 表表示属性，`_text` 表示文本；同名子元素可用数组表示。不能在同一元素中混合文本与子元素。
 
@@ -628,11 +628,11 @@ debug.print(data.root.child._text)
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 属性在 `_attr` 中，文本在 `_text` 中；重复子元素组成数组。不支持 DTD、实体声明及文本与子元素混排。
+- XML 中无属性且无子元素的元素解码为字符串本身，其余元素解码为表；属性的 `_attr`、文本的 `_text` 仅在非空时出现。
 
-- 参数 `text` 必须是对应格式的有效文本。
+- 重复子元素组成数组，根元素名是结果表的唯一键。不支持 DTD、实体声明及文本与子元素混排。
 
 ---
 
@@ -674,9 +674,12 @@ debug.print("packed " .. tostring(#bytes) .. " bytes")
 ```lua
 ```
 
-### 额外说明
+## 额外说明
 
-- 格式串后依次传入数值或字节字符串，数量与类型必须匹配；这些值是打包数据，不作为选项表解析，也不接受表或 nil。
+- 格式串后依次传入数值或字节字符串，数量与类型必须匹配；这些值是打包数据，不作为选项表解析，也不接受表或 `nil`。
+- 格式串项：`b`/`B`、`h`/`H`、`l`/`j`/`L`/`J`/`T` 分别是 1、2、8 字节整数（小写有符号、大写无符号）；`i`/`I` 后跟可选字节数（默认 4，范围 1 到 16）；`f`/`d`/`n` 是 4、8 字节浮点数；`c` 后必须跟字节数，表示定长字符串；`z` 是零结尾字符串；`s` 后跟可选的长度前缀字节数（默认 8，范围 1 到 8）；`x` 是一个填充字节。
+- 字节序默认为本机；`<` 改为小端，`>` 改为大端，`=` 恢复本机。
+- 默认最大对齐为 1，即默认不填充；`!n` 把最大对齐设为 1 到 16 的 2 的幂（省略 `n` 时为本机指针宽度），`X` 按后随的定长项对齐。
 
 ---
 
@@ -707,12 +710,12 @@ serialization.binary_unpack
 
 ## 返回值
 
-返回两个值：解出的数据数组表和下一次解包的一基字节位置。
+返回两个值：解出的数据数组表和下一次解包的起始字节位置。
 
-| 值名 | 类型 | 说明 |
-| --- | --- | --- |
-| `values` | table | 按格式顺序解出的数据数组表 |
-| `next_pos` | integer | 下一次解包的一基起始字节位置 |
+| 值名       | 类型    | 说明                       |
+| ---------- | ------- | -------------------------- |
+| `values`   | table   | 按格式顺序解出的数据数组表 |
+| `next_pos` | integer | 下一次解包的起始字节位置   |
 
 ### 示例
 
@@ -726,6 +729,11 @@ debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. n
 
 ```lua
 ```
+
+## 额外说明
+
+- 必填参数按顺序传入，选填参数放在末尾选项表中；`pos` 是选项表字段，不是第三个位置参数。
+- 返回的第二个值可作为下一次解包调用的 `pos`。
 
 ---
 
@@ -766,3 +774,7 @@ debug.print(tostring(size))
 
 ```lua
 ```
+
+## 额外说明
+
+- 参数 `fmt` 只能包含定长项，含 `z`、`s` 等变长项时会报错。

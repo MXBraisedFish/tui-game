@@ -119,6 +119,18 @@ fn function_value(function: Function) -> Value {
   Value::Function(function)
 }
 
+/// Reject calls that require a game session.
+///
+/// # Errors
+///
+/// Return a Lua error naming the method when the current session is a screensaver.
+fn require_game(state: &super::LuaApiState, method: &str) -> mlua::Result<()> {
+  if state.context.session_kind != LuaSessionKind::Game {
+    return Err(args::message(method, "method requires a game session"));
+  }
+  Ok(())
+}
+
 fn ignore_once(state: &mut super::LuaApiState, method: &'static str, reason: &'static str) {
   if state.ignored_methods.insert(method) {
     push_host_command(state, LuaHostCommand::Ignored { method, reason });

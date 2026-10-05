@@ -579,6 +579,14 @@ impl LuaSession {
     self.take_input_releases()
   }
 
+  /// Forget input on terminal focus loss or overlay takeover under the session's policy.
+  ///
+  /// Pending releases from other ownership changes are preserved when focus releases are disabled.
+  pub fn focus_lost_input(&mut self) -> Vec<super::LuaEventData> {
+    self.api_state.borrow_mut().input.focus_lost();
+    self.take_input_releases()
+  }
+
   /// Drain releases created by a subscription change after the callback returns.
   pub fn take_input_releases(&mut self) -> Vec<super::LuaEventData> {
     self.api_state.borrow_mut().input.take_releases()
@@ -2942,6 +2950,11 @@ mod tests {
           debug.assert(date.date_to_timestamp(t.year, t.month, t.day, t.hour, t.minute, t.second, t.millisecond, {timezone = date.UTC}) == -1)
           debug.assert(date.timestamp_diff(-500, 1000) == 1500)
           debug.assert(date.timestamp_diff(1000, 1000) == 0)
+          local later = date.timestamp_to_date(123, {timezone = date.UTC})
+          debug.assert(date.timestamp_diff(t, later, {timezone = date.UTC}) == 124)
+          debug.assert(date.timestamp_diff(t, 123, {timezone = date.UTC}) == 124)
+          debug.assert(date.timestamp_diff(-1, later, {timezone = date.UTC}) == 124)
+          debug.assert(date.timestamp_diff(t, -1, {timezone = date.UTC}) == 0)
           debug.assert(type(date.now()) == "number")
           debug.assert(type(date.now({time_type = date.DATE})) == "table")
           debug.assert(not select(1, debug.pcall(function() date.UTC = "invalid" end)))
@@ -5209,42 +5222,96 @@ mod tests {
   }
 
   #[test]
-  fn restricted_calls_are_ignored_before_parameter_validation() {
-    let source = valid_script(
-      r#"
-        function Init(ctx)
-          game.exit_game("ignored")
-          event.clear_action("ignored")
-          file.write()
-          file.list_dir()
-          file.create_dir()
-          file.remove()
-          debug.info("ignored")
-        end
-      "#,
-    );
-    let mut session = LuaSession::load(
-      spec(&source, LuaSessionKind::Screensaver),
-      LuaPolicy::default(),
-    )
-    .unwrap();
-    let commands = session.take_host_commands();
-    for method in [
+  fn session_restrictions_raise_errors_before_parameter_validation() {
+    let methods = [
       "game.exit_game",
+      "game.save_game",
+      "game.save_best",
+      "event.skip_action",
       "event.clear_action",
+      "event.enable_focus_release",
+      "event.disable_focus_release",
+      "ime.receive_action_event",
+      "ime.reject_action_event",
+      "ime.receive_key_event",
+      "ime.reject_key_event",
       "file.write",
       "file.list_dir",
       "file.create_dir",
       "file.remove",
-      "debug.info",
-    ] {
-      assert!(
-        commands.iter().any(|command| matches!(
-          command,
-          LuaHostCommand::Ignored { method: found, .. } if *found == method
-        )),
-        "missing ignored command for {method}"
-      );
+    ];
+    for method in methods {
+      let source = valid_script(&format!(
+        r#"
+        function Init(ctx)
+          local ok, message = debug.pcall(function() {method}("invalid") end)
+          debug.assert(not ok)
+          debug.assert((string.find(message, "{method}", {{plain=true}})))
+          debug.assert((string.find(message, "requires a game session", {{plain=true}})))
+        end
+      "#
+      ));
+      let mut session = LuaSession::load(
+        spec(&source, LuaSessionKind::Screensaver),
+        LuaPolicy::default(),
+      )
+      .unwrap();
+      assert!(session.take_host_commands().is_empty(), "{method}");
+      for callback in ["Init(ctx)", "Update(dt)"] {
+        let source = valid_script(&format!("function {callback} {method}() end"));
+        let loaded = LuaSession::load(
+          spec(&source, LuaSessionKind::Screensaver),
+          LuaPolicy::default(),
+        );
+        if callback.starts_with("Init") {
+          assert!(
+            loaded
+              .err()
+              .unwrap()
+              .message
+              .contains("requires a game session"),
+            "{method}"
+          );
+        } else {
+          let mut session = loaded.unwrap();
+          assert!(
+            session
+              .update()
+              .unwrap_err()
+              .message
+              .contains("requires a game session"),
+            "{method}"
+          );
+          assert_eq!(session.state(), LuaSessionState::Faulted);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn disabled_debug_methods_ignore_invalid_requests_without_stopping_scripts() {
+    let source = valid_script(
+      r#"
+      function Init(ctx)
+        for _, fn in ipairs({debug.print, debug.info, debug.warn, debug.error}) do
+          fn()
+          fn({}, {unknown=true})
+        end
+        debug.assert(not select(1, debug.pcall(function() debug.assert(false) end)))
+      end
+    "#,
+    );
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session = LuaSession::load(spec(&source, kind), LuaPolicy::default()).unwrap();
+      session.update().unwrap();
+      let commands = session.take_host_commands();
+      assert_eq!(commands.len(), 4);
+      for method in ["debug.print", "debug.info", "debug.warn", "debug.error"] {
+        assert_eq!(commands.iter().filter(|command| matches!(command,
+          LuaHostCommand::Ignored { method: found, reason: "debug mode is disabled" } if *found == method
+        )).count(), 1);
+      }
+      assert_eq!(session.state(), LuaSessionState::Running);
     }
   }
 
@@ -5289,46 +5356,35 @@ mod tests {
   fn event_action_controls_require_a_game_session() {
     let source = valid_script(
       r#"
-        function Init(ctx)
-          event.skip_action()
-          event.clear_action()
-        end
-      "#,
+      function Init(ctx)
+        event.skip_action()
+        event.clear_action()
+      end
+    "#,
     );
-    let load = |session_kind| {
-      let mut session = LuaSession::load_with_api(
-        spec(&source, session_kind),
-        LuaPolicy::default(),
-        LuaApiConfig::default(),
-      )
-      .unwrap();
-      session.take_host_commands()
-    };
-
-    let permitted = load(LuaSessionKind::Game);
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let commands = session.take_host_commands();
     assert!(
-      permitted
+      commands
         .iter()
         .any(|command| matches!(command, LuaHostCommand::SkipActions))
     );
     assert!(
-      permitted
+      commands
         .iter()
         .any(|command| matches!(command, LuaHostCommand::ClearActions))
     );
-
-    for commands in [load(LuaSessionKind::Screensaver)] {
-      assert!(!commands.iter().any(|command| matches!(
-        command,
-        LuaHostCommand::SkipActions | LuaHostCommand::ClearActions
-      )));
-      for method in ["event.skip_action", "event.clear_action"] {
-        assert!(commands.iter().any(|command| matches!(
-          command,
-          LuaHostCommand::Ignored { method: found, .. } if *found == method
-        )));
-      }
-    }
+    assert!(
+      LuaSession::load(
+        spec(&source, LuaSessionKind::Screensaver),
+        LuaPolicy::default(),
+      )
+      .err()
+      .unwrap()
+      .message
+      .contains("event.skip_action")
+    );
   }
 
   #[test]
@@ -5769,43 +5825,325 @@ mod tests {
   }
 
   #[test]
-  fn ime_defaults_strict_arguments_and_screen_scope_are_enforced() {
+  fn ime_settings_succeed_idempotently_and_validate_arguments() {
     let source = valid_script(
       r#"
       function Init(ctx)
-        debug.assert(ime.receive_action_event() == false)
-        debug.assert(ime.reject_action_event() == true)
-        debug.assert(ime.reject_action_event() == false)
-        debug.assert(ime.receive_action_event() == true)
-        debug.assert(ime.reject_key_event() == false)
-        debug.assert(ime.receive_key_event() == true)
-        debug.assert(ime.receive_key_event() == false)
-        debug.assert(ime.reject_key_event() == true)
-        for _, fn in pairs(ime) do
-          debug.assert(not select(1,debug.pcall(function() fn({}) end)))
+        for _, fn in ipairs({
+          ime.receive_action_event, ime.reject_action_event,
+          ime.receive_key_event, ime.reject_key_event,
+        }) do
+          debug.assert(fn() == true)
+          debug.assert(fn() == true)
+          debug.assert(not select(1, debug.pcall(function() fn({}) end)))
         end
-        debug.assert(not select(1,debug.pcall(function() ime.receive_key_event = true end)))
+        debug.assert(not select(1, debug.pcall(function() ime.receive_key_event = true end)))
       end
     "#,
     );
-    assert!(LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).is_ok());
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    {
+      let input = &session.api_state.borrow().input;
+      assert!(!input.actions);
+      assert!(!input.keys);
+      assert_eq!(
+        input.generation(&crate::LuaEventData::Action {
+          action: "pause".into(),
+          state: crate::LuaActionState::Pressed,
+        }),
+        1
+      );
+      assert_eq!(
+        input.generation(&crate::LuaEventData::Key {
+          key: "esc".into(),
+          state: crate::LuaActionState::Pressed,
+        }),
+        1
+      );
+    }
+    assert_eq!(session.take_host_commands().len(), 2);
+  }
+
+  #[test]
+  fn focus_release_settings_preserve_mapping_and_rejection_cleanup() {
+    use crate::{LuaActionState as State, LuaEventData as Data, LuaRuntimeEvent};
     let source = valid_script(
       r#"
+      local seen = {}
       function Init(ctx)
-        debug.assert(ime.receive_action_event() == false)
-        debug.assert(ime.reject_action_event() == false)
-        debug.assert(ime.receive_key_event() == false)
-        debug.assert(ime.reject_key_event() == false)
+        ime.receive_key_event()
+        for _, fn in ipairs({event.enable_focus_release, event.disable_focus_release}) do
+          debug.assert(fn())
+          debug.assert(fn())
+          debug.assert(not select(1, debug.pcall(function() fn(nil) end)))
+        end
+        debug.assert(event.enable_focus_release())
+        debug.assert(not select(1, debug.pcall(function() event.disable_focus_release = true end)))
       end
+      function HandleEvent(e)
+        if e.type == "resize" then
+          local fn = e.data.width == 1 and event.disable_focus_release or event.enable_focus_release
+          debug.assert(fn())
+          debug.assert(fn())
+        elseif e.type == "key" or e.type == "action" then
+          seen[#seen+1] = e.type .. ":" .. e.data.state
+        end
+      end
+      function SaveGame() return {seen=seen} end
     "#,
     );
-    assert!(
-      LuaSession::load(
-        spec(&source, LuaSessionKind::Screensaver),
-        LuaPolicy::default()
-      )
-      .is_ok()
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let key = |state| Data::Key {
+      key: "esc".into(),
+      state,
+    };
+    let action = |state| Data::Action {
+      action: "pause".into(),
+      state,
+    };
+    let mut sequence = 0;
+    let mut send = |session: &mut LuaSession, data, route| {
+      sequence += 1;
+      session
+        .dispatch_event(&LuaEventDelivery {
+          event: LuaRuntimeEvent {
+            sequence,
+            frame: sequence,
+            data,
+          },
+          route,
+        })
+        .unwrap();
+    };
+    for data in [key(State::Pressed), action(State::Pressed)] {
+      let generation = session.input_generation(&data).unwrap();
+      send(&mut session, data, LuaEventRoute::Input { generation });
+    }
+    let releases = session.focus_lost_input();
+    assert_eq!(releases, [key(State::Released), action(State::Released)]);
+    for data in releases {
+      send(&mut session, data, LuaEventRoute::InputRelease);
+    }
+    assert!(session.focus_lost_input().is_empty());
+    send(
+      &mut session,
+      Data::Resize {
+        width: 1,
+        height: 24,
+      },
+      LuaEventRoute::HandleEvent,
     );
+    for data in [key(State::Pressed), action(State::Pressed)] {
+      let generation = session.input_generation(&data).unwrap();
+      send(&mut session, data, LuaEventRoute::Input { generation });
+    }
+    let old_generation = session.input_generation(&key(State::Held)).unwrap();
+    assert!(session.focus_lost_input().is_empty());
+    assert!(session.focus_lost_input().is_empty());
+    for data in [
+      key(State::Held),
+      key(State::Released),
+      action(State::Held),
+      action(State::Released),
+    ] {
+      let generation = session.input_generation(&data).unwrap();
+      assert_ne!(generation, old_generation);
+      send(
+        &mut session,
+        data.clone(),
+        LuaEventRoute::Input {
+          generation: old_generation,
+        },
+      );
+      send(&mut session, data, LuaEventRoute::Input { generation });
+    }
+    for data in [key(State::Pressed), action(State::Pressed)] {
+      let generation = session.input_generation(&data).unwrap();
+      send(&mut session, data, LuaEventRoute::Input { generation });
+    }
+    let releases = session.close_input(true, true);
+    assert_eq!(releases, [key(State::Released), action(State::Released)]);
+    for data in releases {
+      send(&mut session, data, LuaEventRoute::InputRelease);
+    }
+    send(
+      &mut session,
+      Data::Resize {
+        width: 80,
+        height: 24,
+      },
+      LuaEventRoute::HandleEvent,
+    );
+    let generation = session.input_generation(&action(State::Pressed)).unwrap();
+    send(
+      &mut session,
+      action(State::Pressed),
+      LuaEventRoute::Input { generation },
+    );
+    assert_eq!(session.focus_lost_input(), [action(State::Released)]);
+    assert_eq!(
+      session.save_game().unwrap().unwrap()["seen"],
+      serde_json::json!([
+        "key:pressed",
+        "action:pressed",
+        "key:released",
+        "action:released",
+        "key:pressed",
+        "action:pressed",
+        "key:pressed",
+        "action:pressed",
+        "key:released",
+        "action:released",
+        "action:pressed",
+      ])
+    );
+    let fresh = LuaSession::load(
+      spec(&valid_script(""), LuaSessionKind::Game),
+      LuaPolicy::default(),
+    )
+    .unwrap();
+    assert!(fresh.api_state.borrow().input.focus_release);
+  }
+
+  #[test]
+  fn overlay_takeover_uses_focus_release_policy_and_discards_stale_input() {
+    use crate::{LuaActionState as State, LuaEventBroker, LuaEventData as Data, LuaSessionToken};
+    for enabled in [true, false] {
+      let setting = if enabled {
+        "enable_focus_release"
+      } else {
+        "disable_focus_release"
+      };
+      let source = valid_script(&format!(
+        r#"
+        local seen = {{}}
+        function Init(ctx)
+          ime.receive_key_event()
+          event.{setting}()
+        end
+        function HandleEvent(e)
+          if e.type == "key" or e.type == "action" then
+            seen[#seen+1] = e.type .. ":" .. e.data.state
+          else
+            seen[#seen+1] = e.type
+          end
+        end
+        function SaveGame() return {{seen=seen}} end
+      "#
+      ));
+      let mut session =
+        LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+      let token = LuaSessionToken {
+        kind: LuaSessionKind::Game,
+        generation: 1,
+      };
+      let mut broker = LuaEventBroker::new();
+      broker.synchronize_sessions(Some(token), None);
+      let key = |state| Data::Key {
+        key: "esc".into(),
+        state,
+      };
+      let action = |state| Data::Action {
+        action: "pause".into(),
+        state,
+      };
+      for data in [key(State::Pressed), action(State::Pressed)] {
+        let generation = session.input_generation(&data).unwrap();
+        broker
+          .push_owned(token, 1, data, LuaEventRoute::Input { generation })
+          .unwrap();
+      }
+      for delivery in broker.drain_frame(LuaSessionKind::Game) {
+        session.dispatch_event(&delivery).unwrap();
+      }
+      let old_generation = session.input_generation(&key(State::Held)).unwrap();
+      for data in [
+        key(State::Held),
+        action(State::Held),
+        Data::Key {
+          key: "b".into(),
+          state: State::Pressed,
+        },
+      ] {
+        broker
+          .push_owned(
+            token,
+            2,
+            data,
+            LuaEventRoute::Input {
+              generation: old_generation,
+            },
+          )
+          .unwrap();
+      }
+      let releases = session.focus_lost_input();
+      assert_eq!(
+        releases,
+        if enabled {
+          vec![key(State::Released), action(State::Released)]
+        } else {
+          vec![]
+        }
+      );
+      for data in releases {
+        broker
+          .push_owned(token, 2, data, LuaEventRoute::InputRelease)
+          .unwrap();
+      }
+      broker.clear_pending_interactive(LuaSessionKind::Game);
+      broker.push_system(2, Data::OverlayStarted).unwrap();
+      assert!(session.focus_lost_input().is_empty());
+      for delivery in broker.drain_frame(LuaSessionKind::Game) {
+        session.dispatch_event(&delivery).unwrap();
+      }
+      broker.push_system(3, Data::OverlayStopped).unwrap();
+      for data in [
+        key(State::Held),
+        key(State::Released),
+        action(State::Held),
+        action(State::Released),
+      ] {
+        let generation = session.input_generation(&data).unwrap();
+        broker
+          .push_owned(
+            token,
+            3,
+            data.clone(),
+            LuaEventRoute::Input {
+              generation: old_generation,
+            },
+          )
+          .unwrap();
+        broker
+          .push_owned(token, 3, data, LuaEventRoute::Input { generation })
+          .unwrap();
+      }
+      for data in [key(State::Pressed), action(State::Pressed)] {
+        let generation = session.input_generation(&data).unwrap();
+        broker
+          .push_owned(token, 3, data, LuaEventRoute::Input { generation })
+          .unwrap();
+      }
+      for delivery in broker.drain_frame(LuaSessionKind::Game) {
+        session.dispatch_event(&delivery).unwrap();
+      }
+      let mut expected = vec!["key:pressed", "action:pressed"];
+      if enabled {
+        expected.extend(["key:released", "action:released"]);
+      }
+      expected.extend([
+        "overlay_started",
+        "overlay_stopped",
+        "key:pressed",
+        "action:pressed",
+      ]);
+      assert_eq!(
+        session.save_game().unwrap().unwrap()["seen"],
+        serde_json::json!(expected)
+      );
+    }
   }
 
   #[test]
