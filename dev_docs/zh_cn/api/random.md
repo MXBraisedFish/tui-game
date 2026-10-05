@@ -26,14 +26,6 @@
 | `count`     | 返回当前生成器的总数         | [count](#count)         |
 | `generate`  | 使用指定生成器生成一个随机数 | [generate](#generate)   |
 | `set`       | 修改生成器的参数             | [set](#set)             |
-| `set_type`  | 修改生成器的类型             | [set_type](#set_type)   |
-| `set_range` | 修改生成器的随机区间         | [set_range](#set_range) |
-| `set_seed`  | 修改生成器的种子             | [set_seed](#set_seed)   |
-| `set_step`  | 修改生成器的步进数           | [set_step](#set_step)   |
-| `get_type`  | 获取生成器的类型             | [get_type](#get_type)   |
-| `get_range` | 获取生成器的随机区间         | [get_range](#get_range) |
-| `get_seed`  | 获取生成器的种子             | [get_seed](#get_seed)   |
-| `get_step`  | 获取生成器当前的步进数       | [get_step](#get_step)   |
 | `get_info`  | 获取生成器的完整信息表       | [get_info](#get_info)   |
 | `exists`    | 检查生成器是否存在           | [exists](#exists)       |
 
@@ -65,6 +57,7 @@ local value = random.generate(generator)
 **输出：**
 
 ```lua
+
 ```
 
 ### 等值
@@ -99,6 +92,7 @@ local value = random.generate(generator)
 **输出：**
 
 ```lua
+
 ```
 
 ### 等值
@@ -125,10 +119,10 @@ random.randint
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `min` | integer | `-2147483648` | 区间下界（含） |
-| `max` | integer | `2147483647` | 区间上界（含） |
+| 参数名 | 类型    | 默认值        | 说明           |
+| ------ | ------- | ------------- | -------------- |
+| `min`  | integer | `-2147483648` | 区间下界（含） |
+| `max`  | integer | `2147483647`  | 区间上界（含） |
 
 ## 返回值
 
@@ -154,6 +148,7 @@ debug.print(r3)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -179,10 +174,10 @@ random.randfloat
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `min` | integer / float | `0` | 区间下界（含） |
-| `max` | integer / float | `1` | 区间上界（含） |
+| 参数名 | 类型            | 默认值 | 说明           |
+| ------ | --------------- | ------ | -------------- |
+| `min`  | integer / float | `0`    | 区间下界（含） |
+| `max`  | integer / float | `1`    | 区间上界（含） |
 
 ## 返回值
 
@@ -208,6 +203,7 @@ debug.print(r3)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -237,13 +233,13 @@ random.create
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `type` | const-random | `random.INT` | 生成器类型 |
-| `min` | integer / float | 跟随生成器类型 | 区间下界（含） |
-| `max` | integer / float | 跟随生成器类型 | 区间上界（含） |
-| `seed` | integer | 系统随机生成 | 随机种子 |
-| `step` | integer | `0` | 初始步进数（非负） |
+| 参数名 | 类型            | 默认值         | 说明               |
+| ------ | --------------- | -------------- | ------------------ |
+| `type` | const-random    | `random.INT`   | 生成器类型         |
+| `min`  | integer / float | 跟随生成器类型 | 区间下界（含）     |
+| `max`  | integer / float | 跟随生成器类型 | 区间上界（含）     |
+| `seed` | integer         | 系统随机生成   | 随机种子           |
+| `step` | integer         | `0`            | 初始步进数（非负） |
 
 ## 返回值
 
@@ -270,6 +266,7 @@ debug.print(table.pretty(random.list()))
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -300,9 +297,9 @@ random.delete
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
+| 参数名 | 类型   | 说明      |
+| ------ | ------ | --------- |
+| `id`   | string | 生成器 ID |
 
 ## 返回值
 
@@ -329,6 +326,7 @@ debug.print(table.pretty(random.list()))
 **输出：**
 
 ```lua
+
 ```
 
 ---
@@ -367,6 +365,7 @@ debug.print(table.pretty(random.list()))
 **输出：**
 
 ```lua
+
 ```
 
 ---
@@ -401,6 +400,7 @@ debug.print(table.pretty(random.list()))
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -456,6 +456,7 @@ debug.print(random.count())
 **输出：**
 
 ```lua
+
 ```
 
 ---
@@ -474,9 +475,9 @@ random.generate
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
+| 参数名 | 类型   | 说明      |
+| ------ | ------ | --------- |
+| `id`   | string | 生成器 ID |
 
 ## 返回值
 
@@ -503,6 +504,7 @@ debug.print(random.generate(r))
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -525,19 +527,19 @@ random.set
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
+| 参数名 | 类型   | 说明      |
+| ------ | ------ | --------- |
+| `id`   | string | 生成器 ID |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `type` | const-random | 保持原值 | 生成器类型 |
-| `min` | integer / float | 保持原值 | 区间下界（含） |
-| `max` | integer / float | 保持原值 | 区间上界（含） |
-| `seed` | integer | 保持原值 | 随机种子 |
-| `step` | integer | 保持原值 | 步进数（非负） |
+| 参数名 | 类型            | 默认值   | 说明           |
+| ------ | --------------- | -------- | -------------- |
+| `type` | const-random    | 保持原值 | 生成器类型     |
+| `min`  | integer / float | 保持原值 | 区间下界（含） |
+| `max`  | integer / float | 保持原值 | 区间上界（含） |
+| `seed` | integer         | 保持原值 | 随机种子       |
+| `step` | integer         | 保持原值 | 步进数（非负） |
 
 ## 返回值
 
@@ -564,6 +566,7 @@ debug.print(table.pretty(random.get_info(r)))
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -574,389 +577,6 @@ debug.print(table.pretty(random.get_info(r)))
 - 选填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，目标类型为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数值，须与目标类型匹配且不得小于 `min`，否则抛出错误。
 - 选填参数 `seed` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
 - 选填参数 `step` 取值范围为 $[0, 9223372036854775807]$。
-
----
-
-## `set_type`
-
-修改生成器的类型。
-
-### 调用
-
-```lua
-random.set_type
-```
-
-## 参数
-
-### 必填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
-| `type` | const-random | 生成器类型 |
-
-## 返回值
-
-**对象不存在时**，返回 `false`；**对象存在时**，返回以下结果。
-
-返回一个值。
-
-| 类型    | 说明         |
-| ------- | ------------ |
-| boolean | 是否修改成功 |
-
-### 示例
-
-```lua
-local r = random.create({type = random.INT})
-random.set_type(r, random.FLOAT)
-debug.print(random.get_type(r))
-```
-
-**输出：**
-
-```lua
-```
-
-## 额外说明
-
-- `random.FLOAT` 转 `random.INT` 时，当前区间上下界必须为整数且在 64 位整数范围内，否则抛出错误。
-
----
-
-## `set_range`
-
-修改生成器的随机区间。
-
-### 调用
-
-```lua
-random.set_range
-```
-
-## 参数
-
-### 必填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
-| `min` | integer / float | 区间下界（含） |
-| `max` | integer / float | 区间上界（含） |
-
-## 返回值
-
-**对象不存在时**，返回 `false`；**对象存在时**，返回以下结果。
-
-返回一个值。
-
-| 类型    | 说明         |
-| ------- | ------------ |
-| boolean | 是否修改成功 |
-
-### 示例
-
-```lua
-local r = random.create({min = 10, max = 20})
-
-local min_value, max_value = random.get_range(r)
-debug.print(tostring(min_value) .. ", " .. tostring(max_value))
-
-random.set_range(r, 5, 7)
-
-local min_value, max_value = random.get_range(r)
-debug.print(tostring(min_value) .. ", " .. tostring(max_value))
-```
-
-**输出：**
-
-```lua
-```
-
-## 额外说明
-
-- 随机区间为闭区间 $[min, max]$。
-- 必填参数 `min` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，类型跟随生成器当前类型，浮点生成器要求 $(-\infty, +\infty)$ 内的有限数值，且不得大于 `max`，否则抛出错误。
-- 必填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，类型跟随生成器当前类型，浮点生成器要求 $(-\infty, +\infty)$ 内的有限数值，且不得小于 `min`，否则抛出错误。
-
----
-
-## `set_seed`
-
-修改生成器的种子。
-
-### 调用
-
-```lua
-random.set_seed
-```
-
-## 参数
-
-### 必填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
-| `seed` | integer | 随机种子 |
-
-## 返回值
-
-**对象不存在时**，返回 `false`；**对象存在时**，返回以下结果。
-
-返回一个值。
-
-| 类型    | 说明         |
-| ------- | ------------ |
-| boolean | 是否修改成功 |
-
-### 示例
-
-```lua
-local r = random.create()
-
-debug.print(random.get_info(r).seed)
-
-random.set_seed(r, 1314)
-
-debug.print(random.get_info(r).seed)
-```
-
-**输出：**
-
-```lua
-```
-
-## 额外说明
-
-- 修改种子会重置该生成器的随机序列。
-- 必填参数 `seed` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
-
----
-
-## `set_step`
-
-修改生成器的步进数。
-
-### 调用
-
-```lua
-random.set_step
-```
-
-## 参数
-
-### 必填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
-| `step` | integer | 步进数（非负） |
-
-## 返回值
-
-**对象不存在时**，返回 `false`；**对象存在时**，返回以下结果。
-
-返回一个值。
-
-| 类型    | 说明         |
-| ------- | ------------ |
-| boolean | 是否修改成功 |
-
-### 示例
-
-```lua
-local r = random.create()
-
-debug.print(random.get_info(r).step)
-
-random.set_step(r, 30)
-
-debug.print(random.get_info(r).step)
-```
-
-**输出：**
-
-```lua
-```
-
-## 额外说明
-
-- 步进数是随机流位置，每次 `random.generate` 后会加 1。
-- 必填参数 `step` 取值范围为 $[0, 9223372036854775807]$。
-
----
-
-## `get_type`
-
-获取生成器的类型。
-
-### 调用
-
-```lua
-random.get_type
-```
-
-## 参数
-
-### 必填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
-
-## 返回值
-
-**对象不存在时**，返回 `nil`；**对象存在时**，返回以下结果。
-
-返回一个值。
-
-| 类型   | 说明       |
-| ------ | ---------- |
-| string | 生成器类型 |
-
-### 示例
-
-```lua
-local r = random.create({type = random.INT})
-debug.print(random.get_type(r))
-```
-
-**输出：**
-
-```lua
-```
-
-## 额外说明
-
-- 请先判断查询结果是否为 `nil`，再读取字段或参与计算。
-
----
-
-## `get_range`
-
-获取生成器的随机区间。
-
-### 调用
-
-```lua
-random.get_range
-```
-
-## 参数
-
-### 必填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
-
-## 返回值
-
-**找到生成器时**，返回两个值，依次为区间下界和上界；**找不到时**，返回一个 `nil`。
-
-| 值名 | 类型 | 说明 |
-| --- | --- | --- |
-| `min` | float / integer | 区间下界 |
-| `max` | float / integer | 区间上界 |
-
-### 示例
-
-```lua
-local r = random.create({min = 10, max = 20})
-local min_value, max_value = random.get_range(r)
-debug.print(tostring(min_value) .. ", " .. tostring(max_value))
-```
-
-**输出：**
-
-```lua
-```
-
----
-
-## `get_seed`
-
-获取生成器的种子。
-
-### 调用
-
-```lua
-random.get_seed
-```
-
-## 参数
-
-### 必填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
-
-## 返回值
-
-**对象不存在时**，返回 `nil`；**对象存在时**，返回以下结果。
-
-返回一个值。
-
-| 类型    | 说明     |
-| ------- | -------- |
-| integer | 随机种子 |
-
-### 示例
-
-```lua
-local r = random.create({seed = 2233})
-debug.print(random.get_seed(r))
-```
-
-**输出：**
-
-```lua
-```
-
----
-
-## `get_step`
-
-获取生成器当前的步进数。
-
-### 调用
-
-```lua
-random.get_step
-```
-
-## 参数
-
-### 必填参数
-
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
-
-## 返回值
-
-**对象不存在时**，返回 `nil`；**对象存在时**，返回以下结果。
-
-返回一个值。
-
-| 类型    | 说明       |
-| ------- | ---------- |
-| integer | 当前步进数 |
-
-### 示例
-
-```lua
-local r = random.create({step = 50})
-debug.print(random.get_step(r))
-```
-
-**输出：**
-
-```lua
-```
 
 ---
 
@@ -974,16 +594,16 @@ random.get_info
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
+| 参数名 | 类型   | 说明      |
+| ------ | ------ | --------- |
+| `id`   | string | 生成器 ID |
 
 ## 返回值
 
 **对象存在时**，返回一个表；**不存在时**，返回 `nil`。
 
-| 类型 | 说明 |
-| --- | --- |
+| 类型        | 说明                     |
+| ----------- | ------------------------ |
 | table / nil | 生成器配置，或对象不存在 |
 
 ### 示例
@@ -996,6 +616,7 @@ debug.print(table.pretty(random.get_info(r)))
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -1027,9 +648,9 @@ random.exists
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | string | 生成器 ID |
+| 参数名 | 类型   | 说明      |
+| ------ | ------ | --------- |
+| `id`   | string | 生成器 ID |
 
 ## 返回值
 
@@ -1052,4 +673,5 @@ debug.print(random.exists(r))
 **输出：**
 
 ```lua
+
 ```

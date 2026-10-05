@@ -203,117 +203,51 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
 }
 
 fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Result<()> {
-  for name in ["set", "set_type", "set_range", "set_seed", "set_step"] {
-    let method: &'static str = match name {
-      "set" => "random.set",
-      "set_type" => "random.set_type",
-      "set_range" => "random.set_range",
-      "set_seed" => "random.set_seed",
-      _ => "random.set_step",
-    };
-    let state = state.clone();
-    source.raw_set(
-      name,
-      lua.create_function(move |lua, values: MultiValue| {
-        let (required, options): (&[&str], &[&str]) = match name {
-          "set" => (&["id"], &["type", "min", "max", "seed", "step"]),
-          "set_type" => (&["id", "type"], &[]),
-          "set_range" => (&["id", "min", "max"], &[]),
-          "set_seed" => (&["id", "seed"], &[]),
-          _ => (&["id", "step"], &[]),
+  source.raw_set(
+    "set",
+    lua.create_function(move |lua, values: MultiValue| {
+      let method = "random.set";
+      let table = positional_table(
+        lua,
+        method,
+        values,
+        &["id"],
+        &["type", "min", "max", "seed", "step"],
+      )?;
+      let id = parse_id(args::string(
+        args::required(&table, method, "id")?,
+        method,
+        "id",
+      )?)
+      .ok_or_else(|| args::message(method, "invalid generator ID"))?;
+      with_pool_mut(&state, method, |pool| {
+        let service = RandomService::new();
+        let Some(current) = service.configuration(&pool.runtime().random_generators, id) else {
+          return Ok(false);
         };
-        let table = positional_table(lua, method, values, required, options)?;
-        if name == "set_range" {
-          args::required(&table, method, "min")?;
-          args::required(&table, method, "max")?;
-        } else if name == "set_step" {
-          args::required(&table, method, "step")?;
-        }
-        let id = parse_id(args::string(
-          args::required(&table, method, "id")?,
-          method,
-          "id",
-        )?)
-        .ok_or_else(|| args::message(method, "invalid generator ID"))?;
-        with_pool_mut(&state, method, |pool| {
-          let service = RandomService::new();
-          let Some(current) = service.configuration(&pool.runtime().random_generators, id) else {
-            return Ok(false);
-          };
-          let updated = update_configuration(current, &table, method)?;
-          Ok(service.set_configuration(&mut pool.runtime_mut().random_generators, id, updated))
-        })
-      })?,
-    )?;
-  }
-  Ok(())
+        let updated = update_configuration(current, &table, method)?;
+        Ok(service.set_configuration(&mut pool.runtime_mut().random_generators, id, updated))
+      })
+    })?,
+  )
 }
 
 fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Result<()> {
-  for name in ["get_type", "get_seed", "get_step", "exists"] {
-    let method: &'static str = match name {
-      "get_type" => "random.get_type",
-      "get_seed" => "random.get_seed",
-      "get_step" => "random.get_step",
-      _ => "random.exists",
-    };
-    let state = state.clone();
-    source.raw_set(
-      name,
-      lua.create_function(move |lua, values: MultiValue| {
-        let id = id_argument(values, method)?;
-        with_pool(&state, method, |pool| {
-          let configuration =
-            RandomService::new().configuration(&pool.runtime().random_generators, id);
-          Ok(match name {
-            "get_type" => match configuration {
-              Some(configuration) => {
-                Value::String(lua.create_string(match configuration.range {
-                  RandomConfiguredRange::Integer { .. } => "int",
-                  RandomConfiguredRange::Float { .. } => "float",
-                })?)
-              }
-              None => Value::Nil,
-            },
-            "get_seed" => configuration.map_or(Value::Nil, |value| Value::Integer(value.seed)),
-            "get_step" => configuration
-              .and_then(|value| i64::try_from(value.step).ok())
-              .map_or(Value::Nil, Value::Integer),
-            _ => Value::Boolean(configuration.is_some()),
-          })
-        })
-      })?,
-    )?;
-  }
-
-  let range_state = state.clone();
+  let exists_state = state.clone();
   source.raw_set(
-    "get_range",
+    "exists",
     lua.create_function(move |_, values: MultiValue| {
-      let method = "random.get_range";
+      let method = "random.exists";
       let id = id_argument(values, method)?;
-      with_pool(&range_state, method, |pool| {
-        match RandomService::new().configuration(&pool.runtime().random_generators, id) {
-          Some(RandomConfiguration {
-            range: RandomConfiguredRange::Integer { min, max },
-            ..
-          }) => Ok(MultiValue::from_vec(vec![
-            Value::Integer(min),
-            Value::Integer(max),
-          ])),
-          Some(RandomConfiguration {
-            range: RandomConfiguredRange::Float { min, max },
-            ..
-          }) => Ok(MultiValue::from_vec(vec![
-            Value::Number(min),
-            Value::Number(max),
-          ])),
-          None => Ok(MultiValue::from_vec(vec![Value::Nil])),
-        }
+      with_pool(&exists_state, method, |pool| {
+        Ok(
+          RandomService::new()
+            .configuration(&pool.runtime().random_generators, id)
+            .is_some(),
+        )
       })
     })?,
   )?;
-
   source.raw_set(
     "get_info",
     lua.create_function(move |lua, values: MultiValue| {

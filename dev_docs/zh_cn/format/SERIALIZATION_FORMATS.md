@@ -31,13 +31,17 @@
 ## 通用规则
 
 - 所有序列化操作最后返回的均为字符串类型，只有被写入到对应的文件当中才会被解析。
-- `serialization` 方法按签名接收位置参数，声明了选项的方法可在末尾接收选项表。JSON/YAML 的 null 解码为只读 `serialization.NULL`，编码时还原为 null；CSV、INI、TOML、XML 遇到该哨兵时抛出错误，避免把 null 静默变成空字符串。Lua 表不能保存 `nil` 字段，因此需要显式空值时使用哨兵。
+- JSON / YAML 的 `null` 会与常量 `serialization.NULL` 之间相互转换，而非 `nil`。
 
-  **示例**
+**示例**
 
-  ```lua
-  { is_null = serialization.NULL } -- JSON 为 {"is_null":null}
-  ```
+```lua
+{ is_null = serialization.NULL }
+```
+
+```json
+{ "is_null": null }
+```
 
 ---
 
@@ -57,23 +61,15 @@ local data = { active = true, score = 42 }
 
 > 该部分值的映射可逆
 
-| Lua       | JSON      |
-| --------- | --------- |
-| `boolean` | `boolean` |
-| `integer` | `integer` |
-| `number`  | `float`   |
-| `string`  | `string`  |
-| 数组表    | 数组      |
-| 对象表    | 对象      |
-
-**单向映射**
-
-> 该部分值的映射不可逆
-
-| Lua                  | 方向 | JSON   |
-| -------------------- | ---- | ------ |
-| 顶层 `nil`           | $→$  | `null` |
-| `serialization.NULL` | $↔$  | `null` |
+| Lua                  | JSON      |
+| -------------------- | --------- |
+| `boolean`            | `boolean` |
+| `integer`            | `integer` |
+| `number`             | `float`   |
+| `string`             | `string`  |
+| `serialization.NULL` | `null`    |
+| 数组表               | 数组      |
+| 对象表               | 对象      |
 
 ### 示例
 
@@ -133,11 +129,11 @@ local sparse_data = {
 }
 ```
 
-> 在对象或数组中显式保留 `null` 时使用 `serialization.NULL`
+> 在对象表或数组表中使用 nil 值
 
 ```lua
 local data = {
-  is_null = serialization.NULL, -- JSON 为 {"is_null":null}
+  is_null = nil,
 }
 ```
 
@@ -176,7 +172,7 @@ local data = {
 > 该部分值的映射不可逆
 
 | Lua      | 方向 | TOML   |
-| -------- | ---- | ------ |
+| -------- | :--: | ------ |
 | `string` | $←$  | `date` |
 
 ### 示例
@@ -264,23 +260,23 @@ local data = {
 
 > 该部分值的映射可逆
 
-| Lua       | YAML      |
-| --------- | --------- |
-| `boolean` | `boolean` |
-| `integer` | `integer` |
-| `number`  | `float`   |
-| `string`  | `string`  |
-| 数组表    | 序列      |
-| 对象表    | 映射      |
+| Lua                  | YAML         |
+| -------------------- | ------------ |
+| `boolean`            | `boolean`    |
+| `integer`            | `integer`    |
+| `number`             | `float`      |
+| `string`             | `string`     |
+| `serialization.NULL` | `null` / `~` |
+| 数组表               | 序列         |
+| 对象表               | 映射         |
 
 **单向映射**
 
 > 该部分值的映射不可逆
 
-| Lua                  | 方向 | YAML         |
-| -------------------- | ---- | ------------ |
-| `string`             | $←$  | `date`       |
-| `serialization.NULL` | $↔$  | `null` / `~` |
+| Lua      | 方向 | YAML   |
+| -------- | :--: | ------ |
+| `string` | $←$  | `date` |
 
 ### 示例
 
@@ -337,11 +333,11 @@ name: !person TUI # 反序列化不支持自定义标签
 1: one
 ```
 
-> 在 YAML 中显式保留 `null` 时使用 `serialization.NULL`
+> 在对象表中使用 nil 值
 
 ```lua
 {
-  is_null = serialization.NULL -- YAML 输出 null
+  is_null = nil
 }
 ```
 
@@ -375,7 +371,7 @@ local data = {
 > 该部分值的映射不可逆
 
 | Lua       | 方向 | CSV      |
-| --------- | ---- | -------- |
+| --------- | :--: | -------- |
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
@@ -458,8 +454,8 @@ XML 的根值**必须遵循特定的表结构**。
 
 ```lua
 local data = {
-  root = { -- 根标签（仅一个）
-    _attr = { key = "value" }, -- 属性
+  root = {                              -- 根标签（仅一个）
+    _attr = { key = "value" },          -- 属性
     element = { _text = "child text" }, -- 子标签
   }
 }
@@ -489,13 +485,11 @@ XML 结构：
 > 该部分值的映射不可逆
 
 | Lua       | 方向 | XML      |
-| --------- | ---- | -------- |
+| --------- | :--: | -------- |
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
 | `string`  | $←$  | 单标签   |
-
-XML 不支持 `serialization.NULL`；遇到哨兵会抛出错误。空字符串映射为空标签文本，不等同于 null。
 
 ### 属性
 
@@ -719,12 +713,10 @@ local data = {
 > 该部分值的映射不可逆
 
 | Lua       | 方向 | INI      |
-| --------- | ---- | -------- |
+| --------- | :--: | -------- |
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
-
-INI 不支持 `serialization.NULL`；遇到哨兵会抛出错误。空字符串仍按空值文本写入。
 
 ### 示例
 
@@ -753,7 +745,7 @@ host = 127.0.0.1
 port = 8080
 ```
 
-反序列化：：
+反序列化：
 
 ```lua
 ini = "[server]\nhost=127.0.0.1\nport=8080"
@@ -784,14 +776,12 @@ data = {
 > 键为空值
 
 ```ini
-; 键不可为空
 key =
 ```
 
 > 键名包含非法字符
 
 ```ini
-; 键名不可包含 # / ; / = / [ / ]
 key# = value
 ```
 
@@ -848,19 +838,19 @@ debug.print(tostring(size))
 
 **错误示例**
 
-> 参数 `fmt` 和参数 `values` 数量不匹配
+> 必填参数 `fmt` 和必填参数 `values` 数量不匹配
 
 ```lua
 serialization.binary_pack("<I4 I4", table.unpack({ 100 }))
 ```
 
-> 参数 `data` 长度不足
+> 必填参数 `data` 长度不足
 
 ```lua
 serialization.binary_unpack("<I4", "\x01") -- 需要 4 字节数据
 ```
 
-> 参数 `pos` 超出数据范围
+> 必填参数 `pos` 超出数据范围
 
 ```lua
 serialization.binary_unpack("<I2", "\1\2\3\4", {pos = 6}) -- 数据长 4 字节时最大位置为 5

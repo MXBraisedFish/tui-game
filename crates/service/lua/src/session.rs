@@ -3613,24 +3613,41 @@ mod tests {
               and fails(function() slice.exists() end)
               and fails(function() slice.count(true) end))
           debug.assert(random.set(generator, { type = random.FLOAT, min = -2.5, max = 3.5, seed = 42, step = 5 }))
-          local range_min, range_max = random.get_range(generator)
-          debug.assert(random.get_type(generator) == random.FLOAT
-              and range_min == -2.5
-              and range_max == 3.5
-              and select('#', random.get_range(generator)) == 2
-              and random.get_range("rng_999") == nil
-              and select('#', random.get_range("rng_999")) == 1
-              and random.get_seed(generator) == 42
-              and random.get_step(generator) == 5)
+          local info = random.get_info(generator)
+          debug.assert(info.id == generator and info.type == random.FLOAT
+              and info.min == -2.5 and info.max == 3.5
+              and info.seed == 42 and info.step == 5
+              and select('#', random.get_info(generator)) == 1
+              and random.get_info("rng_999") == nil
+              and select('#', random.get_info("rng_999")) == 1)
           local value = random.generate(generator)
           debug.assert(value >= -2.5 and value <= 3.5
-              and random.get_step(generator) == 6)
-          debug.assert(random.set_type(generator, random.FLOAT))
-          debug.assert(random.set_seed(generator, 42))
-          debug.assert(fails(function() random.set_type(generator) end))
-          debug.assert(fails(function() random.set_seed(generator) end))
-          local missing_step = debug.pcall(function() random.set_step(generator, nil) end)
-          debug.assert(not missing_step)
+              and random.get_info(generator).step == 6)
+          debug.assert(random.set(generator, {type = random.FLOAT}))
+          debug.assert(random.set(generator, {seed = 42}))
+          debug.assert(random.set(generator, {min = 1, max = 9}))
+          debug.assert(random.set(generator, {step = 3}))
+          debug.assert(random.set(generator))
+          info = random.get_info(generator)
+          debug.assert(info.type == random.FLOAT and info.min == 1 and info.max == 9
+              and info.seed == 42 and info.step == 3)
+          info.seed = 999
+          debug.assert(random.get_info(generator).seed == 42)
+          for _, name in ipairs({"set_type", "set_range", "set_seed", "set_step",
+                                 "get_type", "get_range", "get_seed", "get_step"}) do
+            debug.assert(random[name] == nil)
+          end
+          for _, options in ipairs({{step=-1}, {seed=true}, {type="invalid"},
+                                    {min=10, max=1}, {unknown=1}}) do
+            debug.assert(fails(function() random.set(generator, options) end))
+            local unchanged = random.get_info(generator)
+            debug.assert(unchanged.min == 1 and unchanged.max == 9
+                and unchanged.seed == 42 and unchanged.step == 3)
+          end
+          debug.assert(fails(function() random.set() end)
+              and fails(function() random.get_info() end)
+              and not random.set("rng_999", {seed=1})
+              and not random.exists("rng_999"))
 
           debug.assert(slice.exists("base"))
           local base = slice.get_info("base")
@@ -3640,11 +3657,18 @@ mod tests {
               and base.bg == color.TRANSPARENT)
           local first = slice.create(10, 4, { bg = color.BLUE })
           local inserted = slice.create(3, 2, { layer = 1 })
-          local first_width, first_height = slice.get_size(first)
-          debug.assert(first_width == 10 and first_height == 4
-              and select('#', slice.get_size(first)) == 2
-              and slice.get_size("slice_999") == nil
-              and select('#', slice.get_size("slice_999")) == 1)
+          local first_info = slice.get_info(first)
+          debug.assert(first_info.width == 10 and first_info.height == 4
+              and select('#', slice.get_info(first)) == 1
+              and slice.get_info("slice_999") == nil
+              and select('#', slice.get_info("slice_999")) == 1)
+          first_info.width = 999
+          debug.assert(slice.get_info(first).width == 10)
+          for _, name in ipairs({"set_size", "set_width", "set_height", "set_layer",
+                                  "set_background", "get_size", "get_width", "get_height",
+                                  "get_layer", "get_background"}) do
+            debug.assert(slice[name] == nil)
+          end
           debug.assert(fails(function() random.create({ typo = true }) end)
               and fails(function() slice.create(2, 2, { typo = true }) end))
           local slices = slice.list()
@@ -3656,27 +3680,38 @@ mod tests {
               and slices[2].bg == color.BLUE)
           debug.assert(slice.set(first))
           debug.assert(slice.set(first, { bg = color.RED }))
-          debug.assert(slice.get_background(first) == color.RED)
-          debug.assert(slice.set_background(first, color.TRANSPARENT))
-          debug.assert(slice.get_background(first) == color.TRANSPARENT)
-          debug.assert(slice.set_background(first, color.NONE))
-          debug.assert(slice.get_background(first) == color.NONE)
-          debug.assert(fails(function() slice.set_background(first) end))
-          debug.assert(slice.get_background(first) == color.NONE)
-          debug.assert(not slice.set_background("base", color.BLUE))
-          debug.assert(not slice.set_background("slice_999", color.BLUE))
+          debug.assert(slice.get_info(first).bg == color.RED)
+          debug.assert(slice.set(first, {bg = color.TRANSPARENT}))
+          debug.assert(slice.get_info(first).bg == color.TRANSPARENT)
+          debug.assert(slice.set(first, {bg = color.NONE}))
+          debug.assert(slice.get_info(first).bg == color.NONE)
+          debug.assert(fails(function() slice.set() end))
+          debug.assert(slice.get_info(first).bg == color.NONE)
+          debug.assert(not slice.set("base", {bg = color.BLUE}))
+          debug.assert(not slice.set("slice_999", {bg = color.BLUE}))
           local invalid_background = debug.pcall(function()
-              slice.set_background(first, "not-a-color")
+              slice.set(first, {bg = "not-a-color"})
             end)
           debug.assert(not invalid_background)
-          debug.assert(slice.set_size(first, 12, 4)
-              and slice.get_width(first) == 12
-              and slice.get_height(first) == 4)
-          debug.assert(fails(function() slice.set_size(first, 12) end))
-          debug.assert(slice.set_layer(first, 999))
-          debug.assert(slice.get_layer(first) == 2)
+          debug.assert(slice.set(first, {width = 12, height = 4})
+              and slice.get_info(first).width == 12
+              and slice.get_info(first).height == 4)
+          debug.assert(slice.set(first, {width = 13})
+              and slice.get_info(first).height == 4)
+          debug.assert(slice.set(first, {height = 5})
+              and slice.get_info(first).width == 13)
+          for _, options in ipairs({{width = 0}, {height = -1}, {layer = 0},
+                                    {width = 20, bg = "not-a-color"},
+                                    {height = 6, layer = 0}, {unknown = true}}) do
+            debug.assert(fails(function() slice.set(first, options) end))
+            local unchanged = slice.get_info(first)
+            debug.assert(unchanged.width == 13 and unchanged.height == 5
+                and unchanged.bg == color.NONE and unchanged.layer == 2)
+          end
+          debug.assert(slice.set(first, {layer = 999}))
+          debug.assert(slice.get_info(first).layer == 2)
           debug.assert(slice.delete(inserted))
-          debug.assert(slice.get_layer(first) == 1)
+          debug.assert(slice.get_info(first).layer == 1)
           debug.assert(slice["50P"] == nil
               and slice.list_by_layer == nil
               and random.set_params == nil)
@@ -3739,6 +3774,12 @@ mod tests {
         for _, method in ipairs({"get_duration", "get_delay", "get_loop", "get_interval", "get_callback", "get_tip", "get_state",
           "set_duration", "set_delay", "set_loop", "set_interval", "set_callback", "set_tip"}) do
           debug.assert(timer[method] == nil)
+        end
+        for name in pairs(timer) do
+          if string.sub(name, 1, {finish = 4}) == "get_" then
+            debug.assert(name == "get_info")
+          end
+          debug.assert(string.sub(name, 1, {finish = 4}) ~= "set_")
         end
         for _, f in ipairs({
           function() timer.create({duration = 1}) end,

@@ -22,8 +22,8 @@ end
 -- Create the star positions and speeds for the current screen dimensions.
 local function scatter()
   stars = {}
-  random.set_range(column_rng, 0, width - 1)
-  random.set_range(row_rng, 0, height - 2)
+  random.set(column_rng, { min = 0, max = width - 1 })
+  random.set(row_rng, { min = 0, max = height - 2 })
   local total = total_stars()
   for layer_index = 1, #LAYERS do
     local count = math.max({ 1, math.floor(total * LAYERS[layer_index].share) })

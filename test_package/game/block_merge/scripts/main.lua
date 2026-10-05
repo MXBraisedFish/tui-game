@@ -53,7 +53,7 @@ local function spawn_tile()
   if #empty == 0 then
     return
   end
-  random.set_range(position_rng, 1, #empty)
+  random.set(position_rng, { min = 1, max = #empty })
   local index = empty[random.generate(position_rng)]
   if random.generate(value_rng) < 0.9 then
     cells[index] = 2
@@ -210,8 +210,8 @@ function SaveGame()
     score = score,
     moves = moves,
     seed = seed,
-    position_step = random.get_step(position_rng),
-    value_step = random.get_step(value_rng),
+    position_step = random.get_info(position_rng).step,
+    value_step = random.get_info(value_rng).step,
   }
 end
 

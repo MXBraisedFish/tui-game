@@ -48,8 +48,8 @@ function HandleEvent(event)
     width = event.data.width
     height = event.data.height
     local back, front = panel_sizes()
-    slice.set_size(back_panel, back.width, back.height)
-    slice.set_size(front_panel, front.width, front.height)
+    slice.set(back_panel, { width = back.width, height = back.height })
+    slice.set(front_panel, { width = front.width, height = front.height })
   end
 end
 
@@ -66,8 +66,10 @@ end
 function Render()
   draw.fill_rect(0, 0, width, height, { char = " ", bg = color.BLACK })
 
-  local back_width, back_height = slice.get_size(back_panel)
-  local front_width, front_height = slice.get_size(front_panel)
+  local back = slice.get_info(back_panel)
+  local front = slice.get_info(front_panel)
+  local back_width, back_height = back.width, back.height
+  local front_width, front_height = front.width, front.height
   local drift_x = math.floor(math.cos(phase * 0.5) * 4)
   local drift_y = math.floor(math.sin(phase * 0.7) * 2)
 

@@ -10,7 +10,7 @@
 
 | 常量   | 说明                                                     | 定位          |
 | ------ | -------------------------------------------------------- | ------------- |
-| `NULL` | 用来表示 JSON/YAML 中的 `null`，并与 Lua 的 `nil` 区分开 | [NULL](#null) |
+| `NULL` | JSON / YAML 文件中的 `null | [NULL](#null) |
 
 ## 方法
 
@@ -38,7 +38,7 @@
 
 ## `NULL`
 
-用来表示 JSON/YAML 中的 `null`，并与 Lua 的 `nil` 区分开。
+JSON / YAML 文件中的 `null`。
 
 ### 调用
 
@@ -48,28 +48,26 @@ serialization.NULL
 
 ### 可用于
 
-- JSON/YAML 编码参数中的对象字段或数组元素
+- JSON / YAML 编码参数中的对象字段或数组元素。
 
 ### 示例
 
 ```lua
 local encoded = serialization.json_encode({value = serialization.NULL})
-local decoded = serialization.json_decode(encoded)
-local encoded_again = serialization.json_encode(decoded)
+debug.print(encoded)
 ```
 
 **输出：**
 
-```lua
+```json
+{
+  "value": null
+}
 ```
-
-### 等值
-
-无字面值；编码时翻译为 JSON/YAML 的 `null`。
 
 ## 额外说明
 
-- JSON/YAML 编码与解码都保留此值；CSV、INI、TOML、XML 遇到此值会抛出错误。
+- 仅适用于 JSON / YAML 文件。
 
 ---
 
@@ -89,9 +87,9 @@ serialization.json_encode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `value` | any | 要编码的 Lua 值 |
+| 参数名  | 类型 | 说明            |
+| ------- | ---- | --------------- |
+| `value` | any  | 要编码的 Lua 值 |
 
 ## 返回值
 
@@ -111,14 +109,20 @@ debug.print(json)
 
 **输出：**
 
-```lua
+```json
+{
+  "features": [
+    "draw",
+    "events"
+  ],
+  "version": 1,
+  "name": "TUI"
+}
 ```
 
 ## 额外说明
 
-- 参数 `value` 必须可序列化；使用 `serialization.NULL` 表示对象字段或数组位置中的 JSON null。
-- JSON/YAML 编码和解码共用以下数据限制：编码最多 32 层、解码最多 33 层，最多 16,384 个值节点，编码结果最多 1 MiB；拒绝非有限数字、无效 UTF-8、循环表、稀疏数组、非正整数数组键，以及同一表混用数组索引和字符串键。
-- 空 Lua 表编码为 JSON/YAML 对象 `{}`；顶层 `json_encode(nil)` 编码为 `null`。发生错误时会说明被拒绝的值或限制。
+- 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 
 ---
 
@@ -136,8 +140,8 @@ serialization.json_decode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明        |
+| ------ | ------ | ----------- |
 | `text` | string | JSON 字符串 |
 
 ## 返回值
@@ -159,11 +163,12 @@ debug.print(data.name .. ", v" .. tostring(data.version))
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
 
-- 参数 `text` 必须是有效文本；JSON null 解码为 `serialization.NULL`，包含该哨兵的值可以原样重新编码。
+- JSON `null` 会被解析为 `serialization.NULL`
 
 ---
 
@@ -181,8 +186,8 @@ serialization.csv_encode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型  | 说明       |
+| ------ | ----- | ---------- |
 | `rows` | table | 二维数组表 |
 
 ## 返回值
@@ -208,6 +213,7 @@ debug.print(csv)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -230,8 +236,8 @@ serialization.csv_decode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
 | `text` | string | CSV 字符串 |
 
 ## 返回值
@@ -253,6 +259,7 @@ debug.print(data[2][1] .. ": " .. tostring(data[2][2]))
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -275,8 +282,8 @@ serialization.yaml_encode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名  | 类型             | 说明            |
+| ------- | ---------------- | --------------- |
 | `value` | table / 基本类型 | 要编码的 Lua 值 |
 
 ## 返回值
@@ -298,6 +305,7 @@ debug.print(yaml)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -320,8 +328,8 @@ serialization.yaml_decode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明        |
+| ------ | ------ | ----------- |
 | `text` | string | YAML 字符串 |
 
 ## 返回值
@@ -343,6 +351,7 @@ debug.print(data.name)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -388,6 +397,7 @@ debug.print(toml)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -411,8 +421,8 @@ serialization.toml_decode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明        |
+| ------ | ------ | ----------- |
 | `text` | string | TOML 字符串 |
 
 ## 返回值
@@ -434,6 +444,7 @@ debug.print(data.name)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -456,8 +467,8 @@ serialization.ini_encode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名  | 类型  | 说明            |
+| ------- | ----- | --------------- |
 | `value` | table | 要编码的 Lua 表 |
 
 ## 返回值
@@ -482,6 +493,7 @@ debug.print(ini)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -506,8 +518,8 @@ serialization.ini_decode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
 | `text` | string | INI 字符串 |
 
 ## 返回值
@@ -529,6 +541,7 @@ debug.print(data.server.host)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -579,6 +592,7 @@ debug.print(xml)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -603,8 +617,8 @@ serialization.xml_decode
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
 | `text` | string | XML 字符串 |
 
 ## 返回值
@@ -626,6 +640,7 @@ debug.print(data.root.child._text)
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -650,9 +665,9 @@ serialization.binary_pack
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `fmt` | string | 打包格式串 |
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `fmt`  | string | 打包格式串 |
 
 ## 返回值
 
@@ -672,6 +687,7 @@ debug.print("packed " .. tostring(#bytes) .. " bytes")
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -697,16 +713,16 @@ serialization.binary_unpack
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `fmt` | string | 解包格式串 |
+| 参数名 | 类型   | 说明                       |
+| ------ | ------ | -------------------------- |
+| `fmt`  | string | 解包格式串                 |
 | `data` | string | 二进制数据，可包含任意字节 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `pos` | integer | `1` | 从 1 开始的起始字节位置 |
+| 参数名 | 类型    | 默认值 | 说明                    |
+| ------ | ------- | ------ | ----------------------- |
+| `pos`  | integer | `1`    | 从 1 开始的起始字节位置 |
 
 ## 返回值
 
@@ -728,6 +744,7 @@ debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. n
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明
@@ -752,9 +769,9 @@ serialization.binary_packsize
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
-| `fmt` | string | 打包格式串 |
+| 参数名 | 类型   | 说明       |
+| ------ | ------ | ---------- |
+| `fmt`  | string | 打包格式串 |
 
 ## 返回值
 
@@ -774,6 +791,7 @@ debug.print(tostring(size))
 **输出：**
 
 ```lua
+
 ```
 
 ## 额外说明

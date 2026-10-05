@@ -196,14 +196,14 @@ fn documented_members_match_registered_libraries() {
 }
 
 #[test]
-fn input_control_members_match_registered_libraries() {
+fn session_object_libraries_match_documented_members() {
   let root = std::env::temp_dir().join(format!("tg-doc-input-members-{}", std::process::id()));
   fs::create_dir(&root).unwrap();
   let fixture = Fixture(root);
   fs::create_dir(fixture.0.join("scripts")).unwrap();
   let entry = fixture.0.join("scripts/main.lua");
   let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../dev_docs/zh_cn/api");
-  for library in ["keyboard", "ime"] {
+  for library in ["keyboard", "ime", "random", "slice", "timer"] {
     assert_documented_members(library, &docs, &entry);
   }
 }
