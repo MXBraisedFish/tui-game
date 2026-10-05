@@ -240,6 +240,14 @@ impl GameService {
       .and_then(|session| session.input_generation(data))
   }
 
+  /// Report the current game's input-method preference, defaulting to a restriction.
+  pub fn input_method_locked(&self) -> bool {
+    self
+      .session
+      .as_ref()
+      .is_none_or(LuaSession::input_method_locked)
+  }
+
   /// Close live game input and collect releases before an ownership boundary.
   pub fn close_input(&mut self, actions: bool, keys: bool) -> Vec<crate::LuaEventData> {
     self

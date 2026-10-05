@@ -371,6 +371,10 @@ draw.text(x3, 4, "Game", {fg = color.BRIGHT_GREEN})
 
 ![align_resolve_x_example](../image/align_resolve_x_example.png)
 
+## 额外说明
+
+- 必填参数 `width` 取值范围为 $[1, 65535]$。
+
 ---
 
 ## `resolve_y`
@@ -424,6 +428,10 @@ draw.text(5, y3, "Game", {fg = color.BRIGHT_GREEN, max_width = 1})
 **输出：**
 
 ![align_resolve_y_example](../image/align_resolve_y_example.png)
+
+## 额外说明
+
+- 必填参数 `height` 取值范围为 $[1, 65535]$。
 
 ---
 
@@ -480,3 +488,8 @@ draw.fill_rect(x2, y2, 10, 4, {bg = color.BRIGHT_GREEN})
 **输出：**
 
 ![align_resolve_rect_example](../image/align_resolve_rect_example.png)
+
+## 额外说明
+
+- 必填参数 `width` 取值范围为 $[1, 65535]$。
+- 必填参数 `height` 取值范围为 $[1, 65535]$。

@@ -191,7 +191,7 @@ local event = {
 - 游戏可以接收允许的动作、鼠标、系统、服务和对象事件。
 - 屏保不接收键盘、动作、鼠标及交互组件事件。
 - 覆盖屏接管输入时，游戏不会收到动作、鼠标和交互组件事件。
-- `event.skip_action()` 和 `event.clear_action()` 只影响普通游戏动作的 pressed/held，不影响 key、系统事件、宿主行为或已交付活动输入的 released。
+- `events.skip_action()` 和 `events.clear_action()` 只影响普通游戏动作的 pressed/held，不影响 key、系统事件、宿主行为或已交付活动输入的 released。
 
 ### 示例
 

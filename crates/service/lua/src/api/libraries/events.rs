@@ -1,14 +1,14 @@
-//! Lua event library bindings with validated arguments and session-owned host access.
+//! Lua events library bindings with validated arguments and session-owned host access.
 
 use super::*;
 
-/// Build and register the Lua event API in the supplied VM and host context.
+/// Build and register the Lua events API in the supplied VM and host context.
 ///
 /// # Errors
 ///
 /// Propagate Lua allocation, table construction, or function registration errors while installing
 /// this library.
-pub(super) fn event(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
+pub(super) fn events(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, command) in [
     ("skip_action", LuaHostCommand::SkipActions),
@@ -19,9 +19,9 @@ pub(super) fn event(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       name,
       lua.create_function(move |_, values: MultiValue| {
         let method = if matches!(command, LuaHostCommand::SkipActions) {
-          "event.skip_action"
+          "events.skip_action"
         } else {
-          "event.clear_action"
+          "events.clear_action"
         };
         require_game(&state.borrow(), method)?;
         args::no_args(method, values)?;
@@ -39,9 +39,9 @@ pub(super) fn event(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       name,
       lua.create_function(move |_, values: MultiValue| {
         let method = if enabled {
-          "event.enable_focus_release"
+          "events.enable_focus_release"
         } else {
-          "event.disable_focus_release"
+          "events.disable_focus_release"
         };
         require_game(&state.borrow(), method)?;
         args::no_args(method, values)?;

@@ -343,7 +343,10 @@ impl LuaEventBroker {
     data: LuaEventData,
   ) -> Result<Option<u64>, LuaEnqueueError> {
     let targets: &[LuaSessionKind] = match &data {
-      LuaEventData::Action { .. } | LuaEventData::Key { .. } | LuaEventData::Mouse { .. } => {
+      LuaEventData::Action { .. }
+      | LuaEventData::Key { .. }
+      | LuaEventData::Input { .. }
+      | LuaEventData::Mouse { .. } => {
         if self.screensaver.token.is_some() {
           &[]
         } else {
@@ -658,6 +661,7 @@ impl LuaEventBroker {
           delivery.event.data,
           LuaEventData::Action { .. }
             | LuaEventData::Key { .. }
+            | LuaEventData::Input { .. }
             | LuaEventData::Mouse { .. }
             | LuaEventData::HitArea(_)
             | LuaEventData::Hyperlink(_)

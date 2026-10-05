@@ -260,6 +260,7 @@ c
 ## 额外说明
 
 - `nil` 也占参数位置。
+- 必填参数 `index` 取值范围为 $[-n, -1] \cup [1, n + 1]$，$n$ 为变参数量，负值从末尾倒数。
 
 ---
 
@@ -302,7 +303,7 @@ debug.print(tostring(rawequal(1, 1.0)))
 true
 ```
 
-## 额外补充
+## 额外说明
 
 - 不触发 `__eq` 元方法。
 
@@ -354,7 +355,7 @@ debug.print(tostring(value))
 42
 ```
 
-## 额外补充
+## 额外说明
 
 - 不触发 `__index` 元方法。
 
@@ -402,7 +403,7 @@ debug.print(tostring(values.answer))
 42
 ```
 
-## 额外补充
+## 额外说明
 
 - 不触发 `__newindex` 元方法。
 
@@ -638,7 +639,7 @@ debug.print(tostring(values.answer))
 42
 ```
 
-## 额外补充
+## 额外说明
 
 - 受保护的元表不能被设置或移除。
 

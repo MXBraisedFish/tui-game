@@ -2,8 +2,10 @@
 
 use super::{AsyncRuntime, EngineEventQueue};
 use crate::host_engine::services::*;
+use std::cell::RefCell;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 /// Application service instances assembled under one deployment root.
 ///
@@ -73,7 +75,7 @@ pub struct EngineServices {
   /// The popup service instance used by this owner.
   pub popup: PopupService,
   /// The clipboard service instance used by this owner.
-  pub clipboard: ClipboardService,
+  pub clipboard: Rc<RefCell<ClipboardService>>,
   /// The runtime objects.
   pub runtime_objects: RuntimeObjectPool,
   /// The time service instance used by this owner.
@@ -91,7 +93,7 @@ pub struct EngineServices {
   /// The input service instance used by this owner.
   pub input: InputService,
   /// The input method service instance used by this owner.
-  pub input_method: InputMethodService,
+  pub input_method: Rc<RefCell<InputMethodService>>,
   /// The game service instance used by this owner.
   pub game: GameService,
   /// The image service instance used by this owner.
@@ -182,7 +184,7 @@ impl EngineServices {
       ffmpeg,
       video: VideoService::new(),
       terminal: TerminalService::new(),
-      clipboard: ClipboardService::new(),
+      clipboard: Rc::new(RefCell::new(ClipboardService::new())),
       runtime_objects: RuntimeObjectPool::new(),
       time: TimeService::new(),
       host_objects: HostObjectPool::new(),
@@ -194,7 +196,7 @@ impl EngineServices {
       package: PackageService::new(),
       popup: PopupService::new(),
       input: InputService::new(),
-      input_method: InputMethodService::new(),
+      input_method: Rc::new(RefCell::new(InputMethodService::new())),
       game: GameService::new(),
       image: ImageService::new(Some(image_cache_dir)),
       screensaver: ScreensaverService::new(),

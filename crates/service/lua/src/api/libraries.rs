@@ -32,12 +32,13 @@ mod date;
 mod debug;
 mod draw;
 mod encoding;
-mod event;
+mod events;
 mod file;
 mod game;
 mod i18n;
 mod image;
 mod ime;
+mod keyboard;
 mod loader;
 mod math;
 mod measurement;
@@ -108,8 +109,9 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   environment.set("game", game::game(lua, state.clone())?)?;
   environment.set("i18n", i18n::i18n(lua, state.clone())?)?;
   environment.set("image", image::image(lua, state.clone())?)?;
+  environment.set("keyboard", keyboard::keyboard(lua, state.clone())?)?;
   environment.set("ime", ime::ime(lua, state.clone())?)?;
-  environment.set("event", event::event(lua, state.clone())?)?;
+  environment.set("events", events::events(lua, state.clone())?)?;
   environment.set("loader", loader::loader(lua, environment, state.clone())?)?;
   environment.set("file", file::file(lua, state)?)?;
   Ok(())

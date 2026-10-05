@@ -54,12 +54,13 @@ fn api_examples_execute_with_fixture_assets() {
     "debug",
     "draw",
     "encoding",
-    "event",
+    "events",
     "file",
     "game",
     "i18n",
     "image",
     "ime",
+    "keyboard",
     "lifecycle",
     "loader",
     "math",
@@ -172,12 +173,13 @@ fn documented_members_match_registered_libraries() {
     "debug",
     "draw",
     "encoding",
-    "event",
+    "events",
     "file",
     "game",
     "i18n",
     "image",
     "ime",
+    "keyboard",
     "loader",
     "math",
     "measurement",
@@ -188,48 +190,65 @@ fn documented_members_match_registered_libraries() {
     "table",
     "utf8",
   ];
-  let value_pattern = regex::Regex::new(r"(?s)### 等值\s+```(?:lua|text)\n(.*?)```").unwrap();
   for library in libraries {
-    let markdown = fs::read_to_string(docs.join(format!("{library}.md"))).unwrap();
-    let members = markdown
-      .lines()
-      .filter_map(|line| line.strip_prefix("## `").and_then(|s| s.strip_suffix('`')));
-    let fields = members
-      .map(|name| format!("[\"{name}\"] = true"))
-      .collect::<Vec<_>>()
-      .join(",");
-    let mut script = format!(
-      r#"
-      local expected = {{{fields}}}
-      for name in pairs(expected) do
-        debug.assert({library}[name] ~= nil, {{message = "documented member is absent: {library}." .. name}})
-      end
-      for name in pairs({library}) do
-        debug.assert(expected[name], {{message = "registered member is undocumented: {library}." .. name}})
-      end
-    "#
-    );
-    script.push_str(
-      r#"
-      local function same(a, b)
-        if type(a) ~= "table" or type(b) ~= "table" then return a == b end
-        for key, value in pairs(a) do if not same(value, b[key]) then return false end end
-        for key, value in pairs(b) do if not same(value, a[key]) then return false end end
-        return true
-      end
-    "#,
-    );
-    // Separate entries before matching so a delimiter cannot consume the following constant.
-
-    for block in markdown.split("\n## `").skip(1) {
-      let name = block.split('`').next().unwrap();
-      if let Some(value) = value_pattern.captures(block) {
-        script.push_str(&format!(
-          "\ndebug.assert(same({library}.{name}, ({})), {{message = \"constant value differs: {library}.{name}\"}})\n",
-          &value[1]
-        ));
-      }
-    }
-    run_snippet(&entry, &script).unwrap_or_else(|error| panic!("{library}: {error}"));
+    assert_documented_members(library, &docs, &entry);
   }
+}
+
+#[test]
+fn input_control_members_match_registered_libraries() {
+  let root = std::env::temp_dir().join(format!("tg-doc-input-members-{}", std::process::id()));
+  fs::create_dir(&root).unwrap();
+  let fixture = Fixture(root);
+  fs::create_dir(fixture.0.join("scripts")).unwrap();
+  let entry = fixture.0.join("scripts/main.lua");
+  let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../dev_docs/zh_cn/api");
+  for library in ["keyboard", "ime"] {
+    assert_documented_members(library, &docs, &entry);
+  }
+}
+
+fn assert_documented_members(library: &str, docs: &std::path::Path, entry: &std::path::Path) {
+  let value_pattern = regex::Regex::new(r"(?s)### 等值\s+```(?:lua|text)\n(.*?)```").unwrap();
+  let markdown = fs::read_to_string(docs.join(format!("{library}.md"))).unwrap();
+  let members = markdown
+    .lines()
+    .filter_map(|line| line.strip_prefix("## `").and_then(|s| s.strip_suffix('`')));
+  let fields = members
+    .map(|name| format!("[\"{name}\"] = true"))
+    .collect::<Vec<_>>()
+    .join(",");
+  let mut script = format!(
+    r#"
+    local expected = {{{fields}}}
+    for name in pairs(expected) do
+      debug.assert({library}[name] ~= nil, {{message = "documented member is absent: {library}." .. name}})
+    end
+    for name in pairs({library}) do
+      debug.assert(expected[name], {{message = "registered member is undocumented: {library}." .. name}})
+    end
+  "#
+  );
+  script.push_str(
+    r#"
+    local function same(a, b)
+      if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+      for key, value in pairs(a) do if not same(value, b[key]) then return false end end
+      for key, value in pairs(b) do if not same(value, a[key]) then return false end end
+      return true
+    end
+  "#,
+  );
+  // Separate entries before matching so a delimiter cannot consume the following constant.
+
+  for block in markdown.split("\n## `").skip(1) {
+    let name = block.split('`').next().unwrap();
+    if let Some(value) = value_pattern.captures(block) {
+      script.push_str(&format!(
+        "\ndebug.assert(same({library}.{name}, ({})), {{message = \"constant value differs: {library}.{name}\"}})\n",
+        &value[1]
+      ));
+    }
+  }
+  run_snippet(&entry, &script).unwrap_or_else(|error| panic!("{library}: {error}"));
 }

@@ -8,11 +8,11 @@
 
 ## 方法
 
-| 方法       | 说明                                                                       | 定位                  |
-| ---------- | -------------------------------------------------------------------------- | --------------------- |
-| `require`  | 加载并执行模块；首次调用会执行文件，之后从当前脚本环境的模块缓存中返回结果 | [require](#require)   |
-| `dofile`   | 加载并执行模块文件，每次调用都会重新执行                                   | [dofile](#dofile)     |
-| `loadfile` | 读取并编译模块文件，但不会立即执行它                                       | [loadfile](#loadfile) |
+| 方法       | 说明                                 | 定位                  |
+| ---------- | ------------------------------------ | --------------------- |
+| `require`  | 加载并执行模块文件，结果缓存在内存中 | [require](#require)   |
+| `dofile`   | 加载并执行模块文件，结果不缓存       | [dofile](#dofile)     |
+| `loadfile` | 读取并编译模块文件                   | [loadfile](#loadfile) |
 
 ---
 
@@ -20,7 +20,7 @@
 
 ## `require`
 
-加载并执行模块。首次调用会执行文件，之后从当前脚本环境的模块缓存中返回结果。
+加载并执行模块文件，结果缓存在内存中。
 
 ### 调用
 
@@ -32,44 +32,44 @@ loader.require
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                            |
+| ------ | ------ | ------------------------------- |
 | `path` | string | 相对 `scripts/` 的 Lua 文件路径 |
 
 ## 返回值
 
-透传模块返回的原始 Lua 多返回值，包括其中的 `nil`。
+返回任意数量值。
 
-| 类型 | 说明 |
-| --- | --- |
-| any... | 模块自身返回的多返回值，按原顺序透传，`nil` 位置保留 |
+| 类型   | 说明       |
+| ------ | ---------- |
+| any... | 模块返回值 |
 
 ### 示例
 
+> scripts/value.lua -> return "ready", nil
+
 ```lua
--- 准备 scripts/value.lua，内容为：return "ready", nil
 local status, optional = loader.require("value.lua")
 debug.print(status)
+debug.print(type(optional))
 ```
 
 **输出：**
 
 ```lua
+ready
+nil
 ```
 
 ## 额外说明
 
-- 模块路径指向 `.lua` 文件：可省略扩展名，其它扩展名会抛出错误。
-- 模块缓存仅在当前脚本环境内共享。
-- 模块源码最多 1 MiB，一次加载链累计最多 4 MiB。
-- 嵌套加载超过 16 层，或加载链中重复加载同一路径（循环 require）会抛出错误。
-- 模块源码必须是 UTF-8 文本，不接受 Lua 字节码。
+- 路径相对当前包的 `scripts/`。
 
 ---
 
 ## `dofile`
 
-加载并执行模块文件，每次调用都会重新执行。
+加载并执行模块文件，结果不缓存。
 
 ### 调用
 
@@ -81,36 +81,44 @@ loader.dofile
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                            |
+| ------ | ------ | ------------------------------- |
 | `path` | string | 相对 `scripts/` 的 Lua 文件路径 |
 
 ## 返回值
 
-透传模块返回的原始 Lua 多返回值，包括其中的 `nil`。
+返回任意数量值。
 
-| 类型 | 说明 |
-| --- | --- |
-| any... | 模块自身返回的多返回值，按原顺序透传，`nil` 位置保留 |
+| 类型   | 说明       |
+| ------ | ---------- |
+| any... | 模块返回值 |
 
 ### 示例
 
+> scripts/value.lua -> return "ready", nil
+
 ```lua
--- 准备 scripts/value.lua，内容为：return "ready", nil
 local status, optional = loader.dofile("value.lua")
 debug.print(status)
+debug.print(type(optional))
 ```
 
 **输出：**
 
 ```lua
+ready
+nil
 ```
+
+## 额外说明
+
+- 路径相对当前包的 `scripts/`。
 
 ---
 
 ## `loadfile`
 
-读取并编译模块文件，但不会立即执行它。
+读取并编译模块文件。
 
 ### 调用
 
@@ -122,32 +130,36 @@ loader.loadfile
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                            |
+| ------ | ------ | ------------------------------- |
 | `path` | string | 相对 `scripts/` 的 Lua 文件路径 |
 
 ## 返回值
 
-返回可调用的函数。调用该函数时会执行已加载文件，并透传文件的原始多返回值和 `nil`。
+返回一个值。
 
-| 类型 | 说明 |
-| --- | --- |
+| 类型     | 说明                  |
+| -------- | --------------------- |
 | function | 已编译的 Lua 模块函数 |
 
 ### 示例
 
+> scripts/value.lua -> return "ready", nil
+
 ```lua
--- 准备 scripts/value.lua，内容为：return "ready", nil
 local module = loader.loadfile("value.lua")
 local status, optional = module()
 debug.print(status)
+debug.print(type(optional))
 ```
 
 **输出：**
 
 ```lua
+ready
+nil
 ```
 
 ## 额外说明
 
-- `require`、`dofile` 和 `loadfile` 的路径必须指向包内 `scripts/`，不能通过绝对路径或路径穿越读取包外文件。
+- 路径相对当前包的 `scripts/`。

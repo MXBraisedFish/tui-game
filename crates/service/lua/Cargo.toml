@@ -22,7 +22,9 @@ tg-core-unicode = { path = "../../core/unicode" }
 tg-core-version = { path = "../../core/version" }
 tg-service-animation = { path = "../animation" }
 tg-service-async = { path = "../async" }
+tg-service-clipboard = { path = "../clipboard" }
 tg-service-file = { path = "../file" }
+tg-service-input-method = { path = "../input_method" }
 tg-service-image = { path = "../image" }
 tg-service-layout = { path = "../layout" }
 tg-service-log = { path = "../log" }

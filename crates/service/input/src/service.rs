@@ -39,6 +39,17 @@ pub struct InputListenerError(
   pub String,
 );
 
+/// Text committed by the terminal, without input-method preedit information.
+///
+/// # Fields
+///
+/// * `text` - Submitted characters or pasted text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CommittedTextEvent {
+  /// Submitted characters or pasted text.
+  pub text: String,
+}
+
 /// An ordered keyboard state change or focus boundary observed during one input frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InputNotification {
@@ -49,6 +60,8 @@ pub enum InputNotification {
     event: InputActionEvent,
     system: bool,
   },
+  /// Committed text observed independently of shortcut and widget capture.
+  Text { text: String },
   /// A terminal focus boundary following any closing releases.
   Focus { gained: bool },
 }
@@ -65,6 +78,7 @@ struct ActiveAction {
 enum QueuedInput {
   Key(KeyEvent),
   Focus(FocusEvent),
+  Text(CommittedTextEvent),
 }
 
 /// The public entry point for input operations.
@@ -181,6 +195,7 @@ impl InputService {
   pub fn start_system_listener<E>(&self, async_runtime: &mut AsyncRuntime<E>)
   where
     E: From<SystemEvent>
+      + From<CommittedTextEvent>
       + From<InputListenerError>
       + From<tg_service_async::TaskStatusEvent>
       + Send
@@ -208,19 +223,28 @@ impl InputService {
             if let Ok(ct_event) = ct_event::read() {
               match ct_event {
                 CtEvent::Key(key_event) => {
+                  if let Some(event) = committed_text_from_crossterm(key_event)
+                    && sender.send(E::from(event)).is_err()
+                  {
+                    break;
+                  }
                   if let Some(event) = terminal_key_event_from_crossterm(key_event)
                     && sender.send(E::from(event)).is_err()
                   {
-                    // A closed event channel ends this listener instead of retaining a detached
-                    // producer.
+                    break;
+                  }
+                }
+                CtEvent::Paste(text) => {
+                  if !text.is_empty() && sender.send(E::from(CommittedTextEvent { text })).is_err()
+                  {
+                    break;
                   }
                 }
                 other_event => {
                   if let Some(sys_event) = system_event_from_crossterm(other_event)
                     && sender.send(E::from(sys_event)).is_err()
                   {
-                    // A closed event channel ends this listener instead of retaining a detached
-                    // producer.
+                    break;
                   }
                 }
               }
@@ -244,6 +268,11 @@ impl InputService {
         "channel disconnected",
       );
     }
+  }
+
+  /// Queue committed text in the same ordered journal as keys and focus boundaries.
+  pub fn queue_committed_text(&self, event: CommittedTextEvent) {
+    let _ = self.sender.send(QueuedInput::Text(event));
   }
 
   /// Queue a terminal event while retaining its UI-consumption order.
@@ -413,6 +442,13 @@ impl InputService {
     while let Ok(event) = self.receiver.try_recv() {
       match event {
         QueuedInput::Focus(focus) => self.apply_focus(focus),
+        QueuedInput::Text(event) => {
+          if self.focused && !event.text.is_empty() {
+            self
+              .notifications
+              .push(InputNotification::Text { text: event.text });
+          }
+        }
         QueuedInput::Key(event) => {
           if self.focused && self.raw_key_capture_enabled {
             self.raw_key_events.push_back(RawKeyEvent {
@@ -1046,6 +1082,26 @@ fn key_event_from_rdev(event: Event) -> Option<KeyEvent> {
   }
 }
 
+fn committed_text_from_crossterm(event: CtKeyEvent) -> Option<CommittedTextEvent> {
+  if event.kind == CtKeyEventKind::Release
+    || event.modifiers.intersects(
+      CtKeyModifiers::CONTROL
+        | CtKeyModifiers::ALT
+        | CtKeyModifiers::SUPER
+        | CtKeyModifiers::HYPER
+        | CtKeyModifiers::META,
+    )
+  {
+    return None;
+  }
+  match event.code {
+    CtKeyCode::Char(character) if !character.is_control() => Some(CommittedTextEvent {
+      text: character.to_string(),
+    }),
+    _ => None,
+  }
+}
+
 fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
   if event.kind == CtKeyEventKind::Release {
     return None;
@@ -1164,6 +1220,96 @@ mod tests {
       Some(SystemEvent::TerminalKey(event)) => Some(event),
       _ => None,
     }
+  }
+
+  #[test]
+  fn terminal_text_accepts_committed_characters_and_repeats_without_shortcuts() {
+    let event = |code, modifiers, kind| CtKeyEvent::new_with_kind(code, modifiers, kind);
+    for (character, modifiers) in [
+      ('a', CtKeyModifiers::NONE),
+      ('中', CtKeyModifiers::NONE),
+      ('A', CtKeyModifiers::SHIFT),
+    ] {
+      for kind in [CtKeyEventKind::Press, CtKeyEventKind::Repeat] {
+        assert_eq!(
+          committed_text_from_crossterm(event(CtKeyCode::Char(character), modifiers, kind)),
+          Some(CommittedTextEvent {
+            text: character.to_string()
+          })
+        );
+      }
+    }
+    for (code, modifiers, kind) in [
+      (
+        CtKeyCode::Char('a'),
+        CtKeyModifiers::NONE,
+        CtKeyEventKind::Release,
+      ),
+      (
+        CtKeyCode::Char('c'),
+        CtKeyModifiers::CONTROL,
+        CtKeyEventKind::Press,
+      ),
+      (
+        CtKeyCode::Char('a'),
+        CtKeyModifiers::ALT,
+        CtKeyEventKind::Press,
+      ),
+      (
+        CtKeyCode::Enter,
+        CtKeyModifiers::NONE,
+        CtKeyEventKind::Press,
+      ),
+      (
+        CtKeyCode::Backspace,
+        CtKeyModifiers::NONE,
+        CtKeyEventKind::Press,
+      ),
+    ] {
+      assert!(committed_text_from_crossterm(event(code, modifiers, kind)).is_none());
+    }
+  }
+
+  #[test]
+  fn committed_text_keeps_focus_order_and_does_not_consume_widget_events() {
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    input.begin_frame();
+    input.queue_committed_text(CommittedTextEvent {
+      text: "first".into(),
+    });
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+    input.queue_committed_text(CommittedTextEvent {
+      text: "unfocused".into(),
+    });
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.queue_committed_text(CommittedTextEvent {
+      text: "paste\n中".into(),
+    });
+    input.queue_committed_text(CommittedTextEvent {
+      text: String::new(),
+    });
+    input.poll();
+    assert_eq!(
+      input.notifications(),
+      [
+        InputNotification::Text {
+          text: "first".into()
+        },
+        InputNotification::Focus { gained: false },
+        InputNotification::Focus { gained: true },
+        InputNotification::Text {
+          text: "paste\n中".into()
+        },
+      ]
+    );
+    input.clear();
+    assert!(
+      input
+        .notifications()
+        .iter()
+        .all(|event| matches!(event, InputNotification::Focus { .. }))
+    );
   }
 
   #[test]

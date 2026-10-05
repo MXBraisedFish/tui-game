@@ -1,6 +1,8 @@
 # math 库
 
-`math` 提供数学常量和计算方法。浮点数计算可能产生精度误差。
+`math` 提供数学常量和计算方法。
+
+> 浮点数计算可能产生精度误差。
 
 ---
 
@@ -8,17 +10,16 @@
 
 ## 常量
 
-| 常量                | 说明                             | 定位                                    |
-| ------------------- | -------------------------------- | --------------------------------------- |
-| `POSITIVE_INFINITE` | 正无穷                           | [POSITIVE_INFINITE](#positive_infinite) |
-| `PI`                | 圆周率 π                         | [PI](#pi)                               |
-| `E`                 | 自然常数 e                       | [E](#e)                                 |
-| `NEGATIVE_INFINITE` | 负无穷                           | [NEGATIVE_INFINITE](#negative_infinite) |
-| `DEG`               | 弧度转角度系数，`180 / π`        | [DEG](#deg)                             |
-| `RAD`               | 角度转弧度系数，`π / 180`        | [RAD](#rad)                             |
-| `MAX_INTEGER`       | 最大可表示的整数 `2^63-1`        | [MAX_INTEGER](#max_integer)             |
-| `MIN_INTEGER`       | 最小可表示的整数 `-2^63`         | [MIN_INTEGER](#min_integer)             |
-| `INFINITE`          | 正无穷，POSITIVE_INFINITE 的别名 | [INFINITE](#infinite)                   |
+| 常量                | 说明                      | 定位                                    |
+| ------------------- | ------------------------- | --------------------------------------- |
+| `PI`                | 圆周率 π                  | [PI](#pi)                               |
+| `E`                 | 自然常数 e                | [E](#e)                                 |
+| `DEG`               | 弧度转角度系数，`180 / π` | [DEG](#deg)                             |
+| `RAD`               | 角度转弧度系数，`π / 180` | [RAD](#rad)                             |
+| `MAX_INTEGER`       | 最大可表示的整数 `2^63-1` | [MAX_INTEGER](#max_integer)             |
+| `MIN_INTEGER`       | 最小可表示的整数 `-2^63`  | [MIN_INTEGER](#min_integer)             |
+| `POSITIVE_INFINITE` | 正无穷                    | [POSITIVE_INFINITE](#positive_infinite) |
+| `NEGATIVE_INFINITE` | 负无穷                    | [NEGATIVE_INFINITE](#negative_infinite) |
 
 ## 方法
 
@@ -86,7 +87,7 @@ debug.print(tostring(math.PI))
 **输出：**
 
 ```lua
-
+3.141592653589793
 ```
 
 ### 等值
@@ -120,7 +121,7 @@ debug.print(tostring(math.E))
 **输出：**
 
 ```lua
-
+2.718281828459045
 ```
 
 ### 等值
@@ -128,88 +129,6 @@ debug.print(tostring(math.E))
 ```text
 2.718281828459045
 ```
-
----
-
-## `POSITIVE_INFINITE`
-
-正无穷。
-
-### 调用
-
-```lua
-math.POSITIVE_INFINITE
-```
-
-### 可用于
-
-- 数学比较。
-
-### 示例
-
-```lua
-debug.print(tostring(math.POSITIVE_INFINITE > math.MAX_INTEGER))
-```
-
-**输出：**
-
-```lua
-
-```
-
-### 等值
-
-```text
-inf
-```
-
-等价表达式为 `1 / 0`。
-
-## 额外说明
-
-- 该值大于所有有限数。
-- 不可用于计算。
-
----
-
-## `NEGATIVE_INFINITE`
-
-负无穷。
-
-### 调用
-
-```lua
-math.NEGATIVE_INFINITE
-```
-
-### 可用于
-
-- 数学比较。
-
-### 示例
-
-```lua
-debug.print(tostring(math.NEGATIVE_INFINITE < math.MIN_INTEGER))
-```
-
-**输出：**
-
-```lua
-
-```
-
-### 等值
-
-```text
--inf
-```
-
-等价表达式为 `-1 / 0`。
-
-## 额外说明
-
-- 该值小于所有有限数。
-- 不可用于计算。
 
 ---
 
@@ -236,7 +155,7 @@ debug.print(tostring(math.DEG))
 **输出：**
 
 ```lua
-
+57.29577951308232
 ```
 
 ### 等值
@@ -270,7 +189,7 @@ debug.print(tostring(math.RAD))
 **输出：**
 
 ```lua
-
+0.017453292519943295
 ```
 
 ### 等值
@@ -304,7 +223,7 @@ debug.print(tostring(math.MAX_INTEGER))
 **输出：**
 
 ```lua
-
+9223372036854775807
 ```
 
 ### 等值
@@ -338,7 +257,7 @@ debug.print(tostring(math.MIN_INTEGER))
 **输出：**
 
 ```lua
-
+-9223372036854775808
 ```
 
 ### 等值
@@ -349,14 +268,14 @@ debug.print(tostring(math.MIN_INTEGER))
 
 ---
 
-## `INFINITE`
+## `POSITIVE_INFINITE`
 
-正无穷，POSITIVE_INFINITE 的别名。
+正无穷。
 
 ### 调用
 
 ```lua
-math.INFINITE
+math.POSITIVE_INFINITE
 ```
 
 ### 可用于
@@ -366,19 +285,65 @@ math.INFINITE
 ### 示例
 
 ```lua
-debug.print(math.INFINITE == math.POSITIVE_INFINITE)
+debug.print(tostring(math.POSITIVE_INFINITE > math.MAX_INTEGER))
 ```
 
 **输出：**
 
 ```lua
+true
 ```
 
 ### 等值
 
-```text
-math.POSITIVE_INFINITE
+**表达式**
+
+$1 / 0$
+
+## 额外说明
+
+- 别名 `INFINITE`。
+- 该值大于所有有限数。
+- 不可用于计算。
+
+---
+
+## `NEGATIVE_INFINITE`
+
+负无穷。
+
+### 调用
+
+```lua
+math.NEGATIVE_INFINITE
 ```
+
+### 可用于
+
+- 数学比较。
+
+### 示例
+
+```lua
+debug.print(tostring(math.NEGATIVE_INFINITE < math.MIN_INTEGER))
+```
+
+**输出：**
+
+```lua
+true
+```
+
+### 等值
+
+**表达式**
+
+$-1 / 0$
+
+## 额外说明
+
+- 该值小于所有有限数。
+- 不可用于计算。
 
 ---
 
@@ -420,12 +385,12 @@ debug.print(tostring(n))
 **输出：**
 
 ```lua
-
+5.2
 ```
 
 ## 额外说明
 
-- 运行时数值参数和计算结果必须是有限数；无穷常量只可用于比较，不能传入受限运算。
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -465,12 +430,12 @@ debug.print(tostring(n))
 **输出：**
 
 ```lua
-
+4
 ```
 
 ## 额外说明
 
-- 结果超出整数范围时会抛出错误。
+- 必填参数 `value` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，取整结果超出 64 位有符号整数范围时报错。
 
 ---
 
@@ -510,12 +475,12 @@ debug.print(tostring(n))
 **输出：**
 
 ```lua
-
+3
 ```
 
 ## 额外说明
 
-- 结果超出整数范围时会抛出错误。
+- 必填参数 `value` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，取整结果超出 64 位有符号整数范围时报错。
 
 ---
 
@@ -556,12 +521,12 @@ debug.print(tostring(n1) .. ", " .. tostring(n2))
 **输出：**
 
 ```lua
-
+4, -4
 ```
 
 ## 额外说明
 
-- 结果超出整数范围时会抛出错误。
+- 必填参数 `value` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，取整结果超出 64 位有符号整数范围时报错。
 
 ---
 
@@ -603,12 +568,13 @@ debug.print(tostring(r1) .. ", " .. tostring(r2))
 **输出：**
 
 ```lua
-
+3.14, 12300
 ```
 
 ## 额外说明
 
-- 参数 `digits` 范围为 $[-308, 308]$。
+- 必填参数 `digits` 取值范围为 $[-308, 308]$。
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -649,13 +615,14 @@ debug.print(tostring(r))
 **输出：**
 
 ```lua
-
+1
 ```
 
 ## 额外说明
 
-- `x`、`y` 必须是整数，`y` 不能为 0；本接口不接受带小数的余数运算。
 - 结果符号与被除数一致。
+- 必填参数 `x` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
+- 必填参数 `y` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，不得为 $0$。
 
 ---
 
@@ -696,8 +663,13 @@ debug.print(tostring(p))
 **输出：**
 
 ```lua
-
+1024
 ```
+
+## 额外说明
+
+- 必填参数 `x` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
+- 必填参数 `y` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -737,8 +709,12 @@ debug.print(tostring(e2))
 **输出：**
 
 ```lua
-
+7.38905609893065
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -779,12 +755,13 @@ debug.print(tostring(log))
 **输出：**
 
 ```lua
-
+3
 ```
 
 ## 额外说明
 
-- `value` 必须大于 0；`base` 必须大于 0 且不等于 1，不能省略。
+- 必填参数 `value` 取值范围为 $(0, +\infty)$。
+- 必填参数 `base` 取值范围为 $(0, +\infty)$，且不得等于 $1$。
 
 ---
 
@@ -824,12 +801,12 @@ debug.print(tostring(lg))
 **输出：**
 
 ```lua
-
+2
 ```
 
 ## 额外说明
 
-- 参数 `value` 必须大于 0。
+- 必填参数 `value` 取值范围为 $(0, +\infty)$。
 
 ---
 
@@ -869,12 +846,12 @@ debug.print(tostring(ln))
 **输出：**
 
 ```lua
-
+1
 ```
 
 ## 额外说明
 
-- 参数 `value` 必须大于 0。
+- 必填参数 `value` 取值范围为 $(0, +\infty)$。
 
 ---
 
@@ -914,12 +891,12 @@ debug.print(tostring(r))
 **输出：**
 
 ```lua
-
+4
 ```
 
 ## 额外说明
 
-- 参数 `value` 不能为负数。
+- 必填参数 `value` 取值范围为 $[0, +\infty)$。
 
 ---
 
@@ -960,8 +937,13 @@ debug.print(tostring(v))
 **输出：**
 
 ```lua
-
+12
 ```
+
+## 额外说明
+
+- 必填参数 `x` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
+- 必填参数 `exp` 取值范围为 $(-\infty, 2097]$，小于 $-2097$ 时直接返回符号与 `x` 相同的 $0$。
 
 ---
 
@@ -985,7 +967,7 @@ math.frexp
 
 ## 返回值
 
-返回两个值，依次为尾数和二进制指数。
+返回两个值。
 
 | 值名       | 类型    | 说明 |
 | ---------- | ------- | ---- |
@@ -1002,12 +984,13 @@ debug.print(tostring(mantissa) .. ", " .. tostring(exponent))
 **输出：**
 
 ```lua
-
+0.8, 4
 ```
 
 ## 额外说明
 
-- 参数 `value`、返回值 `mantissa` 和 `exponent` 满足公式 $value = mantissa \times 2^{exponent}$；`math.ldexp` 可进行逆运算。
+- 必填参数 `value`、返回值 `mantissa` 和返回值 `exponent` 满足公式 $value = mantissa \times 2^{exponent}$。
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -1047,8 +1030,12 @@ debug.print(tostring(s))
 **输出：**
 
 ```lua
-
+1
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -1088,8 +1075,12 @@ debug.print(tostring(c))
 **输出：**
 
 ```lua
-
+-1
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -1122,15 +1113,19 @@ math.tan
 ### 示例
 
 ```lua
-local t = math.tan(math.PI / 4) -- 可能会有浮点数精度问题
+local t = math.tan(math.PI / 4)
 debug.print(tostring(t))
 ```
 
 **输出：**
 
 ```lua
-
+0.9999999999999999
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -1175,7 +1170,7 @@ debug.print(tostring(r))
 
 ## 额外说明
 
-- 参数 `value` 范围为 $[-1, 1]$。
+- 必填参数 `value` 取值范围为 $[-1, 1]$。
 
 ---
 
@@ -1215,12 +1210,12 @@ debug.print(tostring(r))
 **输出：**
 
 ```lua
-
+1.0471975511965979
 ```
 
 ## 额外说明
 
-- 参数 `value` 范围为 $[-1, 1]$。
+- 必填参数 `value` 取值范围为 $[-1, 1]$。
 
 ---
 
@@ -1260,8 +1255,12 @@ debug.print(tostring(r))
 **输出：**
 
 ```lua
-
+0.7853981633974483
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -1302,8 +1301,13 @@ debug.print(tostring(a))
 **输出：**
 
 ```lua
-
+0.7853981633974483
 ```
+
+## 额外说明
+
+- 必填参数 `y` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
+- 必填参数 `x` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -1343,8 +1347,12 @@ debug.print(tostring(d))
 **输出：**
 
 ```lua
-
+180
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -1384,8 +1392,12 @@ debug.print(tostring(r))
 **输出：**
 
 ```lua
-
+3.141592653589793
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
 
 ---
 
@@ -1426,8 +1438,12 @@ debug.print(tostring(a1) .. ", " .. tostring(a2))
 **输出：**
 
 ```lua
-
+90, 270
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
 
 ---
 
@@ -1467,12 +1483,12 @@ debug.print(tostring(m))
 **输出：**
 
 ```lua
-
+9
 ```
 
 ## 额外说明
 
-- 只接受最多 16,384 项的稠密数值数组；可提供 `n` 字段表示长度，但其值必须与数组项一致，数组中不能有空洞。
+- 必填参数 `values` 必须为稠密数组。
 
 ---
 
@@ -1512,12 +1528,12 @@ debug.print(tostring(m))
 **输出：**
 
 ```lua
-
+1
 ```
 
 ## 额外说明
 
-- 只接受最多 16,384 项的稠密数值数组；可提供 `n` 字段表示长度，但其值必须与数组项一致，数组中不能有空洞。
+- 必填参数 `values` 必须为稠密数组。
 
 ---
 
@@ -1541,7 +1557,7 @@ math.modf
 
 ## 返回值
 
-返回两个值，依次为整数部分和小数部分。
+返回两个值。
 
 | 值名              | 类型    | 说明     |
 | ----------------- | ------- | -------- |
@@ -1558,8 +1574,12 @@ debug.print(tostring(integer_part) .. ", " .. tostring(fractional_part))
 **输出：**
 
 ```lua
-
+2, 0.5
 ```
+
+## 额外说明
+
+- 必填参数 `value` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，整数部分超出 64 位有符号整数范围时报错。
 
 ---
 
@@ -1583,11 +1603,17 @@ math.tointeger
 
 ## 返回值
 
-返回一个值。
+**转换成功**，返回一个值。
 
-| 类型          | 说明             |
-| ------------- | ---------------- |
-| integer / nil | 精确转换后的整数 |
+| 类型    | 说明             |
+| ------- | ---------------- |
+| integer | 精确转换后的整数 |
+
+**转换失败**，返回一个值。
+
+| 类型 | 说明     |
+| ---- | -------- |
+| nil  | 转换失败 |
 
 ### 示例
 
@@ -1600,12 +1626,8 @@ debug.print(tostring(i1) .. ", " .. tostring(i2))
 **输出：**
 
 ```lua
-
+3, nil
 ```
-
-## 额外说明
-
-- 转换失败时返回 `nil`。
 
 ---
 
@@ -1629,11 +1651,17 @@ math.type
 
 ## 返回值
 
-返回一个值。
+**属于数字类型**，返回一个值。
 
-| 类型         | 说明     |
-| ------------ | -------- |
-| string / nil | 数值类型 |
+| 类型   | 说明             |
+| ------ | ---------------- |
+| string | 精确转换后的整数 |
+
+**不属于数字类型**，返回一个值。
+
+| 类型 | 说明     |
+| ---- | -------- |
+| nil  | 转换失败 |
 
 ### 示例
 
@@ -1647,12 +1675,8 @@ debug.print(tostring(t1) .. ", " .. tostring(t2) .. ", " .. tostring(t3))
 **输出：**
 
 ```lua
-
+integer, float, nil
 ```
-
-## 额外说明
-
-- 若传入的不是数值，返回 `nil`。
 
 ---
 
@@ -1686,7 +1710,7 @@ math.ult
 ### 示例
 
 ```lua
-local b1 = math.ult(-1, 1)  -- -1 的无符号二进制码为 2^64-1
+local b1 = math.ult(-1, 1)
 local b2 = math.ult(1, -1)
 debug.print(tostring(b1) .. ", " .. tostring(b2))
 ```
@@ -1694,12 +1718,14 @@ debug.print(tostring(b1) .. ", " .. tostring(b2))
 **输出：**
 
 ```lua
-
+false, true
 ```
 
 ## 额外说明
 
 - 负数会直接以二进制码进行比较，而非取绝对值。
+- 必填参数 `left` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
+- 必填参数 `right` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
 
 ---
 
@@ -1749,12 +1775,15 @@ debug.print(tostring(ae2))
 **输出：**
 
 ```lua
-
+true
+false
 ```
 
 ## 额外说明
 
-- `epsilon` 不能为负数。
+- 必填参数 `left` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
+- 必填参数 `right` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
+- 选填参数 `epsilon` 取值范围为 $[0, +\infty)$。
 
 ---
 
@@ -1787,9 +1816,9 @@ math.percent
 
 返回一个值。
 
-| 类型  | 说明                                     |
-| ----- | ---------------------------------------- |
-| float | 比例；`as_percent = true` 时为百分比数值 |
+| 类型  | 说明 |
+| ----- | ---- |
+| float | 比例 |
 
 ### 示例
 
@@ -1804,12 +1833,14 @@ debug.print(tostring(p2))
 **输出：**
 
 ```lua
-
+0.3125
+31.25
 ```
 
 ## 额外说明
 
-- `total` 不能为 0。默认返回 `value / total`；`as_percent = true` 时再乘以 100。
+- 必填参数 `value` 取值范围为 $(-\infty, +\infty)$，必须为有限数。
+- 必填参数 `total` 取值范围为 $(-\infty, +\infty)$，必须为有限数且不得为 $0$。
 
 ---
 
@@ -1849,12 +1880,12 @@ debug.print(tostring(f))
 **输出：**
 
 ```lua
-
+120
 ```
 
 ## 额外说明
 
-- 参数 `n` 范围为 $[0, 170]$。
+- 必填参数 `n` 取值范围为 $[0, 170]$。
 
 ---
 
@@ -1895,9 +1926,10 @@ debug.print(tostring(c))
 **输出：**
 
 ```lua
-
+10
 ```
 
 ## 额外说明
 
-- 参数 `k` 范围为 $[0, n]$，`n` 不能为负数；组合数超出整数范围时会抛出错误。
+- 必填参数 `n` 取值范围为 $[0, 9223372036854775807]$，组合结果超出 64 位有符号整数范围时报错。
+- 必填参数 `k` 取值范围为 $[0, 9223372036854775807]$，且不得大于 `n`。

@@ -86,7 +86,7 @@ file.AUTO
 
 ### 示例
 
-> file.txt
+> assets/file.txt
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.AUTO, end_of_line = file.AUTO})
@@ -128,7 +128,7 @@ file.ALL
 
 ### 示例
 
-> dir/...
+> assets/dir/...
 
 ```lua
 local request_id = file.list_dir("dir/", {file_type = file.ALL})
@@ -187,7 +187,7 @@ file.CR
 
 ### 示例
 
-> file.txt
+> assets/file.txt
 
 ```lua
 function Init(ctx)
@@ -231,7 +231,7 @@ file.LF
 
 ### 示例
 
-> file.txt
+> assets/file.txt
 
 ```lua
 function Init(ctx)
@@ -275,7 +275,7 @@ file.CRLF
 
 ### 示例
 
-> file.txt
+> assets/file.txt
 
 ```lua
 function Init(ctx)
@@ -319,7 +319,7 @@ file.UTF_8
 
 ### 示例
 
-> file.txt (UTF-8)
+> assets/file.txt (UTF-8)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.UTF_8})
@@ -361,7 +361,7 @@ file.UTF_16LE
 
 ### 示例
 
-> file.txt (UTF-16 LE)
+> assets/file.txt (UTF-16 LE)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.UTF_16LE})
@@ -403,7 +403,7 @@ file.UTF_16BE
 
 ### 示例
 
-> file.txt (UTF-16 BE)
+> assets/file.txt (UTF-16 BE)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.UTF_16BE})
@@ -445,7 +445,7 @@ file.GBK
 
 ### 示例
 
-> file.txt (GBK)
+> assets/file.txt (GBK)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.GBK})
@@ -487,7 +487,7 @@ file.GB18030
 
 ### 示例
 
-> file.txt (GB18030)
+> assets/file.txt (GB18030)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.GB18030})
@@ -529,7 +529,7 @@ file.BIG5
 
 ### 示例
 
-> file.txt (Big5)
+> assets/file.txt (Big5)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.BIG5})
@@ -571,7 +571,7 @@ file.SHIFT_JIS
 
 ### 示例
 
-> file.txt (Shift_JIS)
+> assets/file.txt (Shift_JIS)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.SHIFT_JIS})
@@ -613,7 +613,7 @@ file.EUC_JP
 
 ### 示例
 
-> file.txt (EUC-JP)
+> assets/file.txt (EUC-JP)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.EUC_JP})
@@ -655,7 +655,7 @@ file.ISO_2022_JP
 
 ### 示例
 
-> file.txt (ISO-2022-JP)
+> assets/file.txt (ISO-2022-JP)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_2022_JP})
@@ -697,7 +697,7 @@ file.EUC_KR
 
 ### 示例
 
-> file.txt (EUC-KR)
+> assets/file.txt (EUC-KR)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.EUC_KR})
@@ -739,7 +739,7 @@ file.WINDOWS_874
 
 ### 示例
 
-> file.txt (Windows-874)
+> assets/file.txt (Windows-874)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_874})
@@ -781,7 +781,7 @@ file.WINDOWS_1250
 
 ### 示例
 
-> file.txt (Windows-1250)
+> assets/file.txt (Windows-1250)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1250})
@@ -823,7 +823,7 @@ file.WINDOWS_1251
 
 ### 示例
 
-> file.txt (Windows-1251)
+> assets/file.txt (Windows-1251)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1251})
@@ -865,7 +865,7 @@ file.WINDOWS_1252
 
 ### 示例
 
-> file.txt (Windows-1252)
+> assets/file.txt (Windows-1252)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1252})
@@ -907,7 +907,7 @@ file.WINDOWS_1253
 
 ### 示例
 
-> file.txt (Windows-1253)
+> assets/file.txt (Windows-1253)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1253})
@@ -949,7 +949,7 @@ file.WINDOWS_1254
 
 ### 示例
 
-> file.txt (Windows-1254)
+> assets/file.txt (Windows-1254)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1254})
@@ -991,7 +991,7 @@ file.WINDOWS_1255
 
 ### 示例
 
-> file.txt (Windows-1255)
+> assets/file.txt (Windows-1255)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1255})
@@ -1033,7 +1033,7 @@ file.WINDOWS_1256
 
 ### 示例
 
-> file.txt (Windows-1256)
+> assets/file.txt (Windows-1256)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1256})
@@ -1075,7 +1075,7 @@ file.WINDOWS_1257
 
 ### 示例
 
-> file.txt (Windows-1257)
+> assets/file.txt (Windows-1257)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1257})
@@ -1117,7 +1117,7 @@ file.WINDOWS_1258
 
 ### 示例
 
-> file.txt (Windows-1258)
+> assets/file.txt (Windows-1258)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.WINDOWS_1258})
@@ -1159,7 +1159,7 @@ file.ISO_8859_2
 
 ### 示例
 
-> file.txt (ISO-8859-2)
+> assets/file.txt (ISO-8859-2)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_2})
@@ -1201,7 +1201,7 @@ file.ISO_8859_3
 
 ### 示例
 
-> file.txt (ISO-8859-3)
+> assets/file.txt (ISO-8859-3)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_3})
@@ -1243,7 +1243,7 @@ file.ISO_8859_4
 
 ### 示例
 
-> file.txt (ISO-8859-4)
+> assets/file.txt (ISO-8859-4)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_4})
@@ -1285,7 +1285,7 @@ file.ISO_8859_5
 
 ### 示例
 
-> file.txt (ISO-8859-5)
+> assets/file.txt (ISO-8859-5)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_5})
@@ -1327,7 +1327,7 @@ file.ISO_8859_6
 
 ### 示例
 
-> file.txt (ISO-8859-6)
+> assets/file.txt (ISO-8859-6)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_6})
@@ -1369,7 +1369,7 @@ file.ISO_8859_7
 
 ### 示例
 
-> file.txt (ISO-8859-7)
+> assets/file.txt (ISO-8859-7)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_7})
@@ -1411,7 +1411,7 @@ file.ISO_8859_8
 
 ### 示例
 
-> file.txt (ISO-8859-8)
+> assets/file.txt (ISO-8859-8)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_8})
@@ -1453,7 +1453,7 @@ file.ISO_8859_8_I
 
 ### 示例
 
-> file.txt (ISO-8859-8-I)
+> assets/file.txt (ISO-8859-8-I)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_8_I})
@@ -1495,7 +1495,7 @@ file.ISO_8859_10
 
 ### 示例
 
-> file.txt (ISO-8859-10)
+> assets/file.txt (ISO-8859-10)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_10})
@@ -1537,7 +1537,7 @@ file.ISO_8859_13
 
 ### 示例
 
-> file.txt (ISO-8859-13)
+> assets/file.txt (ISO-8859-13)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_13})
@@ -1579,7 +1579,7 @@ file.ISO_8859_14
 
 ### 示例
 
-> file.txt (ISO-8859-14)
+> assets/file.txt (ISO-8859-14)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_14})
@@ -1621,7 +1621,7 @@ file.ISO_8859_15
 
 ### 示例
 
-> file.txt (ISO-8859-15)
+> assets/file.txt (ISO-8859-15)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_15})
@@ -1663,7 +1663,7 @@ file.ISO_8859_16
 
 ### 示例
 
-> file.txt (ISO-8859-16)
+> assets/file.txt (ISO-8859-16)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.ISO_8859_16})
@@ -1705,7 +1705,7 @@ file.KOI8_R
 
 ### 示例
 
-> file.txt (KOI8-R)
+> assets/file.txt (KOI8-R)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.KOI8_R})
@@ -1747,7 +1747,7 @@ file.KOI8_U
 
 ### 示例
 
-> file.txt (KOI8-U)
+> assets/file.txt (KOI8-U)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.KOI8_U})
@@ -1789,7 +1789,7 @@ file.IBM866
 
 ### 示例
 
-> file.txt (IBM866)
+> assets/file.txt (IBM866)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.IBM866})
@@ -1831,7 +1831,7 @@ file.MACINTOSH
 
 ### 示例
 
-> file.txt (Macintosh)
+> assets/file.txt (Macintosh)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.MACINTOSH})
@@ -1873,7 +1873,7 @@ file.X_MAC_CYRILLIC
 
 ### 示例
 
-> file.txt (x-mac-cyrillic)
+> assets/file.txt (x-mac-cyrillic)
 
 ```lua
 local request_id = file.read("file.txt", {encoding = file.X_MAC_CYRILLIC})
@@ -1944,7 +1944,7 @@ file.read
 
 ### 示例
 
-> file.txt
+> assets/file.txt
 
 ```lua
 local request_id = file.read("file.txt")
@@ -2112,7 +2112,7 @@ file.list_dir
 
 ### 示例
 
-> dir/...
+> assets/dir/...
 
 ```lua
 local request_id = file.list_dir("dir/", {file_type = file.ALL})
@@ -2274,7 +2274,7 @@ file.exists
 
 ### 示例
 
-> test/
+> assets/test/
 
 ```lua
 debug.print(tostring(file.exists("test")))
@@ -2339,7 +2339,7 @@ file.remove
 
 ### 示例
 
-> test/test.txt
+> assets/test/test.txt
 
 ```lua
 file.remove("test", {recursive = false})

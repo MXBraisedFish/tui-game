@@ -645,6 +645,11 @@ pub enum LuaEventData {
     /// The transition into pressed, held, or released.
     state: LuaActionState,
   },
+  /// Text committed by the terminal, including ordinary characters and pasted text.
+  Input {
+    /// The submitted text without preedit or candidate information.
+    text: String,
+  },
   /// The mouse setting for Lua event data.
   Mouse {
     /// The &'static str carried by this Lua event data.
@@ -706,6 +711,7 @@ impl LuaEventData {
     match self {
       Self::Action { .. } => "action",
       Self::Key { .. } => "key",
+      Self::Input { .. } => "input",
       Self::Mouse { .. } => "mouse",
       Self::Resize { .. } => "resize",
       Self::Focus { .. } => "focus",
@@ -762,6 +768,7 @@ impl LuaEventData {
       self,
       Self::Action { .. }
         | Self::Key { .. }
+        | Self::Input { .. }
         | Self::Mouse { .. }
         | Self::HitArea(_)
         | Self::Hyperlink(_)
@@ -806,6 +813,7 @@ impl LuaEventData {
       super::LuaSessionKind::Screensaver => match self {
         Self::Action { .. }
         | Self::Key { .. }
+        | Self::Input { .. }
         | Self::Mouse { .. }
         | Self::OverlayStarted
         | Self::OverlayStopped
@@ -844,6 +852,7 @@ impl LuaEventData {
         data.set("key", key.as_str())?;
         data.set("state", state.as_str())?;
       }
+      Self::Input { text } => data.set("text", text.as_str())?,
       Self::Mouse {
         kind,
         button,

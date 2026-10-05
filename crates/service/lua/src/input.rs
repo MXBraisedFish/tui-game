@@ -7,6 +7,9 @@ pub(crate) struct LuaInputState {
   pub actions: bool,
   pub keys: bool,
   pub focus_release: bool,
+  pub text: bool,
+  pub ime_locked: bool,
+  text_generation: u64,
   action_generation: u64,
   key_generation: u64,
   active_actions: Vec<String>,
@@ -17,6 +20,9 @@ pub(crate) struct LuaInputState {
 impl Default for LuaInputState {
   fn default() -> Self {
     Self {
+      text: false,
+      ime_locked: true,
+      text_generation: 0,
       actions: true,
       keys: false,
       focus_release: true,
@@ -33,6 +39,7 @@ impl LuaInputState {
   pub fn generation(&self, data: &LuaEventData) -> u64 {
     match data {
       LuaEventData::Key { .. } => self.key_generation,
+      LuaEventData::Input { .. } => self.text_generation,
       _ => self.action_generation,
     }
   }
@@ -43,7 +50,12 @@ impl LuaInputState {
 
   /// Forget game input on terminal focus loss or overlay takeover under its release policy.
   pub fn focus_lost(&mut self) {
+    self.close_text();
     self.close_with_releases(true, true, self.focus_release);
+  }
+
+  pub fn close_text(&mut self) {
+    self.text_generation = self.text_generation.wrapping_add(1);
   }
 
   fn close_with_releases(&mut self, actions: bool, keys: bool, emit_releases: bool) {
@@ -81,6 +93,7 @@ impl LuaInputState {
         (self.actions, &mut self.active_actions, action, state)
       }
       LuaEventData::Key { key, state } => (self.keys, &mut self.active_keys, key, state),
+      LuaEventData::Input { .. } => return self.text,
       _ => return true,
     };
     if !enabled {

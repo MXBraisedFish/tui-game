@@ -326,6 +326,8 @@ impl LuaSession {
         session_kind: spec.session_kind,
         scripts_root,
         assets_root,
+        input_method: api_config.input_method,
+        clipboard: api_config.clipboard,
         debug_enabled: api_config.debug_enabled,
         base_size: spec.base_size,
         key_actions: api_config.key_actions,
@@ -502,14 +504,18 @@ impl LuaSession {
     if self.session_kind != LuaSessionKind::Game
       && matches!(
         delivery.event.data,
-        super::LuaEventData::Action { .. } | super::LuaEventData::Key { .. }
+        super::LuaEventData::Action { .. }
+          | super::LuaEventData::Key { .. }
+          | super::LuaEventData::Input { .. }
       )
     {
       return Ok(());
     }
     if matches!(
       delivery.event.data,
-      super::LuaEventData::Action { .. } | super::LuaEventData::Key { .. }
+      super::LuaEventData::Action { .. }
+        | super::LuaEventData::Key { .. }
+        | super::LuaEventData::Input { .. }
     ) && delivery.route != LuaEventRoute::InputRelease
     {
       let mut api = self.api_state.borrow_mut();
@@ -571,9 +577,15 @@ impl LuaSession {
     let enabled = match data {
       super::LuaEventData::Action { .. } => api.input.actions,
       super::LuaEventData::Key { .. } => api.input.keys,
+      super::LuaEventData::Input { .. } => api.input.text,
       _ => false,
     };
     enabled.then(|| api.input.generation(data))
+  }
+
+  /// Report whether the live game asks the application to restrict input methods.
+  pub fn input_method_locked(&self) -> bool {
+    self.state != LuaSessionState::Running || self.api_state.borrow().input.ime_locked
   }
 
   /// Close delivered input without changing subscriptions and return balanced releases.
@@ -2926,7 +2938,7 @@ mod tests {
       "draw",
       "debug",
       "game",
-      "event",
+      "events",
       "loader",
       "file",
       "random",
@@ -2953,6 +2965,7 @@ mod tests {
     for name in [
       "_G",
       "_VERSION",
+      "event",
       "assert",
       "error",
       "pcall",
@@ -4462,7 +4475,7 @@ mod tests {
           debug.assert(debug.assert("value") == "value")
           debug.print("custom", { title = "Title", level = debug.WARN, time = true, type_head = true })
           debug.info("positional")
-          local extra_skip_argument = debug.pcall(function() event.skip_action("extra") end)
+          local extra_skip_argument = debug.pcall(function() events.skip_action("extra") end)
           debug.assert(not extra_skip_argument)
           debug.info("info")
           debug.warn("warn")
@@ -5256,14 +5269,19 @@ mod tests {
       "game.exit_game",
       "game.save_game",
       "game.save_best",
-      "event.skip_action",
-      "event.clear_action",
-      "event.enable_focus_release",
-      "event.disable_focus_release",
-      "ime.receive_action_event",
-      "ime.reject_action_event",
-      "ime.receive_key_event",
-      "ime.reject_key_event",
+      "events.skip_action",
+      "events.clear_action",
+      "events.enable_focus_release",
+      "events.disable_focus_release",
+      "ime.lock",
+      "ime.unlock",
+      "ime.write_clipboard",
+      "ime.receive_input_event",
+      "ime.reject_input_event",
+      "keyboard.receive_action_event",
+      "keyboard.reject_action_event",
+      "keyboard.receive_key_event",
+      "keyboard.reject_key_event",
       "file.write",
       "file.list_dir",
       "file.create_dir",
@@ -5351,7 +5369,7 @@ mod tests {
           debug.info("entry")
         function Init(ctx)
           debug.info("init")
-          event.clear_action()
+          events.clear_action()
         end
       "#,
     );
@@ -5386,8 +5404,8 @@ mod tests {
     let source = valid_script(
       r#"
       function Init(ctx)
-        event.skip_action()
-        event.clear_action()
+        events.skip_action()
+        events.clear_action()
       end
     "#,
     );
@@ -5412,7 +5430,7 @@ mod tests {
       .err()
       .unwrap()
       .message
-      .contains("event.skip_action")
+      .contains("events.skip_action")
     );
   }
 
@@ -5958,19 +5976,216 @@ mod tests {
   }
 
   #[test]
-  fn ime_settings_succeed_idempotently_and_validate_arguments() {
+  fn clipboard_write_validates_text_and_returns_false_without_a_backend() {
+    let source = valid_script(
+      r##"
+      function Init(ctx)
+        debug.assert(select("#", ime.write_clipboard("hello")) == 1)
+        debug.assert(ime.write_clipboard("中文\nhello") == false)
+        debug.assert(ime.write_clipboard("") == false)
+        for _, call in ipairs({
+          function() ime.write_clipboard() end,
+          function() ime.write_clipboard(nil) end,
+          function() ime.write_clipboard(1) end,
+          function() ime.write_clipboard(true) end,
+          function() ime.write_clipboard({text="hello"}) end,
+          function() ime.write_clipboard("hello", "extra") end,
+          function() ime.write_clipboard("bad\0text") end,
+          function() ime.write_clipboard(encoding.hex_decode("ff")) end,
+          function() ime.write_clipboard = false end,
+        }) do debug.assert(not select(1, debug.pcall(call))) end
+      end
+    "##,
+    );
+    let session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let library = session.environment_value("ime");
+    let write = library
+      .as_table()
+      .unwrap()
+      .get::<Function>("write_clipboard")
+      .unwrap();
+    let oversized = session
+      .lua
+      .create_string(vec![b'x'; 1024 * 1024 + 1])
+      .unwrap();
+    let error = write.call::<bool>(oversized).unwrap_err().to_string();
+    assert!(error.contains("ime.write_clipboard") && error.contains("1 MiB"));
+    assert!(session.api_state.borrow().input.actions);
+    assert!(!session.api_state.borrow().input.keys);
+    assert!(!session.api_state.borrow().input.text);
+  }
+
+  #[test]
+  fn ime_controls_validate_options_and_preserve_keyboard_independence() {
+    let source = valid_script(
+      r#"
+      function Init(ctx)
+        debug.assert(ime.receive_action_event == nil)
+        debug.assert(ime.lock() == false)
+        debug.assert(ime.unlock() == false)
+        debug.assert(ime.unlock({restore=false}) == false)
+        for _, fn in ipairs({ime.receive_input_event, ime.reject_input_event}) do
+          debug.assert(fn() == true and fn() == true)
+          debug.assert(not select(1, debug.pcall(function() fn({}) end)))
+        end
+        debug.assert(ime.receive_input_event())
+        for _, call in ipairs({
+          function() ime.lock(nil) end,
+          function() ime.unlock(false) end,
+          function() ime.unlock({restore=1}) end,
+          function() ime.unlock({unknown=true}) end,
+          function() ime.lock = false end,
+        }) do debug.assert(not select(1, debug.pcall(call))) end
+      end
+    "#,
+    );
+    let session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let api = session.api_state.borrow();
+    assert!(api.input.actions);
+    assert!(!api.input.keys);
+    assert!(api.input.text);
+    assert!(api.input.ime_locked);
+  }
+
+  #[test]
+  fn ime_unlock_uses_the_supplied_service_and_retains_session_preference() {
+    let source = valid_script(
+      r#"
+      function Init(ctx)
+        debug.assert(ime.unlock({restore=false}))
+        debug.assert(ime.unlock())
+        debug.assert(ime.unlock({restore=true}))
+      end
+    "#,
+    );
+    let service = Rc::new(std::cell::RefCell::new(
+      tg_service_input_method::InputMethodService::new(),
+    ));
+    let session = LuaSession::load_with_api(
+      spec(&source, LuaSessionKind::Game),
+      LuaPolicy::default(),
+      LuaApiConfig {
+        input_method: Some(service.clone()),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+    assert!(!session.input_method_locked());
+    assert_eq!(
+      service.borrow().policy(),
+      tg_service_input_method::ImPolicy::Free
+    );
+  }
+
+  #[test]
+  fn committed_text_subscription_rejection_and_focus_invalidate_queued_text() {
+    use crate::{LuaEventData as Data, LuaRuntimeEvent};
+    let source = valid_script(
+      r#"
+      local seen = {}
+      function Init(ctx)
+        debug.assert(ime.receive_input_event())
+      end
+      function HandleEvent(e)
+        if e.type == "input" then
+          seen[#seen+1] = e.data.text
+          if e.data.text == "toggle" then
+            ime.reject_input_event()
+            ime.receive_input_event()
+          end
+        end
+      end
+      function SaveGame() return {seen=seen} end
+    "#,
+    );
+    let mut session =
+      LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default()).unwrap();
+    let text = |text: &str| Data::Input { text: text.into() };
+    let original = session.input_generation(&text("first")).unwrap();
+    let send = |session: &mut LuaSession, data, generation| {
+      session
+        .dispatch_event(&LuaEventDelivery {
+          event: LuaRuntimeEvent {
+            sequence: 1,
+            frame: 1,
+            data,
+          },
+          route: LuaEventRoute::Input { generation },
+        })
+        .unwrap();
+    };
+    send(&mut session, text("first"), original);
+    send(&mut session, text("toggle"), original);
+    send(&mut session, text("stale"), original);
+    let restored = session.input_generation(&text("new")).unwrap();
+    assert_ne!(restored, original);
+    send(&mut session, text("new"), restored);
+    assert!(session.focus_lost_input().is_empty());
+    send(&mut session, text("stale after focus"), restored);
+    let focused = session.input_generation(&text("paste\ntext")).unwrap();
+    send(&mut session, text("paste\ntext"), focused);
+    assert_eq!(
+      session.save_game().unwrap().unwrap()["seen"],
+      serde_json::json!(["first", "toggle", "new", "paste\ntext"])
+    );
+    let mut broker = LuaEventBroker::new();
+    let token = LuaSessionToken {
+      kind: LuaSessionKind::Game,
+      generation: 1,
+    };
+    broker.synchronize_sessions(Some(token), None);
+    broker
+      .push_owned(
+        token,
+        1,
+        text("ordinary"),
+        LuaEventRoute::Input {
+          generation: focused,
+        },
+      )
+      .unwrap();
+    broker.clear_pending_actions(LuaSessionKind::Game);
+    assert_eq!(broker.drain_frame(LuaSessionKind::Game).len(), 1);
+    broker
+      .push_owned(
+        token,
+        2,
+        text("overlay stale"),
+        LuaEventRoute::Input {
+          generation: focused,
+        },
+      )
+      .unwrap();
+    broker.clear_pending_interactive(LuaSessionKind::Game);
+    assert!(broker.drain_frame(LuaSessionKind::Game).is_empty());
+    let screensaver = LuaSessionToken {
+      kind: LuaSessionKind::Screensaver,
+      generation: 1,
+    };
+    broker.synchronize_sessions(None, Some(screensaver));
+    assert!(
+      broker
+        .push_owned(screensaver, 3, text("hidden"), LuaEventRoute::HandleEvent)
+        .is_err()
+    );
+  }
+
+  #[test]
+  fn keyboard_settings_succeed_idempotently_and_validate_arguments() {
     let source = valid_script(
       r#"
       function Init(ctx)
         for _, fn in ipairs({
-          ime.receive_action_event, ime.reject_action_event,
-          ime.receive_key_event, ime.reject_key_event,
+          keyboard.receive_action_event, keyboard.reject_action_event,
+          keyboard.receive_key_event, keyboard.reject_key_event,
         }) do
           debug.assert(fn() == true)
           debug.assert(fn() == true)
           debug.assert(not select(1, debug.pcall(function() fn({}) end)))
         end
-        debug.assert(not select(1, debug.pcall(function() ime.receive_key_event = true end)))
+        debug.assert(not select(1, debug.pcall(function() keyboard.receive_key_event = true end)))
       end
     "#,
     );
@@ -6005,18 +6220,18 @@ mod tests {
       r#"
       local seen = {}
       function Init(ctx)
-        ime.receive_key_event()
-        for _, fn in ipairs({event.enable_focus_release, event.disable_focus_release}) do
+        keyboard.receive_key_event()
+        for _, fn in ipairs({events.enable_focus_release, events.disable_focus_release}) do
           debug.assert(fn())
           debug.assert(fn())
           debug.assert(not select(1, debug.pcall(function() fn(nil) end)))
         end
-        debug.assert(event.enable_focus_release())
-        debug.assert(not select(1, debug.pcall(function() event.disable_focus_release = true end)))
+        debug.assert(events.enable_focus_release())
+        debug.assert(not select(1, debug.pcall(function() events.disable_focus_release = true end)))
       end
       function HandleEvent(e)
         if e.type == "resize" then
-          local fn = e.data.width == 1 and event.disable_focus_release or event.enable_focus_release
+          local fn = e.data.width == 1 and events.disable_focus_release or events.enable_focus_release
           debug.assert(fn())
           debug.assert(fn())
         elseif e.type == "key" or e.type == "action" then
@@ -6153,8 +6368,8 @@ mod tests {
         r#"
         local seen = {{}}
         function Init(ctx)
-          ime.receive_key_event()
-          event.{setting}()
+          keyboard.receive_key_event()
+          events.{setting}()
         end
         function HandleEvent(e)
           if e.type == "key" or e.type == "action" then
@@ -6286,7 +6501,7 @@ mod tests {
       r#"
       local keys=0
       function HandleEvent(e)
-        if e.type == "resize" then ime.receive_key_event() end
+        if e.type == "resize" then keyboard.receive_key_event() end
         if e.type == "key" then keys=keys+1 end
       end
       function SaveGame() return {keys=keys} end
@@ -6345,12 +6560,12 @@ mod tests {
     let source = valid_script(
       r#"
       local seen = ""
-      function Init(ctx) ime.receive_key_event() end
+      function Init(ctx) keyboard.receive_key_event() end
       function HandleEvent(e)
         seen = seen .. e.type .. "/" .. (e.data.action or e.data.key) .. "/" .. e.data.state .. ";"
         if e.type == "action" and e.data.state == "pressed" then
-          ime.reject_action_event()
-          ime.receive_action_event()
+          keyboard.reject_action_event()
+          keyboard.receive_action_event()
         end
       end
       function SaveGame() return {seen=seen} end

@@ -40,9 +40,9 @@ pub use file::FileEvent;
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertMode, ImageConvertParams, ImageEvent, ImageService};
 pub use input::{
-  ActionMapEntry, InputActionEvent, InputListenerError, InputNotification, InputService, Key,
-  KeyEvent, KeyEventKind, KeyState, MouseButton, MouseEvent, MouseEventKind, RawKeyEvent,
-  SystemEvent, TerminalKeyCode, format_key_display, key_token, translate_action_map,
+  ActionMapEntry, CommittedTextEvent, InputActionEvent, InputListenerError, InputNotification,
+  InputService, Key, KeyEvent, KeyEventKind, KeyState, MouseButton, MouseEvent, MouseEventKind,
+  RawKeyEvent, SystemEvent, TerminalKeyCode, format_key_display, key_token, translate_action_map,
 };
 pub use layout::{LayoutService, Rect, Size};
 pub use log::{

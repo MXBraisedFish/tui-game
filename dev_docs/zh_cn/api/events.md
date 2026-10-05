@@ -1,6 +1,6 @@
-# event 库
+# events 库
 
-`event` 提供对当前游戏输入动作队列的控制。
+`events` 提供对当前游戏输入动作队列的控制。
 
 ---
 
@@ -30,7 +30,7 @@
 ### 调用
 
 ```lua
-event.skip_action
+events.skip_action
 ```
 
 ## 返回值
@@ -40,7 +40,7 @@ event.skip_action
 ### 示例
 
 ```lua
-event.skip_action()
+events.skip_action()
 ```
 
 ## 额外说明
@@ -60,7 +60,7 @@ event.skip_action()
 ### 调用
 
 ```lua
-event.clear_action
+events.clear_action
 ```
 
 ## 返回值
@@ -70,7 +70,7 @@ event.clear_action
 ### 示例
 
 ```lua
-event.clear_action()
+events.clear_action()
 ```
 
 ## 额外说明
@@ -90,7 +90,7 @@ event.clear_action()
 ### 调用
 
 ```lua
-event.enable_focus_release
+events.enable_focus_release
 ```
 
 ## 返回值
@@ -104,7 +104,7 @@ event.enable_focus_release
 ### 示例
 
 ```lua
-local success = event.enable_focus_release()
+local success = events.enable_focus_release()
 debug.print(success)
 ```
 
@@ -127,7 +127,7 @@ true
 ### 调用
 
 ```lua
-event.disable_focus_release
+events.disable_focus_release
 ```
 
 ## 返回值
@@ -141,7 +141,7 @@ event.disable_focus_release
 ### 示例
 
 ```lua
-local success = event.disable_focus_release()
+local success = events.disable_focus_release()
 debug.print(success)
 ```
 

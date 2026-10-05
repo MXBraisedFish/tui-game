@@ -16,7 +16,8 @@ use std::io::{self, Stdout, Write, stdout};
 use crossterm::cursor::{Hide, Show};
 
 use crossterm::event::{
-  DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture,
+  DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
+  EnableFocusChange, EnableMouseCapture,
 };
 
 use crossterm::execute;
@@ -56,6 +57,7 @@ impl TerminalSurface {
       execute!(stdout, EnterAlternateScreen)?;
       execute!(stdout, EnableMouseCapture)?;
       execute!(stdout, EnableFocusChange)?;
+      execute!(stdout, EnableBracketedPaste)?;
       execute!(stdout, Hide)?;
       stdout.flush()?;
 
@@ -86,6 +88,7 @@ impl TerminalSurface {
 
     let _ = execute!(self.stdout, Show);
     let _ = execute!(self.stdout, DisableFocusChange);
+    let _ = execute!(self.stdout, DisableBracketedPaste);
     let _ = execute!(self.stdout, DisableMouseCapture);
     let _ = execute!(self.stdout, LeaveAlternateScreen);
     let _ = self.stdout.flush();
@@ -201,6 +204,7 @@ impl TerminalService {
 
     let _ = execute!(stdout, Show);
     let _ = execute!(stdout, DisableFocusChange);
+    let _ = execute!(stdout, DisableBracketedPaste);
     let _ = execute!(stdout, DisableMouseCapture);
     let _ = execute!(stdout, LeaveAlternateScreen);
     let _ = stdout.flush();

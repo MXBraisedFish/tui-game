@@ -43,8 +43,8 @@ fn main() {
     r#"
     local seen = {}
     function Init(ctx)
-      debug.assert(ime.receive_action_event())
-      debug.assert(ime.receive_key_event())
+      debug.assert(keyboard.receive_action_event())
+      debug.assert(keyboard.receive_key_event())
     end
     function HandleEvent(e)
       if e.type == "action" or e.type == "key" then
@@ -54,7 +54,7 @@ fn main() {
       elseif e.type == "overlay_started" or e.type == "overlay_stopped" then
         seen[#seen+1] = e.type
       elseif e.type == "resize" then
-        local fn = e.data.width == 1 and event.disable_focus_release or event.enable_focus_release
+        local fn = e.data.width == 1 and events.disable_focus_release or events.enable_focus_release
         debug.assert(fn())
         debug.assert(fn())
       end
@@ -386,6 +386,7 @@ fn route(
 ) {
   for notification in input.notifications() {
     let data = match notification {
+      InputNotification::Text { text } => LuaEventData::Input { text: text.clone() },
       InputNotification::Key { key, state } => LuaEventData::Key {
         key: key_token(*key),
         state: (*state).into(),

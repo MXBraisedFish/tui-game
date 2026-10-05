@@ -20,6 +20,16 @@ pub struct ClipboardService {
   last_error: Option<String>,
 }
 
+impl std::fmt::Debug for ClipboardService {
+  fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    formatter
+      .debug_struct("ClipboardService")
+      .field("available", &self.clipboard.is_some())
+      .field("last_error", &self.last_error)
+      .finish_non_exhaustive()
+  }
+}
+
 impl ClipboardService {
   /// Open the system clipboard, retaining an unavailable backend if initialization fails.
   pub fn new() -> Self {

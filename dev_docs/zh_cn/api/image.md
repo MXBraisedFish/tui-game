@@ -32,7 +32,7 @@ file.HALF_BLOCK`
 
 ### 示例
 
-> test.png
+> assets/test.png
 
 ```lua
 local request_id = image.load("test.png", { mode = image.HALF_BLOCK, block_width = 44, block_height = 20 })
@@ -81,7 +81,7 @@ file.MIX_BLOCK`
 
 ### 示例
 
-> test.png
+> assets/test.png
 
 ```lua
 local request_id = image.load("test.png", { mode = image.MIX_BLOCK, block_width = 44, block_height = 20 })
@@ -166,7 +166,7 @@ image.load
 
 ### 示例
 
-> test.png
+> assets/test.png
 
 ```lua
 local request_id = image.load("test.png", { mode = image.MIX_BLOCK, block_width = 44, block_height = 20 })
@@ -195,6 +195,7 @@ end
 
 - 事件返回值见⌊[事件协议](../EVENT.md)⌉
 - 仅支持 `.png`/`.jpg`/`.jpeg` 格式。
+- 路径相对当前包的 `assets/`。
 - 选填参数 `anti_alias` 取值范围为 $[0, 32]$。
 - 选填参数单位如下：
 
@@ -207,3 +208,11 @@ end
 | `crop_width`   | 像素       |
 | `crop_height`  | 像素       |
 | `anti_alias`   | 缩放后的图像像素 |
+
+- 选填参数 `block_width` 取值范围为 $[1, 2048]$，且与 `block_height` 的乘积不得超过 16384。
+- 选填参数 `block_height` 取值范围为 $[1, 2048]$，且与 `block_width` 的乘积不得超过 16384。
+- 选填参数 `crop_x` 取值范围为 $[0, 2147483647]$，且必须小于原图宽度。
+- 选填参数 `crop_y` 取值范围为 $[0, 2147483647]$，且必须小于原图高度。
+- 选填参数 `crop_width` 取值范围为 $[1, 4294967295]$，且 `crop_x` 与 `crop_width` 之和不得超过原图宽度。
+- 选填参数 `crop_height` 取值范围为 $[1, 4294967295]$，且 `crop_y` 与 `crop_height` 之和不得超过原图高度。
+- 选填参数 `scale` 取值范围为 $(0, +\infty)$，必须为有限正数，且缩放后单边像素数不得超过 16384、总像素数不得超过 16000000。

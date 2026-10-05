@@ -316,9 +316,11 @@ pub(super) fn route_text_input_events(
           context.screensaver_package_ui,
           context.input_demo_ui,
         ) {
-          services
-            .text_input
-            .route_terminal_key(objects, &mut services.clipboard, key);
+          services.text_input.route_terminal_key(
+            objects,
+            &mut services.clipboard.borrow_mut(),
+            key,
+          );
         }
       }
       SystemEvent::Mouse(mouse) => {
@@ -1179,7 +1181,7 @@ pub(super) fn route_export_settings_overlay_events(
         }
         services.text_input.route_terminal_key(
           export_settings_ui.objects_mut(),
-          &mut services.clipboard,
+          &mut services.clipboard.borrow_mut(),
           key,
         );
       }
@@ -1238,7 +1240,7 @@ pub(super) fn route_export_settings_text_input_events(
       SystemEvent::TerminalKey(key) => {
         services.text_input.route_terminal_key(
           export_settings_ui.objects_mut(),
-          &mut services.clipboard,
+          &mut services.clipboard.borrow_mut(),
           key,
         );
       }

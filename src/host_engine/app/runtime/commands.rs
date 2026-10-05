@@ -175,6 +175,8 @@ fn start_game(
     return false;
   }
   let api = crate::host_engine::services::LuaApiConfig {
+    input_method: Some(services.input_method.clone()),
+    clipboard: Some(services.clipboard.clone()),
     debug_enabled,
     key_actions,
     key_default_actions,
@@ -1551,7 +1553,7 @@ pub(super) fn apply_storage_management_view_command(
       reset_storage_management_view_ui(storage_management_view_ui, services);
     }
     StorageManagementViewCommand::CopyAll(text) | StorageManagementViewCommand::CopyPath(text) => {
-      if !services.clipboard.write_text(&text) {
+      if !services.clipboard.borrow_mut().write_text(&text) {
         services.log.warn_operation_failed(
           LogSource::Ui,
           "write_clipboard",

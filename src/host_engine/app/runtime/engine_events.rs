@@ -62,6 +62,7 @@ pub(super) fn drain_engine_events(
       }
     }
     match event {
+      EngineEvent::CommittedText(event) => services.input.queue_committed_text(event),
       EngineEvent::InputKey(event) => services.input.queue_key_event(event, &mut services.log),
       EngineEvent::System(event) => services.input.queue_system_event(event, &mut services.log),
       EngineEvent::Package(event) => {

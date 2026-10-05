@@ -37,7 +37,7 @@ pub fn close(services: &mut EngineServices, mut world: RuntimeWorld, _exit_state
   if let Some(id) = services.game.stop() {
     services.log.close_session(id);
   }
-  let _ = services.input_method.release_input_method();
+  let _ = services.input_method.borrow_mut().release_input_method();
 
   services.terminal.exit();
   services.log.info_message(

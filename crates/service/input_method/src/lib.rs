@@ -86,6 +86,17 @@ pub struct InputMethodService {
   last_error: Option<String>,
 }
 
+impl std::fmt::Debug for InputMethodService {
+  fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    formatter
+      .debug_struct("InputMethodService")
+      .field("policy", &self.policy)
+      .field("active", &self.active)
+      .field("last_error", &self.last_error)
+      .finish_non_exhaustive()
+  }
+}
+
 impl InputMethodService {
   /// Create an input method service with its initial state.
   pub fn new() -> Self {
@@ -140,6 +151,20 @@ impl InputMethodService {
   pub fn release_input_method(&mut self) -> bool {
     self.policy = ImPolicy::Free;
     self.release()
+  }
+
+  /// Release the restriction, optionally restoring the input mode saved before locking.
+  pub fn unlock_input_method(&mut self, restore: bool) -> bool {
+    self.policy = ImPolicy::Free;
+    if restore {
+      return self.release();
+    }
+    self.saved_im = None;
+    self.saved_ime_state = None;
+    self.active = false;
+    self.reconcile_elapsed = Duration::ZERO;
+    self.last_error = None;
+    true
   }
 
   /// Report whether this input method service is input method restricted.
@@ -202,7 +227,7 @@ impl InputMethodService {
 
   fn restrict(&mut self) -> bool {
     if self.active {
-      return true;
+      return self.last_error.is_none() || self.reconcile_now();
     }
 
     let Some(ascii_im) = self.ascii_im.clone() else {
@@ -228,8 +253,8 @@ impl InputMethodService {
     }
 
     let switched = self.set_ascii_input_method(&ascii_im);
-    let ime_closed = self.ensure_ime_closed();
     if switched {
+      let ime_closed = self.ensure_ime_closed();
       self.active = true;
       self.reconcile_elapsed = Duration::ZERO;
       switched && ime_closed
@@ -595,6 +620,46 @@ mod tests {
     assert_eq!(state.current, "00000409");
     assert_eq!(state.ime_state, Some(false));
     assert_eq!(state.ime_set_calls, vec![false]);
+  }
+
+  #[test]
+  fn unlock_without_restore_discards_saved_mode_and_allows_a_new_lock() {
+    let state = Arc::new(Mutex::new(FakeState {
+      methods: vec!["zh".into(), "00000409".into()],
+      current: "zh".into(),
+      ime_state: Some(true),
+      ..Default::default()
+    }));
+    let mut service = service_with_state(state.clone(), None);
+    assert!(service.restrict_input_method());
+    assert!(service.unlock_input_method(false));
+    assert!(service.unlock_input_method(false));
+    assert_eq!(service.policy(), ImPolicy::Free);
+    assert!(!service.is_input_method_restricted());
+    assert_eq!(state.lock().unwrap().current, "00000409");
+    assert!(service.release_input_method());
+    assert_eq!(state.lock().unwrap().current, "00000409");
+    state.lock().unwrap().current = "zh".into();
+    assert!(service.restrict_input_method());
+    assert!(service.unlock_input_method(true));
+    assert_eq!(state.lock().unwrap().current, "zh");
+  }
+
+  #[test]
+  fn repeated_lock_retries_failed_ime_closure() {
+    let state = Arc::new(Mutex::new(FakeState {
+      methods: vec!["zh".into(), "00000409".into()],
+      current: "zh".into(),
+      ime_state: Some(true),
+      ime_set_error: Some("denied".into()),
+      ..Default::default()
+    }));
+    let mut service = service_with_state(state.clone(), None);
+    assert!(!service.restrict_input_method());
+    assert!(!service.restrict_input_method());
+    state.lock().unwrap().ime_set_error = None;
+    assert!(service.restrict_input_method());
+    assert_eq!(state.lock().unwrap().ime_state, Some(false));
   }
 
   #[test]

@@ -1,8 +1,8 @@
 //! Application completion-event aggregation and conversion into service-owned Lua routing inputs.
 
 use crate::host_engine::services::{
-  AudioAsyncEvent, ExportAsyncEvent, FileEvent, ImageEvent, InputListenerError, KeyEvent,
-  LogSource, LuaRoutableEvent, NetworkEvent, PackageAsyncEvent, RecordingAsyncEvent,
+  AudioAsyncEvent, CommittedTextEvent, ExportAsyncEvent, FileEvent, ImageEvent, InputListenerError,
+  KeyEvent, LogSource, LuaRoutableEvent, NetworkEvent, PackageAsyncEvent, RecordingAsyncEvent,
   ScreenshotAsyncEvent, SystemEvent, TimeAsyncEvent, VideoAsyncEvent,
 };
 
@@ -11,6 +11,8 @@ use crate::host_engine::services::{
 pub enum EngineEvent {
   /// A input key notification delivered to the owning consumer.
   InputKey(KeyEvent),
+  /// Text submitted through the terminal input stream.
+  CommittedText(CommittedTextEvent),
   /// A system notification delivered to the owning consumer.
   System(SystemEvent),
   /// A package notification delivered to the owning consumer.
@@ -106,6 +108,7 @@ macro_rules! engine_event_from {
 
 engine_event_from! {
   AudioAsyncEvent => Audio,
+  CommittedTextEvent => CommittedText,
   ExportAsyncEvent => Export,
   FileEvent => File,
   ImageEvent => Image,

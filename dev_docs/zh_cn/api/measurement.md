@@ -76,6 +76,8 @@ debug.print("width: " .. tostring(width) .. ", height: " .. tostring(height))
 - `max_width` 是宽度上限，不会为短文本补空白；`max_height` 截断文本时，返回的高度也会随之减少；改变水平对齐方式不会改变测量结果。
 - 与 `draw.text` 使用相同选项时，测量得到的宽、高就是绘制文本块的大小。
 - 本库只用于测量，不接受 `draw.text` 的坐标、颜色、样式与 `slice_layer` 选项。
+- 选填参数 `max_height` 取值范围为 $[1, 65535]$。
+- 选填参数 `max_width` 取值范围为 $[1, 65535]$。
 
 ---
 
@@ -130,6 +132,11 @@ debug.print("width: " .. tostring(width))
 ```lua
 ```
 
+## 额外说明
+
+- 选填参数 `max_height` 取值范围为 $[1, 65535]$。
+- 选填参数 `max_width` 取值范围为 $[1, 65535]$。
+
 ---
 
 ## `get_text_height`
@@ -182,3 +189,8 @@ debug.print("height: " .. tostring(height))
 
 ```lua
 ```
+
+## 额外说明
+
+- 选填参数 `max_height` 取值范围为 $[1, 65535]$。
+- 选填参数 `max_width` 取值范围为 $[1, 65535]$。

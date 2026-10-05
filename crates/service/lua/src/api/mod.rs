@@ -57,6 +57,8 @@ pub enum LuaCallPhase {
 /// * `key_default_actions` - The key default actions indexed by their declared keys.
 /// * `language_code` - The registered language code.
 /// * `missing_i18n_template` - The missing i18n template.
+/// * `input_method` - The shared platform input-method service.
+/// * `clipboard` - The shared system clipboard.
 #[derive(Clone, Debug)]
 pub struct LuaApiConfig {
   /// The debug enabled.
@@ -69,11 +71,17 @@ pub struct LuaApiConfig {
   pub language_code: String,
   /// The missing i18n template.
   pub missing_i18n_template: String,
+  /// The shared platform input-method service, when supplied by the application.
+  pub input_method: Option<Rc<RefCell<tg_service_input_method::InputMethodService>>>,
+  /// The shared system clipboard, when supplied by the application.
+  pub clipboard: Option<Rc<RefCell<tg_service_clipboard::ClipboardService>>>,
 }
 
 impl Default for LuaApiConfig {
   fn default() -> Self {
     Self {
+      input_method: None,
+      clipboard: None,
       debug_enabled: false,
       key_actions: HashMap::new(),
       key_default_actions: HashMap::new(),
@@ -97,6 +105,8 @@ impl Default for LuaApiConfig {
 /// * `key_default_actions` - The key default actions indexed by their declared keys.
 /// * `language_code` - The registered language code.
 /// * `missing_i18n_template` - The missing i18n template.
+/// * `input_method` - The shared platform input-method service.
+/// * `clipboard` - The shared system clipboard.
 #[derive(Clone, Debug)]
 pub struct LuaApiContext {
   /// The stable source, type, and name of the package.
@@ -119,6 +129,10 @@ pub struct LuaApiContext {
   pub language_code: String,
   /// The missing i18n template.
   pub missing_i18n_template: String,
+  /// The shared platform input-method service, when supplied by the application.
+  pub input_method: Option<Rc<RefCell<tg_service_input_method::InputMethodService>>>,
+  /// The shared system clipboard, when supplied by the application.
+  pub clipboard: Option<Rc<RefCell<tg_service_clipboard::ClipboardService>>>,
 }
 
 /// A session-owned base, slice, or scroll-box drawing destination.

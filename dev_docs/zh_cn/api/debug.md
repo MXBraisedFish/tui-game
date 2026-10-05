@@ -325,7 +325,7 @@ A message
 [游戏][2026-10-05 00:54:12.209][Game] A titled message
 ```
 
-## 额外补充
+## 额外说明
 
 - 必填参数 `message` 不可为 `nil`。
 
@@ -369,7 +369,7 @@ debug.info("Saved")
 [游戏][2026-10-05 01:03:05.690][信息] Saved
 ```
 
-## 额外补充
+## 额外说明
 
 - 必填参数 `message` 不可为 `nil`。
 
@@ -413,7 +413,7 @@ debug.warn("Low health")
 [游戏][2026-10-05 01:03:25.573][警告] Low health
 ```
 
-## 额外补充
+## 额外说明
 
 - 必填参数 `message` 不可为 `nil`。
 
@@ -457,7 +457,7 @@ debug.error("Could not load save")
 [游戏][2026-10-05 01:03:41.814][错误] Could not load save
 ```
 
-## 额外补充
+## 额外说明
 
 - 必填参数 `message` 不可为 `nil`。
 
@@ -509,7 +509,7 @@ local score = debug.assert(nil, {message = "score is required"})
 [脚本终止运行，抛出错误信息]
 ```
 
-## 额外补充
+## 额外说明
 
 - 选填参数 `message` 不可为 `nil`。
 

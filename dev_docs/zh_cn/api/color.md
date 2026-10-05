@@ -888,6 +888,12 @@ draw.text(0, 0, rgb, {fg = rgb})
 
 ![color_rgb_example](../image/color_rgb_example.png)
 
+## 额外说明
+
+- 必填参数 `r` 取值范围为 $[0, 255]$。
+- 必填参数 `g` 取值范围为 $[0, 255]$。
+- 必填参数 `b` 取值范围为 $[0, 255]$。
+
 ---
 
 ## `hex`
@@ -928,3 +934,9 @@ draw.text(0, 0, hex, {fg = hex})
 **输出：**
 
 ![color_hex_example](../image/color_hex_example.png)
+
+## 额外说明
+
+- 必填参数 `r` 取值范围为 $[0, 255]$。
+- 必填参数 `g` 取值范围为 $[0, 255]$。
+- 必填参数 `b` 取值范围为 $[0, 255]$。

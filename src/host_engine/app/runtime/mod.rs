@@ -798,7 +798,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
           .dismiss(PopupDismissEvent::ScreenshotModeInput);
       }
     }
-    sync_input_method_policy(services);
+    sync_input_method_policy(world, services);
     restore_input_modes_if_scope_changed(services, world, &mut input_mode_scope);
 
     if world.state.is_shutdown() || world.is_stopped() {
@@ -817,8 +817,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         update_lua_sessions(services, world, &mut lua_event_router, frame_delta)
       });
     }
-    sync_input_method_policy(services);
-    services.input_method.update(world.clock.delta_time());
+    sync_input_method_policy(world, services);
+    services
+      .input_method
+      .borrow_mut()
+      .update(world.clock.delta_time());
     restore_input_modes_if_scope_changed(services, world, &mut input_mode_scope);
     log_host_view_changes(services, world, &mut logged_ui, &mut logged_overlay);
 
@@ -1042,13 +1045,18 @@ pub fn run_exception(services: &mut EngineServices, world: &mut RuntimeWorld) ->
   ExitState::new()
 }
 
-fn sync_input_method_policy(services: &mut EngineServices) {
-  let policy = if !services.input.is_focused() || services.text_input.is_active() {
+fn sync_input_method_policy(world: &RuntimeWorld, services: &mut EngineServices) {
+  let policy = if !services.input.is_focused()
+    || services.text_input.is_active()
+    || (world.state.is_game_mode()
+      && world.state.current_overlay_kind().is_none()
+      && !services.game.input_method_locked())
+  {
     ImPolicy::Free
   } else {
     ImPolicy::ForceAscii
   };
-  let _ = services.input_method.set_policy(policy);
+  let _ = services.input_method.borrow_mut().set_policy(policy);
 }
 
 fn cursor_when_terminal_focused(
@@ -1629,11 +1637,13 @@ fn route_frame_input(
   }
 
   // Snapshot input ownership before executing host behavior; callbacks run after host routing.
-  let accepts_game_keyboard =
-    world.state.is_game_mode() && world.state.current_overlay_kind().is_none();
+  let accepts_game_keyboard = world.state.is_game_mode()
+    && world.state.current_overlay_kind().is_none()
+    && !services.text_input.is_active();
   let notifications = services.input.notifications().to_vec();
   for notification in notifications {
     let data = match notification {
+      InputNotification::Text { text } => Some(LuaEventData::Input { text }),
       InputNotification::Key { key, state } => Some(LuaEventData::Key {
         key: crate::host_engine::services::key_token(key),
         state: LuaActionState::from(state),
@@ -2954,6 +2964,8 @@ fn toggle_screensaver(
     save_best_enabled: false,
   };
   let api = crate::host_engine::services::LuaApiConfig {
+    input_method: None,
+    clipboard: None,
     debug_enabled: entry.debug,
     key_actions: entry.key_actions.clone(),
     key_default_actions: entry.key_default_actions.clone(),
@@ -3101,7 +3113,7 @@ fn host_action_batches(notifications: &[InputNotification]) -> Vec<Vec<InputActi
         event,
         system: true,
       } => actions.push(event.clone()),
-      InputNotification::Action { system: false, .. } => {}
+      InputNotification::Action { system: false, .. } | InputNotification::Text { .. } => {}
     }
   }
   if !actions.is_empty() {
@@ -3638,7 +3650,7 @@ pub(super) fn copy_screenshot_text(
   rect: crate::host_engine::services::ScreenshotRect,
 ) -> bool {
   let text = ScreenshotService::plain_text(frame, rect);
-  let copied = services.clipboard.write_text(&text);
+  let copied = services.clipboard.borrow_mut().write_text(&text);
   if !copied {
     services.log.warn_operation_failed(
       LogSource::Storage,
@@ -3664,7 +3676,7 @@ pub(super) fn copy_screenshot_rich_text(
   rect: crate::host_engine::services::ScreenshotRect,
 ) -> bool {
   let text = ScreenshotService::rich_text(frame, rect);
-  let copied = services.clipboard.write_text(&text);
+  let copied = services.clipboard.borrow_mut().write_text(&text);
   if !copied {
     services.log.warn_operation_failed(
       LogSource::Storage,
@@ -3815,11 +3827,25 @@ mod tests {
         LuaEventRoute::InputRelease,
       )
       .unwrap();
+    broker
+      .push_owned(
+        game,
+        1,
+        LuaEventData::Input {
+          text: "submitted".into(),
+        },
+        LuaEventRoute::Input { generation: 0 },
+      )
+      .unwrap();
     let batch = broker.drain_frame(LuaSessionKind::Game).into();
     let remaining = defer_script_actions(&mut broker, LuaSessionKind::Game, batch);
-    assert_eq!(remaining.len(), 2);
+    assert_eq!(remaining.len(), 3);
     assert!(matches!(remaining[0].event.data, LuaEventData::Key { .. }));
     assert_eq!(remaining[1].route, LuaEventRoute::InputRelease);
+    assert!(matches!(
+      remaining[2].event.data,
+      LuaEventData::Input { .. }
+    ));
     let next = broker.drain_frame(LuaSessionKind::Game);
     assert_eq!(next.len(), 2);
     assert!(matches!(

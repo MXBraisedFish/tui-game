@@ -81,6 +81,8 @@ debug.print(table.concat(t2, { sep = " | " }))
 
 - `concat`、`insert`、`move`、`unpack`、`remove`、`sort` 的必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会抛出错误。
 - `table` 库和其它库的 API 表本身只读；`insert`、`remove`、`sort`、`move`、`compact` 不能以只读 API 表作为写入目标，`count`、`count_array`、`count_hash`、`pretty`、`deepcopy` 则可以传入。
+- 选填参数 `i` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度，$j - i + 1$ 不得超过 $16384$。
+- 选填参数 `j` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度，小于 `i` 时返回空字符串。
 
 ---
 
@@ -129,6 +131,10 @@ debug.print(table.pretty(t2))
 
 ```lua
 ```
+
+## 额外说明
+
+- 选填参数 `pos` 取值范围为 $[1, n + 1]$，$n$ 为 `list` 的数组长度，越界时抛出错误。
 
 ---
 
@@ -190,6 +196,8 @@ debug.print(table.pretty(t2))
 
 - 方法 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
 - 未给 `target` 时，返回源表 `src`。
+- 必填参数 `first` 与 `last` 的跨度 $last - first + 1$ 不得超过 $16384$；`last` 小于 `first` 时不复制任何元素。
+- 必填参数 `target_start` 加上跨度 $last - first + 1$ 后不得超过 $9223372036854775807$。
 
 ---
 
@@ -297,6 +305,7 @@ debug.print(a2 .. " " .. b2)
 ## 额外说明
 
 - 方法 返回多参数而非表。
+- 选填参数 `i` 与 `j` 的跨度 $j - i + 1$ 不得超过 $16384$；`j` 小于 `i` 时不返回任何值。
 
 ---
 
@@ -348,6 +357,10 @@ debug.print(removed2 .. " " .. table.pretty(t2))
 
 ```lua
 ```
+
+## 额外说明
+
+- 选填参数 `pos` 取值范围为 $[1, n + 1]$，$n$ 为 `list` 的数组长度，越界时抛出错误。
 
 ---
 

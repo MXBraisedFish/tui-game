@@ -35,7 +35,8 @@
 | `align` | 常量 `AUTO`, `LEFT`, `HORIZONTAL_CENTER`, `RIGHT`, `TOP`, `VERTICAL_CENTER`, `BOTTOM`, `CENTER`；函数 `resolve_x`, `resolve_y`, `resolve_rect` |
 | `measurement` | `get_text_size`, `get_text_width`, `get_text_height` |
 | `random` | 常量 `INT`, `FLOAT`；函数 `randint`, `randfloat`, `create`, `delete`, `clear`, `list`, `count`, `generate`, `set`, `set_type`, `set_range`, `set_seed`, `set_step`, `get_type`, `get_seed`, `get_step`, `exists`, `get_range`, `get_info` |
-| `ime` | `receive_action_event`、`reject_action_event`、`receive_key_event`、`reject_key_event`；游戏 action 默认开启、key 默认关闭，开关独立；屏保返回 false；详见 [ime](api/ime.md) |
+| `keyboard` | `receive_action_event`、`reject_action_event`、`receive_key_event`、`reject_key_event`；游戏 action 默认开启、key 默认关闭，开关独立；仅游戏脚本可用；详见 [keyboard](api/keyboard.md) |
+| `ime` | `lock`、`unlock`、`receive_input_event`、`reject_input_event`、`write_clipboard`；文字事件默认不接收；unlock 的 restore 选项默认为 true；仅游戏脚本可用；详见 [ime](api/ime.md) |
 | `timer` | `create`, `list`, `count`, `delete`, `clear`, `exists`, `set`, `get_info`, `start`, `pause`, `reset`, `restart` |
 | `slice` | `create`, `delete`, `clear`, `set`, `set_size`, `set_width`, `set_height`, `set_background`, `set_layer`, `draw`, `exists`, `get_size`, `get_width`, `get_height`, `get_layer`, `get_background`, `get_info`, `list`, `count` |
 | `serialization` | 常量 `NULL`；`json_encode/decode`, `csv_encode/decode`, `yaml_encode/decode`, `toml_encode/decode`, `ini_encode/decode`, `xml_encode/decode`, `binary_pack`, `binary_unpack`, `binary_packsize` |
@@ -46,7 +47,7 @@
 | `game` | `exit_game`, `save_game`, `save_best` |
 | `i18n` | `create`, `get_value`, `get_language_code`, `reload` |
 | `image` | `load` |
-| `event` | `skip_action`, `clear_action` |
+| `events` | `skip_action`, `clear_action` |
 | `loader` | `require`, `dofile`, `loadfile` |
 | `file` | `read`, `write`, `create_dir`, `exists`, `remove`, `list_dir`；另有编码与换行常量，详见 `api/file.md` |
 
@@ -54,7 +55,7 @@
 
 ### 尚未开放
 
-`image.load` 已开放，通过请求编号关联异步结果。`audio`、`animation`、`http`、`effect`、`widget`、`keyboard` 未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
+`image.load` 已开放，通过请求编号关联异步结果。`audio`、`animation`、`http`、`effect`、`widget` 未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
 
 ## 调用差异
 

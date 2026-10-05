@@ -28,7 +28,7 @@
 
 mod service;
 
-pub use service::{InputListenerError, InputNotification, InputService};
+pub use service::{CommittedTextEvent, InputListenerError, InputNotification, InputService};
 pub use tg_core_input::{ActionMapEntry, translate_action_map};
 pub use tg_core_input::{
   InputActionEvent, InputEventType, Key, KeyEvent, KeyEventKind, KeyState, RawKeyEvent,
