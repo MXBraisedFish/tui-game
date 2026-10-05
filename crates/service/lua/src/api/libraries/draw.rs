@@ -88,7 +88,7 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       enqueue_draw(&stroke_state, method, command)
     })?,
   )?;
-  let erase_state = state.clone();
+  let erase_state = state;
   source.raw_set(
     "erase_rect",
     lua.create_function(move |lua, values: MultiValue| {
@@ -109,28 +109,6 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         height: positive_u16(&table, method, "height")?,
       };
       enqueue_draw(&erase_state, method, command)
-    })?,
-  )?;
-  let state2 = state;
-  source.raw_set(
-    "render",
-    lua.create_function(move |_, values: MultiValue| {
-      args::no_args("draw.render", values)?;
-      let mut state = state2.borrow_mut();
-      if state.phase == LuaCallPhase::Render {
-        return Err(args::message(
-          "draw.render",
-          "invalid_state: draw.render cannot be called during Render",
-        ));
-      }
-      if !state
-        .commands
-        .iter()
-        .any(|command| matches!(command, LuaHostCommand::RequestRender))
-      {
-        push_host_command(&mut state, LuaHostCommand::RequestRender);
-      }
-      Ok(())
     })?,
   )?;
   readonly::proxy(lua, source)

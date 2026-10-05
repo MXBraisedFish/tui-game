@@ -239,8 +239,6 @@ pub enum LuaHostCommand {
   InputRejected { actions: bool, keys: bool },
   /// A request to clear actions.
   ClearActions,
-  /// The request render setting for Lua host command.
-  RequestRender,
   /// The file request setting for Lua host command.
   FileRequest {
     /// The identifier of the request.
@@ -293,6 +291,7 @@ pub enum LuaHostCommand {
 /// * `next_file_request_id` - The identifier of the next file request.
 /// * `next_i18n_request_id` - The identifier of the next i18n request.
 /// * `next_image_request_id` - The identifier of the next image request.
+/// * `pending_file_request_ids` - File requests awaiting their result events.
 /// * `pending_image_request_ids` - The pending image request ids.
 /// * `i18n` - The service resolving localized text.
 /// * `direct_random_id` - The identifier of the direct random.
@@ -326,6 +325,8 @@ pub(crate) struct LuaApiState {
   pub next_i18n_request_id: u64,
   /// The identifier of the next image request.
   pub next_image_request_id: u64,
+  /// File requests awaiting their result events.
+  pub pending_file_request_ids: HashSet<u64>,
   /// The pending image request ids.
   pub pending_image_request_ids: HashSet<u64>,
   /// The service resolving localized text.
@@ -403,6 +404,7 @@ pub(crate) fn build_environment(
     next_file_request_id: 1,
     next_i18n_request_id: 1,
     next_image_request_id: 1,
+    pending_file_request_ids: HashSet::new(),
     pending_image_request_ids: HashSet::new(),
     i18n: LuaI18nState::default(),
     input: super::input::LuaInputState::default(),
@@ -433,6 +435,14 @@ pub(crate) fn apply_i18n_event(state: &SharedApiState, event: &LuaI18nEvent) {
   } else if event.kind == LuaI18nEventKind::Created {
     state.i18n.created = false;
   }
+}
+
+/// Release the file request's reserved capacity before its result callback runs.
+pub(crate) fn apply_file_event(state: &SharedApiState, event: &crate::LuaFileEvent) {
+  state
+    .borrow_mut()
+    .pending_file_request_ids
+    .remove(&event.request_id);
 }
 
 /// Apply a completed image request to the matching session context.

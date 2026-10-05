@@ -69,7 +69,7 @@ local encoded_again = serialization.json_encode(decoded)
 
 ## 额外说明
 
-- JSON/YAML 编码与解码都保留此值；CSV、INI、TOML、XML 遇到此值会报错。
+- JSON/YAML 编码与解码都保留此值；CSV、INI、TOML、XML 遇到此值会抛出错误。
 
 ---
 
@@ -238,8 +238,8 @@ serialization.csv_decode
 
 返回一个数组表。
 
-| 类型  | 说明     |
-| ----- | -------- |
+| 类型  | 说明       |
+| ----- | ---------- |
 | table | 二维数组表 |
 
 ### 示例
@@ -393,7 +393,7 @@ debug.print(toml)
 ## 额外说明
 
 - 参数 `value` 必须可序列化；TOML 不支持 null，包含 `serialization.NULL` 时返回错误。
-- TOML 的根必须是对象表，数组或标量根会报错。
+- TOML 的根必须是对象表，数组或标量根会抛出错误。
 
 ---
 
@@ -777,4 +777,4 @@ debug.print(tostring(size))
 
 ## 额外说明
 
-- 参数 `fmt` 只能包含定长项，含 `z`、`s` 等变长项时会报错。
+- 参数 `fmt` 只能包含定长项，含 `z`、`s` 等变长项时会抛出错误。

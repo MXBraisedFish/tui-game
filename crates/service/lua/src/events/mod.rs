@@ -867,7 +867,7 @@ impl LuaEventData {
         if let Some(id) = &event.object_id {
           data.set("id", id.as_str())?;
         } else {
-          data.set("id", event.id)?;
+          data.set("id", event.id.to_string())?;
         }
         data.set("timer_kind", event.timer_kind.as_str())?;
         data.set("kind", event.kind.as_str())?;
@@ -875,7 +875,7 @@ impl LuaEventData {
         data.set("tip", event.tip.as_deref())?;
       }
       Self::Animation(event) => {
-        data.set("id", event.id)?;
+        data.set("id", event.id.to_string())?;
         data.set("kind", event.kind.as_str())?;
         match &event.kind {
           LuaAnimationEventKind::Marker { name } => data.set("name", name.as_str())?,
@@ -884,7 +884,7 @@ impl LuaEventData {
         }
       }
       Self::File(event) => {
-        data.set("request_id", event.request_id)?;
+        data.set("request_id", event.request_id.to_string())?;
         data.set("kind", event.kind.as_str())?;
         data.set("path", event.path.as_str())?;
         data.set("tip", event.tip.as_deref())?;
@@ -918,7 +918,7 @@ impl LuaEventData {
         }
       }
       Self::I18n(event) => {
-        data.set("request_id", event.request_id)?;
+        data.set("request_id", event.request_id.to_string())?;
         data.set("kind", event.kind.as_str())?;
         data.set("ok", event.ok)?;
         data.set("message", event.message.as_str())?;
@@ -930,7 +930,7 @@ impl LuaEventData {
         )?;
       }
       Self::Image(event) => {
-        data.set("request_id", event.request_id)?;
+        data.set("request_id", event.request_id.to_string())?;
         data.set("kind", "convert")?;
         match &event.outcome {
           LuaImageOutcome::Converted(output) => {
@@ -944,7 +944,7 @@ impl LuaEventData {
         }
       }
       Self::Network(event) => {
-        data.set("request_id", event.request_id)?;
+        data.set("request_id", event.request_id.to_string())?;
         data.set("kind", event.method.as_str())?;
         data.set("url", event.url.as_str())?;
         match &event.outcome {
@@ -976,7 +976,7 @@ impl LuaEventData {
         }
       }
       Self::Audio(event) => {
-        data.set("id", event.id)?;
+        data.set("id", event.id.to_string())?;
         data.set("kind", event.kind.as_str())?;
         data.set("duration_ms", event.duration_ms)?;
         data.set("position_ms", event.position_ms)?;
@@ -985,7 +985,7 @@ impl LuaEventData {
         }
       }
       Self::HitArea(event) => {
-        data.set("id", event.id)?;
+        data.set("id", event.id.to_string())?;
         data.set("kind", event.kind)?;
         data.set("x", event.x)?;
         data.set("y", event.y)?;
@@ -994,23 +994,23 @@ impl LuaEventData {
         data.set("dy", event.dy)?;
       }
       Self::Hyperlink(event) => {
-        data.set("id", event.id)?;
+        data.set("id", event.id.to_string())?;
         data.set("kind", "clicked")?;
         data.set("link", event.link.as_str())?;
       }
       Self::Markdown(event) => {
-        data.set("id", event.id)?;
+        data.set("id", event.id.to_string())?;
         data.set("kind", "link_clicked")?;
         data.set("href", event.href.as_str())?;
         data.set("text", event.text.as_str())?;
       }
       Self::TextInput(event) => {
-        data.set("id", event.id)?;
+        data.set("id", event.id.to_string())?;
         data.set("kind", event.kind)?;
         data.set("value", event.value.as_deref())?;
       }
       Self::ScrollBox(event) => {
-        data.set("id", event.id)?;
+        data.set("id", event.id.to_string())?;
         data.set("kind", "scrolled")?;
         data.set("x", event.x)?;
         data.set("y", event.y)?;
@@ -1404,7 +1404,58 @@ mod tests {
 
     for (event, expected_type) in cases {
       assert_eq!(event.event_type(), expected_type);
-      event.to_lua_table(&lua).unwrap();
+      let data = event.to_lua_table(&lua).unwrap();
+      for field in ["id", "request_id"] {
+        let value = data.get::<Value>(field).unwrap();
+        assert!(
+          matches!(value, Value::Nil | Value::String(_)),
+          "{expected_type}.{field}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn request_ids_keep_the_full_unsigned_range_as_strings() {
+    let lua = Lua::new();
+    for request_id in [1, i64::MAX as u64 + 1, u64::MAX] {
+      let error = LuaEventError::sanitized(LuaEventErrorCode::Io);
+      let cases = [
+        LuaEventData::File(LuaFileEvent {
+          request_id,
+          kind: LuaFileOperation::ReadText,
+          path: "missing.txt".into(),
+          tip: None,
+          outcome: LuaFileOutcome::Failed(error.clone()),
+        }),
+        LuaEventData::Image(LuaImageEvent {
+          request_id,
+          outcome: LuaImageOutcome::Failed(error.clone()),
+        }),
+        LuaEventData::I18n(LuaI18nEvent {
+          request_id,
+          kind: LuaI18nEventKind::Created,
+          ok: false,
+          message: "load failed".into(),
+          language_code: "zh_cn".into(),
+          callback_language_code: "en_us".into(),
+          warning: None,
+          namespaces: None,
+        }),
+        LuaEventData::Network(LuaNetworkEvent {
+          request_id,
+          method: NetworkMethod::Get,
+          url: "https://example.invalid".into(),
+          outcome: LuaNetworkOutcome::Failed(error),
+        }),
+      ];
+      for event in cases {
+        let data = event.to_lua_table(&lua).unwrap();
+        let Value::String(id) = data.get::<Value>("request_id").unwrap() else {
+          panic!("string request ID")
+        };
+        assert_eq!(id.to_str().unwrap().as_ref(), request_id.to_string());
+      }
     }
   }
 

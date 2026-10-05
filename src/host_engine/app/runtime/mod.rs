@@ -2288,10 +2288,6 @@ fn apply_lua_host_commands(
       continue;
     }
     match command {
-      LuaHostCommand::RequestRender => {
-        services.canvas.request_render();
-        services.presenter.request_render();
-      }
       LuaHostCommand::FileRequest {
         request_id,
         task,

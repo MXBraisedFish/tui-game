@@ -31,7 +31,7 @@
 ## 通用规则
 
 - 所有序列化操作最后返回的均为字符串类型，只有被写入到对应的文件当中才会被解析。
-- `serialization` 方法按签名接收位置参数，声明了选项的方法可在末尾接收选项表。JSON/YAML 的 null 解码为只读 `serialization.NULL`，编码时还原为 null；CSV、INI、TOML、XML 遇到该哨兵时报错，避免把 null 静默变成空字符串。Lua 表不能保存 `nil` 字段，因此需要显式空值时使用哨兵。
+- `serialization` 方法按签名接收位置参数，声明了选项的方法可在末尾接收选项表。JSON/YAML 的 null 解码为只读 `serialization.NULL`，编码时还原为 null；CSV、INI、TOML、XML 遇到该哨兵时抛出错误，避免把 null 静默变成空字符串。Lua 表不能保存 `nil` 字段，因此需要显式空值时使用哨兵。
 
   **示例**
 
@@ -71,7 +71,7 @@ local data = { active = true, score = 42 }
 > 该部分值的映射不可逆
 
 | Lua                  | 方向 | JSON   |
-| -------------------- | :--: | ------ |
+| -------------------- | ---- | ------ |
 | 顶层 `nil`           | $→$  | `null` |
 | `serialization.NULL` | $↔$  | `null` |
 
@@ -176,7 +176,7 @@ local data = {
 > 该部分值的映射不可逆
 
 | Lua      | 方向 | TOML   |
-| -------- | :--: | ------ |
+| -------- | ---- | ------ |
 | `string` | $←$  | `date` |
 
 ### 示例
@@ -278,7 +278,7 @@ local data = {
 > 该部分值的映射不可逆
 
 | Lua                  | 方向 | YAML         |
-| -------------------- | :--: | ------------ |
+| -------------------- | ---- | ------------ |
 | `string`             | $←$  | `date`       |
 | `serialization.NULL` | $↔$  | `null` / `~` |
 
@@ -375,7 +375,7 @@ local data = {
 > 该部分值的映射不可逆
 
 | Lua       | 方向 | CSV      |
-| --------- | :--: | -------- |
+| --------- | ---- | -------- |
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
@@ -489,13 +489,13 @@ XML 结构：
 > 该部分值的映射不可逆
 
 | Lua       | 方向 | XML      |
-| --------- | :--: | -------- |
+| --------- | ---- | -------- |
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
 | `string`  | $←$  | 单标签   |
 
-XML 不支持 `serialization.NULL`；遇到哨兵会报错。空字符串映射为空标签文本，不等同于 null。
+XML 不支持 `serialization.NULL`；遇到哨兵会抛出错误。空字符串映射为空标签文本，不等同于 null。
 
 ### 属性
 
@@ -719,12 +719,12 @@ local data = {
 > 该部分值的映射不可逆
 
 | Lua       | 方向 | INI      |
-| --------- | :--: | -------- |
+| --------- | ---- | -------- |
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
 
-INI 不支持 `serialization.NULL`；遇到哨兵会报错。空字符串仍按空值文本写入。
+INI 不支持 `serialization.NULL`；遇到哨兵会抛出错误。空字符串仍按空值文本写入。
 
 ### 示例
 

@@ -45,7 +45,10 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       validate_language_code(method, "callback_language_code", &callback_language_code)?;
 
       let mut api = create_state.borrow_mut();
-      if api.i18n.created || api.i18n.loading {
+      if api.i18n.created
+        || api.i18n.loading
+        || api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
+      {
         return Ok(Value::Nil);
       }
       api.i18n.created = true;
@@ -67,7 +70,7 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           callback_language_code,
         },
       );
-      Ok(Value::Integer(request_id as i64))
+      Ok(Value::String(lua.create_string(request_id.to_string())?))
     })?,
   )?;
 
@@ -149,10 +152,10 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       validate_language_code(method, "callback_language_code", &callback_language_code)?;
 
       let mut api = reload_state.borrow_mut();
-      if !api.i18n.created {
-        return Err(args::message(method, "i18n instance has not been created"));
-      }
-      if api.i18n.loading {
+      if !api.i18n.created
+        || api.i18n.loading
+        || api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
+      {
         return Ok(Value::Nil);
       }
       api.i18n.loading = true;
@@ -173,7 +176,7 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           callback_language_code,
         },
       );
-      Ok(Value::Integer(request_id as i64))
+      Ok(Value::String(lua.create_string(request_id.to_string())?))
     })?,
   )?;
 

@@ -298,12 +298,12 @@ debug.print
 
 ### 选填参数
 
-| 参数名      | 类型         | 默认值  | 说明             |
-| ----------- | ------------ | ------- | ---------------- |
-| `title`     | string / nil | `nil`   | 日志标题         |
-| `level`     | const-debug  | `nil`   | 日志等级         |
-| `time`      | boolean      | `false` | 是否显示时间     |
-| `type_head` | boolean      | `false` | 是否显示会话类型 |
+| 参数名      | 类型              | 默认值  | 说明             |
+| ----------- | ----------------- | ------- | ---------------- |
+| `title`     | string / nil      | `nil`   | 日志标题         |
+| `level`     | const-debug / nil | `nil`   | 日志等级         |
+| `time`      | boolean           | `false` | 是否显示时间     |
+| `type_head` | boolean           | `false` | 是否显示会话类型 |
 
 ## 返回值
 
@@ -495,7 +495,7 @@ debug.assert
 | ---- | ------------ |
 | any  | 断言成功的值 |
 
-**断言失败时**，抛出异常。
+**断言失败时**，抛出错误。
 
 ### 示例
 

@@ -96,6 +96,7 @@ struct PackageImageCacheKey {
   crop_height: Option<u32>,
   square_crop: bool,
   scale_bits: u64,
+  anti_alias_bits: u64,
 }
 
 impl PackageImageCacheKey {
@@ -112,6 +113,7 @@ impl PackageImageCacheKey {
       crop_height: params.crop_height,
       square_crop: params.square_crop,
       scale_bits: params.scale.to_bits(),
+      anti_alias_bits: params.anti_alias.to_bits(),
     }
   }
 }
@@ -603,6 +605,52 @@ mod tests {
     assert!(half_block.contains('▅'));
     assert!(mix_block.contains('▀'));
     std::fs::remove_dir_all(dir).expect("test directory should be removed");
+  }
+
+  #[test]
+  fn package_image_cache_distinguishes_smoothing_strength() {
+    let dir = temp_dir("package-image-smoothing");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("icon.png");
+    RgbImage::from_fn(32, 16, |x, _| {
+      if x < 16 {
+        Rgb([240, 20, 40])
+      } else {
+        Rgb([20, 40, 240])
+      }
+    })
+    .save(&path)
+    .unwrap();
+    let sharp_params = ImageConvertParams {
+      anti_alias: 0.0,
+      ..params(&path)
+    };
+    let smooth_params = ImageConvertParams {
+      anti_alias: 0.8,
+      ..params(&path)
+    };
+    let mut cache = PackageImageCache::default();
+    let mut image_service = ImageService::new(None);
+    let sharp = cache
+      .get_or_convert(1, &mut image_service, sharp_params.clone())
+      .unwrap();
+    let smooth = cache
+      .get_or_convert(1, &mut image_service, smooth_params.clone())
+      .unwrap();
+    assert_ne!(sharp, smooth);
+    assert!(Arc::ptr_eq(
+      &sharp,
+      &cache
+        .get_or_convert(1, &mut image_service, sharp_params)
+        .unwrap()
+    ));
+    assert!(Arc::ptr_eq(
+      &smooth,
+      &cache
+        .get_or_convert(1, &mut image_service, smooth_params)
+        .unwrap()
+    ));
+    std::fs::remove_dir_all(dir).unwrap();
   }
 
   #[test]

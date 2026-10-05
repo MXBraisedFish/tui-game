@@ -8,12 +8,12 @@
 
 ## 方法
 
-| 方法           | 说明                               | 定位                          |
-| -------------- | ---------------------------------- | ----------------------------- |
-| `skip_action`  | 将本帧剩余的普通动作留到后续帧处理 | [skip_action](#skip_action)   |
-| `clear_action` | 清除当前等待处理的输入动作         | [clear_action](#clear_action) |
-| `enable_focus_release` | 启用游戏失焦时的释放事件补发 | [enable_focus_release](#enable_focus_release) |
-| `disable_focus_release` | 关闭游戏失焦时的释放事件补发 | [disable_focus_release](#disable_focus_release) |
+| 方法                    | 说明                                       | 定位                                            |
+| ----------------------- | ------------------------------------------ | ----------------------------------------------- |
+| `skip_action`           | 将本帧剩余等待处理的输入动作留到后续帧处理 | [skip_action](#skip_action)                     |
+| `clear_action`          | 清除当前等待处理的输入动作                 | [clear_action](#clear_action)                   |
+| `enable_focus_release`  | 启用游戏失焦时的释放事件补发               | [enable_focus_release](#enable_focus_release)   |
+| `disable_focus_release` | 关闭游戏失焦时的释放事件补发               | [disable_focus_release](#disable_focus_release) |
 
 ---
 
@@ -21,7 +21,7 @@
 
 ## `skip_action`
 
-将本帧剩余的普通动作留到后续帧处理。
+将本帧剩余等待处理的输入动作留到后续帧处理。
 
 ### 限制
 
@@ -81,7 +81,7 @@ event.clear_action()
 
 ## `enable_focus_release`
 
-启用游戏失焦时的释放事件补发，包括终端失焦和覆盖屏接管。
+启用游戏失焦时的释放事件补发。
 
 ### 限制
 
@@ -118,7 +118,7 @@ true
 
 ## `disable_focus_release`
 
-关闭游戏失焦时的释放事件补发，包括终端失焦和覆盖屏接管。
+关闭游戏失焦时的释放事件补发。
 
 ### 限制
 

@@ -542,6 +542,9 @@ impl LuaSession {
         Some(Some(function)) => self.invoke_event_function(function, &delivery.event),
       };
     }
+    if let super::LuaEventData::File(event) = &delivery.event.data {
+      api::apply_file_event(&self.api_state, event);
+    }
     if let super::LuaEventData::I18n(event) = &delivery.event.data {
       api::apply_i18n_event(&self.api_state, event);
     }
@@ -2554,7 +2557,7 @@ mod tests {
     );
     assert_eq!(
       session.environment_value("create_request_id"),
-      Value::Integer(1)
+      Value::String(session.lua.create_string((1).to_string()).unwrap())
     );
     assert_eq!(
       session.environment_value("duplicate_create_result"),
@@ -2608,11 +2611,11 @@ mod tests {
     );
     assert_eq!(
       session.environment_value("created_event_request_id"),
-      Value::Integer(request_id as i64)
+      Value::String(session.lua.create_string((request_id).to_string()).unwrap())
     );
     assert_eq!(
       session.environment_value("reload_request_id"),
-      Value::Integer(2)
+      Value::String(session.lua.create_string((2).to_string()).unwrap())
     );
 
     let reload_commands = session.take_host_commands();
@@ -2645,7 +2648,7 @@ mod tests {
       .unwrap();
     assert_eq!(
       session.environment_value("reload_completed_request_id"),
-      Value::Integer(2)
+      Value::String(session.lua.create_string((2).to_string()).unwrap())
     );
   }
 
@@ -2721,7 +2724,8 @@ mod tests {
             crop_height = 4,
             scale = 0.75,
             cache = false,
-            mode = "mix_block",
+            mode = image.MIX_BLOCK,
+            anti_alias = 1,
             background = color.rgb(12, 34, 56),
           })
           debug.assert(color.rgb(12, 34, 56) == "rgb(12,34,56)")
@@ -2734,9 +2738,20 @@ mod tests {
           local negative_crop = debug.pcall(function() image.load("sample.png", { crop_x = -1 }) end)
           local named_color = debug.pcall(function() image.load("sample.png", { background = "red" }) end)
           local invalid_mode = debug.pcall(function() image.load("sample.png", { mode = "native" }) end)
-          for _ = 1, 3 do image.load("sample") end
-          local over_limit = debug.pcall(function() image.load("sample") end)
-          debug.assert(image_request_id == 1)
+          debug.assert(image.HALF_BLOCK == "half_block" and image.MIX_BLOCK == "mix_block")
+          local change_mode = debug.pcall(function() image.HALF_BLOCK = "mix_block" end)
+          debug.assert(not change_mode)
+          for _, value in ipairs({ -1, 33, math.INFINITE, math.NEGATIVE_INFINITE, "0.8", false, {} }) do
+            local ok, message = debug.pcall(function() image.load("sample", { anti_alias = value }) end)
+            debug.assert(not ok and string.find(message, "anti_alias", { plain = true }) ~= nil)
+          end
+          local nan = debug.pcall(function() image.load("sample", { anti_alias = 0 / 0 }) end)
+          debug.assert(not nan)
+          image.load("sample", { mode = image.HALF_BLOCK, anti_alias = 0 })
+          image.load("sample")
+          image.load("sample", { anti_alias = 0.5 })
+          local over_limit = image.load("sample")
+          debug.assert(image_request_id == "1")
           debug.assert(not named_color_args)
           debug.assert(not extra_color_arg)
           debug.assert(not bad_color_channel)
@@ -2745,7 +2760,7 @@ mod tests {
           debug.assert(not negative_crop)
           debug.assert(not named_color)
           debug.assert(not invalid_mode)
-          debug.assert(not over_limit)
+          debug.assert(over_limit == nil)
         end
         function HandleEvent(event)
           if event.type == "image" and event.data.request_id == image_request_id and event.data.ok then
@@ -2770,7 +2785,7 @@ mod tests {
     let mut session = LuaSession::load(spec, LuaPolicy::default()).unwrap();
     assert_eq!(
       session.environment_value("image_request_id"),
-      Value::Integer(1)
+      Value::String(session.lua.create_string((1).to_string()).unwrap())
     );
     let commands = session.take_host_commands();
     assert_eq!(
@@ -2797,7 +2812,23 @@ mod tests {
     assert_eq!(params.scale, 0.75);
     assert!(!params.cache);
     assert_eq!(params.mode, tg_service_image::ImageConvertMode::MixBlock);
+    assert_eq!(params.anti_alias, 1.0);
     assert_eq!(params.background, [12, 34, 56]);
+    for command in &commands {
+      if let LuaHostCommand::ImageRequest { request_id, params } = command
+        && *request_id != 1
+      {
+        assert_eq!(params.mode, tg_service_image::ImageConvertMode::HalfBlock);
+        assert_eq!(
+          params.anti_alias,
+          match request_id {
+            2 => 0.0,
+            3 => 0.8,
+            _ => 0.5,
+          }
+        );
+      }
+    }
 
     let runtime = AsyncRuntime::<ImageRuntimeEvent>::with_worker_count(1);
     let image_service = ImageService::new(None);
@@ -2860,7 +2891,7 @@ mod tests {
     )));
     assert_eq!(
       session.environment_value("image_after_completion"),
-      Value::Integer(5)
+      Value::String(session.lua.create_string((5).to_string()).unwrap())
     );
     assert!(
       session
@@ -3935,7 +3966,7 @@ mod tests {
       function Init(ctx)
         for i = 1, 1024 do timer.create(1) end
         debug.assert(timer.count() == 1024)
-        debug.assert(not select(1, debug.pcall(function() timer.create(1) end)))
+        debug.assert(timer.create(1) == nil)
         debug.assert(timer.count() == 1024)
       end
     "##,
@@ -4158,53 +4189,51 @@ mod tests {
   }
 
   #[test]
-  fn drawing_is_allowed_in_all_callbacks_but_render_requests_are_not_reentrant() {
+  fn drawing_remains_valid_without_script_render_requests() {
     let source = valid_script(
       r#"
         function Init(ctx)
           draw.fill_rect(2, 1, 10, 4, { bg = color.BLUE })
-          draw.render()
-          local no_arguments = debug.pcall(function() draw.render() end)
-          local extra_argument = debug.pcall(function() draw.render(true) end)
+          debug.assert(draw.render == nil)
           local missing_text = debug.pcall(function() draw.text(1, 1) end)
           local unknown_draw_option = debug.pcall(function() draw.text(1, 1, "x", { boid = true }) end)
           local unknown_rect_option = debug.pcall(function() draw.fill_rect(2, 1, 10, 4, { color = color.BLUE }) end)
           local unknown_slice = debug.pcall(function()
               draw.text(1, 1, "x", { slice_layer = "slice_999" })
             end)
-          debug.assert(no_arguments and not extra_argument
-              and not missing_text and not unknown_draw_option and not unknown_rect_option
+          debug.assert(not missing_text and not unknown_draw_option and not unknown_rect_option
               and not unknown_slice)
         end
         function Update(dt)
           draw.erase_rect(3, 2, 8, 2)
         end
         function Render()
-          local ok = debug.pcall(function() draw.render() end)
-          debug.assert(not ok)
           draw.text(1, 1, "render")
         end
       "#,
     );
-    let mut session = LuaSession::load(spec(&source, LuaSessionKind::Game), LuaPolicy::default())
-      .expect("drawing during Init must be accepted");
-    session
-      .update()
-      .expect("drawing during Update must be accepted");
-    session
-      .render()
-      .expect("ordinary drawing during Render must remain valid");
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session = LuaSession::load(spec(&source, kind), LuaPolicy::default())
+        .expect("drawing during Init must be accepted");
+      session
+        .update()
+        .expect("drawing during Update must be accepted");
+      session
+        .render()
+        .expect("ordinary drawing during Render must remain valid");
 
-    let commands = session.take_draw_commands();
-    assert!(matches!(
-      commands.first(),
-      Some(LuaDrawCommand::FillRect { .. })
-    ));
-    assert!(matches!(
-      commands.get(1),
-      Some(LuaDrawCommand::EraseRect { .. })
-    ));
-    assert!(matches!(commands.get(2), Some(LuaDrawCommand::Text { .. })));
+      let commands = session.take_draw_commands();
+      assert!(matches!(
+        commands.first(),
+        Some(LuaDrawCommand::FillRect { .. })
+      ));
+      assert!(matches!(
+        commands.get(1),
+        Some(LuaDrawCommand::EraseRect { .. })
+      ));
+      assert!(matches!(commands.get(2), Some(LuaDrawCommand::Text { .. })));
+      assert!(session.take_host_commands().is_empty());
+    }
   }
 
   #[test]
@@ -5388,6 +5417,105 @@ mod tests {
   }
 
   #[test]
+  fn asynchronous_admission_returns_nil_and_releases_capacity_before_callbacks() {
+    use crate::{LuaEventData as Data, LuaFileEvent, LuaFileOutcome, LuaRuntimeEvent};
+    let source = valid_script(
+      r#"
+      local ids = {}
+      function Init(ctx)
+        debug.assert(file.read("missing.txt") == nil)
+        debug.assert(file.list_dir("missing-dir") == nil)
+        debug.assert(image.load("missing.png") == nil)
+        debug.assert(i18n.reload() == nil)
+        debug.assert(not select(1, debug.pcall(function() file.read("missing.txt", {unknown=true}) end)))
+        debug.assert(not select(1, debug.pcall(function() image.load("missing.png", {scale=-1}) end)))
+        for i = 1, 8 do
+          ids[i] = i % 2 == 0 and file.read("input.txt", {byte=true}) or file.read("input.txt")
+          debug.assert(type(ids[i]) == "string")
+        end
+        debug.assert(file.read("input.txt") == nil)
+        debug.assert(file.write("output.txt", "text") == nil)
+        debug.assert(file.list_dir(".") == nil)
+        debug.assert(file.create_dir("new") == nil)
+        debug.assert(file.remove("input.txt") == nil)
+        for i = 1, 4 do debug.assert(type(image.load("sample.png")) == "string") end
+        debug.assert(image.load("sample.png") == nil)
+        debug.assert(type(i18n.create()) == "string")
+        debug.assert(i18n.create() == nil)
+        debug.assert(i18n.reload() == nil)
+      end
+      function HandleEvent(e)
+        if e.type == "file" then
+          debug.assert(e.data.request_id == ids[1] and e.data.ok == false)
+          replacement = file.read("input.txt")
+          debug.assert(type(replacement) == "string" and replacement ~= ids[1])
+          debug.assert(file.read("input.txt") == nil)
+        end
+      end
+    "#,
+    );
+    let mut session_spec = spec(&source, LuaSessionKind::Game);
+    let package = session_spec.entry_path.parent().unwrap().to_path_buf();
+    let scripts = package.join("scripts");
+    let assets = package.join("assets");
+    fs::create_dir_all(&scripts).unwrap();
+    fs::create_dir_all(&assets).unwrap();
+    session_spec.entry_path = scripts.join("main.lua");
+    fs::write(&session_spec.entry_path, &source).unwrap();
+    fs::write(assets.join("input.txt"), "text").unwrap();
+    image::RgbImage::new(1, 1)
+      .save(assets.join("sample.png"))
+      .unwrap();
+    let mut session = LuaSession::load(session_spec.clone(), LuaPolicy::default()).unwrap();
+    let commands = session.take_host_commands();
+    assert_eq!(
+      commands
+        .iter()
+        .filter(|command| matches!(command, LuaHostCommand::FileRequest { .. }))
+        .count(),
+      8
+    );
+    assert_eq!(
+      commands
+        .iter()
+        .filter(|command| matches!(command, LuaHostCommand::ImageRequest { .. }))
+        .count(),
+      4
+    );
+    assert_eq!(
+      commands
+        .iter()
+        .filter(|command| matches!(command, LuaHostCommand::I18nRequest { .. }))
+        .count(),
+      1
+    );
+    assert_eq!(session.api_state.borrow().pending_file_request_ids.len(), 8);
+    session
+      .dispatch_event(&LuaEventDelivery {
+        event: LuaRuntimeEvent {
+          sequence: 1,
+          frame: 1,
+          data: Data::File(LuaFileEvent {
+            request_id: 1,
+            kind: LuaFileOperation::ReadText,
+            path: "input.txt".into(),
+            tip: None,
+            outcome: LuaFileOutcome::Failed(crate::LuaEventError::sanitized(
+              crate::LuaEventErrorCode::Io,
+            )),
+          }),
+        },
+        route: LuaEventRoute::HandleEvent,
+      })
+      .unwrap();
+    assert_eq!(session.api_state.borrow().pending_file_request_ids.len(), 8);
+    assert_eq!(session.take_host_commands().len(), 1);
+    let mut fresh = LuaSession::load(session_spec, LuaPolicy::default()).unwrap();
+    assert_eq!(fresh.take_host_commands().len(), 13);
+    fs::remove_dir_all(package).unwrap();
+  }
+
+  #[test]
   fn file_apis_share_current_directory_and_parent_traversal_rules() {
     let id = TEST_ID.fetch_add(1, Ordering::Relaxed);
     let package_root = std::env::temp_dir().join(format!(
@@ -5424,13 +5552,13 @@ mod tests {
             })
             create_dir_request_id = file.create_dir("./created/nested/leaf", { event_tip = "created" })
             remove_request_id = file.remove("./input.txt", { event_tip = "removed" })
-            debug.assert(type(list_request_id) == "number"
-                and type(read_text_request_id) == "number"
-                and type(read_bytes_request_id) == "number"
-                and type(write_text_request_id) == "number"
-                and type(write_bytes_request_id) == "number"
-                and type(create_dir_request_id) == "number"
-                and type(remove_request_id) == "number")
+            debug.assert(type(list_request_id) == "string"
+                and type(read_text_request_id) == "string"
+                and type(read_bytes_request_id) == "string"
+                and type(write_text_request_id) == "string"
+                and type(write_bytes_request_id) == "string"
+                and type(create_dir_request_id) == "string"
+                and type(remove_request_id) == "string")
             local empty = debug.pcall(function() file.list_dir("") end)
             local traversal = debug.pcall(function() file.list_dir("./folder/../") end)
             debug.assert(not empty and not traversal)
@@ -5468,10 +5596,10 @@ mod tests {
     let expected_root = assets_root.canonicalize().unwrap();
     let requests = session.take_host_commands();
     let lua_request_id = |name| {
-      let Value::Integer(value) = session.environment_value(name) else {
-        panic!("{name} should return a Lua integer request id");
+      let Value::String(value) = session.environment_value(name) else {
+        panic!("{name} should return a Lua string request id");
       };
-      value as u64
+      value.to_str().unwrap().parse::<u64>().unwrap()
     };
     let read_text_request_id = lua_request_id("read_text_request_id");
     assert!(requests.iter().any(|command| matches!(
@@ -5570,7 +5698,12 @@ mod tests {
       .unwrap();
     assert_eq!(
       session.environment_value("completed_request_id"),
-      Value::Integer(read_text_request_id as i64)
+      Value::String(
+        session
+          .lua
+          .create_string((read_text_request_id).to_string())
+          .unwrap()
+      )
     );
 
     fs::remove_dir_all(package_root).unwrap();

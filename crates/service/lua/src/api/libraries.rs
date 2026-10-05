@@ -115,6 +115,38 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   Ok(())
 }
 
+/// Resolve an asynchronous asset path, returning no path when the resource is unavailable.
+///
+/// # Arguments
+///
+/// * `root` - The deployment asset root.
+/// * `relative` - The validated path within that root.
+/// * `kind` - The required file or directory kind.
+/// * `method` - The Lua method used in argument errors.
+///
+/// # Errors
+///
+/// Return a Lua argument error for an unsafe path or a sandbox escape.
+fn resolve_request_path(
+  root: &Path,
+  relative: &crate::path::SafeRelativePath,
+  kind: crate::path::SandboxPathKind,
+  method: &str,
+) -> mlua::Result<Option<PathBuf>> {
+  use crate::path::SandboxPathError;
+  match crate::path::resolve_sandbox_path(root, relative, kind) {
+    Ok(path) => Ok(Some(path)),
+    Err(
+      SandboxPathError::RootUnavailable
+      | SandboxPathError::NotFound
+      | SandboxPathError::ParentUnavailable
+      | SandboxPathError::NotFile
+      | SandboxPathError::NotDirectory,
+    ) => Ok(None),
+    Err(error) => Err(args::message(method, format!("unsafe asset path: {error}"))),
+  }
+}
+
 fn function_value(function: Function) -> Value {
   Value::Function(function)
 }

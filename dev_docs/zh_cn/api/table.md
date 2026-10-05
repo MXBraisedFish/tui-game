@@ -79,7 +79,7 @@ debug.print(table.concat(t2, { sep = " | " }))
 
 ## 额外说明
 
-- `concat`、`insert`、`move`、`unpack`、`remove`、`sort` 的必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会报错。
+- `concat`、`insert`、`move`、`unpack`、`remove`、`sort` 的必填参数按顺序传入，选填参数放在末尾选项表中；未知字段、错误类型和多余位置参数会抛出错误。
 - `table` 库和其它库的 API 表本身只读；`insert`、`remove`、`sort`、`move`、`compact` 不能以只读 API 表作为写入目标，`count`、`count_array`、`count_hash`、`pretty`、`deepcopy` 则可以传入。
 
 ---
@@ -188,7 +188,7 @@ debug.print(table.pretty(t2))
 
 ## 额外说明
 
-- 该 API 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
+- 方法 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
 - 未给 `target` 时，返回源表 `src`。
 
 ---
@@ -296,7 +296,7 @@ debug.print(a2 .. " " .. b2)
 
 ## 额外说明
 
-- 该 API 返回多参数而非表。
+- 方法 返回多参数而非表。
 
 ---
 
@@ -373,7 +373,7 @@ table.sort
 
 | 参数名 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `comp` | function | `nil` | 比较函数 |
+| `comp` | function / nil | `nil` | 比较函数 |
 
 ## 返回值
 
@@ -410,7 +410,7 @@ debug.print(table.pretty(t4))
 
 ## 额外说明
 
-- 目标数组表最多 4096 个元素，超出会报错。
+- 目标数组表最多 4096 个元素，超出会抛出错误。
 - 参数 `comp` 函数返回值为 `true` 时，表示 `left` 排在 `right` 之前；返回值为 `false` 时，表示不要求 `left` 排在 `right` 前面（也可能两者相等）。
 
 ---

@@ -8,14 +8,14 @@
 
 ## 方法
 
-| 方法            | 说明                                                                               | 定位                            |
-| --------------- | ---------------------------------------------------------------------------------- | ------------------------------- |
-| `base64_encode` | 将字符串编码为 Base64 字符串                                                       | [base64_encode](#base64_encode) |
-| `base64_decode` | 将 Base64 字符串解码为原始字符串                     | [base64_decode](#base64_decode) |
-| `url_encode`    | 将字符串中的非 URL 安全字节转换为百分号编码                                        | [url_encode](#url_encode)       |
-| `url_decode`    | 将 URL 百分号编码字符串还原为原始字符串                          | [url_decode](#url_decode)       |
-| `hex_encode`    | 将字符串的每个字节编码为两位十六进制数字                                           | [hex_encode](#hex_encode)       |
-| `hex_decode`    | 将偶数长度的十六进制字符串解码为原始字节 | [hex_decode](#hex_decode)       |
+| 方法            | 说明                                        | 定位                            |
+| --------------- | ------------------------------------------- | ------------------------------- |
+| `base64_encode` | 将字符串编码为 Base64 字符串                | [base64_encode](#base64_encode) |
+| `base64_decode` | 将 Base64 字符串解码为原始字符串            | [base64_decode](#base64_decode) |
+| `url_encode`    | 将字符串中的非 URL 安全字节转换为百分号编码 | [url_encode](#url_encode)       |
+| `url_decode`    | 将 URL 百分号编码字符串还原为原始字符串     | [url_decode](#url_decode)       |
+| `hex_encode`    | 将字符串的每个字节编码为两位十六进制数字    | [hex_encode](#hex_encode)       |
+| `hex_decode`    | 将偶数长度的十六进制字符串解码为原始字节    | [hex_decode](#hex_decode)       |
 
 ---
 

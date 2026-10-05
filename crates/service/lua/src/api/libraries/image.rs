@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::MAX_LUA_IMAGE_TASKS_PER_SESSION;
-use crate::path::{SafeRelativePath, SandboxPathError, SandboxPathKind, resolve_sandbox_path};
-use tg_service_image::{ImageConvertMode, ImageConvertParams};
+use crate::path::{SafeRelativePath, SandboxPathKind};
+use tg_service_image::{ImageConvertMode, ImageConvertParams, MAX_ANTI_ALIAS_RADIUS};
 
 /// Build and register the Lua image API in the supplied VM and host context.
 ///
@@ -17,6 +17,8 @@ use tg_service_image::{ImageConvertMode, ImageConvertParams};
 /// Panic if an internal invariant is violated: `mode has a default`.
 pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
+  source.raw_set("HALF_BLOCK", "half_block")?;
+  source.raw_set("MIX_BLOCK", "mix_block")?;
   let load_state = state;
   source.raw_set(
     "load",
@@ -35,6 +37,7 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           "crop_width",
           "crop_height",
           "scale",
+          "anti_alias",
           "cache",
           "mode",
           "background",
@@ -43,9 +46,6 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let table = parameters.options();
       let relative = image_path(&parameters, method)?;
       let assets_root = load_state.borrow().context.assets_root.clone();
-      let resolved = resolve_image_path(&assets_root, &relative)
-        .map_err(|error| args::message(method, format!("invalid image path: {error}")))?;
-
       let output_width = optional_positive_u32(table, method, "block_width")?;
       let output_height = optional_positive_u32(table, method, "block_height")?;
       let crop_x = optional_crop_offset(table, method, "crop_x")?;
@@ -60,6 +60,16 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         return Err(args::message(
           method,
           "scale must be a finite positive number",
+        ));
+      }
+      let anti_alias = match table.get::<Value>("anti_alias")? {
+        Value::Nil => 0.8,
+        value => args::number(value, method, "anti_alias")?,
+      };
+      if !anti_alias.is_finite() || !(0.0..=MAX_ANTI_ALIAS_RADIUS).contains(&anti_alias) {
+        return Err(args::message(
+          method,
+          format!("anti_alias must be a finite number in 0..={MAX_ANTI_ALIAS_RADIUS}"),
         ));
       }
       let cache = args::optional_bool(table, method, "cache", true)?;
@@ -77,15 +87,15 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         }
       };
       let background = parse_background_color(table, method)?;
+      let Some(resolved) = resolve_image_path(&assets_root, &relative)? else {
+        return Ok(None);
+      };
 
       let mut api = load_state.borrow_mut();
-      if api.pending_image_request_ids.len() >= MAX_LUA_IMAGE_TASKS_PER_SESSION {
-        return Err(args::message(
-          method,
-          format!(
-            "at most {MAX_LUA_IMAGE_TASKS_PER_SESSION} image requests may be pending per session"
-          ),
-        ));
+      if api.pending_image_request_ids.len() >= MAX_LUA_IMAGE_TASKS_PER_SESSION
+        || api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
+      {
+        return Ok(None);
       }
       let request_id = api.next_image_request_id;
       api.next_image_request_id = api.next_image_request_id.wrapping_add(1).max(1);
@@ -106,11 +116,12 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
             crop_height,
             square_crop: false,
             scale,
+            anti_alias,
             cache,
           },
         },
       );
-      Ok(request_id)
+      Ok(Some(request_id.to_string()))
     })?,
   )?;
   readonly::proxy(lua, source)
@@ -118,8 +129,18 @@ pub(super) fn image(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
 
 fn image_path(parameters: &args::PositionalArgs, method: &str) -> mlua::Result<SafeRelativePath> {
   let path = args::string(parameters.required(0, method, "path")?, method, "path")?;
-  SafeRelativePath::parse(&path)
-    .map_err(|error| args::message(method, format!("unsafe asset path: {error}")))
+  let relative = SafeRelativePath::parse(&path)
+    .map_err(|error| args::message(method, format!("unsafe asset path: {error}")))?;
+  if relative
+    .extension()
+    .is_some_and(|extension| !is_supported_image_extension(extension))
+  {
+    return Err(args::message(
+      method,
+      "only png, jpg, or jpeg extensions are supported",
+    ));
+  }
+  Ok(relative)
 }
 
 fn optional_positive_u32(table: &Table, method: &str, name: &str) -> mlua::Result<Option<u32>> {
@@ -188,25 +209,19 @@ fn parse_rgb_channel(value: &str) -> Option<u8> {
   value.parse::<u8>().ok()
 }
 
-fn resolve_image_path(root: &Path, relative: &SafeRelativePath) -> Result<PathBuf, String> {
-  if let Some(extension) = relative.extension() {
-    if !is_supported_image_extension(extension) {
-      return Err("only png, jpg, or jpeg extensions are supported".to_string());
-    }
-    return resolve_sandbox_path(root, relative, SandboxPathKind::File)
-      .map_err(|error| error.to_string());
+fn resolve_image_path(root: &Path, relative: &SafeRelativePath) -> mlua::Result<Option<PathBuf>> {
+  if relative.extension().is_some() {
+    return resolve_request_path(root, relative, SandboxPathKind::File, "image.load");
   }
-
   for extension in ["png", "jpg", "jpeg"] {
     let mut candidate = relative.clone();
     candidate.set_extension(extension);
-    match resolve_sandbox_path(root, &candidate, SandboxPathKind::File) {
-      Ok(path) => return Ok(path),
-      Err(SandboxPathError::NotFound) => {}
-      Err(error) => return Err(error.to_string()),
+    if let Some(path) = resolve_request_path(root, &candidate, SandboxPathKind::File, "image.load")?
+    {
+      return Ok(Some(path));
     }
   }
-  Err("no matching png, jpg, or jpeg file was found".to_string())
+  Ok(None)
 }
 
 fn is_supported_image_extension(extension: &str) -> bool {
@@ -260,11 +275,13 @@ mod tests {
     assert!(
       resolve_image_path(&canonical_assets, &extensionless)
         .unwrap_err()
+        .to_string()
         .contains("escapes its safe root")
     );
     assert!(
       resolve_image_path(&canonical_assets, &explicit)
         .unwrap_err()
+        .to_string()
         .contains("escapes its safe root")
     );
 

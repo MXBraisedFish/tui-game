@@ -86,12 +86,10 @@ file.AUTO
 
 ### 示例
 
-> assets/file.txt
+> file.txt
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.AUTO, end_of_line = file.AUTO})
-end
+local request_id = file.read("file.txt", {encoding = file.AUTO, end_of_line = file.AUTO})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -130,12 +128,10 @@ file.ALL
 
 ### 示例
 
-> assets/dir/...
+> dir/...
 
 ```lua
-function Init(ctx)
-  file.list_dir("dir/", {file_type = file.ALL})
-end
+local request_id = file.list_dir("dir/", {file_type = file.ALL})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -149,19 +145,19 @@ end
 ```lua
 {
   [1] = {
-    file_type = "lua", 
+    file_type = "lua",
     path = "helper.lua"
-  }, 
+  },
   [2] = {
-    file_type = "html", 
+    file_type = "html",
     path = "index.html"
-  }, 
+  },
   [3] = {
-    file_type = "rs", 
+    file_type = "rs",
     path = "main.rs"
-  }, 
+  },
   [4] = {
-    file_type = "js", 
+    file_type = "js",
     path = "script.js"
   }
 }
@@ -191,7 +187,7 @@ file.CR
 
 ### 示例
 
-> assets/file.txt
+> file.txt
 
 ```lua
 function Init(ctx)
@@ -235,7 +231,7 @@ file.LF
 
 ### 示例
 
-> assets/file.txt
+> file.txt
 
 ```lua
 function Init(ctx)
@@ -279,7 +275,7 @@ file.CRLF
 
 ### 示例
 
-> assets/file.txt
+> file.txt
 
 ```lua
 function Init(ctx)
@@ -323,12 +319,10 @@ file.UTF_8
 
 ### 示例
 
-> assets/file.txt (UTF-8)
+> file.txt (UTF-8)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.UTF_8})
-end
+local request_id = file.read("file.txt", {encoding = file.UTF_8})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -367,12 +361,10 @@ file.UTF_16LE
 
 ### 示例
 
-> assets/file.txt (UTF-16 LE)
+> file.txt (UTF-16 LE)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.UTF_8})
-end
+local request_id = file.read("file.txt", {encoding = file.UTF_16LE})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -411,12 +403,10 @@ file.UTF_16BE
 
 ### 示例
 
-> assets/file.txt (UTF-16 BE)
+> file.txt (UTF-16 BE)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.UTF_16BE})
-end
+local request_id = file.read("file.txt", {encoding = file.UTF_16BE})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -455,12 +445,10 @@ file.GBK
 
 ### 示例
 
-> assets/file.txt (GBK)
+> file.txt (GBK)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.GBK})
-end
+local request_id = file.read("file.txt", {encoding = file.GBK})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -499,12 +487,10 @@ file.GB18030
 
 ### 示例
 
-> assets/file.txt (GB18030)
+> file.txt (GB18030)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.GB18030})
-end
+local request_id = file.read("file.txt", {encoding = file.GB18030})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -543,12 +529,10 @@ file.BIG5
 
 ### 示例
 
-> assets/file.txt (Big5)
+> file.txt (Big5)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.BIG5})
-end
+local request_id = file.read("file.txt", {encoding = file.BIG5})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -587,12 +571,10 @@ file.SHIFT_JIS
 
 ### 示例
 
-> assets/file.txt (Shift_JIS)
+> file.txt (Shift_JIS)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.SHIFT_JIS})
-end
+local request_id = file.read("file.txt", {encoding = file.SHIFT_JIS})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -631,12 +613,10 @@ file.EUC_JP
 
 ### 示例
 
-> assets/file.txt (EUC-JP)
+> file.txt (EUC-JP)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.EUC_JP})
-end
+local request_id = file.read("file.txt", {encoding = file.EUC_JP})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -675,12 +655,10 @@ file.ISO_2022_JP
 
 ### 示例
 
-> assets/file.txt (ISO-2022-JP)
+> file.txt (ISO-2022-JP)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_2022_JP})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_2022_JP})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -719,12 +697,10 @@ file.EUC_KR
 
 ### 示例
 
-> assets/file.txt (EUC-KR)
+> file.txt (EUC-KR)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.EUC_KR})
-end
+local request_id = file.read("file.txt", {encoding = file.EUC_KR})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -763,12 +739,10 @@ file.WINDOWS_874
 
 ### 示例
 
-> assets/file.txt (Windows-874)
+> file.txt (Windows-874)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_874})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_874})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -807,12 +781,10 @@ file.WINDOWS_1250
 
 ### 示例
 
-> assets/file.txt (Windows-1250)
+> file.txt (Windows-1250)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1250})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1250})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -851,12 +823,10 @@ file.WINDOWS_1251
 
 ### 示例
 
-> assets/file.txt (Windows-1251)
+> file.txt (Windows-1251)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1251})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1251})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -895,12 +865,10 @@ file.WINDOWS_1252
 
 ### 示例
 
-> assets/file.txt (Windows-1252)
+> file.txt (Windows-1252)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1252})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1252})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -939,12 +907,10 @@ file.WINDOWS_1253
 
 ### 示例
 
-> assets/file.txt (Windows-1253)
+> file.txt (Windows-1253)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1253})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1253})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -983,12 +949,10 @@ file.WINDOWS_1254
 
 ### 示例
 
-> assets/file.txt (Windows-1254)
+> file.txt (Windows-1254)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1254})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1254})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1027,12 +991,10 @@ file.WINDOWS_1255
 
 ### 示例
 
-> assets/file.txt (Windows-1255)
+> file.txt (Windows-1255)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1255})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1255})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1071,12 +1033,10 @@ file.WINDOWS_1256
 
 ### 示例
 
-> assets/file.txt (Windows-1256)
+> file.txt (Windows-1256)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1256})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1256})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1115,12 +1075,10 @@ file.WINDOWS_1257
 
 ### 示例
 
-> assets/file.txt (Windows-1257)
+> file.txt (Windows-1257)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1257})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1257})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1159,12 +1117,10 @@ file.WINDOWS_1258
 
 ### 示例
 
-> assets/file.txt (Windows-1258)
+> file.txt (Windows-1258)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.WINDOWS_1258})
-end
+local request_id = file.read("file.txt", {encoding = file.WINDOWS_1258})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1203,12 +1159,10 @@ file.ISO_8859_2
 
 ### 示例
 
-> assets/file.txt (ISO-8859-2)
+> file.txt (ISO-8859-2)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_2})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_2})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1247,12 +1201,10 @@ file.ISO_8859_3
 
 ### 示例
 
-> assets/file.txt (ISO-8859-3)
+> file.txt (ISO-8859-3)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_3})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_3})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1291,12 +1243,10 @@ file.ISO_8859_4
 
 ### 示例
 
-> assets/file.txt (ISO-8859-4)
+> file.txt (ISO-8859-4)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_4})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_4})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1335,12 +1285,10 @@ file.ISO_8859_5
 
 ### 示例
 
-> assets/file.txt (ISO-8859-5)
+> file.txt (ISO-8859-5)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_5})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_5})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1379,12 +1327,10 @@ file.ISO_8859_6
 
 ### 示例
 
-> assets/file.txt (ISO-8859-6)
+> file.txt (ISO-8859-6)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_6})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_6})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1423,12 +1369,10 @@ file.ISO_8859_7
 
 ### 示例
 
-> assets/file.txt (ISO-8859-7)
+> file.txt (ISO-8859-7)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_7})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_7})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1467,12 +1411,10 @@ file.ISO_8859_8
 
 ### 示例
 
-> assets/file.txt (ISO-8859-8)
+> file.txt (ISO-8859-8)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_8})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_8})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1511,12 +1453,10 @@ file.ISO_8859_8_I
 
 ### 示例
 
-> assets/file.txt (ISO-8859-8-I)
+> file.txt (ISO-8859-8-I)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_8_I})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_8_I})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1555,12 +1495,10 @@ file.ISO_8859_10
 
 ### 示例
 
-> assets/file.txt (ISO-8859-10)
+> file.txt (ISO-8859-10)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_10})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_10})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1599,12 +1537,10 @@ file.ISO_8859_13
 
 ### 示例
 
-> assets/file.txt (ISO-8859-13)
+> file.txt (ISO-8859-13)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_13})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_13})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1643,12 +1579,10 @@ file.ISO_8859_14
 
 ### 示例
 
-> assets/file.txt (ISO-8859-14)
+> file.txt (ISO-8859-14)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_14})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_14})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1687,12 +1621,10 @@ file.ISO_8859_15
 
 ### 示例
 
-> assets/file.txt (ISO-8859-15)
+> file.txt (ISO-8859-15)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_15})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_15})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1731,12 +1663,10 @@ file.ISO_8859_16
 
 ### 示例
 
-> assets/file.txt (ISO-8859-16)
+> file.txt (ISO-8859-16)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.ISO_8859_16})
-end
+local request_id = file.read("file.txt", {encoding = file.ISO_8859_16})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1775,12 +1705,10 @@ file.KOI8_R
 
 ### 示例
 
-> assets/file.txt (KOI8-R)
+> file.txt (KOI8-R)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.KOI8_R})
-end
+local request_id = file.read("file.txt", {encoding = file.KOI8_R})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1819,12 +1747,10 @@ file.KOI8_U
 
 ### 示例
 
-> assets/file.txt (KOI8-U)
+> file.txt (KOI8-U)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.KOI8_U})
-end
+local request_id = file.read("file.txt", {encoding = file.KOI8_U})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1863,12 +1789,10 @@ file.IBM866
 
 ### 示例
 
-> assets/file.txt (IBM866)
+> file.txt (IBM866)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.IBM866})
-end
+local request_id = file.read("file.txt", {encoding = file.IBM866})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1907,12 +1831,10 @@ file.MACINTOSH
 
 ### 示例
 
-> assets/file.txt (Macintosh)
+> file.txt (Macintosh)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.MACINTOSH})
-end
+local request_id = file.read("file.txt", {encoding = file.MACINTOSH})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1951,12 +1873,10 @@ file.X_MAC_CYRILLIC
 
 ### 示例
 
-> assets/file.txt (x-mac-cyrillic)
+> file.txt (x-mac-cyrillic)
 
 ```lua
-function Init(ctx)
-  file.read("file.txt", {encoding = file.X_MAC_CYRILLIC})
-end
+local request_id = file.read("file.txt", {encoding = file.X_MAC_CYRILLIC})
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1995,39 +1915,43 @@ file.read
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                      |
+| ------ | ------ | ------------------------- |
 | `path` | string | 相对 `assets/` 的文件路径 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `encoding` | string / const-file | `file.AUTO` | 文本编码 |
-| `end_of_line` | string / const-file | `file.AUTO` | 换行符规范 |
-| `byte` | boolean | `false` | 二进制模式 |
-| `event_tip` | string / `nil` | `nil` | 自定义事件标记 |
+| 参数名        | 类型                | 默认值      | 说明           |
+| ------------- | ------------------- | ----------- | -------------- |
+| `encoding`    | string / const-file | `file.AUTO` | 文本编码       |
+| `end_of_line` | string / const-file | `file.AUTO` | 换行符规范     |
+| `byte`        | boolean             | `false`     | 二进制模式     |
+| `event_tip`   | string / nil        | `nil`       | 自定义事件标记 |
 
 ## 返回值
 
-**成功提交时**，立即返回一个请求编号。
+**请求提交成功时**，返回一个值。
 
-| 类型 | 说明 |
-| --- | --- |
-| integer | 会话内请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
+| 类型   | 说明    |
+| ------ | ------- |
+| string | 事件 ID |
 
-**请求被宿主拒绝登记时**（如同一会话未完成的文件请求达到上限），不会产生该编号对应的结果事件。
+**请求提交失败时**，返回一个值。
+
+| 类型 | 说明         |
+| ---- | ------------ |
+| nil  | 请求提交失败 |
 
 ### 示例
 
-```lua
--- 准备：assets/file.txt 中写入 Hello Tui Game。
+> file.txt
 
+```lua
 local request_id = file.read("file.txt")
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print(serialization.json_encode(event))
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -2035,13 +1959,26 @@ end
 **输出：**
 
 ```lua
+{
+  type = "file",
+  frame = X,        -- 占位符
+  sequence = X,     -- 占位符
+  data = {
+    request_id = X, -- 占位符
+    kind = "read_text",
+    ok = true,
+    path = "file.txt",
+    text = "Hello Tui Game"
+  }
+}
 ```
 
 ## 额外说明
 
-- 路径相对当前包的 `assets/`，不能使用绝对路径或越出该目录；结果由 `HandleEvent` 接收，见⌞[文件事件](../EVENT.md#52-file)⌝。
-- 参数 `byte` 为 `false` 时按文本读取，参数 `encoding` 决定解码方式；读取结果中的换行一律归一为 `\n`，`end_of_line` 只校验取值，不转换换行。
-- 参数 `byte` 为 `true` 时按二进制读取，参数 `encoding` 与参数 `end_of_line` **会被忽略**。
+- 事件返回值见⌊[事件协议](../EVENT.md)⌉
+- 路径相对当前包的 `assets/`。
+- 选填参数 `byte` 为 `false` 时按文本读取。
+- 选填参数 `byte` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
 
 ---
 
@@ -2063,42 +2000,42 @@ file.write
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                      |
+| ------ | ------ | ------------------------- |
 | `path` | string | 相对 `assets/` 的文件路径 |
-| `text` | string | 要写入的文本；`byte = true` 时为原始字节字符串 |
+| `text` | string | 要写入的内容              |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `encoding` | string / const-file | `file.AUTO` | 文本编码 |
-| `end_of_line` | string / const-file | `file.AUTO` | 换行符规范 |
-| `byte` | boolean | `false` | 二进制模式 |
-| `event_tip` | string / `nil` | `nil` | 自定义事件标记 |
+| 参数名        | 类型                | 默认值      | 说明           |
+| ------------- | ------------------- | ----------- | -------------- |
+| `encoding`    | string / const-file | `file.AUTO` | 文本编码       |
+| `end_of_line` | string / const-file | `file.AUTO` | 换行符规范     |
+| `byte`        | boolean             | `false`     | 二进制模式     |
+| `event_tip`   | string / nil        | `nil`       | 自定义事件标记 |
 
 ## 返回值
 
-**成功提交时**，立即返回一个请求编号。
+**请求提交成功时**，返回一个值。
 
-| 类型 | 说明 |
-| --- | --- |
-| integer | 会话内请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
+| 类型   | 说明    |
+| ------ | ------- |
+| string | 事件 ID |
 
-**屏保脚本调用时**，返回 `nil`，不提交任务，也不产生该请求的结果事件。
+**请求提交失败时**，返回一个值。
 
-**请求被宿主拒绝登记时**（如同一会话未完成的文件请求达到上限），不会产生该编号对应的结果事件。
+| 类型 | 说明         |
+| ---- | ------------ |
+| nil  | 请求提交失败 |
 
 ### 示例
 
 ```lua
--- 准备：包内已有 assets/ 目录。
-
 local request_id = file.write("file.txt", "Hello Tui Game", {event_tip = "Get!"})
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print(serialization.json_encode(event))
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -2106,16 +2043,26 @@ end
 **输出：**
 
 ```lua
+{
+  type = "file",
+  frame = X,        -- 占位符
+  sequence = X,     -- 占位符
+  data = {
+    request_id = X, -- 占位符
+    kind = "write_text",
+    ok = true,
+    path = "file.txt",
+  }
+}
 ```
 
 ## 额外说明
 
-- 路径相对当前包的 `assets/`，不能使用绝对路径或越出该目录；结果由 `HandleEvent` 接收，见⌞[文件事件](../EVENT.md#52-file)⌝。
-- 参数 `byte` 为 `false` 时按文本写入，参数 `encoding` 与参数 `end_of_line` **会生效**。
-- 参数 `byte` 为 `true` 时按二进制写入，参数 `encoding` 与参数 `end_of_line` **会被忽略**。
-- 参数 `text` 在文本模式下不能包含 NUL 字符。
-- 该 API 会自动创建未创建的**文件**。
-- 该 API 不会自动补全未创建的**目录**，目录不存在会抛出错误。
+- 事件返回值见⌊[事件协议](../EVENT.md)⌉
+- 路径相对当前包的 `assets/`。
+- 选填参数 `byte` 为 `false` 时按文本读取。
+- 选填参数 `byte` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
+- 方法会自动创建未创建的**文件**，但不会自动补全未创建的**目录**。
 
 ---
 
@@ -2137,47 +2084,42 @@ file.list_dir
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                    |
+| ------ | ------ | ----------------------- |
 | `path` | string | 相对 `assets/` 目录路径 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `recursive` | boolean | `false` | 是否递归子目录枚举 |
-| `file_type` | string / const-file | `nil` | 仅匹配指定扩展名 |
-| `event_tip` | string / `nil` | `nil` | 自定义事件标记 |
+| 参数名      | 类型                      | 默认值  | 说明               |
+| ----------- | ------------------------- | ------- | ------------------ |
+| `recursive` | boolean                   | `false` | 是否递归子目录枚举 |
+| `file_type` | string / const-file | `file.ALL`   | 仅匹配指定扩展名   |
+| `event_tip` | string / nil              | `nil`   | 自定义事件标记     |
 
 ## 返回值
 
-**成功提交时**，立即返回一个请求编号。
+**请求提交成功时**，返回一个值。
 
-| 类型 | 说明 |
-| --- | --- |
-| integer | 会话内请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
+| 类型   | 说明    |
+| ------ | ------- |
+| string | 事件 ID |
 
-**屏保脚本调用时**，返回 `nil`，不提交任务，也不产生该请求的结果事件。
+**请求提交失败时**，返回一个值。
 
-**请求被宿主拒绝登记时**（如同一会话未完成的文件请求达到上限），不会产生该编号对应的结果事件。
+| 类型 | 说明         |
+| ---- | ------------ |
+| nil  | 请求提交失败 |
 
 ### 示例
 
-```lua
--- 准备以下包内资源：
--- assets/
--- + c/ (game.c, main.c)
--- + js/ (data.json, main.js)
--- + rust/ (src/main.rs, Cargo.toml)
--- - file.txt
+> dir/...
 
-file.list_dir(".", {recursive = true})
-file.list_dir("rust/")
-file.list_dir("js/", {file_type = "json", event_tip = "Only Json"})
+```lua
+local request_id = file.list_dir("dir/", {file_type = file.ALL})
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print(serialization.json_encode(event))
+    debug.print(table.pretty(event.data.entries))
   end
 end
 ```
@@ -2185,12 +2127,31 @@ end
 **输出：**
 
 ```lua
+{
+  [1] = {
+    file_type = "lua",
+    path = "helper.lua"
+  },
+  [2] = {
+    file_type = "html",
+    path = "index.html"
+  },
+  [3] = {
+    file_type = "rs",
+    path = "main.rs"
+  },
+  [4] = {
+    file_type = "js",
+    path = "script.js"
+  }
+}
 ```
 
 ## 额外说明
 
-- 路径相对当前包的 `assets/`，不能使用绝对路径或越出该目录；结果由 `HandleEvent` 接收，见⌞[文件事件](../EVENT.md#52-file)⌝。
-- 参数 `file_type` 只接受不含点号的扩展名（如 `rs`），大小写不敏感；不传时等价于 `file.ALL`。
+- 事件返回值见⌊[事件协议](../EVENT.md)⌉
+- 路径相对当前包的 `assets/`。
+- 选填参数 `file_type` 只接受不含点号的扩展名，且不区分大小写。
 
 ---
 
@@ -2212,39 +2173,39 @@ file.create_dir
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                    |
+| ------ | ------ | ----------------------- |
 | `path` | string | 相对 `assets/` 目录路径 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `event_tip` | string / `nil` | `nil` | 自定义事件标记 |
+| 参数名      | 类型         | 默认值 | 说明           |
+| ----------- | ------------ | ------ | -------------- |
+| `event_tip` | string / nil | `nil`  | 自定义事件标记 |
 
 ## 返回值
 
-**成功提交时**，立即返回一个请求编号。
+**请求提交成功时**，返回一个值。
 
-| 类型 | 说明 |
-| --- | --- |
-| integer | 会话内请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
+| 类型   | 说明    |
+| ------ | ------- |
+| string | 事件 ID |
 
-**屏保脚本调用时**，返回 `nil`，不提交任务，也不产生该请求的结果事件。
+**请求提交失败时**，返回一个值。
 
-**请求被宿主拒绝登记时**（如同一会话未完成的文件请求达到上限），不会产生该编号对应的结果事件。
+| 类型 | 说明         |
+| ---- | ------------ |
+| nil  | 请求提交失败 |
 
 ### 示例
 
 ```lua
--- 准备：包内已有 assets/ 目录。
-
-file.create_dir("file")
-file.create_dir("test1/test2")
+local request_id1 = file.create_dir("file")
+local request_id2 = file.create_dir("test1/test2/")
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print(serialization.json_encode(event))
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -2252,12 +2213,36 @@ end
 **输出：**
 
 ```lua
+{
+  type = "file",
+  frame = X,        -- 占位符
+  sequence = X,     -- 占位符
+  data = {
+    request_id = X, -- 占位符
+    kind = "create_dir",
+    ok = true,
+    path = "file",
+  }
+}
+{
+  type = "file",
+  frame = X,        -- 占位符
+  sequence = X,     -- 占位符
+  data = {
+    request_id = X, -- 占位符
+    kind = "create_dir",
+    ok = true,
+    path = "test1/test2",
+  }
+}
 ```
 
 ## 额外说明
 
-- 路径相对当前包的 `assets/`，不能使用绝对路径或越出该目录；结果由 `HandleEvent` 接收，见⌞[文件事件](../EVENT.md#52-file)⌝。
-- 该 API 会逐级创建缺失的目录。
+- 事件返回值见⌊[事件协议](../EVENT.md)⌉
+- 路径相对当前包的 `assets/`。
+- 方法会逐级创建缺失的目录。
+- 返回值最后一级目录不含带 `/` 字符结尾。
 
 ---
 
@@ -2275,8 +2260,8 @@ file.exists
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                  |
+| ------ | ------ | --------------------- |
 | `path` | string | 相对 `assets/` 的路径 |
 
 ## 返回值
@@ -2289,9 +2274,9 @@ file.exists
 
 ### 示例
 
-```lua
--- 准备：包内已有 assets/test/ 目录。
+> test/
 
+```lua
 debug.print(tostring(file.exists("test")))
 debug.print(tostring(file.exists("none")))
 ```
@@ -2299,7 +2284,13 @@ debug.print(tostring(file.exists("none")))
 **输出：**
 
 ```lua
+true
+false
 ```
+
+## 额外说明
+
+- 路径相对当前包的 `assets/`。
 
 ---
 
@@ -2321,43 +2312,41 @@ file.remove
 
 ### 必填参数
 
-| 参数名 | 类型 | 说明 |
-| --- | --- | --- |
+| 参数名 | 类型   | 说明                  |
+| ------ | ------ | --------------------- |
 | `path` | string | 相对 `assets/` 的路径 |
 
 ### 选填参数
 
-| 参数名 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `recursive` | boolean | `false` | 是否删除非空目录 |
-| `event_tip` | string / `nil` | `nil` | 自定义事件标记 |
+| 参数名      | 类型         | 默认值  | 说明             |
+| ----------- | ------------ | ------- | ---------------- |
+| `recursive` | boolean      | `false` | 是否删除非空目录（递归删除） |
+| `event_tip` | string / nil | `nil`   | 自定义事件标记   |
 
 ## 返回值
 
-**成功提交时**，立即返回一个请求编号。
+**请求提交成功时**，返回一个值。
 
-| 类型 | 说明 |
-| --- | --- |
-| integer | 会话内请求编号；在完成或失败事件的 `data.request_id` 中对应此编号 |
+| 类型   | 说明    |
+| ------ | ------- |
+| string | 事件 ID |
 
-**屏保脚本调用时**，返回 `nil`，不提交任务，也不产生该请求的结果事件。
+**请求提交失败时**，返回一个值。
 
-**请求被宿主拒绝登记时**（如同一会话未完成的文件请求达到上限），不会产生该编号对应的结果事件。
+| 类型 | 说明         |
+| ---- | ------------ |
+| nil  | 请求提交失败 |
 
 ### 示例
 
-```lua
--- 准备以下包内资源：
--- assets/
--- + test/test.txt
--- - file.txt
+> test/test.txt
 
-file.remove("file.txt")
+```lua
 file.remove("test", {recursive = false})
 
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print(serialization.json_encode(event))
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -2365,10 +2354,23 @@ end
 **输出：**
 
 ```lua
+{
+  type = "file",
+  frame = X,        -- 占位符
+  sequence = X,     -- 占位符
+  data = {
+    request_id = X, -- 占位符
+    kind = "remove",
+    ok = false,
+    error = {
+      code = "io", 
+      message = "I/O operation failed"
+    },
+    path = "test1",
+  }
+}
 ```
 
 ## 额外说明
 
-- 路径相对当前包的 `assets/`，不能使用绝对路径或越出该目录；结果由 `HandleEvent` 接收，见⌞[文件事件](../EVENT.md#52-file)⌝。
-- 不能删除 `assets/` 根目录。
-- 一次指定一个目标；`recursive = true` 时可删除目标目录及其中的全部内容，`false` 时不能删除非空目录。
+- 路径相对当前包的 `assets/`。

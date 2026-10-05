@@ -20,12 +20,12 @@ local event = {
 } 
 ```
 
-| 字段 | 类型 | 必定存在 | 作用 |
-|---|---|---:|---|
-| `type` | `string` | 是 | 事件类型。根据它判断 `data` 的结构。 |
-| `sequence` | `integer` | 是 | 按生成顺序全局递增的事件序号；收尾释放优先交付时，回调观察到的序号可能不连续或不按大小排列。事件经过 Session 过滤后可能出现跳号。 |
-| `frame` | `integer` | 是 | 事件进入 Lua Broker 时的宿主帧号，不等同于游戏自行维护的帧号。 |
-| `data` | `table` | 是 | 事件数据。没有额外数据的生命周期事件也会得到空表。 |
+| 字段       | 类型      | 必定存在 | 作用                                                                                                                              |
+| ---------- | --------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `type`     | `string`  | 是       | 事件类型。根据它判断 `data` 的结构。                                                                                              |
+| `sequence` | `integer` | 是       | 按生成顺序全局递增的事件序号；收尾释放优先交付时，回调观察到的序号可能不连续或不按大小排列。事件经过 Session 过滤后可能出现跳号。 |
+| `frame`    | `integer` | 是       | 事件进入 Lua Broker 时的宿主帧号，不等同于游戏自行维护的帧号。                                                                    |
+| `data`     | `table`   | 是       | 事件数据。没有额外数据的生命周期事件也会得到空表。                                                                                |
 
 未列出的可选字段为 `nil`。脚本不应依赖 Lua 表的字段遍历顺序。
 
@@ -40,15 +40,15 @@ local event = {
 
 ### 1.2 Session 接收范围
 
-| 分类 | 游戏 | 屏保 | 条件 |
-|---|---:|---:|---|
-| `action`、`key`、`mouse` | 是 | 否 | 仅没有覆盖屏接管交互时投递。 |
-| `resize`、`focus` | 是 | 是 | Session 存活时均可投递，包括覆盖屏期间。 |
-| `overlay_started`、`overlay_stopped` | 是 | 否 | 只通知游戏 Session。 |
-| `timer`、`animation` | 是 | 是 | 只能收到本 Session 所创建对象的事件。 |
-| `file` | 是 | 只读 | 只能收到本 Session 登记的请求结果；屏保不接收写入和目录请求。 |
-| `i18n`、`image`、`network`、`audio` | 是 | 是 | 只能收到本 Session 登记的请求或对象事件；API 权限仍可能拒绝创建请求。 |
-| 交互组件事件 | 是 | 否 | 只能收到本 Session 所创建组件的事件。 |
+| 分类                                 | 游戏 | 屏保 | 条件                                                                  |
+| ------------------------------------ | ---- | ---- | --------------------------------------------------------------------- |
+| `action`、`key`、`mouse`             | 是   | 否   | 仅没有覆盖屏接管交互时投递。                                          |
+| `resize`、`focus`                    | 是   | 是   | Session 存活时均可投递，包括覆盖屏期间。                              |
+| `overlay_started`、`overlay_stopped` | 是   | 否   | 只通知游戏 Session。                                                  |
+| `timer`、`animation`                 | 是   | 是   | 只能收到本 Session 所创建对象的事件。                                 |
+| `file`                               | 是   | 只读 | 只能收到本 Session 登记的请求结果；屏保不接收写入和目录请求。         |
+| `i18n`、`image`、`network`、`audio`  | 是   | 是   | 只能收到本 Session 登记的请求或对象事件；API 权限仍可能拒绝创建请求。 |
+| 交互组件事件                         | 是   | 否   | 只能收到本 Session 所创建组件的事件。                                 |
 
 任意覆盖屏处于栈内时，游戏仍可更新，并继续接收非交互事件，但不会接收普通动作、原始键、鼠标或组件交互事件；已交付输入的收尾释放仍会送达。屏保本身也不接收键盘、鼠标和交互组件事件。
 
@@ -68,10 +68,10 @@ local event = {
 }
 ```
 
-| `data` 字段 | 类型       | 出现条件 | 作用                             |
-| --------- | -------- | ---- | ------------------------------ |
-| `action`  | `string` | 始终   | 游戏包注册的动作 ID。                   |
-| `state`   | `string` | 始终   | `pressed`、`held` 或 `released`。 |
+| `data` 字段 | 类型     | 出现条件 | 作用                              |
+| ----------- | -------- | -------- | --------------------------------- |
+| `action`    | `string` | 始终     | 游戏包注册的动作 ID。             |
+| `state`     | `string` | 始终     | `pressed`、`held` 或 `released`。 |
 
 宿主层优先；各层内部按 priority 降序，同值时当前实际命中的两键组合优先，完全同级按注册顺序。游戏按 actions.json 声明顺序注册。高优先级单键可以先于低优先级组合键，但不能越过宿主；排序不消费按键，组合键与组成单键均可命中。备选绑定按任意一个有效合并，最后一个结束才释放。
 
@@ -203,7 +203,7 @@ end
 
 ### 4.1 `timer`
 
-只发送给创建计时器的 Session。查看⌞[timer 库](api/timer.md)⌝。
+只发送给创建计时器的 Session。查看⌊[timer 库](api/timer.md)⌉。
 
 ```lua
 {
@@ -242,7 +242,7 @@ end
 {
   type = "animation",
   data = {
-    id = 2,
+    id = "2",
     kind = "marker",
     name = "impact",
   },
@@ -251,7 +251,7 @@ end
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `id` | `integer` | 始终 | Session 内动画 ID。 |
+| `id` | `string` | 始终 | Session 内动画 ID。 |
 | `kind` | `string` | 始终 | `started`、`marker`、`loop`、`finished` 或 `cancelled`。 |
 | `name` | `string \| nil` | `kind == "marker"` | 当前触发的标记名称。 |
 | `completed` | `integer \| nil` | `kind == "loop"` | 已完成的循环次数。 |
@@ -300,7 +300,7 @@ error = {
 {
   type = "file",
   data = {
-    request_id = 4,
+    request_id = "4",
     kind = "read_text",
     path = "config/state.txt",
     tip = "load_state",
@@ -312,7 +312,7 @@ error = {
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `request_id` | `integer` | 始终 | Session 内请求 ID。 |
+| `request_id` | `string` | 始终 | Session 内请求 ID。 |
 | `kind` | `string` | 始终 | `read_text`、`read_bytes`、`write_text`、`write_bytes`、`list_dir`、`create_dir` 或 `remove`。 |
 | `path` | `string` | 始终 | 调用方可见的虚拟相对路径，不是操作系统绝对路径。 |
 | `tip` | `string \| nil` | 请求传入 `event_tip` 时 | 调用方自定义的事件标记，原样返回以便区分请求。 |
@@ -344,7 +344,7 @@ error = {
 {
   type = "file",
   data = {
-    request_id = 5,
+    request_id = "5",
     kind = "create_dir",
     path = "save/slot-a",
     tip = "create_slot",
@@ -359,7 +359,7 @@ error = {
 {
   type = "file",
   data = {
-    request_id = 6,
+    request_id = "6",
     kind = "remove",
     path = "save/slot-a",
     tip = "remove_slot",
@@ -376,7 +376,7 @@ error = {
 {
   type = "image",
   data = {
-    request_id = 5,
+    request_id = "5",
     kind = "convert",
     ok = true,
     output = "f%<bg:#000000><fg:#ffffff>▅",
@@ -386,7 +386,7 @@ error = {
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `request_id` | `integer` | 始终 | Session 内请求 ID。 |
+| `request_id` | `string` | 始终 | Session 内请求 ID。 |
 | `kind` | `string` | 始终 | 固定为 `convert`。 |
 | `ok` | `boolean` | 始终 | 转换是否成功。 |
 | `output` | `string \| nil` | `ok == true` | 可直接传给 `draw.text(x, y, event.data.output)` 的富文本字符串。 |
@@ -402,7 +402,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 {
   type = "network",
   data = {
-    request_id = 6,
+    request_id = "6",
     kind = "get",
     url = "https://example.com/data",
     ok = true,
@@ -416,7 +416,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `request_id` | `integer` | 始终 | Session 内请求 ID。 |
+| `request_id` | `string` | 始终 | Session 内请求 ID。 |
 | `kind` | `string` | 始终 | `get` 或 `post`。 |
 | `url` | `string` | 始终 | 原始规范化 URL。 |
 | `ok` | `boolean` | 始终 | 请求是否正常完成。 |
@@ -437,7 +437,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 {
   type = "i18n",
   data = {
-    request_id = 4,
+    request_id = "4",
     kind = "created",
     ok = true,
     message = "i18n instance created",
@@ -450,7 +450,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `request_id` | `integer` | 始终 | 与成功入队的 `i18n.create(options)` 或 `i18n.reload(options)` 返回的会话内请求 ID 相同。 |
+| `request_id` | `string` | 始终 | 与成功入队的 `i18n.create(options)` 或 `i18n.reload(options)` 返回的会话内请求 ID 相同。 |
 | `kind` | `string` | 始终 | `created` 表示 `create` 请求结束，`reloaded` 表示 `reload` 请求结束。 |
 | `ok` | `boolean` | 始终 | 本次语言加载是否成功。 |
 | `message` | `string` | 始终 | 已净化的加载结果说明，不包含绝对路径、系统错误或宿主任务 ID。 |
@@ -476,7 +476,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 {
   type = "audio",
   data = {
-    id = 7,
+    id = "7",
     kind = "paused",
     position_ms = 530,
   },
@@ -485,7 +485,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `id` | `integer` | 始终 | Session 内音频对象 ID。 |
+| `id` | `string` | 始终 | Session 内音频对象 ID。 |
 | `kind` | `string` | 始终 | `ready`、`started`、`paused`、`resumed`、`stopped`、`finished` 或 `failed`。 |
 | `duration_ms` | `integer \| nil` | `ready`、`finished` | 音频总时长，单位毫秒。 |
 | `position_ms` | `integer \| nil` | `started`、`paused`、`resumed`、`finished` | 当前播放位置，单位毫秒；`finished` 时等于总时长。 |
@@ -503,7 +503,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 {
   type = "hit_area",
   data = {
-    id = 8,
+    id = "8",
     kind = "drag",
     x = 30,
     y = 12,
@@ -516,7 +516,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `id` | `integer` | 始终 | Session 内点击区域 ID。 |
+| `id` | `string` | 始终 | Session 内点击区域 ID。 |
 | `kind` | `string` | 始终 | `hover_enter`、`hover_move`、`hover_leave`、`press`、`release`、`click` 或 `drag`。 |
 | `x` | `integer` | 始终 | 事件水平坐标。 |
 | `y` | `integer` | 始终 | 事件垂直坐标。 |
@@ -529,13 +529,13 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 ```lua
 {
   type = "hyperlink",
-  data = { id = 9, kind = "clicked", link = "https://example.com" },
+  data = { id = "9", kind = "clicked", link = "https://example.com" },
 }
 ```
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `id` | `integer` | 始终 | Session 内超链接对象 ID。 |
+| `id` | `string` | 始终 | Session 内超链接对象 ID。 |
 | `kind` | `string` | 始终 | 固定为 `clicked`。 |
 | `link` | `string` | 始终 | 超链接目标。 |
 
@@ -544,13 +544,13 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 ```lua
 {
   type = "markdown",
-  data = { id = 10, kind = "link_clicked", href = "guide.md", text = "Guide" },
+  data = { id = "10", kind = "link_clicked", href = "guide.md", text = "Guide" },
 }
 ```
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `id` | `integer` | 始终 | Session 内 Markdown 对象 ID。 |
+| `id` | `string` | 始终 | Session 内 Markdown 对象 ID。 |
 | `kind` | `string` | 始终 | 固定为 `link_clicked`。 |
 | `href` | `string` | 始终 | 链接目标。 |
 | `text` | `string` | 始终 | 链接显示文本。 |
@@ -560,13 +560,13 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 ```lua
 {
   type = "text_input",
-  data = { id = 11, kind = "changed", value = "player" },
+  data = { id = "11", kind = "changed", value = "player" },
 }
 ```
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `id` | `integer` | 始终 | Session 内文本输入对象 ID。 |
+| `id` | `string` | 始终 | Session 内文本输入对象 ID。 |
 | `kind` | `string` | 始终 | `focused`、`blurred`、`changed`、`submit`、`cancel`、`pressed` 或 `pressed_outside`。 |
 | `value` | `string \| nil` | `changed`、`submit`、`cancel` | 当时的文本内容。 |
 
@@ -575,13 +575,13 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 ```lua
 {
   type = "scroll_box",
-  data = { id = 12, kind = "scrolled", x = 5, y = 20 },
+  data = { id = "12", kind = "scrolled", x = 5, y = 20 },
 }
 ```
 
 | `data` 字段 | 类型 | 出现条件 | 作用 |
 |---|---|---|---|
-| `id` | `integer` | 始终 | Session 内滚动框 ID。 |
+| `id` | `string` | 始终 | Session 内滚动框 ID。 |
 | `kind` | `string` | 始终 | 固定为 `scrolled`。 |
 | `x` | `integer` | 始终 | 当前水平滚动位置。 |
 | `y` | `integer` | 始终 | 当前垂直滚动位置。 |

@@ -32,22 +32,22 @@ measurement.get_text_size
 
 ### 必填参数
 
-| 参数名 | 类型                      | 说明         |
-| ------ | ------------------------- | ------------ |
-| `text` | string / number / boolean | 要测量的文本 |
+| 参数名 | 类型                               | 说明         |
+| ------ | ---------------------------------- | ------------ |
+| `text` | string / integer / float / boolean | 要测量的文本 |
 
 ### 选填参数
 
-| 参数名             | 类型                        | 默认值        | 说明                                |
-| ------------------ | --------------------------- | ------------- | ----------------------------------- |
-| `horizontal_align` | const-align（仅水平类常量） | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式  |
-| `auto_wrap`        | boolean                     | `true`        | 是否自动换行                        |
-| `word_wrap`        | boolean                     | `true`        | 是否按完整单词换行                  |
-| `max_height`       | integer / `nil`             | `nil`         | 最大绘制高度；提供时范围为 1～65535 |
-| `max_width`        | integer / `nil`             | `nil`         | 最大绘制宽度；提供时范围为 1～65535 |
-| `overflow_marker`  | string / number / boolean   | `"..."`       | 文本溢出时使用的省略标记            |
-| `rich_params`      | table / `nil`               | `nil`         | 富文本参数                          |
-| `text_mode`        | const-string                | `string.AUTO` | 文本解析模式                        |
+| 参数名             | 类型                               | 默认值        | 说明                                |
+| ------------------ | ---------------------------------- | ------------- | ----------------------------------- |
+| `horizontal_align` | const-align                        | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式  |
+| `auto_wrap`        | boolean                            | `true`        | 是否自动换行                        |
+| `word_wrap`        | boolean                            | `true`        | 是否按完整单词换行                  |
+| `max_height`       | integer / nil                      | `nil`         | 最大绘制高度；提供时范围为 1～65535 |
+| `max_width`        | integer / nil                      | `nil`         | 最大绘制宽度；提供时范围为 1～65535 |
+| `overflow_marker`  | string / integer / float / boolean | `"..."`       | 文本溢出时使用的省略标记            |
+| `rich_params`      | table / nil                        | `nil`         | 富文本参数                          |
+| `text_mode`        | const-string                       | `string.AUTO` | 文本解析模式                        |
 
 ## 返回值
 
@@ -93,22 +93,22 @@ measurement.get_text_width
 
 ### 必填参数
 
-| 参数名 | 类型                      | 说明         |
-| ------ | ------------------------- | ------------ |
-| `text` | string / number / boolean | 要测量的文本 |
+| 参数名 | 类型                               | 说明         |
+| ------ | ---------------------------------- | ------------ |
+| `text` | string / integer / float / boolean | 要测量的文本 |
 
 ### 选填参数
 
-| 参数名             | 类型                        | 默认值        | 说明                                |
-| ------------------ | --------------------------- | ------------- | ----------------------------------- |
-| `horizontal_align` | const-align（仅水平类常量） | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式  |
-| `auto_wrap`        | boolean                     | `true`        | 是否自动换行                        |
-| `word_wrap`        | boolean                     | `true`        | 是否按完整单词换行                  |
-| `max_height`       | integer / `nil`             | `nil`         | 最大绘制高度；提供时范围为 1～65535 |
-| `max_width`        | integer / `nil`             | `nil`         | 最大绘制宽度；提供时范围为 1～65535 |
-| `overflow_marker`  | string / number / boolean   | `"..."`       | 文本溢出时使用的省略标记            |
-| `rich_params`      | table / `nil`               | `nil`         | 富文本参数                          |
-| `text_mode`        | const-string                | `string.AUTO` | 文本解析模式                        |
+| 参数名             | 类型                               | 默认值        | 说明                                |
+| ------------------ | ---------------------------------- | ------------- | ----------------------------------- |
+| `horizontal_align` | const-align                        | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式  |
+| `auto_wrap`        | boolean                            | `true`        | 是否自动换行                        |
+| `word_wrap`        | boolean                            | `true`        | 是否按完整单词换行                  |
+| `max_height`       | integer / nil                      | `nil`         | 最大绘制高度；提供时范围为 1～65535 |
+| `max_width`        | integer / nil                      | `nil`         | 最大绘制宽度；提供时范围为 1～65535 |
+| `overflow_marker`  | string / integer / float / boolean | `"..."`       | 文本溢出时使用的省略标记            |
+| `rich_params`      | table / nil                        | `nil`         | 富文本参数                          |
+| `text_mode`        | const-string                       | `string.AUTO` | 文本解析模式                        |
 
 ## 返回值
 
@@ -146,22 +146,22 @@ measurement.get_text_height
 
 ### 必填参数
 
-| 参数名 | 类型                      | 说明         |
-| ------ | ------------------------- | ------------ |
-| `text` | string / number / boolean | 要测量的文本 |
+| 参数名 | 类型                               | 说明         |
+| ------ | ---------------------------------- | ------------ |
+| `text` | string / integer / float / boolean | 要测量的文本 |
 
 ### 选填参数
 
-| 参数名             | 类型                        | 默认值        | 说明                                |
-| ------------------ | --------------------------- | ------------- | ----------------------------------- |
-| `horizontal_align` | const-align（仅水平类常量） | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式  |
-| `auto_wrap`        | boolean                     | `true`        | 是否自动换行                        |
-| `word_wrap`        | boolean                     | `true`        | 是否按完整单词换行                  |
-| `max_height`       | integer / `nil`             | `nil`         | 最大绘制高度；提供时范围为 1～65535 |
-| `max_width`        | integer / `nil`             | `nil`         | 最大绘制宽度；提供时范围为 1～65535 |
-| `overflow_marker`  | string / number / boolean   | `"..."`       | 文本溢出时使用的省略标记            |
-| `rich_params`      | table / `nil`               | `nil`         | 富文本参数                          |
-| `text_mode`        | const-string                | `string.AUTO` | 文本解析模式                        |
+| 参数名             | 类型                               | 默认值        | 说明                                |
+| ------------------ | ---------------------------------- | ------------- | ----------------------------------- |
+| `horizontal_align` | const-align                        | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式  |
+| `auto_wrap`        | boolean                            | `true`        | 是否自动换行                        |
+| `word_wrap`        | boolean                            | `true`        | 是否按完整单词换行                  |
+| `max_height`       | integer / nil                      | `nil`         | 最大绘制高度；提供时范围为 1～65535 |
+| `max_width`        | integer / nil                      | `nil`         | 最大绘制宽度；提供时范围为 1～65535 |
+| `overflow_marker`  | string / integer / float / boolean | `"..."`       | 文本溢出时使用的省略标记            |
+| `rich_params`      | table / nil                        | `nil`         | 富文本参数                          |
+| `text_mode`        | const-string                       | `string.AUTO` | 文本解析模式                        |
 
 ## 返回值
 

@@ -1,7 +1,8 @@
 //! Lua file library bindings with validated arguments and session-owned host access.
 
 use super::*;
-use crate::path::{SafeRelativePath, SandboxPathKind, resolve_sandbox_path, sandbox_path_exists};
+use crate::MAX_LUA_FILE_TASKS_PER_SESSION;
+use crate::path::{SafeRelativePath, SandboxPathKind, sandbox_path_exists};
 
 /// Build and register the Lua file API in the supplied VM and host context.
 ///
@@ -75,24 +76,30 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let virtual_path = relative_path.virtual_path().to_string();
       let byte = file_byte_mode(table, method)?;
       let event_tip = file_tip(table, method)?;
-      let path = resolve_file_path(
+      let encoding = if byte {
+        None
+      } else {
+        validate_file_eol(table, method)?;
+        Some(file_encoding(table, method)?)
+      };
+      let Some(path) = resolve_request_path(
         &read_state.borrow().context.assets_root,
         &relative_path,
         SandboxPathKind::File,
         method,
-      )?;
-      let (task, operation) = if byte {
-        (FileTask::LuaReadBytes { path }, LuaFileOperation::ReadBytes)
-      } else {
-        validate_file_eol(table, method)?;
-        let encoding = file_encoding(table, method)?;
-        (
+      )?
+      else {
+        return Ok(None);
+      };
+      let (task, operation) = match encoding {
+        None => (FileTask::LuaReadBytes { path }, LuaFileOperation::ReadBytes),
+        Some(encoding) => (
           FileTask::LuaReadText { path, encoding },
           LuaFileOperation::ReadText,
-        )
+        ),
       };
       let request_id = enqueue_file_request(&read_state, task, operation, virtual_path, event_tip);
-      Ok(Value::Integer(request_id as i64))
+      Ok(request_id)
     })?,
   )?;
   let write_state = state.clone();
@@ -113,15 +120,18 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let virtual_path = relative_path.virtual_path().to_string();
       let byte = file_byte_mode(table, method)?;
       let event_tip = file_tip(table, method)?;
-      let path = resolve_file_path(
-        &write_state.borrow().context.assets_root,
-        &relative_path,
-        SandboxPathKind::WritableFile,
-        method,
-      )?;
       let content = parameters.required(1, method, "text")?;
       let (task, operation) = if byte {
         let bytes = file_bytes(content, method)?;
+        let Some(path) = resolve_request_path(
+          &write_state.borrow().context.assets_root,
+          &relative_path,
+          SandboxPathKind::WritableFile,
+          method,
+        )?
+        else {
+          return Ok(None);
+        };
         (
           FileTask::LuaWriteBytes { path, bytes },
           LuaFileOperation::WriteBytes,
@@ -133,6 +143,15 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         }
         let encoding = file_encoding(table, method)?;
         let end_of_line = validate_file_eol(table, method)?;
+        let Some(path) = resolve_request_path(
+          &write_state.borrow().context.assets_root,
+          &relative_path,
+          SandboxPathKind::WritableFile,
+          method,
+        )?
+        else {
+          return Ok(None);
+        };
         (
           FileTask::LuaWriteText {
             path,
@@ -144,7 +163,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         )
       };
       let request_id = enqueue_file_request(&write_state, task, operation, virtual_path, event_tip);
-      Ok(Value::Integer(request_id as i64))
+      Ok(request_id)
     })?,
   )?;
   let create_dir_state = state.clone();
@@ -159,12 +178,15 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let virtual_path = relative_path.virtual_path().to_string();
       let event_tip = file_tip(table, method)?;
       let assets_root = create_dir_state.borrow().context.assets_root.clone();
-      let path = resolve_file_path(
+      let Some(path) = resolve_request_path(
         &assets_root,
         &relative_path,
         SandboxPathKind::WritableDirectory,
         method,
-      )?;
+      )?
+      else {
+        return Ok(None);
+      };
       let request_id = enqueue_file_request(
         &create_dir_state,
         FileTask::LuaCreateDir {
@@ -176,7 +198,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(Value::Integer(request_id as i64))
+      Ok(request_id)
     })?,
   )?;
   let exists_state = state.clone();
@@ -212,12 +234,15 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let virtual_path = relative_path.virtual_path().to_string();
       let event_tip = file_tip(table, method)?;
       let assets_root = remove_state.borrow().context.assets_root.clone();
-      let path = resolve_file_path(
+      let Some(path) = resolve_request_path(
         &assets_root,
         &relative_path,
         SandboxPathKind::Removable,
         method,
-      )?;
+      )?
+      else {
+        return Ok(None);
+      };
       let request_id = enqueue_file_request(
         &remove_state,
         FileTask::LuaRemove {
@@ -230,7 +255,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(Value::Integer(request_id as i64))
+      Ok(request_id)
     })?,
   )?;
   let list_state = state.clone();
@@ -254,33 +279,34 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         value => args::boolean(value, method, "recursive")?,
       };
       let file_type = match table.get::<Value>("file_type")? {
-        Value::Nil => None,
-        value => {
-          let value = args::string(value, method, "file_type")?;
-          if value.eq_ignore_ascii_case("all") {
-            None
-          } else if value.is_empty()
-            || value.starts_with('.')
-            || !value
-              .chars()
-              .all(|value| value.is_ascii_alphanumeric() || matches!(value, '_' | '-' | '+'))
-          {
-            return Err(args::message(
-              method,
-              "file_type must be an extension such as 'rs'",
-            ));
-          } else {
-            Some(value.to_ascii_lowercase())
-          }
-        }
+        Value::Nil => "all".to_string(),
+        value => args::string(value, method, "file_type")?,
+      };
+      let file_type = if file_type.eq_ignore_ascii_case("all") {
+        None
+      } else if file_type.is_empty()
+        || file_type.starts_with('.')
+        || !file_type
+          .chars()
+          .all(|value| value.is_ascii_alphanumeric() || matches!(value, '_' | '-' | '+'))
+      {
+        return Err(args::message(
+          method,
+          "file_type must be an extension such as 'rs'",
+        ));
+      } else {
+        Some(file_type.to_ascii_lowercase())
       };
       let event_tip = file_tip(table, method)?;
-      let path = resolve_file_path(
+      let Some(path) = resolve_request_path(
         &list_state.borrow().context.assets_root,
         &relative_path,
         SandboxPathKind::Directory,
         method,
-      )?;
+      )?
+      else {
+        return Ok(None);
+      };
       let request_id = enqueue_file_request(
         &list_state,
         FileTask::LuaListDir {
@@ -292,7 +318,7 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(Value::Integer(request_id as i64))
+      Ok(request_id)
     })?,
   )?;
   readonly::proxy(lua, source)
@@ -384,26 +410,31 @@ pub(super) fn file_tip(table: &Table, method: &str) -> mlua::Result<Option<Strin
   }
 }
 
-fn resolve_file_path(
-  root: &Path,
-  relative: &SafeRelativePath,
-  kind: SandboxPathKind,
-  method: &str,
-) -> mlua::Result<PathBuf> {
-  resolve_sandbox_path(root, relative, kind)
-    .map_err(|error| args::message(method, format!("unsafe asset path: {error}")))
-}
-
+/// Reserve a file request slot and return its string ID, or return `None` when admission is full.
+///
+/// # Arguments
+///
+/// * `state` - The session that owns the request and its result.
+/// * `task` - The validated background file operation.
+/// * `operation` - The result event's operation kind.
+/// * `virtual_path` - The asset path visible to the script.
+/// * `event_tip` - The optional text returned with the result event.
 fn enqueue_file_request(
   state: &SharedApiState,
   task: FileTask,
   operation: LuaFileOperation,
   virtual_path: String,
   event_tip: Option<String>,
-) -> u64 {
+) -> Option<String> {
   let mut state = state.borrow_mut();
+  if state.pending_file_request_ids.len() >= MAX_LUA_FILE_TASKS_PER_SESSION
+    || state.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
+  {
+    return None;
+  }
   let request_id = state.next_file_request_id;
   state.next_file_request_id = state.next_file_request_id.wrapping_add(1).max(1);
+  state.pending_file_request_ids.insert(request_id);
   push_host_command(
     &mut state,
     LuaHostCommand::FileRequest {
@@ -414,5 +445,5 @@ fn enqueue_file_request(
       event_tip,
     },
   );
-  request_id
+  Some(request_id.to_string())
 }

@@ -18,7 +18,7 @@
 | `string` | 常量 `AUTO`, `PLAIN_TEXT`, `RICH_TEXT`；函数 `lower`, `upper`, `reverse`, `regex_escape`, `split`, `sub`, `rep`, `find`, `match`, `gmatch`, `gsub`, `regex_find`, `regex_match`, `regex_gmatch`, `regex_gsub`, `regex_test`, `regex_split`, `format`, `rich_text_to_plain_text` |
 | `utf8` | `len`, `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints`, `next` |
 
-更多调用示例见⌞[API 总览](API.md)⌝。
+更多调用示例见⌊[API 总览](API.md)⌉。
 
 ### 项目扩展
 
@@ -50,7 +50,7 @@
 | `loader` | `require`, `dofile`, `loadfile` |
 | `file` | `read`, `write`, `create_dir`, `exists`, `remove`, `list_dir`；另有编码与换行常量，详见 `api/file.md` |
 
-各库的参数、返回值和使用限制见⌞[API 总览](API.md)⌝。
+各库的参数、返回值和使用限制见⌊[API 总览](API.md)⌉。
 
 ### 尚未开放
 
@@ -71,6 +71,6 @@
 - `math.max/min` 接收一个数值数组，`math.log` 要求显式给出底数，`math.fmod` 只接受整数。其余限制查看各方法说明。
 - `utf8` 仅提供上表列出的名字，没有 `utf8.codepoint`、`utf8.byte_position` 或 `utf8.position` 别名。
 - 使用 `string.sub(text, start, options)` 等库函数；不支持借助字符串冒号方法调用原生接口。
-- 相关多个结果按顺序返回；捕获列表、解码对象和配置列表等数据本身仍为表。查看⌞[Lua API 调用约定](LUA_API_MIGRATION.md)⌝。
+- 相关多个结果按顺序返回；捕获列表、解码对象和配置列表等数据本身仍为表。查看⌊[Lua API 调用约定](LUA_API_MIGRATION.md)⌉。
 
 按键兼容性：动作允许共享绑定，宿主层优先，各层 priority 降序、实际命中组合键优先、注册顺序优先。held 改为 pressed 后下一宿主帧只发送一次，持续移动请保存状态并在 Update 中处理。失焦、覆盖屏和拒收补发已交付输入的 released；event 队列控制不影响 key 或收尾释放。schema 2 和已有改键存档保持有效。

@@ -655,7 +655,7 @@ end
 - 每个计时器每帧最多触发一次；投递上限为每帧 128 条，待处理上限 1024 条。
 - 暂停、重置、重启、修改、删除或清空计时器会让尚未投递的旧事件失效。
 - delay、repeat、sleep 为预留类型，没有对应的脚本 API。
-- 查看⌞[计时器事件](../EVENT.md#41-timer)⌝与⌞[timer 库](../api/timer.md)⌝。
+- 查看⌊[计时器事件](../EVENT.md#41-timer)⌉与⌊[timer 库](../api/timer.md)⌉。
 
 ---
 
@@ -669,7 +669,7 @@ end
 {
   type = "animation",
   data = {
-    id = ...,         -- integer
+    id = ...,         -- string
     kind = ...,       -- string
     name = ...,       -- string / nil
     completed = ...,  -- integer / nil
@@ -679,7 +679,7 @@ end
 
 | 字段        | 类型          | 说明                                   |
 | ----------- | ------------- | -------------------------------------- |
-| `id`        | integer       | 当前会话内的动画 ID                    |
+| `id`        | string        | 当前会话内的动画 ID                    |
 | `kind`      | string        | 动画事件类型                           |
 | `name`      | string / nil  | 标记事件中出现，表示当前触发的标记名称 |
 | `completed` | integer / nil | 循环事件中出现，表示已经完成的循环次数 |
@@ -709,7 +709,7 @@ end
   sequence = X,
   data =
   {
-    id = 2,
+    id = "2",
     kind = "marker",
     name = "impact",
   },
@@ -744,7 +744,7 @@ end
 {
   type = "file",
   data = {
-    request_id = ...,  -- integer
+    request_id = ...,  -- string
     kind = ...,        -- string
     path = ...,        -- string
     tip = ...,         -- string / nil
@@ -759,7 +759,7 @@ end
 
 | 字段         | 类型         | 说明                                                |
 | ------------ | ------------ | --------------------------------------------------- |
-| `request_id` | integer      | 当前会话内的请求 ID                                 |
+| `request_id` | string       | 当前会话内的请求 ID                                 |
 | `kind`       | string       | 文件操作类型                                        |
 | `path`       | string       | 调用方可见的虚拟相对路径                            |
 | `tip`        | string / nil | 请求传入 event_tip 时出现，原样返回调用方的事件标记 |
@@ -794,7 +794,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 4,
+    request_id = "4",
     kind = "read_text",
     path = "config/state.txt",
     tip = "load_state",
@@ -809,7 +809,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 5,
+    request_id = "5",
     kind = "create_dir",
     path = "save/slot-a",
     tip = "create_slot",
@@ -823,7 +823,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 6,
+    request_id = "6",
     kind = "remove",
     path = "save/slot-a",
     tip = "remove_slot",
@@ -880,7 +880,7 @@ end
 {
   type = "image",
   data = {
-    request_id = ...,  -- integer
+    request_id = ...,  -- string
     kind = ...,        -- string
     ok = ...,          -- boolean
     output = ...,      -- string / nil
@@ -889,13 +889,13 @@ end
 }
 ```
 
-| 字段         | 类型         | 说明                                         |
-| ------------ | ------------ | -------------------------------------------- |
-| `request_id` | integer      | 当前会话内的请求 ID                          |
-| `kind`       | string       | 图片操作类型                                 |
-| `ok`         | boolean      | 转换是否成功                                 |
+| 字段         | 类型         | 说明                                                                  |
+| ------------ | ------------ | --------------------------------------------------------------------- |
+| `request_id` | string       | 当前会话内的请求 ID                                                   |
+| `kind`       | string       | 图片操作类型                                                          |
+| `ok`         | boolean      | 转换是否成功                                                          |
 | `output`     | string / nil | 转换成功时出现，表示可直接交给 `draw.text(x, y, output)` 的终端富文本 |
-| `error`      | table / nil  | 转换失败时出现，包含通用错误码和错误说明     |
+| `error`      | table / nil  | 转换失败时出现，包含通用错误码和错误说明                              |
 
 ### 发送条件
 
@@ -922,7 +922,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 5,
+    request_id = "5",
     kind = "convert",
     ok = true,
     output = "f%<bg:#000000><fg:#ffffff>▅",
@@ -948,7 +948,7 @@ end
 {
   type = "network",
   data = {
-    request_id = ...,  -- integer
+    request_id = ...,  -- string
     kind = ...,        -- string
     url = ...,         -- string
     ok = ...,          -- boolean
@@ -964,7 +964,7 @@ end
 
 | 字段         | 类型          | 说明                                              |
 | ------------ | ------------- | ------------------------------------------------- |
-| `request_id` | integer       | 当前会话内的请求 ID                               |
+| `request_id` | string        | 当前会话内的请求 ID                               |
 | `kind`       | string        | 网络请求类型                                      |
 | `url`        | string        | 原始规范化 URL                                    |
 | `ok`         | boolean       | 请求是否正常完成                                  |
@@ -1000,7 +1000,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 6,
+    request_id = "6",
     kind = "get",
     url = "https://example.com/data",
     ok = true,
@@ -1040,7 +1040,7 @@ end
 {
   type = "i18n",
   data = {
-    request_id = ...,              -- integer
+    request_id = ...,              -- string
     kind = ...,                    -- string
     ok = ...,                      -- boolean
     warning = ...,                 -- string / nil
@@ -1051,15 +1051,15 @@ end
 }
 ```
 
-| 字段                     | 类型    | 说明                                                             |
-| ------------------------ | ------- | ---------------------------------------------------------------- |
-| `request_id`             | integer | 与 `i18n.create(options)` 或 `i18n.reload(options)` 返回的会话内请求 ID 相同   |
-| `kind`                   | string  | 语言加载事件类型                                                 |
-| `ok`                     | boolean | 本次语言加载是否成功                                             |
-| `message`                | string  | 经过净化的加载结果说明                                           |
-| `warning` | string / nil | 首选语言或回退语言缺少目录、JSON 时的提示；无警告时为 nil |
-| `language_code`          | string  | 请求指定的首选语言代码，缺失时也不切换为回退代码 |
-| `callback_language_code` | string  | 本次请求使用的备用语言代码                                       |
+| 字段                     | 类型         | 说明                                                                         |
+| ------------------------ | ------------ | ---------------------------------------------------------------------------- |
+| `request_id`             | string       | 与 `i18n.create(options)` 或 `i18n.reload(options)` 返回的会话内请求 ID 相同 |
+| `kind`                   | string       | 语言加载事件类型                                                             |
+| `ok`                     | boolean      | 本次语言加载是否成功                                                         |
+| `message`                | string       | 经过净化的加载结果说明                                                       |
+| `warning`                | string / nil | 首选语言或回退语言缺少目录、JSON 时的提示；无警告时为 nil                    |
+| `language_code`          | string       | 请求指定的首选语言代码，缺失时也不切换为回退代码                             |
+| `callback_language_code` | string       | 本次请求使用的备用语言代码                                                   |
 
 ### 发送条件
 
@@ -1126,7 +1126,7 @@ end
 {
   type = "audio",
   data = {
-    id = ...,           -- integer
+    id = ...,           -- string
     kind = ...,         -- string
     duration_ms = ...,  -- integer / nil
     position_ms = ...,  -- integer / nil
@@ -1137,7 +1137,7 @@ end
 
 | 字段          | 类型          | 说明                                                                        |
 | ------------- | ------------- | --------------------------------------------------------------------------- |
-| `id`          | integer       | 当前会话内的音频对象 ID                                                     |
+| `id`          | string        | 当前会话内的音频对象 ID                                                     |
 | `kind`        | string        | 音频事件类型                                                                |
 | `duration_ms` | integer / nil | ready、finished 事件中出现，表示音频总时长，单位为毫秒                      |
 | `position_ms` | integer / nil | started、paused、resumed、finished 事件中出现，表示当前播放位置，单位为毫秒 |
@@ -1168,7 +1168,7 @@ end
   sequence = X,
   data =
   {
-    id = 7,
+    id = "7",
     kind = "paused",
     position_ms = 530,
   },
@@ -1207,7 +1207,7 @@ end
 {
   type = "hit_area",
   data = {
-    id = ...,      -- integer
+    id = ...,      -- string
     kind = ...,    -- string
     x = ...,       -- integer
     y = ...,       -- integer
@@ -1220,7 +1220,7 @@ end
 
 | 字段     | 类型          | 说明                                         |
 | -------- | ------------- | -------------------------------------------- |
-| `id`     | integer       | 当前会话内的点击区域 ID                      |
+| `id`     | string        | 当前会话内的点击区域 ID                      |
 | `kind`   | string        | 点击区域事件类型                             |
 | `x`      | integer       | 事件的水平坐标                               |
 | `y`      | integer       | 事件的垂直坐标                               |
@@ -1253,7 +1253,7 @@ end
   sequence = X,
   data =
   {
-    id = 8,
+    id = "8",
     kind = "drag",
     x = 30,
     y = 12,
@@ -1294,18 +1294,18 @@ end
 {
   type = "hyperlink",
   data = {
-    id = ...,    -- integer
+    id = ...,    -- string
     kind = ...,  -- string
     link = ...,  -- string
   },
 }
 ```
 
-| 字段   | 类型    | 说明                      |
-| ------ | ------- | ------------------------- |
-| `id`   | integer | 当前会话内的超链接对象 ID |
-| `kind` | string  | 超链接事件类型            |
-| `link` | string  | 超链接目标                |
+| 字段   | 类型   | 说明                      |
+| ------ | ------ | ------------------------- |
+| `id`   | string | 当前会话内的超链接对象 ID |
+| `kind` | string | 超链接事件类型            |
+| `link` | string | 超链接目标                |
 
 ### 发送条件
 
@@ -1332,7 +1332,7 @@ end
   sequence = X,
   data =
   {
-    id = 9,
+    id = "9",
     kind = "clicked",
     link = "https://example.com",
   },
@@ -1356,7 +1356,7 @@ Markdown 文本中的链接点击事件。
 {
   type = "markdown",
   data = {
-    id = ...,    -- integer
+    id = ...,    -- string
     kind = ...,  -- string
     href = ...,  -- string
     text = ...,  -- string
@@ -1364,12 +1364,12 @@ Markdown 文本中的链接点击事件。
 }
 ```
 
-| 字段   | 类型    | 说明                          |
-| ------ | ------- | ----------------------------- |
-| `id`   | integer | 当前会话内的 Markdown 对象 ID |
-| `kind` | string  | Markdown 事件类型             |
-| `href` | string  | 被点击链接的目标              |
-| `text` | string  | 被点击链接的显示文本          |
+| 字段   | 类型   | 说明                          |
+| ------ | ------ | ----------------------------- |
+| `id`   | string | 当前会话内的 Markdown 对象 ID |
+| `kind` | string | Markdown 事件类型             |
+| `href` | string | 被点击链接的目标              |
+| `text` | string | 被点击链接的显示文本          |
 
 ### 发送条件
 
@@ -1396,7 +1396,7 @@ end
   sequence = X,
   data =
   {
-    id = 10,
+    id = "10",
     kind = "link_clicked",
     href = "guide.md",
     text = "Guide",
@@ -1421,7 +1421,7 @@ end
 {
   type = "text_input",
   data = {
-    id = ...,     -- integer
+    id = ...,     -- string
     kind = ...,   -- string
     value = ...,  -- string / nil
   },
@@ -1430,7 +1430,7 @@ end
 
 | 字段    | 类型         | 说明                                           |
 | ------- | ------------ | ---------------------------------------------- |
-| `id`    | integer      | 当前会话内的文本输入对象 ID                    |
+| `id`    | string       | 当前会话内的文本输入对象 ID                    |
 | `kind`  | string       | 文本输入事件类型                               |
 | `value` | string / nil | 内容变化、提交或取消时出现，表示当时的文本内容 |
 
@@ -1459,7 +1459,7 @@ end
   sequence = X,
   data =
   {
-    id = 11,
+    id = "11",
     kind = "changed",
     value = "player",
   },
@@ -1494,7 +1494,7 @@ end
 {
   type = "scroll_box",
   data = {
-    id = ...,    -- integer
+    id = ...,    -- string
     kind = ...,  -- string
     x = ...,     -- integer
     y = ...,     -- integer
@@ -1504,7 +1504,7 @@ end
 
 | 字段   | 类型    | 说明                  |
 | ------ | ------- | --------------------- |
-| `id`   | integer | 当前会话内的滚动框 ID |
+| `id`   | string  | 当前会话内的滚动框 ID |
 | `kind` | string  | 滚动框事件类型        |
 | `x`    | integer | 当前水平滚动位置      |
 | `y`    | integer | 当前垂直滚动位置      |
@@ -1534,7 +1534,7 @@ end
   sequence = X,
   data =
   {
-    id = 12,
+    id = "12",
     kind = "scrolled",
     x = 5,
     y = 20,

@@ -44,13 +44,15 @@ pub(super) fn timer(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       let options = schedule_options(&binding, method)?;
       with_pool_mut(&create_state, method, |pool| {
         if pool.timers.len() >= MAX_TIMERS {
-          return Err(args::message(method, "timer limit of 1024 was reached"));
+          return Ok(None);
         }
-        let id = TimeService::new()
-          .create_scheduled_timer(&mut pool.runtime_mut().time, options)
-          .map_err(|error| args::message(method, error.to_string()))?;
+        let Ok(id) =
+          TimeService::new().create_scheduled_timer(&mut pool.runtime_mut().time, options)
+        else {
+          return Ok(None);
+        };
         pool.timers.insert(id, binding);
-        Ok(format_id(id))
+        Ok(Some(format_id(id)))
       })
     })?,
   )?;

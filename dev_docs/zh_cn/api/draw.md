@@ -14,7 +14,6 @@
 | `fill_rect`   | 填充一个矩形区域           | [fill_rect](#fill_rect)     |
 | `stroke_rect` | 绘制一个矩形边框           | [stroke_rect](#stroke_rect) |
 | `erase_rect`  | 擦除指定矩形区域           | [erase_rect](#erase_rect)   |
-| `render`      | 请求执行一次 `Render` 回调 | [render](#render)           |
 
 ---
 
@@ -42,27 +41,27 @@ draw.text
 
 ### 选填参数
 
-| 参数名             | 类型                 | 默认值        | 说明                                |
-| ------------------ | -------------------- | ------------- | ----------------------------------- |
-| `fg`               | string / const-color | `color.NONE`  | 前景色                              |
-| `bg`               | string / const-color | `color.NONE`  | 背景色                              |
-| `horizontal_align` | const-align          | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式  |
-| `auto_wrap`        | boolean              | `true`        | 是否自动换行                        |
-| `word_wrap`        | boolean              | `true`        | 是否按完整单词换行                  |
-| `max_width`        | integer / nil        | `nil`         | 最大绘制宽度 |
-| `max_height`       | integer / nil        | `nil`         | 最大绘制高度 |
-| `overflow_marker`  | string               | `"..."`       | 文本溢出时使用的省略标记            |
-| `text_mode`        | const-string         | `string.AUTO` | 文本解析模式                        |
-| `rich_params`      | table / nil          | `nil`         | 富文本参数                          |
-| `bold`             | boolean              | `false`       | 粗体                                |
-| `italic`           | boolean              | `false`       | 斜体                                |
-| `underline`        | boolean              | `false`       | 下划线                              |
-| `strike`           | boolean              | `false`       | 删除线                              |
-| `blink`            | boolean              | `false`       | 闪烁                                |
-| `reverse`          | boolean              | `false`       | 反显                                |
-| `hidden`           | boolean              | `false`       | 隐藏                                |
-| `dim`              | boolean              | `false`       | 暗淡                                |
-| `slice_layer`      | string               | `"base"`      | 绘制目标切片图层                    |
+| 参数名             | 类型                 | 默认值        | 说明                               |
+| ------------------ | -------------------- | ------------- | ---------------------------------- |
+| `fg`               | string / const-color | `color.NONE`  | 前景色                             |
+| `bg`               | string / const-color | `color.NONE`  | 背景色                             |
+| `horizontal_align` | const-align          | `align.LEFT`  | 各行相对于最长显示行的水平对齐方式 |
+| `auto_wrap`        | boolean              | `true`        | 是否自动换行                       |
+| `word_wrap`        | boolean              | `true`        | 是否按完整单词换行                 |
+| `max_width`        | integer / nil        | `nil`         | 最大绘制宽度                       |
+| `max_height`       | integer / nil        | `nil`         | 最大绘制高度                       |
+| `overflow_marker`  | string               | `"..."`       | 文本溢出时使用的省略标记           |
+| `text_mode`        | const-string         | `string.AUTO` | 文本解析模式                       |
+| `rich_params`      | table / nil          | `nil`         | 富文本参数                         |
+| `bold`             | boolean              | `false`       | 粗体                               |
+| `italic`           | boolean              | `false`       | 斜体                               |
+| `underline`        | boolean              | `false`       | 下划线                             |
+| `strike`           | boolean              | `false`       | 删除线                             |
+| `blink`            | boolean              | `false`       | 闪烁                               |
+| `reverse`          | boolean              | `false`       | 反显                               |
+| `hidden`           | boolean              | `false`       | 隐藏                               |
+| `dim`              | boolean              | `false`       | 暗淡                               |
+| `slice_layer`      | string               | `"base"`      | 绘制目标切片图层                   |
 
 ## 返回值
 
@@ -99,12 +98,12 @@ draw.fill_rect
 
 ### 必填参数
 
-| 参数名   | 类型    | 说明                    |
-| -------- | ------- | ----------------------- |
-| `x`      | integer | 矩形左上角的 x 坐标     |
-| `y`      | integer | 矩形左上角的 y 坐标     |
-| `width`  | integer | 矩形宽度 |
-| `height` | integer | 矩形高度 |
+| 参数名   | 类型    | 说明                |
+| -------- | ------- | ------------------- |
+| `x`      | integer | 矩形左上角的 x 坐标 |
+| `y`      | integer | 矩形左上角的 y 坐标 |
+| `width`  | integer | 矩形宽度            |
+| `height` | integer | 矩形高度            |
 
 ### 选填参数
 
@@ -152,12 +151,12 @@ draw.stroke_rect
 
 ### 必填参数
 
-| 参数名   | 类型    | 说明                    |
-| -------- | ------- | ----------------------- |
-| `x`      | integer | 矩形左上角的 x 坐标     |
-| `y`      | integer | 矩形左上角的 y 坐标     |
-| `width`  | integer | 矩形宽度 |
-| `height` | integer | 矩形高度 |
+| 参数名   | 类型    | 说明                |
+| -------- | ------- | ------------------- |
+| `x`      | integer | 矩形左上角的 x 坐标 |
+| `y`      | integer | 矩形左上角的 y 坐标 |
+| `width`  | integer | 矩形宽度            |
+| `height` | integer | 矩形高度            |
 
 ### 选填参数
 
@@ -165,7 +164,7 @@ draw.stroke_rect
 | ------------- | -------------------- | ------------ | ---------------- |
 | `fg`          | string / const-color | `color.NONE` | 边框前景色       |
 | `bg`          | string / const-color | `color.NONE` | 边框背景色       |
-| `border_char` | const-char / table   | `char.LINE`  | 边框字符         |
+| `border_char` | table / const-char   | `char.LINE`  | 边框字符         |
 | `slice_layer` | string               | `"base"`     | 绘制目标切片图层 |
 
 ## 返回值
@@ -229,12 +228,12 @@ draw.erase_rect
 
 ### 必填参数
 
-| 参数名   | 类型    | 说明                    |
-| -------- | ------- | ----------------------- |
-| `x`      | integer | 矩形左上角的 x 坐标     |
-| `y`      | integer | 矩形左上角的 y 坐标     |
-| `width`  | integer | 矩形宽度 |
-| `height` | integer | 矩形高度 |
+| 参数名   | 类型    | 说明                |
+| -------- | ------- | ------------------- |
+| `x`      | integer | 矩形左上角的 x 坐标 |
+| `y`      | integer | 矩形左上角的 y 坐标 |
+| `width`  | integer | 矩形宽度            |
+| `height` | integer | 矩形高度            |
 
 ### 选填参数
 
@@ -257,34 +256,3 @@ draw.erase_rect(3, 2, 8, 2)
 **输出：**
 
 ![draw_erase_rect_example](../image/draw_erase_rect_example.png)
-
----
-
-## `render`
-
-请求执行一次 `Render` 回调。
-
-### 调用
-
-```lua
-draw.render
-```
-
-## 返回值
-
-无返回值。
-
-### 示例
-
-```lua
-function HandleEvent(event)
-	draw.render()
-end
-
-function Render()
-	-- 绘制逻辑
-end
-```
-## 额外说明
-
-- **不可**在 `Render` 回调中调用。
