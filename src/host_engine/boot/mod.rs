@@ -1,3 +1,5 @@
+//! Boot-phase resource initialization and preparation of application-owned runtime state.
+
 use std::io;
 use std::path::PathBuf;
 use std::thread;
@@ -10,9 +12,13 @@ use crate::host_engine::core::{
 use crate::host_engine::services::{HOST_VERSION, HostLogMessage, LogSource, PackageEvent};
 use crate::host_engine::ui::{BootLoadingUi, BootProgress, BootStage};
 
-/// Prepares the engine and keeps ownership of partially initialized services
-/// when a supervised, post-terminal Boot fault occurs. This lets the caller
-/// show the normal exception page and perform an orderly shutdown.
+/// Initialize deployment resources and services, then return the application state or retained
+/// boot fault.
+///
+/// # Errors
+///
+/// Return an error when deployment paths, essential services, or boot resources cannot be
+/// initialized.
 pub fn prepare(deployment_root: PathBuf) -> io::Result<BootOutput> {
   let mut services = EngineServices::new(deployment_root)?;
   let world = RuntimeWorld::new();
@@ -167,9 +173,12 @@ fn wait_for_initial_package_scan(services: &mut EngineServices) -> Result<(), Ho
     for event in services.async_runtime.poll_events() {
       match event {
         EngineEvent::Package(event) => {
-          let event = services
+          let Some(event) = services
             .package
-            .handle_async_event(event, &mut services.log);
+            .handle_async_event(event, &mut services.log)
+          else {
+            continue;
+          };
           match event {
             PackageEvent::ScanStarted { total: value } => total = value,
             PackageEvent::ScanProgress {

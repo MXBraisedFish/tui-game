@@ -1,3 +1,5 @@
+//! Security settings page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -8,17 +10,17 @@ use crate::host_engine::services::{
 };
 
 const NS: &str = "security_settings";
-const MENU_LEN: usize = 6;
-const ROW_LEN: usize = 6;
-const DEFAULT_START: usize = 4;
+const MENU_LEN: usize = 5;
+const ROW_LEN: usize = 5;
+const DEFAULT_START: usize = 3;
 const LABEL_KEYS: [&str; ROW_LEN] = [
-  "security_settings.security_details",
   "security_settings.reset_terminal",
   "security_settings.mod.reset.status",
   "security_settings.mod.reset.debug",
   "security_settings.mod.default.status",
   "security_settings.mod.default.debug",
 ];
+/// The state and owned widgets of the security settings view.
 pub struct SecuritySettingsUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -29,14 +31,20 @@ pub struct SecuritySettingsUi {
   default_debug: bool,
 }
 
+/// An application request produced by security settings interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SecuritySettingsCommand {
+  /// A request to back.
   Back,
-  OpenDetails,
+  /// The reset terminal setting for security settings command.
   ResetTerminal,
+  /// The reset status setting for security settings command.
   ResetStatus,
+  /// The reset debug setting for security settings command.
   ResetDebug,
+  /// A request to set default status.
   SetDefaultStatus(bool),
+  /// A request to set default debug.
   SetDefaultDebug(bool),
 }
 
@@ -59,6 +67,7 @@ impl RuntimeObjectPoolOwner for SecuritySettingsUi {
 }
 
 impl SecuritySettingsUi {
+  /// Create the security settings view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -72,6 +81,7 @@ impl SecuritySettingsUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the security settings view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       action("security_settings.focus_up", "up", "Focus previous option"),
@@ -83,38 +93,34 @@ impl SecuritySettingsUi {
       ),
       action("security_settings.back", "esc", "Back to settings"),
       action(
-        "security_settings.focus_security_details",
-        "1",
-        "Focus security details",
-      ),
-      action(
         "security_settings.focus_reset_terminal",
-        "2",
+        "1",
         "Focus terminal capability reset",
       ),
       action(
         "security_settings.focus_reset_status",
-        "3",
+        "2",
         "Focus package status reset",
       ),
       action(
         "security_settings.focus_reset_debug",
-        "4",
+        "3",
         "Focus package debug reset",
       ),
       action(
         "security_settings.focus_default_status",
-        "5",
+        "4",
         "Focus default package status",
       ),
       action(
         "security_settings.focus_default_debug",
-        "6",
+        "5",
         "Focus default package debug",
       ),
     ]
   }
 
+  /// Interpret a security settings UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<SecuritySettingsCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -144,18 +150,18 @@ impl SecuritySettingsUi {
         }
         "security_settings.confirm" => self.confirm_selected(),
         "security_settings.back" => Some(SecuritySettingsCommand::Back),
-        "security_settings.focus_security_details" => self.focus(0),
-        "security_settings.focus_reset_terminal" => self.focus(1),
-        "security_settings.focus_reset_status" => self.focus(2),
-        "security_settings.focus_reset_debug" => self.focus(3),
-        "security_settings.focus_default_status" => self.focus(4),
-        "security_settings.focus_default_debug" => self.focus(5),
+        "security_settings.focus_reset_terminal" => self.focus(0),
+        "security_settings.focus_reset_status" => self.focus(1),
+        "security_settings.focus_reset_debug" => self.focus(2),
+        "security_settings.focus_default_status" => self.focus(3),
+        "security_settings.focus_default_debug" => self.focus(4),
         _ => None,
       },
       _ => None,
     }
   }
 
+  /// Advance the security settings view's transient state for this host frame.
   pub fn update(&mut self, _dt: Duration) {}
 
   fn focus(&mut self, index: usize) -> Option<SecuritySettingsCommand> {
@@ -163,11 +169,21 @@ impl SecuritySettingsUi {
     None
   }
 
+  /// Update the defaults used by this security settings ui.
   pub fn set_defaults(&mut self, enabled: bool, debug: bool) {
     self.default_enabled = enabled;
     self.default_debug = debug;
   }
 
+  /// Draw the security settings view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -261,11 +277,10 @@ impl SecuritySettingsUi {
 
   fn confirm_selected(&self) -> Option<SecuritySettingsCommand> {
     Some(match self.selected_index {
-      0 => SecuritySettingsCommand::OpenDetails,
-      1 => SecuritySettingsCommand::ResetTerminal,
-      2 => SecuritySettingsCommand::ResetStatus,
-      3 => SecuritySettingsCommand::ResetDebug,
-      4 => SecuritySettingsCommand::SetDefaultStatus(!self.default_enabled),
+      0 => SecuritySettingsCommand::ResetTerminal,
+      1 => SecuritySettingsCommand::ResetStatus,
+      2 => SecuritySettingsCommand::ResetDebug,
+      3 => SecuritySettingsCommand::SetDefaultStatus(!self.default_enabled),
       _ => SecuritySettingsCommand::SetDefaultDebug(!self.default_debug),
     })
   }
@@ -332,10 +347,10 @@ impl SecuritySettingsUi {
 
   fn value_key(&self, index: usize) -> Option<&'static str> {
     match index {
-      4 if self.default_enabled => Some("security_settings.reset.status.on"),
-      4 => Some("security_settings.reset.status.off"),
-      5 if self.default_debug => Some("security_settings.reset.debug.on"),
-      5 => Some("security_settings.reset.debug.off"),
+      3 if self.default_enabled => Some("security_settings.reset.status.on"),
+      3 => Some("security_settings.reset.status.off"),
+      4 if self.default_debug => Some("security_settings.reset.debug.on"),
+      4 => Some("security_settings.reset.debug.off"),
       _ => None,
     }
   }
@@ -371,6 +386,7 @@ fn action(name: &str, key: &str, description: &str) -> ActionMapEntry {
     action: name.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }
 
@@ -379,14 +395,33 @@ mod tests {
   use super::*;
 
   #[test]
+  fn menu_contains_only_security_settings_actions() {
+    assert_eq!(LABEL_KEYS.len(), MENU_LEN);
+
+    let mut ui = SecuritySettingsUi::init(&HitAreaService::new());
+    let expected = [
+      SecuritySettingsCommand::ResetTerminal,
+      SecuritySettingsCommand::ResetStatus,
+      SecuritySettingsCommand::ResetDebug,
+      SecuritySettingsCommand::SetDefaultStatus(false),
+      SecuritySettingsCommand::SetDefaultDebug(true),
+    ];
+
+    for (index, command) in expected.into_iter().enumerate() {
+      ui.selected_index = index;
+      assert_eq!(ui.confirm_selected(), Some(command));
+    }
+  }
+
+  #[test]
   fn default_options_are_focusable_and_emit_switch_commands() {
     let mut ui = SecuritySettingsUi::init(&HitAreaService::new());
-    ui.selected_index = 4;
+    ui.selected_index = 3;
     assert_eq!(
       ui.confirm_selected(),
       Some(SecuritySettingsCommand::SetDefaultStatus(false))
     );
-    ui.selected_index = 5;
+    ui.selected_index = 4;
     assert_eq!(
       ui.confirm_selected(),
       Some(SecuritySettingsCommand::SetDefaultDebug(true))

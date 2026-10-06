@@ -1,3 +1,5 @@
+//! Fonts settings page state, user commands, and terminal-cell presentation.
+
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
   HitAreaOptions, HitAreaService, I18nService, KeyState, LayoutService, MouseButton, Overflow,
@@ -9,24 +11,50 @@ use crate::host_engine::services::{
 
 const NS: &str = "fonts_settings";
 
+/// The services and view state needed to draw fonts settings.
+///
+/// # Fields
+///
+/// * `render` - The &'a mut render service instance used by this owner.
+/// * `canvas` - The &'a mut canvas service instance used by this owner.
+/// * `layout` - The &'a layout service instance used by this owner.
+/// * `i18n` - The &'a i18n service instance used by this owner.
+/// * `hit_area` - The &'a hit area service instance used by this owner.
+/// * `text_input` - The &'a text input service instance used by this owner.
+/// * `scroll_box` - The &'a scroll box service instance used by this owner.
 pub(crate) struct FontsSettingsRenderContext<'a> {
+  /// The &'a mut render service instance used by this owner.
   pub(crate) render: &'a mut RenderService,
+  /// The &'a mut canvas service instance used by this owner.
   pub(crate) canvas: &'a mut CanvasService,
+  /// The &'a layout service instance used by this owner.
   pub(crate) layout: &'a LayoutService,
+  /// The &'a i18n service instance used by this owner.
   pub(crate) i18n: &'a I18nService,
+  /// The &'a hit area service instance used by this owner.
   pub(crate) hit_area: &'a HitAreaService,
+  /// The &'a text input service instance used by this owner.
   pub(crate) text_input: &'a TextInputService,
+  /// The &'a scroll box service instance used by this owner.
   pub(crate) scroll_box: &'a ScrollBoxService,
 }
 
+/// An application request produced by fonts settings interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FontsSettingsCommand {
+  /// A request to back.
   Back(Vec<String>),
+  /// A request to export preview.
   ExportPreview(Vec<String>),
+  /// A request to start add.
   StartAdd,
+  /// A request to start modify.
   StartModify,
+  /// The finish edit setting for fonts settings command.
   FinishEdit(String),
+  /// A request to cancel edit.
   CancelEdit,
+  /// The scroll setting for fonts settings command.
   Scroll(i32),
 }
 
@@ -36,6 +64,7 @@ enum FontEditMode {
   Modify(usize),
 }
 
+/// The state and owned widgets of the fonts settings view.
 pub struct FontsSettingsUi {
   scroll: ScrollBoxId,
   input: TextInputId,
@@ -48,6 +77,18 @@ pub struct FontsSettingsUi {
 }
 
 impl FontsSettingsUi {
+  /// Create an owned fonts settings ui object and return its identity.
+  ///
+  /// # Arguments
+  ///
+  /// * `objects` - The session or page object pool.
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `failed to create font settings scroll box`.
   pub fn create(
     objects: &mut UiObjectPool,
     hit_area: &HitAreaService,
@@ -92,6 +133,7 @@ impl FontsSettingsUi {
     }
   }
 
+  /// Load font preferences and reset selection, scrolling, and pending edits.
   pub fn enter(&mut self, fonts: Vec<String>) {
     self.fonts = fonts;
     self.selected = self.selected.min(self.fonts.len().saturating_sub(1));
@@ -99,12 +141,14 @@ impl FontsSettingsUi {
     self.edit_mode = None;
   }
 
+  /// Clear and focus the font-name input for appending a font preference.
   pub fn start_add(&mut self, objects: &mut UiObjectPool, text_input: &mut TextInputService) {
     self.edit_mode = Some(FontEditMode::Add);
     let _ = text_input.clear(objects, self.input);
     let _ = text_input.focus(objects, self.input);
   }
 
+  /// Focus the font-name input with the selected existing preference.
   pub fn start_modify(&mut self, objects: &mut UiObjectPool, text_input: &mut TextInputService) {
     let Some(value) = self.fonts.get(self.selected).cloned() else {
       return;
@@ -114,6 +158,13 @@ impl FontsSettingsUi {
     let _ = text_input.focus(objects, self.input);
   }
 
+  /// Apply a nonempty trimmed font preference, then end editing and release input focus.
+  ///
+  /// # Arguments
+  ///
+  /// * `objects` - The session or page object pool.
+  /// * `text_input` - The text input.
+  /// * `value` - The value to store or convert.
   pub fn finish_edit(
     &mut self,
     objects: &mut UiObjectPool,
@@ -138,11 +189,13 @@ impl FontsSettingsUi {
     let _ = text_input.blur(objects);
   }
 
+  /// Discard the pending font edit and release input focus.
   pub fn cancel_edit(&mut self, objects: &mut UiObjectPool, text_input: &mut TextInputService) {
     self.edit_mode = None;
     let _ = text_input.blur(objects);
   }
 
+  /// Return the shortcuts currently enabled by the fonts settings view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     [
       ("fonts_settings.focus_up.move_up", "up"),
@@ -162,10 +215,12 @@ impl FontsSettingsUi {
       action: action.to_string(),
       description: action.to_string(),
       keys: vec![vec![key.to_string()]],
+      priority: 0,
     })
     .collect()
   }
 
+  /// Interpret a fonts settings UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<FontsSettingsCommand> {
     if self.edit_mode.is_some() {
       return match event {
@@ -246,6 +301,14 @@ impl FontsSettingsUi {
     self.selected = next;
   }
 
+  /// Scroll font preferences and keep selection aligned with the visible viewport.
+  ///
+  /// # Arguments
+  ///
+  /// * `objects` - The session or page object pool.
+  /// * `service` - The service.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `dy` - The dy.
   pub fn scroll(
     &mut self,
     objects: &mut UiObjectPool,
@@ -279,6 +342,14 @@ impl FontsSettingsUi {
     );
   }
 
+  /// Prepare the font-list and input surfaces within the available settings region.
+  ///
+  /// # Arguments
+  ///
+  /// * `objects` - The session or page object pool.
+  /// * `service` - The service.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
   pub fn prepare(
     &mut self,
     objects: &mut UiObjectPool,
@@ -315,6 +386,7 @@ impl FontsSettingsUi {
     }
   }
 
+  /// Draw the fonts settings view and register interaction regions in its assigned surfaces.
   pub fn render(
     &mut self,
     objects: &mut UiObjectPool,

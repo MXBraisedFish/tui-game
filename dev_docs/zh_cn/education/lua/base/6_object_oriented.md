@@ -199,6 +199,7 @@ end
 
 function Player:say()
   print("I am " .. self.name)
+end
 
 player1 = Player.new("Alice", 100)
 player2 = Player.new("Peter", 30)
@@ -211,6 +212,6 @@ player2:say()
 
 ---
 
-| 上一篇                                        | 下一篇                                        |
-| ------------------------------------------ | ------------------------------------------ |
-| [Lua 关键字](./5_keyword.md)                  | [Lua 模块](./7_module.md)                    |
+| 上一篇                       | 下一篇                    |
+| ---------------------------- | ------------------------- |
+| [Lua 关键字](./5_keyword.md) | [Lua 模块](./7_module.md) |

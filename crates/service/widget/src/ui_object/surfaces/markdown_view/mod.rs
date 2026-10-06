@@ -1,3 +1,5 @@
+//! Markdown layout, syntax-highlighted code, and clickable text regions.
+
 mod state;
 mod types;
 
@@ -18,6 +20,7 @@ use tg_service_layout::{Rect, Size};
 use tg_service_text_layout::TextAlign;
 use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
 
+/// The public entry point for markdown operations.
 #[derive(Default)]
 pub struct MarkdownService;
 
@@ -76,10 +79,12 @@ struct ListState {
 }
 
 impl MarkdownService {
+  /// Create a markdown service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Create an owned markdown object and return its identity.
   pub fn create(
     &self,
     pool: &mut UiObjectPool,
@@ -98,6 +103,7 @@ impl MarkdownService {
     Some(id)
   }
 
+  /// Remove the identified widget object and release its owned state.
   pub fn remove(&self, pool: &mut UiObjectPool, id: MarkdownViewId) -> bool {
     if pool.markdown_views.views.remove(&id).is_none() {
       return false;
@@ -106,14 +112,23 @@ impl MarkdownService {
     true
   }
 
+  /// Report whether the identified widget object is still present.
   pub fn exists(&self, pool: &UiObjectPool, id: MarkdownViewId) -> bool {
     pool.markdown_views.views.contains_key(&id)
   }
 
+  /// Return the source text retained by the identified Markdown view.
   pub fn markdown<'a>(&self, pool: &'a UiObjectPool, id: MarkdownViewId) -> Option<&'a str> {
     Some(&pool.markdown_views.views.get(&id)?.options.markdown)
   }
 
+  /// Update the markdown used by this markdown service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `markdown` - The markdown.
   pub fn set_markdown(
     &self,
     pool: &mut UiObjectPool,
@@ -127,6 +142,13 @@ impl MarkdownService {
     true
   }
 
+  /// Update the theme used by this markdown service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `theme` - The theme.
   pub fn set_theme(
     &self,
     pool: &mut UiObjectPool,
@@ -140,6 +162,13 @@ impl MarkdownService {
     true
   }
 
+  /// Update the code theme used by this markdown service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `theme` - The theme.
   pub fn set_code_theme(
     &self,
     pool: &mut UiObjectPool,
@@ -153,6 +182,14 @@ impl MarkdownService {
     true
   }
 
+  /// Measure the laid-out Markdown content in terminal cells.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `width` - The width in terminal columns.
+  /// * `code_highlight` - The code highlight.
   pub fn measure(
     &self,
     pool: &UiObjectPool,
@@ -168,6 +205,15 @@ impl MarkdownService {
     })
   }
 
+  /// Render the markdown service into its requested terminal-cell surface.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `params` - The formatting or rendering parameters.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `code_highlight` - The code highlight.
   pub fn render(
     &self,
     pool: &mut UiObjectPool,
@@ -186,6 +232,16 @@ impl MarkdownService {
     )
   }
 
+  /// Render the component into the identified clipped slice and update its interaction geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `slice` - The slice.
+  /// * `params` - The formatting or rendering parameters.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `code_highlight` - The code highlight.
   pub fn render_on(
     &self,
     pool: &mut UiObjectPool,
@@ -205,6 +261,17 @@ impl MarkdownService {
     )
   }
 
+  /// Render the component into the clipped scroll-box content viewport and update its interaction
+  /// geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `scroll_box` - The scroll box.
+  /// * `params` - The formatting or rendering parameters.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `code_highlight` - The code highlight.
   pub fn render_in_scroll_box(
     &self,
     pool: &mut UiObjectPool,
@@ -270,6 +337,13 @@ impl MarkdownService {
     true
   }
 
+  /// Route a pointer event through the component's current hit regions and focus state.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `text_input` - The text input.
+  /// * `event` - The event to apply or route.
   pub fn route_mouse_event(
     &self,
     pool: &mut UiObjectPool,

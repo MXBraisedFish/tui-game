@@ -1,7 +1,15 @@
+//! Column sizing, overflow handling, alignment, and table drawing.
+
 use super::*;
 
 use std::collections::{HashMap, HashSet};
 
+/// Build and register the Lua table API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.globals().get::<Table>("table")?;
   let length = lua
@@ -128,15 +136,35 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
       Ok(())
     })?,
   )?;
+  let option_methods: [(&str, &str, &[&str], &[&str]); 6] = [
+    ("concat", "table.concat", &["list"], &["sep", "i", "j"]),
+    ("insert", "table.insert", &["list", "value"], &["pos"]),
+    (
+      "move",
+      "table.move",
+      &["src", "first", "last", "target_start"],
+      &["target"],
+    ),
+    ("remove", "table.remove", &["list"], &["pos"]),
+    ("sort", "table.sort", &["list"], &["comp"]),
+    ("unpack", "table.unpack", &["list"], &["i", "j"]),
+  ];
+  for (name, method, required_names, option_fields) in option_methods {
+    let function = source.get::<Function>(name)?;
+    source.raw_set(
+      name,
+      standard_options(lua, function, method, required_names, option_fields)?,
+    )?;
+  }
   source.raw_set(
     "count",
-    lua.create_function(|lua, values: MultiValue| {
+    lua.create_function(|_, values: MultiValue| {
       let input = table_argument("table.count", values, false)?;
       let shape = inspect_table_shape("table.count", &input)?;
-      let output = lua.create_table()?;
-      output.raw_set("n", shape.total_count())?;
-      output.raw_set("contiguous", shape.is_contiguous())?;
-      Ok(output)
+      Ok(MultiValue::from_vec(vec![
+        Value::Integer(shape.total_count() as i64),
+        Value::Boolean(shape.is_contiguous()),
+      ]))
     })?,
   )?;
   source.raw_set(
@@ -148,11 +176,11 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
       for (position, index) in shape.array_indexes.iter().copied().enumerate() {
         indexes.raw_set(position + 1, index)?;
       }
-      let output = lua.create_table()?;
-      output.raw_set("n", shape.array_indexes.len())?;
-      output.raw_set("contiguous", shape.is_contiguous())?;
-      output.raw_set("indexes", indexes)?;
-      Ok(output)
+      Ok(MultiValue::from_vec(vec![
+        Value::Integer(shape.array_indexes.len() as i64),
+        Value::Boolean(shape.is_contiguous()),
+        Value::Table(indexes),
+      ]))
     })?,
   )?;
   source.raw_set(
@@ -195,10 +223,7 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
   source.raw_set(
     "deepcopy",
     lua.create_function(|lua, values: MultiValue| {
-      let value = args::one("table.deepcopy", "table", values)?;
-      let Value::Table(input) = value else {
-        return Err(args::invalid("table.deepcopy", "table", "table", &value));
-      };
+      let input = table_argument("table.deepcopy", values, false)?;
       let mut copied = HashMap::new();
       let mut entries = 0_usize;
       deep_copy_table(lua, &input, 0, &mut entries, &mut copied)
@@ -207,10 +232,7 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
   source.raw_set(
     "pretty",
     lua.create_function(|_, values: MultiValue| {
-      let value = args::one("table.pretty", "table", values)?;
-      let Value::Table(input) = value else {
-        return Err(args::invalid("table.pretty", "table", "table", &value));
-      };
+      let input = table_argument("table.pretty", values, false)?;
       let mut writer = PrettyWriter::default();
       let mut entries = 0_usize;
       let mut active = HashSet::new();
@@ -219,6 +241,58 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
     })?,
   )?;
   readonly::proxy(lua, source)
+}
+
+/// Translate strict named options into the bounded Lua table operation's positional arguments.
+///
+/// # Arguments
+///
+/// * `lua` - The VM that owns the function and argument tables.
+/// * `function` - The native operation with its existing resource limits.
+/// * `method` - The public method name used in errors.
+/// * `required_names` - The required arguments in public call order.
+/// * `option_fields` - The named options in native call order.
+///
+/// # Errors
+///
+/// Return an error for invalid arguments or options, or if the bounded native operation fails.
+fn standard_options(
+  lua: &Lua,
+  function: Function,
+  method: &'static str,
+  required_names: &'static [&'static str],
+  option_fields: &'static [&'static str],
+) -> mlua::Result<Function> {
+  lua.create_function(move |lua, values: MultiValue| {
+    let parsed = args::positional(lua, method, values, required_names, option_fields)?;
+    let mut arguments = (0..required_names.len())
+      .map(|index| parsed.get(index))
+      .collect::<Vec<_>>();
+    for field in option_fields {
+      let value = parsed.options().raw_get::<Value>(*field)?;
+      let value = if matches!(value, Value::Nil) {
+        value
+      } else {
+        match *field {
+          "i" | "j" | "pos" => Value::Integer(args::integer(value, method, field)?),
+          "sep" => Value::String(args::lua_string(value, method, field)?),
+          "comp" if matches!(value, Value::Function(_)) => value,
+          "target" if matches!(value, Value::Table(_)) => value,
+          "comp" => return Err(args::invalid(method, field, "function", &value)),
+          "target" => return Err(args::invalid(method, field, "table", &value)),
+          _ => unreachable!("registered table option has no validator"),
+        }
+      };
+      if method == "table.insert" {
+        if !matches!(value, Value::Nil) {
+          arguments.insert(1, value);
+        }
+      } else {
+        arguments.push(value);
+      }
+    }
+    function.call::<MultiValue>(MultiValue::from_vec(arguments))
+  })
 }
 
 fn bounded_standard_function<F>(lua: &Lua, function: Function, check: F) -> mlua::Result<Function>

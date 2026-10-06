@@ -1,3 +1,5 @@
+//! Host import boundary re-exporting service crates without owning their implementations.
+
 use tg_core_version as version;
 pub(crate) use tg_service_animation as animation;
 use tg_service_audio as audio;
@@ -38,9 +40,9 @@ pub use file::FileEvent;
 pub use i18n::{I18nService, LanguageRegistryEntry};
 pub use image::{ImageConvertMode, ImageConvertParams, ImageEvent, ImageService};
 pub use input::{
-  ActionMapEntry, InputActionEvent, InputListenerError, InputService, Key, KeyEvent, KeyEventKind,
-  KeyState, MouseButton, MouseEvent, MouseEventKind, RawKeyEvent, SystemEvent, TerminalKeyCode,
-  format_key_display, key_token, translate_action_map,
+  ActionMapEntry, CommittedTextEvent, InputActionEvent, InputListenerError, InputNotification,
+  InputService, Key, KeyEvent, KeyEventKind, KeyState, MouseButton, MouseEvent, MouseEventKind,
+  RawKeyEvent, SystemEvent, TerminalKeyCode, format_key_display, key_token, translate_action_map,
 };
 pub use layout::{LayoutService, Rect, Size};
 pub use log::{
@@ -54,8 +56,8 @@ pub use lua::{
 };
 pub use network::{NetworkEvent, NetworkService};
 pub use package::{
-  PackageAsset, PackageAsyncEvent, PackageEvent, PackageId, PackageInfo, PackageListEntry,
-  PackageService, PackageSource,
+  PackageAsset, PackageAsyncEvent, PackageEvent, PackageId, PackageImageMode, PackageInfo,
+  PackageListEntry, PackageService, PackageSource,
 };
 pub use random::{RandomGeneratorId, RandomSeed, RandomService};
 pub use recording::{
@@ -75,7 +77,6 @@ pub use storage::{
 };
 pub use tg_service_async::TaskId;
 pub use tg_service_clipboard::ClipboardService;
-pub use tg_service_code_highlight::CodeHighlightService;
 pub use tg_service_ffmpeg::FfmpegService;
 pub use tg_service_host_object::{HostAreaKind, HostObjectPool};
 pub use tg_service_input_method::{ImPolicy, InputMethodService};
@@ -89,8 +90,7 @@ pub use time::{TimeAsyncEvent, TimeService, TimerId};
 pub use version::{HOST_VERSION, MEDIA_MANIFEST_VERSION};
 pub use video::{VideoAsyncEvent, VideoExportStage, VideoService};
 pub use widget::{
-  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, HyperlinkService, MarkdownRenderParams,
-  MarkdownService, MarkdownViewId, MarkdownViewOptions, Overflow, ProgressBarFillOrigin,
+  HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService, Overflow, ProgressBarFillOrigin,
   ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle, ProgressBarService,
   RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions,
   ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, TableBorderMode,

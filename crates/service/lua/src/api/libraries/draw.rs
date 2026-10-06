@@ -1,13 +1,21 @@
+//! Lua draw library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Submit the component's configured drawing state to the current canvas frame.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   let text_state = state.clone();
   source.raw_set(
     "text",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.text";
-      let table = draw_text_parameters(method, values)?;
+      let table = draw_text_parameters(lua, method, values)?;
       let target = parse_draw_target(&table, method, &text_state)?;
       let params = {
         let state = text_state.borrow();
@@ -30,21 +38,14 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let fill_state = state.clone();
   source.raw_set(
     "fill_rect",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.fill_rect";
-      let table = args::named(
+      let table = positional_table(
+        lua,
         method,
         values,
-        &[
-          "x",
-          "y",
-          "width",
-          "height",
-          "char",
-          "fg",
-          "bg",
-          "slice_layer",
-        ],
+        &["x", "y", "width", "height"],
+        &["char", "fg", "bg", "slice_layer"],
       )?;
       let target = parse_draw_target(&table, method, &fill_state)?;
       let fill_char = optional_single_char(&table, method, "char")?;
@@ -64,21 +65,14 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let stroke_state = state.clone();
   source.raw_set(
     "stroke_rect",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.stroke_rect";
-      let table = args::named(
+      let table = positional_table(
+        lua,
         method,
         values,
-        &[
-          "x",
-          "y",
-          "width",
-          "height",
-          "fg",
-          "bg",
-          "border_char",
-          "slice_layer",
-        ],
+        &["x", "y", "width", "height"],
+        &["fg", "bg", "border_char", "slice_layer"],
       )?;
       let target = parse_draw_target(&table, method, &stroke_state)?;
       let command = LuaDrawCommand::StrokeRect {
@@ -94,15 +88,17 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
       enqueue_draw(&stroke_state, method, command)
     })?,
   )?;
-  let erase_state = state.clone();
+  let erase_state = state;
   source.raw_set(
     "erase_rect",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "draw.erase_rect";
-      let table = args::named(
+      let table = positional_table(
+        lua,
         method,
         values,
-        &["x", "y", "width", "height", "slice_layer"],
+        &["x", "y", "width", "height"],
+        &["slice_layer"],
       )?;
       let target = parse_draw_target(&table, method, &erase_state)?;
       let command = LuaDrawCommand::EraseRect {
@@ -113,28 +109,6 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         height: positive_u16(&table, method, "height")?,
       };
       enqueue_draw(&erase_state, method, command)
-    })?,
-  )?;
-  let state2 = state;
-  source.raw_set(
-    "render",
-    lua.create_function(move |_, values: MultiValue| {
-      args::no_args("draw.render", values)?;
-      let mut state = state2.borrow_mut();
-      if state.phase == LuaCallPhase::Render {
-        return Err(args::message(
-          "draw.render",
-          "invalid_state: draw.render cannot be called during Render",
-        ));
-      }
-      if !state
-        .commands
-        .iter()
-        .any(|command| matches!(command, LuaHostCommand::RequestRender))
-      {
-        push_host_command(&mut state, LuaHostCommand::RequestRender);
-      }
-      Ok(())
     })?,
   )?;
   readonly::proxy(lua, source)

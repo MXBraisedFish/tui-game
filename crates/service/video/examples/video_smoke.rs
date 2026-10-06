@@ -1,4 +1,4 @@
-//! Minimal entry: a fresh video service has no active exports.
+//! Independent video smoke entry exercising the public API and checking its results.
 
 use tg_service_async::TaskId;
 use tg_service_video::VideoService;

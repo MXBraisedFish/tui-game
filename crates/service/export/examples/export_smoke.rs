@@ -1,4 +1,4 @@
-//! Minimal entry: exports a temporary data directory as a zip archive.
+//! Independent export smoke entry exercising the public API and checking its results.
 
 use std::path::PathBuf;
 

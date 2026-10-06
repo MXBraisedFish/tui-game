@@ -1,10 +1,12 @@
+//! Storage and mutation of the module's buffered data.
+
 use std::ops::Range;
 
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::TextInputMode;
 
-/// 文本缓冲区：管理文本内容、光标位置、选区，所有操作以字素（grapheme）为边界。
+/// Grapheme-aligned text, cursor, and selection state with bounded normalized editing.
 pub(super) struct TextBuffer {
   text: String,
   cursor: usize,
@@ -16,6 +18,13 @@ pub(super) struct TextBuffer {
 }
 
 impl TextBuffer {
+  /// Create a text buffer initialized from `text`, `max_graphemes`, `mode`.
+  ///
+  /// # Arguments
+  ///
+  /// * `text` - The text to process or display.
+  /// * `max_graphemes` - The max graphemes.
+  /// * `mode` - The mode.
   pub fn new(text: String, max_graphemes: Option<usize>, mode: TextInputMode) -> Self {
     let text = normalize(text, mode);
     let text = truncate_graphemes(text, max_graphemes);
@@ -30,11 +39,12 @@ impl TextBuffer {
     }
   }
 
+  /// Return the text for the addressed object.
   pub fn text(&self) -> &str {
     &self.text
   }
 
-  /// 替换全部文本，自动规范化和截断，返回是否实际变化。
+  /// Update the text used by this text buffer.
   pub fn set_text(&mut self, text: String) -> bool {
     let text = truncate_graphemes(normalize(text, self.mode), self.max_graphemes);
     let changed = self.text != text;
@@ -45,20 +55,23 @@ impl TextBuffer {
     changed
   }
 
+  /// Return the cursor for the addressed object.
   pub fn cursor(&self) -> usize {
     self.cursor
   }
 
+  /// Return the selection for the addressed object when it is available.
   pub fn selection(&self) -> Option<Range<usize>> {
     let anchor = self.anchor?;
     (anchor != self.cursor).then_some(anchor.min(self.cursor)..anchor.max(self.cursor))
   }
 
+  /// Return the text inside the current grapheme-aligned selection.
   pub fn selected_text(&self) -> Option<&str> {
     self.selection().map(|range| &self.text[range])
   }
 
-  /// 全选文本，返回是否实际改变了选区。
+  /// Select the entire text and report whether the selection changed.
   pub fn select_all(&mut self) -> bool {
     if self.text.is_empty() || self.selection() == Some(0..self.text.len()) {
       return false;
@@ -69,7 +82,7 @@ impl TextBuffer {
     true
   }
 
-  /// 设置光标到最近的合法边界，可选扩展选区。
+  /// Move the cursor to the nearest valid grapheme boundary and optionally extend the selection.
   pub fn set_cursor(&mut self, cursor: usize, extend: bool) -> bool {
     let cursor = self.closest_boundary(cursor);
     if cursor == self.cursor {
@@ -90,14 +103,14 @@ impl TextBuffer {
     true
   }
 
-  /// 插入单个字符（控制字符被忽略）。
+  /// Insert an allowed character at the cursor, replacing any active selection.
   pub fn insert_char(&mut self, ch: char) -> bool {
     (!ch.is_control())
       .then(|| ch.to_string())
       .is_some_and(|text| self.insert(&text))
   }
 
-  /// 插入文本字符串，自动规范化处理。
+  /// Normalize and insert text at the cursor, replacing any active selection.
   pub fn insert_text(&mut self, text: &str) -> bool {
     let text = normalize(text.to_string(), self.mode);
     if text.is_empty() {
@@ -106,12 +119,12 @@ impl TextBuffer {
     self.insert(&text)
   }
 
-  /// 插入换行符（仅多行模式有效）。
+  /// Insert a newline only when the input supports multiple lines.
   pub fn insert_newline(&mut self) -> bool {
     self.mode == TextInputMode::MultiLine && self.insert("\n")
   }
 
-  /// 删除光标前一个字素（有选区时先删除选区）。
+  /// Delete the selection or the grapheme immediately before the cursor.
   pub fn delete_prev(&mut self) -> bool {
     if self.delete_selection() {
       return true;
@@ -130,7 +143,7 @@ impl TextBuffer {
     true
   }
 
-  /// 删除光标后一个字素（有选区时先删除选区）。
+  /// Delete the selection or the grapheme immediately after the cursor.
   pub fn delete_next(&mut self) -> bool {
     if self.delete_selection() {
       return true;
@@ -143,7 +156,7 @@ impl TextBuffer {
     true
   }
 
-  /// 删除当前选区内容，返回是否执行了删除。
+  /// Delete selected text and report whether a selection was removed.
   pub fn delete_selection(&mut self) -> bool {
     let Some(range) = self.selection() else {
       return false;
@@ -155,7 +168,7 @@ impl TextBuffer {
     true
   }
 
-  /// 向左移动一个字素或一个单词，可选扩展选区。
+  /// Move the cursor left by a grapheme or word and optionally extend the selection.
   pub fn move_left_select(&mut self, extend: bool, word: bool) -> bool {
     if !extend && self.selection().is_some() {
       let start = self.selection().unwrap().start;
@@ -173,7 +186,7 @@ impl TextBuffer {
     target.is_some_and(|target| self.move_to(target, extend))
   }
 
-  /// 向右移动一个字素或一个单词，可选扩展选区。
+  /// Move the cursor right by a grapheme or word and optionally extend the selection.
   pub fn move_right_select(&mut self, extend: bool, word: bool) -> bool {
     if !extend && self.selection().is_some() {
       let end = self.selection().unwrap().end;
@@ -187,17 +200,19 @@ impl TextBuffer {
     target.is_some_and(|target| self.move_to(target, extend))
   }
 
-  /// 移动光标到指定位置（自动对齐边界），可选扩展选区。
+  /// Move to a grapheme-aligned position and optionally extend the selection.
   pub fn move_to(&mut self, cursor: usize, extend: bool) -> bool {
     let changed = self.set_cursor(cursor, extend);
     self.preferred_column = None;
     changed
   }
 
+  /// Return the current preferred column.
   pub fn preferred_column(&self) -> Option<usize> {
     self.preferred_column
   }
 
+  /// Update the preferred column used by this text buffer.
   pub fn set_preferred_column(&mut self, column: Option<usize>) {
     self.preferred_column = column;
   }

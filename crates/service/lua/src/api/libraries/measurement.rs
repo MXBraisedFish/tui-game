@@ -1,5 +1,13 @@
+//! Lua measurement library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Build and register the Lua measurement API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn measurement(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, result) in [
@@ -16,18 +24,16 @@ pub(super) fn measurement(lua: &Lua, state: SharedApiState) -> mlua::Result<Tabl
           1 => "measurement.get_text_width",
           _ => "measurement.get_text_height",
         };
-        let table = measurement_text_parameters(method, values)?;
+        let table = measurement_text_parameters(lua, method, values)?;
         let params = parse_draw_text_params(&table, method, &state.borrow().context, false)?;
         let (width, height) = tg_service_text_layout::measure_draw_text(&params);
         match result {
-          0 => {
-            let size = lua.create_table()?;
-            size.raw_set("width", width)?;
-            size.raw_set("height", height)?;
-            Ok(Value::Table(size))
-          }
-          1 => Ok(Value::Integer(width as i64)),
-          _ => Ok(Value::Integer(height as i64)),
+          0 => Ok(MultiValue::from_vec(vec![
+            Value::Integer(width as i64),
+            Value::Integer(height as i64),
+          ])),
+          1 => Ok(MultiValue::from_vec(vec![Value::Integer(width as i64)])),
+          _ => Ok(MultiValue::from_vec(vec![Value::Integer(height as i64)])),
         }
       })?,
     )?;
@@ -35,14 +41,29 @@ pub(super) fn measurement(lua: &Lua, state: SharedApiState) -> mlua::Result<Tabl
   readonly::proxy(lua, source)
 }
 
-pub(super) fn draw_text_parameters(method: &str, values: MultiValue) -> mlua::Result<Table> {
-  args::named(
+/// Build validated draw parameters from the trailing Lua option table.
+///
+/// # Arguments
+///
+/// * `lua` - The Lua VM in which values and callbacks are created.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `values` - The input values in their supplied order.
+///
+/// # Errors
+///
+/// Return a Lua argument error for unknown option fields, invalid positions, styles, wrapping, or
+/// drawing destinations.
+pub(super) fn draw_text_parameters(
+  lua: &Lua,
+  method: &str,
+  values: MultiValue,
+) -> mlua::Result<Table> {
+  positional_table(
+    lua,
     method,
     values,
+    &["x", "y", "text"],
     &[
-      "x",
-      "y",
-      "text",
       "fg",
       "bg",
       "horizontal_align",
@@ -66,12 +87,45 @@ pub(super) fn draw_text_parameters(method: &str, values: MultiValue) -> mlua::Re
   )
 }
 
-fn measurement_text_parameters(method: &str, values: MultiValue) -> mlua::Result<Table> {
-  args::named(
+/// Convert required Lua positions and strict options into the internal parameter table.
+///
+/// # Arguments
+///
+/// * `lua` - The Lua VM in which values and callbacks are created.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `values` - The input values in their supplied order.
+/// * `required_names` - Required positional parameter names in their call order.
+/// * `option_fields` - The complete list of accepted trailing option keys.
+///
+/// # Errors
+///
+/// Return a Lua argument error for missing positions or an invalid strict trailing options table.
+pub(super) fn positional_table(
+  lua: &Lua,
+  method: &str,
+  values: MultiValue,
+  required_names: &[&str],
+  option_fields: &[&str],
+) -> mlua::Result<Table> {
+  let parsed = args::positional(lua, method, values, required_names, option_fields)?;
+  let table = lua.create_table()?;
+  for (index, name) in required_names.iter().enumerate() {
+    table.raw_set(*name, parsed.required(index, method, name)?)?;
+  }
+  for pair in parsed.options().clone().pairs::<String, Value>() {
+    let (name, value) = pair?;
+    table.raw_set(name, value)?;
+  }
+  Ok(table)
+}
+
+fn measurement_text_parameters(lua: &Lua, method: &str, values: MultiValue) -> mlua::Result<Table> {
+  positional_table(
+    lua,
     method,
     values,
+    &["text"],
     &[
-      "text",
       "horizontal_align",
       "auto_wrap",
       "word_wrap",
@@ -84,6 +138,19 @@ fn measurement_text_parameters(method: &str, values: MultiValue) -> mlua::Result
   )
 }
 
+/// Validate draw positions, alignment, wrapping, styles, and the destination surface.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `context` - The state and services needed for the operation.
+/// * `include_position` - The include position.
+///
+/// # Errors
+///
+/// Return a Lua argument error when a draw parameter has an unsupported type, value, or
+/// destination.
 pub(super) fn parse_draw_text_params(
   table: &Table,
   method: &str,
@@ -165,6 +232,18 @@ pub(super) fn parse_draw_text_params(
   })
 }
 
+/// Validate and convert a Lua color argument into a terminal color.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+/// * `background` - The cell background color.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the supplied value is not a supported color expression.
 pub(super) fn parse_color(
   value: Value,
   method: &str,
@@ -192,6 +271,18 @@ pub(super) fn parse_color(
     .ok_or_else(|| args::message(method, format!("invalid color '{value}'")))
 }
 
+/// Read an optional positive terminal-cell dimension that fits in `u16`.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error when a supplied dimension is non-integral, non-positive, or
+/// exceeds `u16`.
 pub(super) fn optional_positive_u16(
   table: &Table,
   method: &str,
@@ -208,6 +299,18 @@ pub(super) fn optional_positive_u16(
     .transpose()
 }
 
+/// Validate a positive terminal-cell dimension that fits in `u16`.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the dimension is non-integral, non-positive, or exceeds
+/// `u16`.
 pub(super) fn positive_u16(table: &Table, method: &str, name: &str) -> mlua::Result<u16> {
   let value = args::integer(args::required(table, method, name)?, method, name)?;
   u16::try_from(value)
@@ -216,6 +319,18 @@ pub(super) fn positive_u16(table: &Table, method: &str, name: &str) -> mlua::Res
     .ok_or_else(|| args::message(method, format!("{name} must be in 1..=65535")))
 }
 
+/// Resolve an optional Lua drawing destination into a base, slice, or scroll-box target.
+///
+/// # Arguments
+///
+/// * `table` - The Lua table to inspect or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `state` - The state.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the target kind or identifier is invalid or does not belong
+/// to the session.
 pub(super) fn parse_draw_target(
   table: &Table,
   method: &str,
@@ -245,6 +360,22 @@ pub(super) fn parse_draw_target(
   }
 }
 
+/// Return the available terminal-cell dimensions of the validated drawing target.
+///
+/// # Arguments
+///
+/// * `state` - The state.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `target` - The object or resource affected by the operation.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the requested drawing target cannot be resolved in the
+/// session pool.
+///
+/// # Panics
+///
+/// Panic when passed a scroll-box target; callers must supply the base or a session-owned slice.
 pub(super) fn draw_target_size(
   state: &SharedApiState,
   method: &str,

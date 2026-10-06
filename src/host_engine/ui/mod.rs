@@ -1,3 +1,5 @@
+//! Ui page state, user commands, and terminal-cell presentation.
+
 mod boot_loading;
 mod exit;
 mod home;
@@ -16,11 +18,11 @@ pub use home::{
   ModsCommand, ModsUi, RecordingListCommand, RecordingListUi, RecordingSettingsCommand,
   RecordingSettingsUi, ScreensaverListCommand, ScreensaverListUi, ScreensaverPackageCommand,
   ScreensaverPackageUi, ScreenshotListCommand, ScreenshotListUi, ScreenshotRecordingCommand,
-  ScreenshotRecordingUi, ScreenshotSettingsCommand, ScreenshotSettingsUi, SecurityDetailsCommand,
-  SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
-  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
-  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
-  StorageManagementViewCommand, StorageManagementViewUi, ToolbarCustomCommand,
+  ScreenshotRecordingUi, ScreenshotSettingsCommand, ScreenshotSettingsUi, SecuritySettingsCommand,
+  SecuritySettingsUi, SettingsUi, SettingsUiCommand, StorageManagementClearCommand,
+  StorageManagementClearUi, StorageManagementCommand, StorageManagementExportCommand,
+  StorageManagementExportUi, StorageManagementUi, StorageManagementViewCommand,
+  StorageManagementViewUi, ToolbarCustomCommand,
 };
 pub use overlay::{
   ClearWarningCommand, ClearWarningTarget, ClearWarningUi, CoverContinueCommand, CoverContinueUi,

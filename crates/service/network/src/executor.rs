@@ -1,3 +1,5 @@
+//! Execution of validated network requests and emission of terminal task events.
+
 use std::{
   collections::BTreeMap,
   io::Read,
@@ -25,6 +27,19 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
 const READ_BUFFER_BYTES: usize = 64 * 1024;
 
+/// Execute a validated HTTP task and emit bounded response or failure events.
+///
+/// # Arguments
+///
+/// * `task_id` - The identifier of the asynchronous task.
+/// * `task` - The task.
+/// * `event_tx` - The event tx.
+/// * `cancellation` - The cancellation token for the operation.
+///
+/// # Errors
+///
+/// Return a network error for cancellation, blocked destinations, connection or timeout failures,
+/// invalid responses, or exceeded response limits.
 pub(crate) fn run_network_task<E: From<NetworkEvent>>(
   task_id: TaskId,
   task: NetworkTask,

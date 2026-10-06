@@ -1,3 +1,5 @@
+//! Session-local event queues and generation-aware ownership of asynchronous work.
+
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use tg_core_audio::{AudioAsyncEvent, AudioErrorCode, AudioId};
@@ -19,74 +21,133 @@ use super::{
   LuaTimerEvent, LuaTimerEventKind, LuaTimerKind, sanitize_io_error, sanitize_network_error,
 };
 
-/// A borrowed asynchronous service event that the broker may route to the Lua session owning it.
-///
-/// The application layer builds it from its own event type, so the broker never depends on the
-/// application's aggregate event.
+/// A borrowed service event that can be routed without depending on the application aggregate
+/// event type.
 #[derive(Clone, Copy, Debug)]
 pub enum LuaRoutableEvent<'a> {
-  /// Playback or capture state of an audio object.
+  /// A audio notification delivered to the owning consumer.
   Audio(&'a AudioAsyncEvent),
-  /// Completion of a file or i18n task.
+
+  /// A file notification delivered to the owning consumer.
   File(&'a FileEvent),
-  /// Completion of an image conversion task.
+
+  /// A image notification delivered to the owning consumer.
   Image(&'a ImageEvent),
-  /// Progress or completion of a network request.
+
+  /// A network notification delivered to the owning consumer.
   Network(&'a NetworkEvent),
-  /// Completion of a sleep task.
+
+  /// A time notification delivered to the owning consumer.
   Time(&'a TimeAsyncEvent),
 }
 
+/// The max Lua events per frame used by this module.
 pub const MAX_LUA_EVENTS_PER_FRAME: usize = 128;
+/// The max Lua pending events used by this module.
 pub const MAX_LUA_PENDING_EVENTS: usize = 1_024;
+/// The max Lua network tasks per session used by this module.
 pub const MAX_LUA_NETWORK_TASKS_PER_SESSION: usize = 4;
+/// The max Lua file tasks per session used by this module.
 pub const MAX_LUA_FILE_TASKS_PER_SESSION: usize = 8;
+/// The max Lua image tasks per session used by this module.
 pub const MAX_LUA_IMAGE_TASKS_PER_SESSION: usize = 4;
 
+/// A session kind and generation that reject completions from replaced sessions.
+///
+/// # Fields
+///
+/// * `kind` - The Lua session kind carried by this Lua session token.
+/// * `generation` - The generation used to distinguish live handles from reused identifiers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct LuaSessionToken {
+  /// The Lua session kind carried by this Lua session token.
   pub kind: LuaSessionKind,
+  /// The generation used to distinguish live handles from reused identifiers.
   pub generation: u64,
 }
 
+/// The identity of Lua event callback within its owning pool or session.
+///
+/// # Fields
+///
+/// * `0` - The wrapped u64 value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct LuaEventCallbackId(pub u64);
+pub struct LuaEventCallbackId(
+  /// The wrapped u64 value.
+  pub u64,
+);
 
+/// Delivery through HandleEvent or a registered session-local callback.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LuaEventRoute {
+  /// The handle event setting for Lua event route.
   HandleEvent,
+  /// A keyboard input captured under one subscription generation.
+  Input { generation: u64 },
+  /// A closing release that survives input rejection and ordinary queue cleanup.
+  InputRelease,
+  /// The callback setting for Lua event route.
   Callback(LuaEventCallbackId),
 }
 
+/// A script-visible event paired with its callback delivery route.
+///
+/// # Fields
+///
+/// * `event` - The event to apply or route.
+/// * `route` - The route.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaEventDelivery {
+  /// The event to apply or route.
   pub event: LuaRuntimeEvent,
+  /// The route.
   pub route: LuaEventRoute,
 }
 
+/// The script-visible request metadata associated with a host asynchronous task.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LuaTaskOperation {
+  /// The file setting for Lua task operation.
   File {
+    /// The identifier of the request.
     request_id: u64,
+    /// The Lua file operation carried by this Lua task operation.
     kind: LuaFileOperation,
+    /// The filesystem path for virtual.
     virtual_path: String,
+    /// The event tip.
     event_tip: Option<String>,
   },
+  /// The i18n setting for Lua task operation.
   I18n {
+    /// The identifier of the request.
+    request_id: u64,
+    /// The Lua i18n event kind carried by this Lua task operation.
     kind: LuaI18nEventKind,
+    /// The registered language code.
     language_code: String,
+    /// The callback language code.
     callback_language_code: String,
   },
+  /// The image convert setting for Lua task operation.
   ImageConvert {
+    /// The identifier of the request.
     request_id: u64,
   },
+  /// The network setting for Lua task operation.
   Network {
+    /// The identifier of the request.
     request_id: u64,
+    /// The method.
     method: NetworkMethod,
+    /// The original url.
     original_url: String,
+    /// The response mode.
     response_mode: NetworkResponseMode,
   },
+  /// The sleep setting for Lua task operation.
   Sleep {
+    /// The identifier of the owned object.
     id: u64,
   },
 }
@@ -105,22 +166,37 @@ struct LuaAudioRoute {
   route: LuaEventRoute,
 }
 
+/// Failures reported by Lua enqueue operations.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LuaEnqueueError {
+  /// The inactive session failure condition.
   InactiveSession(LuaSessionKind),
+  /// The stale session failure condition.
   StaleSession(LuaSessionToken),
+  /// The event not allowed failure condition.
   EventNotAllowed {
+    /// The object or resource affected by the operation.
     target: LuaSessionKind,
+    /// The event type.
     event_type: &'static str,
   },
+  /// The queue overflow failure condition.
   QueueOverflow(LuaSessionToken),
+  /// The task already registered failure condition.
   TaskAlreadyRegistered(TaskId),
+  /// The audio already registered failure condition.
   AudioAlreadyRegistered(AudioId),
+  /// The network task limit failure condition.
   NetworkTaskLimit(LuaSessionToken),
+  /// The file task limit failure condition.
   FileTaskLimit(LuaSessionToken),
+  /// The image task limit failure condition.
   ImageTaskLimit(LuaSessionToken),
+  /// The invalid virtual path failure condition.
   InvalidVirtualPath,
+  /// The stale task completion failure condition.
   StaleTaskCompletion(TaskId),
+  /// The stale audio event failure condition.
   StaleAudioEvent(AudioId),
 }
 
@@ -167,10 +243,8 @@ impl SessionQueue {
   }
 }
 
-/// Runtime 主线程上的 Lua 事件 Broker。
-///
-/// 宿主任务 ID 和 Session generation 只存在于 Rust 侧。Lua 只能观察到
-/// Session 本地对象/请求 ID。
+/// Host-thread routing state that exposes session-local identities while keeping host task IDs
+/// and generations private.
 pub struct LuaEventBroker {
   game: SessionQueue,
   screensaver: SessionQueue,
@@ -181,9 +255,11 @@ pub struct LuaEventBroker {
   orphaned_tasks: Vec<TaskId>,
   orphaned_audio: Vec<AudioId>,
   next_sequence: u64,
+  current_frame: u64,
 }
 
 impl LuaEventBroker {
+  /// Create a Lua event broker with its initial state.
   pub fn new() -> Self {
     Self {
       game: SessionQueue::default(),
@@ -195,9 +271,11 @@ impl LuaEventBroker {
       orphaned_tasks: Vec::new(),
       orphaned_audio: Vec::new(),
       next_sequence: 1,
+      current_frame: 0,
     }
   }
 
+  /// Update active session generations and detach resources belonging to replaced sessions.
   pub fn synchronize_sessions(
     &mut self,
     game: Option<LuaSessionToken>,
@@ -243,13 +321,32 @@ impl LuaEventBroker {
     }
   }
 
+  /// Set the host frame used by callback-generated input releases.
+  pub fn set_current_frame(&mut self, frame: u64) {
+    self.current_frame = frame;
+  }
+
+  /// Return the most recently selected host frame.
+  pub fn current_frame(&self) -> u64 {
+    self.current_frame
+  }
+
+  /// Queue a system event for sessions allowed to receive its category.
+  ///
+  /// # Errors
+  ///
+  /// Return an event-queue rejection when delivery violates the live session or queue-budget
+  /// requirements.
   pub fn push_system(
     &mut self,
     frame: u64,
     data: LuaEventData,
   ) -> Result<Option<u64>, LuaEnqueueError> {
     let targets: &[LuaSessionKind] = match &data {
-      LuaEventData::Action { .. } | LuaEventData::Mouse { .. } => {
+      LuaEventData::Action { .. }
+      | LuaEventData::Key { .. }
+      | LuaEventData::Input { .. }
+      | LuaEventData::Mouse { .. } => {
         if self.screensaver.token.is_some() {
           &[]
         } else {
@@ -270,6 +367,19 @@ impl LuaEventBroker {
     self.enqueue_targets(frame, data, LuaEventRoute::HandleEvent, targets)
   }
 
+  /// Queue an event only for the live session owning the referenced request or object.
+  ///
+  /// # Arguments
+  ///
+  /// * `token` - The token.
+  /// * `frame` - The composed terminal-cell frame.
+  /// * `data` - The data.
+  /// * `route` - The route.
+  ///
+  /// # Errors
+  ///
+  /// Return an event-queue rejection when the owning session is stale, absent, or over its queue
+  /// budget.
   pub fn push_owned(
     &mut self,
     token: LuaSessionToken,
@@ -286,6 +396,7 @@ impl LuaEventBroker {
     if token.kind == LuaSessionKind::Game
       && self.screensaver.token.is_some()
       && data.is_interactive()
+      && route != LuaEventRoute::InputRelease
     {
       return Err(LuaEnqueueError::EventNotAllowed {
         target: token.kind,
@@ -301,6 +412,19 @@ impl LuaEventBroker {
     self.enqueue_targets(frame, data, route, &[token.kind])
   }
 
+  /// Register the session-local request and callback owning an asynchronous task.
+  ///
+  /// # Arguments
+  ///
+  /// * `task_id` - The identifier of the asynchronous task.
+  /// * `token` - The token.
+  /// * `operation` - The operation to execute within the boundary.
+  /// * `route` - The route.
+  ///
+  /// # Errors
+  ///
+  /// Return a broker error when request ownership conflicts with an existing task or the session
+  /// is no longer valid.
   pub fn register_task(
     &mut self,
     task_id: TaskId,
@@ -378,6 +502,7 @@ impl LuaEventBroker {
     Ok(())
   }
 
+  /// Remove ownership routing for an asynchronous task.
   pub fn unregister_task(&mut self, task_id: TaskId) -> bool {
     let removed = self.tasks.remove(&task_id).is_some();
     if removed {
@@ -386,6 +511,19 @@ impl LuaEventBroker {
     removed
   }
 
+  /// Register the live session and callback owning an audio object.
+  ///
+  /// # Arguments
+  ///
+  /// * `audio_id` - The playback object identifier.
+  /// * `token` - The token.
+  /// * `local_id` - The identifier of the local.
+  /// * `route` - The route.
+  ///
+  /// # Errors
+  ///
+  /// Return a broker error when audio ownership conflicts with an existing registration or the
+  /// session is no longer valid.
   pub fn register_audio(
     &mut self,
     audio_id: AudioId,
@@ -413,6 +551,7 @@ impl LuaEventBroker {
     Ok(())
   }
 
+  /// Remove ownership routing for an audio object.
   pub fn unregister_audio(&mut self, audio_id: AudioId) -> bool {
     let removed = self.audio.remove(&audio_id).is_some();
     if removed {
@@ -421,18 +560,22 @@ impl LuaEventBroker {
     removed
   }
 
+  /// Drain tasks detached from sessions so the host can cancel them.
   pub fn take_orphaned_tasks(&mut self) -> Vec<TaskId> {
     std::mem::take(&mut self.orphaned_tasks)
   }
 
+  /// Drain audio identities detached from sessions so the host can release them.
   pub fn take_orphaned_audio(&mut self) -> Vec<AudioId> {
     std::mem::take(&mut self.orphaned_audio)
   }
 
-  /// 翻译已经登记所有权的异步服务终态事件。
+  /// Translate owned asynchronous completion events into session-local Lua events.
   ///
-  /// 包、导出、截图、录屏、视频、日志和通用 TaskFinished/TaskFailed
-  /// 不会在这里产生 Lua 事件。
+  /// # Errors
+  ///
+  /// Return an event-queue rejection when an owned terminal event cannot be queued for its live
+  /// session.
   pub fn route_service_event(
     &mut self,
     frame: u64,
@@ -472,10 +615,12 @@ impl LuaEventBroker {
     }
   }
 
+  /// Extract the current frame's event batch without including events produced by its callbacks.
   pub fn drain_frame(&mut self, kind: LuaSessionKind) -> Vec<LuaEventDelivery> {
     self.queue_mut(kind).drain_frame()
   }
 
+  /// Return an undelivered batch to the front of its session queue in delivery order.
   pub fn requeue_front(
     &mut self,
     kind: LuaSessionKind,
@@ -483,38 +628,79 @@ impl LuaEventBroker {
   ) {
     let mut deliveries = deliveries.into_iter().collect::<Vec<_>>();
     let queue = self.queue_mut(kind);
+    let remaining = MAX_LUA_PENDING_EVENTS.saturating_sub(queue.events.len());
+    if deliveries.len() > remaining {
+      queue.overflowed = true;
+      deliveries.truncate(remaining);
+    }
     while let Some(delivery) = deliveries.pop() {
       queue.events.push_front(delivery);
     }
   }
 
+  /// Discard queued action events when the script loses action input ownership.
   pub fn clear_pending_actions(&mut self, kind: LuaSessionKind) {
-    self
-      .queue_mut(kind)
-      .events
-      .retain(|delivery| !matches!(delivery.event.data, LuaEventData::Action { .. }));
-  }
-
-  /// 覆盖屏取得输入所有权时，丢弃尚未派发给脚本的交互事件。
-  pub fn clear_pending_interactive(&mut self, kind: LuaSessionKind) {
     self.queue_mut(kind).events.retain(|delivery| {
-      !matches!(
-        delivery.event.data,
-        LuaEventData::Action { .. }
-          | LuaEventData::Mouse { .. }
-          | LuaEventData::HitArea(_)
-          | LuaEventData::Hyperlink(_)
-          | LuaEventData::Markdown(_)
-          | LuaEventData::TextInput(_)
-          | LuaEventData::ScrollBox(_)
-      )
+      delivery.route == LuaEventRoute::InputRelease
+        || matches!(
+          delivery.event.data,
+          LuaEventData::Action {
+            state: crate::LuaActionState::Released,
+            ..
+          }
+        )
+        || !matches!(delivery.event.data, LuaEventData::Action { .. })
     });
   }
 
+  /// Discard queued interactive input when a host overlay takes ownership.
+  pub fn clear_pending_interactive(&mut self, kind: LuaSessionKind) {
+    self.queue_mut(kind).events.retain(|delivery| {
+      delivery.route == LuaEventRoute::InputRelease
+        || !matches!(
+          delivery.event.data,
+          LuaEventData::Action { .. }
+            | LuaEventData::Key { .. }
+            | LuaEventData::Input { .. }
+            | LuaEventData::Mouse { .. }
+            | LuaEventData::HitArea(_)
+            | LuaEventData::Hyperlink(_)
+            | LuaEventData::Markdown(_)
+            | LuaEventData::TextInput(_)
+            | LuaEventData::ScrollBox(_)
+        )
+    });
+  }
+
+  /// Remove stale raw keyboard input while preserving balanced closing releases.
+  pub fn clear_pending_keys(&mut self, kind: LuaSessionKind) {
+    self.queue_mut(kind).events.retain(|delivery| {
+      delivery.route == LuaEventRoute::InputRelease
+        || !matches!(delivery.event.data, LuaEventData::Key { .. })
+    });
+  }
+
+  /// Extract closing releases before ordinary input or lifecycle boundaries.
+  pub fn take_input_releases(&mut self, kind: LuaSessionKind) -> Vec<LuaEventDelivery> {
+    let queue = self.queue_mut(kind);
+    let mut releases = Vec::new();
+    queue.events.retain(|delivery| {
+      if delivery.route == LuaEventRoute::InputRelease {
+        releases.push(delivery.clone());
+        false
+      } else {
+        true
+      }
+    });
+    releases
+  }
+
+  /// Return the number of pending events queued for the selected live session.
   pub fn pending_len(&self, kind: LuaSessionKind) -> usize {
     self.queue(kind).events.len()
   }
 
+  /// Drain the sessions whose queues exceeded their allowed event budget.
   pub fn take_overflowed_sessions(&mut self) -> Vec<LuaSessionToken> {
     let mut tokens = Vec::new();
     for queue in [&mut self.game, &mut self.screensaver] {
@@ -692,6 +878,7 @@ fn translate_task_event(
   match (operation, event) {
     (
       LuaTaskOperation::I18n {
+        request_id,
         kind,
         language_code: _,
         callback_language_code: _,
@@ -699,10 +886,12 @@ fn translate_task_event(
       LuaRoutableEvent::File(FileEvent::LuaI18nFinished {
         language_code: actual_language_code,
         callback_language_code: actual_callback_language_code,
+        warning,
         namespaces,
         ..
       }),
     ) => Some(LuaEventData::I18n(LuaI18nEvent {
+      request_id: *request_id,
       kind: *kind,
       ok: true,
       message: match kind {
@@ -712,16 +901,19 @@ fn translate_task_event(
       .to_string(),
       language_code: actual_language_code.clone(),
       callback_language_code: actual_callback_language_code.clone(),
+      warning: warning.clone(),
       namespaces: Some(namespaces.clone()),
     })),
     (
       LuaTaskOperation::I18n {
+        request_id,
         kind,
         language_code,
         callback_language_code,
       },
       LuaRoutableEvent::File(FileEvent::Failed { .. }),
     ) => Some(LuaEventData::I18n(LuaI18nEvent {
+      request_id: *request_id,
       kind: *kind,
       ok: false,
       message: match kind {
@@ -732,6 +924,7 @@ fn translate_task_event(
       language_code: language_code.clone(),
       callback_language_code: callback_language_code.clone(),
       namespaces: None,
+      warning: None,
     })),
     (
       LuaTaskOperation::File {
@@ -874,6 +1067,9 @@ fn translate_task_event(
       timer_kind: LuaTimerKind::Sleep,
       kind: LuaTimerEventKind::Finished,
       executed_count: None,
+      object_id: None,
+      tip: None,
+      revision: None,
     })),
     _ => None,
   }
@@ -936,6 +1132,115 @@ mod tests {
       .unwrap();
     assert_eq!(broker.pending_len(LuaSessionKind::Game), 2);
     assert_eq!(broker.pending_len(LuaSessionKind::Screensaver), 1);
+  }
+
+  #[test]
+  fn requeued_input_keeps_the_pending_budget_and_reports_session_overflow() {
+    let game = token(LuaSessionKind::Game, 1);
+    let mut broker = LuaEventBroker::new();
+    broker.synchronize_sessions(Some(game), None);
+    broker
+      .push_owned(
+        game,
+        1,
+        LuaEventData::Focus { gained: true },
+        LuaEventRoute::HandleEvent,
+      )
+      .unwrap();
+    let old = broker.drain_frame(LuaSessionKind::Game);
+    for i in 0..MAX_LUA_PENDING_EVENTS {
+      broker
+        .push_owned(
+          game,
+          2,
+          LuaEventData::Action {
+            action: format!("a{i}"),
+            state: LuaActionState::Pressed,
+          },
+          LuaEventRoute::Input { generation: 0 },
+        )
+        .unwrap();
+    }
+    broker.requeue_front(LuaSessionKind::Game, old);
+    assert_eq!(
+      broker.pending_len(LuaSessionKind::Game),
+      MAX_LUA_PENDING_EVENTS
+    );
+    assert_eq!(broker.take_overflowed_sessions(), [game]);
+  }
+
+  #[test]
+  fn raw_key_tap_edges_are_not_coalesced_when_the_frame_budget_is_exceeded() {
+    let game = token(LuaSessionKind::Game, 1);
+    let mut broker = LuaEventBroker::new();
+    broker.synchronize_sessions(Some(game), None);
+    for i in 0..200 {
+      let state = if i % 2 == 0 {
+        LuaActionState::Pressed
+      } else {
+        LuaActionState::Released
+      };
+      broker
+        .push_owned(
+          game,
+          1,
+          LuaEventData::Key {
+            key: "esc".into(),
+            state,
+          },
+          LuaEventRoute::Input { generation: 0 },
+        )
+        .unwrap();
+    }
+    let mut batch = broker.drain_frame(LuaSessionKind::Game);
+    assert_eq!(batch.len(), MAX_LUA_EVENTS_PER_FRAME);
+    batch.extend(broker.drain_frame(LuaSessionKind::Game));
+    assert_eq!(batch.len(), 200);
+    for (i, delivery) in batch.iter().enumerate() {
+      assert!(
+        matches!(delivery.event.data,LuaEventData::Key {state,..} if state == if i % 2 == 0 {LuaActionState::Pressed} else {LuaActionState::Released})
+      );
+    }
+  }
+
+  #[test]
+  fn closing_releases_survive_overlay_cleanup_and_session_replacement_discards_them() {
+    let game = token(LuaSessionKind::Game, 1);
+    let screen = token(LuaSessionKind::Screensaver, 1);
+    let mut broker = LuaEventBroker::new();
+    broker.synchronize_sessions(Some(game), Some(screen));
+    let key = |state| LuaEventData::Key {
+      key: "esc".into(),
+      state,
+    };
+    assert!(matches!(
+      broker.push_owned(
+        game,
+        1,
+        key(LuaActionState::Pressed),
+        LuaEventRoute::Input { generation: 0 }
+      ),
+      Err(LuaEnqueueError::EventNotAllowed { .. })
+    ));
+    broker
+      .push_owned(
+        game,
+        1,
+        key(LuaActionState::Released),
+        LuaEventRoute::InputRelease,
+      )
+      .unwrap();
+    broker.clear_pending_actions(LuaSessionKind::Game);
+    broker.clear_pending_keys(LuaSessionKind::Game);
+    broker.clear_pending_interactive(LuaSessionKind::Game);
+    broker.push_system(1, LuaEventData::OverlayStarted).unwrap();
+    let batch = broker.drain_frame(LuaSessionKind::Game);
+    assert_eq!(batch.len(), 2);
+    assert_eq!(batch[0].route, LuaEventRoute::InputRelease);
+    assert!(matches!(batch[1].event.data, LuaEventData::OverlayStarted));
+    broker.requeue_front(LuaSessionKind::Game, batch);
+    broker.synchronize_sessions(Some(token(LuaSessionKind::Game, 2)), None);
+    assert!(broker.drain_frame(LuaSessionKind::Game).is_empty());
   }
 
   #[test]
@@ -1792,6 +2097,7 @@ mod tests {
         TaskId(41),
         game,
         LuaTaskOperation::I18n {
+          request_id: 57,
           kind: LuaI18nEventKind::Created,
           language_code: "zh_cn".to_string(),
           callback_language_code: "en_us".to_string(),
@@ -1810,6 +2116,7 @@ mod tests {
             "menu".to_string(),
             HashMap::from([("title".to_string(), "标题".to_string())]),
           )]),
+          warning: Some("fallback language 'en_us' has no language resources".to_string()),
         }),
       )
       .unwrap();
@@ -1820,8 +2127,19 @@ mod tests {
       panic!("expected i18n event");
     };
     assert!(event.ok);
+    assert_eq!(event.request_id, 57);
     assert_eq!(event.kind, LuaI18nEventKind::Created);
     assert_eq!(event.language_code, "zh_cn");
+    assert_eq!(
+      event.warning.as_deref(),
+      Some("fallback language 'en_us' has no language resources")
+    );
+    let lua = mlua::Lua::new();
+    let data = events[0].event.data.to_lua_table(&lua).unwrap();
+    assert_eq!(
+      data.get::<String>("warning").unwrap(),
+      event.warning.as_ref().unwrap().as_str()
+    );
     assert_eq!(event.namespaces.as_ref().unwrap()["menu"]["title"], "标题");
   }
 }

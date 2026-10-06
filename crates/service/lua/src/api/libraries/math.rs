@@ -1,7 +1,15 @@
+//! Lua math library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
 const MAX_I64_EXCLUSIVE: f64 = 9_223_372_036_854_775_808.0;
 
+/// Build and register the Lua math API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn math(lua: &Lua) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   install_constants(&source)?;
@@ -132,15 +140,15 @@ fn rounded_integer(
 }
 
 fn round_to(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.round_to", values, &["value", "digits"])?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "math.round_to", values, &["value", "digits"], &[])?;
     let value = finite_number(
-      args::required(&table, "math.round_to", "value")?,
+      parsed.required(0, "math.round_to", "value")?,
       "math.round_to",
       "value",
     )?;
     let digits = args::integer(
-      args::required(&table, "math.round_to", "digits")?,
+      parsed.required(1, "math.round_to", "digits")?,
       "math.round_to",
       "digits",
     )?;
@@ -166,10 +174,10 @@ fn round_to(lua: &Lua) -> mlua::Result<Function> {
 }
 
 fn fmod(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.fmod", values, &["x", "y"])?;
-    let x = args::integer(args::required(&table, "math.fmod", "x")?, "math.fmod", "x")?;
-    let y = args::integer(args::required(&table, "math.fmod", "y")?, "math.fmod", "y")?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "math.fmod", values, &["x", "y"], &[])?;
+    let x = args::integer(parsed.required(0, "math.fmod", "x")?, "math.fmod", "x")?;
+    let y = args::integer(parsed.required(1, "math.fmod", "y")?, "math.fmod", "y")?;
     if y == 0 {
       return Err(args::message("math.fmod", "y must not be zero"));
     }
@@ -178,27 +186,23 @@ fn fmod(lua: &Lua) -> mlua::Result<Function> {
 }
 
 fn pow(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.pow", values, &["x", "y"])?;
-    let x = finite_number(args::required(&table, "math.pow", "x")?, "math.pow", "x")?;
-    let y = finite_number(args::required(&table, "math.pow", "y")?, "math.pow", "y")?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "math.pow", values, &["x", "y"], &[])?;
+    let x = finite_number(parsed.required(0, "math.pow", "x")?, "math.pow", "x")?;
+    let y = finite_number(parsed.required(1, "math.pow", "y")?, "math.pow", "y")?;
     finite_result("math.pow", x.powf(y))
   })
 }
 
 fn log(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.log", values, &["value", "base"])?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "math.log", values, &["value", "base"], &[])?;
     let value = finite_number(
-      args::required(&table, "math.log", "value")?,
+      parsed.required(0, "math.log", "value")?,
       "math.log",
       "value",
     )?;
-    let base = finite_number(
-      args::required(&table, "math.log", "base")?,
-      "math.log",
-      "base",
-    )?;
+    let base = finite_number(parsed.required(1, "math.log", "base")?, "math.log", "base")?;
     if value <= 0.0 {
       return Err(args::message("math.log", "value must be greater than zero"));
     }
@@ -213,15 +217,11 @@ fn log(lua: &Lua) -> mlua::Result<Function> {
 }
 
 fn ldexp(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.ldexp", values, &["x", "exp"])?;
-    let mut value = finite_number(
-      args::required(&table, "math.ldexp", "x")?,
-      "math.ldexp",
-      "x",
-    )?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "math.ldexp", values, &["x", "exp"], &[])?;
+    let mut value = finite_number(parsed.required(0, "math.ldexp", "x")?, "math.ldexp", "x")?;
     let mut exponent = args::integer(
-      args::required(&table, "math.ldexp", "exp")?,
+      parsed.required(1, "math.ldexp", "exp")?,
       "math.ldexp",
       "exp",
     )?;
@@ -254,17 +254,17 @@ fn ldexp(lua: &Lua) -> mlua::Result<Function> {
 }
 
 fn frexp(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|lua, values: MultiValue| {
+  lua.create_function(|_, values: MultiValue| {
     let value = finite_number(
       args::one("math.frexp", "value", values)?,
       "math.frexp",
       "value",
     )?;
     let (mantissa, exponent) = frexp_parts(value);
-    let result = lua.create_table()?;
-    result.raw_set("mantissa", mantissa)?;
-    result.raw_set("exponent", exponent)?;
-    Ok(result)
+    Ok(MultiValue::from_vec(vec![
+      Value::Number(mantissa),
+      Value::Integer(exponent),
+    ]))
   })
 }
 
@@ -285,18 +285,10 @@ fn frexp_parts(value: f64) -> (f64, i64) {
 }
 
 fn atan2(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.atan2", values, &["y", "x"])?;
-    let y = finite_number(
-      args::required(&table, "math.atan2", "y")?,
-      "math.atan2",
-      "y",
-    )?;
-    let x = finite_number(
-      args::required(&table, "math.atan2", "x")?,
-      "math.atan2",
-      "x",
-    )?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "math.atan2", values, &["y", "x"], &[])?;
+    let y = finite_number(parsed.required(0, "math.atan2", "y")?, "math.atan2", "y")?;
+    let x = finite_number(parsed.required(1, "math.atan2", "x")?, "math.atan2", "x")?;
     finite_result("math.atan2", y.atan2(x))
   })
 }
@@ -360,7 +352,7 @@ fn extremum(lua: &Lua, maximum: bool) -> mlua::Result<Function> {
 }
 
 fn modf(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|lua, values: MultiValue| {
+  lua.create_function(|_, values: MultiValue| {
     let value = args::one("math.modf", "value", values)?;
     let (integer_part, fractional_part) = match value {
       Value::Integer(value) => (value, 0.0),
@@ -370,10 +362,10 @@ fn modf(lua: &Lua) -> mlua::Result<Function> {
         (integer_part, value - integer_part as f64)
       }
     };
-    let result = lua.create_table()?;
-    result.raw_set("integer_part", integer_part)?;
-    result.raw_set("fractional_part", fractional_part)?;
-    Ok(result)
+    Ok(MultiValue::from_vec(vec![
+      Value::Integer(integer_part),
+      Value::Number(fractional_part),
+    ]))
   })
 }
 
@@ -400,15 +392,11 @@ fn numeric_type(lua: &Lua) -> mlua::Result<Function> {
 }
 
 fn ult(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.ult", values, &["left", "right"])?;
-    let left = args::integer(
-      args::required(&table, "math.ult", "left")?,
-      "math.ult",
-      "left",
-    )? as u64;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "math.ult", values, &["left", "right"], &[])?;
+    let left = args::integer(parsed.required(0, "math.ult", "left")?, "math.ult", "left")? as u64;
     let right = args::integer(
-      args::required(&table, "math.ult", "right")?,
+      parsed.required(1, "math.ult", "right")?,
       "math.ult",
       "right",
     )? as u64;
@@ -417,19 +405,26 @@ fn ult(lua: &Lua) -> mlua::Result<Function> {
 }
 
 fn approx_equal(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.approx_equal", values, &["left", "right", "epsilon"])?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(
+      lua,
+      "math.approx_equal",
+      values,
+      &["left", "right"],
+      &["epsilon"],
+    )?;
+    let options = parsed.options();
     let left = finite_number(
-      args::required(&table, "math.approx_equal", "left")?,
+      parsed.required(0, "math.approx_equal", "left")?,
       "math.approx_equal",
       "left",
     )?;
     let right = finite_number(
-      args::required(&table, "math.approx_equal", "right")?,
+      parsed.required(1, "math.approx_equal", "right")?,
       "math.approx_equal",
       "right",
     )?;
-    let epsilon = match table.get::<Value>("epsilon")? {
+    let epsilon = match options.get::<Value>("epsilon")? {
       Value::Nil => 1e-10,
       value => finite_number(value, "math.approx_equal", "epsilon")?,
     };
@@ -445,22 +440,28 @@ fn approx_equal(lua: &Lua) -> mlua::Result<Function> {
 }
 
 fn percent(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.percent", values, &["value", "total", "as_percent"])?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(
+      lua,
+      "math.percent",
+      values,
+      &["value", "total"],
+      &["as_percent"],
+    )?;
     let value = finite_number(
-      args::required(&table, "math.percent", "value")?,
+      parsed.required(0, "math.percent", "value")?,
       "math.percent",
       "value",
     )?;
     let total = finite_number(
-      args::required(&table, "math.percent", "total")?,
+      parsed.required(1, "math.percent", "total")?,
       "math.percent",
       "total",
     )?;
     if total == 0.0 {
       return Err(args::message("math.percent", "total must not be zero"));
     }
-    let as_percent = args::optional_bool(&table, "math.percent", "as_percent", false)?;
+    let as_percent = args::optional_bool(parsed.options(), "math.percent", "as_percent", false)?;
     let result = value / total;
     finite_result(
       "math.percent",
@@ -487,15 +488,15 @@ fn factorial(lua: &Lua) -> mlua::Result<Function> {
 }
 
 fn combination(lua: &Lua) -> mlua::Result<Function> {
-  lua.create_function(|_, values: MultiValue| {
-    let table = args::named("math.combination", values, &["n", "k"])?;
+  lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "math.combination", values, &["n", "k"], &[])?;
     let n = args::integer(
-      args::required(&table, "math.combination", "n")?,
+      parsed.required(0, "math.combination", "n")?,
       "math.combination",
       "n",
     )?;
     let mut k = args::integer(
-      args::required(&table, "math.combination", "k")?,
+      parsed.required(1, "math.combination", "k")?,
       "math.combination",
       "k",
     )?;

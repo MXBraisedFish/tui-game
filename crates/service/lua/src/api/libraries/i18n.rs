@@ -1,39 +1,65 @@
+//! Lua i18n library bindings with validated arguments and session-owned host access.
+
 use super::*;
 use crate::LuaI18nEventKind;
 
+/// Build and register the Lua i18n API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
+///
+/// # Panics
+///
+/// Panic if an internal invariant is violated: `language_code has a default`;
+/// `callback_language_code has a default`.
 pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
 
   let create_state = state.clone();
   source.raw_set(
     "create",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "i18n.create";
-      let table = args::named(method, values, &["language_code", "callback_language_code"])?;
+      let parameters = args::positional(
+        lua,
+        method,
+        values,
+        &[],
+        &["language_code", "callback_language_code"],
+      )?;
+      let table = parameters.options();
       let system_language = create_state.borrow().context.language_code.clone();
       let language_code = args::optional_string(
-        &table,
+        table,
         method,
         "language_code",
         Some(system_language.as_str()),
       )?
       .expect("language_code has a default");
       let callback_language_code =
-        args::optional_string(&table, method, "callback_language_code", Some("en_us"))?
+        args::optional_string(table, method, "callback_language_code", Some("en_us"))?
           .expect("callback_language_code has a default");
       validate_language_code(method, "language_code", &language_code)?;
       validate_language_code(method, "callback_language_code", &callback_language_code)?;
 
       let mut api = create_state.borrow_mut();
-      if api.i18n.created || api.i18n.loading {
-        return Ok(());
+      if api.i18n.created
+        || api.i18n.loading
+        || api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
+      {
+        return Ok(Value::Nil);
       }
       api.i18n.created = true;
       api.i18n.loading = true;
+      let request_id = api.next_i18n_request_id;
+      api.next_i18n_request_id = api.next_i18n_request_id.wrapping_add(1).max(1);
       let assets_root = api.context.assets_root.clone();
       push_host_command(
         &mut api,
         LuaHostCommand::I18nRequest {
+          request_id,
           task: FileTask::LuaLoadI18n {
             assets_root,
             language_code: language_code.clone(),
@@ -44,22 +70,23 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           callback_language_code,
         },
       );
-      Ok(())
+      Ok(Value::String(lua.create_string(request_id.to_string())?))
     })?,
   )?;
 
   let value_state = state.clone();
   source.raw_set(
     "get_value",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "i18n.get_value";
-      let table = args::named(method, values, &["namespace", "key"])?;
+      let parameters = args::positional(lua, method, values, &["namespace", "key"], &["callback"])?;
+      let callback = args::optional_string(parameters.options(), method, "callback", None)?;
       let namespace = args::string(
-        args::required(&table, method, "namespace")?,
+        parameters.required(0, method, "namespace")?,
         method,
         "namespace",
       )?;
-      let key = args::string(args::required(&table, method, "key")?, method, "key")?;
+      let key = args::string(parameters.required(1, method, "key")?, method, "key")?;
       validate_lookup_name(method, "namespace", &namespace)?;
       validate_lookup_name(method, "key", &key)?;
       let api = value_state.borrow();
@@ -70,6 +97,9 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         .and_then(|values| values.get(&key))
       {
         return Ok(value.clone());
+      }
+      if let Some(callback) = callback {
+        return Ok(callback);
       }
       let missing_key = if key.starts_with(&format!("{namespace}.")) {
         key
@@ -97,35 +127,45 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let reload_state = state;
   source.raw_set(
     "reload",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "i18n.reload";
-      let table = args::named(method, values, &["language_code", "callback_language_code"])?;
+      let parameters = args::positional(
+        lua,
+        method,
+        values,
+        &[],
+        &["language_code", "callback_language_code"],
+      )?;
+      let table = parameters.options();
       let system_language = reload_state.borrow().context.language_code.clone();
       let language_code = args::optional_string(
-        &table,
+        table,
         method,
         "language_code",
         Some(system_language.as_str()),
       )?
       .expect("language_code has a default");
       let callback_language_code =
-        args::optional_string(&table, method, "callback_language_code", Some("en_us"))?
+        args::optional_string(table, method, "callback_language_code", Some("en_us"))?
           .expect("callback_language_code has a default");
       validate_language_code(method, "language_code", &language_code)?;
       validate_language_code(method, "callback_language_code", &callback_language_code)?;
 
       let mut api = reload_state.borrow_mut();
-      if !api.i18n.created {
-        return Err(args::message(method, "i18n instance has not been created"));
-      }
-      if api.i18n.loading {
-        return Ok(());
+      if !api.i18n.created
+        || api.i18n.loading
+        || api.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
+      {
+        return Ok(Value::Nil);
       }
       api.i18n.loading = true;
+      let request_id = api.next_i18n_request_id;
+      api.next_i18n_request_id = api.next_i18n_request_id.wrapping_add(1).max(1);
       let assets_root = api.context.assets_root.clone();
       push_host_command(
         &mut api,
         LuaHostCommand::I18nRequest {
+          request_id,
           task: FileTask::LuaLoadI18n {
             assets_root,
             language_code: language_code.clone(),
@@ -136,7 +176,7 @@ pub(super) fn i18n(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           callback_language_code,
         },
       );
-      Ok(())
+      Ok(Value::String(lua.create_string(request_id.to_string())?))
     })?,
   )?;
 

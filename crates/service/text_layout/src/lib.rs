@@ -1,4 +1,25 @@
-//! Text layout service: wraps, aligns and measures plain or rich text into styled grapheme lines.
+//! Styled text wrapping, alignment, clipping, and terminal-cell measurements.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_text_layout::{DrawTextParams, TextWrapMode, layout_text_lines, measure_draw_text};
+//!
+//! fn main() {
+//!   let params = DrawTextParams {
+//!     text: "Hello \u{4e16}\u{754c} wrap".to_string(),
+//!     max_width: Some(6),
+//!     wrap_mode: TextWrapMode::Auto,
+//!     ..DrawTextParams::default()
+//!   };
+//!   let lines = layout_text_lines(&params);
+//!   assert!(lines.len() > 1, "text wraps at width 6");
+//!   assert!(lines.iter().all(|line| line.width <= 6));
+//!   let (width, height) = measure_draw_text(&params);
+//!   assert_eq!(height as usize, lines.len());
+//!   println!("text_layout ok: {width}x{height}");
+//! }
+//! ```
 
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -9,50 +30,103 @@ use tg_service_rich_text::{
 };
 use unicode_linebreak::BreakOpportunity;
 
-/// Horizontal text alignment.
+/// Horizontal alignment within the longest resolved line of a text block.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextAlign {
+  /// Align each line to the left edge of the text block.
   #[default]
   Left,
+  /// Center each line within the longest resolved line.
   Center,
+  /// Align each line to the right edge of the longest resolved line.
   Right,
 }
 
-/// Text wrapping mode.
+/// The rule used to wrap or clip text at the requested width.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextWrapMode {
+  /// Ignore explicit line breaks and clip text when it exceeds the width limit.
   None,
 
+  /// Wrap automatically using Unicode break opportunities, optional word preservation, and
+  /// long-word fallback.
   Auto,
 
+  /// Preserve explicit line breaks and clip each line at the width limit.
   #[default]
   Normal,
 }
 
-/// Parameters for drawing text.
+/// Configuration values controlling draw text behavior.
+///
+/// # Fields
+///
+/// * `x` - The horizontal coordinate in terminal cells.
+/// * `y` - The vertical coordinate in terminal cells.
+/// * `text` - The text to process or display.
+/// * `text_mode` - The rule selecting plain, tagged, or prefix-triggered rich text.
+/// * `params` - Optional named substitutions for rich-text formatting.
+/// * `fg` - The foreground color override, or `None` to inherit the default.
+/// * `bg` - The background color override, or `None` to inherit the default.
+/// * `line_align` - Horizontal placement of each line within the longest resolved line.
+/// * `wrap_mode` - The policy for wrapping or clipping text at the width limit.
+/// * `non_truncate_word_wrap` - Whether words should be kept intact when a legal word wrap is
+/// available.
+/// * `max_width` - The optional line-width limit in terminal columns.
+/// * `max_height` - The optional line-count limit in terminal rows.
+/// * `overflow_marker` - Optional text replacing the visible ending when content is clipped.
+/// * `bold` - Whether the bold text style is enabled.
+/// * `italic` - Whether the italic text style is enabled.
+/// * `underline` - Whether the underline text style is enabled.
+/// * `strike` - Whether the strike text style is enabled.
+/// * `blink` - Whether the blink text style is enabled.
+/// * `reverse` - Whether the reverse text style is enabled.
+/// * `hidden` - Whether the hidden text style is enabled.
+/// * `dim` - Whether the dim text style is enabled.
 #[derive(Clone, Debug)]
 pub struct DrawTextParams {
+  /// The horizontal coordinate in terminal cells.
   pub x: u16,
+  /// The vertical coordinate in terminal cells.
   pub y: u16,
+  /// The text to process or display.
   pub text: String,
+  /// The rule selecting plain, tagged, or prefix-triggered rich text.
   pub text_mode: TextMode,
 
+  /// Optional named substitutions for rich-text formatting.
   pub params: Option<RichTextParams>,
+  /// The foreground color override, or `None` to inherit the default.
   pub fg: Option<TextColor>,
+  /// The background color override, or `None` to inherit the default.
   pub bg: Option<TextColor>,
+  /// Horizontal placement of each line within the longest resolved line.
   pub line_align: TextAlign,
+  /// The policy for wrapping or clipping text at the width limit.
   pub wrap_mode: TextWrapMode,
+  /// Whether words should be kept intact when a legal word wrap is available.
   pub non_truncate_word_wrap: bool,
+  /// The optional line-width limit in terminal columns.
   pub max_width: Option<u16>,
+  /// The optional line-count limit in terminal rows.
   pub max_height: Option<u16>,
+  /// Optional text replacing the visible ending when content is clipped.
   pub overflow_marker: Option<String>,
+  /// Whether the bold text style is enabled.
   pub bold: bool,
+  /// Whether the italic text style is enabled.
   pub italic: bool,
+  /// Whether the underline text style is enabled.
   pub underline: bool,
+  /// Whether the strike text style is enabled.
   pub strike: bool,
+  /// Whether the blink text style is enabled.
   pub blink: bool,
+  /// Whether the reverse text style is enabled.
   pub reverse: bool,
+  /// Whether the hidden text style is enabled.
   pub hidden: bool,
+  /// Whether the dim text style is enabled.
   pub dim: bool,
 }
 
@@ -85,6 +159,13 @@ impl Default for DrawTextParams {
 }
 
 impl DrawTextParams {
+  /// Create a draw text params initialized from `x`, `y`, `text`.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `text` - The text to process or display.
   pub fn new(x: u16, y: u16, text: impl Into<String>) -> Self {
     Self {
       x,
@@ -94,6 +175,7 @@ impl DrawTextParams {
     }
   }
 
+  /// Return the current to text style.
   pub(crate) fn to_text_style(&self) -> TextStyle {
     TextStyle {
       foreground: self.fg.clone(),
@@ -109,12 +191,7 @@ impl DrawTextParams {
     }
   }
 
-  /// Returns the parameters with host formatting applied: when rich text parameters are set and
-  /// the mode is [`TextMode::Auto`], the text is parsed as rich text with any `f%` prefix removed.
-  ///
-  /// Host UIs that pass rich text parameters have explicitly asked for formatted parsing. Lua
-  /// drawing never calls this method, so Lua's `AUTO` mode still only recognizes text with the
-  /// `f%` prefix.
+  /// Create draw parameters that explicitly enable host text formatting.
   pub fn host_formatted(&self) -> Cow<'_, Self> {
     if self.params.is_none() || self.text_mode != TextMode::Auto {
       return Cow::Borrowed(self);
@@ -131,16 +208,34 @@ impl DrawTextParams {
   }
 }
 
+/// One grapheme, its terminal width, and its resolved text style.
+///
+/// # Fields
+///
+/// * `text` - The text to process or display.
+/// * `width` - The width in terminal columns.
+/// * `style` - The text style applied to the rendered content.
 #[derive(Clone, Debug)]
 pub struct StyledGrapheme {
+  /// The text to process or display.
   pub text: String,
+  /// The width in terminal columns.
   pub width: usize,
+  /// The text style applied to the rendered content.
   pub style: TextStyle,
 }
 
+/// One resolved line of styled graphemes and its occupied terminal width.
+///
+/// # Fields
+///
+/// * `items` - The ordered items retained by this owner.
+/// * `width` - The width in terminal columns.
 #[derive(Clone, Debug, Default)]
 pub struct LayoutLine {
+  /// The ordered items retained by this owner.
   pub items: Vec<StyledGrapheme>,
+  /// The width in terminal columns.
   pub width: usize,
 }
 
@@ -157,13 +252,14 @@ enum TextToken {
   Newline,
 }
 
-/// Lays out the text of the draw parameters into a list of text lines.
+/// Lay out text into styled terminal lines using the requested wrapping and clipping.
 pub fn layout_text_lines(params: &DrawTextParams) -> Vec<LayoutLine> {
   let default_style = params.to_text_style();
   let tokens = build_text_tokens(params, &default_style);
   layout_tokens(&tokens, params, &default_style)
 }
 
+/// Lay out styled segments while preserving grapheme widths and formatting boundaries.
 pub fn layout_rich_text_segments(
   segments: &[RichTextSegment],
   params: &DrawTextParams,
@@ -173,12 +269,16 @@ pub fn layout_rich_text_segments(
   layout_tokens(&tokens, params, &default_style)
 }
 
-/// Measures the size (width x height) needed to draw the text.
+/// Measure the terminal-cell footprint of text after draw-parameter resolution.
+///
+/// The width is the longest visible resolved line, which also sets the horizontal alignment
+/// bounds. A width limit controls wrapping and clipping without padding the text block.
 pub fn measure_draw_text(params: &DrawTextParams) -> (u16, u16) {
   let lines = layout_text_lines(params);
   measure_lines(&lines)
 }
 
+/// Measure the terminal-cell footprint of styled text segments.
 pub fn measure_rich_text_segments(
   segments: &[RichTextSegment],
   params: &DrawTextParams,
@@ -203,7 +303,8 @@ fn measure_lines(lines: &[LayoutLine]) -> (u16, u16) {
   (width, height)
 }
 
-/// Parses the rich text into a stream of grapheme tokens, each carrying its style.
+/// Parse styled graphemes into wrapping tokens while retaining hard line breaks and display
+/// widths.
 fn build_text_tokens(params: &DrawTextParams, style: &TextStyle) -> Vec<TextToken> {
   let rich_text =
     RichTextService::new().parse_mode(&params.text, params.params.as_ref(), params.text_mode);
@@ -231,8 +332,13 @@ fn build_segment_tokens(segments: &[RichTextSegment], style: &TextStyle) -> Vec<
   tokens
 }
 
-/// Lays out the token stream into text lines according to the maximum width, the maximum
-/// height and the wrap mode.
+/// Resolve token line breaks within the requested terminal width and wrapping policy.
+///
+/// # Arguments
+///
+/// * `tokens` - The tokens.
+/// * `params` - The formatting or rendering parameters.
+/// * `default_style` - The default style.
 fn layout_tokens(
   tokens: &[TextToken],
   params: &DrawTextParams,
@@ -634,8 +740,14 @@ fn first_grapheme_style(tokens: &[TextToken]) -> Option<TextStyle> {
   })
 }
 
-/// Appends the overflow marker (such as "...") to the line, dropping trailing graphemes when
-/// needed to make room.
+/// Replace the clipped line ending with a marker while keeping the result inside the width limit.
+///
+/// # Arguments
+///
+/// * `line` - The line.
+/// * `marker` - The marker.
+/// * `max_width` - The max width in terminal columns.
+/// * `style` - The text style applied to the rendered content.
 fn apply_overflow_marker(
   line: &mut LayoutLine,
   marker: Option<&str>,
@@ -679,7 +791,13 @@ fn apply_overflow_marker(
   }
 }
 
-/// Splits the overflow marker into graphemes whose total width stays within `max_width`.
+/// Segment the overflow marker into styled graphemes with terminal display widths.
+///
+/// # Arguments
+///
+/// * `marker` - The marker.
+/// * `max_width` - The max width in terminal columns.
+/// * `style` - The text style applied to the rendered content.
 fn marker_graphemes(marker: &str, max_width: usize, style: &TextStyle) -> Vec<StyledGrapheme> {
   let mut result = Vec::new();
   let mut width = 0usize;
@@ -697,7 +815,7 @@ fn marker_graphemes(marker: &str, max_width: usize, style: &TextStyle) -> Vec<St
   result
 }
 
-/// Merges the base style with the override style; non-default override values win.
+/// Combine explicit drawing overrides with the style already supplied by parsed text.
 fn merge_style(base: &TextStyle, overrides: &TextStyle) -> TextStyle {
   let mut merged = base.clone();
 

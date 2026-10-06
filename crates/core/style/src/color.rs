@@ -1,7 +1,8 @@
+//! Parsing of named terminal colors and explicit RGB color expressions.
+
 use super::{TerminalColor, TextColor};
 
-/// Parses a color string into a [`TextColor`]; terminal color names, hex (`#rrggbb`) and
-/// `rgb(r, g, b)` forms are supported.
+/// Parse a terminal color name, hexadecimal RGB value, or `rgb(r, g, b)` expression.
 pub fn parse_text_color(value: &str) -> Option<TextColor> {
   let value = value.trim();
 

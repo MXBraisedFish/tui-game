@@ -1,13 +1,17 @@
+//! Localized labels with stable embedded-English fallback.
+
 use std::collections::HashMap;
 
 use super::{LogLevel, LogPhase, LogSource};
 
+/// The log labels representation used by this module.
 #[derive(Clone, Debug)]
 pub struct LogLabels {
   values: HashMap<&'static str, String>,
 }
 
 impl LogLabels {
+  /// Create a log labels with its initial state.
   pub fn new() -> Self {
     let mut labels = Self {
       values: HashMap::new(),
@@ -16,8 +20,7 @@ impl LogLabels {
     labels
   }
 
-  /// Resets to the English defaults, then applies every label `translate` resolves.
-  /// `translate` returns `None` for keys the active language does not define.
+  /// Replace cached translated log labels using the supplied lookup.
   pub fn refresh(&mut self, translate: impl Fn(&'static str) -> Option<String>) {
     self.insert_defaults();
     for key in log_label_keys() {
@@ -27,14 +30,17 @@ impl LogLabels {
     }
   }
 
+  /// Return the localized phase label, falling back to its embedded English spelling.
   pub fn phase(&self, phase: LogPhase) -> &str {
     self.label(phase.key(), phase.default_label())
   }
 
+  /// Return the localized source label, falling back to its embedded English spelling.
   pub fn source(&self, source: LogSource) -> &str {
     self.label(source.key(), source.default_label())
   }
 
+  /// Return the localized level label, falling back to its embedded English spelling.
   pub fn level(&self, level: LogLevel) -> &str {
     self.label(level.key(), level.default_label())
   }
@@ -100,6 +106,7 @@ impl Default for LogLabels {
   }
 }
 
+/// Return the translation keys needed for log source, phase, and severity labels.
 pub fn log_label_keys() -> &'static [&'static str] {
   &[
     "log.phase.boot",

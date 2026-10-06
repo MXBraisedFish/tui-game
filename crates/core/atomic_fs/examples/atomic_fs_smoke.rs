@@ -1,4 +1,4 @@
-//! Minimal entry: atomically writes one file in the temp directory and reads it back.
+//! Independent atomic fs smoke entry exercising the public API and checking its results.
 
 use std::path::PathBuf;
 

@@ -1,4 +1,7 @@
-use std::collections::{HashSet, VecDeque};
+//! Service support for the input service.
+
+use std::cell::Cell;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{
   Arc,
   atomic::{AtomicBool, Ordering},
@@ -25,14 +28,63 @@ use tg_core_input::{
   ScrollDirection, SystemEvent, TerminalKeyCode, TerminalKeyEvent, display_key_token,
 };
 
-/// 输入服务，管理键盘/鼠标/系统事件的采集与动作分发
-/// A listener thread failure, reported to the application as an input log message.
+/// Failures reported by input listener operations.
+///
+/// # Fields
+///
+/// * `0` - The wrapped string value.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct InputListenerError(pub String);
+pub struct InputListenerError(
+  /// The wrapped string value.
+  pub String,
+);
 
+/// Text committed by the terminal, without input-method preedit information.
+///
+/// # Fields
+///
+/// * `text` - Submitted characters or pasted text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CommittedTextEvent {
+  /// Submitted characters or pasted text.
+  pub text: String,
+}
+
+/// An ordered keyboard state change or focus boundary observed during one input frame.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InputNotification {
+  /// A physical key transition, independent of shortcut capture.
+  Key { key: Key, state: KeyState },
+  /// A logical action transition and its host ownership.
+  Action {
+    event: InputActionEvent,
+    system: bool,
+  },
+  /// Committed text observed independently of shortcut and widget capture.
+  Text { text: String },
+  /// A terminal focus boundary following any closing releases.
+  Focus { gained: bool },
+}
+
+#[derive(Clone, Copy)]
+struct ActiveAction {
+  state: KeyState,
+  frame: u64,
+  priority: u64,
+  combination: bool,
+  registration: usize,
+}
+
+enum QueuedInput {
+  Key(KeyEvent),
+  Focus(FocusEvent),
+  Text(CommittedTextEvent),
+}
+
+/// The public entry point for input operations.
 pub struct InputService {
-  sender: Sender<KeyEvent>,
-  receiver: Receiver<KeyEvent>,
+  sender: Sender<QueuedInput>,
+  receiver: Receiver<QueuedInput>,
   action_sender: Sender<InputActionEvent>,
   action_receiver: Receiver<InputActionEvent>,
   system_sender: Sender<SystemEvent>,
@@ -42,6 +94,14 @@ pub struct InputService {
   key_listener_started: Arc<AtomicBool>,
   system_listener_started: Arc<AtomicBool>,
   held_keys: HashSet<Key>,
+  blocked_keys: HashSet<Key>,
+  blocked_page_keys: HashSet<Key>,
+  blocked_system_keys: HashSet<Key>,
+  key_transitions: HashMap<Key, (KeyState, u64)>,
+  active_actions: HashMap<(bool, String), ActiveAction>,
+  notifications: Vec<InputNotification>,
+  frame: u64,
+  dispatch_cursor: Cell<usize>,
   pressed_keys: HashSet<Key>,
   released_keys: HashSet<Key>,
   mouse_held_buttons: HashSet<MouseButton>,
@@ -57,6 +117,7 @@ pub struct InputService {
 }
 
 impl InputService {
+  /// Create an input service with its initial state.
   pub fn new() -> Self {
     let (sender, receiver) = unbounded();
     let (action_sender, action_receiver) = unbounded();
@@ -74,6 +135,14 @@ impl InputService {
       key_listener_started: Arc::new(AtomicBool::new(false)),
       system_listener_started: Arc::new(AtomicBool::new(false)),
       held_keys: HashSet::new(),
+      blocked_keys: HashSet::new(),
+      blocked_page_keys: HashSet::new(),
+      blocked_system_keys: HashSet::new(),
+      key_transitions: HashMap::new(),
+      active_actions: HashMap::new(),
+      notifications: Vec::new(),
+      frame: 0,
+      dispatch_cursor: Cell::new(0),
       pressed_keys: HashSet::new(),
       released_keys: HashSet::new(),
       mouse_held_buttons: HashSet::new(),
@@ -89,7 +158,7 @@ impl InputService {
     }
   }
 
-  /// 启动全局键盘监听线程（仅首次调用生效）
+  /// Start the global keyboard listener once and send observed key changes to the input queue.
   pub fn start_key_listener<E>(&self, async_runtime: &mut AsyncRuntime<E>)
   where
     E: From<KeyEvent>
@@ -109,7 +178,7 @@ impl InputService {
           if let Some(key_event) = key_event_from_rdev(event)
             && sender_for_callback.send(E::from(key_event)).is_err()
           {
-            // Channel disconnected — likely during shutdown
+            // Stop the listener when the application no longer receives keyboard events.
           }
         };
         if let Err(error) = listen(callback) {
@@ -122,10 +191,11 @@ impl InputService {
     });
   }
 
-  /// 启动系统事件监听线程（终端按键/鼠标/窗口大小/焦点）
+  /// Start the terminal listener for key, mouse, resize, and focus events.
   pub fn start_system_listener<E>(&self, async_runtime: &mut AsyncRuntime<E>)
   where
     E: From<SystemEvent>
+      + From<CommittedTextEvent>
       + From<InputListenerError>
       + From<tg_service_async::TaskStatusEvent>
       + Send
@@ -153,24 +223,34 @@ impl InputService {
             if let Ok(ct_event) = ct_event::read() {
               match ct_event {
                 CtEvent::Key(key_event) => {
+                  if let Some(event) = committed_text_from_crossterm(key_event)
+                    && sender.send(E::from(event)).is_err()
+                  {
+                    break;
+                  }
                   if let Some(event) = terminal_key_event_from_crossterm(key_event)
                     && sender.send(E::from(event)).is_err()
                   {
-                    // Channel disconnected — likely during shutdown.
+                    break;
+                  }
+                }
+                CtEvent::Paste(text) => {
+                  if !text.is_empty() && sender.send(E::from(CommittedTextEvent { text })).is_err()
+                  {
+                    break;
                   }
                 }
                 other_event => {
                   if let Some(sys_event) = system_event_from_crossterm(other_event)
                     && sender.send(E::from(sys_event)).is_err()
                   {
-                    // Channel disconnected — likely during shutdown.
+                    break;
                   }
                 }
               }
             } else {
-              // ct_event::read() failed despite poll() reporting an event.
-              // This is unusual but can happen if the event is consumed between
-              // poll and read (e.g. signal interrupt). The poll error is logged above.
+              // An event may disappear between poll and read; retain the listener after a failed
+              // read.
             }
           }
         }
@@ -178,8 +258,9 @@ impl InputService {
     });
   }
 
+  /// Queue a global key transition for application during input polling.
   pub fn queue_key_event(&self, event: KeyEvent, log: &mut LogService) {
-    if self.sender.send(event).is_err() {
+    if self.sender.send(QueuedInput::Key(event)).is_err() {
       log.warn_operation_failed(
         LogSource::Input,
         "queue_key_event",
@@ -189,7 +270,16 @@ impl InputService {
     }
   }
 
+  /// Queue committed text in the same ordered journal as keys and focus boundaries.
+  pub fn queue_committed_text(&self, event: CommittedTextEvent) {
+    let _ = self.sender.send(QueuedInput::Text(event));
+  }
+
+  /// Queue a terminal event while retaining its UI-consumption order.
   pub fn queue_system_event(&self, event: SystemEvent, log: &mut LogService) {
+    if let SystemEvent::Focus(focus) = event {
+      let _ = self.sender.send(QueuedInput::Focus(focus));
+    }
     if self.system_sender.send(event).is_err() {
       log.warn_operation_failed(
         LogSource::Input,
@@ -200,20 +290,20 @@ impl InputService {
     }
   }
 
-  /// 轮询并应用系统事件队列
+  /// Apply queued system events to the current input state.
   pub fn poll_system_events(&mut self) {
     while let Some(event) = self.pop_system_event() {
-      self.apply_system_event(&event);
+      self.apply_queued_system_event(&event);
     }
   }
 
-  /// 轮询系统事件并优先处理窗口大小变化
+  /// Apply pending terminal size changes before other frame input is routed.
   pub fn poll_resize_events(&mut self, mut on_resize: impl FnMut(u16, u16)) {
     let mut others = VecDeque::new();
     while let Some(event) = self.pop_system_event() {
       match &event {
         SystemEvent::Resize(re) => {
-          self.apply_system_event(&event);
+          self.apply_queued_system_event(&event);
           on_resize(re.width, re.height);
         }
         _ => others.push_back(event),
@@ -222,10 +312,7 @@ impl InputService {
     self.pending_system_events = others;
   }
 
-  /// 取出 Runtime 尚未观察过的系统事件，同时保持其后续 UI 消费顺序。
-  ///
-  /// Runtime 用它旁路观察必须同时送往 Lua 的焦点事件；该方法不应用事件状态，
-  /// 也不把宿主 UI 的事件所有权转交给 Lua。
+  /// Drain unobserved system events without consuming the UI's delivery queue.
   pub fn drain_system_event_observations(&mut self, limit: usize) -> Vec<SystemEvent> {
     while self.pending_system_events.len() < limit {
       let Ok(event) = self.system_receiver.try_recv() else {
@@ -238,13 +325,12 @@ impl InputService {
     self.observed_system_events.drain(..count).collect()
   }
 
-  /// 读取单帧允许的系统事件，同时补齐鼠标 Hold 事件。
-  ///
-  /// 未读取的事件保留在通道中，避免输入洪峰让 Runtime 一帧内无限排空队列。
+  /// Drain system events in order and synthesize pointer hold events for the frame.
   pub fn drain_system_events(&mut self) -> Vec<SystemEvent> {
     self.drain_system_events_limited(128)
   }
 
+  /// Drain at most the frame event budget, leaving excess input queued for later frames.
   pub fn drain_system_events_limited(&mut self, limit: usize) -> Vec<SystemEvent> {
     let mut events = Vec::new();
     let mut active_buttons: HashSet<MouseButton> = HashSet::new();
@@ -269,7 +355,7 @@ impl InputService {
       {
         self.raw_mouse_events.push_back(*mouse);
       }
-      self.apply_system_event(&event);
+      self.apply_queued_system_event(&event);
       events.push(event);
     }
 
@@ -306,19 +392,22 @@ impl InputService {
     Some(event)
   }
 
+  // Keyboard focus is already applied by the ordered journal. Retain pointer cleanup in the
+  // system queue without replaying an old loss/gain pair over fresh keyboard input.
+  fn apply_queued_system_event(&mut self, event: &SystemEvent) {
+    match event {
+      SystemEvent::Focus(focus) if !focus.gained => {
+        self.mouse_held_buttons.clear();
+        self.raw_mouse_events.clear();
+      }
+      SystemEvent::Focus(_) => {}
+      _ => self.apply_system_event(event),
+    }
+  }
+
   fn apply_system_event(&mut self, event: &SystemEvent) {
     match event {
-      SystemEvent::Focus(focus) => {
-        self.focused = focus.gained;
-        if !focus.gained {
-          self.raw_key_events.clear();
-          self.raw_mouse_events.clear();
-          self.held_keys.clear();
-          self.pressed_keys.clear();
-          self.released_keys.clear();
-          self.mouse_held_buttons.clear();
-        }
-      }
+      SystemEvent::Focus(focus) => self.apply_focus(*focus),
       SystemEvent::Mouse(me) => {
         self.mouse_position = Some((me.x, me.y));
 
@@ -338,27 +427,49 @@ impl InputService {
     }
   }
 
-  /// 开始新的一帧，清空单帧按键状态
+  /// Prepare per-frame state and discard submissions or observations belonging to the previous
+  /// frame.
   pub fn begin_frame(&mut self) {
     self.pressed_keys.clear();
     self.released_keys.clear();
+    self.notifications.clear();
+    self.dispatch_cursor.set(0);
+    self.frame = self.frame.wrapping_add(1);
   }
 
-  /// 轮询并应用全局键盘事件
+  /// Drain queued global keyboard transitions into the current frame key state.
   pub fn poll(&mut self) {
     while let Ok(event) = self.receiver.try_recv() {
-      if self.focused && self.raw_key_capture_enabled {
-        self.raw_key_events.push_back(RawKeyEvent {
-          key: event.key,
-          display: display_key_token(event.key),
-          kind: event.kind,
-        });
+      match event {
+        QueuedInput::Focus(focus) => self.apply_focus(focus),
+        QueuedInput::Text(event) => {
+          if self.focused && !event.text.is_empty() {
+            self
+              .notifications
+              .push(InputNotification::Text { text: event.text });
+          }
+        }
+        QueuedInput::Key(event) => {
+          if self.focused && self.raw_key_capture_enabled {
+            self.raw_key_events.push_back(RawKeyEvent {
+              key: event.key,
+              display: display_key_token(event.key),
+              kind: event.kind,
+            });
+          }
+          self.apply_key_event(event);
+        }
       }
-      self.apply_key_event(event);
     }
+    self.advance_held_transitions();
   }
 
-  /// 启用原始按键捕获
+  /// Return the ordered transitions retained for this frame without consuming capture events.
+  pub fn notifications(&self) -> &[InputNotification] {
+    &self.notifications
+  }
+
+  /// Enable raw key capture, clear stale captured events, and return whether the mode changed.
   pub fn enable_raw_key_capture(&mut self) -> bool {
     if self.raw_key_capture_enabled {
       return false;
@@ -368,7 +479,7 @@ impl InputService {
     true
   }
 
-  /// 禁用原始按键捕获
+  /// Disable raw key capture and return whether the mode changed.
   pub fn disable_raw_key_capture(&mut self) -> bool {
     if !self.raw_key_capture_enabled {
       return false;
@@ -377,20 +488,22 @@ impl InputService {
     true
   }
 
+  /// Report whether this input service is raw key capture enabled.
   pub fn is_raw_key_capture_enabled(&self) -> bool {
     self.raw_key_capture_enabled
   }
 
+  /// Report whether this input service is focused.
   pub fn is_focused(&self) -> bool {
     self.focused
   }
 
-  /// 取出所有原始按键事件
+  /// Drain the raw keyboard events collected while key capture was enabled.
   pub fn take_raw_key_events(&mut self) -> Vec<RawKeyEvent> {
     self.raw_key_events.drain(..).collect()
   }
 
-  /// 启用原始鼠标事件捕获
+  /// Enable raw pointer capture, clear stale captured events, and return whether the mode changed.
   pub fn enable_raw_mouse_capture(&mut self) -> bool {
     if self.raw_mouse_capture_enabled {
       return false;
@@ -400,7 +513,7 @@ impl InputService {
     true
   }
 
-  /// 禁用原始鼠标事件捕获
+  /// Disable raw pointer capture and return whether the mode changed.
   pub fn disable_raw_mouse_capture(&mut self) -> bool {
     if !self.raw_mouse_capture_enabled {
       return false;
@@ -409,28 +522,32 @@ impl InputService {
     true
   }
 
+  /// Report whether this input service is raw mouse capture enabled.
   pub fn is_raw_mouse_capture_enabled(&self) -> bool {
     self.raw_mouse_capture_enabled
   }
 
-  /// 取出所有原始鼠标事件
+  /// Drain the raw pointer events collected while mouse capture was enabled.
   pub fn take_raw_mouse_events(&mut self) -> Vec<MouseEvent> {
     self.raw_mouse_events.drain(..).collect()
   }
 
+  /// Report whether the key is currently held down.
   pub fn is_down(&self, key: Key) -> bool {
     self.held_keys.contains(&key)
   }
 
+  /// Report whether the key transitioned to pressed during the current frame.
   pub fn was_pressed(&self, key: Key) -> bool {
     self.pressed_keys.contains(&key)
   }
 
+  /// Report whether the key transitioned to released during the current frame.
   pub fn was_released(&self, key: Key) -> bool {
     self.released_keys.contains(&key)
   }
 
-  /// 查询按键在当前帧的状态
+  /// Return the key state for the addressed object when it is available.
   pub fn key_state(&self, key: Key) -> Option<KeyState> {
     if self.pressed_keys.contains(&key) {
       return Some(KeyState::Pressed);
@@ -447,47 +564,86 @@ impl InputService {
     None
   }
 
+  /// Return the current mouse position.
   pub fn mouse_position(&self) -> Option<(u16, u16)> {
     self.mouse_position
   }
 
+  /// Report whether the addressed object is mouse down.
   pub fn is_mouse_down(&self, button: MouseButton) -> bool {
     self.mouse_held_buttons.contains(&button)
   }
 
-  /// 清空所有按键状态
+  /// Reset key states, captured events, and queued actions so stale input cannot cross ownership
+  /// changes.
   pub fn clear(&mut self) {
-    self.held_keys.clear();
+    self.notifications.retain(|event| {
+      matches!(
+        event,
+        InputNotification::Key {
+          state: KeyState::Released,
+          ..
+        } | InputNotification::Action {
+          event: InputActionEvent {
+            state: KeyState::Released,
+            ..
+          },
+          ..
+        } | InputNotification::Focus { .. }
+      )
+    });
+    self.dispatch_cursor.set(0);
+    while self.action_receiver.try_recv().is_ok() {}
+    self.raw_key_events.clear();
+    let mut retained = VecDeque::new();
+    while let Some(event) = self.pop_system_event() {
+      if !matches!(event, SystemEvent::TerminalKey(_)) {
+        retained.push_back(event);
+      }
+    }
+    self.pending_system_events = retained;
+    self.close_input();
     self.pressed_keys.clear();
     self.released_keys.clear();
   }
 
-  /// 加载按键绑定配置
-  pub fn load_key_bindings(&mut self, bindings: Vec<KeyBinding>) {
-    self.bindings = bindings
-      .into_iter()
-      .map(|binding| KeyBinding {
-        pattern: binding.pattern.normalized(),
-        action: binding.action,
-      })
-      .collect();
+  /// Replace the page action bindings used by ordered input dispatch.
+  pub fn load_key_bindings(&mut self, mut bindings: Vec<KeyBinding>) {
+    for binding in &mut bindings {
+      binding.pattern = binding.pattern.normalized();
+    }
+    if self.bindings == bindings {
+      return;
+    }
+    self.release_actions(Some(false));
+    self
+      .blocked_page_keys
+      .extend(self.held_keys.iter().copied());
+    self.bindings = bindings;
   }
 
-  /// 加载系统级按键绑定。系统绑定优先级高于页面绑定，并且不受 action map 禁用影响。
-  pub fn load_system_key_bindings(&mut self, bindings: Vec<KeyBinding>) {
-    self.system_bindings = bindings
-      .into_iter()
-      .map(|binding| KeyBinding {
-        pattern: binding.pattern.normalized(),
-        action: binding.action,
-      })
-      .collect();
+  /// Replace host bindings that run before page bindings and remain active when page dispatch is
+  /// disabled.
+  pub fn load_system_key_bindings(&mut self, mut bindings: Vec<KeyBinding>) {
+    for binding in &mut bindings {
+      binding.pattern = binding.pattern.normalized();
+    }
+    if self.system_bindings == bindings {
+      return;
+    }
+    self.release_actions(Some(true));
+    self
+      .blocked_system_keys
+      .extend(self.held_keys.iter().copied());
+    self.system_bindings = bindings;
   }
 
+  /// Return the current key bindings.
   pub fn key_bindings(&self) -> &[KeyBinding] {
     &self.bindings
   }
 
+  /// Enable shortcut dispatch and return whether the mode changed.
   pub fn enable_action_map_dispatch(&mut self) -> bool {
     if self.action_map_dispatch_enabled {
       return false;
@@ -496,105 +652,207 @@ impl InputService {
     true
   }
 
+  /// Disable shortcut dispatch and return whether the mode changed.
   pub fn disable_action_map_dispatch(&mut self) -> bool {
     if !self.action_map_dispatch_enabled {
       return false;
     }
+    self.release_actions(Some(false));
+    self
+      .blocked_page_keys
+      .extend(self.held_keys.iter().copied());
     self.action_map_dispatch_enabled = false;
     true
   }
 
+  /// Report whether this input service is action map dispatch enabled.
   pub fn is_action_map_dispatch_enabled(&self) -> bool {
     self.action_map_dispatch_enabled
   }
 
-  fn pattern_state(&self, pattern: KeyPattern) -> Option<KeyState> {
-    match pattern.normalized() {
-      KeyPattern::Single(key) => self.key_state(key),
-      KeyPattern::Combo(first, second) => self.combo_state(first, second),
-    }
-  }
-
-  // 组合键状态判定：任意键释放即认为组合键释放，后按的键触发按下
-  fn combo_state(&self, first: Key, second: Key) -> Option<KeyState> {
-    let first_released = self.was_released(first);
-    let second_released = self.was_released(second);
-
-    let first_pressed = self.was_pressed(first);
-    let second_pressed = self.was_pressed(second);
-
-    let first_down = self.is_down(first);
-    let second_down = self.is_down(second);
-
-    if first_released && self.key_is_active_or_changed(second) {
-      return Some(KeyState::Released);
-    }
-
-    if second_released && self.key_is_active_or_changed(first) {
-      return Some(KeyState::Released);
-    }
-
-    if first_pressed && second_down {
-      return Some(KeyState::Pressed);
-    }
-
-    if second_pressed && first_down {
-      return Some(KeyState::Pressed);
-    }
-
-    if first_down && second_down {
-      return Some(KeyState::Held);
-    }
-
-    None
-  }
-
-  fn key_is_active_or_changed(&self, key: Key) -> bool {
-    self.is_down(key) || self.was_pressed(key) || self.was_released(key)
-  }
-
-  /// 根据当前按键状态和绑定表收集动作事件
+  /// Return this frame's ordered, deduplicated action transitions.
   pub fn collect_action_events(&self) -> Vec<InputActionEvent> {
-    let mut events = Vec::new();
-    let mut consumed_keys = HashSet::new();
-
-    self.collect_events_from_bindings(&self.system_bindings, &mut consumed_keys, &mut events);
-
-    if self.action_map_dispatch_enabled {
-      self.collect_events_from_bindings(&self.bindings, &mut consumed_keys, &mut events);
-    }
-
-    events
+    self
+      .notifications
+      .iter()
+      .filter_map(|notification| match notification {
+        InputNotification::Action { event, .. } => Some(event.clone()),
+        _ => None,
+      })
+      .collect()
   }
 
-  fn collect_events_from_bindings(
-    &self,
-    bindings: &[KeyBinding],
-    consumed_keys: &mut HashSet<Key>,
-    events: &mut Vec<InputActionEvent>,
-  ) {
-    for binding in bindings {
-      let pattern = binding.pattern.normalized();
-
-      if pattern.has_consumed_key(consumed_keys) {
+  fn update_action_states(&mut self) {
+    let mut candidates = Vec::new();
+    for (system, bindings) in [(true, &self.system_bindings), (false, &self.bindings)] {
+      if !system && !self.action_map_dispatch_enabled {
         continue;
       }
-
-      if let Some(state) = self.pattern_state(pattern) {
-        events.push(InputActionEvent {
-          event_type: InputEventType::Keyboard,
-          action: binding.action.clone(),
-          state,
-        });
-
-        pattern.consume_keys(consumed_keys);
+      for (registration, binding) in bindings.iter().enumerate() {
+        let blocked = if system {
+          &self.blocked_system_keys
+        } else {
+          &self.blocked_page_keys
+        };
+        let active = |key| self.held_keys.contains(&key) && !blocked.contains(&key);
+        let matches = match binding.pattern {
+          KeyPattern::Single(key) => active(key),
+          KeyPattern::Combo(first, second) => active(first) && active(second),
+        };
+        if matches {
+          candidates.push((
+            (system, binding.action.clone()),
+            ActiveAction {
+              state: KeyState::Pressed,
+              frame: self.frame,
+              priority: binding.priority,
+              combination: matches!(binding.pattern, KeyPattern::Combo(..)),
+              registration,
+            },
+          ));
+        }
       }
+    }
+    candidates.sort_by(|(left, a), (right, b)| Self::action_order(left.0, a, right.0, b));
+    let mut matching = HashMap::new();
+    for (id, rank) in candidates {
+      matching.entry(id).or_insert(rank);
+    }
+    let mut events = Vec::new();
+    for (id, previous) in &self.active_actions {
+      if !matching.contains_key(id) {
+        events.push((id.clone(), *previous, KeyState::Released));
+      }
+    }
+    for (id, rank) in &mut matching {
+      if let Some(previous) = self.active_actions.get(id) {
+        rank.state = previous.state;
+        rank.frame = previous.frame;
+      } else {
+        events.push((id.clone(), *rank, KeyState::Pressed));
+      }
+    }
+    self.active_actions = matching;
+    events.sort_by(|(a, ar, _), (b, br, _)| Self::action_order(a.0, ar, b.0, br));
+    for ((system, action), _, state) in events {
+      self.push_action(system, action, state);
     }
   }
 
-  /// 收集动作事件并发送到动作通道
+  fn action_order(
+    system_a: bool,
+    a: &ActiveAction,
+    system_b: bool,
+    b: &ActiveAction,
+  ) -> std::cmp::Ordering {
+    system_b
+      .cmp(&system_a)
+      .then(b.priority.cmp(&a.priority))
+      .then(b.combination.cmp(&a.combination))
+      .then(a.registration.cmp(&b.registration))
+  }
+
+  fn push_action(&mut self, system: bool, action: String, state: KeyState) {
+    self.notifications.push(InputNotification::Action {
+      event: InputActionEvent {
+        event_type: InputEventType::Keyboard,
+        action,
+        state,
+      },
+      system,
+    });
+  }
+
+  fn release_actions(&mut self, system: Option<bool>) {
+    let mut closing = self
+      .active_actions
+      .iter()
+      .filter(|(id, _)| system.is_none_or(|scope| id.0 == scope))
+      .map(|(id, rank)| (id.clone(), *rank))
+      .collect::<Vec<_>>();
+    closing.sort_by(|(a, ar), (b, br)| Self::action_order(a.0, ar, b.0, br));
+    for ((scope, action), _) in closing {
+      self.active_actions.remove(&(scope, action.clone()));
+      self.push_action(scope, action, KeyState::Released);
+    }
+  }
+
+  fn close_input(&mut self) {
+    self.blocked_keys.extend(self.held_keys.iter().copied());
+    let mut keys = self.key_transitions.keys().copied().collect::<Vec<_>>();
+    keys.sort_by_key(|key| tg_core_input::key_token(*key));
+    for key in keys {
+      self.notifications.push(InputNotification::Key {
+        key,
+        state: KeyState::Released,
+      });
+    }
+    self.key_transitions.clear();
+    self.release_actions(None);
+    self.held_keys.clear();
+  }
+
+  fn apply_focus(&mut self, focus: FocusEvent) {
+    if self.focused == focus.gained {
+      return;
+    }
+    self.focused = focus.gained;
+    if !focus.gained {
+      self.close_input();
+      self.raw_key_events.clear();
+      self.raw_mouse_events.clear();
+      self.pressed_keys.clear();
+      self.released_keys.clear();
+      self.mouse_held_buttons.clear();
+    }
+    self.notifications.push(InputNotification::Focus {
+      gained: focus.gained,
+    });
+  }
+
+  fn advance_held_transitions(&mut self) {
+    let mut keys = self
+      .key_transitions
+      .iter()
+      .filter(|(_, (state, frame))| *state == KeyState::Pressed && *frame != self.frame)
+      .map(|(key, _)| *key)
+      .collect::<Vec<_>>();
+    keys.sort_by_key(|key| tg_core_input::key_token(*key));
+    for key in keys {
+      self.key_transitions.get_mut(&key).unwrap().0 = KeyState::Held;
+      self.notifications.push(InputNotification::Key {
+        key,
+        state: KeyState::Held,
+      });
+    }
+    let mut actions = self
+      .active_actions
+      .iter()
+      .filter(|(_, rank)| rank.state == KeyState::Pressed && rank.frame != self.frame)
+      .map(|(id, rank)| (id.clone(), *rank))
+      .collect::<Vec<_>>();
+    actions.sort_by(|(a, ar), (b, br)| Self::action_order(a.0, ar, b.0, br));
+    for ((system, action), _) in actions {
+      self
+        .active_actions
+        .get_mut(&(system, action.clone()))
+        .unwrap()
+        .state = KeyState::Held;
+      self.push_action(system, action, KeyState::Held);
+    }
+  }
+
+  /// Queue all matching host and page action transitions without consuming shared keys.
   pub fn dispatch_action_events(&self, log: &mut LogService) {
-    for event in self.collect_action_events() {
+    let start = self.dispatch_cursor.get().min(self.notifications.len());
+    self.dispatch_cursor.set(self.notifications.len());
+    for event in self.notifications[start..]
+      .iter()
+      .filter_map(|notification| match notification {
+        InputNotification::Action { event, .. } => Some(event.clone()),
+        _ => None,
+      })
+    {
       if self.action_sender.send(event).is_err() {
         log.warn_operation_failed(
           LogSource::Input,
@@ -606,12 +864,20 @@ impl InputService {
     }
   }
 
-  /// 只分发系统级动作事件。用于文本输入、加载覆盖层等暂停页面 action map 的场景。
+  /// Queue only host actions while page-level dispatch is suspended.
   pub fn dispatch_system_action_events(&self, log: &mut LogService) {
-    let mut events = Vec::new();
-    let mut consumed_keys = HashSet::new();
-    self.collect_events_from_bindings(&self.system_bindings, &mut consumed_keys, &mut events);
-
+    let start = self.dispatch_cursor.get().min(self.notifications.len());
+    self.dispatch_cursor.set(self.notifications.len());
+    let events = self.notifications[start..]
+      .iter()
+      .filter_map(|notification| match notification {
+        InputNotification::Action {
+          event,
+          system: true,
+        } => Some(event.clone()),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
     for event in events {
       if self.action_sender.send(event).is_err() {
         log.warn_operation_failed(
@@ -624,28 +890,48 @@ impl InputService {
     }
   }
 
-  /// 获取下一个动作事件
+  /// Pop the next queued action event, or return `None` when the queue is empty.
   pub fn next_action_event(&self) -> Option<InputActionEvent> {
     self.action_receiver.try_recv().ok()
   }
 
   fn apply_key_event(&mut self, event: KeyEvent) {
+    if matches!(event.kind, KeyEventKind::Release) {
+      self.blocked_keys.remove(&event.key);
+      self.blocked_page_keys.remove(&event.key);
+      self.blocked_system_keys.remove(&event.key);
+    }
     if !self.focused {
+      if event.kind == KeyEventKind::Press {
+        self.blocked_keys.insert(event.key);
+      }
       return;
     }
-
+    if self.blocked_keys.contains(&event.key) {
+      return;
+    }
     match event.kind {
-      KeyEventKind::Press => {
-        if self.held_keys.insert(event.key) {
-          self.pressed_keys.insert(event.key);
-        }
+      KeyEventKind::Press if self.held_keys.insert(event.key) => {
+        self.pressed_keys.insert(event.key);
+        self
+          .key_transitions
+          .insert(event.key, (KeyState::Pressed, self.frame));
+        self.notifications.push(InputNotification::Key {
+          key: event.key,
+          state: KeyState::Pressed,
+        });
+        self.update_action_states();
       }
-
-      KeyEventKind::Release => {
-        if self.held_keys.remove(&event.key) {
-          self.released_keys.insert(event.key);
-        }
+      KeyEventKind::Release if self.held_keys.remove(&event.key) => {
+        self.released_keys.insert(event.key);
+        self.key_transitions.remove(&event.key);
+        self.notifications.push(InputNotification::Key {
+          key: event.key,
+          state: KeyState::Released,
+        });
+        self.update_action_states();
       }
+      _ => {}
     }
   }
 }
@@ -656,7 +942,6 @@ impl Default for InputService {
   }
 }
 
-// 将 rdev 按键映射为内部 Key 枚举
 fn key_from_rdev(key: RdevKey) -> Option<Key> {
   match key {
     RdevKey::Escape => Some(Key::Esc),
@@ -797,7 +1082,26 @@ fn key_event_from_rdev(event: Event) -> Option<KeyEvent> {
   }
 }
 
-// 将 crossterm 按键事件转换为终端按键系统事件，过滤释放/修饰键组合
+fn committed_text_from_crossterm(event: CtKeyEvent) -> Option<CommittedTextEvent> {
+  if event.kind == CtKeyEventKind::Release
+    || event.modifiers.intersects(
+      CtKeyModifiers::CONTROL
+        | CtKeyModifiers::ALT
+        | CtKeyModifiers::SUPER
+        | CtKeyModifiers::HYPER
+        | CtKeyModifiers::META,
+    )
+  {
+    return None;
+  }
+  match event.code {
+    CtKeyCode::Char(character) if !character.is_control() => Some(CommittedTextEvent {
+      text: character.to_string(),
+    }),
+    _ => None,
+  }
+}
+
 fn terminal_key_event_from_crossterm(event: CtKeyEvent) -> Option<SystemEvent> {
   if event.kind == CtKeyEventKind::Release {
     return None;
@@ -919,21 +1223,112 @@ mod tests {
   }
 
   #[test]
+  fn terminal_text_accepts_committed_characters_and_repeats_without_shortcuts() {
+    let event = |code, modifiers, kind| CtKeyEvent::new_with_kind(code, modifiers, kind);
+    for (character, modifiers) in [
+      ('a', CtKeyModifiers::NONE),
+      ('中', CtKeyModifiers::NONE),
+      ('A', CtKeyModifiers::SHIFT),
+    ] {
+      for kind in [CtKeyEventKind::Press, CtKeyEventKind::Repeat] {
+        assert_eq!(
+          committed_text_from_crossterm(event(CtKeyCode::Char(character), modifiers, kind)),
+          Some(CommittedTextEvent {
+            text: character.to_string()
+          })
+        );
+      }
+    }
+    for (code, modifiers, kind) in [
+      (
+        CtKeyCode::Char('a'),
+        CtKeyModifiers::NONE,
+        CtKeyEventKind::Release,
+      ),
+      (
+        CtKeyCode::Char('c'),
+        CtKeyModifiers::CONTROL,
+        CtKeyEventKind::Press,
+      ),
+      (
+        CtKeyCode::Char('a'),
+        CtKeyModifiers::ALT,
+        CtKeyEventKind::Press,
+      ),
+      (
+        CtKeyCode::Enter,
+        CtKeyModifiers::NONE,
+        CtKeyEventKind::Press,
+      ),
+      (
+        CtKeyCode::Backspace,
+        CtKeyModifiers::NONE,
+        CtKeyEventKind::Press,
+      ),
+    ] {
+      assert!(committed_text_from_crossterm(event(code, modifiers, kind)).is_none());
+    }
+  }
+
+  #[test]
+  fn committed_text_keeps_focus_order_and_does_not_consume_widget_events() {
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    input.begin_frame();
+    input.queue_committed_text(CommittedTextEvent {
+      text: "first".into(),
+    });
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+    input.queue_committed_text(CommittedTextEvent {
+      text: "unfocused".into(),
+    });
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.queue_committed_text(CommittedTextEvent {
+      text: "paste\n中".into(),
+    });
+    input.queue_committed_text(CommittedTextEvent {
+      text: String::new(),
+    });
+    input.poll();
+    assert_eq!(
+      input.notifications(),
+      [
+        InputNotification::Text {
+          text: "first".into()
+        },
+        InputNotification::Focus { gained: false },
+        InputNotification::Focus { gained: true },
+        InputNotification::Text {
+          text: "paste\n中".into()
+        },
+      ]
+    );
+    input.clear();
+    assert!(
+      input
+        .notifications()
+        .iter()
+        .all(|event| matches!(event, InputNotification::Focus { .. }))
+    );
+  }
+
+  #[test]
   fn raw_key_capture_runs_alongside_action_map() {
     let mut input = InputService::new();
     input.load_key_bindings(vec![KeyBinding {
       pattern: KeyPattern::Single(Key::A),
       action: "test.a".to_string(),
+      priority: 0,
     }]);
     assert!(input.enable_raw_key_capture());
     assert!(!input.enable_raw_key_capture());
 
     input
       .sender
-      .send(KeyEvent {
+      .send(QueuedInput::Key(KeyEvent {
         key: Key::A,
         kind: KeyEventKind::Press,
-      })
+      }))
       .unwrap();
     input.poll();
 
@@ -956,10 +1351,10 @@ mod tests {
     for key in [Key::LeftCtrl, Key::RightCtrl] {
       input
         .sender
-        .send(KeyEvent {
+        .send(QueuedInput::Key(KeyEvent {
           key,
           kind: KeyEventKind::Press,
-        })
+        }))
         .unwrap();
     }
     input.poll();
@@ -979,10 +1374,10 @@ mod tests {
     input.enable_raw_key_capture();
     input
       .sender
-      .send(KeyEvent {
+      .send(QueuedInput::Key(KeyEvent {
         key: Key::Left,
         kind: KeyEventKind::Press,
-      })
+      }))
       .unwrap();
     input.poll();
     assert!(input.disable_raw_key_capture());
@@ -992,20 +1387,20 @@ mod tests {
     input.enable_raw_key_capture();
     input
       .sender
-      .send(KeyEvent {
+      .send(QueuedInput::Key(KeyEvent {
         key: Key::Left,
         kind: KeyEventKind::Release,
-      })
+      }))
       .unwrap();
     input.poll();
     assert_eq!(input.take_raw_key_events()[0].kind, KeyEventKind::Release);
 
     input
       .sender
-      .send(KeyEvent {
+      .send(QueuedInput::Key(KeyEvent {
         key: Key::B,
         kind: KeyEventKind::Press,
-      })
+      }))
       .unwrap();
     input.poll();
     input.disable_raw_key_capture();
@@ -1014,11 +1409,342 @@ mod tests {
   }
 
   #[test]
+  fn all_matching_actions_use_scope_priority_pattern_and_registration_order() {
+    let mut input = InputService::new();
+    input.load_system_key_bindings(vec![KeyBinding {
+      pattern: KeyPattern::Single(Key::A),
+      action: "host".into(),
+      priority: 0,
+    }]);
+    input.load_key_bindings(vec![
+      KeyBinding {
+        pattern: KeyPattern::Single(Key::A),
+        action: "early".into(),
+        priority: 0,
+      },
+      KeyBinding {
+        pattern: KeyPattern::Combo(Key::LeftCtrl, Key::A),
+        action: "combo".into(),
+        priority: 0,
+      },
+      KeyBinding {
+        pattern: KeyPattern::Single(Key::A),
+        action: "high".into(),
+        priority: 10,
+      },
+      KeyBinding {
+        pattern: KeyPattern::Single(Key::A),
+        action: "late".into(),
+        priority: 0,
+      },
+    ]);
+    input.apply_key_event(KeyEvent {
+      key: Key::LeftCtrl,
+      kind: KeyEventKind::Press,
+    });
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Press,
+    });
+    assert_eq!(
+      input
+        .collect_action_events()
+        .iter()
+        .map(|event| event.action.as_str())
+        .collect::<Vec<_>>(),
+      ["host", "high", "combo", "early", "late"]
+    );
+    input.begin_frame();
+    input.poll();
+    assert_eq!(input.collect_action_events().len(), 5);
+    assert!(
+      input
+        .collect_action_events()
+        .iter()
+        .all(|event| event.state == KeyState::Held)
+    );
+    input.begin_frame();
+    input.poll();
+    assert!(input.collect_action_events().is_empty());
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Release,
+    });
+    assert_eq!(input.collect_action_events().len(), 5);
+    assert!(
+      input
+        .collect_action_events()
+        .iter()
+        .all(|event| event.state == KeyState::Released)
+    );
+  }
+
+  #[test]
+  fn alternative_bindings_release_only_when_the_last_binding_ends() {
+    let mut input = InputService::new();
+    input.load_key_bindings(vec![
+      KeyBinding {
+        pattern: KeyPattern::Single(Key::A),
+        action: "move".into(),
+        priority: 0,
+      },
+      KeyBinding {
+        pattern: KeyPattern::Single(Key::B),
+        action: "move".into(),
+        priority: 0,
+      },
+    ]);
+    for key in [Key::A, Key::B] {
+      input.apply_key_event(KeyEvent {
+        key,
+        kind: KeyEventKind::Press,
+      });
+    }
+    assert_eq!(input.collect_action_events().len(), 1);
+    input.begin_frame();
+    input.poll();
+    input.begin_frame();
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Release,
+    });
+    assert!(input.collect_action_events().is_empty());
+    input.apply_key_event(KeyEvent {
+      key: Key::B,
+      kind: KeyEventKind::Release,
+    });
+    assert_eq!(input.collect_action_events()[0].state, KeyState::Released);
+  }
+
+  #[test]
+  fn fast_taps_and_autorepeat_preserve_edges_and_capture_is_independent() {
+    let mut input = InputService::new();
+    input.enable_raw_key_capture();
+    input.load_key_bindings(vec![KeyBinding {
+      pattern: KeyPattern::Single(Key::A),
+      action: "a".into(),
+      priority: 0,
+    }]);
+    let mut log = LogService::new();
+    for kind in [
+      KeyEventKind::Press,
+      KeyEventKind::Press,
+      KeyEventKind::Release,
+      KeyEventKind::Press,
+      KeyEventKind::Release,
+    ] {
+      input.queue_key_event(KeyEvent { key: Key::A, kind }, &mut log);
+    }
+    input.poll();
+    let events = input.collect_action_events();
+    assert_eq!(
+      events.iter().map(|event| event.state).collect::<Vec<_>>(),
+      [
+        KeyState::Pressed,
+        KeyState::Released,
+        KeyState::Pressed,
+        KeyState::Released
+      ]
+    );
+    assert_eq!(
+      input
+        .notifications()
+        .iter()
+        .filter(|event| matches!(event, InputNotification::Key { .. }))
+        .count(),
+      4
+    );
+    assert_eq!(input.take_raw_key_events().len(), 5);
+  }
+
+  #[test]
+  fn focus_and_binding_changes_close_input_without_inheriting_held_keys() {
+    let mut input = InputService::new();
+    input.load_key_bindings(vec![KeyBinding {
+      pattern: KeyPattern::Single(Key::A),
+      action: "old".into(),
+      priority: 0,
+    }]);
+    let mut log = LogService::new();
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Press,
+      },
+      &mut log,
+    );
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Press,
+      },
+      &mut log,
+    );
+    input.poll();
+    assert_eq!(
+      input
+        .collect_action_events()
+        .iter()
+        .map(|event| event.state)
+        .collect::<Vec<_>>(),
+      [KeyState::Pressed, KeyState::Released]
+    );
+    input.begin_frame();
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Release,
+      },
+      &mut log,
+    );
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Press,
+      },
+      &mut log,
+    );
+    input.poll();
+    assert_eq!(input.collect_action_events()[0].state, KeyState::Pressed);
+    input.begin_frame();
+    input.load_key_bindings(vec![KeyBinding {
+      pattern: KeyPattern::Single(Key::A),
+      action: "new".into(),
+      priority: 0,
+    }]);
+    input.poll();
+    assert_eq!(input.collect_action_events()[0].action, "old");
+    assert_eq!(input.collect_action_events()[0].state, KeyState::Released);
+    assert_eq!(input.collect_action_events().len(), 1);
+  }
+
+  #[test]
+  fn unchanged_noncanonical_combinations_do_not_reset_active_input() {
+    let mut input = InputService::new();
+    let bindings = vec![KeyBinding {
+      action: "combo".into(),
+      pattern: KeyPattern::Combo(Key::Z, Key::A),
+      priority: 0,
+    }];
+    input.load_key_bindings(bindings.clone());
+    for key in [Key::A, Key::Z] {
+      input.apply_key_event(KeyEvent {
+        key,
+        kind: KeyEventKind::Press,
+      });
+    }
+    input.begin_frame();
+    input.load_key_bindings(bindings);
+    input.poll();
+    assert_eq!(input.collect_action_events().len(), 1);
+    assert_eq!(input.collect_action_events()[0].state, KeyState::Held);
+  }
+
+  #[test]
+  fn actual_single_match_is_not_ranked_as_an_inactive_alternative_combo() {
+    let mut input = InputService::new();
+    input.load_key_bindings(vec![
+      KeyBinding {
+        action: "first".into(),
+        pattern: KeyPattern::Single(Key::A),
+        priority: 0,
+      },
+      KeyBinding {
+        action: "mixed".into(),
+        pattern: KeyPattern::Single(Key::A),
+        priority: 0,
+      },
+      KeyBinding {
+        action: "mixed".into(),
+        pattern: KeyPattern::Combo(Key::B, Key::C),
+        priority: 0,
+      },
+    ]);
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Press,
+    });
+    assert_eq!(
+      input
+        .collect_action_events()
+        .iter()
+        .map(|event| event.action.as_str())
+        .collect::<Vec<_>>(),
+      ["first", "mixed"]
+    );
+  }
+
+  #[test]
+  fn system_queue_observation_does_not_replay_focus_or_close_fresh_input() {
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.queue_key_event(
+      KeyEvent {
+        key: Key::A,
+        kind: KeyEventKind::Press,
+      },
+      &mut log,
+    );
+    input.poll();
+    let notifications = input.notifications().to_vec();
+    assert_eq!(input.drain_system_events().len(), 2);
+    assert!(input.is_down(Key::A));
+    assert_eq!(input.notifications(), notifications);
+  }
+
+  #[test]
+  fn changed_host_mapping_waits_for_fresh_press_and_clear_discards_ui_queue() {
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    let binding = |name: &str| KeyBinding {
+      action: name.into(),
+      pattern: KeyPattern::Single(Key::A),
+      priority: 0,
+    };
+    input.load_system_key_bindings(vec![binding("old")]);
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Press,
+    });
+    input.dispatch_action_events(&mut log);
+    input.clear();
+    assert!(input.next_action_event().is_none());
+    input.begin_frame();
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Release,
+    });
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Press,
+    });
+    input.begin_frame();
+    input.load_system_key_bindings(vec![binding("new")]);
+    input.apply_key_event(KeyEvent {
+      key: Key::B,
+      kind: KeyEventKind::Press,
+    });
+    assert_eq!(
+      input
+        .collect_action_events()
+        .iter()
+        .map(|event| (event.action.as_str(), event.state))
+        .collect::<Vec<_>>(),
+      [("old", KeyState::Released)]
+    );
+  }
+
+  #[test]
   fn action_map_still_reports_pressed_held_and_released() {
     let mut input = InputService::new();
     input.load_key_bindings(vec![KeyBinding {
       pattern: KeyPattern::Single(Key::A),
       action: "test.a".to_string(),
+      priority: 0,
     }]);
     input.apply_key_event(KeyEvent {
       key: Key::A,
@@ -1026,7 +1752,9 @@ mod tests {
     });
     assert_eq!(input.collect_action_events()[0].state, KeyState::Pressed);
     input.begin_frame();
+    input.poll();
     assert_eq!(input.collect_action_events()[0].state, KeyState::Held);
+    input.begin_frame();
     input.apply_key_event(KeyEvent {
       key: Key::A,
       kind: KeyEventKind::Release,
@@ -1041,11 +1769,13 @@ mod tests {
         action: "left_modifier".into(),
         description: String::new(),
         keys: vec![vec!["left_ctrl".into()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "right_modifier".into(),
         description: String::new(),
         keys: vec![vec!["right_ctrl".into()]],
+        priority: 0,
       },
     ])
     .unwrap();
@@ -1054,10 +1784,10 @@ mod tests {
 
     input
       .sender
-      .send(KeyEvent {
+      .send(QueuedInput::Key(KeyEvent {
         key: Key::LeftCtrl,
         kind: KeyEventKind::Press,
-      })
+      }))
       .unwrap();
     input.poll();
     assert_eq!(
@@ -1072,10 +1802,10 @@ mod tests {
     input.begin_frame();
     input
       .sender
-      .send(KeyEvent {
+      .send(QueuedInput::Key(KeyEvent {
         key: Key::RightCtrl,
         kind: KeyEventKind::Press,
-      })
+      }))
       .unwrap();
     input.poll();
     assert_eq!(
@@ -1083,13 +1813,13 @@ mod tests {
       vec![
         InputActionEvent {
           event_type: InputEventType::Keyboard,
-          action: "left_modifier".into(),
-          state: KeyState::Held,
+          action: "right_modifier".into(),
+          state: KeyState::Pressed,
         },
         InputActionEvent {
           event_type: InputEventType::Keyboard,
-          action: "right_modifier".into(),
-          state: KeyState::Pressed,
+          action: "left_modifier".into(),
+          state: KeyState::Held,
         },
       ]
     );
@@ -1097,10 +1827,10 @@ mod tests {
     input.begin_frame();
     input
       .sender
-      .send(KeyEvent {
+      .send(QueuedInput::Key(KeyEvent {
         key: Key::LeftCtrl,
         kind: KeyEventKind::Release,
-      })
+      }))
       .unwrap();
     input.poll();
     assert_eq!(
@@ -1140,7 +1870,10 @@ mod tests {
   #[test]
   fn left_and_right_modifier_combinations_route_to_distinct_actions() {
     fn send(input: &mut InputService, key: Key, kind: KeyEventKind) {
-      input.sender.send(KeyEvent { key, kind }).unwrap();
+      input
+        .sender
+        .send(QueuedInput::Key(KeyEvent { key, kind }))
+        .unwrap();
       input.poll();
     }
 
@@ -1149,11 +1882,13 @@ mod tests {
         action: "left_combo".into(),
         description: String::new(),
         keys: vec![vec!["left_ctrl".into(), "x".into()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "right_combo".into(),
         description: String::new(),
         keys: vec![vec!["right_ctrl".into(), "x".into()]],
+        priority: 0,
       },
     ])
     .unwrap();
@@ -1192,6 +1927,7 @@ mod tests {
     input.load_key_bindings(vec![KeyBinding {
       pattern: KeyPattern::Single(Key::A),
       action: "test.a".to_string(),
+      priority: 0,
     }]);
     assert!(input.is_action_map_dispatch_enabled());
     assert!(input.disable_action_map_dispatch());
@@ -1200,10 +1936,10 @@ mod tests {
 
     input
       .sender
-      .send(KeyEvent {
+      .send(QueuedInput::Key(KeyEvent {
         key: Key::A,
         kind: KeyEventKind::Press,
-      })
+      }))
       .unwrap();
     input.poll();
     input.dispatch_action_events(&mut LogService::new());
@@ -1215,6 +1951,7 @@ mod tests {
     input.load_system_key_bindings(vec![KeyBinding {
       pattern: KeyPattern::Single(Key::Fn(4)),
       action: "host_key.force_stop".to_string(),
+      priority: 0,
     }]);
     input.apply_key_event(KeyEvent {
       key: Key::Fn(4),
@@ -1238,6 +1975,16 @@ mod tests {
 
     assert!(input.enable_action_map_dispatch());
     assert!(!input.enable_action_map_dispatch());
+    input.dispatch_action_events(&mut LogService::new());
+    assert!(input.next_action_event().is_none());
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Release,
+    });
+    input.apply_key_event(KeyEvent {
+      key: Key::A,
+      kind: KeyEventKind::Press,
+    });
     input.dispatch_action_events(&mut LogService::new());
     assert_eq!(input.next_action_event().unwrap().action, "test.a");
   }
@@ -1381,6 +2128,36 @@ mod tests {
 
     assert_eq!(resize, Some((100, 30)));
     assert_eq!(input.drain_system_events(), vec![a, b]);
+  }
+
+  #[test]
+  fn ownership_cleanup_drops_terminal_keys_but_keeps_resize_and_focus_observations() {
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    input.queue_system_event(
+      SystemEvent::TerminalKey(TerminalKeyEvent {
+        code: TerminalKeyCode::Enter,
+        ctrl: false,
+        shift: false,
+      }),
+      &mut log,
+    );
+    let resize = SystemEvent::Resize(ResizeEvent {
+      width: 100,
+      height: 30,
+    });
+    input.queue_system_event(resize, &mut log);
+    let focus = SystemEvent::Focus(FocusEvent { gained: false });
+    input.queue_system_event(focus, &mut log);
+    input.poll();
+    input.clear();
+    assert_eq!(input.drain_system_events(), [resize, focus]);
+    assert!(
+      input
+        .notifications()
+        .iter()
+        .any(|event| matches!(event, InputNotification::Focus { gained: false }))
+    );
   }
 
   #[test]

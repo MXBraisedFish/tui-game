@@ -1,3 +1,5 @@
+//! Host toolbar state, controls, recording status, and terminal-cell rendering.
+
 use std::time::Duration;
 
 use sysinfo::{Networks, System};
@@ -13,13 +15,19 @@ const SMOOTHING: f32 = 0.25;
 const EXPORT_PROGRESS_PER_SECOND: f32 = 0.75;
 const EXPORT_PROGRESS_HOLD: Duration = Duration::from_millis(400);
 
+/// The top toolbar view representation used by this module.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum TopToolbarView {
+  /// The system info setting for top toolbar view.
   #[default]
   SystemInfo,
+  /// The image export setting for top toolbar view.
   ImageExport,
+  /// The video export setting for top toolbar view.
   VideoExport,
+  /// The recording setting for top toolbar view.
   Recording,
+  /// The custom setting for top toolbar view.
   Custom,
 }
 
@@ -93,6 +101,7 @@ impl ExportProgressAnimation {
   }
 }
 
+/// The current toolbar mode and its temporary interaction state.
 pub(super) struct TopToolbarRuntime {
   view: TopToolbarView,
   objects: UiObjectPool,
@@ -107,6 +116,11 @@ pub(super) struct TopToolbarRuntime {
 }
 
 impl TopToolbarRuntime {
+  /// Create a top toolbar runtime initialized from `progress_bar`.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `toolbar progress bar style must be valid`.
   pub(super) fn new(progress_bar: &ProgressBarService) -> Self {
     let mut objects = UiObjectPool::new();
     let mut options = ProgressBarOptions::default();
@@ -137,10 +151,12 @@ impl TopToolbarRuntime {
     }
   }
 
+  /// Advance to the next toolbar display mode.
   pub(super) fn cycle(&mut self) {
     self.view = self.view.next();
   }
 
+  /// Advance host state using the supplied frame timing.
   pub(super) fn update(&mut self, dt: Duration) {
     self.image_progress.update(dt);
     self.video_progress.update(dt);
@@ -187,6 +203,14 @@ impl TopToolbarRuntime {
     self.sampled_frames = 0;
   }
 
+  /// Render the top toolbar runtime into its requested terminal-cell surface.
+  ///
+  /// # Arguments
+  ///
+  /// * `services` - The application services supplied by the lifecycle phase.
+  /// * `image_queue` - The image queue.
+  /// * `image_progress` - The image progress.
+  /// * `custom_text` - The custom text.
   pub(super) fn render(
     &mut self,
     services: &mut EngineServices,

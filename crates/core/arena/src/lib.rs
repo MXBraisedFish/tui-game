@@ -1,5 +1,18 @@
-//! Generational slot arena: stable `(index, generation)` handles that go stale on removal.
+//! Generational storage for values whose handles must expire after removal.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_arena::Arena;
+//!
+//! let mut values = Arena::new();
+//! let (index, generation) = values.insert("value");
+//! assert_eq!(values.get(index, generation), Some(&"value"));
+//! assert_eq!(values.remove(index, generation), Some("value"));
+//! assert_eq!(values.get(index, generation), None);
+//! ```
 
+/// A generational slot collection that rejects handles invalidated by removal.
 pub struct Arena<T> {
   slots: Vec<ArenaSlot<T>>,
 }
@@ -10,10 +23,12 @@ struct ArenaSlot<T> {
 }
 
 impl<T> Arena<T> {
+  /// Create an arena with its initial state.
   pub fn new() -> Self {
     Self { slots: Vec::new() }
   }
 
+  /// Store a value in the arena and return its new identity.
   pub fn insert(&mut self, value: T) -> (u32, u32) {
     if let Some((index, slot)) = self
       .slots
@@ -32,16 +47,19 @@ impl<T> Arena<T> {
     (index, 1)
   }
 
+  /// Return access to the value only when its slot and generation are still live.
   pub fn get(&self, index: u32, generation: u32) -> Option<&T> {
     let slot = self.slots.get(index as usize)?;
     (slot.generation == generation).then_some(slot.value.as_ref()?)
   }
 
+  /// Return mutable access to the value only when its slot and generation are still live.
   pub fn get_mut(&mut self, index: u32, generation: u32) -> Option<&mut T> {
     let slot = self.slots.get_mut(index as usize)?;
     (slot.generation == generation).then_some(slot.value.as_mut()?)
   }
 
+  /// Remove a live value, invalidate its generation, and return the removed value.
   pub fn remove(&mut self, index: u32, generation: u32) -> Option<T> {
     let slot = self.slots.get_mut(index as usize)?;
     if slot.generation != generation {
@@ -52,6 +70,7 @@ impl<T> Arena<T> {
     Some(value)
   }
 
+  /// Return the index and generation of every currently occupied slot.
   pub fn keys(&self) -> Vec<(u32, u32)> {
     self
       .slots

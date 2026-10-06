@@ -2,17 +2,19 @@
 
 本文档说明游戏和屏保 Lua Session 使用的生命周期回调，包括各回调的职责、调用时机、参数格式、返回值和运行限制。
 
+入口生命周期回调由宿主调用。计时器可以通过 timer.create 或 timer.set 指定 callback；指定后，该计时器事件只交给这个函数，未指定时交给 HandleEvent。回调使用相同的事件表和执行限额。其他服务的独立 callback 注册尚未开放。可用库见⌊[LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md)⌉。
+
 ## 1. 回调总览
 
 入口脚本在加载完成后，宿主会从脚本环境中查找以下回调：
 
-| 回调                     |     游戏 |   屏保 | 主要用途                                   |
-| ------------------------ | -------: | -----: | ------------------------------------------ |
-| `Init(ctx)`              |     必需 |   必需 | 初始化脚本状态并读取宿主提供的启动数据。   |
-| `HandleEvent(event)`     |     必需 |   必需 | 接收宿主路由给当前 Session 的事件。        |
-| `Update(dt)`             |     必需 |   必需 | 按固定的 60 Hz 步长更新确定性逻辑。        |
-| `UpdateFrame(dt, alpha)` |     必需 |   必需 | 每个宿主帧更新一次与真实帧时间有关的逻辑。 |
-| `Render()`               |     必需 |   必需 | 为当前可见画面提交绘制命令。               |
+| 回调                     | 游戏     | 屏保   | 主要用途                                   |
+| ------------------------ | -------- | ------ | ------------------------------------------ |
+| `Init(ctx)`              | 必需     | 必需   | 初始化脚本状态并读取宿主提供的启动数据。   |
+| `HandleEvent(event)`     | 必需     | 必需   | 接收宿主路由给当前 Session 的事件。        |
+| `Update(dt)`             | 必需     | 必需   | 按固定的 60 Hz 步长更新确定性逻辑。        |
+| `UpdateFrame(dt, alpha)` | 必需     | 必需   | 每个宿主帧更新一次与真实帧时间有关的逻辑。 |
+| `Render()`               | 必需     | 必需   | 为当前可见画面提交绘制命令。               |
 | `SaveGame()`             | 条件必需 | 不使用 | 返回“继续游戏”槽位所需的数据。             |
 | `SaveBest()`             | 条件必需 | 不使用 | 返回游戏最佳记录及其展示文本。             |
 
@@ -20,8 +22,8 @@
 
 对于游戏：
 
-- `package.json` 中 `game.save = true` 时，`SaveGame` 为必需回调。
-- `package.json` 中 `game.score.enabled = true` 时，`SaveBest` 为必需回调。
+- `game.json` 中 `save_game = true` 时，`SaveGame` 为必需回调。
+- `game.json` 中 `best_score.enable = true` 时，`SaveBest` 为必需回调。
 - 对应功能未开启时，保存回调可以省略；即使定义，宿主也不会通过该功能调用它。
 
 屏保不使用 `SaveGame` 和 `SaveBest`。屏保脚本即使声明这两个函数，宿主也不会将其注册为屏保生命周期回调。
@@ -33,7 +35,7 @@ Session 创建成功后，正常 Runtime 帧中的 Lua 调用顺序为：
 ```text
 投递本帧事件
   ↓
-HandleEvent(event) × 0..128
+HandleEvent(event) 或计时器 callback(event) × 0..128
   ↓
 Update(1 / 60) × 0..8
   ↓
@@ -74,8 +76,8 @@ end
 `ctx` 为一个 Lua 表：
 
 ```lua
-{
-  package_id = "example.game",
+local ctx = {
+  package_id = "example_game",
   package_type = "game",
   base = {
     width = 120,
@@ -152,14 +154,14 @@ end
 - Runtime 每帧在 `Update` 之前投递事件。
 - 单个 Session 每个宿主帧最多处理 128 个事件，剩余事件保留到后续帧。
 - 没有事件时，本帧不会调用 `HandleEvent`。
-- 异步 API 或对象显式注册了独立回调时，完整事件只交给该回调，不再重复进入 `HandleEvent`。
+- `timer.create`、`timer.set` 可以指定 callback；该计时器的事件只交给 callback，不再交给 `HandleEvent`。未指定 callback 时交给 `HandleEvent`。回调接收相同的事件表，遵守相同的执行限额；查看⌊[timer 库](api/timer.md)⌉。
 
 ### 参数
 
 所有事件使用统一信封：
 
 ```lua
-{
+local event = {
   type = "action",
   sequence = 42,
   frame = 1800,
@@ -170,12 +172,12 @@ end
 }
 ```
 
-| 字段       | 类型      | 含义                                                     |
-| ---------- | --------- | -------------------------------------------------------- |
-| `type`     | `string`  | 事件类型，决定 `data` 的具体结构。                       |
-| `sequence` | `integer` | Runtime 全局单调递增的事件序号。经过目标过滤后可能跳号。 |
-| `frame`    | `integer` | 事件进入 Lua Broker 时的宿主帧号。                       |
-| `data`     | `table`   | 当前事件的数据表。                                       |
+| 字段       | 类型      | 含义                                                                                                                 |
+| ---------- | --------- | -------------------------------------------------------------------------------------------------------------------- |
+| `type`     | `string`  | 事件类型，决定 `data` 的具体结构。                                                                                   |
+| `sequence` | `integer` | 按生成顺序全局递增的事件序号；收尾释放优先交付时，回调观察到的序号可能不连续或不按大小排列。经过目标过滤后可能跳号。 |
+| `frame`    | `integer` | 事件进入 Lua Broker 时的宿主帧号。                                                                                   |
+| `data`     | `table`   | 当前事件的数据表。                                                                                                   |
 
 全部事件类型、字段和投递条件见 [EVENT.md](EVENT.md)。
 
@@ -189,7 +191,7 @@ end
 - 游戏可以接收允许的动作、鼠标、系统、服务和对象事件。
 - 屏保不接收键盘、动作、鼠标及交互组件事件。
 - 覆盖屏接管输入时，游戏不会收到动作、鼠标和交互组件事件。
-- `event.skip_action()` 和 `event.clear_action()` 只影响游戏脚本动作事件，不影响宿主全局动作和系统事件，并且要求关闭安全模式。
+- `events.skip_action()` 和 `events.clear_action()` 只影响普通游戏动作的 pressed/held，不影响 key、系统事件、宿主行为或已交付活动输入的 released。
 
 ### 示例
 
@@ -226,8 +228,8 @@ end
 
 ### 参数
 
-| 参数 | 类型     |   当前值 | 含义                                                            |
-| ---- | -------- | -------: | --------------------------------------------------------------- |
+| 参数 | 类型     | 当前值   | 含义                                                            |
+| ---- | -------- | -------- | --------------------------------------------------------------- |
 | `dt` | `number` | `1 / 60` | 本次固定更新代表的秒数。固定步长不再通过 `Init(ctx)` 重复提供。 |
 
 ### 返回值
@@ -336,20 +338,9 @@ Base 画布的初始宽高来自 `Init(ctx)` 的 `ctx.base.width` 和 `ctx.base.
 
 ```lua
 function Render()
-  draw.fill_rect {
-    x = 0,
-    y = 0,
-    width = base_width,
-    height = base_height,
-    bg = color.BLACK,
-  }
+  draw.fill_rect(0, 0, base_width, base_height, {bg = color.BLACK})
 
-  draw.text {
-    x = 1,
-    y = 1,
-    text = "Hello TUI GAME",
-    fg = color.WHITE,
-  }
+  draw.text(1, 1, "Hello TUI GAME", {fg = color.WHITE})
 end
 ```
 
@@ -371,13 +362,11 @@ end
 
 ### 启用条件
 
-仅游戏使用。`package.json` 必须包含：
+仅游戏使用。`game.json` 必须包含：
 
 ```json
 {
-  "game": {
-    "save": true
-  }
+  "save_game": true
 }
 ```
 
@@ -436,7 +425,11 @@ end
 ```lua
 function SaveBest()
   return {
-    best_string = "f%<fg:yellow>最佳分数：" .. tostring(best_score),
+    best_string = { type = "i18n", key = "score", callback = "f%Best: {value:score}" },
+    value = {
+      score = tostring(best_score),
+      rank = { type = "i18n", key = "rank.gold", callback = "Gold" },
+    },
     score = best_score,
   }
 end
@@ -444,14 +437,12 @@ end
 
 ### 启用条件
 
-仅游戏使用。`package.json` 必须启用记录：
+仅游戏使用。`game.json` 必须启用记录：
 
 ```json
 {
-  "game": {
-    "score": {
-      "enabled": true
-    }
+  "best_score": {
+    "enable": true
   }
 }
 ```
@@ -473,16 +464,32 @@ end
 必须返回一个可序列化的对象表，不能返回单值，并且必须包含：
 
 ```lua
-{
+local best_data = {
   best_string = "用于游戏列表展示的文本",
 }
 ```
 
-| 字段          | 类型     | 必填 | 含义                                             |
-| ------------- | -------- | ---: | ------------------------------------------------ |
-| `best_string` | `string` |   是 | 游戏列表显示的最佳记录文本，允许使用富文本语法。 |
+| 字段          | 类型             | 必填 | 含义                                                                                            |
+| ------------- | ---------------- | ---- | ----------------------------------------------------------------------------------------------- |
+| `best_string` | `string / table` | 是   | 游戏列表显示的最佳记录文本，或与包清单相同的文本表。                                            |
+| `value`       | `table`          | 否   | `{value:名称}` 的替换参数；键为名称，每个值为字符串或与包清单相同的文本表。省略时没有替换参数。 |
 
-其余字段由游戏自行定义，宿主会连同 `best_string` 一起保存，并在下一次创建该游戏 Session 时通过 `Init(ctx)` 的 `ctx.best_data` 传回。
+文本表可以写成 `{ type = "text", text = "..." }`，或 `{ type = "i18n", key = "...", callback = "..." }`。i18n 的 `key` 和 `callback` 必填，`key` 不能为空；不接受自定义 `path` 或其他未知字段。
+
+`best_string` 和 `value` 中的所有 i18n 表都从当前包的 `assets/language/<语言代码>/package/best_string.json` 查找。先使用玩家当前语言，缺失时再找 `en_us`，仍找不到则显示该表的 `callback`。语言文件是键到字符串的 JSON 对象，例如：
+
+```json
+{
+  "score": "f%最佳成绩：{value:score}，等级：{value:rank}",
+  "rank.gold": "金牌"
+}
+```
+
+使用 `{value:名称}` 或样式标签时，`best_string` 及其翻译、回退文本需要带 `f%` 前缀。替换值按原样插入，不再次解析其中的占位符或样式标签；未提供的参数保留原占位符。数值请先用 `tostring` 转成字符串；空字符串是有效值。`value` 必须是名称到文本的对象表，不能是数组。
+
+保存的是原始文本表及参数，切换语言或修改语言文件后，游戏列表会重新显示对应文本。旧的纯字符串最佳记录仍可读取。
+
+其余字段由游戏自行定义，宿主会连同 `best_string` 和 `value` 一起保存，并在下一次创建该游戏 Session 时通过 `Init(ctx)` 的 `ctx.best_data` 传回。
 
 宿主只读取第一个返回值。表的类型、深度、大小和循环引用限制与 `SaveGame` 完全相同。
 
@@ -497,15 +504,14 @@ end
 ### 10.1 时间与指令预算
 
 | 回调          | 慢调用警告 | 硬时间上限 | Lua 指令上限 |
-| ------------- | ---------: | ---------: | -----------: |
-| `Init`        |      50 ms |     100 ms |    1,000,000 |
-| `HandleEvent` |      20 ms |      75 ms |      200,000 |
-| 独立事件回调  |      20 ms |      75 ms |      200,000 |
-| `Update`      |      20 ms |      75 ms |      200,000 |
-| `UpdateFrame` |      20 ms |      75 ms |      200,000 |
-| `Render`      |      20 ms |      75 ms |      200,000 |
-| `SaveGame`    |      50 ms |     100 ms |    1,000,000 |
-| `SaveBest`    |      50 ms |     100 ms |    1,000,000 |
+| ------------- | ---------- | ---------- | ------------ |
+| `Init`        | 50 ms      | 100 ms     | 1,000,000    |
+| `HandleEvent` | 20 ms      | 75 ms      | 200,000      |
+| `Update`      | 20 ms      | 75 ms      | 200,000      |
+| `UpdateFrame` | 20 ms      | 75 ms      | 200,000      |
+| `Render`      | 20 ms      | 75 ms      | 200,000      |
+| `SaveGame`    | 50 ms      | 100 ms     | 1,000,000    |
+| `SaveBest`    | 50 ms      | 100 ms     | 1,000,000    |
 
 - Hook 每 1,000 条 Lua 指令检查一次预算。
 - Rust API 调用消耗的墙钟时间也包含在硬时间上限内。
@@ -524,9 +530,9 @@ end
 ### 10.3 一般约束
 
 - 所有生命周期回调都在 Runtime 主线程串行执行，不会并发调用同一 Session。
-- 不要在回调中阻塞等待异步服务结果；请求结果会在后续帧通过事件或独立回调返回。
-- 原始终端按键、宿主内部任务 ID、绝对路径和宿主 UI 对象不会传给脚本。
-- Session 停止后，宿主会清理其事件、对象、异步任务所有权和注册回调；旧 Session 的迟到结果不会进入新 Session。
+- 不要在回调中阻塞等待异步服务结果；当前生产请求结果会在后续帧通过 `HandleEvent` 返回。
+- 原始终端事件对象、宿主内部任务 ID、绝对路径和宿主 UI 对象不会传给脚本。
+- Session 停止后，宿主会清理其事件、对象和异步任务所有权；旧 Session 的迟到结果不会进入新 Session。
 
 ## 11. 最小模板
 
@@ -562,11 +568,7 @@ function UpdateFrame(dt, alpha)
 end
 
 function Render()
-  draw.text {
-    x = 1,
-    y = 1,
-    text = "Elapsed: " .. tostring(state.elapsed),
-  }
+  draw.text(1, 1, "Elapsed: " .. tostring(state.elapsed))
 end
 
 function SaveGame()
@@ -610,10 +612,6 @@ function UpdateFrame(dt, alpha)
 end
 
 function Render()
-  draw.text {
-    x = 1,
-    y = 1,
-    text = "Screensaver " .. tostring(elapsed),
-  }
+  draw.text(1, 1, "Screensaver " .. tostring(elapsed))
 end
 ```

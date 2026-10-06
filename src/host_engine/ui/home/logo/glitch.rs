@@ -1,3 +1,5 @@
+//! Glitch logo animation state and terminal-cell presentation.
+
 use super::{CellStyle, GLITCH_TEMPLATE, LogoCell, LogoRandom, cells_to_rich_text};
 
 const CYAN: (u8, u8, u8) = (161, 232, 229);
@@ -13,6 +15,7 @@ struct LineState {
   total_steps: u32,
 }
 
+/// The glitch logo representation used by this module.
 pub(super) struct GlitchLogo {
   lines: Vec<LineState>,
   next_step: f64,
@@ -21,6 +24,7 @@ pub(super) struct GlitchLogo {
 }
 
 impl GlitchLogo {
+  /// Create a glitch logo initialized from `rng`.
   pub fn new(rng: &mut LogoRandom<'_>) -> Self {
     let mut logo = Self {
       lines: GLITCH_TEMPLATE
@@ -41,6 +45,7 @@ impl GlitchLogo {
     logo
   }
 
+  /// Advance the selected logo animation by its timer step.
   pub fn advance(&mut self, seconds: f64, rng: &mut LogoRandom<'_>) {
     while seconds >= self.next_step {
       let now = self.next_step;
@@ -49,6 +54,7 @@ impl GlitchLogo {
     }
   }
 
+  /// Draw the glitch view and register interaction regions in its assigned surfaces.
   pub fn render(&self) -> String {
     let rows = GLITCH_TEMPLATE
       .iter()

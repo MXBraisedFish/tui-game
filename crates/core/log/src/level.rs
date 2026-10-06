@@ -1,15 +1,23 @@
-/// Log severity level, declared in ascending order (Trace is the lowest, Fatal the highest).
+//! Log severity values and stable labels.
+
+/// Log severity ordered from trace through fatal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogLevel {
+  /// The trace setting for log level.
   Trace,
+  /// The debug setting for log level.
   Debug,
+  /// The info setting for log level.
   Info,
+  /// The warn setting for log level.
   Warn,
+  /// The error setting for log level.
   Error,
+  /// The fatal setting for log level.
   Fatal,
 }
 
-/// Returns the upper-case label of a log level (such as `"WARN"`).
+/// Return the uppercase label for a log severity.
 pub fn format_log_level(level: LogLevel) -> &'static str {
   match level {
     LogLevel::Trace => "TRACE",
@@ -22,6 +30,7 @@ pub fn format_log_level(level: LogLevel) -> &'static str {
 }
 
 impl LogLevel {
+  /// Return the stable string key for this log level.
   pub fn key(self) -> &'static str {
     match self {
       Self::Trace => "log.level.trace",
@@ -33,6 +42,7 @@ impl LogLevel {
     }
   }
 
+  /// Return the embedded English label for this log level.
   pub fn default_label(self) -> &'static str {
     format_log_level(self)
   }

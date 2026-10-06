@@ -1,9 +1,17 @@
+//! Lua string library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
 mod pattern;
 
 use pattern::{LuaCapture, LuaCaptures, LuaPattern, LuaPatternInput, MAX_CAPTURE_GROUPS};
 
+/// Build and register the Lua string API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, value) in [
@@ -34,9 +42,9 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
     "split",
     lua.create_function(|lua, values: MultiValue| {
       let method = "string.split";
-      let parameters = args::named(method, values, &["text", "sep"])?;
-      let text = text_parameter(&parameters, method)?;
-      let separator = args::string(args::required(&parameters, method, "sep")?, method, "sep")?;
+      let parameters = args::positional(lua, method, values, &["text", "sep"], &[])?;
+      let text = args::string(parameters.required(0, method, "text")?, method, "text")?;
+      let separator = args::string(parameters.required(1, method, "sep")?, method, "sep")?;
       if separator.is_empty() {
         return Err(args::message(method, "sep must not be empty"));
       }
@@ -52,21 +60,23 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
   )?;
   source.raw_set(
     "sub",
-    lua.create_function(|_, values: MultiValue| {
-      let table = args::named("string.sub", values, &["text", "start", "finish"])?;
+    lua.create_function(|lua, values: MultiValue| {
+      let parameters =
+        args::positional(lua, "string.sub", values, &["text", "start"], &["finish"])?;
+      let options = parameters.options();
       let text = args::string(
-        args::required(&table, "string.sub", "text")?,
+        parameters.required(0, "string.sub", "text")?,
         "string.sub",
         "text",
       )?;
       let chars = text.chars().collect::<Vec<_>>();
       let start = args::integer(
-        args::required(&table, "string.sub", "start")?,
+        parameters.required(1, "string.sub", "start")?,
         "string.sub",
         "start",
       )?;
       let finish =
-        args::optional_integer(&table, "string.sub", "finish", Some(chars.len() as i64))?.unwrap();
+        args::optional_integer(options, "string.sub", "finish", Some(chars.len() as i64))?.unwrap();
       let start = relative_sub_index(start, chars.len()).max(1);
       let finish = relative_sub_index(finish, chars.len()).min(chars.len() as i128);
       if start > finish {
@@ -77,19 +87,20 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
   )?;
   source.raw_set(
     "rep",
-    lua.create_function(|_, values: MultiValue| {
-      let table = args::named("string.rep", values, &["text", "times", "sep"])?;
+    lua.create_function(|lua, values: MultiValue| {
+      let parameters = args::positional(lua, "string.rep", values, &["text", "times"], &["sep"])?;
+      let options = parameters.options();
       let text = args::string(
-        args::required(&table, "string.rep", "text")?,
+        parameters.required(0, "string.rep", "text")?,
         "string.rep",
         "text",
       )?;
       let times = args::integer(
-        args::required(&table, "string.rep", "times")?,
+        parameters.required(1, "string.rep", "times")?,
         "string.rep",
         "times",
       )?;
-      let sep = args::optional_string(&table, "string.rep", "sep", Some(""))?.unwrap();
+      let sep = args::optional_string(options, "string.rep", "sep", Some(""))?.unwrap();
       if times < 0 {
         return Err(args::message("string.rep", "times must be non-negative"));
       }
@@ -126,10 +137,15 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
   source.raw_set("regex_gsub", string_gsub(lua, true)?)?;
   source.raw_set(
     "regex_test",
-    lua.create_function(|_, values: MultiValue| {
-      let parameters = args::named("string.regex_test", values, &["text", "pattern"])?;
-      let text = text_parameter(&parameters, "string.regex_test")?;
-      let pattern = pattern_parameter(&parameters, "string.regex_test", true)?;
+    lua.create_function(|lua, values: MultiValue| {
+      let parameters =
+        args::positional(lua, "string.regex_test", values, &["text", "pattern"], &[])?;
+      let text = args::string(
+        parameters.required(0, "string.regex_test", "text")?,
+        "string.regex_test",
+        "text",
+      )?;
+      let pattern = pattern_parameter(parameters.get(1), "string.regex_test", true)?;
       Ok(
         pattern
           .captures(&text, 0)
@@ -141,9 +157,14 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
   source.raw_set(
     "regex_split",
     lua.create_function(|lua, values: MultiValue| {
-      let parameters = args::named("string.regex_split", values, &["text", "pattern"])?;
-      let text = text_parameter(&parameters, "string.regex_split")?;
-      let pattern = pattern_parameter(&parameters, "string.regex_split", true)?;
+      let parameters =
+        args::positional(lua, "string.regex_split", values, &["text", "pattern"], &[])?;
+      let text = args::string(
+        parameters.required(0, "string.regex_split", "text")?,
+        "string.regex_split",
+        "text",
+      )?;
+      let pattern = pattern_parameter(parameters.get(1), "string.regex_split", true)?;
       let output = lua.create_table()?;
       let mut total = 0_usize;
       for (index, part) in pattern
@@ -171,40 +192,42 @@ pub(super) fn string_lib(lua: &Lua, state: SharedApiState) -> mlua::Result<Table
   source.raw_set(
     "format",
     lua.create_function(|_, values: MultiValue| {
-      let parameters = args::named("string.format", values, &["format_string", "values"])?;
-      let format_string = args::string(
-        args::required(&parameters, "string.format", "format_string")?,
-        "string.format",
-        "format_string",
-      )?;
-      let values = args::values(&parameters, "string.format")?;
-      safe_format(&format_string, &values)
+      let parameters = args::variadic("string.format", values, &["format_string"])?;
+      let format_string = args::string(parameters[0].clone(), "string.format", "format_string")?;
+      safe_format(&format_string, &parameters[1..])
     })?,
   )?;
   let rich_text_state = state;
   source.raw_set(
     "rich_text_to_plain_text",
-    lua.create_function(move |_, values: MultiValue| {
-      let parameters = args::named(
+    lua.create_function(move |lua, values: MultiValue| {
+      let parameters = args::positional(
+        lua,
         "string.rich_text_to_plain_text",
         values,
-        &["text", "rich_params", "key_params", "strip_header"],
+        &["text"],
+        &["rich_params", "key_params", "strip_header"],
       )?;
-      let text = text_parameter(&parameters, "string.rich_text_to_plain_text")?;
+      let options = parameters.options();
+      let text = args::string(
+        parameters.required(0, "string.rich_text_to_plain_text", "text")?,
+        "string.rich_text_to_plain_text",
+        "text",
+      )?;
       let key_params = args::optional_bool(
-        &parameters,
+        options,
         "string.rich_text_to_plain_text",
         "key_params",
         true,
       )?;
       let strip_header = args::optional_bool(
-        &parameters,
+        options,
         "string.rich_text_to_plain_text",
         "strip_header",
         true,
       )?;
       let mut params = rich_text_params(
-        parameters.get::<Value>("rich_params")?,
+        options.get::<Value>("rich_params")?,
         "string.rich_text_to_plain_text",
       )?;
       if key_params && (text.contains("{key:") || text.contains("{key_default:")) {
@@ -247,14 +270,6 @@ fn ensure_output_size(method: &str, output: &str) -> mlua::Result<()> {
   } else {
     Ok(())
   }
-}
-
-pub(super) fn text_parameter(parameters: &Table, method: &str) -> mlua::Result<String> {
-  args::string(args::required(parameters, method, "text")?, method, "text")
-}
-
-fn lua_text_parameter(parameters: &Table, method: &str) -> mlua::Result<mlua::LuaString> {
-  args::lua_string(args::required(parameters, method, "text")?, method, "text")
 }
 
 enum CompiledPattern {
@@ -430,16 +445,8 @@ impl CompiledPattern {
   }
 }
 
-fn pattern_parameter(
-  parameters: &Table,
-  method: &str,
-  regex: bool,
-) -> mlua::Result<CompiledPattern> {
-  let pattern = args::string(
-    args::required(parameters, method, "pattern")?,
-    method,
-    "pattern",
-  )?;
+fn pattern_parameter(value: Value, method: &str, regex: bool) -> mlua::Result<CompiledPattern> {
+  let pattern = args::string(value, method, "pattern")?;
   compile_pattern(&pattern, method, regex)
 }
 
@@ -503,48 +510,45 @@ fn string_find(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
     } else {
       "string.find"
     };
-    let allowed = if regex_mode {
-      &["text", "pattern", "init"][..]
+    let options = if regex_mode {
+      &["init"][..]
     } else {
-      &["text", "pattern", "init", "plain"][..]
+      &["init", "plain"][..]
     };
-    let parameters = args::named(method, values, allowed)?;
-    let text = text_parameter(&parameters, method)?;
-    let pattern = args::string(
-      args::required(&parameters, method, "pattern")?,
-      method,
-      "pattern",
-    )?;
-    let init = args::optional_integer(&parameters, method, "init", Some(1))?.unwrap();
-    let plain = !regex_mode && args::optional_bool(&parameters, method, "plain", false)?;
+    let parameters = args::positional(lua, method, values, &["text", "pattern"], options)?;
+    let options = parameters.options();
+    let text = args::string(parameters.required(0, method, "text")?, method, "text")?;
+    let pattern = args::string(parameters.get(1), method, "pattern")?;
+    let init = args::optional_integer(options, method, "init", Some(1))?.unwrap();
+    let plain = !regex_mode && args::optional_bool(options, method, "plain", false)?;
     if !plain {
       validate_pattern_size(&pattern, method)?;
     }
     let Some(offset) = search_start(&text, init) else {
-      return Ok(Value::Nil);
+      return Ok(MultiValue::from_vec(vec![Value::Nil]));
     };
     if plain {
       let Some(found) = text[offset..].find(&pattern) else {
-        return Ok(Value::Nil);
+        return Ok(MultiValue::from_vec(vec![Value::Nil]));
       };
       let start = offset + found;
       let finish = start + pattern.len();
       let captures = lua.create_table()?;
       captures.raw_set(1, &text[start..finish])?;
       captures.raw_set("n", 1)?;
-      return find_result(lua, &text, start, finish, captures).map(Value::Table);
+      return find_result(&text, start, finish, captures);
     }
     let pattern = compile_pattern(&pattern, method, regex_mode)?;
     let Some(captures) = pattern
       .captures(&text, offset)
       .map_err(|message| args::message(method, message))?
     else {
-      return Ok(Value::Nil);
+      return Ok(MultiValue::from_vec(vec![Value::Nil]));
     };
     let start = captures.full.start;
     let finish = captures.full.end;
     let values = capture_values_table(lua, method, &text, &captures)?;
-    find_result(lua, &text, start, finish, values).map(Value::Table)
+    find_result(&text, start, finish, values)
   })
 }
 
@@ -555,14 +559,10 @@ fn string_match(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
     } else {
       "string.match"
     };
-    let parameters = args::named(method, values, &["text", "pattern", "init"])?;
-    let text = text_parameter(&parameters, method)?;
-    let pattern = args::string(
-      args::required(&parameters, method, "pattern")?,
-      method,
-      "pattern",
-    )?;
-    let init = args::optional_integer(&parameters, method, "init", Some(1))?.unwrap();
+    let parameters = args::positional(lua, method, values, &["text", "pattern"], &["init"])?;
+    let text = args::string(parameters.required(0, method, "text")?, method, "text")?;
+    let pattern = args::string(parameters.get(1), method, "pattern")?;
+    let init = args::optional_integer(parameters.options(), method, "init", Some(1))?.unwrap();
     validate_pattern_size(&pattern, method)?;
     let Some(offset) = search_start(&text, init) else {
       return Ok(Value::Nil);
@@ -585,9 +585,9 @@ fn string_gmatch(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
     } else {
       "string.gmatch"
     };
-    let parameters = args::named(method, values, &["text", "pattern"])?;
-    let text = lua_text_parameter(&parameters, method)?;
-    let pattern = pattern_parameter(&parameters, method, regex_mode)?;
+    let parameters = args::positional(lua, method, values, &["text", "pattern"], &[])?;
+    let text = args::lua_string(parameters.required(0, method, "text")?, method, "text")?;
+    let pattern = pattern_parameter(parameters.get(1), method, regex_mode)?;
     let state = std::rc::Rc::new(std::cell::RefCell::new(GmatchState::default()));
     lua.create_function(move |lua, _: MultiValue| {
       let mut state = state.borrow_mut();
@@ -692,10 +692,16 @@ fn string_gsub(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
     } else {
       "string.gsub"
     };
-    let parameters = args::named(method, values, &["text", "pattern", "repl", "limit"])?;
-    let text = text_parameter(&parameters, method)?;
-    let pattern = pattern_parameter(&parameters, method, regex_mode)?;
-    let replacement = args::required(&parameters, method, "repl")?;
+    let parameters = args::positional(
+      lua,
+      method,
+      values,
+      &["text", "pattern", "repl"],
+      &["limit"],
+    )?;
+    let text = args::string(parameters.required(0, method, "text")?, method, "text")?;
+    let pattern = pattern_parameter(parameters.get(1), method, regex_mode)?;
+    let replacement = parameters.required(2, method, "repl")?;
     if !matches!(
       &replacement,
       Value::String(_) | Value::Table(_) | Value::Function(_)
@@ -707,7 +713,7 @@ fn string_gsub(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
         &replacement,
       ));
     }
-    let limit = args::optional_integer(&parameters, method, "limit", Some(-1))?.unwrap();
+    let limit = args::optional_integer(parameters.options(), method, "limit", Some(-1))?.unwrap();
     if limit < -1 {
       return Err(args::message(method, "limit must be -1 or non-negative"));
     }
@@ -717,10 +723,10 @@ fn string_gsub(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
     let unlimited = limit == -1;
     let limit = if unlimited { 10_000 } else { limit as usize };
     if limit == 0 {
-      let output = lua.create_table()?;
-      output.raw_set("result", text)?;
-      output.raw_set("count", 0)?;
-      return Ok(output);
+      return Ok(MultiValue::from_vec(vec![
+        Value::String(lua.create_string(text)?),
+        Value::Integer(0),
+      ]));
     }
     let mut result = String::with_capacity(text.len());
     let mut last = 0_usize;
@@ -748,25 +754,24 @@ fn string_gsub(lua: &Lua, regex_mode: bool) -> mlua::Result<Function> {
     if result.len() > args::MAX_API_STRING_BYTES {
       return Err(args::message(method, "output exceeds 1 MiB"));
     }
-    let output = lua.create_table()?;
-    output.raw_set("result", result)?;
-    output.raw_set("count", count as i64)?;
-    Ok(output)
+    Ok(MultiValue::from_vec(vec![
+      Value::String(lua.create_string(result)?),
+      Value::Integer(count as i64),
+    ]))
   })
 }
 
 fn find_result(
-  lua: &Lua,
   text: &str,
   start: usize,
   finish: usize,
   captures: Table,
-) -> mlua::Result<Table> {
-  let result = lua.create_table()?;
-  result.raw_set("start", char_position(text, start))?;
-  result.raw_set("finish", text[..finish].chars().count() as i64)?;
-  result.raw_set("captures", captures)?;
-  Ok(result)
+) -> mlua::Result<MultiValue> {
+  Ok(MultiValue::from_vec(vec![
+    Value::Integer(char_position(text, start)),
+    Value::Integer(text[..finish].chars().count() as i64),
+    Value::Table(captures),
+  ]))
 }
 
 fn capture_values_table(
@@ -1314,6 +1319,12 @@ fn format_value(value: &Value) -> mlua::Result<String> {
   args::dynamic_text(value.clone(), "string.format", "values")
 }
 
+/// Convert Lua formatting values into explicit rich-text parameters.
+///
+/// # Errors
+///
+/// Return a Lua argument error when formatting values cannot be converted into supported
+/// substitutions.
 pub(super) fn rich_text_params(
   value: Value,
   method: &str,

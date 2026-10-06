@@ -1,29 +1,40 @@
+//! Service support for the rich text service.
+
 use super::{RichText, RichTextParams, parser};
 
-/// Text parsing mode.
+/// The plain, explicit rich, or prefix-triggered automatic parsing mode.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextMode {
+  /// The auto setting for text mode.
   #[default]
   Auto,
+  /// The plain setting for text mode.
   Plain,
+  /// The rich setting for text mode.
   Rich,
 }
 
-/// Rich text service that parses rich text and extracts its visible plain text.
+/// The public entry point for rich text operations.
 pub struct RichTextService;
 
 impl RichTextService {
+  /// Create a rich text service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
-  /// Parses a rich text string into a list of styled segments.
-  ///
-  /// Uses [`TextMode::Auto`]: only text with the `f%` prefix is formatted; other text stays plain.
+  /// Parse host text, explicitly enabling substitutions when parameters are supplied.
   pub fn parse(&self, text: &str, params: Option<&RichTextParams>) -> RichText {
     parser::parse_auto(text, params)
   }
 
+  /// Parse literal or tagged text according to the explicitly selected mode.
+  ///
+  /// # Arguments
+  ///
+  /// * `text` - The text to process or display.
+  /// * `params` - The formatting or rendering parameters.
+  /// * `mode` - The mode.
   pub fn parse_mode(
     &self,
     text: &str,
@@ -37,14 +48,14 @@ impl RichTextService {
     }
   }
 
-  /// Parses rich text and returns only its visible text (all style tags removed).
+  /// Return rendered text with formatting directives removed.
   pub fn visible_text(&self, text: &str, params: Option<&RichTextParams>) -> String {
     if params.is_none() && !text.starts_with("f%") {
       return text.to_string();
     }
 
-    // Host UIs that pass parameters have explicitly asked for formatting; Lua's AUTO mode still
-    // requires the `f%` prefix.
+    // Host parameters explicitly request formatting; Lua AUTO text still needs its f% prefix.
+
     let rich_text = if params.is_some() {
       parser::parse_rich(text.strip_prefix("f%").unwrap_or(text), params)
     } else {

@@ -1,0 +1,5 @@
+{
+  "game.name": "Tetris",
+  "game.empty_text": "f%<fg:bright_green>Normal Mode</fg>\nScore: ---\n<fg:bright_red>Challenge Mode</fg>\nScore: ---\nLevel: ---\nStage: ---",
+  "game.detail": "f%Classic Tetris: control the falling blocks, clear lines, and earn points.\nThe game is divided into <fg:bright_green>Normal Mode</fg> and <fg:bright_red>Challenge Mode</fg>.\n\n<fg:bright_green>Normal Mode</fg>:\nNo special rules—just try to achieve the highest score possible!\n\n<fg:bright_red>Challenge Mode</fg>:\nImplemented with reference to the NES version. As the level increases, the blocks fall faster, but at the same time you earn more points.\nPush yourself to your limit!"
+}

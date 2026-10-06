@@ -1,3 +1,5 @@
+//! Error logo animation state and terminal-cell presentation.
+
 use super::{DYNAMIC_TEMPLATE, LogoCell, LogoRandom, cells_to_rich_text, random_rgb};
 
 const FRAME_SECONDS: f64 = 0.16;
@@ -54,6 +56,7 @@ struct Fragment {
   remaining: u32,
 }
 
+/// The error logo representation used by this module.
 pub(super) struct ErrorLogo {
   rows: Vec<Vec<char>>,
   corruptions: Vec<Corruption>,
@@ -66,6 +69,7 @@ pub(super) struct ErrorLogo {
 }
 
 impl ErrorLogo {
+  /// Create an error logo initialized from `rng`.
   pub fn new(rng: &mut LogoRandom<'_>) -> Self {
     let width = DYNAMIC_TEMPLATE
       .iter()
@@ -93,6 +97,7 @@ impl ErrorLogo {
     logo
   }
 
+  /// Advance the selected logo animation by its timer step.
   pub fn advance(&mut self, seconds: f64, rng: &mut LogoRandom<'_>) {
     let target = 1 + (seconds / FRAME_SECONDS).floor() as u64;
     while self.steps < target {
@@ -100,6 +105,7 @@ impl ErrorLogo {
     }
   }
 
+  /// Draw the error view and register interaction regions in its assigned surfaces.
   pub fn render(&self) -> String {
     let mut canvas = self
       .rows

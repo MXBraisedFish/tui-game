@@ -38,5 +38,6 @@
   "game_list.list.search.placeholder": "🔍 搜索",
   "game_list.list.source.official": "官方",
   "game_list.list.source.mod": "模组",
-  "game_list.info.high_score.no": "暂无最佳成绩"
+  "game_list.info.high_score.no": "暂无最佳成绩",
+  "game_list.info.size.error": "该游戏需要至少 {value:w}x{value:h} 的终端尺寸才可以运行"
 }

@@ -1,16 +1,35 @@
+//! Border support for the render service.
+
 use tg_core_style::{TextColor, TextStyle};
 
-/// The character and style configuration of a single border position.
+/// A styled character occupying one position in a rectangle border.
+///
+/// # Fields
+///
+/// * `char` - The char.
+/// * `fg` - The foreground color override, or `None` to inherit the default.
+/// * `bg` - The background color override, or `None` to inherit the default.
+/// * `style` - The text style applied to the rendered content.
 #[derive(Clone, Debug, Default)]
 pub struct BorderCharacter {
+  /// The char.
   pub char: Option<char>,
+  /// The foreground color override, or `None` to inherit the default.
   pub fg: Option<TextColor>,
+  /// The background color override, or `None` to inherit the default.
   pub bg: Option<TextColor>,
+  /// The text style applied to the rendered content.
   pub style: Option<TextStyle>,
 }
 
 impl BorderCharacter {
-  /// Merges the position's style with the defaults into the final [`TextStyle`] used for rendering.
+  /// Resolve a built-in or custom border into the characters used to draw its edges and corners.
+  ///
+  /// # Arguments
+  ///
+  /// * `default_fg` - The default fg.
+  /// * `default_bg` - The default bg.
+  /// * `default_style` - The default style.
   pub fn resolve(
     &self,
     default_fg: Option<&TextColor>,
@@ -36,34 +55,60 @@ impl BorderCharacter {
   }
 }
 
-/// The characters and styles of the eight positions of a custom border.
+/// Eight styled positions describing the edges and corners of a custom border.
+///
+/// # Fields
+///
+/// * `left_top` - The left top.
+/// * `top` - The top.
+/// * `right_top` - The right top.
+/// * `right` - The right.
+/// * `right_bottom` - The right bottom.
+/// * `bottom` - The bottom.
+/// * `left_bottom` - The left bottom.
+/// * `left` - The left.
 #[derive(Clone, Debug, Default)]
 pub struct CustomBorder {
+  /// The left top.
   pub left_top: BorderCharacter,
+  /// The top.
   pub top: BorderCharacter,
+  /// The right top.
   pub right_top: BorderCharacter,
+  /// The right.
   pub right: BorderCharacter,
+  /// The right bottom.
   pub right_bottom: BorderCharacter,
+  /// The bottom.
   pub bottom: BorderCharacter,
+  /// The left bottom.
   pub left_bottom: BorderCharacter,
+  /// The left.
   pub left: BorderCharacter,
 }
 
-/// A border style: none, single line, bold, double line, rounded corners, or custom.
-// reason: boxing the large `Custom` variant would change the public `BorderStyle::Custom` type.
+// Keep Custom unboxed to preserve the public border configuration type.
+
+/// The built-in or custom character arrangement used for a rectangle border.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum BorderStyle {
+  /// The none setting for border style.
   None,
+  /// The line setting for border style.
   Line,
+  /// The bold setting for border style.
   Bold,
+  /// The double setting for border style.
   Double,
+  /// The circle setting for border style.
   Circle,
+  /// The custom setting for border style.
   Custom(CustomBorder),
 }
 
 impl BorderStyle {
-  /// Expands the style into a concrete [`CustomBorder`]; returns `None` for [`BorderStyle::None`].
+  /// Return the current to custom.
   pub fn to_custom(&self) -> Option<CustomBorder> {
     match self {
       Self::None => None,

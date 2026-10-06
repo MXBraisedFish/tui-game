@@ -1,3 +1,5 @@
+//! Clipped content viewports, scrollbar layout, and anchored pointer dragging.
+
 mod state;
 mod types;
 
@@ -16,15 +18,17 @@ use tg_service_canvas::CanvasService;
 pub(crate) use tg_service_canvas::ResolvedScrollBoxLayout;
 use tg_service_layout::{LayoutService, Rect, Size};
 
-/// 可滚动绘制面服务。
+/// The public entry point for scroll box operations.
 #[derive(Default)]
 pub struct ScrollBoxService;
 
 impl ScrollBoxService {
+  /// Create a scroll box service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Create an owned scroll box object and return its identity.
   pub fn create(
     &self,
     pool: &mut UiObjectPool,
@@ -47,6 +51,7 @@ impl ScrollBoxService {
     })
   }
 
+  /// Remove the identified widget object and release its owned state.
   pub fn remove(&self, pool: &mut UiObjectPool, id: ScrollBoxId) -> bool {
     if pool.scroll_boxes.boxes.remove(&id).is_none() {
       return false;
@@ -57,14 +62,24 @@ impl ScrollBoxService {
     true
   }
 
+  /// Report whether the identified widget object is still present.
   pub fn exists(&self, pool: &UiObjectPool, id: ScrollBoxId) -> bool {
     pool.scroll_boxes.boxes.contains_key(&id)
   }
 
+  /// Return the rect for the addressed object when it is available.
   pub fn rect(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<Rect> {
     Some(pool.scroll_boxes.boxes.get(&id)?.options.rect)
   }
 
+  /// Return the component's rectangle after symbolic coordinates and source dimensions are
+  /// resolved.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn resolved_rect(
     &self,
     pool: &UiObjectPool,
@@ -75,6 +90,13 @@ impl ScrollBoxService {
     Some(clamp_rect(rect, layout.developer_size()))
   }
 
+  /// Return the viewport size for the addressed object when it is available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn viewport_size(
     &self,
     pool: &UiObjectPool,
@@ -88,6 +110,13 @@ impl ScrollBoxService {
     })
   }
 
+  /// Return the viewport width in terminal columns for the addressed object when it is available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn viewport_width(
     &self,
     pool: &UiObjectPool,
@@ -97,6 +126,13 @@ impl ScrollBoxService {
     Some(self.viewport_size(pool, id, layout)?.width)
   }
 
+  /// Return the viewport height in terminal rows for the addressed object when it is available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn viewport_height(
     &self,
     pool: &UiObjectPool,
@@ -106,7 +142,13 @@ impl ScrollBoxService {
     Some(self.viewport_size(pool, id, layout)?.height)
   }
 
-  /// 查询扣除 Inside 或 ReserveSpace 滚动条占位后的有效 viewport 尺寸。
+  /// Return the content viewport size after inside or reserved scrollbar space is deducted.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn effective_viewport_size(
     &self,
     pool: &UiObjectPool,
@@ -117,7 +159,13 @@ impl ScrollBoxService {
     Some(effective_viewport(state, layout.developer_size()))
   }
 
-  /// 查询组件包含外置滚动条在内的实际占用区域。
+  /// Return the component rectangle including any externally placed scrollbars.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn occupied_rect(
     &self,
     pool: &UiObjectPool,
@@ -128,7 +176,13 @@ impl ScrollBoxService {
     Some(resolve_scroll_box_layout(state, layout.developer_size()).occupied_rect)
   }
 
-  /// 查询内容真正能够显示和命中的区域。
+  /// Return the terminal rectangle in which content can actually be displayed and hit-tested.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn content_viewport_rect(
     &self,
     pool: &UiObjectPool,
@@ -139,6 +193,14 @@ impl ScrollBoxService {
     Some(resolve_scroll_box_layout(state, layout.developer_size()).content_viewport_rect)
   }
 
+  /// Update the rect used by this scroll box service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn set_rect(
     &self,
     pool: &mut UiObjectPool,
@@ -154,6 +216,7 @@ impl ScrollBoxService {
     true
   }
 
+  /// Return the content size for the addressed object when it is available.
   pub fn content_size(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<Size> {
     let options = &pool.scroll_boxes.boxes.get(&id)?.options;
     Some(Size {
@@ -162,6 +225,15 @@ impl ScrollBoxService {
     })
   }
 
+  /// Update the content size used by this scroll box service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn set_content_size(
     &self,
     pool: &mut UiObjectPool,
@@ -179,6 +251,7 @@ impl ScrollBoxService {
     true
   }
 
+  /// Report whether the addressed object is visible.
   pub fn is_visible(&self, pool: &UiObjectPool, id: ScrollBoxId) -> bool {
     pool
       .scroll_boxes
@@ -187,6 +260,13 @@ impl ScrollBoxService {
       .is_some_and(|state| state.options.visible)
   }
 
+  /// Update the visible used by this scroll box service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `visible` - Whether the target contributes to the visible frame.
   pub fn set_visible(&self, pool: &mut UiObjectPool, id: ScrollBoxId, visible: bool) -> bool {
     let Some(state) = pool.scroll_boxes.boxes.get_mut(&id) else {
       return false;
@@ -195,6 +275,7 @@ impl ScrollBoxService {
     true
   }
 
+  /// Report whether the addressed object is opaque.
   pub fn is_opaque(&self, pool: &UiObjectPool, id: ScrollBoxId) -> bool {
     pool
       .scroll_boxes
@@ -203,6 +284,13 @@ impl ScrollBoxService {
       .is_some_and(|state| state.options.opaque)
   }
 
+  /// Update the opaque used by this scroll box service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `opaque` - Whether the surface background replaces content below it.
   pub fn set_opaque(&self, pool: &mut UiObjectPool, id: ScrollBoxId, opaque: bool) -> bool {
     let Some(state) = pool.scroll_boxes.boxes.get_mut(&id) else {
       return false;
@@ -211,14 +299,23 @@ impl ScrollBoxService {
     true
   }
 
+  /// Return the scroll x in terminal columns for the addressed object when it is available.
   pub fn scroll_x(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<u16> {
     Some(pool.scroll_boxes.boxes.get(&id)?.scroll_x)
   }
 
+  /// Return the scroll y in terminal rows for the addressed object when it is available.
   pub fn scroll_y(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<u16> {
     Some(pool.scroll_boxes.boxes.get(&id)?.scroll_y)
   }
 
+  /// Return the max scroll x in terminal columns for the addressed object when it is available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn max_scroll_x(
     &self,
     pool: &UiObjectPool,
@@ -229,6 +326,13 @@ impl ScrollBoxService {
     Some(max_scroll_x(state, layout.developer_size()))
   }
 
+  /// Return the max scroll y in terminal rows for the addressed object when it is available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn max_scroll_y(
     &self,
     pool: &UiObjectPool,
@@ -239,13 +343,19 @@ impl ScrollBoxService {
     Some(max_scroll_y(state, layout.developer_size()))
   }
 
-  /// 查询完整的滚动位置。
+  /// Return the scroll position for the addressed object when it is available.
   pub fn scroll_position(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<(u16, u16)> {
     let state = pool.scroll_boxes.boxes.get(&id)?;
     Some((state.scroll_x, state.scroll_y))
   }
 
-  /// 查询 viewport 矩形（在 Developer Viewport 内的位置和大小）。
+  /// Return the viewport rect for the addressed object when it is available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn viewport_rect(
     &self,
     pool: &UiObjectPool,
@@ -255,17 +365,23 @@ impl ScrollBoxService {
     self.resolved_rect(pool, id, layout)
   }
 
-  /// 查询内容区宽度。
+  /// Return the content width in terminal columns for the addressed object when it is available.
   pub fn content_width(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<u16> {
     Some(pool.scroll_boxes.boxes.get(&id)?.options.content_width)
   }
 
-  /// 查询内容区高度。
+  /// Return the content height in terminal rows for the addressed object when it is available.
   pub fn content_height(&self, pool: &UiObjectPool, id: ScrollBoxId) -> Option<u16> {
     Some(pool.scroll_boxes.boxes.get(&id)?.options.content_height)
   }
 
-  /// 查询当前被滚动窗口看到的内容区域（内容坐标系）。
+  /// Return the currently visible rectangle in scrollable content coordinates.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn visible_content_rect(
     &self,
     pool: &UiObjectPool,
@@ -286,7 +402,13 @@ impl ScrollBoxService {
     })
   }
 
-  /// 查询当前可见内容区域的宽度。
+  /// Return the visible content size for the addressed object when it is available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn visible_content_size(
     &self,
     pool: &UiObjectPool,
@@ -300,6 +422,14 @@ impl ScrollBoxService {
     })
   }
 
+  /// Return the visible content width in terminal columns for the addressed object when it is
+  /// available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn visible_content_width(
     &self,
     pool: &UiObjectPool,
@@ -309,7 +439,14 @@ impl ScrollBoxService {
     Some(self.visible_content_rect(pool, id, layout)?.width)
   }
 
-  /// 查询当前可见内容区域的高度。
+  /// Return the visible content height in terminal rows for the addressed object when it is
+  /// available.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn visible_content_height(
     &self,
     pool: &UiObjectPool,
@@ -319,7 +456,15 @@ impl ScrollBoxService {
     Some(self.visible_content_rect(pool, id, layout)?.height)
   }
 
-  /// 将内容坐标转换为视口坐标。
+  /// Map a visible content point into developer-viewport coordinates.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `content_x` - The content x.
+  /// * `content_y` - The content y.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn content_to_viewport_point(
     &self,
     pool: &UiObjectPool,
@@ -337,7 +482,15 @@ impl ScrollBoxService {
       .then_some((viewport_x, viewport_y))
   }
 
-  /// 将视口坐标转换为内容坐标。
+  /// Map a developer-viewport point into the scrollable content coordinates when visible.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `viewport_x` - The viewport x.
+  /// * `viewport_y` - The viewport y.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn viewport_to_content_point(
     &self,
     pool: &UiObjectPool,
@@ -357,11 +510,21 @@ impl ScrollBoxService {
     Some((content_x, content_y))
   }
 
-  /// 取出所有已排队的滚动事件。
+  /// Drain scroll-position changes queued since the previous read.
   pub fn drain_scroll_events(&self, pool: &mut UiObjectPool) -> Vec<ScrollBoxEvent> {
     pool.scroll_boxes.events.drain(..).collect()
   }
 
+  /// Set absolute content scroll offsets, clamp them to valid ranges, and queue a change event
+  /// when needed.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn scroll_to(
     &self,
     pool: &mut UiObjectPool,
@@ -396,6 +559,15 @@ impl ScrollBoxService {
     true
   }
 
+  /// Apply relative content scroll offsets within valid ranges.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `dx` - The dx.
+  /// * `dy` - The dy.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn scroll_by(
     &self,
     pool: &mut UiObjectPool,
@@ -430,6 +602,7 @@ impl ScrollBoxService {
     true
   }
 
+  /// Move content to its minimum vertical scroll offset.
   pub fn scroll_to_top(&self, pool: &mut UiObjectPool, id: ScrollBoxId) -> bool {
     let (old, new, emit) = {
       let Some(state) = pool.scroll_boxes.boxes.get_mut(&id) else {
@@ -453,6 +626,13 @@ impl ScrollBoxService {
     true
   }
 
+  /// Move content to its maximum vertical scroll offset.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn scroll_to_bottom(
     &self,
     pool: &mut UiObjectPool,
@@ -481,6 +661,7 @@ impl ScrollBoxService {
     true
   }
 
+  /// Move content to its minimum horizontal scroll offset.
   pub fn scroll_to_left(&self, pool: &mut UiObjectPool, id: ScrollBoxId) -> bool {
     let (old, new, emit) = {
       let Some(state) = pool.scroll_boxes.boxes.get_mut(&id) else {
@@ -504,6 +685,13 @@ impl ScrollBoxService {
     true
   }
 
+  /// Move content to its maximum horizontal scroll offset.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn scroll_to_right(
     &self,
     pool: &mut UiObjectPool,
@@ -532,24 +720,46 @@ impl ScrollBoxService {
     true
   }
 
+  /// Move the surface to the front of its composition group.
   pub fn bring_to_front(&self, pool: &mut UiObjectPool, id: ScrollBoxId) -> bool {
     pool.move_surface_to_edge(SurfaceId::ScrollBox(id), false)
   }
 
+  /// Move the surface to the back of its composition group.
   pub fn send_to_back(&self, pool: &mut UiObjectPool, id: ScrollBoxId) -> bool {
     pool.move_surface_to_edge(SurfaceId::ScrollBox(id), true)
   }
 
+  /// Place the surface immediately above the referenced peer.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `target` - The object or resource affected by the operation.
   pub fn move_above(&self, pool: &mut UiObjectPool, id: ScrollBoxId, target: SurfaceId) -> bool {
     pool.move_surface_relative(SurfaceId::ScrollBox(id), target, true)
   }
 
+  /// Place the surface immediately below the referenced peer.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `target` - The object or resource affected by the operation.
   pub fn move_below(&self, pool: &mut UiObjectPool, id: ScrollBoxId, target: SurfaceId) -> bool {
     pool.move_surface_relative(SurfaceId::ScrollBox(id), target, false)
   }
 
-  // ─── 内部事件路由 ────────────────────────────────────
-
+  /// Route a pointer event through the component's current hit regions and focus state.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `event` - The event to apply or route.
   pub fn route_mouse_event(
     &self,
     pool: &mut UiObjectPool,
@@ -557,7 +767,8 @@ impl ScrollBoxService {
     layout: &LayoutService,
     event: MouseEvent,
   ) -> bool {
-    // 如果有活跃的拖动且鼠标按钮释放或拖拽中，优先处理。
+    // Give an existing drag first refusal on motion and release events before testing new hits.
+
     if let Some(drag) = pool.scroll_boxes.drag {
       return self.route_drag_or_release(pool, layout, event, drag);
     }
@@ -596,7 +807,6 @@ impl ScrollBoxService {
       _ => return false,
     };
 
-    // 根据 overflow 设置限制滚动方向。
     let effective_dx = if state.options.overflow_x == Overflow::Hidden {
       0
     } else {
@@ -627,7 +837,6 @@ impl ScrollBoxService {
     };
     let viewport = layout.developer_size();
 
-    // 找到鼠标下方最顶层的 ScrollBox（含滚动条区域）。
     let Some(id) = find_scroll_box_for_interaction(pool, canvas, layout, event.x, event.y) else {
       return false;
     };
@@ -636,12 +845,11 @@ impl ScrollBoxService {
     };
     let resolved = resolve_scroll_box_layout(state, viewport);
 
-    // 命中测试垂直滚动条滑块。
     if let Some(thumb) = resolved.vertical_thumb_rect {
       let physical = scrollbar_physical_rect(thumb, canvas.viewport());
       if physical.contains(event.x, event.y) {
         let bar = resolved.vertical_track_rect.unwrap();
-        // 滑块在轨道内的本地偏移（开发者坐标）。
+
         let thumb_local = thumb.y.saturating_sub(bar.y);
         pool.scroll_boxes.drag = Some(ScrollBoxDragState {
           scroll_box_id: id,
@@ -657,7 +865,6 @@ impl ScrollBoxService {
       }
     }
 
-    // 命中测试垂直滚动条轨道（翻页）。
     if let Some(bar) = resolved.vertical_track_rect {
       let physical = scrollbar_physical_rect(bar, canvas.viewport());
       if physical.contains(event.x, event.y) {
@@ -678,12 +885,11 @@ impl ScrollBoxService {
       }
     }
 
-    // 命中测试水平滚动条滑块。
     if let Some(thumb) = resolved.horizontal_thumb_rect {
       let physical = scrollbar_physical_rect(thumb, canvas.viewport());
       if physical.contains(event.x, event.y) {
         let bar = resolved.horizontal_track_rect.unwrap();
-        // 滑块在轨道内的本地偏移（开发者坐标）。
+
         let thumb_local = thumb.x.saturating_sub(bar.x);
         pool.scroll_boxes.drag = Some(ScrollBoxDragState {
           scroll_box_id: id,
@@ -699,7 +905,6 @@ impl ScrollBoxService {
       }
     }
 
-    // 命中测试水平滚动条轨道（翻页）。
     if let Some(bar) = resolved.horizontal_track_rect {
       let physical = scrollbar_physical_rect(bar, canvas.viewport());
       if physical.contains(event.x, event.y) {
@@ -772,13 +977,14 @@ impl ScrollBoxService {
               y: new.1,
             });
         }
-        // 注意：不更新 drag_start_mouse / drag_start_thumb_pos。
-        // 始终以按下时的锚点计算，避免 scroll→thumb→scroll 往返
-        // 整数除法累积误差导致滑块漂移/回弹。
+        // Keep the original press anchors fixed; repeated scroll-to-thumb round trips accumulate
+        // integer rounding and make the thumb drift.
+
         true
       }
       _ => {
-        // 拖动期间消费所有鼠标事件。
+        // An active drag owns all pointer events until it ends.
+
         true
       }
     }
@@ -805,6 +1011,7 @@ fn valid_options(options: &ScrollBoxOptions) -> bool {
   options.wheel_step > 0
 }
 
+/// Clamp a configured rectangle to its supported coordinate and size limits.
 pub(crate) fn clamp_rect(rect: Rect, viewport: Size) -> Rect {
   let x = rect.x.min(viewport.width);
   let y = rect.y.min(viewport.height);
@@ -816,6 +1023,7 @@ pub(crate) fn clamp_rect(rect: Rect, viewport: Size) -> Rect {
   }
 }
 
+/// Resolve content bounds and scrollbar occupancy until the viewport dimensions are consistent.
 pub(crate) fn resolve_scroll_box_layout(
   state: &ScrollBoxState,
   viewport: Size,
@@ -1042,7 +1250,7 @@ fn union_rect(left: Rect, right: Rect) -> Rect {
   }
 }
 
-/// 计算滚动条占位后的内容可视尺寸。
+/// Return the visible content size after scrollbar occupancy is resolved.
 pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size {
   let rect = resolve_scroll_box_layout(state, viewport).content_viewport_rect;
   Size {
@@ -1051,7 +1259,7 @@ pub(crate) fn effective_viewport(state: &ScrollBoxState, viewport: Size) -> Size
   }
 }
 
-/// 垂直滚动条是否应显示。
+/// Report whether vertical overflow requires a visible scrollbar.
 #[cfg(test)]
 pub(crate) fn shows_vertical_scrollbar(state: &ScrollBoxState, viewport: Size) -> bool {
   resolve_scroll_box_layout(state, viewport)
@@ -1059,7 +1267,7 @@ pub(crate) fn shows_vertical_scrollbar(state: &ScrollBoxState, viewport: Size) -
     .is_some()
 }
 
-/// 水平滚动条是否应显示。
+/// Report whether horizontal overflow requires a visible scrollbar.
 #[cfg(test)]
 pub(crate) fn shows_horizontal_scrollbar(state: &ScrollBoxState, viewport: Size) -> bool {
   resolve_scroll_box_layout(state, viewport)
@@ -1067,20 +1275,22 @@ pub(crate) fn shows_horizontal_scrollbar(state: &ScrollBoxState, viewport: Size)
     .is_some()
 }
 
+/// Return the max scroll x in terminal columns for the addressed object.
 pub(crate) fn max_scroll_x(state: &ScrollBoxState, viewport: Size) -> u16 {
   resolve_scroll_box_layout(state, viewport).max_scroll_x
 }
 
+/// Return the max scroll y in terminal rows for the addressed object.
 pub(crate) fn max_scroll_y(state: &ScrollBoxState, viewport: Size) -> u16 {
   resolve_scroll_box_layout(state, viewport).max_scroll_y
 }
 
+/// Clamp the stored scroll offsets to the currently valid content range.
 pub(crate) fn clamp_scroll(state: &mut ScrollBoxState, viewport: Size) {
   state.scroll_x = state.scroll_x.min(max_scroll_x(state, viewport));
   state.scroll_y = state.scroll_y.min(max_scroll_y(state, viewport));
 }
 
-/// 将开发者坐标下的滚动条矩形转换到物理坐标。
 fn scrollbar_physical_rect(rect: Rect, viewport: Rect) -> Rect {
   Rect {
     x: viewport.x.saturating_add(rect.x),
@@ -1090,7 +1300,6 @@ fn scrollbar_physical_rect(rect: Rect, viewport: Rect) -> Rect {
   }
 }
 
-/// 寻找鼠标下方最顶层的 ScrollBox（包含滚动条区域）。
 fn find_scroll_box_for_interaction(
   pool: &UiObjectPool,
   canvas: &CanvasService,
@@ -1130,7 +1339,7 @@ mod tests {
   fn create_rejects_zero_wheel_step_and_allows_horizontal_overflow() {
     let service = ScrollBoxService::new();
     let mut pool = UiObjectPool::new();
-    // 水平溢出现在允许。
+
     assert!(
       service
         .create(
@@ -1142,7 +1351,7 @@ mod tests {
         )
         .is_some()
     );
-    // wheel_step = 0 仍然拒绝。
+
     assert!(
       service
         .create(
@@ -1181,7 +1390,6 @@ mod tests {
       )
       .unwrap();
 
-    // 垂直夹紧。
     assert!(service.scroll_to(&mut pool, id, 0, 99, &layout));
     assert_eq!(service.scroll_y(&pool, id), Some(6));
     assert!(service.scroll_by(&mut pool, id, 0, -10, &layout));
@@ -1189,7 +1397,6 @@ mod tests {
     assert!(service.scroll_to_bottom(&mut pool, id, &layout));
     assert_eq!(service.scroll_y(&pool, id), Some(6));
 
-    // 水平夹紧。
     assert!(service.scroll_to(&mut pool, id, 99, 0, &layout));
     assert_eq!(service.scroll_x(&pool, id), Some(13));
     assert!(service.scroll_by(&mut pool, id, -20, 0, &layout));
@@ -1267,7 +1474,6 @@ mod tests {
 
     service.scroll_to(&mut pool, id, 3, 5, &layout);
 
-    // 内容 → 视口。
     assert_eq!(
       service.content_to_viewport_point(&pool, id, 3, 5, &layout),
       Some((0, 0))
@@ -1275,9 +1481,8 @@ mod tests {
     assert_eq!(
       service.content_to_viewport_point(&pool, id, 0, 0, &layout),
       None
-    ); // 内容坐标 < scroll → None
+    );
 
-    // 视口 → 内容。
     assert_eq!(
       service.viewport_to_content_point(&pool, id, 0, 0, &layout),
       Some((3, 5))
@@ -1317,7 +1522,6 @@ mod tests {
     assert_eq!(events.len(), 1);
     assert_eq!(events[0], ScrollBoxEvent::Scrolled { id, x: 0, y: 3 });
 
-    // 再次滚动到相同位置不应发射事件。
     service.scroll_to(&mut pool, id, 0, 3, &layout);
     let events = service.drain_scroll_events(&mut pool);
     assert!(events.is_empty());
@@ -1483,8 +1687,6 @@ mod tests {
     canvas.begin_frame(&layout);
     pool.prepare_canvas(&mut canvas, &layout);
 
-    // 垂直滚动条在 x=7（Overlay 模式的最右侧列）。滑块初始在顶部。
-    // 在滑块区域按下鼠标 → 开始拖动。
     let pressed = service.route_mouse_event(
       &mut pool,
       &canvas,
@@ -1493,14 +1695,13 @@ mod tests {
         kind: MouseEventKind::Press,
         button: Some(MouseButton::Left),
         scroll: None,
-        x: 7, // 滚动条列
-        y: 0, // 滑块顶部
+        x: 7,
+        y: 0,
       },
     );
     assert!(pressed, "press on thumb should be consumed");
     assert!(pool.scroll_boxes.drag.is_some());
 
-    // 释放 → 结束拖动。
     let released = service.route_mouse_event(
       &mut pool,
       &canvas,
@@ -1543,7 +1744,6 @@ mod tests {
     canvas.begin_frame(&layout);
     pool.prepare_canvas(&mut canvas, &layout);
 
-    // 点击轨道底部（滑块下方）→ 向下翻页。
     service.scroll_to_top(&mut pool, id);
     let pressed = service.route_mouse_event(
       &mut pool,
@@ -1554,11 +1754,11 @@ mod tests {
         button: Some(MouseButton::Left),
         scroll: None,
         x: 7,
-        y: 3, // 轨道底部，滑块下方
+        y: 3,
       },
     );
     assert!(pressed);
-    // 验证已向下滚动。
+
     assert!(service.scroll_y(&pool, id).unwrap() > 0);
   }
 
@@ -1590,7 +1790,6 @@ mod tests {
     canvas.begin_frame(&layout);
     pool.prepare_canvas(&mut canvas, &layout);
 
-    // 两个方向都被 blocking。
     assert!(!service.route_mouse_event(
       &mut pool,
       &canvas,
@@ -1645,8 +1844,9 @@ mod tests {
       width: 20,
       height: 15,
     };
-    // ReserveSpace: 内容高度 10 > viewport 5 → 垂直滚动条显示 → 宽度减 1
-    // 内容宽度 20 > viewport 10 → 水平滚动条显示 → 高度减 1
+    // Reserved vertical and horizontal scrollbars each remove one cell from the opposite content
+    // dimension.
+
     let eff = effective_viewport(&state, viewport);
     assert_eq!(eff.width, 9);
     assert_eq!(eff.height, 4);
@@ -2025,11 +2225,12 @@ mod tests {
       width: 20,
       height: 15,
     };
-    // content_width=20 > rect.width=10 → 水平滚动条显示，高度减 1
-    // content_height=5 > effective_height=4 → 垂直滚动条也显示，宽度减 1
+    // One scrollbar can reduce the viewport enough to require the other; resolve both dimensions
+    // together.
+
     assert!(shows_horizontal_scrollbar(&state, viewport));
     assert!(shows_vertical_scrollbar(&state, viewport));
-    assert_eq!(max_scroll_x(&state, viewport), 11); // 20 - 9
+    assert_eq!(max_scroll_x(&state, viewport), 11);
   }
 
   #[test]
@@ -2044,7 +2245,7 @@ mod tests {
         },
         content_width: 10,
         content_height: 10,
-        scrollbar_layout: ScrollbarLayout::Inside, // 默认
+        scrollbar_layout: ScrollbarLayout::Inside,
         scrollbar: ScrollbarPolicy {
           vertical: ScrollbarVisibility::Auto,
           horizontal: ScrollbarVisibility::Never,
@@ -2058,11 +2259,11 @@ mod tests {
       width: 20,
       height: 15,
     };
-    // 垂直滚动条显示 → 宽度减 1，高度不变。
+
     let eff = effective_viewport(&state, viewport);
     assert_eq!(eff.width, 9);
     assert_eq!(eff.height, 5);
-    assert_eq!(max_scroll_y(&state, viewport), 5); // 10 - 5
+    assert_eq!(max_scroll_y(&state, viewport), 5);
   }
 
   #[test]
@@ -2082,10 +2283,11 @@ mod tests {
           content_width: 8,
           content_height: 1,
           scrollbar_style: ScrollbarStyle {
-            track_char: '中',         // CJK 宽 2，应退回默认 '│'
-            thumb_char: '\u{200D}',   // ZWJ 宽 0，应退回默认 '█'
-            h_track_char: '━',        // 宽 1，OK
-            h_thumb_char: '\u{200D}', // 宽 0，应退回默认 '█'
+            track_char: '中', // Reject wide or zero-width scrollbar glyphs; valid scrollbar pieces must occupy
+            // exactly one cell.
+            thumb_char: '\u{200D}',
+            h_track_char: '━',
+            h_thumb_char: '\u{200D}',
             ..Default::default()
           },
           ..Default::default()
@@ -2094,9 +2296,9 @@ mod tests {
       .unwrap();
     let state = pool.scroll_boxes.boxes.get(&id).unwrap();
     let style = &state.options.scrollbar_style;
-    assert_eq!(style.track_char, '│'); // 退回默认
-    assert_eq!(style.thumb_char, '█'); // 退回默认
-    assert_eq!(style.h_track_char, '━'); // 合法宽度
-    assert_eq!(style.h_thumb_char, '█'); // 退回默认
+    assert_eq!(style.track_char, '│');
+    assert_eq!(style.thumb_char, '█');
+    assert_eq!(style.h_track_char, '━');
+    assert_eq!(style.h_thumb_char, '█');
   }
 }

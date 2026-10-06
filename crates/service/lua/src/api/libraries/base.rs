@@ -1,5 +1,13 @@
+//! Lua base library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Build and register the Lua base API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
   let ipairs = lua.create_function(|lua, args: MultiValue| {
     let value = positional_argument(&args, 0, "base.ipairs", "table")?;
@@ -34,7 +42,7 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
       Value::Integer(0),
     ]))
   })?;
-  let next = lua.create_function(|_, args: MultiValue| {
+  let next_for_pairs = lua.create_function(|_, args: MultiValue| {
     let value = positional_argument(&args, 0, "base.next", "table")?;
     let Value::Table(table) = value else {
       return Err(args::invalid("base.next", "table", "table", &value));
@@ -42,7 +50,14 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
     let index = args.get(1).cloned().unwrap_or(Value::Nil);
     next_pair(&table, index)
   })?;
-  let next_for_pairs = next.clone();
+  let next = lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "base.next", values, &["table"], &["key"])?;
+    let value = parsed.get(0);
+    let Value::Table(table) = value else {
+      return Err(args::invalid("base.next", "table", "table", &value));
+    };
+    next_pair(&table, parsed.options().raw_get::<Value>("key")?)
+  })?;
   let pairs = lua.create_function(move |_, args: MultiValue| {
     let value = positional_argument(&args, 0, "base.pairs", "table")?;
     let Value::Table(table) = value else {
@@ -138,9 +153,10 @@ pub(super) fn base(lua: &Lua) -> mlua::Result<Table> {
       )),
     }
   })?;
-  let tonumber = lua.create_function(|_, args: MultiValue| {
-    let value = positional_argument(&args, 0, "base.tonumber", "value")?;
-    let base = args.get(1).cloned().unwrap_or(Value::Nil);
+  let tonumber = lua.create_function(|lua, values: MultiValue| {
+    let parsed = args::positional(lua, "base.tonumber", values, &["value"], &["base"])?;
+    let value = parsed.get(0);
+    let base = parsed.options().raw_get::<Value>("base")?;
     let base = if matches!(base, Value::Nil) {
       None
     } else {
@@ -329,6 +345,8 @@ fn raw_equal(left: &Value, right: &Value) -> bool {
   }
 }
 
+/// Parse a Lua-compatible numeric spelling and return its integer or floating-point
+/// representation.
 pub(super) fn parse_number(text: &str) -> Option<Value> {
   let text = text.trim();
   if let Ok(value) = text.parse::<i64>() {

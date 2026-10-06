@@ -1,3 +1,5 @@
+//! Grapheme-safe editing, focus, selection, cursor layout, and input rendering.
+
 mod buffer;
 mod input;
 mod layout;

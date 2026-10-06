@@ -1,11 +1,12 @@
+//! Cell-effect instances and explicitly overridden effect parameters.
+
 use std::collections::HashMap;
 
 use super::AnimationObjects;
 
 use super::{AnimationError, AnimationTarget, AnimationValue, CellEffectId, EffectParameterId};
 
-/// The host-side entry point for managing character effect parameters. The per-cell effect
-/// algorithm itself is left to the render objects that interpret these parameters.
+/// The public entry point for character effect operations.
 pub struct CharacterEffectService;
 
 impl Default for CharacterEffectService {
@@ -15,10 +16,12 @@ impl Default for CharacterEffectService {
 }
 
 impl CharacterEffectService {
+  /// Create a character effect service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Create an owned character effect object and return its identity.
   pub fn create(
     &self,
     pool: &mut AnimationObjects,
@@ -27,6 +30,7 @@ impl CharacterEffectService {
     pool.character_effects.insert(parameters)
   }
 
+  /// Remove the identified animation object and release its owned state.
   pub fn remove(&self, pool: &mut AnimationObjects, id: CellEffectId) -> bool {
     let removed = pool.character_effects.remove(id).is_some();
     if removed {
@@ -35,10 +39,18 @@ impl CharacterEffectService {
     removed
   }
 
+  /// Report whether the identified animation object is still present.
   pub fn exists(&self, pool: &AnimationObjects, id: CellEffectId) -> bool {
     pool.character_effects.get(id).is_some()
   }
 
+  /// Return the resolved effect parameter, preferring its animation override when present.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `parameter` - The parameter.
   pub fn parameter<'a>(
     &self,
     pool: &'a AnimationObjects,
@@ -55,6 +67,19 @@ impl CharacterEffectService {
     )
   }
 
+  /// Update the parameter used by this character effect service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `parameter` - The parameter.
+  /// * `value` - The value to store or convert.
+  ///
+  /// # Errors
+  ///
+  /// Return `StaleEffect` for a removed effect, `MissingEffectParameter` for an absent parameter,
+  /// or `ValueTypeMismatch` for an incompatible value.
   pub fn set_parameter(
     &self,
     pool: &mut AnimationObjects,
@@ -80,6 +105,13 @@ impl CharacterEffectService {
     Ok(())
   }
 
+  /// Clear the override retained by this character effect service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `parameter` - The parameter.
   pub fn clear_override(
     &self,
     pool: &mut AnimationObjects,

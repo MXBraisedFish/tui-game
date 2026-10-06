@@ -1,31 +1,66 @@
+//! Layout support for the widget service.
+
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use super::state::TextInputState;
 use super::types::TextInputMode;
 
+/// The visual glyph representation used by this module.
+///
+/// # Fields
+///
+/// * `start` - The start.
+/// * `end` - The end.
+/// * `text` - The text to process or display.
+/// * `line` - The line.
+/// * `x` - The horizontal coordinate in terminal cells.
+/// * `width` - The width in terminal columns.
 #[derive(Clone)]
 pub(super) struct VisualGlyph {
+  /// The start.
   pub start: usize,
+  /// The end.
   pub end: usize,
+  /// The text to process or display.
   pub text: String,
+  /// The line.
   pub line: usize,
+  /// The horizontal coordinate in terminal cells.
   pub x: usize,
+  /// The width in terminal columns.
   pub width: usize,
 }
 
+/// The visual line representation used by this module.
+///
+/// # Fields
+///
+/// * `start` - The start.
+/// * `end` - The end.
 #[derive(Clone, Copy)]
 pub(super) struct VisualLine {
+  /// The start.
   pub start: usize,
+  /// The end.
   pub end: usize,
 }
 
+/// Resolved geometry and positions used to display visual.
+///
+/// # Fields
+///
+/// * `glyphs` - The ordered glyphs retained by this owner.
+/// * `lines` - The ordered lines retained by this owner.
 pub(super) struct VisualLayout {
+  /// The ordered glyphs retained by this owner.
   pub glyphs: Vec<VisualGlyph>,
+  /// The ordered lines retained by this owner.
   pub lines: Vec<VisualLine>,
 }
 
 impl VisualLayout {
+  /// Create a visual layout initialized from `text`, `width`.
   pub(super) fn new(text: &str, width: usize) -> Self {
     let width = width.max(1);
     let mut glyphs = Vec::new();
@@ -72,6 +107,7 @@ impl VisualLayout {
     Self { glyphs, lines }
   }
 
+  /// Return the position for the addressed object.
   pub(super) fn position(&self, cursor: usize, hint: Option<usize>) -> (usize, usize) {
     let line = hint
       .filter(|line| {
@@ -99,6 +135,7 @@ impl VisualLayout {
     (line, x)
   }
 
+  /// Return the grapheme boundary nearest to a text-layout column.
   pub(super) fn boundary_at(&self, line: usize, x: usize) -> usize {
     let Some(row) = self.lines.get(line) else {
       return self.lines.last().map(|line| line.end).unwrap_or(0);
@@ -115,6 +152,14 @@ impl VisualLayout {
   }
 }
 
+/// Move the cursor between rendered lines while retaining its preferred column.
+///
+/// # Arguments
+///
+/// * `state` - The state.
+/// * `width` - The width in terminal columns.
+/// * `delta` - The delta.
+/// * `extend` - Whether movement extends the current selection.
 pub(super) fn move_vertical(state: &mut TextInputState, width: usize, delta: isize, extend: bool) {
   if !extend && let Some(range) = state.buffer.selection() {
     state
@@ -141,6 +186,14 @@ pub(super) fn move_vertical(state: &mut TextInputState, width: usize, delta: isi
   state.visual_line = Some(target);
 }
 
+/// Move the cursor to the start or end of its rendered line.
+///
+/// # Arguments
+///
+/// * `state` - The state.
+/// * `width` - The width in terminal columns.
+/// * `end` - The end.
+/// * `extend` - Whether movement extends the current selection.
 pub(super) fn move_line_edge(state: &mut TextInputState, width: usize, end: bool, extend: bool) {
   let layout = VisualLayout::new(state.buffer.text(), width);
   let (line, _) = layout.position(state.buffer.cursor(), state.visual_line);
@@ -151,6 +204,13 @@ pub(super) fn move_line_edge(state: &mut TextInputState, width: usize, end: bool
   state.visual_line = Some(line);
 }
 
+/// Resolve a terminal point to the nearest text cursor boundary.
+///
+/// # Arguments
+///
+/// * `state` - The state.
+/// * `x` - The horizontal coordinate in terminal cells.
+/// * `y` - The vertical coordinate in terminal cells.
 pub(super) fn cursor_from_point(state: &TextInputState, x: u16, y: u16) -> (usize, usize) {
   let hit = state.hit.unwrap();
   let layout = VisualLayout::new(state.buffer.text(), hit.width);

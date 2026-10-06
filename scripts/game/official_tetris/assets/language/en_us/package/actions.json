@@ -1,0 +1,16 @@
+{
+  "actions.exit": "Exit Game",
+  "actions.rotate_clockwise": "Rotate Clockwise",
+  "actions.rotate_counterclockwise": "Rotate Counterclockwise",
+  "actions.move_left": "Move Left",
+  "actions.move_right": "Move Right",
+  "actions.soft_drop": "Soft Drop",
+  "actions.hard_drop": "Hard Drop",
+  "actions.start": "Start / Resume",
+  "actions.restart": "Restart",
+  "actions.pause": "Pause",
+  "actions.switch_mode": "Switch Mode",
+  "actions.normal_mode": "Normal Mode",
+  "actions.challenge_mode": "Challenge Mode",
+  "actions.landing_preview": "Landing Preview"
+}

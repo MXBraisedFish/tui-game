@@ -1,12 +1,30 @@
+//! Bounded conversion between Lua values and structured serialization data.
+
 use std::collections::{BTreeMap, HashSet};
 
-use mlua::{Lua, Table, Value};
+use mlua::{Lua, Table, UserData, Value};
 
 use super::super::{args, readonly};
 
 const MAX_DEPTH: usize = 32;
 const MAX_NODES: usize = 16_384;
 
+/// The explicit Lua value used to preserve nested serialized nulls.
+pub(super) struct NullSentinel;
+
+impl UserData for NullSentinel {}
+
+/// Report whether the Lua value is the serialization null sentinel.
+pub(super) fn is_null_sentinel(value: &Value) -> bool {
+  matches!(value, Value::UserData(value) if value.is::<NullSentinel>())
+}
+
+/// Convert a Lua value into JSON-compatible data while preserving explicit nested nulls.
+///
+/// # Errors
+///
+/// Return a Lua conversion error for unsupported value types, cycles, invalid table keys,
+/// non-finite numbers, or conversion-budget exhaustion.
 pub(super) fn lua_to_json(value: Value, method: &str) -> mlua::Result<serde_json::Value> {
   let mut seen = HashSet::new();
   let mut nodes = 0;
@@ -41,6 +59,7 @@ fn encode(
         .map_err(|_| args::message(method, "text formats require valid UTF-8 strings"))?
         .to_string(),
     )),
+    Value::UserData(value) if value.is::<NullSentinel>() => Ok(serde_json::Value::Null),
     Value::Table(table) => encode_table(table, method, depth, nodes, seen),
     value => Err(args::message(
       method,
@@ -119,15 +138,30 @@ fn encode_table(
   result
 }
 
+/// Convert JSON-compatible data into Lua values, representing nested nulls with the sentinel.
+///
+/// # Arguments
+///
+/// * `lua` - The Lua VM in which values and callbacks are created.
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `null` - The null.
+///
+/// # Errors
+///
+/// Return a Lua conversion error when nesting or node-count limits are exceeded; propagate Lua
+/// allocation and table-construction errors.
 pub(super) fn json_to_lua(
   lua: &Lua,
   value: &serde_json::Value,
   method: &str,
+  null: &Value,
 ) -> mlua::Result<Value> {
   fn decode(
     lua: &Lua,
     value: &serde_json::Value,
     method: &str,
+    null: &Value,
     depth: usize,
     nodes: &mut usize,
   ) -> mlua::Result<Value> {
@@ -136,7 +170,7 @@ pub(super) fn json_to_lua(
       return Err(args::message(method, "decoded value exceeds safety limits"));
     }
     match value {
-      serde_json::Value::Null => Ok(Value::Nil),
+      serde_json::Value::Null => Ok(null.clone()),
       serde_json::Value::Bool(value) => Ok(Value::Boolean(*value)),
       serde_json::Value::Number(value) => {
         if let Some(value) = value.as_i64() {
@@ -153,27 +187,44 @@ pub(super) fn json_to_lua(
       serde_json::Value::Array(values) => {
         let table = lua.create_table_with_capacity(values.len(), 0)?;
         for (index, value) in values.iter().enumerate() {
-          table.raw_set(index + 1, decode(lua, value, method, depth + 1, nodes)?)?;
+          table.raw_set(
+            index + 1,
+            decode(lua, value, method, null, depth + 1, nodes)?,
+          )?;
         }
         Ok(Value::Table(table))
       }
       serde_json::Value::Object(values) => {
         let table = lua.create_table_with_capacity(0, values.len())?;
         for (key, value) in values {
-          table.raw_set(key.as_str(), decode(lua, value, method, depth + 1, nodes)?)?;
+          table.raw_set(
+            key.as_str(),
+            decode(lua, value, method, null, depth + 1, nodes)?,
+          )?;
         }
         Ok(Value::Table(table))
       }
     }
   }
-  decode(lua, value, method, 0, &mut 0)
+  decode(lua, value, method, null, 0, &mut 0)
 }
 
+/// Read a required serialization text argument within the configured byte limit.
+///
+/// # Errors
+///
+/// Return a Lua argument error for missing or non-text input or input beyond the serialization
+/// byte limit.
 pub(super) fn text_argument(values: mlua::MultiValue, method: &str) -> mlua::Result<String> {
-  let value = args::one(method, "s", values)?;
-  args::string(value, method, "s")
+  let value = args::one(method, "text", values)?;
+  args::string(value, method, "text")
 }
 
+/// Validate a serialization text payload against its byte limit.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the text exceeds the accepted byte limit.
 pub(super) fn bounded_text(method: &str, value: String) -> mlua::Result<String> {
   if value.len() > args::MAX_API_STRING_BYTES {
     Err(args::message(method, "serialized output exceeds 1 MiB"))

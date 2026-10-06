@@ -1,3 +1,5 @@
+//! Pointer hit regions resolved against the surface used for drawing.
+
 mod state;
 mod types;
 
@@ -10,16 +12,17 @@ use tg_core_input::{MouseButton, MouseEvent, MouseEventKind};
 use tg_service_canvas::CanvasService;
 use tg_service_layout::Rect;
 
-/// 点击区域服务，管理鼠标交互区域
+/// The public entry point for hit area operations.
 #[derive(Default)]
 pub struct HitAreaService;
 
 impl HitAreaService {
+  /// Create a hit area service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
-  /// 创建一个新的点击区域
+  /// Create an owned hit area object and return its identity.
   pub fn create(&self, pool: &mut UiObjectPool, options: HitAreaOptions) -> HitAreaId {
     let id = HitAreaId(pool.hit_areas.next_id);
     pool.hit_areas.next_id += 1;
@@ -30,7 +33,7 @@ impl HitAreaService {
     id
   }
 
-  /// 移除一个点击区域
+  /// Remove the identified widget object and release its owned state.
   pub fn remove(&self, pool: &mut UiObjectPool, id: HitAreaId) -> bool {
     if pool.hit_areas.areas.remove(&id).is_none() {
       return false;
@@ -43,17 +46,23 @@ impl HitAreaService {
     true
   }
 
-  /// 检查点击区域是否存在
+  /// Report whether the identified widget object is still present.
   pub fn exists(&self, pool: &UiObjectPool, id: HitAreaId) -> bool {
     pool.hit_areas.areas.contains_key(&id)
   }
 
-  /// 检查点击区域是否被悬停
+  /// Report whether the addressed object is hovered.
   pub fn is_hovered(&self, pool: &UiObjectPool, id: HitAreaId) -> bool {
     pool.hit_areas.areas.contains_key(&id) && pool.hit_areas.hovered == Some(id)
   }
 
-  /// 检查指定按键的点击区域是否被按下
+  /// Report whether the addressed object is pressed.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `button` - The mouse button to query.
   pub fn is_pressed(&self, pool: &UiObjectPool, id: HitAreaId, button: MouseButton) -> bool {
     pool
       .hit_areas
@@ -62,12 +71,12 @@ impl HitAreaService {
       .is_some_and(|pressed| pressed.id == id)
   }
 
-  /// 获取当前指针在视口内的位置
+  /// Return the current pointer location in developer-viewport coordinates.
   pub fn pointer_position(&self, pool: &UiObjectPool) -> Option<(u16, u16)> {
     pool.hit_areas.pointer
   }
 
-  /// 获取指针在指定点击区域内的本地坐标
+  /// Return the pointer coordinates relative to the identified hit region.
   pub fn local_pointer_position(&self, pool: &UiObjectPool, id: HitAreaId) -> Option<(u16, u16)> {
     let (x, y) = pool.hit_areas.physical_pointer?;
     let hit = pool.hit_areas.areas.get(&id)?.hit?;
@@ -77,7 +86,14 @@ impl HitAreaService {
       .then(|| (x - hit.rect.x, y - hit.rect.y))
   }
 
-  /// 渲染点击区域的基础命中矩形
+  /// Render the hit area service into its requested terminal-cell surface.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render(
     &self,
     pool: &mut UiObjectPool,
@@ -88,7 +104,15 @@ impl HitAreaService {
     self.render_resolved(pool, id, canvas.base_hit_rect(rect))
   }
 
-  /// 在指定切片上渲染点击区域的命中矩形
+  /// Render the component into the identified clipped slice and update its interaction geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `slice` - The slice.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render_on(
     &self,
     pool: &mut UiObjectPool,
@@ -100,6 +124,14 @@ impl HitAreaService {
     self.render_resolved(pool, id, canvas.slice_hit_rect(slice, rect))
   }
 
+  /// Render the component into the physical host surface and update its interaction geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render_host(
     &self,
     pool: &mut UiObjectPool,
@@ -114,7 +146,7 @@ impl HitAreaService {
     &self,
     pool: &mut UiObjectPool,
     id: HitAreaId,
-    resolved: Option<(Rect, (u16, u16), usize)>,
+    resolved: Option<(Rect, (i32, i32), usize)>,
   ) -> bool {
     if !pool.hit_areas.areas.contains_key(&id) {
       return false;
@@ -130,6 +162,14 @@ impl HitAreaService {
     true
   }
 
+  /// Route a pointer event through the component's current hit regions and focus state.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `text_input` - The text input.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `event` - The event to apply or route.
   pub fn route_mouse_event(
     &self,
     pool: &mut UiObjectPool,
@@ -229,6 +269,7 @@ impl HitAreaService {
     }
   }
 
+  /// Clear pressed and hovered state after terminal focus is lost.
   pub fn focus_lost(&self, pool: &mut UiObjectPool) {
     if let (Some(id), Some((x, y))) = (
       pool.hit_areas.hovered.take(),
@@ -240,6 +281,7 @@ impl HitAreaService {
     pool.hit_areas.pressed.clear();
   }
 
+  /// Clear the component's active pointer state when its surface loses input ownership.
   pub fn deactivate(&self, pool: &mut UiObjectPool) {
     pool.hit_areas.hovered = None;
     pool.hit_areas.pressed.clear();
@@ -288,14 +330,17 @@ impl HitAreaService {
   }
 }
 
-// 计算相对于点击区域原点（切片偏移）的本地坐标
 fn event_point(pool: &UiObjectPool, id: HitAreaId, x: u16, y: u16) -> (u16, u16) {
   pool.hit_areas.areas[&id]
     .hit
     .map(|hit| {
       (
-        x.saturating_sub(hit.origin.0),
-        y.saturating_sub(hit.origin.1),
+        i32::from(x)
+          .saturating_sub(hit.origin.0)
+          .clamp(0, i32::from(u16::MAX)) as u16,
+        i32::from(y)
+          .saturating_sub(hit.origin.1)
+          .clamp(0, i32::from(u16::MAX)) as u16,
       )
     })
     .unwrap_or((x, y))
@@ -476,6 +521,53 @@ mod tests {
       service.local_pointer_position(&pool, slice_area),
       Some((0, 0))
     );
+  }
+
+  #[test]
+  fn negative_slice_hit_uses_the_original_slice_coordinates() {
+    let service = HitAreaService::new();
+    let slices = SliceService::new();
+    let mut text_input = TextInputService::new();
+    let mut pool = UiObjectPool::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(12, 6);
+    let slice = slices
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: SliceRect {
+            x: 0,
+            y: 0,
+            width: SliceLength::Fixed(10),
+            height: SliceLength::Fixed(2),
+          },
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    assert!(slices.draw(&mut pool, slice, -4, 1));
+    let area = service.create(&mut pool, HitAreaOptions::default());
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    pool.prepare_canvas(&mut canvas, &layout);
+    service.render_on(&mut pool, area, slice, rect(0, 0, 10, 2), &canvas);
+
+    service.route_mouse_event(
+      &mut pool,
+      &mut text_input,
+      &canvas,
+      mouse(MouseEventKind::Move, None, 0, 1),
+    );
+
+    assert_eq!(
+      events(&mut pool),
+      vec![UiEvent::HitArea(HitAreaEvent::HoverEnter {
+        id: area,
+        x: 4,
+        y: 0,
+      })]
+    );
+    assert_eq!(service.local_pointer_position(&pool, area), Some((0, 0)));
   }
 
   #[test]

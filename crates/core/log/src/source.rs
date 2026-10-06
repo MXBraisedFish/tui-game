@@ -1,28 +1,48 @@
+//! Log subsystem categories and their lifecycle phases.
+
 use super::LogPhase;
 
-/// Log source category that identifies the subsystem producing an entry.
+/// The producing subsystem and its associated log phase.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogSource {
+  /// Content originating from engine.
   Engine,
+  /// Content originating from boot.
   Boot,
+  /// Content originating from runtime.
   Runtime,
+  /// Content originating from shutdown.
   Shutdown,
+  /// Content originating from terminal.
   Terminal,
+  /// Content originating from render.
   Render,
+  /// Content originating from input.
   Input,
+  /// Content originating from storage.
   Storage,
+  /// Content originating from audio.
   Audio,
+  /// Content originating from pack.
   Pack,
+  /// Content originating from lua.
   Lua,
+  /// Content originating from game.
   Game,
+  /// Content originating from screensaver.
   Screensaver,
+  /// Content originating from overlay.
   Overlay,
+  /// Content originating from ui.
   Ui,
+  /// Content originating from crash.
   Crash,
+  /// Content originating from i18n.
   I18n,
 }
 
 impl LogSource {
+  /// Return the localized phase label, falling back to its embedded English spelling.
   pub fn phase(self) -> LogPhase {
     match self {
       Self::Boot => LogPhase::Boot,
@@ -32,6 +52,7 @@ impl LogSource {
     }
   }
 
+  /// Return the stable string key for this log source.
   pub fn key(self) -> &'static str {
     match self {
       Self::Engine => "log.service.engine",
@@ -54,6 +75,7 @@ impl LogSource {
     }
   }
 
+  /// Return the embedded English label for this log source.
   pub fn default_label(self) -> &'static str {
     match self {
       Self::Engine => "Engine",

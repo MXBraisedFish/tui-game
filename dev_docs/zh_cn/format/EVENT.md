@@ -2,9 +2,11 @@
 
 ## 前言
 
-为保证程序与脚本之间能够以非阻断的方式持续循环运行，程序会将输入、状态变化和异步操作结果以事件的形式传递给脚本处理。未注册专用回调时，事件由 `HandleEvent` 接收。
+为保证程序与脚本之间能够以非阻断的方式持续循环运行，程序会将输入、状态变化和异步操作结果以事件的形式传递给脚本处理。当前生产事件由 `HandleEvent` 接收。
 
 这些事件遵循统一的结构，即事件协议。本文档详细说明各类事件的结构、发送条件和使用示例。
+
+本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；timer 已开放，支持指定 callback；animation、audio、network 和 widget 事件不能仅凭本页结构示例视为已经实现。
 
 ---
 
@@ -16,6 +18,7 @@
 | 类型事件结构      | 各类事件的数据结构               | [类型事件结构](#类型事件结构)       |
 | `action`          | 游戏动作触发事件                 | [action](#action)                   |
 | `key`             | 原始按键触发事件                 | [key](#key)                         |
+| `input`           | 终端提交的文字                   | [input](#input)                     |
 | `mouse`           | 使用鼠标触发的事件               | [mouse](#mouse)                     |
 | `resize`          | Base 画布尺寸变化事件            | [resize](#resize)                   |
 | `focus`           | 终端焦点变化事件                 | [focus](#focus)                     |
@@ -58,7 +61,7 @@
 | `frame`    | integer | 事件进入 Lua 事件队列时的宿主帧序号 |
 | `data`     | table   | 事件数据，无额外数据时为空表        |
 
-### 额外说明
+## 额外说明
 
 - 相邻事件的 `sequence` 不一定连续，事件经过会话过滤后可能出现跳号。
 - `frame` 不等同于游戏自行维护的帧号，也不表示脚本处理事件时的帧号。
@@ -79,19 +82,21 @@
 - 错误码包含以下固定值：
 
 ```lua
-"invalid_request"
-"permission_denied"
-"not_found"
-"too_large"
-"invalid_utf8"
-"cancelled"
-"timeout"
-"io"
-"network"
-"unsupported"
-"decode"
-"backend_unavailable"
-"internal"
+local error_codes = {
+  "invalid_request",
+  "permission_denied",
+  "not_found",
+  "too_large",
+  "invalid_utf8",
+  "cancelled",
+  "timeout",
+  "io",
+  "network",
+  "unsupported",
+  "decode",
+  "backend_unavailable",
+  "internal",
+}
 ```
 
 ---
@@ -123,14 +128,14 @@
 
 ### 发送条件
 
-玩家按下、持续按住或松开按键，且输入命中游戏包的动作映射时，发送给游戏会话。宿主先处理全局按键，剩余输入才转换为动作事件；覆盖屏接管交互期间不发送。
+玩家按下、持续按住或松开按键，且输入命中游戏包的动作映射时，发送给游戏会话。宿主先执行全局快捷键行为，全部命中动作按优先级派发；默认接收，可用 keyboard.reject_action_event 关闭。覆盖屏期间不发送普通动作，但已交付活动输入的收尾 released 仍会交付。
 
 ### 示例
 
 ```lua
 function HandleEvent(event)
   if event.type == "action" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -174,17 +179,19 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `state` 包含以下固定值：
 
 ```lua
 "pressed"  -- 当前帧按下按键
-"held"     -- 当前帧持续按住按键
+"held"     -- pressed 后下一宿主帧仍有效时发送一次，不逐帧重复
 "released" -- 当前帧松开按键
 ```
 
-- 覆盖屏出现后，尚未投递的交互事件会被清理，避免宿主输入继续传递给游戏。
+- 优先级规则：宿主层优先，各层 priority 降序，同值按实际命中组合键优先，再按注册顺序。游戏以 actions.json 声明顺序注册，所有命中动作均发送。备选绑定按任意一个有效合并，最后一个结束才释放。
+- 同帧快速点按保留 pressed/released；自动重复按下被过滤。失焦、首个覆盖屏接管、拒收或映射更新会作废未交付普通输入，已交付活动输入补发一次 released。恢复等待旧键松开后的新按下。
+- 持续移动请在 HandleEvent 中保存按住状态，在 Update 中处理，不依赖 held 逐帧发送。
 
 ---
 
@@ -211,14 +218,14 @@ end
 
 ### 发送条件
 
-玩家按下、持续按住或松开按键后发送。
+游戏调用 keyboard.receive_key_event() 后接收规范化原始键状态变化，默认关闭；屏保不接收。每次键变化先发送 key，再发送对应有序 action。
 
 ### 示例
 
 ```lua
 function HandleEvent(event)
   if event.type == "key" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -262,15 +269,33 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `state` 包含以下固定值：
 
 ```lua
 "pressed"  -- 当前帧按下按键
-"held"     -- 当前帧持续按住按键
+"held"     -- pressed 后下一宿主帧仍有效时发送一次，不逐帧重复
 "released" -- 当前帧松开按键
 ```
+
+- key 保留左右修饰键、数字小键盘和未知键表示，不表示输入法文字。可以观察宿主快捷键但不能阻止宿主，仍受焦点和覆盖屏归属限制；对应 reject 和失焦会为已交付活动键收尾一次。
+
+---
+
+## `input`
+
+接收终端提交的文字。游戏通过 ime.receive_input_event() 开启接收，默认关闭，屏保不接收。
+
+```lua
+{type = "input", data = {text = "你好"}}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| text | string | 提交的文字，包括普通字符和粘贴内容 |
+
+不包含输入法候选词或未提交文字。终端失焦、覆盖屏或程序输入框接管时不向游戏投递；ime.reject_input_event() 会作废尚未交付的文字。
 
 ---
 
@@ -306,7 +331,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "mouse" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -330,7 +355,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 包含以下固定值：
 
@@ -396,7 +421,7 @@ Base 画布尺寸变化事件。
 ```lua
 function HandleEvent(event)
   if event.type == "resize" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -418,7 +443,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 宿主会分别换算游戏和屏保的 Base 画布尺寸，事件中的宽高不直接代表物理终端尺寸。
 - 尚未处理的多个 `resize` 事件只保留最新尺寸。
@@ -454,7 +479,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "focus" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -475,10 +500,10 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `gained` 为 `true` 时表示获得焦点，为 `false` 时表示失去焦点。
-- 失去焦点不会额外生成所有动作的 `released` 事件。游戏应在 `gained == false` 时清理自行保存的输入状态。
+- 失去焦点时，实际已交付且尚未释放的 action 和 key 会先补发一次 released，再发送 focus(false)；未交付 pressed 不产生孤立 released。
 - 焦点事件不会合并。
 
 ---
@@ -509,7 +534,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "overlay_started" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -527,7 +552,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - `data` 固定为空表。
 - 覆盖屏包括截屏模式、尺寸提醒和屏保等使用同一覆盖屏栈的界面。
@@ -563,7 +588,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "overlay_stopped" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -581,7 +606,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - `data` 固定为空表。
 - 移除顶层覆盖屏后，如果栈内仍存在其他覆盖屏，不会发送此事件。
@@ -591,7 +616,7 @@ end
 
 ## `timer`
 
-计时器触发或结束事件。
+计时器到时后的通知。
 
 ### 结构
 
@@ -599,76 +624,55 @@ end
 {
   type = "timer",
   data = {
-    id = ...,              -- integer
-    timer_kind = ...,      -- string
+    id = ...,              -- string
+    timer_kind = "timer",  -- string
     kind = ...,            -- string
-    executed_count = ...,  -- integer / nil
+    executed_count = ...,  -- integer
+    tip = ...,             -- string / nil
   },
 }
 ```
 
-| 字段             | 类型          | 说明                                         |
-| ---------------- | ------------- | -------------------------------------------- |
-| `id`             | integer       | 当前会话内的计时器 ID                        |
-| `timer_kind`     | string        | 计时器类型                                   |
-| `kind`           | string        | 计时器事件类型                               |
-| `executed_count` | integer / nil | 重复计时器事件中出现，表示已经完成的触发次数 |
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 与 timer.create 返回的 ID 相同 |
+| `timer_kind` | string | 当前为 timer |
+| `kind` | string | 非末次触发为 tick，末次为 finished |
+| `executed_count` | integer | 已触发的次数，从 1 开始 |
+| `tip` | string / nil | 创建或修改时填写的自定义文字 |
 
 ### 发送条件
 
-计时器触发、计时结束或休眠请求完成时，发送给创建该计时器或请求的游戏、屏保会话。
+计时到期时，发送给创建计时器的游戏或屏保脚本。
 
 ### 示例
 
 ```lua
+function Init(ctx)
+  local id = timer.create(1, {tip = "到时间了"})
+  timer.start(id)
+end
+
 function HandleEvent(event)
   if event.type == "timer" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
 
 输出：
 
-> X 为占位符
-
 ```lua
-{
-  type = "timer",
-  frame = X,
-  sequence = X,
-  data =
-  {
-    id = 1,
-    timer_kind = "repeat",
-    kind = "tick",
-    executed_count = 3,
-  },
-}
 ```
 
-### 额外补充
+## 额外补充
 
-- 字段 `timer_kind` 包含以下固定值：
-
-```lua
-"timer"  -- 计时器
-"delay"  -- 延迟计时器
-"repeat" -- 重复计时器
-"sleep"  -- 休眠请求
-```
-
-- 字段 `kind` 包含以下固定值：
-
-```lua
-"tick"     -- 重复计时器触发一次
-"finished" -- 计时或休眠结束
-```
-
-- `timer`、`delay`、`sleep` 只产生一次 `finished` 事件。
-- `repeat` 每次触发时产生 `tick`，结束时产生 `finished`；这两种事件都会携带 `executed_count`。
-- 一次性计时器的终态回调在投递后回收，重复计时器的回调保留至结束或取消。
-- 计时器事件不会合并。
+- 当前 timer 库的每次触发只产生一次事件：非末次为 tick，末次为 finished；无限循环只产生 tick。
+- 提供 callback 时只调用它，否则交给 HandleEvent；结束后保留对象和回调，便于重启。
+- 每个计时器每帧最多触发一次；投递上限为每帧 128 条，待处理上限 1024 条。
+- 暂停、重置、重启、修改、删除或清空计时器会让尚未投递的旧事件失效。
+- delay、repeat、sleep 为预留类型，没有对应的脚本 API。
+- 查看⌊[计时器事件](../EVENT.md#41-timer)⌉与⌊[timer 库](../api/timer.md)⌉。
 
 ---
 
@@ -682,7 +686,7 @@ end
 {
   type = "animation",
   data = {
-    id = ...,         -- integer
+    id = ...,         -- string
     kind = ...,       -- string
     name = ...,       -- string / nil
     completed = ...,  -- integer / nil
@@ -692,7 +696,7 @@ end
 
 | 字段        | 类型          | 说明                                   |
 | ----------- | ------------- | -------------------------------------- |
-| `id`        | integer       | 当前会话内的动画 ID                    |
+| `id`        | string        | 当前会话内的动画 ID                    |
 | `kind`      | string        | 动画事件类型                           |
 | `name`      | string / nil  | 标记事件中出现，表示当前触发的标记名称 |
 | `completed` | integer / nil | 循环事件中出现，表示已经完成的循环次数 |
@@ -706,7 +710,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "animation" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -722,14 +726,14 @@ end
   sequence = X,
   data =
   {
-    id = 2,
+    id = "2",
     kind = "marker",
     name = "impact",
   },
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 包含以下固定值：
 
@@ -757,7 +761,7 @@ end
 {
   type = "file",
   data = {
-    request_id = ...,  -- integer
+    request_id = ...,  -- string
     kind = ...,        -- string
     path = ...,        -- string
     tip = ...,         -- string / nil
@@ -772,7 +776,7 @@ end
 
 | 字段         | 类型         | 说明                                                |
 | ------------ | ------------ | --------------------------------------------------- |
-| `request_id` | integer      | 当前会话内的请求 ID                                 |
+| `request_id` | string       | 当前会话内的请求 ID                                 |
 | `kind`       | string       | 文件操作类型                                        |
 | `path`       | string       | 调用方可见的虚拟相对路径                            |
 | `tip`        | string / nil | 请求传入 event_tip 时出现，原样返回调用方的事件标记 |
@@ -791,7 +795,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "file" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -807,7 +811,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 4,
+    request_id = "4",
     kind = "read_text",
     path = "config/state.txt",
     tip = "load_state",
@@ -822,7 +826,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 5,
+    request_id = "5",
     kind = "create_dir",
     path = "save/slot-a",
     tip = "create_slot",
@@ -836,7 +840,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 6,
+    request_id = "6",
     kind = "remove",
     path = "save/slot-a",
     tip = "remove_slot",
@@ -845,7 +849,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 包含以下固定值：
 
@@ -893,7 +897,7 @@ end
 {
   type = "image",
   data = {
-    request_id = ...,  -- integer
+    request_id = ...,  -- string
     kind = ...,        -- string
     ok = ...,          -- boolean
     output = ...,      -- string / nil
@@ -902,13 +906,13 @@ end
 }
 ```
 
-| 字段         | 类型         | 说明                                         |
-| ------------ | ------------ | -------------------------------------------- |
-| `request_id` | integer      | 当前会话内的请求 ID                          |
-| `kind`       | string       | 图片操作类型                                 |
-| `ok`         | boolean      | 转换是否成功                                 |
-| `output`     | string / nil | 转换成功时出现，表示转换结果的虚拟标识或路径 |
-| `error`      | table / nil  | 转换失败时出现，包含通用错误码和错误说明     |
+| 字段         | 类型         | 说明                                                                  |
+| ------------ | ------------ | --------------------------------------------------------------------- |
+| `request_id` | string       | 当前会话内的请求 ID                                                   |
+| `kind`       | string       | 图片操作类型                                                          |
+| `ok`         | boolean      | 转换是否成功                                                          |
+| `output`     | string / nil | 转换成功时出现，表示可直接交给 `draw.text(x, y, output)` 的终端富文本 |
+| `error`      | table / nil  | 转换失败时出现，包含通用错误码和错误说明                              |
 
 ### 发送条件
 
@@ -919,7 +923,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "image" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -935,18 +939,18 @@ end
   sequence = X,
   data =
   {
-    request_id = 5,
+    request_id = "5",
     kind = "convert",
     ok = true,
-    output = "converted-image-id",
+    output = "f%<bg:#000000><fg:#ffffff>▅",
   },
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 固定为 `"convert"`。
-- 转换成功时携带 `output`；转换失败时携带 `error`，两者不会同时出现。
+- 转换成功时携带可绘制的 `f%...` 富文本 `output`；转换失败时携带 `error`，两者不会同时出现。
 - 图片转换的终态事件不会合并。
 
 ---
@@ -961,7 +965,7 @@ end
 {
   type = "network",
   data = {
-    request_id = ...,  -- integer
+    request_id = ...,  -- string
     kind = ...,        -- string
     url = ...,         -- string
     ok = ...,          -- boolean
@@ -977,7 +981,7 @@ end
 
 | 字段         | 类型          | 说明                                              |
 | ------------ | ------------- | ------------------------------------------------- |
-| `request_id` | integer       | 当前会话内的请求 ID                               |
+| `request_id` | string        | 当前会话内的请求 ID                               |
 | `kind`       | string        | 网络请求类型                                      |
 | `url`        | string        | 原始规范化 URL                                    |
 | `ok`         | boolean       | 请求是否正常完成                                  |
@@ -997,7 +1001,7 @@ GET 或 POST 请求产生最终结果时，发送给登记该请求的游戏、�
 ```lua
 function HandleEvent(event)
   if event.type == "network" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1013,7 +1017,7 @@ end
   sequence = X,
   data =
   {
-    request_id = 6,
+    request_id = "6",
     kind = "get",
     url = "https://example.com/data",
     ok = true,
@@ -1025,7 +1029,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 包含以下固定值：
 
@@ -1053,8 +1057,10 @@ end
 {
   type = "i18n",
   data = {
+    request_id = ...,              -- string
     kind = ...,                    -- string
     ok = ...,                      -- boolean
+    warning = ...,                 -- string / nil
     message = ...,                 -- string
     language_code = ...,           -- string
     callback_language_code = ...,  -- string
@@ -1062,24 +1068,26 @@ end
 }
 ```
 
-| 字段                     | 类型    | 说明                                                             |
-| ------------------------ | ------- | ---------------------------------------------------------------- |
-| `kind`                   | string  | 语言加载事件类型                                                 |
-| `ok`                     | boolean | 本次语言加载是否成功                                             |
-| `message`                | string  | 经过净化的加载结果说明                                           |
-| `language_code`          | string  | 成功时为实际加载的主语言或备用语言代码，失败时为请求的主语言代码 |
-| `callback_language_code` | string  | 本次请求使用的备用语言代码                                       |
+| 字段                     | 类型         | 说明                                                                         |
+| ------------------------ | ------------ | ---------------------------------------------------------------------------- |
+| `request_id`             | string       | 与 `i18n.create(options)` 或 `i18n.reload(options)` 返回的会话内请求 ID 相同 |
+| `kind`                   | string       | 语言加载事件类型                                                             |
+| `ok`                     | boolean      | 本次语言加载是否成功                                                         |
+| `message`                | string       | 经过净化的加载结果说明                                                       |
+| `warning`                | string / nil | 首选语言或回退语言缺少目录、JSON 时的提示；无警告时为 nil                    |
+| `language_code`          | string       | 请求指定的首选语言代码，缺失时也不切换为回退代码                             |
+| `callback_language_code` | string       | 本次请求使用的备用语言代码                                                   |
 
 ### 发送条件
 
-调用 `i18n.create {}` 或 `i18n.reload {}` 后，包语言文件异步加载结束时，发送给发起请求的游戏、屏保会话。
+调用 `i18n.create(options)` 或 `i18n.reload(options)` 并成功入队后，包语言文件异步加载结束时，发送给发起请求的游戏、屏保会话；`data.request_id` 与调用立即返回的 ID 相同。
 
 ### 示例
 
 ```lua
 function HandleEvent(event)
   if event.type == "i18n" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1095,6 +1103,7 @@ end
   sequence = X,
   data =
   {
+    request_id = X,
     kind = "created",
     ok = true,
     message = "i18n instance created",
@@ -1104,7 +1113,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 包含以下固定值：
 
@@ -1113,10 +1122,12 @@ end
 "reloaded" -- reload 请求结束
 ```
 
-- 事件进入 `HandleEvent` 前，宿主已经提交成功加载的语言数据，可立即调用 `i18n.get_value {}` 获取文本。
+- 事件进入 `HandleEvent` 前，宿主已经提交成功加载的语言数据，可立即调用 `i18n.get_value(namespace, key)` 获取文本。
 - 包语言文件从 `assets/language/<language_code>/*.json` 读取，不递归扫描子目录；每个命名空间 JSON 必须是单层对象，所有值必须是字符串。
 - 主语言缺少的命名空间和键由备用语言补齐，已有主语言值不会被覆盖。
-- 两种语言都没有某个键时，`i18n.get_value {}` 使用宿主当前语言的 `language_warning.missing` 文本生成缺失提示。
+- 缺少语言目录或 JSON 时使用空语言，ok 仍为 true；warning 会指出缺少首选语言或回退语言及其代码。无警告时为 nil。
+- 两种语言都没有某个键时，get_value 的末尾选项 callback 指定最终返回文字；省略时使用程序的缺失键提示。
+- 重载成功时替换旧资源，即使新资源为空；真正的加载错误才返回 ok 为 false 并保留旧资源。
 - `message` 不包含绝对路径、系统错误或宿主任务 ID。
 - `reload` 失败时保留上一次成功加载的数据。
 
@@ -1132,7 +1143,7 @@ end
 {
   type = "audio",
   data = {
-    id = ...,           -- integer
+    id = ...,           -- string
     kind = ...,         -- string
     duration_ms = ...,  -- integer / nil
     position_ms = ...,  -- integer / nil
@@ -1143,7 +1154,7 @@ end
 
 | 字段          | 类型          | 说明                                                                        |
 | ------------- | ------------- | --------------------------------------------------------------------------- |
-| `id`          | integer       | 当前会话内的音频对象 ID                                                     |
+| `id`          | string        | 当前会话内的音频对象 ID                                                     |
 | `kind`        | string        | 音频事件类型                                                                |
 | `duration_ms` | integer / nil | ready、finished 事件中出现，表示音频总时长，单位为毫秒                      |
 | `position_ms` | integer / nil | started、paused、resumed、finished 事件中出现，表示当前播放位置，单位为毫秒 |
@@ -1158,7 +1169,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "audio" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1174,14 +1185,14 @@ end
   sequence = X,
   data =
   {
-    id = 7,
+    id = "7",
     kind = "paused",
     position_ms = 530,
   },
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 包含以下固定值：
 
@@ -1213,7 +1224,7 @@ end
 {
   type = "hit_area",
   data = {
-    id = ...,      -- integer
+    id = ...,      -- string
     kind = ...,    -- string
     x = ...,       -- integer
     y = ...,       -- integer
@@ -1226,7 +1237,7 @@ end
 
 | 字段     | 类型          | 说明                                         |
 | -------- | ------------- | -------------------------------------------- |
-| `id`     | integer       | 当前会话内的点击区域 ID                      |
+| `id`     | string        | 当前会话内的点击区域 ID                      |
 | `kind`   | string        | 点击区域事件类型                             |
 | `x`      | integer       | 事件的水平坐标                               |
 | `y`      | integer       | 事件的垂直坐标                               |
@@ -1243,7 +1254,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "hit_area" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1259,7 +1270,7 @@ end
   sequence = X,
   data =
   {
-    id = 8,
+    id = "8",
     kind = "drag",
     x = 30,
     y = 12,
@@ -1270,7 +1281,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 包含以下固定值：
 
@@ -1300,18 +1311,18 @@ end
 {
   type = "hyperlink",
   data = {
-    id = ...,    -- integer
+    id = ...,    -- string
     kind = ...,  -- string
     link = ...,  -- string
   },
 }
 ```
 
-| 字段   | 类型    | 说明                      |
-| ------ | ------- | ------------------------- |
-| `id`   | integer | 当前会话内的超链接对象 ID |
-| `kind` | string  | 超链接事件类型            |
-| `link` | string  | 超链接目标                |
+| 字段   | 类型   | 说明                      |
+| ------ | ------ | ------------------------- |
+| `id`   | string | 当前会话内的超链接对象 ID |
+| `kind` | string | 超链接事件类型            |
+| `link` | string | 超链接目标                |
 
 ### 发送条件
 
@@ -1322,7 +1333,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "hyperlink" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1338,14 +1349,14 @@ end
   sequence = X,
   data =
   {
-    id = 9,
+    id = "9",
     kind = "clicked",
     link = "https://example.com",
   },
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 固定为 `"clicked"`。
 - `link` 表示被点击的超链接目标。
@@ -1362,7 +1373,7 @@ Markdown 文本中的链接点击事件。
 {
   type = "markdown",
   data = {
-    id = ...,    -- integer
+    id = ...,    -- string
     kind = ...,  -- string
     href = ...,  -- string
     text = ...,  -- string
@@ -1370,12 +1381,12 @@ Markdown 文本中的链接点击事件。
 }
 ```
 
-| 字段   | 类型    | 说明                          |
-| ------ | ------- | ----------------------------- |
-| `id`   | integer | 当前会话内的 Markdown 对象 ID |
-| `kind` | string  | Markdown 事件类型             |
-| `href` | string  | 被点击链接的目标              |
-| `text` | string  | 被点击链接的显示文本          |
+| 字段   | 类型   | 说明                          |
+| ------ | ------ | ----------------------------- |
+| `id`   | string | 当前会话内的 Markdown 对象 ID |
+| `kind` | string | Markdown 事件类型             |
+| `href` | string | 被点击链接的目标              |
+| `text` | string | 被点击链接的显示文本          |
 
 ### 发送条件
 
@@ -1386,7 +1397,7 @@ Markdown 文本中的链接点击事件。
 ```lua
 function HandleEvent(event)
   if event.type == "markdown" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1402,7 +1413,7 @@ end
   sequence = X,
   data =
   {
-    id = 10,
+    id = "10",
     kind = "link_clicked",
     href = "guide.md",
     text = "Guide",
@@ -1410,7 +1421,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 固定为 `"link_clicked"`。
 - `href` 表示链接目标，`text` 表示该链接在 Markdown 中显示的文本。
@@ -1427,7 +1438,7 @@ end
 {
   type = "text_input",
   data = {
-    id = ...,     -- integer
+    id = ...,     -- string
     kind = ...,   -- string
     value = ...,  -- string / nil
   },
@@ -1436,7 +1447,7 @@ end
 
 | 字段    | 类型         | 说明                                           |
 | ------- | ------------ | ---------------------------------------------- |
-| `id`    | integer      | 当前会话内的文本输入对象 ID                    |
+| `id`    | string       | 当前会话内的文本输入对象 ID                    |
 | `kind`  | string       | 文本输入事件类型                               |
 | `value` | string / nil | 内容变化、提交或取消时出现，表示当时的文本内容 |
 
@@ -1449,7 +1460,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "text_input" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1465,14 +1476,14 @@ end
   sequence = X,
   data =
   {
-    id = 11,
+    id = "11",
     kind = "changed",
     value = "player",
   },
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 包含以下固定值：
 
@@ -1500,7 +1511,7 @@ end
 {
   type = "scroll_box",
   data = {
-    id = ...,    -- integer
+    id = ...,    -- string
     kind = ...,  -- string
     x = ...,     -- integer
     y = ...,     -- integer
@@ -1510,7 +1521,7 @@ end
 
 | 字段   | 类型    | 说明                  |
 | ------ | ------- | --------------------- |
-| `id`   | integer | 当前会话内的滚动框 ID |
+| `id`   | string  | 当前会话内的滚动框 ID |
 | `kind` | string  | 滚动框事件类型        |
 | `x`    | integer | 当前水平滚动位置      |
 | `y`    | integer | 当前垂直滚动位置      |
@@ -1524,7 +1535,7 @@ end
 ```lua
 function HandleEvent(event)
   if event.type == "scroll_box" then
-    debug.print { message = table.pretty(event) }
+    debug.print(table.pretty(event))
   end
 end
 ```
@@ -1540,7 +1551,7 @@ end
   sequence = X,
   data =
   {
-    id = 12,
+    id = "12",
     kind = "scrolled",
     x = 5,
     y = 20,
@@ -1548,7 +1559,7 @@ end
 }
 ```
 
-### 额外补充
+## 额外补充
 
 - 字段 `kind` 固定为 `"scrolled"`。
 - `x`、`y` 表示当前滚动位置。

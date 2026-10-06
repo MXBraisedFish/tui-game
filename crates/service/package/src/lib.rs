@@ -1,4 +1,14 @@
-//! Package service: scans, validates and hot-reloads game/screensaver package manifests.
+//! Schema-2 package discovery, validated launch snapshots, and background rescans.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_package::PackageService;
+//!
+//! let packages = PackageService::new();
+//! assert_eq!(packages.total_count(), 0);
+//! assert!(packages.game_list().is_empty());
+//! ```
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
@@ -14,7 +24,7 @@ use tg_service_async::AsyncRuntime;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use serde::Deserialize;
+use serde::{Deserialize, de::DeserializeOwned};
 
 pub use tg_core_package_id::{PackageId, PackageSource, PackageType};
 
@@ -31,143 +41,341 @@ const MAX_PACKAGE_MANIFEST_BYTES: usize = 1024 * 1024;
 const MAX_PACKAGE_TEXT_BYTES: usize = 1024 * 1024;
 const MAX_PACKAGE_I18N_BYTES: usize = 1024 * 1024;
 
-/// 包文本字段：普通字符串直接使用，对象形式明确声明纯文本或包内 i18n。
+/// Literal package text or an explicitly declared package translation reference.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PackageText {
+  /// The literal setting for package text.
   Literal(String),
+  /// The i18n setting for package text.
   I18n {
+    /// The filesystem path to read, write, or resolve.
     path: String,
+    /// The lookup key.
     key: String,
+    /// The callback.
     callback: String,
   },
 }
 
-/// 包完整信息
+/// A validated package snapshot including display data, requirements, and launch configuration.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `source` - The package source carried by this package info.
+/// * `dir_name` - The dir name.
+/// * `mod_id` - The validated package name within its source and type.
+/// * `package_type` - Whether the package is a game or screensaver.
+/// * `version` - The version.
+/// * `version_code` - The version code.
+/// * `api_min` - The api min.
+/// * `api_max` - The api max.
+/// * `entry` - The entry.
+/// * `display` - The display.
+/// * `runtime` - The runtime.
+/// * `game` - The game.
+/// * `screensaver` - The screensaver.
+/// * `path` - The filesystem path to read, write, or resolve.
 #[derive(Clone, Debug)]
 pub struct PackageInfo {
+  /// The identifier of the owned object.
   pub id: PackageId,
+  /// The package source carried by this package info.
   pub source: PackageSource,
+  /// The dir name.
   pub dir_name: String,
+  /// The validated package name within its source and type.
   pub mod_id: String,
+  /// Whether the package is a game or screensaver.
   pub package_type: PackageType,
+  /// The version.
   pub version: String,
+  /// The version code.
   pub version_code: u32,
+  /// The api min.
   pub api_min: u32,
+  /// The api max.
   pub api_max: u32,
+  /// The entry.
   pub entry: String,
+  /// The display.
   pub display: PackageDisplay,
+  /// The runtime.
   pub runtime: PackageRuntime,
+  /// The game.
   pub game: Option<GameConfig>,
+  /// The screensaver.
   pub screensaver: Option<ScreensaverConfig>,
+  /// The filesystem path to read, write, or resolve.
   pub path: PathBuf,
   watched_files: Vec<PathBuf>,
 }
 
-/// 面向 UI 列表的轻量包条目快照。
+/// A lightweight package snapshot for UI lists.
+///
+/// # Fields
+///
+/// * `id` - The identifier of the owned object.
+/// * `mod_id` - The validated package name within its source and type.
+/// * `source` - The package source carried by this package list entry.
+/// * `package_type` - Whether the package is a game or screensaver.
+/// * `key_actions` - The key actions indexed by their declared keys.
+/// * `key_default_actions` - The key default actions indexed by their declared keys.
+/// * `title` - The title.
+/// * `game_name` - The game name.
+/// * `screensaver_name` - The screensaver name.
+/// * `game_detail` - The game detail.
+/// * `description` - The description.
+/// * `author` - The author.
+/// * `version` - The version.
+/// * `icon` - The icon.
+/// * `icon_path` - The filesystem path for icon.
+/// * `banner` - The banner.
+/// * `path` - The filesystem path to read, write, or resolve.
+/// * `enabled` - Whether the feature is enabled.
+/// * `debug` - The debug.
+/// * `mouse_required` - The mouse required.
+/// * `truecolor_required` - The truecolor required.
+/// * `supported_languages` - The ordered supported languages retained by this owner.
+/// * `score_enabled` - The score enabled.
+/// * `score_empty_text` - The score empty text.
+/// * `best_string` - The localized best-score template.
+/// * `best_values` - Literal substitutions for the best-score display.
+/// * `min_width` - The min width in terminal columns.
+/// * `min_height` - The min height in terminal rows.
+/// * `screensaver_command` - The screensaver command.
 #[derive(Clone, Debug)]
 pub struct PackageListEntry {
+  /// The identifier of the owned object.
   pub id: PackageId,
+  /// The validated package name within its source and type.
   pub mod_id: String,
+  /// The package source carried by this package list entry.
   pub source: PackageSource,
+  /// Whether the package is a game or screensaver.
   pub package_type: PackageType,
+  /// The key actions indexed by their declared keys.
   pub key_actions: HashMap<String, Vec<Vec<String>>>,
+  /// The key default actions indexed by their declared keys.
   pub key_default_actions: HashMap<String, Vec<Vec<String>>>,
+  /// The title.
   pub title: String,
+  /// The game name.
   pub game_name: String,
+  /// The screensaver name.
   pub screensaver_name: String,
+  /// The game detail.
   pub game_detail: String,
+  /// The description.
   pub description: String,
+  /// The author.
   pub author: String,
+  /// The version.
   pub version: String,
+  /// The icon.
   pub icon: PackageAsset,
+  /// The filesystem path for icon.
   pub icon_path: Option<String>,
+  /// The banner.
   pub banner: PackageAsset,
+  /// The filesystem path to read, write, or resolve.
   pub path: PathBuf,
+  /// Whether the feature is enabled.
   pub enabled: bool,
+  /// The debug.
   pub debug: bool,
+  /// The mouse required.
   pub mouse_required: bool,
+  /// The truecolor required.
   pub truecolor_required: bool,
+  /// The ordered supported languages retained by this owner.
   pub supported_languages: Vec<String>,
+  /// The score enabled.
   pub score_enabled: bool,
+  /// The score empty text.
   pub score_empty_text: String,
+  /// The best string.
   pub best_string: Option<String>,
+  /// Localized literal substitutions for the best-score display only.
+  pub best_values: HashMap<String, String>,
+  /// The min width in terminal columns.
   pub min_width: u32,
+  /// The min height in terminal rows.
   pub min_height: u32,
+  /// The screensaver command.
   pub screensaver_command: String,
 }
 
-/// 包显示信息
+/// The visible package labels, icon, banner, and display asset declarations.
+///
+/// # Fields
+///
+/// * `title` - The title.
+/// * `description` - The description.
+/// * `author` - The author.
+/// * `icon` - The icon.
+/// * `banner` - The banner.
 #[derive(Clone, Debug)]
 pub struct PackageDisplay {
+  /// The title.
   pub title: String,
+  /// The description.
   pub description: String,
+  /// The author.
   pub author: String,
+  /// The icon.
   pub icon: PackageAsset,
+  /// The banner.
   pub banner: PackageAsset,
 }
 
-/// 包展示资源。
+/// A package display resource and its validated rendering configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PackageAsset {
-  Image { path: String },
-  Text { path: String, lines: Vec<String> },
+  /// The image setting for package asset.
+  Image {
+    /// The filesystem path to read, write, or resolve.
+    path: String,
+    /// The package image mode carried by this package asset.
+    mode: PackageImageMode,
+  },
+  /// The text setting for package asset.
+  Text {
+    /// The filesystem path to read, write, or resolve.
+    path: String,
+    /// The ordered lines retained by this owner.
+    lines: Vec<String>,
+  },
+}
+
+/// The image sampling mode declared by a package display asset.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PackageImageMode {
+  /// The half block setting for package image mode.
+  HalfBlock,
+  /// The mix block setting for package image mode.
+  MixBlock,
 }
 
 impl PackageAsset {
+  /// Create the default package-icon asset settings.
   pub fn default_icon() -> Self {
     default_icon_asset()
   }
 
+  /// Create the default package-banner asset settings.
   pub fn default_banner() -> Self {
     default_banner_asset()
   }
 }
 
-/// 包运行时要求
+/// The package-declared terminal size and execution requirements.
+///
+/// # Fields
+///
+/// * `min_width` - The minimum developer-area width in columns; zero imposes no minimum.
+/// * `min_height` - The minimum developer-area height in rows; zero imposes no minimum.
 #[derive(Clone, Debug)]
 pub struct PackageRuntime {
+  /// The minimum developer-area width in columns; zero imposes no minimum.
   pub min_width: u32,
+  /// The minimum developer-area height in rows; zero imposes no minimum.
   pub min_height: u32,
 }
 
-/// 游戏配置
+/// The game's script callbacks, save capabilities, and score configuration.
+///
+/// # Fields
+///
+/// * `name` - The name used to identify the object or field.
+/// * `detail` - The diagnostic detail attached to the fault.
+/// * `command` - The command.
+/// * `mouse` - Whether this package requires terminal pointer support.
+/// * `truecolor` - The truecolor.
+/// * `target_fps` - The requested frame rate, or no explicit limit.
+/// * `save` - The save.
+/// * `supported_languages` - The ordered supported languages retained by this owner.
+/// * `score` - The score.
+/// * `actions` - The actions indexed by their declared keys.
+/// * `action_order` - The ordered action order retained by this owner.
 #[derive(Clone, Debug)]
 pub struct GameConfig {
+  /// The name used to identify the object or field.
   pub name: String,
+  /// The diagnostic detail attached to the fault.
   pub detail: String,
+  /// The command.
+  pub command: String,
+  /// Whether this package requires terminal pointer support.
   pub mouse: bool,
+  /// The truecolor.
   pub truecolor: bool,
-  pub target_fps: u32,
+  /// The requested frame rate, or no explicit limit.
+  pub target_fps: Option<u32>,
+  /// The save.
   pub save: bool,
+  /// The ordered supported languages retained by this owner.
   pub supported_languages: Vec<String>,
+  /// The score.
   pub score: Option<ScoreConfig>,
+  /// The actions indexed by their declared keys.
   pub actions: HashMap<String, ActionConfig>,
+  /// The ordered action order retained by this owner.
   pub action_order: Vec<String>,
 }
 
-/// 分数配置
+/// The enabled best-score behavior and comparison ordering.
+///
+/// # Fields
+///
+/// * `enabled` - Whether the feature is enabled.
+/// * `empty_text` - The empty text.
 #[derive(Clone, Debug)]
 pub struct ScoreConfig {
+  /// Whether the feature is enabled.
   pub enabled: bool,
+  /// The empty text.
   pub empty_text: String,
 }
 
-/// 动作绑定配置
+/// One package action with its label and default shortcut patterns.
+///
+/// # Fields
+///
+/// * `description` - The description.
+/// * `keys` - The ordered keys retained by this owner.
+/// * `lock` - The lock.
+/// * `priority` - The nonnegative dispatch priority; larger values are dispatched first.
 #[derive(Clone, Debug)]
 pub struct ActionConfig {
+  /// The description.
   pub description: String,
+  /// The ordered keys retained by this owner.
   pub keys: Vec<Vec<String>>,
+  /// The lock.
   pub lock: bool,
+  /// The nonnegative dispatch priority; larger values are dispatched first.
+  pub priority: u64,
 }
 
-/// 屏保配置
+/// The screensaver's script and runtime configuration.
+///
+/// # Fields
+///
+/// * `name` - The name used to identify the object or field.
+/// * `truecolor` - The truecolor.
+/// * `command` - The command.
 #[derive(Clone, Debug)]
 pub struct ScreensaverConfig {
+  /// The name used to identify the object or field.
   pub name: String,
+  /// The truecolor.
   pub truecolor: bool,
+  /// The command.
   pub command: String,
 }
 
+/// Validated package metadata retained for discovery and launch.
 #[derive(Clone, Debug, Default)]
 pub struct PackageSnapshot {
   games: Vec<PackageInfo>,
@@ -176,82 +384,176 @@ pub struct PackageSnapshot {
 
 #[derive(Clone, Debug)]
 struct ScanRequest {
+  sequence: u64,
   root: PathBuf,
   language_code: String,
   missing_template: String,
 }
 
+/// The inputs of an asynchronous package operation.
 #[derive(Clone, Debug)]
 pub(crate) enum PackageTask {
+  /// The scan setting for package task.
   Scan(ScanRequest),
 }
 
+/// A package async event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum PackageAsyncEvent {
+  /// A event notification delivered to the owning consumer.
   Event(PackageEvent),
+  /// A scan event notification delivered to the owning consumer.
+  ScanEvent {
+    /// The sequence.
+    sequence: u64,
+    /// The event to apply or route.
+    event: PackageEvent,
+  },
+  /// A watch changed notification delivered to the owning consumer.
   WatchChanged {
+    /// The ordered package dirs retained by this owner.
     package_dirs: Vec<PathBuf>,
   },
+  /// A snapshot ready notification delivered to the owning consumer.
   SnapshotReady {
+    /// The sequence.
+    sequence: u64,
+    /// The snapshot.
     snapshot: PackageSnapshot,
+    /// The finished.
     finished: PackageEvent,
+    /// The ordered watched files retained by this owner.
     watched_files: Vec<PathBuf>,
   },
 }
 
+/// A package event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum PackageEvent {
+  /// A info notification delivered to the owning consumer.
   Info(HostLogMessage),
+  /// A warn notification delivered to the owning consumer.
   Warn(HostLogMessage),
+  /// A package warn notification delivered to the owning consumer.
   PackageWarn {
+    /// The stable source, type, and name of the package.
     package_id: PackageId,
+    /// The diagnostic or display message.
     message: HostLogMessage,
   },
+  /// A diagnostic notification delivered to the owning consumer.
   Diagnostic {
+    /// The stable source, type, and name of the package.
     package_id: Option<PackageId>,
+    /// The diagnostic.
     diagnostic: PackageDiagnostic,
   },
+  /// A loaded notification delivered to the owning consumer.
   Loaded {
+    /// The stable source, type, and name of the package.
     package_id: PackageId,
+    /// The filesystem path for relative package.
     relative_package_path: String,
   },
+  /// A scan started notification delivered to the owning consumer.
   ScanStarted {
+    /// The total.
     total: usize,
   },
+  /// A scan progress notification delivered to the owning consumer.
   ScanProgress {
+    /// The scanned.
     scanned: usize,
+    /// The total.
     total: usize,
   },
+  /// A watch changed notification delivered to the owning consumer.
   WatchChanged {
+    /// The folders.
     folders: usize,
   },
+  /// A scan finished notification delivered to the owning consumer.
   ScanFinished {
+    /// The total.
     total: usize,
+    /// The games.
     games: usize,
+    /// The screensavers.
     screensavers: usize,
+    /// The errors.
     errors: u32,
+    /// The duplicates.
     duplicates: u32,
   },
 }
 
+/// The package diagnostic representation used by this module.
+///
+/// # Fields
+///
+/// * `code` - The stable error or language code.
+/// * `relative_package_path` - The filesystem path for relative package.
+/// * `field_path` - The filesystem path for field.
+/// * `line` - The line.
+/// * `column` - The column.
+/// * `reason` - The reason.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackageDiagnostic {
+  /// The stable error or language code.
   pub code: String,
+  /// The filesystem path for relative package.
   pub relative_package_path: String,
+  /// The filesystem path for field.
   pub field_path: String,
+  /// The line.
   pub line: Option<usize>,
+  /// The column.
   pub column: Option<usize>,
+  /// The reason.
   pub reason: String,
 }
 
 #[derive(Debug)]
 struct PackageReadError {
   code: &'static str,
+  source_file: PackageSourceFile,
   field_path: String,
-  line: Option<usize>,
-  column: Option<usize>,
+  line: Option<u32>,
+  column: Option<u32>,
   reason: String,
   related: Vec<PackageReadError>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PackageSourceFile {
+  Package,
+  Display,
+  Game,
+  Screensaver,
+  Actions,
+}
+
+impl PackageSourceFile {
+  fn from_name(name: &'static str) -> Self {
+    match name {
+      "package.json" => Self::Package,
+      "display.json" => Self::Display,
+      "game.json" => Self::Game,
+      "screensaver.json" => Self::Screensaver,
+      "actions.json" => Self::Actions,
+      _ => panic!("unknown package config file: {name}"),
+    }
+  }
+
+  fn name(self) -> &'static str {
+    match self {
+      Self::Package => "package.json",
+      Self::Display => "display.json",
+      Self::Game => "game.json",
+      Self::Screensaver => "screensaver.json",
+      Self::Actions => "actions.json",
+    }
+  }
 }
 
 impl From<String> for PackageReadError {
@@ -274,12 +576,18 @@ impl PackageReadError {
   fn at(field_path: impl Into<String>, reason: impl Into<String>) -> Self {
     Self {
       code: "semantic",
+      source_file: PackageSourceFile::Package,
       field_path: field_path.into(),
       line: None,
       column: None,
       reason: reason.into(),
       related: Vec::new(),
     }
+  }
+
+  fn in_file(mut self, source_file: &'static str) -> Self {
+    self.source_file = PackageSourceFile::from_name(source_file);
+    self
   }
 
   fn combine(mut errors: Vec<Self>) -> Self {
@@ -290,12 +598,26 @@ impl PackageReadError {
   }
 
   fn into_diagnostics(self, relative_package_path: String) -> Vec<PackageDiagnostic> {
+    let source_file = self.source_file.name();
+    let relative_package_path = if self.source_file == PackageSourceFile::Package {
+      relative_package_path
+    } else {
+      let package_dir = relative_package_path
+        .rsplit_once('/')
+        .map(|(package_dir, _)| package_dir)
+        .unwrap_or("");
+      if package_dir.is_empty() {
+        source_file.to_string()
+      } else {
+        format!("{package_dir}/{source_file}")
+      }
+    };
     let mut diagnostics = vec![PackageDiagnostic {
       code: self.code.to_string(),
       relative_package_path: relative_package_path.clone(),
       field_path: self.field_path,
-      line: self.line,
-      column: self.column,
+      line: self.line.map(|line| line as usize),
+      column: self.column.map(|column| column as usize),
       reason: self.reason,
     }];
     diagnostics.extend(
@@ -322,11 +644,12 @@ struct ScanReport {
   watched_files: Vec<PathBuf>,
 }
 
-/// 包管理服务，负责扫描和加载游戏/屏保包。
+/// The public entry point for package operations.
 #[derive(Default)]
 pub struct PackageService {
   snapshot: PackageSnapshot,
   snapshot_revision: u64,
+  scan_sequence: u64,
   user_game_key_actions: BTreeMap<String, BTreeMap<String, Vec<Vec<String>>>>,
   last_scan: Option<ScanRequest>,
   watcher_thread: Option<ManagedThreadId>,
@@ -338,19 +661,83 @@ enum PackageWatcherCommand {
 }
 
 impl PackageService {
+  /// Create a package service with its initial state.
   pub fn new() -> Self {
     Self::default()
   }
 
+  /// Resolve a saved best-score template and its literal substitutions for the current language.
+  ///
+  /// References use the package's `assets/language/<code>/package/best_string.json` file,
+  /// followed by English and the declared callback. Preserve the original save for language changes.
+  ///
+  /// # Errors
+  ///
+  /// Return an error if the template or any named substitution is not valid package text.
+  pub fn resolve_best_save(
+    &self,
+    package_dir: &Path,
+    data: &serde_json::Value,
+  ) -> Result<(String, HashMap<String, String>), String> {
+    validate_best_save(data)?;
+    let language = self
+      .last_scan
+      .as_ref()
+      .map_or("en_us", |scan| scan.language_code.as_str());
+    let mut resources = HashMap::new();
+    let mut resolve = |value: &serde_json::Value, field: &str| -> Result<String, String> {
+      let value = parse_best_text(value, field)?;
+      match value {
+        RawPackageText::Literal(text) => Ok(text),
+        RawPackageText::Object(value) if value.text_type == "text" => Ok(value.text.unwrap()),
+        RawPackageText::Object(value) => {
+          let key = value.key.unwrap();
+          let translated = [language, "en_us"].into_iter().find_map(|code| {
+            resources
+              .entry(code)
+              .or_insert_with(|| load_package_i18n_values(package_dir, code, "best_string.json"))
+              .as_ref()
+              .and_then(|values| values.get(&key))
+              .cloned()
+          });
+          Ok(translated.unwrap_or_else(|| value.callback.unwrap()))
+        }
+      }
+    };
+    let text = resolve(&data["best_string"], "best_string")?;
+    let mut values = HashMap::new();
+    if let Some(params) = data.get("value").and_then(serde_json::Value::as_object) {
+      for (key, value) in params {
+        values.insert(key.clone(), resolve(value, &format!("value.{key}"))?);
+      }
+    }
+    Ok((text, values))
+  }
+
+  /// Configure package scan language and profile-derived package visibility.
+  ///
+  /// # Arguments
+  ///
+  /// * `root_dir` - The deployment root containing assets, data, and scripts.
+  /// * `language_code` - The registered language code.
+  /// * `missing_template` - The missing template.
   pub fn configure_scan(&mut self, root_dir: &Path, language_code: &str, missing_template: &str) {
     self.last_scan = Some(ScanRequest {
+      sequence: self.scan_sequence,
       root: root_dir.to_path_buf(),
       language_code: language_code.to_string(),
       missing_template: missing_template.to_string(),
     });
   }
 
-  /// 扫描所有目录下的包（官方和模组的游戏与屏保），启动期同步等待完成。
+  /// Scan game and screensaver roots and wait for the initial validated package snapshot.
+  ///
+  /// # Arguments
+  ///
+  /// * `root_dir` - The deployment root containing assets, data, and scripts.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `language_code` - The registered language code.
+  /// * `missing_template` - The missing template.
   pub fn scan_all(
     &mut self,
     root_dir: &Path,
@@ -381,21 +768,22 @@ impl PackageService {
     }
   }
 
-  /// 请求后台重新扫描。热加载后续只需调用这个入口。
+  /// Queue a background package rescan without blocking the host frame.
   pub fn request_rescan<
     E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
   >(
-    &self,
+    &mut self,
     async_runtime: &AsyncRuntime<E>,
   ) -> bool {
-    let Some(request) = self.last_scan.clone() else {
+    let Some(request) = self.prepare_scan_request(None) else {
       return false;
     };
     async_runtime.submit(PackageTask::Scan(request));
     true
   }
 
-  /// 启动 package.json 热更新监听。监听线程只产生事件；快照仍由主线程替换。
+  /// Start the manifest watcher that requests rescans without mutating snapshots off the host
+  /// thread.
   pub fn start_watcher<E>(&mut self, async_runtime: &mut AsyncRuntime<E>) -> bool
   where
     E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
@@ -419,7 +807,13 @@ impl PackageService {
     true
   }
 
-  /// 请求使用指定语言重新扫描。语言切换后调用。
+  /// Queue a package rescan using the selected translation language.
+  ///
+  /// # Arguments
+  ///
+  /// * `async_runtime` - The shared background-task executor.
+  /// * `language_code` - The registered language code.
+  /// * `missing_template` - The missing template.
   pub fn request_rescan_for_language<
     E: From<PackageAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
   >(
@@ -428,71 +822,96 @@ impl PackageService {
     language_code: &str,
     missing_template: &str,
   ) -> bool {
-    let Some(mut request) = self.last_scan.clone() else {
+    let Some(request) = self.prepare_scan_request(Some((language_code, missing_template))) else {
       return false;
     };
-    request.language_code = language_code.to_string();
-    request.missing_template = missing_template.to_string();
-    self.last_scan = Some(request.clone());
     async_runtime.submit(PackageTask::Scan(request));
     true
   }
 
+  fn prepare_scan_request(&mut self, language: Option<(&str, &str)>) -> Option<ScanRequest> {
+    let mut request = self.last_scan.clone()?;
+    let sequence = self.scan_sequence.checked_add(1)?;
+    if let Some((language_code, missing_template)) = language {
+      request.language_code = language_code.to_string();
+      request.missing_template = missing_template.to_string();
+    }
+    request.sequence = sequence;
+    self.scan_sequence = sequence;
+    self.last_scan = Some(request.clone());
+    Some(request)
+  }
+
+  /// Publish a matching completed package snapshot or retain the scan failure diagnostic.
   pub fn handle_async_event(
     &mut self,
     event: PackageAsyncEvent,
     log: &mut LogService,
-  ) -> PackageEvent {
+  ) -> Option<PackageEvent> {
     match event {
       PackageAsyncEvent::Event(event) => {
         log_package_event(log, event.clone());
-        event
+        Some(event)
+      }
+      PackageAsyncEvent::ScanEvent { sequence, event } => {
+        if sequence != self.scan_sequence {
+          return None;
+        }
+        log_package_event(log, event.clone());
+        Some(event)
       }
       PackageAsyncEvent::WatchChanged { package_dirs } => {
         let event = PackageEvent::WatchChanged {
           folders: package_dirs.len(),
         };
         log_package_event(log, event.clone());
-        event
+        Some(event)
       }
       PackageAsyncEvent::SnapshotReady {
+        sequence,
         snapshot,
         finished,
         watched_files,
       } => {
+        if sequence != self.scan_sequence {
+          return None;
+        }
         self.publish_snapshot(snapshot);
         if let Some(tx) = &self.watcher_tx {
           let _ = tx.send(PackageWatcherCommand::SetFiles(watched_files));
         }
         log_package_event(log, finished.clone());
-        finished
+        Some(finished)
       }
     }
   }
 
+  /// Return the current games.
   pub fn games(&self) -> Vec<PackageInfo> {
     self.snapshot.games.clone()
   }
 
-  /// Revision of the currently published package/resource snapshot.
+  /// Return the revision of the currently published package snapshot.
   pub fn snapshot_revision(&self) -> u64 {
     self.snapshot_revision
   }
 
+  /// Return the current screensavers.
   pub fn screensavers(&self) -> Vec<PackageInfo> {
     self.snapshot.screensavers.clone()
   }
 
-  /// 按来源和包 ID 精确查找游戏，避免官方包与模组同名时选错。
+  /// Find a game by its complete source/type/name identity.
   pub fn find_game(&self, source: &PackageSource, mod_id: &str) -> Option<PackageInfo> {
     find_package(&self.snapshot.games, source, mod_id)
   }
 
-  /// 按来源和包 ID 精确查找屏保。
+  /// Find a screensaver by its complete source/type/name identity.
   pub fn find_screensaver(&self, source: &PackageSource, mod_id: &str) -> Option<PackageInfo> {
     find_package(&self.snapshot.screensavers, source, mod_id)
   }
 
+  /// Find a package by its complete stable identity.
   pub fn find_by_id(&self, package_id: &PackageId) -> Option<PackageInfo> {
     let packages = match package_id.package_type {
       PackageType::Game => &self.snapshot.games,
@@ -504,12 +923,22 @@ impl PackageService {
       .cloned()
   }
 
-  /// 启动前重新验证扫描快照，并重新解析入口以抵御热更新或损坏数据。
+  /// Revalidate a scanned package and resolve its current entry immediately before launching it.
+  ///
+  /// # Errors
+  ///
+  /// Return an error when the package files no longer satisfy the schema or its entry cannot be
+  /// resolved safely.
   pub fn validate_for_launch(&self, package: &PackageInfo) -> Result<PathBuf, String> {
     validate_loaded_package(package)?;
     resolve_package_entry_path(package)
   }
 
+  /// Validate the game's action declarations and effective user bindings.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid action names, patterns, key tokens, or effective user bindings.
   pub fn validate_game_action_map(
     &self,
     actions: &HashMap<String, Vec<Vec<String>>>,
@@ -525,12 +954,23 @@ impl PackageService {
     Ok(())
   }
 
-  /// 解析包的实际 Lua 入口，并确保规范路径仍位于 scripts/ 内。
+  /// Resolve the existing Lua entry while enforcing containment within the package scripts
+  /// directory.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for an invalid entry, missing script, non-file target, or a canonical path
+  /// outside `scripts/`.
   pub fn resolve_entry_path(&self, package: &PackageInfo) -> Result<PathBuf, String> {
     resolve_package_entry_path(package)
   }
 
-  /// Resolve a package audio asset without permitting access outside its assets directory.
+  /// Resolve a playable audio asset while enforcing its permitted asset root.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for an invalid relative asset path, an escaping path, a missing file, or an
+  /// unsupported audio source.
   pub fn resolve_audio_asset(
     &self,
     package: &PackageInfo,
@@ -543,6 +983,7 @@ impl PackageService {
       })
   }
 
+  /// Return the current mod games.
   pub fn mod_games(&self) -> Vec<PackageListEntry> {
     self
       .games()
@@ -552,6 +993,7 @@ impl PackageService {
       .collect()
   }
 
+  /// Return the current game list.
   pub fn game_list(&self) -> Vec<PackageListEntry> {
     self
       .games()
@@ -560,6 +1002,7 @@ impl PackageService {
       .collect()
   }
 
+  /// Return the current mod screensavers.
   pub fn mod_screensavers(&self) -> Vec<PackageListEntry> {
     self
       .screensavers()
@@ -569,7 +1012,7 @@ impl PackageService {
       .collect()
   }
 
-  /// 返回全部官方与模组屏保的轻量 UI 快照。
+  /// Return the current screensaver list.
   pub fn screensaver_list(&self) -> Vec<PackageListEntry> {
     self
       .screensavers()
@@ -578,10 +1021,12 @@ impl PackageService {
       .collect()
   }
 
+  /// Return the current total count.
   pub fn total_count(&self) -> usize {
     self.snapshot.games.len() + self.snapshot.screensavers.len()
   }
 
+  /// Update the user game key actions used by this package service.
   pub fn set_user_game_key_actions(
     &mut self,
     actions: BTreeMap<String, BTreeMap<String, Vec<Vec<String>>>>,
@@ -590,12 +1035,25 @@ impl PackageService {
   }
 
   fn package_list_entry(&self, info: PackageInfo) -> PackageListEntry {
+    let locked_actions = info
+      .game
+      .as_ref()
+      .map(|game| {
+        game
+          .actions
+          .iter()
+          .filter(|(_, action)| action.lock)
+          .map(|(name, _)| name.clone())
+          .collect::<HashSet<_>>()
+      })
+      .unwrap_or_default();
     let mut entry = package_list_entry(info);
     if let Some(actions) = self.user_game_key_actions.get(&entry.id.storage_key()) {
-      entry.key_actions = actions
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
+      for (action, keys) in actions {
+        if !locked_actions.contains(action) && entry.key_default_actions.contains_key(action) {
+          entry.key_actions.insert(action.clone(), keys.clone());
+        }
+      }
     }
     entry
   }
@@ -617,6 +1075,18 @@ fn find_package(
     .cloned()
 }
 
+/// Execute a package scan or metadata task and emit its completion through the shared event sink.
+///
+/// # Arguments
+///
+/// * `task_id` - The identifier of the asynchronous task.
+/// * `task` - The task.
+/// * `event_tx` - The event tx.
+///
+/// # Errors
+///
+/// Return an error for cancelled scans, unavailable package roots, invalid package metadata, or
+/// task-specific validation failures.
 pub(crate) fn run_package_task<E: From<PackageAsyncEvent>>(
   task_id: TaskId,
   task: PackageTask,
@@ -625,22 +1095,24 @@ pub(crate) fn run_package_task<E: From<PackageAsyncEvent>>(
   match task {
     PackageTask::Scan(request) => {
       let total_candidates = count_package_candidates(&request);
-      send_package_event(
+      send_scan_event(
         event_tx,
+        request.sequence,
         PackageEvent::ScanStarted {
           total: total_candidates,
         },
       );
       let mut report = scan_all_packages(
         &request,
-        &mut |event| send_package_event(event_tx, event),
+        &mut |event| send_scan_event(event_tx, request.sequence, event),
         total_candidates,
       );
       for event in report.events.drain(..) {
-        send_package_event(event_tx, event);
+        send_scan_event(event_tx, request.sequence, event);
       }
       let finished = scan_finished_event(&report);
       let _ = event_tx.send(E::from(PackageAsyncEvent::SnapshotReady {
+        sequence: request.sequence,
         snapshot: report.snapshot,
         finished,
         watched_files: report.watched_files,
@@ -653,6 +1125,14 @@ pub(crate) fn run_package_task<E: From<PackageAsyncEvent>>(
 
 fn send_package_event<E: From<PackageAsyncEvent>>(event_tx: &Sender<E>, event: PackageEvent) {
   let _ = event_tx.send(E::from(PackageAsyncEvent::Event(event)));
+}
+
+fn send_scan_event<E: From<PackageAsyncEvent>>(
+  event_tx: &Sender<E>,
+  sequence: u64,
+  event: PackageEvent,
+) {
+  let _ = event_tx.send(E::from(PackageAsyncEvent::ScanEvent { sequence, event }));
 }
 
 fn scan_finished_event(report: &ScanReport) -> PackageEvent {
@@ -922,10 +1402,24 @@ fn sync_package_watch_dirs<'a, E: From<PackageAsyncEvent>>(
 ) {
   let mut next_dirs = roots.iter().cloned().collect::<HashSet<_>>();
   next_dirs.extend(roots.iter().flat_map(first_level_package_dirs));
-  next_dirs.extend(files.filter_map(|file| file.parent().map(Path::to_path_buf)));
+  // Watch each ancestor so missing resource directories can be created or rebuilt later.
+  for file in files {
+    let Some(package_dir) = watched_file_package_dir(roots, file) else {
+      continue;
+    };
+    let mut parent = file.parent();
+    while let Some(dir) = parent {
+      next_dirs.insert(dir.to_path_buf());
+      if dir == package_dir {
+        break;
+      }
+      parent = dir.parent();
+    }
+  }
 
   for dir in watched_dirs
-    .difference(&next_dirs)
+    .iter()
+    .filter(|dir| !next_dirs.contains(*dir) || !dir.is_dir())
     .cloned()
     .collect::<Vec<_>>()
   {
@@ -934,7 +1428,7 @@ fn sync_package_watch_dirs<'a, E: From<PackageAsyncEvent>>(
   }
 
   for dir in next_dirs {
-    if dir.exists() {
+    if dir.is_dir() {
       watch_package_dir(watcher, watched_dirs, &dir, event_tx);
     }
   }
@@ -995,23 +1489,49 @@ fn queue_package_watch_event<E: From<PackageAsyncEvent>>(
     return;
   }
 
+  let mut refresh_dirs = false;
   for path in event.paths {
+    if matches!(
+      event.kind,
+      EventKind::Remove(_) | EventKind::Modify(notify::event::ModifyKind::Name(_))
+    ) {
+      // A replacement directory needs a new OS watch even when the path already exists.
+      for dir in watched_dirs
+        .iter()
+        .filter(|dir| dir.starts_with(&path))
+        .cloned()
+        .collect::<Vec<_>>()
+      {
+        let _ = watcher.unwatch(&dir);
+        watched_dirs.remove(&dir);
+      }
+    }
     if let Some(package_dir) = watched_package_dir(roots, &path) {
       if package_dir.exists() {
         watch_package_dir(watcher, watched_dirs, &package_dir, event_tx);
       }
       pending.insert(package_dir);
-      continue;
+      refresh_dirs = true;
     }
 
-    if let Some(package_dir) = watched_files.get(&path) {
-      pending.insert(package_dir.clone());
+    // Directory events also affect tracked files beneath that directory.
+    for (file, package_dir) in watched_files {
+      if file.starts_with(&path) {
+        pending.insert(package_dir.clone());
+        refresh_dirs = true;
+      }
     }
+  }
+  if refresh_dirs {
+    sync_package_watch_dirs(watcher, watched_dirs, roots, watched_files.keys(), event_tx);
   }
 }
 
 fn watched_package_dir(roots: &[PathBuf], path: &Path) -> Option<PathBuf> {
-  if path.file_name().and_then(|name| name.to_str()) == Some("package.json") {
+  if matches!(
+    path.file_name().and_then(|name| name.to_str()),
+    Some("package.json" | "display.json" | "game.json" | "screensaver.json" | "actions.json")
+  ) {
     let dir = path.parent()?;
     return roots
       .iter()
@@ -1052,18 +1572,25 @@ fn package_scan_roots(request: &ScanRequest) -> Vec<PathBuf> {
 
 fn package_list_entry(info: PackageInfo) -> PackageListEntry {
   let icon_path = match &info.display.icon {
-    PackageAsset::Image { path } => resolve_package_image_path(&info.path, Path::new(path))
+    PackageAsset::Image { path, .. } => resolve_package_image_path(&info.path, Path::new(path))
       .map(|path| path.to_string_lossy().to_string()),
     _ => None,
   };
   let icon = icon_path
     .as_ref()
-    .map(|path| PackageAsset::Image { path: path.clone() })
+    .map(|path| match &info.display.icon {
+      PackageAsset::Image { mode, .. } => PackageAsset::Image {
+        path: path.clone(),
+        mode: *mode,
+      },
+      PackageAsset::Text { .. } => unreachable!("icon path only exists for image assets"),
+    })
     .unwrap_or_else(|| info.display.icon.clone());
   let banner = match &info.display.banner {
-    PackageAsset::Image { path } => resolve_package_image_path(&info.path, Path::new(path))
+    PackageAsset::Image { path, mode } => resolve_package_image_path(&info.path, Path::new(path))
       .map(|path| PackageAsset::Image {
         path: path.to_string_lossy().to_string(),
+        mode: *mode,
       })
       .unwrap_or_else(default_banner_asset),
     PackageAsset::Text { .. } => info.display.banner.clone(),
@@ -1148,6 +1675,7 @@ fn package_list_entry(info: PackageInfo) -> PackageListEntry {
     score_enabled,
     score_empty_text,
     best_string: None,
+    best_values: HashMap::new(),
     min_width: info.runtime.min_width,
     min_height: info.runtime.min_height,
     screensaver_command,
@@ -1220,7 +1748,6 @@ fn scan_all_packages(
   report
 }
 
-// 递归扫描指定目录下的所有包并加载
 struct ScanTarget {
   relative: &'static str,
   expected_type: PackageType,
@@ -1361,7 +1888,6 @@ fn count_child_dirs(dir: &Path) -> usize {
     .unwrap_or(0)
 }
 
-// 读取并验证单个包的 package.json 文件
 fn read_package(
   dir: &Path,
   dir_name: &str,
@@ -1369,52 +1895,39 @@ fn read_package(
   source: &PackageSource,
   request: &ScanRequest,
 ) -> Result<PackageInfo, PackageReadError> {
-  let json_path = dir.join("package.json");
-  let content =
-    read_utf8_file_limited(&json_path, MAX_PACKAGE_MANIFEST_BYTES).map_err(|error| {
-      PackageReadError {
-        code: "read_failed",
-        field_path: "$".to_string(),
-        line: None,
-        column: None,
-        reason: format!("cannot read package.json: {error}"),
-        related: Vec::new(),
-      }
-    })?;
-  let mut watched_files = vec![json_path.clone()];
-
-  let mut deserializer = serde_json::Deserializer::from_str(&content);
-  let raw: RawPackageJson =
-    serde_path_to_error::deserialize(&mut deserializer).map_err(|error| {
-      let field_path = error.path().to_string();
-      let inner = error.into_inner();
-      PackageReadError {
-        code: match inner.classify() {
-          serde_json::error::Category::Syntax | serde_json::error::Category::Eof => "json_syntax",
-          _ => "schema",
-        },
-        field_path: if field_path.is_empty() {
-          "$".to_string()
-        } else {
-          field_path
-        },
-        line: Some(inner.line()),
-        column: Some(inner.column()),
-        reason: inner.to_string(),
-        related: Vec::new(),
-      }
-    })?;
-
+  let raw =
+    read_package_config_file::<RawPackageHeader>(dir, "package.json", MAX_PACKAGE_MANIFEST_BYTES)?;
+  let mut watched_files = vec![dir.join("package.json")];
+  if *expected_type == PackageType::Game {
+    push_package_i18n_watch_path(
+      dir,
+      &request.language_code,
+      "best_string.json",
+      &mut watched_files,
+    );
+    push_package_i18n_watch_path(dir, "en_us", "best_string.json", &mut watched_files);
+  }
   let mut manifest_errors = Vec::new();
+
   PackageReadError::push_if(
     &mut manifest_errors,
     raw.schema_version != PACKAGE_MANIFEST_VERSION,
     "schema_version",
     format!(
-      "schema_version {} != host {}",
+      "schema_version {} is unsupported; this host requires schema {} with package.json, display.json and a type-specific config file",
       raw.schema_version, PACKAGE_MANIFEST_VERSION
     ),
   );
+  if raw
+    .package
+    .as_deref()
+    .is_some_and(|value| value != "tui game")
+  {
+    manifest_errors.push(PackageReadError::at(
+      "package",
+      "package must be the string 'tui game' when present",
+    ));
+  }
 
   let pkg_type = match parse_package_type(&raw.package_type) {
     Ok(package_type) => {
@@ -1443,7 +1956,6 @@ fn read_package(
       }
     }
   });
-
   PackageReadError::push_if(
     &mut manifest_errors,
     raw.version_code == 0,
@@ -1474,203 +1986,252 @@ fn read_package(
       raw.api.max, HOST_API_VERSION
     ),
   );
-  if let Some(game) = raw.game.as_ref() {
-    let target_fps = game.target_fps.unwrap_or(60);
-    PackageReadError::push_if(
-      &mut manifest_errors,
-      !VALID_TARGET_FPS.contains(&target_fps),
-      "game.target_fps",
-      format!(
-        "target_fps must be one of {:?}, got {}",
-        VALID_TARGET_FPS, target_fps
-      ),
-    );
-  }
-  if let Some(package_type) = pkg_type {
-    PackageReadError::push_if(
-      &mut manifest_errors,
-      package_type == PackageType::Game && raw.game.is_none(),
-      "game",
-      "missing 'game' config for game type".to_string(),
-    );
-    PackageReadError::push_if(
-      &mut manifest_errors,
-      package_type == PackageType::Game && raw.screensaver.is_some(),
-      "screensaver",
-      "game package must not contain screensaver configuration".to_string(),
-    );
-    PackageReadError::push_if(
-      &mut manifest_errors,
-      package_type == PackageType::Screensaver && raw.screensaver.is_none(),
-      "screensaver",
-      "missing 'screensaver' config".to_string(),
-    );
-    PackageReadError::push_if(
-      &mut manifest_errors,
-      package_type == PackageType::Screensaver && raw.game.is_some(),
-      "game",
-      "screensaver package must not contain game configuration".to_string(),
-    );
-  }
   if !manifest_errors.is_empty() {
     return Err(PackageReadError::combine(manifest_errors));
   }
+  let pkg_type = pkg_type.expect("valid package type checked above");
+  let package_id = package_id.expect("valid package ID checked above");
 
-  let Some(pkg_type) = pkg_type else {
-    return Err(PackageReadError::at(
-      "type",
-      "package type validation did not produce a value",
-    ));
+  let display: RawDisplay =
+    read_package_config_file(dir, "display.json", MAX_PACKAGE_MANIFEST_BYTES)?;
+  watched_files.push(dir.join("display.json"));
+  match pkg_type {
+    PackageType::Game => reject_config_file_if_present(dir, "screensaver.json")?,
+    PackageType::Screensaver => {
+      reject_config_file_if_present(dir, "game.json")?;
+      reject_config_file_if_present(dir, "actions.json")?;
+    }
+  }
+  let (raw_entry, runtime, raw_game, raw_screensaver, raw_actions) = match pkg_type {
+    PackageType::Game => {
+      let game: RawGameConfig =
+        read_package_config_file(dir, "game.json", MAX_PACKAGE_MANIFEST_BYTES)?;
+      watched_files.push(dir.join("game.json"));
+      let actions = read_optional_package_config_file::<RawActions>(
+        dir,
+        "actions.json",
+        MAX_PACKAGE_MANIFEST_BYTES,
+      )?;
+      watched_files.push(dir.join("actions.json"));
+      (
+        game.entry.clone(),
+        PackageRuntime {
+          min_width: game.min_width,
+          min_height: game.min_height,
+        },
+        Some(game),
+        None,
+        actions.unwrap_or_default(),
+      )
+    }
+    PackageType::Screensaver => {
+      let screen: RawScreensaverConfig =
+        read_package_config_file(dir, "screensaver.json", MAX_PACKAGE_MANIFEST_BYTES)?;
+      watched_files.push(dir.join("screensaver.json"));
+      (
+        screen.entry.clone(),
+        PackageRuntime {
+          min_width: screen.min_width,
+          min_height: screen.min_height,
+        },
+        None,
+        Some(screen),
+        RawActions::default(),
+      )
+    }
   };
-  let Some(package_id) = package_id else {
-    return Err(PackageReadError::at(
-      "mod_id",
-      "package identity validation did not produce a value",
-    ));
-  };
+  let entry = resolve_entry(dir, &raw_entry)
+    .map_err(|reason| PackageReadError::at("entry", reason).in_file(config_file_for(pkg_type)))?;
 
-  let entry =
-    resolve_entry(dir, &raw.entry).map_err(|reason| PackageReadError::at("entry", reason))?;
-
-  let display = raw.display;
-  let title = resolve_package_text(
+  let version = resolve_config_text(
+    dir,
+    &raw.version,
+    request,
+    &mut watched_files,
+    "version",
+    "package.json",
+  )?;
+  if version.trim().is_empty() {
+    return Err(PackageReadError::at("version", "version is empty"));
+  }
+  let title = resolve_config_text(
     dir,
     &display.title,
     request,
     &mut watched_files,
     "display.title",
+    "display.json",
   )?;
   if title.trim().is_empty() {
-    return Err(PackageReadError::at(
-      "display.title",
-      "display.title is empty",
-    ));
+    return Err(PackageReadError::at("title", "display.title is empty").in_file("display.json"));
   }
-  let version = resolve_package_text(dir, &raw.version, request, &mut watched_files, "version")?;
-  if version.trim().is_empty() {
-    return Err(PackageReadError::at("version", "version is empty"));
-  }
+  let description = resolve_config_text(
+    dir,
+    &display.description,
+    request,
+    &mut watched_files,
+    "display.description",
+    "display.json",
+  )?;
+  let author = resolve_config_text(
+    dir,
+    &display.author,
+    request,
+    &mut watched_files,
+    "display.author",
+    "display.json",
+  )?;
+  let icon = parse_package_asset(dir, &display.icon, AssetShape::Icon, &mut watched_files)
+    .map_err(|reason| PackageReadError::at("icon", reason).in_file("display.json"))?
+    .unwrap_or_else(default_icon_asset);
+  let banner = parse_package_asset(dir, &display.banner, AssetShape::Banner, &mut watched_files)
+    .map_err(|reason| PackageReadError::at("banner", reason).in_file("display.json"))?
+    .unwrap_or_else(default_banner_asset);
 
-  let runtime = raw.runtime;
-
-  let game = match pkg_type {
-    PackageType::Game => {
-      let g = raw
-        .game
-        .ok_or_else(|| PackageReadError::at("game", "missing 'game' config for game type"))?;
-      let target_fps = g.target_fps.unwrap_or(60);
-      if !VALID_TARGET_FPS.contains(&target_fps) {
-        return Err(PackageReadError::at(
-          "game.target_fps",
-          format!(
-            "target_fps must be one of {:?}, got {}",
-            VALID_TARGET_FPS, target_fps
-          ),
-        ));
+  let (game, screensaver) = match (raw_game, raw_screensaver) {
+    (Some(g), None) => {
+      let source_file = "game.json";
+      if g
+        .target_fps
+        .is_some_and(|target_fps| !VALID_TARGET_FPS.contains(&target_fps))
+      {
+        let target_fps = g.target_fps.expect("checked as present");
+        return Err(
+          PackageReadError::at(
+            "target_fps",
+            format!(
+              "target_fps must be one of {:?}, got {}",
+              VALID_TARGET_FPS, target_fps
+            ),
+          )
+          .in_file(source_file),
+        );
       }
-      let name = resolve_package_text(dir, &g.name, request, &mut watched_files, "game.name")?;
+      if g.command.trim().is_empty() {
+        return Err(PackageReadError::at("command", "game.command is empty").in_file(source_file));
+      }
+      let name = resolve_config_text(
+        dir,
+        &g.name,
+        request,
+        &mut watched_files,
+        "name",
+        source_file,
+      )?;
       if name.trim().is_empty() {
-        return Err(PackageReadError::at("game.name", "game.name is empty"));
+        return Err(PackageReadError::at("name", "game.name is empty").in_file(source_file));
       }
-      let detail =
-        resolve_package_text(dir, &g.detail, request, &mut watched_files, "game.detail")?;
+      let detail = resolve_config_text(
+        dir,
+        &g.detail,
+        request,
+        &mut watched_files,
+        "detail",
+        source_file,
+      )?;
       let supported_languages = normalize_language_codes(&g.language)
-        .map_err(|reason| PackageReadError::at("game.language", reason))?;
+        .map_err(|reason| PackageReadError::at("language", reason).in_file(source_file))?;
       let mut actions = HashMap::new();
       let mut action_order = Vec::new();
-      let raw_actions = g
-        .actions
-        .as_object()
-        .ok_or_else(|| PackageReadError::at("game.actions", "game.actions must be an object"))?;
-      for (name, value) in raw_actions {
-        let a: RawActionConfig = serde_json::from_value(value.clone()).map_err(|error| {
-          PackageReadError::at(
-            format!("game.actions.{name}"),
-            format!("invalid action configuration: {error}"),
-          )
-        })?;
+      for (name, action) in raw_actions {
+        let description = resolve_config_text(
+          dir,
+          &action.description,
+          request,
+          &mut watched_files,
+          &format!("{name}.description"),
+          "actions.json",
+        )?;
+        let keys = normalize_action_keys(&name, action.keys)
+          .map_err(|reason| PackageReadError::at(name.clone(), reason).in_file("actions.json"))?;
         action_order.push(name.clone());
         actions.insert(
-          name.clone(),
+          name,
           ActionConfig {
-            description: resolve_package_text(
-              dir,
-              &a.description,
-              request,
-              &mut watched_files,
-              &format!("game.actions.{name}.description"),
-            )?,
-            keys: normalize_action_keys(name, a.keys).map_err(|reason| {
-              PackageReadError::at(format!("game.actions.{name}.keys"), reason)
-            })?,
-            lock: a.lock,
+            description,
+            keys,
+            lock: action.lock,
+            priority: action.priority,
           },
         );
       }
-      Some(GameConfig {
-        name,
-        detail,
-        mouse: g.mouse.unwrap_or(false),
-        truecolor: g.truecolor.unwrap_or(false),
-        target_fps,
-        save: g.save.unwrap_or(false),
-        supported_languages,
-        score: g
-          .score
-          .map(|s| {
-            Ok::<_, String>(ScoreConfig {
-              enabled: s.enabled.unwrap_or(false),
-              empty_text: match s.empty_text {
-                Some(value) => resolve_package_text(
-                  dir,
-                  &value,
-                  request,
-                  &mut watched_files,
-                  "game.score.empty_text",
-                )?,
-                None => String::new(),
-              },
-            })
-          })
-          .transpose()?,
-        actions,
-        action_order,
-      })
-    }
-    PackageType::Screensaver => None,
-  };
 
-  let screensaver = match pkg_type {
-    PackageType::Screensaver => {
-      let s = raw
-        .screensaver
-        .ok_or_else(|| PackageReadError::at("screensaver", "missing 'screensaver' config"))?;
-      let name = resolve_package_text(
+      let score = g
+        .best_score
+        .map(|score| {
+          let empty_text = if score.enable {
+            match score.empty_text {
+              Some(value) => resolve_config_text(
+                dir,
+                &value,
+                request,
+                &mut watched_files,
+                "best_score.empty_text",
+                source_file,
+              )?,
+              None => String::new(),
+            }
+          } else {
+            String::new()
+          };
+          Ok::<_, PackageReadError>(ScoreConfig {
+            enabled: score.enable,
+            empty_text,
+          })
+        })
+        .transpose()?;
+      (
+        Some(GameConfig {
+          name,
+          detail,
+          command: g.command,
+          mouse: g.mouse.unwrap_or(false),
+          truecolor: g.truecolor.unwrap_or(false),
+          target_fps: g.target_fps,
+          save: g.save_game.unwrap_or(false),
+          supported_languages,
+          score,
+          actions,
+          action_order,
+        }),
+        None,
+      )
+    }
+    (None, Some(s)) => {
+      if s.command.trim().is_empty() {
+        return Err(
+          PackageReadError::at("command", "screensaver.command is empty")
+            .in_file("screensaver.json"),
+        );
+      }
+      let name = resolve_config_text(
         dir,
         &s.name,
         request,
         &mut watched_files,
-        "screensaver.name",
+        "name",
+        "screensaver.json",
       )?;
       if name.trim().is_empty() {
-        return Err(PackageReadError::at(
-          "screensaver.name",
-          "screensaver.name is empty",
-        ));
+        return Err(
+          PackageReadError::at("name", "screensaver.name is empty").in_file("screensaver.json"),
+        );
       }
-      if s.command.trim().is_empty() {
-        return Err(PackageReadError::at(
-          "screensaver.command",
-          "screensaver.command is empty",
-        ));
-      }
-      Some(ScreensaverConfig {
-        name,
-        truecolor: s.truecolor.unwrap_or(false),
-        command: s.command,
-      })
+      (
+        None,
+        Some(ScreensaverConfig {
+          name,
+          truecolor: s.truecolor.unwrap_or(false),
+          command: s.command,
+        }),
+      )
     }
-    PackageType::Game => None,
+    _ => {
+      return Err(PackageReadError::at(
+        "type",
+        "package config did not match package type",
+      ));
+    }
   };
 
   let package = PackageInfo {
@@ -1686,37 +2247,67 @@ fn read_package(
     entry,
     display: PackageDisplay {
       title,
-      description: resolve_package_text(
-        dir,
-        &display.description,
-        request,
-        &mut watched_files,
-        "display.description",
-      )?,
-      author: resolve_package_text(
-        dir,
-        &display.author,
-        request,
-        &mut watched_files,
-        "display.author",
-      )?,
-      icon: parse_package_asset(dir, &display.icon, AssetShape::Icon, &mut watched_files)?
-        .unwrap_or_else(default_icon_asset),
-      banner: parse_package_asset(dir, &display.banner, AssetShape::Banner, &mut watched_files)?
-        .unwrap_or_else(default_banner_asset),
+      description,
+      author,
+      icon,
+      banner,
     },
-    runtime: PackageRuntime {
-      min_width: runtime.min_width,
-      min_height: runtime.min_height,
-    },
+    runtime,
     game,
     screensaver,
     path: dir.to_path_buf(),
     watched_files,
   };
-  validate_loaded_package(&package)?;
-  resolve_package_entry_path(&package)?;
+  validate_loaded_package(&package)
+    .map_err(|reason| PackageReadError::semantic(reason).in_file(config_file_for(pkg_type)))?;
+  resolve_package_entry_path(&package)
+    .map_err(|reason| PackageReadError::semantic(reason).in_file(config_file_for(pkg_type)))?;
   Ok(package)
+}
+
+fn config_file_for(package_type: PackageType) -> &'static str {
+  match package_type {
+    PackageType::Game => "game.json",
+    PackageType::Screensaver => "screensaver.json",
+  }
+}
+
+fn reject_config_file_if_present(
+  package_dir: &Path,
+  file_name: &'static str,
+) -> Result<(), PackageReadError> {
+  match std::fs::symlink_metadata(package_dir.join(file_name)) {
+    Ok(_) => Err(
+      PackageReadError::at(
+        "$",
+        format!("this package type must not include {file_name}"),
+      )
+      .in_file(file_name),
+    ),
+    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+    Err(error) => Err(
+      PackageReadError::at("$", format!("cannot inspect {file_name}: {error}")).in_file(file_name),
+    ),
+  }
+}
+
+fn resolve_config_text(
+  package_dir: &Path,
+  value: &RawPackageText,
+  request: &ScanRequest,
+  watched_files: &mut Vec<PathBuf>,
+  field: &str,
+  source_file: &'static str,
+) -> Result<String, PackageReadError> {
+  resolve_package_text(
+    package_dir,
+    value,
+    request,
+    watched_files,
+    field,
+    source_file,
+  )
+  .map_err(|reason| PackageReadError::semantic(reason).in_file(source_file))
 }
 
 fn normalize_action_keys(action: &str, keys: Vec<Vec<String>>) -> Result<Vec<Vec<String>>, String> {
@@ -1729,30 +2320,44 @@ fn normalize_action_keys(action: &str, keys: Vec<Vec<String>>) -> Result<Vec<Vec
       keys.len()
     ));
   }
-  keys
-    .into_iter()
-    .enumerate()
-    .map(|(pattern_index, pattern)| {
-      if pattern.is_empty() {
-        return Err(format!(
-          "game action '{action}' key pattern {pattern_index} is empty"
-        ));
-      }
-      if pattern.len() > 2 {
-        return Err(format!(
-          "game action '{action}' key pattern {pattern_index} contains {} keys; at most 2 are allowed",
-          pattern.len()
-        ));
-      }
-      pattern
-        .into_iter()
-        .map(|token| {
-          canonical_key_token(&token)
-            .ok_or_else(|| format!("game action '{action}' contains unknown key token '{token}'"))
-        })
-        .collect()
-    })
-    .collect()
+  let mut normalized_patterns = Vec::with_capacity(keys.len());
+  let mut seen_patterns = HashSet::new();
+  for (pattern_index, pattern) in keys.into_iter().enumerate() {
+    if pattern.is_empty() {
+      return Err(format!(
+        "game action '{action}' key pattern {pattern_index} is empty"
+      ));
+    }
+    if pattern.len() > 2 {
+      return Err(format!(
+        "game action '{action}' key pattern {pattern_index} contains {} keys; at most 2 are allowed",
+        pattern.len()
+      ));
+    }
+
+    let mut normalized = Vec::with_capacity(pattern.len());
+    for token in pattern {
+      normalized.push(
+        canonical_key_token(&token)
+          .ok_or_else(|| format!("game action '{action}' contains unknown key token '{token}'"))?,
+      );
+    }
+    if normalized.len() == 2 && normalized[0] == normalized[1] {
+      return Err(format!(
+        "game action '{action}' key pattern {pattern_index} contains the same key twice"
+      ));
+    }
+
+    let mut pattern_identity = normalized.clone();
+    pattern_identity.sort_unstable();
+    if !seen_patterns.insert(pattern_identity) {
+      return Err(format!(
+        "game action '{action}' contains a duplicate key binding"
+      ));
+    }
+    normalized_patterns.push(normalized);
+  }
+  Ok(normalized_patterns)
 }
 
 fn read_manifest_package_id(dir: &Path, source: PackageSource) -> Option<PackageId> {
@@ -1790,8 +2395,14 @@ fn validate_loaded_package(package: &PackageInfo) -> Result<(), String> {
       if package.screensaver.is_some() {
         return Err("game package contains screensaver configuration".to_string());
       }
-      if !VALID_TARGET_FPS.contains(&game.target_fps) {
-        return Err(format!("invalid game target_fps {}", game.target_fps));
+      if game
+        .target_fps
+        .is_some_and(|fps| !VALID_TARGET_FPS.contains(&fps))
+      {
+        return Err(format!(
+          "invalid game target_fps {}",
+          game.target_fps.expect("checked as present")
+        ));
       }
       if normalize_language_codes(&game.supported_languages)? != game.supported_languages {
         return Err("game.language contains non-canonical language codes".to_string());
@@ -1897,7 +2508,9 @@ fn has_package_id(snapshot: &PackageSnapshot, id: &PackageId) -> bool {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RawPackageJson {
+struct RawPackageHeader {
+  #[serde(default, deserialize_with = "deserialize_package_marker")]
+  package: Option<String>,
   mod_id: String,
   schema_version: u32,
   #[serde(rename = "type")]
@@ -1905,11 +2518,13 @@ struct RawPackageJson {
   version: RawPackageText,
   version_code: u32,
   api: RawApiRange,
-  entry: String,
-  display: RawDisplay,
-  runtime: RawRuntime,
-  game: Option<RawGameConfig>,
-  screensaver: Option<RawScreensaverConfig>,
+}
+
+fn deserialize_package_marker<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+  D: serde::Deserializer<'de>,
+{
+  String::deserialize(deserializer).map(Some)
 }
 
 #[derive(Deserialize)]
@@ -1917,6 +2532,84 @@ struct RawPackageJson {
 struct RawApiRange {
   min: u32,
   max: u32,
+}
+
+/// Validate the presentation fields in a best-score save without reading language resources.
+///
+/// The optional `value` object contains named literal or package-text substitutions.
+/// Other save fields belong to the game and are left untouched.
+///
+/// # Errors
+///
+/// Return an error for a missing template, malformed text reference, or non-object substitutions.
+///
+/// # Examples
+///
+/// ```rust
+/// use tg_service_package::validate_best_save;
+/// let data = serde_json::json!({
+///   "best_string": {"type": "i18n", "key": "score", "callback": "f%Best: {value:score}"},
+///   "value": {"score": "42"}
+/// });
+/// assert!(validate_best_save(&data).is_ok());
+/// assert!(validate_best_save(&serde_json::json!({"best_string": 42})).is_err());
+/// ```
+pub fn validate_best_save(data: &serde_json::Value) -> Result<(), String> {
+  let object = data
+    .as_object()
+    .ok_or("best save must be an object table")?;
+  let text = object
+    .get("best_string")
+    .ok_or("best save must contain field 'best_string'")?;
+  parse_best_text(text, "best_string")?;
+  if let Some(value) = object.get("value") {
+    let values = value
+      .as_object()
+      .ok_or("best save field 'value' must be an object table")?;
+    for (key, value) in values {
+      if key.trim().is_empty() {
+        return Err("best save substitution names must not be empty".into());
+      }
+      parse_best_text(value, &format!("value.{key}"))?;
+    }
+  }
+  Ok(())
+}
+
+fn parse_best_text(value: &serde_json::Value, field: &str) -> Result<RawPackageText, String> {
+  let text: RawPackageText = serde_json::from_value(value.clone())
+    .map_err(|error| format!("{field} must be a string or package text object: {error}"))?;
+  validate_package_text(&text, field)?;
+  Ok(text)
+}
+
+fn validate_package_text(value: &RawPackageText, field: &str) -> Result<(), String> {
+  match value {
+    RawPackageText::Literal(_) => Ok(()),
+    RawPackageText::Object(value) if value.text_type == "text" => {
+      value
+        .text
+        .as_ref()
+        .ok_or_else(|| format!("{field}.text is required when type is 'text'"))?;
+      Ok(())
+    }
+    RawPackageText::Object(value) if value.text_type == "i18n" => {
+      value
+        .key
+        .as_deref()
+        .filter(|key| !key.trim().is_empty())
+        .ok_or_else(|| format!("{field}.key is required when type is 'i18n'"))?;
+      value
+        .callback
+        .as_ref()
+        .ok_or_else(|| format!("{field}.callback is required when type is 'i18n'"))?;
+      Ok(())
+    }
+    RawPackageText::Object(value) => Err(format!(
+      "{field}.type must be 'text' or 'i18n', got '{}'",
+      value.text_type
+    )),
+  }
 }
 
 #[derive(Clone, Deserialize)]
@@ -1932,7 +2625,6 @@ struct RawPackageTextObject {
   #[serde(rename = "type")]
   text_type: String,
   text: Option<String>,
-  path: Option<String>,
   key: Option<String>,
   callback: Option<String>,
 }
@@ -1955,13 +2647,8 @@ struct RawDisplayAsset {
   #[serde(rename = "type")]
   asset_type: String,
   path: String,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawRuntime {
-  min_width: u32,
-  min_height: u32,
+  #[serde(default)]
+  block: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1969,19 +2656,24 @@ struct RawRuntime {
 struct RawGameConfig {
   name: RawPackageText,
   detail: RawPackageText,
+  command: String,
+  entry: String,
+  #[serde(default)]
+  min_width: u32,
+  #[serde(default)]
+  min_height: u32,
   mouse: Option<bool>,
   truecolor: Option<bool>,
   target_fps: Option<u32>,
-  save: Option<bool>,
+  save_game: Option<bool>,
   language: Vec<String>,
-  score: Option<RawScoreConfig>,
-  actions: serde_json::Value,
+  best_score: Option<RawScoreConfig>,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawScoreConfig {
-  enabled: Option<bool>,
+  enable: bool,
   empty_text: Option<RawPackageText>,
 }
 
@@ -1992,14 +2684,61 @@ struct RawActionConfig {
   keys: Vec<Vec<String>>,
   #[serde(default)]
   lock: bool,
+  #[serde(default)]
+  priority: u64,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawScreensaverConfig {
   name: RawPackageText,
+  entry: String,
+  #[serde(default)]
+  min_width: u32,
+  #[serde(default)]
+  min_height: u32,
   truecolor: Option<bool>,
   command: String,
+}
+
+#[derive(Default)]
+struct RawActions(Vec<(String, RawActionConfig)>);
+
+impl<'de> serde::Deserialize<'de> for RawActions {
+  fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    struct OrderedActions;
+    impl<'de> serde::de::Visitor<'de> for OrderedActions {
+      type Value = RawActions;
+      fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an ordered action object")
+      }
+      fn visit_map<A: serde::de::MapAccess<'de>>(
+        self,
+        mut map: A,
+      ) -> Result<Self::Value, A::Error> {
+        let mut names = HashSet::new();
+        let mut actions = Vec::new();
+        while let Some(name) = map.next_key::<String>()? {
+          if !names.insert(name.clone()) {
+            return Err(serde::de::Error::custom(format!(
+              "duplicate action name '{name}'"
+            )));
+          }
+          actions.push((name, map.next_value::<RawActionConfig>()?));
+        }
+        Ok(RawActions(actions))
+      }
+    }
+    deserializer.deserialize_map(OrderedActions)
+  }
+}
+
+impl IntoIterator for RawActions {
+  type Item = (String, RawActionConfig);
+  type IntoIter = std::vec::IntoIter<Self::Item>;
+  fn into_iter(self) -> Self::IntoIter {
+    self.0.into_iter()
+  }
 }
 
 fn parse_package_type(s: &str) -> Result<PackageType, String> {
@@ -2042,7 +2781,16 @@ fn parse_package_asset(
       resolve_package_image_path(package_dir, Path::new(&path))
         .ok_or_else(|| format!("display image asset '{path}' is missing or unsafe"))?;
       watched_files.push(watched_path);
-      PackageAsset::Image { path }
+      let mode = match raw.block.as_deref().unwrap_or("half_block") {
+        "half_block" => PackageImageMode::HalfBlock,
+        "mix_block" => PackageImageMode::MixBlock,
+        other => {
+          return Err(format!(
+            "display image block '{other}' must be 'half_block' or 'mix_block'"
+          ));
+        }
+      };
+      PackageAsset::Image { path, mode }
     }
     "text" if is_supported_text_path(&path) => {
       let asset_path = resolve_package_file(package_dir, Path::new("assets"), Path::new(&path))
@@ -2074,6 +2822,7 @@ fn parse_package_asset(
   Ok(Some(asset))
 }
 
+/// Return the built-in package icon as terminal text lines.
 pub(crate) fn default_icon_lines() -> Vec<String> {
   normalize_asset_lines(
     ["████████", "██ ██ ██", "   ██   ", "  ████  "],
@@ -2228,6 +2977,86 @@ fn read_utf8_file_limited(path: &Path, limit: usize) -> Result<String, String> {
   String::from_utf8(bytes).map_err(|error| error.to_string())
 }
 
+fn read_package_json_file<T: DeserializeOwned>(
+  path: &Path,
+  source_file: &'static str,
+  limit: usize,
+) -> Result<T, PackageReadError> {
+  let content = read_utf8_file_limited(path, limit).map_err(|error| PackageReadError {
+    code: "read_failed",
+    source_file: PackageSourceFile::from_name(source_file),
+    field_path: "$".to_string(),
+    line: None,
+    column: None,
+    reason: format!("cannot read {source_file}: {error}"),
+    related: Vec::new(),
+  })?;
+
+  let mut deserializer = serde_json::Deserializer::from_str(&content);
+  serde_path_to_error::deserialize(&mut deserializer).map_err(|error| {
+    let field_path = error.path().to_string();
+    let inner = error.into_inner();
+    PackageReadError {
+      code: match inner.classify() {
+        serde_json::error::Category::Syntax | serde_json::error::Category::Eof => "json_syntax",
+        _ => "schema",
+      },
+      source_file: PackageSourceFile::from_name(source_file),
+      field_path: if field_path.is_empty() {
+        "$".to_string()
+      } else {
+        field_path
+      },
+      line: Some(inner.line() as u32),
+      column: Some(inner.column() as u32),
+      reason: inner.to_string(),
+      related: Vec::new(),
+    }
+  })
+}
+
+fn read_package_config_file<T: DeserializeOwned>(
+  package_dir: &Path,
+  file_name: &'static str,
+  limit: usize,
+) -> Result<T, PackageReadError> {
+  let candidate = package_dir.join(file_name);
+  let canonical_package = package_dir.canonicalize().map_err(|error| {
+    PackageReadError::at("$", format!("cannot resolve package directory: {error}"))
+      .in_file(file_name)
+  })?;
+  let canonical_file = match candidate.canonicalize() {
+    Ok(path) => path,
+    Err(_) => return read_package_json_file(&candidate, file_name, limit),
+  };
+  if !canonical_file.starts_with(&canonical_package) {
+    return Err(
+      PackageReadError::at("$", format!("{file_name} escapes the package directory"))
+        .in_file(file_name),
+    );
+  }
+  if !canonical_file.is_file() {
+    return Err(
+      PackageReadError::at("$", format!("{file_name} is not a regular file")).in_file(file_name),
+    );
+  }
+  read_package_json_file(&canonical_file, file_name, limit)
+}
+
+fn read_optional_package_config_file<T: DeserializeOwned>(
+  package_dir: &Path,
+  file_name: &'static str,
+  limit: usize,
+) -> Result<Option<T>, PackageReadError> {
+  match std::fs::symlink_metadata(package_dir.join(file_name)) {
+    Ok(_) => read_package_config_file(package_dir, file_name, limit).map(Some),
+    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+    Err(error) => Err(
+      PackageReadError::at("$", format!("cannot inspect {file_name}: {error}")).in_file(file_name),
+    ),
+  }
+}
+
 fn is_supported_image_path(path: &str) -> bool {
   extension_is(path, &["png", "jpg", "jpeg"])
 }
@@ -2301,42 +3130,19 @@ fn resolve_package_text(
   request: &ScanRequest,
   watched_files: &mut Vec<PathBuf>,
   field: &str,
+  source_file: &str,
 ) -> Result<String, String> {
+  validate_package_text(value, field)?;
   match value {
     RawPackageText::Literal(text) => Ok(text.clone()),
-    RawPackageText::Object(value) if value.text_type == "text" => value
-      .text
-      .clone()
-      .ok_or_else(|| format!("{field}.text is required when type is 'text'")),
-    RawPackageText::Object(value) if value.text_type == "i18n" => {
-      let path = value
-        .path
-        .as_deref()
-        .ok_or_else(|| format!("{field}.path is required when type is 'i18n'"))?;
-      let path = safe_asset_path(path)
-        .filter(|path| extension_is(path, &["json"]))
-        .ok_or_else(|| format!("{field}.path must be a safe relative .json path"))?;
-      let key = value
-        .key
-        .as_deref()
-        .filter(|key| !key.trim().is_empty())
-        .ok_or_else(|| format!("{field}.key is required when type is 'i18n'"))?;
-      let callback = value
-        .callback
-        .as_deref()
-        .ok_or_else(|| format!("{field}.callback is required when type is 'i18n'"))?;
-      Ok(resolve_package_i18n(
-        pkg_dir,
-        &path,
-        key,
-        callback,
-        request,
-        watched_files,
-      ))
-    }
-    RawPackageText::Object(value) => Err(format!(
-      "{field}.type must be 'text' or 'i18n', got '{}'",
-      value.text_type
+    RawPackageText::Object(value) if value.text_type == "text" => Ok(value.text.clone().unwrap()),
+    RawPackageText::Object(value) => Ok(resolve_package_i18n(
+      pkg_dir,
+      source_file,
+      value.key.as_deref().unwrap(),
+      value.callback.as_deref().unwrap(),
+      request,
+      watched_files,
     )),
   }
 }
@@ -2367,6 +3173,7 @@ fn push_package_i18n_watch_path(
       pkg_dir
         .join("assets/language")
         .join(language_code)
+        .join("package")
         .join(path),
     );
   }
@@ -2378,18 +3185,26 @@ fn load_package_i18n_value(
   relative_path: &str,
   key: &str,
 ) -> Option<String> {
+  load_package_i18n_values(pkg_dir, language_code, relative_path)?
+    .get(key)
+    .cloned()
+}
+
+fn load_package_i18n_values(
+  pkg_dir: &Path,
+  language_code: &str,
+  relative_path: &str,
+) -> Option<HashMap<String, String>> {
   if !safe_path_segment(language_code) {
     return None;
   }
   let relative = Path::new("language")
     .join(language_code)
+    .join("package")
     .join(relative_path);
   let path = resolve_package_file(pkg_dir, Path::new("assets"), &relative)?;
   let content = read_utf8_file_limited(&path, MAX_PACKAGE_I18N_BYTES).ok()?;
-  serde_json::from_str::<HashMap<String, String>>(&content)
-    .ok()?
-    .get(key)
-    .cloned()
+  serde_json::from_str(&content).ok()
 }
 
 fn normalize_language_codes(values: &[String]) -> Result<Vec<String>, String> {
@@ -2414,7 +3229,9 @@ fn normalize_language_codes(values: &[String]) -> Result<Vec<String>, String> {
   Ok(normalized)
 }
 
-// 规范化包入口脚本路径。扫描阶段只验证路径语义，不验证脚本文件是否存在。
+// Scan-time normalization checks portable entry semantics; launch-time resolution checks the
+// actual file.
+
 fn resolve_entry(pkg_dir: &Path, entry: &str) -> Result<String, String> {
   let _ = pkg_dir;
   let trimmed = entry.trim();
@@ -2519,29 +3336,64 @@ mod tests {
       .poll_events()
       .into_iter()
       .filter_map(|event| match event {
-        TestEvent::Package(event) => Some(service.handle_async_event(*event, log)),
+        TestEvent::Package(event) => service.handle_async_event(*event, log),
         _ => None,
       })
       .collect()
   }
 
+  fn wait_for_watcher_scan(
+    runtime: &AsyncRuntime<TestEvent>,
+    service: &mut PackageService,
+    log: &mut LogService,
+    change: &str,
+  ) -> PackageEvent {
+    let deadline = Instant::now() + Duration::from_secs(8);
+    let mut rescan_requested = false;
+    while Instant::now() < deadline {
+      for event in runtime.poll_events() {
+        let TestEvent::Package(event) = event else {
+          continue;
+        };
+        let Some(event) = service.handle_async_event(*event, log) else {
+          continue;
+        };
+        if matches!(event, PackageEvent::WatchChanged { .. }) {
+          assert!(service.request_rescan(runtime));
+          rescan_requested = true;
+        }
+        if rescan_requested && matches!(event, PackageEvent::ScanFinished { .. }) {
+          // Wait for the watcher to accept the snapshot file set before mutating the fixture
+          // again.
+
+          std::thread::sleep(Duration::from_millis(150));
+          return event;
+        }
+      }
+      std::thread::sleep(Duration::from_millis(20));
+    }
+    panic!("package watcher did not finish a scan after {change}");
+  }
+
   #[test]
   fn package_id_is_stable_validated_and_separates_source_and_type() {
     let official_game =
-      PackageId::new(PackageSource::Official, PackageType::Game, "sample.game-1").unwrap();
-    let mod_game = PackageId::new(PackageSource::Mod, PackageType::Game, "sample.game-1").unwrap();
+      PackageId::new(PackageSource::Official, PackageType::Game, "sample_game_1").unwrap();
+    let mod_game = PackageId::new(PackageSource::Mod, PackageType::Game, "sample_game_1").unwrap();
     let official_screensaver = PackageId::new(
       PackageSource::Official,
       PackageType::Screensaver,
-      "sample.game-1",
+      "sample_game_1",
     )
     .unwrap();
 
-    assert_eq!(official_game.storage_key(), "official/game/sample.game-1");
+    assert_eq!(official_game.storage_key(), "official/game/sample_game_1");
     assert_ne!(official_game, mod_game);
     assert_ne!(official_game, official_screensaver);
     assert!(PackageId::new(PackageSource::Mod, PackageType::Game, "").is_err());
     assert!(PackageId::new(PackageSource::Mod, PackageType::Game, "bad/id").is_err());
+    assert!(PackageId::new(PackageSource::Mod, PackageType::Game, "old.id").is_err());
+    assert!(PackageId::new(PackageSource::Mod, PackageType::Game, "old-id").is_err());
     assert!(PackageId::new(PackageSource::Mod, PackageType::Game, "中").is_err());
     assert!(PackageId::new(PackageSource::Mod, PackageType::Game, "a".repeat(129)).is_err());
     assert!(
@@ -2553,14 +3405,344 @@ mod tests {
   }
 
   #[test]
-  fn scan_allows_the_same_mod_id_across_sources_and_package_types() {
-    let root = temp_root("package_id_scope");
-    write_game(&root, "scripts/game", "shared.id", "Official Game");
-    write_game(&root, "data/mod/game", "shared.id", "Mod Game");
+  fn package_scanner_rejects_legacy_package_ids() {
+    let root = temp_root("legacy_package_ids");
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+
+    for id in ["old.id", "old-id"] {
+      write_game(&root, "data/mod/game", id, "Legacy ID");
+      let dir = root.join("data/mod/game").join(id);
+      let error =
+        read_package(&dir, id, &PackageType::Game, &PackageSource::Mod, &request).unwrap_err();
+      assert!(
+        error
+          .into_diagnostics(format!("data/mod/game/{id}/package.json"))
+          .iter()
+          .any(|diagnostic| diagnostic.field_path == "mod_id"),
+        "scanner did not report invalid mod_id {id:?}"
+      );
+    }
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn package_read_error_reports_the_config_file_and_field() {
+    let diagnostics = PackageReadError::at("target_fps", "unsupported target FPS")
+      .in_file("game.json")
+      .into_diagnostics("data/mod/game/demo/package.json".to_string());
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+      diagnostics[0].relative_package_path,
+      "data/mod/game/demo/game.json"
+    );
+    assert_eq!(diagnostics[0].field_path, "target_fps");
+    assert_eq!(diagnostics[0].reason, "unsupported target FPS");
+  }
+
+  #[test]
+  fn schema_two_requires_split_config_files_and_reports_the_file() {
+    let root = temp_root("schema2_file_diagnostics");
+    write_game(&root, "data/mod/game", "split_game", "Split Game");
+    let dir = root.join("data/mod/game/split_game");
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+
+    std::fs::remove_file(dir.join("display.json")).unwrap();
+    let diagnostics = read_package(
+      &dir,
+      "split_game",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err()
+    .into_diagnostics("data/mod/game/split_game/package.json".to_string());
+    assert_eq!(
+      diagnostics[0].relative_package_path,
+      "data/mod/game/split_game/display.json"
+    );
+
+    write_game(&root, "data/mod/game", "split_game", "Split Game");
+    std::fs::write(dir.join("display.json"), "[]").unwrap();
+    let diagnostics = read_package(
+      &dir,
+      "split_game",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err()
+    .into_diagnostics("data/mod/game/split_game/package.json".to_string());
+    assert_eq!(
+      diagnostics[0].relative_package_path,
+      "data/mod/game/split_game/display.json"
+    );
+    assert_eq!(diagnostics[0].code, "schema");
+
+    write_game(&root, "data/mod/game", "split_game", "Split Game");
+    std::fs::remove_file(dir.join("game.json")).unwrap();
+    let diagnostics = read_package(
+      &dir,
+      "split_game",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err()
+    .into_diagnostics("data/mod/game/split_game/package.json".to_string());
+    assert_eq!(
+      diagnostics[0].relative_package_path,
+      "data/mod/game/split_game/game.json"
+    );
+
+    write_game(&root, "data/mod/game", "split_game", "Split Game");
+    std::fs::write(dir.join("game.json"), "{").unwrap();
+    let diagnostics = read_package(
+      &dir,
+      "split_game",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err()
+    .into_diagnostics("data/mod/game/split_game/package.json".to_string());
+    assert_eq!(
+      diagnostics[0].relative_package_path,
+      "data/mod/game/split_game/game.json"
+    );
+    assert_eq!(diagnostics[0].code, "json_syntax");
+
     write_screensaver(
       &root,
       "data/mod/screensaver",
-      "shared.id",
+      "split_screen",
+      "Split Screen",
+    );
+    let screen_dir = root.join("data/mod/screensaver/split_screen");
+    std::fs::remove_file(screen_dir.join("screensaver.json")).unwrap();
+    let diagnostics = read_package(
+      &screen_dir,
+      "split_screen",
+      &PackageType::Screensaver,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err()
+    .into_diagnostics("data/mod/screensaver/split_screen/package.json".to_string());
+    assert_eq!(
+      diagnostics[0].relative_package_path,
+      "data/mod/screensaver/split_screen/screensaver.json"
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn schema_one_is_rejected_and_package_marker_is_exact() {
+    let root = temp_root("schema2_header");
+    write_game(&root, "data/mod/game", "schema_game", "Schema Game");
+    let dir = root.join("data/mod/game/schema_game");
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+
+    let mut header: serde_json::Value =
+      serde_json::from_slice(&std::fs::read(dir.join("package.json")).unwrap()).unwrap();
+    header["schema_version"] = serde_json::json!(1);
+    std::fs::write(
+      dir.join("package.json"),
+      serde_json::to_vec(&header).unwrap(),
+    )
+    .unwrap();
+    let diagnostics = read_package(
+      &dir,
+      "schema_game",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err()
+    .into_diagnostics("data/mod/game/schema_game/package.json".to_string());
+    assert!(diagnostics[0].reason.contains("schema 2"));
+
+    header["schema_version"] = serde_json::json!(2);
+    header["package"] = serde_json::json!("tui game");
+    std::fs::write(
+      dir.join("package.json"),
+      serde_json::to_vec(&header).unwrap(),
+    )
+    .unwrap();
+    let package = read_package(
+      &dir,
+      "schema_game",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap();
+    assert_eq!(package.game.unwrap().command, "schema_game");
+
+    header["package"] = serde_json::json!("other");
+    std::fs::write(
+      dir.join("package.json"),
+      serde_json::to_vec(&header).unwrap(),
+    )
+    .unwrap();
+    let error = read_package(
+      &dir,
+      "schema_game",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err();
+    assert_eq!(error.field_path, "package");
+
+    header["package"] = serde_json::Value::Null;
+    std::fs::write(
+      dir.join("package.json"),
+      serde_json::to_vec(&header).unwrap(),
+    )
+    .unwrap();
+    let error = read_package(
+      &dir,
+      "schema_game",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err();
+    assert_eq!(error.field_path, "package");
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn b8_flicker_review_fixture_matches_the_package_schema() {
+    let repository_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .join("../../..")
+      .canonicalize()
+      .unwrap();
+    let package_dir = repository_root.join("test_package/game/b8_flicker_lab");
+    let request = ScanRequest {
+      sequence: 0,
+      root: repository_root,
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+
+    let package = read_package(
+      &package_dir,
+      "b8_flicker_lab",
+      &PackageType::Game,
+      &PackageSource::Official,
+      &request,
+    )
+    .unwrap_or_else(|error| panic!("B8.5 review package failed to load: {error:?}"));
+    let game = package
+      .game
+      .unwrap_or_else(|| panic!("B8.5 review package has no game configuration"));
+
+    assert_eq!(package.mod_id, "b8_flicker_lab");
+    assert_eq!(game.target_fps, Some(120));
+    assert_eq!(game.actions.len(), 7);
+    assert!(package_dir.join("scripts/main.lua").is_file());
+  }
+
+  #[test]
+  fn missing_actions_file_defaults_to_empty_and_is_tracked() {
+    let root = temp_root("optional_actions");
+    write_game(&root, "data/mod/game", "no_actions", "No Actions");
+    let dir = root.join("data/mod/game/no_actions");
+    let actions_path = dir.join("actions.json");
+    std::fs::remove_file(&actions_path).unwrap();
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+
+    let package = read_package(
+      &dir,
+      "no_actions",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap();
+    assert!(package.game.as_ref().unwrap().actions.is_empty());
+    assert!(package.watched_files.contains(&actions_path));
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn package_type_rejects_other_type_config_files() {
+    let root = temp_root("wrong_type_configs");
+    write_game(&root, "data/mod/game", "game_with_screen", "Game");
+    let game_dir = root.join("data/mod/game/game_with_screen");
+    std::fs::write(game_dir.join("screensaver.json"), "{}").unwrap();
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+    let error = read_package(
+      &game_dir,
+      "game_with_screen",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err();
+    assert_eq!(error.source_file.name(), "screensaver.json");
+
+    write_screensaver(
+      &root,
+      "data/mod/screensaver",
+      "screen_with_actions",
+      "Screen",
+    );
+    let screen_dir = root.join("data/mod/screensaver/screen_with_actions");
+    std::fs::write(screen_dir.join("actions.json"), "{}").unwrap();
+    let error = read_package(
+      &screen_dir,
+      "screen_with_actions",
+      &PackageType::Screensaver,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err();
+    assert_eq!(error.source_file.name(), "actions.json");
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn scan_allows_the_same_mod_id_across_sources_and_package_types() {
+    let root = temp_root("package_id_scope");
+    write_game(&root, "scripts/game", "shared_id", "Official Game");
+    write_game(&root, "data/mod/game", "shared_id", "Mod Game");
+    write_screensaver(
+      &root,
+      "data/mod/screensaver",
+      "shared_id",
       "Mod Screensaver",
     );
 
@@ -2573,14 +3755,14 @@ mod tests {
     assert!(
       service
         .find_by_id(
-          &PackageId::new(PackageSource::Official, PackageType::Game, "shared.id").unwrap()
+          &PackageId::new(PackageSource::Official, PackageType::Game, "shared_id").unwrap()
         )
         .is_some()
     );
     assert!(
       service
         .find_by_id(
-          &PackageId::new(PackageSource::Mod, PackageType::Screensaver, "shared.id").unwrap()
+          &PackageId::new(PackageSource::Mod, PackageType::Screensaver, "shared_id").unwrap()
         )
         .is_some()
     );
@@ -2595,6 +3777,17 @@ mod tests {
     );
     assert!(normalize_action_keys("move", vec![Vec::new()]).is_err());
     assert!(normalize_action_keys("move", vec![vec!["arrow_right".into()]]).is_err());
+    assert!(normalize_action_keys("move", vec![vec!["ctrl".into(), "left_ctrl".into()]]).is_err());
+    assert!(
+      normalize_action_keys(
+        "move",
+        vec![
+          vec!["ctrl".into(), "x".into()],
+          vec!["x".into(), "left_ctrl".into()]
+        ]
+      )
+      .is_err()
+    );
     assert!(
       normalize_action_keys(
         "move",
@@ -2612,11 +3805,98 @@ mod tests {
   }
 
   #[test]
+  fn action_priority_preserves_declaration_order_and_reports_invalid_fields() {
+    let root = temp_root("action_priority");
+    write_game(&root, "data/mod/game", "priority_game", "Priority");
+    let dir = root.join("data/mod/game/priority_game");
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".into(),
+      missing_template: MISSING.into(),
+    };
+    let read = || {
+      read_package(
+        &dir,
+        "priority_game",
+        &PackageType::Game,
+        &PackageSource::Mod,
+        &request,
+      )
+    };
+    std::fs::write(
+      dir.join("actions.json"),
+      r#"{
+      "z_first":{"description":"first","keys":[["esc"]]},
+      "a_second":{"description":"second","keys":[["esc"]],"priority":0},
+      "huge":{"description":"huge","keys":[],"priority":18446744073709551615}
+    }"#,
+    )
+    .unwrap();
+    let game = read().unwrap().game.unwrap();
+    assert_eq!(game.action_order, ["z_first", "a_second", "huge"]);
+    assert_eq!(game.actions["z_first"].priority, 0);
+    assert_eq!(game.actions["huge"].priority, u64::MAX);
+    for value in [
+      "-1",
+      "1.5",
+      "1.0",
+      r#""10""#,
+      "true",
+      "null",
+      "18446744073709551616",
+    ] {
+      std::fs::write(
+        dir.join("actions.json"),
+        format!(r#"{{"a":{{"description":"a","keys":[],"priority":{value}}}}}"#),
+      )
+      .unwrap();
+      let error = read().unwrap_err();
+      assert!(error.field_path.contains("priority"), "{value}: {error:?}");
+      assert_eq!(error.source_file, PackageSourceFile::Actions);
+    }
+    std::fs::write(
+      dir.join("actions.json"),
+      r#"{"a":{"description":"a","keys":[]},"a":{"description":"a","keys":[]}}"#,
+    )
+    .unwrap();
+    assert!(read().unwrap_err().reason.contains("duplicate action name"));
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn identical_key_patterns_can_target_multiple_actions() {
+    let actions = HashMap::from([
+      (
+        "move_left".to_string(),
+        vec![vec!["left_ctrl".to_string(), "a".to_string()]],
+      ),
+      (
+        "move_right".to_string(),
+        vec![vec!["a".to_string(), "left_ctrl".to_string()]],
+      ),
+    ]);
+
+    assert!(
+      PackageService::new()
+        .validate_game_action_map(&actions)
+        .is_ok()
+    );
+    assert!(
+      PackageService::new()
+        .validate_game_action_map(&HashMap::from([
+          ("move_left".to_string(), vec![vec!["a".to_string()]]),
+          ("move_right".to_string(), vec![vec!["d".to_string()]]),
+        ]))
+        .is_ok()
+    );
+  }
+
+  #[test]
   fn manifest_semantic_validation_reports_independent_fields_together() {
     let root = temp_root("semantic_diagnostics");
     let dir = root.join("data/mod/game/invalid");
-    std::fs::create_dir_all(dir.join("scripts")).unwrap();
-    std::fs::write(dir.join("scripts/main.lua"), "-- test").unwrap();
+    std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
       dir.join("package.json"),
       r#"{
@@ -2625,18 +3905,12 @@ mod tests {
         "type":"game",
         "version":"1.0.0",
         "version_code":0,
-        "api":{"min":2,"max":0},
-        "entry":"main",
-        "display":{"title":"Invalid","description":"Description","author":"Tester"},
-        "runtime":{"min_width":1,"min_height":1},
-        "game":{
-          "name":"Invalid","detail":"Detail","target_fps":17,
-          "language":["en_us"],"actions":{}
-        }
+        "api":{"min":2,"max":0}
       }"#,
     )
     .unwrap();
     let request = ScanRequest {
+      sequence: 0,
       root: root.clone(),
       language_code: "en_us".to_string(),
       missing_template: MISSING.to_string(),
@@ -2660,34 +3934,53 @@ mod tests {
     assert!(fields.contains(&"version_code"));
     assert!(fields.contains(&"api.min"));
     assert!(fields.contains(&"api.max"));
-    assert!(fields.contains(&"game.target_fps"));
-
     let _ = std::fs::remove_dir_all(root);
   }
 
   #[test]
   fn checked_in_lua_test_packages_have_valid_complete_manifests() {
-    // The checked-in test packages live at the workspace root, three levels above this crate.
+    // Repository package fixtures are reached from the workspace root, not the deployment root.
+
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../test_package");
     let request = ScanRequest {
+      sequence: 0,
       root: root.clone(),
       language_code: "en_us".to_string(),
       missing_template: MISSING.to_string(),
     };
+    let required_fixtures = [
+      (
+        PackageType::Game,
+        &[
+          "block_merge",
+          "permissions_lab",
+          "trail_runner",
+          "b8_flicker_lab",
+        ][..],
+      ),
+      (
+        PackageType::Screensaver,
+        &["layer_waves", "pulse_grid", "star_drift"][..],
+      ),
+    ];
+    let mut package_ids = HashSet::new();
 
     for (relative, expected_type) in [
       ("game", PackageType::Game),
       ("screensaver", PackageType::Screensaver),
     ] {
       let category = root.join(relative);
-      let mut count = 0;
+      let mut fixture_ids = HashSet::new();
       for entry in std::fs::read_dir(&category).unwrap() {
         let entry = entry.unwrap();
         if !entry.file_type().unwrap().is_dir() {
           continue;
         }
-        count += 1;
         let dir_name = entry.file_name().to_string_lossy().into_owned();
+        assert!(
+          fixture_ids.insert(dir_name.clone()),
+          "duplicate {relative} fixture identity {dir_name}"
+        );
         let package = read_package(
           &entry.path(),
           &dir_name,
@@ -2696,9 +3989,16 @@ mod tests {
           &request,
         )
         .unwrap_or_else(|error| panic!("{relative}/{dir_name}: {}", error.reason));
-        assert!(package.runtime.min_width > 0);
-        assert!(package.runtime.min_height > 0);
-        assert!(entry.path().join("scripts/main.lua").is_file());
+        assert!(
+          package_ids.insert(package.id.clone()),
+          "duplicate package identity in checked-in fixtures: {:?}",
+          package.id
+        );
+        assert!(
+          package.path.join("scripts").join(&package.entry).is_file(),
+          "{relative}/{dir_name} entry {} does not exist",
+          package.entry
+        );
         match expected_type {
           PackageType::Game => {
             let game = package.game.expect("game configuration");
@@ -2710,6 +4010,7 @@ mod tests {
                 action: action.clone(),
                 description: config.description.clone(),
                 keys: config.keys.clone(),
+                priority: 0,
               })
               .collect::<Vec<_>>();
             tg_core_input::translate_action_map(&action_map)
@@ -2720,8 +4021,134 @@ mod tests {
           }
         }
       }
-      assert_eq!(count, 3, "expected three {relative} test packages");
+      let required = required_fixtures
+        .iter()
+        .find(|(package_type, _)| package_type == &expected_type)
+        .map(|(_, fixtures)| *fixtures)
+        .expect("required fixture list for package type");
+      for fixture_id in required {
+        assert!(
+          fixture_ids.contains(*fixture_id),
+          "required {relative} fixture {fixture_id} is missing"
+        );
+      }
     }
+  }
+
+  #[test]
+  fn package_dimensions_allow_zero_and_scans_allow_additional_valid_games() {
+    let root = temp_root("package_dimensions");
+    write_game(&root, "data/mod/game", "default_size", "Default Size");
+    write_game(&root, "data/mod/game", "zero_size", "Zero Size");
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+
+    let default_package = read_package(
+      &root.join("data/mod/game/default_size"),
+      "default_size",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap();
+    assert_eq!(default_package.runtime.min_width, 0);
+    assert_eq!(default_package.runtime.min_height, 0);
+
+    let zero_size_dir = root.join("data/mod/game/zero_size");
+    let game_path = zero_size_dir.join("game.json");
+    let mut game: serde_json::Value =
+      serde_json::from_slice(&std::fs::read(&game_path).unwrap()).unwrap();
+    game["min_width"] = serde_json::json!(0);
+    game["min_height"] = serde_json::json!(0);
+    std::fs::write(&game_path, serde_json::to_vec(&game).unwrap()).unwrap();
+    let zero_package = read_package(
+      &zero_size_dir,
+      "zero_size",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap();
+    assert_eq!(zero_package.runtime.min_width, 0);
+    assert_eq!(zero_package.runtime.min_height, 0);
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+    assert_eq!(service.game_list().len(), 2);
+
+    write_game(&root, "data/mod/game", "added_game", "Added Game");
+    scan(&mut service, &root, &mut log, "en_us");
+    let scanned_ids = service
+      .game_list()
+      .into_iter()
+      .map(|package| package.mod_id)
+      .collect::<HashSet<_>>();
+    assert_eq!(scanned_ids.len(), 3);
+    assert!(scanned_ids.contains("added_game"));
+
+    game["min_width"] = serde_json::json!(-1);
+    std::fs::write(&game_path, serde_json::to_vec(&game).unwrap()).unwrap();
+    assert!(
+      read_package(
+        &zero_size_dir,
+        "zero_size",
+        &PackageType::Game,
+        &PackageSource::Mod,
+        &request,
+      )
+      .is_err()
+    );
+
+    game["min_width"] = serde_json::json!("wide");
+    std::fs::write(&game_path, serde_json::to_vec(&game).unwrap()).unwrap();
+    assert!(
+      read_package(
+        &zero_size_dir,
+        "zero_size",
+        &PackageType::Game,
+        &PackageSource::Mod,
+        &request,
+      )
+      .is_err()
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn moved_official_packages_are_explicit_missing_entry_negative_fixtures() {
+    let fixture_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .join("../../../test_package/invalid/official_packages");
+    let request = ScanRequest {
+      sequence: 0,
+      root: fixture_root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+    let mut count = 0;
+    for entry in std::fs::read_dir(&fixture_root).unwrap() {
+      let entry = entry.unwrap();
+      if !entry.file_type().unwrap().is_dir() {
+        continue;
+      }
+      count += 1;
+      assert!(!entry.path().join("scripts").exists());
+      let error = read_package(
+        &entry.path(),
+        &entry.file_name().to_string_lossy(),
+        &PackageType::Game,
+        &PackageSource::Official,
+        &request,
+      )
+      .unwrap_err();
+      assert!(error.reason.contains("scripts directory"), "{error:?}");
+    }
+    assert_eq!(count, 3);
   }
 
   fn write_game(root: &Path, relative: &str, id: &str, title: &str) {
@@ -2733,19 +4160,26 @@ mod tests {
       format!(
         r#"{{
           "mod_id":"{id}",
-          "schema_version":1,
+          "schema_version":2,
           "type":"game",
           "version":"1.0.0",
           "version_code":1,
-          "api":{{"min":1,"max":1}},
-          "entry":"main",
-          "display":{{"title":"{title}","description":"Description","author":"Tester"}},
-          "runtime":{{"min_width":0,"min_height":0}},
-          "game":{{"name":"{title}","detail":"Detail","target_fps":60,"language":["en_us"],"actions":{{}}}}
+          "api":{{"min":1,"max":1}}
         }}"#
       ),
     )
     .unwrap();
+    std::fs::write(
+      dir.join("display.json"),
+      format!(r#"{{"title":"{title}","description":"Description","author":"Tester"}}"#),
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("game.json"),
+      format!(r#"{{"name":"{title}","detail":"Detail","command":"{id}","entry":"main","target_fps":60,"language":["en_us"]}}"#),
+    )
+    .unwrap();
+    std::fs::write(dir.join("actions.json"), "{}").unwrap();
   }
 
   fn write_game_manifest_only(root: &Path, relative: &str, id: &str, title: &str) {
@@ -2757,19 +4191,26 @@ mod tests {
       format!(
         r#"{{
           "mod_id":"{id}",
-          "schema_version":1,
+          "schema_version":2,
           "type":"game",
           "version":"1.0.0",
           "version_code":1,
-          "api":{{"min":1,"max":1}},
-          "entry":"main",
-          "display":{{"title":"{title}","description":"Description","author":"Tester"}},
-          "runtime":{{"min_width":0,"min_height":0}},
-          "game":{{"name":"{title}","detail":"Detail","target_fps":60,"language":["en_us"],"actions":{{}}}}
+          "api":{{"min":1,"max":1}}
         }}"#
       ),
     )
     .unwrap();
+    std::fs::write(
+      dir.join("display.json"),
+      format!(r#"{{"title":"{title}","description":"Description","author":"Tester"}}"#),
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("game.json"),
+      format!(r#"{{"name":"{title}","detail":"Detail","command":"{id}","entry":"main","target_fps":60,"language":["en_us"]}}"#),
+    )
+    .unwrap();
+    std::fs::write(dir.join("actions.json"), "{}").unwrap();
   }
 
   fn write_screensaver(root: &Path, relative: &str, id: &str, title: &str) {
@@ -2781,17 +4222,23 @@ mod tests {
       format!(
         r#"{{
           "mod_id":"{id}",
-          "schema_version":1,
+          "schema_version":2,
           "type":"screensaver",
           "version":"1.0.0",
           "version_code":1,
-          "api":{{"min":1,"max":1}},
-          "entry":"main",
-          "display":{{"title":"{title}","description":"Description","author":"Tester"}},
-          "runtime":{{"min_width":0,"min_height":0}},
-          "screensaver":{{"name":"{title}","command":"screen"}}
+          "api":{{"min":1,"max":1}}
         }}"#
       ),
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("display.json"),
+      format!(r#"{{"title":"{title}","description":"Description","author":"Tester"}}"#),
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("screensaver.json"),
+      format!(r#"{{"name":"{title}","entry":"main","command":"screen"}}"#),
     )
     .unwrap();
   }
@@ -2854,7 +4301,7 @@ mod tests {
     let path = if file.is_empty() {
       language_root.with_extension("json")
     } else {
-      language_root.join(file)
+      language_root.join("package").join(file)
     };
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, json).unwrap();
@@ -2960,6 +4407,316 @@ mod tests {
   }
 
   #[test]
+  fn package_watcher_reloads_created_actions_resources_and_repaired_packages() {
+    let root = temp_root("watch_recovery");
+    write_game(&root, "data/mod/game", "watch_recovery", "Initial");
+    let package_dir = root.join("data/mod/game/watch_recovery");
+    let actions_path = package_dir.join("actions.json");
+    std::fs::remove_file(&actions_path).unwrap();
+    std::fs::create_dir_all(package_dir.join("assets/ui")).unwrap();
+    write_package_language(
+      &root,
+      "data/mod/game",
+      "watch_recovery",
+      "en_us",
+      "display.json",
+      r#"{"watch.title":"Before"}"#,
+    );
+    let display_json = r#"{"title":{"type":"i18n","key":"watch.title","callback":"Callback"},"description":"Description","author":"Tester","icon":{"type":"text","path":"ui/icon.txt"}}"#;
+    let display_path = package_dir.join("display.json");
+    std::fs::write(&display_path, display_json).unwrap();
+    let icon_path = package_dir.join("assets/ui/icon.txt");
+    std::fs::write(&icon_path, "before").unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+    assert_eq!(service.games()[0].display.title, "Before");
+    assert!(matches!(
+      &service.games()[0].display.icon,
+      PackageAsset::Text { lines, .. } if lines.iter().any(|line| line.contains("before"))
+    ));
+
+    let mut runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+    assert!(service.start_watcher(&mut runtime));
+    std::thread::sleep(Duration::from_millis(150));
+
+    std::fs::write(&icon_path, "updated").unwrap();
+    assert!(matches!(
+      wait_for_watcher_scan(&runtime, &mut service, &mut log, "resource update"),
+      PackageEvent::ScanFinished { errors: 0, .. }
+    ));
+    assert!(matches!(
+      &service.games()[0].display.icon,
+      PackageAsset::Text { lines, .. } if lines.iter().any(|line| line.contains("updated"))
+    ));
+
+    std::fs::write(
+      &actions_path,
+      r#"{"move_left":{"description":"Move left","keys":[["a"]]}}"#,
+    )
+    .unwrap();
+    assert!(matches!(
+      wait_for_watcher_scan(&runtime, &mut service, &mut log, "actions creation"),
+      PackageEvent::ScanFinished { errors: 0, .. }
+    ));
+    assert!(
+      service.games()[0]
+        .game
+        .as_ref()
+        .unwrap()
+        .actions
+        .contains_key("move_left")
+    );
+
+    std::fs::write(&display_path, "{").unwrap();
+    assert!(matches!(
+      wait_for_watcher_scan(&runtime, &mut service, &mut log, "invalid config write"),
+      PackageEvent::ScanFinished { errors: 1, .. }
+    ));
+    assert!(service.games().is_empty());
+
+    std::fs::write(&display_path, display_json).unwrap();
+    assert!(matches!(
+      wait_for_watcher_scan(&runtime, &mut service, &mut log, "config repair"),
+      PackageEvent::ScanFinished { errors: 0, .. }
+    ));
+    assert_eq!(service.games()[0].display.title, "Before");
+
+    write_package_language(
+      &root,
+      "data/mod/game",
+      "watch_recovery",
+      "en_us",
+      "display.json",
+      r#"{"watch.title":"After"}"#,
+    );
+    assert!(matches!(
+      wait_for_watcher_scan(&runtime, &mut service, &mut log, "language resource update"),
+      PackageEvent::ScanFinished { errors: 0, .. }
+    ));
+    assert_eq!(service.games()[0].display.title, "After");
+
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn package_watcher_recovers_missing_and_rebuilt_language_directories() {
+    let root = temp_root("watch_language_directories");
+    write_game(&root, "data/mod/game", "language_watch", "Initial");
+    let dir = root.join("data/mod/game/language_watch");
+    std::fs::write(
+      dir.join("display.json"),
+      r#"{"title":{"type":"i18n","key":"title","callback":"Callback"},"description":"Description","author":"Tester"}"#,
+    )
+    .unwrap();
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "zh_cn");
+    assert_eq!(service.games()[0].display.title, "Callback");
+    let mut runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+    assert!(service.start_watcher(&mut runtime));
+    std::thread::sleep(Duration::from_millis(150));
+
+    let english_path = dir.join("assets/language/en_us/package/display.json");
+    std::fs::create_dir_all(english_path.parent().unwrap()).unwrap();
+    std::fs::write(&english_path, r#"{"title":"English"}"#).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "missing ancestor creation",
+    );
+    assert_eq!(service.games()[0].display.title, "English");
+
+    let language_dir = dir.join("assets/language/zh_cn");
+    std::fs::create_dir(&language_dir).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "language directory creation",
+    );
+    let translations = language_dir.join("package");
+    std::fs::create_dir(&translations).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation directory creation",
+    );
+    let title_path = translations.join("display.json");
+    std::fs::write(&title_path, r#"{"title":"Current"}"#).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation file creation",
+    );
+    assert_eq!(service.games()[0].display.title, "Current");
+
+    std::fs::remove_file(&title_path).unwrap();
+    wait_for_watcher_scan(&runtime, &mut service, &mut log, "translation file removal");
+    assert_eq!(service.games()[0].display.title, "English");
+    std::fs::remove_dir(&translations).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation directory removal",
+    );
+    std::fs::create_dir(&translations).unwrap();
+    std::fs::write(&title_path, r#"{"title":"Rebuilt"}"#).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation directory rebuild",
+    );
+    assert_eq!(service.games()[0].display.title, "Rebuilt");
+
+    let replacement = translations.join("replacement.tmp");
+    std::fs::write(&replacement, r#"{"title":"Replaced"}"#).unwrap();
+    std::fs::rename(&replacement, &title_path).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "translation file replacement",
+    );
+    assert_eq!(service.games()[0].display.title, "Replaced");
+
+    let old_dir = language_dir.join("old_package");
+    std::fs::rename(&translations, &old_dir).unwrap();
+    std::fs::create_dir(&translations).unwrap();
+    std::fs::write(&title_path, r#"{"title":"New directory"}"#).unwrap();
+    wait_for_watcher_scan(&runtime, &mut service, &mut log, "directory replacement");
+    assert_eq!(service.games()[0].display.title, "New directory");
+    std::fs::write(&title_path, r#"{"title":"Still watched"}"#).unwrap();
+    wait_for_watcher_scan(&runtime, &mut service, &mut log, "rebuilt directory update");
+    assert_eq!(service.games()[0].display.title, "Still watched");
+
+    drop(runtime);
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn older_scan_events_and_completion_are_ignored_after_newer_failed_scan() {
+    let root = temp_root("scan_sequence");
+    let mut service = PackageService::new();
+    service.configure_scan(&root, "en_us", MISSING);
+    let runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+    let mut log = LogService::new();
+
+    assert!(service.request_rescan(&runtime));
+    let older_sequence = service.scan_sequence;
+    assert!(service.request_rescan_for_language(&runtime, "zh_cn", MISSING));
+    let latest_sequence = service.scan_sequence;
+    assert!(latest_sequence > older_sequence);
+    assert_eq!(service.last_scan.as_ref().unwrap().language_code, "zh_cn");
+
+    let diagnostic = PackageDiagnostic {
+      code: "invalid_config".to_string(),
+      relative_package_path: "data/mod/game/broken/package.json".to_string(),
+      field_path: "id".to_string(),
+      line: Some(2),
+      column: Some(3),
+      reason: "invalid package id".to_string(),
+    };
+    assert!(matches!(
+      service.handle_async_event(
+        PackageAsyncEvent::ScanEvent {
+          sequence: latest_sequence,
+          event: PackageEvent::Diagnostic {
+            package_id: None,
+            diagnostic: diagnostic.clone(),
+          },
+        },
+        &mut log,
+      ),
+      Some(PackageEvent::Diagnostic { diagnostic: accepted, .. }) if accepted == diagnostic
+    ));
+
+    let revision_before_latest_completion = service.snapshot_revision();
+    assert!(matches!(
+      service.handle_async_event(
+        PackageAsyncEvent::SnapshotReady {
+          sequence: latest_sequence,
+          snapshot: PackageSnapshot::default(),
+          finished: PackageEvent::ScanFinished {
+            total: 0,
+            games: 0,
+            screensavers: 0,
+            errors: 1,
+            duplicates: 0,
+          },
+          watched_files: Vec::new(),
+        },
+        &mut log,
+      ),
+      Some(PackageEvent::ScanFinished { errors: 1, .. })
+    ));
+    let revision_after_latest_completion = service.snapshot_revision();
+    assert!(revision_after_latest_completion > revision_before_latest_completion);
+
+    assert!(
+      service
+        .handle_async_event(
+          PackageAsyncEvent::ScanEvent {
+            sequence: older_sequence,
+            event: PackageEvent::ScanProgress {
+              scanned: 1,
+              total: 1,
+            },
+          },
+          &mut log,
+        )
+        .is_none()
+    );
+    assert!(
+      service
+        .handle_async_event(
+          PackageAsyncEvent::ScanEvent {
+            sequence: older_sequence,
+            event: PackageEvent::Diagnostic {
+              package_id: None,
+              diagnostic,
+            },
+          },
+          &mut log,
+        )
+        .is_none()
+    );
+    assert!(
+      service
+        .handle_async_event(
+          PackageAsyncEvent::SnapshotReady {
+            sequence: older_sequence,
+            snapshot: PackageSnapshot::default(),
+            finished: PackageEvent::ScanFinished {
+              total: 0,
+              games: 0,
+              screensavers: 0,
+              errors: 0,
+              duplicates: 0,
+            },
+            watched_files: Vec::new(),
+          },
+          &mut log,
+        )
+        .is_none()
+    );
+    assert_eq!(
+      service.snapshot_revision(),
+      revision_after_latest_completion
+    );
+
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
   fn package_json_only_mod_package_is_scanned() {
     let root = temp_root("manifest_only");
     write_game_manifest_only(&root, "data/mod/game", "manifest_only", "Manifest Only");
@@ -3017,29 +4774,16 @@ mod tests {
   #[test]
   fn package_list_entry_carries_game_action_keys() {
     let root = temp_root("entry_action_keys");
+    write_game(&root, "data/mod/game", "action_keys", "Move Game");
     let dir = root.join("data/mod/game/action_keys");
-    std::fs::create_dir_all(dir.join("scripts")).unwrap();
-    std::fs::write(dir.join("scripts/main.lua"), "-- test").unwrap();
     std::fs::write(
-      dir.join("package.json"),
-      r#"{
-        "mod_id":"action_keys",
-        "schema_version":1,
-        "type":"game",
-        "version":"1.0.0",
-        "version_code":1,
-        "api":{"min":1,"max":1},
-        "entry":"main",
-        "display":{"title":"f%{key:move_up} Move","description":"Description","author":"Tester"},
-        "runtime":{"min_width":0,"min_height":0},
-        "game":{
-          "name":"Move Game","detail":"Detail","language":["en_us"],
-          "target_fps":60,
-          "actions":{
-            "move_up":{"description":"Move up","keys":[["w"],["up"]],"lock":true}
-          }
-        }
-      }"#,
+      dir.join("display.json"),
+      r#"{"title":"f%{key:move_up} Move","description":"Description","author":"Tester"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("actions.json"),
+      r#"{"move_up":{"description":"Move up","keys":[["w"],["up"]],"lock":true},"move_down":{"description":"Move down","keys":[["s"],["down"]]}}"#,
     )
     .unwrap();
 
@@ -3057,13 +4801,26 @@ mod tests {
       PackageId::new(PackageSource::Mod, PackageType::Game, "action_keys")
         .unwrap()
         .storage_key(),
-      BTreeMap::from([("move_up".into(), vec![vec!["k".into()]])]),
+      BTreeMap::from([
+        ("move_up".into(), vec![vec!["k".into()]]),
+        ("move_down".into(), vec![vec!["j".into()]]),
+        ("unknown_action".into(), vec![vec!["x".into()]]),
+      ]),
     )]));
     let entry = service.mod_games().remove(0);
-    assert_eq!(entry.key_actions["move_up"], vec![vec!["k".to_string()]]);
+    assert_eq!(
+      entry.key_actions["move_up"],
+      vec![vec!["w".to_string()], vec!["up".to_string()]]
+    );
+    assert_eq!(entry.key_actions["move_down"], vec![vec!["j".to_string()]]);
+    assert!(!entry.key_actions.contains_key("unknown_action"));
     assert_eq!(
       entry.key_default_actions["move_up"],
       vec![vec!["w".to_string()], vec!["up".to_string()]]
+    );
+    assert_eq!(
+      entry.key_default_actions["move_down"],
+      vec![vec!["s".to_string()], vec!["down".to_string()]]
     );
 
     let _ = std::fs::remove_dir_all(root);
@@ -3072,27 +4829,11 @@ mod tests {
   #[test]
   fn game_action_may_define_no_keys() {
     let root = temp_root("empty_action_keys");
+    write_game(&root, "data/mod/game", "empty_action_keys", "Empty Action");
     let dir = root.join("data/mod/game/empty_action_keys");
-    std::fs::create_dir_all(dir.join("scripts")).unwrap();
-    std::fs::write(dir.join("scripts/main.lua"), "-- test").unwrap();
     std::fs::write(
-      dir.join("package.json"),
-      r#"{
-        "mod_id":"empty_action_keys",
-        "schema_version":1,
-        "type":"game",
-        "version":"1.0.0",
-        "version_code":1,
-        "api":{"min":1,"max":1},
-        "entry":"main",
-        "display":{"title":"Empty Action","description":"Description","author":"Tester"},
-        "runtime":{"min_width":0,"min_height":0},
-        "game":{
-          "name":"Empty Action","detail":"Detail","language":["en_us"],
-          "target_fps":60,
-          "actions":{"optional":{"description":"Optional","keys":[]}}
-        }
-      }"#,
+      dir.join("actions.json"),
+      r#"{"optional":{"description":"Optional","keys":[]}}"#,
     )
     .unwrap();
 
@@ -3111,33 +4852,43 @@ mod tests {
   #[test]
   fn package_i18n_fields_are_resolved_during_scan() {
     let root = temp_root("i18n_fields");
-    write_game_manifest_only(&root, "data/mod/game", "i18n_game", "@display/title");
-    let package_json = root.join("data/mod/game/i18n_game/package.json");
+    write_game_manifest_only(&root, "data/mod/game", "i18n_game", "Title");
+    let dir = root.join("data/mod/game/i18n_game");
     std::fs::write(
-      &package_json,
+      dir.join("package.json"),
       r#"{
         "mod_id":"i18n_game",
-        "schema_version":1,
+        "schema_version":2,
         "type":"game",
-        "version":{"type":"i18n","path":"meta.json","key":"version","callback":"1.0.0"},
+        "version":{"type":"i18n","key":"shared","callback":"1.0.0"},
         "version_code":1,
-        "api":{"min":1,"max":1},
-        "entry":"ui/init",
-        "display":{
-          "title":{"type":"i18n","path":"display.json","key":"title","callback":"Title"},
-          "description":{"type":"i18n","path":"deep/nested/text.json","key":"description","callback":"Description"},
-          "author":{"type":"i18n","path":"common.json","key":"author","callback":"Author"}
-        },
-        "runtime":{"min_width":1,"min_height":1},
-        "game":{
-          "name":{"type":"i18n","path":"common.json","key":"game.name","callback":"Game"},
-          "detail":{"type":"i18n","path":"detail.json","key":"main","callback":"Detail"},
-          "target_fps":60,
-          "language":["zh_cn"],
-          "score":{"enabled":true,"empty_text":{"type":"i18n","path":"common.json","key":"score.empty","callback":"Empty"}},
-          "actions":{"move_up":{"description":{"type":"i18n","path":"action.json","key":"move.up","callback":"Move"},"keys":[["w"]]}}
-        }
+        "api":{"min":1,"max":1}
       }"#,
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("display.json"),
+      r#"{
+        "title":{"type":"i18n","key":"shared","callback":"Title"},
+        "description":{"type":"i18n","key":"description","callback":"Description"},
+        "author":{"type":"i18n","key":"author","callback":"Author"}
+      }"#,
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("game.json"),
+      r#"{
+        "name":{"type":"i18n","key":"shared","callback":"Game"},
+        "detail":{"type":"i18n","key":"detail","callback":"Detail"},
+        "command":"i18n_game","entry":"ui/init","min_width":1,"min_height":1,
+        "target_fps":60,"language":["zh_cn"],
+        "best_score":{"enable":true,"empty_text":{"type":"i18n","key":"best_score.empty","callback":"Empty"}}
+      }"#,
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("actions.json"),
+      r#"{"move_up":{"description":{"type":"i18n","key":"shared","callback":"Move"},"keys":[["w"]]}}"#,
     )
     .unwrap();
     std::fs::create_dir_all(root.join("data/mod/game/i18n_game/scripts/ui")).unwrap();
@@ -3146,54 +4897,21 @@ mod tests {
       "-- test",
     )
     .unwrap();
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_game",
-      "zh_cn",
-      "display.json",
-      r#"{"title":"中文标题"}"#,
-    );
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_game",
-      "zh_cn",
-      "meta.json",
-      r#"{"version":"版本一"}"#,
-    );
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_game",
-      "zh_cn",
-      "deep/nested/text.json",
-      r#"{"description":"多级简介"}"#,
-    );
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_game",
-      "zh_cn",
-      "common.json",
-      r#"{"author":"作者","game.name":"游戏名","score.empty":"无记录"}"#,
-    );
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_game",
-      "zh_cn",
-      "detail.json",
-      r#"{"main":"游戏详情"}"#,
-    );
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_game",
-      "zh_cn",
-      "action.json",
-      r#"{"move.up":"上移"}"#,
-    );
+    // Reuse one key across files to verify that each manifest has its own namespace.
+    for (file, json) in [
+      ("package.json", r#"{"shared":"版本一"}"#),
+      (
+        "display.json",
+        r#"{"shared":"中文标题","description":"多级简介","author":"作者"}"#,
+      ),
+      (
+        "game.json",
+        r#"{"shared":"游戏名","detail":"游戏详情","best_score.empty":"无记录"}"#,
+      ),
+      ("actions.json", r#"{"shared":"上移"}"#),
+    ] {
+      write_package_language(&root, "data/mod/game", "i18n_game", "zh_cn", file, json);
+    }
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
@@ -3217,55 +4935,20 @@ mod tests {
   }
 
   #[test]
-  fn package_i18n_dot_file_key_path_is_resolved() {
+  fn package_text_rejects_a_custom_i18n_path() {
     let root = temp_root("i18n_dot_path");
-    write_game_manifest_only(&root, "data/mod/game", "i18n_dot_game", "Dot Path Game");
-    let package_json = root.join("data/mod/game/i18n_dot_game/package.json");
-    let content = std::fs::read_to_string(&package_json)
-      .unwrap()
-      .replace(
-        r#""author":"Tester""#,
-        r#""author":{"type":"i18n","path":"creator/identity/author.json","key":"name","callback":"Author"}"#,
-      )
-      .replace(r#""version":"1.0.0""#, r#""version":{"type":"i18n","path":"meta/version.json","key":"text","callback":"1.0.0"}"#)
-      .replace(
-        r#""title":"Dot Path Game""#,
-        r#""title":{"type":"i18n","path":"long/path/display/title.json","key":"text","callback":"Title"}"#,
-      );
-    std::fs::write(package_json, content).unwrap();
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_dot_game",
-      "zh_cn",
-      "creator/identity/author.json",
-      r#"{"name":"点号作者"}"#,
-    );
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_dot_game",
-      "zh_cn",
-      "meta/version.json",
-      r#"{"text":"点号版本"}"#,
-    );
-    write_package_language(
-      &root,
-      "data/mod/game",
-      "i18n_dot_game",
-      "zh_cn",
-      "long/path/display/title.json",
-      r#"{"text":"点号标题"}"#,
-    );
+    write_game(&root, "data/mod/game", "i18n_dot_game", "Dot Path Game");
+    std::fs::write(
+      root.join("data/mod/game/i18n_dot_game/display.json"),
+      r#"{"title":{"type":"i18n","path":"nested.json","key":"title","callback":"Title"},"description":"Description","author":"Tester"}"#,
+    )
+    .unwrap();
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
     scan(&mut service, &root, &mut log, "zh_cn");
 
-    let game = service.games().remove(0);
-    assert_eq!(game.display.author, "点号作者");
-    assert_eq!(game.version, "点号版本");
-    assert_eq!(game.display.title, "点号标题");
+    assert!(service.games().is_empty());
 
     let _ = std::fs::remove_dir_all(root);
   }
@@ -3282,18 +4965,11 @@ mod tests {
       "display.json",
       r#"{"title":"English Title"}"#,
     );
-    let package_json = root.join("data/mod/game/fallback_game/package.json");
-    let content = std::fs::read_to_string(&package_json)
-      .unwrap()
-      .replace(
-        r#""title":"Fallback Title""#,
-        r#""title":{"type":"i18n","path":"display.json","key":"title","callback":"Fallback Title"}"#,
-      )
-      .replace(
-        r#""author":"Tester""#,
-        r#""author":{"type":"i18n","path":"missing.json","key":"author","callback":"Fallback Author"}"#,
-      );
-    std::fs::write(package_json, content).unwrap();
+    std::fs::write(
+      root.join("data/mod/game/fallback_game/display.json"),
+      r#"{"title":{"type":"i18n","key":"title","callback":"Fallback Title"},"description":"Description","author":{"type":"i18n","key":"author","callback":"Fallback Author"}}"#,
+    )
+    .unwrap();
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
@@ -3303,6 +4979,32 @@ mod tests {
     assert_eq!(game.display.title, "English Title");
     assert_eq!(game.display.author, "Fallback Author");
 
+    let dir = root.join("data/mod/game/fallback_game");
+    std::fs::create_dir_all(dir.join("assets/language/zh_cn/package")).unwrap();
+    std::fs::write(
+      dir.join("assets/language/zh_cn/package.json"),
+      r#"{"title":"Legacy title"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("assets/language/zh_cn/package/game.json"),
+      r#"{"title":"Wrong manifest title"}"#,
+    )
+    .unwrap();
+    let title_path = dir.join("assets/language/zh_cn/package/display.json");
+    for invalid in ["{", r#"{"title":12}"#, r#"{"other":"Missing title"}"#] {
+      std::fs::write(&title_path, invalid).unwrap();
+      scan(&mut service, &root, &mut log, "zh_cn");
+      assert_eq!(service.games()[0].display.title, "English Title");
+    }
+    std::fs::write(&title_path, r#"{"title":"Current title"}"#).unwrap();
+    scan(&mut service, &root, &mut log, "zh_cn");
+    assert_eq!(service.games()[0].display.title, "Current title");
+    std::fs::remove_file(title_path).unwrap();
+    std::fs::remove_file(dir.join("assets/language/en_us/package/display.json")).unwrap();
+    scan(&mut service, &root, &mut log, "zh_cn");
+    assert_eq!(service.games()[0].display.title, "Fallback Title");
+
     let _ = std::fs::remove_dir_all(root);
   }
 
@@ -3310,18 +5012,18 @@ mod tests {
   fn screensaver_i18n_name_is_resolved() {
     let root = temp_root("screensaver_i18n");
     write_screensaver(&root, "data/mod/screensaver", "screen_i18n", "Screen Title");
-    let package_json = root.join("data/mod/screensaver/screen_i18n/package.json");
-    let content = std::fs::read_to_string(&package_json).unwrap().replace(
+    let screen_json = root.join("data/mod/screensaver/screen_i18n/screensaver.json");
+    let content = std::fs::read_to_string(&screen_json).unwrap().replace(
       r#""name":"Screen Title""#,
-      r#""name":{"type":"i18n","path":"screen.json","key":"name","callback":"Screen Title"}"#,
+      r#""name":{"type":"i18n","key":"name","callback":"Screen Title"}"#,
     );
-    std::fs::write(package_json, content).unwrap();
+    std::fs::write(screen_json, content).unwrap();
     write_package_language(
       &root,
       "data/mod/screensaver",
       "screen_i18n",
       "zh_cn",
-      "screen.json",
+      "screensaver.json",
       r#"{"name":"屏保名"}"#,
     );
 
@@ -3346,12 +5048,12 @@ mod tests {
       "mouse_screen",
       "Mouse Screen",
     );
-    let package_json = root.join("data/mod/screensaver/mouse_screen/package.json");
-    let content = std::fs::read_to_string(&package_json).unwrap().replace(
-      r#""screensaver":{"name":"Mouse Screen","command":"screen"}"#,
-      r#""screensaver":{"name":"Mouse Screen","mouse":true,"command":"screen"}"#,
+    let screen_json = root.join("data/mod/screensaver/mouse_screen/screensaver.json");
+    let content = std::fs::read_to_string(&screen_json).unwrap().replace(
+      r#""entry":"main","command":"screen""#,
+      r#""entry":"main","mouse":true,"command":"screen""#,
     );
-    std::fs::write(package_json, content).unwrap();
+    std::fs::write(screen_json, content).unwrap();
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
@@ -3366,11 +5068,11 @@ mod tests {
   fn game_truecolor_flag_reaches_list_entry() {
     let root = temp_root("game_truecolor");
     write_game(&root, "data/mod/game", "flag_game", "Flag Game");
-    let package_json = root.join("data/mod/game/flag_game/package.json");
-    let content = std::fs::read_to_string(&package_json)
+    let game_json = root.join("data/mod/game/flag_game/game.json");
+    let content = std::fs::read_to_string(&game_json)
       .unwrap()
       .replace(r#""target_fps":60"#, r#""target_fps":60,"truecolor":true"#);
-    std::fs::write(package_json, content).unwrap();
+    std::fs::write(game_json, content).unwrap();
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
@@ -3378,6 +5080,68 @@ mod tests {
 
     let entry = service.mod_games().remove(0);
     assert!(entry.truecolor_required);
+
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn game_target_fps_stays_optional_and_invalid_values_name_game_config() {
+    let root = temp_root("game_target_fps");
+    let request = ScanRequest {
+      sequence: 0,
+      root: root.clone(),
+      language_code: "en_us".to_string(),
+      missing_template: MISSING.to_string(),
+    };
+
+    write_game(&root, "data/mod/game", "fps_default", "Default FPS");
+    let default_dir = root.join("data/mod/game/fps_default");
+    let default_game_json = default_dir.join("game.json");
+    let content = std::fs::read_to_string(&default_game_json)
+      .unwrap()
+      .replace(r#""target_fps":60,"#, "");
+    std::fs::write(default_game_json, content).unwrap();
+    let package = read_package(
+      &default_dir,
+      "fps_default",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap();
+    assert_eq!(package.game.unwrap().target_fps, None);
+
+    write_game(&root, "data/mod/game", "fps_explicit", "Explicit FPS");
+    let explicit = read_package(
+      &root.join("data/mod/game/fps_explicit"),
+      "fps_explicit",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap();
+    assert_eq!(explicit.game.unwrap().target_fps, Some(60));
+
+    write_game(&root, "data/mod/game", "fps_invalid", "Invalid FPS");
+    let invalid_dir = root.join("data/mod/game/fps_invalid");
+    let invalid_game_json = invalid_dir.join("game.json");
+    let content = std::fs::read_to_string(&invalid_game_json)
+      .unwrap()
+      .replace(r#""target_fps":60"#, r#""target_fps":45"#);
+    std::fs::write(invalid_game_json, content).unwrap();
+    let error = read_package(
+      &invalid_dir,
+      "fps_invalid",
+      &PackageType::Game,
+      &PackageSource::Mod,
+      &request,
+    )
+    .unwrap_err();
+    let diagnostics = error.into_diagnostics("data/mod/game/fps_invalid/package.json".to_string());
+    assert!(diagnostics.iter().any(|diagnostic| {
+      diagnostic.field_path == "target_fps"
+        && diagnostic.relative_package_path == "data/mod/game/fps_invalid/game.json"
+    }));
 
     let _ = std::fs::remove_dir_all(root);
   }
@@ -3391,12 +5155,12 @@ mod tests {
       "removed_field_game",
       "Removed Field Game",
     );
-    let package_json = root.join("data/mod/game/removed_field_game/package.json");
-    let content = std::fs::read_to_string(&package_json).unwrap().replace(
+    let game_json = root.join("data/mod/game/removed_field_game/game.json");
+    let content = std::fs::read_to_string(&game_json).unwrap().replace(
       r#""target_fps":60"#,
       r#""target_fps":60,"high_privilege":true"#,
     );
-    std::fs::write(package_json, content).unwrap();
+    std::fs::write(game_json, content).unwrap();
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
@@ -3415,11 +5179,11 @@ mod tests {
       "removed_field_game",
       "Removed Field Game",
     );
-    let package_json = root.join("data/mod/game/removed_field_game/package.json");
-    let content = std::fs::read_to_string(&package_json)
+    let game_json = root.join("data/mod/game/removed_field_game/game.json");
+    let content = std::fs::read_to_string(&game_json)
       .unwrap()
       .replace(r#""target_fps":60"#, r#""target_fps":60,"write":true"#);
-    std::fs::write(package_json, content).unwrap();
+    std::fs::write(game_json, content).unwrap();
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
@@ -3434,18 +5198,21 @@ mod tests {
   fn screensaver_truecolor_command_and_i18n_name_are_scanned() {
     let root = temp_root("screensaver_flags");
     write_screensaver(&root, "data/mod/screensaver", "flag_screen", "Flag Screen");
-    let package_json = root.join("data/mod/screensaver/flag_screen/package.json");
-    let content = std::fs::read_to_string(&package_json).unwrap().replace(
-      r#""screensaver":{"name":"Flag Screen","command":"screen"}"#,
-      r#""screensaver":{"name":{"type":"i18n","path":"screen.json","key":"screen.name","callback":"Flag Screen"},"truecolor":true,"command":"flag-screen"}"#,
-    );
-    std::fs::write(package_json, content).unwrap();
+    let screen_json = root.join("data/mod/screensaver/flag_screen/screensaver.json");
+    let content = std::fs::read_to_string(&screen_json)
+      .unwrap()
+      .replace(
+        r#""name":"Flag Screen""#,
+        r#""name":{"type":"i18n","key":"screen.name","callback":"Flag Screen"},"truecolor":true"#,
+      )
+      .replace(r#""command":"screen""#, r#""command":"flag-screen""#);
+    std::fs::write(screen_json, content).unwrap();
     write_package_language(
       &root,
       "data/mod/screensaver",
       "flag_screen",
       "zh_cn",
-      "screen.json",
+      "screensaver.json",
       r#"{"screen.name":"旗标屏保"}"#,
     );
 
@@ -3472,6 +5239,11 @@ mod tests {
     write_game_manifest_only(&root, "data/mod/game", "asset_game", "Asset Game");
     let dir = root.join("data/mod/game/asset_game");
     std::fs::create_dir_all(dir.join("assets/ui")).unwrap();
+    std::fs::copy(
+      PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../README-i18n/image/logo.png"),
+      dir.join("assets/ui/icon.png"),
+    )
+    .unwrap();
     std::fs::write(dir.join("assets/ui/icon.txt"), "abc\n一二三四五\nx").unwrap();
     std::fs::write(
       dir.join("assets/ui/banner.txt"),
@@ -3483,14 +5255,11 @@ mod tests {
     )
     .unwrap();
 
-    let package_json = dir.join("package.json");
-    let content = std::fs::read_to_string(&package_json)
-      .unwrap()
-      .replace(
-        r#""author":"Tester""#,
-        r#""author":"Tester","icon":{"type":"image","path":"ui/icon.png"},"banner":{"type":"text","path":"ui/banner.txt"}"#,
-      );
-    std::fs::write(package_json, content).unwrap();
+    std::fs::write(
+      dir.join("display.json"),
+      r#"{"title":"Asset Game","description":"Description","author":"Tester","icon":{"type":"image","path":"ui/icon.png","block":"mix_block"},"banner":{"type":"text","path":"ui/banner.txt","block":"unknown-but-ignored"}}"#,
+    )
+    .unwrap();
 
     let mut service = PackageService::new();
     let mut log = LogService::new();
@@ -3500,7 +5269,8 @@ mod tests {
     assert_eq!(
       game.display.icon,
       PackageAsset::Image {
-        path: "ui/icon.png".to_string()
+        path: "ui/icon.png".to_string(),
+        mode: PackageImageMode::MixBlock,
       }
     );
     let PackageAsset::Text { path, lines } = game.display.banner else {
@@ -3522,6 +5292,37 @@ mod tests {
     let icon_path = entry.icon_path.unwrap();
     assert!(Path::new(&icon_path).ends_with(Path::new("assets").join("ui").join("icon.png")));
 
+    let _ = std::fs::remove_dir_all(root);
+  }
+
+  #[test]
+  fn display_image_without_block_uses_half_block_mode() {
+    let root = temp_root("display_image_default_mode");
+    write_game(&root, "data/mod/game", "default_mode", "Default Mode");
+    let dir = root.join("data/mod/game/default_mode");
+    std::fs::create_dir_all(dir.join("assets/ui")).unwrap();
+    std::fs::copy(
+      PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../README-i18n/image/logo.png"),
+      dir.join("assets/ui/icon.png"),
+    )
+    .unwrap();
+    std::fs::write(
+      dir.join("display.json"),
+      r#"{"title":"Default Mode","description":"Description","author":"Tester","icon":{"type":"image","path":"ui/icon.png"}}"#,
+    )
+    .unwrap();
+
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "en_us");
+
+    assert_eq!(
+      service.games()[0].display.icon,
+      PackageAsset::Image {
+        path: "ui/icon.png".to_string(),
+        mode: PackageImageMode::HalfBlock,
+      }
+    );
     let _ = std::fs::remove_dir_all(root);
   }
 
@@ -3551,21 +5352,36 @@ mod tests {
   }
 
   #[test]
-  fn package_watcher_filters_first_level_package_json_only() {
+  fn package_watcher_tracks_all_config_files_across_file_mutations() {
+    use notify::event::{CreateKind, DataChange, ModifyKind, RemoveKind};
+
     let root = PathBuf::from("root/data/mod/game");
     let roots = vec![root.clone()];
+    let package_dir = root.join("alpha");
+    let config_files = [
+      "package.json",
+      "display.json",
+      "game.json",
+      "screensaver.json",
+      "actions.json",
+    ];
 
-    assert_eq!(
-      watched_package_dir(&roots, &root.join("alpha/package.json")),
-      Some(root.join("alpha"))
-    );
+    for name in config_files {
+      assert_eq!(
+        watched_package_dir(&roots, &package_dir.join(name)),
+        Some(package_dir.clone()),
+        "expected {name} to schedule its package for rescanning"
+      );
+      assert_eq!(
+        watched_package_dir(&roots, &package_dir.join("nested").join(name)),
+        None,
+        "nested {name} is not a package config"
+      );
+    }
+
     assert_eq!(
       watched_package_dir(&roots, &root.join("alpha")),
       Some(root.join("alpha"))
-    );
-    assert_eq!(
-      watched_package_dir(&roots, &root.join("alpha/nested/package.json")),
-      None
     );
     assert_eq!(
       watched_package_dir(&roots, &root.join("alpha/nested")),
@@ -3575,6 +5391,40 @@ mod tests {
       watched_package_dir(&roots, &root.join("alpha/readme.md")),
       None
     );
+
+    let physical_temp_root = temp_root("watch_events");
+    let physical_root = physical_temp_root.join("data/mod/game");
+    let physical_package_dir = physical_root.join("alpha");
+    std::fs::create_dir_all(&physical_package_dir).unwrap();
+    let mut watcher =
+      RecommendedWatcher::new(|_: notify::Result<Event>| {}, Config::default()).unwrap();
+    let mut watched_dirs = HashSet::from([physical_root.clone(), physical_package_dir.clone()]);
+    let mut pending = HashSet::new();
+    let watched_files = HashMap::new();
+    let (event_tx, _event_rx) = unbounded::<PackageAsyncEvent>();
+    let mutations = [
+      EventKind::Create(CreateKind::File),
+      EventKind::Modify(ModifyKind::Data(DataChange::Content)),
+      EventKind::Remove(RemoveKind::File),
+    ];
+    for name in config_files {
+      for kind in mutations {
+        let event = Event::new(kind).add_path(physical_package_dir.join(name));
+        queue_package_watch_event::<PackageAsyncEvent>(
+          &mut watcher,
+          &mut watched_dirs,
+          std::slice::from_ref(&physical_root),
+          &watched_files,
+          event,
+          &event_tx,
+          &mut pending,
+        );
+        assert!(pending.contains(&physical_package_dir), "{name}: {kind:?}");
+        pending.clear();
+      }
+    }
+    drop(watcher);
+    let _ = std::fs::remove_dir_all(physical_temp_root);
   }
 
   #[test]
@@ -3586,7 +5436,7 @@ mod tests {
       package_dir.join("package.json"),
       package_dir.join("assets/ui/icon.txt"),
       package_dir.join("assets/language/zh_cn.json"),
-      root.join("beta/assets/language/zh_cn/display.json"),
+      root.join("beta/assets/language/zh_cn/package/display.json"),
       root.join("package.json"),
     ];
 
@@ -3601,10 +5451,118 @@ mod tests {
       Some(&package_dir)
     );
     assert_eq!(
-      watched.get(&root.join("beta/assets/language/zh_cn/display.json")),
+      watched.get(&root.join("beta/assets/language/zh_cn/package/display.json")),
       Some(&root.join("beta"))
     );
     assert!(!watched.contains_key(&root.join("package.json")));
+  }
+
+  #[test]
+  fn best_save_uses_its_own_resource_and_language_fallback() {
+    let root = temp_root("best_save_text");
+    write_game(&root, "data/mod/game", "best_text", "Game");
+    let dir = root.join("data/mod/game/best_text");
+    for (language, file, content) in [
+      (
+        "zh_cn",
+        "best_string.json",
+        r#"{"score":"f%最佳：{value:score} {value:rank}","rank":"金牌"}"#,
+      ),
+      (
+        "en_us",
+        "best_string.json",
+        r#"{"score":"f%Best: {value:score} {value:rank}","only_en":"English"}"#,
+      ),
+      ("zh_cn", "package.json", r#"{"missing":"Wrong resource"}"#),
+    ] {
+      write_package_language(&root, "data/mod/game", "best_text", language, file, content);
+    }
+    let data = serde_json::json!({
+      "best_string":{"type":"i18n","key":"score","callback":"f%Fallback: {value:score}"},
+      "value":{
+        "score":"42",
+        "rank":{"type":"i18n","key":"rank","callback":"Gold"},
+        "english":{"type":"i18n","key":"only_en","callback":"callback"},
+        "missing":{"type":"i18n","key":"missing","callback":"fallback"},
+        "literal":{"type":"text","text":"{value:score}<b>literal"}
+      }
+    });
+    let mut service = PackageService::new();
+    service.configure_scan(&root, "zh_cn", MISSING);
+    let (text, values) = service.resolve_best_save(&dir, &data).unwrap();
+    assert_eq!(text, "f%最佳：{value:score} {value:rank}");
+    assert_eq!(values["rank"], "金牌");
+    assert_eq!(values["english"], "English");
+    assert_eq!(values["missing"], "fallback");
+    assert_eq!(values["literal"], "{value:score}<b>literal");
+    service.configure_scan(&root, "en_us", MISSING);
+    let (text, values) = service.resolve_best_save(&dir, &data).unwrap();
+    assert_eq!(text, "f%Best: {value:score} {value:rank}");
+    assert_eq!(values["rank"], "Gold");
+    assert_eq!(
+      service
+        .resolve_best_save(&dir, &serde_json::json!({"best_string":"---"}))
+        .unwrap(),
+      ("---".into(), HashMap::new())
+    );
+    std::fs::write(
+      dir.join("assets/language/en_us/package/best_string.json"),
+      "{",
+    )
+    .unwrap();
+    let (text, _) = service.resolve_best_save(&dir, &data).unwrap();
+    assert_eq!(text, "f%Fallback: {value:score}");
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn best_save_language_resource_is_watched_before_the_first_save() {
+    let root = temp_root("best_save_watch");
+    write_game(&root, "data/mod/game", "best_watch", "Game");
+    let dir = root.join("data/mod/game/best_watch");
+    let data =
+      serde_json::json!({"best_string":{"type":"i18n","key":"score","callback":"Missing"}});
+    let mut service = PackageService::new();
+    let mut log = LogService::new();
+    scan(&mut service, &root, &mut log, "zh_cn");
+    assert_eq!(service.resolve_best_save(&dir, &data).unwrap().0, "Missing");
+    let mut runtime = AsyncRuntime::<TestEvent>::with_worker_count(1);
+    assert!(service.start_watcher(&mut runtime));
+    std::thread::sleep(Duration::from_millis(150));
+    let mut revision = service.snapshot_revision();
+    for content in [r#"{"score":"Created"}"#, r#"{"score":"Updated"}"#] {
+      write_package_language(
+        &root,
+        "data/mod/game",
+        "best_watch",
+        "zh_cn",
+        "best_string.json",
+        content,
+      );
+      wait_for_watcher_scan(
+        &runtime,
+        &mut service,
+        &mut log,
+        "best score language resource",
+      );
+      assert!(service.snapshot_revision() > revision);
+      revision = service.snapshot_revision();
+      let expected = serde_json::from_str::<serde_json::Value>(content).unwrap();
+      assert_eq!(
+        service.resolve_best_save(&dir, &data).unwrap().0,
+        expected["score"].as_str().unwrap()
+      );
+    }
+    std::fs::remove_file(dir.join("assets/language/zh_cn/package/best_string.json")).unwrap();
+    wait_for_watcher_scan(
+      &runtime,
+      &mut service,
+      &mut log,
+      "best score language resource removal",
+    );
+    assert_eq!(service.resolve_best_save(&dir, &data).unwrap().0, "Missing");
+    drop(runtime);
+    std::fs::remove_dir_all(root).unwrap();
   }
 
   #[test]
@@ -3623,19 +5581,14 @@ mod tests {
       r#"{"title":"监听标题"}"#,
     );
     let package_json = dir.join("package.json");
-    let content = std::fs::read_to_string(&package_json)
-      .unwrap()
-      .replace(
-        r#""title":"Watch Game""#,
-        r#""title":{"type":"i18n","path":"display.json","key":"title","callback":"Watch Game"}"#,
-      )
-      .replace(
-        r#""author":"Tester""#,
-        r#""author":"Tester","icon":{"type":"text","path":"ui/icon.txt"}"#,
-      );
-    std::fs::write(&package_json, content).unwrap();
+    std::fs::write(
+      dir.join("display.json"),
+      r#"{"title":{"type":"i18n","key":"title","callback":"Watch Game"},"description":"Description","author":"Tester","icon":{"type":"text","path":"ui/icon.txt"}}"#,
+    )
+    .unwrap();
 
     let request = ScanRequest {
+      sequence: 0,
       root: root.clone(),
       language_code: "zh_cn".to_string(),
       missing_template: MISSING.to_string(),
@@ -3645,9 +5598,14 @@ mod tests {
     let files = report.watched_files;
 
     assert!(files.contains(&package_json));
+    assert!(files.contains(&dir.join("display.json")));
+    assert!(files.contains(&dir.join("game.json")));
+    assert!(files.contains(&dir.join("actions.json")));
+    assert!(files.contains(&dir.join("assets/language/zh_cn/package/best_string.json")));
+    assert!(files.contains(&dir.join("assets/language/en_us/package/best_string.json")));
     assert!(files.contains(&dir.join("assets/ui/icon.txt")));
-    assert!(files.contains(&dir.join("assets/language/zh_cn/display.json")));
-    assert!(files.contains(&dir.join("assets/language/en_us/display.json")));
+    assert!(files.contains(&dir.join("assets/language/zh_cn/package/display.json")));
+    assert!(files.contains(&dir.join("assets/language/en_us/package/display.json")));
 
     let _ = std::fs::remove_dir_all(root);
   }
@@ -3682,12 +5640,11 @@ mod tests {
     );
     assert!(service.mod_games()[0].icon_path.is_none());
 
-    let package_json = dir.join("package.json");
-    let content = std::fs::read_to_string(&package_json).unwrap().replace(
-      r#""author":"Tester""#,
-      r#""author":"Tester","icon":{"type":"image","path":"bad/icon.gif"}"#,
-    );
-    std::fs::write(package_json, content).unwrap();
+    std::fs::write(
+      dir.join("display.json"),
+      r#"{"title":"Default Asset Game","description":"Description","author":"Tester","icon":{"type":"image","path":"bad/icon.gif"}}"#,
+    )
+    .unwrap();
     scan(&mut service, &root, &mut log, "en_us");
     assert!(service.games().is_empty());
 

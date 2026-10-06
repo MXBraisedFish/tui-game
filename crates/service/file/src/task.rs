@@ -1,3 +1,5 @@
+//! Task support for the file service.
+
 use std::{
   collections::HashMap,
   fs,
@@ -13,119 +15,211 @@ use tg_core_sandbox_path::{
 };
 use tg_service_async::{AsyncJob, TaskCancellation, TaskId};
 
+/// The inputs of an asynchronous file operation.
 #[derive(Clone, Debug)]
 pub enum FileTask {
+  /// The read text setting for file task.
   ReadText {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// The write text setting for file task.
   WriteText {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The text to process or display.
     text: String,
   },
+  /// The read bytes setting for file task.
   ReadBytes {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// The write bytes setting for file task.
   WriteBytes {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The ordered bytes retained by this owner.
     bytes: Vec<u8>,
   },
+  /// The Lua read text setting for file task.
   LuaReadText {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The encoding.
     encoding: String,
   },
+  /// The Lua read bytes setting for file task.
   LuaReadBytes {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// The Lua write text setting for file task.
   LuaWriteText {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The text to process or display.
     text: String,
+    /// The encoding.
     encoding: String,
+    /// The end of line.
     end_of_line: String,
   },
+  /// The Lua write bytes setting for file task.
   LuaWriteBytes {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The ordered bytes retained by this owner.
     bytes: Vec<u8>,
   },
+  /// The Lua list dir setting for file task.
   LuaListDir {
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The recursive.
     recursive: bool,
+    /// The file type.
     file_type: Option<String>,
   },
+  /// The Lua create dir setting for file task.
   LuaCreateDir {
+    /// The filesystem root that bounds path resolution.
     root: PathBuf,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The filesystem path for virtual.
     virtual_path: String,
   },
+  /// The Lua remove setting for file task.
   LuaRemove {
+    /// The filesystem root that bounds path resolution.
     root: PathBuf,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The filesystem path for virtual.
     virtual_path: String,
+    /// The recursive.
     recursive: bool,
   },
+  /// The Lua load i18n setting for file task.
   LuaLoadI18n {
+    /// The assets root.
     assets_root: PathBuf,
+    /// The registered language code.
     language_code: String,
+    /// The callback language code.
     callback_language_code: String,
   },
 }
 
+/// One directory entry with its package-relative path and file kind.
+///
+/// # Fields
+///
+/// * `path` - The filesystem path to read, write, or resolve.
+/// * `file_type` - The file type.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileListEntry {
+  /// The filesystem path to read, write, or resolve.
   pub path: String,
+  /// The file type.
   pub file_type: String,
 }
 
+/// A file event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum FileEvent {
+  /// A read text finished notification delivered to the owning consumer.
   ReadTextFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The text to process or display.
     text: String,
   },
+  /// A write text finished notification delivered to the owning consumer.
   WriteTextFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// A read bytes finished notification delivered to the owning consumer.
   ReadBytesFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The ordered bytes retained by this owner.
     bytes: Vec<u8>,
   },
+  /// A write bytes finished notification delivered to the owning consumer.
   WriteBytesFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// A Lua read text finished notification delivered to the owning consumer.
   LuaReadTextFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The text to process or display.
     text: String,
   },
+  /// A Lua write text finished notification delivered to the owning consumer.
   LuaWriteTextFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// A Lua list dir finished notification delivered to the owning consumer.
   LuaListDirFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The ordered entries retained by this owner.
     entries: Vec<FileListEntry>,
   },
+  /// A Lua create dir finished notification delivered to the owning consumer.
   LuaCreateDirFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// A Lua remove finished notification delivered to the owning consumer.
   LuaRemoveFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// A Lua i18n finished notification delivered to the owning consumer.
   LuaI18nFinished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The registered language code.
     language_code: String,
+    /// The callback language code.
     callback_language_code: String,
+    /// Missing primary or fallback resources, or `None` when both languages were available.
+    warning: Option<String>,
+    /// The namespaces indexed by their declared keys.
     namespaces: HashMap<String, HashMap<String, String>>,
   },
+  /// A failed notification delivered to the owning consumer.
   Failed {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
+    /// The error.
     error: String,
   },
 }
@@ -350,12 +444,13 @@ fn run_file_task<E: From<FileEvent>>(
       language_code,
       callback_language_code,
     } => match load_lua_i18n(&assets_root, &language_code, &callback_language_code) {
-      Ok((language_code, namespaces)) => {
+      Ok((namespaces, warning)) => {
         let _ = event_tx.send(
           FileEvent::LuaI18nFinished {
             task_id,
             language_code,
             callback_language_code,
+            warning,
             namespaces,
           }
           .into(),
@@ -376,14 +471,26 @@ const LUA_DIRECTORY_DEPTH_LIMIT: usize = 32;
 const LUA_I18N_NAMESPACE_LIMIT: usize = 256;
 const LUA_I18N_TOTAL_LIMIT: usize = 4 * 1024 * 1024;
 
-/// Texts of one language, keyed by namespace and then by text key.
 type I18nNamespaces = HashMap<String, HashMap<String, String>>;
 
+/// Load package translations with callback-language fallback, filling missing keys without
+/// replacing primary translations.
+///
+/// # Arguments
+///
+/// * `assets_root` - The assets root.
+/// * `language_code` - The registered language code.
+/// * `callback_language_code` - The callback language code.
+///
+/// # Errors
+///
+/// Return an error for invalid language identifiers, unreadable or invalid translation files,
+/// resource limits, or unsafe paths. Missing languages produce empty maps and a warning.
 fn load_lua_i18n(
   assets_root: &Path,
   language_code: &str,
   callback_language_code: &str,
-) -> Result<(String, I18nNamespaces), String> {
+) -> Result<(I18nNamespaces, Option<String>), String> {
   validate_lua_language_code(language_code)?;
   validate_lua_language_code(callback_language_code)?;
 
@@ -393,16 +500,27 @@ fn load_lua_i18n(
   } else {
     load_lua_language(assets_root, callback_language_code)?
   };
-
-  let (actual_language, mut namespaces) = match (primary, fallback.as_ref()) {
-    (Some(primary), _) => (language_code.to_string(), primary),
-    (None, Some(fallback)) => (callback_language_code.to_string(), fallback.clone()),
-    (None, None) => return Err("no valid i18n language files were found".to_string()),
+  let fallback_missing = if callback_language_code == language_code {
+    primary.is_none()
+  } else {
+    fallback.is_none()
   };
 
-  if actual_language == language_code
-    && let Some(fallback) = fallback
-  {
+  let mut warnings = Vec::new();
+  if primary.is_none() {
+    warnings.push(format!(
+      "primary language '{language_code}' has no language resources"
+    ));
+  }
+  if fallback_missing {
+    warnings.push(format!(
+      "fallback language '{callback_language_code}' has no language resources"
+    ));
+  }
+  let warning = (!warnings.is_empty()).then(|| warnings.join("; "));
+  let mut namespaces = primary.unwrap_or_default();
+
+  if let Some(fallback) = fallback {
     for (namespace, values) in fallback {
       let target = namespaces.entry(namespace).or_default();
       for (key, value) in values {
@@ -410,7 +528,7 @@ fn load_lua_i18n(
       }
     }
   }
-  Ok((actual_language, namespaces))
+  Ok((namespaces, warning))
 }
 
 fn validate_lua_language_code(language_code: &str) -> Result<(), String> {
@@ -429,6 +547,13 @@ fn load_lua_language(
   assets_root: &Path,
   language_code: &str,
 ) -> Result<Option<I18nNamespaces>, String> {
+  if let Err(error) = fs::symlink_metadata(assets_root) {
+    return if error.kind() == std::io::ErrorKind::NotFound {
+      Ok(None)
+    } else {
+      Err("i18n assets directory is unavailable".to_string())
+    };
+  }
   let relative = SafeRelativePath::parse(&format!("language/{language_code}"))
     .map_err(|_| "invalid i18n language path".to_string())?;
   let directory = match resolve_sandbox_path(assets_root, &relative, SandboxPathKind::Directory) {
@@ -922,8 +1047,8 @@ mod tests {
     .unwrap();
     fs::write(fallback.join("extra.json"), r#"{"value":"Extra"}"#).unwrap();
 
-    let (actual, namespaces) = load_lua_i18n(&root, "zh_cn", "en_us").unwrap();
-    assert_eq!(actual, "zh_cn");
+    let (namespaces, warning) = load_lua_i18n(&root, "zh_cn", "en_us").unwrap();
+    assert_eq!(warning, None);
     assert_eq!(namespaces["menu"]["title"], "标题");
     assert_eq!(namespaces["menu"]["fallback"], "Fallback");
     assert_eq!(namespaces["extra"]["value"], "Extra");
@@ -937,8 +1062,11 @@ mod tests {
     fs::create_dir_all(&fallback).unwrap();
     fs::write(fallback.join("menu.json"), r#"{"title":"Title"}"#).unwrap();
 
-    let (actual, namespaces) = load_lua_i18n(&root, "missing", "en_us").unwrap();
-    assert_eq!(actual, "en_us");
+    let (namespaces, warning) = load_lua_i18n(&root, "missing", "en_us").unwrap();
+    assert_eq!(
+      warning.as_deref(),
+      Some("primary language 'missing' has no language resources")
+    );
     assert_eq!(namespaces["menu"]["title"], "Title");
     fs::remove_dir_all(root).unwrap();
   }
@@ -956,6 +1084,63 @@ mod tests {
         .contains("flat string object")
     );
     assert!(load_lua_i18n(&root, "../secret", "en_us").is_err());
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn lua_i18n_missing_or_empty_language_resources_succeed_with_role_warnings() {
+    let root = file_test_directory();
+    for primary_exists in [false, true] {
+      for fallback_exists in [false, true] {
+        for code in ["zh_cn", "en_us"] {
+          let path = root.join("language").join(code);
+          if path.exists() {
+            fs::remove_dir_all(&path).unwrap();
+          }
+        }
+        for (code, exists) in [("zh_cn", primary_exists), ("en_us", fallback_exists)] {
+          if exists {
+            fs::create_dir_all(root.join("language").join(code)).unwrap();
+          }
+        }
+        let (namespaces, warning) = load_lua_i18n(&root, "zh_cn", "en_us").unwrap();
+        assert!(namespaces.is_empty());
+        let warning = warning.unwrap();
+        assert!(warning.contains("primary language 'zh_cn'"));
+        assert!(warning.contains("fallback language 'en_us'"));
+      }
+    }
+    let (namespaces, warning) =
+      load_lua_i18n(&root.join("absent_assets"), "zh_cn", "en_us").unwrap();
+    assert!(namespaces.is_empty() && warning.is_some());
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
+  fn lua_i18n_warns_about_missing_fallback_and_loads_same_language_once() {
+    let root = file_test_directory();
+    fs::create_dir_all(root.join("language/zh_cn")).unwrap();
+    fs::write(root.join("language/zh_cn/menu.json"), r#"{"title":"标题"}"#).unwrap();
+    let (namespaces, warning) = load_lua_i18n(&root, "zh_cn", "en_us").unwrap();
+    assert_eq!(namespaces["menu"]["title"], "标题");
+    assert_eq!(
+      warning.as_deref(),
+      Some("fallback language 'en_us' has no language resources")
+    );
+    let (_, warning) = load_lua_i18n(&root, "zh_cn", "zh_cn").unwrap();
+    assert_eq!(warning, None);
+    let (_, warning) = load_lua_i18n(&root, "absent", "absent").unwrap();
+    let warning = warning.unwrap();
+    assert!(
+      warning.contains("primary language 'absent'")
+        && warning.contains("fallback language 'absent'")
+    );
+    fs::create_dir_all(root.join("language/en_us")).unwrap();
+    fs::write(root.join("language/en_us/menu.json"), "{}").unwrap();
+    let (_, warning) = load_lua_i18n(&root, "zh_cn", "en_us").unwrap();
+    assert_eq!(warning, None);
+    fs::write(root.join("language/en_us/menu.json"), "not json").unwrap();
+    assert!(load_lua_i18n(&root, "zh_cn", "en_us").is_err());
     fs::remove_dir_all(root).unwrap();
   }
 

@@ -1,5 +1,4 @@
-//! Minimal entry: round-trips a text through the system clipboard (restoring the previous
-//! content) when one is available.
+//! Independent clipboard smoke entry exercising the public API and checking its results.
 
 use tg_service_clipboard::ClipboardService;
 

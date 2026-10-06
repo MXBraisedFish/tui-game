@@ -1,3 +1,5 @@
+//! Composition of clipped base, host, widget, and top-layer cells.
+
 use super::{ComposedCell, ComposedFrame};
 use tg_core_style::{CanvasCell, TextColor};
 use tg_core_unicode::graphemes;
@@ -5,8 +7,7 @@ use tg_service_canvas::CanvasService;
 use tg_service_canvas::buffer::CanvasBuffer;
 use tg_service_canvas::{PreparedScrollBox, PreparedSurface};
 
-/// The frame compositor, stacking the base layer, the developer surfaces (slices and scroll boxes),
-/// the host layer and the top layer, in that order, into one composed frame.
+/// The frame compositor representation used by this module.
 pub struct FrameCompositor;
 
 impl Default for FrameCompositor {
@@ -16,11 +17,12 @@ impl Default for FrameCompositor {
 }
 
 impl FrameCompositor {
+  /// Create a frame compositor with its initial state.
   pub fn new() -> Self {
     Self
   }
 
-  /// Composes the canvas layers in stacking order (base -> surfaces -> host -> top) into a frame.
+  /// Combine prepared drawing surfaces into the frame presented to the physical terminal.
   pub fn compose(&self, canvas: &CanvasService) -> ComposedFrame {
     let host = canvas.host_buffer();
     let mut frame = ComposedFrame::new(host.width(), host.height());
@@ -81,8 +83,8 @@ fn overlay_slice(
   ox: u16,
   oy: u16,
 ) {
-  for y in 0..slice.buffer.height() {
-    for x in 0..slice.buffer.width() {
+  for y in 0..slice.rect.height {
+    for x in 0..slice.rect.width {
       if !slice.opaque && !slice.buffer.is_written(x, y) {
         continue;
       }
@@ -234,6 +236,8 @@ fn write_cell(frame: &mut ComposedFrame, x: u16, y: u16, source: &CanvasCell) {
 mod tests {
   use super::*;
   use tg_core_style::TextStyle;
+  use tg_service_canvas::{SliceFrame, SliceId, SurfaceFrame};
+  use tg_service_layout::{LayoutService, Rect};
 
   #[test]
   fn compose_copies_text() {
@@ -246,5 +250,89 @@ mod tests {
       frame.get(1, 2),
       Some(ComposedCell::Text(cell)) if cell.text == "a"
     ));
+  }
+
+  #[test]
+  fn compose_keeps_full_frame_and_applies_slice_source_crop() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(12, 6);
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(
+      1,
+      vec![SurfaceFrame::Slice(SliceFrame {
+        id: SliceId(1),
+        rect: Rect {
+          x: 0,
+          y: 0,
+          width: 6,
+          height: 1,
+        },
+        source_x: 4,
+        source_y: 0,
+        visible: true,
+        opaque: false,
+        background: None,
+      })],
+      &layout,
+    );
+    assert!(canvas.styled_text_on(SliceId(1), 0, 0, "abcdefghij", TextStyle::default(),));
+
+    let frame = FrameCompositor::new().compose(&canvas);
+
+    assert_eq!((frame.width(), frame.height()), (12, 6));
+    let row = (0..6)
+      .map(|x| match frame.get(x, 0).unwrap() {
+        ComposedCell::Text(cell) => cell.text.as_str(),
+        ComposedCell::Empty => " ",
+      })
+      .collect::<String>();
+    assert_eq!(row, "efghij");
+    assert!(matches!(
+      frame.get(6, 0),
+      Some(ComposedCell::Text(cell)) if cell.text == " "
+    ));
+  }
+
+  #[test]
+  fn switching_object_pools_drops_previous_slice_content_even_when_ids_match() {
+    let mut layout = LayoutService::new();
+    layout.resize_physical(4, 2);
+    let slice = SliceId(1);
+    let frame = || {
+      vec![SurfaceFrame::Slice(SliceFrame {
+        id: slice,
+        rect: Rect {
+          x: 0,
+          y: 0,
+          width: 4,
+          height: 2,
+        },
+        source_x: 0,
+        source_y: 0,
+        visible: true,
+        opaque: false,
+        background: None,
+      })]
+    };
+    let mut canvas = CanvasService::new();
+    canvas.begin_frame(&layout);
+    canvas.prepare(11, frame(), &layout);
+    assert!(canvas.styled_text_on(slice, 0, 0, "OLD!", TextStyle::default()));
+    assert!(matches!(
+      FrameCompositor::new().compose(&canvas).get(0, 0),
+      Some(ComposedCell::Text(cell)) if cell.text == "O"
+    ));
+
+    canvas.begin_frame(&layout);
+    canvas.prepare(22, frame(), &layout);
+    let composed = FrameCompositor::new().compose(&canvas);
+
+    assert_eq!(composed.width(), 4);
+    assert_eq!(composed.height(), 2);
+    assert!((0..4).all(|x| matches!(
+      composed.get(x, 0),
+      Some(ComposedCell::Text(cell)) if cell.text == " "
+    )));
   }
 }

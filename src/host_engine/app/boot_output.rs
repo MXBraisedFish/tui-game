@@ -1,14 +1,33 @@
+//! Boot results carried into the initialized application state.
+
 use crate::host_engine::app::{EngineServices, RuntimeWorld};
 use crate::host_engine::core::HostFault;
 
-/// 引擎启动阶段的输出，包含初始化的服务和世界
+/// Initialized services, retained application state, and an optional supervised boot fault.
+///
+/// # Fields
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `fault` - The fault.
 pub struct BootOutput {
+  /// The application services supplied by the lifecycle phase.
   pub services: EngineServices,
+  /// The application-owned runtime state.
   pub world: RuntimeWorld,
+  /// The fault.
   pub fault: Option<HostFault>,
 }
 
 impl BootOutput {
+  /// Retain initialized services and application state, extracting any returned or caught boot
+  /// fault.
+  ///
+  /// # Arguments
+  ///
+  /// * `services` - The application services supplied by the lifecycle phase.
+  /// * `world` - The application-owned runtime state.
+  /// * `result` - The result.
   pub(crate) fn from_boot_result(
     services: EngineServices,
     world: RuntimeWorld,

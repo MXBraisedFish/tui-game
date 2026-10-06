@@ -1,3 +1,5 @@
+//! Storage management page state, user commands, and terminal-cell presentation.
+
 use std::time::Duration;
 
 use crate::host_engine::services::{
@@ -23,6 +25,7 @@ const MENU_KEYS: &[&str] = &[
   "storage_management.export",
 ];
 
+/// The state and owned widgets of the storage management view.
 pub struct StorageManagementUi {
   selected_index: usize,
   objects: UiObjectPool,
@@ -31,6 +34,7 @@ pub struct StorageManagementUi {
   menu_areas: [HitAreaId; MENU_LEN],
 }
 
+/// Resolved geometry and positions used to display storage management.
 pub(crate) struct StorageManagementLayout {
   title_x: u16,
   title_y: u16,
@@ -39,11 +43,16 @@ pub(crate) struct StorageManagementLayout {
   hint_y: u16,
 }
 
+/// An application request produced by storage management interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StorageManagementCommand {
+  /// A request to back.
   Back,
+  /// A request to open view.
   OpenView,
+  /// A request to open clear.
   OpenClear,
+  /// A request to open export.
   OpenExport,
 }
 
@@ -68,6 +77,7 @@ impl RuntimeObjectPoolOwner for StorageManagementUi {
 }
 
 impl StorageManagementUi {
+  /// Create the storage management view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -79,46 +89,55 @@ impl StorageManagementUi {
     }
   }
 
+  /// Return the shortcuts currently enabled by the storage management view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "storage_management.focus_up".to_string(),
         description: "Focus previous option".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management.focus_down".to_string(),
         description: "Focus next option".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management.confirm".to_string(),
         description: "Confirm selected option".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management.back".to_string(),
         description: "Back to settings".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management.focus_view".to_string(),
         description: "Focus storage details".to_string(),
         keys: vec![vec!["1".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management.focus_clear".to_string(),
         description: "Focus clear data".to_string(),
         keys: vec![vec!["2".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "storage_management.focus_export".to_string(),
         description: "Focus export data".to_string(),
         keys: vec![vec!["3".to_string()]],
+        priority: 0,
       },
     ]
   }
 
+  /// Interpret a storage management UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<StorageManagementCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -166,11 +185,21 @@ impl StorageManagementUi {
     }
   }
 
+  /// Advance the storage management view's transient state for this host frame.
   pub fn update(&mut self, dt: Duration) -> Option<StorageManagementCommand> {
     let _ = dt;
     None
   }
 
+  /// Draw the storage management view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -188,6 +217,7 @@ impl StorageManagementUi {
     }
   }
 
+  /// Resolve the storage management view's terminal-cell layout from its available dimensions.
   pub fn compute_positions(
     &self,
     layout: &LayoutService,

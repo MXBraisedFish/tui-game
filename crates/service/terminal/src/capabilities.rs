@@ -1,14 +1,24 @@
-/// Terminal capability description (Unicode, true color and mouse support).
+//! Detection and overrides for terminal color and display capabilities.
+
+/// Detected or overridden Unicode, mouse, and color support.
+///
+/// # Fields
+///
+/// * `unicode` - Whether Unicode output is supported.
+/// * `truecolor` - Whether full RGB output is supported.
+/// * `mouse` - Whether terminal pointer events are supported.
 #[derive(Clone, Debug)]
 pub struct TerminalCapabilities {
+  /// Whether Unicode output is supported.
   pub unicode: bool,
+  /// Whether full RGB output is supported.
   pub truecolor: bool,
+  /// Whether terminal pointer events are supported.
   pub mouse: bool,
 }
 
 impl TerminalCapabilities {
-  /// Returns the default capabilities: Unicode enabled, true color and mouse disabled. The
-  /// terminal itself is not probed.
+  /// Create conservative initial capabilities: Unicode enabled, RGB and pointer support unconfirmed.
   pub fn detect() -> Self {
     Self {
       unicode: true,

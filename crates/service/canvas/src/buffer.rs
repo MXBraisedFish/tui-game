@@ -1,6 +1,8 @@
+//! Storage and mutation of the module's buffered data.
+
 use tg_core_style::CanvasCell;
 
-/// A canvas buffer: a 2D grid of character cells that also tracks which cells were written.
+/// A terminal-cell buffer retaining explicit writes and wide-grapheme continuation state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasBuffer {
   width: u16,
@@ -10,6 +12,7 @@ pub struct CanvasBuffer {
 }
 
 impl CanvasBuffer {
+  /// Create a canvas buffer initialized from `width`, `height`.
   pub fn new(width: u16, height: u16) -> Self {
     let size = width as usize * height as usize;
     Self {
@@ -19,14 +22,16 @@ impl CanvasBuffer {
       written: vec![false; size],
     }
   }
+  /// Return the current width.
   pub fn width(&self) -> u16 {
     self.width
   }
+  /// Return the current height.
   pub fn height(&self) -> u16 {
     self.height
   }
 
-  /// Rebuilds the buffer with a new size, discarding the previous content.
+  /// Resize the base terminal-cell buffer and invalidate its previous contents.
   pub fn resize(&mut self, width: u16, height: u16) {
     self.width = width;
     self.height = height;
@@ -35,7 +40,7 @@ impl CanvasBuffer {
     self.written = vec![false; size];
   }
 
-  /// Clears the buffer, resetting every cell to blank and unwritten.
+  /// Discard the previously retained canvas contents.
   pub fn clear(&mut self) {
     for (cell, written) in self.cells.iter_mut().zip(&mut self.written) {
       *cell = CanvasCell::blank();
@@ -43,7 +48,13 @@ impl CanvasBuffer {
     }
   }
 
-  /// Writes `cell` at the given coordinates; out-of-range coordinates are ignored.
+  /// Write a cell only when its coordinates lie within the buffer bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `cell` - The styled terminal cell to write.
   pub fn set(&mut self, x: u16, y: u16, cell: CanvasCell) {
     let Some(index) = self.index(x, y) else {
       return;
@@ -54,7 +65,7 @@ impl CanvasBuffer {
     }
   }
 
-  /// Erases the cell at the given coordinates, restoring it to the unwritten state.
+  /// Remove the written cell contribution at the supplied buffer coordinates.
   pub fn erase(&mut self, x: u16, y: u16) {
     let Some(index) = self.index(x, y) else {
       return;
@@ -62,12 +73,13 @@ impl CanvasBuffer {
     self.cells[index] = CanvasCell::blank();
     self.written[index] = false;
   }
+  /// Return access to the requested canvas buffer value when it exists.
   pub fn get(&self, x: u16, y: u16) -> Option<&CanvasCell> {
     let index = self.index(x, y)?;
     self.cells.get(index)
   }
 
-  /// Returns whether the cell at the given coordinates has been written.
+  /// Report whether the addressed object is written.
   pub fn is_written(&self, x: u16, y: u16) -> bool {
     self
       .index(x, y)
@@ -76,7 +88,7 @@ impl CanvasBuffer {
       .unwrap_or(false)
   }
 
-  /// Returns the plain text of row `y`.
+  /// Return the visible text stored in the requested buffer row.
   pub fn row_text(&self, y: u16) -> String {
     if y >= self.height {
       return String::new();

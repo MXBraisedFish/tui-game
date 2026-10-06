@@ -1,3 +1,5 @@
+//! Lua random library bindings with validated arguments and session-owned host access.
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -12,6 +14,12 @@ use tg_service_random::{
 const MAX_GENERATORS: usize = 4096;
 static AUTO_SEED_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
+/// Build and register the Lua random API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn random(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   source.raw_set("INT", "int")?;
@@ -39,8 +47,8 @@ fn install_direct(
   };
   source.raw_set(
     name,
-    lua.create_function(move |_lua, values: MultiValue| {
-      let table = args::named(method, values, &["min", "max"])?;
+    lua.create_function(move |lua, values: MultiValue| {
+      let table = positional_table(lua, method, values, &[], &["min", "max"])?;
       if integer {
         let min = args::optional_integer(&table, method, "min", Some(i32::MIN.into()))?.unwrap();
         let max = args::optional_integer(&table, method, "max", Some(i32::MAX.into()))?.unwrap();
@@ -82,7 +90,13 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "create",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "random.create";
-      let table = args::named(method, values, &["type", "min", "max", "seed", "step"])?;
+      let table = positional_table(
+        lua,
+        method,
+        values,
+        &[],
+        &["type", "min", "max", "seed", "step"],
+      )?;
       let configuration = configuration_from_create(&table, method)?;
       with_pool_mut(&create_state, method, |pool| {
         let service = RandomService::new();
@@ -189,120 +203,51 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
 }
 
 fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Result<()> {
-  for (name, allowed) in [
-    ("set", &["id", "type", "min", "max", "seed", "step"][..]),
-    ("set_type", &["id", "type"][..]),
-    ("set_range", &["id", "min", "max"][..]),
-    ("set_seed", &["id", "seed"][..]),
-    ("set_step", &["id", "step"][..]),
-  ] {
-    let method: &'static str = match name {
-      "set" => "random.set",
-      "set_type" => "random.set_type",
-      "set_range" => "random.set_range",
-      "set_seed" => "random.set_seed",
-      _ => "random.set_step",
-    };
-    let state = state.clone();
-    source.raw_set(
-      name,
-      lua.create_function(move |_lua, values: MultiValue| {
-        let table = args::named(method, values, allowed)?;
-        if name == "set_range" {
-          args::required(&table, method, "min")?;
-          args::required(&table, method, "max")?;
-        } else if name == "set_step" {
-          args::required(&table, method, "step")?;
-        }
-        let id = parse_id(args::string(
-          args::required(&table, method, "id")?,
-          method,
-          "id",
-        )?)
-        .ok_or_else(|| args::message(method, "invalid generator ID"))?;
-        with_pool_mut(&state, method, |pool| {
-          let service = RandomService::new();
-          let Some(current) = service.configuration(&pool.runtime().random_generators, id) else {
-            return Ok(false);
-          };
-          let updated = update_configuration(current, &table, method)?;
-          Ok(service.set_configuration(&mut pool.runtime_mut().random_generators, id, updated))
-        })
-      })?,
-    )?;
-  }
-  Ok(())
+  source.raw_set(
+    "set",
+    lua.create_function(move |lua, values: MultiValue| {
+      let method = "random.set";
+      let table = positional_table(
+        lua,
+        method,
+        values,
+        &["id"],
+        &["type", "min", "max", "seed", "step"],
+      )?;
+      let id = parse_id(args::string(
+        args::required(&table, method, "id")?,
+        method,
+        "id",
+      )?)
+      .ok_or_else(|| args::message(method, "invalid generator ID"))?;
+      with_pool_mut(&state, method, |pool| {
+        let service = RandomService::new();
+        let Some(current) = service.configuration(&pool.runtime().random_generators, id) else {
+          return Ok(false);
+        };
+        let updated = update_configuration(current, &table, method)?;
+        Ok(service.set_configuration(&mut pool.runtime_mut().random_generators, id, updated))
+      })
+    })?,
+  )
 }
 
 fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Result<()> {
-  for name in ["get_type", "get_seed", "get_step", "exists"] {
-    let method: &'static str = match name {
-      "get_type" => "random.get_type",
-      "get_seed" => "random.get_seed",
-      "get_step" => "random.get_step",
-      _ => "random.exists",
-    };
-    let state = state.clone();
-    source.raw_set(
-      name,
-      lua.create_function(move |lua, values: MultiValue| {
-        let id = id_argument(values, method)?;
-        with_pool(&state, method, |pool| {
-          let configuration =
-            RandomService::new().configuration(&pool.runtime().random_generators, id);
-          Ok(match name {
-            "get_type" => match configuration {
-              Some(configuration) => {
-                Value::String(lua.create_string(match configuration.range {
-                  RandomConfiguredRange::Integer { .. } => "int",
-                  RandomConfiguredRange::Float { .. } => "float",
-                })?)
-              }
-              None => Value::Nil,
-            },
-            "get_seed" => configuration.map_or(Value::Nil, |value| Value::Integer(value.seed)),
-            "get_step" => configuration
-              .and_then(|value| i64::try_from(value.step).ok())
-              .map_or(Value::Nil, Value::Integer),
-            _ => Value::Boolean(configuration.is_some()),
-          })
-        })
-      })?,
-    )?;
-  }
-
-  let range_state = state.clone();
+  let exists_state = state.clone();
   source.raw_set(
-    "get_range",
-    lua.create_function(move |lua, values: MultiValue| {
-      let method = "random.get_range";
+    "exists",
+    lua.create_function(move |_, values: MultiValue| {
+      let method = "random.exists";
       let id = id_argument(values, method)?;
-      with_pool(&range_state, method, |pool| {
-        match RandomService::new().configuration(&pool.runtime().random_generators, id) {
-          Some(RandomConfiguration {
-            range: RandomConfiguredRange::Integer { min, max },
-            ..
-          }) => {
-            let result = lua.create_table()?;
-            result.raw_set("min", min)?;
-            result.raw_set("max", max)?;
-            Ok(Value::Table(result))
-          }
-          Some(RandomConfiguration {
-            range: RandomConfiguredRange::Float { min, max },
-            ..
-          }) => {
-            let result = lua.create_table()?;
-            result.raw_set("min", min)?;
-            result.raw_set("max", max)?;
-            Ok(Value::Table(result))
-          }
-          None => Ok(Value::Nil),
-        }
+      with_pool(&exists_state, method, |pool| {
+        Ok(
+          RandomService::new()
+            .configuration(&pool.runtime().random_generators, id)
+            .is_some(),
+        )
       })
     })?,
   )?;
-
   source.raw_set(
     "get_info",
     lua.create_function(move |lua, values: MultiValue| {
@@ -570,44 +515,4 @@ fn with_direct_generator<R>(
     }
     operation(&service, objects.runtime_mut(), id)
   })
-}
-
-fn with_pool<R>(
-  state: &SharedApiState,
-  method: &str,
-  operation: impl FnOnce(&crate::LuaObjectPool) -> mlua::Result<R>,
-) -> mlua::Result<R> {
-  let objects = state
-    .borrow()
-    .objects
-    .upgrade()
-    .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
-  let objects = objects
-    .try_borrow()
-    .map_err(|_| args::message(method, "session object pool is busy"))?;
-  operation(
-    objects
-      .as_ref()
-      .ok_or_else(|| args::message(method, "session object pool is unavailable"))?,
-  )
-}
-
-fn with_pool_mut<R>(
-  state: &SharedApiState,
-  method: &str,
-  operation: impl FnOnce(&mut crate::LuaObjectPool) -> mlua::Result<R>,
-) -> mlua::Result<R> {
-  let objects = state
-    .borrow()
-    .objects
-    .upgrade()
-    .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
-  let mut objects = objects
-    .try_borrow_mut()
-    .map_err(|_| args::message(method, "session object pool is busy"))?;
-  operation(
-    objects
-      .as_mut()
-      .ok_or_else(|| args::message(method, "session object pool is unavailable"))?,
-  )
 }

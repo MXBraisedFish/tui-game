@@ -1,4 +1,4 @@
-//! Minimal entry: registers the top bar area and queries its size.
+//! Independent host object smoke entry exercising the public API and checking its results.
 
 use tg_core_geometry::Rect;
 use tg_service_host_object::{HostAreaKind, HostObjectPool};

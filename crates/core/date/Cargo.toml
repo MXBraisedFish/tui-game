@@ -1,0 +1,7 @@
+[package]
+name = "tg-core-date"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chrono = { workspace = true }

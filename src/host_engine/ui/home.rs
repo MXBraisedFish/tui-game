@@ -1,3 +1,5 @@
+//! Home page state, user commands, and terminal-cell presentation.
+
 mod about;
 mod game_list;
 mod logo;
@@ -23,9 +25,7 @@ pub use settings::screenshot_recording::{
   ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
   ScreenshotSettingsUi,
 };
-pub use settings::security::{
-  SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand, SecuritySettingsUi,
-};
+pub use settings::security::{SecuritySettingsCommand, SecuritySettingsUi};
 pub use settings::storage_management::{
   StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
   StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
@@ -85,8 +85,7 @@ fn style_logo(lines: &[&str]) -> String {
   result
 }
 
-/// Screen layout of the home page: positions and areas of the logo, menu items, version label and
-/// action hint.
+/// Resolved geometry and positions used to display home.
 pub(crate) struct HomeLayout {
   logo_x: u16,
   logo_y: u16,
@@ -99,7 +98,7 @@ pub(crate) struct HomeLayout {
   action_hint_y: u16,
 }
 
-/// Home page with the logo, menu navigation and action hints.
+/// The state and owned widgets of the home view.
 pub struct HomeUi {
   selected_index: usize,
   continue_game_name: Option<String>,
@@ -129,22 +128,36 @@ impl RuntimeObjectPoolOwner for HomeUi {
   }
 }
 
-/// Command emitted by the home page.
+/// An application request produced by home UI interactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HomeUiCommand {
+  /// A request to start game.
   StartGame,
+  /// The continue game setting for home UI command.
   ContinueGame,
+  /// A request to open settings.
   OpenSettings,
+  /// A request to open about.
   OpenAbout,
+  /// The exit setting for home UI command.
   Exit,
 }
 
 impl HomeUi {
+  /// Select the next logo mode using the retained sequence cursor.
   pub(crate) fn sequential_logo_mode(cursor: u64) -> DisplayLogoMode {
     logo::dynamic_mode_for_cursor(cursor)
   }
 
-  /// Creates the home page UI and its menu hit areas.
+  /// Create the home view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `animation` - The animation.
+  /// * `random` - The random.
+  /// * `logo_mode` - The logo mode.
+  /// * `logo_seed` - The logo seed.
   pub fn init(
     hit_area: &HitAreaService,
     animation: &AnimationService,
@@ -171,53 +184,61 @@ impl HomeUi {
     }
   }
 
-  /// Returns the action map (key bindings) of the home page.
+  /// Return the shortcuts currently enabled by the home view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       ActionMapEntry {
         action: "home.focus_exit".to_string(),
         description: "Focus exit option".to_string(),
         keys: vec![vec!["esc".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "home.focus_start_game".to_string(),
         description: "Focus start game option".to_string(),
         keys: vec![vec!["1".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "home.focus_continue_game".to_string(),
         description: "Focus continue game option".to_string(),
         keys: vec![vec!["2".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "home.focus_settings".to_string(),
         description: "Focus settings option".to_string(),
         keys: vec![vec!["3".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "home.focus_about".to_string(),
         description: "Focus about option".to_string(),
         keys: vec![vec!["4".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "home.focus_up".to_string(),
         description: "Focus previous option".to_string(),
         keys: vec![vec!["up".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "home.focus_down".to_string(),
         description: "Focus next option".to_string(),
         keys: vec![vec!["down".to_string()]],
+        priority: 0,
       },
       ActionMapEntry {
         action: "home.confirm".to_string(),
         description: "Confirm selected option".to_string(),
         keys: vec![vec!["enter".to_string()]],
+        priority: 0,
       },
     ]
   }
 
-  /// Handles a UI event and returns the command of the menu item the user selected, if any.
+  /// Interpret a home UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<HomeUiCommand> {
     match event {
       UiEvent::HitArea(HitAreaEvent::HoverEnter { id, .. }) => {
@@ -278,6 +299,13 @@ impl HomeUi {
     }
   }
 
+  /// Advance the home view's transient state for this host frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `dt` - The elapsed duration applied to this update.
+  /// * `animation` - The animation.
+  /// * `random` - The random.
   pub fn update(
     &mut self,
     dt: Duration,
@@ -290,7 +318,15 @@ impl HomeUi {
     None
   }
 
-  /// Draws the home page onto the host layer.
+  /// Draw the home view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -311,6 +347,7 @@ impl HomeUi {
     }
   }
 
+  /// Update the continue game name used by this home ui.
   pub fn set_continue_game_name(&mut self, name: Option<String>) {
     self.continue_game_name = name.map(|name| truncate_visible(&name, 12));
     if self.continue_game_name.is_none() && self.selected_index == 1 {
@@ -386,8 +423,7 @@ impl HomeUi {
     RichTextParams::from_action_map(&Self::action_map(), "home.")
   }
 
-  /// Computes the host coordinates of every element of the home page from the
-  /// [`LayoutService`].
+  /// Resolve the home view's terminal-cell layout from its available dimensions.
   pub(crate) fn compute_positions(&self, layout: &LayoutService, i18n: &I18nService) -> HomeLayout {
     let params = self.build_key_params();
     let viewport = layout.developer_viewport_rect();

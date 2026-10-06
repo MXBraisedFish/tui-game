@@ -1,11 +1,23 @@
-//! Terminal service: raw mode / alternate screen lifecycle, capability profile and forced restore.
+//! Terminal capabilities, raw-mode entry, alternate-screen ownership, and restoration.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_terminal::TerminalService;
+//!
+//! let mut terminal = TerminalService::new();
+//! terminal.apply_capability_profile(Some(true), Some("truecolor"), Some(true));
+//! assert!(terminal.capabilities().truecolor);
+//! assert!(!terminal.is_active());
+//! ```
 
 use std::io::{self, Stdout, Write, stdout};
 
 use crossterm::cursor::{Hide, Show};
 
 use crossterm::event::{
-  DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture,
+  DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
+  EnableFocusChange, EnableMouseCapture,
 };
 
 use crossterm::execute;
@@ -18,7 +30,7 @@ mod capabilities;
 
 pub use capabilities::TerminalCapabilities;
 
-/// Terminal service that manages entering and leaving raw mode and the alternate screen.
+/// The public entry point for terminal operations.
 pub struct TerminalService {
   surface: Option<TerminalSurface>,
   capabilities: TerminalCapabilities,
@@ -30,13 +42,13 @@ struct TerminalSurface {
 }
 
 impl TerminalSurface {
-  /// Enters raw mode: enables raw mode, the alternate screen, mouse capture and focus events,
-  /// and hides the cursor.
+  /// Acquire raw mode and alternate-screen ownership, restoring the terminal if partial setup
+  /// fails.
   ///
   /// # Errors
   ///
-  /// Returns the I/O error of the first terminal command that fails; a failure after raw mode
-  /// was enabled force-restores the terminal first.
+  /// Propagate terminal I/O errors while enabling raw mode, alternate-screen output, and event
+  /// capture.
   fn enter() -> io::Result<Self> {
     enable_raw_mode()?;
 
@@ -45,6 +57,7 @@ impl TerminalSurface {
       execute!(stdout, EnterAlternateScreen)?;
       execute!(stdout, EnableMouseCapture)?;
       execute!(stdout, EnableFocusChange)?;
+      execute!(stdout, EnableBracketedPaste)?;
       execute!(stdout, Hide)?;
       stdout.flush()?;
 
@@ -64,17 +77,18 @@ impl TerminalSurface {
     &mut self.stdout
   }
 
-  /// Restores the terminal to normal mode: shows the cursor and disables focus events, mouse
-  /// capture, the alternate screen and raw mode. Does nothing when already restored.
+  /// Restore cursor, capture, screen, and raw-mode state once, using best-effort cleanup for
+  /// Drop.
   fn restore(&mut self) {
     if !self.active {
       return;
     }
 
-    // TODO: log warning — TerminalSurface does not have access to LogService here,
-    // so I/O errors during terminal restore are silently discarded.
+    // Restoration is best-effort because Drop cannot propagate terminal I/O failures.
+
     let _ = execute!(self.stdout, Show);
     let _ = execute!(self.stdout, DisableFocusChange);
+    let _ = execute!(self.stdout, DisableBracketedPaste);
     let _ = execute!(self.stdout, DisableMouseCapture);
     let _ = execute!(self.stdout, LeaveAlternateScreen);
     let _ = self.stdout.flush();
@@ -93,6 +107,7 @@ impl Drop for TerminalSurface {
 }
 
 impl TerminalService {
+  /// Create a terminal service with its initial state.
   pub fn new() -> Self {
     Self {
       surface: None,
@@ -100,10 +115,18 @@ impl TerminalService {
     }
   }
 
+  /// Return the current capabilities.
   pub fn capabilities(&self) -> &TerminalCapabilities {
     &self.capabilities
   }
 
+  /// Apply user-selected capability overrides to the detected terminal profile.
+  ///
+  /// # Arguments
+  ///
+  /// * `unicode` - Whether Unicode output is supported; `None` keeps the detected setting.
+  /// * `color` - The optional terminal color profile; `truecolor` enables full RGB output.
+  /// * `mouse` - Whether terminal pointer input is supported; `None` keeps the detected setting.
   pub fn apply_capability_profile(
     &mut self,
     unicode: Option<bool>,
@@ -121,13 +144,13 @@ impl TerminalService {
     }
   }
 
-  /// Enters terminal raw mode (enables the alternate screen, mouse capture and focus events).
-  ///
-  /// Does nothing when the terminal is already entered.
+  /// Acquire raw mode and alternate-screen ownership, restoring the terminal if partial setup
+  /// fails.
   ///
   /// # Errors
   ///
-  /// Returns the I/O error of the first terminal command that fails.
+  /// Propagate terminal I/O errors while enabling raw mode, alternate-screen output, and event
+  /// capture.
   pub fn enter(&mut self) -> io::Result<()> {
     if self.surface.is_some() {
       return Ok(());
@@ -137,25 +160,26 @@ impl TerminalService {
     Ok(())
   }
 
-  /// Leaves terminal raw mode.
+  /// Restore terminal mode and output state before releasing the active terminal session.
   pub fn exit(&mut self) {
     self.surface = None;
   }
 
+  /// Report whether this terminal service is active.
   pub fn is_active(&self) -> bool {
     self.surface.is_some()
   }
 
+  /// Return mutable access to the owned writer.
   pub fn writer_mut(&mut self) -> Option<&mut Stdout> {
     self.surface.as_mut().map(|surface| surface.writer())
   }
 
-  /// Clears the screen and moves the cursor to (0, 0). Does nothing when the terminal is not
-  /// entered.
+  /// Clear terminal content and move the output cursor to the origin.
   ///
   /// # Errors
   ///
-  /// Returns the I/O error when queuing or flushing the terminal commands fails.
+  /// Propagate terminal I/O errors while clearing the screen or moving the cursor.
   pub fn clear_all_and_home(&mut self) -> io::Result<()> {
     use crossterm::QueueableCommand;
     use crossterm::cursor::MoveTo;
@@ -170,16 +194,17 @@ impl TerminalService {
     Ok(())
   }
 
-  /// Forcibly restores the terminal settings (cleanup for abnormal exits).
+  /// Attempt terminal restoration without requiring a live terminal service instance.
   pub fn force_restore() {
-    // TODO: log warning — static method has no access to LogService,
-    // so I/O errors during forced terminal restore are silently discarded.
+    // Forced restoration is best-effort and has no log-service dependency.
+
     let _ = disable_raw_mode();
 
     let mut stdout = stdout();
 
     let _ = execute!(stdout, Show);
     let _ = execute!(stdout, DisableFocusChange);
+    let _ = execute!(stdout, DisableBracketedPaste);
     let _ = execute!(stdout, DisableMouseCapture);
     let _ = execute!(stdout, LeaveAlternateScreen);
     let _ = stdout.flush();

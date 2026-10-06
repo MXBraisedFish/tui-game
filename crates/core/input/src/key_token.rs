@@ -1,7 +1,10 @@
+//! Portable key-token parsing, canonical persistence, and display labels.
+
 use super::key::Key;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)] // Other target platform variants are constructed by platform-injected tests.
+#[allow(dead_code)] // Platform-injected tests construct variants that the current target cannot produce.
+
 enum KeyDisplayPlatform {
   Windows,
   MacOs,
@@ -23,9 +26,7 @@ fn current_key_display_platform() -> KeyDisplayPlatform {
   }
 }
 
-/// Parses a key token (such as "shift", "a" or "f1") into a [`Key`].
-///
-/// The token is trimmed and matched case-insensitively; unknown tokens yield `None`.
+/// Parse a trimmed, case-insensitive key token, returning `None` for an unknown token.
 pub fn parse_key_token(token: &str) -> Option<Key> {
   let token = token.trim().to_ascii_lowercase();
 
@@ -92,7 +93,7 @@ pub fn parse_key_token(token: &str) -> Option<Key> {
   }
 }
 
-/// Converts any recognized key token into the stable token the input system persists.
+/// Return the persisted token for a recognized key spelling, or `None` when it is unknown.
 pub fn canonical_key_token(token: &str) -> Option<String> {
   parse_key_token(token).map(key_token)
 }
@@ -164,7 +165,7 @@ fn parse_unknown_key(token: &str) -> Option<Key> {
   Some(Key::Unknown(code))
 }
 
-/// Formats key patterns as user-readable display text (such as "[LShift + D]/[LCtrl + C]").
+/// Join key patterns into human-readable shortcut text while retaining alternative combinations.
 pub fn format_key_display(patterns: &[Vec<String>]) -> String {
   format_key_display_for_platform(patterns, current_key_display_platform())
 }
@@ -197,8 +198,8 @@ fn format_key_display_for_platform(
     .join("/")
 }
 
-/// Returns the display sort weight of a key: modifiers < letters < digits < numpad digits <
-/// symbols < numpad operators < other keys.
+/// Rank modifiers before letters, digits, punctuation, and navigation keys in displayed
+/// combinations.
 fn key_display_order(key: &Key) -> u8 {
   match key {
     Key::LeftCtrl | Key::RightCtrl => 0,
@@ -260,7 +261,7 @@ fn key_display_order(key: &Key) -> u8 {
   }
 }
 
-/// Converts a [`Key`] into its human-readable display string.
+/// Return the display label for a keyboard key.
 pub fn display_key_token(key: Key) -> String {
   display_key_token_for_platform(key, current_key_display_platform())
 }
@@ -355,7 +356,7 @@ fn display_key_token_for_platform(key: Key, platform: KeyDisplayPlatform) -> Str
   }
 }
 
-/// Converts a key into the canonical token that can be persisted and parsed again.
+/// Return the stable token that can be parsed back into the same key.
 pub fn key_token(key: Key) -> String {
   match key {
     Key::Esc => "esc".into(),

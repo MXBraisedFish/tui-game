@@ -1,3 +1,5 @@
+//! Service support for the random service.
+
 use rand::{Rng, SeedableRng};
 
 use super::objects::{
@@ -5,13 +7,16 @@ use super::objects::{
   RandomGeneratorId, RandomGeneratorObjects, RandomSeed, RandomSnapshot,
 };
 
+/// The public entry point for random operations.
 pub struct RandomService;
 
 impl RandomService {
+  /// Create a random service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Create an owned random object and return its identity.
   pub fn create(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -20,6 +25,7 @@ impl RandomService {
     generators.create(RandomGenerator::new(seed))
   }
 
+  /// Create an owned random generator with the supplied validated configuration.
   pub fn create_configured(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -30,6 +36,7 @@ impl RandomService {
     generators.create(generator)
   }
 
+  /// Return the configuration for the addressed object when it is available.
   pub fn configuration(
     &self,
     generators: &RandomGeneratorObjects,
@@ -38,6 +45,13 @@ impl RandomService {
     generators.generators.get(&id)?.configuration
   }
 
+  /// Update the configuration used by this random service.
+  ///
+  /// # Arguments
+  ///
+  /// * `generators` - The generators.
+  /// * `id` - The identifier of the owned object.
+  /// * `configuration` - The configuration.
   pub fn set_configuration(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -57,6 +71,7 @@ impl RandomService {
     true
   }
 
+  /// Return the identifiers of generators having explicit configuration.
   pub fn configured_ids(&self, generators: &RandomGeneratorObjects) -> Vec<RandomGeneratorId> {
     let mut ids = generators
       .generators
@@ -67,12 +82,14 @@ impl RandomService {
     ids
   }
 
+  /// Clear the configured retained by this random service.
   pub fn clear_configured(&self, generators: &mut RandomGeneratorObjects) {
     generators
       .generators
       .retain(|_, generator| generator.configuration.is_none());
   }
 
+  /// Generate a value using the identifier's validated configured distribution.
   pub fn generate_configured(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -97,6 +114,14 @@ impl RandomService {
     Some(value)
   }
 
+  /// Generate an integer within both inclusive bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `generators` - The generators.
+  /// * `id` - The identifier of the owned object.
+  /// * `min` - The lower bound of the accepted or generated range.
+  /// * `max` - The upper bound of the accepted or generated range.
   pub fn int_range_inclusive(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -112,6 +137,14 @@ impl RandomService {
     Some(sample_i64_inclusive(&mut generator.rng, min, max))
   }
 
+  /// Generate a floating-point value within the configured inclusive range.
+  ///
+  /// # Arguments
+  ///
+  /// * `generators` - The generators.
+  /// * `id` - The identifier of the owned object.
+  /// * `min` - The lower bound of the accepted or generated range.
+  /// * `max` - The upper bound of the accepted or generated range.
   pub fn float_range_inclusive(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -127,14 +160,23 @@ impl RandomService {
     Some(sample_f64_inclusive(&mut generator.rng, min, max))
   }
 
+  /// Remove the identified random object and release its owned state.
   pub fn remove(&self, generators: &mut RandomGeneratorObjects, id: RandomGeneratorId) -> bool {
     generators.generators.remove(&id).is_some()
   }
 
+  /// Report whether the identified random object is still present.
   pub fn exists(&self, generators: &RandomGeneratorObjects, id: RandomGeneratorId) -> bool {
     generators.generators.contains_key(&id)
   }
 
+  /// Reset the generator's stream state using the supplied seed.
+  ///
+  /// # Arguments
+  ///
+  /// * `generators` - The generators.
+  /// * `id` - The identifier of the owned object.
+  /// * `seed` - The seed initializing the random stream.
   pub fn reseed(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -148,6 +190,13 @@ impl RandomService {
     true
   }
 
+  /// Update the stream used by this random service.
+  ///
+  /// # Arguments
+  ///
+  /// * `generators` - The generators.
+  /// * `id` - The identifier of the owned object.
+  /// * `stream` - The random stream selector.
   pub fn set_stream(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -161,6 +210,7 @@ impl RandomService {
     true
   }
 
+  /// Generate the next unsigned 32-bit value from the owned random stream.
   pub fn next_u32(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -171,6 +221,7 @@ impl RandomService {
     Some(generator.rng.next_u32())
   }
 
+  /// Generate the next unsigned 64-bit value from the owned random stream.
   pub fn next_u64(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -181,6 +232,7 @@ impl RandomService {
     Some(generator.rng.next_u64())
   }
 
+  /// Generate a floating-point value in the generator's unit interval.
   pub fn float_01(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -191,6 +243,14 @@ impl RandomService {
     Some(next_f64(&mut generator.rng))
   }
 
+  /// Generate an integer within the supplied range.
+  ///
+  /// # Arguments
+  ///
+  /// * `generators` - The generators.
+  /// * `id` - The identifier of the owned object.
+  /// * `min` - The lower bound of the accepted or generated range.
+  /// * `max` - The upper bound of the accepted or generated range.
   pub fn int_range(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -206,6 +266,13 @@ impl RandomService {
     Some(sample_i64_range(&mut generator.rng, min, max))
   }
 
+  /// Generate a boolean using the requested probability.
+  ///
+  /// # Arguments
+  ///
+  /// * `generators` - The generators.
+  /// * `id` - The identifier of the owned object.
+  /// * `probability` - The probability.
   pub fn bool(
     &self,
     generators: &mut RandomGeneratorObjects,
@@ -226,6 +293,7 @@ impl RandomService {
     Some(next_f64(&mut generator.rng) < probability)
   }
 
+  /// Return the snapshot for the addressed object when it is available.
   pub fn snapshot(
     &self,
     generators: &RandomGeneratorObjects,
@@ -237,6 +305,7 @@ impl RandomService {
       .map(|generator| generator.snapshot(id))
   }
 
+  /// Create a new owned random generator by restoring the supplied snapshot.
   pub fn restore(
     &self,
     generators: &mut RandomGeneratorObjects,

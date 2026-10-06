@@ -1,5 +1,5 @@
-mod security_details;
+//! Security page state, user commands, and terminal-cell presentation.
+
 mod security_settings;
 
-pub use security_details::{SecurityDetailsCommand, SecurityDetailsUi};
 pub use security_settings::{SecuritySettingsCommand, SecuritySettingsUi};

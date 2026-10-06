@@ -1,3 +1,5 @@
+//! Toolbar custom page state, user commands, and terminal-cell presentation.
+
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, I18nService, LayoutService, Rect,
   RenderService, RichTextParams, RuntimeObjectPool, RuntimeObjectPoolOwner, TextColor,
@@ -7,15 +9,19 @@ use crate::host_engine::services::{
 
 const NS: &str = "toolbar_custom";
 
+/// The state and owned widgets of the toolbar custom view.
 pub struct ToolbarCustomUi {
   objects: UiObjectPool,
   runtime_objects: RuntimeObjectPool,
   input: TextInputId,
 }
 
+/// An application request produced by toolbar custom interactions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ToolbarCustomCommand {
+  /// The changed setting for toolbar custom command.
   Changed(String),
+  /// The submit setting for toolbar custom command.
   Submit(String),
 }
 
@@ -40,6 +46,7 @@ impl RuntimeObjectPoolOwner for ToolbarCustomUi {
 }
 
 impl ToolbarCustomUi {
+  /// Create the toolbar custom view and allocate its owned UI objects.
   pub fn init(text_input: &TextInputService, initial_text: String) -> Self {
     let mut objects = UiObjectPool::new();
     let input = text_input.create(
@@ -58,14 +65,17 @@ impl ToolbarCustomUi {
     }
   }
 
+  /// Load toolbar settings and select the first editable control.
   pub fn enter(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.focus(&mut self.objects, self.input);
   }
 
+  /// Restore the saved toolbar mode after leaving its customization preview.
   pub fn leave(&mut self, text_input: &mut TextInputService) {
     let _ = text_input.blur(&mut self.objects);
   }
 
+  /// Interpret a toolbar custom UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<ToolbarCustomCommand> {
     match event {
       UiEvent::TextInput(TextInputEvent::Changed { id, value }) if *id == self.input => {
@@ -78,6 +88,15 @@ impl ToolbarCustomUi {
     }
   }
 
+  /// Draw the toolbar custom view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `text_input` - The text input.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -92,6 +111,7 @@ impl ToolbarCustomUi {
         action: "host_key.top_toolbar".to_string(),
         description: "Switch top toolbar view".to_string(),
         keys: vec![vec!["f5".to_string()]],
+        priority: 0,
       }],
       "toolbar_custom.",
     );

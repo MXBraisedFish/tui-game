@@ -1,6 +1,15 @@
+//! Application business transitions produced by page and overlay commands.
+
 use super::*;
 use crate::host_engine::services::{UiObjectPool, UiObjectPoolOwner};
 
+/// Apply the home view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_home_command(
   command: HomeUiCommand,
   services: &mut EngineServices,
@@ -22,6 +31,14 @@ pub(super) fn apply_home_command(
   }
 }
 
+/// Apply the game list view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `game_list_ui` - The game list ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_game_list_command(
   command: GameListCommand,
   game_list_ui: &mut GameListUi,
@@ -142,6 +159,7 @@ fn start_game(
         action: action.clone(),
         description: action.clone(),
         keys: keys.clone(),
+        priority: 0,
       },
     )
     .collect::<Vec<_>>();
@@ -157,6 +175,8 @@ fn start_game(
     return false;
   }
   let api = crate::host_engine::services::LuaApiConfig {
+    input_method: Some(services.input_method.clone()),
+    clipboard: Some(services.clipboard.clone()),
     debug_enabled,
     key_actions,
     key_default_actions,
@@ -273,8 +293,7 @@ fn start_game(
   true
 }
 
-/// Lua 入口尚未成功创建 Session 时，无法走运行中 Session 的统一故障处理，
-/// 但对玩家而言仍然是一次游戏启动故障，必须给出可见反馈。
+/// Report a failed game startup and isolate its package session without terminating the host.
 fn show_game_start_fault(services: &mut EngineServices, world: &mut RuntimeWorld) {
   world.state.push_game_warning_overlay();
   services.input.clear();
@@ -282,6 +301,14 @@ fn show_game_start_fault(services: &mut EngineServices, world: &mut RuntimeWorld
   services.presenter.request_render();
 }
 
+/// Apply the cover continue view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `cover_continue_ui` - The cover continue ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_cover_continue_command(
   command: CoverContinueCommand,
   cover_continue_ui: &mut CoverContinueUi,
@@ -314,6 +341,14 @@ pub(super) fn apply_cover_continue_command(
   }
 }
 
+/// Write a package startup failure to its own log and report the isolated session in the host
+/// log.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `package_id` - The stable source, type, and name of the package.
+/// * `message` - The diagnostic or display message.
 pub(super) fn log_package_start_error(
   services: &mut EngineServices,
   package_id: &crate::host_engine::services::PackageId,
@@ -339,6 +374,14 @@ pub(super) fn log_package_start_error(
   );
 }
 
+/// Apply the input demo view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `input_demo_ui` - The input demo ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_input_demo_command(
   command: InputDemoCommand,
   input_demo_ui: &mut InputDemoUi,
@@ -366,10 +409,19 @@ pub(super) fn apply_input_demo_command(
   services.presenter.request_render();
 }
 
+/// Apply the settings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `settings_ui` - The settings ui.
+/// * `security_settings_ui` - The security settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_settings_command(
   command: SettingsUiCommand,
   settings_ui: &mut SettingsUi,
-  security_uis: &mut SecurityUis,
+  security_settings_ui: &mut SecuritySettingsUi,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
@@ -391,9 +443,7 @@ pub(super) fn apply_settings_command(
         .storage
         .read_package_state_or_default(&mut services.log)
         .defaults;
-      security_uis
-        .settings
-        .set_defaults(defaults.enabled, defaults.debug);
+      security_settings_ui.set_defaults(defaults.enabled, defaults.debug);
       world.state.enter_ui_node(UiNodeState::security_settings())
     }
     SettingsUiCommand::OpenDisplaySettings => {
@@ -408,6 +458,14 @@ pub(super) fn apply_settings_command(
   }
 }
 
+/// Apply the key bindings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `settings_ui` - The settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_key_bindings_command(
   command: KeyBindingsCommand,
   settings_ui: &mut SettingsUi,
@@ -448,6 +506,14 @@ pub(super) fn apply_key_bindings_command(
   }
 }
 
+/// Apply the global key bindings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `_settings_ui` - The settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_global_key_bindings_command(
   command: GlobalKeyBindingsCommand,
   _settings_ui: &mut SettingsUi,
@@ -465,11 +531,22 @@ pub(super) fn apply_global_key_bindings_command(
         world.state.pop_ui_node();
       }
     }
-    GlobalKeyBindingsCommand::Conflict(mut request) => {
-      request.text = services
-        .i18n
-        .get_runtime_text("key_bindings_global", "key_bindings_global.conflict");
-      services.popup.show(request);
+
+    GlobalKeyBindingsCommand::InvalidBindings => {
+      services.popup.show(PopupRequest {
+        text: services
+          .i18n
+          .get_runtime_text("key_bindings_global", "key_bindings_global.invalid"),
+        color: TextColor::Rgb {
+          r: 239,
+          g: 41,
+          b: 41,
+        },
+        duration: Duration::from_secs(2),
+        dismiss_on: Vec::new(),
+        replaceable: true,
+        persistent: false,
+      });
     }
     GlobalKeyBindingsCommand::CaptureStarted => {
       let _ = services.input.enable_raw_key_capture();
@@ -478,6 +555,14 @@ pub(super) fn apply_global_key_bindings_command(
   }
 }
 
+/// Apply the game key bindings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `settings_ui` - The settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_game_key_bindings_command(
   command: GameKeyBindingsCommand,
   settings_ui: &mut SettingsUi,
@@ -497,12 +582,7 @@ pub(super) fn apply_game_key_bindings_command(
         world.state.pop_ui_node();
       }
     }
-    GameKeyBindingsCommand::Conflict(mut request) => {
-      request.text = services
-        .i18n
-        .get_runtime_text("key_bindings_game", "key_bindings_game.conflict");
-      services.popup.show(request);
-    }
+
     GameKeyBindingsCommand::FocusSearch => {
       let ui = settings_ui.key_bindings_mut().game_mut();
       let id = ui.search_input();
@@ -511,6 +591,22 @@ pub(super) fn apply_game_key_bindings_command(
     GameKeyBindingsCommand::BlurSearch => {
       let ui = settings_ui.key_bindings_mut().game_mut();
       let _ = services.text_input.blur(ui.objects_mut());
+    }
+    GameKeyBindingsCommand::InvalidBindings => {
+      services.popup.show(PopupRequest {
+        text: services
+          .i18n
+          .get_runtime_text("key_bindings_game", "key_bindings_game.invalid"),
+        color: TextColor::Rgb {
+          r: 239,
+          g: 41,
+          b: 41,
+        },
+        duration: Duration::from_secs(2),
+        dismiss_on: Vec::new(),
+        replaceable: true,
+        persistent: false,
+      });
     }
     GameKeyBindingsCommand::CaptureStarted => {
       let _ = services.input.enable_raw_key_capture();
@@ -524,6 +620,14 @@ pub(super) fn apply_game_key_bindings_command(
   }
 }
 
+/// Apply the screenshot recording view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `settings_ui` - The settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_screenshot_recording_command(
   command: ScreenshotRecordingCommand,
   settings_ui: &mut SettingsUi,
@@ -621,6 +725,14 @@ pub(super) fn apply_screenshot_recording_command(
   }
 }
 
+/// Apply the screenshot list view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `settings_ui` - The settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_screenshot_list_command(
   command: ScreenshotListCommand,
   settings_ui: &mut SettingsUi,
@@ -707,6 +819,14 @@ pub(super) fn apply_screenshot_list_command(
   }
 }
 
+/// Apply the recording list view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `settings_ui` - The settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_recording_list_command(
   command: RecordingListCommand,
   settings_ui: &mut SettingsUi,
@@ -820,6 +940,14 @@ fn show_delete_blocked_popup(services: &mut EngineServices, namespace: &str, key
   });
 }
 
+/// Apply the recording settings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `settings_ui` - The settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_recording_settings_command(
   command: RecordingSettingsCommand,
   settings_ui: &mut SettingsUi,
@@ -864,6 +992,14 @@ pub(super) fn apply_recording_settings_command(
   }
 }
 
+/// Apply the screenshot settings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `settings_ui` - The settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_screenshot_settings_command(
   command: ScreenshotSettingsCommand,
   settings_ui: &mut SettingsUi,
@@ -925,6 +1061,14 @@ pub(super) fn apply_screenshot_settings_command(
   }
 }
 
+/// Apply the display settings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `display_settings_ui` - The display settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_display_settings_command(
   command: DisplaySettingsCommand,
   display_settings_ui: &mut DisplaySettingsUi,
@@ -955,6 +1099,14 @@ pub(super) fn apply_display_settings_command(
   }
 }
 
+/// Apply the toolbar custom view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `display_settings_ui` - The display settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_toolbar_custom_command(
   command: ToolbarCustomCommand,
   display_settings_ui: &mut DisplaySettingsUi,
@@ -978,6 +1130,14 @@ pub(super) fn apply_toolbar_custom_command(
   }
 }
 
+/// Apply the screensaver list view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `ui` - The ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_screensaver_list_command(
   command: ScreensaverListCommand,
   ui: &mut ScreensaverListUi,
@@ -1047,20 +1207,25 @@ pub(super) fn apply_screensaver_list_command(
   }
 }
 
+/// Apply the security settings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `security_settings_ui` - The security settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_security_settings_command(
   command: SecuritySettingsCommand,
-  security_uis: &mut SecurityUis,
+  security_settings_ui: &mut SecuritySettingsUi,
   services: &mut EngineServices,
   world: &mut RuntimeWorld,
 ) {
   match command {
     SecuritySettingsCommand::Back => {
       world.state.pop_ui_node();
-      clear_exiting_pool(security_uis.settings.objects_mut(), services);
-      security_uis.settings = SecuritySettingsUi::init(&services.hit_area);
-    }
-    SecuritySettingsCommand::OpenDetails => {
-      world.state.enter_ui_node(UiNodeState::security_details());
+      clear_exiting_pool(security_settings_ui.objects_mut(), services);
+      *security_settings_ui = SecuritySettingsUi::init(&services.hit_area);
     }
     SecuritySettingsCommand::ResetTerminal => {
       let success = services
@@ -1109,12 +1274,12 @@ pub(super) fn apply_security_settings_command(
       show_security_reset_popup(services, success, false);
     }
     SecuritySettingsCommand::SetDefaultStatus(enabled) => {
-      update_package_defaults(security_uis, services, |defaults| {
+      update_package_defaults(security_settings_ui, services, |defaults| {
         defaults.enabled = enabled;
       });
     }
     SecuritySettingsCommand::SetDefaultDebug(debug) => {
-      update_package_defaults(security_uis, services, |defaults| {
+      update_package_defaults(security_settings_ui, services, |defaults| {
         defaults.debug = debug;
       });
     }
@@ -1122,7 +1287,7 @@ pub(super) fn apply_security_settings_command(
 }
 
 fn update_package_defaults(
-  security_uis: &mut SecurityUis,
+  security_settings_ui: &mut SecuritySettingsUi,
   services: &mut EngineServices,
   update: impl FnOnce(&mut crate::host_engine::services::PackageDefaultState),
 ) {
@@ -1135,9 +1300,7 @@ fn update_package_defaults(
     .write_package_state(&profile, &mut services.log)
     .is_ok()
   {
-    security_uis
-      .settings
-      .set_defaults(profile.defaults.enabled, profile.defaults.debug);
+    security_settings_ui.set_defaults(profile.defaults.enabled, profile.defaults.debug);
   } else {
     show_security_reset_popup(services, false, false);
   }
@@ -1180,33 +1343,14 @@ fn show_security_reset_popup(services: &mut EngineServices, success: bool, termi
   });
 }
 
-pub(super) fn apply_security_details_command(
-  command: SecurityDetailsCommand,
-  security_uis: &mut SecurityUis,
-  services: &mut EngineServices,
-  world: &mut RuntimeWorld,
-) {
-  match command {
-    SecurityDetailsCommand::Back => {
-      world.state.pop_ui_node();
-      clear_exiting_pool(security_uis.details.objects_mut(), services);
-      security_uis.details = SecurityDetailsUi::init(
-        &services.hit_area,
-        &services.scroll_box,
-        &services.markdown,
-        &services.storage,
-        &services.i18n,
-      );
-    }
-    SecurityDetailsCommand::Scroll(amount) => {
-      security_uis
-        .details
-        .scroll(amount, &services.scroll_box, &services.layout);
-      services.canvas.request_render();
-    }
-  }
-}
-
+/// Apply the storage management view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `storage_management_ui` - The storage management ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_storage_management_command(
   command: StorageManagementCommand,
   storage_management_ui: &mut StorageManagementUi,
@@ -1236,6 +1380,15 @@ pub(super) fn apply_storage_management_command(
   }
 }
 
+/// Apply the storage management clear view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `storage_management_clear_ui` - The storage management clear ui.
+/// * `clear_warning_ui` - The clear warning ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_storage_management_clear_command(
   command: StorageManagementClearCommand,
   storage_management_clear_ui: &mut StorageManagementClearUi,
@@ -1288,6 +1441,14 @@ pub(super) fn apply_storage_management_clear_command(
   }
 }
 
+/// Apply the clear warning view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `clear_warning_ui` - The clear warning ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_clear_warning_command(
   command: ClearWarningCommand,
   clear_warning_ui: &mut ClearWarningUi,
@@ -1328,6 +1489,15 @@ pub(super) fn apply_clear_warning_command(
   let _ = world.state.remove_overlay_kind(OverlayKind::ClearWarning);
 }
 
+/// Apply the storage management export view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `storage_management_export_ui` - The storage management export ui.
+/// * `export_settings_ui` - The export settings ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_storage_management_export_command(
   command: StorageManagementExportCommand,
   storage_management_export_ui: &mut StorageManagementExportUi,
@@ -1363,6 +1533,14 @@ pub(super) fn apply_storage_management_export_command(
   }
 }
 
+/// Apply the storage management view view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `storage_management_view_ui` - The storage management view ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_storage_management_view_command(
   command: StorageManagementViewCommand,
   storage_management_view_ui: &mut StorageManagementViewUi,
@@ -1375,7 +1553,7 @@ pub(super) fn apply_storage_management_view_command(
       reset_storage_management_view_ui(storage_management_view_ui, services);
     }
     StorageManagementViewCommand::CopyAll(text) | StorageManagementViewCommand::CopyPath(text) => {
-      if !services.clipboard.write_text(&text) {
+      if !services.clipboard.borrow_mut().write_text(&text) {
         services.log.warn_operation_failed(
           LogSource::Ui,
           "write_clipboard",
@@ -1387,6 +1565,14 @@ pub(super) fn apply_storage_management_view_command(
   }
 }
 
+/// Apply the mods view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `mods_ui` - The mods ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_mods_command(
   command: ModsCommand,
   mods_ui: &mut ModsUi,
@@ -1405,6 +1591,14 @@ pub(super) fn apply_mods_command(
   }
 }
 
+/// Apply the game package view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `game_package_ui` - The game package ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_game_package_command(
   command: GamePackageCommand,
   game_package_ui: &mut GamePackageUi,
@@ -1438,6 +1632,14 @@ pub(super) fn apply_game_package_command(
   }
 }
 
+/// Apply the screensaver package view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `screensaver_package_ui` - The screensaver package ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_screensaver_package_command(
   command: ScreensaverPackageCommand,
   screensaver_package_ui: &mut ScreensaverPackageUi,
@@ -1479,6 +1681,16 @@ pub(super) fn apply_screensaver_package_command(
   }
 }
 
+/// Apply the language select view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `language_select_ui` - The language select ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
+/// * `language_loading_ui` - The language loading ui.
+/// * `language_loading` - The language loading.
 pub(super) fn apply_language_select_command(
   command: LanguageSelectCommand,
   language_select_ui: &mut LanguageSelectUi,
@@ -1537,6 +1749,14 @@ pub(super) fn apply_language_select_command(
   }
 }
 
+/// Apply the terminal check view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `terminal_check_ui` - The terminal check ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_terminal_check_command(
   command: TerminalCheckCommand,
   terminal_check_ui: &mut TerminalCheckUi,
@@ -1583,6 +1803,16 @@ fn sync_terminal_capabilities_from_profile(services: &mut EngineServices) {
   );
 }
 
+/// Update language-loading progress from package scan events and complete its application
+/// transition.
+///
+/// # Arguments
+///
+/// * `events` - The events in delivery order.
+/// * `language_loading` - The language loading.
+/// * `language_loading_ui` - The language loading ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_language_loading_package_events(
   events: &[PackageEvent],
   language_loading: &mut LanguageLoadingRuntime,
@@ -1772,6 +2002,16 @@ fn reset_input_demo_ui(ui: &mut InputDemoUi, services: &mut EngineServices) {
   *ui = InputDemoUi::init(&services.hit_area, &services.progress_bar);
 }
 
+/// Apply the export settings view command to application state and its services.
+///
+/// # Arguments
+///
+/// * `command` - The command.
+/// * `export_settings_ui` - The export settings ui.
+/// * `export_loading_ui` - The export loading ui.
+/// * `export_loading` - The export loading.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_export_settings_command(
   command: ExportSettingsCommand,
   export_settings_ui: &mut ExportSettingsUi,
@@ -1840,6 +2080,15 @@ pub(super) fn apply_export_settings_command(
   }
 }
 
+/// Apply progress and terminal outcomes only for the export tracked by the loading overlay.
+///
+/// # Arguments
+///
+/// * `events` - The events in delivery order.
+/// * `export_loading` - The export loading.
+/// * `export_loading_ui` - The export loading ui.
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `world` - The application-owned runtime state.
 pub(super) fn apply_export_loading_events(
   events: &[crate::host_engine::services::ExportAsyncEvent],
   export_loading: &mut ExportLoadingRuntime,

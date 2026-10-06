@@ -1,4 +1,13 @@
-//! Log data model: levels, lifecycle phases, sources, entries and host log messages.
+//! Log severity, source, phase, message templates, and record data.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_log::HostLogMessage;
+//!
+//! let message = HostLogMessage::new("example", "Value: {value}").param("value", "42");
+//! assert_eq!(message.render(None), "Value: 42");
+//! ```
 
 mod entry;
 mod level;

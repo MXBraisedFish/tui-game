@@ -1,64 +1,77 @@
 # Lua 兼容性与当前注册面
 
-更新时间：2026-09-27。本文先记录 `crates/service/lua/src/api/libraries.rs::install` 实际装入的 Lua 环境，供 B2 对照 Lua 5.4；它是代码清单，不表示所有行为已经符合标准 Lua。
+更新时间：2026-10-04。本文说明脚本能使用哪些接口，以及与标准 Lua 调用方式的区别。
 
 ## 环境边界
 
-宿主只选择性启用当前兼容组需要的 Lua 原生库，再将允许的 API 装入独立脚本 `_ENV`。当前只启用了安全的原生 `table` 库以复用 Lua 5.4 标准函数；其余未装入库不能因为 Lua 5.4 有该能力就视为可用。`io`、`os`、`package`、`debug` 原生库不开放；宿主提供的 `debug` 是受控扩展。
+脚本只能调用本页列出的接口。`io`、`os`、`package`、原生 `debug` 不开放；项目提供的 `debug` 用于输出信息、断言和受保护调用。
 
-### 标准库兼容层（B2 已完成逐组审计）
+### 基础接口
 
-这些命名空间实现或包装 Lua 常见标准能力。下表是当前注册面；B2 已逐组核对 Lua 5.4 语义、项目协议、错误和安全边界。项目专属成员单列在宿主扩展表。
+下表列出当前可用的基础接口。所有公开 API 的选填参数统一放在末尾严格选项表中，变参作为业务数据依次传递；`math`、`string`、`utf8` 的项目接口以各自文档为准，不保证与同名标准函数有相同的签名和结果。
 
 | 位置 | 当前安装项 |
 |---|---|
-| 全局及 `base` | `ipairs`, `pairs`, `next`, `select`, `rawequal`, `rawlen`, `tonumber`, `tostring`, `type`, `setmetatable`, `getmetatable` |
+| 全局及 `base` | `ipairs`, `pairs`, `next`, `select`, `rawequal`, `rawget`, `rawset`, `rawlen`, `tonumber`, `tostring`, `type`, `setmetatable`, `getmetatable` |
 | `math` | 函数：`abs`, `ceil`, `floor`, `round`, `round_to`, `fmod`, `pow`, `exp`, `log`, `lg`, `ln`, `sqrt`, `ldexp`, `frexp`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `deg`, `rad`, `normalize_angle`, `max`, `min`, `modf`, `tointeger`, `type`, `ult`, `approx_equal`, `percent`, `factorial`, `combination`；常量：`PI`, `E`, `POSITIVE_INFINITE`, `INFINITE`, `NEGATIVE_INFINITE`, `DEG`, `RAD`, `MAX_INTEGER`, `MIN_INTEGER` |
-| `table` | 原生 Lua 5.4：`concat`, `insert`, `move`, `pack`, `remove`, `sort`, `unpack`（由宿主包装保留操作上限）；项目扩展：`count`, `count_array`, `count_hash`, `compact`, `deepcopy`, `pretty` |
+| `table` | Lua 5.4 表操作：`concat`, `insert`, `move`, `pack`, `remove`, `sort`, `unpack`（选填参数使用末尾严格选项表，并保留操作上限）；项目扩展：`count`, `count_array`, `count_hash`, `compact`, `deepcopy`, `pretty` |
 | `string` | 常量 `AUTO`, `PLAIN_TEXT`, `RICH_TEXT`；函数 `lower`, `upper`, `reverse`, `regex_escape`, `split`, `sub`, `rep`, `find`, `match`, `gmatch`, `gsub`, `regex_find`, `regex_match`, `regex_gmatch`, `regex_gsub`, `regex_test`, `regex_split`, `format`, `rich_text_to_plain_text` |
-| `utf8` | `len`, `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints`, `byte_position`, `codepoint`, `next`, `position` |
+| `utf8` | `len`, `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints`, `next` |
 
-`base` 的迭代器、表长、模式和类型行为由 Lua 5.4 同版本用例审计；项目扩展的参数/结果形状按已确认契约保留。标准 `table.*` 使用 Lua 5.4 实现并由宿主包装限制操作量；只读 API 表不能通过 rawset、insert、remove、sort 或 move 被修改。错误、预算、GC、终结器、`<close>` 和会话结束行为的证据见兼容基线记录。
+更多调用示例见⌊[API 总览](API.md)⌉。
 
-### 宿主扩展
+### 项目扩展
 
-以下成员属于项目扩展；其余列在标准库兼容层的成员也要由 B2 验证是否真正遵循 Lua 5.4。
+下表列出项目扩展。部分方法名与标准 Lua 相同，仍需使用项目文档中的参数与返回值。
 
 | 命名空间 | 当前注册项 |
 |---|---|
 | `math` | `round`, `round_to`, `pow`, `lg`, `ln`, `ldexp`, `frexp`, `atan2`, `normalize_angle`, `approx_equal`, `percent`, `factorial`, `combination`, `PI`, `E`, `POSITIVE_INFINITE`, `INFINITE`, `NEGATIVE_INFINITE`, `DEG`, `RAD` |
 | `table` | `count`, `count_array`, `count_hash`, `compact`, `deepcopy`, `pretty` |
 | `string` | 常量 `AUTO`, `PLAIN_TEXT`, `RICH_TEXT`；`split`, `regex_escape`, `regex_find`, `regex_match`, `regex_gmatch`, `regex_gsub`, `regex_test`, `regex_split`, `rich_text_to_plain_text` |
-| `utf8` | `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints`, `byte_position`, `position` |
+| `utf8` | `byte_len`, `is_ascii`, `codepoint_to_char`, `ascii_to_char`, `char_to_codepoint`, `char_to_ascii`, `char_position`, `codepoints` |
 | `color` | `BLACK`, `RED`, `GREEN`, `YELLOW`, `BLUE`, `MAGENTA`, `CYAN`, `GRAY`, `GREY`, `BRIGHT_GRAY`, `BRIGHT_GREY`, `BRIGHT_RED`, `BRIGHT_GREEN`, `BRIGHT_YELLOW`, `BRIGHT_BLUE`, `BRIGHT_MAGENTA`, `BRIGHT_CYAN`, `WHITE`, `NONE`, `TRANSPARENT`, `rgb`, `hex` |
 | `char` | `LINE`, `BOLD_LINE`, `DOUBLE_LINE`, `ROUNDED_LINE`, `ASCII_NUMBER`, `ASCII_LOWERCASE`, `ASCII_UPPERCASE`, `ASCII_LETTER`, `ASCII_CHARACTER`, `ASCII` |
 | `align` | 常量 `AUTO`, `LEFT`, `HORIZONTAL_CENTER`, `RIGHT`, `TOP`, `VERTICAL_CENTER`, `BOTTOM`, `CENTER`；函数 `resolve_x`, `resolve_y`, `resolve_rect` |
 | `measurement` | `get_text_size`, `get_text_width`, `get_text_height` |
-| `random` | 常量 `INT`, `FLOAT`；函数 `randint`, `randfloat`, `create`, `delete`, `clear`, `list`, `count`, `generate`, `set`, `set_type`, `set_range`, `set_seed`, `set_step`, `get_type`, `get_seed`, `get_step`, `exists`, `get_range`, `get_info` |
-| `slice` | `create`, `delete`, `clear`, `set`, `set_size`, `set_width`, `set_height`, `set_background`, `set_layer`, `draw`, `exists`, `get_size`, `get_width`, `get_height`, `get_layer`, `get_background`, `get_info`, `list`, `count` |
-| `serialization` | `json_encode/decode`, `csv_encode/decode`, `yaml_encode/decode`, `toml_encode/decode`, `ini_encode/decode`, `xml_encode/decode`, `binary_encode/decode` |
+| `random` | 常量 `INT`, `FLOAT`；函数 `randint`, `randfloat`, `create`, `delete`, `clear`, `list`, `count`, `generate`, `set`, `exists`, `get_info` |
+| `keyboard` | `receive_action_event`、`reject_action_event`、`receive_key_event`、`reject_key_event`；游戏 action 默认开启、key 默认关闭，开关独立；仅游戏脚本可用；详见 [keyboard](api/keyboard.md) |
+| `ime` | `lock`、`unlock`、`receive_input_event`、`reject_input_event`、`write_clipboard`；文字事件默认不接收；unlock 的 restore 选项默认为 true；仅游戏脚本可用；详见 [ime](api/ime.md) |
+| `timer` | `create`, `list`, `count`, `delete`, `clear`, `exists`, `set`, `get_info`, `start`, `pause`, `reset`, `restart` |
+| `slice` | `create`, `delete`, `clear`, `set`, `draw`, `exists`, `get_info`, `list`, `count` |
+| `serialization` | 常量 `NULL`；`json_encode/decode`, `csv_encode/decode`, `yaml_encode/decode`, `toml_encode/decode`, `ini_encode/decode`, `xml_encode/decode`, `binary_pack`, `binary_unpack`, `binary_packsize` |
 | `encoding` | `base64_encode`, `base64_decode`, `url_encode`, `url_decode`, `hex_encode`, `hex_decode` |
 | `draw` | `text`, `fill_rect`, `stroke_rect`, `erase_rect`, `render` |
+| `date` | 常量 `LOCAL`、`UTC`、`UTC_MINUS_1`～`UTC_MINUS_12`、`UTC_PLUS_1`～`UTC_PLUS_14`、`TIMESTAMP`、`DATE`；方法 `now`、`date_to_timestamp`、`timestamp_to_date`、`timestamp_diff`，必填参数按顺序传入，选填参数使用末尾严格选项表；详见 [date](api/date.md) |
 | `debug` | `VERSION`, `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `print`, `info`, `warn`, `error`, `assert`, `pcall`, `xpcall` |
 | `game` | `exit_game`, `save_game`, `save_best` |
 | `i18n` | `create`, `get_value`, `get_language_code`, `reload` |
-| `event` | `skip_action`, `clear_action` |
+| `image` | `load` |
+| `events` | `skip_action`, `clear_action` |
 | `loader` | `require`, `dofile`, `loadfile` |
 | `file` | `read`, `write`, `create_dir`, `exists`, `remove`, `list_dir`；另有编码与换行常量，详见 `api/file.md` |
 
-`char` 的数组内容、`random` / `slice` 的对象字段及各函数详细形状以后续代码审计为准。上述扩展名来自当前注册实现；除 B0 契约草案明确标记外，不从文档占位页推导 API。
+各库的参数、返回值和使用限制见⌊[API 总览](API.md)⌉。
 
-### 尚未注册
+### 尚未开放
 
-`image` 当前没有安装；B6 计划增加其异步请求链路。`audio`、`animation`、`http`、`timer`、`effect`、`widget`、`ime`、`keyboard` 也未由 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
+`image.load` 已开放，通过请求编号关联异步结果。`audio`、`animation`、`http`、`effect`、`widget` 未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
 
-## B2 对照约定
+## 调用差异
 
-- 用户已确认保留 vendored Lua 5.4；不升级到 Lua 5.5。
-- 对标准库按 Lua 5.4 同版本行为作为主对照。Lua 5.5 只记录版本差异，不作为本项目目标。
-- `io`、`os`、`package`、原生 `debug` 等能力不自动开放；任何权限变化需单独说明沙箱边界与测试。
-- 用户已确认字符串原生元表保持隔离：`getmetatable("x")` 在宿主环境返回 nil；不能借 `("x"):sub(...)` 绕过受控的项目 `string.*` API。
-- 用户已确认 B2.4 string 与 math/utf8 保留项目既有参数和结果协议；Lua 5.4 基线仅用于核对计算行为、安全限制与错误边界，不把这些项目 API 转成原生位置参数/多返回。
-- 本清单记录 API 面和总体边界；逐项行为、差异裁决及测试证据见 [B2_LUA_BASELINE.md](../refactor/B2_LUA_BASELINE.md)。
-- B2.1–B2.5 同版本对照、宿主限制和错误/关闭回归均已完成；Lua 服务包 106 项测试通过。项目特有行为和有意保留的协议差异按 API 文档执行。
-- string/pattern 保留项目命名参数和结果表；Lua 字符串元表保持隔离。Unicode 位置/格式语义与 pattern、输出上限列在 [string API](api/string.md)。
+- `timer` 使用秒作为计时单位；必填参数按顺序传入，选填参数放在末尾严格表里，例如 `timer.create(1, {loop = true})`。参数与状态的查询、修改只提供 `get_info` 和 `set`。
+
+- `date` 必填参数按顺序传入，选填参数用末尾严格表显式填写，例如 `date.timestamp_to_date(0, {timezone = date.UTC})`。时间戳单位为毫秒，时区默认本机时区；时区和返回格式使用该库常量。
+
+- 使用 Lua 5.4，不把 Lua 5.5 新增能力视为已提供。
+- `base` 方法也能直接使用全局名称，例如 `pairs(t)`。`debug.pcall` 和 `debug.xpcall` 使用变参；全局 `pcall`、`xpcall`、`assert`、`print` 不开放。
+- 所有选填参数使用末尾严格选项表，例如 `next(t, {key = previous_key})`、`tonumber("ff", {base = 16})`、`table.concat(t, {sep = ","})`；旧的位置选填参数写法不再接受。
+- `table.insert(list, value, {pos = 2})` 先传入要插入的值；`pairs`、`ipairs` 的内部迭代协议保持不变，遍历表使用 `pairs(t)`。
+- `select`、`table.pack`、格式化与受保护调用的变参属于业务数据，仍依次传入，表和 nil 原样保留。
+- `string.find` 返回起点、终点、捕获表；`string.match` 和 `string.gmatch` 返回捕获表。字符位置按 Unicode 字符计数，不能直接套用标准 Lua 的字节位置和捕获多返回值写法。
+- `math.max/min` 接收一个数值数组，`math.log` 要求显式给出底数，`math.fmod` 只接受整数。其余限制查看各方法说明。
+- `utf8` 仅提供上表列出的名字，没有 `utf8.codepoint`、`utf8.byte_position` 或 `utf8.position` 别名。
+- 使用 `string.sub(text, start, options)` 等库函数；不支持借助字符串冒号方法调用原生接口。
+- 相关多个结果按顺序返回；捕获列表、解码对象和配置列表等数据本身仍为表。查看⌊[Lua API 调用约定](LUA_API_MIGRATION.md)⌉。
+
+按键兼容性：动作允许共享绑定，宿主层优先，各层 priority 降序、实际命中组合键优先、注册顺序优先。held 改为 pressed 后下一宿主帧只发送一次，持续移动请保存状态并在 Update 中处理。失焦、覆盖屏和拒收补发已交付输入的 released；event 队列控制不影响 key 或收尾释放。schema 2 和已有改键存档保持有效。

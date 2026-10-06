@@ -1,5 +1,13 @@
+//! Lua align library bindings with validated arguments and session-owned host access.
+
 use super::*;
 
+/// Set the table column alignment and return the updated column configuration.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, value) in [
@@ -18,7 +26,7 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     let state = state.clone();
     source.raw_set(
       name,
-      lua.create_function(move |_, values: MultiValue| {
+      lua.create_function(move |lua, values: MultiValue| {
         let method = if axis == 0 {
           "align.resolve_x"
         } else {
@@ -36,35 +44,18 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         } else {
           "relative_y"
         };
-        let table = args::named(
+        let parameters = args::positional(
+          lua,
           method,
           values,
-          &[
-            dimension,
-            align_name,
-            offset_name,
-            relative_name,
-            "slice_layer",
-          ],
+          &[dimension, align_name],
+          &[offset_name, relative_name, "slice_layer"],
         )?;
-        let target = parse_draw_target(&table, method, &state)?;
-        let size = args::integer(
-          args::required(&table, method, dimension)?,
-          method,
-          dimension,
-        )?;
-        if size <= 0 {
-          return Err(args::message(
-            method,
-            format!("{dimension} must be positive"),
-          ));
-        }
-        let align = args::string(
-          args::required(&table, method, align_name)?,
-          method,
-          align_name,
-        )?;
-        let offset = args::optional_integer(&table, method, offset_name, Some(0))?.unwrap();
+        let options = parameters.options();
+        let target = parse_draw_target(options, method, &state)?;
+        let size = positive_dimension(parameters.get(0), method, dimension)?;
+        let align = args::string(parameters.get(1), method, align_name)?;
+        let offset = args::optional_integer(options, method, offset_name, Some(0))?.unwrap();
         let target_size = draw_target_size(&state, method, target)?;
         let available = if axis == 0 {
           target_size.width
@@ -76,7 +67,7 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           size,
           available,
           &align,
-          args::optional_integer(&table, method, relative_name, None)?,
+          args::optional_integer(options, method, relative_name, None)?,
           offset,
           axis == 0,
         )
@@ -88,14 +79,12 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
     "resolve_rect",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "align.resolve_rect";
-      let table = args::named(
+      let parameters = args::positional(
+        lua,
         method,
         values,
+        &["width", "height", "horizontal_align", "vertical_align"],
         &[
-          "width",
-          "height",
-          "horizontal_align",
-          "vertical_align",
           "offset_x",
           "offset_y",
           "relative_x",
@@ -103,27 +92,20 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           "slice_layer",
         ],
       )?;
-      let target = parse_draw_target(&table, method, &state)?;
-      let width = positive_u16(&table, method, "width")? as i64;
-      let height = positive_u16(&table, method, "height")? as i64;
-      let horizontal = args::string(
-        args::required(&table, method, "horizontal_align")?,
-        method,
-        "horizontal_align",
-      )?;
-      let vertical = args::string(
-        args::required(&table, method, "vertical_align")?,
-        method,
-        "vertical_align",
-      )?;
+      let options = parameters.options();
+      let target = parse_draw_target(options, method, &state)?;
+      let width = positive_dimension(parameters.get(0), method, "width")?;
+      let height = positive_dimension(parameters.get(1), method, "height")?;
+      let horizontal = args::string(parameters.get(2), method, "horizontal_align")?;
+      let vertical = args::string(parameters.get(3), method, "vertical_align")?;
       let target_size = draw_target_size(&state, method, target)?;
       let x = resolve_alignment_axis(
         method,
         width,
         target_size.width as i64,
         &horizontal,
-        args::optional_integer(&table, method, "relative_x", None)?,
-        args::optional_integer(&table, method, "offset_x", Some(0))?.unwrap(),
+        args::optional_integer(options, method, "relative_x", None)?,
+        args::optional_integer(options, method, "offset_x", Some(0))?.unwrap(),
         true,
       )?;
       let y = resolve_alignment_axis(
@@ -131,17 +113,29 @@ pub(super) fn align(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         height,
         target_size.height as i64,
         &vertical,
-        args::optional_integer(&table, method, "relative_y", None)?,
-        args::optional_integer(&table, method, "offset_y", Some(0))?.unwrap(),
+        args::optional_integer(options, method, "relative_y", None)?,
+        args::optional_integer(options, method, "offset_y", Some(0))?.unwrap(),
         false,
       )?;
-      let result = lua.create_table()?;
-      result.raw_set("x", x)?;
-      result.raw_set("y", y)?;
-      Ok(result)
+      Ok(MultiValue::from_vec(vec![
+        Value::Integer(x),
+        Value::Integer(y),
+      ]))
     })?,
   )?;
   readonly::proxy(lua, source)
+}
+
+fn positive_dimension(value: Value, method: &str, name: &str) -> mlua::Result<i64> {
+  let value = args::integer(value, method, name)?;
+  if (1..=65535).contains(&value) {
+    Ok(value)
+  } else {
+    Err(args::message(
+      method,
+      format!("{name} must be in 1..=65535"),
+    ))
+  }
 }
 
 fn resolve_alignment_axis(

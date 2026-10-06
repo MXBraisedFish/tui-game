@@ -1,3 +1,5 @@
+//! Service support for the render service.
+
 use super::BorderStyle;
 use tg_core_style::{TextColor, TextStyle};
 use tg_core_unicode::char_width;
@@ -14,8 +16,7 @@ enum Target {
   Top,
 }
 
-/// The render service, providing high-level drawing operations such as text, filled rectangles and
-/// bordered rectangles.
+/// The public entry point for render operations.
 pub struct RenderService;
 
 impl Default for RenderService {
@@ -25,17 +26,24 @@ impl Default for RenderService {
 }
 
 impl RenderService {
+  /// Create a render service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
-  /// Draws text on the base layer.
+  /// Draw text into the base surface, respecting its resolved clipping bounds.
   pub fn draw_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     self.draw_text_target(canvas, Target::Base, params);
   }
 
-  /// Draws text at signed coordinates on the base layer; the canvas clips whatever falls outside
-  /// it.
+  /// Draw text into the base surface, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_text_at(
     &mut self,
     canvas: &mut CanvasService,
@@ -46,8 +54,13 @@ impl RenderService {
     self.draw_text_target_at(canvas, Target::Base, x, y, params);
   }
 
-  /// Draws text on the given slice. Returns whether it was drawn (`false` when the slice is not
-  /// visible).
+  /// Draw text into the specified slice, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `slice` - The slice.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_text_on(
     &mut self,
     canvas: &mut CanvasService,
@@ -57,6 +70,15 @@ impl RenderService {
     canvas.text_on(slice, params)
   }
 
+  /// Draw text into the specified slice, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `slice` - The slice.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_text_at_on(
     &mut self,
     canvas: &mut CanvasService,
@@ -68,7 +90,13 @@ impl RenderService {
     canvas.text_at_on(slice, x, y, params)
   }
 
-  /// Draws text in the virtual content area of the given scroll box.
+  /// Draw text into the scroll-box content surface, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `id` - The identifier of the owned object.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_text_in_scroll_box(
     &mut self,
     canvas: &mut CanvasService,
@@ -78,6 +106,15 @@ impl RenderService {
     canvas.text_in_scroll_box(id, params)
   }
 
+  /// Draw text into the scroll-box content surface, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_text_at_in_scroll_box(
     &mut self,
     canvas: &mut CanvasService,
@@ -89,20 +126,32 @@ impl RenderService {
     canvas.text_at_in_scroll_box(id, x, y, params)
   }
 
-  /// Draws text on the host layer (used for top-level UI elements).
+  /// Draw text into the physical host surface, respecting its resolved clipping bounds.
   pub fn draw_host_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     let params = params.host_formatted();
     self.draw_text_target(canvas, Target::Host, params.as_ref());
   }
 
-  /// Draws text on the host's top layer.
+  /// Draw text into the top layer, respecting its resolved clipping bounds.
   pub fn draw_top_text(&mut self, canvas: &mut CanvasService, params: &DrawTextParams) {
     let params = params.host_formatted();
     self.draw_text_target(canvas, Target::Top, params.as_ref());
   }
 
-  /// Draws a filled rectangle on the base layer.
-  // reason: public API; grouping the parameters would change its signature.
+  // Retain the explicit drawing parameters required by this public Rust interface.
+
+  /// Draw a filled rectangle into the base surface, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `fill_char` - The fill char.
+  /// * `fill_fg` - The fill fg.
+  /// * `fill_bg` - The fill bg.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect(
     &mut self,
@@ -128,7 +177,19 @@ impl RenderService {
     );
   }
 
-  /// Draws a filled rectangle on the given slice. Returns whether it was drawn.
+  /// Draw a filled rectangle into the specified slice, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `slice` - The slice.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `fill_char` - The fill char.
+  /// * `fill_fg` - The fill fg.
+  /// * `fill_bg` - The fill bg.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect_on(
     &mut self,
@@ -159,7 +220,20 @@ impl RenderService {
     true
   }
 
-  /// Draws a filled rectangle in the virtual content area of the given scroll box.
+  /// Draw a filled rectangle into the scroll-box content surface, respecting its resolved
+  /// clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `fill_char` - The fill char.
+  /// * `fill_fg` - The fill fg.
+  /// * `fill_bg` - The fill bg.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect_in_scroll_box(
     &mut self,
@@ -190,7 +264,19 @@ impl RenderService {
     true
   }
 
-  /// Draws a filled rectangle on the host layer.
+  /// Draw a filled rectangle into the physical host surface, respecting its resolved clipping
+  /// bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `fill_char` - The fill char.
+  /// * `fill_fg` - The fill fg.
+  /// * `fill_bg` - The fill bg.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_host_filled_rect(
     &mut self,
@@ -254,8 +340,22 @@ impl RenderService {
     }
   }
 
-  /// Draws a styled bordered rectangle on the base layer.
-  // reason: public API; grouping the parameters would change its signature.
+  // Retain the explicit drawing parameters required by this public Rust interface.
+
+  /// Draw a bordered rectangle into the base surface, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `border_style` - The border style.
+  /// * `border_fg` - The border fg.
+  /// * `border_bg` - The border bg.
+  /// * `fill_bg` - The fill bg.
+  /// * `border_attrs` - The border attrs.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect(
     &mut self,
@@ -285,7 +385,21 @@ impl RenderService {
     );
   }
 
-  /// Draws a styled bordered rectangle on the given slice. Returns whether it was drawn.
+  /// Draw a bordered rectangle into the specified slice, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `slice` - The slice.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `border_style` - The border style.
+  /// * `border_fg` - The border fg.
+  /// * `border_bg` - The border bg.
+  /// * `fill_bg` - The fill bg.
+  /// * `border_attrs` - The border attrs.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect_on(
     &mut self,
@@ -320,7 +434,22 @@ impl RenderService {
     true
   }
 
-  /// Draws a bordered rectangle in the virtual content area of the given scroll box.
+  /// Draw a bordered rectangle into the scroll-box content surface, respecting its resolved
+  /// clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `border_style` - The border style.
+  /// * `border_fg` - The border fg.
+  /// * `border_bg` - The border bg.
+  /// * `fill_bg` - The fill bg.
+  /// * `border_attrs` - The border attrs.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect_in_scroll_box(
     &mut self,
@@ -355,7 +484,21 @@ impl RenderService {
     true
   }
 
-  /// Draws a styled bordered rectangle on the host layer.
+  /// Draw a bordered rectangle into the physical host surface, respecting its resolved clipping
+  /// bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `border_style` - The border style.
+  /// * `border_fg` - The border fg.
+  /// * `border_bg` - The border bg.
+  /// * `fill_bg` - The fill bg.
+  /// * `border_attrs` - The border attrs.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_host_border_rect(
     &mut self,
@@ -385,7 +528,20 @@ impl RenderService {
     );
   }
 
-  /// Draws a styled bordered rectangle on the host's top layer.
+  /// Draw a bordered rectangle into the top layer, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `border_style` - The border style.
+  /// * `border_fg` - The border fg.
+  /// * `border_bg` - The border bg.
+  /// * `fill_bg` - The fill bg.
+  /// * `border_attrs` - The border attrs.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_top_border_rect(
     &mut self,
@@ -589,9 +745,13 @@ impl RenderService {
     );
   }
 
-  // ─── Unified surface drawing API ──────────────────────────
-
-  /// Draws text on the given surface.
+  /// Draw text into the specified surface, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `surface` - The destination drawing surface and its clipping bounds.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_text_on_surface(
     &mut self,
     canvas: &mut CanvasService,
@@ -604,7 +764,15 @@ impl RenderService {
     }
   }
 
-  /// Draws text at signed local coordinates of the given surface.
+  /// Draw text into the specified surface, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `surface` - The destination drawing surface and its clipping bounds.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `params` - The formatting or rendering parameters.
   pub fn draw_text_at_on_surface(
     &mut self,
     canvas: &mut CanvasService,
@@ -619,8 +787,21 @@ impl RenderService {
     }
   }
 
-  /// Draws a filled rectangle on the given surface.
-  // reason: public API; grouping the parameters would change its signature.
+  // Retain the explicit drawing parameters required by this public Rust interface.
+
+  /// Draw a filled rectangle into the specified surface, respecting its resolved clipping bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `surface` - The destination drawing surface and its clipping bounds.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `fill_char` - The fill char.
+  /// * `fill_fg` - The fill fg.
+  /// * `fill_bg` - The fill bg.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_filled_rect_on_surface(
     &mut self,
@@ -645,8 +826,24 @@ impl RenderService {
     }
   }
 
-  /// Draws a bordered rectangle on the given surface.
-  // reason: public API; grouping the parameters would change its signature.
+  // Retain the explicit drawing parameters required by this public Rust interface.
+
+  /// Draw a bordered rectangle into the specified surface, respecting its resolved clipping
+  /// bounds.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `surface` - The destination drawing surface and its clipping bounds.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `width` - The width in terminal columns.
+  /// * `height` - The height in terminal rows.
+  /// * `border_style` - The border style.
+  /// * `border_fg` - The border fg.
+  /// * `border_bg` - The border bg.
+  /// * `fill_bg` - The fill bg.
+  /// * `border_attrs` - The border attrs.
   #[allow(clippy::too_many_arguments)]
   pub fn draw_border_rect_on_surface(
     &mut self,

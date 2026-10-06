@@ -1,4 +1,4 @@
-//! Minimal entry: composes a canvas with one styled cell into a frame.
+//! Independent render pipeline smoke entry exercising the public API and checking its results.
 
 use tg_core_style::{ComposedCell, TextStyle};
 use tg_service_canvas::CanvasService;

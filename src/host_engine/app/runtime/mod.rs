@@ -1,3 +1,5 @@
+//! Application runtime updates, input ownership, service events, script callbacks, and frame presentation.
+
 mod action_map;
 mod commands;
 mod engine_events;
@@ -6,6 +8,8 @@ mod overlay;
 mod render;
 mod router;
 mod toolbar;
+
+pub(crate) use host_viewport::required_physical_size;
 
 use action_map::*;
 use commands::*;
@@ -24,14 +28,14 @@ use crate::host_engine::core::{
 };
 use crate::host_engine::services::{
   ActionKeyMap, ActionMapEntry, AutoRecordingMode, BorderStyle, DisplayLogoMode, DisplayOrderMode,
-  DrawTextParams, HostAreaKind, HostLogMessage, ImPolicy, InputActionEvent, KeyBindingsProfile,
-  KeyState, LogLevel, LogPrintOptions, LogSource, LuaActionState, LuaEnqueueError, LuaErrorStage,
-  LuaEventBroker, LuaEventData, LuaEventRoute, LuaHostCommand, LuaSessionDiagnostics,
-  LuaSessionError, LuaSessionKind, LuaSessionToken, LuaTaskOperation, PackageEvent,
-  PackageListEntry, PopupDismissEvent, PopupRequest, RandomGeneratorId, RandomSeed, RecordingState,
-  Rect, ScreenshotAsyncEvent, ScreenshotDoubleAction, ScreenshotService, ScreenshotTask, Size,
-  SystemEvent, TaskId, TextColor, UiEvent, UiObjectPoolOwner, VideoAsyncEvent, VideoExportStage,
-  translate_action_map,
+  DrawTextParams, HostAreaKind, HostLogMessage, ImPolicy, InputActionEvent, InputNotification,
+  KeyBindingsProfile, KeyState, LogLevel, LogPrintOptions, LogSource, LuaActionState,
+  LuaEnqueueError, LuaErrorStage, LuaEventBroker, LuaEventData, LuaEventRoute, LuaHostCommand,
+  LuaSessionDiagnostics, LuaSessionError, LuaSessionKind, LuaSessionToken, LuaTaskOperation,
+  PackageEvent, PackageListEntry, PopupDismissEvent, PopupRequest, RandomGeneratorId, RandomSeed,
+  RecordingState, Rect, ScreenshotAsyncEvent, ScreenshotDoubleAction, ScreenshotService,
+  ScreenshotTask, Size, SystemEvent, TaskId, TextColor, UiEvent, UiObjectPoolOwner,
+  VideoAsyncEvent, VideoExportStage, translate_action_map,
 };
 use crate::host_engine::ui::{
   ClearWarningCommand, ClearWarningTarget, ClearWarningUi, CoverContinueCommand, CoverContinueUi,
@@ -46,12 +50,11 @@ use crate::host_engine::ui::{
   ScreensaverListUi, ScreensaverOverlayUi, ScreensaverPackageCommand, ScreensaverPackageUi,
   ScreenshotCaptureCommand, ScreenshotCaptureUi, ScreenshotListCommand, ScreenshotListUi,
   ScreenshotRecordingCommand, ScreenshotRecordingUi, ScreenshotSettingsCommand,
-  ScreenshotSettingsUi, SecurityDetailsCommand, SecurityDetailsUi, SecuritySettingsCommand,
-  SecuritySettingsUi, SettingsUi, SettingsUiCommand, StorageManagementClearCommand,
-  StorageManagementClearUi, StorageManagementCommand, StorageManagementExportCommand,
-  StorageManagementExportUi, StorageManagementUi, StorageManagementViewCommand,
-  StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout, TerminalCheckUi,
-  ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
+  ScreenshotSettingsUi, SecuritySettingsCommand, SecuritySettingsUi, SettingsUi, SettingsUiCommand,
+  StorageManagementClearCommand, StorageManagementClearUi, StorageManagementCommand,
+  StorageManagementExportCommand, StorageManagementExportUi, StorageManagementUi,
+  StorageManagementViewCommand, StorageManagementViewUi, TerminalCheckCommand, TerminalCheckLayout,
+  TerminalCheckUi, ToolbarCustomCommand, WindowSizeWarningCommand, WindowSizeWarningUi,
 };
 use std::{
   collections::HashMap,
@@ -61,6 +64,43 @@ use std::{
 const SCREENSHOT_DOUBLE_ACTION_WINDOW: Duration = Duration::from_millis(300);
 const HOST_KEY_CHORD_WINDOW: Duration = Duration::from_millis(100);
 
+fn effective_game_target_fps(
+  player_limit: Option<u16>,
+  package_target: Option<u32>,
+) -> Option<u16> {
+  let package_limit = package_target.and_then(|fps| u16::try_from(fps).ok());
+  match (player_limit, package_limit) {
+    (Some(player), Some(package)) => Some(player.min(package)),
+    (Some(player), None) => Some(player),
+    (None, Some(package)) => Some(package),
+    (None, None) => None,
+  }
+}
+
+#[cfg(test)]
+mod game_fps_tests {
+  use super::effective_game_target_fps;
+
+  #[test]
+  fn game_frame_limit_uses_the_lower_player_or_package_limit() {
+    for (player, package, expected) in [
+      (Some(30), Some(120), Some(30)),
+      (Some(120), Some(30), Some(30)),
+      (Some(120), None, Some(120)),
+      (None, Some(60), Some(60)),
+      (None, Some(120), Some(120)),
+      (None, None, None),
+    ] {
+      assert_eq!(
+        effective_game_target_fps(player, package),
+        expected,
+        "player={player:?}, package={package:?}"
+      );
+    }
+  }
+}
+
+/// The language loading runtime representation used by this module.
 #[derive(Default)]
 pub(super) struct LanguageLoadingRuntime {
   active: bool,
@@ -68,6 +108,7 @@ pub(super) struct LanguageLoadingRuntime {
   enter_terminal_check_after_finish: bool,
 }
 
+/// The export loading runtime representation used by this module.
 #[derive(Default)]
 pub(super) struct ExportLoadingRuntime {
   active: bool,
@@ -112,6 +153,31 @@ struct PendingScreenshotHotkey {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PendingHostHotkey {
   elapsed: Duration,
+}
+
+/// The specific host commands captured by one physical key change.
+struct HostChordFlags {
+  recording_pause: bool,
+  toolbar_switch: bool,
+}
+
+impl HostChordFlags {
+  /// Capture the specific recording and toolbar commands before handling their base actions.
+  fn new(events: &[InputActionEvent]) -> Self {
+    Self {
+      recording_pause: has_pressed_action(events, HOST_KEY_RECORDING_PAUSE),
+      toolbar_switch: has_pressed_action(events, HOST_KEY_TOP_TOOLBAR_SWITCH),
+    }
+  }
+
+  /// Allow an action unless a specific command from the same key change replaces it.
+  fn allows(&self, action: &str) -> bool {
+    match action {
+      HOST_KEY_RECORDING => !self.recording_pause,
+      HOST_KEY_TOP_TOOLBAR => !self.toolbar_switch,
+      _ => true,
+    }
+  }
 }
 
 struct AutoRecordingRuntime {
@@ -196,17 +262,12 @@ struct InputModePolicy {
   raw_key_capture: bool,
 }
 
-pub(super) struct SecurityUis {
-  settings: SecuritySettingsUi,
-  details: SecurityDetailsUi,
-}
-
 struct RuntimeUiContext<'a> {
   home_ui: &'a mut HomeUi,
   settings_ui: &'a mut SettingsUi,
   display_settings_ui: &'a mut DisplaySettingsUi,
   screensaver_list_ui: &'a mut ScreensaverListUi,
-  security_uis: &'a mut SecurityUis,
+  security_settings_ui: &'a mut SecuritySettingsUi,
   storage_management_ui: &'a mut StorageManagementUi,
   storage_management_clear_ui: &'a mut StorageManagementClearUi,
   storage_management_export_ui: &'a mut StorageManagementExportUi,
@@ -245,7 +306,7 @@ struct RuntimePageContext<'a> {
   settings_ui: &'a mut SettingsUi,
   display_settings_ui: &'a mut DisplaySettingsUi,
   screensaver_list_ui: &'a mut ScreensaverListUi,
-  security_uis: &'a mut SecurityUis,
+  security_settings_ui: &'a mut SecuritySettingsUi,
   storage_management_ui: &'a mut StorageManagementUi,
   storage_management_clear_ui: &'a mut StorageManagementClearUi,
   storage_management_export_ui: &'a mut StorageManagementExportUi,
@@ -274,7 +335,7 @@ impl RuntimePageContext<'_> {
       settings_ui: &mut *self.settings_ui,
       display_settings_ui: &mut *self.display_settings_ui,
       screensaver_list_ui: &mut *self.screensaver_list_ui,
-      security_uis: &mut *self.security_uis,
+      security_settings_ui: &mut *self.security_settings_ui,
       storage_management_ui: &mut *self.storage_management_ui,
       storage_management_clear_ui: &mut *self.storage_management_clear_ui,
       storage_management_export_ui: &mut *self.storage_management_export_ui,
@@ -305,7 +366,7 @@ impl RuntimeUiContext<'_> {
       settings_ui: &mut *self.settings_ui,
       display_settings_ui: &mut *self.display_settings_ui,
       screensaver_list_ui: &mut *self.screensaver_list_ui,
-      security_uis: &mut *self.security_uis,
+      security_settings_ui: &mut *self.security_settings_ui,
       storage_management_ui: &mut *self.storage_management_ui,
       storage_management_clear_ui: &mut *self.storage_management_clear_ui,
       storage_management_export_ui: &mut *self.storage_management_export_ui,
@@ -352,7 +413,13 @@ impl InputModePolicy {
   }
 }
 
-/// 运行引擎主循环：初始化 UI 并循环处理输入、更新与渲染，直到退出。
+/// Run application frames until shutdown, coordinating input, services, scripts, and
+/// presentation.
+///
+/// # Panics
+///
+/// Panic when terminal frame presentation fails; the lifecycle supervisor converts this into a
+/// host fault.
 pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   let host_key_profile = load_host_key_action_map(services);
   reconcile_game_save_profile(services);
@@ -413,16 +480,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     &services.text_input,
     &services.scroll_box,
   );
-  let mut security_uis = SecurityUis {
-    settings: SecuritySettingsUi::init(&services.hit_area),
-    details: SecurityDetailsUi::init(
-      &services.hit_area,
-      &services.scroll_box,
-      &services.markdown,
-      &services.storage,
-      &services.i18n,
-    ),
-  };
+  let mut security_settings_ui = SecuritySettingsUi::init(&services.hit_area);
   let mut storage_management_ui = StorageManagementUi::init(&services.hit_area);
   let mut storage_management_clear_ui = StorageManagementClearUi::init(&services.hit_area);
   let mut storage_management_export_ui = StorageManagementExportUi::init(&services.hit_area);
@@ -501,7 +559,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         settings_ui: &mut settings_ui,
         display_settings_ui: &mut display_settings_ui,
         screensaver_list_ui: &mut screensaver_list_ui,
-        security_uis: &mut security_uis,
+        security_settings_ui: &mut security_settings_ui,
         storage_management_ui: &mut storage_management_ui,
         storage_management_clear_ui: &mut storage_management_clear_ui,
         storage_management_export_ui: &mut storage_management_export_ui,
@@ -585,11 +643,32 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         .engine_events
         .extend(services.async_runtime.poll_events());
       synchronize_lua_event_sessions(services, &mut lua_event_router);
+      queue_lua_timer_events(services, &mut lua_event_router, frame);
       drain_engine_events(services, &mut lua_event_router, frame)
     });
 
+    let batch_owner = (
+      world.state.current_ui_kind(),
+      world.state.current_overlay_kind(),
+    );
     with_fault_domain(HostFaultDomain::Input, || {
       services.input.begin_frame();
+      let previous_bindings = services.input.key_bindings().to_vec();
+      match world.state.current_overlay_kind() {
+        Some(OverlayKind::WindowSizeWarning) => load_window_size_action_map(services),
+        Some(OverlayKind::GameWarning) => load_game_warning_action_map(services),
+        Some(OverlayKind::CoverContinue) => load_cover_continue_action_map(services),
+        Some(OverlayKind::ExportSettings) => load_export_settings_action_map(services),
+        Some(OverlayKind::ScreenshotCapture) => load_screenshot_capture_action_map(services),
+        Some(_) => services.input.load_key_bindings(Vec::new()),
+        None if world.state.is_game_mode() => load_game_action_map(services),
+        None => load_current_action_map(services, &world),
+      }
+      if world.state.is_game_mode() && previous_bindings != services.input.key_bindings() {
+        let releases = services.game.close_input(true, false);
+        queue_game_input_releases(services, &mut lua_event_router, frame, releases);
+        lua_event_router.clear_pending_actions(LuaSessionKind::Game);
+      }
       services.input.poll();
     });
     apply_language_loading_package_events(
@@ -645,6 +724,14 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
     services.canvas.begin_frame(&services.layout);
 
     manage_window_size_overlay(services, world);
+    if batch_owner
+      != (
+        world.state.current_ui_kind(),
+        world.state.current_overlay_kind(),
+      )
+    {
+      services.input.clear();
+    }
     restore_input_modes_if_scope_changed(services, world, &mut input_mode_scope);
     deactivate_hidden_pools(services, world, &mut runtime_ui_context!(frame));
     if world.state.current_ui_kind() != Some(UiNodeKind::ExitWarning)
@@ -711,7 +798,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
           .dismiss(PopupDismissEvent::ScreenshotModeInput);
       }
     }
-    sync_input_method_policy(services);
+    sync_input_method_policy(world, services);
     restore_input_modes_if_scope_changed(services, world, &mut input_mode_scope);
 
     if world.state.is_shutdown() || world.is_stopped() {
@@ -730,8 +817,11 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         update_lua_sessions(services, world, &mut lua_event_router, frame_delta)
       });
     }
-    sync_input_method_policy(services);
-    services.input_method.update(world.clock.delta_time());
+    sync_input_method_policy(world, services);
+    services
+      .input_method
+      .borrow_mut()
+      .update(world.clock.delta_time());
     restore_input_modes_if_scope_changed(services, world, &mut input_mode_scope);
     log_host_view_changes(services, world, &mut logged_ui, &mut logged_overlay);
 
@@ -763,6 +853,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
           game_warning_seconds_left(game_warning_elapsed),
         )
       };
+    let input_cursor = cursor_when_terminal_focused(input_cursor, services.input.is_focused());
     draw_popup(services);
     let text_force_redraw = services.canvas.take_render_requested();
     let composed = services.compositor.compose(&services.canvas);
@@ -788,24 +879,20 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
       update_auto_recording(services, &mut auto_recording);
     }
 
-    scheduler.set_target_fps(
+    scheduler.set_target_fps(effective_game_target_fps(
       services
-        .game
-        .target_fps()
-        .and_then(|fps| u16::try_from(fps).ok())
-        .or_else(|| {
-          services
-            .storage
-            .display_settings_profile()
-            .game_list_fps
-            .target_fps()
-        }),
-    );
+        .storage
+        .display_settings_profile()
+        .game_list_fps
+        .target_fps(),
+      services.game.target_fps(),
+    ));
     scheduler.wait_for_next_frame();
   }
 
-  // Runtime 不再分发 Lua 完成事件。先撤销 Broker 中的任务所有权并请求取消，
-  // 避免 Shutdown 等待已失去 Session 消费者的网络或其它后台任务自然完成。
+  // Detach broker task ownership and request cancellation before shutdown waits for work whose
+  // Lua session no longer receives completion.
+
   lua_event_router.synchronize_sessions(None, None);
   services
     .async_runtime
@@ -872,9 +959,11 @@ fn format_optional_state<T: std::fmt::Debug>(state: Option<T>) -> String {
   state.map_or_else(|| "none".to_string(), |value| format!("{value:?}"))
 }
 
-/// Runs the deliberately small exception screen after a supervised Runtime
-/// fault. Ordinary UI, Lua and business updates stay stopped; terminal resize,
-/// focus-aware input and the exception countdown remain alive.
+/// Run the bounded exceptional-exit display before returning shutdown context.
+///
+/// # Panics
+///
+/// Panic when the exceptional-exit page cannot be presented to the terminal.
 pub fn run_exception(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState {
   if !world.state.is_runtime() {
     world.state.enter_runtime();
@@ -956,13 +1045,25 @@ pub fn run_exception(services: &mut EngineServices, world: &mut RuntimeWorld) ->
   ExitState::new()
 }
 
-fn sync_input_method_policy(services: &mut EngineServices) {
-  let policy = if !services.input.is_focused() || services.text_input.is_active() {
+fn sync_input_method_policy(world: &RuntimeWorld, services: &mut EngineServices) {
+  let policy = if !services.input.is_focused()
+    || services.text_input.is_active()
+    || (world.state.is_game_mode()
+      && world.state.current_overlay_kind().is_none()
+      && !services.game.input_method_locked())
+  {
     ImPolicy::Free
   } else {
     ImPolicy::ForceAscii
   };
-  let _ = services.input_method.set_policy(policy);
+  let _ = services.input_method.borrow_mut().set_policy(policy);
+}
+
+fn cursor_when_terminal_focused(
+  cursor: Option<(u16, u16)>,
+  terminal_focused: bool,
+) -> Option<(u16, u16)> {
+  if terminal_focused { cursor } else { None }
 }
 
 fn update_exit_preparation(
@@ -1521,9 +1622,7 @@ fn route_frame_input(
   } = context;
   for event in services.input.drain_system_event_observations(128) {
     let data = match event {
-      SystemEvent::Focus(event) => Some(LuaEventData::Focus {
-        gained: event.gained,
-      }),
+      SystemEvent::Focus(_) => None,
       SystemEvent::Resize(event) => Some(LuaEventData::Resize {
         width: event.width,
         height: event.height,
@@ -1534,6 +1633,55 @@ fn route_frame_input(
       && let Err(error) = context.lua_events.push_system(*frame, data)
     {
       log_lua_enqueue_error(services, error);
+    }
+  }
+
+  // Snapshot input ownership before executing host behavior; callbacks run after host routing.
+  let accepts_game_keyboard = world.state.is_game_mode()
+    && world.state.current_overlay_kind().is_none()
+    && !services.text_input.is_active();
+  let notifications = services.input.notifications().to_vec();
+  for notification in notifications {
+    let data = match notification {
+      InputNotification::Text { text } => Some(LuaEventData::Input { text }),
+      InputNotification::Key { key, state } => Some(LuaEventData::Key {
+        key: crate::host_engine::services::key_token(key),
+        state: LuaActionState::from(state),
+      }),
+      InputNotification::Action { system: true, .. } => None,
+      InputNotification::Action {
+        event,
+        system: false,
+      } => Some(LuaEventData::Action {
+        action: event.action,
+        state: LuaActionState::from(event.state),
+      }),
+      InputNotification::Focus { gained } => {
+        if !gained {
+          let releases = services.game.focus_lost_input();
+          queue_game_input_releases(services, context.lua_events, *frame, releases);
+          context
+            .lua_events
+            .clear_pending_interactive(LuaSessionKind::Game);
+        }
+        if let Err(error) = context
+          .lua_events
+          .push_system(*frame, LuaEventData::Focus { gained })
+        {
+          log_lua_enqueue_error(services, error);
+        }
+        None
+      }
+    };
+    if accepts_game_keyboard
+      && let Some(data) = data
+      && let Some(token) = services.game.session_token()
+      && let Some(generation) = services.game.input_generation(&data)
+    {
+      let route = LuaEventRoute::Input { generation };
+      if let Err(error) = context.lua_events.push_owned(token, *frame, data, route) {
+        log_lua_enqueue_error(services, error);
+      }
     }
   }
 
@@ -1569,7 +1717,8 @@ fn route_frame_input(
         services.canvas.request_render();
         let _ = services.input.disable_raw_key_capture();
       }
-      // 绑定期间原始按键只用于采集，不触发宿主快捷键或页面动作。
+      // Binding capture owns raw key events and must not trigger host shortcuts or page actions.
+
       services.input.clear();
       let _ = services.input.drain_system_events();
       return;
@@ -1582,26 +1731,56 @@ fn route_frame_input(
     }
   }
   let host_actions = services.input.collect_action_events();
-  if handle_screenshot_hotkey(
-    services,
-    world,
-    screenshot_capture_ui,
-    pending_screenshot_saves,
-    pending_screenshot_hotkey,
-    &host_actions,
-  ) {
-    return;
+  let owner = (
+    world.state.current_ui_kind(),
+    world.state.current_overlay_kind(),
+  );
+  let mut ordinary_input_valid = true;
+  for batch in host_action_batches(services.input.notifications()) {
+    let chord_flags = HostChordFlags::new(&batch);
+    for event in batch {
+      let events = std::slice::from_ref(&event);
+      let _ = handle_screenshot_hotkey(
+        services,
+        world,
+        screenshot_capture_ui,
+        pending_screenshot_saves,
+        pending_screenshot_hotkey,
+        events,
+      );
+      if chord_flags.allows(&event.action) {
+        let _ = handle_host_chord_input(
+          services,
+          world,
+          display_settings_ui,
+          pending_recording_hotkey,
+          pending_screensaver_hotkey,
+          pending_toolbar_hotkey,
+          events,
+        );
+      }
+      let _ = handle_host_key_action(&event.action, event.state, world);
+      if world.state.is_shutdown() {
+        services.input.clear();
+        context
+          .lua_events
+          .clear_pending_interactive(LuaSessionKind::Game);
+        return;
+      }
+      if owner
+        != (
+          world.state.current_ui_kind(),
+          world.state.current_overlay_kind(),
+        )
+      {
+        // Host matches remain valid; the old page/game must not receive the rest of this batch.
+        ordinary_input_valid = false;
+        services.input.clear();
+      }
+    }
   }
 
-  if handle_host_chord_input(
-    services,
-    world,
-    display_settings_ui,
-    pending_recording_hotkey,
-    pending_screensaver_hotkey,
-    pending_toolbar_hotkey,
-    &host_actions,
-  ) {
+  if !ordinary_input_valid {
     return;
   }
 
@@ -1649,7 +1828,8 @@ fn route_frame_input(
     route_input_events(services, world, &mut context.page_context());
   } else if world.state.current_overlay_kind() == Some(OverlayKind::ExportSettings) {
     if services.text_input.is_active() {
-      // 输入中不 dispatch action——避免 Enter 被当作 action 而打断 IME 组字
+      // Suspend action dispatch while editing so Enter does not interrupt IME composition.
+
       services
         .input
         .dispatch_system_action_events(&mut services.log);
@@ -1718,25 +1898,12 @@ fn route_frame_input(
   } else if world.state.current_ui_kind() == Some(UiNodeKind::ExitWarning) {
     route_exit_warning_runtime_events(services, world, exit_warning_ui, pending_screenshot_saves);
   } else if world.state.is_game_mode() {
-    load_game_action_map(services);
-    services.input.dispatch_action_events(&mut services.log);
-    while let Some(event) = services.input.next_action_event() {
-      if handle_host_key_action(event.action.as_str(), event.state, world) {
-        continue;
-      }
-      if let Err(error) = context.lua_events.push_system(
-        *frame,
-        LuaEventData::Action {
-          action: event.action,
-          state: LuaActionState::from(event.state),
-        },
-      ) {
-        log_lua_enqueue_error(services, error);
-      }
-    }
     let allow_mouse = services.input.is_focused();
     let base_rect = services.layout.developer_viewport_rect();
     for event in services.input.drain_system_events() {
+      if matches!(event, SystemEvent::Focus(_)) {
+        continue;
+      }
       queue_lua_system_event(context.lua_events, *frame, event, allow_mouse, base_rect);
     }
   } else if services.text_input.is_active() {
@@ -1781,8 +1948,25 @@ fn queue_lua_system_event(
   if let Some(data) = data
     && let Err(error) = router.push_system(frame, data)
   {
-    // 溢出由 dispatch 阶段按 Session 隔离为故障；其余拒绝在这里无需中断宿主。
+    // Dispatch isolates overflow as a session fault; other broker rejections do not terminate the
+    // host.
+
     debug_assert!(matches!(error, LuaEnqueueError::QueueOverflow(_)));
+  }
+}
+
+fn queue_game_input_releases(
+  services: &mut EngineServices,
+  router: &mut LuaEventBroker,
+  frame: u64,
+  releases: Vec<LuaEventData>,
+) {
+  if let Some(token) = services.game.session_token() {
+    for data in releases {
+      if let Err(error) = router.push_owned(token, frame, data, LuaEventRoute::InputRelease) {
+        log_lua_enqueue_error(services, error);
+      }
+    }
   }
 }
 
@@ -1796,16 +1980,43 @@ fn dispatch_lua_events(
   }
   synchronize_lua_event_sessions(services, router);
 
-  // 先截取两个 Session 的本帧批次，再调用 Lua。回调期间新产生的事件只能进入
-  // Broker 队尾，最早在下一宿主帧被消费。
+  // Snapshot receivers and batches before callbacks. Closing input releases are the only
+  // callback-generated deliveries allowed in this frame, within its existing event budget.
+
+  let game_owner = services.game.session_token();
+  let screensaver_owner = services.screensaver.session_token();
   let game_deliveries = router.drain_frame(LuaSessionKind::Game);
   let screensaver_deliveries = router.drain_frame(LuaSessionKind::Screensaver);
-  for (kind, deliveries) in [
-    (LuaSessionKind::Game, game_deliveries),
-    (LuaSessionKind::Screensaver, screensaver_deliveries),
+  for (kind, owner, deliveries) in [
+    (LuaSessionKind::Game, game_owner, game_deliveries),
+    (
+      LuaSessionKind::Screensaver,
+      screensaver_owner,
+      screensaver_deliveries,
+    ),
   ] {
-    let mut deliveries = deliveries.into_iter();
-    while let Some(mut delivery) = deliveries.next() {
+    let mut deliveries = std::collections::VecDeque::from(deliveries);
+    let mut delivered_count = 0;
+    loop {
+      let current_owner = match kind {
+        LuaSessionKind::Game => services.game.session_token(),
+        LuaSessionKind::Screensaver => services.screensaver.session_token(),
+      };
+      if owner != current_owner {
+        break;
+      }
+      let releases = router.take_input_releases(kind);
+      for release in releases.into_iter().rev() {
+        deliveries.push_front(release);
+      }
+      if delivered_count >= tg_service_lua::MAX_LUA_EVENTS_PER_FRAME {
+        router.requeue_front(kind, deliveries.into_iter());
+        break;
+      }
+      let Some(mut delivery) = deliveries.pop_front() else {
+        break;
+      };
+      delivered_count += 1;
       if let LuaEventData::Resize { width, height } = &delivery.event.data {
         let physical = crate::host_engine::services::Size {
           width: *width,
@@ -1829,22 +2040,38 @@ fn dispatch_lua_events(
       match apply_lua_host_commands(kind, services, world, router) {
         LuaEventFlow::Continue => {}
         LuaEventFlow::Skip => {
-          router.requeue_front(kind, deliveries);
-          break;
+          deliveries = defer_script_actions(router, kind, deliveries);
         }
         LuaEventFlow::Clear => {
-          router.requeue_front(
-            kind,
-            deliveries
-              .filter(|delivery| !matches!(delivery.event.data, LuaEventData::Action { .. })),
-          );
+          deliveries.retain(|delivery| {
+            !matches!(
+              delivery.event.data,
+              LuaEventData::Action {
+                state: LuaActionState::Pressed | LuaActionState::Held,
+                ..
+              }
+            ) || delivery.route == LuaEventRoute::InputRelease
+          });
           router.clear_pending_actions(kind);
-          break;
         }
       }
     }
   }
   synchronize_lua_event_sessions(services, router);
+}
+
+// Keep complete action lifetimes together when a script postpones ordinary input.
+fn defer_script_actions(
+  router: &mut LuaEventBroker,
+  kind: LuaSessionKind,
+  deliveries: std::collections::VecDeque<tg_service_lua::LuaEventDelivery>,
+) -> std::collections::VecDeque<tg_service_lua::LuaEventDelivery> {
+  let (deferred, remaining): (Vec<_>, Vec<_>) = deliveries.into_iter().partition(|delivery| {
+    matches!(delivery.event.data, LuaEventData::Action { .. })
+      && delivery.route != LuaEventRoute::InputRelease
+  });
+  router.requeue_front(kind, deferred);
+  remaining.into()
 }
 
 fn synchronize_lua_event_sessions(services: &mut EngineServices, router: &mut LuaEventBroker) {
@@ -1878,6 +2105,34 @@ fn update_lua_object_pool(
     crate::host_engine::services::AnimationClock::Game,
     frame_delta,
   );
+}
+
+fn queue_lua_timer_events(services: &mut EngineServices, router: &mut LuaEventBroker, frame: u64) {
+  router.set_current_frame(frame);
+  for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+    let (token, events) = match kind {
+      LuaSessionKind::Game => (
+        services.game.session_token(),
+        services
+          .game
+          .with_objects_mut(|objects| objects.take_timer_events()),
+      ),
+      LuaSessionKind::Screensaver => (
+        services.screensaver.session_token(),
+        services
+          .screensaver
+          .with_objects_mut(|objects| objects.take_timer_events()),
+      ),
+    };
+    let Some(token) = token else {
+      continue;
+    };
+    for event in events.unwrap_or_default() {
+      if let Err(error) = router.push_owned(token, frame, event, LuaEventRoute::HandleEvent) {
+        log_lua_enqueue_error(services, error);
+      }
+    }
+  }
 }
 
 fn handle_lua_queue_overflow(
@@ -1925,7 +2180,10 @@ fn queue_lua_overlay_transitions(
   for transition in world.state.take_overlay_transitions() {
     let data = match transition {
       OverlayStackTransition::Started => {
-        // 覆盖屏接管交互时，不允许此前尚未派发的输入越过边界进入脚本。
+        let releases = services.game.focus_lost_input();
+        queue_game_input_releases(services, router, frame, releases);
+        // Discard undelivered script input when an overlay acquires interaction ownership.
+
         router.clear_pending_interactive(LuaSessionKind::Game);
         LuaEventData::OverlayStarted
       }
@@ -1984,8 +2242,9 @@ fn update_lua_sessions(
     None => {}
   }
 
-  // 非当前画面的脚本仍可 Update，但其绘制结果在本帧不可见。帧末必须主动
-  // 回收这些命令和计数，避免宿主覆盖屏让脚本误触单帧绘制上限。
+  // Hidden sessions can update, but their draw commands must be drained at frame end so invisible
+  // work cannot accumulate against the drawing budget.
+
   if visible_session != Some(LuaSessionKind::Game) {
     let _ = services.game.take_draw_commands();
   }
@@ -2039,10 +2298,6 @@ fn apply_lua_host_commands(
       continue;
     }
     match command {
-      LuaHostCommand::RequestRender => {
-        services.canvas.request_render();
-        services.presenter.request_render();
-      }
       LuaHostCommand::FileRequest {
         request_id,
         task,
@@ -2079,6 +2334,7 @@ fn apply_lua_host_commands(
         }
       }
       LuaHostCommand::I18nRequest {
+        request_id,
         task,
         kind: event_kind,
         language_code,
@@ -2096,6 +2352,7 @@ fn apply_lua_host_commands(
           task_id,
           token,
           LuaTaskOperation::I18n {
+            request_id,
             kind: event_kind,
             language_code,
             callback_language_code,
@@ -2193,6 +2450,16 @@ fn apply_lua_host_commands(
           }
         }
       }
+      LuaHostCommand::InputRejected { actions, keys } if kind == LuaSessionKind::Game => {
+        if actions {
+          router.clear_pending_actions(kind);
+        }
+        if keys {
+          router.clear_pending_keys(kind);
+        }
+        let releases = services.game.take_input_releases();
+        queue_game_input_releases(services, router, router.current_frame(), releases);
+      }
       LuaHostCommand::SkipActions if kind == LuaSessionKind::Game => flow = LuaEventFlow::Skip,
       LuaHostCommand::ClearActions if kind == LuaSessionKind::Game => flow = LuaEventFlow::Clear,
       LuaHostCommand::Draw(_) => {}
@@ -2202,6 +2469,7 @@ fn apply_lua_host_commands(
       LuaHostCommand::ExitGame
       | LuaHostCommand::SaveGame
       | LuaHostCommand::SaveBest
+      | LuaHostCommand::InputRejected { .. }
       | LuaHostCommand::SkipActions
       | LuaHostCommand::ClearActions => {}
     }
@@ -2219,7 +2487,13 @@ fn take_lua_host_commands(
   }
 }
 
-/// 返回命令是否属于已经完成的诊断输出。
+/// Translate a Lua diagnostic host command into the owning package/session log route.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `kind` - The requested event, object, or path kind.
+/// * `command` - The command.
 fn apply_lua_diagnostic_host_command(
   services: &mut EngineServices,
   kind: LuaSessionKind,
@@ -2257,8 +2531,14 @@ fn apply_lua_diagnostic_host_command(
   true
 }
 
-/// Init 在 Session 注册到 Game/ScreensaverService 之前执行。若 Init 失败，
-/// 通过刚创建的日志会话提交其故障前诊断，避免随构造中的 Session 一同丢失。
+/// Flush diagnostics collected during package startup to their host or package log destinations.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `log_session` - The log session.
+/// * `kind` - The requested event, object, or path kind.
+/// * `commands` - The commands.
 fn flush_lua_startup_diagnostics(
   services: &mut EngineServices,
   log_session: Option<crate::host_engine::services::LogSessionId>,
@@ -2307,8 +2587,7 @@ fn flush_lua_startup_diagnostics(
   }
 }
 
-/// 故障回调可能已成功执行过若干日志调用。Session 销毁前只提交这些诊断输出；
-/// 保存、退出、文件任务和其他宿主副作用属于未完整完成的回调，必须丢弃。
+/// Flush retained Lua diagnostics after a session fault before releasing its ownership.
 fn flush_lua_fault_diagnostics(services: &mut EngineServices, kind: LuaSessionKind) {
   for command in take_lua_host_commands(kind, services) {
     let _ = apply_lua_diagnostic_host_command(services, kind, &command);
@@ -2616,12 +2895,10 @@ fn handle_screenshot_hotkey(
 
   if pending_screenshot_hotkey.take().is_some() {
     run_quick_screenshot_action(services, pending_screenshot_saves);
-    services.input.clear();
     return true;
   }
 
   *pending_screenshot_hotkey = Some(PendingScreenshotHotkey::new());
-  services.input.clear();
   true
 }
 
@@ -2687,6 +2964,8 @@ fn toggle_screensaver(
     save_best_enabled: false,
   };
   let api = crate::host_engine::services::LuaApiConfig {
+    input_method: None,
+    clipboard: None,
     debug_enabled: entry.debug,
     key_actions: entry.key_actions.clone(),
     key_default_actions: entry.key_default_actions.clone(),
@@ -2784,13 +3063,10 @@ fn handle_host_chord_input(
       }
       RecordingState::Stopped | RecordingState::Finalizing => {}
     }
-    services.input.clear();
-    return true;
   }
   if has_pressed_action(host_actions, HOST_KEY_RECORDING) {
     services.popup.dismiss(PopupDismissEvent::RecordingControl);
     *pending_recording = Some(PendingHostHotkey::new());
-    return true;
   }
   let screensaver_pressed = has_pressed_action(host_actions, HOST_KEY_SCREENSAVER);
   let toolbar_pressed = has_pressed_action(host_actions, HOST_KEY_TOP_TOOLBAR);
@@ -2800,32 +3076,50 @@ fn handle_host_chord_input(
     && (toolbar_pressed || toolbar_switch_pressed)
   {
     *pending_toolbar = None;
-    services.input.clear();
     return true;
   }
 
   if world.state.current_overlay_kind() == Some(OverlayKind::ScreenshotCapture)
     && screensaver_pressed
   {
-    services.input.clear();
     return true;
   }
 
   if toolbar_switch_pressed {
     *pending_toolbar = None;
     toggle_toolbar_enabled(services, display_settings_ui);
-    services.input.clear();
-    return true;
   }
   if screensaver_pressed {
     *pending_screensaver = Some(PendingHostHotkey::new());
-    return true;
   }
   if toolbar_pressed {
     *pending_toolbar = Some(PendingHostHotkey::new());
-    return true;
   }
   false
+}
+
+/// Group host matches by physical key or focus change without altering the input journal.
+fn host_action_batches(notifications: &[InputNotification]) -> Vec<Vec<InputActionEvent>> {
+  let mut batches = Vec::new();
+  let mut actions = Vec::new();
+  for notification in notifications {
+    match notification {
+      InputNotification::Key { .. } | InputNotification::Focus { .. } => {
+        if !actions.is_empty() {
+          batches.push(std::mem::take(&mut actions));
+        }
+      }
+      InputNotification::Action {
+        event,
+        system: true,
+      } => actions.push(event.clone()),
+      InputNotification::Action { system: false, .. } | InputNotification::Text { .. } => {}
+    }
+  }
+  if !actions.is_empty() {
+    batches.push(actions);
+  }
+  batches
 }
 
 fn has_pressed_action(events: &[InputActionEvent], action: &str) -> bool {
@@ -3336,19 +3630,27 @@ fn finish_screenshot_capture(
     .state
     .remove_overlay_kind(OverlayKind::ScreenshotCapture);
   screenshot_ui.finish();
-  // 截屏覆盖屏拥有期间产生的按键状态不得在恢复游戏 action map 后继续传播。
+  // Keys observed while capture owns input must not leak into restored game action bindings.
+
   services.input.clear();
   let _ = services.input.take_raw_key_events();
   while services.input.next_action_event().is_some() {}
 }
 
+/// Copy the selected frame as plain text, logging clipboard rejection and returning success.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `frame` - The composed terminal-cell frame.
+/// * `rect` - The rectangular region in terminal cells.
 pub(super) fn copy_screenshot_text(
   services: &mut EngineServices,
   frame: &crate::host_engine::services::ComposedFrame,
   rect: crate::host_engine::services::ScreenshotRect,
 ) -> bool {
   let text = ScreenshotService::plain_text(frame, rect);
-  let copied = services.clipboard.write_text(&text);
+  let copied = services.clipboard.borrow_mut().write_text(&text);
   if !copied {
     services.log.warn_operation_failed(
       LogSource::Storage,
@@ -3360,13 +3662,21 @@ pub(super) fn copy_screenshot_text(
   copied
 }
 
+/// Copy the selected frame as tagged rich text, logging clipboard rejection and returning
+/// success.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `frame` - The composed terminal-cell frame.
+/// * `rect` - The rectangular region in terminal cells.
 pub(super) fn copy_screenshot_rich_text(
   services: &mut EngineServices,
   frame: &crate::host_engine::services::ComposedFrame,
   rect: crate::host_engine::services::ScreenshotRect,
 ) -> bool {
   let text = ScreenshotService::rich_text(frame, rect);
-  let copied = services.clipboard.write_text(&text);
+  let copied = services.clipboard.borrow_mut().write_text(&text);
   if !copied {
     services.log.warn_operation_failed(
       LogSource::Storage,
@@ -3378,6 +3688,14 @@ pub(super) fn copy_screenshot_rich_text(
   copied
 }
 
+/// Persist the structured capture and queue PNG export using the configured fonts and deployment
+/// root.
+///
+/// # Arguments
+///
+/// * `services` - The application services supplied by the lifecycle phase.
+/// * `frame` - The composed terminal-cell frame.
+/// * `rect` - The rectangular region in terminal cells.
 pub(super) fn submit_screenshot_png(
   services: &mut EngineServices,
   frame: crate::host_engine::services::ComposedFrame,
@@ -3454,8 +3772,9 @@ mod tests {
   use std::time::Duration;
 
   use super::{
-    AutoRecordingRuntime, format_lua_fault_message, has_pressed_action, queue_lua_system_event,
-    replace_lua_resize_size, sequential_screensaver_index,
+    AutoRecordingRuntime, cursor_when_terminal_focused, defer_script_actions,
+    format_lua_fault_message, has_pressed_action, queue_lua_system_event, replace_lua_resize_size,
+    sequential_screensaver_index,
   };
   use crate::host_engine::services::{
     AutoRecordingMode, InputActionEvent, InputEventType, KeyState, LuaErrorStage, LuaEventBroker,
@@ -3465,9 +3784,100 @@ mod tests {
   };
 
   #[test]
+  fn skipping_actions_defers_both_tap_edges_but_keeps_keys_and_closing_releases() {
+    use crate::host_engine::services::{LuaActionState, LuaEventRoute};
+    let game = LuaSessionToken {
+      kind: LuaSessionKind::Game,
+      generation: 1,
+    };
+    let mut broker = LuaEventBroker::new();
+    broker.synchronize_sessions(Some(game), None);
+    for state in [LuaActionState::Pressed, LuaActionState::Released] {
+      broker
+        .push_owned(
+          game,
+          1,
+          LuaEventData::Action {
+            action: "tap".into(),
+            state,
+          },
+          LuaEventRoute::Input { generation: 0 },
+        )
+        .unwrap();
+    }
+    broker
+      .push_owned(
+        game,
+        1,
+        LuaEventData::Key {
+          key: "esc".into(),
+          state: LuaActionState::Pressed,
+        },
+        LuaEventRoute::Input { generation: 0 },
+      )
+      .unwrap();
+    broker
+      .push_owned(
+        game,
+        1,
+        LuaEventData::Action {
+          action: "old".into(),
+          state: LuaActionState::Released,
+        },
+        LuaEventRoute::InputRelease,
+      )
+      .unwrap();
+    broker
+      .push_owned(
+        game,
+        1,
+        LuaEventData::Input {
+          text: "submitted".into(),
+        },
+        LuaEventRoute::Input { generation: 0 },
+      )
+      .unwrap();
+    let batch = broker.drain_frame(LuaSessionKind::Game).into();
+    let remaining = defer_script_actions(&mut broker, LuaSessionKind::Game, batch);
+    assert_eq!(remaining.len(), 3);
+    assert!(matches!(remaining[0].event.data, LuaEventData::Key { .. }));
+    assert_eq!(remaining[1].route, LuaEventRoute::InputRelease);
+    assert!(matches!(
+      remaining[2].event.data,
+      LuaEventData::Input { .. }
+    ));
+    let next = broker.drain_frame(LuaSessionKind::Game);
+    assert_eq!(next.len(), 2);
+    assert!(matches!(
+      next[0].event.data,
+      LuaEventData::Action {
+        state: LuaActionState::Pressed,
+        ..
+      }
+    ));
+    assert!(matches!(
+      next[1].event.data,
+      LuaEventData::Action {
+        state: LuaActionState::Released,
+        ..
+      }
+    ));
+  }
+
+  #[test]
+  fn terminal_focus_gates_final_input_cursor() {
+    assert_eq!(
+      cursor_when_terminal_focused(Some((4, 7)), true),
+      Some((4, 7))
+    );
+    assert_eq!(cursor_when_terminal_focused(Some((4, 7)), false), None);
+    assert_eq!(cursor_when_terminal_focused(None, true), None);
+  }
+
+  #[test]
   fn lua_fault_log_does_not_append_stale_successful_callback_stats() {
     let error = LuaSessionError {
-      package_id: "test.package".to_string(),
+      package_id: "test_package".to_string(),
       session_kind: LuaSessionKind::Game,
       stage: LuaErrorStage::ExecutionLimit,
       callback: Some("Render"),
@@ -3507,6 +3917,193 @@ mod tests {
     }];
     assert!(has_pressed_action(&events, "host_key.screenshot"));
     assert!(!has_pressed_action(&events, "host_key.recording"));
+  }
+
+  #[test]
+  fn host_chord_flags_keep_specific_commands_exclusive_and_preserve_game_matches() {
+    use super::action_map::{
+      HOST_KEY_RECORDING, HOST_KEY_RECORDING_PAUSE, HOST_KEY_SCREENSHOT, HOST_KEY_TOP_TOOLBAR,
+      HOST_KEY_TOP_TOOLBAR_SWITCH,
+    };
+    use super::{HostChordFlags, host_action_batches};
+    use crate::host_engine::services::{
+      ActionMapEntry, InputNotification, InputService, Key, KeyEvent, KeyEventKind, LogService,
+      translate_action_map,
+    };
+
+    for (key, token, base_action, specific_action) in [
+      (
+        Key::Fn(2),
+        "f2",
+        HOST_KEY_RECORDING,
+        HOST_KEY_RECORDING_PAUSE,
+      ),
+      (
+        Key::Fn(5),
+        "f5",
+        HOST_KEY_TOP_TOOLBAR,
+        HOST_KEY_TOP_TOOLBAR_SWITCH,
+      ),
+    ] {
+      for base_priority in [0, 10] {
+        let mut input = InputService::new();
+        let mut log = LogService::new();
+        input.load_system_key_bindings(
+          translate_action_map(&[
+            ActionMapEntry {
+              action: base_action.into(),
+              description: String::new(),
+              keys: vec![vec![token.into()]],
+              priority: base_priority,
+            },
+            ActionMapEntry {
+              action: specific_action.into(),
+              description: String::new(),
+              keys: vec![vec!["q".into(), token.into()]],
+              priority: 0,
+            },
+          ])
+          .unwrap(),
+        );
+        input.load_key_bindings(
+          translate_action_map(&[ActionMapEntry {
+            action: "game_action".into(),
+            description: String::new(),
+            keys: vec![vec![token.into()]],
+            priority: 100,
+          }])
+          .unwrap(),
+        );
+        input.begin_frame();
+        for key in [Key::Q, key] {
+          input.queue_key_event(
+            KeyEvent {
+              key,
+              kind: KeyEventKind::Press,
+            },
+            &mut log,
+          );
+        }
+        input.poll();
+        let batches = host_action_batches(input.notifications());
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].len(), 2);
+        let flags = HostChordFlags::new(&batches[0]);
+        assert!(flags.allows(HOST_KEY_SCREENSHOT));
+        let accepted = batches[0]
+          .iter()
+          .filter(|event| flags.allows(&event.action))
+          .map(|event| event.action.as_str())
+          .collect::<Vec<_>>();
+        assert_eq!(accepted, [specific_action]);
+        assert!(
+          input
+            .notifications()
+            .iter()
+            .any(|notification| matches!(notification,
+              InputNotification::Action { event, system: false }
+                if event.action == "game_action" && event.state == KeyState::Pressed
+            ))
+        );
+
+        input.begin_frame();
+        input.queue_key_event(
+          KeyEvent {
+            key,
+            kind: KeyEventKind::Press,
+          },
+          &mut log,
+        );
+        input.poll();
+        assert!(
+          !host_action_batches(input.notifications())
+            .iter()
+            .flatten()
+            .any(|event| event.state == KeyState::Pressed)
+        );
+        input.begin_frame();
+        input.queue_key_event(
+          KeyEvent {
+            key: Key::Q,
+            kind: KeyEventKind::Release,
+          },
+          &mut log,
+        );
+        input.queue_key_event(
+          KeyEvent {
+            key,
+            kind: KeyEventKind::Release,
+          },
+          &mut log,
+        );
+        input.poll();
+        let released = host_action_batches(input.notifications())
+          .into_iter()
+          .flatten()
+          .filter(|event| event.state == KeyState::Released)
+          .map(|event| event.action)
+          .collect::<Vec<_>>();
+        assert_eq!(released, [specific_action, base_action]);
+      }
+    }
+  }
+
+  #[test]
+  fn host_chord_flags_reset_between_physical_changes_within_one_frame() {
+    use super::action_map::{HOST_KEY_RECORDING, HOST_KEY_RECORDING_PAUSE};
+    use super::{HostChordFlags, host_action_batches};
+    use crate::host_engine::services::{
+      ActionMapEntry, InputService, Key, KeyEvent, KeyEventKind, LogService, translate_action_map,
+    };
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    input.load_system_key_bindings(
+      translate_action_map(&[
+        ActionMapEntry {
+          action: HOST_KEY_RECORDING.into(),
+          description: String::new(),
+          keys: vec![vec!["f2".into()]],
+          priority: 0,
+        },
+        ActionMapEntry {
+          action: HOST_KEY_RECORDING_PAUSE.into(),
+          description: String::new(),
+          keys: vec![vec!["q".into(), "f2".into()]],
+          priority: 0,
+        },
+      ])
+      .unwrap(),
+    );
+    input.begin_frame();
+    for (key, kind) in [
+      (Key::Q, KeyEventKind::Press),
+      (Key::Fn(2), KeyEventKind::Press),
+      (Key::Fn(2), KeyEventKind::Release),
+      (Key::Q, KeyEventKind::Release),
+      (Key::Fn(2), KeyEventKind::Press),
+      (Key::Q, KeyEventKind::Press),
+    ] {
+      input.queue_key_event(KeyEvent { key, kind }, &mut log);
+    }
+    input.poll();
+    let accepted = host_action_batches(input.notifications())
+      .into_iter()
+      .flat_map(|batch| {
+        let flags = HostChordFlags::new(&batch);
+        batch
+          .into_iter()
+          .filter(move |event| event.state == KeyState::Pressed && flags.allows(&event.action))
+      })
+      .map(|event| event.action)
+      .collect::<Vec<_>>();
+    assert_eq!(
+      accepted,
+      [
+        HOST_KEY_RECORDING_PAUSE,
+        HOST_KEY_RECORDING,
+        HOST_KEY_RECORDING_PAUSE
+      ]
+    );
   }
 
   #[test]

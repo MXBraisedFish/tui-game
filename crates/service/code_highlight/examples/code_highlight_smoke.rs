@@ -1,4 +1,4 @@
-//! Minimal entry: highlights a Rust snippet and checks a keyword token is produced.
+//! Independent code highlight smoke entry exercising the public API and checking its results.
 
 use tg_service_code_highlight::{CodeHighlightService, CodeTokenKind};
 

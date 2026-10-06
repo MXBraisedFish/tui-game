@@ -1,8 +1,20 @@
-//! Lua service: sandboxed Lua sessions for games and screensavers, the host API libraries, and the event broker that routes service events to scripts.
+//! Isolated Lua sessions, strict host API bindings, callback budgets, and owned event routing.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_lua::{LuaBudgetKind, LuaPolicy};
+//!
+//! let policy = LuaPolicy::balanced();
+//! assert!(policy.memory_limit_bytes > 0);
+//! let render_budget = policy.budget(LuaBudgetKind::Render);
+//! assert!(render_budget.warn_duration < render_budget.hard_duration);
+//! ```
 
 mod api;
 mod events;
 mod game;
+mod input;
 mod object_pool;
 pub(crate) use tg_core_sandbox_path as path;
 mod policy;
@@ -30,30 +42,45 @@ pub use session::{
   LuaSessionError, LuaSessionKind, LuaSessionSpec, LuaSessionState,
 };
 
-/// 无状态 Lua Session 工厂。每次调用都会创建完全独立的 Lua VM。
+/// A stateless factory creating independent Lua VMs under an execution policy.
 pub struct LuaService {
   policy: LuaPolicy,
 }
 
 impl LuaService {
+  /// Create a Lua service with its initial state.
   pub fn new() -> Self {
     Self {
       policy: LuaPolicy::default(),
     }
   }
 
+  /// Create a stateless Lua session factory using the supplied execution policy.
   pub fn with_policy(policy: LuaPolicy) -> Self {
     Self { policy }
   }
 
+  /// Return the current policy.
   pub fn policy(&self) -> &LuaPolicy {
     &self.policy
   }
 
+  /// Load a fresh isolated Lua VM using the factory's execution policy.
+  ///
+  /// # Errors
+  ///
+  /// Propagate package loading, policy validation, Lua initialization, or initial callback
+  /// errors.
   pub fn create_session(&self, spec: LuaSessionSpec) -> Result<LuaSession, LuaSessionError> {
     LuaSession::load(spec, self.policy.clone())
   }
 
+  /// Load a fresh isolated Lua VM with the supplied host API context and execution policy.
+  ///
+  /// # Errors
+  ///
+  /// Propagate package loading, policy validation, host API construction, or initial callback
+  /// errors.
   pub fn create_session_with_api(
     &self,
     spec: LuaSessionSpec,

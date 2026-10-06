@@ -1,3 +1,5 @@
+//! Link text, clickable geometry, and pointer event routing.
+
 mod state;
 mod types;
 
@@ -12,14 +14,17 @@ use tg_service_canvas::CanvasService;
 use tg_service_layout::Rect;
 use tg_service_text_layout::{self as text_layout, DrawTextParams, TextWrapMode};
 
+/// The public entry point for hyperlink operations.
 #[derive(Default)]
 pub struct HyperlinkService;
 
 impl HyperlinkService {
+  /// Create a hyperlink service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Create an owned hyperlink object and return its identity.
   pub fn create(&self, pool: &mut UiObjectPool, options: HyperlinkOptions) -> Option<HyperlinkId> {
     validate_options(&options).then(|| {
       let id = HyperlinkId(pool.hyperlinks.next_id);
@@ -32,6 +37,7 @@ impl HyperlinkService {
     })
   }
 
+  /// Remove the identified widget object and release its owned state.
   pub fn remove(&self, pool: &mut UiObjectPool, id: HyperlinkId) -> bool {
     if pool.hyperlinks.links.remove(&id).is_none() {
       return false;
@@ -43,18 +49,28 @@ impl HyperlinkService {
     true
   }
 
+  /// Report whether the identified widget object is still present.
   pub fn exists(&self, pool: &UiObjectPool, id: HyperlinkId) -> bool {
     pool.hyperlinks.links.contains_key(&id)
   }
 
+  /// Return the stored link destination for the identified hyperlink.
   pub fn link<'a>(&self, pool: &'a UiObjectPool, id: HyperlinkId) -> Option<&'a str> {
     Some(&pool.hyperlinks.links.get(&id)?.options.link)
   }
 
+  /// Return the text for the addressed object when it is available.
   pub fn text<'a>(&self, pool: &'a UiObjectPool, id: HyperlinkId) -> Option<&'a str> {
     Some(&pool.hyperlinks.links.get(&id)?.options.text)
   }
 
+  /// Update the link used by this hyperlink service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `link` - The link.
   pub fn set_link(&self, pool: &mut UiObjectPool, id: HyperlinkId, link: String) -> bool {
     if link.is_empty() {
       return false;
@@ -66,6 +82,13 @@ impl HyperlinkService {
     true
   }
 
+  /// Update the text used by this hyperlink service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `text` - The text to process or display.
   pub fn set_text(&self, pool: &mut UiObjectPool, id: HyperlinkId, text: String) -> bool {
     if text.is_empty() {
       return false;
@@ -77,6 +100,15 @@ impl HyperlinkService {
     true
   }
 
+  /// Render the hyperlink service into its requested terminal-cell surface.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render(
     &self,
     pool: &mut UiObjectPool,
@@ -108,6 +140,16 @@ impl HyperlinkService {
     )
   }
 
+  /// Render the component into the identified clipped slice and update its interaction geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `slice` - The slice.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render_on(
     &self,
     pool: &mut UiObjectPool,
@@ -149,7 +191,7 @@ impl HyperlinkService {
     &self,
     pool: &mut UiObjectPool,
     id: HyperlinkId,
-    resolved: Option<(Rect, (u16, u16), usize)>,
+    resolved: Option<(Rect, (i32, i32), usize)>,
   ) -> bool {
     if !pool.hyperlinks.links.contains_key(&id) {
       return false;
@@ -164,6 +206,13 @@ impl HyperlinkService {
     true
   }
 
+  /// Route a pointer event through the component's current hit regions and focus state.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `text_input` - The text input.
+  /// * `event` - The event to apply or route.
   pub fn route_mouse_event(
     &self,
     pool: &mut UiObjectPool,

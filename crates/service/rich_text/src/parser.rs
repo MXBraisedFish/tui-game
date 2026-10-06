@@ -1,3 +1,5 @@
+//! Parser support for the rich text service.
+
 use super::params::RichTextParams;
 use super::{RichText, RichTextSegment, TextStyle, parse_text_color};
 use tg_core_input::format_key_display;
@@ -14,8 +16,7 @@ enum TagReadResult {
   Broken(String),
 }
 
-/// Parses text in AUTO mode: text with the `f%` prefix is formatted (`<tag>` tags become styled
-/// segments and `{param}` placeholders are replaced with their values); other text stays plain.
+/// Parse tagged text only when automatic-mode syntax explicitly enables rich formatting.
 pub(super) fn parse_auto(text: &str, params: Option<&RichTextParams>) -> RichText {
   text.strip_prefix(RICH_TEXT_PREFIX).map_or_else(
     || plain_text(text),
@@ -23,10 +24,12 @@ pub(super) fn parse_auto(text: &str, params: Option<&RichTextParams>) -> RichTex
   )
 }
 
+/// Treat the input as literal text without interpreting formatting tags.
 pub(super) fn parse_plain(text: &str) -> RichText {
   plain_text(text)
 }
 
+/// Parse formatting tags and substitutions into styled text segments.
 pub(super) fn parse_rich(text: &str, params: Option<&RichTextParams>) -> RichText {
   parse_formatted_text(text, params)
 }

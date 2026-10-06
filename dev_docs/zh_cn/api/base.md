@@ -1,299 +1,291 @@
 # base 库
 
-## 基本库说明
-
-`base` 提供 Lua 基础操作。
+`base` 提供 Lua 的基础操作。
 
 ---
 
-## 目录
-
-### 方法
-
-| 方法名         | 说明                                                  | 索引                          |
-| -------------- | ----------------------------------------------------- | ----------------------------- |
-| `ipairs`       | 遍历表中的连续整数索引元素                            | [ipairs](#ipairs)             |
-| `pairs`        | 遍历表中的全部键值对                                  | [pairs](#pairs)               |
-| `next`         | 获取表中指定索引之后的下一个键值对                    | [next](#next)                 |
-| `select`       | 获取表中指定位置开始的连续元素，或查询连续元素数量    | [select](#select)             |
-| `rawequal`     | 比较两个值是否直接相等，不触发元方法                  | [rawequal](#rawequal)         |
-| `rawlen`       | 字符串返回其 UTF-8 字节数；表返回其连续数组部分的长度 | [rawlen](#rawlen)             |
-| `tonumber`     | 将值转换为数字，可指定进制                            | [tonumber](#tonumber)         |
-| `tostring`     | 将任意值安全的转换为字符串                            | [tostring](#tostring)         |
-| `type`         | 返回值的类型名                                        | [type](#type)                 |
-| `setmetatable` | 设置或移除表的元表                                    | [setmetatable](#setmetatable) |
-| `getmetatable` | 获取表的元表或元表保护值                              | [getmetatable](#getmetatable) |
-
----
+# 目录
 
 ## 方法
 
+| 方法           | 说明                                                     | 定位                          |
+| -------------- | -------------------------------------------------------- | ----------------------------- |
+| `ipairs`       | 按从 1 开始的连续整数索引遍历表，遇到第一个 nil 值时结束 | [ipairs](#ipairs)             |
+| `pairs`        | 遍历表中的键值对                                         | [pairs](#pairs)               |
+| `next`         | 从指定键之后读取表中的下一个键值对                       | [next](#next)                 |
+| `select`       | 从变参中选择指定位置开始的所有值，或查询变参数量         | [select](#select)             |
+| `rawequal`     | 比较两个值是否相等                                       | [rawequal](#rawequal)         |
+| `rawget`       | 读取表中的原始键值                                       | [rawget](#rawget)             |
+| `rawset`       | 直接设置表中的键值                                       | [rawset](#rawset)             |
+| `rawlen`       | 获取字符串的 UTF-8 字节数或表的原始数组长度              | [rawlen](#rawlen)             |
+| `tonumber`     | 尝试将值转换为数字                                       | [tonumber](#tonumber)         |
+| `tostring`     | 将值转换为字符串                                         | [tostring](#tostring)         |
+| `type`         | 返回值的 Lua 类型名                                      | [type](#type)                 |
+| `setmetatable` | 为表设置或移除元表，或传入 nil 移除元表                  | [setmetatable](#setmetatable) |
+| `getmetatable` | 获取表的元表，或获取它设置的保护值                       | [getmetatable](#getmetatable) |
+
+---
+
+# 方法
+
 ## `ipairs`
 
-遍历表中的连续整数索引元素。
+按从 1 开始的连续整数索引遍历表，遇到第一个 nil 值时结束。
 
 ### 调用
 
 ```lua
--- 单参数
-ipairs()
+ipairs
 ```
 
-### 参数
+## 参数
 
-| 参数    | 类型  | 必填 | 默认值 | 说明       |
-| ------- | ----- | ---- | ------ | ---------- |
-| `table` | table | 是   | -      | 要遍历的表 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明       |
+| ------- | ----- | ---------- |
+| `table` | table | 要遍历的表 |
 
-直接返回一个值。
+## 返回值
 
-| 类型     | 说明       |
-| -------- | ---------- |
-| function | 迭代器函数 |
+返回三个值。
 
-**迭代器函数**，返回一个对象表。
+| 值名       | 类型     | 说明                 |
+| ---------- | -------- | -------------------- |
+| `iterator` | function | 获取下一项的迭代函数 |
+| `state`    | table    | 被遍历的表           |
+| `control`  | integer  | 初始控制值 `0`       |
 
-| 字段    | 类型    | 说明 |
-| ------- | ------- | ---- |
-| `index` | integer | 索引 |
-| `value` | any     | 值   |
+**迭代函数**每次返回两个值。
+
+| 值名    | 类型    | 说明         |
+| ------- | ------- | ------------ |
+| `index` | integer | 当前索引     |
+| `value` | any     | 当前索引的值 |
 
 ### 示例
 
 ```lua
-local t = {"a", "b", "c", [10] = "x"}
-
-for item in ipairs(t) do
-	debug.print {message = item.index .. " " .. item.value}
+local values = {"a", "b", "c", [10] = "ignored"}
+for index, value in ipairs(values) do
+  debug.print(tostring(index) .. " " .. value)
 end
 ```
 
-输出：
+**输出：**
 
-```text
+```lua
 1 a
 2 b
 3 c
 ```
 
-### 额外补充
-
-- 整数下标读取遵循表的 `__index` 元方法。
-- 与 Lua 5.4 一致，不使用已经移除的 `__ipairs` 元方法。
-- 遇到第一个返回 `nil` 的数组值时结束迭代。
-
 ---
 
 ## `pairs`
 
-遍历表中的全部键值对。
+遍历表中的键值对。
 
 ### 调用
 
 ```lua
--- 单参数
-pairs()
+pairs
 ```
 
-### 参数
+## 参数
 
-| 参数    | 类型  | 必填 | 默认值 | 说明       |
-| ------- | ----- | ---- | ------ | ---------- |
-| `table` | table | 是   | -      | 要遍历的表 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明       |
+| ------- | ----- | ---------- |
+| `table` | table | 要遍历的表 |
 
-直接返回一个值。
+## 返回值
 
-| 类型     | 说明       |
-| -------- | ---------- |
-| function | 迭代器函数 |
+返回三个值。
 
-**迭代器函数**，返回一个对象表。
+| 值名       | 类型     | 说明                 |
+| ---------- | -------- | -------------------- |
+| `iterator` | function | 获取下一项的迭代函数 |
+| `state`    | any      | 迭代状态             |
+| `control`  | any      | 初始控制值           |
 
-| 字段    | 类型 | 说明 |
-| ------- | ---- | ---- |
-| `index` | any  | 索引 |
-| `value` | any  | 值   |
+**迭代函数**每次返回两个值。
+
+| 值名    | 类型 | 说明         |
+| ------- | ---- | ------------ |
+| `key`   | any  | 当前键       |
+| `value` | any  | 当前索引的值 |
+
+**若定义`__pairs`元方法**，返回数个自定值。
+
+| 类型   | 说明     |
+| ------ | -------- |
+| any... | 自定义值 |
 
 ### 示例
 
 ```lua
-local t = { "a", "b", x = 1 }
-
-for item in pairs(t) do
-	debug.print {message = tostring(item.index) .. " " .. tostring(item.value)}
+local values = {"a", "b", name = "TUI GAME"}
+for key, value in pairs(values) do
+  debug.print(tostring(key) .. " " .. tostring(value))
 end
 ```
 
-输出：
+**输出：**
 
-```text
+```lua
 1 a
 2 b
-x 1
+name TUI GAME
 ```
-
-### 额外补充
-
-- 目标表的元表存在 `__pairs` 方法时，会先调用该元方法。
-- `__pairs` 应遵循 Lua 5.4 语义，返回迭代函数、状态值和初始控制值。
-- 宿主会将每次迭代产生的键和值包装为 `{ index = ..., value = ... }` 对象表。
 
 ---
 
 ## `next`
 
-获取表中指定索引之后的下一个键值对。
+从指定键之后读取表中的下一个键值对。
 
 ### 调用
 
 ```lua
--- 表参数
-next{}
+next
 ```
 
-### 参数
+## 参数
 
-| 参数    | 类型          | 必填 | 默认值 | 说明                                              |
-| ------- | ------------- | ---- | ------ | ------------------------------------------------- |
-| `table` | table         | 是   | -      | 要查询的表                                        |
-| `index` | integer / nil | 否   | `nil`  | 当前索引；省略或传入 `nil` 时从表的第一个元素开始 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明       |
+| ------- | ----- | ---------- |
+| `table` | table | 要遍历的表 |
 
-**找到下一个元素时**，返回一个对象表。
+### 选填参数
 
-| 字段    | 类型             | 说明           |
-| ------- | ---------------- | -------------- |
-| `value` | any              | 下一个值       |
-| `index` | integer / string | 下一个值的索引 |
+| 参数名 | 类型 | 默认值 | 说明   |
+| ------ | ---- | ------ | ------ |
+| `key`  | any  | `nil`  | 当前键 |
 
-**没有后续元素时**，直接返回一个值。
+## 返回值
+
+**找到下一项时**，返回两个值。
+
+| 值名    | 类型 | 说明       |
+| ------- | ---- | ---------- |
+| `key`   | any  | 下一项的键 |
+| `value` | any  | 下一项的值 |
+
+**未找到下一项时**，返回一个值。
 
 | 类型 | 说明       |
 | ---- | ---------- |
-| nil  | 无后续元素 |
+| nil  | 没有下一项 |
 
 ### 示例
 
 ```lua
-local t = { "a", "b", x = 1 }
-local index = nil
-
-while true do
-	local item = next { table = t, index = index }
-
-	-- 没有后续元素时结束遍历
-	if item == nil then
-		break
-	end
-
-	debug.print { message = tostring(item.index) .. " " .. tostring(item.value) }
-
-	-- 使用当前索引继续查找下一个元素
-	index = item.index
+local values = {"a", "b", name = "TUI GAME"}
+local key, value = next(values)
+while key ~= nil do
+  debug.print(tostring(key) .. " " .. tostring(value))
+  key, value = next(values, { key = key })
 end
 ```
 
-输出：
+**输出：**
 
-```text
+```lua
 1 a
 2 b
-x 1
+name TUI GAME
 ```
+
+## 额外说明
+
+- 选填参数 `key` 为 `nil` 时表示从头开始。
 
 ---
 
-### `select`
+## `select`
 
-获取表中指定位置开始的连续元素，或查询连续元素数量。
+从变参中选择指定位置开始的所有值，或查询变参数量。
 
 ### 调用
 
 ```lua
--- 表参数
-select{}
+select
 ```
 
-### 参数
+## 参数
 
-| 参数     | 类型            | 必填 | 默认值 | 说明                                        |
-| -------- | --------------- | ---- | ------ | ------------------------------------------- |
-| `index`  | integer / `"#"` | 是   | -      | 索引起始位置；传入 `"#"` 时查询连续元素数量 |
-| `values` | table           | 是   | -      | 要查询的表                                  |
+### 必填参数
 
-### 返回
+| 参数名  | 类型            | 说明                         |
+| ------- | --------------- | ---------------------------- |
+| `index` | integer / `"#"` | 起始位置；`"#"` 查询变参数量 |
+| `...`   | any...          | 变参                         |
 
-**参数 `index` 为 `"#"` 时**，直接返回一个值。
+## 返回值
 
-| 类型    | 说明               |
-| ------- | ------------------ |
-| integer | 表中连续元素的数量 |
+**必填参数 `index` 为 `integer` 时**，返回任意数量值。
 
-**参数 `index` 为 integer 时**，从指定索引开始，依次返回连续存在的元素值。
+| 类型   | 说明                   |
+| ------ | ---------------------- |
+| any... | 从指定为开始的数个变参 |
 
-| 类型   | 说明                                                   |
-| ------ | ------------------------------------------------------ |
-| any... | 从指定位置开始的连续元素；没有可返回的元素时返回 `nil` |
+**必填参数 `index` 为 `"#"` 时**，返回一个值。
+
+| 类型    | 说明     |
+| ------- | -------- |
+| integer | 变参数量 |
 
 ### 示例
 
 ```lua
-local t = { "a", "b", "c" , x = 1, [5] = "d" }
-
-local count = select { index = "#", values = t }
-debug.print {message = tostring(count)}
-
-local value1, value2 = select { index = 2, values = t }
-debug.print { message = tostring(value1) .. " " .. tostring(value2) }
-
-local value3 = select { index = -1, values = t }
-debug.print { message = tostring(value3) }
-
-local value4 = select { index = 4, values = t}
-debug.print { message = tostring(value4) }
+local count = select("#", "a", nil, "c")
+debug.print(count)
+local first, second = select(2, "a", "b", "c")
+debug.print(first)
+debug.print(second)
 ```
 
-输出：
+**输出：**
 
-```text
-2
-b c
+```lua
+3
+b
 c
-nil
 ```
 
-### 额外补充
+## 额外说明
 
-- 参数 `index` 为 integer 时，该 API 返回多参数而非表。
+- `nil` 也占参数位置。
+- 必填参数 `index` 取值范围为 $[-n, -1] \cup [1, n + 1]$，$n$ 为变参数量，负值从末尾倒数。
 
 ---
 
-### `rawequal`
+## `rawequal`
 
-比较两个值是否直接相等，不触发元方法。
+比较两个值是否相等。
 
 ### 调用
 
 ```lua
--- 表参数
-rawequal{}
+rawequal
 ```
 
-### 参数
+## 参数
 
-| 参数    | 类型 | 必填 | 默认值 | 说明     |
-| ------- | ---- | ---- | ------ | -------- |
-| `left`  | any  | 是   | -      | 左操作符 |
-| `right` | any  | 是   | -      | 右操作符 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型 | 说明   |
+| ------- | ---- | ------ |
+| `left`  | any  | 左侧值 |
+| `right` | any  | 右侧值 |
 
-直接返回一个值。
+## 返回值
+
+返回一个值。
 
 | 类型    | 说明           |
 | ------- | -------------- |
@@ -302,114 +294,194 @@ rawequal{}
 ### 示例
 
 ```lua
-local t1 = { "a" }
-local t2 = { "a" }
-
-local b1 = rawequal { left = 1, right = 1 }
-debug.print { message = tostring(b1) }
-
-local b2 = rawequal { left = 1, right = 2 }
-debug.print { message = tostring(b2) }
-
-local b3 = rawequal { left = t1, right = t1 }
-debug.print { message = tostring(b3) }
-
-local b4 = rawequal { left = t1, right = t2 }
-debug.print { message = tostring(b4) }
+debug.print(tostring(rawequal(1, 1.0)))
 ```
 
-输出：
+**输出：**
 
-```text
+```lua
 true
-false
-true
-false
 ```
+
+## 额外说明
+
+- 不触发 `__eq` 元方法。
 
 ---
 
-### `rawlen`
+## `rawget`
 
-字符串返回其 UTF-8 字节数；表返回其连续数组部分的长度。
+读取表中的原始键值。
 
 ### 调用
 
 ```lua
--- 单参数
-rawlen()
+rawget
 ```
 
-### 参数
+## 参数
 
-| 参数    | 类型           | 必填 | 默认值 | 说明         |
-| ------- | -------------- | ---- | ------ | ------------ |
-| `value` | string / table | 是   | -      | 需要测量的值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型  | 说明       |
+| ------- | ----- | ---------- |
+| `table` | table | 要读取的表 |
+| `key`   | any   | 要查询的键 |
 
-直接返回一个值。
+## 返回值
 
-| 类型    | 说明                               |
-| ------- | ---------------------------------- |
-| integer | 字符串总字节数；表中连续元素的数量 |
+**若键存在**，返回一个值。
+
+| 类型 | 说明   |
+| ---- | ------ |
+| any  | 原始值 |
+
+**若键不存在**，返回一个值。
+
+| 类型 | 说明   |
+| ---- | ------ |
+| any  | 原始值 |
 
 ### 示例
 
 ```lua
-local t = { "a", "b", "c", x = 1, [5] = "d" }
-
-local l1 = rawlen("Hello")
-debug.print { message = tostring(l1) }
-
-local l2 = rawlen("你好")
-debug.print { message = tostring(l2) }
-
-local l3 = rawlen { value = "Hello" }
-debug.print { message = tostring(l3) }
-
-local l4 = rawlen { value = t }
-debug.print { message = tostring(l4) }
+local value = rawget({answer = 42}, "answer")
+debug.print(tostring(value))
 ```
 
-输出：
+**输出：**
 
-```text
-5
-6
-5
-3
+```lua
+42
 ```
+
+## 额外说明
+
+- 不触发 `__index` 元方法。
 
 ---
 
-### `tonumber`
+## `rawset`
 
-将值转换为数字，可指定进制。
+直接设置表中的键值。
 
 ### 调用
 
 ```lua
--- 表参数
-tonumber{}
+rawset
 ```
 
-### 参数
+## 参数
 
-| 参数    | 类型                     | 必填 | 默认值 | 说明                                           |
-| ------- | ------------------------ | ---- | ------ | ---------------------------------------------- |
-| `value` | float / integer / string | 是   | -      | 需要转换的值                                   |
-| `base`  | integer                  | 否   | `10`   | 指定进制；指定进制时，`value` 参数必须为字符串 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型      | 说明                       |
+| ------- | --------- | -------------------------- |
+| `table` | table     | 要修改的表                 |
+| `key`   | any       | 要设置的键                 |
+| `value` | any / nil | 要写入的值；nil 会移除该键 |
 
-**转换成功**，直接返回一个值。
+## 返回值
 
-| 类型            | 说明         |
-| --------------- | ------------ |
-| float / integer | 转换后的数字 |
+返回一个值。
 
-**转换失败**，直接返回一个值。
+| 类型  | 说明         |
+| ----- | ------------ |
+| table | 修改后的原表 |
+
+### 示例
+
+```lua
+local values = {}
+rawset(values, "answer", 42)
+debug.print(tostring(values.answer))
+```
+
+**输出：**
+
+```lua
+42
+```
+
+## 额外说明
+
+- 不触发 `__newindex` 元方法。
+
+---
+
+## `rawlen`
+
+获取字符串的 UTF-8 字节数或表的原始数组长度。
+
+### 调用
+
+```lua
+rawlen
+```
+
+## 参数
+
+### 必填参数
+
+| 参数名  | 类型           | 说明               |
+| ------- | -------------- | ------------------ |
+| `value` | string / table | 要测量的字符串或表 |
+
+## 返回值
+
+返回一个值。
+
+| 类型    | 说明           |
+| ------- | -------------- |
+| integer | 字节数或表边界 |
+
+### 示例
+
+```lua
+debug.print(tostring(rawlen("你好")))
+```
+
+**输出：**
+
+```lua
+6
+```
+
+---
+
+## `tonumber`
+
+尝试将值转换为数字。
+
+### 调用
+
+```lua
+tonumber
+```
+
+## 参数
+
+### 必填参数
+
+| 参数名  | 类型                     | 说明       |
+| ------- | ------------------------ | ---------- |
+| `value` | string / integer / float | 要转换的值 |
+
+### 选填参数
+
+| 参数名 | 类型    | 默认值   | 说明             |
+| ------ | ------- | -------- | ---------------- |
+| `base` | integer | 自动识别 | 字符串数字的进制 |
+
+## 返回值
+
+**转换成功**，返回一个值。
+
+| 类型   | 说明     |
+| ------ | -------- |
+| number | 转换结果 |
+
+**转换失败**，返回一个值。
 
 | 类型 | 说明     |
 | ---- | -------- |
@@ -418,258 +490,212 @@ tonumber{}
 ### 示例
 
 ```lua
-local n1 = tonumber { value = "42" }
-debug.print { message = tostring(n1) }
-
-local n2 = tonumber { value = "3.14" }
-debug.print { message = tostring(n2) }
-
-local n3 = tonumber { value = "invalid" }
-debug.print { message = tostring(n3) }
-
-local n4 = tonumber { value = "1010", base = 2 }
-debug.print { message = tostring(n4) }
+local decimal = tonumber("42")
+debug.print(type(decimal))
+local hexadecimal = tonumber("2A", { base = 16 })
+debug.print(type(hexadecimal))
 ```
 
-输出：
+**输出：**
 
-```text
-42
-3.14
-nil
-10
+```lua
+number
+number
 ```
+
+## 额外说明
+
+- 选填参数 `base` 取值范围为 $[2, 36]$。
 
 ---
 
-### `tostring`
+## `tostring`
 
-将任意值安全的转换为字符串。
+将值转换为字符串。
 
 ### 调用
 
 ```lua
--- 单参数
-tostring()
+tostring
 ```
 
-### 参数
+## 参数
 
-| 参数    | 类型 | 必填 | 默认值 | 说明         |
-| ------- | ---- | ---- | ------ | ------------ |
-| `value` | any  | 是   | -      | 需要转换的值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型 | 说明       |
+| ------- | ---- | ---------- |
+| `value` | any  | 要转换的值 |
 
-直接返回一个值。
+## 返回值
 
-| 类型   | 说明           |
-| ------ | -------------- |
-| string | 转换后的字符串 |
+返回一个值。
+
+| 类型   | 说明     |
+| ------ | -------- |
+| string | 转换结果 |
 
 ### 示例
 
 ```lua
-local t = { "a", "b", "c" }
-
-debug.print { message = tostring(nil) }
-
-debug.print { message = tostring { value = true } }
-
-debug.print { message = tostring(t) }
-
-debug.print { message = tostring(10.5) }
+debug.print(tostring({name = "TUI GAME"}))
+debug.print(type(tostring(20)))
 ```
 
-输出：
+**输出：**
 
-```text
-nil
-true
-table: 0x114514   -- 表的内部身份指针
-10.5
+```lua
+table: 0x1eb9cd3c2c0
+string
 ```
-
-### 额外补充
-
-- 表的元表存在 `__tostring` 方法时，会调用该元方法。
-- `__tostring` 必须返回一个有效的 UTF-8 字符串，否则抛出错误。
 
 ---
 
-### `type`
+## `type`
 
-返回值的类型名。
+返回值的 Lua 类型名。
 
 ### 调用
 
 ```lua
--- 单参数
-type()
+type
 ```
 
-### 参数
+## 参数
 
-| 参数    | 类型 | 必填 | 默认值 | 说明           |
-| ------- | ---- | ---- | ------ | -------------- |
-| `value` | any  | 是   | -      | 要判断类型的值 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型 | 说明       |
+| ------- | ---- | ---------- |
+| `value` | any  | 要查询的值 |
 
-直接返回一个值。
+## 返回值
 
-| 类型   | 说明           |
-| ------ | -------------- |
-| string | 传递值的类型名 |
+返回一个值。
+
+| 类型   | 说明     |
+| ------ | -------- |
+| string | 类型名称 |
 
 ### 示例
 
 ```lua
-local t = { "a", "b", "c" }
-
-debug.print { message = type(nil) }
-
-debug.print { message = type { value = 10 } }
-
-debug.print { message = type(2.7) }
-
-debug.print { message = type(t) }
-
-debug.print { message = type("Hello") }
-
-debug.print { message = type(false) }
+debug.print(type(42))
+debug.print(type(3.14))
+debug.print(type({}))
+debug.print(type("Hi"))
+debug.print(type(nil))
 ```
 
-输出：
+**输出：**
 
-```text
-nil
-number   -- 整数
-number   -- 浮点数
+```lua
+number
+number
 table
 string
-boolean
+nil
 ```
 
 ---
 
 ## `setmetatable`
 
-设置或移除表的元表。
+为表设置或移除元表，或传入 nil 移除元表。
 
 ### 调用
 
 ```lua
--- 表参数
-setmetatable{}
+setmetatable
 ```
 
-### 参数
+## 参数
 
-| 参数名      | 类型        | 必填 | 默认值 | 说明                        |
-| ----------- | ----------- | ---- | ------ | --------------------------- |
-| `table`     | table       | 是   | -      | 要修改元表的目标表          |
-| `metatable` | table / nil | 否   | `nil`  | 新元表；为 `nil` 时移除元表 |
+### 必填参数
 
-### 返回
+| 参数名      | 类型        | 说明                   |
+| ----------- | ----------- | ---------------------- |
+| `table`     | table       | 要设置元表的表         |
+| `metatable` | table / nil | 新元表；nil 会移除元表 |
 
-直接返回一个值。
+## 返回值
 
-| 类型  | 说明               |
-| ----- | ------------------ |
-| table | 添加元表后的目标表 |
+返回一个值。
+
+| 类型  | 说明             |
+| ----- | ---------------- |
+| table | 设置元表后的原表 |
 
 ### 示例
 
 ```lua
-local t = {}
-local mt = {
-  __index = {
-    value = 10,
-  },
-}
-
-local result = setmetatable { table = t, metatable = mt }
-
-debug.print { message = result == t }
-debug.print { message = t.value }
-
-setmetatable { table = t, metatable = nil }
-debug.print { message = t.value }
+local values = setmetatable({}, {__index = {answer = 42}})
+debug.print(tostring(values.answer))
 ```
 
-输出：
+**输出：**
 
-```text
-true
-10
-nil
+```lua
+42
 ```
 
-### 额外补充
+## 额外说明
 
-- 参数 `metatable` 省略或显式传递 `nil` 时，均表示移除目标表的元表。
-- 若目标表当前元表包含非 `nil` 的 `__metatable` 字段，则该元表受保护，不能被替换或移除。
+- 受保护的元表不能被设置或移除。
 
 ---
 
 ## `getmetatable`
 
-获取表的元表或元表保护值。
+获取表的元表，或获取它设置的保护值。
 
 ### 调用
 
 ```lua
--- 单参数
-getmetatable()
+getmetatable
 ```
 
-### 参数
+## 参数
 
-| 参数名  | 类型  | 必填 | 默认值 | 说明               |
-| ------- | ----- | ---- | ------ | ------------------ |
-| `table` | table | 是   | -      | 要查询元表的目标表 |
+### 必填参数
 
-### 返回
+| 参数名  | 类型 | 说明       |
+| ------- | ---- | ---------- |
+| `value` | any  | 要查询的值 |
 
-若**元表没有 `__metatable` 字段**，直接返回一个值。
+## 返回值
+
+**若元表存在**，返回一个值。
 
 | 类型  | 说明 |
 | ----- | ---- |
 | table | 元表 |
 
-若**元表有 `__metatable` 字段**，直接返回一个值。
+**若元表受保护**，返回一个值。
+
+| 类型 | 说明         |
+| ---- | ------------ |
+| any  | 元表的保护值 |
+
+**若元表不存在**，返回一个值。
 
 | 类型 | 说明       |
 | ---- | ---------- |
-| any  | 返回保护值 |
-
-若目标表**没有元表**时，直接返回一个值。
-
-| 类型 | 说明   |
-| ---- | ------ |
-| nil  | 无元表 |
+| nil  | 元表不存在 |
 
 ### 示例
 
 ```lua
-local t = {}
-local mt = { name = "example" }
-
-setmetatable { table = t, metatable = mt }
-
-local result = getmetatable(t)
-
-debug.print { message = result == mt }
+local meta = getmetatable(setmetatable({}, {}))
+debug.print(type(meta))
 ```
 
-输出：
+**输出：**
 
-```text
-true
-example
+```lua
+table
 ```
 
-### 额外补充
+## 额外说明
 
-- 若元表具有非 `nil` 的 `__metatable` 字段，不会返回真实元表，而是返回该字段的值。
+- 参数不是表时，返回 `nil`。

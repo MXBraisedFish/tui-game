@@ -62,7 +62,7 @@ local base = { x = 10 }
 
 local obj1 = setmetatable { table = {}, metatable = { __index = base } }
 
-debug.print { message = obj1.x }
+debug.print(obj1.x)
 
 local obj2 = setmetatable { table = {}, metatable = {
   __index = function(table, key)
@@ -70,7 +70,7 @@ local obj2 = setmetatable { table = {}, metatable = {
   end
 } }
 
-debug.print { message = obj2.y }
+debug.print(obj2.y)
 ```
 
 输出：
@@ -103,11 +103,11 @@ local base = {}
 local obj1 = setmetatable { table = {}, metatable = { __newindex = base } }
 
 obj1.a = 1
-debug.print { message = base.a }
+debug.print(base.a)
 
 local obj2 = setmetatable { table = {}, metatable = {
   __newindex = function(table, key, value)
-    debug.print { message = "Don't have '" .. key .. "'" }
+    debug.print("Don't have '" .. key .. "'")
   end
 } }
 
@@ -144,7 +144,7 @@ local add = setmetatable { table = {},  metatable = {
   end
 } }
 
-debug.print { message = add(3, 4)}
+debug.print(add(3, 4))
 ```
 
 输出：
@@ -179,7 +179,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x + y }
+debug.print(x + y)
 ```
 
 输出：
@@ -188,7 +188,7 @@ debug.print { message = x + y }
 3
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__add` 即可。
 - `__add` 调用顺序为先查左、后查右。
@@ -219,7 +219,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x - y }
+debug.print(x - y)
 ```
 
 输出：
@@ -228,7 +228,7 @@ debug.print { message = x - y }
 -1
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__sub` 即可。
 - `__sub` 调用顺序为先查左、后查右。
@@ -259,7 +259,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x * y }
+debug.print(x * y)
 ```
 
 输出：
@@ -268,7 +268,7 @@ debug.print { message = x * y }
 2
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__mul` 即可。
 - `__mul` 调用顺序为先查左、后查右。
@@ -299,7 +299,7 @@ local mt = {
 local x = setmetatable { table = { v = 10 }, metatable = mt }
 local y = { v = 4 }
 
-debug.print { message = x / y }
+debug.print(x / y)
 ```
 
 输出：
@@ -308,7 +308,7 @@ debug.print { message = x / y }
 2.5
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__div` 即可。
 - `__div` 调用顺序为先查左、后查右。
@@ -339,7 +339,7 @@ local mt = {
 local x = setmetatable { table = { v = 10 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x % y }
+debug.print(x % y)
 ```
 
 输出：
@@ -348,7 +348,7 @@ debug.print { message = x % y }
 1
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__mod` 即可。
 - `__mod` 调用顺序为先查左、后查右。
@@ -379,7 +379,7 @@ local mt = {
 local x = setmetatable { table = { v = 2 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x ^ y }
+debug.print(x ^ y)
 ```
 
 输出：
@@ -388,7 +388,7 @@ debug.print { message = x ^ y }
 8.0
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__pow` 即可。
 - `__pow` 调用顺序为先查左、后查右。
@@ -419,7 +419,7 @@ local mt = {
 local x = setmetatable { table = { v = 10 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x // y }
+debug.print(x // y)
 ```
 
 输出：
@@ -428,7 +428,7 @@ debug.print { message = x // y }
 3
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__idiv` 即可。
 - `__idiv` 调用顺序为先查左、后查右。
@@ -459,7 +459,7 @@ local mt = {
 local x = setmetatable { table = { v = 6 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x & y }
+debug.print(x & y)
 ```
 
 输出：
@@ -468,7 +468,7 @@ debug.print { message = x & y }
 2
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__band` 即可。
 - `__band` 调用顺序为先查左、后查右。
@@ -499,7 +499,7 @@ local mt = {
 local x = setmetatable { table = { v = 6 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x | y }
+debug.print(x | y)
 ```
 
 输出：
@@ -508,7 +508,7 @@ debug.print { message = x | y }
 7
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__bor` 即可。
 - `__bor` 调用顺序为先查左、后查右。
@@ -539,7 +539,7 @@ local mt = {
 local x = setmetatable { table = { v = 6 }, metatable = mt }
 local y = { v = 3 }
 
-debug.print { message = x ~ y }
+debug.print(x ~ y)
 ```
 
 输出：
@@ -548,7 +548,7 @@ debug.print { message = x ~ y }
 5
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__bxor` 即可。
 - `__bxor` 调用顺序为先查左、后查右。
@@ -579,7 +579,7 @@ local mt = {
 local x = setmetatable { table = { v = 3 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x << y }
+debug.print(x << y)
 ```
 
 输出：
@@ -588,7 +588,7 @@ debug.print { message = x << y }
 12
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__shl` 即可。
 - `__shl` 调用顺序为先查左、后查右。
@@ -619,7 +619,7 @@ local mt = {
 local x = setmetatable { table = { v = 12 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x >> y }
+debug.print(x >> y)
 ```
 
 输出：
@@ -628,7 +628,7 @@ debug.print { message = x >> y }
 3
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__shr` 即可。
 - `__shr` 调用顺序为先查左、后查右。
@@ -658,7 +658,7 @@ local mt = {
 
 local x = setmetatable { table = { v = 5 }, metatable = mt }
 
-debug.print { message = -x }
+debug.print(-x)
 ```
 
 输出：
@@ -692,7 +692,7 @@ local mt = {
 
 local x = setmetatable { table = { v = 0 }, metatable = mt }
 
-debug.print { message = ~x }
+debug.print(~x)
 ```
 
 输出：
@@ -726,7 +726,7 @@ local mt = {
 
 local x = setmetatable { table = { n = 42 }, metatable = mt }
 
-debug.print { message = #x }
+debug.print(#x)
 ```
 
 输出：
@@ -761,7 +761,7 @@ local mt = {
 local x = setmetatable { table = { v = "a" }, metatable = mt }
 local y = { v = "b" }
 
-debug.print { message = x .. y }
+debug.print(x .. y)
 ```
 
 输出：
@@ -770,7 +770,7 @@ debug.print { message = x .. y }
 ab
 ```
 
-### 额外补充
+## 额外补充
 
 - 左操作数和右操作数中，只要其一的元表包含 `__concat` 即可。
 - `__concat` 调用顺序为先查左、后查右。
@@ -801,7 +801,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 1 }
 
-debug.print { message = x == y }
+debug.print(x == y)
 ```
 
 输出：
@@ -810,7 +810,7 @@ debug.print { message = x == y }
 true
 ```
 
-### 额外补充
+## 额外补充
 
 - 返回值会被转换为布尔值。
 - 左操作数和右操作数中，只要其一的元表包含 `__eq` 即可。
@@ -842,7 +842,7 @@ local mt = {
 local x = setmetatable { table = { v = 1 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x < y }
+debug.print(x < y)
 ```
 
 输出：
@@ -851,7 +851,7 @@ debug.print { message = x < y }
 true
 ```
 
-### 额外补充
+## 额外补充
 
 - 返回值会被转换为布尔值。
 - 左操作数和右操作数中，只要其一的元表包含 `__lt` 即可。
@@ -883,7 +883,7 @@ local mt = {
 local x = setmetatable { table = { v = 2 }, metatable = mt }
 local y = { v = 2 }
 
-debug.print { message = x <= y }
+debug.print(x <= y)
 ```
 
 输出：
@@ -892,7 +892,7 @@ debug.print { message = x <= y }
 true
 ```
 
-### 额外补充
+## 额外补充
 
 - 返回值会被转换为布尔值。
 - 左操作数和右操作数中，只要其一的元表包含 `__le` 即可。
@@ -917,7 +917,7 @@ true
 ```lua
 local mt = {
   __gc = function(obj)
-    debug.print { message = "collected" }
+    debug.print("collected")
   end
 }
 
@@ -944,7 +944,7 @@ collected
 
 ### 后继值
 
-- **函数**：如果该作用域正常执行，将对象自己作为参数传入；如果该作用域抛出异常，将对象自己和错误信息作为参数顺序传入。。
+- **函数**：如果该作用域正常执行，将对象自己作为参数传入；如果该作用域抛出错误，将对象自己和错误信息作为参数顺序传入。
 
 ### 示例
 
@@ -952,9 +952,9 @@ collected
 local mt = {
   __close = function(obj, err)
     if err == nil then
-      debug.print { message = "closed" }
+      debug.print("closed")
     else
-      debug.print { message = "error!!!" }
+      debug.print("error!!!")
     end
   end
 }
@@ -965,7 +965,7 @@ end
 
 do
   local y <close> = setmetatable { table = {}, metatable = mt }
-  debug.assert { value = false }
+  debug.assert(false)
 end
 ```
 
@@ -1004,7 +1004,7 @@ function Update(dt)
     t["name"] = {}
     i = 1
   elseif i == 1 then
-    debug.print { message = type(t["name"]) }
+    debug.print(type(t["name"]))
     i = 2
   end
 end
@@ -1029,13 +1029,13 @@ nil
 
 ### 后继值
 
-- **任意值**：`getmetatable` 返回该值；`setmetatable` 会报错阻止修改。
+- **任意值**：`getmetatable` 返回该值；`setmetatable` 会抛出错误阻止修改。
 
 ### 示例
 
 ```lua
 local t = setmetatable { table = {}, metatable = { __metatable = "locked" } }
-debug.print { message = getmetatable(t) }
+debug.print(getmetatable(t))
 ```
 
 输出：
@@ -1052,7 +1052,7 @@ locked
 
 ### 触发条件
 
-表被调用 `tostring` 或抛出异常时使用该值。
+表被调用 `tostring` 或抛出错误时使用该值。
 
 ### 后继值
 
@@ -1062,7 +1062,7 @@ locked
 
 ```lua
 local t = setmetatable { table = {}, metatable = { __name = "Type" } }
-debug.print { message = tostring(t) }
+debug.print(tostring(t))
 ```
 
 输出：

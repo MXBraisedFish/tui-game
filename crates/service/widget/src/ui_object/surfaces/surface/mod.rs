@@ -1,5 +1,7 @@
+//! Prepared drawing surfaces and their identities in a composed frame.
+
 use super::scroll_box::resolve_scroll_box_layout;
-use super::slice::resolve_rect;
+use super::slice::resolve_rect_with_source;
 use crate::UiObjectPool;
 use tg_service_canvas::CanvasService;
 use tg_service_canvas::{ScrollBoxFrame, SliceFrame, SurfaceFrame};
@@ -8,7 +10,7 @@ use tg_service_layout::{LayoutService, Size};
 pub use tg_service_canvas::SurfaceId;
 
 impl UiObjectPool {
-  /// 按叠放顺序生成本帧全部绘制面的描述，交给画布预处理缓冲区。
+  /// Resolve widget surfaces and register their clipped buffers for the current canvas frame.
   pub fn prepare_canvas(&self, canvas: &mut CanvasService, layout: &LayoutService) {
     let frames = self
       .surfaces
@@ -16,9 +18,13 @@ impl UiObjectPool {
       .filter_map(|surface| match *surface {
         SurfaceId::Slice(id) => {
           let state = self.slices.slices.get(&id)?;
+          let (rect, source_x, source_y) =
+            resolve_rect_with_source(state.rect, layout.developer_size());
           Some(SurfaceFrame::Slice(SliceFrame {
             id,
-            rect: resolve_rect(state.rect, layout),
+            rect,
+            source_x,
+            source_y,
             visible: state.visible && (!state.frame_scoped || state.drawn_this_frame),
             opaque: state.opaque,
             background: state.background.clone(),

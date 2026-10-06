@@ -1,4 +1,14 @@
-//! Recording service: captures presented frames and audio events into recording documents and loads them for playback.
+//! Presented-frame recording, synchronized audio capture, and timeline playback.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_recording::{RecordingService, RecordingState};
+//!
+//! let mut recording = RecordingService::new();
+//! assert_eq!(recording.state(), RecordingState::Stopped);
+//! assert!(!recording.pause());
+//! ```
 
 use std::{
   fs,
@@ -19,41 +29,87 @@ use tg_core_version::MEDIA_MANIFEST_VERSION;
 use tg_service_async::TaskId;
 use tg_service_storage::StorageService;
 
+/// The idle, recording, paused, or finalizing recording lifecycle state.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RecordingState {
+  /// The operation is stopped.
   #[default]
   Stopped,
+  /// The operation is recording.
   Recording,
+  /// The operation is paused.
   Paused,
+  /// The operation is finalizing.
   Finalizing,
 }
 
+/// A retained copy of recording data for later inspection or replay.
+///
+/// # Fields
+///
+/// * `state` - The recording state carried by this recording snapshot.
+/// * `active_duration` - The active duration represented as a duration.
+/// * `wall_duration` - The wall duration represented as a duration.
+/// * `paused_duration` - The paused duration represented as a duration.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RecordingSnapshot {
+  /// The recording state carried by this recording snapshot.
   pub state: RecordingState,
+  /// The active duration represented as a duration.
   pub active_duration: Duration,
+  /// The wall duration represented as a duration.
   pub wall_duration: Duration,
+  /// The paused duration represented as a duration.
   pub paused_duration: Duration,
 }
 
+/// The persisted recording playback description needed before its content is loaded.
+///
+/// # Fields
+///
+/// * `started_at` - The started at.
+/// * `frame_rate` - The frame rate.
+/// * `max_width` - The max width in terminal columns.
+/// * `max_height` - The max height in terminal rows.
+/// * `duration_us` - The duration in microseconds.
+/// * `audio` - The audio.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecordingPlaybackMetadata {
+  /// The started at.
   pub started_at: String,
+  /// The frame rate.
   pub frame_rate: u16,
+  /// The max width in terminal columns.
   pub max_width: u16,
+  /// The max height in terminal rows.
   pub max_height: u16,
+  /// The duration in microseconds.
   pub duration_us: u64,
+  /// The audio.
   pub audio: Option<RecordingAudioMetadata>,
 }
 
+/// The persisted recording audio description needed before its content is loaded.
+///
+/// # Fields
+///
+/// * `path` - The filesystem path to read, write, or resolve.
+/// * `sample_rate` - The sample rate.
+/// * `channels` - The channels.
+/// * `duration_us` - The duration in microseconds.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecordingAudioMetadata {
+  /// The filesystem path to read, write, or resolve.
   pub path: PathBuf,
+  /// The sample rate.
   pub sample_rate: u32,
+  /// The channels.
   pub channels: u16,
+  /// The duration in microseconds.
   pub duration_us: u64,
 }
 
+/// The recording playback representation used by this module.
 #[derive(Clone, Debug)]
 pub struct RecordingPlayback {
   metadata: RecordingPlaybackMetadata,
@@ -139,6 +195,7 @@ enum PlaybackColor {
   Transparent,
 }
 
+/// The inputs of an asynchronous recording operation.
 #[derive(Clone, Debug)]
 pub struct RecordingTask {
   document: RecordingDocument,
@@ -146,17 +203,32 @@ pub struct RecordingTask {
 }
 
 impl RecordingTask {
+  /// Return the current path.
   pub(crate) fn path(&self) -> &Path {
     &self.path
   }
 }
 
+/// A recording async event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum RecordingAsyncEvent {
-  Saved { task_id: TaskId, path: PathBuf },
-  Failed { task_id: TaskId, error: String },
+  /// A saved notification delivered to the owning consumer.
+  Saved {
+    /// The identifier of the asynchronous task.
+    task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
+    path: PathBuf,
+  },
+  /// A failed notification delivered to the owning consumer.
+  Failed {
+    /// The identifier of the asynchronous task.
+    task_id: TaskId,
+    /// The error.
+    error: String,
+  },
 }
 
+/// The public entry point for recording operations.
 pub struct RecordingService {
   state: RecordingState,
   session: Option<RecordingSession>,
@@ -275,6 +347,7 @@ fn is_false(value: &bool) -> bool {
 }
 
 impl RecordingService {
+  /// Create a recording service with its initial state.
   pub fn new() -> Self {
     Self {
       state: RecordingState::Stopped,
@@ -287,10 +360,12 @@ impl RecordingService {
     }
   }
 
+  /// Return the state for the addressed object.
   pub fn state(&self) -> RecordingState {
     self.state
   }
 
+  /// Return the snapshot for the addressed object.
   pub fn snapshot(&self) -> RecordingSnapshot {
     let Some(session) = &self.session else {
       return RecordingSnapshot {
@@ -309,14 +384,23 @@ impl RecordingService {
     }
   }
 
+  /// Report whether this recording service is recording.
   pub fn is_recording(&self) -> bool {
     self.state == RecordingState::Recording
   }
 
+  /// Report whether this recording service is paused.
   pub fn is_paused(&self) -> bool {
     self.state == RecordingState::Paused
   }
 
+  /// Start the recording state addressed by this operation.
+  ///
+  /// # Arguments
+  ///
+  /// * `initial` - The initial.
+  /// * `frame_rate` - The frame rate.
+  /// * `storage` - The deployment-relative storage service.
   pub fn start(
     &mut self,
     initial: ComposedFrame,
@@ -355,6 +439,7 @@ impl RecordingService {
     true
   }
 
+  /// Return the audio output path reserved for the active recording.
   pub fn pending_audio_path(&self) -> Option<PathBuf> {
     self
       .session
@@ -363,6 +448,7 @@ impl RecordingService {
       .map(|session| session.audio_path.clone())
   }
 
+  /// Associate an audio capture with the active recording.
   pub fn attach_audio_capture(&mut self, capture_id: AudioCaptureId) -> bool {
     let Some(session) = self.session.as_mut() else {
       return false;
@@ -374,6 +460,7 @@ impl RecordingService {
     true
   }
 
+  /// Return the current audio capture.
   pub fn audio_capture(&self) -> Option<AudioCaptureId> {
     self
       .session
@@ -381,6 +468,7 @@ impl RecordingService {
       .and_then(|session| session.audio_capture)
   }
 
+  /// Remove and return the audio capture associated with the recording.
   pub fn detach_audio_capture(&mut self, capture_id: AudioCaptureId) -> bool {
     let Some(session) = self.session.as_mut() else {
       return false;
@@ -392,6 +480,7 @@ impl RecordingService {
     true
   }
 
+  /// Pause the recording state addressed by this operation.
   pub fn pause(&mut self) -> bool {
     if self.state != RecordingState::Recording {
       return false;
@@ -407,6 +496,7 @@ impl RecordingService {
     true
   }
 
+  /// Resume the recording state addressed by this operation.
   pub fn resume(&mut self) -> bool {
     if self.state != RecordingState::Paused {
       return false;
@@ -424,6 +514,7 @@ impl RecordingService {
     true
   }
 
+  /// Stop the recording state addressed by this operation.
   pub fn stop<
     E: From<RecordingAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
   >(
@@ -483,6 +574,7 @@ impl RecordingService {
     true
   }
 
+  /// Apply audio-capture completion or failure to the owning recording.
   pub fn handle_audio_event<
     E: From<RecordingAsyncEvent> + From<tg_service_async::TaskStatusEvent> + Send + 'static,
   >(
@@ -548,6 +640,7 @@ impl RecordingService {
     self.finalizing_task = Some(task_id);
   }
 
+  /// Append the presented composed frame to the recording timeline when capture is active.
   pub fn capture_presented_frame(&mut self, frame: &ComposedFrame) {
     if self.state == RecordingState::Recording {
       let now = Instant::now();
@@ -576,10 +669,12 @@ impl RecordingService {
     self.last_presented_frame = Some(frame.clone());
   }
 
+  /// Capture the most recently presented frame using the requested scope or selection.
   pub fn capture_last_frame(&self) -> Option<ComposedFrame> {
     self.last_presented_frame.clone()
   }
 
+  /// Apply a matching asynchronous completion event to recording state.
   pub fn handle_engine_event(&mut self, event: &RecordingAsyncEvent) {
     let task_id = match event {
       RecordingAsyncEvent::Saved { task_id, .. } | RecordingAsyncEvent::Failed { task_id, .. } => {
@@ -605,6 +700,7 @@ impl Default for RecordingService {
   }
 }
 
+/// Read and validate recording metadata without decoding its entire frame timeline.
 pub fn load_recording_playback_metadata(path: &Path) -> Option<RecordingPlaybackMetadata> {
   const PALETTE_FIELD: &[u8] = b"\"palette\"";
 
@@ -645,6 +741,7 @@ pub fn load_recording_playback_metadata(path: &Path) -> Option<RecordingPlayback
   )
 }
 
+/// Load a recording's initial frame and validated timeline for playback.
 pub fn load_recording_playback(path: &Path) -> Option<RecordingPlayback> {
   let document: PlaybackDocument = serde_json::from_reader(fs::File::open(path).ok()?).ok()?;
   let metadata = playback_metadata(
@@ -671,10 +768,12 @@ pub fn load_recording_playback(path: &Path) -> Option<RecordingPlayback> {
 }
 
 impl RecordingPlayback {
+  /// Return the current metadata.
   pub fn metadata(&self) -> &RecordingPlaybackMetadata {
     &self.metadata
   }
 
+  /// Return the frame used to initialize recording playback.
   pub fn initial_frame(&self) -> ComposedFrame {
     let mut frame = ComposedFrame::new(self.metadata.max_width, self.metadata.max_height);
     for (y, row) in self.initial.rows.iter().enumerate() {
@@ -689,6 +788,13 @@ impl RecordingPlayback {
     frame
   }
 
+  /// Apply timeline changes through the requested playback timestamp.
+  ///
+  /// # Arguments
+  ///
+  /// * `frame` - The composed terminal-cell frame.
+  /// * `cursor` - The cursor.
+  /// * `time_us` - The time us.
   pub fn apply_until(&self, frame: &mut ComposedFrame, cursor: &mut usize, time_us: u64) {
     while let Some(event) = self
       .events
@@ -1036,6 +1142,18 @@ fn terminal_color_name(color: &TerminalColor) -> &'static str {
   }
 }
 
+/// Persist recording data and report finalization progress or failure through the event sink.
+///
+/// # Arguments
+///
+/// * `task_id` - The identifier of the asynchronous task.
+/// * `task` - The task.
+/// * `event_tx` - The event tx.
+///
+/// # Errors
+///
+/// Return an error for cancellation, invalid recording data, or failures while writing and
+/// finalizing recording files.
 pub fn run_recording_task<E: From<RecordingAsyncEvent>>(
   task_id: TaskId,
   task: RecordingTask,
@@ -1104,7 +1222,6 @@ mod tests {
   }
 
   fn playback_file(value: serde_json::Value) -> PathBuf {
-    // Parallel tests can read the same clock tick on Windows; the counter keeps names unique.
     static NEXT_FILE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let nonce = SystemTime::now()
       .duration_since(UNIX_EPOCH)

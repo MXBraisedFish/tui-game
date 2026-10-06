@@ -1,3 +1,5 @@
+//! Frame-scoped rectangular surfaces with ordered composition and clipping.
+
 use mlua::{Lua, MultiValue, Table, Value};
 
 use super::*;
@@ -14,6 +16,12 @@ enum SliceHandle {
   Object(SliceId),
 }
 
+/// Build and register the Lua slice API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn slice(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   install_lifecycle(lua, &source, state.clone())?;
@@ -28,7 +36,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "create",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.create";
-      let table = args::named(method, values, &["width", "height", "bg", "layer"])?;
+      let table = positional_table(lua, method, values, &["width", "height"], &["bg", "layer"])?;
       let width = length(args::required(&table, method, "width")?, method, "width")?;
       let height = length(args::required(&table, method, "height")?, method, "height")?;
       let background = parse_color(table.get::<Value>("bg")?, method, "bg", true)?;
@@ -54,7 +62,9 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
             },
           )
           .ok_or_else(|| args::message(method, "invalid slice dimensions"))?;
-        // Lua 切片是逐帧提交的资源；创建只保留配置，不使其自动出现在画布上。
+        // Creation stores slice configuration; only a submission for this frame makes it
+        // drawable.
+
         service.set_frame_scoped(objects.ui_mut(), id, true);
         Ok(Value::String(lua.create_string(format_id(id))?))
       })
@@ -92,71 +102,60 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
 }
 
 fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Result<()> {
-  for (name, fields) in [
-    ("set", &["id", "width", "height", "bg", "layer"][..]),
-    ("set_size", &["id", "width", "height"][..]),
-    ("set_width", &["id", "width"][..]),
-    ("set_height", &["id", "height"][..]),
-    ("set_background", &["id", "bg"][..]),
-    ("set_layer", &["id", "layer"][..]),
-  ] {
-    let state = state.clone();
-    source.raw_set(
-      name,
-      lua.create_function(move |_, values: MultiValue| {
-        let method: &'static str = match name {
-          "set" => "slice.set",
-          "set_size" => "slice.set_size",
-          "set_width" => "slice.set_width",
-          "set_height" => "slice.set_height",
-          "set_background" => "slice.set_background",
-          _ => "slice.set_layer",
-        };
-        let table = args::named(method, values, fields)?;
-        let handle = table_id(&table, method)?;
-        let width = optional_length(&table, method, "width")?;
-        let height = optional_length(&table, method, "height")?;
-        let background = optional_background(&table, method)?;
-        let layer = optional_layer(&table, method)?;
-        let SliceHandle::Object(id) = handle else {
+  let set_state = state.clone();
+  source.raw_set(
+    "set",
+    lua.create_function(move |lua, values: MultiValue| {
+      let method = "slice.set";
+      let table = positional_table(
+        lua,
+        method,
+        values,
+        &["id"],
+        &["width", "height", "bg", "layer"],
+      )?;
+      let handle = table_id(&table, method)?;
+      let width = optional_length(&table, method, "width")?;
+      let height = optional_length(&table, method, "height")?;
+      let background = optional_background(&table, method)?;
+      let layer = optional_layer(&table, method)?;
+      let SliceHandle::Object(id) = handle else {
+        return Ok(false);
+      };
+      with_pool_mut(&set_state, method, |objects| {
+        let service = SliceService::new();
+        let Some(mut rect) = service.configured_rect(objects.ui(), id) else {
           return Ok(false);
         };
-        with_pool_mut(&state, method, |objects| {
-          let service = SliceService::new();
-          let Some(mut rect) = service.configured_rect(objects.ui(), id) else {
-            return Ok(false);
-          };
-          if let Some(width) = width {
-            rect.width = width;
-          }
-          if let Some(height) = height {
-            rect.height = height;
-          }
-          if (width.is_some() || height.is_some()) && !service.set_rect(objects.ui_mut(), id, rect)
-          {
-            return Ok(false);
-          }
-          if let Some(background) = background
-            && !service.set_background(objects.ui_mut(), id, background)
-          {
-            return Ok(false);
-          }
-          if let Some(layer) = layer
-            && !service.set_layer(objects.ui_mut(), id, layer)
-          {
-            return Ok(false);
-          }
-          Ok(true)
-        })
-      })?,
-    )?;
-  }
+        if let Some(width) = width {
+          rect.width = width;
+        }
+        if let Some(height) = height {
+          rect.height = height;
+        }
+        if (width.is_some() || height.is_some()) && !service.set_rect(objects.ui_mut(), id, rect) {
+          return Ok(false);
+        }
+        if let Some(background) = background
+          && !service.set_background(objects.ui_mut(), id, background)
+        {
+          return Ok(false);
+        }
+        if let Some(layer) = layer
+          && !service.set_layer(objects.ui_mut(), id, layer)
+        {
+          return Ok(false);
+        }
+        Ok(true)
+      })
+    })?,
+  )?;
 
   source.raw_set(
     "draw",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.draw";
-      let table = args::named(method, values, &["id", "x", "y"])?;
+      let table = positional_table(lua, method, values, &["id", "x", "y"], &[])?;
       let SliceHandle::Object(id) = table_id(&table, method)? else {
         return Err(args::message(method, "base layer cannot be positioned"));
       };
@@ -195,30 +194,6 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
       }
     })?,
   )?;
-
-  for name in [
-    "get_size",
-    "get_width",
-    "get_height",
-    "get_layer",
-    "get_background",
-  ] {
-    let state = state.clone();
-    source.raw_set(
-      name,
-      lua.create_function(move |lua, values: MultiValue| {
-        let method: &'static str = match name {
-          "get_size" => "slice.get_size",
-          "get_width" => "slice.get_width",
-          "get_height" => "slice.get_height",
-          "get_layer" => "slice.get_layer",
-          _ => "slice.get_background",
-        };
-        let handle = id_argument(values, method)?;
-        query_value(lua, &state, method, handle, name)
-      })?,
-    )?;
-  }
 
   let info_state = state.clone();
   source.raw_set(
@@ -262,54 +237,6 @@ fn install_queries(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::Re
   )
 }
 
-fn query_value(
-  lua: &Lua,
-  state: &SharedApiState,
-  method: &str,
-  handle: SliceHandle,
-  query: &str,
-) -> mlua::Result<Value> {
-  let base = state.borrow().context.base_size;
-  match handle {
-    SliceHandle::Base => match query {
-      "get_size" => Ok(Value::Table(size_table(lua, base.width, base.height)?)),
-      "get_width" => Ok(Value::Integer(i64::from(base.width))),
-      "get_height" => Ok(Value::Integer(i64::from(base.height))),
-      "get_layer" => Ok(Value::Integer(0)),
-      _ => Ok(Value::String(lua.create_string("transparent")?)),
-    },
-    SliceHandle::Object(id) => with_pool(state, method, |objects| {
-      let service = SliceService::new();
-      let Some(rect) = service.configured_rect(objects.ui(), id) else {
-        return Ok(Value::Nil);
-      };
-      match query {
-        "get_size" => Ok(Value::Table(size_table(
-          lua,
-          resolve_length(rect.width, base.width),
-          resolve_length(rect.height, base.height),
-        )?)),
-        "get_width" => Ok(Value::Integer(i64::from(resolve_length(
-          rect.width, base.width,
-        )))),
-        "get_height" => Ok(Value::Integer(i64::from(resolve_length(
-          rect.height,
-          base.height,
-        )))),
-        "get_layer" => Ok(
-          service
-            .layer(objects.ui(), id)
-            .map_or(Value::Nil, |value| Value::Integer(i64::from(value))),
-        ),
-        _ => match service.background(objects.ui(), id) {
-          Some(value) => Ok(Value::String(lua.create_string(background_name(value))?)),
-          None => Ok(Value::Nil),
-        },
-      }
-    }),
-  }
-}
-
 fn info_value(
   lua: &Lua,
   state: &SharedApiState,
@@ -351,13 +278,6 @@ fn object_info(lua: &Lua, objects: &LuaObjectPool, id: SliceId, base: Size) -> m
   Ok(info)
 }
 
-fn size_table(lua: &Lua, width: u16, height: u16) -> mlua::Result<Table> {
-  let result = lua.create_table()?;
-  result.raw_set("width", width)?;
-  result.raw_set("height", height)?;
-  Ok(result)
-}
-
 fn length(value: Value, method: &str, name: &str) -> mlua::Result<SliceLength> {
   let value = args::integer(value, method, name)?;
   u16::try_from(value)
@@ -392,6 +312,7 @@ fn optional_background(table: &Table, method: &str) -> mlua::Result<Option<Optio
   }
 }
 
+/// Resolve a Lua slice length against the available terminal-cell dimension.
 pub(super) fn resolve_length(length: SliceLength, total: u16) -> u16 {
   match length {
     SliceLength::Fixed(value) => value,
@@ -417,6 +338,17 @@ fn parse_handle(value: &str, method: &str, name: &str) -> mlua::Result<SliceHand
   parse_id(value, method, name).map(SliceHandle::Object)
 }
 
+/// Validate a Lua object identifier before looking it up in the session pool.
+///
+/// # Arguments
+///
+/// * `value` - The value to store or convert.
+/// * `method` - The script-visible method name included in argument errors.
+/// * `name` - The name used to identify the object or field.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the identifier is not a supported non-negative integer.
 pub(super) fn parse_id(value: &str, method: &str, name: &str) -> mlua::Result<SliceId> {
   let raw = value
     .strip_prefix("slice_")

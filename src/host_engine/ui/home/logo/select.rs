@@ -1,3 +1,5 @@
+//! Select logo animation state and terminal-cell presentation.
+
 use super::{CellStyle, LogoCell, LogoRandom, SELECT_TEMPLATE, cells_to_rich_text};
 
 const FRAME_SECONDS: f64 = 0.06;
@@ -56,6 +58,7 @@ fn visible_size(tick: u32, size: usize) -> usize {
   }
 }
 
+/// The select logo representation used by this module.
 pub(super) struct SelectLogo {
   frames: Vec<SelectionFrame>,
   tick: u64,
@@ -64,6 +67,7 @@ pub(super) struct SelectLogo {
 }
 
 impl SelectLogo {
+  /// Create a select logo initialized from `rng`.
   pub fn new(rng: &mut LogoRandom<'_>) -> Self {
     let mut logo = Self {
       frames: Vec::new(),
@@ -75,6 +79,7 @@ impl SelectLogo {
     logo
   }
 
+  /// Advance the selected logo animation by its timer step.
   pub fn advance(&mut self, seconds: f64, rng: &mut LogoRandom<'_>) {
     let target = 1 + (seconds / FRAME_SECONDS).floor() as u64;
     while self.steps < target {
@@ -82,6 +87,7 @@ impl SelectLogo {
     }
   }
 
+  /// Draw the select view and register interaction regions in its assigned surfaces.
   pub fn render(&self) -> String {
     let width = SELECT_TEMPLATE
       .iter()

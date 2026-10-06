@@ -1,40 +1,55 @@
-# Lua 扩展 API 契约迁移表（初稿）
+# Lua API 调用约定
 
-更新时间：2026-09-27。只覆盖 `libraries.rs::install` 当前注册的宿主扩展。表内记录现状与迁移工作，不表示旧名兼容期限、参数协议或返回协议已经获批。标准 Lua API 和生命周期名称不纳入扩展 API 的统一改名。
+更新时间：2026-10-04。本文说明当前注册的 Lua API 调用和返回规则。各方法的字段、默认值、单位及权限限制以对应 API 页面为准。
 
-## 当前注册映射
+## 调用参数
 
-| API 族 | 当前注册面 | B10 目标记录 |
-|---|---|---|
-| 颜色与字符 | `color.*`, `char.*` | 纯值函数、常量、输入范围与返回类型 |
-| 对齐与测量 | `align.*`, `measurement.*` | 表参数字段、坐标/尺寸单位、结果表字段 |
-| 对象操作 | `random.*`, `slice.*` | 对象标识、生命周期、失败时返回与清理行为 |
-| 编码/序列化 | `encoding.*`, `serialization.*` | 编码名、二进制语义、nil/空容器/错误规则 |
-| 绘制 | `draw.*` | 参数表、坐标/裁剪/图层、同步提交语义 |
-| 调试 | `debug.*` | debug 开关、受控调用与错误回传 |
-| 游戏/事件 | `game.*`, `event.*` | session 类型、生命周期阶段和宿主命令结果 |
-| 本地化 | `i18n.*` | 包语言资源路径、查询回退与重载结果 |
-| 加载器 | `loader.*` | 包内路径、缓存、返回多值及加载错误 |
-| 文件 | `file.*` | `assets` 根约束、异步终态事件、编码和错误形状 |
-| 图片（计划新增） | 当前无注册；见 B0 草案及 B6 | 参数、关联字段、异步返回和取消行为尚待裁决 |
+- 所有公开 API 的选填参数统一使用末尾严格选项表，包括 `base.next`、`base.tonumber` 和 `table` 方法；旧的位置选填参数写法不再接受。
+- `pairs`、`ipairs` 返回的迭代函数按 Lua 循环协议工作；`select`、`table.pack` 等变参传递的是业务数据，不是命名选项。
+- 所有 API 按必填参数的顺序直接传参。方法声明了选项时，可在末尾传一个选项表；不需要选项时可省略。
+- 没有选项的方法不接受额外参数。无参方法使用空括号调用。
+- 选项表只接受文档列出的字段。未知字段、非字符串键、字段类型错误和多余位置参数会抛出错误。
+- 真实业务数据表仍按位置参数传递，不会被当作选项表解析。`select`、`table.pack`、`string.format`、`serialization.binary_pack`、`debug.pcall` 和 `debug.xpcall` 的变参原样传递，变参中的表和 nil 都会保留。
 
-具体当前符号见 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md)。逐函数参数、默认值、单位、权限、结果与测试编号在对应工作包实现后补全；不能以命名表替代可执行契约。
+```lua
+draw.text(2, 3, "Hello", {fg = color.WHITE, bold = true})
+local encoded = encoding.base64_encode("Hello")
+local rows = serialization.csv_encode({{"name", "score"}, {"Ada", 10}})
+local id = file.read("notes.txt", {encoding = file.UTF_8})
+local number = tonumber("ff", {base = 16})
+table.insert(rows, {"Grace", 20}, {pos = 1})
+local text = table.concat({"a", "b"}, {sep = ","})
+```
 
-## Q6 评审样例与候选统一形状
+## 返回值
 
-本节只供用户裁决，尚未授权据此批量改 API。
+- 一个结果直接返回该值；本来就是数据表的结果仍返回表。
+- 相关多个结果使用 Lua 多返回值，接收时按文档顺序赋值。
+- 条件结果按实际分支返回。例如查询到对象时返回多个值，未找到时返回一个 nil。
+- 无返回值与返回一个 nil 不同。多返回值里的 nil 位置也会保留。
+- `loader.require` 和 `loader.dofile` 保留模块自己的多返回值；`loader.loadfile` 返回函数，调用该函数后也保留模块的多返回值。
 
-| 类型 | 当前代码/文档示例 | 需要锁定的内容 |
-|---|---|---|
-| 纯值 `color.rgb` | 当前实现只接受一个命名表，字段 `r/g/b` 为 0–255 整数；页面示例也是命名表，形式章节的 `color.rgb()` 是占位签名 | 候选保持命名表；确认纯值函数是否也采用扩展 API 的统一输入协议，明确非法分量错误 |
-| 选项多的 `draw.text` | `draw.text { x=…, y=…, text=…, fg=… }`；实现只接收一个命名表并拒绝未识别字段 | 候选保持命名表；确定默认值、尺寸单位、同步返回语义 |
-| 异步 `file.read` / `image.load` | `file.read { path=…, encoding=…, event_tip=… }` 入队后由 `HandleEvent` 收到结果；目前调用本身不返回 task id。`image.load` 尚无生产实现，文档只写事件 | 是否新增同步 request id、事件关联字段、失败结构、取消终态和旧名兼容期限 |
+```lua
+local start_pos, end_pos, captures = string.find("item-42", "(%a+)%-(%d+)")
+local width, height = measurement.get_text_size("Hello")
+local bytes = serialization.binary_pack("<I2", 42)
+local values, next_pos = serialization.binary_unpack("<I2", bytes)
+```
 
-推荐候选是：纯值函数也使用命名表以保持宿主扩展一致；带多个可选项的扩展使用命名表；异步 API 提交后返回可关联的 request id，并用终态事件明确结果与错误字段。此推荐**不是已确认决定**。统一 API 名称采用可读的 `snake_case`，但具体 old/new 映射与是否留别名同样须在 Q6 答复后逐组定稿。
+## 异步方法
 
-## 尚未进入实现的范围
+`file` 的异步操作、`i18n.create/reload` 和 `image.load`在成功入队后立即返回 request id，不会同步等待任务完成。终态事件在 `data.request_id` 中携带同一个 id。权限门控或请求去重导致任务未入队时，方法按各自契约返回 nil，且不产生该请求的完成事件。`image.load` 的完成事件还会在 `data.output` 中返回可供 `draw.text` 使用的富文本字符串。
 
-- 不将原生 `assert`、`pcall`、`require` 等仅凭名字相似而纳入扩展迁移；先按 B2 标准 Lua 契约划分。
-- `image` API 必须等 B0 参数/事件决定和 B6 链路实现，不把文档页当成现有功能。
-- 组件事件与独立 callback 当前缺少生产来源/注册 API；不得只去掉 `cfg(test)` 暴露半成品。
-- 每组迁移需要同时更新 Rust 注册、Lua 调用、示例、事件和开发文档，并以脚本测试验证。
+## 序列化空值
+
+JSON 和 YAML 使用 `serialization.NULL` 表示并保留嵌套 null。CSV、INI、TOML 和 XML 不接受该哨兵，会返回明确错误。Lua 表中普通 nil 的处理仍遵循 Lua 表自身的规则。
+
+详细接口见各库页面：
+
+- [API 总览](API.md)
+- [Lua 兼容性与注册面](LUA_COMPATIBILITY.md)
+- [file](api/file.md)、[i18n](api/i18n.md)、[image](api/image.md)、[serialization](api/serialization.md)
+
+## 多行文本对齐
+
+`draw.text` 的 `align.CENTER` 和 `align.RIGHT` 以换行、裁剪和省略处理后的最长显示行作为对齐宽度，不再跟随第一行。坐标始终表示文本块左上角。测量和绘制使用相同选项时，可以直接使用 `align.resolve_rect(width, height, ...)` 返回的坐标；旧脚本若为第一行额外减去半宽或右对齐偏移，应移除这部分补偿。`max_width` 仍是宽度上限，单行及左对齐行为不变。

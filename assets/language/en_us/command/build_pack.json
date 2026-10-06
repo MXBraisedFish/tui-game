@@ -1,0 +1,21 @@
+{
+  "build_pack.title": "初始化 Tui Game 模组包",
+  "build_pack.type": "模组包类型",
+  "build_pack.type.game": "游戏包",
+  "build_pack.type.screensaver": "屏保包",
+
+  "build_pack.id": "模组包 ID：",
+  "build_pack.id.placeholder": "程序内部识别的唯一 ID",
+  "build_pack.pack_title": "模组包标题：",
+  "build_pack.pack_title.placeholder": "模组包的显示名称",
+  "build_pack.author": "模组包作者：",
+  "build_pack.author.placeholder": "模组包作者",
+
+  "build_pack.game.name": "游戏名：",
+  "build_pack.game.name.placeholder": "游戏的显示名称",
+
+  "build_pack.screensaver.name": "屏保名：",
+  "build_pack.screensaver.name.placeholder": "屏保的显示名称",
+
+  "build_pack.final.build": "构建"
+}

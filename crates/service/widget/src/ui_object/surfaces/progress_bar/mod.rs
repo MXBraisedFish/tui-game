@@ -1,3 +1,5 @@
+//! Progress indicators with independent committed and preview values.
+
 mod state;
 mod types;
 
@@ -13,14 +15,17 @@ use tg_core_unicode::char_width;
 use tg_service_canvas::CanvasService;
 use tg_service_layout::Rect;
 
+/// The public entry point for progress bar operations.
 #[derive(Default)]
 pub struct ProgressBarService;
 
 impl ProgressBarService {
+  /// Create a progress bar service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Create an owned progress bar object and return its identity.
   pub fn create(
     &self,
     pool: &mut UiObjectPool,
@@ -41,22 +46,33 @@ impl ProgressBarService {
     })
   }
 
+  /// Remove the identified widget object and release its owned state.
   pub fn remove(&self, pool: &mut UiObjectPool, id: ProgressBarId) -> bool {
     pool.progress_bars.bars.remove(&id).is_some()
   }
 
+  /// Report whether the identified widget object is still present.
   pub fn exists(&self, pool: &UiObjectPool, id: ProgressBarId) -> bool {
     pool.progress_bars.bars.contains_key(&id)
   }
 
+  /// Return the committed progress amount of the identified progress bar.
   pub fn completed(&self, pool: &UiObjectPool, id: ProgressBarId) -> Option<f32> {
     Some(pool.progress_bars.bars.get(&id)?.completed)
   }
 
+  /// Return the preview progress amount of the identified progress bar.
   pub fn preview(&self, pool: &UiObjectPool, id: ProgressBarId) -> Option<f32> {
     Some(pool.progress_bars.bars.get(&id)?.preview)
   }
 
+  /// Update the completed used by this progress bar service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `value` - The value to store or convert.
   pub fn set_completed(&self, pool: &mut UiObjectPool, id: ProgressBarId, value: f32) -> bool {
     let Some(state) = pool.progress_bars.bars.get_mut(&id) else {
       return false;
@@ -65,6 +81,13 @@ impl ProgressBarService {
     true
   }
 
+  /// Update the preview used by this progress bar service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `value` - The value to store or convert.
   pub fn set_preview(&self, pool: &mut UiObjectPool, id: ProgressBarId, value: f32) -> bool {
     let Some(state) = pool.progress_bars.bars.get_mut(&id) else {
       return false;
@@ -73,6 +96,14 @@ impl ProgressBarService {
     true
   }
 
+  /// Update the progress used by this progress bar service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `completed` - The completed.
+  /// * `preview` - The preview.
   pub fn set_progress(
     &self,
     pool: &mut UiObjectPool,
@@ -88,10 +119,18 @@ impl ProgressBarService {
     true
   }
 
+  /// Return the edge from which the identified progress bar fills.
   pub fn origin(&self, pool: &UiObjectPool, id: ProgressBarId) -> Option<ProgressBarFillOrigin> {
     Some(pool.progress_bars.bars.get(&id)?.options.origin)
   }
 
+  /// Update the origin used by this progress bar service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `origin` - The origin.
   pub fn set_origin(
     &self,
     pool: &mut UiObjectPool,
@@ -105,6 +144,14 @@ impl ProgressBarService {
     true
   }
 
+  /// Render the progress bar service into its requested terminal-cell surface.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render(
     &self,
     pool: &UiObjectPool,
@@ -121,6 +168,15 @@ impl ProgressBarService {
     true
   }
 
+  /// Render the component into the identified clipped slice and update its interaction geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `slice` - The slice.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render_on(
     &self,
     pool: &UiObjectPool,
@@ -140,6 +196,14 @@ impl ProgressBarService {
     true
   }
 
+  /// Render the component into the physical host surface and update its interaction geometry.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `rect` - The rectangular region in terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
   pub fn render_host(
     &self,
     pool: &UiObjectPool,

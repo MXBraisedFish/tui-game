@@ -1,4 +1,4 @@
-//! Minimal entry: wraps a CJK/ASCII string to a fixed width and measures it.
+//! Independent text layout smoke entry exercising the public API and checking its results.
 
 use tg_service_text_layout::{DrawTextParams, TextWrapMode, layout_text_lines, measure_draw_text};
 

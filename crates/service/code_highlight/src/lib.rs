@@ -1,4 +1,25 @@
-//! Code highlight service: tree-sitter based syntax highlighting into styled rich-text segments.
+//! Language detection and styled source-code segments from deployed syntax definitions.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_service_code_highlight::{CodeHighlightService, CodeTokenKind};
+//!
+//! fn main() {
+//!   let service = CodeHighlightService::new();
+//!   let language = service
+//!     .language_from_name("rust")
+//!     .expect("rust is supported");
+//!   let source = "fn main() { let x = 1; }";
+//!   let tokens = service.highlight(source, language);
+//!   let keyword = tokens
+//!     .iter()
+//!     .find(|token| token.kind == CodeTokenKind::Keyword)
+//!     .expect("keyword token");
+//!   assert_eq!(&source[keyword.start_byte..keyword.end_byte], "fn");
+//!   println!("code_highlight ok: {} tokens", tokens.len());
+//! }
+//! ```
 
 use std::{collections::HashSet, path::Path, sync::OnceLock};
 
@@ -6,63 +27,132 @@ use serde::Deserialize;
 use tg_core_style::{RichTextSegment, TextColor, TextStyle};
 use tree_sitter::{Node, Parser, Tree};
 
+/// A supported syntax-definition language.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CodeLanguage {
+  /// The Rust source language.
   Rust,
+  /// The Python source language.
   Python,
+  /// The JavaScript source language.
   JavaScript,
+  /// The TypeScript source language.
   TypeScript,
+  /// The Tsx source language.
   Tsx,
+  /// The Json source language.
   Json,
+  /// The Toml source language.
   Toml,
+  /// The Yaml source language.
   Yaml,
+  /// The Lua source language.
   Lua,
+  /// The Shell source language.
   Shell,
 }
 
+/// The syntax category used to select a token style.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CodeTokenKind {
+  /// Source text classified as keyword.
   Keyword,
+  /// Source text classified as string.
   String,
+  /// Source text classified as comment.
   Comment,
+  /// Source text classified as function.
   Function,
+  /// Source text classified as type name.
   TypeName,
+  /// Source text classified as number.
   Number,
+  /// Source text classified as operator.
   Operator,
+  /// Source text classified as punctuation.
   Punctuation,
+  /// Source text classified as variable.
   Variable,
+  /// Source text classified as property.
   Property,
+  /// Source text classified as constant.
   Constant,
+  /// Source text classified as builtin.
   Builtin,
+  /// Source text classified as attribute.
   Attribute,
+  /// Source text classified as text.
   Text,
 }
 
+/// A syntax category covering a half-open UTF-8 byte range in source text.
+///
+/// # Fields
+///
+/// * `start_byte` - The inclusive UTF-8 byte offset of this token.
+/// * `end_byte` - The exclusive UTF-8 byte offset of this token.
+/// * `kind` - The syntax category assigned to this source span.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CodeHighlightToken {
+  /// The inclusive UTF-8 byte offset of this token.
   pub start_byte: usize,
+  /// The exclusive UTF-8 byte offset of this token.
   pub end_byte: usize,
+  /// The syntax category assigned to this source span.
   pub kind: CodeTokenKind,
 }
 
+/// Styles assigned to syntax categories during highlighted segment rendering.
+///
+/// # Fields
+///
+/// * `keyword` - The style applied to keyword content.
+/// * `string` - The style applied to string content.
+/// * `comment` - The style applied to comment content.
+/// * `function` - The style applied to function content.
+/// * `type_name` - The style applied to type name content.
+/// * `number` - The style applied to number content.
+/// * `operator` - The style applied to operator content.
+/// * `punctuation` - The style applied to punctuation content.
+/// * `variable` - The style applied to variable content.
+/// * `property` - The style applied to property content.
+/// * `constant` - The style applied to constant content.
+/// * `builtin` - The style applied to builtin content.
+/// * `attribute` - The style applied to attribute content.
+/// * `text` - The style applied to text content.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CodeHighlightTheme {
+  /// The style applied to keyword content.
   pub keyword: TextStyle,
+  /// The style applied to string content.
   pub string: TextStyle,
+  /// The style applied to comment content.
   pub comment: TextStyle,
+  /// The style applied to function content.
   pub function: TextStyle,
+  /// The style applied to type name content.
   pub type_name: TextStyle,
+  /// The style applied to number content.
   pub number: TextStyle,
+  /// The style applied to operator content.
   pub operator: TextStyle,
+  /// The style applied to punctuation content.
   pub punctuation: TextStyle,
+  /// The style applied to variable content.
   pub variable: TextStyle,
+  /// The style applied to property content.
   pub property: TextStyle,
+  /// The style applied to constant content.
   pub constant: TextStyle,
+  /// The style applied to builtin content.
   pub builtin: TextStyle,
+  /// The style applied to attribute content.
   pub attribute: TextStyle,
+  /// The style applied to text content.
   pub text: TextStyle,
 }
 
+/// The public entry point for code highlight operations.
 pub struct CodeHighlightService;
 
 #[derive(Deserialize)]
@@ -94,22 +184,27 @@ const SUPPORTED: &[CodeLanguage] = &[
 ];
 
 impl CodeHighlightService {
+  /// Create a code highlight service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
+  /// Return the language names supported by the loaded syntax definitions.
   pub fn supported_languages(&self) -> &'static [CodeLanguage] {
     SUPPORTED
   }
 
+  /// Resolve a supported syntax language from its name.
   pub fn language_from_name(&self, name: &str) -> Option<CodeLanguage> {
     language_from_name(name)
   }
 
+  /// Infer the syntax language from the supplied filename or extension.
   pub fn detect_language_from_path(&self, path: &Path) -> Option<CodeLanguage> {
     detect_language_from_path(path)
   }
 
+  /// Return syntax categories and byte spans for source text in the selected language.
   pub fn highlight(&self, source: &str, language: CodeLanguage) -> Vec<CodeHighlightToken> {
     let Some(lang) = tree_sitter_language(language) else {
       return Vec::new();
@@ -124,6 +219,13 @@ impl CodeHighlightService {
     collect_tokens(&tree, source, language)
   }
 
+  /// Convert source text into styled segments without inserting text-format tags.
+  ///
+  /// # Arguments
+  ///
+  /// * `source` - The source value or package origin.
+  /// * `language` - The language.
+  /// * `theme` - The theme.
   pub fn highlight_segments(
     &self,
     source: &str,
@@ -215,6 +317,7 @@ impl CodeHighlightTheme {
   }
 }
 
+/// Resolve a supported syntax language from its name.
 pub fn language_from_name(name: &str) -> Option<CodeLanguage> {
   match name.trim().to_ascii_lowercase().as_str() {
     "rust" | "rs" => Some(CodeLanguage::Rust),
@@ -231,6 +334,7 @@ pub fn language_from_name(name: &str) -> Option<CodeLanguage> {
   }
 }
 
+/// Infer the syntax language from the supplied filename or extension.
 pub fn detect_language_from_path(path: &Path) -> Option<CodeLanguage> {
   let ext = path.extension()?.to_str()?;
   language_from_name(ext)

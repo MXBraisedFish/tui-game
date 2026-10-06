@@ -445,6 +445,20 @@ name = "bytemuck"
 version = "1.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797"
+dependencies = [
+ "bytemuck_derive",
+]
+
+[[package]]
+name = "bytemuck_derive"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a1f896587b6f2c069c73d2f0913e2d590c3990285cd2f0b6aa02b786b4c679c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.4",
+]
 
 [[package]]
 name = "byteorder"
@@ -1088,6 +1102,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
+name = "font-types"
+version = "0.12.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8eb065f3251655b3c90e22e5e363f310fc5332fb3402e37bbc94752283248f6"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "fontconfig-parser"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1265,6 +1288,19 @@ dependencies = [
  "r-efi",
  "rand_core",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "harfrust"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "948d0741125ba89cd3e1c23e5642415b6ade7e1d29d67ba25fb925b533e989d6"
+dependencies = [
+ "bitflags 2.13.1",
+ "bytemuck",
+ "once_cell",
+ "read-fonts",
+ "smallvec",
 ]
 
 [[package]]
@@ -2612,6 +2648,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "read-fonts"
+version = "0.43.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "005c8acf251756c478b0bf402885bfd88a1476020c4c7e6060edc1aa68da38ea"
+dependencies = [
+ "bytemuck",
+ "font-types",
+ "once_cell",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3346,6 +3393,13 @@ name = "tg-core-audio"
 version = "2.0.0"
 
 [[package]]
+name = "tg-core-date"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+]
+
+[[package]]
 name = "tg-core-fault"
 version = "2.0.0"
 
@@ -3575,6 +3629,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tg-core-audio",
+ "tg-core-date",
  "tg-core-input",
  "tg-core-package-id",
  "tg-core-sandbox-path",
@@ -3583,11 +3638,15 @@ dependencies = [
  "tg-core-version",
  "tg-service-animation",
  "tg-service-async",
+ "tg-service-clipboard",
  "tg-service-file",
  "tg-service-image",
+ "tg-service-input",
+ "tg-service-input-method",
  "tg-service-layout",
  "tg-service-log",
  "tg-service-network",
+ "tg-service-package",
  "tg-service-random",
  "tg-service-render",
  "tg-service-rich-text",
@@ -3698,6 +3757,7 @@ dependencies = [
  "crossbeam-channel",
  "fontdb",
  "fontdue",
+ "harfrust",
  "image",
  "serde",
  "serde_json",
@@ -3708,6 +3768,9 @@ dependencies = [
  "tg-service-async",
  "tg-service-log",
  "tg-service-storage",
+ "ttf-parser",
+ "unicode-bidi",
+ "unicode-script",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -3722,6 +3785,7 @@ dependencies = [
  "tg-core-audio",
  "tg-core-package-id",
  "tg-service-log",
+ "tg-service-package",
 ]
 
 [[package]]
@@ -3757,6 +3821,7 @@ dependencies = [
  "mp4",
  "openh264",
  "serde_json",
+ "tg-core-style",
  "tg-core-version",
  "tg-service-async",
  "tg-service-ffmpeg",
@@ -4165,7 +4230,6 @@ dependencies = [
  "tg-service-audio",
  "tg-service-canvas",
  "tg-service-clipboard",
- "tg-service-code-highlight",
  "tg-service-export",
  "tg-service-ffmpeg",
  "tg-service-file",
@@ -4214,6 +4278,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbc4bc3a9f746d862c45cb89d705aa10f187bb96c76001afab07a0d35ce60142"
 
 [[package]]
+name = "unicode-bidi"
+version = "0.3.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5"
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4224,6 +4294,12 @@ name = "unicode-linebreak"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b09c83c3c29d37506a3e260c08c03743a6bb66a9cd432c6934ab501a190571f"
+
+[[package]]
+name = "unicode-script"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "383ad40bb927465ec0ce7720e033cb4ca06912855fc35db31b5755d0de75b1ee"
 
 [[package]]
 name = "unicode-segmentation"

@@ -1,4 +1,14 @@
-//! Audio service: playback pools, decoding and capture on a dedicated audio runtime thread, reporting through an event sink.
+//! Audio playback, volume groups, capture, and ownership-aware resource release.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use tg_core_audio::AudioPoolId;
+//! use tg_service_audio::AudioObjectPool;
+//!
+//! let pool = AudioObjectPool::new(AudioPoolId(1));
+//! assert_eq!(pool.id(), AudioPoolId(1));
+//! ```
 
 mod pool;
 mod runtime;
@@ -25,6 +35,7 @@ pub(crate) use runtime::AudioCommand;
 use runtime::AudioRuntime;
 use types::AudioPlaybackSnapshot;
 
+/// The public entry point for audio operations.
 pub struct AudioService {
   runtime: AudioRuntime,
   pools: HashMap<AudioPoolId, Weak<RwLock<AudioPoolState>>>,
@@ -37,6 +48,7 @@ pub struct AudioService {
 }
 
 impl AudioService {
+  /// Create an audio service initialized from `event_tx`.
   pub fn new(event_tx: EventSink<AudioAsyncEvent>) -> Self {
     Self {
       runtime: AudioRuntime::new(event_tx),
@@ -50,6 +62,11 @@ impl AudioService {
     }
   }
 
+  /// Create a named volume group in the supplied audio pool.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed.
   pub fn create_type(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -79,6 +96,14 @@ impl AudioService {
     Ok(id)
   }
 
+  /// Remove an unused audio volume group from its owning pool.
+  ///
+  /// # Errors
+  ///
+  /// Return `TypeInUse` when live audio objects still reference the requested type;
+  /// `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidId` when the supplied pool, object, type, or capture identity does not match this
+  /// operation.
   pub fn remove_type(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -102,6 +127,20 @@ impl AudioService {
     )
   }
 
+  /// Update the type volume used by this audio service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `type_id` - The identifier of the type.
+  /// * `volume` - The requested volume multiplier.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidId` when the supplied pool, object, type, or capture identity does not match this
+  /// operation; `InvalidVolume` when the volume is non-finite; finite values are clamped to the
+  /// range from zero to one; stale object/type handles return `Ok(false)`.
   pub fn set_type_volume(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -127,6 +166,13 @@ impl AudioService {
     Ok(true)
   }
 
+  /// Pause all playback objects assigned to the audio volume group.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidId` when the supplied pool, object, type, or capture identity does not match this
+  /// operation; stale object/type handles return `Ok(false)`.
   pub fn pause_type(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -154,6 +200,13 @@ impl AudioService {
     Ok(true)
   }
 
+  /// Resume playback objects assigned to the audio volume group.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidId` when the supplied pool, object, type, or capture identity does not match this
+  /// operation; stale object/type handles return `Ok(false)`.
   pub fn resume_type(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -183,6 +236,13 @@ impl AudioService {
     Ok(true)
   }
 
+  /// Stop all playback objects assigned to the audio volume group.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidId` when the supplied pool, object, type, or capture identity does not match this
+  /// operation; stale object/type handles return `Ok(false)`.
   pub fn stop_type(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -202,6 +262,23 @@ impl AudioService {
     Ok(true)
   }
 
+  /// Create an owned audio object and return its identity.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `source` - The source value or package origin.
+  /// * `type_id` - The identifier of the type.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `new audio object disappeared`.
   pub fn create(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -266,6 +343,13 @@ impl AudioService {
     Ok(id)
   }
 
+  /// Remove the identified audio object and release its owned state.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidId` when the supplied pool, object, type, or capture identity does not match this
+  /// operation.
   pub fn remove(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -282,6 +366,12 @@ impl AudioService {
     Ok(removed)
   }
 
+  /// Release playback objects belonging to the specified owner.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// stale object/type handles return `Ok(false)`.
   pub fn remove_owned(&mut self, audio_id: AudioId) -> Result<bool, AudioError> {
     let Some(pool) = self.pools.get(&audio_id.pool_id).and_then(Weak::upgrade) else {
       self.pools.remove(&audio_id.pool_id);
@@ -297,6 +387,14 @@ impl AudioService {
     Ok(removed)
   }
 
+  /// Request playback of the identified audio object, retaining a pending play while its source
+  /// loads.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `InvalidState` when the current playback or capture state rejects the
+  /// operation; `RuntimeClosed` when the service has shut down or the command channel has closed.
   pub fn play(&mut self, pool: &mut AudioObjectPool, audio_id: AudioId) -> Result<(), AudioError> {
     self.ensure_matching_pool(pool, audio_id.pool_id)?;
     let mut state = write_pool(&pool.state);
@@ -329,6 +427,13 @@ impl AudioService {
     self.runtime.send(AudioCommand::Play { audio_id, paused })
   }
 
+  /// Pause the audio state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
   pub fn pause(&mut self, pool: &mut AudioObjectPool, audio_id: AudioId) -> Result<(), AudioError> {
     self.ensure_matching_pool(pool, audio_id.pool_id)?;
     let mut state = write_pool(&pool.state);
@@ -345,6 +450,13 @@ impl AudioService {
     Ok(())
   }
 
+  /// Resume the audio state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
   pub fn resume(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -366,6 +478,13 @@ impl AudioService {
     Ok(())
   }
 
+  /// Stop the audio state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
   pub fn stop(&mut self, pool: &mut AudioObjectPool, audio_id: AudioId) -> Result<(), AudioError> {
     self.ensure_matching_pool(pool, audio_id.pool_id)?;
     let mut state = write_pool(&pool.state);
@@ -376,6 +495,13 @@ impl AudioService {
     self.runtime.send(AudioCommand::Stop { audio_id })
   }
 
+  /// Restart the audio state addressed by this operation.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `InvalidState` when the current playback or capture state rejects the
+  /// operation; `RuntimeClosed` when the service has shut down or the command channel has closed.
   pub fn restart(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -400,6 +526,20 @@ impl AudioService {
       .send(AudioCommand::Restart { audio_id, paused })
   }
 
+  /// Update the volume used by this audio service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `audio_id` - The playback object identifier.
+  /// * `volume` - The requested volume multiplier.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidId` when the supplied pool, object, type, or capture identity does not match this
+  /// operation; `InvalidVolume` when the volume is non-finite; finite values are clamped to the
+  /// range from zero to one; stale object/type handles return `Ok(false)`.
   pub fn set_volume(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -429,6 +569,19 @@ impl AudioService {
     Ok(true)
   }
 
+  /// Update the loop used by this audio service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `audio_id` - The playback object identifier.
+  /// * `looped` - The looped.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidId` when the supplied pool, object, type, or capture identity does not match this
+  /// operation; stale object/type handles return `Ok(false)`.
   pub fn set_loop(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -447,6 +600,11 @@ impl AudioService {
     Ok(true)
   }
 
+  /// Pause playback globally while preserving each object's own pause state.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed.
   pub fn pause_all(&mut self) -> Result<bool, AudioError> {
     if self.globally_paused {
       return Ok(true);
@@ -469,6 +627,11 @@ impl AudioService {
     Ok(affected)
   }
 
+  /// Resume globally paused playback without overriding object or type pauses.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed.
   pub fn resume_all(&mut self) -> Result<bool, AudioError> {
     if !self.globally_paused {
       return Ok(true);
@@ -492,6 +655,11 @@ impl AudioService {
     Ok(affected)
   }
 
+  /// Stop all playback objects and clear their pending-play state.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed.
   pub fn stop_all(&mut self) -> Result<bool, AudioError> {
     let mut any = false;
     for pool in self.live_pools() {
@@ -507,6 +675,13 @@ impl AudioService {
     Ok(any)
   }
 
+  /// Update the all volume used by this audio service.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidVolume` when the volume is non-finite; finite values are clamped to the range
+  /// from zero to one; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
   pub fn set_all_volume(&mut self, volume: f32) -> Result<bool, AudioError> {
     self.master_volume = valid_volume(volume)?;
     let mut any = false;
@@ -525,46 +700,73 @@ impl AudioService {
     Ok(any)
   }
 
+  /// Clear the cache retained by this audio service.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed.
   pub fn clear_cache(&self) -> Result<(), AudioError> {
     self.runtime.send(AudioCommand::ClearCache)
   }
 
+  /// Return the current master volume.
   pub fn master_volume(&self) -> f32 {
     self.master_volume
   }
 
+  /// Report whether the audio output backend was initialized successfully.
   pub fn backend_available(&self) -> bool {
     self.backend_available
   }
 
+  /// Return the state for the addressed object when it is available.
   pub fn state(&self, pool: &AudioObjectPool, audio_id: AudioId) -> Option<AudioState> {
     matching_audio(pool, audio_id).map(|audio| audio.state)
   }
 
+  /// Report whether the addressed object is playing.
   pub fn is_playing(&self, pool: &AudioObjectPool, audio_id: AudioId) -> bool {
     self.state(pool, audio_id) == Some(AudioState::Playing)
   }
 
+  /// Report whether the addressed object is paused.
   pub fn is_paused(&self, pool: &AudioObjectPool, audio_id: AudioId) -> bool {
     self.state(pool, audio_id) == Some(AudioState::Paused)
   }
 
+  /// Report whether the addressed object is stopped.
   pub fn is_stopped(&self, pool: &AudioObjectPool, audio_id: AudioId) -> bool {
     self.state(pool, audio_id) == Some(AudioState::Stopped)
   }
 
+  /// Report whether the addressed object is finished.
   pub fn is_finished(&self, pool: &AudioObjectPool, audio_id: AudioId) -> bool {
     self.state(pool, audio_id) == Some(AudioState::Finished)
   }
 
+  /// Return the duration for the addressed object when it is available.
   pub fn duration(&self, pool: &AudioObjectPool, audio_id: AudioId) -> Option<Duration> {
     matching_audio(pool, audio_id).and_then(|audio| audio.duration)
   }
 
+  /// Return the position for the addressed object when it is available.
   pub fn position(&self, pool: &AudioObjectPool, audio_id: AudioId) -> Option<Duration> {
     matching_audio(pool, audio_id).map(|audio| audio.latest_position())
   }
 
+  /// Request a new playback time for a live audio object in the matching pool.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `audio_id` - The playback object identifier.
+  /// * `position` - The requested playback time offset.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
   pub fn seek(
     &mut self,
     pool: &mut AudioObjectPool,
@@ -578,6 +780,12 @@ impl AudioService {
     self.runtime.send(AudioCommand::Seek { audio_id, position })
   }
 
+  /// Start recording mixed playback audio and return the capture identifier.
+  ///
+  /// # Errors
+  ///
+  /// Return `RuntimeClosed` when the service has shut down or the command channel has closed;
+  /// `InvalidState` when the current playback or capture state rejects the operation.
   pub fn start_capture(&mut self, path: PathBuf) -> Result<AudioCaptureId, AudioError> {
     if self.closed {
       return Err(AudioError::sanitized(AudioErrorCode::RuntimeClosed));
@@ -594,6 +802,13 @@ impl AudioService {
     Ok(capture_id)
   }
 
+  /// Pause the identified audio capture.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
   pub fn pause_capture(&self, capture_id: AudioCaptureId) -> Result<(), AudioError> {
     if self.active_capture != Some(capture_id) {
       return Err(AudioError::sanitized(AudioErrorCode::InvalidId));
@@ -601,6 +816,13 @@ impl AudioService {
     self.runtime.send(AudioCommand::PauseCapture { capture_id })
   }
 
+  /// Resume the identified paused audio capture.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
   pub fn resume_capture(&self, capture_id: AudioCaptureId) -> Result<(), AudioError> {
     if self.active_capture != Some(capture_id) {
       return Err(AudioError::sanitized(AudioErrorCode::InvalidId));
@@ -610,6 +832,13 @@ impl AudioService {
       .send(AudioCommand::ResumeCapture { capture_id })
   }
 
+  /// Finalize the identified audio capture and queue its completion event.
+  ///
+  /// # Errors
+  ///
+  /// Return `InvalidId` when the supplied pool, object, type, or capture identity does not match
+  /// this operation; `RuntimeClosed` when the service has shut down or the command channel has
+  /// closed.
   pub fn stop_capture(&mut self, capture_id: AudioCaptureId) -> Result<(), AudioError> {
     if self.active_capture != Some(capture_id) {
       return Err(AudioError::sanitized(AudioErrorCode::InvalidId));
@@ -621,6 +850,7 @@ impl AudioService {
     Ok(())
   }
 
+  /// Apply a matching asynchronous completion event to audio state.
   pub fn handle_engine_event(&mut self, event: &AudioAsyncEvent) {
     if !event.has_valid_identity() {
       return;
@@ -702,6 +932,7 @@ impl AudioService {
     }
   }
 
+  /// Stop audio work and release its owned runtime resources.
   pub fn shutdown(&mut self) {
     if self.closed {
       return;

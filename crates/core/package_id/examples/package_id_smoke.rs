@@ -1,4 +1,4 @@
-//! Minimal entry: builds one package identity and prints its storage key.
+//! Independent package id smoke entry exercising the public API and checking its results.
 
 use tg_core_package_id::{PackageId, PackageSource, PackageType};
 

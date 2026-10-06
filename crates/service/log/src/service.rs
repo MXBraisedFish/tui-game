@@ -1,3 +1,5 @@
+//! Service support for the log service.
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::io::Write;
@@ -12,8 +14,7 @@ use super::{
   format_log_entry, format_print_log_entry,
 };
 
-/// Log service that keeps the most recent N entries in a ring queue, with leveled writing and
-/// export.
+/// The public entry point for log operations.
 pub struct LogService {
   queue: VecDeque<LogEntry>,
   next_sequence: u64,
@@ -35,12 +36,23 @@ pub struct LogService {
 const MAX_PACKAGE_LOG_BYTES: usize = 8 * 1024 * 1024;
 const PACKAGE_LOG_TRUNCATED: &str = "[Log][WARN] Older package log entries were truncated.\n";
 
+/// The identity of log session within its owning pool or session.
+///
+/// # Fields
+///
+/// * `0` - The wrapped u64 value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct LogSessionId(pub u64);
+pub struct LogSessionId(
+  /// The wrapped u64 value.
+  pub u64,
+);
 
+/// The game or screensaver category of a package logging session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogSessionKind {
+  /// The game setting for log session kind.
   Game,
+  /// The screensaver setting for log session kind.
   Screensaver,
 }
 
@@ -59,6 +71,7 @@ struct PendingHostLog {
 }
 
 impl LogService {
+  /// Create a log service with its initial state.
   pub fn new() -> Self {
     Self {
       queue: VecDeque::new(),
@@ -79,6 +92,11 @@ impl LogService {
     }
   }
 
+  /// Update the output path used by this log service.
+  ///
+  /// # Errors
+  ///
+  /// Return an I/O error if the destination directory or log file cannot be prepared.
   pub fn set_output_path(&mut self, path: PathBuf) -> io::Result<()> {
     self.output_path = Some(path);
     if self.write_enabled {
@@ -88,12 +106,11 @@ impl LogService {
     }
   }
 
-  /// Sets the package manager's central scan log, a file separate from the game/screensaver run
-  /// logs.
+  /// Update the package scan output path used by this log service.
   ///
   /// # Errors
   ///
-  /// Returns the I/O error when the parent directory of `path` cannot be created.
+  /// Return an I/O error if the package scan log destination cannot be prepared.
   pub fn set_package_scan_output_path(&mut self, path: PathBuf) -> io::Result<()> {
     if let Some(parent) = path.parent() {
       std::fs::create_dir_all(parent)?;
@@ -102,19 +119,21 @@ impl LogService {
     Ok(())
   }
 
+  /// Record a info-severity message in the package scan log.
   pub fn info_package_scan_message(&mut self, message: HostLogMessage) {
     self.push_package_scan_message(LogLevel::Info, message);
   }
 
+  /// Record a warn-severity message in the package scan log.
   pub fn warn_package_scan_message(&mut self, message: HostLogMessage) {
     self.push_package_scan_message(LogLevel::Warn, message);
   }
 
-  /// Applies translated labels and `log_info` message templates, then enables file output.
+  /// Replace log translation labels and templates and flush any pending file output.
   ///
   /// # Errors
   ///
-  /// Returns the I/O error when the buffered entries cannot be appended to the log file.
+  /// Propagate label refresh or file-output errors from the requested log configuration update.
   pub fn refresh_labels(
     &mut self,
     translate: impl Fn(&'static str) -> Option<String>,
@@ -127,45 +146,60 @@ impl LogService {
     self.flush_pending_to_file()
   }
 
-  /// Enables file output with the embedded English labels when i18n is unavailable.
+  /// Replace translated log labels with embedded English fallback and flush configured output.
   ///
   /// # Errors
   ///
-  /// Returns the I/O error when the buffered entries cannot be appended to the log file.
+  /// Propagate label refresh or file-output errors from the requested log configuration update.
   pub fn activate_embedded_english(&mut self) -> io::Result<()> {
     self.materialize_pending_messages();
     self.write_enabled = true;
     self.flush_pending_to_file()
   }
 
+  /// Return the current run id.
   pub fn run_id(&self) -> &str {
     &self.run_id
   }
 
+  /// Record a trace-severity message in the host log.
   pub fn trace_message(&mut self, source: LogSource, message: HostLogMessage) {
     self.push_message(LogLevel::Trace, source, message);
   }
 
+  /// Record a debug-severity message in the host log.
   pub fn debug_message(&mut self, source: LogSource, message: HostLogMessage) {
     self.push_message(LogLevel::Debug, source, message);
   }
 
+  /// Record a info-severity message in the host log.
   pub fn info_message(&mut self, source: LogSource, message: HostLogMessage) {
     self.push_message(LogLevel::Info, source, message);
   }
 
+  /// Record a warn-severity message in the host log.
   pub fn warn_message(&mut self, source: LogSource, message: HostLogMessage) {
     self.push_message(LogLevel::Warn, source, message);
   }
 
+  /// Record a error-severity message in the host log.
   pub fn error_message(&mut self, source: LogSource, message: HostLogMessage) {
     self.push_message(LogLevel::Error, source, message);
   }
 
+  /// Record a fatal-severity message in the host log.
   pub fn fatal_message(&mut self, source: LogSource, message: HostLogMessage) {
     self.push_message(LogLevel::Fatal, source, message);
   }
 
+  /// Record a warn-severity message in the host log.
+  ///
+  /// # Arguments
+  ///
+  /// * `source` - The source value or package origin.
+  /// * `operation` - The operation to execute within the boundary.
+  /// * `target` - The object or resource affected by the operation.
+  /// * `error` - The error.
   pub fn warn_operation_failed(
     &mut self,
     source: LogSource,
@@ -185,6 +219,14 @@ impl LogService {
     );
   }
 
+  /// Record a error-severity message in the host log.
+  ///
+  /// # Arguments
+  ///
+  /// * `source` - The source value or package origin.
+  /// * `operation` - The operation to execute within the boundary.
+  /// * `target` - The object or resource affected by the operation.
+  /// * `error` - The error.
   pub fn error_operation_failed(
     &mut self,
     source: LogSource,
@@ -204,6 +246,11 @@ impl LogService {
     );
   }
 
+  /// Register a package logging session and prepare its output file.
+  ///
+  /// # Errors
+  ///
+  /// Return an error if the package logging destination cannot be resolved or prepared.
   pub fn open_session(
     &mut self,
     kind: LogSessionKind,
@@ -249,6 +296,7 @@ impl LogService {
     Ok(id)
   }
 
+  /// Remove the logging session's active routing state.
   pub fn close_session(&mut self, id: LogSessionId) {
     if let Some(session) = self.session_logs.remove(&id) {
       let kind_name = match session.kind {
@@ -276,6 +324,11 @@ impl LogService {
     }
   }
 
+  /// Resolve the log file path for the validated package identity.
+  ///
+  /// # Errors
+  ///
+  /// Return an error when the package identity or log destination cannot be resolved safely.
   pub fn package_log_path(&self, package_id: &PackageId) -> io::Result<PathBuf> {
     let directory = self
       .output_path
@@ -293,6 +346,13 @@ impl LogService {
     )
   }
 
+  /// Record a error-severity message in the owning package log.
+  ///
+  /// # Arguments
+  ///
+  /// * `package_id` - The stable source, type, and name of the package.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn error_package(
     &mut self,
     package_id: &PackageId,
@@ -302,6 +362,13 @@ impl LogService {
     self.push_package(package_id, LogLevel::Error, source, message);
   }
 
+  /// Record a warn-severity message in the owning package log.
+  ///
+  /// # Arguments
+  ///
+  /// * `package_id` - The stable source, type, and name of the package.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn warn_package(
     &mut self,
     package_id: &PackageId,
@@ -311,6 +378,13 @@ impl LogService {
     self.push_package(package_id, LogLevel::Warn, source, message);
   }
 
+  /// Record a warn-severity message in the owning package log.
+  ///
+  /// # Arguments
+  ///
+  /// * `package_id` - The stable source, type, and name of the package.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn warn_package_message(
     &mut self,
     package_id: &PackageId,
@@ -321,6 +395,13 @@ impl LogService {
     self.push_package(package_id, LogLevel::Warn, source, rendered);
   }
 
+  /// Record a info-severity message in the owning package log.
+  ///
+  /// # Arguments
+  ///
+  /// * `package_id` - The stable source, type, and name of the package.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn info_package(
     &mut self,
     package_id: &PackageId,
@@ -330,6 +411,13 @@ impl LogService {
     self.push_package(package_id, LogLevel::Info, source, message);
   }
 
+  /// Record a debug-severity message in the owning package log.
+  ///
+  /// # Arguments
+  ///
+  /// * `package_id` - The stable source, type, and name of the package.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn debug_package(
     &mut self,
     package_id: &PackageId,
@@ -339,26 +427,69 @@ impl LogService {
     self.push_package(package_id, LogLevel::Debug, source, message);
   }
 
+  /// Record a trace-severity message in the registered session log.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn trace_session(&mut self, id: LogSessionId, source: LogSource, message: impl Into<String>) {
     self.push_session(id, LogLevel::Trace, source, message);
   }
 
+  /// Record a debug-severity message in the registered session log.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn debug_session(&mut self, id: LogSessionId, source: LogSource, message: impl Into<String>) {
     self.push_session(id, LogLevel::Debug, source, message);
   }
 
+  /// Record a info-severity message in the registered session log.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn info_session(&mut self, id: LogSessionId, source: LogSource, message: impl Into<String>) {
     self.push_session(id, LogLevel::Info, source, message);
   }
 
+  /// Record a warn-severity message in the registered session log.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn warn_session(&mut self, id: LogSessionId, source: LogSource, message: impl Into<String>) {
     self.push_session(id, LogLevel::Warn, source, message);
   }
 
+  /// Record a error-severity message in the registered session log.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
   pub fn error_session(&mut self, id: LogSessionId, source: LogSource, message: impl Into<String>) {
     self.push_session(id, LogLevel::Error, source, message);
   }
 
+  /// Record script print output using its configured header and package/session routing.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The identifier of the owned object.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
+  /// * `options` - The validated options for the operation.
   pub fn print_session(
     &mut self,
     id: LogSessionId,
@@ -378,6 +509,14 @@ impl LogService {
     }
   }
 
+  /// Record script print output using its configured header and package/session routing.
+  ///
+  /// # Arguments
+  ///
+  /// * `package_id` - The stable source, type, and name of the package.
+  /// * `source` - The source value or package origin.
+  /// * `message` - The diagnostic or display message.
+  /// * `options` - The validated options for the operation.
   pub fn print_package(
     &mut self,
     package_id: &PackageId,
@@ -528,20 +667,21 @@ impl LogService {
     }
   }
 
+  /// Return the current entries.
   pub fn entries(&self) -> &VecDeque<LogEntry> {
     &self.queue
   }
 
-  /// Takes all entries out of the queue, leaving it empty.
+  /// Return the current drain.
   pub fn drain(&mut self) -> Vec<LogEntry> {
     self.queue.drain(..).collect()
   }
+  /// Report whether this log service is empty.
   pub fn is_empty(&self) -> bool {
     self.queue.is_empty()
   }
 
-  /// Sets the maximum number of stored entries (at least 1), dropping the oldest entries beyond
-  /// it.
+  /// Update the max entries used by this log service.
   pub fn set_max_entries(&mut self, max_entries: usize) {
     self.max_entries = max_entries.max(1);
 
@@ -550,16 +690,21 @@ impl LogService {
     }
   }
 
-  /// Writes all current entries to the console (stdout).
+  /// Write queued log records to the console until output stops accepting data.
   pub fn flush_to_console(&self) {
     for entry in &self.queue {
       let line = format_log_entry(entry);
       if writeln!(std::io::stdout(), "{}", line).is_err() {
-        break; // broken pipe, stop
+        break; // A failed console write ends this flush to avoid repeatedly writing to a closed pipe.
       }
     }
   }
 
+  /// Append pending records to their configured log files.
+  ///
+  /// # Errors
+  ///
+  /// Return the file-output error encountered while opening or appending queued log records.
   pub fn flush_pending_to_file(&mut self) -> io::Result<()> {
     if !self.write_enabled {
       return Ok(());
@@ -596,6 +741,7 @@ impl LogService {
     }
   }
 
+  /// Return the most recent file-output error retained by the log service.
   pub fn last_file_error(&self) -> Option<&str> {
     self.last_file_error.as_deref()
   }
@@ -648,8 +794,7 @@ impl Default for LogService {
   }
 }
 
-/// Returns the current Unix timestamp in milliseconds, falling back to 0 when the system clock
-/// is before the Unix epoch.
+/// Return Unix time in milliseconds, using zero if the system clock precedes the epoch.
 fn now_ms() -> u128 {
   SystemTime::now()
     .duration_since(UNIX_EPOCH)
@@ -724,19 +869,19 @@ mod tests {
     let game_id = PackageId::new(
       tg_core_package_id::PackageSource::Mod,
       tg_core_package_id::PackageType::Game,
-      "sample.game",
+      "sample_game",
     )
     .unwrap();
     let screensaver_id = PackageId::new(
       tg_core_package_id::PackageSource::Official,
       tg_core_package_id::PackageType::Screensaver,
-      "sample.screensaver",
+      "sample_screensaver",
     )
     .unwrap();
     let official_game_id = PackageId::new(
       tg_core_package_id::PackageSource::Official,
       tg_core_package_id::PackageType::Game,
-      "sample.game",
+      "sample_game",
     )
     .unwrap();
     let game = log.open_session(LogSessionKind::Game, &game_id).unwrap();

@@ -1,6 +1,5 @@
 {
   "security_settings.title": "安全设置",
-  "security_settings.security_details": "安全详情",
   "security_settings.reset_terminal": "重置终端能力检测",
   "security_settings.mod.reset.status": "重置全部模组状态为关闭",
   "security_settings.mod.reset.debug": "重置全部模组调试为关闭",
@@ -13,7 +12,7 @@
   "security_settings.reset.success": "重置成功",
   "security_settings.reset.fail": "重置失败",
   "security_settings.reset.terminal.success": "，重启程序重新检测",
-  "security_settings.action.focus": "{key:security_settings.focus_security_details}/{key:security_settings.focus_reset_terminal}/{key:security_settings.focus_reset_status}/{key:security_settings.focus_reset_debug}/{key:security_settings.focus_default_status}/{key:security_settings.focus_default_debug} 聚焦",
+  "security_settings.action.focus": "{key:security_settings.focus_reset_terminal}/{key:security_settings.focus_reset_status}/{key:security_settings.focus_reset_debug}/{key:security_settings.focus_default_status}/{key:security_settings.focus_default_debug} 聚焦",
   "security_settings.action.select": "{key:security_settings.focus_up}/{key:security_settings.focus_down} 选择",
   "security_settings.action.switch": "{key:security_settings.confirm} 切换",
   "security_settings.action.confirm": "{key:security_settings.confirm} 确认",

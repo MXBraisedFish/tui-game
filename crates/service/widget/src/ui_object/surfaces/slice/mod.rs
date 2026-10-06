@@ -1,3 +1,5 @@
+//! Frame-scoped rectangular surfaces with ordered composition and clipping.
+
 use std::collections::HashMap;
 
 use crate::SurfaceId;
@@ -7,30 +9,57 @@ use tg_service_layout::{LayoutService, Rect, Size};
 
 pub use tg_service_canvas::SliceId;
 
-/// 切片尺寸描述（固定值/自适应/百分比）
+/// A fixed or source-relative size of a slice dimension.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SliceLength {
+  /// The fixed setting for slice length.
   Fixed(u16),
+  /// The auto setting for slice length.
   Auto,
+  /// The percent setting for slice length.
   Percent(u8),
 }
 
-/// 切片矩形区域
+/// Symbolic slice position and dimensions resolved against a source viewport.
+///
+/// # Fields
+///
+/// * `x` - The horizontal coordinate in terminal cells.
+/// * `y` - The vertical coordinate in terminal cells.
+/// * `width` - The width in terminal columns.
+/// * `height` - The height in terminal rows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SliceRect {
+  /// The horizontal coordinate in terminal cells.
   pub x: i32,
+  /// The vertical coordinate in terminal cells.
   pub y: i32,
+  /// The width in terminal columns.
   pub width: SliceLength,
+  /// The height in terminal rows.
   pub height: SliceLength,
 }
 
-/// 切片创建选项
+/// Configuration values controlling slice behavior.
+///
+/// # Fields
+///
+/// * `rect` - The rectangular region in terminal cells.
+/// * `visible` - Whether this surface participates in composition.
+/// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `layer` - The layer.
+/// * `background` - The background color override, or `None` to inherit the default.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SliceOptions {
+  /// The rectangular region in terminal cells.
   pub rect: SliceRect,
+  /// Whether this surface participates in composition.
   pub visible: bool,
+  /// Whether empty cells cover lower surfaces.
   pub opaque: bool,
+  /// The layer.
   pub layer: Option<i32>,
+  /// The background color override, or `None` to inherit the default.
   pub background: Option<TextColor>,
 }
 
@@ -51,23 +80,50 @@ impl Default for SliceOptions {
   }
 }
 
+/// The retained state of slice.
+///
+/// # Fields
+///
+/// * `rect` - The rectangular region in terminal cells.
+/// * `visible` - Whether this surface participates in composition.
+/// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `layer` - The layer.
+/// * `background` - The background color override, or `None` to inherit the default.
+/// * `frame_scoped` - Whether the slice must be submitted again each frame.
+/// * `drawn_this_frame` - Whether this frame submitted the slice for composition.
 #[derive(Clone)]
 pub(crate) struct SliceState {
+  /// The rectangular region in terminal cells.
   pub rect: SliceRect,
+  /// Whether this surface participates in composition.
   pub visible: bool,
+  /// Whether empty cells cover lower surfaces.
   pub opaque: bool,
+  /// The layer.
   pub layer: i32,
+  /// The background color override, or `None` to inherit the default.
   pub background: Option<TextColor>,
+  /// Whether the slice must be submitted again each frame.
   pub(crate) frame_scoped: bool,
+  /// Whether this frame submitted the slice for composition.
   pub(crate) drawn_this_frame: bool,
 }
 
+/// The collection of owned slice instances and their queued events.
+///
+/// # Fields
+///
+/// * `next_id` - The identifier of the next.
+/// * `slices` - The slices indexed by their declared keys.
 pub(crate) struct SliceObjects {
+  /// The identifier of the next.
   pub next_id: u64,
+  /// The slices indexed by their declared keys.
   pub slices: HashMap<SliceId, SliceState>,
 }
 
 impl SliceObjects {
+  /// Create a slice objects with its initial state.
   pub(crate) fn new() -> Self {
     Self {
       next_id: 1,
@@ -76,16 +132,17 @@ impl SliceObjects {
   }
 }
 
-/// 切片服务，管理视口子区域的分割与层级排序
+/// The public entry point for slice operations.
 #[derive(Default)]
 pub struct SliceService;
 
 impl SliceService {
+  /// Create a slice service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
-  /// 创建新切片
+  /// Create an owned slice object and return its identity.
   pub fn create(&self, pool: &mut UiObjectPool, options: SliceOptions) -> Option<SliceId> {
     valid_rect(options.rect).then(|| {
       let id = SliceId(pool.slices.next_id);
@@ -116,7 +173,7 @@ impl SliceService {
     })
   }
 
-  /// 移除切片
+  /// Remove the identified widget object and release its owned state.
   pub fn remove(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
     let Some(removed) = pool.slices.slices.remove(&id) else {
       return false;
@@ -132,17 +189,24 @@ impl SliceService {
     true
   }
 
-  /// 检查切片是否存在
+  /// Report whether the identified widget object is still present.
   pub fn exists(&self, pool: &UiObjectPool, id: SliceId) -> bool {
     pool.slices.slices.contains_key(&id)
   }
 
-  /// 获取切片的原始矩形配置
+  /// Return the original slice geometry before source-relative layout is resolved.
   pub fn configured_rect(&self, pool: &UiObjectPool, id: SliceId) -> Option<SliceRect> {
     Some(pool.slices.slices.get(&id)?.rect)
   }
 
-  /// 获取切片解析后的实际像素矩形
+  /// Return the component's rectangle after symbolic coordinates and source dimensions are
+  /// resolved.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn resolved_rect(
     &self,
     pool: &UiObjectPool,
@@ -152,6 +216,13 @@ impl SliceService {
     Some(resolve_rect(pool.slices.slices.get(&id)?.rect, layout))
   }
 
+  /// Return the component's resolved terminal width and height.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn resolved_size(
     &self,
     pool: &UiObjectPool,
@@ -165,6 +236,13 @@ impl SliceService {
     })
   }
 
+  /// Return the component's resolved width in terminal columns.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn resolved_width(
     &self,
     pool: &UiObjectPool,
@@ -174,6 +252,13 @@ impl SliceService {
     Some(self.resolved_size(pool, id, layout)?.width)
   }
 
+  /// Return the component's resolved height in terminal rows.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layout` - The service resolving terminal sizes and positions.
   pub fn resolved_height(
     &self,
     pool: &UiObjectPool,
@@ -183,7 +268,13 @@ impl SliceService {
     Some(self.resolved_size(pool, id, layout)?.height)
   }
 
-  /// 修改切片的矩形配置
+  /// Update the rect used by this slice service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `rect` - The rectangular region in terminal cells.
   pub fn set_rect(&self, pool: &mut UiObjectPool, id: SliceId, rect: SliceRect) -> bool {
     if !valid_rect(rect) {
       return false;
@@ -195,6 +286,14 @@ impl SliceService {
     true
   }
 
+  /// Update the position used by this slice service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
   pub fn set_position(&self, pool: &mut UiObjectPool, id: SliceId, x: i32, y: i32) -> bool {
     let Some(state) = pool.slices.slices.get_mut(&id) else {
       return false;
@@ -204,7 +303,13 @@ impl SliceService {
     true
   }
 
-  /// 将切片设置为必须逐帧显式提交后才可见。
+  /// Set whether the slice must be submitted again for each host frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `frame_scoped` - The frame scoped.
   pub fn set_frame_scoped(&self, pool: &mut UiObjectPool, id: SliceId, frame_scoped: bool) -> bool {
     let Some(state) = pool.slices.slices.get_mut(&id) else {
       return false;
@@ -214,7 +319,14 @@ impl SliceService {
     true
   }
 
-  /// 设置切片位置，并将逐帧切片提交到当前帧。
+  /// Submit the component's configured drawing state to the current canvas frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `x` - The horizontal coordinate in terminal cells.
+  /// * `y` - The vertical coordinate in terminal cells.
   pub fn draw(&self, pool: &mut UiObjectPool, id: SliceId, x: i32, y: i32) -> bool {
     let Some(state) = pool.slices.slices.get_mut(&id) else {
       return false;
@@ -225,7 +337,8 @@ impl SliceService {
     true
   }
 
-  /// 清除上一帧对逐帧切片的提交状态。
+  /// Prepare per-frame state and discard submissions or observations belonging to the previous
+  /// frame.
   pub fn begin_frame(&self, pool: &mut UiObjectPool) {
     for state in pool.slices.slices.values_mut() {
       if state.frame_scoped {
@@ -234,10 +347,18 @@ impl SliceService {
     }
   }
 
+  /// Return the layer for the addressed object when it is available.
   pub fn layer(&self, pool: &UiObjectPool, id: SliceId) -> Option<i32> {
     Some(pool.slices.slices.get(&id)?.layer)
   }
 
+  /// Update the layer used by this slice service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `layer` - The layer.
   pub fn set_layer(&self, pool: &mut UiObjectPool, id: SliceId, layer: i32) -> bool {
     let Some(old_layer) = pool.slices.slices.get(&id).map(|state| state.layer) else {
       return false;
@@ -261,10 +382,18 @@ impl SliceService {
     true
   }
 
+  /// Return the background for the addressed object when it is available.
   pub fn background(&self, pool: &UiObjectPool, id: SliceId) -> Option<Option<TextColor>> {
     Some(pool.slices.slices.get(&id)?.background.clone())
   }
 
+  /// Assign the cell background color.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `background` - The cell background color.
   pub fn set_background(
     &self,
     pool: &mut UiObjectPool,
@@ -278,18 +407,22 @@ impl SliceService {
     true
   }
 
+  /// Return the ids for the addressed object.
   pub fn ids(&self, pool: &UiObjectPool) -> Vec<SliceId> {
     let mut ids = pool.slices.slices.keys().copied().collect::<Vec<_>>();
     ids.sort_by_key(|id| id.0);
     ids
   }
 
+  /// Return visible slice identifiers in their resolved composition order for the requested
+  /// layer.
   pub fn ids_by_layer(&self, pool: &UiObjectPool) -> Vec<SliceId> {
     let mut ids = self.ids(pool);
     ids.sort_by_key(|id| (pool.slices.slices[id].layer, id.0));
     ids
   }
 
+  /// Report whether the addressed object is visible.
   pub fn is_visible(&self, pool: &UiObjectPool, id: SliceId) -> bool {
     pool
       .slices
@@ -298,7 +431,13 @@ impl SliceService {
       .is_some_and(|state| state.visible && (!state.frame_scoped || state.drawn_this_frame))
   }
 
-  /// 设置切片可见性
+  /// Update the visible used by this slice service.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `visible` - Whether the target contributes to the visible frame.
   pub fn set_visible(&self, pool: &mut UiObjectPool, id: SliceId, visible: bool) -> bool {
     let Some(state) = pool.slices.slices.get_mut(&id) else {
       return false;
@@ -307,6 +446,7 @@ impl SliceService {
     true
   }
 
+  /// Report whether the addressed object is opaque.
   pub fn is_opaque(&self, pool: &UiObjectPool, id: SliceId) -> bool {
     pool
       .slices
@@ -315,30 +455,46 @@ impl SliceService {
       .is_some_and(|state| state.opaque)
   }
 
-  /// 将切片移至层级最前
+  /// Move the surface to the front of its composition group.
   pub fn bring_to_front(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
     pool.move_surface_to_edge(SurfaceId::Slice(id), false)
   }
 
-  /// 将切片移至层级最后
+  /// Move the surface to the back of its composition group.
   pub fn send_to_back(&self, pool: &mut UiObjectPool, id: SliceId) -> bool {
     pool.move_surface_to_edge(SurfaceId::Slice(id), true)
   }
 
-  /// 将切片移动到目标切片上方
+  /// Place the surface immediately above the referenced peer.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `target` - The object or resource affected by the operation.
   pub fn move_above(&self, pool: &mut UiObjectPool, id: SliceId, target: SliceId) -> bool {
     pool.move_surface_relative(SurfaceId::Slice(id), SurfaceId::Slice(target), true)
   }
 
-  /// 将切片移动到目标切片下方
+  /// Place the surface immediately below the referenced peer.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The object pool that owns the component.
+  /// * `id` - The identifier of the owned object.
+  /// * `target` - The object or resource affected by the operation.
   pub fn move_below(&self, pool: &mut UiObjectPool, id: SliceId, target: SliceId) -> bool {
     pool.move_surface_relative(SurfaceId::Slice(id), SurfaceId::Slice(target), false)
   }
 }
 
-// 根据布局将切片相对坐标解析为绝对像素坐标
+/// Resolve a rectangular request against its coordinate space and available bounds.
 pub(crate) fn resolve_rect(rect: SliceRect, layout: &LayoutService) -> Rect {
-  let viewport = layout.developer_size();
+  resolve_rect_with_source(rect, layout.developer_size()).0
+}
+
+/// Resolve slice geometry against the explicitly supplied source dimensions.
+pub(crate) fn resolve_rect_with_source(rect: SliceRect, viewport: Size) -> (Rect, u16, u16) {
   let resolve = |length: SliceLength, total: u16, offset: i32| match length {
     SliceLength::Fixed(value) => i64::from(value),
     SliceLength::Auto => (i64::from(total) - i64::from(offset.max(0))).max(0),
@@ -352,24 +508,29 @@ pub(crate) fn resolve_rect(rect: SliceRect, layout: &LayoutService) -> Rect {
     (
       visible_start as u16,
       visible_end.saturating_sub(visible_start) as u16,
+      visible_start.saturating_sub(start).clamp(0, length.max(0)) as u16,
     )
   };
-  let (x, width) = clip_axis(
+  let (x, width, source_x) = clip_axis(
     rect.x,
     resolve(rect.width, viewport.width, rect.x),
     viewport.width,
   );
-  let (y, height) = clip_axis(
+  let (y, height, source_y) = clip_axis(
     rect.y,
     resolve(rect.height, viewport.height, rect.y),
     viewport.height,
   );
-  Rect {
-    x,
-    y,
-    width,
-    height,
-  }
+  (
+    Rect {
+      x,
+      y,
+      width,
+      height,
+    },
+    source_x,
+    source_y,
+  )
 }
 
 fn valid_rect(rect: SliceRect) -> bool {
@@ -627,6 +788,22 @@ mod tests {
         width: 6,
         height: 8,
       })
+    );
+    assert_eq!(
+      resolve_rect_with_source(
+        rect(-4, -2, SliceLength::Fixed(10), SliceLength::Auto),
+        layout.developer_size(),
+      ),
+      (
+        Rect {
+          x: 0,
+          y: 0,
+          width: 6,
+          height: 8,
+        },
+        4,
+        2,
+      )
     );
 
     let outside = service

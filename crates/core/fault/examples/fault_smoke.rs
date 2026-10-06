@@ -1,4 +1,4 @@
-//! Minimal entry: installs the crash hook, turns one supervised panic into a host fault and prints it.
+//! Independent fault smoke entry exercising the public API and checking its results.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 

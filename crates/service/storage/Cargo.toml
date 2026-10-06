@@ -10,6 +10,7 @@ tg-core-atomic-fs = { path = "../../core/atomic_fs" }
 tg-core-audio = { path = "../../core/audio" }
 tg-core-package-id = { path = "../../core/package_id" }
 tg-service-log = { path = "../log" }
+tg-service-package = { path = "../package" }
 
 [features]
 # Exposes `StorageService::from_root_for_test` to other crates' tests.

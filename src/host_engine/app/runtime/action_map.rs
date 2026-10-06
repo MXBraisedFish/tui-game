@@ -1,14 +1,24 @@
+//! Host and page shortcut registration with stable declaration order.
+
 use super::*;
 use std::collections::BTreeMap;
 
+/// The host key screenshot used by this module.
 pub(super) const HOST_KEY_SCREENSHOT: &str = "host_key.screenshot";
+/// The host key recording used by this module.
 pub(super) const HOST_KEY_RECORDING: &str = "host_key.recording";
+/// The host key screensaver used by this module.
 pub(super) const HOST_KEY_SCREENSAVER: &str = "host_key.screensaver";
+/// The host key force stop used by this module.
 pub(super) const HOST_KEY_FORCE_STOP: &str = "host_key.force_stop";
+/// The host key top toolbar used by this module.
 pub(super) const HOST_KEY_TOP_TOOLBAR: &str = "host_key.top_toolbar";
+/// The host key recording pause used by this module.
 pub(super) const HOST_KEY_RECORDING_PAUSE: &str = "host_key.recording.pause";
+/// The host key top toolbar switch used by this module.
 pub(super) const HOST_KEY_TOP_TOOLBAR_SWITCH: &str = "host_key.top_toolbar.switch";
 
+/// The host key order used by this module.
 pub(super) const HOST_KEY_ORDER: &[&str] = &[
   HOST_KEY_SCREENSHOT,
   HOST_KEY_RECORDING,
@@ -40,6 +50,8 @@ fn host_key_defaults() -> ActionKeyMap {
   .collect()
 }
 
+/// Reconcile persisted host and game shortcuts with current action declarations, saving changes
+/// when needed.
 pub(super) fn synchronize_key_bindings_profile(
   services: &mut EngineServices,
 ) -> KeyBindingsProfile {
@@ -87,6 +99,7 @@ pub(super) fn synchronize_key_bindings_profile(
   profile
 }
 
+/// Build translated host actions from the user-selected shortcut profile.
 pub(super) fn host_key_action_entries_from_profile(
   services: &EngineServices,
   profile: &KeyBindingsProfile,
@@ -102,18 +115,15 @@ pub(super) fn host_key_action_entries_from_profile(
         .get(*action)
         .cloned()
         .unwrap_or_default(),
+      priority: 0,
     })
     .collect()
 }
 
+/// Install host shortcuts in registration order and return the reconciled profile.
 pub(super) fn load_host_key_action_map(services: &mut EngineServices) -> KeyBindingsProfile {
   let profile = synchronize_key_bindings_profile(services);
-  let mut entries = host_key_action_entries_from_profile(services, &profile);
-  // 组合键必须先于它们包含的单键注册；InputService 会按顺序消费已命中的键。
-  entries.sort_by_key(|entry| {
-    std::cmp::Reverse(entry.keys.iter().map(Vec::len).max().unwrap_or_default())
-  });
-
+  let entries = host_key_action_entries_from_profile(services, &profile);
   match translate_action_map(&entries) {
     Ok(bindings) => services.input.load_system_key_bindings(bindings),
     Err(error) => {
@@ -129,6 +139,7 @@ pub(super) fn load_host_key_action_map(services: &mut EngineServices) -> KeyBind
   profile
 }
 
+/// Expose user and default shortcut labels as rich-text substitutions.
 pub(super) fn host_key_rich_text_params(
   profile: &KeyBindingsProfile,
 ) -> crate::host_engine::services::RichTextParams {
@@ -137,6 +148,7 @@ pub(super) fn host_key_rich_text_params(
   crate::host_engine::services::RichTextParams::from_key_action_maps(&user, &defaults)
 }
 
+/// Install shortcuts for the active program page.
 pub(super) fn load_current_action_map(services: &mut EngineServices, world: &RuntimeWorld) {
   match world.state.current_ui_kind() {
     Some(UiNodeKind::Home) => load_home_action_map(services),
@@ -181,7 +193,6 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
       load_action_map(services, &RecordingListUi::action_map(), "RecordingListUi")
     }
     Some(UiNodeKind::SecuritySettings) => load_security_settings_action_map(services),
-    Some(UiNodeKind::SecurityDetails) => load_security_details_action_map(services),
     Some(UiNodeKind::StorageManagement) => load_storage_management_action_map(services),
     Some(UiNodeKind::StorageManagementClear) => load_storage_management_clear_action_map(services),
     Some(UiNodeKind::StorageManagementExport) => {
@@ -203,6 +214,8 @@ pub(super) fn load_current_action_map(services: &mut EngineServices, world: &Run
   }
 }
 
+/// Install the active game package shortcuts, clearing page bindings if no matching package
+/// exists.
 pub(super) fn load_game_action_map(services: &mut EngineServices) {
   let Some(package_id) = services.game.package().cloned() else {
     services.input.load_key_bindings(Vec::new());
@@ -217,13 +230,27 @@ pub(super) fn load_game_action_map(services: &mut EngineServices) {
     services.input.load_key_bindings(Vec::new());
     return;
   };
-  let entries = entry
-    .key_actions
+  let Some(package) = services
+    .package
+    .games()
     .into_iter()
-    .map(|(action, keys)| ActionMapEntry {
-      description: action.clone(),
-      action,
-      keys,
+    .find(|package| package.id == package_id)
+  else {
+    return;
+  };
+  let Some(game) = package.game else {
+    return;
+  };
+  let entries = game
+    .action_order
+    .iter()
+    .filter_map(|action| {
+      Some(ActionMapEntry {
+        description: action.clone(),
+        action: action.clone(),
+        keys: entry.key_actions.get(action)?.clone(),
+        priority: game.actions.get(action)?.priority,
+      })
     })
     .collect::<Vec<_>>();
   match translate_action_map(&entries) {
@@ -239,18 +266,22 @@ pub(super) fn load_game_action_map(services: &mut EngineServices) {
   }
 }
 
+/// Install shortcuts owned by the window size view.
 pub(super) fn load_window_size_action_map(services: &mut EngineServices) {
   load_action_map(services, &WindowSizeWarningUi::action_map(), "window_size");
 }
 
+/// Install shortcuts owned by the game warning view.
 pub(super) fn load_game_warning_action_map(services: &mut EngineServices) {
   load_action_map(services, &GameWarningUi::action_map(), "game_warning");
 }
 
+/// Install shortcuts owned by the cover continue view.
 pub(super) fn load_cover_continue_action_map(services: &mut EngineServices) {
   load_action_map(services, &CoverContinueUi::action_map(), "CoverContinueUi");
 }
 
+/// Install shortcuts owned by the screenshot capture view.
 pub(super) fn load_screenshot_capture_action_map(services: &mut EngineServices) {
   load_action_map(
     services,
@@ -291,14 +322,6 @@ fn load_security_settings_action_map(services: &mut EngineServices) {
   );
 }
 
-fn load_security_details_action_map(services: &mut EngineServices) {
-  load_action_map(
-    services,
-    &SecurityDetailsUi::action_map(),
-    "SecurityDetailsUi",
-  );
-}
-
 fn load_storage_management_action_map(services: &mut EngineServices) {
   load_action_map(
     services,
@@ -331,6 +354,7 @@ fn load_storage_management_view_action_map(services: &mut EngineServices) {
   );
 }
 
+/// Install shortcuts owned by the export settings view.
 pub(super) fn load_export_settings_action_map(services: &mut EngineServices) {
   load_action_map(
     services,
@@ -339,6 +363,7 @@ pub(super) fn load_export_settings_action_map(services: &mut EngineServices) {
   );
 }
 
+/// Install exit shortcuts appropriate to normal confirmation or pending export completion.
 pub(super) fn load_exit_warning_action_map(
   services: &mut EngineServices,
   waiting_for_exports: bool,
@@ -363,6 +388,7 @@ fn load_mods_action_map(services: &mut EngineServices) {
   load_action_map(services, &ModsUi::action_map(), "ModsUi");
 }
 
+/// Install shortcuts owned by the game list view.
 pub(super) fn load_game_list_action_map(services: &mut EngineServices) {
   load_action_map(services, &GameListUi::action_map(), "GameListUi");
 }

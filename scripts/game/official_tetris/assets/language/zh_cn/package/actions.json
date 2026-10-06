@@ -1,0 +1,16 @@
+{
+  "actions.exit": "退出游戏",
+  "actions.rotate_clockwise": "右旋",
+  "actions.rotate_counterclockwise": "左旋",
+  "actions.move_left": "左移",
+  "actions.move_right": "右移",
+  "actions.soft_drop": "软降",
+  "actions.hard_drop": "硬降",
+  "actions.start": "开始/继续",
+  "actions.restart": "重新开始",
+  "actions.pause": "暂停",
+  "actions.switch_mode": "切换模式",
+  "actions.normal_mode": "普通模式",
+  "actions.challenge_mode": "挑战模式",
+  "actions.landing_preview": "落点预览"
+}

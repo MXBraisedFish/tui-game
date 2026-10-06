@@ -31,15 +31,17 @@
 ## 通用规则
 
 - 所有序列化操作最后返回的均为字符串类型，只有被写入到对应的文件当中才会被解析。
-- 所有文件类型中的空值（例如 `null`，`~` 等），转换后的 `nil` 不会被 Lua 值解释器保留；反之 `nil` 并不会被转换为对应的空值，而是留空。
+- JSON / YAML 的 `null` 会与常量 `serialization.NULL` 之间相互转换，而非 `nil`。
 
-  **示例**
+**示例**
 
-  ```lua
-  {
-    is_null = nil -- JSON 为 {}
-  }
-  ```
+```lua
+{ is_null = serialization.NULL }
+```
+
+```json
+{ "is_null": null }
+```
 
 ---
 
@@ -50,7 +52,7 @@
 JSON 的根值**可为任意可序列化的值**。
 
 ```lua
-data = any...
+local data = { active = true, score = 42 }
 ```
 
 ### 数据结构映射
@@ -59,23 +61,15 @@ data = any...
 
 > 该部分值的映射可逆
 
-| Lua       | JSON      |
-| --------- | --------- |
-| `boolean` | `boolean` |
-| `integer` | `integer` |
-| `number`  | `float`   |
-| `string`  | `string`  |
-| 数组表    | 数组      |
-| 对象表    | 对象      |
-
-**单向映射**
-
-> 该部分值的映射不可逆
-
-| Lua   | 方向 | JSON   |
-| ----- | :--: | ------ |
-| `nil` | $→$  | 空字段 |
-| `nil` | $←$  | `null` |
+| Lua                  | JSON      |
+| -------------------- | --------- |
+| `boolean`            | `boolean` |
+| `integer`            | `integer` |
+| `number`             | `float`   |
+| `string`             | `string`  |
+| `serialization.NULL` | `null`    |
+| 数组表               | 数组      |
+| 对象表               | 对象      |
 
 ### 示例
 
@@ -91,7 +85,7 @@ data = {
 }
 
 json = serialization.json_encode(data)
-debug.print { message = json }
+debug.print(json)
 ```
 
 输出：
@@ -105,7 +99,7 @@ debug.print { message = json }
 ```lua
 json = '{"name":"TUI GAME","values":[1,2,3]}'
 data = serialization.json_decode(json)
-debug.print { message = tostring(data.name) }  -- TUI GAME
+debug.print(tostring(data.name))  -- TUI GAME
 ```
 
 输出：
@@ -119,27 +113,27 @@ TUI GAME
 > Lua 表值混合
 
 ```lua
-{
+local invalid_data = {
   1,
   "A",
-  obj = { ... }
+  obj = { name = "value" },
 }
 ```
 
 > 数组表不连续，存在数据空洞
 
 ```lua
-{
+local sparse_data = {
   [1] = "A",
-  [3] = "C"
+  [3] = "C",
 }
 ```
 
-> `nil` 被当做可显式的 `null`
+> 在对象表或数组表中使用 nil 值
 
 ```lua
-{
-  is_null = nil -- JSON 为 {}
+local data = {
+  is_null = nil,
 }
 ```
 
@@ -152,9 +146,9 @@ TUI GAME
 TOML 的根值**必须是对象表**。
 
 ```lua
-data = {
-  key = value,
-  ...
+local data = {
+  key = "value",
+  enabled = true,
 }
 ```
 
@@ -194,7 +188,7 @@ data = {
 }
 
 toml = serialization.toml_encode(data)
-debug.print { message = toml }
+debug.print(toml)
 ```
 
 输出：
@@ -212,7 +206,7 @@ height = 40
 ```lua
 toml = 'title = "TUI GAME"\n[window]\nwidth = 120'
 data = serialization.toml_decode(toml)
-debug.print { message = tostring(data.window.width) }
+debug.print(tostring(data.window.width))
 ```
 
 输出：
@@ -254,9 +248,9 @@ date = 2026-10-01T15:20:45
 YAML 的根值**必须是对象表**。
 
 ```lua
-data = {
-  key = value,
-  ...
+local data = {
+  key = "value",
+  enabled = true,
 }
 ```
 
@@ -266,24 +260,23 @@ data = {
 
 > 该部分值的映射可逆
 
-| Lua       | YAML      |
-| --------- | --------- |
-| `boolean` | `boolean` |
-| `integer` | `integer` |
-| `number`  | `float`   |
-| `string`  | `string`  |
-| 数组表    | 序列      |
-| 对象表    | 映射      |
+| Lua                  | YAML         |
+| -------------------- | ------------ |
+| `boolean`            | `boolean`    |
+| `integer`            | `integer`    |
+| `number`             | `float`      |
+| `string`             | `string`     |
+| `serialization.NULL` | `null` / `~` |
+| 数组表               | 序列         |
+| 对象表               | 映射         |
 
 **单向映射**
 
 > 该部分值的映射不可逆
 
-| Lua      | 方向 | YAML         |
-| -------- | :--: | ------------ |
-| `string` | $←$  | `date`       |
-| `nil`    | $→$  | 空字段       |
-| `nil`    | $←$  | `null` / `~` |
+| Lua      | 方向 | YAML   |
+| -------- | :--: | ------ |
+| `string` | $←$  | `date` |
 
 ### 示例
 
@@ -299,7 +292,7 @@ data = {
 }
 
 yaml = serialization.yaml_encode(data)
-debug.print { message = yaml }
+debug.print(yaml)
 ```
 
 输出：
@@ -317,7 +310,7 @@ tags:
 ```lua
 yaml = "name: TUI GAME\ntags:\n- tui\n- lua"
 data = serialization.yaml_decode(yaml)
-debug.print { message = tostring(data.tags[1]) }
+debug.print(tostring(data.tags[1]))
 ```
 
 输出：
@@ -340,11 +333,11 @@ name: !person TUI # 反序列化不支持自定义标签
 1: one
 ```
 
-> `nil` 被当做可显式的 `null`
+> 在对象表中使用 nil 值
 
 ```lua
 {
-  is_null = nil -- YAML 为空文件
+  is_null = nil
 }
 ```
 
@@ -357,9 +350,9 @@ name: !person TUI # 反序列化不支持自定义标签
 CSV 的根值**必须是二维数组表**。
 
 ```lua
-data = {
-  {string...},
-  ...
+local data = {
+  { "name", "age" },
+  { "Alice", 30 },
 }
 ```
 
@@ -398,7 +391,7 @@ rows = {
 }
 
 csv = serialization.csv_encode(rows)
-debug.print { message = csv }
+debug.print(csv)
 ```
 
 输出：
@@ -414,8 +407,8 @@ Bob,30,true
 ```lua
 csv = "name,age,work\nAlice,12,false\nBob,30,true"
 rows = serialization.csv_decode(csv)
-debug.print { message = tostring(rows[2][1]) }
-debug.print { message = tostring(type(rows[2][2])) }
+debug.print(tostring(rows[2][1]))
+debug.print(tostring(type(rows[2][2])))
 ```
 
 输出：
@@ -460,14 +453,10 @@ true -- Lua 为 "true"
 XML 的根值**必须遵循特定的表结构**。
 
 ```lua
-data = {
-  root = {            -- 根标签（仅一个）
-    _attr = {         -- 属性
-      key = value
-      ...
-    },
-    _text = value,    -- 子元素（与子标签冲突，见下文）
-    element = { ... } -- 子标签（与子元素冲突，见下文）
+local data = {
+  root = {                              -- 根标签（仅一个）
+    _attr = { key = "value" },          -- 属性
+    element = { _text = "child text" }, -- 子标签
   }
 }
 ```
@@ -500,7 +489,6 @@ XML 结构：
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
-| `nil`     | $→$  | 单标签   |
 | `string`  | $←$  | 单标签   |
 
 ### 属性
@@ -523,7 +511,7 @@ data = {
 }
 
 xml = serialization.xml_encode(data)
-debug.print { message = xml }
+debug.print(xml)
 ```
 
 输出：
@@ -554,10 +542,10 @@ data2 = {
 }
 
 xml1 = serialization.xml_encode(data1)
-debug.print { message = xml1 }
+debug.print(xml1)
 
 xml2 = serialization.xml_encode(data2)
-debug.print { message = xml2 }
+debug.print(xml2)
 ```
 
 输出：
@@ -578,14 +566,14 @@ debug.print { message = xml2 }
 序列化：
 
 ```lua
-{
+local player_data = {
   player = {
     name = "Alice",
     score = 95
   }
 }
 
-{
+local players_data = {
   players = {
     player = {
       { name = "Alice" }, -- 同名使用连续数组表表示
@@ -637,7 +625,7 @@ data = {
 }
 
 xml = serialization.xml_encode(data)
-debug.print { message = xml }
+debug.print(xml)
 ```
 
 输出：
@@ -658,7 +646,7 @@ debug.print { message = xml }
 ```lua
 xml = '<root version="1.0"><item>A</item><item>B</item></root>'
 data = serialization.xml_decode(xml)
-debug.print { message = tostring(data.root.item[1].name) }
+debug.print(tostring(data.root.item[1].name))
 ```
 
 输出：
@@ -704,9 +692,8 @@ data = {
 INI 的根值**必须是对象表**。
 
 ```lua
-data = {
-  key = value,
-  ...
+local data = {
+  key = "value",
 }
 ```
 
@@ -730,7 +717,6 @@ data = {
 | `boolean` | $→$  | `string` |
 | `integer` | $→$  | `string` |
 | `number`  | $→$  | `string` |
-| `nil`     | $→$  | 空字段   |
 
 ### 示例
 
@@ -746,7 +732,7 @@ data = {
 }
 
 ini = serialization.ini_encode(data)
-debug.print { message = ini }
+debug.print(ini)
 ```
 
 输出：
@@ -759,12 +745,12 @@ host = 127.0.0.1
 port = 8080
 ```
 
-反序列化：：
+反序列化：
 
 ```lua
 ini = "[server]\nhost=127.0.0.1\nport=8080"
 data = serialization.ini_decode(ini)
-debug.print { message = data.server.host }
+debug.print(data.server.host)
 ```
 
 输出：
@@ -790,14 +776,12 @@ data = {
 > 键为空值
 
 ```ini
-; 键不可为空
 key =
 ```
 
 > 键名包含非法字符
 
 ```ini
-; 键名不可包含 # / ; / = / [ / ]
 key# = value
 ```
 
@@ -812,12 +796,9 @@ key# = value
 打包：
 
 ```lua
-bytes = serialization.binary_pack {
-  fmt = "<I4 I4",
-  values = { 100, 200 }
-}
+bytes = serialization.binary_pack("<I4 I4", table.unpack({ 100, 200 }))
 
-debug.print { message = "packed " .. tostring(#bytes) .. " bytes" }
+debug.print("packed " .. tostring(#bytes) .. " bytes")
 ```
 
 输出：
@@ -829,17 +810,11 @@ packed 8 bytes
 解包：
 
 ```lua
-bytes = serialization.binary_pack {
-  fmt = "<I4 I4",
-  values = { 100, 200 }
-}
+bytes = serialization.binary_pack("<I4 I4", table.unpack({ 100, 200 }))
 
-result = serialization.binary_unpack {
-  fmt = "<I4 I4",
-  data = bytes
-}
+values, next_pos = serialization.binary_unpack("<I4 I4", bytes)
 
-debug.print { message = result.values[1] .. ", " .. result.values[2] }
+debug.print(values[1] .. ", " .. values[2])
 ```
 
 输出：
@@ -852,7 +827,7 @@ debug.print { message = result.values[1] .. ", " .. result.values[2] }
 
 ```lua
 size = serialization.binary_packsize("<I4 I4")
-debug.print { message = tostring(size) }
+debug.print(tostring(size))
 ```
 
 输出：
@@ -863,30 +838,20 @@ debug.print { message = tostring(size) }
 
 **错误示例**
 
-> 参数 `fmt` 和参数 `values` 数量不匹配
+> 必填参数 `fmt` 和必填参数 `values` 数量不匹配
 
 ```lua
-serialization.binary_pack {
-  fmt = "<I4 I4",
-  values = { 100 }
-}
+serialization.binary_pack("<I4 I4", table.unpack({ 100 }))
 ```
 
-> 参数 `data` 长度不足
+> 必填参数 `data` 长度不足
 
 ```lua
-serialization.binary_unpack {
-  fmt = "<I4",
-  data = "\x01"  -- 需要4字节
-}
+serialization.binary_unpack("<I4", "\x01") -- 需要 4 字节数据
 ```
 
-> 参数 `pos` 超出数据范围
+> 必填参数 `pos` 超出数据范围
 
 ```lua
-serialization.binary_unpack {
-  fmt = "<I2",
-  data = "\1\2\3\4",
-  pos = 6 -- 最大为 3
-}
+serialization.binary_unpack("<I2", "\1\2\3\4", {pos = 6}) -- 数据长 4 字节时最大位置为 5
 ```

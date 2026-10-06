@@ -1,4 +1,4 @@
-//! Minimal entry: creates a slice in a UI object pool, moves it and removes it.
+//! Independent widget smoke entry exercising the public API and checking its results.
 
 use tg_service_widget::{SliceOptions, SliceService, UiObjectPool};
 

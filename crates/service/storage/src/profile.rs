@@ -1,10 +1,12 @@
+//! Persisted user settings, validation, defaults, and atomic profile updates.
+
 use std::{
   collections::{BTreeMap, HashMap},
   fs, io,
   path::Path,
 };
 
-use serde::{Deserialize, Serialize, de::IgnoredAny};
+use serde::{Deserialize, Serialize};
 
 use super::layout;
 use super::service::StorageService;
@@ -12,53 +14,155 @@ use tg_core_atomic_fs::atomic_write;
 use tg_core_package_id::PackageId;
 use tg_service_log::{HostLogMessage, LogService, LogSource};
 
-/// Terminal profile: the user's preferences for Unicode support, color mode and mouse support.
+/// Persisted user settings for terminal.
+///
+/// # Fields
+///
+/// * `unicode` - Whether Unicode output is supported; `None` keeps the detected setting.
+/// * `color` - The color assigned to the target property.
+/// * `mouse` - Whether terminal pointer input is supported; `None` keeps the detected setting.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TerminalProfile {
+  /// Whether Unicode output is supported; `None` keeps the detected setting.
   pub unicode: Option<bool>,
 
+  /// The color assigned to the target property.
   pub color: Option<String>,
 
+  /// Whether terminal pointer input is supported; `None` keeps the detected setting.
   pub mouse: Option<bool>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+/// Persisted user settings for package state.
+///
+/// # Fields
+///
+/// * `defaults` - The defaults.
+/// * `games` - The games indexed by their declared keys.
+/// * `screensavers` - The screensavers indexed by their declared keys.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
 pub struct PackageStateProfile {
+  /// The defaults.
   pub defaults: PackageDefaultState,
+  /// The games indexed by their declared keys.
   pub games: HashMap<String, GamePackageState>,
+  /// The screensavers indexed by their declared keys.
   pub screensavers: HashMap<String, ScreensaverPackageState>,
 }
 
+impl<'de> Deserialize<'de> for PackageStateProfile {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: serde::Deserializer<'de>,
+  {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Wire {
+      defaults: PackageDefaultState,
+      games: HashMap<String, GamePackageState>,
+      screensavers: HashMap<String, ScreensaverPackageState>,
+    }
+
+    let profile = Wire::deserialize(deserializer)?;
+    validate_profile_package_keys(profile.games.keys(), tg_core_package_id::PackageType::Game)
+      .map_err(serde::de::Error::custom)?;
+    validate_profile_package_keys(
+      profile.screensavers.keys(),
+      tg_core_package_id::PackageType::Screensaver,
+    )
+    .map_err(serde::de::Error::custom)?;
+    Ok(Self {
+      defaults: profile.defaults,
+      games: profile.games,
+      screensavers: profile.screensavers,
+    })
+  }
+}
+
+fn validate_profile_package_keys<'a>(
+  keys: impl Iterator<Item = &'a String>,
+  expected_type: tg_core_package_id::PackageType,
+) -> Result<(), String> {
+  for key in keys {
+    let package_id = PackageId::from_storage_key(key)
+      .map_err(|error| format!("invalid package profile key {key:?}: {error}"))?;
+    if package_id.package_type != expected_type {
+      return Err(format!(
+        "package profile key {key:?} must refer to a {expected_type:?}"
+      ));
+    }
+  }
+  Ok(())
+}
+
 impl PackageStateProfile {
+  /// Return the configured game package state or its profile default.
   pub fn game(&self, id: &PackageId) -> Option<&GamePackageState> {
     self.games.get(&id.storage_key())
   }
 
+  /// Return the configured screensaver package state or its profile default.
   pub fn screensaver(&self, id: &PackageId) -> Option<&ScreensaverPackageState> {
     self.screensavers.get(&id.storage_key())
   }
 }
 
+/// The shared type used for action key map.
 pub type ActionKeyMap = BTreeMap<String, Vec<Vec<String>>>;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+/// The key binding map group representation used by this module.
+///
+/// # Fields
+///
+/// * `global` - The global.
+/// * `games` - The games indexed by their declared keys.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
 pub struct KeyBindingMapGroup {
+  /// The global.
   pub global: ActionKeyMap,
+  /// The games indexed by their declared keys.
   pub games: BTreeMap<String, ActionKeyMap>,
 }
 
-/// Persisted key binding table: `default` keeps the original definitions of the packages or the
-/// host, `user` keeps the user mappings that are actually in effect.
+impl<'de> Deserialize<'de> for KeyBindingMapGroup {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: serde::Deserializer<'de>,
+  {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Wire {
+      global: ActionKeyMap,
+      games: BTreeMap<String, ActionKeyMap>,
+    }
+
+    let group = Wire::deserialize(deserializer)?;
+    validate_profile_package_keys(group.games.keys(), tg_core_package_id::PackageType::Game)
+      .map_err(serde::de::Error::custom)?;
+    Ok(Self {
+      global: group.global,
+      games: group.games,
+    })
+  }
+}
+
+/// Persisted user settings for key bindings.
+///
+/// # Fields
+///
+/// * `default` - The default.
+/// * `user` - The user.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct KeyBindingsProfile {
+  /// The default.
   pub default: KeyBindingMapGroup,
+  /// The user.
   pub user: KeyBindingMapGroup,
 }
 
 impl KeyBindingsProfile {
+  /// Reconcile persisted key-binding groups with the current action declarations.
   pub fn synchronize(
     &mut self,
     global: ActionKeyMap,
@@ -92,17 +196,23 @@ fn synchronize_action_map(
   *stored_default = current_default;
 }
 
+/// The operation performed by the capture shortcut while screenshot mode is active.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ScreenshotDoubleAction {
+  /// The copy setting for screenshot double action.
   Copy,
+  /// The copy rich text setting for screenshot double action.
   CopyRichText,
+  /// The save png setting for screenshot double action.
   #[default]
   SavePng,
+  /// The all setting for screenshot double action.
   All,
 }
 
 impl ScreenshotDoubleAction {
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Copy => Self::CopyRichText,
@@ -113,14 +223,25 @@ impl ScreenshotDoubleAction {
   }
 }
 
+/// Persisted user settings for screenshot.
+///
+/// # Fields
+///
+/// * `guide_seen` - The guide seen.
+/// * `double_action` - The double action.
+/// * `auto_exit` - The auto exit.
+/// * `fonts` - The ordered fonts retained by this owner.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ScreenshotProfile {
+  /// The guide seen.
   pub guide_seen: bool,
+  /// The double action.
   pub double_action: ScreenshotDoubleAction,
+  /// The auto exit.
   pub auto_exit: bool,
 
-  /// Custom font paths or system font names tried in order when screenshots are exported.
+  /// The ordered fonts retained by this owner.
   pub fonts: Vec<String>,
 }
 
@@ -135,16 +256,21 @@ impl Default for ScreenshotProfile {
   }
 }
 
+/// The capture frame-rate policy persisted in the recording profile.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingFrameRate {
+  /// The fps30 setting for recording frame rate.
   Fps30,
+  /// The fps60 setting for recording frame rate.
   #[default]
   Fps60,
+  /// The fps120 setting for recording frame rate.
   Fps120,
 }
 
 impl RecordingFrameRate {
+  /// Return the value for the addressed object.
   pub fn value(self) -> u16 {
     match self {
       Self::Fps30 => 30,
@@ -153,6 +279,7 @@ impl RecordingFrameRate {
     }
   }
 
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Fps30 => Self::Fps60,
@@ -162,18 +289,25 @@ impl RecordingFrameRate {
   }
 }
 
+/// The recording operations for which the host displays status notifications.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingPopupMode {
+  /// The off setting for recording popup mode.
   Off,
+  /// The all setting for recording popup mode.
   #[default]
   All,
+  /// The split only setting for recording popup mode.
   SplitOnly,
+  /// The state only setting for recording popup mode.
   StateOnly,
+  /// The start stop only setting for recording popup mode.
   StartStopOnly,
 }
 
 impl RecordingPopupMode {
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Off => Self::All,
@@ -184,29 +318,37 @@ impl RecordingPopupMode {
     }
   }
 
+  /// Report whether segment-split notifications are enabled by this popup policy.
   pub fn shows_split(self) -> bool {
     matches!(self, Self::All | Self::SplitOnly)
   }
 
+  /// Report whether pause/resume notifications are enabled by this popup policy.
   pub fn shows_pause_resume(self) -> bool {
     matches!(self, Self::All | Self::StateOnly)
   }
 
+  /// Report whether start/stop notifications are enabled by this popup policy.
   pub fn shows_start_stop(self) -> bool {
     matches!(self, Self::All | Self::StartStopOnly)
   }
 }
 
+/// The policy controlling automatic recording of active games.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AutoRecordingMode {
+  /// The off setting for auto recording mode.
   #[default]
   Off,
+  /// The host setting for auto recording mode.
   Host,
+  /// The game setting for auto recording mode.
   Game,
 }
 
 impl AutoRecordingMode {
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Off => Self::Host,
@@ -216,17 +358,23 @@ impl AutoRecordingMode {
   }
 }
 
+/// The elapsed recording duration that triggers an automatic segment split.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AutoSplitDuration {
+  /// The off setting for auto split duration.
   Off,
+  /// The minutes3 setting for auto split duration.
   #[default]
   Minutes3,
+  /// The minutes5 setting for auto split duration.
   Minutes5,
+  /// The minutes10 setting for auto split duration.
   Minutes10,
 }
 
 impl AutoSplitDuration {
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Off => Self::Minutes3,
@@ -236,6 +384,7 @@ impl AutoSplitDuration {
     }
   }
 
+  /// Return the duration for the addressed object when it is available.
   pub fn duration(self) -> Option<std::time::Duration> {
     match self {
       Self::Off => None,
@@ -246,17 +395,23 @@ impl AutoSplitDuration {
   }
 }
 
+/// The output-frame-rate selection used during recording export.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingExportFrameRate {
+  /// The recorded setting for recording export frame rate.
   #[default]
   Recorded,
+  /// The fps30 setting for recording export frame rate.
   Fps30,
+  /// The fps60 setting for recording export frame rate.
   Fps60,
+  /// The fps120 setting for recording export frame rate.
   Fps120,
 }
 
 impl RecordingExportFrameRate {
+  /// Resolve the persisted setting against the supplied runtime value.
   pub fn resolve(self, recorded: u16) -> u16 {
     match self {
       Self::Recorded => recorded,
@@ -266,6 +421,7 @@ impl RecordingExportFrameRate {
     }
   }
 
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Recorded => Self::Fps30,
@@ -276,16 +432,21 @@ impl RecordingExportFrameRate {
   }
 }
 
+/// The encoding-quality setting used during video export.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingExportQuality {
+  /// The compact setting for recording export quality.
   Compact,
+  /// The balanced setting for recording export quality.
   #[default]
   Balanced,
+  /// The high setting for recording export quality.
   High,
 }
 
 impl RecordingExportQuality {
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Compact => Self::Balanced,
@@ -295,16 +456,21 @@ impl RecordingExportQuality {
   }
 }
 
+/// The output cell/pixel scaling selection used during recording export.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingPixelScale {
+  /// The half setting for recording pixel scale.
   Half,
+  /// The original setting for recording pixel scale.
   #[default]
   Original,
+  /// The double setting for recording pixel scale.
   Double,
 }
 
 impl RecordingPixelScale {
+  /// Return the current multiplier.
   pub fn multiplier(self) -> (u32, u32) {
     match self {
       Self::Half => (1, 2),
@@ -313,6 +479,7 @@ impl RecordingPixelScale {
     }
   }
 
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Half => Self::Original,
@@ -322,19 +489,27 @@ impl RecordingPixelScale {
   }
 }
 
+/// The policy controlling hardware-encoder attempts and software fallback.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingGpuAcceleration {
+  /// The off setting for recording gpu acceleration.
   Off,
+  /// The auto setting for recording gpu acceleration.
   #[default]
   Auto,
+  /// The nvidia setting for recording gpu acceleration.
   Nvidia,
+  /// The amd setting for recording gpu acceleration.
   Amd,
+  /// The intel setting for recording gpu acceleration.
   Intel,
+  /// The apple setting for recording gpu acceleration.
   Apple,
 }
 
 impl RecordingGpuAcceleration {
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Off => Self::Auto,
@@ -347,17 +522,39 @@ impl RecordingGpuAcceleration {
   }
 }
 
+/// Persisted user settings for recording.
+///
+/// # Fields
+///
+/// * `popup` - The popup.
+/// * `auto_recording` - The auto recording.
+/// * `auto_split` - The auto split.
+/// * `capture_frame_rate` - The capture frame rate.
+/// * `export_frame_rate` - The export frame rate.
+/// * `quality` - The quality.
+/// * `keyframe_interval_seconds` - The keyframe interval in seconds.
+/// * `pixel_scale` - The pixel scale.
+/// * `gpu_acceleration` - The gpu acceleration.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RecordingProfile {
+  /// The popup.
   pub popup: RecordingPopupMode,
+  /// The auto recording.
   pub auto_recording: AutoRecordingMode,
+  /// The auto split.
   pub auto_split: AutoSplitDuration,
+  /// The capture frame rate.
   pub capture_frame_rate: RecordingFrameRate,
+  /// The export frame rate.
   pub export_frame_rate: RecordingExportFrameRate,
+  /// The quality.
   pub quality: RecordingExportQuality,
+  /// The keyframe interval in seconds.
   pub keyframe_interval_seconds: u16,
+  /// The pixel scale.
   pub pixel_scale: RecordingPixelScale,
+  /// The gpu acceleration.
   pub gpu_acceleration: RecordingGpuAcceleration,
 }
 
@@ -366,6 +563,7 @@ fn default_keyframe_interval() -> u16 {
 }
 
 impl RecordingProfile {
+  /// Report whether this recording profile is valid.
   pub fn is_valid(&self) -> bool {
     (1..=10).contains(&self.keyframe_interval_seconds)
   }
@@ -387,47 +585,70 @@ impl Default for RecordingProfile {
   }
 }
 
+/// The animation mode selected for the home-page logo.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplayLogoMode {
+  /// The order setting for display logo mode.
   Order,
+  /// The random setting for display logo mode.
   Random,
+  /// The classic setting for display logo mode.
   Classic,
+  /// The neon setting for display logo mode.
   Neon,
+  /// The wave setting for display logo mode.
   Wave,
+  /// The error setting for display logo mode.
   Error,
+  /// The glitch setting for display logo mode.
   Glitch,
+  /// The select setting for display logo mode.
   Select,
+  /// The char setting for display logo mode.
   Char,
 }
 
+/// The package-source filter used by display lists.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplaySourceMode {
+  /// The all setting for display source mode.
   All,
+  /// The mod setting for display source mode.
   Mod,
+  /// The official setting for display source mode.
   Official,
+  /// The no setting for display source mode.
   No,
 }
 
+/// The ordering policy used by package display lists.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplayOrderMode {
+  /// The random setting for display order mode.
   Random,
+  /// The order setting for display order mode.
   Order,
 }
 
+/// The host frame-rate limit selected by display settings.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplayFpsLimit {
+  /// The fps30 setting for display fps limit.
   Fps30,
+  /// The fps60 setting for display fps limit.
   Fps60,
+  /// The fps120 setting for display fps limit.
   Fps120,
+  /// The unlimited setting for display fps limit.
   Unlimited,
 }
 
 impl DisplayLogoMode {
-  /// Returns the next value in the settings page cycling order.
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Order => Self::Random,
@@ -444,7 +665,7 @@ impl DisplayLogoMode {
 }
 
 impl DisplaySourceMode {
-  /// Returns the next value in the settings page cycling order.
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::All => Self::Mod,
@@ -456,7 +677,7 @@ impl DisplaySourceMode {
 }
 
 impl DisplayOrderMode {
-  /// Returns the next value in the settings page cycling order.
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Random => Self::Order,
@@ -466,6 +687,7 @@ impl DisplayOrderMode {
 }
 
 impl DisplayFpsLimit {
+  /// Return the package's requested frame-rate limit, if one was declared.
   pub fn target_fps(self) -> Option<u16> {
     match self {
       Self::Fps30 => Some(30),
@@ -475,7 +697,7 @@ impl DisplayFpsLimit {
     }
   }
 
-  /// Returns the next value in the settings page cycling order.
+  /// Return the current next.
   pub fn next(self) -> Self {
     match self {
       Self::Fps30 => Self::Fps60,
@@ -486,83 +708,95 @@ impl DisplayFpsLimit {
   }
 }
 
+/// Persisted user settings for display settings.
+///
+/// # Fields
+///
+/// * `logo_mode` - The logo mode.
+/// * `logo_sequence_cursor` - The logo sequence cursor.
+/// * `top_toolbar` - The top toolbar.
+/// * `top_toolbar_custom_text` - The top toolbar custom text.
+/// * `screensaver_source` - The screensaver source.
+/// * `screensaver_order` - The screensaver order.
+/// * `screensaver_sequence_cursor` - The screensaver sequence cursor.
+/// * `game_list_source` - The game list source.
+/// * `game_list_warnings` - The game list warnings.
+/// * `game_list_fps` - The game list fps.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct DisplaySettingsProfile {
+  /// The logo mode.
   pub logo_mode: DisplayLogoMode,
+  /// The logo sequence cursor.
   pub logo_sequence_cursor: u64,
+  /// The top toolbar.
   pub top_toolbar: bool,
+  /// The top toolbar custom text.
   pub top_toolbar_custom_text: String,
+  /// The screensaver source.
   pub screensaver_source: DisplaySourceMode,
+  /// The screensaver order.
   pub screensaver_order: DisplayOrderMode,
+  /// The screensaver sequence cursor.
   pub screensaver_sequence_cursor: u64,
+  /// The game list source.
   pub game_list_source: DisplaySourceMode,
+  /// The game list warnings.
   pub game_list_warnings: bool,
+  /// The game list fps.
   pub game_list_fps: DisplayFpsLimit,
 }
 
+/// The retained state of package default.
+///
+/// # Fields
+///
+/// * `enabled` - Whether the feature is enabled.
+/// * `debug` - The debug.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(from = "PackageDefaultStateProfile", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct PackageDefaultState {
+  /// Whether the feature is enabled.
   pub enabled: bool,
+  /// The debug.
   pub debug: bool,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PackageDefaultStateProfile {
-  enabled: bool,
-  debug: bool,
-  #[serde(default, rename = "safe_mode")]
-  _safe_mode: Option<IgnoredAny>,
-}
-
-impl From<PackageDefaultStateProfile> for PackageDefaultState {
-  fn from(profile: PackageDefaultStateProfile) -> Self {
-    Self {
-      enabled: profile.enabled,
-      debug: profile.debug,
-    }
-  }
-}
-
+/// The retained state of game package.
+///
+/// # Fields
+///
+/// * `enabled` - Whether the feature is enabled.
+/// * `debug` - The debug.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(from = "GamePackageStateProfile", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct GamePackageState {
+  /// Whether the feature is enabled.
   pub enabled: bool,
+  /// The debug.
   pub debug: bool,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct GamePackageStateProfile {
-  enabled: bool,
-  debug: bool,
-  #[serde(default, rename = "safe_mode")]
-  _safe_mode: Option<IgnoredAny>,
-}
-
-impl From<GamePackageStateProfile> for GamePackageState {
-  fn from(profile: GamePackageStateProfile) -> Self {
-    Self {
-      enabled: profile.enabled,
-      debug: profile.debug,
-    }
-  }
-}
-
+/// The retained state of screensaver package.
+///
+/// # Fields
+///
+/// * `enabled` - Whether the feature is enabled.
+/// * `debug` - The debug.
+/// * `playlist_enabled` - The playlist enabled.
+/// * `order` - The order.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ScreensaverPackageState {
-  /// Master switch of the package manager; a disabled package is left out of the screensaver
-  /// list.
+  /// Whether the feature is enabled.
   pub enabled: bool,
+  /// The debug.
   pub debug: bool,
 
-  /// Enabled state inside the screensaver list, independent of the package master switch.
+  /// The playlist enabled.
   pub playlist_enabled: bool,
 
-  /// Display order of an enabled screensaver; disabled screensavers take no part in ordering.
+  /// The order.
   pub order: Option<u32>,
 }
 
@@ -613,8 +847,7 @@ impl Default for PackageDefaultState {
 }
 
 impl TerminalProfile {
-  /// Returns whether all three settings are filled in (the color mode must be `truecolor` or
-  /// `256`).
+  /// Report whether this terminal profile is complete.
   pub fn is_complete(&self) -> bool {
     self.unicode.is_some()
       && self
@@ -626,7 +859,7 @@ impl TerminalProfile {
 }
 
 impl StorageService {
-  /// Reads the saved language code.
+  /// Read the persisted language code from deployment storage.
   pub fn read_language_code(&self, log: &mut LogService) -> Option<String> {
     let content = fs::read_to_string(self.profile_language_path())
       .inspect_err(|error| {
@@ -641,11 +874,12 @@ impl StorageService {
     }
   }
 
-  /// Writes the language code to its profile file.
+  /// Validate and persist the language code in deployment storage.
   ///
   /// # Errors
   ///
-  /// Returns the I/O error when the file cannot be written.
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn write_language_code(&self, language_code: &str) -> std::io::Result<()> {
     atomic_write(
       &self.profile_language_path(),
@@ -654,6 +888,7 @@ impl StorageService {
     )
   }
 
+  /// Read the persisted key bindings profile from deployment storage.
   pub fn read_key_bindings_profile(&self, log: &mut LogService) -> KeyBindingsProfile {
     let path = self.profile_key_bindings_path();
     let content = match fs::read_to_string(&path) {
@@ -674,6 +909,12 @@ impl StorageService {
     })
   }
 
+  /// Validate and persist the key bindings profile in deployment storage.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn write_key_bindings_profile(
     &self,
     profile: &KeyBindingsProfile,
@@ -694,15 +935,17 @@ impl StorageService {
     Ok(())
   }
 
-  /// Returns the default language code.
+  /// Return the current default language code.
   pub fn default_language_code(&self) -> &'static str {
     layout::DEFAULT_LANGUAGE_CODE
   }
 
+  /// Return the current display settings profile.
   pub fn display_settings_profile(&self) -> &DisplaySettingsProfile {
     &self.display_settings
   }
 
+  /// Reload display settings and replace the cached profile with validated values or defaults.
   pub fn reload_display_settings_profile(
     &mut self,
     log: &mut LogService,
@@ -725,6 +968,12 @@ impl StorageService {
     profile
   }
 
+  /// Validate and persist the display settings profile in deployment storage.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn write_display_settings_profile(
     &mut self,
     profile: &DisplaySettingsProfile,
@@ -746,7 +995,7 @@ impl StorageService {
     Ok(())
   }
 
-  /// Reads the terminal profile from its file.
+  /// Read the persisted terminal profile from deployment storage.
   pub fn read_terminal_profile(&self, log: &mut LogService) -> Option<TerminalProfile> {
     let content = fs::read_to_string(self.profile_terminal_path())
       .inspect_err(|error| {
@@ -765,16 +1014,18 @@ impl StorageService {
       .ok()
   }
 
-  /// Reads the terminal profile, falling back to the default when it is missing or invalid.
+  /// Read terminal settings, falling back to defaults when persisted data is unavailable or
+  /// invalid.
   pub fn read_terminal_profile_or_default(&self, log: &mut LogService) -> TerminalProfile {
     self.read_terminal_profile(log).unwrap_or_default()
   }
 
-  /// Reads the terminal profile, lets `f` modify it and writes it back.
+  /// Apply a terminal-profile mutation and atomically persist the resulting settings.
   ///
   /// # Errors
   ///
-  /// Returns an error when the modified profile cannot be serialized or written.
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn update_terminal_profile(
     &self,
     log: &mut LogService,
@@ -785,12 +1036,12 @@ impl StorageService {
     self.write_terminal_profile(&profile, log)
   }
 
-  /// Serializes the terminal profile and writes it to its file.
+  /// Validate and persist the terminal profile in deployment storage.
   ///
   /// # Errors
   ///
-  /// Returns an [`io::ErrorKind::InvalidData`] error when serialization fails and the I/O error
-  /// when the file cannot be written.
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn write_terminal_profile(
     &self,
     profile: &TerminalProfile,
@@ -818,23 +1069,24 @@ impl StorageService {
     Ok(())
   }
 
-  /// Clears the saved terminal capability results so the next start runs capability detection
-  /// again.
+  /// Restore and persist the default terminal capability profile.
   ///
   /// # Errors
   ///
-  /// Returns an error when the default profile cannot be written.
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn reset_terminal_profile(&self, log: &mut LogService) -> std::io::Result<()> {
     self.write_terminal_profile(&TerminalProfile::default(), log)
   }
 
-  /// Returns whether the terminal profile file is completely filled in.
+  /// Report whether the addressed object is terminal profile complete.
   pub fn is_terminal_profile_complete(&self, log: &mut LogService) -> bool {
     self
       .read_terminal_profile(log)
       .is_some_and(|p| p.is_complete())
   }
 
+  /// Read the persisted package state from deployment storage.
   pub fn read_package_state(&self, log: &mut LogService) -> Option<PackageStateProfile> {
     let content = fs::read_to_string(self.profile_package_state_path())
       .inspect_err(|error| {
@@ -858,10 +1110,17 @@ impl StorageService {
       .ok()
   }
 
+  /// Read package enable/debug state, falling back to its defined defaults.
   pub fn read_package_state_or_default(&self, log: &mut LogService) -> PackageStateProfile {
     self.read_package_state(log).unwrap_or_default()
   }
 
+  /// Validate and persist the package state in deployment storage.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn write_package_state(
     &self,
     profile: &PackageStateProfile,
@@ -889,6 +1148,18 @@ impl StorageService {
     Ok(())
   }
 
+  /// Update and persist the enable/debug state of the identified game package.
+  ///
+  /// # Arguments
+  ///
+  /// * `package_id` - The stable source, type, and name of the package.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `f` - The callback used to f.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn update_game_package_state(
     &self,
     package_id: &PackageId,
@@ -908,6 +1179,18 @@ impl StorageService {
     self.write_package_state(&profile, log)
   }
 
+  /// Update and persist the enable/debug state of the identified screensaver package.
+  ///
+  /// # Arguments
+  ///
+  /// * `package_id` - The stable source, type, and name of the package.
+  /// * `log` - The service receiving diagnostic records.
+  /// * `f` - The callback used to f.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn update_screensaver_package_state(
     &self,
     package_id: &PackageId,
@@ -928,6 +1211,7 @@ impl StorageService {
     self.write_package_state(&profile, log)
   }
 
+  /// Read the persisted screenshot profile from deployment storage.
   pub fn read_screenshot_profile(&self, log: &mut LogService) -> Option<ScreenshotProfile> {
     let content = fs::read_to_string(self.profile_screenshot_path())
       .inspect_err(|error| {
@@ -946,6 +1230,7 @@ impl StorageService {
       .ok()
   }
 
+  /// Read the persisted recording profile from deployment storage.
   pub fn read_recording_profile(&self, log: &mut LogService) -> Option<RecordingProfile> {
     let content = fs::read_to_string(self.profile_recording_path())
       .inspect_err(|error| {
@@ -974,14 +1259,23 @@ impl StorageService {
     Some(profile)
   }
 
+  /// Read recording settings, falling back to defaults when persisted data is unavailable or
+  /// invalid.
   pub fn read_recording_profile_or_default(&self, log: &mut LogService) -> RecordingProfile {
     self.read_recording_profile(log).unwrap_or_default()
   }
 
+  /// Return the current recording profile revision.
   pub fn recording_profile_revision(&self) -> u64 {
     self.recording_profile_revision.get()
   }
 
+  /// Validate and persist the recording profile in deployment storage.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn write_recording_profile(
     &self,
     profile: &RecordingProfile,
@@ -1008,10 +1302,18 @@ impl StorageService {
     result
   }
 
+  /// Read screenshot settings, falling back to defaults when persisted data is unavailable or
+  /// invalid.
   pub fn read_screenshot_profile_or_default(&self, log: &mut LogService) -> ScreenshotProfile {
     self.read_screenshot_profile(log).unwrap_or_default()
   }
 
+  /// Validate and persist the screenshot profile in deployment storage.
+  ///
+  /// # Errors
+  ///
+  /// Return an error for invalid profile values or filesystem failures while writing the profile
+  /// through atomic replacement.
   pub fn write_screenshot_profile(
     &self,
     profile: &ScreenshotProfile,
@@ -1036,6 +1338,7 @@ impl StorageService {
     Ok(())
   }
 
+  /// Persist that the user has dismissed the screenshot capture guide.
   pub fn mark_screenshot_guide_seen(&self, log: &mut LogService) {
     let mut profile = self.read_screenshot_profile_or_default(log);
     if profile.guide_seen {
@@ -1292,64 +1595,31 @@ mod tests {
   }
 
   #[test]
-  fn legacy_safe_mode_fields_are_ignored_without_losing_package_settings() {
-    let profile: PackageStateProfile = serde_json::from_str(
-      r#"
-        {
-          "defaults": { "enabled": false, "debug": true, "safe_mode": "off_permanent" },
-          "games": {
-            "game:test.game": { "enabled": false, "debug": true, "safe_mode": false }
-          },
-          "screensavers": {
-            "screensaver:test.screen": {
-              "enabled": true,
-              "debug": false,
-              "playlist_enabled": false,
-              "order": 7
-            }
-          }
-        }
-      "#,
-    )
-    .unwrap();
+  fn package_state_rejects_legacy_package_ids_and_removed_fields() {
+    for key in ["official/game/old.id", "mod/screensaver/old-id"] {
+      let json = if key.contains("screensaver") {
+        format!(
+          r#"{{"defaults":{{"enabled":true,"debug":false}},"games":{{}},"screensavers":{{"{key}":{{"enabled":true,"debug":false,"playlist_enabled":true,"order":null}}}}}}"#
+        )
+      } else {
+        format!(
+          r#"{{"defaults":{{"enabled":true,"debug":false}},"games":{{"{key}":{{"enabled":true,"debug":false}}}},"screensavers":{{}}}}"#
+        )
+      };
+      assert!(
+        serde_json::from_str::<PackageStateProfile>(&json).is_err(),
+        "{key}"
+      );
+    }
 
-    assert_eq!(
-      profile.defaults,
-      PackageDefaultState {
-        enabled: false,
-        debug: true,
-      }
-    );
-    assert_eq!(
-      profile.games["game:test.game"],
-      GamePackageState {
-        enabled: false,
-        debug: true,
-      }
-    );
-    assert_eq!(
-      profile.screensavers["screensaver:test.screen"],
-      ScreensaverPackageState {
-        enabled: true,
-        debug: false,
-        playlist_enabled: false,
-        order: Some(7),
-      }
-    );
-
-    let serialized = serde_json::to_value(profile).unwrap();
-    assert!(serialized["defaults"].get("safe_mode").is_none());
-    assert!(
-      serialized["games"]["game:test.game"]
-        .get("safe_mode")
-        .is_none()
-    );
+    let old_field = r#"{"defaults":{"enabled":true,"debug":false,"safe_mode":false},"games":{},"screensavers":{}}"#;
+    assert!(serde_json::from_str::<PackageStateProfile>(old_field).is_err());
   }
 
   #[test]
-  fn legacy_safe_mode_profile_update_preserves_other_user_data() {
+  fn package_state_profile_update_preserves_other_user_data() {
     let root = std::env::temp_dir().join(format!(
-      "tg_storage_legacy_safe_mode_user_data_{}",
+      "tg_storage_package_state_user_data_{}",
       std::process::id()
     ));
     let _ = fs::remove_dir_all(&root);
@@ -1403,8 +1673,8 @@ mod tests {
       storage.profile_package_state_path(),
       format!(
         r#"{{
-          "defaults": {{"enabled": false, "debug": true, "safe_mode": "off_permanent"}},
-          "games": {{"{}": {{"enabled": false, "debug": true, "safe_mode": false}}}},
+          "defaults": {{"enabled": false, "debug": true}},
+          "games": {{"{}": {{"enabled": false, "debug": true}}}},
           "screensavers": {{"{}": {{"enabled": true, "debug": false, "playlist_enabled": false, "order": 7}}}}
         }}"#,
         game_id.storage_key(),
@@ -1459,12 +1729,7 @@ mod tests {
     let rewritten_profile: Value =
       serde_json::from_str(&fs::read_to_string(storage.profile_package_state_path()).unwrap())
         .unwrap();
-    assert!(rewritten_profile["defaults"].get("safe_mode").is_none());
-    assert!(
-      rewritten_profile["games"][game_id.storage_key()]
-        .get("safe_mode")
-        .is_none()
-    );
+    assert_eq!(rewritten_profile["defaults"]["debug"], true);
 
     fs::remove_dir_all(root).unwrap();
   }
@@ -1493,6 +1758,15 @@ mod tests {
     assert_eq!(profile.user.global["one"], vec![vec!["b".to_string()]]);
     assert!(profile.user.global["two"].is_empty());
     assert_eq!(profile.default.global, global);
+  }
+
+  #[test]
+  fn key_bindings_profile_rejects_legacy_package_ids() {
+    let profile = r#"{
+      "default":{"global":{},"games":{"mod/game/old.id":{}}},
+      "user":{"global":{},"games":{"mod/game/old-id":{}}}
+    }"#;
+    assert!(serde_json::from_str::<KeyBindingsProfile>(profile).is_err());
   }
 
   #[test]
@@ -1549,13 +1823,13 @@ mod tests {
     let mut game_actions = ActionKeyMap::new();
     game_actions.insert("jump".into(), vec![vec!["space".into()]]);
     let mut games = BTreeMap::new();
-    games.insert("game.one".into(), game_actions.clone());
+    games.insert("mod/game/game_one".into(), game_actions.clone());
     profile.synchronize(ActionKeyMap::new(), games);
-    assert_eq!(profile.user.games["game.one"], game_actions);
+    assert_eq!(profile.user.games["mod/game/game_one"], game_actions);
 
     profile.synchronize(ActionKeyMap::new(), BTreeMap::new());
-    assert_eq!(profile.default.games["game.one"], game_actions);
-    assert_eq!(profile.user.games["game.one"], game_actions);
+    assert_eq!(profile.default.games["mod/game/game_one"], game_actions);
+    assert_eq!(profile.user.games["mod/game/game_one"], game_actions);
   }
 
   #[test]
@@ -1565,16 +1839,16 @@ mod tests {
     original.insert("jump".into(), vec![vec!["space".into()]]);
     original.insert("removed".into(), vec![vec!["r".into()]]);
     let mut games = BTreeMap::new();
-    games.insert("game.one".into(), original);
+    games.insert("mod/game/game_one".into(), original);
     profile.synchronize(ActionKeyMap::new(), games);
 
     let mut current = ActionKeyMap::new();
     current.insert("jump".into(), vec![vec!["space".into()]]);
     let mut games = BTreeMap::new();
-    games.insert("game.one".into(), current);
+    games.insert("mod/game/game_one".into(), current);
     profile.synchronize(ActionKeyMap::new(), games);
 
-    assert!(!profile.user.games["game.one"].contains_key("removed"));
+    assert!(!profile.user.games["mod/game/game_one"].contains_key("removed"));
   }
 
   #[test]

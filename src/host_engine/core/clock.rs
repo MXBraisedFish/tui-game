@@ -1,12 +1,15 @@
+//! Monotonic frame timing used by the host lifecycle.
+
 use std::time::{Duration, Instant};
 
-/// 引擎时钟，追踪帧时间增量与运行时长
+/// Monotonic timing retained between application frames.
 pub struct EngineClock {
   last_tick: Instant,
   dt: Duration,
 }
 
 impl EngineClock {
+  /// Create an engine clock with its initial state.
   pub fn new() -> Self {
     let now = Instant::now();
 
@@ -16,13 +19,14 @@ impl EngineClock {
     }
   }
 
-  /// 记录一次时钟滴答，更新上一帧到当前帧的时间增量
+  /// Measure elapsed monotonic time and advance accumulated frame timing.
   pub fn tick(&mut self) {
     let now = Instant::now();
     self.dt = now.duration_since(self.last_tick);
     self.last_tick = now;
   }
 
+  /// Return the current delta time.
   pub fn delta_time(&self) -> Duration {
     self.dt
   }

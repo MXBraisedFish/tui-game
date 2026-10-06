@@ -1,65 +1,99 @@
+//! Layout support for the storage service.
+
+/// The data dir used by this module.
 pub const DATA_DIR: &str = "data";
 
+/// The data cache dir used by this module.
 pub const DATA_CACHE_DIR: &str = "data/cache";
 
+/// The image cache dir used by this module.
 pub const IMAGE_CACHE_DIR: &str = "data/cache/images";
 
+/// The screenshot cache dir used by this module.
 pub const SCREENSHOT_CACHE_DIR: &str = "data/cache/screenshot";
 
+/// The recording cache dir used by this module.
 pub const RECORDING_CACHE_DIR: &str = "data/cache/recording";
 
+/// The data profiles dir used by this module.
 pub const DATA_PROFILES_DIR: &str = "data/profiles";
 
+/// The data log dir used by this module.
 pub const DATA_LOG_DIR: &str = "data/log";
 
+/// The data game log dir used by this module.
 pub const DATA_GAME_LOG_DIR: &str = "data/log/game";
 
+/// The data screensaver log dir used by this module.
 pub const DATA_SCREENSAVER_LOG_DIR: &str = "data/log/screensaver";
 
+/// The data screenshot dir used by this module.
 pub const DATA_SCREENSHOT_DIR: &str = "data/screenshot";
 
+/// The data recording dir used by this module.
 pub const DATA_RECORDING_DIR: &str = "data/recording";
 
+/// The data mod dir used by this module.
 pub const DATA_MOD_DIR: &str = "data/mod";
 
+/// The data mod game dir used by this module.
 pub const DATA_MOD_GAME_DIR: &str = "data/mod/game";
 
+/// The data mod screensaver dir used by this module.
 pub const DATA_MOD_SCREENSAVER_DIR: &str = "data/mod/screensaver";
 
+/// The scripts dir used by this module.
 pub const SCRIPTS_DIR: &str = "scripts";
 
+/// The scripts game dir used by this module.
 pub const SCRIPTS_GAME_DIR: &str = "scripts/game";
 
+/// The scripts screensaver dir used by this module.
 pub const SCRIPTS_SCREENSAVER_DIR: &str = "scripts/screensaver";
 
+/// The assets dir used by this module.
 pub const ASSETS_DIR: &str = "assets";
 
+/// The assets language dir used by this module.
 pub const ASSETS_LANGUAGE_DIR: &str = "assets/language";
 
+/// The profile language file used by this module.
 pub const PROFILE_LANGUAGE_FILE: &str = "data/profiles/language.txt";
 
+/// The profile terminal file used by this module.
 pub const PROFILE_TERMINAL_FILE: &str = "data/profiles/terminal_profile.json";
 
+/// The profile package state file used by this module.
 pub const PROFILE_PACKAGE_STATE_FILE: &str = "data/profiles/package_state.json";
 
+/// The profile screenshot file used by this module.
 pub const PROFILE_SCREENSHOT_FILE: &str = "data/profiles/screenshot_profile.json";
 
+/// The profile recording file used by this module.
 pub const PROFILE_RECORDING_FILE: &str = "data/profiles/recording_profile.json";
 
+/// The profile display settings file used by this module.
 pub const PROFILE_DISPLAY_SETTINGS_FILE: &str = "data/profiles/display_settings.json";
 
+/// The profile key bindings file used by this module.
 pub const PROFILE_KEY_BINDINGS_FILE: &str = "data/profiles/key_bindings.json";
 
+/// The profile game save file used by this module.
 pub const PROFILE_GAME_SAVE_FILE: &str = "data/profiles/game_save.json";
 
+/// The tUI log file used by this module.
 pub const TUI_LOG_FILE: &str = "data/log/tui_log.log";
 
+/// The package log file used by this module.
 pub const PACKAGE_LOG_FILE: &str = "data/log/package.log";
 
+/// The default language code used by this module.
 pub const DEFAULT_LANGUAGE_CODE: &str = "en_us";
 
+/// The language registry file used by this module.
 pub const LANGUAGE_REGISTRY_FILE: &str = "assets/language/language_registry.json";
 
+/// The required directories used by this module.
 pub const REQUIRED_DIRECTORIES: &[&str] = &[
   DATA_DIR,
   DATA_CACHE_DIR,
@@ -82,6 +116,7 @@ pub const REQUIRED_DIRECTORIES: &[&str] = &[
   ASSETS_LANGUAGE_DIR,
 ];
 
+/// The default files used by this module.
 pub const DEFAULT_FILES: &[(&str, &str)] = &[
   (
     PROFILE_TERMINAL_FILE,

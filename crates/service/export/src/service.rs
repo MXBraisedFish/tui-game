@@ -1,3 +1,5 @@
+//! Service support for the export service.
+
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -10,15 +12,19 @@ use tg_service_async::TaskId;
 use tg_service_log::LogService;
 use tg_service_storage::StorageService;
 
-/// 导出文件格式
+/// The archive format used for a directory export.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExportFormat {
+  /// The zip setting for export format.
   Zip,
+  /// The tar setting for export format.
   Tar,
+  /// The tar gz setting for export format.
   TarGz,
 }
 
 impl ExportFormat {
+  /// Return the current extension.
   pub fn extension(self) -> &'static str {
     match self {
       Self::Zip => "zip",
@@ -28,15 +34,22 @@ impl ExportFormat {
   }
 }
 
-/// 导出范围
+/// The deployment content included in a directory export.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExportScope {
+  /// The cache setting for export scope.
   Cache,
+  /// The log setting for export scope.
   Log,
+  /// The mod setting for export scope.
   Mod,
+  /// The profile setting for export scope.
   Profile,
+  /// The screenshot setting for export scope.
   Screenshot,
+  /// The recording setting for export scope.
   Recording,
+  /// The data setting for export scope.
   Data,
 }
 
@@ -66,37 +79,64 @@ impl ExportScope {
   }
 }
 
+/// The inputs of an asynchronous export operation.
+///
+/// # Fields
+///
+/// * `scope` - The set of content included in the operation.
+/// * `output_dir` - The destination directory for the exported file.
+/// * `file_stem` - The output filename without its format extension.
+/// * `format` - The requested output format.
+/// * `root_dir` - The deployment root containing assets, data, and scripts.
 #[derive(Clone, Debug)]
 pub struct ExportTask {
+  /// The set of content included in the operation.
   pub scope: ExportScope,
+  /// The destination directory for the exported file.
   pub output_dir: PathBuf,
+  /// The output filename without its format extension.
   pub file_stem: String,
+  /// The requested output format.
   pub format: ExportFormat,
+  /// The deployment root containing assets, data, and scripts.
   pub root_dir: PathBuf,
 }
 
+/// A export async event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum ExportAsyncEvent {
+  /// A started notification delivered to the owning consumer.
   Started {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The total.
     total: usize,
   },
+  /// A progress notification delivered to the owning consumer.
   Progress {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The packed.
     packed: usize,
+    /// The total.
     total: usize,
   },
+  /// The operation is finished.
   Finished {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The filesystem path to read, write, or resolve.
     path: PathBuf,
   },
+  /// A failed notification delivered to the owning consumer.
   Failed {
+    /// The identifier of the asynchronous task.
     task_id: TaskId,
+    /// The error.
     error: String,
   },
 }
 
-/// 收集 src_dir 下所有条目，relative 路径以 base 为基准（保留父目录名）
 fn collect_entries(base: &Path, src_dir: &Path) -> io::Result<Vec<Entry>> {
   let mut entries = Vec::new();
   collect_recursive(base, src_dir, &mut entries)?;
@@ -131,16 +171,31 @@ fn collect_recursive(base: &Path, current: &Path, out: &mut Vec<Entry>) -> io::R
   Ok(())
 }
 
-/// 导出服务：将指定目录打包为 ZIP / TAR / TAR.GZ，附带 manifest.json。
+/// The public entry point for export operations.
 #[derive(Default)]
 pub struct ExportService;
 
 impl ExportService {
+  /// Create an export service with its initial state.
   pub fn new() -> Self {
     Self
   }
 
-  /// 执行导出。`output_dir` 是用户指定的输出目录，`file_stem` 不含扩展名。
+  /// Archive the selected deployment content and return the completed output path.
+  ///
+  /// # Arguments
+  ///
+  /// * `scope` - The set of content included in the operation.
+  /// * `output_dir` - The destination directory for the exported file.
+  /// * `file_stem` - The output filename without its format extension.
+  /// * `format` - The requested output format.
+  /// * `storage` - The deployment-relative storage service.
+  /// * `log` - The service receiving diagnostic records.
+  ///
+  /// # Errors
+  ///
+  /// Return an error when the output name or directory is invalid, source entries cannot be read,
+  /// or the archive cannot be created or written.
   pub fn export(
     &self,
     scope: ExportScope,
@@ -168,7 +223,8 @@ impl ExportService {
 
     let out_path = output_dir.join(format!("{}.{}", file_stem, format.extension()));
 
-    // 以父目录为基准，保留源目录名（如 data/ → data/cache/...）
+    // Resolve archive entries from the parent so the source directory name stays in the archive.
+
     let base = src_dir.parent().unwrap_or(&src_dir);
     let entries = collect_entries(base, &src_dir)?;
 
@@ -189,6 +245,7 @@ impl ExportService {
     Ok(out_path)
   }
 
+  /// Queue an archive export and return its asynchronous task identifier.
   pub fn submit_export<E>(
     &self,
     async_runtime: &tg_service_async::AsyncRuntime<E>,
@@ -245,13 +302,11 @@ impl ExportService {
     let options =
       zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-    // manifest.json
     let mut manifest_bytes = Vec::new();
     self.write_manifest(&mut manifest_bytes)?;
     zip.start_file("manifest.json", options)?;
     zip.write_all(&manifest_bytes)?;
 
-    // directory contents
     for (index, entry) in entries.iter().enumerate() {
       ensure_not_cancelled(&mut cancelled)?;
       let relative_str = entry.relative.to_string_lossy().replace('\\', "/");
@@ -283,7 +338,6 @@ impl ExportService {
     let file = fs::File::create(out)?;
     let mut tar = tar::Builder::new(file);
 
-    // manifest.json
     let mut manifest_bytes = Vec::new();
     self.write_manifest(&mut manifest_bytes)?;
     let mut header = tar::Header::new_gnu();
@@ -291,7 +345,6 @@ impl ExportService {
     header.set_mode(0o644);
     tar.append_data(&mut header, "manifest.json", &manifest_bytes[..])?;
 
-    // directory contents
     for (index, entry) in entries.iter().enumerate() {
       ensure_not_cancelled(&mut cancelled)?;
       if entry.is_dir {
@@ -344,6 +397,19 @@ impl ExportService {
   }
 }
 
+/// Execute an archive task and publish its progress and completion through the event sink.
+///
+/// # Arguments
+///
+/// * `task_id` - The identifier of the asynchronous task.
+/// * `task` - The task.
+/// * `event_tx` - The event tx.
+/// * `cancellation` - The cancellation token for the operation.
+///
+/// # Errors
+///
+/// Return an error for cancellation, invalid export parameters, source access failures, or
+/// archive output failures.
 pub(crate) fn run_export_task<E: From<ExportAsyncEvent>>(
   task_id: TaskId,
   task: ExportTask,

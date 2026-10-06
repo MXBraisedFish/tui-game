@@ -1,6 +1,15 @@
-use super::*;
-use crate::path::{SafeRelativePath, SandboxPathKind, resolve_sandbox_path, sandbox_path_exists};
+//! Lua file library bindings with validated arguments and session-owned host access.
 
+use super::*;
+use crate::MAX_LUA_FILE_TASKS_PER_SESSION;
+use crate::path::{SafeRelativePath, SandboxPathKind, sandbox_path_exists};
+
+/// Build and register the Lua file API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   for (name, value) in [
@@ -53,70 +62,76 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let read_state = state.clone();
   source.raw_set(
     "read",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.read";
-      let table = args::named(
+      let parameters = args::positional(
+        lua,
         method,
         values,
-        &["path", "encoding", "end_of_line", "byte", "event_tip"],
+        &["path"],
+        &["encoding", "end_of_line", "byte", "event_tip"],
       )?;
-      let relative_path = file_path(&table, method)?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
-      let byte = file_byte_mode(&table, method)?;
-      let event_tip = file_tip(&table, method)?;
-      let path = resolve_file_path(
+      let byte = file_byte_mode(table, method)?;
+      let event_tip = file_tip(table, method)?;
+      let encoding = if byte {
+        None
+      } else {
+        validate_file_eol(table, method)?;
+        Some(file_encoding(table, method)?)
+      };
+      let Some(path) = resolve_request_path(
         &read_state.borrow().context.assets_root,
         &relative_path,
         SandboxPathKind::File,
         method,
-      )?;
-      let (task, operation) = if byte {
-        (FileTask::LuaReadBytes { path }, LuaFileOperation::ReadBytes)
-      } else {
-        validate_file_eol(&table, method)?;
-        let encoding = file_encoding(&table, method)?;
-        (
+      )?
+      else {
+        return Ok(None);
+      };
+      let (task, operation) = match encoding {
+        None => (FileTask::LuaReadBytes { path }, LuaFileOperation::ReadBytes),
+        Some(encoding) => (
           FileTask::LuaReadText { path, encoding },
           LuaFileOperation::ReadText,
-        )
+        ),
       };
-      enqueue_file_request(&read_state, task, operation, virtual_path, event_tip);
-      Ok(())
+      let request_id = enqueue_file_request(&read_state, task, operation, virtual_path, event_tip);
+      Ok(request_id)
     })?,
   )?;
   let write_state = state.clone();
   source.raw_set(
     "write",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.write";
-      if !file_permission(&write_state, method) {
-        return Ok(());
-      }
-      let table = args::named(
+      require_game(&write_state.borrow(), method)?;
+      let parameters = args::positional(
+        lua,
         method,
         values,
-        &[
-          "path",
-          "text",
-          "encoding",
-          "end_of_line",
-          "byte",
-          "event_tip",
-        ],
+        &["path", "text"],
+        &["encoding", "end_of_line", "byte", "event_tip"],
       )?;
-      let relative_path = file_path(&table, method)?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
-      let byte = file_byte_mode(&table, method)?;
-      let event_tip = file_tip(&table, method)?;
-      let path = resolve_file_path(
-        &write_state.borrow().context.assets_root,
-        &relative_path,
-        SandboxPathKind::WritableFile,
-        method,
-      )?;
-      let content = args::required(&table, method, "text")?;
+      let byte = file_byte_mode(table, method)?;
+      let event_tip = file_tip(table, method)?;
+      let content = parameters.required(1, method, "text")?;
       let (task, operation) = if byte {
         let bytes = file_bytes(content, method)?;
+        let Some(path) = resolve_request_path(
+          &write_state.borrow().context.assets_root,
+          &relative_path,
+          SandboxPathKind::WritableFile,
+          method,
+        )?
+        else {
+          return Ok(None);
+        };
         (
           FileTask::LuaWriteBytes { path, bytes },
           LuaFileOperation::WriteBytes,
@@ -126,8 +141,17 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         if text.contains('\0') {
           return Err(args::message(method, "text must contain no NUL"));
         }
-        let encoding = file_encoding(&table, method)?;
-        let end_of_line = validate_file_eol(&table, method)?;
+        let encoding = file_encoding(table, method)?;
+        let end_of_line = validate_file_eol(table, method)?;
+        let Some(path) = resolve_request_path(
+          &write_state.borrow().context.assets_root,
+          &relative_path,
+          SandboxPathKind::WritableFile,
+          method,
+        )?
+        else {
+          return Ok(None);
+        };
         (
           FileTask::LuaWriteText {
             path,
@@ -138,30 +162,32 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
           LuaFileOperation::WriteText,
         )
       };
-      enqueue_file_request(&write_state, task, operation, virtual_path, event_tip);
-      Ok(())
+      let request_id = enqueue_file_request(&write_state, task, operation, virtual_path, event_tip);
+      Ok(request_id)
     })?,
   )?;
   let create_dir_state = state.clone();
   source.raw_set(
     "create_dir",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.create_dir";
-      if !file_permission(&create_dir_state, method) {
-        return Ok(());
-      }
-      let table = args::named(method, values, &["path", "event_tip"])?;
-      let relative_path = file_path(&table, method)?;
+      require_game(&create_dir_state.borrow(), method)?;
+      let parameters = args::positional(lua, method, values, &["path"], &["event_tip"])?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
-      let event_tip = file_tip(&table, method)?;
+      let event_tip = file_tip(table, method)?;
       let assets_root = create_dir_state.borrow().context.assets_root.clone();
-      let path = resolve_file_path(
+      let Some(path) = resolve_request_path(
         &assets_root,
         &relative_path,
         SandboxPathKind::WritableDirectory,
         method,
-      )?;
-      enqueue_file_request(
+      )?
+      else {
+        return Ok(None);
+      };
+      let request_id = enqueue_file_request(
         &create_dir_state,
         FileTask::LuaCreateDir {
           root: assets_root,
@@ -172,15 +198,16 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(())
+      Ok(request_id)
     })?,
   )?;
   let exists_state = state.clone();
   source.raw_set(
     "exists",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.exists";
-      let value = args::one(method, "path", values)?;
+      let parameters = args::positional(lua, method, values, &["path"], &[])?;
+      let value = parameters.required(0, method, "path")?;
       let path = args::string(value, method, "path")?;
       let relative_path = parse_file_path(&path, method)?;
       sandbox_path_exists(&exists_state.borrow().context.assets_root, &relative_path)
@@ -190,13 +217,13 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   let remove_state = state.clone();
   source.raw_set(
     "remove",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.remove";
-      if !file_permission(&remove_state, method) {
-        return Ok(());
-      }
-      let table = args::named(method, values, &["path", "recursive", "event_tip"])?;
-      let relative_path = file_path(&table, method)?;
+      require_game(&remove_state.borrow(), method)?;
+      let parameters =
+        args::positional(lua, method, values, &["path"], &["recursive", "event_tip"])?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       if relative_path.is_root() {
         return Err(args::message(method, "cannot remove the assets root"));
       }
@@ -205,15 +232,18 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         value => args::boolean(value, method, "recursive")?,
       };
       let virtual_path = relative_path.virtual_path().to_string();
-      let event_tip = file_tip(&table, method)?;
+      let event_tip = file_tip(table, method)?;
       let assets_root = remove_state.borrow().context.assets_root.clone();
-      let path = resolve_file_path(
+      let Some(path) = resolve_request_path(
         &assets_root,
         &relative_path,
         SandboxPathKind::Removable,
         method,
-      )?;
-      enqueue_file_request(
+      )?
+      else {
+        return Ok(None);
+      };
+      let request_id = enqueue_file_request(
         &remove_state,
         FileTask::LuaRemove {
           root: assets_root,
@@ -225,57 +255,59 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(())
+      Ok(request_id)
     })?,
   )?;
   let list_state = state.clone();
   source.raw_set(
     "list_dir",
-    lua.create_function(move |_, values: MultiValue| {
+    lua.create_function(move |lua, values: MultiValue| {
       let method = "file.list_dir";
-      if !file_permission(&list_state, method) {
-        return Ok(());
-      }
-      let table = args::named(
+      require_game(&list_state.borrow(), method)?;
+      let parameters = args::positional(
+        lua,
         method,
         values,
-        &["path", "recursive", "file_type", "event_tip"],
+        &["path"],
+        &["recursive", "file_type", "event_tip"],
       )?;
-      let relative_path = file_path(&table, method)?;
+      let table = parameters.options();
+      let relative_path = file_path(&parameters, method)?;
       let virtual_path = relative_path.virtual_path().to_string();
       let recursive = match table.get::<Value>("recursive")? {
         Value::Nil => false,
         value => args::boolean(value, method, "recursive")?,
       };
       let file_type = match table.get::<Value>("file_type")? {
-        Value::Nil => None,
-        value => {
-          let value = args::string(value, method, "file_type")?;
-          if value.eq_ignore_ascii_case("all") {
-            None
-          } else if value.is_empty()
-            || value.starts_with('.')
-            || !value
-              .chars()
-              .all(|value| value.is_ascii_alphanumeric() || matches!(value, '_' | '-' | '+'))
-          {
-            return Err(args::message(
-              method,
-              "file_type must be an extension such as 'rs'",
-            ));
-          } else {
-            Some(value.to_ascii_lowercase())
-          }
-        }
+        Value::Nil => "all".to_string(),
+        value => args::string(value, method, "file_type")?,
       };
-      let event_tip = file_tip(&table, method)?;
-      let path = resolve_file_path(
+      let file_type = if file_type.eq_ignore_ascii_case("all") {
+        None
+      } else if file_type.is_empty()
+        || file_type.starts_with('.')
+        || !file_type
+          .chars()
+          .all(|value| value.is_ascii_alphanumeric() || matches!(value, '_' | '-' | '+'))
+      {
+        return Err(args::message(
+          method,
+          "file_type must be an extension such as 'rs'",
+        ));
+      } else {
+        Some(file_type.to_ascii_lowercase())
+      };
+      let event_tip = file_tip(table, method)?;
+      let Some(path) = resolve_request_path(
         &list_state.borrow().context.assets_root,
         &relative_path,
         SandboxPathKind::Directory,
         method,
-      )?;
-      enqueue_file_request(
+      )?
+      else {
+        return Ok(None);
+      };
+      let request_id = enqueue_file_request(
         &list_state,
         FileTask::LuaListDir {
           path,
@@ -286,24 +318,23 @@ pub(super) fn file(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
         virtual_path,
         event_tip,
       );
-      Ok(())
+      Ok(request_id)
     })?,
   )?;
   readonly::proxy(lua, source)
 }
 
-pub(super) fn file_permission(state: &SharedApiState, method: &'static str) -> bool {
-  let mut state = state.borrow_mut();
-  if state.context.session_kind == LuaSessionKind::Game {
-    true
-  } else {
-    ignore_once(&mut state, method, "method requires a game session");
-    false
-  }
-}
-
-pub(super) fn file_path(table: &Table, method: &str) -> mlua::Result<SafeRelativePath> {
-  let path = args::string(args::required(table, method, "path")?, method, "path")?;
+/// Validate a script-supplied relative path within the session's file sandbox.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the supplied path is invalid, escapes its safe root, or is
+/// not permitted for this request.
+pub(super) fn file_path(
+  parameters: &args::PositionalArgs,
+  method: &str,
+) -> mlua::Result<SafeRelativePath> {
+  let path = args::string(parameters.required(0, method, "path")?, method, "path")?;
   parse_file_path(&path, method)
 }
 
@@ -312,6 +343,11 @@ fn parse_file_path(path: &str, method: &str) -> mlua::Result<SafeRelativePath> {
     .map_err(|error| args::message(method, format!("unsafe asset path: {error}")))
 }
 
+/// Resolve the requested text encoding to one of the supported encoding names.
+///
+/// # Errors
+///
+/// Return a Lua argument error when the encoding is not one of the supported text encodings.
 pub(super) fn file_encoding(table: &Table, method: &str) -> mlua::Result<String> {
   let encoding = match table.get::<Value>("encoding")? {
     Value::Nil => "auto".to_string(),
@@ -355,6 +391,11 @@ fn file_bytes(value: Value, method: &str) -> mlua::Result<Vec<u8>> {
   Ok(value.as_bytes().to_vec())
 }
 
+/// Read an optional bounded event-tip string for the file completion payload.
+///
+/// # Errors
+///
+/// Return a Lua argument error when a supplied event-tip value is not valid bounded text.
 pub(super) fn file_tip(table: &Table, method: &str) -> mlua::Result<Option<String>> {
   match table.get::<Value>("event_tip")? {
     Value::Nil => Ok(None),
@@ -369,26 +410,31 @@ pub(super) fn file_tip(table: &Table, method: &str) -> mlua::Result<Option<Strin
   }
 }
 
-fn resolve_file_path(
-  root: &Path,
-  relative: &SafeRelativePath,
-  kind: SandboxPathKind,
-  method: &str,
-) -> mlua::Result<PathBuf> {
-  resolve_sandbox_path(root, relative, kind)
-    .map_err(|error| args::message(method, format!("unsafe asset path: {error}")))
-}
-
+/// Reserve a file request slot and return its string ID, or return `None` when admission is full.
+///
+/// # Arguments
+///
+/// * `state` - The session that owns the request and its result.
+/// * `task` - The validated background file operation.
+/// * `operation` - The result event's operation kind.
+/// * `virtual_path` - The asset path visible to the script.
+/// * `event_tip` - The optional text returned with the result event.
 fn enqueue_file_request(
   state: &SharedApiState,
   task: FileTask,
   operation: LuaFileOperation,
   virtual_path: String,
   event_tip: Option<String>,
-) {
+) -> Option<String> {
   let mut state = state.borrow_mut();
+  if state.pending_file_request_ids.len() >= MAX_LUA_FILE_TASKS_PER_SESSION
+    || state.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK
+  {
+    return None;
+  }
   let request_id = state.next_file_request_id;
   state.next_file_request_id = state.next_file_request_id.wrapping_add(1).max(1);
+  state.pending_file_request_ids.insert(request_id);
   push_host_command(
     &mut state,
     LuaHostCommand::FileRequest {
@@ -399,4 +445,5 @@ fn enqueue_file_request(
       event_tip,
     },
   );
+  Some(request_id.to_string())
 }

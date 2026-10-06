@@ -1,10 +1,12 @@
+//! Visible text measurements that account for terminal column widths.
+
 use super::types::Size;
 use tg_service_rich_text::RichTextParams;
 use tg_service_rich_text::TextMode;
 use tg_service_text_layout as text_layout;
 use tg_service_text_layout::DrawTextParams;
 
-/// Returns the rendered size of `text`.
+/// Measure visible text as terminal columns and rows.
 pub fn get_text_size(text: &str, params: Option<&RichTextParams>) -> Size {
   let mut draw_params = DrawTextParams::new(
     0,
@@ -23,36 +25,37 @@ pub fn get_text_size(text: &str, params: Option<&RichTextParams>) -> Size {
   get_draw_text_size(&draw_params)
 }
 
-/// Returns the rendered width of `text`.
+/// Return the maximum visible line width in terminal columns.
 pub fn get_text_width(text: &str, params: Option<&RichTextParams>) -> u16 {
   get_text_size(text, params).width
 }
 
-/// Returns the rendered height of `text`.
+/// Return the visible text height in terminal rows.
 pub fn get_text_height(text: &str, params: Option<&RichTextParams>) -> u16 {
   get_text_size(text, params).height
 }
 
-/// Returns the rendered size of a text with layout parameters.
+/// Measure the terminal-cell footprint after applying draw parameters.
 pub fn get_draw_text_size(params: &DrawTextParams) -> Size {
   let params = params.host_formatted();
   let (width, height) = text_layout::measure_draw_text(params.as_ref());
   Size { width, height }
 }
 
-/// Returns the rendered width of a text with layout parameters.
+/// Return the column width after wrapping and draw-parameter resolution.
 pub fn get_draw_text_width(params: &DrawTextParams) -> u16 {
   get_draw_text_size(params).width
 }
 
-/// Returns the rendered height of a text with layout parameters.
+/// Return the row height after wrapping and draw-parameter resolution.
 pub fn get_draw_text_height(params: &DrawTextParams) -> u16 {
   get_draw_text_size(params).height
 }
 
-/// Returns the current terminal size.
+/// Query physical terminal dimensions, using the established fallback when the query fails.
 pub fn get_terminal_size() -> Size {
-  // TODO: log warn when terminal size query fails — fallback to (95, 24)
+  // Use the established fallback dimensions when the terminal size query is unavailable.
+
   let (width, height) = crossterm::terminal::size().unwrap_or((95, 24));
   Size { width, height }
 }

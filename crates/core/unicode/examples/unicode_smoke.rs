@@ -1,4 +1,4 @@
-//! Minimal entry: measures mixed-width text and splits it into graphemes.
+//! Independent unicode smoke entry exercising the public API and checking its results.
 
 use tg_core_unicode::{char_width, display_width, graphemes};
 

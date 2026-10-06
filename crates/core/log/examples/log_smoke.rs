@@ -1,4 +1,4 @@
-//! Minimal entry: renders a host log message and maps a source to its phase.
+//! Independent log smoke entry exercising the public API and checking its results.
 
 use tg_core_log::{HostLogMessage, LogLevel, LogPhase, LogSource, format_log_level};
 

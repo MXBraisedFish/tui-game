@@ -1,3 +1,5 @@
+//! Game page state, user commands, and terminal-cell presentation.
+
 use std::{
   collections::{BTreeMap, HashMap, HashSet},
   time::Duration,
@@ -8,12 +10,11 @@ use unicode_width::UnicodeWidthStr;
 use crate::host_engine::services::{
   ActionMapEntry, BorderStyle, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId,
   HitAreaOptions, HitAreaService, I18nService, InputService, Key, KeyBindingsProfile, KeyEventKind,
-  KeyState, LayoutService, MouseButton, Overflow, PackageInfo, PopupRequest, Rect, RenderService,
-  RichTextParams, RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxId,
-  ScrollBoxOptions, ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility,
-  TerminalColor, TextColor, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,
-  TextInputRenderParams, TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner,
-  format_key_display, key_token,
+  KeyState, LayoutService, MouseButton, Overflow, PackageInfo, Rect, RenderService, RichTextParams,
+  RichTextService, RuntimeObjectPool, RuntimeObjectPoolOwner, ScrollBoxId, ScrollBoxOptions,
+  ScrollBoxService, ScrollbarLayout, ScrollbarPolicy, ScrollbarVisibility, TerminalColor,
+  TextColor, TextInputEvent, TextInputId, TextInputMode, TextInputOptions, TextInputRenderParams,
+  TextInputService, UiEvent, UiObjectPool, UiObjectPoolOwner, format_key_display, key_token,
 };
 
 const CAPTURE_DELAY: Duration = Duration::from_millis(80);
@@ -115,7 +116,8 @@ struct GameBindingRow {
   description: String,
   keys: Vec<Vec<String>>,
   locked: bool,
-  priority: usize,
+  priority: u64,
+  registration_index: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -132,13 +134,20 @@ struct CaptureState {
   elapsed: Option<Duration>,
 }
 
+/// An application request produced by game key bindings interactions.
 #[derive(Clone, Debug)]
 pub enum GameKeyBindingsCommand {
+  /// A request to back.
   Back(KeyBindingsProfile),
-  Conflict(PopupRequest),
+  /// A request to focus search.
   FocusSearch,
+  /// A request to blur search.
   BlurSearch,
+  /// The capture started setting for game key bindings command.
   CaptureStarted,
+  /// Refuse to save malformed bindings within a single action.
+  InvalidBindings,
+  /// The scroll setting for game key bindings command.
   Scroll(i32),
 }
 
@@ -155,6 +164,7 @@ struct GameKeyBindingsLayout {
   hint_lines: Vec<String>,
 }
 
+/// The state and owned widgets of the game key bindings view.
 pub struct GameKeyBindingsUi {
   active: ActivePanel,
   mode: EditMode,
@@ -207,6 +217,17 @@ impl RuntimeObjectPoolOwner for GameKeyBindingsUi {
 }
 
 impl GameKeyBindingsUi {
+  /// Create the game view and allocate its owned UI objects.
+  ///
+  /// # Arguments
+  ///
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
+  ///
+  /// # Panics
+  ///
+  /// Panic if an internal invariant is violated: `failed to create game key bindings scroll box`.
   pub fn init(
     hit_area: &HitAreaService,
     text_input: &TextInputService,
@@ -276,6 +297,7 @@ impl GameKeyBindingsUi {
     }
   }
 
+  /// Rebuild game action rows from package declarations and the persisted shortcut profile.
   pub fn load(&mut self, packages: Vec<PackageInfo>, profile: KeyBindingsProfile) {
     self.active = ActivePanel::Games;
     self.mode = EditMode::Edit;
@@ -318,12 +340,13 @@ impl GameKeyBindingsUi {
               description: config.description.clone(),
               keys,
               locked: config.lock,
-              priority: 0,
+              priority: config.priority,
+              registration_index: 0,
             })
           })
           .enumerate()
-          .map(|(priority, mut row)| {
-            row.priority = priority;
+          .map(|(registration_index, mut row)| {
+            row.registration_index = registration_index;
             row
           })
           .collect();
@@ -338,6 +361,7 @@ impl GameKeyBindingsUi {
     self.select_first_editable_action();
   }
 
+  /// Return the shortcuts currently enabled by the game view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     [
       ("key_bindings_game.focus_up", "up"),
@@ -361,14 +385,17 @@ impl GameKeyBindingsUi {
     .collect()
   }
 
+  /// Report whether this game key bindings ui is capturing.
   pub fn is_capturing(&self) -> bool {
     self.capture.is_some()
   }
 
+  /// Return the current search input.
   pub fn search_input(&self) -> TextInputId {
     self.search_input
   }
 
+  /// Interpret a game UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<GameKeyBindingsCommand> {
     if self.capture.is_some() {
       return None;
@@ -549,6 +576,7 @@ impl GameKeyBindingsUi {
     }
   }
 
+  /// Consume raw key transitions for the active capture or confirmation interaction.
   pub fn handle_raw_key_events(&mut self, input: &mut InputService, dt: Duration) -> bool {
     let Some(capture) = &mut self.capture else {
       return false;
@@ -590,6 +618,13 @@ impl GameKeyBindingsUi {
     true
   }
 
+  /// Scroll the active list panel and keep its selection within the visible rows.
+  ///
+  /// # Arguments
+  ///
+  /// * `scroll_box` - The scroll box.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `dy` - The dy.
   pub fn scroll_active(&mut self, scroll_box: &ScrollBoxService, layout: &LayoutService, dy: i32) {
     let id = match self.active {
       ActivePanel::Games => self.left_scroll,
@@ -643,6 +678,14 @@ impl GameKeyBindingsUi {
     }
   }
 
+  /// Resolve and submit the game view's drawing surfaces for this frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   pub fn prepare_surfaces(
     &mut self,
     layout: &LayoutService,
@@ -681,6 +724,17 @@ impl GameKeyBindingsUi {
     self.ensure_selection_visible(scroll_box, layout);
   }
 
+  /// Draw the game view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
+  /// * `text_input` - The text input.
+  /// * `scroll_box` - The scroll box.
   #[allow(clippy::too_many_arguments)]
   pub fn render(
     &mut self,
@@ -691,10 +745,10 @@ impl GameKeyBindingsUi {
     hit_area: &HitAreaService,
     text_input: &TextInputService,
     scroll_box: &ScrollBoxService,
-  ) {
+  ) -> Option<(u16, u16)> {
     let pos = self.compute_layout(layout, i18n, text_input);
     self.draw_frames(render, canvas, layout, i18n, &pos);
-    self.draw_search(canvas, i18n, text_input, &pos);
+    let input_cursor = self.draw_search(canvas, i18n, text_input, &pos);
     self.draw_games(render, canvas, layout, i18n, &pos);
     self.draw_key_rows(render, canvas, layout, i18n, &pos);
     self.draw_hints(render, canvas, layout, &pos);
@@ -702,6 +756,7 @@ impl GameKeyBindingsUi {
     if self.show_color_doc {
       self.draw_color_doc(render, canvas, layout, i18n, &pos);
     }
+    input_cursor
   }
 
   fn activate_slot(&mut self, requested_slot: usize) -> Option<GameKeyBindingsCommand> {
@@ -735,18 +790,24 @@ impl GameKeyBindingsUi {
   }
 
   fn try_back(&self) -> Option<GameKeyBindingsCommand> {
-    if self.has_internal_conflicts() {
-      Some(GameKeyBindingsCommand::Conflict(PopupRequest {
-        text: String::new(),
-        color: RED,
-        duration: Duration::from_secs(2),
-        dismiss_on: Vec::new(),
-        replaceable: true,
-        persistent: false,
-      }))
-    } else {
-      Some(GameKeyBindingsCommand::Back(self.profile.clone()))
+    if self.games.iter().any(|game| {
+      crate::host_engine::services::translate_action_map(
+        &game
+          .rows
+          .iter()
+          .map(|row| ActionMapEntry {
+            action: row.action.clone(),
+            description: row.description.clone(),
+            keys: row.keys.clone(),
+            priority: 0,
+          })
+          .collect::<Vec<_>>(),
+      )
+      .is_err()
+    }) {
+      return Some(GameKeyBindingsCommand::InvalidBindings);
     }
+    Some(GameKeyBindingsCommand::Back(self.profile.clone()))
   }
 
   fn selected_game(&self) -> Option<&GameBindingEntry> {
@@ -815,7 +876,17 @@ impl GameKeyBindingsUi {
     let mut rows = game.rows.iter().collect::<Vec<_>>();
     rows.sort_by(|a, b| {
       let order = match self.key_sort {
-        KeySort::Priority => a.priority.cmp(&b.priority),
+        KeySort::Priority => b
+          .priority
+          .cmp(&a.priority)
+          .then_with(|| {
+            // No physical match exists in this editor; preview the first displayed binding.
+            b.keys
+              .first()
+              .map_or(0, Vec::len)
+              .cmp(&a.keys.first().map_or(0, Vec::len))
+          })
+          .then(a.registration_index.cmp(&b.registration_index)),
         KeySort::Name => self
           .visible_description(game, a)
           .cmp(&self.visible_description(game, b)),
@@ -866,7 +937,11 @@ impl GameKeyBindingsUi {
   }
 
   fn visible_description(&self, game: &GameBindingEntry, row: &GameBindingRow) -> String {
-    RichTextService::new().visible_text(&row.description, Some(&self.game_params(&game.id)))
+    format!(
+      "{} [P:{}]",
+      RichTextService::new().visible_text(&row.description, Some(&self.game_params(&game.id))),
+      row.priority
+    )
   }
 
   fn internal_conflict_actions(&self, game: &GameBindingEntry) -> HashSet<String> {
@@ -921,13 +996,6 @@ impl GameKeyBindingsUi {
       .map(|row| self.row_conflict_level(game, row))
       .max()
       .unwrap_or(ConflictLevel::None)
-  }
-
-  fn has_internal_conflicts(&self) -> bool {
-    self
-      .games
-      .iter()
-      .any(|game| !self.internal_conflict_actions(game).is_empty())
   }
 
   fn select_game_by_visible_index(&mut self, index: usize) {
@@ -1331,7 +1399,7 @@ impl GameKeyBindingsUi {
     i18n: &I18nService,
     text_input: &TextInputService,
     pos: &GameKeyBindingsLayout,
-  ) {
+  ) -> Option<(u16, u16)> {
     text_input.render_host(
       &mut self.objects,
       self.search_input,
@@ -1351,7 +1419,7 @@ impl GameKeyBindingsUi {
         ..Default::default()
       },
       canvas,
-    );
+    )
   }
 
   fn draw_games(
@@ -1657,7 +1725,7 @@ impl GameKeyBindingsUi {
   ) {
     let keys = [
       "key_bindings_game.color_doc.yellow",
-      "key_bindings_game.color_doc.red",
+      "key_bindings_game.color_doc.shared",
       "key_bindings_game.color_doc.gray",
       "key_bindings_game.color_doc.composite",
       "key_bindings_game.color_doc.priority",
@@ -2012,6 +2080,7 @@ fn action(name: &str, key: &str) -> ActionMapEntry {
     action: name.into(),
     description: name.into(),
     keys: vec![vec![key.into()]],
+    priority: 0,
   }
 }
 
@@ -2213,6 +2282,7 @@ mod tests {
           keys: vec![vec!["f1".into()]],
           locked: false,
           priority: 0,
+          registration_index: 0,
         },
         GameBindingRow {
           action: "b".into(),
@@ -2220,6 +2290,7 @@ mod tests {
           keys: vec![vec!["z".into()]],
           locked: false,
           priority: 1,
+          registration_index: 0,
         },
         GameBindingRow {
           action: "c".into(),
@@ -2227,6 +2298,7 @@ mod tests {
           keys: vec![vec!["z".into()]],
           locked: false,
           priority: 2,
+          registration_index: 0,
         },
       ],
     };
@@ -2238,6 +2310,54 @@ mod tests {
       ui.row_conflict_level(&game, &game.rows[1]),
       ConflictLevel::Internal
     );
+  }
+
+  #[test]
+  fn shared_bindings_can_be_saved_and_display_sort_does_not_change_registration() {
+    let mut ui = test_ui();
+    let row = |name: &str, priority, registration_index, keys| GameBindingRow {
+      action: name.into(),
+      description: name.into(),
+      keys,
+      locked: false,
+      priority,
+      registration_index,
+    };
+    ui.games = vec![GameBindingEntry {
+      id: "game".into(),
+      title: "Game".into(),
+      rows: vec![
+        row("first", 0, 0, vec![vec!["esc".into()]]),
+        row("second", 0, 1, vec![vec!["esc".into()]]),
+        row("combo", 0, 2, vec![vec!["esc".into(), "q".into()]]),
+        row("high", 10, 3, vec![vec!["esc".into()]]),
+      ],
+    }];
+    ui.selected_game_id = Some("game".into());
+    assert_eq!(
+      ui.visible_rows()
+        .iter()
+        .map(|row| row.action.as_str())
+        .collect::<Vec<_>>(),
+      ["high", "combo", "first", "second"]
+    );
+    assert_eq!(
+      ui.games[0]
+        .rows
+        .iter()
+        .map(|row| row.registration_index)
+        .collect::<Vec<_>>(),
+      [0, 1, 2, 3]
+    );
+    assert!(matches!(
+      ui.try_back(),
+      Some(GameKeyBindingsCommand::Back(_))
+    ));
+    ui.key_sort = KeySort::Name;
+    ui.key_ascending = false;
+    let _ = ui.visible_rows();
+    assert_eq!(ui.games[0].rows[0].priority, 0);
+    assert_eq!(ui.games[0].rows[0].registration_index, 0);
   }
 
   #[test]
@@ -2253,6 +2373,7 @@ mod tests {
           keys: vec![vec!["a".into()]],
           locked: false,
           priority: 0,
+          registration_index: 0,
         },
         GameBindingRow {
           action: "locked".into(),
@@ -2260,6 +2381,7 @@ mod tests {
           keys: vec![vec!["b".into()]],
           locked: true,
           priority: 1,
+          registration_index: 0,
         },
         GameBindingRow {
           action: "last".into(),
@@ -2267,6 +2389,7 @@ mod tests {
           keys: vec![vec!["c".into()]],
           locked: false,
           priority: 2,
+          registration_index: 0,
         },
       ],
     }];
@@ -2274,7 +2397,7 @@ mod tests {
     ui.selected_action = Some("first".into());
     ui.active = ActivePanel::Keys;
 
-    ui.move_selection(1);
+    ui.move_selection(-1);
     assert_eq!(ui.selected_action.as_deref(), Some("last"));
     ui.selected_action = Some("locked".into());
     assert!(ui.activate_slot(0).is_none());
@@ -2296,6 +2419,7 @@ mod tests {
         keys: vec![vec!["left_ctrl".into(), "x".into()]],
         locked: false,
         priority: 0,
+        registration_index: 0,
       }],
     }];
     ui.selected_game_id = Some("sample".into());
@@ -2365,12 +2489,13 @@ mod tests {
       keys: vec![vec!["left_ctrl".into(), "j".into()]],
       locked: false,
       priority: 0,
+      registration_index: 0,
     };
 
     assert_eq!(
       ui.visible_description(&game, &row),
       format!(
-        "{}/{} Jump",
+        "{}/{} Jump [P:0]",
         format_key_display(&[vec!["left_ctrl".into(), "j".into()]]),
         format_key_display(&[vec!["right_shift".into(), "k".into()]])
       )

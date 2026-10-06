@@ -1,4 +1,4 @@
-//! Minimal entry: checks the idle recorder state and that a missing recording file is rejected.
+//! Independent recording smoke entry exercising the public API and checking its results.
 
 use std::path::PathBuf;
 

@@ -1,3 +1,5 @@
+//! Global page state, user commands, and terminal-cell presentation.
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::Duration;
 use unicode_width::UnicodeWidthStr;
@@ -5,7 +7,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::host_engine::services::{
   ActionMapEntry, CanvasService, DrawTextParams, HitAreaEvent, HitAreaId, HitAreaOptions,
   HitAreaService, I18nService, InputService, Key, KeyBindingsProfile, KeyEventKind, KeyState,
-  LayoutService, MouseButton, PopupRequest, Rect, RenderService, RichTextParams, RichTextService,
+  LayoutService, MouseButton, Rect, RenderService, RichTextParams, RichTextService,
   RuntimeObjectPool, RuntimeObjectPoolOwner, TerminalColor, TextColor, UiEvent, UiObjectPool,
   UiObjectPoolOwner, format_key_display, key_token,
 };
@@ -50,13 +52,18 @@ struct CaptureState {
   elapsed: Option<Duration>,
 }
 
+/// An application request produced by global key bindings interactions.
 #[derive(Clone, Debug)]
 pub enum GlobalKeyBindingsCommand {
+  /// A request to back.
   Back(KeyBindingsProfile),
-  Conflict(PopupRequest),
+  /// The capture started setting for global key bindings command.
   CaptureStarted,
+  /// Refuse to save malformed bindings within a single action.
+  InvalidBindings,
 }
 
+/// The state and owned widgets of the global key bindings view.
 pub struct GlobalKeyBindingsUi {
   selected: usize,
   mode: EditMode,
@@ -91,6 +98,7 @@ impl RuntimeObjectPoolOwner for GlobalKeyBindingsUi {
 }
 
 impl GlobalKeyBindingsUi {
+  /// Create the global view and allocate its owned UI objects.
   pub fn init(hit_area: &HitAreaService) -> Self {
     let mut objects = UiObjectPool::new();
     Self {
@@ -109,6 +117,7 @@ impl GlobalKeyBindingsUi {
     }
   }
 
+  /// Load the global shortcut profile and reset the editing selection.
   pub fn load(&mut self, entries: Vec<ActionMapEntry>, profile: KeyBindingsProfile) {
     self.selected = 0;
     self.mode = EditMode::Edit;
@@ -125,6 +134,7 @@ impl GlobalKeyBindingsUi {
     self.profile = profile;
   }
 
+  /// Return the shortcuts currently enabled by the global view.
   pub fn action_map() -> Vec<ActionMapEntry> {
     vec![
       action(
@@ -159,10 +169,12 @@ impl GlobalKeyBindingsUi {
     ]
   }
 
+  /// Report whether this global key bindings ui is capturing.
   pub fn is_capturing(&self) -> bool {
     self.capture.is_some()
   }
 
+  /// Interpret a global UI event and return the requested application command.
   pub fn handle_event(&mut self, event: &UiEvent) -> Option<GlobalKeyBindingsCommand> {
     if self.capture.is_some() {
       return None;
@@ -272,20 +284,26 @@ impl GlobalKeyBindingsUi {
   }
 
   fn try_back(&self) -> Option<GlobalKeyBindingsCommand> {
-    if self.global_conflict_actions().is_empty() {
-      Some(GlobalKeyBindingsCommand::Back(self.profile.clone()))
-    } else {
-      Some(GlobalKeyBindingsCommand::Conflict(PopupRequest {
-        text: String::new(),
-        color: RED,
-        duration: Duration::from_secs(2),
-        dismiss_on: Vec::new(),
-        replaceable: true,
-        persistent: false,
-      }))
+    if crate::host_engine::services::translate_action_map(
+      &self
+        .rows
+        .iter()
+        .map(|row| ActionMapEntry {
+          action: row.action.clone(),
+          description: row.description.clone(),
+          keys: row.keys.clone(),
+          priority: 0,
+        })
+        .collect::<Vec<_>>(),
+    )
+    .is_err()
+    {
+      return Some(GlobalKeyBindingsCommand::InvalidBindings);
     }
+    Some(GlobalKeyBindingsCommand::Back(self.profile.clone()))
   }
 
+  /// Consume raw key transitions for the active capture or confirmation interaction.
   pub fn handle_raw_key_events(&mut self, input: &mut InputService, dt: Duration) -> bool {
     let Some(capture) = &mut self.capture else {
       return false;
@@ -400,6 +418,15 @@ impl GlobalKeyBindingsUi {
       .collect()
   }
 
+  /// Draw the global view and register interaction regions in its assigned surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `render` - The drawing service used to render terminal cells.
+  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `layout` - The service resolving terminal sizes and positions.
+  /// * `i18n` - The service resolving localized text.
+  /// * `hit_area` - The hit area.
   pub fn render(
     &mut self,
     render: &mut RenderService,
@@ -546,12 +573,12 @@ impl GlobalKeyBindingsUi {
       );
     }
 
-    let red_actions = self.global_conflict_actions();
+    let shared_actions = self.global_conflict_actions();
     let game_patterns = self.game_patterns();
     for index in 0..self.rows.len().min(ROW_COUNT) {
       let y = table.y.saturating_add(3 + index as u16);
       let row = &self.rows[index];
-      let conflict_color = if red_actions.contains(row.action.as_str()) {
+      let conflict_color = if shared_actions.contains(row.action.as_str()) {
         Some(RED.clone())
       } else if row
         .keys
@@ -726,7 +753,7 @@ impl GlobalKeyBindingsUi {
   ) {
     let keys = [
       "key_bindings_global.color_doc.yellow",
-      "key_bindings_global.color_doc.red",
+      "key_bindings_global.color_doc.shared",
       "key_bindings_global.color_doc.gray",
       "key_bindings_global.color_doc.composite",
       "key_bindings_global.color_doc.priority",
@@ -871,6 +898,7 @@ fn action(name: &str, key: &str, description: &str) -> ActionMapEntry {
     action: name.to_string(),
     description: description.to_string(),
     keys: vec![vec![key.to_string()]],
+    priority: 0,
   }
 }
 
@@ -961,6 +989,10 @@ mod tests {
     let conflicts = ui.global_conflict_actions();
     assert!(conflicts.contains("a"));
     assert!(conflicts.contains("b"));
+    assert!(matches!(
+      ui.try_back(),
+      Some(GlobalKeyBindingsCommand::Back(_))
+    ));
     ui.rows[1].keys.clear();
     assert!(ui.global_conflict_actions().is_empty());
   }
@@ -979,6 +1011,7 @@ mod tests {
         action: "a".into(),
         description: "A".into(),
         keys: vec![vec!["a".into()], vec!["b".into()]],
+        priority: 0,
       }],
       profile,
     );
@@ -1014,11 +1047,13 @@ mod tests {
           action: "a".into(),
           description: "A".into(),
           keys: vec![vec!["a".into()]],
+          priority: 0,
         },
         ActionMapEntry {
           action: "b".into(),
           description: "B".into(),
           keys: vec![vec!["b".into()]],
+          priority: 0,
         },
       ],
       profile,
@@ -1041,6 +1076,7 @@ mod tests {
         action: "a".into(),
         description: "A".into(),
         keys: Vec::new(),
+        priority: 0,
       }],
       KeyBindingsProfile::default(),
     );
@@ -1076,6 +1112,7 @@ mod tests {
         action: "host.quit".into(),
         description: "Quit".into(),
         keys: vec![pattern.clone()],
+        priority: 0,
       }],
       KeyBindingsProfile::default(),
     );

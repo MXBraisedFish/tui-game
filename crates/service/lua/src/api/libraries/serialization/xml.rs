@@ -1,3 +1,5 @@
+//! XML document parsing and serialization exposed to Lua.
+
 use std::collections::{BTreeMap, HashSet};
 
 use mlua::{Lua, MultiValue, Table, Value};
@@ -17,12 +19,18 @@ struct Node {
   children: Vec<Node>,
 }
 
+/// Build and register the Lua xml API in the supplied VM and host context.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn install(lua: &Lua, source: &Table) -> mlua::Result<()> {
   source.raw_set(
     "xml_encode",
     lua.create_function(|_, values: MultiValue| {
       let method = "serialization.xml_encode";
-      let root_value = args::one(method, "value", values)?;
+      let root_value = super::value_argument(values, method, "value", false)?;
       let Value::Table(root) = root_value else {
         return Err(args::invalid(method, "value", "table", &root_value));
       };
@@ -245,6 +253,12 @@ fn lua_attributes(value: Value, method: &str) -> mlua::Result<Vec<(String, Strin
 }
 
 fn scalar_text(value: Value, method: &str) -> mlua::Result<String> {
+  if value::is_null_sentinel(&value) {
+    return Err(args::message(
+      method,
+      "XML does not support serialization.NULL",
+    ));
+  }
   match value {
     Value::Nil => Ok(String::new()),
     Value::Boolean(value) => Ok(value.to_string()),

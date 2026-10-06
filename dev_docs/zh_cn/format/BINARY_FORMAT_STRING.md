@@ -37,18 +37,12 @@ Lua 二进制格式字符串是二进制数据包操作的核心参数，用于�
 ### 示例
 
 ```lua
-little = serialization.binary_pack {
-  fmt = "<I4",
-  values = { 0x12345678 }
-}
+little = serialization.binary_pack("<I4", table.unpack({ 0x12345678 }))
 
-big = serialization.binary_pack {
-  fmt = ">I4",
-  values = { 0x12345678 }
-}
+big = serialization.binary_pack(">I4", table.unpack({ 0x12345678 }))
 
-debug.print { message = tostring(#little) }
-debug.print { message = tostring(#big) }
+debug.print(tostring(#little))
+debug.print(tostring(#big))
 ```
 
 输出：
@@ -77,20 +71,14 @@ debug.print { message = tostring(#big) }
 size1 = serialization.binary_packsize("c1 i4")
 size2 = serialization.binary_packsize("!4 c1 i4")
 
-debug.print { message = tostring(size1) }
-debug.print { message = tostring(size2) }
+debug.print(tostring(size1))
+debug.print(tostring(size2))
 
-bytes1 = serialization.binary_pack {
-  fmt = "c1 Xi4 i4",
-  values = { "A", 100 }
-}
-bytes2 = serialization.binary_pack {
-  fmt = "!4 c1 Xi4 i4", -- Xop 需要 !n 开头
-  values = { "A", 100 }
-}
+bytes1 = serialization.binary_pack("c1 Xi4 i4", table.unpack({ "A", 100 }))
+bytes2 = serialization.binary_pack("!4 c1 Xi4 i4", "A", 100)
 
-debug.print { message = tostring(#bytes1) }
-debug.print { message = tostring(#bytes2) }
+debug.print(tostring(#bytes1))
+debug.print(tostring(#bytes2))
 ```
 
 输出：
@@ -102,7 +90,7 @@ debug.print { message = tostring(#bytes2) }
 8
 ```
 
-### 额外补充
+## 额外补充
 
 - `[n]` 为对齐字节数。
 - `[n]` 必须为 $2^x$，且范围为 $[1, 16]$。
@@ -137,11 +125,11 @@ size3 = serialization.binary_packsize("i I")
 size4 = serialization.binary_packsize("l L")
 size5 = serialization.binary_packsize("j J")
 
-debug.print { message = tostring(size1) }
-debug.print { message = tostring(size2) }
-debug.print { message = tostring(size3) }
-debug.print { message = tostring(size4) }
-debug.print { message = tostring(size5) }
+debug.print(tostring(size1))
+debug.print(tostring(size2))
+debug.print(tostring(size3))
+debug.print(tostring(size4))
+debug.print(tostring(size5))
 ```
 
 输出：
@@ -156,7 +144,7 @@ debug.print { message = tostring(size5) }
 16 -- 每个数据为 8 字节
 ```
 
-### 额外补充
+## 额外补充
 
 - 小写符号表示有符号整数，大写符号表示无符号整数。
 - `h`/`H`/`i`/`I`/`l`/`L` 的实际大小由运行环境决定。
@@ -179,7 +167,7 @@ debug.print { message = tostring(size5) }
 ```lua
 size = serialization.binary_packsize("i1 I2 i4")
 
-debug.print { message = tostring(size) }
+debug.print(tostring(size))
 ```
 
 输出：
@@ -188,7 +176,7 @@ debug.print { message = tostring(size) }
 7
 ```
 
-### 额外补充
+## 额外补充
 
 - 小写符号表示有符号整数，大写符号表示无符号整数。
 - `[n]` 为整数占用的字节数。
@@ -216,9 +204,9 @@ size1 = serialization.binary_packsize("f")
 size2 = serialization.binary_packsize("d")
 size3 = serialization.binary_packsize("n")
 
-debug.print { message = tostring(size1) }
-debug.print { message = tostring(size2) }
-debug.print { message = tostring(size3) }
+debug.print(tostring(size1))
+debug.print(tostring(size2))
+debug.print(tostring(size3))
 ```
 
 输出：
@@ -231,7 +219,7 @@ debug.print { message = tostring(size3) }
 8
 ```
 
-### 额外补充
+## 额外补充
 
 - `n` 的实际大小由运行环境决定。
 
@@ -252,26 +240,17 @@ debug.print { message = tostring(size3) }
 ### 示例
 
 ```lua
-bytes1 = serialization.binary_pack {
-  fmt = "c5 c4 c4",
-  values = { "Hello", "Tui", "Game" }
-}
+bytes1 = serialization.binary_pack("c5 c4 c4", table.unpack({ "Hello", "Tui", "Game" }))
 
-debug.print { message = tostring(#bytes1) }
+debug.print(tostring(#bytes1))
 
-bytes2 = serialization.binary_pack {
-  fmt = "z",
-  values = { "Hello" }
-}
+bytes2 = serialization.binary_pack("z", table.unpack({ "Hello" }))
 
-debug.print { message = tostring(#bytes2) }
+debug.print(tostring(#bytes2))
 
-bytes3 = serialization.binary_pack {
-  fmt = "s4",
-  values = { "Hello" }
-}
+bytes3 = serialization.binary_pack("s4", table.unpack({ "Hello" }))
 
-debug.print { message = tostring(#bytes3) }
+debug.print(tostring(#bytes3))
 ```
 
 输出：
@@ -282,7 +261,7 @@ debug.print { message = tostring(#bytes3) }
 9  -- Hello 前被填充 4 字节的占位数据
 ```
 
-### 额外补充
+## 额外补充
 
 - `c[n]` 的强制固定长度，数据长度大于 `[n]` 会自动截断，小于则会补 `\0`。
 - `z` 存储的总长度为 $数据长度 + 1$。
@@ -304,15 +283,12 @@ debug.print { message = tostring(#bytes3) }
 ### 示例
 
 ```lua
-bytes = serialization.binary_pack {
-  fmt = "<I2 x I2",
-  values = {
+bytes = serialization.binary_pack("<I2 x I2", table.unpack({
     100,
     200
-  }
-}
+  }))
 
-debug.print { message = tostring(#bytes) }
+debug.print(tostring(#bytes))
 ```
 
 输出：
@@ -321,7 +297,7 @@ debug.print { message = tostring(#bytes) }
 5
 ```
 
-### 额外补充
+## 额外补充
 
 - `x` 实际含义为打包时插入一字节占位符或解包时跳过一字节。
 - 格式字符串中的空格在实际的处理中会被忽略，仅用于可读性优化。

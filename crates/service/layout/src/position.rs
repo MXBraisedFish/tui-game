@@ -1,24 +1,33 @@
+//! Resolution of symbolic positions against available terminal-cell bounds.
+
 use super::types::{Position, Size};
 
-/// Horizontal alignment: left.
+/// The align left used by this module.
 pub const ALIGN_LEFT: &str = "left";
 
-/// Horizontal alignment: center.
+/// The align center used by this module.
 pub const ALIGN_CENTER: &str = "center";
 
-/// Horizontal alignment: right.
+/// The align right used by this module.
 pub const ALIGN_RIGHT: &str = "right";
 
-/// Vertical alignment: top.
+/// The align top used by this module.
 pub const ALIGN_TOP: &str = "top";
 
-/// Vertical alignment: middle.
+/// The align middle used by this module.
 pub const ALIGN_MIDDLE: &str = "middle";
 
-/// Vertical alignment: bottom.
+/// The align bottom used by this module.
 pub const ALIGN_BOTTOM: &str = "bottom";
 
-/// Returns the X coordinate for the horizontal anchor and content width.
+/// Resolve a symbolic horizontal position within the available terminal columns.
+///
+/// # Arguments
+///
+/// * `size` - The size.
+/// * `x_anchor` - The x anchor.
+/// * `content_width` - The content width in terminal columns.
+/// * `offset_x` - The offset x.
 pub fn resolve_x(size: Size, x_anchor: &str, content_width: u16, offset_x: u16) -> u16 {
   let term_w = size.width;
   match x_anchor {
@@ -31,7 +40,14 @@ pub fn resolve_x(size: Size, x_anchor: &str, content_width: u16, offset_x: u16) 
   }
 }
 
-/// Returns the Y coordinate for the vertical anchor and content height.
+/// Resolve a symbolic vertical position within the available terminal rows.
+///
+/// # Arguments
+///
+/// * `size` - The size.
+/// * `y_anchor` - The y anchor.
+/// * `content_height` - The content height in terminal rows.
+/// * `offset_y` - The offset y.
 pub fn resolve_y(size: Size, y_anchor: &str, content_height: u16, offset_y: u16) -> u16 {
   let term_h = size.height;
   match y_anchor {
@@ -44,7 +60,17 @@ pub fn resolve_y(size: Size, y_anchor: &str, content_height: u16, offset_y: u16)
   }
 }
 
-/// Returns the position for the anchors and content size.
+/// Resolve a rectangular request against its coordinate space and available bounds.
+///
+/// # Arguments
+///
+/// * `size` - The size.
+/// * `x_anchor` - The x anchor.
+/// * `y_anchor` - The y anchor.
+/// * `content_width` - The content width in terminal columns.
+/// * `content_height` - The content height in terminal rows.
+/// * `offset_x` - The offset x.
+/// * `offset_y` - The offset y.
 pub fn resolve_rect(
   size: Size,
   x_anchor: &str,

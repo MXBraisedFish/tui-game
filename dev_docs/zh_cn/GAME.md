@@ -73,178 +73,30 @@
 一个合规的游戏包必须遵循以下目录结构，缺少部分内容宿主将无法识别和加载该游戏包。
 
 ```text
-<namespace>/               -- 游戏包命名空间/根目录
-├─ package.json            -- 游戏包信息（名称、作者、版本等）
-├─ game.json               -- 游戏包游戏信息（配置、入口、权限等）
-├─ scripts/                -- 脚本目录
-│  ├─ main.lua             -- 脚本入口文件
-│  └─ function/            -- 辅助脚本目录
-│     └─ *.lua             -- 辅助脚本
-└─ assets/                 -- 资源目录
-   ├─ lang/                -- 语言资源目录
-   │  ├─ en_us.json        -- 英语（美国）
-   │  ├─ zh_cn.json        -- 简体中文
-   │  └─ *.json            -- 其它语言文件
-   └─ *                    -- 其它资源
+game_package/
+├─ package.json
+├─ display.json
+├─ game.json
+├─ actions.json             # 可选
+├─ scripts/main.lua
+└─ assets/language/<code>/package/<配置文件名>.json
 ```
 
 ---
 
 # 游戏包配置文件
 
-## 目录结构<font style="opacity:0;">1</font>
+当前宿主使用 schema 2 分文件格式。完整字段、默认值、i18n 和资源规则见[游戏包 schema 2](PACKAAGE_GAME.md)。旧版单文件示例不再是有效包格式。
 
 ```text
-<namespace>/               -- 游戏包命名空间/根目录
-├─ package.json            -- 游戏包信息
-└─ game.json               -- 游戏包游戏信息
+game_package/
+├─ package.json
+├─ display.json
+├─ game.json
+├─ actions.json             # 可选
+├─ scripts/main.lua
+└─ assets/language/<code>/package/<配置文件名>.json
 ```
-
-## 命名空间
-
-- 游戏包根目录为 `<namespace>/`，`<namespace>` 即为该游戏包的命名空间。
-- 命名空间在全局必须唯一，宿主将优先加载首个遇到的同名命名空间游戏包。
-- 命名空间仅允许包含以下字符：小写字母 `a-z`、大写字母 `A-Z`、数字 `0-9`、下划线 `_`。
-
-## `package.json`
-
-> 注：
-> 
-> - `key` 表示语言键，需配合语言文件使用。
-> - `image` 表示图片路径，相对于 `assets/` 目录。
-
-该文件用于声明游戏包的基本信息，格式如下：
-
-```json
-{
-  "package": string,                -- 包名
-  "package_name": string | key,     -- 游戏包显示名称
-  "introduction": string | key,     -- 游戏包简介
-  "author": string | key,           -- 作者
-  "game_name": string | key,        -- 游戏显示名称
-  "description": string | key,      -- 游戏简短描述
-  "detail": string | key,           -- 游戏详细描述
-  "version": string,                -- 包版本号
-  "icon": Array | string | image,   -- 图标
-  "banner": Array | string | image  -- 横幅
-}
-```
-
-**字段说明**
-
-| 字段             | 类型                                                                                                              | 说明                                           |
-| -------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `package`      | <font color="#92cddc">string</font>                                                                             | 包名，用于区分不同游戏包，包内全局唯一。仅允许字符串。                  |
-| `package_name` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏包显示名称，在游戏包列表展示的包名。可填写字符串或语言键。              |
-| `introduction` | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏包简介，在游戏包列表中展示。可填写字符串或语言键。                  |
-| `author`       | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 作者名称。可填写字符串或语言键。                             |
-| `game_name`    | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏展示名称，在游戏列表中展示。可填写字符串或语言键。                  |
-| `description`  | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏简短描述，建议一句话概括玩法或目标。可填写字符串或语言键。              |
-| `detail`       | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font>                                         | 游戏详细描述，建议包含：游戏目标、核心机制、操作方式、特殊警告等。可填写字符串或语言键。 |
-| `version`      | <font color="#92cddc">string</font>                                                                             | 游戏包版本号，由作者自行定义。推荐格式：主版本号.次版本号。仅允许字符串。        |
-| `icon`         | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 图标，在游戏包列表中展示。具体要求见『其它-[头图与图标](#图标和头图)』。      |
-| `banner`       | <font color="#92cddc">Array</font> \| <font color="#92cddc">string</font> \| <font color="#92cddc">image</font> | 横幅，在游戏包详情页展示。具体要求见『其它-[头图与图标](#图标和头图)』。      |
-
-## `game.json`
-
-> 注：
-> 
-> - `key` 表示语言键。
-> - `path` 表示脚本路径，相对于 `scripts/` 目录。
-> - `低资源运行模式`：帧率限制为 24 FPS。
-
-该文件用于声明游戏的核心配置，格式如下：
-
-```json
-{
-  "api": Array | int,                -- 支持的 API 版本范围
-  "entry": path,                     -- 入口脚本路径
-  "save": boolean,                   -- 是否支持存档
-  "best_none": string | key | null,  -- 最佳记录占位文本（null 表示禁用）
-  "min_width": int,                  -- 最小终端宽度（终端字符列数）
-  "min_height": int,                 -- 最小终端高度（终端字符行数）
-  "write": boolean,                  -- 是否请求直写权限
-  "actions": object,                 -- 按键动作注册表
-  "runtime": {
-    "target_fps": int                -- 目标帧率
-    "afk_time": int,                 -- 低资源运行时间阈值
-  }
-}
-```
-
-**字段说明**
-
-| 字段                   | 类型                                                                                                           | 说明                                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `api`                | <font color="#92cddc">Array</font> \| <font color="#92cddc">int</font>                                       | 支持的 API 版本。数组格式 $[min, max]$ 表示支持从 `min` 到 `max` 的版本（含端点）；整数表示仅支持该单一版本。                                             |
-| `entry`              | <font color="#92cddc">path</font>                                                                            | 入口脚本路径，相对于 `scripts/` 目录。                                                                                           |
-| `save`               | <font color="#92cddc">boolean</font>                                                                         | 是否声明存档能力；当前阶段 `SaveGame()` 只进行返回值验证，不写入磁盘。                                                      |
-| `best_none`          | <font color="#92cddc">string</font> \| <font color="#92cddc">key</font> \| <font color="#92cddc">null</font> | 无最佳记录时显示的文本；当前阶段 `SaveBest()` 为可选回调。                                      |
-| `min_width`          | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端宽度（终端字符列数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
-| `min_height`         | <font color="#92cddc">int</font>                                                                             | 游戏所需的最小终端高度（终端字符行数）。终端尺寸不足时会显示提示。值≦0为无限制。                                                                           |
-| `write`              | <font color="#92cddc">boolean</font>                                                                         | 是否请求直写权限。`true` 表示游戏包需要文件写入权限，加载时会向用户申请；`false` 表示不需要权限，所有直写请求将被宿主忽略。<font color="red">直写操作为高风险操作，请最大程度避免使用！</font> |
-| `case_sensitive`     | <font color="#92cddc">boolean</font>                                                                         | 按键是否区分大小写。`true` 表示字母按键区分大小写；`false` 表示字母按键不区分大小写。                                                                  |
-| `actions`            | <font color="#92cddc">object</font>                                                                          | 按键动作注册表，格式见『游戏包配置文件-[注册表格式](#注册表格式)』。宿主会将物理按键映射为语义化动作。填写空对象代表不注册任何按键。                                               |
-| `runtime`            | <font color="#92cddc">object</font>                                                                          | 运行时设置。                                                                                                              |
-| `runtime.target_fps` | <font color="#92cddc">int</font>                                                                             | 目标帧率，支持 `30`、`60`、`120`。其它值将被忽略并回退为 `60`。实际帧率受机器性能影响，该值为上限。                                                         |
-| `runtime.afk_time`   | <font color="#92cddc">int</font>                                                                             | 低资源运行时间阈值。填写正整数，单位为秒。值为 0 则表示永不进入低资源运行模式。                                                                           |
-
-## 注册表格式
-
-> 注：
-> 
-> - `#` 表示自定义或可变内容。
-> - `[]` 表示字段可重复或扩展。
-> - `key` 表示按键映射名，具体按键映射见『附录-[物理按键语义映射表](#物理按键语义映射表)』。
-
-```json
-"actions": {
-  [#action]: {                -- 动作
-    "key": Array | string,    -- 原始物理按键
-    "key_name": string | key  -- 动作含义
-  }
-}
-```
-
-**示例**：
-
-```json
-"actions": {
-  "jump": {
-    "key": "space",
-    "key_name": "跳跃"
-  },
-  "move": {
-    "key": ["up", "down", "left", "right"],
-    "key_name": "game.move"
-  }
-}
-```
-
-> 每个动作可绑定单个按键或最多 5 个按键。宿主会将按键事件转换为动作事件，通过 `handle_event` 传递给脚本（事件类型 `action`）。
-
-## UID
-
-UID 是宿主为每个游戏包生成的唯一标识码，用于内部区分不同游戏包，是最终的识别 ID。
-
-**构成格式**：`mod_game_{编码}`
-
-**编码生成规则**：
-
-1. 将游戏包的 `来源（source）`、`命名空间（namespace）`、`包名（package）`、`游戏名（game_name）`、`作者（author）`、`入口（entry）` 按特定格式拼接成一个字符串。
-2. 对该字符串进行特定运算编码。
-
-上述过程可用以下伪代码表示：
-```python
-encoding = function(source + namespace + package + game_name + author + entry)
-uid = "mod_game_" + encoding
-```
-
-**稳定性**：只要 `来源`、`命名空间`、`包名`、`游戏名`、`作者`、`入口` 保持不变，生成的 UID 就不会改变。
-
-**符号**：由`0-9` `a-z` `A-Z`组成。
-
----
 
 # 游戏包脚本规范
 
@@ -261,7 +113,7 @@ uid = "mod_game_" + encoding
 ## 规范要求
 
 1. 所有脚本文件必须放在 `scripts/` 目录下，且仅支持 `.lua` 扩展名。
-2. 入口脚本建议直接放在 `scripts/` 目录下，由 `package.json` 中的 `entry` 字段指定，可自定义。
+2. 入口脚本建议直接放在 `scripts/` 目录下，由 `game.json` 中的 `entry` 字段指定，可自定义。
 3. 辅助脚本必须放在 `scripts/function/` 目录下，用于组织可复用的模块化代码。
 
 ## 沙箱限制（禁用 API）
@@ -312,7 +164,7 @@ end
 - 必需：`Init(ctx)`、`HandleEvent(event)`、`Update(dt)`、`UpdateFrame(dt, alpha)`、`Render()`。
 - 可选：`SaveGame()`、`SaveBest()`。
 
-入口由 `package.json` 的 `entry` 指定，相对于包内 `scripts/` 目录；省略 `.lua` 后缀时由宿主补齐。入口规范、上下文、事件结构和资源限制详见 [Lua Runtime 协议](LUA_RUNTIME.md)。
+入口由 `game.json` 的 `entry` 指定，相对于包内 `scripts/` 目录；省略 `.lua` 后缀时由宿主补齐。入口规范、上下文、事件结构和资源限制详见 [Lua Runtime 协议](LUA_RUNTIME.md)。
 
 当前阶段不支持 `require`、`load_function`、辅助 Lua 文件、绘制函数、存储 API、资源 API、音频、动画或 Lua 异步 API。所有游戏状态应保存在入口脚本的私有环境中；保存回调只返回 JSON 兼容值，本阶段不会写入磁盘。
 
@@ -366,7 +218,7 @@ end
 {
   "game.title": "推箱子",
   "game.score": "当前得分：{score}",
-  "game.hint": "{tc:green}按 R 键重新开始{tc:clear}"
+  "game.hint": "f%<fg:green>按 R 键重新开始</fg>"
 }
 ```
 
@@ -374,10 +226,10 @@ end
 
 ### 支持的类型
 
-| 类别    | 支持格式                                        | 说明                                |
-| ----- | ------------------------------------------- | --------------------------------- |
-| 文本文件  | `json`, `yaml`, `toml`, `csv`, `xml`, `txt` | 可通过 `read_*` 系列 API 读取并自动解析       |
-| 图像文件  | `png`, `jpg`, `jpeg`                        | 用于 `icon`、`banner` 等字段，支持图片路径引用   |
+| 类别     | 支持格式                                    | 说明                                           |
+| -------- | ------------------------------------------- | ---------------------------------------------- |
+| 文本文件 | `json`, `yaml`, `toml`, `csv`, `xml`, `txt` | 可通过 `read_*` 系列 API 读取并自动解析        |
+| 图像文件 | `png`, `jpg`, `jpeg`                        | 用于 `icon`、`banner` 等字段，支持图片路径引用 |
 
 > 注：其它资源文件可放置在 `assets/` 下的任意子目录中，使用 API 时需提供相对于 `assets/` 的路径。
 
@@ -474,7 +326,7 @@ end
 
 示意图如下：
 
-![绘制坐标](./image/axis.png)
+![绘制坐标](../en_us/image/axis.png)
 
 ---
 
@@ -483,12 +335,12 @@ end
 ## 物理按键语义映射表
 
 ### 字母键（小写）
-| 物理按键      | 传递值       | 展示表       |
+| 物理按键  | 传递值    | 展示表    |
 | --------- | --------- | --------- |
 | `A` ~ `Z` | `a` ~ `z` | `a` ~ `z` |
 
 ### 数字键（主键盘）
-| 物理按键      | 传递值       | 展示表       |
+| 物理按键  | 传递值    | 展示表    |
 | --------- | --------- | --------- |
 | `0` ~ `9` | `0` ~ `9` | `0` ~ `9` |
 
@@ -509,12 +361,12 @@ end
 | `/ ?`       | `/`       | `/`       |
 
 ### 功能键（F1 ~ F12）
-| 物理按键         | 传递值          | 展示表          |
+| 物理按键     | 传递值       | 展示表       |
 | ------------ | ------------ | ------------ |
 | `F1` ~ `F12` | `f1` ~ `f12` | `F1` ~ `F12` |
 
 ### 导航键
-| 物理按键       | 传递值        | 展示表    |
+| 物理按键   | 传递值     | 展示表 |
 | ---------- | ---------- | ------ |
 | `↑`        | `up`       | `↑`    |
 | `↓`        | `down`     | `↓`    |
@@ -526,7 +378,7 @@ end
 | `PageDown` | `pagedown` | `PgDn` |
 
 ### 编辑键
-| 物理按键        | 传递值         | 展示表     |
+| 物理按键    | 传递值      | 展示表  |
 | ----------- | ----------- | ------- |
 | `Enter`     | `enter`     | `Enter` |
 | `Backspace` | `backspace` | `Bksp`  |
@@ -537,26 +389,26 @@ end
 | `Space`     | `space`     | `Space` |
 
 ### 修饰键
-| 物理按键                 | 传递值           | 展示表      |
-| -------------------- | ------------- | -------- |
-| `左 Ctrl`             | `left_ctrl`   | `LCtrl`  |
-| `右 Ctrl`             | `right_ctrl`  | `RCtrl`  |
-| `左 Shift`            | `left_shift`  | `LShift` |
-| `右 Shift`            | `right_shift` | `RShift` |
-| `左 Alt`              | `left_alt`    | `LAlt`   |
-| `右 Alt`              | `right_alt`   | `RAlt`   |
+| 物理按键              | 传递值        | 展示表                                        |
+| --------------------- | ------------- | --------------------------------------------- |
+| `左 Ctrl`             | `left_ctrl`   | `LCtrl`                                       |
+| `右 Ctrl`             | `right_ctrl`  | `RCtrl`                                       |
+| `左 Shift`            | `left_shift`  | `LShift`                                      |
+| `右 Shift`            | `right_shift` | `RShift`                                      |
+| `左 Alt`              | `left_alt`    | `LAlt`                                        |
+| `右 Alt`              | `right_alt`   | `RAlt`                                        |
 | `左 Meta` (Win / Cmd) | `left_meta`   | Linux `LMeta` / macOS `LCmd` / Windows `LWin` |
 | `右 Meta` (Win / Cmd) | `right_meta`  | Linux `RMeta` / macOS `RCmd` / Windows `RWin` |
 
 ### 锁定键
-| 物理按键         | 传递值          | 展示表    |
+| 物理按键     | 传递值       | 展示表 |
 | ------------ | ------------ | ------ |
 | `CapsLock`   | `capslock`   | `Caps` |
 | `NumLock`    | `numlock`    | `Num`  |
 | `ScrollLock` | `scrolllock` | `Scrl` |
 
 ### 系统功能键
-| 物理按键          | 返回值           | 展示表     |
+| 物理按键      | 返回值        | 展示表  |
 | ------------- | ------------- | ------- |
 | `Esc`         | `esc`         | `Esc`   |
 | `PrintScreen` | `printscreen` | `Prtsc` |
@@ -564,8 +416,8 @@ end
 | `Menu`        | `menu`        | `Menu`  |
 
 ### 小键盘
-| 物理按键          | 返回值         | 展示表         |
-| ------------- | ----------- | ----------- |
+| 物理按键         | 返回值      | 展示表      |
+| ---------------- | ----------- | ----------- |
 | 小键盘 `0` ~ `9` | `k0` ~ `k9` | `K0` ~ `K9` |
 | 小键盘 `+`       | `+`         | `K+`        |
 | 小键盘 `-`       | `-`         | `K-`        |
@@ -578,8 +430,8 @@ end
 
 > 注：该部分作为最后的未知键处理，但并非所有未知键都可以被捕获。
 
-| 物理按键    | 返回值        | 展示表 |
-| ------- | ---------- | --- |
+| 物理按键       | 返回值        | 展示表 |
+| -------------- | ------------- | ------ |
 | 无法识别的按键 | `key(扫描码)` | 不固定 |
 
 ---
@@ -598,7 +450,7 @@ end
 ```
 
 **样图**
-![默认图标](./image/mod_icon.png)
+![默认图标](../en_us/image/mod_icon.png)
 
 ## 默认头图
 
@@ -617,4 +469,4 @@ end
 ```
 
 **样图**
-![默认头图](./image/game_banner.png)
+![默认头图](../en_us/image/game_banner.png)

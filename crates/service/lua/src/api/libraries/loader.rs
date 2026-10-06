@@ -1,3 +1,5 @@
+//! Lua loader library bindings with validated arguments and session-owned host access.
+
 use super::*;
 use crate::path::{SafeRelativePath, SandboxPathKind, resolve_sandbox_path};
 
@@ -5,6 +7,18 @@ const MAX_MODULE_SOURCE_BYTES: usize = 1024 * 1024;
 const MAX_MODULE_CHAIN_SOURCE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_MODULE_NESTING: usize = 16;
 
+/// Build and register the Lua loader API in the supplied VM and host context.
+///
+/// # Arguments
+///
+/// * `lua` - The Lua VM in which values and callbacks are created.
+/// * `environment` - The environment.
+/// * `state` - The state.
+///
+/// # Errors
+///
+/// Propagate Lua allocation, table construction, or function registration errors while installing
+/// this library.
 pub(super) fn loader(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::Result<Table> {
   let source = lua.create_table()?;
   let cache = lua.create_table()?;
@@ -54,7 +68,7 @@ fn require_module(
   values: MultiValue,
 ) -> mlua::Result<MultiValue> {
   const METHOD: &str = "loader.require";
-  let module = read_module(state, METHOD, values)?;
+  let module = read_module(lua, state, METHOD, values)?;
   if let Value::Table(cached) = cache.raw_get::<Value>(module.virtual_path.as_str())? {
     return unpack_results(&cached);
   }
@@ -71,7 +85,7 @@ fn execute_module(
   method: &str,
   values: MultiValue,
 ) -> mlua::Result<MultiValue> {
-  let module = read_module(state, method, values)?;
+  let module = read_module(lua, state, method, values)?;
   execute_source(lua, environment, state, method, &module)
 }
 
@@ -82,7 +96,7 @@ fn compile_module(
   values: MultiValue,
 ) -> mlua::Result<Function> {
   const METHOD: &str = "loader.loadfile";
-  let module = read_module(state, METHOD, values)?;
+  let module = read_module(lua, state, METHOD, values)?;
   let function = lua
     .load(&module.source)
     .set_name(&module.display_name)
@@ -158,11 +172,13 @@ fn with_loader_frame<T>(
 }
 
 fn read_module(
+  lua: &Lua,
   state: &SharedApiState,
   method: &str,
   values: MultiValue,
 ) -> mlua::Result<LoadedModule> {
-  let value = args::one(method, "path", values)?;
+  let parameters = args::positional(lua, method, values, &["path"], &[])?;
+  let value = parameters.required(0, method, "path")?;
   let virtual_path = args::string(value, method, "path")?;
   if virtual_path.is_empty() || virtual_path.len() > 8192 || virtual_path.contains('\0') {
     return Err(args::message(method, "invalid module path"));

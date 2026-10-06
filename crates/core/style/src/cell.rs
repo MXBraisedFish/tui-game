@@ -1,16 +1,24 @@
+//! Styled terminal graphemes and explicit wide-cell continuation markers.
+
 use crate::TextStyle;
 
-/// Single character cell of a canvas: its text, its style and whether it continues a wide
-/// character.
+/// A styled grapheme or a trailing-column marker for a wide grapheme.
+///
+/// # Fields
+///
+/// * `text` - The text to process or display.
+/// * `style` - The text style applied to the rendered content.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CanvasCell {
+  /// The text to process or display.
   pub text: String,
+  /// The text style applied to the rendered content.
   pub style: TextStyle,
   continuation: bool,
 }
 
 impl CanvasCell {
-  /// Creates a blank placeholder cell.
+  /// Create a blank terminal cell with the default text style.
   pub fn blank() -> Self {
     Self {
       text: " ".to_string(),
@@ -19,6 +27,7 @@ impl CanvasCell {
     }
   }
 
+  /// Create a text cell with the default style and no wide-cell continuation marker.
   pub fn new(text: impl Into<String>) -> Self {
     Self {
       text: text.into(),
@@ -27,7 +36,7 @@ impl CanvasCell {
     }
   }
 
-  /// Creates a styled character cell.
+  /// Create a text cell carrying the supplied terminal style.
   pub fn styled(text: impl Into<String>, style: TextStyle) -> Self {
     Self {
       text: text.into(),
@@ -36,7 +45,7 @@ impl CanvasCell {
     }
   }
 
-  /// Creates a wide-character continuation marker, which has no column width of its own.
+  /// Create the marker occupying the trailing column of a wide grapheme.
   pub fn continuation() -> Self {
     Self {
       text: String::new(),
@@ -44,6 +53,7 @@ impl CanvasCell {
       continuation: true,
     }
   }
+  /// Report whether this cell is the trailing marker of a wide grapheme.
   pub fn is_continuation(&self) -> bool {
     self.continuation
   }

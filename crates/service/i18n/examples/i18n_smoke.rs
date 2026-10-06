@@ -1,4 +1,4 @@
-//! Minimal entry: loads the embedded en_us fallback and resolves a runtime text.
+//! Independent i18n smoke entry exercising the public API and checking its results.
 
 use tg_service_i18n::I18nService;
 

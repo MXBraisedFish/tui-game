@@ -1,3 +1,5 @@
+//! Tracking of submitted writes so shutdown can stop admission and await completion.
+
 use std::{
   collections::HashMap,
   path::PathBuf,
@@ -6,12 +8,26 @@ use std::{
 
 use crate::TaskId;
 
+/// Queued, active, pending-commit, and failed writes observed at one point in time.
+///
+/// # Fields
+///
+/// * `accepting_writes` - The accepting writes.
+/// * `writing` - Paths currently being written.
+/// * `queued` - Paths admitted but not yet started.
+/// * `pending_commits` - Temporary paths awaiting final commit.
+/// * `failed` - Failed write paths paired with their diagnostic messages.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct WriteBarrierSnapshot {
+  /// The accepting writes.
   pub accepting_writes: bool,
+  /// Paths currently being written.
   pub writing: Vec<PathBuf>,
+  /// Paths admitted but not yet started.
   pub queued: Vec<PathBuf>,
+  /// Temporary paths awaiting final commit.
   pub pending_commits: Vec<PathBuf>,
+  /// Failed write paths paired with their diagnostic messages.
   pub failed: Vec<(PathBuf, String)>,
 }
 
@@ -24,14 +40,14 @@ struct WriteBarrierState {
   failed: Vec<(PathBuf, String)>,
 }
 
-/// Shared tracker of asynchronous file writes that lets shutdown stop new submissions and wait
-/// for pending writes to complete.
+/// A shared write tracker that blocks shutdown until registered writes reach terminal states.
 #[derive(Clone)]
 pub struct WriteBarrier {
   shared: Arc<(Mutex<WriteBarrierState>, Condvar)>,
 }
 
 impl WriteBarrier {
+  /// Create a write barrier with its initial state.
   pub fn new() -> Self {
     let state = WriteBarrierState {
       accepting_writes: true,
@@ -42,6 +58,14 @@ impl WriteBarrier {
     }
   }
 
+  /// Track a queued write and optional temporary commit path, returning false after admission
+  /// closes.
+  ///
+  /// # Arguments
+  ///
+  /// * `task_id` - The identifier of the asynchronous task.
+  /// * `target` - The object or resource affected by the operation.
+  /// * `temporary` - The temporary.
   pub fn register(&self, task_id: TaskId, target: PathBuf, temporary: Option<PathBuf>) -> bool {
     let (lock, _) = &*self.shared;
     let mut state = lock.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -55,6 +79,7 @@ impl WriteBarrier {
     true
   }
 
+  /// Move a registered write from the queued set into the active set.
   pub fn start(&self, task_id: TaskId) {
     let (lock, _) = &*self.shared;
     let mut state = lock.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -63,6 +88,7 @@ impl WriteBarrier {
     }
   }
 
+  /// Remove a completed write from all pending sets and wake shutdown waiters.
   pub fn finish(&self, task_id: TaskId) {
     let (lock, wake) = &*self.shared;
     let mut state = lock.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -72,6 +98,7 @@ impl WriteBarrier {
     wake.notify_all();
   }
 
+  /// Mark the tracked write as failed, retain its diagnostic, and wake shutdown waiters.
   pub fn fail(&self, task_id: TaskId, error: String) {
     let (lock, wake) = &*self.shared;
     let mut state = lock.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -86,6 +113,7 @@ impl WriteBarrier {
     wake.notify_all();
   }
 
+  /// Reject new tracked writes while allowing registered writes to finish.
   pub fn stop_new_writes(&self) {
     let (lock, _) = &*self.shared;
     lock
@@ -94,6 +122,7 @@ impl WriteBarrier {
       .accepting_writes = false;
   }
 
+  /// Wait until every queued or active tracked write finishes or fails.
   pub fn wait(&self) {
     let (lock, wake) = &*self.shared;
     let mut state = lock.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -104,6 +133,7 @@ impl WriteBarrier {
     }
   }
 
+  /// Return the snapshot for the addressed object.
   pub fn snapshot(&self) -> WriteBarrierSnapshot {
     let (lock, _) = &*self.shared;
     let state = lock.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -120,6 +150,7 @@ impl WriteBarrier {
     snapshot
   }
 
+  /// Report whether any registered write has not reached a terminal state.
   pub fn has_pending_writes(&self) -> bool {
     let (lock, _) = &*self.shared;
     let state = lock.lock().unwrap_or_else(|poison| poison.into_inner());

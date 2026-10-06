@@ -1,5 +1,94 @@
-//! Image service: converts png/jpg images into block-rich text (memory + disk cache),
-//! synchronously or as an async job.
+//! Image-to-terminal block conversion with content-based memory and disk caches.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use std::{
+//!   path::PathBuf,
+//!   time::{Duration, Instant},
+//! };
+//!
+//! use tg_service_async::{AsyncRuntime, TaskStatusEvent};
+//! use tg_service_image::{ImageConvertParams, ImageEvent, ImageService};
+//!
+//! #[derive(Debug)]
+//! enum Event {
+//!   Image(ImageEvent),
+//!     Status,
+//! }
+//!
+//! impl From<ImageEvent> for Event {
+//!   fn from(event: ImageEvent) -> Self {
+//!     Self::Image(event)
+//!   }
+//! }
+//!
+//! impl From<TaskStatusEvent> for Event {
+//!   fn from(_: TaskStatusEvent) -> Self {
+//!     Self::Status
+//!   }
+//! }
+//!
+//! fn main() {
+//!   let root = create_temp_dir("tg_image_smoke");
+//!   let path = root.join("smoke.png");
+//!   let mut pixels = image::RgbImage::new(8, 8);
+//!   for (x, y, pixel) in pixels.enumerate_pixels_mut() {
+//!     *pixel = image::Rgb([(x * 32) as u8, (y * 32) as u8, 128]);
+//!   }
+//!   pixels.save(&path).expect("write smoke image");
+//!
+//!   let params = ImageConvertParams {
+//!     image_path: path.to_string_lossy().into(),
+//!     output_width: Some(8),
+//!     output_height: Some(4),
+//!     cache: false,
+//!     ..Default::default()
+//!   };
+//!   let mut service = ImageService::new(None);
+//!   let rendered = service
+//!     .convert(params.clone())
+//!     .expect("synchronous conversion");
+//!   assert!(rendered.starts_with("f%"));
+//!
+//!   let runtime = AsyncRuntime::<Event>::with_worker_count(1);
+//!   let task = service.convert_async(&runtime, params);
+//!   let deadline = Instant::now() + Duration::from_secs(5);
+//!   let mut output = None;
+//!   while output.is_none() && Instant::now() < deadline {
+//!     for event in runtime.poll_events() {
+//!       if let Event::Image(ImageEvent::ConvertFinished {
+//!         task_id,
+//!         output: text,
+//!       }) = event
+//!       {
+//!         assert_eq!(task_id, task);
+//!         output = Some(text);
+//!       }
+//!     }
+//!     std::thread::sleep(Duration::from_millis(5));
+//!   }
+//!   assert_eq!(
+//!     output.as_deref(),
+//!     Some(rendered.as_str()),
+//!     "async job renders the same text"
+//!   );
+//!
+//!   std::fs::remove_dir_all(&root).expect("clean up temporary directory");
+//!   println!("image ok: {} bytes of half-block text", rendered.len());
+//! }
+//!
+//! fn create_temp_dir(prefix: &str) -> PathBuf {
+//!   let nonce = std::time::SystemTime::now()
+//!     .duration_since(std::time::UNIX_EPOCH)
+//!     .unwrap_or_default()
+//!     .as_nanos();
+//!   let root = std::env::temp_dir().join(format!("{prefix}_{}_{nonce}", std::process::id()));
+//!   std::fs::create_dir(&root)
+//!     .unwrap_or_else(|error| panic!("create temporary directory {}: {error}", root.display()));
+//!   root
+//! }
+//! ```
 
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -14,31 +103,62 @@ use serde::{Deserialize, Serialize};
 use tg_core_atomic_fs::atomic_write;
 use tg_service_async::{AsyncJob, AsyncRuntime, TaskCancellation, TaskId, TaskStatusEvent};
 
-/// Parameters of an image conversion.
+/// Configuration values controlling image convert behavior.
+///
+/// # Fields
+///
+/// * `image_path` - The filesystem path for image.
+/// * `mode` - The image convert mode carried by this image convert params.
+/// * `background` - The background color.
+/// * `output_width` - The output width in terminal columns.
+/// * `output_height` - The output height in terminal rows.
+/// * `crop_x` - The crop x.
+/// * `crop_y` - The crop y.
+/// * `crop_width` - The crop width in terminal columns.
+/// * `crop_height` - The crop height in terminal rows.
+/// * `square_crop` - The square crop.
+/// * `scale` - The scale.
+/// * `anti_alias` - The Gaussian smoothing radius in resized image pixels; zero skips smoothing.
+/// * `cache` - The cache.
 #[derive(Clone, Debug)]
 pub struct ImageConvertParams {
+  /// The filesystem path for image.
   pub image_path: String,
+  /// The image convert mode carried by this image convert params.
   pub mode: ImageConvertMode,
-  /// RGB color used to composite source pixels with alpha before resizing.
+
+  /// The background color.
   pub background: [u8; 3],
+  /// The output width in terminal columns.
   pub output_width: Option<u32>,
+  /// The output height in terminal rows.
   pub output_height: Option<u32>,
+  /// The crop x.
   pub crop_x: i32,
+  /// The crop y.
   pub crop_y: i32,
+  /// The crop width in terminal columns.
   pub crop_width: Option<u32>,
+  /// The crop height in terminal rows.
   pub crop_height: Option<u32>,
+  /// The square crop.
   pub square_crop: bool,
+  /// The scale.
   pub scale: f64,
+  /// The Gaussian smoothing radius in resized image pixels, from zero to [`MAX_ANTI_ALIAS_RADIUS`].
+  pub anti_alias: f64,
+  /// The cache.
   pub cache: bool,
 }
 
-/// The character-block geometry used to render each image cell.
+/// The half-block or block-mask sampling rule used for image conversion.
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
 pub enum ImageConvertMode {
-  /// Preserve the existing two-sample-per-cell renderer.
+  /// The half block setting for image convert mode.
   #[default]
   HalfBlock,
-  /// Match each cell against a finite set of supported Unicode block shapes.
+
+  /// The mix block setting for image convert mode.
   MixBlock,
 }
 
@@ -56,23 +176,41 @@ impl Default for ImageConvertParams {
       crop_height: None,
       square_crop: false,
       scale: 1.0,
+      anti_alias: 0.8,
       cache: true,
     }
   }
 }
 
+/// The inputs of an asynchronous image operation.
 #[derive(Clone, Debug)]
 pub enum ImageTask {
+  /// The convert setting for image task.
   Convert {
+    /// The formatting or rendering parameters.
     params: ImageConvertParams,
+    /// The cache dir.
     cache_dir: Option<PathBuf>,
   },
 }
 
+/// A image event payload queued for its owning consumer.
 #[derive(Clone, Debug)]
 pub enum ImageEvent {
-  ConvertFinished { task_id: TaskId, output: String },
-  Failed { task_id: TaskId, error: String },
+  /// A convert finished notification delivered to the owning consumer.
+  ConvertFinished {
+    /// The identifier of the asynchronous task.
+    task_id: TaskId,
+    /// The output.
+    output: String,
+  },
+  /// A failed notification delivered to the owning consumer.
+  Failed {
+    /// The identifier of the asynchronous task.
+    task_id: TaskId,
+    /// The error.
+    error: String,
+  },
 }
 
 impl<E: From<ImageEvent> + Send + 'static> AsyncJob<E> for ImageTask {
@@ -110,11 +248,14 @@ impl<E: From<ImageEvent> + Send + 'static> AsyncJob<E> for ImageTask {
   }
 }
 
-/// Converts images into terminal block character art with memory and disk caching.
+/// The public entry point for image operations.
 pub struct ImageService {
   cache: HashMap<[u8; 32], String>,
   cache_dir: Option<PathBuf>,
 }
+
+/// The largest Gaussian smoothing radius accepted without unbounded filtering work.
+pub const MAX_ANTI_ALIAS_RADIUS: f64 = 32.0;
 
 const MAX_SOURCE_FILE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_SOURCE_PIXELS: u64 = 16_000_000;
@@ -124,10 +265,10 @@ const MAX_OUTPUT_DIMENSION: u32 = 2_048;
 const MAX_OUTPUT_CELLS: u64 = 16_384;
 const MAX_SCALED_PIXELS: u64 = 16_000_000;
 const MAX_CACHE_ENTRY_BYTES: u64 = 2 * 1024 * 1024;
-// atomic_fs uses one fixed sibling temp name, so independent image jobs must serialize writes.
+// Serialize cache commits because the atomic writer uses one temporary sibling per destination.
+
 static CACHE_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
-/// The format of a disk cache entry.
 #[derive(Serialize, Deserialize)]
 struct DiskCacheEntry {
   format_version: u8,
@@ -135,7 +276,7 @@ struct DiskCacheEntry {
 }
 
 impl ImageService {
-  /// Creates an image service. The disk cache is disabled when `cache_dir` is `None`.
+  /// Create an image service initialized from `cache_dir`.
   pub fn new(cache_dir: Option<PathBuf>) -> Self {
     Self {
       cache: HashMap::new(),
@@ -143,12 +284,14 @@ impl ImageService {
     }
   }
 
-  /// Converts an image into terminal character art (with caching).
+  /// Convert an image into terminal block art using validated dimensions, crop settings, and
+  /// content caches.
   ///
   /// # Errors
   ///
-  /// Returns an error when the parameters are invalid, the image path cannot be resolved to an
-  /// existing png/jpg/jpeg file, the image cannot be opened, or the crop area is empty.
+  /// Return an error for invalid dimensions or crop bounds, an unresolved PNG/JPEG path,
+  /// unreadable image data, or an empty crop. Disposable cache-write failures do not invalidate a
+  /// successful conversion.
   pub fn convert(&mut self, params: ImageConvertParams) -> Result<String, String> {
     self
       .convert_cancellable(params, None)?
@@ -176,11 +319,10 @@ impl ImageService {
     let cache_key = compute_cache_key(&source_bytes, &params);
 
     if params.cache {
-      // 1. Memory cache.
       if let Some(cached) = self.cache.get(&cache_key) {
         return Ok((!is_cancelled(cancellation)).then(|| cached.clone()));
       }
-      // 2. Disk cache.
+
       if let Some(disk) = self.read_disk_cache(&cache_key) {
         self.cache.insert(cache_key, disk.clone());
         return Ok((!is_cancelled(cancellation)).then_some(disk));
@@ -209,6 +351,7 @@ impl ImageService {
     Ok((!is_cancelled(cancellation)).then_some(result))
   }
 
+  /// Queue image conversion and return the task identifier used by completion events.
   pub fn convert_async<E>(
     &self,
     async_runtime: &AsyncRuntime<E>,
@@ -222,8 +365,6 @@ impl ImageService {
       cache_dir: self.cache_dir.clone(),
     })
   }
-
-  // ─── Disk cache helpers ──────────────────────────────
 
   fn disk_cache_path(&self, cache_key: &[u8; 32]) -> Option<PathBuf> {
     self.cache_dir.as_ref().map(|dir| {
@@ -270,7 +411,9 @@ impl ImageService {
       rendered: rendered.to_string(),
     };
     if let Ok(json) = serde_json::to_vec(&entry) {
-      // Cache files are disposable, so a failed write does not fail a successful conversion.
+      // Cache persistence is optional; a valid conversion still succeeds when its cache write
+      // fails.
+
       let _guard = CACHE_WRITE_LOCK
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -309,6 +452,11 @@ fn validate(p: &ImageConvertParams) -> Result<(), String> {
   }
   if !p.scale.is_finite() || p.scale <= 0.0 {
     return Err("scale 必须是有限正数".into());
+  }
+  if !p.anti_alias.is_finite() || !(0.0..=MAX_ANTI_ALIAS_RADIUS).contains(&p.anti_alias) {
+    return Err(format!(
+      "anti_alias 必须是 0 到 {MAX_ANTI_ALIAS_RADIUS} 之间的有限数值"
+    ));
   }
   if p.crop_x < 0 {
     return Err("crop_x 不得小于 0".into());
@@ -391,7 +539,6 @@ fn validate_source_dimensions(width: u32, height: u32, path: &Path) -> Result<()
 
 const VALID_EXTS: &[&str] = &["png", "jpg", "jpeg"];
 
-// Resolves the image path; without an extension, looks for a matching png/jpg/jpeg file.
 fn resolve_path(raw: &str) -> Result<PathBuf, String> {
   let path = Path::new(raw);
 
@@ -423,7 +570,6 @@ fn resolve_path(raw: &str) -> Result<PathBuf, String> {
   ))
 }
 
-// Hashes one source snapshot and every parameter that can affect its rendered output.
 fn compute_cache_key(source_bytes: &[u8], p: &ImageConvertParams) -> [u8; 32] {
   let mut hasher = Hasher::new();
   hasher.update(b"tg-service-image-cache\0");
@@ -443,6 +589,7 @@ fn compute_cache_key(source_bytes: &[u8], p: &ImageConvertParams) -> [u8; 32] {
   hash_optional_u32(&mut hasher, p.crop_height);
   hasher.update(&[u8::from(p.square_crop)]);
   hasher.update(&p.scale.to_bits().to_le_bytes());
+  hasher.update(&p.anti_alias.to_bits().to_le_bytes());
   *hasher.finalize().as_bytes()
 }
 
@@ -467,7 +614,6 @@ fn digest_hex(digest: &[u8; 32]) -> String {
   output
 }
 
-// Crops and scales the image, then samples it into terminal block character art.
 #[cfg(test)]
 fn process(img: &image::DynamicImage, p: &ImageConvertParams) -> Result<String, String> {
   process_cancellable(img, p, None)?.ok_or_else(|| "image conversion was cancelled".to_string())
@@ -515,8 +661,8 @@ fn process_cancellable(
 
   let (samples_per_cell_x, samples_per_cell_y) = match p.mode {
     ImageConvertMode::HalfBlock => (1, 2),
-    // The normalized glyph grid is 8×8. Terminal cells are about twice as tall
-    // as they are wide, so each vertical eighth uses two source samples.
+    // Sample an 8-by-8 glyph mask with twice the vertical resolution to match terminal-cell
+    // proportions.
     ImageConvertMode::MixBlock => (8, 16),
   };
   let pixel_width = output_width
@@ -531,6 +677,16 @@ fn process_cancellable(
     pixel_height,
     image::imageops::FilterType::Lanczos3,
   );
+  if is_cancelled(cancellation) {
+    return Ok(None);
+  }
+
+  // Tiny radii round to an identity filter; bypass them to avoid subnormal Gaussian parameters.
+  let resized = if p.anti_alias >= 0.01 {
+    image::imageops::blur(&resized, p.anti_alias as f32)
+  } else {
+    resized
+  };
   if is_cancelled(cancellation) {
     return Ok(None);
   }
@@ -652,8 +808,6 @@ fn scaled_dimensions(width: u32, height: u32, scale: f64) -> Result<(u32, u32), 
   Ok((scaled_width, scaled_height))
 }
 
-// Samples an RGBA image into a string of terminal half-block characters with foreground/background
-// color tags.
 fn sample_halfblock(
   rgba: &image::RgbaImage,
   w: u32,
@@ -814,8 +968,9 @@ fn best_mix_candidate(samples: &[Rgb; 64]) -> MixCandidate {
   for &(glyph, mask) in &MIX_BLOCK_CANDIDATES {
     let candidate = score_mix_candidate(glyph, mask, samples, all_color);
     if best.is_none_or(|current: MixCandidate| candidate.error < current.error) {
-      // Candidates are listed in codepoint order. Keeping the first equal score
-      // makes selection deterministic across platforms and runs.
+      // Retain the first equal-scoring glyph in codepoint order for reproducible
+      // platform-independent choices.
+
       best = Some(candidate);
     }
   }
@@ -1032,6 +1187,140 @@ mod tests {
       mix_output.ends_with('▀'),
       "solid cells use stable tie ordering"
     );
+  }
+
+  #[test]
+  fn anti_alias_preserves_output_geometry_and_smooths_edges_in_both_modes() {
+    let mut pixels = image::RgbaImage::new(32, 16);
+    for (x, _, pixel) in pixels.enumerate_pixels_mut() {
+      *pixel = if x < 16 {
+        image::Rgba([240, 20, 40, 255])
+      } else {
+        image::Rgba([20, 40, 240, 255])
+      };
+    }
+    let image = image::DynamicImage::ImageRgba8(pixels);
+    for mode in [ImageConvertMode::HalfBlock, ImageConvertMode::MixBlock] {
+      let params = ImageConvertParams {
+        mode,
+        output_width: Some(4),
+        output_height: Some(1),
+        anti_alias: 0.0,
+        ..Default::default()
+      };
+      let sharp = process(&image, &params).unwrap();
+      let smooth = process(
+        &image,
+        &ImageConvertParams {
+          anti_alias: 0.8,
+          ..params.clone()
+        },
+      )
+      .unwrap();
+      assert_ne!(sharp, smooth, "smoothing must reach both block encoders");
+      for text in [&sharp, &smooth] {
+        assert_eq!(text.lines().count(), 1);
+        assert_eq!(
+          text
+            .chars()
+            .filter(|character| ('\u{2580}'..='\u{259f}').contains(character))
+            .count(),
+          4
+        );
+      }
+      let tiny = process(
+        &image,
+        &ImageConvertParams {
+          anti_alias: f64::MIN_POSITIVE,
+          ..params
+        },
+      )
+      .unwrap();
+      assert_eq!(
+        tiny, sharp,
+        "subnormal filter radii must remain safe and effectively sharp"
+      );
+    }
+  }
+
+  #[test]
+  fn anti_alias_keeps_solid_truecolor_on_single_pixel_images() {
+    let image = image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+      1,
+      1,
+      image::Rgba([31, 61, 127, 255]),
+    ));
+    for mode in [ImageConvertMode::HalfBlock, ImageConvertMode::MixBlock] {
+      for anti_alias in [0.0, 0.8, MAX_ANTI_ALIAS_RADIUS] {
+        let params = ImageConvertParams {
+          mode,
+          anti_alias,
+          output_width: Some(1),
+          output_height: Some(1),
+          ..Default::default()
+        };
+        let output = process(&image, &params).unwrap();
+        assert!(
+          output.contains("<bg:#1f3d7f>"),
+          "solid RGB must not be reduced to a fixed palette"
+        );
+        assert!(output.contains("<fg:#1f3d7f>"));
+      }
+    }
+  }
+
+  #[test]
+  fn anti_alias_validation_rejects_unbounded_and_non_finite_radii() {
+    for anti_alias in [0.0, 0.8, 1.0, f64::MIN_POSITIVE, MAX_ANTI_ALIAS_RADIUS] {
+      let params = ImageConvertParams {
+        image_path: "sample.png".into(),
+        anti_alias,
+        ..Default::default()
+      };
+      assert!(validate(&params).is_ok());
+    }
+    for anti_alias in [
+      -0.01,
+      MAX_ANTI_ALIAS_RADIUS + 1.0,
+      f64::MAX,
+      f64::NAN,
+      f64::INFINITY,
+      f64::NEG_INFINITY,
+    ] {
+      let params = ImageConvertParams {
+        image_path: "sample.png".into(),
+        anti_alias,
+        ..Default::default()
+      };
+      assert!(validate(&params).unwrap_err().contains("anti_alias"));
+    }
+  }
+
+  #[test]
+  fn smoothing_strength_isolated_in_memory_and_disk_caches() {
+    let source = TestImage::new();
+    let cache_dir = source.root.join("cache");
+    let sharp_params = ImageConvertParams {
+      image_path: source.path.to_string_lossy().into_owned(),
+      output_width: Some(4),
+      output_height: Some(2),
+      anti_alias: 0.0,
+      ..Default::default()
+    };
+    let smooth_params = ImageConvertParams {
+      anti_alias: 0.8,
+      ..sharp_params.clone()
+    };
+    let mut service = ImageService::new(Some(cache_dir.clone()));
+    let sharp = service.convert(sharp_params.clone()).unwrap();
+    let smooth = service.convert(smooth_params.clone()).unwrap();
+    assert_ne!(sharp, smooth);
+    assert_eq!(service.cache.len(), 2);
+    assert_eq!(service.convert(sharp_params.clone()).unwrap(), sharp);
+    assert_eq!(service.convert(smooth_params.clone()).unwrap(), smooth);
+    let mut disk_service = ImageService::new(Some(cache_dir));
+    assert_eq!(disk_service.convert(sharp_params).unwrap(), sharp);
+    assert_eq!(disk_service.convert(smooth_params).unwrap(), smooth);
   }
 
   #[test]
@@ -1339,6 +1628,14 @@ mod tests {
         scale: 1.000_000_2,
         ..p1.clone()
       },
+      ImageConvertParams {
+        anti_alias: 0.0,
+        ..p1.clone()
+      },
+      ImageConvertParams {
+        anti_alias: 0.800_000_001,
+        ..p1.clone()
+      },
     ];
     let baseline = compute_cache_key(b"image-bytes", &p1);
     for variant in variants {
@@ -1439,7 +1736,6 @@ mod tests {
       ..Default::default()
     };
 
-    // First call: renders and writes the disk cache.
     let (r1, cache_path) = {
       let mut svc = ImageService::new(Some(tmp.clone()));
       let rendered = svc.convert(p.clone()).expect("first convert");
@@ -1449,7 +1745,6 @@ mod tests {
     };
     assert!(cache_path.is_file(), "disk cache entry should be written");
 
-    // Second call: a new instance must read from the disk cache.
     let r2 = {
       let mut svc = ImageService::new(Some(tmp.clone()));
       svc.convert(p.clone()).expect("second convert (from disk)")
@@ -1457,7 +1752,6 @@ mod tests {
 
     assert_eq!(r1, r2, "disk-cached result must match");
 
-    // Clean up.
     let _ = fs::remove_dir_all(&tmp);
   }
 
@@ -1510,7 +1804,9 @@ mod tests {
       "fixture replacement must keep the same mtime"
     );
 
-    // A new service must hash the replacement bytes, even when path, size, and mtime match.
+    // Replacement content must invalidate the cache even when filename, byte count, and
+    // modification time match.
+
     let mut svc2 = ImageService::new(Some(tmp.clone()));
     let r2 = svc2.convert(p).expect("replacement image should render");
     assert_ne!(

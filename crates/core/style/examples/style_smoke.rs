@@ -1,4 +1,4 @@
-//! Minimal entry: parses a color, applies it to a style and places a styled cell in a composed frame.
+//! Independent style smoke entry exercising the public API and checking its results.
 
 use tg_core_style::{
   CanvasCell, ComposedCell, ComposedFrame, TextColor, TextStyle, parse_text_color,

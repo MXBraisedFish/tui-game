@@ -1,3 +1,5 @@
+//! Game-session lifecycle, frame callbacks, host commands, and optional save support.
+
 use std::time::Duration;
 
 use serde_json::Value as JsonValue;
@@ -14,29 +16,55 @@ use super::{
 const MAX_REAL_DELTA: Duration = Duration::from_millis(250);
 const MAX_FIXED_UPDATES_PER_FRAME: usize = 8;
 
+/// The Lua session diagnostics representation used by this module.
+///
+/// # Fields
+///
+/// * `entry_path` - The filesystem path for entry.
+/// * `stats` - The stats.
+/// * `memory_bytes` - The memory measured in bytes.
 #[derive(Clone, Debug)]
 pub struct LuaSessionDiagnostics {
+  /// The filesystem path for entry.
   pub entry_path: std::path::PathBuf,
+  /// The stats.
   pub stats: LuaExecutionStats,
+  /// The memory measured in bytes.
   pub memory_bytes: usize,
 }
 
+/// The loading, active, stopped, or faulted state of the game session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameSessionState {
+  /// The operation is inactive.
   Inactive,
+  /// The operation is running.
   Running,
+  /// The operation is faulted.
   Faulted,
 }
 
+/// Initial save data, dimensions, capabilities, and bindings supplied when starting a game.
+///
+/// # Fields
+///
+/// * `target_fps` - The requested frame rate, or no explicit limit.
+/// * `min_size` - The min size.
+/// * `save_game_enabled` - The save game enabled.
+/// * `save_best_enabled` - The save best enabled.
 #[derive(Clone, Copy, Debug)]
 pub struct GameStartOptions {
-  pub target_fps: u32,
+  /// The requested frame rate, or no explicit limit.
+  pub target_fps: Option<u32>,
+  /// The min size.
   pub min_size: Size,
+  /// The save game enabled.
   pub save_game_enabled: bool,
+  /// The save best enabled.
   pub save_best_enabled: bool,
 }
 
-/// 唯一游戏 Session 的宿主生命周期。
+/// The lifecycle owner of one active game session and its save results.
 pub struct GameService {
   session: Option<LuaSession>,
   package: Option<PackageId>,
@@ -50,6 +78,7 @@ pub struct GameService {
 }
 
 impl GameService {
+  /// Create a game service with its initial state.
   pub fn new() -> Self {
     Self {
       session: None,
@@ -64,6 +93,14 @@ impl GameService {
     }
   }
 
+  /// Start the game state addressed by this operation.
+  ///
+  /// # Arguments
+  ///
+  /// * `session` - The Lua session receiving the operation.
+  /// * `package` - The validated package snapshot.
+  /// * `options` - The validated options for the operation.
+  /// * `log_session` - The log session.
   pub fn start(
     &mut self,
     session: LuaSession,
@@ -74,7 +111,7 @@ impl GameService {
     let previous_log = self.stop();
     self.generation = self.generation.wrapping_add(1).max(1);
     self.package = Some(package);
-    self.target_fps = Some(options.target_fps);
+    self.target_fps = options.target_fps;
     self.min_size = options.min_size;
     self.save_game_enabled = options.save_game_enabled;
     self.save_best_enabled = options.save_best_enabled;
@@ -84,6 +121,7 @@ impl GameService {
     previous_log
   }
 
+  /// Stop the game state addressed by this operation.
   pub fn stop(&mut self) -> Option<LogSessionId> {
     self.package = None;
     let log_session = self.log_session.take();
@@ -98,10 +136,12 @@ impl GameService {
     log_session
   }
 
+  /// Return the current log session.
   pub fn log_session(&self) -> Option<LogSessionId> {
     self.log_session
   }
 
+  /// Return the state for the addressed object.
   pub fn state(&self) -> GameSessionState {
     match self.session.as_ref().map(LuaSession::state) {
       Some(LuaSessionState::Running) => GameSessionState::Running,
@@ -110,18 +150,22 @@ impl GameService {
     }
   }
 
+  /// Report whether this game service is active.
   pub fn is_active(&self) -> bool {
     self.session.is_some()
   }
 
+  /// Return the current package id.
   pub fn package_id(&self) -> Option<&str> {
     self.package.as_ref().map(|package| package.mod_id.as_str())
   }
 
+  /// Return the current package.
   pub fn package(&self) -> Option<&PackageId> {
     self.package.as_ref()
   }
 
+  /// Return the current session token.
   pub fn session_token(&self) -> Option<LuaSessionToken> {
     self.session.as_ref().map(|_| LuaSessionToken {
       kind: LuaSessionKind::Game,
@@ -129,6 +173,7 @@ impl GameService {
     })
   }
 
+  /// Return the current diagnostics.
   pub fn diagnostics(&self) -> Option<LuaSessionDiagnostics> {
     self.session.as_ref().map(|session| LuaSessionDiagnostics {
       entry_path: session.entry_path().to_path_buf(),
@@ -137,36 +182,49 @@ impl GameService {
     })
   }
 
+  /// Update the base dimensions exposed to subsequent script drawing callbacks.
   pub fn set_base_size(&mut self, size: Size) {
     if let Some(session) = self.session.as_mut() {
       session.set_base_size(size);
     }
   }
 
+  /// Return the current package source.
   pub fn package_source(&self) -> Option<&PackageSource> {
     self.package.as_ref().map(|package| &package.source)
   }
 
+  /// Report whether the session owns a host object pool.
   pub fn has_objects(&self) -> bool {
     self.session.as_ref().is_some_and(LuaSession::has_objects)
   }
 
+  /// Read the session-owned object pool through the supplied callback when it exists.
   pub fn with_objects<R>(&self, operation: impl FnOnce(&LuaObjectPool) -> R) -> Option<R> {
     self.session.as_ref()?.with_objects(operation)
   }
 
+  /// Mutate the session-owned object pool through the supplied callback when it exists.
   pub fn with_objects_mut<R>(&self, operation: impl FnOnce(&mut LuaObjectPool) -> R) -> Option<R> {
     self.session.as_ref()?.with_objects_mut(operation)
   }
 
+  /// Return the package's requested frame-rate limit, if one was declared.
   pub fn target_fps(&self) -> Option<u32> {
     self.target_fps
   }
 
+  /// Return the terminal dimensions required by the package.
   pub fn min_size(&self) -> Size {
     self.min_size
   }
 
+  /// Deliver one owned event to its callback or HandleEvent under the session budget.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn dispatch_event(&mut self, delivery: &LuaEventDelivery) -> Result<(), LuaSessionError> {
     let Some(session) = self.session.as_mut() else {
       return Ok(());
@@ -174,7 +232,52 @@ impl GameService {
     session.dispatch_event(delivery)
   }
 
-  /// 执行固定 60 Hz 更新和一次帧更新，返回本帧固定更新次数。
+  /// Return the active keyboard subscription generation, or `None` when input is rejected.
+  pub fn input_generation(&self, data: &crate::LuaEventData) -> Option<u64> {
+    self
+      .session
+      .as_ref()
+      .and_then(|session| session.input_generation(data))
+  }
+
+  /// Report the current game's input-method preference, defaulting to a restriction.
+  pub fn input_method_locked(&self) -> bool {
+    self
+      .session
+      .as_ref()
+      .is_none_or(LuaSession::input_method_locked)
+  }
+
+  /// Close live game input and collect releases before an ownership boundary.
+  pub fn close_input(&mut self, actions: bool, keys: bool) -> Vec<crate::LuaEventData> {
+    self
+      .session
+      .as_mut()
+      .map_or_else(Vec::new, |session| session.close_input(actions, keys))
+  }
+
+  /// Forget game input on terminal focus loss or overlay takeover under its session policy.
+  pub fn focus_lost_input(&mut self) -> Vec<crate::LuaEventData> {
+    self
+      .session
+      .as_mut()
+      .map_or_else(Vec::new, LuaSession::focus_lost_input)
+  }
+
+  /// Drain closing releases created by a script subscription change.
+  pub fn take_input_releases(&mut self) -> Vec<crate::LuaEventData> {
+    self
+      .session
+      .as_mut()
+      .map_or_else(Vec::new, LuaSession::take_input_releases)
+  }
+
+  /// Execute fixed 60 Hz updates and one frame update, returning the fixed-update count.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn advance(&mut self, real_delta: Duration) -> Result<usize, LuaSessionError> {
     let Some(session) = self.session.as_mut() else {
       return Ok(0);
@@ -198,6 +301,12 @@ impl GameService {
     Ok(updates)
   }
 
+  /// Invoke the script Render callback and collect bounded draw commands for the frame.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for invalid session state, callback failures, invalid script data, or
+  /// execution/memory budget exhaustion.
   pub fn render(&mut self) -> Result<(), LuaSessionError> {
     let Some(session) = self.session.as_mut() else {
       return Ok(());
@@ -205,6 +314,7 @@ impl GameService {
     session.render()
   }
 
+  /// Drain host commands produced by the session callbacks.
   pub fn take_host_commands(&mut self) -> Vec<LuaHostCommand> {
     self
       .session
@@ -213,6 +323,7 @@ impl GameService {
       .unwrap_or_default()
   }
 
+  /// Drain the structured drawing commands produced for the current frame.
   pub fn take_draw_commands(&mut self) -> Vec<LuaDrawCommand> {
     self
       .session
@@ -221,6 +332,12 @@ impl GameService {
       .unwrap_or_default()
   }
 
+  /// Invoke the game-save callback and return its validated serializable result.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for a failing save callback or a result that violates the supported
+  /// save-data contract.
   pub fn save_game(&mut self) -> Result<Option<JsonValue>, LuaSessionError> {
     if !self.save_game_enabled {
       return Ok(None);
@@ -231,6 +348,12 @@ impl GameService {
       .map_or(Ok(None), LuaSession::save_game)
   }
 
+  /// Invoke the best-score callback and return its validated score result.
+  ///
+  /// # Errors
+  ///
+  /// Return a session error for a failing score callback or a score that violates the supported
+  /// result contract.
   pub fn save_best(&mut self) -> Result<Option<JsonValue>, LuaSessionError> {
     if !self.save_best_enabled {
       return Ok(None);
@@ -257,7 +380,7 @@ mod tests {
   use tg_core_package_id::{PackageSource, PackageType};
 
   fn test_package_id() -> PackageId {
-    PackageId::new(PackageSource::Mod, PackageType::Game, "test.game").unwrap()
+    PackageId::new(PackageSource::Mod, PackageType::Game, "test_game").unwrap()
   }
   use crate::{LuaPolicy, LuaSessionKind, LuaSessionSpec};
 
@@ -287,7 +410,7 @@ mod tests {
     .unwrap();
     LuaSession::load(
       LuaSessionSpec {
-        package_id: "test.game.service".to_string(),
+        package_id: "test_game_service".to_string(),
         session_kind: LuaSessionKind::Game,
         entry_path,
         fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
@@ -313,13 +436,36 @@ mod tests {
   }
 
   #[test]
+  fn package_target_fps_remains_optional_for_the_host_scheduler() {
+    let mut service = GameService::new();
+    service.start(
+      test_session(),
+      test_package_id(),
+      GameStartOptions {
+        target_fps: None,
+        min_size: Size {
+          width: 40,
+          height: 12,
+        },
+        save_game_enabled: false,
+        save_best_enabled: false,
+      },
+      None,
+    );
+
+    assert_eq!(service.target_fps(), None);
+    service.stop();
+    assert_eq!(service.target_fps(), None);
+  }
+
+  #[test]
   fn fixed_update_clamps_delta_and_catches_up_at_most_eight_times() {
     let mut service = GameService::new();
     service.start(
       test_session(),
       test_package_id(),
       GameStartOptions {
-        target_fps: 120,
+        target_fps: Some(120),
         min_size: Size {
           width: 40,
           height: 12,
@@ -351,7 +497,7 @@ mod tests {
       test_session(),
       test_package_id(),
       GameStartOptions {
-        target_fps: 60,
+        target_fps: Some(60),
         min_size: Size {
           width: 40,
           height: 12,
@@ -371,7 +517,7 @@ mod tests {
       test_session(),
       test_package_id(),
       GameStartOptions {
-        target_fps: 60,
+        target_fps: Some(60),
         min_size: Size {
           width: 40,
           height: 12,

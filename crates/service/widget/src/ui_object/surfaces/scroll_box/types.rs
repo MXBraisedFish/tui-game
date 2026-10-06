@@ -1,45 +1,63 @@
+//! Identifiers, configuration, states, and events shared by this module.
+
 use tg_service_layout::Rect;
 
 pub use tg_service_canvas::{ScrollBoxId, ScrollbarSide, ScrollbarStyle};
 
-/// 溢出处理方式。
+/// The allowed scrolling directions for content outside its viewport.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Overflow {
+  /// The hidden setting for overflow.
   Hidden,
+  /// The auto setting for overflow.
   Auto,
 }
 
-/// 滚动条显示策略。
+/// The policy selecting when a scrollbar should be displayed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScrollbarVisibility {
+  /// The auto setting for scrollbar visibility.
   Auto,
+  /// The always setting for scrollbar visibility.
   Always,
+  /// The never setting for scrollbar visibility.
   Never,
 }
 
-/// 滚动条占位策略。
+/// Overlay, inside, or reserved-space scrollbar placement.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ScrollbarLayout {
-  /// 滚动条绘制在 viewport 内；其占据的格子不计入内容可视区域。
+  /// The overlay setting for scrollbar layout.
   Overlay,
-  /// 滚动条占用一列/行，绘制在 viewport 外部，内容可视区域减少 1。
+
+  /// The reserve space setting for scrollbar layout.
   ReserveSpace,
-  /// 滚动条绘制在 viewport 内部最右侧/最底部，内容可视区域减少 1（不被遮挡）。
+
+  /// The inside setting for scrollbar layout.
   #[default]
   Inside,
 }
 
-/// 滚动条轴向（内部使用）。
+/// The horizontal or vertical dimension controlled by a scrollbar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ScrollbarAxis {
+  /// The vertical setting for scrollbar axis.
   Vertical,
+  /// The horizontal setting for scrollbar axis.
   Horizontal,
 }
 
-/// 滚动条策略。
+/// The visibility and layout settings for one scroll axis.
+///
+/// # Fields
+///
+/// * `vertical` - The vertical.
+/// * `horizontal` - The horizontal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ScrollbarPolicy {
+  /// The vertical.
   pub vertical: ScrollbarVisibility,
+  /// The horizontal.
   pub horizontal: ScrollbarVisibility,
 }
 
@@ -52,24 +70,55 @@ impl Default for ScrollbarPolicy {
   }
 }
 
-/// 可滚动绘制面配置。
+/// Configuration values controlling scroll box behavior.
+///
+/// # Fields
+///
+/// * `rect` - The rectangular region in terminal cells.
+/// * `content_width` - The content width in terminal columns.
+/// * `content_height` - The content height in terminal rows.
+/// * `overflow_y` - The overflow y.
+/// * `overflow_x` - The overflow x.
+/// * `scrollbar` - The scrollbar.
+/// * `scrollbar_style` - The scrollbar style.
+/// * `scrollbar_layout` - The scrollbar layout.
+/// * `visible` - Whether this surface participates in composition.
+/// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `mouse_wheel` - The mouse wheel.
+/// * `wheel_step` - The wheel step.
+/// * `h_wheel_step` - The h wheel step.
+/// * `emit_scroll_events` - The emit scroll events.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScrollBoxOptions {
+  /// The rectangular region in terminal cells.
   pub rect: Rect,
+  /// The content width in terminal columns.
   pub content_width: u16,
+  /// The content height in terminal rows.
   pub content_height: u16,
+  /// The overflow y.
   pub overflow_y: Overflow,
+  /// The overflow x.
   pub overflow_x: Overflow,
+  /// The scrollbar.
   pub scrollbar: ScrollbarPolicy,
+  /// The scrollbar style.
   pub scrollbar_style: ScrollbarStyle,
+  /// The scrollbar layout.
   pub scrollbar_layout: ScrollbarLayout,
+  /// Whether this surface participates in composition.
   pub visible: bool,
+  /// Whether empty cells cover lower surfaces.
   pub opaque: bool,
+  /// The mouse wheel.
   pub mouse_wheel: bool,
-  /// 纵向滚轮步长（每次滚轮滚动的行数）。
+
+  /// The wheel step.
   pub wheel_step: u16,
-  /// 横向滚轮步长（每次滚轮滚动的列数）。
+
+  /// The h wheel step.
   pub h_wheel_step: u16,
+  /// The emit scroll events.
   pub emit_scroll_events: bool,
 }
 
@@ -94,8 +143,16 @@ impl Default for ScrollBoxOptions {
   }
 }
 
-/// 滚动盒子事件。
+/// A scroll box event payload queued for its owning consumer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScrollBoxEvent {
-  Scrolled { id: ScrollBoxId, x: u16, y: u16 },
+  /// A scrolled notification delivered to the owning consumer.
+  Scrolled {
+    /// The identifier of the owned object.
+    id: ScrollBoxId,
+    /// The horizontal coordinate in terminal cells.
+    x: u16,
+    /// The vertical coordinate in terminal cells.
+    y: u16,
+  },
 }

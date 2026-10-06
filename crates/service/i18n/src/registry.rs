@@ -1,3 +1,5 @@
+//! Reading the deployed registry of selectable languages.
+
 use std::fs;
 
 use serde::Deserialize;
@@ -5,17 +7,24 @@ use serde::Deserialize;
 use tg_service_log::{LogService, LogSource};
 use tg_service_storage::StorageService;
 
-/// An entry of the language registry.
+/// A registered language and the metadata required to locate its resources.
+///
+/// # Fields
+///
+/// * `code` - The stable error or language code.
+/// * `name` - The name used to identify the object or field.
+/// * `direction` - The direction.
 #[derive(Clone, Debug, Deserialize)]
 pub struct LanguageRegistryEntry {
+  /// The stable error or language code.
   pub code: String,
+  /// The name used to identify the object or field.
   pub name: String,
+  /// The direction.
   pub direction: String,
 }
 
-/// Loads the language registry from disk.
-///
-/// Logs a warning and returns an empty list when the file cannot be read or parsed.
+/// Read registered language metadata and report malformed or missing registry data.
 pub fn load_language_registry(
   storage: &StorageService,
   log: &mut LogService,
