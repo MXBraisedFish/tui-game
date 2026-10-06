@@ -1,14 +1,14 @@
 {
   "branch": "dev",
-  "commit": "40d2a6402d41ecc6a23d39b1d4c370c30c977244",
+  "commit": "5b76bdc00baf1a509f389c7a61718985b4590537",
   "working_tree_snapshot": true,
   "rustc": "rustc 1.93.0 (254b59607 2026-01-19)\nbinary: rustc\ncommit-hash: 254b59607d4417e9dffbc307138ae5c86280fe4c\ncommit-date: 2026-01-19\nhost: x86_64-pc-windows-gnu\nrelease: 1.93.0\nLLVM version: 21.1.8\n",
   "sources": {
-    "Cargo.toml": "0214732635cb046125c3a4819df479f39b103bf0baa3ae5ca046e1d8105a32ae",
-    "Cargo.lock": "f6425f473f95470bab12f5e638b9d0e927ed24dec3b5ea12f7b4e75f226eaad3",
-    "crates/service/screenshot/Cargo.toml": "d319a2dcc38f73415794244d39dcd46ae329d6fd0ca7ef7d6bfdf9d76a693a49",
-    "crates/service/screenshot/src/lib.rs": "aad1a7192061a7bfd9827f83dc0267f7cb4d52c44d00816636005a8fefe2aa0c",
-    "crates/service/render_pipeline/src/presenter.rs": "7d491a454235d3c1db6d0d352aab59533b512988fc5071ddac6ce91f28bf9a7e"
+    "Cargo.toml": "a75438cc33e8975c820b898ae6bfd302b231cf06f40c545320667bc2fe99f490",
+    "Cargo.lock": "6d47a32dca8631f810a612abad7562e284fbbe3413843d918c79919505d7e010",
+    "crates/service/screenshot/Cargo.toml": "cdb4a027edec8b93c3970bce4b5faf839c9ac221200faf0fdebd4f69a0ef463a",
+    "crates/service/screenshot/src/lib.rs": "2ce7c286c807f6f78decb824f8a82ea18f227289de987e6c8fcaa3f1146af4ba",
+    "crates/service/render_pipeline/src/presenter.rs": "78782843d56671fba2a0331445ea0207ffd06795114e2c528fc7182e630faba3"
   },
   "packages": [
     {
@@ -2396,5 +2396,6 @@
       "version": "4.2.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index"
     }
-  ]
+  ],
+  "cargo": "cargo 1.93.0 (083ac5135 2025-12-15)"
 }
