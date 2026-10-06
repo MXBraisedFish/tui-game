@@ -157,13 +157,16 @@ serialization.json_decode
 ```lua
 local json = '{"name":"TUI","version":1}'
 local data = serialization.json_decode(json)
-debug.print(data.name .. ", v" .. tostring(data.version))
+debug.print(table.pretty(data))
 ```
 
 **输出：**
 
 ```lua
-
+{
+  name = "TUI",
+   version = 1
+  }
 ```
 
 ## 额外说明
