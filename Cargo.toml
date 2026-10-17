@@ -71,3 +71,12 @@ sysinfo = "0.38.3"
 [dev-dependencies]
 tg-service-async = { path = "crates/service/async", features = ["test-support"] }
 tg-service-storage = { path = "crates/service/storage", features = ["test-support"] }
+
+# Keep development artifacts small and stable. Full debug info makes every
+# binary several hundred MB, while incremental compilation adds a separate
+# cache directory for each build configuration. Line tables still resolve
+# panic locations, and a fixed configuration makes builds overwrite the same
+# artifact paths instead of accumulating new hashes.
+[profile.dev]
+debug = "line-tables-only"
+incremental = false
