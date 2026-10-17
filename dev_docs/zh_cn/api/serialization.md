@@ -165,8 +165,8 @@ debug.print(table.pretty(data))
 ```lua
 {
   name = "TUI",
-   version = 1
-  }
+  version = 1
+}
 ```
 
 ## 额外说明
@@ -205,9 +205,9 @@ serialization.csv_encode
 
 ```lua
 local data = {
-    { "Name", "Score" },
-    { "Alice", 95 },
-    { "Bob", 87 }
+  { "Name", "Score" },
+  { "Alice", 95 },
+  { "Bob", 87 }
 }
 local csv = serialization.csv_encode(data)
 debug.print(csv)
@@ -215,8 +215,10 @@ debug.print(csv)
 
 **输出：**
 
-```lua
-
+```csv
+Name,Score
+Alice,95
+Bob,87
 ```
 
 ## 额外说明
@@ -256,13 +258,26 @@ serialization.csv_decode
 ```lua
 local csv = "Name,Score\nAlice,95\nBob,87"
 local data = serialization.csv_decode(csv)
-debug.print(data[2][1] .. ": " .. tostring(data[2][2]))
+debug.print(table.pretty(data))
 ```
 
 **输出：**
 
 ```lua
-
+{
+  [1] = {
+    [1] = "Name", 
+    [2] = "Score"
+  }, 
+  [2] = {
+    [1] = "Alice", 
+    [2] = "95"
+  }, 
+  [3] = {
+    [1] = "Bob", 
+    [2] = "87"
+  }
+}
 ```
 
 ## 额外说明
@@ -307,8 +322,9 @@ debug.print(yaml)
 
 **输出：**
 
-```lua
-
+```yaml
+name: TUI
+version: 1
 ```
 
 ## 额外说明
@@ -348,13 +364,16 @@ serialization.yaml_decode
 ```lua
 local yaml = "name: TUI\nversion: 1"
 local data = serialization.yaml_decode(yaml)
-debug.print(data.name)
+debug.print(table.pretty(data))
 ```
 
 **输出：**
 
 ```lua
-
+{
+  name = "TUI", 
+  version = 1
+}
 ```
 
 ## 额外说明
@@ -399,8 +418,9 @@ debug.print(toml)
 
 **输出：**
 
-```lua
-
+```toml
+name = "TUI"
+version = 1
 ```
 
 ## 额外说明
@@ -441,13 +461,16 @@ serialization.toml_decode
 ```lua
 local toml = 'name = "TUI"\nversion = 1'
 local data = serialization.toml_decode(toml)
-debug.print(data.name)
+debug.print(table.pretty(data))
 ```
 
 **输出：**
 
 ```lua
-
+{
+  name = "TUI", 
+  version = 1
+}
 ```
 
 ## 额外说明
@@ -495,8 +518,13 @@ debug.print(ini)
 
 **输出：**
 
-```lua
+```ini
+[logging]
+level=debug
 
+[server]
+host=127.0.0.1
+port=8080
 ```
 
 ## 额外说明
@@ -538,13 +566,18 @@ serialization.ini_decode
 ```lua
 local ini = "[server]\nhost = 127.0.0.1\nport = 8080"
 local data = serialization.ini_decode(ini)
-debug.print(data.server.host)
+debug.print(table.pretty(data))
 ```
 
 **输出：**
 
 ```lua
-
+{
+  server = {
+    host = "127.0.0.1", 
+    port = "8080"
+  }
+}
 ```
 
 ## 额外说明
@@ -594,8 +627,10 @@ debug.print(xml)
 
 **输出：**
 
-```lua
-
+```xml
+<root version="1.0">
+  <child id="1">Hello</child>
+</root>
 ```
 
 ## 额外说明
@@ -637,13 +672,25 @@ serialization.xml_decode
 ```lua
 local xml = '<root version="1.0"><child id="1">Hello</child></root>'
 local data = serialization.xml_decode(xml)
-debug.print(data.root.child._text)
+debug.print(table.pretty(data))
 ```
 
 **输出：**
 
 ```lua
-
+{
+  root = {
+    _attr = {
+      version = "1.0"
+    }, 
+    child = {
+      _attr = {
+        id = "1"
+      }, 
+      _text = "Hello"
+    }
+  }
+}
 ```
 
 ## 额外说明
@@ -690,7 +737,7 @@ debug.print("packed " .. tostring(#bytes) .. " bytes")
 **输出：**
 
 ```lua
-
+packed 8 bytes
 ```
 
 ## 额外说明
@@ -747,7 +794,7 @@ debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. n
 **输出：**
 
 ```lua
-
+100, 200; next=9
 ```
 
 ## 额外说明
@@ -794,7 +841,7 @@ debug.print(tostring(size))
 **输出：**
 
 ```lua
-
+8
 ```
 
 ## 额外说明
