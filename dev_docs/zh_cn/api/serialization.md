@@ -123,6 +123,7 @@ debug.print(json)
 ## 额外说明
 
 - 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
+- `serialization.NULL` 会被解析为 JSON `null`。
 
 ---
 
@@ -223,7 +224,7 @@ Bob,87
 
 ## 额外说明
 
-- 参数 `rows` 必须是二维数组表，单元格只能是标量；CSV 不支持 `serialization.NULL`。
+- 参数 `rows` 必须是二维数组表。
 
 ---
 
@@ -329,7 +330,8 @@ version: 1
 
 ## 额外说明
 
-- 参数 `value` 必须可序列化；`serialization.NULL` 编码为 YAML null。
+- 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
+- `serialization.NULL` 会被解析为 YAML `null`。
 
 ---
 
@@ -378,7 +380,7 @@ debug.print(table.pretty(data))
 
 ## 额外说明
 
-- 参数 `text` 必须是有效文本；YAML null 解码为 `serialization.NULL`。
+- YAML `null` 会被解析为 `serialization.NULL`。
 
 ---
 
@@ -425,8 +427,7 @@ version = 1
 
 ## 额外说明
 
-- 参数 `value` 必须可序列化；TOML 不支持 null，包含 `serialization.NULL` 时返回错误。
-- TOML 的根必须是对象表，数组或标量根会抛出错误。
+- 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 
 ---
 
@@ -472,10 +473,6 @@ debug.print(table.pretty(data))
   version = 1
 }
 ```
-
-## 额外说明
-
-- TOML 文档的根总是对象表，解码结果总是表，且不会包含 `serialization.NULL`。
 
 ---
 
@@ -529,9 +526,7 @@ port=8080
 
 ## 额外说明
 
-- 参数 `value` 必须可序列化；INI 不支持 `serialization.NULL`。
-- 参数 `value` 必须是对象表；只支持一层节，节内值必须是标量。
-- 键名与节名不能为空，也不能含 `[`、`]`、`=`、`;`、`#` 或换行；值不能含换行。
+- 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 
 ---
 
@@ -579,10 +574,6 @@ debug.print(table.pretty(data))
   }
 }
 ```
-
-## 额外说明
-
-- INI 的值都解码为字符串；节解码为嵌套表，节外的键直接放在根表中。
 
 ---
 
@@ -635,9 +626,7 @@ debug.print(xml)
 
 ## 额外说明
 
-- 最外层表必须只有一个根元素。元素的 `_attr` 表表示属性，`_text` 表示文本；同名子元素可用数组表示。不能在同一元素中混合文本与子元素。
-
-- 参数 `value` 必须可序列化；XML 不支持 `serialization.NULL`。
+- 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 
 ---
 
@@ -693,12 +682,6 @@ debug.print(table.pretty(data))
 }
 ```
 
-## 额外说明
-
-- XML 中无属性且无子元素的元素解码为字符串本身，其余元素解码为表；属性的 `_attr`、文本的 `_text` 仅在非空时出现。
-
-- 重复子元素组成数组，根元素名是结果表的唯一键。不支持 DTD、实体声明及文本与子元素混排。
-
 ---
 
 ## `binary_pack`
@@ -739,13 +722,6 @@ debug.print("packed " .. tostring(#bytes) .. " bytes")
 ```lua
 packed 8 bytes
 ```
-
-## 额外说明
-
-- 格式串后依次传入数值或字节字符串，数量与类型必须匹配；这些值是打包数据，不作为选项表解析，也不接受表或 `nil`。
-- 格式串项：`b`/`B`、`h`/`H`、`l`/`j`/`L`/`J`/`T` 分别是 1、2、8 字节整数（小写有符号、大写无符号）；`i`/`I` 后跟可选字节数（默认 4，取值范围 $[1, 16]$）；`f`/`d`/`n` 是 4、8 字节浮点数；`c` 后必须跟字节数，表示定长字符串；`z` 是零结尾字符串；`s` 后跟可选的长度前缀字节数（默认 8，取值范围 $[1, 8]$）；`x` 是一个填充字节。
-- 字节序默认为本机；`<` 改为小端，`>` 改为大端，`=` 恢复本机。
-- 默认最大对齐为 1，即默认不填充；`!n` 把最大对齐设为 $[1, 16]$ 的 2 的幂（省略 `n` 时为本机指针宽度），`X` 按后随的定长项对齐。
 
 ---
 
@@ -799,8 +775,6 @@ debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. n
 
 ## 额外说明
 
-- 必填参数按顺序传入，选填参数放在末尾选项表中；`pos` 是选项表字段，不是第三个位置参数。
-- 返回的第二个值可作为下一次解包调用的 `pos`。
 - 选填参数 `pos` 取值范围为 $[1, x]$，$x$ 为 `data` 的字节数加 $1$，超出时抛出错误。
 
 ---
@@ -846,4 +820,4 @@ debug.print(tostring(size))
 
 ## 额外说明
 
-- 参数 `fmt` 只能包含定长项，含 `z`、`s` 等变长项时会抛出错误。
+- 参数 `fmt` 只能包含定长项，含变长项时会抛出错误。
