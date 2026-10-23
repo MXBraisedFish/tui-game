@@ -152,7 +152,12 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
     ),
     ("remove", "table.remove", &["list"], &["pos"]),
     ("sort", "table.sort", &["list"], &["comp"]),
-    ("unpack", "table.unpack", &["list"], &["i", "j"]),
+    (
+      "unpack",
+      "table.unpack",
+      &["list"],
+      &["start_index", "end_index"],
+    ),
   ];
   for (name, method, required_names, option_fields) in option_methods {
     let function = source.get::<Function>(name)?;
@@ -279,7 +284,7 @@ fn standard_options(
         value
       } else {
         match *field {
-          "i" | "j" | "pos" | "start_index" | "end_index" => {
+          "pos" | "start_index" | "end_index" => {
             Value::Integer(args::integer(value, method, field)?)
           }
           "separator" => Value::String(args::lua_string(value, method, field)?),

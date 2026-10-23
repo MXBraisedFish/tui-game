@@ -2202,7 +2202,7 @@ mod tests {
       )
       .replace(
         r#"table.unpack(packed, 1, packed.n)"#,
-        r#"table.unpack(packed, { i = 1, j = packed.n })"#,
+        r#"table.unpack(packed, { start_index = 1, end_index = packed.n })"#,
       )
       .replace(
         r#"table.concat({ 1, "二", 3 }, "|", 1, 3)"#,
@@ -4924,9 +4924,16 @@ mod tests {
           debug.assert(table.move(list, 1, 2, 1, { target = target }) == target
               and target[1] == nil and target[2] == payload)
           local packed = table.pack("a", nil, "c")
-          local a, b, c = table.unpack(packed, { j = packed.n })
+          local a, b, c = table.unpack(packed, { end_index = packed.n })
           debug.assert(a == "a" and b == nil and c == "c"
-              and select("#", table.unpack(packed, { j = packed.n })) == 3)
+              and select("#", table.unpack(packed, { end_index = packed.n })) == 3)
+          local middle, last = table.unpack(packed, { start_index = 2, end_index = 3 })
+          debug.assert(middle == nil and last == "c")
+          debug.assert(table.unpack({"a", "b"}, { start_index = 2 }) == "b"
+              and table.unpack({"a", "b"}) == "a"
+              and table.unpack({"a", "b"}, {}) == "a"
+              and table.unpack({"a", "b"}, nil) == "a"
+              and select("#", table.unpack(packed, { start_index = 3, end_index = 2 })) == 0)
           debug.assert(table.concat({"a", "b", "c"}, { separator = "-", start_index = 2 }) == "b-c"
               and table.concat({"a", "b", "c"}, { end_index = 2 }) == "ab"
               and table.concat({"a", "b", "c"}, { separator = "-", start_index = 2, end_index = 2 }) == "b"
@@ -4970,7 +4977,10 @@ mod tests {
               and fails(function() table.remove({}, { pos = 1.5 }) end)
               and fails(function() table.move({}, 1, 0, 1, { target = false }) end)
               and fails(function() table.sort({}, { comp = false }) end)
-              and fails(function() table.unpack({}, { j = "2" }) end)
+              and fails(function() table.unpack({}, { end_index = "2" }) end)
+              and fails(function() table.unpack({}, { start_index = 1.5 }) end)
+              and fails(function() table.unpack({}, { i = 1 }) end)
+              and fails(function() table.unpack({}, { j = 2 }) end)
               and fails(function() table.concat({}, {}, {}) end))
           local ok, received, missing = debug.pcall(function(value, hole)
             return value, hole
@@ -5018,7 +5028,7 @@ mod tests {
             end))
           debug.assert(fails(function() table.move({}, 1, 16385, 1) end)
               and fails(function() table.concat({}, { separator = ",", start_index = 1, end_index = 16385 }) end)
-              and fails(function() table.unpack({}, { i = 1, j = 16385 }) end))
+              and fails(function() table.unpack({}, { start_index = 1, end_index = 16385 }) end))
 
           local packed = table.pack("a", nil, "c")
           debug.assert(packed.n == 3 and packed[1] == "a"
@@ -5026,7 +5036,7 @@ mod tests {
           local directly_packed = table.pack("x", nil, "z")
           debug.assert(directly_packed.n == 3 and directly_packed[1] == "x"
               and directly_packed[2] == nil and directly_packed[3] == "z")
-          local first, second, third = table.unpack(packed, { i = 1, j = packed.n })
+          local first, second, third = table.unpack(packed, { start_index = 1, end_index = packed.n })
           debug.assert(first == "a" and second == nil and third == "c")
 
           local sparse = {

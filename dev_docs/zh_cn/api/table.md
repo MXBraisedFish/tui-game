@@ -81,8 +81,8 @@ a | b | c
 
 ## 额外说明
 
-- 选填参数 `i` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度，$j - i + 1$ 不得超过 $16384$。
-- 选填参数 `j` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度。
+- 选填参数 `start_index` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度，$end_index - start_index + 1$ 不得超过 $16384$。
+- 选填参数 `end_index` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度。
 
 ---
 
@@ -228,7 +228,6 @@ true
 ## 额外说明
 
 - 方法实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
-- 未给 `target` 时，返回源表 `src`。
 - 必填参数 `first` 与 `last` 的跨度 $last - first + 1$ 不得超过 $16384$。
 - 必填参数 `target_start` 加上跨度 $last - first + 1$ 后不得超过 $9223372036854775807$。
 
@@ -316,10 +315,10 @@ table.unpack
 
 ### 选填参数
 
-| 参数名 | 类型    | 默认值  | 说明     |
-| ------ | ------- | ------- | -------- |
-| `i`    | integer | `1`     | 起始索引 |
-| `j`    | integer | `#list` | 结束索引 |
+| 参数名        | 类型    | 默认值  | 说明     |
+| ------------- | ------- | ------- | -------- |
+| `start_index` | integer | `1`     | 起始索引 |
+| `end_index`   | integer | `#list` | 结束索引 |
 
 ## 返回值
 
@@ -337,7 +336,7 @@ local a1, b1, c1 = table.unpack(t1)
 debug.print(a1 .. " " .. b1 .. " " .. c1)
 
 local t2 = { 10, 20, 30, 40 }
-local a2, b2 = table.unpack(t2, { i = 2 })
+local a2, b2 = table.unpack(t2, { start_index = 2 })
 debug.print(a2 .. " " .. b2)
 ```
 
@@ -350,8 +349,7 @@ a b c
 
 ## 额外说明
 
-- 方法返回多参数而非表。
-- 选填参数 `i` 与 `j` 的跨度 $j - i + 1$ 不得超过 $16384$。
+- 选填参数 `start_index` 与选填参数 `end_index` 的跨度 $end_index - start_index + 1$ 不得超过 $16384$。
 
 ---
 

@@ -57,9 +57,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       debug.assert(table.move(list, 1, 3, 1, {target = target}) == target)
       debug.assert(target[3] == payload)
       local packed = table.pack("a", nil, "c")
-      local a, b, c = table.unpack(packed, {j = packed.n})
+      local a, b, c = table.unpack(packed, {end_index = packed.n})
       debug.assert(a == "a" and b == nil and c == "c")
-      debug.assert(select("#", table.unpack(packed, {j = packed.n})) == 3)
+      debug.assert(select("#", table.unpack(packed, {end_index = packed.n})) == 3)
+      local middle, last = table.unpack(packed, {start_index = 2, end_index = 3})
+      debug.assert(middle == nil and last == "c")
+      for _, options in ipairs({{i = 1}, {j = 3}}) do
+        debug.assert(not select(1, debug.pcall(function() table.unpack(packed, options) end)))
+      end
       local numbers = {1, 3, 2}
       table.sort(numbers, {comp = function(left, right) return left > right end})
       debug.assert(numbers[1] == 3 and numbers[3] == 1)
