@@ -13,7 +13,7 @@
   "entry": "main",
   "min_width": 100,
   "min_height": 23,
-  "mouse": true,
+  "mouse": false,
   "truecolor": true,
   "target_fps": 60,
   "save_game": false,

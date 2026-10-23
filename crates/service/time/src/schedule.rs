@@ -31,7 +31,7 @@ pub struct ScheduledTimerOptions {
   pub duration: Duration,
   /// The wait before the first execution starts.
   pub delay: Duration,
-  /// The wait between executions, including any recurring delay.
+  /// The wait between executions, independent of the initial delay.
   pub gap: Duration,
   /// The total number of executions, or `None` for unlimited repetition.
   pub repetitions: Option<u32>,

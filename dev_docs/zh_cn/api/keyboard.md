@@ -1,6 +1,6 @@
 # keyboard 库
 
-`keyboard` 决定游戏是否接收动作事件和原始按键事件。
+`keyboard` 用于控制键盘动作事件。
 
 ---
 

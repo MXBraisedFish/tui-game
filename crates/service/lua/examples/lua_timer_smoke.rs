@@ -43,7 +43,7 @@ fn main() {
         end})
         timer.start(id)
       end
-      regular = timer.create(0.1, {delay = 0.05, interval = -0.05, loop = true, ["repeat"] = 2})
+      regular = timer.create(0.1, {delay = 0.05, interval = 0, loop = true, ["repeat"] = 2})
       timer.start(regular)
     end
     function HandleEvent(event)
@@ -55,8 +55,9 @@ fn main() {
     function UpdateFrame(dt, alpha)
       frame = frame + 1
       if frame == 1 then debug.assert(count == 128 and handled == 0) end
-      if frame == 2 then debug.assert(count == 130 and handled == 1) end
-      if frame == 3 then
+      if frame == 2 then debug.assert(count == 130 and handled == 0) end
+      if frame == 3 or frame == 4 then debug.assert(count == 130 and handled == 1) end
+      if frame == 5 then
         debug.assert(count == 130 and handled == 2 and timer.get_info(regular).state == "finished")
         debug.assert(timer.set(regular, {loop = false, tip = "new"}))
         debug.assert(timer.get_info(regular).state == "idle" and timer.get_info(regular).executed_count == 0)
@@ -93,10 +94,10 @@ fn main() {
         save_best_enabled: false,
       })
       .expect("initialize timer session");
-    for frame in 1..=3 {
+    for frame in 1..=5 {
       let events = session
         .with_objects_mut(|objects| {
-          TimeService::new().update(&mut objects.runtime_mut().time, Duration::from_millis(100));
+          TimeService::new().update(&mut objects.runtime_mut().time, Duration::from_millis(50));
           objects.take_timer_events()
         })
         .expect("session pool");
@@ -112,7 +113,7 @@ fn main() {
       }
       session.update().expect("fixed update");
       session
-        .update_frame(Duration::from_millis(100), 0.0)
+        .update_frame(Duration::from_millis(50), 0.0)
         .expect("verify timer state");
       session.render().expect("render");
     }

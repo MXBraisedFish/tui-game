@@ -1,6 +1,6 @@
 # table 库
 
-`table` 提供表的拼接、插入、排序、复制和统计等操作。
+`table` 提供表的操作。
 
 ---
 
@@ -48,11 +48,11 @@ table.concat
 
 ### 选填参数
 
-| 参数名 | 类型    | 默认值  | 说明               |
-| ------ | ------- | ------- | ------------------ |
-| `sep`  | string  | `""`    | 相邻元素间的分隔符 |
-| `i`    | integer | `1`     | 起始索引           |
-| `j`    | integer | `#list` | 结束索引           |
+| 参数名        | 类型    | 默认值  | 说明               |
+| ------------- | ------- | ------- | ------------------ |
+| `separator`   | string  | `""`    | 相邻元素间的分隔符 |
+| `start_index` | integer | `1`     | 起始索引           |
+| `end_index`   | integer | `#list` | 结束索引           |
 
 ## 返回值
 
@@ -69,19 +69,20 @@ local t1 = { "apple", "banana", "grape" }
 debug.print(table.concat(t1))
 
 local t2 = { "a", "b", "c" }
-debug.print(table.concat(t2, { sep = " | " }))
+debug.print(table.concat(t2, { separator = " | " }))
 ```
 
 **输出：**
 
 ```lua
-
+applebananagrape
+a | b | c
 ```
 
 ## 额外说明
 
 - 选填参数 `i` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度，$j - i + 1$ 不得超过 $16384$。
-- 选填参数 `j` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度，小于 `i` 时返回空字符串。
+- 选填参数 `j` 取值范围为 $[1, n]$，$n$ 为 `list` 的数组长度。
 
 ---
 
@@ -119,7 +120,7 @@ table.insert
 ```lua
 local t1 = { "x", "y" }
 table.insert(t1, "z")
-debug.print(table.pretty(t1) .. "\n")
+debug.print(table.pretty(t1))
 
 local t2 = { "a", "c" }
 table.insert(t2, "b", { pos = 2 })
@@ -129,12 +130,21 @@ debug.print(table.pretty(t2))
 **输出：**
 
 ```lua
-
+{
+  [1] = "x", 
+  [2] = "y", 
+  [3] = "z"
+}
+{
+  [1] = "a", 
+  [2] = "b", 
+  [3] = "c"
+}
 ```
 
 ## 额外说明
 
-- 选填参数 `pos` 取值范围为 $[1, n + 1]$，$n$ 为 `list` 的数组长度，越界时抛出错误。
+- 选填参数 `pos` 取值范围为 $[1, n + 1]$，$n$ 为 `list` 的数组长度。
 
 ---
 
@@ -167,7 +177,7 @@ table.move
 
 ## 返回值
 
-返回目标表 `target`。
+返回一个目标表。
 
 | 类型  | 说明   |
 | ----- | ------ |
@@ -190,14 +200,36 @@ debug.print(table.pretty(t2))
 **输出：**
 
 ```lua
+{
+  [1] = "a", 
+  [2] = "b", 
+  [3] = "c", 
+  [4] = "b", 
+  [5] = "c"
+}
+true
+{
+  [1] = "a", 
+  [2] = "b", 
+  [3] = "c", 
+  [4] = "b", 
+  [5] = "c"
+}
 
+{
+  [1] = 1, 
+  [2] = 2, 
+  [3] = 3, 
+  [4] = 1, 
+  [5] = 2
+}
 ```
 
 ## 额外说明
 
-- 方法 实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
+- 方法实际操作为复制元素并覆盖目标位置的元素，而非剪切并移动。
 - 未给 `target` 时，返回源表 `src`。
-- 必填参数 `first` 与 `last` 的跨度 $last - first + 1$ 不得超过 $16384$；`last` 小于 `first` 时不复制任何元素。
+- 必填参数 `first` 与 `last` 的跨度 $last - first + 1$ 不得超过 $16384$。
 - 必填参数 `target_start` 加上跨度 $last - first + 1$ 后不得超过 $9223372036854775807$。
 
 ---
@@ -233,20 +265,30 @@ debug.print(table.pretty(packed2))
 **输出：**
 
 ```lua
+{
+  [1] = "a", 
+  [2] = "b", 
+  [3] = "c",
+  n = 3
+}
 
+{
+  [1] = 1, 
+  [3] = 3, 
+  n = 3
+}
 ```
 
 ## 额外说明
 
-- 要保存的值依次传入，嵌套表按引用保留（不深拷贝）；没有值时使用 `table.pack()`。
-
 - 返回值混合表结构如下：
 
 ```lua
-local packed = {
-  [1] = 1,
-  [3] = 3,
-  n = 3,
+{
+  [1] = 1, -- any（参数1）
+  -- nil 不会显式保留
+  [3] = 3, -- any（参数3）
+  n = 3,   -- integer（元素数量）
 }
 ```
 
@@ -302,13 +344,14 @@ debug.print(a2 .. " " .. b2)
 **输出：**
 
 ```lua
-
+a b c
+20 30
 ```
 
 ## 额外说明
 
-- 方法 返回多参数而非表。
-- 选填参数 `i` 与 `j` 的跨度 $j - i + 1$ 不得超过 $16384$；`j` 小于 `i` 时不返回任何值。
+- 方法返回多参数而非表。
+- 选填参数 `i` 与 `j` 的跨度 $j - i + 1$ 不得超过 $16384$。
 
 ---
 
@@ -349,22 +392,36 @@ table.remove
 ```lua
 local t1 = { "a", "b", "c", "d" }
 local removed1 = table.remove(t1)
-debug.print(removed1 .. " " .. table.pretty(t1) .. "\n")
+debug.print(removed1)
+debug.print(table.pretty(t1) .. "\n")
 
 local t2 = { 10, 20, 30, 40 }
 local removed2 = table.remove(t2, { pos = 2 })
-debug.print(removed2 .. " " .. table.pretty(t2))
+debug.print(removed2)
+debug.print(table.pretty(t2))
 ```
 
 **输出：**
 
 ```lua
+d
+{
+  [1] = "a", 
+  [2] = "b", 
+  [3] = "c"
+}
 
+20
+{
+  [1] = 10, 
+  [2] = 30, 
+  [3] = 40
+}
 ```
 
 ## 额外说明
 
-- 选填参数 `pos` 取值范围为 $[1, n + 1]$，$n$ 为 `list` 的数组长度，越界时抛出错误。
+- 选填参数 `pos` 取值范围为 $[1, n + 1]$，$n$ 为 `list` 的数组长度。
 
 ---
 
@@ -423,13 +480,39 @@ debug.print(table.pretty(t4))
 **输出：**
 
 ```lua
+{
+  [1] = 1, 
+  [2] = 2, 
+  [3] = 3, 
+  [4] = 4
+}
 
+{
+  [1] = "apple", 
+  [2] = "banana", 
+  [3] = "cherry", 
+  [4] = "grape"
+}
+
+{
+  [1] = 8, 
+  [2] = 5, 
+  [3] = 2, 
+  [4] = 1
+}
+
+{
+  [1] = "a", 
+  [2] = "ab", 
+  [3] = "abc", 
+  [4] = "abcdef"
+}
 ```
 
 ## 额外说明
 
-- 目标数组表最多 4096 个元素，超出会抛出错误。
-- 参数 `comp` 函数返回值为 `true` 时，表示 `left` 排在 `right` 之前；返回值为 `false` 时，表示不要求 `left` 排在 `right` 前面（也可能两者相等）。
+- 目标数组表最多 4096 个元素。
+- 参数 `comp` 函数返回值为 `true` 时，表示 `left` 排在 `right` 之前；返回值为 `false` 时，表示 `right` 排在 `left` 之前。
 
 ---
 
@@ -473,7 +556,8 @@ debug.print(t.child.value)
 **输出：**
 
 ```lua
-
+true
+7
 ```
 
 ---
@@ -514,7 +598,11 @@ debug.print(table.pretty(t))
 **输出：**
 
 ```lua
-
+{
+  [1] = "apple", 
+  [2] = "banana", 
+  [3] = "grape"
+}
 ```
 
 ---
@@ -539,7 +627,7 @@ table.count
 
 ## 返回值
 
-返回两个值，依次为表中元素总数和数组部分是否连续。
+返回两个值。
 
 | 值名         | 类型    | 说明                              |
 | ------------ | ------- | --------------------------------- |
@@ -559,14 +647,13 @@ debug.print(contiguous)
 **输出：**
 
 ```lua
-
+3
+false
 ```
 
 ## 额外说明
 
-- 数组部分为空时（包括空表和只有哈希项的表），`contiguous` 为 `true`。
-- 下标为 0 或负整数的项按哈希项计数，不计入数组元素数量。
-- 值为 `nil` 的键在 Lua 表中表示该键不存在，因此不会计数。
+- 数组部分为空时（包括空表和只有哈希项的表），返回值 `contiguous` 为 `true`。
 
 ---
 
@@ -590,7 +677,7 @@ table.count_array
 
 ## 返回值
 
-返回三个值，依次为数组元素数量、数组部分是否连续和有效下标表。
+返回三个值。
 
 | 值名         | 类型    | 说明                              |
 | ------------ | ------- | --------------------------------- |
@@ -612,7 +699,12 @@ debug.print(table.pretty(indexes))
 **输出：**
 
 ```lua
-
+2
+false
+{
+  [1] = 1, 
+  [2] = 3
+}
 ```
 
 ## 额外说明
@@ -659,7 +751,7 @@ debug.print(result)
 **输出：**
 
 ```lua
-
+2
 ```
 
 ---
@@ -703,7 +795,13 @@ debug.print(table.pretty(t))
 **输出：**
 
 ```lua
-
+true
+{
+  [1] = "a", 
+  [2] = "c", 
+  [3] = "h", 
+  name = "Tui Game"
+}
 ```
 
 ## 额外说明

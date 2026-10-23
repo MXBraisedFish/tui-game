@@ -137,7 +137,12 @@ pub(super) fn table_lib(lua: &Lua) -> mlua::Result<Table> {
     })?,
   )?;
   let option_methods: [(&str, &str, &[&str], &[&str]); 6] = [
-    ("concat", "table.concat", &["list"], &["sep", "i", "j"]),
+    (
+      "concat",
+      "table.concat",
+      &["list"],
+      &["separator", "start_index", "end_index"],
+    ),
     ("insert", "table.insert", &["list", "value"], &["pos"]),
     (
       "move",
@@ -274,8 +279,10 @@ fn standard_options(
         value
       } else {
         match *field {
-          "i" | "j" | "pos" => Value::Integer(args::integer(value, method, field)?),
-          "sep" => Value::String(args::lua_string(value, method, field)?),
+          "i" | "j" | "pos" | "start_index" | "end_index" => {
+            Value::Integer(args::integer(value, method, field)?)
+          }
+          "separator" => Value::String(args::lua_string(value, method, field)?),
           "comp" if matches!(value, Value::Function(_)) => value,
           "target" if matches!(value, Value::Table(_)) => value,
           "comp" => return Err(args::invalid(method, field, "function", &value)),

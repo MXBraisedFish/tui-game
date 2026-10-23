@@ -255,7 +255,7 @@ fn schedule_options(
 ) -> mlua::Result<ScheduledTimerOptions> {
   let duration = seconds(binding.duration, method, "duration")?;
   let delay = seconds(binding.delay, method, "delay")?;
-  let gap = seconds(binding.delay + binding.interval, method, "delay + interval")?;
+  let gap = seconds(binding.interval, method, "interval")?;
   Ok(ScheduledTimerOptions {
     duration,
     delay,

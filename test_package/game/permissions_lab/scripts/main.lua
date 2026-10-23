@@ -40,7 +40,7 @@ local function handle_file_event(data)
     for _, entry in ipairs(data.entries) do
       table.insert(names, entry.path .. " [" .. entry.file_type .. "]")
     end
-    push_log("state/ contains: " .. table.concat(names, { sep = ", " }))
+    push_log("state/ contains: " .. table.concat(names, { separator = ", " }))
   end
 end
 

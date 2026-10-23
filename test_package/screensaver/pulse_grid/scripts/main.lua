@@ -98,6 +98,6 @@ function Render()
     local shade = (intensity * (SHADES - 1)) // 1 + 1
     draw.fill_rect(cell.x, cell.y, CELL_WIDTH - 1, CELL_HEIGHT - 1, { char = " ", bg = shades[shade] })
   end
-  local caption = table.concat({ "pulse", "grid", tostring(#cells) .. " cells" }, { sep = " / " })
+  local caption = table.concat({ "pulse", "grid", tostring(#cells) .. " cells" }, { separator = " / " })
   draw.text(1, height - 1, caption, { fg = color.GRAY })
 end

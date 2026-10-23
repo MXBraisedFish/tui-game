@@ -44,7 +44,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       local payload = {pos = "data"}
       local list = {"a", "c"}
       table.insert(list, "b", {pos = 2})
-      debug.assert(table.concat(list, {sep = "-"}) == "a-b-c")
+      debug.assert(table.concat(list, {separator = "-"}) == "a-b-c")
+      debug.assert(table.concat(list, {separator = "-", start_index = 2, end_index = 3}) == "b-c")
+      debug.assert(table.concat(list, {end_index = 2}) == "ab")
+      for _, options in ipairs({{sep = "-"}, {i = 1}, {j = 3}}) do
+        debug.assert(not select(1, debug.pcall(function() table.concat(list, options) end)))
+      end
       debug.assert(table.remove(list, {pos = 2}) == "b")
       table.insert(list, payload)
       debug.assert(list[3] == payload)

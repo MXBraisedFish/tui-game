@@ -2206,23 +2206,23 @@ mod tests {
       )
       .replace(
         r#"table.concat({ 1, "二", 3 }, "|", 1, 3)"#,
-        r#"table.concat({ 1, "二", 3 }, { sep = "|", i = 1, j = 3 })"#,
+        r#"table.concat({ 1, "二", 3 }, { separator = "|", start_index = 1, end_index = 3 })"#,
       )
       .replace(
         r#"table.concat(virtual, ",")"#,
-        r#"table.concat(virtual, { sep = "," })"#,
+        r#"table.concat(virtual, { separator = "," })"#,
       )
       .replace(
         r#"table.concat(sequence, "")"#,
-        r#"table.concat(sequence, { sep = "" })"#,
+        r#"table.concat(sequence, { separator = "" })"#,
       )
       .replace(
         r#"table.concat(moved, ",")"#,
-        r#"table.concat(moved, { sep = "," })"#,
+        r#"table.concat(moved, { separator = "," })"#,
       )
       .replace(
         r#"table.concat(target, ",")"#,
-        r#"table.concat(target, { sep = "," })"#,
+        r#"table.concat(target, { separator = "," })"#,
       );
 
     let session = LuaSession::load(
@@ -3751,17 +3751,19 @@ mod tests {
       r##"
       function Init(ctx)
         local function fails(f) return not select(1, debug.pcall(f)) end
-        local id = timer.create(0.25, {delay = 0.1, interval = -0.05, loop = true, ["repeat"] = 2, tip = "cycle"})
+        local id = timer.create(0.25, {delay = 0.1, interval = 0.05, loop = true, ["repeat"] = 2, tip = "cycle"})
         debug.assert(type(id) == "string" and timer.count() == 1 and timer.exists(id))
         local info = timer.get_info(id)
-        debug.assert(info.duration == 0.25 and info.delay == 0.1 and info.interval == -0.05)
+        debug.assert(info.duration == 0.25 and info.delay == 0.1 and info.interval == 0.05)
         debug.assert(info.loop and info["repeat"] == 2 and info.tip == "cycle" and info.state == "idle")
         debug.assert(info.executed_count == 0 and info.elapsed == 0)
         debug.assert(timer.list().n == 1 and timer.list()[1].id == id)
         debug.assert(select("#", timer.create(1)) == 1)
         debug.assert(timer.start(id) and not timer.start(id))
         debug.assert(fails(function() timer.set(id, {delay = -1}) end))
+        debug.assert(fails(function() timer.set(id, {interval = -0.05}) end))
         debug.assert(timer.get_info(id).state == "running" and timer.get_info(id).delay == 0.1)
+        debug.assert(timer.get_info(id).interval == 0.05)
         debug.assert(timer.set(id, {duration = 0.5, ["repeat"] = false, tip = false, callback = false}))
         info = timer.get_info(id)
         debug.assert(info.state == "idle" and info.duration == 0.5 and info["repeat"] == nil and info.tip == nil)
@@ -3790,6 +3792,7 @@ mod tests {
           function() timer.create(1, {unknown = true}) end,
           function() timer.create(1, {delay = -1}) end,
           function() timer.create(1, {delay = 0.1, interval = -0.2}) end,
+          function() timer.create(1, {delay = 1, interval = -0.5}) end,
           function() timer.create(1, {interval = 1/0}) end,
           function() timer.create(1, {loop = "true"}) end,
           function() timer.create(1, {["repeat"] = 0}) end,
@@ -3817,12 +3820,62 @@ mod tests {
   }
 
   #[test]
+  fn timer_initial_delay_and_repeat_interval_are_independent() {
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      for (delay, interval) in [(2, 4), (2, 0), (0, 4), (0, 0)] {
+        let source = valid_script(
+          &r#"
+          function Init(ctx)
+            completions = 0
+            id = timer.create(1, {delay = DELAY, interval = INTERVAL, loop = true, ["repeat"] = 3,
+              callback = function(event) completions = completions + 1 end})
+            debug.assert(timer.start(id))
+          end
+          function Update(dt) debug.assert(timer.restart(id)) end
+          "#
+          .replace("DELAY", &delay.to_string())
+          .replace("INTERVAL", &interval.to_string()),
+        );
+        let mut session = LuaSession::load(spec(&source, kind), LuaPolicy::default()).unwrap();
+        for execution in 1..=3 {
+          let wait = if execution == 1 { delay } else { interval };
+          advance_test_timers(
+            &mut session,
+            Duration::from_secs(wait + 1) - Duration::from_millis(1),
+          )
+          .unwrap();
+          assert_eq!(
+            session.environment_value("completions"),
+            Value::Integer(execution - 1),
+            "{kind:?}: delay={delay}, interval={interval}, execution={execution} fired early"
+          );
+          advance_test_timers(&mut session, Duration::from_millis(1)).unwrap();
+          assert_eq!(
+            session.environment_value("completions"),
+            Value::Integer(execution),
+            "{kind:?}: delay={delay}, interval={interval}, execution={execution} fired late"
+          );
+        }
+        session.update().unwrap();
+        advance_test_timers(
+          &mut session,
+          Duration::from_secs(delay + 1) - Duration::from_millis(1),
+        )
+        .unwrap();
+        assert_eq!(session.environment_value("completions"), Value::Integer(3));
+        advance_test_timers(&mut session, Duration::from_millis(1)).unwrap();
+        assert_eq!(session.environment_value("completions"), Value::Integer(4));
+      }
+    }
+  }
+
+  #[test]
   fn timer_callbacks_and_handle_event_use_the_same_envelope_without_double_delivery() {
     let source = valid_script(
       r##"
       function Init(ctx)
         callback_count, handled = 0, 0
-        repeating = timer.create(0.1, {delay = 0.2, interval = -0.15, loop = true, ["repeat"] = 2,
+        repeating = timer.create(0.1, {delay = 0.2, interval = 0.05, loop = true, ["repeat"] = 2,
           tip = "hello", callback = function(event)
             debug.assert(event.type == "timer" and event.data.id == repeating and event.data.tip == "hello")
             debug.assert(event.data.executed_count == callback_count + 1)
@@ -4874,7 +4927,11 @@ mod tests {
           local a, b, c = table.unpack(packed, { j = packed.n })
           debug.assert(a == "a" and b == nil and c == "c"
               and select("#", table.unpack(packed, { j = packed.n })) == 3)
-          debug.assert(table.concat({"a", "b", "c"}, { sep = "-", i = 2 }) == "b-c"
+          debug.assert(table.concat({"a", "b", "c"}, { separator = "-", start_index = 2 }) == "b-c"
+              and table.concat({"a", "b", "c"}, { end_index = 2 }) == "ab"
+              and table.concat({"a", "b", "c"}, { separator = "-", start_index = 2, end_index = 2 }) == "b"
+              and table.concat({"a", "b"}, { start_index = 2, end_index = 1 }) == ""
+              and table.concat({"a", "b"}) == "ab"
               and table.concat({"a", "b"}, {}) == "ab"
               and table.concat({"a", "b"}, nil) == "ab")
           local sorted = { 1, 3, 2 }
@@ -4904,7 +4961,12 @@ mod tests {
               and fails(function() tonumber("ff", { base = 1 }) end)
               and fails(function() next(values, "other") end)
               and fails(function() table.insert({}, 1, payload) end)
-              and fails(function() table.concat({}, { sep = false }) end)
+              and fails(function() table.concat({}, { separator = false }) end)
+              and fails(function() table.concat({}, { start_index = 1.5 }) end)
+              and fails(function() table.concat({}, { end_index = "2" }) end)
+              and fails(function() table.concat({}, { sep = "-" }) end)
+              and fails(function() table.concat({}, { i = 1 }) end)
+              and fails(function() table.concat({}, { j = 1 }) end)
               and fails(function() table.remove({}, { pos = 1.5 }) end)
               and fails(function() table.move({}, 1, 0, 1, { target = false }) end)
               and fails(function() table.sort({}, { comp = false }) end)
@@ -4930,10 +4992,10 @@ mod tests {
             return not select(1, debug.pcall(func))
           end
 
-          local joined = table.concat({ 1, "二", 3 }, { sep = "|", i = 1, j = 3 })
+          local joined = table.concat({ 1, "二", 3 }, { separator = "|", start_index = 1, end_index = 3 })
           debug.assert(joined == "1|二|3")
           debug.assert(fails(function()
-              table.concat({ 1, true }, { sep = "," })
+              table.concat({ 1, true }, { separator = "," })
             end))
 
           local inserted = { "a", "c" }
@@ -4955,7 +5017,7 @@ mod tests {
               table.move({}, 0, 1, 9223372036854775807)
             end))
           debug.assert(fails(function() table.move({}, 1, 16385, 1) end)
-              and fails(function() table.concat({}, { sep = ",", i = 1, j = 16385 }) end)
+              and fails(function() table.concat({}, { separator = ",", start_index = 1, end_index = 16385 }) end)
               and fails(function() table.unpack({}, { i = 1, j = 16385 }) end))
 
           local packed = table.pack("a", nil, "c")
