@@ -8,11 +8,11 @@
 
 ## 常量
 
-| 常量         | 说明                                                      | 定位                      |
-| ------------ | --------------------------------------------------------- | ------------------------- |
-| `AUTO`       | 自动检查文本类型                                          | [AUTO](#auto)             |
-| `PLAIN_TEXT` | 强制按普通文本解析；`f%` 头部声明和富文本标签都会原样保留 | [PLAIN_TEXT](#plain_text) |
-| `RICH_TEXT`  | 强制按富文本语法解析；头部声明 `f%` 会被强制保留          | [RICH_TEXT](#rich_text)   |
+| 常量         | 说明                 | 定位                      |
+| ------------ | -------------------- | ------------------------- |
+| `AUTO`       | 自动检查文本类型     | [AUTO](#auto)             |
+| `PLAIN_TEXT` | 强制按普通文本解析   | [PLAIN_TEXT](#plain_text) |
+| `RICH_TEXT`  | 强制按富文本语法解析 | [RICH_TEXT](#rich_text)   |
 
 ## 方法
 
@@ -62,8 +62,8 @@ string.AUTO
 local p_str = "Hello Tui Game"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width(p_str, {text_mode = string.AUTO})
-local len2 = measurement.get_text_width(r_str, {text_mode = string.AUTO})
+local len1 = measurement.get_text_width(p_str, { text_mode = string.AUTO })
+local len2 = measurement.get_text_width(r_str, { text_mode = string.AUTO })
 
 debug.print(tostring(len1))
 debug.print(tostring(len2))
@@ -86,7 +86,7 @@ debug.print(tostring(len2))
 
 ## `PLAIN_TEXT`
 
-强制按普通文本解析；`f%` 头部声明和富文本标签都会原样保留。
+强制按普通文本解析
 
 ### 调用
 
@@ -104,8 +104,8 @@ string.PLAIN_TEXT
 local p_str = "Hello Tui Game"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width(p_str, {text_mode = string.PLAIN_TEXT})
-local len2 = measurement.get_text_width(r_str, {text_mode = string.PLAIN_TEXT})
+local len1 = measurement.get_text_width(p_str, { text_mode = string.PLAIN_TEXT })
+local len2 = measurement.get_text_width(r_str, { text_mode = string.PLAIN_TEXT })
 
 debug.print(tostring(len1))
 debug.print(tostring(len2))
@@ -124,11 +124,15 @@ debug.print(tostring(len2))
 "plain_text"
 ```
 
+### 额外说明
+
+- `f%` 头部声明和富文本标签都会原样保留。
+
 ---
 
 ## `RICH_TEXT`
 
-强制按富文本语法解析；头部声明 `f%` 会被强制保留。
+强制按富文本语法解析。
 
 ### 调用
 
@@ -146,8 +150,8 @@ string.RICH_TEXT
 local nh_r_str = "<fg:red>Hello<fg:yellow> Tui Game</fg>"
 local r_str = "f%<fg:red>Hello<fg:yellow> Tui Game</fg>"
 
-local len1 = measurement.get_text_width(nh_r_str, {text_mode = string.RICH_TEXT})
-local len2 = measurement.get_text_width(r_str, {text_mode = string.RICH_TEXT})
+local len1 = measurement.get_text_width(nh_r_str, { text_mode = string.RICH_TEXT })
+local len2 = measurement.get_text_width(r_str, { text_mode = string.RICH_TEXT })
 
 debug.print(tostring(len1))
 debug.print(tostring(len2))
@@ -166,6 +170,10 @@ debug.print(tostring(len2))
 "rich_text"
 ```
 
+### 额外说明
+
+- `f%` 头部声明会原样保留。
+
 ---
 
 # 方法
@@ -180,15 +188,15 @@ debug.print(tostring(len2))
 string.lower
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `text` | string | 目标字符串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -211,6 +219,12 @@ debug.print(str)
 hello tui game
 ```
 
+### 重定向
+
+```lua
+string.lower
+```
+
 ---
 
 ## `upper`
@@ -223,15 +237,15 @@ hello tui game
 string.upper
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `text` | string | 目标字符串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -254,6 +268,12 @@ debug.print(str)
 HELLO TUI GAME
 ```
 
+### 重定向
+
+```lua
+string.upper
+```
+
 ---
 
 ## `reverse`
@@ -266,15 +286,15 @@ HELLO TUI GAME
 string.reverse
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `text` | string | 目标字符串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -297,6 +317,12 @@ debug.print(str)
 Hello Tui Game
 ```
 
+### 重定向
+
+```lua
+string.reverse
+```
+
 ---
 
 ## `split`
@@ -309,22 +335,22 @@ Hello Tui Game
 string.split
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `text` | string | 目标字符串 |
 | `sep`  | string | 分隔串     |
 
-## 返回值
+### 返回值
 
-返回一个数组表。
+返回一个值。
 
-| 类型  | 说明     |
-| ----- | -------- |
-| table | 分割结果 |
+| 类型  | 说明             |
+| ----- | ---------------- |
+| table | 分割结果的数组表 |
 
 ### 示例
 
@@ -356,22 +382,22 @@ debug.print(table.pretty(parts))
 string.sub
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名  | 类型    | 说明         |
 | ------- | ------- | ------------ |
 | `text`  | string  | 目标字符串   |
 | `start` | integer | 起始字符位置 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名   | 类型    | 默认值         | 说明         |
 | -------- | ------- | -------------- | ------------ |
 | `finish` | integer | 目标字符串长度 | 结束字符位置 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -383,7 +409,7 @@ string.sub
 
 ```lua
 local sub_str = "Hello Tui Game"
-local str = string.sub(sub_str, 1, {finish = 5})
+local str = string.sub(sub_str, 1, { finish = 5 })
 
 debug.print(str)
 ```
@@ -394,10 +420,16 @@ debug.print(str)
 Hello
 ```
 
-## 额外说明
+### 重定向
 
-- 必填参数 `start` 取值范围为 $[-x, x]$，$x$ 为 `text` 的字符数。
-- 选填参数 `finish` 取值范围为 $[-x, x]$，$x$ 为 `text` 的字符数。
+```lua
+string.sub
+```
+
+### 额外说明
+
+- 必填参数 `start` 取值范围为 $[-x, x]$；$x$ 为 `text` 的字符数。
+- 选填参数 `finish` 取值范围为 $[-x, x]$；$x$ 为 `text` 的字符数。
 
 ---
 
@@ -411,22 +443,22 @@ Hello
 string.rep
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名  | 类型    | 说明           |
 | ------- | ------- | -------------- |
 | `text`  | string  | 要重复的字符串 |
 | `times` | integer | 重复次数       |
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型   | 默认值 | 说明               |
 | ------ | ------ | ------ | ------------------ |
 | `sep`  | string | `""`   | 相邻副本间的分隔符 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -438,7 +470,7 @@ string.rep
 
 ```lua
 local rep_str = "ABC"
-local str = string.rep(rep_str, 3, {sep = " | "})
+local str = string.rep(rep_str, 3, { sep = " | " })
 
 debug.print(str)
 ```
@@ -449,9 +481,15 @@ debug.print(str)
 ABC | ABC | ABC
 ```
 
-## 额外说明
+### 重定向
 
-- 必填参数 `times` 取值范围为 $[0, +\infty)$。
+```lua
+string.rep
+```
+
+### 额外说明
+
+- 必填参数 `times` 取值范围为 $[0, +\infty)$；必须为有限数。
 
 ---
 
@@ -465,23 +503,23 @@ ABC | ABC | ABC
 string.find
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型   | 说明       |
 | --------- | ------ | ---------- |
 | `text`    | string | 目标字符串 |
 | `pattern` | string | 模式字符串 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名  | 类型    | 默认值  | 说明               |
 | ------- | ------- | ------- | ------------------ |
 | `init`  | integer | `1`     | 起始搜索位置       |
 | `plain` | boolean | `false` | 是否按普通文本查找 |
 
-## 返回值
+### 返回值
 
 **查找成功时**，返回三个值。
 
@@ -489,7 +527,7 @@ string.find
 | ---------- | ------- | ---------------------------- |
 | `start`    | integer | 匹配起点                     |
 | `finish`   | integer | 匹配终点                     |
-| `captures` | table   | 匹配到的字符串或捕获组数组表 |
+| `captures` | table   | 匹配到的字符串或捕获组混合表 |
 
 **查找失败时**，返回一个值。
 
@@ -529,11 +567,17 @@ Alice
 2
 ```
 
-## 额外说明
+### 重定向
 
-- 选填参数 `init` 取值范围为 $(-\infty, x + 1]$，$x$ 为 `text` 的字符数。
+```lua
+string.find
+```
+
+### 额外说明
+
+- 选填参数 `init` 取值范围为 $(-\infty, x + 1]$；$x$ 为 `text` 的字符数，必须为有限数。
 - 没有捕获组时，`captures.n` 为 1，第 1 项保存完整匹配。
-- 返回值 `captures` 表结构如下：
+- 返回值 `captures` 混合表结构如下：
 
 ```lua
 {
@@ -557,28 +601,28 @@ Alice
 string.match
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型   | 说明       |
 | --------- | ------ | ---------- |
 | `text`    | string | 目标字符串 |
 | `pattern` | string | 模式字符串 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型    | 默认值 | 说明         |
 | ------ | ------- | ------ | ------------ |
 | `init` | integer | `1`    | 起始搜索位置 |
 
-## 返回值
+### 返回值
 
-**若查找成功**，返回一个混合表。
+**若查找成功**，返回一个值。
 
-| 类型  | 说明                   |
-| ----- | ---------------------- |
-| table | 匹配到的字符串或捕获组 |
+| 类型  | 说明             |
+| ----- | ---------------- |
+| table | 匹配结果的混合表 |
 
 **若查找失败**，返回一个值。
 
@@ -605,10 +649,16 @@ debug.print(tostring(match2.n))
 
 ```
 
-## 额外说明
+### 重定向
 
-- 选填参数 `init` 取值范围为 $(-\infty, x + 1]$，$x$ 为 `text` 的字符数。
-- 返回值表结构如下：
+```lua
+string.match
+```
+
+### 额外说明
+
+- 选填参数 `init` 取值范围为 $(-\infty, x + 1]$；$x$ 为 `text` 的字符数，必须为有限数。
+- 返回值混合表结构如下：
 
 ```lua
 {
@@ -630,16 +680,16 @@ debug.print(tostring(match2.n))
 string.gmatch
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型   | 说明       |
 | --------- | ------ | ---------- |
 | `text`    | string | 目标字符串 |
 | `pattern` | string | 模式字符串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -647,11 +697,11 @@ string.gmatch
 | -------- | ---------- |
 | function | 迭代器函数 |
 
-**迭代器函数**每次返回一个混合表。
+**每次调用迭代函数时**，每次返回一个值。
 
-| 类型  | 说明                   |
-| ----- | ---------------------- |
-| table | 匹配到的字符串或捕获组 |
+| 类型  | 说明             |
+| ----- | ---------------- |
+| table | 匹配结果的混合表 |
 
 ### 示例
 
@@ -683,9 +733,15 @@ B 2 2
 C 3 2
 ```
 
-## 额外说明
+### 重定向
 
-- 迭代函数返回值表结构如下：
+```lua
+string.gmatch
+```
+
+### 额外说明
+
+- 迭代函数返回值混合表结构如下：
 
 ```lua
 {
@@ -707,9 +763,9 @@ C 3 2
 string.gsub
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型                      | 说明       |
 | --------- | ------------------------- | ---------- |
@@ -717,13 +773,13 @@ string.gsub
 | `pattern` | string                    | 模式字符串 |
 | `repl`    | string / table / function | 替换内容   |
 
-### 选填参数
+#### 选填参数
 
 | 参数名  | 类型    | 默认值 | 说明         |
 | ------- | ------- | ------ | ------------ |
 | `limit` | integer | `-1`   | 最大替换次数 |
 
-## 返回值
+### 返回值
 
 返回两个值。
 
@@ -738,7 +794,7 @@ string.gsub
 local result1, count1 = string.gsub("one two three", "%a+", "X")
 debug.print(result1 .. " " .. count1 .. "\n")
 
-local result2, count2 = string.gsub("2023-2024-2025", "(%d+)", "[%1]", {limit = 2})
+local result2, count2 = string.gsub("2023-2024-2025", "(%d+)", "[%1]", { limit = 2 })
 debug.print(result2 .. " " .. count2 .. "\n")
 
 local result3, count3 = string.gsub("apple banana apple", "(%w+)", { apple = "fruit", banana = "berry" })
@@ -760,7 +816,13 @@ fruit berry fruit 3
 ax bxx cxxx 3
 ```
 
-## 额外说明
+### 重定向
+
+```lua
+string.gsub
+```
+
+### 额外说明
 
 - 必填参数 `repl` 中用 `%0` 引用完整匹配、`%1` 至 `%9` 引用捕获组。
 - 选填参数 `limit` 取值范围为 $[-1, 10000]$，`-1` 代表不限次数。
@@ -777,15 +839,15 @@ ax bxx cxxx 3
 string.regex_escape
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `text` | string | 目标字符串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -822,30 +884,30 @@ a\+b\*c\?
 string.regex_find
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型   | 说明       |
 | --------- | ------ | ---------- |
 | `text`    | string | 目标字符串 |
 | `pattern` | string | 正则表达式 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型    | 默认值 | 说明         |
 | ------ | ------- | ------ | ------------ |
 | `init` | integer | `1`    | 起始搜索位置 |
 
-## 返回值
+### 返回值
 
-**查找成功时**，返回三个值：匹配起点、匹配终点和捕获数组表。
+**查找成功时**，返回三个值。
 
 | 值名       | 类型    | 说明                         |
 | ---------- | ------- | ---------------------------- |
 | `start`    | integer | 匹配起点                     |
 | `finish`   | integer | 匹配终点                     |
-| `captures` | table   | 匹配到的字符串或捕获组数组表 |
+| `captures` | table   | 匹配到的字符串或捕获组混合表 |
 
 **查找失败时**，返回一个值。
 
@@ -876,10 +938,10 @@ debug.print(tostring(captures2.n))
 
 ```
 
-## 额外说明
+### 额外说明
 
 - 选填参数 `init` 取值范围为 $(-\infty, x + 1]$，$x$ 为 `text` 的字符数。
-- 返回值 `captures` 表结构如下：
+- 返回值 `captures` 混合表结构如下：
 
 ```lua
 {
@@ -903,28 +965,28 @@ debug.print(tostring(captures2.n))
 string.regex_match
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型   | 说明       |
 | --------- | ------ | ---------- |
 | `text`    | string | 目标字符串 |
 | `pattern` | string | 正则表达式 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型    | 默认值 | 说明         |
 | ------ | ------- | ------ | ------------ |
 | `init` | integer | `1`    | 起始搜索位置 |
 
-## 返回值
+### 返回值
 
-**若查找成功**，返回一个混合表。
+**若查找成功**，返回一个值。
 
-| 类型  | 说明                   |
-| ----- | ---------------------- |
-| table | 匹配到的字符串或捕获组 |
+| 类型  | 说明             |
+| ----- | ---------------- |
+| table | 匹配结果的混合表 |
 
 **若查找失败**，返回一个值。
 
@@ -956,10 +1018,10 @@ Alice
 2
 ```
 
-## 额外说明
+### 额外说明
 
 - 选填参数 `init` 取值范围为 $(-\infty, x + 1]$，$x$ 为 `text` 的字符数。
-- 返回值表结构如下：
+- 返回值混合表结构如下：
 
 ```lua
 {
@@ -981,16 +1043,16 @@ Alice
 string.regex_gmatch
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型   | 说明       |
 | --------- | ------ | ---------- |
 | `text`    | string | 目标字符串 |
 | `pattern` | string | 正则表达式 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -998,11 +1060,11 @@ string.regex_gmatch
 | -------- | ---------- |
 | function | 迭代器函数 |
 
-**迭代器函数**每次返回一个混合表。
+**每次调用迭代函数时**，每次返回一个值。
 
-| 类型  | 说明                   |
-| ----- | ---------------------- |
-| table | 匹配到的字符串或捕获组 |
+| 类型  | 说明             |
+| ----- | ---------------- |
+| table | 匹配结果的混合表 |
 
 ### 示例
 
@@ -1033,9 +1095,9 @@ B 2 2
 C 3 2
 ```
 
-## 额外说明
+### 额外说明
 
-- 迭代函数返回值表结构如下：
+- 迭代函数返回值混合表结构如下：
 
 ```lua
 {
@@ -1057,9 +1119,9 @@ C 3 2
 string.regex_gsub
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型                      | 说明       |
 | --------- | ------------------------- | ---------- |
@@ -1067,13 +1129,13 @@ string.regex_gsub
 | `pattern` | string                    | 正则表达式 |
 | `repl`    | string / table / function | 替换内容   |
 
-### 选填参数
+#### 选填参数
 
 | 参数名  | 类型    | 默认值 | 说明         |
 | ------- | ------- | ------ | ------------ |
 | `limit` | integer | `-1`   | 最大替换次数 |
 
-## 返回值
+### 返回值
 
 返回两个值。
 
@@ -1088,7 +1150,7 @@ string.regex_gsub
 local result1, count1 = string.regex_gsub("one two three", [[\w+]], "X")
 debug.print(result1 .. " " .. count1 .. "\n")
 
-local result2, count2 = string.regex_gsub("2023-2024-2025", [[(\d+)]], "[$1]", {limit = 2})
+local result2, count2 = string.regex_gsub("2023-2024-2025", [[(\d+)]], "[$1]", { limit = 2 })
 debug.print(result2 .. " " .. count2 .. "\n")
 
 local result3, count3 = string.regex_gsub("apple banana apple", [[(\w+)]], { apple = "fruit", banana = "berry" })
@@ -1106,7 +1168,7 @@ debug.print(result4 .. " " .. count4)
 
 ```
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `repl` 中用 `$0` 引用完整匹配、`$1` 至 `$9` 引用捕获。
 - 选填参数 `limit` 取值范围为 $[-1, 10000]$，`-1` 代表不限次数。
@@ -1123,16 +1185,16 @@ debug.print(result4 .. " " .. count4)
 string.regex_test
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型   | 说明       |
 | --------- | ------ | ---------- |
 | `text`    | string | 目标字符串 |
 | `pattern` | string | 正则表达式 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -1169,22 +1231,22 @@ false
 string.regex_split
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名    | 类型   | 说明       |
 | --------- | ------ | ---------- |
 | `text`    | string | 目标字符串 |
 | `pattern` | string | 正则表达式 |
 
-## 返回值
+### 返回值
 
-返回一个数组表。
+返回一个值。
 
-| 类型  | 说明     |
-| ----- | -------- |
-| table | 分割结果 |
+| 类型  | 说明             |
+| ----- | ---------------- |
+| table | 分割结果的数组表 |
 
 ### 示例
 
@@ -1226,15 +1288,15 @@ three
 string.format
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名          | 类型   | 说明   |
 | --------------- | ------ | ------ |
 | `format_string` | string | 格式串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -1267,6 +1329,12 @@ Pi ≈ 3.14
 Hello, Tui Game!
 ```
 
+### 重定向
+
+```lua
+string.format
+```
+
 ---
 
 ## `rich_text_to_plain_text`
@@ -1279,15 +1347,15 @@ Hello, Tui Game!
 string.rich_text_to_plain_text
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明         |
 | ------ | ------ | ------------ |
 | `text` | string | 富文本字符串 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名         | 类型        | 默认值 | 说明             |
 | -------------- | ----------- | ------ | ---------------- |
@@ -1295,7 +1363,7 @@ string.rich_text_to_plain_text
 | `key_params`   | boolean     | `true` | 是否解析按键参数 |
 | `strip_header` | boolean     | `true` | 是否剥离 `f%` 头 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -1309,13 +1377,13 @@ string.rich_text_to_plain_text
 local plain1 = string.rich_text_to_plain_text("f%<fg:red>Hello</fg>")
 debug.print(plain1)
 
-local plain2 = string.rich_text_to_plain_text("f%<fg:red>Hello {value:name}</fg>", {rich_params = { name = "World" }})
+local plain2 = string.rich_text_to_plain_text("f%<fg:red>Hello { value:name }</fg>", { rich_params = { name = "World" } })
 debug.print(plain2)
 
-local plain3 = string.rich_text_to_plain_text("f%<fg:red>{key:exit}</fg>", {key_params = false})
+local plain3 = string.rich_text_to_plain_text("f%<fg:red>{ key:exit }</fg>", { key_params = false })
 debug.print(plain3)
 
-local plain4 = string.rich_text_to_plain_text("f%<fg:red>Hello</fg>", {strip_header = false})
+local plain4 = string.rich_text_to_plain_text("f%<fg:red>Hello</fg>", { strip_header = false })
 debug.print(plain4)
 ```
 
@@ -1324,6 +1392,6 @@ debug.print(plain4)
 ```lua
 Hello
 Hello World
-{key:exit}
+{ key:exit }
 f%Hello
 ```

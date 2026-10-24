@@ -261,6 +261,7 @@ mod tests {
     canvas.prepare(
       1,
       vec![SurfaceFrame::Slice(SliceFrame {
+        event_passthrough: false,
         id: SliceId(1),
         rect: Rect {
           x: 0,
@@ -301,6 +302,7 @@ mod tests {
     let slice = SliceId(1);
     let frame = || {
       vec![SurfaceFrame::Slice(SliceFrame {
+        event_passthrough: false,
         id: slice,
         rect: Rect {
           x: 0,

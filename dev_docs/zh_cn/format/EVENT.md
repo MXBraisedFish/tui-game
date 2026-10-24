@@ -6,7 +6,7 @@
 
 这些事件遵循统一的结构，即事件协议。本文档详细说明各类事件的结构、发送条件和使用示例。
 
-本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；timer 已开放，支持指定 callback；animation、audio、network 和 widget 事件不能仅凭本页结构示例视为已经实现。
+本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；timer 已开放，支持指定 callback；widget.hitbox 已开放，使用 hitbox 事件；animation、audio、network 及其他 widget 事件不能仅凭本页结构示例视为已经实现。
 
 ---
 
@@ -31,7 +31,7 @@
 | `network`         | 网络请求结果事件                 | [network](#network)                 |
 | `i18n`            | 国际化语言加载结果事件           | [i18n](#i18n)                       |
 | `audio`           | 音频对象状态变化事件             | [audio](#audio)                     |
-| `hit_area`        | 点击区域交互事件                 | [hit_area](#hit_area)               |
+| `hitbox`        | 点击区域交互事件                 | [hitbox](#hitbox)               |
 | `hyperlink`       | 超链接点击事件                   | [hyperlink](#hyperlink)             |
 | `markdown`        | Markdown 文本中的链接点击事件    | [markdown](#markdown)               |
 | `text_input`      | 文本输入组件的状态变化或交互事件 | [text_input](#text_input)           |
@@ -61,7 +61,7 @@
 | `frame`    | integer | 事件进入 Lua 事件队列时的宿主帧序号 |
 | `data`     | table   | 事件数据，无额外数据时为空表        |
 
-## 额外说明
+### 额外说明
 
 - 相邻事件的 `sequence` 不一定连续，事件经过会话过滤后可能出现跳号。
 - `frame` 不等同于游戏自行维护的帧号，也不表示脚本处理事件时的帧号。
@@ -1214,7 +1214,7 @@ end
 
 ---
 
-## `hit_area`
+## `hitbox`
 
 点击区域交互事件。
 
@@ -1222,12 +1222,14 @@ end
 
 ```lua
 {
-  type = "hit_area",
+  type = "hitbox",
   data = {
     id = ...,      -- string
     kind = ...,    -- string
     x = ...,       -- integer
     y = ...,       -- integer
+    relative_x = ..., -- integer
+    relative_y = ..., -- integer
     button = ...,  -- string / nil
     dx = ...,      -- integer / nil
     dy = ...,      -- integer / nil
@@ -1239,8 +1241,10 @@ end
 | -------- | ------------- | -------------------------------------------- |
 | `id`     | string        | 当前会话内的点击区域 ID                      |
 | `kind`   | string        | 点击区域事件类型                             |
-| `x`      | integer       | 事件的水平坐标                               |
-| `y`      | integer       | 事件的垂直坐标                               |
+| `x`      | integer       | 事件相对于目标切片原始坐标系的水平坐标                               |
+| `y`      | integer       | 事件相对于目标切片原始坐标系的垂直坐标                               |
+| `relative_x` | integer | 相对于 hitbox 未裁剪左上角的水平坐标 |
+| `relative_y` | integer | 相对于 hitbox 未裁剪左上角的垂直坐标 |
 | `button` | string / nil  | 按下、松开、点击或拖动时出现，表示对应鼠标键 |
 | `dx`     | integer / nil | 拖动时出现，表示本次水平位移                 |
 | `dy`     | integer / nil | 拖动时出现，表示本次垂直位移                 |
@@ -1253,7 +1257,7 @@ end
 
 ```lua
 function HandleEvent(event)
-  if event.type == "hit_area" then
+  if event.type == "hitbox" then
     debug.print(table.pretty(event))
   end
 end
@@ -1265,15 +1269,17 @@ end
 
 ```lua
 {
-  type = "hit_area",
+  type = "hitbox",
   frame = X,
   sequence = X,
   data =
   {
-    id = "8",
+    id = "hitbox_008",
     kind = "drag",
     x = 30,
     y = 12,
+    relative_x = 5,
+    relative_y = 4,
     button = "left",
     dx = 2,
     dy = -1,

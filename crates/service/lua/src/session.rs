@@ -528,6 +528,13 @@ impl LuaSession {
         return Ok(());
       }
     }
+    if let super::LuaEventData::HitArea(event) = &delivery.event.data
+      && !self
+        .with_objects(|objects| objects.hitboxes.contains_key(&event.id))
+        .unwrap_or(false)
+    {
+      return Ok(());
+    }
     if let super::LuaEventData::Timer(event) = &delivery.event.data
       && let Some(revision) = event.revision
     {

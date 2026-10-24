@@ -47,6 +47,7 @@ pub struct SliceRect {
 /// * `rect` - The rectangular region in terminal cells.
 /// * `visible` - Whether this surface participates in composition.
 /// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `event_passthrough` - Whether empty positions permit pointer input to lower surfaces.
 /// * `layer` - The layer.
 /// * `background` - The background color override, or `None` to inherit the default.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -61,6 +62,8 @@ pub struct SliceOptions {
   pub layer: Option<i32>,
   /// The background color override, or `None` to inherit the default.
   pub background: Option<TextColor>,
+  /// Allow pointer events through positions without a control on this slice.
+  pub event_passthrough: bool,
 }
 
 impl Default for SliceOptions {
@@ -72,6 +75,7 @@ impl Default for SliceOptions {
         width: SliceLength::Auto,
         height: SliceLength::Auto,
       },
+      event_passthrough: false,
       visible: true,
       opaque: true,
       layer: None,
@@ -87,6 +91,7 @@ impl Default for SliceOptions {
 /// * `rect` - The rectangular region in terminal cells.
 /// * `visible` - Whether this surface participates in composition.
 /// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `event_passthrough` - Whether empty positions permit pointer input to lower surfaces.
 /// * `layer` - The layer.
 /// * `background` - The background color override, or `None` to inherit the default.
 /// * `frame_scoped` - Whether the slice must be submitted again each frame.
@@ -107,6 +112,8 @@ pub(crate) struct SliceState {
   pub(crate) frame_scoped: bool,
   /// Whether this frame submitted the slice for composition.
   pub(crate) drawn_this_frame: bool,
+  /// Allow pointer events through positions without a control on this slice.
+  pub event_passthrough: bool,
 }
 
 /// The collection of owned slice instances and their queued events.
@@ -137,6 +144,25 @@ impl SliceObjects {
 pub struct SliceService;
 
 impl SliceService {
+  /// Return whether unhandled pointer events may reach lower surfaces.
+  pub fn event_passthrough(&self, pool: &UiObjectPool, id: SliceId) -> Option<bool> {
+    Some(pool.slices.slices.get(&id)?.event_passthrough)
+  }
+
+  /// Set whether unhandled pointer events may reach lower surfaces.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The pool owning the slice.
+  /// * `id` - The slice to change.
+  /// * `enabled` - Whether empty positions permit pointer passthrough.
+  pub fn set_event_passthrough(&self, pool: &mut UiObjectPool, id: SliceId, enabled: bool) -> bool {
+    let Some(slice) = pool.slices.slices.get_mut(&id) else {
+      return false;
+    };
+    slice.event_passthrough = enabled;
+    true
+  }
   /// Create a slice service with its initial state.
   pub fn new() -> Self {
     Self
@@ -158,6 +184,7 @@ impl SliceService {
       pool.slices.slices.insert(
         id,
         SliceState {
+          event_passthrough: options.event_passthrough,
           rect: options.rect,
           visible: options.visible,
           opaque: options.opaque,

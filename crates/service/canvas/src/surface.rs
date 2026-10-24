@@ -180,6 +180,7 @@ pub struct ResolvedScrollBoxLayout {
 /// * `source_y` - The source y.
 /// * `visible` - Whether this surface participates in composition.
 /// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `event_passthrough` - Whether empty positions permit pointer input to lower surfaces.
 /// * `background` - The background color override, or `None` to inherit the default.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SliceFrame {
@@ -198,6 +199,8 @@ pub struct SliceFrame {
   pub opaque: bool,
   /// The background color override, or `None` to inherit the default.
   pub background: Option<TextColor>,
+  /// Allow pointer events to reach lower surfaces when no control handles them.
+  pub event_passthrough: bool,
 }
 
 /// The scroll box geometry and drawing data submitted for one composition pass.

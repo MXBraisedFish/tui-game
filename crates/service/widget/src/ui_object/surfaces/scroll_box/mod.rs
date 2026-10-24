@@ -770,6 +770,22 @@ impl ScrollBoxService {
     // Give an existing drag first refusal on motion and release events before testing new hits.
 
     if let Some(drag) = pool.scroll_boxes.drag {
+      let rank = canvas
+        .surface_order()
+        .iter()
+        .position(|surface| *surface == SurfaceId::ScrollBox(drag.scroll_box_id))
+        .map(|index| index + 1);
+      if rank.is_none_or(|rank| {
+        !pool.pointer_parent_contains(rank, event.x, event.y)
+          || pool
+            .pointer_order_at(event.x, event.y)
+            .is_some_and(|top| top.0 > rank)
+      }) {
+        pool.scroll_boxes.drag = None;
+        return pool
+          .pointer_order_at(event.x, event.y)
+          .is_some_and(|(_, order)| order == 0);
+      }
       return self.route_drag_or_release(pool, layout, event, drag);
     }
 
@@ -790,6 +806,19 @@ impl ScrollBoxService {
     let Some(id) = canvas.top_scroll_box_at(event.x, event.y) else {
       return false;
     };
+    let rank = canvas
+      .surface_order()
+      .iter()
+      .position(|surface| *surface == SurfaceId::ScrollBox(id))
+      .unwrap()
+      + 1;
+    if pool
+      .pointer_order_at(event.x, event.y)
+      .is_some_and(|top| top.0 > rank)
+    {
+      return false;
+    }
+
     let Some(state) = pool.scroll_boxes.boxes.get(&id) else {
       return false;
     };
@@ -1303,29 +1332,23 @@ fn scrollbar_physical_rect(rect: Rect, viewport: Rect) -> Rect {
 fn find_scroll_box_for_interaction(
   pool: &UiObjectPool,
   canvas: &CanvasService,
-  layout: &LayoutService,
+  _layout: &LayoutService,
   x: u16,
   y: u16,
 ) -> Option<ScrollBoxId> {
-  let viewport_size = layout.developer_size();
-  canvas
+  let id = canvas.top_scroll_box_at(x, y)?;
+  let rank = canvas
     .surface_order()
     .iter()
-    .rev()
-    .filter_map(|surface| match surface {
-      SurfaceId::ScrollBox(id) => {
-        let state = pool.scroll_boxes.boxes.get(id)?;
-        if !state.options.visible {
-          return None;
-        }
-        let occupied = resolve_scroll_box_layout(state, viewport_size).occupied_rect;
-        scrollbar_physical_rect(occupied, canvas.viewport())
-          .contains(x, y)
-          .then_some(*id)
-      }
-      _ => None,
-    })
-    .next()
+    .position(|surface| *surface == SurfaceId::ScrollBox(id))?
+    + 1;
+  if pool
+    .pointer_order_at(x, y)
+    .is_some_and(|top| top > (rank, 0))
+  {
+    return None;
+  }
+  Some(id)
 }
 
 #[cfg(test)]

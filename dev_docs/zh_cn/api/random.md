@@ -50,7 +50,7 @@ random.INT
 ### 示例
 
 ```lua
-local generator = random.create({type = random.INT})
+local generator = random.create({ type = random.INT })
 debug.print(random.get_info(generator).type)
 ```
 
@@ -85,7 +85,7 @@ random.FLOAT
 ### 示例
 
 ```lua
-local generator = random.create({type = random.FLOAT})
+local generator = random.create({ type = random.FLOAT })
 debug.print(random.get_info(generator).type)
 ```
 
@@ -115,16 +115,16 @@ float
 random.randint
 ```
 
-## 参数
+### 参数
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型    | 默认值        | 说明           |
 | ------ | ------- | ------------- | -------------- |
 | `min`  | integer | `-2147483648` | 区间下界（含） |
 | `max`  | integer | `2147483647`  | 区间上界（含） |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -138,10 +138,10 @@ random.randint
 local r1 = random.randint()
 debug.print(r1)
 
-local r2 = random.randint({min = 1})
+local r2 = random.randint({ min = 1 })
 debug.print(r2)
 
-local r3 = random.randint({min = -20, max = -8})
+local r3 = random.randint({ min = -20, max = -8 })
 debug.print(r3)
 ```
 
@@ -153,7 +153,7 @@ debug.print(r3)
 -18
 ```
 
-## 额外说明
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
 - 选填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
@@ -171,16 +171,16 @@ debug.print(r3)
 random.randfloat
 ```
 
-## 参数
+### 参数
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型            | 默认值 | 说明           |
 | ------ | --------------- | ------ | -------------- |
 | `min`  | integer / float | `0`    | 区间下界（含） |
 | `max`  | integer / float | `1`    | 区间上界（含） |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -194,10 +194,10 @@ random.randfloat
 local r1 = random.randfloat()
 debug.print(r1)
 
-local r2 = random.randfloat({min = 0.9})
+local r2 = random.randfloat({ min = 0.9 })
 debug.print(r2)
 
-local r3 = random.randfloat({min = -20, max = -8})
+local r3 = random.randfloat({ min = -20, max = -8 })
 debug.print(r3)
 ```
 
@@ -209,11 +209,11 @@ debug.print(r3)
 -17.99656635215617
 ```
 
-## 额外说明
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
-- 选填参数 `min` 取值范围为 $(-\infty, +\infty)$。
-- 选填参数 `max` 取值范围为 $(-\infty, +\infty)$。
+- 选填参数 `min` 取值范围为 $(-\infty, +\infty)$；必须为有限数。
+- 选填参数 `max` 取值范围为 $(-\infty, +\infty)$；必须为有限数。
 
 ---
 
@@ -227,9 +227,9 @@ debug.print(r3)
 random.create
 ```
 
-## 参数
+### 参数
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型            | 默认值         | 说明           |
 | ------ | --------------- | -------------- | -------------- |
@@ -239,7 +239,7 @@ random.create
 | `seed` | integer         | 系统随机生成   | 随机种子       |
 | `step` | integer         | `0`            | 初始步进数     |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -254,7 +254,7 @@ local r1 = random.create()
 debug.print(r1)
 debug.print(random.generate(r1))
 
-local r2 = random.create({type = random.INT, min = 1, max = 30, seed = 520})
+local r2 = random.create({ type = random.INT, min = 1, max = 30, seed = 520 })
 debug.print(r2)
 debug.print(random.generate(r2))
 
@@ -289,13 +289,13 @@ rng_002
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
 - 参数 `type` 为 `random.INT` 时，参数 `min` 默认值为 `-2147483648`，参数 `max` 默认值为 `2147483647`。
 - 参数 `type` 为 `random.FLOAT` 时，参数 `min` 默认值为 `0`，参数 `max` 默认值为 `1`。
-- 选填参数 `min` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，`type` 为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数值。
-- 选填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，`type` 为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数值。
+- 选填参数 `min` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，`type` 为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数。
+- 选填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，`type` 为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数。
 - 选填参数 `seed` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
 - 选填参数 `step` 取值范围为 $[0, 9223372036854775807]$。
 
@@ -311,15 +311,15 @@ rng_002
 random.delete
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明      |
 | ------ | ------ | --------- |
 | `id`   | string | 生成器 ID |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -362,7 +362,7 @@ true
 random.clear
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -404,13 +404,13 @@ true
 random.list
 ```
 
-## 返回值
+### 返回值
 
-返回一个混合表。
+返回一个值。
 
-| 类型  | 说明           |
-| ----- | -------------- |
-| table | 所有生成器信息表 |
+| 类型  | 说明                   |
+| ----- | ---------------------- |
+| table | 所有生成器信息的混合表 |
 
 ### 示例
 
@@ -445,7 +445,7 @@ debug.print(table.pretty(random.list()))
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 返回值混合表结构如下：
 
@@ -459,7 +459,7 @@ debug.print(table.pretty(random.list()))
     seed = 42,      -- integer（生成器种子）
     step = 1,       -- integer（生成器步进数）
   },
-  n = 1, -- integer（元素数量）
+  n = 1,            -- integer（生成器数量）
 }
 ```
 
@@ -475,7 +475,7 @@ debug.print(table.pretty(random.list()))
 random.count
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -513,15 +513,15 @@ debug.print(random.count())
 random.generate
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明      |
 | ------ | ------ | --------- |
 | `id`   | string | 生成器 ID |
 
-## 返回值
+### 返回值
 
 **生成器存在时**，返回一个值。
 
@@ -538,7 +538,7 @@ random.generate
 ### 示例
 
 ```lua
-local r = random.create({min = -5, max = 30})
+local r = random.create({ min = -5, max = 30 })
 
 debug.print(random.generate(r))
 debug.print(random.generate(r))
@@ -569,15 +569,15 @@ debug.print(random.generate(r))
 random.set
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明      |
 | ------ | ------ | --------- |
 | `id`   | string | 生成器 ID |
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型            | 默认值   | 说明           |
 | ------ | --------------- | -------- | -------------- |
@@ -587,7 +587,7 @@ random.set
 | `seed` | integer         | 保持原值 | 随机种子       |
 | `step` | integer         | 保持原值 | 步进数         |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -602,7 +602,7 @@ local r = random.create()
 
 debug.print(table.pretty(random.get_info(r)))
 
-random.set(r, {type = random.FLOAT, min = 3.2, max = 5.8, seed = 123456})
+random.set(r, { type = random.FLOAT, min = 3.2, max = 5.8, seed = 123456 })
 
 debug.print(table.pretty(random.get_info(r)))
 ```
@@ -628,11 +628,11 @@ debug.print(table.pretty(random.get_info(r)))
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 随机区间为闭区间 $[min, max]$。
-- 选填参数 `min` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，目标类型为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数值。
-- 选填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，目标类型为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数值。
+- 选填参数 `min` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，目标类型为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数。
+- 选填参数 `max` 取值范围为 $[-9223372036854775808, 9223372036854775807]$，目标类型为 `random.FLOAT` 时为 $(-\infty, +\infty)$ 内的有限数。
 - 选填参数 `seed` 取值范围为 $[-9223372036854775808, 9223372036854775807]$。
 - 选填参数 `step` 取值范围为 $[0, 9223372036854775807]$。
 
@@ -648,21 +648,21 @@ debug.print(table.pretty(random.get_info(r)))
 random.get_info
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明      |
 | ------ | ------ | --------- |
 | `id`   | string | 生成器 ID |
 
-## 返回值
+### 返回值
 
-**生成器存在时**，返回一个表。
+**生成器存在时**，返回一个值。
 
-| 类型  | 说明             |
-| ----- | ---------------- |
-| table | 生成器配置信息表 |
+| 类型  | 说明                 |
+| ----- | -------------------- |
+| table | 生成器配置信息对象表 |
 
 **生成器不存在时**，返回一个值。
 
@@ -690,7 +690,7 @@ debug.print(table.pretty(random.get_info(r)))
 }
 ```
 
-## 额外说明
+### 额外说明
 
 返回表结构如下：
 
@@ -717,15 +717,15 @@ debug.print(table.pretty(random.get_info(r)))
 random.exists
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明      |
 | ------ | ------ | --------- |
 | `id`   | string | 生成器 ID |
 
-## 返回值
+### 返回值
 
 返回一个值。
 

@@ -38,8 +38,36 @@ pub(crate) struct LuaTimerBinding {
 }
 
 use tg_service_widget::{
-  RuntimeObjectPool, RuntimeObjectPoolOwner, SliceService, UiObjectPool, UiObjectPoolOwner,
+  HitAreaId, HitAreaOptions, HitAreaService, RuntimeObjectPool, RuntimeObjectPoolOwner,
+  SliceService, UiObjectPool, UiObjectPoolOwner,
 };
+
+/// Configuration retained by a session-owned script hitbox.
+///
+/// # Fields
+///
+/// * `width` - The configured width in terminal columns.
+/// * `height` - The configured height in terminal rows.
+/// * `options` - The hover and drag event switches.
+/// * `placement` - The original origins retained by the latest drawing submission.
+#[derive(Clone, Copy)]
+pub(crate) struct LuaHitboxBinding {
+  /// The configured width in terminal columns.
+  pub width: u16,
+  /// The configured height in terminal rows.
+  pub height: u16,
+  /// The hover and drag event switches.
+  pub options: HitAreaOptions,
+  /// The original coordinate origins retained from the last drawing submission.
+  pub placement: Option<LuaHitboxPlacement>,
+}
+
+/// The original slice and hitbox origins used to report pointer coordinates after clipping.
+#[derive(Clone, Copy)]
+pub(crate) struct LuaHitboxPlacement {
+  surface_origin: (i32, i32),
+  position: (i32, i32),
+}
 
 /// The shared type used for shared Lua object pool.
 pub(crate) type SharedLuaObjectPool = Rc<RefCell<Option<LuaObjectPool>>>;
@@ -57,6 +85,8 @@ pub struct LuaObjectPool {
   runtime: RuntimeObjectPool,
   /// The timer parameters and callbacks retained by this session.
   pub(crate) timers: BTreeMap<ScheduledTimerId, LuaTimerBinding>,
+  /// The hitbox configurations indexed by their pool-local native identity.
+  pub(crate) hitboxes: BTreeMap<u64, LuaHitboxBinding>,
 }
 
 impl LuaObjectPool {
@@ -66,6 +96,7 @@ impl LuaObjectPool {
       ui: UiObjectPool::new(),
       runtime: RuntimeObjectPool::new(),
       timers: BTreeMap::new(),
+      hitboxes: BTreeMap::new(),
     }
   }
 
@@ -87,6 +118,98 @@ impl LuaObjectPool {
   /// Return mutable access to the owned runtime.
   pub fn runtime_mut(&mut self) -> &mut RuntimeObjectPool {
     &mut self.runtime
+  }
+
+  /// Register an existing hitbox in its owning surface for the current frame.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The pool-local hitbox identity.
+  /// * `target` - The owning base or slice surface.
+  /// * `position` - The signed column and row in the original target surface.
+  /// * `canvas` - The canvas supplying viewport clipping.
+  pub fn draw_hitbox(
+    &mut self,
+    id: u64,
+    target: crate::LuaDrawTarget,
+    position: (i32, i32),
+    canvas: &tg_service_canvas::CanvasService,
+  ) {
+    if let Some(binding) = self.hitboxes.get_mut(&id) {
+      let size = tg_service_layout::Size {
+        width: binding.width,
+        height: binding.height,
+      };
+      let origin = match target {
+        crate::LuaDrawTarget::Base => {
+          HitAreaService::new().render_at(&mut self.ui, HitAreaId(id), position, size, canvas);
+          Some((
+            i32::from(canvas.viewport().x),
+            i32::from(canvas.viewport().y),
+          ))
+        }
+        crate::LuaDrawTarget::Slice(slice) => {
+          HitAreaService::new().render_at_on(
+            &mut self.ui,
+            HitAreaId(id),
+            slice,
+            position,
+            size,
+            canvas,
+          );
+          canvas.slice_origin(slice)
+        }
+      };
+      binding.placement = origin.map(|surface_origin| LuaHitboxPlacement {
+        surface_origin,
+        position,
+      });
+    }
+  }
+
+  /// Route a physical pointer event through this session's submitted hitboxes.
+  ///
+  /// # Arguments
+  ///
+  /// * `canvas` - The canvas used to register this session's hit regions.
+  /// * `event` - The physical terminal pointer event.
+  pub fn route_hitbox_mouse(
+    &mut self,
+    canvas: &tg_service_canvas::CanvasService,
+    event: tg_core_input::MouseEvent,
+  ) -> Vec<LuaEventData> {
+    let event_point = (event.x, event.y);
+    HitAreaService::new().route_mouse_event(
+      &mut self.ui,
+      &mut tg_service_widget::TextInputService::new(),
+      canvas,
+      event,
+    );
+    let mut events = Vec::new();
+    while let Some(event) = self.ui.pop_event() {
+      if let tg_service_widget::UiEvent::HitArea(event) = event {
+        let id = match &event {
+          tg_service_widget::HitAreaEvent::HoverEnter { id, .. }
+          | tg_service_widget::HitAreaEvent::HoverMove { id, .. }
+          | tg_service_widget::HitAreaEvent::HoverLeave { id, .. }
+          | tg_service_widget::HitAreaEvent::Press { id, .. }
+          | tg_service_widget::HitAreaEvent::Release { id, .. }
+          | tg_service_widget::HitAreaEvent::Click { id, .. }
+          | tg_service_widget::HitAreaEvent::Drag { id, .. } => id.0,
+        };
+        if let Some(placement) = self.hitboxes.get(&id).and_then(|binding| binding.placement) {
+          let mut translated = crate::events::translate::translate_hit_area_event(id, &event);
+          if let LuaEventData::HitArea(data) = &mut translated {
+            data.x = i32::from(event_point.0) - placement.surface_origin.0;
+            data.y = i32::from(event_point.1) - placement.surface_origin.1;
+            data.relative_x = i64::from(data.x) - i64::from(placement.position.0);
+            data.relative_y = i64::from(data.y) - i64::from(placement.position.1);
+          }
+          events.push(translated);
+        }
+      }
+    }
+    events
   }
 
   /// Drain timer completions for submission to the owning session's event broker.

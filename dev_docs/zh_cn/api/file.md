@@ -89,7 +89,7 @@ file.AUTO
 > assets/file.txt
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.AUTO, end_of_line = file.AUTO})
+local request_id = file.read("file.txt", { encoding = file.AUTO, end_of_line = file.AUTO })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -131,7 +131,7 @@ file.ALL
 > assets/dir/...
 
 ```lua
-local request_id = file.list_dir("dir/", {file_type = file.ALL})
+local request_id = file.list_dir("dir/", { file_type = file.ALL })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -191,7 +191,7 @@ file.CR
 
 ```lua
 function Init(ctx)
-  file.read("file.txt", {end_of_line = file.CR})
+  file.read("file.txt", { end_of_line = file.CR })
 end
 
 function HandleEvent(event)
@@ -235,7 +235,7 @@ file.LF
 
 ```lua
 function Init(ctx)
-  file.read("file.txt", {end_of_line = file.LF})
+  file.read("file.txt", { end_of_line = file.LF })
 end
 
 function HandleEvent(event)
@@ -279,7 +279,7 @@ file.CRLF
 
 ```lua
 function Init(ctx)
-  file.read("file.txt", {end_of_line = file.CRLF})
+  file.read("file.txt", { end_of_line = file.CRLF })
 end
 
 function HandleEvent(event)
@@ -322,7 +322,7 @@ file.UTF_8
 > assets/file.txt (UTF-8)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.UTF_8})
+local request_id = file.read("file.txt", { encoding = file.UTF_8 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -364,7 +364,7 @@ file.UTF_16LE
 > assets/file.txt (UTF-16 LE)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.UTF_16LE})
+local request_id = file.read("file.txt", { encoding = file.UTF_16LE })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -406,7 +406,7 @@ file.UTF_16BE
 > assets/file.txt (UTF-16 BE)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.UTF_16BE})
+local request_id = file.read("file.txt", { encoding = file.UTF_16BE })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -448,7 +448,7 @@ file.GBK
 > assets/file.txt (GBK)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.GBK})
+local request_id = file.read("file.txt", { encoding = file.GBK })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -490,7 +490,7 @@ file.GB18030
 > assets/file.txt (GB18030)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.GB18030})
+local request_id = file.read("file.txt", { encoding = file.GB18030 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -532,7 +532,7 @@ file.BIG5
 > assets/file.txt (Big5)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.BIG5})
+local request_id = file.read("file.txt", { encoding = file.BIG5 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -574,7 +574,7 @@ file.SHIFT_JIS
 > assets/file.txt (Shift_JIS)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.SHIFT_JIS})
+local request_id = file.read("file.txt", { encoding = file.SHIFT_JIS })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -616,7 +616,7 @@ file.EUC_JP
 > assets/file.txt (EUC-JP)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.EUC_JP})
+local request_id = file.read("file.txt", { encoding = file.EUC_JP })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -658,7 +658,7 @@ file.ISO_2022_JP
 > assets/file.txt (ISO-2022-JP)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_2022_JP})
+local request_id = file.read("file.txt", { encoding = file.ISO_2022_JP })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -700,7 +700,7 @@ file.EUC_KR
 > assets/file.txt (EUC-KR)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.EUC_KR})
+local request_id = file.read("file.txt", { encoding = file.EUC_KR })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -742,7 +742,7 @@ file.WINDOWS_874
 > assets/file.txt (Windows-874)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_874})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_874 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -784,7 +784,7 @@ file.WINDOWS_1250
 > assets/file.txt (Windows-1250)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1250})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1250 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -826,7 +826,7 @@ file.WINDOWS_1251
 > assets/file.txt (Windows-1251)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1251})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1251 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -868,7 +868,7 @@ file.WINDOWS_1252
 > assets/file.txt (Windows-1252)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1252})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1252 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -910,7 +910,7 @@ file.WINDOWS_1253
 > assets/file.txt (Windows-1253)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1253})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1253 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -952,7 +952,7 @@ file.WINDOWS_1254
 > assets/file.txt (Windows-1254)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1254})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1254 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -994,7 +994,7 @@ file.WINDOWS_1255
 > assets/file.txt (Windows-1255)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1255})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1255 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1036,7 +1036,7 @@ file.WINDOWS_1256
 > assets/file.txt (Windows-1256)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1256})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1256 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1078,7 +1078,7 @@ file.WINDOWS_1257
 > assets/file.txt (Windows-1257)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1257})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1257 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1120,7 +1120,7 @@ file.WINDOWS_1258
 > assets/file.txt (Windows-1258)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.WINDOWS_1258})
+local request_id = file.read("file.txt", { encoding = file.WINDOWS_1258 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1162,7 +1162,7 @@ file.ISO_8859_2
 > assets/file.txt (ISO-8859-2)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_2})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_2 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1204,7 +1204,7 @@ file.ISO_8859_3
 > assets/file.txt (ISO-8859-3)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_3})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_3 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1246,7 +1246,7 @@ file.ISO_8859_4
 > assets/file.txt (ISO-8859-4)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_4})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_4 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1288,7 +1288,7 @@ file.ISO_8859_5
 > assets/file.txt (ISO-8859-5)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_5})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_5 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1330,7 +1330,7 @@ file.ISO_8859_6
 > assets/file.txt (ISO-8859-6)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_6})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_6 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1372,7 +1372,7 @@ file.ISO_8859_7
 > assets/file.txt (ISO-8859-7)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_7})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_7 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1414,7 +1414,7 @@ file.ISO_8859_8
 > assets/file.txt (ISO-8859-8)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_8})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_8 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1456,7 +1456,7 @@ file.ISO_8859_8_I
 > assets/file.txt (ISO-8859-8-I)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_8_I})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_8_I })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1498,7 +1498,7 @@ file.ISO_8859_10
 > assets/file.txt (ISO-8859-10)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_10})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_10 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1540,7 +1540,7 @@ file.ISO_8859_13
 > assets/file.txt (ISO-8859-13)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_13})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_13 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1582,7 +1582,7 @@ file.ISO_8859_14
 > assets/file.txt (ISO-8859-14)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_14})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_14 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1624,7 +1624,7 @@ file.ISO_8859_15
 > assets/file.txt (ISO-8859-15)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_15})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_15 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1666,7 +1666,7 @@ file.ISO_8859_16
 > assets/file.txt (ISO-8859-16)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.ISO_8859_16})
+local request_id = file.read("file.txt", { encoding = file.ISO_8859_16 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1708,7 +1708,7 @@ file.KOI8_R
 > assets/file.txt (KOI8-R)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.KOI8_R})
+local request_id = file.read("file.txt", { encoding = file.KOI8_R })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1750,7 +1750,7 @@ file.KOI8_U
 > assets/file.txt (KOI8-U)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.KOI8_U})
+local request_id = file.read("file.txt", { encoding = file.KOI8_U })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1792,7 +1792,7 @@ file.IBM866
 > assets/file.txt (IBM866)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.IBM866})
+local request_id = file.read("file.txt", { encoding = file.IBM866 })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1834,7 +1834,7 @@ file.MACINTOSH
 > assets/file.txt (Macintosh)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.MACINTOSH})
+local request_id = file.read("file.txt", { encoding = file.MACINTOSH })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1876,7 +1876,7 @@ file.X_MAC_CYRILLIC
 > assets/file.txt (x-mac-cyrillic)
 
 ```lua
-local request_id = file.read("file.txt", {encoding = file.X_MAC_CYRILLIC})
+local request_id = file.read("file.txt", { encoding = file.X_MAC_CYRILLIC })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -1911,15 +1911,15 @@ Hello Tui Game
 file.read
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明                      |
 | ------ | ------ | ------------------------- |
 | `path` | string | 相对 `assets/` 的文件路径 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名        | 类型                | 默认值      | 说明           |
 | ------------- | ------------------- | ----------- | -------------- |
@@ -1928,7 +1928,7 @@ file.read
 | `byte`        | boolean             | `false`     | 二进制模式     |
 | `event_tip`   | string / nil        | `nil`       | 自定义事件标记 |
 
-## 返回值
+### 返回值
 
 **请求提交成功时**，返回一个值。
 
@@ -1973,7 +1973,7 @@ end
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 事件返回值见⌊[事件协议](../EVENT.md)⌉
 - 路径相对当前包的 `assets/`。
@@ -1996,16 +1996,16 @@ end
 file.write
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明                      |
 | ------ | ------ | ------------------------- |
 | `path` | string | 相对 `assets/` 的文件路径 |
 | `text` | string | 要写入的内容              |
 
-### 选填参数
+#### 选填参数
 
 | 参数名        | 类型                | 默认值      | 说明           |
 | ------------- | ------------------- | ----------- | -------------- |
@@ -2014,7 +2014,7 @@ file.write
 | `byte`        | boolean             | `false`     | 二进制模式     |
 | `event_tip`   | string / nil        | `nil`       | 自定义事件标记 |
 
-## 返回值
+### 返回值
 
 **请求提交成功时**，返回一个值。
 
@@ -2031,7 +2031,7 @@ file.write
 ### 示例
 
 ```lua
-local request_id = file.write("file.txt", "Hello Tui Game", {event_tip = "Get!"})
+local request_id = file.write("file.txt", "Hello Tui Game", { event_tip = "Get!" })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -2056,13 +2056,13 @@ end
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 事件返回值见⌊[事件协议](../EVENT.md)⌉
 - 路径相对当前包的 `assets/`。
 - 选填参数 `byte` 为 `false` 时按文本读取。
 - 选填参数 `byte` 为 `true` 时按二进制读取，选填参数 `encoding` 与选填参数 `end_of_line` 会被忽略。
-- 方法会自动创建未创建的**文件**，但不会自动补全未创建的**目录**。
+- 方法会自动创建不存在的文件，但不会自动补全不存在的目录。
 
 ---
 
@@ -2080,23 +2080,23 @@ end
 file.list_dir
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明                    |
 | ------ | ------ | ----------------------- |
 | `path` | string | 相对 `assets/` 目录路径 |
 
-### 选填参数
+#### 选填参数
 
-| 参数名      | 类型                      | 默认值  | 说明               |
-| ----------- | ------------------------- | ------- | ------------------ |
-| `recursive` | boolean                   | `false` | 是否递归子目录枚举 |
-| `file_type` | string / const-file | `file.ALL`   | 仅匹配指定扩展名   |
-| `event_tip` | string / nil              | `nil`   | 自定义事件标记     |
+| 参数名      | 类型                | 默认值     | 说明               |
+| ----------- | ------------------- | ---------- | ------------------ |
+| `recursive` | boolean             | `false`    | 是否递归子目录枚举 |
+| `file_type` | string / const-file | `file.ALL` | 仅匹配指定扩展名   |
+| `event_tip` | string / nil        | `nil`      | 自定义事件标记     |
 
-## 返回值
+### 返回值
 
 **请求提交成功时**，返回一个值。
 
@@ -2115,7 +2115,7 @@ file.list_dir
 > assets/dir/...
 
 ```lua
-local request_id = file.list_dir("dir/", {file_type = file.ALL})
+local request_id = file.list_dir("dir/", { file_type = file.ALL })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -2147,7 +2147,7 @@ end
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 事件返回值见⌊[事件协议](../EVENT.md)⌉
 - 路径相对当前包的 `assets/`。
@@ -2169,21 +2169,21 @@ end
 file.create_dir
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明                    |
 | ------ | ------ | ----------------------- |
 | `path` | string | 相对 `assets/` 目录路径 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名      | 类型         | 默认值 | 说明           |
 | ----------- | ------------ | ------ | -------------- |
 | `event_tip` | string / nil | `nil`  | 自定义事件标记 |
 
-## 返回值
+### 返回值
 
 **请求提交成功时**，返回一个值。
 
@@ -2237,7 +2237,7 @@ end
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 事件返回值见⌊[事件协议](../EVENT.md)⌉
 - 路径相对当前包的 `assets/`。
@@ -2256,15 +2256,15 @@ end
 file.exists
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明                  |
 | ------ | ------ | --------------------- |
 | `path` | string | 相对 `assets/` 的路径 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -2288,7 +2288,7 @@ true
 false
 ```
 
-## 额外说明
+### 额外说明
 
 - 路径相对当前包的 `assets/`。
 
@@ -2308,22 +2308,22 @@ false
 file.remove
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明                  |
 | ------ | ------ | --------------------- |
 | `path` | string | 相对 `assets/` 的路径 |
 
-### 选填参数
+#### 选填参数
 
-| 参数名      | 类型         | 默认值  | 说明             |
-| ----------- | ------------ | ------- | ---------------- |
+| 参数名      | 类型         | 默认值  | 说明                         |
+| ----------- | ------------ | ------- | ---------------------------- |
 | `recursive` | boolean      | `false` | 是否删除非空目录（递归删除） |
-| `event_tip` | string / nil | `nil`   | 自定义事件标记   |
+| `event_tip` | string / nil | `nil`   | 自定义事件标记               |
 
-## 返回值
+### 返回值
 
 **请求提交成功时**，返回一个值。
 
@@ -2342,7 +2342,7 @@ file.remove
 > assets/test/test.txt
 
 ```lua
-file.remove("test", {recursive = false})
+file.remove("test", { recursive = false })
 
 function HandleEvent(event)
   if event.type == "file" then
@@ -2371,6 +2371,6 @@ end
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 路径相对当前包的 `assets/`。

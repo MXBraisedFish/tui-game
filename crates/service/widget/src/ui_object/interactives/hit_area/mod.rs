@@ -51,6 +51,69 @@ impl HitAreaService {
     pool.hit_areas.areas.contains_key(&id)
   }
 
+  /// Replace the event options of an existing hit region.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The pool owning the region.
+  /// * `id` - The region to change.
+  /// * `options` - The replacement hover and drag options.
+  pub fn set_options(
+    &self,
+    pool: &mut UiObjectPool,
+    id: HitAreaId,
+    options: HitAreaOptions,
+  ) -> bool {
+    let Some(area) = pool.hit_areas.areas.get_mut(&id) else {
+      return false;
+    };
+    area.options = options;
+    true
+  }
+
+  /// Register a signed base-surface region, clipping negative coordinates before hit testing.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The pool owning the region.
+  /// * `id` - The region to submit for this frame.
+  /// * `position` - The signed column and row in the base surface.
+  /// * `size` - The width and height in terminal cells.
+  /// * `canvas` - The canvas providing the current viewport and clipping bounds.
+  pub fn render_at(
+    &self,
+    pool: &mut UiObjectPool,
+    id: HitAreaId,
+    position: (i32, i32),
+    size: tg_service_layout::Size,
+    canvas: &CanvasService,
+  ) -> bool {
+    let resolved = canvas.base_hit_rect_at(position, size);
+    self.render_resolved(pool, id, resolved)
+  }
+
+  /// Register a signed hit region clipped to its owning slice.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The owning UI pool.
+  /// * `id` - The hit region identity.
+  /// * `slice` - The owning slice identity.
+  /// * `position` - Coordinates in the original slice.
+  /// * `size` - The original region dimensions.
+  /// * `canvas` - The prepared surfaces and viewport.
+  pub fn render_at_on(
+    &self,
+    pool: &mut UiObjectPool,
+    id: HitAreaId,
+    slice: SliceId,
+    position: (i32, i32),
+    size: tg_service_layout::Size,
+    canvas: &CanvasService,
+  ) -> bool {
+    self.render_resolved(pool, id, canvas.slice_hit_rect_at(slice, position, size))
+  }
+
   /// Report whether the addressed object is hovered.
   pub fn is_hovered(&self, pool: &UiObjectPool, id: HitAreaId) -> bool {
     pool.hit_areas.areas.contains_key(&id) && pool.hit_areas.hovered == Some(id)
@@ -177,22 +240,40 @@ impl HitAreaService {
     canvas: &CanvasService,
     event: MouseEvent,
   ) -> bool {
+    // A region omitted from the latest frame no longer owns a captured mouse button.
+    let pointer_order = pool.pointer_order_at(event.x, event.y);
+    let blocking_rank = pointer_order.map_or(0, |order| order.0);
+    let areas = &pool.hit_areas.areas;
+    pool.hit_areas.pressed.retain(|_, pressed| {
+      areas
+        .get(&pressed.id)
+        .and_then(|area| area.hit)
+        .is_some_and(|hit| hit.surface_rank >= blocking_rank)
+    });
     if event.kind == MouseEventKind::Hold {
       let captured = event
         .button
         .is_some_and(|button| pool.hit_areas.pressed.contains_key(&button));
-      return text_input.route_mouse_event(pool, event) || captured;
+      return text_input.route_mouse_event(pool, event)
+        || captured
+        || pointer_order.is_some_and(|(_, order)| order == 0);
     }
     if event.kind == MouseEventKind::Scroll {
-      return text_input.route_mouse_event(pool, event);
+      return text_input.route_mouse_event(pool, event)
+        || pointer_order.is_some_and(|(_, order)| order == 0);
     }
 
     let hit = pool.hit_areas.hit(event.x, event.y);
     let text_order = text_input.mouse_hit_order(pool, event.x, event.y);
-    let top_hit = hit.filter(|(_, order)| text_order.is_none_or(|text| *order > text));
+    let top_hit =
+      hit.filter(|(_, order)| pool.pointer_region_is_top(order.0, order.1, event.x, event.y));
     pool.hit_areas.pointer = canvas.viewport_point(event.x, event.y);
     pool.hit_areas.physical_pointer = Some((event.x, event.y));
     self.update_hover(pool, top_hit.map(|(id, _)| id), event.x, event.y);
+
+    if pointer_order.is_some_and(|(_, order)| order == 0) {
+      return true;
+    }
 
     match event.kind {
       MouseEventKind::Move => top_hit.is_some() || text_order.is_some(),
@@ -233,6 +314,16 @@ impl HitAreaService {
           press.last_x = event.x;
           press.last_y = event.y;
           if pool.hit_areas.areas[&id].options.drag {
+            let Some(hit) = pool.hit_areas.areas[&id].hit else {
+              return false;
+            };
+            if !pool.pointer_parent_contains(hit.surface_rank, event.x, event.y)
+              || pool
+                .pointer_order_at(event.x, event.y)
+                .is_some_and(|top| top.0 > hit.surface_rank)
+            {
+              return false;
+            }
             let (x, y) = event_point(pool, id, event.x, event.y);
             pool.push_hit_event(HitAreaEvent::Drag {
               id,
@@ -377,6 +468,93 @@ mod tests {
       width,
       height,
     }
+  }
+
+  #[test]
+  fn omitted_region_releases_capture_before_dragging() {
+    let service = HitAreaService::new();
+    let mut pool = UiObjectPool::new();
+    let canvas = CanvasService::new();
+    let mut input = TextInputService::new();
+    let id = service.create(
+      &mut pool,
+      HitAreaOptions {
+        hover_move: false,
+        drag: true,
+      },
+    );
+    service.render(&mut pool, id, rect(0, 0, 3, 2), &canvas);
+    service.route_mouse_event(
+      &mut pool,
+      &mut input,
+      &canvas,
+      mouse(MouseEventKind::Press, Some(MouseButton::Left), 0, 0),
+    );
+    events(&mut pool);
+    pool.begin_render();
+    service.route_mouse_event(
+      &mut pool,
+      &mut input,
+      &canvas,
+      mouse(MouseEventKind::Drag, Some(MouseButton::Left), 1, 0),
+    );
+    assert!(!service.is_pressed(&pool, id, MouseButton::Left));
+    assert!(
+      !events(&mut pool)
+        .iter()
+        .any(|event| matches!(event, UiEvent::HitArea(HitAreaEvent::Drag { .. })))
+    );
+  }
+
+  #[test]
+  fn signed_regions_clip_without_overflow_and_options_can_change() {
+    let service = HitAreaService::new();
+    let mut pool = UiObjectPool::new();
+    let canvas = CanvasService::new();
+    let mut input = TextInputService::new();
+    let id = service.create(&mut pool, HitAreaOptions::default());
+    let size = tg_service_layout::Size {
+      width: 4,
+      height: 3,
+    };
+    assert!(service.render_at(&mut pool, id, (-2, -1), size, &canvas));
+    assert!(service.route_mouse_event(
+      &mut pool,
+      &mut input,
+      &canvas,
+      mouse(MouseEventKind::Move, None, 1, 1)
+    ));
+    assert!(!service.route_mouse_event(
+      &mut pool,
+      &mut input,
+      &canvas,
+      mouse(MouseEventKind::Move, None, 2, 1)
+    ));
+    assert!(service.set_options(
+      &mut pool,
+      id,
+      HitAreaOptions {
+        hover_move: true,
+        drag: true
+      }
+    ));
+    assert_eq!(
+      pool.hit_areas.areas[&id].options,
+      HitAreaOptions {
+        hover_move: true,
+        drag: true
+      }
+    );
+    for position in [(i32::MIN, 0), (i32::MAX, i32::MAX)] {
+      assert!(service.render_at(&mut pool, id, position, size, &canvas));
+      assert!(!service.route_mouse_event(
+        &mut pool,
+        &mut input,
+        &canvas,
+        mouse(MouseEventKind::Press, Some(MouseButton::Left), 0, 0)
+      ));
+    }
+    assert!(!service.set_options(&mut pool, HitAreaId(999), HitAreaOptions::default()));
   }
 
   #[test]

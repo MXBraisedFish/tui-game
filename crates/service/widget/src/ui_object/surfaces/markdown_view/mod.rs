@@ -342,20 +342,29 @@ impl MarkdownService {
   /// # Arguments
   ///
   /// * `pool` - The object pool that owns the component.
-  /// * `text_input` - The text input.
+  /// * `_text_input` - The input service retained for existing callers; the pool resolves precedence.
   /// * `event` - The event to apply or route.
   pub fn route_mouse_event(
     &self,
     pool: &mut UiObjectPool,
-    text_input: &crate::TextInputService,
+    _text_input: &crate::TextInputService,
     event: MouseEvent,
   ) -> bool {
+    if pool
+      .pointer_order_at(event.x, event.y)
+      .is_some_and(|(_, order)| order == 0)
+    {
+      for state in pool.markdown_views.views.values_mut() {
+        state.pressed = None;
+      }
+      return true;
+    }
     if !matches!(event.kind, MouseEventKind::Press | MouseEventKind::Release)
       || event.button != Some(MouseButton::Left)
     {
       return false;
     }
-    let Some((id, link_index, order)) = markdown_hit(pool, event.x, event.y) else {
+    let Some((id, link_index, _)) = markdown_hit(pool, event.x, event.y) else {
       if event.kind == MouseEventKind::Release {
         for state in pool.markdown_views.views.values_mut() {
           state.pressed = None;
@@ -363,20 +372,6 @@ impl MarkdownService {
       }
       return false;
     };
-    if pool
-      .hit_areas
-      .hit(event.x, event.y)
-      .is_some_and(|(_, hit_order)| hit_order > order)
-      || pool
-        .hyperlinks
-        .hit(event.x, event.y)
-        .is_some_and(|(_, hyperlink_order)| hyperlink_order > order)
-      || text_input
-        .mouse_hit_order(pool, event.x, event.y)
-        .is_some_and(|text_order| text_order > order)
-    {
-      return false;
-    }
     match event.kind {
       MouseEventKind::Press => {
         if let Some(state) = pool.markdown_views.views.get_mut(&id) {
@@ -933,7 +928,9 @@ fn markdown_hit(
           hit
             .rect
             .contains(x, y)
-            .then_some((*id, index, (hit.surface_rank, hit.order)))
+            .then_some(())
+            .filter(|_| pool.pointer_region_is_top(hit.surface_rank, hit.order, x, y))
+            .map(|_| (*id, index, (hit.surface_rank, hit.order)))
         })
     })
     .max_by_key(|(_, _, order)| *order)

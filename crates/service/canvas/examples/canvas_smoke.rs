@@ -14,6 +14,7 @@ fn main() {
   canvas.prepare(
     1,
     vec![SurfaceFrame::Slice(SliceFrame {
+      event_passthrough: false,
       id: slice,
       rect: Rect {
         x: 2,

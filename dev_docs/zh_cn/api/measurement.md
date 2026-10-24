@@ -28,15 +28,15 @@
 measurement.get_text_size
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明         |
 | ------ | ------ | ------------ |
 | `text` | string | 要测量的文本 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名             | 类型          | 默认值        | 说明                               |
 | ------------------ | ------------- | ------------- | ---------------------------------- |
@@ -46,12 +46,12 @@ measurement.get_text_size
 | `max_height`       | integer / nil | `nil`         | 最大绘制高度                       |
 | `max_width`        | integer / nil | `nil`         | 最大绘制宽度                       |
 | `overflow_marker`  | string        | `"..."`       | 文本溢出时使用的省略标记           |
-| `rich_params`      | table / nil   | `nil`         | 富文本参数                         |
+| `rich_params`      | table / nil   | `nil`         | 富文本参数对象表                   |
 | `text_mode`        | const-string  | `string.AUTO` | 文本解析模式                       |
 
-## 返回值
+### 返回值
 
-返回两个值，依次为文本占用的终端显示列数与行数。
+返回两个值。
 
 | 值名     | 类型    | 说明                   |
 | -------- | ------- | ---------------------- |
@@ -61,7 +61,7 @@ measurement.get_text_size
 ### 示例
 
 ```lua
-local width, height = measurement.get_text_size("Hello\nTUI", {max_width = 10})
+local width, height = measurement.get_text_size("Hello\nTUI", { max_width = 10 })
 debug.print("width: " .. tostring(width) .. ", height: " .. tostring(height))
 ```
 
@@ -71,7 +71,7 @@ debug.print("width: " .. tostring(width) .. ", height: " .. tostring(height))
 width: 5, height: 2
 ```
 
-## 额外说明
+### 额外说明
 
 - 选填参数 `max_height` 取值范围为 $[1, 65535]$。
 - 选填参数 `max_width` 取值范围为 $[1, 65535]$。
@@ -88,15 +88,15 @@ width: 5, height: 2
 measurement.get_text_width
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明         |
 | ------ | ------ | ------------ |
 | `text` | string | 要测量的文本 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名             | 类型          | 默认值        | 说明                               |
 | ------------------ | ------------- | ------------- | ---------------------------------- |
@@ -106,10 +106,10 @@ measurement.get_text_width
 | `max_height`       | integer / nil | `nil`         | 最大绘制高度                       |
 | `max_width`        | integer / nil | `nil`         | 最大绘制宽度                       |
 | `overflow_marker`  | string        | `"..."`       | 文本溢出时使用的省略标记           |
-| `rich_params`      | table / nil   | `nil`         | 富文本参数                         |
+| `rich_params`      | table / nil   | `nil`         | 富文本参数对象表                   |
 | `text_mode`        | const-string  | `string.AUTO` | 文本解析模式                       |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -120,7 +120,7 @@ measurement.get_text_width
 ### 示例
 
 ```lua
-local width = measurement.get_text_width("Hello TUI", {max_width = 10})
+local width = measurement.get_text_width("Hello TUI", { max_width = 10 })
 debug.print("width: " .. tostring(width))
 ```
 
@@ -130,7 +130,7 @@ debug.print("width: " .. tostring(width))
 width: 9
 ```
 
-## 额外说明
+### 额外说明
 
 - 选填参数 `max_height` 取值范围为 $[1, 65535]$。
 - 选填参数 `max_width` 取值范围为 $[1, 65535]$。
@@ -147,15 +147,15 @@ width: 9
 measurement.get_text_height
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明         |
 | ------ | ------ | ------------ |
 | `text` | string | 要测量的文本 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名             | 类型          | 默认值        | 说明                               |
 | ------------------ | ------------- | ------------- | ---------------------------------- |
@@ -165,10 +165,10 @@ measurement.get_text_height
 | `max_height`       | integer / nil | `nil`         | 最大绘制高度                       |
 | `max_width`        | integer / nil | `nil`         | 最大绘制宽度                       |
 | `overflow_marker`  | string        | `"..."`       | 文本溢出时使用的省略标记           |
-| `rich_params`      | table / nil   | `nil`         | 富文本参数                         |
+| `rich_params`      | table / nil   | `nil`         | 富文本参数对象表                   |
 | `text_mode`        | const-string  | `string.AUTO` | 文本解析模式                       |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -179,7 +179,7 @@ measurement.get_text_height
 ### 示例
 
 ```lua
-local height = measurement.get_text_height("Line 1\nLine 2\nLine 3", {max_width = 10})
+local height = measurement.get_text_height("Line 1\nLine 2\nLine 3", { max_width = 10 })
 debug.print("height: " .. tostring(height))
 ```
 
@@ -189,7 +189,7 @@ debug.print("height: " .. tostring(height))
 height: 3
 ```
 
-## 额外说明
+### 额外说明
 
 - 选填参数 `max_height` 取值范围为 $[1, 65535]$。
 - 选填参数 `max_width` 取值范围为 $[1, 65535]$。

@@ -76,7 +76,7 @@ draw.text(3, 4, "BG", {fg = color.BLACK, bg = color.TRANSPARENT})
 "gray"
 ```
 
-## 额外说明
+### 额外说明
 
 - 别名 `GREY`。
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
@@ -123,7 +123,7 @@ draw.text(3, 4, "BG", {fg = color.BLACK, bg = color.TRANSPARENT})
 "bright_gray"
 ```
 
-## 额外说明
+### 额外说明
 
 - 别名 `BRIGHT_GREY`。
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。。
@@ -170,7 +170,7 @@ draw.text(3, 4, "BG", {fg = color.WHITE, bg = color.TRANSPARENT})
 "black"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -216,7 +216,7 @@ draw.text(3, 4, "BG", {fg = color.WHITE, bg = color.TRANSPARENT})
 "red"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -262,7 +262,7 @@ draw.text(3, 4, "BG", {fg = color.WHITE, bg = color.TRANSPARENT})
 "green"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -308,7 +308,7 @@ draw.text(3, 4, "BG", {fg = color.WHITE, bg = color.TRANSPARENT})
 "yellow"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -354,7 +354,7 @@ draw.text(3, 4, "BG", {fg = color.WHITE, bg = color.TRANSPARENT})
 "blue"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -400,7 +400,7 @@ draw.text(3, 4, "BG", {fg = color.WHITE, bg = color.TRANSPARENT})
 "magenta"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -446,7 +446,7 @@ draw.text(3, 4, "BG", {fg = color.WHITE, bg = color.TRANSPARENT})
 "cyan"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -492,7 +492,7 @@ draw.text(3, 4, "BG", {fg = color.WHITE, bg = color.TRANSPARENT})
 "bright_red"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -538,7 +538,7 @@ draw.text(3, 4, "BG", {fg = color.BLACK, bg = color.TRANSPARENT})
 "bright_green"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -584,7 +584,7 @@ draw.text(3, 4, "BG", {fg = color.BLACK, bg = color.TRANSPARENT})
 "bright_yellow"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -630,7 +630,7 @@ draw.text(3, 4, "BG", {fg = color.BLACK, bg = color.TRANSPARENT})
 "bright_blue"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -676,7 +676,7 @@ draw.text(3, 4, "BG", {fg = color.BLACK, bg = color.TRANSPARENT})
 "bright_magenta"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -722,7 +722,7 @@ draw.text(3, 4, "BG", {fg = color.BLACK, bg = color.TRANSPARENT})
 "bright_cyan"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -768,7 +768,7 @@ draw.text(3, 4, "BG", {fg = color.BLACK, bg = color.TRANSPARENT})
 "white"
 ```
 
-## 额外说明
+### 额外说明
 
 - 该常量为相对颜色，实际显示根据玩家的终端设置而不同。
 - 该常量不可参与颜色数值差值计算。
@@ -859,9 +859,9 @@ draw.text(2, 4, "TRAN", {fg = color.WHITE, bg = color.TRANSPARENT})
 color.rgb
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
@@ -869,7 +869,7 @@ color.rgb
 | `g` | integer | 绿色分量 |
 | `b` | integer | 蓝色分量 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -888,7 +888,7 @@ draw.text(0, 0, rgb, {fg = rgb})
 
 ![color_rgb_example](../image/color_rgb_example.png)
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `r` 取值范围为 $[0, 255]$。
 - 必填参数 `g` 取值范围为 $[0, 255]$。
@@ -906,9 +906,9 @@ draw.text(0, 0, rgb, {fg = rgb})
 color.hex
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型 | 说明 |
 | --- | --- | --- |
@@ -916,7 +916,7 @@ color.hex
 | `g` | integer | 绿色分量 |
 | `b` | integer | 蓝色分量 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -935,7 +935,7 @@ draw.text(0, 0, hex, {fg = hex})
 
 ![color_hex_example](../image/color_hex_example.png)
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `r` 取值范围为 $[0, 255]$。
 - 必填参数 `g` 取值范围为 $[0, 255]$。

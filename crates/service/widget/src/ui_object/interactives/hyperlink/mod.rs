@@ -211,38 +211,36 @@ impl HyperlinkService {
   /// # Arguments
   ///
   /// * `pool` - The object pool that owns the component.
-  /// * `text_input` - The text input.
+  /// * `_text_input` - The input service retained for existing callers; the pool resolves precedence.
   /// * `event` - The event to apply or route.
   pub fn route_mouse_event(
     &self,
     pool: &mut UiObjectPool,
-    text_input: &TextInputService,
+    _text_input: &TextInputService,
     event: MouseEvent,
   ) -> bool {
-    if !matches!(event.kind, MouseEventKind::Press | MouseEventKind::Release) {
+    if pool
+      .pointer_order_at(event.x, event.y)
+      .is_some_and(|(_, order)| order == 0)
+    {
+      pool.hyperlinks.pressed = None;
+      return true;
+    }
+    if !matches!(event.kind, MouseEventKind::Press | MouseEventKind::Release)
+      || event.button != Some(MouseButton::Left)
+    {
       return false;
     }
-    if event.button != Some(MouseButton::Left) {
-      return false;
-    }
-
-    let Some((id, order)) = pool.hyperlinks.hit(event.x, event.y) else {
+    let Some((id, _)) = pool
+      .hyperlinks
+      .hit(event.x, event.y)
+      .filter(|(_, order)| pool.pointer_region_is_top(order.0, order.1, event.x, event.y))
+    else {
       if event.kind == MouseEventKind::Release {
         pool.hyperlinks.pressed = None;
       }
       return false;
     };
-    if pool
-      .hit_areas
-      .hit(event.x, event.y)
-      .is_some_and(|(_, hit_order)| hit_order > order)
-      || text_input
-        .mouse_hit_order(pool, event.x, event.y)
-        .is_some_and(|text_order| text_order > order)
-    {
-      return false;
-    }
-
     match event.kind {
       MouseEventKind::Press => {
         pool.hyperlinks.pressed = Some(id);

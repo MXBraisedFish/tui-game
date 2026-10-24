@@ -2,6 +2,8 @@
 
 `slice` 用于创建和管理图层切片对象。
 
+切片的可见矩形是控件的交互边界。默认情况下，即使背景透明、没有字符或控件，上层切片也会阻挡下层控件。`event_passthrough = true` 允许没有本层控件命中的位置穿透；本层控件仍按切片层级优先、同层后绘制优先响应。背景透明度与事件穿透分别控制。
+
 ---
 
 # 目录
@@ -34,23 +36,24 @@
 slice.create
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名   | 类型    | 说明         |
 | -------- | ------- | ------------ |
 | `width`  | integer | 图层切片宽度 |
 | `height` | integer | 图层切片高度 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名  | 类型                 | 默认值       | 说明             |
 | ------- | -------------------- | ------------ | ---------------- |
 | `bg`    | string / const-color | `color.NONE` | 图层切片背景颜色 |
 | `layer` | integer              | 自动向上递增 | 图层切片层级     |
+| `event_passthrough` | boolean | `false` | 本层没有控件命中时，是否允许鼠标事件穿透到下层 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -62,7 +65,7 @@ slice.create
 
 ```lua
 function Init(ctx)
-  s = slice.create(20, 10, {bg = color.YELLOW})
+  s = slice.create(20, 10, { bg = color.YELLOW })
 end
 
 function Render()
@@ -74,9 +77,9 @@ end
 
 ![slice_create_example](../image/slice_create_example.png)
 
-## 额外说明
+### 额外说明
 
-- 图层切片层级之间不允许空洞图层，参数 `layer` 超过最大层级时自动修正为置顶。
+- 图层切片层级之间不允许空洞图层，选填参数 `layer` 超过最大层级时自动修正为置顶。
 - 插入层级会自动将后面的图层切片层级向上递增。
 - 必填参数 `width` 取值范围为 $[1, 65535]$。
 - 必填参数 `height` 取值范围为 $[1, 65535]$。
@@ -94,15 +97,15 @@ end
 slice.delete
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明        |
 | ------ | ------ | ----------- |
 | `id`   | string | 图层切片 ID |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -113,7 +116,7 @@ slice.delete
 ### 示例
 
 ```lua
-local s = slice.create(20, 10, {bg = color.YELLOW})
+local s = slice.create(20, 10, { bg = color.YELLOW })
 debug.print(s)
 
 debug.print(slice.delete(s))
@@ -131,7 +134,7 @@ true
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - `"base"` 图层不可删除，传入 `"base"` 时返回 `false`。
 - 删除位于层级中间的图层切片会自动将后面的图层切片层级向前移动。
@@ -148,7 +151,7 @@ true
 slice.clear
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -159,10 +162,10 @@ slice.clear
 ### 示例
 
 ```lua
-slice.create(20, 10, {bg = color.YELLOW})
-slice.create(30, 8, {bg = color.RED})
-slice.create(40, 6, {bg = color.GREEN})
-slice.create(50, 4, {bg = color.BLUE})
+slice.create(20, 10, { bg = color.YELLOW })
+slice.create(30, 8, { bg = color.RED })
+slice.create(40, 6, { bg = color.GREEN })
+slice.create(50, 4, { bg = color.BLUE })
 
 debug.print(slice.clear())
 
@@ -190,19 +193,19 @@ true
 slice.list
 ```
 
-## 返回值
+### 返回值
 
-返回一个混合表。
+返回一个值。
 
-| 类型  | 说明             |
-| ----- | ---------------- |
-| table | 所有图层切片信息 |
+| 类型  | 说明                     |
+| ----- | ------------------------ |
+| table | 所有图层切片信息的混合表 |
 
 ### 示例
 
 ```lua
-local s1 = slice.create(20, 10, {bg = color.YELLOW})
-local s2 = slice.create(30, 8, {bg = color.RED})
+local s1 = slice.create(20, 10, { bg = color.YELLOW })
+local s2 = slice.create(30, 8, { bg = color.RED })
 
 debug.print(table.pretty(slice.list()))
 ```
@@ -212,35 +215,38 @@ debug.print(table.pretty(slice.list()))
 ```lua
 {
   [1] = {
-    bg = "yellow",
+    id = "slice_001",
     width = 20,
     height = 10,
-    id = "slice_001",
-    layer = 1
+    bg = "yellow",
+    layer = 1,
+    event_passthrough = false
   },
   [2] = {
-    bg = "red",
+    id = "slice_002",
     width = 30,
     height = 8,
-    id = "slice_002",
-    layer = 2
+    bg = "red",
+    layer = 2,
+    event_passthrough = false
   },
   n = 2
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 返回值混合表结构如下：
 
 ```lua
 {
   {
-    id = "slice_001", -- string(图层切片 ID)
+    id = "slice_001", -- string（图层切片 ID）
     width = 20,       -- integer（图层切片宽度）
     height = 10,      -- integer（图层切片高度）
-    layer = 1,        -- integer（图层切片图层序号）
     bg = "yellow",    -- string（图层切片背景颜色）
+    layer = 1, -- integer（图层切片图层序号）
+    event_passthrough = false -- boolean（鼠标事件是否穿透）
   },
   n = 1,              -- integer（图层切片数量）
 }
@@ -261,7 +267,7 @@ debug.print(table.pretty(slice.list()))
 slice.count
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -272,8 +278,8 @@ slice.count
 ### 示例
 
 ```lua
-slice.create(20, 10, {bg = color.YELLOW})
-slice.create(30, 8, {bg = color.RED})
+slice.create(20, 10, { bg = color.YELLOW })
+slice.create(30, 8, { bg = color.RED })
 
 debug.print(slice.count())
 ```
@@ -284,7 +290,7 @@ debug.print(slice.count())
 2
 ```
 
-## 额外说明
+### 额外说明
 
 - 返回值数字不包含 `"base"` 图层。
 
@@ -300,9 +306,9 @@ debug.print(slice.count())
 slice.draw
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型    | 说明                        |
 | ------ | ------- | --------------------------- |
@@ -310,7 +316,7 @@ slice.draw
 | `x`    | integer | 图层切片左上角位置的 x 坐标 |
 | `y`    | integer | 图层切片左上角位置的 y 坐标 |
 
-## 返回值
+### 返回值
 
 无返回值。
 
@@ -318,7 +324,7 @@ slice.draw
 
 ```lua
 function Init(ctx)
-  s = slice.create(20, 10, {bg = color.YELLOW})
+  s = slice.create(20, 10, { bg = color.YELLOW })
 end
 
 function Render()
@@ -330,7 +336,7 @@ end
 
 ![slice_create_example](../image/slice_create_example.png)
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
@@ -347,15 +353,15 @@ end
 slice.set
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明        |
 | ------ | ------ | ----------- |
 | `id`   | string | 图层切片 ID |
 
-### 选填参数
+#### 选填参数
 
 | 参数名   | 类型                 | 默认值   | 说明             |
 | -------- | -------------------- | -------- | ---------------- |
@@ -363,8 +369,9 @@ slice.set
 | `height` | integer              | 保持原值 | 图层切片高度     |
 | `bg`     | string / const-color | 保持原值 | 图层切片背景颜色 |
 | `layer`  | integer              | 保持原值 | 图层切片层级     |
+| `event_passthrough` | boolean | 保持原值 | 本层没有控件命中时，是否允许鼠标事件穿透到下层 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -375,24 +382,31 @@ slice.set
 ### 示例
 
 ```lua
-local s1 = slice.create(20, 10, {bg = color.YELLOW})
-local s2 = slice.create(30, 8, {bg = color.RED})
+local s = slice.create(20, 10, { bg = color.YELLOW })
 
-debug.print(slice.set(s1, {width = 25, height = 5, bg = color.BLUE}))
+debug.print(slice.set(s, { width = 25, height = 5, bg = color.BLUE }))
 
-debug.print(table.pretty(slice.get_info(s1)))
+debug.print(table.pretty(slice.get_info(s)))
 ```
 
 **输出：**
 
 ```lua
-
+true
+{
+  id = "slice_001", 
+  width = 25, 
+  height = 5, 
+  bg = "blue", 
+  layer = 1,
+  event_passthrough = false
+}
 ```
 
-## 额外说明
+### 额外说明
 
 - `"base"` 图层不可修改。
-- 图层层级之间不允许空洞图层，参数 `layer` 超过最大层级时自动修正为置顶。
+- 图层层级之间不允许空洞图层，选填参数 `layer` 超过最大层级时自动修正为置顶。
 - 选填参数 `width` 取值范围为 $[1, 65535]$。
 - 选填参数 `height` 取值范围为 $[1, 65535]$。
 - 选填参数 `layer` 取值范围为 $[1, 2147483647]$。
@@ -409,21 +423,21 @@ debug.print(table.pretty(slice.get_info(s1)))
 slice.get_info
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明        |
 | ------ | ------ | ----------- |
 | `id`   | string | 图层切片 ID |
 
-## 返回值
+### 返回值
 
-**该图层切片存在时**，返回一个表。
+**该图层切片存在时**，返回一个值。
 
-| 类型  | 说明           |
-| ----- | -------------- |
-| table | 该图层切片信息 |
+| 类型  | 说明                 |
+| ----- | -------------------- |
+| table | 该图层切片信息对象表 |
 
 **该图层切片不存在时**，返回一个值。
 
@@ -434,7 +448,7 @@ slice.get_info
 ### 示例
 
 ```lua
-local s = slice.create(20, 10, {bg = color.YELLOW})
+local s = slice.create(20, 10, { bg = color.YELLOW })
 
 debug.print(table.pretty(slice.get_info(s)))
 ```
@@ -443,25 +457,27 @@ debug.print(table.pretty(slice.get_info(s)))
 
 ```lua
 {
-  bg = "yellow",
+  id = "slice_001",
   width = 20,
   height = 10,
-  id = "slice_001",
-  layer = 1
+  bg = "yellow",
+  layer = 1,
+  event_passthrough = false
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 返回表包含以下字段：
 
 ```lua
 {
-  id = "slice_001", -- string(图层切片 ID)
+  id = "slice_001", -- string（图层切片 ID）
   width = 20,       -- integer（图层切片宽度）
   height = 10,      -- integer（图层切片高度）
-  layer = 1,        -- integer（图层切片图层序号）
   bg = "yellow",    -- string（图层切片背景颜色）
+  layer = 1, -- integer（图层切片图层序号）
+  event_passthrough = false -- boolean（鼠标事件是否穿透）
 }
 ```
 
@@ -477,15 +493,15 @@ debug.print(table.pretty(slice.get_info(s)))
 slice.exists
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明        |
 | ------ | ------ | ----------- |
 | `id`   | string | 图层切片 ID |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -496,7 +512,7 @@ slice.exists
 ### 示例
 
 ```lua
-local s = slice.create(20, 10, {bg = color.YELLOW})
+local s = slice.create(20, 10, { bg = color.YELLOW })
 debug.print(slice.exists(s))
 
 slice.delete(s)

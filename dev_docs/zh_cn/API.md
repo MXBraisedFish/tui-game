@@ -100,7 +100,7 @@ local is_equal = rawequal(1, 2) -- 返回 false
 draw.text(1, 2, "Hello Tui Game", {fg = color.WHITE}) -- 在 base 切片坐标 (1, 2) 作为起始位置绘制字符串 "Hello Tui Game"
 ```
 
-### 参数与结果的补充约定
+#### 参数与结果的补充约定
 
 
 - 所有公开 API 的选填参数统一放在末尾严格选项表中，例如 `tonumber("ff", {base = 16})`、`table.insert(list, value, {pos = 2})`；旧的位置选填参数写法不再接受。
@@ -111,6 +111,6 @@ draw.text(1, 2, "Hello Tui Game", {fg = color.WHITE}) -- 在 base 切片坐标 (
 - 文档中的 `integer`、`float` 是 `number` 的两种形式；`const-color` 等表示该库提供的常量，并非额外的 Lua 类型。二进制数据使用 Lua 字符串保存。
 - 示例是单个功能片段。完整脚本还需定义 `Init`、`HandleEvent`、`Update`、`UpdateFrame`、`Render`；显示 `debug.print` 等输出需要开启调试模式。示例下的“输出”留空，供人工实测填写。
 - 文件、图片及语言加载需要包内资源；异步方法返回请求编号，实际结果在 `HandleEvent` 中接收，不能把请求编号当作读取结果。
-- `audio`、`animation`、`http`、`effect` 和 `widget` 当前未开放，相关占位页不代表可调用。查看⌊[调用约定](LUA_API_MIGRATION.md)⌉与⌊[可用接口](LUA_COMPATIBILITY.md)⌉。
+- `widget.hitbox` 已开放。`audio`、`animation`、`http`、`effect` 及其他 `widget` 子库当前未开放，相关占位页不代表可调用。查看⌊[调用约定](LUA_API_MIGRATION.md)⌉与⌊[可用接口](LUA_COMPATIBILITY.md)⌉。
 
 动作与原始键接收由 [keyboard 库](api/keyboard.md) 分别控制。游戏默认接收动作，不接收原始键；held 只发送一次，持续移动在 Update 中使用保存的按住状态。输入法控制和提交文字的接收使用 [ime 库](api/ime.md)，文字事件默认不接收。

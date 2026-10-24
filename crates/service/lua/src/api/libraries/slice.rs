@@ -36,11 +36,26 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "create",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.create";
-      let table = positional_table(lua, method, values, &["width", "height"], &["bg", "layer"])?;
+      let table = positional_table(
+        lua,
+        method,
+        values,
+        &["width", "height"],
+        &["bg", "layer", "event_passthrough"],
+      )?;
       let width = length(args::required(&table, method, "width")?, method, "width")?;
       let height = length(args::required(&table, method, "height")?, method, "height")?;
       let background = parse_color(table.get::<Value>("bg")?, method, "bg", true)?;
       let layer = optional_layer(&table, method)?;
+      let event_passthrough = match table.raw_get::<Value>("event_passthrough")? {
+        Value::Nil => None,
+        _ => Some(args::optional_bool(
+          &table,
+          method,
+          "event_passthrough",
+          false,
+        )?),
+      };
       with_pool_mut(&create_state, method, |objects| {
         let service = SliceService::new();
         if service.ids(objects.ui()).len() >= MAX_SLICES {
@@ -57,6 +72,7 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
                 height,
               },
               layer,
+              event_passthrough: event_passthrough.unwrap_or(false),
               background,
               ..Default::default()
             },
@@ -112,13 +128,22 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         method,
         values,
         &["id"],
-        &["width", "height", "bg", "layer"],
+        &["width", "height", "bg", "layer", "event_passthrough"],
       )?;
       let handle = table_id(&table, method)?;
       let width = optional_length(&table, method, "width")?;
       let height = optional_length(&table, method, "height")?;
       let background = optional_background(&table, method)?;
       let layer = optional_layer(&table, method)?;
+      let event_passthrough = match table.raw_get::<Value>("event_passthrough")? {
+        Value::Nil => None,
+        _ => Some(args::optional_bool(
+          &table,
+          method,
+          "event_passthrough",
+          false,
+        )?),
+      };
       let SliceHandle::Object(id) = handle else {
         return Ok(false);
       };
@@ -145,6 +170,9 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
           && !service.set_layer(objects.ui_mut(), id, layer)
         {
           return Ok(false);
+        }
+        if let Some(enabled) = event_passthrough {
+          service.set_event_passthrough(objects.ui_mut(), id, enabled);
         }
         Ok(true)
       })
@@ -251,6 +279,7 @@ fn info_value(
       info.raw_set("width", size.width)?;
       info.raw_set("height", size.height)?;
       info.raw_set("layer", 0)?;
+      info.raw_set("event_passthrough", false)?;
       info.raw_set("bg", "transparent")?;
       Ok(Value::Table(info))
     }
@@ -271,6 +300,10 @@ fn object_info(lua: &Lua, objects: &LuaObjectPool, id: SliceId, base: Size) -> m
   info.raw_set("width", resolve_length(rect.width, base.width))?;
   info.raw_set("height", resolve_length(rect.height, base.height))?;
   info.raw_set("layer", service.layer(objects.ui(), id).unwrap_or_default())?;
+  info.raw_set(
+    "event_passthrough",
+    service.event_passthrough(objects.ui(), id).unwrap_or(false),
+  )?;
   info.raw_set(
     "bg",
     background_name(service.background(objects.ui(), id).unwrap_or(None)),

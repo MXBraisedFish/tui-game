@@ -33,7 +33,7 @@
 events.skip_action
 ```
 
-## 返回值
+### 返回值
 
 无返回值。
 
@@ -43,7 +43,7 @@ events.skip_action
 events.skip_action()
 ```
 
-## 额外说明
+### 额外说明
 
 - 仅跳过用户输入的 `action` 事件。
 
@@ -63,7 +63,7 @@ events.skip_action()
 events.clear_action
 ```
 
-## 返回值
+### 返回值
 
 无返回值。
 
@@ -73,9 +73,9 @@ events.clear_action
 events.clear_action()
 ```
 
-## 额外说明
+### 额外说明
 
-- 仅清楚用户输入的 `action` 事件。
+- 仅清除用户输入的 `action` 事件。
 
 ---
 
@@ -93,12 +93,12 @@ events.clear_action()
 events.enable_focus_release
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
-| 类型 | 说明 |
-| --- | --- |
+| 类型    | 说明         |
+| ------- | ------------ |
 | boolean | 设置是否成功 |
 
 ### 示例
@@ -130,12 +130,12 @@ true
 events.disable_focus_release
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
-| 类型 | 说明 |
-| --- | --- |
+| 类型    | 说明         |
+| ------- | ------------ |
 | boolean | 设置是否成功 |
 
 ### 示例

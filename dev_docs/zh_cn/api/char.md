@@ -10,10 +10,10 @@
 
 | 常量              | 说明                        | 定位                                |
 | ----------------- | --------------------------- | ----------------------------------- |
-| `LINE`            | 单线边框字符表              | [LINE](#line)                       |
-| `BOLD_LINE`       | 粗线边框字符表              | [BOLD_LINE](#bold_line)             |
-| `DOUBLE_LINE`     | 双线边框字符表              | [DOUBLE_LINE](#double_line)         |
-| `ROUNDED_LINE`    | 圆角线边框字符表            | [ROUNDED_LINE](#rounded_line)       |
+| `LINE`            | 单线边框字符对象表          | [LINE](#line)                       |
+| `BOLD_LINE`       | 粗线边框字符对象表          | [BOLD_LINE](#bold_line)             |
+| `DOUBLE_LINE`     | 双线边框字符对象表          | [DOUBLE_LINE](#double_line)         |
+| `ROUNDED_LINE`    | 圆角线边框字符对象表        | [ROUNDED_LINE](#rounded_line)       |
 | `ASCII_NUMBER`    | 数字字符数组表              | [ASCII_NUMBER](#ascii_number)       |
 | `ASCII_LOWERCASE` | 小写字母字符数组表          | [ASCII_LOWERCASE](#ascii_lowercase) |
 | `ASCII_UPPERCASE` | 大写字母字符数组表          | [ASCII_UPPERCASE](#ascii_uppercase) |
@@ -27,7 +27,7 @@
 
 ## `LINE`
 
-单线边框字符表。
+单线边框字符对象表。
 
 ### 调用
 
@@ -42,7 +42,7 @@ char.LINE
 ### 示例
 
 ```lua
-draw.stroke_rect(15, 1, 12, 5, {border_char = char.LINE})
+draw.stroke_rect(15, 1, 12, 5, { border_char = char.LINE })
 ```
 
 **输出：**
@@ -73,7 +73,7 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.LINE})
 
 ## `BOLD_LINE`
 
-粗线边框字符表。
+粗线边框字符对象表。
 
 ### 调用
 
@@ -88,7 +88,7 @@ char.BOLD_LINE
 ### 示例
 
 ```lua
-draw.stroke_rect(15, 1, 12, 5, {border_char = char.BOLD_LINE})
+draw.stroke_rect(15, 1, 12, 5, { border_char = char.BOLD_LINE })
 ```
 
 **输出：**
@@ -119,7 +119,7 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.BOLD_LINE})
 
 ## `DOUBLE_LINE`
 
-双线边框字符表。
+双线边框字符对象表。
 
 ### 调用
 
@@ -134,7 +134,7 @@ char.DOUBLE_LINE
 ### 示例
 
 ```lua
-draw.stroke_rect(15, 1, 12, 5, {border_char = char.DOUBLE_LINE})
+draw.stroke_rect(15, 1, 12, 5, { border_char = char.DOUBLE_LINE })
 ```
 
 **输出：**
@@ -165,7 +165,7 @@ draw.stroke_rect(15, 1, 12, 5, {border_char = char.DOUBLE_LINE})
 
 ## `ROUNDED_LINE`
 
-圆角线边框字符表。
+圆角线边框字符对象表。
 
 ### 调用
 
@@ -180,7 +180,7 @@ char.ROUNDED_LINE
 ### 示例
 
 ```lua
-draw.stroke_rect(15, 1, 12, 5, {border_char = char.ROUNDED_LINE})
+draw.stroke_rect(15, 1, 12, 5, { border_char = char.ROUNDED_LINE })
 ```
 
 **输出：**
@@ -221,7 +221,7 @@ char.ASCII_NUMBER
 
 ### 可用于
 
-- 任意。
+- 任意
 
 ### 示例
 
@@ -255,9 +255,9 @@ end
 }
 ```
 
-## 额外说明
+### 额外说明
 
-- 所有数字均为**字符串**类型，而非数字。
+- 所有数字均为字符串类型，而非数字。
 
 ---
 
@@ -273,7 +273,7 @@ char.ASCII_LOWERCASE
 
 ### 可用于
 
-- 任意。
+- 任意
 
 ### 示例
 
@@ -341,7 +341,7 @@ char.ASCII_UPPERCASE
 
 ### 可用于
 
-- 任意。
+- 任意
 
 ### 示例
 
@@ -409,7 +409,7 @@ char.ASCII_LETTER
 
 ### 可用于
 
-- 任意。
+- 任意
 
 ### 示例
 
@@ -503,7 +503,7 @@ char.ASCII_CHARACTER
 
 ### 可用于
 
-- 任意。
+- 任意
 
 ### 示例
 
@@ -577,7 +577,7 @@ char.ASCII
 
 ### 可用于
 
-- 任意。
+- 任意
 
 ### 示例
 

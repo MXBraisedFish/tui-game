@@ -147,6 +147,17 @@ pub enum LuaDrawTarget {
 /// A structured drawing request collected during a script callback.
 #[derive(Clone, Debug)]
 pub enum LuaDrawCommand {
+  /// Register a session-owned transparent pointer region for this frame.
+  Hitbox {
+    /// The session-owned base or slice destination.
+    target: LuaDrawTarget,
+    /// The pool-local hitbox identity.
+    id: u64,
+    /// The signed target-surface column.
+    x: i32,
+    /// The signed target-surface row.
+    y: i32,
+  },
   /// The text setting for Lua draw command.
   Text {
     /// The object or resource affected by the operation.

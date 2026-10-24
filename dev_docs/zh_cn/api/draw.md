@@ -8,12 +8,12 @@
 
 ## 方法
 
-| 方法          | 说明                       | 定位                        |
-| ------------- | -------------------------- | --------------------------- |
-| `text`        | 在指定位置绘制文本         | [text](#text)               |
-| `fill_rect`   | 填充一个矩形区域           | [fill_rect](#fill_rect)     |
-| `stroke_rect` | 绘制一个矩形边框           | [stroke_rect](#stroke_rect) |
-| `erase_rect`  | 擦除指定矩形区域           | [erase_rect](#erase_rect)   |
+| 方法          | 说明               | 定位                        |
+| ------------- | ------------------ | --------------------------- |
+| `text`        | 在指定位置绘制文本 | [text](#text)               |
+| `fill_rect`   | 填充一个矩形区域   | [fill_rect](#fill_rect)     |
+| `stroke_rect` | 绘制一个矩形边框   | [stroke_rect](#stroke_rect) |
+| `erase_rect`  | 擦除指定矩形区域   | [erase_rect](#erase_rect)   |
 
 ---
 
@@ -29,9 +29,9 @@
 draw.text
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型    | 说明                  |
 | ------ | ------- | --------------------- |
@@ -39,7 +39,7 @@ draw.text
 | `y`    | integer | 文本块左上角的 y 坐标 |
 | `text` | string  | 要绘制的文本          |
 
-### 选填参数
+#### 选填参数
 
 | 参数名             | 类型                 | 默认值        | 说明                               |
 | ------------------ | -------------------- | ------------- | ---------------------------------- |
@@ -52,7 +52,7 @@ draw.text
 | `max_height`       | integer / nil        | `nil`         | 最大绘制高度                       |
 | `overflow_marker`  | string               | `"..."`       | 文本溢出时使用的省略标记           |
 | `text_mode`        | const-string         | `string.AUTO` | 文本解析模式                       |
-| `rich_params`      | table / nil          | `nil`         | 富文本参数                         |
+| `rich_params`      | table / nil          | `nil`         | 富文本参数对象表                   |
 | `bold`             | boolean              | `false`       | 粗体                               |
 | `italic`           | boolean              | `false`       | 斜体                               |
 | `underline`        | boolean              | `false`       | 下划线                             |
@@ -63,24 +63,24 @@ draw.text
 | `dim`              | boolean              | `false`       | 暗淡                               |
 | `slice_layer`      | string               | `"base"`      | 绘制目标切片图层                   |
 
-## 返回值
+### 返回值
 
 无返回值。
 
 ### 示例
 
 ```lua
-draw.text(2, 1, "Hello TUI GAME", {fg = color.BRIGHT_RED})
-draw.text(2, 2, "Hello TUI GAME", {fg = color.WHITE, italic = true})
+draw.text(2, 1, "Hello TUI GAME", { fg = color.BRIGHT_RED })
+draw.text(2, 2, "Hello TUI GAME", { fg = color.WHITE, italic = true })
 ```
 
 **输出：**
 
 ![draw_text_example](../image/draw_text_example.png)
 
-## 额外说明
+### 额外说明
 
-- 坐标原点为 $(0,0)$。
+- 坐标原点为 $(0, 0)$。
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
 - 选填参数 `max_width` 取值范围为 $[1, 65535]$。
@@ -98,9 +98,9 @@ draw.text(2, 2, "Hello TUI GAME", {fg = color.WHITE, italic = true})
 draw.fill_rect
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名   | 类型    | 说明                |
 | -------- | ------- | ------------------- |
@@ -109,7 +109,7 @@ draw.fill_rect
 | `width`  | integer | 矩形宽度            |
 | `height` | integer | 矩形高度            |
 
-### 选填参数
+#### 选填参数
 
 | 参数名        | 类型                 | 默认值       | 说明             |
 | ------------- | -------------------- | ------------ | ---------------- |
@@ -118,26 +118,25 @@ draw.fill_rect
 | `bg`          | string / const-color | `color.NONE` | 背景色           |
 | `slice_layer` | string               | `"base"`     | 绘制目标切片图层 |
 
-## 返回值
+### 返回值
 
 无返回值。
 
 ### 示例
 
 ```lua
-draw.fill_rect(2, 1, 10, 4, {bg = color.BLUE})
-
-draw.fill_rect(13, 1, 10, 4, {char = "-", fg = color.GREEN})
+draw.fill_rect(2, 1, 10, 4, { bg = color.BLUE })
+draw.fill_rect(13, 1, 10, 4, { char = "-", fg = color.GREEN })
 ```
 
 **输出：**
 
 ![draw_fill_rect_example](../image/draw_fill_rect_example.png)
 
-## 额外说明
+### 额外说明
 
-- 选填参数 `char` 填写时必须为宽度为 **1** 的字符。
-- 坐标原点为 $(0,0)$。
+- 选填参数 `char` 填写时必须为宽度为 `1` 的字符。
+- 坐标原点为 $(0, 0)$。
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `width` 取值范围为 $[1, 65535]$。
@@ -155,9 +154,9 @@ draw.fill_rect(13, 1, 10, 4, {char = "-", fg = color.GREEN})
 draw.stroke_rect
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名   | 类型    | 说明                |
 | -------- | ------- | ------------------- |
@@ -166,59 +165,60 @@ draw.stroke_rect
 | `width`  | integer | 矩形宽度            |
 | `height` | integer | 矩形高度            |
 
-### 选填参数
+#### 选填参数
 
 | 参数名        | 类型                 | 默认值       | 说明             |
 | ------------- | -------------------- | ------------ | ---------------- |
 | `fg`          | string / const-color | `color.NONE` | 边框前景色       |
 | `bg`          | string / const-color | `color.NONE` | 边框背景色       |
-| `border_char` | table / const-char   | `char.LINE`  | 边框字符         |
+| `border_char` | table / const-char   | `char.LINE`  | 边框字符对象表   |
 | `slice_layer` | string               | `"base"`     | 绘制目标切片图层 |
 
-## 返回值
+### 返回值
 
 无返回值。
 
 ### 示例
 
 ```lua
-draw.stroke_rect(2, 1, 12, 5, {fg = color.WHITE, border_char = char.ROUNDED_LINE})
+local custom_border = {
+  top = "-",
+  left_top = "+",
+  left = "|",
+  left_bottom = "+",
+  bottom = "-",
+  right_bottom = "+",
+  right = "|",
+  right_top = "+",
+}
 
-draw.stroke_rect(15, 1, 12, 5, {fg = color.YELLOW, border_char = {
-		top = "-",
-		left_top = "+",
-		left = "|",
-		left_bottom = "+",
-		bottom = "-",
-		right_bottom = "+",
-		right = "|",
-		right_top = "+",
-	}})
+draw.stroke_rect(2, 1, 12, 5, { fg = color.WHITE, border_char = char.ROUNDED_LINE })
+draw.stroke_rect(15, 1, 12, 5, { fg = color.YELLOW, border_char = custom_border })
 ```
 
 **输出：**
 
 ![draw_stroke_rect_example](../image/draw_stroke_rect_example.png)
 
-## 额外说明
+### 额外说明
 
-- 参数 `border_char` 表结构：
+- 选填参数 `border_char` 对象表结构：
 
 ```lua
 local border_char = {
-  top = "─",          -- string / const-char
-  left_top = "┌",     -- string / const-char
-  left = "│",         -- string / const-char
-  left_bottom = "└",  -- string / const-char
-  bottom = "─",       -- string / const-char
-  right_bottom = "┘", -- string / const-char
-  right = "│",        -- string / const-char
-  right_top = "┐",    -- string / const-char
+  top = "─",          -- string / const-char（上边框字符）
+  left_top = "┌",     -- string / const-char（左上角字符）
+  left = "│",         -- string / const-char（左边框字符）
+  left_bottom = "└",  -- string / const-char（左下角字符）
+  bottom = "─",       -- string / const-char（下边框字符）
+  right_bottom = "┘", -- string / const-char（右下角字符）
+  right = "│",        -- string / const-char（右边框字符）
+  right_top = "┐",    -- string / const-char（右上角字符）
 }
 ```
 
-- 选填参数 `border_char` 填写时每个字段必须为宽度为 **1** 的字符。
-- 坐标原点为 $(0,0)$。
+- 选填参数 `border_char` 填写时每个字段必须为宽度为 `1` 的字符。
+- 坐标原点为 $(0, 0)$。
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `width` 取值范围为 $[1, 65535]$。
@@ -236,9 +236,9 @@ local border_char = {
 draw.erase_rect
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名   | 类型    | 说明                |
 | -------- | ------- | ------------------- |
@@ -247,21 +247,20 @@ draw.erase_rect
 | `width`  | integer | 矩形宽度            |
 | `height` | integer | 矩形高度            |
 
-### 选填参数
+#### 选填参数
 
 | 参数名        | 类型   | 默认值   | 说明             |
 | ------------- | ------ | -------- | ---------------- |
 | `slice_layer` | string | `"base"` | 绘制目标切片图层 |
 
-## 返回值
+### 返回值
 
 无返回值。
 
 ### 示例
 
 ```lua
-draw.fill_rect(2, 1, 10, 4, {bg = color.BLUE})
-
+draw.fill_rect(2, 1, 10, 4, { bg = color.BLUE })
 draw.erase_rect(3, 2, 8, 2)
 ```
 
@@ -269,7 +268,7 @@ draw.erase_rect(3, 2, 8, 2)
 
 ![draw_erase_rect_example](../image/draw_erase_rect_example.png)
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。

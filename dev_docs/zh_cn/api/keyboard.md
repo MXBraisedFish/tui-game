@@ -10,10 +10,10 @@
 
 | 方法                   | 说明                 | 定位                                          |
 | ---------------------- | -------------------- | --------------------------------------------- |
-| `receive_action_event` | 开始接收动作事件     | [receive_action_event](#receive_action_event) |
-| `reject_action_event`  | 停止接收动作事件     | [reject_action_event](#reject_action_event)   |
-| `receive_key_event`    | 开始接收原始按键事件 | [receive_key_event](#receive_key_event)       |
-| `reject_key_event`     | 停止接收原始按键事件 | [reject_key_event](#reject_key_event)         |
+| `receive_action_event` | 启用接收动作事件     | [receive_action_event](#receive_action_event) |
+| `reject_action_event`  | 关闭接收动作事件     | [reject_action_event](#reject_action_event)   |
+| `receive_key_event`    | 启用接收原始按键事件 | [receive_key_event](#receive_key_event)       |
+| `reject_key_event`     | 关闭接收原始按键事件 | [reject_key_event](#reject_key_event)         |
 
 ---
 
@@ -21,7 +21,7 @@
 
 ## `receive_action_event`
 
-开始接收动作事件。
+启用接收动作事件。
 
 ### 限制
 
@@ -33,12 +33,12 @@
 keyboard.receive_action_event
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
-| 类型    | 说明        |
-| ------- | ----------- |
+| 类型    | 说明         |
+| ------- | ------------ |
 | boolean | 设置是否成功 |
 
 ### 示例
@@ -58,7 +58,7 @@ true
 
 ## `reject_action_event`
 
-停止接收动作事件。
+关闭接收动作事件。
 
 ### 限制
 
@@ -70,12 +70,12 @@ true
 keyboard.reject_action_event
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
-| 类型    | 说明        |
-| ------- | ----------- |
+| 类型    | 说明         |
+| ------- | ------------ |
 | boolean | 设置是否成功 |
 
 ### 示例
@@ -107,12 +107,12 @@ true
 keyboard.receive_key_event
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
-| 类型    | 说明        |
-| ------- | ----------- |
+| 类型    | 说明         |
+| ------- | ------------ |
 | boolean | 设置是否成功 |
 
 ### 示例
@@ -132,7 +132,7 @@ true
 
 ## `reject_key_event`
 
-停止接收原始按键事件。
+关闭接收原始按键事件。
 
 ### 限制
 
@@ -144,12 +144,12 @@ true
 keyboard.reject_key_event
 ```
 
-## 返回值
+### 返回值
 
 返回一个值。
 
-| 类型    | 说明        |
-| ------- | ----------- |
+| 类型    | 说明         |
+| ------- | ------------ |
 | boolean | 设置是否成功 |
 
 ### 示例

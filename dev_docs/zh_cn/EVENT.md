@@ -1,6 +1,6 @@
 # Lua 事件协议
 
-本文档包含已实现事件和未来事件 schema。当前可投递范围是 `action`、`key`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期、`timer` 计时事件，以及 `file`、`i18n`、`image` 异步终态。计时器指定 callback 时只调用该函数，其余情况通过 `HandleEvent(event)` 交付。`animation`、`audio`、`network` 和 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准。
+本文档包含已实现事件和未来事件 schema。当前可投递范围是 `action`、`key`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期、`timer` 计时事件，以及 `file`、`i18n`、`image` 异步终态和 `widget.hitbox` 的 `hitbox` 交互事件。计时器指定 callback 时只调用该函数，其余情况通过 `HandleEvent(event)` 交付。`animation`、`audio`、`network` 及其他 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准。
 
 事件只用于宿主向脚本通知状态变化；原始终端事件对象、宿主 UI 事件、内部任务 ID、绝对路径和内部错误信息不会暴露给 Lua。
 
@@ -511,16 +511,18 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 以下事件只发送给游戏 Session，并且必须来自该 Session 自己创建和登记的组件。覆盖屏接管交互期间不会投递。
 
-### 7.1 `hit_area`
+### 7.1 `hitbox`
 
 ```lua
 {
-  type = "hit_area",
+  type = "hitbox",
   data = {
-    id = "8",
+    id = "hitbox_008",
     kind = "drag",
     x = 30,
     y = 12,
+    relative_x = 5,
+    relative_y = 4,
     button = "left",
     dx = 2,
     dy = -1,
@@ -532,8 +534,10 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 |---|---|---|---|
 | `id` | `string` | 始终 | Session 内点击区域 ID。 |
 | `kind` | `string` | 始终 | `hover_enter`、`hover_move`、`hover_leave`、`press`、`release`、`click` 或 `drag`。 |
-| `x` | `integer` | 始终 | 事件水平坐标。 |
-| `y` | `integer` | 始终 | 事件垂直坐标。 |
+| `x` | `integer` | 始终 | 目标切片原始坐标系中的水平坐标。 |
+| `y` | `integer` | 始终 | 目标切片原始坐标系中的垂直坐标。 |
+| `relative_x` | `integer` | 始终 | 相对于 hitbox 未裁剪左上角的水平坐标。 |
+| `relative_y` | `integer` | 始终 | 相对于 hitbox 未裁剪左上角的垂直坐标。 |
 | `button` | `string \| nil` | `press`、`release`、`click`、`drag` | `left`、`middle` 或 `right`。 |
 | `dx` | `integer \| nil` | `drag` | 本次拖动的水平位移。 |
 | `dy` | `integer \| nil` | `drag` | 本次拖动的垂直位移。 |
@@ -606,7 +610,7 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 
 - `resize`：保留最新尺寸。
 - `mouse`：同一 `kind` 和 `button` 的 `moved` 或 `held` 保留最新坐标。
-- `hit_area`：同一对象的 `hover_move` 保留最新坐标。
+- `hitbox`：同一对象的 `hover_move` 保留最新坐标。
 - `scroll_box`：同一对象保留最新滚动位置。
 
 以下事件不会合并：动作按下/按住/释放、鼠标按键、拖动、滚轮、焦点、覆盖屏生命周期、计时器、动画标记以及所有异步终态事件。
@@ -631,7 +635,7 @@ image
 network
 i18n
 audio
-hit_area
+hitbox
 hyperlink
 markdown
 text_input

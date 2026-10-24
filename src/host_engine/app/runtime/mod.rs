@@ -1658,6 +1658,9 @@ fn route_frame_input(
       }),
       InputNotification::Focus { gained } => {
         if !gained {
+          services
+            .game
+            .with_objects_mut(|objects| services.hit_area.deactivate(objects.ui_mut()));
           let releases = services.game.focus_lost_input();
           queue_game_input_releases(services, context.lua_events, *frame, releases);
           context
@@ -1903,6 +1906,25 @@ fn route_frame_input(
     for event in services.input.drain_system_events() {
       if matches!(event, SystemEvent::Focus(_)) {
         continue;
+      }
+      if let SystemEvent::Mouse(mouse) = &event
+        && allow_mouse
+        && world.state.current_overlay_kind().is_none()
+        && let Some(token) = services.game.session_token()
+      {
+        let events = services
+          .game
+          .with_objects_mut(|objects| objects.route_hitbox_mouse(&services.canvas, *mouse))
+          .unwrap_or_default();
+        for data in events {
+          if let Err(error) =
+            context
+              .lua_events
+              .push_owned(token, *frame, data, LuaEventRoute::HandleEvent)
+          {
+            log_lua_enqueue_error(services, error);
+          }
+        }
       }
       queue_lua_system_event(context.lua_events, *frame, event, allow_mouse, base_rect);
     }
@@ -2180,6 +2202,9 @@ fn queue_lua_overlay_transitions(
   for transition in world.state.take_overlay_transitions() {
     let data = match transition {
       OverlayStackTransition::Started => {
+        services
+          .game
+          .with_objects_mut(|objects| services.hit_area.deactivate(objects.ui_mut()));
         let releases = services.game.focus_lost_input();
         queue_game_input_releases(services, router, frame, releases);
         // Discard undelivered script input when an overlay acquires interaction ownership.

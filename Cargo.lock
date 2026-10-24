@@ -3638,6 +3638,7 @@ dependencies = [
  "tg-core-version",
  "tg-service-animation",
  "tg-service-async",
+ "tg-service-canvas",
  "tg-service-clipboard",
  "tg-service-file",
  "tg-service-image",

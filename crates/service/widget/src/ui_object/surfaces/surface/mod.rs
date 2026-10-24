@@ -21,6 +21,7 @@ impl UiObjectPool {
           let (rect, source_x, source_y) =
             resolve_rect_with_source(state.rect, layout.developer_size());
           Some(SurfaceFrame::Slice(SliceFrame {
+            event_passthrough: state.event_passthrough,
             id,
             rect,
             source_x,
@@ -50,6 +51,7 @@ impl UiObjectPool {
       })
       .collect();
     canvas.prepare(self.id(), frames, layout);
+    self.pointer_surfaces.replace(canvas.pointer_surfaces());
   }
 }
 

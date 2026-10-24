@@ -8,9 +8,9 @@
 
 ## 常量
 
-| 常量   | 说明                                                     | 定位          |
-| ------ | -------------------------------------------------------- | ------------- |
-| `NULL` | JSON / YAML 文件中的 `null | [NULL](#null) |
+| 常量   | 说明                       | 定位          |
+| ------ | -------------------------- | ------------- |
+| `NULL` | JSON / YAML 文件中的 `null` | [NULL](#null) |
 
 ## 方法
 
@@ -48,12 +48,12 @@ serialization.NULL
 
 ### 可用于
 
-- JSON / YAML 编码参数中的对象字段或数组元素。
+- JSON / YAML 编码参数中的对象字段或数组元素
 
 ### 示例
 
 ```lua
-local encoded = serialization.json_encode({value = serialization.NULL})
+local encoded = serialization.json_encode({ value = serialization.NULL })
 debug.print(encoded)
 ```
 
@@ -65,7 +65,7 @@ debug.print(encoded)
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 仅适用于 JSON / YAML 文件。
 
@@ -83,15 +83,15 @@ debug.print(encoded)
 serialization.json_encode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名  | 类型 | 说明            |
 | ------- | ---- | --------------- |
 | `value` | any  | 要编码的 Lua 值 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -120,7 +120,7 @@ debug.print(json)
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 - `serialization.NULL` 会被解析为 JSON `null`。
@@ -137,15 +137,15 @@ debug.print(json)
 serialization.json_decode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明        |
 | ------ | ------ | ----------- |
 | `text` | string | JSON 字符串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -170,7 +170,7 @@ debug.print(table.pretty(data))
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - JSON `null` 会被解析为 `serialization.NULL`
 
@@ -186,15 +186,15 @@ debug.print(table.pretty(data))
 serialization.csv_encode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型  | 说明       |
 | ------ | ----- | ---------- |
 | `rows` | table | 二维数组表 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -222,9 +222,9 @@ Alice,95
 Bob,87
 ```
 
-## 额外说明
+### 额外说明
 
-- 参数 `rows` 必须是二维数组表。
+- 参数 `rows` 必须是二维稠密数组表。
 
 ---
 
@@ -238,17 +238,17 @@ Bob,87
 serialization.csv_decode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `text` | string | CSV 字符串 |
 
-## 返回值
+### 返回值
 
-返回一个数组表。
+返回一个值。
 
 | 类型  | 说明       |
 | ----- | ---------- |
@@ -281,7 +281,7 @@ debug.print(table.pretty(data))
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - CSV 的每个字段都解码为字符串，空字段为普通空字符串。
 
@@ -297,15 +297,15 @@ debug.print(table.pretty(data))
 serialization.yaml_encode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名  | 类型             | 说明            |
 | ------- | ---------------- | --------------- |
 | `value` | table / 基本类型 | 要编码的 Lua 值 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -328,7 +328,7 @@ name: TUI
 version: 1
 ```
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 - `serialization.NULL` 会被解析为 YAML `null`。
@@ -345,15 +345,15 @@ version: 1
 serialization.yaml_decode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明        |
 | ------ | ------ | ----------- |
 | `text` | string | YAML 字符串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -378,7 +378,7 @@ debug.print(table.pretty(data))
 }
 ```
 
-## 额外说明
+### 额外说明
 
 - YAML `null` 会被解析为 `serialization.NULL`。
 
@@ -394,15 +394,15 @@ debug.print(table.pretty(data))
 serialization.toml_encode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名  | 类型  | 说明            |
 | ------- | ----- | --------------- |
 | `value` | table | 要编码的 Lua 表 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -425,7 +425,7 @@ name = "TUI"
 version = 1
 ```
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 
@@ -441,15 +441,15 @@ version = 1
 serialization.toml_decode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明        |
 | ------ | ------ | ----------- |
 | `text` | string | TOML 字符串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -486,15 +486,15 @@ debug.print(table.pretty(data))
 serialization.ini_encode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名  | 类型  | 说明            |
 | ------- | ----- | --------------- |
 | `value` | table | 要编码的 Lua 表 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -524,7 +524,7 @@ host=127.0.0.1
 port=8080
 ```
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 
@@ -540,21 +540,21 @@ port=8080
 serialization.ini_decode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `text` | string | INI 字符串 |
 
-## 返回值
+### 返回值
 
-返回一个对象表。
+返回一个值。
 
-| 类型  | 说明     |
-| ----- | -------- |
-| table | 解码结果 |
+| 类型  | 说明           |
+| ----- | -------------- |
+| table | 解码结果对象表 |
 
 ### 示例
 
@@ -587,15 +587,15 @@ debug.print(table.pretty(data))
 serialization.xml_encode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名  | 类型  | 说明            |
 | ------- | ----- | --------------- |
 | `value` | table | 要编码的 Lua 表 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -624,7 +624,7 @@ debug.print(xml)
 </root>
 ```
 
-## 额外说明
+### 额外说明
 
 - 必填参数 `value` 必须可序列化，详细结构见⌊[多格式序列化与反序列化规范](../format/SERIALIZATION_FORMATS.md)⌉。
 
@@ -640,21 +640,21 @@ debug.print(xml)
 serialization.xml_decode
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `text` | string | XML 字符串 |
 
-## 返回值
+### 返回值
 
-返回一个对象表。
+返回一个值。
 
-| 类型  | 说明     |
-| ----- | -------- |
-| table | 解码结果 |
+| 类型  | 说明           |
+| ----- | -------------- |
+| table | 解码结果对象表 |
 
 ### 示例
 
@@ -694,15 +694,15 @@ debug.print(table.pretty(data))
 serialization.binary_pack
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `fmt`  | string | 打包格式串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -735,24 +735,24 @@ packed 8 bytes
 serialization.binary_unpack
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明                       |
 | ------ | ------ | -------------------------- |
 | `fmt`  | string | 解包格式串                 |
 | `data` | string | 二进制数据，可包含任意字节 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名 | 类型    | 默认值 | 说明                    |
 | ------ | ------- | ------ | ----------------------- |
 | `pos`  | integer | `1`    | 从 1 开始的起始字节位置 |
 
-## 返回值
+### 返回值
 
-返回两个值：解出的数据数组表和下一次解包的起始字节位置。
+返回两个值。
 
 | 值名       | 类型    | 说明                       |
 | ---------- | ------- | -------------------------- |
@@ -773,9 +773,9 @@ debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. n
 100, 200; next=9
 ```
 
-## 额外说明
+### 额外说明
 
-- 选填参数 `pos` 取值范围为 $[1, x]$，$x$ 为 `data` 的字节数加 $1$，超出时抛出错误。
+- 选填参数 `pos` 取值范围为 $[1, x]$，$x$ 为 `data` 的字节数加 $1$。
 
 ---
 
@@ -789,15 +789,15 @@ debug.print(tostring(values[1]) .. ", " .. tostring(values[2]) .. "; next=" .. n
 serialization.binary_packsize
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型   | 说明       |
 | ------ | ------ | ---------- |
 | `fmt`  | string | 打包格式串 |
 
-## 返回值
+### 返回值
 
 返回一个值。
 
@@ -818,6 +818,6 @@ debug.print(tostring(size))
 8
 ```
 
-## 额外说明
+### 额外说明
 
 - 参数 `fmt` 只能包含定长项，含变长项时会抛出错误。

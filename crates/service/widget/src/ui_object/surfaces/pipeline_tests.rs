@@ -17,6 +17,283 @@ fn text(frame: &ComposedFrame, x: u16, y: u16) -> &str {
 }
 
 #[test]
+fn empty_slice_blocks_every_interactive_kind_unless_passthrough_is_enabled() {
+  use crate::{
+    HitAreaOptions, HitAreaService, HyperlinkOptions, HyperlinkService, MarkdownRenderParams,
+    MarkdownService, MarkdownViewOptions, TextInputOptions, TextInputRenderParams,
+    TextInputService, UiEvent,
+  };
+  use tg_core_input::{MouseButton, MouseEvent, MouseEventKind};
+  for kind in ["hitbox", "link", "input", "markdown"] {
+    let mut pool = UiObjectPool::new();
+    let slices = SliceService::new();
+    let overlay = slices
+      .create(
+        &mut pool,
+        SliceOptions {
+          rect: SliceRect {
+            x: 0,
+            y: 0,
+            width: SliceLength::Fixed(4),
+            height: SliceLength::Fixed(2),
+          },
+          opaque: false,
+          ..Default::default()
+        },
+      )
+      .unwrap();
+    let area = HitAreaService::new();
+    let area_id = area.create(&mut pool, HitAreaOptions::default());
+    let link = HyperlinkService::new();
+    let link_id = link
+      .create(
+        &mut pool,
+        HyperlinkOptions::new("https://example.com", "Open"),
+      )
+      .unwrap();
+    let mut input = TextInputService::new();
+    let input_id = input.create(
+      &mut pool,
+      TextInputOptions {
+        mouse: true,
+        ..Default::default()
+      },
+    );
+    let markdown = MarkdownService::new();
+    let markdown_id = markdown
+      .create(
+        &mut pool,
+        MarkdownViewOptions::new("[Open](https://example.com)"),
+      )
+      .unwrap();
+    let code = tg_service_code_highlight::CodeHighlightService::new();
+    let mut canvas = CanvasService::new();
+    let mut layout = LayoutService::new();
+    layout.resize_physical(8, 4);
+    for passthrough in [false, true] {
+      slices.set_event_passthrough(&mut pool, overlay, passthrough);
+      pool.begin_render();
+      canvas.begin_frame(&layout);
+      pool.prepare_canvas(&mut canvas, &layout);
+      let rect = tg_service_layout::Rect {
+        x: 0,
+        y: 0,
+        width: 4,
+        height: 1,
+      };
+      match kind {
+        "hitbox" => {
+          area.render(&mut pool, area_id, rect, &canvas);
+        }
+        "link" => {
+          link.render(&mut pool, link_id, 0, 0, &mut canvas);
+        }
+        "input" => {
+          input.render(
+            &mut pool,
+            input_id,
+            &TextInputRenderParams {
+              rect,
+              ..Default::default()
+            },
+            &mut canvas,
+          );
+        }
+        _ => {
+          markdown.render(
+            &mut pool,
+            markdown_id,
+            MarkdownRenderParams {
+              x: 0,
+              y: 0,
+              width: 4,
+              max_height: None,
+            },
+            &mut canvas,
+            &code,
+          );
+        }
+      }
+      for mouse_kind in [MouseEventKind::Press, MouseEventKind::Release] {
+        let event = MouseEvent {
+          kind: mouse_kind,
+          button: Some(MouseButton::Left),
+          scroll: None,
+          x: 0,
+          y: 0,
+        };
+        match kind {
+          "link" => {
+            link.route_mouse_event(&mut pool, &input, event);
+          }
+          "markdown" => {
+            markdown.route_mouse_event(&mut pool, &input, event);
+          }
+          _ => {
+            area.route_mouse_event(&mut pool, &mut input, &canvas, event);
+          }
+        }
+      }
+      let events = std::iter::from_fn(|| pool.pop_event()).collect::<Vec<_>>();
+      let responded = events.iter().any(|event| match kind {
+        "hitbox" => matches!(event, UiEvent::HitArea(crate::HitAreaEvent::Click { .. })),
+        "link" => matches!(event, UiEvent::Hyperlink(_)),
+        "input" => matches!(
+          event,
+          UiEvent::TextInput(crate::TextInputEvent::Pressed { .. })
+        ),
+        _ => matches!(event, UiEvent::Markdown(_)),
+      });
+      assert_eq!(
+        responded, passthrough,
+        "kind={kind}, passthrough={passthrough}"
+      );
+    }
+  }
+}
+
+#[test]
+fn scroll_wheel_respects_empty_slices_passthrough_and_upper_controls() {
+  use crate::{HitAreaOptions, HitAreaService};
+  use tg_core_input::{MouseEvent, MouseEventKind, ScrollDirection};
+  let mut pool = UiObjectPool::new();
+  let scroll = ScrollBoxService::new();
+  let scroll_id = scroll
+    .create(
+      &mut pool,
+      ScrollBoxOptions {
+        rect: tg_service_layout::Rect {
+          x: 0,
+          y: 0,
+          width: 8,
+          height: 4,
+        },
+        content_width: 8,
+        content_height: 20,
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  let slices = SliceService::new();
+  let overlay = slices
+    .create(
+      &mut pool,
+      SliceOptions {
+        rect: SliceRect {
+          x: 0,
+          y: 0,
+          width: SliceLength::Fixed(4),
+          height: SliceLength::Fixed(2),
+        },
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  let area = HitAreaService::new();
+  let control = area.create(&mut pool, HitAreaOptions::default());
+  let mut canvas = CanvasService::new();
+  let mut layout = LayoutService::new();
+  layout.resize_physical(10, 6);
+  let event = MouseEvent {
+    kind: MouseEventKind::Scroll,
+    button: None,
+    scroll: Some(ScrollDirection::Down),
+    x: 1,
+    y: 1,
+  };
+  for (passthrough, has_control, expected) in [
+    (false, false, false),
+    (true, false, true),
+    (true, true, false),
+  ] {
+    slices.set_event_passthrough(&mut pool, overlay, passthrough);
+    pool.begin_render();
+    pool.prepare_canvas(&mut canvas, &layout);
+    if has_control {
+      area.render_on(
+        &mut pool,
+        control,
+        overlay,
+        tg_service_layout::Rect {
+          x: 0,
+          y: 0,
+          width: 4,
+          height: 2,
+        },
+        &canvas,
+      );
+    }
+    assert_eq!(
+      scroll.route_mouse_event(&mut pool, &canvas, &layout, event),
+      expected
+    );
+    assert!(scroll.exists(&pool, scroll_id));
+  }
+}
+
+#[test]
+fn owning_slice_rank_precedes_control_draw_order_and_clips_hits() {
+  use crate::{HitAreaEvent, HitAreaOptions, HitAreaService, TextInputService, UiEvent};
+  use tg_core_input::{MouseButton, MouseEvent, MouseEventKind};
+  let mut pool = UiObjectPool::new();
+  let slices = SliceService::new();
+  let options = SliceOptions {
+    rect: SliceRect {
+      x: 2,
+      y: 1,
+      width: SliceLength::Fixed(3),
+      height: SliceLength::Fixed(2),
+    },
+    event_passthrough: true,
+    ..Default::default()
+  };
+  let lower = slices.create(&mut pool, options.clone()).unwrap();
+  let upper = slices.create(&mut pool, options).unwrap();
+  let area = HitAreaService::new();
+  let bottom = area.create(&mut pool, HitAreaOptions::default());
+  let top = area.create(&mut pool, HitAreaOptions::default());
+  let later = area.create(&mut pool, HitAreaOptions::default());
+  let mut input = TextInputService::new();
+  let mut canvas = CanvasService::new();
+  let mut layout = LayoutService::new();
+  layout.resize_physical(10, 5);
+  for reverse in [false, true] {
+    if reverse {
+      slices.set_layer(&mut pool, lower, 2);
+    }
+    pool.begin_render();
+    pool.prepare_canvas(&mut canvas, &layout);
+    let size = tg_service_layout::Size {
+      width: 8,
+      height: 4,
+    };
+    area.render_at_on(&mut pool, top, upper, (-1, -1), size, &canvas);
+    area.render_at_on(&mut pool, later, upper, (-1, -1), size, &canvas);
+    area.render_at_on(&mut pool, bottom, lower, (-1, -1), size, &canvas);
+    let expected = if reverse { bottom } else { later };
+    for (x, y, inside) in [(2, 1, true), (4, 2, true), (5, 2, false), (1, 1, false)] {
+      area.route_mouse_event(
+        &mut pool,
+        &mut input,
+        &canvas,
+        MouseEvent {
+          kind: MouseEventKind::Press,
+          button: Some(MouseButton::Left),
+          scroll: None,
+          x,
+          y,
+        },
+      );
+      let pressed = std::iter::from_fn(|| pool.pop_event()).find_map(|event| match event {
+        UiEvent::HitArea(HitAreaEvent::Press { id, .. }) => Some(id),
+        _ => None,
+      });
+      assert_eq!(pressed, inside.then_some(expected));
+    }
+  }
+}
+
+#[test]
 fn viewport_slices_and_host_compose_in_order() {
   let mut layout = LayoutService::new();
   layout.resize_physical(12, 6);

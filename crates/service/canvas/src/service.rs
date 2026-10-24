@@ -38,6 +38,7 @@ pub struct CanvasService {
 /// * `source_y` - The source y.
 /// * `visible` - Whether this surface participates in composition.
 /// * `opaque` - Whether empty cells cover lower surfaces.
+/// * `event_passthrough` - Whether empty positions permit pointer input to lower surfaces.
 /// * `background` - The background color override, or `None` to inherit the default.
 /// * `order` - The order.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -58,6 +59,8 @@ pub struct PreparedSlice {
   pub background: Option<TextColor>,
   /// The order.
   pub order: usize,
+  /// Allow pointer events through areas without a control.
+  pub event_passthrough: bool,
 }
 
 /// The prepared scroll box representation used by this module.
@@ -210,6 +213,7 @@ impl CanvasService {
       .slices
       .entry(frame.id)
       .or_insert_with(|| PreparedSlice {
+        event_passthrough: frame.event_passthrough,
         buffer: CanvasBuffer::new(rect.width, rect.height),
         rect,
         source_x: frame.source_x,
@@ -226,6 +230,7 @@ impl CanvasService {
       prepared.buffer.clear();
     }
     prepared.rect = rect;
+    prepared.event_passthrough = frame.event_passthrough;
     prepared.source_x = frame.source_x;
     prepared.source_y = frame.source_y;
     prepared.visible = frame.visible;
@@ -799,6 +804,72 @@ impl CanvasService {
     self.viewport
   }
 
+  /// Return physical rectangles, ranks, and passthrough flags for pointer routing.
+  ///
+  /// Rank zero describes the base viewport. Visible surfaces use their composition rank;
+  /// background transparency never changes their rectangular interaction boundaries.
+  pub fn pointer_surfaces(&self) -> Vec<(Rect, usize, bool)> {
+    let mut regions = vec![(self.viewport, 0, true)];
+    regions.extend(self.surface_order.iter().filter_map(|surface| {
+      let (rect, rank, passthrough) = match surface {
+        SurfaceId::Slice(id) => {
+          let slice = self.slices.get(id)?;
+          if !slice.visible {
+            return None;
+          }
+          (slice.rect, slice.order + 1, slice.event_passthrough)
+        }
+        SurfaceId::ScrollBox(id) => {
+          let scroll = self.scroll_boxes.get(id)?;
+          if !scroll.visible {
+            return None;
+          }
+          (scroll.layout.occupied_rect, scroll.order + 1, false)
+        }
+      };
+      (rect.width > 0 && rect.height > 0).then_some((
+        physical_rect(self.viewport, rect),
+        rank,
+        passthrough,
+      ))
+    }));
+    regions
+  }
+
+  /// Return the physical origin of an active slice's original, unclipped coordinates.
+  pub fn slice_origin(&self, id: SliceId) -> Option<(i32, i32)> {
+    let slice = self.slices.get(&id).filter(|slice| slice.visible)?;
+    Some((
+      i32::from(self.viewport.x) + i32::from(slice.rect.x) - i32::from(slice.source_x),
+      i32::from(self.viewport.y) + i32::from(slice.rect.y) - i32::from(slice.source_y),
+    ))
+  }
+
+  /// Resolve a signed pointer rectangle against the base surface without shifting its origin.
+  pub fn base_hit_rect_at(
+    &self,
+    position: (i32, i32),
+    size: Size,
+  ) -> Option<(Rect, (i32, i32), usize)> {
+    self.base_hit_rect(clipped_signed_rect(position, size)?)
+  }
+
+  /// Resolve a signed pointer rectangle against the visible part of a slice.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The target slice identity.
+  /// * `position` - The signed coordinates within the original slice.
+  /// * `size` - The original region dimensions in terminal cells.
+  pub fn slice_hit_rect_at(
+    &self,
+    id: SliceId,
+    position: (i32, i32),
+    size: Size,
+  ) -> Option<(Rect, (i32, i32), usize)> {
+    self.slice_hit_rect(id, clipped_signed_rect(position, size)?)
+  }
+
   /// Return the slice rect for the addressed object when it is available.
   pub fn prepared_slice_rect(&self, id: SliceId) -> Option<Rect> {
     let slice = self.slices.get(&id)?;
@@ -885,8 +956,12 @@ impl CanvasService {
         SurfaceId::Slice(id) => {
           let slice = self.slices.get(id)?;
           let rect = physical_rect(self.viewport, slice.rect);
-          (slice.visible && rect.width > 0 && rect.height > 0 && rect.contains(x, y))
-            .then_some((ScrollBoxId(0), slice.order))
+          (slice.visible
+            && !slice.event_passthrough
+            && rect.width > 0
+            && rect.height > 0
+            && rect.contains(x, y))
+          .then_some((ScrollBoxId(0), slice.order))
         }
       })
       .max_by_key(|(_, order)| *order)
@@ -1079,6 +1154,19 @@ fn surface_hit_rect(
     (ox, oy),
     rank,
   ))
+}
+
+fn clipped_signed_rect(position: (i32, i32), size: Size) -> Option<Rect> {
+  let left = i64::from(position.0).max(0);
+  let top = i64::from(position.1).max(0);
+  let right = (i64::from(position.0) + i64::from(size.width)).min(i64::from(u16::MAX));
+  let bottom = (i64::from(position.1) + i64::from(size.height)).min(i64::from(u16::MAX));
+  (right > left && bottom > top).then(|| Rect {
+    x: left as u16,
+    y: top as u16,
+    width: (right - left) as u16,
+    height: (bottom - top) as u16,
+  })
 }
 
 fn clipped_slice_local_rect(slice: &PreparedSlice, rect: Rect) -> Option<Rect> {
@@ -1310,6 +1398,7 @@ mod tests {
       1,
       vec![
         SurfaceFrame::Slice(SliceFrame {
+          event_passthrough: false,
           id: slice,
           rect: Rect {
             x: 0,
@@ -1398,6 +1487,7 @@ mod tests {
     canvas.prepare(
       1,
       vec![SurfaceFrame::Slice(SliceFrame {
+        event_passthrough: false,
         id: slice,
         rect: Rect {
           x: 0,

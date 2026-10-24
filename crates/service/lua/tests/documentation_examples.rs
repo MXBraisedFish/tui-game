@@ -71,6 +71,7 @@ fn api_examples_execute_with_fixture_assets() {
     "string",
     "table",
     "utf8",
+    "widget/hitbox",
   ];
   let mut failures = Vec::new();
   let mut count = 0;
@@ -189,6 +190,7 @@ fn documented_members_match_registered_libraries() {
     "string",
     "table",
     "utf8",
+    "widget/hitbox",
   ];
   for library in libraries {
     assert_documented_members(library, &docs, &entry);
@@ -203,7 +205,14 @@ fn session_object_libraries_match_documented_members() {
   fs::create_dir(fixture.0.join("scripts")).unwrap();
   let entry = fixture.0.join("scripts/main.lua");
   let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../dev_docs/zh_cn/api");
-  for library in ["keyboard", "ime", "random", "slice", "timer"] {
+  for library in [
+    "keyboard",
+    "ime",
+    "random",
+    "slice",
+    "timer",
+    "widget/hitbox",
+  ] {
     assert_documented_members(library, &docs, &entry);
   }
 }
@@ -211,6 +220,7 @@ fn session_object_libraries_match_documented_members() {
 fn assert_documented_members(library: &str, docs: &std::path::Path, entry: &std::path::Path) {
   let value_pattern = regex::Regex::new(r"(?s)### 等值\s+```(?:lua|text)\n(.*?)```").unwrap();
   let markdown = fs::read_to_string(docs.join(format!("{library}.md"))).unwrap();
+  let library = library.replace('/', ".");
   let members = markdown
     .lines()
     .filter_map(|line| line.strip_prefix("## `").and_then(|s| s.strip_suffix('`')));
@@ -250,5 +260,5 @@ fn assert_documented_members(library: &str, docs: &std::path::Path, entry: &std:
       ));
     }
   }
-  run_snippet(&entry, &script).unwrap_or_else(|error| panic!("{library}: {error}"));
+  run_snippet(entry, &script).unwrap_or_else(|error| panic!("{library}: {error}"));
 }

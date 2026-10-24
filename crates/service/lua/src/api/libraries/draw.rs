@@ -114,7 +114,11 @@ pub(super) fn draw(lua: &Lua, state: SharedApiState) -> mlua::Result<Table> {
   readonly::proxy(lua, source)
 }
 
-fn enqueue_draw(state: &SharedApiState, method: &str, command: LuaDrawCommand) -> mlua::Result<()> {
+pub(super) fn enqueue_draw(
+  state: &SharedApiState,
+  method: &str,
+  command: LuaDrawCommand,
+) -> mlua::Result<()> {
   let mut state = state.borrow_mut();
   if state.draw_command_count >= 4096 {
     state.fatal_api_error = true;

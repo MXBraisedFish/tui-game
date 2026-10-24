@@ -1,8 +1,7 @@
 //! Script-visible event payloads and ownership-aware delivery.
 
 mod broker;
-#[cfg(test)]
-mod translate;
+pub(crate) mod translate;
 
 use mlua::{Lua, Table};
 
@@ -483,27 +482,33 @@ pub struct LuaNetworkEvent {
 ///
 /// * `id` - The identifier of the owned object.
 /// * `kind` - The &'static str carried by this Lua hit area event.
-/// * `x` - The horizontal coordinate in terminal cells.
-/// * `y` - The vertical coordinate in terminal cells.
+/// * `x` - The horizontal coordinate in the original target surface.
+/// * `y` - The vertical coordinate in the original target surface.
 /// * `button` - The mouse button to query.
-/// * `dx` - The dx.
-/// * `dy` - The dy.
+/// * `dx` - The horizontal motion since the previous drag event.
+/// * `dy` - The vertical motion since the previous drag event.
+/// * `relative_x` - The coordinate relative to the original hitbox left edge.
+/// * `relative_y` - The coordinate relative to the original hitbox top edge.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaHitAreaEvent {
   /// The identifier of the owned object.
   pub id: u64,
   /// The &'static str carried by this Lua hit area event.
   pub kind: &'static str,
-  /// The horizontal coordinate in terminal cells.
-  pub x: u16,
-  /// The vertical coordinate in terminal cells.
-  pub y: u16,
+  /// The horizontal coordinate in the original target surface.
+  pub x: i32,
+  /// The vertical coordinate in the original target surface.
+  pub y: i32,
   /// The mouse button to query.
   pub button: Option<&'static str>,
-  /// The dx.
+  /// The horizontal motion since the previous drag event.
   pub dx: Option<i32>,
-  /// The dy.
+  /// The vertical motion since the previous drag event.
   pub dy: Option<i32>,
+  /// The horizontal coordinate relative to the original hitbox left edge.
+  pub relative_x: i64,
+  /// The vertical coordinate relative to the original hitbox top edge.
+  pub relative_y: i64,
 }
 
 /// A Lua hyperlink event payload queued for its owning consumer.
@@ -724,7 +729,7 @@ impl LuaEventData {
       Self::Image(_) => "image",
       Self::Network(_) => "network",
       Self::Audio(_) => "audio",
-      Self::HitArea(_) => "hit_area",
+      Self::HitArea(_) => "hitbox",
       Self::Hyperlink(_) => "hyperlink",
       Self::Markdown(_) => "markdown",
       Self::TextInput(_) => "text_input",
@@ -994,7 +999,9 @@ impl LuaEventData {
         }
       }
       Self::HitArea(event) => {
-        data.set("id", event.id.to_string())?;
+        data.set("id", format!("hitbox_{:03}", event.id))?;
+        data.set("relative_x", event.relative_x)?;
+        data.set("relative_y", event.relative_y)?;
         data.set("kind", event.kind)?;
         data.set("x", event.x)?;
         data.set("y", event.y)?;
@@ -1372,6 +1379,8 @@ mod tests {
       ),
       (
         LuaEventData::HitArea(LuaHitAreaEvent {
+          relative_x: 1,
+          relative_y: 2,
           id: 6,
           kind: "drag",
           x: 7,
@@ -1380,7 +1389,7 @@ mod tests {
           dx: Some(-1),
           dy: Some(2),
         }),
-        "hit_area",
+        "hitbox",
       ),
       (
         LuaEventData::Hyperlink(LuaHyperlinkEvent {

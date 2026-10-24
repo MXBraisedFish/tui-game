@@ -3,6 +3,7 @@
 pub(crate) mod interactives;
 pub(crate) mod surfaces;
 
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -39,6 +40,8 @@ pub struct UiObjectPool {
   id: u64,
   audio: AudioObjectPool,
   render_order: u64,
+  // Updated by prepare_canvas while preserving its shared-reference API.
+  pointer_surfaces: RefCell<Vec<(tg_service_layout::Rect, usize, bool)>>,
   /// Pending events retained in delivery order.
   pub(crate) events: VecDeque<UiComponentEvent>,
   /// The ordered surfaces retained by this owner.
@@ -149,6 +152,7 @@ impl UiObjectPool {
       id,
       audio: AudioObjectPool::new(AudioPoolId(id)),
       render_order: 0,
+      pointer_surfaces: RefCell::new(Vec::new()),
       events: VecDeque::new(),
       surfaces: Vec::new(),
       hit_areas: HitAreaObjects::new(),
@@ -190,6 +194,64 @@ impl UiObjectPool {
     self.hyperlinks.clear_hits();
     self.markdown_views.clear_hits();
     self.text_inputs.clear_hits();
+  }
+
+  /// Return the highest blocking surface rank at a physical terminal point.
+  pub(crate) fn pointer_surface_rank(&self, x: u16, y: u16) -> usize {
+    self
+      .pointer_surfaces
+      .borrow()
+      .iter()
+      .filter(|(rect, _, passthrough)| !passthrough && rect.contains(x, y))
+      .map(|(_, rank, _)| *rank)
+      .max()
+      .unwrap_or(0)
+  }
+
+  /// Report whether a pointer remains within a control's original surface.
+  pub(crate) fn pointer_parent_contains(&self, rank: usize, x: u16, y: u16) -> bool {
+    let surfaces = self.pointer_surfaces.borrow();
+    rank == usize::MAX
+      || surfaces.is_empty()
+      || surfaces
+        .iter()
+        .any(|(rect, current, _)| *current == rank && rect.contains(x, y))
+  }
+
+  /// Return the foremost control order or an empty blocking surface at a physical point.
+  ///
+  /// Controls use their owning surface rank before their frame drawing order. New interactive
+  /// components must participate here so event passthrough never bypasses a visible control.
+  pub(crate) fn pointer_order_at(&self, x: u16, y: u16) -> Option<(usize, u64)> {
+    let area = self.hit_areas.hit(x, y).map(|(_, order)| order);
+    let link = self.hyperlinks.hit(x, y).map(|(_, order)| order);
+    let input = self.text_inputs.pointer_order_at(x, y);
+    let markdown = self
+      .markdown_views
+      .views
+      .values()
+      .flat_map(|view| &view.hits)
+      .filter(|hit| hit.rect.contains(x, y))
+      .map(|hit| (hit.surface_rank, hit.order))
+      .max();
+    let surface = self.pointer_surface_rank(x, y);
+    [
+      area,
+      link,
+      input,
+      markdown,
+      (surface > 0).then_some((surface, 0)),
+    ]
+    .into_iter()
+    .flatten()
+    .max()
+  }
+
+  /// Report whether a control owns pointer input at a physical terminal point.
+  pub(crate) fn pointer_region_is_top(&self, rank: usize, order: u64, x: u16, y: u16) -> bool {
+    self
+      .pointer_order_at(x, y)
+      .is_none_or(|top| (rank, order) >= top)
   }
 
   /// Queue the hit event in delivery order.

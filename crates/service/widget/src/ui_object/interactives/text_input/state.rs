@@ -76,6 +76,17 @@ pub(crate) struct TextInputObjects {
 }
 
 impl TextInputObjects {
+  /// Return the foremost mouse-enabled input order at a physical point.
+  pub(crate) fn pointer_order_at(&self, x: u16, y: u16) -> Option<(usize, u64)> {
+    self
+      .inputs
+      .values()
+      .filter_map(|state| {
+        let hit = state.hit?;
+        (state.mouse && hit.rect.contains(x, y)).then_some((hit.surface_rank, hit.order))
+      })
+      .max()
+  }
   /// Create a text input objects with its initial state.
   pub(crate) fn new() -> Self {
     Self {

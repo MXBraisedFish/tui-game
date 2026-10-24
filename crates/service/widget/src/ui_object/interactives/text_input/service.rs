@@ -334,6 +334,7 @@ impl TextInputService {
           .mouse
           .then_some(state.hit?)
           .filter(|hit| hit.rect.contains(x, y))
+          .filter(|hit| pool.pointer_region_is_top(hit.surface_rank, hit.order, x, y))
       })
       .map(|hit| (hit.surface_rank, hit.order))
       .max()

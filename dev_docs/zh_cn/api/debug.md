@@ -11,7 +11,7 @@
 | 常量      | 说明                                 | 定位                |
 | --------- | ------------------------------------ | ------------------- |
 | `VERSION` | 返回运行时和 TUI GAME API 的版本标识 | [VERSION](#version) |
-| `TRACE`   | 追踪日志等级字符串                   | [TRACE](#trace)     |
+| `TRACE`   | 跟踪日志等级字符串                   | [TRACE](#trace)     |
 | `DEBUG`   | 调试日志等级字符串                   | [DEBUG](#debug)     |
 | `INFO`    | 信息日志等级字符串                   | [INFO](#info)       |
 | `WARN`    | 警告日志等级字符串                   | [WARN](#warn)       |
@@ -46,7 +46,7 @@ debug.VERSION
 
 ### 可用于
 
-- 任意。
+- 任意
 
 ### 示例
 
@@ -66,11 +66,17 @@ Lua 5.4 / TUI GAME API 1
 "Lua 5.4 / TUI GAME API 1"
 ```
 
+### 重定向
+
+```lua
+_VERSION
+```
+
 ---
 
 ## `TRACE`
 
-追踪日志等级字符串。
+跟踪日志等级字符串。
 
 ### 调用
 
@@ -85,7 +91,7 @@ debug.TRACE
 ### 示例
 
 ```lua
-debug.print("trace message", {level = debug.TRACE})
+debug.print("trace message", { level = debug.TRACE })
 ```
 
 **输出：**
@@ -119,7 +125,7 @@ debug.DEBUG
 ### 示例
 
 ```lua
-debug.print("debug message", {level = debug.DEBUG})
+debug.print("debug message", { level = debug.DEBUG })
 ```
 
 **输出：**
@@ -153,7 +159,7 @@ debug.INFO
 ### 示例
 
 ```lua
-debug.print("info message", {level = debug.INFO})
+debug.print("info message", { level = debug.INFO })
 ```
 
 **输出：**
@@ -187,7 +193,7 @@ debug.WARN
 ### 示例
 
 ```lua
-debug.print("warning message", {level = debug.WARN})
+debug.print("warning message", { level = debug.WARN })
 ```
 
 **输出：**
@@ -221,7 +227,7 @@ debug.ERROR
 ### 示例
 
 ```lua
-debug.print("error message", {level = debug.ERROR})
+debug.print("error message", { level = debug.ERROR })
 ```
 
 **输出：**
@@ -255,7 +261,7 @@ debug.FATAL
 ### 示例
 
 ```lua
-debug.print("fatal message", {level = debug.FATAL})
+debug.print("fatal message", { level = debug.FATAL })
 ```
 
 **输出：**
@@ -288,15 +294,15 @@ debug.print("fatal message", {level = debug.FATAL})
 debug.print
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
-| 参数名    | 类型 | 说明     |
-| --------- | ---- | -------- |
-| `message` | any  | 输出信息 |
+| 参数名    | 类型                     | 说明     |
+| --------- | ------------------------ | -------- |
+| `message` | string / integer / float | 输出信息 |
 
-### 选填参数
+#### 选填参数
 
 | 参数名      | 类型              | 默认值  | 说明             |
 | ----------- | ----------------- | ------- | ---------------- |
@@ -305,7 +311,7 @@ debug.print
 | `time`      | boolean           | `false` | 是否显示时间     |
 | `type_head` | boolean           | `false` | 是否显示会话类型 |
 
-## 返回值
+### 返回值
 
 无返回值。
 
@@ -313,8 +319,8 @@ debug.print
 
 ```lua
 debug.print("A message")
-debug.print("A warning", {level = debug.WARN})
-debug.print("A titled message", {title = "Game", time = true, type_head = true})
+debug.print("A warning", { level = debug.WARN })
+debug.print("A titled message", { title = "Game", time = true, type_head = true })
 ```
 
 **输出：**
@@ -325,9 +331,11 @@ A message
 [游戏][2026-10-05 00:54:12.209][Game] A titled message
 ```
 
-## 额外说明
+### 重定向
 
-- 必填参数 `message` 不可为 `nil`。
+```lua
+print
+```
 
 ---
 
@@ -345,15 +353,15 @@ A message
 debug.info
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
-| 参数名    | 类型 | 说明     |
-| --------- | ---- | -------- |
-| `message` | any  | 输出信息 |
+| 参数名    | 类型                     | 说明     |
+| --------- | ------------------------ | -------- |
+| `message` | string / integer / float | 输出信息 |
 
-## 返回值
+### 返回值
 
 无返回值。
 
@@ -368,10 +376,6 @@ debug.info("Saved")
 ```lua
 [游戏][2026-10-05 01:03:05.690][信息] Saved
 ```
-
-## 额外说明
-
-- 必填参数 `message` 不可为 `nil`。
 
 ---
 
@@ -389,15 +393,15 @@ debug.info("Saved")
 debug.warn
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
-| 参数名    | 类型 | 说明     |
-| --------- | ---- | -------- |
-| `message` | any  | 输出信息 |
+| 参数名    | 类型                     | 说明     |
+| --------- | ------------------------ | -------- |
+| `message` | string / integer / float | 输出信息 |
 
-## 返回值
+### 返回值
 
 无返回值。
 
@@ -413,9 +417,11 @@ debug.warn("Low health")
 [游戏][2026-10-05 01:03:25.573][警告] Low health
 ```
 
-## 额外说明
+### 重定向
 
-- 必填参数 `message` 不可为 `nil`。
+```lua
+warn
+```
 
 ---
 
@@ -433,15 +439,15 @@ debug.warn("Low health")
 debug.error
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
-| 参数名    | 类型 | 说明     |
-| --------- | ---- | -------- |
-| `message` | any  | 输出信息 |
+| 参数名    | 类型                     | 说明     |
+| --------- | ------------------------ | -------- |
+| `message` | string / integer / float | 输出信息 |
 
-## 返回值
+### 返回值
 
 无返回值。
 
@@ -457,10 +463,6 @@ debug.error("Could not load save")
 [游戏][2026-10-05 01:03:41.814][错误] Could not load save
 ```
 
-## 额外说明
-
-- 必填参数 `message` 不可为 `nil`。
-
 ---
 
 ## `assert`
@@ -473,21 +475,21 @@ debug.error("Could not load save")
 debug.assert
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名  | 类型 | 说明     |
 | ------- | ---- | -------- |
 | `value` | any  | 断言的值 |
 
-### 选填参数
+#### 选填参数
 
-| 参数名    | 类型 | 默认值               | 说明                 |
-| --------- | ---- | -------------------- | -------------------- |
-| `message` | any  | `"assertion failed"` | 断言失败时输出的信息 |
+| 参数名    | 类型                     | 默认值               | 说明                 |
+| --------- | ------------------------ | -------------------- | -------------------- |
+| `message` | string / integer / float | `"assertion failed"` | 断言失败时输出的信息 |
 
-## 返回值
+### 返回值
 
 **断言成功时**，返回一个值。
 
@@ -500,18 +502,24 @@ debug.assert
 ### 示例
 
 ```lua
-local score = debug.assert(nil, {message = "score is required"})
+local score = debug.assert(100, { message = "score is required" })
+debug.print(score)
+
+debug.assert(nil, { message = "score is required" })
 ```
 
 **输出：**
 
 ```lua
+100
 [脚本终止运行，抛出错误信息]
 ```
 
-## 额外说明
+### 重定向
 
-- 选填参数 `message` 不可为 `nil`。
+```lua
+assert
+```
 
 ---
 
@@ -525,16 +533,16 @@ local score = debug.assert(nil, {message = "score is required"})
 debug.pcall
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名 | 类型     | 说明             |
 | ------ | -------- | ---------------- |
 | `func` | function | 要调用的函数     |
 | `...`  | any...   | 传递给函数的变参 |
 
-## 返回值
+### 返回值
 
 **函数成功时**，返回任意数量值。
 
@@ -579,6 +587,12 @@ true
 sum
 ```
 
+### 重定向
+
+```lua
+pcall
+```
+
 ---
 
 ## `xpcall`
@@ -591,9 +605,9 @@ sum
 debug.xpcall
 ```
 
-## 参数
+### 参数
 
-### 必填参数
+#### 必填参数
 
 | 参数名           | 类型     | 说明                 |
 | ---------------- | -------- | -------------------- |
@@ -601,7 +615,7 @@ debug.xpcall
 | `error_callback` | function | 处理错误值的函数     |
 | `...`            | any...   | 传递给调用函数的变参 |
 
-## 返回值
+### 返回值
 
 **函数成功时**，返回任意数量值。
 
@@ -650,7 +664,13 @@ false
 nil
 ```
 
-## 额外说明
+### 重定向
+
+```lua
+xpcall
+```
+
+### 额外说明
 
 - 必填参数 `error_callback` 回调函数接收一个值，为错误信息。
 - 必填参数 `error_callback` 回调函数返回值仅保留第一个。

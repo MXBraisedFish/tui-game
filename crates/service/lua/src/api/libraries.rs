@@ -35,6 +35,7 @@ mod encoding;
 mod events;
 mod file;
 mod game;
+mod hitbox;
 mod i18n;
 mod image;
 mod ime;
@@ -102,6 +103,9 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   environment.set("random", random::random(lua, state.clone())?)?;
   environment.set("slice", slice::slice(lua, state.clone())?)?;
   environment.set("timer", timer::timer(lua, state.clone())?)?;
+  let widget = lua.create_table()?;
+  widget.raw_set("hitbox", hitbox::hitbox(lua, state.clone())?)?;
+  environment.set("widget", readonly::proxy(lua, widget)?)?;
   environment.set("serialization", serialization::serialization(lua)?)?;
   environment.set("encoding", encoding::encoding(lua)?)?;
   environment.set("draw", draw::draw(lua, state.clone())?)?;

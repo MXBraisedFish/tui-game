@@ -130,7 +130,10 @@ impl TextInputService {
           .iter()
           .filter_map(|(id, state)| state.mouse.then_some((*id, state.hit?)))
           .filter(|(_, hit)| hit.rect.contains(event.x, event.y))
-          .max_by_key(|(_, hit)| hit.order)
+          .filter(|(_, hit)| {
+            pool.pointer_region_is_top(hit.surface_rank, hit.order, event.x, event.y)
+          })
+          .max_by_key(|(_, hit)| (hit.surface_rank, hit.order))
           .map(|(id, _)| id);
         if let Some(id) = hit_id {
           let focused = self.is_focused(pool, id);
@@ -195,6 +198,21 @@ impl TextInputService {
       return false;
     };
     if drag.active.pool_id != pool.id() {
+      return false;
+    }
+    let Some(hit) = pool
+      .text_inputs
+      .inputs
+      .get(&drag.active.input_id)
+      .and_then(|state| state.hit)
+    else {
+      return false;
+    };
+    if !pool.pointer_parent_contains(hit.surface_rank, event.x, event.y)
+      || pool
+        .pointer_order_at(event.x, event.y)
+        .is_some_and(|top| top.0 > hit.surface_rank)
+    {
       return false;
     }
     let Some(state) = pool.text_inputs.inputs.get_mut(&drag.active.input_id) else {

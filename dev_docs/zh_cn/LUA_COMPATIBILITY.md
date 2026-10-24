@@ -47,6 +47,7 @@
 | `game` | `exit_game`, `save_game`, `save_best` |
 | `i18n` | `create`, `get_value`, `get_language_code`, `reload` |
 | `image` | `load` |
+| `widget.hitbox` | `create`、`delete`、`clear`、`list`、`count`、`draw`、`set`、`get_info`、`exists`；详见 [hitbox](api/widget/hitbox.md) |
 | `events` | `skip_action`, `clear_action` |
 | `loader` | `require`, `dofile`, `loadfile` |
 | `file` | `read`, `write`, `create_dir`, `exists`, `remove`, `list_dir`；另有编码与换行常量，详见 `api/file.md` |
@@ -55,7 +56,7 @@
 
 ### 尚未开放
 
-`image.load` 已开放，通过请求编号关联异步结果。`audio`、`animation`、`http`、`effect`、`widget` 未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
+`image.load` 已开放，通过请求编号关联异步结果。`widget.hitbox` 已开放，提供 `create`、`delete`、`clear`、`list`、`count`、`draw`、`set`、`get_info`、`exists`，事件类型为 `hitbox`。命中区域只在本帧调用 `draw` 后生效；`slice_layer` 指定绘制目标，默认 `"base"`。事件 `x/y` 为目标切片坐标，`relative_x/relative_y` 为相对于 hitbox 原始左上角的坐标，`dx/dy` 仍为拖动位移。切片 `create/set` 的 `event_passthrough` 默认 `false`，控制没有本层控件命中时是否允许穿透到下层；屏保可管理和提交对象，但沿用屏保不接收交互事件的规则。`audio`、`animation`、`http`、`effect` 及其他 `widget` 子库未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
 
 ## 调用差异
 

@@ -1,15 +1,22 @@
 //! Translation of service events into the Lua session event model.
 
+#[cfg(test)]
 use tg_service_animation::{AnimationEvent, AnimationEventKind};
+#[cfg(test)]
 use tg_service_time::RepeatTimerEvent;
-use tg_service_widget::{HitAreaEvent, ScrollBoxEvent};
+use tg_service_widget::HitAreaEvent;
+#[cfg(test)]
+use tg_service_widget::ScrollBoxEvent;
 
+#[cfg(test)]
 use super::{
-  LuaAnimationEvent, LuaAnimationEventKind, LuaEventData, LuaHitAreaEvent, LuaScrollBoxEvent,
-  LuaTimerEvent, LuaTimerEventKind, LuaTimerKind,
+  LuaAnimationEvent, LuaAnimationEventKind, LuaScrollBoxEvent, LuaTimerEvent, LuaTimerEventKind,
+  LuaTimerKind,
 };
+use super::{LuaEventData, LuaHitAreaEvent};
 
 /// Convert a repeating-timer outcome into its session-local script event.
+#[cfg(test)]
 pub fn translate_repeat_timer_event(lua_id: u64, event: RepeatTimerEvent) -> LuaEventData {
   match event {
     RepeatTimerEvent::Tick { executed_count, .. } => LuaEventData::Timer(LuaTimerEvent {
@@ -34,6 +41,7 @@ pub fn translate_repeat_timer_event(lua_id: u64, event: RepeatTimerEvent) -> Lua
 }
 
 /// Convert an animation outcome into its session-local script event.
+#[cfg(test)]
 pub fn translate_animation_event(lua_id: u64, event: &AnimationEvent) -> LuaEventData {
   let kind = match &event.kind {
     AnimationEventKind::Started => LuaAnimationEventKind::Started,
@@ -81,8 +89,10 @@ pub fn translate_hit_area_event(lua_id: u64, event: &HitAreaEvent) -> LuaEventDa
   LuaEventData::HitArea(LuaHitAreaEvent {
     id: lua_id,
     kind,
-    x,
-    y,
+    x: i32::from(x),
+    y: i32::from(y),
+    relative_x: i64::from(x),
+    relative_y: i64::from(y),
     button,
     dx,
     dy,
@@ -90,6 +100,7 @@ pub fn translate_hit_area_event(lua_id: u64, event: &HitAreaEvent) -> LuaEventDa
 }
 
 /// Convert a scroll-position change into its script-visible scroll-box event.
+#[cfg(test)]
 pub fn translate_scroll_box_event(lua_id: u64, event: ScrollBoxEvent) -> LuaEventData {
   match event {
     ScrollBoxEvent::Scrolled { x, y, .. } => {

@@ -119,8 +119,13 @@ pub(super) fn route_render(
         objects
           .ui()
           .prepare_canvas(&mut services.canvas, &services.layout);
+        apply_lua_draw_commands(
+          &mut services.render,
+          &mut services.canvas,
+          commands,
+          objects,
+        );
       });
-      apply_lua_draw_commands(&mut services.render, &mut services.canvas, commands);
     } else {
       screensaver_overlay_ui.objects_mut().begin_render();
       screensaver_overlay_ui
@@ -244,8 +249,13 @@ pub(super) fn route_render(
       objects
         .ui()
         .prepare_canvas(&mut services.canvas, &services.layout);
+      apply_lua_draw_commands(
+        &mut services.render,
+        &mut services.canvas,
+        commands,
+        objects,
+      );
     });
-    apply_lua_draw_commands(&mut services.render, &mut services.canvas, commands);
   }
 
   if world.state.current_ui_kind() == Some(UiNodeKind::ScreensaverList) {
@@ -679,10 +689,14 @@ fn apply_lua_draw_commands(
   render: &mut crate::host_engine::services::RenderService,
   canvas: &mut crate::host_engine::services::CanvasService,
   commands: Vec<crate::host_engine::services::LuaDrawCommand>,
+  objects: &mut tg_service_lua::LuaObjectPool,
 ) {
   use crate::host_engine::services::{LuaDrawCommand, LuaDrawTarget};
   for command in commands {
     match command {
+      LuaDrawCommand::Hitbox { id, target, x, y } => {
+        objects.draw_hitbox(id, target, (x, y), canvas)
+      }
       LuaDrawCommand::Text {
         target,
         x,
@@ -763,6 +777,81 @@ mod tests {
   }
 
   #[test]
+  fn lua_hitboxes_replay_in_their_own_pool_and_respect_the_host_viewport() {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root = std::env::temp_dir().join(format!("tg-host-hitbox-{}-{nonce}", std::process::id()));
+    std::fs::create_dir_all(root.join("scripts")).unwrap();
+    let entry = root.join("scripts/main.lua");
+    std::fs::write(
+      &entry,
+      r#"
+      function Init(ctx) id = widget.hitbox.create(4, 3) end
+      function Update(dt) end
+      function UpdateFrame(dt, alpha) end
+      function Render() widget.hitbox.draw(id, -2, -1) end
+      function HandleEvent(event)
+        debug.assert(event.type == "hitbox" and event.data.id == id)
+        debug.assert(event.data.x == 1 and event.data.y == 1)
+      end
+    "#,
+    )
+    .unwrap();
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session = LuaService::new()
+        .create_session(LuaSessionSpec {
+          package_id: "host_hitbox".into(),
+          session_kind: kind,
+          entry_path: entry.clone(),
+          fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
+          base_size: Size {
+            width: 6,
+            height: 4,
+          },
+          continue_data: None,
+          best_data: None,
+          save_game_enabled: false,
+          save_best_enabled: false,
+        })
+        .unwrap();
+      session.render().unwrap();
+      let commands = session.take_draw_commands();
+      let mut layout = LayoutService::new();
+      layout.resize_physical(6, 6);
+      layout.set_developer_viewport(crate::host_engine::services::Rect {
+        x: 0,
+        y: 2,
+        width: 6,
+        height: 4,
+      });
+      let mut canvas = CanvasService::new();
+      canvas.begin_frame(&layout);
+      session.with_objects_mut(|objects| {
+        objects.ui_mut().begin_render();
+        objects.ui().prepare_canvas(&mut canvas, &layout);
+        apply_lua_draw_commands(&mut RenderService::new(), &mut canvas, commands, objects);
+        let mouse = |x, y| crate::host_engine::services::MouseEvent {
+          kind: crate::host_engine::services::MouseEventKind::Press, button: Some(crate::host_engine::services::MouseButton::Left),
+          scroll: None, x, y,
+        };
+        assert!(objects.route_hitbox_mouse(&canvas, mouse(1, 0)).is_empty());
+        let events = objects.route_hitbox_mouse(&canvas, mouse(1, 3));
+        assert!(events.iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "press" && data.x == 1 && data.y == 1)));
+        assert!(!objects.route_hitbox_mouse(&canvas, mouse(2, 3)).iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "press")));
+        objects.ui_mut().begin_render();
+        assert!(!objects.route_hitbox_mouse(&canvas, mouse(1, 3)).iter().any(|event| matches!(event, tg_service_lua::LuaEventData::HitArea(data) if data.kind == "press")));
+      }).unwrap();
+      let frame = FrameCompositor::new().compose(&canvas);
+      assert_eq!((frame.width(), frame.height()), (6, 6));
+      assert!((0..6).all(|y| row_text(&frame, y) == "      "));
+      session.stop();
+    }
+    std::fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
   fn lua_slice_draws_are_clipped_in_game_and_screensaver_frames() {
     let suffix = SystemTime::now()
       .duration_since(UNIX_EPOCH)
@@ -833,7 +922,11 @@ mod tests {
       session
         .with_objects(|objects| objects.ui().prepare_canvas(&mut canvas, &layout))
         .unwrap();
-      apply_lua_draw_commands(&mut RenderService::new(), &mut canvas, commands);
+      session
+        .with_objects_mut(|objects| {
+          apply_lua_draw_commands(&mut RenderService::new(), &mut canvas, commands, objects)
+        })
+        .unwrap();
       let frame = FrameCompositor::new().compose(&canvas);
 
       assert_eq!((frame.width(), frame.height()), (12, 6));
