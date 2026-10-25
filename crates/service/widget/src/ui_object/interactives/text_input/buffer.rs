@@ -55,6 +55,17 @@ impl TextBuffer {
     changed
   }
 
+  /// Replace mode and limit, preserving cursor and selection when effective text is unchanged.
+  pub fn configure(&mut self, text: String, max: Option<usize>, mode: TextInputMode) -> bool {
+    self.max_graphemes = max;
+    self.mode = mode;
+    let normalized = truncate_graphemes(normalize(text, mode), max);
+    if normalized == self.text {
+      return false;
+    }
+    self.set_text(normalized)
+  }
+
   /// Return the cursor for the addressed object.
   pub fn cursor(&self) -> usize {
     self.cursor

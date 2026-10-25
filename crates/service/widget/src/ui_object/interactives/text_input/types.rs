@@ -86,6 +86,7 @@ pub struct TextInputOptions {
 /// * `placeholder_style` - The placeholder style.
 /// * `cursor_style` - The cursor style.
 /// * `cursor_shape` - The cursor shape.
+/// * `cursor_character` - An optional custom cursor grapheme overriding the shape.
 /// * `cursor_blink` - The cursor blink.
 /// * `vertical_align` - The vertical align.
 /// * `text_align` - The text align.
@@ -109,6 +110,8 @@ pub struct TextInputRenderParams {
   pub cursor_style: TextStyle,
   /// The cursor shape.
   pub cursor_shape: Option<TextInputCursorShape>,
+  /// The custom cursor grapheme, when supplied.
+  pub cursor_character: Option<String>,
   /// The cursor blink.
   pub cursor_blink: bool,
   /// The vertical align.
@@ -129,6 +132,7 @@ impl Default for TextInputRenderParams {
       placeholder_style: TextStyle::default(),
       cursor_style: TextStyle::default(),
       cursor_shape: None,
+      cursor_character: None,
       cursor_blink: true,
       vertical_align: VerticalAlign::Top,
       text_align: TextAlign::Left,
@@ -186,9 +190,9 @@ pub enum TextInputEvent {
 #[derive(Clone, Copy)]
 pub(super) enum TextSurface {
   /// The base setting for text surface.
-  Base,
+  Base((i32, i32)),
   /// The slice setting for text surface.
-  Slice(SliceId),
+  Slice(SliceId, (i32, i32)),
   /// The host setting for text surface.
-  Host,
+  Host((i32, i32)),
 }

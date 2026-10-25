@@ -518,6 +518,12 @@ impl LuaSession {
         | super::LuaEventData::Input { .. }
     ) && delivery.route != LuaEventRoute::InputRelease
     {
+      if self
+        .with_objects(|objects| objects.input_is_focused())
+        .unwrap_or(false)
+      {
+        return Ok(());
+      }
       let mut api = self.api_state.borrow_mut();
       if let LuaEventRoute::Input { generation } = delivery.route
         && generation != api.input.generation(&delivery.event.data)
@@ -531,6 +537,13 @@ impl LuaSession {
     if let super::LuaEventData::HitArea(event) = &delivery.event.data
       && !self
         .with_objects(|objects| objects.hitboxes.contains_key(&event.id))
+        .unwrap_or(false)
+    {
+      return Ok(());
+    }
+    if let super::LuaEventData::TextInput(event) = &delivery.event.data
+      && !self
+        .with_objects(|objects| objects.inputs.contains_key(&event.id))
         .unwrap_or(false)
     {
       return Ok(());
@@ -581,6 +594,12 @@ impl LuaSession {
       return None;
     }
     let api = self.api_state.borrow();
+    if self
+      .with_objects(|objects| objects.input_is_focused())
+      .unwrap_or(false)
+    {
+      return None;
+    }
     let enabled = match data {
       super::LuaEventData::Action { .. } => api.input.actions,
       super::LuaEventData::Key { .. } => api.input.keys,
@@ -592,7 +611,11 @@ impl LuaSession {
 
   /// Report whether the live game asks the application to restrict input methods.
   pub fn input_method_locked(&self) -> bool {
-    self.state != LuaSessionState::Running || self.api_state.borrow().input.ime_locked
+    self.state != LuaSessionState::Running
+      || (!self
+        .with_objects(|objects| objects.input_is_focused())
+        .unwrap_or(false)
+        && self.api_state.borrow().input.ime_locked)
   }
 
   /// Close delivered input without changing subscriptions and return balanced releases.
@@ -605,6 +628,7 @@ impl LuaSession {
   ///
   /// Pending releases from other ownership changes are preserved when focus releases are disabled.
   pub fn focus_lost_input(&mut self) -> Vec<super::LuaEventData> {
+    self.with_objects_mut(|objects| objects.deactivate_inputs());
     self.api_state.borrow_mut().input.focus_lost();
     self.take_input_releases()
   }

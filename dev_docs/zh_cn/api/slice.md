@@ -47,11 +47,11 @@ slice.create
 
 #### 选填参数
 
-| 参数名  | 类型                 | 默认值       | 说明             |
-| ------- | -------------------- | ------------ | ---------------- |
-| `bg`    | string / const-color | `color.NONE` | 图层切片背景颜色 |
-| `layer` | integer              | 自动向上递增 | 图层切片层级     |
-| `event_passthrough` | boolean | `false` | 本层没有控件命中时，是否允许鼠标事件穿透到下层 |
+| 参数名              | 类型                 | 默认值       | 说明                                           |
+| ------------------- | -------------------- | ------------ | ---------------------------------------------- |
+| `bg`                | string / const-color | `color.NONE` | 图层切片背景颜色                               |
+| `layer`             | integer              | 自动向上递增 | 图层切片层级                                   |
+| `event_passthrough` | boolean              | `false`      | 本层没有控件命中时，是否允许控件事件穿透到下层 |
 
 ### 返回值
 
@@ -111,7 +111,7 @@ slice.delete
 
 | 类型    | 说明         |
 | ------- | ------------ |
-| boolean | 是否删除成功 |
+| boolean | 删除是否成功 |
 
 ### 示例
 
@@ -157,7 +157,7 @@ slice.clear
 
 | 类型    | 说明         |
 | ------- | ------------ |
-| boolean | 是否删除成功 |
+| boolean | 删除是否成功 |
 
 ### 示例
 
@@ -241,14 +241,14 @@ debug.print(table.pretty(slice.list()))
 ```lua
 {
   {
-    id = "slice_001", -- string（图层切片 ID）
-    width = 20,       -- integer（图层切片宽度）
-    height = 10,      -- integer（图层切片高度）
-    bg = "yellow",    -- string（图层切片背景颜色）
-    layer = 1, -- integer（图层切片图层序号）
-    event_passthrough = false -- boolean（鼠标事件是否穿透）
+    id = "slice_001",         -- string（图层切片 ID）
+    width = 20,               -- integer（图层切片宽度）
+    height = 10,              -- integer（图层切片高度）
+    bg = "yellow",            -- string（图层切片背景颜色）
+    layer = 1,                -- integer（图层切片图层序号）
+    event_passthrough = false -- boolean（控件事件是否穿透）
   },
-  n = 1,              -- integer（图层切片数量）
+  n = 1,                      -- integer（图层切片数量）
 }
 ```
 
@@ -363,13 +363,13 @@ slice.set
 
 #### 选填参数
 
-| 参数名   | 类型                 | 默认值   | 说明             |
-| -------- | -------------------- | -------- | ---------------- |
-| `width`  | integer              | 保持原值 | 图层切片宽度     |
-| `height` | integer              | 保持原值 | 图层切片高度     |
-| `bg`     | string / const-color | 保持原值 | 图层切片背景颜色 |
-| `layer`  | integer              | 保持原值 | 图层切片层级     |
-| `event_passthrough` | boolean | 保持原值 | 本层没有控件命中时，是否允许鼠标事件穿透到下层 |
+| 参数名              | 类型                 | 默认值   | 说明                                           |
+| ------------------- | -------------------- | -------- | ---------------------------------------------- |
+| `width`             | integer              | 保持原值 | 图层切片宽度                                   |
+| `height`            | integer              | 保持原值 | 图层切片高度                                   |
+| `bg`                | string / const-color | 保持原值 | 图层切片背景颜色                               |
+| `layer`             | integer              | 保持原值 | 图层切片层级                                   |
+| `event_passthrough` | boolean              | 保持原值 | 本层没有控件命中时，是否允许控件事件穿透到下层 |
 
 ### 返回值
 
@@ -377,7 +377,7 @@ slice.set
 
 | 类型    | 说明         |
 | ------- | ------------ |
-| boolean | 是否修改成功 |
+| boolean | 修改是否成功 |
 
 ### 示例
 
@@ -394,10 +394,10 @@ debug.print(table.pretty(slice.get_info(s)))
 ```lua
 true
 {
-  id = "slice_001", 
-  width = 25, 
-  height = 5, 
-  bg = "blue", 
+  id = "slice_001",
+  width = 25,
+  height = 5,
+  bg = "blue",
   layer = 1,
   event_passthrough = false
 }
@@ -472,12 +472,12 @@ debug.print(table.pretty(slice.get_info(s)))
 
 ```lua
 {
-  id = "slice_001", -- string（图层切片 ID）
-  width = 20,       -- integer（图层切片宽度）
-  height = 10,      -- integer（图层切片高度）
-  bg = "yellow",    -- string（图层切片背景颜色）
-  layer = 1, -- integer（图层切片图层序号）
-  event_passthrough = false -- boolean（鼠标事件是否穿透）
+  id = "slice_001",         -- string（图层切片 ID）
+  width = 20,               -- integer（图层切片宽度）
+  height = 10,              -- integer（图层切片高度）
+  bg = "yellow",            -- string（图层切片背景颜色）
+  layer = 1,                -- integer（图层切片图层序号）
+  event_passthrough = false -- boolean（控件事件是否穿透）
 }
 ```
 

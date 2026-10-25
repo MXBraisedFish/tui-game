@@ -643,7 +643,7 @@ pub fn run(services: &mut EngineServices, world: &mut RuntimeWorld) -> ExitState
         .engine_events
         .extend(services.async_runtime.poll_events());
       synchronize_lua_event_sessions(services, &mut lua_event_router);
-      queue_lua_timer_events(services, &mut lua_event_router, frame);
+      queue_lua_object_events(services, &mut lua_event_router, frame);
       drain_engine_events(services, &mut lua_event_router, frame)
     });
 
@@ -1641,8 +1641,9 @@ fn route_frame_input(
     && world.state.current_overlay_kind().is_none()
     && !services.text_input.is_active();
   let notifications = services.input.notifications().to_vec();
-  for notification in notifications {
+  for notification in notifications.iter().cloned() {
     let data = match notification {
+      InputNotification::TerminalKey(_) => None,
       InputNotification::Text { text } => Some(LuaEventData::Input { text }),
       InputNotification::Key { key, state } => Some(LuaEventData::Key {
         key: crate::host_engine::services::key_token(key),
@@ -1901,6 +1902,34 @@ fn route_frame_input(
   } else if world.state.current_ui_kind() == Some(UiNodeKind::ExitWarning) {
     route_exit_warning_runtime_events(services, world, exit_warning_ui, pending_screenshot_saves);
   } else if world.state.is_game_mode() {
+    if accepts_game_keyboard && world.state.current_overlay_kind().is_none() {
+      services.game.with_objects_mut(|objects| {
+        for notification in &notifications {
+          match notification {
+            InputNotification::Text { text } => objects.route_input_text(text),
+            InputNotification::TerminalKey(key) => {
+              objects.route_input_key(&mut services.clipboard.borrow_mut(), *key)
+            }
+            _ => {}
+          }
+        }
+      });
+      if let Some(token) = services.game.session_token() {
+        let events = services
+          .game
+          .with_objects_mut(|objects| objects.take_widget_events())
+          .unwrap_or_default();
+        for data in events {
+          if let Err(error) =
+            context
+              .lua_events
+              .push_owned(token, *frame, data, LuaEventRoute::HandleEvent)
+          {
+            log_lua_enqueue_error(services, error);
+          }
+        }
+      }
+    }
     let allow_mouse = services.input.is_focused();
     let base_rect = services.layout.developer_viewport_rect();
     for event in services.input.drain_system_events() {
@@ -1914,7 +1943,7 @@ fn route_frame_input(
       {
         let events = services
           .game
-          .with_objects_mut(|objects| objects.route_hitbox_mouse(&services.canvas, *mouse))
+          .with_objects_mut(|objects| objects.route_widget_mouse(&services.canvas, *mouse))
           .unwrap_or_default();
         for data in events {
           if let Err(error) =
@@ -2129,21 +2158,25 @@ fn update_lua_object_pool(
   );
 }
 
-fn queue_lua_timer_events(services: &mut EngineServices, router: &mut LuaEventBroker, frame: u64) {
+fn queue_lua_object_events(services: &mut EngineServices, router: &mut LuaEventBroker, frame: u64) {
   router.set_current_frame(frame);
   for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
     let (token, events) = match kind {
       LuaSessionKind::Game => (
         services.game.session_token(),
-        services
-          .game
-          .with_objects_mut(|objects| objects.take_timer_events()),
+        services.game.with_objects_mut(|objects| {
+          let mut events = objects.take_timer_events();
+          events.extend(objects.take_widget_events());
+          events
+        }),
       ),
       LuaSessionKind::Screensaver => (
         services.screensaver.session_token(),
-        services
-          .screensaver
-          .with_objects_mut(|objects| objects.take_timer_events()),
+        services.screensaver.with_objects_mut(|objects| {
+          let mut events = objects.take_timer_events();
+          events.extend(objects.take_widget_events());
+          events
+        }),
       ),
     };
     let Some(token) = token else {
@@ -3138,7 +3171,9 @@ fn host_action_batches(notifications: &[InputNotification]) -> Vec<Vec<InputActi
         event,
         system: true,
       } => actions.push(event.clone()),
-      InputNotification::Action { system: false, .. } | InputNotification::Text { .. } => {}
+      InputNotification::Action { system: false, .. }
+      | InputNotification::Text { .. }
+      | InputNotification::TerminalKey(_) => {}
     }
   }
   if !actions.is_empty() {

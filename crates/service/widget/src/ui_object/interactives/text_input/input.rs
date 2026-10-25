@@ -80,7 +80,9 @@ impl TextInputService {
       TerminalKeyCode::Down => move_vertical(state, width, 1, key.shift),
       TerminalKeyCode::Home => move_line_edge(state, width, false, key.shift),
       TerminalKeyCode::End => move_line_edge(state, width, true, key.shift),
-      TerminalKeyCode::Enter if key.ctrl && state.mode == TextInputMode::MultiLine => {
+      TerminalKeyCode::Enter
+        if state.mode == TextInputMode::MultiLine && key.ctrl == state.enter_submit =>
+      {
         changed = state.buffer.insert_newline()
       }
       TerminalKeyCode::Enter => {

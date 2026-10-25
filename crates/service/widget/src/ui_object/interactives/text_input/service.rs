@@ -53,6 +53,7 @@ impl TextInputService {
         buffer: TextBuffer::new(options.initial_text, options.max_chars, options.mode),
         mode: options.mode,
         mouse: options.mouse,
+        enter_submit: true,
         hit: None,
         pending_cursor: None,
         visual_line: None,
@@ -90,7 +91,13 @@ impl TextInputService {
     params: &TextInputRenderParams,
     canvas: &mut CanvasService,
   ) -> Option<(u16, u16)> {
-    self.render_target(pool, id, params, canvas, TextSurface::Base)
+    self.render_target(
+      pool,
+      id,
+      params,
+      canvas,
+      TextSurface::Base((i32::from(params.rect.x), i32::from(params.rect.y))),
+    )
   }
 
   /// Render the component into the identified clipped slice and update its interaction geometry.
@@ -110,7 +117,13 @@ impl TextInputService {
     params: &TextInputRenderParams,
     canvas: &mut CanvasService,
   ) -> Option<(u16, u16)> {
-    self.render_target(pool, id, params, canvas, TextSurface::Slice(slice))
+    self.render_target(
+      pool,
+      id,
+      params,
+      canvas,
+      TextSurface::Slice(slice, (i32::from(params.rect.x), i32::from(params.rect.y))),
+    )
   }
 
   /// Render the component into the physical host surface and update its interaction geometry.
@@ -128,7 +141,140 @@ impl TextInputService {
     params: &TextInputRenderParams,
     canvas: &mut CanvasService,
   ) -> Option<(u16, u16)> {
-    self.render_target(pool, id, params, canvas, TextSurface::Host)
+    self.render_target(
+      pool,
+      id,
+      params,
+      canvas,
+      TextSurface::Host((i32::from(params.rect.x), i32::from(params.rect.y))),
+    )
+  }
+
+  /// Render an input at signed coordinates in the base or specified slice without reflowing clipped content.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The owning object pool.
+  /// * `id` - The input identity.
+  /// * `slice` - The target slice, or `None` for the base.
+  /// * `position` - The original signed column and row.
+  /// * `params` - The input dimensions and presentation.
+  /// * `canvas` - The destination canvas.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// use tg_service_canvas::CanvasService;
+  /// use tg_service_layout::{LayoutService, Rect};
+  /// use tg_service_widget::{TextInputOptions, TextInputRenderParams, TextInputService, UiObjectPool};
+  /// let mut pool = UiObjectPool::new();
+  /// let input = TextInputService::new();
+  /// let id = input.create(&mut pool, TextInputOptions { initial_text: "ab".into(), ..Default::default() });
+  /// let mut canvas = CanvasService::new();
+  /// pool.prepare_canvas(&mut canvas, &LayoutService::new());
+  /// let params = TextInputRenderParams { rect: Rect { x: 0, y: 0, width: 4, height: 1 }, ..Default::default() };
+  /// input.render_at(&mut pool, id, None, (-1, 0), &params, &mut canvas);
+  /// assert_eq!(canvas.base_buffer().get(0, 0).unwrap().text, "b");
+  /// ```
+  pub fn render_at(
+    &self,
+    pool: &mut UiObjectPool,
+    id: TextInputId,
+    slice: Option<SliceId>,
+    position: (i32, i32),
+    params: &TextInputRenderParams,
+    canvas: &mut CanvasService,
+  ) -> Option<(u16, u16)> {
+    let surface = slice.map_or(TextSurface::Base(position), |slice| {
+      TextSurface::Slice(slice, position)
+    });
+    self.render_target(pool, id, params, canvas, surface)
+  }
+
+  /// Update editing behavior while retaining the input identity and focus.
+  ///
+  /// Text is normalized and truncated to the new mode and character limit. Queue a change event
+  /// only when the effective text changes; preserve cursor and selection when text and limits allow.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The owning object pool.
+  /// * `id` - The input identity.
+  /// * `options` - The complete replacement editing configuration.
+  /// * `enter_submit` - Whether Enter submits and Ctrl+Enter inserts a newline.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// use tg_service_widget::{TextInputOptions, TextInputService, UiObjectPool};
+  /// let mut pool = UiObjectPool::new();
+  /// let mut input = TextInputService::new();
+  /// let id = input.create(&mut pool, TextInputOptions::default());
+  /// assert!(input.focus(&mut pool, id));
+  /// assert!(input.configure(&mut pool, id, TextInputOptions { max_chars: Some(3), ..Default::default() }, true));
+  /// input.insert_text(&mut pool, "abcd");
+  /// assert_eq!(input.get_text(&pool, id), Some("abc"));
+  /// assert!(input.is_focused(&pool, id));
+  /// ```
+  pub fn configure(
+    &mut self,
+    pool: &mut UiObjectPool,
+    id: TextInputId,
+    options: TextInputOptions,
+    enter_submit: bool,
+  ) -> bool {
+    let pool_id = pool.id();
+    let Some(state) = pool.text_inputs.inputs.get_mut(&id) else {
+      return false;
+    };
+    let mode_changed = state.mode != options.mode;
+    let changed = state
+      .buffer
+      .configure(options.initial_text, options.max_chars, options.mode);
+    state.mode = options.mode;
+    state.mouse = options.mouse;
+    state.enter_submit = enter_submit;
+    if mode_changed {
+      state.visual_line = None;
+    }
+    if !options.mouse {
+      if self
+        .drag
+        .as_ref()
+        .is_some_and(|drag| drag.active.pool_id == pool_id && drag.active.input_id == id)
+      {
+        self.drag = None;
+      }
+      state.pending_cursor = None;
+    }
+    if changed {
+      state.visual_line = None;
+      let value = state.buffer.text().to_string();
+      pool.push_text_event(TextInputEvent::Changed { id, value });
+    }
+    true
+  }
+
+  /// Insert committed text into the focused input, replacing any selection and queuing a change event.
+  pub fn insert_text(&mut self, pool: &mut UiObjectPool, text: &str) {
+    let TextInputActive::Focused(active) = self.active else {
+      return;
+    };
+    if active.pool_id != pool.id() {
+      return;
+    }
+    let Some(state) = pool.text_inputs.inputs.get_mut(&active.input_id) else {
+      return;
+    };
+    if state.buffer.insert_text(text) {
+      state.visual_line = None;
+      let value = state.buffer.text().to_string();
+      pool.push_text_event(TextInputEvent::Changed {
+        id: active.input_id,
+        value,
+      });
+    }
+    self.cursor_blink_started = Instant::now();
   }
 
   fn render_target(
@@ -145,24 +291,51 @@ impl TextInputService {
       }
       return None;
     }
-    let resolved = match surface {
-      TextSurface::Base => canvas.base_hit_rect(params.rect),
-      TextSurface::Slice(slice) => canvas.slice_hit_rect(slice, params.rect),
-      TextSurface::Host => canvas.host_hit_rect(params.rect),
+    let size = tg_service_layout::Size {
+      width: params.rect.width,
+      height: params.rect.height,
     };
-    let Some((physical_rect, origin, surface_rank)) = resolved else {
+    let (resolved, position, parent_origin) = match surface {
+      TextSurface::Base(position) => (
+        canvas.base_hit_rect_at(position, size),
+        position,
+        Some((
+          i32::from(canvas.viewport().x),
+          i32::from(canvas.viewport().y),
+        )),
+      ),
+      TextSurface::Slice(slice, position) => (
+        canvas.slice_hit_rect_at(slice, position, size),
+        position,
+        canvas.slice_origin(slice),
+      ),
+      TextSurface::Host(position) => (canvas.host_hit_rect(params.rect), position, Some((0, 0))),
+    };
+    let Some((physical_rect, _, surface_rank)) = resolved else {
       if let Some(state) = pool.text_inputs.inputs.get_mut(&id) {
         state.hit = None;
       }
       return None;
     };
+    let parent_origin = parent_origin?;
+    let input_origin = (
+      parent_origin.0.saturating_add(position.0),
+      parent_origin.1.saturating_add(position.1),
+    );
     let mut params = params.clone();
-    params.rect.width = physical_rect.width;
-    params.rect.height = physical_rect.height;
+    params.rect.x = 0;
+    params.rect.y = 0;
     let order = pool.next_render_order();
     let active = self.is_focused(pool, id);
     let state = pool.text_inputs.inputs.get_mut(&id)?;
-    fill_input_background(canvas, surface, &params);
+    let mut background_params = params.clone();
+    background_params.rect = tg_service_layout::Rect {
+      x: (i32::from(physical_rect.x) - input_origin.0) as u16,
+      y: (i32::from(physical_rect.y) - input_origin.1) as u16,
+      width: physical_rect.width,
+      height: physical_rect.height,
+    };
+    fill_input_background(canvas, surface, &background_params);
     let cursor_visible = active
       && params.cursor_shape.unwrap_or_default() != TextInputCursorShape::None
       && (!params.cursor_blink || self.cursor_blink_visible());
@@ -187,15 +360,15 @@ impl TextInputService {
       ),
     };
     if let Some(hit) = state.hit.as_mut() {
+      hit.content_origin.0 = hit.content_origin.0.saturating_add(input_origin.0);
+      hit.content_origin.1 = hit.content_origin.1.saturating_add(input_origin.1);
       hit.rect = physical_rect;
-      hit.origin = origin;
       hit.surface_rank = surface_rank;
     }
     result.and_then(|(x, y)| {
-      Some((
-        u16::try_from(origin.0.saturating_add(i32::from(x))).ok()?,
-        u16::try_from(origin.1.saturating_add(i32::from(y))).ok()?,
-      ))
+      let x = u16::try_from(input_origin.0.saturating_add(i32::from(x))).ok()?;
+      let y = u16::try_from(input_origin.1.saturating_add(i32::from(y))).ok()?;
+      physical_rect.contains(x, y).then_some((x, y))
     })
   }
 

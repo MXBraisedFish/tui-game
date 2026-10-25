@@ -732,7 +732,7 @@ impl LuaEventData {
       Self::HitArea(_) => "hitbox",
       Self::Hyperlink(_) => "hyperlink",
       Self::Markdown(_) => "markdown",
-      Self::TextInput(_) => "text_input",
+      Self::TextInput(_) => "input",
       Self::ScrollBox(_) => "scroll_box",
     }
   }
@@ -1021,9 +1021,9 @@ impl LuaEventData {
         data.set("text", event.text.as_str())?;
       }
       Self::TextInput(event) => {
-        data.set("id", event.id.to_string())?;
+        data.set("id", format!("input_{:03}", event.id))?;
         data.set("kind", event.kind)?;
-        data.set("value", event.value.as_deref())?;
+        data.set("text", event.value.as_deref())?;
       }
       Self::ScrollBox(event) => {
         data.set("id", event.id.to_string())?;
@@ -1409,10 +1409,10 @@ mod tests {
       (
         LuaEventData::TextInput(LuaTextInputEvent {
           id: 9,
-          kind: "changed",
+          kind: "change",
           value: Some("value".to_string()),
         }),
-        "text_input",
+        "input",
       ),
       (
         LuaEventData::ScrollBox(LuaScrollBoxEvent { id: 10, x: 2, y: 3 }),

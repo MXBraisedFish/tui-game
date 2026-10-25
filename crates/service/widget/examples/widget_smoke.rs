@@ -90,5 +90,44 @@ fn main() {
   }
   assert!(slices.remove(&mut pool, overlay));
   assert!(hitboxes.remove(&mut pool, lower));
+
+  let edit = input.create(
+    &mut pool,
+    tg_service_widget::TextInputOptions {
+      initial_text: "ab".into(),
+      mode: tg_service_widget::TextInputMode::MultiLine,
+      ..Default::default()
+    },
+  );
+  assert!(input.focus(&mut pool, edit));
+  assert!(input.configure(
+    &mut pool,
+    edit,
+    tg_service_widget::TextInputOptions {
+      initial_text: "ab".into(),
+      mode: tg_service_widget::TextInputMode::MultiLine,
+      max_chars: Some(4),
+      ..Default::default()
+    },
+    false
+  ));
+  input.insert_text(&mut pool, "\nc");
+  assert_eq!(input.get_text(&pool, edit), Some("ab\nc"));
+  pool.prepare_canvas(&mut canvas, &layout);
+  let params = tg_service_widget::TextInputRenderParams {
+    rect: tg_service_layout::Rect {
+      x: 0,
+      y: 0,
+      width: 4,
+      height: 2,
+    },
+    cursor_character: Some("|".into()),
+    cursor_blink: false,
+    ..Default::default()
+  };
+  input.render_at(&mut pool, edit, None, (-1, 0), &params, &mut canvas);
+  assert_eq!(canvas.base_buffer().get(0, 0).unwrap().text, "b");
+  assert!(input.blur(&mut pool));
+  assert!(input.remove(&mut pool, edit));
   println!("widget ok: slice lifecycle, signed hit region, event options, press and cleanup");
 }

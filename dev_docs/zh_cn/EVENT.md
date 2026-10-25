@@ -1,6 +1,6 @@
 # Lua 事件协议
 
-本文档包含已实现事件和未来事件 schema。当前可投递范围是 `action`、`key`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期、`timer` 计时事件，以及 `file`、`i18n`、`image` 异步终态和 `widget.hitbox` 的 `hitbox` 交互事件。计时器指定 callback 时只调用该函数，其余情况通过 `HandleEvent(event)` 交付。`animation`、`audio`、`network` 及其他 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准。
+本文档包含已实现事件和未来事件 schema。当前可投递范围是 `action`、`key`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期、`timer` 计时事件，以及 `file`、`i18n`、`image` 异步终态、`widget.hitbox` 的 `hitbox` 交互事件，以及 `widget.input` 带有 `id/kind` 的 `input` 组件事件。计时器指定 callback 时只调用该函数，其余情况通过 `HandleEvent(event)` 交付。`animation`、`audio`、`network` 及其他未开放的 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准。
 
 事件只用于宿主向脚本通知状态变化；原始终端事件对象、宿主 UI 事件、内部任务 ID、绝对路径和内部错误信息不会暴露给 Lua。
 
@@ -573,20 +573,11 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 | `href` | `string` | 始终 | 链接目标。 |
 | `text` | `string` | 始终 | 链接显示文本。 |
 
-### 7.4 `text_input`
+### 7.4 `input`
 
-```lua
-{
-  type = "text_input",
-  data = { id = "11", kind = "changed", value = "player" },
-}
-```
+`widget.input` 的事件使用 `type = "input"`。`data.id` 为 `input_001` 形式的字符串，`data.kind` 为 `focus`、`focused`、`blur`、`blurred`、`change`、`submit`、`cancel`。`change/submit/cancel` 另有 `data.text`，内容为完整文本。
 
-| `data` 字段 | 类型 | 出现条件 | 作用 |
-|---|---|---|---|
-| `id` | `string` | 始终 | Session 内文本输入对象 ID。 |
-| `kind` | `string` | 始终 | `focused`、`blurred`、`changed`、`submit`、`cancel`、`pressed` 或 `pressed_outside`。 |
-| `value` | `string \| nil` | `changed`、`submit`、`cancel` | 当时的文本内容。 |
+`focus/blur` 是鼠标请求通知，需要脚本决定是否调用聚焦/失焦方法；`focused/blurred` 是实际焦点变化通知。提交、取消不会自动清空或失焦。原始终端文字事件没有 `data.id/kind`。详见 [input API](api/widget/input.md)。
 
 ### 7.5 `scroll_box`
 
@@ -638,7 +629,7 @@ audio
 hitbox
 hyperlink
 markdown
-text_input
+input
 scroll_box
 ```
 

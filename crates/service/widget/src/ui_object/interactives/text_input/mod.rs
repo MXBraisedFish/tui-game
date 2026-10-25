@@ -8,6 +8,9 @@ mod service;
 mod state;
 mod types;
 
+#[cfg(test)]
+mod tests;
+
 pub use service::TextInputService;
 pub(crate) use state::TextInputObjects;
 pub use types::{

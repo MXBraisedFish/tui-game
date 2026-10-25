@@ -147,6 +147,17 @@ pub enum LuaDrawTarget {
 /// A structured drawing request collected during a script callback.
 #[derive(Clone, Debug)]
 pub enum LuaDrawCommand {
+  /// Render a session-owned editable input in its parent surface.
+  Input {
+    /// The pool-local input identity.
+    id: u64,
+    /// The owning base or slice surface.
+    target: LuaDrawTarget,
+    /// The original signed column.
+    x: i32,
+    /// The original signed row.
+    y: i32,
+  },
   /// Register a session-owned transparent pointer region for this frame.
   Hitbox {
     /// The session-owned base or slice destination.

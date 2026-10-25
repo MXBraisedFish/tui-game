@@ -1,6 +1,6 @@
 # widget.hitbox 库
 
-`widget.hitbox` 用于鼠标响应区域。
+`widget.hitbox` 用于设置鼠标响应区域。
 
 ---
 
@@ -81,15 +81,17 @@ end
 ```lua
 {
   type = "hitbox"
-  frame = X,
-  sequence = X,
+  frame = X,    -- 占位符
+  sequence = X, -- 占位符
   data = {
-    id = X,
-    button = "left",
+    id = X,     -- 占位符
     kind = "click",
-    x = 14,
-    y = 3
-  },
+    button = "left",
+    x = 12,
+    y = 4
+    relative_x = 7,
+    relative_y = 2,
+  }
 }
 ```
 
@@ -124,7 +126,7 @@ widget.hitbox.delete
 
 | 类型    | 说明         |
 | ------- | ------------ |
-| boolean | 是否删除成功 |
+| boolean | 删除是否成功 |
 
 ### 示例
 
@@ -140,7 +142,11 @@ debug.print(table.pretty(widget.hitbox.list()))
 **输出：**
 
 ```lua
-
+hitbox_001
+true
+{
+  n = 0
+}
 ```
 
 ---
@@ -161,7 +167,7 @@ widget.hitbox.clear
 
 | 类型    | 说明         |
 | ------- | ------------ |
-| boolean | 是否删除成功 |
+| boolean | 删除是否成功 |
 
 ### 示例
 
@@ -179,7 +185,10 @@ debug.print(table.pretty(widget.hitbox.list()))
 **输出：**
 
 ```lua
-
+true
+{
+  n = 0
+}
 ```
 
 ---
@@ -205,8 +214,8 @@ widget.hitbox.list
 ### 示例
 
 ```lua
-local s1 = widget.hitbox.create(20, 10)
-local s2 = widget.hitbox.create(30, 8, { hover_move = true })
+local hitbox1 = widget.hitbox.create(20, 10)
+local hitbox2 = widget.hitbox.create(30, 8, { hover_move = true })
 
 debug.print(table.pretty(widget.hitbox.list()))
 ```
@@ -309,8 +318,8 @@ widget.hitbox.draw
 
 #### 选填参数
 
-| 参数名        | 类型   | 说明     |
-| ------------- | ------ | -------- |  |
+| 参数名        | 类型   | 默认值   | 说明             |
+| ------------- | ------ | -------- | ---------------- |
 | `slice_layer` | string | `"base"` | 绘制目标切片图层 |
 
 ### 返回值
@@ -321,7 +330,7 @@ widget.hitbox.draw
 
 ```lua
 function Init(ctx)
-  s = widget.hitbox.create(20, 10)
+  hitbox = widget.hitbox.create(20, 10)
 end
 
 function HandleEvent(event)
@@ -331,21 +340,31 @@ function HandleEvent(event)
 end
 
 function Render()
-  widget.hitbox.draw(s, 5, 2)
+  widget.hitbox.draw(hitbox, 5, 2)
 end
 ```
 
 **输出：**
 
 ```lua
-
+{
+  type = "hitbox"
+  frame = X,    -- 占位符
+  sequence = X, -- 占位符
+  data = {
+    id = X,     -- 占位符
+    kind = "click",
+    button = "left",
+    x = 12,
+    y = 4
+    relative_x = 7,
+    relative_y = 2,
+  }
+}
 ```
 
 ### 额外说明
 
-- `slice_layer` 默认为 `"base"`；指定切片必须属于当前会话。切片未在本帧绘制时，区域不参与命中。
-- 命中范围受所属切片边界和上层切片的事件穿透设置约束。裁剪不会改变区域的原始左上角。
-- 事件 `x`、`y` 是目标切片原始坐标；`relative_x`、`relative_y` 是相对于 hitbox 未裁剪左上角的坐标。`dx`、`dy` 仍仅表示拖动的逐次位移。
 - 必填参数 `x` 取值范围为 $[-2147483648, 2147483647]$。
 - 必填参数 `y` 取值范围为 $[-2147483648, 2147483647]$。
 
@@ -384,7 +403,7 @@ widget.hitbox.set
 
 | 类型    | 说明         |
 | ------- | ------------ |
-| boolean | 是否修改成功 |
+| boolean | 修改是否成功 |
 
 ### 示例
 
@@ -399,7 +418,14 @@ debug.print(table.pretty(widget.hitbox.get_info(hitbox)))
 **输出：**
 
 ```lua
-
+true
+{
+  id = "hitbox_001",
+  width = 25,
+  height = 5,
+  hover_move = false,
+  drag = false
+}
 ```
 
 ### 额外说明
@@ -456,22 +482,22 @@ debug.print(table.pretty(widget.hitbox.get_info(hitbox)))
   id = "hitbox_001",
   width = 20,
   height = 10,
-  hover_move = true,
+  hover_move = false,
   drag = false
 }
 ```
 
 ### 额外说明
 
-- 返回表包含以下字段：
+- 返回对象表包含以下字段：
 
 ```lua
 {
-  id = "hitbox_001", -- string（鼠标响应区域 ID）
-  width = 20,        -- integer（鼠标响应区域宽度）
-  height = 10,       -- integer（鼠标响应区域高度）
-  hover_move = true, -- boolean（鼠标响应区域移动事件）
-  drag = false       -- boolean（鼠标响应区域拖动事件）
+  id = "hitbox_001",  -- string（鼠标响应区域 ID）
+  width = 20,         -- integer（鼠标响应区域宽度）
+  height = 10,        -- integer（鼠标响应区域高度）
+  hover_move = false, -- boolean（鼠标响应区域移动事件）
+  drag = false        -- boolean（鼠标响应区域拖动事件）
 }
 ```
 

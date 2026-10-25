@@ -68,6 +68,8 @@ draw.text(x, y, "AUTO", { fg = color.BRIGHT_RED })
 - `align` 库中用于水平对齐时等价于常量 `align.HORIZONTAL_CENTER`。
 - `align` 库中用于垂直对齐时等价于常量 `align.VERTICAL_CENTER`。
 - `draw` 库和 `measurement` 库中用于水平对齐时等价于常量 `align.LEFT`。
+- `widget.input` 库中用于水平对齐时等价于常量 `align.LEFT`。
+- `widget.input` 库中用于垂直对齐时等价于常量 `align.TOP`。
 
 ---
 

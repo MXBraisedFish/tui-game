@@ -62,6 +62,8 @@ pub enum InputNotification {
   },
   /// Committed text observed independently of shortcut and widget capture.
   Text { text: String },
+  /// A terminal editing key in the same order as committed text and focus boundaries.
+  TerminalKey(TerminalKeyEvent),
   /// A terminal focus boundary following any closing releases.
   Focus { gained: bool },
 }
@@ -79,6 +81,7 @@ enum QueuedInput {
   Key(KeyEvent),
   Focus(FocusEvent),
   Text(CommittedTextEvent),
+  TerminalKey(TerminalKeyEvent),
 }
 
 /// The public entry point for input operations.
@@ -280,6 +283,9 @@ impl InputService {
     if let SystemEvent::Focus(focus) = event {
       let _ = self.sender.send(QueuedInput::Focus(focus));
     }
+    if let SystemEvent::TerminalKey(key) = event {
+      let _ = self.sender.send(QueuedInput::TerminalKey(key));
+    }
     if self.system_sender.send(event).is_err() {
       log.warn_operation_failed(
         LogSource::Input,
@@ -447,6 +453,11 @@ impl InputService {
             self
               .notifications
               .push(InputNotification::Text { text: event.text });
+          }
+        }
+        QueuedInput::TerminalKey(key) => {
+          if self.focused {
+            self.notifications.push(InputNotification::TerminalKey(key));
           }
         }
         QueuedInput::Key(event) => {
@@ -2285,5 +2296,37 @@ mod tests {
 
     input.enable_raw_mouse_capture();
     assert!(input.take_raw_mouse_events().is_empty());
+  }
+  #[test]
+  fn committed_text_and_editing_keys_keep_journal_order_across_focus_boundaries() {
+    let mut input = InputService::new();
+    let mut log = LogService::new();
+    let backspace = TerminalKeyEvent {
+      code: TerminalKeyCode::Backspace,
+      ctrl: false,
+      shift: false,
+    };
+    input.queue_committed_text(CommittedTextEvent { text: "a".into() });
+    input.queue_system_event(SystemEvent::TerminalKey(backspace), &mut log);
+    input.queue_committed_text(CommittedTextEvent { text: "b".into() });
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: false }), &mut log);
+    input.queue_committed_text(CommittedTextEvent {
+      text: "ignored".into(),
+    });
+    input.queue_system_event(SystemEvent::TerminalKey(backspace), &mut log);
+    input.queue_system_event(SystemEvent::Focus(FocusEvent { gained: true }), &mut log);
+    input.queue_committed_text(CommittedTextEvent { text: "c".into() });
+    input.poll();
+    assert_eq!(
+      input.notifications(),
+      &[
+        InputNotification::Text { text: "a".into() },
+        InputNotification::TerminalKey(backspace),
+        InputNotification::Text { text: "b".into() },
+        InputNotification::Focus { gained: false },
+        InputNotification::Focus { gained: true },
+        InputNotification::Text { text: "c".into() },
+      ]
+    );
   }
 }

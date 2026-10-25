@@ -386,6 +386,7 @@ fn route(
 ) {
   for notification in input.notifications() {
     let data = match notification {
+      InputNotification::TerminalKey(_) => continue,
       InputNotification::Text { text } => LuaEventData::Input { text: text.clone() },
       InputNotification::Key { key, state } => LuaEventData::Key {
         key: key_token(*key),

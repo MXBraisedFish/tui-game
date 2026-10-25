@@ -6,7 +6,7 @@
 
 这些事件遵循统一的结构，即事件协议。本文档详细说明各类事件的结构、发送条件和使用示例。
 
-本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；timer 已开放，支持指定 callback；widget.hitbox 已开放，使用 hitbox 事件；animation、audio、network 及其他 widget 事件不能仅凭本页结构示例视为已经实现。
+本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；timer 已开放，支持指定 callback；widget.hitbox 已开放，使用 hitbox 事件；widget.input 已开放，使用带 id/kind 的 input 事件；animation、audio、network 及其余 widget 事件不能仅凭本页结构示例视为已经实现。
 
 ---
 
@@ -34,7 +34,7 @@
 | `hitbox`        | 点击区域交互事件                 | [hitbox](#hitbox)               |
 | `hyperlink`       | 超链接点击事件                   | [hyperlink](#hyperlink)             |
 | `markdown`        | Markdown 文本中的链接点击事件    | [markdown](#markdown)               |
-| `text_input`      | 文本输入组件的状态变化或交互事件 | [text_input](#text_input)           |
+| `input`（组件） | 输入框状态变化或交互事件 | [widget.input](#input输入框组件) |
 | `scroll_box`      | 滚动框位置变化事件               | [scroll_box](#scroll_box)           |
 
 ---
@@ -1434,78 +1434,11 @@ end
 
 ---
 
-## `text_input`
+## `input`（输入框组件）
 
-文本输入组件的状态变化或交互事件。
+`widget.input` 的事件使用 `type = "input"`。`data.id` 为 `input_001` 形式的字符串，`data.kind` 为 `focus`、`focused`、`blur`、`blurred`、`change`、`submit`、`cancel`。`change/submit/cancel` 另有 `data.text`，内容为完整文本。
 
-### 结构
-
-```lua
-{
-  type = "text_input",
-  data = {
-    id = ...,     -- string
-    kind = ...,   -- string
-    value = ...,  -- string / nil
-  },
-}
-```
-
-| 字段    | 类型         | 说明                                           |
-| ------- | ------------ | ---------------------------------------------- |
-| `id`    | string       | 当前会话内的文本输入对象 ID                    |
-| `kind`  | string       | 文本输入事件类型                               |
-| `value` | string / nil | 内容变化、提交或取消时出现，表示当时的文本内容 |
-
-### 发送条件
-
-文本输入组件获得或失去焦点、内容变化、提交、取消，或发生组件内外的按下操作时，发送给创建并登记该组件的游戏会话。覆盖屏接管交互期间不发送，屏保不接收此事件。
-
-### 示例
-
-```lua
-function HandleEvent(event)
-  if event.type == "text_input" then
-    debug.print(table.pretty(event))
-  end
-end
-```
-
-输出：
-
-> X 为占位符
-
-```lua
-{
-  type = "text_input",
-  frame = X,
-  sequence = X,
-  data =
-  {
-    id = "11",
-    kind = "changed",
-    value = "player",
-  },
-}
-```
-
-## 额外补充
-
-- 字段 `kind` 包含以下固定值：
-
-```lua
-"focused"         -- 获得焦点
-"blurred"         -- 失去焦点
-"changed"         -- 文本内容变化
-"submit"          -- 提交文本
-"cancel"          -- 取消输入
-"pressed"         -- 在组件内按下
-"pressed_outside" -- 在组件外按下
-```
-
-- 字段 `value` 仅在 `changed`、`submit`、`cancel` 事件中出现。
-
----
+`focus/blur` 是鼠标请求通知，需要脚本决定是否调用聚焦/失焦方法；`focused/blurred` 是实际焦点变化通知。提交、取消不会自动清空或失焦。原始终端文字事件没有 `data.id/kind`。详见 [input API](../api/widget/input.md)。
 
 ## `scroll_box`
 

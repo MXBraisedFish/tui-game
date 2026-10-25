@@ -48,18 +48,6 @@ pub(super) fn render_single_line(
   if state.buffer.text().is_empty() {
     draw_placeholder(canvas, surface, y, params);
   }
-  if state.buffer.text().is_empty() && !active {
-    state.hit = Some(HitSnapshot {
-      rect: params.rect,
-      origin: (0, 0),
-      surface_rank: 0,
-      width: params.rect.width as usize,
-      first_line: 0,
-      single_start: 0,
-      order,
-    });
-    return None;
-  }
   let layout = VisualLayout::new(state.buffer.text(), usize::MAX / 2);
   let (_, cursor_x_full) = layout.position(state.buffer.cursor(), Some(0));
   let cursor_glyph = layout
@@ -67,7 +55,7 @@ pub(super) fn render_single_line(
     .iter()
     .find(|glyph| glyph.start == state.buffer.cursor());
   let cursor_width = cursor_glyph.map(|glyph| glyph.width).unwrap_or_else(|| {
-    cursor_marker(params.cursor_shape.unwrap_or_default())
+    cursor_marker(params)
       .map(UnicodeWidthStr::width)
       .unwrap_or(0)
   });
@@ -85,7 +73,25 @@ pub(super) fn render_single_line(
     used += glyph.width;
     start = glyph.start;
   }
-  let offset_x = align_offset(params.text_align, params.rect.width, used as u16);
+  used = layout
+    .glyphs
+    .iter()
+    .filter(|glyph| glyph.end > start)
+    .scan(0, |width, glyph| {
+      *width += glyph.width;
+      (*width <= params.rect.width as usize).then_some(glyph.width)
+    })
+    .sum::<usize>()
+    + if cursor_glyph.is_none() {
+      cursor_width
+    } else {
+      0
+    };
+  let offset_x = align_offset(
+    params.text_align,
+    params.rect.width,
+    used.min(params.rect.width as usize) as u16,
+  );
   let start_x = layout.position(start, Some(0)).1;
   let mut x = 0;
   let selection = active.then(|| state.buffer.selection()).flatten();
@@ -116,7 +122,7 @@ pub(super) fn render_single_line(
   if active
     && cursor_glyph.is_none()
     && cursor_visible
-    && let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default())
+    && let Some(marker) = cursor_marker(params)
   {
     draw_styled(
       canvas,
@@ -129,9 +135,11 @@ pub(super) fn render_single_line(
   }
   state.hit = Some(HitSnapshot {
     rect: params.rect,
-    origin: (0, 0),
+    content_origin: (i32::from(offset_x), i32::from(y)),
     surface_rank: 0,
     width: params.rect.width as usize,
+    text_align: params.text_align,
+    max_line_width: params.rect.width,
     first_line: 0,
     single_start: start,
     order,
@@ -159,30 +167,13 @@ pub(super) fn render_multi_line(
   surface: TextSurface,
   order: u64,
 ) -> Option<(u16, u16)> {
-  if state.buffer.text().is_empty() {
-    draw_placeholder(canvas, surface, params.rect.y, params);
-  }
-  if state.buffer.text().is_empty() && !active {
-    state.hit = Some(HitSnapshot {
-      rect: params.rect,
-      origin: (0, 0),
-      surface_rank: 0,
-      width: params.rect.width as usize,
-      first_line: 0,
-      single_start: 0,
-      order,
-    });
-    return None;
-  }
   let layout = VisualLayout::new(state.buffer.text(), params.rect.width as usize);
   let (mut cursor_line, mut cursor_x) = layout.position(state.buffer.cursor(), state.visual_line);
-  if active
-    && !layout
-      .glyphs
-      .iter()
-      .any(|glyph| glyph.start == state.buffer.cursor())
-    && cursor_x >= params.rect.width as usize
-  {
+  let cursor_at_end = !layout
+    .glyphs
+    .iter()
+    .any(|glyph| glyph.start == state.buffer.cursor());
+  if active && cursor_at_end && cursor_x >= params.rect.width as usize {
     cursor_line += 1;
     cursor_x = 0;
   }
@@ -203,6 +194,28 @@ pub(super) fn render_multi_line(
     }
   }
 
+  let max_line_width = line_widths.iter().copied().max().unwrap_or(0) as u16;
+  let total_lines = layout
+    .lines
+    .len()
+    .max(if active { cursor_line + 1 } else { 0 });
+  let visible_lines =
+    (total_lines.saturating_sub(first_line)).min(params.rect.height as usize) as u16;
+  let offset_y = match params.vertical_align {
+    VerticalAlign::Top => 0,
+    VerticalAlign::Center => (params.rect.height - visible_lines) / 2,
+    VerticalAlign::Bottom => params.rect.height - visible_lines,
+  };
+  if state.buffer.text().is_empty() {
+    draw_placeholder(canvas, surface, offset_y, params);
+  }
+  let cursor_line_width = line_widths.get(cursor_line).copied().unwrap_or(0) as u16;
+  let cursor_offset_x = align_offset(params.text_align, max_line_width, cursor_line_width).min(
+    params
+      .rect
+      .width
+      .saturating_sub((cursor_x + 1).min(u16::MAX as usize) as u16),
+  );
   let selection = active.then(|| state.buffer.selection()).flatten();
   for glyph in layout
     .glyphs
@@ -210,7 +223,7 @@ pub(super) fn render_multi_line(
     .filter(|glyph| (first_line..first_line + params.rect.height as usize).contains(&glyph.line))
   {
     let line_w = line_widths.get(glyph.line).copied().unwrap_or(0) as u16;
-    let offset_x = align_offset(params.text_align, params.rect.width, line_w);
+    let offset_x = align_offset(params.text_align, max_line_width, line_w);
     let at_cursor = active && glyph.start == state.buffer.cursor();
     let selected = selection
       .as_ref()
@@ -224,49 +237,47 @@ pub(super) fn render_multi_line(
       canvas,
       surface,
       params.rect.x + offset_x + glyph.x as u16,
-      params.rect.y + (glyph.line - first_line) as u16,
+      params.rect.y + offset_y + (glyph.line - first_line) as u16,
       &glyph.text,
       style,
     );
   }
   if active
-    && !layout
-      .glyphs
-      .iter()
-      .any(|glyph| glyph.start == state.buffer.cursor())
+    && cursor_at_end
     && cursor_visible
-    && let Some(marker) = cursor_marker(params.cursor_shape.unwrap_or_default())
+    && let Some(marker) = cursor_marker(params)
   {
-    let line_w = line_widths.get(cursor_line).copied().unwrap_or(0) as u16;
-    let offset_x = align_offset(params.text_align, params.rect.width, line_w);
     draw_styled(
       canvas,
       surface,
-      params.rect.x + offset_x + cursor_x as u16,
-      params.rect.y + (cursor_line - first_line) as u16,
+      params.rect.x + cursor_offset_x + cursor_x as u16,
+      params.rect.y + offset_y + (cursor_line - first_line) as u16,
       marker,
       input_cursor_style(params),
     );
   }
   state.hit = Some(HitSnapshot {
     rect: params.rect,
-    origin: (0, 0),
+    content_origin: (0, i32::from(offset_y)),
     surface_rank: 0,
     width: params.rect.width as usize,
+    text_align: params.text_align,
+    max_line_width,
     first_line,
     single_start: 0,
     order,
   });
-  let cursor_line_w = line_widths.get(cursor_line).copied().unwrap_or(0) as u16;
-  let cursor_offset_x = align_offset(params.text_align, params.rect.width, cursor_line_w);
   active.then_some((
     params.rect.x + cursor_offset_x + cursor_x as u16,
-    params.rect.y + (cursor_line - first_line) as u16,
+    params.rect.y + offset_y + (cursor_line - first_line) as u16,
   ))
 }
 
-fn cursor_marker(shape: TextInputCursorShape) -> Option<&'static str> {
-  match shape {
+fn cursor_marker(params: &TextInputRenderParams) -> Option<&str> {
+  if let Some(character) = &params.cursor_character {
+    return Some(character);
+  }
+  match params.cursor_shape.unwrap_or_default() {
     TextInputCursorShape::Block => Some("█"),
     TextInputCursorShape::Underline => Some("_"),
     TextInputCursorShape::None => None,
@@ -389,10 +400,26 @@ fn draw_styled(
   style: TextStyle,
 ) {
   match surface {
-    TextSurface::Base => canvas.styled_text(x, y, text, style),
-    TextSurface::Slice(id) => {
-      canvas.styled_text_on(id, x, y, text, style);
+    TextSurface::Base(position) => canvas.styled_text(
+      position.0.saturating_add(i32::from(x)),
+      position.1.saturating_add(i32::from(y)),
+      text,
+      style,
+    ),
+    TextSurface::Slice(id, position) => {
+      canvas.styled_text_on(
+        id,
+        position.0.saturating_add(i32::from(x)),
+        position.1.saturating_add(i32::from(y)),
+        text,
+        style,
+      );
     }
-    TextSurface::Host => canvas.host_styled_text(x, y, text, style),
+    TextSurface::Host(position) => canvas.host_styled_text(
+      position.0.saturating_add(i32::from(x)),
+      position.1.saturating_add(i32::from(y)),
+      text,
+      style,
+    ),
   }
 }

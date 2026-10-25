@@ -72,6 +72,7 @@ fn api_examples_execute_with_fixture_assets() {
     "table",
     "utf8",
     "widget/hitbox",
+    "widget/input",
   ];
   let mut failures = Vec::new();
   let mut count = 0;
@@ -191,6 +192,7 @@ fn documented_members_match_registered_libraries() {
     "table",
     "utf8",
     "widget/hitbox",
+    "widget/input",
   ];
   for library in libraries {
     assert_documented_members(library, &docs, &entry);

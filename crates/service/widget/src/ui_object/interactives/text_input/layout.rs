@@ -195,6 +195,11 @@ pub(super) fn move_vertical(state: &mut TextInputState, width: usize, delta: isi
 /// * `end` - The end.
 /// * `extend` - Whether movement extends the current selection.
 pub(super) fn move_line_edge(state: &mut TextInputState, width: usize, end: bool, extend: bool) {
+  let width = if state.mode == TextInputMode::SingleLine {
+    usize::MAX / 2
+  } else {
+    width
+  };
   let layout = VisualLayout::new(state.buffer.text(), width);
   let (line, _) = layout.position(state.buffer.cursor(), state.visual_line);
   let row = layout.lines[line];
@@ -213,14 +218,36 @@ pub(super) fn move_line_edge(state: &mut TextInputState, width: usize, end: bool
 /// * `y` - The vertical coordinate in terminal cells.
 pub(super) fn cursor_from_point(state: &TextInputState, x: u16, y: u16) -> (usize, usize) {
   let hit = state.hit.unwrap();
-  let layout = VisualLayout::new(state.buffer.text(), hit.width);
+  let layout = VisualLayout::new(
+    state.buffer.text(),
+    if state.mode == TextInputMode::SingleLine {
+      usize::MAX / 2
+    } else {
+      hit.width
+    },
+  );
   let line = if state.mode == TextInputMode::SingleLine {
     0
   } else {
-    hit.first_line + y.saturating_sub(hit.rect.y) as usize
+    hit.first_line + (i32::from(y) - hit.content_origin.1).max(0) as usize
   }
   .min(layout.lines.len().saturating_sub(1));
-  let local_x = x.saturating_sub(hit.rect.x) as usize;
+  let line_width = layout
+    .glyphs
+    .iter()
+    .filter(|glyph| glyph.line == line)
+    .map(|glyph| glyph.width)
+    .sum::<usize>() as u16;
+  let offset_x = if state.mode == TextInputMode::SingleLine {
+    0
+  } else {
+    match hit.text_align {
+      super::types::TextAlign::Left => 0,
+      super::types::TextAlign::Center => (hit.max_line_width.saturating_sub(line_width)) / 2,
+      super::types::TextAlign::Right => hit.max_line_width.saturating_sub(line_width),
+    }
+  };
+  let local_x = (i32::from(x) - hit.content_origin.0 - i32::from(offset_x)).max(0) as usize;
   let cursor = if state.mode == TextInputMode::SingleLine {
     let start_x = layout.position(hit.single_start, Some(0)).1;
     layout.boundary_at(0, start_x + local_x)

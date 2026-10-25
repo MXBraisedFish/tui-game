@@ -13,9 +13,11 @@ use super::types::{TextInputId, TextInputMode};
 /// # Fields
 ///
 /// * `rect` - The rectangular region in terminal cells.
-/// * `origin` - The origin.
+/// * `content_origin` - The unclipped physical text origin after alignment.
 /// * `surface_rank` - The surface rank.
 /// * `width` - The width in terminal columns.
+/// * `text_align` - The alignment applied to each displayed line.
+/// * `max_line_width` - The width of the longest displayed line.
 /// * `first_line` - The first line.
 /// * `single_start` - The single start.
 /// * `order` - The order.
@@ -23,12 +25,16 @@ use super::types::{TextInputId, TextInputMode};
 pub(super) struct HitSnapshot {
   /// The rectangular region in terminal cells.
   pub rect: Rect,
-  /// The origin.
-  pub origin: (i32, i32),
+  /// The original physical input origin, including alignment and clipping offsets.
+  pub content_origin: (i32, i32),
   /// The surface rank.
   pub surface_rank: usize,
   /// The width in terminal columns.
   pub width: usize,
+  /// The alignment used to resolve pointer positions within rendered lines.
+  pub text_align: super::types::TextAlign,
+  /// The widest displayed line used as the horizontal alignment container.
+  pub max_line_width: u16,
   /// The first line.
   pub first_line: usize,
   /// The single start.
@@ -44,6 +50,7 @@ pub(super) struct HitSnapshot {
 /// * `buffer` - The buffer.
 /// * `mode` - The text input mode carried by this text input state.
 /// * `mouse` - Whether this input accepts pointer-driven focus and selection.
+/// * `enter_submit` - Whether unmodified Enter submits.
 /// * `hit` - The hit.
 /// * `pending_cursor` - The pending cursor.
 /// * `visual_line` - The visual line.
@@ -54,6 +61,8 @@ pub(super) struct TextInputState {
   pub mode: TextInputMode,
   /// Whether this input accepts pointer-driven focus and selection.
   pub mouse: bool,
+  /// Whether unmodified Enter submits instead of inserting a newline.
+  pub enter_submit: bool,
   /// The hit.
   pub hit: Option<HitSnapshot>,
   /// The pending cursor.

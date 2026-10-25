@@ -694,6 +694,7 @@ fn apply_lua_draw_commands(
   use crate::host_engine::services::{LuaDrawCommand, LuaDrawTarget};
   for command in commands {
     match command {
+      LuaDrawCommand::Input { id, target, x, y } => objects.draw_input(id, target, (x, y), canvas),
       LuaDrawCommand::Hitbox { id, target, x, y } => {
         objects.draw_hitbox(id, target, (x, y), canvas)
       }
@@ -774,6 +775,74 @@ mod tests {
         ComposedCell::Empty => " ",
       })
       .collect()
+  }
+
+  #[test]
+  fn lua_inputs_replay_signed_geometry_in_game_and_screensaver_frames() {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    let root = std::env::temp_dir().join(format!("tg-host-input-{}-{nonce}", std::process::id()));
+    struct Deployment(std::path::PathBuf);
+    impl Drop for Deployment {
+      fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+      }
+    }
+    let root = Deployment(root);
+    std::fs::create_dir_all(root.0.join("scripts")).unwrap();
+    let entry = root.0.join("scripts/main.lua");
+    std::fs::write(&entry, r#"
+      function Init(ctx)
+        id = widget.input.create(4, 2, {text="abcd\nef", mouse=true, line_mode=widget.input.MULTILINE})
+      end
+      function Render() widget.input.draw(id, -1, -1) end
+      function Update(dt) end
+      function UpdateFrame(dt, alpha) end
+      function HandleEvent(event) end
+    "#).unwrap();
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session = LuaService::new()
+        .create_session(LuaSessionSpec {
+          package_id: "host_input".into(),
+          session_kind: kind,
+          entry_path: entry.clone(),
+          fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
+          base_size: Size {
+            width: 6,
+            height: 4,
+          },
+          continue_data: None,
+          best_data: None,
+          save_game_enabled: false,
+          save_best_enabled: false,
+        })
+        .unwrap();
+      session.render().unwrap();
+      let commands = session.take_draw_commands();
+      let mut layout = LayoutService::new();
+      layout.resize_physical(6, 6);
+      layout.set_developer_viewport(crate::host_engine::services::Rect {
+        x: 0,
+        y: 2,
+        width: 6,
+        height: 4,
+      });
+      let mut canvas = CanvasService::new();
+      canvas.begin_frame(&layout);
+      session
+        .with_objects_mut(|objects| {
+          objects.ui_mut().begin_render();
+          objects.ui().prepare_canvas(&mut canvas, &layout);
+          apply_lua_draw_commands(&mut RenderService::new(), &mut canvas, commands, objects);
+        })
+        .unwrap();
+      let frame = FrameCompositor::new().compose(&canvas);
+      assert_eq!(row_text(&frame, 2), "f     ");
+      assert_eq!(row_text(&frame, 0), "      ");
+      session.stop();
+    }
   }
 
   #[test]

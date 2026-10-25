@@ -4,6 +4,9 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
 
+mod input;
+pub(crate) use input::LuaInputBinding;
+
 use crate::{LuaEventData, LuaTimerEvent, LuaTimerEventKind, LuaTimerKind};
 use mlua::Function;
 use tg_service_time::{ScheduledTimerId, TimeService};
@@ -81,12 +84,16 @@ pub(crate) fn shared_lua_object_pool() -> SharedLuaObjectPool {
 
 /// UI and runtime objects owned by exactly one Lua session.
 pub struct LuaObjectPool {
-  ui: UiObjectPool,
+  pub(crate) ui: UiObjectPool,
   runtime: RuntimeObjectPool,
   /// The timer parameters and callbacks retained by this session.
   pub(crate) timers: BTreeMap<ScheduledTimerId, LuaTimerBinding>,
   /// The hitbox configurations indexed by their pool-local native identity.
   pub(crate) hitboxes: BTreeMap<u64, LuaHitboxBinding>,
+  /// The script input configurations and presentation options.
+  pub(crate) inputs: BTreeMap<u64, LuaInputBinding>,
+  /// The editing focus and pointer capture owned by this session.
+  pub(crate) text_input: tg_service_widget::TextInputService,
 }
 
 impl LuaObjectPool {
@@ -97,6 +104,8 @@ impl LuaObjectPool {
       runtime: RuntimeObjectPool::new(),
       timers: BTreeMap::new(),
       hitboxes: BTreeMap::new(),
+      inputs: BTreeMap::new(),
+      text_input: tg_service_widget::TextInputService::new(),
     }
   }
 
@@ -167,7 +176,7 @@ impl LuaObjectPool {
     }
   }
 
-  /// Route a physical pointer event through this session's submitted hitboxes.
+  /// Route a pointer through session widgets while retaining the original hitbox entry point.
   ///
   /// # Arguments
   ///
@@ -178,15 +187,24 @@ impl LuaObjectPool {
     canvas: &tg_service_canvas::CanvasService,
     event: tg_core_input::MouseEvent,
   ) -> Vec<LuaEventData> {
+    self.route_widget_mouse(canvas, event)
+  }
+
+  /// Route a physical pointer event through this session's submitted hitboxes and inputs.
+  pub fn route_widget_mouse(
+    &mut self,
+    canvas: &tg_service_canvas::CanvasService,
+    event: tg_core_input::MouseEvent,
+  ) -> Vec<LuaEventData> {
     let event_point = (event.x, event.y);
-    HitAreaService::new().route_mouse_event(
-      &mut self.ui,
-      &mut tg_service_widget::TextInputService::new(),
-      canvas,
-      event,
-    );
+    HitAreaService::new().route_mouse_event(&mut self.ui, &mut self.text_input, canvas, event);
     let mut events = Vec::new();
     while let Some(event) = self.ui.pop_event() {
+      if let tg_service_widget::UiEvent::TextInput(event) = &event
+        && let Some(translated) = self.translate_input_event(event.clone())
+      {
+        events.push(translated);
+      }
       if let tg_service_widget::UiEvent::HitArea(event) = event {
         let id = match &event {
           tg_service_widget::HitAreaEvent::HoverEnter { id, .. }

@@ -94,5 +94,28 @@ fn main() {
   );
   input.poll();
   assert_eq!(input.collect_action_events().len(), 2);
+  input.begin_frame();
+  let edit_key = tg_core_input::TerminalKeyEvent {
+    code: tg_core_input::TerminalKeyCode::Backspace,
+    ctrl: false,
+    shift: false,
+  };
+  input.queue_committed_text(tg_service_input::CommittedTextEvent { text: "a".into() });
+  input.queue_system_event(SystemEvent::TerminalKey(edit_key), &mut log);
+  input.poll();
+  let ordered = input
+    .notifications()
+    .iter()
+    .filter(|event| {
+      matches!(
+        event,
+        tg_service_input::InputNotification::Text { .. }
+          | tg_service_input::InputNotification::TerminalKey(_)
+      )
+    })
+    .collect::<Vec<_>>();
+  assert!(
+    matches!(ordered.as_slice(), [tg_service_input::InputNotification::Text { text }, tg_service_input::InputNotification::TerminalKey(key)] if text == "a" && *key == edit_key)
+  );
   println!("input ok: shared priority ordering, held once, focus release and fresh-press recovery");
 }
