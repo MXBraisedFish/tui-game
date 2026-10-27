@@ -53,14 +53,8 @@ widget.input.SINGLELINE
 ### 示例
 
 ```lua
-local value = widget.input.SINGLELINE
-```
-
-**输出：**
-
-```lua
 function Init(ctx)
-  input = widget.input.create(20, 1, { mouse = true, line_mode = widget.input.SINGLELINE, text = "Singleline Input" })
+  input = widget.input.create(20, 1, { line_mode = widget.input.SINGLELINE, text = "Singleline Input" })
 end
 
 function HandleEvent(event)
@@ -110,7 +104,7 @@ widget.input.MULTILINE
 
 ```lua
 function Init(ctx)
-  input = widget.input.create(20, 2, { mouse = true, line_mode = widget.input.MULTILINE, text = "Multiline\nInput" })
+  input = widget.input.create(20, 2, { line_mode = widget.input.MULTILINE, text = "Multiline\nInput" })
 end
 
 function HandleEvent(event)
@@ -160,7 +154,7 @@ widget.input.BLOCK
 
 ```lua
 function Init(ctx)
-  input = widget.input.create(5, 1, { mouse = true, cursor_shape = widget.input.BLOCK, text = "Hi" })
+  input = widget.input.create(5, 1, { cursor_shape = widget.input.BLOCK, text = "Hi" })
 end
 
 function HandleEvent(event)
@@ -210,7 +204,7 @@ widget.input.UNDERLINE
 
 ```lua
 function Init(ctx)
-  input = widget.input.create(5, 1, { mouse = true, cursor_shape = widget.input.LINE, text = "Hi" })
+  input = widget.input.create(5, 1, { cursor_shape = widget.input.LINE, text = "Hi" })
 end
 
 function HandleEvent(event)
@@ -260,7 +254,7 @@ widget.input.LINE
 
 ```lua
 function Init(ctx)
-  input = widget.input.create(5, 1, { mouse = true, cursor_shape = widget.input.UNDERLINE, text = "Hi" })
+  input = widget.input.create(5, 1, { cursor_shape = widget.input.UNDERLINE, text = "Hi" })
 end
 
 function HandleEvent(event)
@@ -324,7 +318,7 @@ widget.input.create
 | `text`             | string                               | `""`                      | 已输入的文本                       |
 | `max_chars`        | integer / nil / `false`              | `nil`                     | 最大字符数                         |
 | `line_mode`        | const-input                          | `widget.input.SINGLELINE` | 输入模式                           |
-| `mouse`            | boolean                              | `false`                   | 是否允许鼠标操作                   |
+| `mouse`            | boolean                              | `true`                   | 是否允许鼠标操作                   |
 | `enter_submit`     | boolean                              | 跟随选填参数 `line_mode`  | \[Enter] 提交                      |
 | `placeholder`      | string                               | `""`                      | 空内容提示文本                     |
 | `placeholder_fg`   | string / const-color                 | `color.NONE`              | 空内容提示文本前景色               |
@@ -351,7 +345,7 @@ widget.input.create
 
 ```lua
 function Init(ctx)
-  input = widget.input.create(20, 1, { mouse = true })
+  input = widget.input.create(20, 1)
 end
 
 function HandleEvent(event)
@@ -518,7 +512,7 @@ debug.print(table.pretty(widget.input.list()))
     text = "",
     max_chars = nil,
     line_mode = "singleline",
-    mouse = false,
+    mouse = true,
     enter_submit = true,
     placeholder = "",
     placeholder_fg = "none",
@@ -554,7 +548,7 @@ debug.print(table.pretty(widget.input.list()))
     text = "",                 -- string（已输入的文本）
     max_chars = nil,           -- integer / nil / false（最大字符数）
     line_mode = "singleline",  -- const-input（输入模式）
-    mouse = false,             -- boolean（是否允许鼠标操作）
+    mouse = true               -- boolean（是否允许鼠标操作）
     enter_submit = true,       -- boolean（提交按键模式）
     placeholder = "",          -- string（空内容提示文本）
     placeholder_fg = "none",   -- string（空内容提示文本前景色）
@@ -634,7 +628,7 @@ widget.input.draw
 
 | 参数名        | 类型   | 默认值   | 说明             |
 | ------------- | ------ | -------- | ---------------- |
-| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
+| `slice_layer` | string | `"base"` | 绘制目标图层切片 |
 
 ### 返回值
 
@@ -644,7 +638,7 @@ widget.input.draw
 
 ```lua
 function Init(ctx)
-  input = widget.input.create(20, 1, { mouse = true })
+  input = widget.input.create(20, 1)
 end
 
 function HandleEvent(event)
@@ -704,7 +698,7 @@ widget.input.focus
 ### 示例
 
 ```lua
-local input = widget.input.create(20, 10, { mouse = true })
+local input = widget.input.create(20, 10)
 debug.print(widget.input.focus(input))
 ```
 
@@ -742,7 +736,7 @@ widget.input.blur
 
 ```lua
 
-local input = widget.input.create(20, 10, { mouse = true })
+local input = widget.input.create(20, 10)
 widget.input.focus(input)
 debug.print(widget.input.blur())
 ```
@@ -834,7 +828,7 @@ true
   text = "",
   max_chars = nil,
   line_mode = "singleline",
-  mouse = false,
+  mouse = true,
   enter_submit = true,
   placeholder = "",
   placeholder_fg = "none",
@@ -913,7 +907,7 @@ debug.print(table.pretty(widget.input.get_info(input)))
   text = "",
   max_chars = nil,
   line_mode = "singleline",
-  mouse = false,
+  mouse = true,
   enter_submit = true,
   placeholder = "",
   placeholder_fg = "none",
@@ -946,7 +940,7 @@ debug.print(table.pretty(widget.input.get_info(input)))
   text = "",                 -- string（已输入的文本）
   max_chars = nil,           -- integer / nil / false（最大字符数）
   line_mode = "singleline",  -- const-input（输入模式）
-  mouse = false,             -- boolean（是否允许鼠标操作）
+              -- boolean（是否允许鼠标操作）
   enter_submit = true,       -- boolean（提交按键模式）
   placeholder = "",          -- string（空内容提示文本）
   placeholder_fg = "none",   -- string（空内容提示文本前景色）

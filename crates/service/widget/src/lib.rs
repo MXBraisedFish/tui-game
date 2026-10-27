@@ -31,7 +31,8 @@ pub use ui_object::interactives::hit_area::{
   HitAreaEvent, HitAreaId, HitAreaOptions, HitAreaService,
 };
 pub use ui_object::interactives::hyperlink::{
-  HyperlinkEvent, HyperlinkId, HyperlinkOptions, HyperlinkService,
+  HyperlinkEvent, HyperlinkId, HyperlinkOptions, HyperlinkService, is_valid_link_target,
+  open_link_target, resolve_link_target,
 };
 pub use ui_object::interactives::text_input::{
   TextInputCursorShape, TextInputEvent, TextInputId, TextInputMode, TextInputOptions,

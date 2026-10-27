@@ -730,7 +730,7 @@ impl LuaEventData {
       Self::Network(_) => "network",
       Self::Audio(_) => "audio",
       Self::HitArea(_) => "hitbox",
-      Self::Hyperlink(_) => "hyperlink",
+      Self::Hyperlink(_) => "link",
       Self::Markdown(_) => "markdown",
       Self::TextInput(_) => "input",
       Self::ScrollBox(_) => "scroll_box",
@@ -1010,8 +1010,8 @@ impl LuaEventData {
         data.set("dy", event.dy)?;
       }
       Self::Hyperlink(event) => {
-        data.set("id", event.id.to_string())?;
-        data.set("kind", "clicked")?;
+        data.set("id", format!("link_{:03}", event.id))?;
+        data.set("kind", "click")?;
         data.set("link", event.link.as_str())?;
       }
       Self::Markdown(event) => {
@@ -1396,7 +1396,7 @@ mod tests {
           id: 7,
           link: "target".to_string(),
         }),
-        "hyperlink",
+        "link",
       ),
       (
         LuaEventData::Markdown(LuaMarkdownEvent {

@@ -119,6 +119,18 @@ pub(super) fn enqueue_draw(
   method: &str,
   command: LuaDrawCommand,
 ) -> mlua::Result<()> {
+  let text_bytes = match &command {
+    LuaDrawCommand::Text { params, .. } => params.text.len(),
+    LuaDrawCommand::Link { id, .. } => with_pool(state, method, |pool| {
+      Ok(
+        pool
+          .links
+          .get(id)
+          .map_or(0, |binding| binding.options.text.len()),
+      )
+    })?,
+    _ => 0,
+  };
   let mut state = state.borrow_mut();
   if state.draw_command_count >= 4096 {
     state.fatal_api_error = true;
@@ -127,8 +139,8 @@ pub(super) fn enqueue_draw(
       "draw command buffer exceeds 4096 commands",
     ));
   }
-  if let LuaDrawCommand::Text { params, .. } = &command {
-    state.draw_text_bytes = state.draw_text_bytes.saturating_add(params.text.len());
+  if text_bytes > 0 {
+    state.draw_text_bytes = state.draw_text_bytes.saturating_add(text_bytes);
     if state.draw_text_bytes > args::MAX_API_STRING_BYTES {
       state.fatal_api_error = true;
       return Err(args::message(

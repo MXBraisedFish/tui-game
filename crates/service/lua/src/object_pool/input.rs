@@ -30,7 +30,10 @@ impl Default for LuaInputBinding {
   fn default() -> Self {
     Self {
       params: TextInputRenderParams::default(),
-      options: TextInputOptions::default(),
+      options: TextInputOptions {
+        mouse: true,
+        ..Default::default()
+      },
       enter_submit: true,
       fg: "none".into(),
       bg: "none".into(),
@@ -105,12 +108,18 @@ impl LuaObjectPool {
   /// Clear stale pointer geometry and drag selection on focus loss or overlay takeover.
   pub fn deactivate_inputs(&mut self) {
     self.text_input.deactivate_pool(&mut self.ui);
+    tg_service_widget::HyperlinkService::new().deactivate(&mut self.ui);
   }
 
   /// Drain pending widget notifications, retaining only events owned by live script objects.
   pub fn take_widget_events(&mut self) -> Vec<LuaEventData> {
     let mut result = Vec::new();
     while let Some(event) = self.ui.pop_event() {
+      if let tg_service_widget::UiEvent::Hyperlink(event) = &event
+        && let Some(event) = self.translate_link_event(event.clone())
+      {
+        result.push(event);
+      }
       if let tg_service_widget::UiEvent::TextInput(event) = event
         && let Some(event) = self.translate_input_event(event)
       {

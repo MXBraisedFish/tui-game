@@ -694,6 +694,7 @@ fn apply_lua_draw_commands(
   use crate::host_engine::services::{LuaDrawCommand, LuaDrawTarget};
   for command in commands {
     match command {
+      LuaDrawCommand::Link { id, target, x, y } => objects.draw_link(id, target, (x, y), canvas),
       LuaDrawCommand::Input { id, target, x, y } => objects.draw_input(id, target, (x, y), canvas),
       LuaDrawCommand::Hitbox { id, target, x, y } => {
         objects.draw_hitbox(id, target, (x, y), canvas)
@@ -775,6 +776,83 @@ mod tests {
         ComposedCell::Empty => " ",
       })
       .collect()
+  }
+
+  #[test]
+  fn lua_links_replay_signed_slice_geometry_and_clicks() {
+    let nonce = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    struct Deployment(std::path::PathBuf);
+    impl Drop for Deployment {
+      fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+      }
+    }
+    let root =
+      Deployment(std::env::temp_dir().join(format!("tg-host-link-{}-{nonce}", std::process::id())));
+    std::fs::create_dir_all(root.0.join("scripts")).unwrap();
+    let entry = root.0.join("scripts/main.lua");
+    std::fs::write(
+      &entry,
+      r#"
+      function Init(ctx)
+        owner = slice.create(3, 1)
+        id = widget.link.create("abcd", "./manual.txt")
+      end
+      function Render()
+        slice.draw(owner, 0, 0)
+        widget.link.draw(id, -1, 0, {slice_layer=owner})
+      end
+      function Update(dt) end
+      function UpdateFrame(dt, alpha) end
+      function HandleEvent(event) end
+    "#,
+    )
+    .unwrap();
+    for kind in [LuaSessionKind::Game, LuaSessionKind::Screensaver] {
+      let mut session = LuaService::new()
+        .create_session(LuaSessionSpec {
+          package_id: "host_link".into(),
+          session_kind: kind,
+          entry_path: entry.clone(),
+          fixed_delta: Duration::from_secs_f64(1.0 / 60.0),
+          base_size: Size {
+            width: 6,
+            height: 4,
+          },
+          continue_data: None,
+          best_data: None,
+          save_game_enabled: false,
+          save_best_enabled: false,
+        })
+        .unwrap();
+      session.render().unwrap();
+      let commands = session.take_draw_commands();
+      let mut layout = LayoutService::new();
+      layout.resize_physical(6, 6);
+      layout.set_developer_viewport(crate::host_engine::services::Rect {
+        x: 0,
+        y: 2,
+        width: 6,
+        height: 4,
+      });
+      let mut canvas = CanvasService::new();
+      canvas.begin_frame(&layout);
+      session.with_objects_mut(|objects| {
+        objects.ui_mut().begin_render();objects.ui().prepare_canvas(&mut canvas,&layout);
+        apply_lua_draw_commands(&mut RenderService::new(),&mut canvas,commands,objects);
+        let mouse=|kind| crate::host_engine::services::MouseEvent{kind,button:Some(crate::host_engine::services::MouseButton::Left),scroll:None,x:0,y:2};
+        objects.route_widget_mouse(&canvas,mouse(crate::host_engine::services::MouseEventKind::Press));
+        let events=objects.route_widget_mouse(&canvas,mouse(crate::host_engine::services::MouseEventKind::Release));
+        assert!(events.iter().any(|data|matches!(data,tg_service_lua::LuaEventData::Hyperlink(event) if event.id==1&&event.link=="./manual.txt")));
+      }).unwrap();
+      let frame = FrameCompositor::new().compose(&canvas);
+      assert_eq!(row_text(&frame, 2), "bcd   ");
+      assert_eq!(row_text(&frame, 0), "      ");
+      session.stop();
+    }
   }
 
   #[test]

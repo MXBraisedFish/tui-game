@@ -1,6 +1,6 @@
 # Lua 事件协议
 
-本文档包含已实现事件和未来事件 schema。当前可投递范围是 `action`、`key`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期、`timer` 计时事件，以及 `file`、`i18n`、`image` 异步终态、`widget.hitbox` 的 `hitbox` 交互事件，以及 `widget.input` 带有 `id/kind` 的 `input` 组件事件。计时器指定 callback 时只调用该函数，其余情况通过 `HandleEvent(event)` 交付。`animation`、`audio`、`network` 及其他未开放的 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准。
+本文档包含已实现事件和未来事件 schema。当前可投递范围是 `action`、`key`、`mouse`、`resize`、`focus`、游戏 overlay 生命周期、`timer` 计时事件，以及 `file`、`i18n`、`image` 异步终态、`widget.hitbox` 的 `hitbox`、`widget.link` 的 `link` 交互事件，以及 `widget.input` 带有 `id/kind` 的 `input` 组件事件。计时器指定 callback 时只调用该函数，其余情况通过 `HandleEvent(event)` 交付。`animation`、`audio`、`network` 及其他未开放的 widget 事件目前只有 schema/部分 broker 测试设施，没有可用的 Lua 注册 API 或生产事件源。已安装库以 [LUA_COMPATIBILITY.md](LUA_COMPATIBILITY.md) 为准。
 
 事件只用于宿主向脚本通知状态变化；原始终端事件对象、宿主 UI 事件、内部任务 ID、绝对路径和内部错误信息不会暴露给 Lua。
 
@@ -542,20 +542,15 @@ GET 或 POST 请求产生唯一终态结果。HTTP 4xx/5xx 是成功收到的 HT
 | `dx` | `integer \| nil` | `drag` | 本次拖动的水平位移。 |
 | `dy` | `integer \| nil` | `drag` | 本次拖动的垂直位移。 |
 
-### 7.2 `hyperlink`
+### 7.2 `link`
+
+`widget.link` 通过 `HandleEvent` 发送点击通知：
 
 ```lua
-{
-  type = "hyperlink",
-  data = { id = "9", kind = "clicked", link = "https://example.com" },
-}
+{type = "link", data = {id = "link_001", kind = "click", link = "./manual.txt"}}
 ```
 
-| `data` 字段 | 类型 | 出现条件 | 作用 |
-|---|---|---|---|
-| `id` | `string` | 始终 | Session 内超链接对象 ID。 |
-| `kind` | `string` | 始终 | 固定为 `clicked`。 |
-| `link` | `string` | 始终 | 超链接目标。 |
+真实鼠标点击和 `widget.link.click` 均自动请求系统默认程序打开目标，并在开启 `copy` 时复制目标；文件/目录复制解析后的绝对路径，网页复制 URL。打开或复制失败静默，事件仍保留原始 `link` 文本。对象删除后丢弃未交付事件。屏保不接收此类交互事件。详见 [link API](api/widget/link.md)。
 
 ### 7.3 `markdown`
 
@@ -627,7 +622,7 @@ network
 i18n
 audio
 hitbox
-hyperlink
+link
 markdown
 input
 scroll_box

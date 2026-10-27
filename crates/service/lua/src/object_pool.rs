@@ -5,7 +5,9 @@ use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
 
 mod input;
+mod link;
 pub(crate) use input::LuaInputBinding;
+pub(crate) use link::LuaLinkBinding;
 
 use crate::{LuaEventData, LuaTimerEvent, LuaTimerEventKind, LuaTimerKind};
 use mlua::Function;
@@ -92,6 +94,8 @@ pub struct LuaObjectPool {
   pub(crate) hitboxes: BTreeMap<u64, LuaHitboxBinding>,
   /// The script input configurations and presentation options.
   pub(crate) inputs: BTreeMap<u64, LuaInputBinding>,
+  /// The script links indexed by their pool-local native identities.
+  pub(crate) links: BTreeMap<u64, LuaLinkBinding>,
   /// The editing focus and pointer capture owned by this session.
   pub(crate) text_input: tg_service_widget::TextInputService,
 }
@@ -105,6 +109,7 @@ impl LuaObjectPool {
       timers: BTreeMap::new(),
       hitboxes: BTreeMap::new(),
       inputs: BTreeMap::new(),
+      links: BTreeMap::new(),
       text_input: tg_service_widget::TextInputService::new(),
     }
   }
@@ -197,9 +202,19 @@ impl LuaObjectPool {
     event: tg_core_input::MouseEvent,
   ) -> Vec<LuaEventData> {
     let event_point = (event.x, event.y);
+    tg_service_widget::HyperlinkService::new().route_mouse_event(
+      &mut self.ui,
+      &self.text_input,
+      event,
+    );
     HitAreaService::new().route_mouse_event(&mut self.ui, &mut self.text_input, canvas, event);
     let mut events = Vec::new();
     while let Some(event) = self.ui.pop_event() {
+      if let tg_service_widget::UiEvent::Hyperlink(event) = &event
+        && let Some(translated) = self.translate_link_event(event.clone())
+      {
+        events.push(translated);
+      }
       if let tg_service_widget::UiEvent::TextInput(event) = &event
         && let Some(translated) = self.translate_input_event(event.clone())
       {

@@ -51,6 +51,7 @@ mod table;
 mod timer;
 mod utf8;
 mod widget_input;
+mod widget_link;
 
 use measurement::{
   draw_target_size, draw_text_parameters, parse_color, parse_draw_target, parse_draw_text_params,
@@ -107,6 +108,7 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
   let widget = lua.create_table()?;
   widget.raw_set("hitbox", hitbox::hitbox(lua, state.clone())?)?;
   widget.raw_set("input", widget_input::input(lua, state.clone())?)?;
+  widget.raw_set("link", widget_link::link(lua, state.clone())?)?;
   environment.set("widget", readonly::proxy(lua, widget)?)?;
   environment.set("serialization", serialization::serialization(lua)?)?;
   environment.set("encoding", encoding::encoding(lua)?)?;
@@ -177,7 +179,7 @@ fn ignore_once(state: &mut super::LuaApiState, method: &'static str, reason: &'s
   }
 }
 
-fn push_host_command(state: &mut super::LuaApiState, command: LuaHostCommand) {
+pub(crate) fn push_host_command(state: &mut super::LuaApiState, command: LuaHostCommand) {
   if state.commands.len() >= MAX_HOST_COMMANDS_PER_CALLBACK {
     state.fatal_api_error = true;
   } else {

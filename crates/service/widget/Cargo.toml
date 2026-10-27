@@ -4,9 +4,11 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+dunce = "1.0"
 pulldown-cmark = "0.13.4"
 tg-core-audio = { path = "../../core/audio" }
 tg-core-input = { path = "../../core/input" }
+tg-core-sandbox-path = { path = "../../core/sandbox_path" }
 tg-core-style = { path = "../../core/style" }
 tg-core-unicode = { path = "../../core/unicode" }
 tg-service-animation = { path = "../animation" }
@@ -20,6 +22,13 @@ tg-service-text-layout = { path = "../text_layout" }
 tg-service-time = { path = "../time" }
 unicode-segmentation = { workspace = true }
 unicode-width = { workspace = true }
+url = "2.5"
 
 [dev-dependencies]
 tg-service-render-pipeline = { path = "../render_pipeline" }
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Com", "Win32_System_Registry"] }
+
+[target.'cfg(not(windows))'.dependencies]
+open = "5.4.5"

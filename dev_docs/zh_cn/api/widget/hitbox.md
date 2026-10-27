@@ -320,7 +320,7 @@ widget.hitbox.draw
 
 | 参数名        | 类型   | 默认值   | 说明             |
 | ------------- | ------ | -------- | ---------------- |
-| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
+| `slice_layer` | string | `"base"` | 绘制目标图层切片 |
 
 ### 返回值
 

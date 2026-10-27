@@ -346,7 +346,7 @@ align.resolve_x
 | ------------- | ------------- | -------- | ---------------- |
 | `offset_x`    | integer       | `0`      | 锚点上的水平偏移 |
 | `relative_x`  | integer / nil | `nil`    | 自定义水平锚点   |
-| `slice_layer` | string        | `"base"` | 目标切片图层     |
+| `slice_layer` | string        | `"base"` | 目标图层切片     |
 
 ### 返回值
 
@@ -404,7 +404,7 @@ align.resolve_y
 | ------------- | ------------- | -------- | ---------------- |
 | `offset_y`    | integer       | `0`      | 锚点上的垂直偏移 |
 | `relative_y`  | integer / nil | `nil`    | 自定义垂直锚点   |
-| `slice_layer` | string        | `"base"` | 目标切片图层     |
+| `slice_layer` | string        | `"base"` | 目标图层切片     |
 
 ### 返回值
 
@@ -466,7 +466,7 @@ align.resolve_rect
 | `offset_y`    | integer       | `0`      | 锚点上的垂直偏移 |
 | `relative_x`  | integer / nil | `nil`    | 自定义水平锚点   |
 | `relative_y`  | integer / nil | `nil`    | 自定义垂直锚点   |
-| `slice_layer` | string        | `"base"` | 目标切片图层     |
+| `slice_layer` | string        | `"base"` | 目标图层切片     |
 
 ### 返回值
 

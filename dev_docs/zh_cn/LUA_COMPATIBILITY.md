@@ -1,6 +1,6 @@
 # Lua 兼容性与当前注册面
 
-更新时间：2026-10-25。本文说明脚本能使用哪些接口，以及与标准 Lua 调用方式的区别。
+更新时间：2026-10-27。本文说明脚本能使用哪些接口，以及与标准 Lua 调用方式的区别。
 
 ## 环境边界
 
@@ -47,6 +47,7 @@
 | `game` | `exit_game`, `save_game`, `save_best` |
 | `i18n` | `create`, `get_value`, `get_language_code`, `reload` |
 | `image` | `load` |
+| `widget.link` | `create`、`delete`、`clear`、`list`、`count`、`draw`、`click`、`set`、`get_info`、`exists`；详见 [link](api/widget/link.md) |
 | `widget.input` | 常量 `SINGLELINE`、`MULTILINE`、`BLOCK`、`UNDERLINE`、`LINE`；方法 `create`、`delete`、`clear`、`list`、`count`、`draw`、`focus`、`blur`、`set`、`get_info`、`exists`；详见 [input](api/widget/input.md) |
 | `widget.hitbox` | `create`、`delete`、`clear`、`list`、`count`、`draw`、`set`、`get_info`、`exists`；详见 [hitbox](api/widget/hitbox.md) |
 | `events` | `skip_action`, `clear_action` |
@@ -57,7 +58,7 @@
 
 ### 尚未开放
 
-`image.load` 已开放，通过请求编号关联异步结果。`widget.hitbox` 已开放，提供 `create`、`delete`、`clear`、`list`、`count`、`draw`、`set`、`get_info`、`exists`，事件类型为 `hitbox`。命中区域只在本帧调用 `draw` 后生效；`slice_layer` 指定绘制目标，默认 `"base"`。事件 `x/y` 为目标切片坐标，`relative_x/relative_y` 为相对于 hitbox 原始左上角的坐标，`dx/dy` 仍为拖动位移。切片 `create/set` 的 `event_passthrough` 默认 `false`，控制没有本层控件命中时是否允许穿透到下层；屏保可管理和提交对象，但沿用屏保不接收交互事件的规则。`widget.input` 已开放，事件类型为 `input`，通过 `data.id/kind` 与原始终端文字区分；聚焦输入框暂停普通游戏按键及原始文字投递。`audio`、`animation`、`http`、`effect` 及其他 `widget` 子库未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
+`image.load` 已开放，通过请求编号关联异步结果。`widget.hitbox` 已开放，提供 `create`、`delete`、`clear`、`list`、`count`、`draw`、`set`、`get_info`、`exists`，事件类型为 `hitbox`。命中区域只在本帧调用 `draw` 后生效；`slice_layer` 指定绘制目标，默认 `"base"`。事件 `x/y` 为目标切片坐标，`relative_x/relative_y` 为相对于 hitbox 原始左上角的坐标，`dx/dy` 仍为拖动位移。切片 `create/set` 的 `event_passthrough` 默认 `false`，控制没有本层控件命中时是否允许穿透到下层；屏保可管理和提交对象，但沿用屏保不接收交互事件的规则。`widget.input` 已开放，事件类型为 `input`，通过 `data.id/kind` 与原始终端文字区分；聚焦输入框暂停普通游戏按键及原始文字投递。`widget.link` 已开放，使用 `link` 点击事件，支持包内 assets 文件/目录与 http/https 网页的系统默认应用打开及可选复制；失败静默。`widget.input.create` 的 `mouse` 默认 `true`。`audio`、`animation`、`http`、`effect` 及其他 `widget` 子库未由当前 `install` 注册。存在相应服务、事件类型或文档页不等于 Lua 脚本可以调用。
 
 ## 调用差异
 

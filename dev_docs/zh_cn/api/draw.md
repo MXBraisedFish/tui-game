@@ -61,7 +61,7 @@ draw.text
 | `reverse`          | boolean              | `false`       | 反显                               |
 | `hidden`           | boolean              | `false`       | 隐藏                               |
 | `dim`              | boolean              | `false`       | 暗淡                               |
-| `slice_layer`      | string               | `"base"`      | 绘制目标切片图层                   |
+| `slice_layer`      | string               | `"base"`      | 绘制目标图层切片                   |
 
 ### 返回值
 
@@ -116,7 +116,7 @@ draw.fill_rect
 | `char`        | string / nil         | `nil`        | 填充字符         |
 | `fg`          | string / const-color | `color.NONE` | 前景色           |
 | `bg`          | string / const-color | `color.NONE` | 背景色           |
-| `slice_layer` | string               | `"base"`     | 绘制目标切片图层 |
+| `slice_layer` | string               | `"base"`     | 绘制目标图层切片 |
 
 ### 返回值
 
@@ -172,7 +172,7 @@ draw.stroke_rect
 | `fg`          | string / const-color | `color.NONE` | 边框前景色       |
 | `bg`          | string / const-color | `color.NONE` | 边框背景色       |
 | `border_char` | table / const-char   | `char.LINE`  | 边框字符对象表   |
-| `slice_layer` | string               | `"base"`     | 绘制目标切片图层 |
+| `slice_layer` | string               | `"base"`     | 绘制目标图层切片 |
 
 ### 返回值
 
@@ -205,7 +205,7 @@ draw.stroke_rect(15, 1, 12, 5, { fg = color.YELLOW, border_char = custom_border 
 - 选填参数 `border_char` 对象表结构：
 
 ```lua
-local border_char = {
+{
   top = "─",          -- string / const-char（上边框字符）
   left_top = "┌",     -- string / const-char（左上角字符）
   left = "│",         -- string / const-char（左边框字符）
@@ -251,7 +251,7 @@ draw.erase_rect
 
 | 参数名        | 类型   | 默认值   | 说明             |
 | ------------- | ------ | -------- | ---------------- |
-| `slice_layer` | string | `"base"` | 绘制目标切片图层 |
+| `slice_layer` | string | `"base"` | 绘制目标图层切片 |
 
 ### 返回值
 

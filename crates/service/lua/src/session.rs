@@ -548,6 +548,27 @@ impl LuaSession {
     {
       return Ok(());
     }
+    if let super::LuaEventData::Hyperlink(event) = &delivery.event.data {
+      if self.session_kind != LuaSessionKind::Game {
+        return Ok(());
+      }
+      let Some(copy) = self
+        .with_objects(|objects| objects.links.get(&event.id).map(|binding| binding.copy))
+        .flatten()
+      else {
+        return Ok(());
+      };
+      let mut api = self.api_state.borrow_mut();
+      let assets_root = api.context.assets_root.clone();
+      api::push_host_command(
+        &mut api,
+        api::LuaHostCommand::OpenLink {
+          assets_root,
+          target: event.link.clone(),
+          copy,
+        },
+      );
+    }
     if let super::LuaEventData::Timer(event) = &delivery.event.data
       && let Some(revision) = event.revision
     {

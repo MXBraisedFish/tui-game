@@ -6,7 +6,7 @@
 
 这些事件遵循统一的结构，即事件协议。本文档详细说明各类事件的结构、发送条件和使用示例。
 
-本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；timer 已开放，支持指定 callback；widget.hitbox 已开放，使用 hitbox 事件；widget.input 已开放，使用带 id/kind 的 input 事件；animation、audio、network 及其余 widget 事件不能仅凭本页结构示例视为已经实现。
+本页是事件 schema 参考，其中某些类型还没有生产 Lua 事件源。当前包能收到的事件、以及通过 `HandleEvent` 投递的类型，请先查看 [当前事件与注册范围](../EVENT.md)；timer 已开放，支持指定 callback；widget.hitbox 已开放，使用 hitbox 事件；widget.input 已开放，使用带 id/kind 的 input 事件；widget.link 已开放，使用 link 事件；animation、audio、network 及其余 widget 事件不能仅凭本页结构示例视为已经实现。
 
 ---
 
@@ -32,7 +32,7 @@
 | `i18n`            | 国际化语言加载结果事件           | [i18n](#i18n)                       |
 | `audio`           | 音频对象状态变化事件             | [audio](#audio)                     |
 | `hitbox`        | 点击区域交互事件                 | [hitbox](#hitbox)               |
-| `hyperlink`       | 超链接点击事件                   | [hyperlink](#hyperlink)             |
+| `link`       | 超链接点击事件                   | [link](#link)             |
 | `markdown`        | Markdown 文本中的链接点击事件    | [markdown](#markdown)               |
 | `input`（组件） | 输入框状态变化或交互事件 | [widget.input](#input输入框组件) |
 | `scroll_box`      | 滚动框位置变化事件               | [scroll_box](#scroll_box)           |
@@ -1307,60 +1307,15 @@ end
 
 ---
 
-## `hyperlink`
+## `link`
 
-超链接点击事件。
-
-### 结构
+`widget.link` 通过 `HandleEvent` 发送点击通知：
 
 ```lua
-{
-  type = "hyperlink",
-  data = {
-    id = ...,    -- string
-    kind = ...,  -- string
-    link = ...,  -- string
-  },
-}
+{type = "link", data = {id = "link_001", kind = "click", link = "./manual.txt"}}
 ```
 
-| 字段   | 类型   | 说明                      |
-| ------ | ------ | ------------------------- |
-| `id`   | string | 当前会话内的超链接对象 ID |
-| `kind` | string | 超链接事件类型            |
-| `link` | string | 超链接目标                |
-
-### 发送条件
-
-玩家点击超链接时，发送给创建并登记该组件的游戏会话。覆盖屏接管交互期间不发送，屏保不接收此事件。
-
-### 示例
-
-```lua
-function HandleEvent(event)
-  if event.type == "hyperlink" then
-    debug.print(table.pretty(event))
-  end
-end
-```
-
-输出：
-
-> X 为占位符
-
-```lua
-{
-  type = "hyperlink",
-  frame = X,
-  sequence = X,
-  data =
-  {
-    id = "9",
-    kind = "clicked",
-    link = "https://example.com",
-  },
-}
-```
+真实鼠标点击和 `widget.link.click` 均自动请求系统默认程序打开目标，并在开启 `copy` 时复制目标；文件/目录复制解析后的绝对路径，网页复制 URL。打开或复制失败静默，事件仍保留原始 `link` 文本。对象删除后丢弃未交付事件。屏保不接收此类交互事件。详见 [link API](../api/widget/link.md)。
 
 ## 额外补充
 

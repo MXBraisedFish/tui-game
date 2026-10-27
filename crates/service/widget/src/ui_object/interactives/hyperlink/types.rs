@@ -20,6 +20,8 @@ pub struct HyperlinkId(
 /// * `link` - The link.
 /// * `text` - The text to process or display.
 /// * `style` - The text style applied to the rendered content.
+/// * `hover_style` - The optional style applied while the pointer owns this link.
+/// * `mouse` - Whether pointer input can hover or activate the link.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HyperlinkOptions {
   /// The link.
@@ -28,6 +30,10 @@ pub struct HyperlinkOptions {
   pub text: String,
   /// The text style applied to the rendered content.
   pub style: TextStyle,
+  /// The optional pointer-hover style; inherit the normal style when absent.
+  pub hover_style: Option<TextStyle>,
+  /// Whether pointer input can hover or activate the link; scripted clicks remain available.
+  pub mouse: bool,
 }
 
 impl HyperlinkOptions {
@@ -37,6 +43,8 @@ impl HyperlinkOptions {
       link: link.into(),
       text: text.into(),
       style: default_hyperlink_style(),
+      hover_style: None,
+      mouse: true,
     }
   }
 

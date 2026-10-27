@@ -2,6 +2,7 @@
 
 mod args;
 mod libraries;
+pub(crate) use libraries::push_host_command;
 pub(crate) mod readonly;
 
 use std::cell::RefCell;
@@ -147,6 +148,17 @@ pub enum LuaDrawTarget {
 /// A structured drawing request collected during a script callback.
 #[derive(Clone, Debug)]
 pub enum LuaDrawCommand {
+  /// Render a session-owned link inside its parent surface.
+  Link {
+    /// The pool-local link identity.
+    id: u64,
+    /// The owning base or slice.
+    target: LuaDrawTarget,
+    /// The signed local column.
+    x: i32,
+    /// The signed local row.
+    y: i32,
+  },
   /// Render a session-owned editable input in its parent surface.
   Input {
     /// The pool-local input identity.
@@ -236,6 +248,15 @@ pub enum LuaDrawCommand {
 /// A script request to the host for actions outside immediate drawing.
 #[derive(Clone, Debug)]
 pub enum LuaHostCommand {
+  /// Open a validated link and optionally copy its resolved target.
+  OpenLink {
+    /// The deployment asset root belonging to the script package.
+    assets_root: PathBuf,
+    /// The original asset-relative path or HTTP/HTTPS URL.
+    target: String,
+    /// Whether to copy the URL or resolved absolute file/directory path.
+    copy: bool,
+  },
   /// The log setting for Lua host command.
   Log {
     /// The level.

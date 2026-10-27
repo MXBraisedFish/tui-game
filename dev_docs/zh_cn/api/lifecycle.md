@@ -66,9 +66,9 @@ end
 | --------------- | ------- | -------------------- |
 | `package_id`    | string  | 模组包 ID            |
 | `package_type`  | string  | 模组包类型           |
-| `base`          | table   | 基础切片图层状态信息 |
-| `base.width`    | integer | 基础切片图层宽度     |
-| `base.height`   | integer | 基础切片图层高度     |
+| `base`          | table   | 基础图层切片状态信息 |
+| `base.width`    | integer | 基础图层切片宽度     |
+| `base.height`   | integer | 基础图层切片高度     |
 | `api_version`   | integer | API 版本             |
 | `start_mode`    | string  | 游戏启动模式         |
 | `continue_data` | any     | 继续游戏数据         |

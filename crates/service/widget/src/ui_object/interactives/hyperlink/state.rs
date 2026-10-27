@@ -50,6 +50,10 @@ pub(crate) struct HyperlinkObjects {
   pub links: HashMap<HyperlinkId, HyperlinkState>,
   /// The pressed.
   pub pressed: Option<HyperlinkId>,
+  /// The foremost hovered link from the latest pointer observation.
+  pub hovered: Option<HyperlinkId>,
+  /// The latest physical pointer coordinates.
+  pub pointer: Option<(u16, u16)>,
 }
 
 impl HyperlinkObjects {
@@ -59,6 +63,8 @@ impl HyperlinkObjects {
       next_id: 1,
       links: HashMap::new(),
       pressed: None,
+      hovered: None,
+      pointer: None,
     }
   }
 

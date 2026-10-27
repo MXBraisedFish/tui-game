@@ -2356,6 +2356,18 @@ fn apply_lua_host_commands(
       continue;
     }
     match command {
+      LuaHostCommand::OpenLink {
+        assets_root,
+        target,
+        copy,
+      } => {
+        let _ = tg_service_widget::open_link_target(
+          &assets_root,
+          &target,
+          copy,
+          &mut services.clipboard.borrow_mut(),
+        );
+      }
       LuaHostCommand::FileRequest {
         request_id,
         task,

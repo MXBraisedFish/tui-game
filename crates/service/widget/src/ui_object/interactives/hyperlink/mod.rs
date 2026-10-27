@@ -1,7 +1,9 @@
 //! Link text, clickable geometry, and pointer event routing.
 
 mod state;
+mod target;
 mod types;
+pub use target::{is_valid_link_target, open_link_target, resolve_link_target};
 
 pub(crate) use self::state::HyperlinkObjects;
 use self::state::{HyperlinkHit, HyperlinkState};
@@ -41,6 +43,9 @@ impl HyperlinkService {
   pub fn remove(&self, pool: &mut UiObjectPool, id: HyperlinkId) -> bool {
     if pool.hyperlinks.links.remove(&id).is_none() {
       return false;
+    }
+    if pool.hyperlinks.hovered == Some(id) {
+      pool.hyperlinks.hovered = None;
     }
     if pool.hyperlinks.pressed == Some(id) {
       pool.hyperlinks.pressed = None;
@@ -117,39 +122,19 @@ impl HyperlinkService {
     y: u16,
     canvas: &mut CanvasService,
   ) -> bool {
-    let Some((text, style)) = pool
-      .hyperlinks
-      .links
-      .get(&id)
-      .map(|state| (state.options.text.clone(), state.options.style.clone()))
-    else {
-      return false;
-    };
-    let params = draw_params(x, y, text, style);
-    canvas.text(&params);
-    let width = text_width(&params);
-    self.render_resolved(
-      pool,
-      id,
-      canvas.base_hit_rect(Rect {
-        x,
-        y,
-        width,
-        height: 1,
-      }),
-    )
+    self.render_at(pool, id, None, (i32::from(x), i32::from(y)), canvas)
   }
 
-  /// Render the component into the identified clipped slice and update its interaction geometry.
+  /// Render a link at unsigned coordinates in the specified slice.
   ///
   /// # Arguments
   ///
-  /// * `pool` - The object pool that owns the component.
-  /// * `id` - The identifier of the owned object.
-  /// * `slice` - The slice.
-  /// * `x` - The horizontal coordinate in terminal cells.
-  /// * `y` - The vertical coordinate in terminal cells.
-  /// * `canvas` - The clipped canvas used for drawing.
+  /// * `pool` - The owning pool.
+  /// * `id` - The link identity.
+  /// * `slice` - The parent slice.
+  /// * `x` - The local column.
+  /// * `y` - The local row.
+  /// * `canvas` - The destination canvas.
   pub fn render_on(
     &self,
     pool: &mut UiObjectPool,
@@ -159,32 +144,122 @@ impl HyperlinkService {
     y: u16,
     canvas: &mut CanvasService,
   ) -> bool {
-    let Some((text, style)) = pool
-      .hyperlinks
-      .links
-      .get(&id)
-      .map(|state| (state.options.text.clone(), state.options.style.clone()))
-    else {
+    self.render_at(pool, id, Some(slice), (i32::from(x), i32::from(y)), canvas)
+  }
+
+  /// Render a link at its original signed base or slice coordinates and clip its hit region.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The owning pool.
+  /// * `id` - The link identity.
+  /// * `slice` - The parent slice, or `None` for the base.
+  /// * `position` - The signed local column and row.
+  /// * `canvas` - The destination canvas.
+  pub fn render_at(
+    &self,
+    pool: &mut UiObjectPool,
+    id: HyperlinkId,
+    slice: Option<SliceId>,
+    position: (i32, i32),
+    canvas: &mut CanvasService,
+  ) -> bool {
+    let Some((text, style, hover_style)) = pool.hyperlinks.links.get(&id).map(|state| {
+      (
+        state.options.text.clone(),
+        state.options.style.clone(),
+        state.options.hover_style.clone(),
+      )
+    }) else {
       return false;
     };
-    let params = draw_params(x, y, text, style);
-    if !canvas.text_on(slice, &params) {
+    let mut params = draw_params(0, 0, text, style);
+    let size = tg_service_layout::Size {
+      width: text_width(&params),
+      height: 1,
+    };
+    let resolved = match slice {
+      None => canvas.base_hit_rect_at(position, size),
+      Some(slice) => canvas.slice_hit_rect_at(slice, position, size),
+    };
+    self.render_resolved(pool, id, resolved);
+    if self.is_hovered(pool, id)
+      && let Some(style) = hover_style
+    {
+      params = draw_params(0, 0, params.text, style);
+    }
+    match slice {
+      None => {
+        canvas.text_at(position.0, position.1, &params);
+        true
+      }
+      Some(slice) => canvas.text_at_on(slice, position.0, position.1, &params),
+    }
+  }
+
+  /// Replace a link's text, target and styles, retaining its identity.
+  ///
+  /// # Arguments
+  ///
+  /// * `pool` - The owning pool.
+  /// * `id` - The link identity.
+  /// * `options` - The validated replacement configuration.
+  pub fn set_options(
+    &self,
+    pool: &mut UiObjectPool,
+    id: HyperlinkId,
+    options: HyperlinkOptions,
+  ) -> bool {
+    if !validate_options(&options) {
       return false;
     }
-    let width = text_width(&params);
-    self.render_resolved(
-      pool,
-      id,
-      canvas.slice_hit_rect(
-        slice,
-        Rect {
-          x,
-          y,
-          width,
-          height: 1,
-        },
-      ),
-    )
+    let Some(state) = pool.hyperlinks.links.get_mut(&id) else {
+      return false;
+    };
+    if !options.mouse {
+      if pool.hyperlinks.pressed == Some(id) {
+        pool.hyperlinks.pressed = None;
+      }
+      if pool.hyperlinks.hovered == Some(id) {
+        pool.hyperlinks.hovered = None;
+      }
+    }
+    state.options = options;
+    state.hit = None;
+    true
+  }
+
+  /// Queue a click notification independently of the link's mouse option.
+  pub fn click(&self, pool: &mut UiObjectPool, id: HyperlinkId) -> bool {
+    let Some(link) = self.link(pool, id).map(str::to_owned) else {
+      return false;
+    };
+    pool.push_hyperlink_event(HyperlinkEvent::Clicked { id, link });
+    true
+  }
+
+  /// Report whether the latest pointer observation belongs to the link's visible hit region.
+  pub fn is_hovered(&self, pool: &UiObjectPool, id: HyperlinkId) -> bool {
+    pool.hyperlinks.hovered == Some(id)
+      && pool.hyperlinks.pointer.is_some_and(|(x, y)| {
+        pool
+          .hyperlinks
+          .links
+          .get(&id)
+          .and_then(|state| state.hit)
+          .is_some_and(|hit| {
+            hit.rect.contains(x, y) && pool.pointer_region_is_top(hit.surface_rank, hit.order, x, y)
+          })
+      })
+  }
+
+  /// Discard pointer state and stale clicks when the pool loses interaction ownership.
+  pub fn deactivate(&self, pool: &mut UiObjectPool) {
+    pool.hyperlinks.pressed = None;
+    pool.hyperlinks.hovered = None;
+    pool.hyperlinks.pointer = None;
+    pool.hyperlinks.clear_hits();
+    pool.events.retain(|event| event.hyperlink_id().is_none());
   }
 
   fn render_resolved(
@@ -198,11 +273,13 @@ impl HyperlinkService {
     }
     let order = pool.next_render_order();
     let state = pool.hyperlinks.links.get_mut(&id).unwrap();
-    state.hit = resolved.map(|(rect, _, surface_rank)| HyperlinkHit {
-      rect,
-      order,
-      surface_rank,
-    });
+    state.hit = resolved
+      .filter(|_| state.options.mouse)
+      .map(|(rect, _, surface_rank)| HyperlinkHit {
+        rect,
+        order,
+        surface_rank,
+      });
     true
   }
 
@@ -219,6 +296,12 @@ impl HyperlinkService {
     _text_input: &TextInputService,
     event: MouseEvent,
   ) -> bool {
+    pool.hyperlinks.pointer = Some((event.x, event.y));
+    pool.hyperlinks.hovered = pool
+      .hyperlinks
+      .hit(event.x, event.y)
+      .filter(|(_, order)| pool.pointer_region_is_top(order.0, order.1, event.x, event.y))
+      .map(|(id, _)| id);
     if pool
       .pointer_order_at(event.x, event.y)
       .is_some_and(|(_, order)| order == 0)
@@ -236,7 +319,7 @@ impl HyperlinkService {
       .hit(event.x, event.y)
       .filter(|(_, order)| pool.pointer_region_is_top(order.0, order.1, event.x, event.y))
     else {
-      if event.kind == MouseEventKind::Release {
+      if matches!(event.kind, MouseEventKind::Press | MouseEventKind::Release) {
         pool.hyperlinks.pressed = None;
       }
       return false;
@@ -249,8 +332,7 @@ impl HyperlinkService {
       MouseEventKind::Release => {
         let clicked = pool.hyperlinks.pressed.take() == Some(id);
         if clicked {
-          let link = pool.hyperlinks.links[&id].options.link.clone();
-          pool.push_hyperlink_event(HyperlinkEvent::Clicked { id, link });
+          self.click(pool, id);
         }
         true
       }

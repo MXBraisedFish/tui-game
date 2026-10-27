@@ -245,7 +245,7 @@ debug.print(table.pretty(slice.list()))
     width = 20,               -- integer（图层切片宽度）
     height = 10,              -- integer（图层切片高度）
     bg = "yellow",            -- string（图层切片背景颜色）
-    layer = 1,                -- integer（图层切片图层序号）
+    layer = 1,                -- integer（图层图层切片序号）
     event_passthrough = false -- boolean（控件事件是否穿透）
   },
   n = 1,                      -- integer（图层切片数量）
@@ -476,7 +476,7 @@ debug.print(table.pretty(slice.get_info(s)))
   width = 20,               -- integer（图层切片宽度）
   height = 10,              -- integer（图层切片高度）
   bg = "yellow",            -- string（图层切片背景颜色）
-  layer = 1,                -- integer（图层切片图层序号）
+  layer = 1,                -- integer（图层图层切片序号）
   event_passthrough = false -- boolean（控件事件是否穿透）
 }
 ```
