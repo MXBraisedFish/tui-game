@@ -85,6 +85,13 @@ pub(crate) struct TextInputObjects {
 }
 
 impl TextInputObjects {
+  pub(crate) fn invalidate_orders(&mut self, orders: &std::collections::HashSet<u64>) {
+    for state in self.inputs.values_mut() {
+      if state.hit.is_some_and(|hit| orders.contains(&hit.order)) {
+        state.hit = None;
+      }
+    }
+  }
   /// Return the foremost mouse-enabled input order at a physical point.
   pub(crate) fn pointer_order_at(&self, x: u16, y: u16) -> Option<(usize, u64)> {
     self

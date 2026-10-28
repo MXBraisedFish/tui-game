@@ -1,13 +1,16 @@
 //! UI and runtime object pools owned by exactly one Lua session.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::{Rc, Weak};
 
 mod input;
 mod link;
+mod scene;
+mod scrollbox;
 pub(crate) use input::LuaInputBinding;
 pub(crate) use link::LuaLinkBinding;
+pub(crate) use scrollbox::{LuaScrollboxBinding, SurfacePlacement};
 
 use crate::{LuaEventData, LuaTimerEvent, LuaTimerEventKind, LuaTimerKind};
 use mlua::Function;
@@ -96,6 +99,11 @@ pub struct LuaObjectPool {
   pub(crate) inputs: BTreeMap<u64, LuaInputBinding>,
   /// The script links indexed by their pool-local native identities.
   pub(crate) links: BTreeMap<u64, LuaLinkBinding>,
+  pub(crate) scrollboxes: BTreeMap<u64, LuaScrollboxBinding>,
+  pub(crate) next_scrollbox_id: u64,
+  pub(crate) surface_placements: HashMap<tg_service_widget::SliceId, SurfacePlacement>,
+  pub(crate) surface_sequence: u64,
+  pub(crate) slice_scopes: HashMap<tg_service_widget::SliceId, tg_service_widget::PointerScopeId>,
   /// The editing focus and pointer capture owned by this session.
   pub(crate) text_input: tg_service_widget::TextInputService,
 }
@@ -110,6 +118,11 @@ impl LuaObjectPool {
       hitboxes: BTreeMap::new(),
       inputs: BTreeMap::new(),
       links: BTreeMap::new(),
+      scrollboxes: BTreeMap::new(),
+      next_scrollbox_id: 0,
+      surface_placements: HashMap::new(),
+      surface_sequence: 0,
+      slice_scopes: HashMap::new(),
       text_input: tg_service_widget::TextInputService::new(),
     }
   }
@@ -201,6 +214,23 @@ impl LuaObjectPool {
     canvas: &tg_service_canvas::CanvasService,
     event: tg_core_input::MouseEvent,
   ) -> Vec<LuaEventData> {
+    let mut boxes = self
+      .scrollboxes
+      .iter()
+      .filter_map(|(id, binding)| binding.widget.frame_order().map(|order| (*id, order)))
+      .collect::<Vec<_>>();
+    boxes.sort_by_key(|(_, order)| std::cmp::Reverse(*order));
+    for (id, _) in boxes {
+      if self
+        .scrollboxes
+        .get_mut(&id)
+        .unwrap()
+        .widget
+        .route_mouse(&self.ui, event)
+      {
+        break;
+      }
+    }
     let event_point = (event.x, event.y);
     tg_service_widget::HyperlinkService::new().route_mouse_event(
       &mut self.ui,
@@ -242,6 +272,7 @@ impl LuaObjectPool {
         }
       }
     }
+    events.extend(self.take_scrollbox_events());
     events
   }
 

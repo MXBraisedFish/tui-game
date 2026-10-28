@@ -2,18 +2,20 @@
 
 `widget.scrollbox` 用于设置滚动框。
 
+> 滚动框由绘制组件、交互组件和切片图层组件构成。
+
 ---
 
 # 目录
 
 ## 常量
 
-| 常量        | 说明             | 定位                      |
-| ----------- | ---------------- | ------------------------- |
-| `TO_TOP`    | 垂直滚动到顶部   | [TO_TOP](#to_top)         |
-| `TO_BOTTOM` | 垂直滚动到底部   | [TO_BOTTOM](#to_bottom)   |
-| `TO_LEFT`   | 水平滚动到最左侧 | [TO_LEFT](#to_left)       |
-| `TO_RIGHT`  | 水平滚动到最右侧 | [TO_RIGHT](#to_right)     |
+| 常量        | 说明             | 定位                    |
+| ----------- | ---------------- | ----------------------- |
+| `TO_TOP`    | 垂直滚动到顶部   | [TO_TOP](#to_top)       |
+| `TO_BOTTOM` | 垂直滚动到底部   | [TO_BOTTOM](#to_bottom) |
+| `TO_LEFT`   | 水平滚动到最左侧 | [TO_LEFT](#to_left)     |
+| `TO_RIGHT`  | 水平滚动到最右侧 | [TO_RIGHT](#to_right)   |
 
 ## 方法
 
@@ -41,7 +43,7 @@
 ### 调用
 
 ```lua
-widget.input.TO_TOP
+widget.scrollbox.TO_TOP
 ```
 
 ### 可用于
@@ -53,15 +55,14 @@ widget.input.TO_TOP
 
 ```lua
 local scrollbox_draw = false
-local scroll = false
 
 function Init(ctx)
   scrollbox = widget.scrollbox.create(5, 3, { always_show_scrollbar = true })
 end
 
-function HandleEvent(event)
-  if scrollbox_draw and not scroll then
-    widget.scrollbox.scroll(scrollbox, widget.input.TO_TOP, 0)
+function Update(event)
+  if scrollbox_draw then
+    widget.scrollbox.scroll(scrollbox, widget.scrollbox.TO_TOP, 0)
   end
 end
 
@@ -93,7 +94,7 @@ end
 ### 调用
 
 ```lua
-widget.input.TO_BOTTOM
+widget.scrollbox.TO_BOTTOM
 ```
 
 ### 可用于
@@ -105,15 +106,14 @@ widget.input.TO_BOTTOM
 
 ```lua
 local scrollbox_draw = false
-local scroll = false
 
 function Init(ctx)
   scrollbox = widget.scrollbox.create(5, 3, { always_show_scrollbar = true })
 end
 
-function HandleEvent(event)
-  if scrollbox_draw and not scroll then
-    widget.scrollbox.scroll(scrollbox, widget.input.TO_BOTTOM, 0)
+function Update(event)
+  if scrollbox_draw then
+    widget.scrollbox.scroll(scrollbox, widget.scrollbox.TO_BOTTOM, 0)
   end
 end
 
@@ -145,7 +145,7 @@ end
 ### 调用
 
 ```lua
-widget.input.TO_LEFT
+widget.scrollbox.TO_LEFT
 ```
 
 ### 可用于
@@ -157,15 +157,14 @@ widget.input.TO_LEFT
 
 ```lua
 local scrollbox_draw = false
-local scroll = false
 
 function Init(ctx)
   scrollbox = widget.scrollbox.create(5, 3, { always_show_scrollbar = true })
 end
 
-function HandleEvent(event)
-  if scrollbox_draw and not scroll then
-    widget.scrollbox.scroll(scrollbox, 0, widget.input.TO_LEFT)
+function Update(event)
+  if scrollbox_draw then
+    widget.scrollbox.scroll(scrollbox, 0, widget.scrollbox.TO_LEFT)
   end
 end
 
@@ -180,7 +179,7 @@ end
 
 **输出：**
 
-![widget_scrollbox_TO_LEFT_example](../../image/widget_scrollbox_TO_LEFT_example.png)
+![widget_scrollbox_TO_TOP_example](../../image/widget_scrollbox_TO_TOP_example.png)
 
 ### 等值
 
@@ -197,7 +196,7 @@ end
 ### 调用
 
 ```lua
-widget.input.TO_RIGHT
+widget.scrollbox.TO_RIGHT
 ```
 
 ### 可用于
@@ -215,9 +214,9 @@ function Init(ctx)
   scrollbox = widget.scrollbox.create(5, 3, { always_show_scrollbar = true })
 end
 
-function HandleEvent(event)
+function Update(event)
   if scrollbox_draw and not scroll then
-    widget.scrollbox.scroll(scrollbox, 0, widget.input.TO_RIGHT)
+    widget.scrollbox.scroll(scrollbox, 0, widget.scrollbox.TO_RIGHT)
   end
 end
 
@@ -265,22 +264,22 @@ widget.scrollbox.create
 
 #### 选填参数
 
-| 参数                        | 类型                 | 默认值       | 含义                                 |
-| --------------------------- | -------------------- | ------------ | ------------------------------------ |
-| `bg`                        | string / const-color | `color.NONE` | 滚动框背景颜色                       |
-| `mouse`                     | boolean              | `true`       | 是否允许鼠标操作                     |
-| `wheel_vertical`            | boolean              | `true`       | 存在垂直内容超出时，是否可以垂直滚动 |
-| `wheel_horizontal`          | boolean              | `true`       | 存在水平内容超出时，是否可以水平滚动 |
-| `scrollbar_swap_vertical`   | boolean              | `false`      | 对调垂直滚动条位置                   |
-| `scrollbar_swap_horizontal` | boolean              | `false`      | 对调水平滚动条位置                   |
-| `track_shape_vertical`      | string               | `│`          | 垂直滚动条轨道样式                   |
-| `thumb_shape_vertical`      | string               | `█`          | 垂直滚动条滑块样式                   |
-| `track_shape_horizontal`    | string               | `─`          | 水平滚动条轨道样式                   |
-| `thumb_shape_horizontal`    | string               | `█`          | 水平滚动条滑块样式                   |
-| `include_scrollbar`         | boolean              | `true`       | 滚动框尺寸设置是否将滚动条包含在内   |
-| `always_show_scrollbar`     | boolean              | `false`      | 滚动条是否常驻显示                   |
-| `wheel_step_vertical`       | integer              | `2`          | 垂直滚动步长                         |
-| `wheel_step_horizontal`     | integer              | `3`          | 水平滚动步长                         |
+| 参数                        | 类型                 | 默认值       | 含义                               |
+| --------------------------- | -------------------- | ------------ | ---------------------------------- |
+| `bg`                        | string / const-color | `color.NONE` | 滚动框背景颜色                     |
+| `mouse`                     | boolean              | `true`       | 是否允许鼠标操作                   |
+| `wheel_vertical`            | boolean              | `true`       | 是否接受垂直滚轮操作               |
+| `wheel_horizontal`          | boolean              | `true`       | 是否接受水平滚轮操作               |
+| `scrollbar_swap_vertical`   | boolean              | `false`      | 对调垂直滚动条位置                 |
+| `scrollbar_swap_horizontal` | boolean              | `false`      | 对调水平滚动条位置                 |
+| `track_shape_vertical`      | string               | `│`          | 垂直滚动条轨道样式                 |
+| `thumb_shape_vertical`      | string               | `█`          | 垂直滚动条滑块样式                 |
+| `track_shape_horizontal`    | string               | `─`          | 水平滚动条轨道样式                 |
+| `thumb_shape_horizontal`    | string               | `█`          | 水平滚动条滑块样式                 |
+| `include_scrollbar`         | boolean              | `true`       | 滚动框尺寸设置是否将滚动条包含在内 |
+| `always_show_scrollbar`     | boolean              | `false`      | 滚动条是否常驻显示                 |
+| `wheel_step_vertical`       | integer              | `2`          | 垂直滚动步长                       |
+| `wheel_step_horizontal`     | integer              | `3`          | 水平滚动步长                       |
 
 ### 返回值
 
@@ -304,6 +303,8 @@ end
 ```
 
 **输出：**
+
+![widget_scrollbox_create_example](../../image/widget_scrollbox_create_example.png)
 
 ### 额外说明
 
@@ -439,10 +440,12 @@ debug.print(table.pretty(widget.scrollbox.list()))
 {
   [1] = {
     id = "scrollbox_001",
-    context_width = 40,
-    context_height = 10,
-    scrollbox_width = 41,
-    scrollbox_height = 11,
+    width = 40,
+    height = 10,
+    content_width = 40,
+    content_height = 10,
+    scrollbox_width = 40,
+    scrollbox_height = 10,
     bg = "none",
     mouse = true,
     wheel_vertical = true,
@@ -459,7 +462,7 @@ debug.print(table.pretty(widget.scrollbox.list()))
     wheel_step_horizontal = 3,
     scroll_offset_vertical = 0,
     scroll_offset_horizontal = 0
-  }
+  },
   n = 1
 }
 ```
@@ -472,10 +475,12 @@ debug.print(table.pretty(widget.scrollbox.list()))
 {
   {
     id = "scrollbox_001",              -- string（滚动框图层切片 ID）
-    context_width = 40,                -- integer（可视内容区域宽度）
-    context_height = 10,               -- integer（可视内容区域高度）
-    scrollbox_width = 41,              -- integer（滚动框总宽度）
-    scrollbox_height = 11,             -- integer（滚动框总高度）
+    width = 40,                        -- string（滚动框设置宽度）
+    height = 10,                       -- string（滚动框设置宽度）
+    content_width = 40,                -- integer（可视内容区域宽度）
+    content_height = 10,               -- integer（可视内容区域高度）
+    scrollbox_width = 40,              -- integer（滚动框总宽度）
+    scrollbox_height = 10,             -- integer（滚动框总高度）
     bg = "none",                       -- string（滚动框背景颜色）
     mouse = true,                      -- boolean（是否允许鼠标操作）
     wheel_vertical = true,             -- boolean（是否可垂直滚动）
@@ -489,7 +494,7 @@ debug.print(table.pretty(widget.scrollbox.list()))
     include_scrollbar = true,          -- boolean（滚动条宽高是否包含在可视区域内）
     always_show_scrollbar = false,     -- boolean（滚动条是否常驻显示）
     wheel_step_vertical = 2,           -- integer（垂直滚动步长）
-    wheel_step_horizontal = 3          -- integer（水平滚动步长）
+    wheel_step_horizontal = 3,         -- integer（水平滚动步长）
     scroll_offset_vertical = 0,        -- integer（垂直已滚动距离）
     scroll_offset_horizontal = 0       -- integer（水平已滚动距离）
   },
@@ -605,16 +610,16 @@ widget.scrollbox.scroll
 | 参数名                    | 类型                      | 说明              |
 | ------------------------- | ------------------------- | ----------------- |
 | `id`                      | string                    | 滚动框图层切片 ID |
-| `scroll_times_vertical`   | integer / const-scrollbox | 水平滚动次数      |
-| `scroll_times_horizontal` | integer / const-scrollbox | 垂直滚动次数      |
+| `scroll_times_vertical`   | integer / const-scrollbox | 垂直滚动次数      |
+| `scroll_times_horizontal` | integer / const-scrollbox | 水平滚动次数      |
 
 ### 返回值
 
 返回一个值。
 
-| 类型    | 说明         |
-| ------- | ------------ |
-| boolean | 聚焦是否成功 |
+| 类型    | 说明                     |
+| ------- | ------------------------ |
+| boolean | 对象存在且滚动请求已受理 |
 
 ### 示例
 
@@ -623,17 +628,19 @@ local scrollbox_draw = false
 local scroll = false
 
 function Init(ctx)
-  scrollbox = widget.scrollbox.create(5, 3, { always_show_scrollbar = true })
+  scrollbox = widget.scrollbox.create(5, 6, { always_show_scrollbar = true })
 end
 
-function HandleEvent(event)
+function Update(event)
   if scrollbox_draw and not scroll then
-    widget.scrollbox.scroll(scrollbox, 5, 6)
+    widget.scrollbox.scroll(scrollbox, 1, 1)
+
+    scroll = true
   end
 end
 
 function Render()
-  draw.stroke_rect(4, 1, 7, 5)
+  draw.stroke_rect(4, 1, 7, 8)
   draw.fill_rect(0, 0, 20, 8, { char = "&", slice_layer = scrollbox })
   widget.scrollbox.draw(scrollbox, 5, 2)
 
@@ -643,9 +650,7 @@ end
 
 **输出：**
 
-```lua
-true
-```
+![widget_scrollbox_scroll_example](../../image/widget_scrollbox_scroll_example.png)
 
 ### 额外说明
 
@@ -674,26 +679,26 @@ widget.scrollbox.set
 
 #### 选填参数
 
-| 参数                        | 类型                      | 默认值   | 含义                                 |
-| --------------------------- | ------------------------- | -------- | ------------------------------------ |
-| `width`                     | integer                   | 保持原值 | 滚动框宽度                           |
-| `height`                    | integer                   | 保持原值 | 滚动框高度                           |
-| `bg`                        | string / const-color      | 保持原值 | 滚动框背景颜色                       |
-| `mouse`                     | boolean                   | 保持原值 | 是否允许鼠标操作                     |
-| `wheel_vertical`            | boolean                   | 保持原值 | 存在垂直内容超出时，是否可以垂直滚动 |
-| `wheel_horizontal`          | boolean                   | 保持原值 | 存在水平内容超出时，是否可以水平滚动 |
-| `scrollbar_swap_vertical`   | boolean                   | 保持原值 | 对调垂直滚动条位置                   |
-| `scrollbar_swap_horizontal` | boolean                   | 保持原值 | 对调水平滚动条位置                   |
-| `track_shape_vertical`      | string                    | 保持原值 | 垂直滚动条轨道样式                   |
-| `thumb_shape_vertical`      | string                    | 保持原值 | 垂直滚动条滑块样式                   |
-| `track_shape_horizontal`    | string                    | 保持原值 | 水平滚动条轨道样式                   |
-| `thumb_shape_horizontal`    | string                    | 保持原值 | 水平滚动条滑块样式                   |
-| `include_scrollbar`         | boolean                   | 保持原值 | 滚动框尺寸设置是否将滚动条包含在内   |
-| `always_show_scrollbar`     | boolean                   | 保持原值 | 滚动条是否常驻显示                   |
-| `wheel_step_vertical`       | integer                   | 保持原值 | 垂直滚动步长                         |
-| `wheel_step_horizontal`     | integer                   | 保持原值 | 水平滚动步长                         |
-| `scroll_offset_vertical`    | integer / const-scrollbox | 保持原值 | 垂直已滚动距离                       |
-| `scroll_offset_horizontal`  | integer / const-scrollbox | 保持原值 | 水平已滚动距离                       |
+| 参数                        | 类型                      | 默认值   | 含义                               |
+| --------------------------- | ------------------------- | -------- | ---------------------------------- |
+| `width`                     | integer                   | 保持原值 | 滚动框宽度                         |
+| `height`                    | integer                   | 保持原值 | 滚动框高度                         |
+| `bg`                        | string / const-color      | 保持原值 | 滚动框背景颜色                     |
+| `mouse`                     | boolean                   | 保持原值 | 是否允许鼠标操作                   |
+| `wheel_vertical`            | boolean                   | 保持原值 | 是否接受垂直滚轮操作               |
+| `wheel_horizontal`          | boolean                   | 保持原值 | 是否接受水平滚轮操作               |
+| `scrollbar_swap_vertical`   | boolean                   | 保持原值 | 对调垂直滚动条位置                 |
+| `scrollbar_swap_horizontal` | boolean                   | 保持原值 | 对调水平滚动条位置                 |
+| `track_shape_vertical`      | string                    | 保持原值 | 垂直滚动条轨道样式                 |
+| `thumb_shape_vertical`      | string                    | 保持原值 | 垂直滚动条滑块样式                 |
+| `track_shape_horizontal`    | string                    | 保持原值 | 水平滚动条轨道样式                 |
+| `thumb_shape_horizontal`    | string                    | 保持原值 | 水平滚动条滑块样式                 |
+| `include_scrollbar`         | boolean                   | 保持原值 | 滚动框尺寸设置是否将滚动条包含在内 |
+| `always_show_scrollbar`     | boolean                   | 保持原值 | 滚动条是否常驻显示                 |
+| `wheel_step_vertical`       | integer                   | 保持原值 | 垂直滚动步长                       |
+| `wheel_step_horizontal`     | integer                   | 保持原值 | 水平滚动步长                       |
+| `scroll_offset_vertical`    | integer / const-scrollbox | 保持原值 | 垂直已滚动距离                     |
+| `scroll_offset_horizontal`  | integer / const-scrollbox | 保持原值 | 水平已滚动距离                     |
 
 ### 返回值
 
@@ -719,10 +724,12 @@ debug.print(table.pretty(widget.scrollbox.get_info(scrollbox)))
 true
 {
   id = "scrollbox_001",
-  context_width = 40,
-  context_height = 10,
-  scrollbox_width = 41,
-  scrollbox_height = 11,
+  width = 20,
+  height = 5,
+  content_width = 20,
+  content_height = 5,
+  scrollbox_width = 20,
+  scrollbox_height = 5,
   bg = "none",
   mouse = true,
   wheel_vertical = true,
@@ -750,6 +757,8 @@ true
 - 必填参数 `wheel_step_horizontal` 取值范围为 $[1, 65535]$。
 - 必填参数 `scroll_offset_vertical` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总高度，超出范围会修正回正常区域。
 - 必填参数 `scroll_offset_horizontal` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总宽度，超出范围会修正回正常区域。
+- 选填参数 `track_shape_vertical`，选填参数 `thumb_shape_vertical`，选填参数 `track_shape_horizontal` 和选填参数 `thumb_shape_horizontal` 填写时每个字段必须为宽度为 `1` 的字符。
+- 选填参数 `include_scrollbar` 仅对当前方法的必填参数 `width` 和必填参数 `height` 生效，实际仍区分内容尺寸和滚动框实际尺寸。
 
 ---
 
@@ -798,10 +807,12 @@ debug.print(table.pretty(widget.scrollbox.get_info(scrollbox)))
 ```lua
 {
   id = "scrollbox_001",
-  context_width = 40,
-  context_height = 10,
-  scrollbox_width = 41,
-  scrollbox_height = 11,
+  width = 40,
+  height = 10,
+  content_width = 40,
+  content_height = 10,
+  scrollbox_width = 40,
+  scrollbox_height = 10,
   bg = "none",
   mouse = true,
   wheel_vertical = true,
@@ -828,10 +839,12 @@ debug.print(table.pretty(widget.scrollbox.get_info(scrollbox)))
 ```lua
 {
   id = "scrollbox_001",              -- string（滚动框图层切片 ID）
-  context_width = 40,                -- integer（可视内容区域宽度）
-  context_height = 10,               -- integer（可视内容区域高度）
-  scrollbox_width = 41,              -- integer（滚动框总宽度）
-  scrollbox_height = 11,             -- integer（滚动框总高度）
+  width = 40,                        -- string（滚动框设置宽度）
+  height = 10,                       -- string（滚动框设置宽度）
+  content_width = 40,                -- integer（可视内容区域宽度）
+  content_height = 10,               -- integer（可视内容区域高度）
+  scrollbox_width = 40,              -- integer（滚动框总宽度）
+  scrollbox_height = 10,             -- integer（滚动框总高度）
   bg = "none",                       -- string（滚动框背景颜色）
   mouse = true,                      -- boolean（是否允许鼠标操作）
   wheel_vertical = true,             -- boolean（是否可垂直滚动）
@@ -845,7 +858,7 @@ debug.print(table.pretty(widget.scrollbox.get_info(scrollbox)))
   include_scrollbar = true,          -- boolean（滚动条宽高是否包含在可视区域内）
   always_show_scrollbar = false,     -- boolean（滚动条是否常驻显示）
   wheel_step_vertical = 2,           -- integer（垂直滚动步长）
-  wheel_step_horizontal = 3          -- integer（水平滚动步长）
+  wheel_step_horizontal = 3,         -- integer（水平滚动步长）
   scroll_offset_vertical = 0,        -- integer（垂直已滚动距离）
   scroll_offset_horizontal = 0       -- integer（水平已滚动距离）
 }

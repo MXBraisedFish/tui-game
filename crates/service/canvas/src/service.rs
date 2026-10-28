@@ -49,6 +49,8 @@ pub struct PreparedSlice {
   pub rect: Rect,
   /// The source x.
   pub source_x: u16,
+  /// The interaction rank inherited by an embedded surface.
+  pub hit_rank: usize,
   /// The source y.
   pub source_y: u16,
   /// Whether this surface participates in composition.
@@ -217,6 +219,7 @@ impl CanvasService {
         buffer: CanvasBuffer::new(rect.width, rect.height),
         rect,
         source_x: frame.source_x,
+        hit_rank: order + 1,
         source_y: frame.source_y,
         visible: frame.visible,
         opaque: frame.opaque,
@@ -237,6 +240,7 @@ impl CanvasService {
     prepared.opaque = frame.opaque;
     prepared.background = frame.background;
     prepared.order = order;
+    prepared.hit_rank = order + 1;
   }
 
   fn prepare_scroll_box(&mut self, order: usize, frame: ScrollBoxFrame) {
@@ -273,6 +277,124 @@ impl CanvasService {
     prepared.opaque = frame.opaque;
     prepared.order = order;
     prepared.scrollbar_style = frame.scrollbar_style;
+  }
+
+  /// Return the physical clip, original origin and interaction rank of a drawing surface.
+  pub fn surface_geometry(&self, target: Option<SliceId>) -> Option<(Rect, (i32, i32), usize)> {
+    match target {
+      None => Some((
+        self.viewport,
+        (i32::from(self.viewport.x), i32::from(self.viewport.y)),
+        0,
+      )),
+      Some(id) => {
+        let slice = self.slices.get(&id).filter(|slice| slice.visible)?;
+        Some((
+          Rect {
+            x: self.viewport.x.saturating_add(slice.rect.x),
+            y: self.viewport.y.saturating_add(slice.rect.y),
+            ..slice.rect
+          },
+          self.slice_origin(id)?,
+          slice.hit_rank,
+        ))
+      }
+    }
+  }
+
+  /// Remove a surface from global composition while retaining its buffer for embedded replay.
+  pub fn detach_slice(&mut self, id: SliceId) {
+    self
+      .surface_order
+      .retain(|surface| *surface != SurfaceId::Slice(id));
+  }
+
+  /// Prepare a clipped embedded buffer without allocating its complete logical content extent.
+  ///
+  /// # Arguments
+  ///
+  /// * `id` - The private embedded surface identity.
+  /// * `clip` - The physical visible rectangle, already intersected with all ancestors.
+  /// * `origin` - The physical location of logical content coordinate zero.
+  /// * `rank` - The root layer rank inherited by its controls.
+  /// * `background` - The background applied to unstyled cells during composition.
+  /// * `opaque` - Whether unwritten cells cover the parent.
+  pub fn prepare_embedded_slice(
+    &mut self,
+    id: SliceId,
+    clip: Rect,
+    origin: (i32, i32),
+    rank: usize,
+    background: Option<TextColor>,
+    opaque: bool,
+  ) {
+    self.detach_slice(id);
+    self.slices.insert(
+      id,
+      PreparedSlice {
+        buffer: CanvasBuffer::new(clip.width, clip.height),
+        rect: Rect {
+          x: clip.x.saturating_sub(self.viewport.x),
+          y: clip.y.saturating_sub(self.viewport.y),
+          ..clip
+        },
+        source_x: (i64::from(clip.x) - i64::from(origin.0)).clamp(0, u16::MAX as i64) as u16,
+        source_y: (i64::from(clip.y) - i64::from(origin.1)).clamp(0, u16::MAX as i64) as u16,
+        hit_rank: rank,
+        order: 0,
+        background,
+        opaque,
+        event_passthrough: true,
+        visible: clip.width > 0 && clip.height > 0,
+      },
+    );
+  }
+
+  /// Composite an embedded slice at its physical clip into the supplied parent buffer.
+  pub fn composite_embedded_slice(&mut self, id: SliceId, parent: Option<SliceId>) {
+    let Some((_, origin, _)) = self.surface_geometry(parent) else {
+      return;
+    };
+    let Some(source) = self.slices.get(&id) else {
+      return;
+    };
+    if !source.visible {
+      return;
+    }
+    let mut writes = Vec::new();
+    for y in 0..source.buffer.height() {
+      for x in 0..source.buffer.width() {
+        if !source.opaque && !source.buffer.is_written(x, y) {
+          continue;
+        }
+        let mut cell = source.buffer.get(x, y).unwrap().clone();
+        if cell.style.background.is_none() {
+          cell.style.background.clone_from(&source.background);
+        }
+        let physical_x = i32::from(self.viewport.x) + i32::from(source.rect.x) + i32::from(x);
+        let physical_y = i32::from(self.viewport.y) + i32::from(source.rect.y) + i32::from(y);
+        writes.push((physical_x - origin.0, physical_y - origin.1, cell));
+      }
+    }
+    for (x, y, cell) in writes {
+      match parent {
+        None => {
+          if let (Ok(x), Ok(y)) = (u16::try_from(x), u16::try_from(y)) {
+            self.base.set(x, y, cell);
+          }
+        }
+        Some(parent) => {
+          if let Some(target) = self.slices.get_mut(&parent)
+            && let (Ok(x), Ok(y)) = (
+              u16::try_from(x - i32::from(target.source_x)),
+              u16::try_from(y - i32::from(target.source_y)),
+            )
+          {
+            target.buffer.set(x, y, cell);
+          }
+        }
+      }
+    }
   }
 
   /// Discard the previously retained canvas contents.
@@ -1000,7 +1122,7 @@ impl CanvasService {
       width: visible_local.width,
       height: visible_local.height,
     };
-    Some((visible, (origin_x, origin_y), slice.order + 1))
+    Some((visible, (origin_x, origin_y), slice.hit_rank))
   }
 
   /// Resolve and clip a hit rectangle against the identified scroll-box content viewport.

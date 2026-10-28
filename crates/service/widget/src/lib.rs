@@ -47,8 +47,9 @@ pub use ui_object::surfaces::progress_bar::{
   ProgressBarService,
 };
 pub use ui_object::surfaces::scroll_box::{
-  Overflow, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollBoxService, ScrollbarLayout,
-  ScrollbarPolicy, ScrollbarSide, ScrollbarStyle, ScrollbarVisibility,
+  Overflow, ScrollBoxContentView, ScrollBoxEvent, ScrollBoxId, ScrollBoxOptions, ScrollBoxService,
+  ScrollBoxWidget, ScrollBoxWidgetLayout, ScrollBoxWidgetOptions, ScrollbarLayout, ScrollbarPolicy,
+  ScrollbarSide, ScrollbarStyle, ScrollbarVisibility, clip_rect,
 };
 pub use ui_object::surfaces::slice::{SliceId, SliceLength, SliceOptions, SliceRect, SliceService};
 pub use ui_object::surfaces::surface::SurfaceId;
@@ -56,4 +57,4 @@ pub use ui_object::surfaces::table::{
   TableAlign, TableBorderMode, TableBorderStyle, TableCell, TableColumn, TableDrawParams, TableId,
   TableOptions, TableOverflow, TableRow, TableService, TableStyle,
 };
-pub use ui_object::{UiEvent, UiObjectPool, UiObjectPoolOwner};
+pub use ui_object::{PointerScopeId, UiEvent, UiObjectPool, UiObjectPoolOwner};

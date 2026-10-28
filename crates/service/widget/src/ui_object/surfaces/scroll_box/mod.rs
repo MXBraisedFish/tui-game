@@ -1,5 +1,9 @@
 //! Clipped content viewports, scrollbar layout, and anchored pointer dragging.
 
+mod embedded;
+pub use embedded::{
+  ScrollBoxContentView, ScrollBoxWidget, ScrollBoxWidgetLayout, ScrollBoxWidgetOptions, clip_rect,
+};
 mod state;
 mod types;
 
@@ -776,7 +780,7 @@ impl ScrollBoxService {
         .position(|surface| *surface == SurfaceId::ScrollBox(drag.scroll_box_id))
         .map(|index| index + 1);
       if rank.is_none_or(|rank| {
-        !pool.pointer_parent_contains(rank, event.x, event.y)
+        !pool.pointer_parent_contains(rank, 0, event.x, event.y)
           || pool
             .pointer_order_at(event.x, event.y)
             .is_some_and(|top| top.0 > rank)

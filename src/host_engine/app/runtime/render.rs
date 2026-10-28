@@ -691,73 +691,7 @@ fn apply_lua_draw_commands(
   commands: Vec<crate::host_engine::services::LuaDrawCommand>,
   objects: &mut tg_service_lua::LuaObjectPool,
 ) {
-  use crate::host_engine::services::{LuaDrawCommand, LuaDrawTarget};
-  for command in commands {
-    match command {
-      LuaDrawCommand::Link { id, target, x, y } => objects.draw_link(id, target, (x, y), canvas),
-      LuaDrawCommand::Input { id, target, x, y } => objects.draw_input(id, target, (x, y), canvas),
-      LuaDrawCommand::Hitbox { id, target, x, y } => {
-        objects.draw_hitbox(id, target, (x, y), canvas)
-      }
-      LuaDrawCommand::Text {
-        target,
-        x,
-        y,
-        params,
-      } => match target {
-        LuaDrawTarget::Base => render.draw_text_at(canvas, x, y, &params),
-        LuaDrawTarget::Slice(id) => {
-          render.draw_text_at_on(canvas, id, x, y, &params);
-        }
-      },
-      LuaDrawCommand::FillRect {
-        target,
-        x,
-        y,
-        width,
-        height,
-        fill_char,
-        fg,
-        bg,
-      } => match target {
-        LuaDrawTarget::Base => {
-          render.draw_filled_rect(canvas, x, y, width, height, fill_char, fg, bg)
-        }
-        LuaDrawTarget::Slice(id) => {
-          render.draw_filled_rect_on(canvas, id, x, y, width, height, fill_char, fg, bg);
-        }
-      },
-      LuaDrawCommand::StrokeRect {
-        target,
-        x,
-        y,
-        width,
-        height,
-        border,
-        fg,
-        bg,
-      } => match target {
-        LuaDrawTarget::Base => {
-          render.draw_border_rect(canvas, x, y, width, height, &border, fg, bg, None, None)
-        }
-        LuaDrawTarget::Slice(id) => {
-          render.draw_border_rect_on(canvas, id, x, y, width, height, &border, fg, bg, None, None);
-        }
-      },
-      LuaDrawCommand::EraseRect {
-        target,
-        x,
-        y,
-        width,
-        height,
-      } => match target {
-        LuaDrawTarget::Base => canvas.erase_rect(x, y, width, height),
-        LuaDrawTarget::Slice(id) => {
-          canvas.erase_rect_on(id, x, y, width, height);
-        }
-      },
-    }
-  }
+  objects.replay_draw_commands(render, canvas, commands);
 }
 
 #[cfg(test)]

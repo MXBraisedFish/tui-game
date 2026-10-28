@@ -49,10 +49,10 @@ pub use log::{
   HostLogMessage, LogLevel, LogPrintOptions, LogService, LogSessionId, LogSessionKind, LogSource,
 };
 pub use lua::{
-  GameService, GameStartOptions, LuaActionState, LuaApiConfig, LuaDrawCommand, LuaDrawTarget,
-  LuaEnqueueError, LuaErrorStage, LuaEventBroker, LuaEventData, LuaEventRoute, LuaHostCommand,
-  LuaObjectPool, LuaRoutableEvent, LuaService, LuaSessionDiagnostics, LuaSessionError,
-  LuaSessionKind, LuaSessionSpec, LuaSessionToken, LuaTaskOperation, ScreensaverService,
+  GameService, GameStartOptions, LuaActionState, LuaApiConfig, LuaDrawCommand, LuaEnqueueError,
+  LuaErrorStage, LuaEventBroker, LuaEventData, LuaEventRoute, LuaHostCommand, LuaObjectPool,
+  LuaRoutableEvent, LuaService, LuaSessionDiagnostics, LuaSessionError, LuaSessionKind,
+  LuaSessionSpec, LuaSessionToken, LuaTaskOperation, ScreensaverService,
 };
 pub use network::{NetworkEvent, NetworkService};
 pub use package::{

@@ -564,15 +564,15 @@ pub struct LuaTextInputEvent {
 /// # Fields
 ///
 /// * `id` - The identifier of the owned object.
-/// * `x` - The horizontal coordinate in terminal cells.
-/// * `y` - The vertical coordinate in terminal cells.
+/// * `x` - The absolute horizontal scroll offset in terminal cells.
+/// * `y` - The absolute vertical scroll offset in terminal cells.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LuaScrollBoxEvent {
   /// The identifier of the owned object.
   pub id: u64,
-  /// The horizontal coordinate in terminal cells.
+  /// The absolute horizontal scroll offset in terminal cells.
   pub x: u16,
-  /// The vertical coordinate in terminal cells.
+  /// The absolute vertical scroll offset in terminal cells.
   pub y: u16,
 }
 
@@ -733,7 +733,7 @@ impl LuaEventData {
       Self::Hyperlink(_) => "link",
       Self::Markdown(_) => "markdown",
       Self::TextInput(_) => "input",
-      Self::ScrollBox(_) => "scroll_box",
+      Self::ScrollBox(_) => "scrollbox",
     }
   }
 
@@ -1026,10 +1026,10 @@ impl LuaEventData {
         data.set("text", event.value.as_deref())?;
       }
       Self::ScrollBox(event) => {
-        data.set("id", event.id.to_string())?;
-        data.set("kind", "scrolled")?;
-        data.set("x", event.x)?;
-        data.set("y", event.y)?;
+        data.set("id", format!("scrollbox_{:03}", event.id))?;
+        data.set("kind", "scroll")?;
+        data.set("scroll_offset_horizontal", event.x)?;
+        data.set("scroll_offset_vertical", event.y)?;
       }
     }
     Ok(data)
@@ -1416,7 +1416,7 @@ mod tests {
       ),
       (
         LuaEventData::ScrollBox(LuaScrollBoxEvent { id: 10, x: 2, y: 3 }),
-        "scroll_box",
+        "scrollbox",
       ),
     ];
 

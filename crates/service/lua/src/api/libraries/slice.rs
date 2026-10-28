@@ -95,6 +95,8 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       match id_argument(values, method)? {
         SliceHandle::Base => Ok(false),
         SliceHandle::Object(id) => with_pool_mut(&delete_state, method, |objects| {
+          objects.invalidate_surface(id);
+          objects.surface_placements.remove(&id);
           Ok(SliceService::new().remove(objects.ui_mut(), id))
         }),
       }
@@ -109,6 +111,8 @@ fn install_lifecycle(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
       with_pool_mut(&state, method, |objects| {
         let service = SliceService::new();
         for id in service.ids(objects.ui()) {
+          objects.invalidate_surface(id);
+          objects.surface_placements.remove(&id);
           service.remove(objects.ui_mut(), id);
         }
         Ok(true)
@@ -183,7 +187,7 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
     "draw",
     lua.create_function(move |lua, values: MultiValue| {
       let method = "slice.draw";
-      let table = positional_table(lua, method, values, &["id", "x", "y"], &[])?;
+      let table = positional_table(lua, method, values, &["id", "x", "y"], &["slice_layer"])?;
       let SliceHandle::Object(id) = table_id(&table, method)? else {
         return Err(args::message(method, "base layer cannot be positioned"));
       };
@@ -197,13 +201,28 @@ fn install_mutations(lua: &Lua, source: &Table, state: SharedApiState) -> mlua::
         method,
         "y",
       )?;
-      with_pool_mut(&state, method, |objects| {
-        if SliceService::new().draw(objects.ui_mut(), id, x, y) {
-          Ok(())
-        } else {
-          Err(args::message(method, "unknown slice id"))
+      let target = parse_draw_target(&table, method, &state)?;
+      let sequence = with_pool_mut(&state, method, |objects| {
+        if !SliceService::new().exists(objects.ui(), id) {
+          return Err(args::message(method, "unknown slice id"));
         }
-      })
+        let sequence = objects
+          .place_surface(id, target, (x, y))
+          .map_err(|error| args::message(method, error))?;
+        SliceService::new().draw(objects.ui_mut(), id, x, y);
+        Ok(sequence)
+      })?;
+      draw::enqueue_draw(
+        &state,
+        method,
+        LuaDrawCommand::Surface {
+          id,
+          target,
+          x,
+          y,
+          sequence,
+        },
+      )
     })?,
   )
 }

@@ -548,6 +548,14 @@ impl LuaSession {
     {
       return Ok(());
     }
+    if let super::LuaEventData::ScrollBox(event) = &delivery.event.data
+      && (self.session_kind != LuaSessionKind::Game
+        || !self
+          .with_objects(|objects| objects.scrollboxes.contains_key(&event.id))
+          .unwrap_or(false))
+    {
+      return Ok(());
+    }
     if let super::LuaEventData::Hyperlink(event) = &delivery.event.data {
       if self.session_kind != LuaSessionKind::Game {
         return Ok(());
@@ -726,6 +734,10 @@ impl LuaSession {
   /// Return a session error for invalid session state, callback failures, invalid script data, or
   /// execution/memory budget exhaustion.
   pub fn render(&mut self) -> Result<(), LuaSessionError> {
+    self.with_objects_mut(|objects| {
+      objects.surface_placements.clear();
+      objects.surface_sequence = 0;
+    });
     self.invoke_hot(Callback::Render, (), LuaBudgetKind::Render)
   }
 

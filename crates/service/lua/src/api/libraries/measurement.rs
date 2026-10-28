@@ -340,6 +340,18 @@ pub(super) fn parse_draw_target(
   if layer == "base" {
     return Ok(LuaDrawTarget::Base);
   }
+  if let Some(id) = layer
+    .strip_prefix("scrollbox_")
+    .and_then(|id| id.parse::<u64>().ok())
+  {
+    return with_pool(state, method, |pool| {
+      pool
+        .scrollboxes
+        .get(&id)
+        .map(|binding| LuaDrawTarget::Slice(binding.surface))
+        .ok_or_else(|| args::message(method, "unknown scrollbox layer"))
+    });
+  }
   let id = slice::parse_id(&layer, method, "slice_layer")?;
   let objects = state
     .borrow()
@@ -373,9 +385,6 @@ pub(super) fn parse_draw_target(
 /// Return a Lua argument error when the requested drawing target cannot be resolved in the
 /// session pool.
 ///
-/// # Panics
-///
-/// Panic when passed a scroll-box target; callers must supply the base or a session-owned slice.
 pub(super) fn draw_target_size(
   state: &SharedApiState,
   method: &str,
@@ -397,6 +406,17 @@ pub(super) fn draw_target_size(
   let pool = objects
     .as_ref()
     .ok_or_else(|| args::message(method, "session object pool is unavailable"))?;
+  if let Some(binding) = pool
+    .scrollboxes
+    .values()
+    .find(|binding| binding.surface == id)
+  {
+    let content = binding.widget.layout().content;
+    return Ok(tg_service_layout::Size {
+      width: content.width,
+      height: content.height,
+    });
+  }
   let rect = tg_service_widget::SliceService::new()
     .configured_rect(pool.ui(), id)
     .ok_or_else(|| args::message(method, "unknown or inaccessible slice layer"))?;

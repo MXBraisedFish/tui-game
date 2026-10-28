@@ -210,7 +210,7 @@ impl TextInputService {
     else {
       return false;
     };
-    if !pool.pointer_parent_contains(hit.surface_rank, event.x, event.y)
+    if !pool.pointer_parent_contains(hit.surface_rank, hit.order, event.x, event.y)
       || pool
         .pointer_order_at(event.x, event.y)
         .is_some_and(|top| top.0 > hit.surface_rank)

@@ -271,7 +271,14 @@ impl HitAreaService {
     pool.hit_areas.physical_pointer = Some((event.x, event.y));
     self.update_hover(pool, top_hit.map(|(id, _)| id), event.x, event.y);
 
-    if pointer_order.is_some_and(|(_, order)| order == 0) {
+    if pointer_order.is_some_and(|(rank, order)| order == 0 || pool.is_pointer_region(rank, order))
+    {
+      if event.kind == MouseEventKind::Release {
+        if let Some(button) = event.button {
+          pool.hit_areas.pressed.remove(&button);
+        }
+        text_input.route_mouse_event(pool, event);
+      }
       return true;
     }
 
@@ -317,7 +324,7 @@ impl HitAreaService {
             let Some(hit) = pool.hit_areas.areas[&id].hit else {
               return false;
             };
-            if !pool.pointer_parent_contains(hit.surface_rank, event.x, event.y)
+            if !pool.pointer_parent_contains(hit.surface_rank, hit.order, event.x, event.y)
               || pool
                 .pointer_order_at(event.x, event.y)
                 .is_some_and(|top| top.0 > hit.surface_rank)

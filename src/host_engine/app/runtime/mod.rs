@@ -2183,6 +2183,11 @@ fn queue_lua_object_events(services: &mut EngineServices, router: &mut LuaEventB
       continue;
     };
     for event in events.unwrap_or_default() {
+      if kind == LuaSessionKind::Screensaver
+        && matches!(event, tg_service_lua::LuaEventData::ScrollBox(_))
+      {
+        continue;
+      }
       if let Err(error) = router.push_owned(token, frame, event, LuaEventRoute::HandleEvent) {
         log_lua_enqueue_error(services, error);
       }

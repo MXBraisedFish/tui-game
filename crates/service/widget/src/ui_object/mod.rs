@@ -1,7 +1,11 @@
 //! Shared UI object ownership, surface ordering, and queued interaction events.
 
 pub(crate) mod interactives;
+mod pointer_scope;
 pub(crate) mod surfaces;
+use pointer_scope::PointerScope;
+pub use pointer_scope::PointerScopeId;
+use std::collections::HashMap;
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -40,6 +44,12 @@ pub struct UiObjectPool {
   id: u64,
   audio: AudioObjectPool,
   render_order: u64,
+  next_pointer_scope: u64,
+  next_embedded_slice: u64,
+  pointer_scopes: HashMap<PointerScopeId, PointerScope>,
+  order_scopes: HashMap<u64, PointerScopeId>,
+  scope_stack: Vec<PointerScopeId>,
+  pointer_regions: Vec<(tg_service_layout::Rect, usize, u64)>,
   // Updated by prepare_canvas while preserving its shared-reference API.
   pointer_surfaces: RefCell<Vec<(tg_service_layout::Rect, usize, bool)>>,
   /// Pending events retained in delivery order.
@@ -152,6 +162,12 @@ impl UiObjectPool {
       id,
       audio: AudioObjectPool::new(AudioPoolId(id)),
       render_order: 0,
+      next_pointer_scope: 0,
+      next_embedded_slice: 0,
+      pointer_scopes: HashMap::new(),
+      order_scopes: HashMap::new(),
+      scope_stack: Vec::new(),
+      pointer_regions: Vec::new(),
       pointer_surfaces: RefCell::new(Vec::new()),
       events: VecDeque::new(),
       surfaces: Vec::new(),
@@ -184,12 +200,19 @@ impl UiObjectPool {
   /// Allocate the next drawing-order value for hit-test precedence.
   pub(crate) fn next_render_order(&mut self) -> u64 {
     self.render_order += 1;
+    if let Some(scope) = self.scope_stack.last() {
+      self.order_scopes.insert(self.render_order, *scope);
+    }
     self.render_order
   }
 
   /// Reset drawing order and per-frame interaction geometry before rendering the pool.
   pub fn begin_render(&mut self) {
     self.render_order = 0;
+    self.pointer_scopes.clear();
+    self.order_scopes.clear();
+    self.scope_stack.clear();
+    self.pointer_regions.clear();
     self.hit_areas.clear_hits();
     self.hyperlinks.clear_hits();
     self.markdown_views.clear_hits();
@@ -209,7 +232,22 @@ impl UiObjectPool {
   }
 
   /// Report whether a pointer remains within a control's original surface.
-  pub(crate) fn pointer_parent_contains(&self, rank: usize, x: u16, y: u16) -> bool {
+  pub(crate) fn pointer_parent_contains(&self, rank: usize, order: u64, x: u16, y: u16) -> bool {
+    // Captured drags may cross sibling controls, but a later embedded layer still occludes them.
+    if let Some((top_rank, top_order)) = self.pointer_order_at(x, y)
+      && (top_rank, top_order) > (rank, order)
+      && self.order_scopes.get(&top_order) != self.order_scopes.get(&order)
+    {
+      return false;
+    }
+    if let Some(scope) = self
+      .order_scopes
+      .get(&order)
+      .and_then(|id| self.pointer_scopes.get(id))
+      && !scope.clip.contains(x, y)
+    {
+      return false;
+    }
     let surfaces = self.pointer_surfaces.borrow();
     rank == usize::MAX
       || surfaces.is_empty()
@@ -235,11 +273,18 @@ impl UiObjectPool {
       .map(|hit| (hit.surface_rank, hit.order))
       .max();
     let surface = self.pointer_surface_rank(x, y);
+    let region = self
+      .pointer_regions
+      .iter()
+      .filter(|(rect, _, _)| rect.contains(x, y))
+      .map(|(_, rank, order)| (*rank, *order))
+      .max();
     [
       area,
       link,
       input,
       markdown,
+      region,
       (surface > 0).then_some((surface, 0)),
     ]
     .into_iter()

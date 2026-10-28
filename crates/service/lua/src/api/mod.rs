@@ -137,7 +137,7 @@ pub struct LuaApiContext {
 }
 
 /// A session-owned base, slice, or scroll-box drawing destination.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum LuaDrawTarget {
   /// The base setting for Lua draw target.
   Base,
@@ -148,6 +148,19 @@ pub enum LuaDrawTarget {
 /// A structured drawing request collected during a script callback.
 #[derive(Clone, Debug)]
 pub enum LuaDrawCommand {
+  /// Place an embedded layer component or a user slice within its parent.
+  Surface {
+    /// The canvas identity of the content surface.
+    id: SliceId,
+    /// The owning parent surface.
+    target: LuaDrawTarget,
+    /// The signed local column.
+    x: i32,
+    /// The signed local row.
+    y: i32,
+    /// The frame-local submission identity, used for last-placement semantics.
+    sequence: u64,
+  },
   /// Render a session-owned link inside its parent surface.
   Link {
     /// The pool-local link identity.

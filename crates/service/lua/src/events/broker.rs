@@ -1310,7 +1310,7 @@ mod tests {
       broker.push_owned(game, 1, game_ui, LuaEventRoute::HandleEvent),
       Err(LuaEnqueueError::EventNotAllowed {
         target: LuaSessionKind::Game,
-        event_type: "scroll_box"
+        event_type: "scrollbox"
       })
     ));
     assert!(matches!(
