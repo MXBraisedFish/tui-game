@@ -2184,7 +2184,10 @@ fn queue_lua_object_events(services: &mut EngineServices, router: &mut LuaEventB
     };
     for event in events.unwrap_or_default() {
       if kind == LuaSessionKind::Screensaver
-        && matches!(event, tg_service_lua::LuaEventData::ScrollBox(_))
+        && matches!(
+          event,
+          tg_service_lua::LuaEventData::ScrollBox(_) | tg_service_lua::LuaEventData::Markdown(_)
+        )
       {
         continue;
       }

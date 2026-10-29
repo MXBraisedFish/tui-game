@@ -39,8 +39,8 @@ pub use ui_object::interactives::text_input::{
   TextInputRenderParams, TextInputService, VerticalAlign,
 };
 pub use ui_object::surfaces::markdown_view::{
-  MarkdownEvent, MarkdownRenderParams, MarkdownService, MarkdownTheme, MarkdownViewId,
-  MarkdownViewOptions,
+  MarkdownEvent, MarkdownLayout, MarkdownRenderParams, MarkdownService, MarkdownTheme,
+  MarkdownViewId, MarkdownViewOptions,
 };
 pub use ui_object::surfaces::progress_bar::{
   ProgressBarFillOrigin, ProgressBarId, ProgressBarOptions, ProgressBarSegmentStyle,

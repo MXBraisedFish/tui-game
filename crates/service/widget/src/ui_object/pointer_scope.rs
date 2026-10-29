@@ -97,6 +97,9 @@ impl UiObjectPool {
     }
     self.text_inputs.invalidate_orders(&orders);
     for view in self.markdown_views.views.values_mut() {
+      if view.hits.iter().any(|hit| orders.contains(&hit.order)) {
+        view.pressed = None;
+      }
       view.hits.retain(|hit| !orders.contains(&hit.order));
     }
   }

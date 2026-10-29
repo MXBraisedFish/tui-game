@@ -3669,6 +3669,7 @@ dependencies = [
  "tg-service-async",
  "tg-service-canvas",
  "tg-service-clipboard",
+ "tg-service-code-highlight",
  "tg-service-file",
  "tg-service-image",
  "tg-service-input",

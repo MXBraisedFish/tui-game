@@ -20,7 +20,7 @@ pub(crate) struct MarkdownViewState {
   /// The ordered hits retained by this owner.
   pub hits: Vec<MarkdownLinkHit>,
   /// The pressed.
-  pub pressed: Option<usize>,
+  pub pressed: Option<(String, String)>,
 }
 
 /// The markdown link hit representation used by this module.
@@ -72,7 +72,6 @@ impl MarkdownViewObjects {
   pub(crate) fn clear_hits(&mut self) {
     for state in self.views.values_mut() {
       state.hits.clear();
-      state.pressed = None;
     }
   }
 }

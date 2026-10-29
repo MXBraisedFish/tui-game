@@ -71,7 +71,7 @@ pub enum TextWrapMode {
 /// * `line_align` - Horizontal placement of each line within the longest resolved line.
 /// * `wrap_mode` - The policy for wrapping or clipping text at the width limit.
 /// * `non_truncate_word_wrap` - Whether words should be kept intact when a legal word wrap is
-/// available.
+///   available.
 /// * `max_width` - The optional line-width limit in terminal columns.
 /// * `max_height` - The optional line-count limit in terminal rows.
 /// * `overflow_marker` - Optional text replacing the visible ending when content is clipped.
@@ -212,11 +212,14 @@ impl DrawTextParams {
 ///
 /// # Fields
 ///
+/// * `source_offset` - The byte offset in the concatenated source segments, if present.
 /// * `text` - The text to process or display.
 /// * `width` - The width in terminal columns.
 /// * `style` - The text style applied to the rendered content.
 #[derive(Clone, Debug)]
 pub struct StyledGrapheme {
+  /// The source byte offset; generated hyphens inherit their anchor, other markers use None.
+  pub source_offset: Option<usize>,
   /// The text to process or display.
   pub text: String,
   /// The width in terminal columns.
@@ -314,6 +317,7 @@ fn build_text_tokens(params: &DrawTextParams, style: &TextStyle) -> Vec<TextToke
 fn build_segment_tokens(segments: &[RichTextSegment], style: &TextStyle) -> Vec<TextToken> {
   let mut tokens = Vec::new();
 
+  let mut source_offset = 0;
   for segment in segments {
     let merged = merge_style(style, &segment.style);
     for g in graphemes(&segment.text) {
@@ -321,11 +325,13 @@ fn build_segment_tokens(segments: &[RichTextSegment], style: &TextStyle) -> Vec<
         tokens.push(TextToken::Newline);
       } else {
         tokens.push(TextToken::Grapheme(StyledGrapheme {
-          text: g.text,
+          source_offset: Some(source_offset),
+          text: g.text.clone(),
           width: g.display_width,
           style: merged.clone(),
         }));
       }
+      source_offset += g.text.len();
     }
   }
 
@@ -601,6 +607,7 @@ fn hyphenate_english_word(
   let split = best?;
   let mut line = line_from_items(&items[start..split]);
   line.push(StyledGrapheme {
+    source_offset: items[split - 1].source_offset,
     text: "-".to_string(),
     width: 1,
     style: items[split - 1].style.clone(),
@@ -807,6 +814,7 @@ fn marker_graphemes(marker: &str, max_width: usize, style: &TextStyle) -> Vec<St
     }
     width += g.display_width;
     result.push(StyledGrapheme {
+      source_offset: None,
       text: g.text,
       width: g.display_width,
       style: style.clone(),

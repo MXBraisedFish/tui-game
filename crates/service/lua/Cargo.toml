@@ -21,6 +21,7 @@ tg-core-style = { path = "../../core/style" }
 tg-core-unicode = { path = "../../core/unicode" }
 tg-core-version = { path = "../../core/version" }
 tg-service-animation = { path = "../animation" }
+tg-service-code-highlight = { path = "../code_highlight" }
 tg-service-canvas = { path = "../canvas" }
 tg-service-async = { path = "../async" }
 tg-service-clipboard = { path = "../clipboard" }

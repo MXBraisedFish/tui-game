@@ -6,6 +6,8 @@ use std::rc::{Rc, Weak};
 
 mod input;
 mod link;
+mod markdown;
+pub(crate) use markdown::LuaMarkdownBinding;
 mod scene;
 mod scrollbox;
 pub(crate) use input::LuaInputBinding;
@@ -101,6 +103,8 @@ pub struct LuaObjectPool {
   pub(crate) links: BTreeMap<u64, LuaLinkBinding>,
   pub(crate) scrollboxes: BTreeMap<u64, LuaScrollboxBinding>,
   pub(crate) next_scrollbox_id: u64,
+  pub(crate) markdowns: BTreeMap<u64, LuaMarkdownBinding>,
+  pub(crate) next_markdown_id: u64,
   pub(crate) surface_placements: HashMap<tg_service_widget::SliceId, SurfacePlacement>,
   pub(crate) surface_sequence: u64,
   pub(crate) slice_scopes: HashMap<tg_service_widget::SliceId, tg_service_widget::PointerScopeId>,
@@ -120,6 +124,8 @@ impl LuaObjectPool {
       links: BTreeMap::new(),
       scrollboxes: BTreeMap::new(),
       next_scrollbox_id: 0,
+      markdowns: BTreeMap::new(),
+      next_markdown_id: 0,
       surface_placements: HashMap::new(),
       surface_sequence: 0,
       slice_scopes: HashMap::new(),
@@ -232,6 +238,11 @@ impl LuaObjectPool {
       }
     }
     let event_point = (event.x, event.y);
+    tg_service_widget::MarkdownService::new().route_mouse_event(
+      &mut self.ui,
+      &self.text_input,
+      event,
+    );
     tg_service_widget::HyperlinkService::new().route_mouse_event(
       &mut self.ui,
       &self.text_input,
@@ -244,6 +255,11 @@ impl LuaObjectPool {
         && let Some(translated) = self.translate_link_event(event.clone())
       {
         events.push(translated);
+      }
+      if let tg_service_widget::UiEvent::Markdown(event) = &event
+        && let Some(event) = self.translate_markdown_event(event.clone())
+      {
+        events.push(event);
       }
       if let tg_service_widget::UiEvent::TextInput(event) = &event
         && let Some(translated) = self.translate_input_event(event.clone())

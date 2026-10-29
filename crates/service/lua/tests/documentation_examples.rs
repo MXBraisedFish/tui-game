@@ -75,6 +75,7 @@ fn api_examples_execute_with_fixture_assets() {
     "widget/input",
     "widget/link",
     "widget/scrollbox",
+    "widget/markdown",
   ];
   let mut failures = Vec::new();
   let mut count = 0;
@@ -82,17 +83,27 @@ fn api_examples_execute_with_fixture_assets() {
     let markdown = fs::read_to_string(docs.join(format!("{library}.md"))).unwrap();
     let mut example_section = false;
     let mut in_example = false;
+    let mut fence_length = 0;
     let mut source = String::new();
     let mut start = 0;
     for (index, line) in markdown.lines().enumerate() {
       if !in_example && (line.starts_with('#') || line.starts_with("**输出")) {
         example_section = line == "### 示例";
       }
-      if example_section && line == "```lua" && !in_example {
+      if let Some(fence) = line
+        .strip_suffix("lua")
+        .filter(|fence| fence.len() >= 3 && fence.chars().all(|character| character == '`'))
+        && example_section
+        && !in_example
+      {
+        fence_length = fence.len();
         in_example = true;
         source.clear();
         start = index + 1;
-      } else if in_example && line == "```" {
+      } else if in_example
+        && line.len() == fence_length
+        && line.chars().all(|character| character == '`')
+      {
         in_example = false;
         count += 1;
         let result = run_snippet(&entry, &source);
@@ -197,6 +208,7 @@ fn documented_members_match_registered_libraries() {
     "widget/input",
     "widget/link",
     "widget/scrollbox",
+    "widget/markdown",
   ];
   for library in libraries {
     assert_documented_members(library, &docs, &entry);
@@ -221,6 +233,7 @@ fn session_object_libraries_match_documented_members() {
     "widget/input",
     "widget/link",
     "widget/scrollbox",
+    "widget/markdown",
   ] {
     assert_documented_members(library, &docs, &entry);
   }

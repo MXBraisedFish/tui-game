@@ -51,7 +51,13 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
         "none".into(),
       )?;
       with_pool_mut(&create_state, method, |pool| {
-        if pool.scrollboxes.len() >= 1024 {
+        if pool
+          .scrollboxes
+          .values()
+          .filter(|binding| binding.markdown.is_none())
+          .count()
+          >= 1024
+        {
           return Err(args::message(method, "scrollbox limit of 1024 was reached"));
         }
         let widget = ScrollBoxWidget::new(&mut pool.ui, options)
@@ -65,6 +71,7 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
             widget,
             surface,
             background,
+            markdown: None,
           },
         );
         Ok(format_id(id))
@@ -85,6 +92,7 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
         let surface = pool
           .scrollboxes
           .get(&id)
+          .filter(|binding| binding.markdown.is_none())
           .ok_or_else(|| args::message(method, "unknown scrollbox id"))?
           .surface;
         let sequence = pool
@@ -115,7 +123,11 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
       let table = positional_table(lua, method, values, &["id"], &fields)?;
       let id = table_id(&table, method)?;
       with_pool_mut(&set_state, method, |pool| {
-        let Some(binding) = pool.scrollboxes.get_mut(&id) else {
+        let Some(binding) = pool
+          .scrollboxes
+          .get_mut(&id)
+          .filter(|binding| binding.markdown.is_none())
+        else {
           return Ok(false);
         };
         let (options, background) = options(
@@ -164,38 +176,14 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
       let vertical = table.raw_get::<Value>("scroll_times_vertical")?;
       let horizontal = table.raw_get::<Value>("scroll_times_horizontal")?;
       with_pool_mut(&scroll_state, method, |pool| {
-        let Some(binding) = pool.scrollboxes.get_mut(&id) else {
+        let Some(binding) = pool
+          .scrollboxes
+          .get_mut(&id)
+          .filter(|binding| binding.markdown.is_none())
+        else {
           return Ok(false);
         };
-        let mut delta = [0i64; 2];
-        let mut endpoint = [None; 2];
-        for (index, value, name, step) in [
-          (
-            0,
-            horizontal,
-            "scroll_times_horizontal",
-            binding.widget.options().wheel_step_horizontal,
-          ),
-          (
-            1,
-            vertical,
-            "scroll_times_vertical",
-            binding.widget.options().wheel_step_vertical,
-          ),
-        ] {
-          if matches!(value, Value::String(_)) {
-            endpoint[index] = Some(offset(value, method, name, index == 1, 0)?);
-          } else {
-            let count = args::integer(value, method, name)?;
-            i32::try_from(count)
-              .map_err(|_| args::message(method, format!("{name} is out of i32 range")))?;
-            delta[index] = count * i64::from(step);
-          }
-        }
-        binding.widget.scroll_by(delta[0], delta[1]);
-        if endpoint.iter().any(Option::is_some) {
-          binding.widget.scroll_to_axes(endpoint[0], endpoint[1]);
-        }
+        scroll_widget(&mut binding.widget, vertical, horizontal, method)?;
         Ok(true)
       })
     })?,
@@ -209,11 +197,23 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
         let table = positional_table(lua, &method, values, &["id"], &[])?;
         let id = table_id(&table, &method)?;
         with_pool_mut(&state, &method, |pool| match name {
-          "delete" => Ok(Value::Boolean(pool.delete_scrollbox(id))),
-          "exists" => Ok(Value::Boolean(pool.scrollboxes.contains_key(&id))),
+          "delete" => Ok(Value::Boolean(
+            pool
+              .scrollboxes
+              .get(&id)
+              .is_some_and(|binding| binding.markdown.is_none())
+              && pool.delete_scrollbox(id),
+          )),
+          "exists" => Ok(Value::Boolean(
+            pool
+              .scrollboxes
+              .get(&id)
+              .is_some_and(|binding| binding.markdown.is_none()),
+          )),
           _ => pool
             .scrollboxes
             .get(&id)
+            .filter(|binding| binding.markdown.is_none())
             .map(|binding| info(lua, id, binding).map(Value::Table))
             .unwrap_or(Ok(Value::Nil)),
         })
@@ -232,13 +232,31 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
             pool.clear_scrollboxes();
             Ok(Value::Boolean(true))
           }
-          "count" => Ok(Value::Integer(pool.scrollboxes.len() as i64)),
+          "count" => Ok(Value::Integer(
+            pool
+              .scrollboxes
+              .values()
+              .filter(|binding| binding.markdown.is_none())
+              .count() as i64,
+          )),
           _ => {
             let result = lua.create_table()?;
-            for (index, (id, binding)) in pool.scrollboxes.iter().enumerate() {
+            for (index, (id, binding)) in pool
+              .scrollboxes
+              .iter()
+              .filter(|(_, binding)| binding.markdown.is_none())
+              .enumerate()
+            {
               result.raw_set(index + 1, info(lua, *id, binding)?)?;
             }
-            result.raw_set("n", pool.scrollboxes.len())?;
+            result.raw_set(
+              "n",
+              pool
+                .scrollboxes
+                .values()
+                .filter(|binding| binding.markdown.is_none())
+                .count(),
+            )?;
             Ok(Value::Table(result))
           }
         })
@@ -247,7 +265,7 @@ pub(super) fn scrollbox(lua: &Lua, state: SharedApiState) -> mlua::Result<Table>
   }
   readonly::proxy(lua, source)
 }
-fn coordinate(table: &Table, method: &str, name: &str) -> mlua::Result<i32> {
+pub(super) fn coordinate(table: &Table, method: &str, name: &str) -> mlua::Result<i32> {
   i32::try_from(args::integer(
     args::required(table, method, name)?,
     method,
@@ -265,7 +283,7 @@ fn table_id(table: &Table, method: &str) -> mlua::Result<u64> {
 fn format_id(id: u64) -> String {
   format!("scrollbox_{id:03}")
 }
-fn offset(
+pub(super) fn offset(
   value: Value,
   method: &str,
   name: &str,
@@ -287,7 +305,7 @@ fn offset(
     }
   }
 }
-fn options(
+pub(super) fn options(
   table: &Table,
   method: &str,
   mut options: ScrollBoxWidgetOptions,
@@ -395,4 +413,43 @@ fn info(lua: &Lua, id: u64, binding: &LuaScrollboxBinding) -> mlua::Result<Table
     result.raw_set(name, value.to_string())?;
   }
   Ok(result)
+}
+
+pub(super) fn scroll_widget(
+  widget: &mut ScrollBoxWidget,
+  vertical: Value,
+  horizontal: Value,
+  method: &str,
+) -> mlua::Result<()> {
+  let mut delta = [0i64; 2];
+  let mut endpoint = [None; 2];
+  for (index, value, name, step) in [
+    (
+      0,
+      horizontal,
+      "scroll_times_horizontal",
+      widget.options().wheel_step_horizontal,
+    ),
+    (
+      1,
+      vertical,
+      "scroll_times_vertical",
+      widget.options().wheel_step_vertical,
+    ),
+  ] {
+    if matches!(value, Value::String(_)) {
+      endpoint[index] = Some(offset(value, method, name, index == 1, 0)?);
+    } else {
+      let count = args::integer(value, method, name)?;
+      i32::try_from(count)
+        .map_err(|_| args::message(method, format!("{name} is out of i32 range")))?;
+      delta[index] = count * i64::from(step);
+    }
+  }
+  widget.scroll_by(delta[0], delta[1]);
+  if endpoint.iter().any(Option::is_some) {
+    widget.scroll_to_axes(endpoint[0], endpoint[1]);
+  }
+
+  Ok(())
 }

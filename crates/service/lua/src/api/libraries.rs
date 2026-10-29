@@ -52,6 +52,7 @@ mod timer;
 mod utf8;
 mod widget_input;
 mod widget_link;
+mod widget_markdown;
 mod widget_scrollbox;
 
 use measurement::{
@@ -114,6 +115,7 @@ pub fn install(lua: &Lua, environment: &Table, state: SharedApiState) -> mlua::R
     "scrollbox",
     widget_scrollbox::scrollbox(lua, state.clone())?,
   )?;
+  widget.raw_set("markdown", widget_markdown::markdown(lua, state.clone())?)?;
   environment.set("widget", readonly::proxy(lua, widget)?)?;
   environment.set("serialization", serialization::serialization(lua)?)?;
   environment.set("encoding", encoding::encoding(lua)?)?;

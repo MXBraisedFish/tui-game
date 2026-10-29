@@ -348,8 +348,22 @@ pub(super) fn parse_draw_target(
       pool
         .scrollboxes
         .get(&id)
+        .filter(|binding| binding.markdown.is_none())
         .map(|binding| LuaDrawTarget::Slice(binding.surface))
         .ok_or_else(|| args::message(method, "unknown scrollbox layer"))
+    });
+  }
+  if let Some(id) = layer
+    .strip_prefix("markdown_")
+    .and_then(|id| id.parse::<u64>().ok())
+  {
+    return with_pool(state, method, |pool| {
+      pool
+        .markdowns
+        .get(&id)
+        .and_then(|binding| pool.scrollboxes.get(&binding.scrollbox))
+        .map(|binding| LuaDrawTarget::Slice(binding.surface))
+        .ok_or_else(|| args::message(method, "unknown markdown layer"))
     });
   }
   let id = slice::parse_id(&layer, method, "slice_layer")?;

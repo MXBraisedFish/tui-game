@@ -108,6 +108,7 @@ impl LuaObjectPool {
   /// Clear stale pointer geometry and drag selection on focus loss or overlay takeover.
   pub fn deactivate_inputs(&mut self) {
     self.text_input.deactivate_pool(&mut self.ui);
+    tg_service_widget::MarkdownService::new().deactivate(&mut self.ui);
     for binding in self.scrollboxes.values_mut() {
       binding.widget.deactivate();
     }
@@ -120,6 +121,11 @@ impl LuaObjectPool {
     while let Some(event) = self.ui.pop_event() {
       if let tg_service_widget::UiEvent::Hyperlink(event) = &event
         && let Some(event) = self.translate_link_event(event.clone())
+      {
+        result.push(event);
+      }
+      if let tg_service_widget::UiEvent::Markdown(event) = &event
+        && let Some(event) = self.translate_markdown_event(event.clone())
       {
         result.push(event);
       }

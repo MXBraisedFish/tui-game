@@ -556,6 +556,27 @@ impl LuaSession {
     {
       return Ok(());
     }
+    if let super::LuaEventData::Markdown(event) = &delivery.event.data {
+      if self.session_kind != LuaSessionKind::Game
+        || !self
+          .with_objects(|objects| objects.markdowns.contains_key(&event.id))
+          .unwrap_or(false)
+      {
+        return Ok(());
+      }
+      if event.scroll_offset.is_none() && tg_service_widget::is_valid_link_target(&event.href) {
+        let mut api = self.api_state.borrow_mut();
+        let assets_root = api.context.assets_root.clone();
+        api::push_host_command(
+          &mut api,
+          api::LuaHostCommand::OpenLink {
+            assets_root,
+            target: event.href.clone(),
+            copy: false,
+          },
+        );
+      }
+    }
     if let super::LuaEventData::Hyperlink(event) = &delivery.event.data {
       if self.session_kind != LuaSessionKind::Game {
         return Ok(());
@@ -7569,6 +7590,7 @@ mod tests {
     for path in markdown_files {
       let markdown = fs::read_to_string(&path).unwrap();
       let mut in_lua_fence = false;
+      let mut fence_length = 0;
       let mut compile_example = true;
       let mut in_call_section = false;
       let mut in_output_section = false;
@@ -7583,12 +7605,21 @@ mod tests {
         if line.trim() == "输出：" || line.trim().starts_with("**输出") {
           in_output_section = true;
         }
-        if line.trim() == "```lua" && !in_lua_fence {
+        if let Some(fence) = line
+          .trim()
+          .strip_suffix("lua")
+          .filter(|fence| fence.len() >= 3 && fence.chars().all(|character| character == '`'))
+          && !in_lua_fence
+        {
+          fence_length = fence.len();
           in_lua_fence = true;
           compile_example = !in_call_section && !in_output_section;
           fence_line = line_index + 1;
           example.clear();
-        } else if line.trim() == "```" && in_lua_fence {
+        } else if in_lua_fence
+          && line.trim().len() == fence_length
+          && line.trim().chars().all(|character| character == '`')
+        {
           if compile_example {
             example_count += 1;
             let chunk = if example.trim_start().starts_with('{') {

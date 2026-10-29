@@ -212,6 +212,9 @@ impl LuaObjectPool {
           .max((i64::from(y) + i64::from(size.height)).clamp(0, i64::from(u16::MAX)) as u16);
       }
     }
+    if let Some(markdown) = scrollbox.and_then(|id| self.scrollboxes[&id].markdown) {
+      extent = self.prepare_markdown(markdown, extent);
+    }
     if let Some(id) = scrollbox {
       let widget = &mut self.scrollboxes.get_mut(&id).unwrap().widget;
       widget.set_extent(extent);
@@ -366,6 +369,19 @@ impl LuaObjectPool {
         rank,
         service.background(&self.ui, id).flatten(),
         service.is_opaque(&self.ui, id),
+      );
+    }
+    if let Some(markdown) = self
+      .scrollbox_id_for_surface(id)
+      .and_then(|id| self.scrollboxes[&id].markdown)
+    {
+      let binding = &self.markdowns[&markdown];
+      tg_service_widget::MarkdownService::new().render_layout_on(
+        &mut self.ui,
+        binding.native,
+        id,
+        &binding.layout,
+        canvas,
       );
     }
     self.replay_surface(LuaDrawTarget::Slice(id), render, canvas, commands, depth);

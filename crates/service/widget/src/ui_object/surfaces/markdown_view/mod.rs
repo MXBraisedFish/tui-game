@@ -1,6 +1,8 @@
 //! Markdown layout, syntax-highlighted code, and clickable text regions.
 
+mod layout;
 mod state;
+pub use layout::MarkdownLayout;
 mod types;
 
 pub(crate) use self::state::MarkdownViewObjects;
@@ -36,6 +38,7 @@ enum MdBlock {
   Text {
     segments: Vec<RichTextSegment>,
     links: Vec<LinkSpan>,
+    continuation: Vec<RichTextSegment>,
   },
   Code {
     language: Option<String>,
@@ -64,6 +67,7 @@ struct InlineState {
   segments: Vec<RichTextSegment>,
   links: Vec<LinkSpan>,
   active_link: Option<ActiveLink>,
+  continuation: Vec<RichTextSegment>,
 }
 
 #[derive(Clone)]
@@ -138,6 +142,8 @@ impl MarkdownService {
     let Some(state) = pool.markdown_views.views.get_mut(&id) else {
       return false;
     };
+    state.hits.clear();
+    state.pressed = None;
     state.options.markdown = markdown;
     true
   }
@@ -198,11 +204,11 @@ impl MarkdownService {
     code_highlight: &CodeHighlightService,
   ) -> Option<Size> {
     let state = pool.markdown_views.views.get(&id)?;
-    let blocks = parse_markdown(&state.options, code_highlight);
-    Some(Size {
-      width,
-      height: measure_blocks(&blocks, &state.options, width, code_highlight),
-    })
+    Some(
+      self
+        .layout(&state.options, width, false, code_highlight)
+        .size(),
+    )
   }
 
   /// Render the markdown service into its requested terminal-cell surface.
@@ -311,30 +317,15 @@ impl MarkdownService {
     else {
       return false;
     };
-    let blocks = parse_markdown(&options, code_highlight);
-    if let Some(state) = pool.markdown_views.views.get_mut(&id) {
-      state.hits.clear();
+    let layout = self.layout(&options, params.width, false, code_highlight);
+    layout::render_layout(pool, id, target, &layout, params, canvas)
+  }
+
+  /// Cancel pending link activation when the owning surface loses interaction ownership.
+  pub fn deactivate(&self, pool: &mut UiObjectPool) {
+    for state in pool.markdown_views.views.values_mut() {
       state.pressed = None;
     }
-    let mut y = params.y;
-    let bottom = params
-      .max_height
-      .map(|height| params.y.saturating_add(height));
-    let mut context = MarkdownDrawContext {
-      pool,
-      id,
-      options: &options,
-      target,
-      canvas,
-      code_highlight,
-    };
-    for block in blocks {
-      if bottom.is_some_and(|bottom| y >= bottom) {
-        break;
-      }
-      y = draw_block(&mut context, &block, params.x, y, params.width);
-    }
-    true
   }
 
   /// Route a pointer event through the component's current hit regions and focus state.
@@ -374,8 +365,10 @@ impl MarkdownService {
     };
     match event.kind {
       MouseEventKind::Press => {
+        self.deactivate(pool);
         if let Some(state) = pool.markdown_views.views.get_mut(&id) {
-          state.pressed = Some(link_index);
+          let hit = &state.hits[link_index];
+          state.pressed = Some((hit.href.clone(), hit.text.clone()));
         }
         true
       }
@@ -383,7 +376,8 @@ impl MarkdownService {
         let Some(state) = pool.markdown_views.views.get_mut(&id) else {
           return false;
         };
-        let clicked = state.pressed.take() == Some(link_index);
+        let hit = &state.hits[link_index];
+        let clicked = state.pressed.take() == Some((hit.href.clone(), hit.text.clone()));
         if clicked {
           let hit = state.hits[link_index].clone();
           pool.push_markdown_event(MarkdownEvent::LinkClicked {
@@ -392,6 +386,7 @@ impl MarkdownService {
             text: hit.text,
           });
         }
+        self.deactivate(pool);
         true
       }
       _ => false,
@@ -456,6 +451,9 @@ fn parse_markdown(
       }
       Event::End(TagEnd::Heading(_)) => finish_text(&mut blocks, inline.take(), true),
       Event::Start(Tag::Paragraph) => {
+        if !list_stack.is_empty() && inline.is_some() {
+          continue;
+        }
         let mut state = InlineState::new(if quote_depth > 0 {
           options.theme.quote.clone()
         } else {
@@ -463,6 +461,10 @@ fn parse_markdown(
         });
         for _ in 0..quote_depth {
           state.push_text(&options.theme.quote_marker, &options.theme.quote);
+          state.continuation.push(RichTextSegment {
+            text: options.theme.quote_marker.clone(),
+            style: options.theme.quote.clone(),
+          });
         }
         inline = Some(state);
       }
@@ -493,6 +495,11 @@ fn parse_markdown(
             }
           })
           .unwrap_or_else(|| "• ".to_string());
+        let marker = format!(
+          "{}{}",
+          "  ".repeat(list_stack.len().saturating_sub(1)),
+          marker
+        );
         let marker_style = TextStyle {
           foreground: Some(TextColor::Rgb {
             r: 255,
@@ -503,6 +510,10 @@ fn parse_markdown(
         };
         let mut state = InlineState::new(options.theme.paragraph.clone());
         state.push_text(&marker, &marker_style);
+        state.continuation.push(RichTextSegment {
+          text: " ".repeat(display_width(&marker)),
+          style: marker_style,
+        });
         inline = Some(state);
       }
       Event::End(TagEnd::Item) => finish_text(&mut blocks, inline.take(), false),
@@ -515,6 +526,10 @@ fn parse_markdown(
             &options.theme.task_unchecked
           };
           state.push_text(marker, style);
+          state.continuation.push(RichTextSegment {
+            text: " ".repeat(display_width(marker)),
+            style: style.clone(),
+          });
         }
       }
       Event::Start(Tag::CodeBlock(kind)) => {
@@ -599,280 +614,6 @@ fn parse_markdown(
   blocks
 }
 
-struct MarkdownDrawContext<'a> {
-  pool: &'a mut UiObjectPool,
-  id: MarkdownViewId,
-  options: &'a MarkdownViewOptions,
-  target: MarkdownTarget,
-  canvas: &'a mut CanvasService,
-  code_highlight: &'a CodeHighlightService,
-}
-
-fn draw_block(
-  context: &mut MarkdownDrawContext<'_>,
-  block: &MdBlock,
-  x: u16,
-  y: u16,
-  width: u16,
-) -> u16 {
-  match block {
-    MdBlock::Text { segments, links } => {
-      let params = text_params(x, y, width, None);
-      draw_segments(context.canvas, context.target, segments, &params);
-      register_links(
-        context.pool,
-        context.id,
-        links,
-        x,
-        y,
-        context.target,
-        context.canvas,
-      );
-      y.saturating_add(measure_segments(segments, &params).height)
-    }
-    MdBlock::Code { language, code } => {
-      draw_code_block(context, x, y, width, language.as_deref(), code)
-    }
-    MdBlock::Rule => {
-      draw_plain(
-        context.canvas,
-        context.target,
-        x,
-        y,
-        &"─".repeat(width as usize),
-        context.options.theme.horizontal_rule.clone(),
-      );
-      y.saturating_add(1)
-    }
-    MdBlock::Table { rows, aligns } => draw_table(context, x, y, width, rows, aligns),
-    MdBlock::Blank => y.saturating_add(1),
-  }
-}
-
-fn draw_code_block(
-  context: &mut MarkdownDrawContext<'_>,
-  x: u16,
-  y: u16,
-  width: u16,
-  language: Option<&str>,
-  code: &str,
-) -> u16 {
-  let options = context.options;
-  let lines = code.trim_end_matches('\n').split('\n').collect::<Vec<_>>();
-  let max_line = lines
-    .iter()
-    .map(|line| display_width(line))
-    .max()
-    .unwrap_or(0) as u16;
-  let inner_width = max_line.saturating_add(2).clamp(20, width.max(1));
-  let right = inner_width.saturating_sub(1);
-  draw_plain(
-    context.canvas,
-    context.target,
-    x,
-    y,
-    &format!("┌{}┐", "─".repeat(right as usize)),
-    options.theme.code_border.clone(),
-  );
-  if let Some(language) = language.filter(|language| !language.is_empty()) {
-    draw_plain(
-      context.canvas,
-      context.target,
-      x.saturating_add(2),
-      y,
-      language,
-      options.theme.code_border.clone(),
-    );
-  }
-  let code_language =
-    language.and_then(|language| context.code_highlight.language_from_name(language));
-  let mut row = y.saturating_add(1);
-  for line in lines {
-    draw_plain(
-      context.canvas,
-      context.target,
-      x,
-      row,
-      "│",
-      options.theme.code_border.clone(),
-    );
-    draw_plain(
-      context.canvas,
-      context.target,
-      x.saturating_add(inner_width),
-      row,
-      "│",
-      options.theme.code_border.clone(),
-    );
-    let segments = code_language
-      .map(|language| {
-        context
-          .code_highlight
-          .highlight_segments(line, language, &options.code_theme)
-      })
-      .unwrap_or_else(|| {
-        vec![RichTextSegment {
-          text: line.to_string(),
-          style: options.theme.code_block.clone(),
-        }]
-      });
-    draw_segments(
-      context.canvas,
-      context.target,
-      &segments,
-      &DrawTextParams {
-        x: x.saturating_add(1),
-        y: row,
-        wrap_mode: TextWrapMode::None,
-        max_width: Some(inner_width.saturating_sub(1)),
-        ..Default::default()
-      },
-    );
-    row = row.saturating_add(1);
-  }
-  draw_plain(
-    context.canvas,
-    context.target,
-    x,
-    row,
-    &format!("└{}┘", "─".repeat(right as usize)),
-    options.theme.code_border.clone(),
-  );
-  row.saturating_add(1)
-}
-
-fn draw_table(
-  context: &mut MarkdownDrawContext<'_>,
-  x: u16,
-  y: u16,
-  width: u16,
-  rows: &[Vec<String>],
-  aligns: &[TextAlign],
-) -> u16 {
-  let theme = &context.options.theme;
-  if rows.is_empty() || width < 3 {
-    return y;
-  }
-  let columns = rows.iter().map(Vec::len).max().unwrap_or(0).max(1);
-  let cell_widths = markdown_table_widths(rows, width, columns);
-  let mut row_y = y;
-  draw_plain(
-    context.canvas,
-    context.target,
-    x,
-    row_y,
-    &table_border(&cell_widths, '┌', '┬', '┐'),
-    theme.table_border.clone(),
-  );
-  row_y = row_y.saturating_add(1);
-  for (index, row) in rows.iter().enumerate() {
-    let row_style = if index == 0 {
-      theme.table_header.clone()
-    } else {
-      theme.paragraph.clone()
-    };
-    let row_height = markdown_table_row_height(row, &cell_widths).max(1);
-    for line in 0..row_height {
-      draw_plain(
-        context.canvas,
-        context.target,
-        x,
-        row_y.saturating_add(line),
-        "│",
-        theme.table_border.clone(),
-      );
-    }
-    let mut cell_x = x.saturating_add(1);
-    for (col, cell_width) in cell_widths.iter().enumerate().take(columns) {
-      let text = row.get(col).map(String::as_str).unwrap_or("");
-      draw_segments(
-        context.canvas,
-        context.target,
-        &[RichTextSegment {
-          text: text.to_string(),
-          style: row_style.clone(),
-        }],
-        &DrawTextParams {
-          x: cell_x,
-          y: row_y,
-          max_width: Some(*cell_width),
-          max_height: Some(row_height),
-          wrap_mode: TextWrapMode::Auto,
-          non_truncate_word_wrap: true,
-          line_align: *aligns.get(col).unwrap_or(&TextAlign::Left),
-          ..Default::default()
-        },
-      );
-      cell_x = cell_x.saturating_add(*cell_width);
-      for line in 0..row_height {
-        draw_plain(
-          context.canvas,
-          context.target,
-          cell_x,
-          row_y.saturating_add(line),
-          "│",
-          theme.table_border.clone(),
-        );
-      }
-      cell_x = cell_x.saturating_add(1);
-    }
-    row_y = row_y.saturating_add(row_height);
-    let sep = if index + 1 == rows.len() {
-      table_border(&cell_widths, '└', '┴', '┘')
-    } else {
-      table_border(&cell_widths, '├', '┼', '┤')
-    };
-    draw_plain(
-      context.canvas,
-      context.target,
-      x,
-      row_y,
-      &sep,
-      theme.table_border.clone(),
-    );
-    row_y = row_y.saturating_add(1);
-  }
-  row_y
-}
-
-fn measure_blocks(
-  blocks: &[MdBlock],
-  options: &MarkdownViewOptions,
-  width: u16,
-  code_highlight: &CodeHighlightService,
-) -> u16 {
-  let mut height = 0u16;
-  for block in blocks {
-    height = match block {
-      MdBlock::Text { segments, .. } => {
-        height.saturating_add(measure_segments(segments, &text_params(0, 0, width, None)).height)
-      }
-      MdBlock::Code { code, .. } => height
-        .saturating_add(code.lines().count() as u16)
-        .saturating_add(2),
-      MdBlock::Rule => height.saturating_add(1),
-      MdBlock::Table { rows, .. } => {
-        let widths =
-          markdown_table_widths(rows, width, rows.iter().map(Vec::len).max().unwrap_or(1));
-        height.saturating_add(
-          rows
-            .iter()
-            .map(|row| {
-              markdown_table_row_height(row, &widths)
-                .max(1)
-                .saturating_add(1)
-            })
-            .sum::<u16>()
-            .saturating_add(1),
-        )
-      }
-      MdBlock::Blank => height.saturating_add(1),
-    };
-  }
-  let _ = (options, code_highlight);
-  height
-}
-
 fn register_links(
   pool: &mut UiObjectPool,
   id: MarkdownViewId,
@@ -883,10 +624,17 @@ fn register_links(
   canvas: &CanvasService,
 ) {
   for link in links {
+    let Ok(start) = u16::try_from(link.start) else {
+      continue;
+    };
+    let width = link.width.min(usize::from(u16::MAX - start)) as u16;
+    if width == 0 {
+      continue;
+    }
     let rect = Rect {
-      x: x.saturating_add(link.start as u16),
+      x: x.saturating_add(start),
       y,
-      width: link.width as u16,
+      width,
       height: 1,
     };
     let resolved = match target {
@@ -954,44 +702,6 @@ fn draw_segments(
   }
 }
 
-fn draw_plain(
-  canvas: &mut CanvasService,
-  target: MarkdownTarget,
-  x: u16,
-  y: u16,
-  text: &str,
-  style: TextStyle,
-) -> bool {
-  match target {
-    MarkdownTarget::Base => {
-      canvas.styled_text(x, y, text, style);
-      true
-    }
-    MarkdownTarget::Slice(slice) => canvas.styled_text_on(slice, x, y, text, style),
-    MarkdownTarget::ScrollBox(scroll_box) => {
-      canvas.styled_text_in_scroll_box(scroll_box, x, y, text, style)
-    }
-  }
-}
-
-fn text_params(x: u16, y: u16, width: u16, height: Option<u16>) -> DrawTextParams {
-  DrawTextParams {
-    x,
-    y,
-    wrap_mode: TextWrapMode::Auto,
-    non_truncate_word_wrap: true,
-    max_width: Some(width),
-    max_height: height,
-    line_align: TextAlign::Left,
-    ..Default::default()
-  }
-}
-
-fn measure_segments(segments: &[RichTextSegment], params: &DrawTextParams) -> Size {
-  let (width, height) = text_layout::measure_rich_text_segments(segments, params);
-  Size { width, height }
-}
-
 fn finish_text(blocks: &mut Vec<MdBlock>, state: Option<InlineState>, blank_after: bool) {
   let Some(state) = state else {
     return;
@@ -1004,6 +714,7 @@ fn finish_text(blocks: &mut Vec<MdBlock>, state: Option<InlineState>, blank_afte
     blocks.push(MdBlock::Text {
       segments: state.segments,
       links: state.links,
+      continuation: state.continuation,
     });
   }
   if blank_after {
@@ -1031,6 +742,7 @@ impl InlineState {
       segments: Vec::new(),
       links: Vec::new(),
       active_link: None,
+      continuation: Vec::new(),
     }
   }
 
@@ -1137,64 +849,62 @@ fn markdown_table_widths(rows: &[Vec<String>], width: u16, columns: usize) -> Ve
   if columns == 0 {
     return Vec::new();
   }
-  let borders = columns as u16 + 1;
-  let available = width.saturating_sub(borders).max(columns as u16);
+  let available = (width as usize)
+    .saturating_sub(columns.saturating_add(1))
+    .max(columns);
   let mut widths = (0..columns)
-    .map(|col| {
+    .map(|column| {
       rows
         .iter()
-        .filter_map(|row| row.get(col))
+        .filter_map(|row| row.get(column))
         .map(|text| visible_width(text))
         .max()
         .unwrap_or(1)
         .max(1)
     })
     .collect::<Vec<_>>();
-
-  while widths.iter().sum::<u16>() > available {
-    let Some(index) = widths
-      .iter()
-      .enumerate()
-      .filter(|(_, width)| **width > 3)
-      .max_by_key(|(_, width)| **width)
-      .map(|(index, _)| index)
-    else {
-      break;
-    };
-    widths[index] -= 1;
+  let total = |values: &[u16]| values.iter().map(|value| *value as usize).sum::<usize>();
+  if total(&widths) > available {
+    let (mut low, mut high) = (1u16, *widths.iter().max().unwrap());
+    while low < high {
+      let middle = (u32::from(low) + u32::from(high)).div_ceil(2);
+      if widths
+        .iter()
+        .map(|value| usize::from((*value).min(middle as u16)))
+        .sum::<usize>()
+        <= available
+      {
+        low = middle as u16;
+      } else {
+        high = middle as u16 - 1;
+      }
+    }
+    for value in &mut widths {
+      *value = (*value).min(low);
+    }
   }
-
-  while widths.iter().sum::<u16>() < available {
-    let Some(index) = widths
+  let (mut low, mut high) = (1u16, width);
+  while low < high {
+    let middle = (u32::from(low) + u32::from(high)).div_ceil(2);
+    if widths
       .iter()
-      .enumerate()
-      .min_by_key(|(_, width)| **width)
-      .map(|(index, _)| index)
-    else {
-      break;
-    };
-    widths[index] += 1;
+      .map(|value| usize::from((*value).max(middle as u16)))
+      .sum::<usize>()
+      <= available
+    {
+      low = middle as u16;
+    } else {
+      high = middle as u16 - 1;
+    }
+  }
+  for value in &mut widths {
+    *value = (*value).max(low);
+  }
+  let remainder = available.saturating_sub(total(&widths));
+  for value in widths.iter_mut().take(remainder) {
+    *value = value.saturating_add(1);
   }
   widths
-}
-
-fn markdown_table_row_height(row: &[String], widths: &[u16]) -> u16 {
-  widths
-    .iter()
-    .enumerate()
-    .map(|(index, width)| {
-      text_layout::measure_draw_text(&DrawTextParams {
-        text: row.get(index).cloned().unwrap_or_default(),
-        max_width: Some(*width),
-        wrap_mode: TextWrapMode::Auto,
-        non_truncate_word_wrap: true,
-        ..Default::default()
-      })
-      .1
-      .max(1)
-    })
-    .max()
-    .unwrap_or(1)
 }
 
 fn visible_width(text: &str) -> u16 {
@@ -1283,6 +993,51 @@ mod tests {
       .map(|segment| segment.text.as_str())
       .collect::<String>();
     assert_eq!(text, "before  after");
+  }
+
+  #[test]
+  fn markdown_click_survives_redraw_but_source_changes_cancel_it() {
+    let service = MarkdownService::new();
+    let code = CodeHighlightService::new();
+    let mut pool = UiObjectPool::new();
+    let id = service
+      .create(
+        &mut pool,
+        MarkdownViewOptions::new("[Open](https://example.com)"),
+      )
+      .unwrap();
+    let layout = tg_service_layout::LayoutService::new();
+    let mut canvas = CanvasService::new();
+    let params = MarkdownRenderParams {
+      x: 0,
+      y: 0,
+      width: 30,
+      max_height: None,
+    };
+    let input = crate::TextInputService::new();
+    let mouse = |kind| MouseEvent {
+      kind,
+      x: 1,
+      y: 0,
+      button: Some(MouseButton::Left),
+      scroll: None,
+    };
+    for replace in [false, true] {
+      pool.begin_render();
+      canvas.begin_frame(&layout);
+      pool.prepare_canvas(&mut canvas, &layout);
+      service.render(&mut pool, id, params, &mut canvas, &code);
+      assert!(service.route_mouse_event(&mut pool, &input, mouse(MouseEventKind::Press)));
+      if replace {
+        service.set_markdown(&mut pool, id, "[Other](https://example.org)".into());
+      }
+      pool.begin_render();
+      canvas.begin_frame(&layout);
+      pool.prepare_canvas(&mut canvas, &layout);
+      service.render(&mut pool, id, params, &mut canvas, &code);
+      service.route_mouse_event(&mut pool, &input, mouse(MouseEventKind::Release));
+      assert_eq!(pool.pop_event().is_some(), !replace);
+    }
   }
 
   #[test]

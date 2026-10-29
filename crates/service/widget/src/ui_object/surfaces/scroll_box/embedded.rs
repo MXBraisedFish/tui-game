@@ -15,6 +15,7 @@ use tg_service_layout::{Rect, Size};
 /// * `background` - The background painted behind content and scrollbars.
 /// * `mouse` - The component's own pointer input switch.
 /// * `wheel_vertical`, `wheel_horizontal` - The accepted wheel directions.
+/// * `horizontal` - Whether horizontal overflow is enabled.
 /// * `scrollbar_swap_vertical`, `scrollbar_swap_horizontal` - The scrollbar placement switches.
 /// * `include_scrollbar`, `always_show_scrollbar` - The sizing and visibility policies.
 /// * `wheel_step_vertical`, `wheel_step_horizontal` - The wheel distances in cells.
@@ -33,6 +34,8 @@ pub struct ScrollBoxWidgetOptions {
   pub wheel_vertical: bool,
   /// Whether horizontal wheel events are enabled.
   pub wheel_horizontal: bool,
+  /// Whether horizontal overflow and its scrollbar are enabled.
+  pub horizontal: bool,
   /// Whether the vertical scrollbar is placed on the left.
   pub scrollbar_swap_vertical: bool,
   /// Whether the horizontal scrollbar is placed on the top.
@@ -57,6 +60,7 @@ impl Default for ScrollBoxWidgetOptions {
       mouse: true,
       wheel_vertical: true,
       wheel_horizontal: true,
+      horizontal: true,
       scrollbar_swap_vertical: false,
       scrollbar_swap_horizontal: false,
       include_scrollbar: true,
@@ -525,7 +529,7 @@ fn resolve(
   offset: (u16, u16),
 ) -> ScrollBoxWidgetLayout {
   let mut vertical = options.always_show_scrollbar;
-  let mut horizontal = vertical;
+  let mut horizontal = vertical && options.horizontal;
   for _ in 0..4 {
     let width = options
       .width
@@ -535,7 +539,7 @@ fn resolve(
       .saturating_sub(u16::from(options.include_scrollbar && horizontal));
     let next = (
       options.always_show_scrollbar || extent.height > height,
-      options.always_show_scrollbar || extent.width > width,
+      options.horizontal && (options.always_show_scrollbar || extent.width > width),
     );
     if next == (vertical, horizontal) {
       break;
@@ -565,7 +569,7 @@ fn resolve(
     height: view.height,
   };
   let maximum = (
-    if view.width == 0 {
+    if !options.horizontal || view.width == 0 {
       0
     } else {
       extent.width.saturating_sub(view.width)

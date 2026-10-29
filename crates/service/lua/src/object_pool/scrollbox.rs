@@ -9,6 +9,7 @@ pub(crate) struct LuaScrollboxBinding {
   pub widget: ScrollBoxWidget,
   pub surface: SliceId,
   pub background: String,
+  pub markdown: Option<u64>,
 }
 #[derive(Clone, Copy)]
 /// A frame-local parent, position and submission identity for an embedded surface.
@@ -78,7 +79,15 @@ impl LuaObjectPool {
         binding
           .widget
           .take_scroll_event()
-          .map(|(x, y)| LuaEventData::ScrollBox(LuaScrollBoxEvent { id: *id, x, y }))
+          .map(|(x, y)| match binding.markdown {
+            None => LuaEventData::ScrollBox(LuaScrollBoxEvent { id: *id, x, y }),
+            Some(id) => LuaEventData::Markdown(crate::LuaMarkdownEvent {
+              id,
+              href: String::new(),
+              text: String::new(),
+              scroll_offset: Some((x, y)),
+            }),
+          })
       })
       .collect()
   }
@@ -94,7 +103,16 @@ impl LuaObjectPool {
   }
 
   pub(crate) fn clear_scrollboxes(&mut self) {
-    for binding in std::mem::take(&mut self.scrollboxes).into_values() {
+    for id in self
+      .scrollboxes
+      .iter()
+      .filter_map(|(id, binding)| binding.markdown.is_none().then_some(*id))
+      .collect::<Vec<_>>()
+    {
+      if self.scrollboxes[&id].widget.frame_order().is_some() {
+        self.invalidate_surface(self.scrollboxes[&id].surface);
+      }
+      let binding = self.scrollboxes.remove(&id).unwrap();
       self.ui.invalidate_pointer_scope(binding.widget.scope());
       self.surface_placements.remove(&binding.surface);
     }

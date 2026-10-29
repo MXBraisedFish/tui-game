@@ -540,6 +540,8 @@ pub struct LuaMarkdownEvent {
   pub href: String,
   /// The text to process or display.
   pub text: String,
+  /// The horizontal and vertical offsets for a scroll event, or None for a link click.
+  pub scroll_offset: Option<(u16, u16)>,
 }
 
 /// A Lua text input event payload queued for its owning consumer.
@@ -807,6 +809,9 @@ impl LuaEventData {
         left.id == right.id && left.kind == "hover_move" && right.kind == "hover_move"
       }
       (Self::ScrollBox(left), Self::ScrollBox(right)) => left.id == right.id,
+      (Self::Markdown(left), Self::Markdown(right)) => {
+        left.id == right.id && left.scroll_offset.is_some() && right.scroll_offset.is_some()
+      }
       _ => false,
     }
   }
@@ -1015,10 +1020,16 @@ impl LuaEventData {
         data.set("link", event.link.as_str())?;
       }
       Self::Markdown(event) => {
-        data.set("id", event.id.to_string())?;
-        data.set("kind", "link_clicked")?;
-        data.set("href", event.href.as_str())?;
-        data.set("text", event.text.as_str())?;
+        data.set("id", format!("markdown_{:03}", event.id))?;
+        if let Some((x, y)) = event.scroll_offset {
+          data.set("kind", "scroll")?;
+          data.set("scroll_offset_horizontal", x)?;
+          data.set("scroll_offset_vertical", y)?;
+        } else {
+          data.set("kind", "click")?;
+          data.set("link", event.href.as_str())?;
+          data.set("text", event.text.as_str())?;
+        }
       }
       Self::TextInput(event) => {
         data.set("id", format!("input_{:03}", event.id))?;
@@ -1400,6 +1411,7 @@ mod tests {
       ),
       (
         LuaEventData::Markdown(LuaMarkdownEvent {
+          scroll_offset: None,
           id: 8,
           href: "target".to_string(),
           text: "label".to_string(),

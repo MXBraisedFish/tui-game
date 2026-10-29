@@ -2,25 +2,27 @@
 
 `widget.markdown` 用于设置 Markdown 文档。
 
+> Markdown 文档组件由绘制组件、交互组件和切片图层组件构成。
+
 ---
 
 # 目录
 
 ## 方法
 
-| 方法                    | 说明                             | 定位                  |
-| ----------------------- | -------------------------------- | --------------------- |
-| `markdown_to_rich_text` | 将 Markdown 文档内容转换为富文本 | [create](#create)     |
-| `create`                | 创建一个 Markdown 文档对象       | [create](#create)     |
-| `delete`                | 删除指定 Markdown 文档           | [delete](#delete)     |
-| `clear`                 | 删除所有 Markdown 文档           | [clear](#clear)       |
-| `list`                  | 获取所有 Markdown 文档信息       | [list](#list)         |
-| `count`                 | 返回当前 Markdown 文档的总数     | [count](#count)       |
-| `draw`                  | 绘制 Markdown 文档               | [draw](#draw)         |
-| `scroll`                | 模拟滚动 Markdown 文档           | [click](#click)       |
-| `set`                   | 修改 Markdown 文档的参数         | [set](#set)           |
-| `get_info`              | 获取 Markdown 文档的完整信息表   | [get_info](#get_info) |
-| `exists`                | 检查 Markdown 文档是否存在       | [exists](#exists)     |
+| 方法                    | 说明                             | 定位                                            |
+| ----------------------- | -------------------------------- | ----------------------------------------------- |
+| `markdown_to_rich_text` | 将 Markdown 文档内容转换为富文本 | [markdown_to_rich_text](#markdown_to_rich_text) |
+| `create`                | 创建一个 Markdown 文档对象       | [create](#create)                               |
+| `delete`                | 删除指定 Markdown 文档           | [delete](#delete)                               |
+| `clear`                 | 删除所有 Markdown 文档           | [clear](#clear)                                 |
+| `list`                  | 获取所有 Markdown 文档信息       | [list](#list)                                   |
+| `count`                 | 返回当前 Markdown 文档的总数     | [count](#count)                                 |
+| `draw`                  | 绘制 Markdown 文档               | [draw](#draw)                                   |
+| `scroll`                | 模拟滚动 Markdown 文档           | [scroll](#scroll)                               |
+| `set`                   | 修改 Markdown 文档的参数         | [set](#set)                                     |
+| `get_info`              | 获取 Markdown 文档的完整信息表   | [get_info](#get_info)                           |
+| `exists`                | 检查 Markdown 文档是否存在       | [exists](#exists)                               |
 
 ---
 
@@ -44,12 +46,6 @@ widget.markdown.markdown_to_rich_text
 | ---------- | ------ | ----------------- |
 | `markdown` | string | Markdown 文档内容 |
 
-#### 选填参数
-
-| 参数    | 类型  | 默认值 | 含义     |
-| ------- | ----- | ------ | -------- |
-| `theme` | table | `{}`   | 应用主题 |
-
 ### 返回值
 
 返回一个值。
@@ -61,21 +57,32 @@ widget.markdown.markdown_to_rich_text
 ### 示例
 
 ````lua
-function Init(ctx)
-  markdown = widget.markdown.markdown_to_rich_text([[This is a **test Markdown document**.\n\n> This method can convert Markdown into rich text for rendering.\n\n```lua\nprint("This is a Lua example code block")\n```]])
-end
+local markdown = widget.markdown.markdown_to_rich_text([[This is a **test Markdown document**.
 
-function Render()
-  widget.markdown.draw(markdown, 5, 2)
-end
+> This method can convert Markdown into rich text for rendering.
+
+```lua
+print("This is a Lua example code block")
+```]])
+debug.print(markdown)
 ````
 
 **输出：**
 
+```lua
+f%<reset><fg:#DCDFDA>This is a <reset><fg:#DCDFDA><bold>test Markdown document<reset><fg:#DCDFDA>.
+
+<reset><fg:#FFA4D1>▌ <reset><fg:#FFA4D1>This method can convert Markdown into rich text for rendering.
+
+
+<reset><fg:#D5F288>print<reset><fg:#B8D7F9>(<reset><fg:#A4DFAE>"This is a Lua example code block"<reset><fg:#B8D7F9>)
+
+<reset>
+```
+
 ### 额外说明
 
-- 选填参数 `theme` 为无效值或存在无法解析的字段时，自动退回程序内置主题。
-- 该方法转换出来的富文本仅具有展示作用，链接等内容无实用交互。
+- 该方法转换出来的富文本仅具有展示作用，链接、代办事项等内容无实用交互。
 
 ---
 
@@ -101,10 +108,11 @@ widget.markdown.create
 
 #### 选填参数
 
-| 参数                    | 类型                     | 默认值 | 含义     |
-| ----------------------- | ------------------------ | ------ | -------- |
-| `theme`                 | table                    | `{}`   | 应用主题 |
-| `vertical_scroll_shape` | string / const-scrollbox | ``     | 应用主题 |
+| 参数                    | 类型    | 默认值  | 含义                                 |
+| ----------------------- | ------- | ------- | ------------------------------------ |
+| `wheel_step_vertical`   | integer | `2`     | 垂直滚动步长                         |
+| `wheel_step_horizontal` | integer | `3`     | 水平滚动步长                         |
+| `allow_overflow`        | boolean | `false` | 是否允许超宽内容保持原行宽并横向滚动 |
 
 ### 返回值
 
@@ -118,7 +126,13 @@ widget.markdown.create
 
 ````lua
 function Init(ctx)
-  markdown = widget.markdown.create(40, 5,[[This is a **test Markdown document**.\n\n> This method can convert Markdown into rich text for rendering.\n\n```lua\nprint("This is a Lua example code block")\n```]])
+  markdown = widget.markdown.create(40, 15, [[This is a **test Markdown document**.
+
+> This method can convert Markdown into rich text for rendering.
+
+```lua
+print("This is a Lua example code block")
+```]])
 end
 
 function Render()
@@ -128,9 +142,14 @@ end
 
 **输出：**
 
+![widget_markdown_create_example](../../image/widget_markdown_create_example.png)
+
 ### 额外说明
 
-- 必填参数 `markdown` 在填写文件路径时，路径相对当前包的 `assets/`。
+- 必填参数 `markdown` 中的链接内容在填写路径时，文件路径起始位置相对当前包的 `assets/`。
+- 选填参数 `wheel_step_vertical` 取值范围为 $[1, 65535]$。
+- 选填参数 `wheel_step_horizontal` 取值范围为 $[1, 65535]$。
+- 选填参数 `wheel_step_horizontal` 仅在选填参数 `allow_overflow` 为 `true` 时生效。
 
 ---
 
@@ -163,7 +182,7 @@ widget.markdown.delete
 ### 示例
 
 ```lua
-local markdown = widget.markdown.create("test", "./test.md")
+local markdown = widget.markdown.create(40, 15, "Test")
 debug.print(markdown)
 
 debug.print(widget.markdown.delete(markdown))
@@ -204,10 +223,10 @@ widget.markdown.clear
 ### 示例
 
 ```lua
-widget.markdown.create("test", "./test.md")
-widget.markdown.create("test", "./test.md")
-widget.markdown.create("test", "./test.md")
-widget.markdown.create("test", "./test.md")
+widget.markdown.create(40, 15, "Test")
+widget.markdown.create(40, 15, "Test")
+widget.markdown.create(40, 15, "Test")
+widget.markdown.create(40, 15, "Test")
 
 debug.print(widget.markdown.clear())
 
@@ -246,7 +265,7 @@ widget.markdown.list
 ### 示例
 
 ```lua
-local markdown = widget.markdown.create("test", "./test.md")
+local markdown = widget.markdown.create(40, 15, "Test")
 
 debug.print(table.pretty(widget.markdown.list()))
 ```
@@ -257,21 +276,14 @@ debug.print(table.pretty(widget.markdown.list()))
 {
   [1] = {
     id = "markdown_001",
-    text = "test",
-    markdown = "./test.md",
-    fg = "bright_blue",
-    bg = "none",
-    hover_fg = "bright_blue",
-    hover_bg = "none",
-    copy = false,
-    bold = false,
-    italic = false,
-    underline = false,
-    strike = false,
-    bmarkdown = false,
-    reverse = false,
-    hidden = false,
-    dim = false
+    width = 40,
+    height = 15,
+    markdown = "Test",
+    allow_overflow = false,
+    wheel_step_vertical = 2,
+    wheel_step_horizontal = 3,
+    scroll_offset_vertical = 0,
+    scroll_offset_horizontal = 0,
   },
   n = 1
 }
@@ -284,24 +296,17 @@ debug.print(table.pretty(widget.markdown.list()))
 ```lua
 {
   {
-    id = "markdown_001",          -- string（ Markdown 文档 ID）
-    text = "test",            -- string（链接展示文本）
-    markdown = "./test.md",       -- string（链接目标）
-    fg = "bright_blue",       -- string（前景色）
-    bg = "none",              -- string（背景色）
-    hover_fg = "bright_blue", -- string（指针悬浮前景色）
-    hover_bg = "none",        -- string（指针悬浮背景色）
-    copy = false,             -- boolean（执行后是否复制到剪切板）
-    bold = false,             -- boolean（粗体）
-    italic = false,           -- boolean（斜体）
-    underline = false,        -- boolean（下划线）
-    strike = false,           -- boolean（删除线）
-    bmarkdown = false,            -- boolean（闪烁）
-    reverse = false,          -- boolean（反显）
-    hidden = false,           -- boolean（隐藏）
-    dim = false               -- boolean（暗淡）
+    id = "markdown_001",          -- string（Markdown 文档 ID）
+    width = 40,                   -- integer（Markdown 文档宽度）
+    height = 15,                  -- integer（Markdown 文档高度）
+    markdown = "Test",            -- string（Markdown 文档内容）
+    allow_overflow = false,       -- boolean（是否允许超宽内容保持原行宽并横向滚动）
+    wheel_step_vertical = 2,      -- integer（垂直滚动步长）
+    wheel_step_horizontal = 3,    -- integer（水平滚动步长）
+    scroll_offset_vertical = 0,   -- integer（垂直已滚动距离）
+    scroll_offset_horizontal = 0, -- integer（水平已滚动距离）
   },
-  n = 1,                      -- integer（ Markdown 文档数量）
+  n = 1,                          -- integer（ Markdown 文档数量）
 }
 ```
 
@@ -328,8 +333,8 @@ widget.markdown.count
 ### 示例
 
 ```lua
-widget.markdown.create("test", "./test.md")
-widget.markdown.create("test", "./test.md")
+widget.markdown.create(40, 15, "Test")
+widget.markdown.create(40, 15, "Test")
 
 debug.print(widget.markdown.count())
 ```
@@ -374,15 +379,21 @@ widget.markdown.draw
 
 ### 示例
 
-```lua
+````lua
 function Init(ctx)
-  markdown = widget.markdown.create("Tui Game", "https://github.com/MXBraisedFish/tui-game")
+  markdown = widget.markdown.create(40, 15, [[This is a **test Markdown document**.
+
+> This method can convert Markdown into rich text for rendering.
+
+```lua
+print("This is a Lua example code block")
+```]])
 end
 
 function Render()
   widget.markdown.draw(markdown, 5, 2)
 end
-```
+````
 
 **输出：**
 
@@ -395,44 +406,80 @@ end
 
 ---
 
-## `click`
+## `scroll`
 
-模拟点击 Markdown 文档。
+模拟滚动 Markdown 文档。
 
 ### 调用
 
 ```lua
-widget.markdown.click
+widget.markdown.scroll
 ```
 
 ### 参数
 
 #### 必填参数
 
-| 参数名 | 类型   | 说明             |
-| ------ | ------ | ---------------- |
-| `id`   | string | Markdown 文档 ID |
+| 参数名                  | 类型                      | 说明             |
+| ----------------------- | ------------------------- | ---------------- |
+| `id`                    | string                    | Markdown 文档 ID |
+| `scroll_times_vertical` | integer / const-scrollbox | 垂直滚动次数     |
+
+#### 选填参数
+
+| 参数名                    | 类型                      | 默认值 | 说明         |
+| ------------------------- | ------------------------- | ------ | ------------ |
+| `scroll_times_horizontal` | integer / const-scrollbox | `0`    | 水平滚动次数 |
 
 ### 返回值
 
 返回一个值。
 
-| 类型    | 说明         |
-| ------- | ------------ |
-| boolean | 聚焦是否成功 |
+| 类型    | 说明                     |
+| ------- | ------------------------ |
+| boolean | 对象存在且滚动请求已受理 |
 
 ### 示例
 
+````lua
+local markdown_draw = false
+local scroll = false
+
+function Init(ctx)
+  markdown = widget.markdown.create(40, 5, [[This is a **test Markdown document**.
+
+> This method can convert Markdown into rich text for rendering.
+
 ```lua
-local markdown = widget.markdown.create("Tui Game", "https://github.com/MXBraisedFish/tui-game", { copy = true })
-debug.print(widget.markdown.click(markdown))
-```
+print("This is a Lua example code block")
+```]])
+end
+
+function Update(event)
+  if markdown_draw and not scroll then
+    widget.markdown.scroll(markdown, 1)
+
+    scroll = true
+  end
+end
+
+function Render()
+  draw.stroke_rect(4, 1, 42, 7)
+  widget.markdown.draw(markdown, 5, 2)
+
+  markdown_draw = true
+end
+````
 
 **输出：**
 
-```lua
-true
-```
+![widget_markdown_scroll_example](../../image/widget_markdown_scroll_example.png)
+
+### 额外说明
+
+- 必填参数 `scroll_times_vertical` 取值范围为 $[-2147483648, 2147483647]$。
+- 选填参数 `scroll_times_horizontal` 取值范围为 $[-2147483648, 2147483647]$。
+- 选填参数 `scroll_times_horizontal` 仅在当前 Markdown 文档对象的配置字段 `allow_overflow` 为 `true` 时生效。
 
 ---
 
@@ -456,23 +503,16 @@ widget.markdown.set
 
 #### 选填参数
 
-| 参数        | 类型                 | 默认值   | 含义                   |
-| ----------- | -------------------- | -------- | ---------------------- |
-| `text`      | string               | 保持原值 | 链接展示文本           |
-| `markdown`  | string               | 保持原值 | 链接目标               |
-| `fg`        | string / const-color | 保持原值 | 前景色                 |
-| `bg`        | string / const-color | 保持原值 | 背景色                 |
-| `hover_fg`  | string / const-color | 保持原值 | 指针悬浮前景色         |
-| `hover_bg`  | string / const-color | 保持原值 | 指针悬浮背景色         |
-| `copy`      | boolean              | 保持原值 | 执行后是否复制到剪切板 |
-| `bold`      | boolean              | 保持原值 | 粗体                   |
-| `italic`    | boolean              | 保持原值 | 斜体                   |
-| `underline` | boolean              | 保持原值 | 下划线                 |
-| `strike`    | boolean              | 保持原值 | 删除线                 |
-| `bmarkdown` | boolean              | 保持原值 | 闪烁                   |
-| `reverse`   | boolean              | 保持原值 | 反显                   |
-| `hidden`    | boolean              | 保持原值 | 隐藏                   |
-| `dim`       | boolean              | 保持原值 | 暗淡                   |
+| 参数                       | 类型                      | 默认值   | 含义                                 |
+| -------------------------- | ------------------------- | -------- | ------------------------------------ |
+| `width`                    | integer                   | 保持原值 | Markdown 文档宽度                    |
+| `height`                   | integer                   | 保持原值 | Markdown 文档高度                    |
+| `markdown`                 | string                    | 保持原值 | Markdown 文档内容                    |
+| `wheel_step_vertical`      | integer                   | 保持原值 | 垂直滚动步长                         |
+| `wheel_step_horizontal`    | integer                   | 保持原值 | 水平滚动步长                         |
+| `scroll_offset_vertical`   | integer / const-scrollbox | 保持原值 | 垂直绝对偏移                         |
+| `scroll_offset_horizontal` | integer / const-scrollbox | 保持原值 | 水平绝对偏移                         |
+| `allow_overflow`           | boolean                   | 保持原值 | 是否允许超宽内容保持原行宽并横向滚动 |
 
 ### 返回值
 
@@ -485,9 +525,9 @@ widget.markdown.set
 ### 示例
 
 ```lua
-local markdown = widget.markdown.create("test", "./test.md")
+local markdown = widget.markdown.create(40, 15, "Test")
 
-debug.print(widget.markdown.set(markdown, { fg = color.BRIGHT_GREEN, hover_fg = color.BRIGHT_RED }))
+debug.print(widget.markdown.set(markdown, { width = 20, height = 10 }))
 
 debug.print(table.pretty(widget.markdown.get_info(markdown)))
 ```
@@ -498,29 +538,26 @@ debug.print(table.pretty(widget.markdown.get_info(markdown)))
 true
 {
   id = "markdown_001",
-  text = "test",
-  markdown = "./test.md",
-  fg = "bright_green",
-  bg = "none",
-  hover_fg = "bright_red",
-  hover_bg = "none",
-  copy = false,
-  bold = false,
-  italic = false,
-  underline = false,
-  strike = false,
-  bmarkdown = false,
-  reverse = false,
-  hidden = false,
-  dim = false
+  width = 20,
+  height = 10,
+  markdown = "Test",
+  allow_overflow = false,
+  wheel_step_vertical = 2,
+  wheel_step_horizontal = 3,
+  scroll_offset_vertical = 0,
+  scroll_offset_horizontal = 0,
 }
 ```
 
 ### 额外说明
 
-- 必填参数 `width` 取值范围为 $[1, 65535]$。
-- 必填参数 `height` 取值范围为 $[1, 65535]$。
-- 选填参数 `max_chars` 取值范围为 $[1, 65535]$。
+- 选填参数 `width` 取值范围为 $[1, 65535]$。
+- 选填参数 `height` 取值范围为 $[1, 65535]$。
+- 选填参数 `wheel_step_vertical` 取值范围为 $[1, 65535]$。
+- 选填参数 `wheel_step_horizontal` 取值范围为 $[1, 65535]$。
+- 选填参数 `scroll_offset_vertical` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总高度，超出范围会修正回正常区域。
+- 选填参数 `scroll_offset_horizontal` 取值范围为 $[0, n]$；`n` 为滚动框内的内容总高度，超出范围会修正回正常区域。
+- 选填参数 `wheel_step_horizontal`、选填参数 `scroll_offset_horizontal` 仅在选填参数 `allow_overflow` 为 `true` 时生效。
 
 ---
 
@@ -559,7 +596,7 @@ widget.markdown.get_info
 ### 示例
 
 ```lua
-local markdown = widget.markdown.create("test", "./test.md")
+local markdown = widget.markdown.create(40, 15, "Test")
 
 debug.print(table.pretty(widget.markdown.get_info(markdown)))
 ```
@@ -569,29 +606,14 @@ debug.print(table.pretty(widget.markdown.get_info(markdown)))
 ```lua
 {
   id = "markdown_001",
-  width = 20,
-  height = 10,
-  fg = "none",
-  bg = "none",
-  vertical_align = "auto",
-  horizontal_align = "auto",
-  text = "",
-  max_chars = nil,
-  line_mode = "singleline",
-  mouse = false,
-  enter_submit = true,
-  placeholder = "",
-  placeholder_fg = "none",
-  cursor_shape = "█",
-  cursor_bmarkdown = true,
-  bold = false,
-  italic = false,
-  underline = false,
-  strike = false,
-  bmarkdown = false,
-  reverse = false,
-  hidden = false,
-  dim = false
+  width = 40,
+  height = 5,
+  markdown = "Test",
+  allow_overflow = false,
+  wheel_step_vertical = 2,
+  wheel_step_horizontal = 3,
+  scroll_offset_vertical = 0,
+  scroll_offset_horizontal = 0,
 }
 ```
 
@@ -601,22 +623,15 @@ debug.print(table.pretty(widget.markdown.get_info(markdown)))
 
 ```lua
 {
-  id = "markdown_001",          -- string（ Markdown 文档 ID）
-  text = "test",            -- string（链接展示文本）
-  markdown = "./test.md",       -- string（链接目标）
-  fg = "bright_blue",       -- string（前景色）
-  bg = "none",              -- string（背景色）
-  hover_fg = "bright_blue", -- string（指针悬浮前景色）
-  hover_bg = "none",        -- string（指针悬浮背景色）
-  copy = false,             -- boolean（执行后是否复制到剪切板）
-  bold = false,             -- boolean（粗体）
-  italic = false,           -- boolean（斜体）
-  underline = false,        -- boolean（下划线）
-  strike = false,           -- boolean（删除线）
-  bmarkdown = false,            -- boolean（闪烁）
-  reverse = false,          -- boolean（反显）
-  hidden = false,           -- boolean（隐藏）
-  dim = false               -- boolean（暗淡）
+  id = "markdown_001",          -- string（Markdown 文档 ID）
+  width = 40,                   -- integer（Markdown 文档宽度）
+  height = 5,                   -- integer（Markdown 文档高度）
+  markdown = "Test",            -- string（Markdown 文档内容）
+  allow_overflow = false,       -- boolean（是否允许超宽内容保持原行宽并横向滚动）
+  wheel_step_vertical = 2,      -- integer（垂直滚动步长）
+  wheel_step_horizontal = 3,    -- integer（水平滚动步长）
+  scroll_offset_vertical = 0,   -- integer（垂直已滚动距离）
+  scroll_offset_horizontal = 0, -- integer（水平已滚动距离）
 }
 ```
 
@@ -651,7 +666,7 @@ widget.markdown.exists
 ### 示例
 
 ```lua
-local markdown = widget.markdown.create("test", "./test.md")
+local markdown = widget.markdown.create(40, 15, "Test")
 debug.print(widget.markdown.exists(markdown))
 
 widget.markdown.delete(markdown)
